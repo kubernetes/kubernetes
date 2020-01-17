@@ -34,28 +34,21 @@ const (
 	// and GA labels to ensure backward compatibility.
 	// TODO: stop applying the beta Arch labels in Kubernetes 1.18.
 	LabelArch = "beta.kubernetes.io/arch"
-
-	// GA versions of the legacy beta labels.
-	// TODO: update kubelet and controllers to set both beta and GA labels, then export these constants
-	labelZoneFailureDomainGA = "failure-domain.kubernetes.io/zone"
-	labelZoneRegionGA        = "failure-domain.kubernetes.io/region"
-	labelInstanceTypeGA      = "kubernetes.io/instance-type"
 )
 
 var kubeletLabels = sets.NewString(
 	v1.LabelHostname,
+	v1.LabelZoneFailureDomainStable,
+	v1.LabelZoneRegionStable,
 	v1.LabelZoneFailureDomain,
 	v1.LabelZoneRegion,
 	v1.LabelInstanceType,
+	v1.LabelInstanceTypeStable,
 	v1.LabelOSStable,
 	v1.LabelArchStable,
 
 	LabelOS,
 	LabelArch,
-
-	labelZoneFailureDomainGA,
-	labelZoneRegionGA,
-	labelInstanceTypeGA,
 )
 
 var kubeletLabelNamespaces = sets.NewString(

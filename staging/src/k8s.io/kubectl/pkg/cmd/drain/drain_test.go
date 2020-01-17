@@ -17,6 +17,7 @@ limitations under the License.
 package drain
 
 import (
+	"errors"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -159,7 +160,7 @@ func TestCordon(t *testing.T) {
 			defer tf.Cleanup()
 
 			codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
-			ns := scheme.Codecs
+			ns := scheme.Codecs.WithoutConversion()
 
 			newNode := &corev1.Node{}
 			updated := false
@@ -174,9 +175,9 @@ func TestCordon(t *testing.T) {
 					case m.isFor("GET", "/nodes/node2"):
 						fallthrough
 					case m.isFor("GET", "/nodes/node"):
-						return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, test.node)}, nil
+						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, test.node)}, nil
 					case m.isFor("GET", "/nodes/bar"):
-						return &http.Response{StatusCode: 404, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.StringBody("nope")}, nil
+						return &http.Response{StatusCode: http.StatusNotFound, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.StringBody("nope")}, nil
 					case m.isFor("PATCH", "/nodes/node1"):
 						fallthrough
 					case m.isFor("PATCH", "/nodes/node2"):
@@ -202,7 +203,7 @@ func TestCordon(t *testing.T) {
 							t.Fatalf("%s: expected:\n%v\nsaw:\n%v\n", test.description, test.expected.Spec.Unschedulable, newNode.Spec.Unschedulable)
 						}
 						updated = true
-						return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, newNode)}, nil
+						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, newNode)}, nil
 					default:
 						t.Fatalf("%s: unexpected request: %v %#v\n%#v", test.description, req.Method, req.URL, req)
 						return nil, nil
@@ -214,11 +215,12 @@ func TestCordon(t *testing.T) {
 			ioStreams, _, _, _ := genericclioptions.NewTestIOStreams()
 			cmd := test.cmd(tf, ioStreams)
 
+			var recovered interface{}
 			sawFatal := false
 			func() {
 				defer func() {
 					// Recover from the panic below.
-					_ = recover()
+					recovered = recover()
 					// Restore cmdutil behavior
 					cmdutil.DefaultBehaviorOnFatal()
 				}()
@@ -230,19 +232,19 @@ func TestCordon(t *testing.T) {
 				cmd.Execute()
 			}()
 
-			if test.expectFatal {
+			switch {
+			case recovered != nil && !sawFatal:
+				t.Fatalf("got panic: %v", recovered)
+			case test.expectFatal:
 				if !sawFatal {
 					t.Fatalf("%s: unexpected non-error", test.description)
 				}
 				if updated {
 					t.Fatalf("%s: unexpected update", test.description)
 				}
-			}
-
-			if !test.expectFatal && sawFatal {
+			case !test.expectFatal && sawFatal:
 				t.Fatalf("%s: unexpected error", test.description)
-			}
-			if !reflect.DeepEqual(test.expected.Spec, test.node.Spec) && !updated {
+			case !reflect.DeepEqual(test.expected.Spec, test.node.Spec) && !updated:
 				t.Fatalf("%s: node never updated", test.description)
 			}
 		})
@@ -534,16 +536,17 @@ func TestDrain(t *testing.T) {
 	}
 
 	tests := []struct {
-		description   string
-		node          *corev1.Node
-		expected      *corev1.Node
-		pods          []corev1.Pod
-		rcs           []corev1.ReplicationController
-		replicaSets   []appsv1.ReplicaSet
-		args          []string
-		expectWarning string
-		expectFatal   bool
-		expectDelete  bool
+		description                string
+		node                       *corev1.Node
+		expected                   *corev1.Node
+		pods                       []corev1.Pod
+		rcs                        []corev1.ReplicationController
+		replicaSets                []appsv1.ReplicaSet
+		args                       []string
+		failUponEvictionOrDeletion bool
+		expectWarning              string
+		expectFatal                bool
+		expectDelete               bool
 	}{
 		{
 			description:  "RC-managed pod",
@@ -705,6 +708,17 @@ func TestDrain(t *testing.T) {
 			expectFatal:  false,
 			expectDelete: false,
 		},
+		{
+			description:                "fail to list pods",
+			node:                       node,
+			expected:                   cordonedNode,
+			pods:                       []corev1.Pod{rsPod},
+			replicaSets:                []appsv1.ReplicaSet{rs},
+			args:                       []string{"node"},
+			expectFatal:                true,
+			expectDelete:               true,
+			failUponEvictionOrDeletion: true,
+		},
 	}
 
 	testEviction := false
@@ -724,7 +738,7 @@ func TestDrain(t *testing.T) {
 				defer tf.Cleanup()
 
 				codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
-				ns := scheme.Codecs
+				ns := scheme.Codecs.WithoutConversion()
 
 				tf.Client = &fake.RESTClient{
 					GroupVersion:         schema.GroupVersion{Group: "", Version: "v1"},
@@ -763,20 +777,23 @@ func TestDrain(t *testing.T) {
 							}
 							return cmdtesting.GenResponseWithJsonEncodedBody(resourceList)
 						case m.isFor("GET", "/nodes/node"):
-							return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, test.node)}, nil
+							return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, test.node)}, nil
 						case m.isFor("GET", "/namespaces/default/replicationcontrollers/rc"):
-							return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &test.rcs[0])}, nil
+							return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &test.rcs[0])}, nil
 						case m.isFor("GET", "/namespaces/default/daemonsets/ds"):
-							return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &ds)}, nil
+							return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &ds)}, nil
 						case m.isFor("GET", "/namespaces/default/daemonsets/missing-ds"):
-							return &http.Response{StatusCode: 404, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &appsv1.DaemonSet{})}, nil
+							return &http.Response{StatusCode: http.StatusNotFound, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &appsv1.DaemonSet{})}, nil
 						case m.isFor("GET", "/namespaces/default/jobs/job"):
-							return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &job)}, nil
+							return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &job)}, nil
 						case m.isFor("GET", "/namespaces/default/replicasets/rs"):
-							return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &test.replicaSets[0])}, nil
+							return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &test.replicaSets[0])}, nil
 						case m.isFor("GET", "/namespaces/default/pods/bar"):
-							return &http.Response{StatusCode: 404, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &corev1.Pod{})}, nil
+							return &http.Response{StatusCode: http.StatusNotFound, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &corev1.Pod{})}, nil
 						case m.isFor("GET", "/pods"):
+							if test.failUponEvictionOrDeletion && atomic.LoadInt32(&evictions) > 0 || atomic.LoadInt32(&deletions) > 0 {
+								return nil, errors.New("request failed")
+							}
 							values, err := url.ParseQuery(req.URL.RawQuery)
 							if err != nil {
 								t.Fatalf("%s: unexpected error: %v", test.description, err)
@@ -786,9 +803,9 @@ func TestDrain(t *testing.T) {
 							if !reflect.DeepEqual(getParams, values) {
 								t.Fatalf("%s: expected:\n%v\nsaw:\n%v\n", test.description, getParams, values)
 							}
-							return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &corev1.PodList{Items: test.pods})}, nil
+							return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &corev1.PodList{Items: test.pods})}, nil
 						case m.isFor("GET", "/replicationcontrollers"):
-							return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &corev1.ReplicationControllerList{Items: test.rcs})}, nil
+							return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &corev1.ReplicationControllerList{Items: test.rcs})}, nil
 						case m.isFor("PATCH", "/nodes/node"):
 							data, err := ioutil.ReadAll(req.Body)
 							if err != nil {
@@ -809,14 +826,19 @@ func TestDrain(t *testing.T) {
 							if !reflect.DeepEqual(test.expected.Spec, newNode.Spec) {
 								t.Fatalf("%s: expected:\n%v\nsaw:\n%v\n", test.description, test.expected.Spec, newNode.Spec)
 							}
-							return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, newNode)}, nil
+							return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, newNode)}, nil
 						case m.isFor("DELETE", "/namespaces/default/pods/bar"):
 							atomic.AddInt32(&deletions, 1)
-							return &http.Response{StatusCode: 204, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &test.pods[0])}, nil
+							if test.failUponEvictionOrDeletion {
+								return nil, errors.New("request failed")
+							}
+							return &http.Response{StatusCode: http.StatusNoContent, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &test.pods[0])}, nil
 						case m.isFor("POST", "/namespaces/default/pods/bar/eviction"):
-
 							atomic.AddInt32(&evictions, 1)
-							return &http.Response{StatusCode: 201, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &policyv1beta1.Eviction{})}, nil
+							if test.failUponEvictionOrDeletion {
+								return nil, errors.New("request failed")
+							}
+							return &http.Response{StatusCode: http.StatusCreated, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &policyv1beta1.Eviction{})}, nil
 						default:
 							t.Fatalf("%s: unexpected request: %v %#v\n%#v", test.description, req.Method, req.URL, req)
 							return nil, nil
@@ -828,12 +850,13 @@ func TestDrain(t *testing.T) {
 				ioStreams, _, _, errBuf := genericclioptions.NewTestIOStreams()
 				cmd := NewCmdDrain(tf, ioStreams)
 
+				var recovered interface{}
 				sawFatal := false
 				fatalMsg := ""
 				func() {
 					defer func() {
 						// Recover from the panic below.
-						_ = recover()
+						recovered = recover()
 						// Restore cmdutil behavior
 						cmdutil.DefaultBehaviorOnFatal()
 					}()
@@ -841,17 +864,13 @@ func TestDrain(t *testing.T) {
 					cmd.SetArgs(test.args)
 					cmd.Execute()
 				}()
-				if test.expectFatal {
-					if !sawFatal {
-						//t.Logf("outBuf = %s", outBuf.String())
-						//t.Logf("errBuf = %s", errBuf.String())
-						t.Fatalf("%s: unexpected non-error when using %s", test.description, currMethod)
-					}
-				} else {
-					if sawFatal {
-						t.Fatalf("%s: unexpected error when using %s: %s", test.description, currMethod, fatalMsg)
-
-					}
+				switch {
+				case recovered != nil && !sawFatal:
+					t.Fatalf("got panic: %v", recovered)
+				case test.expectDelete && test.expectFatal && !sawFatal:
+					t.Fatalf("%s: unexpected non-error when using %s", test.description, currMethod)
+				case !test.expectFatal && sawFatal:
+					t.Fatalf("%s: unexpected error when using %s: %s", test.description, currMethod, fatalMsg)
 				}
 
 				deleted := deletions > 0
@@ -884,7 +903,7 @@ func TestDrain(t *testing.T) {
 					t.Fatalf("%s: same pod deleted %d times and evicted %d times", test.description, deletions, evictions)
 				}
 
-				if len(test.expectWarning) > 0 {
+				if test.expectDelete && len(test.expectWarning) > 0 {
 					if len(errBuf.String()) == 0 {
 						t.Fatalf("%s: expected warning, but found no stderr output", test.description)
 					}

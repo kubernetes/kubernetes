@@ -36,6 +36,7 @@ type IntegrationTestNodePreparer struct {
 	client          clientset.Interface
 	countToStrategy []testutils.CountToStrategy
 	nodeNamePrefix  string
+	nodeSpec        *v1.Node
 }
 
 // NewIntegrationTestNodePreparer creates an IntegrationTestNodePreparer configured with defaults.
@@ -44,6 +45,15 @@ func NewIntegrationTestNodePreparer(client clientset.Interface, countToStrategy 
 		client:          client,
 		countToStrategy: countToStrategy,
 		nodeNamePrefix:  nodeNamePrefix,
+	}
+}
+
+// NewIntegrationTestNodePreparerWithNodeSpec creates an IntegrationTestNodePreparer configured with nodespec.
+func NewIntegrationTestNodePreparerWithNodeSpec(client clientset.Interface, countToStrategy []testutils.CountToStrategy, nodeSpec *v1.Node) testutils.TestNodePreparer {
+	return &IntegrationTestNodePreparer{
+		client:          client,
+		countToStrategy: countToStrategy,
+		nodeSpec:        nodeSpec,
 	}
 }
 
@@ -71,6 +81,11 @@ func (p *IntegrationTestNodePreparer) PrepareNodes() error {
 			},
 		},
 	}
+
+	if p.nodeSpec != nil {
+		baseNode = p.nodeSpec
+	}
+
 	for i := 0; i < numNodes; i++ {
 		var err error
 		for retry := 0; retry < retries; retry++ {

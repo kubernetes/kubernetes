@@ -58,6 +58,7 @@ go_test(
         "//pkg/apis/apps/install:go_default_library",
         "//pkg/apis/autoscaling:go_default_library",
         "//pkg/apis/autoscaling/install:go_default_library",
+        "//pkg/apis/autoscaling/v2beta2:go_default_library",
         "//pkg/apis/core/install:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/controller/podautoscaler/metrics:go_default_library",
@@ -89,6 +90,7 @@ go_test(
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/github.com/stretchr/testify/require:go_default_library",
         "//vendor/k8s.io/heapster/metrics/api/v1/types:go_default_library",
+        "//vendor/k8s.io/utils/pointer:go_default_library",
     ],
 )
 

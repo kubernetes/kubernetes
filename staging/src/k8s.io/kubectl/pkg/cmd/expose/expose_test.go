@@ -306,7 +306,7 @@ func TestRunExposeService(t *testing.T) {
 					Selector: map[string]string{"app": "go"},
 				},
 			},
-			flags: map[string]string{"filename": "../../../test/data/redis-master-service.yaml", "selector": "func=stream", "protocol": "UDP", "port": "14", "name": "foo", "labels": "svc=test", "dry-run": "true"},
+			flags: map[string]string{"filename": "../../../testdata/redis-master-service.yaml", "selector": "func=stream", "protocol": "UDP", "port": "14", "name": "foo", "labels": "svc=test", "dry-run": "true"},
 			output: &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", Labels: map[string]string{"svc": "test"}},
 				Spec: corev1.ServiceSpec{
@@ -602,7 +602,7 @@ func TestRunExposeService(t *testing.T) {
 			defer tf.Cleanup()
 
 			codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
-			ns := scheme.Codecs
+			ns := scheme.Codecs.WithoutConversion()
 
 			tf.Client = &fake.RESTClient{
 				GroupVersion:         schema.GroupVersion{Version: "v1"},

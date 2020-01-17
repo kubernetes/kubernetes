@@ -30,11 +30,12 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
-	discovery "k8s.io/api/discovery/v1alpha1"
+	discovery "k8s.io/api/discovery/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/proxy"
+	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
 	utilproxytest "k8s.io/kubernetes/pkg/proxy/util/testing"
 	"k8s.io/kubernetes/pkg/util/async"
@@ -245,7 +246,7 @@ func TestDeleteEndpointConnections(t *testing.T) {
 			} else {
 				simErr = fmt.Errorf(tc.simulatedErr)
 			}
-			cmdFunc := func() ([]byte, error) { return []byte(cmdOutput), simErr }
+			cmdFunc := func() ([]byte, []byte, error) { return []byte(cmdOutput), nil, simErr }
 			fcmd.CombinedOutputScript = append(fcmd.CombinedOutputScript, cmdFunc)
 			fexec.CommandScript = append(fexec.CommandScript, execFunc)
 		}
@@ -295,10 +296,7 @@ func TestDeleteEndpointConnections(t *testing.T) {
 		if tc.protocol == UDP {
 			isIPv6 := func(ip string) bool {
 				netIP := net.ParseIP(ip)
-				if netIP.To4() == nil {
-					return true
-				}
-				return false
+				return netIP.To4() == nil
 			}
 			endpointIP := utilproxy.IPPart(tc.endpoint)
 			expectCommand := fmt.Sprintf("conntrack -D --orig-dst %s --dst-nat %s -p udp", tc.svcIP, endpointIP)
@@ -342,28 +340,6 @@ func (f *fakePortOpener) OpenLocalPort(lp *utilproxy.LocalPort) (utilproxy.Close
 	return nil, nil
 }
 
-type fakeHealthChecker struct {
-	services  map[types.NamespacedName]uint16
-	endpoints map[types.NamespacedName]int
-}
-
-func newFakeHealthChecker() *fakeHealthChecker {
-	return &fakeHealthChecker{
-		services:  map[types.NamespacedName]uint16{},
-		endpoints: map[types.NamespacedName]int{},
-	}
-}
-
-func (fake *fakeHealthChecker) SyncServices(newServices map[types.NamespacedName]uint16) error {
-	fake.services = newServices
-	return nil
-}
-
-func (fake *fakeHealthChecker) SyncEndpoints(newEndpoints map[types.NamespacedName]int) error {
-	fake.endpoints = newEndpoints
-	return nil
-}
-
 const testHostname = "test-hostname"
 
 func NewFakeProxier(ipt utiliptables.Interface, endpointSlicesEnabled bool) *Proxier {
@@ -380,7 +356,7 @@ func NewFakeProxier(ipt utiliptables.Interface, endpointSlicesEnabled bool) *Pro
 		hostname:                 testHostname,
 		portsMap:                 make(map[utilproxy.LocalPort]utilproxy.Closeable),
 		portMapper:               &fakePortOpener{[]*utilproxy.LocalPort{}},
-		healthChecker:            newFakeHealthChecker(),
+		serviceHealthServer:      healthcheck.NewFakeServiceHealthServer(),
 		precomputedProbabilities: make([]string, 0, 1001),
 		iptablesData:             bytes.NewBuffer(nil),
 		existingFilterChainsData: bytes.NewBuffer(nil),
@@ -2382,15 +2358,15 @@ COMMIT
 -A KUBE-MARK-MASQ -j MARK --set-xmark 
 -A KUBE-SERVICES -m comment --comment "ns1/svc1: cluster IP" -m tcp -p tcp -d 172.20.1.1/32 --dport 0 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
 -A KUBE-SERVICES -m comment --comment "ns1/svc1: cluster IP" -m tcp -p tcp -d 172.20.1.1/32 --dport 0 -j KUBE-SVC-AHZNAGK3SCETOS2T
--A KUBE-SVC-AHZNAGK3SCETOS2T -m statistic --mode random --probability 0.3333333333 -j KUBE-SEP-PXD6POUVGD2I37UY
--A KUBE-SEP-PXD6POUVGD2I37UY -s 10.0.1.1/32 -j KUBE-MARK-MASQ
--A KUBE-SEP-PXD6POUVGD2I37UY -m tcp -p tcp -j DNAT --to-destination 10.0.1.1:80
--A KUBE-SVC-AHZNAGK3SCETOS2T -m statistic --mode random --probability 0.5000000000 -j KUBE-SEP-SOKZUIT7SCEVIP33
--A KUBE-SEP-SOKZUIT7SCEVIP33 -s 10.0.1.2/32 -j KUBE-MARK-MASQ
--A KUBE-SEP-SOKZUIT7SCEVIP33 -m tcp -p tcp -j DNAT --to-destination 10.0.1.2:80
--A KUBE-SVC-AHZNAGK3SCETOS2T -j KUBE-SEP-WVE3FAB34S7NZGDJ
--A KUBE-SEP-WVE3FAB34S7NZGDJ -s 10.0.1.3/32 -j KUBE-MARK-MASQ
--A KUBE-SEP-WVE3FAB34S7NZGDJ -m tcp -p tcp -j DNAT --to-destination 10.0.1.3:80
+-A KUBE-SVC-AHZNAGK3SCETOS2T -m comment --comment ns1/svc1: -m statistic --mode random --probability 0.3333333333 -j KUBE-SEP-PXD6POUVGD2I37UY
+-A KUBE-SEP-PXD6POUVGD2I37UY -m comment --comment ns1/svc1: -s 10.0.1.1/32 -j KUBE-MARK-MASQ
+-A KUBE-SEP-PXD6POUVGD2I37UY -m comment --comment ns1/svc1: -m tcp -p tcp -j DNAT --to-destination 10.0.1.1:80
+-A KUBE-SVC-AHZNAGK3SCETOS2T -m comment --comment ns1/svc1: -m statistic --mode random --probability 0.5000000000 -j KUBE-SEP-SOKZUIT7SCEVIP33
+-A KUBE-SEP-SOKZUIT7SCEVIP33 -m comment --comment ns1/svc1: -s 10.0.1.2/32 -j KUBE-MARK-MASQ
+-A KUBE-SEP-SOKZUIT7SCEVIP33 -m comment --comment ns1/svc1: -m tcp -p tcp -j DNAT --to-destination 10.0.1.2:80
+-A KUBE-SVC-AHZNAGK3SCETOS2T -m comment --comment ns1/svc1: -j KUBE-SEP-WVE3FAB34S7NZGDJ
+-A KUBE-SEP-WVE3FAB34S7NZGDJ -m comment --comment ns1/svc1: -s 10.0.1.3/32 -j KUBE-MARK-MASQ
+-A KUBE-SEP-WVE3FAB34S7NZGDJ -m comment --comment ns1/svc1: -m tcp -p tcp -j DNAT --to-destination 10.0.1.3:80
 -A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
 COMMIT
 `
@@ -2413,7 +2389,6 @@ COMMIT
 		},
 	})
 
-	ipAddressType := discovery.AddressTypeIP
 	tcpProtocol := v1.ProtocolTCP
 	endpointSlice := &discovery.EndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{
@@ -2426,7 +2401,7 @@ COMMIT
 			Port:     utilpointer.Int32Ptr(80),
 			Protocol: &tcpProtocol,
 		}},
-		AddressType: &ipAddressType,
+		AddressType: discovery.AddressTypeIPv4,
 		Endpoints: []discovery.Endpoint{{
 			Addresses:  []string{"10.0.1.1"},
 			Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},

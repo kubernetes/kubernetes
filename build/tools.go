@@ -37,5 +37,5 @@ import (
 	_ "k8s.io/gengo/examples/import-boss/generators"
 	_ "k8s.io/gengo/examples/set-gen/generators"
 	_ "k8s.io/kube-openapi/cmd/openapi-gen"
-	_ "k8s.io/repo-infra/kazel"
+	_ "k8s.io/repo-infra/cmd/kazel"
 )

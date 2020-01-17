@@ -51,12 +51,12 @@ func (f *buildManagerInfoManager) Update(liveObj, newObj runtime.Object, managed
 }
 
 // Apply implements Manager.
-func (f *buildManagerInfoManager) Apply(liveObj runtime.Object, patch []byte, managed Managed, manager string, force bool) (runtime.Object, Managed, error) {
+func (f *buildManagerInfoManager) Apply(liveObj, appliedObj runtime.Object, managed Managed, manager string, force bool) (runtime.Object, Managed, error) {
 	manager, err := f.buildManagerInfo(manager, metav1.ManagedFieldsOperationApply)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to build manager identifier: %v", err)
 	}
-	return f.fieldManager.Apply(liveObj, patch, managed, manager, force)
+	return f.fieldManager.Apply(liveObj, appliedObj, managed, manager, force)
 }
 
 func (f *buildManagerInfoManager) buildManagerInfo(prefix string, operation metav1.ManagedFieldsOperationType) (string, error) {

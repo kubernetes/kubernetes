@@ -19,6 +19,7 @@ limitations under the License.
 package scheduler
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -36,6 +37,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/klog"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/scheduler"
@@ -44,10 +46,6 @@ import (
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	"k8s.io/kubernetes/plugin/pkg/admission/priority"
 	testutils "k8s.io/kubernetes/test/utils"
-
-	_ "k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
-
-	"k8s.io/klog"
 )
 
 var lowPriority, mediumPriority, highPriority = int32(100), int32(200), int32(300)
@@ -84,7 +82,7 @@ func (fp *tokenFilter) Name() string {
 	return tokenFilterName
 }
 
-func (fp *tokenFilter) Filter(state *framework.CycleState, pod *v1.Pod,
+func (fp *tokenFilter) Filter(ctx context.Context, state *framework.CycleState, pod *v1.Pod,
 	nodeInfo *schedulernodeinfo.NodeInfo) *framework.Status {
 	if fp.Tokens > 0 {
 		fp.Tokens--
@@ -97,17 +95,17 @@ func (fp *tokenFilter) Filter(state *framework.CycleState, pod *v1.Pod,
 	return framework.NewStatus(status, fmt.Sprintf("can't fit %v", pod.Name))
 }
 
-func (fp *tokenFilter) PreFilter(state *framework.CycleState, pod *v1.Pod) *framework.Status {
+func (fp *tokenFilter) PreFilter(ctx context.Context, state *framework.CycleState, pod *v1.Pod) *framework.Status {
 	return nil
 }
 
-func (fp *tokenFilter) AddPod(state *framework.CycleState, podToSchedule *v1.Pod,
+func (fp *tokenFilter) AddPod(ctx context.Context, state *framework.CycleState, podToSchedule *v1.Pod,
 	podToAdd *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *framework.Status {
 	fp.Tokens--
 	return nil
 }
 
-func (fp *tokenFilter) RemovePod(state *framework.CycleState, podToSchedule *v1.Pod,
+func (fp *tokenFilter) RemovePod(ctx context.Context, state *framework.CycleState, podToSchedule *v1.Pod,
 	podToRemove *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *framework.Status {
 	fp.Tokens++
 	return nil
@@ -117,16 +115,19 @@ func (fp *tokenFilter) PreFilterExtensions() framework.PreFilterExtensions {
 	return fp
 }
 
-var _ = framework.FilterPlugin(&tokenFilter{})
+var _ framework.FilterPlugin = &tokenFilter{}
 
 // TestPreemption tests a few preemption scenarios.
 func TestPreemption(t *testing.T) {
 	// Initialize scheduler with a filter plugin.
 	var filter tokenFilter
 	registry := make(framework.Registry)
-	registry.Register(filterPluginName, func(_ *runtime.Unknown, fh framework.FrameworkHandle) (framework.Plugin, error) {
+	err := registry.Register(filterPluginName, func(_ *runtime.Unknown, fh framework.FrameworkHandle) (framework.Plugin, error) {
 		return &filter, nil
 	})
+	if err != nil {
+		t.Fatalf("Error registering a filter: %v", err)
+	}
 	plugins := &schedulerconfig.Plugins{
 		Filter: &schedulerconfig.PluginSet{
 			Enabled: []schedulerconfig.Plugin{
@@ -391,6 +392,7 @@ func TestPreemption(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		t.Logf("================ Running test: %v\n", test.description)
 		filter.Tokens = test.initTokens
 		filter.Unresolvable = test.unresolvable
 		pods := make([]*v1.Pod, len(test.existingPods))
@@ -526,8 +528,8 @@ func TestPodPriorityResolution(t *testing.T) {
 	externalInformers := informers.NewSharedInformerFactory(externalClientset, time.Second)
 	admission.SetExternalKubeClientSet(externalClientset)
 	admission.SetExternalKubeInformerFactory(externalInformers)
-	externalInformers.Start(context.stopCh)
-	externalInformers.WaitForCacheSync(context.stopCh)
+	externalInformers.Start(context.ctx.Done())
+	externalInformers.WaitForCacheSync(context.ctx.Done())
 
 	tests := []struct {
 		Name             string
@@ -582,6 +584,7 @@ func TestPodPriorityResolution(t *testing.T) {
 
 	pods := make([]*v1.Pod, 0, len(tests))
 	for _, test := range tests {
+		t.Logf("================ Running test: %v\n", test.Name)
 		t.Run(test.Name, func(t *testing.T) {
 			pod, err := runPausePod(cs, test.Pod)
 			if err != nil {

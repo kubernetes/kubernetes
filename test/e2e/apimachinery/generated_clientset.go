@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 
 	"github.com/onsi/ginkgo"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -67,7 +68,7 @@ func testingPod(name, value string) v1.Pod {
 
 func observeCreation(w watch.Interface) {
 	select {
-	case event, _ := <-w.ResultChan():
+	case event := <-w.ResultChan():
 		if event.Type != watch.Added {
 			framework.Failf("Failed to observe the creation: %v", event)
 		}
@@ -82,7 +83,7 @@ func observerUpdate(w watch.Interface, expectedUpdate func(runtime.Object) bool)
 	timeout := false
 	for !updated && !timeout {
 		select {
-		case event, _ := <-w.ResultChan():
+		case event := <-w.ResultChan():
 			if event.Type == watch.Modified {
 				if expectedUpdate(event.Object) {
 					updated = true
@@ -95,7 +96,6 @@ func observerUpdate(w watch.Interface, expectedUpdate func(runtime.Object) bool)
 	if !updated {
 		framework.Failf("Failed to observe pod update")
 	}
-	return
 }
 
 var _ = SIGDescribe("Generated clientset", func() {
@@ -214,7 +214,7 @@ var _ = SIGDescribe("Generated clientset", func() {
 	f := framework.NewDefaultFramework("clientset")
 
 	ginkgo.BeforeEach(func() {
-		framework.SkipIfMissingResource(f.DynamicClient, CronJobGroupVersionResource, f.Namespace.Name)
+		e2eskipper.SkipIfMissingResource(f.DynamicClient, CronJobGroupVersionResource, f.Namespace.Name)
 	})
 
 	ginkgo.It("should create v1beta1 cronJobs, delete cronJobs, watch cronJobs", func() {

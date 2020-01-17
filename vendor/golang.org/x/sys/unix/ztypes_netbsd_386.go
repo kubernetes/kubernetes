@@ -57,23 +57,23 @@ type Rlimit struct {
 type _Gid_t uint32
 
 type Stat_t struct {
-	Dev           uint64
-	Mode          uint32
-	Ino           uint64
-	Nlink         uint32
-	Uid           uint32
-	Gid           uint32
-	Rdev          uint64
-	Atimespec     Timespec
-	Mtimespec     Timespec
-	Ctimespec     Timespec
-	Birthtimespec Timespec
-	Size          int64
-	Blocks        int64
-	Blksize       uint32
-	Flags         uint32
-	Gen           uint32
-	Spare         [2]uint32
+	Dev     uint64
+	Mode    uint32
+	Ino     uint64
+	Nlink   uint32
+	Uid     uint32
+	Gid     uint32
+	Rdev    uint64
+	Atim    Timespec
+	Mtim    Timespec
+	Ctim    Timespec
+	Btim    Timespec
+	Size    int64
+	Blocks  int64
+	Blksize uint32
+	Flags   uint32
+	Gen     uint32
+	Spare   [2]uint32
 }
 
 type Statfs_t [0]byte
@@ -411,6 +411,7 @@ type Ptmget struct {
 
 const (
 	AT_FDCWD            = -0x64
+	AT_SYMLINK_FOLLOW   = 0x400
 	AT_SYMLINK_NOFOLLOW = 0x200
 )
 

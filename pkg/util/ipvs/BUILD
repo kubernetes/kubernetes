@@ -16,6 +16,9 @@ go_test(
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/util/version:go_default_library",
     ] + select({
+        "@io_bazel_rules_go//go/platform:android": [
+            "//vendor/github.com/docker/libnetwork/ipvs:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:linux": [
             "//vendor/github.com/docker/libnetwork/ipvs:go_default_library",
         ],
@@ -36,6 +39,8 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/util/version:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:android": [
+            "//vendor/github.com/docker/libnetwork/ipvs:go_default_library",
+            "//vendor/k8s.io/klog:go_default_library",
             "//vendor/k8s.io/utils/exec:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:darwin": [
@@ -45,6 +50,9 @@ go_library(
             "//vendor/k8s.io/utils/exec:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:freebsd": [
+            "//vendor/k8s.io/utils/exec:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:ios": [
             "//vendor/k8s.io/utils/exec:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:linux": [

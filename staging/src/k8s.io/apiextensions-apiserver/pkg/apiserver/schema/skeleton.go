@@ -49,3 +49,17 @@ func (s *Structural) StripValueValidations() *Structural {
 	v.Visit(s)
 	return s
 }
+
+// StripNullable returns a copy without nullable.
+func (s *Structural) StripNullable() *Structural {
+	s = s.DeepCopy()
+	v := Visitor{
+		Structural: func(s *Structural) bool {
+			changed := s.Nullable
+			s.Nullable = false
+			return changed
+		},
+	}
+	v.Visit(s)
+	return s
+}

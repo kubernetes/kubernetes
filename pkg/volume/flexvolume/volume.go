@@ -17,10 +17,11 @@ limitations under the License.
 package flexvolume
 
 import (
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/util/mount"
-	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/utils/mount"
 	utilstrings "k8s.io/utils/strings"
+
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/kubernetes/pkg/volume"
 )
 
 type flexVolume struct {

@@ -33,7 +33,7 @@ import (
 )
 
 func TestGetVolumeName_Volume(t *testing.T) {
-	plugin := newPlugin()
+	plugin := newPlugin(t)
 	name := aws.KubernetesVolumeID("my-aws-volume")
 	spec := createVolSpec(name, false)
 
@@ -47,7 +47,7 @@ func TestGetVolumeName_Volume(t *testing.T) {
 }
 
 func TestGetVolumeName_PersistentVolume(t *testing.T) {
-	plugin := newPlugin()
+	plugin := newPlugin(t)
 	name := aws.KubernetesVolumeID("my-aws-pv")
 	spec := createPVSpec(name, true)
 
@@ -142,8 +142,8 @@ func TestAttachDetach(t *testing.T) {
 
 // newPlugin creates a new gcePersistentDiskPlugin with fake cloud, NewAttacher
 // and NewDetacher won't work.
-func newPlugin() *awsElasticBlockStorePlugin {
-	host := volumetest.NewFakeVolumeHost("/tmp", nil, nil)
+func newPlugin(t *testing.T) *awsElasticBlockStorePlugin {
+	host := volumetest.NewFakeVolumeHost(t, "/tmp", nil, nil)
 	plugins := ProbeVolumePlugins()
 	plugin := plugins[0]
 	plugin.Init(host)

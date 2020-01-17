@@ -23,7 +23,7 @@ See the [documentation][doc] for a complete API specification.
 ## Development Status
 Stable.
 
-___
+<hr>
 Released under the [MIT License](LICENSE.txt).
 
 [doc-img]: https://godoc.org/github.com/uber-go/atomic?status.svg

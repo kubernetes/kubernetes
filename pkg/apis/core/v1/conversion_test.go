@@ -25,7 +25,7 @@ import (
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -40,8 +40,10 @@ import (
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	utilpointer "k8s.io/utils/pointer"
 
-	// enforce that all types are installed
-	_ "k8s.io/kubernetes/pkg/api/testapi"
+	// ensure types are installed
+	_ "k8s.io/kubernetes/pkg/apis/core/install"
+	// ensure types are installed corereplicationcontroller<->replicaset conversions
+	_ "k8s.io/kubernetes/pkg/apis/apps/install"
 )
 
 func TestPodLogOptions(t *testing.T) {
@@ -338,13 +340,7 @@ func roundTripRS(t *testing.T, rs *apps.ReplicaSet) *apps.ReplicaSet {
 		t.Errorf("%v\nData: %s\nSource: %#v", err, string(data), rs)
 		return nil
 	}
-	obj3 := &apps.ReplicaSet{}
-	err = legacyscheme.Scheme.Convert(obj2, obj3, nil)
-	if err != nil {
-		t.Errorf("%v\nSource: %#v", err, obj2)
-		return nil
-	}
-	return obj3
+	return obj2.(*apps.ReplicaSet)
 }
 
 func Test_core_PodStatus_to_v1_PodStatus(t *testing.T) {

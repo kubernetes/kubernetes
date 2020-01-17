@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/instrumentation/monitoring"
 
 	"github.com/onsi/ginkgo"
@@ -45,7 +46,7 @@ const (
 
 var _ = SIGDescribe("[HPA] Horizontal pod autoscaling (scale resource: Custom Metrics from Stackdriver)", func() {
 	ginkgo.BeforeEach(func() {
-		framework.SkipUnlessProviderIs("gce", "gke")
+		e2eskipper.SkipUnlessProviderIs("gce", "gke")
 	})
 
 	f := framework.NewDefaultFramework("horizontal-pod-autoscaling")
@@ -258,11 +259,11 @@ func (tc *CustomMetricTestCase) Run() {
 	}
 	defer monitoring.CleanupDescriptors(gcmService, projectID)
 
-	err = monitoring.CreateAdapter(monitoring.AdapterDefault)
+	err = monitoring.CreateAdapter(tc.framework.Namespace.ObjectMeta.Name, monitoring.AdapterDefault)
 	if err != nil {
 		framework.Failf("Failed to set up: %v", err)
 	}
-	defer monitoring.CleanupAdapter(monitoring.AdapterDefault)
+	defer monitoring.CleanupAdapter(tc.framework.Namespace.ObjectMeta.Name, monitoring.AdapterDefault)
 
 	// Run application that exports the metric
 	err = createDeploymentToScale(tc.framework, tc.kubeClient, tc.deployment, tc.pod)

@@ -33,6 +33,10 @@ import (
 // TODO(jennybuckley): Determine if this is really the best value. Ideally we wouldn't unnecessarily merge too many entries.
 const DefaultMaxUpdateManagers int = 10
 
+// DefaultTrackOnCreateProbability defines the default probability that the field management of an object
+// starts being tracked from the object's creation, instead of from the first time the object is applied to.
+const DefaultTrackOnCreateProbability float32 = 0.0
+
 // Managed groups a fieldpath.ManagedFields together with the timestamps associated with each operation.
 type Managed interface {
 	// Fields gets the fieldpath.ManagedFields.
@@ -51,7 +55,7 @@ type Manager interface {
 
 	// Apply is used when server-side apply is called, as it merges the
 	// object and updates the managed fields.
-	Apply(liveObj runtime.Object, patch []byte, managed Managed, fieldManager string, force bool) (runtime.Object, Managed, error)
+	Apply(liveObj, appliedObj runtime.Object, managed Managed, fieldManager string, force bool) (runtime.Object, Managed, error)
 }
 
 // FieldManager updates the managed fields and merge applied
@@ -92,7 +96,7 @@ func newDefaultFieldManager(f Manager, objectCreater runtime.ObjectCreater, kind
 	f = NewStripMetaManager(f)
 	f = NewBuildManagerInfoManager(f, kind.GroupVersion())
 	f = NewCapManagersManager(f, DefaultMaxUpdateManagers)
-	f = NewSkipNonAppliedManager(f, objectCreater, kind)
+	f = NewProbabilisticSkipNonAppliedManager(f, objectCreater, kind, DefaultTrackOnCreateProbability)
 	return NewFieldManager(f)
 }
 
@@ -135,7 +139,7 @@ func (f *FieldManager) Update(liveObj, newObj runtime.Object, manager string) (o
 
 // Apply is used when server-side apply is called, as it merges the
 // object and updates the managed fields.
-func (f *FieldManager) Apply(liveObj runtime.Object, patch []byte, manager string, force bool) (object runtime.Object, err error) {
+func (f *FieldManager) Apply(liveObj, appliedObj runtime.Object, manager string, force bool) (object runtime.Object, err error) {
 	// If the object doesn't have metadata, apply isn't allowed.
 	if _, err = meta.Accessor(liveObj); err != nil {
 		return nil, fmt.Errorf("couldn't get accessor: %v", err)
@@ -149,7 +153,7 @@ func (f *FieldManager) Apply(liveObj runtime.Object, patch []byte, manager strin
 
 	internal.RemoveObjectManagedFields(liveObj)
 
-	if object, managed, err = f.fieldManager.Apply(liveObj, patch, managed, manager, force); err != nil {
+	if object, managed, err = f.fieldManager.Apply(liveObj, appliedObj, managed, manager, force); err != nil {
 		return nil, err
 	}
 

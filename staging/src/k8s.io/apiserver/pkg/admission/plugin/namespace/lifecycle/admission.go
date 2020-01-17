@@ -170,8 +170,15 @@ func (l *Lifecycle) Admit(ctx context.Context, a admission.Attributes, o admissi
 			return nil
 		}
 
-		// TODO: This should probably not be a 403
-		return admission.NewForbidden(a, fmt.Errorf("unable to create new content in namespace %s because it is being terminated", a.GetNamespace()))
+		err := admission.NewForbidden(a, fmt.Errorf("unable to create new content in namespace %s because it is being terminated", a.GetNamespace()))
+		if apierr, ok := err.(*errors.StatusError); ok {
+			apierr.ErrStatus.Details.Causes = append(apierr.ErrStatus.Details.Causes, metav1.StatusCause{
+				Type:    v1.NamespaceTerminatingCause,
+				Message: fmt.Sprintf("namespace %s is being terminated", a.GetNamespace()),
+				Field:   "metadata.namespace",
+			})
+		}
+		return err
 	}
 
 	return nil

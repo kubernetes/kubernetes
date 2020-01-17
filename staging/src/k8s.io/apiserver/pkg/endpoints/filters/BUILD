@@ -33,7 +33,7 @@ go_test(
         "//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authorization/authorizer:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/endpoints/request:go_default_library",
-        "//vendor/github.com/pborman/uuid:go_default_library",
+        "//vendor/github.com/google/uuid:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
     ],
 )

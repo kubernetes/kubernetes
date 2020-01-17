@@ -24,9 +24,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/coreos/etcd/clientv3"
+	"go.etcd.io/etcd/clientv3"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -51,13 +51,6 @@ const testNamespace = "etcdstoragepathtestnamespace"
 // it essentially means that you will be break old clusters unless you create some migration path for the old data.
 func TestEtcdStoragePath(t *testing.T) {
 	master := StartRealMasterOrDie(t, func(opts *options.ServerRunOptions) {
-		// force enable all resources so we can check storage.
-		// TODO: drop these once we stop allowing them to be served.
-		opts.APIEnablement.RuntimeConfig["extensions/v1beta1/deployments"] = "true"
-		opts.APIEnablement.RuntimeConfig["extensions/v1beta1/daemonsets"] = "true"
-		opts.APIEnablement.RuntimeConfig["extensions/v1beta1/replicasets"] = "true"
-		opts.APIEnablement.RuntimeConfig["extensions/v1beta1/podsecuritypolicies"] = "true"
-		opts.APIEnablement.RuntimeConfig["extensions/v1beta1/networkpolicies"] = "true"
 	})
 	defer master.Cleanup()
 	defer dumpEtcdKVOnFailure(t, master.KV)

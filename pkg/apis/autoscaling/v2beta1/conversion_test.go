@@ -30,7 +30,7 @@ import (
 // TODO(yue9944882): Test nil/empty conversion across all resource types
 func TestNilOrEmptyConversion(t *testing.T) {
 	scheme := runtime.NewScheme()
-	assert.NoError(t, addConversionFuncs(scheme))
+	assert.NoError(t, RegisterConversions(scheme))
 
 	testCases := []struct {
 		obj1 interface{}

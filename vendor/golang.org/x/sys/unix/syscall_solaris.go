@@ -35,6 +35,22 @@ type SockaddrDatalink struct {
 	raw    RawSockaddrDatalink
 }
 
+func direntIno(buf []byte) (uint64, bool) {
+	return readInt(buf, unsafe.Offsetof(Dirent{}.Ino), unsafe.Sizeof(Dirent{}.Ino))
+}
+
+func direntReclen(buf []byte) (uint64, bool) {
+	return readInt(buf, unsafe.Offsetof(Dirent{}.Reclen), unsafe.Sizeof(Dirent{}.Reclen))
+}
+
+func direntNamlen(buf []byte) (uint64, bool) {
+	reclen, ok := direntReclen(buf)
+	if !ok {
+		return 0, false
+	}
+	return reclen - uint64(unsafe.Offsetof(Dirent{}.Name)), true
+}
+
 //sysnb	pipe(p *[2]_C_int) (n int, err error)
 
 func Pipe(p []int) (err error) {
@@ -189,6 +205,7 @@ func Setgroups(gids []int) (err error) {
 	return setgroups(len(a), &a[0])
 }
 
+// ReadDirent reads directory entries from fd and writes them into buf.
 func ReadDirent(fd int, buf []byte) (n int, err error) {
 	// Final argument is (basep *uintptr) and the syscall doesn't take nil.
 	// TODO(rsc): Can we use a single global basep for all calls?

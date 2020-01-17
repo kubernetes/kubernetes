@@ -25,6 +25,8 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/test/e2e/apps"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -42,10 +44,10 @@ var _ = SIGDescribe("Etcd failure [Disruptive]", func() {
 		// - master access
 		// ... so the provider check should be identical to the intersection of
 		// providers that provide those capabilities.
-		framework.SkipUnlessProviderIs("gce")
-		framework.SkipUnlessSSHKeyPresent()
+		e2eskipper.SkipUnlessProviderIs("gce")
+		e2eskipper.SkipUnlessSSHKeyPresent()
 
-		err := framework.RunRC(testutils.RCConfig{
+		err := e2erc.RunRC(testutils.RCConfig{
 			Client:    f.ClientSet,
 			Name:      "baz",
 			Namespace: f.Namespace.Name,

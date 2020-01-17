@@ -19,6 +19,7 @@ package common
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -123,11 +124,11 @@ var _ = framework.KubeDescribe("Security Context", func() {
 			// creates a pod with RunAsUser, which is not supported on Windows.
 			framework.SkipIfNodeOSDistroIs("windows")
 			name := "explicit-nonroot-uid"
-			pod := makeNonRootPod(name, rootImage, pointer.Int64Ptr(1234))
-			pod = podClient.Create(pod)
+			pod := makeNonRootPod(name, rootImage, pointer.Int64Ptr(nonRootTestUserID))
+			podClient.Create(pod)
 
 			podClient.WaitForSuccess(name, framework.PodStartTimeout)
-			framework.ExpectNoError(podClient.MatchContainerOutput(name, name, "1234"))
+			framework.ExpectNoError(podClient.MatchContainerOutput(name, name, "1000"))
 		})
 		ginkgo.It("should not run with an explicit root user ID [LinuxOnly]", func() {
 			// creates a pod with RunAsUser, which is not supported on Windows.
@@ -144,7 +145,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 		ginkgo.It("should run with an image specified user ID", func() {
 			name := "implicit-nonroot-uid"
 			pod := makeNonRootPod(name, nonRootImage, nil)
-			pod = podClient.Create(pod)
+			podClient.Create(pod)
 
 			podClient.WaitForSuccess(name, framework.PodStartTimeout)
 			framework.ExpectNoError(podClient.MatchContainerOutput(name, name, "1234"))
@@ -191,7 +192,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 			))
 
 			if readOnlyRootFilesystem {
-				podClient.WaitForFailure(podName, framework.PodStartTimeout)
+				waitForFailure(f, podName, framework.PodStartTimeout)
 			} else {
 				podClient.WaitForSuccess(podName, framework.PodStartTimeout)
 			}
@@ -327,7 +328,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 		*/
 		ginkgo.It("should allow privilege escalation when not explicitly set and uid != 0 [LinuxOnly] [NodeConformance]", func() {
 			podName := "alpine-nnp-nil-" + string(uuid.NewUUID())
-			if err := createAndMatchOutput(podName, "Effective uid: 0", nil, 1000); err != nil {
+			if err := createAndMatchOutput(podName, "Effective uid: 0", nil, nonRootTestUserID); err != nil {
 				framework.Failf("Match output for pod %q failed: %v", podName, err)
 			}
 		})
@@ -343,7 +344,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 		framework.ConformanceIt("should not allow privilege escalation when false [LinuxOnly] [NodeConformance]", func() {
 			podName := "alpine-nnp-false-" + string(uuid.NewUUID())
 			apeFalse := false
-			if err := createAndMatchOutput(podName, "Effective uid: 1000", &apeFalse, 1000); err != nil {
+			if err := createAndMatchOutput(podName, fmt.Sprintf("Effective uid: %d", nonRootTestUserID), &apeFalse, nonRootTestUserID); err != nil {
 				framework.Failf("Match output for pod %q failed: %v", podName, err)
 			}
 		})
@@ -360,9 +361,25 @@ var _ = framework.KubeDescribe("Security Context", func() {
 		ginkgo.It("should allow privilege escalation when true [LinuxOnly] [NodeConformance]", func() {
 			podName := "alpine-nnp-true-" + string(uuid.NewUUID())
 			apeTrue := true
-			if err := createAndMatchOutput(podName, "Effective uid: 0", &apeTrue, 1000); err != nil {
+			if err := createAndMatchOutput(podName, "Effective uid: 0", &apeTrue, nonRootTestUserID); err != nil {
 				framework.Failf("Match output for pod %q failed: %v", podName, err)
 			}
 		})
 	})
 })
+
+// waitForFailure waits for pod to fail.
+func waitForFailure(f *framework.Framework, name string, timeout time.Duration) {
+	gomega.Expect(e2epod.WaitForPodCondition(f.ClientSet, f.Namespace.Name, name, "success or failure", timeout,
+		func(pod *v1.Pod) (bool, error) {
+			switch pod.Status.Phase {
+			case v1.PodFailed:
+				return true, nil
+			case v1.PodSucceeded:
+				return true, fmt.Errorf("pod %q successed with reason: %q, message: %q", name, pod.Status.Reason, pod.Status.Message)
+			default:
+				return false, nil
+			}
+		},
+	)).To(gomega.Succeed(), "wait for pod %q to fail", name)
+}

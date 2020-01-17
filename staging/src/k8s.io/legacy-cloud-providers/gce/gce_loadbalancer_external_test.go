@@ -38,6 +38,10 @@ import (
 	utilnet "k8s.io/utils/net"
 )
 
+const (
+	eventMsgFirewallChange = "Firewall change required by security admin"
+)
+
 func TestEnsureStaticIP(t *testing.T) {
 	t.Parallel()
 
@@ -55,6 +59,13 @@ func TestEnsureStaticIP(t *testing.T) {
 
 	// Second ensure call
 	var ipPrime string
+	ipPrime, existed, err = ensureStaticIP(gce, ipName, serviceName, gce.region, ip, cloud.NetworkTierDefault)
+	if err != nil || !existed || ip != ipPrime {
+		t.Fatalf(`ensureStaticIP(%v, %v, %v, %v, %v) = %v, %v, %v; want %v, true, nil`, gce, ipName, serviceName, gce.region, ip, ipPrime, existed, err, ip)
+	}
+
+	// Ensure call with different name
+	ipName = "another-name-for-static-ip"
 	ipPrime, existed, err = ensureStaticIP(gce, ipName, serviceName, gce.region, ip, cloud.NetworkTierDefault)
 	if err != nil || !existed || ip != ipPrime {
 		t.Fatalf(`ensureStaticIP(%v, %v, %v, %v, %v) = %v, %v, %v; want %v, true, nil`, gce, ipName, serviceName, gce.region, ip, ipPrime, existed, err, ip)

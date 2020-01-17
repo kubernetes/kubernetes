@@ -257,6 +257,9 @@ func (m *cgroupManagerImpl) Exists(name CgroupName) bool {
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.SupportPodPidsLimit) || utilfeature.DefaultFeatureGate.Enabled(kubefeatures.SupportNodePidsLimit) {
 		whitelistControllers.Insert("pids")
 	}
+	if _, ok := m.subsystems.MountPoints["hugetlb"]; ok {
+		whitelistControllers.Insert("hugetlb")
+	}
 	var missingPaths []string
 	// If even one cgroup path doesn't exist, then the cgroup doesn't exist.
 	for controller, path := range cgroupPaths {
@@ -282,7 +285,6 @@ func (m *cgroupManagerImpl) Destroy(cgroupConfig *CgroupConfig) error {
 	start := time.Now()
 	defer func() {
 		metrics.CgroupManagerDuration.WithLabelValues("destroy").Observe(metrics.SinceInSeconds(start))
-		metrics.DeprecatedCgroupManagerLatency.WithLabelValues("destroy").Observe(metrics.SinceInMicroseconds(start))
 	}()
 
 	cgroupPaths := m.buildCgroupPaths(cgroupConfig.Name)
@@ -410,7 +412,6 @@ func (m *cgroupManagerImpl) Update(cgroupConfig *CgroupConfig) error {
 	start := time.Now()
 	defer func() {
 		metrics.CgroupManagerDuration.WithLabelValues("update").Observe(metrics.SinceInSeconds(start))
-		metrics.DeprecatedCgroupManagerLatency.WithLabelValues("update").Observe(metrics.SinceInMicroseconds(start))
 	}()
 
 	// Extract the cgroup resource parameters
@@ -446,7 +447,6 @@ func (m *cgroupManagerImpl) Create(cgroupConfig *CgroupConfig) error {
 	start := time.Now()
 	defer func() {
 		metrics.CgroupManagerDuration.WithLabelValues("create").Observe(metrics.SinceInSeconds(start))
-		metrics.DeprecatedCgroupManagerLatency.WithLabelValues("create").Observe(metrics.SinceInMicroseconds(start))
 	}()
 
 	resources := m.toResources(cgroupConfig.ResourceParameters)

@@ -9,8 +9,8 @@ go_library(
     importpath = "k8s.io/kubernetes/test/e2e/framework/node",
     visibility = ["//visibility:public"],
     deps = [
+        "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/controller/nodelifecycle:go_default_library",
-        "//pkg/scheduler/algorithm/predicates:go_default_library",
         "//pkg/scheduler/nodeinfo:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

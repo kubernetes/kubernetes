@@ -4,9 +4,8 @@ reviewers:
   - neolit123
   - johnSchnake
   - SataQiu
-  - draveness
-  - alejandrox1
 approvers:
+  - alejandrox1
   - andrewsykim
   - bowei # for test/e2e/{dns*,network}.go
   - cblecker
@@ -20,6 +19,7 @@ approvers:
   - oomichi
   - pwittrock # for test/e2e/kubectl.go
   - saad-ali
+  - SataQiu
   - sig-testing-approvers
   - smarterclayton
   - soltysh

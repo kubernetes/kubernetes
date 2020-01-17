@@ -90,7 +90,7 @@ func TestGetPodAndPluginMapPaths(t *testing.T) {
 
 	spec := getTestVolume(true) // block volume
 	pluginMgr := volume.VolumePluginMgr{}
-	pluginMgr.InitPlugins(ProbeVolumePlugins(), nil, volumetest.NewFakeVolumeHost(tmpVDir, nil, nil))
+	pluginMgr.InitPlugins(ProbeVolumePlugins(), nil, volumetest.NewFakeVolumeHost(t, tmpVDir, nil, nil))
 	plugin, err := pluginMgr.FindMapperPluginByName(vsphereVolumePluginName)
 	if err != nil {
 		os.RemoveAll(tmpVDir)

@@ -23,6 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
@@ -43,7 +44,7 @@ var _ = SIGDescribe("Hybrid cluster network", func() {
 	f := framework.NewDefaultFramework("hybrid-network")
 
 	ginkgo.BeforeEach(func() {
-		framework.SkipUnlessNodeOSDistroIs("windows")
+		e2eskipper.SkipUnlessNodeOSDistroIs("windows")
 	})
 
 	ginkgo.Context("for all supported CNIs", func() {

@@ -43,8 +43,8 @@ limitations under the License.
 // object that will be input to an apiserver), for such an override to
 // be used by the apiserver the developer-maintained conversion
 // functions must also be registered by invoking the
-// `AddConversionFuncs` method of the relevant `Scheme` object from
-// k8s.io/apimachinery/pkg/runtime.
+// `AddConversionFunc`/`AddGeneratedConversionFunc` method of the
+// relevant `Scheme` object from k8s.io/apimachinery/pkg/runtime.
 //
 // `conversion-gen` will scan its `--input-dirs`, looking at the
 // package defined in each of those directories for comment tags that
@@ -99,6 +99,15 @@ func main() {
 	flag.Set("logtostderr", "true")
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	pflag.Parse()
+
+	// k8s.io/apimachinery/pkg/runtime contains a number of manual conversions,
+	// that we need to generate conversions.
+	// Packages being dependencies of explicitly requested packages are only
+	// partially scanned - only types explicitly used are being traversed.
+	// Not used functions or types are omitted.
+	// Adding this explicitly to InputDirs ensures that the package is fully
+	// scanned and all functions are parsed and processed.
+	genericArgs.InputDirs = append(genericArgs.InputDirs, "k8s.io/apimachinery/pkg/runtime")
 
 	if err := generatorargs.Validate(genericArgs); err != nil {
 		klog.Fatalf("Error: %v", err)

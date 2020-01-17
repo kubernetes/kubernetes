@@ -20,9 +20,8 @@ import (
 	"errors"
 	"strconv"
 
-	"k8s.io/kubernetes/pkg/util/mount"
-
 	"k8s.io/klog"
+	utilexec "k8s.io/utils/exec"
 
 	siotypes "github.com/thecodeteam/goscaleio/types/v1"
 )
@@ -30,10 +29,10 @@ import (
 type sioMgr struct {
 	client     sioInterface
 	configData map[string]string
-	exec       mount.Exec
+	exec       utilexec.Interface
 }
 
-func newSioMgr(configs map[string]string, exec mount.Exec) (*sioMgr, error) {
+func newSioMgr(configs map[string]string, exec utilexec.Interface) (*sioMgr, error) {
 	if configs == nil {
 		return nil, errors.New("missing configuration data")
 	}

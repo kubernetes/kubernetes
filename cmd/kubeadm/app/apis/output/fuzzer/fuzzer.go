@@ -36,7 +36,6 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 func fuzzBootstrapToken(obj *output.BootstrapToken, c fuzz.Continue) {
 	c.FuzzNoCustom(obj)
 
-	obj.ObjectMeta = metav1.ObjectMeta{}
 	obj.Token = &kubeadmapiv1beta2.BootstrapTokenString{ID: "uvxdac", Secret: "fq35fuyue3kd4gda"}
 	obj.Description = ""
 	obj.TTL = &metav1.Duration{Duration: time.Hour * 24}

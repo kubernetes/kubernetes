@@ -16,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e_node
+package e2enode
 
 import (
 	"fmt"
@@ -104,7 +104,7 @@ var _ = framework.KubeDescribe("NodeProblemDetector [NodeFeature:NodeProblemDete
 
 			nodeTime = time.Now()
 			bootTime, err = util.GetBootTime()
-			gomega.Expect(err).To(gomega.BeNil())
+			framework.ExpectNoError(err)
 
 			// Set lookback duration longer than node up time.
 			// Assume the test won't take more than 1 hour, in fact it usually only takes 90 seconds.

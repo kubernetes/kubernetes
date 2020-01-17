@@ -167,7 +167,6 @@ filegroup(
 filegroup(
     name = "test-portable-targets",
     srcs = [
-        "//hack:e2e.go",
         "//hack:get-build.sh",
         "//hack:ginkgo-e2e.sh",
         "//hack/e2e-internal:all-srcs",

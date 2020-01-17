@@ -23,7 +23,7 @@ import (
 	"github.com/onsi/ginkgo"
 
 	v1 "k8s.io/api/core/v1"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	clientset "k8s.io/client-go/kubernetes"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 )
@@ -55,7 +55,7 @@ func DeletePodWithWaitByName(c clientset.Interface, podName, podNamespace string
 	e2elog.Logf("Deleting pod %q in namespace %q", podName, podNamespace)
 	err := c.CoreV1().Pods(podNamespace).Delete(podName, nil)
 	if err != nil {
-		if apierrs.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			return nil // assume pod was already deleted
 		}
 		return fmt.Errorf("pod Delete API error: %v", err)

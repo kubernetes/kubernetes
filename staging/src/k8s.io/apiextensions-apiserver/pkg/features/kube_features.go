@@ -62,8 +62,12 @@ const (
 
 	// owner: @sttts
 	// alpha: v1.15
+	// beta: v1.16
+	// GA: v1.17
 	//
 	// CustomResourceDefaulting enables OpenAPI defaulting in CustomResources.
+	//
+	// TODO: remove in 1.18
 	CustomResourceDefaulting featuregate.Feature = "CustomResourceDefaulting"
 )
 
@@ -79,5 +83,5 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	CustomResourceSubresources:      {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	CustomResourceWebhookConversion: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	CustomResourcePublishOpenAPI:    {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
-	CustomResourceDefaulting:        {Default: true, PreRelease: featuregate.Beta},
+	CustomResourceDefaulting:        {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 }

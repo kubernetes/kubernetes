@@ -135,7 +135,7 @@ func TestPodAndContainer(t *testing.T) {
 			tf := cmdtesting.NewTestFactory().WithNamespace("test")
 			defer tf.Cleanup()
 
-			ns := scheme.Codecs
+			ns := scheme.Codecs.WithoutConversion()
 
 			tf.Client = &fake.RESTClient{
 				NegotiatedSerializer: ns,
@@ -205,7 +205,7 @@ func TestExec(t *testing.T) {
 			defer tf.Cleanup()
 
 			codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
-			ns := scheme.Codecs
+			ns := scheme.Codecs.WithoutConversion()
 
 			tf.Client = &fake.RESTClient{
 				GroupVersion:         schema.GroupVersion{Group: "", Version: "v1"},
@@ -214,10 +214,10 @@ func TestExec(t *testing.T) {
 					switch p, m := req.URL.Path, req.Method; {
 					case p == test.podPath && m == "GET":
 						body := cmdtesting.ObjBody(codec, test.pod)
-						return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: body}, nil
+						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: body}, nil
 					case p == test.fetchPodPath && m == "GET":
 						body := cmdtesting.ObjBody(codec, test.pod)
-						return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: body}, nil
+						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: body}, nil
 					default:
 						t.Errorf("%s: unexpected request: %s %#v\n%#v", test.name, req.Method, req.URL, req)
 						return nil, fmt.Errorf("unexpected request")

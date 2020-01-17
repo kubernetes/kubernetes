@@ -22,44 +22,39 @@ import (
 	"k8s.io/api/core/v1"
 )
 
+type keyVal struct {
+	k string
+	v string
+}
+
 // MakeNodesAndPodsForEvenPodsSpread serves as a testing helper for EvenPodsSpread feature.
 // It builds a fake cluster containing running Pods and Nodes.
 // The size of Pods and Nodes are determined by input arguments.
 // The specs of Pods and Nodes are generated with the following rules:
-// - If `pod` has "node" as a topologyKey, each generated node is applied with a unique label: "node: node<i>".
-// - If `pod` has "zone" as a topologyKey, each generated node is applied with a rotating label: "zone: zone[0-9]".
-// - Depending on "labelSelector.MatchExpressions[0].Key" the `pod` has in each topologySpreadConstraint,
-//   each generated pod will be applied with label "key1", "key1,key2", ..., "key1,key2,...,keyN" in a rotating manner.
-func MakeNodesAndPodsForEvenPodsSpread(pod *v1.Pod, existingPodsNum, allNodesNum, filteredNodesNum int) (existingPods []*v1.Pod, allNodes []*v1.Node, filteredNodes []*v1.Node) {
-	var topologyKeys []string
-	var labels []string
-	zones := 10
-	for _, c := range pod.Spec.TopologySpreadConstraints {
-		topologyKeys = append(topologyKeys, c.TopologyKey)
-		labels = append(labels, c.LabelSelector.MatchExpressions[0].Key)
+// - Each generated node is applied with a unique label: "node: node<i>".
+// - Each generated node is applied with a rotating label: "zone: zone[0-9]".
+// - Depending on the input labels, each generated pod will be applied with
+//   label "key1", "key1,key2", ..., "key1,key2,...,keyN" in a rotating manner.
+func MakeNodesAndPodsForEvenPodsSpread(labels map[string]string, existingPodsNum, allNodesNum, filteredNodesNum int) (existingPods []*v1.Pod, allNodes []*v1.Node, filteredNodes []*v1.Node) {
+	var labelPairs []keyVal
+	for k, v := range labels {
+		labelPairs = append(labelPairs, keyVal{k: k, v: v})
 	}
+	zones := 10
 	// build nodes
 	for i := 0; i < allNodesNum; i++ {
-		nodeWrapper := MakeNode().Name(fmt.Sprintf("node%d", i))
-		for _, tpKey := range topologyKeys {
-			if tpKey == "zone" {
-				nodeWrapper = nodeWrapper.Label("zone", fmt.Sprintf("zone%d", i%zones))
-			} else if tpKey == "node" {
-				nodeWrapper = nodeWrapper.Label("node", fmt.Sprintf("node%d", i))
-			}
-		}
-		node := nodeWrapper.Obj()
+		node := MakeNode().Name(fmt.Sprintf("node%d", i)).
+			Label(v1.LabelZoneFailureDomain, fmt.Sprintf("zone%d", i%zones)).
+			Label(v1.LabelHostname, fmt.Sprintf("node%d", i)).Obj()
 		allNodes = append(allNodes, node)
-		if len(filteredNodes) < filteredNodesNum {
-			filteredNodes = append(filteredNodes, node)
-		}
 	}
+	filteredNodes = allNodes[:filteredNodesNum]
 	// build pods
 	for i := 0; i < existingPodsNum; i++ {
 		podWrapper := MakePod().Name(fmt.Sprintf("pod%d", i)).Node(fmt.Sprintf("node%d", i%allNodesNum))
 		// apply labels[0], labels[0,1], ..., labels[all] to each pod in turn
-		for _, label := range labels[:i%len(labels)+1] {
-			podWrapper = podWrapper.Label(label, "")
+		for _, p := range labelPairs[:i%len(labelPairs)+1] {
+			podWrapper = podWrapper.Label(p.k, p.v)
 		}
 		existingPods = append(existingPods, podWrapper.Obj())
 	}

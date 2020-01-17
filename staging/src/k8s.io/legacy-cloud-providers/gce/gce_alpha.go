@@ -27,6 +27,9 @@ const (
 	// AlphaFeatureILBSubsets allows InternalLoadBalancer services to include a subset
 	// of cluster nodes as backends instead of all nodes.
 	AlphaFeatureILBSubsets = "ILBSubsets"
+	// AlphaFeatureILBCustomSubnet allows InternalLoadBalancer services to specify a
+	// network subnet to allocate ip addresses from.
+	AlphaFeatureILBCustomSubnet = "ILBCustomSubnet"
 )
 
 // AlphaFeatureGate contains a mapping of alpha features to whether they are enabled

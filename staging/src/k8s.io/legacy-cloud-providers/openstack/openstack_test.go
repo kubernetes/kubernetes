@@ -119,6 +119,8 @@ func TestReadConfig(t *testing.T) {
  [Metadata]
  search-order = configDrive, metadataService
  `))
+	cfg.Global.Password = os.Getenv("OS_PASSWORD")
+
 	if err != nil {
 		t.Fatalf("Should succeed when a valid config is provided: %s", err)
 	}
@@ -476,8 +478,17 @@ func TestNodeAddresses(t *testing.T) {
 	}
 }
 
+func configFromEnvWithPasswd() (cfg Config, ok bool) {
+	cfg, ok = configFromEnv()
+	if !ok {
+		return cfg, ok
+	}
+	cfg.Global.Password = os.Getenv("OS_PASSWORD")
+	return cfg, ok
+}
+
 func TestNewOpenStack(t *testing.T) {
-	cfg, ok := configFromEnv()
+	cfg, ok := configFromEnvWithPasswd()
 	if !ok {
 		t.Skip("No config found in environment")
 	}
@@ -489,7 +500,7 @@ func TestNewOpenStack(t *testing.T) {
 }
 
 func TestLoadBalancer(t *testing.T) {
-	cfg, ok := configFromEnv()
+	cfg, ok := configFromEnvWithPasswd()
 	if !ok {
 		t.Skip("No config found in environment")
 	}
@@ -553,7 +564,7 @@ func TestZones(t *testing.T) {
 var diskPathRegexp = regexp.MustCompile("/dev/disk/(?:by-id|by-path)/")
 
 func TestVolumes(t *testing.T) {
-	cfg, ok := configFromEnv()
+	cfg, ok := configFromEnvWithPasswd()
 	if !ok {
 		t.Skip("No config found in environment")
 	}

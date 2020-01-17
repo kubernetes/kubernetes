@@ -25,7 +25,7 @@ import (
 
 	auditregistrationv1alpha1 "k8s.io/api/auditregistration/v1alpha1"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -107,14 +107,11 @@ var _ = SIGDescribe("[Feature:DynamicAudit]", func() {
 		})
 		framework.ExpectNoError(err, "failed to create proxy service")
 
-		config, err = framework.LoadConfig()
-		framework.ExpectNoError(err, "failed to load config")
-
 		var podIP string
 		// get pod ip
 		err = wait.Poll(100*time.Millisecond, 10*time.Second, func() (done bool, err error) {
 			p, err := f.ClientSet.CoreV1().Pods(namespace).Get("audit-proxy", metav1.GetOptions{})
-			if errors.IsNotFound(err) {
+			if apierrors.IsNotFound(err) {
 				framework.Logf("waiting for audit-proxy pod to be present")
 				return false, nil
 			} else if err != nil {

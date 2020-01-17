@@ -26,12 +26,12 @@ import (
 	"testing"
 	"time"
 
-	appsv1beta1 "k8s.io/api/apps/v1beta1"
-	appsv1beta2 "k8s.io/api/apps/v1beta2"
 	auditregv1alpha1 "k8s.io/api/auditregistration/v1alpha1"
 	batchv2alpha1 "k8s.io/api/batch/v2alpha1"
 	discoveryv1alpha1 "k8s.io/api/discovery/v1alpha1"
+	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
+	flowcontrolv1alpha1 "k8s.io/api/flowcontrol/v1alpha1"
 	nodev1alpha1 "k8s.io/api/node/v1alpha1"
 	rbacv1alpha1 "k8s.io/api/rbac/v1alpha1"
 	schedulerapi "k8s.io/api/scheduling/v1"
@@ -106,10 +106,6 @@ var kindWhiteList = sets.NewString(
 	"JobTemplate",
 	// --
 
-	// k8s.io/api/extensions
-	"ReplicationControllerDummy",
-	// --
-
 	// k8s.io/api/imagepolicy
 	"ImageReview",
 	// --
@@ -128,17 +124,36 @@ var kindWhiteList = sets.NewString(
 var missingHanlders = sets.NewString(
 	"ClusterRole",
 	"LimitRange",
-	"MutatingWebhookConfiguration",
 	"ResourceQuota",
 	"Role",
-	"ValidatingWebhookConfiguration",
-	"VolumeAttachment",
 	"PriorityClass",
 	"PodPreset",
 	"AuditSink",
-	"CSINode",
-	"CSIDriver",
+	"FlowSchema",                 // TODO(yue9944882): remove this comment by merging print-handler for flow-control API
+	"PriorityLevelConfiguration", // TODO(yue9944882): remove this comment by merging print-handler for flow-control API
 )
+
+// known types that are no longer served we should tolerate restmapper errors for
+var unservedTypes = map[schema.GroupVersionKind]bool{
+	{Group: "extensions", Version: "v1beta1", Kind: "ControllerRevision"}: true,
+	{Group: "extensions", Version: "v1beta1", Kind: "DaemonSet"}:          true,
+	{Group: "extensions", Version: "v1beta1", Kind: "Deployment"}:         true,
+	{Group: "extensions", Version: "v1beta1", Kind: "NetworkPolicy"}:      true,
+	{Group: "extensions", Version: "v1beta1", Kind: "PodSecurityPolicy"}:  true,
+	{Group: "extensions", Version: "v1beta1", Kind: "ReplicaSet"}:         true,
+
+	{Group: "apps", Version: "v1beta1", Kind: "ControllerRevision"}: true,
+	{Group: "apps", Version: "v1beta1", Kind: "DaemonSet"}:          true,
+	{Group: "apps", Version: "v1beta1", Kind: "Deployment"}:         true,
+	{Group: "apps", Version: "v1beta1", Kind: "ReplicaSet"}:         true,
+	{Group: "apps", Version: "v1beta1", Kind: "StatefulSet"}:        true,
+
+	{Group: "apps", Version: "v1beta2", Kind: "ControllerRevision"}: true,
+	{Group: "apps", Version: "v1beta2", Kind: "DaemonSet"}:          true,
+	{Group: "apps", Version: "v1beta2", Kind: "Deployment"}:         true,
+	{Group: "apps", Version: "v1beta2", Kind: "ReplicaSet"}:         true,
+	{Group: "apps", Version: "v1beta2", Kind: "StatefulSet"}:        true,
+}
 
 func TestServerSidePrint(t *testing.T) {
 	s, _, closeFn := setupWithResources(t,
@@ -147,22 +162,16 @@ func TestServerSidePrint(t *testing.T) {
 			auditregv1alpha1.SchemeGroupVersion,
 			batchv2alpha1.SchemeGroupVersion,
 			discoveryv1alpha1.SchemeGroupVersion,
+			discoveryv1beta1.SchemeGroupVersion,
 			rbacv1alpha1.SchemeGroupVersion,
 			settingsv1alpha1.SchemeGroupVersion,
 			schedulerapi.SchemeGroupVersion,
 			storagev1alpha1.SchemeGroupVersion,
-			appsv1beta1.SchemeGroupVersion,
-			appsv1beta2.SchemeGroupVersion,
 			extensionsv1beta1.SchemeGroupVersion,
 			nodev1alpha1.SchemeGroupVersion,
+			flowcontrolv1alpha1.SchemeGroupVersion,
 		},
-		[]schema.GroupVersionResource{
-			extensionsv1beta1.SchemeGroupVersion.WithResource("daemonsets"),
-			extensionsv1beta1.SchemeGroupVersion.WithResource("deployments"),
-			extensionsv1beta1.SchemeGroupVersion.WithResource("networkpolicies"),
-			extensionsv1beta1.SchemeGroupVersion.WithResource("podsecuritypolicies"),
-			extensionsv1beta1.SchemeGroupVersion.WithResource("replicasets"),
-		},
+		[]schema.GroupVersionResource{},
 	)
 	defer closeFn()
 
@@ -214,6 +223,9 @@ func TestServerSidePrint(t *testing.T) {
 		// read table definition as returned by the server
 		mapping, err := mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
 		if err != nil {
+			if unservedTypes[gvk] {
+				continue
+			}
 			t.Errorf("unexpected error getting mapping for GVK %s: %v", gvk, err)
 			continue
 		}

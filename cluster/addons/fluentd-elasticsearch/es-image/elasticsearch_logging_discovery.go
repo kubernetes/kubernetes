@@ -19,6 +19,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"net"
 	"os"
 	"strconv"
 	"strings"
@@ -31,6 +32,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	clientapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/klog"
+	utilnet "k8s.io/utils/net"
 )
 
 func buildConfigFromEnvs(masterURL, kubeconfigPath string) (*restclient.Config, error) {
@@ -52,16 +54,41 @@ func flattenSubsets(subsets []corev1.EndpointSubset) []string {
 	ips := []string{}
 	for _, ss := range subsets {
 		for _, addr := range ss.Addresses {
-			ips = append(ips, fmt.Sprintf(`"%s"`, addr.IP))
+			if utilnet.IsIPv6String(addr.IP) {
+				ips = append(ips, fmt.Sprintf(`"[%s]"`, addr.IP))
+			} else {
+				ips = append(ips, fmt.Sprintf(`"%s"`, addr.IP))
+			}
 		}
 	}
 	return ips
+}
+
+func getAdvertiseAddress() (string, error) {
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return "", err
+	}
+
+	for _, addr := range addrs {
+		if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+			return ipnet.IP.String(), nil
+		}
+	}
+
+	return "", fmt.Errorf("no non-loopback address is available")
 }
 
 func main() {
 	flag.Parse()
 
 	klog.Info("Kubernetes Elasticsearch logging discovery")
+
+	advertiseAddress, err := getAdvertiseAddress()
+	if err != nil {
+		klog.Fatalf("Failed to get valid advertise address: %v", err)
+	}
+	fmt.Printf("network.host: \"%s\"\n\n", advertiseAddress)
 
 	cc, err := buildConfigFromEnvs(os.Getenv("APISERVER_HOST"), os.Getenv("KUBE_CONFIG_FILE"))
 	if err != nil {

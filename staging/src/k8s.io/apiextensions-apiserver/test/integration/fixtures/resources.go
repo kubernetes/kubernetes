@@ -523,7 +523,7 @@ func DeleteCustomResourceDefinition(crd *apiextensionsv1beta1.CustomResourceDefi
 
 // DeleteV1CustomResourceDefinition deletes a CRD and waits until it disappears from discovery.
 func DeleteV1CustomResourceDefinition(crd *apiextensionsv1.CustomResourceDefinition, apiExtensionsClient clientset.Interface) error {
-	if err := apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Delete(crd.Name, nil); err != nil {
+	if err := apiExtensionsClient.ApiextensionsV1().CustomResourceDefinitions().Delete(crd.Name, nil); err != nil {
 		return err
 	}
 	for _, version := range servedV1Versions(crd) {

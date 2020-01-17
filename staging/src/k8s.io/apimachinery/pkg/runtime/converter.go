@@ -72,9 +72,6 @@ var (
 	unmarshalerType        = reflect.TypeOf(new(encodingjson.Unmarshaler)).Elem()
 	mapStringInterfaceType = reflect.TypeOf(map[string]interface{}{})
 	stringType             = reflect.TypeOf(string(""))
-	int64Type              = reflect.TypeOf(int64(0))
-	float64Type            = reflect.TypeOf(float64(0))
-	boolType               = reflect.TypeOf(bool(false))
 	fieldCache             = newFieldsCache()
 
 	// DefaultUnstructuredConverter performs unstructured to Go typed object conversions.
@@ -256,6 +253,7 @@ func fieldInfoFromField(structType reflect.Type, field int) *fieldInfo {
 		for i := range items {
 			if items[i] == "omitempty" {
 				info.omitempty = true
+				break
 			}
 		}
 	}
@@ -571,24 +569,15 @@ func toUnstructured(sv, dv reflect.Value) error {
 		return nil
 	}
 
-	st, dt := sv.Type(), dv.Type()
+	st := sv.Type()
 	switch st.Kind() {
 	case reflect.String:
-		if dt.Kind() == reflect.Interface && dv.NumMethod() == 0 {
-			dv.Set(reflect.New(stringType))
-		}
 		dv.Set(reflect.ValueOf(sv.String()))
 		return nil
 	case reflect.Bool:
-		if dt.Kind() == reflect.Interface && dv.NumMethod() == 0 {
-			dv.Set(reflect.New(boolType))
-		}
 		dv.Set(reflect.ValueOf(sv.Bool()))
 		return nil
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		if dt.Kind() == reflect.Interface && dv.NumMethod() == 0 {
-			dv.Set(reflect.New(int64Type))
-		}
 		dv.Set(reflect.ValueOf(sv.Int()))
 		return nil
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
@@ -596,15 +585,9 @@ func toUnstructured(sv, dv reflect.Value) error {
 		if uVal > math.MaxInt64 {
 			return fmt.Errorf("unsigned value %d does not fit into int64 (overflow)", uVal)
 		}
-		if dt.Kind() == reflect.Interface && dv.NumMethod() == 0 {
-			dv.Set(reflect.New(int64Type))
-		}
 		dv.Set(reflect.ValueOf(int64(uVal)))
 		return nil
 	case reflect.Float32, reflect.Float64:
-		if dt.Kind() == reflect.Interface && dv.NumMethod() == 0 {
-			dv.Set(reflect.New(float64Type))
-		}
 		dv.Set(reflect.ValueOf(sv.Float()))
 		return nil
 	case reflect.Map:

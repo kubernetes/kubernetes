@@ -47,7 +47,7 @@ func TestDescribeUnknownSchemaObject(t *testing.T) {
 
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
-		Resp:                 &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, cmdtesting.NewInternalType("", "", "foo"))},
+		Resp:                 &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, cmdtesting.NewInternalType("", "", "foo"))},
 	}
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
@@ -59,7 +59,7 @@ func TestDescribeUnknownSchemaObject(t *testing.T) {
 		t.Errorf("unexpected describer: %#v", d)
 	}
 
-	if buf.String() != fmt.Sprintf("%s", d.Output) {
+	if buf.String() != d.Output {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }
@@ -79,7 +79,7 @@ func TestDescribeUnknownNamespacedSchemaObject(t *testing.T) {
 
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
-		Resp:                 &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, cmdtesting.NewInternalNamespacedType("", "", "foo", "non-default"))},
+		Resp:                 &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, cmdtesting.NewInternalNamespacedType("", "", "foo", "non-default"))},
 	}
 	tf.WithNamespace("non-default")
 
@@ -92,7 +92,7 @@ func TestDescribeUnknownNamespacedSchemaObject(t *testing.T) {
 		t.Errorf("unexpected describer: %#v", d)
 	}
 
-	if buf.String() != fmt.Sprintf("%s", d.Output) {
+	if buf.String() != d.Output {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }
@@ -115,7 +115,7 @@ func TestDescribeObject(t *testing.T) {
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/replicationcontrollers/redis-master" && m == "GET":
-				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &rc.Items[0])}, nil
+				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &rc.Items[0])}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				return nil, nil
@@ -126,14 +126,14 @@ func TestDescribeObject(t *testing.T) {
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 
 	cmd := NewCmdDescribe("kubectl", tf, streams)
-	cmd.Flags().Set("filename", "../../../test/data/redis-master-controller.yaml")
+	cmd.Flags().Set("filename", "../../../testdata/redis-master-controller.yaml")
 	cmd.Run(cmd, []string{})
 
 	if d.Name != "redis-master" || d.Namespace != "test" {
 		t.Errorf("unexpected describer: %#v", d)
 	}
 
-	if buf.String() != fmt.Sprintf("%s", d.Output) {
+	if buf.String() != d.Output {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }
@@ -153,7 +153,7 @@ func TestDescribeListObjects(t *testing.T) {
 
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
-		Resp:                 &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, pods)},
+		Resp:                 &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, pods)},
 	}
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
@@ -180,7 +180,7 @@ func TestDescribeObjectShowEvents(t *testing.T) {
 
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
-		Resp:                 &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, pods)},
+		Resp:                 &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, pods)},
 	}
 
 	cmd := NewCmdDescribe("kubectl", tf, genericclioptions.NewTestIOStreamsDiscard())
@@ -206,7 +206,7 @@ func TestDescribeObjectSkipEvents(t *testing.T) {
 
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
-		Resp:                 &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, pods)},
+		Resp:                 &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, pods)},
 	}
 
 	cmd := NewCmdDescribe("kubectl", tf, genericclioptions.NewTestIOStreamsDiscard())

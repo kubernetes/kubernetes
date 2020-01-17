@@ -19,7 +19,6 @@ package v1beta1
 import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 )
 
 // GroupName is the group name for this API.
@@ -33,12 +32,6 @@ func Kind(kind string) schema.GroupKind {
 	return SchemeGroupVersion.WithKind(kind).GroupKind()
 }
 
-// scheme is the registry for the common types that adhere to the meta v1beta1 API spec.
-var scheme = runtime.NewScheme()
-
-// ParameterCodec knows about query parameters used with the meta v1beta1 API spec.
-var ParameterCodec = runtime.NewParameterCodec(scheme)
-
 // AddMetaToScheme registers base meta types into schemas.
 func AddMetaToScheme(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
@@ -48,14 +41,5 @@ func AddMetaToScheme(scheme *runtime.Scheme) error {
 		&PartialObjectMetadataList{},
 	)
 
-	return scheme.AddConversionFuncs(
-		Convert_Slice_string_To_v1beta1_IncludeObjectPolicy,
-	)
-}
-
-func init() {
-	utilruntime.Must(AddMetaToScheme(scheme))
-
-	// register manually. This usually goes through the SchemeBuilder, which we cannot use here.
-	utilruntime.Must(RegisterDefaults(scheme))
+	return nil
 }

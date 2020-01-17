@@ -32,9 +32,8 @@ import (
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs/renewal"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/controlplane"
-	controlplanephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/controlplane"
 	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
-	"k8s.io/kubernetes/cmd/kubeadm/app/util"
+	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
 	etcdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/etcd"
@@ -277,7 +276,7 @@ func performEtcdStaticPodUpgrade(certsRenewMgr *renewal.Manager, client clientse
 	// Backing up etcd data store
 	backupEtcdDir := pathMgr.BackupEtcdDir()
 	runningEtcdDir := cfg.Etcd.Local.DataDir
-	if err := util.CopyDir(runningEtcdDir, backupEtcdDir); err != nil {
+	if err := kubeadmutil.CopyDir(runningEtcdDir, backupEtcdDir); err != nil {
 		return true, errors.Wrap(err, "failed to back up etcd data")
 	}
 
@@ -464,7 +463,7 @@ func StaticPodControlPlane(client clientset.Interface, waiter apiclient.Waiter, 
 
 	// Write the updated static Pod manifests into the temporary directory
 	fmt.Printf("[upgrade/staticpods] Writing new Static Pod manifests to %q\n", pathMgr.TempManifestDir())
-	err = controlplanephase.CreateInitStaticPodManifestFiles(pathMgr.TempManifestDir(), pathMgr.KustomizeDir(), cfg)
+	err = controlplane.CreateInitStaticPodManifestFiles(pathMgr.TempManifestDir(), pathMgr.KustomizeDir(), cfg)
 	if err != nil {
 		return errors.Wrap(err, "error creating init static pod manifest files")
 	}
@@ -523,7 +522,7 @@ func rollbackEtcdData(cfg *kubeadmapi.InitConfiguration, pathMgr StaticPodPathMa
 	backupEtcdDir := pathMgr.BackupEtcdDir()
 	runningEtcdDir := cfg.Etcd.Local.DataDir
 
-	if err := util.CopyDir(backupEtcdDir, runningEtcdDir); err != nil {
+	if err := kubeadmutil.CopyDir(backupEtcdDir, runningEtcdDir); err != nil {
 		// Let the user know there we're problems, but we tried to reçover
 		return errors.Wrapf(err, "couldn't recover etcd database with error, the location of etcd backup: %s ", backupEtcdDir)
 	}
@@ -592,8 +591,8 @@ func renewCertsByComponent(cfg *kubeadmapi.InitConfiguration, component string, 
 
 // GetPathManagerForUpgrade returns a path manager properly configured for the given InitConfiguration.
 func GetPathManagerForUpgrade(kubernetesDir, kustomizeDir string, internalcfg *kubeadmapi.InitConfiguration, etcdUpgrade bool) (StaticPodPathManager, error) {
-	isHAEtcd := etcdutil.CheckConfigurationIsHA(&internalcfg.Etcd)
-	return NewKubeStaticPodPathManagerUsingTempDirs(kubernetesDir, kustomizeDir, true, etcdUpgrade && !isHAEtcd)
+	isExternalEtcd := internalcfg.Etcd.External != nil
+	return NewKubeStaticPodPathManagerUsingTempDirs(kubernetesDir, kustomizeDir, true, etcdUpgrade && !isExternalEtcd)
 }
 
 // PerformStaticPodUpgrade performs the upgrade of the control plane components for a static pod hosted cluster

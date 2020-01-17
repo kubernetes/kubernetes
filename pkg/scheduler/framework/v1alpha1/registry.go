@@ -29,7 +29,7 @@ type PluginFactory = func(configuration *runtime.Unknown, f FrameworkHandle) (Pl
 
 // DecodeInto decodes configuration whose type is *runtime.Unknown to the interface into.
 func DecodeInto(configuration *runtime.Unknown, into interface{}) error {
-	if configuration == nil {
+	if configuration == nil || configuration.Raw == nil {
 		return nil
 	}
 

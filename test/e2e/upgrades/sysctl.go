@@ -22,12 +22,13 @@ import (
 	"github.com/onsi/ginkgo"
 
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/kubelet/sysctl"
 
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -60,7 +61,7 @@ func (t *SysctlUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, u
 
 	ginkgo.By("Checking the old unsafe sysctl pod was not suddenly started during an upgrade")
 	pod, err := f.ClientSet.CoreV1().Pods(t.invalidPod.Namespace).Get(t.invalidPod.Name, metav1.GetOptions{})
-	if err != nil && !errors.IsNotFound(err) {
+	if err != nil && !apierrors.IsNotFound(err) {
 		framework.ExpectNoError(err)
 	}
 	if err == nil {
@@ -80,14 +81,14 @@ func (t *SysctlUpgradeTest) verifySafeSysctlWork(f *framework.Framework) *v1.Pod
 	ginkgo.By("Creating a pod with safe sysctls")
 	safeSysctl := "net.ipv4.ip_local_port_range"
 	safeSysctlValue := "1024 1042"
-	validPod := sysctlTestPod("valid-sysctls", map[string]string{safeSysctl: safeSysctlValue})
-	validPod = f.PodClient().Create(t.validPod)
+	sysctlTestPod("valid-sysctls", map[string]string{safeSysctl: safeSysctlValue})
+	validPod := f.PodClient().Create(t.validPod)
 
 	ginkgo.By("Making sure the valid pod launches")
 	ev, err := f.PodClient().WaitForErrorEventOrSuccess(t.validPod)
 	framework.ExpectNoError(err)
 	if ev != nil && ev.Reason == sysctl.UnsupportedReason {
-		framework.Skipf("No sysctl support in Docker <1.12")
+		e2eskipper.Skipf("No sysctl support in Docker <1.12")
 	}
 	f.TestContainerOutput("pod with safe sysctl launched", t.validPod, 0, []string{fmt.Sprintf("%s = %s", safeSysctl, safeSysctlValue)})
 
@@ -105,7 +106,7 @@ func (t *SysctlUpgradeTest) verifyUnsafeSysctlsAreRejected(f *framework.Framewor
 	ev, err := f.PodClient().WaitForErrorEventOrSuccess(invalidPod)
 	framework.ExpectNoError(err)
 	if ev != nil && ev.Reason == sysctl.UnsupportedReason {
-		framework.Skipf("No sysctl support in Docker <1.12")
+		e2eskipper.Skipf("No sysctl support in Docker <1.12")
 	}
 	framework.ExpectEqual(ev.Reason, sysctl.ForbiddenReason)
 

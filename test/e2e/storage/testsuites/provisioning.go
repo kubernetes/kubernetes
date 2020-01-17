@@ -25,7 +25,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 )
@@ -69,26 +70,26 @@ var _ TestSuite = &provisioningTestSuite{}
 func InitProvisioningTestSuite() TestSuite {
 	return &provisioningTestSuite{
 		tsInfo: TestSuiteInfo{
-			name: "provisioning",
-			testPatterns: []testpatterns.TestPattern{
+			Name: "provisioning",
+			TestPatterns: []testpatterns.TestPattern{
 				testpatterns.DefaultFsDynamicPV,
 				testpatterns.NtfsDynamicPV,
 			},
-			supportedSizeRange: volume.SizeRange{
+			SupportedSizeRange: volume.SizeRange{
 				Min: "1Mi",
 			},
 		},
 	}
 }
 
-func (p *provisioningTestSuite) getTestSuiteInfo() TestSuiteInfo {
+func (p *provisioningTestSuite) GetTestSuiteInfo() TestSuiteInfo {
 	return p.tsInfo
 }
 
-func (p *provisioningTestSuite) skipRedundantSuite(driver TestDriver, pattern testpatterns.TestPattern) {
+func (p *provisioningTestSuite) SkipRedundantSuite(driver TestDriver, pattern testpatterns.TestPattern) {
 }
 
-func (p *provisioningTestSuite) defineTests(driver TestDriver, pattern testpatterns.TestPattern) {
+func (p *provisioningTestSuite) DefineTests(driver TestDriver, pattern testpatterns.TestPattern) {
 	type local struct {
 		config        *PerTestConfig
 		driverCleanup func()
@@ -111,12 +112,12 @@ func (p *provisioningTestSuite) defineTests(driver TestDriver, pattern testpatte
 	ginkgo.BeforeEach(func() {
 		// Check preconditions.
 		if pattern.VolType != testpatterns.DynamicPV {
-			framework.Skipf("Suite %q does not support %v", p.tsInfo.name, pattern.VolType)
+			e2eskipper.Skipf("Suite %q does not support %v", p.tsInfo.Name, pattern.VolType)
 		}
 		ok := false
 		dDriver, ok = driver.(DynamicPVTestDriver)
 		if !ok {
-			framework.Skipf("Driver %s doesn't support %v -- skipping", dInfo.Name, pattern.VolType)
+			e2eskipper.Skipf("Driver %s doesn't support %v -- skipping", dInfo.Name, pattern.VolType)
 		}
 	})
 
@@ -133,14 +134,14 @@ func (p *provisioningTestSuite) defineTests(driver TestDriver, pattern testpatte
 		l.config, l.driverCleanup = driver.PrepareTest(f)
 		l.intreeOps, l.migratedOps = getMigrationVolumeOpCounts(f.ClientSet, dInfo.InTreePluginName)
 		l.cs = l.config.Framework.ClientSet
-		testVolumeSizeRange := p.getTestSuiteInfo().supportedSizeRange
+		testVolumeSizeRange := p.GetTestSuiteInfo().SupportedSizeRange
 		driverVolumeSizeRange := dDriver.GetDriverInfo().SupportedSizeRange
 		claimSize, err := getSizeRangesIntersection(testVolumeSizeRange, driverVolumeSizeRange)
 		framework.ExpectNoError(err, "determine intersection of test size range %+v and driver size range %+v", testVolumeSizeRange, driverVolumeSizeRange)
 
 		l.sc = dDriver.GetDynamicProvisionStorageClass(l.config, pattern.FsType)
 		if l.sc == nil {
-			framework.Skipf("Driver %q does not define Dynamic Provision StorageClass - skipping", dInfo.Name)
+			e2eskipper.Skipf("Driver %q does not define Dynamic Provision StorageClass - skipping", dInfo.Name)
 		}
 		l.pvc = e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
 			ClaimSize:        claimSize,
@@ -162,17 +163,16 @@ func (p *provisioningTestSuite) defineTests(driver TestDriver, pattern testpatte
 	}
 
 	cleanup := func() {
-		if l.driverCleanup != nil {
-			l.driverCleanup()
-			l.driverCleanup = nil
-		}
+		err := tryFunc(l.driverCleanup)
+		l.driverCleanup = nil
+		framework.ExpectNoError(err, "while cleaning up driver")
 
 		validateMigrationVolumeOpCounts(f.ClientSet, dInfo.InTreePluginName, l.intreeOps, l.migratedOps)
 	}
 
 	ginkgo.It("should provision storage with mount options", func() {
 		if dInfo.SupportedMountOption == nil {
-			framework.Skipf("Driver %q does not define supported mount option - skipping", dInfo.Name)
+			e2eskipper.Skipf("Driver %q does not define supported mount option - skipping", dInfo.Name)
 		}
 
 		init()
@@ -187,7 +187,7 @@ func (p *provisioningTestSuite) defineTests(driver TestDriver, pattern testpatte
 
 	ginkgo.It("should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource]", func() {
 		if !dInfo.Capabilities[CapSnapshotDataSource] {
-			framework.Skipf("Driver %q does not support populate data from snapshot - skipping", dInfo.Name)
+			e2eskipper.Skipf("Driver %q does not support populate data from snapshot - skipping", dInfo.Name)
 		}
 
 		sDriver, ok := driver.(SnapshottableTestDriver)
@@ -213,7 +213,7 @@ func (p *provisioningTestSuite) defineTests(driver TestDriver, pattern testpatte
 	})
 	ginkgo.It("should provision storage with pvc data source", func() {
 		if !dInfo.Capabilities[CapPVCDataSource] {
-			framework.Skipf("Driver %q does not support cloning - skipping", dInfo.Name)
+			e2eskipper.Skipf("Driver %q does not support cloning - skipping", dInfo.Name)
 		}
 
 		init()
@@ -248,7 +248,7 @@ func (t StorageClassTest) TestDynamicProvisioning() *v1.PersistentVolume {
 		_, err = client.StorageV1().StorageClasses().Create(class)
 		// The "should provision storage with snapshot data source" test already has created the class.
 		// TODO: make class creation optional and remove the IsAlreadyExists exception
-		framework.ExpectEqual(err == nil || apierrs.IsAlreadyExists(err), true)
+		framework.ExpectEqual(err == nil || apierrors.IsAlreadyExists(err), true)
 		class, err = client.StorageV1().StorageClasses().Get(class.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		defer func() {
@@ -264,7 +264,7 @@ func (t StorageClassTest) TestDynamicProvisioning() *v1.PersistentVolume {
 		framework.Logf("deleting claim %q/%q", claim.Namespace, claim.Name)
 		// typically this claim has already been deleted
 		err = client.CoreV1().PersistentVolumeClaims(claim.Namespace).Delete(claim.Name, nil)
-		if err != nil && !apierrs.IsNotFound(err) {
+		if err != nil && !apierrors.IsNotFound(err) {
 			framework.Failf("Error deleting claim %q. Error: %v", claim.Name, err)
 		}
 	}()
@@ -294,13 +294,26 @@ func (t StorageClassTest) TestDynamicProvisioning() *v1.PersistentVolume {
 	return pv
 }
 
+// getBoundPV returns a PV details.
+func getBoundPV(client clientset.Interface, pvc *v1.PersistentVolumeClaim) (*v1.PersistentVolume, error) {
+	// Get new copy of the claim
+	claim, err := client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(pvc.Name, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	// Get the bound PV
+	pv, err := client.CoreV1().PersistentVolumes().Get(claim.Spec.VolumeName, metav1.GetOptions{})
+	return pv, err
+}
+
 // checkProvisioning verifies that the claim is bound and has the correct properities
 func (t StorageClassTest) checkProvisioning(client clientset.Interface, claim *v1.PersistentVolumeClaim, class *storagev1.StorageClass) *v1.PersistentVolume {
 	err := e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, claim.Namespace, claim.Name, framework.Poll, framework.ClaimProvisionTimeout)
 	framework.ExpectNoError(err)
 
 	ginkgo.By("checking the claim")
-	pv, err := e2epv.GetBoundPV(client, claim)
+	pv, err := getBoundPV(client, claim)
 	framework.ExpectNoError(err)
 
 	// Check sizes
@@ -325,7 +338,7 @@ func (t StorageClassTest) checkProvisioning(client clientset.Interface, claim *v
 				break
 			}
 		}
-		gomega.Expect(found).To(gomega.BeTrue())
+		framework.ExpectEqual(found, true)
 	}
 
 	framework.ExpectEqual(pv.Spec.ClaimRef.Name, claim.ObjectMeta.Name)
@@ -373,7 +386,7 @@ func PVWriteReadSingleNodeCheck(client clientset.Interface, claim *v1.Persistent
 	pod = nil // Don't stop twice.
 
 	// Get a new copy of the PV
-	volume, err := e2epv.GetBoundPV(client, claim)
+	volume, err := getBoundPV(client, claim)
 	framework.ExpectNoError(err)
 
 	ginkgo.By(fmt.Sprintf("checking the created volume has the correct mount options, is readable and retains data on the same node %q", actualNodeName))
@@ -454,7 +467,10 @@ func (t StorageClassTest) TestBindingWaitForFirstConsumerMultiPVC(claims []*v1.P
 	ginkgo.By("creating a storage class " + t.Class.Name)
 	class, err := t.Client.StorageV1().StorageClasses().Create(t.Class)
 	framework.ExpectNoError(err)
-	defer deleteStorageClass(t.Client, class.Name)
+	defer func() {
+		err = deleteStorageClass(t.Client, class.Name)
+		framework.ExpectNoError(err, "While deleting storage class")
+	}()
 
 	ginkgo.By("creating claims")
 	var claimNames []string
@@ -466,7 +482,7 @@ func (t StorageClassTest) TestBindingWaitForFirstConsumerMultiPVC(claims []*v1.P
 		framework.ExpectNoError(err)
 	}
 	defer func() {
-		var errors map[string]error
+		errors := map[string]error{}
 		for _, claim := range createdClaims {
 			err := e2epv.DeletePersistentVolumeClaim(t.Client, claim.Name, claim.Namespace)
 			if err != nil {
@@ -629,6 +645,12 @@ func prepareSnapshotDataSourceForProvisioning(
 	ginkgo.By("[Initialize dataSource]creating a initClaim")
 	updatedClaim, err := client.CoreV1().PersistentVolumeClaims(initClaim.Namespace).Create(initClaim)
 	framework.ExpectNoError(err)
+
+	// write namespace to the /mnt/test (= the volume).
+	ginkgo.By("[Initialize dataSource]write data to volume")
+	command := fmt.Sprintf("echo '%s' > /mnt/test/initialData", updatedClaim.GetNamespace())
+	RunInPodWithVolume(client, updatedClaim.Namespace, updatedClaim.Name, "pvc-snapshot-writer", command, node)
+
 	err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, updatedClaim.Namespace, updatedClaim.Name, framework.Poll, framework.ClaimProvisionTimeout)
 	framework.ExpectNoError(err)
 
@@ -636,11 +658,6 @@ func prepareSnapshotDataSourceForProvisioning(
 	// Get new copy of the initClaim
 	_, err = client.CoreV1().PersistentVolumeClaims(updatedClaim.Namespace).Get(updatedClaim.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err)
-
-	// write namespace to the /mnt/test (= the volume).
-	ginkgo.By("[Initialize dataSource]write data to volume")
-	command := fmt.Sprintf("echo '%s' > /mnt/test/initialData", updatedClaim.GetNamespace())
-	RunInPodWithVolume(client, updatedClaim.Namespace, updatedClaim.Name, "pvc-snapshot-writer", command, node)
 
 	ginkgo.By("[Initialize dataSource]creating a SnapshotClass")
 	snapshotClass, err = dynamicClient.Resource(snapshotClassGVR).Create(snapshotClass, metav1.CreateOptions{})
@@ -667,13 +684,13 @@ func prepareSnapshotDataSourceForProvisioning(
 	cleanupFunc := func() {
 		framework.Logf("deleting snapshot %q/%q", snapshot.GetNamespace(), snapshot.GetName())
 		err = dynamicClient.Resource(snapshotGVR).Namespace(updatedClaim.Namespace).Delete(snapshot.GetName(), nil)
-		if err != nil && !apierrs.IsNotFound(err) {
+		if err != nil && !apierrors.IsNotFound(err) {
 			framework.Failf("Error deleting snapshot %q. Error: %v", snapshot.GetName(), err)
 		}
 
 		framework.Logf("deleting initClaim %q/%q", updatedClaim.Namespace, updatedClaim.Name)
 		err = client.CoreV1().PersistentVolumeClaims(updatedClaim.Namespace).Delete(updatedClaim.Name, nil)
-		if err != nil && !apierrs.IsNotFound(err) {
+		if err != nil && !apierrors.IsNotFound(err) {
 			framework.Failf("Error deleting initClaim %q. Error: %v", updatedClaim.Name, err)
 		}
 
@@ -715,7 +732,7 @@ func preparePVCDataSourceForProvisioning(
 	cleanupFunc := func() {
 		framework.Logf("deleting source PVC %q/%q", sourcePVC.Namespace, sourcePVC.Name)
 		err = client.CoreV1().PersistentVolumeClaims(sourcePVC.Namespace).Delete(sourcePVC.Name, nil)
-		if err != nil && !apierrs.IsNotFound(err) {
+		if err != nil && !apierrors.IsNotFound(err) {
 			framework.Failf("Error deleting source PVC %q. Error: %v", sourcePVC.Name, err)
 		}
 	}

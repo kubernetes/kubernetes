@@ -88,8 +88,21 @@ type CIDRAllocator interface {
 	Run(stopCh <-chan struct{})
 }
 
+// CIDRAllocatorParams is parameters that's required for creating new
+// cidr range allocator.
+type CIDRAllocatorParams struct {
+	// ClusterCIDRs is list of cluster cidrs
+	ClusterCIDRs []*net.IPNet
+	// ServiceCIDR is primary service cidr for cluster
+	ServiceCIDR *net.IPNet
+	// SecondaryServiceCIDR is secondary service cidr for cluster
+	SecondaryServiceCIDR *net.IPNet
+	// NodeCIDRMaskSizes is list of node cidr mask sizes
+	NodeCIDRMaskSizes []int
+}
+
 // New creates a new CIDR range allocator.
-func New(kubeClient clientset.Interface, cloud cloudprovider.Interface, nodeInformer informers.NodeInformer, allocatorType CIDRAllocatorType, clusterCIDRs []*net.IPNet, serviceCIDR *net.IPNet, secondaryServiceCIDR *net.IPNet, nodeCIDRMaskSize int) (CIDRAllocator, error) {
+func New(kubeClient clientset.Interface, cloud cloudprovider.Interface, nodeInformer informers.NodeInformer, allocatorType CIDRAllocatorType, allocatorParams CIDRAllocatorParams) (CIDRAllocator, error) {
 	nodeList, err := listNodes(kubeClient)
 	if err != nil {
 		return nil, err
@@ -97,7 +110,7 @@ func New(kubeClient clientset.Interface, cloud cloudprovider.Interface, nodeInfo
 
 	switch allocatorType {
 	case RangeAllocatorType:
-		return NewCIDRRangeAllocator(kubeClient, nodeInformer, clusterCIDRs, serviceCIDR, secondaryServiceCIDR, nodeCIDRMaskSize, nodeList)
+		return NewCIDRRangeAllocator(kubeClient, nodeInformer, allocatorParams, nodeList)
 	case CloudAllocatorType:
 		return NewCloudCIDRAllocator(kubeClient, cloud, nodeInformer)
 	default:

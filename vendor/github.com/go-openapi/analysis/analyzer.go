@@ -142,38 +142,12 @@ func (p *enumAnalysis) addSchemaEnum(key string, enum []interface{}) {
 // or validation etc.
 func New(doc *spec.Swagger) *Spec {
 	a := &Spec{
-		spec:        doc,
-		consumes:    make(map[string]struct{}, 150),
-		produces:    make(map[string]struct{}, 150),
-		authSchemes: make(map[string]struct{}, 150),
-		operations:  make(map[string]map[string]*spec.Operation, 150),
-		allSchemas:  make(map[string]SchemaRef, 150),
-		allOfs:      make(map[string]SchemaRef, 150),
-		references: referenceAnalysis{
-			schemas:        make(map[string]spec.Ref, 150),
-			pathItems:      make(map[string]spec.Ref, 150),
-			responses:      make(map[string]spec.Ref, 150),
-			parameters:     make(map[string]spec.Ref, 150),
-			items:          make(map[string]spec.Ref, 150),
-			headerItems:    make(map[string]spec.Ref, 150),
-			parameterItems: make(map[string]spec.Ref, 150),
-			allRefs:        make(map[string]spec.Ref, 150),
-		},
-		patterns: patternAnalysis{
-			parameters:  make(map[string]string, 150),
-			headers:     make(map[string]string, 150),
-			items:       make(map[string]string, 150),
-			schemas:     make(map[string]string, 150),
-			allPatterns: make(map[string]string, 150),
-		},
-		enums: enumAnalysis{
-			parameters: make(map[string][]interface{}, 150),
-			headers:    make(map[string][]interface{}, 150),
-			items:      make(map[string][]interface{}, 150),
-			schemas:    make(map[string][]interface{}, 150),
-			allEnums:   make(map[string][]interface{}, 150),
-		},
+		spec:       doc,
+		references: referenceAnalysis{},
+		patterns:   patternAnalysis{},
+		enums:      enumAnalysis{},
 	}
+	a.reset()
 	a.initialize()
 	return a
 }

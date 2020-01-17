@@ -25,18 +25,16 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	"k8s.io/kubernetes/pkg/features"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/nodestatus"
@@ -63,7 +61,7 @@ func (kl *Kubelet) registerWithAPIServer() {
 			step = 7 * time.Second
 		}
 
-		node, err := kl.initialNode()
+		node, err := kl.initialNode(context.TODO())
 		if err != nil {
 			klog.Errorf("Unable to construct v1.Node object for kubelet: %v", err)
 			continue
@@ -150,11 +148,15 @@ func (kl *Kubelet) reconcileExtendedResource(initialNode, node *v1.Node) bool {
 func (kl *Kubelet) updateDefaultLabels(initialNode, existingNode *v1.Node) bool {
 	defaultLabels := []string{
 		v1.LabelHostname,
+		v1.LabelZoneFailureDomainStable,
+		v1.LabelZoneRegionStable,
 		v1.LabelZoneFailureDomain,
 		v1.LabelZoneRegion,
+		v1.LabelInstanceTypeStable,
 		v1.LabelInstanceType,
 		v1.LabelOSStable,
 		v1.LabelArchStable,
+		v1.LabelWindowsBuild,
 		kubeletapis.LabelOS,
 		kubeletapis.LabelArch,
 	}
@@ -214,7 +216,7 @@ func (kl *Kubelet) reconcileCMADAnnotationWithExistingNode(node, existingNode *v
 
 // initialNode constructs the initial v1.Node for this Kubelet, incorporating node
 // labels, information from the cloud provider, and Kubelet configuration.
-func (kl *Kubelet) initialNode() (*v1.Node, error) {
+func (kl *Kubelet) initialNode(ctx context.Context) (*v1.Node, error) {
 	node := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: string(kl.nodeName),
@@ -230,6 +232,14 @@ func (kl *Kubelet) initialNode() (*v1.Node, error) {
 			Unschedulable: !kl.registerSchedulable,
 		},
 	}
+	osLabels, err := getOSSpecificLabels()
+	if err != nil {
+		return nil, err
+	}
+	for label, value := range osLabels {
+		node.Labels[label] = value
+	}
+
 	nodeTaints := make([]v1.Taint, 0)
 	if len(kl.registerWithTaints) > 0 {
 		taints := make([]v1.Taint, len(kl.registerWithTaints))
@@ -242,17 +252,15 @@ func (kl *Kubelet) initialNode() (*v1.Node, error) {
 	}
 
 	unschedulableTaint := v1.Taint{
-		Key:    schedulerapi.TaintNodeUnschedulable,
+		Key:    v1.TaintNodeUnschedulable,
 		Effect: v1.TaintEffectNoSchedule,
 	}
 
-	// If TaintNodesByCondition enabled, taint node with TaintNodeUnschedulable when initializing
+	// Taint node with TaintNodeUnschedulable when initializing
 	// node to avoid race condition; refer to #63897 for more detail.
-	if utilfeature.DefaultFeatureGate.Enabled(features.TaintNodesByCondition) {
-		if node.Spec.Unschedulable &&
-			!taintutil.TaintExists(nodeTaints, &unschedulableTaint) {
-			nodeTaints = append(nodeTaints, unschedulableTaint)
-		}
+	if node.Spec.Unschedulable &&
+		!taintutil.TaintExists(nodeTaints, &unschedulableTaint) {
+		nodeTaints = append(nodeTaints, unschedulableTaint)
 	}
 
 	if kl.externalCloudProvider {
@@ -320,34 +328,40 @@ func (kl *Kubelet) initialNode() (*v1.Node, error) {
 		// local metadata server here.
 		var err error
 		if node.Spec.ProviderID == "" {
-			node.Spec.ProviderID, err = cloudprovider.GetInstanceProviderID(context.TODO(), kl.cloud, kl.nodeName)
+			node.Spec.ProviderID, err = cloudprovider.GetInstanceProviderID(ctx, kl.cloud, kl.nodeName)
 			if err != nil {
 				return nil, err
 			}
 		}
 
-		instanceType, err := instances.InstanceType(context.TODO(), kl.nodeName)
+		instanceType, err := instances.InstanceType(ctx, kl.nodeName)
 		if err != nil {
 			return nil, err
 		}
 		if instanceType != "" {
 			klog.Infof("Adding node label from cloud provider: %s=%s", v1.LabelInstanceType, instanceType)
 			node.ObjectMeta.Labels[v1.LabelInstanceType] = instanceType
+			klog.Infof("Adding node label from cloud provider: %s=%s", v1.LabelInstanceTypeStable, instanceType)
+			node.ObjectMeta.Labels[v1.LabelInstanceTypeStable] = instanceType
 		}
 		// If the cloud has zone information, label the node with the zone information
 		zones, ok := kl.cloud.Zones()
 		if ok {
-			zone, err := zones.GetZone(context.TODO())
+			zone, err := zones.GetZone(ctx)
 			if err != nil {
 				return nil, fmt.Errorf("failed to get zone from cloud provider: %v", err)
 			}
 			if zone.FailureDomain != "" {
 				klog.Infof("Adding node label from cloud provider: %s=%s", v1.LabelZoneFailureDomain, zone.FailureDomain)
 				node.ObjectMeta.Labels[v1.LabelZoneFailureDomain] = zone.FailureDomain
+				klog.Infof("Adding node label from cloud provider: %s=%s", v1.LabelZoneFailureDomainStable, zone.FailureDomain)
+				node.ObjectMeta.Labels[v1.LabelZoneFailureDomainStable] = zone.FailureDomain
 			}
 			if zone.Region != "" {
 				klog.Infof("Adding node label from cloud provider: %s=%s", v1.LabelZoneRegion, zone.Region)
 				node.ObjectMeta.Labels[v1.LabelZoneRegion] = zone.Region
+				klog.Infof("Adding node label from cloud provider: %s=%s", v1.LabelZoneRegionStable, zone.Region)
+				node.ObjectMeta.Labels[v1.LabelZoneRegionStable] = zone.Region
 			}
 		}
 	}
@@ -430,7 +444,7 @@ func (kl *Kubelet) tryUpdateNodeStatus(tryNumber int) error {
 	kl.setNodeStatus(node)
 
 	now := kl.clock.Now()
-	if utilfeature.DefaultFeatureGate.Enabled(features.NodeLease) && now.Before(kl.lastStatusReportTime.Add(kl.nodeStatusReportFrequency)) {
+	if now.Before(kl.lastStatusReportTime.Add(kl.nodeStatusReportFrequency)) {
 		if !podCIDRChanged && !nodeStatusHasChanged(&originalNode.Status, &node.Status) {
 			// We must mark the volumes as ReportedInUse in volume manager's dsw even
 			// if no changes were made to the node status (no volumes were added or removed
@@ -503,7 +517,7 @@ func (kl *Kubelet) setNodeStatus(node *v1.Node) {
 	for i, f := range kl.setNodeStatusFuncs {
 		klog.V(5).Infof("Setting node status at position %v", i)
 		if err := f(node); err != nil {
-			klog.Warningf("Failed to set some node status fields: %s", err)
+			klog.Errorf("Failed to set some node status fields: %s", err)
 		}
 	}
 }
@@ -541,9 +555,9 @@ func (kl *Kubelet) defaultNodeStatusFuncs() []func(*v1.Node) error {
 		nodestatus.Images(kl.nodeStatusMaxImages, kl.imageManager.GetImageList),
 		nodestatus.GoRuntime(),
 	)
-	if utilfeature.DefaultFeatureGate.Enabled(features.AttachVolumeLimit) {
-		setters = append(setters, nodestatus.VolumeLimits(kl.volumePluginMgr.ListVolumePluginWithLimits))
-	}
+	// Volume limits
+	setters = append(setters, nodestatus.VolumeLimits(kl.volumePluginMgr.ListVolumePluginWithLimits))
+
 	setters = append(setters,
 		nodestatus.MemoryPressureCondition(kl.clock.Now, kl.evictionManager.IsUnderMemoryPressure, kl.recordNodeStatusEvent),
 		nodestatus.DiskPressureCondition(kl.clock.Now, kl.evictionManager.IsUnderDiskPressure, kl.recordNodeStatusEvent),

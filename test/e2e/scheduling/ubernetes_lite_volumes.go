@@ -21,9 +21,8 @@ import (
 	"strconv"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 	compute "google.golang.org/api/compute/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -32,6 +31,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 )
 
 var _ = SIGDescribe("Multi-AZ Cluster Volumes [sig-storage]", func() {
@@ -40,14 +40,14 @@ var _ = SIGDescribe("Multi-AZ Cluster Volumes [sig-storage]", func() {
 	var err error
 	image := framework.ServeHostnameImage
 	ginkgo.BeforeEach(func() {
-		framework.SkipUnlessProviderIs("gce", "gke")
+		e2eskipper.SkipUnlessProviderIs("gce", "gke")
 		if zoneCount <= 0 {
 			zoneCount, err = getZoneCount(f.ClientSet)
 			framework.ExpectNoError(err)
 		}
 		ginkgo.By(fmt.Sprintf("Checking for multi-zone cluster.  Zone count = %d", zoneCount))
 		msg := fmt.Sprintf("Zone count is %d, only run for multi-zone clusters, skipping test", zoneCount)
-		framework.SkipUnlessAtLeast(zoneCount, 2, msg)
+		e2eskipper.SkipUnlessAtLeast(zoneCount, 2, msg)
 		// TODO: SkipUnlessDefaultScheduler() // Non-default schedulers might not spread
 	})
 	ginkgo.It("should schedule pods in the same zones as statically provisioned PVs", func() {
@@ -168,10 +168,10 @@ func OnlyAllowNodeZones(f *framework.Framework, zoneCount int, image string) {
 		framework.ExpectNoError(err)
 
 		pvZone, ok := pv.ObjectMeta.Labels[v1.LabelZoneFailureDomain]
-		gomega.Expect(ok).To(gomega.BeTrue(), "PV has no LabelZone to be found")
+		framework.ExpectEqual(ok, true, "PV has no LabelZone to be found")
 		pvZones.Insert(pvZone)
 	}
-	gomega.Expect(pvZones.Equal(expectedZones)).To(gomega.BeTrue(), fmt.Sprintf("PDs provisioned in unwanted zones. We want zones: %v, got: %v", expectedZones, pvZones))
+	framework.ExpectEqual(pvZones.Equal(expectedZones), true, fmt.Sprintf("PDs provisioned in unwanted zones. We want zones: %v, got: %v", expectedZones, pvZones))
 }
 
 type staticPVTestConfig struct {

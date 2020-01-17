@@ -19,6 +19,7 @@
   "k8s.io/api/coordination/v1beta1": "coordinationv1beta1",
   "k8s.io/api/core/v1": "v1",
   "k8s.io/api/discovery/v1alpha1": "discoveryv1alpha1",
+  "k8s.io/api/discovery/v1beta1": "discoveryv1beta1",
   "k8s.io/api/events/v1beta1": "eventsv1beta1",
   "k8s.io/api/extensions/v1beta1": "extensionsv1beta1",
   "k8s.io/api/imagepolicy/v1alpha1": "imagepolicyv1alpha1",
@@ -37,6 +38,7 @@
   "k8s.io/api/storage/v1": "storagev1",
   "k8s.io/api/storage/v1alpha1": "storagev1alpha1",
   "k8s.io/api/storage/v1beta1": "storagev1beta1",
+  "k8s.io/apimachinery/pkg/api/errors": "apierrors",
   "k8s.io/kubernetes/pkg/controller/apis/config/v1alpha1": "controllerconfigv1alpha1",
   "k8s.io/kubernetes/pkg/kubelet/apis/config/v1beta1": "kubeletconfigv1beta1",
   "k8s.io/kubelet/pkg/apis/deviceplugin/v1alpha": "kubeletdevicepluginv1alpha",
@@ -49,5 +51,10 @@
   "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1": "kubeletstatsv1alpha1",
   "k8s.io/kubernetes/pkg/proxy/apis/config/v1alpha1": "proxyconfigv1alpha1",
   "k8s.io/kubernetes/pkg/scheduler/apis/config/v1alpha1": "schedulerconfigv1alpha1",
-  "k8s.io/kubernetes/test/e2e/framework/service": "e2eservice"
+  "k8s.io/kubernetes/test/e2e/framework/kubectl": "e2ekubectl",
+  "k8s.io/kubernetes/test/e2e/framework/node": "e2enode",
+  "k8s.io/kubernetes/test/e2e/framework/pod": "e2epod",
+  "k8s.io/kubernetes/test/e2e/framework/resource": "e2eresource",
+  "k8s.io/kubernetes/test/e2e/framework/service": "e2eservice",
+  "k8s.io/kubernetes/test/e2e/framework/ssh": "e2essh"
 }

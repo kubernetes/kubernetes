@@ -17,14 +17,15 @@ limitations under the License.
 package tainttoleration
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
 )
 
 func nodeWithTaints(nodeName string, taints []v1.Taint) *v1.Node {
@@ -157,7 +158,7 @@ func TestTaintTolerationScore(t *testing.T) {
 			},
 			expectedList: []framework.NodeScore{
 				{Name: "nodeA", Score: framework.MaxNodeScore},
-				{Name: "nodeB", Score: 5},
+				{Name: "nodeB", Score: 50},
 				{Name: "nodeC", Score: 0},
 			},
 		},
@@ -228,23 +229,25 @@ func TestTaintTolerationScore(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			state := framework.NewCycleState()
-
-			fh, _ := framework.NewFramework(nil, nil, nil)
-			snapshot := fh.NodeInfoSnapshot()
-			snapshot.NodeInfoMap = schedulernodeinfo.CreateNodeNameToInfoMap(nil, test.nodes)
+			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(nil, test.nodes))
+			fh, _ := framework.NewFramework(nil, nil, nil, framework.WithSnapshotSharedLister(snapshot))
 
 			p, _ := New(nil, fh)
+			status := p.(framework.PostFilterPlugin).PostFilter(context.Background(), state, test.pod, test.nodes, nil)
+			if !status.IsSuccess() {
+				t.Errorf("unexpected error: %v", status)
+			}
 			var gotList framework.NodeScoreList
 			for _, n := range test.nodes {
 				nodeName := n.ObjectMeta.Name
-				score, status := p.(framework.ScorePlugin).Score(state, test.pod, nodeName)
+				score, status := p.(framework.ScorePlugin).Score(context.Background(), state, test.pod, nodeName)
 				if !status.IsSuccess() {
 					t.Errorf("unexpected error: %v", status)
 				}
 				gotList = append(gotList, framework.NodeScore{Name: nodeName, Score: score})
 			}
 
-			status := p.(framework.ScorePlugin).ScoreExtensions().NormalizeScore(state, test.pod, gotList)
+			status = p.(framework.ScorePlugin).ScoreExtensions().NormalizeScore(context.Background(), state, test.pod, gotList)
 			if !status.IsSuccess() {
 				t.Errorf("unexpected error: %v", status)
 			}
@@ -257,7 +260,7 @@ func TestTaintTolerationScore(t *testing.T) {
 }
 
 func TestTaintTolerationFilter(t *testing.T) {
-	unschedulable := framework.NewStatus(framework.UnschedulableAndUnresolvable, predicates.ErrTaintsTolerationsNotMatch.GetReason())
+	unschedulable := framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonNotMatch)
 	tests := []struct {
 		name       string
 		pod        *v1.Pod
@@ -328,7 +331,7 @@ func TestTaintTolerationFilter(t *testing.T) {
 			nodeInfo := schedulernodeinfo.NewNodeInfo()
 			nodeInfo.SetNode(test.node)
 			p, _ := New(nil, nil)
-			gotStatus := p.(framework.FilterPlugin).Filter(nil, test.pod, nodeInfo)
+			gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), nil, test.pod, nodeInfo)
 			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
 				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
 			}

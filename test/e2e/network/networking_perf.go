@@ -25,6 +25,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -166,6 +167,6 @@ var _ = SIGDescribe("Networking IPerf IPv4 [Experimental] [Feature:Networking-IP
 // TODO jayunit100 : Retag this test according to semantics from #22401
 var _ = SIGDescribe("Networking IPerf IPv6 [Experimental] [Feature:Networking-IPv6] [Slow] [Feature:Networking-Performance] [LinuxOnly]", func() {
 	// IPv6 is not supported on Windows.
-	framework.SkipIfNodeOSDistroIs("windows")
+	e2eskipper.SkipIfNodeOSDistroIs("windows")
 	networkingIPerfTest(true)
 })

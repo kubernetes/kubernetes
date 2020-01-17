@@ -45,22 +45,22 @@ roleRef:
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: fluentd-es-v2.7.0
+  name: fluentd-es-v2.8.0
   namespace: kube-system
   labels:
     k8s-app: fluentd-es
-    version: v2.7.0
+    version: v2.8.0
     addonmanager.kubernetes.io/mode: Reconcile
 spec:
   selector:
     matchLabels:
       k8s-app: fluentd-es
-      version: v2.7.0
+      version: v2.8.0
   template:
     metadata:
       labels:
         k8s-app: fluentd-es
-        version: v2.7.0
+        version: v2.8.0
       # This annotation ensures that fluentd does not get evicted if the node
       # supports critical pod annotation based priority scheme.
       # Note that this does not guarantee admission on the nodes (#40573).
@@ -71,7 +71,7 @@ spec:
       serviceAccountName: fluentd-es
       containers:
       - name: fluentd-es
-        image: quay.io/fluentd_elasticsearch/fluentd:v2.7.0
+        image: quay.io/fluentd_elasticsearch/fluentd:v2.8.0
         env:
         - name: FLUENTD_ARGS
           value: --no-supervisor -q
@@ -89,6 +89,20 @@ spec:
           readOnly: true
         - name: config-volume
           mountPath: /etc/fluent/config.d
+        ports:
+        - containerPort: 24231
+          name: prometheus
+          protocol: TCP
+        livenessProbe:
+          tcpSocket:
+            port: prometheus
+          initialDelaySeconds: 5
+          timeoutSeconds: 10
+        readinessProbe:
+          tcpSocket:
+            port: prometheus
+          initialDelaySeconds: 5
+          timeoutSeconds: 10
       terminationGracePeriodSeconds: 30
       volumes:
       - name: varlog

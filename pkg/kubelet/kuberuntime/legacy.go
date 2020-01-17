@@ -44,9 +44,9 @@ func legacyLogSymlink(containerID string, containerName, podName, podNamespace s
 		containerName, containerID)
 }
 
-func logSymlink(containerLogsDir, podFullName, containerName, dockerID string) string {
+func logSymlink(containerLogsDir, podFullName, containerName, containerID string) string {
 	suffix := fmt.Sprintf(".%s", legacyLogSuffix)
-	logPath := fmt.Sprintf("%s_%s-%s", podFullName, containerName, dockerID)
+	logPath := fmt.Sprintf("%s_%s-%s", podFullName, containerName, containerID)
 	// Length of a filename cannot exceed 255 characters in ext4 on Linux.
 	if len(logPath) > ext4MaxFileNameLen-len(suffix) {
 		logPath = logPath[:ext4MaxFileNameLen-len(suffix)]

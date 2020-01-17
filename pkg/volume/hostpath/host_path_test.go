@@ -50,7 +50,7 @@ func newHostPathTypeList(pathType ...string) []*v1.HostPathType {
 
 func TestCanSupport(t *testing.T) {
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), nil /* prober */, volumetest.NewFakeVolumeHost("fake", nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), nil /* prober */, volumetest.NewFakeVolumeHost(t, "fake", nil, nil))
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/host-path")
 	if err != nil {
@@ -72,7 +72,7 @@ func TestCanSupport(t *testing.T) {
 
 func TestGetAccessModes(t *testing.T) {
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), nil /* prober */, volumetest.NewFakeVolumeHost("/tmp/fake", nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), nil /* prober */, volumetest.NewFakeVolumeHost(t, "/tmp/fake", nil, nil))
 
 	plug, err := plugMgr.FindPersistentPluginByName("kubernetes.io/host-path")
 	if err != nil {
@@ -85,7 +85,7 @@ func TestGetAccessModes(t *testing.T) {
 
 func TestRecycler(t *testing.T) {
 	plugMgr := volume.VolumePluginMgr{}
-	pluginHost := volumetest.NewFakeVolumeHost("/tmp/fake", nil, nil)
+	pluginHost := volumetest.NewFakeVolumeHost(t, "/tmp/fake", nil, nil)
 	plugMgr.InitPlugins([]volume.VolumePlugin{&hostPathPlugin{nil, volume.VolumeConfig{}}}, nil, pluginHost)
 
 	spec := &volume.Spec{PersistentVolume: &v1.PersistentVolume{Spec: v1.PersistentVolumeSpec{PersistentVolumeSource: v1.PersistentVolumeSource{HostPath: &v1.HostPathVolumeSource{Path: "/foo"}}}}}
@@ -104,7 +104,7 @@ func TestDeleter(t *testing.T) {
 	}
 	defer os.RemoveAll(tempPath)
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), nil /* prober */, volumetest.NewFakeVolumeHost("/tmp/fake", nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), nil /* prober */, volumetest.NewFakeVolumeHost(t, "/tmp/fake", nil, nil))
 
 	spec := &volume.Spec{PersistentVolume: &v1.PersistentVolume{Spec: v1.PersistentVolumeSpec{PersistentVolumeSource: v1.PersistentVolumeSource{HostPath: &v1.HostPathVolumeSource{Path: tempPath}}}}}
 	plug, err := plugMgr.FindDeletablePluginBySpec(spec)
@@ -138,7 +138,7 @@ func TestDeleterTempDir(t *testing.T) {
 
 	for name, test := range tests {
 		plugMgr := volume.VolumePluginMgr{}
-		plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), nil /* prober */, volumetest.NewFakeVolumeHost("/tmp/fake", nil, nil))
+		plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), nil /* prober */, volumetest.NewFakeVolumeHost(t, "/tmp/fake", nil, nil))
 		spec := &volume.Spec{PersistentVolume: &v1.PersistentVolume{Spec: v1.PersistentVolumeSpec{PersistentVolumeSource: v1.PersistentVolumeSource{HostPath: &v1.HostPathVolumeSource{Path: test.path}}}}}
 		plug, _ := plugMgr.FindDeletablePluginBySpec(spec)
 		deleter, _ := plug.NewDeleter(spec)
@@ -156,7 +156,7 @@ func TestProvisioner(t *testing.T) {
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{ProvisioningEnabled: true}),
 		nil,
-		volumetest.NewFakeVolumeHost("/tmp/fake", nil, nil))
+		volumetest.NewFakeVolumeHost(t, "/tmp/fake", nil, nil))
 	spec := &volume.Spec{PersistentVolume: &v1.PersistentVolume{Spec: v1.PersistentVolumeSpec{
 		PersistentVolumeSource: v1.PersistentVolumeSource{HostPath: &v1.HostPathVolumeSource{Path: fmt.Sprintf("/tmp/hostpath.%s", uuid.NewUUID())}}}}}
 	plug, err := plugMgr.FindCreatablePluginBySpec(spec)
@@ -203,7 +203,7 @@ func TestProvisioner(t *testing.T) {
 
 func TestInvalidHostPath(t *testing.T) {
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), nil /* prober */, volumetest.NewFakeVolumeHost("fake", nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), nil /* prober */, volumetest.NewFakeVolumeHost(t, "fake", nil, nil))
 
 	plug, err := plugMgr.FindPluginByName(hostPathPluginName)
 	if err != nil {
@@ -228,7 +228,7 @@ func TestInvalidHostPath(t *testing.T) {
 
 func TestPlugin(t *testing.T) {
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), nil /* prober */, volumetest.NewFakeVolumeHost("fake", nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), nil /* prober */, volumetest.NewFakeVolumeHost(t, "fake", nil, nil))
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/host-path")
 	if err != nil {
@@ -304,7 +304,7 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 	client := fake.NewSimpleClientset(pv, claim)
 
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), nil /* prober */, volumetest.NewFakeVolumeHost("/tmp/fake", client, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), nil /* prober */, volumetest.NewFakeVolumeHost(t, "/tmp/fake", client, nil))
 	plug, _ := plugMgr.FindPluginByName(hostPathPluginName)
 
 	// readOnly bool is supplied by persistent-claim volume source when its mounter creates other volumes

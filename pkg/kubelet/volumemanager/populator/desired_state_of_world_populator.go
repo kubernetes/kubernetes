@@ -43,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/csimigration"
 	"k8s.io/kubernetes/pkg/volume/util"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 )
@@ -87,7 +88,9 @@ func NewDesiredStateOfWorldPopulator(
 	desiredStateOfWorld cache.DesiredStateOfWorld,
 	actualStateOfWorld cache.ActualStateOfWorld,
 	kubeContainerRuntime kubecontainer.Runtime,
-	keepTerminatedPodVolumes bool) DesiredStateOfWorldPopulator {
+	keepTerminatedPodVolumes bool,
+	csiMigratedPluginManager csimigration.PluginManager,
+	intreeToCSITranslator csimigration.InTreeToCSITranslator) DesiredStateOfWorldPopulator {
 	return &desiredStateOfWorldPopulator{
 		kubeClient:                kubeClient,
 		loopSleepDuration:         loopSleepDuration,
@@ -102,6 +105,8 @@ func NewDesiredStateOfWorldPopulator(
 		keepTerminatedPodVolumes: keepTerminatedPodVolumes,
 		hasAddedPods:             false,
 		hasAddedPodsLock:         sync.RWMutex{},
+		csiMigratedPluginManager: csiMigratedPluginManager,
+		intreeToCSITranslator:    intreeToCSITranslator,
 	}
 }
 
@@ -119,6 +124,8 @@ type desiredStateOfWorldPopulator struct {
 	keepTerminatedPodVolumes  bool
 	hasAddedPods              bool
 	hasAddedPodsLock          sync.RWMutex
+	csiMigratedPluginManager  csimigration.PluginManager
+	intreeToCSITranslator     csimigration.InTreeToCSITranslator
 }
 
 type processedPods struct {
@@ -505,19 +512,35 @@ func (dswp *desiredStateOfWorldPopulator) createVolumeSpec(
 			pvcSource.ClaimName,
 			pvcUID)
 
-		// TODO: remove feature gate check after no longer needed
-		if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
-			volumeMode, err := util.GetVolumeMode(volumeSpec)
+		migratable, err := dswp.csiMigratedPluginManager.IsMigratable(volumeSpec)
+		if err != nil {
+			return nil, nil, "", err
+		}
+		if migratable {
+			volumeSpec, err = csimigration.TranslateInTreeSpecToCSI(volumeSpec, dswp.intreeToCSITranslator)
 			if err != nil {
 				return nil, nil, "", err
 			}
-			// Error if a container has volumeMounts but the volumeMode of PVC isn't Filesystem
-			if mounts.Has(podVolume.Name) && volumeMode != v1.PersistentVolumeFilesystem {
-				return nil, nil, "", fmt.Errorf(
-					"volume %s has volumeMode %s, but is specified in volumeMounts",
-					podVolume.Name,
-					volumeMode)
-			}
+		}
+
+		// TODO: replace this with util.GetVolumeMode() when features.BlockVolume is removed.
+		// The function will return the right value then.
+		volumeMode := v1.PersistentVolumeFilesystem
+		if volumeSpec.PersistentVolume != nil && volumeSpec.PersistentVolume.Spec.VolumeMode != nil {
+			volumeMode = *volumeSpec.PersistentVolume.Spec.VolumeMode
+		}
+
+		// TODO: remove features.BlockVolume checks / comments after no longer needed
+		// Error if a container has volumeMounts but the volumeMode of PVC isn't Filesystem.
+		// Do not check feature gate here to make sure even when the feature is disabled in kubelet,
+		// because controller-manager / API server can already contain block PVs / PVCs.
+		if mounts.Has(podVolume.Name) && volumeMode != v1.PersistentVolumeFilesystem {
+			return nil, nil, "", fmt.Errorf(
+				"volume %s has volumeMode %s, but is specified in volumeMounts",
+				podVolume.Name,
+				volumeMode)
+		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
 			// Error if a container has volumeDevices but the volumeMode of PVC isn't Block
 			if devices.Has(podVolume.Name) && volumeMode != v1.PersistentVolumeBlock {
 				return nil, nil, "", fmt.Errorf(
@@ -532,7 +555,18 @@ func (dswp *desiredStateOfWorldPopulator) createVolumeSpec(
 	// Do not return the original volume object, since the source could mutate it
 	clonedPodVolume := podVolume.DeepCopy()
 
-	return nil, volume.NewSpecFromVolume(clonedPodVolume), "", nil
+	spec := volume.NewSpecFromVolume(clonedPodVolume)
+	migratable, err := dswp.csiMigratedPluginManager.IsMigratable(spec)
+	if err != nil {
+		return nil, nil, "", err
+	}
+	if migratable {
+		spec, err = csimigration.TranslateInTreeSpecToCSI(spec, dswp.intreeToCSITranslator)
+		if err != nil {
+			return nil, nil, "", err
+		}
+	}
+	return nil, spec, "", nil
 }
 
 // getPVCExtractPV fetches the PVC object with the given namespace and name from

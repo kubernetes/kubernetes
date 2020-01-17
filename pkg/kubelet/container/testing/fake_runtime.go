@@ -177,6 +177,10 @@ func (f *FakeRuntime) Type() string {
 	return f.RuntimeType
 }
 
+func (f *FakeRuntime) SupportsSingleFileMapping() bool {
+	return true
+}
+
 func (f *FakeRuntime) Version() (kubecontainer.Version, error) {
 	f.Lock()
 	defer f.Unlock()

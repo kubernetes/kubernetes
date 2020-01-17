@@ -33,6 +33,9 @@ import (
 	"github.com/opencontainers/runc/libcontainer/cgroups/fs"
 	"github.com/opencontainers/runc/libcontainer/configs"
 	"k8s.io/klog"
+	utilio "k8s.io/utils/io"
+	"k8s.io/utils/mount"
+	utilpath "k8s.io/utils/path"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -47,6 +50,7 @@ import (
 	podresourcesapi "k8s.io/kubernetes/pkg/kubelet/apis/podresources/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/containermap"
 	cputopology "k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
@@ -59,12 +63,9 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/stats/pidlimit"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
-	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/util/procfs"
 	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
-	utilio "k8s.io/utils/io"
-	utilpath "k8s.io/utils/path"
 )
 
 const (
@@ -297,7 +298,7 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 			return nil, err
 		}
 
-		klog.Infof("[topologymanager] Initilizing Topology Manager with %s policy", nodeConfig.ExperimentalTopologyManagerPolicy)
+		klog.Infof("[topologymanager] Initializing Topology Manager with %s policy", nodeConfig.ExperimentalTopologyManagerPolicy)
 	} else {
 		cm.topologyManager = topologymanager.NewFakeManager()
 	}
@@ -320,6 +321,7 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 			nodeConfig.ExperimentalCPUManagerReconcilePeriod,
 			machineInfo,
 			numaNodeInfo,
+			nodeConfig.NodeAllocatableConfig.ReservedSystemCPUs,
 			cm.GetNodeAllocatableReservation(),
 			nodeConfig.KubeletRootDir,
 			cm.topologyManager,
@@ -573,7 +575,11 @@ func (cm *containerManagerImpl) Start(node *v1.Node,
 
 	// Initialize CPU manager
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CPUManager) {
-		cm.cpuManager.Start(cpumanager.ActivePodsFunc(activePods), podStatusProvider, runtimeService)
+		containerMap, err := buildContainerMapFromRuntime(runtimeService)
+		if err != nil {
+			return fmt.Errorf("failed to build map of initial containers from runtime: %v", err)
+		}
+		cm.cpuManager.Start(cpumanager.ActivePodsFunc(activePods), sourcesReady, podStatusProvider, runtimeService, containerMap)
 	}
 
 	// cache the node Info including resource capacity and
@@ -683,6 +689,25 @@ func (cm *containerManagerImpl) SystemCgroupsLimit() v1.ResourceList {
 			cpuLimit,
 			resource.DecimalSI),
 	}
+}
+
+func buildContainerMapFromRuntime(runtimeService internalapi.RuntimeService) (containermap.ContainerMap, error) {
+	podSandboxMap := make(map[string]string)
+	podSandboxList, _ := runtimeService.ListPodSandbox(nil)
+	for _, p := range podSandboxList {
+		podSandboxMap[p.Id] = p.Metadata.Uid
+	}
+
+	containerMap := containermap.NewContainerMap()
+	containerList, _ := runtimeService.ListContainers(nil)
+	for _, c := range containerList {
+		if _, exists := podSandboxMap[c.PodSandboxId]; !exists {
+			return nil, fmt.Errorf("no PodsandBox found with Id '%s'", c.PodSandboxId)
+		}
+		containerMap.Add(podSandboxMap[c.PodSandboxId], c.Metadata.Name, c.Id)
+	}
+
+	return containerMap, nil
 }
 
 func isProcessRunningInHost(pid int) (bool, error) {

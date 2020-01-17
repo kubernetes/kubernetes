@@ -16,22 +16,24 @@ limitations under the License.
 
 package metrics
 
+import "k8s.io/component-base/metrics/testutil"
+
 // SchedulerMetrics is metrics for scheduler
-type SchedulerMetrics Metrics
+type SchedulerMetrics testutil.Metrics
 
 // Equal returns true if all metrics are the same as the arguments.
 func (m *SchedulerMetrics) Equal(o SchedulerMetrics) bool {
-	return (*Metrics)(m).Equal(Metrics(o))
+	return (*testutil.Metrics)(m).Equal(testutil.Metrics(o))
 }
 
 func newSchedulerMetrics() SchedulerMetrics {
-	result := NewMetrics()
+	result := testutil.NewMetrics()
 	return SchedulerMetrics(result)
 }
 
 func parseSchedulerMetrics(data string) (SchedulerMetrics, error) {
 	result := newSchedulerMetrics()
-	if err := parseMetrics(data, (*Metrics)(&result)); err != nil {
+	if err := testutil.ParseMetrics(data, (*testutil.Metrics)(&result)); err != nil {
 		return SchedulerMetrics{}, err
 	}
 	return result, nil

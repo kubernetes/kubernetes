@@ -22,9 +22,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/spf13/pflag"
 
-	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/apiserver/pkg/admission"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	auditbuffered "k8s.io/apiserver/plugin/pkg/audit/buffered"
@@ -147,10 +149,10 @@ func TestAddFlags(t *testing.T) {
 			StorageConfig: storagebackend.Config{
 				Type: "etcd3",
 				Transport: storagebackend.TransportConfig{
-					ServerList: nil,
-					KeyFile:    "/var/run/kubernetes/etcd.key",
-					CAFile:     "/var/run/kubernetes/etcdca.crt",
-					CertFile:   "/var/run/kubernetes/etcdce.crt",
+					ServerList:    nil,
+					KeyFile:       "/var/run/kubernetes/etcd.key",
+					TrustedCAFile: "/var/run/kubernetes/etcdca.crt",
+					CertFile:      "/var/run/kubernetes/etcdce.crt",
 				},
 				Paging:                true,
 				Prefix:                "/registry",
@@ -266,6 +268,7 @@ func TestAddFlags(t *testing.T) {
 			WebHook: &kubeoptions.WebHookAuthenticationOptions{
 				CacheTTL:   180000000000,
 				ConfigFile: "/token-webhook-config",
+				Version:    "v1beta1",
 			},
 			BootstrapToken: &kubeoptions.BootstrapTokenAuthenticationOptions{},
 			OIDC: &kubeoptions.OIDCAuthenticationOptions{
@@ -287,6 +290,7 @@ func TestAddFlags(t *testing.T) {
 			WebhookConfigFile:           "/webhook-config",
 			WebhookCacheAuthorizedTTL:   180000000000,
 			WebhookCacheUnauthorizedTTL: 60000000000,
+			WebhookVersion:              "v1beta1",
 		},
 		CloudProvider: &kubeoptions.CloudProviderOptions{
 			CloudConfigFile: "/cloud-config",
@@ -305,6 +309,6 @@ func TestAddFlags(t *testing.T) {
 	}
 
 	if !reflect.DeepEqual(expected, s) {
-		t.Errorf("Got different run options than expected.\nDifference detected on:\n%s", diff.ObjectReflectDiff(expected, s))
+		t.Errorf("Got different run options than expected.\nDifference detected on:\n%s", cmp.Diff(expected, s, cmpopts.IgnoreUnexported(admission.Plugins{})))
 	}
 }

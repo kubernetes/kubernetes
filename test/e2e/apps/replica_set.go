@@ -22,7 +22,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	replicasetutil "k8s.io/kubernetes/test/e2e/framework/replicaset"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 
 	"github.com/onsi/ginkgo"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -95,9 +96,8 @@ var _ = SIGDescribe("ReplicaSet", func() {
 
 	ginkgo.It("should serve a basic image on each replica with a private image", func() {
 		// requires private images
-		framework.SkipUnlessProviderIs("gce", "gke")
-		privateimage := imageutils.GetConfig(imageutils.Agnhost)
-		privateimage.SetRegistry(imageutils.PrivateRegistry)
+		e2eskipper.SkipUnlessProviderIs("gce", "gke")
+		privateimage := imageutils.GetConfig(imageutils.AgnhostPrivate)
 		testReplicaSetServeImageOrFail(f, "private", privateimage.GetE2EImage())
 	})
 
@@ -290,7 +290,7 @@ func testRSAdoptMatchingAndReleaseNotMatching(f *framework.Framework) {
 	err = wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
 		p2, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(p.Name, metav1.GetOptions{})
 		// The Pod p should either be adopted or deleted by the ReplicaSet
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			return true, nil
 		}
 		framework.ExpectNoError(err)
@@ -316,7 +316,7 @@ func testRSAdoptMatchingAndReleaseNotMatching(f *framework.Framework) {
 
 		pod.Labels = map[string]string{"name": "not-matching-name"}
 		_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Update(pod)
-		if err != nil && errors.IsConflict(err) {
+		if err != nil && apierrors.IsConflict(err) {
 			return false, nil
 		}
 		if err != nil {

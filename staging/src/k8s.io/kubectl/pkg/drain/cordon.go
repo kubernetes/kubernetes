@@ -62,10 +62,8 @@ func NewCordonHelperFromRuntimeObject(nodeObject runtime.Object, scheme *runtime
 // or false when no change is needed
 func (c *CordonHelper) UpdateIfRequired(desired bool) bool {
 	c.desired = desired
-	if c.node.Spec.Unschedulable == c.desired {
-		return false
-	}
-	return true
+
+	return c.node.Spec.Unschedulable != c.desired
 }
 
 // PatchOrReplace uses given clientset to update the node status, either by patching or

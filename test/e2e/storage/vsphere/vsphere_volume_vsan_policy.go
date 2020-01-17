@@ -32,6 +32,7 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -100,7 +101,7 @@ var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsp
 		masterNode   string
 	)
 	ginkgo.BeforeEach(func() {
-		framework.SkipUnlessProviderIs("vsphere")
+		e2eskipper.SkipUnlessProviderIs("vsphere")
 		Bootstrap(f)
 		client = f.ClientSet
 		namespace = f.Namespace.Name
@@ -321,6 +322,7 @@ func invokeInvalidPolicyTestNeg(client clientset.Interface, namespace string, sc
 	framework.ExpectError(err)
 
 	eventList, err := client.CoreV1().Events(pvclaim.Namespace).List(metav1.ListOptions{})
+	framework.ExpectNoError(err)
 	return fmt.Errorf("Failure message: %+q", eventList.Items[0].Message)
 }
 
@@ -352,5 +354,6 @@ func invokeStaleDummyVMTestWithStoragePolicy(client clientset.Interface, masterN
 	dummyVMFullName := DummyVMPrefixName + "-" + fmt.Sprint(fnvHash.Sum32())
 	errorMsg := "Dummy VM - " + vmName + "is still present. Failing the test.."
 	nodeInfo := TestContext.NodeMapper.GetNodeInfo(masterNode)
-	gomega.Expect(nodeInfo.VSphere.IsVMPresent(dummyVMFullName, nodeInfo.DataCenterRef)).NotTo(gomega.BeTrue(), errorMsg)
+	isVMPresentFlag, _ := nodeInfo.VSphere.IsVMPresent(dummyVMFullName, nodeInfo.DataCenterRef)
+	framework.ExpectNotEqual(isVMPresentFlag, true, errorMsg)
 }

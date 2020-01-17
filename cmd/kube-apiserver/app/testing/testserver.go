@@ -34,8 +34,10 @@ import (
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/util/cert"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
+	testutil "k8s.io/kubernetes/test/utils"
 )
 
 // TearDownFunc is to be called to tear down a test server.
@@ -45,6 +47,9 @@ type TearDownFunc func()
 type TestServerInstanceOptions struct {
 	// DisableStorageCleanup Disable the automatic storage cleanup
 	DisableStorageCleanup bool
+
+	// Enable cert-auth for the kube-apiserver
+	EnableCertAuth bool
 }
 
 // TestServer return values supplied by kube-test-ApiServer
@@ -66,6 +71,7 @@ type Logger interface {
 func NewDefaultTestServerOptions() *TestServerInstanceOptions {
 	return &TestServerInstanceOptions{
 		DisableStorageCleanup: false,
+		EnableCertAuth:        true,
 	}
 }
 
@@ -114,7 +120,6 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 	for _, f := range s.Flags().FlagSets {
 		fs.AddFlagSet(f)
 	}
-
 	s.InsecureServing.BindPort = 0
 
 	s.SecureServing.Listener, s.SecureServing.BindPort, err = createLocalhostListenerOnFreePort()
@@ -122,6 +127,37 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 		return result, fmt.Errorf("failed to create listener: %v", err)
 	}
 	s.SecureServing.ServerCert.CertDirectory = result.TmpDir
+
+	if instanceOptions.EnableCertAuth {
+		// create certificates for aggregation and client-cert auth
+		proxySigningKey, err := testutil.NewPrivateKey()
+		if err != nil {
+			return result, err
+		}
+		proxySigningCert, err := cert.NewSelfSignedCACert(cert.Config{CommonName: "front-proxy-ca"}, proxySigningKey)
+		if err != nil {
+			return result, err
+		}
+		proxyCACertFile := path.Join(s.SecureServing.ServerCert.CertDirectory, "proxy-ca.crt")
+		if err := ioutil.WriteFile(proxyCACertFile, testutil.EncodeCertPEM(proxySigningCert), 0644); err != nil {
+			return result, err
+		}
+		s.Authentication.RequestHeader.ClientCAFile = proxyCACertFile
+		clientSigningKey, err := testutil.NewPrivateKey()
+		if err != nil {
+			return result, err
+		}
+		clientSigningCert, err := cert.NewSelfSignedCACert(cert.Config{CommonName: "client-ca"}, clientSigningKey)
+		if err != nil {
+			return result, err
+		}
+		clientCACertFile := path.Join(s.SecureServing.ServerCert.CertDirectory, "client-ca.crt")
+		if err := ioutil.WriteFile(clientCACertFile, testutil.EncodeCertPEM(clientSigningCert), 0644); err != nil {
+			return result, err
+		}
+		s.Authentication.ClientCert.ClientCA = clientCACertFile
+	}
+
 	s.SecureServing.ExternalAddress = s.SecureServing.Listener.Addr().(*net.TCPAddr).IP // use listener addr although it is a loopback device
 
 	_, thisFile, _, ok := runtime.Caller(0)
@@ -134,7 +170,9 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 	s.Etcd.StorageConfig = *storageConfig
 	s.APIEnablement.RuntimeConfig.Set("api/all=true")
 
-	fs.Parse(customFlags)
+	if err := fs.Parse(customFlags); err != nil {
+		return result, err
+	}
 	completedOptions, err := app.Complete(s)
 	if err != nil {
 		return result, fmt.Errorf("failed to set default ServerRunOptions: %v", err)
@@ -205,7 +243,7 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 	}
 
 	// from here the caller must call tearDown
-	result.ClientConfig = server.GenericAPIServer.LoopbackClientConfig
+	result.ClientConfig = restclient.CopyConfig(server.GenericAPIServer.LoopbackClientConfig)
 	result.ClientConfig.QPS = 1000
 	result.ClientConfig.Burst = 10000
 	result.ServerOpts = s

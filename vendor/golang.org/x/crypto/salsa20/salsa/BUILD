@@ -4,9 +4,10 @@ go_library(
     name = "go_default_library",
     srcs = [
         "hsalsa20.go",
-        "salsa2020_amd64.s",
         "salsa208.go",
         "salsa20_amd64.go",
+        "salsa20_amd64.s",
+        "salsa20_noasm.go",
         "salsa20_ref.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/golang.org/x/crypto/salsa20/salsa",

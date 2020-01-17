@@ -45,16 +45,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1alpha1.SAControllerConfiguration)(nil), (*config.SAControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_SAControllerConfiguration_To_config_SAControllerConfiguration(a.(*v1alpha1.SAControllerConfiguration), b.(*config.SAControllerConfiguration), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*config.SAControllerConfiguration)(nil), (*v1alpha1.SAControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_SAControllerConfiguration_To_v1alpha1_SAControllerConfiguration(a.(*config.SAControllerConfiguration), b.(*v1alpha1.SAControllerConfiguration), scope)
-	}); err != nil {
-		return err
-	}
 	if err := s.AddConversionFunc((*config.SAControllerConfiguration)(nil), (*v1alpha1.SAControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_config_SAControllerConfiguration_To_v1alpha1_SAControllerConfiguration(a.(*config.SAControllerConfiguration), b.(*v1alpha1.SAControllerConfiguration), scope)
 	}); err != nil {

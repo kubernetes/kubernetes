@@ -41,7 +41,7 @@ func NewCounter(opts *CounterOpts) *Counter {
 		lazyMetric:  lazyMetric{},
 	}
 	kc.setPrometheusCounter(noop)
-	kc.lazyInit(kc)
+	kc.lazyInit(kc, BuildFQName(opts.Namespace, opts.Subsystem, opts.Name))
 	return kc
 }
 
@@ -92,7 +92,7 @@ func NewCounterVec(opts *CounterOpts, labels []string) *CounterVec {
 		originalLabels: labels,
 		lazyMetric:     lazyMetric{},
 	}
-	cv.lazyInit(cv)
+	cv.lazyInit(cv, BuildFQName(opts.Namespace, opts.Subsystem, opts.Name))
 	return cv
 }
 
@@ -158,4 +158,13 @@ func (v *CounterVec) Delete(labels map[string]string) bool {
 		return false // since we haven't created the metric, we haven't deleted a metric with the passed in values
 	}
 	return v.CounterVec.Delete(labels)
+}
+
+// Reset deletes all metrics in this vector.
+func (v *CounterVec) Reset() {
+	if !v.IsCreated() {
+		return
+	}
+
+	v.CounterVec.Reset()
 }

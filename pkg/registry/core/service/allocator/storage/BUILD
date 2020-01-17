@@ -25,6 +25,7 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/registry/core/service/allocator/storage",
     deps = [
         "//pkg/apis/core:go_default_library",
+        "//pkg/apis/core/install:go_default_library",
         "//pkg/registry/core/rangeallocation:go_default_library",
         "//pkg/registry/core/service/allocator:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",

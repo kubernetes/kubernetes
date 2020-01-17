@@ -123,10 +123,8 @@ func ValidateNetworkPolicySpec(spec *networking.NetworkPolicySpec, fldPath *fiel
 	}
 	for i, pType := range spec.PolicyTypes {
 		policyPath := fldPath.Child("policyTypes").Index(i)
-		for _, p := range spec.PolicyTypes {
-			if !allowed.Has(string(p)) {
-				allErrs = append(allErrs, field.NotSupported(policyPath, pType, []string{string(networking.PolicyTypeIngress), string(networking.PolicyTypeEgress)}))
-			}
+		if !allowed.Has(string(pType)) {
+			allErrs = append(allErrs, field.NotSupported(policyPath, pType, []string{string(networking.PolicyTypeIngress), string(networking.PolicyTypeEgress)}))
 		}
 	}
 	return allErrs

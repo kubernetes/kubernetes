@@ -155,7 +155,7 @@ func GenResponseWithJsonEncodedBody(bodyStruct interface{}) (*http.Response, err
 	if err != nil {
 		return nil, err
 	}
-	return &http.Response{StatusCode: 200, Header: DefaultHeader(), Body: BytesBody(jsonBytes)}, nil
+	return &http.Response{StatusCode: http.StatusOK, Header: DefaultHeader(), Body: BytesBody(jsonBytes)}, nil
 }
 
 func InitTestErrorHandler(t *testing.T) {

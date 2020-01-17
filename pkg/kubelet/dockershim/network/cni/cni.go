@@ -191,7 +191,7 @@ func getDefaultCNINetwork(confDir string, binDirs []string) (*cniNetwork, error)
 			}
 		}
 		if len(confList.Plugins) == 0 {
-			klog.Warningf("CNI config list %s has no networks, skipping", confFile)
+			klog.Warningf("CNI config list %s has no networks, skipping", string(confList.Bytes[:maxStringLengthInLog(len(confList.Bytes))]))
 			continue
 		}
 
@@ -199,7 +199,7 @@ func getDefaultCNINetwork(confDir string, binDirs []string) (*cniNetwork, error)
 		// all plugins of this config exist on disk
 		caps, err := cniConfig.ValidateNetworkList(context.TODO(), confList)
 		if err != nil {
-			klog.Warningf("Error validating CNI config %v: %v", confList, err)
+			klog.Warningf("Error validating CNI config list %s: %v", string(confList.Bytes[:maxStringLengthInLog(len(confList.Bytes))]), err)
 			continue
 		}
 
@@ -461,4 +461,14 @@ func (plugin *cniNetworkPlugin) buildCNIRuntimeConf(podName string, podNs string
 	}
 
 	return rt, nil
+}
+
+func maxStringLengthInLog(length int) int {
+	// we allow no more than 4096-length strings to be logged
+	const maxStringLength = 4096
+
+	if length < maxStringLength {
+		return length
+	}
+	return maxStringLength
 }

@@ -140,7 +140,7 @@ func TestCreateRole(t *testing.T) {
 			cmd.Run(cmd, []string{roleName})
 			actual := &rbac.Role{}
 			if err := runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), buf.Bytes(), actual); err != nil {
-				t.Log(string(buf.Bytes()))
+				t.Log(buf.String())
 				t.Fatal(err)
 			}
 			if !equality.Semantic.DeepEqual(test.expectedRole, actual) {

@@ -607,11 +607,9 @@ func (g *Cloud) Initialize(clientBuilder cloudprovider.ControllerClientBuilder, 
 	g.clientBuilder = clientBuilder
 	g.client = clientBuilder.ClientOrDie("cloud-provider")
 
-	if g.OnXPN() {
-		g.eventBroadcaster = record.NewBroadcaster()
-		g.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: g.client.CoreV1().Events("")})
-		g.eventRecorder = g.eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "g-cloudprovider"})
-	}
+	g.eventBroadcaster = record.NewBroadcaster()
+	g.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: g.client.CoreV1().Events("")})
+	g.eventRecorder = g.eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "g-cloudprovider"})
 
 	go g.watchClusterID(stop)
 }

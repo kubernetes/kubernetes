@@ -22,6 +22,8 @@ import (
 	"time"
 
 	"k8s.io/klog"
+	utilexec "k8s.io/utils/exec"
+	"k8s.io/utils/mount"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
 	v1 "k8s.io/api/core/v1"
@@ -43,8 +45,8 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/controller/volume/events"
-	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/csimigration"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
@@ -98,6 +100,8 @@ type expandController struct {
 	queue workqueue.RateLimitingInterface
 
 	translator CSINameTranslator
+
+	csiMigratedPluginManager csimigration.PluginManager
 }
 
 // NewExpandController expands the pvs
@@ -108,19 +112,21 @@ func NewExpandController(
 	scInformer storageclassinformer.StorageClassInformer,
 	cloud cloudprovider.Interface,
 	plugins []volume.VolumePlugin,
-	translator CSINameTranslator) (ExpandController, error) {
+	translator CSINameTranslator,
+	csiMigratedPluginManager csimigration.PluginManager) (ExpandController, error) {
 
 	expc := &expandController{
-		kubeClient:        kubeClient,
-		cloud:             cloud,
-		pvcLister:         pvcInformer.Lister(),
-		pvcsSynced:        pvcInformer.Informer().HasSynced,
-		pvLister:          pvInformer.Lister(),
-		pvSynced:          pvInformer.Informer().HasSynced,
-		classLister:       scInformer.Lister(),
-		classListerSynced: scInformer.Informer().HasSynced,
-		queue:             workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "volume_expand"),
-		translator:        translator,
+		kubeClient:               kubeClient,
+		cloud:                    cloud,
+		pvcLister:                pvcInformer.Lister(),
+		pvcsSynced:               pvcInformer.Informer().HasSynced,
+		pvLister:                 pvInformer.Lister(),
+		pvSynced:                 pvInformer.Informer().HasSynced,
+		classLister:              scInformer.Lister(),
+		classListerSynced:        scInformer.Informer().HasSynced,
+		queue:                    workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "volume_expand"),
+		translator:               translator,
+		csiMigratedPluginManager: csiMigratedPluginManager,
 	}
 
 	if err := expc.volumePluginMgr.InitPlugins(plugins, nil, expc); err != nil {
@@ -242,25 +248,15 @@ func (expc *expandController) syncHandler(key string) error {
 		return nil
 	}
 
-	volumeSpec := volume.NewSpecFromPersistentVolume(pv, false)
-	volumePlugin, err := expc.volumePluginMgr.FindExpandablePluginBySpec(volumeSpec)
 	volumeResizerName := class.Provisioner
-
-	if err != nil || volumePlugin == nil {
-		msg := fmt.Errorf("didn't find a plugin capable of expanding the volume; " +
-			"waiting for an external controller to process this PVC")
-		eventType := v1.EventTypeNormal
-		if err != nil {
-			eventType = v1.EventTypeWarning
-		}
-		expc.recorder.Event(pvc, eventType, events.ExternalExpanding, fmt.Sprintf("Ignoring the PVC: %v.", msg))
-		klog.Infof("Ignoring the PVC %q (uid: %q) : %v.", util.GetPersistentVolumeClaimQualifiedName(pvc), pvc.UID, msg)
-		// If we are expecting that an external plugin will handle resizing this volume then
-		// is no point in requeuing this PVC.
+	volumeSpec := volume.NewSpecFromPersistentVolume(pv, false)
+	migratable, err := expc.csiMigratedPluginManager.IsMigratable(volumeSpec)
+	if err != nil {
+		klog.V(4).Infof("failed to check CSI migration status for PVC: %s with error: %v", util.ClaimToClaimKey(pvc), err)
 		return nil
 	}
-
-	if volumePlugin.IsMigratedToCSI() {
+	// handle CSI migration scenarios before invoking FindExpandablePluginBySpec for in-tree
+	if migratable {
 		msg := fmt.Sprintf("CSI migration enabled for %s; waiting for external resizer to expand the pvc", volumeResizerName)
 		expc.recorder.Event(pvc, v1.EventTypeNormal, events.ExternalExpanding, msg)
 		csiResizerName, err := expc.translator.GetCSINameFromInTreeName(class.Provisioner)
@@ -276,6 +272,21 @@ func (expc *expandController) syncHandler(key string) error {
 			expc.recorder.Event(pvc, v1.EventTypeWarning, events.ExternalExpanding, errorMsg)
 			return fmt.Errorf(errorMsg)
 		}
+		return nil
+	}
+
+	volumePlugin, err := expc.volumePluginMgr.FindExpandablePluginBySpec(volumeSpec)
+	if err != nil || volumePlugin == nil {
+		msg := fmt.Errorf("didn't find a plugin capable of expanding the volume; " +
+			"waiting for an external controller to process this PVC")
+		eventType := v1.EventTypeNormal
+		if err != nil {
+			eventType = v1.EventTypeWarning
+		}
+		expc.recorder.Event(pvc, eventType, events.ExternalExpanding, fmt.Sprintf("Ignoring the PVC: %v.", msg))
+		klog.Infof("Ignoring the PVC %q (uid: %q) : %v.", util.GetPersistentVolumeClaimQualifiedName(pvc), pvc.UID, msg)
+		// If we are expecting that an external plugin will handle resizing this volume then
+		// is no point in requeuing this PVC.
 		return nil
 	}
 
@@ -380,8 +391,8 @@ func (expc *expandController) GetMounter(pluginName string) mount.Interface {
 	return nil
 }
 
-func (expc *expandController) GetExec(pluginName string) mount.Exec {
-	return mount.NewOSExec()
+func (expc *expandController) GetExec(pluginName string) utilexec.Interface {
+	return utilexec.New()
 }
 
 func (expc *expandController) GetHostName() string {

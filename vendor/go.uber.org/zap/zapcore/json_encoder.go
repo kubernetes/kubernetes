@@ -137,6 +137,9 @@ func (enc *jsonEncoder) resetReflectBuf() {
 	if enc.reflectBuf == nil {
 		enc.reflectBuf = bufferpool.Get()
 		enc.reflectEnc = json.NewEncoder(enc.reflectBuf)
+
+		// For consistency with our custom JSON encoder.
+		enc.reflectEnc.SetEscapeHTML(false)
 	} else {
 		enc.reflectBuf.Reset()
 	}

@@ -16,9 +16,9 @@ import (
 
 // Sgemm performs one of the matrix-matrix operations
 //  C = alpha * A * B + beta * C
-//  C = alpha * A^T * B + beta * C
-//  C = alpha * A * B^T + beta * C
-//  C = alpha * A^T * B^T + beta * C
+//  C = alpha * Aᵀ * B + beta * C
+//  C = alpha * A * Bᵀ + beta * C
+//  C = alpha * Aᵀ * Bᵀ + beta * C
 // where A is an m×k or k×m dense matrix, B is an n×k or k×n dense matrix, C is
 // an m×n matrix, and alpha and beta are scalars. tA and tB specify whether A or
 // B are transposed.
@@ -138,9 +138,9 @@ func sgemmParallel(aTrans, bTrans bool, m, n, k int, a []float32, lda int, b []f
 	// In all cases, there is one dimension for each matrix along which
 	// C must be updated sequentially.
 	// Cij = \sum_k Aik Bki,	(A * B)
-	// Cij = \sum_k Aki Bkj,	(A^T * B)
-	// Cij = \sum_k Aik Bjk,	(A * B^T)
-	// Cij = \sum_k Aki Bjk,	(A^T * B^T)
+	// Cij = \sum_k Aki Bkj,	(Aᵀ * B)
+	// Cij = \sum_k Aik Bjk,	(A * Bᵀ)
+	// Cij = \sum_k Aki Bjk,	(Aᵀ * Bᵀ)
 	//
 	// This code computes one {i, j} block sequentially along the k dimension,
 	// and computes all of the {i, j} blocks concurrently. This

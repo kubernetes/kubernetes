@@ -27,6 +27,7 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	webhookinit "k8s.io/apiserver/pkg/admission/plugin/webhook/initializer"
 	genericapiserver "k8s.io/apiserver/pkg/server"
+	egressselector "k8s.io/apiserver/pkg/server/egressselector"
 	"k8s.io/apiserver/pkg/util/webhook"
 	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
 	externalinformers "k8s.io/client-go/informers"
@@ -44,8 +45,8 @@ type Config struct {
 }
 
 // New sets up the plugins and admission start hooks needed for admission
-func (c *Config) New(proxyTransport *http.Transport, serviceResolver webhook.ServiceResolver) ([]admission.PluginInitializer, genericapiserver.PostStartHookFunc, error) {
-	webhookAuthResolverWrapper := webhook.NewDefaultAuthenticationInfoResolverWrapper(proxyTransport, c.LoopbackClientConfig)
+func (c *Config) New(proxyTransport *http.Transport, egressSelector *egressselector.EgressSelector, serviceResolver webhook.ServiceResolver) ([]admission.PluginInitializer, genericapiserver.PostStartHookFunc, error) {
+	webhookAuthResolverWrapper := webhook.NewDefaultAuthenticationInfoResolverWrapper(proxyTransport, egressSelector, c.LoopbackClientConfig)
 	webhookPluginInitializer := webhookinit.NewPluginInitializer(webhookAuthResolverWrapper, serviceResolver)
 
 	var cloudConfig []byte

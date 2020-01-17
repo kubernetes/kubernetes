@@ -13,7 +13,6 @@ go_library(
     visibility = ["//visibility:private"],
     deps = [
         "//staging/src/k8s.io/component-base/metrics:go_default_library",
-        "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
         "//vendor/gopkg.in/yaml.v2:go_default_library",
     ],
 )
@@ -44,7 +43,7 @@ genrule(
         "//:all-srcs",
     ],
     outs = ["stable-metrics-list.yaml"],
-    cmd = "./$(locations :instrumentation) $(locations //:all-srcs) > $@",
+    cmd = "for loc in $(locations //:all-srcs); do echo $$loc; done | ./$(locations :instrumentation) - > $@",
     message = "Listing all stable metrics.",
     tools = [":instrumentation"],
 )
@@ -63,5 +62,5 @@ go_test(
     srcs = ["main_test.go"],
     data = glob(["testdata/**"]),
     embed = [":go_default_library"],
-    deps = ["//vendor/github.com/prometheus/client_golang/prometheus:go_default_library"],
+    deps = ["//staging/src/k8s.io/component-base/metrics:go_default_library"],
 )

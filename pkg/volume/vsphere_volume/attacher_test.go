@@ -32,7 +32,7 @@ import (
 )
 
 func TestGetDeviceName_Volume(t *testing.T) {
-	plugin := newPlugin()
+	plugin := newPlugin(t)
 	volPath := "[local] volumes/test"
 	spec := createVolSpec(volPath)
 
@@ -46,7 +46,7 @@ func TestGetDeviceName_Volume(t *testing.T) {
 }
 
 func TestGetDeviceName_PersistentVolume(t *testing.T) {
-	plugin := newPlugin()
+	plugin := newPlugin(t)
 	volPath := "[local] volumes/test"
 	spec := createPVSpec(volPath)
 
@@ -166,8 +166,8 @@ func TestAttachDetach(t *testing.T) {
 
 // newPlugin creates a new vsphereVolumePlugin with fake cloud, NewAttacher
 // and NewDetacher won't work.
-func newPlugin() *vsphereVolumePlugin {
-	host := volumetest.NewFakeVolumeHost("/tmp", nil, nil)
+func newPlugin(t *testing.T) *vsphereVolumePlugin {
+	host := volumetest.NewFakeVolumeHost(t, "/tmp", nil, nil)
 	plugins := ProbeVolumePlugins()
 	plugin := plugins[0]
 	plugin.Init(host)

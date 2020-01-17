@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 
 	"github.com/onsi/ginkgo"
 )
@@ -62,7 +63,7 @@ var _ = SIGDescribe("DNS", func() {
 
 	// Added due to #8512. This is critical for GCE and GKE deployments.
 	ginkgo.It("should provide DNS for the cluster [Provider:GCE]", func() {
-		framework.SkipUnlessProviderIs("gce", "gke")
+		e2eskipper.SkipUnlessProviderIs("gce", "gke")
 
 		namesToResolve := []string{"google.com"}
 		// Windows containers do not have a route to the GCE metadata server by default.
@@ -212,7 +213,7 @@ var _ = SIGDescribe("DNS", func() {
 		// All the names we need to be able to resolve.
 		// for headless service.
 		namesToResolve := []string{
-			fmt.Sprintf("%s", headlessService.Name),
+			headlessService.Name,
 			fmt.Sprintf("%s.%s", headlessService.Name, f.Namespace.Name),
 			fmt.Sprintf("%s.%s.svc", headlessService.Name, f.Namespace.Name),
 			fmt.Sprintf("_http._tcp.%s.%s.svc", headlessService.Name, f.Namespace.Name),

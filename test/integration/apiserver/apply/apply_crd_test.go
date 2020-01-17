@@ -25,7 +25,7 @@ import (
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 	genericfeatures "k8s.io/apiserver/pkg/features"
@@ -108,7 +108,7 @@ spec:
 	if err == nil {
 		t.Fatalf("Expecting to get conflicts when applying object after updating replicas, got no error: %s", result)
 	}
-	status, ok := err.(*errors.StatusError)
+	status, ok := err.(*apierrors.StatusError)
 	if !ok {
 		t.Fatalf("Expecting to get conflicts as API error")
 	}
@@ -190,7 +190,8 @@ func TestApplyCRDStructuralSchema(t *testing.T) {
 										"type": "string"
 									},
 									"protocol": {
-										"type": "string"
+										"type": "string",
+										"nullable": true
 									}
 								},
 								"required": [
@@ -298,7 +299,7 @@ spec:
 	if err == nil {
 		t.Fatalf("Expecting to get conflicts when applying object after updating replicas, got no error: %s", result)
 	}
-	status, ok := err.(*errors.StatusError)
+	status, ok := err.(*apierrors.StatusError)
 	if !ok {
 		t.Fatalf("Expecting to get conflicts as API error")
 	}
@@ -338,7 +339,7 @@ spec:
 	if err == nil {
 		t.Fatalf("Expecting to get conflicts when a different applier updates existing list item, got no error: %s", result)
 	}
-	status, ok = err.(*errors.StatusError)
+	status, ok = err.(*apierrors.StatusError)
 	if !ok {
 		t.Fatalf("Expecting to get conflicts as API error")
 	}
@@ -503,7 +504,7 @@ spec:
 	if err == nil {
 		t.Fatalf("Expecting to get conflicts when applying object after updating replicas, got no error: %s", result)
 	}
-	status, ok := err.(*errors.StatusError)
+	status, ok := err.(*apierrors.StatusError)
 	if !ok {
 		t.Fatalf("Expecting to get conflicts as API error")
 	}
@@ -697,7 +698,7 @@ spec:
 	if err == nil {
 		t.Fatalf("Expecting to get conflicts when applying object after updating replicas, got no error: %s", result)
 	}
-	status, ok := err.(*errors.StatusError)
+	status, ok := err.(*apierrors.StatusError)
 	if !ok {
 		t.Fatalf("Expecting to get conflicts as API error")
 	}

@@ -30,6 +30,7 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -56,7 +57,7 @@ var _ = utils.SIGDescribe("vsphere cloud provider stress [Feature:vsphere]", fun
 	)
 
 	ginkgo.BeforeEach(func() {
-		framework.SkipUnlessProviderIs("vsphere")
+		e2eskipper.SkipUnlessProviderIs("vsphere")
 		Bootstrap(f)
 		client = f.ClientSet
 		namespace = f.Namespace.Name
@@ -68,11 +69,11 @@ var _ = utils.SIGDescribe("vsphere cloud provider stress [Feature:vsphere]", fun
 		// Resulting 120 Volumes and POD Creation. Volumes will be provisioned with each different types of Storage Class,
 		// Each iteration creates PVC, verify PV is provisioned, then creates a pod, verify volume is attached to the node, and then delete the pod and delete pvc.
 		instances = GetAndExpectIntEnvVar(VCPStressInstances)
-		gomega.Expect(instances <= volumesPerNode*len(nodeList.Items)).To(gomega.BeTrue(), fmt.Sprintf("Number of Instances should be less or equal: %v", volumesPerNode*len(nodeList.Items)))
-		gomega.Expect(instances > len(scNames)).To(gomega.BeTrue(), "VCP_STRESS_INSTANCES should be greater than 3 to utilize all 4 types of storage classes")
+		framework.ExpectEqual(instances <= volumesPerNode*len(nodeList.Items), true, fmt.Sprintf("Number of Instances should be less or equal: %v", volumesPerNode*len(nodeList.Items)))
+		framework.ExpectEqual(instances > len(scNames), true, "VCP_STRESS_INSTANCES should be greater than 3 to utilize all 4 types of storage classes")
 
 		iterations = GetAndExpectIntEnvVar(VCPStressIterations)
-		gomega.Expect(iterations > 0).To(gomega.BeTrue(), "VCP_STRESS_ITERATIONS should be greater than 0")
+		framework.ExpectEqual(iterations > 0, true, "VCP_STRESS_ITERATIONS should be greater than 0")
 
 		policyName = GetAndExpectStringEnvVar(SPBMPolicyName)
 		datastoreName = GetAndExpectStringEnvVar(StorageClassDatastoreName)
@@ -155,7 +156,7 @@ func PerformVolumeLifeCycleInParallel(f *framework.Framework, client clientset.I
 
 		ginkgo.By(fmt.Sprintf("%v Verifing the volume: %v is attached to the node VM: %v", logPrefix, persistentvolumes[0].Spec.VsphereVolume.VolumePath, pod.Spec.NodeName))
 		isVolumeAttached, verifyDiskAttachedError := diskIsAttached(persistentvolumes[0].Spec.VsphereVolume.VolumePath, pod.Spec.NodeName)
-		gomega.Expect(isVolumeAttached).To(gomega.BeTrue())
+		framework.ExpectEqual(isVolumeAttached, true)
 		framework.ExpectNoError(verifyDiskAttachedError)
 
 		ginkgo.By(fmt.Sprintf("%v Verifing the volume: %v is accessible in the pod: %v", logPrefix, persistentvolumes[0].Spec.VsphereVolume.VolumePath, pod.Name))

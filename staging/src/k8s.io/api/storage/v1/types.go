@@ -17,7 +17,7 @@ limitations under the License.
 package v1
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -215,4 +215,98 @@ type VolumeError struct {
 	// information.
 	// +optional
 	Message string `json:"message,omitempty" protobuf:"bytes,2,opt,name=message"`
+}
+
+// +genclient
+// +genclient:nonNamespaced
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// CSINode holds information about all CSI drivers installed on a node.
+// CSI drivers do not need to create the CSINode object directly. As long as
+// they use the node-driver-registrar sidecar container, the kubelet will
+// automatically populate the CSINode object for the CSI driver as part of
+// kubelet plugin registration.
+// CSINode has the same name as a node. If the object is missing, it means either
+// there are no CSI Drivers available on the node, or the Kubelet version is low
+// enough that it doesn't create this object.
+// CSINode has an OwnerReference that points to the corresponding node object.
+type CSINode struct {
+	metav1.TypeMeta `json:",inline"`
+
+	// metadata.name must be the Kubernetes node name.
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// spec is the specification of CSINode
+	Spec CSINodeSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
+}
+
+// CSINodeSpec holds information about the specification of all CSI drivers installed on a node
+type CSINodeSpec struct {
+	// drivers is a list of information of all CSI Drivers existing on a node.
+	// If all drivers in the list are uninstalled, this can become empty.
+	// +patchMergeKey=name
+	// +patchStrategy=merge
+	Drivers []CSINodeDriver `json:"drivers" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,1,rep,name=drivers"`
+}
+
+// CSINodeDriver holds information about the specification of one CSI driver installed on a node
+type CSINodeDriver struct {
+	// This is the name of the CSI driver that this object refers to.
+	// This MUST be the same name returned by the CSI GetPluginName() call for
+	// that driver.
+	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
+
+	// nodeID of the node from the driver point of view.
+	// This field enables Kubernetes to communicate with storage systems that do
+	// not share the same nomenclature for nodes. For example, Kubernetes may
+	// refer to a given node as "node1", but the storage system may refer to
+	// the same node as "nodeA". When Kubernetes issues a command to the storage
+	// system to attach a volume to a specific node, it can use this field to
+	// refer to the node name using the ID that the storage system will
+	// understand, e.g. "nodeA" instead of "node1". This field is required.
+	NodeID string `json:"nodeID" protobuf:"bytes,2,opt,name=nodeID"`
+
+	// topologyKeys is the list of keys supported by the driver.
+	// When a driver is initialized on a cluster, it provides a set of topology
+	// keys that it understands (e.g. "company.com/zone", "company.com/region").
+	// When a driver is initialized on a node, it provides the same topology keys
+	// along with values. Kubelet will expose these topology keys as labels
+	// on its own node object.
+	// When Kubernetes does topology aware provisioning, it can use this list to
+	// determine which labels it should retrieve from the node object and pass
+	// back to the driver.
+	// It is possible for different nodes to use different topology keys.
+	// This can be empty if driver does not support topology.
+	// +optional
+	TopologyKeys []string `json:"topologyKeys" protobuf:"bytes,3,rep,name=topologyKeys"`
+
+	// allocatable represents the volume resources of a node that are available for scheduling.
+	// This field is beta.
+	// +optional
+	Allocatable *VolumeNodeResources `json:"allocatable,omitempty" protobuf:"bytes,4,opt,name=allocatable"`
+}
+
+// VolumeNodeResources is a set of resource limits for scheduling of volumes.
+type VolumeNodeResources struct {
+	// Maximum number of unique volumes managed by the CSI driver that can be used on a node.
+	// A volume that is both attached and mounted on a node is considered to be used once, not twice.
+	// The same rule applies for a unique volume that is shared among multiple pods on the same node.
+	// If this field is not specified, then the supported number of volumes on this node is unbounded.
+	// +optional
+	Count *int32 `json:"count,omitempty" protobuf:"varint,1,opt,name=count"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// CSINodeList is a collection of CSINode objects.
+type CSINodeList struct {
+	metav1.TypeMeta `json:",inline"`
+
+	// Standard list metadata
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+	// +optional
+	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// items is the list of CSINode
+	Items []CSINode `json:"items" protobuf:"bytes,2,rep,name=items"`
 }

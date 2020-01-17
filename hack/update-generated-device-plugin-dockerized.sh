@@ -14,6 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This script generates `*/api.pb.go` from the protobuf file `*/api.proto`.
+# Example:
+#   kube::protoc::generate_proto "${DEVICE_PLUGIN_ALPHA}"
+
 set -o errexit
 set -o nounset
 set -o pipefail

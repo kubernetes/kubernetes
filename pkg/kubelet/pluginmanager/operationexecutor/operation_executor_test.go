@@ -46,7 +46,7 @@ func TestOperationExecutor_RegisterPlugin_ConcurrentRegisterPlugin(t *testing.T)
 	ch, quit, oe := setup()
 	for i := 0; i < numPluginsToRegister; i++ {
 		socketPath := fmt.Sprintf("%s/plugin-%d.sock", socketDir, i)
-		oe.RegisterPlugin(socketPath, false /* foundInDeprecatedDir */, time.Now(), nil /* plugin handlers */, nil /* actual state of the world updator */)
+		oe.RegisterPlugin(socketPath, time.Now(), nil /* plugin handlers */, nil /* actual state of the world updator */)
 	}
 	if !isOperationRunConcurrently(ch, quit, numPluginsToRegister) {
 		t.Fatalf("Unable to start register operations in Concurrent for plugins")
@@ -57,7 +57,7 @@ func TestOperationExecutor_RegisterPlugin_SerialRegisterPlugin(t *testing.T) {
 	ch, quit, oe := setup()
 	socketPath := fmt.Sprintf("%s/plugin-serial.sock", socketDir)
 	for i := 0; i < numPluginsToRegister; i++ {
-		oe.RegisterPlugin(socketPath, false /* foundInDeprecatedDir */, time.Now(), nil /* plugin handlers */, nil /* actual state of the world updator */)
+		oe.RegisterPlugin(socketPath, time.Now(), nil /* plugin handlers */, nil /* actual state of the world updator */)
 
 	}
 	if !isOperationRunSerially(ch, quit) {
@@ -103,7 +103,6 @@ func newFakeOperationGenerator(ch chan interface{}, quit chan interface{}) Opera
 
 func (fopg *fakeOperationGenerator) GenerateRegisterPluginFunc(
 	socketPath string,
-	foundInDeprecatedDir bool,
 	timestamp time.Time,
 	pluginHandlers map[string]cache.PluginHandler,
 	actualStateOfWorldUpdater ActualStateOfWorldUpdater) func() error {

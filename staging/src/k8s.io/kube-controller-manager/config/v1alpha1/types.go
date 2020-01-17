@@ -382,6 +382,10 @@ type NodeIPAMControllerConfiguration struct {
 	SecondaryServiceCIDR string
 	// NodeCIDRMaskSize is the mask size for node cidr in cluster.
 	NodeCIDRMaskSize int32
+	// NodeCIDRMaskSizeIPv4 is the mask size for node cidr in dual-stack cluster.
+	NodeCIDRMaskSizeIPv4 int32
+	// NodeCIDRMaskSizeIPv6 is the mask size for node cidr in dual-stack cluster.
+	NodeCIDRMaskSizeIPv6 int32
 }
 
 // NodeLifecycleControllerConfiguration contains elements describing NodeLifecycleController.

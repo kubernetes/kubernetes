@@ -572,7 +572,7 @@ func getLocalIP() ([]v1.NodeAddress, error) {
 		} else {
 			for _, addr := range localAddrs {
 				if ipnet, ok := addr.(*net.IPNet); ok {
-					if ipnet.IP.To4() != nil {
+					if !ipnet.IP.IsLinkLocalUnicast() {
 						// Filter external IP by MAC address OUIs from vCenter and from ESX
 						vmMACAddr := strings.ToLower(i.HardwareAddr.String())
 						// Making sure that the MAC address is long enough
@@ -683,7 +683,7 @@ func (vs *VSphere) NodeAddresses(ctx context.Context, nodeName k8stypes.NodeName
 	for _, v := range vmMoList[0].Guest.Net {
 		if vs.cfg.Network.PublicNetwork == v.Network {
 			for _, ip := range v.IpAddress {
-				if net.ParseIP(ip).To4() != nil {
+				if !net.ParseIP(ip).IsLinkLocalUnicast() {
 					nodehelpers.AddToNodeAddresses(&addrs,
 						v1.NodeAddress{
 							Type:    v1.NodeExternalIP,

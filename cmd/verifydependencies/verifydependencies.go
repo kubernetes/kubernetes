@@ -72,23 +72,26 @@ func main() {
 
 	for _, dep := range externalDeps.Dependencies {
 		for _, refPath := range dep.RefPaths {
-			file, err := os.Open(refPath.Path)
-			if err != nil {
-				log.Fatalf("error opening file %v : %v", refPath.Path, err)
-			}
-			matcher := regexp.MustCompile(refPath.Match)
-			depFileScanner := bufio.NewScanner(file)
-			var found bool
-			for depFileScanner.Scan() {
-				line := depFileScanner.Text()
-				if matcher.MatchString(line) && strings.Contains(line, dep.Version) {
-					found = true
-					break
+			func() {
+				file, err := os.Open(refPath.Path)
+				if err != nil {
+					log.Fatalf("error opening file %v : %v", refPath.Path, err)
 				}
-			}
-			if !found {
-				pathsToUpdate = append(pathsToUpdate, refPath.Path)
-			}
+				defer file.Close()
+				matcher := regexp.MustCompile(refPath.Match)
+				depFileScanner := bufio.NewScanner(file)
+				var found bool
+				for depFileScanner.Scan() {
+					line := depFileScanner.Text()
+					if matcher.MatchString(line) && strings.Contains(line, dep.Version) {
+						found = true
+						break
+					}
+				}
+				if !found {
+					pathsToUpdate = append(pathsToUpdate, refPath.Path)
+				}
+			}()
 		}
 		if len(pathsToUpdate) > 0 {
 			log.Fatalf(mismatchErrorMessage, externalDepsFilePath, dep.Name, dep.Version, strings.Join(pathsToUpdate, "\n"), dep.Name, externalDepsFilePath)

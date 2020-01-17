@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	testutils "k8s.io/kubernetes/test/utils"
 
 	"github.com/onsi/ginkgo"
@@ -35,7 +36,7 @@ import (
 var _ = SIGDescribe("Kubernetes Dashboard [Feature:Dashboard]", func() {
 	ginkgo.BeforeEach(func() {
 		// TODO(kubernetes/kubernetes#61559): Enable dashboard here rather than skip the test.
-		framework.SkipIfProviderIs("gke")
+		e2eskipper.SkipIfProviderIs("gke")
 	})
 
 	const (

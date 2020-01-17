@@ -97,7 +97,7 @@ func TestDisabledSubpath(t *testing.T) {
 
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeSubpath, false)()
 	for name, test := range cases {
-		_, _, err := makeMounts(&pod, "/pod", &test.container, "fakepodname", "", "", podVolumes, fhu, fsp, nil)
+		_, _, err := makeMounts(&pod, "/pod", &test.container, "fakepodname", "", []string{}, podVolumes, fhu, fsp, nil)
 		if err != nil && !test.expectError {
 			t.Errorf("test %v failed: %v", name, err)
 		}
@@ -243,14 +243,14 @@ func writeHostsFile(filename string, cfg string) (string, error) {
 
 func TestManagedHostsFileContent(t *testing.T) {
 	testCases := []struct {
-		hostIP          string
+		hostIPs         []string
 		hostName        string
 		hostDomainName  string
 		hostAliases     []v1.HostAlias
 		expectedContent string
 	}{
 		{
-			"123.45.67.89",
+			[]string{"123.45.67.89"},
 			"podFoo",
 			"",
 			[]v1.HostAlias{},
@@ -265,7 +265,7 @@ fe00::2	ip6-allrouters
 `,
 		},
 		{
-			"203.0.113.1",
+			[]string{"203.0.113.1"},
 			"podFoo",
 			"domainFoo",
 			[]v1.HostAlias{},
@@ -280,7 +280,7 @@ fe00::2	ip6-allrouters
 `,
 		},
 		{
-			"203.0.113.1",
+			[]string{"203.0.113.1"},
 			"podFoo",
 			"domainFoo",
 			[]v1.HostAlias{
@@ -300,7 +300,7 @@ fe00::2	ip6-allrouters
 `,
 		},
 		{
-			"203.0.113.1",
+			[]string{"203.0.113.1"},
 			"podFoo",
 			"domainFoo",
 			[]v1.HostAlias{
@@ -321,10 +321,26 @@ fe00::2	ip6-allrouters
 456.78.90.123	park	doo	boo
 `,
 		},
+		{
+			[]string{"203.0.113.1", "fd00::6"},
+			"podFoo",
+			"domainFoo",
+			[]v1.HostAlias{},
+			`# Kubernetes-managed hosts file.
+127.0.0.1	localhost
+::1	localhost ip6-localhost ip6-loopback
+fe00::0	ip6-localnet
+fe00::0	ip6-mcastprefix
+fe00::1	ip6-allnodes
+fe00::2	ip6-allrouters
+203.0.113.1	podFoo.domainFoo	podFoo
+fd00::6	podFoo.domainFoo	podFoo
+`,
+		},
 	}
 
 	for _, testCase := range testCases {
-		actualContent := managedHostsFileContent(testCase.hostIP, testCase.hostName, testCase.hostDomainName, testCase.hostAliases)
+		actualContent := managedHostsFileContent(testCase.hostIPs, testCase.hostName, testCase.hostDomainName, testCase.hostAliases)
 		assert.Equal(t, testCase.expectedContent, string(actualContent), "hosts file content not expected")
 	}
 }
@@ -704,6 +720,15 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 						},
 					},
 					{
+						Name: "POD_IPS",
+						ValueFrom: &v1.EnvVarSource{
+							FieldRef: &v1.ObjectFieldSelector{
+								APIVersion: "v1",
+								FieldPath:  "status.podIPs",
+							},
+						},
+					},
+					{
 						Name: "HOST_IP",
 						ValueFrom: &v1.EnvVarSource{
 							FieldRef: &v1.ObjectFieldSelector{
@@ -722,6 +747,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 				{Name: "POD_NODE_NAME", Value: "node-name"},
 				{Name: "POD_SERVICE_ACCOUNT_NAME", Value: "special"},
 				{Name: "POD_IP", Value: "1.2.3.4"},
+				{Name: "POD_IPS", Value: "1.2.3.4,fd00::6"},
 				{Name: "HOST_IP", Value: testKubeletHostIP},
 			},
 		},
@@ -1627,8 +1653,9 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 			},
 		}
 		podIP := "1.2.3.4"
+		podIPs := []string{"1.2.3.4,fd00::6"}
 
-		result, err := kl.makeEnvironmentVariables(testPod, tc.container, podIP)
+		result, err := kl.makeEnvironmentVariables(testPod, tc.container, podIP, podIPs)
 		select {
 		case e := <-fakeRecorder.Events:
 			assert.Equal(t, tc.expectedEvent, e)

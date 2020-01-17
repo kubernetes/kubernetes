@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	componentbaseconfig "k8s.io/component-base/config"
+	"k8s.io/component-base/metrics"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
@@ -87,6 +88,7 @@ func Validate(config *kubeproxyconfig.KubeProxyConfiguration) field.ErrorList {
 	}
 
 	allErrs = append(allErrs, validateKubeProxyNodePortAddress(config.NodePortAddresses, newPath.Child("NodePortAddresses"))...)
+	allErrs = append(allErrs, validateShowHiddenMetricsVersion(config.ShowHiddenMetricsForVersion, newPath.Child("ShowHiddenMetricsForVersion"))...)
 
 	return allErrs
 }
@@ -272,5 +274,15 @@ func validateIPVSExcludeCIDRs(excludeCIDRs []string, fldPath *field.Path) field.
 			allErrs = append(allErrs, field.Invalid(fldPath, excludeCIDRs, "must be a valid IP block"))
 		}
 	}
+	return allErrs
+}
+
+func validateShowHiddenMetricsVersion(version string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	errs := metrics.ValidateShowHiddenMetricsVersion(version)
+	for _, e := range errs {
+		allErrs = append(allErrs, field.Invalid(fldPath, version, e.Error()))
+	}
+
 	return allErrs
 }

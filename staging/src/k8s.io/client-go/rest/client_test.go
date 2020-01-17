@@ -27,7 +27,7 @@ import (
 
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	v1beta1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -57,12 +57,14 @@ func TestSerializer(t *testing.T) {
 		NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
 	}
 
-	serializer, err := createSerializers(contentConfig)
+	n := runtime.NewClientNegotiator(contentConfig.NegotiatedSerializer, gv)
+	d, err := n.Decoder("application/json", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	// bytes based on actual return from API server when encoding an "unversioned" object
-	obj, err := runtime.Decode(serializer.Decoder, []byte(`{"kind":"Status","apiVersion":"v1","metadata":{},"status":"Success"}`))
+	obj, err := runtime.Decode(d, []byte(`{"kind":"Status","apiVersion":"v1","metadata":{},"status":"Success"}`))
 	t.Log(obj)
 	if err != nil {
 		t.Fatal(err)

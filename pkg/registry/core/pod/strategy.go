@@ -37,11 +37,13 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper/qos"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/client"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 )
@@ -141,18 +143,6 @@ func (podStrategy) CheckGracefulDelete(ctx context.Context, obj runtime.Object, 
 	return true
 }
 
-type podStrategyWithoutGraceful struct {
-	podStrategy
-}
-
-// CheckGracefulDelete prohibits graceful deletion.
-func (podStrategyWithoutGraceful) CheckGracefulDelete(ctx context.Context, obj runtime.Object, options *metav1.DeleteOptions) bool {
-	return false
-}
-
-// StrategyWithoutGraceful implements the legacy instant delele behavior.
-var StrategyWithoutGraceful = podStrategyWithoutGraceful{Strategy}
-
 type podStatusStrategy struct {
 	podStrategy
 }
@@ -248,7 +238,7 @@ func getPod(getter ResourceGetter, ctx context.Context, name string) (*api.Pod, 
 	return pod, nil
 }
 
-// returns primary IP for a Pod
+// getPodIP returns primary IP for a Pod
 func getPodIP(pod *api.Pod) string {
 	if pod == nil {
 		return ""
@@ -325,25 +315,9 @@ func LogLocation(
 	// Try to figure out a container
 	// If a container was provided, it must be valid
 	container := opts.Container
-	if len(container) == 0 {
-		switch len(pod.Spec.Containers) {
-		case 1:
-			container = pod.Spec.Containers[0].Name
-		case 0:
-			return nil, nil, errors.NewBadRequest(fmt.Sprintf("a container name must be specified for pod %s", name))
-		default:
-			containerNames := getContainerNames(pod.Spec.Containers)
-			initContainerNames := getContainerNames(pod.Spec.InitContainers)
-			err := fmt.Sprintf("a container name must be specified for pod %s, choose one of: [%s]", name, containerNames)
-			if len(initContainerNames) > 0 {
-				err += fmt.Sprintf(" or one of the init containers: [%s]", initContainerNames)
-			}
-			return nil, nil, errors.NewBadRequest(err)
-		}
-	} else {
-		if !podHasContainerWithName(pod, container) {
-			return nil, nil, errors.NewBadRequest(fmt.Sprintf("container %s is not valid for pod %s", container, name))
-		}
+	container, err = validateContainer(container, pod)
+	if err != nil {
+		return nil, nil, err
 	}
 	nodeName := types.NodeName(pod.Spec.NodeName)
 	if len(nodeName) == 0 {
@@ -381,6 +355,10 @@ func LogLocation(
 		Host:     net.JoinHostPort(nodeInfo.Hostname, nodeInfo.Port),
 		Path:     fmt.Sprintf("/containerLogs/%s/%s/%s", pod.Namespace, pod.Name, container),
 		RawQuery: params.Encode(),
+	}
+
+	if opts.InsecureSkipTLSVerifyBackend && utilfeature.DefaultFeatureGate.Enabled(features.AllowInsecureBackendProxy) {
+		return loc, nodeInfo.InsecureSkipTLSVerifyTransport, nil
 	}
 	return loc, nodeInfo.Transport, nil
 }
@@ -482,26 +460,11 @@ func streamLocation(
 
 	// Try to figure out a container
 	// If a container was provided, it must be valid
-	if container == "" {
-		switch len(pod.Spec.Containers) {
-		case 1:
-			container = pod.Spec.Containers[0].Name
-		case 0:
-			return nil, nil, errors.NewBadRequest(fmt.Sprintf("a container name must be specified for pod %s", name))
-		default:
-			containerNames := getContainerNames(pod.Spec.Containers)
-			initContainerNames := getContainerNames(pod.Spec.InitContainers)
-			err := fmt.Sprintf("a container name must be specified for pod %s, choose one of: [%s]", name, containerNames)
-			if len(initContainerNames) > 0 {
-				err += fmt.Sprintf(" or one of the init containers: [%s]", initContainerNames)
-			}
-			return nil, nil, errors.NewBadRequest(err)
-		}
-	} else {
-		if !podHasContainerWithName(pod, container) {
-			return nil, nil, errors.NewBadRequest(fmt.Sprintf("container %s is not valid for pod %s", container, name))
-		}
+	container, err = validateContainer(container, pod)
+	if err != nil {
+		return nil, nil, err
 	}
+
 	nodeName := types.NodeName(pod.Spec.NodeName)
 	if len(nodeName) == 0 {
 		// If pod has not been assigned a host, return an empty location
@@ -557,4 +520,30 @@ func PortForwardLocation(
 		RawQuery: params.Encode(),
 	}
 	return loc, nodeInfo.Transport, nil
+}
+
+// validateContainer validate container is valid for pod, return valid container
+func validateContainer(container string, pod *api.Pod) (string, error) {
+	if len(container) == 0 {
+		switch len(pod.Spec.Containers) {
+		case 1:
+			container = pod.Spec.Containers[0].Name
+		case 0:
+			return "", errors.NewBadRequest(fmt.Sprintf("a container name must be specified for pod %s", pod.Name))
+		default:
+			containerNames := getContainerNames(pod.Spec.Containers)
+			initContainerNames := getContainerNames(pod.Spec.InitContainers)
+			err := fmt.Sprintf("a container name must be specified for pod %s, choose one of: [%s]", pod.Name, containerNames)
+			if len(initContainerNames) > 0 {
+				err += fmt.Sprintf(" or one of the init containers: [%s]", initContainerNames)
+			}
+			return "", errors.NewBadRequest(err)
+		}
+	} else {
+		if !podHasContainerWithName(pod, container) {
+			return "", errors.NewBadRequest(fmt.Sprintf("container %s is not valid for pod %s", container, pod.Name))
+		}
+	}
+
+	return container, nil
 }

@@ -204,21 +204,6 @@ test-integration: generated_files
 	hack/make-rules/test-integration.sh $(WHAT)
 endif
 
-define TEST_E2E_HELP_INFO
-# Build and run end-to-end tests.
-#
-# Example:
-#   make test-e2e
-endef
-.PHONY: test-e2e
-ifeq ($(PRINT_HELP),y)
-test-e2e:
-	@echo "$$TEST_E2E_HELP_INFO"
-else
-test-e2e: ginkgo generated_files
-	go run hack/e2e.go -- --build --up --test --down
-endif
-
 define TEST_E2E_NODE_HELP_INFO
 # Build and run node end-to-end tests.
 #

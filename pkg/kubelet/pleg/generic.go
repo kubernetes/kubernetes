@@ -138,6 +138,8 @@ func (g *GenericPLEG) Healthy() (bool, error) {
 	if relistTime.IsZero() {
 		return false, fmt.Errorf("pleg has yet to be successful")
 	}
+	// Expose as metric so you can alert on `time()-pleg_last_seen_seconds > nn`
+	metrics.PLEGLastSeen.Set(float64(relistTime.Unix()))
 	elapsed := g.clock.Since(relistTime)
 	if elapsed > relistThreshold {
 		return false, fmt.Errorf("pleg was last seen active %v ago; threshold is %v", elapsed, relistThreshold)
@@ -190,13 +192,11 @@ func (g *GenericPLEG) relist() {
 
 	if lastRelistTime := g.getRelistTime(); !lastRelistTime.IsZero() {
 		metrics.PLEGRelistInterval.Observe(metrics.SinceInSeconds(lastRelistTime))
-		metrics.DeprecatedPLEGRelistInterval.Observe(metrics.SinceInMicroseconds(lastRelistTime))
 	}
 
 	timestamp := g.clock.Now()
 	defer func() {
 		metrics.PLEGRelistDuration.Observe(metrics.SinceInSeconds(timestamp))
-		metrics.DeprecatedPLEGRelistLatency.Observe(metrics.SinceInMicroseconds(timestamp))
 	}()
 
 	// Get all the pods.
@@ -272,7 +272,7 @@ func (g *GenericPLEG) relist() {
 			select {
 			case g.eventChannel <- events[i]:
 			default:
-				metrics.PLEGDiscardEvents.WithLabelValues().Inc()
+				metrics.PLEGDiscardEvents.Inc()
 				klog.Error("event channel is full, discard this relist() cycle event")
 			}
 		}
@@ -362,17 +362,6 @@ func (g *GenericPLEG) getPodIPs(pid types.UID, status *kubecontainer.PodStatus) 
 		// If at least one sandbox is ready, then use this status update's pod IP
 		if sandboxStatus.State == runtimeapi.PodSandboxState_SANDBOX_READY {
 			return status.IPs
-		}
-	}
-
-	if len(status.SandboxStatuses) == 0 {
-		// Without sandboxes (which built-in runtimes like rkt don't report)
-		// look at all the container statuses, and if any containers are
-		// running then use the new pod IP
-		for _, containerStatus := range status.ContainerStatuses {
-			if containerStatus.State == kubecontainer.ContainerStateCreated || containerStatus.State == kubecontainer.ContainerStateRunning {
-				return status.IPs
-			}
 		}
 	}
 

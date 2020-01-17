@@ -36,12 +36,11 @@ import (
 	cadvisormetrics "github.com/google/cadvisor/container"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"github.com/google/cadvisor/metrics"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"google.golang.org/grpc"
 	"k8s.io/klog"
+	"k8s.io/kubernetes/pkg/kubelet/metrics/collectors"
 
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -76,13 +75,13 @@ import (
 )
 
 const (
-	metricsPath               = "/metrics"
-	cadvisorMetricsPath       = "/metrics/cadvisor"
-	resourceMetricsPathPrefix = "/metrics/resource"
-	proberMetricsPath         = "/metrics/probes"
-	specPath                  = "/spec/"
-	statsPath                 = "/stats/"
-	logsPath                  = "/logs/"
+	metricsPath         = "/metrics"
+	cadvisorMetricsPath = "/metrics/cadvisor"
+	resourceMetricsPath = "/metrics/resource"
+	proberMetricsPath   = "/metrics/probes"
+	specPath            = "/spec/"
+	statsPath           = "/stats/"
+	logsPath            = "/logs/"
 )
 
 // Server is a http.Handler which exposes kubelet functionality over HTTP.
@@ -147,6 +146,8 @@ func ListenAndServeKubeletServer(
 	s := &http.Server{
 		Addr:           net.JoinHostPort(address.String(), strconv.FormatUint(uint64(port), 10)),
 		Handler:        &handler,
+		ReadTimeout:    4 * 60 * time.Minute,
+		WriteTimeout:   4 * 60 * time.Minute,
 		MaxHeaderBytes: 1 << 20,
 	}
 	if tlsOptions != nil {
@@ -301,7 +302,7 @@ func (s *Server) InstallDefaultHandlers(enableCAdvisorJSONEndpoints bool) {
 	s.restfulCont.Handle(metricsPath, legacyregistry.Handler())
 
 	// cAdvisor metrics are exposed under the secured handler as well
-	r := prometheus.NewRegistry()
+	r := compbasemetrics.NewKubeRegistry()
 
 	includedMetrics := cadvisormetrics.MetricSet{
 		cadvisormetrics.CpuUsageMetrics:         struct{}{},
@@ -314,24 +315,31 @@ func (s *Server) InstallDefaultHandlers(enableCAdvisorJSONEndpoints bool) {
 		cadvisormetrics.AppMetrics:              struct{}{},
 		cadvisormetrics.ProcessMetrics:          struct{}{},
 	}
-	r.MustRegister(metrics.NewPrometheusCollector(prometheusHostAdapter{s.host}, containerPrometheusLabelsFunc(s.host), includedMetrics))
+	r.RawMustRegister(metrics.NewPrometheusCollector(prometheusHostAdapter{s.host}, containerPrometheusLabelsFunc(s.host), includedMetrics))
 	s.restfulCont.Handle(cadvisorMetricsPath,
-		promhttp.HandlerFor(r, promhttp.HandlerOpts{ErrorHandling: promhttp.ContinueOnError}),
+		compbasemetrics.HandlerFor(r, compbasemetrics.HandlerOpts{ErrorHandling: compbasemetrics.ContinueOnError}),
 	)
 
-	v1alpha1ResourceRegistry := prometheus.NewRegistry()
-	v1alpha1ResourceRegistry.MustRegister(stats.NewPrometheusResourceMetricCollector(s.resourceAnalyzer, v1alpha1.Config()))
-	s.restfulCont.Handle(path.Join(resourceMetricsPathPrefix, v1alpha1.Version),
-		promhttp.HandlerFor(v1alpha1ResourceRegistry, promhttp.HandlerOpts{ErrorHandling: promhttp.ContinueOnError}),
+	// deprecated endpoint which will be removed in release 1.20.0+.
+	v1alpha1ResourceRegistry := compbasemetrics.NewKubeRegistry()
+	v1alpha1ResourceRegistry.CustomMustRegister(stats.NewPrometheusResourceMetricCollector(s.resourceAnalyzer, v1alpha1.Config()))
+	s.restfulCont.Handle(path.Join(resourceMetricsPath, v1alpha1.Version),
+		compbasemetrics.HandlerFor(v1alpha1ResourceRegistry, compbasemetrics.HandlerOpts{ErrorHandling: compbasemetrics.ContinueOnError}),
+	)
+
+	resourceRegistry := compbasemetrics.NewKubeRegistry()
+	resourceRegistry.CustomMustRegister(collectors.NewResourceMetricsCollector(s.resourceAnalyzer))
+	s.restfulCont.Handle(resourceMetricsPath,
+		compbasemetrics.HandlerFor(resourceRegistry, compbasemetrics.HandlerOpts{ErrorHandling: compbasemetrics.ContinueOnError}),
 	)
 
 	// prober metrics are exposed under a different endpoint
 
 	p := compbasemetrics.NewKubeRegistry()
-	compbasemetrics.RegisterProcessStartTime(p.RawRegister)
+	_ = compbasemetrics.RegisterProcessStartTime(p.Register)
 	p.MustRegister(prober.ProberResults)
 	s.restfulCont.Handle(proberMetricsPath,
-		promhttp.HandlerFor(p, promhttp.HandlerOpts{ErrorHandling: promhttp.ContinueOnError}),
+		compbasemetrics.HandlerFor(p, compbasemetrics.HandlerOpts{ErrorHandling: compbasemetrics.ContinueOnError}),
 	)
 
 	if enableCAdvisorJSONEndpoints {

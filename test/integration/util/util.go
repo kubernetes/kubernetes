@@ -17,20 +17,18 @@ limitations under the License.
 package util
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/informers"
+	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/events"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/scheduler"
-
-	// import DefaultProvider
-	_ "k8s.io/kubernetes/pkg/scheduler/algorithmprovider/defaults"
-	schedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -45,10 +43,11 @@ func StartApiserver() (string, ShutdownFunc) {
 		h.M.GenericAPIServer.Handler.ServeHTTP(w, req)
 	}))
 
-	framework.RunAMasterUsingServer(framework.NewIntegrationTestMasterConfig(), s, h)
+	_, _, closeFn := framework.RunAMasterUsingServer(framework.NewIntegrationTestMasterConfig(), s, h)
 
 	shutdownFunc := func() {
 		klog.Infof("destroying API server")
+		closeFn()
 		s.Close()
 		klog.Infof("destroyed API server")
 	}
@@ -57,71 +56,50 @@ func StartApiserver() (string, ShutdownFunc) {
 
 // StartScheduler configures and starts a scheduler given a handle to the clientSet interface
 // and event broadcaster. It returns the running scheduler and the shutdown function to stop it.
-func StartScheduler(clientSet clientset.Interface) (*scheduler.Scheduler, ShutdownFunc) {
+func StartScheduler(clientSet clientset.Interface) (*scheduler.Scheduler, coreinformers.PodInformer, ShutdownFunc) {
+	ctx, cancel := context.WithCancel(context.Background())
+
 	informerFactory := informers.NewSharedInformerFactory(clientSet, 0)
-	stopCh := make(chan struct{})
+	podInformer := informerFactory.Core().V1().Pods()
 	evtBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{
 		Interface: clientSet.EventsV1beta1().Events("")})
 
-	evtBroadcaster.StartRecordingToSink(stopCh)
+	evtBroadcaster.StartRecordingToSink(ctx.Done())
 
 	recorder := evtBroadcaster.NewRecorder(
 		legacyscheme.Scheme,
 		v1.DefaultSchedulerName,
 	)
 
-	sched, err := createScheduler(clientSet, informerFactory, recorder, stopCh)
+	sched, err := createScheduler(clientSet, informerFactory, podInformer, recorder, ctx.Done())
 	if err != nil {
 		klog.Fatalf("Error creating scheduler: %v", err)
 	}
-	scheduler.AddAllEventHandlers(sched,
-		v1.DefaultSchedulerName,
-		informerFactory.Core().V1().Nodes(),
-		informerFactory.Core().V1().Pods(),
-		informerFactory.Core().V1().PersistentVolumes(),
-		informerFactory.Core().V1().PersistentVolumeClaims(),
-		informerFactory.Core().V1().Services(),
-		informerFactory.Storage().V1().StorageClasses(),
-		informerFactory.Storage().V1beta1().CSINodes(),
-	)
 
-	informerFactory.Start(stopCh)
-	sched.Run()
+	informerFactory.Start(ctx.Done())
+	go sched.Run(ctx)
 
 	shutdownFunc := func() {
 		klog.Infof("destroying scheduler")
-		close(stopCh)
+		cancel()
 		klog.Infof("destroyed scheduler")
 	}
-	return sched, shutdownFunc
+	return sched, podInformer, shutdownFunc
 }
 
 // createScheduler create a scheduler with given informer factory and default name.
 func createScheduler(
 	clientSet clientset.Interface,
 	informerFactory informers.SharedInformerFactory,
+	podInformer coreinformers.PodInformer,
 	recorder events.EventRecorder,
 	stopCh <-chan struct{},
 ) (*scheduler.Scheduler, error) {
-	defaultProviderName := schedulerconfig.SchedulerDefaultProviderName
-
 	return scheduler.New(
 		clientSet,
-		informerFactory.Core().V1().Nodes(),
-		informerFactory.Core().V1().Pods(),
-		informerFactory.Core().V1().PersistentVolumes(),
-		informerFactory.Core().V1().PersistentVolumeClaims(),
-		informerFactory.Core().V1().ReplicationControllers(),
-		informerFactory.Apps().V1().ReplicaSets(),
-		informerFactory.Apps().V1().StatefulSets(),
-		informerFactory.Core().V1().Services(),
-		informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
-		informerFactory.Storage().V1().StorageClasses(),
-		informerFactory.Storage().V1beta1().CSINodes(),
+		informerFactory,
+		podInformer,
 		recorder,
-		schedulerconfig.SchedulerAlgorithmSource{
-			Provider: &defaultProviderName,
-		},
 		stopCh,
 	)
 }

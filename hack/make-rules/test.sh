@@ -31,16 +31,6 @@ export KUBE_CACHE_MUTATION_DETECTOR
 KUBE_PANIC_WATCH_DECODE_ERROR="${KUBE_PANIC_WATCH_DECODE_ERROR:-true}"
 export KUBE_PANIC_WATCH_DECODE_ERROR
 
-# Handle case where OS has sha#sum commands, instead of shasum.
-if which shasum >/dev/null 2>&1; then
-  SHA1SUM="shasum -a1"
-elif which sha1sum >/dev/null 2>&1; then
-  SHA1SUM="sha1sum"
-else
-  echo "Failed to find shasum or sha1sum utility." >&2
-  exit 1
-fi
-
 kube::test::find_dirs() {
   (
     cd "${KUBE_ROOT}"
@@ -81,13 +71,6 @@ KUBE_COVERPROCS=${KUBE_COVERPROCS:-4}
 KUBE_RACE=${KUBE_RACE:-}   # use KUBE_RACE="-race" to enable race testing
 # Set to the goveralls binary path to report coverage results to Coveralls.io.
 KUBE_GOVERALLS_BIN=${KUBE_GOVERALLS_BIN:-}
-# Lists of API Versions of each groups that should be tested, groups are
-# separated by comma, lists are separated by semicolon. e.g.,
-# "v1,compute/v1alpha1,experimental/v1alpha2;v1,compute/v2,experimental/v1alpha3"
-# FIXME: due to current implementation of a test client (see: pkg/api/testapi/testapi.go)
-# ONLY the last version is tested in each group.
-ALL_VERSIONS_CSV=$(IFS=',';echo "${KUBE_AVAILABLE_GROUP_VERSIONS[*]// /,}";IFS=$)
-KUBE_TEST_API_VERSIONS="${KUBE_TEST_API_VERSIONS:-${ALL_VERSIONS_CSV}}"
 # once we have multiple group supports
 # Create a junit-style XML test report in this directory if set.
 KUBE_JUNIT_REPORT_DIR=${KUBE_JUNIT_REPORT_DIR:-}
@@ -189,14 +172,7 @@ junitFilenamePrefix() {
     return
   fi
   mkdir -p "${KUBE_JUNIT_REPORT_DIR}"
-  # This filename isn't parsed by anything, and we must avoid
-  # exceeding 255 character filename limit. KUBE_TEST_API
-  # barely fits there and in coverage mode test names are
-  # appended to generated file names, easily exceeding
-  # 255 chars in length. So let's just use a sha1 hash of it.
-  local KUBE_TEST_API_HASH
-  KUBE_TEST_API_HASH="$(echo -n "${KUBE_TEST_API//\//-}"| ${SHA1SUM} |awk '{print $1}')"
-  echo "${KUBE_JUNIT_REPORT_DIR}/junit_${KUBE_TEST_API_HASH}_$(kube::util::sortable_date)"
+  echo "${KUBE_JUNIT_REPORT_DIR}/junit_$(kube::util::sortable_date)"
 }
 
 verifyAndSuggestPackagePath() {
@@ -250,7 +226,7 @@ produceJUnitXMLReport() {
 
   if ! command -v gotestsum >/dev/null 2>&1; then
     kube::log::error "gotestsum not found; please install with " \
-      "go install k8s.io/kubernetes/vendor/gotest.tools/gotestsum"
+      "GO111MODULE=off go install k8s.io/kubernetes/vendor/gotest.tools/gotestsum"
     return
   fi
   gotestsum --junitfile "${junit_xml_filename}" --raw-command cat "${junit_filename_prefix}"*.stdout
@@ -281,9 +257,8 @@ runTests() {
   fi
 
   # Create coverage report directories.
-  KUBE_TEST_API_HASH="$(echo -n "${KUBE_TEST_API//\//-}"| ${SHA1SUM} |awk '{print $1}')"
   if [[ -z "${KUBE_COVER_REPORT_DIR}" ]]; then
-    cover_report_dir="/tmp/k8s_coverage/${KUBE_TEST_API_HASH}/$(kube::util::sortable_date)"
+    cover_report_dir="/tmp/k8s_coverage/$(kube::util::sortable_date)"
   else
     cover_report_dir="${KUBE_COVER_REPORT_DIR}"
   fi
@@ -372,16 +347,7 @@ checkFDs() {
 
 checkFDs
 
-
-# Convert the CSVs to arrays.
-IFS=';' read -r -a apiVersions <<< "${KUBE_TEST_API_VERSIONS}"
-apiVersionsCount=${#apiVersions[@]}
-for (( i=0; i<apiVersionsCount; i++ )); do
-  apiVersion=${apiVersions[i]}
-  echo "Running tests for APIVersion: ${apiVersion}"
-  # KUBE_TEST_API sets the version of each group to be tested.
-  KUBE_TEST_API="${apiVersion}" runTests "$@"
-done
+runTests "$@"
 
 # We might run the tests for multiple versions, but we want to report only
 # one of them to coveralls. Here we report coverage from the last run.

@@ -23,23 +23,9 @@ a serivce
 package endpoints
 
 import (
-	"fmt"
-	"sort"
-	"time"
-
-	"github.com/onsi/ginkgo"
 	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/test/e2e/framework"
 )
-
-// ServiceStartTimeout is how long to wait for a service endpoint to be resolvable.
-const ServiceStartTimeout = 3 * time.Minute
-
-// PortsByPodName is a map that maps pod name to container ports.
-type PortsByPodName map[string][]int
 
 // PortsByPodUID is a map that maps pod UID to container ports.
 type PortsByPodUID map[types.UID][]int
@@ -59,78 +45,4 @@ func GetContainerPortsByPodUID(ep *v1.Endpoints) PortsByPodUID {
 		}
 	}
 	return m
-}
-
-func translatePodNameToUID(c clientset.Interface, ns string, expectedEndpoints PortsByPodName) (PortsByPodUID, error) {
-	portsByUID := make(PortsByPodUID)
-	for name, portList := range expectedEndpoints {
-		pod, err := c.CoreV1().Pods(ns).Get(name, metav1.GetOptions{})
-		if err != nil {
-			return nil, fmt.Errorf("failed to get pod %s, that's pretty weird. validation failed: %s", name, err)
-		}
-		portsByUID[pod.ObjectMeta.UID] = portList
-	}
-	return portsByUID, nil
-}
-
-func validatePorts(ep PortsByPodUID, expectedEndpoints PortsByPodUID) error {
-	if len(ep) != len(expectedEndpoints) {
-		// should not happen because we check this condition before
-		return fmt.Errorf("invalid number of endpoints got %v, expected %v", ep, expectedEndpoints)
-	}
-	for podUID := range expectedEndpoints {
-		if _, ok := ep[podUID]; !ok {
-			return fmt.Errorf("endpoint %v not found", podUID)
-		}
-		if len(ep[podUID]) != len(expectedEndpoints[podUID]) {
-			return fmt.Errorf("invalid list of ports for uid %v. Got %v, expected %v", podUID, ep[podUID], expectedEndpoints[podUID])
-		}
-		sort.Ints(ep[podUID])
-		sort.Ints(expectedEndpoints[podUID])
-		for index := range ep[podUID] {
-			if ep[podUID][index] != expectedEndpoints[podUID][index] {
-				return fmt.Errorf("invalid list of ports for uid %v. Got %v, expected %v", podUID, ep[podUID], expectedEndpoints[podUID])
-			}
-		}
-	}
-	return nil
-}
-
-// ValidateEndpointsPorts validates that the given service exists and is served by the given expectedEndpoints.
-func ValidateEndpointsPorts(c clientset.Interface, namespace, serviceName string, expectedEndpoints PortsByPodName) error {
-	ginkgo.By(fmt.Sprintf("waiting up to %v for service %s in namespace %s to expose endpoints %v", ServiceStartTimeout, serviceName, namespace, expectedEndpoints))
-	i := 1
-	for start := time.Now(); time.Since(start) < ServiceStartTimeout; time.Sleep(1 * time.Second) {
-		ep, err := c.CoreV1().Endpoints(namespace).Get(serviceName, metav1.GetOptions{})
-		if err != nil {
-			framework.Logf("Get endpoints failed (%v elapsed, ignoring for 5s): %v", time.Since(start), err)
-			continue
-		}
-		portsByPodUID := GetContainerPortsByPodUID(ep)
-		expectedPortsByPodUID, err := translatePodNameToUID(c, namespace, expectedEndpoints)
-		if err != nil {
-			return err
-		}
-		if len(portsByPodUID) == len(expectedEndpoints) {
-			err := validatePorts(portsByPodUID, expectedPortsByPodUID)
-			if err != nil {
-				return err
-			}
-			framework.Logf("successfully validated that service %s in namespace %s exposes endpoints %v (%v elapsed)",
-				serviceName, namespace, expectedEndpoints, time.Since(start))
-			return nil
-		}
-		if i%5 == 0 {
-			framework.Logf("Unexpected endpoints: found %v, expected %v (%v elapsed, will retry)", portsByPodUID, expectedEndpoints, time.Since(start))
-		}
-		i++
-	}
-	if pods, err := c.CoreV1().Pods(metav1.NamespaceAll).List(metav1.ListOptions{}); err == nil {
-		for _, pod := range pods.Items {
-			framework.Logf("Pod %s\t%s\t%s\t%s", pod.Namespace, pod.Name, pod.Spec.NodeName, pod.DeletionTimestamp)
-		}
-	} else {
-		framework.Logf("Can't list pod debug info: %v", err)
-	}
-	return fmt.Errorf("Timed out waiting for service %s in namespace %s to expose endpoints %v (%v elapsed)", serviceName, namespace, expectedEndpoints, ServiceStartTimeout)
 }

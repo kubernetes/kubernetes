@@ -138,7 +138,10 @@ func newHTTP2Server(conn net.Conn, config *ServerConfig) (_ ServerTransport, err
 	}
 	framer := newFramer(conn, writeBufSize, readBufSize, maxHeaderListSize)
 	// Send initial settings as connection preface to client.
-	var isettings []http2.Setting
+	isettings := []http2.Setting{{
+		ID:  http2.SettingMaxFrameSize,
+		Val: http2MaxFrameLen,
+	}}
 	// TODO(zhaoq): Have a better way to signal "no limit" because 0 is
 	// permitted in the HTTP2 spec.
 	maxStreams := config.MaxStreams

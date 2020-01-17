@@ -26,7 +26,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pborman/uuid"
+	"github.com/google/uuid"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -223,7 +223,7 @@ func TestAudit(t *testing.T) {
 			"short running with auditID",
 			shortRunningPath,
 			"GET",
-			uuid.NewRandom().String(),
+			uuid.New().String(),
 			nil,
 			func(w http.ResponseWriter, req *http.Request) {
 				w.Write([]byte("foo"))
@@ -422,7 +422,7 @@ func TestAudit(t *testing.T) {
 			"empty longrunning with audit id",
 			longRunningPath,
 			"GET",
-			uuid.NewRandom().String(),
+			uuid.New().String(),
 			nil,
 			func(w http.ResponseWriter, req *http.Request) {
 				w.Write([]byte("foo"))
@@ -778,7 +778,7 @@ func TestAuditIDHttpHeader(t *testing.T) {
 		},
 		{
 			"no http header when there is no audit even the request header specified",
-			uuid.NewRandom().String(),
+			uuid.New().String(),
 			auditinternal.LevelNone,
 			false,
 		},
@@ -790,7 +790,7 @@ func TestAuditIDHttpHeader(t *testing.T) {
 		},
 		{
 			"user provided header",
-			uuid.NewRandom().String(),
+			uuid.New().String(),
 			auditinternal.LevelRequestResponse,
 			true,
 		},

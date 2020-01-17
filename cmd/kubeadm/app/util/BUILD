@@ -9,6 +9,7 @@ go_library(
         "chroot_windows.go",
         "copy.go",
         "endpoint.go",
+        "env.go",
         "error.go",
         "marshal.go",
         "net.go",
@@ -20,6 +21,7 @@ go_library(
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//cmd/kubeadm/app/constants:go_default_library",
+        "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
@@ -89,7 +91,6 @@ filegroup(
         "//cmd/kubeadm/app/util/pubkeypin:all-srcs",
         "//cmd/kubeadm/app/util/runtime:all-srcs",
         "//cmd/kubeadm/app/util/staticpod:all-srcs",
-        "//cmd/kubeadm/app/util/system:all-srcs",
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],

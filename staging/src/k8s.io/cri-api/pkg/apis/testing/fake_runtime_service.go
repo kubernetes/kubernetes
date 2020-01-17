@@ -194,6 +194,14 @@ func (r *FakeRuntimeService) RunPodSandbox(config *runtimeapi.PodSandboxConfig, 
 			Network: &runtimeapi.PodSandboxNetworkStatus{
 				Ip: FakePodSandboxIPs[0],
 			},
+			// Without setting sandboxStatus's Linux.Namespaces.Options, kubeGenericRuntimeManager's podSandboxChanged will consider it as network
+			// namespace changed and always recreate sandbox which causes pod creation failed.
+			// Ref `sandboxStatus.GetLinux().GetNamespaces().GetOptions().GetNetwork() != networkNamespaceForPod(pod)` in podSandboxChanged function.
+			Linux: &runtimeapi.LinuxPodSandboxStatus{
+				Namespaces: &runtimeapi.Namespace{
+					Options: config.GetLinux().GetSecurityContext().GetNamespaceOptions(),
+				},
+			},
 			Labels:         config.Labels,
 			Annotations:    config.Annotations,
 			RuntimeHandler: runtimeHandler,

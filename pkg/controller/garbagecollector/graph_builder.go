@@ -403,27 +403,21 @@ func referencesDiffs(old []metav1.OwnerReference, new []metav1.OwnerReference) (
 		oldUIDToRef[string(value.UID)] = value
 	}
 	oldUIDSet := sets.StringKeySet(oldUIDToRef)
-	newUIDToRef := make(map[string]metav1.OwnerReference)
 	for _, value := range new {
-		newUIDToRef[string(value.UID)] = value
-	}
-	newUIDSet := sets.StringKeySet(newUIDToRef)
-
-	addedUID := newUIDSet.Difference(oldUIDSet)
-	removedUID := oldUIDSet.Difference(newUIDSet)
-	intersection := oldUIDSet.Intersection(newUIDSet)
-
-	for uid := range addedUID {
-		added = append(added, newUIDToRef[uid])
-	}
-	for uid := range removedUID {
-		removed = append(removed, oldUIDToRef[uid])
-	}
-	for uid := range intersection {
-		if !reflect.DeepEqual(oldUIDToRef[uid], newUIDToRef[uid]) {
-			changed = append(changed, ownerRefPair{oldRef: oldUIDToRef[uid], newRef: newUIDToRef[uid]})
+		newUID := string(value.UID)
+		if oldUIDSet.Has(newUID) {
+			if !reflect.DeepEqual(oldUIDToRef[newUID], value) {
+				changed = append(changed, ownerRefPair{oldRef: oldUIDToRef[newUID], newRef: value})
+			}
+			oldUIDSet.Delete(newUID)
+		} else {
+			added = append(added, value)
 		}
 	}
+	for oldUID := range oldUIDSet {
+		removed = append(removed, oldUIDToRef[oldUID])
+	}
+
 	return added, removed, changed
 }
 

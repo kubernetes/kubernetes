@@ -544,12 +544,12 @@ func (impl Implementation) Dlaqr5(wantt, wantz bool, kacc22 int, n, ktop, kbot, 
 			// rows get multiplied by zero).
 			impl.Dlacpy(blas.All, knz, jlen, h[(incol+1+j2)*ldh+jcol:], ldh, wh[kzs*ldwh:], ldwh)
 
-			// Multiply by U21^T.
+			// Multiply by U21ᵀ.
 			impl.Dlaset(blas.All, kzs, jlen, 0, 0, wh, ldwh)
 			bi.Dtrmm(blas.Left, blas.Upper, blas.Trans, blas.NonUnit, knz, jlen,
 				1, u[j2*ldu+kzs:], ldu, wh[kzs*ldwh:], ldwh)
 
-			// Multiply top of H by U11^T.
+			// Multiply top of H by U11ᵀ.
 			bi.Dgemm(blas.Trans, blas.NoTrans, i2, jlen, j2,
 				1, u, ldu, h[(incol+1)*ldh+jcol:], ldh,
 				1, wh, ldwh)
@@ -557,7 +557,7 @@ func (impl Implementation) Dlaqr5(wantt, wantz bool, kacc22 int, n, ktop, kbot, 
 			// Copy top of H to bottom of WH.
 			impl.Dlacpy(blas.All, j2, jlen, h[(incol+1)*ldh+jcol:], ldh, wh[i2*ldwh:], ldwh)
 
-			// Multiply by U21^T.
+			// Multiply by U21ᵀ.
 			bi.Dtrmm(blas.Left, blas.Lower, blas.Trans, blas.NonUnit, j2, jlen,
 				1, u[i2:], ldu, wh[i2*ldwh:], ldwh)
 

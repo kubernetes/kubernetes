@@ -21,14 +21,16 @@ limitations under the License.
 package app
 
 import (
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/scale"
-	"k8s.io/kubernetes/pkg/controller/disruption"
-
 	"net/http"
 
 	"k8s.io/klog"
+
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/scale"
+	"k8s.io/kubernetes/pkg/controller/disruption"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 )
 
 func startDisruptionController(ctx ControllerContext) (http.Handler, bool, error) {
@@ -40,6 +42,10 @@ func startDisruptionController(ctx ControllerContext) (http.Handler, bool, error
 		klog.Infof(
 			"Refusing to start disruption because resource %q in group %q is not available.",
 			resource, group+"/"+version)
+		return nil, false, nil
+	}
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodDisruptionBudget) {
+		klog.Infof("Refusing to start disruption because the PodDisruptionBudget feature is disabled")
 		return nil, false, nil
 	}
 

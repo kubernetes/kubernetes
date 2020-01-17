@@ -132,6 +132,7 @@ func (r *Result) RootObjectSchemata() []*spec.Schema {
 }
 
 // FieldSchemata returns the schemata which apply to fields in objects.
+// nolint: dupl
 func (r *Result) FieldSchemata() map[FieldKey][]*spec.Schema {
 	if r.cachedFieldSchemta != nil {
 		return r.cachedFieldSchemta
@@ -151,6 +152,7 @@ func (r *Result) FieldSchemata() map[FieldKey][]*spec.Schema {
 }
 
 // ItemSchemata returns the schemata which apply to items in slices.
+// nolint: dupl
 func (r *Result) ItemSchemata() map[ItemKey][]*spec.Schema {
 	if r.cachedItemSchemata != nil {
 		return r.cachedItemSchemata
@@ -175,6 +177,7 @@ func (r *Result) resetCaches() {
 }
 
 // mergeForField merges other into r, assigning other's root schemata to the given Object and field name.
+// nolint: unparam
 func (r *Result) mergeForField(obj map[string]interface{}, field string, other *Result) *Result {
 	if other == nil {
 		return r
@@ -196,6 +199,7 @@ func (r *Result) mergeForField(obj map[string]interface{}, field string, other *
 }
 
 // mergeForSlice merges other into r, assigning other's root schemata to the given slice and index.
+// nolint: unparam
 func (r *Result) mergeForSlice(slice reflect.Value, i int, other *Result) *Result {
 	if other == nil {
 		return r
@@ -231,6 +235,7 @@ func (r *Result) addPropertySchemata(obj map[string]interface{}, fld string, sch
 	r.fieldSchemata = append(r.fieldSchemata, fieldSchemata{obj: obj, field: fld, schemata: schemata{one: schema}})
 }
 
+/*
 // addSliceSchemata adds the given schemata for the slice and index.
 // The slice schemata might be reused. I.e. do not modify it after being added to a result.
 func (r *Result) addSliceSchemata(slice reflect.Value, i int, schema *spec.Schema) {
@@ -239,6 +244,7 @@ func (r *Result) addSliceSchemata(slice reflect.Value, i int, schema *spec.Schem
 	}
 	r.itemSchemata = append(r.itemSchemata, itemSchemata{slice: slice, index: i, schemata: schemata{one: schema}})
 }
+*/
 
 // mergeWithoutRootSchemata merges other into r, ignoring the rootObject schemata.
 func (r *Result) mergeWithoutRootSchemata(other *Result) {
@@ -251,9 +257,7 @@ func (r *Result) mergeWithoutRootSchemata(other *Result) {
 		if r.fieldSchemata == nil {
 			r.fieldSchemata = other.fieldSchemata
 		} else {
-			for _, x := range other.fieldSchemata {
-				r.fieldSchemata = append(r.fieldSchemata, x)
-			}
+			r.fieldSchemata = append(r.fieldSchemata, other.fieldSchemata...)
 		}
 	}
 
@@ -261,9 +265,7 @@ func (r *Result) mergeWithoutRootSchemata(other *Result) {
 		if r.itemSchemata == nil {
 			r.itemSchemata = other.itemSchemata
 		} else {
-			for _, x := range other.itemSchemata {
-				r.itemSchemata = append(r.itemSchemata, x)
-			}
+			r.itemSchemata = append(r.itemSchemata, other.itemSchemata...)
 		}
 	}
 }

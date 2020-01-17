@@ -125,7 +125,7 @@ func validateTaintEffect(effect corev1.TaintEffect) error {
 	return nil
 }
 
-// ReorganizeTaints returns the updated set of taints, taking into account old taints that were not updated,
+// reorganizeTaints returns the updated set of taints, taking into account old taints that were not updated,
 // old taints that were updated, old taints that were deleted, and new taints.
 func reorganizeTaints(node *corev1.Node, overwrite bool, taintsToAdd []corev1.Taint, taintsToRemove []corev1.Taint) (string, []corev1.Taint, error) {
 	newTaints := append([]corev1.Taint{}, taintsToAdd...)
@@ -177,7 +177,7 @@ func addTaints(oldTaints []corev1.Taint, newTaints *[]corev1.Taint) bool {
 	return len(oldTaints) != len(*newTaints)
 }
 
-// CheckIfTaintsAlreadyExists checks if the node already has taints that we want to add and returns a string with taint keys.
+// checkIfTaintsAlreadyExists checks if the node already has taints that we want to add and returns a string with taint keys.
 func checkIfTaintsAlreadyExists(oldTaints []corev1.Taint, taints []corev1.Taint) string {
 	var existingTaintList = make([]string, 0)
 	for _, taint := range taints {
@@ -190,30 +190,26 @@ func checkIfTaintsAlreadyExists(oldTaints []corev1.Taint, taints []corev1.Taint)
 	return strings.Join(existingTaintList, ",")
 }
 
-// DeleteTaintsByKey removes all the taints that have the same key to given taintKey
+// deleteTaintsByKey removes all the taints that have the same key to given taintKey
 func deleteTaintsByKey(taints []corev1.Taint, taintKey string) ([]corev1.Taint, bool) {
 	newTaints := []corev1.Taint{}
-	deleted := false
 	for i := range taints {
 		if taintKey == taints[i].Key {
-			deleted = true
 			continue
 		}
 		newTaints = append(newTaints, taints[i])
 	}
-	return newTaints, deleted
+	return newTaints, len(taints) != len(newTaints)
 }
 
-// DeleteTaint removes all the taints that have the same key and effect to given taintToDelete.
+// deleteTaint removes all the taints that have the same key and effect to given taintToDelete.
 func deleteTaint(taints []corev1.Taint, taintToDelete *corev1.Taint) ([]corev1.Taint, bool) {
 	newTaints := []corev1.Taint{}
-	deleted := false
 	for i := range taints {
 		if taintToDelete.MatchTaint(&taints[i]) {
-			deleted = true
 			continue
 		}
 		newTaints = append(newTaints, taints[i])
 	}
-	return newTaints, deleted
+	return newTaints, len(taints) != len(newTaints)
 }

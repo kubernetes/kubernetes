@@ -18,7 +18,6 @@ package cacher
 
 import (
 	"fmt"
-	"reflect"
 	"strconv"
 	"strings"
 	"testing"
@@ -435,54 +434,4 @@ func TestReflectorForWatchCache(t *testing.T) {
 			t.Errorf("unexpected resource version: %d", version)
 		}
 	}
-}
-
-func TestCachingObjects(t *testing.T) {
-	store := newTestWatchCache(5)
-
-	index := 0
-	store.eventHandler = func(event *watchCacheEvent) {
-		switch event.Type {
-		case watch.Added, watch.Modified:
-			if _, ok := event.Object.(runtime.CacheableObject); !ok {
-				t.Fatalf("Object in %s event should support caching: %#v", event.Type, event.Object)
-			}
-			if _, ok := event.PrevObject.(runtime.CacheableObject); ok {
-				t.Fatalf("PrevObject in %s event should not support caching: %#v", event.Type, event.Object)
-			}
-		case watch.Deleted:
-			if _, ok := event.Object.(runtime.CacheableObject); ok {
-				t.Fatalf("Object in %s event should not support caching: %#v", event.Type, event.Object)
-			}
-			if _, ok := event.PrevObject.(runtime.CacheableObject); !ok {
-				t.Fatalf("PrevObject in %s event should support caching: %#v", event.Type, event.Object)
-			}
-		}
-
-		// Verify that delivered event is the same as cached one modulo Object/PrevObject.
-		switch event.Type {
-		case watch.Added, watch.Modified:
-			event.Object = event.Object.(runtime.CacheableObject).GetObject()
-		case watch.Deleted:
-			event.PrevObject = event.PrevObject.(runtime.CacheableObject).GetObject()
-			// In events store in watchcache, we also don't update ResourceVersion.
-			// So we need to ensure that we don't fail on it.
-			resourceVersion, err := store.versioner.ObjectResourceVersion(store.cache[index].PrevObject)
-			if err != nil {
-				t.Fatalf("Failed to parse resource version: %v", err)
-			}
-			updateResourceVersionIfNeeded(event.PrevObject, store.versioner, resourceVersion)
-		}
-		if a, e := event, store.cache[index]; !reflect.DeepEqual(a, e) {
-			t.Errorf("watchCacheEvent messed up: %#v, expected: %#v", a, e)
-		}
-		index++
-	}
-
-	pod1 := makeTestPod("pod", 1)
-	pod2 := makeTestPod("pod", 2)
-	pod3 := makeTestPod("pod", 3)
-	store.Add(pod1)
-	store.Update(pod2)
-	store.Delete(pod3)
 }

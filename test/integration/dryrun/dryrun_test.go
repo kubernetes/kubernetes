@@ -21,7 +21,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -55,7 +55,7 @@ func DryRunCreateTest(t *testing.T, rsc dynamic.ResourceInterface, obj *unstruct
 			obj.GroupVersionKind())
 	}
 
-	if _, err := rsc.Get(obj.GetName(), metav1.GetOptions{}); !errors.IsNotFound(err) {
+	if _, err := rsc.Get(obj.GetName(), metav1.GetOptions{}); !apierrors.IsNotFound(err) {
 		t.Fatalf("object shouldn't exist: %v", err)
 	}
 }
@@ -92,7 +92,7 @@ func getReplicasOrFail(t *testing.T, obj *unstructured.Unstructured) int64 {
 
 func DryRunScalePatchTest(t *testing.T, rsc dynamic.ResourceInterface, name string) {
 	obj, err := rsc.Get(name, metav1.GetOptions{}, "scale")
-	if errors.IsNotFound(err) {
+	if apierrors.IsNotFound(err) {
 		return
 	}
 	if err != nil {
@@ -119,7 +119,7 @@ func DryRunScalePatchTest(t *testing.T, rsc dynamic.ResourceInterface, name stri
 
 func DryRunScaleUpdateTest(t *testing.T, rsc dynamic.ResourceInterface, name string) {
 	obj, err := rsc.Get(name, metav1.GetOptions{}, "scale")
-	if errors.IsNotFound(err) {
+	if apierrors.IsNotFound(err) {
 		return
 	}
 	if err != nil {
@@ -156,7 +156,7 @@ func DryRunUpdateTest(t *testing.T, rsc dynamic.ResourceInterface, name string) 
 		}
 		obj.SetAnnotations(map[string]string{"update": "true"})
 		obj, err = rsc.Update(obj, metav1.UpdateOptions{DryRun: []string{metav1.DryRunAll}})
-		if err == nil || !errors.IsConflict(err) {
+		if err == nil || !apierrors.IsConflict(err) {
 			break
 		}
 	}
@@ -213,7 +213,7 @@ func TestDryRun(t *testing.T) {
 	// start API server
 	s, err := kubeapiservertesting.StartTestServer(t, kubeapiservertesting.NewDefaultTestServerOptions(), []string{
 		"--disable-admission-plugins=ServiceAccount,StorageObjectInUseProtection",
-		"--runtime-config=extensions/v1beta1/deployments=true,extensions/v1beta1/daemonsets=true,extensions/v1beta1/replicasets=true,extensions/v1beta1/podsecuritypolicies=true,extensions/v1beta1/networkpolicies=true",
+		"--runtime-config=api/all=true",
 	}, framework.SharedEtcd())
 	if err != nil {
 		t.Fatal(err)

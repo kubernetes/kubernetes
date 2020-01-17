@@ -17,8 +17,7 @@ go_test(
     tags = ["integration"],
     deps = [
         "//pkg/controller/volume/persistentvolume:go_default_library",
-        "//pkg/controller/volume/persistentvolume/options:go_default_library",
-        "//pkg/scheduler/algorithm/predicates:go_default_library",
+        "//pkg/scheduler/framework/plugins/nodevolumelimits:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/testing:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
@@ -58,8 +57,6 @@ go_library(
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/api/v1/pod:go_default_library",
         "//pkg/scheduler:go_default_library",
-        "//pkg/scheduler/algorithmprovider/defaults:go_default_library",
-        "//pkg/scheduler/apis/config:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",

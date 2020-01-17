@@ -14,6 +14,8 @@ syntax = "proto3";
 
 package devtools.buildozer;
 
+option go_package = "api_proto";
+
 message Output {
   repeated Record records = 1;
   message Record {

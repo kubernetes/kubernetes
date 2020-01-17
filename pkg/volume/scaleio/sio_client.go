@@ -28,7 +28,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/kubernetes/pkg/util/mount"
+	utilexec "k8s.io/utils/exec"
 
 	sio "github.com/thecodeteam/goscaleio"
 	siotypes "github.com/thecodeteam/goscaleio/types/v1"
@@ -78,10 +78,10 @@ type sioClient struct {
 	inited           bool
 	diskRegex        *regexp.Regexp
 	mtx              sync.Mutex
-	exec             mount.Exec
+	exec             utilexec.Interface
 }
 
-func newSioClient(gateway, username, password string, sslEnabled bool, exec mount.Exec) (*sioClient, error) {
+func newSioClient(gateway, username, password string, sslEnabled bool, exec utilexec.Interface) (*sioClient, error) {
 	client := new(sioClient)
 	client.gateway = gateway
 	client.username = username
@@ -321,7 +321,7 @@ func (c *sioClient) getGUID() (string, error) {
 	if c.sdcGUID == "" {
 		klog.V(4).Info(log("sdc guid label not set, falling back to using drv_cfg"))
 		cmd := c.getSdcCmd()
-		output, err := c.exec.Run(cmd, "--query_guid")
+		output, err := c.exec.Command(cmd, "--query_guid").CombinedOutput()
 		if err != nil {
 			klog.Error(log("drv_cfg --query_guid failed: %v", err))
 			return "", err

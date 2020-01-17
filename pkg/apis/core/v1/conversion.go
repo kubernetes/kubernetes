@@ -31,35 +31,8 @@ import (
 )
 
 func addConversionFuncs(scheme *runtime.Scheme) error {
-	// Add non-generated conversion functions
-	err := scheme.AddConversionFuncs(
-		Convert_core_Pod_To_v1_Pod,
-		Convert_core_PodSpec_To_v1_PodSpec,
-		Convert_v1_PodStatus_To_core_PodStatus,
-		Convert_core_PodStatus_To_v1_PodStatus,
-		Convert_core_NodeSpec_To_v1_NodeSpec,
-		Convert_v1_NodeSpec_To_core_NodeSpec,
-		Convert_core_ReplicationControllerSpec_To_v1_ReplicationControllerSpec,
-		Convert_core_ServiceSpec_To_v1_ServiceSpec,
-		Convert_v1_Pod_To_core_Pod,
-		Convert_v1_PodSpec_To_core_PodSpec,
-		Convert_v1_ReplicationControllerSpec_To_core_ReplicationControllerSpec,
-		Convert_v1_Secret_To_core_Secret,
-		Convert_v1_ServiceSpec_To_core_ServiceSpec,
-		Convert_v1_ResourceList_To_core_ResourceList,
-		Convert_v1_ReplicationController_To_apps_ReplicaSet,
-		Convert_v1_ReplicationControllerSpec_To_apps_ReplicaSetSpec,
-		Convert_v1_ReplicationControllerStatus_To_apps_ReplicaSetStatus,
-		Convert_apps_ReplicaSet_To_v1_ReplicationController,
-		Convert_apps_ReplicaSetSpec_To_v1_ReplicationControllerSpec,
-		Convert_apps_ReplicaSetStatus_To_v1_ReplicationControllerStatus,
-	)
-	if err != nil {
-		return err
-	}
-
 	// Add field conversion funcs.
-	err = scheme.AddFieldLabelConversionFunc(SchemeGroupVersion.WithKind("Pod"),
+	err := scheme.AddFieldLabelConversionFunc(SchemeGroupVersion.WithKind("Pod"),
 		func(label, value string) (string, string, error) {
 			switch label {
 			case "metadata.name",
@@ -70,6 +43,7 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 				"spec.serviceAccountName",
 				"status.phase",
 				"status.podIP",
+				"status.podIPs",
 				"status.nominatedNodeName":
 				return label, value, nil
 			// This is for backwards compatibility with old v1 clients which send spec.host

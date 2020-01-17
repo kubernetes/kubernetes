@@ -389,7 +389,7 @@ func TestCacheInvalidation(t *testing.T) {
 		},
 	}
 	manager.RegisterPod(podWithSecrets("ns1", "name1", s1))
-	// Fetch both secrets - this should triggger get operations.
+	// Fetch both secrets - this should trigger get operations.
 	store.Get("ns1", "s1")
 	store.Get("ns1", "s10")
 	store.Get("ns1", "s2")

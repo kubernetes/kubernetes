@@ -348,6 +348,8 @@ const (
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// DEPRECATED - This group version of CSINode is deprecated by storage/v1/CSINode.
+// See the release notes for more information.
 // CSINode holds information about all CSI drivers installed on a node.
 // CSI drivers do not need to create the CSINode object directly. As long as
 // they use the node-driver-registrar sidecar container, the kubelet will

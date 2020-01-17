@@ -29,8 +29,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	nodectlr "k8s.io/kubernetes/pkg/controller/nodelifecycle"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/system"
@@ -59,18 +59,15 @@ type PodNode struct {
 }
 
 // FirstAddress returns the first address of the given type of each node.
-// TODO: Use return type string instead of []string
-func FirstAddress(nodelist *v1.NodeList, addrType v1.NodeAddressType) []string {
-	hosts := []string{}
+func FirstAddress(nodelist *v1.NodeList, addrType v1.NodeAddressType) string {
 	for _, n := range nodelist.Items {
 		for _, addr := range n.Status.Addresses {
 			if addr.Type == addrType && addr.Address != "" {
-				hosts = append(hosts, addr.Address)
-				break
+				return addr.Address
 			}
 		}
 	}
-	return hosts
+	return ""
 }
 
 // TODO: better to change to a easy read name
@@ -156,7 +153,6 @@ func IsConditionUnset(node *v1.Node, conditionType v1.NodeConditionType) bool {
 
 // Filter filters nodes in NodeList in place, removing nodes that do not
 // satisfy the given condition
-// TODO: consider merging with pkg/client/cache.NodeLister
 func Filter(nodeList *v1.NodeList, fn func(node v1.Node) bool) {
 	var l []v1.Node
 
@@ -336,7 +332,6 @@ func GetPublicIps(c clientset.Interface) ([]string, error) {
 // 2) Needs to be ready.
 // If EITHER 1 or 2 is not true, most tests will want to ignore the node entirely.
 // If there are no nodes that are both ready and schedulable, this will return an error.
-// TODO: remove references in framework/util.go.
 func GetReadySchedulableNodes(c clientset.Interface) (nodes *v1.NodeList, err error) {
 	nodes, err = checkWaitListSchedulableNodes(c)
 	if err != nil {
@@ -466,12 +461,15 @@ func isNodeUntaintedWithNonblocking(node *v1.Node, nonblockingTaints string) boo
 		nodeInfo.SetNode(node)
 	}
 
-	fit, _, err := predicates.PodToleratesNodeTaints(fakePod, nil, nodeInfo)
+	taints, err := nodeInfo.Taints()
 	if err != nil {
 		e2elog.Failf("Can't test predicates for node %s: %v", node.Name, err)
 		return false
 	}
-	return fit
+
+	return v1helper.TolerationsTolerateTaintsWithFilter(fakePod.Spec.Tolerations, taints, func(t *v1.Taint) bool {
+		return t.Effect == v1.TaintEffectNoExecute || t.Effect == v1.TaintEffectNoSchedule
+	})
 }
 
 // IsNodeSchedulable returns true if:

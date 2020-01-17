@@ -19,16 +19,8 @@ package v1alpha1
 import (
 	v1alpha1 "k8s.io/api/node/v1alpha1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
-	runtime "k8s.io/apimachinery/pkg/runtime"
 	node "k8s.io/kubernetes/pkg/apis/node"
 )
-
-func addConversionFuncs(s *runtime.Scheme) error {
-	return s.AddConversionFuncs(
-		Convert_v1alpha1_RuntimeClass_To_node_RuntimeClass,
-		Convert_node_RuntimeClass_To_v1alpha1_RuntimeClass,
-	)
-}
 
 // Convert_v1alpha1_RuntimeClass_To_node_RuntimeClass must override the automatic
 // conversion since we unnested the spec struct after v1alpha1

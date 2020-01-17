@@ -48,16 +48,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1alpha1.RuntimeClass)(nil), (*node.RuntimeClass)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_RuntimeClass_To_node_RuntimeClass(a.(*v1alpha1.RuntimeClass), b.(*node.RuntimeClass), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*node.RuntimeClass)(nil), (*v1alpha1.RuntimeClass)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_node_RuntimeClass_To_v1alpha1_RuntimeClass(a.(*node.RuntimeClass), b.(*v1alpha1.RuntimeClass), scope)
-	}); err != nil {
-		return err
-	}
 	if err := s.AddGeneratedConversionFunc((*v1alpha1.RuntimeClassList)(nil), (*node.RuntimeClassList)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1alpha1_RuntimeClassList_To_node_RuntimeClassList(a.(*v1alpha1.RuntimeClassList), b.(*node.RuntimeClassList), scope)
 	}); err != nil {

@@ -78,19 +78,14 @@ func (p *perfCounterNodeStatsClient) startMonitoring() error {
 		return err
 	}
 
-	kernelVersion, err := getKernelVersion()
-	if err != nil {
-		return err
-	}
-
-	osImageVersion, err := getOSImageVersion()
+	osInfo, err := GetOSInfo()
 	if err != nil {
 		return err
 	}
 
 	p.nodeInfo = nodeInfo{
-		kernelVersion:               kernelVersion,
-		osImageVersion:              osImageVersion,
+		kernelVersion:               osInfo.GetPatchVersion(),
+		osImageVersion:              osInfo.ProductName,
 		memoryPhysicalCapacityBytes: memory,
 		startTime:                   time.Now(),
 	}

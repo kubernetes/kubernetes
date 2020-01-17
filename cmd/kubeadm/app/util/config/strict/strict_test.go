@@ -25,7 +25,6 @@ import (
 	kubeproxyconfigv1alpha1 "k8s.io/kube-proxy/config/v1alpha1"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
-	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
@@ -55,13 +54,13 @@ func TestVerifyUnmarshalStrict(t *testing.T) {
 		},
 		{
 			fileName:      "invalid_duplicate_field_kubeletcfg.yaml",
-			kind:          string(componentconfigs.KubeletConfigurationKind),
+			kind:          "KubeletConfiguration",
 			groupVersion:  kubeletconfigv1beta1.SchemeGroupVersion,
 			expectedError: true,
 		},
 		{
 			fileName:      "invalid_duplicate_field_kubeproxycfg.yaml",
-			kind:          string(componentconfigs.KubeProxyConfigurationKind),
+			kind:          "KubeProxyConfiguration",
 			groupVersion:  kubeproxyconfigv1alpha1.SchemeGroupVersion,
 			expectedError: true,
 		},
@@ -85,13 +84,13 @@ func TestVerifyUnmarshalStrict(t *testing.T) {
 		},
 		{
 			fileName:      "invalid_unknown_field_kubeletcfg.yaml",
-			kind:          string(componentconfigs.KubeletConfigurationKind),
+			kind:          "KubeletConfiguration",
 			groupVersion:  kubeletconfigv1beta1.SchemeGroupVersion,
 			expectedError: true,
 		},
 		{
 			fileName:      "invalid_unknown_field_kubeproxycfg.yaml",
-			kind:          string(componentconfigs.KubeProxyConfigurationKind),
+			kind:          "KubeProxyConfiguration",
 			groupVersion:  kubeproxyconfigv1alpha1.SchemeGroupVersion,
 			expectedError: true,
 		},
@@ -129,13 +128,13 @@ func TestVerifyUnmarshalStrict(t *testing.T) {
 		},
 		{
 			fileName:      "valid_kubeletcfg.yaml",
-			kind:          string(componentconfigs.KubeletConfigurationKind),
+			kind:          "KubeletConfiguration",
 			groupVersion:  kubeletconfigv1beta1.SchemeGroupVersion,
 			expectedError: false,
 		},
 		{
 			fileName:      "valid_kubeproxycfg.yaml",
-			kind:          string(componentconfigs.KubeProxyConfigurationKind),
+			kind:          "KubeProxyConfiguration",
 			groupVersion:  kubeproxyconfigv1alpha1.SchemeGroupVersion,
 			expectedError: false,
 		},

@@ -1,6 +1,6 @@
 dependencies:
   - name: "etcd"
-    version: 3.3.15
+    version: 3.4.3
     refPaths:
     - path: cluster/gce/manifests/etcd.manifest
       match: etcd_docker_tag|etcd_version
@@ -19,22 +19,20 @@ dependencies:
     - path: cmd/kubeadm/app/constants/constants.go
     - path: hack/lib/etcd.sh
       match: ETCD_VERSION=
-    - path: staging/src/k8s.io/sample-apiserver/artifacts/example/rc.yaml
+    - path: staging/src/k8s.io/sample-apiserver/artifacts/example/deployment.yaml
       match: quay.io/coreos/etcd
     - path: test/e2e/framework/nodes_util.go
       match: const etcdImage
 
   - name: "docker"
-    version: 18.09
+    version: 19.03
     refPaths:
-    - path: cmd/kubeadm/app/util/system/docker_validator.go
+    - path: vendor/k8s.io/system-validators/validators/docker_validator.go
       match: latestValidatedDockerVersion
-    - path: cmd/kubeadm/app/util/system/docker_validator_test.go
-      match: ServerVersion
 
 
   - name: "golang"
-    version: 1.12.10
+    version: 1.13.6
     refPaths:
     - path: build/build-image/cross/Dockerfile
       match: "golang:"
@@ -63,7 +61,7 @@ dependencies:
 
 
   - name: "coredns-kube-up"
-    version: 1.6.2
+    version: 1.6.5
     refPaths:
     - path: cluster/addons/dns/coredns/coredns.yaml.base
       match: k8s.gcr.io/coredns
@@ -73,7 +71,7 @@ dependencies:
       match: k8s.gcr.io/coredns
 
   - name: "coredns-kubeadm"
-    version: 1.6.2
+    version: 1.6.5
     refPaths:
     - path: cmd/kubeadm/app/constants/constants.go
       match: CoreDNSVersion =
@@ -85,3 +83,5 @@ dependencies:
       match: CRI_TOOLS_VERSION =
     - path: cluster/gce/gci/configure.sh
       match: DEFAULT_CRICTL_VERSION=
+    - path: cluster/gce/windows/k8s-node-setup.psm1
+      match: CRICTL_VERSION =
