@@ -220,6 +220,5 @@ func PerformControlPlaneUpgrade(flags *applyFlags, client clientset.Interface, w
 		return upgrade.DryRunStaticPodUpgrade(flags.kustomizeDir, internalcfg)
 	}
 
-	// Don't save etcd backup directory if etcd is HA, as this could cause corruption
 	return upgrade.PerformStaticPodUpgrade(client, waiter, internalcfg, flags.etcdUpgrade, flags.renewCerts, flags.kustomizeDir)
 }
