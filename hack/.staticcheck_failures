@@ -27,7 +27,6 @@ pkg/volume/rbd
 pkg/volume/storageos
 pkg/volume/util
 pkg/volume/util/fsquota
-pkg/volume/util/fsquota/common
 pkg/volume/util/subpath
 test/e2e/apps
 test/e2e/autoscaling

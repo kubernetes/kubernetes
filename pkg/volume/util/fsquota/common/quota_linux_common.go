@@ -33,11 +33,6 @@ const (
 	BadQuotaID QuotaID = 0
 )
 
-const (
-	acct      = iota
-	enforcing = iota
-)
-
 // QuotaType -- type of quota to be applied
 type QuotaType int
 
