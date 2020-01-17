@@ -33,7 +33,10 @@ const (
 
 // System preset priority level names
 const (
-	PriorityLevelConfigurationNameExempt = "exempt"
+	PriorityLevelConfigurationNameExempt   = "exempt"
+	PriorityLevelConfigurationNameCatchAll = "catch-all"
+	FlowSchemaNameExempt                   = "exempt"
+	FlowSchemaNameCatchAll                 = "catch-all"
 )
 
 // Conditions

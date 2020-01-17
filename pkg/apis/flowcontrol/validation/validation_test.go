@@ -24,10 +24,78 @@ import (
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/kubernetes/pkg/apis/flowcontrol"
 )
 
 func TestFlowSchemaValidation(t *testing.T) {
+	badExempt := flowcontrol.FlowSchemaSpec{
+		MatchingPrecedence: 1,
+		PriorityLevelConfiguration: flowcontrol.PriorityLevelConfigurationReference{
+			Name: flowcontrol.PriorityLevelConfigurationNameExempt,
+		},
+		Rules: []flowcontrol.PolicyRulesWithSubjects{
+			{
+				Subjects: []flowcontrol.Subject{
+					{
+						Kind:  flowcontrol.SubjectKindGroup,
+						Group: &flowcontrol.GroupSubject{Name: "system:masters"},
+					},
+				},
+				ResourceRules: []flowcontrol.ResourcePolicyRule{
+					{
+						Verbs:        []string{flowcontrol.VerbAll},
+						APIGroups:    []string{flowcontrol.APIGroupAll},
+						Resources:    []string{flowcontrol.ResourceAll},
+						ClusterScope: true,
+						Namespaces:   []string{flowcontrol.NamespaceEvery},
+					},
+				},
+				NonResourceRules: []flowcontrol.NonResourcePolicyRule{
+					{
+						Verbs:           []string{flowcontrol.VerbAll},
+						NonResourceURLs: []string{"/"},
+					},
+				},
+			},
+		},
+	}
+	badCatchAll := flowcontrol.FlowSchemaSpec{
+		MatchingPrecedence: flowcontrol.FlowSchemaMaxMatchingPrecedence,
+		PriorityLevelConfiguration: flowcontrol.PriorityLevelConfigurationReference{
+			Name: flowcontrol.PriorityLevelConfigurationNameCatchAll,
+		},
+		DistinguisherMethod: &flowcontrol.FlowDistinguisherMethod{Type: flowcontrol.FlowDistinguisherMethodByUserType},
+		Rules: []flowcontrol.PolicyRulesWithSubjects{
+			{
+				Subjects: []flowcontrol.Subject{
+					{
+						Kind:  flowcontrol.SubjectKindGroup,
+						Group: &flowcontrol.GroupSubject{Name: user.AllUnauthenticated},
+					},
+					{
+						Kind:  flowcontrol.SubjectKindGroup,
+						Group: &flowcontrol.GroupSubject{Name: user.AllAuthenticated},
+					},
+				},
+				ResourceRules: []flowcontrol.ResourcePolicyRule{
+					{
+						Verbs:        []string{flowcontrol.VerbAll},
+						APIGroups:    []string{flowcontrol.APIGroupAll},
+						Resources:    []string{flowcontrol.ResourceAll},
+						ClusterScope: true,
+						Namespaces:   []string{flowcontrol.NamespaceEvery},
+					},
+				},
+				NonResourceRules: []flowcontrol.NonResourcePolicyRule{
+					{
+						Verbs:           []string{flowcontrol.VerbAll},
+						NonResourceURLs: []string{"/"},
+					},
+				},
+			},
+		},
+	}
 	testCases := []struct {
 		name           string
 		flowSchema     *flowcontrol.FlowSchema
@@ -92,6 +160,251 @@ func TestFlowSchemaValidation(t *testing.T) {
 				},
 			},
 			expectedErrors: field.ErrorList{},
+		},
+		{
+			name: "malformed Subject union in ServiceAccount case",
+			flowSchema: &flowcontrol.FlowSchema{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "system-foo",
+				},
+				Spec: flowcontrol.FlowSchemaSpec{
+					MatchingPrecedence: 50,
+					PriorityLevelConfiguration: flowcontrol.PriorityLevelConfigurationReference{
+						Name: "system-bar",
+					},
+					Rules: []flowcontrol.PolicyRulesWithSubjects{
+						{
+							Subjects: []flowcontrol.Subject{
+								{
+									Kind:  flowcontrol.SubjectKindServiceAccount,
+									User:  &flowcontrol.UserSubject{Name: "fred"},
+									Group: &flowcontrol.GroupSubject{Name: "fred"},
+								},
+							},
+							NonResourceRules: []flowcontrol.NonResourcePolicyRule{
+								{
+									Verbs:           []string{flowcontrol.VerbAll},
+									NonResourceURLs: []string{"*"},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrors: field.ErrorList{
+				field.Required(field.NewPath("spec").Child("rules").Index(0).Child("subjects").Index(0).Child("serviceAccount"), "serviceAccount is required when subject kind is 'ServiceAccount'"),
+				field.Forbidden(field.NewPath("spec").Child("rules").Index(0).Child("subjects").Index(0).Child("user"), "user is forbidden when subject kind is not 'User'"),
+				field.Forbidden(field.NewPath("spec").Child("rules").Index(0).Child("subjects").Index(0).Child("group"), "group is forbidden when subject kind is not 'Group'"),
+			},
+		},
+		{
+			name: "Subject union malformed in User case",
+			flowSchema: &flowcontrol.FlowSchema{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "system-foo",
+				},
+				Spec: flowcontrol.FlowSchemaSpec{
+					MatchingPrecedence: 50,
+					PriorityLevelConfiguration: flowcontrol.PriorityLevelConfigurationReference{
+						Name: "system-bar",
+					},
+					Rules: []flowcontrol.PolicyRulesWithSubjects{
+						{
+							Subjects: []flowcontrol.Subject{
+								{
+									Kind:           flowcontrol.SubjectKindUser,
+									Group:          &flowcontrol.GroupSubject{Name: "fred"},
+									ServiceAccount: &flowcontrol.ServiceAccountSubject{Namespace: "s", Name: "n"},
+								},
+							},
+							NonResourceRules: []flowcontrol.NonResourcePolicyRule{
+								{
+									Verbs:           []string{flowcontrol.VerbAll},
+									NonResourceURLs: []string{"*"},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrors: field.ErrorList{
+				field.Forbidden(field.NewPath("spec").Child("rules").Index(0).Child("subjects").Index(0).Child("serviceAccount"), "serviceAccount is forbidden when subject kind is not 'ServiceAccount'"),
+				field.Required(field.NewPath("spec").Child("rules").Index(0).Child("subjects").Index(0).Child("user"), "user is required when subject kind is 'User'"),
+				field.Forbidden(field.NewPath("spec").Child("rules").Index(0).Child("subjects").Index(0).Child("group"), "group is forbidden when subject kind is not 'Group'"),
+			},
+		},
+		{
+			name: "malformed Subject union in Group case",
+			flowSchema: &flowcontrol.FlowSchema{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "system-foo",
+				},
+				Spec: flowcontrol.FlowSchemaSpec{
+					MatchingPrecedence: 50,
+					PriorityLevelConfiguration: flowcontrol.PriorityLevelConfigurationReference{
+						Name: "system-bar",
+					},
+					Rules: []flowcontrol.PolicyRulesWithSubjects{
+						{
+							Subjects: []flowcontrol.Subject{
+								{
+									Kind:           flowcontrol.SubjectKindGroup,
+									User:           &flowcontrol.UserSubject{Name: "fred"},
+									ServiceAccount: &flowcontrol.ServiceAccountSubject{Namespace: "s", Name: "n"},
+								},
+							},
+							NonResourceRules: []flowcontrol.NonResourcePolicyRule{
+								{
+									Verbs:           []string{flowcontrol.VerbAll},
+									NonResourceURLs: []string{"*"},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrors: field.ErrorList{
+				field.Forbidden(field.NewPath("spec").Child("rules").Index(0).Child("subjects").Index(0).Child("serviceAccount"), "serviceAccount is forbidden when subject kind is not 'ServiceAccount'"),
+				field.Forbidden(field.NewPath("spec").Child("rules").Index(0).Child("subjects").Index(0).Child("user"), "user is forbidden when subject kind is not 'User'"),
+				field.Required(field.NewPath("spec").Child("rules").Index(0).Child("subjects").Index(0).Child("group"), "group is required when subject kind is 'Group'"),
+			},
+		},
+		{
+			name: "exempt flow-schema should work",
+			flowSchema: &flowcontrol.FlowSchema{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: flowcontrol.FlowSchemaNameExempt,
+				},
+				Spec: flowcontrol.FlowSchemaSpec{
+					MatchingPrecedence: 1,
+					PriorityLevelConfiguration: flowcontrol.PriorityLevelConfigurationReference{
+						Name: flowcontrol.PriorityLevelConfigurationNameExempt,
+					},
+					Rules: []flowcontrol.PolicyRulesWithSubjects{
+						{
+							Subjects: []flowcontrol.Subject{
+								{
+									Kind:  flowcontrol.SubjectKindGroup,
+									Group: &flowcontrol.GroupSubject{Name: "system:masters"},
+								},
+							},
+							ResourceRules: []flowcontrol.ResourcePolicyRule{
+								{
+									Verbs:        []string{flowcontrol.VerbAll},
+									APIGroups:    []string{flowcontrol.APIGroupAll},
+									Resources:    []string{flowcontrol.ResourceAll},
+									ClusterScope: true,
+									Namespaces:   []string{flowcontrol.NamespaceEvery},
+								},
+							},
+							NonResourceRules: []flowcontrol.NonResourcePolicyRule{
+								{
+									Verbs:           []string{flowcontrol.VerbAll},
+									NonResourceURLs: []string{"*"},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrors: field.ErrorList{},
+		},
+		{
+			name: "bad exempt flow-schema should fail",
+			flowSchema: &flowcontrol.FlowSchema{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: flowcontrol.FlowSchemaNameExempt,
+				},
+				Spec: badExempt,
+			},
+			expectedErrors: field.ErrorList{field.Invalid(field.NewPath("spec"), badExempt, "spec of 'exempt' must equal the fixed value")},
+		},
+		{
+			name: "bad catch-all flow-schema should fail",
+			flowSchema: &flowcontrol.FlowSchema{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: flowcontrol.FlowSchemaNameCatchAll,
+				},
+				Spec: badCatchAll,
+			},
+			expectedErrors: field.ErrorList{field.Invalid(field.NewPath("spec"), badCatchAll, "spec of 'catch-all' must equal the fixed value")},
+		},
+		{
+			name: "catch-all flow-schema should work",
+			flowSchema: &flowcontrol.FlowSchema{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: flowcontrol.FlowSchemaNameCatchAll,
+				},
+				Spec: flowcontrol.FlowSchemaSpec{
+					MatchingPrecedence: 10000,
+					PriorityLevelConfiguration: flowcontrol.PriorityLevelConfigurationReference{
+						Name: flowcontrol.PriorityLevelConfigurationNameCatchAll,
+					},
+					DistinguisherMethod: &flowcontrol.FlowDistinguisherMethod{Type: flowcontrol.FlowDistinguisherMethodByUserType},
+					Rules: []flowcontrol.PolicyRulesWithSubjects{
+						{
+							Subjects: []flowcontrol.Subject{
+								{
+									Kind:  flowcontrol.SubjectKindGroup,
+									Group: &flowcontrol.GroupSubject{Name: user.AllUnauthenticated},
+								},
+								{
+									Kind:  flowcontrol.SubjectKindGroup,
+									Group: &flowcontrol.GroupSubject{Name: user.AllAuthenticated},
+								},
+							},
+							ResourceRules: []flowcontrol.ResourcePolicyRule{
+								{
+									Verbs:        []string{flowcontrol.VerbAll},
+									APIGroups:    []string{flowcontrol.APIGroupAll},
+									Resources:    []string{flowcontrol.ResourceAll},
+									ClusterScope: true,
+									Namespaces:   []string{flowcontrol.NamespaceEvery},
+								},
+							},
+							NonResourceRules: []flowcontrol.NonResourcePolicyRule{
+								{
+									Verbs:           []string{flowcontrol.VerbAll},
+									NonResourceURLs: []string{"*"},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrors: field.ErrorList{},
+		},
+		{
+			name: "non-exempt flow-schema with matchingPrecedence==1 should fail",
+			flowSchema: &flowcontrol.FlowSchema{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "fred",
+				},
+				Spec: flowcontrol.FlowSchemaSpec{
+					MatchingPrecedence: 1,
+					PriorityLevelConfiguration: flowcontrol.PriorityLevelConfigurationReference{
+						Name: "exempt",
+					},
+					Rules: []flowcontrol.PolicyRulesWithSubjects{
+						{
+							Subjects: []flowcontrol.Subject{
+								{
+									Kind:  flowcontrol.SubjectKindGroup,
+									Group: &flowcontrol.GroupSubject{Name: "gorp"},
+								},
+							},
+							NonResourceRules: []flowcontrol.NonResourcePolicyRule{
+								{
+									Verbs:           []string{flowcontrol.VerbAll},
+									NonResourceURLs: []string{"*"},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrors: field.ErrorList{
+				field.Invalid(field.NewPath("spec").Child("matchingPrecedence"), int32(1), "only the schema named 'exempt' may have matchingPrecedence 1")},
 		},
 		{
 			name: "flow-schema mixes * verbs/apiGroups/resources should fail",
@@ -594,11 +907,139 @@ func TestFlowSchemaValidation(t *testing.T) {
 }
 
 func TestPriorityLevelConfigurationValidation(t *testing.T) {
+	badSpec := flowcontrol.PriorityLevelConfigurationSpec{
+		Type: flowcontrol.PriorityLevelEnablementLimited,
+		Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
+			AssuredConcurrencyShares: 42,
+			LimitResponse: flowcontrol.LimitResponse{
+				Type: flowcontrol.LimitResponseTypeReject},
+		},
+	}
 	testCases := []struct {
 		name                       string
 		priorityLevelConfiguration *flowcontrol.PriorityLevelConfiguration
 		expectedErrors             field.ErrorList
 	}{
+		{
+			name: "exempt should work",
+			priorityLevelConfiguration: &flowcontrol.PriorityLevelConfiguration{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: flowcontrol.PriorityLevelConfigurationNameExempt,
+				},
+				Spec: flowcontrol.PriorityLevelConfigurationSpec{
+					Type: flowcontrol.PriorityLevelEnablementExempt,
+				},
+			},
+			expectedErrors: field.ErrorList{},
+		},
+		{
+			name: "wrong exempt spec should fail",
+			priorityLevelConfiguration: &flowcontrol.PriorityLevelConfiguration{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: flowcontrol.PriorityLevelConfigurationNameExempt,
+				},
+				Spec: badSpec,
+			},
+			expectedErrors: field.ErrorList{
+				field.Invalid(field.NewPath("spec").Child("type"), flowcontrol.PriorityLevelEnablementLimited, "type must be 'Exempt' if and only if name is 'exempt'"),
+				field.Invalid(field.NewPath("spec"), badSpec, "spec of 'exempt' must equal the fixed value"),
+			},
+		},
+		{
+			name: "limited requires more details",
+			priorityLevelConfiguration: &flowcontrol.PriorityLevelConfiguration{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "broken-limited",
+				},
+				Spec: flowcontrol.PriorityLevelConfigurationSpec{
+					Type: flowcontrol.PriorityLevelEnablementLimited,
+				},
+			},
+			expectedErrors: field.ErrorList{field.Required(field.NewPath("spec").Child("limited"), "must not be empty when type is Limited")},
+		},
+		{
+			name: "max-in-flight should work",
+			priorityLevelConfiguration: &flowcontrol.PriorityLevelConfiguration{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "max-in-flight",
+				},
+				Spec: flowcontrol.PriorityLevelConfigurationSpec{
+					Type: flowcontrol.PriorityLevelEnablementLimited,
+					Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
+						AssuredConcurrencyShares: 42,
+						LimitResponse: flowcontrol.LimitResponse{
+							Type: flowcontrol.LimitResponseTypeReject},
+					},
+				},
+			},
+			expectedErrors: field.ErrorList{},
+		},
+		{
+			name: "forbid queuing details when not queuing",
+			priorityLevelConfiguration: &flowcontrol.PriorityLevelConfiguration{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "system-foo",
+				},
+				Spec: flowcontrol.PriorityLevelConfigurationSpec{
+					Type: flowcontrol.PriorityLevelEnablementLimited,
+					Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
+						AssuredConcurrencyShares: 100,
+						LimitResponse: flowcontrol.LimitResponse{
+							Type: flowcontrol.LimitResponseTypeReject,
+							Queuing: &flowcontrol.QueuingConfiguration{
+								Queues:           512,
+								HandSize:         4,
+								QueueLengthLimit: 100,
+							}}}},
+			},
+			expectedErrors: field.ErrorList{field.Forbidden(field.NewPath("spec").Child("limited").Child("limitResponse").Child("queuing"), "must be nil if limited.limitResponse.type is not Limited")},
+		},
+		{
+			name: "wrong backstop spec should fail",
+			priorityLevelConfiguration: &flowcontrol.PriorityLevelConfiguration{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: flowcontrol.PriorityLevelConfigurationNameCatchAll,
+				},
+				Spec: badSpec,
+			},
+			expectedErrors: field.ErrorList{field.Invalid(field.NewPath("spec"), badSpec, "spec of 'catch-all' must equal the fixed value")},
+		},
+		{
+			name: "backstop should work",
+			priorityLevelConfiguration: &flowcontrol.PriorityLevelConfiguration{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: flowcontrol.PriorityLevelConfigurationNameCatchAll,
+				},
+				Spec: flowcontrol.PriorityLevelConfigurationSpec{
+					Type: flowcontrol.PriorityLevelEnablementLimited,
+					Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
+						AssuredConcurrencyShares: 100,
+						LimitResponse: flowcontrol.LimitResponse{
+							Type: flowcontrol.LimitResponseTypeQueue,
+							Queuing: &flowcontrol.QueuingConfiguration{
+								Queues:           128,
+								HandSize:         6,
+								QueueLengthLimit: 100,
+							}}}},
+			},
+			expectedErrors: field.ErrorList{},
+		},
+		{
+			name: "broken queuing level should fail",
+			priorityLevelConfiguration: &flowcontrol.PriorityLevelConfiguration{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "system-foo",
+				},
+				Spec: flowcontrol.PriorityLevelConfigurationSpec{
+					Type: flowcontrol.PriorityLevelEnablementLimited,
+					Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
+						AssuredConcurrencyShares: 100,
+						LimitResponse: flowcontrol.LimitResponse{
+							Type: flowcontrol.LimitResponseTypeQueue,
+						}}},
+			},
+			expectedErrors: field.ErrorList{field.Required(field.NewPath("spec").Child("limited").Child("limitResponse").Child("queuing"), "must not be empty if limited.limitResponse.type is Limited")},
+		},
 		{
 			name: "normal customized priority level should work",
 			priorityLevelConfiguration: &flowcontrol.PriorityLevelConfiguration{
@@ -616,18 +1057,6 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 								HandSize:         4,
 								QueueLengthLimit: 100,
 							}}}},
-			},
-			expectedErrors: field.ErrorList{},
-		},
-		{
-			name: "system low priority level w/ exempt should work",
-			priorityLevelConfiguration: &flowcontrol.PriorityLevelConfiguration{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: flowcontrol.PriorityLevelConfigurationNameExempt,
-				},
-				Spec: flowcontrol.PriorityLevelConfigurationSpec{
-					Type: flowcontrol.PriorityLevelEnablementExempt,
-				},
 			},
 			expectedErrors: field.ErrorList{},
 		},
