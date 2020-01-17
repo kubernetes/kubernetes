@@ -75,6 +75,8 @@ var (
 
 		# Remove from node 'foo' the taint with key 'dedicated' and effect 'NoSchedule' if one exists.
 		kubectl taint nodes foo dedicated:NoSchedule-
+		               (or)
+		kubectl taint nodes foo dedicated=:NoSchedule-
 
 		# Remove from node 'foo' all the taints with key 'dedicated'
 		kubectl taint nodes foo dedicated-
@@ -83,7 +85,7 @@ var (
 		kubectl taint node -l myLabel=X  dedicated=foo:PreferNoSchedule
 
 		# Add to node 'foo' a taint with key 'bar' and no value
-		kubectl taint nodes foo bar:NoSchedule`))
+		kubectl taint nodes foo bar=:NoSchedule`))
 )
 
 func NewCmdTaint(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
