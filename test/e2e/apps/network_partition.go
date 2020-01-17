@@ -36,7 +36,7 @@ import (
 	nodepkg "k8s.io/kubernetes/pkg/controller/nodelifecycle"
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
-	jobutil "k8s.io/kubernetes/test/e2e/framework/job"
+	e2ejob "k8s.io/kubernetes/test/e2e/framework/job"
 	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -438,11 +438,11 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 			completions := int32(4)
 			backoffLimit := int32(6) // default value
 
-			job := jobutil.NewTestJob("notTerminate", "network-partition", v1.RestartPolicyNever,
+			job := e2ejob.NewTestJob("notTerminate", "network-partition", v1.RestartPolicyNever,
 				parallelism, completions, nil, backoffLimit)
-			job, err := jobutil.CreateJob(f.ClientSet, f.Namespace.Name, job)
+			job, err := e2ejob.CreateJob(f.ClientSet, f.Namespace.Name, job)
 			framework.ExpectNoError(err)
-			label := labels.SelectorFromSet(labels.Set(map[string]string{jobutil.JobSelectorKey: job.Name}))
+			label := labels.SelectorFromSet(labels.Set(map[string]string{e2ejob.JobSelectorKey: job.Name}))
 
 			ginkgo.By(fmt.Sprintf("verifying that there are now %v running pods", parallelism))
 			_, err = e2epod.PodsCreatedByLabel(c, ns, job.Name, parallelism, label)
