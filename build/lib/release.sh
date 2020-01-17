@@ -472,7 +472,7 @@ function kube::release::package_kube_manifests_tarball() {
   # Merge GCE-specific addons with general purpose addons.
   local gce_objects
   gce_objects=$(cd "${KUBE_ROOT}/cluster/gce/addons" && find . \( -name \*.yaml -or -name \*.yaml.in -or -name \*.json \) \( -not -name \*demo\* \))
-  if [ -n "${gce_objects}" ]; then
+  if [[ -n ${gce_objects} ]]; then
     tar c -C "${KUBE_ROOT}/cluster/gce/addons" "${gce_objects}" | tar x -C "${dst_dir}"
   fi
 
