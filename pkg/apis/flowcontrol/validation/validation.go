@@ -341,7 +341,7 @@ func ValidatePriorityLevelConfiguration(pl *flowcontrol.PriorityLevelConfigurati
 	allErrs := apivalidation.ValidateObjectMeta(&pl.ObjectMeta, false, ValidatePriorityLevelConfigurationName, field.NewPath("metadata"))
 	specPath := field.NewPath("spec")
 	allErrs = append(allErrs, ValidatePriorityLevelConfigurationSpec(&pl.Spec, pl.Name, specPath)...)
-	if mand, ok := internalbootstrap.MandatoryPriorityLevels[pl.Name]; ok {
+	if mand, ok := internalbootstrap.MandatoryPriorityLevelConfigurations[pl.Name]; ok {
 		// Check for almost exact equality.  This is a pretty
 		// strict test, and it is OK in this context because both
 		// sides of this comparison are intended to ultimately

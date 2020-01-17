@@ -35,7 +35,7 @@ var MandatoryFlowSchemas = internalizeFSes(bootstrap.MandatoryFlowSchemas)
 // key is the object's name and the value is the
 // `*PriorityLevelConfiguration`.  Nobody should mutate anything
 // reachable from this map.
-var MandatoryPriorityLevels = internalizePLs(bootstrap.MandatoryPriorityLevelConfigurations)
+var MandatoryPriorityLevelConfigurations = internalizePLs(bootstrap.MandatoryPriorityLevelConfigurations)
 
 func internalizeFSes(exts []*fcv1a1.FlowSchema) map[string]*flowcontrol.FlowSchema {
 	ans := make(map[string]*flowcontrol.FlowSchema, len(exts))
