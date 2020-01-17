@@ -17,11 +17,13 @@ import (
 // does the pagination between API operations, and Paginator defines the
 // configuration that will be used per page request.
 //
-//     cont := true
-//     for p.Next() && cont {
+//     for p.Next() {
 //         data := p.Page().(*s3.ListObjectsOutput)
 //         // process the page's data
+//         // ...
+//         // break out of loop to stop fetching additional pages
 //     }
+//
 //     return p.Err()
 //
 // See service client API operation Pages methods for examples how the SDK will
@@ -146,7 +148,7 @@ func (r *Request) nextPageTokens() []interface{} {
 				return nil
 			}
 		case bool:
-			if v == false {
+			if !v {
 				return nil
 			}
 		}
