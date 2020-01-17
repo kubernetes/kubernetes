@@ -19,14 +19,20 @@ package markcontrolplane
 import (
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 )
 
 // MarkControlPlane taints the control-plane and sets the control-plane label
 func MarkControlPlane(client clientset.Interface, controlPlaneName string, taints []v1.Taint) error {
+	klog.V(1).Infof("[patchnode] Creating the Node API object %q if missing", controlPlaneName)
+	// See the comments for this function
+	if err := apiclient.EnsureNodeObject(client, controlPlaneName); err != nil {
+		return err
+	}
 
 	fmt.Printf("[mark-control-plane] Marking the node %s as control-plane by adding the label \"%s=''\"\n", controlPlaneName, constants.LabelNodeRoleMaster)
 

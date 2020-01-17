@@ -36,7 +36,7 @@ func (p *PackageHash) CheckForChanges() bool {
 	codeHash, codeModifiedTime, testHash, testModifiedTime, deleted := p.computeHashes()
 
 	if deleted {
-		if p.Deleted == false {
+		if !p.Deleted {
 			t := time.Now()
 			p.CodeModifiedTime = t
 			p.TestModifiedTime = t

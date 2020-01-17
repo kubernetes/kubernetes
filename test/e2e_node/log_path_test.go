@@ -17,13 +17,14 @@ limitations under the License.
 package e2e_node
 
 import (
-	. "github.com/onsi/ginkgo"
-	"k8s.io/api/core/v1"
+	"github.com/onsi/ginkgo"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/kubelet"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 )
 
 const (
@@ -35,8 +36,8 @@ var _ = framework.KubeDescribe("ContainerLogPath [NodeConformance]", func() {
 	f := framework.NewDefaultFramework("kubelet-container-log-path")
 	var podClient *framework.PodClient
 
-	Describe("Pod with a container", func() {
-		Context("printed log to stdout", func() {
+	ginkgo.Describe("Pod with a container", func() {
+		ginkgo.Context("printed log to stdout", func() {
 			makeLogPod := func(podName, log string) *v1.Pod {
 				return &v1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
@@ -101,11 +102,11 @@ var _ = framework.KubeDescribe("ContainerLogPath [NodeConformance]", func() {
 
 			createAndWaitPod := func(pod *v1.Pod) error {
 				podClient.Create(pod)
-				return framework.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
+				return e2epod.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
 			}
 
 			var logPodName string
-			BeforeEach(func() {
+			ginkgo.BeforeEach(func() {
 				if framework.TestContext.ContainerRuntime == "docker" {
 					// Container Log Path support requires JSON logging driver.
 					// It does not work when Docker daemon is logging to journald.
@@ -134,7 +135,7 @@ var _ = framework.KubeDescribe("ContainerLogPath [NodeConformance]", func() {
 				err := createAndWaitPod(makeLogPod(logPodName, logString))
 				framework.ExpectNoError(err, "Failed waiting for pod: %s to enter success state", logPodName)
 			})
-			It("should print log to correct log path", func() {
+			ginkgo.It("should print log to correct log path", func() {
 
 				logDir := kubelet.ContainerLogsDir
 
@@ -151,12 +152,13 @@ var _ = framework.KubeDescribe("ContainerLogPath [NodeConformance]", func() {
 				framework.ExpectNoError(err, "Failed waiting for pod: %s to enter success state", logCheckPodName)
 			})
 
-			It("should print log to correct cri log path", func() {
+			ginkgo.It("should print log to correct cri log path", func() {
 
 				logCRIDir := "/var/log/pods"
 
 				// get podID from created Pod
 				createdLogPod, err := podClient.Get(logPodName, metav1.GetOptions{})
+				framework.ExpectNoError(err, "Failed to get pod: %s", logPodName)
 				podNs := createdLogPod.Namespace
 				podName := createdLogPod.Name
 				podID := string(createdLogPod.UID)

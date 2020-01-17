@@ -6,8 +6,11 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/apis/node/validation",
     visibility = ["//visibility:public"],
     deps = [
+        "//pkg/apis/core:go_default_library",
+        "//pkg/apis/core/validation:go_default_library",
         "//pkg/apis/node:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/validation:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1/validation:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
     ],
 )
@@ -17,9 +20,15 @@ go_test(
     srcs = ["validation_test.go"],
     embed = [":go_default_library"],
     deps = [
+        "//pkg/apis/core:go_default_library",
         "//pkg/apis/node:go_default_library",
+        "//pkg/features:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        "//staging/src/k8s.io/component-base/featuregate/testing:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
+        "//vendor/k8s.io/utils/pointer:go_default_library",
     ],
 )
 

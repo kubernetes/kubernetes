@@ -1,8 +1,0 @@
-.*.swo
-.*.swp
-
-server_standalone/server_standalone
-
-examples/sftp-server/id_rsa
-examples/sftp-server/id_rsa.pub
-examples/sftp-server/sftp-server

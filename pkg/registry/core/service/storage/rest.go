@@ -46,16 +46,22 @@ import (
 	registry "k8s.io/kubernetes/pkg/registry/core/service"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/registry/core/service/portallocator"
+	netutil "k8s.io/utils/net"
+
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // REST adapts a service registry into apiserver's RESTStorage model.
 type REST struct {
-	services         ServiceStorage
-	endpoints        EndpointsStorage
-	serviceIPs       ipallocator.Interface
-	serviceNodePorts portallocator.Interface
-	proxyTransport   http.RoundTripper
-	pods             rest.Getter
+	services               ServiceStorage
+	endpoints              EndpointsStorage
+	serviceIPs             ipallocator.Interface
+	secondaryServiceIPs    ipallocator.Interface
+	defaultServiceIPFamily api.IPFamily
+	serviceNodePorts       portallocator.Interface
+	proxyTransport         http.RoundTripper
+	pods                   rest.Getter
 }
 
 // ServiceNodePort includes protocol and port number of a service NodePort.
@@ -94,16 +100,29 @@ func NewREST(
 	endpoints EndpointsStorage,
 	pods rest.Getter,
 	serviceIPs ipallocator.Interface,
+	secondaryServiceIPs ipallocator.Interface,
 	serviceNodePorts portallocator.Interface,
 	proxyTransport http.RoundTripper,
 ) (*REST, *registry.ProxyREST) {
+	// detect this cluster default Service IPFamily (ipfamily of --service-cluster-ip-range)
+	// we do it once here, to avoid having to do it over and over during ipfamily assignment
+	serviceIPFamily := api.IPv4Protocol
+	cidr := serviceIPs.CIDR()
+	if netutil.IsIPv6CIDR(&cidr) {
+		serviceIPFamily = api.IPv6Protocol
+	}
+
+	klog.V(0).Infof("the default service ipfamily for this cluster is: %s", string(serviceIPFamily))
+
 	rest := &REST{
-		services:         services,
-		endpoints:        endpoints,
-		serviceIPs:       serviceIPs,
-		serviceNodePorts: serviceNodePorts,
-		proxyTransport:   proxyTransport,
-		pods:             pods,
+		services:               services,
+		endpoints:              endpoints,
+		serviceIPs:             serviceIPs,
+		secondaryServiceIPs:    secondaryServiceIPs,
+		serviceNodePorts:       serviceNodePorts,
+		defaultServiceIPFamily: serviceIPFamily,
+		proxyTransport:         proxyTransport,
+		pods:                   pods,
 	}
 	return rest, &registry.ProxyREST{Redirector: rest, ProxyTransport: proxyTransport}
 }
@@ -160,6 +179,11 @@ func (rs *REST) Export(ctx context.Context, name string, opts metav1.ExportOptio
 func (rs *REST) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
 	service := obj.(*api.Service)
 
+	// set the service ip family, if it was not already set
+	if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) && service.Spec.IPFamily == nil {
+		service.Spec.IPFamily = &rs.defaultServiceIPFamily
+	}
+
 	if err := rest.BeforeCreate(registry.Strategy, ctx, obj); err != nil {
 		return nil, err
 	}
@@ -169,7 +193,8 @@ func (rs *REST) Create(ctx context.Context, obj runtime.Object, createValidation
 	defer func() {
 		if releaseServiceIP {
 			if helper.IsServiceIPSet(service) {
-				rs.serviceIPs.Release(net.ParseIP(service.Spec.ClusterIP))
+				allocator := rs.getAllocatorByClusterIP(service)
+				allocator.Release(net.ParseIP(service.Spec.ClusterIP))
 			}
 		}
 	}()
@@ -177,7 +202,8 @@ func (rs *REST) Create(ctx context.Context, obj runtime.Object, createValidation
 	var err error
 	if !dryrun.IsDryRun(options.DryRun) {
 		if service.Spec.Type != api.ServiceTypeExternalName {
-			if releaseServiceIP, err = initClusterIP(service, rs.serviceIPs); err != nil {
+			allocator := rs.getAllocatorBySpec(service)
+			if releaseServiceIP, err = initClusterIP(service, allocator); err != nil {
 				return nil, err
 			}
 		}
@@ -256,7 +282,8 @@ func (rs *REST) Delete(ctx context.Context, id string, deleteValidation rest.Val
 
 func (rs *REST) releaseAllocatedResources(svc *api.Service) {
 	if helper.IsServiceIPSet(svc) {
-		rs.serviceIPs.Release(net.ParseIP(svc.Spec.ClusterIP))
+		allocator := rs.getAllocatorByClusterIP(svc)
+		allocator.Release(net.ParseIP(svc.Spec.ClusterIP))
 	}
 
 	for _, nodePort := range collectServiceNodePorts(svc) {
@@ -365,6 +392,7 @@ func (rs *REST) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 	}
 
 	service := obj.(*api.Service)
+
 	if !rest.ValidNamespace(ctx, &service.ObjectMeta) {
 		return nil, false, errors.NewConflict(api.Resource("services"), service.Namespace, fmt.Errorf("Service.Namespace does not match the provided context"))
 	}
@@ -379,7 +407,8 @@ func (rs *REST) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 	defer func() {
 		if releaseServiceIP {
 			if helper.IsServiceIPSet(service) {
-				rs.serviceIPs.Release(net.ParseIP(service.Spec.ClusterIP))
+				allocator := rs.getAllocatorByClusterIP(service)
+				allocator.Release(net.ParseIP(service.Spec.ClusterIP))
 			}
 		}
 	}()
@@ -389,15 +418,19 @@ func (rs *REST) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 
 	if !dryrun.IsDryRun(options.DryRun) {
 		// Update service from ExternalName to non-ExternalName, should initialize ClusterIP.
+		// Since we don't support changing the ip family of a service we don't need to handle
+		// oldService.Spec.ServiceIPFamily != service.Spec.ServiceIPFamily
 		if oldService.Spec.Type == api.ServiceTypeExternalName && service.Spec.Type != api.ServiceTypeExternalName {
-			if releaseServiceIP, err = initClusterIP(service, rs.serviceIPs); err != nil {
+			allocator := rs.getAllocatorBySpec(service)
+			if releaseServiceIP, err = initClusterIP(service, allocator); err != nil {
 				return nil, false, err
 			}
 		}
 		// Update service from non-ExternalName to ExternalName, should release ClusterIP if exists.
 		if oldService.Spec.Type != api.ServiceTypeExternalName && service.Spec.Type == api.ServiceTypeExternalName {
 			if helper.IsServiceIPSet(oldService) {
-				rs.serviceIPs.Release(net.ParseIP(oldService.Spec.ClusterIP))
+				allocator := rs.getAllocatorByClusterIP(service)
+				allocator.Release(net.ParseIP(oldService.Spec.ClusterIP))
 			}
 		}
 	}
@@ -521,6 +554,35 @@ func (r *REST) ConvertToTable(ctx context.Context, object runtime.Object, tableO
 	return r.services.ConvertToTable(ctx, object, tableOptions)
 }
 
+// When allocating we always use BySpec, when releasing we always use ByClusterIP
+func (r *REST) getAllocatorByClusterIP(service *api.Service) ipallocator.Interface {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) || r.secondaryServiceIPs == nil {
+		return r.serviceIPs
+	}
+
+	secondaryAllocatorCIDR := r.secondaryServiceIPs.CIDR()
+	if netutil.IsIPv6String(service.Spec.ClusterIP) && netutil.IsIPv6CIDR(&secondaryAllocatorCIDR) {
+		return r.secondaryServiceIPs
+	}
+
+	return r.serviceIPs
+}
+
+func (r *REST) getAllocatorBySpec(service *api.Service) ipallocator.Interface {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) ||
+		service.Spec.IPFamily == nil ||
+		r.secondaryServiceIPs == nil {
+		return r.serviceIPs
+	}
+
+	secondaryAllocatorCIDR := r.secondaryServiceIPs.CIDR()
+	if *(service.Spec.IPFamily) == api.IPv6Protocol && netutil.IsIPv6CIDR(&secondaryAllocatorCIDR) {
+		return r.secondaryServiceIPs
+	}
+
+	return r.serviceIPs
+}
+
 func isValidAddress(ctx context.Context, addr *api.EndpointAddress, pods rest.Getter) error {
 	if addr.TargetRef == nil {
 		return fmt.Errorf("Address has no target ref, skipping: %v", addr)
@@ -539,8 +601,8 @@ func isValidAddress(ctx context.Context, addr *api.EndpointAddress, pods rest.Ge
 	if pod == nil {
 		return fmt.Errorf("pod is missing, skipping (%s/%s)", addr.TargetRef.Namespace, addr.TargetRef.Name)
 	}
-	if pod.Status.PodIP != addr.IP {
-		return fmt.Errorf("pod ip doesn't match endpoint ip, skipping: %s vs %s (%s/%s)", pod.Status.PodIP, addr.IP, addr.TargetRef.Namespace, addr.TargetRef.Name)
+	if pod.Status.PodIPs[0].IP != addr.IP {
+		return fmt.Errorf("pod ip doesn't match endpoint ip, skipping: %s vs %s (%s/%s)", pod.Status.PodIPs[0].IP, addr.IP, addr.TargetRef.Namespace, addr.TargetRef.Name)
 	}
 	return nil
 }
@@ -603,11 +665,11 @@ func allocateHealthCheckNodePort(service *api.Service, nodePortOp *portallocator
 }
 
 // The return bool value indicates if a cluster IP is allocated successfully.
-func initClusterIP(service *api.Service, serviceIPs ipallocator.Interface) (bool, error) {
+func initClusterIP(service *api.Service, allocator ipallocator.Interface) (bool, error) {
 	switch {
 	case service.Spec.ClusterIP == "":
 		// Allocate next available.
-		ip, err := serviceIPs.AllocateNext()
+		ip, err := allocator.AllocateNext()
 		if err != nil {
 			// TODO: what error should be returned here?  It's not a
 			// field-level validation failure (the field is valid), and it's
@@ -618,7 +680,7 @@ func initClusterIP(service *api.Service, serviceIPs ipallocator.Interface) (bool
 		return true, nil
 	case service.Spec.ClusterIP != api.ClusterIPNone && service.Spec.ClusterIP != "":
 		// Try to respect the requested IP.
-		if err := serviceIPs.Allocate(net.ParseIP(service.Spec.ClusterIP)); err != nil {
+		if err := allocator.Allocate(net.ParseIP(service.Spec.ClusterIP)); err != nil {
 			// TODO: when validation becomes versioned, this gets more complicated.
 			el := field.ErrorList{field.Invalid(field.NewPath("spec", "clusterIP"), service.Spec.ClusterIP, err.Error())}
 			return false, errors.NewInvalid(api.Kind("Service"), service.Name, el)

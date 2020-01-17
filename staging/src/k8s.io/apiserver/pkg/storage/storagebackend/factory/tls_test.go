@@ -34,7 +34,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/apis/example"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
-	"k8s.io/apiserver/pkg/storage/etcd/testing/testingcert"
+	"k8s.io/apiserver/pkg/storage/etcd3/testing/testingcert"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 )
 

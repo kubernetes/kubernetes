@@ -24,10 +24,11 @@
 package stats // import "google.golang.org/grpc/stats"
 
 import (
+	"context"
 	"net"
 	"time"
 
-	"golang.org/x/net/context"
+	"google.golang.org/grpc/metadata"
 )
 
 // RPCStats contains stats information about RPCs.
@@ -173,6 +174,9 @@ type End struct {
 	BeginTime time.Time
 	// EndTime is the time when the RPC ends.
 	EndTime time.Time
+	// Trailer contains the trailer metadata received from the server. This
+	// field is only valid if this End is from the client side.
+	Trailer metadata.MD
 	// Error is the error the RPC ended with. It is an error generated from
 	// status.Status and can be converted back to status.Status using
 	// status.FromError if non-nil.

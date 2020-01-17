@@ -1440,15 +1440,20 @@ func BenchmarkCheckRetryClosesBody(b *testing.B) {
 	defer testServer.Close()
 
 	c := testRESTClient(b, testServer)
-	r := c.Verb("POST").
-		Prefix("foo", "bar").
-		Suffix("baz").
-		Timeout(time.Second).
-		Body([]byte(strings.Repeat("abcd", 1000)))
 
+	requests := make([]*Request, 0, b.N)
 	for i := 0; i < b.N; i++ {
-		if _, err := r.DoRaw(); err != nil {
-			b.Fatalf("Unexpected error: %v %#v", err, err)
+		requests = append(requests, c.Verb("POST").
+			Prefix("foo", "bar").
+			Suffix("baz").
+			Timeout(time.Second).
+			Body([]byte(strings.Repeat("abcd", 1000))))
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if _, err := requests[i].DoRaw(); err != nil {
+			b.Fatalf("Unexpected error (%d/%d): %v", i, b.N, err)
 		}
 	}
 }
@@ -1988,4 +1993,67 @@ func defaultResourcePathWithPrefix(prefix, resource, namespace, name string) str
 		path = path + "/" + name
 	}
 	return path
+}
+
+func TestRequestPreflightCheck(t *testing.T) {
+	for _, tt := range []struct {
+		name         string
+		verbs        []string
+		namespace    string
+		resourceName string
+		namespaceSet bool
+		expectsErr   bool
+	}{
+		{
+			name:         "no namespace set",
+			verbs:        []string{"GET", "PUT", "DELETE", "POST"},
+			namespaceSet: false,
+			expectsErr:   false,
+		},
+		{
+			name:         "empty resource name and namespace",
+			verbs:        []string{"GET", "PUT", "DELETE"},
+			namespaceSet: true,
+			expectsErr:   false,
+		},
+		{
+			name:         "resource name with empty namespace",
+			verbs:        []string{"GET", "PUT", "DELETE"},
+			namespaceSet: true,
+			resourceName: "ResourceName",
+			expectsErr:   true,
+		},
+		{
+			name:         "post empty resource name and namespace",
+			verbs:        []string{"POST"},
+			namespaceSet: true,
+			expectsErr:   true,
+		},
+		{
+			name:         "working requests",
+			verbs:        []string{"GET", "PUT", "DELETE", "POST"},
+			namespaceSet: true,
+			resourceName: "ResourceName",
+			namespace:    "Namespace",
+			expectsErr:   false,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			for _, verb := range tt.verbs {
+				r := &Request{
+					verb:         verb,
+					namespace:    tt.namespace,
+					resourceName: tt.resourceName,
+					namespaceSet: tt.namespaceSet,
+				}
+
+				err := r.requestPreflightCheck()
+				hasErr := err != nil
+				if hasErr == tt.expectsErr {
+					return
+				}
+				t.Errorf("%s: expects error: %v, has error: %v", verb, tt.expectsErr, hasErr)
+			}
+		})
+	}
 }

@@ -6,6 +6,7 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/google.golang.org/grpc/internal",
     importpath = "google.golang.org/grpc/internal",
     visibility = ["//visibility:public"],
+    deps = ["//vendor/google.golang.org/grpc/connectivity:go_default_library"],
 )
 
 filegroup(
@@ -20,8 +21,14 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//vendor/google.golang.org/grpc/internal/backoff:all-srcs",
+        "//vendor/google.golang.org/grpc/internal/balancerload:all-srcs",
+        "//vendor/google.golang.org/grpc/internal/binarylog:all-srcs",
         "//vendor/google.golang.org/grpc/internal/channelz:all-srcs",
+        "//vendor/google.golang.org/grpc/internal/envconfig:all-srcs",
         "//vendor/google.golang.org/grpc/internal/grpcrand:all-srcs",
+        "//vendor/google.golang.org/grpc/internal/grpcsync:all-srcs",
+        "//vendor/google.golang.org/grpc/internal/syscall:all-srcs",
+        "//vendor/google.golang.org/grpc/internal/transport:all-srcs",
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],

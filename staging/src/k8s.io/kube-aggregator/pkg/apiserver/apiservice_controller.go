@@ -28,15 +28,15 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 
-	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
-	informers "k8s.io/kube-aggregator/pkg/client/informers/internalversion/apiregistration/internalversion"
-	listers "k8s.io/kube-aggregator/pkg/client/listers/apiregistration/internalversion"
+	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
+	informers "k8s.io/kube-aggregator/pkg/client/informers/externalversions/apiregistration/v1"
+	listers "k8s.io/kube-aggregator/pkg/client/listers/apiregistration/v1"
 	"k8s.io/kube-aggregator/pkg/controllers"
 )
 
 // APIHandlerManager defines the behaviour that an API handler should have.
 type APIHandlerManager interface {
-	AddAPIService(apiService *apiregistration.APIService) error
+	AddAPIService(apiService *v1.APIService) error
 	RemoveAPIService(apiServiceName string)
 }
 
@@ -130,7 +130,7 @@ func (c *APIServiceRegistrationController) processNextWorkItem() bool {
 	return true
 }
 
-func (c *APIServiceRegistrationController) enqueue(obj *apiregistration.APIService) {
+func (c *APIServiceRegistrationController) enqueue(obj *v1.APIService) {
 	key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 	if err != nil {
 		klog.Errorf("Couldn't get key for object %#v: %v", obj, err)
@@ -141,26 +141,26 @@ func (c *APIServiceRegistrationController) enqueue(obj *apiregistration.APIServi
 }
 
 func (c *APIServiceRegistrationController) addAPIService(obj interface{}) {
-	castObj := obj.(*apiregistration.APIService)
+	castObj := obj.(*v1.APIService)
 	klog.V(4).Infof("Adding %s", castObj.Name)
 	c.enqueue(castObj)
 }
 
 func (c *APIServiceRegistrationController) updateAPIService(obj, _ interface{}) {
-	castObj := obj.(*apiregistration.APIService)
+	castObj := obj.(*v1.APIService)
 	klog.V(4).Infof("Updating %s", castObj.Name)
 	c.enqueue(castObj)
 }
 
 func (c *APIServiceRegistrationController) deleteAPIService(obj interface{}) {
-	castObj, ok := obj.(*apiregistration.APIService)
+	castObj, ok := obj.(*v1.APIService)
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
 			klog.Errorf("Couldn't get object from tombstone %#v", obj)
 			return
 		}
-		castObj, ok = tombstone.Obj.(*apiregistration.APIService)
+		castObj, ok = tombstone.Obj.(*v1.APIService)
 		if !ok {
 			klog.Errorf("Tombstone contained object that is not expected %#v", obj)
 			return

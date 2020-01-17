@@ -18,14 +18,16 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
+source "${KUBE_ROOT}/hack/lib/init.sh"
 cd "${KUBE_ROOT}"
 
+all_e2e_files=()
 # NOTE: This checks e2e test code without the e2e framework which contains Expect().To(HaveOccurred())
-mapfile -t all_e2e_files < <(find test/e2e -name '*.go' | grep -v 'test/e2e/framework/')
+kube::util::read-array all_e2e_files < <(find test/e2e{,_node,_kubeadm} -name '*.go' | grep -v 'test/e2e/framework/')
 errors_expect_no_error=()
 for file in "${all_e2e_files[@]}"
 do
-    if grep "Expect(.*)\.NotTo(.*HaveOccurred()" "${file}" > /dev/null
+    if grep -E "Expect\(.*\)\.(NotTo|ToNot)\(.*HaveOccurred\(\)" "${file}" > /dev/null
     then
         errors_expect_no_error+=( "${file}" )
     fi
@@ -37,6 +39,15 @@ do
     if grep "Expect(.*)\.To(.*HaveOccurred()" "${file}" > /dev/null
     then
         errors_expect_error+=( "${file}" )
+    fi
+done
+
+errors_expect_equal=()
+for file in "${all_e2e_files[@]}"
+do
+    if grep -E "Expect\(.*\)\.To\((gomega\.Equal|Equal)" "${file}" > /dev/null
+    then
+        errors_expect_equal+=( "${file}" )
     fi
 done
 
@@ -63,6 +74,20 @@ if [ ${#errors_expect_error[@]} -ne 0 ]; then
     echo
     echo 'The above files need to use framework.ExpectError(err) instead of '
     echo 'Expect(err).To(HaveOccurred()) or gomega.Expect(err).To(gomega.HaveOccurred())'
+    echo
+  } >&2
+  exit 1
+fi
+
+if [ ${#errors_expect_equal[@]} -ne 0 ]; then
+  {
+    echo "Errors:"
+    for err in "${errors_expect_equal[@]}"; do
+      echo "$err"
+    done
+    echo
+    echo 'The above files need to use framework.ExpectEqual(foo, bar) instead of '
+    echo 'Expect(foo).To(Equal(bar)) or gomega.Expect(foo).To(gomega.Equal(bar))'
     echo
   } >&2
   exit 1

@@ -17,6 +17,7 @@ limitations under the License.
 package podpreset
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"reflect"
@@ -29,12 +30,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/admission"
 	genericadmissioninitializer "k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	settingsv1alpha1listers "k8s.io/client-go/listers/settings/v1alpha1"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/core/pods"
 	apiscorev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 )
 
@@ -94,7 +97,7 @@ func (p *Plugin) SetExternalKubeInformerFactory(f informers.SharedInformerFactor
 }
 
 // Admit injects a pod with the specific fields for each pod preset it matches.
-func (p *Plugin) Admit(a admission.Attributes, o admission.ObjectInterfaces) error {
+func (p *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
 	// Ignore all calls to subresources or resources other than pods.
 	// Ignore all operations other than CREATE.
 	if len(a.GetSubresource()) != 0 || a.GetResource().GroupResource() != api.Resource("pods") || a.GetOperation() != admission.Create {
@@ -183,16 +186,12 @@ func safeToApplyPodPresetsOnPod(pod *api.Pod, podPresets []*settingsv1alpha1.Pod
 	if _, err := mergeVolumes(pod.Spec.Volumes, podPresets); err != nil {
 		errs = append(errs, err)
 	}
-	for _, ctr := range pod.Spec.Containers {
-		if err := safeToApplyPodPresetsOnContainer(&ctr, podPresets); err != nil {
+	pods.VisitContainersWithPath(&pod.Spec, func(c *api.Container, _ *field.Path) bool {
+		if err := safeToApplyPodPresetsOnContainer(c, podPresets); err != nil {
 			errs = append(errs, err)
 		}
-	}
-	for _, iCtr := range pod.Spec.InitContainers {
-		if err := safeToApplyPodPresetsOnContainer(&iCtr, podPresets); err != nil {
-			errs = append(errs, err)
-		}
-	}
+		return true
+	})
 
 	return utilerrors.NewAggregate(errs)
 }

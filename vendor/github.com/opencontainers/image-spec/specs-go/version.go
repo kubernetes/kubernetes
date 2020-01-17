@@ -22,10 +22,10 @@ const (
 	// VersionMinor is for functionality in a backwards-compatible manner
 	VersionMinor = 0
 	// VersionPatch is for backwards-compatible bug fixes
-	VersionPatch = 0
+	VersionPatch = 1
 
 	// VersionDev indicates development branch. Releases will be empty string.
-	VersionDev = "-rc6-dev"
+	VersionDev = ""
 )
 
 // Version is the specification version that the package types support.

@@ -29,12 +29,12 @@ import (
 	"github.com/onsi/ginkgo"
 	compute "google.golang.org/api/compute/v1"
 	"google.golang.org/api/googleapi"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	utilexec "k8s.io/utils/exec"
 )
 
@@ -69,18 +69,15 @@ type backendType string
 // IngressController manages implementation details of Ingress on GCE/GKE.
 type IngressController struct {
 	Ns           string
-	rcPath       string
 	UID          string
 	staticIPName string
-	rc           *v1.ReplicationController
-	svc          *v1.Service
 	Client       clientset.Interface
 	Cloud        framework.CloudConfig
 }
 
 // CleanupIngressController calls cont.CleanupIngressControllerWithTimeout with hard-coded timeout
 func (cont *IngressController) CleanupIngressController() error {
-	return cont.CleanupIngressControllerWithTimeout(framework.LoadBalancerCleanupTimeout)
+	return cont.CleanupIngressControllerWithTimeout(e2eservice.LoadBalancerCleanupTimeout)
 }
 
 // CleanupIngressControllerWithTimeout calls the IngressController.Cleanup(false)
@@ -88,7 +85,7 @@ func (cont *IngressController) CleanupIngressController() error {
 func (cont *IngressController) CleanupIngressControllerWithTimeout(timeout time.Duration) error {
 	pollErr := wait.Poll(5*time.Second, timeout, func() (bool, error) {
 		if err := cont.Cleanup(false); err != nil {
-			e2elog.Logf("Monitoring glbc's cleanup of gce resources:\n%v", err)
+			framework.Logf("Monitoring glbc's cleanup of gce resources:\n%v", err)
 			return false, nil
 		}
 		return true, nil
@@ -109,7 +106,7 @@ func (cont *IngressController) CleanupIngressControllerWithTimeout(timeout time.
 	// throw out confusing events.
 	if ipErr := wait.Poll(5*time.Second, 1*time.Minute, func() (bool, error) {
 		if err := cont.deleteStaticIPs(); err != nil {
-			e2elog.Logf("Failed to delete static-ip: %v\n", err)
+			framework.Logf("Failed to delete static-ip: %v\n", err)
 			return false, nil
 		}
 		return true, nil
@@ -128,7 +125,7 @@ func (cont *IngressController) CleanupIngressControllerWithTimeout(timeout time.
 }
 
 func (cont *IngressController) getL7AddonUID() (string, error) {
-	e2elog.Logf("Retrieving UID from config map: %v/%v", metav1.NamespaceSystem, uidConfigMap)
+	framework.Logf("Retrieving UID from config map: %v/%v", metav1.NamespaceSystem, uidConfigMap)
 	cm, err := cont.Client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(uidConfigMap, metav1.GetOptions{})
 	if err != nil {
 		return "", err
@@ -297,7 +294,7 @@ func (cont *IngressController) deleteURLMap(del bool) (msg string) {
 			continue
 		}
 		if del {
-			e2elog.Logf("Deleting url-map: %s", um.Name)
+			framework.Logf("Deleting url-map: %s", um.Name)
 			if err := gceCloud.DeleteURLMap(um.Name); err != nil &&
 				!cont.isHTTPErrorCode(err, http.StatusNotFound) {
 				msg += fmt.Sprintf("Failed to delete url map %v\n", um.Name)
@@ -333,7 +330,7 @@ func (cont *IngressController) deleteBackendService(del bool) (msg string) {
 		return fmt.Sprintf("Failed to list backend services: %v", err)
 	}
 	if len(beList) == 0 {
-		e2elog.Logf("No backend services found")
+		framework.Logf("No backend services found")
 		return msg
 	}
 	for _, be := range beList {
@@ -341,7 +338,7 @@ func (cont *IngressController) deleteBackendService(del bool) (msg string) {
 			continue
 		}
 		if del {
-			e2elog.Logf("Deleting backed-service: %s", be.Name)
+			framework.Logf("Deleting backed-service: %s", be.Name)
 			if err := gceCloud.DeleteGlobalBackendService(be.Name); err != nil &&
 				!cont.isHTTPErrorCode(err, http.StatusNotFound) {
 				msg += fmt.Sprintf("Failed to delete backend service %v: %v\n", be.Name, err)
@@ -370,7 +367,7 @@ func (cont *IngressController) deleteHTTPHealthCheck(del bool) (msg string) {
 			continue
 		}
 		if del {
-			e2elog.Logf("Deleting http-health-check: %s", hc.Name)
+			framework.Logf("Deleting http-health-check: %s", hc.Name)
 			if err := gceCloud.DeleteHTTPHealthCheck(hc.Name); err != nil &&
 				!cont.isHTTPErrorCode(err, http.StatusNotFound) {
 				msg += fmt.Sprintf("Failed to delete HTTP health check %v\n", hc.Name)
@@ -411,7 +408,7 @@ func (cont *IngressController) deleteSSLCertificate(del bool) (msg string) {
 				continue
 			}
 			if del {
-				e2elog.Logf("Deleting ssl-certificate: %s", s.Name)
+				framework.Logf("Deleting ssl-certificate: %s", s.Name)
 				if err := gceCloud.DeleteSslCertificate(s.Name); err != nil &&
 					!cont.isHTTPErrorCode(err, http.StatusNotFound) {
 					msg += fmt.Sprintf("Failed to delete ssl certificates: %v\n", s.Name)
@@ -457,7 +454,7 @@ func (cont *IngressController) deleteInstanceGroup(del bool) (msg string) {
 			continue
 		}
 		if del {
-			e2elog.Logf("Deleting instance-group: %s", ig.Name)
+			framework.Logf("Deleting instance-group: %s", ig.Name)
 			if err := gceCloud.DeleteInstanceGroup(ig.Name, cont.Cloud.Zone); err != nil &&
 				!cont.isHTTPErrorCode(err, http.StatusNotFound) {
 				msg += fmt.Sprintf("Failed to delete instance group %v\n", ig.Name)
@@ -479,7 +476,7 @@ func (cont *IngressController) deleteNetworkEndpointGroup(del bool) (msg string)
 			return msg
 		}
 		// Do not return error as NEG is still alpha.
-		e2elog.Logf("Failed to list network endpoint group: %v", err)
+		framework.Logf("Failed to list network endpoint group: %v", err)
 		return msg
 	}
 	if len(negList) == 0 {
@@ -490,7 +487,7 @@ func (cont *IngressController) deleteNetworkEndpointGroup(del bool) (msg string)
 			continue
 		}
 		if del {
-			e2elog.Logf("Deleting network-endpoint-group: %s", neg.Name)
+			framework.Logf("Deleting network-endpoint-group: %s", neg.Name)
 			if err := gceCloud.DeleteNetworkEndpointGroup(neg.Name, cont.Cloud.Zone); err != nil &&
 				!cont.isHTTPErrorCode(err, http.StatusNotFound) {
 				msg += fmt.Sprintf("Failed to delete network endpoint group %v\n", neg.Name)
@@ -558,11 +555,11 @@ func (cont *IngressController) canDeleteNEG(resourceName, creationTimestamp stri
 func canDeleteWithTimestamp(resourceName, creationTimestamp string) bool {
 	createdTime, err := time.Parse(time.RFC3339, creationTimestamp)
 	if err != nil {
-		e2elog.Logf("WARNING: Failed to parse creation timestamp %v for %v: %v", creationTimestamp, resourceName, err)
+		framework.Logf("WARNING: Failed to parse creation timestamp %v for %v: %v", creationTimestamp, resourceName, err)
 		return false
 	}
 	if time.Since(createdTime) > maxAge {
-		e2elog.Logf("%v created on %v IS too old", resourceName, creationTimestamp)
+		framework.Logf("%v created on %v IS too old", resourceName, creationTimestamp)
 		return true
 	}
 	return false
@@ -621,7 +618,7 @@ func (cont *IngressController) WaitForNegBackendService(svcPorts map[string]v1.S
 	return wait.Poll(5*time.Second, 1*time.Minute, func() (bool, error) {
 		err := cont.verifyBackendMode(svcPorts, negBackend)
 		if err != nil {
-			e2elog.Logf("Err while checking if backend service is using NEG: %v", err)
+			framework.Logf("Err while checking if backend service is using NEG: %v", err)
 			return false, nil
 		}
 		return true, nil
@@ -633,7 +630,7 @@ func (cont *IngressController) WaitForIgBackendService(svcPorts map[string]v1.Se
 	return wait.Poll(5*time.Second, 1*time.Minute, func() (bool, error) {
 		err := cont.verifyBackendMode(svcPorts, igBackend)
 		if err != nil {
-			e2elog.Logf("Err while checking if backend service is using IG: %v", err)
+			framework.Logf("Err while checking if backend service is using IG: %v", err)
 			return false, nil
 		}
 		return true, nil
@@ -767,9 +764,9 @@ func (cont *IngressController) Init() error {
 	// There's a name limit imposed by GCE. The controller will truncate.
 	testName := fmt.Sprintf("k8s-fw-foo-app-X-%v--%v", cont.Ns, cont.UID)
 	if len(testName) > nameLenLimit {
-		e2elog.Logf("WARNING: test name including cluster UID: %v is over the GCE limit of %v", testName, nameLenLimit)
+		framework.Logf("WARNING: test name including cluster UID: %v is over the GCE limit of %v", testName, nameLenLimit)
 	} else {
-		e2elog.Logf("Detected cluster UID %v", cont.UID)
+		framework.Logf("Detected cluster UID %v", cont.UID)
 	}
 	return nil
 }
@@ -783,9 +780,9 @@ func (cont *IngressController) CreateStaticIP(name string) string {
 	if err := gceCloud.ReserveGlobalAddress(addr); err != nil {
 		if delErr := gceCloud.DeleteGlobalAddress(name); delErr != nil {
 			if cont.isHTTPErrorCode(delErr, http.StatusNotFound) {
-				e2elog.Logf("Static ip with name %v was not allocated, nothing to delete", name)
+				framework.Logf("Static ip with name %v was not allocated, nothing to delete", name)
 			} else {
-				e2elog.Logf("Failed to delete static ip %v: %v", name, delErr)
+				framework.Logf("Failed to delete static ip %v: %v", name, delErr)
 			}
 		}
 		framework.Failf("Failed to allocate static ip %v: %v", name, err)
@@ -797,7 +794,7 @@ func (cont *IngressController) CreateStaticIP(name string) string {
 	}
 
 	cont.staticIPName = ip.Name
-	e2elog.Logf("Reserved static ip %v: %v", cont.staticIPName, ip.Address)
+	framework.Logf("Reserved static ip %v: %v", cont.staticIPName, ip.Address)
 	return ip.Address
 }
 
@@ -817,7 +814,7 @@ func (cont *IngressController) deleteStaticIPs() error {
 		for _, ip := range e2eIPs {
 			ips = append(ips, ip.Name)
 		}
-		e2elog.Logf("None of the remaining %d static-ips were created by this e2e: %v", len(ips), strings.Join(ips, ", "))
+		framework.Logf("None of the remaining %d static-ips were created by this e2e: %v", len(ips), strings.Join(ips, ", "))
 	}
 	return nil
 }
@@ -843,32 +840,32 @@ func gcloudComputeResourceList(resource, regex, project string, out interface{})
 				errMsg = fmt.Sprintf("%v, stderr %v", errMsg, string(osExitErr.Stderr))
 			}
 		}
-		e2elog.Logf("Error running gcloud command 'gcloud %s': err: %v, output: %v, status: %d, msg: %v", strings.Join(command, " "), err, string(output), errCode, errMsg)
+		framework.Logf("Error running gcloud command 'gcloud %s': err: %v, output: %v, status: %d, msg: %v", strings.Join(command, " "), err, string(output), errCode, errMsg)
 	}
 	if err := json.Unmarshal([]byte(output), out); err != nil {
-		e2elog.Logf("Error unmarshalling gcloud output for %v: %v, output: %v", resource, err, string(output))
+		framework.Logf("Error unmarshalling gcloud output for %v: %v, output: %v", resource, err, string(output))
 	}
 }
 
 // GcloudComputeResourceDelete deletes the specified compute resource by name and project.
 func GcloudComputeResourceDelete(resource, name, project string, args ...string) error {
-	e2elog.Logf("Deleting %v: %v", resource, name)
+	framework.Logf("Deleting %v: %v", resource, name)
 	argList := append([]string{"compute", resource, "delete", name, fmt.Sprintf("--project=%v", project), "-q"}, args...)
 	output, err := exec.Command("gcloud", argList...).CombinedOutput()
 	if err != nil {
-		e2elog.Logf("Error deleting %v, output: %v\nerror: %+v", resource, string(output), err)
+		framework.Logf("Error deleting %v, output: %v\nerror: %+v", resource, string(output), err)
 	}
 	return err
 }
 
 // GcloudComputeResourceCreate creates a compute resource with a name and arguments.
 func GcloudComputeResourceCreate(resource, name, project string, args ...string) error {
-	e2elog.Logf("Creating %v in project %v: %v", resource, project, name)
+	framework.Logf("Creating %v in project %v: %v", resource, project, name)
 	argsList := append([]string{"compute", resource, "create", name, fmt.Sprintf("--project=%v", project)}, args...)
-	e2elog.Logf("Running command: gcloud %+v", strings.Join(argsList, " "))
+	framework.Logf("Running command: gcloud %+v", strings.Join(argsList, " "))
 	output, err := exec.Command("gcloud", argsList...).CombinedOutput()
 	if err != nil {
-		e2elog.Logf("Error creating %v, output: %v\nerror: %+v", resource, string(output), err)
+		framework.Logf("Error creating %v, output: %v\nerror: %+v", resource, string(output), err)
 	}
 	return err
 }

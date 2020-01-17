@@ -1,12 +1,12 @@
 kind: Service
 apiVersion: v1
 metadata:
-  name: csi-hostpath-provisioner
+  name: csi-hostpath-provisioner 
   labels:
-    app: csi-hostpath-provisioner
+    app: csi-hostpath-provisioner 
 spec:
   selector:
-    app: csi-hostpath-provisioner
+    app: csi-hostpath-provisioner 
   ports:
     - name: dummy
       port: 12345
@@ -27,18 +27,25 @@ spec:
       labels:
         app: csi-hostpath-provisioner
     spec:
+      affinity:
+        podAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: app
+                operator: In
+                values:
+                - csi-hostpathplugin
+            topologyKey: kubernetes.io/hostname
       serviceAccountName: csi-provisioner
       containers:
         - name: csi-provisioner
-          image: quay.io/k8scsi/csi-provisioner:v1.1.0
+          # TODO: replace with official 1.4.0 release when ready
+          image: quay.io/k8scsi/csi-provisioner:v1.4.0-rc1
           args:
-            - "--provisioner=csi-hostpath"
-            - "--csi-address=$(ADDRESS)"
-            - "--connection-timeout=15s"
-          env:
-            - name: ADDRESS
-              value: /csi/csi.sock
-          imagePullPolicy: Always
+            - -v=5
+            - --csi-address=/csi/csi.sock
+            - --connection-timeout=15s
           volumeMounts:
             - mountPath: /csi
               name: socket-dir

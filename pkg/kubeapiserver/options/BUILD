@@ -43,6 +43,7 @@ go_library(
         "//plugin/pkg/admission/podtolerationrestriction:go_default_library",
         "//plugin/pkg/admission/priority:go_default_library",
         "//plugin/pkg/admission/resourcequota:go_default_library",
+        "//plugin/pkg/admission/runtimeclass:go_default_library",
         "//plugin/pkg/admission/security/podsecuritypolicy:go_default_library",
         "//plugin/pkg/admission/securitycontext/scdeny:go_default_library",
         "//plugin/pkg/admission/serviceaccount:go_default_library",
@@ -88,6 +89,12 @@ go_test(
         "authentication_test.go",
         "authorization_test.go",
     ],
+    data = [
+        "testdata/client-expired.pem",
+        "testdata/client-valid.pem",
+        "testdata/intermediate.pem",
+        "testdata/root.pem",
+    ],
     embed = [":go_default_library"],
     deps = [
         "//pkg/kubeapiserver/authenticator:go_default_library",
@@ -96,5 +103,6 @@ go_test(
         "//staging/src/k8s.io/apiserver/pkg/authentication/authenticator:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/authenticatorfactory:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server/options:go_default_library",
+        "//vendor/github.com/google/go-cmp/cmp:go_default_library",
     ],
 )

@@ -26,7 +26,6 @@ import (
 	"sync"
 	"time"
 
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 )
 
@@ -182,7 +181,7 @@ func GatherCPUProfileForSeconds(componentName string, profileBaseName string, se
 		defer wg.Done()
 	}
 	if err := gatherProfile(componentName, profileBaseName, fmt.Sprintf("profile?seconds=%v", seconds)); err != nil {
-		e2elog.Logf("Failed to gather %v CPU profile: %v", componentName, err)
+		Logf("Failed to gather %v CPU profile: %v", componentName, err)
 	}
 }
 
@@ -192,7 +191,7 @@ func GatherMemoryProfile(componentName string, profileBaseName string, wg *sync.
 		defer wg.Done()
 	}
 	if err := gatherProfile(componentName, profileBaseName, "heap"); err != nil {
-		e2elog.Logf("Failed to gather %v memory profile: %v", componentName, err)
+		Logf("Failed to gather %v memory profile: %v", componentName, err)
 	}
 }
 

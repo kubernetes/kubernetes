@@ -36,9 +36,9 @@ import (
 	"github.com/coreos/etcd/pkg/types"
 
 	"github.com/coreos/pkg/capnslog"
-	"github.com/ghodss/yaml"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/grpclog"
+	"sigs.k8s.io/yaml"
 )
 
 const (
@@ -273,17 +273,17 @@ func NewConfig() *Config {
 		TickMs:                     100,
 		ElectionMs:                 1000,
 		InitialElectionTickAdvance: true,
-		LPUrls:              []url.URL{*lpurl},
-		LCUrls:              []url.URL{*lcurl},
-		APUrls:              []url.URL{*apurl},
-		ACUrls:              []url.URL{*acurl},
-		ClusterState:        ClusterStateFlagNew,
-		InitialClusterToken: "etcd-cluster",
-		StrictReconfigCheck: DefaultStrictReconfigCheck,
-		LogOutput:           DefaultLogOutput,
-		Metrics:             "basic",
-		EnableV2:            DefaultEnableV2,
-		AuthToken:           "simple",
+		LPUrls:                     []url.URL{*lpurl},
+		LCUrls:                     []url.URL{*lcurl},
+		APUrls:                     []url.URL{*apurl},
+		ACUrls:                     []url.URL{*acurl},
+		ClusterState:               ClusterStateFlagNew,
+		InitialClusterToken:        "etcd-cluster",
+		StrictReconfigCheck:        DefaultStrictReconfigCheck,
+		LogOutput:                  DefaultLogOutput,
+		Metrics:                    "basic",
+		EnableV2:                   DefaultEnableV2,
+		AuthToken:                  "simple",
 	}
 	cfg.InitialCluster = cfg.InitialClusterFromName(cfg.Name)
 	return cfg

@@ -62,7 +62,14 @@ func newWithClock(authenticator authenticator.Token, cacheErrs bool, successTTL,
 		cacheErrs:     cacheErrs,
 		successTTL:    successTTL,
 		failureTTL:    failureTTL,
-		cache:         newStripedCache(32, fnvHashFunc, func() cache { return newSimpleCache(128, clock) }),
+		// Cache performance degrades noticeably when the number of
+		// tokens in operation exceeds the size of the cache. It is
+		// cheap to make the cache big in the second dimension below,
+		// the memory is only consumed when that many tokens are being
+		// used. Currently we advertise support 5k nodes and 10k
+		// namespaces; a 32k entry cache is therefore a 2x safety
+		// margin.
+		cache: newStripedCache(32, fnvHashFunc, func() cache { return newSimpleCache(1024, clock) }),
 	}
 }
 

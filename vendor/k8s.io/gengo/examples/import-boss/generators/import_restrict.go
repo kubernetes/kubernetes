@@ -19,6 +19,7 @@ package generators
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -196,6 +197,8 @@ func (importRuleFile) VerifyFile(f *generator.File, path string) error {
 		return nil
 	}
 
+	forbiddenImports := map[string]string{}
+	allowedMismatchedImports := []string{}
 	for _, r := range rules.Rules {
 		re, err := regexp.Compile(r.SelectorRegexp)
 		if err != nil {
@@ -209,7 +212,7 @@ func (importRuleFile) VerifyFile(f *generator.File, path string) error {
 			for _, forbidden := range r.ForbiddenPrefixes {
 				klog.V(4).Infof("Checking %v against %v\n", v, forbidden)
 				if strings.HasPrefix(v, forbidden) {
-					return fmt.Errorf("import %v has forbidden prefix %v", v, forbidden)
+					forbiddenImports[v] = forbidden
 				}
 			}
 			found := false
@@ -221,9 +224,24 @@ func (importRuleFile) VerifyFile(f *generator.File, path string) error {
 				}
 			}
 			if !found {
-				return fmt.Errorf("import %v did not match any allowed prefix", v)
+				allowedMismatchedImports = append(allowedMismatchedImports, v)
 			}
 		}
+	}
+
+	if len(forbiddenImports) > 0 || len(allowedMismatchedImports) > 0 {
+		var errorBuilder strings.Builder
+		for i, f := range forbiddenImports {
+			fmt.Fprintf(&errorBuilder, "import %v has forbidden prefix %v\n", i, f)
+		}
+		if len(allowedMismatchedImports) > 0 {
+			sort.Sort(sort.StringSlice(allowedMismatchedImports))
+			fmt.Fprintf(&errorBuilder, "the following imports did not match any allowed prefix:\n")
+			for _, i := range allowedMismatchedImports {
+				fmt.Fprintf(&errorBuilder, "  %v\n", i)
+			}
+		}
+		return errors.New(errorBuilder.String())
 	}
 	if len(rules.Rules) > 0 {
 		klog.V(2).Infof("%v passes rules found in %v\n", path, actualPath)

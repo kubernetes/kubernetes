@@ -40,6 +40,14 @@ func (c Conflict) Error() string {
 	return fmt.Sprintf("conflict with %q: %v", c.Manager, c.Path)
 }
 
+// Equals returns true if c == c2
+func (c Conflict) Equals(c2 Conflict) bool {
+	if c.Manager != c2.Manager {
+		return false
+	}
+	return c.Path.Equals(c2.Path)
+}
+
 // Conflicts accumulates multiple conflicts and aggregates them by managers.
 type Conflicts []Conflict
 
@@ -74,12 +82,25 @@ func (conflicts Conflicts) Error() string {
 	return strings.Join(messages, "\n")
 }
 
+// Equals returns true if the lists of conflicts are the same.
+func (c Conflicts) Equals(c2 Conflicts) bool {
+	if len(c) != len(c2) {
+		return false
+	}
+	for i := range c {
+		if !c[i].Equals(c2[i]) {
+			return false
+		}
+	}
+	return true
+}
+
 // ConflictsFromManagers creates a list of conflicts given Managers sets.
 func ConflictsFromManagers(sets fieldpath.ManagedFields) Conflicts {
 	conflicts := []Conflict{}
 
 	for manager, set := range sets {
-		set.Iterate(func(p fieldpath.Path) {
+		set.Set().Iterate(func(p fieldpath.Path) {
 			conflicts = append(conflicts, Conflict{
 				Manager: manager,
 				Path:    p,

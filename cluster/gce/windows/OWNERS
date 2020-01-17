@@ -1,2 +1,12 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+reviewers:
+  - mtaufen
+  - pjh
+  - yujuhong
 approvers:
-- yujuhong
+  - mtaufen
+  - pjh
+  - yujuhong
+labels:
+  - sig/gcp

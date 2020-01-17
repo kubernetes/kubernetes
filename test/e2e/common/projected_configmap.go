@@ -24,6 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
@@ -53,7 +54,9 @@ var _ = ginkgo.Describe("[sig-storage] Projected configMap", func() {
 		doProjectedConfigMapE2EWithoutMappings(f, 0, 0, &defaultMode)
 	})
 
-	ginkgo.It("should be consumable from pods in volume as non-root with defaultMode and fsGroup set [NodeFeature:FSGroup]", func() {
+	ginkgo.It("should be consumable from pods in volume as non-root with defaultMode and fsGroup set [LinuxOnly] [NodeFeature:FSGroup]", func() {
+		// Windows does not support RunAsUser / FSGroup SecurityContext options, and it does not support setting file permissions.
+		framework.SkipIfNodeOSDistroIs("windows")
 		defaultMode := int32(0440) /* setting fsGroup sets mode to at least 440 */
 		doProjectedConfigMapE2EWithoutMappings(f, 1000, 1001, &defaultMode)
 	})
@@ -68,7 +71,9 @@ var _ = ginkgo.Describe("[sig-storage] Projected configMap", func() {
 		doProjectedConfigMapE2EWithoutMappings(f, 1000, 0, nil)
 	})
 
-	ginkgo.It("should be consumable from pods in volume as non-root with FSGroup [NodeFeature:FSGroup]", func() {
+	ginkgo.It("should be consumable from pods in volume as non-root with FSGroup [LinuxOnly] [NodeFeature:FSGroup]", func() {
+		// Windows does not support RunAsUser / FSGroup SecurityContext options.
+		framework.SkipIfNodeOSDistroIs("windows")
 		doProjectedConfigMapE2EWithoutMappings(f, 1000, 1001, nil)
 	})
 
@@ -102,7 +107,9 @@ var _ = ginkgo.Describe("[sig-storage] Projected configMap", func() {
 		doProjectedConfigMapE2EWithMappings(f, 1000, 0, nil)
 	})
 
-	ginkgo.It("should be consumable from pods in volume with mappings as non-root with FSGroup [NodeFeature:FSGroup]", func() {
+	ginkgo.It("should be consumable from pods in volume with mappings as non-root with FSGroup [LinuxOnly] [NodeFeature:FSGroup]", func() {
+		// Windows does not support RunAsUser / FSGroup SecurityContext options.
+		framework.SkipIfNodeOSDistroIs("windows")
 		doProjectedConfigMapE2EWithMappings(f, 1000, 1001, nil)
 	})
 
@@ -179,7 +186,7 @@ var _ = ginkgo.Describe("[sig-storage] Projected configMap", func() {
 		f.PodClient().CreateSync(pod)
 
 		pollLogs := func() (string, error) {
-			return framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, containerName)
+			return e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, containerName)
 		}
 
 		gomega.Eventually(pollLogs, podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("value-1"))
@@ -358,17 +365,17 @@ var _ = ginkgo.Describe("[sig-storage] Projected configMap", func() {
 		f.PodClient().CreateSync(pod)
 
 		pollCreateLogs := func() (string, error) {
-			return framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, createContainerName)
+			return e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, createContainerName)
 		}
 		gomega.Eventually(pollCreateLogs, podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("Error reading file /etc/projected-configmap-volumes/create/data-1"))
 
 		pollUpdateLogs := func() (string, error) {
-			return framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, updateContainerName)
+			return e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, updateContainerName)
 		}
 		gomega.Eventually(pollUpdateLogs, podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("Error reading file /etc/projected-configmap-volumes/update/data-3"))
 
 		pollDeleteLogs := func() (string, error) {
-			return framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, deleteContainerName)
+			return e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, deleteContainerName)
 		}
 		gomega.Eventually(pollDeleteLogs, podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("value-1"))
 

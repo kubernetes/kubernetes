@@ -289,6 +289,11 @@ const (
 	NonStructuralSchema CustomResourceDefinitionConditionType = "NonStructuralSchema"
 	// Terminating means that the CustomResourceDefinition has been deleted and is cleaning up.
 	Terminating CustomResourceDefinitionConditionType = "Terminating"
+	// KubernetesAPIApprovalPolicyConformant indicates that an API in *.k8s.io or *.kubernetes.io is or is not approved.  For CRDs
+	// outside those groups, this condition will not be set.  For CRDs inside those groups, the condition will
+	// be true if .metadata.annotations["api-approved.kubernetes.io"] is set to a URL, otherwise it will be false.
+	// See https://github.com/kubernetes/enhancements/pull/1111 for more details.
+	KubernetesAPIApprovalPolicyConformant CustomResourceDefinitionConditionType = "KubernetesAPIApprovalPolicyConformant"
 )
 
 // CustomResourceDefinitionCondition contains details for the current condition of this pod.

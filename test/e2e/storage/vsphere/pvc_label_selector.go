@@ -23,6 +23,7 @@ import (
 	"k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -83,14 +84,14 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:LabelSelector]", func() {
 			framework.ExpectNoError(err)
 
 			ginkgo.By("wait for the pvc_ssd to bind with pv_ssd")
-			framework.ExpectNoError(framework.WaitOnPVandPVC(c, ns, pv_ssd, pvc_ssd))
+			framework.ExpectNoError(e2epv.WaitOnPVandPVC(c, ns, pv_ssd, pvc_ssd))
 
 			ginkgo.By("Verify status of pvc_vvol is pending")
-			err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimPending, c, ns, pvc_vvol.Name, 3*time.Second, 300*time.Second)
+			err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimPending, c, ns, pvc_vvol.Name, 3*time.Second, 300*time.Second)
 			framework.ExpectNoError(err)
 
 			ginkgo.By("delete pvc_ssd")
-			framework.ExpectNoError(framework.DeletePersistentVolumeClaim(c, pvc_ssd.Name, ns), "Failed to delete PVC ", pvc_ssd.Name)
+			framework.ExpectNoError(e2epv.DeletePersistentVolumeClaim(c, pvc_ssd.Name, ns), "Failed to delete PVC ", pvc_ssd.Name)
 
 			ginkgo.By("verify pv_ssd is deleted")
 			err = framework.WaitForPersistentVolumeDeleted(c, pv_ssd.Name, 3*time.Second, 300*time.Second)
@@ -98,7 +99,7 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:LabelSelector]", func() {
 			volumePath = ""
 
 			ginkgo.By("delete pvc_vvol")
-			framework.ExpectNoError(framework.DeletePersistentVolumeClaim(c, pvc_vvol.Name, ns), "Failed to delete PVC ", pvc_vvol.Name)
+			framework.ExpectNoError(e2epv.DeletePersistentVolumeClaim(c, pvc_vvol.Name, ns), "Failed to delete PVC ", pvc_vvol.Name)
 		})
 	})
 })
@@ -137,12 +138,12 @@ func testCleanupVSpherePVClabelselector(c clientset.Interface, ns string, nodeIn
 		nodeInfo.VSphere.DeleteVolume(volumePath, nodeInfo.DataCenterRef)
 	}
 	if pvc_ssd != nil {
-		framework.ExpectNoError(framework.DeletePersistentVolumeClaim(c, pvc_ssd.Name, ns), "Failed to delete PVC ", pvc_ssd.Name)
+		framework.ExpectNoError(e2epv.DeletePersistentVolumeClaim(c, pvc_ssd.Name, ns), "Failed to delete PVC ", pvc_ssd.Name)
 	}
 	if pvc_vvol != nil {
-		framework.ExpectNoError(framework.DeletePersistentVolumeClaim(c, pvc_vvol.Name, ns), "Failed to delete PVC ", pvc_vvol.Name)
+		framework.ExpectNoError(e2epv.DeletePersistentVolumeClaim(c, pvc_vvol.Name, ns), "Failed to delete PVC ", pvc_vvol.Name)
 	}
 	if pv_ssd != nil {
-		framework.ExpectNoError(framework.DeletePersistentVolume(c, pv_ssd.Name), "Failed to delete PV ", pv_ssd.Name)
+		framework.ExpectNoError(e2epv.DeletePersistentVolume(c, pv_ssd.Name), "Failed to delete PV ", pv_ssd.Name)
 	}
 }

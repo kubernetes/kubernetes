@@ -35,7 +35,6 @@ import (
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
@@ -85,10 +84,10 @@ type nodeMemory struct {
 func checkNodeAllocatableTest(f *framework.Framework) {
 
 	nodeMem := getNodeMemory(f)
-	e2elog.Logf("nodeMem says: %+v", nodeMem)
+	framework.Logf("nodeMem says: %+v", nodeMem)
 
 	// calculate the allocatable mem based on capacity - reserved amounts
-	calculatedNodeAlloc := nodeMem.capacity.Copy()
+	calculatedNodeAlloc := nodeMem.capacity.DeepCopy()
 	calculatedNodeAlloc.Sub(nodeMem.systemReserve)
 	calculatedNodeAlloc.Sub(nodeMem.kubeReserve)
 	calculatedNodeAlloc.Sub(nodeMem.softEviction)
@@ -97,7 +96,7 @@ func checkNodeAllocatableTest(f *framework.Framework) {
 	ginkgo.By(fmt.Sprintf("Checking stated allocatable memory %v against calculated allocatable memory %v", &nodeMem.allocatable, calculatedNodeAlloc))
 
 	// sanity check against stated allocatable
-	gomega.Expect(calculatedNodeAlloc.Cmp(nodeMem.allocatable)).To(gomega.Equal(0))
+	framework.ExpectEqual(calculatedNodeAlloc.Cmp(nodeMem.allocatable), 0)
 }
 
 // Deploys `allocatablePods + 1` pods, each with a memory limit of `1/allocatablePods` of the total allocatable
@@ -126,7 +125,7 @@ func overrideAllocatableMemoryTest(f *framework.Framework, allocatablePods int) 
 		for _, e := range eventList.Items {
 			// Look for an event that shows FailedScheduling
 			if e.Type == "Warning" && e.Reason == "FailedScheduling" && e.InvolvedObject.Name == failurePods[0].ObjectMeta.Name {
-				e2elog.Logf("Found %+v event with message %+v", e.Reason, e.Message)
+				framework.Logf("Found %+v event with message %+v", e.Reason, e.Message)
 				return true
 			}
 		}
@@ -187,7 +186,7 @@ func getNodeMemory(f *framework.Framework) nodeMemory {
 
 	// Assuming that agent nodes have the same config
 	// Make sure there is >0 agent nodes, then use the first one for info
-	gomega.Expect(nodeList.Size()).NotTo(gomega.Equal(0))
+	framework.ExpectNotEqual(nodeList.Size(), 0)
 
 	ginkgo.By("Getting memory details from node status and kubelet config")
 
@@ -277,7 +276,7 @@ func pollConfigz(timeout time.Duration, pollInterval time.Duration, nodeName str
 	output := string(buf[:n])
 	proxyRegexp := regexp.MustCompile("Starting to serve on 127.0.0.1:([0-9]+)")
 	match := proxyRegexp.FindStringSubmatch(output)
-	gomega.Expect(len(match)).To(gomega.Equal(2))
+	framework.ExpectEqual(len(match), 2)
 	port, err := strconv.Atoi(match[1])
 	framework.ExpectNoError(err)
 	ginkgo.By("http requesting node kubelet /configz")
@@ -294,11 +293,11 @@ func pollConfigz(timeout time.Duration, pollInterval time.Duration, nodeName str
 	gomega.Eventually(func() bool {
 		resp, err = client.Do(req)
 		if err != nil {
-			e2elog.Logf("Failed to get /configz, retrying. Error: %v", err)
+			framework.Logf("Failed to get /configz, retrying. Error: %v", err)
 			return false
 		}
 		if resp.StatusCode != 200 {
-			e2elog.Logf("/configz response status not 200, retrying. Response was: %+v", resp)
+			framework.Logf("/configz response status not 200, retrying. Response was: %+v", resp)
 			return false
 		}
 

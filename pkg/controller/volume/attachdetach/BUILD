@@ -11,7 +11,6 @@ go_library(
     srcs = ["attach_detach_controller.go"],
     importpath = "k8s.io/kubernetes/pkg/controller/volume/attachdetach",
     deps = [
-        "//pkg/controller:go_default_library",
         "//pkg/controller/volume/attachdetach/cache:go_default_library",
         "//pkg/controller/volume/attachdetach/metrics:go_default_library",
         "//pkg/controller/volume/attachdetach/populator:go_default_library",
@@ -62,6 +61,7 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//staging/src/k8s.io/client-go/informers:go_default_library",
+        "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
     ],
 )
 

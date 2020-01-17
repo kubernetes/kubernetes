@@ -18,6 +18,7 @@ package transport
 
 import (
 	"fmt"
+	"net/http"
 	"reflect"
 	"sync"
 	"testing"
@@ -152,5 +153,87 @@ func TestCachingTokenSourceRace(t *testing.T) {
 		if tts.calls != 1 {
 			t.Errorf("expected one call to Token() but saw: %d", tts.calls)
 		}
+	}
+}
+
+type uncancellableRT struct {
+	rt http.RoundTripper
+}
+
+func (urt *uncancellableRT) RoundTrip(req *http.Request) (*http.Response, error) {
+	return urt.rt.RoundTrip(req)
+}
+
+func TestCancellation(t *testing.T) {
+	tests := []struct {
+		name          string
+		header        http.Header
+		wrapTransport func(http.RoundTripper) http.RoundTripper
+		expectCancel  bool
+	}{
+		{
+			name:         "cancel req with bearer token skips oauth rt",
+			header:       map[string][]string{"Authorization": {"Bearer TOKEN"}},
+			expectCancel: true,
+		},
+		{
+			name:         "cancel req without bearer token hits both rts",
+			expectCancel: true,
+		},
+		{
+			name: "cancel req without bearer token hits both wrapped rts",
+			wrapTransport: func(rt http.RoundTripper) http.RoundTripper {
+				return NewUserAgentRoundTripper("testing testing", rt)
+			},
+			expectCancel: true,
+		},
+		{
+			name: "can't cancel request with rts that doesn't implent unwrap or cancel",
+			wrapTransport: func(rt http.RoundTripper) http.RoundTripper {
+				return &uncancellableRT{rt: rt}
+			},
+			expectCancel: false,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			baseRecorder := &recordCancelRoundTripper{}
+
+			var base http.RoundTripper = baseRecorder
+			if test.wrapTransport != nil {
+				base = test.wrapTransport(base)
+			}
+
+			rt := &tokenSourceTransport{
+				base: base,
+				ort: &oauth2.Transport{
+					Base: base,
+				},
+			}
+
+			rt.CancelRequest(&http.Request{
+				Header: test.header,
+			})
+
+			if baseRecorder.canceled != test.expectCancel {
+				t.Errorf("unexpected cancel: got=%v, want=%v", baseRecorder.canceled, test.expectCancel)
+			}
+		})
+	}
+}
+
+type recordCancelRoundTripper struct {
+	canceled bool
+	base     http.RoundTripper
+}
+
+func (rt *recordCancelRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	return nil, nil
+}
+
+func (rt *recordCancelRoundTripper) CancelRequest(req *http.Request) {
+	rt.canceled = true
+	if rt.base != nil {
+		tryCancelRequest(rt.base, req)
 	}
 }

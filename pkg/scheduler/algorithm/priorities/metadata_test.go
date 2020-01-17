@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
@@ -137,7 +137,6 @@ func TestPriorityMetadata(t *testing.T) {
 		{
 			pod: podWithTolerationsAndAffinity,
 			expected: &priorityMetadata{
-				nonZeroRequest: nonZeroReqs,
 				podLimits:      nonPodLimits,
 				podTolerations: tolerations,
 				affinity:       podAffinity,
@@ -147,7 +146,6 @@ func TestPriorityMetadata(t *testing.T) {
 		{
 			pod: podWithTolerationsAndRequests,
 			expected: &priorityMetadata{
-				nonZeroRequest: specifiedReqs,
 				podLimits:      nonPodLimits,
 				podTolerations: tolerations,
 				affinity:       nil,
@@ -157,7 +155,6 @@ func TestPriorityMetadata(t *testing.T) {
 		{
 			pod: podWithAffinityAndRequests,
 			expected: &priorityMetadata{
-				nonZeroRequest: specifiedReqs,
 				podLimits:      specifiedPodLimits,
 				podTolerations: nil,
 				affinity:       podAffinity,

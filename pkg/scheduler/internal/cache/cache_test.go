@@ -23,7 +23,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -1066,7 +1066,7 @@ func TestNodeOperators(t *testing.T) {
 		if !found {
 			t.Errorf("Failed to find node %v in internalcache.", node.Name)
 		}
-		if cache.nodeTree.NumNodes() != 1 || cache.nodeTree.next() != node.Name {
+		if cache.nodeTree.NumNodes() != 1 || cache.nodeTree.Next() != node.Name {
 			t.Errorf("cache.nodeTree is not updated correctly after adding node: %v", node.Name)
 		}
 
@@ -1077,7 +1077,7 @@ func TestNodeOperators(t *testing.T) {
 		}
 
 		// Case 2: dump cached nodes successfully.
-		cachedNodes := NewNodeInfoSnapshot()
+		cachedNodes := schedulernodeinfo.NewSnapshot()
 		cache.UpdateNodeInfoSnapshot(cachedNodes)
 		newNode, found := cachedNodes.NodeInfoMap[node.Name]
 		if !found || len(cachedNodes.NodeInfoMap) != 1 {
@@ -1109,7 +1109,7 @@ func TestNodeOperators(t *testing.T) {
 			t.Errorf("Failed to update node in schedulernodeinfo:\n got: %+v \nexpected: %+v", got, expected)
 		}
 		// Check nodeTree after update
-		if cache.nodeTree.NumNodes() != 1 || cache.nodeTree.next() != node.Name {
+		if cache.nodeTree.NumNodes() != 1 || cache.nodeTree.Next() != node.Name {
 			t.Errorf("unexpected cache.nodeTree after updating node: %v", node.Name)
 		}
 
@@ -1120,7 +1120,7 @@ func TestNodeOperators(t *testing.T) {
 		}
 		// Check nodeTree after remove. The node should be removed from the nodeTree even if there are
 		// still pods on it.
-		if cache.nodeTree.NumNodes() != 0 || cache.nodeTree.next() != "" {
+		if cache.nodeTree.NumNodes() != 0 || cache.nodeTree.Next() != "" {
 			t.Errorf("unexpected cache.nodeTree after removing node: %v", node.Name)
 		}
 	}
@@ -1180,7 +1180,7 @@ func TestSchedulerCache_UpdateNodeInfoSnapshot(t *testing.T) {
 	}
 
 	var cache *schedulerCache
-	var snapshot *NodeInfoSnapshot
+	var snapshot *schedulernodeinfo.Snapshot
 	type operation = func()
 
 	addNode := func(i int) operation {
@@ -1333,7 +1333,7 @@ func TestSchedulerCache_UpdateNodeInfoSnapshot(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			cache = newSchedulerCache(time.Second, time.Second, nil)
-			snapshot = NewNodeInfoSnapshot()
+			snapshot = schedulernodeinfo.NewSnapshot()
 
 			for _, op := range test.operations {
 				op()
@@ -1364,7 +1364,7 @@ func TestSchedulerCache_UpdateNodeInfoSnapshot(t *testing.T) {
 	}
 }
 
-func compareCacheWithNodeInfoSnapshot(cache *schedulerCache, snapshot *NodeInfoSnapshot) error {
+func compareCacheWithNodeInfoSnapshot(cache *schedulerCache, snapshot *schedulernodeinfo.Snapshot) error {
 	if len(snapshot.NodeInfoMap) != len(cache.nodes) {
 		return fmt.Errorf("unexpected number of nodes in the snapshot. Expected: %v, got: %v", len(cache.nodes), len(snapshot.NodeInfoMap))
 	}
@@ -1390,7 +1390,7 @@ func BenchmarkUpdate1kNodes30kPods(b *testing.B) {
 	cache := setupCacheOf1kNodes30kPods(b)
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
-		cachedNodes := NewNodeInfoSnapshot()
+		cachedNodes := schedulernodeinfo.NewSnapshot()
 		cache.UpdateNodeInfoSnapshot(cachedNodes)
 	}
 }

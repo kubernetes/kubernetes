@@ -471,9 +471,11 @@ const operationRecycle = "Recycle"
 var (
 	classGold                    string = "gold"
 	classSilver                  string = "silver"
+	classCopper                  string = "copper"
 	classEmpty                   string = ""
 	classNonExisting             string = "non-existing"
 	classExternal                string = "external"
+	classExternalWait            string = "external-wait"
 	classUnknownInternal         string = "unknown-internal"
 	classUnsupportedMountOptions string = "unsupported-mountoptions"
 	classLarge                   string = "large"
@@ -519,6 +521,12 @@ func wrapTestWithProvisionCalls(expectedProvisionCalls []provisionCall, toWrap t
 	return wrapTestWithPluginCalls(nil, nil, expectedProvisionCalls, toWrap)
 }
 
+type fakeCSINameTranslator struct{}
+
+func (t fakeCSINameTranslator) GetCSINameFromInTreeName(pluginName string) (string, error) {
+	return "vendor.com/MockCSIPlugin", nil
+}
+
 // wrapTestWithCSIMigrationProvisionCalls returns a testCall that:
 // - configures controller with a volume plugin that emulates CSI migration
 // - calls given testCall
@@ -528,9 +536,7 @@ func wrapTestWithCSIMigrationProvisionCalls(toWrap testCall) testCall {
 			isMigratedToCSI: true,
 		}
 		ctrl.volumePluginMgr.InitPlugins([]vol.VolumePlugin{plugin}, nil /* prober */, ctrl)
-		ctrl.csiNameFromIntreeNameHook = func(string) (string, error) {
-			return "vendor.com/MockCSIPlugin", nil
-		}
+		ctrl.translator = fakeCSINameTranslator{}
 		return toWrap(ctrl, reactor, test)
 	}
 }

@@ -8,3 +8,5 @@ approvers:
   - jszczepkowski
   - sig-autoscaling-maintainers
   - wasylkowski
+labels:
+- sig/autoscaling

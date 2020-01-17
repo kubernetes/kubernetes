@@ -17,6 +17,7 @@ limitations under the License.
 package master
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -25,16 +26,26 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-openapi/spec"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
+	"k8s.io/kubernetes/test/integration/etcd"
 	"k8s.io/kubernetes/test/integration/framework"
+)
+
+const (
+	// testApiextensionsOverlapProbeString is a probe string which identifies whether
+	// a CRD change triggers an OpenAPI spec change
+	testApiextensionsOverlapProbeString = "testApiextensionsOverlapProbeField"
 )
 
 func TestRun(t *testing.T) {
@@ -82,6 +93,29 @@ func TestRun(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("Failed to create deployment: %v", err)
+	}
+}
+
+func endpointReturnsStatusOK(client *kubernetes.Clientset, path string) bool {
+	res := client.CoreV1().RESTClient().Get().AbsPath(path).Do()
+	var status int
+	res.StatusCode(&status)
+	return status == http.StatusOK
+}
+
+func TestLivezAndReadyz(t *testing.T) {
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--livez-grace-period", "0s"}, framework.SharedEtcd())
+	defer server.TearDownFn()
+
+	client, err := kubernetes.NewForConfig(server.ClientConfig)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !endpointReturnsStatusOK(client, "/livez") {
+		t.Fatalf("livez should be healthy")
+	}
+	if !endpointReturnsStatusOK(client, "/readyz") {
+		t.Fatalf("readyz should be healthy")
 	}
 }
 
@@ -145,6 +179,204 @@ func TestOpenAPIDelegationChainPlumbing(t *testing.T) {
 	if !matchedRegistration {
 		t.Errorf("missing path: %q", registrationPrefix)
 	}
+}
+
+func TestOpenAPIApiextensionsOverlapProtection(t *testing.T) {
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	defer server.TearDownFn()
+	apiextensionsclient, err := apiextensionsclientset.NewForConfig(server.ClientConfig)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	crdPath, exist, err := getOpenAPIPath(apiextensionsclient, `/apis/apiextensions.k8s.io/v1beta1/customresourcedefinitions/{name}`)
+	if err != nil {
+		t.Fatalf("unexpected error getting CRD OpenAPI path: %v", err)
+	}
+	if !exist {
+		t.Fatalf("unexpected error: apiextensions OpenAPI path doesn't exist")
+	}
+
+	// Create a CRD that overlaps OpenAPI path with the CRD API
+	crd := &apiextensionsv1beta1.CustomResourceDefinition{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        "customresourcedefinitions.apiextensions.k8s.io",
+			Annotations: map[string]string{"api-approved.kubernetes.io": "unapproved, test-only"},
+		},
+		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
+			Group:   "apiextensions.k8s.io",
+			Version: "v1beta1",
+			Scope:   apiextensionsv1beta1.ClusterScoped,
+			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
+				Plural:   "customresourcedefinitions",
+				Singular: "customresourcedefinition",
+				Kind:     "CustomResourceDefinition",
+				ListKind: "CustomResourceDefinitionList",
+			},
+			Validation: &apiextensionsv1beta1.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensionsv1beta1.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+						testApiextensionsOverlapProbeString: {Type: "boolean"},
+					},
+				},
+			},
+		},
+	}
+	etcd.CreateTestCRDs(t, apiextensionsclient, false, crd)
+
+	// Create a probe CRD foo that triggers an OpenAPI spec change
+	if err := triggerSpecUpdateWithProbeCRD(t, apiextensionsclient, "foo"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Expect the CRD path to not change
+	path, _, err := getOpenAPIPath(apiextensionsclient, `/apis/apiextensions.k8s.io/v1beta1/customresourcedefinitions/{name}`)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	pathBytes, err := json.Marshal(path)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	crdPathBytes, err := json.Marshal(crdPath)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !bytes.Equal(pathBytes, crdPathBytes) {
+		t.Fatalf("expected CRD OpenAPI path to not change, but got different results: want %q, got %q", string(crdPathBytes), string(pathBytes))
+	}
+
+	// Expect the orphan definition to be pruned from the spec
+	exist, err = specHasProbe(apiextensionsclient, testApiextensionsOverlapProbeString)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if exist {
+		t.Fatalf("unexpected error: orphan definition isn't pruned")
+	}
+
+	// Create a CRD that overlaps OpenAPI definition with the CRD API
+	crd = &apiextensionsv1beta1.CustomResourceDefinition{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        "customresourcedefinitions.apiextensions.apis.pkg.apiextensions-apiserver.k8s.io",
+			Annotations: map[string]string{"api-approved.kubernetes.io": "unapproved, test-only"},
+		},
+		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
+			Group:   "apiextensions.apis.pkg.apiextensions-apiserver.k8s.io",
+			Version: "v1beta1",
+			Scope:   apiextensionsv1beta1.ClusterScoped,
+			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
+				Plural:   "customresourcedefinitions",
+				Singular: "customresourcedefinition",
+				Kind:     "CustomResourceDefinition",
+				ListKind: "CustomResourceDefinitionList",
+			},
+			Validation: &apiextensionsv1beta1.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensionsv1beta1.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+						testApiextensionsOverlapProbeString: {Type: "boolean"},
+					},
+				},
+			},
+		},
+	}
+	etcd.CreateTestCRDs(t, apiextensionsclient, false, crd)
+
+	// Create a probe CRD bar that triggers an OpenAPI spec change
+	if err := triggerSpecUpdateWithProbeCRD(t, apiextensionsclient, "bar"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Expect the apiextensions definition to not change, since the overlapping definition will get renamed.
+	apiextensionsDefinition, exist, err := getOpenAPIDefinition(apiextensionsclient, `io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceDefinition`)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !exist {
+		t.Fatalf("unexpected error: apiextensions definition doesn't exist")
+	}
+	bytes, err := json.Marshal(apiextensionsDefinition)
+	if exist := strings.Contains(string(bytes), testApiextensionsOverlapProbeString); exist {
+		t.Fatalf("unexpected error: apiextensions definition gets overlapped")
+	}
+}
+
+// triggerSpecUpdateWithProbeCRD creates a probe CRD with suffix in name, and waits until
+// the path and definition for the probe CRD show up in the OpenAPI spec
+func triggerSpecUpdateWithProbeCRD(t *testing.T, apiextensionsclient *apiextensionsclientset.Clientset, suffix string) error {
+	// Create a probe CRD that triggers OpenAPI spec change
+	name := fmt.Sprintf("integration-test-%s-crd", suffix)
+	kind := fmt.Sprintf("Integration-test-%s-crd", suffix)
+	group := "probe.test.com"
+	crd := &apiextensionsv1beta1.CustomResourceDefinition{
+		ObjectMeta: metav1.ObjectMeta{Name: name + "s." + group},
+		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
+			Group:   group,
+			Version: "v1",
+			Scope:   apiextensionsv1beta1.ClusterScoped,
+			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
+				Plural:   name + "s",
+				Singular: name,
+				Kind:     kind,
+				ListKind: kind + "List",
+			},
+		},
+	}
+	etcd.CreateTestCRDs(t, apiextensionsclient, false, crd)
+
+	// Expect the probe CRD path to show up in the OpenAPI spec
+	// TODO(roycaihw): expose response header in rest client and utilize etag here
+	if err := wait.Poll(1*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
+		_, exist, err := getOpenAPIPath(apiextensionsclient, fmt.Sprintf(`/apis/%s/v1/%ss/{name}`, group, name))
+		if err != nil {
+			return false, err
+		}
+		return exist, nil
+	}); err != nil {
+		return fmt.Errorf("failed to observe probe CRD path in the spec: %v", err)
+	}
+	return nil
+}
+
+func specHasProbe(clientset *apiextensionsclientset.Clientset, probe string) (bool, error) {
+	bs, err := clientset.RESTClient().Get().AbsPath("openapi", "v2").DoRaw()
+	if err != nil {
+		return false, err
+	}
+	return strings.Contains(string(bs), probe), nil
+}
+
+func getOpenAPIPath(clientset *apiextensionsclientset.Clientset, path string) (spec.PathItem, bool, error) {
+	bs, err := clientset.RESTClient().Get().AbsPath("openapi", "v2").DoRaw()
+	if err != nil {
+		return spec.PathItem{}, false, err
+	}
+	s := spec.Swagger{}
+	if err := json.Unmarshal(bs, &s); err != nil {
+		return spec.PathItem{}, false, err
+	}
+	if s.SwaggerProps.Paths == nil {
+		return spec.PathItem{}, false, fmt.Errorf("unexpected empty path")
+	}
+	value, ok := s.SwaggerProps.Paths.Paths[path]
+	return value, ok, nil
+}
+
+func getOpenAPIDefinition(clientset *apiextensionsclientset.Clientset, definition string) (spec.Schema, bool, error) {
+	bs, err := clientset.RESTClient().Get().AbsPath("openapi", "v2").DoRaw()
+	if err != nil {
+		return spec.Schema{}, false, err
+	}
+	s := spec.Swagger{}
+	if err := json.Unmarshal(bs, &s); err != nil {
+		return spec.Schema{}, false, err
+	}
+	if s.SwaggerProps.Definitions == nil {
+		return spec.Schema{}, false, fmt.Errorf("unexpected empty path")
+	}
+	value, ok := s.SwaggerProps.Definitions[definition]
+	return value, ok, nil
 }
 
 // return the unique endpoint IPs

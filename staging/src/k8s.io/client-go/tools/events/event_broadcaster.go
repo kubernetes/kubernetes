@@ -53,7 +53,6 @@ type eventKey struct {
 	action              string
 	reason              string
 	reportingController string
-	reportingInstance   string
 	regarding           corev1.ObjectReference
 	related             corev1.ObjectReference
 }
@@ -103,6 +102,10 @@ func newBroadcaster(sink EventSink, sleepDuration time.Duration, eventCache map[
 	}
 }
 
+func (e *eventBroadcasterImpl) Shutdown() {
+	e.Broadcaster.Shutdown()
+}
+
 // refreshExistingEventSeries refresh events TTL
 func (e *eventBroadcasterImpl) refreshExistingEventSeries() {
 	// TODO: Investigate whether lock contention won't be a problem
@@ -111,7 +114,9 @@ func (e *eventBroadcasterImpl) refreshExistingEventSeries() {
 	for isomorphicKey, event := range e.eventCache {
 		if event.Series != nil {
 			if recordedEvent, retry := recordEvent(e.sink, event); !retry {
-				e.eventCache[isomorphicKey] = recordedEvent
+				if recordedEvent != nil {
+					e.eventCache[isomorphicKey] = recordedEvent
+				}
 			}
 		}
 	}
@@ -203,9 +208,9 @@ func recordEvent(sink EventSink, event *v1beta1.Event) (*v1beta1.Event, bool) {
 	var err error
 	isEventSeries := event.Series != nil
 	if isEventSeries {
-		patch, err := createPatchBytesForSeries(event)
-		if err != nil {
-			klog.Errorf("Unable to calculate diff, no merge is possible: %v", err)
+		patch, patchBytesErr := createPatchBytesForSeries(event)
+		if patchBytesErr != nil {
+			klog.Errorf("Unable to calculate diff, no merge is possible: %v", patchBytesErr)
 			return nil, false
 		}
 		newEvent, err = sink.Patch(event, patch)
@@ -262,7 +267,6 @@ func getKey(event *v1beta1.Event) eventKey {
 		action:              event.Action,
 		reason:              event.Reason,
 		reportingController: event.ReportingController,
-		reportingInstance:   event.ReportingInstance,
 		regarding:           event.Regarding,
 	}
 	if event.Related != nil {
@@ -271,9 +275,9 @@ func getKey(event *v1beta1.Event) eventKey {
 	return key
 }
 
-// startEventWatcher starts sending events received from this EventBroadcaster to the given event handler function.
+// StartEventWatcher starts sending events received from this EventBroadcaster to the given event handler function.
 // The return value is used to stop recording
-func (e *eventBroadcasterImpl) startEventWatcher(eventHandler func(event runtime.Object)) func() {
+func (e *eventBroadcasterImpl) StartEventWatcher(eventHandler func(event runtime.Object)) func() {
 	watcher := e.Watch()
 	go func() {
 		defer utilruntime.HandleCrash()
@@ -304,7 +308,7 @@ func (e *eventBroadcasterImpl) StartRecordingToSink(stopCh <-chan struct{}) {
 		}
 		e.recordToSink(event, clock.RealClock{})
 	}
-	stopWatcher := e.startEventWatcher(eventHandler)
+	stopWatcher := e.StartEventWatcher(eventHandler)
 	go func() {
 		<-stopCh
 		stopWatcher()

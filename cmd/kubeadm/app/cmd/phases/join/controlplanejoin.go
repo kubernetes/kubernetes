@@ -24,14 +24,14 @@ import (
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
+	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
 	markcontrolplanephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/markcontrolplane"
 	uploadconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
-	"k8s.io/kubernetes/pkg/util/normalizer"
 )
 
-var controlPlaneJoinExample = normalizer.Examples(`
+var controlPlaneJoinExample = cmdutil.Examples(`
 	# Joins a machine as a control plane instance
 	kubeadm join phase control-plane-join all
 `)
@@ -40,8 +40,10 @@ func getControlPlaneJoinPhaseFlags(name string) []string {
 	flags := []string{
 		options.CfgPath,
 		options.ControlPlane,
-		options.ExperimentalControlPlane,
 		options.NodeName,
+	}
+	if name == "etcd" {
+		flags = append(flags, options.Kustomize)
 	}
 	if name != "mark-control-plane" {
 		flags = append(flags, options.APIServerAdvertiseAddress)
@@ -138,7 +140,7 @@ func runEtcdPhase(c workflow.RunData) error {
 	// "If you add a new member to a 1-node cluster, the cluster cannot make progress before the new member starts
 	// because it needs two members as majority to agree on the consensus. You will only see this behavior between the time
 	// etcdctl member add informs the cluster about the new member and the new member successfully establishing a connection to the 	// existing one."
-	if err := etcdphase.CreateStackedEtcdStaticPodManifestFile(client, kubeadmconstants.GetStaticPodDirectory(), cfg.NodeRegistration.Name, &cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint); err != nil {
+	if err := etcdphase.CreateStackedEtcdStaticPodManifestFile(client, kubeadmconstants.GetStaticPodDirectory(), data.KustomizeDir(), cfg.NodeRegistration.Name, &cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint); err != nil {
 		return errors.Wrap(err, "error creating local etcd static pod manifest file")
 	}
 

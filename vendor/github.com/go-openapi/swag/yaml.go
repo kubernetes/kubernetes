@@ -22,7 +22,6 @@ import (
 
 	"github.com/mailru/easyjson/jlexer"
 	"github.com/mailru/easyjson/jwriter"
-
 	yaml "gopkg.in/yaml.v2"
 )
 

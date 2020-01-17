@@ -79,7 +79,7 @@ type PodStatusProvider interface {
 	GetPodStatus(uid types.UID) (v1.PodStatus, bool)
 }
 
-// An object which provides guarantees that a pod can be safely deleted.
+// PodDeletionSafetyProvider provides guarantees that a pod can be safely deleted.
 type PodDeletionSafetyProvider interface {
 	// A function which returns true if the pod can safely be deleted
 	PodResourcesAreReclaimed(pod *v1.Pod, status v1.PodStatus) bool
@@ -100,6 +100,10 @@ type Manager interface {
 	// triggers a status update.
 	SetContainerReadiness(podUID types.UID, containerID kubecontainer.ContainerID, ready bool)
 
+	// SetContainerStartup updates the cached container status with the given startup, and
+	// triggers a status update.
+	SetContainerStartup(podUID types.UID, containerID kubecontainer.ContainerID, started bool)
+
 	// TerminatePod resets the container status for the provided pod to terminated and triggers
 	// a status update.
 	TerminatePod(pod *v1.Pod)
@@ -111,6 +115,7 @@ type Manager interface {
 
 const syncPeriod = 10 * time.Second
 
+// NewManager returns a functional Manager.
 func NewManager(kubeClient clientset.Interface, podManager kubepod.Manager, podDeletionSafety PodDeletionSafetyProvider) Manager {
 	return &manager{
 		kubeClient:        kubeClient,
@@ -150,6 +155,7 @@ func (m *manager) Start() {
 	}
 
 	klog.Info("Starting to sync pod status with apiserver")
+	//lint:ignore SA1015 Ticker can link since this is only called once and doesn't handle termination.
 	syncTicker := time.Tick(syncPeriod)
 	// syncPod and syncBatch share the same go routine to avoid sync races.
 	go wait.Forever(func() {
@@ -244,6 +250,45 @@ func (m *manager) SetContainerReadiness(podUID types.UID, containerID kubecontai
 	}
 	updateConditionFunc(v1.PodReady, GeneratePodReadyCondition(&pod.Spec, status.Conditions, status.ContainerStatuses, status.Phase))
 	updateConditionFunc(v1.ContainersReady, GenerateContainersReadyCondition(&pod.Spec, status.ContainerStatuses, status.Phase))
+	m.updateStatusInternal(pod, status, false)
+}
+
+func (m *manager) SetContainerStartup(podUID types.UID, containerID kubecontainer.ContainerID, started bool) {
+	m.podStatusesLock.Lock()
+	defer m.podStatusesLock.Unlock()
+
+	pod, ok := m.podManager.GetPodByUID(podUID)
+	if !ok {
+		klog.V(4).Infof("Pod %q has been deleted, no need to update startup", string(podUID))
+		return
+	}
+
+	oldStatus, found := m.podStatuses[pod.UID]
+	if !found {
+		klog.Warningf("Container startup changed before pod has synced: %q - %q",
+			format.Pod(pod), containerID.String())
+		return
+	}
+
+	// Find the container to update.
+	containerStatus, _, ok := findContainerStatus(&oldStatus.status, containerID.String())
+	if !ok {
+		klog.Warningf("Container startup changed for unknown container: %q - %q",
+			format.Pod(pod), containerID.String())
+		return
+	}
+
+	if containerStatus.Started != nil && *containerStatus.Started == started {
+		klog.V(4).Infof("Container startup unchanged (%v): %q - %q", started,
+			format.Pod(pod), containerID.String())
+		return
+	}
+
+	// Make sure we're not updating the cached version.
+	status := *oldStatus.status.DeepCopy()
+	containerStatus, _, _ = findContainerStatus(&status, containerID.String())
+	containerStatus.Started = &started
+
 	m.updateStatusInternal(pod, status, false)
 }
 
@@ -476,7 +521,7 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 	// TODO: make me easier to express from client code
 	pod, err := m.kubeClient.CoreV1().Pods(status.podNamespace).Get(status.podName, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
-		klog.V(3).Infof("Pod %q (%s) does not exist on the server", status.podName, uid)
+		klog.V(3).Infof("Pod %q does not exist on the server", format.PodDesc(status.podName, status.podNamespace, uid))
 		// If the Pod is deleted the status will be cleared in
 		// RemoveOrphanedStatuses, so we just ignore the update here.
 		return
@@ -536,7 +581,7 @@ func (m *manager) needsUpdate(uid types.UID, status versionedPodStatus) bool {
 }
 
 func (m *manager) canBeDeleted(pod *v1.Pod, status v1.PodStatus) bool {
-	if pod.DeletionTimestamp == nil || kubepod.IsMirrorPod(pod) {
+	if pod.DeletionTimestamp == nil || kubetypes.IsMirrorPod(pod) {
 		return false
 	}
 	return m.podDeletionSafety.PodResourcesAreReclaimed(pod, status)
@@ -559,7 +604,7 @@ func (m *manager) needsReconcile(uid types.UID, status v1.PodStatus) bool {
 		return false
 	}
 	// If the pod is a static pod, we should check its mirror pod, because only status in mirror pod is meaningful to us.
-	if kubepod.IsStaticPod(pod) {
+	if kubetypes.IsStaticPod(pod) {
 		mirrorPod, ok := m.podManager.GetMirrorPodByPod(pod)
 		if !ok {
 			klog.V(4).Infof("Static pod %q has no corresponding mirror pod, no need to reconcile", format.Pod(pod))
@@ -582,13 +627,11 @@ func (m *manager) needsReconcile(uid types.UID, status v1.PodStatus) bool {
 	return true
 }
 
-// We add this function, because apiserver only supports *RFC3339* now, which means that the timestamp returned by
-// apiserver has no nanosecond information. However, the timestamp returned by metav1.Now() contains nanosecond,
-// so when we do comparison between status from apiserver and cached status, isPodStatusByKubeletEqual() will always return false.
-// There is related issue #15262 and PR #15263 about this.
-// In fact, the best way to solve this is to do it on api side. However, for now, we normalize the status locally in
-// kubelet temporarily.
-// TODO(random-liu): Remove timestamp related logic after apiserver supports nanosecond or makes it consistent.
+// normalizeStatus normalizes nanosecond precision timestamps in podStatus
+// down to second precision (*RFC339NANO* -> *RFC3339*). This must be done
+// before comparing podStatus to the status returned by apiserver because
+// apiserver does not support RFC339NANO.
+// Related issue #15262/PR #15263 to move apiserver to RFC339NANO is closed.
 func normalizeStatus(pod *v1.Pod, status *v1.PodStatus) *v1.PodStatus {
 	bytesPerStatus := kubecontainer.MaxPodTerminationMessageLogLength
 	if containers := len(pod.Spec.Containers) + len(pod.Spec.InitContainers); containers > 0 {

@@ -42,6 +42,7 @@ items:
     - watch
   - apiGroups:
     - ""
+    - events.k8s.io
     resources:
     - events
     verbs:
@@ -100,6 +101,7 @@ items:
     - create
   - apiGroups:
     - ""
+    - events.k8s.io
     resources:
     - events
     verbs:
@@ -117,15 +119,16 @@ items:
     name: system:controller:clusterrole-aggregation-controller
   rules:
   - apiGroups:
-    - '*'
+    - rbac.authorization.k8s.io
     resources:
-    - '*'
+    - clusterroles
     verbs:
-    - '*'
-  - nonResourceURLs:
-    - '*'
-    verbs:
-    - '*'
+    - escalate
+    - get
+    - list
+    - patch
+    - update
+    - watch
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: ClusterRole
   metadata:
@@ -178,6 +181,7 @@ items:
     - list
   - apiGroups:
     - ""
+    - events.k8s.io
     resources:
     - events
     verbs:
@@ -254,6 +258,7 @@ items:
     - watch
   - apiGroups:
     - ""
+    - events.k8s.io
     resources:
     - events
     verbs:
@@ -318,6 +323,7 @@ items:
     - watch
   - apiGroups:
     - ""
+    - events.k8s.io
     resources:
     - events
     verbs:
@@ -390,6 +396,7 @@ items:
     - get
   - apiGroups:
     - ""
+    - events.k8s.io
     resources:
     - events
     verbs:
@@ -433,6 +440,7 @@ items:
     - create
   - apiGroups:
     - ""
+    - events.k8s.io
     resources:
     - events
     verbs:
@@ -497,6 +505,7 @@ items:
     - get
   - apiGroups:
     - ""
+    - events.k8s.io
     resources:
     - events
     verbs:
@@ -526,6 +535,7 @@ items:
     - watch
   - apiGroups:
     - ""
+    - events.k8s.io
     resources:
     - events
     verbs:
@@ -593,6 +603,7 @@ items:
     - list
   - apiGroups:
     - ""
+    - events.k8s.io
     resources:
     - events
     verbs:
@@ -642,6 +653,7 @@ items:
     - watch
   - apiGroups:
     - ""
+    - events.k8s.io
     resources:
     - events
     verbs:
@@ -725,6 +737,7 @@ items:
     - list
   - apiGroups:
     - ""
+    - events.k8s.io
     resources:
     - events
     verbs:
@@ -829,6 +842,7 @@ items:
     - watch
   - apiGroups:
     - ""
+    - events.k8s.io
     resources:
     - events
     verbs:
@@ -880,6 +894,7 @@ items:
     - watch
   - apiGroups:
     - ""
+    - events.k8s.io
     resources:
     - events
     verbs:
@@ -915,6 +930,7 @@ items:
     - watch
   - apiGroups:
     - ""
+    - events.k8s.io
     resources:
     - events
     verbs:
@@ -967,6 +983,7 @@ items:
     - watch
   - apiGroups:
     - ""
+    - events.k8s.io
     resources:
     - events
     verbs:
@@ -1016,6 +1033,7 @@ items:
     - watch
   - apiGroups:
     - ""
+    - events.k8s.io
     resources:
     - events
     verbs:
@@ -1047,6 +1065,7 @@ items:
     - update
   - apiGroups:
     - ""
+    - events.k8s.io
     resources:
     - events
     verbs:
@@ -1078,6 +1097,7 @@ items:
     - patch
   - apiGroups:
     - ""
+    - events.k8s.io
     resources:
     - events
     verbs:
@@ -1102,6 +1122,7 @@ items:
     - create
   - apiGroups:
     - ""
+    - events.k8s.io
     resources:
     - events
     verbs:
@@ -1142,6 +1163,7 @@ items:
     - watch
   - apiGroups:
     - ""
+    - events.k8s.io
     resources:
     - events
     verbs:
@@ -1216,6 +1238,7 @@ items:
     - get
   - apiGroups:
     - ""
+    - events.k8s.io
     resources:
     - events
     verbs:
@@ -1243,6 +1266,7 @@ items:
     - watch
   - apiGroups:
     - ""
+    - events.k8s.io
     resources:
     - events
     verbs:

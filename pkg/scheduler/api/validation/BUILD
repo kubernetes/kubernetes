@@ -13,6 +13,7 @@ go_library(
     deps = [
         "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/scheduler/api:go_default_library",
+        "//pkg/scheduler/framework/v1alpha1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
@@ -24,7 +25,10 @@ go_test(
     name = "go_default_test",
     srcs = ["validation_test.go"],
     embed = [":go_default_library"],
-    deps = ["//pkg/scheduler/api:go_default_library"],
+    deps = [
+        "//pkg/scheduler/api:go_default_library",
+        "//pkg/scheduler/framework/v1alpha1:go_default_library",
+    ],
 )
 
 filegroup(

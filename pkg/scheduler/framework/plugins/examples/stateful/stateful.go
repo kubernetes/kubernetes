@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"sync"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
@@ -36,7 +36,7 @@ type MultipointExample struct {
 }
 
 var _ = framework.ReservePlugin(&MultipointExample{})
-var _ = framework.PrebindPlugin(&MultipointExample{})
+var _ = framework.PreBindPlugin(&MultipointExample{})
 
 // Name is the name of the plug used in Registry and configurations.
 const Name = "multipoint-plugin-example"
@@ -47,15 +47,15 @@ func (mp *MultipointExample) Name() string {
 }
 
 // Reserve is the functions invoked by the framework at "reserve" extension point.
-func (mp *MultipointExample) Reserve(pc *framework.PluginContext, pod *v1.Pod, nodeName string) *framework.Status {
+func (mp *MultipointExample) Reserve(state *framework.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
 	// Reserve is not called concurrently, and so we don't need to lock.
 	mp.numRuns++
 	return nil
 }
 
-// Prebind is the functions invoked by the framework at "prebind" extension point.
-func (mp *MultipointExample) Prebind(pc *framework.PluginContext, pod *v1.Pod, nodeName string) *framework.Status {
-	// Prebind could be called concurrently for different pods.
+// PreBind is the functions invoked by the framework at "prebind" extension point.
+func (mp *MultipointExample) PreBind(state *framework.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
+	// PreBind could be called concurrently for different pods.
 	mp.mu.Lock()
 	defer mp.mu.Unlock()
 	mp.numRuns++

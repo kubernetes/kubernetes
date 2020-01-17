@@ -24,8 +24,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/kubernetes/test/e2e/framework"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 const (
@@ -59,7 +59,7 @@ var _ = KubeadmDescribe("kubelet-config ConfigMap", func() {
 
 	// kubelet-config map is named using the kubernetesVersion as a suffix, and so
 	// it is necessary to get it from the kubeadm-config ConfigMap before testing
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		// if the kubelet-config map name is already known exit
 		if kubeletConfigConfigMapName != "" {
 			return
@@ -69,7 +69,7 @@ var _ = KubeadmDescribe("kubelet-config ConfigMap", func() {
 		m := getClusterConfiguration(f.ClientSet)
 
 		// Extract the kubernetesVersion
-		Expect(m).To(HaveKey("kubernetesVersion"))
+		gomega.Expect(m).To(gomega.HaveKey("kubernetesVersion"))
 		k8sVersionString := m["kubernetesVersion"].(string)
 		k8sVersion, err := version.ParseSemantic(k8sVersionString)
 		if err != nil {
@@ -83,25 +83,25 @@ var _ = KubeadmDescribe("kubelet-config ConfigMap", func() {
 		kubeletConfigConfigMapResource.Name = kubeletConfigConfigMapName
 	})
 
-	It("should exist and be properly configured", func() {
+	ginkgo.It("should exist and be properly configured", func() {
 		cm := GetConfigMap(f.ClientSet, kubeSystemNamespace, kubeletConfigConfigMapName)
 
-		Expect(cm.Data).To(HaveKey(kubeletConfigConfigMapKey))
+		gomega.Expect(cm.Data).To(gomega.HaveKey(kubeletConfigConfigMapKey))
 	})
 
-	It("should have related Role and RoleBinding", func() {
+	ginkgo.It("should have related Role and RoleBinding", func() {
 		ExpectRole(f.ClientSet, kubeSystemNamespace, kubeletConfigRoleName)
 		ExpectRoleBinding(f.ClientSet, kubeSystemNamespace, kubeletConfigRoleBindingName)
 	})
 
-	It("should be accessible for bootstrap tokens", func() {
+	ginkgo.It("should be accessible for bootstrap tokens", func() {
 		ExpectSubjectHasAccessToResource(f.ClientSet,
 			rbacv1.GroupKind, bootstrapTokensGroup,
 			kubeadmConfigConfigMapResource,
 		)
 	})
 
-	It("should be accessible for nodes", func() {
+	ginkgo.It("should be accessible for nodes", func() {
 		ExpectSubjectHasAccessToResource(f.ClientSet,
 			rbacv1.GroupKind, nodesGroup,
 			kubeadmConfigConfigMapResource,

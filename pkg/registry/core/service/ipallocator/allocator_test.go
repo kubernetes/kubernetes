@@ -61,11 +61,20 @@ func TestAllocate(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		r := NewCIDRRange(cidr)
+		r, err := NewCIDRRange(cidr)
+		if err != nil {
+			t.Fatal(err)
+		}
 		t.Logf("base: %v", r.base.Bytes())
 		if f := r.Free(); f != tc.free {
 			t.Errorf("Test %s unexpected free %d", tc.name, f)
 		}
+
+		rCIDR := r.CIDR()
+		if rCIDR.String() != tc.cidr {
+			t.Errorf("allocator returned a different cidr")
+		}
+
 		if f := r.Used(); f != 0 {
 			t.Errorf("Test %s unexpected used %d", tc.name, f)
 		}
@@ -148,7 +157,10 @@ func TestAllocateTiny(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	r := NewCIDRRange(cidr)
+	r, err := NewCIDRRange(cidr)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if f := r.Free(); f != 0 {
 		t.Errorf("free: %d", f)
 	}
@@ -162,7 +174,10 @@ func TestAllocateSmall(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	r := NewCIDRRange(cidr)
+	r, err := NewCIDRRange(cidr)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if f := r.Free(); f != 2 {
 		t.Errorf("free: %d", f)
 	}
@@ -252,7 +267,10 @@ func TestForEach(t *testing.T) {
 	}
 
 	for i, tc := range testCases {
-		r := NewCIDRRange(cidr)
+		r, err := NewCIDRRange(cidr)
+		if err != nil {
+			t.Fatal(err)
+		}
 		for ips := range tc {
 			ip := net.ParseIP(ips)
 			if err := r.Allocate(ip); err != nil {
@@ -280,7 +298,10 @@ func TestSnapshot(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	r := NewCIDRRange(cidr)
+	r, err := NewCIDRRange(cidr)
+	if err != nil {
+		t.Fatal(err)
+	}
 	ip := []net.IP{}
 	for i := 0; i < 10; i++ {
 		n, err := r.AllocateNext()
@@ -309,11 +330,17 @@ func TestSnapshot(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	other := NewCIDRRange(otherCidr)
+	other, err := NewCIDRRange(otherCidr)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if err := r.Restore(otherCidr, dst.Data); err != ErrMismatchedNetwork {
 		t.Fatal(err)
 	}
-	other = NewCIDRRange(network)
+	other, err = NewCIDRRange(network)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if err := other.Restore(network, dst.Data); err != nil {
 		t.Fatal(err)
 	}
@@ -333,7 +360,10 @@ func TestNewFromSnapshot(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	r := NewCIDRRange(cidr)
+	r, err := NewCIDRRange(cidr)
+	if err != nil {
+		t.Fatal(err)
+	}
 	allocated := []net.IP{}
 	for i := 0; i < 128; i++ {
 		ip, err := r.AllocateNext()

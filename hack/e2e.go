@@ -153,7 +153,7 @@ func (t tester) getKubetest(get bool, old time.Duration) (string, error) {
 		log.Printf("The kubetest binary is older than %s.", old)
 	}
 	if t.goPath == "" {
-		return "", fmt.Errorf("Cannot install kubetest until $GOPATH is set")
+		return "", fmt.Errorf("cannot install kubetest until $GOPATH is set")
 	}
 	log.Print("Updating kubetest binary...")
 	cmd := []string{"go", "get", "-u", "k8s.io/test-infra/kubetest"}

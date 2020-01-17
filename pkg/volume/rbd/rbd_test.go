@@ -707,3 +707,34 @@ func TestGetRbdImageSize(t *testing.T) {
 		}
 	}
 }
+
+func TestGetRbdImageInfo(t *testing.T) {
+	tmpDir, err := utiltesting.MkTmpdir("rbd_test")
+	if err != nil {
+		t.Fatalf("error creating temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	for i, c := range []struct {
+		DeviceMountPath    string
+		TargetRbdImageInfo *rbdImageInfo
+	}{
+		{
+			DeviceMountPath:    fmt.Sprintf("%s/plugins/kubernetes.io/rbd/rbd/pool1-image-image1", tmpDir),
+			TargetRbdImageInfo: &rbdImageInfo{pool: "pool1", name: "image1"},
+		},
+		{
+			DeviceMountPath:    fmt.Sprintf("%s/plugins/kubernetes.io/rbd/mounts/pool2-image-image2", tmpDir),
+			TargetRbdImageInfo: &rbdImageInfo{pool: "pool2", name: "image2"},
+		},
+	} {
+		rbdImageInfo, err := getRbdImageInfo(c.DeviceMountPath)
+		if err != nil {
+			t.Errorf("Case %d: getRbdImageInfo failed: %v", i, err)
+			continue
+		}
+		if !reflect.DeepEqual(rbdImageInfo, c.TargetRbdImageInfo) {
+			t.Errorf("Case %d: unexpected RbdImageInfo, wanted %v, got %v", i, c.TargetRbdImageInfo, rbdImageInfo)
+		}
+	}
+}

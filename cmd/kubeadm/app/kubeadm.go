@@ -22,8 +22,7 @@ import (
 
 	"github.com/spf13/pflag"
 
-	// ensure libs have a chance to globally register their flags
-	_ "k8s.io/klog"
+	"k8s.io/klog"
 
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd"
@@ -31,6 +30,7 @@ import (
 
 // Run creates and executes new kubeadm command
 func Run() error {
+	klog.InitFlags(nil)
 	pflag.CommandLine.SetNormalizeFunc(cliflag.WordSepNormalizeFunc)
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 

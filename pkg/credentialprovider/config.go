@@ -282,7 +282,20 @@ func (ident DockerConfigEntry) MarshalJSON() ([]byte, error) {
 // decodeDockerConfigFieldAuth deserializes the "auth" field from dockercfg into a
 // username and a password. The format of the auth field is base64(<username>:<password>).
 func decodeDockerConfigFieldAuth(field string) (username, password string, err error) {
-	decoded, err := base64.StdEncoding.DecodeString(field)
+
+	var decoded []byte
+
+	// StdEncoding can only decode padded string
+	// RawStdEncoding can only decode unpadded string
+	// a string is correctly padded if and only if its length is a multiple of 4
+	if (len(field) % 4) == 0 {
+		// decode padded data
+		decoded, err = base64.StdEncoding.DecodeString(field)
+	} else {
+		// decode unpadded data
+		decoded, err = base64.RawStdEncoding.DecodeString(field)
+	}
+
 	if err != nil {
 		return
 	}

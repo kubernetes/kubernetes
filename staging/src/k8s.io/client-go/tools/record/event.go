@@ -127,6 +127,9 @@ type EventBroadcaster interface {
 	// NewRecorder returns an EventRecorder that can be used to send events to this EventBroadcaster
 	// with the event source set to the given event source.
 	NewRecorder(scheme *runtime.Scheme, source v1.EventSource) EventRecorder
+
+	// Shutdown shuts down the broadcaster
+	Shutdown()
 }
 
 // Creates a new event broadcaster.
@@ -161,18 +164,19 @@ type eventBroadcasterImpl struct {
 // StartRecordingToSink starts sending events received from the specified eventBroadcaster to the given sink.
 // The return value can be ignored or used to stop recording, if desired.
 // TODO: make me an object with parameterizable queue length and retry interval
-func (eventBroadcaster *eventBroadcasterImpl) StartRecordingToSink(sink EventSink) watch.Interface {
-	// The default math/rand package functions aren't thread safe, so create a
-	// new Rand object for each StartRecording call.
-	randGen := rand.New(rand.NewSource(time.Now().UnixNano()))
-	eventCorrelator := NewEventCorrelatorWithOptions(eventBroadcaster.options)
-	return eventBroadcaster.StartEventWatcher(
+func (e *eventBroadcasterImpl) StartRecordingToSink(sink EventSink) watch.Interface {
+	eventCorrelator := NewEventCorrelatorWithOptions(e.options)
+	return e.StartEventWatcher(
 		func(event *v1.Event) {
-			recordToSink(sink, event, eventCorrelator, randGen, eventBroadcaster.sleepDuration)
+			recordToSink(sink, event, eventCorrelator, e.sleepDuration)
 		})
 }
 
-func recordToSink(sink EventSink, event *v1.Event, eventCorrelator *EventCorrelator, randGen *rand.Rand, sleepDuration time.Duration) {
+func (e *eventBroadcasterImpl) Shutdown() {
+	e.Broadcaster.Shutdown()
+}
+
+func recordToSink(sink EventSink, event *v1.Event, eventCorrelator *EventCorrelator, sleepDuration time.Duration) {
 	// Make a copy before modification, because there could be multiple listeners.
 	// Events are safe to copy like this.
 	eventCopy := *event
@@ -197,7 +201,7 @@ func recordToSink(sink EventSink, event *v1.Event, eventCorrelator *EventCorrela
 		// Randomize the first sleep so that various clients won't all be
 		// synced up if the master goes down.
 		if tries == 1 {
-			time.Sleep(time.Duration(float64(sleepDuration) * randGen.Float64()))
+			time.Sleep(time.Duration(float64(sleepDuration) * rand.Float64()))
 		} else {
 			time.Sleep(sleepDuration)
 		}
@@ -252,8 +256,8 @@ func recordEvent(sink EventSink, event *v1.Event, patch []byte, updateExistingEv
 
 // StartLogging starts sending events received from this EventBroadcaster to the given logging function.
 // The return value can be ignored or used to stop recording, if desired.
-func (eventBroadcaster *eventBroadcasterImpl) StartLogging(logf func(format string, args ...interface{})) watch.Interface {
-	return eventBroadcaster.StartEventWatcher(
+func (e *eventBroadcasterImpl) StartLogging(logf func(format string, args ...interface{})) watch.Interface {
+	return e.StartEventWatcher(
 		func(e *v1.Event) {
 			logf("Event(%#v): type: '%v' reason: '%v' %v", e.InvolvedObject, e.Type, e.Reason, e.Message)
 		})
@@ -261,8 +265,8 @@ func (eventBroadcaster *eventBroadcasterImpl) StartLogging(logf func(format stri
 
 // StartEventWatcher starts sending events received from this EventBroadcaster to the given event handler function.
 // The return value can be ignored or used to stop recording, if desired.
-func (eventBroadcaster *eventBroadcasterImpl) StartEventWatcher(eventHandler func(*v1.Event)) watch.Interface {
-	watcher := eventBroadcaster.Watch()
+func (e *eventBroadcasterImpl) StartEventWatcher(eventHandler func(*v1.Event)) watch.Interface {
+	watcher := e.Watch()
 	go func() {
 		defer utilruntime.HandleCrash()
 		for watchEvent := range watcher.ResultChan() {
@@ -279,8 +283,8 @@ func (eventBroadcaster *eventBroadcasterImpl) StartEventWatcher(eventHandler fun
 }
 
 // NewRecorder returns an EventRecorder that records events with the given event source.
-func (eventBroadcaster *eventBroadcasterImpl) NewRecorder(scheme *runtime.Scheme, source v1.EventSource) EventRecorder {
-	return &recorderImpl{scheme, source, eventBroadcaster.Broadcaster, clock.RealClock{}}
+func (e *eventBroadcasterImpl) NewRecorder(scheme *runtime.Scheme, source v1.EventSource) EventRecorder {
+	return &recorderImpl{scheme, source, e.Broadcaster, clock.RealClock{}}
 }
 
 type recorderImpl struct {

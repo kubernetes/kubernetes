@@ -23,7 +23,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/util/mount"
 
-	siotypes "github.com/codedellemc/goscaleio/types/v1"
+	siotypes "github.com/thecodeteam/goscaleio/types/v1"
 )
 
 var (

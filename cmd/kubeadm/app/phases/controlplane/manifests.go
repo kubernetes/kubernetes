@@ -25,29 +25,27 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/apimachinery/pkg/util/version"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	certphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	staticpodutil "k8s.io/kubernetes/cmd/kubeadm/app/util/staticpod"
-	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
-	"k8s.io/kubernetes/pkg/master/ports"
+	utilsnet "k8s.io/utils/net"
 )
 
 // CreateInitStaticPodManifestFiles will write all static pod manifest files needed to bring up the control plane.
-func CreateInitStaticPodManifestFiles(manifestDir string, cfg *kubeadmapi.InitConfiguration) error {
+func CreateInitStaticPodManifestFiles(manifestDir, kustomizeDir string, cfg *kubeadmapi.InitConfiguration) error {
 	klog.V(1).Infoln("[control-plane] creating static Pod files")
-	return CreateStaticPodFiles(manifestDir, &cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint, kubeadmconstants.KubeAPIServer, kubeadmconstants.KubeControllerManager, kubeadmconstants.KubeScheduler)
+	return CreateStaticPodFiles(manifestDir, kustomizeDir, &cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint, kubeadmconstants.KubeAPIServer, kubeadmconstants.KubeControllerManager, kubeadmconstants.KubeScheduler)
 }
 
 // GetStaticPodSpecs returns all staticPodSpecs actualized to the context of the current configuration
 // NB. this methods holds the information about how kubeadm creates static pod manifests.
-func GetStaticPodSpecs(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.APIEndpoint, k8sVersion *version.Version) map[string]v1.Pod {
+func GetStaticPodSpecs(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.APIEndpoint) map[string]v1.Pod {
 	// Get the required hostpath mounts
 	mounts := getHostPathVolumesForTheControlPlane(cfg)
 
@@ -59,7 +57,7 @@ func GetStaticPodSpecs(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmap
 			ImagePullPolicy: v1.PullIfNotPresent,
 			Command:         getAPIServerCommand(cfg, endpoint),
 			VolumeMounts:    staticpodutil.VolumeMountMapToSlice(mounts.GetVolumeMounts(kubeadmconstants.KubeAPIServer)),
-			LivenessProbe:   livenessProbe(staticpodutil.GetAPIServerProbeAddress(endpoint), int(endpoint.BindPort), v1.URISchemeHTTPS),
+			LivenessProbe:   staticpodutil.LivenessProbe(staticpodutil.GetAPIServerProbeAddress(endpoint), "/healthz", int(endpoint.BindPort), v1.URISchemeHTTPS),
 			Resources:       staticpodutil.ComponentResources("250m"),
 			Env:             getProxyEnvVars(),
 		}, mounts.GetVolumes(kubeadmconstants.KubeAPIServer)),
@@ -67,9 +65,9 @@ func GetStaticPodSpecs(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmap
 			Name:            kubeadmconstants.KubeControllerManager,
 			Image:           images.GetKubernetesImage(kubeadmconstants.KubeControllerManager, cfg),
 			ImagePullPolicy: v1.PullIfNotPresent,
-			Command:         getControllerManagerCommand(cfg, k8sVersion),
+			Command:         getControllerManagerCommand(cfg),
 			VolumeMounts:    staticpodutil.VolumeMountMapToSlice(mounts.GetVolumeMounts(kubeadmconstants.KubeControllerManager)),
-			LivenessProbe:   livenessProbe(staticpodutil.GetControllerManagerProbeAddress(cfg), ports.InsecureKubeControllerManagerPort, v1.URISchemeHTTP),
+			LivenessProbe:   staticpodutil.LivenessProbe(staticpodutil.GetControllerManagerProbeAddress(cfg), "/healthz", kubeadmconstants.InsecureKubeControllerManagerPort, v1.URISchemeHTTP),
 			Resources:       staticpodutil.ComponentResources("200m"),
 			Env:             getProxyEnvVars(),
 		}, mounts.GetVolumes(kubeadmconstants.KubeControllerManager)),
@@ -79,7 +77,7 @@ func GetStaticPodSpecs(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmap
 			ImagePullPolicy: v1.PullIfNotPresent,
 			Command:         getSchedulerCommand(cfg),
 			VolumeMounts:    staticpodutil.VolumeMountMapToSlice(mounts.GetVolumeMounts(kubeadmconstants.KubeScheduler)),
-			LivenessProbe:   livenessProbe(staticpodutil.GetSchedulerProbeAddress(cfg), ports.InsecureSchedulerPort, v1.URISchemeHTTP),
+			LivenessProbe:   staticpodutil.LivenessProbe(staticpodutil.GetSchedulerProbeAddress(cfg), "/healthz", kubeadmconstants.InsecureSchedulerPort, v1.URISchemeHTTP),
 			Resources:       staticpodutil.ComponentResources("100m"),
 			Env:             getProxyEnvVars(),
 		}, mounts.GetVolumes(kubeadmconstants.KubeScheduler)),
@@ -87,33 +85,11 @@ func GetStaticPodSpecs(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmap
 	return staticPodSpecs
 }
 
-func livenessProbe(host string, port int, scheme v1.URIScheme) *v1.Probe {
-	return &v1.Probe{
-		Handler: v1.Handler{
-			HTTPGet: &v1.HTTPGetAction{
-				Host:   host,
-				Path:   "/healthz",
-				Port:   intstr.FromInt(port),
-				Scheme: scheme,
-			},
-		},
-		InitialDelaySeconds: 15,
-		TimeoutSeconds:      15,
-		FailureThreshold:    8,
-	}
-}
-
 // CreateStaticPodFiles creates all the requested static pod files.
-func CreateStaticPodFiles(manifestDir string, cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.APIEndpoint, componentNames ...string) error {
-	// TODO: Move the "pkg/util/version".Version object into the internal API instead of always parsing the string
-	k8sVersion, err := version.ParseSemantic(cfg.KubernetesVersion)
-	if err != nil {
-		return err
-	}
-
+func CreateStaticPodFiles(manifestDir, kustomizeDir string, cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.APIEndpoint, componentNames ...string) error {
 	// gets the StaticPodSpecs, actualized for the current ClusterConfiguration
 	klog.V(1).Infoln("[control-plane] getting StaticPodSpecs")
-	specs := GetStaticPodSpecs(cfg, endpoint, k8sVersion)
+	specs := GetStaticPodSpecs(cfg, endpoint)
 
 	// creates required static pod specs
 	for _, componentName := range componentNames {
@@ -121,6 +97,15 @@ func CreateStaticPodFiles(manifestDir string, cfg *kubeadmapi.ClusterConfigurati
 		spec, exists := specs[componentName]
 		if !exists {
 			return errors.Errorf("couldn't retrieve StaticPodSpec for %q", componentName)
+		}
+
+		// if kustomizeDir is defined, customize the static pod manifest
+		if kustomizeDir != "" {
+			kustomizedSpec, err := staticpodutil.KustomizeStaticPod(&spec, kustomizeDir)
+			if err != nil {
+				return errors.Wrapf(err, "failed to kustomize static pod manifest file for %q", componentName)
+			}
+			spec = *kustomizedSpec
 		}
 
 		// writes the StaticPodSpec to disk
@@ -191,6 +176,12 @@ func getAPIServerCommand(cfg *kubeadmapi.ClusterConfiguration, localAPIEndpoint 
 		}
 	}
 
+	// TODO: The following code should be remvoved after dual-stack is GA.
+	// Note: The user still retains the ability to explicitly set feature-gates and that value will overwrite this base value.
+	if enabled, present := cfg.FeatureGates[features.IPv6DualStack]; present {
+		defaultArguments["feature-gates"] = fmt.Sprintf("%s=%t", features.IPv6DualStack, enabled)
+	}
+
 	if cfg.APIServer.ExtraArgs == nil {
 		cfg.APIServer.ExtraArgs = map[string]string{}
 	}
@@ -201,20 +192,52 @@ func getAPIServerCommand(cfg *kubeadmapi.ClusterConfiguration, localAPIEndpoint 
 }
 
 // getAuthzModes gets the authorization-related parameters to the api server
-// Node,RBAC should be fixed in this order at the beginning
-// AlwaysAllow and AlwaysDeny is ignored as they are only for testing
+// Node,RBAC is the default mode if nothing is passed to kubeadm. User provided modes override
+// the default.
 func getAuthzModes(authzModeExtraArgs string) string {
-	modes := []string{
-		authzmodes.ModeNode,
-		authzmodes.ModeRBAC,
+	defaultMode := []string{
+		kubeadmconstants.ModeNode,
+		kubeadmconstants.ModeRBAC,
 	}
-	if strings.Contains(authzModeExtraArgs, authzmodes.ModeABAC) {
-		modes = append(modes, authzmodes.ModeABAC)
+
+	if len(authzModeExtraArgs) > 0 {
+		mode := []string{}
+		for _, requested := range strings.Split(authzModeExtraArgs, ",") {
+			if isValidAuthzMode(requested) {
+				mode = append(mode, requested)
+			} else {
+				klog.Warningf("ignoring unknown kube-apiserver authorization-mode %q", requested)
+			}
+		}
+
+		// only return the user provided mode if at least one was valid
+		if len(mode) > 0 {
+			klog.Warningf("the default kube-apiserver authorization-mode is %q; using %q",
+				strings.Join(defaultMode, ","),
+				strings.Join(mode, ","),
+			)
+			return strings.Join(mode, ",")
+		}
 	}
-	if strings.Contains(authzModeExtraArgs, authzmodes.ModeWebhook) {
-		modes = append(modes, authzmodes.ModeWebhook)
+	return strings.Join(defaultMode, ",")
+}
+
+func isValidAuthzMode(authzMode string) bool {
+	allModes := []string{
+		kubeadmconstants.ModeNode,
+		kubeadmconstants.ModeRBAC,
+		kubeadmconstants.ModeWebhook,
+		kubeadmconstants.ModeABAC,
+		kubeadmconstants.ModeAlwaysAllow,
+		kubeadmconstants.ModeAlwaysDeny,
 	}
-	return strings.Join(modes, ",")
+
+	for _, mode := range allModes {
+		if authzMode == mode {
+			return true
+		}
+	}
+	return false
 }
 
 // calcNodeCidrSize determines the size of the subnets used on each node, based
@@ -241,7 +264,7 @@ func getAuthzModes(authzModeExtraArgs string) string {
 func calcNodeCidrSize(podSubnet string) string {
 	maskSize := "24"
 	if ip, podCidr, err := net.ParseCIDR(podSubnet); err == nil {
-		if ip.To4() == nil {
+		if utilsnet.IsIPv6(ip) {
 			var nodeCidrSize int
 			podNetSize, totalBits := podCidr.Mask.Size()
 			switch {
@@ -262,7 +285,7 @@ func calcNodeCidrSize(podSubnet string) string {
 }
 
 // getControllerManagerCommand builds the right controller manager command from the given config object and version
-func getControllerManagerCommand(cfg *kubeadmapi.ClusterConfiguration, k8sVersion *version.Version) []string {
+func getControllerManagerCommand(cfg *kubeadmapi.ClusterConfiguration) []string {
 
 	kubeconfigFile := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ControllerManagerKubeConfigFileName)
 	caFile := filepath.Join(cfg.CertificatesDir, kubeadmconstants.CACertName)
@@ -293,10 +316,20 @@ func getControllerManagerCommand(cfg *kubeadmapi.ClusterConfiguration, k8sVersio
 	// Let the controller-manager allocate Node CIDRs for the Pod network.
 	// Each node will get a subspace of the address CIDR provided with --pod-network-cidr.
 	if cfg.Networking.PodSubnet != "" {
+		// TODO(Arvinderpal): Needs to be fixed once PR #73977 lands. Should be a list of maskSizes.
 		maskSize := calcNodeCidrSize(cfg.Networking.PodSubnet)
 		defaultArguments["allocate-node-cidrs"] = "true"
 		defaultArguments["cluster-cidr"] = cfg.Networking.PodSubnet
 		defaultArguments["node-cidr-mask-size"] = maskSize
+		if cfg.Networking.ServiceSubnet != "" {
+			defaultArguments["service-cluster-ip-range"] = cfg.Networking.ServiceSubnet
+		}
+	}
+
+	// TODO: The following code should be remvoved after dual-stack is GA.
+	// Note: The user still retains the ability to explicitly set feature-gates and that value will overwrite this base value.
+	if enabled, present := cfg.FeatureGates[features.IPv6DualStack]; present {
+		defaultArguments["feature-gates"] = fmt.Sprintf("%s=%t", features.IPv6DualStack, enabled)
 	}
 
 	command := []string{"kube-controller-manager"}
@@ -307,10 +340,19 @@ func getControllerManagerCommand(cfg *kubeadmapi.ClusterConfiguration, k8sVersio
 
 // getSchedulerCommand builds the right scheduler command from the given config object and version
 func getSchedulerCommand(cfg *kubeadmapi.ClusterConfiguration) []string {
+	kubeconfigFile := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.SchedulerKubeConfigFileName)
 	defaultArguments := map[string]string{
-		"bind-address": "127.0.0.1",
-		"leader-elect": "true",
-		"kubeconfig":   filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.SchedulerKubeConfigFileName),
+		"bind-address":              "127.0.0.1",
+		"leader-elect":              "true",
+		"kubeconfig":                kubeconfigFile,
+		"authentication-kubeconfig": kubeconfigFile,
+		"authorization-kubeconfig":  kubeconfigFile,
+	}
+
+	// TODO: The following code should be remvoved after dual-stack is GA.
+	// Note: The user still retains the ability to explicitly set feature-gates and that value will overwrite this base value.
+	if enabled, present := cfg.FeatureGates[features.IPv6DualStack]; present {
+		defaultArguments["feature-gates"] = fmt.Sprintf("%s=%t", features.IPv6DualStack, enabled)
 	}
 
 	command := []string{"kube-scheduler"}

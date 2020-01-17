@@ -16,7 +16,7 @@ limitations under the License.
 
 package system
 
-// KernelConfig defines one kernel configration item.
+// KernelConfig defines one kernel configuration item.
 type KernelConfig struct {
 	// Name is the general name of the kernel configuration. It is used to
 	// match kernel configuration.

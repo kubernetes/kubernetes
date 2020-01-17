@@ -47,23 +47,13 @@ type NetDevLine struct {
 // are interface names.
 type NetDev map[string]NetDevLine
 
-// NewNetDev returns kernel/system statistics read from /proc/net/dev.
-func NewNetDev() (NetDev, error) {
-	fs, err := NewFS(DefaultMountPoint)
-	if err != nil {
-		return nil, err
-	}
-
-	return fs.NewNetDev()
+// NetDev returns kernel/system statistics read from /proc/net/dev.
+func (fs FS) NetDev() (NetDev, error) {
+	return newNetDev(fs.proc.Path("net/dev"))
 }
 
-// NewNetDev returns kernel/system statistics read from /proc/net/dev.
-func (fs FS) NewNetDev() (NetDev, error) {
-	return newNetDev(fs.Path("net/dev"))
-}
-
-// NewNetDev returns kernel/system statistics read from /proc/[pid]/net/dev.
-func (p Proc) NewNetDev() (NetDev, error) {
+// NetDev returns kernel/system statistics read from /proc/[pid]/net/dev.
+func (p Proc) NetDev() (NetDev, error) {
 	return newNetDev(p.path("net/dev"))
 }
 
@@ -75,7 +65,7 @@ func newNetDev(file string) (NetDev, error) {
 	}
 	defer f.Close()
 
-	nd := NetDev{}
+	netDev := NetDev{}
 	s := bufio.NewScanner(f)
 	for n := 0; s.Scan(); n++ {
 		// Skip the 2 header lines.
@@ -83,20 +73,20 @@ func newNetDev(file string) (NetDev, error) {
 			continue
 		}
 
-		line, err := nd.parseLine(s.Text())
+		line, err := netDev.parseLine(s.Text())
 		if err != nil {
-			return nd, err
+			return netDev, err
 		}
 
-		nd[line.Name] = *line
+		netDev[line.Name] = *line
 	}
 
-	return nd, s.Err()
+	return netDev, s.Err()
 }
 
 // parseLine parses a single line from the /proc/net/dev file. Header lines
 // must be filtered prior to calling this method.
-func (nd NetDev) parseLine(rawLine string) (*NetDevLine, error) {
+func (netDev NetDev) parseLine(rawLine string) (*NetDevLine, error) {
 	parts := strings.SplitN(rawLine, ":", 2)
 	if len(parts) != 2 {
 		return nil, errors.New("invalid net/dev line, missing colon")
@@ -185,11 +175,11 @@ func (nd NetDev) parseLine(rawLine string) (*NetDevLine, error) {
 
 // Total aggregates the values across interfaces and returns a new NetDevLine.
 // The Name field will be a sorted comma separated list of interface names.
-func (nd NetDev) Total() NetDevLine {
+func (netDev NetDev) Total() NetDevLine {
 	total := NetDevLine{}
 
-	names := make([]string, 0, len(nd))
-	for _, ifc := range nd {
+	names := make([]string, 0, len(netDev))
+	for _, ifc := range netDev {
 		names = append(names, ifc.Name)
 		total.RxBytes += ifc.RxBytes
 		total.RxPackets += ifc.RxPackets

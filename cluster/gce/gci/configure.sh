@@ -26,10 +26,10 @@ set -o pipefail
 ### Hardcoded constants
 DEFAULT_CNI_VERSION="v0.7.5"
 DEFAULT_CNI_SHA1="52e9d2de8a5f927307d9397308735658ee44ab8d"
-DEFAULT_NPD_VERSION="v0.6.3"
-DEFAULT_NPD_SHA1="3a6ac56be6c121f1b94450bfd1a81ad28d532369"
-DEFAULT_CRICTL_VERSION="v1.14.0"
-DEFAULT_CRICTL_SHA1="1f93c6183d0a4e186708efe7899da7a7bce9c736"
+DEFAULT_NPD_VERSION="v0.7.1"
+DEFAULT_NPD_SHA1="a9cae965973d586bf5206ad4fe5aae07e6bfd154"
+DEFAULT_CRICTL_VERSION="v1.16.1"
+DEFAULT_CRICTL_SHA1="8d7b788bf0a52bd3248407c6ebf779ffead27c99"
 DEFAULT_MOUNTER_TAR_SHA="8003b798cf33c7f91320cd6ee5cec4fa22244571"
 ###
 
@@ -126,12 +126,12 @@ function validate-hash {
 # Get default service account credentials of the VM.
 GCE_METADATA_INTERNAL="http://metadata.google.internal/computeMetadata/v1/instance"
 function get-credentials {
-  curl "${GCE_METADATA_INTERNAL}/service-accounts/default/token" -H "Metadata-Flavor: Google" -s | python -c \
+  curl --fail --retry 5 --retry-delay 3 ${CURL_RETRY_CONNREFUSED} --silent --show-error "${GCE_METADATA_INTERNAL}/service-accounts/default/token" -H "Metadata-Flavor: Google" -s | python -c \
     'import sys; import json; print(json.loads(sys.stdin.read())["access_token"])'
 }
 
 function valid-storage-scope {
-  curl "${GCE_METADATA_INTERNAL}/service-accounts/default/scopes" -H "Metadata-Flavor: Google" -s | grep -q "auth/devstorage"
+  curl --fail --retry 5 --retry-delay 3 ${CURL_RETRY_CONNREFUSED} --silent --show-error "${GCE_METADATA_INTERNAL}/service-accounts/default/scopes" -H "Metadata-Flavor: Google" -s | grep -E "auth/devstorage|auth/cloud-platform"
 }
 
 # Retry a download until we get it. Takes a hash and a set of URLs.
@@ -248,7 +248,7 @@ function install-cni-binaries {
   fi
 
   echo "Downloading cni binaries"
-  download-or-bust "${cni_sha1}" "https://storage.googleapis.com/kubernetes-release/network-plugins/${cni_tar}"
+  download-or-bust "${cni_sha1}" "${CNI_STORAGE_PATH}/${cni_tar}"
   local -r cni_dir="${KUBE_HOME}/cni"
   mkdir -p "${cni_dir}/bin"
   tar xzf "${KUBE_HOME}/${cni_tar}" -C "${cni_dir}/bin" --overwrite

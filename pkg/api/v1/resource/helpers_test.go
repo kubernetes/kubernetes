@@ -22,7 +22,11 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 func TestResourceHelpers(t *testing.T) {
@@ -63,6 +67,57 @@ func TestDefaultResourceHelpers(t *testing.T) {
 	}
 }
 
+func TestGetResourceRequest(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodOverhead, true)()
+
+	cases := []struct {
+		pod           *v1.Pod
+		cName         string
+		resourceName  v1.ResourceName
+		expectedValue int64
+	}{
+		{
+			pod:           getPod("foo", podResources{cpuRequest: "9"}),
+			resourceName:  v1.ResourceCPU,
+			expectedValue: 9000,
+		},
+		{
+			pod:           getPod("foo", podResources{memoryRequest: "90Mi"}),
+			resourceName:  v1.ResourceMemory,
+			expectedValue: 94371840,
+		},
+		{
+			cName:         "just-overhead for cpu",
+			pod:           getPod("foo", podResources{cpuOverhead: "5", memoryOverhead: "5"}),
+			resourceName:  v1.ResourceCPU,
+			expectedValue: 0,
+		},
+		{
+			cName:         "just-overhead for memory",
+			pod:           getPod("foo", podResources{memoryOverhead: "5"}),
+			resourceName:  v1.ResourceMemory,
+			expectedValue: 0,
+		},
+		{
+			cName:         "cpu overhead and req",
+			pod:           getPod("foo", podResources{cpuRequest: "2", cpuOverhead: "5", memoryOverhead: "5"}),
+			resourceName:  v1.ResourceCPU,
+			expectedValue: 7000,
+		},
+		{
+			cName:         "mem overhead and req",
+			pod:           getPod("foo", podResources{cpuRequest: "2", memoryRequest: "1024", cpuOverhead: "5", memoryOverhead: "5"}),
+			resourceName:  v1.ResourceMemory,
+			expectedValue: 1029,
+		},
+	}
+	as := assert.New(t)
+	for idx, tc := range cases {
+		actual := GetResourceRequest(tc.pod, tc.resourceName)
+		as.Equal(actual, tc.expectedValue, "expected test case [%d] %v: to return %q; got %q instead", idx, tc.cName, tc.expectedValue, actual)
+	}
+}
+
 func TestExtractResourceValue(t *testing.T) {
 	cases := []struct {
 		fs            *v1.ResourceFieldSelector
@@ -76,7 +131,7 @@ func TestExtractResourceValue(t *testing.T) {
 				Resource: "limits.cpu",
 			},
 			cName:         "foo",
-			pod:           getPod("foo", "", "9", "", ""),
+			pod:           getPod("foo", podResources{cpuLimit: "9"}),
 			expectedValue: "9",
 		},
 		{
@@ -84,7 +139,7 @@ func TestExtractResourceValue(t *testing.T) {
 				Resource: "requests.cpu",
 			},
 			cName:         "foo",
-			pod:           getPod("foo", "", "", "", ""),
+			pod:           getPod("foo", podResources{}),
 			expectedValue: "0",
 		},
 		{
@@ -92,7 +147,7 @@ func TestExtractResourceValue(t *testing.T) {
 				Resource: "requests.cpu",
 			},
 			cName:         "foo",
-			pod:           getPod("foo", "8", "", "", ""),
+			pod:           getPod("foo", podResources{cpuRequest: "8"}),
 			expectedValue: "8",
 		},
 		{
@@ -100,7 +155,7 @@ func TestExtractResourceValue(t *testing.T) {
 				Resource: "requests.cpu",
 			},
 			cName:         "foo",
-			pod:           getPod("foo", "100m", "", "", ""),
+			pod:           getPod("foo", podResources{cpuRequest: "100m"}),
 			expectedValue: "1",
 		},
 		{
@@ -109,7 +164,7 @@ func TestExtractResourceValue(t *testing.T) {
 				Divisor:  resource.MustParse("100m"),
 			},
 			cName:         "foo",
-			pod:           getPod("foo", "1200m", "", "", ""),
+			pod:           getPod("foo", podResources{cpuRequest: "1200m"}),
 			expectedValue: "12",
 		},
 		{
@@ -117,7 +172,7 @@ func TestExtractResourceValue(t *testing.T) {
 				Resource: "requests.memory",
 			},
 			cName:         "foo",
-			pod:           getPod("foo", "", "", "100Mi", ""),
+			pod:           getPod("foo", podResources{memoryRequest: "100Mi"}),
 			expectedValue: "104857600",
 		},
 		{
@@ -126,7 +181,7 @@ func TestExtractResourceValue(t *testing.T) {
 				Divisor:  resource.MustParse("1Mi"),
 			},
 			cName:         "foo",
-			pod:           getPod("foo", "", "", "100Mi", "1Gi"),
+			pod:           getPod("foo", podResources{memoryRequest: "100Mi", memoryLimit: "1Gi"}),
 			expectedValue: "100",
 		},
 		{
@@ -134,7 +189,7 @@ func TestExtractResourceValue(t *testing.T) {
 				Resource: "limits.memory",
 			},
 			cName:         "foo",
-			pod:           getPod("foo", "", "", "10Mi", "100Mi"),
+			pod:           getPod("foo", podResources{memoryRequest: "10Mi", memoryLimit: "100Mi"}),
 			expectedValue: "104857600",
 		},
 		{
@@ -142,7 +197,7 @@ func TestExtractResourceValue(t *testing.T) {
 				Resource: "limits.cpu",
 			},
 			cName:         "init-foo",
-			pod:           getPod("foo", "", "9", "", ""),
+			pod:           getPod("foo", podResources{cpuLimit: "9"}),
 			expectedValue: "9",
 		},
 		{
@@ -150,7 +205,7 @@ func TestExtractResourceValue(t *testing.T) {
 				Resource: "requests.cpu",
 			},
 			cName:         "init-foo",
-			pod:           getPod("foo", "", "", "", ""),
+			pod:           getPod("foo", podResources{}),
 			expectedValue: "0",
 		},
 		{
@@ -158,7 +213,7 @@ func TestExtractResourceValue(t *testing.T) {
 				Resource: "requests.cpu",
 			},
 			cName:         "init-foo",
-			pod:           getPod("foo", "8", "", "", ""),
+			pod:           getPod("foo", podResources{cpuRequest: "8"}),
 			expectedValue: "8",
 		},
 		{
@@ -166,7 +221,7 @@ func TestExtractResourceValue(t *testing.T) {
 				Resource: "requests.cpu",
 			},
 			cName:         "init-foo",
-			pod:           getPod("foo", "100m", "", "", ""),
+			pod:           getPod("foo", podResources{cpuRequest: "100m"}),
 			expectedValue: "1",
 		},
 		{
@@ -175,7 +230,7 @@ func TestExtractResourceValue(t *testing.T) {
 				Divisor:  resource.MustParse("100m"),
 			},
 			cName:         "init-foo",
-			pod:           getPod("foo", "1200m", "", "", ""),
+			pod:           getPod("foo", podResources{cpuRequest: "1200m"}),
 			expectedValue: "12",
 		},
 		{
@@ -183,7 +238,7 @@ func TestExtractResourceValue(t *testing.T) {
 				Resource: "requests.memory",
 			},
 			cName:         "init-foo",
-			pod:           getPod("foo", "", "", "100Mi", ""),
+			pod:           getPod("foo", podResources{memoryRequest: "100Mi"}),
 			expectedValue: "104857600",
 		},
 		{
@@ -192,15 +247,16 @@ func TestExtractResourceValue(t *testing.T) {
 				Divisor:  resource.MustParse("1Mi"),
 			},
 			cName:         "init-foo",
-			pod:           getPod("foo", "", "", "100Mi", "1Gi"),
+			pod:           getPod("foo", podResources{memoryRequest: "100Mi", memoryLimit: "1Gi"}),
 			expectedValue: "100",
 		},
 		{
 			fs: &v1.ResourceFieldSelector{
 				Resource: "limits.memory",
 			},
-			cName:         "init-foo",
-			pod:           getPod("foo", "", "", "10Mi", "100Mi"),
+			cName: "init-foo",
+			pod:   getPod("foo", podResources{memoryRequest: "10Mi", memoryLimit: "100Mi"}),
+
 			expectedValue: "104857600",
 		},
 	}
@@ -216,37 +272,124 @@ func TestExtractResourceValue(t *testing.T) {
 	}
 }
 
-func getPod(cname, cpuRequest, cpuLimit, memoryRequest, memoryLimit string) *v1.Pod {
-	resources := v1.ResourceRequirements{
+func TestPodRequestsAndLimits(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodOverhead, true)()
+
+	cases := []struct {
+		pod              *v1.Pod
+		cName            string
+		expectedRequests v1.ResourceList
+		expectedLimits   v1.ResourceList
+	}{
+		{
+			cName:            "just-limit-no-overhead",
+			pod:              getPod("foo", podResources{cpuLimit: "9"}),
+			expectedRequests: v1.ResourceList{},
+			expectedLimits: v1.ResourceList{
+				v1.ResourceName(v1.ResourceCPU): resource.MustParse("9"),
+			},
+		},
+		{
+			cName: "just-overhead",
+			pod:   getPod("foo", podResources{cpuOverhead: "5", memoryOverhead: "5"}),
+			expectedRequests: v1.ResourceList{
+				v1.ResourceName(v1.ResourceCPU):    resource.MustParse("5"),
+				v1.ResourceName(v1.ResourceMemory): resource.MustParse("5"),
+			},
+			expectedLimits: v1.ResourceList{},
+		},
+		{
+			cName: "req-and-overhead",
+			pod:   getPod("foo", podResources{cpuRequest: "1", memoryRequest: "10", cpuOverhead: "5", memoryOverhead: "5"}),
+			expectedRequests: v1.ResourceList{
+				v1.ResourceName(v1.ResourceCPU):    resource.MustParse("6"),
+				v1.ResourceName(v1.ResourceMemory): resource.MustParse("15"),
+			},
+			expectedLimits: v1.ResourceList{},
+		},
+		{
+			cName: "all-req-lim-and-overhead",
+			pod:   getPod("foo", podResources{cpuRequest: "1", cpuLimit: "2", memoryRequest: "10", memoryLimit: "12", cpuOverhead: "5", memoryOverhead: "5"}),
+			expectedRequests: v1.ResourceList{
+				v1.ResourceName(v1.ResourceCPU):    resource.MustParse("6"),
+				v1.ResourceName(v1.ResourceMemory): resource.MustParse("15"),
+			},
+			expectedLimits: v1.ResourceList{
+				v1.ResourceName(v1.ResourceCPU):    resource.MustParse("7"),
+				v1.ResourceName(v1.ResourceMemory): resource.MustParse("17"),
+			},
+		},
+		{
+			cName: "req-some-lim-and-overhead",
+			pod:   getPod("foo", podResources{cpuRequest: "1", cpuLimit: "2", memoryRequest: "10", cpuOverhead: "5", memoryOverhead: "5"}),
+			expectedRequests: v1.ResourceList{
+				v1.ResourceName(v1.ResourceCPU):    resource.MustParse("6"),
+				v1.ResourceName(v1.ResourceMemory): resource.MustParse("15"),
+			},
+			expectedLimits: v1.ResourceList{
+				v1.ResourceName(v1.ResourceCPU): resource.MustParse("7"),
+			},
+		},
+	}
+	for idx, tc := range cases {
+		resRequests, resLimits := PodRequestsAndLimits(tc.pod)
+
+		if !equality.Semantic.DeepEqual(tc.expectedRequests, resRequests) {
+			t.Errorf("test case failure[%d]: %v, requests:\n expected:\t%v\ngot\t\t%v", idx, tc.cName, tc.expectedRequests, resRequests)
+		}
+
+		if !equality.Semantic.DeepEqual(tc.expectedLimits, resLimits) {
+			t.Errorf("test case failure[%d]: %v, limits:\n expected:\t%v\ngot\t\t%v", idx, tc.cName, tc.expectedLimits, resLimits)
+		}
+	}
+}
+
+type podResources struct {
+	cpuRequest, cpuLimit, memoryRequest, memoryLimit, cpuOverhead, memoryOverhead string
+}
+
+func getPod(cname string, resources podResources) *v1.Pod {
+	r := v1.ResourceRequirements{
 		Limits:   make(v1.ResourceList),
 		Requests: make(v1.ResourceList),
 	}
-	if cpuLimit != "" {
-		resources.Limits[v1.ResourceCPU] = resource.MustParse(cpuLimit)
+
+	overhead := make(v1.ResourceList)
+
+	if resources.cpuLimit != "" {
+		r.Limits[v1.ResourceCPU] = resource.MustParse(resources.cpuLimit)
 	}
-	if memoryLimit != "" {
-		resources.Limits[v1.ResourceMemory] = resource.MustParse(memoryLimit)
+	if resources.memoryLimit != "" {
+		r.Limits[v1.ResourceMemory] = resource.MustParse(resources.memoryLimit)
 	}
-	if cpuRequest != "" {
-		resources.Requests[v1.ResourceCPU] = resource.MustParse(cpuRequest)
+	if resources.cpuRequest != "" {
+		r.Requests[v1.ResourceCPU] = resource.MustParse(resources.cpuRequest)
 	}
-	if memoryRequest != "" {
-		resources.Requests[v1.ResourceMemory] = resource.MustParse(memoryRequest)
+	if resources.memoryRequest != "" {
+		r.Requests[v1.ResourceMemory] = resource.MustParse(resources.memoryRequest)
 	}
+	if resources.cpuOverhead != "" {
+		overhead[v1.ResourceCPU] = resource.MustParse(resources.cpuOverhead)
+	}
+	if resources.memoryOverhead != "" {
+		overhead[v1.ResourceMemory] = resource.MustParse(resources.memoryOverhead)
+	}
+
 	return &v1.Pod{
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{
 				{
 					Name:      cname,
-					Resources: resources,
+					Resources: r,
 				},
 			},
 			InitContainers: []v1.Container{
 				{
 					Name:      "init-" + cname,
-					Resources: resources,
+					Resources: r,
 				},
 			},
+			Overhead: overhead,
 		},
 	}
 }

@@ -21,8 +21,9 @@ import (
 	"strconv"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	cloudvolume "k8s.io/cloud-provider/volume"
 )
@@ -40,9 +41,14 @@ const (
 	// "projects/{projectName}/zones/{zoneName}/disks/{diskName}"
 	volIDZonalFmt = "projects/%s/zones/%s/disks/%s"
 	// "projects/{projectName}/regions/{regionName}/disks/{diskName}"
-	volIDRegionalFmt   = "projects/%s/regions/%s/disks/%s"
-	volIDDiskNameValue = 5
-	volIDTotalElements = 6
+	volIDRegionalFmt      = "projects/%s/regions/%s/disks/%s"
+	volIDProjectValue     = 1
+	volIDRegionalityValue = 2
+	volIDZoneValue        = 3
+	volIDDiskNameValue    = 5
+	volIDTotalElements    = 6
+
+	nodeIDFmt = "projects/%s/zones/%s/instances/%s"
 
 	// UnspecifiedValue is used for an unknown zone string
 	UnspecifiedValue = "UNSPECIFIED"
@@ -141,19 +147,44 @@ func (g *gcePersistentDiskCSITranslator) TranslateInTreeStorageClassToCSI(sc *st
 // plugin never supported ReadWriteMany but also did not validate or enforce
 // this access mode for pre-provisioned volumes. The GCE PD CSI Driver validates
 // and enforces (fails) ReadWriteMany. Therefore we treat all in-tree
-// ReadWriteMany as ReadWriteOnce volumes to not break legacy volumes.
+// ReadWriteMany as ReadWriteOnce volumes to not break legacy volumes. It also
+// takes [ReadWriteOnce, ReadOnlyMany] and makes it ReadWriteOnce. This is
+// because the in-tree plugin does not enforce access modes and just attaches
+// the disk in ReadWriteOnce mode; however, the CSI external-attacher will fail
+// this combination because technically [ReadWriteOnce, ReadOnlyMany] is not
+// supportable on an attached volume
+// See: https://github.com/kubernetes-csi/external-attacher/issues/153
 func backwardCompatibleAccessModes(ams []v1.PersistentVolumeAccessMode) []v1.PersistentVolumeAccessMode {
 	if ams == nil {
 		return nil
 	}
-	newAM := []v1.PersistentVolumeAccessMode{}
+
+	s := map[v1.PersistentVolumeAccessMode]bool{}
+	var newAM []v1.PersistentVolumeAccessMode
+
 	for _, am := range ams {
 		if am == v1.ReadWriteMany {
-			newAM = append(newAM, v1.ReadWriteOnce)
+			// ReadWriteMany is unsupported in CSI, but in-tree did no
+			// validation and treated it as ReadWriteOnce
+			s[v1.ReadWriteOnce] = true
 		} else {
-			newAM = append(newAM, am)
+			s[am] = true
 		}
 	}
+
+	switch {
+	case s[v1.ReadOnlyMany] && s[v1.ReadWriteOnce]:
+		// ROX,RWO is unsupported in CSI, but in-tree did not validation and
+		// treated it as ReadWriteOnce
+		newAM = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
+	case s[v1.ReadWriteOnce]:
+		newAM = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
+	case s[v1.ReadOnlyMany]:
+		newAM = []v1.PersistentVolumeAccessMode{v1.ReadOnlyMany}
+	default:
+		newAM = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
+	}
+
 	return newAM
 }
 
@@ -172,6 +203,10 @@ func (g *gcePersistentDiskCSITranslator) TranslateInTreeInlineVolumeToCSI(volume
 	}
 
 	pv := &v1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			// A.K.A InnerVolumeSpecName required to match for Unmount
+			Name: volume.Name,
+		},
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				CSI: &v1.CSIPersistentVolumeSource{
@@ -298,10 +333,53 @@ func (g *gcePersistentDiskCSITranslator) GetCSIPluginName() string {
 	return GCEPDDriverName
 }
 
+// RepairVolumeHandle returns a fully specified volume handle by inferring
+// project, zone/region from the node ID if the volume handle has UNSPECIFIED
+// sections
+func (g *gcePersistentDiskCSITranslator) RepairVolumeHandle(volumeHandle, nodeID string) (string, error) {
+	var err error
+	tok := strings.Split(volumeHandle, "/")
+	if len(tok) < volIDTotalElements {
+		return "", fmt.Errorf("volume handle has wrong number of elements; got %v, wanted %v or more", len(tok), volIDTotalElements)
+	}
+	if tok[volIDProjectValue] != UnspecifiedValue {
+		return volumeHandle, nil
+	}
+
+	nodeTok := strings.Split(nodeID, "/")
+	if len(nodeTok) < volIDTotalElements {
+		return "", fmt.Errorf("node handle has wrong number of elements; got %v, wanted %v or more", len(nodeTok), volIDTotalElements)
+	}
+
+	switch tok[volIDRegionalityValue] {
+	case "zones":
+		zone := ""
+		if tok[volIDZoneValue] == UnspecifiedValue {
+			zone = nodeTok[volIDZoneValue]
+		} else {
+			zone = tok[volIDZoneValue]
+		}
+		return fmt.Sprintf(volIDZonalFmt, nodeTok[volIDProjectValue], zone, tok[volIDDiskNameValue]), nil
+	case "regions":
+		region := ""
+		if tok[volIDZoneValue] == UnspecifiedValue {
+			region, err = getRegionFromZones([]string{nodeTok[volIDZoneValue]})
+			if err != nil {
+				return "", fmt.Errorf("failed to get region from zone %s: %v", nodeTok[volIDZoneValue], err)
+			}
+		} else {
+			region = tok[volIDZoneValue]
+		}
+		return fmt.Sprintf(volIDRegionalFmt, nodeTok[volIDProjectValue], region, tok[volIDDiskNameValue]), nil
+	default:
+		return "", fmt.Errorf("expected volume handle to have zones or regions regionality value, got: %s", tok[volIDRegionalityValue])
+	}
+}
+
 func pdNameFromVolumeID(id string) (string, error) {
 	splitID := strings.Split(id, "/")
-	if len(splitID) != volIDTotalElements {
-		return "", fmt.Errorf("failed to get id components. Expected projects/{project}/zones/{zone}/disks/{name}. Got: %s", id)
+	if len(splitID) < volIDTotalElements {
+		return "", fmt.Errorf("failed to get id components.Got: %v, wanted %v components or more. ", len(splitID), volIDTotalElements)
 	}
 	return splitID[volIDDiskNameValue], nil
 }

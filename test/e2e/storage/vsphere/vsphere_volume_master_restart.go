@@ -27,6 +27,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -62,7 +64,8 @@ var _ = utils.SIGDescribe("Volume Attach Verify [Feature:vsphere][Serial][Disrup
 		namespace = f.Namespace.Name
 		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(client, framework.TestContext.NodeSchedulableTimeout))
 
-		nodes := framework.GetReadySchedulableNodesOrDie(client)
+		nodes, err := e2enode.GetReadySchedulableNodes(client)
+		framework.ExpectNoError(err)
 		numNodes = len(nodes.Items)
 		if numNodes < 2 {
 			framework.Skipf("Requires at least %d nodes (not %d)", 2, len(nodes.Items))
@@ -80,6 +83,8 @@ var _ = utils.SIGDescribe("Volume Attach Verify [Feature:vsphere][Serial][Disrup
 	})
 
 	ginkgo.It("verify volume remains attached after master kubelet restart", func() {
+		framework.SkipUnlessSSHKeyPresent()
+
 		// Create pod on each node
 		for i := 0; i < numNodes; i++ {
 			ginkgo.By(fmt.Sprintf("%d: Creating a test vsphere volume", i))
@@ -91,10 +96,10 @@ var _ = utils.SIGDescribe("Volume Attach Verify [Feature:vsphere][Serial][Disrup
 			podspec := getVSpherePodSpecWithVolumePaths([]string{volumePath}, nodeKeyValueLabelList[i], nil)
 			pod, err := client.CoreV1().Pods(namespace).Create(podspec)
 			framework.ExpectNoError(err)
-			defer framework.DeletePodWithWait(f, client, pod)
+			defer e2epod.DeletePodWithWait(client, pod)
 
 			ginkgo.By("Waiting for pod to be ready")
-			gomega.Expect(framework.WaitForPodNameRunningInNamespace(client, pod.Name, namespace)).To(gomega.Succeed())
+			gomega.Expect(e2epod.WaitForPodNameRunningInNamespace(client, pod.Name, namespace)).To(gomega.Succeed())
 
 			pod, err = client.CoreV1().Pods(namespace).Get(pod.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
@@ -123,7 +128,7 @@ var _ = utils.SIGDescribe("Volume Attach Verify [Feature:vsphere][Serial][Disrup
 			expectVolumeToBeAttached(nodeName, volumePath)
 
 			ginkgo.By(fmt.Sprintf("Deleting pod on node %s", nodeName))
-			err = framework.DeletePodWithWait(f, client, pod)
+			err = e2epod.DeletePodWithWait(client, pod)
 			framework.ExpectNoError(err)
 
 			ginkgo.By(fmt.Sprintf("Waiting for volume %s to be detached from the node %s", volumePath, nodeName))

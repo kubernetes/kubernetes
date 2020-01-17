@@ -40,9 +40,9 @@ import (
 	"k8s.io/kubernetes/test/e2e_node/system"
 
 	"github.com/pborman/uuid"
-	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	compute "google.golang.org/api/compute/v0.beta"
+	"google.golang.org/api/option"
 	"k8s.io/klog"
 	"sigs.k8s.io/yaml"
 )
@@ -56,6 +56,7 @@ var imageConfigFile = flag.String("image-config-file", "", "yaml file describing
 var imageConfigDir = flag.String("image-config-dir", "", "(optional)path to image config files")
 var imageProject = flag.String("image-project", "", "gce project the hosts live in")
 var images = flag.String("images", "", "images to test")
+var preemptibleInstances = flag.Bool("preemptible-instances", false, "If true, gce instances will be configured to be preemptible")
 var hosts = flag.String("hosts", "", "hosts to test")
 var cleanup = flag.Bool("cleanup", true, "If true remove files from remote hosts and delete temporary instances")
 var deleteInstances = flag.Bool("delete-instances", true, "If true, delete any instances created")
@@ -599,14 +600,15 @@ func createInstance(imageConfig *internalGCEImage) (string, error) {
 		},
 	}
 
+	scheduling := compute.Scheduling{
+		Preemptible: *preemptibleInstances,
+	}
 	for _, accelerator := range imageConfig.resources.Accelerators {
 		if i.GuestAccelerators == nil {
 			autoRestart := true
 			i.GuestAccelerators = []*compute.AcceleratorConfig{}
-			i.Scheduling = &compute.Scheduling{
-				OnHostMaintenance: "TERMINATE",
-				AutomaticRestart:  &autoRestart,
-			}
+			scheduling.OnHostMaintenance = "TERMINATE"
+			scheduling.AutomaticRestart = &autoRestart
 		}
 		aType := fmt.Sprintf(acceleratorTypeResourceFormat, *project, *zone, accelerator.Type)
 		ac := &compute.AcceleratorConfig{
@@ -615,7 +617,7 @@ func createInstance(imageConfig *internalGCEImage) (string, error) {
 		}
 		i.GuestAccelerators = append(i.GuestAccelerators, ac)
 	}
-
+	i.Scheduling = &scheduling
 	i.Metadata = imageConfig.metadata
 	if _, err := computeService.Instances.Get(*project, *zone, i.Name).Do(); err != nil {
 		op, err := computeService.Instances.Insert(*project, *zone, i).Do()
@@ -724,12 +726,12 @@ func getComputeClient() (*compute.Service, error) {
 		}
 
 		var client *http.Client
-		client, err = google.DefaultClient(oauth2.NoContext, compute.ComputeScope)
+		client, err = google.DefaultClient(context.Background(), compute.ComputeScope)
 		if err != nil {
 			continue
 		}
 
-		cs, err = compute.New(client)
+		cs, err = compute.NewService(context.Background(), option.WithHTTPClient(client))
 		if err != nil {
 			continue
 		}

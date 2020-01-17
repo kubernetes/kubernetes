@@ -29,9 +29,9 @@ package v2alpha1
 // AUTO-GENERATED FUNCTIONS START HERE. DO NOT EDIT.
 var map_CronJob = map[string]string{
 	"":         "CronJob represents the configuration of a single cron job.",
-	"metadata": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata",
-	"spec":     "Specification of the desired behavior of a cron job, including the schedule. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status",
-	"status":   "Current status of a cron job. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status",
+	"metadata": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"spec":     "Specification of the desired behavior of a cron job, including the schedule. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
+	"status":   "Current status of a cron job. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
 }
 
 func (CronJob) SwaggerDoc() map[string]string {
@@ -40,7 +40,7 @@ func (CronJob) SwaggerDoc() map[string]string {
 
 var map_CronJobList = map[string]string{
 	"":         "CronJobList is a collection of cron jobs.",
-	"metadata": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata",
+	"metadata": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 	"items":    "items is the list of CronJobs.",
 }
 
@@ -75,8 +75,8 @@ func (CronJobStatus) SwaggerDoc() map[string]string {
 
 var map_JobTemplate = map[string]string{
 	"":         "JobTemplate describes a template for creating copies of a predefined pod.",
-	"metadata": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata",
-	"template": "Defines jobs that will be created from this template. https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status",
+	"metadata": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"template": "Defines jobs that will be created from this template. https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
 }
 
 func (JobTemplate) SwaggerDoc() map[string]string {
@@ -85,8 +85,8 @@ func (JobTemplate) SwaggerDoc() map[string]string {
 
 var map_JobTemplateSpec = map[string]string{
 	"":         "JobTemplateSpec describes the data a Job should have when created from a template",
-	"metadata": "Standard object's metadata of the jobs created from this template. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata",
-	"spec":     "Specification of the desired behavior of the job. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status",
+	"metadata": "Standard object's metadata of the jobs created from this template. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"spec":     "Specification of the desired behavior of the job. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
 }
 
 func (JobTemplateSpec) SwaggerDoc() map[string]string {

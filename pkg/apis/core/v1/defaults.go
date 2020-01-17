@@ -24,6 +24,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/parsers"
 	utilpointer "k8s.io/utils/pointer"
+
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
+	utilnet "k8s.io/utils/net"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
@@ -128,6 +132,33 @@ func SetDefaults_Service(obj *v1.Service) {
 		obj.Spec.ExternalTrafficPolicy == "" {
 		obj.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeCluster
 	}
+
+	// if dualstack feature gate is on then we need to default
+	// Spec.IPFamily correctly. This is to cover the case
+	// when an existing cluster have been converted to dualstack
+	// i.e. it already contain services with Spec.IPFamily==nil
+	if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) &&
+		obj.Spec.Type != v1.ServiceTypeExternalName &&
+		obj.Spec.ClusterIP != "" && /*has an ip already set*/
+		obj.Spec.ClusterIP != "None" && /* not converting from ExternalName to other */
+		obj.Spec.IPFamily == nil /* family was not previously set */ {
+
+		// there is a change that the ClusterIP (set by user) is unparsable.
+		// in this case, the family will be set mistakenly to ipv4 (because
+		// the util function does not parse errors *sigh*). The error
+		// will be caught in validation which asserts the validity of the
+		// IP and the service object will not be persisted with the wrong IP
+		// family
+
+		ipv6 := v1.IPv6Protocol
+		ipv4 := v1.IPv4Protocol
+		if utilnet.IsIPv6String(obj.Spec.ClusterIP) {
+			obj.Spec.IPFamily = &ipv6
+		} else {
+			obj.Spec.IPFamily = &ipv4
+		}
+	}
+
 }
 func SetDefaults_Pod(obj *v1.Pod) {
 	// If limits are specified, but requests are not, default requests to limits
@@ -141,7 +172,7 @@ func SetDefaults_Pod(obj *v1.Pod) {
 			}
 			for key, value := range obj.Spec.Containers[i].Resources.Limits {
 				if _, exists := obj.Spec.Containers[i].Resources.Requests[key]; !exists {
-					obj.Spec.Containers[i].Resources.Requests[key] = *(value.Copy())
+					obj.Spec.Containers[i].Resources.Requests[key] = value.DeepCopy()
 				}
 			}
 		}
@@ -153,7 +184,7 @@ func SetDefaults_Pod(obj *v1.Pod) {
 			}
 			for key, value := range obj.Spec.InitContainers[i].Resources.Limits {
 				if _, exists := obj.Spec.InitContainers[i].Resources.Requests[key]; !exists {
-					obj.Spec.InitContainers[i].Resources.Requests[key] = *(value.Copy())
+					obj.Spec.InitContainers[i].Resources.Requests[key] = value.DeepCopy()
 				}
 			}
 		}
@@ -315,7 +346,7 @@ func SetDefaults_NodeStatus(obj *v1.NodeStatus) {
 	if obj.Allocatable == nil && obj.Capacity != nil {
 		obj.Allocatable = make(v1.ResourceList, len(obj.Capacity))
 		for key, value := range obj.Capacity {
-			obj.Allocatable[key] = *(value.Copy())
+			obj.Allocatable[key] = value.DeepCopy()
 		}
 		obj.Allocatable = obj.Capacity
 	}
@@ -339,19 +370,19 @@ func SetDefaults_LimitRangeItem(obj *v1.LimitRangeItem) {
 		// If a default limit is unspecified, but the max is specified, default the limit to the max
 		for key, value := range obj.Max {
 			if _, exists := obj.Default[key]; !exists {
-				obj.Default[key] = *(value.Copy())
+				obj.Default[key] = value.DeepCopy()
 			}
 		}
 		// If a default limit is specified, but the default request is not, default request to limit
 		for key, value := range obj.Default {
 			if _, exists := obj.DefaultRequest[key]; !exists {
-				obj.DefaultRequest[key] = *(value.Copy())
+				obj.DefaultRequest[key] = value.DeepCopy()
 			}
 		}
 		// If a default request is not specified, but the min is provided, default request to the min
 		for key, value := range obj.Min {
 			if _, exists := obj.DefaultRequest[key]; !exists {
-				obj.DefaultRequest[key] = *(value.Copy())
+				obj.DefaultRequest[key] = value.DeepCopy()
 			}
 		}
 	}
@@ -419,12 +450,5 @@ func SetDefaults_HostPathVolumeSource(obj *v1.HostPathVolumeSource) {
 	typeVol := v1.HostPathUnset
 	if obj.Type == nil {
 		obj.Type = &typeVol
-	}
-}
-
-func SetDefaults_SecurityContext(obj *v1.SecurityContext) {
-	if obj.ProcMount == nil {
-		defProcMount := v1.DefaultProcMount
-		obj.ProcMount = &defProcMount
 	}
 }

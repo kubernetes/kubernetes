@@ -19,16 +19,14 @@ package node
 import (
 	"time"
 
-	batch "k8s.io/api/batch/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/util/slice"
 	"k8s.io/kubernetes/test/e2e/framework"
 	jobutil "k8s.io/kubernetes/test/e2e/framework/job"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 )
 
 const dummyFinalizer = "k8s.io/dummy-finalizer"
@@ -41,12 +39,12 @@ var _ = framework.KubeDescribe("[Feature:TTLAfterFinished][NodeAlphaFeature:TTLA
 	})
 })
 
-func cleanupJob(f *framework.Framework, job *batch.Job) {
+func cleanupJob(f *framework.Framework, job *batchv1.Job) {
 	ns := f.Namespace.Name
 	c := f.ClientSet
 
-	e2elog.Logf("Remove the Job's dummy finalizer; the Job should be deleted cascadingly")
-	removeFinalizerFunc := func(j *batch.Job) {
+	framework.Logf("Remove the Job's dummy finalizer; the Job should be deleted cascadingly")
+	removeFinalizerFunc := func(j *batchv1.Job) {
 		j.ObjectMeta.Finalizers = slice.RemoveString(j.ObjectMeta.Finalizers, dummyFinalizer, nil)
 	}
 	_, err := jobutil.UpdateJobWithRetries(c, ns, job.Name, removeFinalizerFunc)
@@ -71,28 +69,28 @@ func testFinishedJob(f *framework.Framework) {
 	job.ObjectMeta.Finalizers = []string{dummyFinalizer}
 	defer cleanupJob(f, job)
 
-	e2elog.Logf("Create a Job %s/%s with TTL", ns, job.Name)
+	framework.Logf("Create a Job %s/%s with TTL", ns, job.Name)
 	job, err := jobutil.CreateJob(c, ns, job)
 	framework.ExpectNoError(err)
 
-	e2elog.Logf("Wait for the Job to finish")
+	framework.Logf("Wait for the Job to finish")
 	err = jobutil.WaitForJobFinish(c, ns, job.Name)
 	framework.ExpectNoError(err)
 
-	e2elog.Logf("Wait for TTL after finished controller to delete the Job")
+	framework.Logf("Wait for TTL after finished controller to delete the Job")
 	err = jobutil.WaitForJobDeleting(c, ns, job.Name)
 	framework.ExpectNoError(err)
 
-	e2elog.Logf("Check Job's deletionTimestamp and compare with the time when the Job finished")
+	framework.Logf("Check Job's deletionTimestamp and compare with the time when the Job finished")
 	job, err = jobutil.GetJob(c, ns, job.Name)
 	framework.ExpectNoError(err)
 	finishTime := jobutil.FinishTime(job)
 	finishTimeUTC := finishTime.UTC()
-	gomega.Expect(finishTime.IsZero()).NotTo(gomega.BeTrue())
+	framework.ExpectNotEqual(finishTime.IsZero(), true)
 
 	deleteAtUTC := job.ObjectMeta.DeletionTimestamp.UTC()
-	gomega.Expect(deleteAtUTC).NotTo(gomega.BeNil())
+	framework.ExpectNotEqual(deleteAtUTC, nil)
 
 	expireAtUTC := finishTimeUTC.Add(time.Duration(ttl) * time.Second)
-	gomega.Expect(deleteAtUTC.Before(expireAtUTC)).To(gomega.BeFalse())
+	framework.ExpectEqual(deleteAtUTC.Before(expireAtUTC), false)
 }

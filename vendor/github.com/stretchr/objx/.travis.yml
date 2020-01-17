@@ -1,8 +1,14 @@
 language: go
 go:
-  - 1.8
-  - 1.9
-  - tip
+  - "1.10.x"
+  - "1.11.x"
+  - "1.12.x"
+  - master
+
+matrix:
+  allow_failures:
+    - go: master
+fast_finish: true
 
 env:
   global:
@@ -14,12 +20,11 @@ before_script:
   - ./cc-test-reporter before-build
 
 install:
-- go get github.com/go-task/task/cmd/task
+  - curl -sL https://taskfile.dev/install.sh | sh
 
 script:
-- task dl-deps
-- task lint
-- task test-coverage
+  - diff -u <(echo -n) <(./bin/task lint)
+  - ./bin/task test-coverage
 
 after_script:
   - ./cc-test-reporter after-build --exit-code $TRAVIS_TEST_RESULT

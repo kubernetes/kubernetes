@@ -11,7 +11,6 @@ import "unsafe"
 const wordSize = int(unsafe.Sizeof(uintptr(0)))
 
 func maskBytes(key [4]byte, pos int, b []byte) int {
-
 	// Mask one byte at a time for small buffers.
 	if len(b) < 2*wordSize {
 		for i := range b {

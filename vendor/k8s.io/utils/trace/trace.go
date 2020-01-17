@@ -25,31 +25,55 @@ import (
 	"k8s.io/klog"
 )
 
+// Field is a key value pair that provides additional details about the trace.
+type Field struct {
+	Key   string
+	Value interface{}
+}
+
+func (f Field) format() string {
+	return fmt.Sprintf("%s:%v", f.Key, f.Value)
+}
+
+func writeFields(b *bytes.Buffer, l []Field) {
+	for i, f := range l {
+		b.WriteString(f.format())
+		if i < len(l)-1 {
+			b.WriteString(",")
+		}
+	}
+}
+
 type traceStep struct {
 	stepTime time.Time
 	msg      string
+	fields   []Field
 }
 
 // Trace keeps track of a set of "steps" and allows us to log a specific
 // step if it took longer than its share of the total allowed time
 type Trace struct {
 	name      string
+	fields    []Field
 	startTime time.Time
 	steps     []traceStep
 }
 
-// New creates a Trace with the specified name
-func New(name string) *Trace {
-	return &Trace{name, time.Now(), nil}
+// New creates a Trace with the specified name. The name identifies the operation to be traced. The
+// Fields add key value pairs to provide additional details about the trace, such as operation inputs.
+func New(name string, fields ...Field) *Trace {
+	return &Trace{name: name, startTime: time.Now(), fields: fields}
 }
 
-// Step adds a new step with a specific message
-func (t *Trace) Step(msg string) {
+// Step adds a new step with a specific message. Call this at the end of an execution step to record
+// how long it took. The Fields add key value pairs to provide additional details about the trace
+// step.
+func (t *Trace) Step(msg string, fields ...Field) {
 	if t.steps == nil {
 		// traces almost always have less than 6 steps, do this to avoid more than a single allocation
 		t.steps = make([]traceStep, 0, 6)
 	}
-	t.steps = append(t.steps, traceStep{time.Now(), msg})
+	t.steps = append(t.steps, traceStep{stepTime: time.Now(), msg: msg, fields: fields})
 }
 
 // Log is used to dump all the steps in the Trace
@@ -64,12 +88,23 @@ func (t *Trace) logWithStepThreshold(stepThreshold time.Duration) {
 	endTime := time.Now()
 
 	totalTime := endTime.Sub(t.startTime)
-	buffer.WriteString(fmt.Sprintf("Trace[%d]: %q (started: %v) (total time: %v):\n", tracenum, t.name, t.startTime, totalTime))
+	buffer.WriteString(fmt.Sprintf("Trace[%d]: %q ", tracenum, t.name))
+	if len(t.fields) > 0 {
+		writeFields(&buffer, t.fields)
+		buffer.WriteString(" ")
+	}
+	buffer.WriteString(fmt.Sprintf("(started: %v) (total time: %v):\n", t.startTime, totalTime))
 	lastStepTime := t.startTime
 	for _, step := range t.steps {
 		stepDuration := step.stepTime.Sub(lastStepTime)
 		if stepThreshold == 0 || stepDuration > stepThreshold || klog.V(4) {
-			buffer.WriteString(fmt.Sprintf("Trace[%d]: [%v] [%v] %v\n", tracenum, step.stepTime.Sub(t.startTime), stepDuration, step.msg))
+			buffer.WriteString(fmt.Sprintf("Trace[%d]: [%v] [%v] ", tracenum, step.stepTime.Sub(t.startTime), stepDuration))
+			buffer.WriteString(step.msg)
+			if len(step.fields) > 0 {
+				buffer.WriteString(" ")
+				writeFields(&buffer, step.fields)
+			}
+			buffer.WriteString("\n")
 		}
 		lastStepTime = step.stepTime
 	}

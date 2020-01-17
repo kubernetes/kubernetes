@@ -161,8 +161,5 @@ func (i *Info) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &i.InfoProps); err != nil {
 		return err
 	}
-	if err := json.Unmarshal(data, &i.VendorExtensible); err != nil {
-		return err
-	}
-	return nil
+	return json.Unmarshal(data, &i.VendorExtensible)
 }

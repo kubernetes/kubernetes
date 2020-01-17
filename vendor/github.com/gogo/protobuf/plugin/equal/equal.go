@@ -107,10 +107,7 @@ given to the equal plugin, will generate the following code:
 
 	func (this *B) Equal(that interface{}) bool {
 		if that == nil {
-			if this == nil {
-				return true
-			}
-			return false
+			return this == nil
 		}
 
 		that1, ok := that.(*B)
@@ -118,10 +115,7 @@ given to the equal plugin, will generate the following code:
 			return false
 		}
 		if that1 == nil {
-			if this == nil {
-				return true
-			}
-			return false
+			return this == nil
 		} else if this == nil {
 			return false
 		}
@@ -236,19 +230,15 @@ func (p *plugin) generateNullableField(fieldname string, verbose bool) {
 func (p *plugin) generateMsgNullAndTypeCheck(ccTypeName string, verbose bool) {
 	p.P(`if that == nil {`)
 	p.In()
-	p.P(`if this == nil {`)
-	p.In()
 	if verbose {
+		p.P(`if this == nil {`)
+		p.In()
 		p.P(`return nil`)
-	} else {
-		p.P(`return true`)
-	}
-	p.Out()
-	p.P(`}`)
-	if verbose {
+		p.Out()
+		p.P(`}`)
 		p.P(`return `, p.fmtPkg.Use(), `.Errorf("that == nil && this != nil")`)
 	} else {
-		p.P(`return false`)
+		p.P(`return this == nil`)
 	}
 	p.Out()
 	p.P(`}`)
@@ -274,19 +264,15 @@ func (p *plugin) generateMsgNullAndTypeCheck(ccTypeName string, verbose bool) {
 	p.P(`}`)
 	p.P(`if that1 == nil {`)
 	p.In()
-	p.P(`if this == nil {`)
-	p.In()
 	if verbose {
+		p.P(`if this == nil {`)
+		p.In()
 		p.P(`return nil`)
-	} else {
-		p.P(`return true`)
-	}
-	p.Out()
-	p.P(`}`)
-	if verbose {
+		p.Out()
+		p.P(`}`)
 		p.P(`return `, p.fmtPkg.Use(), `.Errorf("that is type *`, ccTypeName, ` but is nil && this != nil")`)
 	} else {
-		p.P(`return false`)
+		p.P(`return this == nil`)
 	}
 	p.Out()
 	p.P(`} else if this == nil {`)
@@ -306,7 +292,16 @@ func (p *plugin) generateField(file *generator.FileDescriptor, message *generato
 	repeated := field.IsRepeated()
 	ctype := gogoproto.IsCustomType(field)
 	nullable := gogoproto.IsNullable(field)
-	isDuration := gogoproto.IsStdDuration(field)
+	isNormal := (gogoproto.IsStdDuration(field) ||
+		gogoproto.IsStdDouble(field) ||
+		gogoproto.IsStdFloat(field) ||
+		gogoproto.IsStdInt64(field) ||
+		gogoproto.IsStdUInt64(field) ||
+		gogoproto.IsStdInt32(field) ||
+		gogoproto.IsStdUInt32(field) ||
+		gogoproto.IsStdBool(field) ||
+		gogoproto.IsStdString(field))
+	isBytes := gogoproto.IsStdBytes(field)
 	isTimestamp := gogoproto.IsStdTime(field)
 	// oneof := field.OneofIndex != nil
 	if !repeated {
@@ -336,11 +331,37 @@ func (p *plugin) generateField(file *generator.FileDescriptor, message *generato
 			}
 			p.Out()
 			p.P(`}`)
-		} else if isDuration {
+		} else if isNormal {
 			if nullable {
 				p.generateNullableField(fieldname, verbose)
 			} else {
 				p.P(`if this.`, fieldname, ` != that1.`, fieldname, `{`)
+			}
+			p.In()
+			if verbose {
+				p.P(`return `, p.fmtPkg.Use(), `.Errorf("`, fieldname, ` this(%v) Not Equal that(%v)", this.`, fieldname, `, that1.`, fieldname, `)`)
+			} else {
+				p.P(`return false`)
+			}
+			p.Out()
+			p.P(`}`)
+		} else if isBytes {
+			if nullable {
+				p.P(`if that1.`, fieldname, ` == nil {`)
+				p.In()
+				p.P(`if this.`, fieldname, ` != nil {`)
+				p.In()
+				if verbose {
+					p.P(`return `, p.fmtPkg.Use(), `.Errorf("this.`, fieldname, ` != nil && that1.`, fieldname, ` == nil")`)
+				} else {
+					p.P(`return false`)
+				}
+				p.Out()
+				p.P(`}`)
+				p.Out()
+				p.P(`} else if !`, p.bytesPkg.Use(), `.Equal(*this.`, fieldname, `, *that1.`, fieldname, `) {`)
+			} else {
+				p.P(`if !`, p.bytesPkg.Use(), `.Equal(this.`, fieldname, `, that1.`, fieldname, `) {`)
 			}
 			p.In()
 			if verbose {
@@ -401,11 +422,17 @@ func (p *plugin) generateField(file *generator.FileDescriptor, message *generato
 			} else {
 				p.P(`if !this.`, fieldname, `[i].Equal(that1.`, fieldname, `[i]) {`)
 			}
-		} else if isDuration {
+		} else if isNormal {
 			if nullable {
 				p.P(`if dthis, dthat := this.`, fieldname, `[i], that1.`, fieldname, `[i]; (dthis != nil && dthat != nil && *dthis != *dthat) || (dthis != nil && dthat == nil) || (dthis == nil && dthat != nil)  {`)
 			} else {
 				p.P(`if this.`, fieldname, `[i] != that1.`, fieldname, `[i] {`)
+			}
+		} else if isBytes {
+			if nullable {
+				p.P(`if !`, p.bytesPkg.Use(), `.Equal(*this.`, fieldname, `[i], *that1.`, fieldname, `[i]) {`)
+			} else {
+				p.P(`if !`, p.bytesPkg.Use(), `.Equal(this.`, fieldname, `[i], that1.`, fieldname, `[i]) {`)
 			}
 		} else {
 			if p.IsMap(field) {
@@ -415,6 +442,16 @@ func (p *plugin) generateField(file *generator.FileDescriptor, message *generato
 				nullable, valuegoTyp, valuegoAliasTyp = generator.GoMapValueTypes(field, m.ValueField, valuegoTyp, valuegoAliasTyp)
 
 				mapValue := m.ValueAliasField
+				mapValueNormal := (gogoproto.IsStdDuration(mapValue) ||
+					gogoproto.IsStdDouble(mapValue) ||
+					gogoproto.IsStdFloat(mapValue) ||
+					gogoproto.IsStdInt64(mapValue) ||
+					gogoproto.IsStdUInt64(mapValue) ||
+					gogoproto.IsStdInt32(mapValue) ||
+					gogoproto.IsStdUInt32(mapValue) ||
+					gogoproto.IsStdBool(mapValue) ||
+					gogoproto.IsStdString(mapValue))
+				mapValueBytes := gogoproto.IsStdBytes(mapValue)
 				if mapValue.IsMessage() || p.IsGroup(mapValue) {
 					if nullable && valuegoTyp == valuegoAliasTyp {
 						p.P(`if !this.`, fieldname, `[i].Equal(that1.`, fieldname, `[i]) {`)
@@ -422,14 +459,26 @@ func (p *plugin) generateField(file *generator.FileDescriptor, message *generato
 						// Equal() has a pointer receiver, but map value is a value type
 						a := `this.` + fieldname + `[i]`
 						b := `that1.` + fieldname + `[i]`
-						if valuegoTyp != valuegoAliasTyp {
+						if !mapValueNormal && !mapValueBytes && valuegoTyp != valuegoAliasTyp {
 							// cast back to the type that has the generated methods on it
 							a = `(` + valuegoTyp + `)(` + a + `)`
 							b = `(` + valuegoTyp + `)(` + b + `)`
 						}
 						p.P(`a := `, a)
 						p.P(`b := `, b)
-						if nullable {
+						if mapValueNormal {
+							if nullable {
+								p.P(`if *a != *b {`)
+							} else {
+								p.P(`if a != b {`)
+							}
+						} else if mapValueBytes {
+							if nullable {
+								p.P(`if !`, p.bytesPkg.Use(), `.Equal(*a, *b) {`)
+							} else {
+								p.P(`if !`, p.bytesPkg.Use(), `.Equal(a, b) {`)
+							}
+						} else if nullable {
 							p.P(`if !a.Equal(b) {`)
 						} else {
 							p.P(`if !(&a).Equal(&b) {`)

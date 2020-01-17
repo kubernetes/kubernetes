@@ -21,9 +21,10 @@ import (
 	"testing"
 	"time"
 
+	"net/http"
+
 	"k8s.io/apimachinery/pkg/util/clock"
 	rl "k8s.io/client-go/tools/leaderelection/resourcelock"
-	"net/http"
 )
 
 type fakeLock struct {
@@ -31,8 +32,8 @@ type fakeLock struct {
 }
 
 // Get is a dummy to allow us to have a fakeLock for testing.
-func (fl *fakeLock) Get() (ler *rl.LeaderElectionRecord, err error) {
-	return nil, nil
+func (fl *fakeLock) Get() (ler *rl.LeaderElectionRecord, rawRecord []byte, err error) {
+	return nil, nil, nil
 }
 
 // Create is a dummy to allow us to have a fakeLock for testing.
@@ -76,7 +77,7 @@ func TestLeaderElectionHealthChecker(t *testing.T) {
 			elector:        nil,
 		},
 		{
-			description:    "call check when the the lease is far expired",
+			description:    "call check when the lease is far expired",
 			expected:       fmt.Errorf("failed election to renew leadership on lease %s", "foo"),
 			adaptorTimeout: time.Second * 20,
 			elector: &LeaderElector{
@@ -93,7 +94,7 @@ func TestLeaderElectionHealthChecker(t *testing.T) {
 			},
 		},
 		{
-			description:    "call check when the the lease is far expired but held by another server",
+			description:    "call check when the lease is far expired but held by another server",
 			expected:       nil,
 			adaptorTimeout: time.Second * 20,
 			elector: &LeaderElector{
@@ -110,7 +111,7 @@ func TestLeaderElectionHealthChecker(t *testing.T) {
 			},
 		},
 		{
-			description:    "call check when the the lease is not expired",
+			description:    "call check when the lease is not expired",
 			expected:       nil,
 			adaptorTimeout: time.Second * 20,
 			elector: &LeaderElector{
@@ -127,7 +128,7 @@ func TestLeaderElectionHealthChecker(t *testing.T) {
 			},
 		},
 		{
-			description:    "call check when the the lease is expired but inside the timeout",
+			description:    "call check when the lease is expired but inside the timeout",
 			expected:       nil,
 			adaptorTimeout: time.Second * 20,
 			elector: &LeaderElector{

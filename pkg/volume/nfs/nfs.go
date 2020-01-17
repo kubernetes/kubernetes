@@ -32,7 +32,12 @@ import (
 	utilstrings "k8s.io/utils/strings"
 )
 
+func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
+	return host.GetPodVolumeDir(uid, utilstrings.EscapeQualifiedName(nfsPluginName), volName)
+}
+
 // ProbeVolumePlugins is the primary entrypoint for volume plugins.
+// This is the primary entrypoint for volume plugins.
 // The volumeConfig arg provides the ability to configure recycler behavior.  It is implemented as a pointer to allow nils.
 // The nfsPlugin is used to store the volumeConfig and give it, when needed, to the func that creates NFS Recyclers.
 // Tests that exercise recycling should not use this func but instead use ProbeRecyclablePlugins() to override default behavior.
@@ -120,10 +125,11 @@ func (plugin *nfsPlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod, moun
 
 	return &nfsMounter{
 		nfs: &nfs{
-			volName: spec.Name(),
-			mounter: mounter,
-			pod:     pod,
-			plugin:  plugin,
+			volName:         spec.Name(),
+			mounter:         mounter,
+			pod:             pod,
+			plugin:          plugin,
+			MetricsProvider: volume.NewMetricsStatFS(getPath(pod.UID, spec.Name(), plugin.host)),
 		},
 		server:       source.Server,
 		exportPath:   source.Path,
@@ -138,10 +144,11 @@ func (plugin *nfsPlugin) NewUnmounter(volName string, podUID types.UID) (volume.
 
 func (plugin *nfsPlugin) newUnmounterInternal(volName string, podUID types.UID, mounter mount.Interface) (volume.Unmounter, error) {
 	return &nfsUnmounter{&nfs{
-		volName: volName,
-		mounter: mounter,
-		pod:     &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: podUID}},
-		plugin:  plugin,
+		volName:         volName,
+		mounter:         mounter,
+		pod:             &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: podUID}},
+		plugin:          plugin,
+		MetricsProvider: volume.NewMetricsStatFS(getPath(podUID, volName, plugin.host)),
 	}}, nil
 }
 
@@ -184,7 +191,7 @@ type nfs struct {
 	pod     *v1.Pod
 	mounter mount.Interface
 	plugin  *nfsPlugin
-	volume.MetricsNil
+	volume.MetricsProvider
 }
 
 func (nfsVolume *nfs) GetPath() string {

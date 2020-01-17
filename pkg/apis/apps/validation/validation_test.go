@@ -26,8 +26,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 func TestValidateStatefulSet(t *testing.T) {
@@ -1776,6 +1779,8 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 }
 
 func TestValidateDaemonSet(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
+
 	validSelector := map[string]string{"a": "b"}
 	validPodTemplate := api.PodTemplate{
 		Template: api.PodTemplateSpec{
@@ -1946,6 +1951,26 @@ func TestValidateDaemonSet(t *testing.T) {
 				},
 			},
 		},
+		"template may not contain ephemeral containers": {
+			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+			Spec: apps.DaemonSetSpec{
+				Selector: &metav1.LabelSelector{MatchLabels: validSelector},
+				Template: api.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Labels: validSelector,
+					},
+					Spec: api.PodSpec{
+						RestartPolicy:       api.RestartPolicyAlways,
+						DNSPolicy:           api.DNSClusterFirst,
+						Containers:          []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
+						EphemeralContainers: []api.EphemeralContainer{{EphemeralContainerCommon: api.EphemeralContainerCommon{Name: "debug", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}}},
+					},
+				},
+				UpdateStrategy: apps.DaemonSetUpdateStrategy{
+					Type: apps.OnDeleteDaemonSetStrategyType,
+				},
+			},
+		},
 	}
 	for k, v := range errorCases {
 		errs := ValidateDaemonSet(&v)
@@ -2018,6 +2043,8 @@ func validDeployment() *apps.Deployment {
 }
 
 func TestValidateDeployment(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
+
 	successCases := []*apps.Deployment{
 		validDeployment(),
 	}
@@ -2102,6 +2129,17 @@ func TestValidateDeployment(t *testing.T) {
 	invalidProgressDeadlineDeployment.Spec.ProgressDeadlineSeconds = &seconds
 	invalidProgressDeadlineDeployment.Spec.MinReadySeconds = seconds
 	errorCases["must be greater than minReadySeconds"] = invalidProgressDeadlineDeployment
+
+	// Must not have ephemeral containers
+	invalidEphemeralContainersDeployment := validDeployment()
+	invalidEphemeralContainersDeployment.Spec.Template.Spec.EphemeralContainers = []api.EphemeralContainer{{
+		EphemeralContainerCommon: api.EphemeralContainerCommon{
+			Name:                     "ec",
+			Image:                    "image",
+			ImagePullPolicy:          "IfNotPresent",
+			TerminationMessagePolicy: "File"},
+	}}
+	errorCases["ephemeral containers not allowed"] = invalidEphemeralContainersDeployment
 
 	for k, v := range errorCases {
 		errs := ValidateDeployment(v)

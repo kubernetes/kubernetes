@@ -11,42 +11,83 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
+	"syscall"
 	"time"
 
 	units "github.com/docker/go-units"
+	"golang.org/x/sys/unix"
 )
 
 const (
-	cgroupNamePrefix = "name="
+	CgroupNamePrefix = "name="
 	CgroupProcesses  = "cgroup.procs"
 )
 
+var (
+	isUnifiedOnce sync.Once
+	isUnified     bool
+)
+
+// HugePageSizeUnitList is a list of the units used by the linux kernel when
+// naming the HugePage control files.
+// https://www.kernel.org/doc/Documentation/cgroup-v1/hugetlb.txt
+// TODO Since the kernel only use KB, MB and GB; TB and PB should be removed,
+// depends on https://github.com/docker/go-units/commit/a09cd47f892041a4fac473133d181f5aea6fa393
+var HugePageSizeUnitList = []string{"B", "KB", "MB", "GB", "TB", "PB"}
+
+// IsCgroup2UnifiedMode returns whether we are running in cgroup v2 unified mode.
+func IsCgroup2UnifiedMode() bool {
+	isUnifiedOnce.Do(func() {
+		var st syscall.Statfs_t
+		if err := syscall.Statfs("/sys/fs/cgroup", &st); err != nil {
+			panic("cannot statfs cgroup root")
+		}
+		isUnified = st.Type == unix.CGROUP2_SUPER_MAGIC
+	})
+	return isUnified
+}
+
 // https://www.kernel.org/doc/Documentation/cgroup-v1/cgroups.txt
-func FindCgroupMountpoint(subsystem string) (string, error) {
-	mnt, _, err := FindCgroupMountpointAndRoot(subsystem)
+func FindCgroupMountpoint(cgroupPath, subsystem string) (string, error) {
+	mnt, _, err := FindCgroupMountpointAndRoot(cgroupPath, subsystem)
 	return mnt, err
 }
 
-func FindCgroupMountpointAndRoot(subsystem string) (string, string, error) {
+func FindCgroupMountpointAndRoot(cgroupPath, subsystem string) (string, string, error) {
 	// We are not using mount.GetMounts() because it's super-inefficient,
 	// parsing it directly sped up x10 times because of not using Sscanf.
 	// It was one of two major performance drawbacks in container start.
 	if !isSubsystemAvailable(subsystem) {
 		return "", "", NewNotFoundError(subsystem)
 	}
+
 	f, err := os.Open("/proc/self/mountinfo")
 	if err != nil {
 		return "", "", err
 	}
 	defer f.Close()
 
-	scanner := bufio.NewScanner(f)
+	if IsCgroup2UnifiedMode() {
+		subsystem = ""
+	}
+
+	return findCgroupMountpointAndRootFromReader(f, cgroupPath, subsystem)
+}
+
+func findCgroupMountpointAndRootFromReader(reader io.Reader, cgroupPath, subsystem string) (string, string, error) {
+	scanner := bufio.NewScanner(reader)
 	for scanner.Scan() {
 		txt := scanner.Text()
-		fields := strings.Split(txt, " ")
-		for _, opt := range strings.Split(fields[len(fields)-1], ",") {
-			if opt == subsystem {
-				return fields[4], fields[3], nil
+		fields := strings.Fields(txt)
+		if len(fields) < 9 {
+			continue
+		}
+		if strings.HasPrefix(fields[4], cgroupPath) {
+			for _, opt := range strings.Split(fields[len(fields)-1], ",") {
+				if (subsystem == "" && fields[9] == "cgroup2") || opt == subsystem {
+					return fields[4], fields[3], nil
+				}
 			}
 		}
 	}
@@ -58,6 +99,19 @@ func FindCgroupMountpointAndRoot(subsystem string) (string, string, error) {
 }
 
 func isSubsystemAvailable(subsystem string) bool {
+	if IsCgroup2UnifiedMode() {
+		controllers, err := GetAllSubsystems()
+		if err != nil {
+			return false
+		}
+		for _, c := range controllers {
+			if c == subsystem {
+				return true
+			}
+		}
+		return false
+	}
+
 	cgroups, err := ParseCgroupFile("/proc/self/cgroup")
 	if err != nil {
 		return false
@@ -102,7 +156,7 @@ func FindCgroupMountpointDir() (string, error) {
 			return "", fmt.Errorf("Found no fields post '-' in %q", text)
 		}
 
-		if postSeparatorFields[0] == "cgroup" {
+		if postSeparatorFields[0] == "cgroup" || postSeparatorFields[0] == "cgroup2" {
 			// Check that the mount is properly formatted.
 			if numPostFields < 3 {
 				return "", fmt.Errorf("Error found less than 3 fields post '-' in %q", text)
@@ -156,8 +210,8 @@ func getCgroupMountsHelper(ss map[string]bool, mi io.Reader, all bool) ([]Mount,
 				continue
 			}
 			ss[opt] = true
-			if strings.HasPrefix(opt, cgroupNamePrefix) {
-				opt = opt[len(cgroupNamePrefix):]
+			if strings.HasPrefix(opt, CgroupNamePrefix) {
+				opt = opt[len(CgroupNamePrefix):]
 			}
 			m.Subsystems = append(m.Subsystems, opt)
 			numFound++
@@ -175,6 +229,19 @@ func getCgroupMountsHelper(ss map[string]bool, mi io.Reader, all bool) ([]Mount,
 // GetCgroupMounts returns the mounts for the cgroup subsystems.
 // all indicates whether to return just the first instance or all the mounts.
 func GetCgroupMounts(all bool) ([]Mount, error) {
+	if IsCgroup2UnifiedMode() {
+		availableControllers, err := GetAllSubsystems()
+		if err != nil {
+			return nil, err
+		}
+		m := Mount{
+			Mountpoint: "/sys/fs/cgroup",
+			Root:       "/sys/fs/cgroup",
+			Subsystems: availableControllers,
+		}
+		return []Mount{m}, nil
+	}
+
 	f, err := os.Open("/proc/self/mountinfo")
 	if err != nil {
 		return nil, err
@@ -257,7 +324,7 @@ func GetInitCgroupPath(subsystem string) (string, error) {
 }
 
 func getCgroupPathHelper(subsystem, cgroup string) (string, error) {
-	mnt, root, err := FindCgroupMountpointAndRoot(subsystem)
+	mnt, root, err := FindCgroupMountpointAndRoot("", subsystem)
 	if err != nil {
 		return "", err
 	}
@@ -338,12 +405,15 @@ func parseCgroupFromReader(r io.Reader) (map[string]string, error) {
 }
 
 func getControllerPath(subsystem string, cgroups map[string]string) (string, error) {
+	if IsCgroup2UnifiedMode() {
+		return "/", nil
+	}
 
 	if p, ok := cgroups[subsystem]; ok {
 		return p, nil
 	}
 
-	if p, ok := cgroups[cgroupNamePrefix+subsystem]; ok {
+	if p, ok := cgroups[CgroupNamePrefix+subsystem]; ok {
 		return p, nil
 	}
 
@@ -398,19 +468,26 @@ func RemovePaths(paths map[string]string) (err error) {
 }
 
 func GetHugePageSize() ([]string, error) {
-	var pageSizes []string
-	sizeList := []string{"B", "kB", "MB", "GB", "TB", "PB"}
 	files, err := ioutil.ReadDir("/sys/kernel/mm/hugepages")
 	if err != nil {
-		return pageSizes, err
+		return []string{}, err
 	}
+	var fileNames []string
 	for _, st := range files {
-		nameArray := strings.Split(st.Name(), "-")
+		fileNames = append(fileNames, st.Name())
+	}
+	return getHugePageSizeFromFilenames(fileNames)
+}
+
+func getHugePageSizeFromFilenames(fileNames []string) ([]string, error) {
+	var pageSizes []string
+	for _, fileName := range fileNames {
+		nameArray := strings.Split(fileName, "-")
 		pageSize, err := units.RAMInBytes(nameArray[1])
 		if err != nil {
 			return []string{}, err
 		}
-		sizeString := units.CustomSize("%g%s", float64(pageSize), 1024.0, sizeList)
+		sizeString := units.CustomSize("%g%s", float64(pageSize), 1024.0, HugePageSizeUnitList)
 		pageSizes = append(pageSizes, sizeString)
 	}
 
@@ -454,10 +531,39 @@ func WriteCgroupProc(dir string, pid int) error {
 	}
 
 	// Dont attach any pid to the cgroup if -1 is specified as a pid
-	if pid != -1 {
-		if err := ioutil.WriteFile(filepath.Join(dir, CgroupProcesses), []byte(strconv.Itoa(pid)), 0700); err != nil {
-			return fmt.Errorf("failed to write %v to %v: %v", pid, CgroupProcesses, err)
-		}
+	if pid == -1 {
+		return nil
 	}
-	return nil
+
+	cgroupProcessesFile, err := os.OpenFile(filepath.Join(dir, CgroupProcesses), os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0700)
+	if err != nil {
+		return fmt.Errorf("failed to write %v to %v: %v", pid, CgroupProcesses, err)
+	}
+	defer cgroupProcessesFile.Close()
+
+	for i := 0; i < 5; i++ {
+		_, err = cgroupProcessesFile.WriteString(strconv.Itoa(pid))
+		if err == nil {
+			return nil
+		}
+
+		// EINVAL might mean that the task being added to cgroup.procs is in state
+		// TASK_NEW. We should attempt to do so again.
+		if isEINVAL(err) {
+			time.Sleep(30 * time.Millisecond)
+			continue
+		}
+
+		return fmt.Errorf("failed to write %v to %v: %v", pid, CgroupProcesses, err)
+	}
+	return err
+}
+
+func isEINVAL(err error) bool {
+	switch err := err.(type) {
+	case *os.PathError:
+		return err.Err == unix.EINVAL
+	default:
+		return false
+	}
 }

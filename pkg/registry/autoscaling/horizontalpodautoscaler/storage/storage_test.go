@@ -33,11 +33,11 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	"k8s.io/apiserver/pkg/registry/rest"
-	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
+	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 )
 
-func newStorage(t *testing.T) (*REST, *StatusREST, *etcdtesting.EtcdTestServer) {
+func newStorage(t *testing.T) (*REST, *StatusREST, *etcd3testing.EtcdTestServer) {
 	etcdStorage, server := registrytest.NewEtcdStorage(t, autoscaling.GroupName)
 	restOptions := generic.RESTOptions{
 		StorageConfig:           etcdStorage,
@@ -45,7 +45,10 @@ func newStorage(t *testing.T) (*REST, *StatusREST, *etcdtesting.EtcdTestServer) 
 		DeleteCollectionWorkers: 1,
 		ResourcePrefix:          "horizontalpodautoscalers",
 	}
-	horizontalPodAutoscalerStorage, statusStorage := NewREST(restOptions)
+	horizontalPodAutoscalerStorage, statusStorage, err := NewREST(restOptions)
+	if err != nil {
+		t.Fatalf("unexpected error from REST storage: %v", err)
+	}
 	return horizontalPodAutoscalerStorage, statusStorage, server
 }
 

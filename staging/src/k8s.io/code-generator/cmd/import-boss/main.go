@@ -63,6 +63,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/spf13/pflag"
 	"k8s.io/code-generator/pkg/util"
 	"k8s.io/gengo/args"
 	"k8s.io/gengo/examples/import-boss/generators"
@@ -81,6 +82,7 @@ func main() {
 		"k8s.io/kubernetes/cmd/...",
 		"k8s.io/kubernetes/plugin/...",
 	}
+	pflag.CommandLine.BoolVar(&arguments.IncludeTestFiles, "include-test-files", false, "If true, include *_test.go files.")
 
 	if err := arguments.Execute(
 		generators.NameSystems(),

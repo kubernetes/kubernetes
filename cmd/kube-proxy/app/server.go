@@ -28,10 +28,15 @@ import (
 	"strings"
 	"time"
 
+	"github.com/fsnotify/fsnotify"
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
+
 	v1 "k8s.io/api/core/v1"
-	v1meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/selection"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/server/healthz"
@@ -47,14 +52,19 @@ import (
 	"k8s.io/client-go/tools/record"
 	cliflag "k8s.io/component-base/cli/flag"
 	componentbaseconfig "k8s.io/component-base/config"
+	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/version"
+	"k8s.io/component-base/version/verflag"
+	"k8s.io/klog"
 	"k8s.io/kube-proxy/config/v1alpha1"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/apis"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
-	"k8s.io/kubernetes/pkg/proxy/apis/config/scheme"
+	proxyconfigscheme "k8s.io/kubernetes/pkg/proxy/apis/config/scheme"
 	"k8s.io/kubernetes/pkg/proxy/apis/config/validation"
 	"k8s.io/kubernetes/pkg/proxy/config"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
@@ -69,17 +79,8 @@ import (
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	utilipvs "k8s.io/kubernetes/pkg/util/ipvs"
 	"k8s.io/kubernetes/pkg/util/oom"
-	"k8s.io/kubernetes/pkg/util/resourcecontainer"
-	"k8s.io/kubernetes/pkg/version"
-	"k8s.io/kubernetes/pkg/version/verflag"
 	"k8s.io/utils/exec"
 	utilpointer "k8s.io/utils/pointer"
-
-	"github.com/fsnotify/fsnotify"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
-	"k8s.io/klog"
 )
 
 const (
@@ -101,7 +102,7 @@ type Options struct {
 	ConfigFile string
 	// WriteConfigTo is the path where the default configuration will be written.
 	WriteConfigTo string
-	// CleanupAndExit, when true, makes the proxy server clean up iptables rules, then exit.
+	// CleanupAndExit, when true, makes the proxy server clean up iptables and ipvs rules, then exit.
 	CleanupAndExit bool
 	// CleanupIPVS, when true, makes the proxy server clean up ipvs rules before running.
 	CleanupIPVS bool
@@ -128,9 +129,6 @@ type Options struct {
 	healthzPort int32
 	// metricsPort is the port to be used by the metrics server.
 	metricsPort int32
-
-	scheme *runtime.Scheme
-	codecs serializer.CodecFactory
 
 	// hostnameOverride, if set from the command line flag, takes precedence over the `HostnameOverride` value from the config file
 	hostnameOverride string
@@ -160,7 +158,7 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 	fs.Var(utilflag.IPVar{Val: &o.config.HealthzBindAddress}, "healthz-bind-address", "The IP address for the health check server to serve on (set to `0.0.0.0` for all IPv4 interfaces and `::` for all IPv6 interfaces)")
 	fs.Var(utilflag.IPVar{Val: &o.config.MetricsBindAddress}, "metrics-bind-address", "The IP address for the metrics server to serve on (set to `0.0.0.0` for all IPv4 interfaces and `::` for all IPv6 interfaces)")
 	fs.Var(utilflag.PortRangeVar{Val: &o.config.PortRange}, "proxy-port-range", "Range of host ports (beginPort-endPort, single port or beginPort+offset, inclusive) that may be consumed in order to proxy service traffic. If (unspecified, 0, or 0-0) then ports will be randomly chosen.")
-	fs.Var(&o.config.Mode, "proxy-mode", "Which proxy mode to use: 'userspace' (older) or 'iptables' (faster) or 'ipvs' (experimental). If blank, use the best-available proxy (currently iptables).  If the iptables proxy is selected, regardless of how, but the system's kernel or iptables versions are insufficient, this always falls back to the userspace proxy.")
+	fs.Var(&o.config.Mode, "proxy-mode", "Which proxy mode to use: 'userspace' (older) or 'iptables' (faster) or 'ipvs'. If blank, use the best-available proxy (currently iptables).  If the iptables proxy is selected, regardless of how, but the system's kernel or iptables versions are insufficient, this always falls back to the userspace proxy.")
 	fs.Var(cliflag.NewMapStringBool(&o.config.FeatureGates), "feature-gates", "A set of key=value pairs that describe feature gates for alpha/experimental features. "+
 		"Options are:\n"+strings.Join(utilfeature.DefaultFeatureGate.KnownFeatures(), "\n"))
 
@@ -191,10 +189,6 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&o.config.EnableProfiling, "profiling", o.config.EnableProfiling, "If true enables profiling via web interface on /debug/pprof handler.")
 
 	fs.Float32Var(&o.config.ClientConnection.QPS, "kube-api-qps", o.config.ClientConnection.QPS, "QPS to use while talking with kubernetes apiserver")
-
-	// All flags below here are deprecated and will eventually be removed.
-	fs.StringVar(&o.config.ResourceContainer, "resource-container", o.config.ResourceContainer, "Absolute name of the resource-only container to create and run the Kube-proxy in (Default: /kube-proxy).")
-	fs.MarkDeprecated("resource-container", "This feature will be removed in a later release.")
 }
 
 // NewOptions returns initialized Options
@@ -203,8 +197,6 @@ func NewOptions() *Options {
 		config:      new(kubeproxyconfig.KubeProxyConfiguration),
 		healthzPort: ports.ProxyHealthzPort,
 		metricsPort: ports.ProxyStatusPort,
-		scheme:      scheme.Scheme,
-		codecs:      scheme.Codecs,
 		CleanupIPVS: true,
 		errCh:       make(chan error),
 	}
@@ -260,6 +252,7 @@ func (o *Options) eventHandler(ent fsnotify.Event) {
 	if eventOpIs(fsnotify.Write) || eventOpIs(fsnotify.Rename) {
 		// error out when ConfigFile is updated
 		o.errCh <- fmt.Errorf("content of the proxy server's configuration file was updated")
+		return
 	}
 	o.errCh <- nil
 }
@@ -337,12 +330,12 @@ func (o *Options) runLoop() error {
 
 func (o *Options) writeConfigFile() (err error) {
 	const mediaType = runtime.ContentTypeYAML
-	info, ok := runtime.SerializerInfoForMediaType(o.codecs.SupportedMediaTypes(), mediaType)
+	info, ok := runtime.SerializerInfoForMediaType(proxyconfigscheme.Codecs.SupportedMediaTypes(), mediaType)
 	if !ok {
 		return fmt.Errorf("unable to locate encoder -- %q is not a supported media type", mediaType)
 	}
 
-	encoder := o.codecs.EncoderForVersion(info.Serializer, v1alpha1.SchemeGroupVersion)
+	encoder := proxyconfigscheme.Codecs.EncoderForVersion(info.Serializer, v1alpha1.SchemeGroupVersion)
 
 	configFile, err := os.Create(o.WriteConfigTo)
 	if err != nil {
@@ -389,7 +382,7 @@ func (o *Options) loadConfigFromFile(file string) (*kubeproxyconfig.KubeProxyCon
 
 // loadConfig decodes data as a KubeProxyConfiguration object.
 func (o *Options) loadConfig(data []byte) (*kubeproxyconfig.KubeProxyConfiguration, error) {
-	configObj, gvk, err := o.codecs.UniversalDecoder().Decode(data, nil, nil)
+	configObj, gvk, err := proxyconfigscheme.Codecs.UniversalDecoder().Decode(data, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -402,14 +395,14 @@ func (o *Options) loadConfig(data []byte) (*kubeproxyconfig.KubeProxyConfigurati
 
 // ApplyDefaults applies the default values to Options.
 func (o *Options) ApplyDefaults(in *kubeproxyconfig.KubeProxyConfiguration) (*kubeproxyconfig.KubeProxyConfiguration, error) {
-	external, err := o.scheme.ConvertToVersion(in, v1alpha1.SchemeGroupVersion)
+	external, err := proxyconfigscheme.Scheme.ConvertToVersion(in, v1alpha1.SchemeGroupVersion)
 	if err != nil {
 		return nil, err
 	}
 
-	o.scheme.Default(external)
+	proxyconfigscheme.Scheme.Default(external)
 
-	internal, err := o.scheme.ConvertToVersion(external, kubeproxyconfig.SchemeGroupVersion)
+	internal, err := proxyconfigscheme.Scheme.ConvertToVersion(external, kubeproxyconfig.SchemeGroupVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -446,7 +439,10 @@ with the apiserver API to configure the proxy.`,
 			if err := opts.Validate(args); err != nil {
 				klog.Fatalf("failed validate: %v", err)
 			}
-			klog.Fatal(opts.Run())
+
+			if err := opts.Run(); err != nil {
+				klog.Exit(err)
+			}
 		},
 	}
 
@@ -473,7 +469,7 @@ type ProxyServer struct {
 	IpvsInterface          utilipvs.Interface
 	IpsetInterface         utilipset.Interface
 	execer                 exec.Interface
-	Proxier                proxy.ProxyProvider
+	Proxier                proxy.Provider
 	Broadcaster            record.EventBroadcaster
 	Recorder               record.EventRecorder
 	ConntrackConfiguration kubeproxyconfig.KubeProxyConntrackConfiguration
@@ -483,8 +479,8 @@ type ProxyServer struct {
 	CleanupIPVS            bool
 	MetricsBindAddress     string
 	EnableProfiling        bool
+	UseEndpointSlices      bool
 	OOMScoreAdj            *int32
-	ResourceContainer      string
 	ConfigSyncPeriod       time.Duration
 	HealthzServer          *healthcheck.HealthzServer
 }
@@ -542,15 +538,6 @@ func (s *ProxyServer) Run() error {
 		}
 	}
 
-	if len(s.ResourceContainer) != 0 {
-		// Run in its own container.
-		if err := resourcecontainer.RunInResourceContainer(s.ResourceContainer); err != nil {
-			klog.Warningf("Failed to start in resource-only container %q: %v", s.ResourceContainer, err)
-		} else {
-			klog.V(2).Infof("Running in resource-only container %q", s.ResourceContainer)
-		}
-	}
-
 	if s.Broadcaster != nil && s.EventClient != nil {
 		s.Broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: s.EventClient.Events("")})
 	}
@@ -565,9 +552,11 @@ func (s *ProxyServer) Run() error {
 		proxyMux := mux.NewPathRecorderMux("kube-proxy")
 		healthz.InstallHandler(proxyMux)
 		proxyMux.HandleFunc("/proxyMode", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+			w.Header().Set("X-Content-Type-Options", "nosniff")
 			fmt.Fprintf(w, "%s", s.ProxyMode)
 		})
-		proxyMux.Handle("/metrics", prometheus.Handler())
+		proxyMux.Handle("/metrics", legacyregistry.Handler())
 		if s.EnableProfiling {
 			routes.Profiling{}.Install(proxyMux)
 		}
@@ -621,12 +610,25 @@ func (s *ProxyServer) Run() error {
 		}
 	}
 
+	noProxyName, err := labels.NewRequirement(apis.LabelServiceProxyName, selection.DoesNotExist, nil)
+	if err != nil {
+		return err
+	}
+
+	noHeadlessEndpoints, err := labels.NewRequirement(v1.IsHeadlessService, selection.DoesNotExist, nil)
+	if err != nil {
+		return err
+	}
+
+	labelSelector := labels.NewSelector()
+	labelSelector = labelSelector.Add(*noProxyName, *noHeadlessEndpoints)
+
 	informerFactory := informers.NewSharedInformerFactoryWithOptions(s.Client, s.ConfigSyncPeriod,
-		informers.WithTweakListOptions(func(options *v1meta.ListOptions) {
-			options.LabelSelector = "!" + apis.LabelServiceProxyName
+		informers.WithTweakListOptions(func(options *metav1.ListOptions) {
+			options.LabelSelector = labelSelector.String()
 		}))
 
-	// Create configs (i.e. Watches for Services and Endpoints)
+	// Create configs (i.e. Watches for Services and Endpoints or EndpointSlices)
 	// Note: RegisterHandler() calls need to happen before creation of Sources because sources
 	// only notify on changes, and the initial update (on process start) may be lost if no handlers
 	// are registered yet.
@@ -634,9 +636,15 @@ func (s *ProxyServer) Run() error {
 	serviceConfig.RegisterEventHandler(s.Proxier)
 	go serviceConfig.Run(wait.NeverStop)
 
-	endpointsConfig := config.NewEndpointsConfig(informerFactory.Core().V1().Endpoints(), s.ConfigSyncPeriod)
-	endpointsConfig.RegisterEventHandler(s.Proxier)
-	go endpointsConfig.Run(wait.NeverStop)
+	if utilfeature.DefaultFeatureGate.Enabled(features.EndpointSlice) {
+		endpointSliceConfig := config.NewEndpointSliceConfig(informerFactory.Discovery().V1alpha1().EndpointSlices(), s.ConfigSyncPeriod)
+		endpointSliceConfig.RegisterEventHandler(s.Proxier)
+		go endpointSliceConfig.Run(wait.NeverStop)
+	} else {
+		endpointsConfig := config.NewEndpointsConfig(informerFactory.Core().V1().Endpoints(), s.ConfigSyncPeriod)
+		endpointsConfig.RegisterEventHandler(s.Proxier)
+		go endpointsConfig.Run(wait.NeverStop)
+	}
 
 	// This has to start after the calls to NewServiceConfig and NewEndpointsConfig because those
 	// functions must configure their shared informer event handlers first.

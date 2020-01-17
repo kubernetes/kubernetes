@@ -47,7 +47,6 @@ import (
 
 const (
 	imageWatcherStr = "watcher="
-	imageSizeStr    = "size "
 	kubeLockMagic   = "kubelet_lock_magic_"
 	// The following three values are used for 30 seconds timeout
 	// while waiting for RBD Watcher to expire.
@@ -56,6 +55,12 @@ const (
 	rbdImageWatcherSteps     = 10
 	rbdImageSizeUnitMiB      = 1024 * 1024
 )
+
+// A struct contains rbd image info.
+type rbdImageInfo struct {
+	pool string
+	name string
+}
 
 func getDevFromImageAndPool(pool, image string) (string, bool) {
 	device, found := getRbdDevFromImageAndPool(pool, image)
@@ -289,7 +294,7 @@ func rbdErrors(runErr, resultErr error) error {
 // 'rbd' utility builds a comma-separated list of monitor addresses from '-m' /
 // '--mon_host` parameter (comma, semi-colon, or white-space delimited monitor
 // addresses) and send it to kernel rbd/libceph modules, which can accept
-// comma-seprated list of monitor addresses (e.g. ip1[:port1][,ip2[:port2]...])
+// comma-separated list of monitor addresses (e.g. ip1[:port1][,ip2[:port2]...])
 // in their first version in linux (see
 // https://github.com/torvalds/linux/blob/602adf400201636e95c3fed9f31fba54a3d7e844/net/ceph/ceph_common.c#L239).
 // Also, libceph module chooses monitor randomly, so we can simply pass all
@@ -372,7 +377,7 @@ func (util *RBDUtil) AttachDisk(b rbdMounter) (string, error) {
 		}
 	}
 
-	// Evalute whether this device was mapped with rbd.
+	// Evaluate whether this device was mapped with rbd.
 	devicePath, mapped := waitForPath(b.Pool, b.Image, 1 /*maxRetries*/, false /*useNbdDriver*/)
 
 	// If rbd-nbd tools are found, we will fallback to it should the default krbd driver fail.
@@ -485,7 +490,7 @@ func (util *RBDUtil) DetachDisk(plugin *rbdPlugin, deviceMountPath string, devic
 	klog.V(3).Infof("rbd: successfully unmap device %s", device)
 
 	// Currently, we don't persist rbd info on the disk, but for backward
-	// compatbility, we need to clean it if found.
+	// compatibility, we need to clean it if found.
 	rbdFile := filepath.Join(deviceMountPath, "rbd.json")
 	exists, err := utilpath.Exists(utilpath.CheckFollowSymlink, rbdFile)
 	if err != nil {
@@ -564,10 +569,6 @@ func (util *RBDUtil) cleanOldRBDFile(plugin *rbdPlugin, rbdFile string) error {
 		return fmt.Errorf("rbd: decode err: %v.", err)
 	}
 
-	if err != nil {
-		klog.Errorf("failed to load rbd info from %s: %v", rbdFile, err)
-		return err
-	}
 	// Remove rbd lock if found.
 	// The disk is not attached to this node anymore, so the lock on image
 	// for this node can be removed safely.
@@ -788,4 +789,16 @@ func (util *RBDUtil) rbdStatus(b *rbdMounter) (bool, string, error) {
 		klog.Warningf("rbd: no watchers on %s", b.Image)
 		return false, output, nil
 	}
+}
+
+// getRbdImageInfo try to get rbdImageInfo from deviceMountPath.
+func getRbdImageInfo(deviceMountPath string) (*rbdImageInfo, error) {
+	deviceMountedPathSeps := strings.Split(filepath.Base(deviceMountPath), "-image-")
+	if len(deviceMountedPathSeps) != 2 {
+		return nil, fmt.Errorf("Can't found devicePath for %s ", deviceMountPath)
+	}
+	return &rbdImageInfo{
+		pool: deviceMountedPathSeps[0],
+		name: deviceMountedPathSeps[1],
+	}, nil
 }

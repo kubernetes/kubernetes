@@ -426,7 +426,9 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 				}
 			}
 		}
-		r := NewLeaseEndpointReconciler(clientset.CoreV1(), fakeLeases)
+
+		epAdapter := EndpointsAdapter{endpointClient: clientset.CoreV1()}
+		r := NewLeaseEndpointReconciler(epAdapter, fakeLeases)
 		err := r.ReconcileEndpoints(test.serviceName, net.ParseIP(test.ip), test.endpointPorts, true)
 		if err != nil {
 			t.Errorf("case %q: unexpected error: %v", test.testName, err)
@@ -526,7 +528,8 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 					}
 				}
 			}
-			r := NewLeaseEndpointReconciler(clientset.CoreV1(), fakeLeases)
+			epAdapter := EndpointsAdapter{endpointClient: clientset.CoreV1()}
+			r := NewLeaseEndpointReconciler(epAdapter, fakeLeases)
 			err := r.ReconcileEndpoints(test.serviceName, net.ParseIP(test.ip), test.endpointPorts, false)
 			if err != nil {
 				t.Errorf("case %q: unexpected error: %v", test.testName, err)
@@ -626,7 +629,8 @@ func TestLeaseRemoveEndpoints(t *testing.T) {
 					continue
 				}
 			}
-			r := NewLeaseEndpointReconciler(clientset.CoreV1(), fakeLeases)
+			epAdapter := EndpointsAdapter{endpointClient: clientset.CoreV1()}
+			r := NewLeaseEndpointReconciler(epAdapter, fakeLeases)
 			err := r.RemoveEndpoints(test.serviceName, net.ParseIP(test.ip), test.endpointPorts)
 			if err != nil {
 				t.Errorf("case %q: unexpected error: %v", test.testName, err)

@@ -20,7 +20,6 @@ package exec
 
 import (
 	"fmt"
-	"os"
 
 	"k8s.io/klog"
 
@@ -48,7 +47,7 @@ var _ mount.Interface = &execMounter{}
 
 // Mount runs mount(8) using given exec interface.
 func (m *execMounter) Mount(source string, target string, fstype string, options []string) error {
-	bind, bindOpts, bindRemountOpts := mount.IsBind(options)
+	bind, bindOpts, bindRemountOpts := mount.MakeBindOpts(options)
 
 	if bind {
 		err := m.doExecMount(source, target, fstype, bindOpts)
@@ -97,65 +96,6 @@ func (m *execMounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	return m.wrappedMounter.IsLikelyNotMountPoint(file)
 }
 
-// DeviceOpened checks if block device in use by calling Open with O_EXCL flag.
-// Returns true if open returns errno EBUSY, and false if errno is nil.
-// Returns an error if errno is any error other than EBUSY.
-// Returns with error if pathname is not a device.
-func (m *execMounter) DeviceOpened(pathname string) (bool, error) {
-	return m.wrappedMounter.DeviceOpened(pathname)
-}
-
-// PathIsDevice uses FileInfo returned from os.Stat to check if path refers
-// to a device.
-func (m *execMounter) PathIsDevice(pathname string) (bool, error) {
-	return m.wrappedMounter.PathIsDevice(pathname)
-}
-
-//GetDeviceNameFromMount given a mount point, find the volume id from checking /proc/mounts
-func (m *execMounter) GetDeviceNameFromMount(mountPath, pluginMountDir string) (string, error) {
-	return m.wrappedMounter.GetDeviceNameFromMount(mountPath, pluginMountDir)
-}
-
-func (m *execMounter) IsMountPointMatch(mp mount.MountPoint, dir string) bool {
-	return m.wrappedMounter.IsMountPointMatch(mp, dir)
-}
-
-func (m *execMounter) MakeRShared(path string) error {
-	return m.wrappedMounter.MakeRShared(path)
-}
-
-func (m *execMounter) GetFileType(pathname string) (mount.FileType, error) {
-	return m.wrappedMounter.GetFileType(pathname)
-}
-
-func (m *execMounter) MakeFile(pathname string) error {
-	return m.wrappedMounter.MakeFile(pathname)
-}
-
-func (m *execMounter) MakeDir(pathname string) error {
-	return m.wrappedMounter.MakeDir(pathname)
-}
-
-func (m *execMounter) ExistsPath(pathname string) (bool, error) {
-	return m.wrappedMounter.ExistsPath(pathname)
-}
-
-func (m *execMounter) EvalHostSymlinks(pathname string) (string, error) {
-	return m.wrappedMounter.EvalHostSymlinks(pathname)
-}
-
 func (m *execMounter) GetMountRefs(pathname string) ([]string, error) {
 	return m.wrappedMounter.GetMountRefs(pathname)
-}
-
-func (m *execMounter) GetFSGroup(pathname string) (int64, error) {
-	return m.wrappedMounter.GetFSGroup(pathname)
-}
-
-func (m *execMounter) GetSELinuxSupport(pathname string) (bool, error) {
-	return m.wrappedMounter.GetSELinuxSupport(pathname)
-}
-
-func (m *execMounter) GetMode(pathname string) (os.FileMode, error) {
-	return m.wrappedMounter.GetMode(pathname)
 }

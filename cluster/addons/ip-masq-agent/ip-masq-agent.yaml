@@ -24,8 +24,6 @@ spec:
     metadata:
       labels:
         k8s-app: ip-masq-agent
-      annotations:
-        scheduler.alpha.kubernetes.io/critical-pod: ''
     spec:
       priorityClassName: system-node-critical
       serviceAccountName: ip-masq-agent
@@ -46,8 +44,7 @@ spec:
           - name: config
             mountPath: /etc/config
       nodeSelector:
-        # TODO(liggitt): switch to node.kubernetes.io/masq-agent-ds-ready in 1.16
-        beta.kubernetes.io/masq-agent-ds-ready: "true"
+        node.kubernetes.io/masq-agent-ds-ready: "true"
       volumes:
         - name: config
           configMap:

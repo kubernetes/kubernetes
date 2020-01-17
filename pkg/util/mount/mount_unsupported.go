@@ -20,14 +20,14 @@ package mount
 
 import (
 	"errors"
-	"os"
 )
 
+// Mounter implements mount.Interface for unsupported platforms
 type Mounter struct {
 	mounterPath string
 }
 
-var unsupportedErr = errors.New("util/mount on this platform is not supported")
+var errUnsupported = errors.New("util/mount on this platform is not supported")
 
 // New returns a mount.Interface for the current system.
 // It provides options to override the default mounter behavior.
@@ -38,44 +38,29 @@ func New(mounterPath string) Interface {
 	}
 }
 
+// Mount always returns an error on unsupported platforms
 func (mounter *Mounter) Mount(source string, target string, fstype string, options []string) error {
-	return unsupportedErr
+	return errUnsupported
 }
 
+// Unmount always returns an error on unsupported platforms
 func (mounter *Mounter) Unmount(target string) error {
-	return unsupportedErr
+	return errUnsupported
 }
 
+// List always returns an error on unsupported platforms
 func (mounter *Mounter) List() ([]MountPoint, error) {
-	return []MountPoint{}, unsupportedErr
+	return []MountPoint{}, errUnsupported
 }
 
-func (mounter *Mounter) IsMountPointMatch(mp MountPoint, dir string) bool {
-	return (mp.Path == dir)
-}
-
+// IsLikelyNotMountPoint always returns an error on unsupported platforms
 func (mounter *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
-	return true, unsupportedErr
+	return true, errUnsupported
 }
 
-func (mounter *Mounter) GetDeviceNameFromMount(mountPath, pluginMountDir string) (string, error) {
-	return "", unsupportedErr
-}
-
-func getDeviceNameFromMount(mounter Interface, mountPath, pluginMountDir string) (string, error) {
-	return "", unsupportedErr
-}
-
-func (mounter *Mounter) DeviceOpened(pathname string) (bool, error) {
-	return false, unsupportedErr
-}
-
-func (mounter *Mounter) PathIsDevice(pathname string) (bool, error) {
-	return true, unsupportedErr
-}
-
-func (mounter *Mounter) MakeRShared(path string) error {
-	return unsupportedErr
+// GetMountRefs always returns an error on unsupported platforms
+func (mounter *Mounter) GetMountRefs(pathname string) ([]string, error) {
+	return nil, errUnsupported
 }
 
 func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, fstype string, options []string) error {
@@ -83,41 +68,5 @@ func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, 
 }
 
 func (mounter *SafeFormatAndMount) diskLooksUnformatted(disk string) (bool, error) {
-	return true, unsupportedErr
-}
-
-func (mounter *Mounter) GetFileType(pathname string) (FileType, error) {
-	return FileType("fake"), unsupportedErr
-}
-
-func (mounter *Mounter) MakeDir(pathname string) error {
-	return unsupportedErr
-}
-
-func (mounter *Mounter) MakeFile(pathname string) error {
-	return unsupportedErr
-}
-
-func (mounter *Mounter) ExistsPath(pathname string) (bool, error) {
-	return true, errors.New("not implemented")
-}
-
-func (mounter *Mounter) EvalHostSymlinks(pathname string) (string, error) {
-	return "", unsupportedErr
-}
-
-func (mounter *Mounter) GetMountRefs(pathname string) ([]string, error) {
-	return nil, errors.New("not implemented")
-}
-
-func (mounter *Mounter) GetFSGroup(pathname string) (int64, error) {
-	return -1, errors.New("not implemented")
-}
-
-func (mounter *Mounter) GetSELinuxSupport(pathname string) (bool, error) {
-	return false, errors.New("not implemented")
-}
-
-func (mounter *Mounter) GetMode(pathname string) (os.FileMode, error) {
-	return 0, errors.New("not implemented")
+	return true, errUnsupported
 }

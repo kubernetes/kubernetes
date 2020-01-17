@@ -23,14 +23,49 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/http/httputil"
+	"reflect"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/rest"
 )
+
+func TestAuthorizeClientBearerTokenNoops(t *testing.T) {
+	// All of these should do nothing (not panic, no side-effects)
+	cfgGens := []func() *rest.Config{
+		func() *rest.Config { return nil },
+		func() *rest.Config { return &rest.Config{} },
+		func() *rest.Config { return &rest.Config{BearerToken: "mu"} },
+	}
+	authcGens := []func() *AuthenticationInfo{
+		func() *AuthenticationInfo { return nil },
+		func() *AuthenticationInfo { return &AuthenticationInfo{} },
+	}
+	authzGens := []func() *AuthorizationInfo{
+		func() *AuthorizationInfo { return nil },
+		func() *AuthorizationInfo { return &AuthorizationInfo{} },
+	}
+	for _, cfgGen := range cfgGens {
+		for _, authcGen := range authcGens {
+			for _, authzGen := range authzGens {
+				pConfig := cfgGen()
+				pAuthc := authcGen()
+				pAuthz := authzGen()
+				AuthorizeClientBearerToken(pConfig, pAuthc, pAuthz)
+				if before, after := authcGen(), pAuthc; !reflect.DeepEqual(before, after) {
+					t.Errorf("AuthorizeClientBearerToken(%v, %#+v, %v) changed %#+v", pConfig, pAuthc, pAuthz, *before)
+				}
+				if before, after := authzGen(), pAuthz; !reflect.DeepEqual(before, after) {
+					t.Errorf("AuthorizeClientBearerToken(%v, %v, %#+v) changed %#+v", pConfig, pAuthc, pAuthz, *before)
+				}
+			}
+		}
+	}
+}
 
 func TestNewWithDelegate(t *testing.T) {
 	delegateConfig := NewConfig(codecs)
@@ -101,23 +136,36 @@ func TestNewWithDelegate(t *testing.T) {
 	// Wait for the hooks to finish before checking the response
 	<-delegatePostStartHookChan
 	<-wrappingPostStartHookChan
-
-	checkPath(server.URL, http.StatusOK, `{
-  "paths": [
-    "/apis",
-    "/bar",
-    "/foo",
-    "/healthz",
-    "/healthz/delegate-health",
-    "/healthz/log",
-    "/healthz/ping",
-    "/healthz/poststarthook/delegate-post-start-hook",
-    "/healthz/poststarthook/generic-apiserver-start-informers",
-    "/healthz/poststarthook/wrapping-post-start-hook",
-    "/healthz/wrapping-health",
-    "/metrics"
-  ]
-}`, t)
+	expectedPaths := []string{
+		"/apis",
+		"/bar",
+		"/foo",
+		"/healthz",
+		"/healthz/delegate-health",
+		"/healthz/log",
+		"/healthz/ping",
+		"/healthz/poststarthook/delegate-post-start-hook",
+		"/healthz/poststarthook/generic-apiserver-start-informers",
+		"/healthz/poststarthook/wrapping-post-start-hook",
+		"/healthz/wrapping-health",
+		"/livez",
+		"/livez/delegate-health",
+		"/livez/log",
+		"/livez/ping",
+		"/livez/poststarthook/delegate-post-start-hook",
+		"/livez/poststarthook/generic-apiserver-start-informers",
+		"/livez/poststarthook/wrapping-post-start-hook",
+		"/metrics",
+		"/readyz",
+		"/readyz/delegate-health",
+		"/readyz/log",
+		"/readyz/ping",
+		"/readyz/poststarthook/delegate-post-start-hook",
+		"/readyz/poststarthook/generic-apiserver-start-informers",
+		"/readyz/poststarthook/wrapping-post-start-hook",
+		"/readyz/shutdown",
+	}
+	checkExpectedPathsAtRoot(server.URL, expectedPaths, t)
 	checkPath(server.URL+"/healthz", http.StatusInternalServerError, `[+]ping ok
 [+]log ok
 [-]wrapping-health failed: reason withheld
@@ -139,22 +187,57 @@ healthz check failed
 }
 
 func checkPath(url string, expectedStatusCode int, expectedBody string, t *testing.T) {
-	resp, err := http.Get(url)
-	if err != nil {
-		t.Fatal(err)
-	}
-	dump, _ := httputil.DumpResponse(resp, true)
-	t.Log(string(dump))
+	t.Run(url, func(t *testing.T) {
+		resp, err := http.Get(url)
+		if err != nil {
+			t.Fatal(err)
+		}
+		dump, _ := httputil.DumpResponse(resp, true)
+		t.Log(string(dump))
 
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		t.Fatal(err)
-	}
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	if e, a := expectedBody, string(body); e != a {
-		t.Errorf("%q expected %v, got %v", url, e, a)
-	}
-	if e, a := expectedStatusCode, resp.StatusCode; e != a {
-		t.Errorf("%q expected %v, got %v", url, e, a)
-	}
+		if e, a := expectedBody, string(body); e != a {
+			t.Errorf("%q expected %v, got %v", url, e, a)
+		}
+		if e, a := expectedStatusCode, resp.StatusCode; e != a {
+			t.Errorf("%q expected %v, got %v", url, e, a)
+		}
+	})
+}
+
+func checkExpectedPathsAtRoot(url string, expectedPaths []string, t *testing.T) {
+	t.Run(url, func(t *testing.T) {
+		resp, err := http.Get(url)
+		if err != nil {
+			t.Fatal(err)
+		}
+		dump, _ := httputil.DumpResponse(resp, true)
+		t.Log(string(dump))
+
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var result map[string]interface{}
+		json.Unmarshal(body, &result)
+		paths, ok := result["paths"].([]interface{})
+		if !ok {
+			t.Errorf("paths not found")
+		}
+		pathset := sets.NewString()
+		for _, p := range paths {
+			pathset.Insert(p.(string))
+		}
+		expectedset := sets.NewString(expectedPaths...)
+		for _, p := range pathset.Difference(expectedset) {
+			t.Errorf("Got %v path, which we did not expect", p)
+		}
+		for _, p := range expectedset.Difference(pathset) {
+			t.Errorf(" Expected %v path which we did not get", p)
+		}
+	})
 }

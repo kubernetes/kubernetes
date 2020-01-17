@@ -23,7 +23,6 @@ go_library(
         "//staging/src/k8s.io/client-go/tools/remotecommand:go_default_library",
         "//staging/src/k8s.io/cri-api/pkg/apis/runtime/v1alpha2:go_default_library",
         "//vendor/github.com/emicklei/go-restful:go_default_library",
-        "//vendor/google.golang.org/grpc:go_default_library",
         "//vendor/google.golang.org/grpc/codes:go_default_library",
         "//vendor/google.golang.org/grpc/status:go_default_library",
     ],

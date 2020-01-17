@@ -17,31 +17,33 @@ limitations under the License.
 package compatibility
 
 import (
-	"fmt"
-	"net/http/httptest"
-	"reflect"
 	"testing"
 
-	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
+	"github.com/google/go-cmp/cmp"
+
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
-	clientset "k8s.io/client-go/kubernetes"
-	restclient "k8s.io/client-go/rest"
-	utiltesting "k8s.io/client-go/util/testing"
+	"k8s.io/client-go/kubernetes/fake"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
+	"k8s.io/kubernetes/pkg/scheduler"
 	_ "k8s.io/kubernetes/pkg/scheduler/algorithmprovider/defaults"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
-	latestschedulerapi "k8s.io/kubernetes/pkg/scheduler/api/latest"
+	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
+	schedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/core"
 	"k8s.io/kubernetes/pkg/scheduler/factory"
 )
 
 func TestCompatibility_v1_Scheduler(t *testing.T) {
 	// Add serialized versions of scheduler config that exercise available options to ensure compatibility between releases
 	schedulerFiles := map[string]struct {
-		JSON           string
-		ExpectedPolicy schedulerapi.Policy
+		JSON             string
+		wantPredicates   sets.String
+		wantPrioritizers sets.String
+		wantPlugins      map[string][]kubeschedulerconfig.Plugin
+		wantExtenders    []schedulerapi.ExtenderConfig
 	}{
 		// Do not change this JSON after the corresponding release has been tagged.
 		// A failure indicates backwards compatibility with the specified release was broken.
@@ -63,22 +65,20 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
     {"name": "TestLabelPreference",      "weight": 4, "argument": {"labelPreference": {"label": "bar", "presence":true}}}
   ]
 }`,
-			ExpectedPolicy: schedulerapi.Policy{
-				Predicates: []schedulerapi.PredicatePolicy{
-					{Name: "MatchNodeSelector"},
-					{Name: "PodFitsResources"},
-					{Name: "PodFitsPorts"},
-					{Name: "NoDiskConflict"},
-					{Name: "TestServiceAffinity", Argument: &schedulerapi.PredicateArgument{ServiceAffinity: &schedulerapi.ServiceAffinity{Labels: []string{"region"}}}},
-					{Name: "TestLabelsPresence", Argument: &schedulerapi.PredicateArgument{LabelsPresence: &schedulerapi.LabelsPresence{Labels: []string{"foo"}, Presence: true}}},
-				},
-				Priorities: []schedulerapi.PriorityPolicy{
-					{Name: "LeastRequestedPriority", Weight: 1},
-					{Name: "ServiceSpreadingPriority", Weight: 2},
-					{Name: "TestServiceAntiAffinity", Weight: 3, Argument: &schedulerapi.PriorityArgument{ServiceAntiAffinity: &schedulerapi.ServiceAntiAffinity{Label: "zone"}}},
-					{Name: "TestLabelPreference", Weight: 4, Argument: &schedulerapi.PriorityArgument{LabelPreference: &schedulerapi.LabelPreference{Label: "bar", Presence: true}}},
-				},
-			},
+			wantPredicates: sets.NewString(
+				"MatchNodeSelector",
+				"PodFitsResources",
+				"PodFitsPorts",
+				"NoDiskConflict",
+				"TestServiceAffinity",
+				"TestLabelsPresence",
+			),
+			wantPrioritizers: sets.NewString(
+				"LeastRequestedPriority",
+				"ServiceSpreadingPriority",
+				"TestServiceAntiAffinity",
+				"TestLabelPreference",
+			),
 		},
 
 		// Do not change this JSON after the corresponding release has been tagged.
@@ -104,23 +104,25 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			{"name": "TestLabelPreference",      "weight": 4, "argument": {"labelPreference": {"label": "bar", "presence":true}}}
 		  ]
 		}`,
-			ExpectedPolicy: schedulerapi.Policy{
-				Predicates: []schedulerapi.PredicatePolicy{
-					{Name: "MatchNodeSelector"},
-					{Name: "PodFitsHostPorts"},
-					{Name: "PodFitsResources"},
-					{Name: "NoDiskConflict"},
-					{Name: "HostName"},
-					{Name: "TestServiceAffinity", Argument: &schedulerapi.PredicateArgument{ServiceAffinity: &schedulerapi.ServiceAffinity{Labels: []string{"region"}}}},
-					{Name: "TestLabelsPresence", Argument: &schedulerapi.PredicateArgument{LabelsPresence: &schedulerapi.LabelsPresence{Labels: []string{"foo"}, Presence: true}}},
-				},
-				Priorities: []schedulerapi.PriorityPolicy{
-					{Name: "EqualPriority", Weight: 2},
-					{Name: "LeastRequestedPriority", Weight: 2},
-					{Name: "BalancedResourceAllocation", Weight: 2},
-					{Name: "SelectorSpreadPriority", Weight: 2},
-					{Name: "TestServiceAntiAffinity", Weight: 3, Argument: &schedulerapi.PriorityArgument{ServiceAntiAffinity: &schedulerapi.ServiceAntiAffinity{Label: "zone"}}},
-					{Name: "TestLabelPreference", Weight: 4, Argument: &schedulerapi.PriorityArgument{LabelPreference: &schedulerapi.LabelPreference{Label: "bar", Presence: true}}},
+			wantPredicates: sets.NewString(
+				"MatchNodeSelector",
+				"PodFitsHostPorts",
+				"PodFitsResources",
+				"NoDiskConflict",
+				"TestServiceAffinity",
+				"TestLabelsPresence",
+			),
+			wantPrioritizers: sets.NewString(
+				"EqualPriority",
+				"LeastRequestedPriority",
+				"BalancedResourceAllocation",
+				"SelectorSpreadPriority",
+				"TestServiceAntiAffinity",
+				"TestLabelPreference",
+			),
+			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
+				"FilterPlugin": {
+					{Name: "NodeName"},
 				},
 			},
 		},
@@ -154,29 +156,31 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			{"name": "TestLabelPreference",      "weight": 4, "argument": {"labelPreference": {"label": "bar", "presence":true}}}
 		  ]
 		}`,
-			ExpectedPolicy: schedulerapi.Policy{
-				Predicates: []schedulerapi.PredicatePolicy{
-					{Name: "MatchNodeSelector"},
-					{Name: "PodFitsResources"},
-					{Name: "PodFitsHostPorts"},
-					{Name: "HostName"},
-					{Name: "NoDiskConflict"},
-					{Name: "NoVolumeZoneConflict"},
-					{Name: "MaxEBSVolumeCount"},
-					{Name: "MaxGCEPDVolumeCount"},
-					{Name: "MaxAzureDiskVolumeCount"},
-					{Name: "TestServiceAffinity", Argument: &schedulerapi.PredicateArgument{ServiceAffinity: &schedulerapi.ServiceAffinity{Labels: []string{"region"}}}},
-					{Name: "TestLabelsPresence", Argument: &schedulerapi.PredicateArgument{LabelsPresence: &schedulerapi.LabelsPresence{Labels: []string{"foo"}, Presence: true}}},
-				},
-				Priorities: []schedulerapi.PriorityPolicy{
-					{Name: "EqualPriority", Weight: 2},
-					{Name: "NodeAffinityPriority", Weight: 2},
-					{Name: "ImageLocalityPriority", Weight: 2},
-					{Name: "LeastRequestedPriority", Weight: 2},
-					{Name: "BalancedResourceAllocation", Weight: 2},
-					{Name: "SelectorSpreadPriority", Weight: 2},
-					{Name: "TestServiceAntiAffinity", Weight: 3, Argument: &schedulerapi.PriorityArgument{ServiceAntiAffinity: &schedulerapi.ServiceAntiAffinity{Label: "zone"}}},
-					{Name: "TestLabelPreference", Weight: 4, Argument: &schedulerapi.PriorityArgument{LabelPreference: &schedulerapi.LabelPreference{Label: "bar", Presence: true}}},
+			wantPredicates: sets.NewString(
+				"MatchNodeSelector",
+				"PodFitsResources",
+				"PodFitsHostPorts",
+				"NoDiskConflict",
+				"NoVolumeZoneConflict",
+				"MaxEBSVolumeCount",
+				"MaxGCEPDVolumeCount",
+				"MaxAzureDiskVolumeCount",
+				"TestServiceAffinity",
+				"TestLabelsPresence",
+			),
+			wantPrioritizers: sets.NewString(
+				"EqualPriority",
+				"NodeAffinityPriority",
+				"ImageLocalityPriority",
+				"LeastRequestedPriority",
+				"BalancedResourceAllocation",
+				"SelectorSpreadPriority",
+				"TestServiceAntiAffinity",
+				"TestLabelPreference",
+			),
+			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
+				"FilterPlugin": {
+					{Name: "NodeName"},
 				},
 			},
 		},
@@ -214,34 +218,36 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			{"name": "InterPodAffinityPriority",   "weight": 2}
 		  ]
 		}`,
-			ExpectedPolicy: schedulerapi.Policy{
-				Predicates: []schedulerapi.PredicatePolicy{
-					{Name: "MatchNodeSelector"},
-					{Name: "PodFitsResources"},
-					{Name: "PodFitsHostPorts"},
-					{Name: "HostName"},
-					{Name: "NoDiskConflict"},
-					{Name: "NoVolumeZoneConflict"},
-					{Name: "PodToleratesNodeTaints"},
-					{Name: "CheckNodeMemoryPressure"},
-					{Name: "MaxEBSVolumeCount"},
-					{Name: "MaxGCEPDVolumeCount"},
-					{Name: "MaxAzureDiskVolumeCount"},
-					{Name: "MatchInterPodAffinity"},
-					{Name: "GeneralPredicates"},
-					{Name: "TestServiceAffinity", Argument: &schedulerapi.PredicateArgument{ServiceAffinity: &schedulerapi.ServiceAffinity{Labels: []string{"region"}}}},
-					{Name: "TestLabelsPresence", Argument: &schedulerapi.PredicateArgument{LabelsPresence: &schedulerapi.LabelsPresence{Labels: []string{"foo"}, Presence: true}}},
+			wantPredicates: sets.NewString(
+				"MatchNodeSelector",
+				"PodFitsResources",
+				"PodFitsHostPorts",
+				"NoDiskConflict",
+				"NoVolumeZoneConflict",
+				"CheckNodeMemoryPressure",
+				"MaxEBSVolumeCount",
+				"MaxGCEPDVolumeCount",
+				"MaxAzureDiskVolumeCount",
+				"MatchInterPodAffinity",
+				"GeneralPredicates",
+				"TestServiceAffinity",
+				"TestLabelsPresence",
+			),
+			wantPrioritizers: sets.NewString(
+				"EqualPriority",
+				"ImageLocalityPriority",
+				"LeastRequestedPriority",
+				"BalancedResourceAllocation",
+				"SelectorSpreadPriority",
+				"NodeAffinityPriority",
+				"InterPodAffinityPriority",
+			),
+			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
+				"FilterPlugin": {
+					{Name: "NodeName"},
+					{Name: "TaintToleration"},
 				},
-				Priorities: []schedulerapi.PriorityPolicy{
-					{Name: "EqualPriority", Weight: 2},
-					{Name: "ImageLocalityPriority", Weight: 2},
-					{Name: "LeastRequestedPriority", Weight: 2},
-					{Name: "BalancedResourceAllocation", Weight: 2},
-					{Name: "SelectorSpreadPriority", Weight: 2},
-					{Name: "NodeAffinityPriority", Weight: 2},
-					{Name: "TaintTolerationPriority", Weight: 2},
-					{Name: "InterPodAffinityPriority", Weight: 2},
-				},
+				"ScorePlugin": {{Name: "TaintToleration", Weight: 2}},
 			},
 		},
 
@@ -281,37 +287,39 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			{"name": "MostRequestedPriority",   "weight": 2}
 		  ]
 		}`,
-			ExpectedPolicy: schedulerapi.Policy{
-				Predicates: []schedulerapi.PredicatePolicy{
-					{Name: "MatchNodeSelector"},
-					{Name: "PodFitsResources"},
-					{Name: "PodFitsHostPorts"},
-					{Name: "HostName"},
-					{Name: "NoDiskConflict"},
-					{Name: "NoVolumeZoneConflict"},
-					{Name: "PodToleratesNodeTaints"},
-					{Name: "CheckNodeMemoryPressure"},
-					{Name: "CheckNodeDiskPressure"},
-					{Name: "MaxEBSVolumeCount"},
-					{Name: "MaxGCEPDVolumeCount"},
-					{Name: "MaxAzureDiskVolumeCount"},
-					{Name: "MatchInterPodAffinity"},
-					{Name: "GeneralPredicates"},
-					{Name: "TestServiceAffinity", Argument: &schedulerapi.PredicateArgument{ServiceAffinity: &schedulerapi.ServiceAffinity{Labels: []string{"region"}}}},
-					{Name: "TestLabelsPresence", Argument: &schedulerapi.PredicateArgument{LabelsPresence: &schedulerapi.LabelsPresence{Labels: []string{"foo"}, Presence: true}}},
+			wantPredicates: sets.NewString(
+				"MatchNodeSelector",
+				"PodFitsResources",
+				"PodFitsHostPorts",
+				"NoDiskConflict",
+				"NoVolumeZoneConflict",
+				"CheckNodeMemoryPressure",
+				"CheckNodeDiskPressure",
+				"MaxEBSVolumeCount",
+				"MaxGCEPDVolumeCount",
+				"MaxAzureDiskVolumeCount",
+				"MatchInterPodAffinity",
+				"GeneralPredicates",
+				"TestServiceAffinity",
+				"TestLabelsPresence",
+			),
+			wantPrioritizers: sets.NewString(
+				"EqualPriority",
+				"ImageLocalityPriority",
+				"LeastRequestedPriority",
+				"BalancedResourceAllocation",
+				"SelectorSpreadPriority",
+				"NodePreferAvoidPodsPriority",
+				"NodeAffinityPriority",
+				"InterPodAffinityPriority",
+				"MostRequestedPriority",
+			),
+			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
+				"FilterPlugin": {
+					{Name: "NodeName"},
+					{Name: "TaintToleration"},
 				},
-				Priorities: []schedulerapi.PriorityPolicy{
-					{Name: "EqualPriority", Weight: 2},
-					{Name: "ImageLocalityPriority", Weight: 2},
-					{Name: "LeastRequestedPriority", Weight: 2},
-					{Name: "BalancedResourceAllocation", Weight: 2},
-					{Name: "SelectorSpreadPriority", Weight: 2},
-					{Name: "NodePreferAvoidPodsPriority", Weight: 2},
-					{Name: "NodeAffinityPriority", Weight: 2},
-					{Name: "TaintTolerationPriority", Weight: 2},
-					{Name: "InterPodAffinityPriority", Weight: 2},
-					{Name: "MostRequestedPriority", Weight: 2},
-				},
+				"ScorePlugin": {{Name: "TaintToleration", Weight: 2}},
 			},
 		},
 		// Do not change this JSON after the corresponding release has been tagged.
@@ -360,49 +368,51 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			"nodeCacheCapable": true
 		  }]
 		}`,
-			ExpectedPolicy: schedulerapi.Policy{
-				Predicates: []schedulerapi.PredicatePolicy{
-					{Name: "MatchNodeSelector"},
-					{Name: "PodFitsResources"},
-					{Name: "PodFitsHostPorts"},
-					{Name: "HostName"},
-					{Name: "NoDiskConflict"},
-					{Name: "NoVolumeZoneConflict"},
-					{Name: "PodToleratesNodeTaints"},
-					{Name: "CheckNodeMemoryPressure"},
-					{Name: "CheckNodeDiskPressure"},
-					{Name: "MaxEBSVolumeCount"},
-					{Name: "MaxGCEPDVolumeCount"},
-					{Name: "MaxAzureDiskVolumeCount"},
-					{Name: "MatchInterPodAffinity"},
-					{Name: "GeneralPredicates"},
-					{Name: "TestServiceAffinity", Argument: &schedulerapi.PredicateArgument{ServiceAffinity: &schedulerapi.ServiceAffinity{Labels: []string{"region"}}}},
-					{Name: "TestLabelsPresence", Argument: &schedulerapi.PredicateArgument{LabelsPresence: &schedulerapi.LabelsPresence{Labels: []string{"foo"}, Presence: true}}},
+			wantPredicates: sets.NewString(
+				"MatchNodeSelector",
+				"PodFitsResources",
+				"PodFitsHostPorts",
+				"NoDiskConflict",
+				"NoVolumeZoneConflict",
+				"CheckNodeMemoryPressure",
+				"CheckNodeDiskPressure",
+				"MaxEBSVolumeCount",
+				"MaxGCEPDVolumeCount",
+				"MaxAzureDiskVolumeCount",
+				"MatchInterPodAffinity",
+				"GeneralPredicates",
+				"TestServiceAffinity",
+				"TestLabelsPresence",
+			),
+			wantPrioritizers: sets.NewString(
+				"EqualPriority",
+				"ImageLocalityPriority",
+				"LeastRequestedPriority",
+				"BalancedResourceAllocation",
+				"SelectorSpreadPriority",
+				"NodePreferAvoidPodsPriority",
+				"NodeAffinityPriority",
+				"InterPodAffinityPriority",
+				"MostRequestedPriority",
+			),
+			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
+				"FilterPlugin": {
+					{Name: "NodeName"},
+					{Name: "TaintToleration"},
 				},
-				Priorities: []schedulerapi.PriorityPolicy{
-					{Name: "EqualPriority", Weight: 2},
-					{Name: "ImageLocalityPriority", Weight: 2},
-					{Name: "LeastRequestedPriority", Weight: 2},
-					{Name: "BalancedResourceAllocation", Weight: 2},
-					{Name: "SelectorSpreadPriority", Weight: 2},
-					{Name: "NodePreferAvoidPodsPriority", Weight: 2},
-					{Name: "NodeAffinityPriority", Weight: 2},
-					{Name: "TaintTolerationPriority", Weight: 2},
-					{Name: "InterPodAffinityPriority", Weight: 2},
-					{Name: "MostRequestedPriority", Weight: 2},
-				},
-				ExtenderConfigs: []schedulerapi.ExtenderConfig{{
-					URLPrefix:        "/prefix",
-					FilterVerb:       "filter",
-					PrioritizeVerb:   "prioritize",
-					Weight:           1,
-					BindVerb:         "bind", // 1.7 was missing json tags on the BindVerb field and required "BindVerb"
-					EnableHTTPS:      true,
-					TLSConfig:        &schedulerapi.ExtenderTLSConfig{Insecure: true},
-					HTTPTimeout:      1,
-					NodeCacheCapable: true,
-				}},
+				"ScorePlugin": {{Name: "TaintToleration", Weight: 2}},
 			},
+			wantExtenders: []schedulerapi.ExtenderConfig{{
+				URLPrefix:        "/prefix",
+				FilterVerb:       "filter",
+				PrioritizeVerb:   "prioritize",
+				Weight:           1,
+				BindVerb:         "bind", // 1.7 was missing json tags on the BindVerb field and required "BindVerb"
+				EnableHTTPS:      true,
+				TLSConfig:        &schedulerapi.ExtenderTLSConfig{Insecure: true},
+				HTTPTimeout:      1,
+				NodeCacheCapable: true,
+			}},
 		},
 		// Do not change this JSON after the corresponding release has been tagged.
 		// A failure indicates backwards compatibility with the specified release was broken.
@@ -451,50 +461,52 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			"nodeCacheCapable": true
 		  }]
 		}`,
-			ExpectedPolicy: schedulerapi.Policy{
-				Predicates: []schedulerapi.PredicatePolicy{
-					{Name: "MatchNodeSelector"},
-					{Name: "PodFitsResources"},
-					{Name: "PodFitsHostPorts"},
-					{Name: "HostName"},
-					{Name: "NoDiskConflict"},
-					{Name: "NoVolumeZoneConflict"},
-					{Name: "PodToleratesNodeTaints"},
-					{Name: "CheckNodeMemoryPressure"},
-					{Name: "CheckNodeDiskPressure"},
-					{Name: "CheckNodeCondition"},
-					{Name: "MaxEBSVolumeCount"},
-					{Name: "MaxGCEPDVolumeCount"},
-					{Name: "MaxAzureDiskVolumeCount"},
-					{Name: "MatchInterPodAffinity"},
-					{Name: "GeneralPredicates"},
-					{Name: "TestServiceAffinity", Argument: &schedulerapi.PredicateArgument{ServiceAffinity: &schedulerapi.ServiceAffinity{Labels: []string{"region"}}}},
-					{Name: "TestLabelsPresence", Argument: &schedulerapi.PredicateArgument{LabelsPresence: &schedulerapi.LabelsPresence{Labels: []string{"foo"}, Presence: true}}},
+			wantPredicates: sets.NewString(
+				"MatchNodeSelector",
+				"PodFitsResources",
+				"PodFitsHostPorts",
+				"NoDiskConflict",
+				"NoVolumeZoneConflict",
+				"CheckNodeMemoryPressure",
+				"CheckNodeDiskPressure",
+				"CheckNodeCondition",
+				"MaxEBSVolumeCount",
+				"MaxGCEPDVolumeCount",
+				"MaxAzureDiskVolumeCount",
+				"MatchInterPodAffinity",
+				"GeneralPredicates",
+				"TestServiceAffinity",
+				"TestLabelsPresence",
+			),
+			wantPrioritizers: sets.NewString(
+				"EqualPriority",
+				"ImageLocalityPriority",
+				"LeastRequestedPriority",
+				"BalancedResourceAllocation",
+				"SelectorSpreadPriority",
+				"NodePreferAvoidPodsPriority",
+				"NodeAffinityPriority",
+				"InterPodAffinityPriority",
+				"MostRequestedPriority",
+			),
+			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
+				"FilterPlugin": {
+					{Name: "NodeName"},
+					{Name: "TaintToleration"},
 				},
-				Priorities: []schedulerapi.PriorityPolicy{
-					{Name: "EqualPriority", Weight: 2},
-					{Name: "ImageLocalityPriority", Weight: 2},
-					{Name: "LeastRequestedPriority", Weight: 2},
-					{Name: "BalancedResourceAllocation", Weight: 2},
-					{Name: "SelectorSpreadPriority", Weight: 2},
-					{Name: "NodePreferAvoidPodsPriority", Weight: 2},
-					{Name: "NodeAffinityPriority", Weight: 2},
-					{Name: "TaintTolerationPriority", Weight: 2},
-					{Name: "InterPodAffinityPriority", Weight: 2},
-					{Name: "MostRequestedPriority", Weight: 2},
-				},
-				ExtenderConfigs: []schedulerapi.ExtenderConfig{{
-					URLPrefix:        "/prefix",
-					FilterVerb:       "filter",
-					PrioritizeVerb:   "prioritize",
-					Weight:           1,
-					BindVerb:         "bind", // 1.8 became case-insensitive and tolerated "bindVerb"
-					EnableHTTPS:      true,
-					TLSConfig:        &schedulerapi.ExtenderTLSConfig{Insecure: true},
-					HTTPTimeout:      1,
-					NodeCacheCapable: true,
-				}},
+				"ScorePlugin": {{Name: "TaintToleration", Weight: 2}},
 			},
+			wantExtenders: []schedulerapi.ExtenderConfig{{
+				URLPrefix:        "/prefix",
+				FilterVerb:       "filter",
+				PrioritizeVerb:   "prioritize",
+				Weight:           1,
+				BindVerb:         "bind", // 1.8 became case-insensitive and tolerated "bindVerb"
+				EnableHTTPS:      true,
+				TLSConfig:        &schedulerapi.ExtenderTLSConfig{Insecure: true},
+				HTTPTimeout:      1,
+				NodeCacheCapable: true,
+			}},
 		},
 		// Do not change this JSON after the corresponding release has been tagged.
 		// A failure indicates backwards compatibility with the specified release was broken.
@@ -544,51 +556,53 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			"nodeCacheCapable": true
 		  }]
 		}`,
-			ExpectedPolicy: schedulerapi.Policy{
-				Predicates: []schedulerapi.PredicatePolicy{
-					{Name: "MatchNodeSelector"},
-					{Name: "PodFitsResources"},
-					{Name: "PodFitsHostPorts"},
-					{Name: "HostName"},
-					{Name: "NoDiskConflict"},
-					{Name: "NoVolumeZoneConflict"},
-					{Name: "PodToleratesNodeTaints"},
-					{Name: "CheckNodeMemoryPressure"},
-					{Name: "CheckNodeDiskPressure"},
-					{Name: "CheckNodeCondition"},
-					{Name: "MaxEBSVolumeCount"},
-					{Name: "MaxGCEPDVolumeCount"},
-					{Name: "MaxAzureDiskVolumeCount"},
-					{Name: "MatchInterPodAffinity"},
-					{Name: "GeneralPredicates"},
-					{Name: "CheckVolumeBinding"},
-					{Name: "TestServiceAffinity", Argument: &schedulerapi.PredicateArgument{ServiceAffinity: &schedulerapi.ServiceAffinity{Labels: []string{"region"}}}},
-					{Name: "TestLabelsPresence", Argument: &schedulerapi.PredicateArgument{LabelsPresence: &schedulerapi.LabelsPresence{Labels: []string{"foo"}, Presence: true}}},
+			wantPredicates: sets.NewString(
+				"MatchNodeSelector",
+				"PodFitsResources",
+				"PodFitsHostPorts",
+				"NoDiskConflict",
+				"NoVolumeZoneConflict",
+				"CheckNodeMemoryPressure",
+				"CheckNodeDiskPressure",
+				"CheckNodeCondition",
+				"MaxEBSVolumeCount",
+				"MaxGCEPDVolumeCount",
+				"MaxAzureDiskVolumeCount",
+				"MatchInterPodAffinity",
+				"GeneralPredicates",
+				"CheckVolumeBinding",
+				"TestServiceAffinity",
+				"TestLabelsPresence",
+			),
+			wantPrioritizers: sets.NewString(
+				"EqualPriority",
+				"ImageLocalityPriority",
+				"LeastRequestedPriority",
+				"BalancedResourceAllocation",
+				"SelectorSpreadPriority",
+				"NodePreferAvoidPodsPriority",
+				"NodeAffinityPriority",
+				"InterPodAffinityPriority",
+				"MostRequestedPriority",
+			),
+			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
+				"FilterPlugin": {
+					{Name: "NodeName"},
+					{Name: "TaintToleration"},
 				},
-				Priorities: []schedulerapi.PriorityPolicy{
-					{Name: "EqualPriority", Weight: 2},
-					{Name: "ImageLocalityPriority", Weight: 2},
-					{Name: "LeastRequestedPriority", Weight: 2},
-					{Name: "BalancedResourceAllocation", Weight: 2},
-					{Name: "SelectorSpreadPriority", Weight: 2},
-					{Name: "NodePreferAvoidPodsPriority", Weight: 2},
-					{Name: "NodeAffinityPriority", Weight: 2},
-					{Name: "TaintTolerationPriority", Weight: 2},
-					{Name: "InterPodAffinityPriority", Weight: 2},
-					{Name: "MostRequestedPriority", Weight: 2},
-				},
-				ExtenderConfigs: []schedulerapi.ExtenderConfig{{
-					URLPrefix:        "/prefix",
-					FilterVerb:       "filter",
-					PrioritizeVerb:   "prioritize",
-					Weight:           1,
-					BindVerb:         "bind", // 1.9 was case-insensitive and tolerated "bindVerb"
-					EnableHTTPS:      true,
-					TLSConfig:        &schedulerapi.ExtenderTLSConfig{Insecure: true},
-					HTTPTimeout:      1,
-					NodeCacheCapable: true,
-				}},
+				"ScorePlugin": {{Name: "TaintToleration", Weight: 2}},
 			},
+			wantExtenders: []schedulerapi.ExtenderConfig{{
+				URLPrefix:        "/prefix",
+				FilterVerb:       "filter",
+				PrioritizeVerb:   "prioritize",
+				Weight:           1,
+				BindVerb:         "bind", // 1.9 was case-insensitive and tolerated "bindVerb"
+				EnableHTTPS:      true,
+				TLSConfig:        &schedulerapi.ExtenderTLSConfig{Insecure: true},
+				HTTPTimeout:      1,
+				NodeCacheCapable: true,
+			}},
 		},
 
 		// Do not change this JSON after the corresponding release has been tagged.
@@ -642,54 +656,56 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			"ignorable":true
 		  }]
 		}`,
-			ExpectedPolicy: schedulerapi.Policy{
-				Predicates: []schedulerapi.PredicatePolicy{
-					{Name: "MatchNodeSelector"},
-					{Name: "PodFitsResources"},
-					{Name: "PodFitsHostPorts"},
-					{Name: "HostName"},
-					{Name: "NoDiskConflict"},
-					{Name: "NoVolumeZoneConflict"},
-					{Name: "PodToleratesNodeTaints"},
-					{Name: "CheckNodeMemoryPressure"},
-					{Name: "CheckNodeDiskPressure"},
-					{Name: "CheckNodePIDPressure"},
-					{Name: "CheckNodeCondition"},
-					{Name: "MaxEBSVolumeCount"},
-					{Name: "MaxGCEPDVolumeCount"},
-					{Name: "MaxAzureDiskVolumeCount"},
-					{Name: "MatchInterPodAffinity"},
-					{Name: "GeneralPredicates"},
-					{Name: "CheckVolumeBinding"},
-					{Name: "TestServiceAffinity", Argument: &schedulerapi.PredicateArgument{ServiceAffinity: &schedulerapi.ServiceAffinity{Labels: []string{"region"}}}},
-					{Name: "TestLabelsPresence", Argument: &schedulerapi.PredicateArgument{LabelsPresence: &schedulerapi.LabelsPresence{Labels: []string{"foo"}, Presence: true}}},
+			wantPredicates: sets.NewString(
+				"MatchNodeSelector",
+				"PodFitsResources",
+				"PodFitsHostPorts",
+				"NoDiskConflict",
+				"NoVolumeZoneConflict",
+				"CheckNodeMemoryPressure",
+				"CheckNodeDiskPressure",
+				"CheckNodePIDPressure",
+				"CheckNodeCondition",
+				"MaxEBSVolumeCount",
+				"MaxGCEPDVolumeCount",
+				"MaxAzureDiskVolumeCount",
+				"MatchInterPodAffinity",
+				"GeneralPredicates",
+				"CheckVolumeBinding",
+				"TestServiceAffinity",
+				"TestLabelsPresence",
+			),
+			wantPrioritizers: sets.NewString(
+				"EqualPriority",
+				"ImageLocalityPriority",
+				"LeastRequestedPriority",
+				"BalancedResourceAllocation",
+				"SelectorSpreadPriority",
+				"NodePreferAvoidPodsPriority",
+				"NodeAffinityPriority",
+				"InterPodAffinityPriority",
+				"MostRequestedPriority",
+			),
+			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
+				"FilterPlugin": {
+					{Name: "NodeName"},
+					{Name: "TaintToleration"},
 				},
-				Priorities: []schedulerapi.PriorityPolicy{
-					{Name: "EqualPriority", Weight: 2},
-					{Name: "ImageLocalityPriority", Weight: 2},
-					{Name: "LeastRequestedPriority", Weight: 2},
-					{Name: "BalancedResourceAllocation", Weight: 2},
-					{Name: "SelectorSpreadPriority", Weight: 2},
-					{Name: "NodePreferAvoidPodsPriority", Weight: 2},
-					{Name: "NodeAffinityPriority", Weight: 2},
-					{Name: "TaintTolerationPriority", Weight: 2},
-					{Name: "InterPodAffinityPriority", Weight: 2},
-					{Name: "MostRequestedPriority", Weight: 2},
-				},
-				ExtenderConfigs: []schedulerapi.ExtenderConfig{{
-					URLPrefix:        "/prefix",
-					FilterVerb:       "filter",
-					PrioritizeVerb:   "prioritize",
-					Weight:           1,
-					BindVerb:         "bind", // 1.10 was case-insensitive and tolerated "bindVerb"
-					EnableHTTPS:      true,
-					TLSConfig:        &schedulerapi.ExtenderTLSConfig{Insecure: true},
-					HTTPTimeout:      1,
-					NodeCacheCapable: true,
-					ManagedResources: []schedulerapi.ExtenderManagedResource{{Name: v1.ResourceName("example.com/foo"), IgnoredByScheduler: true}},
-					Ignorable:        true,
-				}},
+				"ScorePlugin": {{Name: "TaintToleration", Weight: 2}},
 			},
+			wantExtenders: []schedulerapi.ExtenderConfig{{
+				URLPrefix:        "/prefix",
+				FilterVerb:       "filter",
+				PrioritizeVerb:   "prioritize",
+				Weight:           1,
+				BindVerb:         "bind", // 1.10 was case-insensitive and tolerated "bindVerb"
+				EnableHTTPS:      true,
+				TLSConfig:        &schedulerapi.ExtenderTLSConfig{Insecure: true},
+				HTTPTimeout:      1,
+				NodeCacheCapable: true,
+				ManagedResources: []schedulerapi.ExtenderManagedResource{{Name: v1.ResourceName("example.com/foo"), IgnoredByScheduler: true}},
+				Ignorable:        true,
+			}},
 		},
 		// Do not change this JSON after the corresponding release has been tagged.
 		// A failure indicates backwards compatibility with the specified release was broken.
@@ -753,65 +769,57 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			"ignorable":true
 		  }]
 		}`,
-			ExpectedPolicy: schedulerapi.Policy{
-				Predicates: []schedulerapi.PredicatePolicy{
-					{Name: "MatchNodeSelector"},
-					{Name: "PodFitsResources"},
-					{Name: "PodFitsHostPorts"},
-					{Name: "HostName"},
-					{Name: "NoDiskConflict"},
-					{Name: "NoVolumeZoneConflict"},
-					{Name: "PodToleratesNodeTaints"},
-					{Name: "CheckNodeMemoryPressure"},
-					{Name: "CheckNodeDiskPressure"},
-					{Name: "CheckNodePIDPressure"},
-					{Name: "CheckNodeCondition"},
-					{Name: "MaxEBSVolumeCount"},
-					{Name: "MaxGCEPDVolumeCount"},
-					{Name: "MaxAzureDiskVolumeCount"},
-					{Name: "MatchInterPodAffinity"},
-					{Name: "GeneralPredicates"},
-					{Name: "CheckVolumeBinding"},
-					{Name: "TestServiceAffinity", Argument: &schedulerapi.PredicateArgument{ServiceAffinity: &schedulerapi.ServiceAffinity{Labels: []string{"region"}}}},
-					{Name: "TestLabelsPresence", Argument: &schedulerapi.PredicateArgument{LabelsPresence: &schedulerapi.LabelsPresence{Labels: []string{"foo"}, Presence: true}}},
+			wantPredicates: sets.NewString(
+				"MatchNodeSelector",
+				"PodFitsResources",
+				"PodFitsHostPorts",
+				"NoDiskConflict",
+				"NoVolumeZoneConflict",
+				"CheckNodeMemoryPressure",
+				"CheckNodeDiskPressure",
+				"CheckNodePIDPressure",
+				"CheckNodeCondition",
+				"MaxEBSVolumeCount",
+				"MaxGCEPDVolumeCount",
+				"MaxAzureDiskVolumeCount",
+				"MatchInterPodAffinity",
+				"GeneralPredicates",
+				"CheckVolumeBinding",
+				"TestServiceAffinity",
+				"TestLabelsPresence",
+			),
+			wantPrioritizers: sets.NewString(
+				"EqualPriority",
+				"ImageLocalityPriority",
+				"LeastRequestedPriority",
+				"BalancedResourceAllocation",
+				"SelectorSpreadPriority",
+				"NodePreferAvoidPodsPriority",
+				"NodeAffinityPriority",
+				"InterPodAffinityPriority",
+				"MostRequestedPriority",
+				"RequestedToCapacityRatioPriority",
+			),
+			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
+				"FilterPlugin": {
+					{Name: "NodeName"},
+					{Name: "TaintToleration"},
 				},
-				Priorities: []schedulerapi.PriorityPolicy{
-					{Name: "EqualPriority", Weight: 2},
-					{Name: "ImageLocalityPriority", Weight: 2},
-					{Name: "LeastRequestedPriority", Weight: 2},
-					{Name: "BalancedResourceAllocation", Weight: 2},
-					{Name: "SelectorSpreadPriority", Weight: 2},
-					{Name: "NodePreferAvoidPodsPriority", Weight: 2},
-					{Name: "NodeAffinityPriority", Weight: 2},
-					{Name: "TaintTolerationPriority", Weight: 2},
-					{Name: "InterPodAffinityPriority", Weight: 2},
-					{Name: "MostRequestedPriority", Weight: 2},
-					{
-						Name:   "RequestedToCapacityRatioPriority",
-						Weight: 2,
-						Argument: &schedulerapi.PriorityArgument{
-							RequestedToCapacityRatioArguments: &schedulerapi.RequestedToCapacityRatioArguments{
-								UtilizationShape: []schedulerapi.UtilizationShapePoint{
-									{Utilization: 0, Score: 0},
-									{Utilization: 50, Score: 7},
-								}},
-						},
-					},
-				},
-				ExtenderConfigs: []schedulerapi.ExtenderConfig{{
-					URLPrefix:        "/prefix",
-					FilterVerb:       "filter",
-					PrioritizeVerb:   "prioritize",
-					Weight:           1,
-					BindVerb:         "bind", // 1.11 restored case-sensitivity, but allowed either "BindVerb" or "bindVerb"
-					EnableHTTPS:      true,
-					TLSConfig:        &schedulerapi.ExtenderTLSConfig{Insecure: true},
-					HTTPTimeout:      1,
-					NodeCacheCapable: true,
-					ManagedResources: []schedulerapi.ExtenderManagedResource{{Name: v1.ResourceName("example.com/foo"), IgnoredByScheduler: true}},
-					Ignorable:        true,
-				}},
+				"ScorePlugin": {{Name: "TaintToleration", Weight: 2}},
 			},
+			wantExtenders: []schedulerapi.ExtenderConfig{{
+				URLPrefix:        "/prefix",
+				FilterVerb:       "filter",
+				PrioritizeVerb:   "prioritize",
+				Weight:           1,
+				BindVerb:         "bind", // 1.11 restored case-sensitivity, but allowed either "BindVerb" or "bindVerb"
+				EnableHTTPS:      true,
+				TLSConfig:        &schedulerapi.ExtenderTLSConfig{Insecure: true},
+				HTTPTimeout:      1,
+				NodeCacheCapable: true,
+				ManagedResources: []schedulerapi.ExtenderManagedResource{{Name: v1.ResourceName("example.com/foo"), IgnoredByScheduler: true}},
+				Ignorable:        true,
+			}},
 		},
 		// Do not change this JSON after the corresponding release has been tagged.
 		// A failure indicates backwards compatibility with the specified release was broken.
@@ -876,66 +884,58 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			"ignorable":true
 		  }]
 		}`,
-			ExpectedPolicy: schedulerapi.Policy{
-				Predicates: []schedulerapi.PredicatePolicy{
-					{Name: "MatchNodeSelector"},
-					{Name: "PodFitsResources"},
-					{Name: "PodFitsHostPorts"},
-					{Name: "HostName"},
-					{Name: "NoDiskConflict"},
-					{Name: "NoVolumeZoneConflict"},
-					{Name: "PodToleratesNodeTaints"},
-					{Name: "CheckNodeMemoryPressure"},
-					{Name: "CheckNodeDiskPressure"},
-					{Name: "CheckNodePIDPressure"},
-					{Name: "CheckNodeCondition"},
-					{Name: "MaxEBSVolumeCount"},
-					{Name: "MaxGCEPDVolumeCount"},
-					{Name: "MaxAzureDiskVolumeCount"},
-					{Name: "MaxCSIVolumeCountPred"},
-					{Name: "MatchInterPodAffinity"},
-					{Name: "GeneralPredicates"},
-					{Name: "CheckVolumeBinding"},
-					{Name: "TestServiceAffinity", Argument: &schedulerapi.PredicateArgument{ServiceAffinity: &schedulerapi.ServiceAffinity{Labels: []string{"region"}}}},
-					{Name: "TestLabelsPresence", Argument: &schedulerapi.PredicateArgument{LabelsPresence: &schedulerapi.LabelsPresence{Labels: []string{"foo"}, Presence: true}}},
+			wantPredicates: sets.NewString(
+				"MatchNodeSelector",
+				"PodFitsResources",
+				"PodFitsHostPorts",
+				"NoDiskConflict",
+				"NoVolumeZoneConflict",
+				"CheckNodeMemoryPressure",
+				"CheckNodeDiskPressure",
+				"CheckNodePIDPressure",
+				"CheckNodeCondition",
+				"MaxEBSVolumeCount",
+				"MaxGCEPDVolumeCount",
+				"MaxAzureDiskVolumeCount",
+				"MaxCSIVolumeCountPred",
+				"MatchInterPodAffinity",
+				"GeneralPredicates",
+				"CheckVolumeBinding",
+				"TestServiceAffinity",
+				"TestLabelsPresence",
+			),
+			wantPrioritizers: sets.NewString(
+				"EqualPriority",
+				"ImageLocalityPriority",
+				"LeastRequestedPriority",
+				"BalancedResourceAllocation",
+				"SelectorSpreadPriority",
+				"NodePreferAvoidPodsPriority",
+				"NodeAffinityPriority",
+				"InterPodAffinityPriority",
+				"MostRequestedPriority",
+				"RequestedToCapacityRatioPriority",
+			),
+			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
+				"FilterPlugin": {
+					{Name: "NodeName"},
+					{Name: "TaintToleration"},
 				},
-				Priorities: []schedulerapi.PriorityPolicy{
-					{Name: "EqualPriority", Weight: 2},
-					{Name: "ImageLocalityPriority", Weight: 2},
-					{Name: "LeastRequestedPriority", Weight: 2},
-					{Name: "BalancedResourceAllocation", Weight: 2},
-					{Name: "SelectorSpreadPriority", Weight: 2},
-					{Name: "NodePreferAvoidPodsPriority", Weight: 2},
-					{Name: "NodeAffinityPriority", Weight: 2},
-					{Name: "TaintTolerationPriority", Weight: 2},
-					{Name: "InterPodAffinityPriority", Weight: 2},
-					{Name: "MostRequestedPriority", Weight: 2},
-					{
-						Name:   "RequestedToCapacityRatioPriority",
-						Weight: 2,
-						Argument: &schedulerapi.PriorityArgument{
-							RequestedToCapacityRatioArguments: &schedulerapi.RequestedToCapacityRatioArguments{
-								UtilizationShape: []schedulerapi.UtilizationShapePoint{
-									{Utilization: 0, Score: 0},
-									{Utilization: 50, Score: 7},
-								}},
-						},
-					},
-				},
-				ExtenderConfigs: []schedulerapi.ExtenderConfig{{
-					URLPrefix:        "/prefix",
-					FilterVerb:       "filter",
-					PrioritizeVerb:   "prioritize",
-					Weight:           1,
-					BindVerb:         "bind", // 1.11 restored case-sensitivity, but allowed either "BindVerb" or "bindVerb"
-					EnableHTTPS:      true,
-					TLSConfig:        &schedulerapi.ExtenderTLSConfig{Insecure: true},
-					HTTPTimeout:      1,
-					NodeCacheCapable: true,
-					ManagedResources: []schedulerapi.ExtenderManagedResource{{Name: v1.ResourceName("example.com/foo"), IgnoredByScheduler: true}},
-					Ignorable:        true,
-				}},
+				"ScorePlugin": {{Name: "TaintToleration", Weight: 2}},
 			},
+			wantExtenders: []schedulerapi.ExtenderConfig{{
+				URLPrefix:        "/prefix",
+				FilterVerb:       "filter",
+				PrioritizeVerb:   "prioritize",
+				Weight:           1,
+				BindVerb:         "bind", // 1.11 restored case-sensitivity, but allowed either "BindVerb" or "bindVerb"
+				EnableHTTPS:      true,
+				TLSConfig:        &schedulerapi.ExtenderTLSConfig{Insecure: true},
+				HTTPTimeout:      1,
+				NodeCacheCapable: true,
+				ManagedResources: []schedulerapi.ExtenderManagedResource{{Name: v1.ResourceName("example.com/foo"), IgnoredByScheduler: true}},
+				Ignorable:        true,
+			}},
 		},
 		"1.14": {
 			JSON: `{
@@ -999,123 +999,280 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			"ignorable":true
 		  }]
 		}`,
-			ExpectedPolicy: schedulerapi.Policy{
-				Predicates: []schedulerapi.PredicatePolicy{
-					{Name: "MatchNodeSelector"},
-					{Name: "PodFitsResources"},
-					{Name: "PodFitsHostPorts"},
-					{Name: "HostName"},
-					{Name: "NoDiskConflict"},
-					{Name: "NoVolumeZoneConflict"},
-					{Name: "PodToleratesNodeTaints"},
-					{Name: "CheckNodeMemoryPressure"},
-					{Name: "CheckNodeDiskPressure"},
-					{Name: "CheckNodePIDPressure"},
-					{Name: "CheckNodeCondition"},
-					{Name: "MaxEBSVolumeCount"},
-					{Name: "MaxGCEPDVolumeCount"},
-					{Name: "MaxAzureDiskVolumeCount"},
-					{Name: "MaxCSIVolumeCountPred"},
-					{Name: "MaxCinderVolumeCount"},
-					{Name: "MatchInterPodAffinity"},
-					{Name: "GeneralPredicates"},
-					{Name: "CheckVolumeBinding"},
-					{Name: "TestServiceAffinity", Argument: &schedulerapi.PredicateArgument{ServiceAffinity: &schedulerapi.ServiceAffinity{Labels: []string{"region"}}}},
-					{Name: "TestLabelsPresence", Argument: &schedulerapi.PredicateArgument{LabelsPresence: &schedulerapi.LabelsPresence{Labels: []string{"foo"}, Presence: true}}},
+			wantPredicates: sets.NewString(
+				"MatchNodeSelector",
+				"PodFitsResources",
+				"PodFitsHostPorts",
+				"NoDiskConflict",
+				"NoVolumeZoneConflict",
+				"CheckNodeMemoryPressure",
+				"CheckNodeDiskPressure",
+				"CheckNodePIDPressure",
+				"CheckNodeCondition",
+				"MaxEBSVolumeCount",
+				"MaxGCEPDVolumeCount",
+				"MaxAzureDiskVolumeCount",
+				"MaxCSIVolumeCountPred",
+				"MaxCinderVolumeCount",
+				"MatchInterPodAffinity",
+				"GeneralPredicates",
+				"CheckVolumeBinding",
+				"TestServiceAffinity",
+				"TestLabelsPresence",
+			),
+			wantPrioritizers: sets.NewString(
+				"EqualPriority",
+				"ImageLocalityPriority",
+				"LeastRequestedPriority",
+				"BalancedResourceAllocation",
+				"SelectorSpreadPriority",
+				"NodePreferAvoidPodsPriority",
+				"NodeAffinityPriority",
+				"InterPodAffinityPriority",
+				"MostRequestedPriority",
+				"RequestedToCapacityRatioPriority",
+			),
+			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
+				"FilterPlugin": {
+					{Name: "NodeName"},
+					{Name: "TaintToleration"},
 				},
-				Priorities: []schedulerapi.PriorityPolicy{
-					{Name: "EqualPriority", Weight: 2},
-					{Name: "ImageLocalityPriority", Weight: 2},
-					{Name: "LeastRequestedPriority", Weight: 2},
-					{Name: "BalancedResourceAllocation", Weight: 2},
-					{Name: "SelectorSpreadPriority", Weight: 2},
-					{Name: "NodePreferAvoidPodsPriority", Weight: 2},
-					{Name: "NodeAffinityPriority", Weight: 2},
-					{Name: "TaintTolerationPriority", Weight: 2},
-					{Name: "InterPodAffinityPriority", Weight: 2},
-					{Name: "MostRequestedPriority", Weight: 2},
-					{
-						Name:   "RequestedToCapacityRatioPriority",
-						Weight: 2,
-						Argument: &schedulerapi.PriorityArgument{
-							RequestedToCapacityRatioArguments: &schedulerapi.RequestedToCapacityRatioArguments{
-								UtilizationShape: []schedulerapi.UtilizationShapePoint{
-									{Utilization: 0, Score: 0},
-									{Utilization: 50, Score: 7},
-								}},
-						},
-					},
-				},
-				ExtenderConfigs: []schedulerapi.ExtenderConfig{{
-					URLPrefix:        "/prefix",
-					FilterVerb:       "filter",
-					PrioritizeVerb:   "prioritize",
-					Weight:           1,
-					BindVerb:         "bind", // 1.11 restored case-sensitivity, but allowed either "BindVerb" or "bindVerb"
-					EnableHTTPS:      true,
-					TLSConfig:        &schedulerapi.ExtenderTLSConfig{Insecure: true},
-					HTTPTimeout:      1,
-					NodeCacheCapable: true,
-					ManagedResources: []schedulerapi.ExtenderManagedResource{{Name: v1.ResourceName("example.com/foo"), IgnoredByScheduler: true}},
-					Ignorable:        true,
-				}},
+				"ScorePlugin": {{Name: "TaintToleration", Weight: 2}},
 			},
+			wantExtenders: []schedulerapi.ExtenderConfig{{
+				URLPrefix:        "/prefix",
+				FilterVerb:       "filter",
+				PrioritizeVerb:   "prioritize",
+				Weight:           1,
+				BindVerb:         "bind", // 1.11 restored case-sensitivity, but allowed either "BindVerb" or "bindVerb"
+				EnableHTTPS:      true,
+				TLSConfig:        &schedulerapi.ExtenderTLSConfig{Insecure: true},
+				HTTPTimeout:      1,
+				NodeCacheCapable: true,
+				ManagedResources: []schedulerapi.ExtenderManagedResource{{Name: v1.ResourceName("example.com/foo"), IgnoredByScheduler: true}},
+				Ignorable:        true,
+			}},
+		},
+		"1.16": {
+			JSON: `{
+		  "kind": "Policy",
+		  "apiVersion": "v1",
+		  "predicates": [
+			{"name": "MatchNodeSelector"},
+			{"name": "PodFitsResources"},
+			{"name": "PodFitsHostPorts"},
+			{"name": "HostName"},
+			{"name": "NoDiskConflict"},
+			{"name": "NoVolumeZoneConflict"},
+			{"name": "PodToleratesNodeTaints"},
+			{"name": "CheckNodeMemoryPressure"},
+			{"name": "CheckNodeDiskPressure"},
+			{"name": "CheckNodePIDPressure"},
+			{"name": "CheckNodeCondition"},
+			{"name": "MaxEBSVolumeCount"},
+			{"name": "MaxGCEPDVolumeCount"},
+			{"name": "MaxAzureDiskVolumeCount"},
+			{"name": "MaxCSIVolumeCountPred"},
+                        {"name": "MaxCinderVolumeCount"},
+			{"name": "MatchInterPodAffinity"},
+			{"name": "GeneralPredicates"},
+			{"name": "CheckVolumeBinding"},
+			{"name": "TestServiceAffinity", "argument": {"serviceAffinity" : {"labels" : ["region"]}}},
+			{"name": "TestLabelsPresence",  "argument": {"labelsPresence"  : {"labels" : ["foo"], "presence":true}}}
+		  ],"priorities": [
+			{"name": "EqualPriority",   "weight": 2},
+			{"name": "ImageLocalityPriority",   "weight": 2},
+			{"name": "LeastRequestedPriority",   "weight": 2},
+			{"name": "BalancedResourceAllocation",   "weight": 2},
+			{"name": "SelectorSpreadPriority",   "weight": 2},
+			{"name": "NodePreferAvoidPodsPriority",   "weight": 2},
+			{"name": "NodeAffinityPriority",   "weight": 2},
+			{"name": "TaintTolerationPriority",   "weight": 2},
+			{"name": "InterPodAffinityPriority",   "weight": 2},
+			{"name": "MostRequestedPriority",   "weight": 2},
+			{
+				"name": "RequestedToCapacityRatioPriority",
+				"weight": 2,
+				"argument": {
+				"requestedToCapacityRatioArguments": {
+					"shape": [
+						{"utilization": 0,  "score": 0},
+						{"utilization": 50, "score": 7}
+					],
+					"resources": [
+						{"name": "intel.com/foo", "weight": 3},
+						{"name": "intel.com/bar", "weight": 5}
+					]
+				}
+			}}
+		  ],"extenders": [{
+			"urlPrefix":        "/prefix",
+			"filterVerb":       "filter",
+			"prioritizeVerb":   "prioritize",
+			"weight":           1,
+			"bindVerb":         "bind",
+			"enableHttps":      true,
+			"tlsConfig":        {"Insecure":true},
+			"httpTimeout":      1,
+			"nodeCacheCapable": true,
+			"managedResources": [{"name":"example.com/foo","ignoredByScheduler":true}],
+			"ignorable":true
+		  }]
+		}`,
+			wantPredicates: sets.NewString(
+				"MatchNodeSelector",
+				"PodFitsResources",
+				"PodFitsHostPorts",
+				"NoDiskConflict",
+				"NoVolumeZoneConflict",
+				"CheckNodeMemoryPressure",
+				"CheckNodeDiskPressure",
+				"CheckNodePIDPressure",
+				"CheckNodeCondition",
+				"MaxEBSVolumeCount",
+				"MaxGCEPDVolumeCount",
+				"MaxAzureDiskVolumeCount",
+				"MaxCSIVolumeCountPred",
+				"MaxCinderVolumeCount",
+				"MatchInterPodAffinity",
+				"GeneralPredicates",
+				"CheckVolumeBinding",
+				"TestServiceAffinity",
+				"TestLabelsPresence",
+			),
+			wantPrioritizers: sets.NewString(
+				"EqualPriority",
+				"ImageLocalityPriority",
+				"LeastRequestedPriority",
+				"BalancedResourceAllocation",
+				"SelectorSpreadPriority",
+				"NodePreferAvoidPodsPriority",
+				"NodeAffinityPriority",
+				"InterPodAffinityPriority",
+				"MostRequestedPriority",
+				"RequestedToCapacityRatioPriority",
+			),
+			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
+				"FilterPlugin": {
+					{Name: "NodeName"},
+					{Name: "TaintToleration"},
+				},
+				"ScorePlugin": {{Name: "TaintToleration", Weight: 2}},
+			},
+			wantExtenders: []schedulerapi.ExtenderConfig{{
+				URLPrefix:        "/prefix",
+				FilterVerb:       "filter",
+				PrioritizeVerb:   "prioritize",
+				Weight:           1,
+				BindVerb:         "bind", // 1.11 restored case-sensitivity, but allowed either "BindVerb" or "bindVerb"
+				EnableHTTPS:      true,
+				TLSConfig:        &schedulerapi.ExtenderTLSConfig{Insecure: true},
+				HTTPTimeout:      1,
+				NodeCacheCapable: true,
+				ManagedResources: []schedulerapi.ExtenderManagedResource{{Name: v1.ResourceName("example.com/foo"), IgnoredByScheduler: true}},
+				Ignorable:        true,
+			}},
 		},
 	}
-
 	registeredPredicates := sets.NewString(factory.ListRegisteredFitPredicates()...)
 	registeredPriorities := sets.NewString(factory.ListRegisteredPriorityFunctions()...)
 	seenPredicates := sets.NewString()
 	seenPriorities := sets.NewString()
+	mandatoryPredicates := sets.NewString("CheckNodeCondition")
+	filterToPredicateMap := map[string]string{
+		"TaintToleration": "PodToleratesNodeTaints",
+		"NodeName":        "HostName",
+	}
+	scoreToPriorityMap := map[string]string{
+		"TaintToleration": "TaintTolerationPriority",
+	}
 
 	for v, tc := range schedulerFiles {
-		fmt.Printf("%s: Testing scheduler config\n", v)
+		t.Run(v, func(t *testing.T) {
+			policyConfigMap := v1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: "scheduler-custom-policy-config"},
+				Data:       map[string]string{schedulerconfig.SchedulerPolicyConfigMapKey: tc.JSON},
+			}
+			client := fake.NewSimpleClientset(&policyConfigMap)
+			algorithmSrc := schedulerconfig.SchedulerAlgorithmSource{
+				Policy: &schedulerconfig.SchedulerPolicySource{
+					ConfigMap: &kubeschedulerconfig.SchedulerPolicyConfigMapSource{
+						Namespace: policyConfigMap.Namespace,
+						Name:      policyConfigMap.Name,
+					},
+				},
+			}
+			informerFactory := informers.NewSharedInformerFactory(client, 0)
 
-		policy := schedulerapi.Policy{}
-		if err := runtime.DecodeInto(latestschedulerapi.Codec, []byte(tc.JSON), &policy); err != nil {
-			t.Errorf("%s: Error decoding: %v", v, err)
-			continue
-		}
-		for _, predicate := range policy.Predicates {
-			seenPredicates.Insert(predicate.Name)
-		}
-		for _, priority := range policy.Priorities {
-			seenPriorities.Insert(priority.Name)
-		}
-		if !reflect.DeepEqual(policy, tc.ExpectedPolicy) {
-			t.Errorf("%s: Expected:\n\t%#v\nGot:\n\t%#v", v, tc.ExpectedPolicy, policy)
-		}
+			sched, err := scheduler.New(
+				client,
+				informerFactory.Core().V1().Nodes(),
+				informerFactory.Core().V1().Pods(),
+				informerFactory.Core().V1().PersistentVolumes(),
+				informerFactory.Core().V1().PersistentVolumeClaims(),
+				informerFactory.Core().V1().ReplicationControllers(),
+				informerFactory.Apps().V1().ReplicaSets(),
+				informerFactory.Apps().V1().StatefulSets(),
+				informerFactory.Core().V1().Services(),
+				informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
+				informerFactory.Storage().V1().StorageClasses(),
+				informerFactory.Storage().V1beta1().CSINodes(),
+				nil,
+				algorithmSrc,
+				make(chan struct{}),
+			)
 
-		handler := utiltesting.FakeHandler{
-			StatusCode:   500,
-			ResponseBody: "",
-			T:            t,
-		}
-		server := httptest.NewServer(&handler)
-		defer server.Close()
-		client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
-		informerFactory := informers.NewSharedInformerFactory(client, 0)
+			if err != nil {
+				t.Fatalf("%s: Error constructing: %v", v, err)
+			}
+			gotPredicates := sets.NewString()
+			for p := range sched.Algorithm.Predicates() {
+				gotPredicates.Insert(p)
+			}
+			wantPredicates := tc.wantPredicates.Union(mandatoryPredicates)
+			if !gotPredicates.Equal(wantPredicates) {
+				t.Errorf("Got predicates %v, want %v", gotPredicates, wantPredicates)
+			}
 
-		if _, err := factory.NewConfigFactory(&factory.ConfigFactoryArgs{
-			SchedulerName:                  "some-scheduler-name",
-			Client:                         client,
-			NodeInformer:                   informerFactory.Core().V1().Nodes(),
-			PodInformer:                    informerFactory.Core().V1().Pods(),
-			PvInformer:                     informerFactory.Core().V1().PersistentVolumes(),
-			PvcInformer:                    informerFactory.Core().V1().PersistentVolumeClaims(),
-			ReplicationControllerInformer:  informerFactory.Core().V1().ReplicationControllers(),
-			ReplicaSetInformer:             informerFactory.Apps().V1().ReplicaSets(),
-			StatefulSetInformer:            informerFactory.Apps().V1().StatefulSets(),
-			ServiceInformer:                informerFactory.Core().V1().Services(),
-			PdbInformer:                    informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
-			StorageClassInformer:           informerFactory.Storage().V1().StorageClasses(),
-			HardPodAffinitySymmetricWeight: v1.DefaultHardPodAffinitySymmetricWeight,
-			DisablePreemption:              false,
-			PercentageOfNodesToScore:       schedulerapi.DefaultPercentageOfNodesToScore,
-		}).CreateFromConfig(policy); err != nil {
-			t.Errorf("%s: Error constructing: %v", v, err)
-			continue
-		}
+			gotPrioritizers := sets.NewString()
+			for _, p := range sched.Algorithm.Prioritizers() {
+				gotPrioritizers.Insert(p.Name)
+			}
+			if !gotPrioritizers.Equal(tc.wantPrioritizers) {
+				t.Errorf("Got prioritizers %v, want %v", gotPrioritizers, tc.wantPrioritizers)
+			}
+
+			gotPlugins := sched.Framework.ListPlugins()
+			for _, p := range gotPlugins["FilterPlugin"] {
+				seenPredicates.Insert(filterToPredicateMap[p.Name])
+
+			}
+			for _, p := range gotPlugins["FilterPlugin"] {
+				seenPriorities.Insert(scoreToPriorityMap[p.Name])
+
+			}
+			if diff := cmp.Diff(tc.wantPlugins, gotPlugins); diff != "" {
+				t.Errorf("unexpected plugins diff (-want, +got): %s", diff)
+			}
+
+			gotExtenders := sched.Algorithm.Extenders()
+			var wantExtenders []*core.HTTPExtender
+			for _, e := range tc.wantExtenders {
+				extender, err := core.NewHTTPExtender(&e)
+				if err != nil {
+					t.Errorf("Error transforming extender: %+v", e)
+				}
+				wantExtenders = append(wantExtenders, extender.(*core.HTTPExtender))
+			}
+			for i := range gotExtenders {
+				if !core.Equal(wantExtenders[i], gotExtenders[i].(*core.HTTPExtender)) {
+					t.Errorf("Got extender #%d %+v, want %+v", i, gotExtenders[i], wantExtenders[i])
+				}
+			}
+
+			seenPredicates = seenPredicates.Union(gotPredicates)
+			seenPriorities = seenPriorities.Union(gotPrioritizers)
+		})
 	}
 
 	if !seenPredicates.HasAll(registeredPredicates.List()...) {

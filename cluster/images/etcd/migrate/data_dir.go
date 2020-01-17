@@ -116,7 +116,7 @@ func (d *DataDirectory) String() string {
 }
 
 // VersionFile provides utilities for reading and writing version.txt files
-// to etcd "data-dir" for tracking the etcd server and storage verions
+// to etcd "data-dir" for tracking the etcd server and storage versions
 // of the data in the directory.
 type VersionFile struct {
 	path string

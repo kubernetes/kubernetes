@@ -24,13 +24,12 @@ import (
 	gcm "google.golang.org/api/monitoring/v3"
 	appsv1 "k8s.io/api/apps/v1"
 	as "k8s.io/api/autoscaling/v2beta1"
-	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/instrumentation/monitoring"
 
 	"github.com/onsi/ginkgo"
@@ -222,7 +221,7 @@ type CustomMetricTestCase struct {
 	hpa             *as.HorizontalPodAutoscaler
 	kubeClient      clientset.Interface
 	deployment      *appsv1.Deployment
-	pod             *corev1.Pod
+	pod             *v1.Pod
 	initialReplicas int
 	scaledReplicas  int
 }
@@ -240,7 +239,7 @@ func (tc *CustomMetricTestCase) Run() {
 	// and uncomment following lines:
 	/*
 		ts, err := google.DefaultTokenSource(oauth2.NoContext)
-		e2elog.Logf("Couldn't get application default credentials, %v", err)
+		framework.Logf("Couldn't get application default credentials, %v", err)
 		if err != nil {
 			framework.Failf("Error accessing application default credentials, %v", err)
 		}
@@ -285,7 +284,7 @@ func (tc *CustomMetricTestCase) Run() {
 	waitForReplicas(tc.deployment.ObjectMeta.Name, tc.framework.Namespace.ObjectMeta.Name, tc.kubeClient, 15*time.Minute, tc.scaledReplicas)
 }
 
-func createDeploymentToScale(f *framework.Framework, cs clientset.Interface, deployment *appsv1.Deployment, pod *corev1.Pod) error {
+func createDeploymentToScale(f *framework.Framework, cs clientset.Interface, deployment *appsv1.Deployment, pod *v1.Pod) error {
 	if deployment != nil {
 		_, err := cs.AppsV1().Deployments(f.Namespace.ObjectMeta.Name).Create(deployment)
 		if err != nil {
@@ -301,7 +300,7 @@ func createDeploymentToScale(f *framework.Framework, cs clientset.Interface, dep
 	return nil
 }
 
-func cleanupDeploymentsToScale(f *framework.Framework, cs clientset.Interface, deployment *appsv1.Deployment, pod *corev1.Pod) {
+func cleanupDeploymentsToScale(f *framework.Framework, cs clientset.Interface, deployment *appsv1.Deployment, pod *v1.Pod) {
 	if deployment != nil {
 		_ = cs.AppsV1().Deployments(f.Namespace.ObjectMeta.Name).Delete(deployment.ObjectMeta.Name, &metav1.DeleteOptions{})
 	}
@@ -445,7 +444,7 @@ func waitForReplicas(deploymentName, namespace string, cs clientset.Interface, t
 			framework.Failf("Failed to get replication controller %s: %v", deployment, err)
 		}
 		replicas := int(deployment.Status.ReadyReplicas)
-		e2elog.Logf("waiting for %d replicas (current: %d)", desiredReplicas, replicas)
+		framework.Logf("waiting for %d replicas (current: %d)", desiredReplicas, replicas)
 		return replicas == desiredReplicas, nil // Expected number of replicas found. Exit.
 	})
 	if err != nil {

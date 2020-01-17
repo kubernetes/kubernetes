@@ -68,16 +68,18 @@ func WithImpersonation(handler http.Handler, a authorizer.Authorizer, s runtime.
 		groups := []string{}
 		userExtra := map[string][]string{}
 		for _, impersonationRequest := range impersonationRequests {
+			gvk := impersonationRequest.GetObjectKind().GroupVersionKind()
 			actingAsAttributes := &authorizer.AttributesRecord{
 				User:            requestor,
 				Verb:            "impersonate",
-				APIGroup:        impersonationRequest.GetObjectKind().GroupVersionKind().Group,
+				APIGroup:        gvk.Group,
+				APIVersion:      gvk.Version,
 				Namespace:       impersonationRequest.Namespace,
 				Name:            impersonationRequest.Name,
 				ResourceRequest: true,
 			}
 
-			switch impersonationRequest.GetObjectKind().GroupVersionKind().GroupKind() {
+			switch gvk.GroupKind() {
 			case v1.SchemeGroupVersion.WithKind("ServiceAccount").GroupKind():
 				actingAsAttributes.Resource = "serviceaccounts"
 				username = serviceaccount.MakeUsername(impersonationRequest.Namespace, impersonationRequest.Name)
@@ -107,7 +109,7 @@ func WithImpersonation(handler http.Handler, a authorizer.Authorizer, s runtime.
 				return
 			}
 
-			decision, reason, err := a.Authorize(actingAsAttributes)
+			decision, reason, err := a.Authorize(ctx, actingAsAttributes)
 			if err != nil || decision != authorizer.DecisionAllow {
 				klog.V(4).Infof("Forbidden: %#v, Reason: %s, Error: %v", req.RequestURI, reason, err)
 				responsewriters.Forbidden(ctx, actingAsAttributes, w, req, reason, s)

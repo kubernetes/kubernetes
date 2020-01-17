@@ -39,8 +39,8 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
+	utilnet "k8s.io/utils/net"
 )
 
 // ValidateInitConfiguration validates an InitConfiguration object and collects all encountered errors
@@ -49,6 +49,7 @@ func ValidateInitConfiguration(c *kubeadm.InitConfiguration) field.ErrorList {
 	allErrs = append(allErrs, ValidateNodeRegistrationOptions(&c.NodeRegistration, field.NewPath("nodeRegistration"))...)
 	allErrs = append(allErrs, ValidateBootstrapTokens(c.BootstrapTokens, field.NewPath("bootstrapTokens"))...)
 	allErrs = append(allErrs, ValidateClusterConfiguration(&c.ClusterConfiguration)...)
+	// TODO(Arvinderpal): update advertiseAddress validation for dual-stack once it's implemented.
 	allErrs = append(allErrs, ValidateAPIEndpoint(&c.LocalAPIEndpoint, field.NewPath("localAPIEndpoint"))...)
 	// TODO: Maybe validate that .CertificateKey is a valid hex encoded AES key
 	return allErrs
@@ -57,7 +58,7 @@ func ValidateInitConfiguration(c *kubeadm.InitConfiguration) field.ErrorList {
 // ValidateClusterConfiguration validates an ClusterConfiguration object and collects all encountered errors
 func ValidateClusterConfiguration(c *kubeadm.ClusterConfiguration) field.ErrorList {
 	allErrs := field.ErrorList{}
-	allErrs = append(allErrs, ValidateNetworking(&c.Networking, field.NewPath("networking"))...)
+	allErrs = append(allErrs, ValidateNetworking(c, field.NewPath("networking"))...)
 	allErrs = append(allErrs, ValidateAPIServer(&c.APIServer, field.NewPath("apiServer"))...)
 	allErrs = append(allErrs, ValidateAbsolutePath(c.CertificatesDir, field.NewPath("certificatesDir"))...)
 	allErrs = append(allErrs, ValidateFeatureGates(c.FeatureGates, field.NewPath("featureGates"))...)
@@ -103,7 +104,10 @@ func ValidateNodeRegistrationOptions(nro *kubeadm.NodeRegistrationOptions, fldPa
 	if len(nro.Name) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath, "--node-name or .nodeRegistration.name in the config file is a required value. It seems like this value couldn't be automatically detected in your environment, please specify the desired value using the CLI or config file."))
 	} else {
-		allErrs = append(allErrs, apivalidation.ValidateDNS1123Subdomain(nro.Name, field.NewPath("name"))...)
+		nameFldPath := fldPath.Child("name")
+		for _, err := range validation.IsDNS1123Subdomain(nro.Name) {
+			allErrs = append(allErrs, field.Invalid(nameFldPath, nro.Name, err))
+		}
 	}
 	allErrs = append(allErrs, ValidateSocketPath(nro.CRISocket, fldPath.Child("criSocket"))...)
 	// TODO: Maybe validate .Taints as well in the future using something like validateNodeTaints() in pkg/apis/core/validation
@@ -320,7 +324,7 @@ func ValidateCertSANs(altnames []string, fldPath *field.Path) field.ErrorList {
 	return allErrs
 }
 
-// ValidateURLs validates the URLs given in the string slice, makes sure they are parseable. Optionally, it can enforcs HTTPS usage.
+// ValidateURLs validates the URLs given in the string slice, makes sure they are parsable. Optionally, it can enforces HTTPS usage.
 func ValidateURLs(urls []string, requireHTTPS bool, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for _, urlstr := range urls {
@@ -367,27 +371,55 @@ func ValidateHostPort(endpoint string, fldPath *field.Path) field.ErrorList {
 }
 
 // ValidateIPNetFromString validates network portion of ip address
-func ValidateIPNetFromString(subnet string, minAddrs int64, fldPath *field.Path) field.ErrorList {
+func ValidateIPNetFromString(subnetStr string, minAddrs int64, isDualStack bool, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	_, svcSubnet, err := net.ParseCIDR(subnet)
-	if err != nil {
-		allErrs = append(allErrs, field.Invalid(fldPath, subnet, "couldn't parse subnet"))
-		return allErrs
-	}
-	numAddresses := ipallocator.RangeSize(svcSubnet)
-	if numAddresses < minAddrs {
-		allErrs = append(allErrs, field.Invalid(fldPath, subnet, "subnet is too small"))
+	if isDualStack {
+		subnets, err := utilnet.ParseCIDRs(strings.Split(subnetStr, ","))
+		if err != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath, subnetStr, err.Error()))
+		} else {
+			areDualStackCIDRs, err := utilnet.IsDualStackCIDRs(subnets)
+			if err != nil {
+				allErrs = append(allErrs, field.Invalid(fldPath, subnets, err.Error()))
+			} else if !areDualStackCIDRs {
+				allErrs = append(allErrs, field.Invalid(fldPath, subnetStr, "expected at least one IP from each family (v4 or v6) for dual-stack networking"))
+			}
+			for _, s := range subnets {
+				numAddresses := ipallocator.RangeSize(s)
+				if numAddresses < minAddrs {
+					allErrs = append(allErrs, field.Invalid(fldPath, s, "subnet is too small"))
+				}
+			}
+		}
+	} else {
+		_, svcSubnet, err := net.ParseCIDR(subnetStr)
+		if err != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath, subnetStr, "couldn't parse subnet"))
+			return allErrs
+		}
+		numAddresses := ipallocator.RangeSize(svcSubnet)
+		if numAddresses < minAddrs {
+			allErrs = append(allErrs, field.Invalid(fldPath, subnetStr, "subnet is too small"))
+		}
 	}
 	return allErrs
 }
 
 // ValidateNetworking validates networking configuration
-func ValidateNetworking(c *kubeadm.Networking, fldPath *field.Path) field.ErrorList {
+func ValidateNetworking(c *kubeadm.ClusterConfiguration, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	allErrs = append(allErrs, apivalidation.ValidateDNS1123Subdomain(c.DNSDomain, field.NewPath("dnsDomain"))...)
-	allErrs = append(allErrs, ValidateIPNetFromString(c.ServiceSubnet, constants.MinimumAddressesInServiceSubnet, field.NewPath("serviceSubnet"))...)
-	if len(c.PodSubnet) != 0 {
-		allErrs = append(allErrs, ValidateIPNetFromString(c.PodSubnet, constants.MinimumAddressesInServiceSubnet, field.NewPath("podSubnet"))...)
+	dnsDomainFldPath := field.NewPath("dnsDomain")
+	for _, err := range validation.IsDNS1123Subdomain(c.Networking.DNSDomain) {
+		allErrs = append(allErrs, field.Invalid(dnsDomainFldPath, c.Networking.DNSDomain, err))
+	}
+	// check if dual-stack feature-gate is enabled
+	isDualStack := features.Enabled(c.FeatureGates, features.IPv6DualStack)
+
+	if len(c.Networking.ServiceSubnet) != 0 {
+		allErrs = append(allErrs, ValidateIPNetFromString(c.Networking.ServiceSubnet, constants.MinimumAddressesInServiceSubnet, isDualStack, field.NewPath("serviceSubnet"))...)
+	}
+	if len(c.Networking.PodSubnet) != 0 {
+		allErrs = append(allErrs, ValidateIPNetFromString(c.Networking.PodSubnet, constants.MinimumAddressesInServiceSubnet, isDualStack, field.NewPath("podSubnet"))...)
 	}
 	return allErrs
 }
@@ -432,7 +464,7 @@ func isAllowedFlag(flagName string) bool {
 		kubeadmcmdoptions.NodeCRISocket,
 		kubeadmcmdoptions.KubeconfigDir,
 		kubeadmcmdoptions.UploadCerts,
-		kubeadmcmdoptions.ExperimentalUploadCerts,
+		kubeadmcmdoptions.Kustomize,
 		"print-join-command", "rootfs", "v")
 	if knownFlags.Has(flagName) {
 		return true
@@ -451,7 +483,6 @@ func ValidateFeatureGates(featureGates map[string]bool, fldPath *field.Path) fie
 				fmt.Sprintf("%s is not a valid feature name.", k)))
 		}
 	}
-
 	return allErrs
 }
 

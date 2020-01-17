@@ -17,6 +17,7 @@ limitations under the License.
 package initializer_test
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -72,7 +73,7 @@ type WantExternalKubeInformerFactory struct {
 func (self *WantExternalKubeInformerFactory) SetExternalKubeInformerFactory(sf informers.SharedInformerFactory) {
 	self.sf = sf
 }
-func (self *WantExternalKubeInformerFactory) Admit(a admission.Attributes, o admission.ObjectInterfaces) error {
+func (self *WantExternalKubeInformerFactory) Admit(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
 	return nil
 }
 func (self *WantExternalKubeInformerFactory) Handles(o admission.Operation) bool { return false }
@@ -87,7 +88,7 @@ type WantExternalKubeClientSet struct {
 }
 
 func (self *WantExternalKubeClientSet) SetExternalKubeClientSet(cs kubernetes.Interface) { self.cs = cs }
-func (self *WantExternalKubeClientSet) Admit(a admission.Attributes, o admission.ObjectInterfaces) error {
+func (self *WantExternalKubeClientSet) Admit(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
 	return nil
 }
 func (self *WantExternalKubeClientSet) Handles(o admission.Operation) bool { return false }
@@ -102,7 +103,7 @@ type WantAuthorizerAdmission struct {
 }
 
 func (self *WantAuthorizerAdmission) SetAuthorizer(a authorizer.Authorizer) { self.auth = a }
-func (self *WantAuthorizerAdmission) Admit(a admission.Attributes, o admission.ObjectInterfaces) error {
+func (self *WantAuthorizerAdmission) Admit(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
 	return nil
 }
 func (self *WantAuthorizerAdmission) Handles(o admission.Operation) bool { return false }
@@ -114,7 +115,7 @@ var _ initializer.WantsAuthorizer = &WantAuthorizerAdmission{}
 // TestAuthorizer is a test stub that fulfills the WantsAuthorizer interface.
 type TestAuthorizer struct{}
 
-func (t *TestAuthorizer) Authorize(a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
+func (t *TestAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
 	return authorizer.DecisionNoOpinion, "", nil
 }
 
@@ -124,7 +125,7 @@ type clientCertWanter struct {
 }
 
 func (s *clientCertWanter) SetClientCert(cert, key []byte) { s.gotCert, s.gotKey = cert, key }
-func (s *clientCertWanter) Admit(a admission.Attributes, o admission.ObjectInterfaces) error {
+func (s *clientCertWanter) Admit(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
 	return nil
 }
 func (s *clientCertWanter) Handles(o admission.Operation) bool { return false }

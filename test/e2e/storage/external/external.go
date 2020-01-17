@@ -30,6 +30,8 @@ import (
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/config"
+	"k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 
@@ -39,6 +41,7 @@ import (
 
 // List of testSuites to be executed for each external driver.
 var csiTestSuites = []func() testsuites.TestSuite{
+	testsuites.InitEphemeralTestSuite,
 	testsuites.InitMultiVolumeTestSuite,
 	testsuites.InitProvisioningTestSuite,
 	testsuites.InitSnapshottableTestSuite,
@@ -46,10 +49,13 @@ var csiTestSuites = []func() testsuites.TestSuite{
 	testsuites.InitVolumeIOTestSuite,
 	testsuites.InitVolumeModeTestSuite,
 	testsuites.InitVolumesTestSuite,
+	testsuites.InitVolumeExpandTestSuite,
+	testsuites.InitDisruptiveTestSuite,
+	testsuites.InitVolumeLimitsTestSuite,
 }
 
 func init() {
-	flag.Var(testDriverParameter{}, "storage.testdriver", "name of a .yaml or .json file that defines a driver for storage testing, can be used more than once")
+	config.Flags.Var(testDriverParameter{}, "storage.testdriver", "name of a .yaml or .json file that defines a driver for storage testing, can be used more than once")
 }
 
 // testDriverParameter is used to hook loading of the driver
@@ -68,7 +74,14 @@ func (t testDriverParameter) String() string {
 }
 
 func (t testDriverParameter) Set(filename string) error {
-	driver, err := t.loadDriverDefinition(filename)
+	return AddDriverDefinition(filename)
+}
+
+// AddDriverDefinition defines ginkgo tests for CSI driver definition file.
+// Either --storage.testdriver cmdline argument or AddDriverDefinition can be used
+// to define the tests.
+func AddDriverDefinition(filename string) error {
+	driver, err := loadDriverDefinition(filename)
 	if err != nil {
 		return err
 	}
@@ -84,7 +97,7 @@ func (t testDriverParameter) Set(filename string) error {
 	return nil
 }
 
-func (t testDriverParameter) loadDriverDefinition(filename string) (*driverDefinition, error) {
+func loadDriverDefinition(filename string) (*driverDefinition, error) {
 	if filename == "" {
 		return nil, errors.New("missing file name")
 	}
@@ -99,7 +112,9 @@ func (t testDriverParameter) loadDriverDefinition(filename string) (*driverDefin
 				"", // Default fsType
 			),
 		},
-		ClaimSize: "5Gi",
+		SupportedSizeRange: volume.SizeRange{
+			Min: "5Gi",
+		},
 	}
 	// TODO: strict checking of the file content once https://github.com/kubernetes/kubernetes/pull/71589
 	// or something similar is merged.
@@ -119,6 +134,9 @@ var _ testsuites.DynamicPVTestDriver = &driverDefinition{}
 // Same for snapshotting.
 var _ testsuites.SnapshottableTestDriver = &driverDefinition{}
 
+// And for ephemeral volumes.
+var _ testsuites.EphemeralTestDriver = &driverDefinition{}
+
 // runtime.DecodeInto needs a runtime.Object but doesn't do any
 // deserialization of it and therefore none of the methods below need
 // an implementation.
@@ -134,9 +152,6 @@ type driverDefinition struct {
 	// supported file systems (SupportedFsType): it is set so that tests using
 	// the default file system are enabled.
 	DriverInfo testsuites.DriverInfo
-
-	// ShortName is used to create unique names for test cases and test resources.
-	ShortName string
 
 	// StorageClass must be set to enable dynamic provisioning tests.
 	// The default is to not run those tests.
@@ -168,9 +183,29 @@ type driverDefinition struct {
 		// TODO (?): load from file
 	}
 
-	// ClaimSize defines the desired size of dynamically
-	// provisioned volumes. Default is "5GiB".
-	ClaimSize string
+	// InlineVolumes defines one or more volumes for use as inline
+	// ephemeral volumes. At least one such volume has to be
+	// defined to enable testing of inline ephemeral volumes.  If
+	// a test needs more volumes than defined, some of the defined
+	// volumes will be used multiple times.
+	//
+	// DriverInfo.Name is used as name of the driver in the inline volume.
+	InlineVolumes []struct {
+		// Attributes are passed as NodePublishVolumeReq.volume_context.
+		// Can be empty.
+		Attributes map[string]string
+		// Shared defines whether the resulting volume is
+		// shared between different pods (i.e.  changes made
+		// in one pod are visible in another)
+		Shared bool
+		// ReadOnly must be set to true if the driver does not
+		// support mounting as read/write.
+		ReadOnly bool
+	}
+
+	// SupportedSizeRange defines the desired size of dynamically
+	// provisioned volumes.
+	SupportedSizeRange volume.SizeRange
 
 	// ClientNodeName selects a specific node for scheduling test pods.
 	// Can be left empty. Most drivers should not need this and instead
@@ -200,6 +235,8 @@ func (d *driverDefinition) SkipUnsupportedTest(pattern testpatterns.TestPattern)
 		if d.StorageClass.FromName || d.StorageClass.FromFile != "" {
 			supported = true
 		}
+	case testpatterns.CSIInlineVolume:
+		supported = len(d.InlineVolumes) != 0
 	}
 	if !supported {
 		framework.Skipf("Driver %q does not support volume type %q - skipping", d.DriverInfo.Name, pattern.VolType)
@@ -236,7 +273,7 @@ func (d *driverDefinition) GetDynamicProvisionStorageClass(config *testsuites.Pe
 
 	items, err := f.LoadFromManifests(d.StorageClass.FromFile)
 	framework.ExpectNoError(err, "load storage class from %s", d.StorageClass.FromFile)
-	gomega.Expect(len(items)).To(gomega.Equal(1), "exactly one item from %s", d.StorageClass.FromFile)
+	framework.ExpectEqual(len(items), 1, "exactly one item from %s", d.StorageClass.FromFile)
 
 	err = f.PatchItems(items...)
 	framework.ExpectNoError(err, "patch items")
@@ -268,8 +305,16 @@ func (d *driverDefinition) GetSnapshotClass(config *testsuites.PerTestConfig) *u
 	return testsuites.GetSnapshotClass(snapshotter, parameters, ns, suffix)
 }
 
-func (d *driverDefinition) GetClaimSize() string {
-	return d.ClaimSize
+func (d *driverDefinition) GetVolume(config *testsuites.PerTestConfig, volumeNumber int) (map[string]string, bool, bool) {
+	if len(d.InlineVolumes) == 0 {
+		framework.Skipf("%s does not have any InlineVolumeAttributes defined", d.DriverInfo.Name)
+	}
+	volume := d.InlineVolumes[volumeNumber%len(d.InlineVolumes)]
+	return volume.Attributes, volume.Shared, volume.ReadOnly
+}
+
+func (d *driverDefinition) GetCSIDriverName(config *testsuites.PerTestConfig) string {
+	return d.DriverInfo.Name
 }
 
 func (d *driverDefinition) PrepareTest(f *framework.Framework) (*testsuites.PerTestConfig, func()) {

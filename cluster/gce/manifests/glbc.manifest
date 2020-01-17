@@ -4,13 +4,13 @@ metadata:
   name: l7-lb-controller-v1.2.3
   namespace: kube-system
   annotations:
-    scheduler.alpha.kubernetes.io/critical-pod: ''
     seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
   labels:
     k8s-app: gcp-lb-controller
     version: v1.2.3
     kubernetes.io/name: "GLBC"
 spec:
+  priorityClassName: system-node-critical
   terminationGracePeriodSeconds: 600
   hostNetwork: true
   containers:

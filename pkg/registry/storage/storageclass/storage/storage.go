@@ -33,7 +33,7 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against persistent volumes.
-func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
+func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, error) {
 	store := &genericregistry.Store{
 		NewFunc:                  func() runtime.Object { return &storageapi.StorageClass{} },
 		NewListFunc:              func() runtime.Object { return &storageapi.StorageClassList{} },
@@ -48,10 +48,10 @@ func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
 	}
 	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {
-		panic(err) // TODO: Propagate error up
+		return nil, err
 	}
 
-	return &REST{store}
+	return &REST{store}, nil
 }
 
 // Implement ShortNamesProvider

@@ -18,26 +18,58 @@ package get
 
 import (
 	"bytes"
+	"fmt"
 	"regexp"
 	"strings"
 	"testing"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 func TestHumanReadablePrinterSupportsExpectedOptions(t *testing.T) {
-	testObject := &api.Pod{ObjectMeta: metav1.ObjectMeta{
-		Name: "foo",
-		Labels: map[string]string{
-			"l1": "value",
+	testTable := &metav1.Table{
+		ColumnDefinitions: []metav1.TableColumnDefinition{
+			{Name: "Name", Type: "string", Format: "name"},
+			{Name: "Ready", Type: "string", Format: ""},
+			{Name: "Status", Type: "string", Format: ""},
+			{Name: "Restarts", Type: "integer", Format: ""},
+			{Name: "Age", Type: "string", Format: ""},
+			{Name: "IP", Type: "string", Format: "", Priority: 1},
+			{Name: "Node", Type: "string", Format: "", Priority: 1},
+			{Name: "Nominated Node", Type: "string", Format: "", Priority: 1},
+			{Name: "Readiness Gates", Type: "string", Format: "", Priority: 1},
 		},
-	}}
+		Rows: []metav1.TableRow{{
+			Object: runtime.RawExtension{
+				Object: &corev1.Pod{
+					TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "Pod"},
+					ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "foons", Labels: map[string]string{"l1": "value"}},
+				},
+			},
+			Cells: []interface{}{"foo", "0/0", "", int64(0), "<unknown>", "<none>", "<none>", "<none>", "<none>"},
+		}},
+	}
+	testPod := &corev1.Pod{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1",
+			Kind:       "Pod",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "foo",
+			Namespace: "foons",
+			Labels: map[string]string{
+				"l1": "value",
+			},
+		},
+	}
 
 	testCases := []struct {
 		name       string
+		testObject runtime.Object
 		showKind   bool
 		showLabels bool
 
@@ -56,53 +88,104 @@ func TestHumanReadablePrinterSupportsExpectedOptions(t *testing.T) {
 	}{
 		{
 			name:           "empty output format matches a humanreadable printer",
+			testObject:     testPod.DeepCopy(),
+			expectedOutput: "NAME\\ +AGE\nfoo\\ +<unknown>\n",
+		},
+		{
+			name:           "empty output format matches a humanreadable printer",
+			testObject:     testTable.DeepCopy(),
 			expectedOutput: "NAME\\ +READY\\ +STATUS\\ +RESTARTS\\ +AGE\nfoo\\ +0/0\\ +0\\ +<unknown>\n",
 		},
 		{
 			name:           "\"wide\" output format prints",
+			testObject:     testPod.DeepCopy(),
+			outputFormat:   "wide",
+			expectedOutput: "NAME\\ +AGE\nfoo\\ +<unknown>\n",
+		},
+		{
+			name:           "\"wide\" output format prints",
+			testObject:     testTable.DeepCopy(),
 			outputFormat:   "wide",
 			expectedOutput: "NAME\\ +READY\\ +STATUS\\ +RESTARTS\\ +AGE\\ +IP\\ +NODE\\ +NOMINATED NODE\\ +READINESS GATES\nfoo\\ +0/0\\ +0\\ +<unknown>\\ +<none>\\ +<none>\\ +<none>\\ +<none>\n",
 		},
 		{
 			name:           "no-headers prints output with no headers",
+			testObject:     testPod.DeepCopy(),
+			noHeaders:      true,
+			expectedOutput: "foo\\ +<unknown>\n",
+		},
+		{
+			name:           "no-headers prints output with no headers",
+			testObject:     testTable.DeepCopy(),
 			noHeaders:      true,
 			expectedOutput: "foo\\ +0/0\\ +0\\ +<unknown>\n",
 		},
 		{
 			name:           "no-headers and a \"wide\" output format prints output with no headers and additional columns",
+			testObject:     testPod.DeepCopy(),
+			outputFormat:   "wide",
+			noHeaders:      true,
+			expectedOutput: "foo\\ +<unknown>\n",
+		},
+		{
+			name:           "no-headers and a \"wide\" output format prints output with no headers and additional columns",
+			testObject:     testTable.DeepCopy(),
 			outputFormat:   "wide",
 			noHeaders:      true,
 			expectedOutput: "foo\\ +0/0\\ +0\\ +<unknown>\\ +<none>\\ +<none>\\ +<none>\\ +<none>\n",
 		},
 		{
 			name:           "show-kind displays the resource's kind, even when printing a single type of resource",
+			testObject:     testPod.DeepCopy(),
+			showKind:       true,
+			expectedOutput: "NAME\\ +AGE\npod/foo\\ +<unknown>\n",
+		},
+		{
+			name:           "show-kind displays the resource's kind, even when printing a single type of resource",
+			testObject:     testTable.DeepCopy(),
 			showKind:       true,
 			expectedOutput: "NAME\\ +READY\\ +STATUS\\ +RESTARTS\\ +AGE\npod/foo\\ +0/0\\ +0\\ +<unknown>\n",
 		},
 		{
 			name:           "label-columns prints specified label values in new column",
+			testObject:     testPod.DeepCopy(),
+			columnLabels:   []string{"l1"},
+			expectedOutput: "NAME\\ +AGE\\ +L1\nfoo\\ +<unknown>\\ +value\n",
+		},
+		{
+			name:           "label-columns prints specified label values in new column",
+			testObject:     testTable.DeepCopy(),
 			columnLabels:   []string{"l1"},
 			expectedOutput: "NAME\\ +READY\\ +STATUS\\ +RESTARTS\\ +AGE\\ +L1\nfoo\\ +0/0\\ +0\\ +<unknown>\\ +value\n",
 		},
 		{
 			name:           "withNamespace displays an additional NAMESPACE column",
+			testObject:     testPod.DeepCopy(),
 			withNamespace:  true,
-			expectedOutput: "NAMESPACE\\ +NAME\\ +READY\\ +STATUS\\ +RESTARTS\\ +AGE\n\\ +foo\\ +0/0\\ +0\\ +<unknown>\n",
+			expectedOutput: "NAMESPACE\\ +NAME\\ +AGE\nfoons\\ +foo\\ +<unknown>\n",
+		},
+		{
+			name:           "withNamespace displays an additional NAMESPACE column",
+			testObject:     testTable.DeepCopy(),
+			withNamespace:  true,
+			expectedOutput: "NAMESPACE\\ +NAME\\ +READY\\ +STATUS\\ +RESTARTS\\ +AGE\nfoons\\ +foo\\ +0/0\\ +0\\ +<unknown>\n",
 		},
 		{
 			name:          "no printer is matched on an invalid outputFormat",
+			testObject:    testPod.DeepCopy(),
 			outputFormat:  "invalid",
 			expectNoMatch: true,
 		},
 		{
 			name:          "printer should not match on any other format supported by another printer",
+			testObject:    testPod.DeepCopy(),
 			outputFormat:  "go-template",
 			expectNoMatch: true,
 		},
 	}
 
 	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
+		t.Run(fmt.Sprintf("%s %T", tc.name, tc.testObject), func(t *testing.T) {
 			printFlags := HumanPrintFlags{
 				ShowKind:     &tc.showKind,
 				ShowLabels:   &tc.showLabels,
@@ -139,7 +222,7 @@ func TestHumanReadablePrinterSupportsExpectedOptions(t *testing.T) {
 			}
 
 			out := bytes.NewBuffer([]byte{})
-			err = p.PrintObj(testObject, out)
+			err = p.PrintObj(tc.testObject, out)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -149,7 +232,7 @@ func TestHumanReadablePrinterSupportsExpectedOptions(t *testing.T) {
 				t.Errorf("unexpected error: %v", err)
 			}
 			if !match {
-				t.Errorf("unexpected output: expecting %q, got %q", tc.expectedOutput, out.String())
+				t.Errorf("unexpected output: expecting\n%s\ngot\n%s", tc.expectedOutput, out.String())
 			}
 		})
 	}

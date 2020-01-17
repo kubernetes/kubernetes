@@ -23,7 +23,7 @@ import (
 	"sync"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -39,6 +39,7 @@ import (
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/recyclerclient"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
 )
@@ -64,6 +65,13 @@ const (
 	ProbeRemove
 	CSIVolumeStaged    CSIVolumePhaseType = "staged"
 	CSIVolumePublished CSIVolumePhaseType = "published"
+)
+
+var (
+	deprecatedVolumeProviders = map[string]string{
+		"kubernetes.io/cinder":  "The Cinder volume provider is deprecated and will be removed in a future release",
+		"kubernetes.io/scaleio": "The ScaleIO volume provider is deprecated and will be removed in a future release",
+	}
 )
 
 // VolumeOptions contains option information about a volume.
@@ -334,6 +342,8 @@ type KubeletVolumeHost interface {
 	CSIDriversSynced() cache.InformerSynced
 	// WaitForCacheSync is a helper function that waits for cache sync for CSIDriverLister
 	WaitForCacheSync() error
+	// Returns hostutil.HostUtils
+	GetHostUtil() hostutil.HostUtils
 }
 
 // AttachDetachVolumeHost is a AttachDetach Controller specific interface that plugins can use
@@ -672,6 +682,11 @@ func (pm *VolumePluginMgr) FindPluginBySpec(spec *Spec) (VolumePlugin, error) {
 		}
 		return nil, fmt.Errorf("multiple volume plugins matched: %s", strings.Join(matchedPluginNames, ","))
 	}
+
+	// Issue warning if the matched provider is deprecated
+	if detail, ok := deprecatedVolumeProviders[matches[0].GetPluginName()]; ok {
+		klog.Warningf("WARNING: %s built-in volume provider is now deprecated. %s", matches[0].GetPluginName(), detail)
+	}
 	return matches[0], nil
 }
 
@@ -734,6 +749,11 @@ func (pm *VolumePluginMgr) FindPluginByName(name string) (VolumePlugin, error) {
 			matchedPluginNames = append(matchedPluginNames, plugin.GetPluginName())
 		}
 		return nil, fmt.Errorf("multiple volume plugins matched: %s", strings.Join(matchedPluginNames, ","))
+	}
+
+	// Issue warning if the matched provider is deprecated
+	if detail, ok := deprecatedVolumeProviders[matches[0].GetPluginName()]; ok {
+		klog.Warningf("WARNING: %s built-in volume provider is now deprecated. %s", matches[0].GetPluginName(), detail)
 	}
 	return matches[0], nil
 }

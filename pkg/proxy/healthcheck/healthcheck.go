@@ -210,6 +210,7 @@ func (h hcHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	h.hcs.lock.RUnlock()
 
 	resp.Header().Set("Content-Type", "application/json")
+	resp.Header().Set("X-Content-Type-Options", "nosniff")
 	if count == 0 {
 		resp.WriteHeader(http.StatusServiceUnavailable)
 	} else {
@@ -338,6 +339,7 @@ func (h healthzHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	currentTime := h.hs.clock.Now()
 
 	resp.Header().Set("Content-Type", "application/json")
+	resp.Header().Set("X-Content-Type-Options", "nosniff")
 	if !lastUpdated.IsZero() && currentTime.After(lastUpdated.Add(h.hs.healthTimeout)) {
 		resp.WriteHeader(http.StatusServiceUnavailable)
 	} else {

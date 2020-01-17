@@ -38,6 +38,8 @@ const (
 	TextMime = "text/plain"
 	// HTMLMime the html mime type
 	HTMLMime = "text/html"
+	// CSVMime the csv mime type
+	CSVMime = "text/csv"
 	// MultipartFormMime the multipart form mime type
 	MultipartFormMime = "multipart/form-data"
 	// URLencodedFormMime the url encoded form mime type

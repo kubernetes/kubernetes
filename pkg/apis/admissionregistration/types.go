@@ -118,7 +118,7 @@ const (
 // ValidatingWebhookConfiguration describes the configuration of an admission webhook that accepts or rejects and object without changing it.
 type ValidatingWebhookConfiguration struct {
 	metav1.TypeMeta
-	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata.
+	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
 	// +optional
 	metav1.ObjectMeta
 	// Webhooks is a list of webhooks and the affected resources and operations.
@@ -132,7 +132,7 @@ type ValidatingWebhookConfiguration struct {
 type ValidatingWebhookConfigurationList struct {
 	metav1.TypeMeta
 	// Standard list metadata.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
 	// +optional
 	metav1.ListMeta
 	// List of ValidatingWebhookConfigurations.
@@ -144,7 +144,7 @@ type ValidatingWebhookConfigurationList struct {
 // MutatingWebhookConfiguration describes the configuration of and admission webhook that accept or reject and may change the object.
 type MutatingWebhookConfiguration struct {
 	metav1.TypeMeta
-	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata.
+	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
 	// +optional
 	metav1.ObjectMeta
 	// Webhooks is a list of webhooks and the affected resources and operations.
@@ -158,7 +158,7 @@ type MutatingWebhookConfiguration struct {
 type MutatingWebhookConfigurationList struct {
 	metav1.TypeMeta
 	// Standard list metadata.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
 	// +optional
 	metav1.ListMeta
 	// List of MutatingWebhookConfiguration.

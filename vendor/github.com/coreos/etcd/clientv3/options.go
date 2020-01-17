@@ -16,17 +16,17 @@ package clientv3
 
 import (
 	"math"
+	"time"
 
 	"google.golang.org/grpc"
 )
 
 var (
-	// Disable gRPC internal retrial logic
-	// TODO: enable when gRPC retry is stable (FailFast=false)
-	// Reference:
-	//  - https://github.com/grpc/grpc-go/issues/1532
-	//  - https://github.com/grpc/proposal/blob/master/A6-client-retries.md
-	defaultFailFast = grpc.FailFast(true)
+	// client-side handling retrying of request failures where data was not written to the wire or
+	// where server indicates it did not process the data. gRPC default is default is "FailFast(true)"
+	// but for etcd we default to "FailFast(false)" to minimize client request error responses due to
+	// transient failures.
+	defaultFailFast = grpc.FailFast(false)
 
 	// client-side request send limit, gRPC default is math.MaxInt32
 	// Make sure that "client-side send limit < server-side default send/recv limit"
@@ -38,6 +38,22 @@ var (
 	// because range response can easily exceed request send limits
 	// Default to math.MaxInt32; writes exceeding server-side send limit fails anyway
 	defaultMaxCallRecvMsgSize = grpc.MaxCallRecvMsgSize(math.MaxInt32)
+
+	// client-side non-streaming retry limit, only applied to requests where server responds with
+	// a error code clearly indicating it was unable to process the request such as codes.Unavailable.
+	// If set to 0, retry is disabled.
+	defaultUnaryMaxRetries uint = 100
+
+	// client-side streaming retry limit, only applied to requests where server responds with
+	// a error code clearly indicating it was unable to process the request such as codes.Unavailable.
+	// If set to 0, retry is disabled.
+	defaultStreamMaxRetries = ^uint(0) // max uint
+
+	// client-side retry backoff wait between requests.
+	defaultBackoffWaitBetween = 25 * time.Millisecond
+
+	// client-side retry backoff default jitter fraction.
+	defaultBackoffJitterFraction = 0.10
 )
 
 // defaultCallOpts defines a list of default "gRPC.CallOption".

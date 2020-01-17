@@ -16,15 +16,13 @@ spec:
     metadata:
       labels:
         k8s-app: calico-typha-autoscaler
-      annotations:
-        scheduler.alpha.kubernetes.io/critical-pod: ''
     spec:
       priorityClassName: system-cluster-critical
       securityContext:
         supplementalGroups: [ 65534 ]
         fsGroup: 65534
       containers:
-      - image: k8s.gcr.io/cluster-proportional-autoscaler-amd64:1.6.0
+      - image: k8s.gcr.io/cluster-proportional-autoscaler-amd64:1.7.1
         name: autoscaler
         command:
           - /cluster-proportional-autoscaler

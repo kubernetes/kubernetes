@@ -27,7 +27,7 @@ import (
 	"golang.org/x/sys/unix"
 
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/volume/util/quota"
+	"k8s.io/kubernetes/pkg/volume/util/fsquota"
 )
 
 // FSInfo linux returns (available bytes, byte capacity, byte usage, total inodes, inodes free, inode usage, error)
@@ -60,7 +60,7 @@ func DiskUsage(path string) (*resource.Quantity, error) {
 	// First check whether the quota system knows about this directory
 	// A nil quantity with no error means that the path does not support quotas
 	// and we should use other mechanisms.
-	data, err := quota.GetConsumption(path)
+	data, err := fsquota.GetConsumption(path)
 	if data != nil {
 		return data, nil
 	} else if err != nil {
@@ -68,9 +68,9 @@ func DiskUsage(path string) (*resource.Quantity, error) {
 	}
 	// Uses the same niceness level as cadvisor.fs does when running du
 	// Uses -B 1 to always scale to a blocksize of 1 byte
-	out, err := exec.Command("nice", "-n", "19", "du", "-s", "-B", "1", path).CombinedOutput()
+	out, err := exec.Command("nice", "-n", "19", "du", "-x", "-s", "-B", "1", path).CombinedOutput()
 	if err != nil {
-		return nil, fmt.Errorf("failed command 'du' ($ nice -n 19 du -s -B 1) on path %s with error %v", path, err)
+		return nil, fmt.Errorf("failed command 'du' ($ nice -n 19 du -x -s -B 1) on path %s with error %v", path, err)
 	}
 	used, err := resource.ParseQuantity(strings.Fields(string(out))[0])
 	if err != nil {
@@ -89,7 +89,7 @@ func Find(path string) (int64, error) {
 	// First check whether the quota system knows about this directory
 	// A nil quantity with no error means that the path does not support quotas
 	// and we should use other mechanisms.
-	inodes, err := quota.GetInodes(path)
+	inodes, err := fsquota.GetInodes(path)
 	if inodes != nil {
 		return inodes.Value(), nil
 	} else if err != nil {

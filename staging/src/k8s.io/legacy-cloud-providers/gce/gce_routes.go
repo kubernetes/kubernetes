@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2017 The Kubernetes Authors.
 
@@ -38,13 +40,13 @@ func newRoutesMetricContext(request string) *metricContext {
 
 // ListRoutes in the cloud environment.
 func (g *Cloud) ListRoutes(ctx context.Context, clusterName string) ([]*cloudprovider.Route, error) {
-	ctx, cancel := cloud.ContextWithCallTimeout()
+	timeoutCtx, cancel := cloud.ContextWithCallTimeout()
 	defer cancel()
 
 	mc := newRoutesMetricContext("list")
 	prefix := truncateClusterName(clusterName)
 	f := filter.Regexp("name", prefix+"-.*").AndRegexp("network", g.NetworkURL()).AndRegexp("description", k8sNodeRouteTag)
-	routes, err := g.c.Routes().List(ctx, f)
+	routes, err := g.c.Routes().List(timeoutCtx, f)
 	if err != nil {
 		return nil, mc.Observe(err)
 	}
@@ -64,7 +66,7 @@ func (g *Cloud) ListRoutes(ctx context.Context, clusterName string) ([]*cloudpro
 
 // CreateRoute in the cloud environment.
 func (g *Cloud) CreateRoute(ctx context.Context, clusterName string, nameHint string, route *cloudprovider.Route) error {
-	ctx, cancel := cloud.ContextWithCallTimeout()
+	timeoutCtx, cancel := cloud.ContextWithCallTimeout()
 	defer cancel()
 
 	mc := newRoutesMetricContext("create")
@@ -74,6 +76,7 @@ func (g *Cloud) CreateRoute(ctx context.Context, clusterName string, nameHint st
 		return mc.Observe(err)
 	}
 	cr := &compute.Route{
+		// TODO(thockin): generate a unique name for node + route cidr. Don't depend on name hints.
 		Name:            truncateClusterName(clusterName) + "-" + nameHint,
 		DestRange:       route.DestinationCIDR,
 		NextHopInstance: fmt.Sprintf("zones/%s/instances/%s", targetInstance.Zone, targetInstance.Name),
@@ -81,7 +84,7 @@ func (g *Cloud) CreateRoute(ctx context.Context, clusterName string, nameHint st
 		Priority:        1000,
 		Description:     k8sNodeRouteTag,
 	}
-	err = g.c.Routes().Insert(ctx, meta.GlobalKey(cr.Name), cr)
+	err = g.c.Routes().Insert(timeoutCtx, meta.GlobalKey(cr.Name), cr)
 	if isHTTPErrorCode(err, http.StatusConflict) {
 		klog.Infof("Route %q already exists.", cr.Name)
 		err = nil
@@ -91,11 +94,11 @@ func (g *Cloud) CreateRoute(ctx context.Context, clusterName string, nameHint st
 
 // DeleteRoute from the cloud environment.
 func (g *Cloud) DeleteRoute(ctx context.Context, clusterName string, route *cloudprovider.Route) error {
-	ctx, cancel := cloud.ContextWithCallTimeout()
+	timeoutCtx, cancel := cloud.ContextWithCallTimeout()
 	defer cancel()
 
 	mc := newRoutesMetricContext("delete")
-	return mc.Observe(g.c.Routes().Delete(ctx, meta.GlobalKey(route.Name)))
+	return mc.Observe(g.c.Routes().Delete(timeoutCtx, meta.GlobalKey(route.Name)))
 }
 
 func truncateClusterName(clusterName string) string {

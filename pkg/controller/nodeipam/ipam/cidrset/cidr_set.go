@@ -162,7 +162,7 @@ func (s *CidrSet) getBeginingAndEndIndices(cidr *net.IPNet) (begin, end int, err
 	var ipSize int
 
 	if cidr == nil {
-		return -1, -1, fmt.Errorf("Error getting indices for cluster cidr %v, cidr is nil", s.clusterCIDR)
+		return -1, -1, fmt.Errorf("error getting indices for cluster cidr %v, cidr is nil", s.clusterCIDR)
 	}
 
 	if !s.clusterCIDR.Contains(cidr.IP.Mask(s.clusterCIDR.Mask)) && !cidr.Contains(s.clusterCIDR.IP.Mask(cidr.Mask)) {

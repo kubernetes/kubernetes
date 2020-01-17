@@ -17,8 +17,107 @@ limitations under the License.
 package pods
 
 import (
+	"reflect"
 	"testing"
+
+	"k8s.io/apimachinery/pkg/util/validation/field"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/features"
 )
+
+func TestVisitContainersWithPath(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
+
+	testCases := []struct {
+		description string
+		haveSpec    *api.PodSpec
+		wantNames   []string
+	}{
+		{
+			"empty podspec",
+			&api.PodSpec{},
+			[]string{},
+		},
+		{
+			"regular containers",
+			&api.PodSpec{
+				Containers: []api.Container{
+					{Name: "c1"},
+					{Name: "c2"},
+				},
+			},
+			[]string{"spec.containers[0]", "spec.containers[1]"},
+		},
+		{
+			"init containers",
+			&api.PodSpec{
+				InitContainers: []api.Container{
+					{Name: "i1"},
+					{Name: "i2"},
+				},
+			},
+			[]string{"spec.initContainers[0]", "spec.initContainers[1]"},
+		},
+		{
+			"regular and init containers",
+			&api.PodSpec{
+				Containers: []api.Container{
+					{Name: "c1"},
+					{Name: "c2"},
+				},
+				InitContainers: []api.Container{
+					{Name: "i1"},
+					{Name: "i2"},
+				},
+			},
+			[]string{"spec.initContainers[0]", "spec.initContainers[1]", "spec.containers[0]", "spec.containers[1]"},
+		},
+		{
+			"ephemeral containers",
+			&api.PodSpec{
+				Containers: []api.Container{
+					{Name: "c1"},
+					{Name: "c2"},
+				},
+				EphemeralContainers: []api.EphemeralContainer{
+					{EphemeralContainerCommon: api.EphemeralContainerCommon{Name: "e1"}},
+				},
+			},
+			[]string{"spec.containers[0]", "spec.containers[1]", "spec.ephemeralContainers[0]"},
+		},
+		{
+			"all container types",
+			&api.PodSpec{
+				Containers: []api.Container{
+					{Name: "c1"},
+					{Name: "c2"},
+				},
+				InitContainers: []api.Container{
+					{Name: "i1"},
+					{Name: "i2"},
+				},
+				EphemeralContainers: []api.EphemeralContainer{
+					{EphemeralContainerCommon: api.EphemeralContainerCommon{Name: "e1"}},
+					{EphemeralContainerCommon: api.EphemeralContainerCommon{Name: "e2"}},
+				},
+			},
+			[]string{"spec.initContainers[0]", "spec.initContainers[1]", "spec.containers[0]", "spec.containers[1]", "spec.ephemeralContainers[0]", "spec.ephemeralContainers[1]"},
+		},
+	}
+
+	for _, tc := range testCases {
+		gotNames := []string{}
+		VisitContainersWithPath(tc.haveSpec, func(c *api.Container, p *field.Path) bool {
+			gotNames = append(gotNames, p.String())
+			return true
+		})
+		if !reflect.DeepEqual(gotNames, tc.wantNames) {
+			t.Errorf("VisitContainersWithPath() for test case %q visited containers %q, wanted to visit %q", tc.description, gotNames, tc.wantNames)
+		}
+	}
+}
 
 func TestConvertDownwardAPIFieldLabel(t *testing.T) {
 	testCases := []struct {

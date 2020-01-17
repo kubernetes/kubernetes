@@ -34,8 +34,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/stats/pidlimit"
 	"k8s.io/kubernetes/test/e2e/framework"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 func setDesiredConfiguration(initialConfig *kubeletconfig.KubeletConfiguration) {
@@ -59,8 +59,8 @@ func setDesiredConfiguration(initialConfig *kubeletconfig.KubeletConfiguration) 
 
 var _ = framework.KubeDescribe("Node Container Manager [Serial]", func() {
 	f := framework.NewDefaultFramework("node-container-manager")
-	Describe("Validate Node Allocatable [NodeFeature:NodeAllocatable]", func() {
-		It("sets up the node and runs the test", func() {
+	ginkgo.Describe("Validate Node Allocatable [NodeFeature:NodeAllocatable]", func() {
+		ginkgo.It("sets up the node and runs the test", func() {
 			framework.ExpectNoError(runTest(f))
 		})
 	})
@@ -89,11 +89,13 @@ func getAllocatableLimits(cpu, memory, pids string, capacity v1.ResourceList) (*
 	// Total cpu reservation is 200m.
 	for k, v := range capacity {
 		if k == v1.ResourceCPU {
-			allocatableCPU = v.Copy()
+			c := v.DeepCopy()
+			allocatableCPU = &c
 			allocatableCPU.Sub(resource.MustParse(cpu))
 		}
 		if k == v1.ResourceMemory {
-			allocatableMemory = v.Copy()
+			c := v.DeepCopy()
+			allocatableMemory = &c
 			allocatableMemory.Sub(resource.MustParse(memory))
 		}
 	}
@@ -188,7 +190,7 @@ func runTest(f *framework.Framework) error {
 	}
 	// TODO: Update cgroupManager to expose a Status interface to get current Cgroup Settings.
 	// The node may not have updated capacity and allocatable yet, so check that it happens eventually.
-	Eventually(func() error {
+	gomega.Eventually(func() error {
 		nodeList, err := f.ClientSet.CoreV1().Nodes().List(metav1.ListOptions{})
 		if err != nil {
 			return err
@@ -230,7 +232,7 @@ func runTest(f *framework.Framework) error {
 			return fmt.Errorf("Unexpected memory allocatable value exposed by the node. Expected: %v, got: %v, capacity: %v", allocatableMemory, schedulerAllocatable[v1.ResourceMemory], capacity[v1.ResourceMemory])
 		}
 		return nil
-	}, time.Minute, 5*time.Second).Should(BeNil())
+	}, time.Minute, 5*time.Second).Should(gomega.BeNil())
 
 	kubeReservedCgroupName := cm.NewCgroupName(cm.RootCgroupName, kubeReservedCgroup)
 	if !cgroupManager.Exists(kubeReservedCgroupName) {

@@ -40,3 +40,9 @@ func NewJustBeforeEachNode(body interface{}, codeLocation types.CodeLocation, ti
 		runner: newRunner(body, codeLocation, timeout, failer, types.SpecComponentTypeJustBeforeEach, componentIndex),
 	}
 }
+
+func NewJustAfterEachNode(body interface{}, codeLocation types.CodeLocation, timeout time.Duration, failer *failer.Failer, componentIndex int) *SetupNode {
+	return &SetupNode{
+		runner: newRunner(body, codeLocation, timeout, failer, types.SpecComponentTypeJustAfterEach, componentIndex),
+	}
+}

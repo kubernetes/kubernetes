@@ -24,6 +24,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/diff"
 	apiserverconfig "k8s.io/apiserver/pkg/apis/config"
@@ -391,7 +393,7 @@ func TestEncryptionProviderConfigCorrect(t *testing.T) {
 			if stale != (transformer.Name != testCase.Name) {
 				t.Fatalf("%s: wrong stale information on reading using %s transformer, should be %v", testCase.Name, transformer.Name, testCase.Name == transformer.Name)
 			}
-			if bytes.Compare(untransformedData, originalText) != 0 {
+			if !bytes.Equal(untransformedData, originalText) {
 				t.Fatalf("%s: %s transformer transformed data incorrectly. Expected: %v, got %v", testCase.Name, transformer.Name, originalText, untransformedData)
 			}
 		}
@@ -506,4 +508,303 @@ resources:
 			}
 		})
 	}
+}
+
+func TestKMSPluginHealthz(t *testing.T) {
+	service, err := envelope.NewGRPCService("unix:///tmp/testprovider.sock", kmsPluginConnectionTimeout)
+	if err != nil {
+		t.Fatalf("Could not initialize envelopeService, error: %v", err)
+	}
+
+	testCases := []struct {
+		desc    string
+		config  string
+		want    []*kmsPluginProbe
+		wantErr bool
+	}{
+		{
+			desc: "Install Healthz",
+			config: `kind: EncryptionConfiguration
+apiVersion: apiserver.config.k8s.io/v1
+resources:
+  - resources:
+    - secrets
+    providers:
+    - kms:
+        name: foo
+        endpoint: unix:///tmp/testprovider.sock
+        timeout:   15s
+`,
+			want: []*kmsPluginProbe{
+				{
+					name:    "foo",
+					Service: service,
+				},
+			},
+		},
+		{
+			desc: "Install multiple healthz",
+			config: `kind: EncryptionConfiguration
+apiVersion: apiserver.config.k8s.io/v1
+resources:
+  - resources:
+    - secrets
+    providers:
+    - kms:
+        name: foo
+        endpoint: unix:///tmp/testprovider.sock
+        timeout:   15s
+    - kms:
+        name: bar
+        endpoint: unix:///tmp/testprovider.sock
+        timeout:   15s
+`,
+			want: []*kmsPluginProbe{
+				{
+					name:    "foo",
+					Service: service,
+				},
+				{
+					name:    "bar",
+					Service: service,
+				},
+			},
+		},
+		{
+			desc: "No KMS Providers",
+			config: `kind: EncryptionConfiguration
+apiVersion: apiserver.config.k8s.io/v1
+resources:
+  - resources:
+    - secrets
+    providers:
+    - aesgcm:
+        keys:
+        - name: key1
+          secret: c2VjcmV0IGlzIHNlY3VyZQ==
+`,
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.desc, func(t *testing.T) {
+			got, err := getKMSPluginProbes(strings.NewReader(tt.config))
+			if err != nil && !tt.wantErr {
+				t.Fatalf("got %v, want nil for error", err)
+			}
+
+			if d := cmp.Diff(tt.want, got, cmp.Comparer(serviceComparer)); d != "" {
+				t.Fatalf("HealthzConfig mismatch (-want +got):\n%s", d)
+			}
+		})
+	}
+}
+
+// As long as got and want contain envelope.Service we will return true.
+// If got has an envelope.Service and want does note (or vice versa) this will return false.
+func serviceComparer(_, _ envelope.Service) bool {
+	return true
+}
+
+func TestCBCKeyRotationWithOverlappingProviders(t *testing.T) {
+	testCBCKeyRotationWithProviders(
+		t,
+		`{
+  "kind": "EncryptionConfiguration",
+  "apiVersion": "apiserver.config.k8s.io/v1",
+  "resources": [
+    {
+      "resources": [
+        "ignored"
+      ],
+      "providers": [
+        {
+          "aescbc": {
+            "keys": [
+              {
+                "name": "1",
+                "secret": "Owq7A4JrJpSjrvH8kXkvl4JmOLzvZ6j9BcGRkR8OPQ4="
+              }
+            ]
+          }
+        },
+        {
+          "aescbc": {
+            "keys": [
+              {
+                "name": "2",
+                "secret": "+qcnfOFX3aRXM9PuY7lQXDWYIQ3GWUdBc3nYBo91SCA="
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}`,
+		"k8s:enc:aescbc:v1:1:",
+		`{
+  "kind": "EncryptionConfiguration",
+  "apiVersion": "apiserver.config.k8s.io/v1",
+  "resources": [
+    {
+      "resources": [
+        "ignored"
+      ],
+      "providers": [
+        {
+          "aescbc": {
+            "keys": [
+              {
+                "name": "2",
+                "secret": "+qcnfOFX3aRXM9PuY7lQXDWYIQ3GWUdBc3nYBo91SCA="
+              }
+            ]
+          }
+        },
+        {
+          "aescbc": {
+            "keys": [
+              {
+                "name": "1",
+                "secret": "Owq7A4JrJpSjrvH8kXkvl4JmOLzvZ6j9BcGRkR8OPQ4="
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}`,
+		"k8s:enc:aescbc:v1:2:",
+	)
+}
+
+func TestCBCKeyRotationWithoutOverlappingProviders(t *testing.T) {
+	testCBCKeyRotationWithProviders(
+		t,
+		`{
+  "kind": "EncryptionConfiguration",
+  "apiVersion": "apiserver.config.k8s.io/v1",
+  "resources": [
+    {
+      "resources": [
+        "ignored"
+      ],
+      "providers": [
+        {
+          "aescbc": {
+            "keys": [
+              {
+                "name": "A",
+                "secret": "Owq7A4JrJpSjrvH8kXkvl4JmOLzvZ6j9BcGRkR8OPQ4="
+              },
+              {
+                "name": "B",
+                "secret": "+qcnfOFX3aRXM9PuY7lQXDWYIQ3GWUdBc3nYBo91SCA="
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}`,
+		"k8s:enc:aescbc:v1:A:",
+		`{
+  "kind": "EncryptionConfiguration",
+  "apiVersion": "apiserver.config.k8s.io/v1",
+  "resources": [
+    {
+      "resources": [
+        "ignored"
+      ],
+      "providers": [
+        {
+          "aescbc": {
+            "keys": [
+              {
+                "name": "B",
+                "secret": "+qcnfOFX3aRXM9PuY7lQXDWYIQ3GWUdBc3nYBo91SCA="
+              },
+              {
+                "name": "A",
+                "secret": "Owq7A4JrJpSjrvH8kXkvl4JmOLzvZ6j9BcGRkR8OPQ4="
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}`,
+		"k8s:enc:aescbc:v1:B:",
+	)
+}
+
+func testCBCKeyRotationWithProviders(t *testing.T, firstEncryptionConfig, firstPrefix, secondEncryptionConfig, secondPrefix string) {
+	p := getTransformerFromEncryptionConfig(t, firstEncryptionConfig)
+
+	context := value.DefaultContext([]byte("authenticated_data"))
+
+	out, err := p.TransformToStorage([]byte("firstvalue"), context)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.HasPrefix(out, []byte(firstPrefix)) {
+		t.Fatalf("unexpected prefix: %q", out)
+	}
+	from, stale, err := p.TransformFromStorage(out, context)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stale || !bytes.Equal([]byte("firstvalue"), from) {
+		t.Fatalf("unexpected data: %t %q", stale, from)
+	}
+
+	// verify changing the context fails storage
+	_, _, err = p.TransformFromStorage(out, value.DefaultContext([]byte("incorrect_context")))
+	if err != nil {
+		t.Fatalf("CBC mode does not support authentication: %v", err)
+	}
+
+	// reverse the order, use the second key
+	p = getTransformerFromEncryptionConfig(t, secondEncryptionConfig)
+	from, stale, err = p.TransformFromStorage(out, context)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !stale || !bytes.Equal([]byte("firstvalue"), from) {
+		t.Fatalf("unexpected data: %t %q", stale, from)
+	}
+
+	out, err = p.TransformToStorage([]byte("firstvalue"), context)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.HasPrefix(out, []byte(secondPrefix)) {
+		t.Fatalf("unexpected prefix: %q", out)
+	}
+	from, stale, err = p.TransformFromStorage(out, context)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stale || !bytes.Equal([]byte("firstvalue"), from) {
+		t.Fatalf("unexpected data: %t %q", stale, from)
+	}
+}
+
+func getTransformerFromEncryptionConfig(t *testing.T, encryptionConfig string) value.Transformer {
+	t.Helper()
+	transformers, err := ParseEncryptionConfiguration(strings.NewReader(encryptionConfig))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(transformers) != 1 {
+		t.Fatalf("input config does not have exactly one resource: %s", encryptionConfig)
+	}
+	for _, transformer := range transformers {
+		return transformer
+	}
+	panic("unreachable")
 }

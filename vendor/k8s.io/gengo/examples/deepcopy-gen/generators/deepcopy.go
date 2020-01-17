@@ -718,7 +718,7 @@ func (g *genDeepCopy) doMap(t *types.Type, sw *generator.SnippetWriter) {
 	}
 
 	if !ut.Key.IsAssignable() {
-		klog.Fatalf("Hit an unsupported type %v.", uet)
+		klog.Fatalf("Hit an unsupported type %v for: %v", uet, t)
 	}
 
 	sw.Do("*out = make($.|raw$, len(*in))\n", t)
@@ -745,6 +745,10 @@ func (g *genDeepCopy) doMap(t *types.Type, sw *generator.SnippetWriter) {
 	case uet.IsAssignable():
 		sw.Do("(*out)[key] = val\n", nil)
 	case uet.Kind == types.Interface:
+		// Note: do not generate code that won't compile as `DeepCopyinterface{}()` is not a valid function
+		if uet.Name.Name == "interface{}" {
+			klog.Fatalf("DeepCopy of %q is unsupported. Instead, use named interfaces with DeepCopy<named-interface> as one of the methods.", uet.Name.Name)
+		}
 		sw.Do("if val == nil {(*out)[key]=nil} else {\n", nil)
 		// Note: if t.Elem has been an alias "J" of an interface "I" in Go, we will see it
 		// as kind Interface of name "J" here, i.e. generate val.DeepCopyJ(). The golang
@@ -761,7 +765,7 @@ func (g *genDeepCopy) doMap(t *types.Type, sw *generator.SnippetWriter) {
 	case uet.Kind == types.Struct:
 		sw.Do("(*out)[key] = *val.DeepCopy()\n", uet)
 	default:
-		klog.Fatalf("Hit an unsupported type %v.", uet)
+		klog.Fatalf("Hit an unsupported type %v for %v", uet, t)
 	}
 	sw.Do("}\n", nil)
 }
@@ -793,6 +797,10 @@ func (g *genDeepCopy) doSlice(t *types.Type, sw *generator.SnippetWriter) {
 			g.generateFor(ut.Elem, sw)
 			sw.Do("}\n", nil)
 		} else if uet.Kind == types.Interface {
+			// Note: do not generate code that won't compile as `DeepCopyinterface{}()` is not a valid function
+			if uet.Name.Name == "interface{}" {
+				klog.Fatalf("DeepCopy of %q is unsupported. Instead, use named interfaces with DeepCopy<named-interface> as one of the methods.", uet.Name.Name)
+			}
 			sw.Do("if (*in)[i] != nil {\n", nil)
 			// Note: if t.Elem has been an alias "J" of an interface "I" in Go, we will see it
 			// as kind Interface of name "J" here, i.e. generate val.DeepCopyJ(). The golang
@@ -802,7 +810,7 @@ func (g *genDeepCopy) doSlice(t *types.Type, sw *generator.SnippetWriter) {
 		} else if uet.Kind == types.Struct {
 			sw.Do("(*in)[i].DeepCopyInto(&(*out)[i])\n", nil)
 		} else {
-			klog.Fatalf("Hit an unsupported type %v.", uet)
+			klog.Fatalf("Hit an unsupported type %v for %v", uet, t)
 		}
 		sw.Do("}\n", nil)
 	}
@@ -863,6 +871,10 @@ func (g *genDeepCopy) doStruct(t *types.Type, sw *generator.SnippetWriter) {
 				sw.Do("in.$.name$.DeepCopyInto(&out.$.name$)\n", args)
 			}
 		case uft.Kind == types.Interface:
+			// Note: do not generate code that won't compile as `DeepCopyinterface{}()` is not a valid function
+			if uft.Name.Name == "interface{}" {
+				klog.Fatalf("DeepCopy of %q is unsupported. Instead, use named interfaces with DeepCopy<named-interface> as one of the methods.", uft.Name.Name)
+			}
 			sw.Do("if in.$.name$ != nil {\n", args)
 			// Note: if t.Elem has been an alias "J" of an interface "I" in Go, we will see it
 			// as kind Interface of name "J" here, i.e. generate val.DeepCopyJ(). The golang
@@ -870,7 +882,7 @@ func (g *genDeepCopy) doStruct(t *types.Type, sw *generator.SnippetWriter) {
 			sw.Do(fmt.Sprintf("out.$.name$ = in.$.name$.DeepCopy%s()\n", uft.Name.Name), args)
 			sw.Do("}\n", nil)
 		default:
-			klog.Fatalf("Hit an unsupported type %v.", uft)
+			klog.Fatalf("Hit an unsupported type %v for %v, from %v", uft, ft, t)
 		}
 	}
 }
@@ -907,6 +919,6 @@ func (g *genDeepCopy) doPointer(t *types.Type, sw *generator.SnippetWriter) {
 		sw.Do("*out = new($.Elem|raw$)\n", ut)
 		sw.Do("(*in).DeepCopyInto(*out)\n", nil)
 	default:
-		klog.Fatalf("Hit an unsupported type %v.", uet)
+		klog.Fatalf("Hit an unsupported type %v for %v", uet, t)
 	}
 }

@@ -25,16 +25,16 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/Azure/azure-sdk-for-go/services/containerregistry/mgmt/2017-10-01/containerregistry"
+	"github.com/Azure/azure-sdk-for-go/services/containerregistry/mgmt/2019-05-01/containerregistry"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/adal"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/spf13/pflag"
-	"k8s.io/klog"
-	"sigs.k8s.io/yaml"
 
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	"k8s.io/legacy-cloud-providers/azure/auth"
+	"sigs.k8s.io/yaml"
 )
 
 var flagConfigFile = pflag.String("azure-container-registry-config", "",
@@ -58,10 +58,6 @@ func init() {
 			Provider: NewACRProvider(flagConfigFile),
 			Lifetime: 1 * time.Minute,
 		})
-}
-
-func getContextWithCancel() (context.Context, context.CancelFunc) {
-	return context.WithCancel(context.Background())
 }
 
 // RegistriesClient is a testable interface for the ACR client List operation.
@@ -262,7 +258,4 @@ func parseACRLoginServerFromImage(image string) string {
 		return match[0]
 	}
 	return ""
-}
-func (a *acrProvider) LazyProvide(image string) *credentialprovider.DockerConfigEntry {
-	return nil
 }

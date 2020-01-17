@@ -51,6 +51,7 @@ type applyFlags struct {
 	renewCerts         bool
 	criSocket          string
 	imagePullTimeout   time.Duration
+	kustomizeDir       string
 }
 
 // sessionIsInteractive returns true if the session is of an interactive type (the default, can be opted out of with -y, -f or --dry-run)
@@ -72,12 +73,13 @@ func NewCmdApply(apf *applyPlanFlags) *cobra.Command {
 		Use:                   "apply [version]",
 		DisableFlagsInUseLine: true,
 		Short:                 "Upgrade your Kubernetes cluster to the specified version",
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			userVersion, err := getK8sVersionFromUserInput(flags.applyPlanFlags, args, true)
-			kubeadmutil.CheckErr(err)
+			if err != nil {
+				return err
+			}
 
-			err = runApply(flags, userVersion)
-			kubeadmutil.CheckErr(err)
+			return runApply(flags, userVersion)
 		},
 	}
 
@@ -88,8 +90,9 @@ func NewCmdApply(apf *applyPlanFlags) *cobra.Command {
 	cmd.Flags().BoolVarP(&flags.force, "force", "f", flags.force, "Force upgrading although some requirements might not be met. This also implies non-interactive mode.")
 	cmd.Flags().BoolVar(&flags.dryRun, options.DryRun, flags.dryRun, "Do not change any state, just output what actions would be performed.")
 	cmd.Flags().BoolVar(&flags.etcdUpgrade, "etcd-upgrade", flags.etcdUpgrade, "Perform the upgrade of etcd.")
-	cmd.Flags().BoolVar(&flags.renewCerts, "certificate-renewal", flags.renewCerts, "Perform the renewal of certificates used by component changed during upgrades.")
+	cmd.Flags().BoolVar(&flags.renewCerts, options.CertificateRenewal, flags.renewCerts, "Perform the renewal of certificates used by component changed during upgrades.")
 	cmd.Flags().DurationVar(&flags.imagePullTimeout, "image-pull-timeout", flags.imagePullTimeout, "The maximum amount of time to wait for the control plane pods to be downloaded.")
+	options.AddKustomizePodsFlag(cmd.Flags(), &flags.kustomizeDir)
 
 	// The CRI socket flag is deprecated here, since it should be taken from the NodeRegistrationOptions for the current
 	// node instead of the command line. This prevents errors by the users (such as attempts to use wrong CRI during upgrade).
@@ -226,9 +229,9 @@ func PerformControlPlaneUpgrade(flags *applyFlags, client clientset.Interface, w
 	fmt.Printf("[upgrade/apply] Upgrading your Static Pod-hosted control plane to version %q...\n", internalcfg.KubernetesVersion)
 
 	if flags.dryRun {
-		return upgrade.DryRunStaticPodUpgrade(internalcfg)
+		return upgrade.DryRunStaticPodUpgrade(flags.kustomizeDir, internalcfg)
 	}
 
 	// Don't save etcd backup directory if etcd is HA, as this could cause corruption
-	return upgrade.PerformStaticPodUpgrade(client, waiter, internalcfg, flags.etcdUpgrade, flags.renewCerts)
+	return upgrade.PerformStaticPodUpgrade(client, waiter, internalcfg, flags.etcdUpgrade, flags.renewCerts, flags.kustomizeDir)
 }

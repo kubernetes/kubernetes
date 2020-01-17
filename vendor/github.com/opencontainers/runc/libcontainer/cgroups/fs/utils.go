@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"math"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -59,8 +60,12 @@ func getCgroupParamUint(cgroupPath, cgroupFile string) (uint64, error) {
 	if err != nil {
 		return 0, err
 	}
+	trimmed := strings.TrimSpace(string(contents))
+	if trimmed == "max" {
+		return math.MaxUint64, nil
+	}
 
-	res, err := parseUint(strings.TrimSpace(string(contents)), 10, 64)
+	res, err := parseUint(trimmed, 10, 64)
 	if err != nil {
 		return res, fmt.Errorf("unable to parse %q as a uint from Cgroup file %q", string(contents), fileName)
 	}

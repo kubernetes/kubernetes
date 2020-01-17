@@ -21,7 +21,6 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 
 	"github.com/onsi/ginkgo"
@@ -95,10 +94,10 @@ var _ = SIGDescribe("SSH", func() {
 				}
 				// Show stdout, stderr for logging purposes.
 				if len(stdout) > 0 {
-					e2elog.Logf("Got stdout from %s: %s", host, strings.TrimSpace(stdout))
+					framework.Logf("Got stdout from %s: %s", host, strings.TrimSpace(stdout))
 				}
 				if len(stderr) > 0 {
-					e2elog.Logf("Got stderr from %s: %s", host, strings.TrimSpace(stderr))
+					framework.Logf("Got stderr from %s: %s", host, strings.TrimSpace(stderr))
 				}
 			}
 		}

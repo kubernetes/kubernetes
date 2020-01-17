@@ -84,6 +84,16 @@ type KubeSchedulerConfiguration struct {
 	// If this value is nil, the default value will be used.
 	BindTimeoutSeconds *int64 `json:"bindTimeoutSeconds"`
 
+	// PodInitialBackoffSeconds is the initial backoff for unschedulable pods.
+	// If specified, it must be greater than 0. If this value is null, the default value (1s)
+	// will be used.
+	PodInitialBackoffSeconds *int64 `json:"podInitialBackoffSeconds"`
+
+	// PodMaxBackoffSeconds is the max backoff for unschedulable pods.
+	// If specified, it must be greater than podInitialBackoffSeconds. If this value is null,
+	// the default value (10s) will be used.
+	PodMaxBackoffSeconds *int64 `json:"podMaxBackoffSeconds"`
+
 	// Plugins specify the set of plugins that should be enabled or disabled. Enabled plugins are the
 	// ones that should be enabled in addition to the default plugins. Disabled plugins are any of the
 	// default plugins that should be disabled.
@@ -135,8 +145,10 @@ type SchedulerPolicyConfigMapSource struct {
 type KubeSchedulerLeaderElectionConfiguration struct {
 	componentbaseconfigv1alpha1.LeaderElectionConfiguration `json:",inline"`
 	// LockObjectNamespace defines the namespace of the lock object
+	// DEPRECATED: will be removed in favor of resourceNamespace
 	LockObjectNamespace string `json:"lockObjectNamespace"`
 	// LockObjectName defines the lock object name
+	// DEPRECATED: will be removed in favor of resourceName
 	LockObjectName string `json:"lockObjectName"`
 }
 
@@ -160,9 +172,6 @@ type Plugins struct {
 
 	// Score is a list of plugins that should be invoked when ranking nodes that have passed the filtering phase.
 	Score *PluginSet `json:"score,omitempty"`
-
-	// NormalizeScore is a list of plugins that should be invoked after the scoring phase to normalize scores.
-	NormalizeScore *PluginSet `json:"normalizeScore,omitempty"`
 
 	// Reserve is a list of plugins invoked when reserving a node to run the pod.
 	Reserve *PluginSet `json:"reserve,omitempty"`

@@ -35,53 +35,54 @@ import (
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 
 	"github.com/davecgh/go-spew/spew"
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 	"k8s.io/klog"
 )
 
 var _ = framework.KubeDescribe("AppArmor [Feature:AppArmor][NodeFeature:AppArmor]", func() {
 	if isAppArmorEnabled() {
-		BeforeEach(func() {
-			By("Loading AppArmor profiles for testing")
+		ginkgo.BeforeEach(func() {
+			ginkgo.By("Loading AppArmor profiles for testing")
 			framework.ExpectNoError(loadTestProfiles(), "Could not load AppArmor test profiles")
 		})
-		Context("when running with AppArmor", func() {
+		ginkgo.Context("when running with AppArmor", func() {
 			f := framework.NewDefaultFramework("apparmor-test")
 
-			It("should reject an unloaded profile", func() {
+			ginkgo.It("should reject an unloaded profile", func() {
 				status := runAppArmorTest(f, false, apparmor.ProfileNamePrefix+"non-existent-profile")
 				expectSoftRejection(status)
 			})
-			It("should enforce a profile blocking writes", func() {
+			ginkgo.It("should enforce a profile blocking writes", func() {
 				status := runAppArmorTest(f, true, apparmor.ProfileNamePrefix+apparmorProfilePrefix+"deny-write")
 				if len(status.ContainerStatuses) == 0 {
 					framework.Failf("Unexpected pod status: %s", spew.Sdump(status))
 					return
 				}
 				state := status.ContainerStatuses[0].State.Terminated
-				Expect(state).ToNot(BeNil(), "ContainerState: %+v", status.ContainerStatuses[0].State)
-				Expect(state.ExitCode).To(Not(BeZero()), "ContainerStateTerminated: %+v", state)
+				gomega.Expect(state).ToNot(gomega.BeNil(), "ContainerState: %+v", status.ContainerStatuses[0].State)
+				gomega.Expect(state.ExitCode).To(gomega.Not(gomega.BeZero()), "ContainerStateTerminated: %+v", state)
 
 			})
-			It("should enforce a permissive profile", func() {
+			ginkgo.It("should enforce a permissive profile", func() {
 				status := runAppArmorTest(f, true, apparmor.ProfileNamePrefix+apparmorProfilePrefix+"audit-write")
 				if len(status.ContainerStatuses) == 0 {
 					framework.Failf("Unexpected pod status: %s", spew.Sdump(status))
 					return
 				}
 				state := status.ContainerStatuses[0].State.Terminated
-				Expect(state).ToNot(BeNil(), "ContainerState: %+v", status.ContainerStatuses[0].State)
-				Expect(state.ExitCode).To(BeZero(), "ContainerStateTerminated: %+v", state)
+				gomega.Expect(state).ToNot(gomega.BeNil(), "ContainerState: %+v", status.ContainerStatuses[0].State)
+				gomega.Expect(state.ExitCode).To(gomega.BeZero(), "ContainerStateTerminated: %+v", state)
 			})
 		})
 	} else {
-		Context("when running without AppArmor", func() {
+		ginkgo.Context("when running without AppArmor", func() {
 			f := framework.NewDefaultFramework("apparmor-test")
 
-			It("should reject a pod with an AppArmor profile", func() {
+			ginkgo.It("should reject a pod with an AppArmor profile", func() {
 				status := runAppArmorTest(f, false, apparmor.ProfileRuntimeDefault)
 				expectSoftRejection(status)
 			})
@@ -147,7 +148,7 @@ func runAppArmorTest(f *framework.Framework, shouldRun bool, profile string) v1.
 	pod := createPodWithAppArmor(f, profile)
 	if shouldRun {
 		// The pod needs to start before it stops, so wait for the longer start timeout.
-		framework.ExpectNoError(framework.WaitTimeoutForPodNoLongerRunningInNamespace(
+		framework.ExpectNoError(e2epod.WaitTimeoutForPodNoLongerRunningInNamespace(
 			f.ClientSet, pod.Name, f.Namespace.Name, framework.PodStartTimeout))
 	} else {
 		// Pod should remain in the pending state. Wait for the Reason to be set to "AppArmor".
@@ -197,10 +198,10 @@ func createPodWithAppArmor(f *framework.Framework, profile string) *v1.Pod {
 
 func expectSoftRejection(status v1.PodStatus) {
 	args := []interface{}{"PodStatus: %+v", status}
-	Expect(status.Phase).To(Equal(v1.PodPending), args...)
-	Expect(status.Reason).To(Equal("AppArmor"), args...)
-	Expect(status.Message).To(ContainSubstring("AppArmor"), args...)
-	Expect(status.ContainerStatuses[0].State.Waiting.Reason).To(Equal("Blocked"), args...)
+	framework.ExpectEqual(status.Phase, v1.PodPending, args...)
+	framework.ExpectEqual(status.Reason, "AppArmor", args...)
+	gomega.Expect(status.Message).To(gomega.ContainSubstring("AppArmor"), args...)
+	framework.ExpectEqual(status.ContainerStatuses[0].State.Waiting.Reason, "Blocked", args...)
 }
 
 func isAppArmorEnabled() bool {

@@ -14,6 +14,7 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/k8s.io/apiextensions-apiserver/test/integration/fixtures",
     importpath = "k8s.io/apiextensions-apiserver/test/integration/fixtures",
     deps = [
+        "//staging/src/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1:go_default_library",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1:go_default_library",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset:go_default_library",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/cmd/server/options:go_default_library",
@@ -31,6 +32,7 @@ go_library(
         "//staging/src/k8s.io/client-go/restmapper:go_default_library",
         "//staging/src/k8s.io/client-go/scale:go_default_library",
         "//vendor/github.com/pborman/uuid:go_default_library",
+        "//vendor/k8s.io/utils/pointer:go_default_library",
     ],
 )
 

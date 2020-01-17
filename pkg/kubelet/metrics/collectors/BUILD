@@ -29,8 +29,8 @@ go_test(
         "//pkg/kubelet/apis/stats/v1alpha1:go_default_library",
         "//pkg/kubelet/server/stats/testing:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/component-base/metrics/testutil:go_default_library",
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
-        "//vendor/github.com/prometheus/client_golang/prometheus/testutil:go_default_library",
     ],
 )
 

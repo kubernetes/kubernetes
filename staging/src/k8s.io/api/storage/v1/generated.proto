@@ -36,7 +36,7 @@ option go_package = "v1";
 // according to etcd is in ObjectMeta.Name.
 message StorageClass {
   // Standard object's metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
@@ -80,7 +80,7 @@ message StorageClass {
 // StorageClassList is a collection of storage classes.
 message StorageClassList {
   // Standard list metadata
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
@@ -94,7 +94,7 @@ message StorageClassList {
 // VolumeAttachment objects are non-namespaced.
 message VolumeAttachment {
   // Standard object metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
@@ -112,7 +112,7 @@ message VolumeAttachment {
 // VolumeAttachmentList is a collection of VolumeAttachment objects.
 message VolumeAttachmentList {
   // Standard list metadata
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 

@@ -398,7 +398,7 @@ func doSafeMakeDir(pathname string, base string, perm os.FileMode) error {
 			return fmt.Errorf("cannot create directory %s: %s", currentPath, err)
 		}
 		// Dive into the created directory
-		childFD, err := syscall.Openat(parentFD, dir, nofollowFlags, 0)
+		childFD, err = syscall.Openat(parentFD, dir, nofollowFlags|unix.O_CLOEXEC, 0)
 		if err != nil {
 			return fmt.Errorf("cannot open %s: %s", currentPath, err)
 		}
@@ -454,7 +454,7 @@ func findExistingPrefix(base, pathname string) (string, []string, error) {
 	// This should be faster than looping through all dirs and calling os.Stat()
 	// on each of them, as the symlinks are resolved only once with OpenAt().
 	currentPath := base
-	fd, err := syscall.Open(currentPath, syscall.O_RDONLY, 0)
+	fd, err := syscall.Open(currentPath, syscall.O_RDONLY|syscall.O_CLOEXEC, 0)
 	if err != nil {
 		return pathname, nil, fmt.Errorf("error opening %s: %s", currentPath, err)
 	}
@@ -466,7 +466,7 @@ func findExistingPrefix(base, pathname string) (string, []string, error) {
 	for i, dir := range dirs {
 		// Using O_PATH here will prevent hangs in case user replaces directory with
 		// fifo
-		childFD, err := syscall.Openat(fd, dir, unix.O_PATH, 0)
+		childFD, err := syscall.Openat(fd, dir, unix.O_PATH|unix.O_CLOEXEC, 0)
 		if err != nil {
 			if os.IsNotExist(err) {
 				return currentPath, dirs[i:], nil
@@ -499,7 +499,7 @@ func doSafeOpen(pathname string, base string) (int, error) {
 
 	// Assumption: base is the only directory that we have under control.
 	// Base dir is not allowed to be a symlink.
-	parentFD, err := syscall.Open(base, nofollowFlags, 0)
+	parentFD, err := syscall.Open(base, nofollowFlags|unix.O_CLOEXEC, 0)
 	if err != nil {
 		return -1, fmt.Errorf("cannot open directory %s: %s", base, err)
 	}
@@ -531,7 +531,7 @@ func doSafeOpen(pathname string, base string) (int, error) {
 		}
 
 		klog.V(5).Infof("Opening path %s", currentPath)
-		childFD, err = syscall.Openat(parentFD, seg, openFDFlags, 0)
+		childFD, err = syscall.Openat(parentFD, seg, openFDFlags|unix.O_CLOEXEC, 0)
 		if err != nil {
 			return -1, fmt.Errorf("cannot open %s: %s", currentPath, err)
 		}

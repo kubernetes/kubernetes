@@ -18,7 +18,6 @@ package lifecycle
 
 import (
 	"encoding/xml"
-	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -31,6 +30,7 @@ import (
 	"k8s.io/client-go/discovery"
 	"k8s.io/kubernetes/test/e2e/chaosmonkey"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/config"
 	"k8s.io/kubernetes/test/e2e/framework/ginkgowrapper"
 	e2elifecycle "k8s.io/kubernetes/test/e2e/framework/lifecycle"
 	"k8s.io/kubernetes/test/e2e/upgrades"
@@ -42,8 +42,8 @@ import (
 )
 
 var (
-	upgradeTarget = flag.String("upgrade-target", "ci/latest", "Version to upgrade to (e.g. 'release/stable', 'release/latest', 'ci/latest', '0.19.1', '0.19.1-669-gabac8c8') if doing an upgrade test.")
-	upgradeImage  = flag.String("upgrade-image", "", "Image to upgrade to (e.g. 'container_vm' or 'gci') if doing an upgrade test.")
+	upgradeTarget = config.Flags.String("upgrade-target", "ci/latest", "Version to upgrade to (e.g. 'release/stable', 'release/latest', 'ci/latest', '0.19.1', '0.19.1-669-gabac8c8') if doing an upgrade test.")
+	upgradeImage  = config.Flags.String("upgrade-image", "", "Image to upgrade to (e.g. 'container_vm' or 'gci') if doing an upgrade test.")
 )
 
 var upgradeTests = []upgrades.Test{

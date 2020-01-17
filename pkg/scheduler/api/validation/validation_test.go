@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/scheduler/api"
+	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
 
 func TestValidatePolicy(t *testing.T) {
@@ -52,7 +53,7 @@ func TestValidatePolicy(t *testing.T) {
 		},
 		{
 			name:     "policy weight exceeds maximum",
-			policy:   api.Policy{Priorities: []api.PriorityPolicy{{Name: "WeightPriority", Weight: api.MaxWeight}}},
+			policy:   api.Policy{Priorities: []api.PriorityPolicy{{Name: "WeightPriority", Weight: framework.MaxWeight}}},
 			expected: errors.New("Priority WeightPriority should have a positive weight applied to it or it has overflown"),
 		},
 		{

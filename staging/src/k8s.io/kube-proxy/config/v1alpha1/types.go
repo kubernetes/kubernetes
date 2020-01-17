@@ -131,9 +131,6 @@ type KubeProxyConfiguration struct {
 	// portRange is the range of host ports (beginPort-endPort, inclusive) that may be consumed
 	// in order to proxy service traffic. If unspecified (0-0) then ports will be randomly chosen.
 	PortRange string `json:"portRange"`
-	// resourceContainer is the bsolute name of the resource-only container to create and run
-	// the Kube-proxy in (Default: /kube-proxy).
-	ResourceContainer string `json:"resourceContainer"`
 	// udpIdleTimeout is how long an idle UDP connection will be kept open (e.g. '250ms', '2s').
 	// Must be greater than 0. Only applicable for proxyMode=userspace.
 	UDPIdleTimeout metav1.Duration `json:"udpIdleTimeout"`

@@ -68,7 +68,7 @@ go_library(
         "//staging/src/k8s.io/cri-api/pkg/apis/runtime/v1alpha2:go_default_library",
         "//vendor/github.com/armon/circbuf:go_default_library",
         "//vendor/github.com/google/cadvisor/info/v1:go_default_library",
-        "//vendor/google.golang.org/grpc:go_default_library",
+        "//vendor/google.golang.org/grpc/status:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:linux": [
@@ -100,6 +100,7 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
+        "//pkg/api/v1/pod:go_default_library",
         "//pkg/credentialprovider:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/kubelet/container:go_default_library",
@@ -116,11 +117,11 @@ go_test(
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/client-go/util/flowcontrol:go_default_library",
         "//staging/src/k8s.io/component-base/featuregate/testing:go_default_library",
+        "//staging/src/k8s.io/component-base/metrics/legacyregistry:go_default_library",
         "//staging/src/k8s.io/cri-api/pkg/apis/runtime/v1alpha2:go_default_library",
         "//staging/src/k8s.io/cri-api/pkg/apis/testing:go_default_library",
         "//vendor/github.com/golang/mock/gomock:go_default_library",
         "//vendor/github.com/google/cadvisor/info/v1:go_default_library",
-        "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/github.com/stretchr/testify/require:go_default_library",
         "//vendor/k8s.io/utils/pointer:go_default_library",

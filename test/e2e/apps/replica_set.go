@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"time"
 
-	apps "k8s.io/api/apps/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -30,21 +30,21 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/controller/replicaset"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	replicasetutil "k8s.io/kubernetes/test/e2e/framework/replicaset"
 
 	"github.com/onsi/ginkgo"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
-func newRS(rsName string, replicas int32, rsPodLabels map[string]string, imageName string, image string) *apps.ReplicaSet {
+func newRS(rsName string, replicas int32, rsPodLabels map[string]string, imageName string, image string, args []string) *appsv1.ReplicaSet {
 	zero := int64(0)
-	return &apps.ReplicaSet{
+	return &appsv1.ReplicaSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   rsName,
 			Labels: rsPodLabels,
 		},
-		Spec: apps.ReplicaSetSpec{
+		Spec: appsv1.ReplicaSetSpec{
 			Selector: &metav1.LabelSelector{
 				MatchLabels: rsPodLabels,
 			},
@@ -59,6 +59,7 @@ func newRS(rsName string, replicas int32, rsPodLabels map[string]string, imageNa
 						{
 							Name:  imageName,
 							Image: image,
+							Args:  args,
 						},
 					},
 				},
@@ -95,7 +96,7 @@ var _ = SIGDescribe("ReplicaSet", func() {
 	ginkgo.It("should serve a basic image on each replica with a private image", func() {
 		// requires private images
 		framework.SkipUnlessProviderIs("gce", "gke")
-		privateimage := imageutils.GetConfig(imageutils.ServeHostname)
+		privateimage := imageutils.GetConfig(imageutils.Agnhost)
 		privateimage.SetRegistry(imageutils.PrivateRegistry)
 		testReplicaSetServeImageOrFail(f, "private", privateimage.GetE2EImage())
 	})
@@ -123,20 +124,20 @@ func testReplicaSetServeImageOrFail(f *framework.Framework, test string, image s
 	// Create a ReplicaSet for a service that serves its hostname.
 	// The source for the Docker containter kubernetes/serve_hostname is
 	// in contrib/for-demos/serve_hostname
-	e2elog.Logf("Creating ReplicaSet %s", name)
-	newRS := newRS(name, replicas, map[string]string{"name": name}, name, image)
+	framework.Logf("Creating ReplicaSet %s", name)
+	newRS := newRS(name, replicas, map[string]string{"name": name}, name, image, []string{"serve-hostname"})
 	newRS.Spec.Template.Spec.Containers[0].Ports = []v1.ContainerPort{{ContainerPort: 9376}}
 	_, err := f.ClientSet.AppsV1().ReplicaSets(f.Namespace.Name).Create(newRS)
 	framework.ExpectNoError(err)
 
 	// Check that pods for the new RS were created.
 	// TODO: Maybe switch PodsCreated to just check owner references.
-	pods, err := framework.PodsCreated(f.ClientSet, f.Namespace.Name, name, replicas)
+	pods, err := e2epod.PodsCreated(f.ClientSet, f.Namespace.Name, name, replicas)
 	framework.ExpectNoError(err)
 
 	// Wait for the pods to enter the running state. Waiting loops until the pods
 	// are running so non-running pods cause a timeout for this test.
-	e2elog.Logf("Ensuring a pod for ReplicaSet %q is running", name)
+	framework.Logf("Ensuring a pod for ReplicaSet %q is running", name)
 	running := int32(0)
 	for _, pod := range pods.Items {
 		if pod.DeletionTimestamp != nil {
@@ -152,7 +153,7 @@ func testReplicaSetServeImageOrFail(f *framework.Framework, test string, image s
 			}
 		}
 		framework.ExpectNoError(err)
-		e2elog.Logf("Pod %q is running (conditions: %+v)", pod.Name, pod.Status.Conditions)
+		framework.Logf("Pod %q is running (conditions: %+v)", pod.Name, pod.Status.Conditions)
 		running++
 	}
 
@@ -162,11 +163,11 @@ func testReplicaSetServeImageOrFail(f *framework.Framework, test string, image s
 	}
 
 	// Verify that something is listening.
-	e2elog.Logf("Trying to dial the pod")
+	framework.Logf("Trying to dial the pod")
 	retryTimeout := 2 * time.Minute
 	retryInterval := 5 * time.Second
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
-	err = wait.Poll(retryInterval, retryTimeout, framework.NewPodProxyResponseChecker(f.ClientSet, f.Namespace.Name, label, name, true, pods).CheckAllResponses)
+	err = wait.Poll(retryInterval, retryTimeout, e2epod.NewProxyResponseChecker(f.ClientSet, f.Namespace.Name, label, name, true, pods).CheckAllResponses)
 	if err != nil {
 		framework.Failf("Did not get expected responses within the timeout period of %.2f seconds.", retryTimeout.Seconds())
 	}
@@ -201,7 +202,7 @@ func testReplicaSetConditionCheck(f *framework.Framework) {
 	framework.ExpectNoError(err)
 
 	ginkgo.By(fmt.Sprintf("Creating replica set %q that asks for more than the allowed pod quota", name))
-	rs := newRS(name, 3, map[string]string{"name": name}, NginxImageName, NginxImage)
+	rs := newRS(name, 3, map[string]string{"name": name}, WebserverImageName, WebserverImage, nil)
 	rs, err = c.AppsV1().ReplicaSets(namespace).Create(rs)
 	framework.ExpectNoError(err)
 
@@ -219,7 +220,7 @@ func testReplicaSetConditionCheck(f *framework.Framework) {
 		}
 		conditions = rs.Status.Conditions
 
-		cond := replicaset.GetCondition(rs.Status, apps.ReplicaSetReplicaFailure)
+		cond := replicaset.GetCondition(rs.Status, appsv1.ReplicaSetReplicaFailure)
 		return cond != nil, nil
 
 	})
@@ -229,7 +230,7 @@ func testReplicaSetConditionCheck(f *framework.Framework) {
 	framework.ExpectNoError(err)
 
 	ginkgo.By(fmt.Sprintf("Scaling down replica set %q to satisfy pod quota", name))
-	rs, err = replicasetutil.UpdateReplicaSetWithRetries(c, namespace, name, func(update *apps.ReplicaSet) {
+	rs, err = replicasetutil.UpdateReplicaSetWithRetries(c, namespace, name, func(update *appsv1.ReplicaSet) {
 		x := int32(2)
 		update.Spec.Replicas = &x
 	})
@@ -249,7 +250,7 @@ func testReplicaSetConditionCheck(f *framework.Framework) {
 		}
 		conditions = rs.Status.Conditions
 
-		cond := replicaset.GetCondition(rs.Status, apps.ReplicaSetReplicaFailure)
+		cond := replicaset.GetCondition(rs.Status, appsv1.ReplicaSetReplicaFailure)
 		return cond == nil, nil
 	})
 	if err == wait.ErrWaitTimeout {
@@ -272,7 +273,7 @@ func testRSAdoptMatchingAndReleaseNotMatching(f *framework.Framework) {
 			Containers: []v1.Container{
 				{
 					Name:  name,
-					Image: NginxImage,
+					Image: WebserverImage,
 				},
 			},
 		},
@@ -280,7 +281,7 @@ func testRSAdoptMatchingAndReleaseNotMatching(f *framework.Framework) {
 
 	ginkgo.By("When a replicaset with a matching selector is created")
 	replicas := int32(1)
-	rsSt := newRS(name, replicas, map[string]string{"name": name}, name, NginxImage)
+	rsSt := newRS(name, replicas, map[string]string{"name": name}, name, WebserverImage, nil)
 	rsSt.Spec.Selector = &metav1.LabelSelector{MatchLabels: map[string]string{"name": name}}
 	rs, err := f.ClientSet.AppsV1().ReplicaSets(f.Namespace.Name).Create(rsSt)
 	framework.ExpectNoError(err)
@@ -305,7 +306,7 @@ func testRSAdoptMatchingAndReleaseNotMatching(f *framework.Framework) {
 	framework.ExpectNoError(err)
 
 	ginkgo.By("When the matched label of one of its pods change")
-	pods, err := framework.PodsCreated(f.ClientSet, f.Namespace.Name, rs.Name, replicas)
+	pods, err := e2epod.PodsCreated(f.ClientSet, f.Namespace.Name, rs.Name, replicas)
 	framework.ExpectNoError(err)
 
 	p = &pods.Items[0]

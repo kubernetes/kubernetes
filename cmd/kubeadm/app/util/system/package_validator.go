@@ -24,9 +24,6 @@ import (
 
 	"github.com/blang/semver"
 	"github.com/pkg/errors"
-
-	errorsutil "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/klog"
 )
 
 // semVerDotsCount is the number of dots in a valid semantic version.
@@ -93,22 +90,22 @@ func (validator *packageValidator) Name() string {
 // Validate checks packages and their versions against the spec using the
 // package manager on the running machine, and returns an error on any
 // package/version mismatch.
-func (validator *packageValidator) Validate(spec SysSpec) (error, error) {
+func (validator *packageValidator) Validate(spec SysSpec) ([]error, []error) {
 	if len(spec.PackageSpecs) == 0 {
 		return nil, nil
 	}
 
 	var err error
 	if validator.kernelRelease, err = getKernelRelease(); err != nil {
-		return nil, err
+		return nil, []error{err}
 	}
 	if validator.osDistro, err = getOSDistro(); err != nil {
-		return nil, err
+		return nil, []error{err}
 	}
 
 	manager, err := newPackageManager()
 	if err != nil {
-		return nil, err
+		return nil, []error{err}
 	}
 	specs := applyPackageSpecOverride(spec.PackageSpecs, spec.PackageSpecOverrides, validator.osDistro)
 	return validator.validate(specs, manager)
@@ -116,7 +113,7 @@ func (validator *packageValidator) Validate(spec SysSpec) (error, error) {
 
 // Validate checks packages and their versions against the packageSpecs using
 // the packageManager, and returns an error on any package/version mismatch.
-func (validator *packageValidator) validate(packageSpecs []PackageSpec, manager packageManager) (error, error) {
+func (validator *packageValidator) validate(packageSpecs []PackageSpec, manager packageManager) ([]error, []error) {
 	var errs []error
 	for _, spec := range packageSpecs {
 		// Substitute variables in package name.
@@ -127,7 +124,6 @@ func (validator *packageValidator) validate(packageSpecs []PackageSpec, manager 
 		// Get the version of the package on the running machine.
 		version, err := manager.getPackageVersion(packageName)
 		if err != nil {
-			klog.V(1).Infof("Failed to get the version for the package %q: %s\n", packageName, err)
 			errs = append(errs, err)
 			validator.reporter.Report(nameWithVerRange, "not installed", bad)
 			continue
@@ -145,7 +141,6 @@ func (validator *packageValidator) validate(packageSpecs []PackageSpec, manager 
 		// the version is in the range.
 		sv, err := semver.Make(toSemVer(version))
 		if err != nil {
-			klog.Errorf("Failed to convert %q to semantic version: %s\n", version, err)
 			errs = append(errs, err)
 			validator.reporter.Report(nameWithVerRange, "internal error", bad)
 			continue
@@ -158,7 +153,7 @@ func (validator *packageValidator) validate(packageSpecs []PackageSpec, manager 
 			validator.reporter.Report(nameWithVerRange, version, bad)
 		}
 	}
-	return nil, errorsutil.NewAggregate(errs)
+	return nil, errs
 }
 
 // getKernelRelease returns the kernel release of the local machine.

@@ -22,6 +22,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/authenticatorfactory"
@@ -101,7 +103,7 @@ func TestToAuthenticationConfig(t *testing.T) {
 			Allow: false,
 		},
 		ClientCert: &apiserveroptions.ClientCertAuthenticationOptions{
-			ClientCA: "/client-ca",
+			ClientCA: "testdata/root.pem",
 		},
 		WebHook: &WebHookAuthenticationOptions{
 			CacheTTL:   180000000000,
@@ -124,7 +126,7 @@ func TestToAuthenticationConfig(t *testing.T) {
 			UsernameHeaders:     []string{"x-remote-user"},
 			GroupHeaders:        []string{"x-remote-group"},
 			ExtraHeaderPrefixes: []string{"x-remote-extra-"},
-			ClientCAFile:        "/testClientCAFile",
+			ClientCAFile:        "testdata/root.pem",
 			AllowedNames:        []string{"kube-aggregator"},
 		},
 		ServiceAccounts: &ServiceAccountAuthenticationOptions{
@@ -143,7 +145,7 @@ func TestToAuthenticationConfig(t *testing.T) {
 		Anonymous:                   false,
 		BasicAuthFile:               "/testBasicAuthFile",
 		BootstrapToken:              false,
-		ClientCAFile:                "/client-ca",
+		ClientVerifyOptionFn:        nil, // this is nil because you can't compare functions
 		TokenAuthFile:               "/testTokenFile",
 		OIDCIssuerURL:               "testIssuerURL",
 		OIDCClientID:                "testClientID",
@@ -162,13 +164,27 @@ func TestToAuthenticationConfig(t *testing.T) {
 			UsernameHeaders:     []string{"x-remote-user"},
 			GroupHeaders:        []string{"x-remote-group"},
 			ExtraHeaderPrefixes: []string{"x-remote-extra-"},
-			ClientCA:            "/testClientCAFile",
+			VerifyOptionFn:      nil, // this is nil because you can't compare functions
 			AllowedClientNames:  []string{"kube-aggregator"},
 		},
 	}
 
-	resultConfig := testOptions.ToAuthenticationConfig()
+	resultConfig, err := testOptions.ToAuthenticationConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// nil these out because you cannot compare pointers.  Ensure they are non-nil first
+	if resultConfig.ClientVerifyOptionFn == nil {
+		t.Error("missing client verify")
+	}
+	if resultConfig.RequestHeaderConfig.VerifyOptionFn == nil {
+		t.Error("missing requestheader verify")
+	}
+	resultConfig.ClientVerifyOptionFn = nil
+	resultConfig.RequestHeaderConfig.VerifyOptionFn = nil
+
 	if !reflect.DeepEqual(resultConfig, expectConfig) {
-		t.Errorf("Got AuthenticationConfig:\n\t%v\nExpected AuthenticationConfig:\n\t%v", resultConfig, expectConfig)
+		t.Error(cmp.Diff(resultConfig, expectConfig))
 	}
 }

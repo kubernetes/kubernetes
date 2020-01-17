@@ -101,7 +101,7 @@ func TestAggregatedAPIServer(t *testing.T) {
 		kubeAPIServerOptions.SecureServing.ServerCert.CertDirectory = certDir
 		kubeAPIServerOptions.InsecureServing.BindPort = 0
 		kubeAPIServerOptions.Etcd.StorageConfig.Transport.ServerList = []string{framework.GetEtcdURL()}
-		kubeAPIServerOptions.ServiceClusterIPRange = *defaultServiceClusterIPRange
+		kubeAPIServerOptions.ServiceClusterIPRanges = defaultServiceClusterIPRange.String()
 		kubeAPIServerOptions.Authentication.RequestHeader.UsernameHeaders = []string{"X-Remote-User"}
 		kubeAPIServerOptions.Authentication.RequestHeader.GroupHeaders = []string{"X-Remote-Group"}
 		kubeAPIServerOptions.Authentication.RequestHeader.ExtraHeaderPrefixes = []string{"X-Remote-Extra-"}
@@ -118,7 +118,7 @@ func TestAggregatedAPIServer(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		kubeAPIServerConfig, _, _, _, admissionPostStartHook, err := app.CreateKubeAPIServerConfig(completedOptions, tunneler, proxyTransport)
+		kubeAPIServerConfig, _, _, _, err := app.CreateKubeAPIServerConfig(completedOptions, tunneler, proxyTransport)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -129,7 +129,7 @@ func TestAggregatedAPIServer(t *testing.T) {
 		kubeAPIServerClientConfig.ServerName = ""
 		kubeClientConfigValue.Store(kubeAPIServerClientConfig)
 
-		kubeAPIServer, err := app.CreateKubeAPIServer(kubeAPIServerConfig, genericapiserver.NewEmptyDelegate(), admissionPostStartHook)
+		kubeAPIServer, err := app.CreateKubeAPIServer(kubeAPIServerConfig, genericapiserver.NewEmptyDelegate())
 		if err != nil {
 			t.Fatal(err)
 		}

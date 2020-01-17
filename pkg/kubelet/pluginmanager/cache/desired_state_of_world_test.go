@@ -18,6 +18,8 @@ package cache
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 // Calls AddOrUpdatePlugin() to add a plugin
@@ -96,10 +98,7 @@ func Test_DSW_AddOrUpdatePlugin_Negative_PluginMissingInfo(t *testing.T) {
 	dsw := NewDesiredStateOfWorld()
 	socketPath := ""
 	err := dsw.AddOrUpdatePlugin(socketPath, false /* foundInDeprecatedDir */)
-	// Assert
-	if err == nil || err.Error() != "Socket path is empty" {
-		t.Fatalf("AddOrUpdatePlugin failed. Expected: <Socket path is empty> Actual: <%v>", err)
-	}
+	require.EqualError(t, err, "socket path is empty")
 
 	// Get pluginsToRegister and check the newly added plugin is there
 	dswPlugins := dsw.GetPluginsToRegister()

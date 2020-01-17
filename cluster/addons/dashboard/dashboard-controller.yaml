@@ -24,7 +24,6 @@ spec:
       labels:
         k8s-app: kubernetes-dashboard
       annotations:
-        scheduler.alpha.kubernetes.io/critical-pod: ''
         seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
     spec:
       priorityClassName: system-cluster-critical
@@ -63,6 +62,8 @@ spec:
       - name: tmp-volume
         emptyDir: {}
       serviceAccountName: kubernetes-dashboard
+      nodeSelector:
+        "beta.kubernetes.io/os": linux
       tolerations:
       - key: "CriticalAddonsOnly"
         operator: "Exists"

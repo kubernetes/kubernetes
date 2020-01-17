@@ -44,6 +44,8 @@ type RecommendedOptions struct {
 	// ProcessInfo is used to identify events created by the server.
 	ProcessInfo *ProcessInfo
 	Webhook     *WebhookOptions
+	// API Server Egress Selector is used to control outbound traffic from the API Server
+	EgressSelector *EgressSelectorOptions
 }
 
 func NewRecommendedOptions(prefix string, codec runtime.Codec, processInfo *ProcessInfo) *RecommendedOptions {
@@ -67,6 +69,7 @@ func NewRecommendedOptions(prefix string, codec runtime.Codec, processInfo *Proc
 		Admission:                  NewAdmissionOptions(),
 		ProcessInfo:                processInfo,
 		Webhook:                    NewWebhookOptions(),
+		EgressSelector:             NewEgressSelectorOptions(),
 	}
 }
 
@@ -79,6 +82,7 @@ func (o *RecommendedOptions) AddFlags(fs *pflag.FlagSet) {
 	o.Features.AddFlags(fs)
 	o.CoreAPI.AddFlags(fs)
 	o.Admission.AddFlags(fs)
+	o.EgressSelector.AddFlags(fs)
 }
 
 // ApplyTo adds RecommendedOptions to the server configuration.
@@ -110,6 +114,9 @@ func (o *RecommendedOptions) ApplyTo(config *server.RecommendedConfig) error {
 	} else if err := o.Admission.ApplyTo(&config.Config, config.SharedInformerFactory, config.ClientConfig, initializers...); err != nil {
 		return err
 	}
+	if err := o.EgressSelector.ApplyTo(&config.Config); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -124,6 +131,7 @@ func (o *RecommendedOptions) Validate() []error {
 	errors = append(errors, o.Features.Validate()...)
 	errors = append(errors, o.CoreAPI.Validate()...)
 	errors = append(errors, o.Admission.Validate()...)
+	errors = append(errors, o.EgressSelector.Validate()...)
 
 	return errors
 }

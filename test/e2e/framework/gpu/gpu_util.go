@@ -20,7 +20,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	"k8s.io/klog"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
@@ -61,22 +60,4 @@ func NVIDIADevicePlugin() *v1.Pod {
 	// Remove node affinity
 	p.Spec.Affinity = nil
 	return p
-}
-
-// GetGPUDevicePluginImage returns the image of GPU device plugin.
-func GetGPUDevicePluginImage() string {
-	ds, err := framework.DsFromManifest(GPUDevicePluginDSYAML)
-	if err != nil {
-		klog.Errorf("Failed to parse the device plugin image: %v", err)
-		return ""
-	}
-	if ds == nil {
-		klog.Errorf("Failed to parse the device plugin image: the extracted DaemonSet is nil")
-		return ""
-	}
-	if len(ds.Spec.Template.Spec.Containers) < 1 {
-		klog.Errorf("Failed to parse the device plugin image: cannot extract the container from YAML")
-		return ""
-	}
-	return ds.Spec.Template.Spec.Containers[0].Image
 }

@@ -22,8 +22,11 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/features"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -96,6 +99,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 	if err != nil {
 		t.Errorf("unable to parse label selector: %v", err)
 	}
+
 	successCases := []autoscaling.HorizontalPodAutoscaler{
 		{
 			ObjectMeta: metav1.ObjectMeta{
@@ -396,7 +400,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 					MaxReplicas:    5,
 				},
 			},
-			msg: "must be greater than 0",
+			msg: "must be greater than or equal to 1",
 		},
 		{
 			horizontalPodAutoscaler: autoscaling.HorizontalPodAutoscaler{
@@ -999,6 +1003,165 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 			} else if !strings.Contains(errs[0].Error(), expectedMsg) {
 				t.Errorf("unexpected error: %q, expected %q", errs[0], expectedMsg)
 			}
+		}
+	}
+}
+
+func prepareMinReplicasCases(t *testing.T, minReplicas int32) []autoscaling.HorizontalPodAutoscaler {
+	metricLabelSelector, err := metav1.ParseToLabelSelector("label=value")
+	if err != nil {
+		t.Errorf("unable to parse label selector: %v", err)
+	}
+	minReplicasCases := []autoscaling.HorizontalPodAutoscaler{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            "myautoscaler",
+				Namespace:       metav1.NamespaceDefault,
+				ResourceVersion: "theversion",
+			},
+			Spec: autoscaling.HorizontalPodAutoscalerSpec{
+				ScaleTargetRef: autoscaling.CrossVersionObjectReference{
+					Kind: "ReplicationController",
+					Name: "myrc",
+				},
+				MinReplicas: utilpointer.Int32Ptr(minReplicas),
+				MaxReplicas: 5,
+				Metrics: []autoscaling.MetricSpec{
+					{
+						Type: autoscaling.ObjectMetricSourceType,
+						Object: &autoscaling.ObjectMetricSource{
+							DescribedObject: autoscaling.CrossVersionObjectReference{
+								Kind: "ReplicationController",
+								Name: "myrc",
+							},
+							Metric: autoscaling.MetricIdentifier{
+								Name: "somemetric",
+							},
+							Target: autoscaling.MetricTarget{
+								Type:  autoscaling.ValueMetricType,
+								Value: resource.NewMilliQuantity(300, resource.DecimalSI),
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            "myautoscaler",
+				Namespace:       metav1.NamespaceDefault,
+				ResourceVersion: "theversion",
+			},
+			Spec: autoscaling.HorizontalPodAutoscalerSpec{
+				ScaleTargetRef: autoscaling.CrossVersionObjectReference{
+					Kind: "ReplicationController",
+					Name: "myrc",
+				},
+				MinReplicas: utilpointer.Int32Ptr(minReplicas),
+				MaxReplicas: 5,
+				Metrics: []autoscaling.MetricSpec{
+					{
+						Type: autoscaling.ExternalMetricSourceType,
+						External: &autoscaling.ExternalMetricSource{
+							Metric: autoscaling.MetricIdentifier{
+								Name:     "somemetric",
+								Selector: metricLabelSelector,
+							},
+							Target: autoscaling.MetricTarget{
+								Type:         autoscaling.AverageValueMetricType,
+								AverageValue: resource.NewMilliQuantity(300, resource.DecimalSI),
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	return minReplicasCases
+}
+
+func TestValidateHorizontalPodAutoscalerScaleToZeroEnabled(t *testing.T) {
+	// Enable HPAScaleToZero feature gate.
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAScaleToZero, true)()
+
+	zeroMinReplicasCases := prepareMinReplicasCases(t, 0)
+	for _, successCase := range zeroMinReplicasCases {
+		if errs := ValidateHorizontalPodAutoscaler(&successCase); len(errs) != 0 {
+			t.Errorf("expected success: %v", errs)
+		}
+	}
+}
+
+func TestValidateHorizontalPodAutoscalerScaleToZeroDisabled(t *testing.T) {
+	// Disable HPAScaleToZero feature gate.
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAScaleToZero, false)()
+
+	zeroMinReplicasCases := prepareMinReplicasCases(t, 0)
+	errorMsg := "must be greater than or equal to 1"
+
+	for _, errorCase := range zeroMinReplicasCases {
+		errs := ValidateHorizontalPodAutoscaler(&errorCase)
+		if len(errs) == 0 {
+			t.Errorf("expected failure for %q", errorMsg)
+		} else if !strings.Contains(errs[0].Error(), errorMsg) {
+			t.Errorf("unexpected error: %q, expected: %q", errs[0], errorMsg)
+		}
+	}
+
+	nonZeroMinReplicasCases := prepareMinReplicasCases(t, 1)
+
+	for _, successCase := range nonZeroMinReplicasCases {
+		successCase.Spec.MinReplicas = utilpointer.Int32Ptr(1)
+		if errs := ValidateHorizontalPodAutoscaler(&successCase); len(errs) != 0 {
+			t.Errorf("expected success: %v", errs)
+		}
+	}
+}
+
+func TestValidateHorizontalPodAutoscalerUpdateScaleToZeroEnabled(t *testing.T) {
+	// Enable HPAScaleToZero feature gate.
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAScaleToZero, true)()
+
+	zeroMinReplicasCases := prepareMinReplicasCases(t, 0)
+	nonZeroMinReplicasCases := prepareMinReplicasCases(t, 1)
+
+	for i, zeroCase := range zeroMinReplicasCases {
+		nonZeroCase := nonZeroMinReplicasCases[i]
+
+		if errs := ValidateHorizontalPodAutoscalerUpdate(&nonZeroCase, &zeroCase); len(errs) != 0 {
+			t.Errorf("expected success: %v", errs)
+		}
+
+		if errs := ValidateHorizontalPodAutoscalerUpdate(&zeroCase, &nonZeroCase); len(errs) != 0 {
+			t.Errorf("expected success: %v", errs)
+		}
+	}
+}
+
+func TestValidateHorizontalPodAutoscalerScaleToZeroUpdateDisabled(t *testing.T) {
+	// Disable HPAScaleToZero feature gate.
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAScaleToZero, false)()
+
+	zeroMinReplicasCases := prepareMinReplicasCases(t, 0)
+	nonZeroMinReplicasCases := prepareMinReplicasCases(t, 1)
+	errorMsg := "must be greater than or equal to 1"
+
+	for i, zeroCase := range zeroMinReplicasCases {
+		nonZeroCase := nonZeroMinReplicasCases[i]
+		errs := ValidateHorizontalPodAutoscalerUpdate(&zeroCase, &nonZeroCase)
+
+		if len(errs) == 0 {
+			t.Errorf("expected failure for %q", errorMsg)
+		} else if !strings.Contains(errs[0].Error(), errorMsg) {
+			t.Errorf("unexpected error: %q, expected: %q", errs[0], errorMsg)
+		}
+
+		if errs := ValidateHorizontalPodAutoscalerUpdate(&zeroCase, &zeroCase); len(errs) != 0 {
+			t.Errorf("expected success: %v", errs)
+		}
+
+		if errs := ValidateHorizontalPodAutoscalerUpdate(&nonZeroCase, &zeroCase); len(errs) != 0 {
+			t.Errorf("expected success: %v", errs)
 		}
 	}
 }

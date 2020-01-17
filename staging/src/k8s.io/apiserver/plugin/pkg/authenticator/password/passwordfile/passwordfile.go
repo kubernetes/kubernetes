@@ -18,6 +18,7 @@ package passwordfile
 
 import (
 	"context"
+	"crypto/subtle"
 	"encoding/csv"
 	"fmt"
 	"io"
@@ -85,7 +86,7 @@ func (a *PasswordAuthenticator) AuthenticatePassword(ctx context.Context, userna
 	if !ok {
 		return nil, false, nil
 	}
-	if user.password != password {
+	if subtle.ConstantTimeCompare([]byte(user.password), []byte(password)) == 0 {
 		return nil, false, nil
 	}
 	return &authenticator.Response{User: user.info}, true, nil

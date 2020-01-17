@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2017 The Kubernetes Authors.
 
@@ -23,15 +25,15 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-03-01/compute"
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-07-01/compute"
 	"github.com/Azure/go-autorest/autorest/to"
-	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	kwait "k8s.io/apimachinery/pkg/util/wait"
 	cloudvolume "k8s.io/cloud-provider/volume"
 	volumehelpers "k8s.io/cloud-provider/volume/helpers"
+	"k8s.io/klog"
 )
 
 const (
@@ -262,7 +264,7 @@ func (c *ManagedDiskController) ResizeDisk(diskURI string, oldSize resource.Quan
 // according to https://docs.microsoft.com/en-us/rest/api/compute/disks/get
 func getResourceGroupFromDiskURI(diskURI string) (string, error) {
 	fields := strings.Split(diskURI, "/")
-	if len(fields) != 9 || fields[3] != "resourceGroups" {
+	if len(fields) != 9 || strings.ToLower(fields[3]) != "resourcegroups" {
 		return "", fmt.Errorf("invalid disk URI: %s", diskURI)
 	}
 	return fields[4], nil
@@ -314,7 +316,7 @@ func (c *Cloud) GetAzureDiskLabels(diskURI string) (map[string]string, error) {
 		return nil, fmt.Errorf("failed to parse zone %v for AzureDisk %v: %v", zones, diskName, err)
 	}
 
-	zone := c.makeZone(zoneID)
+	zone := c.makeZone(c.Location, zoneID)
 	klog.V(4).Infof("Got zone %q for Azure disk %q", zone, diskName)
 	labels := map[string]string{
 		v1.LabelZoneRegion:        c.Location,

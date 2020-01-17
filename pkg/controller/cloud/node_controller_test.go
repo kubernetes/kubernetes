@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
 
@@ -31,7 +31,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	cloudprovider "k8s.io/cloud-provider"
 	fakecloud "k8s.io/cloud-provider/fake"
-	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/testutil"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
@@ -197,7 +196,7 @@ func TestNodeInitialized(t *testing.T) {
 		DeleteWaitChan: make(chan struct{}),
 	}
 
-	factory := informers.NewSharedInformerFactory(fnh, controller.NoResyncPeriodFunc())
+	factory := informers.NewSharedInformerFactory(fnh, 0)
 
 	fakeCloud := &fakecloud.Cloud{
 		InstanceTypes: map[types.NodeName]string{
@@ -262,7 +261,7 @@ func TestNodeIgnored(t *testing.T) {
 		DeleteWaitChan: make(chan struct{}),
 	}
 
-	factory := informers.NewSharedInformerFactory(fnh, controller.NoResyncPeriodFunc())
+	factory := informers.NewSharedInformerFactory(fnh, 0)
 
 	fakeCloud := &fakecloud.Cloud{
 		InstanceTypes: map[types.NodeName]string{
@@ -334,7 +333,7 @@ func TestGCECondition(t *testing.T) {
 		DeleteWaitChan: make(chan struct{}),
 	}
 
-	factory := informers.NewSharedInformerFactory(fnh, controller.NoResyncPeriodFunc())
+	factory := informers.NewSharedInformerFactory(fnh, 0)
 
 	fakeCloud := &fakecloud.Cloud{
 		InstanceTypes: map[types.NodeName]string{
@@ -419,7 +418,7 @@ func TestZoneInitialized(t *testing.T) {
 		DeleteWaitChan: make(chan struct{}),
 	}
 
-	factory := informers.NewSharedInformerFactory(fnh, controller.NoResyncPeriodFunc())
+	factory := informers.NewSharedInformerFactory(fnh, 0)
 
 	fakeCloud := &fakecloud.Cloud{
 		InstanceTypes: map[types.NodeName]string{
@@ -509,7 +508,7 @@ func TestNodeAddresses(t *testing.T) {
 		DeleteWaitChan: make(chan struct{}),
 	}
 
-	factory := informers.NewSharedInformerFactory(fnh, controller.NoResyncPeriodFunc())
+	factory := informers.NewSharedInformerFactory(fnh, 0)
 
 	fakeCloud := &fakecloud.Cloud{
 		InstanceTypes: map[types.NodeName]string{},
@@ -622,7 +621,7 @@ func TestNodeProvidedIPAddresses(t *testing.T) {
 		DeleteWaitChan: make(chan struct{}),
 	}
 
-	factory := informers.NewSharedInformerFactory(fnh, controller.NoResyncPeriodFunc())
+	factory := informers.NewSharedInformerFactory(fnh, 0)
 
 	fakeCloud := &fakecloud.Cloud{
 		InstanceTypes: map[types.NodeName]string{
@@ -837,7 +836,7 @@ func TestNodeAddressesNotUpdate(t *testing.T) {
 		},
 	}
 
-	factory := informers.NewSharedInformerFactory(fnh, controller.NoResyncPeriodFunc())
+	factory := informers.NewSharedInformerFactory(fnh, 0)
 
 	fakeCloud := &fakecloud.Cloud{
 		InstanceTypes: map[types.NodeName]string{},
@@ -912,7 +911,7 @@ func TestNodeProviderID(t *testing.T) {
 		DeleteWaitChan: make(chan struct{}),
 	}
 
-	factory := informers.NewSharedInformerFactory(fnh, controller.NoResyncPeriodFunc())
+	factory := informers.NewSharedInformerFactory(fnh, 0)
 
 	fakeCloud := &fakecloud.Cloud{
 		InstanceTypes: map[types.NodeName]string{},
@@ -995,7 +994,7 @@ func TestNodeProviderIDAlreadySet(t *testing.T) {
 		DeleteWaitChan: make(chan struct{}),
 	}
 
-	factory := informers.NewSharedInformerFactory(fnh, controller.NoResyncPeriodFunc())
+	factory := informers.NewSharedInformerFactory(fnh, 0)
 
 	fakeCloud := &fakecloud.Cloud{
 		InstanceTypes: map[types.NodeName]string{},

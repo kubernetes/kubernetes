@@ -18,7 +18,7 @@ package algorithm
 
 import (
 	"k8s.io/api/core/v1"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
+	extenderv1 "k8s.io/kubernetes/pkg/scheduler/apis/extender/v1"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
@@ -34,12 +34,12 @@ type SchedulerExtender interface {
 	// the list of failed nodes and failure reasons.
 	Filter(pod *v1.Pod,
 		nodes []*v1.Node, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo,
-	) (filteredNodes []*v1.Node, failedNodesMap schedulerapi.FailedNodesMap, err error)
+	) (filteredNodes []*v1.Node, failedNodesMap extenderv1.FailedNodesMap, err error)
 
 	// Prioritize based on extender-implemented priority functions. The returned scores & weight
 	// are used to compute the weighted score for an extender. The weighted scores are added to
-	// the scores computed  by Kubernetes scheduler. The total scores are used to do the host selection.
-	Prioritize(pod *v1.Pod, nodes []*v1.Node) (hostPriorities *schedulerapi.HostPriorityList, weight int, err error)
+	// the scores computed by Kubernetes scheduler. The total scores are used to do the host selection.
+	Prioritize(pod *v1.Pod, nodes []*v1.Node) (hostPriorities *extenderv1.HostPriorityList, weight int64, err error)
 
 	// Bind delegates the action of binding a pod to a node to the extender.
 	Bind(binding *v1.Binding) error
@@ -61,9 +61,9 @@ type SchedulerExtender interface {
 	//   2. A different set of victim pod for every given candidate node after preemption phase of extender.
 	ProcessPreemption(
 		pod *v1.Pod,
-		nodeToVictims map[*v1.Node]*schedulerapi.Victims,
+		nodeToVictims map[*v1.Node]*extenderv1.Victims,
 		nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo,
-	) (map[*v1.Node]*schedulerapi.Victims, error)
+	) (map[*v1.Node]*extenderv1.Victims, error)
 
 	// SupportsPreemption returns if the scheduler extender support preemption or not.
 	SupportsPreemption() bool

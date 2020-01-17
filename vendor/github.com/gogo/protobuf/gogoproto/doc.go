@@ -162,7 +162,7 @@ The most complete way to see examples is to look at
 	github.com/gogo/protobuf/test/thetest.proto
 
 Gogoprototest is a seperate project,
-because we want to keep gogoprotobuf independant of goprotobuf,
+because we want to keep gogoprotobuf independent of goprotobuf,
 but we still want to test it thoroughly.
 
 */

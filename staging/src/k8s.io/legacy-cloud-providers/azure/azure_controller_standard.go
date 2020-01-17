@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2018 The Kubernetes Authors.
 
@@ -17,14 +19,13 @@ limitations under the License.
 package azure
 
 import (
-	"fmt"
 	"net/http"
 	"strings"
 
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-03-01/compute"
-	"k8s.io/klog"
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-07-01/compute"
 
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/klog"
 )
 
 // AttachDisk attaches a vhd to vm
@@ -68,8 +69,7 @@ func (as *availabilitySet) AttachDisk(isManagedDisk bool, diskName, diskURI stri
 			})
 	}
 
-	newVM := compute.VirtualMachine{
-		Location: vm.Location,
+	newVM := compute.VirtualMachineUpdate{
 		VirtualMachineProperties: &compute.VirtualMachineProperties{
 			HardwareProfile: vm.HardwareProfile,
 			StorageProfile: &compute.StorageProfile{
@@ -84,7 +84,7 @@ func (as *availabilitySet) AttachDisk(isManagedDisk bool, diskName, diskURI stri
 	// Invalidate the cache right after updating
 	defer as.cloud.vmCache.Delete(vmName)
 
-	_, err = as.VirtualMachinesClient.CreateOrUpdate(ctx, nodeResourceGroup, vmName, newVM, "attach_disk")
+	_, err = as.VirtualMachinesClient.Update(ctx, nodeResourceGroup, vmName, newVM, "attach_disk")
 	if err != nil {
 		klog.Errorf("azureDisk - attach disk(%s, %s) failed, err: %v", diskName, diskURI, err)
 		detail := err.Error()
@@ -120,9 +120,9 @@ func (as *availabilitySet) DetachDisk(diskName, diskURI string, nodeName types.N
 
 	bFoundDisk := false
 	for i, disk := range disks {
-		if disk.Lun != nil && (disk.Name != nil && diskName != "" && *disk.Name == diskName) ||
-			(disk.Vhd != nil && disk.Vhd.URI != nil && diskURI != "" && *disk.Vhd.URI == diskURI) ||
-			(disk.ManagedDisk != nil && diskURI != "" && *disk.ManagedDisk.ID == diskURI) {
+		if disk.Lun != nil && (disk.Name != nil && diskName != "" && strings.EqualFold(*disk.Name, diskName)) ||
+			(disk.Vhd != nil && disk.Vhd.URI != nil && diskURI != "" && strings.EqualFold(*disk.Vhd.URI, diskURI)) ||
+			(disk.ManagedDisk != nil && diskURI != "" && strings.EqualFold(*disk.ManagedDisk.ID, diskURI)) {
 			// found the disk
 			klog.V(2).Infof("azureDisk - detach disk: name %q uri %q", diskName, diskURI)
 			disks = append(disks[:i], disks[i+1:]...)
@@ -132,11 +132,11 @@ func (as *availabilitySet) DetachDisk(diskName, diskURI string, nodeName types.N
 	}
 
 	if !bFoundDisk {
-		return nil, fmt.Errorf("detach azure disk failure, disk %s not found, diskURI: %s", diskName, diskURI)
+		// only log here, next action is to update VM status with original meta data
+		klog.Errorf("detach azure disk: disk %s not found, diskURI: %s", diskName, diskURI)
 	}
 
-	newVM := compute.VirtualMachine{
-		Location: vm.Location,
+	newVM := compute.VirtualMachineUpdate{
 		VirtualMachineProperties: &compute.VirtualMachineProperties{
 			HardwareProfile: vm.HardwareProfile,
 			StorageProfile: &compute.StorageProfile{
@@ -151,7 +151,7 @@ func (as *availabilitySet) DetachDisk(diskName, diskURI string, nodeName types.N
 	// Invalidate the cache right after updating
 	defer as.cloud.vmCache.Delete(vmName)
 
-	return as.VirtualMachinesClient.CreateOrUpdate(ctx, nodeResourceGroup, vmName, newVM, "detach_disk")
+	return as.VirtualMachinesClient.Update(ctx, nodeResourceGroup, vmName, newVM, "detach_disk")
 }
 
 // GetDataDisks gets a list of data disks attached to the node.

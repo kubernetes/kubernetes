@@ -31,6 +31,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/metadata"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/controller"
@@ -88,6 +89,7 @@ type GraphBuilder struct {
 	// it is protected by monitorLock.
 	running bool
 
+	metadataClient metadata.Interface
 	// monitors are the producer of the graphChanges queue, graphBuilder alters
 	// the in-memory graph according to the changes.
 	graphChanges workqueue.RateLimitingInterface
@@ -425,15 +427,14 @@ func referencesDiffs(old []metav1.OwnerReference, new []metav1.OwnerReference) (
 	return added, removed, changed
 }
 
-// returns if the object in the event just transitions to "being deleted".
-func deletionStarts(oldObj interface{}, newAccessor metav1.Object) bool {
-	// The delta_fifo may combine the creation and update of the object into one
-	// event, so if there is no oldObj, we just return if the newObj (via
-	// newAccessor) is being deleted.
+func deletionStartsWithFinalizer(oldObj interface{}, newAccessor metav1.Object, matchingFinalizer string) bool {
+	// if the new object isn't being deleted, or doesn't have the finalizer we're interested in, return false
+	if !beingDeleted(newAccessor) || !hasFinalizer(newAccessor, matchingFinalizer) {
+		return false
+	}
+
+	// if the old object is nil, or wasn't being deleted, or didn't have the finalizer, return true
 	if oldObj == nil {
-		if newAccessor.GetDeletionTimestamp() == nil {
-			return false
-		}
 		return true
 	}
 	oldAccessor, err := meta.Accessor(oldObj)
@@ -441,7 +442,7 @@ func deletionStarts(oldObj interface{}, newAccessor metav1.Object) bool {
 		utilruntime.HandleError(fmt.Errorf("cannot access oldObj: %v", err))
 		return false
 	}
-	return beingDeleted(newAccessor) && !beingDeleted(oldAccessor)
+	return !beingDeleted(oldAccessor) || !hasFinalizer(oldAccessor, matchingFinalizer)
 }
 
 func beingDeleted(accessor metav1.Object) bool {
@@ -449,19 +450,17 @@ func beingDeleted(accessor metav1.Object) bool {
 }
 
 func hasDeleteDependentsFinalizer(accessor metav1.Object) bool {
-	finalizers := accessor.GetFinalizers()
-	for _, finalizer := range finalizers {
-		if finalizer == metav1.FinalizerDeleteDependents {
-			return true
-		}
-	}
-	return false
+	return hasFinalizer(accessor, metav1.FinalizerDeleteDependents)
 }
 
 func hasOrphanFinalizer(accessor metav1.Object) bool {
+	return hasFinalizer(accessor, metav1.FinalizerOrphanDependents)
+}
+
+func hasFinalizer(accessor metav1.Object, matchingFinalizer string) bool {
 	finalizers := accessor.GetFinalizers()
 	for _, finalizer := range finalizers {
-		if finalizer == metav1.FinalizerOrphanDependents {
+		if finalizer == matchingFinalizer {
 			return true
 		}
 	}
@@ -471,13 +470,13 @@ func hasOrphanFinalizer(accessor metav1.Object) bool {
 // this function takes newAccessor directly because the caller already
 // instantiates an accessor for the newObj.
 func startsWaitingForDependentsDeleted(oldObj interface{}, newAccessor metav1.Object) bool {
-	return deletionStarts(oldObj, newAccessor) && hasDeleteDependentsFinalizer(newAccessor)
+	return deletionStartsWithFinalizer(oldObj, newAccessor, metav1.FinalizerDeleteDependents)
 }
 
 // this function takes newAccessor directly because the caller already
 // instantiates an accessor for the newObj.
 func startsWaitingForDependentsOrphaned(oldObj interface{}, newAccessor metav1.Object) bool {
-	return deletionStarts(oldObj, newAccessor) && hasOrphanFinalizer(newAccessor)
+	return deletionStartsWithFinalizer(oldObj, newAccessor, metav1.FinalizerOrphanDependents)
 }
 
 // if an blocking ownerReference points to an object gets removed, or gets set to

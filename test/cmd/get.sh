@@ -26,9 +26,9 @@ run_kubectl_get_tests() {
   kube::log::status "Testing kubectl get"
   ### Test retrieval of non-existing pods
   # Pre-condition: no POD exists
-  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
+  kube::test::get_object_assert pods "{{range.items}}{{${id_field:?}}}:{{end}}" ''
   # Command
-  output_message=$(! kubectl get pods abc 2>&1 "${kube_flags[@]}")
+  output_message=$(! kubectl get pods abc 2>&1 "${kube_flags[@]:?}")
   # Post-condition: POD abc should error since it doesn't exist
   kube::test::if_has_string "${output_message}" 'pods "abc" not found'
 
@@ -98,7 +98,7 @@ run_kubectl_get_tests() {
   # Post-condition: make sure we don't display an empty List
   if kube::test::if_has_string "${output_message}" 'List'; then
     echo 'Unexpected List output'
-    echo "${LINENO} $(basename $0)"
+    echo "${LINENO} $(basename "$0")"
     exit 1
   fi
 
@@ -138,9 +138,9 @@ run_kubectl_get_tests() {
 
   ### Test kubectl get chunk size does not result in a --watch error when resource list is served in multiple chunks
   # Pre-condition: ConfigMap one two tree does not exist
-  kube::test::get_object_assert 'configmaps' '{{range.items}}{{ if eq $id_field \"one\" }}found{{end}}{{end}}:' ':'
-  kube::test::get_object_assert 'configmaps' '{{range.items}}{{ if eq $id_field \"two\" }}found{{end}}{{end}}:' ':'
-  kube::test::get_object_assert 'configmaps' '{{range.items}}{{ if eq $id_field \"three\" }}found{{end}}{{end}}:' ':'
+  kube::test::get_object_assert 'configmaps' "{{range.items}}{{ if eq $id_field \\\"one\\\" }}found{{end}}{{end}}:" ':'
+  kube::test::get_object_assert 'configmaps' "{{range.items}}{{ if eq $id_field \\\"two\\\" }}found{{end}}{{end}}:" ':'
+  kube::test::get_object_assert 'configmaps' "{{range.items}}{{ if eq $id_field \\\"three\\\" }}found{{end}}{{end}}:" ':'
 
   # Post-condition: Create three configmaps and ensure that we can --watch them with a --chunk-size of 1
   kubectl create cm one "${kube_flags[@]}"

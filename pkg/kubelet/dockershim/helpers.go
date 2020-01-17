@@ -43,7 +43,7 @@ const (
 )
 
 var (
-	conflictRE = regexp.MustCompile(`Conflict. (?:.)+ is already in use by container ([0-9a-z]+)`)
+	conflictRE = regexp.MustCompile(`Conflict. (?:.)+ is already in use by container \"?([0-9a-z]+)\"?`)
 
 	// this is hacky, but extremely common.
 	// if a container starts but the executable file is not found, runc gives a message that matches
@@ -344,7 +344,7 @@ func ensureSandboxImageExists(client libdocker.Interface, image string) error {
 
 	var pullErrs []error
 	for _, currentCreds := range creds {
-		authConfig := dockertypes.AuthConfig(credentialprovider.LazyProvide(currentCreds, repoToPull))
+		authConfig := dockertypes.AuthConfig(currentCreds)
 		err := client.PullImage(image, authConfig, dockertypes.ImagePullOptions{})
 		// If there was no error, return success
 		if err == nil {

@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2018 The Kubernetes Authors.
 
@@ -50,8 +52,8 @@ type NetworkData struct {
 
 // IPAddress represents IP address information.
 type IPAddress struct {
-	PrivateIP string `json:"privateIPAddress"`
-	PublicIP  string `json:"publicIPAddress"`
+	PrivateIP string `json:"privateIpAddress"`
+	PublicIP  string `json:"publicIpAddress"`
 }
 
 // Subnet represents subnet information.
@@ -62,6 +64,7 @@ type Subnet struct {
 
 // ComputeMetadata represents compute information
 type ComputeMetadata struct {
+	Environment    string `json:"azEnvironment,omitempty"`
 	SKU            string `json:"sku,omitempty"`
 	Name           string `json:"name,omitempty"`
 	Zone           string `json:"zone,omitempty"`
@@ -72,6 +75,7 @@ type ComputeMetadata struct {
 	UpdateDomain   string `json:"platformUpdateDomain,omitempty"`
 	ResourceGroup  string `json:"resourceGroupName,omitempty"`
 	VMScaleSetName string `json:"vmScaleSetName,omitempty"`
+	SubscriptionID string `json:"subscriptionId,omitempty"`
 }
 
 // InstanceMetadata represents instance information.
@@ -111,7 +115,7 @@ func (ims *InstanceMetadataService) getInstanceMetadata(key string) (interface{}
 
 	q := req.URL.Query()
 	q.Add("format", "json")
-	q.Add("api-version", "2017-12-01")
+	q.Add("api-version", "2019-03-11")
 	req.URL.RawQuery = q.Encode()
 
 	client := &http.Client{}

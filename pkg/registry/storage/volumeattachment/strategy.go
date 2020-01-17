@@ -61,7 +61,6 @@ func (volumeAttachmentStrategy) PrepareForCreate(ctx context.Context, obj runtim
 	case storageapiv1beta1.SchemeGroupVersion:
 		// allow modification of status for v1beta1
 	default:
-		volumeAttachment := obj.(*storage.VolumeAttachment)
 		volumeAttachment.Status = storage.VolumeAttachmentStatus{}
 	}
 

@@ -32,7 +32,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -115,7 +114,7 @@ var _ = SIGDescribe("Generated clientset", func() {
 		if err != nil {
 			framework.Failf("Failed to query for pods: %v", err)
 		}
-		gomega.Expect(len(pods.Items)).To(gomega.Equal(0))
+		framework.ExpectEqual(len(pods.Items), 0)
 		options = metav1.ListOptions{
 			LabelSelector:   selector,
 			ResourceVersion: pods.ListMeta.ResourceVersion,
@@ -140,7 +139,7 @@ var _ = SIGDescribe("Generated clientset", func() {
 		if err != nil {
 			framework.Failf("Failed to query for pods: %v", err)
 		}
-		gomega.Expect(len(pods.Items)).To(gomega.Equal(1))
+		framework.ExpectEqual(len(pods.Items), 1)
 
 		ginkgo.By("verifying pod creation was observed")
 		observeCreation(w)
@@ -231,7 +230,7 @@ var _ = SIGDescribe("Generated clientset", func() {
 		if err != nil {
 			framework.Failf("Failed to query for cronJobs: %v", err)
 		}
-		gomega.Expect(len(cronJobs.Items)).To(gomega.Equal(0))
+		framework.ExpectEqual(len(cronJobs.Items), 0)
 		options = metav1.ListOptions{
 			LabelSelector:   selector,
 			ResourceVersion: cronJobs.ListMeta.ResourceVersion,
@@ -256,7 +255,7 @@ var _ = SIGDescribe("Generated clientset", func() {
 		if err != nil {
 			framework.Failf("Failed to query for cronJobs: %v", err)
 		}
-		gomega.Expect(len(cronJobs.Items)).To(gomega.Equal(1))
+		framework.ExpectEqual(len(cronJobs.Items), 1)
 
 		ginkgo.By("verifying cronJob creation was observed")
 		observeCreation(w)
@@ -273,6 +272,6 @@ var _ = SIGDescribe("Generated clientset", func() {
 		if err != nil {
 			framework.Failf("Failed to list cronJobs to verify deletion: %v", err)
 		}
-		gomega.Expect(len(cronJobs.Items)).To(gomega.Equal(0))
+		framework.ExpectEqual(len(cronJobs.Items), 0)
 	})
 })

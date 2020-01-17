@@ -16,7 +16,6 @@ go_library(
     srcs = ["gen_kube_man.go"],
     importpath = "k8s.io/kubernetes/cmd/genman",
     deps = [
-        "//cmd/cloud-controller-manager/app:go_default_library",
         "//cmd/genutils:go_default_library",
         "//cmd/kube-apiserver/app:go_default_library",
         "//cmd/kube-controller-manager/app:go_default_library",

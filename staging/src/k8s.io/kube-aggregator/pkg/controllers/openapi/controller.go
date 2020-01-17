@@ -25,7 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog"
-	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
+	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	"k8s.io/kube-aggregator/pkg/controllers/openapi/aggregator"
 )
 
@@ -154,7 +154,7 @@ func (c *AggregationController) sync(key string) (syncAction, error) {
 }
 
 // AddAPIService adds a new API Service to OpenAPI Aggregation.
-func (c *AggregationController) AddAPIService(handler http.Handler, apiService *apiregistration.APIService) {
+func (c *AggregationController) AddAPIService(handler http.Handler, apiService *v1.APIService) {
 	if apiService.Spec.Service == nil {
 		return
 	}
@@ -165,7 +165,7 @@ func (c *AggregationController) AddAPIService(handler http.Handler, apiService *
 }
 
 // UpdateAPIService updates API Service's info and handler.
-func (c *AggregationController) UpdateAPIService(handler http.Handler, apiService *apiregistration.APIService) {
+func (c *AggregationController) UpdateAPIService(handler http.Handler, apiService *v1.APIService) {
 	if apiService.Spec.Service == nil {
 		return
 	}

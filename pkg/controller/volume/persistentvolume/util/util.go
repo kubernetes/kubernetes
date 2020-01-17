@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -69,6 +70,16 @@ const (
 	AnnStorageProvisioner = "volume.beta.kubernetes.io/storage-provisioner"
 )
 
+// IsDelayBindingProvisioning checks if claim provisioning with selected-node annotation
+func IsDelayBindingProvisioning(claim *v1.PersistentVolumeClaim) bool {
+	// When feature VolumeScheduling enabled,
+	// Scheduler signal to the PV controller to start dynamic
+	// provisioning by setting the "AnnSelectedNode" annotation
+	// in the PVC
+	_, ok := claim.Annotations[AnnSelectedNode]
+	return ok
+}
+
 // IsDelayBindingMode checks if claim is in delay binding mode.
 func IsDelayBindingMode(claim *v1.PersistentVolumeClaim, classLister storagelisters.StorageClassLister) (bool, error) {
 	className := v1helper.GetPersistentVolumeClaimClass(claim)
@@ -78,7 +89,10 @@ func IsDelayBindingMode(claim *v1.PersistentVolumeClaim, classLister storagelist
 
 	class, err := classLister.Get(className)
 	if err != nil {
-		return false, nil
+		if apierrors.IsNotFound(err) {
+			return false, nil
+		}
+		return false, err
 	}
 
 	if class.VolumeBindingMode == nil {

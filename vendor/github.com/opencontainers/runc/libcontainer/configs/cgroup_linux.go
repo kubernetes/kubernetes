@@ -119,4 +119,12 @@ type Resources struct {
 
 	// Set class identifier for container's network packets
 	NetClsClassid uint32 `json:"net_cls_classid_u"`
+
+	// Used on cgroups v2:
+
+	// CpuWeight sets a proportional bandwidth limit.
+	CpuWeight uint64 `json:"cpu_weight"`
+
+	// CpuMax sets she maximum bandwidth limit (format: max period).
+	CpuMax string `json:"cpu_max"`
 }

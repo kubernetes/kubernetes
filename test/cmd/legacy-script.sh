@@ -23,7 +23,7 @@ set -o pipefail
 # Set locale to ensure english responses from kubectl commands
 export LANG=C
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
 # Expects the following has already been done by whatever sources this script
 # source "${KUBE_ROOT}/hack/lib/init.sh"
 # source "${KUBE_ROOT}/hack/lib/test.sh"
@@ -44,7 +44,6 @@ source "${KUBE_ROOT}/test/cmd/get.sh"
 source "${KUBE_ROOT}/test/cmd/kubeadm.sh"
 source "${KUBE_ROOT}/test/cmd/kubeconfig.sh"
 source "${KUBE_ROOT}/test/cmd/node-management.sh"
-source "${KUBE_ROOT}/test/cmd/old-print.sh"
 source "${KUBE_ROOT}/test/cmd/plugins.sh"
 source "${KUBE_ROOT}/test/cmd/proxy.sh"
 source "${KUBE_ROOT}/test/cmd/rbac.sh"
@@ -67,14 +66,14 @@ CTLRMGR_PORT=${CTLRMGR_PORT:-10252}
 PROXY_HOST=127.0.0.1 # kubectl only serves on localhost.
 
 IMAGE_NGINX="k8s.gcr.io/nginx:1.7.9"
-IMAGE_DEPLOYMENT_R1="k8s.gcr.io/nginx:test-cmd"  # deployment-revision1.yaml
-IMAGE_DEPLOYMENT_R2="$IMAGE_NGINX"  # deployment-revision2.yaml
-IMAGE_PERL="k8s.gcr.io/perl"
-IMAGE_PAUSE_V2="k8s.gcr.io/pause:2.0"
-IMAGE_DAEMONSET_R2="k8s.gcr.io/pause:latest"
-IMAGE_DAEMONSET_R2_2="k8s.gcr.io/nginx:test-cmd"  # rollingupdate-daemonset-rv2.yaml
-IMAGE_STATEFULSET_R1="k8s.gcr.io/nginx-slim:0.7"
-IMAGE_STATEFULSET_R2="k8s.gcr.io/nginx-slim:0.8"
+export IMAGE_DEPLOYMENT_R1="k8s.gcr.io/nginx:test-cmd"  # deployment-revision1.yaml
+export IMAGE_DEPLOYMENT_R2="$IMAGE_NGINX"  # deployment-revision2.yaml
+export IMAGE_PERL="k8s.gcr.io/perl"
+export IMAGE_PAUSE_V2="k8s.gcr.io/pause:2.0"
+export IMAGE_DAEMONSET_R2="k8s.gcr.io/pause:latest"
+export IMAGE_DAEMONSET_R2_2="k8s.gcr.io/nginx:test-cmd"  # rollingupdate-daemonset-rv2.yaml
+export IMAGE_STATEFULSET_R1="k8s.gcr.io/nginx-slim:0.7"
+export IMAGE_STATEFULSET_R2="k8s.gcr.io/nginx-slim:0.8"
 
 # Expose kubectl directly for readability
 PATH="${KUBE_OUTPUT_HOSTBIN}":$PATH
@@ -84,8 +83,6 @@ clusterroles="clusterroles"
 configmaps="configmaps"
 csr="csr"
 deployments="deployments"
-horizontalpodautoscalers="horizontalpodautoscalers"
-metrics="metrics"
 namespaces="namespaces"
 nodes="nodes"
 persistentvolumeclaims="persistentvolumeclaims"
@@ -99,10 +96,8 @@ secrets="secrets"
 serviceaccounts="serviceaccounts"
 services="services"
 statefulsets="statefulsets"
-static="static"
 storageclass="storageclass"
 subjectaccessreviews="subjectaccessreviews"
-selfsubjectaccessreviews="selfsubjectaccessreviews"
 customresourcedefinitions="customresourcedefinitions"
 daemonsets="daemonsets"
 controllerrevisions="controllerrevisions"
@@ -132,9 +127,9 @@ function record_command() {
     local name="$1"
     local output="${KUBE_JUNIT_REPORT_DIR:-/tmp/junit-results}"
     echo "Recording: ${name}"
-    echo "Running command: $@"
-    juLog -output="${output}" -class="test-cmd" -name="${name}" "$@"
-    if [[ $? -ne 0 ]]; then
+    echo "Running command: $*"
+    if ! juLog -output="${output}" -class="test-cmd" -name="${name}" "$@"
+    then
       echo "Error when running ${name}"
       foundError="${foundError}""${name}"", "
     fi
@@ -148,7 +143,7 @@ function stop-proxy()
 {
   [[ -n "${PROXY_PORT-}" ]] && kube::log::status "Stopping proxy on port ${PROXY_PORT}"
   [[ -n "${PROXY_PID-}" ]] && kill "${PROXY_PID}" 1>&2 2>/dev/null
-  [[ -n "${PROXY_PORT_FILE-}" ]] && rm -f ${PROXY_PORT_FILE}
+  [[ -n "${PROXY_PORT_FILE-}" ]] && rm -f "${PROXY_PORT_FILE}"
   PROXY_PID=
   PROXY_PORT=
   PROXY_PORT_FILE=
@@ -164,22 +159,22 @@ function start-proxy()
 
 
   if [ $# -eq 0 ]; then
-    kubectl proxy --port=0 --www=. 1>${PROXY_PORT_FILE} 2>&1 &
+    kubectl proxy --port=0 --www=. 1>"${PROXY_PORT_FILE}" 2>&1 &
   else
-    kubectl proxy --port=0 --www=. --api-prefix="$1" 1>${PROXY_PORT_FILE} 2>&1 &
+    kubectl proxy --port=0 --www=. --api-prefix="$1" 1>"${PROXY_PORT_FILE}" 2>&1 &
   fi
   PROXY_PID=$!
   PROXY_PORT=
 
   local attempts=0
   while [[ -z ${PROXY_PORT} ]]; do
-    if (( ${attempts} > 9 )); then
+    if (( attempts > 9 )); then
       kill "${PROXY_PID}"
-      kube::log::error_exit "Couldn't start proxy. Failed to read port after ${attempts} tries. Got: $(cat ${PROXY_PORT_FILE})"
+      kube::log::error_exit "Couldn't start proxy. Failed to read port after ${attempts} tries. Got: $(cat "${PROXY_PORT_FILE}")"
     fi
     sleep .5
     kube::log::status "Attempt ${attempts} to read ${PROXY_PORT_FILE}..."
-    PROXY_PORT=$(sed 's/.*Starting to serve on 127.0.0.1:\([0-9]*\)$/\1/'< ${PROXY_PORT_FILE})
+    PROXY_PORT=$(sed 's/.*Starting to serve on 127.0.0.1:\([0-9]*\)$/\1/'< "${PROXY_PORT_FILE}")
     attempts=$((attempts+1))
   done
 
@@ -205,7 +200,7 @@ function cleanup()
   rm -rf "${KUBE_TEMP}"
 
   local junit_dir="${KUBE_JUNIT_REPORT_DIR:-/tmp/junit-results}"
-  echo "junit report dir:" ${junit_dir}
+  echo "junit report dir:" "${junit_dir}"
 
   kube::log::status "Clean up complete"
 }
@@ -230,11 +225,11 @@ function check-curl-proxy-code()
 function kubectl-with-retry()
 {
   ERROR_FILE="${KUBE_TEMP}/kubectl-error"
-  preserve_err_file=${PRESERVE_ERR_FILE-false}
+  preserve_err_file=${PRESERVE_ERR_FILE:-false}
   for count in {0..3}; do
-    kubectl "$@" 2> ${ERROR_FILE} || true
+    kubectl "$@" 2> "${ERROR_FILE}" || true
     if grep -q "the object has been modified" "${ERROR_FILE}"; then
-      kube::log::status "retry $1, error: $(cat ${ERROR_FILE})"
+      kube::log::status "retry $1, error: $(cat "${ERROR_FILE}")"
       rm "${ERROR_FILE}"
       sleep $((2**count))
     else
@@ -256,12 +251,12 @@ function wait-for-pods-with-label()
 {
   local i
   for i in $(seq 1 10); do
-    kubeout=`kubectl get po -l $1 --output=go-template --template='{{range.items}}{{.metadata.name}}{{end}}' --sort-by metadata.name "${kube_flags[@]}"`
-    if [[ $kubeout = $2 ]]; then
+    kubeout=$(kubectl get po -l "$1" --output=go-template --template='{{range.items}}{{.metadata.name}}{{end}}' --sort-by metadata.name "${kube_flags[@]}")
+    if [[ $kubeout = "$2" ]]; then
         return
     fi
-    echo Waiting for pods: $2, found $kubeout
-    sleep $i
+    echo Waiting for pods: "$2", found "$kubeout"
+    sleep "$i"
   done
   kube::log::error_exit "Timeout waiting for pods with label $1"
 }
@@ -320,60 +315,62 @@ runTests() {
   }
 
   kube_flags=(
-    -s "http://127.0.0.1:${API_PORT}"
+    '-s' "http://127.0.0.1:${API_PORT}"
   )
 
   # token defined in hack/testdata/auth-tokens.csv
   kube_flags_with_token=(
-    -s "https://127.0.0.1:${SECURE_API_PORT}" --token=admin-token --insecure-skip-tls-verify=true
+    '-s' "https://127.0.0.1:${SECURE_API_PORT}" '--token=admin-token' '--insecure-skip-tls-verify=true'
   )
 
   if [[ -z "${ALLOW_SKEW:-}" ]]; then
-    kube_flags+=("--match-server-version")
-    kube_flags_with_token+=("--match-server-version")
+    kube_flags+=('--match-server-version')
+    kube_flags_with_token+=('--match-server-version')
   fi
   if kube::test::if_supports_resource "${nodes}" ; then
     [ "$(kubectl get nodes -o go-template='{{ .apiVersion }}' "${kube_flags[@]}")" == "v1" ]
   fi
 
-  id_field=".metadata.name"
-  labels_field=".metadata.labels"
-  annotations_field=".metadata.annotations"
-  service_selector_field=".spec.selector"
-  rc_replicas_field=".spec.replicas"
-  rc_status_replicas_field=".status.replicas"
-  rc_container_image_field=".spec.template.spec.containers"
-  rs_replicas_field=".spec.replicas"
-  port_field="(index .spec.ports 0).port"
-  port_name="(index .spec.ports 0).name"
-  second_port_field="(index .spec.ports 1).port"
-  second_port_name="(index .spec.ports 1).name"
-  image_field="(index .spec.containers 0).image"
-  pod_container_name_field="(index .spec.containers 0).name"
-  container_name_field="(index .spec.template.spec.containers 0).name"
-  hpa_min_field=".spec.minReplicas"
-  hpa_max_field=".spec.maxReplicas"
-  hpa_cpu_field=".spec.targetCPUUtilizationPercentage"
-  template_labels=".spec.template.metadata.labels.name"
-  statefulset_replicas_field=".spec.replicas"
-  statefulset_observed_generation=".status.observedGeneration"
-  job_parallelism_field=".spec.parallelism"
-  deployment_replicas=".spec.replicas"
-  secret_data=".data"
-  secret_type=".type"
-  change_cause_annotation='.*kubernetes.io/change-cause.*'
-  pdb_min_available=".spec.minAvailable"
-  pdb_max_unavailable=".spec.maxUnavailable"
-  generation_field=".metadata.generation"
-  template_generation_field=".spec.templateGeneration"
-  container_len="(len .spec.template.spec.containers)"
-  image_field0="(index .spec.template.spec.containers 0).image"
-  image_field1="(index .spec.template.spec.containers 1).image"
+  # Define helper variables for fields to prevent typos.
+  # They will be used in some other files under test/cmd,
+  # Let's export them as https://github.com/koalaman/shellcheck/wiki/SC2034 suggested.
+  export id_field=".metadata.name"
+  export labels_field=".metadata.labels"
+  export annotations_field=".metadata.annotations"
+  export service_selector_field=".spec.selector"
+  export rc_replicas_field=".spec.replicas"
+  export rc_status_replicas_field=".status.replicas"
+  export rc_container_image_field=".spec.template.spec.containers"
+  export rs_replicas_field=".spec.replicas"
+  export port_field="(index .spec.ports 0).port"
+  export port_name="(index .spec.ports 0).name"
+  export second_port_field="(index .spec.ports 1).port"
+  export second_port_name="(index .spec.ports 1).name"
+  export image_field="(index .spec.containers 0).image"
+  export pod_container_name_field="(index .spec.containers 0).name"
+  export container_name_field="(index .spec.template.spec.containers 0).name"
+  export hpa_min_field=".spec.minReplicas"
+  export hpa_max_field=".spec.maxReplicas"
+  export hpa_cpu_field=".spec.targetCPUUtilizationPercentage"
+  export template_labels=".spec.template.metadata.labels.name"
+  export statefulset_replicas_field=".spec.replicas"
+  export statefulset_observed_generation=".status.observedGeneration"
+  export job_parallelism_field=".spec.parallelism"
+  export deployment_replicas=".spec.replicas"
+  export secret_data=".data"
+  export secret_type=".type"
+  export change_cause_annotation='.*kubernetes.io/change-cause.*'
+  export pdb_min_available=".spec.minAvailable"
+  export pdb_max_unavailable=".spec.maxUnavailable"
+  export generation_field=".metadata.generation"
+  export container_len="(len .spec.template.spec.containers)"
+  export image_field0="(index .spec.template.spec.containers 0).image"
+  export image_field1="(index .spec.template.spec.containers 1).image"
 
   # Make sure "default" namespace exists.
   if kube::test::if_supports_resource "${namespaces}" ; then
     output_message=$(kubectl get "${kube_flags[@]}" namespaces)
-    if [[ ! $(echo "${output_message}" | grep "default") ]]; then
+    if ! grep -q "default" <<< "${output_message}"; then
       # Create default namespace
       kubectl create "${kube_flags[@]}" ns default
     fi
@@ -397,10 +394,10 @@ runTests() {
 
    if [[ -n "${WHAT-}" ]]; then
     for pkg in ${WHAT}
-    do 
+    do
       # running of kubeadm is captured in hack/make-targets/test-cmd.sh
-      if [[ "${pkg}" != "kubeadm" ]]; then 
-        record_command run_${pkg}_tests
+      if [[ "${pkg}" != "kubeadm" ]]; then
+        record_command "run_${pkg}_tests"
       fi
     done
     cleanup_tests
@@ -504,7 +501,6 @@ runTests() {
 
   if kube::test::if_supports_resource "${pods}" ; then
     record_command run_kubectl_get_tests
-    record_command run_kubectl_old_print_tests
   fi
 
   ################

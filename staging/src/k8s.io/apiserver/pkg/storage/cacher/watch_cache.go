@@ -40,6 +40,10 @@ const (
 	// before terminating request and returning Timeout error with retry
 	// after suggestion.
 	blockTimeout = 3 * time.Second
+
+	// resourceVersionTooHighRetrySeconds is the seconds before a operation should be retried by the client
+	// after receiving a 'too high resource version' error.
+	resourceVersionTooHighRetrySeconds = 1
 )
 
 // watchCacheEvent is a single "watch event" that is send to users of
@@ -206,6 +210,37 @@ func (w *watchCache) objectToVersionedRuntimeObject(obj interface{}) (runtime.Ob
 	return object, resourceVersion, nil
 }
 
+func setCachingObjects(event *watchCacheEvent, versioner storage.Versioner) {
+	switch event.Type {
+	case watch.Added, watch.Modified:
+		if object, err := newCachingObject(event.Object); err == nil {
+			event.Object = object
+		} else {
+			klog.Errorf("couldn't create cachingObject from: %#v", event.Object)
+		}
+		// Don't wrap PrevObject for update event (for create events it is nil).
+		// We only encode those to deliver DELETE watch events, so if
+		// event.Object is not nil it can be used only for watchers for which
+		// selector was satisfied for its previous version and is no longer
+		// satisfied for the current version.
+		// This is rare enough that it doesn't justify making deep-copy of the
+		// object (done by newCachingObject) every time.
+	case watch.Deleted:
+		// Don't wrap Object for delete events - these are not to deliver any
+		// events. Only wrap PrevObject.
+		if object, err := newCachingObject(event.PrevObject); err == nil {
+			// Update resource version of the underlying object.
+			// event.PrevObject is used to deliver DELETE watch events and
+			// for them, we set resourceVersion to <current> instead of
+			// the resourceVersion of the last modification of the object.
+			updateResourceVersionIfNeeded(object.object, versioner, event.ResourceVersion)
+			event.PrevObject = object
+		} else {
+			klog.Errorf("couldn't create cachingObject from: %#v", event.Object)
+		}
+	}
+}
+
 // processEvent is safe as long as there is at most one call to it in flight
 // at any point in time.
 func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, updateFunc func(*storeElement) error) error {
@@ -219,7 +254,7 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, upd
 		return err
 	}
 
-	watchCacheEvent := &watchCacheEvent{
+	wcEvent := &watchCacheEvent{
 		Type:            event.Type,
 		Object:          elem.Object,
 		ObjLabels:       elem.Labels,
@@ -242,12 +277,12 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, upd
 		}
 		if exists {
 			previousElem := previous.(*storeElement)
-			watchCacheEvent.PrevObject = previousElem.Object
-			watchCacheEvent.PrevObjLabels = previousElem.Labels
-			watchCacheEvent.PrevObjFields = previousElem.Fields
+			wcEvent.PrevObject = previousElem.Object
+			wcEvent.PrevObjLabels = previousElem.Labels
+			wcEvent.PrevObjFields = previousElem.Fields
 		}
 
-		w.updateCache(watchCacheEvent)
+		w.updateCache(wcEvent)
 		w.resourceVersion = resourceVersion
 		defer w.cond.Broadcast()
 
@@ -260,7 +295,18 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, upd
 	// This is safe as long as there is at most one call to processEvent in flight
 	// at any point in time.
 	if w.eventHandler != nil {
-		w.eventHandler(watchCacheEvent)
+		// Set up caching of object serializations only for dispatching this event.
+		//
+		// Storing serializations in memory would result in increased memory usage,
+		// but it would help for caching encodings for watches started from old
+		// versions. However, we still don't have a convincing data that the gain
+		// from it justifies increased memory usage, so for now we drop the cached
+		// serializations after dispatching this event.
+
+		// Make a shallow copy to allow overwriting Object and PrevObject.
+		wce := *wcEvent
+		setCachingObjects(&wce, w.versioner)
+		w.eventHandler(&wce)
 	}
 	return nil
 }
@@ -303,8 +349,8 @@ func (w *watchCache) waitUntilFreshAndBlock(resourceVersion uint64, trace *utilt
 	}
 	for w.resourceVersion < resourceVersion {
 		if w.clock.Since(startTime) >= blockTimeout {
-			// Timeout with retry after 1 second.
-			return errors.NewTimeoutError(fmt.Sprintf("Too large resource version: %v, current: %v", resourceVersion, w.resourceVersion), 1)
+			// Request that the client retry after 'resourceVersionTooHighRetrySeconds' seconds.
+			return storage.NewTooLargeResourceVersionError(resourceVersion, w.resourceVersion, resourceVersionTooHighRetrySeconds)
 		}
 		w.cond.Wait()
 	}

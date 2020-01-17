@@ -37,7 +37,7 @@ func TestCmdCompletion(t *testing.T) {
 
 	for _, rt := range tests {
 		t.Run(rt.name, func(t *testing.T) {
-			_, _, actual := RunCmd(kubeadmPath, "completion", rt.args)
+			_, _, _, actual := RunCmd(kubeadmPath, "completion", rt.args)
 			if (actual == nil) != rt.expected {
 				t.Errorf(
 					"failed CmdCompletion running 'kubeadm completion %s' with an error: %v\n\texpected: %t\n\t  actual: %t",

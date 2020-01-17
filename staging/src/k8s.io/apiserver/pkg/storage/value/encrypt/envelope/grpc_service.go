@@ -61,12 +61,11 @@ func NewGRPCService(endpoint string, callTimeout time.Duration) (Service, error)
 		return nil, err
 	}
 
-	connection, err := grpc.Dial(addr, grpc.WithInsecure(), grpc.WithDefaultCallOptions(grpc.FailFast(false)), grpc.WithDialer(
-		func(string, time.Duration) (net.Conn, error) {
+	connection, err := grpc.Dial(addr, grpc.WithInsecure(), grpc.WithDefaultCallOptions(grpc.WaitForReady(true)), grpc.WithContextDialer(
+		func(context.Context, string) (net.Conn, error) {
 			// Ignoring addr and timeout arguments:
 			// addr - comes from the closure
-			// timeout - is ignored since we are connecting in a non-blocking configuration
-			c, err := net.DialTimeout(unixProtocol, addr, 0)
+			c, err := net.DialUnix(unixProtocol, nil, &net.UnixAddr{Name: addr})
 			if err != nil {
 				klog.Errorf("failed to create connection to unix socket: %s, error: %v", addr, err)
 			}

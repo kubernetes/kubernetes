@@ -1,0 +1,58 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: konnectivity-server
+  namespace: kube-system
+  annotations:
+    seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
+  component: konnectivity-server
+spec:
+  priorityClassName: system-cluster-critical
+  hostNetwork: true
+  containers:
+  - name: konnectivity-server-container
+    image: gcr.io/google-containers/proxy-server:v0.0.3
+    resources:
+      requests:
+        cpu: 40m
+    command: [ "/proxy-server"{{ konnectivity_args }} ]
+    livenessProbe:
+      httpGet:
+        scheme: HTTP
+        host: 127.0.0.1
+        port: {{ admin_port }}
+        path: /healthz
+      initialDelaySeconds: {{ liveness_probe_initial_delay }}
+      timeoutSeconds: 60
+    ports:
+    - name: serverport
+      containerPort: {{ server_port }}
+      hostPort: {{ server_port }}
+    - name: agentport
+      containerPort: {{ agent_port }}
+      hostPort: {{ agent_port }}
+    - name: adminport
+      containerPort: {{ admin_port }}
+      hostPort: {{ admin_port }}
+    volumeMounts:
+    - name: varlogkonnectivityserver
+      mountPath: /var/log/konnectivity-server.log
+      readOnly: false
+    - name: pkiserver
+      mountPath: /etc/srv/kubernetes/pki/konnectivity-server
+      readOnly: true
+    - name: pkiagent
+      mountPath: /etc/srv/kubernetes/pki/konnectivity-agent
+      readOnly: true
+  volumes:
+  - name: varlogkonnectivityserver
+    hostPath:
+      path: /var/log/konnectivity-server.log
+      type: FileOrCreate
+  - name: pkiserver
+    hostPath:
+      path: /etc/srv/kubernetes/pki/konnectivity-server
+  - name: pkiagent
+    hostPath:
+      path: /etc/srv/kubernetes/pki/konnectivity-agent
+

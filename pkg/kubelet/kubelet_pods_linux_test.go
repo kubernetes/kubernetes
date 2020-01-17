@@ -22,13 +22,13 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/util/mount"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
+	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
 )
 
@@ -241,7 +241,7 @@ func TestMakeMounts(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			fm := &mount.FakeMounter{}
+			fhu := hostutil.NewFakeHostUtil(nil)
 			fsp := &subpath.FakeSubpath{}
 			pod := v1.Pod{
 				Spec: v1.PodSpec{
@@ -249,7 +249,7 @@ func TestMakeMounts(t *testing.T) {
 				},
 			}
 
-			mounts, _, err := makeMounts(&pod, "/pod", &tc.container, "fakepodname", "", "", tc.podVolumes, fm, fsp, nil)
+			mounts, _, err := makeMounts(&pod, "/pod", &tc.container, "fakepodname", "", "", tc.podVolumes, fhu, fsp, nil)
 
 			// validate only the error if we expect an error
 			if tc.expectErr {

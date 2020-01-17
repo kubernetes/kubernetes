@@ -26,9 +26,7 @@ import (
 )
 
 var (
-	quantity              = *resource.NewQuantity(1, resource.DecimalSI)
-	extendedResourceName1 = "example.com/er1"
-	extendedResourceName2 = "example.com/er2"
+	quantity = *resource.NewQuantity(1, resource.DecimalSI)
 )
 
 func TestRemoveMissingExtendedResources(t *testing.T) {

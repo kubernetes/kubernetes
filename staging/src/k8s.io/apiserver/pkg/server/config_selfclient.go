@@ -38,12 +38,9 @@ func (s *SecureServingInfo) NewClientConfig(caCert []byte) (*restclient.Config, 
 	}
 
 	return &restclient.Config{
-		// Increase QPS limits. The client is currently passed to all admission plugins,
-		// and those can be throttled in case of higher load on apiserver - see #22340 and #22422
-		// for more details. Once #22422 is fixed, we may want to remove it.
-		QPS:   50,
-		Burst: 100,
-		Host:  "https://" + net.JoinHostPort(host, port),
+		// Do not limit loopback client QPS.
+		QPS:  -1,
+		Host: "https://" + net.JoinHostPort(host, port),
 		// override the ServerName to select our loopback certificate via SNI. This name is also
 		// used by the client to compare the returns server certificate against.
 		TLSClientConfig: restclient.TLSClientConfig{

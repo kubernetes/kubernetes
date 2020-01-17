@@ -24,7 +24,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/config"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	instrumentation "k8s.io/kubernetes/test/e2e/instrumentation/common"
 
 	"github.com/onsi/ginkgo"
@@ -72,7 +71,7 @@ func CheckCadvisorHealthOnAllNodes(c clientset.Interface, timeout time.Duration)
 		if maxRetries--; maxRetries <= 0 {
 			break
 		}
-		e2elog.Logf("failed to retrieve kubelet stats -\n %v", errors)
+		framework.Logf("failed to retrieve kubelet stats -\n %v", errors)
 		time.Sleep(cadvisor.SleepDuration)
 	}
 	framework.Failf("Failed after retrying %d times for cadvisor to be healthy on all nodes. Errors:\n%v", maxRetries, errors)

@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "event_broadcaster.go",
         "event_recorder.go",
+        "fake.go",
         "interfaces.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/tools/events",
@@ -41,6 +42,7 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/scheme:go_default_library",
+        "//staging/src/k8s.io/client-go/rest:go_default_library",
         "//staging/src/k8s.io/client-go/tools/reference:go_default_library",
     ],
 )

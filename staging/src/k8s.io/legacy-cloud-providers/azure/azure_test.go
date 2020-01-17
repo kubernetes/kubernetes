@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2016 The Kubernetes Authors.
 
@@ -21,10 +23,13 @@ import (
 	"context"
 	"fmt"
 	"math"
-	"net"
-	"net/http"
 	"strings"
 	"testing"
+
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-07-01/compute"
+	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2019-06-01/network"
+	"github.com/Azure/go-autorest/autorest/to"
+	"github.com/stretchr/testify/assert"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,11 +38,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	servicehelpers "k8s.io/cloud-provider/service/helpers"
 	"k8s.io/legacy-cloud-providers/azure/auth"
-
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-03-01/compute"
-	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2018-07-01/network"
-	"github.com/Azure/go-autorest/autorest/to"
-	"github.com/stretchr/testify/assert"
 )
 
 var testClusterName = "testCluster"
@@ -120,7 +120,7 @@ func TestParseConfig(t *testing.T) {
 
 // Test flipServiceInternalAnnotation
 func TestFlipServiceInternalAnnotation(t *testing.T) {
-	svc := getTestService("servicea", v1.ProtocolTCP, 80)
+	svc := getTestService("servicea", v1.ProtocolTCP, nil, 80)
 	svcUpdated := flipServiceInternalAnnotation(&svc)
 	if !requiresInternalLoadBalancer(svcUpdated) {
 		t.Errorf("Expected svc to be an internal service")
@@ -145,7 +145,7 @@ func TestFlipServiceInternalAnnotation(t *testing.T) {
 // Test additional of a new service/port.
 func TestAddPort(t *testing.T) {
 	az := getTestCloud()
-	svc := getTestService("servicea", v1.ProtocolTCP, 80)
+	svc := getTestService("servicea", v1.ProtocolTCP, nil, 80)
 	clusterResources := getClusterResources(az, 1, 1)
 
 	svc.Spec.Ports = append(svc.Spec.Ports, v1.ServicePort{
@@ -200,7 +200,7 @@ func testLoadBalancerServiceDefaultModeSelection(t *testing.T, isInternal bool) 
 			svc = getInternalTestService(svcName, 8081)
 			addTestSubnet(t, az, &svc)
 		} else {
-			svc = getTestService(svcName, v1.ProtocolTCP, 8081)
+			svc = getTestService(svcName, v1.ProtocolTCP, nil, 8081)
 		}
 
 		lbStatus, err := az.EnsureLoadBalancer(context.TODO(), testClusterName, &svc, clusterResources.nodes)
@@ -255,7 +255,7 @@ func testLoadBalancerServiceAutoModeSelection(t *testing.T, isInternal bool) {
 			svc = getInternalTestService(svcName, 8081)
 			addTestSubnet(t, az, &svc)
 		} else {
-			svc = getTestService(svcName, v1.ProtocolTCP, 8081)
+			svc = getTestService(svcName, v1.ProtocolTCP, nil, 8081)
 		}
 		setLoadBalancerAutoModeAnnotation(&svc)
 		lbStatus, err := az.EnsureLoadBalancer(context.TODO(), testClusterName, &svc, clusterResources.nodes)
@@ -318,7 +318,7 @@ func testLoadBalancerServicesSpecifiedSelection(t *testing.T, isInternal bool) {
 			svc = getInternalTestService(svcName, 8081)
 			addTestSubnet(t, az, &svc)
 		} else {
-			svc = getTestService(svcName, v1.ProtocolTCP, 8081)
+			svc = getTestService(svcName, v1.ProtocolTCP, nil, 8081)
 		}
 		lbMode := fmt.Sprintf("%s,%s", selectedAvailabilitySetName1, selectedAvailabilitySetName2)
 		setLoadBalancerModeAnnotation(&svc, lbMode)
@@ -360,7 +360,7 @@ func testLoadBalancerMaxRulesServices(t *testing.T, isInternal bool) {
 			svc = getInternalTestService(svcName, 8081)
 			addTestSubnet(t, az, &svc)
 		} else {
-			svc = getTestService(svcName, v1.ProtocolTCP, 8081)
+			svc = getTestService(svcName, v1.ProtocolTCP, nil, 8081)
 		}
 
 		lbStatus, err := az.EnsureLoadBalancer(context.TODO(), testClusterName, &svc, clusterResources.nodes)
@@ -389,7 +389,7 @@ func testLoadBalancerMaxRulesServices(t *testing.T, isInternal bool) {
 		svc = getInternalTestService(svcName, 8081)
 		addTestSubnet(t, az, &svc)
 	} else {
-		svc = getTestService(svcName, v1.ProtocolTCP, 8081)
+		svc = getTestService(svcName, v1.ProtocolTCP, nil, 8081)
 	}
 	_, err := az.EnsureLoadBalancer(context.TODO(), testClusterName, &svc, clusterResources.nodes)
 	if err == nil {
@@ -419,7 +419,7 @@ func testLoadBalancerServiceAutoModeDeleteSelection(t *testing.T, isInternal boo
 			svc = getInternalTestService(svcName, 8081)
 			addTestSubnet(t, az, &svc)
 		} else {
-			svc = getTestService(svcName, v1.ProtocolTCP, 8081)
+			svc = getTestService(svcName, v1.ProtocolTCP, nil, 8081)
 		}
 		setLoadBalancerAutoModeAnnotation(&svc)
 		lbStatus, err := az.EnsureLoadBalancer(context.TODO(), testClusterName, &svc, clusterResources.nodes)
@@ -438,7 +438,7 @@ func testLoadBalancerServiceAutoModeDeleteSelection(t *testing.T, isInternal boo
 			svc = getInternalTestService(svcName, 8081)
 			addTestSubnet(t, az, &svc)
 		} else {
-			svc = getTestService(svcName, v1.ProtocolTCP, 8081)
+			svc = getTestService(svcName, v1.ProtocolTCP, nil, 8081)
 		}
 
 		setLoadBalancerAutoModeAnnotation(&svc)
@@ -482,7 +482,7 @@ func TestReconcileLoadBalancerAddServiceOnInternalSubnet(t *testing.T) {
 
 func TestReconcileSecurityGroupFromAnyDestinationAddressPrefixToLoadBalancerIP(t *testing.T) {
 	az := getTestCloud()
-	svc1 := getTestService("serviceea", v1.ProtocolTCP, 80)
+	svc1 := getTestService("serviceea", v1.ProtocolTCP, nil, 80)
 	svc1.Spec.LoadBalancerIP = "192.168.0.0"
 	sg := getTestSecurityGroup(az)
 	// Simulate a pre-Kubernetes 1.8 NSG, where we do not specify the destination address prefix
@@ -499,7 +499,7 @@ func TestReconcileSecurityGroupFromAnyDestinationAddressPrefixToLoadBalancerIP(t
 
 func TestReconcileSecurityGroupDynamicLoadBalancerIP(t *testing.T) {
 	az := getTestCloud()
-	svc1 := getTestService("servicea", v1.ProtocolTCP, 80)
+	svc1 := getTestService("servicea", v1.ProtocolTCP, nil, 80)
 	svc1.Spec.LoadBalancerIP = ""
 	sg := getTestSecurityGroup(az)
 	dynamicallyAssignedIP := "192.168.0.0"
@@ -514,7 +514,7 @@ func TestReconcileSecurityGroupDynamicLoadBalancerIP(t *testing.T) {
 func TestReconcileLoadBalancerAddServicesOnMultipleSubnets(t *testing.T) {
 	az := getTestCloud()
 	clusterResources := getClusterResources(az, 1, 1)
-	svc1 := getTestService("service1", v1.ProtocolTCP, 8081)
+	svc1 := getTestService("service1", v1.ProtocolTCP, nil, 8081)
 	svc2 := getInternalTestService("service2", 8081)
 
 	// Internal and External service cannot reside on the same LB resource
@@ -580,7 +580,7 @@ func TestReconcileLoadBalancerEditServiceSubnet(t *testing.T) {
 func TestReconcileLoadBalancerNodeHealth(t *testing.T) {
 	az := getTestCloud()
 	clusterResources := getClusterResources(az, 1, 1)
-	svc := getTestService("servicea", v1.ProtocolTCP, 80)
+	svc := getTestService("servicea", v1.ProtocolTCP, nil, 80)
 	svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
 	svc.Spec.HealthCheckNodePort = int32(32456)
 
@@ -601,7 +601,7 @@ func TestReconcileLoadBalancerNodeHealth(t *testing.T) {
 func TestReconcileLoadBalancerRemoveService(t *testing.T) {
 	az := getTestCloud()
 	clusterResources := getClusterResources(az, 1, 1)
-	svc := getTestService("servicea", v1.ProtocolTCP, 80, 443)
+	svc := getTestService("servicea", v1.ProtocolTCP, nil, 80, 443)
 
 	lb, err := az.reconcileLoadBalancer(testClusterName, &svc, clusterResources.nodes, true /* wantLb */)
 	if err != nil {
@@ -625,7 +625,7 @@ func TestReconcileLoadBalancerRemoveService(t *testing.T) {
 func TestReconcileLoadBalancerRemoveAllPortsRemovesFrontendConfig(t *testing.T) {
 	az := getTestCloud()
 	clusterResources := getClusterResources(az, 1, 1)
-	svc := getTestService("servicea", v1.ProtocolTCP, 80)
+	svc := getTestService("servicea", v1.ProtocolTCP, nil, 80)
 
 	lb, err := az.reconcileLoadBalancer(testClusterName, &svc, clusterResources.nodes, true /* wantLb */)
 	if err != nil {
@@ -633,7 +633,7 @@ func TestReconcileLoadBalancerRemoveAllPortsRemovesFrontendConfig(t *testing.T) 
 	}
 	validateLoadBalancer(t, lb, svc)
 
-	svcUpdated := getTestService("servicea", v1.ProtocolTCP)
+	svcUpdated := getTestService("servicea", v1.ProtocolTCP, nil)
 	lb, err = az.reconcileLoadBalancer(testClusterName, &svcUpdated, clusterResources.nodes, false /* wantLb*/)
 	if err != nil {
 		t.Errorf("Unexpected error: %q", err)
@@ -652,13 +652,13 @@ func TestReconcileLoadBalancerRemovesPort(t *testing.T) {
 	az := getTestCloud()
 	clusterResources := getClusterResources(az, 1, 1)
 
-	svc := getTestService("servicea", v1.ProtocolTCP, 80, 443)
+	svc := getTestService("servicea", v1.ProtocolTCP, nil, 80, 443)
 	lb, err := az.reconcileLoadBalancer(testClusterName, &svc, clusterResources.nodes, true /* wantLb */)
 	if err != nil {
 		t.Errorf("Unexpected error: %q", err)
 	}
 
-	svcUpdated := getTestService("servicea", v1.ProtocolTCP, 80)
+	svcUpdated := getTestService("servicea", v1.ProtocolTCP, nil, 80)
 	lb, err = az.reconcileLoadBalancer(testClusterName, &svcUpdated, clusterResources.nodes, true /* wantLb */)
 	if err != nil {
 		t.Errorf("Unexpected error: %q", err)
@@ -671,8 +671,8 @@ func TestReconcileLoadBalancerRemovesPort(t *testing.T) {
 func TestReconcileLoadBalancerMultipleServices(t *testing.T) {
 	az := getTestCloud()
 	clusterResources := getClusterResources(az, 1, 1)
-	svc1 := getTestService("servicea", v1.ProtocolTCP, 80, 443)
-	svc2 := getTestService("serviceb", v1.ProtocolTCP, 80)
+	svc1 := getTestService("servicea", v1.ProtocolTCP, nil, 80, 443)
+	svc2 := getTestService("serviceb", v1.ProtocolTCP, nil, 80)
 
 	updatedLoadBalancer, err := az.reconcileLoadBalancer(testClusterName, &svc1, clusterResources.nodes, true /* wantLb */)
 	if err != nil {
@@ -698,7 +698,7 @@ func findLBRuleForPort(lbRules []network.LoadBalancingRule, port int32) (network
 
 func TestServiceDefaultsToNoSessionPersistence(t *testing.T) {
 	az := getTestCloud()
-	svc := getTestService("service-sa-omitted", v1.ProtocolTCP, 7170)
+	svc := getTestService("service-sa-omitted", v1.ProtocolTCP, nil, 7170)
 	clusterResources := getClusterResources(az, 1, 1)
 
 	lb, err := az.reconcileLoadBalancer(testClusterName, &svc, clusterResources.nodes, true /* wantLb */)
@@ -711,14 +711,14 @@ func TestServiceDefaultsToNoSessionPersistence(t *testing.T) {
 		t.Error(err)
 	}
 
-	if lbRule.LoadDistribution != network.Default {
+	if lbRule.LoadDistribution != network.LoadDistributionDefault {
 		t.Errorf("Expected LB rule to have default load distribution but was %s", lbRule.LoadDistribution)
 	}
 }
 
 func TestServiceRespectsNoSessionAffinity(t *testing.T) {
 	az := getTestCloud()
-	svc := getTestService("service-sa-none", v1.ProtocolTCP, 7170)
+	svc := getTestService("service-sa-none", v1.ProtocolTCP, nil, 7170)
 	svc.Spec.SessionAffinity = v1.ServiceAffinityNone
 	clusterResources := getClusterResources(az, 1, 1)
 
@@ -734,14 +734,14 @@ func TestServiceRespectsNoSessionAffinity(t *testing.T) {
 		t.Error(err)
 	}
 
-	if lbRule.LoadDistribution != network.Default {
+	if lbRule.LoadDistribution != network.LoadDistributionDefault {
 		t.Errorf("Expected LB rule to have default load distribution but was %s", lbRule.LoadDistribution)
 	}
 }
 
 func TestServiceRespectsClientIPSessionAffinity(t *testing.T) {
 	az := getTestCloud()
-	svc := getTestService("service-sa-clientip", v1.ProtocolTCP, 7170)
+	svc := getTestService("service-sa-clientip", v1.ProtocolTCP, nil, 7170)
 	svc.Spec.SessionAffinity = v1.ServiceAffinityClientIP
 	clusterResources := getClusterResources(az, 1, 1)
 
@@ -757,7 +757,7 @@ func TestServiceRespectsClientIPSessionAffinity(t *testing.T) {
 		t.Error(err)
 	}
 
-	if lbRule.LoadDistribution != network.SourceIP {
+	if lbRule.LoadDistribution != network.LoadDistributionSourceIP {
 		t.Errorf("Expected LB rule to have SourceIP load distribution but was %s", lbRule.LoadDistribution)
 	}
 }
@@ -765,7 +765,7 @@ func TestServiceRespectsClientIPSessionAffinity(t *testing.T) {
 func TestReconcileSecurityGroupNewServiceAddsPort(t *testing.T) {
 	az := getTestCloud()
 	getTestSecurityGroup(az)
-	svc1 := getTestService("servicea", v1.ProtocolTCP, 80)
+	svc1 := getTestService("servicea", v1.ProtocolTCP, nil, 80)
 	clusterResources := getClusterResources(az, 1, 1)
 	lb, _ := az.reconcileLoadBalancer(testClusterName, &svc1, clusterResources.nodes, true)
 	lbStatus, _ := az.getServiceLoadBalancerStatus(&svc1, lb)
@@ -797,8 +797,8 @@ func TestReconcileSecurityGroupNewInternalServiceAddsPort(t *testing.T) {
 
 func TestReconcileSecurityGroupRemoveService(t *testing.T) {
 	az := getTestCloud()
-	service1 := getTestService("servicea", v1.ProtocolTCP, 81)
-	service2 := getTestService("serviceb", v1.ProtocolTCP, 82)
+	service1 := getTestService("servicea", v1.ProtocolTCP, nil, 81)
+	service2 := getTestService("serviceb", v1.ProtocolTCP, nil, 82)
 	clusterResources := getClusterResources(az, 1, 1)
 
 	lb, _ := az.reconcileLoadBalancer(testClusterName, &service1, clusterResources.nodes, true)
@@ -819,11 +819,11 @@ func TestReconcileSecurityGroupRemoveService(t *testing.T) {
 
 func TestReconcileSecurityGroupRemoveServiceRemovesPort(t *testing.T) {
 	az := getTestCloud()
-	svc := getTestService("servicea", v1.ProtocolTCP, 80, 443)
+	svc := getTestService("servicea", v1.ProtocolTCP, nil, 80, 443)
 	clusterResources := getClusterResources(az, 1, 1)
 
 	sg := getTestSecurityGroup(az, svc)
-	svcUpdated := getTestService("servicea", v1.ProtocolTCP, 80)
+	svcUpdated := getTestService("servicea", v1.ProtocolTCP, nil, 80)
 	lb, _ := az.reconcileLoadBalancer(testClusterName, &svc, clusterResources.nodes, true)
 	lbStatus, _ := az.getServiceLoadBalancerStatus(&svc, lb)
 
@@ -837,7 +837,7 @@ func TestReconcileSecurityGroupRemoveServiceRemovesPort(t *testing.T) {
 
 func TestReconcileSecurityWithSourceRanges(t *testing.T) {
 	az := getTestCloud()
-	svc := getTestService("servicea", v1.ProtocolTCP, 80, 443)
+	svc := getTestService("servicea", v1.ProtocolTCP, nil, 80, 443)
 	svc.Spec.LoadBalancerSourceRanges = []string{
 		"192.168.0.0/24",
 		"10.0.0.0/32",
@@ -864,7 +864,7 @@ func TestReconcileSecurityGroupEtagMismatch(t *testing.T) {
 	cachedSG.Etag = to.StringPtr("1111111-0000-0000-0000-000000000000")
 	az.nsgCache.Set(to.String(sg.Name), &cachedSG)
 
-	svc1 := getTestService("servicea", v1.ProtocolTCP, 80)
+	svc1 := getTestService("servicea", v1.ProtocolTCP, nil, 80)
 	clusterResources := getClusterResources(az, 1, 1)
 	lb, _ := az.reconcileLoadBalancer(testClusterName, &svc1, clusterResources.nodes, true)
 	lbStatus, _ := az.getServiceLoadBalancerStatus(&svc1, lb)
@@ -877,7 +877,7 @@ func TestReconcileSecurityGroupEtagMismatch(t *testing.T) {
 
 func TestReconcilePublicIPWithNewService(t *testing.T) {
 	az := getTestCloud()
-	svc := getTestService("servicea", v1.ProtocolTCP, 80, 443)
+	svc := getTestService("servicea", v1.ProtocolTCP, nil, 80, 443)
 
 	pip, err := az.reconcilePublicIP(testClusterName, &svc, "", true /* wantLb*/)
 	if err != nil {
@@ -898,7 +898,7 @@ func TestReconcilePublicIPWithNewService(t *testing.T) {
 
 func TestReconcilePublicIPRemoveService(t *testing.T) {
 	az := getTestCloud()
-	svc := getTestService("servicea", v1.ProtocolTCP, 80, 443)
+	svc := getTestService("servicea", v1.ProtocolTCP, nil, 80, 443)
 
 	pip, err := az.reconcilePublicIP(testClusterName, &svc, "", true /* wantLb*/)
 	if err != nil {
@@ -939,7 +939,7 @@ func TestReconcilePublicIPWithExternalAndInternalSwitch(t *testing.T) {
 	validatePublicIP(t, pip, &svc, true)
 
 	// Update to external service
-	svcUpdated := getTestService("servicea", v1.ProtocolTCP, 80)
+	svcUpdated := getTestService("servicea", v1.ProtocolTCP, nil, 80)
 	pip, err = az.reconcilePublicIP(testClusterName, &svcUpdated, "", true /* wantLb*/)
 	if err != nil {
 		t.Errorf("Unexpected error: %q", err)
@@ -996,6 +996,7 @@ func getTestCloud() (az *Cloud) {
 	az.lbCache, _ = az.newLBCache()
 	az.nsgCache, _ = az.newNSGCache()
 	az.rtCache, _ = az.newRouteTableCache()
+	az.controllerCommon = &controllerCommon{cloud: az}
 
 	return az
 }
@@ -1130,7 +1131,7 @@ func getBackendPort(port int32) int32 {
 	return port + 10000
 }
 
-func getTestService(identifier string, proto v1.Protocol, requestedPorts ...int32) v1.Service {
+func getTestService(identifier string, proto v1.Protocol, annotations map[string]string, requestedPorts ...int32) v1.Service {
 	ports := []v1.ServicePort{}
 	for _, port := range requestedPorts {
 		ports = append(ports, v1.ServicePort{
@@ -1150,19 +1151,23 @@ func getTestService(identifier string, proto v1.Protocol, requestedPorts ...int3
 	svc.Name = identifier
 	svc.Namespace = "default"
 	svc.UID = types.UID(identifier)
-	svc.Annotations = make(map[string]string)
+	if annotations == nil {
+		svc.Annotations = make(map[string]string)
+	} else {
+		svc.Annotations = annotations
+	}
 
 	return svc
 }
 
 func getInternalTestService(identifier string, requestedPorts ...int32) v1.Service {
-	svc := getTestService(identifier, v1.ProtocolTCP, requestedPorts...)
+	svc := getTestService(identifier, v1.ProtocolTCP, nil, requestedPorts...)
 	svc.Annotations[ServiceAnnotationLoadBalancerInternal] = "true"
 	return svc
 }
 
 func getResourceGroupTestService(identifier, resourceGroup, loadBalancerIP string, requestedPorts ...int32) v1.Service {
-	svc := getTestService(identifier, v1.ProtocolTCP, requestedPorts...)
+	svc := getTestService(identifier, v1.ProtocolTCP, nil, requestedPorts...)
 	svc.Spec.LoadBalancerIP = loadBalancerIP
 	svc.Annotations[ServiceAnnotationLoadBalancerResourceGroup] = resourceGroup
 	return svc
@@ -1721,70 +1726,6 @@ func validateEmptyConfig(t *testing.T, config string) {
 	}
 }
 
-func TestGetZone(t *testing.T) {
-	cloud := &Cloud{
-		Config: Config{
-			Location:            "eastus",
-			UseInstanceMetadata: true,
-		},
-	}
-	testcases := []struct {
-		name        string
-		zone        string
-		faultDomain string
-		expected    string
-	}{
-		{
-			name:     "GetZone should get real zone if only node's zone is set",
-			zone:     "1",
-			expected: "eastus-1",
-		},
-		{
-			name:        "GetZone should get real zone if both node's zone and FD are set",
-			zone:        "1",
-			faultDomain: "99",
-			expected:    "eastus-1",
-		},
-		{
-			name:        "GetZone should get faultDomain if node's zone isn't set",
-			faultDomain: "99",
-			expected:    "99",
-		},
-	}
-
-	for _, test := range testcases {
-		listener, err := net.Listen("tcp", "127.0.0.1:0")
-		if err != nil {
-			t.Errorf("Test [%s] unexpected error: %v", test.name, err)
-		}
-
-		mux := http.NewServeMux()
-		mux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			fmt.Fprintf(w, fmt.Sprintf(`{"compute":{"zone":"%s", "platformFaultDomain":"%s"}}`, test.zone, test.faultDomain))
-		}))
-		go func() {
-			http.Serve(listener, mux)
-		}()
-		defer listener.Close()
-
-		cloud.metadata, err = NewInstanceMetadataService("http://" + listener.Addr().String() + "/")
-		if err != nil {
-			t.Errorf("Test [%s] unexpected error: %v", test.name, err)
-		}
-
-		zone, err := cloud.GetZone(context.Background())
-		if err != nil {
-			t.Errorf("Test [%s] unexpected error: %v", test.name, err)
-		}
-		if zone.FailureDomain != test.expected {
-			t.Errorf("Test [%s] unexpected zone: %s, expected %q", test.name, zone.FailureDomain, test.expected)
-		}
-		if zone.Region != cloud.Location {
-			t.Errorf("Test [%s] unexpected region: %s, expected: %s", test.name, zone.Region, cloud.Location)
-		}
-	}
-}
-
 func TestGetNodeNameByProviderID(t *testing.T) {
 	az := getTestCloud()
 	providers := []struct {
@@ -1868,7 +1809,7 @@ func addTestSubnet(t *testing.T, az *Cloud, svc *v1.Service) {
 
 func TestIfServiceSpecifiesSharedRuleAndRuleDoesNotExistItIsCreated(t *testing.T) {
 	az := getTestCloud()
-	svc := getTestService("servicesr", v1.ProtocolTCP, 80)
+	svc := getTestService("servicesr", v1.ProtocolTCP, nil, 80)
 	svc.Spec.LoadBalancerIP = "192.168.77.88"
 	svc.Annotations[ServiceAnnotationSharedSecurityRule] = "true"
 
@@ -1907,7 +1848,7 @@ func TestIfServiceSpecifiesSharedRuleAndRuleDoesNotExistItIsCreated(t *testing.T
 
 func TestIfServiceSpecifiesSharedRuleAndRuleExistsThenTheServicesPortAndAddressAreAdded(t *testing.T) {
 	az := getTestCloud()
-	svc := getTestService("servicesr", v1.ProtocolTCP, 80)
+	svc := getTestService("servicesr", v1.ProtocolTCP, nil, 80)
 	svc.Spec.LoadBalancerIP = "192.168.77.88"
 	svc.Annotations[ServiceAnnotationSharedSecurityRule] = "true"
 
@@ -1960,11 +1901,11 @@ func TestIfServiceSpecifiesSharedRuleAndRuleExistsThenTheServicesPortAndAddressA
 func TestIfServicesSpecifySharedRuleButDifferentPortsThenSeparateRulesAreCreated(t *testing.T) {
 	az := getTestCloud()
 
-	svc1 := getTestService("servicesr1", v1.ProtocolTCP, 4444)
+	svc1 := getTestService("servicesr1", v1.ProtocolTCP, nil, 4444)
 	svc1.Spec.LoadBalancerIP = "192.168.77.88"
 	svc1.Annotations[ServiceAnnotationSharedSecurityRule] = "true"
 
-	svc2 := getTestService("servicesr2", v1.ProtocolTCP, 8888)
+	svc2 := getTestService("servicesr2", v1.ProtocolTCP, nil, 8888)
 	svc2.Spec.LoadBalancerIP = "192.168.33.44"
 	svc2.Annotations[ServiceAnnotationSharedSecurityRule] = "true"
 
@@ -2029,11 +1970,11 @@ func TestIfServicesSpecifySharedRuleButDifferentPortsThenSeparateRulesAreCreated
 func TestIfServicesSpecifySharedRuleButDifferentProtocolsThenSeparateRulesAreCreated(t *testing.T) {
 	az := getTestCloud()
 
-	svc1 := getTestService("servicesr1", v1.ProtocolTCP, 4444)
+	svc1 := getTestService("servicesr1", v1.ProtocolTCP, nil, 4444)
 	svc1.Spec.LoadBalancerIP = "192.168.77.88"
 	svc1.Annotations[ServiceAnnotationSharedSecurityRule] = "true"
 
-	svc2 := getTestService("servicesr2", v1.ProtocolUDP, 4444)
+	svc2 := getTestService("servicesr2", v1.ProtocolUDP, nil, 4444)
 	svc2.Spec.LoadBalancerIP = "192.168.77.88"
 	svc2.Annotations[ServiceAnnotationSharedSecurityRule] = "true"
 
@@ -2096,12 +2037,12 @@ func TestIfServicesSpecifySharedRuleButDifferentProtocolsThenSeparateRulesAreCre
 func TestIfServicesSpecifySharedRuleButDifferentSourceAddressesThenSeparateRulesAreCreated(t *testing.T) {
 	az := getTestCloud()
 
-	svc1 := getTestService("servicesr1", v1.ProtocolTCP, 80)
+	svc1 := getTestService("servicesr1", v1.ProtocolTCP, nil, 80)
 	svc1.Spec.LoadBalancerIP = "192.168.77.88"
 	svc1.Spec.LoadBalancerSourceRanges = []string{"192.168.12.0/24"}
 	svc1.Annotations[ServiceAnnotationSharedSecurityRule] = "true"
 
-	svc2 := getTestService("servicesr2", v1.ProtocolTCP, 80)
+	svc2 := getTestService("servicesr2", v1.ProtocolTCP, nil, 80)
 	svc2.Spec.LoadBalancerIP = "192.168.33.44"
 	svc2.Spec.LoadBalancerSourceRanges = []string{"192.168.34.0/24"}
 	svc2.Annotations[ServiceAnnotationSharedSecurityRule] = "true"
@@ -2167,15 +2108,15 @@ func TestIfServicesSpecifySharedRuleButDifferentSourceAddressesThenSeparateRules
 func TestIfServicesSpecifySharedRuleButSomeAreOnDifferentPortsThenRulesAreSeparatedOrConsoliatedByPort(t *testing.T) {
 	az := getTestCloud()
 
-	svc1 := getTestService("servicesr1", v1.ProtocolTCP, 4444)
+	svc1 := getTestService("servicesr1", v1.ProtocolTCP, nil, 4444)
 	svc1.Spec.LoadBalancerIP = "192.168.77.88"
 	svc1.Annotations[ServiceAnnotationSharedSecurityRule] = "true"
 
-	svc2 := getTestService("servicesr2", v1.ProtocolTCP, 8888)
+	svc2 := getTestService("servicesr2", v1.ProtocolTCP, nil, 8888)
 	svc2.Spec.LoadBalancerIP = "192.168.33.44"
 	svc2.Annotations[ServiceAnnotationSharedSecurityRule] = "true"
 
-	svc3 := getTestService("servicesr3", v1.ProtocolTCP, 4444)
+	svc3 := getTestService("servicesr3", v1.ProtocolTCP, nil, 4444)
 	svc3.Spec.LoadBalancerIP = "192.168.99.11"
 	svc3.Annotations[ServiceAnnotationSharedSecurityRule] = "true"
 
@@ -2267,11 +2208,11 @@ func TestIfServicesSpecifySharedRuleButSomeAreOnDifferentPortsThenRulesAreSepara
 func TestIfServiceSpecifiesSharedRuleAndServiceIsDeletedThenTheServicesPortAndAddressAreRemoved(t *testing.T) {
 	az := getTestCloud()
 
-	svc1 := getTestService("servicesr1", v1.ProtocolTCP, 80)
+	svc1 := getTestService("servicesr1", v1.ProtocolTCP, nil, 80)
 	svc1.Spec.LoadBalancerIP = "192.168.77.88"
 	svc1.Annotations[ServiceAnnotationSharedSecurityRule] = "true"
 
-	svc2 := getTestService("servicesr2", v1.ProtocolTCP, 80)
+	svc2 := getTestService("servicesr2", v1.ProtocolTCP, nil, 80)
 	svc2.Spec.LoadBalancerIP = "192.168.33.44"
 	svc2.Annotations[ServiceAnnotationSharedSecurityRule] = "true"
 
@@ -2322,15 +2263,15 @@ func TestIfServiceSpecifiesSharedRuleAndServiceIsDeletedThenTheServicesPortAndAd
 func TestIfSomeServicesShareARuleAndOneIsDeletedItIsRemovedFromTheRightRule(t *testing.T) {
 	az := getTestCloud()
 
-	svc1 := getTestService("servicesr1", v1.ProtocolTCP, 4444)
+	svc1 := getTestService("servicesr1", v1.ProtocolTCP, nil, 4444)
 	svc1.Spec.LoadBalancerIP = "192.168.77.88"
 	svc1.Annotations[ServiceAnnotationSharedSecurityRule] = "true"
 
-	svc2 := getTestService("servicesr2", v1.ProtocolTCP, 8888)
+	svc2 := getTestService("servicesr2", v1.ProtocolTCP, nil, 8888)
 	svc2.Spec.LoadBalancerIP = "192.168.33.44"
 	svc2.Annotations[ServiceAnnotationSharedSecurityRule] = "true"
 
-	svc3 := getTestService("servicesr3", v1.ProtocolTCP, 4444)
+	svc3 := getTestService("servicesr3", v1.ProtocolTCP, nil, 4444)
 	svc3.Spec.LoadBalancerIP = "192.168.99.11"
 	svc3.Annotations[ServiceAnnotationSharedSecurityRule] = "true"
 
@@ -2429,15 +2370,15 @@ func TestIfSomeServicesShareARuleAndOneIsDeletedItIsRemovedFromTheRightRule(t *t
 func TestIfServiceSpecifiesSharedRuleAndLastServiceIsDeletedThenRuleIsDeleted(t *testing.T) {
 	az := getTestCloud()
 
-	svc1 := getTestService("servicesr1", v1.ProtocolTCP, 4444)
+	svc1 := getTestService("servicesr1", v1.ProtocolTCP, nil, 4444)
 	svc1.Spec.LoadBalancerIP = "192.168.77.88"
 	svc1.Annotations[ServiceAnnotationSharedSecurityRule] = "true"
 
-	svc2 := getTestService("servicesr2", v1.ProtocolTCP, 8888)
+	svc2 := getTestService("servicesr2", v1.ProtocolTCP, nil, 8888)
 	svc2.Spec.LoadBalancerIP = "192.168.33.44"
 	svc2.Annotations[ServiceAnnotationSharedSecurityRule] = "true"
 
-	svc3 := getTestService("servicesr3", v1.ProtocolTCP, 4444)
+	svc3 := getTestService("servicesr3", v1.ProtocolTCP, nil, 4444)
 	svc3.Spec.LoadBalancerIP = "192.168.99.11"
 	svc3.Annotations[ServiceAnnotationSharedSecurityRule] = "true"
 
@@ -2509,23 +2450,23 @@ func TestIfServiceSpecifiesSharedRuleAndLastServiceIsDeletedThenRuleIsDeleted(t 
 func TestCanCombineSharedAndPrivateRulesInSameGroup(t *testing.T) {
 	az := getTestCloud()
 
-	svc1 := getTestService("servicesr1", v1.ProtocolTCP, 4444)
+	svc1 := getTestService("servicesr1", v1.ProtocolTCP, nil, 4444)
 	svc1.Spec.LoadBalancerIP = "192.168.77.88"
 	svc1.Annotations[ServiceAnnotationSharedSecurityRule] = "true"
 
-	svc2 := getTestService("servicesr2", v1.ProtocolTCP, 8888)
+	svc2 := getTestService("servicesr2", v1.ProtocolTCP, nil, 8888)
 	svc2.Spec.LoadBalancerIP = "192.168.33.44"
 	svc2.Annotations[ServiceAnnotationSharedSecurityRule] = "true"
 
-	svc3 := getTestService("servicesr3", v1.ProtocolTCP, 4444)
+	svc3 := getTestService("servicesr3", v1.ProtocolTCP, nil, 4444)
 	svc3.Spec.LoadBalancerIP = "192.168.99.11"
 	svc3.Annotations[ServiceAnnotationSharedSecurityRule] = "true"
 
-	svc4 := getTestService("servicesr4", v1.ProtocolTCP, 4444)
+	svc4 := getTestService("servicesr4", v1.ProtocolTCP, nil, 4444)
 	svc4.Spec.LoadBalancerIP = "192.168.22.33"
 	svc4.Annotations[ServiceAnnotationSharedSecurityRule] = "false"
 
-	svc5 := getTestService("servicesr5", v1.ProtocolTCP, 8888)
+	svc5 := getTestService("servicesr5", v1.ProtocolTCP, nil, 8888)
 	svc5.Spec.LoadBalancerIP = "192.168.22.33"
 	svc5.Annotations[ServiceAnnotationSharedSecurityRule] = "false"
 
@@ -2702,6 +2643,12 @@ func TestGetResourceGroupFromDiskURI(t *testing.T) {
 	}{
 		{
 			diskURL:        "/subscriptions/4be8920b-2978-43d7-axyz-04d8549c1d05/resourceGroups/azure-k8s1102/providers/Microsoft.Compute/disks/andy-mghyb1102-dynamic-pvc-f7f014c9-49f4-11e8-ab5c-000d3af7b38e",
+			expectedResult: "azure-k8s1102",
+			expectError:    false,
+		},
+		{
+			// case insentive check
+			diskURL:        "/subscriptions/4be8920b-2978-43d7-axyz-04d8549c1d05/resourcegroups/azure-k8s1102/providers/Microsoft.Compute/disks/andy-mghyb1102-dynamic-pvc-f7f014c9-49f4-11e8-ab5c-000d3af7b38e",
 			expectedResult: "azure-k8s1102",
 			expectError:    false,
 		},

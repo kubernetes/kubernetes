@@ -29,10 +29,10 @@ go_library(
         "//staging/src/k8s.io/client-go/informers:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/scheme:go_default_library",
-        "//staging/src/k8s.io/client-go/kubernetes/typed/core/v1:go_default_library",
         "//staging/src/k8s.io/client-go/rest:go_default_library",
         "//staging/src/k8s.io/client-go/tools/clientcmd:go_default_library",
         "//staging/src/k8s.io/client-go/tools/clientcmd/api:go_default_library",
+        "//staging/src/k8s.io/client-go/tools/events:go_default_library",
         "//staging/src/k8s.io/client-go/tools/leaderelection:go_default_library",
         "//staging/src/k8s.io/client-go/tools/leaderelection/resourcelock:go_default_library",
         "//staging/src/k8s.io/client-go/tools/record:go_default_library",
@@ -75,5 +75,6 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/util/rand:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server/options:go_default_library",
         "//staging/src/k8s.io/component-base/config:go_default_library",
+        "//vendor/github.com/stretchr/testify/assert:go_default_library",
     ],
 )

@@ -132,7 +132,7 @@ func rewriteOptionalMethods(decl ast.Decl, isOptional OptionalFunc) {
 		switch t.Name.Name {
 		case "Unmarshal":
 			ast.Walk(&optionalItemsVisitor{}, t.Body)
-		case "MarshalTo", "Size", "String":
+		case "MarshalTo", "Size", "String", "MarshalToSizedBuffer":
 			ast.Walk(&optionalItemsVisitor{}, t.Body)
 			fallthrough
 		case "Marshal":

@@ -59,6 +59,11 @@ type CounterVecMetric interface {
 // GaugeMetric is an interface which defines a subset of the interface provided by prometheus.Gauge
 type GaugeMetric interface {
 	Set(float64)
+	Inc()
+	Dec()
+	Add(float64)
+	Write(out *dto.Metric) error
+	SetToCurrentTime()
 }
 
 // ObserverMetric captures individual observations.
@@ -73,4 +78,10 @@ type PromRegistry interface {
 	MustRegister(...prometheus.Collector)
 	Unregister(prometheus.Collector) bool
 	Gather() ([]*dto.MetricFamily, error)
+}
+
+// Gatherer is the interface for the part of a registry in charge of gathering
+// the collected metrics into a number of MetricFamilies.
+type Gatherer interface {
+	prometheus.Gatherer
 }

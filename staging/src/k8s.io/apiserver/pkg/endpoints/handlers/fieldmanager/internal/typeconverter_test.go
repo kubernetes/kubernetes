@@ -23,6 +23,7 @@ import (
 	"strings"
 	"testing"
 
+	"sigs.k8s.io/structured-merge-diff/typed"
 	"sigs.k8s.io/yaml"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -47,7 +48,7 @@ func TestTypeConverter(t *testing.T) {
 		t.Fatalf("Failed to build OpenAPI models: %v", err)
 	}
 
-	tc, err := internal.NewTypeConverter(m)
+	tc, err := internal.NewTypeConverter(m, false)
 	if err != nil {
 		t.Fatalf("Failed to build TypeConverter: %v", err)
 	}
@@ -123,9 +124,6 @@ spec:
 		t.Run(fmt.Sprintf("%v ObjectToTyped with TypeConverter", testCase.name), func(t *testing.T) {
 			testObjectToTyped(t, tc, testCase.yaml)
 		})
-		t.Run(fmt.Sprintf("%v YAMLToTyped with TypeConverter", testCase.name), func(t *testing.T) {
-			testYAMLToTyped(t, tc, testCase.yaml)
-		})
 		t.Run(fmt.Sprintf("%v ObjectToTyped with DeducedTypeConverter", testCase.name), func(t *testing.T) {
 			testObjectToTyped(t, dtc, testCase.yaml)
 		})
@@ -154,24 +152,58 @@ Final object:
 	}
 }
 
-func testYAMLToTyped(t *testing.T, tc internal.TypeConverter, y string) {
+var result typed.TypedValue
+
+func BenchmarkObjectToTyped(b *testing.B) {
+	y := `
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+  labels:
+    app: nginx
+spec:
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:1.15.4
+`
 	obj := &unstructured.Unstructured{Object: map[string]interface{}{}}
 	if err := yaml.Unmarshal([]byte(y), &obj.Object); err != nil {
-		t.Fatalf("Failed to parse yaml object: %v", err)
+		b.Fatalf("Failed to parse yaml object: %v", err)
 	}
-	yamlTyped, err := tc.YAMLToTyped([]byte(y))
+
+	d, err := fakeSchema.OpenAPISchema()
 	if err != nil {
-		t.Fatalf("Failed to convert yaml to typed: %v", err)
+		b.Fatalf("Failed to parse OpenAPI schema: %v", err)
 	}
-	newObj, err := tc.TypedToObject(yamlTyped)
+	m, err := proto.NewOpenAPIData(d)
 	if err != nil {
-		t.Fatalf("Failed to convert typed to object: %v", err)
+		b.Fatalf("Failed to build OpenAPI models: %v", err)
 	}
-	if !reflect.DeepEqual(obj, newObj) {
-		t.Errorf(`YAML conversion resulted in different object failed:
-Original object:
-%#v
-Final object:
-%#v`, obj, newObj)
+
+	tc, err := internal.NewTypeConverter(m, false)
+	if err != nil {
+		b.Fatalf("Failed to build TypeConverter: %v", err)
 	}
+
+	b.ResetTimer()
+	b.ReportAllocs()
+
+	var r *typed.TypedValue
+	for i := 0; i < b.N; i++ {
+		var err error
+		r, err = tc.ObjectToTyped(obj)
+		if err != nil {
+			b.Fatalf("Failed to convert object to typed: %v", err)
+		}
+	}
+	result = *r
 }

@@ -94,6 +94,7 @@ func TestAddFlags(t *testing.T) {
 		"--cloud-provider=azure",
 		"--cors-allowed-origins=10.10.10.100,10.10.10.200",
 		"--contention-profiling=true",
+		"--egress-selector-config-file=/var/run/kubernetes/egress-selector/connectivity.yaml",
 		"--enable-aggregator-routing=true",
 		"--enable-logs-handler=false",
 		"--endpoint-reconciler-type=" + string(reconcilers.LeaseEndpointReconcilerType),
@@ -111,13 +112,14 @@ func TestAddFlags(t *testing.T) {
 		"--proxy-client-key-file=/var/run/kubernetes/proxy.key",
 		"--request-timeout=2m",
 		"--storage-backend=etcd3",
+		"--service-cluster-ip-range=192.168.128.0/17",
 	}
 	fs.Parse(args)
 
 	// This is a snapshot of expected options parsed by args.
 	expected := &ServerRunOptions{
 		ServiceNodePortRange:   kubeoptions.DefaultServiceNodePortRange,
-		ServiceClusterIPRange:  kubeoptions.DefaultServiceIPCIDR,
+		ServiceClusterIPRanges: (&net.IPNet{IP: net.ParseIP("192.168.128.0"), Mask: net.CIDRMask(17, 32)}).String(),
 		MasterCount:            5,
 		EndpointReconcilerType: string(reconcilers.LeaseEndpointReconcilerType),
 		AllowPrivileged:        false,
@@ -128,8 +130,8 @@ func TestAddFlags(t *testing.T) {
 			MaxMutatingRequestsInFlight: 200,
 			RequestTimeout:              time.Duration(2) * time.Minute,
 			MinRequestTimeout:           1800,
-			JSONPatchMaxCopyBytes:       int64(100 * 1024 * 1024),
-			MaxRequestBodyBytes:         int64(100 * 1024 * 1024),
+			JSONPatchMaxCopyBytes:       int64(3 * 1024 * 1024),
+			MaxRequestBodyBytes:         int64(3 * 1024 * 1024),
 		},
 		Admission: &kubeoptions.AdmissionOptions{
 			GenericAdmission: &apiserveroptions.AdmissionOptions{
@@ -186,7 +188,7 @@ func TestAddFlags(t *testing.T) {
 				string(kapi.NodeExternalDNS),
 				string(kapi.NodeExternalIP),
 			},
-			EnableHttps: true,
+			EnableHTTPS: true,
 			HTTPTimeout: time.Duration(5) * time.Second,
 			TLSClientConfig: restclient.TLSClientConfig{
 				CertFile: "/var/run/kubernetes/ceserver.crt",
@@ -292,6 +294,9 @@ func TestAddFlags(t *testing.T) {
 		},
 		APIEnablement: &apiserveroptions.APIEnablementOptions{
 			RuntimeConfig: cliflag.ConfigurationMap{},
+		},
+		EgressSelector: &apiserveroptions.EgressSelectorOptions{
+			ConfigFile: "/var/run/kubernetes/egress-selector/connectivity.yaml",
 		},
 		EnableLogsHandler:       false,
 		EnableAggregatorRouting: true,

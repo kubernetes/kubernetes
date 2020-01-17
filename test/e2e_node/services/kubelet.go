@@ -62,14 +62,10 @@ func (a *args) Set(value string) error {
 
 // kubeletArgs is the override kubelet args specified by the test runner.
 var kubeletArgs args
-var kubeletContainerized bool
-var hyperkubeImage string
 var genKubeletConfigFile bool
 
 func init() {
 	flag.Var(&kubeletArgs, "kubelet-flags", "Kubelet flags passed to kubelet, this will override default kubelet flags in the test. Flags specified in multiple kubelet-flags will be concatenate.")
-	flag.BoolVar(&kubeletContainerized, "kubelet-containerized", false, "Run kubelet in a docker container")
-	flag.StringVar(&hyperkubeImage, "hyperkube-image", "", "Docker image with containerized kubelet")
 	flag.BoolVar(&genKubeletConfigFile, "generate-kubelet-config-file", true, "The test runner will generate a Kubelet config file containing test defaults instead of passing default flags to the Kubelet.")
 }
 
@@ -102,10 +98,6 @@ const (
 // startKubelet starts the Kubelet in a separate process or returns an error
 // if the Kubelet fails to start.
 func (e *E2EServices) startKubelet() (*server, error) {
-	if kubeletContainerized && hyperkubeImage == "" {
-		return nil, fmt.Errorf("the --hyperkube-image option must be set")
-	}
-
 	klog.Info("Starting kubelet")
 
 	// set feature gates so we can check which features are enabled and pass the appropriate flags
@@ -200,41 +192,12 @@ func (e *E2EServices) startKubelet() (*server, error) {
 		// Use the timestamp from the current directory to name the systemd unit.
 		unitTimestamp := remote.GetTimestampFromWorkspaceDir(cwd)
 		unitName := fmt.Sprintf("kubelet-%s.service", unitTimestamp)
-		if kubeletContainerized {
-			cmdArgs = append(cmdArgs, systemdRun, "--unit="+unitName, "--slice=runtime.slice", "--remain-after-exit",
-				"/usr/bin/docker", "run", "--name=kubelet",
-				"--rm", "--privileged", "--net=host", "--pid=host",
-				"-e HOST=/rootfs", "-e HOST_ETC=/host-etc",
-				"-v", "/etc/localtime:/etc/localtime:ro",
-				"-v", "/etc/machine-id:/etc/machine-id:ro",
-				"-v", filepath.Dir(kubeconfigPath)+":/etc/kubernetes",
-				"-v", "/:/rootfs:rw,rslave",
-				"-v", "/run:/run",
-				"-v", "/sys/fs/cgroup:/sys/fs/cgroup:rw",
-				"-v", "/sys:/sys:rw",
-				"-v", "/usr/bin/docker:/usr/bin/docker:ro",
-				"-v", "/var/lib/cni:/var/lib/cni",
-				"-v", "/var/lib/docker:/var/lib/docker",
-				"-v", "/var/lib/kubelet:/var/lib/kubelet:rw,rslave",
-				"-v", "/var/log:/var/log",
-				"-v", podPath+":"+podPath+":rw",
-			)
-
-			// if we will generate a kubelet config file, we need to mount that path into the container too
-			if genKubeletConfigFile {
-				cmdArgs = append(cmdArgs, "-v", filepath.Dir(kubeletConfigPath)+":"+filepath.Dir(kubeletConfigPath)+":rw")
-			}
-
-			cmdArgs = append(cmdArgs, hyperkubeImage, "/hyperkube", "kubelet", "--containerized")
-			kubeconfigPath = "/etc/kubernetes/kubeconfig"
-		} else {
-			cmdArgs = append(cmdArgs,
-				systemdRun,
-				"--unit="+unitName,
-				"--slice=runtime.slice",
-				"--remain-after-exit",
-				builder.GetKubeletServerBin())
-		}
+		cmdArgs = append(cmdArgs,
+			systemdRun,
+			"--unit="+unitName,
+			"--slice=runtime.slice",
+			"--remain-after-exit",
+			builder.GetKubeletServerBin())
 
 		killCommand = exec.Command("systemctl", "kill", unitName)
 		restartCommand = exec.Command("systemctl", "restart", unitName)
@@ -289,10 +252,16 @@ func (e *E2EServices) startKubelet() (*server, error) {
 		return nil, err
 	}
 
+	cniCacheDir, err := getCNICacheDirectory()
+	if err != nil {
+		return nil, err
+	}
+
 	cmdArgs = append(cmdArgs,
 		"--network-plugin=kubenet",
 		"--cni-bin-dir", cniBinDir,
-		"--cni-conf-dir", cniConfDir)
+		"--cni-conf-dir", cniConfDir,
+		"--cni-cache-dir", cniCacheDir)
 
 	// Keep hostname override for convenience.
 	if framework.TestContext.NodeName != "" { // If node name is specified, set hostname override.
@@ -465,6 +434,15 @@ func getCNIConfDirectory() (string, error) {
 		return "", err
 	}
 	return filepath.Join(cwd, "cni", "net.d"), nil
+}
+
+// getCNICacheDirectory returns CNI Cache directory.
+func getCNICacheDirectory() (string, error) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(cwd, "cni", "cache"), nil
 }
 
 // getDynamicConfigDir returns the directory for dynamic Kubelet configuration

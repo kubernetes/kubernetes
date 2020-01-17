@@ -28,9 +28,9 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/api/core/v1"
-	policy "k8s.io/api/policy/v1beta1"
-	schedulerapi "k8s.io/api/scheduling/v1"
+	v1 "k8s.io/api/core/v1"
+	policyv1beta1 "k8s.io/api/policy/v1beta1"
+	schedulingv1 "k8s.io/api/scheduling/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -41,16 +41,17 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/klog"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	"k8s.io/kubernetes/test/e2e/scheduling"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
-	"k8s.io/klog"
 )
 
 const (
@@ -108,9 +109,10 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 			sum += size
 		}
 		// Give instances time to spin up
-		framework.ExpectNoError(framework.WaitForReadyNodes(c, sum, scaleUpTimeout))
+		framework.ExpectNoError(e2enode.WaitForReadyNodes(c, sum, scaleUpTimeout))
 
-		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
+		nodes, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
+		framework.ExpectNoError(err)
 		nodeCount = len(nodes.Items)
 		coreCount = 0
 		for _, node := range nodes.Items {
@@ -122,7 +124,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		mem := nodes.Items[0].Status.Allocatable[v1.ResourceMemory]
 		memAllocatableMb = int((&mem).Value() / 1024 / 1024)
 
-		gomega.Expect(nodeCount).Should(gomega.Equal(sum))
+		framework.ExpectEqual(nodeCount, sum)
 
 		if framework.ProviderIs("gke") {
 			val, err := isAutoscalerEnabled(5)
@@ -142,7 +144,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		for _, size := range originalSizes {
 			expectedNodes += size
 		}
-		framework.ExpectNoError(framework.WaitForReadyNodes(c, expectedNodes, scaleDownTimeout))
+		framework.ExpectNoError(e2enode.WaitForReadyNodes(c, expectedNodes, scaleDownTimeout))
 		nodes, err := c.CoreV1().Nodes().List(metav1.ListOptions{})
 		framework.ExpectNoError(err)
 
@@ -185,7 +187,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 				}
 			}
 		}
-		gomega.Expect(eventFound).Should(gomega.Equal(true))
+		framework.ExpectEqual(eventFound, true)
 		// Verify that cluster size is not changed
 		framework.ExpectNoError(WaitForClusterSizeFunc(f.ClientSet,
 			func(size int) bool { return size <= nodeCount }, time.Second))
@@ -222,7 +224,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		ginkgo.By("Enable autoscaler")
 		framework.ExpectNoError(enableAutoscaler(gpuPoolName, 0, 1))
 		defer disableAutoscaler(gpuPoolName, 0, 1)
-		gomega.Expect(len(getPoolNodes(f, gpuPoolName))).Should(gomega.Equal(0))
+		framework.ExpectEqual(len(getPoolNodes(f, gpuPoolName)), 0)
 
 		ginkgo.By("Schedule a pod which requires GPU")
 		framework.ExpectNoError(ScheduleAnySingleGpuPod(f, "gpu-pod-rc"))
@@ -230,7 +232,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 
 		framework.ExpectNoError(WaitForClusterSizeFunc(f.ClientSet,
 			func(size int) bool { return size == nodeCount+1 }, scaleUpTimeout))
-		gomega.Expect(len(getPoolNodes(f, gpuPoolName))).Should(gomega.Equal(1))
+		framework.ExpectEqual(len(getPoolNodes(f, gpuPoolName)), 1)
 	})
 
 	ginkgo.It(fmt.Sprintf("Should scale up GPU pool from 1 [GpuType:%s] [Feature:ClusterSizeAutoscalingGpu]", gpuType), func() {
@@ -253,14 +255,14 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		ginkgo.By("Enable autoscaler")
 		framework.ExpectNoError(enableAutoscaler(gpuPoolName, 0, 2))
 		defer disableAutoscaler(gpuPoolName, 0, 2)
-		gomega.Expect(len(getPoolNodes(f, gpuPoolName))).Should(gomega.Equal(1))
+		framework.ExpectEqual(len(getPoolNodes(f, gpuPoolName)), 1)
 
 		ginkgo.By("Scale GPU deployment")
 		framework.ScaleRC(f.ClientSet, f.ScalesGetter, f.Namespace.Name, "gpu-pod-rc", 2, true)
 
 		framework.ExpectNoError(WaitForClusterSizeFunc(f.ClientSet,
 			func(size int) bool { return size == nodeCount+2 }, scaleUpTimeout))
-		gomega.Expect(len(getPoolNodes(f, gpuPoolName))).Should(gomega.Equal(2))
+		framework.ExpectEqual(len(getPoolNodes(f, gpuPoolName)), 2)
 	})
 
 	ginkgo.It(fmt.Sprintf("Should not scale GPU pool up if pod does not require GPUs [GpuType:%s] [Feature:ClusterSizeAutoscalingGpu]", gpuType), func() {
@@ -279,7 +281,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		ginkgo.By("Enable autoscaler")
 		framework.ExpectNoError(enableAutoscaler(gpuPoolName, 0, 1))
 		defer disableAutoscaler(gpuPoolName, 0, 1)
-		gomega.Expect(len(getPoolNodes(f, gpuPoolName))).Should(gomega.Equal(0))
+		framework.ExpectEqual(len(getPoolNodes(f, gpuPoolName)), 0)
 
 		ginkgo.By("Schedule bunch of pods beyond point of filling default pool but do not request any GPUs")
 		ReserveMemory(f, "memory-reservation", 100, nodeCount*memAllocatableMb, false, 1*time.Second)
@@ -289,7 +291,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 			func(size int) bool { return size >= nodeCount+1 }, scaleUpTimeout))
 
 		// Expect gpu pool to stay intact
-		gomega.Expect(len(getPoolNodes(f, gpuPoolName))).Should(gomega.Equal(0))
+		framework.ExpectEqual(len(getPoolNodes(f, gpuPoolName)), 0)
 	})
 
 	ginkgo.It(fmt.Sprintf("Should scale down GPU pool from 1 [GpuType:%s] [Feature:ClusterSizeAutoscalingGpu]", gpuType), func() {
@@ -312,14 +314,14 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		ginkgo.By("Enable autoscaler")
 		framework.ExpectNoError(enableAutoscaler(gpuPoolName, 0, 1))
 		defer disableAutoscaler(gpuPoolName, 0, 1)
-		gomega.Expect(len(getPoolNodes(f, gpuPoolName))).Should(gomega.Equal(1))
+		framework.ExpectEqual(len(getPoolNodes(f, gpuPoolName)), 1)
 
 		ginkgo.By("Remove the only POD requiring GPU")
 		framework.DeleteRCAndWaitForGC(f.ClientSet, f.Namespace.Name, "gpu-pod-rc")
 
 		framework.ExpectNoError(WaitForClusterSizeFunc(f.ClientSet,
 			func(size int) bool { return size == nodeCount }, scaleDownTimeout))
-		gomega.Expect(len(getPoolNodes(f, gpuPoolName))).Should(gomega.Equal(0))
+		framework.ExpectEqual(len(getPoolNodes(f, gpuPoolName)), 0)
 	})
 
 	ginkgo.It("should increase cluster size if pending pods are small and one node is broken [Feature:ClusterSizeAutoscalingScaleUp]",
@@ -359,10 +361,12 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		if status.target != target {
 			klog.Warningf("Final number of nodes (%v) does not match initial scale-up target (%v).", status.target, target)
 		}
-		gomega.Expect(status.timestamp.Add(freshStatusLimit).Before(time.Now())).Should(gomega.Equal(false))
-		gomega.Expect(status.status).Should(gomega.Equal(caNoScaleUpStatus))
-		gomega.Expect(status.ready).Should(gomega.Equal(status.target))
-		gomega.Expect(len(framework.GetReadySchedulableNodesOrDie(f.ClientSet).Items)).Should(gomega.Equal(status.target + unmanagedNodes))
+		framework.ExpectEqual(status.timestamp.Add(freshStatusLimit).Before(time.Now()), false)
+		framework.ExpectEqual(status.status, caNoScaleUpStatus)
+		framework.ExpectEqual(status.ready, status.target)
+		nodes, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
+		framework.ExpectNoError(err)
+		framework.ExpectEqual(len(nodes.Items), status.target+unmanagedNodes)
 	})
 
 	ginkgo.It("should increase cluster size if pending pods are small and there is another node pool that is not autoscaled [Feature:ClusterSizeAutoscalingScaleUp]", func() {
@@ -373,7 +377,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		addNodePool(extraPoolName, "n1-standard-4", 1)
 		defer deleteNodePool(extraPoolName)
 		extraNodes := getPoolInitialSize(extraPoolName)
-		framework.ExpectNoError(framework.WaitForReadyNodes(c, nodeCount+extraNodes, resizeTimeout))
+		framework.ExpectNoError(e2enode.WaitForReadyNodes(c, nodeCount+extraNodes, resizeTimeout))
 		// We wait for nodes to become schedulable to make sure the new nodes
 		// will be returned by getPoolNodes below.
 		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(c, resizeTimeout))
@@ -381,7 +385,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 
 		ginkgo.By("Getting memory available on new nodes, so we can account for it when creating RC")
 		nodes := getPoolNodes(f, extraPoolName)
-		gomega.Expect(len(nodes)).Should(gomega.Equal(extraNodes))
+		framework.ExpectEqual(len(nodes), extraNodes)
 		extraMemMb := 0
 		for _, node := range nodes {
 			mem := node.Status.Allocatable[v1.ResourceMemory]
@@ -407,7 +411,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		addNodePool(extraPoolName, "n1-standard-4", 1)
 		defer deleteNodePool(extraPoolName)
 		extraNodes := getPoolInitialSize(extraPoolName)
-		framework.ExpectNoError(framework.WaitForReadyNodes(c, nodeCount+extraNodes, resizeTimeout))
+		framework.ExpectNoError(e2enode.WaitForReadyNodes(c, nodeCount+extraNodes, resizeTimeout))
 		framework.ExpectNoError(enableAutoscaler(extraPoolName, 1, 2))
 		framework.ExpectNoError(disableAutoscaler(extraPoolName, 1, 2))
 	})
@@ -437,7 +441,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		defer framework.DeleteRCAndWaitForGC(f.ClientSet, f.Namespace.Name, "extra-pod")
 
 		framework.ExpectNoError(waitForAllCaPodsReadyInNamespace(f, c))
-		framework.ExpectNoError(framework.WaitForReadyNodes(c, nodeCount+newPods, scaleUpTimeout))
+		framework.ExpectNoError(e2enode.WaitForReadyNodes(c, nodeCount+newPods, scaleUpTimeout))
 	})
 
 	ginkgo.It("should increase cluster size if pod requesting EmptyDir volume is pending [Feature:ClusterSizeAutoscalingScaleUp]", func() {
@@ -458,21 +462,21 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		defer framework.DeleteRCAndWaitForGC(f.ClientSet, f.Namespace.Name, "extra-pod")
 
 		framework.ExpectNoError(waitForAllCaPodsReadyInNamespace(f, c))
-		framework.ExpectNoError(framework.WaitForReadyNodes(c, nodeCount+newPods, scaleUpTimeout))
+		framework.ExpectNoError(e2enode.WaitForReadyNodes(c, nodeCount+newPods, scaleUpTimeout))
 	})
 
 	ginkgo.It("should increase cluster size if pod requesting volume is pending [Feature:ClusterSizeAutoscalingScaleUp]", func() {
 		framework.SkipUnlessProviderIs("gce", "gke")
 
 		volumeLabels := labels.Set{
-			framework.VolumeSelectorKey: f.Namespace.Name,
+			e2epv.VolumeSelectorKey: f.Namespace.Name,
 		}
 		selector := metav1.SetAsLabelSelector(volumeLabels)
 
 		ginkgo.By("creating volume & pvc")
-		diskName, err := framework.CreatePDWithRetry()
+		diskName, err := e2epv.CreatePDWithRetry()
 		framework.ExpectNoError(err)
-		pvConfig := framework.PersistentVolumeConfig{
+		pvConfig := e2epv.PersistentVolumeConfig{
 			NamePrefix: "gce-",
 			Labels:     volumeLabels,
 			PVSource: v1.PersistentVolumeSource{
@@ -485,23 +489,23 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 			Prebind: nil,
 		}
 		emptyStorageClass := ""
-		pvcConfig := framework.PersistentVolumeClaimConfig{
+		pvcConfig := e2epv.PersistentVolumeClaimConfig{
 			Selector:         selector,
 			StorageClassName: &emptyStorageClass,
 		}
 
-		pv, pvc, err := framework.CreatePVPVC(c, pvConfig, pvcConfig, f.Namespace.Name, false)
+		pv, pvc, err := e2epv.CreatePVPVC(c, pvConfig, pvcConfig, f.Namespace.Name, false)
 		framework.ExpectNoError(err)
-		framework.ExpectNoError(framework.WaitOnPVandPVC(c, f.Namespace.Name, pv, pvc))
+		framework.ExpectNoError(e2epv.WaitOnPVandPVC(c, f.Namespace.Name, pv, pvc))
 
 		defer func() {
-			errs := framework.PVPVCCleanup(c, f.Namespace.Name, pv, pvc)
+			errs := e2epv.PVPVCCleanup(c, f.Namespace.Name, pv, pvc)
 			if len(errs) > 0 {
 				framework.Failf("failed to delete PVC and/or PV. Errors: %v", utilerrors.NewAggregate(errs))
 			}
 			pv, pvc = nil, nil
 			if diskName != "" {
-				framework.ExpectNoError(framework.DeletePDWithRetry(diskName))
+				framework.ExpectNoError(e2epv.DeletePDWithRetry(diskName))
 			}
 		}()
 
@@ -530,7 +534,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		}()
 
 		framework.ExpectNoError(waitForAllCaPodsReadyInNamespace(f, c))
-		framework.ExpectNoError(framework.WaitForReadyNodes(c, nodeCount+newPods, scaleUpTimeout))
+		framework.ExpectNoError(e2enode.WaitForReadyNodes(c, nodeCount+newPods, scaleUpTimeout))
 	})
 
 	ginkgo.It("should add node to the particular mig [Feature:ClusterSizeAutoscalingScaleUp]", func() {
@@ -573,8 +577,8 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 			framework.AddOrUpdateLabelOnNode(c, node, labelKey, labelValue)
 		}
 
-		scheduling.CreateNodeSelectorPods(f, "node-selector", minSize+1, map[string]string{labelKey: labelValue}, false)
-
+		err = scheduling.CreateNodeSelectorPods(f, "node-selector", minSize+1, map[string]string{labelKey: labelValue}, false)
+		framework.ExpectNoError(err)
 		ginkgo.By("Waiting for new node to appear and annotating it")
 		framework.WaitForGroupSize(minMig, int32(minSize+1))
 		// Verify that cluster size is increased
@@ -641,7 +645,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		addNodePool(extraPoolName, "n1-standard-4", 1)
 		defer deleteNodePool(extraPoolName)
 		extraNodes := getPoolInitialSize(extraPoolName)
-		framework.ExpectNoError(framework.WaitForReadyNodes(c, nodeCount+extraNodes, resizeTimeout))
+		framework.ExpectNoError(e2enode.WaitForReadyNodes(c, nodeCount+extraNodes, resizeTimeout))
 		framework.ExpectNoError(enableAutoscaler(extraPoolName, 1, 2))
 		defer disableAutoscaler(extraPoolName, 1, 2)
 
@@ -655,7 +659,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		// reseting all the timers in scale down code. Adding 5 extra minutes to workaround
 		// this issue.
 		// TODO: Remove the extra time when GKE restart is fixed.
-		framework.ExpectNoError(framework.WaitForReadyNodes(c, nodeCount+extraNodes+1, scaleUpTimeout+5*time.Minute))
+		framework.ExpectNoError(e2enode.WaitForReadyNodes(c, nodeCount+extraNodes+1, scaleUpTimeout+5*time.Minute))
 	})
 
 	simpleScaleDownTest := func(unready int) {
@@ -684,6 +688,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 
 	ginkgo.It("should correctly scale down after a node is not needed and one node is broken [Feature:ClusterSizeAutoscalingScaleDown]",
 		func() {
+			framework.SkipUnlessSSHKeyPresent()
 			framework.TestUnderTemporaryNetworkFailure(c, "default", getAnyNode(c), func() { simpleScaleDownTest(1) })
 		})
 
@@ -721,8 +726,9 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		runDrainTest(f, originalSizes, f.Namespace.Name, 1, 0, func(increasedSize int) {
 			ginkgo.By("No nodes should be removed")
 			time.Sleep(scaleDownTimeout)
-			nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-			gomega.Expect(len(nodes.Items)).Should(gomega.Equal(increasedSize))
+			nodes, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
+			framework.ExpectNoError(err)
+			framework.ExpectEqual(len(nodes.Items), increasedSize)
 		})
 	})
 
@@ -766,7 +772,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 				}
 			}
 			framework.ExpectNoError(framework.ResizeGroup(minMig, int32(0)))
-			framework.ExpectNoError(framework.WaitForReadyNodes(c, nodeCount-minSize, resizeTimeout))
+			framework.ExpectNoError(e2enode.WaitForReadyNodes(c, nodeCount-minSize, resizeTimeout))
 		}
 
 		ginkgo.By("Make remaining nodes unschedulable")
@@ -812,12 +818,12 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		addNodePool(extraPoolName, "n1-standard-4", 1)
 		defer deleteNodePool(extraPoolName)
 		extraNodes := getPoolInitialSize(extraPoolName)
-		framework.ExpectNoError(framework.WaitForReadyNodes(c, nodeCount+extraNodes, resizeTimeout))
+		framework.ExpectNoError(e2enode.WaitForReadyNodes(c, nodeCount+extraNodes, resizeTimeout))
 		framework.ExpectNoError(enableAutoscaler(extraPoolName, 0, 1))
 		defer disableAutoscaler(extraPoolName, 0, 1)
 
 		ngNodes := getPoolNodes(f, extraPoolName)
-		gomega.Expect(len(ngNodes)).To(gomega.Equal(extraNodes))
+		framework.ExpectEqual(len(ngNodes), extraNodes)
 		for _, node := range ngNodes {
 			ginkgo.By(fmt.Sprintf("Target node for scale-down: %s", node.Name))
 		}
@@ -830,7 +836,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 
 		// GKE-specific check
 		newSize := getPoolSize(f, extraPoolName)
-		gomega.Expect(newSize).Should(gomega.Equal(0))
+		framework.ExpectEqual(newSize, 0)
 	}
 
 	gceScaleToZero := func() {
@@ -845,7 +851,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 			}
 		}
 		framework.ExpectNoError(framework.ResizeGroup(minMig, int32(1)))
-		framework.ExpectNoError(framework.WaitForReadyNodes(c, nodeCount-minSize+1, resizeTimeout))
+		framework.ExpectNoError(e2enode.WaitForReadyNodes(c, nodeCount-minSize+1, resizeTimeout))
 		ngNodes, err := framework.GetGroupNodes(minMig)
 		framework.ExpectNoError(err)
 		gomega.Expect(len(ngNodes) == 1).To(gomega.BeTrue())
@@ -861,7 +867,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		// non-GKE only
 		newSize, err := framework.GroupSize(minMig)
 		framework.ExpectNoError(err)
-		gomega.Expect(newSize).Should(gomega.Equal(0))
+		framework.ExpectEqual(newSize, 0)
 	}
 
 	ginkgo.It("Should be able to scale a node group down to 0[Feature:ClusterSizeAutoscalingScaleDown]", func() {
@@ -875,6 +881,8 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 	})
 
 	ginkgo.It("Shouldn't perform scale up operation and should list unhealthy status if most of the cluster is broken[Feature:ClusterSizeAutoscalingScaleUp]", func() {
+		framework.SkipUnlessSSHKeyPresent()
+
 		clusterSize := nodeCount
 		for clusterSize < unhealthyClusterThreshold+1 {
 			clusterSize = manuallyIncreaseClusterSize(f, originalSizes)
@@ -915,18 +923,19 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 				ReserveMemory(f, "memory-reservation", 100, nodeCount*memAllocatableMb, false, defaultTimeout)
 				defer framework.DeleteRCAndWaitForGC(f.ClientSet, f.Namespace.Name, "memory-reservation")
 				time.Sleep(scaleUpTimeout)
-				currentNodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-				e2elog.Logf("Currently available nodes: %v, nodes available at the start of test: %v, disabled nodes: %v", len(currentNodes.Items), len(nodes.Items), nodesToBreakCount)
-				gomega.Expect(len(currentNodes.Items)).Should(gomega.Equal(len(nodes.Items) - nodesToBreakCount))
-				status, err := getClusterwideStatus(c)
-				e2elog.Logf("Clusterwide status: %v", status)
+				currentNodes, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
 				framework.ExpectNoError(err)
-				gomega.Expect(status).Should(gomega.Equal("Unhealthy"))
+				framework.Logf("Currently available nodes: %v, nodes available at the start of test: %v, disabled nodes: %v", len(currentNodes.Items), len(nodes.Items), nodesToBreakCount)
+				framework.ExpectEqual(len(currentNodes.Items), len(nodes.Items)-nodesToBreakCount)
+				status, err := getClusterwideStatus(c)
+				framework.Logf("Clusterwide status: %v", status)
+				framework.ExpectNoError(err)
+				framework.ExpectEqual(status, "Unhealthy")
 			}
 		}
 		testFunction()
 		// Give nodes time to recover from network failure
-		framework.ExpectNoError(framework.WaitForReadyNodes(c, len(nodes.Items), nodesRecoverTimeout))
+		framework.ExpectNoError(e2enode.WaitForReadyNodes(c, len(nodes.Items), nodesRecoverTimeout))
 	})
 
 	ginkgo.It("shouldn't scale up when expendable pod is created [Feature:ClusterSizeAutoscalingScaleUp]", func() {
@@ -1014,12 +1023,12 @@ func runDrainTest(f *framework.Framework, migSizes map[string]int, namespace str
 
 	ginkgo.By("Create a PodDisruptionBudget")
 	minAvailable := intstr.FromInt(numPods - pdbSize)
-	pdb := &policy.PodDisruptionBudget{
+	pdb := &policyv1beta1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test_pdb",
 			Namespace: namespace,
 		},
-		Spec: policy.PodDisruptionBudgetSpec{
+		Spec: policyv1beta1.PodDisruptionBudgetSpec{
 			Selector:     &metav1.LabelSelector{MatchLabels: labelMap},
 			MinAvailable: &minAvailable,
 		},
@@ -1225,7 +1234,12 @@ func deleteNodePool(name string) {
 
 func getPoolNodes(f *framework.Framework, poolName string) []*v1.Node {
 	nodes := make([]*v1.Node, 0, 1)
-	nodeList := framework.GetReadyNodesIncludingTaintedOrDie(f.ClientSet)
+	nodeList, err := e2enode.GetReadyNodesIncludingTainted(f.ClientSet)
+	if err != nil {
+		framework.Logf("Unexpected error occurred: %v", err)
+	}
+	// TODO: write a wrapper for ExpectNoErrorWithOffset()
+	framework.ExpectNoErrorWithOffset(0, err)
 	for _, node := range nodeList.Items {
 		if node.Labels[gkeNodepoolNameKey] == poolName {
 			nodes = append(nodes, &node)
@@ -1246,7 +1260,7 @@ func getPoolInitialSize(poolName string) int {
 	klog.Infof("Node-pool initial size: %s", output)
 	framework.ExpectNoError(err, string(output))
 	fields := strings.Fields(string(output))
-	gomega.Expect(len(fields)).Should(gomega.Equal(1))
+	framework.ExpectEqual(len(fields), 1)
 	size, err := strconv.ParseInt(fields[0], 10, 64)
 	framework.ExpectNoError(err)
 
@@ -1262,7 +1276,8 @@ func getPoolInitialSize(poolName string) int {
 
 func getPoolSize(f *framework.Framework, poolName string) int {
 	size := 0
-	nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
+	nodeList, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
+	framework.ExpectNoError(err)
 	for _, node := range nodeList.Items {
 		if node.Labels[gkeNodepoolNameKey] == poolName {
 			size++
@@ -1339,8 +1354,8 @@ func WaitForClusterSizeFuncWithUnready(c clientset.Interface, sizeFunc func(int)
 		numNodes := len(nodes.Items)
 
 		// Filter out not-ready nodes.
-		framework.FilterNodes(nodes, func(node v1.Node) bool {
-			return framework.IsNodeConditionSetAsExpected(&node, v1.NodeReady, true)
+		e2enode.Filter(nodes, func(node v1.Node) bool {
+			return e2enode.IsConditionSetAsExpected(&node, v1.NodeReady, true)
 		})
 		numReady := len(nodes.Items)
 
@@ -1890,12 +1905,12 @@ func addKubeSystemPdbs(f *framework.Framework) (func(), error) {
 		labelMap := map[string]string{"k8s-app": pdbData.label}
 		pdbName := fmt.Sprintf("test-pdb-for-%v", pdbData.label)
 		minAvailable := intstr.FromInt(pdbData.minAvailable)
-		pdb := &policy.PodDisruptionBudget{
+		pdb := &policyv1beta1.PodDisruptionBudget{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      pdbName,
 				Namespace: "kube-system",
 			},
-			Spec: policy.PodDisruptionBudgetSpec{
+			Spec: policyv1beta1.PodDisruptionBudgetSpec{
 				Selector:     &metav1.LabelSelector{MatchLabels: labelMap},
 				MinAvailable: &minAvailable,
 			},
@@ -1916,11 +1931,11 @@ func createPriorityClasses(f *framework.Framework) func() {
 		highPriorityClassName:       1000,
 	}
 	for className, priority := range priorityClasses {
-		_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(&schedulerapi.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: className}, Value: priority})
+		_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(&schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: className}, Value: priority})
 		if err != nil {
 			klog.Errorf("Error creating priority class: %v", err)
 		}
-		gomega.Expect(err == nil || errors.IsAlreadyExists(err)).To(gomega.Equal(true))
+		framework.ExpectEqual(err == nil || errors.IsAlreadyExists(err), true)
 	}
 
 	return func() {

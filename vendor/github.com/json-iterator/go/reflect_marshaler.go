@@ -93,8 +93,7 @@ func (encoder *marshalerEncoder) Encode(ptr unsafe.Pointer, stream *Stream) {
 		stream.WriteNil()
 		return
 	}
-	marshaler := obj.(json.Marshaler)
-	bytes, err := marshaler.MarshalJSON()
+	bytes, err := json.Marshal(obj)
 	if err != nil {
 		stream.Error = err
 	} else {

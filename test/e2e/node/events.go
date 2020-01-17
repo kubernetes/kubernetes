@@ -27,10 +27,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 )
 
 var _ = SIGDescribe("Events", func() {
@@ -61,6 +59,7 @@ var _ = SIGDescribe("Events", func() {
 					{
 						Name:  "p",
 						Image: framework.ServeHostnameImage,
+						Args:  []string{"serve-hostname"},
 						Ports: []v1.ContainerPort{{ContainerPort: 80}},
 					},
 				},
@@ -82,14 +81,14 @@ var _ = SIGDescribe("Events", func() {
 		selector := labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
 		options := metav1.ListOptions{LabelSelector: selector.String()}
 		pods, err := podClient.List(options)
-		gomega.Expect(len(pods.Items)).To(gomega.Equal(1))
+		framework.ExpectEqual(len(pods.Items), 1)
 
 		ginkgo.By("retrieving the pod")
 		podWithUID, err := podClient.Get(pod.Name, metav1.GetOptions{})
 		if err != nil {
 			framework.Failf("Failed to get pod: %v", err)
 		}
-		e2elog.Logf("%+v\n", podWithUID)
+		framework.Logf("%+v\n", podWithUID)
 		var events *v1.EventList
 		// Check for scheduler event about the pod.
 		ginkgo.By("checking for scheduler event about the pod")
@@ -106,7 +105,7 @@ var _ = SIGDescribe("Events", func() {
 				return false, err
 			}
 			if len(events.Items) > 0 {
-				e2elog.Logf("Saw scheduler event for our pod.")
+				framework.Logf("Saw scheduler event for our pod.")
 				return true, nil
 			}
 			return false, nil
@@ -126,7 +125,7 @@ var _ = SIGDescribe("Events", func() {
 				return false, err
 			}
 			if len(events.Items) > 0 {
-				e2elog.Logf("Saw kubelet event for our pod.")
+				framework.Logf("Saw kubelet event for our pod.")
 				return true, nil
 			}
 			return false, nil

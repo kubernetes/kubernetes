@@ -16,7 +16,6 @@ package cloudinfo
 
 import (
 	"io/ioutil"
-	"os"
 	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -28,9 +27,10 @@ import (
 )
 
 const (
-	productVerFileName = "/sys/class/dmi/id/product_version"
-	biosVerFileName    = "/sys/class/dmi/id/bios_vendor"
-	amazon             = "amazon"
+	productVerFileName       = "/sys/class/dmi/id/product_version"
+	biosVerFileName          = "/sys/class/dmi/id/bios_vendor"
+	systemdOSReleaseFileName = "/etc/os-release"
+	amazon                   = "amazon"
 )
 
 func init() {
@@ -42,23 +42,18 @@ type provider struct{}
 var _ cloudinfo.CloudProvider = provider{}
 
 func (provider) IsActiveProvider() bool {
-	var dataProduct []byte
-	var dataBios []byte
-	if _, err := os.Stat(productVerFileName); err == nil {
-		dataProduct, err = ioutil.ReadFile(productVerFileName)
-		if err != nil {
-			return false
-		}
+	return fileContainsAmazonIdentifier(productVerFileName) ||
+		fileContainsAmazonIdentifier(biosVerFileName) ||
+		fileContainsAmazonIdentifier(systemdOSReleaseFileName)
+}
+
+func fileContainsAmazonIdentifier(filename string) bool {
+	fileContent, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return false
 	}
 
-	if _, err := os.Stat(biosVerFileName); err == nil {
-		dataBios, err = ioutil.ReadFile(biosVerFileName)
-		if err != nil {
-			return false
-		}
-	}
-
-	return strings.Contains(string(dataProduct), amazon) || strings.Contains(strings.ToLower(string(dataBios)), amazon)
+	return strings.Contains(string(fileContent), amazon)
 }
 
 func getAwsMetadata(name string) string {

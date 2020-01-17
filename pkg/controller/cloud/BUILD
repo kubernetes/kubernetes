@@ -15,7 +15,6 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/controller/cloud",
     deps = [
         "//pkg/controller:go_default_library",
-        "//pkg/controller/util/node:go_default_library",
         "//pkg/kubelet/apis:go_default_library",
         "//pkg/scheduler/api:go_default_library",
         "//pkg/util/node:go_default_library",
@@ -34,6 +33,7 @@ go_library(
         "//staging/src/k8s.io/client-go/tools/record:go_default_library",
         "//staging/src/k8s.io/client-go/util/retry:go_default_library",
         "//staging/src/k8s.io/cloud-provider:go_default_library",
+        "//staging/src/k8s.io/cloud-provider/node/helpers:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ],
 )
@@ -46,7 +46,6 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/controller:go_default_library",
         "//pkg/controller/testutil:go_default_library",
         "//pkg/kubelet/apis:go_default_library",
         "//pkg/scheduler/api:go_default_library",

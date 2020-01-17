@@ -33,9 +33,9 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/component-base/version"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/credentialprovider"
-	"k8s.io/kubernetes/pkg/version"
 )
 
 var ecrPattern = regexp.MustCompile(`^(\d{12})\.dkr\.ecr(\-fips)?\.([a-zA-Z0-9][a-zA-Z0-9-_]*)\.amazonaws\.com(\.cn)?$`)
@@ -78,12 +78,6 @@ func (p *ecrProvider) Enabled() bool {
 		return false
 	}
 	return true
-}
-
-// LazyProvide is lazy
-// TODO: the LazyProvide methods will be removed in a future PR
-func (p *ecrProvider) LazyProvide(image string) *credentialprovider.DockerConfigEntry {
-	return nil
 }
 
 // Provide returns a DockerConfig with credentials from the cache if they are

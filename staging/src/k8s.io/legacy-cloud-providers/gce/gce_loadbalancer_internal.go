@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2017 The Kubernetes Authors.
 
@@ -18,39 +20,45 @@ package gce
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/meta"
 	"strconv"
 	"strings"
 
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
+	computebeta "google.golang.org/api/compute/v0.beta"
 	compute "google.golang.org/api/compute/v1"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	cloudprovider "k8s.io/cloud-provider"
 	servicehelpers "k8s.io/cloud-provider/service/helpers"
 	"k8s.io/klog"
 )
 
 const (
+	// Used to list instances in all states(RUNNING and other) - https://cloud.google.com/compute/docs/reference/rest/v1/instanceGroups/listInstances
 	allInstances = "ALL"
 )
 
-func usesNEG(service *v1.Service) bool {
-	_, ok := service.GetAnnotations()[NEGAnnotation]
-	return ok
-}
-
 func (g *Cloud) ensureInternalLoadBalancer(clusterName, clusterID string, svc *v1.Service, existingFwdRule *compute.ForwardingRule, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
-	if usesNEG(svc) {
-		// Do not manage loadBalancer for services using NEGs
-		return &svc.Status.LoadBalancer, nil
+	if g.AlphaFeatureGate.Enabled(AlphaFeatureILBSubsets) {
+		return nil, cloudprovider.ImplementedElsewhere
 	}
+
 	nm := types.NamespacedName{Name: svc.Name, Namespace: svc.Namespace}
 	ports, protocol := getPortsAndProtocol(svc.Spec.Ports)
 	if protocol != v1.ProtocolTCP && protocol != v1.ProtocolUDP {
 		return nil, fmt.Errorf("Invalid protocol %s, only TCP and UDP are supported", string(protocol))
 	}
 	scheme := cloud.SchemeInternal
+	options := getILBOptions(svc)
+	if g.isLegacyNetwork {
+		g.eventRecorder.Event(svc, v1.EventTypeWarning, "ILBOptionsIgnored", "Internal LoadBalancer options are not supported with Legacy Networks.")
+		options = ILBOptions{}
+	}
+
 	loadBalancerName := g.GetLoadBalancerName(context.TODO(), clusterName, svc)
 	sharedBackend := shareBackendService(svc)
 	backendServiceName := makeBackendServiceName(loadBalancerName, clusterID, sharedBackend, scheme, protocol, svc.Spec.SessionAffinity)
@@ -119,46 +127,31 @@ func (g *Cloud) ensureInternalLoadBalancer(clusterName, clusterID string, svc *v
 		return nil, err
 	}
 
-	expectedFwdRule := &compute.ForwardingRule{
-		Name:                loadBalancerName,
-		Description:         fmt.Sprintf(`{"kubernetes.io/service-name":"%s"}`, nm.String()),
-		IPAddress:           ipToUse,
-		BackendService:      backendServiceLink,
-		Ports:               ports,
-		IPProtocol:          string(protocol),
-		LoadBalancingScheme: string(scheme),
-	}
-
-	// Given that CreateGCECloud will attempt to determine the subnet based off the network,
-	// the subnetwork should rarely be unknown.
-	if subnetworkURL != "" {
-		expectedFwdRule.Subnetwork = subnetworkURL
-	} else {
-		expectedFwdRule.Network = g.networkURL
-	}
-
-	fwdRuleDeleted := false
-	if existingFwdRule != nil && !fwdRuleEqual(existingFwdRule, expectedFwdRule) {
-		klog.V(2).Infof("ensureInternalLoadBalancer(%v): deleting existing forwarding rule with IP address %v", loadBalancerName, existingFwdRule.IPAddress)
-		if err = ignoreNotFound(g.DeleteRegionForwardingRule(loadBalancerName, g.region)); err != nil {
-			return nil, err
-		}
-		fwdRuleDeleted = true
-	}
-
 	bsDescription := makeBackendServiceDescription(nm, sharedBackend)
 	err = g.ensureInternalBackendService(backendServiceName, bsDescription, svc.Spec.SessionAffinity, scheme, protocol, igLinks, hc.SelfLink)
 	if err != nil {
 		return nil, err
 	}
 
-	// If we previously deleted the forwarding rule or it never existed, finally create it.
-	if fwdRuleDeleted || existingFwdRule == nil {
-		klog.V(2).Infof("ensureInternalLoadBalancer(%v): creating forwarding rule", loadBalancerName)
-		if err = g.CreateRegionForwardingRule(expectedFwdRule, g.region); err != nil {
-			return nil, err
-		}
-		klog.V(2).Infof("ensureInternalLoadBalancer(%v): created forwarding rule", loadBalancerName)
+	newFRC := &forwardingRuleComposite{
+		name:           loadBalancerName,
+		description:    &forwardingRuleDescription{ServiceName: nm.String()},
+		ipAddress:      ipToUse,
+		backendService: backendServiceLink,
+		ports:          ports,
+		ipProtocol:     string(protocol),
+		lbScheme:       string(scheme),
+		// Given that CreateGCECloud will attempt to determine the subnet based off the network,
+		// the subnetwork should rarely be unknown.
+		subnetwork: subnetworkURL,
+		network:    g.networkURL,
+	}
+	if options.AllowGlobalAccess {
+		newFRC.allowGlobalAccess = options.AllowGlobalAccess
+		newFRC.description.APIVersion = meta.VersionBeta
+	}
+	if err := g.ensureInternalForwardingRule(existingFwdRule, newFRC); err != nil {
+		return nil, err
 	}
 
 	// Delete the previous internal load balancer resources if necessary
@@ -210,9 +203,8 @@ func (g *Cloud) clearPreviousInternalResources(svc *v1.Service, loadBalancerName
 // updateInternalLoadBalancer is called when the list of nodes has changed. Therefore, only the instance groups
 // and possibly the backend service need to be updated.
 func (g *Cloud) updateInternalLoadBalancer(clusterName, clusterID string, svc *v1.Service, nodes []*v1.Node) error {
-	if usesNEG(svc) {
-		// Do not manage loadBalancer for services using NEGs
-		return nil
+	if g.AlphaFeatureGate.Enabled(AlphaFeatureILBSubsets) {
+		return cloudprovider.ImplementedElsewhere
 	}
 	g.sharedResourceLock.Lock()
 	defer g.sharedResourceLock.Unlock()
@@ -420,7 +412,7 @@ func (g *Cloud) ensureInternalHealthCheck(name string, svcName types.NamespacedN
 
 	if needToUpdateHealthChecks(hc, expectedHC) {
 		klog.V(2).Infof("ensureInternalHealthCheck: health check %v exists but parameters have drifted - updating...", name)
-		expectedHC = mergeHealthChecks(hc, expectedHC)
+		mergeHealthChecks(hc, expectedHC)
 		if err := g.UpdateHealthCheck(expectedHC); err != nil {
 			klog.Warningf("Failed to reconcile http health check %v parameters", name)
 			return nil, err
@@ -642,7 +634,7 @@ func firewallRuleEqual(a, b *compute.Firewall) bool {
 // The HC interval will be reconciled to 8 seconds.
 // If the existing health check is larger than the default interval,
 // the configuration will be kept.
-func mergeHealthChecks(hc, newHC *compute.HealthCheck) *compute.HealthCheck {
+func mergeHealthChecks(hc, newHC *compute.HealthCheck) {
 	if hc.CheckIntervalSec > newHC.CheckIntervalSec {
 		newHC.CheckIntervalSec = hc.CheckIntervalSec
 	}
@@ -655,18 +647,24 @@ func mergeHealthChecks(hc, newHC *compute.HealthCheck) *compute.HealthCheck {
 	if hc.HealthyThreshold > newHC.HealthyThreshold {
 		newHC.HealthyThreshold = hc.HealthyThreshold
 	}
-	return newHC
 }
 
 // needToUpdateHealthChecks checks whether the healthcheck needs to be updated.
 func needToUpdateHealthChecks(hc, newHC *compute.HealthCheck) bool {
-	if hc.HttpHealthCheck == nil || newHC.HttpHealthCheck == nil {
+	switch {
+	case
+		hc.HttpHealthCheck == nil,
+		newHC.HttpHealthCheck == nil,
+		hc.HttpHealthCheck.Port != newHC.HttpHealthCheck.Port,
+		hc.HttpHealthCheck.RequestPath != newHC.HttpHealthCheck.RequestPath,
+		hc.Description != newHC.Description,
+		hc.CheckIntervalSec < newHC.CheckIntervalSec,
+		hc.TimeoutSec < newHC.TimeoutSec,
+		hc.UnhealthyThreshold < newHC.UnhealthyThreshold,
+		hc.HealthyThreshold < newHC.HealthyThreshold:
 		return true
 	}
-	changed := hc.HttpHealthCheck.Port != newHC.HttpHealthCheck.Port || hc.HttpHealthCheck.RequestPath != newHC.HttpHealthCheck.RequestPath || hc.Description != newHC.Description
-	changed = changed || hc.CheckIntervalSec < newHC.CheckIntervalSec || hc.TimeoutSec < newHC.TimeoutSec
-	changed = changed || hc.UnhealthyThreshold < newHC.UnhealthyThreshold || hc.HealthyThreshold < newHC.HealthyThreshold
-	return changed
+	return false
 }
 
 // backendsListEqual asserts that backend lists are equal by instance group link only
@@ -697,14 +695,6 @@ func backendSvcEqual(a, b *compute.BackendService) bool {
 		a.LoadBalancingScheme == b.LoadBalancingScheme &&
 		equalStringSets(a.HealthChecks, b.HealthChecks) &&
 		backendsListEqual(a.Backends, b.Backends)
-}
-
-func fwdRuleEqual(a, b *compute.ForwardingRule) bool {
-	return (a.IPAddress == "" || b.IPAddress == "" || a.IPAddress == b.IPAddress) &&
-		a.IPProtocol == b.IPProtocol &&
-		a.LoadBalancingScheme == b.LoadBalancingScheme &&
-		equalStringSets(a.Ports, b.Ports) &&
-		a.BackendService == b.BackendService
 }
 
 func getPortsAndProtocol(svcPorts []v1.ServicePort) (ports []string, protocol v1.Protocol) {
@@ -743,4 +733,206 @@ func determineRequestedIP(svc *v1.Service, fwdRule *compute.ForwardingRule) stri
 	}
 
 	return ""
+}
+
+func getILBOptions(svc *v1.Service) ILBOptions {
+	return ILBOptions{AllowGlobalAccess: GetLoadBalancerAnnotationAllowGlobalAccess(svc)}
+}
+
+// forwardingRuleComposite is a composite type encapsulating both the GA and Beta ForwardingRules.
+// It exposes methods to compute the ForwardingRule object based on the given parameters and to compare 2 composite types
+// based on the version string.
+type forwardingRuleComposite struct {
+	allowGlobalAccess bool
+	name              string
+	description       *forwardingRuleDescription
+	ipAddress         string
+	backendService    string
+	ports             []string
+	ipProtocol        string
+	lbScheme          string
+	subnetwork        string
+	network           string
+}
+
+func (f *forwardingRuleComposite) Version() meta.Version {
+	return f.description.APIVersion
+}
+
+func (f *forwardingRuleComposite) Equal(other *forwardingRuleComposite) bool {
+	return (f.ipAddress == "" || other.ipAddress == "" || f.ipAddress == other.ipAddress) &&
+		f.ipProtocol == other.ipProtocol &&
+		f.lbScheme == other.lbScheme &&
+		equalStringSets(f.ports, other.ports) &&
+		f.backendService == other.backendService &&
+		f.allowGlobalAccess == other.allowGlobalAccess
+}
+
+// toForwardingRuleComposite converts a compute beta or GA ForwardingRule into the composite type
+func toForwardingRuleComposite(rule interface{}) (frc *forwardingRuleComposite, err error) {
+	switch fr := rule.(type) {
+	case *compute.ForwardingRule:
+		frc = &forwardingRuleComposite{
+			name:           fr.Name,
+			ipAddress:      fr.IPAddress,
+			description:    &forwardingRuleDescription{APIVersion: meta.VersionGA},
+			backendService: fr.BackendService,
+			ports:          fr.Ports,
+			ipProtocol:     fr.IPProtocol,
+			lbScheme:       fr.LoadBalancingScheme,
+			subnetwork:     fr.Subnetwork,
+			network:        fr.Network,
+		}
+		if fr.Description != "" {
+			err = frc.description.unmarshal(fr.Description)
+		}
+		return frc, err
+	case *computebeta.ForwardingRule:
+		frc = &forwardingRuleComposite{
+			name:              fr.Name,
+			ipAddress:         fr.IPAddress,
+			description:       &forwardingRuleDescription{APIVersion: meta.VersionBeta},
+			backendService:    fr.BackendService,
+			ports:             fr.Ports,
+			ipProtocol:        fr.IPProtocol,
+			lbScheme:          fr.LoadBalancingScheme,
+			subnetwork:        fr.Subnetwork,
+			network:           fr.Network,
+			allowGlobalAccess: fr.AllowGlobalAccess,
+		}
+		if fr.Description != "" {
+			err = frc.description.unmarshal(fr.Description)
+		}
+		return frc, err
+	default:
+		return nil, fmt.Errorf("Invalid object type %T to compute ForwardingRuleComposite from", fr)
+	}
+}
+
+// ToBeta returns a Beta ForwardingRule from the composite type.
+func (f *forwardingRuleComposite) ToBeta() (*computebeta.ForwardingRule, error) {
+	descStr, err := f.description.marshal()
+	if err != nil {
+		return nil, fmt.Errorf("Failed to compute description for beta forwarding rule %s, err: %v", f.name, err)
+	}
+	return &computebeta.ForwardingRule{
+		Name:                f.name,
+		Description:         descStr,
+		IPAddress:           f.ipAddress,
+		BackendService:      f.backendService,
+		Ports:               f.ports,
+		IPProtocol:          f.ipProtocol,
+		LoadBalancingScheme: f.lbScheme,
+		Subnetwork:          f.subnetwork,
+		Network:             f.network,
+		AllowGlobalAccess:   f.allowGlobalAccess,
+	}, nil
+}
+
+// ToGA returns a GA ForwardingRule from the composite type.
+func (f *forwardingRuleComposite) ToGA() (*compute.ForwardingRule, error) {
+	descStr, err := f.description.marshal()
+	if err != nil {
+		return nil, fmt.Errorf("Failed to compute description for GA forwarding rule %s, err: %v", f.name, err)
+	}
+	return &compute.ForwardingRule{
+		Name:                f.name,
+		Description:         descStr,
+		IPAddress:           f.ipAddress,
+		BackendService:      f.backendService,
+		Ports:               f.ports,
+		IPProtocol:          f.ipProtocol,
+		LoadBalancingScheme: f.lbScheme,
+		Subnetwork:          f.subnetwork,
+		Network:             f.network,
+	}, nil
+}
+
+type forwardingRuleDescription struct {
+	ServiceName string       `json:"kubernetes.io/service-name"`
+	APIVersion  meta.Version `json:"kubernetes.io/api-version,omitempty"`
+}
+
+// marshal the description as a JSON-encoded string.
+func (d *forwardingRuleDescription) marshal() (string, error) {
+	out, err := json.Marshal(d)
+	if err != nil {
+		return "", err
+	}
+	return string(out), err
+}
+
+// unmarshal desc JSON-encoded string into this structure.
+func (d *forwardingRuleDescription) unmarshal(desc string) error {
+	return json.Unmarshal([]byte(desc), d)
+}
+
+func getFwdRuleAPIVersion(rule *compute.ForwardingRule) (meta.Version, error) {
+	d := &forwardingRuleDescription{}
+	if rule.Description == "" {
+		return meta.VersionGA, nil
+	}
+	if err := d.unmarshal(rule.Description); err != nil {
+		return meta.VersionGA, fmt.Errorf("Failed to get APIVersion from Forwarding rule %s - %v", rule.Name, err)
+	}
+	if d.APIVersion == "" {
+		d.APIVersion = meta.VersionGA
+	}
+	return d.APIVersion, nil
+}
+
+func (g *Cloud) ensureInternalForwardingRule(existingFwdRule *compute.ForwardingRule, newFRC *forwardingRuleComposite) (err error) {
+	if existingFwdRule != nil {
+		version, err := getFwdRuleAPIVersion(existingFwdRule)
+		if err != nil {
+			return err
+		}
+		var oldFRC *forwardingRuleComposite
+		switch version {
+		case meta.VersionBeta:
+			var betaRule *computebeta.ForwardingRule
+			betaRule, err = g.GetBetaRegionForwardingRule(existingFwdRule.Name, g.region)
+			if err != nil {
+				return err
+			}
+			oldFRC, err = toForwardingRuleComposite(betaRule)
+		case meta.VersionGA:
+			oldFRC, err = toForwardingRuleComposite(existingFwdRule)
+		default:
+			klog.Errorf("invalid version string for %s, assuming GA", existingFwdRule.Name)
+			oldFRC, err = toForwardingRuleComposite(existingFwdRule)
+		}
+		if err != nil {
+			return err
+		}
+		if oldFRC.Equal(newFRC) {
+			klog.V(4).Infof("oldFRC == newFRC, no updates needed (oldFRC == %+v)", oldFRC)
+			return nil
+		}
+		klog.V(2).Infof("ensureInternalLoadBalancer(%v): deleting existing forwarding rule with IP address %v", existingFwdRule.Name, existingFwdRule.IPAddress)
+		if err = ignoreNotFound(g.DeleteRegionForwardingRule(existingFwdRule.Name, g.region)); err != nil {
+			return err
+		}
+	}
+	// At this point, the existing rule has been deleted if required.
+	// Create the rule based on the api version determined
+	if newFRC.Version() == meta.VersionBeta {
+		klog.V(2).Infof("ensureInternalLoadBalancer(%v): creating beta forwarding rule", newFRC.name)
+		var betaRule *computebeta.ForwardingRule
+		betaRule, err = newFRC.ToBeta()
+		if err != nil {
+			return err
+		}
+		err = g.CreateBetaRegionForwardingRule(betaRule, g.region)
+	} else {
+		var gaRule *compute.ForwardingRule
+		klog.V(2).Infof("ensureInternalLoadBalancer(%v): creating ga forwarding rule", newFRC.name)
+		gaRule, err = newFRC.ToGA()
+		if err != nil {
+			return err
+		}
+		err = g.CreateRegionForwardingRule(gaRule, g.region)
+	}
+	klog.V(2).Infof("ensureInternalLoadBalancer(%v): created forwarding rule, err : %s", newFRC.name, err)
+	return err
 }

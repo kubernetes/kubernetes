@@ -26,15 +26,15 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 )
 
 //TODO : Consolidate this code with the code for emptyDir.
 //This will require some smart.
-var _ = Describe("[sig-storage] HostPath", func() {
+var _ = ginkgo.Describe("[sig-storage] HostPath", func() {
 	f := framework.NewDefaultFramework("hostpath")
 
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		// TODO permission denied cleanup failures
 		//cleanup before running the test.
 		_ = os.Remove("/tmp/test-file")
@@ -62,13 +62,15 @@ var _ = Describe("[sig-storage] HostPath", func() {
 	})
 
 	// This test requires mounting a folder into a container with write privileges.
-	It("should support r/w [NodeConformance]", func() {
+	ginkgo.It("should support r/w [NodeConformance]", func() {
 		filePath := path.Join(volumePath, "test-file")
 		retryDuration := 180
 		source := &v1.HostPathVolumeSource{
 			Path: "/tmp",
 		}
-		pod := testPodWithHostVol(volumePath, source, true)
+		// we can't spawn privileged containers on Windows, nor do we need to.
+		privileged := !framework.NodeOSDistroIs("windows")
+		pod := testPodWithHostVol(volumePath, source, privileged)
 
 		pod.Spec.Containers[0].Args = []string{
 			fmt.Sprintf("--new_file_0644=%v", filePath),
@@ -86,7 +88,7 @@ var _ = Describe("[sig-storage] HostPath", func() {
 		})
 	})
 
-	It("should support subPath [NodeConformance]", func() {
+	ginkgo.It("should support subPath [NodeConformance]", func() {
 		subPath := "sub-path"
 		fileName := "test-file"
 		retryDuration := 180
@@ -97,7 +99,10 @@ var _ = Describe("[sig-storage] HostPath", func() {
 		source := &v1.HostPathVolumeSource{
 			Path: "/tmp",
 		}
-		pod := testPodWithHostVol(volumePath, source, true)
+
+		// we can't spawn privileged containers on Windows, nor do we need to.
+		privileged := !framework.NodeOSDistroIs("windows")
+		pod := testPodWithHostVol(volumePath, source, privileged)
 
 		// Write the file in the subPath from container 0
 		container := &pod.Spec.Containers[0]

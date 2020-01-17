@@ -24,8 +24,14 @@ func (t *Taint) MatchTaint(taintToMatch *Taint) bool {
 	return t.Key == taintToMatch.Key && t.Effect == taintToMatch.Effect
 }
 
-// taint.ToString() converts taint struct to string in format key=value:effect or key:effect.
+// taint.ToString() converts taint struct to string in format '<key>=<value>:<effect>', '<key>=<value>:', '<key>:<effect>', or '<key>'.
 func (t *Taint) ToString() string {
+	if len(t.Effect) == 0 {
+		if len(t.Value) == 0 {
+			return fmt.Sprintf("%v", t.Key)
+		}
+		return fmt.Sprintf("%v=%v:", t.Key, t.Value)
+	}
 	if len(t.Value) == 0 {
 		return fmt.Sprintf("%v:%v", t.Key, t.Effect)
 	}

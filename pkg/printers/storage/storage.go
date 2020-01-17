@@ -43,5 +43,5 @@ func (c TableConvertor) ConvertToTable(ctx context.Context, obj runtime.Object, 
 			return nil, fmt.Errorf("unrecognized type %T for table options, can't display tabular output", tableOptions)
 		}
 	}
-	return c.TableGenerator.GenerateTable(obj, printers.PrintOptions{Wide: true, NoHeaders: noHeaders})
+	return c.TableGenerator.GenerateTable(obj, printers.GenerateOptions{Wide: true, NoHeaders: noHeaders})
 }

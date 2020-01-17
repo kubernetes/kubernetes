@@ -37,6 +37,7 @@ go_test(
     srcs = ["backend_test.go"],
     embed = [":go_default_library"],
     deps = [
+        "//staging/src/k8s.io/api/authentication/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",

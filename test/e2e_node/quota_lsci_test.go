@@ -27,11 +27,11 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/util/mount"
-	"k8s.io/kubernetes/pkg/volume/util/quota"
+	"k8s.io/kubernetes/pkg/volume/util/fsquota"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 )
 
 const (
@@ -53,7 +53,7 @@ func runOneQuotaTest(f *framework.Framework, quotasRequested bool) {
 	if quotasRequested {
 		priority = 1
 	}
-	Context(fmt.Sprintf(testContextFmt, fmt.Sprintf("use quotas for LSCI monitoring (quotas enabled: %v)", quotasRequested)), func() {
+	ginkgo.Context(fmt.Sprintf(testContextFmt, fmt.Sprintf("use quotas for LSCI monitoring (quotas enabled: %v)", quotasRequested)), func() {
 		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
 			defer withFeatureGate(LSCIQuotaFeature, quotasRequested)()
 			// TODO: remove hardcoded kubelet volume directory path
@@ -142,6 +142,6 @@ func diskConcealingPod(name string, diskConsumedMB int, volumeSource *v1.VolumeS
 // Don't bother returning an error; if something goes wrong,
 // simply treat it as "no".
 func supportsQuotas(dir string) bool {
-	supportsQuota, err := quota.SupportsQuotas(mount.New(""), dir)
+	supportsQuota, err := fsquota.SupportsQuotas(mount.New(""), dir)
 	return supportsQuota && err == nil
 }

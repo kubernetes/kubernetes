@@ -136,7 +136,7 @@ func getKubeConfigSpecs(cfg *kubeadmapi.InitConfiguration) (map[string]*kubeConf
 				Organizations: []string{kubeadmconstants.SystemPrivilegedGroup},
 			},
 		},
-		kubeadmconstants.KubeletKubeConfigFileName: {
+		kubeadmconstants.KubeletBootstrapKubeConfigFileName: {
 			CACert:     caCert,
 			APIServer:  controlPlaneEndpoint,
 			ClientName: fmt.Sprintf("%s%s", kubeadmconstants.NodesUserPrefix, cfg.NodeRegistration.Name),
@@ -224,7 +224,13 @@ func validateKubeConfig(outDir, filename string, config *clientcmdapi.Config) er
 	expectedCtx := config.CurrentContext
 	expectedCluster := config.Contexts[expectedCtx].Cluster
 	currentCtx := currentConfig.CurrentContext
+	if currentConfig.Contexts[currentCtx] == nil {
+		return errors.Errorf("failed to find CurrentContext in Contexts of the kubeconfig file %s", kubeConfigFilePath)
+	}
 	currentCluster := currentConfig.Contexts[currentCtx].Cluster
+	if currentConfig.Clusters[currentCluster] == nil {
+		return errors.Errorf("failed to find the given CurrentContext Cluster in Clusters of the kubeconfig file %s", kubeConfigFilePath)
+	}
 
 	// If the current CA cert on disk doesn't match the expected CA cert, error out because we have a file, but it's stale
 	if !bytes.Equal(currentConfig.Clusters[currentCluster].CertificateAuthorityData, config.Clusters[expectedCluster].CertificateAuthorityData) {
@@ -342,7 +348,7 @@ func writeKubeConfigFromSpec(out io.Writer, spec *kubeConfigSpec, clustername st
 func ValidateKubeconfigsForExternalCA(outDir string, cfg *kubeadmapi.InitConfiguration) error {
 	kubeConfigFileNames := []string{
 		kubeadmconstants.AdminKubeConfigFileName,
-		kubeadmconstants.KubeletKubeConfigFileName,
+		kubeadmconstants.KubeletBootstrapKubeConfigFileName,
 		kubeadmconstants.ControllerManagerKubeConfigFileName,
 		kubeadmconstants.SchedulerKubeConfigFileName,
 	}

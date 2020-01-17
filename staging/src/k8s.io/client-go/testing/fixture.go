@@ -18,9 +18,11 @@ package testing
 
 import (
 	"fmt"
+	"reflect"
 	"sync"
 
 	jsonpatch "github.com/evanphx/json-patch"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -139,6 +141,11 @@ func ObjectReaction(tracker ObjectTracker) ReactionFunc {
 				return true, nil, err
 			}
 
+			// reset the object in preparation to unmarshal, since unmarshal does not guarantee that fields
+			// in obj that are removed by patch are cleared
+			value := reflect.ValueOf(obj)
+			value.Elem().Set(reflect.New(value.Type().Elem()).Elem())
+
 			switch action.GetPatchType() {
 			case types.JSONPatchType:
 				patch, err := jsonpatch.DecodePatch(action.GetPatch())
@@ -149,6 +156,7 @@ func ObjectReaction(tracker ObjectTracker) ReactionFunc {
 				if err != nil {
 					return true, nil, err
 				}
+
 				if err = json.Unmarshal(modified, obj); err != nil {
 					return true, nil, err
 				}
@@ -310,6 +318,11 @@ func (t *tracker) Add(obj runtime.Object) error {
 	if err != nil {
 		return err
 	}
+
+	if partial, ok := obj.(*metav1.PartialObjectMetadata); ok && len(partial.TypeMeta.APIVersion) > 0 {
+		gvks = []schema.GroupVersionKind{partial.TypeMeta.GroupVersionKind()}
+	}
+
 	if len(gvks) == 0 {
 		return fmt.Errorf("no registered kinds for %v", obj)
 	}

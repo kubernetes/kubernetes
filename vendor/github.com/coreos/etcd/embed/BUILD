@@ -38,7 +38,6 @@ go_library(
         "//vendor/github.com/coreos/etcd/rafthttp:go_default_library",
         "//vendor/github.com/coreos/etcd/wal:go_default_library",
         "//vendor/github.com/coreos/pkg/capnslog:go_default_library",
-        "//vendor/github.com/ghodss/yaml:go_default_library",
         "//vendor/github.com/grpc-ecosystem/go-grpc-prometheus:go_default_library",
         "//vendor/github.com/grpc-ecosystem/grpc-gateway/runtime:go_default_library",
         "//vendor/github.com/soheilhy/cmux:go_default_library",
@@ -48,6 +47,7 @@ go_library(
         "//vendor/google.golang.org/grpc/credentials:go_default_library",
         "//vendor/google.golang.org/grpc/grpclog:go_default_library",
         "//vendor/google.golang.org/grpc/keepalive:go_default_library",
+        "//vendor/sigs.k8s.io/yaml:go_default_library",
     ],
 )
 

@@ -51,4 +51,7 @@ const (
 	ImageLocalityPriority = "ImageLocalityPriority"
 	// ResourceLimitsPriority defines the nodes of prioritizer function ResourceLimitsPriority.
 	ResourceLimitsPriority = "ResourceLimitsPriority"
+	// EvenPodsSpreadPriority defines the name of prioritizer function that prioritizes nodes
+	// which have pods and labels matching the incoming pod's topologySpreadConstraints.
+	EvenPodsSpreadPriority = "EvenPodsSpreadPriority"
 )

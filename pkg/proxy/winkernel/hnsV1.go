@@ -172,6 +172,8 @@ func (hns hnsV1) getLoadBalancer(endpoints []endpointsInfo, flags loadBalancerFl
 				if len(elbPolicy.VIPs) == 0 || elbPolicy.VIPs[0] != vip {
 					continue
 				}
+			} else if len(elbPolicy.VIPs) != 0 {
+				continue
 			}
 			LogJson(plist, "Found existing Hns loadbalancer policy resource", 1)
 			return &loadBalancerInfo{

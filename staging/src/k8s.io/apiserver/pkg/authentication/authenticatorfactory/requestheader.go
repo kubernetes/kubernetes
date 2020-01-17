@@ -16,6 +16,10 @@ limitations under the License.
 
 package authenticatorfactory
 
+import (
+	x509request "k8s.io/apiserver/pkg/authentication/request/x509"
+)
+
 type RequestHeaderConfig struct {
 	// UsernameHeaders are the headers to check (in order, case-insensitively) for an identity. The first header with a value wins.
 	UsernameHeaders []string
@@ -24,8 +28,9 @@ type RequestHeaderConfig struct {
 	// ExtraHeaderPrefixes are the head prefixes to check (case-insentively) for filling in
 	// the user.Info.Extra.  All values of all matching headers will be added.
 	ExtraHeaderPrefixes []string
-	// ClientCA points to CA bundle file which is used verify the identity of the front proxy
-	ClientCA string
+	// VerifyOptionFn are the options for verifying incoming connections using mTLS.  Generally this points to CA bundle file which is used verify the identity of the front proxy.
+	// It may produce different options at will.
+	VerifyOptionFn x509request.VerifyOptionFunc
 	// AllowedClientNames is a list of common names that may be presented by the authenticating front proxy.  Empty means: accept any.
 	AllowedClientNames []string
 }

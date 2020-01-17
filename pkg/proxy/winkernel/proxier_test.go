@@ -20,6 +20,7 @@ package winkernel
 
 import (
 	"k8s.io/api/core/v1"
+	discovery "k8s.io/api/discovery/v1alpha1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/proxy"
 
@@ -331,6 +332,15 @@ func TestCreateLoadBalancer(t *testing.T) {
 		t.Errorf("%v does not match %v", proxier.serviceMap[svcPortName].hnsID, guid)
 	}
 }
+
+func TestNoopEndpointSlice(t *testing.T) {
+	p := Proxier{}
+	p.OnEndpointSliceAdd(&discovery.EndpointSlice{})
+	p.OnEndpointSliceUpdate(&discovery.EndpointSlice{}, &discovery.EndpointSlice{})
+	p.OnEndpointSliceDelete(&discovery.EndpointSlice{})
+	p.OnEndpointSlicesSynced()
+}
+
 func makeNSN(namespace, name string) types.NamespacedName {
 	return types.NamespacedName{Namespace: namespace, Name: name}
 }

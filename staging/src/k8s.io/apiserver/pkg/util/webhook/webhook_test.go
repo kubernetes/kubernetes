@@ -17,6 +17,7 @@ limitations under the License.
 package webhook
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
@@ -550,7 +551,7 @@ func TestWithExponentialBackoff(t *testing.T) {
 		t.Fatalf("failed to create the webhook: %v", err)
 	}
 
-	result := wh.WithExponentialBackoff(func() rest.Result {
+	result := wh.WithExponentialBackoff(context.Background(), func() rest.Result {
 		return wh.RestClient.Get().Do()
 	})
 
@@ -562,7 +563,7 @@ func TestWithExponentialBackoff(t *testing.T) {
 		t.Errorf("unexpected status code: %d", statusCode)
 	}
 
-	result = wh.WithExponentialBackoff(func() rest.Result {
+	result = wh.WithExponentialBackoff(context.Background(), func() rest.Result {
 		return wh.RestClient.Get().Do()
 	})
 

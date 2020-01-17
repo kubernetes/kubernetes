@@ -19,7 +19,6 @@ package node
 import (
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 
 	"github.com/onsi/ginkgo"
 )
@@ -36,7 +35,7 @@ var _ = SIGDescribe("AppArmor", func() {
 			if !ginkgo.CurrentGinkgoTestDescription().Failed {
 				return
 			}
-			framework.LogFailedContainers(f.ClientSet, f.Namespace.Name, e2elog.Logf)
+			framework.LogFailedContainers(f.ClientSet, f.Namespace.Name, framework.Logf)
 		})
 
 		ginkgo.It("should enforce an AppArmor profile", func() {

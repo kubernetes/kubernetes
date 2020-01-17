@@ -241,3 +241,55 @@ func TestValidateFieldManagerInvalid(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateMangedFieldsInvalid(t *testing.T) {
+	tests := []metav1.ManagedFieldsEntry{
+		{
+			Operation: metav1.ManagedFieldsOperationUpdate,
+			// FieldsType is missing
+		},
+		{
+			Operation:  metav1.ManagedFieldsOperationUpdate,
+			FieldsType: "RandomVersion",
+		},
+		{
+			Operation:  "RandomOperation",
+			FieldsType: "FieldsV1",
+		},
+		{
+			// Operation is missing
+			FieldsType: "FieldsV1",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(fmt.Sprintf("%#v", test), func(t *testing.T) {
+			errs := ValidateManagedFields([]metav1.ManagedFieldsEntry{test}, field.NewPath("managedFields"))
+			if len(errs) == 0 {
+				t.Errorf("Validation should have failed")
+			}
+		})
+	}
+}
+
+func TestValidateMangedFieldsValid(t *testing.T) {
+	tests := []metav1.ManagedFieldsEntry{
+		{
+			Operation:  metav1.ManagedFieldsOperationUpdate,
+			FieldsType: "FieldsV1",
+		},
+		{
+			Operation:  metav1.ManagedFieldsOperationApply,
+			FieldsType: "FieldsV1",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(fmt.Sprintf("%#v", test), func(t *testing.T) {
+			err := ValidateManagedFields([]metav1.ManagedFieldsEntry{test}, field.NewPath("managedFields"))
+			if err != nil {
+				t.Errorf("Validation failed: %v", err)
+			}
+		})
+	}
+}

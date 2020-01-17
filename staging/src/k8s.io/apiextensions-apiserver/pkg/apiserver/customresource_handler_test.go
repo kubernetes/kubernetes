@@ -17,24 +17,23 @@ limitations under the License.
 package apiserver
 
 import (
-	"math/rand"
-	"reflect"
+	"encoding/json"
+	"io"
+	"io/ioutil"
+	"net/http"
+	"net/http/httptest"
+	"sigs.k8s.io/yaml"
 	"testing"
 
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/conversion"
-	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
-	"k8s.io/apimachinery/pkg/api/equality"
-	metafuzzer "k8s.io/apimachinery/pkg/apis/meta/fuzzer"
+	listers "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
-	"k8s.io/apimachinery/pkg/runtime/serializer/json"
-	"k8s.io/apimachinery/pkg/util/diff"
-	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/apimachinery/pkg/runtime/serializer/protobuf"
+	"k8s.io/apiserver/pkg/endpoints/discovery"
+	apirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/client-go/tools/cache"
 )
 
 func TestConvertFieldLabel(t *testing.T) {
@@ -97,6 +96,9 @@ func TestConvertFieldLabel(t *testing.T) {
 				t.Fatal(err)
 			}
 			_, c, err := f.NewConverter(&crd)
+			if err != nil {
+				t.Fatalf("Failed to create CR converter. error: %v", err)
+			}
 
 			label, value, err := c.ConvertFieldLabel(schema.GroupVersionKind{}, test.label, "value")
 			if e, a := test.expectError, err != nil; e != a {
@@ -119,201 +121,300 @@ func TestConvertFieldLabel(t *testing.T) {
 	}
 }
 
-func TestRoundtripObjectMeta(t *testing.T) {
-	scheme := runtime.NewScheme()
-	codecs := serializer.NewCodecFactory(scheme)
-	codec := json.NewSerializer(json.DefaultMetaFactory, scheme, scheme, false)
-	seed := rand.Int63()
-	fuzzer := fuzzer.FuzzerFor(metafuzzer.Funcs, rand.NewSource(seed), codecs)
+func TestRouting(t *testing.T) {
+	hasSynced := false
 
-	N := 1000
-	for i := 0; i < N; i++ {
-		u := &unstructured.Unstructured{Object: map[string]interface{}{}}
-		original := &metav1.ObjectMeta{}
-		fuzzer.Fuzz(original)
-		if err := setObjectMeta(u, original); err != nil {
-			t.Fatalf("unexpected error setting ObjectMeta: %v", err)
-		}
-		o, _, err := getObjectMeta(u, false)
-		if err != nil {
-			t.Fatalf("unexpected error getting the Objectmeta: %v", err)
-		}
+	crdIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+	crdLister := listers.NewCustomResourceDefinitionLister(crdIndexer)
 
-		if !equality.Semantic.DeepEqual(original, o) {
-			t.Errorf("diff: %v\nCodec: %#v", diff.ObjectReflectDiff(original, o), codec)
-		}
-	}
-}
-
-// TestMalformedObjectMetaFields sets a number of different random values and types for all
-// metadata fields. If json.Unmarshal accepts them, compare that getObjectMeta
-// gives the same result. Otherwise, drop malformed fields.
-func TestMalformedObjectMetaFields(t *testing.T) {
-	fuzzer := fuzzer.FuzzerFor(metafuzzer.Funcs, rand.NewSource(rand.Int63()), serializer.NewCodecFactory(runtime.NewScheme()))
-	spuriousValues := func() []interface{} {
-		return []interface{}{
-			// primitives
-			nil,
-			int64(1),
-			float64(1.5),
-			true,
-			"a",
-			// well-formed complex values
-			[]interface{}{"a", "b"},
-			map[string]interface{}{"a": "1", "b": "2"},
-			[]interface{}{int64(1), int64(2)},
-			[]interface{}{float64(1.5), float64(2.5)},
-			// known things json decoding tolerates
-			map[string]interface{}{"a": "1", "b": nil},
-			// malformed things
-			map[string]interface{}{"a": "1", "b": []interface{}{"nested"}},
-			[]interface{}{"a", int64(1), float64(1.5), true, []interface{}{"nested"}},
-		}
-	}
-	N := 100
-	for i := 0; i < N; i++ {
-		fuzzedObjectMeta := &metav1.ObjectMeta{}
-		fuzzer.Fuzz(fuzzedObjectMeta)
-		goodMetaMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(fuzzedObjectMeta.DeepCopy())
-		if err != nil {
-			t.Fatal(err)
-		}
-		for _, pth := range jsonPaths(nil, goodMetaMap) {
-			for _, v := range spuriousValues() {
-				// skip values of same type, because they can only cause decoding errors further insides
-				orig, err := JsonPathValue(goodMetaMap, pth, 0)
-				if err != nil {
-					t.Fatalf("unexpected to not find something at %v: %v", pth, err)
-				}
-				if reflect.TypeOf(v) == reflect.TypeOf(orig) {
-					continue
-				}
-
-				// make a spurious map
-				spuriousMetaMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(fuzzedObjectMeta.DeepCopy())
-				if err != nil {
-					t.Fatal(err)
-				}
-				if err := SetJsonPath(spuriousMetaMap, pth, 0, v); err != nil {
-					t.Fatal(err)
-				}
-
-				// See if it can unmarshal to object meta
-				spuriousJSON, err := encodingjson.Marshal(spuriousMetaMap)
-				if err != nil {
-					t.Fatalf("error on %v=%#v: %v", pth, v, err)
-				}
-				expectedObjectMeta := &metav1.ObjectMeta{}
-				if err := encodingjson.Unmarshal(spuriousJSON, expectedObjectMeta); err != nil {
-					// if standard json unmarshal would fail decoding this field, drop the field entirely
-					truncatedMetaMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(fuzzedObjectMeta.DeepCopy())
-					if err != nil {
-						t.Fatal(err)
-					}
-
-					// we expect this logic for the different fields:
-					switch {
-					default:
-						// delete complete top-level field by default
-						DeleteJsonPath(truncatedMetaMap, pth[:1], 0)
-					}
-
-					truncatedJSON, err := encodingjson.Marshal(truncatedMetaMap)
-					if err != nil {
-						t.Fatalf("error on %v=%#v: %v", pth, v, err)
-					}
-					expectedObjectMeta = &metav1.ObjectMeta{}
-					if err := encodingjson.Unmarshal(truncatedJSON, expectedObjectMeta); err != nil {
-						t.Fatalf("error on %v=%#v: %v", pth, v, err)
-					}
-				}
-
-				// make sure dropInvalidTypedFields+getObjectMeta matches what we expect
-				u := &unstructured.Unstructured{Object: map[string]interface{}{"metadata": spuriousMetaMap}}
-				actualObjectMeta, _, err := getObjectMeta(u, true)
-				if err != nil {
-					t.Errorf("got unexpected error after dropping invalid typed fields on %v=%#v: %v", pth, v, err)
-					continue
-				}
-
-				if !equality.Semantic.DeepEqual(expectedObjectMeta, actualObjectMeta) {
-					t.Errorf("%v=%#v, diff: %v\n", pth, v, diff.ObjectReflectDiff(expectedObjectMeta, actualObjectMeta))
-					t.Errorf("expectedObjectMeta %#v", expectedObjectMeta)
-				}
-			}
-		}
-	}
-}
-
-func TestGetObjectMetaNils(t *testing.T) {
-	u := &unstructured.Unstructured{
-		Object: map[string]interface{}{
-			"kind":       "Pod",
-			"apiVersion": "v1",
-			"metadata": map[string]interface{}{
-				"generateName": nil,
-				"labels": map[string]interface{}{
-					"foo": nil,
-				},
+	delegateCalled := false
+	delegate := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		delegateCalled = true
+		http.Error(w, "", 418)
+	})
+	customV1 := schema.GroupVersion{Group: "custom", Version: "v1"}
+	handler := &crdHandler{
+		crdLister: crdLister,
+		hasSynced: func() bool { return hasSynced },
+		delegate:  delegate,
+		versionDiscoveryHandler: &versionDiscoveryHandler{
+			discovery: map[schema.GroupVersion]*discovery.APIVersionHandler{
+				customV1: discovery.NewAPIVersionHandler(Codecs, customV1, discovery.APIResourceListerFunc(func() []metav1.APIResource {
+					return nil
+				})),
 			},
+			delegate: delegate,
+		},
+		groupDiscoveryHandler: &groupDiscoveryHandler{
+			discovery: map[string]*discovery.APIGroupHandler{
+				"custom": discovery.NewAPIGroupHandler(Codecs, metav1.APIGroup{
+					Name:             customV1.Group,
+					Versions:         []metav1.GroupVersionForDiscovery{{GroupVersion: customV1.String(), Version: customV1.Version}},
+					PreferredVersion: metav1.GroupVersionForDiscovery{GroupVersion: customV1.String(), Version: customV1.Version},
+				}),
+			},
+			delegate: delegate,
 		},
 	}
 
-	o, _, err := getObjectMeta(u, true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if o.GenerateName != "" {
-		t.Errorf("expected null json value to be read as \"\" string, but got: %q", o.GenerateName)
-	}
-	if got, expected := o.Labels, map[string]string{"foo": ""}; !reflect.DeepEqual(got, expected) {
-		t.Errorf("unexpected labels, expected=%#v, got=%#v", expected, got)
+	testcases := []struct {
+		Name    string
+		Method  string
+		Path    string
+		Headers map[string]string
+		Body    io.Reader
+
+		APIGroup          string
+		APIVersion        string
+		Verb              string
+		Resource          string
+		IsResourceRequest bool
+
+		HasSynced bool
+
+		ExpectStatus         int
+		ExpectResponse       func(*testing.T, *http.Response, []byte)
+		ExpectDelegateCalled bool
+	}{
+		{
+			Name:                 "existing group discovery, presync",
+			Method:               "GET",
+			Path:                 "/apis/custom",
+			APIGroup:             "custom",
+			APIVersion:           "",
+			HasSynced:            false,
+			IsResourceRequest:    false,
+			ExpectDelegateCalled: false,
+			ExpectStatus:         503,
+		},
+		{
+			Name:                 "existing group discovery",
+			Method:               "GET",
+			Path:                 "/apis/custom",
+			APIGroup:             "custom",
+			APIVersion:           "",
+			HasSynced:            true,
+			IsResourceRequest:    false,
+			ExpectDelegateCalled: false,
+			ExpectStatus:         200,
+		},
+
+		{
+			Name:                 "nonexisting group discovery, presync",
+			Method:               "GET",
+			Path:                 "/apis/other",
+			APIGroup:             "other",
+			APIVersion:           "",
+			HasSynced:            false,
+			IsResourceRequest:    false,
+			ExpectDelegateCalled: false,
+			ExpectStatus:         503,
+		},
+		{
+			Name:                 "nonexisting group discovery",
+			Method:               "GET",
+			Path:                 "/apis/other",
+			APIGroup:             "other",
+			APIVersion:           "",
+			HasSynced:            true,
+			IsResourceRequest:    false,
+			ExpectDelegateCalled: true,
+			ExpectStatus:         418,
+		},
+
+		{
+			Name:                 "existing group version discovery, presync",
+			Method:               "GET",
+			Path:                 "/apis/custom/v1",
+			APIGroup:             "custom",
+			APIVersion:           "v1",
+			HasSynced:            false,
+			IsResourceRequest:    false,
+			ExpectDelegateCalled: false,
+			ExpectStatus:         503,
+		},
+		{
+			Name:                 "existing group version discovery",
+			Method:               "GET",
+			Path:                 "/apis/custom/v1",
+			APIGroup:             "custom",
+			APIVersion:           "v1",
+			HasSynced:            true,
+			IsResourceRequest:    false,
+			ExpectDelegateCalled: false,
+			ExpectStatus:         200,
+		},
+
+		{
+			Name:                 "nonexisting group version discovery, presync",
+			Method:               "GET",
+			Path:                 "/apis/other/v1",
+			APIGroup:             "other",
+			APIVersion:           "v1",
+			HasSynced:            false,
+			IsResourceRequest:    false,
+			ExpectDelegateCalled: false,
+			ExpectStatus:         503,
+		},
+		{
+			Name:                 "nonexisting group version discovery",
+			Method:               "GET",
+			Path:                 "/apis/other/v1",
+			APIGroup:             "other",
+			APIVersion:           "v1",
+			HasSynced:            true,
+			IsResourceRequest:    false,
+			ExpectDelegateCalled: true,
+			ExpectStatus:         418,
+		},
+
+		{
+			Name:                 "existing group, nonexisting version discovery, presync",
+			Method:               "GET",
+			Path:                 "/apis/custom/v2",
+			APIGroup:             "custom",
+			APIVersion:           "v2",
+			HasSynced:            false,
+			IsResourceRequest:    false,
+			ExpectDelegateCalled: false,
+			ExpectStatus:         503,
+		},
+		{
+			Name:                 "existing group, nonexisting version discovery",
+			Method:               "GET",
+			Path:                 "/apis/custom/v2",
+			APIGroup:             "custom",
+			APIVersion:           "v2",
+			HasSynced:            true,
+			IsResourceRequest:    false,
+			ExpectDelegateCalled: true,
+			ExpectStatus:         418,
+		},
+
+		{
+			Name:                 "nonexisting group, resource request, presync",
+			Method:               "GET",
+			Path:                 "/apis/custom/v2/foos",
+			APIGroup:             "custom",
+			APIVersion:           "v2",
+			Verb:                 "list",
+			Resource:             "foos",
+			HasSynced:            false,
+			IsResourceRequest:    true,
+			ExpectDelegateCalled: false,
+			ExpectStatus:         503,
+		},
+		{
+			Name:                 "nonexisting group, resource request",
+			Method:               "GET",
+			Path:                 "/apis/custom/v2/foos",
+			APIGroup:             "custom",
+			APIVersion:           "v2",
+			Verb:                 "list",
+			Resource:             "foos",
+			HasSynced:            true,
+			IsResourceRequest:    true,
+			ExpectDelegateCalled: true,
+			ExpectStatus:         418,
+		},
 	}
 
-	// double check this what the kube JSON decode is doing
-	bs, _ := encodingjson.Marshal(u.UnstructuredContent())
-	kubeObj, _, err := clientgoscheme.Codecs.UniversalDecoder(corev1.SchemeGroupVersion).Decode(bs, nil, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	pod, ok := kubeObj.(*corev1.Pod)
-	if !ok {
-		t.Fatalf("expected v1 Pod, got: %T", pod)
-	}
-	if got, expected := o.GenerateName, pod.ObjectMeta.GenerateName; got != expected {
-		t.Errorf("expected generatedName to be %q, got %q", expected, got)
-	}
-	if got, expected := o.Labels, pod.ObjectMeta.Labels; !reflect.DeepEqual(got, expected) {
-		t.Errorf("expected labels to be %v, got %v", expected, got)
-	}
-}
+	for _, tc := range testcases {
+		t.Run(tc.Name, func(t *testing.T) {
+			for _, contentType := range []string{"json", "yaml", "proto", "unknown"} {
+				t.Run(contentType, func(t *testing.T) {
+					delegateCalled = false
+					hasSynced = tc.HasSynced
 
-func TestGetObjectMeta(t *testing.T) {
-	for i := 0; i < 100; i++ {
-		u := &unstructured.Unstructured{Object: map[string]interface{}{
-			"metadata": map[string]interface{}{
-				"name": "good",
-				"Name": "bad1",
-				"nAme": "bad2",
-				"naMe": "bad3",
-				"namE": "bad4",
+					recorder := httptest.NewRecorder()
 
-				"namespace": "good",
-				"Namespace": "bad1",
-				"nAmespace": "bad2",
-				"naMespace": "bad3",
-				"namEspace": "bad4",
+					req := httptest.NewRequest(tc.Method, tc.Path, tc.Body)
+					for k, v := range tc.Headers {
+						req.Header.Set(k, v)
+					}
 
-				"creationTimestamp": "a",
-			},
-		}}
+					expectStatus := tc.ExpectStatus
+					switch contentType {
+					case "json":
+						req.Header.Set("Accept", "application/json")
+					case "yaml":
+						req.Header.Set("Accept", "application/yaml")
+					case "proto":
+						req.Header.Set("Accept", "application/vnd.kubernetes.protobuf, application/json")
+					case "unknown":
+						req.Header.Set("Accept", "application/vnd.kubernetes.unknown")
+						// rather than success, we'll get a not supported error
+						if expectStatus == 200 {
+							expectStatus = 406
+						}
+					default:
+						t.Fatalf("unknown content type %v", contentType)
+					}
 
-		meta, _, err := getObjectMeta(u, true)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if meta.Name != "good" || meta.Namespace != "good" {
-			t.Fatalf("got %#v", meta)
-		}
+					req = req.WithContext(apirequest.WithRequestInfo(req.Context(), &apirequest.RequestInfo{
+						Verb:              tc.Verb,
+						Resource:          tc.Resource,
+						APIGroup:          tc.APIGroup,
+						APIVersion:        tc.APIVersion,
+						IsResourceRequest: tc.IsResourceRequest,
+						Path:              tc.Path,
+					}))
+
+					handler.ServeHTTP(recorder, req)
+
+					if tc.ExpectDelegateCalled != delegateCalled {
+						t.Errorf("expected delegated called %v, got %v", tc.ExpectDelegateCalled, delegateCalled)
+					}
+					result := recorder.Result()
+					content, _ := ioutil.ReadAll(result.Body)
+					if e, a := expectStatus, result.StatusCode; e != a {
+						t.Log(string(content))
+						t.Errorf("expected %v, got %v", e, a)
+					}
+					if tc.ExpectResponse != nil {
+						tc.ExpectResponse(t, result, content)
+					}
+
+					// Make sure error responses come back with status objects in all encodings, including unknown encodings
+					if !delegateCalled && expectStatus >= 300 {
+						status := &metav1.Status{}
+
+						switch contentType {
+						// unknown accept headers fall back to json errors
+						case "json", "unknown":
+							if e, a := "application/json", result.Header.Get("Content-Type"); e != a {
+								t.Errorf("expected Content-Type %v, got %v", e, a)
+							}
+							if err := json.Unmarshal(content, status); err != nil {
+								t.Fatal(err)
+							}
+						case "yaml":
+							if e, a := "application/yaml", result.Header.Get("Content-Type"); e != a {
+								t.Errorf("expected Content-Type %v, got %v", e, a)
+							}
+							if err := yaml.Unmarshal(content, status); err != nil {
+								t.Fatal(err)
+							}
+						case "proto":
+							if e, a := "application/vnd.kubernetes.protobuf", result.Header.Get("Content-Type"); e != a {
+								t.Errorf("expected Content-Type %v, got %v", e, a)
+							}
+							if _, _, err := protobuf.NewSerializer(Scheme, Scheme).Decode(content, nil, status); err != nil {
+								t.Fatal(err)
+							}
+						default:
+							t.Fatalf("unknown content type %v", contentType)
+						}
+
+						if e, a := metav1.Unversioned.WithKind("Status"), status.GroupVersionKind(); e != a {
+							t.Errorf("expected %#v, got %#v", e, a)
+						}
+						if int(status.Code) != int(expectStatus) {
+							t.Errorf("expected %v, got %v", expectStatus, status.Code)
+						}
+					}
+				})
+			}
+		})
 	}
 }

@@ -22,8 +22,9 @@ const (
 )
 
 type TeamCityReporter struct {
-	writer        io.Writer
-	testSuiteName string
+	writer         io.Writer
+	testSuiteName  string
+	ReporterConfig config.DefaultReporterConfigType
 }
 
 func NewTeamCityReporter(writer io.Writer) *TeamCityReporter {
@@ -65,6 +66,10 @@ func (reporter *TeamCityReporter) SpecWillRun(specSummary *types.SpecSummary) {
 func (reporter *TeamCityReporter) SpecDidComplete(specSummary *types.SpecSummary) {
 	testName := escape(strings.Join(specSummary.ComponentTexts[1:], " "))
 
+	if reporter.ReporterConfig.ReportPassed && specSummary.State == types.SpecStatePassed {
+		details := escape(specSummary.CapturedOutput)
+		fmt.Fprintf(reporter.writer, "%s[testPassed name='%s' details='%s']", messageId, testName, details)
+	}
 	if specSummary.State == types.SpecStateFailed || specSummary.State == types.SpecStateTimedOut || specSummary.State == types.SpecStatePanicked {
 		message := escape(specSummary.Failure.ComponentCodeLocation.String())
 		details := escape(specSummary.Failure.Message)

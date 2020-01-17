@@ -36,6 +36,14 @@ saveResults() {
     echo -n "${RESULTS_DIR}/e2e.tar.gz" > "${RESULTS_DIR}/done"
 }
 
+# Optional Golang runner alternative to the bash script.
+# Entry provided via env var to simplify invocation. 
+if [[ -n ${E2E_USE_GO_RUNNER:-} ]]; then
+    set -x
+    /gorunner
+    exit $?
+fi
+
 # We get the TERM from kubernetes and handle it gracefully
 trap shutdown TERM
 
@@ -59,9 +67,8 @@ ginkgo_args+=(
 )
 
 set -x
-/usr/local/bin/ginkgo "${ginkgo_args[@]}" /usr/local/bin/e2e.test -- --disable-log-dump --repo-root=/kubernetes --provider="${E2E_PROVIDER}" --report-dir="${RESULTS_DIR}" --kubeconfig="${KUBECONFIG}" | tee "${RESULTS_DIR}"/e2e.log &
+/usr/local/bin/ginkgo "${ginkgo_args[@]}" /usr/local/bin/e2e.test -- --disable-log-dump --repo-root=/kubernetes --provider="${E2E_PROVIDER}" --report-dir="${RESULTS_DIR}" --kubeconfig="${KUBECONFIG}" -v="${E2E_VERBOSITY}" > >(tee "${RESULTS_DIR}"/e2e.log)
+ret=$?
 set +x
-# $! is the pid of tee, not ginkgo
-wait "$(pgrep ginkgo)" && ret=0 || ret=$?
 saveResults
 exit ${ret}

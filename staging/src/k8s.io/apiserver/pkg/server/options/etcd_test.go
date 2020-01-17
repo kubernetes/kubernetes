@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 )
 
@@ -190,6 +191,51 @@ func TestParseWatchCacheSizes(t *testing.T) {
 						}
 					}
 				}
+			}
+		})
+	}
+}
+
+func TestKMSHealthzEndpoint(t *testing.T) {
+	testCases := []struct {
+		name                 string
+		encryptionConfigPath string
+		wantChecks           []string
+	}{
+		{
+			name:                 "single kms-provider, expect single kms healthz check",
+			encryptionConfigPath: "testdata/encryption-configs/single-kms-provider.yaml",
+			wantChecks:           []string{"etcd", "kms-provider-0"},
+		},
+		{
+			name:                 "two kms-providers, expect two kms healthz checks",
+			encryptionConfigPath: "testdata/encryption-configs/multiple-kms-providers.yaml",
+			wantChecks:           []string{"etcd", "kms-provider-0", "kms-provider-1"},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			serverConfig := &server.Config{}
+			etcdOptions := &EtcdOptions{
+				EncryptionProviderConfigFilepath: tc.encryptionConfigPath,
+			}
+			if err := etcdOptions.addEtcdHealthEndpoint(serverConfig); err != nil {
+				t.Fatalf("Failed to add healthz error: %v", err)
+			}
+
+			for _, n := range tc.wantChecks {
+				found := false
+				for _, h := range serverConfig.HealthzChecks {
+					if n == h.Name() {
+						found = true
+						break
+					}
+				}
+				if !found {
+					t.Errorf("Missing HealthzChecker %s", n)
+				}
+				found = false
 			}
 		})
 	}

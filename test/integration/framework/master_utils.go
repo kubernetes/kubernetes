@@ -17,6 +17,7 @@ limitations under the License.
 package framework
 
 import (
+	"context"
 	"flag"
 	"net"
 	"net/http"
@@ -44,6 +45,7 @@ import (
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/component-base/version"
 	"k8s.io/klog"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -51,7 +53,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubeapiserver"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master"
-	"k8s.io/kubernetes/pkg/version"
 )
 
 // Config is a struct of configuration directives for NewMasterComponents.
@@ -69,7 +70,7 @@ type Config struct {
 // alwaysAllow always allows an action
 type alwaysAllow struct{}
 
-func (alwaysAllow) Authorize(requestAttributes authorizer.Attributes) (authorizer.Decision, string, error) {
+func (alwaysAllow) Authorize(ctx context.Context, requestAttributes authorizer.Attributes) (authorizer.Decision, string, error) {
 	return authorizer.DecisionAllow, "always allow", nil
 }
 

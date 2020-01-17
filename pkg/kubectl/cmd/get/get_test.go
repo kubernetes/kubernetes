@@ -38,7 +38,6 @@ import (
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/watch"
@@ -48,10 +47,10 @@ import (
 	"k8s.io/client-go/rest/fake"
 	restclientwatch "k8s.io/client-go/rest/watch"
 	"k8s.io/kube-openapi/pkg/util/proto"
-	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
-	openapitesting "k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi/testing"
-	"k8s.io/kubernetes/pkg/kubectl/scheme"
+	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
+	"k8s.io/kubectl/pkg/scheme"
+	"k8s.io/kubectl/pkg/util/openapi"
+	openapitesting "k8s.io/kubectl/pkg/util/openapi/testing"
 )
 
 var (
@@ -236,6 +235,31 @@ func TestGetObjects(t *testing.T) {
 	cmd.SetOutput(buf)
 	cmd.Run(cmd, []string{"pods", "foo"})
 
+	expected := `NAME   AGE
+foo    <unknown>
+`
+	if e, a := expected, buf.String(); e != a {
+		t.Errorf("expected\n%v\ngot\n%v", e, a)
+	}
+}
+
+func TestGetTableObjects(t *testing.T) {
+	pods, _, _ := cmdtesting.TestData()
+
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Resp:                 &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: podTableObjBody(codec, pods.Items[0])},
+	}
+
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdGet("kubectl", tf, streams)
+	cmd.SetOutput(buf)
+	cmd.Run(cmd, []string{"pods", "foo"})
+
 	expected := `NAME   READY   STATUS   RESTARTS   AGE
 foo    0/0              0          <unknown>
 `
@@ -254,6 +278,32 @@ func TestGetObjectsShowKind(t *testing.T) {
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
 		Resp:                 &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &pods.Items[0])},
+	}
+
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdGet("kubectl", tf, streams)
+	cmd.SetOutput(buf)
+	cmd.Flags().Set("show-kind", "true")
+	cmd.Run(cmd, []string{"pods", "foo"})
+
+	expected := `NAME      AGE
+pod/foo   <unknown>
+`
+	if e, a := expected, buf.String(); e != a {
+		t.Errorf("expected\n%v\ngot\n%v", e, a)
+	}
+}
+
+func TestGetTableObjectsShowKind(t *testing.T) {
+	pods, _, _ := cmdtesting.TestData()
+
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Resp:                 &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: podTableObjBody(codec, pods.Items[0])},
 	}
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
@@ -309,7 +359,68 @@ func TestGetMultipleResourceTypesShowKinds(t *testing.T) {
 		}),
 	}
 
-	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	streams, _, buf, bufErr := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdGet("kubectl", tf, streams)
+	cmd.SetOutput(buf)
+	cmd.Run(cmd, []string{"all"})
+
+	expected := `NAME      AGE
+pod/foo   <unknown>
+pod/bar   <unknown>
+
+NAME          AGE
+service/baz   <unknown>
+`
+	if e, a := expected, buf.String(); e != a {
+		t.Errorf("expected\n%v\ngot\n%v", e, a)
+	}
+
+	// The error out should be empty
+	if e, a := "", bufErr.String(); e != a {
+		t.Errorf("expected\n%v\ngot\n%v", e, a)
+	}
+}
+
+func TestGetMultipleTableResourceTypesShowKinds(t *testing.T) {
+	pods, svcs, _ := cmdtesting.TestData()
+
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+
+	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			switch p, m := req.URL.Path, req.Method; {
+			case p == "/namespaces/test/pods" && m == "GET":
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: podTableObjBody(codec, pods.Items...)}, nil
+			case p == "/namespaces/test/replicationcontrollers" && m == "GET":
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &corev1.ReplicationControllerList{})}, nil
+			case p == "/namespaces/test/services" && m == "GET":
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: serviceTableObjBody(codec, svcs.Items...)}, nil
+			case p == "/namespaces/test/statefulsets" && m == "GET":
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &appsv1.StatefulSetList{})}, nil
+			case p == "/namespaces/test/horizontalpodautoscalers" && m == "GET":
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &autoscalingv1.HorizontalPodAutoscalerList{})}, nil
+			case p == "/namespaces/test/jobs" && m == "GET":
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &batchv1.JobList{})}, nil
+			case p == "/namespaces/test/cronjobs" && m == "GET":
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &batchv1beta1.CronJobList{})}, nil
+			case p == "/namespaces/test/daemonsets" && m == "GET":
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &appsv1.DaemonSetList{})}, nil
+			case p == "/namespaces/test/deployments" && m == "GET":
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &extensionsv1beta1.DeploymentList{})}, nil
+			case p == "/namespaces/test/replicasets" && m == "GET":
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &extensionsv1beta1.ReplicaSetList{})}, nil
+
+			default:
+				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+
+	streams, _, buf, bufErr := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)
 	cmd.SetOutput(buf)
 	cmd.Run(cmd, []string{"all"})
@@ -317,11 +428,141 @@ func TestGetMultipleResourceTypesShowKinds(t *testing.T) {
 	expected := `NAME      READY   STATUS   RESTARTS   AGE
 pod/foo   0/0              0          <unknown>
 pod/bar   0/0              0          <unknown>
+
 NAME          TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE
 service/baz   ClusterIP   <none>       <none>        <none>    <unknown>
 `
 	if e, a := expected, buf.String(); e != a {
 		t.Errorf("expected\n%v\ngot\n%v", e, a)
+	}
+
+	// The error out should be empty
+	if e, a := "", bufErr.String(); e != a {
+		t.Errorf("expected\n%v\ngot\n%v", e, a)
+	}
+}
+
+func TestNoBlankLinesForGetMultipleTableResource(t *testing.T) {
+	pods, svcs, _ := cmdtesting.TestData()
+
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+
+	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			switch p, m := req.URL.Path, req.Method; {
+			case p == "/namespaces/test/pods" && m == "GET":
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: podTableObjBody(codec, pods.Items...)}, nil
+			case p == "/namespaces/test/replicationcontrollers" && m == "GET":
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: emptyTableObjBody(codec)}, nil
+			case p == "/namespaces/test/services" && m == "GET":
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: serviceTableObjBody(codec, svcs.Items...)}, nil
+			case p == "/namespaces/test/statefulsets" && m == "GET":
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: emptyTableObjBody(codec)}, nil
+			case p == "/namespaces/test/horizontalpodautoscalers" && m == "GET":
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: emptyTableObjBody(codec)}, nil
+			case p == "/namespaces/test/jobs" && m == "GET":
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: emptyTableObjBody(codec)}, nil
+			case p == "/namespaces/test/cronjobs" && m == "GET":
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: emptyTableObjBody(codec)}, nil
+			case p == "/namespaces/test/daemonsets" && m == "GET":
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: emptyTableObjBody(codec)}, nil
+			case p == "/namespaces/test/deployments" && m == "GET":
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: emptyTableObjBody(codec)}, nil
+			case p == "/namespaces/test/replicasets" && m == "GET":
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: emptyTableObjBody(codec)}, nil
+
+			default:
+				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+
+	streams, _, buf, bufErr := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdGet("kubectl", tf, streams)
+	cmd.SetOutput(buf)
+
+	expected := `NAME      READY   STATUS   RESTARTS   AGE
+pod/foo   0/0              0          <unknown>
+pod/bar   0/0              0          <unknown>
+
+NAME          TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE
+service/baz   ClusterIP   <none>       <none>        <none>    <unknown>
+`
+	for _, cmdArgs := range [][]string{
+		{"pods,services,jobs"},
+		{"deployments,pods,statefulsets,services,jobs"},
+		{"all"},
+	} {
+		cmd.Run(cmd, cmdArgs)
+
+		if e, a := expected, buf.String(); e != a {
+			t.Errorf("[kubectl get %v] expected\n%v\ngot\n%v", cmdArgs, e, a)
+		}
+
+		// The error out should be empty
+		if e, a := "", bufErr.String(); e != a {
+			t.Errorf("[kubectl get %v] expected\n%v\ngot\n%v", cmdArgs, e, a)
+		}
+
+		buf.Reset()
+		bufErr.Reset()
+	}
+}
+
+func TestNoBlankLinesForGetAll(t *testing.T) {
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+
+	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			switch p, m := req.URL.Path, req.Method; {
+			case p == "/namespaces/test/pods" && m == "GET":
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: emptyTableObjBody(codec)}, nil
+			case p == "/namespaces/test/replicationcontrollers" && m == "GET":
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: emptyTableObjBody(codec)}, nil
+			case p == "/namespaces/test/services" && m == "GET":
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: emptyTableObjBody(codec)}, nil
+			case p == "/namespaces/test/statefulsets" && m == "GET":
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: emptyTableObjBody(codec)}, nil
+			case p == "/namespaces/test/horizontalpodautoscalers" && m == "GET":
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: emptyTableObjBody(codec)}, nil
+			case p == "/namespaces/test/jobs" && m == "GET":
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: emptyTableObjBody(codec)}, nil
+			case p == "/namespaces/test/cronjobs" && m == "GET":
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: emptyTableObjBody(codec)}, nil
+			case p == "/namespaces/test/daemonsets" && m == "GET":
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: emptyTableObjBody(codec)}, nil
+			case p == "/namespaces/test/deployments" && m == "GET":
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: emptyTableObjBody(codec)}, nil
+			case p == "/namespaces/test/replicasets" && m == "GET":
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: emptyTableObjBody(codec)}, nil
+
+			default:
+				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+
+	streams, _, buf, errbuf := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdGet("kubectl", tf, streams)
+	cmd.SetOutput(buf)
+	cmd.Run(cmd, []string{"all"})
+
+	expected := ``
+	if e, a := expected, buf.String(); e != a {
+		t.Errorf("expected\n%v\ngot\n%v", e, a)
+	}
+	expectedErr := `No resources found in test namespace.
+`
+	if e, a := expectedErr, errbuf.String(); e != a {
+		t.Errorf("expectedErr\n%v\ngot\n%v", e, a)
 	}
 }
 
@@ -335,6 +576,32 @@ func TestGetObjectsShowLabels(t *testing.T) {
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
 		Resp:                 &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &pods.Items[0])},
+	}
+
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdGet("kubectl", tf, streams)
+	cmd.SetOutput(buf)
+	cmd.Flags().Set("show-labels", "true")
+	cmd.Run(cmd, []string{"pods", "foo"})
+
+	expected := `NAME   AGE         LABELS
+foo    <unknown>   <none>
+`
+	if e, a := expected, buf.String(); e != a {
+		t.Errorf("expected\n%v\ngot\n%v", e, a)
+	}
+}
+
+func TestGetTableObjectsShowLabels(t *testing.T) {
+	pods, _, _ := cmdtesting.TestData()
+
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Resp:                 &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: podTableObjBody(codec, pods.Items[0])},
 	}
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
@@ -382,7 +649,7 @@ func TestGetEmptyTable(t *testing.T) {
 	if e, a := expected, buf.String(); e != a {
 		t.Errorf("expected\n%v\ngot\n%v", e, a)
 	}
-	expectedErr := `No resources found.
+	expectedErr := `No resources found in test namespace.
 `
 	if e, a := expectedErr, errbuf.String(); e != a {
 		t.Errorf("expectedErr\n%v\ngot\n%v", e, a)
@@ -432,6 +699,60 @@ func TestGetObjectIgnoreNotFound(t *testing.T) {
 
 	if buf.String() != "" {
 		t.Errorf("unexpected output: %s", buf.String())
+	}
+}
+
+func TestEmptyResult(t *testing.T) {
+	cmdtesting.InitTestErrorHandler(t)
+
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &corev1.PodList{})}, nil
+		}),
+	}
+
+	streams, _, _, errbuf := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdGet("kubectl", tf, streams)
+	// we're assuming that an empty file is being passed from stdin
+	cmd.Flags().Set("filename", "-")
+	cmd.Run(cmd, []string{})
+
+	if !strings.Contains(errbuf.String(), "No resources found") {
+		t.Errorf("unexpected output: %q", errbuf.String())
+	}
+}
+
+func TestEmptyResultJSON(t *testing.T) {
+	cmdtesting.InitTestErrorHandler(t)
+
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &corev1.PodList{})}, nil
+		}),
+	}
+
+	streams, _, outbuf, errbuf := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdGet("kubectl", tf, streams)
+	// we're assuming that an empty file is being passed from stdin
+	cmd.Flags().Set("filename", "-")
+	cmd.Flags().Set("output", "json")
+	cmd.Run(cmd, []string{})
+
+	if errbuf.Len() > 0 {
+		t.Errorf("unexpected error: %q", errbuf.String())
+	}
+	if !strings.Contains(outbuf.String(), `"items": []`) {
+		t.Errorf("unexpected output: %q", outbuf.String())
 	}
 }
 
@@ -492,10 +813,10 @@ func TestGetSortedObjects(t *testing.T) {
 	cmd.Flags().Set("sort-by", ".metadata.name")
 	cmd.Run(cmd, []string{"pods"})
 
-	expected := `NAME   READY   STATUS   RESTARTS   AGE
-a      0/0              0          <unknown>
-b      0/0              0          <unknown>
-c      0/0              0          <unknown>
+	expected := `NAME   AGE
+a      <unknown>
+b      <unknown>
+c      <unknown>
 `
 	if e, a := expected, buf.String(); e != a {
 		t.Errorf("expected\n%v\ngot\n%v", e, a)
@@ -761,6 +1082,32 @@ func TestGetObjectsIdentifiedByFile(t *testing.T) {
 	cmd.Flags().Set("filename", "../../../../test/e2e/testing-manifests/statefulset/cassandra/controller.yaml")
 	cmd.Run(cmd, []string{})
 
+	expected := `NAME   AGE
+foo    <unknown>
+`
+	if e, a := expected, buf.String(); e != a {
+		t.Errorf("expected\n%v\ngot\n%v", e, a)
+	}
+}
+
+func TestGetTableObjectsIdentifiedByFile(t *testing.T) {
+	pods, _, _ := cmdtesting.TestData()
+
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Resp:                 &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: podTableObjBody(codec, pods.Items[0])},
+	}
+
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdGet("kubectl", tf, streams)
+	cmd.SetOutput(buf)
+	cmd.Flags().Set("filename", "../../../../test/e2e/testing-manifests/statefulset/cassandra/controller.yaml")
+	cmd.Run(cmd, []string{})
+
 	expected := `NAME   READY   STATUS   RESTARTS   AGE
 foo    0/0              0          <unknown>
 `
@@ -779,6 +1126,32 @@ func TestGetListObjects(t *testing.T) {
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
 		Resp:                 &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, pods)},
+	}
+
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdGet("kubectl", tf, streams)
+	cmd.SetOutput(buf)
+	cmd.Run(cmd, []string{"pods"})
+
+	expected := `NAME   AGE
+foo    <unknown>
+bar    <unknown>
+`
+	if e, a := expected, buf.String(); e != a {
+		t.Errorf("expected\n%v\ngot\n%v", e, a)
+	}
+}
+
+func TestGetListTableObjects(t *testing.T) {
+	pods, _, _ := cmdtesting.TestData()
+
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Resp:                 &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: podTableObjBody(codec, pods.Items...)},
 	}
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
@@ -812,10 +1185,10 @@ func TestGetListComponentStatus(t *testing.T) {
 	cmd.SetOutput(buf)
 	cmd.Run(cmd, []string{"componentstatuses"})
 
-	expected := `NAME            STATUS      MESSAGE   ERROR
-servergood      Healthy     ok        
-serverbad       Unhealthy             bad status: 500
-serverunknown   Unhealthy             fizzbuzz error
+	expected := `NAME            AGE
+servergood      <unknown>
+serverbad       <unknown>
+serverunknown   <unknown>
 `
 	if e, a := expected, buf.String(); e != a {
 		t.Errorf("expected\n%v\ngot\n%v", e, a)
@@ -911,9 +1284,49 @@ func TestGetMultipleTypeObjects(t *testing.T) {
 	cmd.SetOutput(buf)
 	cmd.Run(cmd, []string{"pods,services"})
 
+	expected := `NAME      AGE
+pod/foo   <unknown>
+pod/bar   <unknown>
+
+NAME          AGE
+service/baz   <unknown>
+`
+	if e, a := expected, buf.String(); e != a {
+		t.Errorf("expected\n%v\ngot\n%v", e, a)
+	}
+}
+
+func TestGetMultipleTypeTableObjects(t *testing.T) {
+	pods, svc, _ := cmdtesting.TestData()
+
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			switch req.URL.Path {
+			case "/namespaces/test/pods":
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: podTableObjBody(codec, pods.Items...)}, nil
+			case "/namespaces/test/services":
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: serviceTableObjBody(codec, svc.Items...)}, nil
+			default:
+				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdGet("kubectl", tf, streams)
+	cmd.SetOutput(buf)
+	cmd.Run(cmd, []string{"pods,services"})
+
 	expected := `NAME      READY   STATUS   RESTARTS   AGE
 pod/foo   0/0              0          <unknown>
 pod/bar   0/0              0          <unknown>
+
 NAME          TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE
 service/baz   ClusterIP   <none>       <none>        <none>    <unknown>
 `
@@ -1055,9 +1468,54 @@ func TestGetMultipleTypeObjectsWithLabelSelector(t *testing.T) {
 	cmd.Flags().Set("selector", "a=b")
 	cmd.Run(cmd, []string{"pods,services"})
 
+	expected := `NAME      AGE
+pod/foo   <unknown>
+pod/bar   <unknown>
+
+NAME          AGE
+service/baz   <unknown>
+`
+	if e, a := expected, buf.String(); e != a {
+		t.Errorf("expected\n%v\ngot\n%v", e, a)
+	}
+}
+
+func TestGetMultipleTypeTableObjectsWithLabelSelector(t *testing.T) {
+	pods, svc, _ := cmdtesting.TestData()
+
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			if req.URL.Query().Get(metav1.LabelSelectorQueryParam("v1")) != "a=b" {
+				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
+			}
+			switch req.URL.Path {
+			case "/namespaces/test/pods":
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: podTableObjBody(codec, pods.Items...)}, nil
+			case "/namespaces/test/services":
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: serviceTableObjBody(codec, svc.Items...)}, nil
+			default:
+				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdGet("kubectl", tf, streams)
+	cmd.SetOutput(buf)
+
+	cmd.Flags().Set("selector", "a=b")
+	cmd.Run(cmd, []string{"pods,services"})
+
 	expected := `NAME      READY   STATUS   RESTARTS   AGE
 pod/foo   0/0              0          <unknown>
 pod/bar   0/0              0          <unknown>
+
 NAME          TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE
 service/baz   ClusterIP   <none>       <none>        <none>    <unknown>
 `
@@ -1098,9 +1556,54 @@ func TestGetMultipleTypeObjectsWithFieldSelector(t *testing.T) {
 	cmd.Flags().Set("field-selector", "a=b")
 	cmd.Run(cmd, []string{"pods,services"})
 
+	expected := `NAME      AGE
+pod/foo   <unknown>
+pod/bar   <unknown>
+
+NAME          AGE
+service/baz   <unknown>
+`
+	if e, a := expected, buf.String(); e != a {
+		t.Errorf("expected\n%v\ngot\n%v", e, a)
+	}
+}
+
+func TestGetMultipleTypeTableObjectsWithFieldSelector(t *testing.T) {
+	pods, svc, _ := cmdtesting.TestData()
+
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			if req.URL.Query().Get(metav1.FieldSelectorQueryParam("v1")) != "a=b" {
+				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+			}
+			switch req.URL.Path {
+			case "/namespaces/test/pods":
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: podTableObjBody(codec, pods.Items...)}, nil
+			case "/namespaces/test/services":
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: serviceTableObjBody(codec, svc.Items...)}, nil
+			default:
+				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdGet("kubectl", tf, streams)
+	cmd.SetOutput(buf)
+
+	cmd.Flags().Set("field-selector", "a=b")
+	cmd.Run(cmd, []string{"pods,services"})
+
 	expected := `NAME      READY   STATUS   RESTARTS   AGE
 pod/foo   0/0              0          <unknown>
 pod/bar   0/0              0          <unknown>
+
 NAME          TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE
 service/baz   ClusterIP   <none>       <none>        <none>    <unknown>
 `
@@ -1142,8 +1645,53 @@ func TestGetMultipleTypeObjectsWithDirectReference(t *testing.T) {
 
 	cmd.Run(cmd, []string{"services/bar", "node/foo"})
 
+	expected := `NAME          AGE
+service/baz   <unknown>
+
+NAME       AGE
+node/foo   <unknown>
+`
+	if e, a := expected, buf.String(); e != a {
+		t.Errorf("expected\n%v\ngot\n%v", e, a)
+	}
+}
+
+func TestGetMultipleTypeTableObjectsWithDirectReference(t *testing.T) {
+	_, svc, _ := cmdtesting.TestData()
+	node := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "foo",
+		},
+	}
+
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			switch req.URL.Path {
+			case "/nodes/foo":
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: nodeTableObjBody(codec, *node)}, nil
+			case "/namespaces/test/services/bar":
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: serviceTableObjBody(codec, svc.Items[0])}, nil
+			default:
+				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdGet("kubectl", tf, streams)
+	cmd.SetOutput(buf)
+
+	cmd.Run(cmd, []string{"services/bar", "node/foo"})
+
 	expected := `NAME          TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE
 service/baz   ClusterIP   <none>       <none>        <none>    <unknown>
+
 NAME       STATUS    ROLES    AGE         VERSION
 node/foo   Unknown   <none>   <unknown>   
 `
@@ -1298,6 +1846,57 @@ func TestWatchLabelSelector(t *testing.T) {
 	cmd.Flags().Set("selector", "a=b")
 	cmd.Run(cmd, []string{"pods"})
 
+	expected := `NAME   AGE
+bar    <unknown>
+foo    <unknown>
+foo    <unknown>
+foo    <unknown>
+`
+	if e, a := expected, buf.String(); e != a {
+		t.Errorf("expected\n%v\ngot\n%v", e, a)
+	}
+}
+
+func TestWatchTableLabelSelector(t *testing.T) {
+	pods, events := watchTestData()
+
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+
+	podList := &corev1.PodList{
+		Items: pods,
+		ListMeta: metav1.ListMeta{
+			ResourceVersion: "10",
+		},
+	}
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			if req.URL.Query().Get(metav1.LabelSelectorQueryParam("v1")) != "a=b" {
+				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
+			}
+			switch req.URL.Path {
+			case "/namespaces/test/pods":
+				if req.URL.Query().Get("watch") == "true" {
+					return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: podTableWatchBody(codec, events[2:])}, nil
+				}
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: podTableObjBody(codec, podList.Items...)}, nil
+			default:
+				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdGet("kubectl", tf, streams)
+	cmd.SetOutput(buf)
+
+	cmd.Flags().Set("watch", "true")
+	cmd.Flags().Set("selector", "a=b")
+	cmd.Run(cmd, []string{"pods"})
+
 	expected := `NAME   READY   STATUS   RESTARTS   AGE
 bar    0/0              0          <unknown>
 foo    0/0              0          <unknown>
@@ -1349,6 +1948,57 @@ func TestWatchFieldSelector(t *testing.T) {
 	cmd.Flags().Set("field-selector", "a=b")
 	cmd.Run(cmd, []string{"pods"})
 
+	expected := `NAME   AGE
+bar    <unknown>
+foo    <unknown>
+foo    <unknown>
+foo    <unknown>
+`
+	if e, a := expected, buf.String(); e != a {
+		t.Errorf("expected\n%v\ngot\n%v", e, a)
+	}
+}
+
+func TestWatchTableFieldSelector(t *testing.T) {
+	pods, events := watchTestData()
+
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+
+	podList := &corev1.PodList{
+		Items: pods,
+		ListMeta: metav1.ListMeta{
+			ResourceVersion: "10",
+		},
+	}
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			if req.URL.Query().Get(metav1.FieldSelectorQueryParam("v1")) != "a=b" {
+				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+			}
+			switch req.URL.Path {
+			case "/namespaces/test/pods":
+				if req.URL.Query().Get("watch") == "true" {
+					return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: podTableWatchBody(codec, events[2:])}, nil
+				}
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: podTableObjBody(codec, podList.Items...)}, nil
+			default:
+				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdGet("kubectl", tf, streams)
+	cmd.SetOutput(buf)
+
+	cmd.Flags().Set("watch", "true")
+	cmd.Flags().Set("field-selector", "a=b")
+	cmd.Run(cmd, []string{"pods"})
+
 	expected := `NAME   READY   STATUS   RESTARTS   AGE
 bar    0/0              0          <unknown>
 foo    0/0              0          <unknown>
@@ -1376,6 +2026,96 @@ func TestWatchResource(t *testing.T) {
 			case "/namespaces/test/pods":
 				if req.URL.Query().Get("watch") == "true" && req.URL.Query().Get("fieldSelector") == "metadata.name=foo" {
 					return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: watchBody(codec, events[1:])}, nil
+				}
+				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
+				return nil, nil
+			default:
+				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdGet("kubectl", tf, streams)
+	cmd.SetOutput(buf)
+
+	cmd.Flags().Set("watch", "true")
+	cmd.Run(cmd, []string{"pods", "foo"})
+
+	expected := `NAME   AGE
+foo    <unknown>
+foo    <unknown>
+foo    <unknown>
+`
+	if e, a := expected, buf.String(); e != a {
+		t.Errorf("expected\n%v\ngot\n%v", e, a)
+	}
+}
+
+func TestWatchStatus(t *testing.T) {
+	pods, events := watchTestData()
+	events = append(events, watch.Event{Type: "ERROR", Object: &metav1.Status{Status: "Failure", Reason: "InternalServerError", Message: "Something happened"}})
+
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			switch req.URL.Path {
+			case "/namespaces/test/pods/foo":
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &pods[1])}, nil
+			case "/namespaces/test/pods":
+				if req.URL.Query().Get("watch") == "true" && req.URL.Query().Get("fieldSelector") == "metadata.name=foo" {
+					return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: watchBody(codec, events[1:])}, nil
+				}
+				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
+				return nil, nil
+			default:
+				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdGet("kubectl", tf, streams)
+	cmd.SetOutput(buf)
+
+	cmd.Flags().Set("watch", "true")
+	cmd.Run(cmd, []string{"pods", "foo"})
+
+	expected := `NAME   AGE
+foo    <unknown>
+foo    <unknown>
+foo    <unknown>
+
+STATUS    REASON                MESSAGE
+Failure   InternalServerError   Something happened
+`
+	if e, a := expected, buf.String(); e != a {
+		t.Errorf("expected\n%v\ngot\n%v", e, a)
+	}
+}
+
+func TestWatchTableResource(t *testing.T) {
+	pods, events := watchTestData()
+
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			switch req.URL.Path {
+			case "/namespaces/test/pods/foo":
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: podTableObjBody(codec, pods[1])}, nil
+			case "/namespaces/test/pods":
+				if req.URL.Query().Get("watch") == "true" && req.URL.Query().Get("fieldSelector") == "metadata.name=foo" {
+					return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: podTableWatchBody(codec, events[1:])}, nil
 				}
 				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
 				return nil, nil
@@ -1510,6 +2250,220 @@ b      false
 	}
 }
 
+func TestWatchResourceWatchEvents(t *testing.T) {
+
+	testcases := []struct {
+		format   string
+		table    bool
+		expected string
+	}{
+		{
+			format: "",
+			expected: `EVENT      NAMESPACE   NAME      AGE
+ADDED      test        pod/bar   <unknown>
+ADDED      test        pod/foo   <unknown>
+MODIFIED   test        pod/foo   <unknown>
+DELETED    test        pod/foo   <unknown>
+`,
+		},
+		{
+			format: "",
+			table:  true,
+			expected: `EVENT      NAMESPACE   NAME      READY   STATUS   RESTARTS   AGE
+ADDED      test        pod/bar   0/0              0          <unknown>
+ADDED      test        pod/foo   0/0              0          <unknown>
+MODIFIED   test        pod/foo   0/0              0          <unknown>
+DELETED    test        pod/foo   0/0              0          <unknown>
+`,
+		},
+		{
+			format: "wide",
+			table:  true,
+			expected: `EVENT      NAMESPACE   NAME      READY   STATUS   RESTARTS   AGE         IP       NODE     NOMINATED NODE   READINESS GATES
+ADDED      test        pod/bar   0/0              0          <unknown>   <none>   <none>   <none>           <none>
+ADDED      test        pod/foo   0/0              0          <unknown>   <none>   <none>   <none>           <none>
+MODIFIED   test        pod/foo   0/0              0          <unknown>   <none>   <none>   <none>           <none>
+DELETED    test        pod/foo   0/0              0          <unknown>   <none>   <none>   <none>           <none>
+`,
+		},
+		{
+			format: "json",
+			expected: `{"type":"ADDED","object":{"apiVersion":"v1","kind":"Pod","metadata":{"creationTimestamp":null,"name":"bar","namespace":"test","resourceVersion":"9"},"spec":{"containers":null,"dnsPolicy":"ClusterFirst","enableServiceLinks":true,"restartPolicy":"Always","securityContext":{},"terminationGracePeriodSeconds":30},"status":{}}}
+{"type":"ADDED","object":{"apiVersion":"v1","kind":"Pod","metadata":{"creationTimestamp":null,"name":"foo","namespace":"test","resourceVersion":"10"},"spec":{"containers":null,"dnsPolicy":"ClusterFirst","enableServiceLinks":true,"restartPolicy":"Always","securityContext":{},"terminationGracePeriodSeconds":30},"status":{}}}
+{"type":"MODIFIED","object":{"apiVersion":"v1","kind":"Pod","metadata":{"creationTimestamp":null,"name":"foo","namespace":"test","resourceVersion":"11"},"spec":{"containers":null,"dnsPolicy":"ClusterFirst","enableServiceLinks":true,"restartPolicy":"Always","securityContext":{},"terminationGracePeriodSeconds":30},"status":{}}}
+{"type":"DELETED","object":{"apiVersion":"v1","kind":"Pod","metadata":{"creationTimestamp":null,"name":"foo","namespace":"test","resourceVersion":"12"},"spec":{"containers":null,"dnsPolicy":"ClusterFirst","enableServiceLinks":true,"restartPolicy":"Always","securityContext":{},"terminationGracePeriodSeconds":30},"status":{}}}
+`,
+		},
+		{
+			format: "yaml",
+			expected: `object:
+  apiVersion: v1
+  kind: Pod
+  metadata:
+    creationTimestamp: null
+    name: bar
+    namespace: test
+    resourceVersion: "9"
+  spec:
+    containers: null
+    dnsPolicy: ClusterFirst
+    enableServiceLinks: true
+    restartPolicy: Always
+    securityContext: {}
+    terminationGracePeriodSeconds: 30
+  status: {}
+type: ADDED
+---
+object:
+  apiVersion: v1
+  kind: Pod
+  metadata:
+    creationTimestamp: null
+    name: foo
+    namespace: test
+    resourceVersion: "10"
+  spec:
+    containers: null
+    dnsPolicy: ClusterFirst
+    enableServiceLinks: true
+    restartPolicy: Always
+    securityContext: {}
+    terminationGracePeriodSeconds: 30
+  status: {}
+type: ADDED
+---
+object:
+  apiVersion: v1
+  kind: Pod
+  metadata:
+    creationTimestamp: null
+    name: foo
+    namespace: test
+    resourceVersion: "11"
+  spec:
+    containers: null
+    dnsPolicy: ClusterFirst
+    enableServiceLinks: true
+    restartPolicy: Always
+    securityContext: {}
+    terminationGracePeriodSeconds: 30
+  status: {}
+type: MODIFIED
+---
+object:
+  apiVersion: v1
+  kind: Pod
+  metadata:
+    creationTimestamp: null
+    name: foo
+    namespace: test
+    resourceVersion: "12"
+  spec:
+    containers: null
+    dnsPolicy: ClusterFirst
+    enableServiceLinks: true
+    restartPolicy: Always
+    securityContext: {}
+    terminationGracePeriodSeconds: 30
+  status: {}
+type: DELETED
+`,
+		},
+		{
+			format: `jsonpath={.type},{.object.metadata.name},{.object.metadata.resourceVersion}{"\n"}`,
+			expected: `ADDED,bar,9
+ADDED,foo,10
+MODIFIED,foo,11
+DELETED,foo,12
+`,
+		},
+		{
+			format: `go-template={{.type}},{{.object.metadata.name}},{{.object.metadata.resourceVersion}}{{"\n"}}`,
+			expected: `ADDED,bar,9
+ADDED,foo,10
+MODIFIED,foo,11
+DELETED,foo,12
+`,
+		},
+		{
+			format: `custom-columns=TYPE:.type,NAME:.object.metadata.name,RSRC:.object.metadata.resourceVersion`,
+			expected: `TYPE    NAME   RSRC
+ADDED   bar    9
+ADDED   foo    10
+MODIFIED   foo    11
+DELETED    foo    12
+`,
+		},
+		{
+			format: `name`,
+			expected: `pod/bar
+pod/foo
+pod/foo
+pod/foo
+`,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(fmt.Sprintf("%s, table=%v", tc.format, tc.table), func(t *testing.T) {
+			pods, events := watchTestData()
+
+			tf := cmdtesting.NewTestFactory().WithNamespace("test")
+			defer tf.Cleanup()
+			codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+
+			podList := &corev1.PodList{
+				Items: pods,
+				ListMeta: metav1.ListMeta{
+					ResourceVersion: "10",
+				},
+			}
+
+			tf.UnstructuredClient = &fake.RESTClient{
+				NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+					switch req.URL.Path {
+					case "/pods":
+						if req.URL.Query().Get("watch") == "true" {
+							if tc.table {
+								return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: podTableWatchBody(codec, events[2:])}, nil
+							} else {
+								return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: watchBody(codec, events[2:])}, nil
+							}
+						}
+
+						if tc.table {
+							return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: podTableObjBody(codec, podList.Items...)}, nil
+						} else {
+							return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, podList)}, nil
+						}
+					default:
+						t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
+						return nil, nil
+					}
+				}),
+			}
+
+			streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+			cmd := NewCmdGet("kubectl", tf, streams)
+			cmd.SetOutput(buf)
+
+			cmd.Flags().Set("watch", "true")
+			cmd.Flags().Set("all-namespaces", "true")
+			cmd.Flags().Set("show-kind", "true")
+			cmd.Flags().Set("output-watch-events", "true")
+			if len(tc.format) > 0 {
+				cmd.Flags().Set("output", tc.format)
+			}
+
+			cmd.Run(cmd, []string{"pods"})
+			if e, a := tc.expected, buf.String(); e != a {
+				t.Errorf("expected\n%v\ngot\n%v", e, a)
+			}
+		})
+	}
+}
+
 func TestWatchResourceIdentifiedByFile(t *testing.T) {
 	pods, events := watchTestData()
 
@@ -1544,10 +2498,10 @@ func TestWatchResourceIdentifiedByFile(t *testing.T) {
 	cmd.Flags().Set("filename", "../../../../test/e2e/testing-manifests/statefulset/cassandra/controller.yaml")
 	cmd.Run(cmd, []string{})
 
-	expected := `NAME   READY   STATUS   RESTARTS   AGE
-foo    0/0              0          <unknown>
-foo    0/0              0          <unknown>
-foo    0/0              0          <unknown>
+	expected := `NAME   AGE
+foo    <unknown>
+foo    <unknown>
+foo    <unknown>
 `
 	if e, a := expected, buf.String(); e != a {
 		t.Errorf("expected\n%v\ngot\n%v", e, a)
@@ -1570,6 +2524,48 @@ func TestWatchOnlyResource(t *testing.T) {
 			case "/namespaces/test/pods":
 				if req.URL.Query().Get("watch") == "true" && req.URL.Query().Get("fieldSelector") == "metadata.name=foo" {
 					return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: watchBody(codec, events[1:])}, nil
+				}
+				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
+				return nil, nil
+			default:
+				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdGet("kubectl", tf, streams)
+	cmd.SetOutput(buf)
+
+	cmd.Flags().Set("watch-only", "true")
+	cmd.Run(cmd, []string{"pods", "foo"})
+
+	expected := `NAME   AGE
+foo    <unknown>
+foo    <unknown>
+`
+	if e, a := expected, buf.String(); e != a {
+		t.Errorf("expected\n%v\ngot\n%v", e, a)
+	}
+}
+
+func TestWatchOnlyTableResource(t *testing.T) {
+	pods, events := watchTestData()
+
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			switch req.URL.Path {
+			case "/namespaces/test/pods/foo":
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: podTableObjBody(codec, pods[1])}, nil
+			case "/namespaces/test/pods":
+				if req.URL.Query().Get("watch") == "true" && req.URL.Query().Get("fieldSelector") == "metadata.name=foo" {
+					return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: podTableWatchBody(codec, events[1:])}, nil
 				}
 				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
 				return nil, nil
@@ -1632,6 +2628,51 @@ func TestWatchOnlyList(t *testing.T) {
 	cmd.Flags().Set("watch-only", "true")
 	cmd.Run(cmd, []string{"pods"})
 
+	expected := `NAME   AGE
+foo    <unknown>
+foo    <unknown>
+`
+	if e, a := expected, buf.String(); e != a {
+		t.Errorf("expected\n%v\ngot\n%v", e, a)
+	}
+}
+
+func TestWatchOnlyTableList(t *testing.T) {
+	pods, events := watchTestData()
+
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+
+	podList := &corev1.PodList{
+		Items: pods,
+		ListMeta: metav1.ListMeta{
+			ResourceVersion: "10",
+		},
+	}
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			switch req.URL.Path {
+			case "/namespaces/test/pods":
+				if req.URL.Query().Get("watch") == "true" {
+					return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: podTableWatchBody(codec, events[2:])}, nil
+				}
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: podTableObjBody(codec, podList.Items...)}, nil
+			default:
+				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdGet("kubectl", tf, streams)
+	cmd.SetOutput(buf)
+
+	cmd.Flags().Set("watch-only", "true")
+	cmd.Run(cmd, []string{"pods"})
+
 	expected := `NAME   READY   STATUS   RESTARTS   AGE
 foo    0/0              0          <unknown>
 foo    0/0              0          <unknown>
@@ -1649,5 +2690,109 @@ func watchBody(codec runtime.Codec, events []watch.Event) io.ReadCloser {
 			panic(err)
 		}
 	}
-	return json.Framer.NewFrameReader(ioutil.NopCloser(buf))
+	return ioutil.NopCloser(buf)
+}
+
+var podColumns = []metav1.TableColumnDefinition{
+	{Name: "Name", Type: "string", Format: "name"},
+	{Name: "Ready", Type: "string", Format: ""},
+	{Name: "Status", Type: "string", Format: ""},
+	{Name: "Restarts", Type: "integer", Format: ""},
+	{Name: "Age", Type: "string", Format: ""},
+	{Name: "IP", Type: "string", Format: "", Priority: 1},
+	{Name: "Node", Type: "string", Format: "", Priority: 1},
+	{Name: "Nominated Node", Type: "string", Format: "", Priority: 1},
+	{Name: "Readiness Gates", Type: "string", Format: "", Priority: 1},
+}
+
+// build a meta table response from a pod list
+func podTableObjBody(codec runtime.Codec, pods ...corev1.Pod) io.ReadCloser {
+	table := &metav1.Table{
+		ColumnDefinitions: podColumns,
+	}
+	for i := range pods {
+		b := bytes.NewBuffer(nil)
+		codec.Encode(&pods[i], b)
+		table.Rows = append(table.Rows, metav1.TableRow{
+			Object: runtime.RawExtension{Raw: b.Bytes()},
+			Cells:  []interface{}{pods[i].Name, "0/0", "", int64(0), "<unknown>", "<none>", "<none>", "<none>", "<none>"},
+		})
+	}
+	return cmdtesting.ObjBody(codec, table)
+}
+
+// build meta table watch events from pod watch events
+func podTableWatchBody(codec runtime.Codec, events []watch.Event) io.ReadCloser {
+	tableEvents := []watch.Event{}
+	for i, e := range events {
+		b := bytes.NewBuffer(nil)
+		codec.Encode(e.Object, b)
+		var columns []metav1.TableColumnDefinition
+		if i == 0 {
+			columns = podColumns
+		}
+		tableEvents = append(tableEvents, watch.Event{
+			Type: e.Type,
+			Object: &metav1.Table{
+				ColumnDefinitions: columns,
+				Rows: []metav1.TableRow{{
+					Object: runtime.RawExtension{Raw: b.Bytes()},
+					Cells:  []interface{}{e.Object.(*corev1.Pod).Name, "0/0", "", int64(0), "<unknown>", "<none>", "<none>", "<none>", "<none>"},
+				}}},
+		})
+	}
+	return watchBody(codec, tableEvents)
+}
+
+// build a meta table response from a service list
+func serviceTableObjBody(codec runtime.Codec, services ...corev1.Service) io.ReadCloser {
+	table := &metav1.Table{
+		ColumnDefinitions: []metav1.TableColumnDefinition{
+			{Name: "Name", Type: "string", Format: "name"},
+			{Name: "Type", Type: "string", Format: ""},
+			{Name: "Cluster-IP", Type: "string", Format: ""},
+			{Name: "External-IP", Type: "string", Format: ""},
+			{Name: "Port(s)", Type: "string", Format: ""},
+			{Name: "Age", Type: "string", Format: ""},
+		},
+	}
+	for i := range services {
+		b := bytes.NewBuffer(nil)
+		codec.Encode(&services[i], b)
+		table.Rows = append(table.Rows, metav1.TableRow{
+			Object: runtime.RawExtension{Raw: b.Bytes()},
+			Cells:  []interface{}{services[i].Name, "ClusterIP", "<none>", "<none>", "<none>", "<unknown>"},
+		})
+	}
+	return cmdtesting.ObjBody(codec, table)
+}
+
+// build a meta table response from a node list
+func nodeTableObjBody(codec runtime.Codec, nodes ...corev1.Node) io.ReadCloser {
+	table := &metav1.Table{
+		ColumnDefinitions: []metav1.TableColumnDefinition{
+			{Name: "Name", Type: "string", Format: "name"},
+			{Name: "Status", Type: "string", Format: ""},
+			{Name: "Roles", Type: "string", Format: ""},
+			{Name: "Age", Type: "string", Format: ""},
+			{Name: "Version", Type: "string", Format: ""},
+		},
+	}
+	for i := range nodes {
+		b := bytes.NewBuffer(nil)
+		codec.Encode(&nodes[i], b)
+		table.Rows = append(table.Rows, metav1.TableRow{
+			Object: runtime.RawExtension{Raw: b.Bytes()},
+			Cells:  []interface{}{nodes[i].Name, "Unknown", "<none>", "<unknown>", ""},
+		})
+	}
+	return cmdtesting.ObjBody(codec, table)
+}
+
+// build an empty table response
+func emptyTableObjBody(codec runtime.Codec) io.ReadCloser {
+	table := &metav1.Table{
+		ColumnDefinitions: podColumns,
+	}
+	return cmdtesting.ObjBody(codec, table)
 }

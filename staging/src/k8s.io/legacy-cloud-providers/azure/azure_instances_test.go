@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2018 The Kubernetes Authors.
 
@@ -24,14 +26,15 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-03-01/compute"
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-07-01/compute"
 	"github.com/Azure/go-autorest/autorest/to"
-	"k8s.io/api/core/v1"
+
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
 
 // setTestVirtualMachines sets test virtual machine with powerstate.
-func setTestVirtualMachines(c *Cloud, vmList map[string]string) {
+func setTestVirtualMachines(c *Cloud, vmList map[string]string, isDataDisksFull bool) {
 	virtualMachineClient := c.VirtualMachinesClient.(*fakeAzureVirtualMachinesClient)
 	store := map[string]map[string]compute.VirtualMachine{
 		"rg": make(map[string]compute.VirtualMachine),
@@ -44,22 +47,34 @@ func setTestVirtualMachines(c *Cloud, vmList map[string]string) {
 			ID:       &instanceID,
 			Location: &c.Location,
 		}
-		if powerState != "" {
-			status := []compute.InstanceViewStatus{
-				{
-					Code: to.StringPtr(powerState),
-				},
-				{
-					Code: to.StringPtr("ProvisioningState/succeeded"),
-				},
-			}
-			vm.VirtualMachineProperties = &compute.VirtualMachineProperties{
-				InstanceView: &compute.VirtualMachineInstanceView{
-					Statuses: &status,
-				},
-			}
+		status := []compute.InstanceViewStatus{
+			{
+				Code: to.StringPtr(powerState),
+			},
+			{
+				Code: to.StringPtr("ProvisioningState/succeeded"),
+			},
 		}
-
+		vm.VirtualMachineProperties = &compute.VirtualMachineProperties{
+			InstanceView: &compute.VirtualMachineInstanceView{
+				Statuses: &status,
+			},
+			StorageProfile: &compute.StorageProfile{
+				DataDisks: &[]compute.DataDisk{},
+			},
+		}
+		if !isDataDisksFull {
+			vm.StorageProfile.DataDisks = &[]compute.DataDisk{{
+				Lun:  to.Int32Ptr(0),
+				Name: to.StringPtr("disk1"),
+			}}
+		} else {
+			dataDisks := make([]compute.DataDisk, maxLUN)
+			for i := 0; i < maxLUN; i++ {
+				dataDisks[i] = compute.DataDisk{Lun: to.Int32Ptr(int32(i))}
+			}
+			vm.StorageProfile.DataDisks = &dataDisks
+		}
 		store["rg"][nodeName] = vm
 	}
 
@@ -68,6 +83,7 @@ func setTestVirtualMachines(c *Cloud, vmList map[string]string) {
 
 func TestInstanceID(t *testing.T) {
 	cloud := getTestCloud()
+	cloud.Config.UseInstanceMetadata = true
 
 	testcases := []struct {
 		name         string
@@ -107,7 +123,7 @@ func TestInstanceID(t *testing.T) {
 
 		mux := http.NewServeMux()
 		mux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			fmt.Fprintf(w, fmt.Sprintf(`{"compute":{"name":"%s"}}`, test.metadataName))
+			fmt.Fprintf(w, fmt.Sprintf(`{"compute":{"name":"%s","subscriptionId":"subscription","resourceGroupName":"rg"}}`, test.metadataName))
 		}))
 		go func() {
 			http.Serve(listener, mux)
@@ -122,7 +138,7 @@ func TestInstanceID(t *testing.T) {
 		for _, vm := range test.vmList {
 			vmListWithPowerState[vm] = ""
 		}
-		setTestVirtualMachines(cloud, vmListWithPowerState)
+		setTestVirtualMachines(cloud, vmListWithPowerState, false)
 		instanceID, err := cloud.InstanceID(context.Background(), types.NodeName(test.nodeName))
 		if test.expectError {
 			if err == nil {
@@ -191,17 +207,17 @@ func TestInstanceShutdownByProviderID(t *testing.T) {
 			expected: false,
 		},
 		{
-			name:        "InstanceShutdownByProviderID should report error if VM doesn't exist",
-			vmList:      map[string]string{"vm1": "PowerState/running"},
-			nodeName:    "vm8",
-			expectError: true,
+			name:     "InstanceShutdownByProviderID should return false if VM doesn't exist",
+			vmList:   map[string]string{"vm1": "PowerState/running"},
+			nodeName: "vm8",
+			expected: false,
 		},
 	}
 
 	for _, test := range testcases {
 		cloud := getTestCloud()
-		setTestVirtualMachines(cloud, test.vmList)
-		providerID := "azure://" + cloud.getStandardMachineID("rg", test.nodeName)
+		setTestVirtualMachines(cloud, test.vmList, false)
+		providerID := "azure://" + cloud.getStandardMachineID("subscription", "rg", test.nodeName)
 		hasShutdown, err := cloud.InstanceShutdownByProviderID(context.Background(), providerID)
 		if test.expectError {
 			if err == nil {

@@ -34,7 +34,7 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/registry/rest:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server/options:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server/storage:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/storage/etcd/testing:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/storage/etcd3/testing:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/storage/storagebackend:go_default_library",
     ],
 )

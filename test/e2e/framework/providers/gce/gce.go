@@ -26,13 +26,14 @@ import (
 
 	compute "google.golang.org/api/compute/v1"
 	"google.golang.org/api/googleapi"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
+	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	gcecloud "k8s.io/legacy-cloud-providers/gce"
 )
 
@@ -42,7 +43,7 @@ func init() {
 }
 
 func factory() (framework.ProviderInterface, error) {
-	e2elog.Logf("Fetching cloud provider for %q\r", framework.TestContext.Provider)
+	framework.Logf("Fetching cloud provider for %q\r", framework.TestContext.Provider)
 	zone := framework.TestContext.CloudConfig.Zone
 	region := framework.TestContext.CloudConfig.Region
 
@@ -169,14 +170,14 @@ func (p *Provider) EnsureLoadBalancerResourcesDeleted(ip, portRange string) erro
 	}
 
 	return wait.Poll(10*time.Second, 5*time.Minute, func() (bool, error) {
-		service := p.gceCloud.ComputeServices().GA
-		list, err := service.ForwardingRules.List(project, region).Do()
+		computeservice := p.gceCloud.ComputeServices().GA
+		list, err := computeservice.ForwardingRules.List(project, region).Do()
 		if err != nil {
 			return false, err
 		}
 		for _, item := range list.Items {
 			if item.PortRange == portRange && item.IPAddress == ip {
-				e2elog.Logf("found a load balancer: %v", item)
+				framework.Logf("found a load balancer: %v", item)
 				return false, nil
 			}
 		}
@@ -230,7 +231,7 @@ func (p *Provider) DeletePD(pdName string) error {
 			return nil
 		}
 
-		e2elog.Logf("error deleting PD %q: %v", pdName, err)
+		framework.Logf("error deleting PD %q: %v", pdName, err)
 	}
 	return err
 }
@@ -248,16 +249,16 @@ func (p *Provider) CreatePVSource(zone, diskName string) (*v1.PersistentVolumeSo
 
 // DeletePVSource deletes a persistent volume source
 func (p *Provider) DeletePVSource(pvSource *v1.PersistentVolumeSource) error {
-	return framework.DeletePDWithRetry(pvSource.GCEPersistentDisk.PDName)
+	return e2epv.DeletePDWithRetry(pvSource.GCEPersistentDisk.PDName)
 }
 
 // CleanupServiceResources cleans up GCE Service Type=LoadBalancer resources with
 // the given name. The name is usually the UUID of the Service prefixed with an
 // alpha-numeric character ('a') to work around cloudprovider rules.
 func (p *Provider) CleanupServiceResources(c clientset.Interface, loadBalancerName, region, zone string) {
-	if pollErr := wait.Poll(5*time.Second, framework.LoadBalancerCleanupTimeout, func() (bool, error) {
+	if pollErr := wait.Poll(5*time.Second, e2eservice.LoadBalancerCleanupTimeout, func() (bool, error) {
 		if err := p.cleanupGCEResources(c, loadBalancerName, region, zone); err != nil {
-			e2elog.Logf("Still waiting for glbc to cleanup: %v", err)
+			framework.Logf("Still waiting for glbc to cleanup: %v", err)
 			return false, nil
 		}
 		return true, nil
@@ -348,18 +349,8 @@ func SetInstanceTags(cloudConfig framework.CloudConfig, instanceName, zone strin
 	if err != nil {
 		framework.Failf("failed to set instance tags: %v", err)
 	}
-	e2elog.Logf("Sent request to set tags %v on instance: %v", tags, instanceName)
+	framework.Logf("Sent request to set tags %v on instance: %v", tags, instanceName)
 	return resTags.Items
-}
-
-// GetNodeTags gets k8s node tag from one of the nodes
-func GetNodeTags(c clientset.Interface, cloudConfig framework.CloudConfig) []string {
-	nodes := framework.GetReadySchedulableNodesOrDie(c)
-	if len(nodes.Items) == 0 {
-		e2elog.Logf("GetNodeTags: Found 0 node.")
-		return []string{}
-	}
-	return GetInstanceTags(cloudConfig, nodes.Items[0].Name).Items
 }
 
 // IsGoogleAPIHTTPErrorCode returns true if the error is a google api

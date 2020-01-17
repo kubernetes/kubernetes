@@ -31,6 +31,7 @@ import (
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 )
 
+// ClientCARegistrationHook defines CA registration hook request structure
 type ClientCARegistrationHook struct {
 	ClientCA []byte
 
@@ -41,6 +42,7 @@ type ClientCARegistrationHook struct {
 	RequestHeaderAllowedNames        []string
 }
 
+// PostStartHook initializes client CA configmap for the API server
 func (h ClientCARegistrationHook) PostStartHook(hookContext genericapiserver.PostStartHookContext) error {
 	// initializing CAs is important so that aggregated API servers can come up with "normal" config.
 	// We've seen lagging etcd before, so we want to retry this a few times before we decide to crashloop

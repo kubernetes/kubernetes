@@ -4,7 +4,6 @@ metadata:
   name: etcd-empty-dir-cleanup
   namespace: kube-system
   annotations:
-    scheduler.alpha.kubernetes.io/critical-pod: ''
     seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
   labels:
     k8s-app: etcd-empty-dir-cleanup
@@ -14,4 +13,4 @@ spec:
   dnsPolicy: Default
   containers:
   - name: etcd-empty-dir-cleanup
-    image: k8s.gcr.io/etcd-empty-dir-cleanup:3.3.10.1
+    image: k8s.gcr.io/etcd-empty-dir-cleanup:3.3.15.0

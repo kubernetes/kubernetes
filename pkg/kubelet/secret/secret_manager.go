@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
@@ -33,6 +33,8 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 )
 
+// Manager manages Kubernets secrets. This includes retrieving
+// secrets or registering/unregistering them via Pods.
 type Manager interface {
 	// Get secret by secret namespace and name.
 	GetSecret(namespace, name string) (*v1.Secret, error)
@@ -54,6 +56,7 @@ type simpleSecretManager struct {
 	kubeClient clientset.Interface
 }
 
+// NewSimpleSecretManager creates a new SecretManager instance.
 func NewSimpleSecretManager(kubeClient clientset.Interface) Manager {
 	return &simpleSecretManager{kubeClient: kubeClient}
 }

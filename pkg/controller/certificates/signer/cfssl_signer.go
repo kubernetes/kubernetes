@@ -47,6 +47,7 @@ func NewCSRSigningController(
 		return nil, err
 	}
 	return certificates.NewCertificateController(
+		"csrsigning",
 		client,
 		csrInformer,
 		signer.handle,
@@ -87,7 +88,7 @@ func newCFSSLSigner(caFile, caKeyFile string, client clientset.Interface, certif
 
 	priv, err := helpers.ParsePrivateKeyPEMWithPassword(cakey, password)
 	if err != nil {
-		return nil, fmt.Errorf("Malformed private key %v", err)
+		return nil, fmt.Errorf("malformed private key %v", err)
 	}
 	return &cfsslSigner{
 		priv:                priv,

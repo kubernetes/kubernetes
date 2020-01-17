@@ -31,12 +31,15 @@ const (
 	// owner: @sttts, @nikhita
 	// alpha: v1.8
 	// beta: v1.9
+	// GA: v1.16
 	//
 	// CustomResourceValidation is a list of validation methods for CustomResources
 	CustomResourceValidation featuregate.Feature = "CustomResourceValidation"
 
 	// owner: @roycaihw, @sttts
 	// alpha: v1.14
+	// beta: v1.15
+	// GA: v1.16
 	//
 	// CustomResourcePublishOpenAPI enables publishing of CRD OpenAPI specs.
 	CustomResourcePublishOpenAPI featuregate.Feature = "CustomResourcePublishOpenAPI"
@@ -44,12 +47,15 @@ const (
 	// owner: @sttts, @nikhita
 	// alpha: v1.10
 	// beta: v1.11
+	// GA: v1.16
 	//
 	// CustomResourceSubresources defines the subresources for CustomResources
 	CustomResourceSubresources featuregate.Feature = "CustomResourceSubresources"
 
 	// owner: @mbohlool, @roycaihw
 	// alpha: v1.13
+	// beta: v1.15
+	// GA: v1.16
 	//
 	// CustomResourceWebhookConversion defines the webhook conversion for Custom Resources.
 	CustomResourceWebhookConversion featuregate.Feature = "CustomResourceWebhookConversion"
@@ -69,9 +75,9 @@ func init() {
 // To add a new feature, define a key for it above and add it here. The features will be
 // available throughout Kubernetes binaries.
 var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
-	CustomResourceValidation:        {Default: true, PreRelease: featuregate.Beta},
-	CustomResourceSubresources:      {Default: true, PreRelease: featuregate.Beta},
-	CustomResourceWebhookConversion: {Default: true, PreRelease: featuregate.Beta},
-	CustomResourcePublishOpenAPI:    {Default: true, PreRelease: featuregate.Beta},
-	CustomResourceDefaulting:        {Default: false, PreRelease: featuregate.Alpha},
+	CustomResourceValidation:        {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+	CustomResourceSubresources:      {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+	CustomResourceWebhookConversion: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+	CustomResourcePublishOpenAPI:    {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+	CustomResourceDefaulting:        {Default: true, PreRelease: featuregate.Beta},
 }

@@ -68,6 +68,17 @@ func TestGetNodeImageStates(t *testing.T) {
 				},
 			},
 		},
+		{
+			node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: "node-0"},
+				Status:     v1.NodeStatus{},
+			},
+			imageExistenceMap: map[string]sets.String{
+				"gcr.io/10:v1":  sets.NewString("node-1"),
+				"gcr.io/200:v1": sets.NewString(),
+			},
+			expected: map[string]*ImageStateSummary{},
+		},
 	}
 
 	for _, test := range tests {
@@ -120,6 +131,37 @@ func TestCreateImageExistenceMap(t *testing.T) {
 			},
 			expected: map[string]sets.String{
 				"gcr.io/10:v1":  sets.NewString("node-0", "node-1"),
+				"gcr.io/200:v1": sets.NewString("node-1"),
+			},
+		},
+		{
+			nodes: []*v1.Node{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "node-0"},
+					Status:     v1.NodeStatus{},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "node-1"},
+					Status: v1.NodeStatus{
+						Images: []v1.ContainerImage{
+							{
+								Names: []string{
+									"gcr.io/10:v1",
+								},
+								SizeBytes: int64(10 * mb),
+							},
+							{
+								Names: []string{
+									"gcr.io/200:v1",
+								},
+								SizeBytes: int64(200 * mb),
+							},
+						},
+					},
+				},
+			},
+			expected: map[string]sets.String{
+				"gcr.io/10:v1":  sets.NewString("node-1"),
 				"gcr.io/200:v1": sets.NewString("node-1"),
 			},
 		},

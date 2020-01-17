@@ -24,10 +24,10 @@ run_cluster_management_tests() {
 
   kube::log::status "Testing cluster-management commands"
 
-  kube::test::get_object_assert nodes "{{range.items}}{{$id_field}}:{{end}}" '127.0.0.1:'
+  kube::test::get_object_assert nodes "{{range.items}}{{${id_field:?}}}:{{end}}" '127.0.0.1:'
 
   # create test pods we can work with
-  kubectl create -f - "${kube_flags[@]}" << __EOF__
+  kubectl create -f - "${kube_flags[@]:?}" << __EOF__
 {
   "kind": "Pod",
   "apiVersion": "v1",

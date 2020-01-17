@@ -17,18 +17,24 @@ limitations under the License.
 package csinode
 
 import (
+	"reflect"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/storage"
+	"k8s.io/kubernetes/pkg/features"
+	utilpointer "k8s.io/utils/pointer"
 )
 
-func getValidCSINode(name string) *storage.CSINode {
-	return &storage.CSINode{
+func TestPrepareForCreate(t *testing.T) {
+	valid := getValidCSINode("foo")
+	emptyAllocatable := &storage.CSINode{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
+			Name: "foo",
 		},
 		Spec: storage.CSINodeSpec{
 			Drivers: []storage.CSINodeDriver{
@@ -39,6 +45,171 @@ func getValidCSINode(name string) *storage.CSINode {
 				},
 			},
 		},
+	}
+
+	volumeLimitsEnabledCases := []struct {
+		name     string
+		obj      *storage.CSINode
+		expected *storage.CSINode
+	}{
+		{
+			"empty allocatable",
+			emptyAllocatable,
+			emptyAllocatable,
+		},
+		{
+			"valid allocatable",
+			valid,
+			valid,
+		},
+	}
+
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AttachVolumeLimit, true)()
+	for _, test := range volumeLimitsEnabledCases {
+		t.Run(test.name, func(t *testing.T) {
+			testPrepareForCreate(t, test.obj, test.expected)
+		})
+	}
+
+	volumeLimitsDisabledCases := []struct {
+		name     string
+		obj      *storage.CSINode
+		expected *storage.CSINode
+	}{
+		{
+			"empty allocatable",
+			emptyAllocatable,
+			emptyAllocatable,
+		},
+		{
+			"drop allocatable",
+			valid,
+			emptyAllocatable,
+		},
+	}
+
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AttachVolumeLimit, false)()
+	for _, test := range volumeLimitsDisabledCases {
+		t.Run(test.name, func(t *testing.T) {
+			testPrepareForCreate(t, test.obj, test.expected)
+		})
+	}
+}
+
+func testPrepareForCreate(t *testing.T, obj, expected *storage.CSINode) {
+	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewContext(), &genericapirequest.RequestInfo{
+		APIGroup:   "storage.k8s.io",
+		APIVersion: "v1beta1",
+		Resource:   "csinodes",
+	})
+	Strategy.PrepareForCreate(ctx, obj)
+	if !reflect.DeepEqual(*expected, *obj) {
+		t.Errorf("Object mismatch! Expected:\n%#v\ngot:\n%#v", *expected, *obj)
+	}
+}
+
+func TestPrepareForUpdate(t *testing.T) {
+	valid := getValidCSINode("foo")
+	differentAllocatable := &storage.CSINode{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "foo",
+		},
+		Spec: storage.CSINodeSpec{
+			Drivers: []storage.CSINodeDriver{
+				{
+					Name:         "valid-driver-name",
+					NodeID:       "valid-node",
+					TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
+					Allocatable:  &storage.VolumeNodeResources{Count: utilpointer.Int32Ptr(20)},
+				},
+			},
+		},
+	}
+	emptyAllocatable := &storage.CSINode{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "foo",
+		},
+		Spec: storage.CSINodeSpec{
+			Drivers: []storage.CSINodeDriver{
+				{
+					Name:         "valid-driver-name",
+					NodeID:       "valid-node",
+					TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
+				},
+			},
+		},
+	}
+
+	volumeLimitsEnabledCases := []struct {
+		name     string
+		old      *storage.CSINode
+		new      *storage.CSINode
+		expected *storage.CSINode
+	}{
+		{
+			"allow empty allocatable when it's not set",
+			emptyAllocatable,
+			emptyAllocatable,
+			emptyAllocatable,
+		},
+		{
+			"allow valid allocatable when it's already set",
+			valid,
+			differentAllocatable,
+			differentAllocatable,
+		},
+		{
+			"allow valid allocatable when it's not set",
+			emptyAllocatable,
+			valid,
+			valid,
+		},
+	}
+
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AttachVolumeLimit, true)()
+	for _, test := range volumeLimitsEnabledCases {
+		t.Run(test.name, func(t *testing.T) {
+			testPrepareForUpdate(t, test.new, test.old, test.expected)
+		})
+	}
+
+	volumeLimitsDisabledCases := []struct {
+		name     string
+		old      *storage.CSINode
+		new      *storage.CSINode
+		expected *storage.CSINode
+	}{
+		{
+			"allow empty allocatable when it's not set",
+			emptyAllocatable,
+			emptyAllocatable,
+			emptyAllocatable,
+		},
+		{
+			"drop allocatable when it's not set",
+			emptyAllocatable,
+			valid,
+			emptyAllocatable,
+		},
+	}
+
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AttachVolumeLimit, false)()
+	for _, test := range volumeLimitsDisabledCases {
+		t.Run(test.name, func(t *testing.T) {
+			testPrepareForUpdate(t, test.new, test.old, test.expected)
+		})
+	}
+}
+
+func testPrepareForUpdate(t *testing.T, obj, old, expected *storage.CSINode) {
+	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewContext(), &genericapirequest.RequestInfo{
+		APIGroup:   "storage.k8s.io",
+		APIVersion: "v1beta1",
+		Resource:   "csinodes",
+	})
+	Strategy.PrepareForUpdate(ctx, obj, old)
+	if !reflect.DeepEqual(*expected, *obj) {
+		t.Errorf("Object mismatch! Expected:\n%#v\ngot:\n%#v", *expected, *obj)
 	}
 }
 
@@ -88,6 +259,43 @@ func TestCSINodeValidation(t *testing.T) {
 			false,
 		},
 		{
+			"valid csinode with empty allocatable",
+			&storage.CSINode{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: storage.CSINodeSpec{
+					Drivers: []storage.CSINodeDriver{
+						{
+							Name:         "valid-driver-name",
+							NodeID:       "valid-node",
+							TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
+						},
+					},
+				},
+			},
+			false,
+		},
+		{
+			"valid csinode with missing volume limits",
+			&storage.CSINode{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: storage.CSINodeSpec{
+					Drivers: []storage.CSINodeDriver{
+						{
+							Name:         "valid-driver-name",
+							NodeID:       "valid-node",
+							TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
+							Allocatable:  &storage.VolumeNodeResources{Count: nil},
+						},
+					},
+				},
+			},
+			false,
+		},
+		{
 			"invalid driver name",
 			&storage.CSINode{
 				ObjectMeta: metav1.ObjectMeta{
@@ -99,6 +307,7 @@ func TestCSINodeValidation(t *testing.T) {
 							Name:         "$csi-driver@",
 							NodeID:       "valid-node",
 							TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
+							Allocatable:  &storage.VolumeNodeResources{Count: utilpointer.Int32Ptr(10)},
 						},
 					},
 				},
@@ -117,6 +326,26 @@ func TestCSINodeValidation(t *testing.T) {
 							Name:         "valid-driver-name",
 							NodeID:       "",
 							TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
+							Allocatable:  &storage.VolumeNodeResources{Count: utilpointer.Int32Ptr(10)},
+						},
+					},
+				},
+			},
+			true,
+		},
+		{
+			"invalid allocatable with negative volumes limit",
+			&storage.CSINode{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: storage.CSINodeSpec{
+					Drivers: []storage.CSINodeDriver{
+						{
+							Name:         "valid-driver-name",
+							NodeID:       "valid-node",
+							TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
+							Allocatable:  &storage.VolumeNodeResources{Count: utilpointer.Int32Ptr(-1)},
 						},
 					},
 				},
@@ -135,6 +364,7 @@ func TestCSINodeValidation(t *testing.T) {
 							Name:         "valid-driver-name",
 							NodeID:       "valid-node",
 							TopologyKeys: []string{"company.com/zone1", ""},
+							Allocatable:  &storage.VolumeNodeResources{Count: utilpointer.Int32Ptr(10)},
 						},
 					},
 				},
@@ -163,5 +393,23 @@ func TestCSINodeValidation(t *testing.T) {
 				t.Errorf("Validation of v1beta1 object unexpectedly succeeded")
 			}
 		})
+	}
+}
+
+func getValidCSINode(name string) *storage.CSINode {
+	return &storage.CSINode{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Spec: storage.CSINodeSpec{
+			Drivers: []storage.CSINodeDriver{
+				{
+					Name:         "valid-driver-name",
+					NodeID:       "valid-node",
+					TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
+					Allocatable:  &storage.VolumeNodeResources{Count: utilpointer.Int32Ptr(10)},
+				},
+			},
+		},
 	}
 }

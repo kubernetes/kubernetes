@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2014 The Kubernetes Authors.
 
@@ -25,7 +27,7 @@ import (
 	"strconv"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -63,9 +65,12 @@ const (
 // The constants are used to map from the machine type (number of CPUs) to the limit of
 // persistent disks that can be attached to an instance. Please refer to gcloud doc
 // https://cloud.google.com/compute/docs/disks/#increased_persistent_disk_limits
+// These constants are all the documented attach limit minus one because the
+// node boot disk is considered an attachable disk so effective attach limit is
+// one less.
 const (
-	VolumeLimit16  = 16
-	VolumeLimit128 = 128
+	volumeLimitSmall = 15
+	VolumeLimitBig   = 127
 )
 
 func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
@@ -109,7 +114,7 @@ func (plugin *gcePersistentDiskPlugin) SupportsMountOption() bool {
 }
 
 func (plugin *gcePersistentDiskPlugin) SupportsBulkVolumeVerification() bool {
-	return false
+	return true
 }
 
 func (plugin *gcePersistentDiskPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
@@ -121,7 +126,7 @@ func (plugin *gcePersistentDiskPlugin) GetAccessModes() []v1.PersistentVolumeAcc
 
 func (plugin *gcePersistentDiskPlugin) GetVolumeLimits() (map[string]int64, error) {
 	volumeLimits := map[string]int64{
-		util.GCEVolumeLimitKey: VolumeLimit16,
+		util.GCEVolumeLimitKey: volumeLimitSmall,
 	}
 	cloud := plugin.host.GetCloudProvider()
 
@@ -149,9 +154,9 @@ func (plugin *gcePersistentDiskPlugin) GetVolumeLimits() (map[string]int64, erro
 		return volumeLimits, nil
 	}
 	if strings.HasPrefix(instanceType, "n1-") || strings.HasPrefix(instanceType, "custom-") {
-		volumeLimits[util.GCEVolumeLimitKey] = VolumeLimit128
+		volumeLimits[util.GCEVolumeLimitKey] = VolumeLimitBig
 	} else {
-		volumeLimits[util.GCEVolumeLimitKey] = VolumeLimit16
+		volumeLimits[util.GCEVolumeLimitKey] = volumeLimitSmall
 	}
 
 	return volumeLimits, nil
@@ -277,7 +282,15 @@ func (plugin *gcePersistentDiskPlugin) ExpandVolumeDevice(
 }
 
 func (plugin *gcePersistentDiskPlugin) NodeExpand(resizeOptions volume.NodeResizeOptions) (bool, error) {
-	_, err := util.GenericResizeFS(plugin.host, plugin.GetPluginName(), resizeOptions.DevicePath, resizeOptions.DeviceMountPath)
+	fsVolume, err := util.CheckVolumeModeFilesystem(resizeOptions.VolumeSpec)
+	if err != nil {
+		return false, fmt.Errorf("error checking VolumeMode: %v", err)
+	}
+	// if volume is not a fs file system, there is nothing for us to do here.
+	if !fsVolume {
+		return true, nil
+	}
+	_, err = util.GenericResizeFS(plugin.host, plugin.GetPluginName(), resizeOptions.DevicePath, resizeOptions.DeviceMountPath)
 	if err != nil {
 		return false, err
 	}
@@ -288,8 +301,13 @@ var _ volume.NodeExpandableVolumePlugin = &gcePersistentDiskPlugin{}
 
 func (plugin *gcePersistentDiskPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
 	mounter := plugin.host.GetMounter(plugin.GetPluginName())
+	kvh, ok := plugin.host.(volume.KubeletVolumeHost)
+	if !ok {
+		return nil, fmt.Errorf("plugin volume host does not implement KubeletVolumeHost interface")
+	}
+	hu := kvh.GetHostUtil()
 	pluginMntDir := util.GetPluginMountDir(plugin.host, plugin.GetPluginName())
-	sourceName, err := mounter.GetDeviceNameFromMount(mountPath, pluginMntDir)
+	sourceName, err := hu.GetDeviceNameFromMount(mounter, mountPath, pluginMntDir)
 	if err != nil {
 		return nil, err
 	}
@@ -364,8 +382,7 @@ func (b *gcePersistentDiskMounter) SetUpAt(dir string, mounterArgs volume.Mounte
 	notMnt, err := b.mounter.IsLikelyNotMountPoint(dir)
 	klog.V(4).Infof("GCE PersistentDisk set up: Dir (%s) PD name (%q) Mounted (%t) Error (%v), ReadOnly (%t)", dir, b.pdName, !notMnt, err, b.readOnly)
 	if err != nil && !os.IsNotExist(err) {
-		klog.Errorf("cannot validate mount point: %s %v", dir, err)
-		return err
+		return fmt.Errorf("cannot validate mount point: %s %v", dir, err)
 	}
 	if !notMnt {
 		return nil
@@ -374,8 +391,7 @@ func (b *gcePersistentDiskMounter) SetUpAt(dir string, mounterArgs volume.Mounte
 	if runtime.GOOS != "windows" {
 		// in windows, we will use mklink to mount, will MkdirAll in Mount func
 		if err := os.MkdirAll(dir, 0750); err != nil {
-			klog.Errorf("mkdir failed on disk %s (%v)", dir, err)
-			return err
+			return fmt.Errorf("mkdir failed on disk %s (%v)", dir, err)
 		}
 	}
 
@@ -394,35 +410,32 @@ func (b *gcePersistentDiskMounter) SetUpAt(dir string, mounterArgs volume.Mounte
 	if err != nil {
 		notMnt, mntErr := b.mounter.IsLikelyNotMountPoint(dir)
 		if mntErr != nil {
-			klog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
-			return err
+			return fmt.Errorf("failed to mount: %v. Cleanup IsLikelyNotMountPoint check failed: %v", err, mntErr)
 		}
 		if !notMnt {
 			if mntErr = b.mounter.Unmount(dir); mntErr != nil {
-				klog.Errorf("Failed to unmount: %v", mntErr)
-				return err
+				return fmt.Errorf("failed to mount: %v. Cleanup failed to unmount: %v", err, mntErr)
 			}
 			notMnt, mntErr := b.mounter.IsLikelyNotMountPoint(dir)
 			if mntErr != nil {
-				klog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
-				return err
+				return fmt.Errorf("failed to mount: %v. Cleanup IsLikelyNotMountPoint check failed: %v", err, mntErr)
 			}
 			if !notMnt {
 				// This is very odd, we don't expect it.  We'll try again next sync loop.
-				klog.Errorf("%s is still mounted, despite call to unmount().  Will try again next sync loop.", dir)
-				return err
+				return fmt.Errorf("%s is still mounted, despite call to unmount().  Will try again next sync loop", dir)
 			}
 		}
-		os.Remove(dir)
-		klog.Errorf("Mount of disk %s failed: %v", dir, err)
-		return err
+		mntErr = os.Remove(dir)
+		if mntErr != nil {
+			return fmt.Errorf("failed to mount: %v. Cleanup os Remove(%s) failed: %v", err, dir, mntErr)
+		}
+
+		return fmt.Errorf("mount of disk %s failed: %v", dir, err)
 	}
 
 	if !b.readOnly {
 		volume.SetVolumeOwnership(b, mounterArgs.FsGroup)
 	}
-
-	klog.V(4).Infof("Successfully mounted %s", dir)
 	return nil
 }
 

@@ -35,7 +35,6 @@ filegroup(
 # TODO: collect all relevant docker_push targets into one target that can be run:
 #   //build:push-server-images
 #   //cluster/images/conformance:push-conformance
-#   //cluster/images/hyperkube:push-hyperkube
 gcs_upload(
     name = "push-build",
     data = [

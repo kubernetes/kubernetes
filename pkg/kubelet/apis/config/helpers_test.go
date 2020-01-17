@@ -79,6 +79,8 @@ func allPrimitiveFieldPaths(t *testing.T, tp reflect.Type, path *field.Path) set
 	return paths
 }
 
+//lint:file-ignore U1000 Ignore dummy types, used by tests.
+
 // dummy helper types
 type foo struct {
 	foo int
@@ -138,6 +140,7 @@ var (
 	// KubeletConfiguration fields that do not contain file paths.
 	kubeletConfigurationNonPathFieldPaths = sets.NewString(
 		"Address",
+		"AllowedUnsafeSysctls[*]",
 		"Authentication.Anonymous.Enabled",
 		"Authentication.Webhook.CacheTTL.Duration",
 		"Authentication.Webhook.Enabled",
@@ -148,6 +151,7 @@ var (
 		"CPUCFSQuotaPeriod.Duration",
 		"CPUManagerPolicy",
 		"CPUManagerReconcilePeriod.Duration",
+		"TopologyManagerPolicy",
 		"QOSReserved[*]",
 		"CgroupDriver",
 		"CgroupRoot",

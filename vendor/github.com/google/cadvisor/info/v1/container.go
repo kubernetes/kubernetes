@@ -41,6 +41,10 @@ type MemorySpec struct {
 	SwapLimit uint64 `json:"swap_limit,omitempty"`
 }
 
+type ProcessSpec struct {
+	Limit uint64 `json:"limit,omitempty"`
+}
+
 type ContainerSpec struct {
 	// Time at which the container was created.
 	CreationTime time.Time `json:"creation_time,omitempty"`
@@ -57,6 +61,9 @@ type ContainerSpec struct {
 	Memory    MemorySpec `json:"memory,omitempty"`
 
 	HasNetwork bool `json:"has_network"`
+
+	HasProcesses bool        `json:"has_processes"`
+	Processes    ProcessSpec `json:"processes,omitempty"`
 
 	HasFilesystem bool `json:"has_filesystem"`
 
@@ -563,6 +570,15 @@ type ProcessStats struct {
 
 	// Number of open file descriptors
 	FdCount uint64 `json:"fd_count"`
+
+	// Number of sockets
+	SocketCount uint64 `json:"socket_count"`
+
+	// Number of threads currently in container
+	ThreadsCurrent uint64 `json:"threads_current,omitempty"`
+
+	// Maxium number of threads allowed in container
+	ThreadsMax uint64 `json:"threads_max,omitempty"`
 }
 
 type ContainerStats struct {
@@ -628,6 +644,9 @@ func (a *ContainerStats) StatsEq(b *ContainerStats) bool {
 		return false
 	}
 	if !reflect.DeepEqual(a.Network, b.Network) {
+		return false
+	}
+	if !reflect.DeepEqual(a.Processes, b.Processes) {
 		return false
 	}
 	if !reflect.DeepEqual(a.Filesystem, b.Filesystem) {

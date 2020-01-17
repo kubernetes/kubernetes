@@ -3,13 +3,13 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = [
-        "deduced.go",
         "doc.go",
         "helpers.go",
         "merge.go",
         "parser.go",
         "remove.go",
         "typed.go",
+        "union.go",
         "validate.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/sigs.k8s.io/structured-merge-diff/typed",

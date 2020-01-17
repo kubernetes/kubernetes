@@ -91,6 +91,7 @@ func enforceRequirements(flags *applyPlanFlags, dryRun bool, newK8sVersion strin
 
 	var cfg *kubeadmapi.InitConfiguration
 	if flags.cfgPath != "" {
+		klog.Warning("WARNING: Usage of the --config flag for reconfiguring the cluster during upgrade is not recommended!")
 		cfg, err = configutil.LoadInitConfigurationFromFile(flags.cfgPath)
 	} else {
 		cfg, err = configutil.FetchInitConfigurationFromCluster(client, os.Stdout, "upgrade/config", false)
@@ -120,7 +121,7 @@ func enforceRequirements(flags *applyPlanFlags, dryRun bool, newK8sVersion strin
 
 	// Ensure the user is root
 	klog.V(1).Info("running preflight checks")
-	if err := runPreflightChecks(ignorePreflightErrorsSet); err != nil {
+	if err := runPreflightChecks(client, ignorePreflightErrorsSet, &cfg.ClusterConfiguration); err != nil {
 		return nil, nil, nil, err
 	}
 
@@ -178,9 +179,17 @@ func printConfiguration(clustercfg *kubeadmapi.ClusterConfiguration, w io.Writer
 }
 
 // runPreflightChecks runs the root preflight check
-func runPreflightChecks(ignorePreflightErrors sets.String) error {
+func runPreflightChecks(client clientset.Interface, ignorePreflightErrors sets.String, cfg *kubeadmapi.ClusterConfiguration) error {
 	fmt.Println("[preflight] Running pre-flight checks.")
-	return preflight.RunRootCheckOnly(ignorePreflightErrors)
+	err := preflight.RunRootCheckOnly(ignorePreflightErrors)
+	if err != nil {
+		return err
+	}
+	err = upgrade.RunCoreDNSMigrationCheck(client, ignorePreflightErrors, cfg.DNS.Type)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // getClient gets a real or fake client depending on whether the user is dry-running or not

@@ -15,7 +15,7 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
-        "//staging/src/k8s.io/api/admissionregistration/v1beta1:go_default_library",
+        "//staging/src/k8s.io/api/admissionregistration/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
@@ -34,7 +34,7 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/admission/configuration",
     importpath = "k8s.io/apiserver/pkg/admission/configuration",
     deps = [
-        "//staging/src/k8s.io/api/admissionregistration/v1beta1:go_default_library",
+        "//staging/src/k8s.io/api/admissionregistration/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
@@ -42,7 +42,7 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/generic:go_default_library",
         "//staging/src/k8s.io/client-go/informers:go_default_library",
-        "//staging/src/k8s.io/client-go/listers/admissionregistration/v1beta1:go_default_library",
+        "//staging/src/k8s.io/client-go/listers/admissionregistration/v1:go_default_library",
         "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
     ],
 )

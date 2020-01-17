@@ -5,7 +5,6 @@ go_library(
     srcs = [
         "subpath.go",
         "subpath_linux.go",
-        "subpath_nsenter.go",
         "subpath_unsupported.go",
         "subpath_windows.go",
     ],
@@ -32,7 +31,6 @@ go_library(
             "//pkg/util/mount:go_default_library",
             "//vendor/golang.org/x/sys/unix:go_default_library",
             "//vendor/k8s.io/klog:go_default_library",
-            "//vendor/k8s.io/utils/nsenter:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:nacl": [
             "//pkg/util/mount:go_default_library",
@@ -67,17 +65,13 @@ go_test(
     name = "go_default_test",
     srcs = [
         "subpath_linux_test.go",
-        "subpath_nsenter_test.go",
         "subpath_windows_test.go",
     ],
     embed = [":go_default_library"],
     deps = select({
         "@io_bazel_rules_go//go/platform:linux": [
             "//pkg/util/mount:go_default_library",
-            "//pkg/volume/util/nsenter:go_default_library",
-            "//vendor/golang.org/x/sys/unix:go_default_library",
             "//vendor/k8s.io/klog:go_default_library",
-            "//vendor/k8s.io/utils/nsenter:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:windows": [
             "//vendor/github.com/stretchr/testify/assert:go_default_library",

@@ -35,7 +35,11 @@ func AddConversionFuncs(scheme *runtime.Scheme) error {
 
 		Convert_v1_ListMeta_To_v1_ListMeta,
 
+		Convert_v1_DeleteOptions_To_v1_DeleteOptions,
+
 		Convert_intstr_IntOrString_To_intstr_IntOrString,
+		Convert_Pointer_intstr_IntOrString_To_intstr_IntOrString,
+		Convert_intstr_IntOrString_To_Pointer_intstr_IntOrString,
 
 		Convert_Pointer_v1_Duration_To_v1_Duration,
 		Convert_v1_Duration_To_Pointer_v1_Duration,
@@ -195,8 +199,29 @@ func Convert_v1_ListMeta_To_v1_ListMeta(in, out *ListMeta, s conversion.Scope) e
 }
 
 // +k8s:conversion-fn=copy-only
+func Convert_v1_DeleteOptions_To_v1_DeleteOptions(in, out *DeleteOptions, s conversion.Scope) error {
+	*out = *in
+	return nil
+}
+
+// +k8s:conversion-fn=copy-only
 func Convert_intstr_IntOrString_To_intstr_IntOrString(in, out *intstr.IntOrString, s conversion.Scope) error {
 	*out = *in
+	return nil
+}
+
+func Convert_Pointer_intstr_IntOrString_To_intstr_IntOrString(in **intstr.IntOrString, out *intstr.IntOrString, s conversion.Scope) error {
+	if *in == nil {
+		*out = intstr.IntOrString{} // zero value
+		return nil
+	}
+	*out = **in // copy
+	return nil
+}
+
+func Convert_intstr_IntOrString_To_Pointer_intstr_IntOrString(in *intstr.IntOrString, out **intstr.IntOrString, s conversion.Scope) error {
+	temp := *in // copy
+	*out = &temp
 	return nil
 }
 
@@ -230,10 +255,10 @@ func Convert_v1_Duration_To_Pointer_v1_Duration(in *Duration, out **Duration, s 
 }
 
 // Convert_Slice_string_To_v1_Time allows converting a URL query parameter value
-func Convert_Slice_string_To_v1_Time(input *[]string, out *Time, s conversion.Scope) error {
+func Convert_Slice_string_To_v1_Time(in *[]string, out *Time, s conversion.Scope) error {
 	str := ""
-	if len(*input) > 0 {
-		str = (*input)[0]
+	if len(*in) > 0 {
+		str = (*in)[0]
 	}
 	return out.UnmarshalQueryParameter(str)
 }
@@ -311,9 +336,9 @@ func Convert_Slice_string_To_Slice_int32(in *[]string, out *[]int32, s conversio
 }
 
 // Convert_Slice_string_To_v1_DeletionPropagation allows converting a URL query parameter propagationPolicy
-func Convert_Slice_string_To_v1_DeletionPropagation(input *[]string, out *DeletionPropagation, s conversion.Scope) error {
-	if len(*input) > 0 {
-		*out = DeletionPropagation((*input)[0])
+func Convert_Slice_string_To_v1_DeletionPropagation(in *[]string, out *DeletionPropagation, s conversion.Scope) error {
+	if len(*in) > 0 {
+		*out = DeletionPropagation((*in)[0])
 	} else {
 		*out = ""
 	}
@@ -321,9 +346,9 @@ func Convert_Slice_string_To_v1_DeletionPropagation(input *[]string, out *Deleti
 }
 
 // Convert_Slice_string_To_v1_IncludeObjectPolicy allows converting a URL query parameter value
-func Convert_Slice_string_To_v1_IncludeObjectPolicy(input *[]string, out *IncludeObjectPolicy, s conversion.Scope) error {
-	if len(*input) > 0 {
-		*out = IncludeObjectPolicy((*input)[0])
+func Convert_Slice_string_To_v1_IncludeObjectPolicy(in *[]string, out *IncludeObjectPolicy, s conversion.Scope) error {
+	if len(*in) > 0 {
+		*out = IncludeObjectPolicy((*in)[0])
 	}
 	return nil
 }

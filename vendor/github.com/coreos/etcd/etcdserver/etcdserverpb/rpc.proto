@@ -351,6 +351,9 @@ message ResponseHeader {
   // member_id is the ID of the member which sent the response.
   uint64 member_id = 2;
   // revision is the key-value store revision when the request was applied.
+  // For watch progress responses, the header.revision indicates progress. All future events
+  // recieved in this stream are guaranteed to have a higher revision number than the
+  // header.revision number.
   int64 revision = 3;
   // raft_term is the raft term when the request was applied.
   uint64 raft_term = 4;
@@ -639,6 +642,7 @@ message WatchRequest {
   oneof request_union {
     WatchCreateRequest create_request = 1;
     WatchCancelRequest cancel_request = 2;
+    WatchProgressRequest progress_request = 3;
   }
 }
 
@@ -671,11 +675,26 @@ message WatchCreateRequest {
   // If prev_kv is set, created watcher gets the previous KV before the event happens.
   // If the previous KV is already compacted, nothing will be returned.
   bool prev_kv = 6;
+
+  // If watch_id is provided and non-zero, it will be assigned to this watcher.
+  // Since creating a watcher in etcd is not a synchronous operation,
+  // this can be used ensure that ordering is correct when creating multiple
+  // watchers on the same stream. Creating a watcher with an ID already in
+  // use on the stream will cause an error to be returned.
+  int64 watch_id = 7;
+
+  // fragment enables splitting large revisions into multiple watch responses.
+  bool fragment = 8;
 }
 
 message WatchCancelRequest {
   // watch_id is the watcher id to cancel so that no more events are transmitted.
   int64 watch_id = 1;
+}
+
+// Requests the a watch stream progress status be sent in the watch response stream as soon as
+// possible.
+message WatchProgressRequest {
 }
 
 message WatchResponse {
@@ -702,6 +721,9 @@ message WatchResponse {
 
   // cancel_reason indicates the reason for canceling the watcher.
   string cancel_reason = 6;
+
+  // framgment is true if large watch response was split over multiple responses.
+  bool fragment = 7;
 
   repeated mvccpb.Event events = 11;
 }

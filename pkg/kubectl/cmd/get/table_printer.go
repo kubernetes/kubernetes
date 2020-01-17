@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -45,6 +46,11 @@ func (t *TablePrinter) PrintObj(obj runtime.Object, writer io.Writer) error {
 }
 
 func decodeIntoTable(obj runtime.Object) (runtime.Object, error) {
+	event, isEvent := obj.(*metav1.WatchEvent)
+	if isEvent {
+		obj = event.Object.Object
+	}
+
 	if obj.GetObjectKind().GroupVersionKind().Group != metav1beta1.GroupName {
 		return nil, fmt.Errorf("attempt to decode non-Table object into a v1beta1.Table")
 	}
@@ -73,5 +79,9 @@ func decodeIntoTable(obj runtime.Object) (runtime.Object, error) {
 		row.Object.Object = converted
 	}
 
+	if isEvent {
+		event.Object.Object = table
+		return event, nil
+	}
 	return table, nil
 }

@@ -21,7 +21,6 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/credentialprovider"
 	credentialprovidersecrets "k8s.io/kubernetes/pkg/credentialprovider/secrets"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/util/parsers"
@@ -57,14 +56,13 @@ func (m *kubeGenericRuntimeManager) PullImage(image kubecontainer.ImageSpec, pul
 
 	var pullErrs []error
 	for _, currentCreds := range creds {
-		authConfig := credentialprovider.LazyProvide(currentCreds, repoToPull)
 		auth := &runtimeapi.AuthConfig{
-			Username:      authConfig.Username,
-			Password:      authConfig.Password,
-			Auth:          authConfig.Auth,
-			ServerAddress: authConfig.ServerAddress,
-			IdentityToken: authConfig.IdentityToken,
-			RegistryToken: authConfig.RegistryToken,
+			Username:      currentCreds.Username,
+			Password:      currentCreds.Password,
+			Auth:          currentCreds.Auth,
+			ServerAddress: currentCreds.ServerAddress,
+			IdentityToken: currentCreds.IdentityToken,
+			RegistryToken: currentCreds.RegistryToken,
 		}
 
 		imageRef, err := m.imageService.PullImage(imgSpec, auth, podSandboxConfig)

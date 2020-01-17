@@ -24,15 +24,15 @@ import (
 	"strings"
 	"time"
 
+	"github.com/onsi/ginkgo"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	clientset "k8s.io/client-go/kubernetes"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
-
-	"github.com/onsi/ginkgo"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 )
 
 const (
@@ -96,7 +96,7 @@ var _ = SIGDescribe("ClusterDns [Feature:Example]", func() {
 
 		// wait for objects
 		for _, ns := range namespaces {
-			framework.WaitForControlledPodsRunning(c, ns.Name, backendRcName, api.Kind("ReplicationController"))
+			e2epod.WaitForControlledPodsRunning(c, ns.Name, backendRcName, api.Kind("ReplicationController"))
 			framework.WaitForService(c, ns.Name, backendSvcName, true, framework.Poll, framework.ServiceStartTimeout)
 		}
 		// it is not enough that pods are running because they may be set to running, but
@@ -106,11 +106,11 @@ var _ = SIGDescribe("ClusterDns [Feature:Example]", func() {
 			options := metav1.ListOptions{LabelSelector: label.String()}
 			pods, err := c.CoreV1().Pods(ns.Name).List(options)
 			framework.ExpectNoError(err, "failed to list pods in namespace: %s", ns.Name)
-			err = framework.PodsResponding(c, ns.Name, backendPodName, false, pods)
+			err = e2epod.PodsResponding(c, ns.Name, backendPodName, false, pods)
 			framework.ExpectNoError(err, "waiting for all pods to respond")
-			e2elog.Logf("found %d backend pods responding in namespace %s", len(pods.Items), ns.Name)
+			framework.Logf("found %d backend pods responding in namespace %s", len(pods.Items), ns.Name)
 
-			err = framework.ServiceResponding(c, ns.Name, backendSvcName)
+			err = e2eservice.WaitForServiceResponding(c, ns.Name, backendSvcName)
 			framework.ExpectNoError(err, "waiting for the service to respond")
 		}
 
@@ -145,7 +145,7 @@ var _ = SIGDescribe("ClusterDns [Feature:Example]", func() {
 		// wait until the pods have been scheduler, i.e. are not Pending anymore. Remember
 		// that we cannot wait for the pods to be running because our pods terminate by themselves.
 		for _, ns := range namespaces {
-			err := framework.WaitForPodNotPending(c, ns.Name, frontendPodName)
+			err := e2epod.WaitForPodNotPending(c, ns.Name, frontendPodName)
 			framework.ExpectNoError(err)
 		}
 

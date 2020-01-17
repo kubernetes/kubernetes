@@ -29,12 +29,11 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
-	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 // TODO: it would probably be slightly better to build up the objects
@@ -204,7 +203,7 @@ const (
 	addonNsName           = metav1.NamespaceSystem
 )
 
-var serveHostnameImage = imageutils.GetE2EImage(imageutils.ServeHostname)
+var serveHostnameImage = imageutils.GetE2EImage(imageutils.Agnhost)
 
 type stringPair struct {
 	data, fileName string
@@ -299,7 +298,7 @@ var _ = SIGDescribe("Addon update", func() {
 		sshExecAndVerify(sshClient, fmt.Sprintf("sudo cp %s/%s %s/%s", temporaryRemotePath, svcAddonEnsureExists, destinationDir, svcAddonEnsureExists))
 		// Delete the "ensure exist class" addon at the end.
 		defer func() {
-			e2elog.Logf("Cleaning up ensure exist class addon.")
+			framework.Logf("Cleaning up ensure exist class addon.")
 			err := f.ClientSet.CoreV1().Services(addonNsName).Delete("addon-ensure-exists-test", nil)
 			framework.ExpectNoError(err)
 		}()
@@ -388,11 +387,11 @@ func getMasterSSHClient() (*ssh.Client, error) {
 func sshExecAndVerify(client *ssh.Client, cmd string) {
 	_, _, rc, err := sshExec(client, cmd)
 	framework.ExpectNoError(err, "Failed to execute %q with ssh client %+v", cmd, client)
-	gomega.Expect(rc).To(gomega.Equal(0), "error return code from executing command on the cluster: %s", cmd)
+	framework.ExpectEqual(rc, 0, "error return code from executing command on the cluster: %s", cmd)
 }
 
 func sshExec(client *ssh.Client, cmd string) (string, string, int, error) {
-	e2elog.Logf("Executing '%s' on %v", cmd, client.RemoteAddr())
+	framework.Logf("Executing '%s' on %v", cmd, client.RemoteAddr())
 	session, err := client.NewSession()
 	if err != nil {
 		return "", "", 0, fmt.Errorf("error creating session to host %s: '%v'", client.RemoteAddr(), err)
@@ -424,7 +423,7 @@ func sshExec(client *ssh.Client, cmd string) (string, string, int, error) {
 }
 
 func writeRemoteFile(sshClient *ssh.Client, data, dir, fileName string, mode os.FileMode) error {
-	e2elog.Logf(fmt.Sprintf("Writing remote file '%s/%s' on %v", dir, fileName, sshClient.RemoteAddr()))
+	framework.Logf(fmt.Sprintf("Writing remote file '%s/%s' on %v", dir, fileName, sshClient.RemoteAddr()))
 	session, err := sshClient.NewSession()
 	if err != nil {
 		return fmt.Errorf("error creating session to host %s: '%v'", sshClient.RemoteAddr(), err)

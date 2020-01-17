@@ -36,7 +36,7 @@ func TestKubeConfigSubCommandsThatWritesToOut(t *testing.T) {
 	defer os.RemoveAll(tmpdir)
 
 	// Adds a pki folder with a ca cert to the temp folder
-	pkidir := testutil.SetupPkiDirWithCertificateAuthorithy(t, tmpdir)
+	pkidir := testutil.SetupPkiDirWithCertificateAuthority(t, tmpdir)
 
 	// Retrieves ca cert for assertions
 	caCert, _, err := pkiutil.TryLoadCertAndKeyFromDisk(pkidir, kubeadmconstants.CACertAndKeyBaseName)

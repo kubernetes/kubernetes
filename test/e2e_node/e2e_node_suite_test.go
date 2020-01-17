@@ -41,13 +41,15 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/system"
 	commontest "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+	"k8s.io/kubernetes/test/e2e/framework/testfiles"
+	"k8s.io/kubernetes/test/e2e/generated"
 	"k8s.io/kubernetes/test/e2e_node/services"
 
-	"github.com/kardianos/osext"
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 	"github.com/onsi/ginkgo/config"
 	morereporters "github.com/onsi/ginkgo/reporters"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega"
 	"github.com/spf13/pflag"
 	"k8s.io/klog"
 )
@@ -61,8 +63,9 @@ var systemValidateMode = flag.Bool("system-validate-mode", false, "If true, only
 var systemSpecFile = flag.String("system-spec-file", "", "The name of the system spec file that will be used for node conformance test. If it's unspecified or empty, the default system spec (system.DefaultSysSpec) will be used.")
 
 func init() {
-	framework.RegisterCommonFlags()
-	framework.RegisterNodeFlags()
+	e2econfig.CopyFlags(e2econfig.Flags, flag.CommandLine)
+	framework.RegisterCommonFlags(flag.CommandLine)
+	framework.RegisterNodeFlags(flag.CommandLine)
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	// Mark the run-services-mode flag as hidden to prevent user from using it.
 	pflag.CommandLine.MarkHidden("run-services-mode")
@@ -71,6 +74,13 @@ func init() {
 	// TODO(random-liu): Find who is using flag.Parse() and cause errors and move the following logic
 	// into TestContext.
 	// TODO(pohly): remove RegisterNodeFlags from test_context.go enable Viper config support here?
+
+	// Enable bindata file lookup as fallback.
+	testfiles.AddFileSource(testfiles.BindataFileSource{
+		Asset:      generated.Asset,
+		AssetNames: generated.AssetNames,
+	})
+
 }
 
 func TestMain(m *testing.M) {
@@ -115,14 +125,14 @@ func TestE2eNode(t *testing.T) {
 				klog.Exitf("chroot %q failed: %v", rootfs, err)
 			}
 		}
-		if _, err := system.ValidateSpec(*spec, framework.TestContext.ContainerRuntime); err != nil {
+		if _, err := system.ValidateSpec(*spec, framework.TestContext.ContainerRuntime); len(err) != 0 {
 			klog.Exitf("system validation failed: %v", err)
 		}
 		return
 	}
 	// If run-services-mode is not specified, run test.
-	RegisterFailHandler(Fail)
-	reporters := []Reporter{}
+	gomega.RegisterFailHandler(ginkgo.Fail)
+	reporters := []ginkgo.Reporter{}
 	reportDir := framework.TestContext.ReportDir
 	if reportDir != "" {
 		// Create the directory if it doesn't already exists
@@ -135,13 +145,13 @@ func TestE2eNode(t *testing.T) {
 			reporters = append(reporters, morereporters.NewJUnitReporter(junitPath))
 		}
 	}
-	RunSpecsWithDefaultAndCustomReporters(t, "E2eNode Suite", reporters)
+	ginkgo.RunSpecsWithDefaultAndCustomReporters(t, "E2eNode Suite", reporters)
 }
 
 // Setup the kubelet on the node
-var _ = SynchronizedBeforeSuite(func() []byte {
+var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// Run system validation test.
-	Expect(validateSystem()).To(Succeed(), "system validation")
+	gomega.Expect(validateSystem()).To(gomega.Succeed(), "system validation")
 
 	// Pre-pull the images tests depend on so we can fail immediately if there is an image pull issue
 	// This helps with debugging test flakes since it is hard to tell when a test failure is due to image pulling.
@@ -149,7 +159,7 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 		klog.Infof("Pre-pulling images so that they are cached for the tests.")
 		updateImageWhiteList()
 		err := PrePullAllImages()
-		Expect(err).ShouldNot(HaveOccurred())
+		gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
 	}
 
 	// TODO(yifan): Temporary workaround to disable coreos from auto restart
@@ -161,7 +171,7 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 		// If the services are expected to stop after test, they should monitor the test process.
 		// If the services are expected to keep running after test, they should not monitor the test process.
 		e2es = services.NewE2EServices(*stopServices)
-		Expect(e2es.Start()).To(Succeed(), "should be able to start node services.")
+		gomega.Expect(e2es.Start()).To(gomega.Succeed(), "should be able to start node services.")
 		klog.Infof("Node services started.  Running tests...")
 	} else {
 		klog.Infof("Running tests without starting services.")
@@ -176,11 +186,11 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 	return nil
 }, func([]byte) {
 	// update test context with node configuration.
-	Expect(updateTestContext()).To(Succeed(), "update test context with node config.")
+	gomega.Expect(updateTestContext()).To(gomega.Succeed(), "update test context with node config.")
 })
 
 // Tear down the kubelet on the node
-var _ = SynchronizedAfterSuite(func() {}, func() {
+var _ = ginkgo.SynchronizedAfterSuite(func() {}, func() {
 	if e2es != nil {
 		if *startServices && *stopServices {
 			klog.Infof("Stopping node services...")
@@ -193,7 +203,7 @@ var _ = SynchronizedAfterSuite(func() {}, func() {
 
 // validateSystem runs system validation in a separate process and returns error if validation fails.
 func validateSystem() error {
-	testBin, err := osext.Executable()
+	testBin, err := os.Executable()
 	if err != nil {
 		return fmt.Errorf("can't get current binary: %v", err)
 	}
@@ -216,7 +226,7 @@ func maskLocksmithdOnCoreos() {
 	}
 	if bytes.Contains(data, []byte("ID=coreos")) {
 		output, err := exec.Command("systemctl", "mask", "--now", "locksmithd").CombinedOutput()
-		Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("should be able to mask locksmithd - output: %q", string(output)))
+		framework.ExpectNoError(err, fmt.Sprintf("should be able to mask locksmithd - output: %q", string(output)))
 		klog.Infof("Locksmithd is masked successfully")
 	}
 }
@@ -229,8 +239,8 @@ func waitForNodeReady() {
 		nodeReadyPollInterval = 1 * time.Second
 	)
 	client, err := getAPIServerClient()
-	Expect(err).NotTo(HaveOccurred(), "should be able to get apiserver client.")
-	Eventually(func() error {
+	framework.ExpectNoError(err, "should be able to get apiserver client.")
+	gomega.Eventually(func() error {
 		node, err := getNode(client)
 		if err != nil {
 			return fmt.Errorf("failed to get node: %v", err)
@@ -239,7 +249,7 @@ func waitForNodeReady() {
 			return fmt.Errorf("node is not ready: %+v", node)
 		}
 		return nil
-	}, nodeReadyTimeout, nodeReadyPollInterval).Should(Succeed())
+	}, nodeReadyTimeout, nodeReadyPollInterval).Should(gomega.Succeed())
 }
 
 // updateTestContext updates the test context with the node name.
@@ -273,11 +283,11 @@ func updateTestContext() error {
 // getNode gets node object from the apiserver.
 func getNode(c *clientset.Clientset) (*v1.Node, error) {
 	nodes, err := c.CoreV1().Nodes().List(metav1.ListOptions{})
-	Expect(err).NotTo(HaveOccurred(), "should be able to list nodes.")
+	framework.ExpectNoError(err, "should be able to list nodes.")
 	if nodes == nil {
 		return nil, fmt.Errorf("the node list is nil.")
 	}
-	Expect(len(nodes.Items) > 1).NotTo(BeTrue(), "the number of nodes is more than 1.")
+	gomega.Expect(len(nodes.Items) > 1).NotTo(gomega.BeTrue(), "the number of nodes is more than 1.")
 	if len(nodes.Items) == 0 {
 		return nil, fmt.Errorf("empty node list: %+v", nodes)
 	}

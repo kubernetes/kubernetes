@@ -38,11 +38,13 @@ import (
 	"time"
 
 	restful "github.com/emicklei/go-restful"
+
 	fuzzer "k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
+	metainternalversionscheme "k8s.io/apimachinery/pkg/apis/meta/internalversion/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
@@ -71,14 +73,13 @@ import (
 	genericapitesting "k8s.io/apiserver/pkg/endpoints/testing"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/rest"
-	"k8s.io/apiserver/pkg/server/filters"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 )
 
 type alwaysMutatingDeny struct{}
 
-func (alwaysMutatingDeny) Admit(a admission.Attributes, o admission.ObjectInterfaces) (err error) {
+func (alwaysMutatingDeny) Admit(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) (err error) {
 	return admission.NewForbidden(a, errors.New("Mutating admission control is denying all modifications"))
 }
 
@@ -86,15 +87,19 @@ func (alwaysMutatingDeny) Handles(operation admission.Operation) bool {
 	return true
 }
 
+var _ admission.MutationInterface = &alwaysMutatingDeny{}
+
 type alwaysValidatingDeny struct{}
 
-func (alwaysValidatingDeny) Validate(a admission.Attributes, o admission.ObjectInterfaces) (err error) {
+func (alwaysValidatingDeny) Validate(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) (err error) {
 	return admission.NewForbidden(a, errors.New("Validating admission control is denying all modifications"))
 }
 
 func (alwaysValidatingDeny) Handles(operation admission.Operation) bool {
 	return true
 }
+
+var _ admission.ValidationInterface = &alwaysValidatingDeny{}
 
 // This creates fake API versions, similar to api/latest.go.
 var testAPIGroup = "test.group"
@@ -449,7 +454,7 @@ func (storage *SimpleRESTStorage) Delete(ctx context.Context, id string, deleteV
 	if err := storage.errors["delete"]; err != nil {
 		return nil, false, err
 	}
-	if err := deleteValidation(&storage.item); err != nil {
+	if err := deleteValidation(ctx, &storage.item); err != nil {
 		return nil, false, err
 	}
 	var obj runtime.Object = &metav1.Status{Status: metav1.StatusSuccess}
@@ -478,7 +483,7 @@ func (storage *SimpleRESTStorage) Create(ctx context.Context, obj runtime.Object
 	if storage.injectedFunction != nil {
 		obj, err = storage.injectedFunction(obj)
 	}
-	if err := createValidation(obj); err != nil {
+	if err := createValidation(ctx, obj); err != nil {
 		return nil, err
 	}
 	return obj, err
@@ -497,7 +502,7 @@ func (storage *SimpleRESTStorage) Update(ctx context.Context, name string, objIn
 	if storage.injectedFunction != nil {
 		obj, err = storage.injectedFunction(obj)
 	}
-	if err := updateValidation(&storage.item, obj); err != nil {
+	if err := updateValidation(ctx, &storage.item, obj); err != nil {
 		return nil, false, err
 	}
 	return obj, false, err
@@ -655,7 +660,7 @@ func (storage *NamedCreaterRESTStorage) Create(ctx context.Context, name string,
 	if storage.injectedFunction != nil {
 		obj, err = storage.injectedFunction(obj)
 	}
-	if err := createValidation(obj); err != nil {
+	if err := createValidation(ctx, obj); err != nil {
 		return nil, err
 	}
 	return obj, err
@@ -1219,7 +1224,12 @@ func TestListCompression(t *testing.T) {
 	}
 	for i, testCase := range testCases {
 		storage := map[string]rest.Storage{}
-		simpleStorage := SimpleRESTStorage{expectedResourceNamespace: testCase.namespace}
+		simpleStorage := SimpleRESTStorage{
+			expectedResourceNamespace: testCase.namespace,
+			list: []genericapitesting.Simple{
+				{Other: strings.Repeat("0123456789abcdef", (128*1024/16)+1)},
+			},
+		}
 		storage["simple"] = &simpleStorage
 		selfLinker := &setTestSelfLinker{
 			t:           t,
@@ -1228,7 +1238,6 @@ func TestListCompression(t *testing.T) {
 		}
 		var handler = handleInternal(storage, admissionControl, selfLinker, nil)
 
-		handler = filters.WithCompression(handler)
 		handler = genericapifilters.WithRequestInfo(handler, newTestRequestInfoResolver())
 
 		server := httptest.NewServer(handler)
@@ -1656,11 +1665,51 @@ func BenchmarkGet(b *testing.B) {
 	b.StopTimer()
 }
 
-func TestGetCompression(t *testing.T) {
+func BenchmarkGetNoCompression(b *testing.B) {
 	storage := map[string]rest.Storage{}
 	simpleStorage := SimpleRESTStorage{
 		item: genericapitesting.Simple{
 			Other: "foo",
+		},
+	}
+	selfLinker := &setTestSelfLinker{
+		expectedSet: "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/id",
+		name:        "id",
+		namespace:   "default",
+	}
+	storage["simple"] = &simpleStorage
+	handler := handleLinker(storage, selfLinker)
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	client := &http.Client{
+		Transport: &http.Transport{
+			DisableCompression: true,
+		},
+	}
+
+	u := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/id"
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		resp, err := client.Get(u)
+		if err != nil {
+			b.Fatalf("unexpected error: %v", err)
+		}
+		if resp.StatusCode != http.StatusOK {
+			b.Fatalf("unexpected response: %#v", resp)
+		}
+		if _, err := io.Copy(ioutil.Discard, resp.Body); err != nil {
+			b.Fatalf("unable to read body")
+		}
+	}
+	b.StopTimer()
+}
+func TestGetCompression(t *testing.T) {
+	storage := map[string]rest.Storage{}
+	simpleStorage := SimpleRESTStorage{
+		item: genericapitesting.Simple{
+			Other: strings.Repeat("0123456789abcdef", (128*1024/16)+1),
 		},
 	}
 	selfLinker := &setTestSelfLinker{
@@ -1672,7 +1721,6 @@ func TestGetCompression(t *testing.T) {
 
 	storage["simple"] = &simpleStorage
 	handler := handleLinker(storage, selfLinker)
-	handler = filters.WithCompression(handler)
 	handler = genericapifilters.WithRequestInfo(handler, newTestRequestInfoResolver())
 	server := httptest.NewServer(handler)
 	defer server.Close()
@@ -1687,7 +1735,7 @@ func TestGetCompression(t *testing.T) {
 	for _, test := range tests {
 		req, err := http.NewRequest("GET", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/id", nil)
 		if err != nil {
-			t.Fatalf("unexpected error cretaing request: %v", err)
+			t.Fatalf("unexpected error creating request: %v", err)
 		}
 		// It's necessary to manually set Accept-Encoding here
 		// to prevent http.DefaultClient from automatically
@@ -1827,7 +1875,7 @@ func TestGetTable(t *testing.T) {
 	{
 		partial := meta.AsPartialObjectMetadata(m)
 		partial.GetObjectKind().SetGroupVersionKind(metav1beta1.SchemeGroupVersion.WithKind("PartialObjectMetadata"))
-		encodedBody, err := runtime.Encode(metainternalversion.Codecs.LegacyCodec(metav1beta1.SchemeGroupVersion), partial)
+		encodedBody, err := runtime.Encode(metainternalversionscheme.Codecs.LegacyCodec(metav1beta1.SchemeGroupVersion), partial)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1838,7 +1886,7 @@ func TestGetTable(t *testing.T) {
 	{
 		partial := meta.AsPartialObjectMetadata(m)
 		partial.GetObjectKind().SetGroupVersionKind(metav1.SchemeGroupVersion.WithKind("PartialObjectMetadata"))
-		encodedBody, err := runtime.Encode(metainternalversion.Codecs.LegacyCodec(metav1.SchemeGroupVersion), partial)
+		encodedBody, err := runtime.Encode(metainternalversionscheme.Codecs.LegacyCodec(metav1.SchemeGroupVersion), partial)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -2028,14 +2076,14 @@ func TestWatchTable(t *testing.T) {
 	}
 	partial := meta.AsPartialObjectMetadata(m)
 	partial.GetObjectKind().SetGroupVersionKind(metav1beta1.SchemeGroupVersion.WithKind("PartialObjectMetadata"))
-	encodedBody, err := runtime.Encode(metainternalversion.Codecs.LegacyCodec(metav1beta1.SchemeGroupVersion), partial)
+	encodedBody, err := runtime.Encode(metainternalversionscheme.Codecs.LegacyCodec(metav1beta1.SchemeGroupVersion), partial)
 	if err != nil {
 		t.Fatal(err)
 	}
 	// the codec includes a trailing newline that is not present during decode
 	encodedBody = bytes.TrimSpace(encodedBody)
 
-	encodedBodyV1, err := runtime.Encode(metainternalversion.Codecs.LegacyCodec(metav1.SchemeGroupVersion), partial)
+	encodedBodyV1, err := runtime.Encode(metainternalversionscheme.Codecs.LegacyCodec(metav1.SchemeGroupVersion), partial)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2044,7 +2092,7 @@ func TestWatchTable(t *testing.T) {
 
 	metaDoc := metav1.ObjectMeta{}.SwaggerDoc()
 
-	s := metainternalversion.Codecs.SupportedMediaTypes()[0].Serializer
+	s := metainternalversionscheme.Codecs.SupportedMediaTypes()[0].Serializer
 
 	tests := []struct {
 		accept string
@@ -2261,7 +2309,7 @@ func TestWatchTable(t *testing.T) {
 }
 
 func watcher(mediaType string, r io.ReadCloser) streaming.Decoder {
-	info, ok := runtime.SerializerInfoForMediaType(metainternalversion.Codecs.SupportedMediaTypes(), mediaType)
+	info, ok := runtime.SerializerInfoForMediaType(metainternalversionscheme.Codecs.SupportedMediaTypes(), mediaType)
 	if !ok || info.StreamSerializer == nil {
 		panic(info)
 	}
@@ -2435,7 +2483,7 @@ func TestGetPartialObjectMetadata(t *testing.T) {
 		}
 		body := ""
 		if test.expected != nil {
-			itemOut, d, err := extractBodyObject(resp, metainternalversion.Codecs.LegacyCodec(metav1beta1.SchemeGroupVersion))
+			itemOut, d, err := extractBodyObject(resp, metainternalversionscheme.Codecs.LegacyCodec(metav1beta1.SchemeGroupVersion))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -3036,6 +3084,9 @@ func TestDelete(t *testing.T) {
 
 	client := http.Client{}
 	request, err := http.NewRequest("DELETE", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, nil)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 	res, err := client.Do(request)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -3068,6 +3119,9 @@ func TestDeleteWithOptions(t *testing.T) {
 
 	client := http.Client{}
 	request, err := http.NewRequest("DELETE", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, bytes.NewReader(body))
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 	res, err := client.Do(request)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -3105,6 +3159,9 @@ func TestDeleteWithOptionsQuery(t *testing.T) {
 
 	client := http.Client{}
 	request, err := http.NewRequest("DELETE", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID+"?gracePeriodSeconds="+strconv.FormatInt(grace, 10), nil)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 	res, err := client.Do(request)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -3145,6 +3202,9 @@ func TestDeleteWithOptionsQueryAndBody(t *testing.T) {
 	}
 	client := http.Client{}
 	request, err := http.NewRequest("DELETE", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID+"?gracePeriodSeconds="+strconv.FormatInt(grace+10, 10), bytes.NewReader(body))
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 	res, err := client.Do(request)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -3181,6 +3241,9 @@ func TestDeleteInvokesAdmissionControl(t *testing.T) {
 
 		client := http.Client{}
 		request, err := http.NewRequest("DELETE", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, nil)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
 		response, err := client.Do(request)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
@@ -3204,6 +3267,9 @@ func TestDeleteMissing(t *testing.T) {
 
 	client := http.Client{}
 	request, err := http.NewRequest("DELETE", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, nil)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 	response, err := client.Do(request)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -3244,6 +3310,9 @@ func TestUpdate(t *testing.T) {
 
 	client := http.Client{}
 	request, err := http.NewRequest("PUT", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, bytes.NewReader(body))
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 	response, err := client.Do(request)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -3286,6 +3355,9 @@ func TestUpdateInvokesAdmissionControl(t *testing.T) {
 
 		client := http.Client{}
 		request, err := http.NewRequest("PUT", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, bytes.NewReader(body))
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
 		response, err := client.Do(request)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
@@ -3319,6 +3391,9 @@ func TestUpdateRequiresMatchingName(t *testing.T) {
 
 	client := http.Client{}
 	request, err := http.NewRequest("PUT", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, bytes.NewReader(body))
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 	response, err := client.Do(request)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -3353,6 +3428,9 @@ func TestUpdateAllowsMissingNamespace(t *testing.T) {
 
 	client := http.Client{}
 	request, err := http.NewRequest("PUT", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, bytes.NewReader(body))
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 	response, err := client.Do(request)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -3394,6 +3472,9 @@ func TestUpdateDisallowsMismatchedNamespaceOnError(t *testing.T) {
 
 	client := http.Client{}
 	request, err := http.NewRequest("PUT", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, bytes.NewReader(body))
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 	response, err := client.Do(request)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -3433,6 +3514,9 @@ func TestUpdatePreventsMismatchedNamespace(t *testing.T) {
 
 	client := http.Client{}
 	request, err := http.NewRequest("PUT", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, bytes.NewReader(body))
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 	response, err := client.Do(request)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -3467,6 +3551,9 @@ func TestUpdateMissing(t *testing.T) {
 
 	client := http.Client{}
 	request, err := http.NewRequest("PUT", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, bytes.NewReader(body))
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 	response, err := client.Do(request)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -3623,7 +3710,7 @@ func TestParentResourceIsRequired(t *testing.T) {
 	}
 }
 
-func TestCreateWithName(t *testing.T) {
+func TestNamedCreaterWithName(t *testing.T) {
 	pathName := "helloworld"
 	storage := &NamedCreaterRESTStorage{SimpleRESTStorage: &SimpleRESTStorage{}}
 	handler := handle(map[string]rest.Storage{
@@ -3652,6 +3739,147 @@ func TestCreateWithName(t *testing.T) {
 	}
 	if storage.createdName != pathName {
 		t.Errorf("Did not get expected name in create context. Got: %s, Expected: %s", storage.createdName, pathName)
+	}
+}
+
+func TestNamedCreaterWithoutName(t *testing.T) {
+	storage := &NamedCreaterRESTStorage{
+		SimpleRESTStorage: &SimpleRESTStorage{
+			injectedFunction: func(obj runtime.Object) (runtime.Object, error) {
+				time.Sleep(5 * time.Millisecond)
+				return obj, nil
+			},
+		},
+	}
+
+	selfLinker := &setTestSelfLinker{
+		t:           t,
+		name:        "bar",
+		namespace:   "default",
+		expectedSet: "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/foo",
+	}
+	handler := handleLinker(map[string]rest.Storage{"foo": storage}, selfLinker)
+	server := httptest.NewServer(handler)
+	defer server.Close()
+	client := http.Client{}
+
+	simple := &genericapitesting.Simple{
+		Other: "bar",
+	}
+	data, err := runtime.Encode(testCodec, simple)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	request, err := http.NewRequest("POST", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/foo", bytes.NewBuffer(data))
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	var response *http.Response
+	go func() {
+		response, err = client.Do(request)
+		wg.Done()
+	}()
+	wg.Wait()
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	// empty name is not allowed for NamedCreater
+	if response.StatusCode != http.StatusBadRequest {
+		t.Errorf("Unexpected response %#v", response)
+	}
+}
+
+type namePopulatorAdmissionControl struct {
+	t            *testing.T
+	populateName string
+}
+
+func (npac *namePopulatorAdmissionControl) Validate(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) (err error) {
+	if a.GetName() != npac.populateName {
+		npac.t.Errorf("Unexpected name: got %q, expected %q", a.GetName(), npac.populateName)
+	}
+	return nil
+}
+
+func (npac *namePopulatorAdmissionControl) Handles(operation admission.Operation) bool {
+	return true
+}
+
+var _ admission.ValidationInterface = &namePopulatorAdmissionControl{}
+
+func TestNamedCreaterWithGenerateName(t *testing.T) {
+	populateName := "bar"
+	storage := &SimpleRESTStorage{
+		injectedFunction: func(obj runtime.Object) (runtime.Object, error) {
+			time.Sleep(5 * time.Millisecond)
+			if metadata, err := meta.Accessor(obj); err == nil {
+				if len(metadata.GetName()) != 0 {
+					t.Errorf("Unexpected name %q", metadata.GetName())
+				}
+				metadata.SetName(populateName)
+			} else {
+				return nil, err
+			}
+			return obj, nil
+		},
+	}
+
+	selfLinker := &setTestSelfLinker{
+		t:           t,
+		namespace:   "default",
+		expectedSet: "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/foo",
+	}
+
+	ac := &namePopulatorAdmissionControl{
+		t:            t,
+		populateName: populateName,
+	}
+
+	handler := handleInternal(map[string]rest.Storage{"foo": storage}, ac, selfLinker, nil)
+	server := httptest.NewServer(handler)
+	defer server.Close()
+	client := http.Client{}
+
+	simple := &genericapitesting.Simple{
+		Other: "bar",
+	}
+	data, err := runtime.Encode(testCodec, simple)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	request, err := http.NewRequest("POST", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/foo", bytes.NewBuffer(data))
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	var response *http.Response
+	go func() {
+		response, err = client.Do(request)
+		wg.Done()
+	}()
+	wg.Wait()
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if response.StatusCode != http.StatusCreated {
+		t.Errorf("Unexpected status: %d, Expected: %d, %#v", response.StatusCode, http.StatusOK, response)
+	}
+
+	var itemOut genericapitesting.Simple
+	body, err := extractBody(response, &itemOut)
+	if err != nil {
+		t.Errorf("unexpected error: %v %#v", err, response)
+	}
+
+	itemOut.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
+	simple.Name = populateName
+	if !reflect.DeepEqual(&itemOut, simple) {
+		t.Errorf("Unexpected data: %#v, expected %#v (%s)", itemOut, simple, string(body))
 	}
 }
 
@@ -3837,6 +4065,7 @@ func TestCreateYAML(t *testing.T) {
 		t.Errorf("Never set self link")
 	}
 }
+
 func TestCreateInNamespace(t *testing.T) {
 	storage := SimpleRESTStorage{
 		injectedFunction: func(obj runtime.Object) (runtime.Object, error) {
@@ -3947,7 +4176,7 @@ func TestCreateInvokeAdmissionControl(t *testing.T) {
 	}
 }
 
-func expectApiStatus(t *testing.T, method, url string, data []byte, code int) *metav1.Status {
+func expectAPIStatus(t *testing.T, method, url string, data []byte, code int) *metav1.Status {
 	t.Helper()
 	client := http.Client{}
 	request, err := http.NewRequest(method, url, bytes.NewBuffer(data))
@@ -3982,7 +4211,7 @@ func TestDelayReturnsError(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	status := expectApiStatus(t, "DELETE", fmt.Sprintf("%s/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/foo/bar", server.URL), nil, http.StatusConflict)
+	status := expectAPIStatus(t, "DELETE", fmt.Sprintf("%s/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/foo/bar", server.URL), nil, http.StatusConflict)
 	if status.Status != metav1.StatusFailure || status.Message == "" || status.Details == nil || status.Reason != metav1.StatusReasonAlreadyExists {
 		t.Errorf("Unexpected status %#v", status)
 	}
@@ -4013,7 +4242,7 @@ func TestWriteJSONDecodeError(t *testing.T) {
 	// Unless specific metav1.Status() parameters are implemented for the particular error in question, such that
 	// the status code is defined, metav1 errors where error.status == metav1.StatusFailure
 	// will throw a '500 Internal Server Error'. Non-metav1 type errors will always throw a '500 Internal Server Error'.
-	status := expectApiStatus(t, "GET", server.URL, nil, http.StatusInternalServerError)
+	status := expectAPIStatus(t, "GET", server.URL, nil, http.StatusInternalServerError)
 	if status.Reason != metav1.StatusReasonUnknown {
 		t.Errorf("unexpected reason %#v", status)
 	}
@@ -4067,7 +4296,7 @@ func TestCreateTimeout(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	itemOut := expectApiStatus(t, "POST", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/foo?timeout=4ms", data, http.StatusGatewayTimeout)
+	itemOut := expectAPIStatus(t, "POST", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/foo?timeout=4ms", data, http.StatusGatewayTimeout)
 	if itemOut.Status != metav1.StatusFailure || itemOut.Reason != metav1.StatusReasonTimeout {
 		t.Errorf("Unexpected status %#v", itemOut)
 	}
@@ -4245,12 +4474,12 @@ func TestDryRunDisabled(t *testing.T) {
 	}))
 	defer server.Close()
 	for _, test := range tests {
-		baseUrl := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version
-		response := runRequest(t, baseUrl+test.path, test.verb, test.data, test.contentType)
+		baseURL := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version
+		response := runRequest(t, baseURL+test.path, test.verb, test.data, test.contentType)
 		if response.StatusCode == http.StatusBadRequest {
 			t.Fatalf("unexpected BadRequest: %#v", response)
 		}
-		response = runRequest(t, baseUrl+test.path+"?dryRun", test.verb, test.data, test.contentType)
+		response = runRequest(t, baseURL+test.path+"?dryRun", test.verb, test.data, test.contentType)
 		if response.StatusCode != http.StatusBadRequest {
 			t.Fatalf("unexpected non BadRequest: %#v", response)
 		}

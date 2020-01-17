@@ -17,6 +17,7 @@ limitations under the License.
 package defaulttolerationseconds
 
 import (
+	"context"
 	"testing"
 
 	"k8s.io/apiserver/pkg/admission"
@@ -264,7 +265,7 @@ func TestForgivenessAdmission(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		err := handler.Admit(admission.NewAttributesRecord(&test.requestedPod, nil, api.Kind("Pod").WithVersion("version"), "foo", "name", api.Resource("pods").WithVersion("version"), "", "ignored", nil, false, nil), nil)
+		err := handler.Admit(context.TODO(), admission.NewAttributesRecord(&test.requestedPod, nil, api.Kind("Pod").WithVersion("version"), "foo", "name", api.Resource("pods").WithVersion("version"), "", "ignored", nil, false, nil), nil)
 		if err != nil {
 			t.Errorf("[%s]: unexpected error %v for pod %+v", test.description, err, test.requestedPod)
 		}

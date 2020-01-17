@@ -63,8 +63,10 @@ type KubeControllerManagerOptions struct {
 	CSRSigningController             *CSRSigningControllerOptions
 	DaemonSetController              *DaemonSetControllerOptions
 	DeploymentController             *DeploymentControllerOptions
+	StatefulSetController            *StatefulSetControllerOptions
 	DeprecatedFlags                  *DeprecatedControllerOptions
 	EndpointController               *EndpointControllerOptions
+	EndpointSliceController          *EndpointSliceControllerOptions
 	GarbageCollectorController       *GarbageCollectorControllerOptions
 	HPAController                    *HPAControllerOptions
 	JobController                    *JobControllerOptions
@@ -114,11 +116,17 @@ func NewKubeControllerManagerOptions() (*KubeControllerManagerOptions, error) {
 		DeploymentController: &DeploymentControllerOptions{
 			&componentConfig.DeploymentController,
 		},
+		StatefulSetController: &StatefulSetControllerOptions{
+			&componentConfig.StatefulSetController,
+		},
 		DeprecatedFlags: &DeprecatedControllerOptions{
 			&componentConfig.DeprecatedController,
 		},
 		EndpointController: &EndpointControllerOptions{
 			&componentConfig.EndpointController,
+		},
+		EndpointSliceController: &EndpointSliceControllerOptions{
+			&componentConfig.EndpointSliceController,
 		},
 		GarbageCollectorController: &GarbageCollectorControllerOptions{
 			&componentConfig.GarbageCollectorController,
@@ -184,6 +192,8 @@ func NewKubeControllerManagerOptions() (*KubeControllerManagerOptions, error) {
 	}
 
 	s.GarbageCollectorController.GCIgnoredResources = gcIgnoredResources
+	s.Generic.LeaderElection.ResourceName = "kube-controller-manager"
+	s.Generic.LeaderElection.ResourceNamespace = "kube-system"
 
 	return &s, nil
 }
@@ -216,9 +226,11 @@ func (s *KubeControllerManagerOptions) Flags(allControllers []string, disabledBy
 	s.AttachDetachController.AddFlags(fss.FlagSet("attachdetach controller"))
 	s.CSRSigningController.AddFlags(fss.FlagSet("csrsigning controller"))
 	s.DeploymentController.AddFlags(fss.FlagSet("deployment controller"))
+	s.StatefulSetController.AddFlags(fss.FlagSet("statefulset controller"))
 	s.DaemonSetController.AddFlags(fss.FlagSet("daemonset controller"))
 	s.DeprecatedFlags.AddFlags(fss.FlagSet("deprecated"))
 	s.EndpointController.AddFlags(fss.FlagSet("endpoint controller"))
+	s.EndpointSliceController.AddFlags(fss.FlagSet("endpointslice controller"))
 	s.GarbageCollectorController.AddFlags(fss.FlagSet("garbagecollector controller"))
 	s.HPAController.AddFlags(fss.FlagSet("horizontalpodautoscaling controller"))
 	s.JobController.AddFlags(fss.FlagSet("job controller"))
@@ -261,10 +273,16 @@ func (s *KubeControllerManagerOptions) ApplyTo(c *kubecontrollerconfig.Config) e
 	if err := s.DeploymentController.ApplyTo(&c.ComponentConfig.DeploymentController); err != nil {
 		return err
 	}
+	if err := s.StatefulSetController.ApplyTo(&c.ComponentConfig.StatefulSetController); err != nil {
+		return err
+	}
 	if err := s.DeprecatedFlags.ApplyTo(&c.ComponentConfig.DeprecatedController); err != nil {
 		return err
 	}
 	if err := s.EndpointController.ApplyTo(&c.ComponentConfig.EndpointController); err != nil {
+		return err
+	}
+	if err := s.EndpointSliceController.ApplyTo(&c.ComponentConfig.EndpointSliceController); err != nil {
 		return err
 	}
 	if err := s.GarbageCollectorController.ApplyTo(&c.ComponentConfig.GarbageCollectorController); err != nil {
@@ -342,8 +360,10 @@ func (s *KubeControllerManagerOptions) Validate(allControllers []string, disable
 	errs = append(errs, s.CSRSigningController.Validate()...)
 	errs = append(errs, s.DaemonSetController.Validate()...)
 	errs = append(errs, s.DeploymentController.Validate()...)
+	errs = append(errs, s.StatefulSetController.Validate()...)
 	errs = append(errs, s.DeprecatedFlags.Validate()...)
 	errs = append(errs, s.EndpointController.Validate()...)
+	errs = append(errs, s.EndpointSliceController.Validate()...)
 	errs = append(errs, s.GarbageCollectorController.Validate()...)
 	errs = append(errs, s.HPAController.Validate()...)
 	errs = append(errs, s.JobController.Validate()...)
@@ -382,6 +402,7 @@ func (s KubeControllerManagerOptions) Config(allControllers []string, disabledBy
 	if err != nil {
 		return nil, err
 	}
+	kubeconfig.DisableCompression = true
 	kubeconfig.ContentConfig.ContentType = s.Generic.ClientConnection.ContentType
 	kubeconfig.QPS = s.Generic.ClientConnection.QPS
 	kubeconfig.Burst = int(s.Generic.ClientConnection.Burst)

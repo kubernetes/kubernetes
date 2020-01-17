@@ -53,6 +53,12 @@ type Op struct {
 	// for watch, put, delete
 	prevKV bool
 
+	// for watch
+	// fragmentation should be disabled by default
+	// if true, split watch events when total exceeds
+	// "--max-request-bytes" flag value + 512-byte
+	fragment bool
+
 	// for put
 	ignoreValue bool
 	ignoreLease bool
@@ -510,4 +516,15 @@ func toLeaseTimeToLiveRequest(id LeaseID, opts ...LeaseOption) *pb.LeaseTimeToLi
 	ret := &LeaseOp{id: id}
 	ret.applyOpts(opts)
 	return &pb.LeaseTimeToLiveRequest{ID: int64(id), Keys: ret.attachedKeys}
+}
+
+// WithFragment to receive raw watch response with fragmentation.
+// Fragmentation is disabled by default. If fragmentation is enabled,
+// etcd watch server will split watch response before sending to clients
+// when the total size of watch events exceed server-side request limit.
+// The default server-side request limit is 1.5 MiB, which can be configured
+// as "--max-request-bytes" flag value + gRPC-overhead 512 bytes.
+// See "etcdserver/api/v3rpc/watch.go" for more details.
+func WithFragment() OpOption {
+	return func(op *Op) { op.fragment = true }
 }

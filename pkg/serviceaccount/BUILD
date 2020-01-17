@@ -60,6 +60,7 @@ go_test(
         "//staging/src/k8s.io/client-go/listers/core/v1:go_default_library",
         "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
         "//staging/src/k8s.io/client-go/util/keyutil:go_default_library",
+        "//vendor/gopkg.in/square/go-jose.v2:go_default_library",
         "//vendor/gopkg.in/square/go-jose.v2/jwt:go_default_library",
     ],
 )

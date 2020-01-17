@@ -71,7 +71,7 @@ func EnforceVersionPolicies(versionGetter VersionGetter, newK8sVersionStr string
 	}
 
 	// Make sure the new version is a supported version (higher than the minimum one supported)
-	if constants.MinimumControlPlaneVersion.AtLeast(newK8sVersion) {
+	if !newK8sVersion.AtLeast(constants.MinimumControlPlaneVersion) {
 		// This must not happen, kubeadm always supports a minimum version; and we can't go below that
 		skewErrors.Mandatory = append(skewErrors.Mandatory, errors.Errorf("Specified version to upgrade to %q is equal to or lower than the minimum supported version %q. Please specify a higher version to upgrade to", newK8sVersionStr, clusterVersionStr))
 	}

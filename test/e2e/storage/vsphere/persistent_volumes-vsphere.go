@@ -26,7 +26,8 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -39,8 +40,8 @@ var _ = utils.SIGDescribe("PersistentVolumes:vsphere", func() {
 		pv         *v1.PersistentVolume
 		pvc        *v1.PersistentVolumeClaim
 		clientPod  *v1.Pod
-		pvConfig   framework.PersistentVolumeConfig
-		pvcConfig  framework.PersistentVolumeClaimConfig
+		pvConfig   e2epv.PersistentVolumeConfig
+		pvcConfig  e2epv.PersistentVolumeClaimConfig
 		err        error
 		node       string
 		volLabel   labels.Set
@@ -66,19 +67,15 @@ var _ = utils.SIGDescribe("PersistentVolumes:vsphere", func() {
 		clientPod = nil
 		pvc = nil
 		pv = nil
-		nodes := framework.GetReadySchedulableNodesOrDie(c)
-		if len(nodes.Items) < 1 {
-			framework.Skipf("Requires at least %d node", 1)
-		}
-		nodeInfo = TestContext.NodeMapper.GetNodeInfo(nodes.Items[0].Name)
+		nodeInfo = GetReadySchedulableRandomNodeInfo()
 
-		volLabel = labels.Set{framework.VolumeSelectorKey: ns}
+		volLabel = labels.Set{e2epv.VolumeSelectorKey: ns}
 		selector = metav1.SetAsLabelSelector(volLabel)
 
 		if volumePath == "" {
 			volumePath, err = nodeInfo.VSphere.CreateVolume(&VolumeOptions{}, nodeInfo.DataCenterRef)
 			framework.ExpectNoError(err)
-			pvConfig = framework.PersistentVolumeConfig{
+			pvConfig = e2epv.PersistentVolumeConfig{
 				NamePrefix: "vspherepv-",
 				Labels:     volLabel,
 				PVSource: v1.PersistentVolumeSource{
@@ -90,18 +87,18 @@ var _ = utils.SIGDescribe("PersistentVolumes:vsphere", func() {
 				Prebind: nil,
 			}
 			emptyStorageClass := ""
-			pvcConfig = framework.PersistentVolumeClaimConfig{
+			pvcConfig = e2epv.PersistentVolumeClaimConfig{
 				Selector:         selector,
 				StorageClassName: &emptyStorageClass,
 			}
 		}
 		ginkgo.By("Creating the PV and PVC")
-		pv, pvc, err = framework.CreatePVPVC(c, pvConfig, pvcConfig, ns, false)
+		pv, pvc, err = e2epv.CreatePVPVC(c, pvConfig, pvcConfig, ns, false)
 		framework.ExpectNoError(err)
-		framework.ExpectNoError(framework.WaitOnPVandPVC(c, ns, pv, pvc))
+		framework.ExpectNoError(e2epv.WaitOnPVandPVC(c, ns, pv, pvc))
 
 		ginkgo.By("Creating the Client Pod")
-		clientPod, err = framework.CreateClientPod(c, ns, pvc)
+		clientPod, err = e2epod.CreateClientPod(c, ns, pvc)
 		framework.ExpectNoError(err)
 		node = clientPod.Spec.NodeName
 
@@ -112,15 +109,15 @@ var _ = utils.SIGDescribe("PersistentVolumes:vsphere", func() {
 	})
 
 	ginkgo.AfterEach(func() {
-		e2elog.Logf("AfterEach: Cleaning up test resources")
+		framework.Logf("AfterEach: Cleaning up test resources")
 		if c != nil {
-			framework.ExpectNoError(framework.DeletePodWithWait(f, c, clientPod), "AfterEach: failed to delete pod ", clientPod.Name)
+			framework.ExpectNoError(e2epod.DeletePodWithWait(c, clientPod), "AfterEach: failed to delete pod ", clientPod.Name)
 
 			if pv != nil {
-				framework.ExpectNoError(framework.DeletePersistentVolume(c, pv.Name), "AfterEach: failed to delete PV ", pv.Name)
+				framework.ExpectNoError(e2epv.DeletePersistentVolume(c, pv.Name), "AfterEach: failed to delete PV ", pv.Name)
 			}
 			if pvc != nil {
-				framework.ExpectNoError(framework.DeletePersistentVolumeClaim(c, pvc.Name, ns), "AfterEach: failed to delete PVC ", pvc.Name)
+				framework.ExpectNoError(e2epv.DeletePersistentVolumeClaim(c, pvc.Name, ns), "AfterEach: failed to delete PVC ", pvc.Name)
 			}
 		}
 	})
@@ -149,11 +146,11 @@ var _ = utils.SIGDescribe("PersistentVolumes:vsphere", func() {
 
 	ginkgo.It("should test that deleting a PVC before the pod does not cause pod deletion to fail on vsphere volume detach", func() {
 		ginkgo.By("Deleting the Claim")
-		framework.ExpectNoError(framework.DeletePersistentVolumeClaim(c, pvc.Name, ns), "Failed to delete PVC ", pvc.Name)
+		framework.ExpectNoError(e2epv.DeletePersistentVolumeClaim(c, pvc.Name, ns), "Failed to delete PVC ", pvc.Name)
 		pvc = nil
 
 		ginkgo.By("Deleting the Pod")
-		framework.ExpectNoError(framework.DeletePodWithWait(f, c, clientPod), "Failed to delete pod ", clientPod.Name)
+		framework.ExpectNoError(e2epod.DeletePodWithWait(c, clientPod), "Failed to delete pod ", clientPod.Name)
 	})
 
 	/*
@@ -165,11 +162,11 @@ var _ = utils.SIGDescribe("PersistentVolumes:vsphere", func() {
 	*/
 	ginkgo.It("should test that deleting the PV before the pod does not cause pod deletion to fail on vspehre volume detach", func() {
 		ginkgo.By("Deleting the Persistent Volume")
-		framework.ExpectNoError(framework.DeletePersistentVolume(c, pv.Name), "Failed to delete PV ", pv.Name)
+		framework.ExpectNoError(e2epv.DeletePersistentVolume(c, pv.Name), "Failed to delete PV ", pv.Name)
 		pv = nil
 
 		ginkgo.By("Deleting the pod")
-		framework.ExpectNoError(framework.DeletePodWithWait(f, c, clientPod), "Failed to delete pod ", clientPod.Name)
+		framework.ExpectNoError(e2epod.DeletePodWithWait(c, clientPod), "Failed to delete pod ", clientPod.Name)
 	})
 	/*
 		This test verifies that a volume mounted to a pod remains mounted after a kubelet restarts.
@@ -179,6 +176,7 @@ var _ = utils.SIGDescribe("PersistentVolumes:vsphere", func() {
 		3. Verify that written file is accessible after kubelet restart
 	*/
 	ginkgo.It("should test that a file written to the vspehre volume mount before kubelet restart can be read after restart [Disruptive]", func() {
+		framework.SkipUnlessSSHKeyPresent()
 		utils.TestKubeletRestartsAndRestoresMount(c, f, clientPod)
 	})
 
@@ -194,6 +192,7 @@ var _ = utils.SIGDescribe("PersistentVolumes:vsphere", func() {
 		5. Verify that volume mount not to be found.
 	*/
 	ginkgo.It("should test that a vspehre volume mounted to a pod that is deleted while the kubelet is down unmounts when the kubelet returns [Disruptive]", func() {
+		framework.SkipUnlessSSHKeyPresent()
 		utils.TestVolumeUnmountsFromDeletedPod(c, f, clientPod)
 	})
 

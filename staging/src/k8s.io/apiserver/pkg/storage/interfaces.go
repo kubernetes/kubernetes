@@ -73,16 +73,13 @@ type ResponseMeta struct {
 	ResourceVersion uint64
 }
 
-// MatchValue defines a pair (<index name>, <value for that index>).
-type MatchValue struct {
-	IndexName string
-	Value     string
-}
+// IndexerFunc is a function that for a given object computes
+// <value of an index> for a particular <index>.
+type IndexerFunc func(obj runtime.Object) string
 
-// TriggerPublisherFunc is a function that takes an object, and returns a list of pairs
-// (<index name>, <index value for the given object>) for all indexes known
-// to that function.
-type TriggerPublisherFunc func(obj runtime.Object) []MatchValue
+// IndexerFuncs is a mapping from <index name> to function that
+// for a given object computes <value for that index>.
+type IndexerFuncs map[string]IndexerFunc
 
 // Everything accepts all objects.
 var Everything = SelectionPredicate{
@@ -98,10 +95,10 @@ type UpdateFunc func(input runtime.Object, res ResponseMeta) (output runtime.Obj
 // ValidateObjectFunc is a function to act on a given object. An error may be returned
 // if the hook cannot be completed. The function may NOT transform the provided
 // object.
-type ValidateObjectFunc func(obj runtime.Object) error
+type ValidateObjectFunc func(ctx context.Context, obj runtime.Object) error
 
 // ValidateAllObjectFunc is a "admit everything" instance of ValidateObjectFunc.
-func ValidateAllObjectFunc(obj runtime.Object) error {
+func ValidateAllObjectFunc(ctx context.Context, obj runtime.Object) error {
 	return nil
 }
 

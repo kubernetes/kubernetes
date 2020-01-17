@@ -61,6 +61,7 @@ var (
 
 	ErrGRPCNoLeader                   = status.New(codes.Unavailable, "etcdserver: no leader").Err()
 	ErrGRPCNotLeader                  = status.New(codes.FailedPrecondition, "etcdserver: not leader").Err()
+	ErrGRPCLeaderChanged              = status.New(codes.Unavailable, "etcdserver: leader changed").Err()
 	ErrGRPCNotCapable                 = status.New(codes.Unavailable, "etcdserver: not capable").Err()
 	ErrGRPCStopped                    = status.New(codes.Unavailable, "etcdserver: server stopped").Err()
 	ErrGRPCTimeout                    = status.New(codes.Unavailable, "etcdserver: request timed out").Err()
@@ -163,6 +164,7 @@ var (
 
 	ErrNoLeader                   = Error(ErrGRPCNoLeader)
 	ErrNotLeader                  = Error(ErrGRPCNotLeader)
+	ErrLeaderChanged              = Error(ErrGRPCLeaderChanged)
 	ErrNotCapable                 = Error(ErrGRPCNotCapable)
 	ErrStopped                    = Error(ErrGRPCStopped)
 	ErrTimeout                    = Error(ErrGRPCTimeout)

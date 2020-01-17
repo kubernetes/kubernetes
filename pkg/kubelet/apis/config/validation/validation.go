@@ -111,6 +111,9 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration) error 
 	if kc.ServerTLSBootstrap && !localFeatureGate.Enabled(features.RotateKubeletServerCertificate) {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: ServerTLSBootstrap %v requires feature gate RotateKubeletServerCertificate", kc.ServerTLSBootstrap))
 	}
+	if kc.TopologyManagerPolicy != kubeletconfig.NoneTopologyManagerPolicy && !localFeatureGate.Enabled(features.TopologyManager) {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: TopologyManager %v requires feature gate TopologyManager", kc.TopologyManagerPolicy))
+	}
 	for _, val := range kc.EnforceNodeAllocatable {
 		switch val {
 		case kubetypes.NodeAllocatableEnforcementKey:

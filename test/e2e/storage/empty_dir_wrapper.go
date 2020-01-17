@@ -21,16 +21,16 @@ import (
 	"strconv"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 )
 
 const (
@@ -220,7 +220,8 @@ func createGitServer(f *framework.Framework) (gitURL string, gitRepo string, cle
 			Containers: []v1.Container{
 				{
 					Name:            "git-repo",
-					Image:           imageutils.GetE2EImage(imageutils.Fakegitserver),
+					Image:           imageutils.GetE2EImage(imageutils.Agnhost),
+					Args:            []string{"fake-gitserver"},
 					ImagePullPolicy: "IfNotPresent",
 					Ports: []v1.ContainerPort{
 						{ContainerPort: int32(containerPort)},
@@ -345,9 +346,8 @@ func testNoWrappedVolumeRace(f *framework.Framework, volumes []v1.Volume, volume
 	const nodeHostnameLabelKey = "kubernetes.io/hostname"
 
 	rcName := wrappedVolumeRaceRCNamePrefix + string(uuid.NewUUID())
-	nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-	gomega.Expect(len(nodeList.Items)).To(gomega.BeNumerically(">", 0))
-	targetNode := nodeList.Items[0]
+	targetNode, err := e2enode.GetRandomReadySchedulableNode(f.ClientSet)
+	framework.ExpectNoError(err)
 
 	ginkgo.By("Creating RC which spawns configmap-volume pods")
 	affinity := &v1.Affinity{
@@ -384,14 +384,8 @@ func testNoWrappedVolumeRace(f *framework.Framework, volumes []v1.Volume, volume
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
 						{
-							Name:    "test-container",
-							Image:   imageutils.GetE2EImage(imageutils.BusyBox),
-							Command: []string{"sleep", "10000"},
-							Resources: v1.ResourceRequirements{
-								Requests: v1.ResourceList{
-									v1.ResourceCPU: resource.MustParse("10m"),
-								},
-							},
+							Name:         "test-container",
+							Image:        imageutils.GetE2EImage(imageutils.Pause),
 							VolumeMounts: volumeMounts,
 						},
 					},
@@ -402,7 +396,7 @@ func testNoWrappedVolumeRace(f *framework.Framework, volumes []v1.Volume, volume
 			},
 		},
 	}
-	_, err := f.ClientSet.CoreV1().ReplicationControllers(f.Namespace.Name).Create(rc)
+	_, err = f.ClientSet.CoreV1().ReplicationControllers(f.Namespace.Name).Create(rc)
 	framework.ExpectNoError(err, "error creating replication controller")
 
 	defer func() {
@@ -410,7 +404,7 @@ func testNoWrappedVolumeRace(f *framework.Framework, volumes []v1.Volume, volume
 		framework.ExpectNoError(err)
 	}()
 
-	pods, err := framework.PodsCreated(f.ClientSet, f.Namespace.Name, rcName, podCount)
+	pods, err := e2epod.PodsCreated(f.ClientSet, f.Namespace.Name, rcName, podCount)
 
 	ginkgo.By("Ensuring each pod is running")
 

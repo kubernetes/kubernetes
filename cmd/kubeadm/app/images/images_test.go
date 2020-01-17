@@ -103,17 +103,17 @@ func TestGetEtcdImage(t *testing.T) {
 		{
 			cfg: &kubeadmapi.ClusterConfiguration{
 				ImageRepository:   "real.repo",
-				KubernetesVersion: "1.12.0",
+				KubernetesVersion: "1.16.0",
 				Etcd: kubeadmapi.Etcd{
 					Local: &kubeadmapi.LocalEtcd{},
 				},
 			},
-			expected: "real.repo/etcd:3.2.24",
+			expected: "real.repo/etcd:3.3.15-0",
 		},
 		{
 			cfg: &kubeadmapi.ClusterConfiguration{
 				ImageRepository:   "real.repo",
-				KubernetesVersion: "1.12.0",
+				KubernetesVersion: "1.16.0",
 				Etcd: kubeadmapi.Etcd{
 					Local: &kubeadmapi.LocalEtcd{
 						ImageMeta: kubeadmapi.ImageMeta{
@@ -127,7 +127,7 @@ func TestGetEtcdImage(t *testing.T) {
 		{
 			cfg: &kubeadmapi.ClusterConfiguration{
 				ImageRepository:   "real.repo",
-				KubernetesVersion: "1.12.0",
+				KubernetesVersion: "1.16.0",
 				Etcd: kubeadmapi.Etcd{
 					Local: &kubeadmapi.LocalEtcd{
 						ImageMeta: kubeadmapi.ImageMeta{
@@ -136,7 +136,7 @@ func TestGetEtcdImage(t *testing.T) {
 					},
 				},
 			},
-			expected: "override/etcd:3.2.24",
+			expected: "override/etcd:3.3.15-0",
 		},
 		{
 			expected: GetGenericImage(gcrPrefix, "etcd", constants.DefaultEtcdVersion),

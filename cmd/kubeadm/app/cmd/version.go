@@ -27,8 +27,7 @@ import (
 	"sigs.k8s.io/yaml"
 
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
-	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	"k8s.io/kubernetes/pkg/version"
+	"k8s.io/component-base/version"
 )
 
 // Version provides the version information of kubeadm.
@@ -41,9 +40,8 @@ func NewCmdVersion(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "version",
 		Short: "Print the version of kubeadm",
-		Run: func(cmd *cobra.Command, args []string) {
-			err := RunVersion(out, cmd)
-			kubeadmutil.CheckErr(err)
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return RunVersion(out, cmd)
 		},
 	}
 	cmd.Flags().StringP("output", "o", "", "Output format; available options are 'yaml', 'json' and 'short'")
@@ -62,7 +60,7 @@ func RunVersion(out io.Writer, cmd *cobra.Command) error {
 	const flag = "output"
 	of, err := cmd.Flags().GetString(flag)
 	if err != nil {
-		klog.Fatalf("error accessing flag %s for command %s: %v", flag, cmd.Name(), err)
+		return errors.Wrapf(err, "error accessing flag %s for command %s", flag, cmd.Name())
 	}
 
 	switch of {

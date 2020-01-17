@@ -35,7 +35,7 @@ type PathElement struct {
 	// Key selects the list element which has fields matching those given.
 	// The containing object must be an associative list with map typed
 	// elements.
-	Key []value.Field
+	Key *value.Map
 
 	// Value selects the list element with the given value. The containing
 	// object must be an associative list with a primitive typed element
@@ -47,14 +47,62 @@ type PathElement struct {
 	Index *int
 }
 
+// Less provides an order for path elements.
+func (e PathElement) Less(rhs PathElement) bool {
+	if e.FieldName != nil {
+		if rhs.FieldName == nil {
+			return true
+		}
+		return *e.FieldName < *rhs.FieldName
+	} else if rhs.FieldName != nil {
+		return false
+	}
+
+	if e.Key != nil {
+		if rhs.Key == nil {
+			return true
+		}
+		return e.Key.Less(rhs.Key)
+	} else if rhs.Key != nil {
+		return false
+	}
+
+	if e.Value != nil {
+		if rhs.Value == nil {
+			return true
+		}
+		return e.Value.Less(*rhs.Value)
+	} else if rhs.Value != nil {
+		return false
+	}
+
+	if e.Index != nil {
+		if rhs.Index == nil {
+			return true
+		}
+		return *e.Index < *rhs.Index
+	} else if rhs.Index != nil {
+		// Yes, I know the next statement is the same.  But this way
+		// the obvious way of extending the function wil be bug-free.
+		return false
+	}
+
+	return false
+}
+
+// Equals returns true if both path elements are equal.
+func (e PathElement) Equals(rhs PathElement) bool {
+	return !e.Less(rhs) && !rhs.Less(e)
+}
+
 // String presents the path element as a human-readable string.
 func (e PathElement) String() string {
 	switch {
 	case e.FieldName != nil:
 		return "." + *e.FieldName
-	case len(e.Key) > 0:
-		strs := make([]string, len(e.Key))
-		for i, k := range e.Key {
+	case e.Key != nil:
+		strs := make([]string, len(e.Key.Items))
+		for i, k := range e.Key.Items {
 			strs[i] = fmt.Sprintf("%v=%v", k.Name, k.Value)
 		}
 		// The order must be canonical, since we use the string value
@@ -92,61 +140,99 @@ func KeyByFields(nameValues ...interface{}) []value.Field {
 // PathElementSet is a set of path elements.
 // TODO: serialize as a list.
 type PathElementSet struct {
-	// The strange construction is because there's no way to test
-	// PathElements for equality (it can't be used as a key for a map).
-	members map[string]PathElement
+	members sortedPathElements
 }
+
+type sortedPathElements []PathElement
+
+// Implement the sort interface; this would permit bulk creation, which would
+// be faster than doing it one at a time via Insert.
+func (spe sortedPathElements) Len() int           { return len(spe) }
+func (spe sortedPathElements) Less(i, j int) bool { return spe[i].Less(spe[j]) }
+func (spe sortedPathElements) Swap(i, j int)      { spe[i], spe[j] = spe[j], spe[i] }
 
 // Insert adds pe to the set.
 func (s *PathElementSet) Insert(pe PathElement) {
-	serialized := pe.String()
-	if s.members == nil {
-		s.members = map[string]PathElement{
-			serialized: pe,
-		}
+	loc := sort.Search(len(s.members), func(i int) bool {
+		return !s.members[i].Less(pe)
+	})
+	if loc == len(s.members) {
+		s.members = append(s.members, pe)
 		return
 	}
-	if _, ok := s.members[serialized]; !ok {
-		s.members[serialized] = pe
+	if s.members[loc].Equals(pe) {
+		return
 	}
+	s.members = append(s.members, PathElement{})
+	copy(s.members[loc+1:], s.members[loc:])
+	s.members[loc] = pe
 }
 
 // Union returns a set containing elements that appear in either s or s2.
 func (s *PathElementSet) Union(s2 *PathElementSet) *PathElementSet {
-	out := &PathElementSet{
-		members: map[string]PathElement{},
+	out := &PathElementSet{}
+
+	i, j := 0, 0
+	for i < len(s.members) && j < len(s2.members) {
+		if s.members[i].Less(s2.members[j]) {
+			out.members = append(out.members, s.members[i])
+			i++
+		} else {
+			out.members = append(out.members, s2.members[j])
+			if !s2.members[j].Less(s.members[i]) {
+				i++
+			}
+			j++
+		}
 	}
-	for k, v := range s.members {
-		out.members[k] = v
+
+	if i < len(s.members) {
+		out.members = append(out.members, s.members[i:]...)
 	}
-	for k, v := range s2.members {
-		out.members[k] = v
+	if j < len(s2.members) {
+		out.members = append(out.members, s2.members[j:]...)
 	}
 	return out
 }
 
 // Intersection returns a set containing elements which appear in both s and s2.
 func (s *PathElementSet) Intersection(s2 *PathElementSet) *PathElementSet {
-	out := &PathElementSet{
-		members: map[string]PathElement{},
-	}
-	for k, v := range s.members {
-		if _, ok := s2.members[k]; ok {
-			out.members[k] = v
+	out := &PathElementSet{}
+
+	i, j := 0, 0
+	for i < len(s.members) && j < len(s2.members) {
+		if s.members[i].Less(s2.members[j]) {
+			i++
+		} else {
+			if !s2.members[j].Less(s.members[i]) {
+				out.members = append(out.members, s.members[i])
+				i++
+			}
+			j++
 		}
 	}
+
 	return out
 }
 
 // Difference returns a set containing elements which appear in s but not in s2.
 func (s *PathElementSet) Difference(s2 *PathElementSet) *PathElementSet {
-	out := &PathElementSet{
-		members: map[string]PathElement{},
-	}
-	for k, v := range s.members {
-		if _, ok := s2.members[k]; !ok {
-			out.members[k] = v
+	out := &PathElementSet{}
+
+	i, j := 0, 0
+	for i < len(s.members) && j < len(s2.members) {
+		if s.members[i].Less(s2.members[j]) {
+			out.members = append(out.members, s.members[i])
+			i++
+		} else {
+			if !s2.members[j].Less(s.members[i]) {
+				i++
+			}
+			j++
 		}
+	}
+	if i < len(s.members) {
+		out.members = append(out.members, s.members[i:]...)
 	}
 	return out
 }
@@ -156,11 +242,16 @@ func (s *PathElementSet) Size() int { return len(s.members) }
 
 // Has returns true if pe is a member of the set.
 func (s *PathElementSet) Has(pe PathElement) bool {
-	if s.members == nil {
+	loc := sort.Search(len(s.members), func(i int) bool {
+		return !s.members[i].Less(pe)
+	})
+	if loc == len(s.members) {
 		return false
 	}
-	_, ok := s.members[pe.String()]
-	return ok
+	if s.members[loc].Equals(pe) {
+		return true
+	}
+	return false
 }
 
 // Equals returns true if s and s2 have exactly the same members.
@@ -169,14 +260,14 @@ func (s *PathElementSet) Equals(s2 *PathElementSet) bool {
 		return false
 	}
 	for k := range s.members {
-		if _, ok := s2.members[k]; !ok {
+		if !s.members[k].Equals(s2.members[k]) {
 			return false
 		}
 	}
 	return true
 }
 
-// Iterate calls f for each PathElement in the set.
+// Iterate calls f for each PathElement in the set. The order is deterministic.
 func (s *PathElementSet) Iterate(f func(PathElement)) {
 	for _, pe := range s.members {
 		f(pe)

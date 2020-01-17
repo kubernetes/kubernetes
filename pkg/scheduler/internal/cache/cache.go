@@ -21,7 +21,8 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -69,6 +70,7 @@ type schedulerCache struct {
 	// a map from pod key to podState.
 	podStates map[string]*podState
 	nodes     map[string]*nodeInfoListItem
+	csiNodes  map[string]*storagev1beta1.CSINode
 	// headNode points to the most recently updated NodeInfo in "nodes". It is the
 	// head of the linked list.
 	headNode *nodeInfoListItem
@@ -108,6 +110,7 @@ func newSchedulerCache(ttl, period time.Duration, stop <-chan struct{}) *schedul
 
 		nodes:       make(map[string]*nodeInfoListItem),
 		nodeTree:    newNodeTree(nil),
+		csiNodes:    make(map[string]*storagev1beta1.CSINode),
 		assumedPods: make(map[string]bool),
 		podStates:   make(map[string]*podState),
 		imageStates: make(map[string]*imageState),
@@ -118,13 +121,6 @@ func newSchedulerCache(ttl, period time.Duration, stop <-chan struct{}) *schedul
 func newNodeInfoListItem(ni *schedulernodeinfo.NodeInfo) *nodeInfoListItem {
 	return &nodeInfoListItem{
 		info: ni,
-	}
-}
-
-// NewNodeInfoSnapshot initializes a NodeInfoSnapshot struct and returns it.
-func NewNodeInfoSnapshot() *NodeInfoSnapshot {
-	return &NodeInfoSnapshot{
-		NodeInfoMap: make(map[string]*schedulernodeinfo.NodeInfo),
 	}
 }
 
@@ -207,12 +203,12 @@ func (cache *schedulerCache) Snapshot() *Snapshot {
 // beginning of every scheduling cycle.
 // This function tracks generation number of NodeInfo and updates only the
 // entries of an existing snapshot that have changed after the snapshot was taken.
-func (cache *schedulerCache) UpdateNodeInfoSnapshot(nodeSnapshot *NodeInfoSnapshot) error {
+func (cache *schedulerCache) UpdateNodeInfoSnapshot(nodeSnapshot *schedulernodeinfo.Snapshot) error {
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
 	balancedVolumesEnabled := utilfeature.DefaultFeatureGate.Enabled(features.BalanceAttachedNodeVolumes)
 
-	// Get the last generation of the the snapshot.
+	// Get the last generation of the snapshot.
 	snapshotGeneration := nodeSnapshot.Generation
 
 	// Start from the head of the NodeInfo doubly linked list and update snapshot
@@ -564,8 +560,38 @@ func (cache *schedulerCache) RemoveNode(node *v1.Node) error {
 		cache.moveNodeInfoToHead(node.Name)
 	}
 
-	cache.nodeTree.RemoveNode(node)
+	if err := cache.nodeTree.RemoveNode(node); err != nil {
+		return err
+	}
 	cache.removeNodeImageStates(node)
+	return nil
+}
+
+func (cache *schedulerCache) AddCSINode(csiNode *storagev1beta1.CSINode) error {
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+
+	cache.csiNodes[csiNode.Name] = csiNode
+	return nil
+}
+
+func (cache *schedulerCache) UpdateCSINode(oldCSINode, newCSINode *storagev1beta1.CSINode) error {
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+
+	cache.csiNodes[newCSINode.Name] = newCSINode
+	return nil
+}
+
+func (cache *schedulerCache) RemoveCSINode(csiNode *storagev1beta1.CSINode) error {
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+
+	_, ok := cache.csiNodes[csiNode.Name]
+	if !ok {
+		return fmt.Errorf("csinode %v is not found", csiNode.Name)
+	}
+	delete(cache.csiNodes, csiNode.Name)
 	return nil
 }
 
@@ -664,4 +690,45 @@ func (cache *schedulerCache) expirePod(key string, ps *podState) error {
 
 func (cache *schedulerCache) NodeTree() *NodeTree {
 	return cache.nodeTree
+}
+
+// GetNodeInfo returns cached data for the node name.
+func (cache *schedulerCache) GetNodeInfo(nodeName string) (*v1.Node, error) {
+	cache.mu.RLock()
+	defer cache.mu.RUnlock()
+
+	n, ok := cache.nodes[nodeName]
+	if !ok {
+		return nil, fmt.Errorf("node %q not found in cache", nodeName)
+	}
+
+	return n.info.Node(), nil
+}
+
+// ListNodes returns the cached list of nodes.
+func (cache *schedulerCache) ListNodes() []*v1.Node {
+	cache.mu.RLock()
+	defer cache.mu.RUnlock()
+
+	nodes := make([]*v1.Node, 0, len(cache.nodes))
+	for _, node := range cache.nodes {
+		// Node info is sometimes not removed immediately. See schedulerCache.RemoveNode.
+		n := node.info.Node()
+		if n != nil {
+			nodes = append(nodes, n)
+		}
+	}
+	return nodes
+}
+
+func (cache *schedulerCache) GetCSINodeInfo(nodeName string) (*storagev1beta1.CSINode, error) {
+	cache.mu.RLock()
+	defer cache.mu.RUnlock()
+
+	n, ok := cache.csiNodes[nodeName]
+	if !ok {
+		return nil, fmt.Errorf("error retrieving csinode '%v' from cache", nodeName)
+	}
+
+	return n, nil
 }

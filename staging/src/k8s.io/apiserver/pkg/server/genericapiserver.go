@@ -26,13 +26,13 @@ import (
 
 	systemd "github.com/coreos/go-systemd/daemon"
 	"github.com/go-openapi/spec"
-	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilwaitgroup "k8s.io/apimachinery/pkg/util/waitgroup"
 	"k8s.io/apiserver/pkg/admission"
@@ -45,6 +45,7 @@ import (
 	"k8s.io/apiserver/pkg/server/routes"
 	utilopenapi "k8s.io/apiserver/pkg/util/openapi"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/klog"
 	openapibuilder "k8s.io/kube-openapi/pkg/builder"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kube-openapi/pkg/handler"
@@ -76,6 +77,10 @@ type APIGroupInfo struct {
 	NegotiatedSerializer runtime.NegotiatedSerializer
 	// ParameterCodec performs conversions for query parameters passed to API calls
 	ParameterCodec runtime.ParameterCodec
+
+	// StaticOpenAPISpec is the spec derived from the definitions of all resources installed together.
+	// It is set during InstallAPIGroups, InstallAPIGroup, and InstallLegacyAPIGroup.
+	StaticOpenAPISpec *spec.Swagger
 }
 
 // GenericAPIServer contains state for a Kubernetes cluster api server.
@@ -145,9 +150,22 @@ type GenericAPIServer struct {
 	preShutdownHooksCalled bool
 
 	// healthz checks
-	healthzLock    sync.Mutex
-	healthzChecks  []healthz.HealthzChecker
-	healthzCreated bool
+	healthzLock            sync.Mutex
+	healthzChecks          []healthz.HealthChecker
+	healthzChecksInstalled bool
+	// livez checks
+	livezLock            sync.Mutex
+	livezChecks          []healthz.HealthChecker
+	livezChecksInstalled bool
+	// readyz checks
+	readyzLock            sync.Mutex
+	readyzChecks          []healthz.HealthChecker
+	readyzChecksInstalled bool
+	livezGracePeriod      time.Duration
+	livezClock            clock.Clock
+	// the readiness stop channel is used to signal that the apiserver has initiated a shutdown sequence, this
+	// will cause readyz to return unhealthy.
+	readinessStopCh chan struct{}
 
 	// auditing. The backend is started after the server starts listening.
 	AuditBackend audit.Backend
@@ -171,6 +189,11 @@ type GenericAPIServer struct {
 	// HandlerChainWaitGroup allows you to wait for all chain handlers finish after the server shutdown.
 	HandlerChainWaitGroup *utilwaitgroup.SafeWaitGroup
 
+	// ShutdownDelayDuration allows to block shutdown for some time, e.g. until endpoints pointing to this API server
+	// have converged on all node. During this time, the API server keeps serving, /healthz will return 200,
+	// but /readyz will return failure.
+	ShutdownDelayDuration time.Duration
+
 	// The limit on the request body size that would be accepted and decoded in a write request.
 	// 0 means no limit.
 	maxRequestBodyBytes int64
@@ -189,13 +212,16 @@ type DelegationTarget interface {
 	PreShutdownHooks() map[string]preShutdownHookEntry
 
 	// HealthzChecks returns the healthz checks that need to be combined
-	HealthzChecks() []healthz.HealthzChecker
+	HealthzChecks() []healthz.HealthChecker
 
 	// ListedPaths returns the paths for supporting an index
 	ListedPaths() []string
 
 	// NextDelegate returns the next delegationTarget in the chain of delegations
 	NextDelegate() DelegationTarget
+
+	// PrepareRun does post API installation setup steps. It calls recursively the same function of the delegates.
+	PrepareRun() preparedGenericAPIServer
 }
 
 func (s *GenericAPIServer) UnprotectedHandler() http.Handler {
@@ -208,7 +234,7 @@ func (s *GenericAPIServer) PostStartHooks() map[string]postStartHookEntry {
 func (s *GenericAPIServer) PreShutdownHooks() map[string]preShutdownHookEntry {
 	return s.preShutdownHooks
 }
-func (s *GenericAPIServer) HealthzChecks() []healthz.HealthzChecker {
+func (s *GenericAPIServer) HealthzChecks() []healthz.HealthChecker {
 	return s.healthzChecks
 }
 func (s *GenericAPIServer) ListedPaths() []string {
@@ -235,8 +261,8 @@ func (s emptyDelegate) PostStartHooks() map[string]postStartHookEntry {
 func (s emptyDelegate) PreShutdownHooks() map[string]preShutdownHookEntry {
 	return map[string]preShutdownHookEntry{}
 }
-func (s emptyDelegate) HealthzChecks() []healthz.HealthzChecker {
-	return []healthz.HealthzChecker{}
+func (s emptyDelegate) HealthzChecks() []healthz.HealthChecker {
+	return []healthz.HealthChecker{}
 }
 func (s emptyDelegate) ListedPaths() []string {
 	return []string{}
@@ -244,14 +270,19 @@ func (s emptyDelegate) ListedPaths() []string {
 func (s emptyDelegate) NextDelegate() DelegationTarget {
 	return nil
 }
+func (s emptyDelegate) PrepareRun() preparedGenericAPIServer {
+	return preparedGenericAPIServer{nil}
+}
 
 // preparedGenericAPIServer is a private wrapper that enforces a call of PrepareRun() before Run can be invoked.
 type preparedGenericAPIServer struct {
 	*GenericAPIServer
 }
 
-// PrepareRun does post API installation setup steps.
+// PrepareRun does post API installation setup steps. It calls recursively the same function of the delegates.
 func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
+	s.delegationTarget.PrepareRun()
+
 	if s.openAPIConfig != nil {
 		s.OpenAPIVersionedService, s.StaticOpenAPISpec = routes.OpenAPI{
 			Config: s.openAPIConfig,
@@ -259,6 +290,12 @@ func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 	}
 
 	s.installHealthz()
+	s.installLivez()
+	err := s.addReadyzShutdownCheck(s.readinessStopCh)
+	if err != nil {
+		klog.Errorf("Failed to install readyz shutdown check %s", err)
+	}
+	s.installReadyz()
 
 	// Register audit backend preShutdownHook.
 	if s.AuditBackend != nil {
@@ -277,17 +314,31 @@ func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 // Run spawns the secure http server. It only returns if stopCh is closed
 // or the secure port cannot be listened on initially.
 func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
-	err := s.NonBlockingRun(stopCh)
+	delayedStopCh := make(chan struct{})
+
+	go func() {
+		defer close(delayedStopCh)
+		<-stopCh
+
+		time.Sleep(s.ShutdownDelayDuration)
+	}()
+
+	// close socket after delayed stopCh
+	err := s.NonBlockingRun(delayedStopCh)
 	if err != nil {
 		return err
 	}
 
 	<-stopCh
 
+	// run shutdown hooks directly. This includes deregistering from the kubernetes endpoint in case of kube-apiserver.
 	err = s.RunPreShutdownHooks()
 	if err != nil {
 		return err
 	}
+
+	// wait for the delayed stopCh before closing the handler chain (it rejects everything after Wait has been called).
+	<-delayedStopCh
 
 	// Wait for all requests to finish, which are bounded by the RequestTimeout variable.
 	s.HandlerChainWaitGroup.Wait()
@@ -318,6 +369,7 @@ func (s preparedGenericAPIServer) NonBlockingRun(stopCh <-chan struct{}) error {
 		stoppedCh, err = s.SecureServingInfo.Serve(s.Handler, s.ShutdownTimeout, internalStopCh)
 		if err != nil {
 			close(internalStopCh)
+			close(auditStopCh)
 			return err
 		}
 	}
@@ -327,6 +379,7 @@ func (s preparedGenericAPIServer) NonBlockingRun(stopCh <-chan struct{}) error {
 	// ensure cleanup.
 	go func() {
 		<-stopCh
+		close(s.readinessStopCh)
 		close(internalStopCh)
 		if stoppedCh != nil {
 			<-stoppedCh
@@ -473,10 +526,9 @@ func (s *GenericAPIServer) newAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupV
 
 		EquivalentResourceRegistry: s.EquivalentResourceRegistry,
 
-		Admit:                        s.admissionControl,
-		MinRequestTimeout:            s.minRequestTimeout,
-		EnableAPIResponseCompression: s.enableAPIResponseCompression,
-		Authorizer:                   s.Authorizer,
+		Admit:             s.admissionControl,
+		MinRequestTimeout: s.minRequestTimeout,
+		Authorizer:        s.Authorizer,
 	}
 }
 
@@ -513,6 +565,9 @@ func (s *GenericAPIServer) getOpenAPIModels(apiPrefix string, apiGroupInfos ...*
 	openAPISpec, err := openapibuilder.BuildOpenAPIDefinitionsForResources(s.openAPIConfig, resourceNames...)
 	if err != nil {
 		return nil, err
+	}
+	for _, apiGroupInfo := range apiGroupInfos {
+		apiGroupInfo.StaticOpenAPISpec = openAPISpec
 	}
 	return utilopenapi.ToProtoModels(openAPISpec)
 }

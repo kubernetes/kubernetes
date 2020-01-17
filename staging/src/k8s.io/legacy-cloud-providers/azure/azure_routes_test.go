@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2018 The Kubernetes Authors.
 
@@ -22,11 +24,13 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2019-06-01/network"
+	"github.com/Azure/go-autorest/autorest/to"
+	"github.com/stretchr/testify/assert"
+
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	cloudprovider "k8s.io/cloud-provider"
-
-	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2018-07-01/network"
-	"github.com/Azure/go-autorest/autorest/to"
 )
 
 func TestDeleteRoute(t *testing.T) {
@@ -43,7 +47,7 @@ func TestDeleteRoute(t *testing.T) {
 		nodeInformerSynced: func() bool { return true },
 	}
 	route := cloudprovider.Route{TargetNode: "node", DestinationCIDR: "1.2.3.4/24"}
-	routeName := mapNodeNameToRouteName(route.TargetNode)
+	routeName := mapNodeNameToRouteName(route.TargetNode, route.DestinationCIDR)
 
 	fakeRoutes.FakeStore = map[string]map[string]network.Route{
 		cloud.RouteTableName: {
@@ -134,7 +138,7 @@ func TestCreateRoute(t *testing.T) {
 		t.Errorf("unexpected calls create if not exists, exists: %v", fakeTable.Calls)
 	}
 
-	routeName := mapNodeNameToRouteName(route.TargetNode)
+	routeName := mapNodeNameToRouteName(route.TargetNode, string(route.DestinationCIDR))
 	routeInfo, found := fakeRoutes.FakeStore[cloud.RouteTableName][routeName]
 	if !found {
 		t.Errorf("could not find route: %v in %v", routeName, fakeRoutes.FakeStore)
@@ -389,4 +393,41 @@ func TestProcessRoutes(t *testing.T) {
 			}
 		}
 	}
+}
+
+func errorNotNil(t *testing.T, err error) {
+	if nil != err {
+		t.Errorf("%s: failure error: %v", t.Name(), err)
+	}
+}
+func TestFindFirstIPByFamily(t *testing.T) {
+	firstIPv4 := "10.0.0.1"
+	firstIPv6 := "2001:1234:5678:9abc::9"
+	ips := []string{
+		firstIPv4,
+		"11.0.0.1",
+		firstIPv6,
+		"fda4:6dee:effc:62a0:0:0:0:0",
+	}
+	outIPV4, err := findFirstIPByFamily(ips, false)
+	errorNotNil(t, err)
+	assert.Equal(t, outIPV4, firstIPv4)
+
+	outIPv6, err := findFirstIPByFamily(ips, true)
+	errorNotNil(t, err)
+	assert.Equal(t, outIPv6, firstIPv6)
+}
+
+func TestRouteNameFuncs(t *testing.T) {
+	v4CIDR := "10.0.0.1/16"
+	v6CIDR := "fd3e:5f02:6ec0:30ba::/64"
+	nodeName := "thisNode"
+
+	routeName := mapNodeNameToRouteName(types.NodeName(nodeName), v4CIDR)
+	outNodeName := mapRouteNameToNodeName(routeName)
+	assert.Equal(t, string(outNodeName), nodeName)
+
+	routeName = mapNodeNameToRouteName(types.NodeName(nodeName), v6CIDR)
+	outNodeName = mapRouteNameToNodeName(routeName)
+	assert.Equal(t, string(outNodeName), nodeName)
 }

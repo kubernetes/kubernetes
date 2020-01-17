@@ -22,7 +22,7 @@ import (
 // A Matcher is a representation of a class of values.
 // It is used to represent the valid or expected arguments to a mocked method.
 type Matcher interface {
-	// Matches returns whether y is a match.
+	// Matches returns whether x is a match.
 	Matches(x interface{}) bool
 
 	// String describes what the matcher matches.
@@ -85,6 +85,18 @@ func (n notMatcher) String() string {
 	return "not(" + n.m.String() + ")"
 }
 
+type assignableToTypeOfMatcher struct {
+	targetType reflect.Type
+}
+
+func (m assignableToTypeOfMatcher) Matches(x interface{}) bool {
+	return reflect.TypeOf(x).AssignableTo(m.targetType)
+}
+
+func (m assignableToTypeOfMatcher) String() string {
+	return "is assignable to " + m.targetType.Name()
+}
+
 // Constructors
 func Any() Matcher             { return anyMatcher{} }
 func Eq(x interface{}) Matcher { return eqMatcher{x} }
@@ -94,4 +106,17 @@ func Not(x interface{}) Matcher {
 		return notMatcher{m}
 	}
 	return notMatcher{Eq(x)}
+}
+
+// AssignableToTypeOf is a Matcher that matches if the parameter to the mock
+// function is assignable to the type of the parameter to this function.
+//
+// Example usage:
+//
+// 		dbMock.EXPECT().
+// 			Insert(gomock.AssignableToTypeOf(&EmployeeRecord{})).
+// 			Return(errors.New("DB error"))
+//
+func AssignableToTypeOf(x interface{}) Matcher {
+	return assignableToTypeOfMatcher{reflect.TypeOf(x)}
 }

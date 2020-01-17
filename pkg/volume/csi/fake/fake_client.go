@@ -189,20 +189,23 @@ func (f *NodeClient) NodeStageVolume(ctx context.Context, req *csipb.NodeStageVo
 		return nil, errors.New("missing staging target path")
 	}
 
+	csiVol := CSIVolume{
+		Path:          req.GetStagingTargetPath(),
+		VolumeContext: req.GetVolumeContext(),
+	}
+
 	fsType := ""
 	fsTypes := "block|ext4|xfs|zfs"
 	mounted := req.GetVolumeCapability().GetMount()
 	if mounted != nil {
 		fsType = mounted.GetFsType()
+		csiVol.MountFlags = mounted.GetMountFlags()
 	}
 	if !strings.Contains(fsTypes, fsType) {
 		return nil, errors.New("invalid fstype")
 	}
 
-	f.nodeStagedVolumes[req.GetVolumeId()] = CSIVolume{
-		Path:          req.GetStagingTargetPath(),
-		VolumeContext: req.GetVolumeContext(),
-	}
+	f.nodeStagedVolumes[req.GetVolumeId()] = csiVol
 	return &csipb.NodeStageVolumeResponse{}, nil
 }
 

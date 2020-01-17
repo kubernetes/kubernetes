@@ -18,7 +18,6 @@ package authenticatorfactory
 
 import (
 	"errors"
-	"fmt"
 	"time"
 
 	"github.com/go-openapi/spec"
@@ -31,10 +30,10 @@ import (
 	unionauth "k8s.io/apiserver/pkg/authentication/request/union"
 	"k8s.io/apiserver/pkg/authentication/request/websocket"
 	"k8s.io/apiserver/pkg/authentication/request/x509"
+	x509request "k8s.io/apiserver/pkg/authentication/request/x509"
 	"k8s.io/apiserver/pkg/authentication/token/cache"
 	webhooktoken "k8s.io/apiserver/plugin/pkg/authenticator/token/webhook"
 	authenticationclient "k8s.io/client-go/kubernetes/typed/authentication/v1beta1"
-	"k8s.io/client-go/util/cert"
 )
 
 // DelegatingAuthenticatorConfig is the minimal configuration needed to create an authenticator
@@ -48,8 +47,9 @@ type DelegatingAuthenticatorConfig struct {
 	// CacheTTL is the length of time that a token authentication answer will be cached.
 	CacheTTL time.Duration
 
-	// ClientCAFile is the CA bundle file used to authenticate client certificates
-	ClientCAFile string
+	// ClientVerifyOptionFn are the options for verifying incoming connections using mTLS and directly assigning to users.
+	// Generally this is the CA bundle file used to authenticate client certificates
+	ClientVerifyOptionFn x509request.VerifyOptionFunc
 
 	APIAudiences authenticator.Audiences
 
@@ -63,8 +63,8 @@ func (c DelegatingAuthenticatorConfig) New() (authenticator.Request, *spec.Secur
 	// front-proxy first, then remote
 	// Add the front proxy authenticator if requested
 	if c.RequestHeaderConfig != nil {
-		requestHeaderAuthenticator, err := headerrequest.NewSecure(
-			c.RequestHeaderConfig.ClientCA,
+		requestHeaderAuthenticator, err := headerrequest.NewDynamicVerifyOptionsSecure(
+			c.RequestHeaderConfig.VerifyOptionFn,
 			c.RequestHeaderConfig.AllowedClientNames,
 			c.RequestHeaderConfig.UsernameHeaders,
 			c.RequestHeaderConfig.GroupHeaders,
@@ -77,14 +77,8 @@ func (c DelegatingAuthenticatorConfig) New() (authenticator.Request, *spec.Secur
 	}
 
 	// x509 client cert auth
-	if len(c.ClientCAFile) > 0 {
-		clientCAs, err := cert.NewPool(c.ClientCAFile)
-		if err != nil {
-			return nil, nil, fmt.Errorf("unable to load client CA file %s: %v", c.ClientCAFile, err)
-		}
-		verifyOpts := x509.DefaultVerifyOptions()
-		verifyOpts.Roots = clientCAs
-		authenticators = append(authenticators, x509.New(verifyOpts, x509.CommonNameUserConversion))
+	if c.ClientVerifyOptionFn != nil {
+		authenticators = append(authenticators, x509.NewDynamic(c.ClientVerifyOptionFn, x509.CommonNameUserConversion))
 	}
 
 	if c.TokenAccessReviewClient != nil {

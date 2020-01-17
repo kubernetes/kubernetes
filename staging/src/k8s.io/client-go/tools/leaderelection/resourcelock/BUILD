@@ -7,6 +7,7 @@ go_library(
         "endpointslock.go",
         "interface.go",
         "leaselock.go",
+        "multilock.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/tools/leaderelection/resourcelock",
     importpath = "k8s.io/client-go/tools/leaderelection/resourcelock",
@@ -14,6 +15,7 @@ go_library(
     deps = [
         "//staging/src/k8s.io/api/coordination/v1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/typed/coordination/v1:go_default_library",

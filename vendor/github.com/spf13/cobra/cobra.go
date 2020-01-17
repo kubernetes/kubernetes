@@ -23,6 +23,7 @@ import (
 	"strconv"
 	"strings"
 	"text/template"
+	"time"
 	"unicode"
 )
 
@@ -55,6 +56,12 @@ var MousetrapHelpText string = `This is a command line tool.
 
 You need to open cmd.exe and run it from there.
 `
+
+// MousetrapDisplayDuration controls how long the MousetrapHelpText message is displayed on Windows
+// if the CLI is started from explorer.exe. Set to 0 to wait for the return key to be pressed.
+// To disable the mousetrap, just set MousetrapHelpText to blank string ("").
+// Works only on Microsoft Windows.
+var MousetrapDisplayDuration time.Duration = 5 * time.Second
 
 // AddTemplateFunc adds a template function that's available to Usage and Help
 // template generation.

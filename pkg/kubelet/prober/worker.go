@@ -20,9 +20,9 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/component-base/metrics"
 	"k8s.io/klog"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -69,9 +69,9 @@ type worker struct {
 
 	// proberResultsMetricLabels holds the labels attached to this worker
 	// for the ProberResults metric by result.
-	proberResultsSuccessfulMetricLabels prometheus.Labels
-	proberResultsFailedMetricLabels     prometheus.Labels
-	proberResultsUnknownMetricLabels    prometheus.Labels
+	proberResultsSuccessfulMetricLabels metrics.Labels
+	proberResultsFailedMetricLabels     metrics.Labels
+	proberResultsUnknownMetricLabels    metrics.Labels
 }
 
 // Creates and starts a new probe worker.
@@ -98,9 +98,13 @@ func newWorker(
 		w.spec = container.LivenessProbe
 		w.resultsManager = m.livenessManager
 		w.initialValue = results.Success
+	case startup:
+		w.spec = container.StartupProbe
+		w.resultsManager = m.startupManager
+		w.initialValue = results.Failure
 	}
 
-	basicMetricLabels := prometheus.Labels{
+	basicMetricLabels := metrics.Labels{
 		"probe_type": w.probeType.String(),
 		"container":  w.container.Name,
 		"pod":        w.pod.Name,
@@ -218,8 +222,21 @@ func (w *worker) doProbe() (keepGoing bool) {
 			w.pod.Spec.RestartPolicy != v1.RestartPolicyNever
 	}
 
+	// Probe disabled for InitialDelaySeconds.
 	if int32(time.Since(c.State.Running.StartedAt.Time).Seconds()) < w.spec.InitialDelaySeconds {
 		return true
+	}
+
+	if c.Started != nil && *c.Started {
+		// Stop probing for startup once container has started.
+		if w.probeType == startup {
+			return true
+		}
+	} else {
+		// Disable other probes until container has started.
+		if w.probeType != startup {
+			return true
+		}
 	}
 
 	// TODO: in order for exec probes to correctly handle downward API env, we must be able to reconstruct
@@ -255,8 +272,8 @@ func (w *worker) doProbe() (keepGoing bool) {
 
 	w.resultsManager.Set(w.containerID, result, w.pod)
 
-	if w.probeType == liveness && result == results.Failure {
-		// The container fails a liveness check, it will need to be restarted.
+	if (w.probeType == liveness || w.probeType == startup) && result == results.Failure {
+		// The container fails a liveness/startup check, it will need to be restarted.
 		// Stop probing until we see a new container ID. This is to reduce the
 		// chance of hitting #21751, where running `docker exec` when a
 		// container is being stopped may lead to corrupted container state.
@@ -267,8 +284,8 @@ func (w *worker) doProbe() (keepGoing bool) {
 	return true
 }
 
-func deepCopyPrometheusLabels(m prometheus.Labels) prometheus.Labels {
-	ret := make(prometheus.Labels, len(m))
+func deepCopyPrometheusLabels(m metrics.Labels) metrics.Labels {
+	ret := make(metrics.Labels, len(m))
 	for k, v := range m {
 		ret[k] = v
 	}

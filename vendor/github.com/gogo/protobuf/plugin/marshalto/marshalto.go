@@ -76,49 +76,59 @@ message B {
 given to the marshalto plugin, will generate the following code:
 
   func (m *B) Marshal() (dAtA []byte, err error) {
-	size := m.Size()
-	dAtA = make([]byte, size)
-	n, err := m.MarshalTo(dAtA)
-	if err != nil {
-		return nil, err
-	}
-	return dAtA[:n], nil
+          size := m.Size()
+          dAtA = make([]byte, size)
+          n, err := m.MarshalToSizedBuffer(dAtA[:size])
+          if err != nil {
+                  return nil, err
+          }
+          return dAtA[:n], nil
   }
 
   func (m *B) MarshalTo(dAtA []byte) (int, error) {
-	var i int
-	_ = i
-	var l int
-	_ = l
-	dAtA[i] = 0xa
-	i++
-	i = encodeVarintExample(dAtA, i, uint64(m.A.Size()))
-	n2, err := m.A.MarshalTo(dAtA[i:])
-	if err != nil {
-		return 0, err
-	}
-	i += n2
-	if len(m.G) > 0 {
-		for _, msg := range m.G {
-			dAtA[i] = 0x12
-			i++
-			i = encodeVarintExample(dAtA, i, uint64(msg.Size()))
-			n, err := msg.MarshalTo(dAtA[i:])
-			if err != nil {
-				return 0, err
-			}
-			i += n
-		}
-	}
-	if m.XXX_unrecognized != nil {
-		i += copy(dAtA[i:], m.XXX_unrecognized)
-	}
-	return i, nil
+          size := m.Size()
+          return m.MarshalToSizedBuffer(dAtA[:size])
+  }
+
+  func (m *B) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+          i := len(dAtA)
+          _ = i
+          var l int
+          _ = l
+          if m.XXX_unrecognized != nil {
+                  i -= len(m.XXX_unrecognized)
+                  copy(dAtA[i:], m.XXX_unrecognized)
+          }
+          if len(m.G) > 0 {
+                  for iNdEx := len(m.G) - 1; iNdEx >= 0; iNdEx-- {
+                          {
+                                  size := m.G[iNdEx].Size()
+                                  i -= size
+                                  if _, err := m.G[iNdEx].MarshalTo(dAtA[i:]); err != nil {
+                                          return 0, err
+                                  }
+                                  i = encodeVarintExample(dAtA, i, uint64(size))
+                          }
+                          i--
+                          dAtA[i] = 0x12
+                  }
+          }
+          {
+                  size, err := m.A.MarshalToSizedBuffer(dAtA[:i])
+                  if err != nil {
+                          return 0, err
+                  }
+                  i -= size
+                  i = encodeVarintExample(dAtA, i, uint64(size))
+          }
+          i--
+          dAtA[i] = 0xa
+          return len(dAtA) - i, nil
   }
 
 As shown above Marshal calculates the size of the not yet marshalled message
 and allocates the appropriate buffer.
-This is followed by calling the MarshalTo method which requires a preallocated buffer.
+This is followed by calling the MarshalToSizedBuffer method which requires a preallocated buffer, and marshals backwards.
 The MarshalTo method allows a user to rather preallocated a reusable buffer.
 
 The Size method is generated using the size plugin and the gogoproto.sizer, gogoproto.sizer_all extensions.
@@ -194,29 +204,17 @@ func (p *marshalto) Init(g *generator.Generator) {
 }
 
 func (p *marshalto) callFixed64(varName ...string) {
+	p.P(`i -= 8`)
 	p.P(p.binaryPkg.Use(), `.LittleEndian.PutUint64(dAtA[i:], uint64(`, strings.Join(varName, ""), `))`)
-	p.P(`i += 8`)
 }
 
 func (p *marshalto) callFixed32(varName ...string) {
+	p.P(`i -= 4`)
 	p.P(p.binaryPkg.Use(), `.LittleEndian.PutUint32(dAtA[i:], uint32(`, strings.Join(varName, ""), `))`)
-	p.P(`i += 4`)
 }
 
 func (p *marshalto) callVarint(varName ...string) {
 	p.P(`i = encodeVarint`, p.localName, `(dAtA, i, uint64(`, strings.Join(varName, ""), `))`)
-}
-
-func (p *marshalto) encodeVarint(varName string) {
-	p.P(`for `, varName, ` >= 1<<7 {`)
-	p.In()
-	p.P(`dAtA[i] = uint8(uint64(`, varName, `)&0x7f|0x80)`)
-	p.P(varName, ` >>= 7`)
-	p.P(`i++`)
-	p.Out()
-	p.P(`}`)
-	p.P(`dAtA[i] = uint8(`, varName, `)`)
-	p.P(`i++`)
 }
 
 func (p *marshalto) encodeKey(fieldNumber int32, wireType int) {
@@ -228,9 +226,9 @@ func (p *marshalto) encodeKey(fieldNumber int32, wireType int) {
 		x >>= 7
 	}
 	keybuf = append(keybuf, uint8(x))
-	for _, b := range keybuf {
-		p.P(`dAtA[i] = `, fmt.Sprintf("%#v", b))
-		p.P(`i++`)
+	for i = len(keybuf) - 1; i >= 0; i-- {
+		p.P(`i--`)
+		p.P(`dAtA[i] = `, fmt.Sprintf("%#v", keybuf[i]))
 	}
 }
 
@@ -283,6 +281,7 @@ func (p *marshalto) mapField(numGen NumGen, field *descriptor.FieldDescriptorPro
 		descriptor.FieldDescriptorProto_TYPE_SFIXED32:
 		p.callFixed32(varName)
 	case descriptor.FieldDescriptorProto_TYPE_BOOL:
+		p.P(`i--`)
 		p.P(`if `, varName, ` {`)
 		p.In()
 		p.P(`dAtA[i] = 1`)
@@ -292,46 +291,28 @@ func (p *marshalto) mapField(numGen NumGen, field *descriptor.FieldDescriptorPro
 		p.P(`dAtA[i] = 0`)
 		p.Out()
 		p.P(`}`)
-		p.P(`i++`)
 	case descriptor.FieldDescriptorProto_TYPE_STRING,
 		descriptor.FieldDescriptorProto_TYPE_BYTES:
 		if gogoproto.IsCustomType(field) && kvField.IsBytes() {
-			p.callVarint(varName, `.Size()`)
-			p.P(`n`, numGen.Next(), `, err := `, varName, `.MarshalTo(dAtA[i:])`)
-			p.P(`if err != nil {`)
-			p.In()
-			p.P(`return 0, err`)
-			p.Out()
-			p.P(`}`)
-			p.P(`i+=n`, numGen.Current())
+			p.forward(varName, true, protoSizer)
 		} else {
+			p.P(`i -= len(`, varName, `)`)
+			p.P(`copy(dAtA[i:], `, varName, `)`)
 			p.callVarint(`len(`, varName, `)`)
-			p.P(`i+=copy(dAtA[i:], `, varName, `)`)
 		}
 	case descriptor.FieldDescriptorProto_TYPE_SINT32:
 		p.callVarint(`(uint32(`, varName, `) << 1) ^ uint32((`, varName, ` >> 31))`)
 	case descriptor.FieldDescriptorProto_TYPE_SINT64:
 		p.callVarint(`(uint64(`, varName, `) << 1) ^ uint64((`, varName, ` >> 63))`)
 	case descriptor.FieldDescriptorProto_TYPE_MESSAGE:
-		if gogoproto.IsStdTime(field) {
-			p.callVarint(p.typesPkg.Use(), `.SizeOfStdTime(*`, varName, `)`)
-			p.P(`n`, numGen.Next(), `, err := `, p.typesPkg.Use(), `.StdTimeMarshalTo(*`, varName, `, dAtA[i:])`)
-		} else if gogoproto.IsStdDuration(field) {
-			p.callVarint(p.typesPkg.Use(), `.SizeOfStdDuration(*`, varName, `)`)
-			p.P(`n`, numGen.Next(), `, err := `, p.typesPkg.Use(), `.StdDurationMarshalTo(*`, varName, `, dAtA[i:])`)
-		} else if protoSizer {
-			p.callVarint(varName, `.ProtoSize()`)
-			p.P(`n`, numGen.Next(), `, err := `, varName, `.MarshalTo(dAtA[i:])`)
-		} else {
-			p.callVarint(varName, `.Size()`)
-			p.P(`n`, numGen.Next(), `, err := `, varName, `.MarshalTo(dAtA[i:])`)
+		if !p.marshalAllSizeOf(kvField, `(*`+varName+`)`, numGen.Next()) {
+			if gogoproto.IsCustomType(field) {
+				p.forward(varName, true, protoSizer)
+			} else {
+				p.backward(varName, true)
+			}
 		}
-		p.P(`if err != nil {`)
-		p.In()
-		p.P(`return 0, err`)
-		p.Out()
-		p.P(`}`)
-		p.P(`i+=n`, numGen.Current())
+
 	}
 }
 
@@ -383,67 +364,63 @@ func (p *marshalto) generateField(proto3 bool, numGen NumGen, file *generator.Fi
 	switch *field.Type {
 	case descriptor.FieldDescriptorProto_TYPE_DOUBLE:
 		if packed {
-			p.encodeKey(fieldNumber, wireType)
-			p.callVarint(`len(m.`, fieldname, `) * 8`)
-			p.P(`for _, num := range m.`, fieldname, ` {`)
-			p.In()
-			p.P(`f`, numGen.Next(), ` := `, p.mathPkg.Use(), `.Float64bits(float64(num))`)
+			val := p.reverseListRange(`m.`, fieldname)
+			p.P(`f`, numGen.Next(), ` := `, p.mathPkg.Use(), `.Float64bits(float64(`, val, `))`)
 			p.callFixed64("f" + numGen.Current())
 			p.Out()
 			p.P(`}`)
-		} else if repeated {
-			p.P(`for _, num := range m.`, fieldname, ` {`)
-			p.In()
+			p.callVarint(`len(m.`, fieldname, `) * 8`)
 			p.encodeKey(fieldNumber, wireType)
-			p.P(`f`, numGen.Next(), ` := `, p.mathPkg.Use(), `.Float64bits(float64(num))`)
+		} else if repeated {
+			val := p.reverseListRange(`m.`, fieldname)
+			p.P(`f`, numGen.Next(), ` := `, p.mathPkg.Use(), `.Float64bits(float64(`, val, `))`)
 			p.callFixed64("f" + numGen.Current())
+			p.encodeKey(fieldNumber, wireType)
 			p.Out()
 			p.P(`}`)
 		} else if proto3 {
 			p.P(`if m.`, fieldname, ` != 0 {`)
 			p.In()
-			p.encodeKey(fieldNumber, wireType)
 			p.callFixed64(p.mathPkg.Use(), `.Float64bits(float64(m.`+fieldname, `))`)
+			p.encodeKey(fieldNumber, wireType)
 			p.Out()
 			p.P(`}`)
 		} else if !nullable {
-			p.encodeKey(fieldNumber, wireType)
 			p.callFixed64(p.mathPkg.Use(), `.Float64bits(float64(m.`+fieldname, `))`)
-		} else {
 			p.encodeKey(fieldNumber, wireType)
+		} else {
 			p.callFixed64(p.mathPkg.Use(), `.Float64bits(float64(*m.`+fieldname, `))`)
+			p.encodeKey(fieldNumber, wireType)
 		}
 	case descriptor.FieldDescriptorProto_TYPE_FLOAT:
 		if packed {
-			p.encodeKey(fieldNumber, wireType)
-			p.callVarint(`len(m.`, fieldname, `) * 4`)
-			p.P(`for _, num := range m.`, fieldname, ` {`)
-			p.In()
-			p.P(`f`, numGen.Next(), ` := `, p.mathPkg.Use(), `.Float32bits(float32(num))`)
+			val := p.reverseListRange(`m.`, fieldname)
+			p.P(`f`, numGen.Next(), ` := `, p.mathPkg.Use(), `.Float32bits(float32(`, val, `))`)
 			p.callFixed32("f" + numGen.Current())
 			p.Out()
 			p.P(`}`)
-		} else if repeated {
-			p.P(`for _, num := range m.`, fieldname, ` {`)
-			p.In()
+			p.callVarint(`len(m.`, fieldname, `) * 4`)
 			p.encodeKey(fieldNumber, wireType)
-			p.P(`f`, numGen.Next(), ` := `, p.mathPkg.Use(), `.Float32bits(float32(num))`)
+		} else if repeated {
+			val := p.reverseListRange(`m.`, fieldname)
+			p.P(`f`, numGen.Next(), ` := `, p.mathPkg.Use(), `.Float32bits(float32(`, val, `))`)
 			p.callFixed32("f" + numGen.Current())
+			p.encodeKey(fieldNumber, wireType)
 			p.Out()
 			p.P(`}`)
 		} else if proto3 {
 			p.P(`if m.`, fieldname, ` != 0 {`)
 			p.In()
-			p.encodeKey(fieldNumber, wireType)
 			p.callFixed32(p.mathPkg.Use(), `.Float32bits(float32(m.`+fieldname, `))`)
+			p.encodeKey(fieldNumber, wireType)
 			p.Out()
 			p.P(`}`)
 		} else if !nullable {
-			p.encodeKey(fieldNumber, wireType)
 			p.callFixed32(p.mathPkg.Use(), `.Float32bits(float32(m.`+fieldname, `))`)
-		} else {
 			p.encodeKey(fieldNumber, wireType)
+		} else {
 			p.callFixed32(p.mathPkg.Use(), `.Float32bits(float32(*m.`+fieldname, `))`)
+			p.encodeKey(fieldNumber, wireType)
 		}
 	case descriptor.FieldDescriptorProto_TYPE_INT64,
 		descriptor.FieldDescriptorProto_TYPE_UINT64,
@@ -474,115 +451,109 @@ func (p *marshalto) generateField(proto3 bool, numGen NumGen, file *generator.Fi
 			p.P(jvar, `++`)
 			p.Out()
 			p.P(`}`)
-			p.encodeKey(fieldNumber, wireType)
+			p.P(`i -= `, jvar)
+			p.P(`copy(dAtA[i:], dAtA`, numGen.Current(), `[:`, jvar, `])`)
 			p.callVarint(jvar)
-			p.P(`i += copy(dAtA[i:], dAtA`, numGen.Current(), `[:`, jvar, `])`)
-		} else if repeated {
-			p.P(`for _, num := range m.`, fieldname, ` {`)
-			p.In()
 			p.encodeKey(fieldNumber, wireType)
-			p.callVarint("num")
+		} else if repeated {
+			val := p.reverseListRange(`m.`, fieldname)
+			p.callVarint(val)
+			p.encodeKey(fieldNumber, wireType)
 			p.Out()
 			p.P(`}`)
 		} else if proto3 {
 			p.P(`if m.`, fieldname, ` != 0 {`)
 			p.In()
-			p.encodeKey(fieldNumber, wireType)
 			p.callVarint(`m.`, fieldname)
+			p.encodeKey(fieldNumber, wireType)
 			p.Out()
 			p.P(`}`)
 		} else if !nullable {
-			p.encodeKey(fieldNumber, wireType)
 			p.callVarint(`m.`, fieldname)
-		} else {
 			p.encodeKey(fieldNumber, wireType)
+		} else {
 			p.callVarint(`*m.`, fieldname)
+			p.encodeKey(fieldNumber, wireType)
 		}
 	case descriptor.FieldDescriptorProto_TYPE_FIXED64,
 		descriptor.FieldDescriptorProto_TYPE_SFIXED64:
 		if packed {
-			p.encodeKey(fieldNumber, wireType)
-			p.callVarint(`len(m.`, fieldname, `) * 8`)
-			p.P(`for _, num := range m.`, fieldname, ` {`)
-			p.In()
-			p.callFixed64("num")
+			val := p.reverseListRange(`m.`, fieldname)
+			p.callFixed64(val)
 			p.Out()
 			p.P(`}`)
-		} else if repeated {
-			p.P(`for _, num := range m.`, fieldname, ` {`)
-			p.In()
+			p.callVarint(`len(m.`, fieldname, `) * 8`)
 			p.encodeKey(fieldNumber, wireType)
-			p.callFixed64("num")
+		} else if repeated {
+			val := p.reverseListRange(`m.`, fieldname)
+			p.callFixed64(val)
+			p.encodeKey(fieldNumber, wireType)
 			p.Out()
 			p.P(`}`)
 		} else if proto3 {
 			p.P(`if m.`, fieldname, ` != 0 {`)
 			p.In()
-			p.encodeKey(fieldNumber, wireType)
 			p.callFixed64("m." + fieldname)
+			p.encodeKey(fieldNumber, wireType)
 			p.Out()
 			p.P(`}`)
 		} else if !nullable {
-			p.encodeKey(fieldNumber, wireType)
 			p.callFixed64("m." + fieldname)
-		} else {
 			p.encodeKey(fieldNumber, wireType)
+		} else {
 			p.callFixed64("*m." + fieldname)
+			p.encodeKey(fieldNumber, wireType)
 		}
 	case descriptor.FieldDescriptorProto_TYPE_FIXED32,
 		descriptor.FieldDescriptorProto_TYPE_SFIXED32:
 		if packed {
-			p.encodeKey(fieldNumber, wireType)
-			p.callVarint(`len(m.`, fieldname, `) * 4`)
-			p.P(`for _, num := range m.`, fieldname, ` {`)
-			p.In()
-			p.callFixed32("num")
+			val := p.reverseListRange(`m.`, fieldname)
+			p.callFixed32(val)
 			p.Out()
 			p.P(`}`)
-		} else if repeated {
-			p.P(`for _, num := range m.`, fieldname, ` {`)
-			p.In()
+			p.callVarint(`len(m.`, fieldname, `) * 4`)
 			p.encodeKey(fieldNumber, wireType)
-			p.callFixed32("num")
+		} else if repeated {
+			val := p.reverseListRange(`m.`, fieldname)
+			p.callFixed32(val)
+			p.encodeKey(fieldNumber, wireType)
 			p.Out()
 			p.P(`}`)
 		} else if proto3 {
 			p.P(`if m.`, fieldname, ` != 0 {`)
 			p.In()
-			p.encodeKey(fieldNumber, wireType)
 			p.callFixed32("m." + fieldname)
+			p.encodeKey(fieldNumber, wireType)
 			p.Out()
 			p.P(`}`)
 		} else if !nullable {
-			p.encodeKey(fieldNumber, wireType)
 			p.callFixed32("m." + fieldname)
-		} else {
 			p.encodeKey(fieldNumber, wireType)
+		} else {
 			p.callFixed32("*m." + fieldname)
+			p.encodeKey(fieldNumber, wireType)
 		}
 	case descriptor.FieldDescriptorProto_TYPE_BOOL:
 		if packed {
-			p.encodeKey(fieldNumber, wireType)
+			val := p.reverseListRange(`m.`, fieldname)
+			p.P(`i--`)
+			p.P(`if `, val, ` {`)
+			p.In()
+			p.P(`dAtA[i] = 1`)
+			p.Out()
+			p.P(`} else {`)
+			p.In()
+			p.P(`dAtA[i] = 0`)
+			p.Out()
+			p.P(`}`)
+			p.Out()
+			p.P(`}`)
 			p.callVarint(`len(m.`, fieldname, `)`)
-			p.P(`for _, b := range m.`, fieldname, ` {`)
-			p.In()
-			p.P(`if b {`)
-			p.In()
-			p.P(`dAtA[i] = 1`)
-			p.Out()
-			p.P(`} else {`)
-			p.In()
-			p.P(`dAtA[i] = 0`)
-			p.Out()
-			p.P(`}`)
-			p.P(`i++`)
-			p.Out()
-			p.P(`}`)
-		} else if repeated {
-			p.P(`for _, b := range m.`, fieldname, ` {`)
-			p.In()
 			p.encodeKey(fieldNumber, wireType)
-			p.P(`if b {`)
+		} else if repeated {
+			val := p.reverseListRange(`m.`, fieldname)
+			p.P(`i--`)
+			p.P(`if `, val, ` {`)
 			p.In()
 			p.P(`dAtA[i] = 1`)
 			p.Out()
@@ -591,13 +562,13 @@ func (p *marshalto) generateField(proto3 bool, numGen NumGen, file *generator.Fi
 			p.P(`dAtA[i] = 0`)
 			p.Out()
 			p.P(`}`)
-			p.P(`i++`)
+			p.encodeKey(fieldNumber, wireType)
 			p.Out()
 			p.P(`}`)
 		} else if proto3 {
 			p.P(`if m.`, fieldname, ` {`)
 			p.In()
-			p.encodeKey(fieldNumber, wireType)
+			p.P(`i--`)
 			p.P(`if m.`, fieldname, ` {`)
 			p.In()
 			p.P(`dAtA[i] = 1`)
@@ -607,11 +578,11 @@ func (p *marshalto) generateField(proto3 bool, numGen NumGen, file *generator.Fi
 			p.P(`dAtA[i] = 0`)
 			p.Out()
 			p.P(`}`)
-			p.P(`i++`)
+			p.encodeKey(fieldNumber, wireType)
 			p.Out()
 			p.P(`}`)
 		} else if !nullable {
-			p.encodeKey(fieldNumber, wireType)
+			p.P(`i--`)
 			p.P(`if m.`, fieldname, ` {`)
 			p.In()
 			p.P(`dAtA[i] = 1`)
@@ -621,9 +592,9 @@ func (p *marshalto) generateField(proto3 bool, numGen NumGen, file *generator.Fi
 			p.P(`dAtA[i] = 0`)
 			p.Out()
 			p.P(`}`)
-			p.P(`i++`)
-		} else {
 			p.encodeKey(fieldNumber, wireType)
+		} else {
+			p.P(`i--`)
 			p.P(`if *m.`, fieldname, ` {`)
 			p.In()
 			p.P(`dAtA[i] = 1`)
@@ -633,34 +604,36 @@ func (p *marshalto) generateField(proto3 bool, numGen NumGen, file *generator.Fi
 			p.P(`dAtA[i] = 0`)
 			p.Out()
 			p.P(`}`)
-			p.P(`i++`)
+			p.encodeKey(fieldNumber, wireType)
 		}
 	case descriptor.FieldDescriptorProto_TYPE_STRING:
 		if repeated {
-			p.P(`for _, s := range m.`, fieldname, ` {`)
-			p.In()
+			val := p.reverseListRange(`m.`, fieldname)
+			p.P(`i -= len(`, val, `)`)
+			p.P(`copy(dAtA[i:], `, val, `)`)
+			p.callVarint(`len(`, val, `)`)
 			p.encodeKey(fieldNumber, wireType)
-			p.P(`l = len(s)`)
-			p.encodeVarint("l")
-			p.P(`i+=copy(dAtA[i:], s)`)
 			p.Out()
 			p.P(`}`)
 		} else if proto3 {
 			p.P(`if len(m.`, fieldname, `) > 0 {`)
 			p.In()
-			p.encodeKey(fieldNumber, wireType)
+			p.P(`i -= len(m.`, fieldname, `)`)
+			p.P(`copy(dAtA[i:], m.`, fieldname, `)`)
 			p.callVarint(`len(m.`, fieldname, `)`)
-			p.P(`i+=copy(dAtA[i:], m.`, fieldname, `)`)
+			p.encodeKey(fieldNumber, wireType)
 			p.Out()
 			p.P(`}`)
 		} else if !nullable {
-			p.encodeKey(fieldNumber, wireType)
+			p.P(`i -= len(m.`, fieldname, `)`)
+			p.P(`copy(dAtA[i:], m.`, fieldname, `)`)
 			p.callVarint(`len(m.`, fieldname, `)`)
-			p.P(`i+=copy(dAtA[i:], m.`, fieldname, `)`)
-		} else {
 			p.encodeKey(fieldNumber, wireType)
+		} else {
+			p.P(`i -= len(*m.`, fieldname, `)`)
+			p.P(`copy(dAtA[i:], *m.`, fieldname, `)`)
 			p.callVarint(`len(*m.`, fieldname, `)`)
-			p.P(`i+=copy(dAtA[i:], *m.`, fieldname, `)`)
+			p.encodeKey(fieldNumber, wireType)
 		}
 	case descriptor.FieldDescriptorProto_TYPE_GROUP:
 		panic(fmt.Errorf("marshaler does not support group %v", fieldname))
@@ -676,113 +649,32 @@ func (p *marshalto) generateField(proto3 bool, numGen NumGen, file *generator.Fi
 			valuegoTyp, valuewire := p.GoType(nil, m.ValueField)
 			valuegoAliasTyp, _ := p.GoType(nil, m.ValueAliasField)
 			nullable, valuegoTyp, valuegoAliasTyp = generator.GoMapValueTypes(field, m.ValueField, valuegoTyp, valuegoAliasTyp)
-			keyKeySize := keySize(1, wireToType(keywire))
-			valueKeySize := keySize(2, wireToType(valuewire))
+			var val string
 			if gogoproto.IsStableMarshaler(file.FileDescriptorProto, message.DescriptorProto) {
 				keysName := `keysFor` + fieldname
 				p.P(keysName, ` := make([]`, keygoTyp, `, 0, len(m.`, fieldname, `))`)
-				p.P(`for k, _ := range m.`, fieldname, ` {`)
+				p.P(`for k := range m.`, fieldname, ` {`)
 				p.In()
 				p.P(keysName, ` = append(`, keysName, `, `, keygoTyp, `(k))`)
 				p.Out()
 				p.P(`}`)
 				p.P(p.sortKeysPkg.Use(), `.`, keyCapTyp, `s(`, keysName, `)`)
-				p.P(`for _, k := range `, keysName, ` {`)
+				val = p.reverseListRange(keysName)
 			} else {
-				p.P(`for k, _ := range m.`, fieldname, ` {`)
-			}
-			p.In()
-			p.encodeKey(fieldNumber, wireType)
-			sum := []string{strconv.Itoa(keyKeySize)}
-			switch m.KeyField.GetType() {
-			case descriptor.FieldDescriptorProto_TYPE_DOUBLE,
-				descriptor.FieldDescriptorProto_TYPE_FIXED64,
-				descriptor.FieldDescriptorProto_TYPE_SFIXED64:
-				sum = append(sum, `8`)
-			case descriptor.FieldDescriptorProto_TYPE_FLOAT,
-				descriptor.FieldDescriptorProto_TYPE_FIXED32,
-				descriptor.FieldDescriptorProto_TYPE_SFIXED32:
-				sum = append(sum, `4`)
-			case descriptor.FieldDescriptorProto_TYPE_INT64,
-				descriptor.FieldDescriptorProto_TYPE_UINT64,
-				descriptor.FieldDescriptorProto_TYPE_UINT32,
-				descriptor.FieldDescriptorProto_TYPE_ENUM,
-				descriptor.FieldDescriptorProto_TYPE_INT32:
-				sum = append(sum, `sov`+p.localName+`(uint64(k))`)
-			case descriptor.FieldDescriptorProto_TYPE_BOOL:
-				sum = append(sum, `1`)
-			case descriptor.FieldDescriptorProto_TYPE_STRING,
-				descriptor.FieldDescriptorProto_TYPE_BYTES:
-				sum = append(sum, `len(k)+sov`+p.localName+`(uint64(len(k)))`)
-			case descriptor.FieldDescriptorProto_TYPE_SINT32,
-				descriptor.FieldDescriptorProto_TYPE_SINT64:
-				sum = append(sum, `soz`+p.localName+`(uint64(k))`)
+				p.P(`for k := range m.`, fieldname, ` {`)
+				val = "k"
+				p.In()
 			}
 			if gogoproto.IsStableMarshaler(file.FileDescriptorProto, message.DescriptorProto) {
-				p.P(`v := m.`, fieldname, `[`, keygoAliasTyp, `(k)]`)
+				p.P(`v := m.`, fieldname, `[`, keygoAliasTyp, `(`, val, `)]`)
 			} else {
-				p.P(`v := m.`, fieldname, `[k]`)
+				p.P(`v := m.`, fieldname, `[`, val, `]`)
 			}
+			p.P(`baseI := i`)
 			accessor := `v`
-			switch m.ValueField.GetType() {
-			case descriptor.FieldDescriptorProto_TYPE_DOUBLE,
-				descriptor.FieldDescriptorProto_TYPE_FIXED64,
-				descriptor.FieldDescriptorProto_TYPE_SFIXED64:
-				sum = append(sum, strconv.Itoa(valueKeySize))
-				sum = append(sum, strconv.Itoa(8))
-			case descriptor.FieldDescriptorProto_TYPE_FLOAT,
-				descriptor.FieldDescriptorProto_TYPE_FIXED32,
-				descriptor.FieldDescriptorProto_TYPE_SFIXED32:
-				sum = append(sum, strconv.Itoa(valueKeySize))
-				sum = append(sum, strconv.Itoa(4))
-			case descriptor.FieldDescriptorProto_TYPE_INT64,
-				descriptor.FieldDescriptorProto_TYPE_UINT64,
-				descriptor.FieldDescriptorProto_TYPE_UINT32,
-				descriptor.FieldDescriptorProto_TYPE_ENUM,
-				descriptor.FieldDescriptorProto_TYPE_INT32:
-				sum = append(sum, strconv.Itoa(valueKeySize))
-				sum = append(sum, `sov`+p.localName+`(uint64(v))`)
-			case descriptor.FieldDescriptorProto_TYPE_BOOL:
-				sum = append(sum, strconv.Itoa(valueKeySize))
-				sum = append(sum, `1`)
-			case descriptor.FieldDescriptorProto_TYPE_STRING:
-				sum = append(sum, strconv.Itoa(valueKeySize))
-				sum = append(sum, `len(v)+sov`+p.localName+`(uint64(len(v)))`)
-			case descriptor.FieldDescriptorProto_TYPE_BYTES:
-				if gogoproto.IsCustomType(field) {
-					p.P(`cSize := 0`)
-					if gogoproto.IsNullable(field) {
-						p.P(`if `, accessor, ` != nil {`)
-						p.In()
-					}
-					p.P(`cSize = `, accessor, `.Size()`)
-					p.P(`cSize += `, strconv.Itoa(valueKeySize), ` + sov`+p.localName+`(uint64(cSize))`)
-					if gogoproto.IsNullable(field) {
-						p.Out()
-						p.P(`}`)
-					}
-					sum = append(sum, `cSize`)
-				} else {
-					p.P(`byteSize := 0`)
-					if proto3 {
-						p.P(`if len(v) > 0 {`)
-					} else {
-						p.P(`if v != nil {`)
-					}
-					p.In()
-					p.P(`byteSize = `, strconv.Itoa(valueKeySize), ` + len(v)+sov`+p.localName+`(uint64(len(v)))`)
-					p.Out()
-					p.P(`}`)
-					sum = append(sum, `byteSize`)
-				}
-			case descriptor.FieldDescriptorProto_TYPE_SINT32,
-				descriptor.FieldDescriptorProto_TYPE_SINT64:
-				sum = append(sum, strconv.Itoa(valueKeySize))
-				sum = append(sum, `soz`+p.localName+`(uint64(v))`)
-			case descriptor.FieldDescriptorProto_TYPE_MESSAGE:
-				if valuegoTyp != valuegoAliasTyp &&
-					!gogoproto.IsStdTime(field) &&
-					!gogoproto.IsStdDuration(field) {
+
+			if m.ValueField.GetType() == descriptor.FieldDescriptorProto_TYPE_MESSAGE {
+				if valuegoTyp != valuegoAliasTyp && !gogoproto.IsStdType(m.ValueAliasField) {
 					if nullable {
 						// cast back to the type that has the generated methods on it
 						accessor = `((` + valuegoTyp + `)(` + accessor + `))`
@@ -792,27 +684,8 @@ func (p *marshalto) generateField(proto3 bool, numGen NumGen, file *generator.Fi
 				} else if !nullable {
 					accessor = `(&v)`
 				}
-				p.P(`msgSize := 0`)
-				p.P(`if `, accessor, ` != nil {`)
-				p.In()
-				if gogoproto.IsStdTime(field) {
-					p.P(`msgSize = `, p.typesPkg.Use(), `.SizeOfStdTime(*`, accessor, `)`)
-				} else if gogoproto.IsStdDuration(field) {
-					p.P(`msgSize = `, p.typesPkg.Use(), `.SizeOfStdDuration(*`, accessor, `)`)
-				} else if protoSizer {
-					p.P(`msgSize = `, accessor, `.ProtoSize()`)
-				} else {
-					p.P(`msgSize = `, accessor, `.Size()`)
-				}
-				p.P(`msgSize += `, strconv.Itoa(valueKeySize), ` + sov`+p.localName+`(uint64(msgSize))`)
-				p.Out()
-				p.P(`}`)
-				sum = append(sum, `msgSize`)
 			}
-			p.P(`mapSize := `, strings.Join(sum, " + "))
-			p.callVarint("mapSize")
-			p.encodeKey(1, wireToType(keywire))
-			p.mapField(numGen, field, m.KeyField, "k", protoSizer)
+
 			nullableMsg := nullable && (m.ValueField.GetType() == descriptor.FieldDescriptorProto_TYPE_MESSAGE ||
 				gogoproto.IsCustomType(field) && m.ValueField.IsBytes())
 			plainBytes := m.ValueField.IsBytes() && !gogoproto.IsCustomType(field)
@@ -827,131 +700,86 @@ func (p *marshalto) generateField(proto3 bool, numGen NumGen, file *generator.Fi
 				}
 				p.In()
 			}
+			p.mapField(numGen, field, m.ValueAliasField, accessor, protoSizer)
 			p.encodeKey(2, wireToType(valuewire))
-			p.mapField(numGen, field, m.ValueField, accessor, protoSizer)
 			if nullableMsg || plainBytes {
 				p.Out()
 				p.P(`}`)
 			}
+
+			p.mapField(numGen, field, m.KeyField, val, protoSizer)
+			p.encodeKey(1, wireToType(keywire))
+
+			p.callVarint(`baseI - i`)
+
+			p.encodeKey(fieldNumber, wireType)
 			p.Out()
 			p.P(`}`)
 		} else if repeated {
-			p.P(`for _, msg := range m.`, fieldname, ` {`)
-			p.In()
-			p.encodeKey(fieldNumber, wireType)
-			varName := "msg"
-			if gogoproto.IsStdTime(field) {
-				if gogoproto.IsNullable(field) {
-					varName = "*" + varName
-				}
-				p.callVarint(p.typesPkg.Use(), `.SizeOfStdTime(`, varName, `)`)
-				p.P(`n, err := `, p.typesPkg.Use(), `.StdTimeMarshalTo(`, varName, `, dAtA[i:])`)
-			} else if gogoproto.IsStdDuration(field) {
-				if gogoproto.IsNullable(field) {
-					varName = "*" + varName
-				}
-				p.callVarint(p.typesPkg.Use(), `.SizeOfStdDuration(`, varName, `)`)
-				p.P(`n, err := `, p.typesPkg.Use(), `.StdDurationMarshalTo(`, varName, `, dAtA[i:])`)
-			} else if protoSizer {
-				p.callVarint(varName, ".ProtoSize()")
-				p.P(`n, err := `, varName, `.MarshalTo(dAtA[i:])`)
-			} else {
-				p.callVarint(varName, ".Size()")
-				p.P(`n, err := `, varName, `.MarshalTo(dAtA[i:])`)
+			val := p.reverseListRange(`m.`, fieldname)
+			sizeOfVarName := val
+			if gogoproto.IsNullable(field) {
+				sizeOfVarName = `*` + val
 			}
-			p.P(`if err != nil {`)
-			p.In()
-			p.P(`return 0, err`)
-			p.Out()
-			p.P(`}`)
-			p.P(`i+=n`)
+			if !p.marshalAllSizeOf(field, sizeOfVarName, ``) {
+				if gogoproto.IsCustomType(field) {
+					p.forward(val, true, protoSizer)
+				} else {
+					p.backward(val, true)
+				}
+			}
+			p.encodeKey(fieldNumber, wireType)
 			p.Out()
 			p.P(`}`)
 		} else {
-			p.encodeKey(fieldNumber, wireType)
-			varName := `m.` + fieldname
-			if gogoproto.IsStdTime(field) {
-				if gogoproto.IsNullable(field) {
-					varName = "*" + varName
-				}
-				p.callVarint(p.typesPkg.Use(), `.SizeOfStdTime(`, varName, `)`)
-				p.P(`n`, numGen.Next(), `, err := `, p.typesPkg.Use(), `.StdTimeMarshalTo(`, varName, `, dAtA[i:])`)
-			} else if gogoproto.IsStdDuration(field) {
-				if gogoproto.IsNullable(field) {
-					varName = "*" + varName
-				}
-				p.callVarint(p.typesPkg.Use(), `.SizeOfStdDuration(`, varName, `)`)
-				p.P(`n`, numGen.Next(), `, err := `, p.typesPkg.Use(), `.StdDurationMarshalTo(`, varName, `, dAtA[i:])`)
-			} else if protoSizer {
-				p.callVarint(varName, `.ProtoSize()`)
-				p.P(`n`, numGen.Next(), `, err := `, varName, `.MarshalTo(dAtA[i:])`)
-			} else {
-				p.callVarint(varName, `.Size()`)
-				p.P(`n`, numGen.Next(), `, err := `, varName, `.MarshalTo(dAtA[i:])`)
+			sizeOfVarName := `m.` + fieldname
+			if gogoproto.IsNullable(field) {
+				sizeOfVarName = `*` + sizeOfVarName
 			}
-			p.P(`if err != nil {`)
-			p.In()
-			p.P(`return 0, err`)
-			p.Out()
-			p.P(`}`)
-			p.P(`i+=n`, numGen.Current())
+			if !p.marshalAllSizeOf(field, sizeOfVarName, numGen.Next()) {
+				if gogoproto.IsCustomType(field) {
+					p.forward(`m.`+fieldname, true, protoSizer)
+				} else {
+					p.backward(`m.`+fieldname, true)
+				}
+			}
+			p.encodeKey(fieldNumber, wireType)
 		}
 	case descriptor.FieldDescriptorProto_TYPE_BYTES:
 		if !gogoproto.IsCustomType(field) {
 			if repeated {
-				p.P(`for _, b := range m.`, fieldname, ` {`)
-				p.In()
+				val := p.reverseListRange(`m.`, fieldname)
+				p.P(`i -= len(`, val, `)`)
+				p.P(`copy(dAtA[i:], `, val, `)`)
+				p.callVarint(`len(`, val, `)`)
 				p.encodeKey(fieldNumber, wireType)
-				p.callVarint("len(b)")
-				p.P(`i+=copy(dAtA[i:], b)`)
 				p.Out()
 				p.P(`}`)
 			} else if proto3 {
 				p.P(`if len(m.`, fieldname, `) > 0 {`)
 				p.In()
-				p.encodeKey(fieldNumber, wireType)
+				p.P(`i -= len(m.`, fieldname, `)`)
+				p.P(`copy(dAtA[i:], m.`, fieldname, `)`)
 				p.callVarint(`len(m.`, fieldname, `)`)
-				p.P(`i+=copy(dAtA[i:], m.`, fieldname, `)`)
+				p.encodeKey(fieldNumber, wireType)
 				p.Out()
 				p.P(`}`)
 			} else {
-				p.encodeKey(fieldNumber, wireType)
+				p.P(`i -= len(m.`, fieldname, `)`)
+				p.P(`copy(dAtA[i:], m.`, fieldname, `)`)
 				p.callVarint(`len(m.`, fieldname, `)`)
-				p.P(`i+=copy(dAtA[i:], m.`, fieldname, `)`)
+				p.encodeKey(fieldNumber, wireType)
 			}
 		} else {
 			if repeated {
-				p.P(`for _, msg := range m.`, fieldname, ` {`)
-				p.In()
+				val := p.reverseListRange(`m.`, fieldname)
+				p.forward(val, true, protoSizer)
 				p.encodeKey(fieldNumber, wireType)
-				if protoSizer {
-					p.callVarint(`msg.ProtoSize()`)
-				} else {
-					p.callVarint(`msg.Size()`)
-				}
-				p.P(`n, err := msg.MarshalTo(dAtA[i:])`)
-				p.P(`if err != nil {`)
-				p.In()
-				p.P(`return 0, err`)
-				p.Out()
-				p.P(`}`)
-				p.P(`i+=n`)
 				p.Out()
 				p.P(`}`)
 			} else {
+				p.forward(`m.`+fieldname, true, protoSizer)
 				p.encodeKey(fieldNumber, wireType)
-				if protoSizer {
-					p.callVarint(`m.`, fieldname, `.ProtoSize()`)
-				} else {
-					p.callVarint(`m.`, fieldname, `.Size()`)
-				}
-				p.P(`n`, numGen.Next(), `, err := m.`, fieldname, `.MarshalTo(dAtA[i:])`)
-				p.P(`if err != nil {`)
-				p.In()
-				p.P(`return 0, err`)
-				p.Out()
-				p.P(`}`)
-				p.P(`i+=n`, numGen.Current())
 			}
 		}
 	case descriptor.FieldDescriptorProto_TYPE_SINT32:
@@ -975,30 +803,30 @@ func (p *marshalto) generateField(proto3 bool, numGen NumGen, file *generator.Fi
 			p.P(jvar, `++`)
 			p.Out()
 			p.P(`}`)
-			p.encodeKey(fieldNumber, wireType)
+			p.P(`i -= `, jvar)
+			p.P(`copy(dAtA[i:], `, datavar, `[:`, jvar, `])`)
 			p.callVarint(jvar)
-			p.P(`i+=copy(dAtA[i:], `, datavar, `[:`, jvar, `])`)
-		} else if repeated {
-			p.P(`for _, num := range m.`, fieldname, ` {`)
-			p.In()
 			p.encodeKey(fieldNumber, wireType)
-			p.P(`x`, numGen.Next(), ` := (uint32(num) << 1) ^ uint32((num >> 31))`)
-			p.encodeVarint("x" + numGen.Current())
+		} else if repeated {
+			val := p.reverseListRange(`m.`, fieldname)
+			p.P(`x`, numGen.Next(), ` := (uint32(`, val, `) << 1) ^ uint32((`, val, ` >> 31))`)
+			p.callVarint(`x`, numGen.Current())
+			p.encodeKey(fieldNumber, wireType)
 			p.Out()
 			p.P(`}`)
 		} else if proto3 {
 			p.P(`if m.`, fieldname, ` != 0 {`)
 			p.In()
-			p.encodeKey(fieldNumber, wireType)
 			p.callVarint(`(uint32(m.`, fieldname, `) << 1) ^ uint32((m.`, fieldname, ` >> 31))`)
+			p.encodeKey(fieldNumber, wireType)
 			p.Out()
 			p.P(`}`)
 		} else if !nullable {
-			p.encodeKey(fieldNumber, wireType)
 			p.callVarint(`(uint32(m.`, fieldname, `) << 1) ^ uint32((m.`, fieldname, ` >> 31))`)
-		} else {
 			p.encodeKey(fieldNumber, wireType)
+		} else {
 			p.callVarint(`(uint32(*m.`, fieldname, `) << 1) ^ uint32((*m.`, fieldname, ` >> 31))`)
+			p.encodeKey(fieldNumber, wireType)
 		}
 	case descriptor.FieldDescriptorProto_TYPE_SINT64:
 		if packed {
@@ -1021,30 +849,30 @@ func (p *marshalto) generateField(proto3 bool, numGen NumGen, file *generator.Fi
 			p.P(jvar, `++`)
 			p.Out()
 			p.P(`}`)
-			p.encodeKey(fieldNumber, wireType)
+			p.P(`i -= `, jvar)
+			p.P(`copy(dAtA[i:], `, datavar, `[:`, jvar, `])`)
 			p.callVarint(jvar)
-			p.P(`i+=copy(dAtA[i:], `, datavar, `[:`, jvar, `])`)
-		} else if repeated {
-			p.P(`for _, num := range m.`, fieldname, ` {`)
-			p.In()
 			p.encodeKey(fieldNumber, wireType)
-			p.P(`x`, numGen.Next(), ` := (uint64(num) << 1) ^ uint64((num >> 63))`)
-			p.encodeVarint("x" + numGen.Current())
+		} else if repeated {
+			val := p.reverseListRange(`m.`, fieldname)
+			p.P(`x`, numGen.Next(), ` := (uint64(`, val, `) << 1) ^ uint64((`, val, ` >> 63))`)
+			p.callVarint("x" + numGen.Current())
+			p.encodeKey(fieldNumber, wireType)
 			p.Out()
 			p.P(`}`)
 		} else if proto3 {
 			p.P(`if m.`, fieldname, ` != 0 {`)
 			p.In()
-			p.encodeKey(fieldNumber, wireType)
 			p.callVarint(`(uint64(m.`, fieldname, `) << 1) ^ uint64((m.`, fieldname, ` >> 63))`)
+			p.encodeKey(fieldNumber, wireType)
 			p.Out()
 			p.P(`}`)
 		} else if !nullable {
-			p.encodeKey(fieldNumber, wireType)
 			p.callVarint(`(uint64(m.`, fieldname, `) << 1) ^ uint64((m.`, fieldname, ` >> 63))`)
-		} else {
 			p.encodeKey(fieldNumber, wireType)
+		} else {
 			p.callVarint(`(uint64(*m.`, fieldname, `) << 1) ^ uint64((*m.`, fieldname, ` >> 63))`)
+			p.encodeKey(fieldNumber, wireType)
 		}
 	default:
 		panic("not implemented")
@@ -1091,7 +919,7 @@ func (p *marshalto) Generate(file *generator.FileDescriptor) {
 			p.P(`size := m.Size()`)
 		}
 		p.P(`dAtA = make([]byte, size)`)
-		p.P(`n, err := m.MarshalTo(dAtA)`)
+		p.P(`n, err := m.MarshalToSizedBuffer(dAtA[:size])`)
 		p.P(`if err != nil {`)
 		p.In()
 		p.P(`return nil, err`)
@@ -1103,14 +931,54 @@ func (p *marshalto) Generate(file *generator.FileDescriptor) {
 		p.P(``)
 		p.P(`func (m *`, ccTypeName, `) MarshalTo(dAtA []byte) (int, error) {`)
 		p.In()
-		p.P(`var i int`)
+		if gogoproto.IsProtoSizer(file.FileDescriptorProto, message.DescriptorProto) {
+			p.P(`size := m.ProtoSize()`)
+		} else {
+			p.P(`size := m.Size()`)
+		}
+		p.P(`return m.MarshalToSizedBuffer(dAtA[:size])`)
+		p.Out()
+		p.P(`}`)
+		p.P(``)
+		p.P(`func (m *`, ccTypeName, `) MarshalToSizedBuffer(dAtA []byte) (int, error) {`)
+		p.In()
+		p.P(`i := len(dAtA)`)
 		p.P(`_ = i`)
 		p.P(`var l int`)
 		p.P(`_ = l`)
+		if gogoproto.HasUnrecognized(file.FileDescriptorProto, message.DescriptorProto) {
+			p.P(`if m.XXX_unrecognized != nil {`)
+			p.In()
+			p.P(`i -= len(m.XXX_unrecognized)`)
+			p.P(`copy(dAtA[i:], m.XXX_unrecognized)`)
+			p.Out()
+			p.P(`}`)
+		}
+		if message.DescriptorProto.HasExtension() {
+			if gogoproto.HasExtensionsMap(file.FileDescriptorProto, message.DescriptorProto) {
+				p.P(`if n, err := `, p.protoPkg.Use(), `.EncodeInternalExtensionBackwards(m, dAtA[:i]); err != nil {`)
+				p.In()
+				p.P(`return 0, err`)
+				p.Out()
+				p.P(`} else {`)
+				p.In()
+				p.P(`i -= n`)
+				p.Out()
+				p.P(`}`)
+			} else {
+				p.P(`if m.XXX_extensions != nil {`)
+				p.In()
+				p.P(`i -= len(m.XXX_extensions)`)
+				p.P(`copy(dAtA[i:], m.XXX_extensions)`)
+				p.Out()
+				p.P(`}`)
+			}
+		}
 		fields := orderFields(message.GetField())
 		sort.Sort(fields)
 		oneofs := make(map[string]struct{})
-		for _, field := range message.Field {
+		for i := len(message.Field) - 1; i >= 0; i-- {
+			field := message.Field[i]
 			oneof := field.OneofIndex != nil
 			if !oneof {
 				proto3 := gogoproto.IsProto3(file.FileDescriptorProto)
@@ -1121,44 +989,13 @@ func (p *marshalto) Generate(file *generator.FileDescriptor) {
 					oneofs[fieldname] = struct{}{}
 					p.P(`if m.`, fieldname, ` != nil {`)
 					p.In()
-					p.P(`nn`, numGen.Next(), `, err := m.`, fieldname, `.MarshalTo(dAtA[i:])`)
-					p.P(`if err != nil {`)
-					p.In()
-					p.P(`return 0, err`)
-					p.Out()
-					p.P(`}`)
-					p.P(`i+=nn`, numGen.Current())
+					p.forward(`m.`+fieldname, false, gogoproto.IsProtoSizer(file.FileDescriptorProto, message.DescriptorProto))
 					p.Out()
 					p.P(`}`)
 				}
 			}
 		}
-		if message.DescriptorProto.HasExtension() {
-			if gogoproto.HasExtensionsMap(file.FileDescriptorProto, message.DescriptorProto) {
-				p.P(`n, err := `, p.protoPkg.Use(), `.EncodeInternalExtension(m, dAtA[i:])`)
-				p.P(`if err != nil {`)
-				p.In()
-				p.P(`return 0, err`)
-				p.Out()
-				p.P(`}`)
-				p.P(`i+=n`)
-			} else {
-				p.P(`if m.XXX_extensions != nil {`)
-				p.In()
-				p.P(`i+=copy(dAtA[i:], m.XXX_extensions)`)
-				p.Out()
-				p.P(`}`)
-			}
-		}
-		if gogoproto.HasUnrecognized(file.FileDescriptorProto, message.DescriptorProto) {
-			p.P(`if m.XXX_unrecognized != nil {`)
-			p.In()
-			p.P(`i+=copy(dAtA[i:], m.XXX_unrecognized)`)
-			p.Out()
-			p.P(`}`)
-		}
-
-		p.P(`return i, nil`)
+		p.P(`return len(dAtA) - i, nil`)
 		p.Out()
 		p.P(`}`)
 		p.P()
@@ -1173,10 +1010,16 @@ func (p *marshalto) Generate(file *generator.FileDescriptor) {
 			ccTypeName := p.OneOfTypeName(message, field)
 			p.P(`func (m *`, ccTypeName, `) MarshalTo(dAtA []byte) (int, error) {`)
 			p.In()
-			p.P(`i := 0`)
+			p.P(`return m.MarshalToSizedBuffer(dAtA[:m.Size()])`)
+			p.Out()
+			p.P(`}`)
+			p.P(``)
+			p.P(`func (m *`, ccTypeName, `) MarshalToSizedBuffer(dAtA []byte) (int, error) {`)
+			p.In()
+			p.P(`i := len(dAtA)`)
 			vanity.TurnOffNullableForNativeTypes(field)
 			p.generateField(false, numGen, file, message, field)
-			p.P(`return i, nil`)
+			p.P(`return len(dAtA) - i, nil`)
 			p.Out()
 			p.P(`}`)
 		}
@@ -1185,6 +1028,8 @@ func (p *marshalto) Generate(file *generator.FileDescriptor) {
 	if p.atleastOne {
 		p.P(`func encodeVarint`, p.localName, `(dAtA []byte, offset int, v uint64) int {`)
 		p.In()
+		p.P(`offset -= sov`, p.localName, `(v)`)
+		p.P(`base := offset`)
 		p.P(`for v >= 1<<7 {`)
 		p.In()
 		p.P(`dAtA[offset] = uint8(v&0x7f|0x80)`)
@@ -1193,11 +1038,96 @@ func (p *marshalto) Generate(file *generator.FileDescriptor) {
 		p.Out()
 		p.P(`}`)
 		p.P(`dAtA[offset] = uint8(v)`)
-		p.P(`return offset+1`)
+		p.P(`return base`)
 		p.Out()
 		p.P(`}`)
 	}
 
+}
+
+func (p *marshalto) reverseListRange(expression ...string) string {
+	exp := strings.Join(expression, "")
+	p.P(`for iNdEx := len(`, exp, `) - 1; iNdEx >= 0; iNdEx-- {`)
+	p.In()
+	return exp + `[iNdEx]`
+}
+
+func (p *marshalto) marshalAllSizeOf(field *descriptor.FieldDescriptorProto, varName, num string) bool {
+	if gogoproto.IsStdTime(field) {
+		p.marshalSizeOf(`StdTimeMarshalTo`, `SizeOfStdTime`, varName, num)
+	} else if gogoproto.IsStdDuration(field) {
+		p.marshalSizeOf(`StdDurationMarshalTo`, `SizeOfStdDuration`, varName, num)
+	} else if gogoproto.IsStdDouble(field) {
+		p.marshalSizeOf(`StdDoubleMarshalTo`, `SizeOfStdDouble`, varName, num)
+	} else if gogoproto.IsStdFloat(field) {
+		p.marshalSizeOf(`StdFloatMarshalTo`, `SizeOfStdFloat`, varName, num)
+	} else if gogoproto.IsStdInt64(field) {
+		p.marshalSizeOf(`StdInt64MarshalTo`, `SizeOfStdInt64`, varName, num)
+	} else if gogoproto.IsStdUInt64(field) {
+		p.marshalSizeOf(`StdUInt64MarshalTo`, `SizeOfStdUInt64`, varName, num)
+	} else if gogoproto.IsStdInt32(field) {
+		p.marshalSizeOf(`StdInt32MarshalTo`, `SizeOfStdInt32`, varName, num)
+	} else if gogoproto.IsStdUInt32(field) {
+		p.marshalSizeOf(`StdUInt32MarshalTo`, `SizeOfStdUInt32`, varName, num)
+	} else if gogoproto.IsStdBool(field) {
+		p.marshalSizeOf(`StdBoolMarshalTo`, `SizeOfStdBool`, varName, num)
+	} else if gogoproto.IsStdString(field) {
+		p.marshalSizeOf(`StdStringMarshalTo`, `SizeOfStdString`, varName, num)
+	} else if gogoproto.IsStdBytes(field) {
+		p.marshalSizeOf(`StdBytesMarshalTo`, `SizeOfStdBytes`, varName, num)
+	} else {
+		return false
+	}
+	return true
+}
+
+func (p *marshalto) marshalSizeOf(marshal, size, varName, num string) {
+	p.P(`n`, num, `, err`, num, ` := `, p.typesPkg.Use(), `.`, marshal, `(`, varName, `, dAtA[i-`, p.typesPkg.Use(), `.`, size, `(`, varName, `):])`)
+	p.P(`if err`, num, ` != nil {`)
+	p.In()
+	p.P(`return 0, err`, num)
+	p.Out()
+	p.P(`}`)
+	p.P(`i -= n`, num)
+	p.callVarint(`n`, num)
+}
+
+func (p *marshalto) backward(varName string, varInt bool) {
+	p.P(`{`)
+	p.In()
+	p.P(`size, err := `, varName, `.MarshalToSizedBuffer(dAtA[:i])`)
+	p.P(`if err != nil {`)
+	p.In()
+	p.P(`return 0, err`)
+	p.Out()
+	p.P(`}`)
+	p.P(`i -= size`)
+	if varInt {
+		p.callVarint(`size`)
+	}
+	p.Out()
+	p.P(`}`)
+}
+
+func (p *marshalto) forward(varName string, varInt, protoSizer bool) {
+	p.P(`{`)
+	p.In()
+	if protoSizer {
+		p.P(`size := `, varName, `.ProtoSize()`)
+	} else {
+		p.P(`size := `, varName, `.Size()`)
+	}
+	p.P(`i -= size`)
+	p.P(`if _, err := `, varName, `.MarshalTo(dAtA[i:]); err != nil {`)
+	p.In()
+	p.P(`return 0, err`)
+	p.Out()
+	p.P(`}`)
+	p.Out()
+	if varInt {
+		p.callVarint(`size`)
+	}
+	p.P(`}`)
 }
 
 func init() {

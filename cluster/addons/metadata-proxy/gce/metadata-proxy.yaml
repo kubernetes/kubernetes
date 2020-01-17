@@ -31,11 +31,6 @@ spec:
         k8s-app: metadata-proxy
         kubernetes.io/cluster-service: "true"
         version: v0.1
-      # This annotation ensures that the proxy does not get evicted if the node
-      # supports critical pod annotation based priority scheme.
-      # Note that this does not guarantee admission on the nodes (#40573).
-      annotations:
-        scheduler.alpha.kubernetes.io/critical-pod: ''
     spec:
       priorityClassName: system-node-critical
       serviceAccountName: metadata-proxy
@@ -88,7 +83,6 @@ spec:
                 fieldPath: metadata.namespace
       # END_PROMETHEUS_TO_SD
       nodeSelector:
-        # TODO(liggitt): switch to cloud.google.com/metadata-proxy-ready=true in v1.16
-        beta.kubernetes.io/metadata-proxy-ready: "true"
+        cloud.google.com/metadata-proxy-ready: "true"
         beta.kubernetes.io/os: linux
       terminationGracePeriodSeconds: 30

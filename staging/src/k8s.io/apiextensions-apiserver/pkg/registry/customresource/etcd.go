@@ -177,12 +177,19 @@ type StatusREST struct {
 var _ = rest.Patcher(&StatusREST{})
 
 func (r *StatusREST) New() runtime.Object {
-	return &unstructured.Unstructured{}
+	return r.store.New()
 }
 
 // Get retrieves the object from the storage. It is required to support Patch.
 func (r *StatusREST) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
-	return r.store.Get(ctx, name, options)
+	o, err := r.store.Get(ctx, name, options)
+	if err != nil {
+		return nil, err
+	}
+	if u, ok := o.(*unstructured.Unstructured); ok {
+		shallowCopyObjectMeta(u)
+	}
+	return o, nil
 }
 
 // Update alters the status subset of an object.
@@ -290,17 +297,17 @@ func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.Update
 }
 
 func toScaleCreateValidation(f rest.ValidateObjectFunc, specReplicasPath, statusReplicasPath, labelSelectorPath string) rest.ValidateObjectFunc {
-	return func(obj runtime.Object) error {
+	return func(ctx context.Context, obj runtime.Object) error {
 		scale, _, err := scaleFromCustomResource(obj.(*unstructured.Unstructured), specReplicasPath, statusReplicasPath, labelSelectorPath)
 		if err != nil {
 			return err
 		}
-		return f(scale)
+		return f(ctx, scale)
 	}
 }
 
 func toScaleUpdateValidation(f rest.ValidateObjectUpdateFunc, specReplicasPath, statusReplicasPath, labelSelectorPath string) rest.ValidateObjectUpdateFunc {
-	return func(obj, old runtime.Object) error {
+	return func(ctx context.Context, obj, old runtime.Object) error {
 		newScale, _, err := scaleFromCustomResource(obj.(*unstructured.Unstructured), specReplicasPath, statusReplicasPath, labelSelectorPath)
 		if err != nil {
 			return err
@@ -309,7 +316,7 @@ func toScaleUpdateValidation(f rest.ValidateObjectUpdateFunc, specReplicasPath, 
 		if err != nil {
 			return err
 		}
-		return f(newScale, oldScale)
+		return f(ctx, newScale, oldScale)
 	}
 }
 
@@ -335,7 +342,7 @@ func scaleFromCustomResource(cr *unstructured.Unstructured, specReplicasPath, st
 	var labelSelector string
 	if len(labelSelectorPath) > 0 {
 		labelSelectorPath = strings.TrimPrefix(labelSelectorPath, ".") // ignore leading period
-		labelSelector, found, err = unstructured.NestedString(cr.UnstructuredContent(), strings.Split(labelSelectorPath, ".")...)
+		labelSelector, _, err = unstructured.NestedString(cr.UnstructuredContent(), strings.Split(labelSelectorPath, ".")...)
 		if err != nil {
 			return nil, false, err
 		}

@@ -54,7 +54,8 @@ func NewContainerRuntimeOptions() *config.ContainerRuntimeOptions {
 		ExperimentalDockershim:     false,
 
 		//Alpha feature
-		CNIBinDir:  "/opt/cni/bin",
-		CNIConfDir: "/etc/cni/net.d",
+		CNIBinDir:   "/opt/cni/bin",
+		CNIConfDir:  "/etc/cni/net.d",
+		CNICacheDir: "/var/lib/cni/cache",
 	}
 }

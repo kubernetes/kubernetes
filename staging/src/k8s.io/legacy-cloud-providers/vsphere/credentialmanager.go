@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2016 The Kubernetes Authors.
 
@@ -19,13 +21,14 @@ package vsphere
 import (
 	"errors"
 	"fmt"
-	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/client-go/listers/core/v1"
-	"k8s.io/klog"
 	"net/http"
 	"strings"
 	"sync"
+
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	v1 "k8s.io/client-go/listers/core/v1"
+	"k8s.io/klog"
 )
 
 // Error Messages
@@ -84,7 +87,7 @@ func (secretCredentialManager *SecretCredentialManager) GetCredential(server str
 
 func (secretCredentialManager *SecretCredentialManager) updateCredentialsMap() error {
 	if secretCredentialManager.SecretLister == nil {
-		return fmt.Errorf("SecretLister is not initialized")
+		return fmt.Errorf("secretLister is not initialized")
 	}
 	secret, err := secretCredentialManager.SecretLister.Secrets(secretCredentialManager.SecretNamespace).Get(secretCredentialManager.SecretName)
 	if err != nil {

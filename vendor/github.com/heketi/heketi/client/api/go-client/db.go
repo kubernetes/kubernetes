@@ -50,3 +50,35 @@ func (c *Client) DbDump() (string, error) {
 	respJSON := string(respBytes)
 	return respJSON, nil
 }
+
+// DbCheck provides a JSON summary of the DB check operation
+func (c *Client) DbCheck() (string, error) {
+	req, err := http.NewRequest("GET", c.host+"/db/check", nil)
+	if err != nil {
+		return "", err
+	}
+
+	// Set token
+	err = c.setToken(req)
+	if err != nil {
+		return "", err
+	}
+
+	// Send request
+	r, err := c.do(req)
+	if err != nil {
+		return "", err
+	}
+	defer r.Body.Close()
+	if r.StatusCode != http.StatusOK {
+		return "", utils.GetErrorFromResponse(r)
+	}
+
+	respBytes, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		return "", err
+	}
+
+	respJSON := string(respBytes)
+	return respJSON, nil
+}

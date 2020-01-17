@@ -17,6 +17,7 @@ go_library(
         "//pkg/util/mount:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/util:go_default_library",
+        "//pkg/volume/util/hostutil:go_default_library",
         "//pkg/volume/util/recyclerclient:go_default_library",
         "//pkg/volume/validation:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
@@ -31,9 +32,9 @@ go_test(
     srcs = ["host_path_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/util/mount:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/testing:go_default_library",
+        "//pkg/volume/util/hostutil:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

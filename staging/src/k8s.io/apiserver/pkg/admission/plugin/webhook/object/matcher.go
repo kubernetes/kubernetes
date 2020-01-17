@@ -19,7 +19,6 @@ package object
 import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/admission"
@@ -47,8 +46,7 @@ func matchObject(obj runtime.Object, selector labels.Selector) bool {
 // MatchObjectSelector decideds whether the request matches the ObjectSelector
 // of the webhook. Only when they match, the webhook is called.
 func (m *Matcher) MatchObjectSelector(h webhook.WebhookAccessor, attr admission.Attributes) (bool, *apierrors.StatusError) {
-	// TODO: adding an LRU cache to cache the translation
-	selector, err := metav1.LabelSelectorAsSelector(h.GetObjectSelector())
+	selector, err := h.GetParsedObjectSelector()
 	if err != nil {
 		return false, apierrors.NewInternalError(err)
 	}

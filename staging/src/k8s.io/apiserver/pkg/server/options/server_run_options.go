@@ -41,7 +41,9 @@ type ServerRunOptions struct {
 	MaxRequestsInFlight         int
 	MaxMutatingRequestsInFlight int
 	RequestTimeout              time.Duration
+	LivezGracePeriod            time.Duration
 	MinRequestTimeout           int
+	ShutdownDelayDuration       time.Duration
 	// We intentionally did not add a flag for this option. Users of the
 	// apiserver library can wire it to a flag.
 	JSONPatchMaxCopyBytes int64
@@ -49,9 +51,9 @@ type ServerRunOptions struct {
 	// decoded in a write request. 0 means no limit.
 	// We intentionally did not add a flag for this option. Users of the
 	// apiserver library can wire it to a flag.
-	MaxRequestBodyBytes       int64
-	TargetRAMMB               int
-	EnableInfightQuotaHandler bool
+	MaxRequestBodyBytes        int64
+	TargetRAMMB                int
+	EnableInflightQuotaHandler bool
 }
 
 func NewServerRunOptions() *ServerRunOptions {
@@ -60,7 +62,9 @@ func NewServerRunOptions() *ServerRunOptions {
 		MaxRequestsInFlight:         defaults.MaxRequestsInFlight,
 		MaxMutatingRequestsInFlight: defaults.MaxMutatingRequestsInFlight,
 		RequestTimeout:              defaults.RequestTimeout,
+		LivezGracePeriod:            defaults.LivezGracePeriod,
 		MinRequestTimeout:           defaults.MinRequestTimeout,
+		ShutdownDelayDuration:       defaults.ShutdownDelayDuration,
 		JSONPatchMaxCopyBytes:       defaults.JSONPatchMaxCopyBytes,
 		MaxRequestBodyBytes:         defaults.MaxRequestBodyBytes,
 	}
@@ -72,8 +76,10 @@ func (s *ServerRunOptions) ApplyTo(c *server.Config) error {
 	c.ExternalAddress = s.ExternalHost
 	c.MaxRequestsInFlight = s.MaxRequestsInFlight
 	c.MaxMutatingRequestsInFlight = s.MaxMutatingRequestsInFlight
+	c.LivezGracePeriod = s.LivezGracePeriod
 	c.RequestTimeout = s.RequestTimeout
 	c.MinRequestTimeout = s.MinRequestTimeout
+	c.ShutdownDelayDuration = s.ShutdownDelayDuration
 	c.JSONPatchMaxCopyBytes = s.JSONPatchMaxCopyBytes
 	c.MaxRequestBodyBytes = s.MaxRequestBodyBytes
 	c.PublicAddress = s.AdvertiseAddress
@@ -106,7 +112,11 @@ func (s *ServerRunOptions) Validate() []error {
 		errors = append(errors, fmt.Errorf("--target-ram-mb can not be negative value"))
 	}
 
-	if s.EnableInfightQuotaHandler {
+	if s.LivezGracePeriod < 0 {
+		errors = append(errors, fmt.Errorf("--livez-grace-period can not be a negative value"))
+	}
+
+	if s.EnableInflightQuotaHandler {
 		if !utilfeature.DefaultFeatureGate.Enabled(features.RequestManagement) {
 			errors = append(errors, fmt.Errorf("--enable-inflight-quota-handler can not be set if feature "+
 				"gate RequestManagement is disabled"))
@@ -134,6 +144,10 @@ func (s *ServerRunOptions) Validate() []error {
 
 	if s.MinRequestTimeout < 0 {
 		errors = append(errors, fmt.Errorf("--min-request-timeout can not be negative value"))
+	}
+
+	if s.ShutdownDelayDuration < 0 {
+		errors = append(errors, fmt.Errorf("--shutdown-delay-duration can not be negative value"))
 	}
 
 	if s.JSONPatchMaxCopyBytes < 0 {
@@ -185,14 +199,24 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"it out. This is the default request timeout for requests but may be overridden by flags such as "+
 		"--min-request-timeout for specific types of requests.")
 
+	fs.DurationVar(&s.LivezGracePeriod, "livez-grace-period", s.LivezGracePeriod, ""+
+		"This option represents the maximum amount of time it should take for apiserver to complete its startup sequence "+
+		"and become live. From apiserver's start time to when this amount of time has elapsed, /livez will assume "+
+		"that unfinished post-start hooks will complete successfully and therefore return true.")
+
 	fs.IntVar(&s.MinRequestTimeout, "min-request-timeout", s.MinRequestTimeout, ""+
 		"An optional field indicating the minimum number of seconds a handler must keep "+
 		"a request open before timing it out. Currently only honored by the watch request "+
 		"handler, which picks a randomized value above this number as the connection timeout, "+
 		"to spread out load.")
 
-	fs.BoolVar(&s.EnableInfightQuotaHandler, "enable-inflight-quota-handler", s.EnableInfightQuotaHandler, ""+
+	fs.BoolVar(&s.EnableInflightQuotaHandler, "enable-inflight-quota-handler", s.EnableInflightQuotaHandler, ""+
 		"If true, replace the max-in-flight handler with an enhanced one that queues and dispatches with priority and fairness")
+
+	fs.DurationVar(&s.ShutdownDelayDuration, "shutdown-delay-duration", s.ShutdownDelayDuration, ""+
+		"Time to delay the termination. During that time the server keeps serving requests normally and /healthz "+
+		"returns success, but /readyz immediately returns failure. Graceful termination starts after this delay "+
+		"has elapsed. This can be used to allow load balancer to stop sending traffic to this server.")
 
 	utilfeature.DefaultMutableFeatureGate.AddFlag(fs)
 }

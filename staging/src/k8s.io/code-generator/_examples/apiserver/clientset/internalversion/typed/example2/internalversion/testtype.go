@@ -32,7 +32,7 @@ import (
 // TestTypesGetter has a method to return a TestTypeInterface.
 // A group's client should implement this interface.
 type TestTypesGetter interface {
-	TestTypes(namespace string) TestTypeInterface
+	TestTypes() TestTypeInterface
 }
 
 // TestTypeInterface has methods to work with TestType resources.
@@ -52,14 +52,12 @@ type TestTypeInterface interface {
 // testTypes implements TestTypeInterface
 type testTypes struct {
 	client rest.Interface
-	ns     string
 }
 
 // newTestTypes returns a TestTypes
-func newTestTypes(c *SecondExampleClient, namespace string) *testTypes {
+func newTestTypes(c *SecondExampleClient) *testTypes {
 	return &testTypes{
 		client: c.RESTClient(),
-		ns:     namespace,
 	}
 }
 
@@ -67,7 +65,6 @@ func newTestTypes(c *SecondExampleClient, namespace string) *testTypes {
 func (c *testTypes) Get(name string, options v1.GetOptions) (result *example2.TestType, err error) {
 	result = &example2.TestType{}
 	err = c.client.Get().
-		Namespace(c.ns).
 		Resource("testtypes").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
@@ -84,7 +81,6 @@ func (c *testTypes) List(opts v1.ListOptions) (result *example2.TestTypeList, er
 	}
 	result = &example2.TestTypeList{}
 	err = c.client.Get().
-		Namespace(c.ns).
 		Resource("testtypes").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -101,7 +97,6 @@ func (c *testTypes) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	}
 	opts.Watch = true
 	return c.client.Get().
-		Namespace(c.ns).
 		Resource("testtypes").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -112,7 +107,6 @@ func (c *testTypes) Watch(opts v1.ListOptions) (watch.Interface, error) {
 func (c *testTypes) Create(testType *example2.TestType) (result *example2.TestType, err error) {
 	result = &example2.TestType{}
 	err = c.client.Post().
-		Namespace(c.ns).
 		Resource("testtypes").
 		Body(testType).
 		Do().
@@ -124,7 +118,6 @@ func (c *testTypes) Create(testType *example2.TestType) (result *example2.TestTy
 func (c *testTypes) Update(testType *example2.TestType) (result *example2.TestType, err error) {
 	result = &example2.TestType{}
 	err = c.client.Put().
-		Namespace(c.ns).
 		Resource("testtypes").
 		Name(testType.Name).
 		Body(testType).
@@ -139,7 +132,6 @@ func (c *testTypes) Update(testType *example2.TestType) (result *example2.TestTy
 func (c *testTypes) UpdateStatus(testType *example2.TestType) (result *example2.TestType, err error) {
 	result = &example2.TestType{}
 	err = c.client.Put().
-		Namespace(c.ns).
 		Resource("testtypes").
 		Name(testType.Name).
 		SubResource("status").
@@ -152,7 +144,6 @@ func (c *testTypes) UpdateStatus(testType *example2.TestType) (result *example2.
 // Delete takes name of the testType and deletes it. Returns an error if one occurs.
 func (c *testTypes) Delete(name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
-		Namespace(c.ns).
 		Resource("testtypes").
 		Name(name).
 		Body(options).
@@ -167,7 +158,6 @@ func (c *testTypes) DeleteCollection(options *v1.DeleteOptions, listOptions v1.L
 		timeout = time.Duration(*listOptions.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
-		Namespace(c.ns).
 		Resource("testtypes").
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -180,7 +170,6 @@ func (c *testTypes) DeleteCollection(options *v1.DeleteOptions, listOptions v1.L
 func (c *testTypes) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *example2.TestType, err error) {
 	result = &example2.TestType{}
 	err = c.client.Patch(pt).
-		Namespace(c.ns).
 		Resource("testtypes").
 		SubResource(subresources...).
 		Name(name).

@@ -17,6 +17,7 @@ limitations under the License.
 package noderestriction
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"strings"
@@ -105,7 +106,7 @@ var (
 )
 
 // Admit checks the admission policy and triggers corresponding actions
-func (p *Plugin) Admit(a admission.Attributes, o admission.ObjectInterfaces) error {
+func (p *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
 	nodeName, isNode := p.nodeIdentifier.NodeIdentity(a.GetUserInfo())
 
 	// Our job is just to restrict nodes
@@ -155,10 +156,10 @@ func (p *Plugin) Admit(a admission.Attributes, o admission.ObjectInterfaces) err
 		return admission.NewForbidden(a, fmt.Errorf("disabled by feature gate %s", features.NodeLease))
 
 	case csiNodeResource:
-		if p.features.Enabled(features.KubeletPluginsWatcher) && p.features.Enabled(features.CSINodeInfo) {
+		if p.features.Enabled(features.CSINodeInfo) {
 			return p.admitCSINode(nodeName, a)
 		}
-		return admission.NewForbidden(a, fmt.Errorf("disabled by feature gates %s and %s", features.KubeletPluginsWatcher, features.CSINodeInfo))
+		return admission.NewForbidden(a, fmt.Errorf("disabled by feature gates %s", features.CSINodeInfo))
 
 	default:
 		return nil
@@ -356,14 +357,9 @@ func (p *Plugin) admitNode(nodeName string, a admission.Attributes) error {
 			return admission.NewForbidden(a, fmt.Errorf("node %q is not allowed to set the following labels: %s", nodeName, strings.Join(forbiddenLabels.List(), ", ")))
 		}
 		// check and warn if nodes set labels on create that would have been forbidden on update
-		// TODO(liggitt): in 1.17, expand getForbiddenCreateLabels to match getForbiddenUpdateLabels and drop this
+		// TODO(liggitt): in 1.19, expand getForbiddenCreateLabels to match getForbiddenUpdateLabels and drop this
 		if forbiddenUpdateLabels := p.getForbiddenUpdateLabels(modifiedLabels); len(forbiddenUpdateLabels) > 0 {
 			klog.Warningf("node %q added disallowed labels on node creation: %s", nodeName, strings.Join(forbiddenUpdateLabels.List(), ", "))
-		}
-
-		// On create, get name from new object if unset in admission
-		if len(requestedName) == 0 {
-			requestedName = node.Name
 		}
 	}
 	if requestedName != nodeName {
@@ -439,7 +435,7 @@ func getLabelNamespace(key string) string {
 }
 
 // getForbiddenCreateLabels returns the set of labels that may not be set by the node.
-// TODO(liggitt): in 1.17, expand to match getForbiddenUpdateLabels()
+// TODO(liggitt): in 1.19, expand to match getForbiddenUpdateLabels()
 func (p *Plugin) getForbiddenCreateLabels(modifiedLabels sets.String) sets.String {
 	if len(modifiedLabels) == 0 {
 		return nil

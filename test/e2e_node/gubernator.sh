@@ -22,11 +22,12 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-source hack/lib/logging.sh
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
+source "${KUBE_ROOT}/hack/lib/logging.sh"
 
 
 if [[ $# -eq 0 || ! $1 =~ ^[Yy]$ ]]; then
-  read -p "Do you want to run gubernator.sh and upload logs publicly to GCS? [y/n]" yn
+  read -r -p "Do you want to run gubernator.sh and upload logs publicly to GCS? [y/n]" yn
   echo
   if [[ ! $yn =~ ^[Yy]$ ]]; then
       exit 1
@@ -59,9 +60,9 @@ V=2 kube::log::status "Using bucket ${bucket_name}"
 # Check if the bucket exists
 if ! gsutil ls gs:// | grep -q "gs://${bucket_name}/"; then
   V=2 kube::log::status "Creating public bucket ${bucket_name}"
-  gsutil mb gs://${bucket_name}/
+  gsutil mb "gs://${bucket_name}/"
   # Make all files in the bucket publicly readable
-  gsutil acl ch -u AllUsers:R gs://${bucket_name}
+  gsutil acl ch -u AllUsers:R "gs://${bucket_name}"
 else
   V=2 kube::log::status "Bucket already exists"
 fi
@@ -79,24 +80,24 @@ fi
 
 # Get start and end timestamps based on build-log.txt file contents
 # Line where the actual tests start
-start_line=$(grep -n -m 1 "^=" ${BUILD_LOG_PATH} | sed 's/\([0-9]*\).*/\1/')
+start_line=$(grep -n -m 1 "^=" "${BUILD_LOG_PATH}" | sed 's/\([0-9]*\).*/\1/')
 # Create text file starting where the tests start
-after_start=$(tail -n +${start_line} ${BUILD_LOG_PATH})
+after_start=$(tail -n "+${start_line}" "${BUILD_LOG_PATH}")
 echo "${after_start}" >> build-log-cut.txt
 # Match the first timestamp
 start_time_raw=$(grep -m 1 -o '[0-9][0-9][0-9][0-9][[:blank:]][0-9][0-9]:[0-9][0-9]:[0-9][0-9].[0-9]*' build-log-cut.txt)
 rm build-log-cut.txt
 # Make the date readable by date command (ex: 0101 00:00:00.000 -> 01/01 00:00:00.000)
-start_time=$(echo ${start_time_raw} | sed 's/^.\{2\}/&\//')
+start_time=$(echo "${start_time_raw}" | sed 's/^.\{2\}/&\//')
 V=2 kube::log::status "Started at ${start_time}"
 # Match the last timestamp in the build-log file
-end_time=$(grep -o '[0-9][0-9][0-9][0-9][[:blank:]][0-9][0-9]:[0-9][0-9]:[0-9][0-9].[0-9]*' ${BUILD_LOG_PATH} | tail -1 | sed 's/^.\{2\}/&\//')
+end_time=$(grep -o '[0-9][0-9][0-9][0-9][[:blank:]][0-9][0-9]:[0-9][0-9]:[0-9][0-9].[0-9]*' "${BUILD_LOG_PATH}" | tail -1 | sed 's/^.\{2\}/&\//')
 # Convert to epoch time for Gubernator
 start_time_epoch=$(date -d "${start_time}" +%s)
 end_time_epoch=$(date -d "${end_time}" +%s)
 
 # Make folder name for build from timestamp
-BUILD_STAMP=$(echo $start_time | sed 's/\///' | sed 's/ /_/')
+BUILD_STAMP=$(echo "${start_time}" | sed 's/\///' | sed 's/ /_/')
 
 GCS_LOGS_PATH="${GCS_JOBS_PATH}/${BUILD_STAMP}"
 
@@ -108,11 +109,11 @@ if gsutil ls "${GCS_JOBS_PATH}" | grep -q "${BUILD_STAMP}"; then
   exit
 fi
 
-for result in $(find ${ARTIFACTS} -type d -name "results"); do
-  if [[ $result != "" && $result != "${ARTIFACTS}/results" && $result != $ARTIFACTS ]]; then
-    mv $result/* $ARTIFACTS
+while IFS= read -r result; do
+  if [[ $result != "" && $result != "${ARTIFACTS}/results" && $result != "${ARTIFACTS}" ]]; then
+    mv "${result}/"* "${ARTIFACTS}"
   fi
-done
+done < <(find "${ARTIFACTS}" -type d -name "results")
 
 # Upload log files
 for upload_attempt in $(seq 3); do
@@ -137,7 +138,6 @@ version=""
 if [[ -e "version" ]]; then
   version=$(cat "version")
 elif [[ -e "hack/lib/version.sh" ]]; then
-  export KUBE_ROOT="."
   source "hack/lib/version.sh"
   kube::version::get_version_vars
   version="${KUBE_GIT_VERSION-}"
@@ -167,16 +167,21 @@ if [[ -e "${ARTIFACTS}/finished.json" ]]; then
 fi
 
 V=2 kube::log::status "Constructing started.json and finished.json files"
-echo "{" >> "${ARTIFACTS}/started.json"
-echo "    \"version\": \"${version}\"," >> "${ARTIFACTS}/started.json"
-echo "    \"timestamp\": ${start_time_epoch}," >> "${ARTIFACTS}/started.json"
-echo "    \"jenkins-node\": \"${NODE_NAME:-}\"" >> "${ARTIFACTS}/started.json"
-echo "}" >> "${ARTIFACTS}/started.json"
+cat <<EOF >"${ARTIFACTS}/started.json"
+{
+    "version": "${version}",
+    "timestamp": ${start_time_epoch},
+    "jenkins-node": "${NODE_NAME:-}"
+}
+EOF
 
-echo "{" >> "${ARTIFACTS}/finished.json"
-echo "    \"result\": \"${build_result}\"," >> "${ARTIFACTS}/finished.json"
-echo "    \"timestamp\": ${end_time_epoch}" >> "${ARTIFACTS}/finished.json"
-echo "}" >> "${ARTIFACTS}/finished.json"
+
+cat <<EOF >"${ARTIFACTS}/finished.json"
+{
+    "result": "${build_result}",
+    "timestamp": ${end_time_epoch}
+}
+EOF
 
 
 # Upload started.json

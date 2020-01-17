@@ -18,17 +18,23 @@ package integration
 
 import (
 	"path"
+	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/coreos/etcd/clientv3"
 	"github.com/coreos/etcd/pkg/transport"
+	"google.golang.org/grpc"
+
 	"sigs.k8s.io/yaml"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/json"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/client-go/dynamic"
@@ -40,9 +46,9 @@ import (
 )
 
 var pruningFixture = &apiextensionsv1beta1.CustomResourceDefinition{
-	ObjectMeta: metav1.ObjectMeta{Name: "foos.tests.apiextensions.k8s.io"},
+	ObjectMeta: metav1.ObjectMeta{Name: "foos.tests.example.com"},
 	Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
-		Group:   "tests.apiextensions.k8s.io",
+		Group:   "tests.example.com",
 		Version: "v1beta1",
 		Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
 			Plural:   "foos",
@@ -107,9 +113,68 @@ properties:
 x-kubernetes-preserve-unknown-fields: true
 `
 
-	fooInstance = `
+	fooSchemaEmbeddedResource = `
+type: object
+properties:
+  embeddedPruning:
+    type: object
+    x-kubernetes-embedded-resource: true
+    properties:
+      specified:
+        type: string
+  embeddedPreserving:
+    type: object
+    x-kubernetes-embedded-resource: true
+    x-kubernetes-preserve-unknown-fields: true
+  embeddedNested:
+    type: object
+    x-kubernetes-embedded-resource: true
+    x-kubernetes-preserve-unknown-fields: true
+    properties:
+      embeddedPruning:
+        type: object
+        x-kubernetes-embedded-resource: true
+        properties:
+          specified:
+            type: string
+`
+
+	fooSchemaEmbeddedResourceInstance = pruningFooInstance + `
+embeddedPruning:
+  apiVersion: foo/v1
+  kind: Foo
+  metadata:
+    name: foo
+    unspecified: bar
+  unspecified: bar
+  specified: bar
+embeddedPreserving:
+  apiVersion: foo/v1
+  kind: Foo
+  metadata:
+    name: foo
+    unspecified: bar
+  unspecified: bar
+embeddedNested:
+  apiVersion: foo/v1
+  kind: Foo
+  metadata:
+    name: foo
+    unspecified: bar
+  unspecified: bar
+  embeddedPruning:
+    apiVersion: foo/v1
+    kind: Foo
+    metadata:
+      name: foo
+      unspecified: bar
+    unspecified: bar
+    specified: bar
+`
+
+	pruningFooInstance = `
 kind: Foo
-apiVersion: tests.apiextensions.k8s.io/v1beta1
+apiVersion: tests.example.com/v1beta1
 metadata:
   name: foo
 `
@@ -136,7 +201,7 @@ func TestPruningCreate(t *testing.T) {
 	t.Logf("Creating CR and expect 'unspecified' fields to be pruned")
 	fooClient := dynamicClient.Resource(schema.GroupVersionResource{crd.Spec.Group, crd.Spec.Version, crd.Spec.Names.Plural})
 	foo := &unstructured.Unstructured{}
-	if err := yaml.Unmarshal([]byte(fooInstance), &foo.Object); err != nil {
+	if err := yaml.Unmarshal([]byte(pruningFooInstance), &foo.Object); err != nil {
 		t.Fatal(err)
 	}
 	unstructured.SetNestedField(foo.Object, "bar", "unspecified")
@@ -188,7 +253,7 @@ func TestPruningStatus(t *testing.T) {
 	t.Logf("Creating CR and expect 'unspecified' fields to be pruned")
 	fooClient := dynamicClient.Resource(schema.GroupVersionResource{crd.Spec.Group, crd.Spec.Version, crd.Spec.Names.Plural})
 	foo := &unstructured.Unstructured{}
-	if err := yaml.Unmarshal([]byte(fooInstance), &foo.Object); err != nil {
+	if err := yaml.Unmarshal([]byte(pruningFooInstance), &foo.Object); err != nil {
 		t.Fatal(err)
 	}
 	foo, err = fooClient.Create(foo, metav1.CreateOptions{})
@@ -268,8 +333,12 @@ func TestPruningFromStorage(t *testing.T) {
 		t.Fatal(err)
 	}
 	etcdConfig := clientv3.Config{
-		Endpoints: restOptions.StorageConfig.Transport.ServerList,
-		TLS:       tlsConfig,
+		Endpoints:   restOptions.StorageConfig.Transport.ServerList,
+		DialTimeout: 20 * time.Second,
+		DialOptions: []grpc.DialOption{
+			grpc.WithBlock(), // block until the underlying connection is up
+		},
+		TLS: tlsConfig,
 	}
 	etcdclient, err := clientv3.New(etcdConfig)
 	if err != nil {
@@ -279,7 +348,7 @@ func TestPruningFromStorage(t *testing.T) {
 	t.Logf("Creating object with unknown field manually in etcd")
 
 	original := &unstructured.Unstructured{}
-	if err := yaml.Unmarshal([]byte(fooInstance), &original.Object); err != nil {
+	if err := yaml.Unmarshal([]byte(pruningFooInstance), &original.Object); err != nil {
 		t.Fatal(err)
 	}
 	unstructured.SetNestedField(original.Object, "bar", "unspecified")
@@ -341,7 +410,7 @@ func TestPruningPatch(t *testing.T) {
 
 	fooClient := dynamicClient.Resource(schema.GroupVersionResource{crd.Spec.Group, crd.Spec.Version, crd.Spec.Names.Plural})
 	foo := &unstructured.Unstructured{}
-	if err := yaml.Unmarshal([]byte(fooInstance), &foo.Object); err != nil {
+	if err := yaml.Unmarshal([]byte(pruningFooInstance), &foo.Object); err != nil {
 		t.Fatal(err)
 	}
 	foo, err = fooClient.Create(foo, metav1.CreateOptions{})
@@ -394,7 +463,7 @@ func TestPruningCreatePreservingUnknownFields(t *testing.T) {
 	t.Logf("Creating CR and expect 'unspecified' field to be pruned")
 	fooClient := dynamicClient.Resource(schema.GroupVersionResource{crd.Spec.Group, crd.Spec.Version, crd.Spec.Names.Plural})
 	foo := &unstructured.Unstructured{}
-	if err := yaml.Unmarshal([]byte(fooInstance), &foo.Object); err != nil {
+	if err := yaml.Unmarshal([]byte(pruningFooInstance), &foo.Object); err != nil {
 		t.Fatal(err)
 	}
 	unstructured.SetNestedField(foo.Object, "bar", "unspecified")
@@ -455,5 +524,74 @@ func TestPruningCreatePreservingUnknownFields(t *testing.T) {
 		if _, found, _ := unstructured.NestedFieldNoCopy(foo.Object, pth...); found {
 			t.Errorf("Expected '%s' field to be pruned, but it was not", strings.Join(pth, "."))
 		}
+	}
+}
+
+func TestPruningEmbeddedResources(t *testing.T) {
+	tearDownFn, apiExtensionClient, dynamicClient, err := fixtures.StartDefaultServerWithClients(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tearDownFn()
+
+	crd := pruningFixture.DeepCopy()
+	crd.Spec.Validation = &apiextensionsv1beta1.CustomResourceValidation{}
+	if err := yaml.Unmarshal([]byte(fooSchemaEmbeddedResource), &crd.Spec.Validation.OpenAPIV3Schema); err != nil {
+		t.Fatal(err)
+	}
+
+	crd, err = fixtures.CreateNewCustomResourceDefinition(crd, apiExtensionClient, dynamicClient)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Logf("Creating CR and expect 'unspecified' field to be pruned")
+	fooClient := dynamicClient.Resource(schema.GroupVersionResource{crd.Spec.Group, crd.Spec.Version, crd.Spec.Names.Plural})
+	foo := &unstructured.Unstructured{}
+	if err := yaml.Unmarshal([]byte(fooSchemaEmbeddedResourceInstance), &foo.Object); err != nil {
+		t.Fatal(err)
+	}
+	foo, err = fooClient.Create(foo, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Unable to create CR: %v", err)
+	}
+	t.Logf("CR created: %#v", foo.UnstructuredContent())
+
+	t.Logf("Comparing with expected, pruned value")
+	x := runtime.DeepCopyJSON(foo.Object)
+	delete(x, "apiVersion")
+	delete(x, "kind")
+	delete(x, "metadata")
+	var expected map[string]interface{}
+	if err := yaml.Unmarshal([]byte(`
+embeddedPruning:
+  apiVersion: foo/v1
+  kind: Foo
+  metadata:
+    name: foo
+  specified: bar
+embeddedPreserving:
+  apiVersion: foo/v1
+  kind: Foo
+  metadata:
+    name: foo
+  unspecified: bar
+embeddedNested:
+  apiVersion: foo/v1
+  kind: Foo
+  metadata:
+    name: foo
+  embeddedPruning:
+    apiVersion: foo/v1
+    kind: Foo
+    metadata:
+      name: foo
+    specified: bar
+  unspecified: bar
+`), &expected); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(expected, x) {
+		t.Errorf("unexpected diff: %s", diff.ObjectDiff(expected, x))
 	}
 }

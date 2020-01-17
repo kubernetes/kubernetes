@@ -24,7 +24,7 @@ import (
 
 	"k8s.io/klog"
 
-	siotypes "github.com/codedellemc/goscaleio/types/v1"
+	siotypes "github.com/thecodeteam/goscaleio/types/v1"
 )
 
 type sioMgr struct {
@@ -130,7 +130,7 @@ func (m *sioMgr) AttachVolume(volName string, multipleMappings bool) (string, er
 	// handle vol if already attached
 	if len(vol.MappedSdcInfo) > 0 {
 		if m.isSdcMappedToVol(iid, vol) {
-			klog.V(4).Info(log("skippping attachment, volume %s already attached to sdc %s", volName, iid))
+			klog.V(4).Info(log("skipping attachment, volume %s already attached to sdc %s", volName, iid))
 			return devs[vol.ID], nil
 		}
 	}

@@ -47,10 +47,11 @@ func newItemsValidator(path, in string, items *spec.Items, root interface{}, for
 	iv := &itemsValidator{path: path, in: in, items: items, root: root, KnownFormats: formats}
 	iv.validators = []valueValidator{
 		&typeValidator{
-			Type:   spec.StringOrArray([]string{items.Type}),
-			Format: items.Format,
-			In:     in,
-			Path:   path,
+			Type:     spec.StringOrArray([]string{items.Type}),
+			Nullable: items.Nullable,
+			Format:   items.Format,
+			In:       in,
+			Path:     path,
 		},
 		iv.stringValidator(),
 		iv.formatValidator(),
@@ -186,10 +187,11 @@ func NewHeaderValidator(name string, header *spec.Header, formats strfmt.Registr
 	p := &HeaderValidator{name: name, header: header, KnownFormats: formats}
 	p.validators = []valueValidator{
 		&typeValidator{
-			Type:   spec.StringOrArray([]string{header.Type}),
-			Format: header.Format,
-			In:     "header",
-			Path:   name,
+			Type:     spec.StringOrArray([]string{header.Type}),
+			Nullable: header.Nullable,
+			Format:   header.Format,
+			In:       "header",
+			Path:     name,
 		},
 		p.stringValidator(),
 		p.formatValidator(),
@@ -292,10 +294,11 @@ func NewParamValidator(param *spec.Parameter, formats strfmt.Registry) *ParamVal
 	p := &ParamValidator{param: param, KnownFormats: formats}
 	p.validators = []valueValidator{
 		&typeValidator{
-			Type:   spec.StringOrArray([]string{param.Type}),
-			Format: param.Format,
-			In:     param.In,
-			Path:   param.Name,
+			Type:     spec.StringOrArray([]string{param.Type}),
+			Nullable: param.Nullable,
+			Format:   param.Format,
+			In:       param.In,
+			Path:     param.Name,
 		},
 		p.stringValidator(),
 		p.formatValidator(),

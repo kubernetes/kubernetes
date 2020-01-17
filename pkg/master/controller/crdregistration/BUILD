@@ -11,7 +11,6 @@ go_library(
     srcs = ["crdregistration_controller.go"],
     importpath = "k8s.io/kubernetes/pkg/master/controller/crdregistration",
     deps = [
-        "//pkg/controller:go_default_library",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions:go_default_library",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/client/informers/internalversion/apiextensions/internalversion:go_default_library",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/internalversion:go_default_library",
@@ -22,7 +21,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
         "//staging/src/k8s.io/client-go/util/workqueue:go_default_library",
-        "//staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration:go_default_library",
+        "//staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ],
 )
@@ -50,6 +49,6 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
-        "//staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration:go_default_library",
+        "//staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1:go_default_library",
     ],
 )

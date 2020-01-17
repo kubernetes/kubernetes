@@ -39,7 +39,9 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/rest"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog"
 )
 
@@ -161,14 +163,14 @@ func ConnectResource(connecter rest.Connecter, scope *RequestScope, admit admiss
 			userInfo, _ := request.UserFrom(ctx)
 			// TODO: remove the mutating admission here as soon as we have ported all plugin that handle CONNECT
 			if mutatingAdmission, ok := admit.(admission.MutationInterface); ok {
-				err = mutatingAdmission.Admit(admission.NewAttributesRecord(opts, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Connect, nil, false, userInfo), scope)
+				err = mutatingAdmission.Admit(ctx, admission.NewAttributesRecord(opts, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Connect, nil, false, userInfo), scope)
 				if err != nil {
 					scope.err(err, w, req)
 					return
 				}
 			}
 			if validatingAdmission, ok := admit.(admission.ValidationInterface); ok {
-				err = validatingAdmission.Validate(admission.NewAttributesRecord(opts, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Connect, nil, false, userInfo), scope)
+				err = validatingAdmission.Validate(ctx, admission.NewAttributesRecord(opts, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Connect, nil, false, userInfo), scope)
 				if err != nil {
 					scope.err(err, w, req)
 					return
@@ -218,12 +220,15 @@ func finishRequest(timeout time.Duration, fn resultFunc) (result runtime.Object,
 		defer func() {
 			panicReason := recover()
 			if panicReason != nil {
-				// Same as stdlib http server code. Manually allocate stack
-				// trace buffer size to prevent excessively large logs
-				const size = 64 << 10
-				buf := make([]byte, size)
-				buf = buf[:goruntime.Stack(buf, false)]
-				panicReason = fmt.Sprintf("%v\n%s", panicReason, buf)
+				// do not wrap the sentinel ErrAbortHandler panic value
+				if panicReason != http.ErrAbortHandler {
+					// Same as stdlib http server code. Manually allocate stack
+					// trace buffer size to prevent excessively large logs
+					const size = 64 << 10
+					buf := make([]byte, size)
+					buf = buf[:goruntime.Stack(buf, false)]
+					panicReason = fmt.Sprintf("%v\n%s", panicReason, buf)
+				}
 				// Propagate to parent goroutine
 				panicCh <- panicReason
 			}
@@ -318,6 +323,10 @@ func checkName(obj runtime.Object, name, namespace string, namer ScopeNamer) err
 // TODO: remove the need for the namer LinkSetters by requiring objects implement either Object or List
 //   interfaces
 func setObjectSelfLink(ctx context.Context, obj runtime.Object, req *http.Request, namer ScopeNamer) error {
+	if utilfeature.DefaultFeatureGate.Enabled(features.RemoveSelfLink) {
+		return nil
+	}
+
 	// We only generate list links on objects that implement ListInterface - historically we duck typed this
 	// check via reflection, but as we move away from reflection we require that you not only carry Items but
 	// ListMeta into order to be identified as a list.

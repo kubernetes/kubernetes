@@ -29,6 +29,8 @@ import (
 	fakeexampleinternalversion "k8s.io/code-generator/_examples/apiserver/clientset/internalversion/typed/example/internalversion/fake"
 	secondexampleinternalversion "k8s.io/code-generator/_examples/apiserver/clientset/internalversion/typed/example2/internalversion"
 	fakesecondexampleinternalversion "k8s.io/code-generator/_examples/apiserver/clientset/internalversion/typed/example2/internalversion/fake"
+	thirdexampleinternalversion "k8s.io/code-generator/_examples/apiserver/clientset/internalversion/typed/example3.io/internalversion"
+	fakethirdexampleinternalversion "k8s.io/code-generator/_examples/apiserver/clientset/internalversion/typed/example3.io/internalversion/fake"
 )
 
 // NewSimpleClientset returns a clientset that will respond with the provided objects.
@@ -86,4 +88,9 @@ func (c *Clientset) Example() exampleinternalversion.ExampleInterface {
 // SecondExample retrieves the SecondExampleClient
 func (c *Clientset) SecondExample() secondexampleinternalversion.SecondExampleInterface {
 	return &fakesecondexampleinternalversion.FakeSecondExample{Fake: &c.Fake}
+}
+
+// ThirdExample retrieves the ThirdExampleClient
+func (c *Clientset) ThirdExample() thirdexampleinternalversion.ThirdExampleInterface {
+	return &fakethirdexampleinternalversion.FakeThirdExample{Fake: &c.Fake}
 }

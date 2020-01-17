@@ -309,14 +309,7 @@ func (s *store) Restore(b backend.Backend) error {
 }
 
 func (s *store) restore() error {
-	b := s.b
-
-	reportDbTotalSizeInBytesMu.Lock()
-	reportDbTotalSizeInBytes = func() float64 { return float64(b.Size()) }
-	reportDbTotalSizeInBytesMu.Unlock()
-	reportDbTotalSizeInUseInBytesMu.Lock()
-	reportDbTotalSizeInUseInBytes = func() float64 { return float64(b.SizeInUse()) }
-	reportDbTotalSizeInUseInBytesMu.Unlock()
+	s.setupMetricsReporter()
 
 	min, max := newRevBytes(), newRevBytes()
 	revToBytes(revision{main: 1}, min)
@@ -494,6 +487,30 @@ func (s *store) ConsistentIndex() uint64 {
 	v := binary.BigEndian.Uint64(vs[0])
 	atomic.StoreUint64(&s.consistentIndex, v)
 	return v
+}
+
+func (s *store) setupMetricsReporter() {
+	b := s.b
+	reportDbTotalSizeInBytesMu.Lock()
+	reportDbTotalSizeInBytes = func() float64 { return float64(b.Size()) }
+	reportDbTotalSizeInBytesMu.Unlock()
+	reportDbTotalSizeInUseInBytesMu.Lock()
+	reportDbTotalSizeInUseInBytes = func() float64 { return float64(b.SizeInUse()) }
+	reportDbTotalSizeInUseInBytesMu.Unlock()
+	reportCurrentRevMu.Lock()
+	reportCurrentRev = func() float64 {
+		s.revMu.RLock()
+		defer s.revMu.RUnlock()
+		return float64(s.currentRev)
+	}
+	reportCurrentRevMu.Unlock()
+	reportCompactRevMu.Lock()
+	reportCompactRev = func() float64 {
+		s.revMu.RLock()
+		defer s.revMu.RUnlock()
+		return float64(s.compactMainRev)
+	}
+	reportCompactRevMu.Unlock()
 }
 
 // appendMarkTombstone appends tombstone mark to normal revision bytes.

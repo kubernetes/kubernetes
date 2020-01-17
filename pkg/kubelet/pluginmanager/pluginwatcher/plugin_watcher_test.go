@@ -28,7 +28,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog"
-	registerapi "k8s.io/kubernetes/pkg/kubelet/apis/pluginregistration/v1"
+	registerapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
 )
 
@@ -285,27 +285,6 @@ func TestPluginRegistrationAtKubeletStart(t *testing.T) {
 	case <-time.After(wait.ForeverTestTimeout):
 		t.Fatalf("Timeout while waiting for the plugin registration status")
 	}
-}
-
-func waitForPluginRegistrationStatus(t *testing.T, statusChan chan registerapi.RegistrationStatus) bool {
-	select {
-	case status := <-statusChan:
-		return status.PluginRegistered
-	case <-time.After(wait.ForeverTestTimeout):
-		t.Fatalf("Timed out while waiting for registration status")
-	}
-	return false
-}
-
-func waitForEvent(t *testing.T, expected examplePluginEvent, eventChan chan examplePluginEvent) bool {
-	select {
-	case event := <-eventChan:
-		return event == expected
-	case <-time.After(wait.ForeverTestTimeout):
-		t.Fatalf("Timed out while waiting for registration status %v", expected)
-	}
-
-	return false
 }
 
 func newWatcher(t *testing.T, testDeprecatedDir bool, desiredStateOfWorldCache cache.DesiredStateOfWorld, stopCh <-chan struct{}) *Watcher {

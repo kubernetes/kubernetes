@@ -64,7 +64,6 @@ ComponentConfigs:
     NodePortAddresses: null
     OOMScoreAdj: -999
     PortRange: ""
-    ResourceContainer: /kube-proxy
     UDPIdleTimeout: 250ms
     Winkernel:
       EnableDSR: false
@@ -72,6 +71,7 @@ ComponentConfigs:
       SourceVip: ""
   Kubelet:
     Address: 1.2.3.4
+    AllowedUnsafeSysctls: null
     Authentication:
       Anonymous:
         Enabled: false

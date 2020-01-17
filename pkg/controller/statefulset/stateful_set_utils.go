@@ -34,12 +34,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller/history"
 )
 
-// maxUpdateRetries is the maximum number of retries used for update conflict resolution prior to failure
-const maxUpdateRetries = 10
-
-// updateConflictError is the error used to indicate that the maximum number of retries against the API server have
-// been attempted and we need to back off
-var updateConflictError = fmt.Errorf("aborting update after %d attempts", maxUpdateRetries)
 var patchCodec = scheme.Codecs.LegacyCodec(apps.SchemeGroupVersion)
 
 // overlappingStatefulSets sorts a list of StatefulSets by creation timestamp, using their names as a tie breaker.
@@ -344,11 +338,12 @@ func ApplyRevision(set *apps.StatefulSet, revision *apps.ControllerRevision) (*a
 	if err != nil {
 		return nil, err
 	}
-	err = json.Unmarshal(patched, clone)
+	restoredSet := &apps.StatefulSet{}
+	err = json.Unmarshal(patched, restoredSet)
 	if err != nil {
 		return nil, err
 	}
-	return clone, nil
+	return restoredSet, nil
 }
 
 // nextRevision finds the next valid revision number based on revisions. If the length of revisions

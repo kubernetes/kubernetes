@@ -356,11 +356,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*apps.DaemonSetUpdateStrategy)(nil), (*v1beta2.DaemonSetUpdateStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apps_DaemonSetUpdateStrategy_To_v1beta2_DaemonSetUpdateStrategy(a.(*apps.DaemonSetUpdateStrategy), b.(*v1beta2.DaemonSetUpdateStrategy), scope)
-	}); err != nil {
-		return err
-	}
 	if err := s.AddConversionFunc((*apps.DaemonSet)(nil), (*v1beta2.DaemonSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_apps_DaemonSet_To_v1beta2_DaemonSet(a.(*apps.DaemonSet), b.(*v1beta2.DaemonSet), scope)
 	}); err != nil {
@@ -371,43 +366,8 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*apps.DeploymentStrategy)(nil), (*v1beta2.DeploymentStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apps_DeploymentStrategy_To_v1beta2_DeploymentStrategy(a.(*apps.DeploymentStrategy), b.(*v1beta2.DeploymentStrategy), scope)
-	}); err != nil {
-		return err
-	}
 	if err := s.AddConversionFunc((*apps.Deployment)(nil), (*v1beta2.Deployment)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_apps_Deployment_To_v1beta2_Deployment(a.(*apps.Deployment), b.(*v1beta2.Deployment), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddConversionFunc((*apps.ReplicaSetSpec)(nil), (*v1beta2.ReplicaSetSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apps_ReplicaSetSpec_To_v1beta2_ReplicaSetSpec(a.(*apps.ReplicaSetSpec), b.(*v1beta2.ReplicaSetSpec), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddConversionFunc((*apps.RollingUpdateDaemonSet)(nil), (*v1beta2.RollingUpdateDaemonSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apps_RollingUpdateDaemonSet_To_v1beta2_RollingUpdateDaemonSet(a.(*apps.RollingUpdateDaemonSet), b.(*v1beta2.RollingUpdateDaemonSet), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddConversionFunc((*apps.RollingUpdateDeployment)(nil), (*v1beta2.RollingUpdateDeployment)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apps_RollingUpdateDeployment_To_v1beta2_RollingUpdateDeployment(a.(*apps.RollingUpdateDeployment), b.(*v1beta2.RollingUpdateDeployment), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddConversionFunc((*apps.StatefulSetSpec)(nil), (*v1beta2.StatefulSetSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apps_StatefulSetSpec_To_v1beta2_StatefulSetSpec(a.(*apps.StatefulSetSpec), b.(*v1beta2.StatefulSetSpec), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddConversionFunc((*apps.StatefulSetStatus)(nil), (*v1beta2.StatefulSetStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apps_StatefulSetStatus_To_v1beta2_StatefulSetStatus(a.(*apps.StatefulSetStatus), b.(*v1beta2.StatefulSetStatus), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddConversionFunc((*apps.StatefulSetUpdateStrategy)(nil), (*v1beta2.StatefulSetUpdateStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apps_StatefulSetUpdateStrategy_To_v1beta2_StatefulSetUpdateStrategy(a.(*apps.StatefulSetUpdateStrategy), b.(*v1beta2.StatefulSetUpdateStrategy), scope)
 	}); err != nil {
 		return err
 	}
@@ -421,11 +381,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*v1beta2.DaemonSetUpdateStrategy)(nil), (*apps.DaemonSetUpdateStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta2_DaemonSetUpdateStrategy_To_apps_DaemonSetUpdateStrategy(a.(*v1beta2.DaemonSetUpdateStrategy), b.(*apps.DaemonSetUpdateStrategy), scope)
-	}); err != nil {
-		return err
-	}
 	if err := s.AddConversionFunc((*v1beta2.DaemonSet)(nil), (*apps.DaemonSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1beta2_DaemonSet_To_apps_DaemonSet(a.(*v1beta2.DaemonSet), b.(*apps.DaemonSet), scope)
 	}); err != nil {
@@ -436,48 +391,13 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*v1beta2.DeploymentStrategy)(nil), (*apps.DeploymentStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta2_DeploymentStrategy_To_apps_DeploymentStrategy(a.(*v1beta2.DeploymentStrategy), b.(*apps.DeploymentStrategy), scope)
-	}); err != nil {
-		return err
-	}
 	if err := s.AddConversionFunc((*v1beta2.Deployment)(nil), (*apps.Deployment)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1beta2_Deployment_To_apps_Deployment(a.(*v1beta2.Deployment), b.(*apps.Deployment), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*v1beta2.ReplicaSetSpec)(nil), (*apps.ReplicaSetSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta2_ReplicaSetSpec_To_apps_ReplicaSetSpec(a.(*v1beta2.ReplicaSetSpec), b.(*apps.ReplicaSetSpec), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddConversionFunc((*v1beta2.RollingUpdateDaemonSet)(nil), (*apps.RollingUpdateDaemonSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta2_RollingUpdateDaemonSet_To_apps_RollingUpdateDaemonSet(a.(*v1beta2.RollingUpdateDaemonSet), b.(*apps.RollingUpdateDaemonSet), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddConversionFunc((*v1beta2.RollingUpdateDeployment)(nil), (*apps.RollingUpdateDeployment)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta2_RollingUpdateDeployment_To_apps_RollingUpdateDeployment(a.(*v1beta2.RollingUpdateDeployment), b.(*apps.RollingUpdateDeployment), scope)
-	}); err != nil {
-		return err
-	}
 	if err := s.AddConversionFunc((*v1beta2.ScaleStatus)(nil), (*autoscaling.ScaleStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1beta2_ScaleStatus_To_autoscaling_ScaleStatus(a.(*v1beta2.ScaleStatus), b.(*autoscaling.ScaleStatus), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddConversionFunc((*v1beta2.StatefulSetSpec)(nil), (*apps.StatefulSetSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta2_StatefulSetSpec_To_apps_StatefulSetSpec(a.(*v1beta2.StatefulSetSpec), b.(*apps.StatefulSetSpec), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddConversionFunc((*v1beta2.StatefulSetStatus)(nil), (*apps.StatefulSetStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta2_StatefulSetStatus_To_apps_StatefulSetStatus(a.(*v1beta2.StatefulSetStatus), b.(*apps.StatefulSetStatus), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddConversionFunc((*v1beta2.StatefulSetUpdateStrategy)(nil), (*apps.StatefulSetUpdateStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta2_StatefulSetUpdateStrategy_To_apps_StatefulSetUpdateStrategy(a.(*v1beta2.StatefulSetUpdateStrategy), b.(*apps.StatefulSetUpdateStrategy), scope)
 	}); err != nil {
 		return err
 	}
@@ -725,6 +645,11 @@ func autoConvert_v1beta2_DaemonSetUpdateStrategy_To_apps_DaemonSetUpdateStrategy
 	return nil
 }
 
+// Convert_v1beta2_DaemonSetUpdateStrategy_To_apps_DaemonSetUpdateStrategy is an autogenerated conversion function.
+func Convert_v1beta2_DaemonSetUpdateStrategy_To_apps_DaemonSetUpdateStrategy(in *v1beta2.DaemonSetUpdateStrategy, out *apps.DaemonSetUpdateStrategy, s conversion.Scope) error {
+	return autoConvert_v1beta2_DaemonSetUpdateStrategy_To_apps_DaemonSetUpdateStrategy(in, out, s)
+}
+
 func autoConvert_apps_DaemonSetUpdateStrategy_To_v1beta2_DaemonSetUpdateStrategy(in *apps.DaemonSetUpdateStrategy, out *v1beta2.DaemonSetUpdateStrategy, s conversion.Scope) error {
 	out.Type = v1beta2.DaemonSetUpdateStrategyType(in.Type)
 	if in.RollingUpdate != nil {
@@ -737,6 +662,11 @@ func autoConvert_apps_DaemonSetUpdateStrategy_To_v1beta2_DaemonSetUpdateStrategy
 		out.RollingUpdate = nil
 	}
 	return nil
+}
+
+// Convert_apps_DaemonSetUpdateStrategy_To_v1beta2_DaemonSetUpdateStrategy is an autogenerated conversion function.
+func Convert_apps_DaemonSetUpdateStrategy_To_v1beta2_DaemonSetUpdateStrategy(in *apps.DaemonSetUpdateStrategy, out *v1beta2.DaemonSetUpdateStrategy, s conversion.Scope) error {
+	return autoConvert_apps_DaemonSetUpdateStrategy_To_v1beta2_DaemonSetUpdateStrategy(in, out, s)
 }
 
 func autoConvert_v1beta2_Deployment_To_apps_Deployment(in *v1beta2.Deployment, out *apps.Deployment, s conversion.Scope) error {
@@ -918,6 +848,11 @@ func autoConvert_v1beta2_DeploymentStrategy_To_apps_DeploymentStrategy(in *v1bet
 	return nil
 }
 
+// Convert_v1beta2_DeploymentStrategy_To_apps_DeploymentStrategy is an autogenerated conversion function.
+func Convert_v1beta2_DeploymentStrategy_To_apps_DeploymentStrategy(in *v1beta2.DeploymentStrategy, out *apps.DeploymentStrategy, s conversion.Scope) error {
+	return autoConvert_v1beta2_DeploymentStrategy_To_apps_DeploymentStrategy(in, out, s)
+}
+
 func autoConvert_apps_DeploymentStrategy_To_v1beta2_DeploymentStrategy(in *apps.DeploymentStrategy, out *v1beta2.DeploymentStrategy, s conversion.Scope) error {
 	out.Type = v1beta2.DeploymentStrategyType(in.Type)
 	if in.RollingUpdate != nil {
@@ -930,6 +865,11 @@ func autoConvert_apps_DeploymentStrategy_To_v1beta2_DeploymentStrategy(in *apps.
 		out.RollingUpdate = nil
 	}
 	return nil
+}
+
+// Convert_apps_DeploymentStrategy_To_v1beta2_DeploymentStrategy is an autogenerated conversion function.
+func Convert_apps_DeploymentStrategy_To_v1beta2_DeploymentStrategy(in *apps.DeploymentStrategy, out *v1beta2.DeploymentStrategy, s conversion.Scope) error {
+	return autoConvert_apps_DeploymentStrategy_To_v1beta2_DeploymentStrategy(in, out, s)
 }
 
 func autoConvert_v1beta2_ReplicaSet_To_apps_ReplicaSet(in *v1beta2.ReplicaSet, out *apps.ReplicaSet, s conversion.Scope) error {
@@ -1046,6 +986,11 @@ func autoConvert_v1beta2_ReplicaSetSpec_To_apps_ReplicaSetSpec(in *v1beta2.Repli
 	return nil
 }
 
+// Convert_v1beta2_ReplicaSetSpec_To_apps_ReplicaSetSpec is an autogenerated conversion function.
+func Convert_v1beta2_ReplicaSetSpec_To_apps_ReplicaSetSpec(in *v1beta2.ReplicaSetSpec, out *apps.ReplicaSetSpec, s conversion.Scope) error {
+	return autoConvert_v1beta2_ReplicaSetSpec_To_apps_ReplicaSetSpec(in, out, s)
+}
+
 func autoConvert_apps_ReplicaSetSpec_To_v1beta2_ReplicaSetSpec(in *apps.ReplicaSetSpec, out *v1beta2.ReplicaSetSpec, s conversion.Scope) error {
 	if err := metav1.Convert_int32_To_Pointer_int32(&in.Replicas, &out.Replicas, s); err != nil {
 		return err
@@ -1056,6 +1001,11 @@ func autoConvert_apps_ReplicaSetSpec_To_v1beta2_ReplicaSetSpec(in *apps.ReplicaS
 		return err
 	}
 	return nil
+}
+
+// Convert_apps_ReplicaSetSpec_To_v1beta2_ReplicaSetSpec is an autogenerated conversion function.
+func Convert_apps_ReplicaSetSpec_To_v1beta2_ReplicaSetSpec(in *apps.ReplicaSetSpec, out *v1beta2.ReplicaSetSpec, s conversion.Scope) error {
+	return autoConvert_apps_ReplicaSetSpec_To_v1beta2_ReplicaSetSpec(in, out, s)
 }
 
 func autoConvert_v1beta2_ReplicaSetStatus_To_apps_ReplicaSetStatus(in *v1beta2.ReplicaSetStatus, out *apps.ReplicaSetStatus, s conversion.Scope) error {
@@ -1089,25 +1039,57 @@ func Convert_apps_ReplicaSetStatus_To_v1beta2_ReplicaSetStatus(in *apps.ReplicaS
 }
 
 func autoConvert_v1beta2_RollingUpdateDaemonSet_To_apps_RollingUpdateDaemonSet(in *v1beta2.RollingUpdateDaemonSet, out *apps.RollingUpdateDaemonSet, s conversion.Scope) error {
-	// WARNING: in.MaxUnavailable requires manual conversion: inconvertible types (*k8s.io/apimachinery/pkg/util/intstr.IntOrString vs k8s.io/apimachinery/pkg/util/intstr.IntOrString)
+	if err := metav1.Convert_Pointer_intstr_IntOrString_To_intstr_IntOrString(&in.MaxUnavailable, &out.MaxUnavailable, s); err != nil {
+		return err
+	}
 	return nil
+}
+
+// Convert_v1beta2_RollingUpdateDaemonSet_To_apps_RollingUpdateDaemonSet is an autogenerated conversion function.
+func Convert_v1beta2_RollingUpdateDaemonSet_To_apps_RollingUpdateDaemonSet(in *v1beta2.RollingUpdateDaemonSet, out *apps.RollingUpdateDaemonSet, s conversion.Scope) error {
+	return autoConvert_v1beta2_RollingUpdateDaemonSet_To_apps_RollingUpdateDaemonSet(in, out, s)
 }
 
 func autoConvert_apps_RollingUpdateDaemonSet_To_v1beta2_RollingUpdateDaemonSet(in *apps.RollingUpdateDaemonSet, out *v1beta2.RollingUpdateDaemonSet, s conversion.Scope) error {
-	// WARNING: in.MaxUnavailable requires manual conversion: inconvertible types (k8s.io/apimachinery/pkg/util/intstr.IntOrString vs *k8s.io/apimachinery/pkg/util/intstr.IntOrString)
+	if err := metav1.Convert_intstr_IntOrString_To_Pointer_intstr_IntOrString(&in.MaxUnavailable, &out.MaxUnavailable, s); err != nil {
+		return err
+	}
 	return nil
+}
+
+// Convert_apps_RollingUpdateDaemonSet_To_v1beta2_RollingUpdateDaemonSet is an autogenerated conversion function.
+func Convert_apps_RollingUpdateDaemonSet_To_v1beta2_RollingUpdateDaemonSet(in *apps.RollingUpdateDaemonSet, out *v1beta2.RollingUpdateDaemonSet, s conversion.Scope) error {
+	return autoConvert_apps_RollingUpdateDaemonSet_To_v1beta2_RollingUpdateDaemonSet(in, out, s)
 }
 
 func autoConvert_v1beta2_RollingUpdateDeployment_To_apps_RollingUpdateDeployment(in *v1beta2.RollingUpdateDeployment, out *apps.RollingUpdateDeployment, s conversion.Scope) error {
-	// WARNING: in.MaxUnavailable requires manual conversion: inconvertible types (*k8s.io/apimachinery/pkg/util/intstr.IntOrString vs k8s.io/apimachinery/pkg/util/intstr.IntOrString)
-	// WARNING: in.MaxSurge requires manual conversion: inconvertible types (*k8s.io/apimachinery/pkg/util/intstr.IntOrString vs k8s.io/apimachinery/pkg/util/intstr.IntOrString)
+	if err := metav1.Convert_Pointer_intstr_IntOrString_To_intstr_IntOrString(&in.MaxUnavailable, &out.MaxUnavailable, s); err != nil {
+		return err
+	}
+	if err := metav1.Convert_Pointer_intstr_IntOrString_To_intstr_IntOrString(&in.MaxSurge, &out.MaxSurge, s); err != nil {
+		return err
+	}
 	return nil
 }
 
+// Convert_v1beta2_RollingUpdateDeployment_To_apps_RollingUpdateDeployment is an autogenerated conversion function.
+func Convert_v1beta2_RollingUpdateDeployment_To_apps_RollingUpdateDeployment(in *v1beta2.RollingUpdateDeployment, out *apps.RollingUpdateDeployment, s conversion.Scope) error {
+	return autoConvert_v1beta2_RollingUpdateDeployment_To_apps_RollingUpdateDeployment(in, out, s)
+}
+
 func autoConvert_apps_RollingUpdateDeployment_To_v1beta2_RollingUpdateDeployment(in *apps.RollingUpdateDeployment, out *v1beta2.RollingUpdateDeployment, s conversion.Scope) error {
-	// WARNING: in.MaxUnavailable requires manual conversion: inconvertible types (k8s.io/apimachinery/pkg/util/intstr.IntOrString vs *k8s.io/apimachinery/pkg/util/intstr.IntOrString)
-	// WARNING: in.MaxSurge requires manual conversion: inconvertible types (k8s.io/apimachinery/pkg/util/intstr.IntOrString vs *k8s.io/apimachinery/pkg/util/intstr.IntOrString)
+	if err := metav1.Convert_intstr_IntOrString_To_Pointer_intstr_IntOrString(&in.MaxUnavailable, &out.MaxUnavailable, s); err != nil {
+		return err
+	}
+	if err := metav1.Convert_intstr_IntOrString_To_Pointer_intstr_IntOrString(&in.MaxSurge, &out.MaxSurge, s); err != nil {
+		return err
+	}
 	return nil
+}
+
+// Convert_apps_RollingUpdateDeployment_To_v1beta2_RollingUpdateDeployment is an autogenerated conversion function.
+func Convert_apps_RollingUpdateDeployment_To_v1beta2_RollingUpdateDeployment(in *apps.RollingUpdateDeployment, out *v1beta2.RollingUpdateDeployment, s conversion.Scope) error {
+	return autoConvert_apps_RollingUpdateDeployment_To_v1beta2_RollingUpdateDeployment(in, out, s)
 }
 
 func autoConvert_v1beta2_RollingUpdateStatefulSetStrategy_To_apps_RollingUpdateStatefulSetStrategy(in *v1beta2.RollingUpdateStatefulSetStrategy, out *apps.RollingUpdateStatefulSetStrategy, s conversion.Scope) error {
@@ -1319,6 +1301,11 @@ func autoConvert_v1beta2_StatefulSetSpec_To_apps_StatefulSetSpec(in *v1beta2.Sta
 	return nil
 }
 
+// Convert_v1beta2_StatefulSetSpec_To_apps_StatefulSetSpec is an autogenerated conversion function.
+func Convert_v1beta2_StatefulSetSpec_To_apps_StatefulSetSpec(in *v1beta2.StatefulSetSpec, out *apps.StatefulSetSpec, s conversion.Scope) error {
+	return autoConvert_v1beta2_StatefulSetSpec_To_apps_StatefulSetSpec(in, out, s)
+}
+
 func autoConvert_apps_StatefulSetSpec_To_v1beta2_StatefulSetSpec(in *apps.StatefulSetSpec, out *v1beta2.StatefulSetSpec, s conversion.Scope) error {
 	if err := metav1.Convert_int32_To_Pointer_int32(&in.Replicas, &out.Replicas, s); err != nil {
 		return err
@@ -1337,6 +1324,11 @@ func autoConvert_apps_StatefulSetSpec_To_v1beta2_StatefulSetSpec(in *apps.Statef
 	return nil
 }
 
+// Convert_apps_StatefulSetSpec_To_v1beta2_StatefulSetSpec is an autogenerated conversion function.
+func Convert_apps_StatefulSetSpec_To_v1beta2_StatefulSetSpec(in *apps.StatefulSetSpec, out *v1beta2.StatefulSetSpec, s conversion.Scope) error {
+	return autoConvert_apps_StatefulSetSpec_To_v1beta2_StatefulSetSpec(in, out, s)
+}
+
 func autoConvert_v1beta2_StatefulSetStatus_To_apps_StatefulSetStatus(in *v1beta2.StatefulSetStatus, out *apps.StatefulSetStatus, s conversion.Scope) error {
 	if err := metav1.Convert_int64_To_Pointer_int64(&in.ObservedGeneration, &out.ObservedGeneration, s); err != nil {
 		return err
@@ -1350,6 +1342,11 @@ func autoConvert_v1beta2_StatefulSetStatus_To_apps_StatefulSetStatus(in *v1beta2
 	out.CollisionCount = (*int32)(unsafe.Pointer(in.CollisionCount))
 	out.Conditions = *(*[]apps.StatefulSetCondition)(unsafe.Pointer(&in.Conditions))
 	return nil
+}
+
+// Convert_v1beta2_StatefulSetStatus_To_apps_StatefulSetStatus is an autogenerated conversion function.
+func Convert_v1beta2_StatefulSetStatus_To_apps_StatefulSetStatus(in *v1beta2.StatefulSetStatus, out *apps.StatefulSetStatus, s conversion.Scope) error {
+	return autoConvert_v1beta2_StatefulSetStatus_To_apps_StatefulSetStatus(in, out, s)
 }
 
 func autoConvert_apps_StatefulSetStatus_To_v1beta2_StatefulSetStatus(in *apps.StatefulSetStatus, out *v1beta2.StatefulSetStatus, s conversion.Scope) error {
@@ -1367,6 +1364,11 @@ func autoConvert_apps_StatefulSetStatus_To_v1beta2_StatefulSetStatus(in *apps.St
 	return nil
 }
 
+// Convert_apps_StatefulSetStatus_To_v1beta2_StatefulSetStatus is an autogenerated conversion function.
+func Convert_apps_StatefulSetStatus_To_v1beta2_StatefulSetStatus(in *apps.StatefulSetStatus, out *v1beta2.StatefulSetStatus, s conversion.Scope) error {
+	return autoConvert_apps_StatefulSetStatus_To_v1beta2_StatefulSetStatus(in, out, s)
+}
+
 func autoConvert_v1beta2_StatefulSetUpdateStrategy_To_apps_StatefulSetUpdateStrategy(in *v1beta2.StatefulSetUpdateStrategy, out *apps.StatefulSetUpdateStrategy, s conversion.Scope) error {
 	out.Type = apps.StatefulSetUpdateStrategyType(in.Type)
 	if in.RollingUpdate != nil {
@@ -1381,6 +1383,11 @@ func autoConvert_v1beta2_StatefulSetUpdateStrategy_To_apps_StatefulSetUpdateStra
 	return nil
 }
 
+// Convert_v1beta2_StatefulSetUpdateStrategy_To_apps_StatefulSetUpdateStrategy is an autogenerated conversion function.
+func Convert_v1beta2_StatefulSetUpdateStrategy_To_apps_StatefulSetUpdateStrategy(in *v1beta2.StatefulSetUpdateStrategy, out *apps.StatefulSetUpdateStrategy, s conversion.Scope) error {
+	return autoConvert_v1beta2_StatefulSetUpdateStrategy_To_apps_StatefulSetUpdateStrategy(in, out, s)
+}
+
 func autoConvert_apps_StatefulSetUpdateStrategy_To_v1beta2_StatefulSetUpdateStrategy(in *apps.StatefulSetUpdateStrategy, out *v1beta2.StatefulSetUpdateStrategy, s conversion.Scope) error {
 	out.Type = v1beta2.StatefulSetUpdateStrategyType(in.Type)
 	if in.RollingUpdate != nil {
@@ -1393,4 +1400,9 @@ func autoConvert_apps_StatefulSetUpdateStrategy_To_v1beta2_StatefulSetUpdateStra
 		out.RollingUpdate = nil
 	}
 	return nil
+}
+
+// Convert_apps_StatefulSetUpdateStrategy_To_v1beta2_StatefulSetUpdateStrategy is an autogenerated conversion function.
+func Convert_apps_StatefulSetUpdateStrategy_To_v1beta2_StatefulSetUpdateStrategy(in *apps.StatefulSetUpdateStrategy, out *v1beta2.StatefulSetUpdateStrategy, s conversion.Scope) error {
+	return autoConvert_apps_StatefulSetUpdateStrategy_To_v1beta2_StatefulSetUpdateStrategy(in, out, s)
 }

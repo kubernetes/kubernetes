@@ -20,7 +20,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 
 	"k8s.io/klog"
@@ -28,8 +27,8 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/initsystem"
 	utilruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
-	"k8s.io/kubernetes/pkg/util/initsystem"
 	utilsexec "k8s.io/utils/exec"
 )
 
@@ -79,10 +78,10 @@ func runCleanupNode(c workflow.RunData) error {
 
 	klog.V(1).Info("[reset] Removing Kubernetes-managed containers")
 	if err := removeContainers(utilsexec.New(), r.CRISocketPath()); err != nil {
-		klog.Errorf("[reset] Failed to remove containers: %v", err)
+		klog.Warningf("[reset] Failed to remove containers: %v\n", err)
 	}
 
-	r.AddDirsToClean("/etc/cni/net.d", "/var/lib/dockershim", "/var/run/kubernetes")
+	r.AddDirsToClean("/etc/cni/net.d", "/var/lib/dockershim", "/var/run/kubernetes", "/var/lib/cni")
 
 	// Remove contents from the config and pki directories
 	klog.V(1).Infoln("[reset] Removing contents from the config and pki directories")
@@ -97,16 +96,13 @@ func runCleanupNode(c workflow.RunData) error {
 func absoluteKubeletRunDirectory() (string, error) {
 	absoluteKubeletRunDirectory, err := filepath.EvalSymlinks(kubeadmconstants.KubeletRunDirectory)
 	if err != nil {
-		klog.Errorf("[reset] Failed to evaluate the %q directory. Skipping its unmount and cleanup: %v", kubeadmconstants.KubeletRunDirectory, err)
+		klog.Warningf("[reset] Failed to evaluate the %q directory. Skipping its unmount and cleanup: %v\n", kubeadmconstants.KubeletRunDirectory, err)
 		return "", err
 	}
-
-	// Only unmount mount points which start with "/var/lib/kubelet" or absolute path of symbolic link, and avoid using empty absoluteKubeletRunDirectory
-	umountDirsCmd := fmt.Sprintf("awk '$2 ~ path {print $2}' path=%s/ /proc/mounts | xargs -r umount", absoluteKubeletRunDirectory)
-	klog.V(1).Infof("[reset] Executing command %q", umountDirsCmd)
-	umountOutputBytes, err := exec.Command("sh", "-c", umountDirsCmd).Output()
+	err = unmountKubeletDirectory(absoluteKubeletRunDirectory)
 	if err != nil {
-		klog.Errorf("[reset] Failed to unmount mounted directories in %s: %s\n", kubeadmconstants.KubeletRunDirectory, string(umountOutputBytes))
+		klog.Warningf("[reset] Failed to unmount mounted directories in %s \n", kubeadmconstants.KubeletRunDirectory)
+		return "", err
 	}
 	return absoluteKubeletRunDirectory, nil
 }
@@ -132,7 +128,7 @@ func resetConfigDir(configPathDir, pkiPathDir string) {
 	fmt.Printf("[reset] Deleting contents of config directories: %v\n", dirsToClean)
 	for _, dir := range dirsToClean {
 		if err := CleanDir(dir); err != nil {
-			klog.Errorf("[reset] Failed to remove directory: %q [%v]\n", dir, err)
+			klog.Warningf("[reset] Failed to remove directory: %q [%v]\n", dir, err)
 		}
 	}
 
@@ -146,7 +142,7 @@ func resetConfigDir(configPathDir, pkiPathDir string) {
 	fmt.Printf("[reset] Deleting files: %v\n", filesToClean)
 	for _, path := range filesToClean {
 		if err := os.RemoveAll(path); err != nil {
-			klog.Errorf("[reset] Failed to remove file: %q [%v]\n", path, err)
+			klog.Warningf("[reset] Failed to remove file: %q [%v]\n", path, err)
 		}
 	}
 }

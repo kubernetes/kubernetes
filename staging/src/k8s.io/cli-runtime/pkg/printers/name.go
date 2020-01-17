@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -42,6 +43,11 @@ type NamePrinter struct {
 // PrintObj is an implementation of ResourcePrinter.PrintObj which decodes the object
 // and print "resource/name" pair. If the object is a List, print all items in it.
 func (p *NamePrinter) PrintObj(obj runtime.Object, w io.Writer) error {
+	switch castObj := obj.(type) {
+	case *metav1.WatchEvent:
+		obj = castObj.Object.Object
+	}
+
 	// we use reflect.Indirect here in order to obtain the actual value from a pointer.
 	// using reflect.Indirect indiscriminately is valid here, as all runtime.Objects are supposed to be pointers.
 	// we need an actual value in order to retrieve the package path for an object.

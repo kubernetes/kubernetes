@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
@@ -29,7 +28,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
+	"k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 )
 
@@ -45,15 +45,6 @@ var (
 	snapshotContentGVR = schema.GroupVersionResource{Group: snapshotGroup, Version: "v1alpha1", Resource: "volumesnapshotcontents"}
 )
 
-type SnapshotClassTest struct {
-	Name           string
-	CloudProviders []string
-	Snapshotter    string
-	Parameters     map[string]string
-	NodeName       string
-	NodeSelector   map[string]string // NodeSelector for the pod
-}
-
 type snapshottableTestSuite struct {
 	tsInfo TestSuiteInfo
 }
@@ -68,12 +59,18 @@ func InitSnapshottableTestSuite() TestSuite {
 			testPatterns: []testpatterns.TestPattern{
 				testpatterns.DynamicSnapshot,
 			},
+			supportedSizeRange: volume.SizeRange{
+				Min: "1Mi",
+			},
 		},
 	}
 }
 
 func (s *snapshottableTestSuite) getTestSuiteInfo() TestSuiteInfo {
 	return s.tsInfo
+}
+
+func (s *snapshottableTestSuite) skipRedundantSuite(driver TestDriver, pattern testpatterns.TestPattern) {
 }
 
 func (s *snapshottableTestSuite) defineTests(driver TestDriver, pattern testpatterns.TestPattern) {
@@ -84,11 +81,11 @@ func (s *snapshottableTestSuite) defineTests(driver TestDriver, pattern testpatt
 
 	ginkgo.BeforeEach(func() {
 		// Check preconditions.
-		gomega.Expect(pattern.SnapshotType).To(gomega.Equal(testpatterns.DynamicCreatedSnapshot))
+		framework.ExpectEqual(pattern.SnapshotType, testpatterns.DynamicCreatedSnapshot)
 		dInfo := driver.GetDriverInfo()
 		ok := false
 		sDriver, ok = driver.(SnapshottableTestDriver)
-		if !dInfo.Capabilities[CapDataSource] || !ok {
+		if !dInfo.Capabilities[CapSnapshotDataSource] || !ok {
 			framework.Skipf("Driver %q does not support snapshots - skipping", dInfo.Name)
 		}
 		dDriver, ok = driver.(DynamicPVTestDriver)
@@ -108,25 +105,30 @@ func (s *snapshottableTestSuite) defineTests(driver TestDriver, pattern testpatt
 		dc := f.DynamicClient
 
 		// Now do the more expensive test initialization.
-		config, testCleanup := driver.PrepareTest(f)
-		defer testCleanup()
+		config, driverCleanup := driver.PrepareTest(f)
+		defer driverCleanup()
 
 		vsc := sDriver.GetSnapshotClass(config)
 		class := dDriver.GetDynamicProvisionStorageClass(config, "")
 		if class == nil {
 			framework.Skipf("Driver %q does not define Dynamic Provision StorageClass - skipping", driver.GetDriverInfo().Name)
 		}
+		testVolumeSizeRange := s.getTestSuiteInfo().supportedSizeRange
+		driverVolumeSizeRange := dDriver.GetDriverInfo().SupportedSizeRange
+		claimSize, err := getSizeRangesIntersection(testVolumeSizeRange, driverVolumeSizeRange)
+		framework.ExpectNoError(err, "determine intersection of test size range %+v and driver size range %+v", testVolumeSizeRange, driverVolumeSizeRange)
+		pvc := e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
+			ClaimSize:        claimSize,
+			StorageClassName: &(class.Name),
+		}, config.Framework.Namespace.Name)
 
-		claimSize := dDriver.GetClaimSize()
-		pvc := getClaim(claimSize, config.Framework.Namespace.Name)
-		pvc.Spec.StorageClassName = &class.Name
-		e2elog.Logf("In creating storage class object and pvc object for driver - sc: %v, pvc: %v", class, pvc)
+		framework.Logf("In creating storage class object and pvc object for driver - sc: %v, pvc: %v", class, pvc)
 
 		ginkgo.By("creating a StorageClass " + class.Name)
-		class, err := cs.StorageV1().StorageClasses().Create(class)
+		class, err = cs.StorageV1().StorageClasses().Create(class)
 		framework.ExpectNoError(err)
 		defer func() {
-			e2elog.Logf("deleting storage class %s", class.Name)
+			framework.Logf("deleting storage class %s", class.Name)
 			framework.ExpectNoError(cs.StorageV1().StorageClasses().Delete(class.Name, nil))
 		}()
 
@@ -134,14 +136,14 @@ func (s *snapshottableTestSuite) defineTests(driver TestDriver, pattern testpatt
 		pvc, err = cs.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(pvc)
 		framework.ExpectNoError(err)
 		defer func() {
-			e2elog.Logf("deleting claim %q/%q", pvc.Namespace, pvc.Name)
+			framework.Logf("deleting claim %q/%q", pvc.Namespace, pvc.Name)
 			// typically this claim has already been deleted
 			err = cs.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(pvc.Name, nil)
 			if err != nil && !apierrs.IsNotFound(err) {
 				framework.Failf("Error deleting claim %q. Error: %v", pvc.Name, err)
 			}
 		}()
-		err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, cs, pvc.Namespace, pvc.Name, framework.Poll, framework.ClaimProvisionTimeout)
+		err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, cs, pvc.Namespace, pvc.Name, framework.Poll, framework.ClaimProvisionTimeout)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("checking the claim")
@@ -157,7 +159,7 @@ func (s *snapshottableTestSuite) defineTests(driver TestDriver, pattern testpatt
 		vsc, err = dc.Resource(snapshotClassGVR).Create(vsc, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 		defer func() {
-			e2elog.Logf("deleting SnapshotClass %s", vsc.GetName())
+			framework.Logf("deleting SnapshotClass %s", vsc.GetName())
 			framework.ExpectNoError(dc.Resource(snapshotClassGVR).Delete(vsc.GetName(), nil))
 		}()
 
@@ -167,7 +169,7 @@ func (s *snapshottableTestSuite) defineTests(driver TestDriver, pattern testpatt
 		snapshot, err = dc.Resource(snapshotGVR).Namespace(snapshot.GetNamespace()).Create(snapshot, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 		defer func() {
-			e2elog.Logf("deleting snapshot %q/%q", snapshot.GetNamespace(), snapshot.GetName())
+			framework.Logf("deleting snapshot %q/%q", snapshot.GetNamespace(), snapshot.GetName())
 			// typically this snapshot has already been deleted
 			err = dc.Resource(snapshotGVR).Namespace(snapshot.GetNamespace()).Delete(snapshot.GetName(), nil)
 			if err != nil && !apierrs.IsNotFound(err) {
@@ -194,36 +196,36 @@ func (s *snapshottableTestSuite) defineTests(driver TestDriver, pattern testpatt
 
 		// Check SnapshotContent properties
 		ginkgo.By("checking the SnapshotContent")
-		gomega.Expect(snapshotContentSpec["snapshotClassName"]).To(gomega.Equal(vsc.GetName()))
-		gomega.Expect(volumeSnapshotRef["name"]).To(gomega.Equal(snapshot.GetName()))
-		gomega.Expect(volumeSnapshotRef["namespace"]).To(gomega.Equal(snapshot.GetNamespace()))
-		gomega.Expect(persistentVolumeRef["name"]).To(gomega.Equal(pv.Name))
+		framework.ExpectEqual(snapshotContentSpec["snapshotClassName"], vsc.GetName())
+		framework.ExpectEqual(volumeSnapshotRef["name"], snapshot.GetName())
+		framework.ExpectEqual(volumeSnapshotRef["namespace"], snapshot.GetNamespace())
+		framework.ExpectEqual(persistentVolumeRef["name"], pv.Name)
 	})
 }
 
 // WaitForSnapshotReady waits for a VolumeSnapshot to be ready to use or until timeout occurs, whichever comes first.
 func WaitForSnapshotReady(c dynamic.Interface, ns string, snapshotName string, Poll, timeout time.Duration) error {
-	e2elog.Logf("Waiting up to %v for VolumeSnapshot %s to become ready", timeout, snapshotName)
+	framework.Logf("Waiting up to %v for VolumeSnapshot %s to become ready", timeout, snapshotName)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(Poll) {
 		snapshot, err := c.Resource(snapshotGVR).Namespace(ns).Get(snapshotName, metav1.GetOptions{})
 		if err != nil {
-			e2elog.Logf("Failed to get claim %q, retrying in %v. Error: %v", snapshotName, Poll, err)
+			framework.Logf("Failed to get claim %q, retrying in %v. Error: %v", snapshotName, Poll, err)
 			continue
 		} else {
 			status := snapshot.Object["status"]
 			if status == nil {
-				e2elog.Logf("VolumeSnapshot %s found but is not ready.", snapshotName)
+				framework.Logf("VolumeSnapshot %s found but is not ready.", snapshotName)
 				continue
 			}
 			value := status.(map[string]interface{})
 			if value["readyToUse"] == true {
-				e2elog.Logf("VolumeSnapshot %s found and is ready", snapshotName, time.Since(start))
+				framework.Logf("VolumeSnapshot %s found and is ready", snapshotName, time.Since(start))
 				return nil
 			} else if value["ready"] == true {
-				e2elog.Logf("VolumeSnapshot %s found and is ready", snapshotName, time.Since(start))
+				framework.Logf("VolumeSnapshot %s found and is ready", snapshotName, time.Since(start))
 				return nil
 			} else {
-				e2elog.Logf("VolumeSnapshot %s found but is not ready.", snapshotName)
+				framework.Logf("VolumeSnapshot %s found but is not ready.", snapshotName)
 			}
 		}
 	}

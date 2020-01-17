@@ -22,7 +22,7 @@ import (
 	"sync"
 	"time"
 
-	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
@@ -31,7 +31,7 @@ import (
 	commonutils "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/auth"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 
 	"github.com/onsi/ginkgo"
@@ -52,11 +52,11 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 
 		// this test wants powerful permissions.  Since the namespace names are unique, we can leave this
 		// lying around so we don't have to race any caches
-		err := auth.BindClusterRoleInNamespace(c.RbacV1beta1(), "edit", f.Namespace.Name,
-			rbacv1beta1.Subject{Kind: rbacv1beta1.ServiceAccountKind, Namespace: f.Namespace.Name, Name: "default"})
+		err := auth.BindClusterRoleInNamespace(c.RbacV1(), "edit", f.Namespace.Name,
+			rbacv1.Subject{Kind: rbacv1.ServiceAccountKind, Namespace: f.Namespace.Name, Name: "default"})
 		framework.ExpectNoError(err)
 
-		err = auth.WaitForAuthorizationUpdate(c.AuthorizationV1beta1(),
+		err = auth.WaitForAuthorizationUpdate(c.AuthorizationV1(),
 			serviceaccount.MakeUsername(f.Namespace.Name, "default"),
 			f.Namespace.Name, "create", schema.GroupResource{Resource: "pods"}, true)
 		framework.ExpectNoError(err)
@@ -76,20 +76,20 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 			var wg sync.WaitGroup
 			passed := true
 			checkRestart := func(podName string, timeout time.Duration) {
-				err := framework.WaitForPodNameRunningInNamespace(c, podName, ns)
+				err := e2epod.WaitForPodNameRunningInNamespace(c, podName, ns)
 				framework.ExpectNoError(err)
 				for t := time.Now(); time.Since(t) < timeout; time.Sleep(framework.Poll) {
 					pod, err := c.CoreV1().Pods(ns).Get(podName, metav1.GetOptions{})
 					framework.ExpectNoError(err, fmt.Sprintf("getting pod %s", podName))
 					stat := podutil.GetExistingContainerStatus(pod.Status.ContainerStatuses, podName)
-					e2elog.Logf("Pod: %s, restart count:%d", stat.Name, stat.RestartCount)
+					framework.Logf("Pod: %s, restart count:%d", stat.Name, stat.RestartCount)
 					if stat.RestartCount > 0 {
-						e2elog.Logf("Saw %v restart, succeeded...", podName)
+						framework.Logf("Saw %v restart, succeeded...", podName)
 						wg.Done()
 						return
 					}
 				}
-				e2elog.Logf("Failed waiting for %v restart! ", podName)
+				framework.Logf("Failed waiting for %v restart! ", podName)
 				passed = false
 				wg.Done()
 			}
@@ -122,7 +122,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 			ginkgo.By("creating secret and pod")
 			framework.RunKubectlOrDieInput(secretYaml, "create", "-f", "-", nsFlag)
 			framework.RunKubectlOrDieInput(podYaml, "create", "-f", "-", nsFlag)
-			err := framework.WaitForPodNoLongerRunningInNamespace(c, podName, ns)
+			err := e2epod.WaitForPodNoLongerRunningInNamespace(c, podName, ns)
 			framework.ExpectNoError(err)
 
 			ginkgo.By("checking if secret was read correctly")
@@ -140,7 +140,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 
 			ginkgo.By("creating the pod")
 			framework.RunKubectlOrDieInput(podYaml, "create", "-f", "-", nsFlag)
-			err := framework.WaitForPodNoLongerRunningInNamespace(c, podName, ns)
+			err := e2epod.WaitForPodNoLongerRunningInNamespace(c, podName, ns)
 			framework.ExpectNoError(err)
 
 			ginkgo.By("checking if name and namespace were passed correctly")
@@ -154,5 +154,5 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 
 func readFile(test, file string) string {
 	from := filepath.Join(test, file)
-	return commonutils.SubstituteImageName(string(testfiles.ReadOrDie(from, ginkgo.Fail)))
+	return commonutils.SubstituteImageName(string(testfiles.ReadOrDie(from)))
 }

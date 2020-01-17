@@ -38,6 +38,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	cloudprovider "k8s.io/cloud-provider"
+	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/volume/persistentvolume/metrics"
 	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
@@ -93,6 +94,7 @@ func NewController(p ControllerParameters) (*PersistentVolumeController, error) 
 		volumeQueue:                   workqueue.NewNamed("volumes"),
 		resyncPeriod:                  p.SyncPeriod,
 		operationTimestamps:           metrics.NewOperationStartTimeCache(),
+		translator:                    csitrans.New(),
 	}
 
 	// Prober is nil because PV is not aware of Flexvolume.
@@ -208,8 +210,11 @@ func (ctrl *PersistentVolumeController) updateVolume(volume *v1.PersistentVolume
 
 // deleteVolume runs in worker thread and handles "volume deleted" event.
 func (ctrl *PersistentVolumeController) deleteVolume(volume *v1.PersistentVolume) {
-	_ = ctrl.volumes.store.Delete(volume)
-	klog.V(4).Infof("volume %q deleted", volume.Name)
+	if err := ctrl.volumes.store.Delete(volume); err != nil {
+		klog.Errorf("volume %q deletion encountered : %v", volume.Name, err)
+	} else {
+		klog.V(4).Infof("volume %q deleted", volume.Name)
+	}
 	// record deletion metric if a deletion start timestamp is in the cache
 	// the following calls will be a no-op if there is nothing for this volume in the cache
 	// end of timestamp cache entry lifecycle, "RecordMetric" will do the clean
@@ -253,7 +258,9 @@ func (ctrl *PersistentVolumeController) updateClaim(claim *v1.PersistentVolumeCl
 // Unit test [5-5] [5-6] [5-7]
 // deleteClaim runs in worker thread and handles "claim deleted" event.
 func (ctrl *PersistentVolumeController) deleteClaim(claim *v1.PersistentVolumeClaim) {
-	_ = ctrl.claims.Delete(claim)
+	if err := ctrl.claims.Delete(claim); err != nil {
+		klog.Errorf("claim %q deletion encountered : %v", claim.Name, err)
+	}
 	claimKey := claimToClaimKey(claim)
 	klog.V(4).Infof("claim %q deleted", claimKey)
 	// clean any possible unfinished provision start timestamp from cache
@@ -282,7 +289,7 @@ func (ctrl *PersistentVolumeController) Run(stopCh <-chan struct{}) {
 	klog.Infof("Starting persistent volume controller")
 	defer klog.Infof("Shutting down persistent volume controller")
 
-	if !controller.WaitForCacheSync("persistent volume", stopCh, ctrl.volumeListerSynced, ctrl.claimListerSynced, ctrl.classListerSynced, ctrl.podListerSynced, ctrl.NodeListerSynced) {
+	if !cache.WaitForNamedCacheSync("persistent volume", stopCh, ctrl.volumeListerSynced, ctrl.claimListerSynced, ctrl.classListerSynced, ctrl.podListerSynced, ctrl.NodeListerSynced) {
 		return
 	}
 

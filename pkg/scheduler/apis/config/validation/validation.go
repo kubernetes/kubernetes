@@ -47,6 +47,18 @@ func ValidateKubeSchedulerConfiguration(cc *config.KubeSchedulerConfiguration) f
 		allErrs = append(allErrs, field.Invalid(field.NewPath("percentageOfNodesToScore"),
 			cc.PercentageOfNodesToScore, "not in valid range 0-100"))
 	}
+	if cc.PodInitialBackoffSeconds == nil {
+		allErrs = append(allErrs, field.Required(field.NewPath("podInitialBackoffSeconds"), ""))
+	} else if *cc.PodInitialBackoffSeconds <= 0 {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("podInitialBackoffSeconds"),
+			cc.PodInitialBackoffSeconds, "must be greater than 0"))
+	}
+	if cc.PodMaxBackoffSeconds == nil {
+		allErrs = append(allErrs, field.Required(field.NewPath("podMaxBackoffSeconds"), ""))
+	} else if cc.PodInitialBackoffSeconds != nil && *cc.PodMaxBackoffSeconds < *cc.PodInitialBackoffSeconds {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("podMaxBackoffSeconds"),
+			cc.PodMaxBackoffSeconds, "must be greater than or equal to PodInitialBackoffSeconds"))
+	}
 	return allErrs
 }
 
@@ -57,11 +69,5 @@ func ValidateKubeSchedulerLeaderElectionConfiguration(cc *config.KubeSchedulerLe
 		return allErrs
 	}
 	allErrs = append(allErrs, componentbasevalidation.ValidateLeaderElectionConfiguration(&cc.LeaderElectionConfiguration, field.NewPath("leaderElectionConfiguration"))...)
-	if len(cc.LockObjectNamespace) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("lockObjectNamespace"), ""))
-	}
-	if len(cc.LockObjectName) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("lockObjectName"), ""))
-	}
 	return allErrs
 }

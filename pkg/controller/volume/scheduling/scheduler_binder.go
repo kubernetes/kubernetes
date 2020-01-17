@@ -25,7 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apiserver/pkg/storage/etcd"
+	"k8s.io/apiserver/pkg/storage/etcd3"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	storageinformers "k8s.io/client-go/informers/storage/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -33,6 +33,7 @@ import (
 	"k8s.io/klog"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
+	"k8s.io/kubernetes/pkg/controller/volume/scheduling/metrics"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
@@ -154,9 +155,9 @@ func (b *volumeBinder) FindPodVolumes(pod *v1.Pod, node *v1.Node) (unboundVolume
 	boundVolumesSatisfied = true
 	start := time.Now()
 	defer func() {
-		VolumeSchedulingStageLatency.WithLabelValues("predicate").Observe(time.Since(start).Seconds())
+		metrics.VolumeSchedulingStageLatency.WithLabelValues("predicate").Observe(time.Since(start).Seconds())
 		if err != nil {
-			VolumeSchedulingStageFailed.WithLabelValues("predicate").Inc()
+			metrics.VolumeSchedulingStageFailed.WithLabelValues("predicate").Inc()
 		}
 	}()
 
@@ -256,9 +257,9 @@ func (b *volumeBinder) AssumePodVolumes(assumedPod *v1.Pod, nodeName string) (al
 	klog.V(4).Infof("AssumePodVolumes for pod %q, node %q", podName, nodeName)
 	start := time.Now()
 	defer func() {
-		VolumeSchedulingStageLatency.WithLabelValues("assume").Observe(time.Since(start).Seconds())
+		metrics.VolumeSchedulingStageLatency.WithLabelValues("assume").Observe(time.Since(start).Seconds())
 		if err != nil {
-			VolumeSchedulingStageFailed.WithLabelValues("assume").Inc()
+			metrics.VolumeSchedulingStageFailed.WithLabelValues("assume").Inc()
 		}
 	}()
 
@@ -332,9 +333,9 @@ func (b *volumeBinder) BindPodVolumes(assumedPod *v1.Pod) (err error) {
 
 	start := time.Now()
 	defer func() {
-		VolumeSchedulingStageLatency.WithLabelValues("bind").Observe(time.Since(start).Seconds())
+		metrics.VolumeSchedulingStageLatency.WithLabelValues("bind").Observe(time.Since(start).Seconds())
 		if err != nil {
-			VolumeSchedulingStageFailed.WithLabelValues("bind").Inc()
+			metrics.VolumeSchedulingStageFailed.WithLabelValues("bind").Inc()
 		}
 	}()
 
@@ -347,10 +348,14 @@ func (b *volumeBinder) BindPodVolumes(assumedPod *v1.Pod) (err error) {
 		return err
 	}
 
-	return wait.Poll(time.Second, b.bindTimeout, func() (bool, error) {
+	err = wait.Poll(time.Second, b.bindTimeout, func() (bool, error) {
 		b, err := b.checkBindings(assumedPod, bindings, claimsToProvision)
 		return b, err
 	})
+	if err != nil {
+		return fmt.Errorf("Failed to bind volumes: %v", err)
+	}
+	return nil
 }
 
 func getPodName(pod *v1.Pod) string {
@@ -425,7 +430,7 @@ func (b *volumeBinder) bindAPIUpdate(podName string, bindings []*bindingInfo, cl
 }
 
 var (
-	versioner = etcd.APIObjectVersioner{}
+	versioner = etcd3.APIObjectVersioner{}
 )
 
 // checkBindings runs through all the PVCs in the Pod and checks:
@@ -514,7 +519,10 @@ func (b *volumeBinder) checkBindings(pod *v1.Pod, bindings []*bindingInfo, claim
 		}
 		selectedNode := pvc.Annotations[pvutil.AnnSelectedNode]
 		if selectedNode != pod.Spec.NodeName {
-			return false, fmt.Errorf("selectedNode annotation value %q not set to scheduled node %q", selectedNode, pod.Spec.NodeName)
+			// If provisioner fails to provision a volume, selectedNode
+			// annotation will be removed to signal back to the scheduler to
+			// retry.
+			return false, fmt.Errorf("provisioning failed for PVC %q", pvc.Name)
 		}
 
 		// If the PVC is bound to a PV, check its node affinity
@@ -665,11 +673,7 @@ func (b *volumeBinder) findMatchingVolumes(pod *v1.Pod, claimsToBind []*v1.Persi
 
 	for _, pvc := range claimsToBind {
 		// Get storage class name from each PVC
-		storageClassName := ""
-		storageClass := pvc.Spec.StorageClassName
-		if storageClass != nil {
-			storageClassName = *storageClass
-		}
+		storageClassName := v1helper.GetPersistentVolumeClaimClass(pvc)
 		allPVs := b.pvCache.ListPVs(storageClassName)
 		pvcName := getPVCName(pvc)
 

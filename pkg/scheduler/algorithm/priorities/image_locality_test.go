@@ -18,14 +18,13 @@ package priorities
 
 import (
 	"crypto/sha256"
+	"encoding/hex"
 	"reflect"
-	"sort"
 	"testing"
 
-	"encoding/hex"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
+	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	"k8s.io/kubernetes/pkg/util/parsers"
 )
@@ -108,11 +107,13 @@ func TestImageLocalityPriority(t *testing.T) {
 		},
 	}
 
+	nodeWithNoImages := v1.NodeStatus{}
+
 	tests := []struct {
 		pod          *v1.Pod
 		pods         []*v1.Pod
 		nodes        []*v1.Node
-		expectedList schedulerapi.HostPriorityList
+		expectedList framework.NodeScoreList
 		name         string
 	}{
 		{
@@ -127,7 +128,7 @@ func TestImageLocalityPriority(t *testing.T) {
 			// Score: 10 * (250M/2 - 23M)/(1000M - 23M) = 1
 			pod:          &v1.Pod{Spec: test40250},
 			nodes:        []*v1.Node{makeImageNode("machine1", node403002000), makeImageNode("machine2", node25010)},
-			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 0}, {Host: "machine2", Score: 1}},
+			expectedList: []framework.NodeScore{{Name: "machine1", Score: 0}, {Name: "machine2", Score: 1}},
 			name:         "two images spread on two nodes, prefer the larger image one",
 		},
 		{
@@ -142,7 +143,7 @@ func TestImageLocalityPriority(t *testing.T) {
 			// Score: 0
 			pod:          &v1.Pod{Spec: test40300},
 			nodes:        []*v1.Node{makeImageNode("machine1", node403002000), makeImageNode("machine2", node25010)},
-			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 1}, {Host: "machine2", Score: 0}},
+			expectedList: []framework.NodeScore{{Name: "machine1", Score: 1}, {Name: "machine2", Score: 0}},
 			name:         "two images on one node, prefer this node",
 		},
 		{
@@ -157,8 +158,27 @@ func TestImageLocalityPriority(t *testing.T) {
 			// Score: 0 (10M/2 < 23M, min-threshold)
 			pod:          &v1.Pod{Spec: testMinMax},
 			nodes:        []*v1.Node{makeImageNode("machine1", node403002000), makeImageNode("machine2", node25010)},
-			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: schedulerapi.MaxPriority}, {Host: "machine2", Score: 0}},
+			expectedList: []framework.NodeScore{{Name: "machine1", Score: framework.MaxNodeScore}, {Name: "machine2", Score: 0}},
 			name:         "if exceed limit, use limit",
+		},
+		{
+			// Pod: gcr.io/2000 gcr.io/10
+
+			// Node1
+			// Image: gcr.io/2000:latest 2000MB
+			// Score: 10 * (2000M/3 - 23M)/(1000M - 23M) = 6
+
+			// Node2
+			// Image: gcr.io/10:latest 10MB
+			// Score: 0 (10M/2 < 23M, min-threshold)
+
+			// Node3
+			// Image:
+			// Score: 0
+			pod:          &v1.Pod{Spec: testMinMax},
+			nodes:        []*v1.Node{makeImageNode("machine1", node403002000), makeImageNode("machine2", node25010), makeImageNode("machine3", nodeWithNoImages)},
+			expectedList: []framework.NodeScore{{Name: "machine1", Score: 6}, {Name: "machine2", Score: 0}, {Name: "machine3", Score: 0}},
+			name:         "if exceed limit, use limit (with node which has no images present)",
 		},
 	}
 
@@ -170,8 +190,8 @@ func TestImageLocalityPriority(t *testing.T) {
 				t.Errorf("unexpected error: %v", err)
 			}
 
-			sort.Sort(test.expectedList)
-			sort.Sort(list)
+			sortNodeScoreList(test.expectedList)
+			sortNodeScoreList(list)
 
 			if !reflect.DeepEqual(test.expectedList, list) {
 				t.Errorf("expected %#v, got %#v", test.expectedList, list)

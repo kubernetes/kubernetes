@@ -22,12 +22,11 @@ import (
 	"net/http"
 	"runtime/debug"
 
-	"k8s.io/klog"
-
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/server/healthz"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/klog"
 )
 
 // PostStartHookFunc is a function that is called after the server has started.
@@ -67,6 +66,13 @@ type postStartHookEntry struct {
 	done chan struct{}
 }
 
+type PostStartHookConfigEntry struct {
+	hook PostStartHookFunc
+	// originatingStack holds the stack that registered postStartHooks. This allows us to show a more helpful message
+	// for duplicate registration.
+	originatingStack string
+}
+
 type preShutdownHookEntry struct {
 	hook PreShutdownHookFunc
 }
@@ -77,9 +83,10 @@ func (s *GenericAPIServer) AddPostStartHook(name string, hook PostStartHookFunc)
 		return fmt.Errorf("missing name")
 	}
 	if hook == nil {
-		return nil
+		return fmt.Errorf("hook func may not be nil: %q", name)
 	}
 	if s.disabledPostStartHooks.Has(name) {
+		klog.V(1).Infof("skipping %q because it was explicitly disabled", name)
 		return nil
 	}
 
@@ -97,7 +104,7 @@ func (s *GenericAPIServer) AddPostStartHook(name string, hook PostStartHookFunc)
 	// done is closed when the poststarthook is finished.  This is used by the health check to be able to indicate
 	// that the poststarthook is finished
 	done := make(chan struct{})
-	if err := s.AddHealthzChecks(postStartHookHealthz{name: "poststarthook/" + name, done: done}); err != nil {
+	if err := s.AddBootSequenceHealthChecks(postStartHookHealthz{name: "poststarthook/" + name, done: done}); err != nil {
 		return err
 	}
 	s.postStartHooks[name] = postStartHookEntry{hook: hook, originatingStack: string(debug.Stack()), done: done}
@@ -219,7 +226,7 @@ type postStartHookHealthz struct {
 	done chan struct{}
 }
 
-var _ healthz.HealthzChecker = postStartHookHealthz{}
+var _ healthz.HealthChecker = postStartHookHealthz{}
 
 func (h postStartHookHealthz) Name() string {
 	return h.name

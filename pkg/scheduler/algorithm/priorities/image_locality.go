@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"strings"
 
-	"k8s.io/api/core/v1"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
+	v1 "k8s.io/api/core/v1"
+	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	"k8s.io/kubernetes/pkg/util/parsers"
 )
@@ -39,10 +39,10 @@ const (
 // based on the total size of those images.
 // - If none of the images are present, this node will be given the lowest priority.
 // - If some of the images are present on a node, the larger their sizes' sum, the higher the node's priority.
-func ImageLocalityPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *schedulernodeinfo.NodeInfo) (schedulerapi.HostPriority, error) {
+func ImageLocalityPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *schedulernodeinfo.NodeInfo) (framework.NodeScore, error) {
 	node := nodeInfo.Node()
 	if node == nil {
-		return schedulerapi.HostPriority{}, fmt.Errorf("node not found")
+		return framework.NodeScore{}, fmt.Errorf("node not found")
 	}
 
 	var score int
@@ -53,9 +53,9 @@ func ImageLocalityPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *scheduler
 		score = 0
 	}
 
-	return schedulerapi.HostPriority{
-		Host:  node.Name,
-		Score: score,
+	return framework.NodeScore{
+		Name:  node.Name,
+		Score: int64(score),
 	}, nil
 }
 
@@ -68,7 +68,7 @@ func calculatePriority(sumScores int64) int {
 		sumScores = maxThreshold
 	}
 
-	return int(int64(schedulerapi.MaxPriority) * (sumScores - minThreshold) / (maxThreshold - minThreshold))
+	return int(int64(framework.MaxNodeScore) * (sumScores - minThreshold) / (maxThreshold - minThreshold))
 }
 
 // sumImageScores returns the sum of image scores of all the containers that are already on the node.

@@ -112,8 +112,10 @@ func (in *KubeControllerManagerConfiguration) DeepCopyInto(out *KubeControllerMa
 	out.CSRSigningController = in.CSRSigningController
 	out.DaemonSetController = in.DaemonSetController
 	out.DeploymentController = in.DeploymentController
+	out.StatefulSetController = in.StatefulSetController
 	out.DeprecatedController = in.DeprecatedController
 	out.EndpointController = in.EndpointController
+	out.EndpointSliceController = in.EndpointSliceController
 	in.GarbageCollectorController.DeepCopyInto(&out.GarbageCollectorController)
 	out.HPAController = in.HPAController
 	out.JobController = in.JobController

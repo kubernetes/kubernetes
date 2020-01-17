@@ -11,6 +11,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/hashicorp/hcl/hcl/ast:go_default_library",
+        "//vendor/github.com/hashicorp/hcl/hcl/token:go_default_library",
         "//vendor/github.com/hashicorp/hcl/json/scanner:go_default_library",
         "//vendor/github.com/hashicorp/hcl/json/token:go_default_library",
     ],

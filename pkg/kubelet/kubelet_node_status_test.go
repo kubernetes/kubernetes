@@ -23,6 +23,7 @@ import (
 	goruntime "runtime"
 	"sort"
 	"strconv"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -49,6 +50,7 @@ import (
 	core "k8s.io/client-go/testing"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-base/version"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
@@ -59,7 +61,6 @@ import (
 	kubeletvolume "k8s.io/kubernetes/pkg/kubelet/volumemanager"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	taintutil "k8s.io/kubernetes/pkg/util/taints"
-	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/volume/util"
 )
 
@@ -159,15 +160,6 @@ func (lcm *localCM) GetCapacity() v1.ResourceList {
 	return lcm.capacity
 }
 
-// sortableNodeAddress is a type for sorting []v1.NodeAddress
-type sortableNodeAddress []v1.NodeAddress
-
-func (s sortableNodeAddress) Len() int { return len(s) }
-func (s sortableNodeAddress) Less(i, j int) bool {
-	return (string(s[i].Type) + s[i].Address) < (string(s[j].Type) + s[j].Address)
-}
-func (s sortableNodeAddress) Swap(i, j int) { s[j], s[i] = s[i], s[j] }
-
 func TestUpdateNewNodeStatus(t *testing.T) {
 	cases := []struct {
 		desc                string
@@ -202,12 +194,12 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 				ContainerManager: cm.NewStubContainerManager(),
 				allocatableReservation: v1.ResourceList{
 					v1.ResourceCPU:              *resource.NewMilliQuantity(200, resource.DecimalSI),
-					v1.ResourceMemory:           *resource.NewQuantity(100E6, resource.BinarySI),
+					v1.ResourceMemory:           *resource.NewQuantity(100e6, resource.BinarySI),
 					v1.ResourceEphemeralStorage: *resource.NewQuantity(2000, resource.BinarySI),
 				},
 				capacity: v1.ResourceList{
 					v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-					v1.ResourceMemory:           *resource.NewQuantity(10E9, resource.BinarySI),
+					v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
 					v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
 				},
 			}
@@ -223,7 +215,7 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 				SystemUUID:     "abc",
 				BootID:         "1b3",
 				NumCores:       2,
-				MemoryCapacity: 10E9, // 10G
+				MemoryCapacity: 10e9, // 10G
 			}
 			kubelet.machineInfo = machineInfo
 
@@ -270,7 +262,7 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 						SystemUUID:              "abc",
 						BootID:                  "1b3",
 						KernelVersion:           cadvisortest.FakeKernelVersion,
-						OSImage:                 cadvisortest.FakeContainerOsVersion,
+						OSImage:                 cadvisortest.FakeContainerOSVersion,
 						OperatingSystem:         goruntime.GOOS,
 						Architecture:            goruntime.GOARCH,
 						ContainerRuntimeVersion: "test://1.5.0",
@@ -279,13 +271,13 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 					},
 					Capacity: v1.ResourceList{
 						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory:           *resource.NewQuantity(10E9, resource.BinarySI),
+						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
 						v1.ResourcePods:             *resource.NewQuantity(0, resource.DecimalSI),
 						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
 					},
 					Allocatable: v1.ResourceList{
 						v1.ResourceCPU:              *resource.NewMilliQuantity(1800, resource.DecimalSI),
-						v1.ResourceMemory:           *resource.NewQuantity(9900E6, resource.BinarySI),
+						v1.ResourceMemory:           *resource.NewQuantity(9900e6, resource.BinarySI),
 						v1.ResourcePods:             *resource.NewQuantity(0, resource.DecimalSI),
 						v1.ResourceEphemeralStorage: *resource.NewQuantity(3000, resource.BinarySI),
 					},
@@ -332,11 +324,11 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 		ContainerManager: cm.NewStubContainerManager(),
 		allocatableReservation: v1.ResourceList{
 			v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
-			v1.ResourceMemory: *resource.NewQuantity(100E6, resource.BinarySI),
+			v1.ResourceMemory: *resource.NewQuantity(100e6, resource.BinarySI),
 		},
 		capacity: v1.ResourceList{
 			v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-			v1.ResourceMemory:           *resource.NewQuantity(20E9, resource.BinarySI),
+			v1.ResourceMemory:           *resource.NewQuantity(20e9, resource.BinarySI),
 			v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
 		},
 	}
@@ -385,12 +377,12 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 			},
 			Capacity: v1.ResourceList{
 				v1.ResourceCPU:    *resource.NewMilliQuantity(3000, resource.DecimalSI),
-				v1.ResourceMemory: *resource.NewQuantity(20E9, resource.BinarySI),
+				v1.ResourceMemory: *resource.NewQuantity(20e9, resource.BinarySI),
 				v1.ResourcePods:   *resource.NewQuantity(0, resource.DecimalSI),
 			},
 			Allocatable: v1.ResourceList{
 				v1.ResourceCPU:    *resource.NewMilliQuantity(2800, resource.DecimalSI),
-				v1.ResourceMemory: *resource.NewQuantity(19900E6, resource.BinarySI),
+				v1.ResourceMemory: *resource.NewQuantity(19900e6, resource.BinarySI),
 				v1.ResourcePods:   *resource.NewQuantity(0, resource.DecimalSI),
 			},
 		},
@@ -401,7 +393,7 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 		SystemUUID:     "abc",
 		BootID:         "1b3",
 		NumCores:       2,
-		MemoryCapacity: 20E9,
+		MemoryCapacity: 20e9,
 	}
 	kubelet.machineInfo = machineInfo
 
@@ -448,7 +440,7 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 				SystemUUID:              "abc",
 				BootID:                  "1b3",
 				KernelVersion:           cadvisortest.FakeKernelVersion,
-				OSImage:                 cadvisortest.FakeContainerOsVersion,
+				OSImage:                 cadvisortest.FakeContainerOSVersion,
 				OperatingSystem:         goruntime.GOOS,
 				Architecture:            goruntime.GOARCH,
 				ContainerRuntimeVersion: "test://1.5.0",
@@ -457,13 +449,13 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 			},
 			Capacity: v1.ResourceList{
 				v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-				v1.ResourceMemory:           *resource.NewQuantity(20E9, resource.BinarySI),
+				v1.ResourceMemory:           *resource.NewQuantity(20e9, resource.BinarySI),
 				v1.ResourcePods:             *resource.NewQuantity(0, resource.DecimalSI),
 				v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
 			},
 			Allocatable: v1.ResourceList{
 				v1.ResourceCPU:              *resource.NewMilliQuantity(1800, resource.DecimalSI),
-				v1.ResourceMemory:           *resource.NewQuantity(19900E6, resource.BinarySI),
+				v1.ResourceMemory:           *resource.NewQuantity(19900e6, resource.BinarySI),
 				v1.ResourcePods:             *resource.NewQuantity(0, resource.DecimalSI),
 				v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
 			},
@@ -546,6 +538,7 @@ func TestUpdateExistingNodeStatusTimeout(t *testing.T) {
 	kubelet := testKubelet.kubelet
 	kubelet.kubeClient = nil // ensure only the heartbeat client is used
 	kubelet.heartbeatClient, err = clientset.NewForConfig(config)
+	require.NoError(t, err)
 	kubelet.onRepeatedHeartbeatFailure = func() {
 		atomic.AddInt64(&failureCallbacks, 1)
 	}
@@ -553,11 +546,11 @@ func TestUpdateExistingNodeStatusTimeout(t *testing.T) {
 		ContainerManager: cm.NewStubContainerManager(),
 		allocatableReservation: v1.ResourceList{
 			v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
-			v1.ResourceMemory: *resource.NewQuantity(100E6, resource.BinarySI),
+			v1.ResourceMemory: *resource.NewQuantity(100e6, resource.BinarySI),
 		},
 		capacity: v1.ResourceList{
 			v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
-			v1.ResourceMemory: *resource.NewQuantity(20E9, resource.BinarySI),
+			v1.ResourceMemory: *resource.NewQuantity(20e9, resource.BinarySI),
 		},
 	}
 
@@ -584,13 +577,13 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 		ContainerManager: cm.NewStubContainerManager(),
 		allocatableReservation: v1.ResourceList{
 			v1.ResourceCPU:              *resource.NewMilliQuantity(200, resource.DecimalSI),
-			v1.ResourceMemory:           *resource.NewQuantity(100E6, resource.BinarySI),
-			v1.ResourceEphemeralStorage: *resource.NewQuantity(10E9, resource.BinarySI),
+			v1.ResourceMemory:           *resource.NewQuantity(100e6, resource.BinarySI),
+			v1.ResourceEphemeralStorage: *resource.NewQuantity(10e9, resource.BinarySI),
 		},
 		capacity: v1.ResourceList{
 			v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-			v1.ResourceMemory:           *resource.NewQuantity(10E9, resource.BinarySI),
-			v1.ResourceEphemeralStorage: *resource.NewQuantity(20E9, resource.BinarySI),
+			v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
+			v1.ResourceEphemeralStorage: *resource.NewQuantity(20e9, resource.BinarySI),
 		},
 	}
 	// Since this test retroactively overrides the stub container manager,
@@ -606,7 +599,7 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 		SystemUUID:     "abc",
 		BootID:         "1b3",
 		NumCores:       2,
-		MemoryCapacity: 10E9,
+		MemoryCapacity: 10e9,
 	}
 	kubelet.machineInfo = machineInfo
 
@@ -646,7 +639,7 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 				SystemUUID:              "abc",
 				BootID:                  "1b3",
 				KernelVersion:           cadvisortest.FakeKernelVersion,
-				OSImage:                 cadvisortest.FakeContainerOsVersion,
+				OSImage:                 cadvisortest.FakeContainerOSVersion,
 				OperatingSystem:         goruntime.GOOS,
 				Architecture:            goruntime.GOARCH,
 				ContainerRuntimeVersion: "test://1.5.0",
@@ -655,15 +648,15 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 			},
 			Capacity: v1.ResourceList{
 				v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-				v1.ResourceMemory:           *resource.NewQuantity(10E9, resource.BinarySI),
+				v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
 				v1.ResourcePods:             *resource.NewQuantity(0, resource.DecimalSI),
-				v1.ResourceEphemeralStorage: *resource.NewQuantity(20E9, resource.BinarySI),
+				v1.ResourceEphemeralStorage: *resource.NewQuantity(20e9, resource.BinarySI),
 			},
 			Allocatable: v1.ResourceList{
 				v1.ResourceCPU:              *resource.NewMilliQuantity(1800, resource.DecimalSI),
-				v1.ResourceMemory:           *resource.NewQuantity(9900E6, resource.BinarySI),
+				v1.ResourceMemory:           *resource.NewQuantity(9900e6, resource.BinarySI),
 				v1.ResourcePods:             *resource.NewQuantity(0, resource.DecimalSI),
-				v1.ResourceEphemeralStorage: *resource.NewQuantity(10E9, resource.BinarySI),
+				v1.ResourceEphemeralStorage: *resource.NewQuantity(10e9, resource.BinarySI),
 			},
 			Addresses: []v1.NodeAddress{
 				{Type: v1.NodeInternalIP, Address: "127.0.0.1"},
@@ -807,11 +800,11 @@ func TestUpdateNodeStatusWithLease(t *testing.T) {
 		ContainerManager: cm.NewStubContainerManager(),
 		allocatableReservation: v1.ResourceList{
 			v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
-			v1.ResourceMemory: *resource.NewQuantity(100E6, resource.BinarySI),
+			v1.ResourceMemory: *resource.NewQuantity(100e6, resource.BinarySI),
 		},
 		capacity: v1.ResourceList{
 			v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-			v1.ResourceMemory:           *resource.NewQuantity(20E9, resource.BinarySI),
+			v1.ResourceMemory:           *resource.NewQuantity(20e9, resource.BinarySI),
 			v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
 		},
 	}
@@ -828,7 +821,7 @@ func TestUpdateNodeStatusWithLease(t *testing.T) {
 		SystemUUID:     "abc",
 		BootID:         "1b3",
 		NumCores:       2,
-		MemoryCapacity: 20E9,
+		MemoryCapacity: 20e9,
 	}
 	kubelet.machineInfo = machineInfo
 
@@ -876,7 +869,7 @@ func TestUpdateNodeStatusWithLease(t *testing.T) {
 				SystemUUID:              "abc",
 				BootID:                  "1b3",
 				KernelVersion:           cadvisortest.FakeKernelVersion,
-				OSImage:                 cadvisortest.FakeContainerOsVersion,
+				OSImage:                 cadvisortest.FakeContainerOSVersion,
 				OperatingSystem:         goruntime.GOOS,
 				Architecture:            goruntime.GOARCH,
 				ContainerRuntimeVersion: "test://1.5.0",
@@ -885,13 +878,13 @@ func TestUpdateNodeStatusWithLease(t *testing.T) {
 			},
 			Capacity: v1.ResourceList{
 				v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-				v1.ResourceMemory:           *resource.NewQuantity(20E9, resource.BinarySI),
+				v1.ResourceMemory:           *resource.NewQuantity(20e9, resource.BinarySI),
 				v1.ResourcePods:             *resource.NewQuantity(0, resource.DecimalSI),
 				v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
 			},
 			Allocatable: v1.ResourceList{
 				v1.ResourceCPU:              *resource.NewMilliQuantity(1800, resource.DecimalSI),
-				v1.ResourceMemory:           *resource.NewQuantity(19900E6, resource.BinarySI),
+				v1.ResourceMemory:           *resource.NewQuantity(19900e6, resource.BinarySI),
 				v1.ResourcePods:             *resource.NewQuantity(0, resource.DecimalSI),
 				v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
 			},
@@ -974,7 +967,7 @@ func TestUpdateNodeStatusWithLease(t *testing.T) {
 	// Update node status again when something is changed.
 	// Report node status even if it is still within the duration of nodeStatusReportFrequency.
 	clock.Step(10 * time.Second)
-	var newMemoryCapacity int64 = 40E9
+	var newMemoryCapacity int64 = 40e9
 	kubelet.machineInfo.MemoryCapacity = uint64(newMemoryCapacity)
 	assert.NoError(t, kubelet.updateNodeStatus())
 
@@ -987,7 +980,7 @@ func TestUpdateNodeStatusWithLease(t *testing.T) {
 
 	updatedNode, err = applyNodeStatusPatch(updatedNode, patchAction.GetPatch())
 	require.NoError(t, err)
-	memCapacity, _ := updatedNode.Status.Capacity[v1.ResourceMemory]
+	memCapacity := updatedNode.Status.Capacity[v1.ResourceMemory]
 	updatedMemoryCapacity, _ := (&memCapacity).AsInt64()
 	assert.Equal(t, newMemoryCapacity, updatedMemoryCapacity, "Memory capacity")
 
@@ -1004,11 +997,12 @@ func TestUpdateNodeStatusWithLease(t *testing.T) {
 	// Report node status if it is still within the duration of nodeStatusReportFrequency.
 	clock.Step(10 * time.Second)
 	assert.Equal(t, "", kubelet.runtimeState.podCIDR(), "Pod CIDR should be empty")
-	podCIDR := "10.0.0.0/24"
-	updatedNode.Spec.PodCIDR = podCIDR
+	podCIDRs := []string{"10.0.0.0/24", "2000::/10"}
+	updatedNode.Spec.PodCIDR = podCIDRs[0]
+	updatedNode.Spec.PodCIDRs = podCIDRs
 	kubeClient.ReactionChain = fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{*updatedNode}}).ReactionChain
 	assert.NoError(t, kubelet.updateNodeStatus())
-	assert.Equal(t, podCIDR, kubelet.runtimeState.podCIDR(), "Pod CIDR should be updated now")
+	assert.Equal(t, strings.Join(podCIDRs, ","), kubelet.runtimeState.podCIDR(), "Pod CIDR should be updated now")
 	// 2 more action (There were 7 actions before).
 	actions = kubeClient.Actions()
 	assert.Len(t, actions, 9)
@@ -1019,7 +1013,8 @@ func TestUpdateNodeStatusWithLease(t *testing.T) {
 	// Update node status when keeping the pod CIDR.
 	// Do not report node status if it is within the duration of nodeStatusReportFrequency.
 	clock.Step(10 * time.Second)
-	assert.Equal(t, podCIDR, kubelet.runtimeState.podCIDR(), "Pod CIDR should already be updated")
+	assert.Equal(t, strings.Join(podCIDRs, ","), kubelet.runtimeState.podCIDR(), "Pod CIDR should already be updated")
+
 	assert.NoError(t, kubelet.updateNodeStatus())
 	// Only 1 more action (There were 9 actions before).
 	actions = kubeClient.Actions()
@@ -1463,7 +1458,7 @@ func TestUpdateNewNodeStatusTooLargeReservation(t *testing.T) {
 		},
 		capacity: v1.ResourceList{
 			v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-			v1.ResourceMemory:           *resource.NewQuantity(10E9, resource.BinarySI),
+			v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
 			v1.ResourceEphemeralStorage: *resource.NewQuantity(3000, resource.BinarySI),
 		},
 	}
@@ -1479,7 +1474,7 @@ func TestUpdateNewNodeStatusTooLargeReservation(t *testing.T) {
 		SystemUUID:     "abc",
 		BootID:         "1b3",
 		NumCores:       2,
-		MemoryCapacity: 10E9, // 10G
+		MemoryCapacity: 10e9, // 10G
 	}
 	kubelet.machineInfo = machineInfo
 
@@ -1489,13 +1484,13 @@ func TestUpdateNewNodeStatusTooLargeReservation(t *testing.T) {
 		Status: v1.NodeStatus{
 			Capacity: v1.ResourceList{
 				v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-				v1.ResourceMemory:           *resource.NewQuantity(10E9, resource.BinarySI),
+				v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
 				v1.ResourcePods:             *resource.NewQuantity(0, resource.DecimalSI),
 				v1.ResourceEphemeralStorage: *resource.NewQuantity(3000, resource.BinarySI),
 			},
 			Allocatable: v1.ResourceList{
 				v1.ResourceCPU:              *resource.NewMilliQuantity(0, resource.DecimalSI),
-				v1.ResourceMemory:           *resource.NewQuantity(10E9, resource.BinarySI),
+				v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
 				v1.ResourcePods:             *resource.NewQuantity(0, resource.DecimalSI),
 				v1.ResourceEphemeralStorage: *resource.NewQuantity(2000, resource.BinarySI),
 			},
@@ -1756,12 +1751,12 @@ func TestReconcileExtendedResource(t *testing.T) {
 				Status: v1.NodeStatus{
 					Capacity: v1.ResourceList{
 						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory:           *resource.NewQuantity(10E9, resource.BinarySI),
+						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
 						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
 					},
 					Allocatable: v1.ResourceList{
 						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory:           *resource.NewQuantity(10E9, resource.BinarySI),
+						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
 						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
 					},
 				},
@@ -1770,12 +1765,12 @@ func TestReconcileExtendedResource(t *testing.T) {
 				Status: v1.NodeStatus{
 					Capacity: v1.ResourceList{
 						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory:           *resource.NewQuantity(10E9, resource.BinarySI),
+						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
 						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
 					},
 					Allocatable: v1.ResourceList{
 						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory:           *resource.NewQuantity(10E9, resource.BinarySI),
+						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
 						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
 					},
 				},
@@ -1789,12 +1784,12 @@ func TestReconcileExtendedResource(t *testing.T) {
 				Status: v1.NodeStatus{
 					Capacity: v1.ResourceList{
 						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory:           *resource.NewQuantity(10E9, resource.BinarySI),
+						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
 						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
 					},
 					Allocatable: v1.ResourceList{
 						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory:           *resource.NewQuantity(10E9, resource.BinarySI),
+						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
 						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
 					},
 				},
@@ -1803,12 +1798,12 @@ func TestReconcileExtendedResource(t *testing.T) {
 				Status: v1.NodeStatus{
 					Capacity: v1.ResourceList{
 						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory:           *resource.NewQuantity(10E9, resource.BinarySI),
+						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
 						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
 					},
 					Allocatable: v1.ResourceList{
 						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory:           *resource.NewQuantity(10E9, resource.BinarySI),
+						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
 						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
 					},
 				},
@@ -1822,14 +1817,14 @@ func TestReconcileExtendedResource(t *testing.T) {
 				Status: v1.NodeStatus{
 					Capacity: v1.ResourceList{
 						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory:           *resource.NewQuantity(10E9, resource.BinarySI),
+						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
 						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
 						extendedResourceName1:       *resource.NewQuantity(int64(2), resource.DecimalSI),
 						extendedResourceName2:       *resource.NewQuantity(int64(10), resource.DecimalSI),
 					},
 					Allocatable: v1.ResourceList{
 						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory:           *resource.NewQuantity(10E9, resource.BinarySI),
+						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
 						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
 						extendedResourceName1:       *resource.NewQuantity(int64(2), resource.DecimalSI),
 						extendedResourceName2:       *resource.NewQuantity(int64(10), resource.DecimalSI),
@@ -1840,14 +1835,14 @@ func TestReconcileExtendedResource(t *testing.T) {
 				Status: v1.NodeStatus{
 					Capacity: v1.ResourceList{
 						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory:           *resource.NewQuantity(10E9, resource.BinarySI),
+						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
 						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
 						extendedResourceName1:       *resource.NewQuantity(int64(0), resource.DecimalSI),
 						extendedResourceName2:       *resource.NewQuantity(int64(0), resource.DecimalSI),
 					},
 					Allocatable: v1.ResourceList{
 						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory:           *resource.NewQuantity(10E9, resource.BinarySI),
+						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
 						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
 						extendedResourceName1:       *resource.NewQuantity(int64(0), resource.DecimalSI),
 						extendedResourceName2:       *resource.NewQuantity(int64(0), resource.DecimalSI),
@@ -2006,8 +2001,6 @@ func TestRegisterWithApiServerWithTaint(t *testing.T) {
 			utilfeature.DefaultFeatureGate.Enabled(features.TaintNodesByCondition),
 			taintutil.TaintExists(got.Spec.Taints, unschedulableTaint),
 			"test unschedulable taint for TaintNodesByCondition")
-
-		return
 	})
 }
 
@@ -2163,6 +2156,159 @@ func TestNodeStatusHasChanged(t *testing.T) {
 			assert.Equal(t, tc.expectChange, changed, "Expect node status change to be %t, but got %t.", tc.expectChange, changed)
 			assert.True(t, apiequality.Semantic.DeepEqual(originalStatusCopy, tc.originalStatus), "%s", diff.ObjectDiff(originalStatusCopy, tc.originalStatus))
 			assert.True(t, apiequality.Semantic.DeepEqual(statusCopy, tc.status), "%s", diff.ObjectDiff(statusCopy, tc.status))
+		})
+	}
+}
+
+func TestUpdateNodeAddresses(t *testing.T) {
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	kubelet := testKubelet.kubelet
+	kubeClient := testKubelet.fakeKubeClient
+
+	existingNode := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname}}
+	kubeClient.ReactionChain = fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{existingNode}}).ReactionChain
+
+	tests := []struct {
+		Name   string
+		Before []v1.NodeAddress
+		After  []v1.NodeAddress
+	}{
+		{
+			Name:   "nil to populated",
+			Before: nil,
+			After: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "127.0.0.1"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+		},
+		{
+			Name:   "empty to populated",
+			Before: []v1.NodeAddress{},
+			After: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "127.0.0.1"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+		},
+		{
+			Name: "populated to nil",
+			Before: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "127.0.0.1"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			After: nil,
+		},
+		{
+			Name: "populated to empty",
+			Before: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "127.0.0.1"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			After: []v1.NodeAddress{},
+		},
+		{
+			Name: "multiple addresses of same type, no change",
+			Before: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "127.0.0.1"},
+				{Type: v1.NodeInternalIP, Address: "127.0.0.2"},
+				{Type: v1.NodeInternalIP, Address: "127.0.0.3"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			After: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "127.0.0.1"},
+				{Type: v1.NodeInternalIP, Address: "127.0.0.2"},
+				{Type: v1.NodeInternalIP, Address: "127.0.0.3"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+		},
+		{
+			Name: "1 InternalIP to 2 InternalIP",
+			Before: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "127.0.0.1"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			After: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "127.0.0.1"},
+				{Type: v1.NodeInternalIP, Address: "127.0.0.2"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+		},
+		{
+			Name: "2 InternalIP to 1 InternalIP",
+			Before: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "127.0.0.1"},
+				{Type: v1.NodeInternalIP, Address: "127.0.0.2"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			After: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "127.0.0.1"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+		},
+		{
+			Name: "2 InternalIP to 2 different InternalIP",
+			Before: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "127.0.0.1"},
+				{Type: v1.NodeInternalIP, Address: "127.0.0.2"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			After: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "127.0.0.3"},
+				{Type: v1.NodeInternalIP, Address: "127.0.0.4"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+		},
+		{
+			Name: "2 InternalIP to reversed order",
+			Before: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "127.0.0.1"},
+				{Type: v1.NodeInternalIP, Address: "127.0.0.2"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			After: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "127.0.0.2"},
+				{Type: v1.NodeInternalIP, Address: "127.0.0.1"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.Name, func(t *testing.T) {
+			oldNode := &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
+				Spec:       v1.NodeSpec{},
+				Status: v1.NodeStatus{
+					Addresses: test.Before,
+				},
+			}
+			expectedNode := &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
+				Spec:       v1.NodeSpec{},
+				Status: v1.NodeStatus{
+					Addresses: test.After,
+				},
+			}
+
+			_, err := kubeClient.CoreV1().Nodes().Update(oldNode)
+			assert.NoError(t, err)
+			kubelet.setNodeStatusFuncs = []func(*v1.Node) error{
+				func(node *v1.Node) error {
+					node.Status.Addresses = expectedNode.Status.Addresses
+					return nil
+				},
+			}
+			assert.NoError(t, kubelet.updateNodeStatus())
+
+			actions := kubeClient.Actions()
+			lastAction := actions[len(actions)-1]
+			assert.IsType(t, core.PatchActionImpl{}, lastAction)
+			patchAction := lastAction.(core.PatchActionImpl)
+
+			updatedNode, err := applyNodeStatusPatch(oldNode, patchAction.GetPatch())
+			require.NoError(t, err)
+
+			assert.True(t, apiequality.Semantic.DeepEqual(updatedNode, expectedNode), "%s", diff.ObjectDiff(expectedNode, updatedNode))
 		})
 	}
 }

@@ -17,6 +17,7 @@ limitations under the License.
 package node
 
 import (
+	"context"
 	"fmt"
 	"runtime"
 	"runtime/pprof"
@@ -40,8 +41,6 @@ import (
 )
 
 var (
-	csiEnabledFeature          = featuregate.NewFeatureGate()
-	csiDisabledFeature         = featuregate.NewFeatureGate()
 	trEnabledFeature           = featuregate.NewFeatureGate()
 	trDisabledFeature          = featuregate.NewFeatureGate()
 	leaseEnabledFeature        = featuregate.NewFeatureGate()
@@ -51,12 +50,6 @@ var (
 )
 
 func init() {
-	if err := csiEnabledFeature.Add(map[featuregate.Feature]featuregate.FeatureSpec{features.CSIPersistentVolume: {Default: true}}); err != nil {
-		panic(err)
-	}
-	if err := csiDisabledFeature.Add(map[featuregate.Feature]featuregate.FeatureSpec{features.CSIPersistentVolume: {Default: false}}); err != nil {
-		panic(err)
-	}
 	if err := trEnabledFeature.Add(map[featuregate.Feature]featuregate.FeatureSpec{features.TokenRequest: {Default: true}}); err != nil {
 		panic(err)
 	}
@@ -69,13 +62,7 @@ func init() {
 	if err := leaseDisabledFeature.Add(map[featuregate.Feature]featuregate.FeatureSpec{features.NodeLease: {Default: false}}); err != nil {
 		panic(err)
 	}
-	if err := csiNodeInfoEnabledFeature.Add(map[featuregate.Feature]featuregate.FeatureSpec{features.KubeletPluginsWatcher: {Default: true}}); err != nil {
-		panic(err)
-	}
 	if err := csiNodeInfoEnabledFeature.Add(map[featuregate.Feature]featuregate.FeatureSpec{features.CSINodeInfo: {Default: true}}); err != nil {
-		panic(err)
-	}
-	if err := csiNodeInfoDisabledFeature.Add(map[featuregate.Feature]featuregate.FeatureSpec{features.KubeletPluginsWatcher: {Default: false}}); err != nil {
 		panic(err)
 	}
 	if err := csiNodeInfoDisabledFeature.Add(map[featuregate.Feature]featuregate.FeatureSpec{features.CSINodeInfo: {Default: false}}); err != nil {
@@ -204,22 +191,9 @@ func TestAuthorizer(t *testing.T) {
 			expect: authorizer.DecisionNoOpinion,
 		},
 		{
-			name:     "disallowed attachment - no relationship",
-			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "volumeattachments", APIGroup: "storage.k8s.io", Name: "attachment0-node1"},
-			features: csiEnabledFeature,
-			expect:   authorizer.DecisionNoOpinion,
-		},
-		{
-			name:     "disallowed attachment - feature disabled",
-			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "volumeattachments", APIGroup: "storage.k8s.io", Name: "attachment0-node0"},
-			features: csiDisabledFeature,
-			expect:   authorizer.DecisionNoOpinion,
-		},
-		{
-			name:     "allowed attachment - feature enabled",
-			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "volumeattachments", APIGroup: "storage.k8s.io", Name: "attachment0-node0"},
-			features: csiEnabledFeature,
-			expect:   authorizer.DecisionAllow,
+			name:   "allowed attachment",
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "volumeattachments", APIGroup: "storage.k8s.io", Name: "attachment0-node0"},
+			expect: authorizer.DecisionAllow,
 		},
 		{
 			name:     "allowed svcacct token create - feature enabled",
@@ -441,7 +415,7 @@ func TestAuthorizer(t *testing.T) {
 			} else {
 				authz.features = tc.features
 			}
-			decision, _, _ := authz.Authorize(tc.attrs)
+			decision, _, _ := authz.Authorize(context.Background(), tc.attrs)
 			if decision != tc.expect {
 				t.Errorf("expected %v, got %v", tc.expect, decision)
 			}
@@ -531,13 +505,13 @@ func TestAuthorizerSharedResources(t *testing.T) {
 		)
 
 		if len(tc.Secret) > 0 {
-			decision, _, err = authz.Authorize(authorizer.AttributesRecord{User: tc.User, ResourceRequest: true, Verb: "get", Resource: "secrets", Namespace: "ns1", Name: tc.Secret})
+			decision, _, err = authz.Authorize(context.Background(), authorizer.AttributesRecord{User: tc.User, ResourceRequest: true, Verb: "get", Resource: "secrets", Namespace: "ns1", Name: tc.Secret})
 			if err != nil {
 				t.Errorf("%d: unexpected error: %v", i, err)
 				continue
 			}
 		} else if len(tc.ConfigMap) > 0 {
-			decision, _, err = authz.Authorize(authorizer.AttributesRecord{User: tc.User, ResourceRequest: true, Verb: "get", Resource: "configmaps", Namespace: "ns1", Name: tc.ConfigMap})
+			decision, _, err = authz.Authorize(context.Background(), authorizer.AttributesRecord{User: tc.User, ResourceRequest: true, Verb: "get", Resource: "configmaps", Namespace: "ns1", Name: tc.ConfigMap})
 			if err != nil {
 				t.Errorf("%d: unexpected error: %v", i, err)
 				continue
@@ -554,7 +528,7 @@ func TestAuthorizerSharedResources(t *testing.T) {
 	{
 		node3SharedSecretGet := authorizer.AttributesRecord{User: node3, ResourceRequest: true, Verb: "get", Resource: "secrets", Namespace: "ns1", Name: "shared-all"}
 
-		decision, _, err := authz.Authorize(node3SharedSecretGet)
+		decision, _, err := authz.Authorize(context.Background(), node3SharedSecretGet)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -566,7 +540,7 @@ func TestAuthorizerSharedResources(t *testing.T) {
 		pod3.Spec.Volumes = nil
 		g.AddPod(pod3)
 
-		decision, _, err = authz.Authorize(node3SharedSecretGet)
+		decision, _, err = authz.Authorize(context.Background(), node3SharedSecretGet)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -777,22 +751,14 @@ func BenchmarkAuthorization(b *testing.B) {
 			expect: authorizer.DecisionNoOpinion,
 		},
 		{
-			name:     "disallowed attachment - no relationship",
-			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "volumeattachments", APIGroup: "storage.k8s.io", Name: "attachment0-node1"},
-			features: csiEnabledFeature,
-			expect:   authorizer.DecisionNoOpinion,
+			name:   "disallowed attachment - no relationship",
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "volumeattachments", APIGroup: "storage.k8s.io", Name: "attachment0-node1"},
+			expect: authorizer.DecisionNoOpinion,
 		},
 		{
-			name:     "disallowed attachment - feature disabled",
-			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "volumeattachments", APIGroup: "storage.k8s.io", Name: "attachment0-node0"},
-			features: csiDisabledFeature,
-			expect:   authorizer.DecisionNoOpinion,
-		},
-		{
-			name:     "allowed attachment - feature enabled",
-			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "volumeattachments", APIGroup: "storage.k8s.io", Name: "attachment0-node0"},
-			features: csiEnabledFeature,
-			expect:   authorizer.DecisionAllow,
+			name:   "allowed attachment",
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "volumeattachments", APIGroup: "storage.k8s.io", Name: "attachment0-node0"},
+			expect: authorizer.DecisionAllow,
 		},
 	}
 
@@ -868,7 +834,7 @@ func BenchmarkAuthorization(b *testing.B) {
 				b.SetParallelism(5000)
 				b.RunParallel(func(pb *testing.PB) {
 					for pb.Next() {
-						decision, _, _ := authz.Authorize(tc.attrs)
+						decision, _, _ := authz.Authorize(context.Background(), tc.attrs)
 						if decision != tc.expect {
 							b.Errorf("expected %v, got %v", tc.expect, decision)
 						}

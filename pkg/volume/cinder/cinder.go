@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2015 The Kubernetes Authors.
 
@@ -23,18 +25,18 @@ import (
 	"path"
 	"path/filepath"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/openstack"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/legacy-cloud-providers/openstack"
 	"k8s.io/utils/keymutex"
 	utilstrings "k8s.io/utils/strings"
 )
@@ -267,8 +269,13 @@ func (plugin *cinderPlugin) getCloudProvider() (BlockStorageProvider, error) {
 
 func (plugin *cinderPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
 	mounter := plugin.host.GetMounter(plugin.GetPluginName())
+	kvh, ok := plugin.host.(volume.KubeletVolumeHost)
+	if !ok {
+		return nil, fmt.Errorf("plugin volume host does not implement KubeletVolumeHost interface")
+	}
+	hu := kvh.GetHostUtil()
 	pluginMntDir := util.GetPluginMountDir(plugin.host, plugin.GetPluginName())
-	sourceName, err := mounter.GetDeviceNameFromMount(mountPath, pluginMntDir)
+	sourceName, err := hu.GetDeviceNameFromMount(mounter, mountPath, pluginMntDir)
 	if err != nil {
 		return nil, err
 	}
@@ -306,7 +313,16 @@ func (plugin *cinderPlugin) ExpandVolumeDevice(spec *volume.Spec, newSize resour
 }
 
 func (plugin *cinderPlugin) NodeExpand(resizeOptions volume.NodeResizeOptions) (bool, error) {
-	_, err := util.GenericResizeFS(plugin.host, plugin.GetPluginName(), resizeOptions.DevicePath, resizeOptions.DeviceMountPath)
+	fsVolume, err := util.CheckVolumeModeFilesystem(resizeOptions.VolumeSpec)
+	if err != nil {
+		return false, fmt.Errorf("error checking VolumeMode: %v", err)
+	}
+	// if volume is not a fs file system, there is nothing for us to do here.
+	if !fsVolume {
+		return true, nil
+	}
+
+	_, err = util.GenericResizeFS(plugin.host, plugin.GetPluginName(), resizeOptions.DevicePath, resizeOptions.DeviceMountPath)
 	if err != nil {
 		return false, err
 	}
@@ -503,12 +519,12 @@ func (c *cinderVolumeUnmounter) TearDownAt(dir string) error {
 	c.pdName = path.Base(refs[0])
 	klog.V(4).Infof("Found volume %s mounted to %s", c.pdName, dir)
 
-	// lock the volume (and thus wait for any concurrrent SetUpAt to finish)
+	// lock the volume (and thus wait for any concurrent SetUpAt to finish)
 	c.plugin.volumeLocks.LockKey(c.pdName)
 	defer c.plugin.volumeLocks.UnlockKey(c.pdName)
 
 	// Reload list of references, there might be SetUpAt finished in the meantime
-	refs, err = c.mounter.GetMountRefs(dir)
+	_, err = c.mounter.GetMountRefs(dir)
 	if err != nil {
 		klog.V(4).Infof("GetMountRefs failed: %v", err)
 		return err

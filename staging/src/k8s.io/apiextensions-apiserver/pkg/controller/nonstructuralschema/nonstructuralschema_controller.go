@@ -97,7 +97,7 @@ func calculateCondition(in *apiextensions.CustomResourceDefinition) *apiextensio
 
 		pth := field.NewPath("spec", "validation", "openAPIV3Schema")
 
-		allErrs = append(allErrs, schema.ValidateStructural(s, pth)...)
+		allErrs = append(allErrs, schema.ValidateStructural(pth, s)...)
 	}
 
 	for _, v := range in.Spec.Versions {
@@ -114,7 +114,7 @@ func calculateCondition(in *apiextensions.CustomResourceDefinition) *apiextensio
 
 		pth := field.NewPath("spec", "version").Key(v.Name).Child("schema", "openAPIV3Schema")
 
-		allErrs = append(allErrs, schema.ValidateStructural(s, pth)...)
+		allErrs = append(allErrs, schema.ValidateStructural(pth, s)...)
 	}
 
 	if len(allErrs) == 0 {
@@ -230,7 +230,7 @@ func (c *ConditionController) processNextWorkItem() bool {
 func (c *ConditionController) enqueue(obj *apiextensions.CustomResourceDefinition) {
 	key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %#v: %v", obj, err))
+		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %#v: %v", obj, err))
 		return
 	}
 

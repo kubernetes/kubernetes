@@ -32,7 +32,7 @@ option go_package = "v1";
 
 // CrossVersionObjectReference contains enough information to let you identify the referred resource.
 message CrossVersionObjectReference {
-  // Kind of the referent; More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds"
+  // Kind of the referent; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds"
   optional string kind = 1;
 
   // Name of the referent; More info: http://kubernetes.io/docs/user-guide/identifiers#names
@@ -88,11 +88,11 @@ message ExternalMetricStatus {
 
 // configuration of a horizontal pod autoscaler.
 message HorizontalPodAutoscaler {
-  // Standard object metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+  // Standard object metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
-  // behaviour of autoscaler. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status.
+  // behaviour of autoscaler. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status.
   // +optional
   optional HorizontalPodAutoscalerSpec spec = 2;
 
@@ -141,7 +141,11 @@ message HorizontalPodAutoscalerSpec {
   // and will set the desired number of pods by using its Scale subresource.
   optional CrossVersionObjectReference scaleTargetRef = 1;
 
-  // lower limit for the number of pods that can be set by the autoscaler, default 1.
+  // minReplicas is the lower limit for the number of replicas to which the autoscaler
+  // can scale down.  It defaults to 1 pod.  minReplicas is allowed to be 0 if the
+  // alpha feature gate HPAScaleToZero is enabled and at least one Object or External
+  // metric is configured.  Scaling is active as long as at least one metric value is
+  // available.
   // +optional
   optional int32 minReplicas = 2;
 
@@ -380,15 +384,15 @@ message ResourceMetricStatus {
 
 // Scale represents a scaling request for a resource.
 message Scale {
-  // Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata.
+  // Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
-  // defines the behavior of the scale. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status.
+  // defines the behavior of the scale. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status.
   // +optional
   optional ScaleSpec spec = 2;
 
-  // current status of the scale. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status. Read-only.
+  // current status of the scale. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status. Read-only.
   // +optional
   optional ScaleStatus status = 3;
 }

@@ -17,14 +17,17 @@ limitations under the License.
 package validation
 
 import (
+	"fmt"
 	"strings"
 
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	pathvalidation "k8s.io/apimachinery/pkg/api/validation/path"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 func ValidateScale(scale *autoscaling.Scale) field.ErrorList {
@@ -42,10 +45,12 @@ func ValidateScale(scale *autoscaling.Scale) field.ErrorList {
 // Prefix indicates this name will be used as part of generation, in which case trailing dashes are allowed.
 var ValidateHorizontalPodAutoscalerName = apivalidation.ValidateReplicationControllerName
 
-func validateHorizontalPodAutoscalerSpec(autoscaler autoscaling.HorizontalPodAutoscalerSpec, fldPath *field.Path) field.ErrorList {
+func validateHorizontalPodAutoscalerSpec(autoscaler autoscaling.HorizontalPodAutoscalerSpec, fldPath *field.Path, minReplicasLowerBound int32) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if autoscaler.MinReplicas != nil && *autoscaler.MinReplicas < 1 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("minReplicas"), *autoscaler.MinReplicas, "must be greater than 0"))
+
+	if autoscaler.MinReplicas != nil && *autoscaler.MinReplicas < minReplicasLowerBound {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("minReplicas"), *autoscaler.MinReplicas,
+			fmt.Sprintf("must be greater than or equal to %d", minReplicasLowerBound)))
 	}
 	if autoscaler.MaxReplicas < 1 {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("maxReplicas"), autoscaler.MaxReplicas, "must be greater than 0"))
@@ -56,7 +61,7 @@ func validateHorizontalPodAutoscalerSpec(autoscaler autoscaling.HorizontalPodAut
 	if refErrs := ValidateCrossVersionObjectReference(autoscaler.ScaleTargetRef, fldPath.Child("scaleTargetRef")); len(refErrs) > 0 {
 		allErrs = append(allErrs, refErrs...)
 	}
-	if refErrs := validateMetrics(autoscaler.Metrics, fldPath.Child("metrics")); len(refErrs) > 0 {
+	if refErrs := validateMetrics(autoscaler.Metrics, fldPath.Child("metrics"), autoscaler.MinReplicas); len(refErrs) > 0 {
 		allErrs = append(allErrs, refErrs...)
 	}
 	return allErrs
@@ -85,13 +90,34 @@ func ValidateCrossVersionObjectReference(ref autoscaling.CrossVersionObjectRefer
 
 func ValidateHorizontalPodAutoscaler(autoscaler *autoscaling.HorizontalPodAutoscaler) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMeta(&autoscaler.ObjectMeta, true, ValidateHorizontalPodAutoscalerName, field.NewPath("metadata"))
-	allErrs = append(allErrs, validateHorizontalPodAutoscalerSpec(autoscaler.Spec, field.NewPath("spec"))...)
+
+	// MinReplicasLowerBound represents a minimum value for minReplicas
+	// 0 when HPA scale-to-zero feature is enabled
+	var minReplicasLowerBound int32
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.HPAScaleToZero) {
+		minReplicasLowerBound = 0
+	} else {
+		minReplicasLowerBound = 1
+	}
+	allErrs = append(allErrs, validateHorizontalPodAutoscalerSpec(autoscaler.Spec, field.NewPath("spec"), minReplicasLowerBound)...)
 	return allErrs
 }
 
 func ValidateHorizontalPodAutoscalerUpdate(newAutoscaler, oldAutoscaler *autoscaling.HorizontalPodAutoscaler) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&newAutoscaler.ObjectMeta, &oldAutoscaler.ObjectMeta, field.NewPath("metadata"))
-	allErrs = append(allErrs, validateHorizontalPodAutoscalerSpec(newAutoscaler.Spec, field.NewPath("spec"))...)
+
+	// minReplicasLowerBound represents a minimum value for minReplicas
+	// 0 when HPA scale-to-zero feature is enabled or HPA object already has minReplicas=0
+	var minReplicasLowerBound int32
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.HPAScaleToZero) || (oldAutoscaler.Spec.MinReplicas != nil && *oldAutoscaler.Spec.MinReplicas == 0) {
+		minReplicasLowerBound = 0
+	} else {
+		minReplicasLowerBound = 1
+	}
+
+	allErrs = append(allErrs, validateHorizontalPodAutoscalerSpec(newAutoscaler.Spec, field.NewPath("spec"), minReplicasLowerBound)...)
 	return allErrs
 }
 
@@ -103,13 +129,27 @@ func ValidateHorizontalPodAutoscalerStatusUpdate(newAutoscaler, oldAutoscaler *a
 	return allErrs
 }
 
-func validateMetrics(metrics []autoscaling.MetricSpec, fldPath *field.Path) field.ErrorList {
+func validateMetrics(metrics []autoscaling.MetricSpec, fldPath *field.Path, minReplicas *int32) field.ErrorList {
 	allErrs := field.ErrorList{}
+	hasObjectMetrics := false
+	hasExternalMetrics := false
 
 	for i, metricSpec := range metrics {
 		idxPath := fldPath.Index(i)
 		if targetErrs := validateMetricSpec(metricSpec, idxPath); len(targetErrs) > 0 {
 			allErrs = append(allErrs, targetErrs...)
+		}
+		if metricSpec.Type == autoscaling.ObjectMetricSourceType {
+			hasObjectMetrics = true
+		}
+		if metricSpec.Type == autoscaling.ExternalMetricSourceType {
+			hasExternalMetrics = true
+		}
+	}
+
+	if minReplicas != nil && *minReplicas == 0 {
+		if !hasObjectMetrics && !hasExternalMetrics {
+			allErrs = append(allErrs, field.Forbidden(fldPath, "must specify at least one Object or External metric to support scaling to zero replicas"))
 		}
 	}
 

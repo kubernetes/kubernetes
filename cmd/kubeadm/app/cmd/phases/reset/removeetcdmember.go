@@ -36,7 +36,7 @@ func NewRemoveETCDMemberPhase() workflow.Phase {
 		Name:  "remove-etcd-member",
 		Short: "Remove a local etcd member.",
 		Long:  "Remove a local etcd member for a control plane node.",
-		Run:   runPreflight,
+		Run:   runRemoveETCDMemberPhase,
 		InheritFlags: []string{
 			options.KubeconfigPath,
 		},

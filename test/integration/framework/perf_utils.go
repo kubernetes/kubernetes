@@ -21,7 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	e2eframework "k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	testutils "k8s.io/kubernetes/test/utils"
 
 	"k8s.io/klog"
@@ -84,7 +84,10 @@ func (p *IntegrationTestNodePreparer) PrepareNodes() error {
 		}
 	}
 
-	nodes := e2eframework.GetReadySchedulableNodesOrDie(p.client)
+	nodes, err := e2enode.GetReadySchedulableNodes(p.client)
+	if err != nil {
+		klog.Fatalf("Error listing nodes: %v", err)
+	}
 	index := 0
 	sum := 0
 	for _, v := range p.countToStrategy {
@@ -101,7 +104,10 @@ func (p *IntegrationTestNodePreparer) PrepareNodes() error {
 
 // CleanupNodes deletes existing test nodes.
 func (p *IntegrationTestNodePreparer) CleanupNodes() error {
-	nodes := e2eframework.GetReadySchedulableNodesOrDie(p.client)
+	nodes, err := e2enode.GetReadySchedulableNodes(p.client)
+	if err != nil {
+		klog.Fatalf("Error listing nodes: %v", err)
+	}
 	for i := range nodes.Items {
 		if err := p.client.CoreV1().Nodes().Delete(nodes.Items[i].Name, &metav1.DeleteOptions{}); err != nil {
 			klog.Errorf("Error while deleting Node: %v", err)

@@ -28,6 +28,7 @@ var (
 		"kubelet_container_log_filesystem_used_bytes",
 		"Bytes used by the container's logs on the filesystem.",
 		[]string{
+			"uid",
 			"namespace",
 			"pod",
 			"container",
@@ -67,6 +68,7 @@ func (c *logMetricsCollector) Collect(ch chan<- prometheus.Metric) {
 					descLogSize,
 					prometheus.GaugeValue,
 					float64(*c.Logs.UsedBytes),
+					ps.PodRef.UID,
 					ps.PodRef.Namespace,
 					ps.PodRef.Name,
 					c.Name,

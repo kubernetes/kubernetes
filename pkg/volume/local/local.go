@@ -25,7 +25,7 @@ import (
 
 	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/validation"
 	"k8s.io/utils/keymutex"
 	utilstrings "k8s.io/utils/strings"
@@ -124,12 +125,18 @@ func (plugin *localVolumePlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ vo
 		return nil, err
 	}
 
+	kvh, ok := plugin.host.(volume.KubeletVolumeHost)
+	if !ok {
+		return nil, fmt.Errorf("plugin volume host does not implement KubeletVolumeHost interface")
+	}
+
 	return &localVolumeMounter{
 		localVolume: &localVolume{
 			pod:             pod,
 			podUID:          pod.UID,
 			volName:         spec.Name(),
 			mounter:         plugin.host.GetMounter(plugin.GetPluginName()),
+			hostUtil:        kvh.GetHostUtil(),
 			plugin:          plugin,
 			globalPath:      globalLocalPath,
 			MetricsProvider: volume.NewMetricsStatFS(plugin.host.GetPodVolumeDir(pod.UID, utilstrings.EscapeQualifiedName(localVolumePluginName), spec.Name())),
@@ -230,14 +237,19 @@ func (plugin *localVolumePlugin) getGlobalLocalPath(spec *volume.Spec) (string, 
 		return "", fmt.Errorf("local volume source is nil or local path is not set")
 	}
 
-	fileType, err := plugin.host.GetMounter(plugin.GetPluginName()).GetFileType(spec.PersistentVolume.Spec.Local.Path)
+	kvh, ok := plugin.host.(volume.KubeletVolumeHost)
+	if !ok {
+		return "", fmt.Errorf("plugin volume host does not implement KubeletVolumeHost interface")
+	}
+
+	fileType, err := kvh.GetHostUtil().GetFileType(spec.PersistentVolume.Spec.Local.Path)
 	if err != nil {
 		return "", err
 	}
 	switch fileType {
-	case mount.FileTypeDirectory:
+	case hostutil.FileTypeDirectory:
 		return spec.PersistentVolume.Spec.Local.Path, nil
-	case mount.FileTypeBlockDev:
+	case hostutil.FileTypeBlockDev:
 		return filepath.Join(plugin.generateBlockDeviceBaseGlobalPath(), spec.Name()), nil
 	default:
 		return "", fmt.Errorf("only directory and block device are supported")
@@ -247,8 +259,9 @@ func (plugin *localVolumePlugin) getGlobalLocalPath(spec *volume.Spec) (string, 
 var _ volume.DeviceMountableVolumePlugin = &localVolumePlugin{}
 
 type deviceMounter struct {
-	plugin  *localVolumePlugin
-	mounter *mount.SafeFormatAndMount
+	plugin   *localVolumePlugin
+	mounter  *mount.SafeFormatAndMount
+	hostUtil hostutil.HostUtils
 }
 
 var _ volume.DeviceMounter = &deviceMounter{}
@@ -258,9 +271,14 @@ func (plugin *localVolumePlugin) CanDeviceMount(spec *volume.Spec) (bool, error)
 }
 
 func (plugin *localVolumePlugin) NewDeviceMounter() (volume.DeviceMounter, error) {
+	kvh, ok := plugin.host.(volume.KubeletVolumeHost)
+	if !ok {
+		return nil, fmt.Errorf("plugin volume host does not implement KubeletVolumeHost interface")
+	}
 	return &deviceMounter{
-		plugin:  plugin,
-		mounter: util.NewSafeFormatAndMountFromHost(plugin.GetPluginName(), plugin.host),
+		plugin:   plugin,
+		mounter:  util.NewSafeFormatAndMountFromHost(plugin.GetPluginName(), plugin.host),
+		hostUtil: kvh.GetHostUtil(),
 	}, nil
 }
 
@@ -296,7 +314,9 @@ func (dm *deviceMounter) mountLocalBlockDevice(spec *volume.Spec, devicePath str
 	mountOptions := util.MountOptionFromSpec(spec, options...)
 	err = dm.mounter.FormatAndMount(devicePath, deviceMountPath, fstype, mountOptions)
 	if err != nil {
-		os.Remove(deviceMountPath)
+		if rmErr := os.Remove(deviceMountPath); rmErr != nil {
+			klog.Warningf("local: failed to remove %s: %v", deviceMountPath, rmErr)
+		}
 		return fmt.Errorf("local: failed to mount device %s at %s (fstype: %s), error %v", devicePath, deviceMountPath, fstype, err)
 	}
 	klog.V(3).Infof("local: successfully mount device %s at %s (fstype: %s)", devicePath, deviceMountPath, fstype)
@@ -307,17 +327,17 @@ func (dm *deviceMounter) MountDevice(spec *volume.Spec, devicePath string, devic
 	if spec.PersistentVolume.Spec.Local == nil || len(spec.PersistentVolume.Spec.Local.Path) == 0 {
 		return fmt.Errorf("local volume source is nil or local path is not set")
 	}
-	fileType, err := dm.mounter.GetFileType(spec.PersistentVolume.Spec.Local.Path)
+	fileType, err := dm.hostUtil.GetFileType(spec.PersistentVolume.Spec.Local.Path)
 	if err != nil {
 		return err
 	}
 
 	switch fileType {
-	case mount.FileTypeBlockDev:
+	case hostutil.FileTypeBlockDev:
 		// local volume plugin does not implement AttachableVolumePlugin interface, so set devicePath to Path in PV spec directly
 		devicePath = spec.PersistentVolume.Spec.Local.Path
 		return dm.mountLocalBlockDevice(spec, devicePath, deviceMountPath)
-	case mount.FileTypeDirectory:
+	case hostutil.FileTypeDirectory:
 		// if the given local volume path is of already filesystem directory, return directly
 		return nil
 	default:
@@ -390,8 +410,9 @@ type localVolume struct {
 	// Global path to the volume
 	globalPath string
 	// Mounter interface that provides system calls to mount the global path to the pod local path.
-	mounter mount.Interface
-	plugin  *localVolumePlugin
+	mounter  mount.Interface
+	hostUtil hostutil.HostUtils
+	plugin   *localVolumePlugin
 	volume.MetricsProvider
 }
 
@@ -462,7 +483,7 @@ func (m *localVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs)
 		refs = m.filterPodMounts(refs)
 		if len(refs) > 0 {
 			fsGroupNew := int64(*mounterArgs.FsGroup)
-			fsGroupOld, err := m.mounter.GetFSGroup(m.globalPath)
+			_, fsGroupOld, err := m.hostUtil.GetOwner(m.globalPath)
 			if err != nil {
 				return fmt.Errorf("failed to check fsGroup for %s (%v)", m.globalPath, err)
 			}
@@ -513,7 +534,9 @@ func (m *localVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs)
 				return err
 			}
 		}
-		os.Remove(dir)
+		if rmErr := os.Remove(dir); rmErr != nil {
+			klog.Warningf("failed to remove %s: %v", dir, rmErr)
+		}
 		return err
 	}
 	if !m.readOnly {

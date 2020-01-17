@@ -22,9 +22,11 @@ import (
 	"net/http"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -37,28 +39,28 @@ var _ = SIGDescribe("Ports Security Check [Feature:KubeletSecurity]", func() {
 	var nodeName string
 
 	ginkgo.BeforeEach(func() {
-		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-		gomega.Expect(len(nodes.Items)).NotTo(gomega.BeZero())
-		node = &nodes.Items[0]
+		var err error
+		node, err = e2enode.GetRandomReadySchedulableNode(f.ClientSet)
+		framework.ExpectNoError(err)
 		nodeName = node.Name
 	})
 
 	// make sure kubelet readonly (10255) and cadvisor (4194) ports are disabled via API server proxy
 	ginkgo.It(fmt.Sprintf("should not be able to proxy to the readonly kubelet port %v using proxy subresource", ports.KubeletReadOnlyPort), func() {
-		result, err := framework.NodeProxyRequest(f.ClientSet, nodeName, "pods/", ports.KubeletReadOnlyPort)
+		result, err := e2ekubelet.ProxyRequest(f.ClientSet, nodeName, "pods/", ports.KubeletReadOnlyPort)
 		framework.ExpectNoError(err)
 
 		var statusCode int
 		result.StatusCode(&statusCode)
-		gomega.Expect(statusCode).NotTo(gomega.Equal(http.StatusOK))
+		framework.ExpectNotEqual(statusCode, http.StatusOK)
 	})
 	ginkgo.It("should not be able to proxy to cadvisor port 4194 using proxy subresource", func() {
-		result, err := framework.NodeProxyRequest(f.ClientSet, nodeName, "containers/", 4194)
+		result, err := e2ekubelet.ProxyRequest(f.ClientSet, nodeName, "containers/", 4194)
 		framework.ExpectNoError(err)
 
 		var statusCode int
 		result.StatusCode(&statusCode)
-		gomega.Expect(statusCode).NotTo(gomega.Equal(http.StatusOK))
+		framework.ExpectNotEqual(statusCode, http.StatusOK)
 	})
 
 	// make sure kubelet readonly (10255) and cadvisor (4194) ports are closed on the public IP address
@@ -72,7 +74,7 @@ var _ = SIGDescribe("Ports Security Check [Feature:KubeletSecurity]", func() {
 
 // checks whether the target port is closed
 func portClosedTest(f *framework.Framework, pickNode *v1.Node, port int) {
-	nodeAddrs := framework.GetNodeAddresses(pickNode, v1.NodeExternalIP)
+	nodeAddrs := e2enode.GetAddresses(pickNode, v1.NodeExternalIP)
 	gomega.Expect(len(nodeAddrs)).NotTo(gomega.BeZero())
 
 	for _, addr := range nodeAddrs {

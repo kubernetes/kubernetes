@@ -43,32 +43,32 @@ var (
 	None *F
 )
 
-// Regexp returns a filter for fieldName matches regexp v.
+// Regexp returns a filter for fieldName eq regexp v.
 func Regexp(fieldName, v string) *F {
 	return (&F{}).AndRegexp(fieldName, v)
 }
 
-// NotRegexp returns a filter for fieldName not matches regexp v.
+// NotRegexp returns a filter for fieldName ne regexp v.
 func NotRegexp(fieldName, v string) *F {
 	return (&F{}).AndNotRegexp(fieldName, v)
 }
 
-// EqualInt returns a filter for fieldName ~ v.
+// EqualInt returns a filter for fieldName eq v.
 func EqualInt(fieldName string, v int) *F {
 	return (&F{}).AndEqualInt(fieldName, v)
 }
 
-// NotEqualInt returns a filter for fieldName != v.
+// NotEqualInt returns a filter for fieldName ne v.
 func NotEqualInt(fieldName string, v int) *F {
 	return (&F{}).AndNotEqualInt(fieldName, v)
 }
 
-// EqualBool returns a filter for fieldName == v.
+// EqualBool returns a filter for fieldName eq v.
 func EqualBool(fieldName string, v bool) *F {
 	return (&F{}).AndEqualBool(fieldName, v)
 }
 
-// NotEqualBool returns a filter for fieldName != v.
+// NotEqualBool returns a filter for fieldName ne v.
 func NotEqualBool(fieldName string, v bool) *F {
 	return (&F{}).AndNotEqualBool(fieldName, v)
 }
@@ -104,25 +104,27 @@ type F struct {
 	predicates []filterPredicate
 }
 
+// TODO(rramkumar): Support logical OR
+
 // And joins two filters together.
 func (fl *F) And(rest *F) *F {
 	fl.predicates = append(fl.predicates, rest.predicates...)
 	return fl
 }
 
-// AndRegexp adds a field match string predicate.
+// AndRegexp adds a field ~ string predicate.
 func (fl *F) AndRegexp(fieldName, v string) *F {
-	fl.predicates = append(fl.predicates, filterPredicate{fieldName: fieldName, op: equals, s: &v})
+	fl.predicates = append(fl.predicates, filterPredicate{fieldName: fieldName, op: regexpEquals, s: &v})
 	return fl
 }
 
-// AndNotRegexp adds a field not match string predicate.
+// AndNotRegexp adds a field !~ string predicate.
 func (fl *F) AndNotRegexp(fieldName, v string) *F {
-	fl.predicates = append(fl.predicates, filterPredicate{fieldName: fieldName, op: notEquals, s: &v})
+	fl.predicates = append(fl.predicates, filterPredicate{fieldName: fieldName, op: regexpNotEquals, s: &v})
 	return fl
 }
 
-// AndEqualInt adds a field == int predicate.
+// AndEqualInt adds a field = int predicate.
 func (fl *F) AndEqualInt(fieldName string, v int) *F {
 	fl.predicates = append(fl.predicates, filterPredicate{fieldName: fieldName, op: equals, i: &v})
 	return fl
@@ -134,7 +136,7 @@ func (fl *F) AndNotEqualInt(fieldName string, v int) *F {
 	return fl
 }
 
-// AndEqualBool adds a field == bool predicate.
+// AndEqualBool adds a field = bool predicate.
 func (fl *F) AndEqualBool(fieldName string, v bool) *F {
 	fl.predicates = append(fl.predicates, filterPredicate{fieldName: fieldName, op: equals, b: &v})
 	return fl
@@ -177,8 +179,10 @@ func (fl *F) Match(obj interface{}) bool {
 type filterOp int
 
 const (
-	equals    filterOp = iota
-	notEquals filterOp = iota
+	regexpEquals    filterOp = iota
+	regexpNotEquals filterOp = iota
+	equals          filterOp = iota
+	notEquals       filterOp = iota
 )
 
 // filterPredicate is an individual predicate for a fieldName and value.
@@ -194,6 +198,13 @@ type filterPredicate struct {
 func (fp *filterPredicate) String() string {
 	var op string
 	switch fp.op {
+	case regexpEquals:
+		// GCE API maps regexp comparison to 'eq'
+		op = "eq"
+	case regexpNotEquals:
+		op = "ne"
+	// Since GCE API does not allow using a mix of 'eq' and '=' operators,
+	// we use 'eq' everywhere
 	case equals:
 		op = "eq"
 	case notEquals:
@@ -237,7 +248,10 @@ func (fp *filterPredicate) match(o interface{}) bool {
 			klog.Errorf("Match regexp %q is invalid: %v", *fp.s, err)
 			return false
 		}
-		match = re.Match([]byte(x))
+		match = x == *fp.s
+		if fp.op < regexpNotEquals {
+			match = re.Match([]byte(x))
+		}
 	case int:
 		if fp.i == nil {
 			return false
@@ -251,6 +265,10 @@ func (fp *filterPredicate) match(o interface{}) bool {
 	}
 
 	switch fp.op {
+	case regexpEquals:
+		return match
+	case regexpNotEquals:
+		return !match
 	case equals:
 		return match
 	case notEquals:

@@ -285,6 +285,29 @@ func PatchNodeOnce(client clientset.Interface, nodeName string, patchFn func(*v1
 	}
 }
 
+// EnsureNodeObject creates a Node with the given name if the Node doesn't exist.
+// Adding a placeholder v1.LabelHostname label makes the object suitable for patching using PatchNodeOnce.
+//
+// Currently this function is used to make sure a Node object exists before patching it
+// during the "kubeadm init" phases. The creation of the Node object is delayed due to TLS boostrap
+// and instead of waiting for the object, we create it as a placeholder and patch it right away.
+// Later the same Node object is populated with dynamic values by the kubelet.
+func EnsureNodeObject(client clientset.Interface, nodeName string) error {
+	node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   nodeName,
+			Labels: map[string]string{v1.LabelHostname: ""},
+		},
+	}
+	if _, err := client.CoreV1().Nodes().Create(node); err != nil {
+		if apierrors.IsAlreadyExists(err) {
+			return nil
+		}
+		return errors.Wrapf(err, "error creating Node %q", nodeName)
+	}
+	return nil
+}
+
 // PatchNode tries to patch a node using patchFn for the actual mutating logic.
 // Retries are provided by the wait package.
 func PatchNode(client clientset.Interface, nodeName string, patchFn func(*v1.Node)) error {
@@ -292,4 +315,26 @@ func PatchNode(client clientset.Interface, nodeName string, patchFn func(*v1.Nod
 	// the function returns false. If the condition function returns an error
 	// then the retries end and the error is returned.
 	return wait.Poll(constants.APICallRetryInterval, constants.PatchNodeTimeout, PatchNodeOnce(client, nodeName, patchFn))
+}
+
+// GetConfigMapWithRetry tries to retrieve a ConfigMap using the given client,
+// retrying if we get an unexpected error.
+//
+// TODO: evaluate if this can be done better. Potentially remove the retry if feasible.
+func GetConfigMapWithRetry(client clientset.Interface, namespace, name string) (*v1.ConfigMap, error) {
+	var cm *v1.ConfigMap
+	var lastError error
+	err := wait.ExponentialBackoff(clientsetretry.DefaultBackoff, func() (bool, error) {
+		var err error
+		cm, err = client.CoreV1().ConfigMaps(namespace).Get(name, metav1.GetOptions{})
+		if err == nil {
+			return true, nil
+		}
+		lastError = err
+		return false, nil
+	})
+	if err == nil {
+		return cm, nil
+	}
+	return nil, lastError
 }

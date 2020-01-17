@@ -24,7 +24,7 @@ var (
 	// HNSVersion1803 added ACL functionality.
 	HNSVersion1803 = Version{Major: 7, Minor: 2}
 	// V2ApiSupport allows the use of V2 Api calls and V2 Schema.
-	V2ApiSupport = Version{Major: 9, Minor: 1}
+	V2ApiSupport = Version{Major: 9, Minor: 2}
 	// Remote Subnet allows for Remote Subnet policies on Overlay networks
 	RemoteSubnetVersion = Version{Major: 9, Minor: 2}
 	// A Host Route policy allows for local container to local host communication Overlay networks

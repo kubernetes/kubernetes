@@ -37,7 +37,7 @@ type REST struct {
 }
 
 // NewREST returns a registry which will store CertificateSigningRequest in the given helper
-func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *ApprovalREST) {
+func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *ApprovalREST, error) {
 	store := &genericregistry.Store{
 		NewFunc:                  func() runtime.Object { return &certificates.CertificateSigningRequest{} },
 		NewListFunc:              func() runtime.Object { return &certificates.CertificateSigningRequestList{} },
@@ -52,7 +52,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *Approva
 	}
 	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {
-		panic(err) // TODO: Propagate error up
+		return nil, nil, nil, err
 	}
 
 	// Subresources use the same store and creation strategy, which only
@@ -64,7 +64,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *Approva
 	approvalStore := *store
 	approvalStore.UpdateStrategy = csrregistry.ApprovalStrategy
 
-	return &REST{store}, &StatusREST{store: &statusStore}, &ApprovalREST{store: &approvalStore}
+	return &REST{store}, &StatusREST{store: &statusStore}, &ApprovalREST{store: &approvalStore}, nil
 }
 
 // Implement ShortNamesProvider

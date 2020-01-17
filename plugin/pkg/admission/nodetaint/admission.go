@@ -17,8 +17,10 @@ limitations under the License.
 package nodetaint
 
 import (
+	"context"
 	"fmt"
 	"io"
+
 	"k8s.io/apiserver/pkg/admission"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
@@ -65,7 +67,7 @@ var (
 )
 
 // Admit is the main function that checks node identity and adds taints as needed.
-func (p *Plugin) Admit(a admission.Attributes, o admission.ObjectInterfaces) error {
+func (p *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
 	// If TaintNodesByCondition is not enabled, we don't need to do anything.
 	if !p.features.Enabled(features.TaintNodesByCondition) {
 		return nil

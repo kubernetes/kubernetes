@@ -22,7 +22,7 @@ import (
 )
 
 // Gauge is our internal representation for our wrapping struct around prometheus
-// gauges. kubeGauge implements both KubeCollector and KubeGauge.
+// gauges. kubeGauge implements both kubeCollector and KubeGauge.
 type Gauge struct {
 	GaugeMetric
 	*GaugeOpts
@@ -30,14 +30,12 @@ type Gauge struct {
 	selfCollector
 }
 
-// NewGauge returns an object which satisfies the KubeCollector and KubeGauge interfaces.
+// NewGauge returns an object which satisfies the kubeCollector and KubeGauge interfaces.
 // However, the object returned will not measure anything unless the collector is first
 // registered, since the metric is lazily instantiated.
 func NewGauge(opts *GaugeOpts) *Gauge {
-	// todo: handle defaulting better
-	if opts.StabilityLevel == "" {
-		opts.StabilityLevel = ALPHA
-	}
+	opts.StabilityLevel.setDefaults()
+
 	kc := &Gauge{
 		GaugeOpts:  opts,
 		lazyMetric: lazyMetric{},
@@ -55,7 +53,7 @@ func (g *Gauge) setPrometheusGauge(gauge prometheus.Gauge) {
 
 // DeprecatedVersion returns a pointer to the Version or nil
 func (g *Gauge) DeprecatedVersion() *semver.Version {
-	return g.GaugeOpts.DeprecatedVersion
+	return parseSemver(g.GaugeOpts.DeprecatedVersion)
 }
 
 // initializeMetric invocation creates the actual underlying Gauge. Until this method is called
@@ -74,7 +72,7 @@ func (g *Gauge) initializeDeprecatedMetric() {
 }
 
 // GaugeVec is the internal representation of our wrapping struct around prometheus
-// gaugeVecs. kubeGaugeVec implements both KubeCollector and KubeGaugeVec.
+// gaugeVecs. kubeGaugeVec implements both kubeCollector and KubeGaugeVec.
 type GaugeVec struct {
 	*prometheus.GaugeVec
 	*GaugeOpts
@@ -82,14 +80,12 @@ type GaugeVec struct {
 	originalLabels []string
 }
 
-// NewGaugeVec returns an object which satisfies the KubeCollector and KubeGaugeVec interfaces.
+// NewGaugeVec returns an object which satisfies the kubeCollector and KubeGaugeVec interfaces.
 // However, the object returned will not measure anything unless the collector is first
 // registered, since the metric is lazily instantiated.
 func NewGaugeVec(opts *GaugeOpts, labels []string) *GaugeVec {
-	// todo: handle defaulting better
-	if opts.StabilityLevel == "" {
-		opts.StabilityLevel = ALPHA
-	}
+	opts.StabilityLevel.setDefaults()
+
 	cv := &GaugeVec{
 		GaugeVec:       noopGaugeVec,
 		GaugeOpts:      opts,
@@ -102,7 +98,7 @@ func NewGaugeVec(opts *GaugeOpts, labels []string) *GaugeVec {
 
 // DeprecatedVersion returns a pointer to the Version or nil
 func (v *GaugeVec) DeprecatedVersion() *semver.Version {
-	return v.GaugeOpts.DeprecatedVersion
+	return parseSemver(v.GaugeOpts.DeprecatedVersion)
 }
 
 // initializeMetric invocation creates the actual underlying GaugeVec. Until this method is called
@@ -142,9 +138,23 @@ func (v *GaugeVec) WithLabelValues(lvs ...string) GaugeMetric {
 // must match those of the VariableLabels in Desc). If that label map is
 // accessed for the first time, a new GaugeMetric is created IFF the gaugeVec has
 // been registered to a metrics registry.
-func (v *GaugeVec) With(labels prometheus.Labels) GaugeMetric {
+func (v *GaugeVec) With(labels map[string]string) GaugeMetric {
 	if !v.IsCreated() {
 		return noop // return no-op gauge
 	}
 	return v.GaugeVec.With(labels)
+}
+
+// Delete deletes the metric where the variable labels are the same as those
+// passed in as labels. It returns true if a metric was deleted.
+//
+// It is not an error if the number and names of the Labels are inconsistent
+// with those of the VariableLabels in Desc. However, such inconsistent Labels
+// can never match an actual metric, so the method will always return false in
+// that case.
+func (v *GaugeVec) Delete(labels map[string]string) bool {
+	if !v.IsCreated() {
+		return false // since we haven't created the metric, we haven't deleted a metric with the passed in values
+	}
+	return v.GaugeVec.Delete(labels)
 }

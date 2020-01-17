@@ -51,12 +51,11 @@ func InitArgs(args ...string) func(*LinuxFactory) error {
 // SystemdCgroups is an options func to configure a LinuxFactory to return
 // containers that use systemd to create and manage cgroups.
 func SystemdCgroups(l *LinuxFactory) error {
-	l.NewCgroupsManager = func(config *configs.Cgroup, paths map[string]string) cgroups.Manager {
-		return &systemd.Manager{
-			Cgroups: config,
-			Paths:   paths,
-		}
+	systemdCgroupsManager, err := systemd.NewSystemdCgroupsManager()
+	if err != nil {
+		return err
 	}
+	l.NewCgroupsManager = systemdCgroupsManager
 	return nil
 }
 

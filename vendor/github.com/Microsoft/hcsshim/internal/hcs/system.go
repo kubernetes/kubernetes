@@ -43,6 +43,10 @@ type System struct {
 	callbackNumber uintptr
 
 	logctx logrus.Fields
+
+	closedWaitOnce sync.Once
+	waitBlock      chan struct{}
+	waitError      error
 }
 
 func newSystem(id string) *System {
@@ -51,6 +55,7 @@ func newSystem(id string) *System {
 		logctx: logrus.Fields{
 			logfields.ContainerID: id,
 		},
+		waitBlock: make(chan struct{}),
 	}
 }
 
@@ -121,6 +126,8 @@ func CreateComputeSystem(id string, hcsDocumentInterface interface{}) (_ *System
 		return nil, makeSystemError(computeSystem, operation, hcsDocument, err, events)
 	}
 
+	go computeSystem.waitBackground()
+
 	return computeSystem, nil
 }
 
@@ -153,6 +160,7 @@ func OpenComputeSystem(id string) (_ *System, err error) {
 	if err = computeSystem.registerCallback(); err != nil {
 		return nil, makeSystemError(computeSystem, operation, "", err, nil)
 	}
+	go computeSystem.waitBackground()
 
 	return computeSystem, nil
 }
@@ -280,7 +288,7 @@ func (computeSystem *System) Shutdown() (err error) {
 	operation := "hcsshim::ComputeSystem::Shutdown"
 	computeSystem.logOperationBegin(operation)
 	defer func() {
-		if IsAlreadyStopped(err) {
+		if IsAlreadyClosed(err) || IsAlreadyStopped(err) || IsPending(err) {
 			computeSystem.logOperationEnd(operation, nil)
 		} else {
 			computeSystem.logOperationEnd(operation, err)
@@ -312,7 +320,7 @@ func (computeSystem *System) Terminate() (err error) {
 	operation := "hcsshim::ComputeSystem::Terminate"
 	computeSystem.logOperationBegin(operation)
 	defer func() {
-		if IsPending(err) {
+		if IsAlreadyClosed(err) || IsAlreadyStopped(err) || IsPending(err) {
 			computeSystem.logOperationEnd(operation, nil)
 		} else {
 			computeSystem.logOperationEnd(operation, err)
@@ -335,48 +343,67 @@ func (computeSystem *System) Terminate() (err error) {
 	return nil
 }
 
-// Wait synchronously waits for the compute system to shutdown or terminate.
+// waitBackground waits for the compute system exit notification. Once received
+// sets `computeSystem.waitError` (if any) and unblocks all `Wait`,
+// `WaitExpectedError`, and `WaitTimeout` calls.
+//
+// This MUST be called exactly once per `computeSystem.handle` but `Wait`,
+// `WaitExpectedError`, and `WaitTimeout` are safe to call multiple times.
+func (computeSystem *System) waitBackground() {
+	computeSystem.waitError = waitForNotification(computeSystem.callbackNumber, hcsNotificationSystemExited, nil)
+	computeSystem.closedWaitOnce.Do(func() {
+		close(computeSystem.waitBlock)
+	})
+}
+
+// Wait synchronously waits for the compute system to shutdown or terminate. If
+// the compute system has already exited returns the previous error (if any).
 func (computeSystem *System) Wait() (err error) {
 	operation := "hcsshim::ComputeSystem::Wait"
 	computeSystem.logOperationBegin(operation)
 	defer func() { computeSystem.logOperationEnd(operation, err) }()
 
-	err = waitForNotification(computeSystem.callbackNumber, hcsNotificationSystemExited, nil)
-	if err != nil {
-		return makeSystemError(computeSystem, "Wait", "", err, nil)
+	<-computeSystem.waitBlock
+	if computeSystem.waitError != nil {
+		return makeSystemError(computeSystem, "Wait", "", computeSystem.waitError, nil)
 	}
 
 	return nil
 }
 
 // WaitExpectedError synchronously waits for the compute system to shutdown or
-// terminate, and ignores the passed error if it occurs.
+// terminate and returns the error (if any) as long as it does not match
+// `expected`. If the compute system has already exited returns the previous
+// error (if any) as long as it does not match `expected`.
 func (computeSystem *System) WaitExpectedError(expected error) (err error) {
 	operation := "hcsshim::ComputeSystem::WaitExpectedError"
 	computeSystem.logOperationBegin(operation)
 	defer func() { computeSystem.logOperationEnd(operation, err) }()
 
-	err = waitForNotification(computeSystem.callbackNumber, hcsNotificationSystemExited, nil)
-	if err != nil && getInnerError(err) != expected {
-		return makeSystemError(computeSystem, "WaitExpectedError", "", err, nil)
+	<-computeSystem.waitBlock
+	if computeSystem.waitError != nil && getInnerError(computeSystem.waitError) != expected {
+		return makeSystemError(computeSystem, "WaitExpectedError", "", computeSystem.waitError, nil)
 	}
-
 	return nil
 }
 
-// WaitTimeout synchronously waits for the compute system to terminate or the duration to elapse.
-// If the timeout expires, IsTimeout(err) == true
+// WaitTimeout synchronously waits for the compute system to terminate or the
+// duration to elapse. If the timeout expires, `IsTimeout(err) == true`. If
+// the compute system has already exited returns the previous error (if any).
 func (computeSystem *System) WaitTimeout(timeout time.Duration) (err error) {
 	operation := "hcsshim::ComputeSystem::WaitTimeout"
 	computeSystem.logOperationBegin(operation)
 	defer func() { computeSystem.logOperationEnd(operation, err) }()
 
-	err = waitForNotification(computeSystem.callbackNumber, hcsNotificationSystemExited, &timeout)
-	if err != nil {
-		return makeSystemError(computeSystem, "WaitTimeout", "", err, nil)
+	select {
+	case <-computeSystem.waitBlock:
+		if computeSystem.waitError != nil {
+			return makeSystemError(computeSystem, "WaitTimeout", "", computeSystem.waitError, nil)
+		}
+		return nil
+	case <-time.After(timeout):
+		return makeSystemError(computeSystem, "WaitTimeout", "", ErrTimeout, nil)
 	}
-
-	return nil
 }
 
 func (computeSystem *System) Properties(types ...schema1.PropertyType) (_ *schema1.ContainerProperties, err error) {
@@ -387,18 +414,19 @@ func (computeSystem *System) Properties(types ...schema1.PropertyType) (_ *schem
 	computeSystem.logOperationBegin(operation)
 	defer func() { computeSystem.logOperationEnd(operation, err) }()
 
-	queryj, err := json.Marshal(schema1.PropertyQuery{types})
+	queryBytes, err := json.Marshal(schema1.PropertyQuery{PropertyTypes: types})
 	if err != nil {
 		return nil, makeSystemError(computeSystem, "Properties", "", err, nil)
 	}
 
+	queryString := string(queryBytes)
 	logrus.WithFields(computeSystem.logctx).
-		WithField(logfields.JSON, queryj).
+		WithField(logfields.JSON, queryString).
 		Debug("HCS ComputeSystem Properties Query")
 
 	var resultp, propertiesp *uint16
 	syscallWatcher(computeSystem.logctx, func() {
-		err = hcsGetComputeSystemProperties(computeSystem.handle, string(queryj), &propertiesp, &resultp)
+		err = hcsGetComputeSystemProperties(computeSystem.handle, string(queryString), &propertiesp, &resultp)
 	})
 	events := processHcsResult(resultp)
 	if err != nil {
@@ -519,6 +547,7 @@ func (computeSystem *System) CreateProcess(c interface{}) (_ *Process, err error
 	if err = process.registerCallback(); err != nil {
 		return nil, makeSystemError(computeSystem, "CreateProcess", "", err, nil)
 	}
+	go process.waitBackground()
 
 	return process, nil
 }
@@ -557,6 +586,7 @@ func (computeSystem *System) OpenProcess(pid int) (_ *Process, err error) {
 	if err = process.registerCallback(); err != nil {
 		return nil, makeSystemError(computeSystem, "OpenProcess", "", err, nil)
 	}
+	go process.waitBackground()
 
 	return process, nil
 }
@@ -587,13 +617,17 @@ func (computeSystem *System) Close() (err error) {
 	}
 
 	computeSystem.handle = 0
+	computeSystem.closedWaitOnce.Do(func() {
+		close(computeSystem.waitBlock)
+	})
 
 	return nil
 }
 
 func (computeSystem *System) registerCallback() error {
 	context := &notifcationWatcherContext{
-		channels: newChannels(),
+		channels: newSystemChannels(),
+		systemID: computeSystem.id,
 	}
 
 	callbackMapLock.Lock()
@@ -640,7 +674,7 @@ func (computeSystem *System) unregisterCallback() error {
 	closeChannels(context.channels)
 
 	callbackMapLock.Lock()
-	callbackMap[callbackNumber] = nil
+	delete(callbackMap, callbackNumber)
 	callbackMapLock.Unlock()
 
 	handle = 0

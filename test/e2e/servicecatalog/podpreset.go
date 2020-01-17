@@ -22,17 +22,16 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
-	settings "k8s.io/api/settings/v1alpha1"
+	settingsv1alpha1 "k8s.io/api/settings/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
-	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 var _ = SIGDescribe("[Feature:PodPreset] PodPreset", func() {
@@ -50,12 +49,12 @@ var _ = SIGDescribe("[Feature:PodPreset] PodPreset", func() {
 	ginkgo.It("should create a pod preset", func() {
 		ginkgo.By("Creating a pod preset")
 
-		pip := &settings.PodPreset{
+		pip := &settingsv1alpha1.PodPreset{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "hello",
 				Namespace: f.Namespace.Name,
 			},
-			Spec: settings.PodPresetSpec{
+			Spec: settingsv1alpha1.PodPresetSpec{
 				Selector: metav1.LabelSelector{
 					MatchExpressions: []metav1.LabelSelectorRequirement{
 						{
@@ -114,7 +113,7 @@ var _ = SIGDescribe("[Feature:PodPreset] PodPreset", func() {
 		options := metav1.ListOptions{LabelSelector: selector.String()}
 		pods, err := podClient.List(options)
 		framework.ExpectNoError(err, "failed to query for pod")
-		gomega.Expect(len(pods.Items)).To(gomega.Equal(0))
+		framework.ExpectEqual(len(pods.Items), 0)
 		options = metav1.ListOptions{
 			LabelSelector:   selector.String(),
 			ResourceVersion: pods.ListMeta.ResourceVersion,
@@ -130,7 +129,7 @@ var _ = SIGDescribe("[Feature:PodPreset] PodPreset", func() {
 		options = metav1.ListOptions{LabelSelector: selector.String()}
 		pods, err = podClient.List(options)
 		framework.ExpectNoError(err, "failed to query for pod")
-		gomega.Expect(len(pods.Items)).To(gomega.Equal(1))
+		framework.ExpectEqual(len(pods.Items), 1)
 
 		ginkgo.By("verifying pod creation was observed")
 		select {
@@ -168,12 +167,12 @@ var _ = SIGDescribe("[Feature:PodPreset] PodPreset", func() {
 	ginkgo.It("should not modify the pod on conflict", func() {
 		ginkgo.By("Creating a pod preset")
 
-		pip := &settings.PodPreset{
+		pip := &settingsv1alpha1.PodPreset{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "hello",
 				Namespace: f.Namespace.Name,
 			},
-			Spec: settings.PodPresetSpec{
+			Spec: settingsv1alpha1.PodPresetSpec{
 				Selector: metav1.LabelSelector{
 					MatchExpressions: []metav1.LabelSelectorRequirement{
 						{
@@ -234,7 +233,7 @@ var _ = SIGDescribe("[Feature:PodPreset] PodPreset", func() {
 		options := metav1.ListOptions{LabelSelector: selector.String()}
 		pods, err := podClient.List(options)
 		framework.ExpectNoError(err, "failed to query for pod")
-		gomega.Expect(len(pods.Items)).To(gomega.Equal(0))
+		framework.ExpectEqual(len(pods.Items), 0)
 		options = metav1.ListOptions{
 			LabelSelector:   selector.String(),
 			ResourceVersion: pods.ListMeta.ResourceVersion,
@@ -250,7 +249,7 @@ var _ = SIGDescribe("[Feature:PodPreset] PodPreset", func() {
 		options = metav1.ListOptions{LabelSelector: selector.String()}
 		pods, err = podClient.List(options)
 		framework.ExpectNoError(err, "failed to query for pod")
-		gomega.Expect(len(pods.Items)).To(gomega.Equal(1))
+		framework.ExpectEqual(len(pods.Items), 1)
 
 		ginkgo.By("verifying pod creation was observed")
 		select {
@@ -287,6 +286,6 @@ var _ = SIGDescribe("[Feature:PodPreset] PodPreset", func() {
 	})
 })
 
-func createPodPreset(c clientset.Interface, ns string, job *settings.PodPreset) (*settings.PodPreset, error) {
+func createPodPreset(c clientset.Interface, ns string, job *settingsv1alpha1.PodPreset) (*settingsv1alpha1.PodPreset, error) {
 	return c.SettingsV1alpha1().PodPresets(ns).Create(job)
 }

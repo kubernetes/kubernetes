@@ -64,8 +64,10 @@ if [[ "$#" -lt 2 ]]; then
   echo "  Set the REGENERATE_DOCS environment var to regenerate documentation for the target branch after picking the specified commits."
   echo "  This is useful when picking commits containing changes to API documentation."
   echo
-  echo " Set UPSTREAM_REMOTE (default: upstream) and FORK_REMOTE (default: origin)"
-  echo " To override the default remote names to what you have locally."
+  echo "  Set UPSTREAM_REMOTE (default: upstream) and FORK_REMOTE (default: origin)"
+  echo "  to override the default remote names to what you have locally."
+  echo
+  echo "  For merge process info, see https://git.k8s.io/community/contributors/devel/sig-release/cherry-picks.md"
   exit 2
 fi
 
@@ -151,6 +153,8 @@ Automated cherry pick of ${numandtitle}
 Cherry pick of ${PULLSUBJ} on ${rel}.
 
 ${numandtitle}
+
+For details on the cherry pick process, see the [cherry pick requests](https://git.k8s.io/community/contributors/devel/sig-release/cherry-picks.md) page.
 EOF
 
 hub pull-request -F "${prtext}" -h "${GITHUB_USER}:${NEWBRANCH}" -b "${MAIN_REPO_ORG}:${rel}"

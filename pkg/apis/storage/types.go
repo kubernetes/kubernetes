@@ -84,7 +84,7 @@ type StorageClass struct {
 type StorageClassList struct {
 	metav1.TypeMeta
 	// Standard list metadata
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ListMeta
 
@@ -102,7 +102,7 @@ type VolumeAttachment struct {
 	metav1.TypeMeta
 
 	// Standard object metadata.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta
 
@@ -123,7 +123,7 @@ type VolumeAttachment struct {
 type VolumeAttachmentList struct {
 	metav1.TypeMeta
 	// Standard list metadata
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ListMeta
 
@@ -239,7 +239,7 @@ type CSIDriver struct {
 	// The driver name must be 63 characters or less, beginning and ending with
 	// an alphanumeric character ([a-z0-9A-Z]) with dashes (-), dots (.), and
 	// alphanumerics between.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	metav1.ObjectMeta
 
 	// Specification of the CSI Driver.
@@ -253,7 +253,7 @@ type CSIDriverList struct {
 	metav1.TypeMeta
 
 	// Standard list metadata
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ListMeta
 
@@ -293,7 +293,46 @@ type CSIDriverSpec struct {
 	// "csi.storage.k8s.io/pod.uid": string(pod.UID)
 	// +optional
 	PodInfoOnMount *bool
+
+	// VolumeLifecycleModes defines what kind of volumes this CSI volume driver supports.
+	// The default if the list is empty is "Persistent", which is the usage
+	// defined by the CSI specification and implemented in Kubernetes via the usual
+	// PV/PVC mechanism.
+	// The other mode is "Ephemeral". In this mode, volumes are defined inline
+	// inside the pod spec with CSIVolumeSource and their lifecycle is tied to
+	// the lifecycle of that pod. A driver has to be aware of this
+	// because it is only going to get a NodePublishVolume call for such a volume.
+	// For more information about implementing this mode, see
+	// https://kubernetes-csi.github.io/docs/ephemeral-local-volumes.html
+	// A driver can support one or more of these mode and
+	// more modes may be added in the future.
+	// +optional
+	VolumeLifecycleModes []VolumeLifecycleMode
 }
+
+// VolumeLifecycleMode specifies how a CSI volume is used in Kubernetes.
+// More modes may be added in the future.
+type VolumeLifecycleMode string
+
+const (
+	// VolumeLifecyclePersistent explicitly confirms that the driver implements
+	// the full CSI spec. It is the default when CSIDriverSpec.VolumeLifecycleModes is not
+	// set. Such volumes are managed in Kubernetes via the persistent volume
+	// claim mechanism and have a lifecycle that is independent of the pods which
+	// use them.
+	VolumeLifecyclePersistent VolumeLifecycleMode = "Persistent"
+	// VolumeLifecycleEphemeral indicates that the driver can be used for
+	// ephemeral inline volumes. Such volumes are specified inside the pod
+	// spec with a CSIVolumeSource and, as far as Kubernetes is concerned, have
+	// a lifecycle that is tied to the lifecycle of the pod. For example, such
+	// a volume might contain data that gets created specifically for that pod,
+	// like secrets.
+	// But how the volume actually gets created and managed is entirely up to
+	// the driver. It might also use reference counting to share the same volume
+	// instance among different pods if the CSIVolumeSource of those pods is
+	// identical.
+	VolumeLifecycleEphemeral VolumeLifecycleMode = "Ephemeral"
+)
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -355,6 +394,20 @@ type CSINodeDriver struct {
 	// This can be empty if driver does not support topology.
 	// +optional
 	TopologyKeys []string
+
+	// allocatable represents the volume resources of a node that are available for scheduling.
+	// +optional
+	Allocatable *VolumeNodeResources
+}
+
+// VolumeNodeResources is a set of resource limits for scheduling of volumes.
+type VolumeNodeResources struct {
+	// Maximum number of unique volumes managed by the CSI driver that can be used on a node.
+	// A volume that is both attached and mounted on a node is considered to be used once, not twice.
+	// The same rule applies for a unique volume that is shared among multiple pods on the same node.
+	// If this field is nil, then the supported number of volumes on this node is unbounded.
+	// +optional
+	Count *int32
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -364,7 +417,7 @@ type CSINodeList struct {
 	metav1.TypeMeta
 
 	// Standard list metadata
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ListMeta
 

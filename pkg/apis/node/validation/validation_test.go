@@ -19,8 +19,14 @@ package validation
 import (
 	"testing"
 
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/node"
+	"k8s.io/kubernetes/pkg/features"
+	utilpointer "k8s.io/utils/pointer"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -123,6 +129,144 @@ func TestValidateRuntimeUpdate(t *testing.T) {
 			} else {
 				assert.Empty(t, errs)
 			}
+		})
+	}
+}
+
+func TestValidateOverhead(t *testing.T) {
+
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodOverhead, true)()
+
+	successCase := []struct {
+		Name     string
+		overhead *node.Overhead
+	}{
+		{
+			Name: "Overhead with valid cpu and memory resources",
+			overhead: &node.Overhead{
+				PodFixed: core.ResourceList{
+					core.ResourceName(core.ResourceCPU):    resource.MustParse("10"),
+					core.ResourceName(core.ResourceMemory): resource.MustParse("10G"),
+				},
+			},
+		},
+	}
+
+	for _, tc := range successCase {
+		rc := &node.RuntimeClass{
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			Handler:    "bar",
+			Overhead:   tc.overhead,
+		}
+		if errs := ValidateRuntimeClass(rc); len(errs) != 0 {
+			t.Errorf("%q unexpected error: %v", tc.Name, errs)
+		}
+	}
+
+	errorCase := []struct {
+		Name     string
+		overhead *node.Overhead
+	}{
+		{
+			Name: "Invalid Resources",
+			overhead: &node.Overhead{
+				PodFixed: core.ResourceList{
+					core.ResourceName("my.org"): resource.MustParse("10m"),
+				},
+			},
+		},
+	}
+	for _, tc := range errorCase {
+		rc := &node.RuntimeClass{
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			Handler:    "bar",
+			Overhead:   tc.overhead,
+		}
+		if errs := ValidateRuntimeClass(rc); len(errs) == 0 {
+			t.Errorf("%q expected error", tc.Name)
+		}
+	}
+}
+
+func TestValidateScheduling(t *testing.T) {
+	tests := []struct {
+		name       string
+		scheduling *node.Scheduling
+		expectErrs int
+	}{{
+		name: "valid scheduling",
+		scheduling: &node.Scheduling{
+			NodeSelector: map[string]string{"valid": "yes"},
+			Tolerations: []core.Toleration{{
+				Key:      "valid",
+				Operator: core.TolerationOpExists,
+				Effect:   core.TaintEffectNoSchedule,
+			}},
+		},
+	}, {
+		name:       "empty scheduling",
+		scheduling: &node.Scheduling{},
+	}, {
+		name: "invalid nodeSelector",
+		scheduling: &node.Scheduling{
+			NodeSelector: map[string]string{"not a valid key!!!": "nope"},
+		},
+		expectErrs: 1,
+	}, {
+		name: "invalid toleration",
+		scheduling: &node.Scheduling{
+			Tolerations: []core.Toleration{{
+				Key:      "valid",
+				Operator: core.TolerationOpExists,
+				Effect:   core.TaintEffectNoSchedule,
+			}, {
+				Key:      "not a valid key!!!",
+				Operator: core.TolerationOpExists,
+				Effect:   core.TaintEffectNoSchedule,
+			}},
+		},
+		expectErrs: 1,
+	}, {
+		name: "duplicate tolerations",
+		scheduling: &node.Scheduling{
+			Tolerations: []core.Toleration{{
+				Key:               "valid",
+				Operator:          core.TolerationOpExists,
+				Effect:            core.TaintEffectNoExecute,
+				TolerationSeconds: utilpointer.Int64Ptr(5),
+			}, {
+				Key:               "valid",
+				Operator:          core.TolerationOpExists,
+				Effect:            core.TaintEffectNoExecute,
+				TolerationSeconds: utilpointer.Int64Ptr(10),
+			}},
+		},
+		expectErrs: 1,
+	}, {
+		name: "invalid scheduling",
+		scheduling: &node.Scheduling{
+			NodeSelector: map[string]string{"not a valid key!!!": "nope"},
+			Tolerations: []core.Toleration{{
+				Key:      "valid",
+				Operator: core.TolerationOpExists,
+				Effect:   core.TaintEffectNoSchedule,
+			}, {
+				Key:      "not a valid toleration key!!!",
+				Operator: core.TolerationOpExists,
+				Effect:   core.TaintEffectNoSchedule,
+			}},
+		},
+		expectErrs: 2,
+	}}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			rc := &node.RuntimeClass{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+				Handler:    "bar",
+				Scheduling: test.scheduling,
+			}
+			assert.Len(t, ValidateRuntimeClass(rc), test.expectErrs)
 		})
 	}
 }

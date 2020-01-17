@@ -145,7 +145,7 @@ func (ssc *StatefulSetController) Run(workers int, stopCh <-chan struct{}) {
 	klog.Infof("Starting stateful set controller")
 	defer klog.Infof("Shutting down statefulset controller")
 
-	if !controller.WaitForCacheSync("stateful set", stopCh, ssc.podListerSynced, ssc.setListerSynced, ssc.pvcListerSynced, ssc.revListerSynced) {
+	if !cache.WaitForNamedCacheSync("stateful set", stopCh, ssc.podListerSynced, ssc.setListerSynced, ssc.pvcListerSynced, ssc.revListerSynced) {
 		return
 	}
 

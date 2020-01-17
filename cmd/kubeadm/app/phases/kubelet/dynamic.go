@@ -21,7 +21,7 @@ import (
 
 	"github.com/pkg/errors"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/version"
 	clientset "k8s.io/client-go/kubernetes"
@@ -38,7 +38,7 @@ func EnableDynamicConfigForNode(client clientset.Interface, nodeName string, kub
 		nodeName, configMapName, metav1.NamespaceSystem)
 	fmt.Println("[kubelet] WARNING: The Dynamic Kubelet Config feature is beta, but off by default. It hasn't been well-tested yet at this stage, use with caution.")
 
-	_, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(configMapName, metav1.GetOptions{})
+	_, err := apiclient.GetConfigMapWithRetry(client, metav1.NamespaceSystem, configMapName)
 	if err != nil {
 		return errors.Wrap(err, "couldn't get the kubelet configuration ConfigMap")
 	}

@@ -90,7 +90,7 @@ func (k *KubeadmCert) CreateAsCA(ic *kubeadmapi.InitConfiguration) (*x509.Certif
 		return nil, nil, errors.Wrapf(err, "couldn't generate %q CA certificate", k.Name)
 	}
 
-	err = writeCertificateAuthorithyFilesIfNotExist(
+	err = writeCertificateAuthorityFilesIfNotExist(
 		ic.CertificatesDir,
 		k.BaseName,
 		caCert,
@@ -146,7 +146,7 @@ func (t CertificateTree) CreateTree(ic *kubeadmapi.InitConfiguration) error {
 				return err
 			}
 
-			err = writeCertificateAuthorithyFilesIfNotExist(
+			err = writeCertificateAuthorityFilesIfNotExist(
 				ic.CertificatesDir,
 				ca.BaseName,
 				caCert,
@@ -336,7 +336,7 @@ var (
 	// KubeadmCertEtcdHealthcheck is the definition of the cert used by Kubernetes to check the health of the etcd server.
 	KubeadmCertEtcdHealthcheck = KubeadmCert{
 		Name:     "etcd-healthcheck-client",
-		LongName: "certificate for liveness probes to healtcheck etcd",
+		LongName: "certificate for liveness probes to healthcheck etcd",
 		BaseName: kubeadmconstants.EtcdHealthcheckClientCertAndKeyBaseName,
 		CAName:   "etcd-ca",
 		config: certutil.Config{

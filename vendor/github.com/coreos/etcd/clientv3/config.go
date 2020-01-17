@@ -19,6 +19,7 @@ import (
 	"crypto/tls"
 	"time"
 
+	"go.uber.org/zap"
 	"google.golang.org/grpc"
 )
 
@@ -67,9 +68,19 @@ type Config struct {
 	RejectOldCluster bool `json:"reject-old-cluster"`
 
 	// DialOptions is a list of dial options for the grpc client (e.g., for interceptors).
+	// For example, pass "grpc.WithBlock()" to block until the underlying connection is up.
+	// Without this, Dial returns immediately and connecting the server happens in background.
 	DialOptions []grpc.DialOption
+
+	// LogConfig configures client-side logger.
+	// If nil, use the default logger.
+	// TODO: configure gRPC logger
+	LogConfig *zap.Config
 
 	// Context is the default client context; it can be used to cancel grpc dial out and
 	// other operations that do not have an explicit context.
 	Context context.Context
+
+	// PermitWithoutStream when set will allow client to send keepalive pings to server without any active streams(RPCs).
+	PermitWithoutStream bool `json:"permit-without-stream"`
 }

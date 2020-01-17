@@ -5,6 +5,12 @@ import (
 	"github.com/gophercloud/gophercloud/pagination"
 )
 
+// ListOptsBuilder allows extensions to add additional parameters to the
+// List request.
+type ListOptsBuilder interface {
+	ToFloatingIPListQuery() (string, error)
+}
+
 // ListOpts allows the filtering and sorting of paginated collections through
 // the API. Filtering is achieved by passing in struct field values that map to
 // the floating IP attributes you want to see returned. SortKey allows you to
@@ -31,16 +37,25 @@ type ListOpts struct {
 	NotTagsAny        string `q:"not-tags-any"`
 }
 
+// ToNetworkListQuery formats a ListOpts into a query string.
+func (opts ListOpts) ToFloatingIPListQuery() (string, error) {
+	q, err := gophercloud.BuildQueryString(opts)
+	return q.String(), err
+}
+
 // List returns a Pager which allows you to iterate over a collection of
 // floating IP resources. It accepts a ListOpts struct, which allows you to
 // filter and sort the returned collection for greater efficiency.
-func List(c *gophercloud.ServiceClient, opts ListOpts) pagination.Pager {
-	q, err := gophercloud.BuildQueryString(&opts)
-	if err != nil {
-		return pagination.Pager{Err: err}
+func List(c *gophercloud.ServiceClient, opts ListOptsBuilder) pagination.Pager {
+	url := rootURL(c)
+	if opts != nil {
+		query, err := opts.ToFloatingIPListQuery()
+		if err != nil {
+			return pagination.Pager{Err: err}
+		}
+		url += query
 	}
-	u := rootURL(c) + q.String()
-	return pagination.NewPager(c, u, func(r pagination.PageResult) pagination.Page {
+	return pagination.NewPager(c, url, func(r pagination.PageResult) pagination.Page {
 		return FloatingIPPage{pagination.LinkedPageBase{PageResult: r}}
 	})
 }
@@ -124,6 +139,7 @@ type UpdateOptsBuilder interface {
 type UpdateOpts struct {
 	Description *string `json:"description,omitempty"`
 	PortID      *string `json:"port_id,omitempty"`
+	FixedIP     string  `json:"fixed_ip_address,omitempty"`
 }
 
 // ToFloatingIPUpdateMap allows UpdateOpts to satisfy the UpdateOptsBuilder

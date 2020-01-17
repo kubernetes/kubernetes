@@ -284,7 +284,7 @@ func TestHostportManager(t *testing.T) {
 	err := iptables.SaveInto(utiliptables.TableNAT, raw)
 	assert.NoError(t, err)
 
-	lines := strings.Split(string(raw.Bytes()), "\n")
+	lines := strings.Split(raw.String(), "\n")
 	expectedLines := map[string]bool{
 		`*nat`:                              true,
 		`:KUBE-HOSTPORTS - [0:0]`:           true,
@@ -331,7 +331,7 @@ func TestHostportManager(t *testing.T) {
 	raw.Reset()
 	err = iptables.SaveInto(utiliptables.TableNAT, raw)
 	assert.NoError(t, err)
-	lines = strings.Split(string(raw.Bytes()), "\n")
+	lines = strings.Split(raw.String(), "\n")
 	remainingChains := make(map[string]bool)
 	for _, line := range lines {
 		if strings.HasPrefix(line, ":") {

@@ -21,10 +21,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/onsi/ginkgo"
-
-	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	appsv1 "k8s.io/api/apps/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -33,14 +31,13 @@ import (
 	watchtools "k8s.io/client-go/tools/watch"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 // UpdateDeploymentWithRetries updates the specified deployment with retries.
-func UpdateDeploymentWithRetries(c clientset.Interface, namespace, name string, applyUpdate testutils.UpdateDeploymentFunc) (*apps.Deployment, error) {
-	return testutils.UpdateDeploymentWithRetries(c, namespace, name, applyUpdate, e2elog.Logf, poll, pollShortTimeout)
+func UpdateDeploymentWithRetries(c clientset.Interface, namespace, name string, applyUpdate testutils.UpdateDeploymentFunc) (*appsv1.Deployment, error) {
+	return testutils.UpdateDeploymentWithRetries(c, namespace, name, applyUpdate, framework.Logf, poll, pollShortTimeout)
 }
 
 // CheckDeploymentRevisionAndImage checks if the input deployment's and its new replica set's revision and image are as expected.
@@ -50,8 +47,8 @@ func CheckDeploymentRevisionAndImage(c clientset.Interface, ns, deploymentName, 
 
 // WatchRecreateDeployment watches Recreate deployments and ensures no new pods will run at the same time with
 // old pods.
-func WatchRecreateDeployment(c clientset.Interface, d *apps.Deployment) error {
-	if d.Spec.Strategy.Type != apps.RecreateDeploymentStrategyType {
+func WatchRecreateDeployment(c clientset.Interface, d *appsv1.Deployment) error {
+	if d.Spec.Strategy.Type != appsv1.RecreateDeploymentStrategyType {
 		return fmt.Errorf("deployment %q does not use a Recreate strategy: %s", d.Name, d.Spec.Strategy.Type)
 	}
 
@@ -63,14 +60,14 @@ func WatchRecreateDeployment(c clientset.Interface, d *apps.Deployment) error {
 	status := d.Status
 
 	condition := func(event watch.Event) (bool, error) {
-		d := event.Object.(*apps.Deployment)
+		d := event.Object.(*appsv1.Deployment)
 		status = d.Status
 
 		if d.Status.UpdatedReplicas > 0 && d.Status.Replicas != d.Status.UpdatedReplicas {
 			_, allOldRSs, err := deploymentutil.GetOldReplicaSets(d, c.AppsV1())
 			newRS, nerr := deploymentutil.GetNewReplicaSet(d, c.AppsV1())
 			if err == nil && nerr == nil {
-				e2elog.Logf("%+v", d)
+				framework.Logf("%+v", d)
 				logReplicaSetsOfDeployment(d, allOldRSs, newRS)
 				logPodsOfDeployment(c, d, append(allOldRSs, newRS))
 			}
@@ -92,17 +89,17 @@ func WatchRecreateDeployment(c clientset.Interface, d *apps.Deployment) error {
 }
 
 // NewDeployment returns a deployment spec with the specified argument.
-func NewDeployment(deploymentName string, replicas int32, podLabels map[string]string, imageName, image string, strategyType apps.DeploymentStrategyType) *apps.Deployment {
+func NewDeployment(deploymentName string, replicas int32, podLabels map[string]string, imageName, image string, strategyType appsv1.DeploymentStrategyType) *appsv1.Deployment {
 	zero := int64(0)
-	return &apps.Deployment{
+	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   deploymentName,
 			Labels: podLabels,
 		},
-		Spec: apps.DeploymentSpec{
+		Spec: appsv1.DeploymentSpec{
 			Replicas: &replicas,
 			Selector: &metav1.LabelSelector{MatchLabels: podLabels},
-			Strategy: apps.DeploymentStrategy{
+			Strategy: appsv1.DeploymentStrategy{
 				Type: strategyType,
 			},
 			Template: v1.PodTemplateSpec{
@@ -113,8 +110,9 @@ func NewDeployment(deploymentName string, replicas int32, podLabels map[string]s
 					TerminationGracePeriodSeconds: &zero,
 					Containers: []v1.Container{
 						{
-							Name:  imageName,
-							Image: image,
+							Name:            imageName,
+							Image:           image,
+							SecurityContext: &v1.SecurityContext{},
 						},
 					},
 				},
@@ -124,13 +122,13 @@ func NewDeployment(deploymentName string, replicas int32, podLabels map[string]s
 }
 
 // CreateDeployment creates a deployment.
-func CreateDeployment(client clientset.Interface, replicas int32, podLabels map[string]string, nodeSelector map[string]string, namespace string, pvclaims []*v1.PersistentVolumeClaim, command string) (*apps.Deployment, error) {
+func CreateDeployment(client clientset.Interface, replicas int32, podLabels map[string]string, nodeSelector map[string]string, namespace string, pvclaims []*v1.PersistentVolumeClaim, command string) (*appsv1.Deployment, error) {
 	deploymentSpec := testDeployment(replicas, podLabels, nodeSelector, namespace, pvclaims, false, command)
 	deployment, err := client.AppsV1().Deployments(namespace).Create(deploymentSpec)
 	if err != nil {
 		return nil, fmt.Errorf("deployment %q Create API error: %v", deploymentSpec.Name, err)
 	}
-	e2elog.Logf("Waiting deployment %q to complete", deploymentSpec.Name)
+	framework.Logf("Waiting deployment %q to complete", deploymentSpec.Name)
 	err = WaitForDeploymentComplete(client, deployment)
 	if err != nil {
 		return nil, fmt.Errorf("deployment %q failed to complete: %v", deploymentSpec.Name, err)
@@ -139,7 +137,7 @@ func CreateDeployment(client clientset.Interface, replicas int32, podLabels map[
 }
 
 // GetPodsForDeployment gets pods for the given deployment
-func GetPodsForDeployment(client clientset.Interface, deployment *apps.Deployment) (*v1.PodList, error) {
+func GetPodsForDeployment(client clientset.Interface, deployment *appsv1.Deployment) (*v1.PodList, error) {
 	replicaSet, err := deploymentutil.GetNewReplicaSet(deployment, client.AppsV1())
 	if err != nil {
 		return nil, fmt.Errorf("Failed to get new replica set for deployment %q: %v", deployment.Name, err)
@@ -150,7 +148,7 @@ func GetPodsForDeployment(client clientset.Interface, deployment *apps.Deploymen
 	podListFunc := func(namespace string, options metav1.ListOptions) (*v1.PodList, error) {
 		return client.CoreV1().Pods(namespace).List(options)
 	}
-	rsList := []*apps.ReplicaSet{replicaSet}
+	rsList := []*appsv1.ReplicaSet{replicaSet}
 	podList, err := deploymentutil.ListPods(deployment, rsList, podListFunc)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to list Pods of Deployment %q: %v", deployment.Name, err)
@@ -158,28 +156,20 @@ func GetPodsForDeployment(client clientset.Interface, deployment *apps.Deploymen
 	return podList, nil
 }
 
-// RunDeployment runs a delopyment with the specified config.
-func RunDeployment(config testutils.DeploymentConfig) error {
-	ginkgo.By(fmt.Sprintf("creating deployment %s in namespace %s", config.Name, config.Namespace))
-	config.NodeDumpFunc = framework.DumpNodeDebugInfo
-	config.ContainerDumpFunc = framework.LogFailedContainers
-	return testutils.RunDeployment(config)
-}
-
 // testDeployment creates a deployment definition based on the namespace. The deployment references the PVC's
 // name.  A slice of BASH commands can be supplied as args to be run by the pod
-func testDeployment(replicas int32, podLabels map[string]string, nodeSelector map[string]string, namespace string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool, command string) *apps.Deployment {
+func testDeployment(replicas int32, podLabels map[string]string, nodeSelector map[string]string, namespace string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool, command string) *appsv1.Deployment {
 	if len(command) == 0 {
 		command = "trap exit TERM; while true; do sleep 1; done"
 	}
 	zero := int64(0)
 	deploymentName := "deployment-" + string(uuid.NewUUID())
-	deploymentSpec := &apps.Deployment{
+	deploymentSpec := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      deploymentName,
 			Namespace: namespace,
 		},
-		Spec: apps.DeploymentSpec{
+		Spec: appsv1.DeploymentSpec{
 			Replicas: &replicas,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: podLabels,

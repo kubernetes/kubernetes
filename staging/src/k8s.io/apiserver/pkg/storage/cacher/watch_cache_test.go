@@ -18,6 +18,7 @@ package cacher
 
 import (
 	"fmt"
+	"reflect"
 	"strconv"
 	"strings"
 	"testing"
@@ -34,7 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/storage"
-	"k8s.io/apiserver/pkg/storage/etcd"
+	"k8s.io/apiserver/pkg/storage/etcd3"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -75,7 +76,7 @@ func newTestWatchCache(capacity int) *watchCache {
 		}
 		return labels.Set(pod.Labels), fields.Set{"spec.nodeName": pod.Spec.NodeName}, nil
 	}
-	versioner := etcd.APIObjectVersioner{}
+	versioner := etcd3.APIObjectVersioner{}
 	mockHandler := func(*watchCacheEvent) {}
 	wc := newWatchCache(capacity, keyFunc, mockHandler, getAttrsFunc, versioner)
 	wc.clock = clock.NewFakeClock(time.Now())
@@ -379,8 +380,11 @@ func TestWaitUntilFreshAndListTimeout(t *testing.T) {
 	}()
 
 	_, _, err := store.WaitUntilFreshAndList(5, nil)
-	if err == nil {
-		t.Fatalf("unexpected lack of timeout error")
+	if !errors.IsTimeout(err) {
+		t.Errorf("expected timeout error but got: %v", err)
+	}
+	if !storage.IsTooLargeResourceVersion(err) {
+		t.Errorf("expected 'Too large resource version' cause in error but got: %v", err)
 	}
 }
 
@@ -431,4 +435,54 @@ func TestReflectorForWatchCache(t *testing.T) {
 			t.Errorf("unexpected resource version: %d", version)
 		}
 	}
+}
+
+func TestCachingObjects(t *testing.T) {
+	store := newTestWatchCache(5)
+
+	index := 0
+	store.eventHandler = func(event *watchCacheEvent) {
+		switch event.Type {
+		case watch.Added, watch.Modified:
+			if _, ok := event.Object.(runtime.CacheableObject); !ok {
+				t.Fatalf("Object in %s event should support caching: %#v", event.Type, event.Object)
+			}
+			if _, ok := event.PrevObject.(runtime.CacheableObject); ok {
+				t.Fatalf("PrevObject in %s event should not support caching: %#v", event.Type, event.Object)
+			}
+		case watch.Deleted:
+			if _, ok := event.Object.(runtime.CacheableObject); ok {
+				t.Fatalf("Object in %s event should not support caching: %#v", event.Type, event.Object)
+			}
+			if _, ok := event.PrevObject.(runtime.CacheableObject); !ok {
+				t.Fatalf("PrevObject in %s event should support caching: %#v", event.Type, event.Object)
+			}
+		}
+
+		// Verify that delivered event is the same as cached one modulo Object/PrevObject.
+		switch event.Type {
+		case watch.Added, watch.Modified:
+			event.Object = event.Object.(runtime.CacheableObject).GetObject()
+		case watch.Deleted:
+			event.PrevObject = event.PrevObject.(runtime.CacheableObject).GetObject()
+			// In events store in watchcache, we also don't update ResourceVersion.
+			// So we need to ensure that we don't fail on it.
+			resourceVersion, err := store.versioner.ObjectResourceVersion(store.cache[index].PrevObject)
+			if err != nil {
+				t.Fatalf("Failed to parse resource version: %v", err)
+			}
+			updateResourceVersionIfNeeded(event.PrevObject, store.versioner, resourceVersion)
+		}
+		if a, e := event, store.cache[index]; !reflect.DeepEqual(a, e) {
+			t.Errorf("watchCacheEvent messed up: %#v, expected: %#v", a, e)
+		}
+		index++
+	}
+
+	pod1 := makeTestPod("pod", 1)
+	pod2 := makeTestPod("pod", 2)
+	pod3 := makeTestPod("pod", 3)
+	store.Add(pod1)
+	store.Update(pod2)
+	store.Delete(pod3)
 }

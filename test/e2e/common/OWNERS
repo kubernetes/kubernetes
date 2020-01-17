@@ -2,10 +2,11 @@
 
 approvers:
 - Random-Liu
-- dchen1107
 - derekwaynecarr
 - tallclair
-- vishh
 - yujuhong
+emeritus_approvers:
+- vishh
+- dchen1107
 reviewers:
 - sig-node-reviewers

@@ -80,7 +80,7 @@ message AdmissionRequest {
   optional string requestSubResource = 15;
 
   // Name is the name of the object as presented in the request.  On a CREATE operation, the client may omit name and
-  // rely on the server to generate the name.  If that is the case, this method will return the empty string.
+  // rely on the server to generate the name.  If that is the case, this field will contain an empty string.
   // +optional
   optional string name = 5;
 
@@ -95,11 +95,11 @@ message AdmissionRequest {
   // UserInfo is information about the requesting user
   optional k8s.io.api.authentication.v1.UserInfo userInfo = 8;
 
-  // Object is the object from the incoming request prior to default values being applied
+  // Object is the object from the incoming request.
   // +optional
   optional k8s.io.apimachinery.pkg.runtime.RawExtension object = 9;
 
-  // OldObject is the existing object. Only populated for UPDATE requests.
+  // OldObject is the existing object. Only populated for DELETE and UPDATE requests.
   // +optional
   optional k8s.io.apimachinery.pkg.runtime.RawExtension oldObject = 10;
 

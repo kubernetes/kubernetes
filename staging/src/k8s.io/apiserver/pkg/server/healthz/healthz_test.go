@@ -111,7 +111,7 @@ func testMultipleChecks(path string, t *testing.T) {
 
 	for i, test := range tests {
 		mux := http.NewServeMux()
-		checks := []HealthzChecker{PingHealthz}
+		checks := []HealthChecker{PingHealthz}
 		if test.addBadCheck {
 			checks = append(checks, NamedCheck("bad", func(_ *http.Request) error {
 				return errors.New("this will fail")
@@ -158,14 +158,14 @@ func TestCheckerNames(t *testing.T) {
 
 	testCases := []struct {
 		desc string
-		have []HealthzChecker
+		have []HealthChecker
 		want []string
 	}{
-		{"no checker", []HealthzChecker{}, []string{}},
-		{"one checker", []HealthzChecker{c1}, []string{n1}},
-		{"other checker", []HealthzChecker{c2}, []string{n2}},
-		{"checker order", []HealthzChecker{c1, c2}, []string{n1, n2}},
-		{"different checker order", []HealthzChecker{c2, c1}, []string{n2, n1}},
+		{"no checker", []HealthChecker{}, []string{}},
+		{"one checker", []HealthChecker{c1}, []string{n1}},
+		{"other checker", []HealthChecker{c2}, []string{n2}},
+		{"checker order", []HealthChecker{c1, c2}, []string{n1, n2}},
+		{"different checker order", []HealthChecker{c2, c1}, []string{n2, n1}},
 	}
 
 	for _, tc := range testCases {

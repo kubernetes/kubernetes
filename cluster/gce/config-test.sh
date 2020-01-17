@@ -41,6 +41,10 @@ NODE_LOCAL_SSDS=${NODE_LOCAL_SSDS:-0}
 NODE_LABELS="${KUBE_NODE_LABELS:-}"
 WINDOWS_NODE_LABELS="${WINDOWS_NODE_LABELS:-}"
 
+# KUBE_CREATE_NODES can be used to avoid creating nodes, while master will be sized for NUM_NODES nodes.
+# Firewalls and node templates are still created.
+KUBE_CREATE_NODES="${KUBE_CREATE_NODES:-true}"
+
 # An extension to local SSDs allowing users to specify block/fs and SCSI/NVMe devices
 # Format of this variable will be "#,scsi/nvme,block/fs" you can specify multiple
 # configurations by separating them by a semi-colon ex. "2,scsi,fs;1,nvme,block"
@@ -134,8 +138,13 @@ if [[ "${KUBE_FEATURE_GATES:-}" == "AllAlpha=true" ]]; then
   RUNTIME_CONFIG="${KUBE_RUNTIME_CONFIG:-api/all=true}"
 fi
 
+# If feature gates includes AllAlpha or EndpointSlice, and EndpointSlice has not been disabled, add EndpointSlice controller to list of controllers to run.
+if [[ (( "${KUBE_FEATURE_GATES:-}" == *"AllAlpha=true"* ) || ( "${KUBE_FEATURE_GATES:-}" == *"EndpointSlice=true"* )) && "${KUBE_FEATURE_GATES:-}" != *"EndpointSlice=false"* ]]; then
+  RUN_CONTROLLERS="${RUN_CONTROLLERS:-*,endpointslice}"
+fi
+
 # Optional: set feature gates
-FEATURE_GATES="${KUBE_FEATURE_GATES:-ExperimentalCriticalPodAnnotation=true}"
+FEATURE_GATES="${KUBE_FEATURE_GATES:-}"
 
 TERMINATED_POD_GC_THRESHOLD=${TERMINATED_POD_GC_THRESHOLD:-100}
 
@@ -183,7 +192,14 @@ ENABLE_METADATA_AGENT="${KUBE_ENABLE_METADATA_AGENT:-none}"
 # Useful for scheduling heapster in large clusters with nodes of small size.
 HEAPSTER_MACHINE_TYPE="${HEAPSTER_MACHINE_TYPE:-}"
 
-# Set etcd image (e.g. k8s.gcr.io/etcd) and version (e.g. 3.3.10-1) if you need
+# Optional: Additional nodes would be created if their type and number is specified.
+# NUM_NODES would be lowered respectively.
+# Useful for running cluster-level addons that needs more resources than would fit
+# on small nodes, like network plugins.
+NUM_ADDITIONAL_NODES="${NUM_ADDITIONAL_NODES:-}"
+ADDITIONAL_MACHINE_TYPE="${ADDITIONAL_MACHINE_TYPE:-}"
+
+# Set etcd image (e.g. k8s.gcr.io/etcd) and version (e.g. 3.3.15-0) if you need
 # non-default version.
 ETCD_IMAGE="${TEST_ETCD_IMAGE:-}"
 ETCD_DOCKER_REPOSITORY="${TEST_ETCD_DOCKER_REPOSITORY:-}"
@@ -219,6 +235,7 @@ CONTROLLER_MANAGER_TEST_ARGS="${CONTROLLER_MANAGER_TEST_ARGS:-} ${TEST_CLUSTER_R
 SCHEDULER_TEST_ARGS="${SCHEDULER_TEST_ARGS:-} ${TEST_CLUSTER_API_CONTENT_TYPE}"
 KUBEPROXY_TEST_ARGS="${KUBEPROXY_TEST_ARGS:-} ${TEST_CLUSTER_API_CONTENT_TYPE}"
 
+MASTER_NODE_LABELS="${KUBE_MASTER_NODE_LABELS:-}"
 # NON_MASTER_NODE_LABELS are labels will only be applied on non-master nodes.
 NON_MASTER_NODE_LABELS="${KUBE_NON_MASTER_NODE_LABELS:-}"
 WINDOWS_NON_MASTER_NODE_LABELS="${WINDOWS_NON_MASTER_NODE_LABELS:-}"
@@ -260,8 +277,6 @@ METADATA_CONCEALMENT_NO_FIREWALL="${METADATA_CONCEALMENT_NO_FIREWALL:-false}" # 
 if [[ ${ENABLE_METADATA_CONCEALMENT:-} == "true" ]]; then
   # Put the necessary label on the node so the daemonset gets scheduled.
   NODE_LABELS="${NODE_LABELS},cloud.google.com/metadata-proxy-ready=true"
-  # TODO(liggitt): remove this in v1.16
-  NODE_LABELS="${NODE_LABELS},beta.kubernetes.io/metadata-proxy-ready=true"
   # Add to the provider custom variables.
   PROVIDER_VARS="${PROVIDER_VARS:-} ENABLE_METADATA_CONCEALMENT METADATA_CONCEALMENT_NO_FIREWALL"
 fi
@@ -280,7 +295,11 @@ if [[ ${KUBE_ENABLE_INSECURE_REGISTRY:-false} == "true" ]]; then
 fi
 
 if [[ ! -z "${NODE_ACCELERATORS}" ]]; then
-    FEATURE_GATES="${FEATURE_GATES},DevicePlugins=true"
+    if [[ -z "${FEATURE_GATES:-}" ]]; then
+        FEATURE_GATES="DevicePlugins=true"
+    else
+        FEATURE_GATES="${FEATURE_GATES},DevicePlugins=true"
+    fi
     if [[ "${NODE_ACCELERATORS}" =~ .*type=([a-zA-Z0-9-]+).* ]]; then
         NON_MASTER_NODE_LABELS="${NON_MASTER_NODE_LABELS},cloud.google.com/gke-accelerator=${BASH_REMATCH[1]}"
     fi
@@ -316,6 +335,7 @@ NODE_PROBLEM_DETECTOR_TAR_HASH="${NODE_PROBLEM_DETECTOR_TAR_HASH:-}"
 NODE_PROBLEM_DETECTOR_RELEASE_PATH="${NODE_PROBLEM_DETECTOR_RELEASE_PATH:-}"
 NODE_PROBLEM_DETECTOR_CUSTOM_FLAGS="${NODE_PROBLEM_DETECTOR_CUSTOM_FLAGS:-}"
 
+CNI_STORAGE_PATH="${CNI_STORAGE_PATH:-https://storage.googleapis.com/kubernetes-release/network-plugins}"
 CNI_VERSION="${CNI_VERSION:-}"
 CNI_SHA1="${CNI_SHA1:-}"
 
@@ -379,7 +399,7 @@ fi
 CUSTOM_INGRESS_YAML="${CUSTOM_INGRESS_YAML:-}"
 
 if [[ -z "${KUBE_ADMISSION_CONTROL:-}" ]]; then
-  ADMISSION_CONTROL="NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,PodPreset,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,Priority,StorageObjectInUseProtection,PersistentVolumeClaimResize"
+  ADMISSION_CONTROL="NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,PodPreset,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,Priority,StorageObjectInUseProtection,PersistentVolumeClaimResize,RuntimeClass"
   if [[ "${ENABLE_POD_SECURITY_POLICY:-}" == "true" ]]; then
     ADMISSION_CONTROL="${ADMISSION_CONTROL},PodSecurityPolicy"
   fi
@@ -456,7 +476,7 @@ fi
 # Fluentd requirements
 # YAML exists to trigger a configuration refresh when changes are made.
 FLUENTD_GCP_YAML_VERSION="v3.2.0"
-FLUENTD_GCP_VERSION="${FLUENTD_GCP_VERSION:-1.6.8}"
+FLUENTD_GCP_VERSION="${FLUENTD_GCP_VERSION:-1.6.17}"
 FLUENTD_GCP_MEMORY_LIMIT="${FLUENTD_GCP_MEMORY_LIMIT:-}"
 FLUENTD_GCP_CPU_REQUEST="${FLUENTD_GCP_CPU_REQUEST:-}"
 FLUENTD_GCP_MEMORY_REQUEST="${FLUENTD_GCP_MEMORY_REQUEST:-}"
@@ -493,12 +513,6 @@ KUBE_PROXY_MODE="${KUBE_PROXY_MODE:-iptables}"
 
 # Optional: duration of cluster signed certificates.
 CLUSTER_SIGNING_DURATION="${CLUSTER_SIGNING_DURATION:-}"
-
-# Optional: enable pod priority
-ENABLE_POD_PRIORITY="${ENABLE_POD_PRIORITY:-}"
-if [[ "${ENABLE_POD_PRIORITY}" == "true" ]]; then
-    FEATURE_GATES="${FEATURE_GATES},PodPriority=true"
-fi
 
 # Optional: enable certificate rotation of the kubelet certificates.
 ROTATE_CERTIFICATES="${ROTATE_CERTIFICATES:-}"

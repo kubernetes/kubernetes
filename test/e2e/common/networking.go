@@ -17,15 +17,15 @@ limitations under the License.
 package common
 
 import (
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
-var _ = Describe("[sig-network] Networking", func() {
+var _ = ginkgo.Describe("[sig-network] Networking", func() {
 	f := framework.NewDefaultFramework("pod-network-test")
 
-	Describe("Granular Checks: Pods", func() {
+	ginkgo.Describe("Granular Checks: Pods", func() {
 
 		// Try to hit all endpoints through a test container, retry 5 times,
 		// expect exactly one unique hostname. Each of these endpoints reports

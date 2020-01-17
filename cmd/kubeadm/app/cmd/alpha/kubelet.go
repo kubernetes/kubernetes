@@ -27,20 +27,18 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
-	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
-	"k8s.io/kubernetes/pkg/util/normalizer"
 	utilsexec "k8s.io/utils/exec"
 )
 
 var (
-	kubeletConfigDownloadLongDesc = normalizer.LongDesc(`
+	kubeletConfigDownloadLongDesc = cmdutil.LongDesc(`
 		Download the kubelet configuration from a ConfigMap of the form "kubelet-config-1.X" in the cluster,
 		where X is the minor version of the kubelet. Either kubeadm autodetects the kubelet version by exec-ing
 		"kubelet --version" or respects the --kubelet-version parameter.
 		` + cmdutil.AlphaDisclaimer)
 
-	kubeletConfigDownloadExample = normalizer.Examples(fmt.Sprintf(`
+	kubeletConfigDownloadExample = cmdutil.Examples(fmt.Sprintf(`
 		# Download the kubelet configuration from the ConfigMap in the cluster. Autodetect the kubelet version.
 		kubeadm alpha phase kubelet config download
 
@@ -48,7 +46,7 @@ var (
 		kubeadm alpha phase kubelet config download --kubelet-version %s
 		`, constants.CurrentKubernetesVersion))
 
-	kubeletConfigEnableDynamicLongDesc = normalizer.LongDesc(`
+	kubeletConfigEnableDynamicLongDesc = cmdutil.LongDesc(`
 		Enable or update dynamic kubelet configuration for a Node, against the kubelet-config-1.X ConfigMap in the cluster,
 		where X is the minor version of the desired kubelet version.
 
@@ -57,7 +55,7 @@ var (
 
 		` + cmdutil.AlphaDisclaimer)
 
-	kubeletConfigEnableDynamicExample = normalizer.Examples(fmt.Sprintf(`
+	kubeletConfigEnableDynamicExample = cmdutil.Examples(fmt.Sprintf(`
 		# Enable dynamic kubelet configuration for a Node.
 		kubeadm alpha phase kubelet enable-dynamic-config --node-name node-1 --kubelet-version %s
 
@@ -102,15 +100,18 @@ func newCmdKubeletConfigDownload() *cobra.Command {
 		Short:   "Download the kubelet configuration from the cluster ConfigMap kubelet-config-1.X, where X is the minor version of the kubelet",
 		Long:    kubeletConfigDownloadLongDesc,
 		Example: kubeletConfigDownloadExample,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			kubeletVersion, err := getKubeletVersion(kubeletVersionStr)
-			kubeadmutil.CheckErr(err)
+			if err != nil {
+				return err
+			}
 
 			client, err := kubeconfigutil.ClientSetFromFile(kubeConfigFile)
-			kubeadmutil.CheckErr(err)
+			if err != nil {
+				return err
+			}
 
-			err = kubeletphase.DownloadConfig(client, kubeletVersion, constants.KubeletRunDirectory)
-			kubeadmutil.CheckErr(err)
+			return kubeletphase.DownloadConfig(client, kubeletVersion, constants.KubeletRunDirectory)
 		},
 	}
 
@@ -137,23 +138,26 @@ func newCmdKubeletConfigEnableDynamic() *cobra.Command {
 		Short:   "EXPERIMENTAL: Enable or update dynamic kubelet configuration for a Node",
 		Long:    kubeletConfigEnableDynamicLongDesc,
 		Example: kubeletConfigEnableDynamicExample,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(nodeName) == 0 {
-				kubeadmutil.CheckErr(errors.New("The --node-name argument is required"))
+				return errors.New("the --node-name argument is required")
 			}
 			if len(kubeletVersionStr) == 0 {
-				kubeadmutil.CheckErr(errors.New("The --kubelet-version argument is required"))
+				return errors.New("the --kubelet-version argument is required")
 			}
 
 			kubeletVersion, err := version.ParseSemantic(kubeletVersionStr)
-			kubeadmutil.CheckErr(err)
+			if err != nil {
+				return err
+			}
 
 			kubeConfigFile = cmdutil.GetKubeConfigPath(kubeConfigFile)
 			client, err := kubeconfigutil.ClientSetFromFile(kubeConfigFile)
-			kubeadmutil.CheckErr(err)
+			if err != nil {
+				return err
+			}
 
-			err = kubeletphase.EnableDynamicConfigForNode(client, nodeName, kubeletVersion)
-			kubeadmutil.CheckErr(err)
+			return kubeletphase.EnableDynamicConfigForNode(client, nodeName, kubeletVersion)
 		},
 	}
 

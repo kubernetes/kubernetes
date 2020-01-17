@@ -31,12 +31,13 @@ import (
 	"k8s.io/kubernetes/pkg/registry/autoscaling/horizontalpodautoscaler"
 )
 
+// REST implements a RESTStorage for pod disruption budgets against etcd
 type REST struct {
 	*genericregistry.Store
 }
 
 // NewREST returns a RESTStorage object that will work against horizontal pod autoscalers.
-func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
+func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 	store := &genericregistry.Store{
 		NewFunc:                  func() runtime.Object { return &autoscaling.HorizontalPodAutoscaler{} },
 		NewListFunc:              func() runtime.Object { return &autoscaling.HorizontalPodAutoscalerList{} },
@@ -50,12 +51,12 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 	}
 	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {
-		panic(err) // TODO: Propagate error up
+		return nil, nil, err
 	}
 
 	statusStore := *store
 	statusStore.UpdateStrategy = horizontalpodautoscaler.StatusStrategy
-	return &REST{store}, &StatusREST{store: &statusStore}
+	return &REST{store}, &StatusREST{store: &statusStore}, nil
 }
 
 // Implement ShortNamesProvider
@@ -74,11 +75,12 @@ func (r *REST) Categories() []string {
 	return []string{"all"}
 }
 
-/// StatusREST implements the REST endpoint for changing the status of a daemonset
+// StatusREST implements the REST endpoint for changing the status of a daemonset
 type StatusREST struct {
 	store *genericregistry.Store
 }
 
+// New creates a new HorizontalPodAutoscaler object.
 func (r *StatusREST) New() runtime.Object {
 	return &autoscaling.HorizontalPodAutoscaler{}
 }

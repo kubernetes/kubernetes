@@ -58,7 +58,7 @@ type FinalizeREST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against namespaces.
-func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *FinalizeREST) {
+func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *FinalizeREST, error) {
 	store := &genericregistry.Store{
 		NewFunc:                  func() runtime.Object { return &api.Namespace{} },
 		NewListFunc:              func() runtime.Object { return &api.NamespaceList{} },
@@ -76,7 +76,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *Finaliz
 	}
 	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: namespace.GetAttrs}
 	if err := store.CompleteWithOptions(options); err != nil {
-		panic(err) // TODO: Propagate error up
+		return nil, nil, nil, err
 	}
 
 	statusStore := *store
@@ -85,7 +85,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *Finaliz
 	finalizeStore := *store
 	finalizeStore.UpdateStrategy = namespace.FinalizeStrategy
 
-	return &REST{store: store, status: &statusStore}, &StatusREST{store: &statusStore}, &FinalizeREST{store: &finalizeStore}
+	return &REST{store: store, status: &statusStore}, &StatusREST{store: &statusStore}, &FinalizeREST{store: &finalizeStore}, nil
 }
 
 func (r *REST) NamespaceScoped() bool {
@@ -178,7 +178,7 @@ func (r *REST) Delete(ctx context.Context, name string, deleteValidation rest.Va
 					// wrong type
 					return nil, fmt.Errorf("expected *api.Namespace, got %v", existing)
 				}
-				if err := deleteValidation(existingNamespace); err != nil {
+				if err := deleteValidation(ctx, existingNamespace); err != nil {
 					return nil, err
 				}
 				// Set the deletion timestamp if needed

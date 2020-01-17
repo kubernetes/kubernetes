@@ -23,23 +23,22 @@ import (
 	"strings"
 	"time"
 
-	apiv1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 
-	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 // makePodToVerifyHugePages returns a pod that verifies specified cgroup with hugetlb
-func makePodToVerifyHugePages(baseName string, hugePagesLimit resource.Quantity) *apiv1.Pod {
+func makePodToVerifyHugePages(baseName string, hugePagesLimit resource.Quantity) *v1.Pod {
 	// convert the cgroup name to its literal form
 	cgroupFsName := ""
 	cgroupName := cm.NewCgroupName(cm.RootCgroupName, defaultNodeAllocatableCgroup, baseName)
@@ -51,19 +50,19 @@ func makePodToVerifyHugePages(baseName string, hugePagesLimit resource.Quantity)
 
 	// this command takes the expected value and compares it against the actual value for the pod cgroup hugetlb.2MB.limit_in_bytes
 	command := fmt.Sprintf("expected=%v; actual=$(cat /tmp/hugetlb/%v/hugetlb.2MB.limit_in_bytes); if [ \"$expected\" -ne \"$actual\" ]; then exit 1; fi; ", hugePagesLimit.Value(), cgroupFsName)
-	e2elog.Logf("Pod to run command: %v", command)
-	pod := &apiv1.Pod{
+	framework.Logf("Pod to run command: %v", command)
+	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "pod" + string(uuid.NewUUID()),
 		},
-		Spec: apiv1.PodSpec{
-			RestartPolicy: apiv1.RestartPolicyNever,
-			Containers: []apiv1.Container{
+		Spec: v1.PodSpec{
+			RestartPolicy: v1.RestartPolicyNever,
+			Containers: []v1.Container{
 				{
 					Image:   busyboxImage,
 					Name:    "container" + string(uuid.NewUUID()),
 					Command: []string{"sh", "-c", command},
-					VolumeMounts: []apiv1.VolumeMount{
+					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      "sysfscgroup",
 							MountPath: "/tmp",
@@ -71,11 +70,11 @@ func makePodToVerifyHugePages(baseName string, hugePagesLimit resource.Quantity)
 					},
 				},
 			},
-			Volumes: []apiv1.Volume{
+			Volumes: []v1.Volume{
 				{
 					Name: "sysfscgroup",
-					VolumeSource: apiv1.VolumeSource{
-						HostPath: &apiv1.HostPathVolumeSource{Path: "/sys/fs/cgroup"},
+					VolumeSource: v1.VolumeSource{
+						HostPath: &v1.HostPathVolumeSource{Path: "/sys/fs/cgroup"},
 					},
 				},
 			},
@@ -84,31 +83,9 @@ func makePodToVerifyHugePages(baseName string, hugePagesLimit resource.Quantity)
 	return pod
 }
 
-// enableHugePagesInKubelet enables hugepages feature for kubelet
-func enableHugePagesInKubelet(f *framework.Framework) *kubeletconfig.KubeletConfiguration {
-	oldCfg, err := getCurrentKubeletConfig()
-	framework.ExpectNoError(err)
-	newCfg := oldCfg.DeepCopy()
-	if newCfg.FeatureGates == nil {
-		newCfg.FeatureGates = make(map[string]bool)
-		newCfg.FeatureGates["HugePages"] = true
-	}
-
-	// Update the Kubelet configuration.
-	framework.ExpectNoError(setKubeletConfiguration(f, newCfg))
-
-	// Wait for the Kubelet to be ready.
-	Eventually(func() bool {
-		nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-		return len(nodeList.Items) == 1
-	}, time.Minute, time.Second).Should(BeTrue())
-
-	return oldCfg
-}
-
-// configureHugePages attempts to allocate 100Mi of 2Mi hugepages for testing purposes
+// configureHugePages attempts to allocate 10Mi of 2Mi hugepages for testing purposes
 func configureHugePages() error {
-	err := exec.Command("/bin/sh", "-c", "echo 50 > /proc/sys/vm/nr_hugepages").Run()
+	err := exec.Command("/bin/sh", "-c", "echo 5 > /proc/sys/vm/nr_hugepages").Run()
 	if err != nil {
 		return err
 	}
@@ -120,11 +97,11 @@ func configureHugePages() error {
 	if err != nil {
 		return err
 	}
-	e2elog.Logf("HugePages_Total is set to %v", numHugePages)
-	if numHugePages == 50 {
+	framework.Logf("HugePages_Total is set to %v", numHugePages)
+	if numHugePages == 5 {
 		return nil
 	}
-	return fmt.Errorf("expected hugepages %v, but found %v", 50, numHugePages)
+	return fmt.Errorf("expected hugepages %v, but found %v", 5, numHugePages)
 }
 
 // releaseHugePages releases all pre-allocated hugepages
@@ -146,13 +123,13 @@ func pollResourceAsString(f *framework.Framework, resourceName string) string {
 	node, err := f.ClientSet.CoreV1().Nodes().Get(framework.TestContext.NodeName, metav1.GetOptions{})
 	framework.ExpectNoError(err)
 	amount := amountOfResourceAsString(node, resourceName)
-	e2elog.Logf("amount of %v: %v", resourceName, amount)
+	framework.Logf("amount of %v: %v", resourceName, amount)
 	return amount
 }
 
 // amountOfResourceAsString returns the amount of resourceName advertised by a node
-func amountOfResourceAsString(node *apiv1.Node, resourceName string) string {
-	val, ok := node.Status.Capacity[apiv1.ResourceName(resourceName)]
+func amountOfResourceAsString(node *v1.Node, resourceName string) string {
+	val, ok := node.Status.Capacity[v1.ResourceName(resourceName)]
 	if !ok {
 		return ""
 	}
@@ -160,23 +137,23 @@ func amountOfResourceAsString(node *apiv1.Node, resourceName string) string {
 }
 
 func runHugePagesTests(f *framework.Framework) {
-	It("should assign hugepages as expected based on the Pod spec", func() {
-		By("by running a G pod that requests hugepages")
-		pod := f.PodClient().Create(&apiv1.Pod{
+	ginkgo.It("should assign hugepages as expected based on the Pod spec", func() {
+		ginkgo.By("by running a G pod that requests hugepages")
+		pod := f.PodClient().Create(&v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "pod" + string(uuid.NewUUID()),
 				Namespace: f.Namespace.Name,
 			},
-			Spec: apiv1.PodSpec{
-				Containers: []apiv1.Container{
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
 					{
 						Image: imageutils.GetPauseImageName(),
 						Name:  "container" + string(uuid.NewUUID()),
-						Resources: apiv1.ResourceRequirements{
-							Limits: apiv1.ResourceList{
-								apiv1.ResourceName("cpu"):           resource.MustParse("10m"),
-								apiv1.ResourceName("memory"):        resource.MustParse("100Mi"),
-								apiv1.ResourceName("hugepages-2Mi"): resource.MustParse("50Mi"),
+						Resources: v1.ResourceRequirements{
+							Limits: v1.ResourceList{
+								v1.ResourceName("cpu"):           resource.MustParse("10m"),
+								v1.ResourceName("memory"):        resource.MustParse("100Mi"),
+								v1.ResourceName("hugepages-2Mi"): resource.MustParse("6Mi"),
 							},
 						},
 					},
@@ -184,11 +161,11 @@ func runHugePagesTests(f *framework.Framework) {
 			},
 		})
 		podUID := string(pod.UID)
-		By("checking if the expected hugetlb settings were applied")
-		verifyPod := makePodToVerifyHugePages("pod"+podUID, resource.MustParse("50Mi"))
+		ginkgo.By("checking if the expected hugetlb settings were applied")
+		verifyPod := makePodToVerifyHugePages("pod"+podUID, resource.MustParse("6Mi"))
 		f.PodClient().Create(verifyPod)
-		err := framework.WaitForPodSuccessInNamespace(f.ClientSet, verifyPod.Name, f.Namespace.Name)
-		Expect(err).NotTo(HaveOccurred())
+		err := e2epod.WaitForPodSuccessInNamespace(f.ClientSet, verifyPod.Name, f.Namespace.Name)
+		framework.ExpectNoError(err)
 	})
 }
 
@@ -196,54 +173,46 @@ func runHugePagesTests(f *framework.Framework) {
 var _ = SIGDescribe("HugePages [Serial] [Feature:HugePages][NodeFeature:HugePages]", func() {
 	f := framework.NewDefaultFramework("hugepages-test")
 
-	Context("With config updated with hugepages feature enabled", func() {
-		var oldCfg *kubeletconfig.KubeletConfiguration
-
-		BeforeEach(func() {
-			By("verifying hugepages are supported")
+	ginkgo.Context("With config updated with hugepages feature enabled", func() {
+		ginkgo.BeforeEach(func() {
+			ginkgo.By("verifying hugepages are supported")
 			if !isHugePageSupported() {
 				framework.Skipf("skipping test because hugepages are not supported")
 				return
 			}
-			By("configuring the host to reserve a number of pre-allocated hugepages")
-			Eventually(func() error {
+			ginkgo.By("configuring the host to reserve a number of pre-allocated hugepages")
+			gomega.Eventually(func() error {
 				err := configureHugePages()
 				if err != nil {
 					return err
 				}
 				return nil
-			}, 30*time.Second, framework.Poll).Should(BeNil())
-			By("enabling hugepages in kubelet")
-			oldCfg = enableHugePagesInKubelet(f)
-			By("restarting kubelet to pick up pre-allocated hugepages")
+			}, 30*time.Second, framework.Poll).Should(gomega.BeNil())
+			ginkgo.By("restarting kubelet to pick up pre-allocated hugepages")
 			restartKubelet()
-			By("by waiting for hugepages resource to become available on the local node")
-			Eventually(func() string {
+			ginkgo.By("by waiting for hugepages resource to become available on the local node")
+			gomega.Eventually(func() string {
 				return pollResourceAsString(f, "hugepages-2Mi")
-			}, 30*time.Second, framework.Poll).Should(Equal("100Mi"))
+			}, 30*time.Second, framework.Poll).Should(gomega.Equal("10Mi"))
 		})
 
 		runHugePagesTests(f)
 
-		AfterEach(func() {
-			By("Releasing hugepages")
-			Eventually(func() error {
+		ginkgo.AfterEach(func() {
+			ginkgo.By("Releasing hugepages")
+			gomega.Eventually(func() error {
 				err := releaseHugePages()
 				if err != nil {
 					return err
 				}
 				return nil
-			}, 30*time.Second, framework.Poll).Should(BeNil())
-			if oldCfg != nil {
-				By("Restoring old kubelet config")
-				setOldKubeletConfig(f, oldCfg)
-			}
-			By("restarting kubelet to release hugepages")
+			}, 30*time.Second, framework.Poll).Should(gomega.BeNil())
+			ginkgo.By("restarting kubelet to release hugepages")
 			restartKubelet()
-			By("by waiting for hugepages resource to not appear available on the local node")
-			Eventually(func() string {
+			ginkgo.By("by waiting for hugepages resource to not appear available on the local node")
+			gomega.Eventually(func() string {
 				return pollResourceAsString(f, "hugepages-2Mi")
-			}, 30*time.Second, framework.Poll).Should(Equal("0"))
+			}, 30*time.Second, framework.Poll).Should(gomega.Equal("0"))
 		})
 	})
 })

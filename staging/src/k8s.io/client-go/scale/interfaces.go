@@ -19,11 +19,13 @@ package scale
 import (
 	autoscalingapi "k8s.io/api/autoscaling/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 // ScalesGetter can produce a ScaleInterface
-// for a particular namespace.
 type ScalesGetter interface {
+	// Scales produces a ScaleInterface for a particular namespace.
+	// Set namespace to the empty string for non-namespaced resources.
 	Scales(namespace string) ScaleInterface
 }
 
@@ -36,4 +38,7 @@ type ScaleInterface interface {
 
 	// Update updates the scale of the given scalable resource.
 	Update(resource schema.GroupResource, scale *autoscalingapi.Scale) (*autoscalingapi.Scale, error)
+
+	// Patch patches the scale of the given scalable resource.
+	Patch(gvr schema.GroupVersionResource, name string, pt types.PatchType, data []byte) (*autoscalingapi.Scale, error)
 }

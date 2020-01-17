@@ -7,84 +7,129 @@ metadata:
     kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
 rules:
+  # The CNI plugin needs to get pods, nodes, and namespaces.
   - apiGroups: [""]
     resources:
+      - pods
+      - nodes
       - namespaces
-      - serviceaccounts
     verbs:
       - get
-      - list
-      - watch
   - apiGroups: [""]
     resources:
       - endpoints
-    verbs:
-      - get
-  - apiGroups: [""]
-    resources:
       - services
     verbs:
-      - get
-  - apiGroups: [""]
-    resources:
-      - pods/status
-    verbs:
-      - update
-      - patch
-  - apiGroups: [""]
-    resources:
-      - nodes
-    verbs:
-      - get
-      - list
-      - update
+      # Used to discover service IPs for advertisement.
       - watch
+      - list
+      # Used to discover Typhas.
+      - get
+  - apiGroups: [""]
+    resources:
+      - nodes/status
+    verbs:
+      # Needed for clearing NodeNetworkUnavailable flag.
+      - patch
+      # Calico stores some configuration information in node annotations.
+      - update
+  # Watch for changes to Kubernetes NetworkPolicies.
   - apiGroups: ["networking.k8s.io"]
     resources:
       - networkpolicies
     verbs:
       - watch
       - list
-  - apiGroups: ["crd.projectcalico.org"]
-    resources:
-      - felixconfigurations
-      - bgppeers
-      - bgpconfigurations
-      - ippools
-      - globalnetworkpolicies
-      - globalnetworksets
-      - networkpolicies
-      - clusterinformations
-      - hostendpoints
-    verbs:
-      - create
-      - get
-      - list
-      - update
-      - watch
-  # Used in Calico v2.6 only - can be removed after upgrade.
+  # Used by Calico for policy information.
   - apiGroups: [""]
     resources:
       - pods
+      - namespaces
+      - serviceaccounts
     verbs:
-      - get
       - list
       - watch
+  # The CNI plugin patches pods/status.
+  - apiGroups: [""]
+    resources:
+      - pods/status
+    verbs:
       - patch
+  # Calico monitors various CRDs for config.
+  # Note: Though we are not using ipam from calico, calico node still needs those permission
+  #       to boot.
   - apiGroups: ["crd.projectcalico.org"]
     resources:
       - globalfelixconfigs
+      - felixconfigurations
+      - bgppeers
       - globalbgpconfigs
+      - bgpconfigurations
+      - ippools
+      - ipamblocks
+      - globalnetworkpolicies
+      - globalnetworksets
+      - networkpolicies
+      - networksets
+      - clusterinformations
+      - hostendpoints
+    verbs:
+      - get
+      - list
+      - watch
+  # Calico must create and update some CRDs on startup.
+  - apiGroups: ["crd.projectcalico.org"]
+    resources:
+      - ippools
+      - felixconfigurations
+      - clusterinformations
     verbs:
       - create
-      - get
-      - list
       - update
-      - watch
-  - apiGroups: ["extensions"]
+  # Calico stores some configuration information on the node.
+  - apiGroups: [""]
     resources:
-      - networkpolicies
+      - nodes
     verbs:
       - get
       - list
       - watch
+  # These permissions are only required for upgrade from v2.6, and can
+  # be removed after upgrade or on fresh installations.
+  - apiGroups: ["crd.projectcalico.org"]
+    resources:
+      - bgpconfigurations
+      - bgppeers
+    verbs:
+      - create
+      - update
+  # These permissions are required for Calico CNI to perform IPAM allocations.
+  - apiGroups: ["crd.projectcalico.org"]
+    resources:
+      - blockaffinities
+      - ipamblocks
+      - ipamhandles
+    verbs:
+      - get
+      - list
+      - create
+      - update
+      - delete
+  - apiGroups: ["crd.projectcalico.org"]
+    resources:
+      - ipamconfigs
+    verbs:
+      - get
+  # Block affinities must also be watchable by confd for route aggregation.
+  - apiGroups: ["crd.projectcalico.org"]
+    resources:
+      - blockaffinities
+    verbs:
+      - watch
+  # The Calico IPAM migration needs to get daemonsets. These permissions can be
+  # removed if not upgrading from an installation using host-local IPAM.
+  - apiGroups: ["apps"]
+    resources:
+      - daemonsets
+    verbs:
+      - get

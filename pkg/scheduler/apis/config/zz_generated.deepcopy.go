@@ -37,6 +37,16 @@ func (in *KubeSchedulerConfiguration) DeepCopyInto(out *KubeSchedulerConfigurati
 		*out = new(int64)
 		**out = **in
 	}
+	if in.PodInitialBackoffSeconds != nil {
+		in, out := &in.PodInitialBackoffSeconds, &out.PodInitialBackoffSeconds
+		*out = new(int64)
+		**out = **in
+	}
+	if in.PodMaxBackoffSeconds != nil {
+		in, out := &in.PodMaxBackoffSeconds, &out.PodMaxBackoffSeconds
+		*out = new(int64)
+		**out = **in
+	}
 	if in.Plugins != nil {
 		in, out := &in.Plugins, &out.Plugins
 		*out = new(Plugins)
@@ -171,11 +181,6 @@ func (in *Plugins) DeepCopyInto(out *Plugins) {
 	}
 	if in.Score != nil {
 		in, out := &in.Score, &out.Score
-		*out = new(PluginSet)
-		(*in).DeepCopyInto(*out)
-	}
-	if in.NormalizeScore != nil {
-		in, out := &in.NormalizeScore, &out.NormalizeScore
 		*out = new(PluginSet)
 		(*in).DeepCopyInto(*out)
 	}

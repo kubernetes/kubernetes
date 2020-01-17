@@ -71,10 +71,8 @@ kube::golang::server_targets() {
     cmd/kube-proxy
     cmd/kube-apiserver
     cmd/kube-controller-manager
-    cmd/cloud-controller-manager
     cmd/kubelet
     cmd/kubeadm
-    cmd/hyperkube
     cmd/kube-scheduler
     vendor/k8s.io/apiextensions-apiserver
     cluster/gce/gci/mounter
@@ -90,7 +88,6 @@ readonly KUBE_SERVER_BINARIES=("${KUBE_SERVER_TARGETS[@]##*/}")
 kube::golang::server_image_targets() {
   # NOTE: this contains cmd targets for kube::build::get_docker_wrapped_binaries
   local targets=(
-    cmd/cloud-controller-manager
     cmd/kube-apiserver
     cmd/kube-controller-manager
     cmd/kube-scheduler
@@ -109,6 +106,7 @@ kube::golang::conformance_image_targets() {
   local targets=(
     vendor/github.com/onsi/ginkgo/ginkgo
     test/e2e/e2e.test
+    cluster/images/conformance/go-runner
     cmd/kubectl
   )
   echo "${targets[@]}"
@@ -264,6 +262,7 @@ kube::golang::test_targets() {
     cmd/linkcheck
     vendor/github.com/onsi/ginkgo/ginkgo
     test/e2e/e2e.test
+    cluster/images/conformance/go-runner
   )
   echo "${targets[@]}"
 }
@@ -318,7 +317,6 @@ readonly KUBE_ALL_TARGETS=(
 readonly KUBE_ALL_BINARIES=("${KUBE_ALL_TARGETS[@]##*/}")
 
 readonly KUBE_STATIC_LIBRARIES=(
-  cloud-controller-manager
   kube-apiserver
   kube-controller-manager
   kube-scheduler
@@ -468,7 +466,7 @@ EOF
   local go_version
   IFS=" " read -ra go_version <<< "$(go version)"
   local minimum_go_version
-  minimum_go_version=go1.12.1
+  minimum_go_version=go1.12.4
   if [[ "${minimum_go_version}" != $(echo -e "${minimum_go_version}\n${go_version[2]}" | sort -s -t. -k 1,1 -k 2,2n -k 3,3n | head -n1) && "${go_version[2]}" != "devel" ]]; then
     kube::log::usage_from_stdin <<EOF
 Detected go version: ${go_version[*]}.

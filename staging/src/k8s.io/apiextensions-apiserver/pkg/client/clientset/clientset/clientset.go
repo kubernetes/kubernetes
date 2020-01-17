@@ -19,6 +19,9 @@ limitations under the License.
 package clientset
 
 import (
+	"fmt"
+
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1"
 	discovery "k8s.io/client-go/discovery"
 	rest "k8s.io/client-go/rest"
@@ -28,6 +31,7 @@ import (
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
 	ApiextensionsV1beta1() apiextensionsv1beta1.ApiextensionsV1beta1Interface
+	ApiextensionsV1() apiextensionsv1.ApiextensionsV1Interface
 }
 
 // Clientset contains the clients for groups. Each group has exactly one
@@ -35,11 +39,17 @@ type Interface interface {
 type Clientset struct {
 	*discovery.DiscoveryClient
 	apiextensionsV1beta1 *apiextensionsv1beta1.ApiextensionsV1beta1Client
+	apiextensionsV1      *apiextensionsv1.ApiextensionsV1Client
 }
 
 // ApiextensionsV1beta1 retrieves the ApiextensionsV1beta1Client
 func (c *Clientset) ApiextensionsV1beta1() apiextensionsv1beta1.ApiextensionsV1beta1Interface {
 	return c.apiextensionsV1beta1
+}
+
+// ApiextensionsV1 retrieves the ApiextensionsV1Client
+func (c *Clientset) ApiextensionsV1() apiextensionsv1.ApiextensionsV1Interface {
+	return c.apiextensionsV1
 }
 
 // Discovery retrieves the DiscoveryClient
@@ -51,14 +61,23 @@ func (c *Clientset) Discovery() discovery.DiscoveryInterface {
 }
 
 // NewForConfig creates a new Clientset for the given config.
+// If config's RateLimiter is not set and QPS and Burst are acceptable,
+// NewForConfig will generate a rate-limiter in configShallowCopy.
 func NewForConfig(c *rest.Config) (*Clientset, error) {
 	configShallowCopy := *c
 	if configShallowCopy.RateLimiter == nil && configShallowCopy.QPS > 0 {
+		if configShallowCopy.Burst <= 0 {
+			return nil, fmt.Errorf("Burst is required to be greater than 0 when RateLimiter is not set and QPS is set to greater than 0")
+		}
 		configShallowCopy.RateLimiter = flowcontrol.NewTokenBucketRateLimiter(configShallowCopy.QPS, configShallowCopy.Burst)
 	}
 	var cs Clientset
 	var err error
 	cs.apiextensionsV1beta1, err = apiextensionsv1beta1.NewForConfig(&configShallowCopy)
+	if err != nil {
+		return nil, err
+	}
+	cs.apiextensionsV1, err = apiextensionsv1.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
@@ -75,6 +94,7 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 func NewForConfigOrDie(c *rest.Config) *Clientset {
 	var cs Clientset
 	cs.apiextensionsV1beta1 = apiextensionsv1beta1.NewForConfigOrDie(c)
+	cs.apiextensionsV1 = apiextensionsv1.NewForConfigOrDie(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClientForConfigOrDie(c)
 	return &cs
@@ -84,6 +104,7 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 func New(c rest.Interface) *Clientset {
 	var cs Clientset
 	cs.apiextensionsV1beta1 = apiextensionsv1beta1.New(c)
+	cs.apiextensionsV1 = apiextensionsv1.New(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClient(c)
 	return &cs

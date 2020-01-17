@@ -23,12 +23,8 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/cmd/kubeadm/app/util/system",
     deps = [
-        "//staging/src/k8s.io/apimachinery/pkg/util/errors:go_default_library",
         "//vendor/github.com/blang/semver:go_default_library",
-        "//vendor/github.com/docker/docker/api/types:go_default_library",
-        "//vendor/github.com/docker/docker/client:go_default_library",
         "//vendor/github.com/pkg/errors:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 
@@ -44,7 +40,6 @@ go_test(
     embed = [":go_default_library"],
     tags = ["e2e"],
     deps = [
-        "//vendor/github.com/docker/docker/api/types:go_default_library",
         "//vendor/github.com/pkg/errors:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
     ],

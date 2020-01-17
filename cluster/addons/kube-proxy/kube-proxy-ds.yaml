@@ -21,14 +21,11 @@ spec:
     metadata:
       labels:
         k8s-app: kube-proxy
-      annotations:
-        scheduler.alpha.kubernetes.io/critical-pod: ''
     spec:
       priorityClassName: system-node-critical
       hostNetwork: true
       nodeSelector:
-        # TODO(liggitt): switch to node.kubernetes.io/kube-proxy-ds-ready in 1.16
-        beta.kubernetes.io/kube-proxy-ds-ready: "true"
+        node.kubernetes.io/kube-proxy-ds-ready: "true"
       tolerations:
       - operator: "Exists"
         effect: "NoExecute"
@@ -36,14 +33,14 @@ spec:
         effect: "NoSchedule"
       containers:
       - name: kube-proxy
-        image: {{pillar['kube_docker_registry']}}/kube-proxy:{{pillar['kube-proxy_docker_tag']}}
+        image: {{pillar['kube_docker_registry']}}/kube-proxy-amd64:{{pillar['kube-proxy_docker_tag']}}
         resources:
           requests:
             cpu: {{ cpurequest }}
         command:
         - /bin/sh
         - -c
-        - kube-proxy {{cluster_cidr}} --resource-container="" --oom-score-adj=-998 {{params}} 1>>/var/log/kube-proxy.log 2>&1
+        - kube-proxy {{cluster_cidr}} --oom-score-adj=-998 {{params}} 1>>/var/log/kube-proxy.log 2>&1
         env:
         - name: KUBERNETES_SERVICE_HOST
           value: {{kubernetes_service_host_env_value}}

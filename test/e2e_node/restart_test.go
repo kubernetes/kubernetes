@@ -19,20 +19,18 @@ limitations under the License.
 package e2e_node
 
 import (
-	"time"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
-
 	"fmt"
 	"os/exec"
+	"time"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 // waitForPods waits for timeout duration, for pod_count.
@@ -41,7 +39,7 @@ func waitForPods(f *framework.Framework, pod_count int, timeout time.Duration) (
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(10 * time.Second) {
 		podList, err := f.PodClient().List(metav1.ListOptions{})
 		if err != nil {
-			e2elog.Logf("Failed to list pods on node: %v", err)
+			framework.Logf("Failed to list pods on node: %v", err)
 			continue
 		}
 
@@ -52,7 +50,7 @@ func waitForPods(f *framework.Framework, pod_count int, timeout time.Duration) (
 			}
 			runningPods = append(runningPods, &pod)
 		}
-		e2elog.Logf("Running pod count %d", len(runningPods))
+		framework.Logf("Running pod count %d", len(runningPods))
 		if len(runningPods) >= pod_count {
 			break
 		}
@@ -78,12 +76,12 @@ var _ = framework.KubeDescribe("Restart [Serial] [Slow] [Disruptive] [NodeFeatur
 	)
 
 	f := framework.NewDefaultFramework("restart-test")
-	Context("Container Runtime", func() {
-		Context("Network", func() {
-			It("should recover from ip leak", func() {
+	ginkgo.Context("Container Runtime", func() {
+		ginkgo.Context("Network", func() {
+			ginkgo.It("should recover from ip leak", func() {
 
 				pods := newTestPods(podCount, false, imageutils.GetPauseImageName(), "restart-container-runtime-test")
-				By(fmt.Sprintf("Trying to create %d pods on node", len(pods)))
+				ginkgo.By(fmt.Sprintf("Trying to create %d pods on node", len(pods)))
 				createBatchPodWithRateControl(f, pods, podCreationInterval)
 				defer deletePodsSync(f, pods)
 
@@ -95,10 +93,10 @@ var _ = framework.KubeDescribe("Restart [Serial] [Slow] [Disruptive] [NodeFeatur
 				}
 
 				for i := 0; i < restartCount; i += 1 {
-					By(fmt.Sprintf("Killing container runtime iteration %d", i))
+					ginkgo.By(fmt.Sprintf("Killing container runtime iteration %d", i))
 					// Wait for container runtime to be running
 					var pid int
-					Eventually(func() error {
+					gomega.Eventually(func() error {
 						runtimePids, err := getPidsForProcess(framework.TestContext.ContainerRuntimeProcessName, framework.TestContext.ContainerRuntimePidFile)
 						if err != nil {
 							return err
@@ -112,7 +110,7 @@ var _ = framework.KubeDescribe("Restart [Serial] [Slow] [Disruptive] [NodeFeatur
 							return err
 						}
 						return nil
-					}, 1*time.Minute, 2*time.Second).Should(BeNil())
+					}, 1*time.Minute, 2*time.Second).Should(gomega.BeNil())
 					if stdout, err := exec.Command("sudo", "kill", fmt.Sprintf("%d", pid)).CombinedOutput(); err != nil {
 						framework.Failf("Failed to kill container runtime (pid=%d): %v, stdout: %q", pid, err, string(stdout))
 					}
@@ -120,18 +118,18 @@ var _ = framework.KubeDescribe("Restart [Serial] [Slow] [Disruptive] [NodeFeatur
 					time.Sleep(20 * time.Second)
 				}
 
-				By("Checking currently Running/Ready pods")
+				ginkgo.By("Checking currently Running/Ready pods")
 				postRestartRunningPods := waitForPods(f, len(runningPods), recoverTimeout)
 				if len(postRestartRunningPods) == 0 {
 					framework.Failf("Failed to start *any* pods after container runtime restart, this might indicate an IP leak")
 				}
-				By("Confirm no containers have terminated")
+				ginkgo.By("Confirm no containers have terminated")
 				for _, pod := range postRestartRunningPods {
 					if c := testutils.TerminatedContainers(pod); len(c) != 0 {
 						framework.Failf("Pod %q has failed containers %+v after container runtime restart, this might indicate an IP leak", pod.Name, c)
 					}
 				}
-				By(fmt.Sprintf("Container runtime restart test passed with %d pods", len(postRestartRunningPods)))
+				ginkgo.By(fmt.Sprintf("Container runtime restart test passed with %d pods", len(postRestartRunningPods)))
 			})
 		})
 	})

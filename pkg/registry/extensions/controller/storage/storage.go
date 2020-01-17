@@ -40,14 +40,17 @@ type ContainerStorage struct {
 	Scale                 *ScaleREST
 }
 
-func NewStorage(optsGetter generic.RESTOptionsGetter) ContainerStorage {
+func NewStorage(optsGetter generic.RESTOptionsGetter) (ContainerStorage, error) {
 	// scale does not set status, only updates spec so we ignore the status
-	controllerREST, _ := controllerstore.NewREST(optsGetter)
+	controllerREST, _, err := controllerstore.NewREST(optsGetter)
+	if err != nil {
+		return ContainerStorage{}, err
+	}
 
 	return ContainerStorage{
 		ReplicationController: &RcREST{},
 		Scale:                 &ScaleREST{store: controllerREST.Store},
-	}
+	}, nil
 }
 
 type ScaleREST struct {
@@ -112,14 +115,15 @@ func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.Update
 }
 
 func toScaleCreateValidation(f rest.ValidateObjectFunc) rest.ValidateObjectFunc {
-	return func(obj runtime.Object) error {
-		return f(scaleFromRC(obj.(*api.ReplicationController)))
+	return func(ctx context.Context, obj runtime.Object) error {
+		return f(ctx, scaleFromRC(obj.(*api.ReplicationController)))
 	}
 }
 
 func toScaleUpdateValidation(f rest.ValidateObjectUpdateFunc) rest.ValidateObjectUpdateFunc {
-	return func(obj, old runtime.Object) error {
+	return func(ctx context.Context, obj, old runtime.Object) error {
 		return f(
+			ctx,
 			scaleFromRC(obj.(*api.ReplicationController)),
 			scaleFromRC(old.(*api.ReplicationController)),
 		)

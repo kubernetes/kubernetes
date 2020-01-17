@@ -94,6 +94,7 @@ if [ "${remote}" = true ] ; then
   instance_prefix=${INSTANCE_PREFIX:-"test"}
   cleanup=${CLEANUP:-"true"}
   delete_instances=${DELETE_INSTANCES:-"false"}
+  preemptible_instances=${PREEMPTIBLE_INSTANCES:-"false"}
   test_suite=${TEST_SUITE:-"default"}
 
   # Get the compute zone
@@ -116,7 +117,7 @@ if [ "${remote}" = true ] ; then
   IFS=',' read -ra IM <<< "${images}"
        images=""
        for i in "${IM[@]}"; do
-         if gcloud compute instances list "${instance_prefix}-${i}" | grep "${i}"; then
+         if gcloud compute instances list --project="${project}" --filter="name:'${instance_prefix}-${i}' AND zone:'${zone}'" | grep "${i}"; then
            if [[ "${hosts}" != "" ]]; then
              hosts="${hosts},"
            fi
@@ -149,14 +150,14 @@ if [ "${remote}" = true ] ; then
     --image-project="${image_project}" --instance-name-prefix="${instance_prefix}" \
     --delete-instances="${delete_instances}" --test_args="${test_args}" --instance-metadata="${metadata}" \
     --image-config-file="${image_config_file}" --system-spec-name="${system_spec_name}" \
-    --extra-envs="${extra_envs}" --test-suite="${test_suite}" \
+    --preemptible-instances="${preemptible_instances}" --extra-envs="${extra_envs}" --test-suite="${test_suite}" \
     2>&1 | tee -i "${artifacts}/build-log.txt"
   exit $?
 
 else
   # Refresh sudo credentials if needed
   if ping -c 1 -q metadata.google.internal &> /dev/null; then
-    echo 'Running on CGE, not asking for sudo credentials'
+    echo 'Running on GCE, not asking for sudo credentials'
   elif sudo --non-interactive "$(which bash)" -c true 2> /dev/null; then
     # if we can run bash without a password, it's a pretty safe bet that either
     # we can run any command without a password, or that sudo credentials
@@ -164,7 +165,7 @@ else
     echo 'No need to refresh sudo credentials'
   else
     echo 'Updating sudo credentials'
-    sudo --validate || exit 1
+    sudo -v || exit 1
   fi
 
   # Do not use any network plugin by default. User could override the flags with

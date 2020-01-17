@@ -84,6 +84,25 @@ function FetchAndImport-ModuleFromMetadata {
   Import-Module -Force C:\$Filename
 }
 
+# Returns true if the ENABLE_STACKDRIVER_WINDOWS or ENABLE_NODE_LOGGING field in kube_env is true.
+# $KubeEnv is a hash table containing the kube-env metadata keys+values.
+# ENABLE_NODE_LOGGING is used for legacy Stackdriver Logging, and will be deprecated (always set to False)
+# soon. ENABLE_STACKDRIVER_WINDOWS is added to indicate whether logging is enabled for windows nodes.
+function IsLoggingEnabled {
+  param (
+    [parameter(Mandatory=$true)] [hashtable]$KubeEnv
+  )
+
+  if ($KubeEnv.Contains('ENABLE_STACKDRIVER_WINDOWS') -and `
+      ($KubeEnv['ENABLE_STACKDRIVER_WINDOWS'] -eq 'true')) {
+    return $true
+  } elseif ($KubeEnv.Contains('ENABLE_NODE_LOGGING') -and `
+      ($KubeEnv['ENABLE_NODE_LOGGING'] -eq 'true')) {
+    return $true
+  }
+  return $false
+}
+
 try {
   # Don't use FetchAndImport-ModuleFromMetadata for common.psm1 - the common
   # module includes variables and functions that any other function may depend
@@ -100,7 +119,6 @@ try {
   Dump-DebugInfoToConsole
   Set-PrerequisiteOptions
   $kube_env = Fetch-KubeEnv
-  Disable-WindowsDefender
 
   if (Test-IsTestCluster $kube_env) {
     Log-Output 'Test cluster detected, installing OpenSSH.'
@@ -112,7 +130,13 @@ try {
   Set-EnvironmentVars
   Create-Directories
   Download-HelperScripts
-  InstallAndStart-LoggingAgent
+
+  # Even if Stackdriver is already installed, the function will still [re]start the service.
+  if (IsLoggingEnabled $kube_env) {
+    Install-LoggingAgent
+    Configure-LoggingAgent
+    Restart-LoggingAgent
+  }
 
   Create-DockerRegistryKey
   Configure-Dockerd
@@ -124,6 +148,7 @@ try {
   Set-PodCidr
   Configure-HostNetworkingService
   Configure-CniNetworking
+  Configure-HostDnsConf
   Configure-GcePdTools
   Configure-Kubelet
 

@@ -22,16 +22,7 @@ import (
 	"syscall"
 
 	info "github.com/google/cadvisor/info/v1"
-)
-
-const (
-	// Kernel constants for tasks stats.
-	genlIdCtrl           = syscall.NLMSG_MIN_TYPE // GENL_ID_CTRL
-	taskstatsGenlName    = "TASKSTATS"            // TASKSTATS_GENL_NAME
-	cgroupStatsCmdAttrFd = 0x1                    // CGROUPSTATS_CMD_ATTR_FD
-	ctrlAttrFamilyId     = 0x1                    // CTRL_ATTR_FAMILY_ID
-	ctrlAttrFamilyName   = 0x2                    // CTRL_ATTR_FAMILY_NAME
-	ctrlCmdGetFamily     = 0x3                    // CTRL_CMD_GETFAMILY
+	"golang.org/x/sys/unix"
 )
 
 var (
@@ -124,15 +115,15 @@ func prepareMessage(headerType uint16, cmd uint8, attributes []byte) (msg netlin
 // Prepares message to query family id for task stats.
 func prepareFamilyMessage() (msg netlinkMessage) {
 	buf := bytes.NewBuffer([]byte{})
-	addAttribute(buf, ctrlAttrFamilyName, taskstatsGenlName, len(taskstatsGenlName)+1)
-	return prepareMessage(genlIdCtrl, ctrlCmdGetFamily, buf.Bytes())
+	addAttribute(buf, unix.CTRL_ATTR_FAMILY_NAME, unix.TASKSTATS_GENL_NAME, len(unix.TASKSTATS_GENL_NAME)+1)
+	return prepareMessage(unix.GENL_ID_CTRL, unix.CTRL_CMD_GETFAMILY, buf.Bytes())
 }
 
 // Prepares message to query task stats for a task group.
 func prepareCmdMessage(id uint16, cfd uintptr) (msg netlinkMessage) {
 	buf := bytes.NewBuffer([]byte{})
-	addAttribute(buf, cgroupStatsCmdAttrFd, uint32(cfd), 4)
-	return prepareMessage(id, __TASKSTATS_CMD_MAX+1, buf.Bytes())
+	addAttribute(buf, unix.CGROUPSTATS_CMD_ATTR_FD, uint32(cfd), 4)
+	return prepareMessage(id, unix.CGROUPSTATS_CMD_GET, buf.Bytes())
 }
 
 // Extracts returned family id from the response.
@@ -158,7 +149,7 @@ func parseFamilyResp(msg syscall.NetlinkMessage) (uint16, error) {
 		if err != nil {
 			return 0, err
 		}
-		if attr.Type == ctrlAttrFamilyId {
+		if attr.Type == unix.CTRL_ATTR_FAMILY_ID {
 			err = binary.Read(buf, Endian, &id)
 			if err != nil {
 				return 0, err

@@ -17,6 +17,7 @@ limitations under the License.
 package noderestriction
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"strings"
@@ -66,13 +67,7 @@ func init() {
 	if err := leaseDisabledFeature.Add(map[featuregate.Feature]featuregate.FeatureSpec{features.NodeLease: {Default: false}}); err != nil {
 		panic(err)
 	}
-	if err := csiNodeInfoEnabledFeature.Add(map[featuregate.Feature]featuregate.FeatureSpec{features.KubeletPluginsWatcher: {Default: true}}); err != nil {
-		panic(err)
-	}
 	if err := csiNodeInfoEnabledFeature.Add(map[featuregate.Feature]featuregate.FeatureSpec{features.CSINodeInfo: {Default: true}}); err != nil {
-		panic(err)
-	}
-	if err := csiNodeInfoDisabledFeature.Add(map[featuregate.Feature]featuregate.FeatureSpec{features.KubeletPluginsWatcher: {Default: false}}); err != nil {
 		panic(err)
 	}
 	if err := csiNodeInfoDisabledFeature.Add(map[featuregate.Feature]featuregate.FeatureSpec{features.CSINodeInfo: {Default: false}}); err != nil {
@@ -831,19 +826,19 @@ func Test_nodePlugin_Admit(t *testing.T) {
 		{
 			name:       "allow create of my node pulling name from object",
 			podsGetter: noExistingPods,
-			attributes: admission.NewAttributesRecord(mynodeObj, nil, nodeKind, mynodeObj.Namespace, "", nodeResource, "", admission.Create, &metav1.CreateOptions{}, false, mynode),
+			attributes: admission.NewAttributesRecord(mynodeObj, nil, nodeKind, mynodeObj.Namespace, "mynode", nodeResource, "", admission.Create, &metav1.CreateOptions{}, false, mynode),
 			err:        "",
 		},
 		{
 			name:       "allow create of my node with taints",
 			podsGetter: noExistingPods,
-			attributes: admission.NewAttributesRecord(mynodeObjTaintA, nil, nodeKind, mynodeObj.Namespace, "", nodeResource, "", admission.Create, &metav1.CreateOptions{}, false, mynode),
+			attributes: admission.NewAttributesRecord(mynodeObjTaintA, nil, nodeKind, mynodeObj.Namespace, "mynode", nodeResource, "", admission.Create, &metav1.CreateOptions{}, false, mynode),
 			err:        "",
 		},
 		{
 			name:       "allow create of my node with labels",
 			podsGetter: noExistingPods,
-			attributes: admission.NewAttributesRecord(setAllowedCreateLabels(mynodeObj, ""), nil, nodeKind, mynodeObj.Namespace, "", nodeResource, "", admission.Create, &metav1.CreateOptions{}, false, mynode),
+			attributes: admission.NewAttributesRecord(setAllowedCreateLabels(mynodeObj, ""), nil, nodeKind, mynodeObj.Namespace, "mynode", nodeResource, "", admission.Create, &metav1.CreateOptions{}, false, mynode),
 			err:        "",
 		},
 		{
@@ -1170,7 +1165,7 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			name:       "disallowed create CSINode - feature disabled",
 			attributes: admission.NewAttributesRecord(nodeInfo, nil, csiNodeKind, nodeInfo.Namespace, nodeInfo.Name, csiNodeResource, "", admission.Create, &metav1.CreateOptions{}, false, mynode),
 			features:   csiNodeInfoDisabledFeature,
-			err:        fmt.Sprintf("forbidden: disabled by feature gates %s and %s", features.KubeletPluginsWatcher, features.CSINodeInfo),
+			err:        fmt.Sprintf("forbidden: disabled by feature gates %s", features.CSINodeInfo),
 		},
 		{
 			name:       "disallowed create another node's CSINode - feature enabled",
@@ -1216,7 +1211,7 @@ func Test_nodePlugin_Admit(t *testing.T) {
 				c.features = tt.features
 			}
 			c.podsGetter = tt.podsGetter
-			err := c.Admit(tt.attributes, nil)
+			err := c.Admit(context.TODO(), tt.attributes, nil)
 			if (err == nil) != (len(tt.err) == 0) {
 				t.Errorf("nodePlugin.Admit() error = %v, expected %v", err, tt.err)
 				return

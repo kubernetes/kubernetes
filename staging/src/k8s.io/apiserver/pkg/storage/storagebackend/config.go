@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apiserver/pkg/server/egressselector"
 	"k8s.io/apiserver/pkg/storage/value"
 )
 
@@ -38,6 +39,8 @@ type TransportConfig struct {
 	KeyFile  string
 	CertFile string
 	CAFile   string
+	// function to determine the egress dialer. (i.e. konnectivity server dialer)
+	EgressLookup egressselector.Lookup
 }
 
 // Config is configuration for creating a storage backend.

@@ -138,10 +138,10 @@ func TestParse(t *testing.T) {
 }
 
 func TestLook(t *testing.T) {
-	lpf := errors.New("LookPath failed")
-	sf := errors.New("Stat failed")
-	lpnc := errors.New("LookPath should not be called")
-	snc := errors.New("Stat should not be called")
+	lpf := errors.New("lookPath failed")
+	sf := errors.New("stat failed")
+	lpnc := errors.New("lookPath should not be called")
+	snc := errors.New("stat should not be called")
 	cases := []struct {
 		stat     error
 		lookPath error
@@ -324,7 +324,7 @@ func TestGetKubetest(t *testing.T) {
 			stat: func(p string) (os.FileInfo, error) {
 				// stat
 				if p != c.stat {
-					return nil, fmt.Errorf("Failed to find %s", p)
+					return nil, fmt.Errorf("failed to find %s", p)
 				}
 				return FileInfo{time.Now().Add(c.age * -1)}, nil
 			},
@@ -332,7 +332,7 @@ func TestGetKubetest(t *testing.T) {
 				if c.path {
 					return filepath.Join(p, name), nil
 				}
-				return "", fmt.Errorf("Not on path: %s", name)
+				return "", fmt.Errorf("not on path: %s", name)
 			},
 			goPath: c.goPath,
 			wait: func(cmd string, args ...string) error {

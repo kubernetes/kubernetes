@@ -19,10 +19,14 @@ package network
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilwait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
+	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 
 	"github.com/onsi/ginkgo"
 )
@@ -46,15 +50,17 @@ var _ = SIGDescribe("Networking", func() {
 	})
 
 	ginkgo.It("should provide Internet connection for containers [Feature:Networking-IPv4]", func() {
-		ginkgo.By("Running container which tries to ping 8.8.8.8")
+		ginkgo.By("Running container which tries to connect to 8.8.8.8")
 		framework.ExpectNoError(
-			framework.CheckConnectivityToHost(f, "", "ping-test", "8.8.8.8", framework.IPv4PingCommand, 30))
+			framework.CheckConnectivityToHost(f, "", "connectivity-test", "8.8.8.8", 53, 30))
 	})
 
-	ginkgo.It("should provide Internet connection for containers [Feature:Networking-IPv6][Experimental]", func() {
-		ginkgo.By("Running container which tries to ping 2001:4860:4860::8888")
+	ginkgo.It("should provide Internet connection for containers [Feature:Networking-IPv6][Experimental][LinuxOnly]", func() {
+		// IPv6 is not supported on Windows.
+		framework.SkipIfNodeOSDistroIs("windows")
+		ginkgo.By("Running container which tries to connect to 2001:4860:4860::8888")
 		framework.ExpectNoError(
-			framework.CheckConnectivityToHost(f, "", "ping-test", "2001:4860:4860::8888", framework.IPv6PingCommand, 30))
+			framework.CheckConnectivityToHost(f, "", "connectivity-test", "2001:4860:4860::8888", 53, 30))
 	})
 
 	// First test because it has no dependencies on variables created later on.
@@ -97,8 +103,7 @@ var _ = SIGDescribe("Networking", func() {
 		config.GetSelfURLStatusCode(ports.ProxyStatusPort, "/proxyMode", "200")
 	})
 
-	// TODO: Remove [Slow] when this has had enough bake time to prove presubmit worthiness.
-	ginkgo.Describe("Granular Checks: Services [Slow]", func() {
+	ginkgo.Describe("Granular Checks: Services", func() {
 
 		ginkgo.It("should function for pod-Service: http", func() {
 			config := framework.NewNetworkingTestConfig(f)
@@ -200,7 +205,8 @@ var _ = SIGDescribe("Networking", func() {
 			config.DialFromNode("udp", config.NodeIP, config.NodeUDPPort, config.MaxTries, config.MaxTries, sets.NewString())
 		})
 
-		ginkgo.It("should function for client IP based session affinity: http", func() {
+		// [LinuxOnly]: Windows does not support session affinity.
+		ginkgo.It("should function for client IP based session affinity: http [LinuxOnly]", func() {
 			config := framework.NewNetworkingTestConfig(f)
 			ginkgo.By(fmt.Sprintf("dialing(http) %v --> %v:%v", config.TestContainerPod.Name, config.SessionAffinityService.Spec.ClusterIP, framework.ClusterHTTPPort))
 
@@ -217,7 +223,8 @@ var _ = SIGDescribe("Networking", func() {
 			}
 		})
 
-		ginkgo.It("should function for client IP based session affinity: udp", func() {
+		// [LinuxOnly]: Windows does not support session affinity.
+		ginkgo.It("should function for client IP based session affinity: udp [LinuxOnly]", func() {
 			config := framework.NewNetworkingTestConfig(f)
 			ginkgo.By(fmt.Sprintf("dialing(udp) %v --> %v:%v", config.TestContainerPod.Name, config.SessionAffinityService.Spec.ClusterIP, framework.ClusterUDPPort))
 
@@ -233,5 +240,89 @@ var _ = SIGDescribe("Networking", func() {
 				framework.Failf("Unexpected endpoints return: %v, expect 1 endpoints", eps)
 			}
 		})
+	})
+
+	ginkgo.It("should recreate its iptables rules if they are deleted [Disruptive]", func() {
+		framework.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
+		framework.SkipUnlessSSHKeyPresent()
+
+		hosts, err := e2essh.NodeSSHHosts(f.ClientSet)
+		framework.ExpectNoError(err, "failed to find external/internal IPs for every node")
+		if len(hosts) == 0 {
+			framework.Failf("No ssh-able nodes")
+		}
+		host := hosts[0]
+
+		ns := f.Namespace.Name
+		numPods, servicePort := 3, defaultServeHostnameServicePort
+		svc := "iptables-flush-test"
+
+		defer func() {
+			framework.ExpectNoError(e2eservice.StopServeHostnameService(f.ClientSet, ns, svc))
+		}()
+		podNames, svcIP, err := e2eservice.StartServeHostnameService(f.ClientSet, getServeHostnameService(svc), ns, numPods)
+		framework.ExpectNoError(err, "failed to create replication controller with service: %s in the namespace: %s", svc, ns)
+
+		// Ideally we want to reload the system firewall, but we don't necessarily
+		// know how to do that on this system ("firewall-cmd --reload"? "systemctl
+		// restart iptables"?). So instead we just manually delete all "KUBE-"
+		// chains.
+
+		ginkgo.By("dumping iptables rules on a node")
+		result, err := e2essh.SSH("sudo iptables-save", host, framework.TestContext.Provider)
+		if err != nil || result.Code != 0 {
+			e2essh.LogResult(result)
+			framework.Failf("couldn't dump iptable rules: %v", err)
+		}
+
+		// All the commands that delete rules have to come before all the commands
+		// that delete chains, since the chains can't be deleted while there are
+		// still rules referencing them.
+		var deleteRuleCmds, deleteChainCmds []string
+		table := ""
+		for _, line := range strings.Split(result.Stdout, "\n") {
+			if strings.HasPrefix(line, "*") {
+				table = line[1:]
+			} else if table == "" {
+				continue
+			}
+
+			// Delete jumps from non-KUBE chains to KUBE chains
+			if !strings.HasPrefix(line, "-A KUBE-") && strings.Contains(line, "-j KUBE-") {
+				deleteRuleCmds = append(deleteRuleCmds, fmt.Sprintf("sudo iptables -t %s -D %s || true", table, line[3:]))
+			}
+			// Flush and delete all KUBE chains
+			if strings.HasPrefix(line, ":KUBE-") {
+				chain := strings.Split(line, " ")[0][1:]
+				deleteRuleCmds = append(deleteRuleCmds, fmt.Sprintf("sudo iptables -t %s -F %s || true", table, chain))
+				deleteChainCmds = append(deleteChainCmds, fmt.Sprintf("sudo iptables -t %s -X %s || true", table, chain))
+			}
+		}
+		cmd := strings.Join(append(deleteRuleCmds, deleteChainCmds...), "\n")
+
+		ginkgo.By("deleting all KUBE-* iptables chains")
+		result, err = e2essh.SSH(cmd, host, framework.TestContext.Provider)
+		if err != nil || result.Code != 0 {
+			e2essh.LogResult(result)
+			framework.Failf("couldn't delete iptable rules: %v", err)
+		}
+
+		ginkgo.By("verifying that kube-proxy rules are eventually recreated")
+		framework.ExpectNoError(e2eservice.VerifyServeHostnameServiceUp(f.ClientSet, ns, host, podNames, svcIP, servicePort))
+
+		ginkgo.By("verifying that kubelet rules are eventually recreated")
+		err = utilwait.PollImmediate(framework.Poll, framework.RestartNodeReadyAgainTimeout, func() (bool, error) {
+			result, err = e2essh.SSH("sudo iptables-save -t nat", host, framework.TestContext.Provider)
+			if err != nil || result.Code != 0 {
+				e2essh.LogResult(result)
+				return false, err
+			}
+
+			if strings.Contains(result.Stdout, "\n-A KUBE-MARK-DROP ") {
+				return true, nil
+			}
+			return false, nil
+		})
+		framework.ExpectNoError(err, "kubelet did not recreate its iptables rules")
 	})
 })

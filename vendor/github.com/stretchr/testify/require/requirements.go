@@ -22,7 +22,7 @@ type ValueAssertionFunc func(TestingT, interface{}, ...interface{})
 // for table driven tests.
 type BoolAssertionFunc func(TestingT, bool, ...interface{})
 
-// ValuesAssertionFunc is a common function prototype when validating an error value.  Can be useful
+// ErrorAssertionFunc is a common function prototype when validating an error value.  Can be useful
 // for table driven tests.
 type ErrorAssertionFunc func(TestingT, error, ...interface{})
 

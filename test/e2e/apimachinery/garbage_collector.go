@@ -21,11 +21,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	apps "k8s.io/api/apps/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	"k8s.io/api/core/v1"
-	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apiextensionstestserver "k8s.io/apiextensions-apiserver/test/integration/fixtures"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -38,8 +38,8 @@ import (
 	"k8s.io/apiserver/pkg/storage/names"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
-	"k8s.io/kubernetes/test/e2e/framework/metrics"
+	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 
 	"github.com/onsi/ginkgo"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -49,8 +49,11 @@ import (
 // with some wiggle room, to prevent pods being unable to schedule due
 // to max pod constraints.
 func estimateMaximumPods(c clientset.Interface, min, max int32) int32 {
+	nodes, err := e2enode.GetReadySchedulableNodes(c)
+	framework.ExpectNoError(err)
+
 	availablePods := int32(0)
-	for _, node := range framework.GetReadySchedulableNodesOrDie(c).Items {
+	for _, node := range nodes.Items {
 		if q, ok := node.Status.Allocatable["pods"]; ok {
 			if num, ok := q.AsInt64(); ok {
 				availablePods += int32(num)
@@ -113,17 +116,17 @@ func getPodTemplateSpec(labels map[string]string) v1.PodTemplateSpec {
 	}
 }
 
-func newOwnerDeployment(f *framework.Framework, deploymentName string, labels map[string]string) *apps.Deployment {
+func newOwnerDeployment(f *framework.Framework, deploymentName string, labels map[string]string) *appsv1.Deployment {
 	replicas := int32(2)
-	return &apps.Deployment{
+	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: deploymentName,
 		},
-		Spec: apps.DeploymentSpec{
+		Spec: appsv1.DeploymentSpec{
 			Replicas: &replicas,
 			Selector: &metav1.LabelSelector{MatchLabels: labels},
-			Strategy: apps.DeploymentStrategy{
-				Type: apps.RollingUpdateDeploymentStrategyType,
+			Strategy: appsv1.DeploymentStrategy{
+				Type: appsv1.RollingUpdateDeploymentStrategyType,
 			},
 			Template: getPodTemplateSpec(labels),
 		},
@@ -242,16 +245,16 @@ func verifyRemainingObjects(f *framework.Framework, objects map[string]int) (boo
 func gatherMetrics(f *framework.Framework) {
 	ginkgo.By("Gathering metrics")
 	var summary framework.TestDataSummary
-	grabber, err := metrics.NewMetricsGrabber(f.ClientSet, f.KubemarkExternalClusterClientSet, false, false, true, false, false)
+	grabber, err := e2emetrics.NewMetricsGrabber(f.ClientSet, f.KubemarkExternalClusterClientSet, false, false, true, false, false)
 	if err != nil {
-		e2elog.Logf("Failed to create MetricsGrabber. Skipping metrics gathering.")
+		framework.Logf("Failed to create MetricsGrabber. Skipping metrics gathering.")
 	} else {
 		received, err := grabber.Grab()
 		if err != nil {
-			e2elog.Logf("MetricsGrabber failed grab metrics. Skipping metrics gathering.")
+			framework.Logf("MetricsGrabber failed grab metrics. Skipping metrics gathering.")
 		} else {
-			summary = (*framework.MetricsForE2E)(&received)
-			e2elog.Logf(summary.PrintHumanReadable())
+			summary = (*e2emetrics.ComponentCollection)(&received)
+			framework.Logf(summary.PrintHumanReadable())
 		}
 	}
 }
@@ -653,15 +656,15 @@ var _ = SIGDescribe("Garbage collector", func() {
 			_, err := rcClient.Get(rc.Name, metav1.GetOptions{})
 			if err == nil {
 				pods, _ := podClient.List(metav1.ListOptions{})
-				e2elog.Logf("%d pods remaining", len(pods.Items))
+				framework.Logf("%d pods remaining", len(pods.Items))
 				count := 0
 				for _, pod := range pods.Items {
 					if pod.ObjectMeta.DeletionTimestamp == nil {
 						count++
 					}
 				}
-				e2elog.Logf("%d pods has nil DeletionTimestamp", count)
-				e2elog.Logf("")
+				framework.Logf("%d pods has nil DeletionTimestamp", count)
+				framework.Logf("")
 				return false, nil
 			}
 			if errors.IsNotFound(err) {
@@ -673,10 +676,10 @@ var _ = SIGDescribe("Garbage collector", func() {
 			if err2 != nil {
 				framework.Failf("%v", err2)
 			}
-			e2elog.Logf("%d remaining pods are:", len(pods.Items))
-			e2elog.Logf("The ObjectMeta of the remaining pods are:")
+			framework.Logf("%d remaining pods are:", len(pods.Items))
+			framework.Logf("The ObjectMeta of the remaining pods are:")
 			for _, pod := range pods.Items {
-				e2elog.Logf("%#v", pod.ObjectMeta)
+				framework.Logf("%#v", pod.ObjectMeta)
 			}
 			framework.Failf("failed to delete the rc: %v", err)
 		}
@@ -755,15 +758,15 @@ var _ = SIGDescribe("Garbage collector", func() {
 			_, err := rcClient.Get(rc1.Name, metav1.GetOptions{})
 			if err == nil {
 				pods, _ := podClient.List(metav1.ListOptions{})
-				e2elog.Logf("%d pods remaining", len(pods.Items))
+				framework.Logf("%d pods remaining", len(pods.Items))
 				count := 0
 				for _, pod := range pods.Items {
 					if pod.ObjectMeta.DeletionTimestamp == nil {
 						count++
 					}
 				}
-				e2elog.Logf("%d pods has nil DeletionTimestamp", count)
-				e2elog.Logf("")
+				framework.Logf("%d pods has nil DeletionTimestamp", count)
+				framework.Logf("")
 				return false, nil
 			}
 			if errors.IsNotFound(err) {
@@ -775,10 +778,10 @@ var _ = SIGDescribe("Garbage collector", func() {
 			if err2 != nil {
 				framework.Failf("%v", err2)
 			}
-			e2elog.Logf("%d remaining pods are:", len(pods.Items))
-			e2elog.Logf("ObjectMeta of remaining pods are:")
+			framework.Logf("%d remaining pods are:", len(pods.Items))
+			framework.Logf("ObjectMeta of remaining pods are:")
 			for _, pod := range pods.Items {
-				e2elog.Logf("%#v", pod.ObjectMeta)
+				framework.Logf("%#v", pod.ObjectMeta)
 			}
 			framework.Failf("failed to delete rc %s, err: %v", rc1Name, err)
 		}
@@ -830,15 +833,15 @@ var _ = SIGDescribe("Garbage collector", func() {
 		patch1 := addRefPatch(pod3.Name, pod3.UID)
 		pod1, err = podClient.Patch(pod1.Name, types.StrategicMergePatchType, patch1)
 		framework.ExpectNoError(err, "failed to apply to pod %s in namespace %s, a strategic merge patch: %s", pod1.Name, f.Namespace.Name, patch1)
-		e2elog.Logf("pod1.ObjectMeta.OwnerReferences=%#v", pod1.ObjectMeta.OwnerReferences)
+		framework.Logf("pod1.ObjectMeta.OwnerReferences=%#v", pod1.ObjectMeta.OwnerReferences)
 		patch2 := addRefPatch(pod1.Name, pod1.UID)
 		pod2, err = podClient.Patch(pod2.Name, types.StrategicMergePatchType, patch2)
 		framework.ExpectNoError(err, "failed to apply to pod %s in namespace %s, a strategic merge patch: %s", pod2.Name, f.Namespace.Name, patch2)
-		e2elog.Logf("pod2.ObjectMeta.OwnerReferences=%#v", pod2.ObjectMeta.OwnerReferences)
+		framework.Logf("pod2.ObjectMeta.OwnerReferences=%#v", pod2.ObjectMeta.OwnerReferences)
 		patch3 := addRefPatch(pod2.Name, pod2.UID)
 		pod3, err = podClient.Patch(pod3.Name, types.StrategicMergePatchType, patch3)
 		framework.ExpectNoError(err, "failed to apply to pod %s in namespace %s, a strategic merge patch: %s", pod3.Name, f.Namespace.Name, patch3)
-		e2elog.Logf("pod3.ObjectMeta.OwnerReferences=%#v", pod3.ObjectMeta.OwnerReferences)
+		framework.Logf("pod3.ObjectMeta.OwnerReferences=%#v", pod3.ObjectMeta.OwnerReferences)
 		// delete one pod, should result in the deletion of all pods
 		deleteOptions := getForegroundOptions()
 		deleteOptions.Preconditions = metav1.NewUIDPreconditions(string(pod1.UID))
@@ -858,7 +861,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 			}
 			return false, nil
 		}); err != nil {
-			e2elog.Logf("pods are %#v", pods.Items)
+			framework.Logf("pods are %#v", pods.Items)
 			framework.Failf("failed to wait for all pods to be deleted: %v", err)
 		}
 	})
@@ -876,23 +879,25 @@ var _ = SIGDescribe("Garbage collector", func() {
 
 		// Create a random custom resource definition and ensure it's available for
 		// use.
-		definition := apiextensionstestserver.NewRandomNameCustomResourceDefinition(apiextensionsv1beta1.ClusterScoped)
+		definition := apiextensionstestserver.NewRandomNameV1CustomResourceDefinition(apiextensionsv1.ClusterScoped)
 		defer func() {
-			err = apiextensionstestserver.DeleteCustomResourceDefinition(definition, apiExtensionClient)
+			err = apiextensionstestserver.DeleteV1CustomResourceDefinition(definition, apiExtensionClient)
 			if err != nil && !errors.IsNotFound(err) {
 				framework.Failf("failed to delete CustomResourceDefinition: %v", err)
 			}
 		}()
-		definition, err = apiextensionstestserver.CreateNewCustomResourceDefinition(definition, apiExtensionClient, f.DynamicClient)
+		definition, err = apiextensionstestserver.CreateNewV1CustomResourceDefinition(definition, apiExtensionClient, f.DynamicClient)
 		if err != nil {
 			framework.Failf("failed to create CustomResourceDefinition: %v", err)
 		}
+		framework.ExpectEqual(len(definition.Spec.Versions), 1, "custom resource definition should have one version")
+		version := definition.Spec.Versions[0]
 
 		// Get a client for the custom resource.
-		gvr := schema.GroupVersionResource{Group: definition.Spec.Group, Version: definition.Spec.Version, Resource: definition.Spec.Names.Plural}
+		gvr := schema.GroupVersionResource{Group: definition.Spec.Group, Version: version.Name, Resource: definition.Spec.Names.Plural}
 		resourceClient := f.DynamicClient.Resource(gvr)
 
-		apiVersion := definition.Spec.Group + "/" + definition.Spec.Version
+		apiVersion := definition.Spec.Group + "/" + version.Name
 
 		// Create a custom owner resource.
 		ownerName := names.SimpleNameGenerator.GenerateName("owner")
@@ -909,7 +914,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		if err != nil {
 			framework.Failf("failed to create owner resource %q: %v", ownerName, err)
 		}
-		e2elog.Logf("created owner resource %q", ownerName)
+		framework.Logf("created owner resource %q", ownerName)
 
 		// Create a custom dependent resource.
 		dependentName := names.SimpleNameGenerator.GenerateName("dependent")
@@ -934,7 +939,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		if err != nil {
 			framework.Failf("failed to create dependent resource %q: %v", dependentName, err)
 		}
-		e2elog.Logf("created dependent resource %q", dependentName)
+		framework.Logf("created dependent resource %q", dependentName)
 
 		// Delete the owner.
 		background := metav1.DeletePropagationBackground
@@ -948,8 +953,8 @@ var _ = SIGDescribe("Garbage collector", func() {
 			_, err := resourceClient.Get(dependentName, metav1.GetOptions{})
 			return errors.IsNotFound(err), nil
 		}); err != nil {
-			e2elog.Logf("owner: %#v", persistedOwner)
-			e2elog.Logf("dependent: %#v", persistedDependent)
+			framework.Logf("owner: %#v", persistedOwner)
+			framework.Logf("dependent: %#v", persistedDependent)
 			framework.Failf("failed waiting for dependent resource %q to be deleted", dependentName)
 		}
 
@@ -977,23 +982,25 @@ var _ = SIGDescribe("Garbage collector", func() {
 
 		// Create a random custom resource definition and ensure it's available for
 		// use.
-		definition := apiextensionstestserver.NewRandomNameCustomResourceDefinition(apiextensionsv1beta1.ClusterScoped)
+		definition := apiextensionstestserver.NewRandomNameV1CustomResourceDefinition(apiextensionsv1.ClusterScoped)
 		defer func() {
-			err = apiextensionstestserver.DeleteCustomResourceDefinition(definition, apiExtensionClient)
+			err = apiextensionstestserver.DeleteV1CustomResourceDefinition(definition, apiExtensionClient)
 			if err != nil && !errors.IsNotFound(err) {
 				framework.Failf("failed to delete CustomResourceDefinition: %v", err)
 			}
 		}()
-		definition, err = apiextensionstestserver.CreateNewCustomResourceDefinition(definition, apiExtensionClient, f.DynamicClient)
+		definition, err = apiextensionstestserver.CreateNewV1CustomResourceDefinition(definition, apiExtensionClient, f.DynamicClient)
 		if err != nil {
 			framework.Failf("failed to create CustomResourceDefinition: %v", err)
 		}
+		framework.ExpectEqual(len(definition.Spec.Versions), 1, "custom resource definition should have one version")
+		version := definition.Spec.Versions[0]
 
 		// Get a client for the custom resource.
-		gvr := schema.GroupVersionResource{Group: definition.Spec.Group, Version: definition.Spec.Version, Resource: definition.Spec.Names.Plural}
+		gvr := schema.GroupVersionResource{Group: definition.Spec.Group, Version: version.Name, Resource: definition.Spec.Names.Plural}
 		resourceClient := f.DynamicClient.Resource(gvr)
 
-		apiVersion := definition.Spec.Group + "/" + definition.Spec.Version
+		apiVersion := definition.Spec.Group + "/" + version.Name
 
 		// Create a custom owner resource.
 		ownerName := names.SimpleNameGenerator.GenerateName("owner")
@@ -1010,7 +1017,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		if err != nil {
 			framework.Failf("failed to create owner resource %q: %v", ownerName, err)
 		}
-		e2elog.Logf("created owner resource %q", ownerName)
+		framework.Logf("created owner resource %q", ownerName)
 
 		// Create a custom dependent resource.
 		dependentName := names.SimpleNameGenerator.GenerateName("dependent")
@@ -1035,7 +1042,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		if err != nil {
 			framework.Failf("failed to create dependent resource %q: %v", dependentName, err)
 		}
-		e2elog.Logf("created dependent resource %q", dependentName)
+		framework.Logf("created dependent resource %q", dependentName)
 
 		// Delete the owner and orphan the dependent.
 		err = resourceClient.Delete(ownerName, getOrphanOptions())

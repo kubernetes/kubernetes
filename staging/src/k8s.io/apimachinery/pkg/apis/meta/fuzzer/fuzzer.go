@@ -214,10 +214,6 @@ func v1FuzzerFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 			if len(j.Finalizers) == 0 {
 				j.Finalizers = nil
 			}
-			j.Initializers = nil
-		},
-		func(j *metav1.Initializers, c fuzz.Continue) {
-			j = nil
 		},
 		func(j *metav1.ListMeta, c fuzz.Continue) {
 			j.ResourceVersion = strconv.FormatUint(c.RandUint64(), 10)
@@ -276,9 +272,7 @@ func v1FuzzerFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 		},
 		func(j *metav1.ManagedFieldsEntry, c fuzz.Continue) {
 			c.FuzzNoCustom(j)
-			if j.Fields != nil && len(j.Fields.Map) == 0 {
-				j.Fields = nil
-			}
+			j.FieldsV1 = nil
 		},
 	}
 }

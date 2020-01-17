@@ -19,6 +19,7 @@ limitations under the License.
 package scheme
 
 import (
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	appsv1 "k8s.io/api/apps/v1"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
@@ -38,6 +39,7 @@ import (
 	coordinationv1 "k8s.io/api/coordination/v1"
 	coordinationv1beta1 "k8s.io/api/coordination/v1beta1"
 	corev1 "k8s.io/api/core/v1"
+	discoveryv1alpha1 "k8s.io/api/discovery/v1alpha1"
 	eventsv1beta1 "k8s.io/api/events/v1beta1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -66,6 +68,7 @@ var Scheme = runtime.NewScheme()
 var Codecs = serializer.NewCodecFactory(Scheme)
 var ParameterCodec = runtime.NewParameterCodec(Scheme)
 var localSchemeBuilder = runtime.SchemeBuilder{
+	admissionregistrationv1.AddToScheme,
 	admissionregistrationv1beta1.AddToScheme,
 	appsv1.AddToScheme,
 	appsv1beta1.AddToScheme,
@@ -85,6 +88,7 @@ var localSchemeBuilder = runtime.SchemeBuilder{
 	coordinationv1beta1.AddToScheme,
 	coordinationv1.AddToScheme,
 	corev1.AddToScheme,
+	discoveryv1alpha1.AddToScheme,
 	eventsv1beta1.AddToScheme,
 	extensionsv1beta1.AddToScheme,
 	networkingv1.AddToScheme,

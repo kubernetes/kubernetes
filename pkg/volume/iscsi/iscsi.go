@@ -235,6 +235,14 @@ func (plugin *iscsiPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*v
 	if err != nil {
 		return nil, err
 	}
+	arr := strings.Split(device, "-lun-")
+	if len(arr) < 2 {
+		return nil, fmt.Errorf("failed to retrieve lun from globalPDPath: %v", globalPDPath)
+	}
+	lun, err := strconv.Atoi(arr[1])
+	if err != nil {
+		return nil, err
+	}
 	iface, _ := extractIface(globalPDPath)
 	iscsiVolume := &v1.Volume{
 		Name: volumeName,
@@ -242,6 +250,7 @@ func (plugin *iscsiPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*v
 			ISCSI: &v1.ISCSIVolumeSource{
 				TargetPortal:   bkpPortal,
 				IQN:            iqn,
+				Lun:            int32(lun),
 				ISCSIInterface: iface,
 			},
 		},
@@ -271,6 +280,7 @@ type iscsiDisk struct {
 	Portals       []string
 	Iqn           string
 	Lun           string
+	InitIface     string
 	Iface         string
 	chapDiscovery bool
 	chapSession   bool
@@ -542,12 +552,18 @@ func createISCSIDisk(spec *volume.Spec, podUID types.UID, plugin *iscsiPlugin, m
 		return nil, err
 	}
 
+	initIface := iface
+	if initiatorName != "" {
+		iface = bkportal[0] + ":" + spec.Name()
+	}
+
 	return &iscsiDisk{
 		podUID:        podUID,
 		VolName:       spec.Name(),
 		Portals:       bkportal,
 		Iqn:           iqn,
 		Lun:           lun,
+		InitIface:     initIface,
 		Iface:         iface,
 		chapDiscovery: chapDiscovery,
 		chapSession:   chapSession,

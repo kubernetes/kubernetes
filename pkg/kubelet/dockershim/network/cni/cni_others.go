@@ -66,15 +66,22 @@ func (plugin *cniNetworkPlugin) GetPodNetworkStatus(namespace string, name strin
 		return nil, fmt.Errorf("CNI failed to retrieve network namespace path: %v", err)
 	}
 	if netnsPath == "" {
-		return nil, fmt.Errorf("Cannot find the network namespace, skipping pod network status for container %q", id)
+		return nil, fmt.Errorf("cannot find the network namespace, skipping pod network status for container %q", id)
 	}
 
-	ip, err := network.GetPodIP(plugin.execer, plugin.nsenterPath, netnsPath, network.DefaultInterfaceName)
+	ips, err := network.GetPodIPs(plugin.execer, plugin.nsenterPath, netnsPath, network.DefaultInterfaceName)
 	if err != nil {
 		return nil, err
 	}
 
-	return &network.PodNetworkStatus{IP: ip}, nil
+	if len(ips) == 0 {
+		return nil, fmt.Errorf("cannot find pod IPs in the network namespace, skipping pod network status for container %q", id)
+	}
+
+	return &network.PodNetworkStatus{
+		IP:  ips[0],
+		IPs: ips,
+	}, nil
 }
 
 // buildDNSCapabilities builds cniDNSConfig from runtimeapi.DNSConfig.

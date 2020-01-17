@@ -36,10 +36,10 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/component-base/metrics/prometheus/ratelimiter"
+	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubernetes/pkg/controller"
 	jobutil "k8s.io/kubernetes/pkg/controller/job"
-	"k8s.io/kubernetes/pkg/kubectl/scheme"
-	"k8s.io/kubernetes/pkg/util/metrics"
 )
 
 // Controller watches for changes of Jobs API objects. Triggered by Job creation
@@ -75,7 +75,7 @@ func New(jobInformer batchinformers.JobInformer, client clientset.Interface) *Co
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: client.CoreV1().Events("")})
 
 	if client != nil && client.CoreV1().RESTClient().GetRateLimiter() != nil {
-		metrics.RegisterMetricAndTrackRateLimiterUsage("ttl_after_finished_controller", client.CoreV1().RESTClient().GetRateLimiter())
+		ratelimiter.RegisterMetricAndTrackRateLimiterUsage("ttl_after_finished_controller", client.CoreV1().RESTClient().GetRateLimiter())
 	}
 
 	tc := &Controller{
@@ -105,7 +105,7 @@ func (tc *Controller) Run(workers int, stopCh <-chan struct{}) {
 	klog.Infof("Starting TTL after finished controller")
 	defer klog.Infof("Shutting down TTL after finished controller")
 
-	if !controller.WaitForCacheSync("TTL after finished", stopCh, tc.jListerSynced) {
+	if !cache.WaitForNamedCacheSync("TTL after finished", stopCh, tc.jListerSynced) {
 		return
 	}
 
@@ -267,7 +267,7 @@ func needsCleanup(j *batch.Job) bool {
 
 func getFinishAndExpireTime(j *batch.Job) (*time.Time, *time.Time, error) {
 	if !needsCleanup(j) {
-		return nil, nil, fmt.Errorf("Job %s/%s should not be cleaned up", j.Namespace, j.Name)
+		return nil, nil, fmt.Errorf("job %s/%s should not be cleaned up", j.Namespace, j.Name)
 	}
 	finishAt, err := jobFinishTime(j)
 	if err != nil {

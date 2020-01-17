@@ -24,6 +24,8 @@ import (
 	"k8s.io/client-go/discovery"
 	fakediscovery "k8s.io/client-go/discovery/fake"
 	clientset "k8s.io/client-go/kubernetes"
+	admissionregistrationv1 "k8s.io/client-go/kubernetes/typed/admissionregistration/v1"
+	fakeadmissionregistrationv1 "k8s.io/client-go/kubernetes/typed/admissionregistration/v1/fake"
 	admissionregistrationv1beta1 "k8s.io/client-go/kubernetes/typed/admissionregistration/v1beta1"
 	fakeadmissionregistrationv1beta1 "k8s.io/client-go/kubernetes/typed/admissionregistration/v1beta1/fake"
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
@@ -62,6 +64,8 @@ import (
 	fakecoordinationv1beta1 "k8s.io/client-go/kubernetes/typed/coordination/v1beta1/fake"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	fakecorev1 "k8s.io/client-go/kubernetes/typed/core/v1/fake"
+	discoveryv1alpha1 "k8s.io/client-go/kubernetes/typed/discovery/v1alpha1"
+	fakediscoveryv1alpha1 "k8s.io/client-go/kubernetes/typed/discovery/v1alpha1/fake"
 	eventsv1beta1 "k8s.io/client-go/kubernetes/typed/events/v1beta1"
 	fakeeventsv1beta1 "k8s.io/client-go/kubernetes/typed/events/v1beta1/fake"
 	extensionsv1beta1 "k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
@@ -145,6 +149,11 @@ func (c *Clientset) Tracker() testing.ObjectTracker {
 }
 
 var _ clientset.Interface = &Clientset{}
+
+// AdmissionregistrationV1 retrieves the AdmissionregistrationV1Client
+func (c *Clientset) AdmissionregistrationV1() admissionregistrationv1.AdmissionregistrationV1Interface {
+	return &fakeadmissionregistrationv1.FakeAdmissionregistrationV1{Fake: &c.Fake}
+}
 
 // AdmissionregistrationV1beta1 retrieves the AdmissionregistrationV1beta1Client
 func (c *Clientset) AdmissionregistrationV1beta1() admissionregistrationv1beta1.AdmissionregistrationV1beta1Interface {
@@ -239,6 +248,11 @@ func (c *Clientset) CoordinationV1() coordinationv1.CoordinationV1Interface {
 // CoreV1 retrieves the CoreV1Client
 func (c *Clientset) CoreV1() corev1.CoreV1Interface {
 	return &fakecorev1.FakeCoreV1{Fake: &c.Fake}
+}
+
+// DiscoveryV1alpha1 retrieves the DiscoveryV1alpha1Client
+func (c *Clientset) DiscoveryV1alpha1() discoveryv1alpha1.DiscoveryV1alpha1Interface {
+	return &fakediscoveryv1alpha1.FakeDiscoveryV1alpha1{Fake: &c.Fake}
 }
 
 // EventsV1beta1 retrieves the EventsV1beta1Client

@@ -40,7 +40,7 @@ type HostPortManager interface {
 	// Add implements port mappings.
 	// id should be a unique identifier for a pod, e.g. podSandboxID.
 	// podPortMapping is the associated port mapping information for the pod.
-	// natInterfaceName is the interface that localhost used to talk to the given pod.
+	// natInterfaceName is the interface that localhost uses to talk to the given pod, if known.
 	Add(id string, podPortMapping *PodPortMapping, natInterfaceName string) error
 	// Remove cleans up matching port mappings
 	// Remove must be able to clean up port mappings without pod IP
@@ -249,7 +249,7 @@ func (hm *hostportManager) syncIPTables(lines []byte) error {
 	klog.V(3).Infof("Restoring iptables rules: %s", lines)
 	err := hm.iptables.RestoreAll(lines, utiliptables.NoFlushTables, utiliptables.RestoreCounters)
 	if err != nil {
-		return fmt.Errorf("Failed to execute iptables-restore: %v", err)
+		return fmt.Errorf("failed to execute iptables-restore: %v", err)
 	}
 	return nil
 }
@@ -351,7 +351,7 @@ func getExistingHostportIPTablesRules(iptables utiliptables.Interface) (map[util
 		}
 	}
 
-	for _, line := range strings.Split(string(iptablesData.Bytes()), "\n") {
+	for _, line := range strings.Split(iptablesData.String(), "\n") {
 		if strings.HasPrefix(line, fmt.Sprintf("-A %s", kubeHostportChainPrefix)) ||
 			strings.HasPrefix(line, fmt.Sprintf("-A %s", string(kubeHostportsChain))) {
 			existingHostportRules = append(existingHostportRules, line)
@@ -382,8 +382,6 @@ func filterRules(rules []string, filters []utiliptables.Chain) []string {
 // filterChains deletes all entries of filter chains from chain map
 func filterChains(chains map[utiliptables.Chain]string, filterChains []utiliptables.Chain) {
 	for _, chain := range filterChains {
-		if _, ok := chains[chain]; ok {
-			delete(chains, chain)
-		}
+		delete(chains, chain)
 	}
 }

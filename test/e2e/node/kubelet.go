@@ -29,14 +29,15 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 )
 
 const (
@@ -52,10 +53,10 @@ const (
 // podNamePrefix and namespace.
 func getPodMatches(c clientset.Interface, nodeName string, podNamePrefix string, namespace string) sets.String {
 	matches := sets.NewString()
-	e2elog.Logf("Checking pods on node %v via /runningpods endpoint", nodeName)
-	runningPods, err := framework.GetKubeletPods(c, nodeName)
+	framework.Logf("Checking pods on node %v via /runningpods endpoint", nodeName)
+	runningPods, err := e2ekubelet.GetKubeletPods(c, nodeName)
 	if err != nil {
-		e2elog.Logf("Error checking running pods on %v: %v", nodeName, err)
+		framework.Logf("Error checking running pods on %v: %v", nodeName, err)
 		return matches
 	}
 	for _, pod := range runningPods.Items {
@@ -92,7 +93,7 @@ func waitTillNPodsRunningOnNodes(c clientset.Interface, nodeNames sets.String, p
 		if seen.Len() == targetNumPods {
 			return true, nil
 		}
-		e2elog.Logf("Waiting for %d pods to be running on the node; %d are currently running;", targetNumPods, seen.Len())
+		framework.Logf("Waiting for %d pods to be running on the node; %d are currently running;", targetNumPods, seen.Len())
 		return false, nil
 	})
 }
@@ -213,7 +214,7 @@ func checkPodCleanup(c clientset.Interface, pod *v1.Pod, expectClean bool) {
 	}
 
 	for _, test := range tests {
-		e2elog.Logf("Wait up to %v for host's (%v) %q to be %v", timeout, nodeIP, test.feature, condMsg)
+		framework.Logf("Wait up to %v for host's (%v) %q to be %v", timeout, nodeIP, test.feature, condMsg)
 		err = wait.Poll(poll, timeout, func() (bool, error) {
 			result, err := e2essh.NodeExec(nodeIP, test.cmd, framework.TestContext.Provider)
 			framework.ExpectNoError(err)
@@ -231,9 +232,9 @@ func checkPodCleanup(c clientset.Interface, pod *v1.Pod, expectClean bool) {
 	}
 
 	if expectClean {
-		e2elog.Logf("Pod's host has been cleaned up")
+		framework.Logf("Pod's host has been cleaned up")
 	} else {
-		e2elog.Logf("Pod's host has not been cleaned up (per expectation)")
+		framework.Logf("Pod's host has not been cleaned up (per expectation)")
 	}
 }
 
@@ -254,7 +255,7 @@ var _ = SIGDescribe("kubelet", func() {
 			numNodes        int
 			nodeNames       sets.String
 			nodeLabels      map[string]string
-			resourceMonitor *framework.ResourceMonitor
+			resourceMonitor *e2ekubelet.ResourceMonitor
 		)
 		type DeleteTest struct {
 			podsPerNode int
@@ -270,18 +271,11 @@ var _ = SIGDescribe("kubelet", func() {
 			// nodes we observe initially.
 			nodeLabels = make(map[string]string)
 			nodeLabels["kubelet_cleanup"] = "true"
-			nodes := framework.GetReadySchedulableNodesOrDie(c)
+			nodes, err := e2enode.GetBoundedReadySchedulableNodes(c, maxNodesToCheck)
 			numNodes = len(nodes.Items)
-			gomega.Expect(numNodes).NotTo(gomega.BeZero())
+			framework.ExpectNoError(err)
 			nodeNames = sets.NewString()
-			// If there are a lot of nodes, we don't want to use all of them
-			// (if there are 1000 nodes in the cluster, starting 10 pods/node
-			// will take ~10 minutes today). And there is also deletion phase.
-			// Instead, we choose at most 10 nodes.
-			if numNodes > maxNodesToCheck {
-				numNodes = maxNodesToCheck
-			}
-			for i := 0; i < numNodes; i++ {
+			for i := 0; i < len(nodes.Items); i++ {
 				nodeNames.Insert(nodes.Items[i].Name)
 			}
 			for nodeName := range nodeNames {
@@ -290,9 +284,15 @@ var _ = SIGDescribe("kubelet", func() {
 				}
 			}
 
+			// While we only use a bounded number of nodes in the test. We need to know
+			// the actual number of nodes in the cluster, to avoid running resourceMonitor
+			// against large clusters.
+			actualNodes, err := e2enode.GetReadySchedulableNodes(c)
+			framework.ExpectNoError(err)
+
 			// Start resourceMonitor only in small clusters.
-			if len(nodes.Items) <= maxNodesToCheck {
-				resourceMonitor = framework.NewResourceMonitor(f.ClientSet, framework.TargetContainers(), containerStatsPollingInterval)
+			if len(actualNodes.Items) <= maxNodesToCheck {
+				resourceMonitor = e2ekubelet.NewResourceMonitor(f.ClientSet, e2ekubelet.TargetContainers(), containerStatsPollingInterval)
 				resourceMonitor.Start()
 			}
 		})
@@ -348,7 +348,7 @@ var _ = SIGDescribe("kubelet", func() {
 				start := time.Now()
 				err = waitTillNPodsRunningOnNodes(f.ClientSet, nodeNames, rcName, ns, 0, itArg.timeout)
 				framework.ExpectNoError(err)
-				e2elog.Logf("Deleting %d pods on %d nodes completed in %v after the RC was deleted", totalPods, len(nodeNames),
+				framework.Logf("Deleting %d pods on %d nodes completed in %v after the RC was deleted", totalPods, len(nodeNames),
 					time.Since(start))
 				if resourceMonitor != nil {
 					resourceMonitor.LogCPUSummary()
@@ -396,9 +396,9 @@ var _ = SIGDescribe("kubelet", func() {
 			})
 
 			ginkgo.AfterEach(func() {
-				err := framework.DeletePodWithWait(f, c, pod)
+				err := e2epod.DeletePodWithWait(c, pod)
 				framework.ExpectNoError(err, "AfterEach: Failed to delete client pod ", pod.Name)
-				err = framework.DeletePodWithWait(f, c, nfsServerPod)
+				err = e2epod.DeletePodWithWait(c, nfsServerPod)
 				framework.ExpectNoError(err, "AfterEach: Failed to delete server pod ", nfsServerPod.Name)
 			})
 
@@ -411,7 +411,7 @@ var _ = SIGDescribe("kubelet", func() {
 					stopNfsServer(nfsServerPod)
 
 					ginkgo.By("Delete the pod mounted to the NFS volume -- expect failure")
-					err := framework.DeletePodWithWait(f, c, pod)
+					err := e2epod.DeletePodWithWait(c, pod)
 					framework.ExpectError(err)
 					// pod object is now stale, but is intentionally not nil
 

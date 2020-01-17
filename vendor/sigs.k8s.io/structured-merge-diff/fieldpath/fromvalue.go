@@ -117,7 +117,7 @@ func GuessBestListPathElement(index int, item value.Value) PathElement {
 		keys = append(keys, *f)
 	}
 	if len(keys) > 0 {
-		return PathElement{Key: keys}
+		return PathElement{Key: &value.Map{Items: keys}}
 	}
 	return PathElement{Index: &index}
 }

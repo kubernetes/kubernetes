@@ -22,7 +22,6 @@ import (
 
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -39,7 +38,7 @@ type Policy struct {
 	// RequiredDuringScheduling affinity is not symmetric, but there is an implicit PreferredDuringScheduling affinity rule
 	// corresponding to every RequiredDuringScheduling affinity rule.
 	// HardPodAffinitySymmetricWeight represents the weight of implicit PreferredDuringScheduling affinity rule, in the range 1-100.
-	HardPodAffinitySymmetricWeight int `json:"hardPodAffinitySymmetricWeight"`
+	HardPodAffinitySymmetricWeight int32 `json:"hardPodAffinitySymmetricWeight"`
 
 	// When AlwaysCheckAllPredicates is set to true, scheduler checks all
 	// the configured predicates even after one or more of them fails.
@@ -66,7 +65,7 @@ type PriorityPolicy struct {
 	Name string `json:"name"`
 	// The numeric multiplier for the node scores that the priority function generates
 	// The weight should be non-zero and can be a positive or a negative integer
-	Weight int `json:"weight"`
+	Weight int64 `json:"weight"`
 	// Holds the parameters to configure the given priority function
 	Argument *PriorityArgument `json:"argument"`
 }
@@ -127,25 +126,34 @@ type LabelPreference struct {
 	Presence bool `json:"presence"`
 }
 
-// RequestedToCapacityRatioArguments holds arguments specific to RequestedToCapacityRatio priority function
+// RequestedToCapacityRatioArguments holds arguments specific to RequestedToCapacityRatio priority function.
 type RequestedToCapacityRatioArguments struct {
-	// Array of point defining priority function shape
+	// Array of point defining priority function shape.
 	UtilizationShape []UtilizationShapePoint `json:"shape"`
+	Resources        []ResourceSpec          `json:"resources,omitempty"`
 }
 
-// UtilizationShapePoint represents single point of priority function shape
+// UtilizationShapePoint represents single point of priority function shape.
 type UtilizationShapePoint struct {
 	// Utilization (x axis). Valid values are 0 to 100. Fully utilized node maps to 100.
-	Utilization int `json:"utilization"`
+	Utilization int32 `json:"utilization"`
 	// Score assigned to given utilization (y axis). Valid values are 0 to 10.
-	Score int `json:"score"`
+	Score int32 `json:"score"`
+}
+
+// ResourceSpec represents single resource and weight for bin packing of priority RequestedToCapacityRatioArguments.
+type ResourceSpec struct {
+	// Name of the resource to be managed by RequestedToCapacityRatio function.
+	Name apiv1.ResourceName `json:"name"`
+	// Weight of the resource.
+	Weight int64 `json:"weight,omitempty"`
 }
 
 // ExtenderManagedResource describes the arguments of extended resources
 // managed by an extender.
 type ExtenderManagedResource struct {
 	// Name is the extended resource name.
-	Name apiv1.ResourceName `json:"name,casttype=ResourceName"`
+	Name apiv1.ResourceName `json:"name"`
 	// IgnoredByScheduler indicates whether kube-scheduler should ignore this
 	// resource when applying predicates.
 	IgnoredByScheduler bool `json:"ignoredByScheduler,omitempty"`
@@ -191,7 +199,7 @@ type ExtenderConfig struct {
 	PrioritizeVerb string `json:"prioritizeVerb,omitempty"`
 	// The numeric multiplier for the node scores that the prioritize call generates.
 	// The weight should be a positive integer
-	Weight int `json:"weight,omitempty"`
+	Weight int64 `json:"weight,omitempty"`
 	// Verb for the bind call, empty if not supported. This verb is appended to the URLPrefix when issuing the bind call to extender.
 	// If this method is implemented by the extender, it is the extender's responsibility to bind the pod to apiserver. Only one extender
 	// can implement this function.
@@ -232,115 +240,4 @@ type caseInsensitiveExtenderConfig *ExtenderConfig
 // This preserves compatibility with incorrect case-insensitive configuration fields.
 func (t *ExtenderConfig) UnmarshalJSON(b []byte) error {
 	return gojson.Unmarshal(b, caseInsensitiveExtenderConfig(t))
-}
-
-// ExtenderArgs represents the arguments needed by the extender to filter/prioritize
-// nodes for a pod.
-type ExtenderArgs struct {
-	// Pod being scheduled
-	Pod *apiv1.Pod `json:"pod"`
-	// List of candidate nodes where the pod can be scheduled; to be populated
-	// only if ExtenderConfig.NodeCacheCapable == false
-	Nodes *apiv1.NodeList `json:"nodes,omitempty"`
-	// List of candidate node names where the pod can be scheduled; to be
-	// populated only if ExtenderConfig.NodeCacheCapable == true
-	NodeNames *[]string `json:"nodenames,omitempty"`
-}
-
-// ExtenderPreemptionResult represents the result returned by preemption phase of extender.
-type ExtenderPreemptionResult struct {
-	NodeNameToMetaVictims map[string]*MetaVictims `json:"nodeNameToMetaVictims,omitempty"`
-}
-
-// ExtenderPreemptionArgs represents the arguments needed by the extender to preempt pods on nodes.
-type ExtenderPreemptionArgs struct {
-	// Pod being scheduled
-	Pod *apiv1.Pod `json:"pod"`
-	// Victims map generated by scheduler preemption phase
-	// Only set NodeNameToMetaVictims if ExtenderConfig.NodeCacheCapable == true. Otherwise, only set NodeNameToVictims.
-	NodeNameToVictims     map[string]*Victims     `json:"nodeToVictims,omitempty"`
-	NodeNameToMetaVictims map[string]*MetaVictims `json:"nodeNameToMetaVictims,omitempty"`
-}
-
-// Victims represents:
-//   pods:  a group of pods expected to be preempted.
-//   numPDBViolations: the count of violations of PodDisruptionBudget
-type Victims struct {
-	Pods             []*apiv1.Pod `json:"pods"`
-	NumPDBViolations int          `json:"numPDBViolations"`
-}
-
-// MetaPod represent identifier for a v1.Pod
-type MetaPod struct {
-	UID string `json:"uid"`
-}
-
-// MetaVictims represents:
-//   pods:  a group of pods expected to be preempted.
-//     Only Pod identifiers will be sent and user are expect to get v1.Pod in their own way.
-//   numPDBViolations: the count of violations of PodDisruptionBudget
-type MetaVictims struct {
-	Pods             []*MetaPod `json:"pods"`
-	NumPDBViolations int        `json:"numPDBViolations"`
-}
-
-// FailedNodesMap represents the filtered out nodes, with node names and failure messages
-type FailedNodesMap map[string]string
-
-// ExtenderFilterResult represents the results of a filter call to an extender
-type ExtenderFilterResult struct {
-	// Filtered set of nodes where the pod can be scheduled; to be populated
-	// only if ExtenderConfig.NodeCacheCapable == false
-	Nodes *apiv1.NodeList `json:"nodes,omitempty"`
-	// Filtered set of nodes where the pod can be scheduled; to be populated
-	// only if ExtenderConfig.NodeCacheCapable == true
-	NodeNames *[]string `json:"nodenames,omitempty"`
-	// Filtered out nodes where the pod can't be scheduled and the failure messages
-	FailedNodes FailedNodesMap `json:"failedNodes,omitempty"`
-	// Error message indicating failure
-	Error string `json:"error,omitempty"`
-}
-
-// ExtenderBindingArgs represents the arguments to an extender for binding a pod to a node.
-type ExtenderBindingArgs struct {
-	// PodName is the name of the pod being bound
-	PodName string
-	// PodNamespace is the namespace of the pod being bound
-	PodNamespace string
-	// PodUID is the UID of the pod being bound
-	PodUID types.UID
-	// Node selected by the scheduler
-	Node string
-}
-
-// ExtenderBindingResult represents the result of binding of a pod to a node from an extender.
-type ExtenderBindingResult struct {
-	// Error message indicating failure
-	Error string
-}
-
-// HostPriority represents the priority of scheduling to a particular host, higher priority is better.
-type HostPriority struct {
-	// Name of the host
-	Host string `json:"host"`
-	// Score associated with the host
-	Score int `json:"score"`
-}
-
-// HostPriorityList declares a []HostPriority type.
-type HostPriorityList []HostPriority
-
-func (h HostPriorityList) Len() int {
-	return len(h)
-}
-
-func (h HostPriorityList) Less(i, j int) bool {
-	if h[i].Score == h[j].Score {
-		return h[i].Host < h[j].Host
-	}
-	return h[i].Score < h[j].Score
-}
-
-func (h HostPriorityList) Swap(i, j int) {
-	h[i], h[j] = h[j], h[i]
 }

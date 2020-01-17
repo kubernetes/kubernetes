@@ -20,12 +20,12 @@ go_test(
     srcs = ["reconciler_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/kubelet/apis/pluginregistration/v1:go_default_library",
         "//pkg/kubelet/pluginmanager/cache:go_default_library",
         "//pkg/kubelet/pluginmanager/operationexecutor:go_default_library",
         "//pkg/kubelet/pluginmanager/pluginwatcher:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//staging/src/k8s.io/client-go/tools/record:go_default_library",
+        "//staging/src/k8s.io/kubelet/pkg/apis/pluginregistration/v1:go_default_library",
         "//vendor/github.com/stretchr/testify/require:go_default_library",
     ],
 )

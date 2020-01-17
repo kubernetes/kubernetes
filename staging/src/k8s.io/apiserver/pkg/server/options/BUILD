@@ -11,6 +11,7 @@ go_library(
         "coreapi.go",
         "deprecated_insecure_serving.go",
         "doc.go",
+        "egress_selector.go",
         "etcd.go",
         "events.go",
         "feature.go",
@@ -48,6 +49,7 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/audit:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/audit/policy:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/authenticatorfactory:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/authentication/request/x509:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authorization/authorizer:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authorization/authorizerfactory:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authorization/path:go_default_library",
@@ -56,7 +58,9 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/registry/generic:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/registry/generic/registry:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/server/egressselector:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server/healthz:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/server/options/encryptionconfig:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server/resourceconfig:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server/storage:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/storage/storagebackend:go_default_library",
@@ -82,6 +86,7 @@ go_library(
         "//vendor/gopkg.in/natefinch/lumberjack.v2:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
         "//vendor/k8s.io/kube-openapi/pkg/common:go_default_library",
+        "//vendor/k8s.io/utils/path:go_default_library",
     ],
 )
 

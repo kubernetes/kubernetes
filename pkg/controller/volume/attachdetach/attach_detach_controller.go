@@ -24,7 +24,7 @@ import (
 	"time"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -43,7 +43,6 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/metrics"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/populator"
@@ -113,20 +112,6 @@ func NewAttachDetachController(
 	disableReconciliationSync bool,
 	reconcilerSyncDuration time.Duration,
 	timerConfig TimerConfig) (AttachDetachController, error) {
-	// TODO: The default resyncPeriod for shared informers is 12 hours, this is
-	// unacceptable for the attach/detach controller. For example, if a pod is
-	// skipped because the node it is scheduled to didn't set its annotation in
-	// time, we don't want to have to wait 12hrs before processing the pod
-	// again.
-	// Luckily https://github.com/kubernetes/kubernetes/issues/23394 is being
-	// worked on and will split resync in to resync and relist. Once that
-	// happens the resync period can be set to something much faster (30
-	// seconds).
-	// If that issue is not resolved in time, then this controller will have to
-	// consider some unappealing alternate options: use a non-shared informer
-	// and set a faster resync period even if it causes relist, or requeue
-	// dropped pods so they are continuously processed until it is accepted or
-	// deleted (probably can't do this with sharedInformer), etc.
 	adc := &attachDetachController{
 		kubeClient:  kubeClient,
 		pvcLister:   pvcInformer.Lister(),
@@ -204,9 +189,12 @@ func NewAttachDetachController(
 
 	// This custom indexer will index pods by its PVC keys. Then we don't need
 	// to iterate all pods every time to find pods which reference given PVC.
-	adc.podIndexer.AddIndexers(kcache.Indexers{
+	err := adc.podIndexer.AddIndexers(kcache.Indexers{
 		pvcKeyIndex: indexByPVCKey,
 	})
+	if err != nil {
+		klog.Warningf("adding indexer got %v", err)
+	}
 
 	nodeInformer.Informer().AddEventHandler(kcache.ResourceEventHandlerFuncs{
 		AddFunc:    adc.nodeAdd,
@@ -343,7 +331,7 @@ func (adc *attachDetachController) Run(stopCh <-chan struct{}) {
 		synced = append(synced, adc.csiDriversSynced)
 	}
 
-	if !controller.WaitForCacheSync("attach detach", stopCh, synced...) {
+	if !kcache.WaitForNamedCacheSync("attach detach", stopCh, synced...) {
 		return
 	}
 
@@ -779,7 +767,7 @@ func (adc *attachDetachController) DeleteServiceAccountTokenFunc() func(types.UI
 }
 
 func (adc *attachDetachController) GetExec(pluginName string) mount.Exec {
-	return mount.NewOsExec()
+	return mount.NewOSExec()
 }
 
 func (adc *attachDetachController) addNodeToDswp(node *v1.Node, nodeName types.NodeName) {

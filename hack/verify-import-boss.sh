@@ -25,4 +25,4 @@ kube::golang::setup_env
 
 make -C "${KUBE_ROOT}" WHAT=vendor/k8s.io/code-generator/cmd/import-boss
 
-$(kube::util::find-binary "import-boss") --verify-only
+$(kube::util::find-binary "import-boss") --verify-only "$@"

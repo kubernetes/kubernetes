@@ -105,17 +105,13 @@ func NodeSSHHosts(c clientset.Interface) ([]string, error) {
 	nodelist := waitListSchedulableNodesOrDie(c)
 
 	hosts := nodeAddresses(nodelist, v1.NodeExternalIP)
-	// If ExternalIPs aren't set, assume the test programs can reach the
-	// InternalIP. Simplified exception logic here assumes that the hosts will
-	// either all have ExternalIP or none will. Simplifies handling here and
-	// should be adequate since the setting of the external IPs is provider
-	// specific: they should either all have them or none of them will.
-	if len(hosts) == 0 {
+	// If  ExternalIPs aren't available for all nodes, try falling back to the InternalIPs.
+	if len(hosts) < len(nodelist.Items) {
 		e2elog.Logf("No external IP address on nodes, falling back to internal IPs")
 		hosts = nodeAddresses(nodelist, v1.NodeInternalIP)
 	}
 
-	// Error if any node didn't have an external/internal IP.
+	// Error if neither External nor Internal IPs weren't available for all nodes.
 	if len(hosts) != len(nodelist.Items) {
 		return hosts, fmt.Errorf(
 			"only found %d IPs on nodes, but found %d nodes. Nodelist: %v",

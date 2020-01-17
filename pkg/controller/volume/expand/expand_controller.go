@@ -24,7 +24,7 @@ import (
 	"k8s.io/klog"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
@@ -41,9 +41,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	cloudprovider "k8s.io/cloud-provider"
-	csitranslation "k8s.io/csi-translation-lib"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/volume/events"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
@@ -61,6 +59,11 @@ const (
 // ExpandController expands the pvs
 type ExpandController interface {
 	Run(stopCh <-chan struct{})
+}
+
+// CSINameTranslator can get the CSI Driver name based on the in-tree plugin name
+type CSINameTranslator interface {
+	GetCSINameFromInTreeName(pluginName string) (string, error)
 }
 
 type expandController struct {
@@ -93,15 +96,19 @@ type expandController struct {
 	operationGenerator operationexecutor.OperationGenerator
 
 	queue workqueue.RateLimitingInterface
+
+	translator CSINameTranslator
 }
 
+// NewExpandController expands the pvs
 func NewExpandController(
 	kubeClient clientset.Interface,
 	pvcInformer coreinformers.PersistentVolumeClaimInformer,
 	pvInformer coreinformers.PersistentVolumeInformer,
 	scInformer storageclassinformer.StorageClassInformer,
 	cloud cloudprovider.Interface,
-	plugins []volume.VolumePlugin) (ExpandController, error) {
+	plugins []volume.VolumePlugin,
+	translator CSINameTranslator) (ExpandController, error) {
 
 	expc := &expandController{
 		kubeClient:        kubeClient,
@@ -113,6 +120,7 @@ func NewExpandController(
 		classLister:       scInformer.Lister(),
 		classListerSynced: scInformer.Informer().HasSynced,
 		queue:             workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "volume_expand"),
+		translator:        translator,
 	}
 
 	if err := expc.volumePluginMgr.InitPlugins(plugins, nil, expc); err != nil {
@@ -255,7 +263,7 @@ func (expc *expandController) syncHandler(key string) error {
 	if volumePlugin.IsMigratedToCSI() {
 		msg := fmt.Sprintf("CSI migration enabled for %s; waiting for external resizer to expand the pvc", volumeResizerName)
 		expc.recorder.Event(pvc, v1.EventTypeNormal, events.ExternalExpanding, msg)
-		csiResizerName, err := csitranslation.GetCSINameFromInTreeName(class.Provisioner)
+		csiResizerName, err := expc.translator.GetCSINameFromInTreeName(class.Provisioner)
 		if err != nil {
 			errorMsg := fmt.Sprintf("error getting CSI driver name for pvc %s, with error %v", util.ClaimToClaimKey(pvc), err)
 			expc.recorder.Event(pvc, v1.EventTypeWarning, events.ExternalExpanding, errorMsg)
@@ -300,7 +308,7 @@ func (expc *expandController) Run(stopCh <-chan struct{}) {
 	klog.Infof("Starting expand controller")
 	defer klog.Infof("Shutting down expand controller")
 
-	if !controller.WaitForCacheSync("expand", stopCh, expc.pvcsSynced, expc.pvSynced, expc.classListerSynced) {
+	if !cache.WaitForNamedCacheSync("expand", stopCh, expc.pvcsSynced, expc.pvSynced, expc.classListerSynced) {
 		return
 	}
 
@@ -373,7 +381,7 @@ func (expc *expandController) GetMounter(pluginName string) mount.Interface {
 }
 
 func (expc *expandController) GetExec(pluginName string) mount.Exec {
-	return mount.NewOsExec()
+	return mount.NewOSExec()
 }
 
 func (expc *expandController) GetHostName() string {

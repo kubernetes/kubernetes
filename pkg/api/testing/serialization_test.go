@@ -27,7 +27,7 @@ import (
 
 	jsoniter "github.com/json-iterator/go"
 	appsv1 "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
 	"k8s.io/apimachinery/pkg/api/apitesting/roundtrip"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -47,6 +47,7 @@ import (
 	k8s_apps_v1 "k8s.io/kubernetes/pkg/apis/apps/v1"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
+	"sigs.k8s.io/yaml"
 )
 
 // fuzzInternalObject fuzzes an arbitrary runtime object using the appropriate
@@ -424,6 +425,25 @@ func benchmarkItems(b *testing.B) []v1.Pod {
 	return items
 }
 
+func benchmarkItemsList(b *testing.B, numItems int) v1.PodList {
+	apiObjectFuzzer := fuzzer.FuzzerFor(FuzzerFuncs, rand.NewSource(benchmarkSeed), legacyscheme.Codecs)
+	items := make([]v1.Pod, numItems)
+	for i := range items {
+		var pod api.Pod
+		apiObjectFuzzer.Fuzz(&pod)
+		pod.Spec.InitContainers, pod.Status.InitContainerStatuses = nil, nil
+		out, err := legacyscheme.Scheme.ConvertToVersion(&pod, v1.SchemeGroupVersion)
+		if err != nil {
+			panic(err)
+		}
+		items[i] = *out.(*v1.Pod)
+	}
+
+	return v1.PodList{
+		Items: items,
+	}
+}
+
 // BenchmarkEncodeCodec measures the cost of performing a codec encode, which includes
 // reflection (to clear APIVersion and Kind)
 func BenchmarkEncodeCodec(b *testing.B) {
@@ -610,6 +630,43 @@ func BenchmarkDecodeIntoJSONCodecGenConfigCompatibleWithStandardLibrary(b *testi
 	for i := 0; i < b.N; i++ {
 		obj := v1.Pod{}
 		if err := iter.Unmarshal(encoded[i%width], &obj); err != nil {
+			b.Fatal(err)
+		}
+	}
+	b.StopTimer()
+}
+
+// BenchmarkEncodeYAMLMarshal provides a baseline for regular YAML encode performance
+func BenchmarkEncodeYAMLMarshal(b *testing.B) {
+	items := benchmarkItems(b)
+	width := len(items)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if _, err := yaml.Marshal(&items[i%width]); err != nil {
+			b.Fatal(err)
+		}
+	}
+	b.StopTimer()
+}
+
+// BenchmarkDecodeYAML provides a baseline for regular YAML decode performance
+func BenchmarkDecodeIntoYAML(b *testing.B) {
+	codec := testapi.Default.Codec()
+	items := benchmarkItems(b)
+	width := len(items)
+	encoded := make([][]byte, width)
+	for i := range items {
+		data, err := runtime.Encode(codec, &items[i])
+		if err != nil {
+			b.Fatal(err)
+		}
+		encoded[i] = data
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		obj := v1.Pod{}
+		if err := yaml.Unmarshal(encoded[i%width], &obj); err != nil {
 			b.Fatal(err)
 		}
 	}

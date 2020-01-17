@@ -21,7 +21,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"reflect"
 	"testing"
 
 	"github.com/pmezard/go-difflib/difflib"
@@ -198,95 +197,6 @@ func TestInitConfigurationMarshallingFromFile(t *testing.T) {
 	}
 }
 */
-
-func TestConsistentOrderByteSlice(t *testing.T) {
-	var (
-		aKind = "Akind"
-		aFile = []byte(`
-kind: Akind
-apiVersion: foo.k8s.io/v1
-`)
-		aaKind = "Aakind"
-		aaFile = []byte(`
-kind: Aakind
-apiVersion: foo.k8s.io/v1
-`)
-		abKind = "Abkind"
-		abFile = []byte(`
-kind: Abkind
-apiVersion: foo.k8s.io/v1
-`)
-	)
-	var tests = []struct {
-		name     string
-		in       map[string][]byte
-		expected [][]byte
-	}{
-		{
-			name: "a_aa_ab",
-			in: map[string][]byte{
-				aKind:  aFile,
-				aaKind: aaFile,
-				abKind: abFile,
-			},
-			expected: [][]byte{aaFile, abFile, aFile},
-		},
-		{
-			name: "a_ab_aa",
-			in: map[string][]byte{
-				aKind:  aFile,
-				abKind: abFile,
-				aaKind: aaFile,
-			},
-			expected: [][]byte{aaFile, abFile, aFile},
-		},
-		{
-			name: "aa_a_ab",
-			in: map[string][]byte{
-				aaKind: aaFile,
-				aKind:  aFile,
-				abKind: abFile,
-			},
-			expected: [][]byte{aaFile, abFile, aFile},
-		},
-		{
-			name: "aa_ab_a",
-			in: map[string][]byte{
-				aaKind: aaFile,
-				abKind: abFile,
-				aKind:  aFile,
-			},
-			expected: [][]byte{aaFile, abFile, aFile},
-		},
-		{
-			name: "ab_a_aa",
-			in: map[string][]byte{
-				abKind: abFile,
-				aKind:  aFile,
-				aaKind: aaFile,
-			},
-			expected: [][]byte{aaFile, abFile, aFile},
-		},
-		{
-			name: "ab_aa_a",
-			in: map[string][]byte{
-				abKind: abFile,
-				aaKind: aaFile,
-				aKind:  aFile,
-			},
-			expected: [][]byte{aaFile, abFile, aFile},
-		},
-	}
-
-	for _, rt := range tests {
-		t.Run(rt.name, func(t2 *testing.T) {
-			actual := consistentOrderByteSlice(rt.in)
-			if !reflect.DeepEqual(rt.expected, actual) {
-				t2.Errorf("the expected and actual output differs.\n\texpected: %s\n\tout: %s\n", rt.expected, actual)
-			}
-		})
-	}
-}
 
 func TestDefaultTaintsMarshaling(t *testing.T) {
 	tests := []struct {

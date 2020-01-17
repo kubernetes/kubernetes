@@ -23,17 +23,18 @@ import (
 
 	"github.com/pkg/errors"
 
-	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
-	rbac "k8s.io/api/rbac/v1"
-	storage "k8s.io/api/storage/v1"
+	appsv1 "k8s.io/api/apps/v1"
+	v1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
+	storagev1 "k8s.io/api/storage/v1"
+	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/cache"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 )
 
@@ -115,7 +116,7 @@ func visitManifests(cb func([]byte) error, files ...string) error {
 func (f *Framework) PatchItems(items ...interface{}) error {
 	for _, item := range items {
 		// Uncomment when debugging the loading and patching of items.
-		// e2elog.Logf("patching original content of %T:\n%s", item, PrettyPrint(item))
+		// Logf("patching original content of %T:\n%s", item, PrettyPrint(item))
 		if err := f.patchItemRecursively(item); err != nil {
 			return err
 		}
@@ -154,7 +155,7 @@ func (f *Framework) CreateItems(items ...interface{}) (func(), error) {
 		// to non-namespaced items.
 		for _, destructor := range destructors {
 			if err := destructor(); err != nil && !apierrs.IsNotFound(err) {
-				e2elog.Logf("deleting failed: %s", err)
+				Logf("deleting failed: %s", err)
 			}
 		}
 	}
@@ -167,12 +168,12 @@ func (f *Framework) CreateItems(items ...interface{}) (func(), error) {
 		description := DescribeItem(item)
 		// Uncomment this line to get a full dump of the entire item.
 		// description = fmt.Sprintf("%s:\n%s", description, PrettyPrint(item))
-		e2elog.Logf("creating %s", description)
+		Logf("creating %s", description)
 		for _, factory := range factories {
 			destructor, err := factory.Create(f, item)
 			if destructor != nil {
 				destructors = append(destructors, func() error {
-					e2elog.Logf("deleting %s", description)
+					Logf("deleting %s", description)
 					return destructor()
 				})
 			}
@@ -278,6 +279,7 @@ var errorItemNotSupported = errors.New("not supported")
 var factories = map[What]ItemFactory{
 	{"ClusterRole"}:        &clusterRoleFactory{},
 	{"ClusterRoleBinding"}: &clusterRoleBindingFactory{},
+	{"CSIDriver"}:          &csiDriverFactory{},
 	{"DaemonSet"}:          &daemonSetFactory{},
 	{"Role"}:               &roleFactory{},
 	{"RoleBinding"}:        &roleBindingFactory{},
@@ -307,9 +309,9 @@ func (f *Framework) PatchNamespace(item *string) {
 
 func (f *Framework) patchItemRecursively(item interface{}) error {
 	switch item := item.(type) {
-	case *rbac.Subject:
+	case *rbacv1.Subject:
 		f.PatchNamespace(&item.Namespace)
-	case *rbac.RoleRef:
+	case *rbacv1.RoleRef:
 		// TODO: avoid hard-coding this special name. Perhaps add a Framework.PredefinedRoles
 		// which contains all role names that are defined cluster-wide before the test starts?
 		// All those names are excempt from renaming. That list could be populated by querying
@@ -317,21 +319,23 @@ func (f *Framework) patchItemRecursively(item interface{}) error {
 		if item.Name != "e2e-test-privileged-psp" {
 			f.PatchName(&item.Name)
 		}
-	case *rbac.ClusterRole:
+	case *rbacv1.ClusterRole:
 		f.PatchName(&item.Name)
-	case *rbac.Role:
+	case *rbacv1.Role:
 		f.PatchNamespace(&item.Namespace)
 		// Roles are namespaced, but because for RoleRef above we don't
 		// know whether the referenced role is a ClusterRole or Role
 		// and therefore always renames, we have to do the same here.
 		f.PatchName(&item.Name)
-	case *storage.StorageClass:
+	case *storagev1.StorageClass:
+		f.PatchName(&item.Name)
+	case *storagev1beta1.CSIDriver:
 		f.PatchName(&item.Name)
 	case *v1.ServiceAccount:
 		f.PatchNamespace(&item.ObjectMeta.Namespace)
 	case *v1.Secret:
 		f.PatchNamespace(&item.ObjectMeta.Namespace)
-	case *rbac.ClusterRoleBinding:
+	case *rbacv1.ClusterRoleBinding:
 		f.PatchName(&item.Name)
 		for i := range item.Subjects {
 			if err := f.patchItemRecursively(&item.Subjects[i]); err != nil {
@@ -341,7 +345,7 @@ func (f *Framework) patchItemRecursively(item interface{}) error {
 		if err := f.patchItemRecursively(&item.RoleRef); err != nil {
 			return errors.Wrapf(err, "%T", f)
 		}
-	case *rbac.RoleBinding:
+	case *rbacv1.RoleBinding:
 		f.PatchNamespace(&item.Namespace)
 		for i := range item.Subjects {
 			if err := f.patchItemRecursively(&item.Subjects[i]); err != nil {
@@ -353,10 +357,22 @@ func (f *Framework) patchItemRecursively(item interface{}) error {
 		}
 	case *v1.Service:
 		f.PatchNamespace(&item.ObjectMeta.Namespace)
-	case *apps.StatefulSet:
+	case *appsv1.StatefulSet:
 		f.PatchNamespace(&item.ObjectMeta.Namespace)
-	case *apps.DaemonSet:
+		if err := e2epod.PatchContainerImages(item.Spec.Template.Spec.Containers); err != nil {
+			return err
+		}
+		if err := e2epod.PatchContainerImages(item.Spec.Template.Spec.InitContainers); err != nil {
+			return err
+		}
+	case *appsv1.DaemonSet:
 		f.PatchNamespace(&item.ObjectMeta.Namespace)
+		if err := e2epod.PatchContainerImages(item.Spec.Template.Spec.Containers); err != nil {
+			return err
+		}
+		if err := e2epod.PatchContainerImages(item.Spec.Template.Spec.InitContainers); err != nil {
+			return err
+		}
 	default:
 		return errors.Errorf("missing support for patching item of type %T", item)
 	}
@@ -391,16 +407,16 @@ func (*serviceAccountFactory) Create(f *Framework, i interface{}) (func() error,
 type clusterRoleFactory struct{}
 
 func (f *clusterRoleFactory) New() runtime.Object {
-	return &rbac.ClusterRole{}
+	return &rbacv1.ClusterRole{}
 }
 
 func (*clusterRoleFactory) Create(f *Framework, i interface{}) (func() error, error) {
-	item, ok := i.(*rbac.ClusterRole)
+	item, ok := i.(*rbacv1.ClusterRole)
 	if !ok {
 		return nil, errorItemNotSupported
 	}
 
-	e2elog.Logf("Define cluster role %v", item.GetName())
+	Logf("Define cluster role %v", item.GetName())
 	client := f.ClientSet.RbacV1().ClusterRoles()
 	if _, err := client.Create(item); err != nil {
 		return nil, errors.Wrap(err, "create ClusterRole")
@@ -413,11 +429,11 @@ func (*clusterRoleFactory) Create(f *Framework, i interface{}) (func() error, er
 type clusterRoleBindingFactory struct{}
 
 func (f *clusterRoleBindingFactory) New() runtime.Object {
-	return &rbac.ClusterRoleBinding{}
+	return &rbacv1.ClusterRoleBinding{}
 }
 
 func (*clusterRoleBindingFactory) Create(f *Framework, i interface{}) (func() error, error) {
-	item, ok := i.(*rbac.ClusterRoleBinding)
+	item, ok := i.(*rbacv1.ClusterRoleBinding)
 	if !ok {
 		return nil, errorItemNotSupported
 	}
@@ -434,11 +450,11 @@ func (*clusterRoleBindingFactory) Create(f *Framework, i interface{}) (func() er
 type roleFactory struct{}
 
 func (f *roleFactory) New() runtime.Object {
-	return &rbac.Role{}
+	return &rbacv1.Role{}
 }
 
 func (*roleFactory) Create(f *Framework, i interface{}) (func() error, error) {
-	item, ok := i.(*rbac.Role)
+	item, ok := i.(*rbacv1.Role)
 	if !ok {
 		return nil, errorItemNotSupported
 	}
@@ -455,11 +471,11 @@ func (*roleFactory) Create(f *Framework, i interface{}) (func() error, error) {
 type roleBindingFactory struct{}
 
 func (f *roleBindingFactory) New() runtime.Object {
-	return &rbac.RoleBinding{}
+	return &rbacv1.RoleBinding{}
 }
 
 func (*roleBindingFactory) Create(f *Framework, i interface{}) (func() error, error) {
-	item, ok := i.(*rbac.RoleBinding)
+	item, ok := i.(*rbacv1.RoleBinding)
 	if !ok {
 		return nil, errorItemNotSupported
 	}
@@ -497,11 +513,11 @@ func (*serviceFactory) Create(f *Framework, i interface{}) (func() error, error)
 type statefulSetFactory struct{}
 
 func (f *statefulSetFactory) New() runtime.Object {
-	return &apps.StatefulSet{}
+	return &appsv1.StatefulSet{}
 }
 
 func (*statefulSetFactory) Create(f *Framework, i interface{}) (func() error, error) {
-	item, ok := i.(*apps.StatefulSet)
+	item, ok := i.(*appsv1.StatefulSet)
 	if !ok {
 		return nil, errorItemNotSupported
 	}
@@ -518,11 +534,11 @@ func (*statefulSetFactory) Create(f *Framework, i interface{}) (func() error, er
 type daemonSetFactory struct{}
 
 func (f *daemonSetFactory) New() runtime.Object {
-	return &apps.DaemonSet{}
+	return &appsv1.DaemonSet{}
 }
 
 func (*daemonSetFactory) Create(f *Framework, i interface{}) (func() error, error) {
-	item, ok := i.(*apps.DaemonSet)
+	item, ok := i.(*appsv1.DaemonSet)
 	if !ok {
 		return nil, errorItemNotSupported
 	}
@@ -539,11 +555,11 @@ func (*daemonSetFactory) Create(f *Framework, i interface{}) (func() error, erro
 type storageClassFactory struct{}
 
 func (f *storageClassFactory) New() runtime.Object {
-	return &storage.StorageClass{}
+	return &storagev1.StorageClass{}
 }
 
 func (*storageClassFactory) Create(f *Framework, i interface{}) (func() error, error) {
-	item, ok := i.(*storage.StorageClass)
+	item, ok := i.(*storagev1.StorageClass)
 	if !ok {
 		return nil, errorItemNotSupported
 	}
@@ -551,6 +567,27 @@ func (*storageClassFactory) Create(f *Framework, i interface{}) (func() error, e
 	client := f.ClientSet.StorageV1().StorageClasses()
 	if _, err := client.Create(item); err != nil {
 		return nil, errors.Wrap(err, "create StorageClass")
+	}
+	return func() error {
+		return client.Delete(item.GetName(), &metav1.DeleteOptions{})
+	}, nil
+}
+
+type csiDriverFactory struct{}
+
+func (f *csiDriverFactory) New() runtime.Object {
+	return &storagev1beta1.CSIDriver{}
+}
+
+func (*csiDriverFactory) Create(f *Framework, i interface{}) (func() error, error) {
+	item, ok := i.(*storagev1beta1.CSIDriver)
+	if !ok {
+		return nil, errorItemNotSupported
+	}
+
+	client := f.ClientSet.StorageV1beta1().CSIDrivers()
+	if _, err := client.Create(item); err != nil {
+		return nil, errors.Wrap(err, "create CSIDriver")
 	}
 	return func() error {
 		return client.Delete(item.GetName(), &metav1.DeleteOptions{})

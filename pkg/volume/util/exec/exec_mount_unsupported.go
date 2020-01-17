@@ -20,12 +20,13 @@ package exec
 
 import (
 	"errors"
-	"os"
 
 	"k8s.io/kubernetes/pkg/util/mount"
 )
 
 type execMounter struct{}
+
+var _ = mount.Interface(&execMounter{})
 
 // NewExecMounter returns a mounter that uses provided Exec interface to mount and
 // unmount a filesystem. For all other calls it uses a wrapped mounter.
@@ -45,62 +46,10 @@ func (mounter *execMounter) List() ([]mount.MountPoint, error) {
 	return []mount.MountPoint{}, nil
 }
 
-func (mounter *execMounter) IsMountPointMatch(mp mount.MountPoint, dir string) bool {
-	return (mp.Path == dir)
-}
-
 func (mounter *execMounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	return true, nil
 }
 
-func (mounter *execMounter) GetDeviceNameFromMount(mountPath, pluginMountDir string) (string, error) {
-	return "", nil
-}
-
-func (mounter *execMounter) DeviceOpened(pathname string) (bool, error) {
-	return false, nil
-}
-
-func (mounter *execMounter) PathIsDevice(pathname string) (bool, error) {
-	return true, nil
-}
-
-func (mounter *execMounter) MakeRShared(path string) error {
-	return nil
-}
-
-func (mounter *execMounter) GetFileType(pathname string) (mount.FileType, error) {
-	return mount.FileType("fake"), errors.New("not implemented")
-}
-
-func (mounter *execMounter) MakeDir(pathname string) error {
-	return nil
-}
-
-func (mounter *execMounter) MakeFile(pathname string) error {
-	return nil
-}
-
-func (mounter *execMounter) ExistsPath(pathname string) (bool, error) {
-	return true, errors.New("not implemented")
-}
-
-func (mounter *execMounter) EvalHostSymlinks(pathname string) (string, error) {
-	return "", errors.New("not implemented")
-}
-
 func (mounter *execMounter) GetMountRefs(pathname string) ([]string, error) {
 	return nil, errors.New("not implemented")
-}
-
-func (mounter *execMounter) GetFSGroup(pathname string) (int64, error) {
-	return -1, errors.New("not implemented")
-}
-
-func (mounter *execMounter) GetSELinuxSupport(pathname string) (bool, error) {
-	return false, errors.New("not implemented")
-}
-
-func (mounter *execMounter) GetMode(pathname string) (os.FileMode, error) {
-	return 0, errors.New("not implemented")
 }

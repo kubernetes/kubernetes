@@ -20,26 +20,21 @@ import (
 	"net"
 	"strconv"
 
-	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	componentbaseconfigv1alpha1 "k8s.io/component-base/config/v1alpha1"
-	kubescedulerconfigv1alpha1 "k8s.io/kube-scheduler/config/v1alpha1"
+	kubeschedulerconfigv1alpha1 "k8s.io/kube-scheduler/config/v1alpha1"
 
 	// this package shouldn't really depend on other k8s.io/kubernetes code
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/master/ports"
 )
 
-// When the --failure-domains scheduler flag is not specified,
-// DefaultFailureDomains defines the set of label keys used when TopologyKey is empty in PreferredDuringScheduling anti-affinity.
-var defaultFailureDomains string = v1.LabelHostname + "," + v1.LabelZoneFailureDomain + "," + v1.LabelZoneRegion
-
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	return RegisterDefaults(scheme)
 }
 
 // SetDefaults_KubeSchedulerConfiguration sets additional defaults
-func SetDefaults_KubeSchedulerConfiguration(obj *kubescedulerconfigv1alpha1.KubeSchedulerConfiguration) {
+func SetDefaults_KubeSchedulerConfiguration(obj *kubeschedulerconfigv1alpha1.KubeSchedulerConfiguration) {
 	if len(obj.SchedulerName) == 0 {
 		obj.SchedulerName = api.DefaultSchedulerName
 	}
@@ -50,7 +45,7 @@ func SetDefaults_KubeSchedulerConfiguration(obj *kubescedulerconfigv1alpha1.Kube
 
 	if obj.AlgorithmSource.Policy == nil &&
 		(obj.AlgorithmSource.Provider == nil || len(*obj.AlgorithmSource.Provider) == 0) {
-		val := kubescedulerconfigv1alpha1.SchedulerDefaultProviderName
+		val := kubeschedulerconfigv1alpha1.SchedulerDefaultProviderName
 		obj.AlgorithmSource.Provider = &val
 	}
 
@@ -78,11 +73,11 @@ func SetDefaults_KubeSchedulerConfiguration(obj *kubescedulerconfigv1alpha1.Kube
 		obj.MetricsBindAddress = net.JoinHostPort("0.0.0.0", strconv.Itoa(ports.InsecureSchedulerPort))
 	}
 
-	if len(obj.LeaderElection.LockObjectNamespace) == 0 {
-		obj.LeaderElection.LockObjectNamespace = kubescedulerconfigv1alpha1.SchedulerDefaultLockObjectNamespace
+	if len(obj.LeaderElection.LockObjectNamespace) == 0 && len(obj.LeaderElection.ResourceNamespace) == 0 {
+		obj.LeaderElection.LockObjectNamespace = kubeschedulerconfigv1alpha1.SchedulerDefaultLockObjectNamespace
 	}
-	if len(obj.LeaderElection.LockObjectName) == 0 {
-		obj.LeaderElection.LockObjectName = kubescedulerconfigv1alpha1.SchedulerDefaultLockObjectName
+	if len(obj.LeaderElection.LockObjectName) == 0 && len(obj.LeaderElection.ResourceName) == 0 {
+		obj.LeaderElection.LockObjectName = kubeschedulerconfigv1alpha1.SchedulerDefaultLockObjectName
 	}
 
 	if len(obj.ClientConnection.ContentType) == 0 {
@@ -102,5 +97,15 @@ func SetDefaults_KubeSchedulerConfiguration(obj *kubescedulerconfigv1alpha1.Kube
 	if obj.BindTimeoutSeconds == nil {
 		defaultBindTimeoutSeconds := int64(600)
 		obj.BindTimeoutSeconds = &defaultBindTimeoutSeconds
+	}
+
+	if obj.PodInitialBackoffSeconds == nil {
+		defaultPodInitialBackoffSeconds := int64(1)
+		obj.PodInitialBackoffSeconds = &defaultPodInitialBackoffSeconds
+	}
+
+	if obj.PodMaxBackoffSeconds == nil {
+		defaultPodMaxBackoffSeconds := int64(10)
+		obj.PodMaxBackoffSeconds = &defaultPodMaxBackoffSeconds
 	}
 }

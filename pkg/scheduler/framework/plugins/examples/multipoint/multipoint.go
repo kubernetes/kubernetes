@@ -17,17 +17,17 @@ limitations under the License.
 package multipoint
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
 
 // CommunicatingPlugin is an example of a plugin that implements two
-// extension points. It communicates through pluginContext with another function.
+// extension points. It communicates through state with another function.
 type CommunicatingPlugin struct{}
 
 var _ = framework.ReservePlugin(CommunicatingPlugin{})
-var _ = framework.PrebindPlugin(CommunicatingPlugin{})
+var _ = framework.PreBindPlugin(CommunicatingPlugin{})
 
 // Name is the name of the plug used in Registry and configurations.
 const Name = "multipoint-communicating-plugin"
@@ -37,28 +37,41 @@ func (mc CommunicatingPlugin) Name() string {
 	return Name
 }
 
+type stateData struct {
+	data string
+}
+
+func (f *stateData) Clone() framework.StateData {
+	copy := &stateData{
+		data: f.data,
+	}
+	return copy
+}
+
 // Reserve is the functions invoked by the framework at "reserve" extension point.
-func (mc CommunicatingPlugin) Reserve(pc *framework.PluginContext, pod *v1.Pod, nodeName string) *framework.Status {
+func (mc CommunicatingPlugin) Reserve(state *framework.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
 	if pod == nil {
 		return framework.NewStatus(framework.Error, "pod cannot be nil")
 	}
 	if pod.Name == "my-test-pod" {
-		pc.Lock()
-		pc.Write(framework.ContextKey(pod.Name), "never bind")
-		pc.Unlock()
+		state.Lock()
+		state.Write(framework.StateKey(pod.Name), &stateData{data: "never bind"})
+		state.Unlock()
 	}
 	return nil
 }
 
-// Prebind is the functions invoked by the framework at "prebind" extension point.
-func (mc CommunicatingPlugin) Prebind(pc *framework.PluginContext, pod *v1.Pod, nodeName string) *framework.Status {
+// PreBind is the functions invoked by the framework at "prebind" extension point.
+func (mc CommunicatingPlugin) PreBind(state *framework.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
 	if pod == nil {
 		return framework.NewStatus(framework.Error, "pod cannot be nil")
 	}
-	pc.RLock()
-	defer pc.RUnlock()
-	if v, e := pc.Read(framework.ContextKey(pod.Name)); e == nil && v == "never bind" {
-		return framework.NewStatus(framework.Unschedulable, "pod is not permitted")
+	state.RLock()
+	defer state.RUnlock()
+	if v, e := state.Read(framework.StateKey(pod.Name)); e == nil {
+		if value, ok := v.(*stateData); ok && value.data == "never bind" {
+			return framework.NewStatus(framework.Unschedulable, "pod is not permitted")
+		}
 	}
 	return nil
 }

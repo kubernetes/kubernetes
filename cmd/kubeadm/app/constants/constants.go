@@ -23,6 +23,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -31,6 +32,7 @@ import (
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
+	utilnet "k8s.io/utils/net"
 )
 
 const (
@@ -86,6 +88,8 @@ const (
 
 	// EtcdListenClientPort defines the port etcd listen on for client traffic
 	EtcdListenClientPort = 2379
+	// EtcdMetricsPort is the port at which to obtain etcd metrics and health status
+	EtcdMetricsPort = 2381
 
 	// EtcdPeerCertAndKeyBaseName defines etcd's peer certificate and key base name
 	EtcdPeerCertAndKeyBaseName = "etcd/peer"
@@ -258,7 +262,7 @@ const (
 	MinExternalEtcdVersion = "3.2.18"
 
 	// DefaultEtcdVersion indicates the default etcd version that kubeadm uses
-	DefaultEtcdVersion = "3.3.10"
+	DefaultEtcdVersion = "3.3.15-0"
 
 	// PauseVersion indicates the default pause image version for kubeadm
 	PauseVersion = "3.1"
@@ -331,7 +335,7 @@ const (
 	KubeDNSVersion = "1.14.13"
 
 	// CoreDNSVersion is the version of CoreDNS to be deployed if it is used
-	CoreDNSVersion = "1.3.1"
+	CoreDNSVersion = "1.6.2"
 
 	// ClusterConfigurationKind is the string kind value for the ClusterConfiguration struct
 	ClusterConfigurationKind = "ClusterConfiguration"
@@ -354,6 +358,35 @@ const (
 
 	// KubeadmCertsSecret specifies in what Secret in the kube-system namespace the certificates should be stored
 	KubeadmCertsSecret = "kubeadm-certs"
+
+	// KubeletPort is the default port for the kubelet server on each host machine.
+	// May be overridden by a flag at startup.
+	KubeletPort = 10250
+	// InsecureSchedulerPort is the default port for the scheduler status server.
+	// May be overridden by a flag at startup.
+	// Deprecated: use the secure KubeSchedulerPort instead.
+	InsecureSchedulerPort = 10251
+	// InsecureKubeControllerManagerPort is the default port for the controller manager status server.
+	// May be overridden by a flag at startup.
+	// Deprecated: use the secure KubeControllerManagerPort instead.
+	InsecureKubeControllerManagerPort = 10252
+
+	// Mode* constants were copied from pkg/kubeapiserver/authorizer/modes
+	// to avoid kubeadm dependency on the internal module
+	// TODO: share Mode* constants in component config
+
+	// ModeAlwaysAllow is the mode to set all requests as authorized
+	ModeAlwaysAllow string = "AlwaysAllow"
+	// ModeAlwaysDeny is the mode to set no requests as authorized
+	ModeAlwaysDeny string = "AlwaysDeny"
+	// ModeABAC is the mode to use Attribute Based Access Control to authorize
+	ModeABAC string = "ABAC"
+	// ModeWebhook is the mode to make an external webhook call to authorize
+	ModeWebhook string = "Webhook"
+	// ModeRBAC is the mode to use Role Based Access Control to authorize
+	ModeRBAC string = "RBAC"
+	// ModeNode is an authorization mode that authorizes API requests made by kubelets.
+	ModeNode string = "Node"
 )
 
 var (
@@ -379,21 +412,22 @@ var (
 	ControlPlaneComponents = []string{KubeAPIServer, KubeControllerManager, KubeScheduler}
 
 	// MinimumControlPlaneVersion specifies the minimum control plane version kubeadm can deploy
-	MinimumControlPlaneVersion = version.MustParseSemantic("v1.13.0")
+	MinimumControlPlaneVersion = version.MustParseSemantic("v1.16.0")
 
 	// MinimumKubeletVersion specifies the minimum version of kubelet which kubeadm supports
-	MinimumKubeletVersion = version.MustParseSemantic("v1.13.0")
+	MinimumKubeletVersion = version.MustParseSemantic("v1.16.0")
 
 	// CurrentKubernetesVersion specifies current Kubernetes version supported by kubeadm
-	CurrentKubernetesVersion = version.MustParseSemantic("v1.14.0")
+	CurrentKubernetesVersion = version.MustParseSemantic("v1.17.0")
 
 	// SupportedEtcdVersion lists officially supported etcd versions with corresponding Kubernetes releases
 	SupportedEtcdVersion = map[uint8]string{
-		12: "3.2.24",
 		13: "3.2.24",
 		14: "3.3.10",
 		15: "3.3.10",
-		16: "3.3.10",
+		16: "3.3.15-0",
+		17: "3.3.15-0",
+		18: "3.3.15-0",
 	}
 
 	// KubeadmCertsClusterRoleName sets the name for the ClusterRole that allows
@@ -416,7 +450,7 @@ func EtcdSupportedVersion(versionString string) (*version.Version, error) {
 		}
 		return etcdVersion, nil
 	}
-	return nil, errors.Errorf("Unsupported or unknown Kubernetes version(%v)", kubernetesVersion)
+	return nil, errors.Errorf("unsupported or unknown Kubernetes version(%v)", kubernetesVersion)
 }
 
 // GetStaticPodDirectory returns the location on the disk where the Static Pod should be present
@@ -490,20 +524,56 @@ func CreateTimestampDirForKubeadm(kubernetesDir, dirName string) (string, error)
 }
 
 // GetDNSIP returns a dnsIP, which is 10th IP in svcSubnet CIDR range
-func GetDNSIP(svcSubnet string) (net.IP, error) {
+func GetDNSIP(svcSubnetList string, isDualStack bool) (net.IP, error) {
 	// Get the service subnet CIDR
-	_, svcSubnetCIDR, err := net.ParseCIDR(svcSubnet)
+	svcSubnetCIDR, err := GetKubernetesServiceCIDR(svcSubnetList, isDualStack)
 	if err != nil {
-		return nil, errors.Wrapf(err, "couldn't parse service subnet CIDR %q", svcSubnet)
+		return nil, errors.Wrapf(err, "unable to get internal Kubernetes Service IP from the given service CIDR (%s)", svcSubnetList)
 	}
 
 	// Selects the 10th IP in service subnet CIDR range as dnsIP
 	dnsIP, err := ipallocator.GetIndexedIP(svcSubnetCIDR, 10)
 	if err != nil {
-		return nil, errors.Wrapf(err, "unable to get tenth IP address from service subnet CIDR %s", svcSubnetCIDR.String())
+		return nil, errors.Wrap(err, "unable to get internal Kubernetes Service IP from the given service CIDR")
 	}
 
 	return dnsIP, nil
+}
+
+// GetKubernetesServiceCIDR returns the default Service CIDR for the Kubernetes internal service
+func GetKubernetesServiceCIDR(svcSubnetList string, isDualStack bool) (*net.IPNet, error) {
+	if isDualStack {
+		// The default service address family for the cluster is the address family of the first
+		// service cluster IP range configured via the `--service-cluster-ip-range` flag
+		// of the kube-controller-manager and kube-apiserver.
+		svcSubnets, err := utilnet.ParseCIDRs(strings.Split(svcSubnetList, ","))
+		if err != nil {
+			return nil, errors.Wrapf(err, "unable to parse ServiceSubnet %v", svcSubnetList)
+		}
+		if len(svcSubnets) == 0 {
+			return nil, errors.New("received empty ServiceSubnet for dual-stack")
+		}
+		return svcSubnets[0], nil
+	}
+	// internal IP address for the API server
+	_, svcSubnet, err := net.ParseCIDR(svcSubnetList)
+	if err != nil {
+		return nil, errors.Wrapf(err, "unable to parse ServiceSubnet %v", svcSubnetList)
+	}
+	return svcSubnet, nil
+}
+
+// GetAPIServerVirtualIP returns the IP of the internal Kubernetes API service
+func GetAPIServerVirtualIP(svcSubnetList string, isDualStack bool) (net.IP, error) {
+	svcSubnet, err := GetKubernetesServiceCIDR(svcSubnetList, isDualStack)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to get internal Kubernetes Service IP from the given service CIDR")
+	}
+	internalAPIServerVirtualIP, err := ipallocator.GetIndexedIP(svcSubnet, 1)
+	if err != nil {
+		return nil, errors.Wrapf(err, "unable to get the first IP address from the given CIDR: %s", svcSubnet.String())
+	}
+	return internalAPIServerVirtualIP, nil
 }
 
 // GetStaticPodAuditPolicyFile returns the path to the audit policy file within a static pod

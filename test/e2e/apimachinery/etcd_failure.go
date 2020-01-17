@@ -25,7 +25,6 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/test/e2e/apps"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -44,6 +43,7 @@ var _ = SIGDescribe("Etcd failure [Disruptive]", func() {
 		// ... so the provider check should be identical to the intersection of
 		// providers that provide those capabilities.
 		framework.SkipUnlessProviderIs("gce")
+		framework.SkipUnlessSSHKeyPresent()
 
 		err := framework.RunRC(testutils.RCConfig{
 			Client:    f.ClientSet,
@@ -115,7 +115,7 @@ func checkExistingRCRecovers(f *framework.Framework) {
 		options := metav1.ListOptions{LabelSelector: rcSelector.String()}
 		pods, err := podClient.List(options)
 		if err != nil {
-			e2elog.Logf("apiserver returned error, as expected before recovery: %v", err)
+			framework.Logf("apiserver returned error, as expected before recovery: %v", err)
 			return false, nil
 		}
 		if len(pods.Items) == 0 {
@@ -125,7 +125,7 @@ func checkExistingRCRecovers(f *framework.Framework) {
 			err = podClient.Delete(pod.Name, metav1.NewDeleteOptions(0))
 			framework.ExpectNoError(err, "failed to delete pod %s in namespace: %s", pod.Name, f.Namespace.Name)
 		}
-		e2elog.Logf("apiserver has recovered")
+		framework.Logf("apiserver has recovered")
 		return true, nil
 	}))
 

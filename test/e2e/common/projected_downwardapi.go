@@ -24,6 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
@@ -86,7 +87,9 @@ var _ = ginkgo.Describe("[sig-storage] Projected downwardAPI", func() {
 		})
 	})
 
-	ginkgo.It("should provide podname as non-root with fsgroup [NodeFeature:FSGroup]", func() {
+	ginkgo.It("should provide podname as non-root with fsgroup [LinuxOnly] [NodeFeature:FSGroup]", func() {
+		// Windows does not support RunAsUser / FSGroup SecurityContext options.
+		framework.SkipIfNodeOSDistroIs("windows")
 		podName := "metadata-volume-" + string(uuid.NewUUID())
 		uid := int64(1001)
 		gid := int64(1234)
@@ -100,7 +103,9 @@ var _ = ginkgo.Describe("[sig-storage] Projected downwardAPI", func() {
 		})
 	})
 
-	ginkgo.It("should provide podname as non-root with fsgroup and defaultMode [NodeFeature:FSGroup]", func() {
+	ginkgo.It("should provide podname as non-root with fsgroup and defaultMode [LinuxOnly] [NodeFeature:FSGroup]", func() {
+		// Windows does not support RunAsUser / FSGroup SecurityContext options, and it does not support setting file permissions.
+		framework.SkipIfNodeOSDistroIs("windows")
 		podName := "metadata-volume-" + string(uuid.NewUUID())
 		uid := int64(1001)
 		gid := int64(1234)
@@ -132,7 +137,7 @@ var _ = ginkgo.Describe("[sig-storage] Projected downwardAPI", func() {
 		podClient.CreateSync(pod)
 
 		gomega.Eventually(func() (string, error) {
-			return framework.GetPodLogs(f.ClientSet, f.Namespace.Name, podName, containerName)
+			return e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, podName, containerName)
 		},
 			podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("key1=\"value1\"\n"))
 
@@ -142,7 +147,7 @@ var _ = ginkgo.Describe("[sig-storage] Projected downwardAPI", func() {
 		})
 
 		gomega.Eventually(func() (string, error) {
-			return framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, containerName)
+			return e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, containerName)
 		},
 			podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("key3=\"value3\"\n"))
 	})
@@ -166,7 +171,7 @@ var _ = ginkgo.Describe("[sig-storage] Projected downwardAPI", func() {
 		framework.ExpectNoError(err, "Failed to get pod %q", pod.Name)
 
 		gomega.Eventually(func() (string, error) {
-			return framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, containerName)
+			return e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, containerName)
 		},
 			podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("builder=\"bar\"\n"))
 
@@ -176,7 +181,7 @@ var _ = ginkgo.Describe("[sig-storage] Projected downwardAPI", func() {
 		})
 
 		gomega.Eventually(func() (string, error) {
-			return framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, containerName)
+			return e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, containerName)
 		},
 			podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("builder=\"foo\"\n"))
 	})

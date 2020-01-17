@@ -29,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	instrumentation "k8s.io/kubernetes/test/e2e/instrumentation/common"
 
 	gcm "google.golang.org/api/monitoring/v3"
@@ -84,7 +83,7 @@ func testStackdriverMonitoring(f *framework.Framework, pods, allPodsCPU int, per
 	// and uncomment following lines (comment out the two lines above): (DON'T set the env var below)
 	/*
 		ts, err := google.DefaultTokenSource(oauth2.NoContext)
-		e2elog.Logf("Couldn't get application default credentials, %v", err)
+		framework.Logf("Couldn't get application default credentials, %v", err)
 		if err != nil {
 			framework.Failf("Error accessing application default credentials, %v", err)
 		}
@@ -111,7 +110,7 @@ func testStackdriverMonitoring(f *framework.Framework, pods, allPodsCPU int, per
 	pollingFunction := checkForMetrics(projectID, gcmService, time.Now(), metricsMap, allPodsCPU, perPodCPU)
 	err = wait.Poll(pollFrequency, pollTimeout, pollingFunction)
 	if err != nil {
-		e2elog.Logf("Missing metrics: %+v\n", metricsMap)
+		framework.Logf("Missing metrics: %+v\n", metricsMap)
 	}
 	framework.ExpectNoError(err)
 }
@@ -130,9 +129,9 @@ func checkForMetrics(projectID string, gcmService *gcm.Service, start time.Time,
 			if len(ts) > 0 {
 				counter = counter + 1
 				metricsMap[metric] = true
-				e2elog.Logf("Received %v timeseries for metric %v\n", len(ts), metric)
+				framework.Logf("Received %v timeseries for metric %v\n", len(ts), metric)
 			} else {
-				e2elog.Logf("No timeseries for metric %v\n", metric)
+				framework.Logf("No timeseries for metric %v\n", metric)
 			}
 
 			var sum float64
@@ -149,10 +148,10 @@ func checkForMetrics(projectID string, gcmService *gcm.Service, start time.Time,
 						}
 					}
 					sum = sum + *max.Value.DoubleValue
-					e2elog.Logf("Received %v points for metric %v\n",
+					framework.Logf("Received %v points for metric %v\n",
 						len(t.Points), metric)
 				}
-				e2elog.Logf("Most recent cpu/utilization sum*cpu/limit: %v\n", sum*float64(cpuLimit))
+				framework.Logf("Most recent cpu/utilization sum*cpu/limit: %v\n", sum*float64(cpuLimit))
 				if math.Abs(sum*float64(cpuLimit)-float64(cpuUsed)) > tolerance*float64(cpuUsed) {
 					return false, nil
 				}

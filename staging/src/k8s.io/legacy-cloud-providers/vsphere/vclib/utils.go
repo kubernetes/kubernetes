@@ -152,7 +152,7 @@ func GetDatastorePathObjFromVMDiskPath(vmDiskPath string) (*object.DatastorePath
 	isSuccess := datastorePathObj.FromString(vmDiskPath)
 	if !isSuccess {
 		klog.Errorf("Failed to parse volPath: %s", vmDiskPath)
-		return nil, fmt.Errorf("Failed to parse volPath: %s", vmDiskPath)
+		return nil, fmt.Errorf("failed to parse volPath: %s", vmDiskPath)
 	}
 	return datastorePathObj, nil
 }

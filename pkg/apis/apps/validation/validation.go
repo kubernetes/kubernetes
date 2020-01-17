@@ -255,6 +255,7 @@ func ValidateDaemonSetUpdate(ds, oldDS *apps.DaemonSet) field.ErrorList {
 	return allErrs
 }
 
+// ValidateDaemonSetSpecUpdate tests if an update to a DaemonSetSpec is valid.
 func ValidateDaemonSetSpecUpdate(newSpec, oldSpec *apps.DaemonSetSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
@@ -291,7 +292,7 @@ func validateDaemonSetStatus(status *apps.DaemonSetStatus, fldPath *field.Path) 
 	return allErrs
 }
 
-// ValidateDaemonSetStatusUpdate validates tests if required fields in the DaemonSet Status section
+// ValidateDaemonSetStatusUpdate tests if required fields in the DaemonSet Status section
 func ValidateDaemonSetStatusUpdate(ds, oldDS *apps.DaemonSet) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&ds.ObjectMeta, &oldDS.ObjectMeta, field.NewPath("metadata"))
 	allErrs = append(allErrs, validateDaemonSetStatus(&ds.Status, field.NewPath("status"))...)
@@ -340,6 +341,7 @@ func ValidateDaemonSetSpec(spec *apps.DaemonSetSpec, fldPath *field.Path) field.
 	return allErrs
 }
 
+// ValidateRollingUpdateDaemonSet validates a given RollingUpdateDaemonSet.
 func ValidateRollingUpdateDaemonSet(rollingUpdate *apps.RollingUpdateDaemonSet, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, ValidatePositiveIntOrPercent(rollingUpdate.MaxUnavailable, fldPath.Child("maxUnavailable"))...)
@@ -352,6 +354,7 @@ func ValidateRollingUpdateDaemonSet(rollingUpdate *apps.RollingUpdateDaemonSet, 
 	return allErrs
 }
 
+// ValidateDaemonSetUpdateStrategy validates a given DaemonSetUpdateStrategy.
 func ValidateDaemonSetUpdateStrategy(strategy *apps.DaemonSetUpdateStrategy, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	switch strategy.Type {
@@ -378,6 +381,8 @@ var ValidateDaemonSetName = apimachineryvalidation.NameIsDNSSubdomain
 // ValidateDeploymentName validates that the given name can be used as a deployment name.
 var ValidateDeploymentName = apimachineryvalidation.NameIsDNSSubdomain
 
+// ValidatePositiveIntOrPercent tests if a given value is a valid int or
+// percentage.
 func ValidatePositiveIntOrPercent(intOrPercent intstr.IntOrString, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	switch intOrPercent.Type {
@@ -412,6 +417,8 @@ func getIntOrPercentValue(intOrStringValue intstr.IntOrString) int {
 	return intOrStringValue.IntValue()
 }
 
+// IsNotMoreThan100Percent tests is a value can be represented as a percentage
+// and if this value is not more than 100%.
 func IsNotMoreThan100Percent(intOrStringValue intstr.IntOrString, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	value, isPercent := getPercentValue(intOrStringValue)
@@ -422,6 +429,7 @@ func IsNotMoreThan100Percent(intOrStringValue intstr.IntOrString, fldPath *field
 	return allErrs
 }
 
+// ValidateRollingUpdateDeployment validates a given RollingUpdateDeployment.
 func ValidateRollingUpdateDeployment(rollingUpdate *apps.RollingUpdateDeployment, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, ValidatePositiveIntOrPercent(rollingUpdate.MaxUnavailable, fldPath.Child("maxUnavailable"))...)
@@ -435,6 +443,7 @@ func ValidateRollingUpdateDeployment(rollingUpdate *apps.RollingUpdateDeployment
 	return allErrs
 }
 
+// ValidateDeploymentStrategy validates given DeploymentStrategy.
 func ValidateDeploymentStrategy(strategy *apps.DeploymentStrategy, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	switch strategy.Type {
@@ -456,6 +465,7 @@ func ValidateDeploymentStrategy(strategy *apps.DeploymentStrategy, fldPath *fiel
 	return allErrs
 }
 
+// ValidateRollback validates given RollbackConfig.
 func ValidateRollback(rollback *apps.RollbackConfig, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	v := rollback.Revision
@@ -530,12 +540,15 @@ func ValidateDeploymentStatus(status *apps.DeploymentStatus, fldPath *field.Path
 	return allErrs
 }
 
+// ValidateDeploymentUpdate tests if an update to a Deployment is valid.
 func ValidateDeploymentUpdate(update, old *apps.Deployment) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&update.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata"))
 	allErrs = append(allErrs, ValidateDeploymentSpec(&update.Spec, field.NewPath("spec"))...)
 	return allErrs
 }
 
+// ValidateDeploymentStatusUpdate tests if a an update to a Deployment status
+// is valid.
 func ValidateDeploymentStatusUpdate(update, old *apps.Deployment) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&update.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata"))
 	fldPath := field.NewPath("status")
@@ -550,12 +563,14 @@ func ValidateDeploymentStatusUpdate(update, old *apps.Deployment) field.ErrorLis
 	return allErrs
 }
 
+// ValidateDeployment validates a given Deployment.
 func ValidateDeployment(obj *apps.Deployment) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMeta(&obj.ObjectMeta, true, ValidateDeploymentName, field.NewPath("metadata"))
 	allErrs = append(allErrs, ValidateDeploymentSpec(&obj.Spec, field.NewPath("spec"))...)
 	return allErrs
 }
 
+// ValidateDeploymentRollback validates a given DeploymentRollback.
 func ValidateDeploymentRollback(obj *apps.DeploymentRollback) field.ErrorList {
 	allErrs := apivalidation.ValidateAnnotations(obj.UpdatedAnnotations, field.NewPath("updatedAnnotations"))
 	if len(obj.Name) == 0 {
@@ -594,6 +609,7 @@ func ValidateReplicaSetStatusUpdate(rs, oldRs *apps.ReplicaSet) field.ErrorList 
 	return allErrs
 }
 
+// ValidateReplicaSetStatus validates a given ReplicaSetStatus.
 func ValidateReplicaSetStatus(status apps.ReplicaSetStatus, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.Replicas), fldPath.Child("replicas"))...)

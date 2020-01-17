@@ -46,8 +46,6 @@ type mustMatchPatterns struct {
 
 var (
 	_ SysctlsStrategy = &mustMatchPatterns{}
-
-	defaultSysctlsPatterns = []string{"*"}
 )
 
 // NewMustMatchPatterns creates a new mustMatchPatterns strategy that will provide validation.

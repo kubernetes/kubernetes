@@ -29,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
@@ -207,14 +208,14 @@ func testPodSELinuxLabeling(f *framework.Framework, hostIPC bool, hostPID bool) 
 	pod, err := client.Create(pod)
 
 	framework.ExpectNoError(err, "Error creating pod %v", pod)
-	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(f.ClientSet, pod))
+	framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(f.ClientSet, pod))
 
 	testContent := "hello"
 	testFilePath := mountPath + "/TEST"
 	err = f.WriteFileViaContainer(pod.Name, pod.Spec.Containers[0].Name, testFilePath, testContent)
-	gomega.Expect(err).To(gomega.BeNil())
+	framework.ExpectNoError(err)
 	content, err := f.ReadFileViaContainer(pod.Name, pod.Spec.Containers[0].Name, testFilePath)
-	gomega.Expect(err).To(gomega.BeNil())
+	framework.ExpectNoError(err)
 	gomega.Expect(content).To(gomega.ContainSubstring(testContent))
 
 	foundPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(pod.Name, metav1.GetOptions{})
@@ -266,5 +267,6 @@ func testPodSELinuxLabeling(f *framework.Framework, hostIPC bool, hostPID bool) 
 	framework.ExpectNoError(err, "Error waiting for pod to run %v", pod)
 
 	content, err = f.ReadFileViaContainer(pod.Name, "test-container", testFilePath)
+	framework.ExpectNoError(err, "Error reading file via container")
 	gomega.Expect(content).NotTo(gomega.ContainSubstring(testContent))
 }

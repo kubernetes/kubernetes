@@ -17,6 +17,7 @@ limitations under the License.
 package serviceaccount
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"math/rand"
@@ -154,7 +155,7 @@ func (s *Plugin) ValidateInitialization() error {
 }
 
 // Admit verifies if the pod should be admitted
-func (s *Plugin) Admit(a admission.Attributes, o admission.ObjectInterfaces) (err error) {
+func (s *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) (err error) {
 	if shouldIgnore(a) {
 		return nil
 	}
@@ -165,7 +166,7 @@ func (s *Plugin) Admit(a admission.Attributes, o admission.ObjectInterfaces) (er
 	// That makes the kubelet very angry and confused, and it immediately deletes the pod (because the spec doesn't match)
 	// That said, don't allow mirror pods to reference ServiceAccounts or SecretVolumeSources either
 	if _, isMirrorPod := pod.Annotations[api.MirrorPodAnnotationKey]; isMirrorPod {
-		return s.Validate(a, o)
+		return s.Validate(ctx, a, o)
 	}
 
 	// Set the default service account if needed
@@ -192,11 +193,11 @@ func (s *Plugin) Admit(a admission.Attributes, o admission.ObjectInterfaces) (er
 		}
 	}
 
-	return s.Validate(a, o)
+	return s.Validate(ctx, a, o)
 }
 
 // Validate the data we obtained
-func (s *Plugin) Validate(a admission.Attributes, o admission.ObjectInterfaces) (err error) {
+func (s *Plugin) Validate(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) (err error) {
 	if shouldIgnore(a) {
 		return nil
 	}

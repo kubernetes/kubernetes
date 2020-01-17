@@ -16,13 +16,11 @@ limitations under the License.
 
 package priorities
 
-import (
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
-)
+import framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 
 var (
-	leastResourcePriority = &ResourceAllocationPriority{"LeastResourceAllocation", leastResourceScorer}
+	leastRequestedRatioResources = DefaultRequestedRatioResources
+	leastResourcePriority        = &ResourceAllocationPriority{"LeastResourceAllocation", leastResourceScorer, leastRequestedRatioResources}
 
 	// LeastRequestedPriorityMap is a priority function that favors nodes with fewer requested resources.
 	// It calculates the percentage of memory and CPU requested by pods scheduled on the node, and
@@ -33,9 +31,14 @@ var (
 	LeastRequestedPriorityMap = leastResourcePriority.PriorityMap
 )
 
-func leastResourceScorer(requested, allocable *schedulernodeinfo.Resource, includeVolumes bool, requestedVolumes int, allocatableVolumes int) int64 {
-	return (leastRequestedScore(requested.MilliCPU, allocable.MilliCPU) +
-		leastRequestedScore(requested.Memory, allocable.Memory)) / 2
+func leastResourceScorer(requested, allocable ResourceToValueMap, includeVolumes bool, requestedVolumes int, allocatableVolumes int) int64 {
+	var nodeScore, weightSum int64
+	for resource, weight := range leastRequestedRatioResources {
+		resourceScore := leastRequestedScore(requested[resource], allocable[resource])
+		nodeScore += resourceScore * weight
+		weightSum += weight
+	}
+	return nodeScore / weightSum
 }
 
 // The unused capacity is calculated on a scale of 0-10
@@ -49,5 +52,5 @@ func leastRequestedScore(requested, capacity int64) int64 {
 		return 0
 	}
 
-	return ((capacity - requested) * int64(schedulerapi.MaxPriority)) / capacity
+	return ((capacity - requested) * int64(framework.MaxNodeScore)) / capacity
 }

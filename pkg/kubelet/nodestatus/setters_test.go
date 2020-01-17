@@ -34,13 +34,14 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	cloudprovider "k8s.io/cloud-provider"
 	fakecloud "k8s.io/cloud-provider/fake"
+	"k8s.io/component-base/version"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubecontainertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
-	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 
@@ -55,12 +56,13 @@ const (
 // TODO(mtaufen): below is ported from the old kubelet_node_status_test.go code, potentially add more test coverage for NodeAddress setter in future
 func TestNodeAddress(t *testing.T) {
 	cases := []struct {
-		name              string
-		hostnameOverride  bool
-		nodeIP            net.IP
-		nodeAddresses     []v1.NodeAddress
-		expectedAddresses []v1.NodeAddress
-		shouldError       bool
+		name                  string
+		hostnameOverride      bool
+		nodeIP                net.IP
+		externalCloudProvider bool
+		nodeAddresses         []v1.NodeAddress
+		expectedAddresses     []v1.NodeAddress
+		shouldError           bool
 	}{
 		{
 			name:   "A single InternalIP",
@@ -178,6 +180,21 @@ func TestNodeAddress(t *testing.T) {
 			shouldError: false,
 		},
 		{
+			name:   "cloud reports hostname, nodeIP is set, no override",
+			nodeIP: net.ParseIP("10.1.1.1"),
+			nodeAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeExternalIP, Address: "55.55.55.55"},
+				{Type: v1.NodeHostName, Address: "cloud-host"},
+			},
+			expectedAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeExternalIP, Address: "55.55.55.55"},
+				{Type: v1.NodeHostName, Address: "cloud-host"}, // cloud-reported hostname wins over detected hostname
+			},
+			shouldError: false,
+		},
+		{
 			name: "cloud reports hostname, overridden",
 			nodeAddresses: []v1.NodeAddress{
 				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
@@ -191,6 +208,17 @@ func TestNodeAddress(t *testing.T) {
 			},
 			hostnameOverride: true,
 			shouldError:      false,
+		},
+		{
+			name:                  "cloud provider is external",
+			nodeIP:                net.ParseIP("10.0.0.1"),
+			nodeAddresses:         []v1.NodeAddress{},
+			externalCloudProvider: true,
+			expectedAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.0.0.1"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			shouldError: false,
 		},
 		{
 			name: "cloud doesn't report hostname, no override, detected hostname mismatch",
@@ -221,6 +249,37 @@ func TestNodeAddress(t *testing.T) {
 			shouldError: false,
 		},
 		{
+			name:   "cloud doesn't report hostname, nodeIP is set, no override, detected hostname match",
+			nodeIP: net.ParseIP("10.1.1.1"),
+			nodeAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeExternalIP, Address: "55.55.55.55"},
+				{Type: v1.NodeExternalDNS, Address: testKubeletHostname}, // cloud-reported address value matches detected hostname
+			},
+			expectedAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeExternalIP, Address: "55.55.55.55"},
+				{Type: v1.NodeExternalDNS, Address: testKubeletHostname},
+				{Type: v1.NodeHostName, Address: testKubeletHostname}, // detected hostname gets auto-added
+			},
+			shouldError: false,
+		},
+		{
+			name:   "cloud doesn't report hostname, nodeIP is set, no override, detected hostname match with same type as nodeIP",
+			nodeIP: net.ParseIP("10.1.1.1"),
+			nodeAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeInternalIP, Address: testKubeletHostname}, // cloud-reported address value matches detected hostname
+				{Type: v1.NodeExternalIP, Address: "55.55.55.55"},
+			},
+			expectedAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeExternalIP, Address: "55.55.55.55"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname}, // detected hostname gets auto-added
+			},
+			shouldError: false,
+		},
+		{
 			name: "cloud doesn't report hostname, hostname override, hostname mismatch",
 			nodeAddresses: []v1.NodeAddress{
 				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
@@ -241,6 +300,9 @@ func TestNodeAddress(t *testing.T) {
 			existingNode := &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname, Annotations: make(map[string]string)},
 				Spec:       v1.NodeSpec{},
+				Status: v1.NodeStatus{
+					Addresses: []v1.NodeAddress{},
+				},
 			}
 
 			nodeIP := testCase.nodeIP
@@ -248,13 +310,21 @@ func TestNodeAddress(t *testing.T) {
 				return nil
 			}
 			hostname := testKubeletHostname
-			externalCloudProvider := false
-			cloud := &fakecloud.Cloud{
-				Addresses: testCase.nodeAddresses,
-				Err:       nil,
-			}
+
 			nodeAddressesFunc := func() ([]v1.NodeAddress, error) {
 				return testCase.nodeAddresses, nil
+			}
+
+			// cloud provider is expected to be nil if external provider is set
+			var cloud cloudprovider.Interface
+			if testCase.externalCloudProvider {
+				cloud = nil
+			} else {
+				cloud = &fakecloud.Cloud{
+					Addresses: testCase.nodeAddresses,
+					Err:       nil,
+				}
+
 			}
 
 			// construct setter
@@ -262,7 +332,7 @@ func TestNodeAddress(t *testing.T) {
 				nodeIPValidator,
 				hostname,
 				testCase.hostnameOverride,
-				externalCloudProvider,
+				testCase.externalCloudProvider,
 				cloud,
 				nodeAddressesFunc)
 
@@ -883,7 +953,7 @@ func TestReadyCondition(t *testing.T) {
 		Status: v1.NodeStatus{
 			Capacity: v1.ResourceList{
 				v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-				v1.ResourceMemory:           *resource.NewQuantity(10E9, resource.BinarySI),
+				v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
 				v1.ResourcePods:             *resource.NewQuantity(100, resource.DecimalSI),
 				v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
 			},
@@ -946,7 +1016,7 @@ func TestReadyCondition(t *testing.T) {
 		{
 			desc:             "new, not ready: missing capacities",
 			node:             &v1.Node{},
-			expectConditions: []v1.NodeCondition{*makeReadyCondition(false, "Missing node capacity for resources: cpu, memory, pods, ephemeral-storage", now, now)},
+			expectConditions: []v1.NodeCondition{*makeReadyCondition(false, "missing node capacity for resources: cpu, memory, pods, ephemeral-storage", now, now)},
 		},
 		// the transition tests ensure timestamps are set correctly, no need to test the entire condition matrix in this section
 		{
@@ -1514,54 +1584,6 @@ func TestVolumeLimits(t *testing.T) {
 			// check expected node
 			assert.True(t, apiequality.Semantic.DeepEqual(tc.expectNode, node),
 				"Diff: %s", diff.ObjectDiff(tc.expectNode, node))
-		})
-	}
-}
-
-func TestRemoveOutOfDiskCondition(t *testing.T) {
-	now := time.Now()
-
-	var cases = []struct {
-		desc       string
-		inputNode  *v1.Node
-		expectNode *v1.Node
-	}{
-		{
-			desc: "should remove stale OutOfDiskCondition from node status",
-			inputNode: &v1.Node{
-				Status: v1.NodeStatus{
-					Conditions: []v1.NodeCondition{
-						*makeMemoryPressureCondition(false, now, now),
-						{
-							Type:   v1.NodeOutOfDisk,
-							Status: v1.ConditionFalse,
-						},
-						*makeDiskPressureCondition(false, now, now),
-					},
-				},
-			},
-			expectNode: &v1.Node{
-				Status: v1.NodeStatus{
-					Conditions: []v1.NodeCondition{
-						*makeMemoryPressureCondition(false, now, now),
-						*makeDiskPressureCondition(false, now, now),
-					},
-				},
-			},
-		},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.desc, func(t *testing.T) {
-			// construct setter
-			setter := RemoveOutOfDiskCondition()
-			// call setter on node
-			if err := setter(tc.inputNode); err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			// check expected node
-			assert.True(t, apiequality.Semantic.DeepEqual(tc.expectNode, tc.inputNode),
-				"Diff: %s", diff.ObjectDiff(tc.expectNode, tc.inputNode))
 		})
 	}
 }

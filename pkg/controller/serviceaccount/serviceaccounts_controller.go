@@ -31,9 +31,8 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/component-base/metrics/prometheus/ratelimiter"
 	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/util/metrics"
 )
 
 // ServiceAccountsControllerOptions contains options for running a ServiceAccountsController
@@ -69,7 +68,7 @@ func NewServiceAccountsController(saInformer coreinformers.ServiceAccountInforme
 		queue:                   workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "serviceaccount"),
 	}
 	if cl != nil && cl.CoreV1().RESTClient().GetRateLimiter() != nil {
-		if err := metrics.RegisterMetricAndTrackRateLimiterUsage("serviceaccount_controller", cl.CoreV1().RESTClient().GetRateLimiter()); err != nil {
+		if err := ratelimiter.RegisterMetricAndTrackRateLimiterUsage("serviceaccount_controller", cl.CoreV1().RESTClient().GetRateLimiter()); err != nil {
 			return nil, err
 		}
 	}
@@ -117,7 +116,7 @@ func (c *ServiceAccountsController) Run(workers int, stopCh <-chan struct{}) {
 	klog.Infof("Starting service account controller")
 	defer klog.Infof("Shutting down service account controller")
 
-	if !controller.WaitForCacheSync("service account", stopCh, c.saListerSynced, c.nsListerSynced) {
+	if !cache.WaitForNamedCacheSync("service account", stopCh, c.saListerSynced, c.nsListerSynced) {
 		return
 	}
 

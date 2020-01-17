@@ -28,16 +28,19 @@ import (
 	"github.com/go-openapi/spec"
 	"github.com/go-openapi/strfmt"
 	"github.com/go-openapi/validate"
+
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/conversion"
 	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	structuraldefaulting "k8s.io/apiextensions-apiserver/pkg/apiserver/schema/defaulting"
+	schemaobjectmeta "k8s.io/apiextensions-apiserver/pkg/apiserver/schema/objectmeta"
 	structuralpruning "k8s.io/apiextensions-apiserver/pkg/apiserver/schema/pruning"
 	apiservervalidation "k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
 	informers "k8s.io/apiextensions-apiserver/pkg/client/informers/internalversion/apiextensions/internalversion"
 	listers "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/internalversion"
 	"k8s.io/apiextensions-apiserver/pkg/controller/establish"
 	"k8s.io/apiextensions-apiserver/pkg/controller/finalizer"
+	"k8s.io/apiextensions-apiserver/pkg/controller/openapi/builder"
 	"k8s.io/apiextensions-apiserver/pkg/crdserverscheme"
 	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 	"k8s.io/apiextensions-apiserver/pkg/registry/customresource"
@@ -72,11 +75,13 @@ import (
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilopenapi "k8s.io/apiserver/pkg/util/openapi"
 	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/scale"
 	"k8s.io/client-go/scale/scheme/autoscalingv1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog"
+	"k8s.io/kube-openapi/pkg/util/proto"
 )
 
 // crdHandler serves the `/apis` endpoint.
@@ -93,6 +98,7 @@ type crdHandler struct {
 	customStorage atomic.Value
 
 	crdLister listers.CustomResourceDefinitionLister
+	hasSynced func() bool
 
 	delegate          http.Handler
 	restOptionsGetter generic.RESTOptionsGetter
@@ -111,6 +117,18 @@ type crdHandler struct {
 
 	// request timeout we should delay storage teardown for
 	requestTimeout time.Duration
+
+	// minRequestTimeout applies to CR's list/watch calls
+	minRequestTimeout time.Duration
+
+	// staticOpenAPISpec is used as a base for the schema of CR's for the
+	// purpose of managing fields, it is how CR handlers get the structure
+	// of TypeMeta and ObjectMeta
+	staticOpenAPISpec *spec.Swagger
+
+	// The limit on the request size that would be accepted and decoded in a write request
+	// 0 means no limit.
+	maxRequestBodyBytes int64
 }
 
 // crdInfo stores enough information to serve the storage for the custom resource
@@ -153,12 +171,16 @@ func NewCustomResourceDefinitionHandler(
 	authResolverWrapper webhook.AuthenticationInfoResolverWrapper,
 	masterCount int,
 	authorizer authorizer.Authorizer,
-	requestTimeout time.Duration) (*crdHandler, error) {
+	requestTimeout time.Duration,
+	minRequestTimeout time.Duration,
+	staticOpenAPISpec *spec.Swagger,
+	maxRequestBodyBytes int64) (*crdHandler, error) {
 	ret := &crdHandler{
 		versionDiscoveryHandler: versionDiscoveryHandler,
 		groupDiscoveryHandler:   groupDiscoveryHandler,
 		customStorage:           atomic.Value{},
 		crdLister:               crdInformer.Lister(),
+		hasSynced:               crdInformer.Informer().HasSynced,
 		delegate:                delegate,
 		restOptionsGetter:       restOptionsGetter,
 		admission:               admission,
@@ -166,8 +188,12 @@ func NewCustomResourceDefinitionHandler(
 		masterCount:             masterCount,
 		authorizer:              authorizer,
 		requestTimeout:          requestTimeout,
+		minRequestTimeout:       minRequestTimeout,
+		staticOpenAPISpec:       staticOpenAPISpec,
+		maxRequestBodyBytes:     maxRequestBodyBytes,
 	}
 	crdInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc:    ret.createCustomResourceDefinition,
 		UpdateFunc: ret.updateCustomResourceDefinition,
 		DeleteFunc: func(obj interface{}) {
 			ret.removeDeadStorage()
@@ -189,11 +215,18 @@ func NewCustomResourceDefinitionHandler(
 // and on the client side (by restarting the watch)
 var longRunningFilter = genericfilters.BasicLongRunningRequestCheck(sets.NewString("watch"), sets.NewString())
 
+// possiblyAcrossAllNamespacesVerbs contains those verbs which can be per-namespace and across all
+// namespaces for namespaces resources. I.e. for these an empty namespace in the requestInfo is fine.
+var possiblyAcrossAllNamespacesVerbs = sets.NewString("list", "watch")
+
 func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	ctx := req.Context()
 	requestInfo, ok := apirequest.RequestInfoFrom(ctx)
 	if !ok {
-		responsewriters.InternalError(w, req, fmt.Errorf("no RequestInfo found in the context"))
+		responsewriters.ErrorNegotiated(
+			apierrors.NewInternalError(fmt.Errorf("no RequestInfo found in the context")),
+			Codecs, schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}, w, req,
+		)
 		return
 	}
 	if !requestInfo.IsResourceRequest {
@@ -201,11 +234,19 @@ func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		// only match /apis/<group>/<version>
 		// only registered under /apis
 		if len(pathParts) == 3 {
+			if !r.hasSynced() {
+				responsewriters.ErrorNegotiated(serverStartingError(), Codecs, schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}, w, req)
+				return
+			}
 			r.versionDiscoveryHandler.ServeHTTP(w, req)
 			return
 		}
 		// only match /apis/<group>
 		if len(pathParts) == 2 {
+			if !r.hasSynced() {
+				responsewriters.ErrorNegotiated(serverStartingError(), Codecs, schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}, w, req)
+				return
+			}
 			r.groupDiscoveryHandler.ServeHTTP(w, req)
 			return
 		}
@@ -217,17 +258,40 @@ func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	crdName := requestInfo.Resource + "." + requestInfo.APIGroup
 	crd, err := r.crdLister.Get(crdName)
 	if apierrors.IsNotFound(err) {
+		if !r.hasSynced() {
+			responsewriters.ErrorNegotiated(serverStartingError(), Codecs, schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}, w, req)
+			return
+		}
+
 		r.delegate.ServeHTTP(w, req)
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		utilruntime.HandleError(err)
+		responsewriters.ErrorNegotiated(
+			apierrors.NewInternalError(fmt.Errorf("error resolving resource")),
+			Codecs, schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}, w, req,
+		)
 		return
 	}
+
+	// if the scope in the CRD and the scope in request differ (with exception of the verbs in possiblyAcrossAllNamespacesVerbs
+	// for namespaced resources), pass request to the delegate, which is supposed to lead to a 404.
+	namespacedCRD, namespacedReq := crd.Spec.Scope == apiextensions.NamespaceScoped, len(requestInfo.Namespace) > 0
+	if !namespacedCRD && namespacedReq {
+		r.delegate.ServeHTTP(w, req)
+		return
+	}
+	if namespacedCRD && !namespacedReq && !possiblyAcrossAllNamespacesVerbs.Has(requestInfo.Verb) {
+		r.delegate.ServeHTTP(w, req)
+		return
+	}
+
 	if !apiextensions.HasServedCRDVersion(crd, requestInfo.APIVersion) {
 		r.delegate.ServeHTTP(w, req)
 		return
 	}
+
 	// There is a small chance that a CRD is being served because NamesAccepted condition is true,
 	// but it becomes "unserved" because another names update leads to a conflict
 	// and EstablishingController wasn't fast enough to put the CRD into the Established condition.
@@ -240,9 +304,21 @@ func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	terminating := apiextensions.IsCRDConditionTrue(crd, apiextensions.Terminating)
 
-	crdInfo, err := r.getOrCreateServingInfoFor(crd)
+	crdInfo, err := r.getOrCreateServingInfoFor(crd.UID, crd.Name)
+	if apierrors.IsNotFound(err) {
+		r.delegate.ServeHTTP(w, req)
+		return
+	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		utilruntime.HandleError(err)
+		responsewriters.ErrorNegotiated(
+			apierrors.NewInternalError(fmt.Errorf("error resolving resource")),
+			Codecs, schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}, w, req,
+		)
+		return
+	}
+	if !hasServedCRDVersion(crdInfo.spec, requestInfo.APIVersion) {
+		r.delegate.ServeHTTP(w, req)
 		return
 	}
 
@@ -262,7 +338,10 @@ func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	subresources, err := apiextensions.GetSubresourcesForVersion(crd, requestInfo.APIVersion)
 	if err != nil {
 		utilruntime.HandleError(err)
-		http.Error(w, "the server could not properly serve the CR subresources", http.StatusInternalServerError)
+		responsewriters.ErrorNegotiated(
+			apierrors.NewInternalError(fmt.Errorf("could not properly serve the subresource")),
+			Codecs, schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}, w, req,
+		)
 		return
 	}
 	switch {
@@ -273,7 +352,10 @@ func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	case len(subresource) == 0:
 		handlerFunc = r.serveResource(w, req, requestInfo, crdInfo, terminating, supportedTypes)
 	default:
-		http.Error(w, "the server could not find the requested resource", http.StatusNotFound)
+		responsewriters.ErrorNegotiated(
+			apierrors.NewNotFound(schema.GroupResource{Group: requestInfo.APIGroup, Resource: requestInfo.Resource}, requestInfo.Name),
+			Codecs, schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}, w, req,
+		)
 	}
 
 	if handlerFunc != nil {
@@ -287,20 +369,21 @@ func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 func (r *crdHandler) serveResource(w http.ResponseWriter, req *http.Request, requestInfo *apirequest.RequestInfo, crdInfo *crdInfo, terminating bool, supportedTypes []string) http.HandlerFunc {
 	requestScope := crdInfo.requestScopes[requestInfo.APIVersion]
 	storage := crdInfo.storages[requestInfo.APIVersion].CustomResource
-	minRequestTimeout := 1 * time.Minute
 
 	switch requestInfo.Verb {
 	case "get":
 		return handlers.GetResource(storage, storage, requestScope)
 	case "list":
 		forceWatch := false
-		return handlers.ListResource(storage, storage, requestScope, forceWatch, minRequestTimeout)
+		return handlers.ListResource(storage, storage, requestScope, forceWatch, r.minRequestTimeout)
 	case "watch":
 		forceWatch := true
-		return handlers.ListResource(storage, storage, requestScope, forceWatch, minRequestTimeout)
+		return handlers.ListResource(storage, storage, requestScope, forceWatch, r.minRequestTimeout)
 	case "create":
 		if terminating {
-			http.Error(w, fmt.Sprintf("%v not allowed while CustomResourceDefinition is terminating", requestInfo.Verb), http.StatusMethodNotAllowed)
+			err := apierrors.NewMethodNotSupported(schema.GroupResource{Group: requestInfo.APIGroup, Resource: requestInfo.Resource}, requestInfo.Verb)
+			err.ErrStatus.Message = fmt.Sprintf("%v not allowed while custom resource definition is terminating", requestInfo.Verb)
+			responsewriters.ErrorNegotiated(err, Codecs, schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}, w, req)
 			return nil
 		}
 		return handlers.CreateResource(storage, requestScope, r.admission)
@@ -315,7 +398,10 @@ func (r *crdHandler) serveResource(w http.ResponseWriter, req *http.Request, req
 		checkBody := true
 		return handlers.DeleteCollection(storage, checkBody, requestScope, r.admission)
 	default:
-		http.Error(w, fmt.Sprintf("unhandled verb %q", requestInfo.Verb), http.StatusMethodNotAllowed)
+		responsewriters.ErrorNegotiated(
+			apierrors.NewMethodNotSupported(schema.GroupResource{Group: requestInfo.APIGroup, Resource: requestInfo.Resource}, requestInfo.Verb),
+			Codecs, schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}, w, req,
+		)
 		return nil
 	}
 }
@@ -332,7 +418,10 @@ func (r *crdHandler) serveStatus(w http.ResponseWriter, req *http.Request, reque
 	case "patch":
 		return handlers.PatchResource(storage, requestScope, r.admission, supportedTypes)
 	default:
-		http.Error(w, fmt.Sprintf("unhandled verb %q", requestInfo.Verb), http.StatusMethodNotAllowed)
+		responsewriters.ErrorNegotiated(
+			apierrors.NewMethodNotSupported(schema.GroupResource{Group: requestInfo.APIGroup, Resource: requestInfo.Resource}, requestInfo.Verb),
+			Codecs, schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}, w, req,
+		)
 		return nil
 	}
 }
@@ -349,11 +438,24 @@ func (r *crdHandler) serveScale(w http.ResponseWriter, req *http.Request, reques
 	case "patch":
 		return handlers.PatchResource(storage, requestScope, r.admission, supportedTypes)
 	default:
-		http.Error(w, fmt.Sprintf("unhandled verb %q", requestInfo.Verb), http.StatusMethodNotAllowed)
+		responsewriters.ErrorNegotiated(
+			apierrors.NewMethodNotSupported(schema.GroupResource{Group: requestInfo.APIGroup, Resource: requestInfo.Resource}, requestInfo.Verb),
+			Codecs, schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}, w, req,
+		)
 		return nil
 	}
 }
 
+// createCustomResourceDefinition removes potentially stale storage so it gets re-created
+func (r *crdHandler) createCustomResourceDefinition(obj interface{}) {
+	crd := obj.(*apiextensions.CustomResourceDefinition)
+	r.customStorageLock.Lock()
+	defer r.customStorageLock.Unlock()
+	// this could happen if the create event is merged from create-update events
+	r.removeStorage_locked(crd.UID)
+}
+
+// updateCustomResourceDefinition removes potentially stale storage so it gets re-created
 func (r *crdHandler) updateCustomResourceDefinition(oldObj, newObj interface{}) {
 	oldCRD := oldObj.(*apiextensions.CustomResourceDefinition)
 	newCRD := newObj.(*apiextensions.CustomResourceDefinition)
@@ -374,6 +476,10 @@ func (r *crdHandler) updateCustomResourceDefinition(oldObj, newObj interface{}) 
 		}
 	}
 
+	if oldCRD.UID != newCRD.UID {
+		r.removeStorage_locked(oldCRD.UID)
+	}
+
 	storageMap := r.customStorage.Load().(crdStorageMap)
 	oldInfo, found := storageMap[newCRD.UID]
 	if !found {
@@ -384,15 +490,22 @@ func (r *crdHandler) updateCustomResourceDefinition(oldObj, newObj interface{}) 
 		return
 	}
 
-	klog.V(4).Infof("Updating customresourcedefinition %s", oldCRD.Name)
+	klog.V(4).Infof("Updating customresourcedefinition %s", newCRD.Name)
+	r.removeStorage_locked(newCRD.UID)
+}
 
-	if oldInfo, ok := storageMap[types.UID(oldCRD.UID)]; ok {
+// removeStorage_locked removes the cached storage with the given uid as key from the storage map. This function
+// updates r.customStorage with the cleaned-up storageMap and tears down the old storage.
+// NOTE: Caller MUST hold r.customStorageLock to write r.customStorage thread-safely.
+func (r *crdHandler) removeStorage_locked(uid types.UID) {
+	storageMap := r.customStorage.Load().(crdStorageMap)
+	if oldInfo, ok := storageMap[uid]; ok {
 		// Copy because we cannot write to storageMap without a race
 		// as it is used without locking elsewhere.
 		storageMap2 := storageMap.clone()
 
 		// Remove from the CRD info map and store the map
-		delete(storageMap2, types.UID(oldCRD.UID))
+		delete(storageMap2, uid)
 		r.customStorage.Store(storageMap2)
 
 		// Tear down the old storage
@@ -463,22 +576,32 @@ func (r *crdHandler) tearDown(oldInfo *crdInfo) {
 // GetCustomResourceListerCollectionDeleter returns the ListerCollectionDeleter of
 // the given crd.
 func (r *crdHandler) GetCustomResourceListerCollectionDeleter(crd *apiextensions.CustomResourceDefinition) (finalizer.ListerCollectionDeleter, error) {
-	info, err := r.getOrCreateServingInfoFor(crd)
+	info, err := r.getOrCreateServingInfoFor(crd.UID, crd.Name)
 	if err != nil {
 		return nil, err
 	}
 	return info.storages[info.storageVersion].CustomResource, nil
 }
 
-func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResourceDefinition) (*crdInfo, error) {
+// getOrCreateServingInfoFor gets the CRD serving info for the given CRD UID if the key exists in the storage map.
+// Otherwise the function fetches the up-to-date CRD using the given CRD name and creates CRD serving info.
+func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crdInfo, error) {
 	storageMap := r.customStorage.Load().(crdStorageMap)
-	if ret, ok := storageMap[crd.UID]; ok {
+	if ret, ok := storageMap[uid]; ok {
 		return ret, nil
 	}
 
 	r.customStorageLock.Lock()
 	defer r.customStorageLock.Unlock()
 
+	// Get the up-to-date CRD when we have the lock, to avoid racing with updateCustomResourceDefinition.
+	// If updateCustomResourceDefinition sees an update and happens later, the storage will be deleted and
+	// we will re-create the updated storage on demand. If updateCustomResourceDefinition happens before,
+	// we make sure that we observe the same up-to-date CRD.
+	crd, err := r.crdLister.Get(name)
+	if err != nil {
+		return nil, err
+	}
 	storageMap = r.customStorage.Load().(crdStorageMap)
 	if ret, ok := storageMap[crd.UID]; ok {
 		return ret, nil
@@ -507,11 +630,30 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 		if val == nil {
 			continue
 		}
-		structuralSchemas[v.Name], err = structuralschema.NewStructural(val.OpenAPIV3Schema)
+		s, err := structuralschema.NewStructural(val.OpenAPIV3Schema)
 		if *crd.Spec.PreserveUnknownFields == false && err != nil {
-			utilruntime.HandleError(err)
+			// This should never happen. If it does, it is a programming error.
+			utilruntime.HandleError(fmt.Errorf("failed to convert schema to structural: %v", err))
 			return nil, fmt.Errorf("the server could not properly serve the CR schema") // validation should avoid this
 		}
+
+		if *crd.Spec.PreserveUnknownFields == false {
+			// we don't own s completely, e.g. defaults are not deep-copied. So better make a copy here.
+			s = s.DeepCopy()
+
+			if err := structuraldefaulting.PruneDefaults(s); err != nil {
+				// This should never happen. If it does, it is a programming error.
+				utilruntime.HandleError(fmt.Errorf("failed to prune defaults: %v", err))
+				return nil, fmt.Errorf("the server could not properly serve the CR schema") // validation should avoid this
+			}
+		}
+		structuralSchemas[v.Name] = s
+	}
+
+	openAPIModels, err := buildOpenAPIModelsForApply(r.staticOpenAPISpec, crd)
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("error building openapi models for %s: %v", crd.Name, err))
+		openAPIModels = nil
 	}
 
 	for _, v := range crd.Spec.Versions {
@@ -571,7 +713,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 					if err := apiservervalidation.ConvertJSONSchemaProps(&statusSchema, openapiSchema); err != nil {
 						return nil, err
 					}
-					statusValidator = validate.NewSchemaValidator(openapiSchema, nil, "", strfmt.Default)
+					statusValidator = validate.NewSchemaValidator(openapiSchema, nil, "", strfmt.Default, validate.DisableObjectArrayTypeCheck(true))
 				}
 			}
 		}
@@ -603,6 +745,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 				kind,
 				validator,
 				statusValidator,
+				structuralSchemas,
 				statusSpec,
 				scaleSpec,
 			),
@@ -675,15 +818,23 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 			TableConvertor: storages[v.Name].CustomResource,
 
 			Authorizer: r.authorizer,
+
+			MaxRequestBodyBytes: r.maxRequestBodyBytes,
 		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
 			reqScope := *requestScopes[v.Name]
-			reqScope.FieldManager = fieldmanager.NewCRDFieldManager(
+			reqScope.FieldManager, err = fieldmanager.NewDefaultCRDFieldManager(
+				openAPIModels,
 				reqScope.Convertor,
 				reqScope.Defaulter,
-				reqScope.Kind.GroupVersion(),
+				reqScope.Creater,
+				reqScope.Kind,
 				reqScope.HubGroupVersion,
+				*crd.Spec.PreserveUnknownFields,
 			)
+			if err != nil {
+				return nil, err
+			}
 			requestScopes[v.Name] = &reqScope
 		}
 
@@ -700,19 +851,14 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 			SelfLinkPathPrefix: selfLinkPrefix,
 			SelfLinkPathSuffix: "/scale",
 		}
+		// TODO(issues.k8s.io/82046): We can't effectively track ownership on scale requests yet.
+		scaleScope.FieldManager = nil
 		scaleScopes[v.Name] = &scaleScope
 
 		// override status subresource values
 		// shallow copy
 		statusScope := *requestScopes[v.Name]
 		statusScope.Subresource = "status"
-		statusScope.Serializer = unstructuredNegotiatedSerializer{
-			typer: typer, creator: creator,
-			converter:             safeConverter,
-			structuralSchemas:     structuralSchemas,
-			structuralSchemaGK:    kind.GroupKind(),
-			preserveUnknownFields: *crd.Spec.PreserveUnknownFields,
-		}
 		statusScope.Namer = handlers.ContextBasedNaming{
 			SelfLinker:         meta.NewAccessor(),
 			ClusterScoped:      clusterScoped,
@@ -906,6 +1052,7 @@ func (t crdConversionRESTOptionsGetter) GetRESTOptions(resource schema.GroupReso
 		d := schemaCoercingDecoder{delegate: ret.StorageConfig.Codec, validator: unstructuredSchemaCoercer{
 			// drop invalid fields while decoding old CRs (before we haven't had any ObjectMeta validation)
 			dropInvalidMetadata:   true,
+			repairGeneration:      true,
 			structuralSchemas:     t.structuralSchemas,
 			structuralSchemaGK:    t.structuralSchemaGK,
 			preserveUnknownFields: t.preserveUnknownFields,
@@ -1006,6 +1153,7 @@ func (v schemaCoercingConverter) ConvertFieldLabel(gvk schema.GroupVersionKind, 
 // - generic pruning of unknown fields following a structural schema.
 type unstructuredSchemaCoercer struct {
 	dropInvalidMetadata bool
+	repairGeneration    bool
 
 	structuralSchemas     map[string]*structuralschema.Structural
 	structuralSchemaGK    schema.GroupKind
@@ -1022,7 +1170,7 @@ func (v *unstructuredSchemaCoercer) apply(u *unstructured.Unstructured) error {
 	if err != nil {
 		return err
 	}
-	objectMeta, foundObjectMeta, err := getObjectMeta(u, v.dropInvalidMetadata)
+	objectMeta, foundObjectMeta, err := schemaobjectmeta.GetObjectMeta(u.Object, v.dropInvalidMetadata)
 	if err != nil {
 		return err
 	}
@@ -1032,8 +1180,18 @@ func (v *unstructuredSchemaCoercer) apply(u *unstructured.Unstructured) error {
 	if err != nil {
 		return err
 	}
-	if !v.preserveUnknownFields && gv.Group == v.structuralSchemaGK.Group && kind == v.structuralSchemaGK.Kind {
-		structuralpruning.Prune(u.Object, v.structuralSchemas[gv.Version])
+	if gv.Group == v.structuralSchemaGK.Group && kind == v.structuralSchemaGK.Kind {
+		if !v.preserveUnknownFields {
+			// TODO: switch over pruning and coercing at the root to  schemaobjectmeta.Coerce too
+			structuralpruning.Prune(u.Object, v.structuralSchemas[gv.Version], false)
+		}
+		if err := schemaobjectmeta.Coerce(nil, u.Object, v.structuralSchemas[gv.Version], false, v.dropInvalidMetadata); err != nil {
+			return err
+		}
+		// fixup missing generation in very old CRs
+		if v.repairGeneration && objectMeta.Generation == 0 {
+			objectMeta.Generation = 1
+		}
 	}
 
 	// restore meta fields, starting clean
@@ -1044,7 +1202,7 @@ func (v *unstructuredSchemaCoercer) apply(u *unstructured.Unstructured) error {
 		u.SetAPIVersion(apiVersion)
 	}
 	if foundObjectMeta {
-		if err := setObjectMeta(u, objectMeta); err != nil {
+		if err := schemaobjectmeta.SetObjectMeta(u.Object, objectMeta); err != nil {
 			return err
 		}
 	}
@@ -1052,64 +1210,56 @@ func (v *unstructuredSchemaCoercer) apply(u *unstructured.Unstructured) error {
 	return nil
 }
 
-var encodingjson = json.CaseSensitiveJsonIterator()
-
-func getObjectMeta(u *unstructured.Unstructured, dropMalformedFields bool) (*metav1.ObjectMeta, bool, error) {
-	metadata, found := u.UnstructuredContent()["metadata"]
-	if !found {
-		return nil, false, nil
-	}
-
-	// round-trip through JSON first, hoping that unmarshaling just works
-	objectMeta := &metav1.ObjectMeta{}
-	metadataBytes, err := encodingjson.Marshal(metadata)
-	if err != nil {
-		return nil, false, err
-	}
-	if err = encodingjson.Unmarshal(metadataBytes, objectMeta); err == nil {
-		// if successful, return
-		return objectMeta, true, nil
-	}
-	if !dropMalformedFields {
-		// if we're not trying to drop malformed fields, return the error
-		return nil, true, err
-	}
-
-	metadataMap, ok := metadata.(map[string]interface{})
-	if !ok {
-		return nil, false, fmt.Errorf("invalid metadata: expected object, got %T", metadata)
-	}
-
-	// Go field by field accumulating into the metadata object.
-	// This takes advantage of the fact that you can repeatedly unmarshal individual fields into a single struct,
-	// each iteration preserving the old key-values.
-	accumulatedObjectMeta := &metav1.ObjectMeta{}
-	testObjectMeta := &metav1.ObjectMeta{}
-	for k, v := range metadataMap {
-		// serialize a single field
-		if singleFieldBytes, err := encodingjson.Marshal(map[string]interface{}{k: v}); err == nil {
-			// do a test unmarshal
-			if encodingjson.Unmarshal(singleFieldBytes, testObjectMeta) == nil {
-				// if that succeeds, unmarshal for real
-				encodingjson.Unmarshal(singleFieldBytes, accumulatedObjectMeta)
-			}
+// hasServedCRDVersion returns true if the given version is in the list of CRD's versions and the Served flag is set.
+func hasServedCRDVersion(spec *apiextensions.CustomResourceDefinitionSpec, version string) bool {
+	for _, v := range spec.Versions {
+		if v.Name == version {
+			return v.Served
 		}
 	}
-
-	return accumulatedObjectMeta, true, nil
+	return false
 }
 
-func setObjectMeta(u *unstructured.Unstructured, objectMeta *metav1.ObjectMeta) error {
-	if objectMeta == nil {
-		unstructured.RemoveNestedField(u.UnstructuredContent(), "metadata")
-		return nil
+// serverStartingError returns a ServiceUnavailble error with a retry-after time
+func serverStartingError() error {
+	err := apierrors.NewServiceUnavailable("server is starting")
+	if err.ErrStatus.Details == nil {
+		err.ErrStatus.Details = &metav1.StatusDetails{}
+	}
+	if err.ErrStatus.Details.RetryAfterSeconds == 0 {
+		err.ErrStatus.Details.RetryAfterSeconds = int32(10)
+	}
+	return err
+}
+
+// buildOpenAPIModelsForApply constructs openapi models from any validation schemas specified in the custom resource,
+// and merges it with the models defined in the static OpenAPI spec.
+// Returns nil models if the ServerSideApply feature is disabled, or the static spec is nil, or an error is encountered.
+func buildOpenAPIModelsForApply(staticOpenAPISpec *spec.Swagger, crd *apiextensions.CustomResourceDefinition) (proto.Models, error) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
+		return nil, nil
+	}
+	if staticOpenAPISpec == nil {
+		return nil, nil
 	}
 
-	metadata, err := runtime.DefaultUnstructuredConverter.ToUnstructured(objectMeta)
+	specs := []*spec.Swagger{}
+	for _, v := range crd.Spec.Versions {
+		s, err := builder.BuildSwagger(crd, v.Name, builder.Options{V2: false, StripDefaults: true, StripValueValidation: true, AllowNonStructural: true})
+		if err != nil {
+			return nil, err
+		}
+		specs = append(specs, s)
+	}
+
+	mergedOpenAPI, err := builder.MergeSpecs(staticOpenAPISpec, specs...)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	u.UnstructuredContent()["metadata"] = metadata
-	return nil
+	models, err := utilopenapi.ToProtoModels(mergedOpenAPI)
+	if err != nil {
+		return nil, err
+	}
+	return models, nil
 }

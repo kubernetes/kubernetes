@@ -265,7 +265,7 @@ func (b *Builder) Unstructured() *Builder {
 		localFn:      b.isLocal,
 		restMapperFn: b.restMapperFn,
 		clientFn:     b.getClient,
-		decoder:      unstructured.UnstructuredJSONScheme,
+		decoder:      &metadataValidatingDecoder{unstructured.UnstructuredJSONScheme},
 	}
 
 	return b

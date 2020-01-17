@@ -206,7 +206,7 @@ func (pm *basicManager) updatePodsInternal(pods ...*v1.Pod) {
 		podFullName := kubecontainer.GetPodFullName(pod)
 		// This logic relies on a static pod and its mirror to have the same name.
 		// It is safe to type convert here due to the IsMirrorPod guard.
-		if IsMirrorPod(pod) {
+		if kubetypes.IsMirrorPod(pod) {
 			mirrorPodUID := kubetypes.MirrorPodUID(pod.UID)
 			pm.mirrorPodByUID[mirrorPodUID] = pod
 			pm.mirrorPodByFullName[podFullName] = pod
@@ -235,7 +235,7 @@ func (pm *basicManager) DeletePod(pod *v1.Pod) {
 	}
 	podFullName := kubecontainer.GetPodFullName(pod)
 	// It is safe to type convert here due to the IsMirrorPod guard.
-	if IsMirrorPod(pod) {
+	if kubetypes.IsMirrorPod(pod) {
 		mirrorPodUID := kubetypes.MirrorPodUID(pod.UID)
 		delete(pm.mirrorPodByUID, mirrorPodUID)
 		delete(pm.mirrorPodByFullName, podFullName)
@@ -307,7 +307,7 @@ func (pm *basicManager) GetUIDTranslations() (podToMirror map[kubetypes.Resolved
 	mirrorToPod = make(map[kubetypes.MirrorPodUID]kubetypes.ResolvedPodUID, len(pm.translationByUID))
 	// Insert empty translation mapping for all static pods.
 	for uid, pod := range pm.podByUID {
-		if !IsStaticPod(pod) {
+		if !kubetypes.IsStaticPod(pod) {
 			continue
 		}
 		podToMirror[uid] = ""
@@ -338,7 +338,7 @@ func (pm *basicManager) getOrphanedMirrorPodNames() []string {
 func (pm *basicManager) DeleteOrphanedMirrorPods() {
 	podFullNames := pm.getOrphanedMirrorPodNames()
 	for _, podFullName := range podFullNames {
-		pm.MirrorClient.DeleteMirrorPod(podFullName)
+		pm.MirrorClient.DeleteMirrorPod(podFullName, nil)
 	}
 }
 

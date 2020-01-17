@@ -54,9 +54,8 @@ import (
 )
 
 var (
-	corev1GV     = schema.GroupVersion{Version: "v1"}
-	corev1Codec  = scheme.Codecs.CodecForVersions(scheme.Codecs.LegacyCodec(corev1GV), scheme.Codecs.UniversalDecoder(corev1GV), corev1GV, corev1GV)
-	metaAccessor = meta.NewAccessor()
+	corev1GV    = schema.GroupVersion{Version: "v1"}
+	corev1Codec = scheme.Codecs.CodecForVersions(scheme.Codecs.LegacyCodec(corev1GV), scheme.Codecs.UniversalDecoder(corev1GV), corev1GV, corev1GV)
 )
 
 func stringBody(body string) io.ReadCloser {
@@ -226,6 +225,35 @@ var aPod string = `
     }
 }
 `
+var aPodBadAnnotations string = `
+{
+    "kind": "Pod",
+    "apiVersion": "` + corev1GV.String() + `",
+    "metadata": {
+        "name": "busybox{id}",
+        "labels": {
+            "name": "busybox{id}"
+        },
+        "annotations": {
+            "name": 0
+        }
+    },
+    "spec": {
+        "containers": [
+            {
+                "name": "busybox",
+                "image": "busybox",
+                "command": [
+                    "sleep",
+                    "3600"
+                ],
+                "imagePullPolicy": "IfNotPresent"
+            }
+        ],
+        "restartPolicy": "Always"
+    }
+}
+`
 
 var aRC string = `
 {
@@ -279,6 +307,22 @@ func newDefaultBuilderWith(fakeClientFn FakeClientFunc) *Builder {
 			return FakeCategoryExpander, nil
 		}).
 		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...)
+}
+
+func newUnstructuredDefaultBuilder() *Builder {
+	return newUnstructuredDefaultBuilderWith(fakeClient())
+}
+
+func newUnstructuredDefaultBuilderWith(fakeClientFn FakeClientFunc) *Builder {
+	return NewFakeBuilder(
+		fakeClientFn,
+		func() (meta.RESTMapper, error) {
+			return testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme), nil
+		},
+		func() (restmapper.CategoryExpander, error) {
+			return FakeCategoryExpander, nil
+		}).
+		Unstructured()
 }
 
 type errorRestMapper struct {
@@ -1677,6 +1721,64 @@ func TestHasNames(t *testing.T) {
 			if hasNames != tt.expectedHasName {
 				t.Errorf("expected HasName to return %v for %s", tt.expectedHasName, tt.args)
 			}
+		})
+	}
+}
+
+func TestUnstructured(t *testing.T) {
+	// create test dirs
+	tmpDir, err := utiltesting.MkTmpdir("unstructured_test")
+	if err != nil {
+		t.Fatalf("error creating temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// create test files
+	writeTestFile(t, fmt.Sprintf("%s/pod.json", tmpDir), aPod)
+	writeTestFile(t, fmt.Sprintf("%s/badpod.json", tmpDir), aPodBadAnnotations)
+
+	tests := []struct {
+		name          string
+		file          string
+		expectedError string
+	}{
+		{
+			name:          "pod",
+			file:          "pod.json",
+			expectedError: "",
+		},
+		{
+			name:          "badpod",
+			file:          "badpod.json",
+			expectedError: "v1.ObjectMeta.Annotations",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result := newUnstructuredDefaultBuilder().
+				ContinueOnError().
+				FilenameParam(false, &FilenameOptions{Recursive: false, Filenames: []string{fmt.Sprintf("%s/%s", tmpDir, tc.file)}}).
+				Flatten().
+				Do()
+
+			err := result.Err()
+			if err == nil {
+				_, err = result.Infos()
+			}
+
+			if len(tc.expectedError) == 0 {
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+			} else {
+				if err == nil {
+					t.Errorf("expected error, got none")
+				} else if !strings.Contains(err.Error(), tc.expectedError) {
+					t.Errorf("expected error with '%s', got: %v", tc.expectedError, err)
+				}
+			}
+
 		})
 	}
 }

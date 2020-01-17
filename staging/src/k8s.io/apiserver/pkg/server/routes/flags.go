@@ -121,6 +121,7 @@ func StringFlagPutHandler(setter StringFlagSetterFunc) http.HandlerFunc {
 // writePlainText renders a simple string response.
 func writePlainText(statusCode int, text string, w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "text/plain")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.WriteHeader(statusCode)
 	fmt.Fprintln(w, text)
 }

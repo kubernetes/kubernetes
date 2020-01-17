@@ -4,11 +4,8 @@ go_library(
     name = "go_default_library",
     srcs = [
         "delegator.go",
-        "delegator_1_8.go",
-        "delegator_pre_1_8.go",
         "http.go",
         "instrument_client.go",
-        "instrument_client_1_8.go",
         "instrument_server.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/github.com/prometheus/client_golang/prometheus/promhttp",

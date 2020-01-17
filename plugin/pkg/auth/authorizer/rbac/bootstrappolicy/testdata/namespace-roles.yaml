@@ -29,6 +29,7 @@ items:
     - update
   - apiGroups:
     - ""
+    - events.k8s.io
     resources:
     - events
     verbs:
@@ -167,6 +168,7 @@ items:
     - watch
   - apiGroups:
     - ""
+    - events.k8s.io
     resources:
     - events
     verbs:

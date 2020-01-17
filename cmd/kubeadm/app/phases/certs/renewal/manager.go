@@ -116,7 +116,7 @@ func NewManager(cfg *kubeadmapi.ClusterConfiguration, kubernetesDir string) (*Ma
 			longName: "certificate embedded in the kubeconfig file for the scheduler manager to use",
 			fileName: kubeadmconstants.SchedulerKubeConfigFileName,
 		},
-		//NB. we are escluding KubeletKubeConfig from renewal because management of this certificate is delegated to kubelet
+		//NB. we are excluding KubeletKubeConfig from renewal because management of this certificate is delegated to kubelet
 	}
 
 	// create a CertificateRenewHandler for each kubeConfig file
@@ -257,6 +257,9 @@ func (rm *Manager) CreateRenewCSR(name, outdir string) error {
 
 	// generates the CSR request and save it
 	csr, key, err := pkiutil.NewCSRAndKey(cfg)
+	if err != nil {
+		return errors.Wrapf(err, "failure while generating %s CSR and key", name)
+	}
 	if err := pkiutil.WriteKey(outdir, name, key); err != nil {
 		return errors.Wrapf(err, "failure while saving %s key", name)
 	}

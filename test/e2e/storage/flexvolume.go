@@ -18,7 +18,6 @@ package storage
 
 import (
 	"fmt"
-	"math/rand"
 	"net"
 	"path"
 
@@ -29,6 +28,7 @@ import (
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
@@ -77,9 +77,9 @@ func installFlex(c clientset.Interface, node *v1.Node, vendor, driver, filePath 
 	host := ""
 	var err error
 	if node != nil {
-		host, err = framework.GetNodeExternalIP(node)
+		host, err = e2enode.GetExternalIP(node)
 		if err != nil {
-			host, err = framework.GetNodeInternalIP(node)
+			host, err = e2enode.GetInternalIP(node)
 		}
 	} else {
 		masterHostWithPort := framework.GetMasterHost()
@@ -92,7 +92,7 @@ func installFlex(c clientset.Interface, node *v1.Node, vendor, driver, filePath 
 	cmd := fmt.Sprintf("sudo mkdir -p %s", flexDir)
 	sshAndLog(cmd, host, true /*failOnError*/)
 
-	data := testfiles.ReadOrDie(filePath, ginkgo.Fail)
+	data := testfiles.ReadOrDie(filePath)
 	cmd = fmt.Sprintf("sudo tee <<'EOF' %s\n%s\nEOF", flexFile, string(data))
 	sshAndLog(cmd, host, true /*failOnError*/)
 
@@ -106,9 +106,9 @@ func uninstallFlex(c clientset.Interface, node *v1.Node, vendor, driver string) 
 	host := ""
 	var err error
 	if node != nil {
-		host, err = framework.GetNodeExternalIP(node)
+		host, err = e2enode.GetExternalIP(node)
 		if err != nil {
-			host, err = framework.GetNodeInternalIP(node)
+			host, err = e2enode.GetInternalIP(node)
 		}
 	} else {
 		masterHostWithPort := framework.GetMasterHost()
@@ -160,7 +160,7 @@ var _ = utils.SIGDescribe("Flexvolumes", func() {
 
 	var cs clientset.Interface
 	var ns *v1.Namespace
-	var node v1.Node
+	var node *v1.Node
 	var config volume.TestConfig
 	var suffix string
 
@@ -172,8 +172,9 @@ var _ = utils.SIGDescribe("Flexvolumes", func() {
 
 		cs = f.ClientSet
 		ns = f.Namespace
-		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-		node = nodes.Items[rand.Intn(len(nodes.Items))]
+		var err error
+		node, err = e2enode.GetRandomReadySchedulableNode(f.ClientSet)
+		framework.ExpectNoError(err)
 		config = volume.TestConfig{
 			Namespace:      ns.Name,
 			Prefix:         "flex",
@@ -187,7 +188,7 @@ var _ = utils.SIGDescribe("Flexvolumes", func() {
 		driverInstallAs := driver + "-" + suffix
 
 		ginkgo.By(fmt.Sprintf("installing flexvolume %s on node %s as %s", path.Join(driverDir, driver), node.Name, driverInstallAs))
-		installFlex(cs, &node, "k8s", driverInstallAs, path.Join(driverDir, driver))
+		installFlex(cs, node, "k8s", driverInstallAs, path.Join(driverDir, driver))
 
 		testFlexVolume(driverInstallAs, cs, config, f)
 
@@ -197,7 +198,7 @@ var _ = utils.SIGDescribe("Flexvolumes", func() {
 		}
 
 		ginkgo.By(fmt.Sprintf("uninstalling flexvolume %s from node %s", driverInstallAs, node.Name))
-		uninstallFlex(cs, &node, "k8s", driverInstallAs)
+		uninstallFlex(cs, node, "k8s", driverInstallAs)
 	})
 
 	ginkgo.It("should be mountable when attachable", func() {
@@ -205,7 +206,7 @@ var _ = utils.SIGDescribe("Flexvolumes", func() {
 		driverInstallAs := driver + "-" + suffix
 
 		ginkgo.By(fmt.Sprintf("installing flexvolume %s on node %s as %s", path.Join(driverDir, driver), node.Name, driverInstallAs))
-		installFlex(cs, &node, "k8s", driverInstallAs, path.Join(driverDir, driver))
+		installFlex(cs, node, "k8s", driverInstallAs, path.Join(driverDir, driver))
 		ginkgo.By(fmt.Sprintf("installing flexvolume %s on master as %s", path.Join(driverDir, driver), driverInstallAs))
 		installFlex(cs, nil, "k8s", driverInstallAs, path.Join(driverDir, driver))
 
@@ -220,7 +221,7 @@ var _ = utils.SIGDescribe("Flexvolumes", func() {
 		time.Sleep(detachTimeout)
 
 		ginkgo.By(fmt.Sprintf("uninstalling flexvolume %s from node %s", driverInstallAs, node.Name))
-		uninstallFlex(cs, &node, "k8s", driverInstallAs)
+		uninstallFlex(cs, node, "k8s", driverInstallAs)
 		ginkgo.By(fmt.Sprintf("uninstalling flexvolume %s from master", driverInstallAs))
 		uninstallFlex(cs, nil, "k8s", driverInstallAs)
 	})

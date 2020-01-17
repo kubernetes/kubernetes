@@ -19,18 +19,17 @@ package replicaset
 import (
 	"fmt"
 
-	apps "k8s.io/api/apps/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	testutils "k8s.io/kubernetes/test/utils"
 )
 
 // UpdateReplicaSetWithRetries updates replicaset template with retries.
-func UpdateReplicaSetWithRetries(c clientset.Interface, namespace, name string, applyUpdate testutils.UpdateReplicaSetFunc) (*apps.ReplicaSet, error) {
-	return testutils.UpdateReplicaSetWithRetries(c, namespace, name, applyUpdate, e2elog.Logf, framework.Poll, framework.PollShortTimeout)
+func UpdateReplicaSetWithRetries(c clientset.Interface, namespace, name string, applyUpdate testutils.UpdateReplicaSetFunc) (*appsv1.ReplicaSet, error) {
+	return testutils.UpdateReplicaSetWithRetries(c, namespace, name, applyUpdate, framework.Logf, framework.Poll, framework.PollShortTimeout)
 }
 
 // CheckNewRSAnnotations check if the new RS's annotation is as expected

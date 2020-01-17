@@ -17,6 +17,7 @@ limitations under the License.
 package webhook
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
@@ -397,7 +398,7 @@ func TestTLSConfig(t *testing.T) {
 
 			// Allow all and see if we get an error.
 			service.Allow()
-			decision, _, err := wh.Authorize(attr)
+			decision, _, err := wh.Authorize(context.Background(), attr)
 			if tt.wantAuth {
 				if decision != authorizer.DecisionAllow {
 					t.Errorf("expected successful authorization")
@@ -419,7 +420,7 @@ func TestTLSConfig(t *testing.T) {
 			}
 
 			service.Deny()
-			if decision, _, _ := wh.Authorize(attr); decision == authorizer.DecisionAllow {
+			if decision, _, _ := wh.Authorize(context.Background(), attr); decision == authorizer.DecisionAllow {
 				t.Errorf("%s: incorrectly authorized with DenyAll policy", tt.test)
 			}
 		}()
@@ -523,7 +524,7 @@ func TestWebhook(t *testing.T) {
 	}
 
 	for i, tt := range tests {
-		decision, _, err := wh.Authorize(tt.attr)
+		decision, _, err := wh.Authorize(context.Background(), tt.attr)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -627,7 +628,7 @@ func TestWebhookCache(t *testing.T) {
 			serv.called = 0
 			serv.allow = test.allow
 			serv.statusCode = test.statusCode
-			authorized, _, err := wh.Authorize(test.attr)
+			authorized, _, err := wh.Authorize(context.Background(), test.attr)
 			if test.expectedErr && err == nil {
 				t.Fatalf("%d: Expected error", i)
 			} else if !test.expectedErr && err != nil {

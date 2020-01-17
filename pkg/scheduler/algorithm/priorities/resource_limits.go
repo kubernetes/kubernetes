@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	"k8s.io/api/core/v1"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
+	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 
 	"k8s.io/klog"
@@ -33,10 +33,10 @@ import (
 // of the pod are satisfied, the node is assigned a score of 1.
 // Rationale of choosing the lowest score of 1 is that this is mainly selected to break ties between nodes that have
 // same scores assigned by one of least and most requested priority functions.
-func ResourceLimitsPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *schedulernodeinfo.NodeInfo) (schedulerapi.HostPriority, error) {
+func ResourceLimitsPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *schedulernodeinfo.NodeInfo) (framework.NodeScore, error) {
 	node := nodeInfo.Node()
 	if node == nil {
-		return schedulerapi.HostPriority{}, fmt.Errorf("node not found")
+		return framework.NodeScore{}, fmt.Errorf("node not found")
 	}
 
 	allocatableResources := nodeInfo.AllocatableResource()
@@ -54,7 +54,7 @@ func ResourceLimitsPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *schedule
 	cpuScore := computeScore(podLimits.MilliCPU, allocatableResources.MilliCPU)
 	memScore := computeScore(podLimits.Memory, allocatableResources.Memory)
 
-	score := int(0)
+	score := int64(0)
 	if cpuScore == 1 || memScore == 1 {
 		score = 1
 	}
@@ -71,8 +71,8 @@ func ResourceLimitsPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *schedule
 		)
 	}
 
-	return schedulerapi.HostPriority{
-		Host:  node.Name,
+	return framework.NodeScore{
+		Name:  node.Name,
 		Score: score,
 	}, nil
 }

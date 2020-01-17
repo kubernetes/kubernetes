@@ -20,7 +20,18 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"sort"
+	"strconv"
+	"strings"
 	"time"
+
+	"k8s.io/apimachinery/pkg/util/sets"
+	clientset "k8s.io/client-go/kubernetes"
+	dockermetrics "k8s.io/kubernetes/pkg/kubelet/dockershim/metrics"
+	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+
+	"github.com/prometheus/common/model"
 )
 
 const (
@@ -88,4 +99,123 @@ func (g *Grabber) getMetricsFromNode(nodeName string, kubeletPort int) (string, 
 		}
 		return string(rawOutput), nil
 	}
+}
+
+// KubeletLatencyMetric stores metrics scraped from the kubelet server's /metric endpoint.
+// TODO: Get some more structure around the metrics and this type
+type KubeletLatencyMetric struct {
+	// eg: list, info, create
+	Operation string
+	// eg: sync_pods, pod_worker
+	Method string
+	// 0 <= quantile <=1, e.g. 0.95 is 95%tile, 0.5 is median.
+	Quantile float64
+	Latency  time.Duration
+}
+
+// KubeletLatencyMetrics implements sort.Interface for []KubeletMetric based on
+// the latency field.
+type KubeletLatencyMetrics []KubeletLatencyMetric
+
+func (a KubeletLatencyMetrics) Len() int           { return len(a) }
+func (a KubeletLatencyMetrics) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a KubeletLatencyMetrics) Less(i, j int) bool { return a[i].Latency > a[j].Latency }
+
+// If a apiserver client is passed in, the function will try to get kubelet metrics from metrics grabber;
+// or else, the function will try to get kubelet metrics directly from the node.
+func getKubeletMetricsFromNode(c clientset.Interface, nodeName string) (KubeletMetrics, error) {
+	if c == nil {
+		return GrabKubeletMetricsWithoutProxy(nodeName, "/metrics")
+	}
+	grabber, err := NewMetricsGrabber(c, nil, true, false, false, false, false)
+	if err != nil {
+		return KubeletMetrics{}, err
+	}
+	return grabber.GrabFromKubelet(nodeName)
+}
+
+// GetKubeletMetrics gets all metrics in kubelet subsystem from specified node and trims
+// the subsystem prefix.
+func GetKubeletMetrics(c clientset.Interface, nodeName string) (KubeletMetrics, error) {
+	ms, err := getKubeletMetricsFromNode(c, nodeName)
+	if err != nil {
+		return KubeletMetrics{}, err
+	}
+
+	kubeletMetrics := make(KubeletMetrics)
+	for name, samples := range ms {
+		const prefix = kubeletmetrics.KubeletSubsystem + "_"
+		if !strings.HasPrefix(name, prefix) {
+			// Not a kubelet metric.
+			continue
+		}
+		method := strings.TrimPrefix(name, prefix)
+		kubeletMetrics[method] = samples
+	}
+	return kubeletMetrics, nil
+}
+
+// GetDefaultKubeletLatencyMetrics calls GetKubeletLatencyMetrics with a set of default metricNames
+// identifying common latency metrics.
+// Note that the KubeletMetrics passed in should not contain subsystem prefix.
+func GetDefaultKubeletLatencyMetrics(ms KubeletMetrics) KubeletLatencyMetrics {
+	latencyMetricNames := sets.NewString(
+		kubeletmetrics.PodWorkerDurationKey,
+		kubeletmetrics.PodWorkerStartDurationKey,
+		kubeletmetrics.PodStartDurationKey,
+		kubeletmetrics.CgroupManagerOperationsKey,
+		dockermetrics.DockerOperationsLatencyKey,
+		kubeletmetrics.PodWorkerStartDurationKey,
+		kubeletmetrics.PLEGRelistDurationKey,
+	)
+	return GetKubeletLatencyMetrics(ms, latencyMetricNames)
+}
+
+// GetKubeletLatencyMetrics filters ms to include only those contained in the metricNames set,
+// then constructs a KubeletLatencyMetrics list based on the samples associated with those metrics.
+func GetKubeletLatencyMetrics(ms KubeletMetrics, filterMetricNames sets.String) KubeletLatencyMetrics {
+	var latencyMetrics KubeletLatencyMetrics
+	for name, samples := range ms {
+		if !filterMetricNames.Has(name) {
+			continue
+		}
+		for _, sample := range samples {
+			latency := sample.Value
+			operation := string(sample.Metric["operation_type"])
+			var quantile float64
+			if val, ok := sample.Metric[model.QuantileLabel]; ok {
+				var err error
+				if quantile, err = strconv.ParseFloat(string(val), 64); err != nil {
+					continue
+				}
+			}
+
+			latencyMetrics = append(latencyMetrics, KubeletLatencyMetric{
+				Operation: operation,
+				Method:    name,
+				Quantile:  quantile,
+				Latency:   time.Duration(int64(latency)) * time.Microsecond,
+			})
+		}
+	}
+	return latencyMetrics
+}
+
+// HighLatencyKubeletOperations logs and counts the high latency metrics exported by the kubelet server via /metrics.
+func HighLatencyKubeletOperations(c clientset.Interface, threshold time.Duration, nodeName string, logFunc func(fmt string, args ...interface{})) (KubeletLatencyMetrics, error) {
+	ms, err := GetKubeletMetrics(c, nodeName)
+	if err != nil {
+		return KubeletLatencyMetrics{}, err
+	}
+	latencyMetrics := GetDefaultKubeletLatencyMetrics(ms)
+	sort.Sort(latencyMetrics)
+	var badMetrics KubeletLatencyMetrics
+	logFunc("\nLatency metrics for node %v", nodeName)
+	for _, m := range latencyMetrics {
+		if m.Latency > threshold {
+			badMetrics = append(badMetrics, m)
+			e2elog.Logf("%+v", m)
+		}
+	}
+	return badMetrics, nil
 }

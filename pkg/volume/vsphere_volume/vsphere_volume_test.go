@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2016 The Kubernetes Authors.
 
@@ -62,7 +64,7 @@ func TestCanSupport(t *testing.T) {
 type fakePDManager struct {
 }
 
-func (fake *fakePDManager) CreateVolume(v *vsphereVolumeProvisioner, selectedZone []string) (volSpec *VolumeSpec, err error) {
+func (fake *fakePDManager) CreateVolume(v *vsphereVolumeProvisioner, selectedNode *v1.Node, selectedZone []string) (volSpec *VolumeSpec, err error) {
 	volSpec = &VolumeSpec{
 		Path:              "[local] test-volume-name.vmdk",
 		Size:              100,

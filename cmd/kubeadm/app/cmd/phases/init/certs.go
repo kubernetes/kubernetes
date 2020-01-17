@@ -30,19 +30,17 @@ import (
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
-	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
-	"k8s.io/kubernetes/pkg/util/normalizer"
 )
 
 var (
-	saKeyLongDesc = fmt.Sprintf(normalizer.LongDesc(`
+	saKeyLongDesc = fmt.Sprintf(cmdutil.LongDesc(`
 		Generate the private key for signing service account tokens along with its public key, and save them into
 		%s and %s files.
 		If both files already exist, kubeadm skips the generation step and existing files will be used.
 		`+cmdutil.AlphaDisclaimer), kubeadmconstants.ServiceAccountPrivateKeyName, kubeadmconstants.ServiceAccountPublicKeyName)
 
-	genericLongDesc = normalizer.LongDesc(`
+	genericLongDesc = cmdutil.LongDesc(`
 		Generate the %[1]s, and save them into %[2]s.cert and %[2]s.key files.%[3]s
 
 		If both files already exist, kubeadm skips the generation step and existing files will be used.
@@ -86,17 +84,19 @@ func newCertSubPhases() []workflow.Phase {
 
 	subPhases = append(subPhases, allPhase)
 
-	certTree, _ := certsphase.GetDefaultCertList().AsMap().CertTree()
-
-	for ca, certList := range certTree {
-		caPhase := newCertSubPhase(ca, runCAPhase(ca))
-		subPhases = append(subPhases, caPhase)
-
-		for _, cert := range certList {
-			certPhase := newCertSubPhase(cert, runCertPhase(cert, ca))
-			certPhase.LocalFlags = localFlags()
-			subPhases = append(subPhases, certPhase)
+	// This loop assumes that GetDefaultCertList() always returns a list of
+	// certificate that is preceded by the CAs that sign them.
+	var lastCACert *certsphase.KubeadmCert
+	for _, cert := range certsphase.GetDefaultCertList() {
+		var phase workflow.Phase
+		if cert.CAName == "" {
+			phase = newCertSubPhase(cert, runCAPhase(cert))
+			lastCACert = cert
+		} else {
+			phase = newCertSubPhase(cert, runCertPhase(cert, lastCACert))
+			phase.LocalFlags = localFlags()
 		}
+		subPhases = append(subPhases, phase)
 	}
 
 	// SA creates the private/public key pair, which doesn't use x509 at all
@@ -135,10 +135,12 @@ func getCertPhaseFlags(name string) []string {
 		options.CfgPath,
 		options.CSROnly,
 		options.CSRDir,
+		options.KubernetesVersion,
 	}
 	if name == "all" || name == "apiserver" {
 		flags = append(flags,
 			options.APIServerAdvertiseAddress,
+			options.ControlPlaneEndpoint,
 			options.APIServerCertSANs,
 			options.NetworkingDNSDomain,
 			options.NetworkingServiceSubnet,
@@ -158,11 +160,14 @@ func getSANDescription(certSpec *certsphase.KubeadmCert) string {
 	defaultInternalConfig := &kubeadmapi.InitConfiguration{}
 
 	kubeadmscheme.Scheme.Default(defaultConfig)
-	err := kubeadmscheme.Scheme.Convert(defaultConfig, defaultInternalConfig, nil)
-	kubeadmutil.CheckErr(err)
+	if err := kubeadmscheme.Scheme.Convert(defaultConfig, defaultInternalConfig, nil); err != nil {
+		return ""
+	}
 
 	certConfig, err := certSpec.GetConfig(defaultInternalConfig)
-	kubeadmutil.CheckErr(err)
+	if err != nil {
+		return ""
+	}
 
 	if len(certConfig.AltNames.DNSNames) == 0 && len(certConfig.AltNames.IPs) == 0 {
 		return ""
@@ -215,18 +220,18 @@ func runCAPhase(ca *certsphase.KubeadmCert) func(c workflow.RunData) error {
 			return errors.New("certs phase invoked with an invalid data struct")
 		}
 
+		// if using external etcd, skips etcd certificate authority generation
+		if data.Cfg().Etcd.External != nil && ca.Name == "etcd-ca" {
+			fmt.Printf("[certs] External etcd mode: Skipping %s certificate authority generation\n", ca.BaseName)
+			return nil
+		}
+
 		if _, err := pkiutil.TryLoadCertFromDisk(data.CertificateDir(), ca.BaseName); err == nil {
 			if _, err := pkiutil.TryLoadKeyFromDisk(data.CertificateDir(), ca.BaseName); err == nil {
 				fmt.Printf("[certs] Using existing %s certificate authority\n", ca.BaseName)
 				return nil
 			}
 			fmt.Printf("[certs] Using existing %s keyless certificate authority\n", ca.BaseName)
-			return nil
-		}
-
-		// if using external etcd, skips etcd certificate authority generation
-		if data.Cfg().Etcd.External != nil && ca.Name == "etcd-ca" {
-			fmt.Printf("[certs] External etcd mode: Skipping %s certificate authority generation\n", ca.BaseName)
 			return nil
 		}
 
@@ -245,6 +250,12 @@ func runCertPhase(cert *certsphase.KubeadmCert, caCert *certsphase.KubeadmCert) 
 		data, ok := c.(InitData)
 		if !ok {
 			return errors.New("certs phase invoked with an invalid data struct")
+		}
+
+		// if using external etcd, skips etcd certificates generation
+		if data.Cfg().Etcd.External != nil && cert.CAName == "etcd-ca" {
+			fmt.Printf("[certs] External etcd mode: Skipping %s certificate generation\n", cert.BaseName)
+			return nil
 		}
 
 		if certData, _, err := pkiutil.TryLoadCertAndKeyFromDisk(data.CertificateDir(), cert.BaseName); err == nil {
@@ -268,12 +279,6 @@ func runCertPhase(cert *certsphase.KubeadmCert, caCert *certsphase.KubeadmCert) 
 			}
 
 			return certsphase.CreateCSR(cert, data.Cfg(), csrDir)
-		}
-
-		// if using external etcd, skips etcd certificates generation
-		if data.Cfg().Etcd.External != nil && cert.CAName == "etcd-ca" {
-			fmt.Printf("[certs] External etcd mode: Skipping %s certificate authority generation\n", cert.BaseName)
-			return nil
 		}
 
 		// if dryrunning, write certificates to a temporary folder (and defer restore to the path originally specified by the user)

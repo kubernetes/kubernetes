@@ -1,3 +1,5 @@
+// untested sections: 2
+
 package matchers
 
 import "github.com/onsi/gomega/format"

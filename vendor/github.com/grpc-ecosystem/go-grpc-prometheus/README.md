@@ -38,7 +38,7 @@ import "github.com/grpc-ecosystem/go-grpc-prometheus"
     // After all your registrations, make sure all of the Prometheus metrics are initialized.
     grpc_prometheus.Register(myServer)
     // Register Prometheus metrics handler.    
-    http.Handle("/metrics", prometheus.Handler())
+    http.Handle("/metrics", promhttp.Handler())
 ...
 ```
 
@@ -49,8 +49,8 @@ import "github.com/grpc-ecosystem/go-grpc-prometheus"
 ...
    clientConn, err = grpc.Dial(
        address,
-		   grpc.WithUnaryInterceptor(UnaryClientInterceptor),
-		   grpc.WithStreamInterceptor(StreamClientInterceptor)
+		   grpc.WithUnaryInterceptor(grpc_prometheus.UnaryClientInterceptor),
+		   grpc.WithStreamInterceptor(grpc_prometheus.StreamClientInterceptor)
    )
    client = pb_testproto.NewTestServiceClient(clientConn)
    resp, err := client.PingEmpty(s.ctx, &myservice.Request{Msg: "hello"})
@@ -118,7 +118,7 @@ each of the 20 messages sent back, a counter will be incremented:
 grpc_server_msg_sent_total{grpc_method="PingList",grpc_service="mwitkow.testproto.TestService",grpc_type="server_stream"} 20
 ```
 
-After the call completes, it's status (`OK` or other [gRPC status code](https://github.com/grpc/grpc-go/blob/master/codes/codes.go)) 
+After the call completes, its status (`OK` or other [gRPC status code](https://github.com/grpc/grpc-go/blob/master/codes/codes.go)) 
 and the relevant call labels increment the `grpc_server_handled_total` counter.
 
 ```jsoniq
@@ -128,8 +128,8 @@ grpc_server_handled_total{grpc_code="OK",grpc_method="PingList",grpc_service="mw
 ## Histograms
 
 [Prometheus histograms](https://prometheus.io/docs/concepts/metric_types/#histogram) are a great way
-to measure latency distributions of your RPCs. However since it is bad practice to have metrics
-of [high cardinality](https://prometheus.io/docs/practices/instrumentation/#do-not-overuse-labels))
+to measure latency distributions of your RPCs. However, since it is bad practice to have metrics
+of [high cardinality](https://prometheus.io/docs/practices/instrumentation/#do-not-overuse-labels)
 the latency monitoring metrics are disabled by default. To enable them please call the following
 in your server initialization code:
 
@@ -137,8 +137,8 @@ in your server initialization code:
 grpc_prometheus.EnableHandlingTimeHistogram()
 ```
 
-After the call completes, it's handling time will be recorded in a [Prometheus histogram](https://prometheus.io/docs/concepts/metric_types/#histogram)
-variable `grpc_server_handling_seconds`. It contains three sub-metrics:
+After the call completes, its handling time will be recorded in a [Prometheus histogram](https://prometheus.io/docs/concepts/metric_types/#histogram)
+variable `grpc_server_handling_seconds`. The histogram variable contains three sub-metrics:
 
  * `grpc_server_handling_seconds_count` - the count of all completed RPCs by status and method 
  * `grpc_server_handling_seconds_sum` - cumulative time of RPCs by status and method, useful for 
@@ -168,7 +168,7 @@ grpc_server_handling_seconds_count{grpc_code="OK",grpc_method="PingList",grpc_se
 
 ## Useful query examples
 
-Prometheus philosophy is to provide the most detailed metrics possible to the monitoring system, and
+Prometheus philosophy is to provide raw metrics to the monitoring system, and
 let the aggregations be handled there. The verbosity of above metrics make it possible to have that
 flexibility. Here's a couple of useful monitoring queries:
 

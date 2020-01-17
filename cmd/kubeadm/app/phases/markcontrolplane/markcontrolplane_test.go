@@ -24,12 +24,12 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/pkg/util/node"
+	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
 
 func TestMarkControlPlane(t *testing.T) {
@@ -108,7 +108,7 @@ func TestMarkControlPlane(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			hostname, err := node.GetHostname("")
+			hostname, err := kubeadmutil.GetHostname("")
 			if err != nil {
 				t.Fatalf("MarkControlPlane(%s): unexpected error: %v", tc.name, err)
 			}
@@ -138,14 +138,9 @@ func TestMarkControlPlane(t *testing.T) {
 			s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
 
-				if req.URL.Path != "/api/v1/nodes/"+hostname {
-					t.Errorf("MarkControlPlane(%s): request for unexpected HTTP resource: %v", tc.name, req.URL.Path)
-					http.Error(w, "", http.StatusNotFound)
-					return
-				}
-
 				switch req.Method {
 				case "GET":
+				case "POST":
 				case "PATCH":
 					patchRequest = toString(req.Body)
 				default:

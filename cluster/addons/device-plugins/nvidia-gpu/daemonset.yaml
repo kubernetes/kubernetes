@@ -14,8 +14,6 @@ spec:
     metadata:
       labels:
         k8s-app: nvidia-gpu-device-plugin
-      annotations:
-        scheduler.alpha.kubernetes.io/critical-pod: ''
     spec:
       priorityClassName: system-node-critical
       affinity:
@@ -38,7 +36,7 @@ spec:
         hostPath:
           path: /dev
       containers:
-      - image: "k8s.gcr.io/nvidia-gpu-device-plugin@sha256:08509a36233c5096bb273a492251a9a5ca28558ab36d74007ca2a9d3f0b61e1d"
+      - image: "k8s.gcr.io/nvidia-gpu-device-plugin@sha256:4b036e8844920336fa48f36edeb7d4398f426d6a934ba022848deed2edbf09aa"
         command: ["/usr/bin/nvidia-gpu-device-plugin", "-logtostderr"]
         name: nvidia-gpu-device-plugin
         resources:

@@ -17,7 +17,6 @@ limitations under the License.
 package mount
 
 import (
-	"errors"
 	"os"
 	"path/filepath"
 	"sync"
@@ -29,7 +28,6 @@ import (
 type FakeMounter struct {
 	MountPoints []MountPoint
 	Log         []FakeAction
-	Filesystem  map[string]FileType
 	// Error to return for a path when calling IsLikelyNotMountPoint
 	MountCheckErrors map[string]error
 	// Some tests run things in parallel, make sure the mounter does not produce
@@ -39,9 +37,12 @@ type FakeMounter struct {
 
 var _ Interface = &FakeMounter{}
 
-// Values for FakeAction.Action
-const FakeActionMount = "mount"
-const FakeActionUnmount = "unmount"
+const (
+	// FakeActionMount is the string for specifying mount as FakeAction.Action
+	FakeActionMount = "mount"
+	// FakeActionUnmount is the string for specifying unmount as FakeAction.Action
+	FakeActionUnmount = "unmount"
+)
 
 // FakeAction objects are logged every time a fake mount or unmount is called.
 type FakeAction struct {
@@ -51,6 +52,7 @@ type FakeAction struct {
 	FSType string // applies only to "mount" actions
 }
 
+// ResetLog clears all the log entries in FakeMounter
 func (f *FakeMounter) ResetLog() {
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
@@ -58,6 +60,7 @@ func (f *FakeMounter) ResetLog() {
 	f.Log = []FakeAction{}
 }
 
+// Mount records the mount event and updates the in-memory mount points for FakeMounter
 func (f *FakeMounter) Mount(source string, target string, fstype string, options []string) error {
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
@@ -100,6 +103,7 @@ func (f *FakeMounter) Mount(source string, target string, fstype string, options
 	return nil
 }
 
+// Unmount records the unmount event and updates the in-memory mount points for FakeMounter
 func (f *FakeMounter) Unmount(target string) error {
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
@@ -125,6 +129,7 @@ func (f *FakeMounter) Unmount(target string) error {
 	return nil
 }
 
+// List returns all the in-memory mountpoints for FakeMounter
 func (f *FakeMounter) List() ([]MountPoint, error) {
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
@@ -132,10 +137,8 @@ func (f *FakeMounter) List() ([]MountPoint, error) {
 	return f.MountPoints, nil
 }
 
-func (f *FakeMounter) IsMountPointMatch(mp MountPoint, dir string) bool {
-	return mp.Path == dir
-}
-
+// IsLikelyNotMountPoint determines whether a path is a mountpoint by checking
+// if the absolute path to file is in the in-memory mountpoints
 func (f *FakeMounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
@@ -166,56 +169,8 @@ func (f *FakeMounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	return true, nil
 }
 
-func (f *FakeMounter) DeviceOpened(pathname string) (bool, error) {
-	f.mutex.Lock()
-	defer f.mutex.Unlock()
-
-	for _, mp := range f.MountPoints {
-		if mp.Device == pathname {
-			return true, nil
-		}
-	}
-	return false, nil
-}
-
-func (f *FakeMounter) PathIsDevice(pathname string) (bool, error) {
-	return true, nil
-}
-
-func (f *FakeMounter) GetDeviceNameFromMount(mountPath, pluginMountDir string) (string, error) {
-	return getDeviceNameFromMount(f, mountPath, pluginMountDir)
-}
-
-func (f *FakeMounter) MakeRShared(path string) error {
-	return nil
-}
-
-func (f *FakeMounter) GetFileType(pathname string) (FileType, error) {
-	if t, ok := f.Filesystem[pathname]; ok {
-		return t, nil
-	}
-	return FileType("Directory"), nil
-}
-
-func (f *FakeMounter) MakeDir(pathname string) error {
-	return nil
-}
-
-func (f *FakeMounter) MakeFile(pathname string) error {
-	return nil
-}
-
-func (f *FakeMounter) ExistsPath(pathname string) (bool, error) {
-	if _, ok := f.Filesystem[pathname]; ok {
-		return true, nil
-	}
-	return false, nil
-}
-
-func (f *FakeMounter) EvalHostSymlinks(pathname string) (string, error) {
-	return pathname, nil
-}
-
+// GetMountRefs finds all mount references to the path, returns a
+// list of paths.
 func (f *FakeMounter) GetMountRefs(pathname string) ([]string, error) {
 	realpath, err := filepath.EvalSymlinks(pathname)
 	if err != nil {
@@ -223,16 +178,4 @@ func (f *FakeMounter) GetMountRefs(pathname string) ([]string, error) {
 		realpath = pathname
 	}
 	return getMountRefsByDev(f, realpath)
-}
-
-func (f *FakeMounter) GetFSGroup(pathname string) (int64, error) {
-	return -1, errors.New("GetFSGroup not implemented")
-}
-
-func (f *FakeMounter) GetSELinuxSupport(pathname string) (bool, error) {
-	return false, errors.New("GetSELinuxSupport not implemented")
-}
-
-func (f *FakeMounter) GetMode(pathname string) (os.FileMode, error) {
-	return 0, errors.New("not implemented")
 }

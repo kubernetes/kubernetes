@@ -17,12 +17,15 @@ limitations under the License.
 package versioning
 
 import (
+	"encoding/json"
 	"io"
 	"reflect"
+	"sync"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/klog"
 )
 
 // NewDefaultingCodecForScheme is a convenience method for callers that are using a scheme.
@@ -62,6 +65,8 @@ func NewCodec(
 		encodeVersion: encodeVersion,
 		decodeVersion: decodeVersion,
 
+		identifier: identifier(encodeVersion, encoder),
+
 		originalSchemeName: originalSchemeName,
 	}
 	return internal
@@ -78,19 +83,47 @@ type codec struct {
 	encodeVersion runtime.GroupVersioner
 	decodeVersion runtime.GroupVersioner
 
+	identifier runtime.Identifier
+
 	// originalSchemeName is optional, but when filled in it holds the name of the scheme from which this codec originates
 	originalSchemeName string
+}
+
+var identifiersMap sync.Map
+
+type codecIdentifier struct {
+	EncodeGV string `json:"encodeGV,omitempty"`
+	Encoder  string `json:"encoder,omitempty"`
+	Name     string `json:"name,omitempty"`
+}
+
+// identifier computes Identifier of Encoder based on codec parameters.
+func identifier(encodeGV runtime.GroupVersioner, encoder runtime.Encoder) runtime.Identifier {
+	result := codecIdentifier{
+		Name: "versioning",
+	}
+
+	if encodeGV != nil {
+		result.EncodeGV = encodeGV.Identifier()
+	}
+	if encoder != nil {
+		result.Encoder = string(encoder.Identifier())
+	}
+	if id, ok := identifiersMap.Load(result); ok {
+		return id.(runtime.Identifier)
+	}
+	identifier, err := json.Marshal(result)
+	if err != nil {
+		klog.Fatalf("Failed marshaling identifier for codec: %v", err)
+	}
+	identifiersMap.Store(result, runtime.Identifier(identifier))
+	return runtime.Identifier(identifier)
 }
 
 // Decode attempts a decode of the object, then tries to convert it to the internal version. If into is provided and the decoding is
 // successful, the returned runtime.Object will be the value passed as into. Note that this may bypass conversion if you pass an
 // into that matches the serialized version.
 func (c *codec) Decode(data []byte, defaultGVK *schema.GroupVersionKind, into runtime.Object) (runtime.Object, *schema.GroupVersionKind, error) {
-	versioned, isVersioned := into.(*runtime.VersionedObjects)
-	if isVersioned {
-		into = versioned.Last()
-	}
-
 	// If the into object is unstructured and expresses an opinion about its group/version,
 	// create a new instance of the type so we always exercise the conversion path (skips short-circuiting on `into == obj`)
 	decodeInto := into
@@ -113,41 +146,21 @@ func (c *codec) Decode(data []byte, defaultGVK *schema.GroupVersionKind, into ru
 
 	// if we specify a target, use generic conversion.
 	if into != nil {
-		if into == obj {
-			if isVersioned {
-				return versioned, gvk, nil
-			}
-			return into, gvk, nil
-		}
-
 		// perform defaulting if requested
 		if c.defaulter != nil {
-			// create a copy to ensure defaulting is not applied to the original versioned objects
-			if isVersioned {
-				versioned.Objects = []runtime.Object{obj.DeepCopyObject()}
-			}
 			c.defaulter.Default(obj)
-		} else {
-			if isVersioned {
-				versioned.Objects = []runtime.Object{obj}
-			}
+		}
+
+		// Short-circuit conversion if the into object is same object
+		if into == obj {
+			return into, gvk, nil
 		}
 
 		if err := c.convertor.Convert(obj, into, c.decodeVersion); err != nil {
 			return nil, gvk, err
 		}
 
-		if isVersioned {
-			versioned.Objects = append(versioned.Objects, into)
-			return versioned, gvk, nil
-		}
 		return into, gvk, nil
-	}
-
-	// Convert if needed.
-	if isVersioned {
-		// create a copy, because ConvertToVersion does not guarantee non-mutation of objects
-		versioned.Objects = []runtime.Object{obj.DeepCopyObject()}
 	}
 
 	// perform defaulting if requested
@@ -159,18 +172,19 @@ func (c *codec) Decode(data []byte, defaultGVK *schema.GroupVersionKind, into ru
 	if err != nil {
 		return nil, gvk, err
 	}
-	if isVersioned {
-		if versioned.Last() != out {
-			versioned.Objects = append(versioned.Objects, out)
-		}
-		return versioned, gvk, nil
-	}
 	return out, gvk, nil
 }
 
 // Encode ensures the provided object is output in the appropriate group and version, invoking
 // conversion if necessary. Unversioned objects (according to the ObjectTyper) are output as is.
 func (c *codec) Encode(obj runtime.Object, w io.Writer) error {
+	if co, ok := obj.(runtime.CacheableObject); ok {
+		return co.CacheEncode(c.Identifier(), c.doEncode, w)
+	}
+	return c.doEncode(obj, w)
+}
+
+func (c *codec) doEncode(obj runtime.Object, w io.Writer) error {
 	switch obj := obj.(type) {
 	case *runtime.Unknown:
 		return c.encoder.Encode(obj, w)
@@ -230,10 +244,7 @@ func (c *codec) Encode(obj runtime.Object, w io.Writer) error {
 	return c.encoder.Encode(out, w)
 }
 
-// DirectEncoder was moved and renamed to runtime.WithVersionEncoder in 1.15.
-// TODO: remove in 1.16.
-type DirectEncoder = runtime.WithVersionEncoder
-
-// DirectDecoder was moved and renamed to runtime.WithoutVersionDecoder in 1.15.
-// TODO: remove in 1.16.
-type DirectDecoder = runtime.WithoutVersionDecoder
+// Identifier implements runtime.Encoder interface.
+func (c *codec) Identifier() runtime.Identifier {
+	return c.identifier
+}

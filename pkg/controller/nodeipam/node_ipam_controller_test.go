@@ -20,6 +20,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"strings"
 	"testing"
 
 	"k8s.io/api/core/v1"
@@ -30,9 +31,10 @@ import (
 	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam"
 	"k8s.io/kubernetes/pkg/controller/testutil"
 	"k8s.io/legacy-cloud-providers/gce"
+	netutils "k8s.io/utils/net"
 )
 
-func newTestNodeIpamController(clusterCIDR, serviceCIDR *net.IPNet, nodeCIDRMaskSize int, allocatorType ipam.CIDRAllocatorType) (*Controller, error) {
+func newTestNodeIpamController(clusterCIDR []*net.IPNet, serviceCIDR *net.IPNet, secondaryServiceCIDR *net.IPNet, nodeCIDRMaskSize int, allocatorType ipam.CIDRAllocatorType) (*Controller, error) {
 	clientSet := fake.NewSimpleClientset()
 	fakeNodeHandler := &testutil.FakeNodeHandler{
 		Existing: []*v1.Node{
@@ -51,36 +53,45 @@ func newTestNodeIpamController(clusterCIDR, serviceCIDR *net.IPNet, nodeCIDRMask
 	fakeGCE := gce.NewFakeGCECloud(gce.DefaultTestClusterValues())
 	return NewNodeIpamController(
 		fakeNodeInformer, fakeGCE, clientSet,
-		clusterCIDR, serviceCIDR, nodeCIDRMaskSize, allocatorType,
+		clusterCIDR, serviceCIDR, secondaryServiceCIDR, nodeCIDRMaskSize, allocatorType,
 	)
 }
 
 // TestNewNodeIpamControllerWithCIDRMasks tests if the controller can be
 // created with combinations of network CIDRs and masks.
 func TestNewNodeIpamControllerWithCIDRMasks(t *testing.T) {
+	emptyServiceCIDR := ""
 	for _, tc := range []struct {
-		desc          string
-		clusterCIDR   string
-		serviceCIDR   string
-		maskSize      int
-		allocatorType ipam.CIDRAllocatorType
-		wantFatal     bool
+		desc                 string
+		clusterCIDR          string
+		serviceCIDR          string
+		secondaryServiceCIDR string
+		maskSize             int
+		allocatorType        ipam.CIDRAllocatorType
+		wantFatal            bool
 	}{
-		{"valid_range_allocator", "10.0.0.0/21", "10.1.0.0/21", 24, ipam.RangeAllocatorType, false},
-		{"valid_cloud_allocator", "10.0.0.0/21", "10.1.0.0/21", 24, ipam.CloudAllocatorType, false},
-		{"valid_ipam_from_cluster", "10.0.0.0/21", "10.1.0.0/21", 24, ipam.IPAMFromClusterAllocatorType, false},
-		{"valid_ipam_from_cloud", "10.0.0.0/21", "10.1.0.0/21", 24, ipam.IPAMFromCloudAllocatorType, false},
-		{"valid_skip_cluster_CIDR_validation_for_cloud_allocator", "invalid", "10.1.0.0/21", 24, ipam.CloudAllocatorType, false},
-		{"invalid_cluster_CIDR", "invalid", "10.1.0.0/21", 24, ipam.IPAMFromClusterAllocatorType, true},
-		{"valid_CIDR_smaller_than_mask_cloud_allocator", "10.0.0.0/26", "10.1.0.0/21", 24, ipam.CloudAllocatorType, false},
-		{"invalid_CIDR_smaller_than_mask_other_allocators", "10.0.0.0/26", "10.1.0.0/21", 24, ipam.IPAMFromCloudAllocatorType, true},
+		{"valid_range_allocator", "10.0.0.0/21", "10.1.0.0/21", emptyServiceCIDR, 24, ipam.RangeAllocatorType, false},
+
+		{"valid_range_allocator_dualstack", "10.0.0.0/21,2000::/10", "10.1.0.0/21", emptyServiceCIDR, 24, ipam.RangeAllocatorType, false},
+		{"valid_range_allocator_dualstack_dualstackservice", "10.0.0.0/21,2000::/10", "10.1.0.0/21", "3000::/10", 24, ipam.RangeAllocatorType, false},
+
+		{"valid_cloud_allocator", "10.0.0.0/21", "10.1.0.0/21", emptyServiceCIDR, 24, ipam.CloudAllocatorType, false},
+		{"valid_ipam_from_cluster", "10.0.0.0/21", "10.1.0.0/21", emptyServiceCIDR, 24, ipam.IPAMFromClusterAllocatorType, false},
+		{"valid_ipam_from_cloud", "10.0.0.0/21", "10.1.0.0/21", emptyServiceCIDR, 24, ipam.IPAMFromCloudAllocatorType, false},
+		{"valid_skip_cluster_CIDR_validation_for_cloud_allocator", "invalid", "10.1.0.0/21", emptyServiceCIDR, 24, ipam.CloudAllocatorType, false},
+		{"invalid_cluster_CIDR", "invalid", "10.1.0.0/21", emptyServiceCIDR, 24, ipam.IPAMFromClusterAllocatorType, true},
+		{"valid_CIDR_smaller_than_mask_cloud_allocator", "10.0.0.0/26", "10.1.0.0/21", emptyServiceCIDR, 24, ipam.CloudAllocatorType, false},
+		{"invalid_CIDR_smaller_than_mask_other_allocators", "10.0.0.0/26", "10.1.0.0/21", emptyServiceCIDR, 24, ipam.IPAMFromCloudAllocatorType, true},
+		{"invalid_serviceCIDR_contains_clusterCIDR", "10.0.0.0/23", "10.0.0.0/21", emptyServiceCIDR, 24, ipam.IPAMFromClusterAllocatorType, true},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
-			_, clusterCIDRIpNet, _ := net.ParseCIDR(tc.clusterCIDR)
+			clusterCidrs, _ := netutils.ParseCIDRs(strings.Split(tc.clusterCIDR, ","))
 			_, serviceCIDRIpNet, _ := net.ParseCIDR(tc.serviceCIDR)
+			_, secondaryServiceCIDRIpNet, _ := net.ParseCIDR(tc.secondaryServiceCIDR)
+
 			if os.Getenv("EXIT_ON_FATAL") == "1" {
 				// This is the subprocess which runs the actual code.
-				newTestNodeIpamController(clusterCIDRIpNet, serviceCIDRIpNet, tc.maskSize, tc.allocatorType)
+				newTestNodeIpamController(clusterCidrs, serviceCIDRIpNet, secondaryServiceCIDRIpNet, tc.maskSize, tc.allocatorType)
 				return
 			}
 			// This is the host process that monitors the exit code of the subprocess.
@@ -96,7 +107,7 @@ func TestNewNodeIpamControllerWithCIDRMasks(t *testing.T) {
 				gotFatal = !exitErr.Success()
 			}
 			if gotFatal != tc.wantFatal {
-				t.Errorf("newTestNodeIpamController(%v, %v, %v, %v) : gotFatal = %t ; wantFatal = %t", clusterCIDRIpNet, serviceCIDRIpNet, tc.maskSize, tc.allocatorType, gotFatal, tc.wantFatal)
+				t.Errorf("newTestNodeIpamController(%v, %v, %v, %v) : gotFatal = %t ; wantFatal = %t", clusterCidrs, serviceCIDRIpNet, tc.maskSize, tc.allocatorType, gotFatal, tc.wantFatal)
 			}
 		})
 	}

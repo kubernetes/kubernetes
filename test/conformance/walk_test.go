@@ -69,6 +69,23 @@ var _ = framework.KubeDescribe("Feature", func() {
 		Description: `By default the stdout and stderr from the process
 being executed in a pod MUST be sent to the pod's logs.` + "\n\n"}},
 	},
+	// SIGDescribe + KubeDescribe + It, Describe + KubeDescribe + It
+	{"e2e/foo.go", `
+var _ = framework.SIGDescribe("Feature", func() {
+	KubeDescribe("Described by", func() {
+		// Description: description1
+		framework.ConformanceIt("A ConformanceIt", func() {})
+	})
+	Describe("Also described via", func() {
+		KubeDescribe("A nested", func() {
+			// Description: description2
+			framework.ConformanceIt("ConformanceIt", func() {})
+		})
+	})
+})`, []conformanceData{
+		{URL: "https://github.com/kubernetes/kubernetes/tree/master/e2e/foo.go#L6", TestName: "Feature Described by A ConformanceIt", Description: "description1\n\n"},
+		{URL: "https://github.com/kubernetes/kubernetes/tree/master/e2e/foo.go#L11", TestName: "Feature Also described via A nested ConformanceIt", Description: "description2\n\n"},
+	}},
 	// KubeDescribe + Context + It
 	{"e2e/foo.go", `
 var _ = framework.KubeDescribe("Feature", func() {
@@ -101,7 +118,7 @@ func TestConformance(t *testing.T) {
 		*confDoc = true
 		tests := scanfile(test.filename, code)
 		if !reflect.DeepEqual(tests, test.output) {
-			t.Errorf("code:\n%s\ngot  %v\nwant %v",
+			t.Errorf("code:\n%s\ngot  %+v\nwant %+v",
 				code, tests, test.output)
 		}
 	}
@@ -139,16 +156,12 @@ func TestValidateTestName(t *testing.T) {
 			"",
 		},
 		{
-			"a test case with valid tags [LinuxOnly] [NodeConformance] [Serial]",
+			"a test case with valid tags [LinuxOnly] [NodeConformance] [Serial] [Disruptive]",
 			"",
 		},
 		{
 			"a flaky test case that is invalid [Flaky]",
 			"[Flaky]",
-		},
-		{
-			"a disruptive test case that is invalid [Disruptive]",
-			"[Disruptive]",
 		},
 		{
 			"a feature test case that is invalid [Feature:Awesome]",
@@ -159,12 +172,12 @@ func TestValidateTestName(t *testing.T) {
 			"[Alpha]",
 		},
 		{
-			"a test case with multiple invalid tags [Flaky][Disruptive] [Feature:Awesome] [Alpha]",
-			"[Flaky],[Disruptive],[Feature:Awesome],[Alpha]",
+			"a test case with multiple invalid tags [Flaky] [Feature:Awesome] [Alpha]",
+			"[Flaky],[Feature:Awesome],[Alpha]",
 		},
 		{
-			"[sig-awesome] [Disruptive] a test case with valid and invalid tags [Alpha] [Serial] [Flaky]",
-			"[Disruptive],[Alpha],[Flaky]",
+			"[sig-awesome] [Alpha] [Disruptive] a test case with valid and invalid tags [Serial] [Flaky]",
+			"[Alpha],[Flaky]",
 		},
 	}
 	for i, tc := range testCases {

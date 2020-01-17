@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2014 The Kubernetes Authors.
 
@@ -22,12 +24,13 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 
 	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -250,8 +253,13 @@ func getVolumeSource(
 
 func (plugin *awsElasticBlockStorePlugin) ConstructVolumeSpec(volName, mountPath string) (*volume.Spec, error) {
 	mounter := plugin.host.GetMounter(plugin.GetPluginName())
+	kvh, ok := plugin.host.(volume.KubeletVolumeHost)
+	if !ok {
+		return nil, fmt.Errorf("plugin volume host does not implement KubeletVolumeHost interface")
+	}
+	hu := kvh.GetHostUtil()
 	pluginMntDir := util.GetPluginMountDir(plugin.host, plugin.GetPluginName())
-	volumeID, err := mounter.GetDeviceNameFromMount(mountPath, pluginMntDir)
+	volumeID, err := hu.GetDeviceNameFromMount(mounter, mountPath, pluginMntDir)
 	if err != nil {
 		return nil, err
 	}
@@ -318,7 +326,15 @@ func (plugin *awsElasticBlockStorePlugin) ExpandVolumeDevice(
 }
 
 func (plugin *awsElasticBlockStorePlugin) NodeExpand(resizeOptions volume.NodeResizeOptions) (bool, error) {
-	_, err := util.GenericResizeFS(plugin.host, plugin.GetPluginName(), resizeOptions.DevicePath, resizeOptions.DeviceMountPath)
+	fsVolume, err := util.CheckVolumeModeFilesystem(resizeOptions.VolumeSpec)
+	if err != nil {
+		return false, fmt.Errorf("error checking VolumeMode: %v", err)
+	}
+	// if volume is not a fs file system, there is nothing for us to do here.
+	if !fsVolume {
+		return true, nil
+	}
+	_, err = util.GenericResizeFS(plugin.host, plugin.GetPluginName(), resizeOptions.DevicePath, resizeOptions.DeviceMountPath)
 	if err != nil {
 		return false, err
 	}
@@ -401,8 +417,15 @@ func (b *awsElasticBlockStoreMounter) SetUpAt(dir string, mounterArgs volume.Mou
 
 	globalPDPath := makeGlobalPDPath(b.plugin.host, b.volumeID)
 
-	if err := os.MkdirAll(dir, 0750); err != nil {
-		return err
+	if runtime.GOOS != "windows" {
+		// On Windows, Mount will create the parent of dir and mklink (create a symbolic link) at dir later, so don't create a
+		// directory at dir now. Otherwise mklink will error: "Cannot create a file when that file already exists".
+		// Instead, do nothing. For example when dir is:
+		// C:\var\lib\kubelet\pods\xxx\volumes\kubernetes.io~aws-ebs\pvc-xxx
+		// do nothing. Mount will make pvc-xxx a symlink to the global mount path (e.g. C:\var\lib\kubelet\plugins\kubernetes.io\aws-ebs\mounts\aws\us-west-2b\vol-xxx)
+		if err := os.MkdirAll(dir, 0750); err != nil {
+			return err
+		}
 	}
 
 	// Perform a bind mount to the full path to allow duplicate mounts of the same PD.

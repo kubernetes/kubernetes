@@ -18,8 +18,6 @@ package system
 
 import (
 	"fmt"
-
-	errorsutil "k8s.io/apimachinery/pkg/util/errors"
 )
 
 // Validator is the interface for all validators.
@@ -27,7 +25,7 @@ type Validator interface {
 	// Name is the name of the validator.
 	Name() string
 	// Validate is the validate function.
-	Validate(SysSpec) (error, error)
+	Validate(SysSpec) ([]error, []error)
 }
 
 // Reporter is the interface for the reporters for the validators.
@@ -37,21 +35,25 @@ type Reporter interface {
 }
 
 // Validate uses validators to validate the system and returns a warning or error.
-func Validate(spec SysSpec, validators []Validator) (error, error) {
+func Validate(spec SysSpec, validators []Validator) ([]error, []error) {
 	var errs []error
 	var warns []error
 
 	for _, v := range validators {
 		fmt.Printf("Validating %s...\n", v.Name())
 		warn, err := v.Validate(spec)
-		errs = append(errs, err)
-		warns = append(warns, warn)
+		if len(err) != 0 {
+			errs = append(errs, err...)
+		}
+		if len(warn) != 0 {
+			warns = append(warns, warn...)
+		}
 	}
-	return errorsutil.NewAggregate(warns), errorsutil.NewAggregate(errs)
+	return warns, errs
 }
 
 // ValidateSpec uses all default validators to validate the system and writes to stdout.
-func ValidateSpec(spec SysSpec, runtime string) (error, error) {
+func ValidateSpec(spec SysSpec, runtime string) ([]error, []error) {
 	// OS-level validators.
 	var osValidators = []Validator{
 		&OSValidator{Reporter: DefaultReporter},

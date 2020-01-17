@@ -50,7 +50,7 @@ import (
 	"k8s.io/client-go/tools/pager"
 	"k8s.io/client-go/tools/record"
 	ref "k8s.io/client-go/tools/reference"
-	"k8s.io/kubernetes/pkg/util/metrics"
+	"k8s.io/component-base/metrics/prometheus/ratelimiter"
 )
 
 // Utilities for dealing with Jobs and CronJobs and time.
@@ -74,7 +74,7 @@ func NewController(kubeClient clientset.Interface) (*Controller, error) {
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
 
 	if kubeClient != nil && kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
-		if err := metrics.RegisterMetricAndTrackRateLimiterUsage("cronjob_controller", kubeClient.CoreV1().RESTClient().GetRateLimiter()); err != nil {
+		if err := ratelimiter.RegisterMetricAndTrackRateLimiterUsage("cronjob_controller", kubeClient.CoreV1().RESTClient().GetRateLimiter()); err != nil {
 			return nil, err
 		}
 	}

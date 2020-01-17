@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2017 The Kubernetes Authors.
 
@@ -23,17 +25,16 @@ import (
 	"net/http"
 	"strings"
 	"sync"
-	"time"
 
-	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
-	cloudprovider "k8s.io/cloud-provider"
-
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-03-01/compute"
-	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2018-07-01/network"
-	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2018-07-01/storage"
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-07-01/compute"
+	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2019-06-01/network"
+	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2019-04-01/storage"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/to"
+
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
+	cloudprovider "k8s.io/cloud-provider"
 )
 
 var (
@@ -193,7 +194,21 @@ func (fAPC *fakeAzurePIPClient) Get(ctx context.Context, resourceGroupName strin
 	}
 	return result, autorest.DetailedError{
 		StatusCode: http.StatusNotFound,
-		Message:    "Not such PIP",
+		Message:    "No such PIP",
+	}
+}
+
+func (fAPC *fakeAzurePIPClient) GetVirtualMachineScaleSetPublicIPAddress(ctx context.Context, resourceGroupName string, virtualMachineScaleSetName string, virtualmachineIndex string, networkInterfaceName string, IPConfigurationName string, publicIPAddressName string, expand string) (result network.PublicIPAddress, err error) {
+	fAPC.mutex.Lock()
+	defer fAPC.mutex.Unlock()
+	if _, ok := fAPC.FakeStore[resourceGroupName]; ok {
+		if entity, ok := fAPC.FakeStore[resourceGroupName][publicIPAddressName]; ok {
+			return entity, nil
+		}
+	}
+	return result, autorest.DetailedError{
+		StatusCode: http.StatusNotFound,
+		Message:    "No such PIP",
 	}
 }
 
@@ -298,6 +313,17 @@ func (fVMC *fakeAzureVirtualMachinesClient) CreateOrUpdate(ctx context.Context, 
 		fVMC.FakeStore[resourceGroupName] = make(map[string]compute.VirtualMachine)
 	}
 	fVMC.FakeStore[resourceGroupName][VMName] = parameters
+
+	return nil, nil
+}
+
+func (fVMC *fakeAzureVirtualMachinesClient) Update(ctx context.Context, resourceGroupName string, VMName string, parameters compute.VirtualMachineUpdate, source string) (resp *http.Response, err error) {
+	fVMC.mutex.Lock()
+	defer fVMC.mutex.Unlock()
+
+	if _, ok := fVMC.FakeStore[resourceGroupName]; !ok {
+		fVMC.FakeStore[resourceGroupName] = make(map[string]compute.VirtualMachine)
+	}
 
 	return nil, nil
 }
@@ -486,7 +512,6 @@ func (fNSG *fakeAzureNSGClient) List(ctx context.Context, resourceGroupName stri
 }
 
 func getRandomIPPtr() *string {
-	rand.Seed(time.Now().UnixNano())
 	return to.StringPtr(fmt.Sprintf("%d.%d.%d.%d", rand.Intn(256), rand.Intn(256), rand.Intn(256), rand.Intn(256)))
 }
 
@@ -524,7 +549,7 @@ func (fVMC *fakeVirtualMachineScaleSetVMsClient) List(ctx context.Context, resou
 	return result, nil
 }
 
-func (fVMC *fakeVirtualMachineScaleSetVMsClient) Get(ctx context.Context, resourceGroupName string, VMScaleSetName string, instanceID string) (result compute.VirtualMachineScaleSetVM, err error) {
+func (fVMC *fakeVirtualMachineScaleSetVMsClient) Get(ctx context.Context, resourceGroupName string, VMScaleSetName string, instanceID string, expand compute.InstanceViewTypes) (result compute.VirtualMachineScaleSetVM, err error) {
 	fVMC.mutex.Lock()
 	defer fVMC.mutex.Unlock()
 
@@ -539,15 +564,6 @@ func (fVMC *fakeVirtualMachineScaleSetVMsClient) Get(ctx context.Context, resour
 		StatusCode: http.StatusNotFound,
 		Message:    "No such VirtualMachineScaleSetVM",
 	}
-}
-
-func (fVMC *fakeVirtualMachineScaleSetVMsClient) GetInstanceView(ctx context.Context, resourceGroupName string, VMScaleSetName string, instanceID string) (result compute.VirtualMachineScaleSetVMInstanceView, err error) {
-	_, err = fVMC.Get(ctx, resourceGroupName, VMScaleSetName, instanceID)
-	if err != nil {
-		return result, err
-	}
-
-	return result, nil
 }
 
 func (fVMC *fakeVirtualMachineScaleSetVMsClient) Update(ctx context.Context, resourceGroupName string, VMScaleSetName string, instanceID string, parameters compute.VirtualMachineScaleSetVM, source string) (resp *http.Response, err error) {
@@ -879,6 +895,10 @@ func (f *fakeVMSet) GetInstanceIDByNodeName(name string) (string, error) {
 
 func (f *fakeVMSet) GetInstanceTypeByNodeName(name string) (string, error) {
 	return "", fmt.Errorf("unimplemented")
+}
+
+func (f *fakeVMSet) GetPrivateIPsByNodeName(nodeName string) ([]string, error) {
+	return []string{}, fmt.Errorf("unimplemented")
 }
 
 func (f *fakeVMSet) GetIPByNodeName(name string) (string, string, error) {

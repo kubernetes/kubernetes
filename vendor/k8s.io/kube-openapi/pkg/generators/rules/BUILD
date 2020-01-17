@@ -4,6 +4,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "doc.go",
+        "idl_tag.go",
         "names_match.go",
         "omitempty_match_case.go",
     ],

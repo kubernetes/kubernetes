@@ -128,6 +128,9 @@ func TestConstructVolumeSpec(t *testing.T) {
 	}
 
 	cephfsSpec, err := plug.(*cephfsPlugin).ConstructVolumeSpec("cephfsVolume", "/cephfsVolume/")
+	if err != nil {
+		t.Errorf("ConstructVolumeSpec() failed: %v", err)
+	}
 
 	if cephfsSpec.Name() != "cephfsVolume" {
 		t.Errorf("Get wrong cephfs spec name, got: %s", cephfsSpec.Name())

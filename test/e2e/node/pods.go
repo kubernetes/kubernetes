@@ -25,18 +25,17 @@ import (
 	"strconv"
 	"time"
 
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
-	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 var _ = SIGDescribe("Pods Extended", func() {
@@ -80,7 +79,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 			options := metav1.ListOptions{LabelSelector: selector.String()}
 			pods, err := podClient.List(options)
 			framework.ExpectNoError(err, "failed to query for pod")
-			gomega.Expect(len(pods.Items)).To(gomega.Equal(0))
+			framework.ExpectEqual(len(pods.Items), 0)
 			options = metav1.ListOptions{
 				LabelSelector:   selector.String(),
 				ResourceVersion: pods.ListMeta.ResourceVersion,
@@ -94,7 +93,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 			options = metav1.ListOptions{LabelSelector: selector.String()}
 			pods, err = podClient.List(options)
 			framework.ExpectNoError(err, "failed to query for pod")
-			gomega.Expect(len(pods.Items)).To(gomega.Equal(1))
+			framework.ExpectEqual(len(pods.Items), 1)
 
 			// We need to wait for the pod to be running, otherwise the deletion
 			// may be carried out immediately rather than gracefully.
@@ -117,7 +116,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 			output := string(buf[:n])
 			proxyRegexp := regexp.MustCompile("Starting to serve on 127.0.0.1:([0-9]+)")
 			match := proxyRegexp.FindStringSubmatch(output)
-			gomega.Expect(len(match)).To(gomega.Equal(2))
+			framework.ExpectEqual(len(match), 2)
 			port, err := strconv.Atoi(match[1])
 			framework.ExpectNoError(err, "failed to convert port into string")
 
@@ -132,7 +131,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 			ginkgo.By("deleting the pod gracefully")
 			rsp, err := client.Do(req)
 			framework.ExpectNoError(err, "failed to use http client to send delete")
-			gomega.Expect(rsp.StatusCode).Should(gomega.Equal(http.StatusOK), "failed to delete gracefully by client request")
+			framework.ExpectEqual(rsp.StatusCode, http.StatusOK, "failed to delete gracefully by client request")
 			var lastPod v1.Pod
 			err = json.NewDecoder(rsp.Body).Decode(&lastPod)
 			framework.ExpectNoError(err, "failed to decode graceful termination proxy response")
@@ -142,9 +141,9 @@ var _ = SIGDescribe("Pods Extended", func() {
 			ginkgo.By("verifying the kubelet observed the termination notice")
 
 			err = wait.Poll(time.Second*5, time.Second*30, func() (bool, error) {
-				podList, err := framework.GetKubeletPods(f.ClientSet, pod.Spec.NodeName)
+				podList, err := e2ekubelet.GetKubeletPods(f.ClientSet, pod.Spec.NodeName)
 				if err != nil {
-					e2elog.Logf("Unable to retrieve kubelet pods for node %v: %v", pod.Spec.NodeName, err)
+					framework.Logf("Unable to retrieve kubelet pods for node %v: %v", pod.Spec.NodeName, err)
 					return false, nil
 				}
 				for _, kubeletPod := range podList.Items {
@@ -152,24 +151,24 @@ var _ = SIGDescribe("Pods Extended", func() {
 						continue
 					}
 					if kubeletPod.ObjectMeta.DeletionTimestamp == nil {
-						e2elog.Logf("deletion has not yet been observed")
+						framework.Logf("deletion has not yet been observed")
 						return false, nil
 					}
 					return false, nil
 				}
-				e2elog.Logf("no pod exists with the name we were looking for, assuming the termination request was observed and completed")
+				framework.Logf("no pod exists with the name we were looking for, assuming the termination request was observed and completed")
 				return true, nil
 			})
 			framework.ExpectNoError(err, "kubelet never observed the termination notice")
 
-			gomega.Expect(lastPod.DeletionTimestamp).ToNot(gomega.BeNil())
-			gomega.Expect(lastPod.Spec.TerminationGracePeriodSeconds).ToNot(gomega.BeZero())
+			framework.ExpectNotEqual(lastPod.DeletionTimestamp, nil)
+			framework.ExpectNotEqual(lastPod.Spec.TerminationGracePeriodSeconds, 0)
 
 			selector = labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
 			options = metav1.ListOptions{LabelSelector: selector.String()}
 			pods, err = podClient.List(options)
 			framework.ExpectNoError(err, "failed to query for pods")
-			gomega.Expect(len(pods.Items)).To(gomega.Equal(0))
+			framework.ExpectEqual(len(pods.Items), 0)
 
 		})
 	})
@@ -179,12 +178,13 @@ var _ = SIGDescribe("Pods Extended", func() {
 		ginkgo.BeforeEach(func() {
 			podClient = f.PodClient()
 		})
+
 		/*
 			Release : v1.9
 			Testname: Pods, QOS
-			Description:  Create a Pod with CPU and Memory request and limits. Pos status MUST have QOSClass set to PodQOSGuaranteed.
+			Description:  Create a Pod with CPU and Memory request and limits. Pod status MUST have QOSClass set to PodQOSGuaranteed.
 		*/
-		framework.ConformanceIt("should be submitted and removed ", func() {
+		framework.ConformanceIt("should be set on Pods with matching resource requests and limits for memory and cpu", func() {
 			ginkgo.By("creating the pod")
 			name := "pod-qos-class-" + string(uuid.NewUUID())
 			pod := &v1.Pod{
@@ -220,7 +220,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 			ginkgo.By("verifying QOS class is set on the pod")
 			pod, err := podClient.Get(name, metav1.GetOptions{})
 			framework.ExpectNoError(err, "failed to query for pod")
-			gomega.Expect(pod.Status.QOSClass == v1.PodQOSGuaranteed)
+			framework.ExpectEqual(pod.Status.QOSClass, v1.PodQOSGuaranteed)
 		})
 	})
 })

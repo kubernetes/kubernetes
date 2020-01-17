@@ -24,7 +24,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apiextensionstestserver "k8s.io/apiextensions-apiserver/test/integration/fixtures"
@@ -38,9 +38,10 @@ import (
 	"k8s.io/apiserver/pkg/storage/names"
 	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/metadata"
+	"k8s.io/client-go/metadata/metadatainformer"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/cache"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
@@ -58,6 +59,11 @@ func getForegroundOptions() *metav1.DeleteOptions {
 func getOrphanOptions() *metav1.DeleteOptions {
 	var trueVar = true
 	return &metav1.DeleteOptions{OrphanDependents: &trueVar}
+}
+
+func getPropagateOrphanOptions() *metav1.DeleteOptions {
+	policy := metav1.DeletePropagationOrphan
+	return &metav1.DeleteOptions{PropagationPolicy: &policy}
 }
 
 func getNonOrphanOptions() *metav1.DeleteOptions {
@@ -196,6 +202,7 @@ type testContext struct {
 	clientSet          clientset.Interface
 	apiExtensionClient apiextensionsclientset.Interface
 	dynamicClient      dynamic.Interface
+	metadataClient     metadata.Interface
 	startGC            func(workers int)
 	// syncPeriod is how often the GC started with startGC will be resynced.
 	syncPeriod time.Duration
@@ -226,20 +233,24 @@ func setupWithServer(t *testing.T, result *kubeapiservertesting.TestServer, work
 	restMapper.Reset()
 	deletableResources := garbagecollector.GetDeletableResources(discoveryClient)
 	config := *result.ClientConfig
+	metadataClient, err := metadata.NewForConfig(&config)
+	if err != nil {
+		t.Fatalf("failed to create metadataClient: %v", err)
+	}
 	dynamicClient, err := dynamic.NewForConfig(&config)
 	if err != nil {
 		t.Fatalf("failed to create dynamicClient: %v", err)
 	}
 	sharedInformers := informers.NewSharedInformerFactory(clientSet, 0)
-	dynamicInformers := dynamicinformer.NewDynamicSharedInformerFactory(dynamicClient, 0)
+	metadataInformers := metadatainformer.NewSharedInformerFactory(metadataClient, 0)
 	alwaysStarted := make(chan struct{})
 	close(alwaysStarted)
 	gc, err := garbagecollector.NewGarbageCollector(
-		dynamicClient,
+		metadataClient,
 		restMapper,
 		deletableResources,
 		garbagecollector.DefaultIgnoredResources(),
-		controller.NewInformerFactory(sharedInformers, dynamicInformers),
+		controller.NewInformerFactory(sharedInformers, metadataInformers),
 		alwaysStarted,
 	)
 	if err != nil {
@@ -273,6 +284,7 @@ func setupWithServer(t *testing.T, result *kubeapiservertesting.TestServer, work
 		clientSet:          clientSet,
 		apiExtensionClient: apiExtensionClient,
 		dynamicClient:      dynamicClient,
+		metadataClient:     metadataClient,
 		startGC:            startGC,
 		syncPeriod:         syncPeriod,
 	}
@@ -454,6 +466,9 @@ func setupRCsPods(t *testing.T, gc *garbagecollector.GarbageCollector, clientSet
 	case options.OrphanDependents != nil:
 		// if the deletion options explicitly specify whether to orphan, that controls
 		orphan = *options.OrphanDependents
+	case options.PropagationPolicy != nil:
+		// if the deletion options explicitly specify whether to orphan, that controls
+		orphan = *options.PropagationPolicy == metav1.DeletePropagationOrphan
 	case len(initialFinalizers) != 0 && initialFinalizers[0] == metav1.FinalizerOrphanDependents:
 		// if the orphan finalizer is explicitly added, we orphan
 		orphan = true
@@ -517,8 +532,8 @@ func TestStressingCascadingDeletion(t *testing.T) {
 
 	const collections = 10
 	var wg sync.WaitGroup
-	wg.Add(collections * 4)
-	rcUIDs := make(chan types.UID, collections*4)
+	wg.Add(collections * 5)
+	rcUIDs := make(chan types.UID, collections*5)
 	for i := 0; i < collections; i++ {
 		// rc is created with empty finalizers, deleted with nil delete options, pods will remain.
 		go setupRCsPods(t, gc, clientSet, "collection1-"+strconv.Itoa(i), ns.Name, []string{}, nil, &wg, rcUIDs)
@@ -528,6 +543,8 @@ func TestStressingCascadingDeletion(t *testing.T) {
 		go setupRCsPods(t, gc, clientSet, "collection3-"+strconv.Itoa(i), ns.Name, []string{metav1.FinalizerOrphanDependents}, getNonOrphanOptions(), &wg, rcUIDs)
 		// rc is created with empty finalizers, deleted with DeleteOptions.OrphanDependents=true, pods will remain.
 		go setupRCsPods(t, gc, clientSet, "collection4-"+strconv.Itoa(i), ns.Name, []string{}, getOrphanOptions(), &wg, rcUIDs)
+		// rc is created with empty finalizers, deleted with DeleteOptions.PropagationPolicy=Orphan, pods will remain.
+		go setupRCsPods(t, gc, clientSet, "collection5-"+strconv.Itoa(i), ns.Name, []string{}, getPropagateOrphanOptions(), &wg, rcUIDs)
 	}
 	wg.Wait()
 	t.Logf("all pods are created, all replications controllers are created then deleted")
@@ -535,7 +552,7 @@ func TestStressingCascadingDeletion(t *testing.T) {
 	if err := wait.Poll(1*time.Second, 300*time.Second, func() (bool, error) {
 		podsInEachCollection := 3
 		// see the comments on the calls to setupRCsPods for details
-		remainingGroups := 3
+		remainingGroups := 4
 		return verifyRemainingObjects(t, clientSet, ns.Name, 0, collections*podsInEachCollection*remainingGroups)
 	}); err != nil {
 		t.Fatal(err)
@@ -549,7 +566,7 @@ func TestStressingCascadingDeletion(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, pod := range pods.Items {
-		if !strings.Contains(pod.ObjectMeta.Name, "collection1-") && !strings.Contains(pod.ObjectMeta.Name, "collection2-") && !strings.Contains(pod.ObjectMeta.Name, "collection4-") {
+		if !strings.Contains(pod.ObjectMeta.Name, "collection1-") && !strings.Contains(pod.ObjectMeta.Name, "collection2-") && !strings.Contains(pod.ObjectMeta.Name, "collection4-") && !strings.Contains(pod.ObjectMeta.Name, "collection5-") {
 			t.Errorf("got unexpected remaining pod: %#v", pod)
 		}
 	}
@@ -766,6 +783,69 @@ func TestNonBlockingOwnerRefDoesNotBlock(t *testing.T) {
 	}
 	if len(pods.Items) != 2 {
 		t.Errorf("expect there to be 2 pods, got %#v", pods.Items)
+	}
+}
+
+func TestDoubleDeletionWithFinalizer(t *testing.T) {
+	// test setup
+	ctx := setup(t, 5)
+	defer ctx.tearDown()
+	clientSet := ctx.clientSet
+	ns := createNamespaceOrDie("gc-double-foreground", clientSet, t)
+	defer deleteNamespaceOrDie(ns.Name, clientSet, t)
+
+	// step 1: creates a pod with a custom finalizer and deletes it, then waits until gc removes its finalizer
+	podClient := clientSet.CoreV1().Pods(ns.Name)
+	pod := newPod("lucy", ns.Name, nil)
+	pod.ObjectMeta.Finalizers = []string{"x/y"}
+	if _, err := podClient.Create(pod); err != nil {
+		t.Fatalf("Failed to create pod: %v", err)
+	}
+	if err := podClient.Delete(pod.Name, getForegroundOptions()); err != nil {
+		t.Fatalf("Failed to delete pod: %v", err)
+	}
+	if err := wait.PollImmediate(1*time.Second, 10*time.Second, func() (bool, error) {
+		returnedPod, err := podClient.Get(pod.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		if len(returnedPod.Finalizers) != 1 || returnedPod.Finalizers[0] != "x/y" {
+			t.Logf("waiting for pod %q to have only one finalizer %q at step 1, got %v", returnedPod.Name, "x/y", returnedPod.Finalizers)
+			return false, nil
+		}
+		return true, nil
+	}); err != nil {
+		t.Fatalf("Failed waiting for pod to have only one filanizer at step 1, error: %v", err)
+	}
+
+	// step 2: deletes the pod one more time and checks if there's only the custom finalizer left
+	if err := podClient.Delete(pod.Name, getForegroundOptions()); err != nil {
+		t.Fatalf("Failed to delete pod: %v", err)
+	}
+	if err := wait.PollImmediate(1*time.Second, 10*time.Second, func() (bool, error) {
+		returnedPod, err := podClient.Get(pod.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		if len(returnedPod.Finalizers) != 1 || returnedPod.Finalizers[0] != "x/y" {
+			t.Logf("waiting for pod %q to have only one finalizer %q at step 2, got %v", returnedPod.Name, "x/y", returnedPod.Finalizers)
+			return false, nil
+		}
+		return true, nil
+	}); err != nil {
+		t.Fatalf("Failed waiting for pod to have only one finalizer at step 2, gc hasn't removed its finalzier?, error: %v", err)
+	}
+
+	// step 3: removes the custom finalizer and checks if the pod was removed
+	patch := []byte(`[{"op":"remove","path":"/metadata/finalizers"}]`)
+	if _, err := podClient.Patch(pod.Name, types.JSONPatchType, patch); err != nil {
+		t.Fatalf("Failed to update pod: %v", err)
+	}
+	if err := wait.Poll(1*time.Second, 10*time.Second, func() (bool, error) {
+		_, err := podClient.Get(pod.Name, metav1.GetOptions{})
+		return errors.IsNotFound(err), nil
+	}); err != nil {
+		t.Fatalf("Failed waiting for pod %q to be deleted", pod.Name)
 	}
 }
 

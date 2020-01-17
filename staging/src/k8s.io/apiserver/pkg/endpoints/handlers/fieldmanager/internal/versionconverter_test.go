@@ -39,7 +39,7 @@ func TestVersionConverter(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to build OpenAPI models: %v", err)
 	}
-	tc, err := internal.NewTypeConverter(m)
+	tc, err := internal.NewTypeConverter(m, false)
 	if err != nil {
 		t.Fatalf("Failed to build TypeConverter: %v", err)
 	}

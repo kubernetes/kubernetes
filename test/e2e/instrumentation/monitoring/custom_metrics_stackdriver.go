@@ -36,7 +36,6 @@ import (
 	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	customclient "k8s.io/metrics/pkg/client/custom_metrics"
 	externalclient "k8s.io/metrics/pkg/client/external_metrics"
 )
@@ -258,11 +257,11 @@ func verifyResponseFromExternalMetricsAPI(f *framework.Framework, externalMetric
 func cleanupSDExporterPod(f *framework.Framework, cs clientset.Interface) {
 	err := cs.CoreV1().Pods(f.Namespace.Name).Delete(stackdriverExporterPod1, &metav1.DeleteOptions{})
 	if err != nil {
-		e2elog.Logf("Failed to delete %s pod: %v", stackdriverExporterPod1, err)
+		framework.Logf("Failed to delete %s pod: %v", stackdriverExporterPod1, err)
 	}
 	err = cs.CoreV1().Pods(f.Namespace.Name).Delete(stackdriverExporterPod2, &metav1.DeleteOptions{})
 	if err != nil {
-		e2elog.Logf("Failed to delete %s pod: %v", stackdriverExporterPod2, err)
+		framework.Logf("Failed to delete %s pod: %v", stackdriverExporterPod2, err)
 	}
 }
 

@@ -32,7 +32,7 @@ import (
 	"strings"
 	"sync"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -59,8 +59,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
-	mountutil "k8s.io/kubernetes/pkg/util/mount"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
 	volumevalidation "k8s.io/kubernetes/pkg/volume/validation"
@@ -128,7 +128,7 @@ func (kl *Kubelet) makeBlockVolumes(pod *v1.Pod, container *v1.Container, podVol
 }
 
 // makeMounts determines the mount points for the given container.
-func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, hostDomain, podIP string, podVolumes kubecontainer.VolumeMap, mounter mountutil.Interface, subpather subpath.Interface, expandEnvs []kubecontainer.EnvVar) ([]kubecontainer.Mount, func(), error) {
+func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, hostDomain, podIP string, podVolumes kubecontainer.VolumeMap, hu hostutil.HostUtils, subpather subpath.Interface, expandEnvs []kubecontainer.EnvVar) ([]kubecontainer.Mount, func(), error) {
 	// Kubernetes only mounts on /etc/hosts if:
 	// - container is not an infrastructure (pause) container
 	// - container is not already mounting on /etc/hosts
@@ -195,7 +195,7 @@ func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, h
 			volumePath := hostPath
 			hostPath = filepath.Join(volumePath, subPath)
 
-			if subPathExists, err := mounter.ExistsPath(hostPath); err != nil {
+			if subPathExists, err := hu.PathExists(hostPath); err != nil {
 				klog.Errorf("Could not determine if subPath %s exists; will not attempt to change its permissions", hostPath)
 			} else if !subPathExists {
 				// Create the sub path now because if it's auto-created later when referenced, it may have an
@@ -203,7 +203,7 @@ func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, h
 				// when the pod specifies an fsGroup, and if the directory is not created here, Docker will
 				// later auto-create it with the incorrect mode 0750
 				// Make extra care not to escape the volume!
-				perm, err := mounter.GetMode(volumePath)
+				perm, err := hu.GetMode(volumePath)
 				if err != nil {
 					return nil, cleanupAction, err
 				}
@@ -403,7 +403,7 @@ func (kl *Kubelet) GeneratePodHostNameAndDomain(pod *v1.Pod) (string, string, er
 	hostname := pod.Name
 	if len(pod.Spec.Hostname) > 0 {
 		if msgs := utilvalidation.IsDNS1123Label(pod.Spec.Hostname); len(msgs) != 0 {
-			return "", "", fmt.Errorf("Pod Hostname %q is not a valid DNS label: %s", pod.Spec.Hostname, strings.Join(msgs, ";"))
+			return "", "", fmt.Errorf("pod Hostname %q is not a valid DNS label: %s", pod.Spec.Hostname, strings.Join(msgs, ";"))
 		}
 		hostname = pod.Spec.Hostname
 	}
@@ -416,7 +416,7 @@ func (kl *Kubelet) GeneratePodHostNameAndDomain(pod *v1.Pod) (string, string, er
 	hostDomain := ""
 	if len(pod.Spec.Subdomain) > 0 {
 		if msgs := utilvalidation.IsDNS1123Label(pod.Spec.Subdomain); len(msgs) != 0 {
-			return "", "", fmt.Errorf("Pod Subdomain %q is not a valid DNS label: %s", pod.Spec.Subdomain, strings.Join(msgs, ";"))
+			return "", "", fmt.Errorf("pod Subdomain %q is not a valid DNS label: %s", pod.Spec.Subdomain, strings.Join(msgs, ";"))
 		}
 		hostDomain = fmt.Sprintf("%s.%s.svc.%s", pod.Spec.Subdomain, pod.Namespace, clusterDomain)
 	}
@@ -465,7 +465,7 @@ func (kl *Kubelet) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Contai
 	}
 	opts.Envs = append(opts.Envs, envs...)
 
-	mounts, cleanupAction, err := makeMounts(pod, kl.getPodDir(pod.UID), container, hostname, hostDomainName, podIP, volumes, kl.mounter, kl.subpather, opts.Envs)
+	mounts, cleanupAction, err := makeMounts(pod, kl.getPodDir(pod.UID), container, hostname, hostDomainName, podIP, volumes, kl.hostutil, kl.subpather, opts.Envs)
 	if err != nil {
 		return nil, cleanupAction, err
 	}
@@ -581,7 +581,7 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container
 			configMap, ok := configMaps[name]
 			if !ok {
 				if kl.kubeClient == nil {
-					return result, fmt.Errorf("Couldn't get configMap %v/%v, no kubeClient defined", pod.Namespace, name)
+					return result, fmt.Errorf("couldn't get configMap %v/%v, no kubeClient defined", pod.Namespace, name)
 				}
 				optional := cm.Optional != nil && *cm.Optional
 				configMap, err = kl.configMapManager.GetConfigMap(pod.Namespace, name)
@@ -616,7 +616,7 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container
 			secret, ok := secrets[name]
 			if !ok {
 				if kl.kubeClient == nil {
-					return result, fmt.Errorf("Couldn't get secret %v/%v, no kubeClient defined", pod.Namespace, name)
+					return result, fmt.Errorf("couldn't get secret %v/%v, no kubeClient defined", pod.Namespace, name)
 				}
 				optional := s.Optional != nil && *s.Optional
 				secret, err = kl.secretManager.GetSecret(pod.Namespace, name)
@@ -690,7 +690,7 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container
 				configMap, ok := configMaps[name]
 				if !ok {
 					if kl.kubeClient == nil {
-						return result, fmt.Errorf("Couldn't get configMap %v/%v, no kubeClient defined", pod.Namespace, name)
+						return result, fmt.Errorf("couldn't get configMap %v/%v, no kubeClient defined", pod.Namespace, name)
 					}
 					configMap, err = kl.configMapManager.GetConfigMap(pod.Namespace, name)
 					if err != nil {
@@ -707,7 +707,7 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container
 					if optional {
 						continue
 					}
-					return result, fmt.Errorf("Couldn't find key %v in ConfigMap %v/%v", key, pod.Namespace, name)
+					return result, fmt.Errorf("couldn't find key %v in ConfigMap %v/%v", key, pod.Namespace, name)
 				}
 			case envVar.ValueFrom.SecretKeyRef != nil:
 				s := envVar.ValueFrom.SecretKeyRef
@@ -717,7 +717,7 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container
 				secret, ok := secrets[name]
 				if !ok {
 					if kl.kubeClient == nil {
-						return result, fmt.Errorf("Couldn't get secret %v/%v, no kubeClient defined", pod.Namespace, name)
+						return result, fmt.Errorf("couldn't get secret %v/%v, no kubeClient defined", pod.Namespace, name)
 					}
 					secret, err = kl.secretManager.GetSecret(pod.Namespace, name)
 					if err != nil {
@@ -734,7 +734,7 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container
 					if optional {
 						continue
 					}
-					return result, fmt.Errorf("Couldn't find key %v in Secret %v/%v", key, pod.Namespace, name)
+					return result, fmt.Errorf("couldn't find key %v in Secret %v/%v", key, pod.Namespace, name)
 				}
 				runtimeVal = string(runtimeValBytes)
 			}
@@ -1013,14 +1013,14 @@ func (kl *Kubelet) HandlePodCleanups() error {
 	// These two conditions could be alleviated by checkpointing kubelet.
 	activePods := kl.filterOutTerminatedPods(allPods)
 
-	desiredPods := make(map[types.UID]empty)
+	desiredPods := make(map[types.UID]sets.Empty)
 	for _, pod := range activePods {
-		desiredPods[pod.UID] = empty{}
+		desiredPods[pod.UID] = sets.Empty{}
 	}
 	// Stop the workers for no-longer existing pods.
 	// TODO: is here the best place to forget pod workers?
 	kl.podWorkers.ForgetNonExistingPodWorkers(desiredPods)
-	kl.probeManager.CleanupPods(activePods)
+	kl.probeManager.CleanupPods(desiredPods)
 
 	runningPods, err := kl.runtimeCache.GetPods()
 	if err != nil {
@@ -1108,9 +1108,11 @@ func (kl *Kubelet) validateContainerLogStatus(podName string, podStatus *v1.PodS
 	var cID string
 
 	cStatus, found := podutil.GetContainerStatus(podStatus.ContainerStatuses, containerName)
-	// if not found, check the init containers
 	if !found {
 		cStatus, found = podutil.GetContainerStatus(podStatus.InitContainerStatuses, containerName)
+	}
+	if !found && utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) {
+		cStatus, found = podutil.GetContainerStatus(podStatus.EphemeralContainerStatuses, containerName)
 	}
 	if !found {
 		return kubecontainer.ContainerID{}, fmt.Errorf("container %q in pod %q is not available", containerName, podName)
@@ -1382,7 +1384,16 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 // alter the kubelet state at all.
 func (kl *Kubelet) convertStatusToAPIStatus(pod *v1.Pod, podStatus *kubecontainer.PodStatus) *v1.PodStatus {
 	var apiPodStatus v1.PodStatus
-	apiPodStatus.PodIP = podStatus.IP
+	apiPodStatus.PodIPs = make([]v1.PodIP, 0, len(podStatus.IPs))
+	for _, ip := range podStatus.IPs {
+		apiPodStatus.PodIPs = append(apiPodStatus.PodIPs, v1.PodIP{
+			IP: ip,
+		})
+	}
+
+	if len(apiPodStatus.PodIPs) > 0 {
+		apiPodStatus.PodIP = apiPodStatus.PodIPs[0].IP
+	}
 	// set status for Pods created on versions of kube older than 1.6
 	apiPodStatus.QOSClass = v1qos.GetPodQOS(pod)
 
@@ -1405,6 +1416,22 @@ func (kl *Kubelet) convertStatusToAPIStatus(pod *v1.Pod, podStatus *kubecontaine
 		len(pod.Spec.InitContainers) > 0,
 		true,
 	)
+	if utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) {
+		var ecSpecs []v1.Container
+		for i := range pod.Spec.EphemeralContainers {
+			ecSpecs = append(ecSpecs, v1.Container(pod.Spec.EphemeralContainers[i].EphemeralContainerCommon))
+		}
+
+		// #80875: By now we've iterated podStatus 3 times. We could refactor this to make a single
+		// pass through podStatus.ContainerStatuses
+		apiPodStatus.EphemeralContainerStatuses = kl.convertToAPIContainerStatuses(
+			pod, podStatus,
+			oldPodStatus.EphemeralContainerStatuses,
+			ecSpecs,
+			len(pod.Spec.InitContainers) > 0,
+			false,
+		)
+	}
 
 	// Preserves conditions not controlled by kubelet
 	for _, c := range pod.Status.Conditions {
@@ -1412,6 +1439,7 @@ func (kl *Kubelet) convertStatusToAPIStatus(pod *v1.Pod, podStatus *kubecontaine
 			apiPodStatus.Conditions = append(apiPodStatus.Conditions, c)
 		}
 	}
+
 	return &apiPodStatus
 }
 

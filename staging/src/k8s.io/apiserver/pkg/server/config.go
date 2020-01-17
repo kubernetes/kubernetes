@@ -23,6 +23,7 @@ import (
 	"net"
 	"net/http"
 	goruntime "runtime"
+	"runtime/debug"
 	"sort"
 	"strconv"
 	"strings"
@@ -32,11 +33,11 @@ import (
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/go-openapi/spec"
 	"github.com/pborman/uuid"
-	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilwaitgroup "k8s.io/apimachinery/pkg/util/waitgroup"
 	"k8s.io/apimachinery/pkg/version"
@@ -54,17 +55,17 @@ import (
 	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
 	apiopenapi "k8s.io/apiserver/pkg/endpoints/openapi"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/features"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic"
+	"k8s.io/apiserver/pkg/server/egressselector"
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/routes"
 	serverstore "k8s.io/apiserver/pkg/server/storage"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	restclient "k8s.io/client-go/rest"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/component-base/logs"
+	"k8s.io/klog"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 
 	// install apis
@@ -95,6 +96,11 @@ type Config struct {
 	// This is required for proper functioning of the PostStartHooks on a GenericAPIServer
 	// TODO: move into SecureServing(WithLoopback) as soon as insecure serving is gone
 	LoopbackClientConfig *restclient.Config
+
+	// EgressSelector provides a lookup mechanism for dialing outbound connections.
+	// It does so based on a EgressSelectorConfiguration which was read at startup.
+	EgressSelector *egressselector.EgressSelector
+
 	// RuleResolver is required to get the list of rules that apply to a given user
 	// in a given namespace
 	RuleResolver authorizer.RuleResolver
@@ -111,6 +117,8 @@ type Config struct {
 	EnableMetrics             bool
 
 	DisabledPostStartHooks sets.String
+	// done values in this values for this map are ignored.
+	PostStartHooks map[string]PostStartHookConfigEntry
 
 	// Version will enable the /version endpoint if non-nil
 	Version *version.Info
@@ -133,8 +141,12 @@ type Config struct {
 	// DiscoveryAddresses is used to build the IPs pass to discovery. If nil, the ExternalAddress is
 	// always reported
 	DiscoveryAddresses discovery.Addresses
-	// The default set of healthz checks. There might be more added via AddHealthzChecks dynamically.
-	HealthzChecks []healthz.HealthzChecker
+	// The default set of healthz checks. There might be more added via AddHealthChecks dynamically.
+	HealthzChecks []healthz.HealthChecker
+	// The default set of livez checks. There might be more added via AddHealthChecks dynamically.
+	LivezChecks []healthz.HealthChecker
+	// The default set of readyz-only checks. There might be more added via AddReadyzChecks dynamically.
+	ReadyzChecks []healthz.HealthChecker
 	// LegacyAPIGroupPrefixes is used to set up URL parsing for authorization and for validating requests
 	// to InstallLegacyAPIGroup. New API servers don't generally have legacy groups at all.
 	LegacyAPIGroupPrefixes sets.String
@@ -156,11 +168,22 @@ type Config struct {
 	// If specified, long running requests such as watch will be allocated a random timeout between this value, and
 	// twice this value.  Note that it is up to the request handlers to ignore or honor this timeout. In seconds.
 	MinRequestTimeout int
+
+	// This represents the maximum amount of time it should take for apiserver to complete its startup
+	// sequence and become healthy. From apiserver's start time to when this amount of time has
+	// elapsed, /livez will assume that unfinished post-start hooks will complete successfully and
+	// therefore return true.
+	LivezGracePeriod time.Duration
+	// ShutdownDelayDuration allows to block shutdown for some time, e.g. until endpoints pointing to this API server
+	// have converged on all node. During this time, the API server keeps serving, /healthz will return 200,
+	// but /readyz will return failure.
+	ShutdownDelayDuration time.Duration
+
 	// The limit on the total size increase all "copy" operations in a json
 	// patch may cause.
 	// This affects all places that applies json patch in the binary.
 	JSONPatchMaxCopyBytes int64
-	// The limit on the request body size that would be accepted and decoded in a write request.
+	// The limit on the request size that would be accepted and decoded in a write request
 	// 0 means no limit.
 	MaxRequestBodyBytes int64
 	// MaxRequestsInFlight is the maximum number of parallel non-long-running requests. Every further
@@ -171,10 +194,6 @@ type Config struct {
 	MaxMutatingRequestsInFlight int
 	// Predicate which is true for paths of long-running http requests
 	LongRunningFunc apirequest.LongRunningRequestCheck
-
-	// EnableAPIResponseCompression indicates whether API Responses should support compression
-	// if the client requests it via Accept-Encoding
-	EnableAPIResponseCompression bool
 
 	// MergedResourceConfig indicates which groupVersion enabled and its resources enabled/disabled.
 	// This is composed of genericapiserver defaultAPIResourceConfig and those parsed from flags.
@@ -234,6 +253,9 @@ type SecureServingInfo struct {
 	// HTTP2MaxStreamsPerConnection is the limit that the api server imposes on each client.
 	// A value of zero means to use the default provided by golang's HTTP/2 support.
 	HTTP2MaxStreamsPerConnection int
+
+	// DisableHTTP2 indicates that http2 should not be enabled.
+	DisableHTTP2 bool
 }
 
 type AuthenticationInfo struct {
@@ -256,13 +278,17 @@ type AuthorizationInfo struct {
 
 // NewConfig returns a Config struct with the default values
 func NewConfig(codecs serializer.CodecFactory) *Config {
+	defaultHealthChecks := []healthz.HealthChecker{healthz.PingHealthz, healthz.LogHealthz}
 	return &Config{
 		Serializer:                  codecs,
 		BuildHandlerChainFunc:       DefaultBuildHandlerChain,
 		HandlerChainWaitGroup:       new(utilwaitgroup.SafeWaitGroup),
 		LegacyAPIGroupPrefixes:      sets.NewString(DefaultLegacyAPIPrefix),
 		DisabledPostStartHooks:      sets.NewString(),
-		HealthzChecks:               []healthz.HealthzChecker{healthz.PingHealthz, healthz.LogHealthz},
+		PostStartHooks:              map[string]PostStartHookConfigEntry{},
+		HealthzChecks:               append([]healthz.HealthChecker{}, defaultHealthChecks...),
+		ReadyzChecks:                append([]healthz.HealthChecker{}, defaultHealthChecks...),
+		LivezChecks:                 append([]healthz.HealthChecker{}, defaultHealthChecks...),
 		EnableIndex:                 true,
 		EnableDiscovery:             true,
 		EnableProfiling:             true,
@@ -271,23 +297,22 @@ func NewConfig(codecs serializer.CodecFactory) *Config {
 		MaxMutatingRequestsInFlight: 200,
 		RequestTimeout:              time.Duration(60) * time.Second,
 		MinRequestTimeout:           1800,
-		// 10MB is the recommended maximum client request size in bytes
+		LivezGracePeriod:            time.Duration(0),
+		ShutdownDelayDuration:       time.Duration(0),
+		// 1.5MB is the default client request size in bytes
 		// the etcd server should accept. See
-		// https://github.com/etcd-io/etcd/blob/release-3.3/etcdserver/server.go#L90.
+		// https://github.com/etcd-io/etcd/blob/release-3.4/embed/config.go#L56.
 		// A request body might be encoded in json, and is converted to
-		// proto when persisted in etcd. Assuming the upper bound of
-		// the size ratio is 10:1, we set 100MB as the largest size
+		// proto when persisted in etcd, so we allow 2x as the largest size
 		// increase the "copy" operations in a json patch may cause.
-		JSONPatchMaxCopyBytes: int64(100 * 1024 * 1024),
-		// 10MB is the recommended maximum client request size in bytes
+		JSONPatchMaxCopyBytes: int64(3 * 1024 * 1024),
+		// 1.5MB is the recommended client request size in byte
 		// the etcd server should accept. See
-		// https://github.com/etcd-io/etcd/blob/release-3.3/etcdserver/server.go#L90.
+		// https://github.com/etcd-io/etcd/blob/release-3.4/embed/config.go#L56.
 		// A request body might be encoded in json, and is converted to
-		// proto when persisted in etcd. Assuming the upper bound of
-		// the size ratio is 10:1, we set 100MB as the largest request
+		// proto when persisted in etcd, so we allow 2x as the largest request
 		// body size to be accepted and decoded in a write request.
-		MaxRequestBodyBytes:          int64(100 * 1024 * 1024),
-		EnableAPIResponseCompression: utilfeature.DefaultFeatureGate.Enabled(features.APIResponseCompression),
+		MaxRequestBodyBytes: int64(3 * 1024 * 1024),
 
 		// Default to treating watch as a long-running operation
 		// Generic API servers have no inherent long-running subresources
@@ -355,6 +380,47 @@ type completedConfig struct {
 type CompletedConfig struct {
 	// Embed a private pointer that cannot be instantiated outside of this package.
 	*completedConfig
+}
+
+// AddHealthChecks adds a health check to our config to be exposed by the health endpoints
+// of our configured apiserver. We should prefer this to adding healthChecks directly to
+// the config unless we explicitly want to add a healthcheck only to a specific health endpoint.
+func (c *Config) AddHealthChecks(healthChecks ...healthz.HealthChecker) {
+	for _, check := range healthChecks {
+		c.HealthzChecks = append(c.HealthzChecks, check)
+		c.LivezChecks = append(c.LivezChecks, check)
+		c.ReadyzChecks = append(c.ReadyzChecks, check)
+	}
+}
+
+// AddPostStartHook allows you to add a PostStartHook that will later be added to the server itself in a New call.
+// Name conflicts will cause an error.
+func (c *Config) AddPostStartHook(name string, hook PostStartHookFunc) error {
+	if len(name) == 0 {
+		return fmt.Errorf("missing name")
+	}
+	if hook == nil {
+		return fmt.Errorf("hook func may not be nil: %q", name)
+	}
+	if c.DisabledPostStartHooks.Has(name) {
+		klog.V(1).Infof("skipping %q because it was explicitly disabled", name)
+		return nil
+	}
+
+	if postStartHook, exists := c.PostStartHooks[name]; exists {
+		// this is programmer error, but it can be hard to debug
+		return fmt.Errorf("unable to add %q because it was already registered by: %s", name, postStartHook.originatingStack)
+	}
+	c.PostStartHooks[name] = PostStartHookConfigEntry{hook: hook, originatingStack: string(debug.Stack())}
+
+	return nil
+}
+
+// AddPostStartHookOrDie allows you to add a PostStartHook, but dies on failure.
+func (c *Config) AddPostStartHookOrDie(name string, hook PostStartHookFunc) {
+	if err := c.AddPostStartHook(name, hook); err != nil {
+		klog.Fatalf("Error registering PostStartHook %q: %v", name, err)
+	}
 }
 
 // Complete fills in any fields not set that are required to have valid data and can be derived
@@ -477,11 +543,11 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		EquivalentResourceRegistry: c.EquivalentResourceRegistry,
 		HandlerChainWaitGroup:      c.HandlerChainWaitGroup,
 
-		minRequestTimeout: time.Duration(c.MinRequestTimeout) * time.Second,
-		ShutdownTimeout:   c.RequestTimeout,
-
-		SecureServingInfo: c.SecureServing,
-		ExternalAddress:   c.ExternalAddress,
+		minRequestTimeout:     time.Duration(c.MinRequestTimeout) * time.Second,
+		ShutdownTimeout:       c.RequestTimeout,
+		ShutdownDelayDuration: c.ShutdownDelayDuration,
+		SecureServingInfo:     c.SecureServing,
+		ExternalAddress:       c.ExternalAddress,
 
 		Handler: apiServerHandler,
 
@@ -493,12 +559,16 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		preShutdownHooks:       map[string]preShutdownHookEntry{},
 		disabledPostStartHooks: c.DisabledPostStartHooks,
 
-		healthzChecks: c.HealthzChecks,
+		healthzChecks:    c.HealthzChecks,
+		livezChecks:      c.LivezChecks,
+		readyzChecks:     c.ReadyzChecks,
+		readinessStopCh:  make(chan struct{}),
+		livezGracePeriod: c.LivezGracePeriod,
 
 		DiscoveryGroupManager: discovery.NewRootAPIsHandler(c.DiscoveryAddresses, c.Serializer),
 
-		enableAPIResponseCompression: c.EnableAPIResponseCompression,
-		maxRequestBodyBytes:          c.MaxRequestBodyBytes,
+		maxRequestBodyBytes: c.MaxRequestBodyBytes,
+		livezClock:          clock.RealClock{},
 	}
 
 	for {
@@ -514,12 +584,20 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		}
 	}
 
+	// first add poststarthooks from delegated targets
 	for k, v := range delegationTarget.PostStartHooks() {
 		s.postStartHooks[k] = v
 	}
 
 	for k, v := range delegationTarget.PreShutdownHooks() {
 		s.preShutdownHooks[k] = v
+	}
+
+	// add poststarthooks that were preconfigured.  Using the add method will give us an error if the same name has already been registered.
+	for name, preconfiguredPostStartHook := range c.PostStartHooks {
+		if err := s.AddPostStartHook(name, preconfiguredPostStartHook.hook); err != nil {
+			return nil, err
+		}
 	}
 
 	genericApiServerHookName := "generic-apiserver-start-informers"
@@ -544,8 +622,7 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		if skip {
 			continue
 		}
-
-		s.healthzChecks = append(s.healthzChecks, delegateCheck)
+		s.AddHealthChecks(delegateCheck)
 	}
 
 	s.listedPathProvider = routes.ListedPathProviders{s.listedPathProvider, delegationTarget}
@@ -646,6 +723,7 @@ func AuthorizeClientBearerToken(loopback *restclient.Config, authn *Authenticati
 	}
 	if authn == nil || authz == nil {
 		// prevent nil pointer panic
+		return
 	}
 	if authn.Authenticator == nil || authz.Authorizer == nil {
 		// authenticator or authorizer might be nil if we want to bypass authz/authn

@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 )
 
+// Manager interface provides methods for Kubelet to manage ConfigMap.
 type Manager interface {
 	// Get configmap by configmap namespace and name.
 	GetConfigMap(namespace, name string) (*v1.ConfigMap, error)
@@ -54,6 +55,7 @@ type simpleConfigMapManager struct {
 	kubeClient clientset.Interface
 }
 
+// NewSimpleConfigMapManager creates a new ConfigMapManager instance.
 func NewSimpleConfigMapManager(kubeClient clientset.Interface) Manager {
 	return &simpleConfigMapManager{kubeClient: kubeClient}
 }
@@ -129,7 +131,7 @@ func NewCachingConfigMapManager(kubeClient clientset.Interface, getTTL manager.G
 // NewWatchingConfigMapManager creates a manager that keeps a cache of all configmaps
 // necessary for registered pods.
 // It implements the following logic:
-// - whenever a pod is created or updated, we start inidvidual watches for all
+// - whenever a pod is created or updated, we start individual watches for all
 //   referenced objects that aren't referenced from other registered pods
 // - every GetObject() returns a value from local cache propagated via watches
 func NewWatchingConfigMapManager(kubeClient clientset.Interface) Manager {

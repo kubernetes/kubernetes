@@ -20,14 +20,13 @@ import (
 	"fmt"
 	"hash/fnv"
 	"io"
+	"math"
 	"sync"
 	"time"
 
 	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientset "k8s.io/client-go/kubernetes"
@@ -75,13 +74,17 @@ type GetPodFunc func(name, namespace string) (*v1.Pod, error)
 // GetNodeFunc returns the node for the specified name, or a NotFound error if missing.
 type GetNodeFunc func(name string) (*v1.Node, error)
 
+// GetPodsByNodeNameFunc returns the list of pods assigned to the specified node.
+type GetPodsByNodeNameFunc func(nodeName string) ([]v1.Pod, error)
+
 // NoExecuteTaintManager listens to Taint/Toleration changes and is responsible for removing Pods
 // from Nodes tainted with NoExecute Taints.
 type NoExecuteTaintManager struct {
-	client   clientset.Interface
-	recorder record.EventRecorder
-	getPod   GetPodFunc
-	getNode  GetNodeFunc
+	client                clientset.Interface
+	recorder              record.EventRecorder
+	getPod                GetPodFunc
+	getNode               GetNodeFunc
+	getPodsAssignedToNode GetPodsByNodeNameFunc
 
 	taintEvictionQueue *TimedWorkerQueue
 	// keeps a map from nodeName to all noExecute taints on that Node
@@ -125,28 +128,9 @@ func getNoExecuteTaints(taints []v1.Taint) []v1.Taint {
 	return result
 }
 
-func getPodsAssignedToNode(c clientset.Interface, nodeName string) ([]v1.Pod, error) {
-	selector := fields.SelectorFromSet(fields.Set{"spec.nodeName": nodeName})
-	pods, err := c.CoreV1().Pods(v1.NamespaceAll).List(metav1.ListOptions{
-		FieldSelector: selector.String(),
-		LabelSelector: labels.Everything().String(),
-	})
-	for i := 0; i < retries && err != nil; i++ {
-		pods, err = c.CoreV1().Pods(v1.NamespaceAll).List(metav1.ListOptions{
-			FieldSelector: selector.String(),
-			LabelSelector: labels.Everything().String(),
-		})
-		time.Sleep(100 * time.Millisecond)
-	}
-	if err != nil {
-		return []v1.Pod{}, fmt.Errorf("failed to get Pods assigned to node %v", nodeName)
-	}
-	return pods.Items, nil
-}
-
 // getMinTolerationTime returns minimal toleration time from the given slice, or -1 if it's infinite.
 func getMinTolerationTime(tolerations []v1.Toleration) time.Duration {
-	minTolerationTime := int64(-1)
+	minTolerationTime := int64(math.MaxInt64)
 	if len(tolerations) == 0 {
 		return 0
 	}
@@ -156,18 +140,21 @@ func getMinTolerationTime(tolerations []v1.Toleration) time.Duration {
 			tolerationSeconds := *(tolerations[i].TolerationSeconds)
 			if tolerationSeconds <= 0 {
 				return 0
-			} else if tolerationSeconds < minTolerationTime || minTolerationTime == -1 {
+			} else if tolerationSeconds < minTolerationTime {
 				minTolerationTime = tolerationSeconds
 			}
 		}
 	}
 
+	if minTolerationTime == int64(math.MaxInt64) {
+		return -1
+	}
 	return time.Duration(minTolerationTime) * time.Second
 }
 
 // NewNoExecuteTaintManager creates a new NoExecuteTaintManager that will use passed clientset to
 // communicate with the API server.
-func NewNoExecuteTaintManager(c clientset.Interface, getPod GetPodFunc, getNode GetNodeFunc) *NoExecuteTaintManager {
+func NewNoExecuteTaintManager(c clientset.Interface, getPod GetPodFunc, getNode GetNodeFunc, getPodsAssignedToNode GetPodsByNodeNameFunc) *NoExecuteTaintManager {
 	eventBroadcaster := record.NewBroadcaster()
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "taint-controller"})
 	eventBroadcaster.StartLogging(klog.Infof)
@@ -179,11 +166,12 @@ func NewNoExecuteTaintManager(c clientset.Interface, getPod GetPodFunc, getNode 
 	}
 
 	tm := &NoExecuteTaintManager{
-		client:       c,
-		recorder:     recorder,
-		getPod:       getPod,
-		getNode:      getNode,
-		taintedNodes: make(map[string][]v1.Taint),
+		client:                c,
+		recorder:              recorder,
+		getPod:                getPod,
+		getNode:               getNode,
+		getPodsAssignedToNode: getPodsAssignedToNode,
+		taintedNodes:          make(map[string][]v1.Taint),
 
 		nodeUpdateQueue: workqueue.NewNamed("noexec_taint_node"),
 		podUpdateQueue:  workqueue.NewNamed("noexec_taint_pod"),
@@ -228,6 +216,10 @@ func (tc *NoExecuteTaintManager) Run(stopCh <-chan struct{}) {
 			if shutdown {
 				break
 			}
+			// The fact that pods are processed by the same worker as nodes is used to avoid races
+			// between node worker setting tc.taintedNodes and pod worker reading this to decide
+			// whether to delete pod.
+			// It's possible that even without this assumption this code is still correct.
 			podUpdate := item.(podUpdateItem)
 			hash := hash(podUpdate.nodeName, UpdateWorkerSize)
 			select {
@@ -450,7 +442,11 @@ func (tc *NoExecuteTaintManager) handleNodeUpdate(nodeUpdate nodeUpdateItem) {
 			tc.taintedNodes[node.Name] = taints
 		}
 	}()
-	pods, err := getPodsAssignedToNode(tc.client, node.Name)
+
+	// This is critical that we update tc.taintedNodes before we call getPodsAssignedToNode:
+	// getPodsAssignedToNode can be delayed as long as all future updates to pods will call
+	// tc.PodUpdated which will use tc.taintedNodes to potentially delete delayed pods.
+	pods, err := tc.getPodsAssignedToNode(node.Name)
 	if err != nil {
 		klog.Errorf(err.Error())
 		return

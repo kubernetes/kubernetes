@@ -61,7 +61,6 @@ func rewriteTestsInFile(pathToFile string) {
 	}
 
 	ioutil.WriteFile(pathToFile, buffer.Bytes(), fileInfo.Mode())
-	return
 }
 
 /*
@@ -88,7 +87,6 @@ func rewriteTestFuncAsItStatement(testFunc *ast.FuncDecl, rootNode *ast.File, de
 
 	// remove the old test func from the root node's declarations
 	rootNode.Decls = append(rootNode.Decls[:funcIndex], rootNode.Decls[funcIndex+1:]...)
-	return
 }
 
 /*

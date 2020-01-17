@@ -247,7 +247,7 @@ func (m *FakeNodeHandler) UpdateStatus(node *v1.Node) (*v1.Node, error) {
 	}
 
 	if !found {
-		return nil, fmt.Errorf("Not found node %v", node)
+		return nil, fmt.Errorf("not found node %v", node)
 	}
 
 	origNodeCopy.Status = node.Status

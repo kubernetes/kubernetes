@@ -206,6 +206,38 @@ var (
 		// highest bucket start of 0.01 sec * 2^14 == 163.84 sec
 		Buckets: prometheus.ExponentialBuckets(.01, 2, 15),
 	})
+
+	currentRev = prometheus.NewGaugeFunc(prometheus.GaugeOpts{
+		Namespace: "etcd_debugging",
+		Subsystem: "mvcc",
+		Name:      "current_revision",
+		Help:      "The current revision of store.",
+	},
+		func() float64 {
+			reportCurrentRevMu.RLock()
+			defer reportCurrentRevMu.RUnlock()
+			return reportCurrentRev()
+		},
+	)
+	// overridden by mvcc initialization
+	reportCurrentRevMu sync.RWMutex
+	reportCurrentRev   = func() float64 { return 0 }
+
+	compactRev = prometheus.NewGaugeFunc(prometheus.GaugeOpts{
+		Namespace: "etcd_debugging",
+		Subsystem: "mvcc",
+		Name:      "compact_revision",
+		Help:      "The revision of the last compaction in store.",
+	},
+		func() float64 {
+			reportCompactRevMu.RLock()
+			defer reportCompactRevMu.RUnlock()
+			return reportCompactRev()
+		},
+	)
+	// overridden by mvcc initialization
+	reportCompactRevMu sync.RWMutex
+	reportCompactRev   = func() float64 { return 0 }
 )
 
 func init() {
@@ -228,6 +260,8 @@ func init() {
 	prometheus.MustRegister(dbTotalSizeInUse)
 	prometheus.MustRegister(hashDurations)
 	prometheus.MustRegister(hashRevDurations)
+	prometheus.MustRegister(currentRev)
+	prometheus.MustRegister(compactRev)
 }
 
 // ReportEventReceived reports that an event is received.

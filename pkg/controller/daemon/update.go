@@ -49,7 +49,7 @@ func (dsc *DaemonSetsController) rollingUpdate(ds *apps.DaemonSet, nodeList []*v
 	_, oldPods := dsc.getAllDaemonSetPods(ds, nodeToDaemonPods, hash)
 	maxUnavailable, numUnavailable, err := dsc.getUnavailableNumbers(ds, nodeList, nodeToDaemonPods)
 	if err != nil {
-		return fmt.Errorf("Couldn't get unavailable numbers: %v", err)
+		return fmt.Errorf("couldn't get unavailable numbers: %v", err)
 	}
 	oldAvailablePods, oldUnavailablePods := util.SplitByAvailablePods(ds.Spec.MinReadySeconds, oldPods)
 
@@ -160,21 +160,13 @@ func (dsc *DaemonSetsController) cleanupHistory(ds *apps.DaemonSet, old []*apps.
 		}
 	}
 
-	// Find all live history with the above hashes
-	liveHistory := make(map[string]bool)
-	for _, history := range old {
-		if hash := history.Labels[apps.DefaultDaemonSetUniqueLabelKey]; liveHashes[hash] {
-			liveHistory[history.Name] = true
-		}
-	}
-
 	// Clean up old history from smallest to highest revision (from oldest to newest)
 	sort.Sort(historiesByRevision(old))
 	for _, history := range old {
 		if toKill <= 0 {
 			break
 		}
-		if liveHistory[history.Name] {
+		if hash := history.Labels[apps.DefaultDaemonSetUniqueLabelKey]; liveHashes[hash] {
 			continue
 		}
 		// Clean up
@@ -424,7 +416,7 @@ func (dsc *DaemonSetsController) getUnavailableNumbers(ds *apps.DaemonSet, nodeL
 	}
 	maxUnavailable, err := intstrutil.GetValueFromIntOrPercent(ds.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable, desiredNumberScheduled, true)
 	if err != nil {
-		return -1, -1, fmt.Errorf("Invalid value for MaxUnavailable: %v", err)
+		return -1, -1, fmt.Errorf("invalid value for MaxUnavailable: %v", err)
 	}
 	klog.V(4).Infof(" DaemonSet %s/%s, maxUnavailable: %d, numUnavailable: %d", ds.Namespace, ds.Name, maxUnavailable, numUnavailable)
 	return maxUnavailable, numUnavailable, nil

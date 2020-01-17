@@ -443,22 +443,19 @@ func TestValidateAuthInfoExecWithAuthProvider(t *testing.T) {
 	test.testConfig(t)
 }
 
-func TestValidateAuthInfoExecInvalidEnv(t *testing.T) {
+func TestValidateAuthInfoExecNoEnv(t *testing.T) {
 	config := clientcmdapi.NewConfig()
 	config.AuthInfos["user"] = &clientcmdapi.AuthInfo{
 		Exec: &clientcmdapi.ExecConfig{
 			Command:    "/bin/example",
 			APIVersion: "clientauthentication.k8s.io/v1alpha1",
 			Env: []clientcmdapi.ExecEnvVar{
-				{Name: "foo"}, // No value
+				{Name: "foo", Value: ""},
 			},
 		},
 	}
 	test := configValidationTest{
 		config: config,
-		expectedErrorSubstring: []string{
-			"env variable foo value must be specified for user to use exec authentication plugin",
-		},
 	}
 
 	test.testAuthInfo("user", t)

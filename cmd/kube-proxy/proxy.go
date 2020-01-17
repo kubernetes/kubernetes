@@ -18,7 +18,6 @@ package main
 
 import (
 	goflag "flag"
-	"fmt"
 	"math/rand"
 	"os"
 	"time"
@@ -27,9 +26,9 @@ import (
 
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/logs"
+	_ "k8s.io/component-base/metrics/prometheus/restclient" // for client metric registration
+	_ "k8s.io/component-base/metrics/prometheus/version"    // for version metric registration
 	"k8s.io/kubernetes/cmd/kube-proxy/app"
-	_ "k8s.io/kubernetes/pkg/client/metrics/prometheus" // for client metric registration
-	_ "k8s.io/kubernetes/pkg/version/prometheus"        // for version metric registration
 )
 
 func main() {
@@ -47,7 +46,6 @@ func main() {
 	defer logs.FlushLogs()
 
 	if err := command.Execute(); err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
 	}
 }

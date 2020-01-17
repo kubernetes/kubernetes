@@ -9,6 +9,7 @@ go_library(
         "client_request.go",
         "client_response.go",
         "constants.go",
+        "csv.go",
         "discard.go",
         "file.go",
         "headers.go",

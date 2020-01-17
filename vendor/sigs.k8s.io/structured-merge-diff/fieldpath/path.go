@@ -35,6 +35,40 @@ func (fp Path) String() string {
 	return strings.Join(strs, "")
 }
 
+// Equals returns true if the two paths are equivalent.
+func (fp Path) Equals(fp2 Path) bool {
+	return !fp.Less(fp2) && !fp2.Less(fp)
+}
+
+// Less provides a lexical order for Paths.
+func (fp Path) Less(rhs Path) bool {
+	i := 0
+	for {
+		if i >= len(fp) && i >= len(rhs) {
+			// Paths are the same length and all items are equal.
+			return false
+		}
+		if i >= len(fp) {
+			// LHS is shorter.
+			return true
+		}
+		if i >= len(rhs) {
+			// RHS is shorter.
+			return false
+		}
+		if fp[i].Less(rhs[i]) {
+			// LHS is less; return
+			return true
+		}
+		if rhs[i].Less(fp[i]) {
+			// RHS is less; return
+			return false
+		}
+		// The items are equal; continue.
+		i++
+	}
+}
+
 func (fp Path) Copy() Path {
 	new := make(Path, len(fp))
 	copy(new, fp)
@@ -58,7 +92,7 @@ func MakePath(parts ...interface{}) (Path, error) {
 			if len(t) == 0 {
 				return nil, fmt.Errorf("associative list key type path elements must have at least one key (got zero)")
 			}
-			fp = append(fp, PathElement{Key: t})
+			fp = append(fp, PathElement{Key: &value.Map{Items: t}})
 		case value.Value:
 			// TODO: understand schema and verify that this is a set type
 			// TODO: make a copy of t

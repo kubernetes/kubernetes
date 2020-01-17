@@ -20,33 +20,36 @@ metadata:
   # rename if there are conflicts
   name: external-snapshotter-runner
 rules:
-- apiGroups: [""]
-  resources: ["persistentvolumes"]
-  verbs: ["get", "list", "watch"]
-- apiGroups: [""]
-  resources: ["persistentvolumeclaims"]
-  verbs: ["get", "list", "watch", "update"]
-- apiGroups: ["storage.k8s.io"]
-  resources: ["storageclasses"]
-  verbs: ["get", "list", "watch"]
-- apiGroups: [""]
-  resources: ["events"]
-  verbs: ["list", "watch", "create", "update", "patch"]
-- apiGroups: [""]
-  resources: ["secrets"]
-  verbs: ["get", "list"]
-- apiGroups: ["snapshot.storage.k8s.io"]
-  resources: ["volumesnapshotclasses"]
-  verbs: ["get", "list", "watch"]
-- apiGroups: ["snapshot.storage.k8s.io"]
-  resources: ["volumesnapshotcontents"]
-  verbs: ["create", "get", "list", "watch", "update", "delete"]
-- apiGroups: ["snapshot.storage.k8s.io"]
-  resources: ["volumesnapshots"]
-  verbs: ["get", "list", "watch", "update"]
-- apiGroups: ["apiextensions.k8s.io"]
-  resources: ["customresourcedefinitions"]
-  verbs: ["create", "list", "watch", "delete"]
+  - apiGroups: [""]
+    resources: ["persistentvolumes"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims"]
+    verbs: ["get", "list", "watch", "update"]
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["storageclasses"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["list", "watch", "create", "update", "patch"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list"]
+  - apiGroups: ["snapshot.storage.k8s.io"]
+    resources: ["volumesnapshotclasses"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["snapshot.storage.k8s.io"]
+    resources: ["volumesnapshotcontents"]
+    verbs: ["create", "get", "list", "watch", "update", "delete"]
+  - apiGroups: ["snapshot.storage.k8s.io"]
+    resources: ["volumesnapshots"]
+    verbs: ["get", "list", "watch", "update"]
+  - apiGroups: ["snapshot.storage.k8s.io"]
+    resources: ["volumesnapshots/status"]
+    verbs: ["update"]
+  - apiGroups: ["apiextensions.k8s.io"]
+    resources: ["customresourcedefinitions"]
+    verbs: ["create", "list", "watch", "delete", "get", "update"]
 
 ---
 kind: ClusterRoleBinding
@@ -54,12 +57,39 @@ apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: csi-snapshotter-role
 subjects:
-- kind: ServiceAccount
-  name: csi-snapshotter
-  # replace with non-default namespace name
-  namespace: default
+  - kind: ServiceAccount
+    name: csi-snapshotter
+    # replace with non-default namespace name
+    namespace: default
 roleRef:
   kind: ClusterRole
   # change the name also here if the ClusterRole gets renamed
   name: external-snapshotter-runner
   apiGroup: rbac.authorization.k8s.io
+
+---
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  namespace: default # TODO: replace with the namespace you want for your sidecar
+  name: external-snapshotter-leaderelection
+rules:
+- apiGroups: ["coordination.k8s.io"]
+  resources: ["leases"]
+  verbs: ["get", "watch", "list", "delete", "update", "create"]
+
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: external-snapshotter-leaderelection
+  namespace: default # TODO: replace with the namespace you want for your sidecar
+subjects:
+  - kind: ServiceAccount
+    name: csi-snapshotter
+    namespace: default # TODO: replace with the namespace you want for your sidecar
+roleRef:
+  kind: Role
+  name: external-snapshotter-leaderelection
+  apiGroup: rbac.authorization.k8s.io
+

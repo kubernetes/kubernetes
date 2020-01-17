@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 
 	"k8s.io/klog"
+	utilio "k8s.io/utils/io"
 )
 
 var (
@@ -47,6 +48,10 @@ const (
 	podDNSCluster podDNSType = iota
 	podDNSHost
 	podDNSNone
+)
+
+const (
+	maxResolveConfLength = 10 * 1 << 20 // 10MB
 )
 
 // Configurer is used for setting up DNS resolver configuration when launching pods.
@@ -186,14 +191,12 @@ func (c *Configurer) CheckLimitsForResolvConf() {
 		klog.V(4).Infof("CheckLimitsForResolvConf: " + log)
 		return
 	}
-
-	return
 }
 
 // parseResolvConf reads a resolv.conf file from the given reader, and parses
 // it into nameservers, searches and options, possibly returning an error.
 func parseResolvConf(reader io.Reader) (nameservers []string, searches []string, options []string, err error) {
-	file, err := ioutil.ReadAll(reader)
+	file, err := utilio.ReadAtMost(reader, maxResolveConfLength)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -227,7 +230,11 @@ func parseResolvConf(reader io.Reader) (nameservers []string, searches []string,
 			}
 		}
 		if fields[0] == "search" {
-			searches = fields[1:]
+			// Normalise search fields so the same domain with and without trailing dot will only count once, to avoid hitting search validation limits.
+			searches = []string{}
+			for _, s := range fields[1:] {
+				searches = append(searches, strings.TrimSuffix(s, "."))
+			}
 		}
 		if fields[0] == "options" {
 			options = fields[1:]
@@ -391,13 +398,13 @@ func (c *Configurer) SetupDNSinContainerizedMounter(mounterPath string) {
 	}
 	if c.ResolverConfig != "" {
 		f, err := os.Open(c.ResolverConfig)
-		defer f.Close()
 		if err != nil {
 			klog.Error("Could not open resolverConf file")
 		} else {
+			defer f.Close()
 			_, hostSearch, _, err := parseResolvConf(f)
 			if err != nil {
-				klog.Errorf("Error for parsing the reslov.conf file: %v", err)
+				klog.Errorf("Error for parsing the resolv.conf file: %v", err)
 			} else {
 				dnsString = dnsString + "search"
 				for _, search := range hostSearch {

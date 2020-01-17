@@ -30,8 +30,7 @@ import (
 	core "k8s.io/client-go/testing"
 	cloudprovider "k8s.io/cloud-provider"
 	fakecloud "k8s.io/cloud-provider/fake"
-	"k8s.io/kubernetes/pkg/controller"
-	nodeutil "k8s.io/kubernetes/pkg/controller/util/node"
+	cloudnodeutil "k8s.io/cloud-provider/node/helpers"
 )
 
 func alwaysReady() bool { return true }
@@ -51,12 +50,14 @@ func TestIsResponsibleForRoute(t *testing.T) {
 		{"10.244.0.0/16", myClusterRoute, "10.244.255.0/24", true},
 		{"10.244.0.0/14", myClusterRoute, "10.244.0.0/24", true},
 		{"10.244.0.0/14", myClusterRoute, "10.247.255.0/24", true},
+		{"a00:100::/10", myClusterRoute, "a00:100::/24", true},
 		// Routes that match our naming/tagging scheme, but are outside our cidr
 		{"10.244.0.0/16", myClusterRoute, "10.224.0.0/24", false},
 		{"10.244.0.0/16", myClusterRoute, "10.0.10.0/24", false},
 		{"10.244.0.0/16", myClusterRoute, "10.255.255.0/24", false},
 		{"10.244.0.0/14", myClusterRoute, "10.248.0.0/24", false},
 		{"10.244.0.0/14", myClusterRoute, "10.243.255.0/24", false},
+		{"a00:100::/10", myClusterRoute, "b00:100::/24", false},
 	}
 	for i, testCase := range testCases {
 		_, cidr, err := net.ParseCIDR(testCase.clusterCIDR)
@@ -64,8 +65,8 @@ func TestIsResponsibleForRoute(t *testing.T) {
 			t.Errorf("%d. Error in test case: unparsable cidr %q", i, testCase.clusterCIDR)
 		}
 		client := fake.NewSimpleClientset()
-		informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
-		rc := New(nil, nil, informerFactory.Core().V1().Nodes(), myClusterName, cidr)
+		informerFactory := informers.NewSharedInformerFactory(client, 0)
+		rc := New(nil, nil, informerFactory.Core().V1().Nodes(), myClusterName, []*net.IPNet{cidr})
 		rc.nodeListerSynced = alwaysReady
 		route := &cloudprovider.Route{
 			Name:            testCase.routeName,
@@ -80,9 +81,12 @@ func TestIsResponsibleForRoute(t *testing.T) {
 
 func TestReconcile(t *testing.T) {
 	cluster := "my-k8s"
-	node1 := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node-1", UID: "01"}, Spec: v1.NodeSpec{PodCIDR: "10.120.0.0/24"}}
-	node2 := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node-2", UID: "02"}, Spec: v1.NodeSpec{PodCIDR: "10.120.1.0/24"}}
+	node1 := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node-1", UID: "01"}, Spec: v1.NodeSpec{PodCIDR: "10.120.0.0/24", PodCIDRs: []string{"10.120.0.0/24"}}}
+	node2 := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node-2", UID: "02"}, Spec: v1.NodeSpec{PodCIDR: "10.120.1.0/24", PodCIDRs: []string{"10.120.1.0/24"}}}
 	nodeNoCidr := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node-2", UID: "02"}, Spec: v1.NodeSpec{PodCIDR: ""}}
+
+	node3 := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node-3", UID: "03"}, Spec: v1.NodeSpec{PodCIDR: "10.120.0.0/24", PodCIDRs: []string{"10.120.0.0/24", "a00:100::/24"}}}
+	node4 := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node-4", UID: "04"}, Spec: v1.NodeSpec{PodCIDR: "10.120.1.0/24", PodCIDRs: []string{"10.120.1.0/24", "a00:200::/24"}}}
 
 	testCases := []struct {
 		nodes                      []*v1.Node
@@ -90,7 +94,124 @@ func TestReconcile(t *testing.T) {
 		expectedRoutes             []*cloudprovider.Route
 		expectedNetworkUnavailable []bool
 		clientset                  *fake.Clientset
+		dualStack                  bool
 	}{
+		// multicidr
+		// 2 nodes, no routes yet
+		{
+			dualStack: true,
+			nodes: []*v1.Node{
+				&node3,
+				&node4,
+			},
+			initialRoutes: []*cloudprovider.Route{},
+			expectedRoutes: []*cloudprovider.Route{
+				{Name: cluster + "-01", TargetNode: "node-3", DestinationCIDR: "10.120.0.0/24", Blackhole: false},
+				{Name: cluster + "-02", TargetNode: "node-4", DestinationCIDR: "10.120.1.0/24", Blackhole: false},
+
+				{Name: cluster + "-03", TargetNode: "node-3", DestinationCIDR: "a00:100::/24", Blackhole: false},
+				{Name: cluster + "-04", TargetNode: "node-4", DestinationCIDR: "a00:200::/24", Blackhole: false},
+			},
+			expectedNetworkUnavailable: []bool{true, true},
+			clientset:                  fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{node1, node2}}),
+		},
+		// 2 nodes, all routes already created
+		{
+			dualStack: true,
+			nodes: []*v1.Node{
+				&node3,
+				&node4,
+			},
+			initialRoutes: []*cloudprovider.Route{
+				{Name: cluster + "-01", TargetNode: "node-3", DestinationCIDR: "10.120.0.0/24", Blackhole: false},
+				{Name: cluster + "-02", TargetNode: "node-4", DestinationCIDR: "10.120.1.0/24", Blackhole: false},
+
+				{Name: cluster + "-03", TargetNode: "node-3", DestinationCIDR: "a00:100::/24", Blackhole: false},
+				{Name: cluster + "-04", TargetNode: "node-4", DestinationCIDR: "a00:200::/24", Blackhole: false},
+			},
+			expectedRoutes: []*cloudprovider.Route{
+				{Name: cluster + "-01", TargetNode: "node-3", DestinationCIDR: "10.120.0.0/24", Blackhole: false},
+				{Name: cluster + "-02", TargetNode: "node-4", DestinationCIDR: "10.120.1.0/24", Blackhole: false},
+
+				{Name: cluster + "-03", TargetNode: "node-3", DestinationCIDR: "a00:100::/24", Blackhole: false},
+				{Name: cluster + "-04", TargetNode: "node-4", DestinationCIDR: "a00:200::/24", Blackhole: false},
+			},
+			expectedNetworkUnavailable: []bool{true, true},
+			clientset:                  fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{node1, node2}}),
+		},
+		// 2 nodes, few wrong routes
+		{
+			dualStack: true,
+			nodes: []*v1.Node{
+				&node3,
+				&node4,
+			},
+			initialRoutes: []*cloudprovider.Route{
+				{Name: cluster + "-01", TargetNode: "node-3", DestinationCIDR: "10.120.1.0/24", Blackhole: false},
+				{Name: cluster + "-02", TargetNode: "node-4", DestinationCIDR: "10.120.0.0/24", Blackhole: false},
+
+				{Name: cluster + "-03", TargetNode: "node-3", DestinationCIDR: "a00:200::/24", Blackhole: false},
+				{Name: cluster + "-04", TargetNode: "node-4", DestinationCIDR: "a00:100::/24", Blackhole: false},
+			},
+			expectedRoutes: []*cloudprovider.Route{
+				{Name: cluster + "-01", TargetNode: "node-3", DestinationCIDR: "10.120.0.0/24", Blackhole: false},
+				{Name: cluster + "-02", TargetNode: "node-4", DestinationCIDR: "10.120.1.0/24", Blackhole: false},
+
+				{Name: cluster + "-03", TargetNode: "node-3", DestinationCIDR: "a00:100::/24", Blackhole: false},
+				{Name: cluster + "-04", TargetNode: "node-4", DestinationCIDR: "a00:200::/24", Blackhole: false},
+			},
+			expectedNetworkUnavailable: []bool{true, true},
+			clientset:                  fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{node1, node2}}),
+		},
+		// 2 nodes, some routes already created
+		{
+			dualStack: true,
+			nodes: []*v1.Node{
+				&node3,
+				&node4,
+			},
+			initialRoutes: []*cloudprovider.Route{
+				{Name: cluster + "-01", TargetNode: "node-3", DestinationCIDR: "10.120.0.0/24", Blackhole: false},
+				{Name: cluster + "-04", TargetNode: "node-4", DestinationCIDR: "a00:200::/24", Blackhole: false},
+			},
+			expectedRoutes: []*cloudprovider.Route{
+				{Name: cluster + "-01", TargetNode: "node-3", DestinationCIDR: "10.120.0.0/24", Blackhole: false},
+				{Name: cluster + "-02", TargetNode: "node-4", DestinationCIDR: "10.120.1.0/24", Blackhole: false},
+
+				{Name: cluster + "-03", TargetNode: "node-3", DestinationCIDR: "a00:100::/24", Blackhole: false},
+				{Name: cluster + "-04", TargetNode: "node-4", DestinationCIDR: "a00:200::/24", Blackhole: false},
+			},
+			expectedNetworkUnavailable: []bool{true, true},
+			clientset:                  fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{node1, node2}}),
+		},
+		// 2 nodes, too many routes
+		{
+			dualStack: true,
+			nodes: []*v1.Node{
+				&node3,
+				&node4,
+			},
+			initialRoutes: []*cloudprovider.Route{
+				{Name: cluster + "-01", TargetNode: "node-3", DestinationCIDR: "10.120.0.0/24", Blackhole: false},
+				{Name: cluster + "-02", TargetNode: "node-4", DestinationCIDR: "10.120.1.0/24", Blackhole: false},
+				{Name: cluster + "-001", TargetNode: "node-x", DestinationCIDR: "10.120.2.0/24", Blackhole: false},
+
+				{Name: cluster + "-03", TargetNode: "node-3", DestinationCIDR: "a00:100::/24", Blackhole: false},
+				{Name: cluster + "-04", TargetNode: "node-4", DestinationCIDR: "a00:200::/24", Blackhole: false},
+				{Name: cluster + "-0002", TargetNode: "node-y", DestinationCIDR: "a00:300::/24", Blackhole: false},
+			},
+			expectedRoutes: []*cloudprovider.Route{
+				{Name: cluster + "-01", TargetNode: "node-3", DestinationCIDR: "10.120.0.0/24", Blackhole: false},
+				{Name: cluster + "-02", TargetNode: "node-4", DestinationCIDR: "10.120.1.0/24", Blackhole: false},
+
+				{Name: cluster + "-03", TargetNode: "node-3", DestinationCIDR: "a00:100::/24", Blackhole: false},
+				{Name: cluster + "-04", TargetNode: "node-4", DestinationCIDR: "a00:200::/24", Blackhole: false},
+			},
+			expectedNetworkUnavailable: []bool{true, true},
+			clientset:                  fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{node1, node2}}),
+		},
+
+		// single cidr
 		// 2 nodes, routes already there
 		{
 			nodes: []*v1.Node{
@@ -237,9 +358,16 @@ func TestReconcile(t *testing.T) {
 		if !ok {
 			t.Error("Error in test: fakecloud doesn't support Routes()")
 		}
+		cidrs := make([]*net.IPNet, 0)
 		_, cidr, _ := net.ParseCIDR("10.120.0.0/16")
-		informerFactory := informers.NewSharedInformerFactory(testCase.clientset, controller.NoResyncPeriodFunc())
-		rc := New(routes, testCase.clientset, informerFactory.Core().V1().Nodes(), cluster, cidr)
+		cidrs = append(cidrs, cidr)
+		if testCase.dualStack {
+			_, cidrv6, _ := net.ParseCIDR("ace:cab:deca::/8")
+			cidrs = append(cidrs, cidrv6)
+		}
+
+		informerFactory := informers.NewSharedInformerFactory(testCase.clientset, 0)
+		rc := New(routes, testCase.clientset, informerFactory.Core().V1().Nodes(), cluster, cidrs)
 		rc.nodeListerSynced = alwaysReady
 		if err := rc.reconcile(testCase.nodes, testCase.initialRoutes); err != nil {
 			t.Errorf("%d. Error from rc.reconcile(): %v", i, err)
@@ -247,7 +375,7 @@ func TestReconcile(t *testing.T) {
 		for _, action := range testCase.clientset.Actions() {
 			if action.GetVerb() == "update" && action.GetResource().Resource == "nodes" {
 				node := action.(core.UpdateAction).GetObject().(*v1.Node)
-				_, condition := nodeutil.GetNodeCondition(&node.Status, v1.NodeNetworkUnavailable)
+				_, condition := cloudnodeutil.GetNodeCondition(&node.Status, v1.NodeNetworkUnavailable)
 				if condition == nil {
 					t.Errorf("%d. Missing NodeNetworkUnavailable condition for Node %v", i, node.Name)
 				} else {
@@ -284,7 +412,7 @@ func TestReconcile(t *testing.T) {
 					break poll
 				}
 			case <-timeoutChan:
-				t.Errorf("%d. rc.reconcile() = %v, routes:\n%v\nexpected: nil, routes:\n%v\n", i, err, flatten(finalRoutes), flatten(testCase.expectedRoutes))
+				t.Errorf("%d. rc.reconcile() = %v,\nfound routes:\n%v\nexpected routes:\n%v\n", i, err, flatten(finalRoutes), flatten(testCase.expectedRoutes))
 				break poll
 			}
 		}
@@ -295,16 +423,22 @@ func routeListEqual(list1, list2 []*cloudprovider.Route) bool {
 	if len(list1) != len(list2) {
 		return false
 	}
-	routeMap1 := make(map[string]*cloudprovider.Route)
+
+	// nodename+cidr:bool
+	seen := make(map[string]bool)
+
 	for _, route1 := range list1 {
-		routeMap1[route1.Name] = route1
-	}
-	for _, route2 := range list2 {
-		if route1, exists := routeMap1[route2.Name]; !exists || *route1 != *route2 {
-			return false
+		for _, route2 := range list2 {
+			if route1.DestinationCIDR == route2.DestinationCIDR && route1.TargetNode == route2.TargetNode {
+				seen[string(route1.TargetNode)+route1.DestinationCIDR] = true
+				break
+			}
 		}
 	}
-	return true
+	if len(seen) == len(list1) {
+		return true
+	}
+	return false
 }
 
 func flatten(list []*cloudprovider.Route) []cloudprovider.Route {

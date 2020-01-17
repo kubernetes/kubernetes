@@ -33,21 +33,20 @@ import (
 
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 )
 
 func shredFile(filePath string) {
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
-		e2elog.Logf("File %v was not found, skipping shredding", filePath)
+		framework.Logf("File %v was not found, skipping shredding", filePath)
 		return
 	}
-	e2elog.Logf("Shredding file %v", filePath)
+	framework.Logf("Shredding file %v", filePath)
 	_, _, err := framework.RunCmd("shred", "--remove", filePath)
 	if err != nil {
-		e2elog.Logf("Failed to shred file %v: %v", filePath, err)
+		framework.Logf("Failed to shred file %v: %v", filePath, err)
 	}
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
-		e2elog.Logf("File %v successfully shredded", filePath)
+		framework.Logf("File %v successfully shredded", filePath)
 		return
 	}
 	// Shred failed Try to remove the file for good meausure
@@ -67,13 +66,13 @@ func createGCESecrets(client clientset.Interface, ns string) {
 
 	premadeSAFile, ok := os.LookupEnv(saEnv)
 	if !ok {
-		e2elog.Logf("Could not find env var %v, please either create cloud-sa"+
+		framework.Logf("Could not find env var %v, please either create cloud-sa"+
 			" secret manually or rerun test after setting %v to the filepath of"+
 			" the GCP Service Account to give to the GCE Persistent Disk CSI Driver", saEnv, saEnv)
 		return
 	}
 
-	e2elog.Logf("Found CI service account key at %v", premadeSAFile)
+	framework.Logf("Found CI service account key at %v", premadeSAFile)
 	// Need to copy it saFile
 	stdout, stderr, err := framework.RunCmd("cp", premadeSAFile, saFile)
 	framework.ExpectNoError(err, "error copying service account key: %s\nstdout: %s\nstderr: %s", err, stdout, stderr)

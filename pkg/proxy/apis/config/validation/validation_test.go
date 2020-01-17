@@ -202,7 +202,7 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 					TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5 * time.Second},
 				},
 			},
-			msg: "must be a valid CIDR block (e.g. 10.100.0.0/16)",
+			msg: "must be a valid CIDR block (e.g. 10.100.0.0/16 or FD02::0:0:0/96)",
 		},
 		{
 			config: kubeproxyconfig.KubeProxyConfiguration{

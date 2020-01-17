@@ -248,7 +248,7 @@ func TestPullImage(t *testing.T) {
 		{"valid: pull image using CRI", "unix:///var/run/crio/crio.sock", "image1", false},
 		{"invalid: CRI pull error", "unix:///var/run/crio/crio.sock", "image2", true},
 		{"valid: pull image using docker", constants.DefaultDockerCRISocket, "image1", false},
-		{"invalide: docer pull error", constants.DefaultDockerCRISocket, "image2", true},
+		{"invalid: docker pull error", constants.DefaultDockerCRISocket, "image2", true},
 	}
 
 	for _, tc := range cases {

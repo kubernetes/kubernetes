@@ -15,7 +15,15 @@ func (c *Container) OPTIONSFilter(req *Request, resp *Response, chain *FilterCha
 		chain.ProcessFilter(req, resp)
 		return
 	}
-	resp.AddHeader(HEADER_Allow, strings.Join(c.computeAllowedMethods(req), ","))
+
+	archs := req.Request.Header.Get(HEADER_AccessControlRequestHeaders)
+	methods := strings.Join(c.computeAllowedMethods(req), ",")
+	origin := req.Request.Header.Get(HEADER_Origin)
+
+	resp.AddHeader(HEADER_Allow, methods)
+	resp.AddHeader(HEADER_AccessControlAllowOrigin, origin)
+	resp.AddHeader(HEADER_AccessControlAllowHeaders, archs)
+	resp.AddHeader(HEADER_AccessControlAllowMethods, methods)
 }
 
 // OPTIONSFilter is a filter function that inspects the Http Request for the OPTIONS method

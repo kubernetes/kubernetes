@@ -20,12 +20,12 @@ import (
 	"github.com/pkg/errors"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
+	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	markcontrolplanephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/markcontrolplane"
-	"k8s.io/kubernetes/pkg/util/normalizer"
 )
 
 var (
-	markControlPlaneExample = normalizer.Examples(`
+	markControlPlaneExample = cmdutil.Examples(`
 		# Applies control-plane label and taint to the current node, functionally equivalent to what executed by kubeadm init.
 		kubeadm init phase mark-control-plane --config config.yml
 

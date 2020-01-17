@@ -60,15 +60,20 @@ func dataSourceInUse(oldPVCSpec *core.PersistentVolumeClaimSpec) bool {
 
 func dataSourceIsEnabled(pvcSpec *core.PersistentVolumeClaimSpec) bool {
 	if pvcSpec.DataSource != nil {
-		if pvcSpec.DataSource.Kind == pvc &&
-			*pvcSpec.DataSource.APIGroup == "" &&
-			utilfeature.DefaultFeatureGate.Enabled(features.VolumePVCDataSource) {
+		apiGroup := ""
+		if pvcSpec.DataSource.APIGroup != nil {
+			apiGroup = *pvcSpec.DataSource.APIGroup
+		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.VolumePVCDataSource) &&
+			pvcSpec.DataSource.Kind == pvc &&
+			apiGroup == "" {
 			return true
 
 		}
-		if pvcSpec.DataSource.Kind == volumeSnapshot &&
-			*pvcSpec.DataSource.APIGroup == "snapshot.storage.k8s.io" &&
-			utilfeature.DefaultFeatureGate.Enabled(features.VolumeSnapshotDataSource) {
+
+		if utilfeature.DefaultFeatureGate.Enabled(features.VolumeSnapshotDataSource) &&
+			pvcSpec.DataSource.Kind == volumeSnapshot &&
+			apiGroup == "snapshot.storage.k8s.io" {
 			return true
 		}
 	}

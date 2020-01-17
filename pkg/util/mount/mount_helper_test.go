@@ -21,11 +21,17 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"runtime"
 	"syscall"
 	"testing"
 )
 
 func TestDoCleanupMountPoint(t *testing.T) {
+
+	if runtime.GOOS == "darwin" {
+		t.Skipf("not supported on GOOS=%s", runtime.GOOS)
+	}
+
 	const testMount = "test-mount"
 	const defaultPerm = 0750
 

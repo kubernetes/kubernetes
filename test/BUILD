@@ -18,6 +18,7 @@ filegroup(
         "//test/e2e_node:all-srcs",
         "//test/fixtures:all-srcs",
         "//test/images:all-srcs",
+        "//test/instrumentation:all-srcs",
         "//test/integration:all-srcs",
         "//test/kubemark:all-srcs",
         "//test/list:all-srcs",

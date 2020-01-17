@@ -20,17 +20,17 @@
 //
 // Basic examples:
 //
-//	glog.Info("Prepare to repel boarders")
+//	klog.Info("Prepare to repel boarders")
 //
-//	glog.Fatalf("Initialization failed: %s", err)
+//	klog.Fatalf("Initialization failed: %s", err)
 //
 // See the documentation for the V function for an explanation of these examples:
 //
-//	if glog.V(2) {
-//		glog.Info("Starting transaction...")
+//	if klog.V(2) {
+//		klog.Info("Starting transaction...")
 //	}
 //
-//	glog.V(2).Infoln("Processed", nItems, "elements")
+//	klog.V(2).Infoln("Processed", nItems, "elements")
 //
 // Log output is buffered and written periodically using Flush. Programs
 // should call Flush before exiting to guarantee all log output is written.
@@ -142,7 +142,7 @@ func (s *severity) Set(value string) error {
 	if v, ok := severityByName(value); ok {
 		threshold = v
 	} else {
-		v, err := strconv.Atoi(value)
+		v, err := strconv.ParseInt(value, 10, 32)
 		if err != nil {
 			return err
 		}
@@ -226,7 +226,7 @@ func (l *Level) Get() interface{} {
 
 // Set is part of the flag.Value interface.
 func (l *Level) Set(value string) error {
-	v, err := strconv.Atoi(value)
+	v, err := strconv.ParseInt(value, 10, 32)
 	if err != nil {
 		return err
 	}
@@ -294,7 +294,7 @@ func (m *moduleSpec) Set(value string) error {
 			return errVmoduleSyntax
 		}
 		pattern := patLev[0]
-		v, err := strconv.Atoi(patLev[1])
+		v, err := strconv.ParseInt(patLev[1], 10, 32)
 		if err != nil {
 			return errors.New("syntax error: expect comma-separated list of filename=N")
 		}
@@ -396,40 +396,23 @@ type flushSyncWriter interface {
 	io.Writer
 }
 
+// init sets up the defaults and runs flushDaemon.
 func init() {
-	// Default stderrThreshold is ERROR.
-	logging.stderrThreshold = errorLog
-
+	logging.stderrThreshold = errorLog // Default stderrThreshold is ERROR.
 	logging.setVState(0, nil, false)
+	logging.logDir = ""
+	logging.logFile = ""
+	logging.logFileMaxSizeMB = 1800
+	logging.toStderr = true
+	logging.alsoToStderr = false
+	logging.skipHeaders = false
+	logging.addDirHeader = false
+	logging.skipLogHeaders = false
 	go logging.flushDaemon()
 }
 
-var initDefaultsOnce sync.Once
-
 // InitFlags is for explicitly initializing the flags.
 func InitFlags(flagset *flag.FlagSet) {
-
-	// Initialize defaults.
-	initDefaultsOnce.Do(func() {
-		logging.logDir = ""
-		logging.logFile = ""
-		logging.logFileMaxSizeMB = 1800
-		// TODO: The default value of toStderr should be false.
-		// Ideally, toStderr can be deprecated.
-		// If --log-file is set, only log to the dedicated log-file.
-		// If --alsoToStderr is true, whether or not --log-file is set, we will
-		// log to stderr.
-		// Since kubernetes/kubernetes are currently using klog with
-		// default --toStderr to be true, we can't change this default value
-		// directly.
-		// As a compromise, when --log-file is set, the toStdErr is reset to
-		// be false. e.g. See function `IsSingleMode`.
-		logging.toStderr = true
-		logging.alsoToStderr = false
-		logging.skipHeaders = false
-		logging.skipLogHeaders = false
-	})
-
 	if flagset == nil {
 		flagset = flag.CommandLine
 	}
@@ -442,6 +425,7 @@ func InitFlags(flagset *flag.FlagSet) {
 	flagset.BoolVar(&logging.toStderr, "logtostderr", logging.toStderr, "log to standard error instead of files")
 	flagset.BoolVar(&logging.alsoToStderr, "alsologtostderr", logging.alsoToStderr, "log to standard error as well as files")
 	flagset.Var(&logging.verbosity, "v", "number for the log level verbosity")
+	flagset.BoolVar(&logging.skipHeaders, "add_dir_header", logging.addDirHeader, "If true, adds the file directory to the header")
 	flagset.BoolVar(&logging.skipHeaders, "skip_headers", logging.skipHeaders, "If true, avoid header prefixes in the log messages")
 	flagset.BoolVar(&logging.skipLogHeaders, "skip_log_headers", logging.skipLogHeaders, "If true, avoid headers when opening log files")
 	flagset.Var(&logging.stderrThreshold, "stderrthreshold", "logs at or above this threshold go to stderr")
@@ -477,8 +461,6 @@ type loggingT struct {
 	mu sync.Mutex
 	// file holds writer for each of the log types.
 	file [numSeverity]flushSyncWriter
-	// file holds writer for the dedicated file when --log-file is set.
-	singleModeFile flushSyncWriter
 	// pcs is used in V to avoid an allocation when computing the caller's PC.
 	pcs [1]uintptr
 	// vmap is a cache of the V Level for each V() call site, identified by PC.
@@ -512,6 +494,9 @@ type loggingT struct {
 
 	// If true, do not add the headers to log files
 	skipLogHeaders bool
+
+	// If true, add the file directory to the header
+	addDirHeader bool
 }
 
 // buffer holds a byte Buffer for reuse. The zero value is ready for use.
@@ -522,16 +507,6 @@ type buffer struct {
 }
 
 var logging loggingT
-
-func (l *loggingT) IsSingleMode() bool {
-	if l.logFile != "" {
-		// TODO: Remove the toStdErr reset when switching the logging.toStderr
-		// default value to be false.
-		l.toStderr = false
-		return true
-	}
-	return false
-}
 
 // setVState sets a consistent state for V logging.
 // l.mu is held.
@@ -607,9 +582,14 @@ func (l *loggingT) header(s severity, depth int) (*buffer, string, int) {
 		file = "???"
 		line = 1
 	} else {
-		slash := strings.LastIndex(file, "/")
-		if slash >= 0 {
-			file = file[slash+1:]
+		if slash := strings.LastIndex(file, "/"); slash >= 0 {
+			path := file
+			file = path[slash+1:]
+			if l.addDirHeader {
+				if dirsep := strings.LastIndex(path[:slash], "/"); dirsep >= 0 {
+					file = path[dirsep+1:]
+				}
+			}
 		}
 	}
 	return l.formatHeader(s, file, line), file, line
@@ -758,40 +738,28 @@ func (rb *redirectBuffer) Write(bytes []byte) (n int, err error) {
 
 // SetOutput sets the output destination for all severities
 func SetOutput(w io.Writer) {
-	// In single-mode, all severity logs are tracked in a single dedicated file.
-	if logging.IsSingleMode() {
+	logging.mu.Lock()
+	defer logging.mu.Unlock()
+	for s := fatalLog; s >= infoLog; s-- {
 		rb := &redirectBuffer{
 			w: w,
 		}
-		logging.singleModeFile = rb
-	} else {
-		for s := fatalLog; s >= infoLog; s-- {
-			rb := &redirectBuffer{
-				w: w,
-			}
-			logging.file[s] = rb
-		}
+		logging.file[s] = rb
 	}
 }
 
 // SetOutputBySeverity sets the output destination for specific severity
 func SetOutputBySeverity(name string, w io.Writer) {
-	// In single-mode, all severity logs are tracked in a single dedicated file.
-	// Guarantee this buffer exists whatever severity output is trying to be set.
-	if logging.IsSingleMode() {
-		if logging.singleModeFile == nil {
-			logging.singleModeFile = &redirectBuffer{w: w}
-		}
-	} else {
-		sev, ok := severityByName(name)
-		if !ok {
-			panic(fmt.Sprintf("SetOutputBySeverity(%q): unrecognized severity name", name))
-		}
-		rb := &redirectBuffer{
-			w: w,
-		}
-		logging.file[sev] = rb
+	logging.mu.Lock()
+	defer logging.mu.Unlock()
+	sev, ok := severityByName(name)
+	if !ok {
+		panic(fmt.Sprintf("SetOutputBySeverity(%q): unrecognized severity name", name))
 	}
+	rb := &redirectBuffer{
+		w: w,
+	}
+	logging.file[sev] = rb
 }
 
 // output writes the data to the log files and releases the buffer.
@@ -803,7 +771,46 @@ func (l *loggingT) output(s severity, buf *buffer, file string, line int, alsoTo
 		}
 	}
 	data := buf.Bytes()
-	l.writeLogData(s, data)
+	if l.toStderr {
+		os.Stderr.Write(data)
+	} else {
+		if alsoToStderr || l.alsoToStderr || s >= l.stderrThreshold.get() {
+			os.Stderr.Write(data)
+		}
+
+		if logging.logFile != "" {
+			// Since we are using a single log file, all of the items in l.file array
+			// will point to the same file, so just use one of them to write data.
+			if l.file[infoLog] == nil {
+				if err := l.createFiles(infoLog); err != nil {
+					os.Stderr.Write(data) // Make sure the message appears somewhere.
+					l.exit(err)
+				}
+			}
+			l.file[infoLog].Write(data)
+		} else {
+			if l.file[s] == nil {
+				if err := l.createFiles(s); err != nil {
+					os.Stderr.Write(data) // Make sure the message appears somewhere.
+					l.exit(err)
+				}
+			}
+
+			switch s {
+			case fatalLog:
+				l.file[fatalLog].Write(data)
+				fallthrough
+			case errorLog:
+				l.file[errorLog].Write(data)
+				fallthrough
+			case warningLog:
+				l.file[warningLog].Write(data)
+				fallthrough
+			case infoLog:
+				l.file[infoLog].Write(data)
+			}
+		}
+	}
 	if s == fatalLog {
 		// If we got here via Exit rather than Fatal, print no stacks.
 		if atomic.LoadUint32(&fatalNoStacks) > 0 {
@@ -811,68 +818,36 @@ func (l *loggingT) output(s severity, buf *buffer, file string, line int, alsoTo
 			timeoutFlush(10 * time.Second)
 			os.Exit(1)
 		}
+		// Dump all goroutine stacks before exiting.
+		// First, make sure we see the trace for the current goroutine on standard error.
+		// If -logtostderr has been specified, the loop below will do that anyway
+		// as the first stack in the full dump.
+		if !l.toStderr {
+			os.Stderr.Write(stacks(false))
+		}
+		// Write the stack trace for all goroutines to the files.
+		trace := stacks(true)
 		logExitFunc = func(error) {} // If we get a write error, we'll still exit below.
-		l.writeLogData(fatalLog, stacks(true))
+		for log := fatalLog; log >= infoLog; log-- {
+			if f := l.file[log]; f != nil { // Can be nil if -logtostderr is set.
+				f.Write(trace)
+			}
+		}
 		l.mu.Unlock()
 		timeoutFlush(10 * time.Second)
 		os.Exit(255) // C++ uses -1, which is silly because it's anded with 255 anyway.
 	}
 	l.putBuffer(buf)
 	l.mu.Unlock()
-	// Note: The stats estimate logs for each severity level individually,
-	// even in the situation that log-file is specified and
-	// all severity-level logs are tracked only in the infoLog file.
 	if stats := severityStats[s]; stats != nil {
 		atomic.AddInt64(&stats.lines, 1)
 		atomic.AddInt64(&stats.bytes, int64(len(data)))
 	}
 }
 
-// writeLogData writes |data| to the `s` and lower severity files.
-// e.g. If Severity level is Error, the data will be written to all the Error,
-// Warning, and Info log file. However, if --log_file flag is provided, klog
-// no longer tracks logs separately due to their severity level, but rather
-// only write to the singleModeFile which later on will be flushed to the
-// dedicated log_file.
-func (l *loggingT) writeLogData(s severity, data []byte) {
-	shouldAlsoToStderr := l.alsoToStderr && s >= l.stderrThreshold.get()
-	if l.IsSingleMode() {
-		if shouldAlsoToStderr {
-			os.Stderr.Write(data)
-		}
-		if l.singleModeFile == nil {
-			now := time.Now()
-			sb := &syncBuffer{
-				logger:   l,
-				maxbytes: CalculateMaxSize(),
-			}
-			if err := sb.rotateFile(now, true); err != nil {
-				l.exit(err)
-			}
-			l.singleModeFile = sb
-		}
-		l.singleModeFile.Write(data)
-	} else {
-		if l.toStderr || shouldAlsoToStderr {
-			os.Stderr.Write(data)
-		}
-		for currSeverity := s; currSeverity >= infoLog; currSeverity-- {
-			if l.file[currSeverity] == nil {
-				if err := l.createFiles(currSeverity); err != nil {
-					os.Stderr.Write(data) // Make sure the message appears somewhere.
-					l.exit(err)
-				}
-			}
-			if f := l.file[currSeverity]; f != nil { // Can be nil if -logtostderr is set.
-				f.Write(data)
-			}
-		}
-	}
-}
-
 // timeoutFlush calls Flush and returns when it completes or after timeout
 // elapses, whichever happens first.  This is needed because the hooks invoked
-// by Flush may deadlock when glog.Fatal is called from a hook that holds
+// by Flush may deadlock when klog.Fatal is called from a hook that holds
 // a lock.
 func timeoutFlush(timeout time.Duration) {
 	done := make(chan bool, 1)
@@ -883,7 +858,7 @@ func timeoutFlush(timeout time.Duration) {
 	select {
 	case <-done:
 	case <-time.After(timeout):
-		fmt.Fprintln(os.Stderr, "glog: Flush took longer than", timeout)
+		fmt.Fprintln(os.Stderr, "klog: Flush took longer than", timeout)
 	}
 }
 
@@ -1047,20 +1022,12 @@ func (l *loggingT) lockAndFlushAll() {
 // flushAll flushes all the logs and attempts to "sync" their data to disk.
 // l.mu is held.
 func (l *loggingT) flushAll() {
-	if l.IsSingleMode() {
-		file := l.singleModeFile
+	// Flush from fatal down, in case there's trouble flushing.
+	for s := fatalLog; s >= infoLog; s-- {
+		file := l.file[s]
 		if file != nil {
 			file.Flush() // ignore error
 			file.Sync()  // ignore error
-		}
-	} else {
-		// Flush from fatal down, in case there's trouble flushing.
-		for s := fatalLog; s >= infoLog; s-- {
-			file := l.file[s]
-			if file != nil {
-				file.Flush() // ignore error
-				file.Sync()  // ignore error
-			}
 		}
 	}
 }
@@ -1147,9 +1114,9 @@ type Verbose bool
 // The returned value is a boolean of type Verbose, which implements Info, Infoln
 // and Infof. These methods will write to the Info log if called.
 // Thus, one may write either
-//  if glog.V(2) { glog.Info("log this") }
+//	if klog.V(2) { klog.Info("log this") }
 // or
-//  glog.V(2).Info("log this")
+//	klog.V(2).Info("log this")
 // The second form is shorter but the first is cheaper if logging is off because it does
 // not evaluate its arguments.
 //
@@ -1223,7 +1190,7 @@ func InfoDepth(depth int, args ...interface{}) {
 }
 
 // Infoln logs to the INFO log.
-// Arguments are handled in the manner of fmt.Println; a newline is appended if missing.
+// Arguments are handled in the manner of fmt.Println; a newline is always appended.
 func Infoln(args ...interface{}) {
 	logging.println(infoLog, args...)
 }
@@ -1247,7 +1214,7 @@ func WarningDepth(depth int, args ...interface{}) {
 }
 
 // Warningln logs to the WARNING and INFO logs.
-// Arguments are handled in the manner of fmt.Println; a newline is appended if missing.
+// Arguments are handled in the manner of fmt.Println; a newline is always appended.
 func Warningln(args ...interface{}) {
 	logging.println(warningLog, args...)
 }
@@ -1271,7 +1238,7 @@ func ErrorDepth(depth int, args ...interface{}) {
 }
 
 // Errorln logs to the ERROR, WARNING, and INFO logs.
-// Arguments are handled in the manner of fmt.Println; a newline is appended if missing.
+// Arguments are handled in the manner of fmt.Println; a newline is always appended.
 func Errorln(args ...interface{}) {
 	logging.println(errorLog, args...)
 }
@@ -1297,7 +1264,7 @@ func FatalDepth(depth int, args ...interface{}) {
 
 // Fatalln logs to the FATAL, ERROR, WARNING, and INFO logs,
 // including a stack trace of all running goroutines, then calls os.Exit(255).
-// Arguments are handled in the manner of fmt.Println; a newline is appended if missing.
+// Arguments are handled in the manner of fmt.Println; a newline is always appended.
 func Fatalln(args ...interface{}) {
 	logging.println(fatalLog, args...)
 }

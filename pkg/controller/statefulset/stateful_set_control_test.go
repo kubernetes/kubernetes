@@ -1774,7 +1774,7 @@ func assertMonotonicInvariants(set *apps.StatefulSet, spc *fakeStatefulPodContro
 	sort.Sort(ascendingOrdinal(pods))
 	for ord := 0; ord < len(pods); ord++ {
 		if ord > 0 && isRunningAndReady(pods[ord]) && !isRunningAndReady(pods[ord-1]) {
-			return fmt.Errorf("Successor %s is Running and Ready while %s is not", pods[ord].Name, pods[ord-1].Name)
+			return fmt.Errorf("successor %s is Running and Ready while %s is not", pods[ord].Name, pods[ord-1].Name)
 		}
 
 		if getOrdinal(pods[ord]) != ord {

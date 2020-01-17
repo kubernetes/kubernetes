@@ -40,7 +40,7 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/kubelet"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
@@ -69,14 +69,14 @@ func testHostIP(podClient *framework.PodClient, pod *v1.Pod) {
 		p, err := podClient.Get(pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "Failed to get pod %q", pod.Name)
 		if p.Status.HostIP != "" {
-			e2elog.Logf("Pod %s has hostIP: %s", p.Name, p.Status.HostIP)
+			framework.Logf("Pod %s has hostIP: %s", p.Name, p.Status.HostIP)
 			break
 		}
 		if time.Since(t) >= hostIPTimeout {
 			framework.Failf("Gave up waiting for hostIP of pod %s after %v seconds",
 				p.Name, time.Since(t).Seconds())
 		}
-		e2elog.Logf("Retrying to get the hostIP of pod %s", p.Name)
+		framework.Logf("Retrying to get the hostIP of pod %s", p.Name)
 		time.Sleep(5 * time.Second)
 	}
 }
@@ -118,13 +118,13 @@ func getRestartDelay(podClient *framework.PodClient, podName string, containerNa
 		framework.ExpectNoError(err, fmt.Sprintf("getting pod %s", podName))
 		status, ok := podutil.GetContainerStatus(pod.Status.ContainerStatuses, containerName)
 		if !ok {
-			e2elog.Logf("getRestartDelay: status missing")
+			framework.Logf("getRestartDelay: status missing")
 			continue
 		}
 
 		// the only case this happens is if this is the first time the Pod is running and there is no "Last State".
 		if status.LastTerminationState.Terminated == nil {
-			e2elog.Logf("Container's last state is not \"Terminated\".")
+			framework.Logf("Container's last state is not \"Terminated\".")
 			continue
 		}
 
@@ -151,7 +151,7 @@ func getRestartDelay(podClient *framework.PodClient, podName string, containerNa
 			} else {
 				startedAt = status.LastTerminationState.Terminated.StartedAt.Time
 			}
-			e2elog.Logf("getRestartDelay: restartCount = %d, finishedAt=%s restartedAt=%s (%s)", status.RestartCount, previousFinishedAt, startedAt, startedAt.Sub(previousFinishedAt))
+			framework.Logf("getRestartDelay: restartCount = %d, finishedAt=%s restartedAt=%s (%s)", status.RestartCount, previousFinishedAt, startedAt, startedAt.Sub(previousFinishedAt))
 			return startedAt.Sub(previousFinishedAt), nil
 		}
 	}
@@ -219,7 +219,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		options := metav1.ListOptions{LabelSelector: selector.String()}
 		pods, err := podClient.List(options)
 		framework.ExpectNoError(err, "failed to query for pods")
-		gomega.Expect(len(pods.Items)).To(gomega.Equal(0))
+		framework.ExpectEqual(len(pods.Items), 0)
 		options = metav1.ListOptions{
 			LabelSelector:   selector.String(),
 			ResourceVersion: pods.ListMeta.ResourceVersion,
@@ -233,10 +233,10 @@ var _ = framework.KubeDescribe("Pods", func() {
 				if err == nil {
 					select {
 					case listCompleted <- true:
-						e2elog.Logf("observed the pod list")
+						framework.Logf("observed the pod list")
 						return podList, err
 					default:
-						e2elog.Logf("channel blocked")
+						framework.Logf("channel blocked")
 					}
 				}
 				return podList, err
@@ -257,7 +257,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		options = metav1.ListOptions{LabelSelector: selector.String()}
 		pods, err = podClient.List(options)
 		framework.ExpectNoError(err, "failed to query for pods")
-		gomega.Expect(len(pods.Items)).To(gomega.Equal(1))
+		framework.ExpectEqual(len(pods.Items), 1)
 
 		ginkgo.By("verifying pod creation was observed")
 		select {
@@ -286,10 +286,10 @@ var _ = framework.KubeDescribe("Pods", func() {
 		framework.ExpectNoError(err, "failed to delete pod")
 
 		ginkgo.By("verifying the kubelet observed the termination notice")
-		gomega.Expect(wait.Poll(time.Second*5, time.Second*30, func() (bool, error) {
-			podList, err := framework.GetKubeletPods(f.ClientSet, pod.Spec.NodeName)
+		err = wait.Poll(time.Second*5, time.Second*30, func() (bool, error) {
+			podList, err := e2ekubelet.GetKubeletPods(f.ClientSet, pod.Spec.NodeName)
 			if err != nil {
-				e2elog.Logf("Unable to retrieve kubelet pods for node %v: %v", pod.Spec.NodeName, err)
+				framework.Logf("Unable to retrieve kubelet pods for node %v: %v", pod.Spec.NodeName, err)
 				return false, nil
 			}
 			for _, kubeletPod := range podList.Items {
@@ -297,14 +297,15 @@ var _ = framework.KubeDescribe("Pods", func() {
 					continue
 				}
 				if kubeletPod.ObjectMeta.DeletionTimestamp == nil {
-					e2elog.Logf("deletion has not yet been observed")
+					framework.Logf("deletion has not yet been observed")
 					return false, nil
 				}
 				return true, nil
 			}
-			e2elog.Logf("no pod exists with the name we were looking for, assuming the termination request was observed and completed")
+			framework.Logf("no pod exists with the name we were looking for, assuming the termination request was observed and completed")
 			return true, nil
-		})).NotTo(gomega.HaveOccurred(), "kubelet never observed the termination notice")
+		})
+		framework.ExpectNoError(err, "kubelet never observed the termination notice")
 
 		ginkgo.By("verifying pod deletion was observed")
 		deleted := false
@@ -318,7 +319,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 					lastPod = event.Object.(*v1.Pod)
 					deleted = true
 				case watch.Error:
-					e2elog.Logf("received a watch error: %v", event.Object)
+					framework.Logf("received a watch error: %v", event.Object)
 					framework.Failf("watch closed with error")
 				}
 			case <-timer:
@@ -336,7 +337,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		options = metav1.ListOptions{LabelSelector: selector.String()}
 		pods, err = podClient.List(options)
 		framework.ExpectNoError(err, "failed to query for pods")
-		gomega.Expect(len(pods.Items)).To(gomega.Equal(0))
+		framework.ExpectEqual(len(pods.Items), 0)
 	})
 
 	/*
@@ -374,7 +375,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		options := metav1.ListOptions{LabelSelector: selector.String()}
 		pods, err := podClient.List(options)
 		framework.ExpectNoError(err, "failed to query for pods")
-		gomega.Expect(len(pods.Items)).To(gomega.Equal(1))
+		framework.ExpectEqual(len(pods.Items), 1)
 
 		ginkgo.By("updating the pod")
 		podClient.Update(name, func(pod *v1.Pod) {
@@ -389,8 +390,8 @@ var _ = framework.KubeDescribe("Pods", func() {
 		options = metav1.ListOptions{LabelSelector: selector.String()}
 		pods, err = podClient.List(options)
 		framework.ExpectNoError(err, "failed to query for pods")
-		gomega.Expect(len(pods.Items)).To(gomega.Equal(1))
-		e2elog.Logf("Pod update OK")
+		framework.ExpectEqual(len(pods.Items), 1)
+		framework.Logf("Pod update OK")
 	})
 
 	/*
@@ -428,7 +429,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		options := metav1.ListOptions{LabelSelector: selector.String()}
 		pods, err := podClient.List(options)
 		framework.ExpectNoError(err, "failed to query for pods")
-		gomega.Expect(len(pods.Items)).To(gomega.Equal(1))
+		framework.ExpectEqual(len(pods.Items), 1)
 
 		ginkgo.By("updating the pod")
 		podClient.Update(name, func(pod *v1.Pod) {
@@ -802,7 +803,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 				podReady := podClient.PodIsReady(podName)
 				res := expectReady == podReady
 				if !res {
-					e2elog.Logf("Expect the Ready condition of pod %q to be %v, but got %v", podName, expectReady, podReady)
+					framework.Logf("Expect the Ready condition of pod %q to be %v, but got %v", podName, expectReady, podReady)
 				}
 				return res, nil
 			})

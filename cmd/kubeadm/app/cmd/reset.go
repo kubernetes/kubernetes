@@ -34,7 +34,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	utilruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
 )
@@ -42,9 +41,7 @@ import (
 var (
 	iptablesCleanupInstructions = dedent.Dedent(`
 		The reset process does not reset or clean up iptables rules or IPVS tables.
-		If you wish to reset iptables, you must do so manually.
-		For example:
-		iptables -F && iptables -t nat -F && iptables -t mangle -F && iptables -X
+		If you wish to reset iptables, you must do so manually by using the "iptables" command.
 
 		If your cluster was setup to utilize IPVS, run ipvsadm --clear (or similar)
 		to reset your system's IPVS tables.
@@ -105,7 +102,6 @@ func newResetData(cmd *cobra.Command, options *resetOptions, in io.Reader, out i
 	if err != nil {
 		return nil, err
 	}
-	kubeadmutil.CheckErr(err)
 	if cfg != nil {
 		// Also set the union of pre-flight errors to InitConfiguration, to provide a consistent view of the runtime configuration:
 		cfg.NodeRegistration.IgnorePreflightErrors = ignorePreflightErrorsSet.List()
@@ -118,6 +114,9 @@ func newResetData(cmd *cobra.Command, options *resetOptions, in io.Reader, out i
 			return nil, err
 		}
 		klog.V(1).Infof("[reset] Detected and using CRI socket: %s", criSocketPath)
+	} else {
+		criSocketPath = options.criSocketPath
+		klog.V(1).Infof("[reset] Using specified CRI socket: %s", criSocketPath)
 	}
 
 	return &resetData{
@@ -164,13 +163,17 @@ func NewCmdReset(in io.Reader, out io.Writer, resetOptions *resetOptions) *cobra
 
 	cmd := &cobra.Command{
 		Use:   "reset",
-		Short: "Run this to revert any changes made to this host by 'kubeadm init' or 'kubeadm join'",
-		Run: func(cmd *cobra.Command, args []string) {
+		Short: "Performs a best effort revert of changes made to this host by 'kubeadm init' or 'kubeadm join'",
+		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := resetRunner.InitData(args)
-			kubeadmutil.CheckErr(err)
+			if err != nil {
+				return err
+			}
 
 			err = resetRunner.Run(args)
-			kubeadmutil.CheckErr(err)
+			if err != nil {
+				return err
+			}
 
 			// Then clean contents from the stateful kubelet, etcd and cni directories
 			data := c.(*resetData)
@@ -178,6 +181,7 @@ func NewCmdReset(in io.Reader, out io.Writer, resetOptions *resetOptions) *cobra
 
 			// Output help text instructing user how to remove iptables rules
 			fmt.Print(iptablesCleanupInstructions)
+			return nil
 		},
 	}
 

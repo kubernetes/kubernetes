@@ -41,7 +41,6 @@ import (
 	nodebootstraptokenphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/node"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	cryptoutil "k8s.io/kubernetes/cmd/kubeadm/app/util/crypto"
-	rbachelper "k8s.io/kubernetes/pkg/apis/rbac/v1"
 )
 
 const (
@@ -127,7 +126,12 @@ func createRBAC(client clientset.Interface) error {
 			Namespace: metav1.NamespaceSystem,
 		},
 		Rules: []rbac.PolicyRule{
-			rbachelper.NewRule("get").Groups("").Resources("secrets").Names(kubeadmconstants.KubeadmCertsSecret).RuleOrDie(),
+			{
+				Verbs:         []string{"get"},
+				APIGroups:     []string{""},
+				Resources:     []string{"secrets"},
+				ResourceNames: []string{kubeadmconstants.KubeadmCertsSecret},
+			},
 		},
 	})
 	if err != nil {
@@ -200,7 +204,7 @@ func getDataFromDisk(cfg *kubeadmapi.InitConfiguration, key []byte) (map[string]
 	secretData := map[string][]byte{}
 	for certName, certPath := range certsToTransfer(cfg) {
 		cert, err := loadAndEncryptCert(certPath, key)
-		if err == nil || (err != nil && os.IsNotExist(err)) {
+		if err == nil || os.IsNotExist(err) {
 			secretData[certOrKeyNameToSecretName(certName)] = cert
 		} else {
 			return nil, err
@@ -258,7 +262,7 @@ func getSecret(client clientset.Interface) (*v1.Secret, error) {
 	secret, err := client.CoreV1().Secrets(metav1.NamespaceSystem).Get(kubeadmconstants.KubeadmCertsSecret, metav1.GetOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			return nil, errors.Errorf("Secret %q was not found in the %q Namespace. This Secret might have expired. Please, run `kubeadm init phase upload-certs --experimental-upload-certs` on a control plane to generate a new one", kubeadmconstants.KubeadmCertsSecret, metav1.NamespaceSystem)
+			return nil, errors.Errorf("Secret %q was not found in the %q Namespace. This Secret might have expired. Please, run `kubeadm init phase upload-certs --upload-certs` on a control plane to generate a new one", kubeadmconstants.KubeadmCertsSecret, metav1.NamespaceSystem)
 		}
 		return nil, err
 	}

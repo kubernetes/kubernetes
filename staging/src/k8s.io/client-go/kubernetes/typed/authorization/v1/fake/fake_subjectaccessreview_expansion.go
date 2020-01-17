@@ -17,11 +17,17 @@ limitations under the License.
 package fake
 
 import (
+	"context"
+
 	authorizationapi "k8s.io/api/authorization/v1"
 	core "k8s.io/client-go/testing"
 )
 
 func (c *FakeSubjectAccessReviews) Create(sar *authorizationapi.SubjectAccessReview) (result *authorizationapi.SubjectAccessReview, err error) {
+	return c.CreateContext(context.Background(), sar)
+}
+
+func (c *FakeSubjectAccessReviews) CreateContext(ctx context.Context, sar *authorizationapi.SubjectAccessReview) (result *authorizationapi.SubjectAccessReview, err error) {
 	obj, err := c.Fake.Invokes(core.NewRootCreateAction(authorizationapi.SchemeGroupVersion.WithResource("subjectaccessreviews"), sar), &authorizationapi.SubjectAccessReview{})
 	if obj == nil {
 		return nil, err
