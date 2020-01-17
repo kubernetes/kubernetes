@@ -121,7 +121,7 @@ func TestSampleAPIServer(f *framework.Framework, aggrclient *aggregatorclient.Cl
 	restClient := client.Discovery().RESTClient()
 
 	namespace := f.Namespace.Name
-	context := setupServerCert(namespace, "sample-api")
+	certCtx := setupServerCert(namespace, "sample-api")
 
 	// kubectl create -f namespace.yaml
 	// NOTE: aggregated apis should generally be set up in their own namespace. As the test framework is setting up a new namespace, we are just using that.
@@ -134,8 +134,8 @@ func TestSampleAPIServer(f *framework.Framework, aggrclient *aggregatorclient.Cl
 		},
 		Type: v1.SecretTypeOpaque,
 		Data: map[string][]byte{
-			"tls.crt": context.cert,
-			"tls.key": context.key,
+			"tls.crt": certCtx.cert,
+			"tls.key": certCtx.key,
 		},
 	}
 	_, err := client.CoreV1().Secrets(namespace).Create(secret)
@@ -346,7 +346,7 @@ func TestSampleAPIServer(f *framework.Framework, aggrclient *aggregatorclient.Cl
 			},
 			Group:                "wardle.example.com",
 			Version:              "v1alpha1",
-			CABundle:             context.signingCert,
+			CABundle:             certCtx.signingCert,
 			GroupPriorityMinimum: 2000,
 			VersionPriority:      200,
 		},
