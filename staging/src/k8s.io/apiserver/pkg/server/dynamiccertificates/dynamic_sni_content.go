@@ -18,7 +18,7 @@ package dynamiccertificates
 
 // DynamicFileSNIContent provides a SNICertKeyContentProvider that can dynamically react to new file content
 type DynamicFileSNIContent struct {
-	*DynamicFileServingContent
+	*DynamicCertKeyPairContent
 	sniNames []string
 }
 
@@ -34,10 +34,10 @@ func NewDynamicSNIContentFromFiles(purpose, certFile, keyFile string, sniNames .
 	}
 
 	ret := &DynamicFileSNIContent{
-		DynamicFileServingContent: servingContent,
+		DynamicCertKeyPairContent: servingContent,
 		sniNames:                  sniNames,
 	}
-	if err := ret.loadServingCert(); err != nil {
+	if err := ret.loadCertKeyPair(); err != nil {
 		return nil, err
 	}
 
