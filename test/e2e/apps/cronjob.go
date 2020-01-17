@@ -34,7 +34,7 @@ import (
 	batchinternal "k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/controller/job"
 	"k8s.io/kubernetes/test/e2e/framework"
-	jobutil "k8s.io/kubernetes/test/e2e/framework/job"
+	e2ejob "k8s.io/kubernetes/test/e2e/framework/job"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
@@ -213,7 +213,7 @@ var _ = SIGDescribe("CronJob", func() {
 		framework.ExpectNoError(framework.DeleteResourceAndWaitForGC(f.ClientSet, batchinternal.Kind("Job"), f.Namespace.Name, job.Name))
 
 		ginkgo.By("Ensuring job was deleted")
-		_, err = jobutil.GetJob(f.ClientSet, f.Namespace.Name, job.Name)
+		_, err = e2ejob.GetJob(f.ClientSet, f.Namespace.Name, job.Name)
 		framework.ExpectError(err)
 		framework.ExpectEqual(apierrors.IsNotFound(err), true)
 

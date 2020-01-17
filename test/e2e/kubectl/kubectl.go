@@ -70,7 +70,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/auth"
 	e2eendpoints "k8s.io/kubernetes/test/e2e/framework/endpoints"
-	jobutil "k8s.io/kubernetes/test/e2e/framework/job"
+	e2ejob "k8s.io/kubernetes/test/e2e/framework/job"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
@@ -1964,7 +1964,7 @@ metadata:
 			gomega.Expect(runOutput).To(gomega.ContainSubstring("abcd1234"))
 			gomega.Expect(runOutput).To(gomega.ContainSubstring("stdin closed"))
 
-			err := jobutil.WaitForJobGone(c, ns, jobName, wait.ForeverTestTimeout)
+			err := e2ejob.WaitForJobGone(c, ns, jobName, wait.ForeverTestTimeout)
 			framework.ExpectNoError(err)
 
 			ginkgo.By("verifying the job " + jobName + " was deleted")
