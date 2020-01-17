@@ -36,18 +36,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller/testutil"
 )
 
-type FakeController struct{}
-
-func (*FakeController) Run(<-chan struct{}) {}
-
-func (*FakeController) HasSynced() bool {
-	return true
-}
-
-func (*FakeController) LastSyncResourceVersion() string {
-	return ""
-}
-
 func alwaysReady() bool { return true }
 
 func NewFromClient(kubeClient clientset.Interface, terminatedPodThreshold int) (*PodGCController, coreinformers.PodInformer, coreinformers.NodeInformer) {

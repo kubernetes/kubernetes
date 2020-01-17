@@ -7,7 +7,6 @@ pkg/controller/garbagecollector
 pkg/controller/namespace/deletion
 pkg/controller/nodeipam
 pkg/controller/podautoscaler
-pkg/controller/podgc
 pkg/controller/replicaset
 pkg/controller/resourcequota
 pkg/controller/statefulset
