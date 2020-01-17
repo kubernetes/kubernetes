@@ -575,6 +575,9 @@ func (dswp *desiredStateOfWorldPopulator) createVolumeSpec(
 // An error is returned if the PVC object's phase is not "Bound".
 func (dswp *desiredStateOfWorldPopulator) getPVCExtractPV(
 	namespace string, claimName string) (*v1.PersistentVolumeClaim, error) {
+	if dswp.kubeClient == nil {
+		return nil, fmt.Errorf("failed to fetch PVC from API server due to nil kubeClient")
+	}
 	pvc, err :=
 		dswp.kubeClient.CoreV1().PersistentVolumeClaims(namespace).Get(claimName, metav1.GetOptions{})
 	if err != nil || pvc == nil {
@@ -612,6 +615,9 @@ func (dswp *desiredStateOfWorldPopulator) getPVSpec(
 	name string,
 	pvcReadOnly bool,
 	expectedClaimUID types.UID) (*volume.Spec, string, error) {
+	if dswp.kubeClient == nil {
+		return nil, "", fmt.Errorf("failed to fetch PV from API server due to nil kubeClient")
+	}
 	pv, err := dswp.kubeClient.CoreV1().PersistentVolumes().Get(name, metav1.GetOptions{})
 	if err != nil || pv == nil {
 		return nil, "", fmt.Errorf(

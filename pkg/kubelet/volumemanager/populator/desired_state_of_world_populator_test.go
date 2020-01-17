@@ -47,6 +47,53 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util/types"
 )
 
+func TestFindAndAddNewPods_WithNilKubeClient(t *testing.T) {
+	// create dswp
+	mode := v1.PersistentVolumeFilesystem
+	pv := &v1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "dswp-test-volume-name",
+		},
+		Spec: v1.PersistentVolumeSpec{
+			ClaimRef:   &v1.ObjectReference{Namespace: "ns", Name: "file-bound"},
+			VolumeMode: &mode,
+		},
+	}
+	pvc := &v1.PersistentVolumeClaim{
+		Spec: v1.PersistentVolumeClaimSpec{
+			VolumeName: "dswp-test-volume-name",
+		},
+		Status: v1.PersistentVolumeClaimStatus{
+			Phase: v1.ClaimBound,
+		},
+	}
+	dswp, fakePodManager, _ := createDswpWithVolume(t, pv, pvc)
+
+	// create pod
+	containers := []v1.Container{
+		{
+			VolumeMounts: []v1.VolumeMount{
+				{
+					Name:      "dswp-test-volume-name",
+					MountPath: "/mnt",
+				},
+			},
+		},
+	}
+	pod := createPodWithVolume("dswp-test-pod", "dswp-test-volume-name", "file-bound", containers)
+
+	fakePodManager.AddPod(pod)
+
+	podName := util.GetUniquePodName(pod)
+
+	dswp.kubeClient = nil
+	dswp.findAndAddNewPods()
+
+	if dswp.pods.processedPods[podName] {
+		t.Fatalf("Should have failed to record that the volumes for the specified pod: %s have been processed by the populator", podName)
+	}
+}
+
 func TestFindAndAddNewPods_FindAndRemoveDeletedPods(t *testing.T) {
 	// create dswp
 	mode := v1.PersistentVolumeFilesystem
