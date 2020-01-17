@@ -121,6 +121,7 @@ func autoConvert_v1alpha1_KubeProxyConfiguration_To_config_KubeProxyConfiguratio
 		return err
 	}
 	out.ShowHiddenMetricsForVersion = in.ShowHiddenMetricsForVersion
+	out.DetectLocalMode = config.LocalMode(in.DetectLocalMode)
 	return nil
 }
 
@@ -159,6 +160,7 @@ func autoConvert_config_KubeProxyConfiguration_To_v1alpha1_KubeProxyConfiguratio
 		return err
 	}
 	out.ShowHiddenMetricsForVersion = in.ShowHiddenMetricsForVersion
+	out.DetectLocalMode = v1alpha1.LocalMode(in.DetectLocalMode)
 	return nil
 }
 

@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
+	proxyutiliptables "k8s.io/kubernetes/pkg/proxy/util/iptables"
 	utilproxytest "k8s.io/kubernetes/pkg/proxy/util/testing"
 	"k8s.io/kubernetes/pkg/util/async"
 	"k8s.io/kubernetes/pkg/util/conntrack"
@@ -345,6 +346,7 @@ const testHostname = "test-hostname"
 func NewFakeProxier(ipt utiliptables.Interface, endpointSlicesEnabled bool) *Proxier {
 	// TODO: Call NewProxier after refactoring out the goroutine
 	// invocation into a Run() method.
+	detectLocal, _ := proxyutiliptables.NewDetectLocalByCIDR("10.0.0.0/24", ipt)
 	p := &Proxier{
 		exec:                     &fakeexec.FakeExec{},
 		serviceMap:               make(proxy.ServiceMap),
@@ -352,7 +354,7 @@ func NewFakeProxier(ipt utiliptables.Interface, endpointSlicesEnabled bool) *Pro
 		endpointsMap:             make(proxy.EndpointsMap),
 		endpointsChanges:         proxy.NewEndpointChangeTracker(testHostname, newEndpointInfo, nil, nil, endpointSlicesEnabled),
 		iptables:                 ipt,
-		clusterCIDR:              "10.0.0.0/24",
+		localDetector:            detectLocal,
 		hostname:                 testHostname,
 		portsMap:                 make(map[utilproxy.LocalPort]utilproxy.Closeable),
 		portMapper:               &fakePortOpener{[]*utilproxy.LocalPort{}},
@@ -958,8 +960,6 @@ func TestOnlyLocalLoadBalancing(t *testing.T) {
 func TestOnlyLocalNodePortsNoClusterCIDR(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt, false)
-	// set cluster CIDR to empty before test
-	fp.clusterCIDR = ""
 	onlyLocalNodePorts(t, fp, ipt)
 }
 
@@ -2342,8 +2342,8 @@ func TestEndpointSliceE2E(t *testing.T) {
 :KUBE-FORWARD - [0:0]
 -A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 -A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark  -j ACCEPT
--A KUBE-FORWARD -s 10.0.0.0/24 -m comment --comment "kubernetes forwarding conntrack pod source rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
--A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack pod destination rule" -d 10.0.0.0/24 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack pod source rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack pod destination rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 COMMIT
 *nat
 :KUBE-SERVICES - [0:0]

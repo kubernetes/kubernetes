@@ -164,6 +164,8 @@ type KubeProxyConfiguration struct {
 	Winkernel KubeProxyWinkernelConfiguration
 	// ShowHiddenMetricsForVersion is the version for which you want to show hidden metrics.
 	ShowHiddenMetricsForVersion string
+	// DetectLocalMode determines mode to use for detecting local traffic, defaults to LocalModeClusterCIDR
+	DetectLocalMode LocalMode
 }
 
 // Currently, three modes of proxy are available in Linux platform: 'userspace' (older, going to be EOL), 'iptables'
@@ -186,6 +188,14 @@ const (
 	ProxyModeIPTables    ProxyMode = "iptables"
 	ProxyModeIPVS        ProxyMode = "ipvs"
 	ProxyModeKernelspace ProxyMode = "kernelspace"
+)
+
+// LocalMode represents modes to detect local traffic from the node
+type LocalMode string
+
+// Currently supported modes for LocalMode
+const (
+	LocalModeClusterCIDR LocalMode = "ClusterCIDR"
 )
 
 // IPVSSchedulerMethod is the algorithm for allocating TCP connections and
@@ -244,6 +254,22 @@ func (m *ProxyMode) String() string {
 
 func (m *ProxyMode) Type() string {
 	return "ProxyMode"
+}
+
+func (m *LocalMode) Set(s string) error {
+	*m = LocalMode(s)
+	return nil
+}
+
+func (m *LocalMode) String() string {
+	if m != nil {
+		return string(*m)
+	}
+	return ""
+}
+
+func (m *LocalMode) Type() string {
+	return "LocalMode"
 }
 
 type ConfigurationMap map[string]string
