@@ -357,9 +357,8 @@ type hostPathTypeChecker interface {
 }
 
 type fileTypeChecker struct {
-	path   string
-	exists bool
-	hu     hostutil.HostUtils
+	path string
+	hu   hostutil.HostUtils
 }
 
 func (ftc *fileTypeChecker) Exists() bool {
