@@ -111,14 +111,15 @@ function kube::release::package_src_tarball() {
   if [ "${KUBE_GIT_TREE_STATE-}" = 'clean' ]; then
     git archive -o "${src_tarball}" HEAD
   else
-    "${TAR}" czf "${src_tarball}" --transform 's|^\.|kubernetes|' -C "${KUBE_ROOT}" "$(cd "${KUBE_ROOT}" && find . -mindepth 1 -maxdepth 1 \
-        -not \( \
-          \( -path ./_\*        -o \
-             -path ./.git\*     -o \
-             -path ./.config\* -o \
-             -path ./.gsutil\*    \
-          \) -prune \
-        \))"
+    find "${KUBE_ROOT}" -mindepth 1 -maxdepth 1 \
+      -not \( \
+        \( -path "${KUBE_ROOT}"/_\*       -o \
+           -path "${KUBE_ROOT}"/.git\*    -o \
+           -path "${KUBE_ROOT}"/.config\* -o \
+           -path "${KUBE_ROOT}"/.gsutil\*    \
+        \) -prune \
+      \) -print0 \
+    | "${TAR}" czf "${src_tarball}" --transform "s|${KUBE_ROOT#/*}|kubernetes|" --null -T -
   fi
 }
 
