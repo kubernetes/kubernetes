@@ -126,10 +126,11 @@ function kube::release::package_src_tarball() {
 # a full SDK
 function kube::release::package_client_tarballs() {
    # Find all of the built client binaries
-  for platform in "${LOCAL_OUTPUT_BINPATH}"/*/*; do
+  for platform_long in "${LOCAL_OUTPUT_BINPATH}"/*/*; do
+    local platform
     local platform_tag
-    platform_tag=${platform##${LOCAL_OUTPUT_BINPATH}/} # Strip LOCAL_OUTPUT_BINPATH
-    platform_tag=${platform_tag/\//-} # Replace a "/" for a "-"
+    platform=${platform_long##${LOCAL_OUTPUT_BINPATH}/} # Strip LOCAL_OUTPUT_BINPATH
+    platform_tag=${platform/\//-} # Replace a "/" for a "-"
     kube::log::status "Starting tarball: client $platform_tag"
 
     (
