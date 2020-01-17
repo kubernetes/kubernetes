@@ -27,7 +27,12 @@ import (
 )
 
 func init() {
-	Install(legacyscheme.Scheme)
+	Install(GetTheScheme())
+}
+
+// GetTheScheme returns the `*Scheme` with which this package registers stuff
+func GetTheScheme() *runtime.Scheme {
+	return legacyscheme.Scheme
 }
 
 // Install registers the API group and adds types to a scheme
