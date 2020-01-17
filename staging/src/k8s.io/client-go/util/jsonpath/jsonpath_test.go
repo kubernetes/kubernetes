@@ -215,6 +215,7 @@ func TestJSONInput(t *testing.T) {
 	pointsTests := []jsonpathTest{
 		{"exists filter", "{[?(@.z)].id}", pointsData, "i2 i5", false},
 		{"bracket key", "{[0]['id']}", pointsData, "i1", false},
+		{"notexists filter", "{[?(!@.z)].id}", pointsData, "i1 i3 i4 i6", false},
 	}
 	testJSONPath(pointsTests, false, t)
 }
@@ -232,6 +233,7 @@ func TestKubernetes(t *testing.T) {
 			  "kubernetes.io/hostname":"127.0.0.1"
 			}
 		  },
+		  "spec":{},
 		  "status":{
 			"capacity":{"cpu":"4"},
 			"ready": true,
@@ -289,6 +291,7 @@ func TestKubernetes(t *testing.T) {
 		{"hostname", `{.items[0].metadata.labels.kubernetes\.io/hostname}`, &nodesData, "127.0.0.1", false},
 		{"hostname filter", `{.items[?(@.metadata.labels.kubernetes\.io/hostname=="127.0.0.1")].kind}`, &nodesData, "None", false},
 		{"bool item", `{.items[?(@..ready==true)].metadata.name}`, &nodesData, "127.0.0.1", false},
+		{"no spec", `{.items[?(!@.spec)].metadata.name}`, &nodesData, "127.0.0.2", false},
 	}
 	testJSONPath(nodesTests, false, t)
 
@@ -369,6 +372,20 @@ func TestFilterPartialMatchesSometimesMissingAnnotations(t *testing.T) {
 			},
 		},
 		false, // don't allow missing keys
+		t,
+	)
+
+	testJSONPath(
+		[]jsonpathTest{
+			{
+				"filter, should only match a subset, some items don't have annotations, tolerate missing items",
+				`{.items[?(!@.metadata.annotations.color)].metadata.name}`,
+				data,
+				"pod2",
+				false, // expect no error
+			},
+		},
+		true, // allow missing keys
 		t,
 	)
 }

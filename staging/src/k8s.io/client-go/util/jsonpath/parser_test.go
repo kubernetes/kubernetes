@@ -83,6 +83,9 @@ var parserTests = []parserTest{
 		newArray([3]ParamsEntry{{-1, true, false}, {0, true, true}, {0, false, false}})}, false},
 	{"negative index slice, equals a[1] to a[len-1]", `{[1:-1]}`, []Node{newList(),
 		newArray([3]ParamsEntry{{1, true, false}, {-1, true, false}, {0, false, false}})}, false},
+	{"filter", `{[?(!@.price)]}`,
+		[]Node{newList(), newFilter(newList(), newList(), "notexists"),
+			newList(), newField("price"), newList()}, false},
 }
 
 func collectNode(nodes []Node, cur Node) []Node {

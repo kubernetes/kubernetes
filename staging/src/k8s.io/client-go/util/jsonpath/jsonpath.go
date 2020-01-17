@@ -458,6 +458,11 @@ func (j *JSONPath) evalFilter(input []reflect.Value, node *FilterNode) ([]reflec
 					results = append(results, value.Index(i))
 				}
 				continue
+			} else if node.Operator == "notexists" {
+				if len(lefts) == 0 {
+					results = append(results, value.Index(i))
+				}
+				continue
 			}
 
 			if err != nil {

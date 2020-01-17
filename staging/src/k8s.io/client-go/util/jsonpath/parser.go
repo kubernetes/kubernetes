@@ -175,6 +175,8 @@ func (p *Parser) parseInsideAction(cur *ListNode) error {
 	case isAlphaNumeric(r):
 		p.backup()
 		return p.parseIdentifier(cur)
+	case r == '!':
+		p.consumeText()
 	default:
 		return fmt.Errorf("unrecognized character in action: %#U", r)
 	}
@@ -370,7 +372,7 @@ Loop:
 	if p.next() != ']' {
 		return fmt.Errorf("unclosed array expect ]")
 	}
-	reg := regexp.MustCompile(`^([^!<>=]+)([!<>=]+)(.+?)$`)
+	reg := regexp.MustCompile(`^([^<>=]+)([!<>=]+)(.+?)$`)
 	text := p.consumeText()
 	text = text[:len(text)-2]
 	value := reg.FindStringSubmatch(text)
@@ -379,7 +381,12 @@ Loop:
 		if err != nil {
 			return err
 		}
-		cur.append(newFilter(parser.Root, newList(), "exists"))
+		if strings.HasPrefix(text, "!") {
+			cur.append(newFilter(parser.Root, newList(), "notexists"))
+		} else {
+			cur.append(newFilter(parser.Root, newList(), "exists"))
+		}
+
 	} else {
 		leftParser, err := parseAction("left", value[1])
 		if err != nil {
