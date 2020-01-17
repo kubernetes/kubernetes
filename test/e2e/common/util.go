@@ -205,7 +205,7 @@ func RestartNodes(c clientset.Interface, nodes []v1.Node) error {
 func rcByNamePort(name string, replicas int32, image string, containerArgs []string, port int, protocol v1.Protocol,
 	labels map[string]string, gracePeriod *int64) *v1.ReplicationController {
 
-	return e2erc.ByNameContainer(name, replicas, image, labels, v1.Container{
+	return e2erc.ByNameContainer(name, replicas, labels, v1.Container{
 		Name:  name,
 		Image: image,
 		Args:  containerArgs,
