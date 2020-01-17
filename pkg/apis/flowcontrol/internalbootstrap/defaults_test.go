@@ -22,13 +22,13 @@ import (
 	fcv1a1 "k8s.io/api/flowcontrol/v1alpha1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap"
-	"k8s.io/kubernetes/pkg/apis/flowcontrol/install"
 )
 
 func TestMandatoryAlreadyDefaulted(t *testing.T) {
+	scheme := NewAPFScheme()
 	for _, obj := range bootstrap.MandatoryFlowSchemas {
 		obj2 := obj.DeepCopyObject().(*fcv1a1.FlowSchema)
-		install.GetTheScheme().Default(obj2)
+		scheme.Default(obj2)
 		if apiequality.Semantic.DeepEqual(obj, obj2) {
 			t.Logf("Defaulting makes no change to %#+v", *obj)
 		} else {
@@ -37,7 +37,7 @@ func TestMandatoryAlreadyDefaulted(t *testing.T) {
 	}
 	for _, obj := range bootstrap.MandatoryPriorityLevelConfigurations {
 		obj2 := obj.DeepCopyObject().(*fcv1a1.PriorityLevelConfiguration)
-		install.GetTheScheme().Default(obj2)
+		scheme.Default(obj2)
 		if apiequality.Semantic.DeepEqual(obj, obj2) {
 			t.Logf("Defaulting makes no change to %#+v", *obj)
 		} else {
