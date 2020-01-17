@@ -76,10 +76,8 @@ func makeTopologyManagerPod(podName string, tmCtnAttributes []tmCtnAttribute) *v
 	}
 }
 
-func configureTopologyManagerInKubelet(f *framework.Framework, policy string) {
+func configureTopologyManagerInKubelet(f *framework.Framework, oldCfg *kubeletconfig.KubeletConfiguration, policy string) {
 	// Configure Topology Manager in Kubelet with policy.
-	oldCfg, err := getCurrentKubeletConfig()
-	framework.ExpectNoError(err)
 	newCfg := oldCfg.DeepCopy()
 	if newCfg.FeatureGates == nil {
 		newCfg.FeatureGates = make(map[string]bool)
@@ -92,7 +90,6 @@ func configureTopologyManagerInKubelet(f *framework.Framework, policy string) {
 
 	// Set the Topology Manager policy
 	newCfg.TopologyManagerPolicy = policy
-	//newCfg.TopologyManagerPolicy = topologymanager.PolicySingleNumaNode
 
 	// Set the CPU Manager policy to static.
 	newCfg.CPUManagerPolicy = string(cpumanager.PolicyStatic)
@@ -351,18 +348,19 @@ func runTopologyManagerSuiteTests(f *framework.Framework) {
 }
 
 func runTopologyManagerTests(f *framework.Framework) {
-	var oldCfg *kubeletconfig.KubeletConfiguration
-
 	ginkgo.It("run Topology Manager test suite", func() {
+		oldCfg, err := getCurrentKubeletConfig()
+		framework.ExpectNoError(err)
 
 		var policies = []string{topologymanager.PolicySingleNumaNode, topologymanager.PolicyRestricted,
 			topologymanager.PolicyBestEffort, topologymanager.PolicyNone}
 
 		for _, policy := range policies {
 			// Configure Topology Manager
-			ginkgo.By("by configuring Topology Manager policy to xxx")
+			ginkgo.By(fmt.Sprintf("by configuring Topology Manager policy to %s", policy))
 			framework.Logf("Configuring topology Manager policy to %s", policy)
-			configureTopologyManagerInKubelet(f, policy)
+
+			configureTopologyManagerInKubelet(f, oldCfg, policy)
 			// Run the tests
 			runTopologyManagerSuiteTests(f)
 		}
