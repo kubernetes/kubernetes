@@ -94,12 +94,16 @@ const (
 	MaxTotalScore int64 = math.MaxInt64
 )
 
-// Status indicates the result of running a plugin. It consists of a code and a
-// message. When the status code is not `Success`, the reasons should explain why.
+// Status indicates the result of running a plugin. It consists of a code, a
+// message and extra information for the status. When the status code is not `Success`,
+// the reasons should explain why, and extraInfos could provide supplementary information
+// for the reasons, e.g. extraInfos of status for FilterPlugin could provide specific
+// PredicateFailureReason which could be used by other components(e.g. kubelet).
 // NOTE: A nil Status is also considered as Success.
 type Status struct {
-	code    Code
-	reasons []string
+	code       Code
+	reasons    []string
+	extraInfos []interface{}
 }
 
 // Code returns code of the Status.
@@ -123,9 +127,19 @@ func (s *Status) Reasons() []string {
 	return s.reasons
 }
 
+// ExtraInfos returns extra information of the Status
+func (s *Status) ExtraInfos() []interface{} {
+	return s.extraInfos
+}
+
 // AppendReason appends given reason to the Status.
 func (s *Status) AppendReason(reason string) {
 	s.reasons = append(s.reasons, reason)
+}
+
+// AppendExtraInfo appends given extraInfo to the Status
+func (s *Status) AppendExtraInfo(extraInfo interface{}) {
+	s.extraInfos = append(s.extraInfos, extraInfo)
 }
 
 // IsSuccess returns true if and only if "Status" is nil or Code is "Success".
@@ -180,6 +194,9 @@ func (p PluginToStatus) Merge() *Status {
 		finalStatus.code = s.Code()
 		for _, r := range s.reasons {
 			finalStatus.AppendReason(r)
+		}
+		for _, e := range s.extraInfos {
+			finalStatus.AppendExtraInfo(e)
 		}
 	}
 

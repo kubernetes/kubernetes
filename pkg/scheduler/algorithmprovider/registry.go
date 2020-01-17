@@ -43,8 +43,13 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumezone"
 )
 
-// ClusterAutoscalerProvider defines the default autoscaler provider
-const ClusterAutoscalerProvider = "ClusterAutoscalerProvider"
+const (
+	// ClusterAutoscalerProvider defines the default autoscaler provider
+	ClusterAutoscalerProvider = "ClusterAutoscalerProvider"
+
+	// KubeletProvider defines the default kubelet provider
+	KubeletProvider = "KubeletProvider"
+)
 
 // Config the configuration of an algorithm provider.
 type Config struct {
@@ -63,9 +68,13 @@ func NewRegistry(hardPodAffinityWeight int64) Registry {
 	caConfig := getClusterAutoscalerConfig(hardPodAffinityWeight)
 	applyFeatureGates(caConfig)
 
+	kubeletConfig := getKubeletConfig()
+	applyFeatureGates(kubeletConfig)
+
 	return Registry{
 		schedulerapi.SchedulerDefaultProviderName: defaultConfig,
 		ClusterAutoscalerProvider:                 caConfig,
+		KubeletProvider:                           kubeletConfig,
 	}
 }
 
@@ -153,6 +162,27 @@ func getClusterAutoscalerConfig(hardPodAffinityWeight int64) *Config {
 	}
 
 	return &caConfig
+}
+
+func getKubeletConfig() *Config {
+	return &Config{
+		FrameworkPlugins: &schedulerapi.Plugins{
+			PreFilter: &schedulerapi.PluginSet{
+				Enabled: []schedulerapi.Plugin{
+					{Name: noderesources.FitName},
+					{Name: nodeports.Name},
+				},
+			},
+			Filter: &schedulerapi.PluginSet{
+				Enabled: []schedulerapi.Plugin{
+					{Name: noderesources.FitName},
+					{Name: nodename.Name},
+					{Name: nodeports.Name},
+					{Name: nodeaffinity.Name},
+				},
+			},
+		},
+	}
 }
 
 func applyFeatureGates(config *Config) {

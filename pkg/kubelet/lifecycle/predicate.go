@@ -17,6 +17,7 @@ limitations under the License.
 package lifecycle
 
 import (
+	"context"
 	"fmt"
 
 	"k8s.io/klog"
@@ -24,7 +25,9 @@ import (
 	"k8s.io/api/core/v1"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
+	"k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
+	frameworkplugins "k8s.io/kubernetes/pkg/scheduler/framework/plugins"
+	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
@@ -35,22 +38,36 @@ type pluginResourceUpdateFuncType func(*schedulernodeinfo.NodeInfo, *PodAdmitAtt
 // AdmissionFailureHandler is an interface which defines how to deal with a failure to admit a pod.
 // This allows for the graceful handling of pod admission failure.
 type AdmissionFailureHandler interface {
-	HandleAdmissionFailure(admitPod *v1.Pod, failureReasons []predicates.PredicateFailureReason) (bool, []predicates.PredicateFailureReason, error)
+	HandleAdmissionFailure(admitPod *v1.Pod, failureStatuses schedulerframework.PluginToStatus) (bool, schedulerframework.PluginToStatus, error)
 }
 
 type predicateAdmitHandler struct {
 	getNodeAnyWayFunc        getNodeAnyWayFuncType
 	pluginResourceUpdateFunc pluginResourceUpdateFuncType
 	admissionFailureHandler  AdmissionFailureHandler
+	schedulerFramework       schedulerframework.Framework
 }
 
 var _ PodAdmitHandler = &predicateAdmitHandler{}
 
 func NewPredicateAdmitHandler(getNodeAnyWayFunc getNodeAnyWayFuncType, admissionFailureHandler AdmissionFailureHandler, pluginResourceUpdateFunc pluginResourceUpdateFuncType) *predicateAdmitHandler {
+	// New a scheduler algorithm registry, the argument `hardPodAffinityWeight` does not matter for us.
+	providerRegistry := algorithmprovider.NewRegistry(0)
+	config := providerRegistry[algorithmprovider.KubeletProvider]
+	registry := frameworkplugins.NewInTreeRegistry(&frameworkplugins.RegistryArgs{
+		VolumeBinder: nil, // Set it to nil because it will not be used in kubelet.
+	})
+	framework, err := schedulerframework.NewFramework(registry, config.FrameworkPlugins,
+		config.FrameworkPluginConfig)
+	if err != nil {
+		return nil
+	}
+
 	return &predicateAdmitHandler{
 		getNodeAnyWayFunc,
 		pluginResourceUpdateFunc,
 		admissionFailureHandler,
+		framework,
 	}
 }
 
@@ -89,7 +106,7 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 	// the Resource Class API in the future.
 	podWithoutMissingExtendedResources := removeMissingExtendedResources(admitPod, nodeInfo)
 
-	fit, reasons, err := predicates.GeneralPredicates(podWithoutMissingExtendedResources, nil, nodeInfo)
+	fit, statuses, err := w.generalPredicates(podWithoutMissingExtendedResources, nodeInfo)
 	if err != nil {
 		message := fmt.Sprintf("GeneralPredicates failed due to %v, which is unexpected.", err)
 		klog.Warningf("Failed to admit pod %v - %s", format.Pod(admitPod), message)
@@ -100,7 +117,7 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 		}
 	}
 	if !fit {
-		fit, reasons, err = w.admissionFailureHandler.HandleAdmissionFailure(admitPod, reasons)
+		fit, statuses, err = w.admissionFailureHandler.HandleAdmissionFailure(admitPod, statuses)
 		if err != nil {
 			message := fmt.Sprintf("Unexpected error while attempting to recover from admission failure: %v", err)
 			klog.Warningf("Failed to admit pod %v - %s", format.Pod(admitPod), message)
@@ -112,9 +129,8 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 		}
 	}
 	if !fit {
-		var reason string
 		var message string
-		if len(reasons) == 0 {
+		if len(statuses) == 0 {
 			message = fmt.Sprint("GeneralPredicates failed due to unknown reason, which is unexpected.")
 			klog.Warningf("Failed to admit pod %v - %s", format.Pod(admitPod), message)
 			return PodAdmitResult{
@@ -124,30 +140,38 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 			}
 		}
 		// If there are failed predicates, we only return the first one as a reason.
-		r := reasons[0]
-		switch re := r.(type) {
-		case *predicates.PredicateFailureError:
-			reason = re.PredicateName
-			message = re.Error()
-			klog.V(2).Infof("Predicate failed on Pod: %v, for reason: %v", format.Pod(admitPod), message)
-		case *predicates.InsufficientResourceError:
-			reason = fmt.Sprintf("OutOf%s", re.ResourceName)
-			message = re.Error()
-			klog.V(2).Infof("Predicate failed on Pod: %v, for reason: %v", format.Pod(admitPod), message)
-		default:
-			reason = "UnexpectedPredicateFailureType"
-			message = fmt.Sprintf("GeneralPredicates failed due to %v, which is unexpected.", r)
-			klog.Warningf("Failed to admit pod %v - %s", format.Pod(admitPod), message)
-		}
+		message = statuses.Merge().Message()
+		klog.V(2).Infof("Predicate failed on Pod: %v, for reason: %v", format.Pod(admitPod), message)
 		return PodAdmitResult{
 			Admit:   fit,
-			Reason:  reason,
+			Reason:  "PredicateFailure",
 			Message: message,
 		}
 	}
 	return PodAdmitResult{
 		Admit: true,
 	}
+}
+
+func (w *predicateAdmitHandler) generalPredicates(pod *v1.Pod,
+	nodeInfo *schedulernodeinfo.NodeInfo) (bool, schedulerframework.PluginToStatus, error) {
+	state := schedulerframework.NewCycleState()
+	preFilterStatus := w.schedulerFramework.RunPreFilterPlugins(context.TODO(), state, pod)
+	if !preFilterStatus.IsSuccess() {
+		var err error
+		if !preFilterStatus.IsUnschedulable() {
+			err = preFilterStatus.AsError()
+		}
+		return false, schedulerframework.PluginToStatus{"prefilter": preFilterStatus}, err
+	}
+
+	filterStatus := w.schedulerFramework.RunFilterPlugins(context.TODO(), state, pod, nodeInfo)
+	status := filterStatus.Merge()
+	if !status.IsSuccess() && !status.IsUnschedulable() {
+		return false, filterStatus, status.AsError()
+	}
+
+	return status.IsSuccess(), filterStatus, nil
 }
 
 func removeMissingExtendedResources(pod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *v1.Pod {

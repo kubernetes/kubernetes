@@ -31,7 +31,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
+	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
 
 const message = "Preempted in order to admit critical pod"
@@ -61,22 +62,29 @@ func NewCriticalPodAdmissionHandler(getPodsFunc eviction.ActivePodsFunc, killPod
 
 // HandleAdmissionFailure gracefully handles admission rejection, and, in some cases,
 // to allow admission of the pod despite its previous failure.
-func (c *CriticalPodAdmissionHandler) HandleAdmissionFailure(admitPod *v1.Pod, failureReasons []predicates.PredicateFailureReason) (bool, []predicates.PredicateFailureReason, error) {
+func (c *CriticalPodAdmissionHandler) HandleAdmissionFailure(admitPod *v1.Pod, failureStatuses schedulerframework.PluginToStatus) (bool, schedulerframework.PluginToStatus, error) {
 	if !kubetypes.IsCriticalPod(admitPod) {
-		return false, failureReasons, nil
+		return false, failureStatuses, nil
 	}
 	// InsufficientResourceError is not a reason to reject a critical pod.
 	// Instead of rejecting, we free up resources to admit it, if no other reasons for rejection exist.
-	nonResourceReasons := []predicates.PredicateFailureReason{}
+	nonResourceReasons := make(schedulerframework.PluginToStatus, len(failureStatuses))
 	resourceReasons := []*admissionRequirement{}
-	for _, reason := range failureReasons {
-		if r, ok := reason.(*predicates.InsufficientResourceError); ok {
-			resourceReasons = append(resourceReasons, &admissionRequirement{
-				resourceName: r.ResourceName,
-				quantity:     r.GetInsufficientAmount(),
-			})
-		} else {
-			nonResourceReasons = append(nonResourceReasons, reason)
+	for name, status := range failureStatuses {
+		isResourceReason := true
+		for _, extraInfo := range status.ExtraInfos() {
+			if r, ok := extraInfo.(*noderesources.InsufficientResource); ok {
+				resourceReasons = append(resourceReasons, &admissionRequirement{
+					resourceName: r.ResourceName,
+					quantity:     r.GetInsufficientAmount(),
+				})
+			} else {
+				isResourceReason = false
+				break
+			}
+		}
+		if !isResourceReason {
+			nonResourceReasons[name] = status
 		}
 	}
 	if len(nonResourceReasons) > 0 {

@@ -108,6 +108,33 @@ func TestClusterAutoscalerProvider(t *testing.T) {
 	}
 }
 
+func TestKubeletProvider(t *testing.T) {
+	wantConfig := &Config{
+		FrameworkPlugins: &schedulerapi.Plugins{
+			PreFilter: &schedulerapi.PluginSet{
+				Enabled: []schedulerapi.Plugin{
+					{Name: noderesources.FitName},
+					{Name: nodeports.Name},
+				},
+			},
+			Filter: &schedulerapi.PluginSet{
+				Enabled: []schedulerapi.Plugin{
+					{Name: noderesources.FitName},
+					{Name: nodename.Name},
+					{Name: nodeports.Name},
+					{Name: nodeaffinity.Name},
+				},
+			},
+		},
+	}
+
+	r := NewRegistry(0)
+	gotConfig := r[KubeletProvider]
+	if diff := cmp.Diff(wantConfig, gotConfig); diff != "" {
+		t.Errorf("unexpected config diff (-want, +got): %s", diff)
+	}
+}
+
 func TestApplyFeatureGates(t *testing.T) {
 	hardPodAffinityWeight := int64(1)
 	tests := []struct {

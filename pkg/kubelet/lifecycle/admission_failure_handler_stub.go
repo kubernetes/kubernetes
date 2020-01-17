@@ -18,7 +18,7 @@ package lifecycle
 
 import (
 	"k8s.io/api/core/v1"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
+	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
 
 // AdmissionFailureHandlerStub is an AdmissionFailureHandler that does not perform any handling of admission failure.
@@ -31,6 +31,6 @@ func NewAdmissionFailureHandlerStub() *AdmissionFailureHandlerStub {
 	return &AdmissionFailureHandlerStub{}
 }
 
-func (n *AdmissionFailureHandlerStub) HandleAdmissionFailure(admitPod *v1.Pod, failureReasons []predicates.PredicateFailureReason) (bool, []predicates.PredicateFailureReason, error) {
-	return false, failureReasons, nil
+func (n *AdmissionFailureHandlerStub) HandleAdmissionFailure(admitPod *v1.Pod, failureStatuses schedulerframework.PluginToStatus) (bool, schedulerframework.PluginToStatus, error) {
+	return false, failureStatuses, nil
 }

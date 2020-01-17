@@ -159,16 +159,17 @@ func (f *Fit) Filter(ctx context.Context, cycleState *framework.CycleState, pod 
 		insufficientResources = Fits(pod, nodeInfo, f.ignoredResources)
 	}
 
-	// We will keep all failure reasons.
-	var failureReasons []string
-	for _, r := range insufficientResources {
-		failureReasons = append(failureReasons, getErrReason(r.ResourceName))
+	if len(insufficientResources) == 0 {
+		return nil
 	}
 
-	if len(insufficientResources) != 0 {
-		return framework.NewStatus(framework.Unschedulable, failureReasons...)
+	// We will keep all failure reasons.
+	status := framework.NewStatus(framework.Unschedulable)
+	for _, r := range insufficientResources {
+		status.AppendReason(getErrReason(r.ResourceName))
+		status.AppendExtraInfo(r)
 	}
-	return nil
+	return status
 }
 
 func getErrReason(rn v1.ResourceName) string {
@@ -181,6 +182,11 @@ type InsufficientResource struct {
 	Requested    int64
 	Used         int64
 	Capacity     int64
+}
+
+// GetInsufficientAmount returns the amount of the insufficient resource.
+func (e *InsufficientResource) GetInsufficientAmount() int64 {
+	return e.Requested - (e.Capacity - e.Used)
 }
 
 // Fits checks if node have enough resources to host the pod.
