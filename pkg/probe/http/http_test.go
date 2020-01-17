@@ -109,89 +109,103 @@ func TestHTTPProbeCheckerPlus(t *testing.T) {
 	prober := New(followNonLocalRedirects)
 
 	testCases := []struct {
-		handler           func(w http.ResponseWriter, r *http.Request)
 		reqHeaders        http.Header
 		health            probe.Result
 		expectHTTPCodes   []int
 		expectHTTPContent string
 		accBody           string
 		notBody           string
+		body              string
+		statusCode        int
 	}{
 		// The probe will be filled in below.  This is primarily testing that an HTTP GET happens.
 		{
-			handler:           handleReq(http.StatusOK, "helloworld"),
+			body:              "helloworld",
+			statusCode:        http.StatusOK,
 			expectHTTPCodes:   []int{},
 			expectHTTPContent: "helloworld",
 			health:            probe.Success,
 		},
 		{
-			handler:           handleReq(http.StatusOK, "ok"),
+			body:              "ok",
+			statusCode:        http.StatusOK,
 			expectHTTPCodes:   []int{},
 			expectHTTPContent: "",
 			health:            probe.Success,
 		},
 		{
-			handler:           handleReq(http.StatusNotFound, "not found"),
+			body:              "not found",
+			statusCode:        http.StatusNotFound,
 			expectHTTPCodes:   []int{},
 			expectHTTPContent: "",
 			health:            probe.Failure,
 		},
 		{
-			handler:           handleReq(http.StatusNotFound, "not found"),
+			body:              "not found",
+			statusCode:        http.StatusNotFound,
 			expectHTTPCodes:   []int{404},
 			expectHTTPContent: "",
 			health:            probe.Success,
 		},
 		{
-			handler:           handleReq(http.StatusNotFound, "not found"),
+			body:              "not found",
+			statusCode:        http.StatusNotFound,
 			expectHTTPCodes:   []int{500, 404},
 			expectHTTPContent: "",
 			health:            probe.Success,
 		},
 		{
-			handler:           handleReq(http.StatusNotFound, "not found"),
+			body:              "not found",
+			statusCode:        http.StatusNotFound,
 			expectHTTPCodes:   []int{200},
 			expectHTTPContent: "",
 			health:            probe.Failure,
 		},
 		{
-			handler:           handleReq(http.StatusNotFound, "not found"),
+			body:              "not found",
+			statusCode:        http.StatusNotFound,
 			expectHTTPCodes:   []int{400, 200},
 			expectHTTPContent: "",
 			health:            probe.Failure,
 		},
 		{
-			handler:           handleReq(http.StatusNotFound, "not found"),
+			body:              "not found",
+			statusCode:        http.StatusNotFound,
 			expectHTTPCodes:   []int{404, 500},
 			expectHTTPContent: "not*",
 			health:            probe.Success,
 		},
 		{
-			handler:           handleReq(http.StatusNotFound, "not found"),
+			body:              "not found",
+			statusCode:        http.StatusNotFound,
 			expectHTTPCodes:   []int{404, 500},
 			expectHTTPContent: "found*",
 			health:            probe.Failure,
 		},
 		{
-			handler:           handleReq(http.StatusNotFound, "not found"),
+			body:              "not found",
+			statusCode:        http.StatusNotFound,
 			expectHTTPCodes:   []int{200},
 			expectHTTPContent: "not *",
 			health:            probe.Failure,
 		},
 		{
-			handler:           handleReq(http.StatusNotFound, "not found"),
+			body:              "not found",
+			statusCode:        http.StatusNotFound,
 			expectHTTPCodes:   []int{404, 500},
 			expectHTTPContent: "not *",
 			health:            probe.Success,
 		},
 		{
-			handler:           handleReq(http.StatusNotFound, "not found"),
+			body:              "not found",
+			statusCode:        http.StatusNotFound,
 			expectHTTPCodes:   []int{},
 			expectHTTPContent: "not *",
 			health:            probe.Success,
 		},
 		{
-			handler:           handleReq(http.StatusNotFound, "not found"),
+			body:              "not found",
+			statusCode:        http.StatusNotFound,
 			expectHTTPCodes:   []int{},
 			expectHTTPContent: "found *",
 			health:            probe.Failure,
@@ -199,39 +213,39 @@ func TestHTTPProbeCheckerPlus(t *testing.T) {
 	}
 
 	for i, test := range testCases {
-		t.Run(fmt.Sprintf("case-%2d", i), func(t *testing.T) {
+		t.Run(fmt.Sprintf("case-%2d: assert expectHTTPCodes='%v', expectHTTPContent='%s' for response body='%s', statusCode='%d' is %s", i, test.expectHTTPCodes, test.expectHTTPContent, test.body, test.statusCode, test.health), func(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				test.handler(w, r)
+				handleReq(test.statusCode, test.body)(w, r)
 			}))
 			defer server.Close()
 			u, err := url.Parse(server.URL)
 			if err != nil {
-				t.Errorf("case %d: unexpected error: %v", i, err)
+				t.Fatalf("case %d: unexpected error: %v", i, err)
 			}
 			_, port, err := net.SplitHostPort(u.Host)
 			if err != nil {
-				t.Errorf("case %d: unexpected error: %v", i, err)
+				t.Fatalf("case %d: unexpected error: %v", i, err)
 			}
 			_, err = strconv.Atoi(port)
 			if err != nil {
-				t.Errorf("case %d: unexpected error: %v", i, err)
+				t.Fatalf("case %d: unexpected error: %v", i, err)
 			}
 			health, output, err := prober.Probe(u, test.reqHeaders, test.expectHTTPCodes, test.expectHTTPContent, 1*time.Second)
 			if test.health == probe.Unknown && err == nil {
-				t.Errorf("case %d: expected error", i)
+				t.Fatalf("case %d: expected error", i)
 			}
 			if test.health != probe.Unknown && err != nil {
-				t.Errorf("case %d: unexpected error: %v", i, err)
+				t.Fatalf("case %d: unexpected error: %v", i, err)
 			}
 			if health != test.health {
-				t.Errorf("case %d: expected %v, got %v", i, test.health, health)
+				t.Fatalf("case %d: expected %v, got %v", i, test.health, health)
 			}
 			if health != probe.Failure && test.health != probe.Failure {
 				if !strings.Contains(output, test.accBody) {
-					t.Errorf("Expected response body to contain %v, got %v", test.accBody, output)
+					t.Fatalf("Expected response body to contain %v, got %v", test.accBody, output)
 				}
 				if test.notBody != "" && strings.Contains(output, test.notBody) {
-					t.Errorf("Expected response not to contain %v, got %v", test.notBody, output)
+					t.Fatalf("Expected response not to contain %v, got %v", test.notBody, output)
 				}
 			}
 		})
@@ -388,21 +402,6 @@ func TestHTTPProbeChecker(t *testing.T) {
 			handler:      redirectHandler(http.StatusPermanentRedirect, true), // 308
 			successCodes: []int{},
 			health:       probe.Failure,
-		},
-		{
-			handler:      specialHandler(), //500
-			health:       probe.Success,
-			successCodes: []int{200, 500},
-		},
-		{
-			handler:      specialHandler(), //500
-			health:       probe.Failure,
-			successCodes: []int{200},
-		},
-		{
-			handler:      specialHandler(), //500
-			health:       probe.Success,
-			successCodes: []int{500},
 		},
 	}
 	for i, test := range testCases {
