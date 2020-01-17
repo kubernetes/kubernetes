@@ -6,12 +6,12 @@ go_library(
         "doc.go",
         "interface.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/legacy-cloud-providers/azure/clients/virtualmachinesizeclient/mockvirtualmachinesizeclient",
-    importpath = "k8s.io/legacy-cloud-providers/azure/clients/virtualmachinesizeclient/mockvirtualmachinesizeclient",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/legacy-cloud-providers/azure/clients/vmsizeclient/mockvmsizeclient",
+    importpath = "k8s.io/legacy-cloud-providers/azure/clients/vmsizeclient/mockvmsizeclient",
     visibility = ["//visibility:public"],
     deps = [
         "//staging/src/k8s.io/legacy-cloud-providers/azure/retry:go_default_library",
-        "//vendor/github.com/Azure/azure-sdk-for-go/services/network/mgmt/2019-06-01/network:go_default_library",
+        "//vendor/github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-07-01/compute:go_default_library",
         "//vendor/github.com/golang/mock/gomock:go_default_library",
     ],
 )

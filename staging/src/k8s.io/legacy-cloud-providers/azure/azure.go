@@ -27,7 +27,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-07-01/compute"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 
@@ -39,21 +38,24 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
-	"k8s.io/client-go/pkg/version"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog"
 	"k8s.io/legacy-cloud-providers/azure/auth"
 	azclients "k8s.io/legacy-cloud-providers/azure/clients"
+	"k8s.io/legacy-cloud-providers/azure/clients/diskclient"
 	"k8s.io/legacy-cloud-providers/azure/clients/interfaceclient"
 	"k8s.io/legacy-cloud-providers/azure/clients/loadbalancerclient"
 	"k8s.io/legacy-cloud-providers/azure/clients/publicipclient"
 	"k8s.io/legacy-cloud-providers/azure/clients/routeclient"
 	"k8s.io/legacy-cloud-providers/azure/clients/routetableclient"
 	"k8s.io/legacy-cloud-providers/azure/clients/securitygroupclient"
+	"k8s.io/legacy-cloud-providers/azure/clients/snapshotclient"
+	"k8s.io/legacy-cloud-providers/azure/clients/storageaccountclient"
 	"k8s.io/legacy-cloud-providers/azure/clients/subnetclient"
 	"k8s.io/legacy-cloud-providers/azure/clients/vmclient"
+	"k8s.io/legacy-cloud-providers/azure/clients/vmsizeclient"
 	"k8s.io/legacy-cloud-providers/azure/clients/vmssclient"
 	"k8s.io/legacy-cloud-providers/azure/clients/vmssvmclient"
 	"k8s.io/legacy-cloud-providers/azure/retry"
@@ -235,7 +237,7 @@ type Cloud struct {
 	VirtualMachinesClient           VirtualMachinesClient
 	StorageAccountClient            StorageAccountClient
 	DisksClient                     DisksClient
-	SnapshotsClient                 *compute.SnapshotsClient
+	SnapshotsClient                 SnapshotsClient
 	FileClient                      FileClient
 	VirtualMachineScaleSetsClient   VirtualMachineScaleSetsClient
 	VirtualMachineScaleSetVMsClient VirtualMachineScaleSetVMsClient
@@ -493,17 +495,15 @@ func (az *Cloud) InitializeCloudFromConfig(config *Config, fromSecret bool) erro
 	az.VirtualMachinesClient = vmclient.New(azClientConfig.WithRateLimiter(config.VirtualMachineRateLimit))
 	az.PublicIPAddressesClient = publicipclient.New(azClientConfig.WithRateLimiter(config.PublicIPAddressRateLimit))
 	az.VirtualMachineScaleSetsClient = vmssclient.New(azClientConfig.WithRateLimiter(config.VirtualMachineScaleSetRateLimit))
+	az.DisksClient = diskclient.New(azClientConfig.WithRateLimiter(config.DiskRateLimit))
+	az.VirtualMachineSizesClient = vmsizeclient.New(azClientConfig.WithRateLimiter(config.VirtualMachineSizeRateLimit))
+	az.SnapshotsClient = snapshotclient.New(azClientConfig.WithRateLimiter(config.SnapshotRateLimit))
+	az.StorageAccountClient = storageaccountclient.New(azClientConfig.WithRateLimiter(config.StorageAccountRateLimit))
 
 	// Error "not an active Virtual Machine Scale Set VM" is not retriable for VMSS VM.
 	vmssVMClientConfig := azClientConfig.WithRateLimiter(config.VirtualMachineScaleSetRateLimit)
 	vmssVMClientConfig.Backoff = vmssVMClientConfig.Backoff.WithNonRetriableErrors([]string{vmssVMNotActiveErrorMessage})
 	az.VirtualMachineScaleSetVMsClient = vmssvmclient.New(vmssVMClientConfig)
-
-	// TODO(feiskyer): refactor the following clients to use armclient
-	az.DisksClient = newAzDisksClient(azClientConfig.WithRateLimiter(config.DiskRateLimit))
-	az.SnapshotsClient = newSnapshotsClient(azClientConfig.WithRateLimiter(config.SnapshotRateLimit))
-	az.StorageAccountClient = newAzStorageAccountClient(azClientConfig.WithRateLimiter(config.StorageAccountRateLimit))
-	az.VirtualMachineSizesClient = newAzVirtualMachineSizesClient(azClientConfig.WithRateLimiter(config.VirtualMachineSizeRateLimit))
 
 	// TODO(feiskyer): refactor azureFileClient to Interface.
 	az.FileClient = &azureFileClient{env: *env}
@@ -613,15 +613,6 @@ func (az *Cloud) HasClusterID() bool {
 // ProviderName returns the cloud provider ID.
 func (az *Cloud) ProviderName() string {
 	return CloudProviderName
-}
-
-// configureUserAgent configures the autorest client with a user agent that
-// includes "kubernetes" and the full kubernetes git version string
-// example:
-// Azure-SDK-for-Go/7.0.1-beta arm-network/2016-09-01; kubernetes-cloudprovider/v1.7.0-alpha.2.711+a2fadef8170bb0-dirty;
-func configureUserAgent(client *autorest.Client) {
-	k8sVersion := version.Get().GitVersion
-	client.UserAgent = fmt.Sprintf("%s; kubernetes-cloudprovider/%s", client.UserAgent, k8sVersion)
 }
 
 func initDiskControllers(az *Cloud) error {
