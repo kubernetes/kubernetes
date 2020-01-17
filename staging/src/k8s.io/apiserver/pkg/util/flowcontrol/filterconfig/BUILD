@@ -25,7 +25,6 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/queueset:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/flowcontrol/metrics:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/util/shufflesharding:go_default_library",
         "//staging/src/k8s.io/client-go/informers:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/typed/flowcontrol/v1alpha1:go_default_library",
         "//staging/src/k8s.io/client-go/listers/flowcontrol/v1alpha1:go_default_library",

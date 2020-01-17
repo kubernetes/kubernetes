@@ -27,7 +27,6 @@ import (
 	fq "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing"
 	test "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/testing"
 	"k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/testing/clock"
-	"k8s.io/apiserver/pkg/util/shufflesharding"
 	"k8s.io/klog"
 )
 
@@ -144,7 +143,10 @@ func TestNoRestraint(t *testing.T) {
 	clk, counter := clock.NewFakeEventClock(now, 0, nil)
 	nrf := test.NewNoRestraintFactory()
 	config := fq.QueueSetConfig{}
-	nr := nrf.NewQueueSet(config)
+	nr, err := nrf.NewQueueSet(config)
+	if err != nil {
+		t.Error(err)
+	}
 	exerciseQueueSetUniformScenario(t, "NoRestraint", nr, []uniformClient{
 		{1001001001, 5, 10, time.Second, time.Second},
 		{2002002002, 2, 10, time.Second, time.Second / 2},
@@ -156,19 +158,21 @@ func TestUniformFlows(t *testing.T) {
 
 	clk, counter := clock.NewFakeEventClock(now, 0, nil)
 	qsf := NewQueueSetFactory(clk, counter)
-	dealer, err := shufflesharding.NewDealer(8, 3)
-	if err != nil {
-		t.Fatalf("Dealder creation failed with %v", err)
-	}
 	config := fq.QueueSetConfig{
 		Name:             "TestUniformFlows",
 		ConcurrencyLimit: 4,
 		DesiredNumQueues: 8,
 		QueueLengthLimit: 6,
-		Dealer:           dealer,
+		HandSize:         3,
 		RequestWaitLimit: 10 * time.Minute,
 	}
-	qs := qsf.NewQueueSet(config)
+	if err := qsf.CheckConfig(config); err != nil {
+		t.Error(err)
+	}
+	qs, err := qsf.NewQueueSet(config)
+	if err != nil {
+		t.Error(err)
+	}
 
 	exerciseQueueSetUniformScenario(t, "UniformFlows", qs, []uniformClient{
 		{1001001001, 5, 10, time.Second, time.Second},
@@ -181,19 +185,21 @@ func TestDifferentFlows(t *testing.T) {
 
 	clk, counter := clock.NewFakeEventClock(now, 0, nil)
 	qsf := NewQueueSetFactory(clk, counter)
-	dealer, err := shufflesharding.NewDealer(8, 3)
-	if err != nil {
-		t.Fatalf("Dealder creation failed with %v", err)
-	}
 	config := fq.QueueSetConfig{
 		Name:             "TestDifferentFlows",
 		ConcurrencyLimit: 4,
 		DesiredNumQueues: 8,
 		QueueLengthLimit: 6,
-		Dealer:           dealer,
+		HandSize:         3,
 		RequestWaitLimit: 10 * time.Minute,
 	}
-	qs := qsf.NewQueueSet(config)
+	if err := qsf.CheckConfig(config); err != nil {
+		t.Error(err)
+	}
+	qs, err := qsf.NewQueueSet(config)
+	if err != nil {
+		t.Error(err)
+	}
 
 	exerciseQueueSetUniformScenario(t, "DifferentFlows", qs, []uniformClient{
 		{1001001001, 6, 10, time.Second, time.Second},
@@ -211,7 +217,13 @@ func TestDifferentFlowsWithoutQueuing(t *testing.T) {
 		ConcurrencyLimit: 4,
 		DesiredNumQueues: 0,
 	}
-	qs := qsf.NewQueueSet(config)
+	if err := qsf.CheckConfig(config); err != nil {
+		t.Error(err)
+	}
+	qs, err := qsf.NewQueueSet(config)
+	if err != nil {
+		t.Error(err)
+	}
 
 	exerciseQueueSetUniformScenario(t, "DifferentFlowsWithoutQueuing", qs, []uniformClient{
 		{1001001001, 6, 10, time.Second, 57 * time.Millisecond},
@@ -224,19 +236,21 @@ func TestTimeout(t *testing.T) {
 
 	clk, counter := clock.NewFakeEventClock(now, 0, nil)
 	qsf := NewQueueSetFactory(clk, counter)
-	dealer, err := shufflesharding.NewDealer(128, 1)
-	if err != nil {
-		t.Fatalf("Dealer creation failed with %v", err)
-	}
 	config := fq.QueueSetConfig{
 		Name:             "TestTimeout",
 		ConcurrencyLimit: 1,
 		DesiredNumQueues: 128,
 		QueueLengthLimit: 128,
-		Dealer:           dealer,
+		HandSize:         1,
 		RequestWaitLimit: 0,
 	}
-	qs := qsf.NewQueueSet(config)
+	if err := qsf.CheckConfig(config); err != nil {
+		t.Error(err)
+	}
+	qs, err := qsf.NewQueueSet(config)
+	if err != nil {
+		t.Error(err)
+	}
 
 	exerciseQueueSetUniformScenario(t, "Timeout", qs, []uniformClient{
 		{1001001001, 5, 100, time.Second, time.Second},

@@ -120,6 +120,5 @@ func WithPriorityAndFairness(
 			}()
 			klog.V(6).Infof("Timed out waiting for RequestInfo=%#+v, user.Info=%#+v to finish\n", requestInfo, user)
 		}
-		return
 	})
 }

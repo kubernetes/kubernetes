@@ -19,13 +19,19 @@ package fairqueuing
 import (
 	"context"
 	"time"
-
-	"k8s.io/apiserver/pkg/util/shufflesharding"
 )
 
 // QueueSetFactory is used to create QueueSet objects.
 type QueueSetFactory interface {
-	NewQueueSet(config QueueSetConfig) QueueSet
+	// CheckConfig returns nil if and only if the given configuration
+	// is valid.  For a given factory object, the behavior of this
+	// method does not vary over time.
+	CheckConfig(QueueSetConfig) error
+
+	// NewQueueSet constructs a new QueueSet having the given
+	// configuration.  Returns a non-nil error if and only if
+	// CheckConfig would return a non-nil error.
+	NewQueueSet(config QueueSetConfig) (QueueSet, error)
 }
 
 // QueueSet is the abstraction for the queuing and dispatching
@@ -36,8 +42,13 @@ type QueueSetFactory interface {
 // .  Some day we may have connections between priority levels, but
 // today is not that day.
 type QueueSet interface {
-	// SetConfiguration updates the configuration
-	SetConfiguration(QueueSetConfig)
+	// SetConfiguration updates the configuration.  Fails and returns
+	// a non-nil error if and only if a call to the factory's
+	// CheckConfig method would return a non-nil error.  If the
+	// config's DesiredNumQueues field is zero then the other
+	// queuing-specific config parameters are not changed, so that the
+	// queues continue draining as before.
+	SetConfiguration(QueueSetConfig) error
 
 	// Quiesce controls whether the QueueSet is operating normally or
 	// is quiescing.  A quiescing QueueSet drains as normal but does
@@ -86,13 +97,9 @@ type QueueSetConfig struct {
 	// QueueLengthLimit is the maximum number of requests that may be waiting in a given queue at a time
 	QueueLengthLimit int
 
-	// Dealer does the shuffle sharding.  When it is time to enqueue a
-	// request, the Dealer is called to deal a random "hand" of queue
-	// indices and the request is put in one of the dealt queues with
-	// minimum length.  The Dealer should deal valid queue indices.
-	// If the Dealer is nil or it deals no valid queue indices then
-	// QueueSet::Wait will crash.
-	Dealer *shufflesharding.Dealer
+	// HandSize is a parameter of shuffle sharding.  Upon arrival of a request, a queue is chosen by randomly
+	// dealing a "hand" of this many queues and then picking one of minimum length.
+	HandSize int
 
 	// RequestWaitLimit is the maximum amount of time that a request may wait in a queue.
 	// If, by the end of that time, the request has not been dispatched then it is rejected.
