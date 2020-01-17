@@ -62,6 +62,9 @@ type FakeControllerSource struct {
 	changes     []watch.Event // one change per resourceVersion
 	Broadcaster *watch.Broadcaster
 	lastRV      int
+
+	// Set this to simulate an error on List()
+	ListError error
 }
 
 type FakePVControllerSource struct {
@@ -174,6 +177,11 @@ func (f *FakeControllerSource) getListItemsLocked() ([]runtime.Object, error) {
 func (f *FakeControllerSource) List(options metav1.ListOptions) (runtime.Object, error) {
 	f.lock.RLock()
 	defer f.lock.RUnlock()
+
+	if f.ListError != nil {
+		return nil, f.ListError
+	}
+
 	list, err := f.getListItemsLocked()
 	if err != nil {
 		return nil, err
