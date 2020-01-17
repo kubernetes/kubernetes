@@ -248,6 +248,10 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 		}
 	}
 
+	if len(f.queueSortPlugins) == 0 {
+		return nil, fmt.Errorf("no queue sort plugin is enabled")
+	}
+
 	if len(f.queueSortPlugins) > 1 {
 		return nil, fmt.Errorf("only one queue sort plugin can be enabled")
 	}
@@ -287,8 +291,14 @@ func updatePluginList(pluginList interface{}, pluginSet *config.PluginSet, plugi
 
 // QueueSortFunc returns the function to sort pods in scheduling queue
 func (f *framework) QueueSortFunc() LessFunc {
+	if f == nil {
+		// If framework is nil, simply keep their order unchanged.
+		// NOTE: this is primarily for tests.
+		return func(_, _ *PodInfo) bool { return false }
+	}
+
 	if len(f.queueSortPlugins) == 0 {
-		return nil
+		panic("No QueueSort plugin is registered in the framework.")
 	}
 
 	// Only one QueueSort plugin can be enabled.

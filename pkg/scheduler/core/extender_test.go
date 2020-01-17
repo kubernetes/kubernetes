@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	extenderv1 "k8s.io/kubernetes/pkg/scheduler/apis/extender/v1"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
@@ -366,6 +367,7 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 		{
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterFilterPlugin("TrueFilter", NewTrueFilterPlugin),
+				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 			},
 			extenders: []FakeExtender{
 				{
@@ -382,6 +384,7 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 		{
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterFilterPlugin("TrueFilter", NewTrueFilterPlugin),
+				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 			},
 			extenders: []FakeExtender{
 				{
@@ -398,6 +401,7 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 		{
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterFilterPlugin("TrueFilter", NewTrueFilterPlugin),
+				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 			},
 			extenders: []FakeExtender{
 				{
@@ -418,6 +422,7 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 		{
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterFilterPlugin("TrueFilter", NewTrueFilterPlugin),
+				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 			},
 			extenders: []FakeExtender{
 				{
@@ -434,6 +439,7 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 		{
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterFilterPlugin("TrueFilter", NewTrueFilterPlugin),
+				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 			},
 			extenders: []FakeExtender{
 				{
@@ -453,6 +459,7 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 		{
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterFilterPlugin("TrueFilter", NewTrueFilterPlugin),
+				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 			},
 			extenders: []FakeExtender{
 				{
@@ -478,6 +485,7 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterFilterPlugin("TrueFilter", NewTrueFilterPlugin),
 				st.RegisterScorePlugin("Machine2Prioritizer", newMachine2PrioritizerPlugin(), 20),
+				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 			},
 			extenders: []FakeExtender{
 				{
@@ -505,6 +513,7 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterFilterPlugin("TrueFilter", NewTrueFilterPlugin),
 				st.RegisterScorePlugin("Machine2Prioritizer", newMachine2PrioritizerPlugin(), 1),
+				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 			},
 			extenders: []FakeExtender{
 				{
@@ -530,6 +539,7 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			// because of the errors from errorPredicateExtender.
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterFilterPlugin("TrueFilter", NewTrueFilterPlugin),
+				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 			},
 			extenders: []FakeExtender{
 				{
@@ -568,8 +578,9 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 
 			registry := framework.Registry{}
 			plugins := &schedulerapi.Plugins{
-				Filter: &schedulerapi.PluginSet{},
-				Score:  &schedulerapi.PluginSet{},
+				QueueSort: &schedulerapi.PluginSet{},
+				Filter:    &schedulerapi.PluginSet{},
+				Score:     &schedulerapi.PluginSet{},
 			}
 			var pluginConfigs []schedulerapi.PluginConfig
 			for _, f := range test.registerPlugins {

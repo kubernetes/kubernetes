@@ -26,7 +26,6 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
-
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -37,6 +36,7 @@ import (
 )
 
 const (
+	queueSortPlugin                   = "no-op-queue-sort-plugin"
 	scoreWithNormalizePlugin1         = "score-with-normalize-plugin-1"
 	scoreWithNormalizePlugin2         = "score-with-normalize-plugin-2"
 	scorePlugin1                      = "score-plugin-1"
@@ -275,7 +275,24 @@ func (pp *TestPermitPlugin) Permit(ctx context.Context, state *CycleState, p *v1
 	return NewStatus(Wait, ""), time.Duration(10 * time.Second)
 }
 
-var registry Registry = func() Registry {
+var _ QueueSortPlugin = &TestQueueSortPlugin{}
+
+func newQueueSortPlugin(_ *runtime.Unknown, _ FrameworkHandle) (Plugin, error) {
+	return &TestQueueSortPlugin{}, nil
+}
+
+// TestQueueSortPlugin is a no-op implementation for QueueSort extension point.
+type TestQueueSortPlugin struct{}
+
+func (pl *TestQueueSortPlugin) Name() string {
+	return queueSortPlugin
+}
+
+func (pl *TestQueueSortPlugin) Less(_, _ *PodInfo) bool {
+	return false
+}
+
+var registry = func() Registry {
 	r := make(Registry)
 	r.Register(scoreWithNormalizePlugin1, newScoreWithNormalizePlugin1)
 	r.Register(scoreWithNormalizePlugin2, newScoreWithNormalizePlugin2)
@@ -291,7 +308,7 @@ var defaultWeights = map[string]int32{
 	scorePlugin1:              1,
 }
 
-var emptyArgs []config.PluginConfig = make([]config.PluginConfig, 0)
+var emptyArgs = make([]config.PluginConfig, 0)
 var state = &CycleState{}
 
 // Pod is only used for logging errors.
@@ -299,6 +316,22 @@ var pod = &v1.Pod{}
 var nodes = []*v1.Node{
 	{ObjectMeta: metav1.ObjectMeta{Name: "node1"}},
 	{ObjectMeta: metav1.ObjectMeta{Name: "node2"}},
+}
+
+func newFrameworkWithQueueSortEnabled(r Registry, pl *config.Plugins, plc []config.PluginConfig, opts ...Option) (Framework, error) {
+	if _, ok := r[queueSortPlugin]; !ok {
+		r[queueSortPlugin] = newQueueSortPlugin
+	}
+	plugins := &config.Plugins{}
+	plugins.Append(&config.Plugins{
+		QueueSort: &config.PluginSet{
+			Enabled: []config.Plugin{
+				{Name: queueSortPlugin},
+			},
+		},
+	})
+	plugins.Append(pl)
+	return NewFramework(r, plugins, plc, opts...)
 }
 
 func TestInitFrameworkWithScorePlugins(t *testing.T) {
@@ -338,7 +371,7 @@ func TestInitFrameworkWithScorePlugins(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := NewFramework(registry, tt.plugins, emptyArgs)
+			_, err := newFrameworkWithQueueSortEnabled(registry, tt.plugins, emptyArgs)
 			if tt.initErr && err == nil {
 				t.Fatal("Framework initialization should fail")
 			}
@@ -534,7 +567,7 @@ func TestRunScorePlugins(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Inject the results via Args in PluginConfig.
-			f, err := NewFramework(registry, tt.plugins, tt.pluginConfigs)
+			f, err := newFrameworkWithQueueSortEnabled(registry, tt.plugins, tt.pluginConfigs)
 			if err != nil {
 				t.Fatalf("Failed to create framework for testing: %v", err)
 			}
@@ -572,7 +605,7 @@ func TestPreFilterPlugins(t *testing.T) {
 		})
 	plugins := &config.Plugins{PreFilter: &config.PluginSet{Enabled: []config.Plugin{{Name: preFilterWithExtensionsPluginName}, {Name: preFilterPluginName}}}}
 	t.Run("TestPreFilterPlugin", func(t *testing.T) {
-		f, err := NewFramework(r, plugins, emptyArgs)
+		f, err := newFrameworkWithQueueSortEnabled(r, plugins, emptyArgs)
 		if err != nil {
 			t.Fatalf("Failed to create framework for testing: %v", err)
 		}
@@ -798,7 +831,7 @@ func TestFilterPlugins(t *testing.T) {
 					config.Plugin{Name: pl.name})
 			}
 
-			f, err := NewFramework(registry, cfgPls, emptyArgs, WithRunAllFilters(tt.runAllFilters))
+			f, err := newFrameworkWithQueueSortEnabled(registry, cfgPls, emptyArgs, WithRunAllFilters(tt.runAllFilters))
 			if err != nil {
 				t.Fatalf("fail to create framework: %s", err)
 			}
@@ -1003,7 +1036,7 @@ func TestRecordingMetrics(t *testing.T) {
 				Unreserve:  pluginSet,
 			}
 			recorder := newMetricsRecorder(100, time.Nanosecond)
-			f, err := NewFramework(r, plugins, emptyArgs, withMetricsRecorder(recorder))
+			f, err := newFrameworkWithQueueSortEnabled(r, plugins, emptyArgs, withMetricsRecorder(recorder))
 			if err != nil {
 				t.Fatalf("Failed to create framework for testing: %v", err)
 			}
@@ -1052,7 +1085,7 @@ func TestPermitWaitingMetric(t *testing.T) {
 			plugins := &config.Plugins{
 				Permit: &config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin, Weight: 1}}},
 			}
-			f, err := NewFramework(r, plugins, emptyArgs)
+			f, err := newFrameworkWithQueueSortEnabled(r, plugins, emptyArgs)
 			if err != nil {
 				t.Fatalf("Failed to create framework for testing: %v", err)
 			}
@@ -1082,7 +1115,7 @@ func TestRejectWaitingPod(t *testing.T) {
 		Permit: &config.PluginSet{Enabled: []config.Plugin{{Name: permitPlugin, Weight: 1}}},
 	}
 
-	f, err := NewFramework(r, plugins, emptyArgs)
+	f, err := newFrameworkWithQueueSortEnabled(r, plugins, emptyArgs)
 	if err != nil {
 		t.Fatalf("Failed to create framework for testing: %v", err)
 	}

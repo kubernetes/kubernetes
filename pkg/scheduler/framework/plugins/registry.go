@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeunschedulable"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodevolumelimits"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/podtopologyspread"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/serviceaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/tainttoleration"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumebinding"
@@ -77,5 +78,6 @@ func NewInTreeRegistry(args *RegistryArgs) framework.Registry {
 		interpodaffinity.Name:          interpodaffinity.New,
 		nodelabel.Name:                 nodelabel.New,
 		serviceaffinity.Name:           serviceaffinity.New,
+		queuesort.Name:                 queuesort.New,
 	}
 }
