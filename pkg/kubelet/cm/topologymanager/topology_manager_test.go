@@ -104,6 +104,253 @@ func TestGetAffinity(t *testing.T) {
 	}
 }
 
+func TestAccumulateProvidersHints(t *testing.T) {
+	tcases := []struct {
+		name     string
+		hp       []HintProvider
+		expected []map[string][]TopologyHint
+	}{
+		{
+			name:     "TopologyHint not set",
+			hp:       []HintProvider{},
+			expected: nil,
+		},
+		{
+			name: "HintProvider returns empty non-nil map[string][]TopologyHint",
+			hp: []HintProvider{
+				&mockHintProvider{
+					map[string][]TopologyHint{},
+				},
+			},
+			expected: []map[string][]TopologyHint{
+				{},
+			},
+		},
+		{
+			name: "HintProvider returns - nil map[string][]TopologyHint from provider",
+			hp: []HintProvider{
+				&mockHintProvider{
+					map[string][]TopologyHint{
+						"resource": nil,
+					},
+				},
+			},
+			expected: []map[string][]TopologyHint{
+				{
+					"resource": nil,
+				},
+			},
+		},
+		{
+			name: "2 HintProviders with 1 resource returns hints",
+			hp: []HintProvider{
+				&mockHintProvider{
+					map[string][]TopologyHint{
+						"resource1": {TopologyHint{}},
+					},
+				},
+				&mockHintProvider{
+					map[string][]TopologyHint{
+						"resource2": {TopologyHint{}},
+					},
+				},
+			},
+			expected: []map[string][]TopologyHint{
+				{
+					"resource1": {TopologyHint{}},
+				},
+				{
+					"resource2": {TopologyHint{}},
+				},
+			},
+		},
+		{
+			name: "2 HintProviders 1 with 1 resource 1 with nil hints",
+			hp: []HintProvider{
+				&mockHintProvider{
+					map[string][]TopologyHint{
+						"resource1": {TopologyHint{}},
+					},
+				},
+				&mockHintProvider{nil},
+			},
+			expected: []map[string][]TopologyHint{
+				{
+					"resource1": {TopologyHint{}},
+				},
+				nil,
+			},
+		},
+		{
+			name: "2 HintProviders 1 with 1 resource 1 empty hints",
+			hp: []HintProvider{
+				&mockHintProvider{
+					map[string][]TopologyHint{
+						"resource1": {TopologyHint{}},
+					},
+				},
+				&mockHintProvider{
+					map[string][]TopologyHint{},
+				},
+			},
+			expected: []map[string][]TopologyHint{
+				{
+					"resource1": {TopologyHint{}},
+				},
+				{},
+			},
+		},
+		{
+			name: "HintProvider with 2 resources returns hints",
+			hp: []HintProvider{
+				&mockHintProvider{
+					map[string][]TopologyHint{
+						"resource1": {TopologyHint{}},
+						"resource2": {TopologyHint{}},
+					},
+				},
+			},
+			expected: []map[string][]TopologyHint{
+				{
+					"resource1": {TopologyHint{}},
+					"resource2": {TopologyHint{}},
+				},
+			},
+		},
+	}
+
+	for _, tc := range tcases {
+		mngr := manager{
+			hintProviders: tc.hp,
+		}
+		actual := mngr.accumulateProvidersHints(v1.Pod{}, v1.Container{})
+		if !reflect.DeepEqual(actual, tc.expected) {
+			t.Errorf("Test Case %s: Expected NUMANodeAffinity in result to be %v, got %v", tc.name, tc.expected, actual)
+		}
+	}
+}
+
+type mockPolicy struct {
+	nonePolicy
+	ph []map[string][]TopologyHint
+}
+
+func (p *mockPolicy) Merge(providersHints []map[string][]TopologyHint) (TopologyHint, lifecycle.PodAdmitResult) {
+	p.ph = providersHints
+	return TopologyHint{}, lifecycle.PodAdmitResult{}
+}
+
+func TestCalculateAffinity(t *testing.T) {
+	tcases := []struct {
+		name     string
+		hp       []HintProvider
+		expected []map[string][]TopologyHint
+	}{
+		{
+			name:     "No hint providers",
+			hp:       []HintProvider{},
+			expected: ([]map[string][]TopologyHint)(nil),
+		},
+		{
+			name: "HintProvider returns empty non-nil map[string][]TopologyHint",
+			hp: []HintProvider{
+				&mockHintProvider{
+					map[string][]TopologyHint{},
+				},
+			},
+			expected: []map[string][]TopologyHint{
+				{},
+			},
+		},
+		{
+			name: "HintProvider returns -nil map[string][]TopologyHint from provider",
+			hp: []HintProvider{
+				&mockHintProvider{
+					map[string][]TopologyHint{
+						"resource": nil,
+					},
+				},
+			},
+			expected: []map[string][]TopologyHint{
+				{
+					"resource": nil,
+				},
+			},
+		},
+		{
+			name: "Assorted HintProviders",
+			hp: []HintProvider{
+				&mockHintProvider{
+					map[string][]TopologyHint{
+						"resource-1/A": {
+							{NUMANodeAffinity: NewTestBitMask(0), Preferred: true},
+							{NUMANodeAffinity: NewTestBitMask(0, 1), Preferred: false},
+						},
+						"resource-1/B": {
+							{NUMANodeAffinity: NewTestBitMask(1), Preferred: true},
+							{NUMANodeAffinity: NewTestBitMask(1, 2), Preferred: false},
+						},
+					},
+				},
+				&mockHintProvider{
+					map[string][]TopologyHint{
+						"resource-2/A": {
+							{NUMANodeAffinity: NewTestBitMask(2), Preferred: true},
+							{NUMANodeAffinity: NewTestBitMask(3, 4), Preferred: false},
+						},
+						"resource-2/B": {
+							{NUMANodeAffinity: NewTestBitMask(2), Preferred: true},
+							{NUMANodeAffinity: NewTestBitMask(3, 4), Preferred: false},
+						},
+					},
+				},
+				&mockHintProvider{
+					map[string][]TopologyHint{
+						"resource-3": nil,
+					},
+				},
+			},
+			expected: []map[string][]TopologyHint{
+				{
+					"resource-1/A": {
+						{NUMANodeAffinity: NewTestBitMask(0), Preferred: true},
+						{NUMANodeAffinity: NewTestBitMask(0, 1), Preferred: false},
+					},
+					"resource-1/B": {
+						{NUMANodeAffinity: NewTestBitMask(1), Preferred: true},
+						{NUMANodeAffinity: NewTestBitMask(1, 2), Preferred: false},
+					},
+				},
+				{
+					"resource-2/A": {
+						{NUMANodeAffinity: NewTestBitMask(2), Preferred: true},
+						{NUMANodeAffinity: NewTestBitMask(3, 4), Preferred: false},
+					},
+					"resource-2/B": {
+						{NUMANodeAffinity: NewTestBitMask(2), Preferred: true},
+						{NUMANodeAffinity: NewTestBitMask(3, 4), Preferred: false},
+					},
+				},
+				{
+					"resource-3": nil,
+				},
+			},
+		},
+	}
+
+	for _, tc := range tcases {
+		mngr := manager{}
+		mngr.policy = &mockPolicy{}
+		mngr.hintProviders = tc.hp
+		mngr.calculateAffinity(v1.Pod{}, v1.Container{})
+		actual := mngr.policy.(*mockPolicy).ph
+		if !reflect.DeepEqual(tc.expected, actual) {
+			t.Errorf("Test Case: %s", tc.name)
+			t.Errorf("Expected result to be %v, got %v", tc.expected, actual)
+		}
+	}
+}
+
 func TestAddContainer(t *testing.T) {
 	testCases := []struct {
 		name        string

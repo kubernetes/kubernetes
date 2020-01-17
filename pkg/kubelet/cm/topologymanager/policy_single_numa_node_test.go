@@ -17,6 +17,7 @@ limitations under the License.
 package topologymanager
 
 import (
+	"reflect"
 	"testing"
 )
 
@@ -53,7 +54,119 @@ func TestPolicySingleNumaNodeCanAdmitPodResult(t *testing.T) {
 	}
 }
 
-func TestSingleNumaNodePolicyMerge(t *testing.T) {
+func TestPolicySingleNumaNodeFilterHints(t *testing.T) {
+	tcases := []struct {
+		name              string
+		allResources      [][]TopologyHint
+		expectedResources [][]TopologyHint
+	}{
+		{
+			name:              "filter empty resources",
+			allResources:      [][]TopologyHint{},
+			expectedResources: [][]TopologyHint(nil),
+		},
+		{
+			name: "filter hints with nil socket mask 1/2",
+			allResources: [][]TopologyHint{
+				{
+					{NUMANodeAffinity: nil, Preferred: false},
+				},
+				{
+					{NUMANodeAffinity: nil, Preferred: true},
+				},
+			},
+			expectedResources: [][]TopologyHint{
+				[]TopologyHint(nil),
+				{
+					{NUMANodeAffinity: nil, Preferred: true},
+				},
+			},
+		},
+		{
+			name: "filter hints with nil socket mask 2/2",
+			allResources: [][]TopologyHint{
+				{
+					{NUMANodeAffinity: NewTestBitMask(0), Preferred: true},
+					{NUMANodeAffinity: nil, Preferred: false},
+				},
+				{
+					{NUMANodeAffinity: NewTestBitMask(1), Preferred: true},
+					{NUMANodeAffinity: nil, Preferred: true},
+				},
+			},
+			expectedResources: [][]TopologyHint{
+				{
+					{NUMANodeAffinity: NewTestBitMask(0), Preferred: true},
+				},
+				{
+					{NUMANodeAffinity: NewTestBitMask(1), Preferred: true},
+					{NUMANodeAffinity: nil, Preferred: true},
+				},
+			},
+		},
+		{
+			name: "filter hints with empty resource socket mask",
+			allResources: [][]TopologyHint{
+				{
+					{NUMANodeAffinity: NewTestBitMask(1), Preferred: true},
+					{NUMANodeAffinity: NewTestBitMask(0), Preferred: true},
+					{NUMANodeAffinity: nil, Preferred: false},
+				},
+				{},
+			},
+			expectedResources: [][]TopologyHint{
+				{
+					{NUMANodeAffinity: NewTestBitMask(1), Preferred: true},
+					{NUMANodeAffinity: NewTestBitMask(0), Preferred: true},
+				},
+				[]TopologyHint(nil),
+			},
+		},
+		{
+			name: "filter hints with wide sockemask",
+			allResources: [][]TopologyHint{
+				{
+					{NUMANodeAffinity: NewTestBitMask(0), Preferred: true},
+					{NUMANodeAffinity: NewTestBitMask(1), Preferred: true},
+					{NUMANodeAffinity: NewTestBitMask(1, 2), Preferred: false},
+					{NUMANodeAffinity: NewTestBitMask(0, 1, 2), Preferred: false},
+					{NUMANodeAffinity: nil, Preferred: false},
+				},
+				{
+					{NUMANodeAffinity: NewTestBitMask(1, 2), Preferred: false},
+					{NUMANodeAffinity: NewTestBitMask(0, 1, 2), Preferred: false},
+					{NUMANodeAffinity: NewTestBitMask(0, 2), Preferred: false},
+					{NUMANodeAffinity: NewTestBitMask(3), Preferred: false},
+				},
+				{
+					{NUMANodeAffinity: NewTestBitMask(1, 2), Preferred: false},
+					{NUMANodeAffinity: NewTestBitMask(0, 1, 2), Preferred: false},
+					{NUMANodeAffinity: NewTestBitMask(0, 2), Preferred: false},
+				},
+			},
+			expectedResources: [][]TopologyHint{
+				{
+					{NUMANodeAffinity: NewTestBitMask(0), Preferred: true},
+					{NUMANodeAffinity: NewTestBitMask(1), Preferred: true},
+				},
+				[]TopologyHint(nil),
+				[]TopologyHint(nil),
+			},
+		},
+	}
+
+	numaNodes := []int{0, 1, 2, 3}
+	for _, tc := range tcases {
+		policy := NewSingleNumaNodePolicy(numaNodes)
+		actual := policy.(*singleNumaNodePolicy).filterHints(tc.allResources)
+		if !reflect.DeepEqual(tc.expectedResources, actual) {
+			t.Errorf("Test Case: %s", tc.name)
+			t.Errorf("Expected result to be %v, got %v", tc.expectedResources, actual)
+		}
+	}
+}
+
+func TestPolicySingleNumaNodeMerge(t *testing.T) {
 	numaNodes := []int{0, 1}
 	policy := NewSingleNumaNodePolicy(numaNodes)
 
