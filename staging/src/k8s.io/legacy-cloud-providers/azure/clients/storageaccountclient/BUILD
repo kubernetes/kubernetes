@@ -19,6 +19,7 @@ go_library(
         "//vendor/github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2019-06-01/storage:go_default_library",
         "//vendor/github.com/Azure/go-autorest/autorest:go_default_library",
         "//vendor/github.com/Azure/go-autorest/autorest/azure:go_default_library",
+        "//vendor/github.com/Azure/go-autorest/autorest/to:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ],
 )
