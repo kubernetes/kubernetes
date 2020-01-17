@@ -17,6 +17,7 @@ limitations under the License.
 package framework
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -36,6 +37,9 @@ import (
 	kubeletstatsv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/test/e2e/system"
+
+	// TODO: Remove the following imports (ref: https://github.com/kubernetes/kubernetes/issues/81245)
+	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 )
 
 // ResourceConstraint is a struct to hold constraints.
@@ -69,9 +73,6 @@ type ResourceUsagePerContainer map[string]*ContainerResourceUsage
 // ResourceUsageSummary is a struct to hold resource usage summary.
 // we can't have int here, as JSON does not accept integer keys.
 type ResourceUsageSummary map[string][]SingleContainerSummary
-
-// NoCPUConstraint is the number of constraint for CPU.
-const NoCPUConstraint = math.MaxFloat64
 
 // PrintHumanReadable prints resource usage summary in human readable.
 func (s *ResourceUsageSummary) PrintHumanReadable() string {
@@ -183,7 +184,7 @@ type resourceGatherWorker struct {
 func (w *resourceGatherWorker) singleProbe() {
 	data := make(ResourceUsagePerContainer)
 	if w.inKubemark {
-		kubemarkData := GetKubemarkMasterComponentsResourceUsage()
+		kubemarkData := getKubemarkMasterComponentsResourceUsage()
 		if data == nil {
 			return
 		}
@@ -555,4 +556,66 @@ func (g *ContainerResourceGatherer) StopAndSummarize(percentiles []int, constrai
 		return &summary, fmt.Errorf(strings.Join(violatedConstraints, "\n"))
 	}
 	return &summary, nil
+}
+
+// kubemarkResourceUsage is a struct for tracking the resource usage of kubemark.
+type kubemarkResourceUsage struct {
+	Name                    string
+	MemoryWorkingSetInBytes uint64
+	CPUUsageInCores         float64
+}
+
+func getMasterUsageByPrefix(prefix string) (string, error) {
+	sshResult, err := e2essh.SSH(fmt.Sprintf("ps ax -o %%cpu,rss,command | tail -n +2 | grep %v | sed 's/\\s+/ /g'", prefix), GetMasterHost()+":22", TestContext.Provider)
+	if err != nil {
+		return "", err
+	}
+	return sshResult.Stdout, nil
+}
+
+// getKubemarkMasterComponentsResourceUsage returns the resource usage of kubemark which contains multiple combinations of cpu and memory usage for each pod name.
+func getKubemarkMasterComponentsResourceUsage() map[string]*kubemarkResourceUsage {
+	result := make(map[string]*kubemarkResourceUsage)
+	// Get kubernetes component resource usage
+	sshResult, err := getMasterUsageByPrefix("kube")
+	if err != nil {
+		Logf("Error when trying to SSH to master machine. Skipping probe. %v", err)
+		return nil
+	}
+	scanner := bufio.NewScanner(strings.NewReader(sshResult))
+	for scanner.Scan() {
+		var cpu float64
+		var mem uint64
+		var name string
+		fmt.Sscanf(strings.TrimSpace(scanner.Text()), "%f %d /usr/local/bin/kube-%s", &cpu, &mem, &name)
+		if name != "" {
+			// Gatherer expects pod_name/container_name format
+			fullName := name + "/" + name
+			result[fullName] = &kubemarkResourceUsage{Name: fullName, MemoryWorkingSetInBytes: mem * 1024, CPUUsageInCores: cpu / 100}
+		}
+	}
+	// Get etcd resource usage
+	sshResult, err = getMasterUsageByPrefix("bin/etcd")
+	if err != nil {
+		Logf("Error when trying to SSH to master machine. Skipping probe")
+		return nil
+	}
+	scanner = bufio.NewScanner(strings.NewReader(sshResult))
+	for scanner.Scan() {
+		var cpu float64
+		var mem uint64
+		var etcdKind string
+		fmt.Sscanf(strings.TrimSpace(scanner.Text()), "%f %d /bin/sh -c /usr/local/bin/etcd", &cpu, &mem)
+		dataDirStart := strings.Index(scanner.Text(), "--data-dir")
+		if dataDirStart < 0 {
+			continue
+		}
+		fmt.Sscanf(scanner.Text()[dataDirStart:], "--data-dir=/var/%s", &etcdKind)
+		if etcdKind != "" {
+			// Gatherer expects pod_name/container_name format
+			fullName := "etcd/" + etcdKind
+			result[fullName] = &kubemarkResourceUsage{Name: fullName, MemoryWorkingSetInBytes: mem * 1024, CPUUsageInCores: cpu / 100}
+		}
+	}
+	return result
 }
