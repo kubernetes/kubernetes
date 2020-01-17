@@ -47,7 +47,7 @@ func newCAProvider(caFile, caKeyFile string) (*caProvider, error) {
 
 type caProvider struct {
 	caValue  atomic.Value
-	caLoader *dynamiccertificates.DynamicFileServingContent
+	caLoader *dynamiccertificates.DynamicCertKeyPairContent
 }
 
 // setCA unconditionally stores the current cert/key content
