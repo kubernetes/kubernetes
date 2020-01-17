@@ -61,6 +61,15 @@ func (f *RemoteRuntime) Start(endpoint string) error {
 	}
 
 	go f.server.Serve(l)
+
+	// Set runtime and network conditions ready.
+	f.RuntimeService.FakeStatus = &kubeapi.RuntimeStatus{
+		Conditions: []*kubeapi.RuntimeCondition{
+			{Type: kubeapi.RuntimeReady, Status: true},
+			{Type: kubeapi.NetworkReady, Status: true},
+		},
+	}
+
 	return nil
 }
 

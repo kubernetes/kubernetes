@@ -76,6 +76,11 @@ var (
 		Name:    "Inline-volume (default fs)",
 		VolType: InlineVolume,
 	}
+	// DefaultFsEphemeralVolume is TestPattern for "Ephemeral-volume (default fs)"
+	DefaultFsEphemeralVolume = TestPattern{
+		Name:    "Ephemeral-volume (default fs)",
+		VolType: CSIInlineVolume,
+	}
 	// DefaultFsPreprovisionedPV is TestPattern for "Pre-provisioned PV (default fs)"
 	DefaultFsPreprovisionedPV = TestPattern{
 		Name:    "Pre-provisioned PV (default fs)",
@@ -92,6 +97,12 @@ var (
 	// Ext3InlineVolume is TestPattern for "Inline-volume (ext3)"
 	Ext3InlineVolume = TestPattern{
 		Name:    "Inline-volume (ext3)",
+		VolType: InlineVolume,
+		FsType:  "ext3",
+	}
+	// Ext3EphemeralVolume is TestPattern for "Ephemeral-volume (ext3)"
+	Ext3EphemeralVolume = TestPattern{
+		Name:    "Ephemeral-volume (ext3)",
 		VolType: InlineVolume,
 		FsType:  "ext3",
 	}
@@ -116,6 +127,12 @@ var (
 		VolType: InlineVolume,
 		FsType:  "ext4",
 	}
+	// Ext4EphemeralVolume is TestPattern for "Ephemeral-volume (ext4)"
+	Ext4EphemeralVolume = TestPattern{
+		Name:    "Ephemeral-volume (ext4)",
+		VolType: CSIInlineVolume,
+		FsType:  "ext4",
+	}
 	// Ext4PreprovisionedPV is TestPattern for "Pre-provisioned PV (ext4)"
 	Ext4PreprovisionedPV = TestPattern{
 		Name:    "Pre-provisioned PV (ext4)",
@@ -135,6 +152,13 @@ var (
 	XfsInlineVolume = TestPattern{
 		Name:       "Inline-volume (xfs)",
 		VolType:    InlineVolume,
+		FsType:     "xfs",
+		FeatureTag: "[Slow]",
+	}
+	// XfsEphemeralVolume is TestPattern for "Ephemeral-volume (xfs)"
+	XfsEphemeralVolume = TestPattern{
+		Name:       "Ephemeral-volume (xfs)",
+		VolType:    CSIInlineVolume,
 		FsType:     "xfs",
 		FeatureTag: "[Slow]",
 	}
@@ -159,6 +183,13 @@ var (
 	NtfsInlineVolume = TestPattern{
 		Name:       "Inline-volume (ntfs)",
 		VolType:    InlineVolume,
+		FsType:     "ntfs",
+		FeatureTag: "[sig-windows]",
+	}
+	// NtfsEphemeralVolume is TestPattern for "Ephemeral-volume (ntfs)"
+	NtfsEphemeralVolume = TestPattern{
+		Name:       "Ephemeral-volume (ntfs)",
+		VolType:    CSIInlineVolume,
 		FsType:     "ntfs",
 		FeatureTag: "[sig-windows]",
 	}

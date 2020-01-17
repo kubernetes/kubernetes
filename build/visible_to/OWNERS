@@ -4,7 +4,6 @@ reviewers:
   - brendandburns
   - dchen1107
   - ixdy
-  - jbeda
   - lavalamp
   - mikedanese
   - monopole
@@ -16,7 +15,6 @@ approvers:
   - brendandburns
   - dchen1107
   - ixdy
-  - jbeda
   - lavalamp
   - mikedanese
   - monopole
@@ -24,3 +22,5 @@ approvers:
   - smarterclayton
   - thockin
   - wojtek-t
+emeritus_approvers:
+  - jbeda

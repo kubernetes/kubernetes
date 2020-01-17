@@ -51,6 +51,57 @@ func (o *GeneratedOperations) Run() (eventErr, detailedErr error) {
 	return o.OperationFunc()
 }
 
+// TransientOperationFailure indicates operation failed with a transient error
+// and may fix itself when retried.
+type TransientOperationFailure struct {
+	msg string
+}
+
+func (err *TransientOperationFailure) Error() string {
+	return err.msg
+}
+
+// NewTransientOperationFailure creates an instance of TransientOperationFailure error
+func NewTransientOperationFailure(msg string) *TransientOperationFailure {
+	return &TransientOperationFailure{msg: msg}
+}
+
+// UncertainProgressError indicates operation failed with a non-final error
+// and operation may be in-progress in background.
+type UncertainProgressError struct {
+	msg string
+}
+
+func (err *UncertainProgressError) Error() string {
+	return err.msg
+}
+
+// NewUncertainProgressError creates an instance of UncertainProgressError type
+func NewUncertainProgressError(msg string) *UncertainProgressError {
+	return &UncertainProgressError{msg: msg}
+}
+
+// IsOperationFinishedError checks if given error is of type that indicates
+// operation is finished with a FINAL error.
+func IsOperationFinishedError(err error) bool {
+	if _, ok := err.(*UncertainProgressError); ok {
+		return false
+	}
+	if _, ok := err.(*TransientOperationFailure); ok {
+		return false
+	}
+	return true
+}
+
+// IsUncertainProgressError checks if given error is of type that indicates
+// operation might be in-progress in background.
+func IsUncertainProgressError(err error) bool {
+	if _, ok := err.(*UncertainProgressError); ok {
+		return true
+	}
+	return false
+}
+
 const (
 	// VolumeResizerKey is key that will be used to store resizer used
 	// for resizing PVC. The generated key/value pair will be added

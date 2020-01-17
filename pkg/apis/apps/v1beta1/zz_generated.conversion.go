@@ -181,16 +181,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.ScaleStatus)(nil), (*autoscaling.ScaleStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_ScaleStatus_To_autoscaling_ScaleStatus(a.(*v1beta1.ScaleStatus), b.(*autoscaling.ScaleStatus), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*autoscaling.ScaleStatus)(nil), (*v1beta1.ScaleStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_autoscaling_ScaleStatus_To_v1beta1_ScaleStatus(a.(*autoscaling.ScaleStatus), b.(*v1beta1.ScaleStatus), scope)
-	}); err != nil {
-		return err
-	}
 	if err := s.AddGeneratedConversionFunc((*v1beta1.StatefulSet)(nil), (*apps.StatefulSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1beta1_StatefulSet_To_apps_StatefulSet(a.(*v1beta1.StatefulSet), b.(*apps.StatefulSet), scope)
 	}); err != nil {

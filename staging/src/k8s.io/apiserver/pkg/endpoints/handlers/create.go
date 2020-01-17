@@ -50,7 +50,7 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 		defer trace.LogIfLong(500 * time.Millisecond)
 
 		if isDryRun(req.URL) && !utilfeature.DefaultFeatureGate.Enabled(features.DryRun) {
-			scope.err(errors.NewBadRequest("the dryRun alpha feature is disabled"), w, req)
+			scope.err(errors.NewBadRequest("the dryRun feature is disabled"), w, req)
 			return
 		}
 

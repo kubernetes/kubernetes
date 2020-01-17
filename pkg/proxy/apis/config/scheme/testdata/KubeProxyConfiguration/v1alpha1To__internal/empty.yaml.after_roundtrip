@@ -1,0 +1,43 @@
+BindAddress: 0.0.0.0
+ClientConnection:
+  AcceptContentTypes: ""
+  Burst: 10
+  ContentType: application/vnd.kubernetes.protobuf
+  Kubeconfig: ""
+  QPS: 5
+ClusterCIDR: ""
+ConfigSyncPeriod: 15m0s
+Conntrack:
+  MaxPerCore: 32768
+  Min: 131072
+  TCPCloseWaitTimeout: 1h0m0s
+  TCPEstablishedTimeout: 24h0m0s
+EnableProfiling: false
+FeatureGates: {}
+HealthzBindAddress: 0.0.0.0:10256
+HostnameOverride: ""
+IPTables:
+  MasqueradeAll: false
+  MasqueradeBit: 14
+  MinSyncPeriod: 0s
+  SyncPeriod: 30s
+IPVS:
+  ExcludeCIDRs: null
+  MinSyncPeriod: 0s
+  Scheduler: ""
+  StrictARP: false
+  SyncPeriod: 30s
+  TCPFinTimeout: 0s
+  TCPTimeout: 0s
+  UDPTimeout: 0s
+MetricsBindAddress: 127.0.0.1:10249
+Mode: ""
+NodePortAddresses: null
+OOMScoreAdj: -999
+PortRange: ""
+ShowHiddenMetricsForVersion: ""
+UDPIdleTimeout: 250ms
+Winkernel:
+  EnableDSR: false
+  NetworkName: ""
+  SourceVip: ""

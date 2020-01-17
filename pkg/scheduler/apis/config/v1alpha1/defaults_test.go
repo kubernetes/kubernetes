@@ -17,48 +17,153 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"encoding/json"
 	"reflect"
 	"testing"
+	"time"
 
-	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
+	componentbaseconfig "k8s.io/component-base/config/v1alpha1"
 	kubeschedulerconfigv1alpha1 "k8s.io/kube-scheduler/config/v1alpha1"
+	"k8s.io/utils/pointer"
 )
 
 func TestSchedulerDefaults(t *testing.T) {
-	ks1 := &kubeschedulerconfigv1alpha1.KubeSchedulerConfiguration{}
-	SetDefaults_KubeSchedulerConfiguration(ks1)
-	cm, err := convertObjToConfigMap("KubeSchedulerConfiguration", ks1)
-	if err != nil {
-		t.Errorf("unexpected ConvertObjToConfigMap error %v", err)
-	}
-
-	ks2 := &kubeschedulerconfigv1alpha1.KubeSchedulerConfiguration{}
-	if err = json.Unmarshal([]byte(cm.Data["KubeSchedulerConfiguration"]), ks2); err != nil {
-		t.Errorf("unexpected error unserializing scheduler config %v", err)
-	}
-
-	if !reflect.DeepEqual(ks2, ks1) {
-		t.Errorf("Expected:\n%#v\n\nGot:\n%#v", ks1, ks2)
-	}
-}
-
-// ConvertObjToConfigMap converts an object to a ConfigMap.
-// This is specifically meant for ComponentConfigs.
-func convertObjToConfigMap(name string, obj runtime.Object) (*v1.ConfigMap, error) {
-	eJSONBytes, err := json.Marshal(obj)
-	if err != nil {
-		return nil, err
-	}
-	cm := &v1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
+	enable := true
+	tests := []struct {
+		name     string
+		config   *kubeschedulerconfigv1alpha1.KubeSchedulerConfiguration
+		expected *kubeschedulerconfigv1alpha1.KubeSchedulerConfiguration
+	}{
+		{
+			name:   "empty config",
+			config: &kubeschedulerconfigv1alpha1.KubeSchedulerConfiguration{},
+			expected: &kubeschedulerconfigv1alpha1.KubeSchedulerConfiguration{
+				SchedulerName:                  pointer.StringPtr("default-scheduler"),
+				AlgorithmSource:                kubeschedulerconfigv1alpha1.SchedulerAlgorithmSource{Provider: pointer.StringPtr("DefaultProvider")},
+				HardPodAffinitySymmetricWeight: pointer.Int32Ptr(1),
+				HealthzBindAddress:             pointer.StringPtr("0.0.0.0:10251"),
+				MetricsBindAddress:             pointer.StringPtr("0.0.0.0:10251"),
+				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
+					EnableProfiling:           &enable,
+					EnableContentionProfiling: &enable,
+				},
+				LeaderElection: kubeschedulerconfigv1alpha1.KubeSchedulerLeaderElectionConfiguration{
+					LeaderElectionConfiguration: componentbaseconfig.LeaderElectionConfiguration{
+						LeaderElect:       pointer.BoolPtr(true),
+						LeaseDuration:     metav1.Duration{Duration: 15 * time.Second},
+						RenewDeadline:     metav1.Duration{Duration: 10 * time.Second},
+						RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
+						ResourceLock:      "endpointsleases",
+						ResourceNamespace: "",
+						ResourceName:      "",
+					},
+					LockObjectName:      "kube-scheduler",
+					LockObjectNamespace: "kube-system",
+				},
+				ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
+					QPS:         50,
+					Burst:       100,
+					ContentType: "application/vnd.kubernetes.protobuf",
+				},
+				DisablePreemption:        pointer.BoolPtr(false),
+				PercentageOfNodesToScore: pointer.Int32Ptr(0),
+				BindTimeoutSeconds:       pointer.Int64Ptr(600),
+				PodInitialBackoffSeconds: pointer.Int64Ptr(1),
+				PodMaxBackoffSeconds:     pointer.Int64Ptr(10),
+				Plugins:                  nil,
+			},
 		},
-		Data: map[string]string{
-			name: string(eJSONBytes[:]),
+		{
+			name: "metrics and healthz address with no port",
+			config: &kubeschedulerconfigv1alpha1.KubeSchedulerConfiguration{
+				MetricsBindAddress: pointer.StringPtr("1.2.3.4"),
+				HealthzBindAddress: pointer.StringPtr("1.2.3.4"),
+			},
+			expected: &kubeschedulerconfigv1alpha1.KubeSchedulerConfiguration{
+				SchedulerName:                  pointer.StringPtr("default-scheduler"),
+				AlgorithmSource:                kubeschedulerconfigv1alpha1.SchedulerAlgorithmSource{Provider: pointer.StringPtr("DefaultProvider")},
+				HardPodAffinitySymmetricWeight: pointer.Int32Ptr(1),
+				HealthzBindAddress:             pointer.StringPtr("1.2.3.4:10251"),
+				MetricsBindAddress:             pointer.StringPtr("1.2.3.4:10251"),
+				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
+					EnableProfiling:           &enable,
+					EnableContentionProfiling: &enable,
+				},
+				LeaderElection: kubeschedulerconfigv1alpha1.KubeSchedulerLeaderElectionConfiguration{
+					LeaderElectionConfiguration: componentbaseconfig.LeaderElectionConfiguration{
+						LeaderElect:       pointer.BoolPtr(true),
+						LeaseDuration:     metav1.Duration{Duration: 15 * time.Second},
+						RenewDeadline:     metav1.Duration{Duration: 10 * time.Second},
+						RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
+						ResourceLock:      "endpointsleases",
+						ResourceNamespace: "",
+						ResourceName:      "",
+					},
+					LockObjectName:      "kube-scheduler",
+					LockObjectNamespace: "kube-system",
+				},
+				ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
+					QPS:         50,
+					Burst:       100,
+					ContentType: "application/vnd.kubernetes.protobuf",
+				},
+				DisablePreemption:        pointer.BoolPtr(false),
+				PercentageOfNodesToScore: pointer.Int32Ptr(0),
+				BindTimeoutSeconds:       pointer.Int64Ptr(600),
+				PodInitialBackoffSeconds: pointer.Int64Ptr(1),
+				PodMaxBackoffSeconds:     pointer.Int64Ptr(10),
+				Plugins:                  nil,
+			},
+		},
+		{
+			name: "metrics and healthz port with no address",
+			config: &kubeschedulerconfigv1alpha1.KubeSchedulerConfiguration{
+				MetricsBindAddress: pointer.StringPtr(":12345"),
+				HealthzBindAddress: pointer.StringPtr(":12345"),
+			},
+			expected: &kubeschedulerconfigv1alpha1.KubeSchedulerConfiguration{
+				SchedulerName:                  pointer.StringPtr("default-scheduler"),
+				AlgorithmSource:                kubeschedulerconfigv1alpha1.SchedulerAlgorithmSource{Provider: pointer.StringPtr("DefaultProvider")},
+				HardPodAffinitySymmetricWeight: pointer.Int32Ptr(1),
+				HealthzBindAddress:             pointer.StringPtr("0.0.0.0:12345"),
+				MetricsBindAddress:             pointer.StringPtr("0.0.0.0:12345"),
+				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
+					EnableProfiling:           &enable,
+					EnableContentionProfiling: &enable,
+				},
+				LeaderElection: kubeschedulerconfigv1alpha1.KubeSchedulerLeaderElectionConfiguration{
+					LeaderElectionConfiguration: componentbaseconfig.LeaderElectionConfiguration{
+						LeaderElect:       pointer.BoolPtr(true),
+						LeaseDuration:     metav1.Duration{Duration: 15 * time.Second},
+						RenewDeadline:     metav1.Duration{Duration: 10 * time.Second},
+						RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
+						ResourceLock:      "endpointsleases",
+						ResourceNamespace: "",
+						ResourceName:      "",
+					},
+					LockObjectName:      "kube-scheduler",
+					LockObjectNamespace: "kube-system",
+				},
+				ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
+					QPS:         50,
+					Burst:       100,
+					ContentType: "application/vnd.kubernetes.protobuf",
+				},
+				DisablePreemption:        pointer.BoolPtr(false),
+				PercentageOfNodesToScore: pointer.Int32Ptr(0),
+				BindTimeoutSeconds:       pointer.Int64Ptr(600),
+				PodInitialBackoffSeconds: pointer.Int64Ptr(1),
+				PodMaxBackoffSeconds:     pointer.Int64Ptr(10),
+				Plugins:                  nil,
+			},
 		},
 	}
-	return cm, nil
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			SetDefaults_KubeSchedulerConfiguration(tc.config)
+			if !reflect.DeepEqual(tc.expected, tc.config) {
+				t.Errorf("Expected:\n%#v\n\nGot:\n%#v", tc.expected, tc.config)
+			}
+		})
+	}
 }

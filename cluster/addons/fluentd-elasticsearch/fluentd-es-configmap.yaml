@@ -207,7 +207,7 @@ data:
     <source>
       @id docker.log
       @type tail
-      format /^time="(?<time>[^)]*)" level=(?<severity>[^ ]*) msg="(?<message>[^"]*)"( err="(?<error>[^"]*)")?( statusCode=($<status_code>\d+))?/
+      format /^time="(?<time>[^"]*)" level=(?<severity>[^ ]*) msg="(?<message>[^"]*)"( err="(?<error>[^"]*)")?( statusCode=($<status_code>\d+))?/
       path /var/log/docker.log
       pos_file /var/log/es-docker.log.pos
       tag docker
@@ -473,7 +473,7 @@ data:
         retry_forever
         retry_max_interval 30
         chunk_limit_size 2M
-        queue_limit_length 8
+        total_limit_size 500M
         overflow_action block
       </buffer>
     </match>

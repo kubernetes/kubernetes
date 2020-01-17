@@ -18,6 +18,7 @@ package network
 
 import (
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/network/scale"
 
 	"github.com/onsi/ginkgo"
@@ -40,7 +41,7 @@ var _ = SIGDescribe("Loadbalancing: L7 Scalability", func() {
 		)
 
 		ginkgo.BeforeEach(func() {
-			framework.SkipUnlessProviderIs("gce", "gke")
+			e2eskipper.SkipUnlessProviderIs("gce", "gke")
 
 			scaleFramework = scale.NewIngressScaleFramework(f.ClientSet, ns, framework.TestContext.CloudConfig)
 			if err := scaleFramework.PrepareScaleTest(); err != nil {

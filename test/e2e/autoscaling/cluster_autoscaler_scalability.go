@@ -32,6 +32,8 @@ import (
 	"k8s.io/klog"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -66,12 +68,12 @@ var _ = framework.KubeDescribe("Cluster size autoscaler scalability [Slow]", fun
 	var sum int
 
 	ginkgo.BeforeEach(func() {
-		framework.SkipUnlessProviderIs("gce", "gke", "kubemark")
+		e2eskipper.SkipUnlessProviderIs("gce", "gke", "kubemark")
 
 		// Check if Cloud Autoscaler is enabled by trying to get its ConfigMap.
 		_, err := f.ClientSet.CoreV1().ConfigMaps("kube-system").Get("cluster-autoscaler-status", metav1.GetOptions{})
 		if err != nil {
-			framework.Skipf("test expects Cluster Autoscaler to be enabled")
+			e2eskipper.Skipf("test expects Cluster Autoscaler to be enabled")
 		}
 
 		c = f.ClientSet
@@ -345,8 +347,8 @@ var _ = framework.KubeDescribe("Cluster size autoscaler scalability [Slow]", fun
 		totalMemReservation := unschedulableMemReservation * unschedulablePodReplicas
 		timeToWait := 5 * time.Minute
 		podsConfig := reserveMemoryRCConfig(f, "unschedulable-pod", unschedulablePodReplicas, totalMemReservation, timeToWait)
-		framework.RunRC(*podsConfig) // Ignore error (it will occur because pods are unschedulable)
-		defer framework.DeleteRCAndWaitForGC(f.ClientSet, f.Namespace.Name, podsConfig.Name)
+		e2erc.RunRC(*podsConfig) // Ignore error (it will occur because pods are unschedulable)
+		defer e2erc.DeleteRCAndWaitForGC(f.ClientSet, f.Namespace.Name, podsConfig.Name)
 
 		// Ensure that no new nodes have been added so far.
 		readyNodeCount, _ := e2enode.TotalReady(f.ClientSet)
@@ -379,7 +381,7 @@ func simpleScaleUpTestWithTolerance(f *framework.Framework, config *scaleUpTestC
 	// run rc based on config
 	ginkgo.By(fmt.Sprintf("Running RC %v from config", config.extraPods.Name))
 	start := time.Now()
-	framework.ExpectNoError(framework.RunRC(*config.extraPods))
+	framework.ExpectNoError(e2erc.RunRC(*config.extraPods))
 	// check results
 	if tolerateMissingNodeCount > 0 {
 		// Tolerate some number of nodes not to be created.
@@ -397,7 +399,7 @@ func simpleScaleUpTestWithTolerance(f *framework.Framework, config *scaleUpTestC
 	}
 	timeTrack(start, fmt.Sprintf("Scale up to %v", config.expectedResult.nodes))
 	return func() error {
-		return framework.DeleteRCAndWaitForGC(f.ClientSet, f.Namespace.Name, config.extraPods.Name)
+		return e2erc.DeleteRCAndWaitForGC(f.ClientSet, f.Namespace.Name, config.extraPods.Name)
 	}
 }
 
@@ -475,10 +477,10 @@ func createHostPortPodsWithMemory(f *framework.Framework, id string, replicas, p
 		HostPorts:  map[string]int{"port1": port},
 		MemRequest: request,
 	}
-	err := framework.RunRC(*config)
+	err := e2erc.RunRC(*config)
 	framework.ExpectNoError(err)
 	return func() error {
-		return framework.DeleteRCAndWaitForGC(f.ClientSet, f.Namespace.Name, id)
+		return e2erc.DeleteRCAndWaitForGC(f.ClientSet, f.Namespace.Name, id)
 	}
 }
 
@@ -515,10 +517,10 @@ func distributeLoad(f *framework.Framework, namespace string, id string, podDist
 	framework.ExpectNoError(waitForAllCaPodsReadyInNamespace(f, f.ClientSet))
 	// Create the target RC
 	rcConfig := reserveMemoryRCConfig(f, id, totalPods, totalPods*podMemRequestMegabytes, timeout)
-	framework.ExpectNoError(framework.RunRC(*rcConfig))
+	framework.ExpectNoError(e2erc.RunRC(*rcConfig))
 	framework.ExpectNoError(waitForAllCaPodsReadyInNamespace(f, f.ClientSet))
 	return func() error {
-		return framework.DeleteRCAndWaitForGC(f.ClientSet, f.Namespace.Name, id)
+		return e2erc.DeleteRCAndWaitForGC(f.ClientSet, f.Namespace.Name, id)
 	}
 }
 

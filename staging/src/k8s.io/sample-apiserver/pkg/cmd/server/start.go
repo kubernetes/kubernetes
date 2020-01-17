@@ -41,7 +41,7 @@ import (
 	sampleopenapi "k8s.io/sample-apiserver/pkg/generated/openapi"
 )
 
-const defaultEtcdPathPrefix = "/registry/wardle.kubernetes.io"
+const defaultEtcdPathPrefix = "/registry/wardle.example.com"
 
 // WardleServerOptions contains state for master/api server
 type WardleServerOptions struct {

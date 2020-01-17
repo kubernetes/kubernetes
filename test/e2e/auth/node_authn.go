@@ -19,7 +19,7 @@ package auth
 import (
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -40,7 +40,7 @@ var _ = SIGDescribe("[Feature:NodeAuthenticator]", func() {
 
 		nodeList, err := f.ClientSet.CoreV1().Nodes().List(metav1.ListOptions{})
 		framework.ExpectNoError(err, "failed to list nodes in namespace: %s", ns)
-		gomega.Expect(len(nodeList.Items)).NotTo(gomega.BeZero())
+		framework.ExpectNotEqual(len(nodeList.Items), 0)
 
 		pickedNode := nodeList.Items[0]
 		nodeIPs = e2enode.GetAddresses(&pickedNode, v1.NodeExternalIP)
@@ -51,7 +51,8 @@ var _ = SIGDescribe("[Feature:NodeAuthenticator]", func() {
 		saName := "default"
 		sa, err := f.ClientSet.CoreV1().ServiceAccounts(ns).Get(saName, metav1.GetOptions{})
 		framework.ExpectNoError(err, "failed to retrieve service account (%s:%s)", ns, saName)
-		gomega.Expect(len(sa.Secrets)).NotTo(gomega.BeZero())
+		framework.ExpectNotEqual(len(sa.Secrets), 0)
+
 	})
 
 	ginkgo.It("The kubelet's main port 10250 should reject requests with no credentials", func() {

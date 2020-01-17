@@ -24,9 +24,9 @@ source "${KUBE_ROOT}/hack/lib/util.sh"
 
 # required version for this script, if not installed on the host we will
 # use the official docker image instead. keep this in sync with SHELLCHECK_IMAGE
-SHELLCHECK_VERSION="0.6.0"
-# upstream shellcheck latest stable image as of January 10th, 2019
-SHELLCHECK_IMAGE="koalaman/shellcheck-alpine:v0.6.0@sha256:7d4d712a2686da99d37580b4e2f45eb658b74e4b01caf67c1099adc294b96b52"
+SHELLCHECK_VERSION="0.7.0"
+# upstream shellcheck latest stable image as of October 23rd, 2019
+SHELLCHECK_IMAGE="koalaman/shellcheck-alpine:v0.7.0@sha256:24bbf52aae6eaa27accc9f61de32d30a1498555e6ef452966d0702ff06f38ecb"
 
 # fixed name for the shellcheck docker container so we can reliably clean it up
 SHELLCHECK_CONTAINER="k8s-shellcheck"

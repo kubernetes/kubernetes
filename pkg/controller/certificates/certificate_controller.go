@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"golang.org/x/time/rate"
-	"k8s.io/klog"
 
 	certificates "k8s.io/api/certificates/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -36,6 +35,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/controller"
 )
 

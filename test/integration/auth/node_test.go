@@ -27,17 +27,13 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1beta1"
 	storagev1 "k8s.io/api/storage/v1"
-	storagev1beta1 "k8s.io/api/storage/v1beta1"
-	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/scheme"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/features"
@@ -56,9 +52,6 @@ func TestNodeAuthorizer(t *testing.T) {
 
 	// Enable DynamicKubeletConfig feature so that Node.Spec.ConfigSource can be set
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicKubeletConfig, true)()
-
-	// Enable NodeLease feature so that nodes can create leases
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeLease, true)()
 
 	// Enable CSINodeInfo feature so that nodes can create CSINode objects.
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSINodeInfo, true)()
@@ -399,18 +392,18 @@ func TestNodeAuthorizer(t *testing.T) {
 
 	getNode1CSINode := func(client clientset.Interface) func() error {
 		return func() error {
-			_, err := client.StorageV1beta1().CSINodes().Get("node1", metav1.GetOptions{})
+			_, err := client.StorageV1().CSINodes().Get("node1", metav1.GetOptions{})
 			return err
 		}
 	}
 	createNode1CSINode := func(client clientset.Interface) func() error {
 		return func() error {
-			nodeInfo := &storagev1beta1.CSINode{
+			nodeInfo := &storagev1.CSINode{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "node1",
 				},
-				Spec: storagev1beta1.CSINodeSpec{
-					Drivers: []storagev1beta1.CSINodeDriver{
+				Spec: storagev1.CSINodeSpec{
+					Drivers: []storagev1.CSINodeDriver{
 						{
 							Name:         "com.example.csi.driver1",
 							NodeID:       "com.example.csi/node1",
@@ -419,24 +412,24 @@ func TestNodeAuthorizer(t *testing.T) {
 					},
 				},
 			}
-			_, err := client.StorageV1beta1().CSINodes().Create(nodeInfo)
+			_, err := client.StorageV1().CSINodes().Create(nodeInfo)
 			return err
 		}
 	}
 	updateNode1CSINode := func(client clientset.Interface) func() error {
 		return func() error {
-			nodeInfo, err := client.StorageV1beta1().CSINodes().Get("node1", metav1.GetOptions{})
+			nodeInfo, err := client.StorageV1().CSINodes().Get("node1", metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
-			nodeInfo.Spec.Drivers = []storagev1beta1.CSINodeDriver{
+			nodeInfo.Spec.Drivers = []storagev1.CSINodeDriver{
 				{
 					Name:         "com.example.csi.driver2",
 					NodeID:       "com.example.csi/node1",
 					TopologyKeys: []string{"com.example.csi/rack"},
 				},
 			}
-			_, err = client.StorageV1beta1().CSINodes().Update(nodeInfo)
+			_, err = client.StorageV1().CSINodes().Update(nodeInfo)
 			return err
 		}
 	}
@@ -444,13 +437,13 @@ func TestNodeAuthorizer(t *testing.T) {
 		return func() error {
 			bs := []byte(fmt.Sprintf(`{"csiDrivers": [ { "driver": "net.example.storage.driver2", "nodeID": "net.example.storage/node1", "topologyKeys": [ "net.example.storage/region" ] } ] }`))
 			// StrategicMergePatch is unsupported by CRs. Falling back to MergePatch
-			_, err := client.StorageV1beta1().CSINodes().Patch("node1", types.MergePatchType, bs)
+			_, err := client.StorageV1().CSINodes().Patch("node1", types.MergePatchType, bs)
 			return err
 		}
 	}
 	deleteNode1CSINode := func(client clientset.Interface) func() error {
 		return func() error {
-			return client.StorageV1beta1().CSINodes().Delete("node1", &metav1.DeleteOptions{})
+			return client.StorageV1().CSINodes().Delete("node1", &metav1.DeleteOptions{})
 		}
 	}
 
@@ -642,14 +635,14 @@ func expect(t *testing.T, f func() error, wantErr func(error) bool) (timeout boo
 
 func expectForbidden(t *testing.T, f func() error) {
 	t.Helper()
-	if ok, err := expect(t, f, errors.IsForbidden); !ok {
+	if ok, err := expect(t, f, apierrors.IsForbidden); !ok {
 		t.Errorf("Expected forbidden error, got %v", err)
 	}
 }
 
 func expectNotFound(t *testing.T, f func() error) {
 	t.Helper()
-	if ok, err := expect(t, f, errors.IsNotFound); !ok {
+	if ok, err := expect(t, f, apierrors.IsNotFound); !ok {
 		t.Errorf("Expected notfound error, got %v", err)
 	}
 }
@@ -659,18 +652,4 @@ func expectAllowed(t *testing.T, f func() error) {
 	if ok, err := expect(t, f, func(e error) bool { return e == nil }); !ok {
 		t.Errorf("Expected no error, got %v", err)
 	}
-}
-
-// crdFromManifest reads a .json/yaml file and returns the CRD in it.
-func crdFromManifest(filename string) (*apiextensionsv1beta1.CustomResourceDefinition, error) {
-	var crd apiextensionsv1beta1.CustomResourceDefinition
-	data, err := ioutil.ReadFile(filename)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), data, &crd); err != nil {
-		return nil, err
-	}
-	return &crd, nil
 }

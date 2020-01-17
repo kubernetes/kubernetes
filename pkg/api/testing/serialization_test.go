@@ -42,7 +42,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	k8s_apps_v1 "k8s.io/kubernetes/pkg/apis/apps/v1"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -80,7 +79,10 @@ func ConvertV1ReplicaSetToAPIReplicationController(in *appsv1.ReplicaSet, out *a
 }
 
 func TestSetControllerConversion(t *testing.T) {
-	if err := legacyscheme.Scheme.AddConversionFuncs(ConvertV1ReplicaSetToAPIReplicationController); err != nil {
+	s := legacyscheme.Scheme
+	if err := s.AddConversionFunc((*appsv1.ReplicaSet)(nil), (*api.ReplicationController)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return ConvertV1ReplicaSetToAPIReplicationController(a.(*appsv1.ReplicaSet), b.(*api.ReplicationController), scope)
+	}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -168,11 +170,18 @@ var nonRoundTrippableTypes = sets.NewString(
 var commonKinds = []string{"Status", "ListOptions", "DeleteOptions", "ExportOptions", "GetOptions", "CreateOptions", "UpdateOptions", "PatchOptions"}
 
 // TestCommonKindsRegistered verifies that all group/versions registered with
-// the testapi package have the common kinds.
+// the legacyscheme package have the common kinds.
 func TestCommonKindsRegistered(t *testing.T) {
+	gvs := map[schema.GroupVersion]bool{}
+	for gvk := range legacyscheme.Scheme.AllKnownTypes() {
+		if gvk.Version == runtime.APIVersionInternal {
+			continue
+		}
+		gvs[gvk.GroupVersion()] = true
+	}
+
 	for _, kind := range commonKinds {
-		for _, group := range testapi.Groups {
-			gv := group.GroupVersion()
+		for gv := range gvs {
 			gvk := gv.WithKind(kind)
 			obj, err := legacyscheme.Scheme.New(gvk)
 			if err != nil {
@@ -183,7 +192,7 @@ func TestCommonKindsRegistered(t *testing.T) {
 			if obj, got, err = legacyscheme.Codecs.LegacyCodec().Decode([]byte(`{"kind":"`+kind+`"}`), &defaults, obj); err != nil || gvk != *got {
 				t.Errorf("expected %v: %v %v", gvk, got, err)
 			}
-			data, err := runtime.Encode(legacyscheme.Codecs.LegacyCodec(*gv), obj)
+			data, err := runtime.Encode(legacyscheme.Codecs.LegacyCodec(gv), obj)
 			if err != nil {
 				t.Errorf("expected %v: %v\n%s", gvk, err, string(data))
 				continue
@@ -204,7 +213,7 @@ func TestCommonKindsRegistered(t *testing.T) {
 }
 
 // TestRoundTripTypes applies the round-trip test to all round-trippable Kinds
-// in all of the API groups registered for test in the testapi package.
+// in all of the API groups registered for test in the legacyscheme package.
 func TestRoundTripTypes(t *testing.T) {
 	seed := rand.Int63()
 	fuzzer := fuzzer.FuzzerFor(FuzzerFuncs, rand.NewSource(seed), legacyscheme.Codecs)
@@ -236,8 +245,8 @@ func TestEncodePtr(t *testing.T) {
 		},
 	}
 	obj := runtime.Object(pod)
-	data, err := runtime.Encode(testapi.Default.Codec(), obj)
-	obj2, err2 := runtime.Decode(testapi.Default.Codec(), data)
+	data, err := runtime.Encode(legacyscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), obj)
+	obj2, err2 := runtime.Decode(legacyscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), data)
 	if err != nil || err2 != nil {
 		t.Fatalf("Failure: '%v' '%v'", err, err2)
 	}
@@ -259,7 +268,7 @@ metadata:
 spec:
   containers: null
 status: {}`)
-	if obj, err := runtime.Decode(testapi.Default.Codec(), testYAML); err != nil {
+	if obj, err := runtime.Decode(legacyscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), testYAML); err != nil {
 		t.Fatalf("unable to decode yaml: %v", err)
 	} else {
 		if obj2, ok := obj.(*api.Pod); !ok {
@@ -276,11 +285,11 @@ status: {}`)
 // an unknown kind will not be decoded without error.
 func TestBadJSONRejection(t *testing.T) {
 	badJSONMissingKind := []byte(`{ }`)
-	if _, err := runtime.Decode(testapi.Default.Codec(), badJSONMissingKind); err == nil {
+	if _, err := runtime.Decode(legacyscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), badJSONMissingKind); err == nil {
 		t.Errorf("Did not reject despite lack of kind field: %s", badJSONMissingKind)
 	}
 	badJSONUnknownType := []byte(`{"kind": "bar"}`)
-	if _, err1 := runtime.Decode(testapi.Default.Codec(), badJSONUnknownType); err1 == nil {
+	if _, err1 := runtime.Decode(legacyscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), badJSONUnknownType); err1 == nil {
 		t.Errorf("Did not reject despite use of unknown type: %s", badJSONUnknownType)
 	}
 	/*badJSONKindMismatch := []byte(`{"kind": "Pod"}`)
@@ -302,14 +311,14 @@ func TestUnversionedTypes(t *testing.T) {
 
 	for _, obj := range testcases {
 		// Make sure the unversioned codec can encode
-		unversionedJSON, err := runtime.Encode(testapi.Default.Codec(), obj)
+		unversionedJSON, err := runtime.Encode(legacyscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), obj)
 		if err != nil {
 			t.Errorf("%v: unexpected error: %v", obj, err)
 			continue
 		}
 
 		// Make sure the versioned codec under test can decode
-		versionDecodedObject, err := runtime.Decode(testapi.Default.Codec(), unversionedJSON)
+		versionDecodedObject, err := runtime.Decode(legacyscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), unversionedJSON)
 		if err != nil {
 			t.Errorf("%v: unexpected error: %v", obj, err)
 			continue
@@ -451,7 +460,7 @@ func BenchmarkEncodeCodec(b *testing.B) {
 	width := len(items)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if _, err := runtime.Encode(testapi.Default.Codec(), &items[i%width]); err != nil {
+		if _, err := runtime.Encode(legacyscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), &items[i%width]); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -471,7 +480,7 @@ func BenchmarkEncodeCodecFromInternal(b *testing.B) {
 	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if _, err := runtime.Encode(testapi.Default.Codec(), &encodable[i%width]); err != nil {
+		if _, err := runtime.Encode(legacyscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), &encodable[i%width]); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -492,7 +501,7 @@ func BenchmarkEncodeJSONMarshal(b *testing.B) {
 }
 
 func BenchmarkDecodeCodec(b *testing.B) {
-	codec := testapi.Default.Codec()
+	codec := legacyscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion)
 	items := benchmarkItems(b)
 	width := len(items)
 	encoded := make([][]byte, width)
@@ -514,7 +523,7 @@ func BenchmarkDecodeCodec(b *testing.B) {
 }
 
 func BenchmarkDecodeIntoExternalCodec(b *testing.B) {
-	codec := testapi.Default.Codec()
+	codec := legacyscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion)
 	items := benchmarkItems(b)
 	width := len(items)
 	encoded := make([][]byte, width)
@@ -537,7 +546,7 @@ func BenchmarkDecodeIntoExternalCodec(b *testing.B) {
 }
 
 func BenchmarkDecodeIntoInternalCodec(b *testing.B) {
-	codec := testapi.Default.Codec()
+	codec := legacyscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion)
 	items := benchmarkItems(b)
 	width := len(items)
 	encoded := make([][]byte, width)
@@ -561,7 +570,7 @@ func BenchmarkDecodeIntoInternalCodec(b *testing.B) {
 
 // BenchmarkDecodeJSON provides a baseline for regular JSON decode performance
 func BenchmarkDecodeIntoJSON(b *testing.B) {
-	codec := testapi.Default.Codec()
+	codec := legacyscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion)
 	items := benchmarkItems(b)
 	width := len(items)
 	encoded := make([][]byte, width)
@@ -586,7 +595,7 @@ func BenchmarkDecodeIntoJSON(b *testing.B) {
 // BenchmarkDecodeIntoJSONCodecGenConfigFast provides a baseline
 // for JSON decode performance with jsoniter.ConfigFast
 func BenchmarkDecodeIntoJSONCodecGenConfigFast(b *testing.B) {
-	kcodec := testapi.Default.Codec()
+	kcodec := legacyscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion)
 	items := benchmarkItems(b)
 	width := len(items)
 	encoded := make([][]byte, width)
@@ -613,7 +622,7 @@ func BenchmarkDecodeIntoJSONCodecGenConfigFast(b *testing.B) {
 // jsoniter.ConfigCompatibleWithStandardLibrary, but with case sensitivity set
 // to true
 func BenchmarkDecodeIntoJSONCodecGenConfigCompatibleWithStandardLibrary(b *testing.B) {
-	kcodec := testapi.Default.Codec()
+	kcodec := legacyscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion)
 	items := benchmarkItems(b)
 	width := len(items)
 	encoded := make([][]byte, width)
@@ -651,7 +660,7 @@ func BenchmarkEncodeYAMLMarshal(b *testing.B) {
 
 // BenchmarkDecodeYAML provides a baseline for regular YAML decode performance
 func BenchmarkDecodeIntoYAML(b *testing.B) {
-	codec := testapi.Default.Codec()
+	codec := legacyscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion)
 	items := benchmarkItems(b)
 	width := len(items)
 	encoded := make([][]byte, width)

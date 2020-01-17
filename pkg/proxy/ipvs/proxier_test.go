@@ -28,12 +28,13 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
-	discovery "k8s.io/api/discovery/v1alpha1"
+	discovery "k8s.io/api/discovery/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/proxy"
+	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	netlinktest "k8s.io/kubernetes/pkg/proxy/ipvs/testing"
 	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
 	proxyutiltest "k8s.io/kubernetes/pkg/proxy/util/testing"
@@ -59,18 +60,6 @@ func (f *fakeIPGetter) NodeIPs() ([]net.IP, error) {
 	return f.nodeIPs, nil
 }
 
-type fakeHealthChecker struct {
-	services  map[types.NamespacedName]uint16
-	Endpoints map[types.NamespacedName]int
-}
-
-func newFakeHealthChecker() *fakeHealthChecker {
-	return &fakeHealthChecker{
-		services:  map[types.NamespacedName]uint16{},
-		Endpoints: map[types.NamespacedName]int{},
-	}
-}
-
 // fakePortOpener implements portOpener.
 type fakePortOpener struct {
 	openPorts []*utilproxy.LocalPort
@@ -81,16 +70,6 @@ type fakePortOpener struct {
 func (f *fakePortOpener) OpenLocalPort(lp *utilproxy.LocalPort) (utilproxy.Closeable, error) {
 	f.openPorts = append(f.openPorts, lp)
 	return nil, nil
-}
-
-func (fake *fakeHealthChecker) SyncServices(newServices map[types.NamespacedName]uint16) error {
-	fake.services = newServices
-	return nil
-}
-
-func (fake *fakeHealthChecker) SyncEndpoints(newEndpoints map[types.NamespacedName]int) error {
-	fake.Endpoints = newEndpoints
-	return nil
 }
 
 // fakeKernelHandler implements KernelHandler.
@@ -119,9 +98,9 @@ func (fake *fakeIPSetVersioner) GetVersion() (string, error) {
 
 func NewFakeProxier(ipt utiliptables.Interface, ipvs utilipvs.Interface, ipset utilipset.Interface, nodeIPs []net.IP, excludeCIDRs []*net.IPNet, endpointSlicesEnabled bool) *Proxier {
 	fcmd := fakeexec.FakeCmd{
-		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
-			func() ([]byte, error) { return []byte("dummy device have been created"), nil },
-			func() ([]byte, error) { return []byte(""), nil },
+		CombinedOutputScript: []fakeexec.FakeAction{
+			func() ([]byte, []byte, error) { return []byte("dummy device have been created"), nil, nil },
+			func() ([]byte, []byte, error) { return []byte(""), nil, nil },
 		},
 	}
 	fexec := &fakeexec.FakeExec{
@@ -151,7 +130,7 @@ func NewFakeProxier(ipt utiliptables.Interface, ipvs utilipvs.Interface, ipset u
 		hostname:              testHostname,
 		portsMap:              make(map[utilproxy.LocalPort]utilproxy.Closeable),
 		portMapper:            &fakePortOpener{[]*utilproxy.LocalPort{}},
-		healthChecker:         newFakeHealthChecker(),
+		serviceHealthServer:   healthcheck.NewFakeServiceHealthServer(),
 		ipvsScheduler:         DefaultScheduler,
 		ipGetter:              &fakeIPGetter{nodeIPs: nodeIPs},
 		iptablesData:          bytes.NewBuffer(nil),
@@ -2972,7 +2951,7 @@ func compareEndpointsMaps(t *testing.T, tci int, newMap proxy.EndpointsMap, expe
 					t.Errorf("Failed to cast proxy.BaseEndpointInfo")
 					continue
 				}
-				if *newEp != *(expected[x][i]) {
+				if !reflect.DeepEqual(*newEp, *(expected[x][i])) {
 					t.Errorf("[%d] expected new[%v][%d] to be %v, got %v", tci, x, i, expected[x][i], newEp)
 				}
 			}
@@ -3723,7 +3702,6 @@ func TestEndpointSliceE2E(t *testing.T) {
 	// Add initial service
 	serviceName := "svc1"
 	namespaceName := "ns1"
-
 	fp.OnServiceAdd(&v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: serviceName, Namespace: namespaceName},
 		Spec: v1.ServiceSpec{
@@ -3734,7 +3712,6 @@ func TestEndpointSliceE2E(t *testing.T) {
 	})
 
 	// Add initial endpoint slice
-	ipAddressType := discovery.AddressTypeIP
 	tcpProtocol := v1.ProtocolTCP
 	endpointSlice := &discovery.EndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{
@@ -3747,7 +3724,7 @@ func TestEndpointSliceE2E(t *testing.T) {
 			Port:     utilpointer.Int32Ptr(80),
 			Protocol: &tcpProtocol,
 		}},
-		AddressType: &ipAddressType,
+		AddressType: discovery.AddressTypeIPv4,
 		Endpoints: []discovery.Endpoint{{
 			Addresses:  []string{"10.0.1.1"},
 			Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},

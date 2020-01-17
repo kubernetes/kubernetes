@@ -297,6 +297,9 @@ func TestOpenAPIApiextensionsOverlapProtection(t *testing.T) {
 		t.Fatalf("unexpected error: apiextensions definition doesn't exist")
 	}
 	bytes, err := json.Marshal(apiextensionsDefinition)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	if exist := strings.Contains(string(bytes), testApiextensionsOverlapProbeString); exist {
 		t.Fatalf("unexpected error: apiextensions definition gets overlapped")
 	}
@@ -428,6 +431,10 @@ func testReconcilersMasterLease(t *testing.T, leaseCount int, masterCount int) {
 	// 2. verify master count servers have registered
 	if err := wait.PollImmediate(3*time.Second, 2*time.Minute, func() (bool, error) {
 		client, err := kubernetes.NewForConfig(masterCountServers[0].ClientConfig)
+		if err != nil {
+			t.Logf("error creating client: %v", err)
+			return false, nil
+		}
 		endpoints, err := client.CoreV1().Endpoints("default").Get("kubernetes", metav1.GetOptions{})
 		if err != nil {
 			t.Logf("error fetching endpoints: %v", err)

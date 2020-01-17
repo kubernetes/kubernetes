@@ -27,13 +27,14 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/net"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -160,9 +161,9 @@ var _ = SIGDescribe("Proxy", func() {
 				Labels:      labels,
 				CreatedPods: &pods,
 			}
-			err = framework.RunRC(cfg)
+			err = e2erc.RunRC(cfg)
 			framework.ExpectNoError(err)
-			defer framework.DeleteRCAndWaitForGC(f.ClientSet, f.Namespace.Name, cfg.Name)
+			defer e2erc.DeleteRCAndWaitForGC(f.ClientSet, f.Namespace.Name, cfg.Name)
 
 			err = waitForEndpoint(f.ClientSet, f.Namespace.Name, service.Name)
 			framework.ExpectNoError(err)
@@ -225,7 +226,7 @@ var _ = SIGDescribe("Proxy", func() {
 						body, status, d, err := doProxy(f, path, i)
 
 						if err != nil {
-							if serr, ok := err.(*errors.StatusError); ok {
+							if serr, ok := err.(*apierrors.StatusError); ok {
 								recordError(fmt.Sprintf("%v (%v; %v): path %v gave status error: %+v",
 									i, status, d, path, serr.Status()))
 							} else {
@@ -321,7 +322,7 @@ func waitForEndpoint(c clientset.Interface, ns, name string) error {
 	registerTimeout := time.Minute
 	for t := time.Now(); time.Since(t) < registerTimeout; time.Sleep(framework.Poll) {
 		endpoint, err := c.CoreV1().Endpoints(ns).Get(name, metav1.GetOptions{})
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			framework.Logf("Endpoint %s/%s is not ready yet", ns, name)
 			continue
 		}

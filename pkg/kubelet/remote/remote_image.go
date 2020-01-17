@@ -39,7 +39,7 @@ type RemoteImageService struct {
 // NewRemoteImageService creates a new internalapi.ImageManagerService.
 func NewRemoteImageService(endpoint string, connectionTimeout time.Duration) (internalapi.ImageManagerService, error) {
 	klog.V(3).Infof("Connecting to image service %s", endpoint)
-	addr, dailer, err := util.GetAddressAndDialer(endpoint)
+	addr, dialer, err := util.GetAddressAndDialer(endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -47,7 +47,7 @@ func NewRemoteImageService(endpoint string, connectionTimeout time.Duration) (in
 	ctx, cancel := context.WithTimeout(context.Background(), connectionTimeout)
 	defer cancel()
 
-	conn, err := grpc.DialContext(ctx, addr, grpc.WithInsecure(), grpc.WithDialer(dailer), grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxMsgSize)))
+	conn, err := grpc.DialContext(ctx, addr, grpc.WithInsecure(), grpc.WithContextDialer(dialer), grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxMsgSize)))
 	if err != nil {
 		klog.Errorf("Connect remote image service %s failed: %v", addr, err)
 		return nil, err

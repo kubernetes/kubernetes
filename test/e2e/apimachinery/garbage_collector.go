@@ -28,7 +28,7 @@ import (
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apiextensionstestserver "k8s.io/apiextensions-apiserver/test/integration/fixtures"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -40,6 +40,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 
 	"github.com/onsi/ginkgo"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -326,7 +327,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		if err := wait.Poll(5*time.Second, 30*time.Second, func() (bool, error) {
 			pods, err := podClient.List(metav1.ListOptions{})
 			if err != nil {
-				return false, fmt.Errorf("Failed to list pods: %v", err)
+				return false, fmt.Errorf("failed to list pods: %v", err)
 			}
 			// We intentionally don't wait the number of pods to reach
 			// rc.Spec.Replicas. We want to see if the garbage collector and the
@@ -384,7 +385,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		if err := wait.Poll(5*time.Second, 30*time.Second, func() (bool, error) {
 			rc, err := rcClient.Get(rc.Name, metav1.GetOptions{})
 			if err != nil {
-				return false, fmt.Errorf("Failed to get rc: %v", err)
+				return false, fmt.Errorf("failed to get rc: %v", err)
 			}
 			if rc.Status.Replicas == *rc.Spec.Replicas {
 				return true, nil
@@ -411,7 +412,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		if err := wait.Poll(5*time.Second, 120*time.Second, func() (bool, error) {
 			rcs, err := rcClient.List(metav1.ListOptions{})
 			if err != nil {
-				return false, fmt.Errorf("Failed to list rcs: %v", err)
+				return false, fmt.Errorf("failed to list rcs: %v", err)
 			}
 			if len(rcs.Items) != 0 {
 				return false, nil
@@ -450,7 +451,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		if err := wait.Poll(5*time.Second, 30*time.Second, func() (bool, error) {
 			rc, err := rcClient.Get(rc.Name, metav1.GetOptions{})
 			if err != nil {
-				return false, fmt.Errorf("Failed to get rc: %v", err)
+				return false, fmt.Errorf("failed to get rc: %v", err)
 			}
 			if rc.Status.Replicas == *rc.Spec.Replicas {
 				return true, nil
@@ -499,7 +500,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		err = wait.PollImmediate(500*time.Millisecond, 1*time.Minute, func() (bool, error) {
 			rsList, err := rsClient.List(metav1.ListOptions{})
 			if err != nil {
-				return false, fmt.Errorf("Failed to list rs: %v", err)
+				return false, fmt.Errorf("failed to list rs: %v", err)
 			}
 			return len(rsList.Items) > 0, nil
 
@@ -558,7 +559,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		err = wait.PollImmediate(500*time.Millisecond, 1*time.Minute, func() (bool, error) {
 			rsList, err := rsClient.List(metav1.ListOptions{})
 			if err != nil {
-				return false, fmt.Errorf("Failed to list rs: %v", err)
+				return false, fmt.Errorf("failed to list rs: %v", err)
 			}
 			return len(rsList.Items) > 0, nil
 
@@ -631,7 +632,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		if err := wait.Poll(5*time.Second, 30*time.Second, func() (bool, error) {
 			rc, err := rcClient.Get(rc.Name, metav1.GetOptions{})
 			if err != nil {
-				return false, fmt.Errorf("Failed to get rc: %v", err)
+				return false, fmt.Errorf("failed to get rc: %v", err)
 			}
 			if rc.Status.Replicas == *rc.Spec.Replicas {
 				return true, nil
@@ -667,7 +668,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 				framework.Logf("")
 				return false, nil
 			}
-			if errors.IsNotFound(err) {
+			if apierrors.IsNotFound(err) {
 				return true, nil
 			}
 			return false, err
@@ -726,7 +727,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		if err := wait.Poll(5*time.Second, 30*time.Second, func() (bool, error) {
 			rc1, err := rcClient.Get(rc1.Name, metav1.GetOptions{})
 			if err != nil {
-				return false, fmt.Errorf("Failed to get rc: %v", err)
+				return false, fmt.Errorf("failed to get rc: %v", err)
 			}
 			if rc1.Status.Replicas == *rc1.Spec.Replicas {
 				return true, nil
@@ -769,7 +770,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 				framework.Logf("")
 				return false, nil
 			}
-			if errors.IsNotFound(err) {
+			if apierrors.IsNotFound(err) {
 				return true, nil
 			}
 			return false, err
@@ -854,7 +855,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		if err := wait.Poll(5*time.Second, 90*time.Second, func() (bool, error) {
 			pods, err2 = podClient.List(metav1.ListOptions{})
 			if err2 != nil {
-				return false, fmt.Errorf("Failed to list pods: %v", err)
+				return false, fmt.Errorf("failed to list pods: %v", err)
 			}
 			if len(pods.Items) == 0 {
 				return true, nil
@@ -882,7 +883,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		definition := apiextensionstestserver.NewRandomNameV1CustomResourceDefinition(apiextensionsv1.ClusterScoped)
 		defer func() {
 			err = apiextensionstestserver.DeleteV1CustomResourceDefinition(definition, apiExtensionClient)
-			if err != nil && !errors.IsNotFound(err) {
+			if err != nil && !apierrors.IsNotFound(err) {
 				framework.Failf("failed to delete CustomResourceDefinition: %v", err)
 			}
 		}()
@@ -951,7 +952,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		// Ensure the dependent is deleted.
 		if err := wait.Poll(5*time.Second, 60*time.Second, func() (bool, error) {
 			_, err := resourceClient.Get(dependentName, metav1.GetOptions{})
-			return errors.IsNotFound(err), nil
+			return apierrors.IsNotFound(err), nil
 		}); err != nil {
 			framework.Logf("owner: %#v", persistedOwner)
 			framework.Logf("dependent: %#v", persistedDependent)
@@ -963,7 +964,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		if err == nil {
 			framework.Failf("expected owner resource %q to be deleted", ownerName)
 		} else {
-			if !errors.IsNotFound(err) {
+			if !apierrors.IsNotFound(err) {
 				framework.Failf("unexpected error getting owner resource %q: %v", ownerName, err)
 			}
 		}
@@ -985,7 +986,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		definition := apiextensionstestserver.NewRandomNameV1CustomResourceDefinition(apiextensionsv1.ClusterScoped)
 		defer func() {
 			err = apiextensionstestserver.DeleteV1CustomResourceDefinition(definition, apiExtensionClient)
-			if err != nil && !errors.IsNotFound(err) {
+			if err != nil && !apierrors.IsNotFound(err) {
 				framework.Failf("failed to delete CustomResourceDefinition: %v", err)
 			}
 		}()
@@ -1056,8 +1057,8 @@ var _ = SIGDescribe("Garbage collector", func() {
 			if err == nil {
 				return false, nil
 			}
-			if err != nil && !errors.IsNotFound(err) {
-				return false, fmt.Errorf("Failed to get owner: %v", err)
+			if err != nil && !apierrors.IsNotFound(err) {
+				return false, fmt.Errorf("failed to get owner: %v", err)
 			}
 			return true, nil
 		}); err != nil {
@@ -1075,7 +1076,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 	})
 
 	ginkgo.It("should delete jobs and pods created by cronjob", func() {
-		framework.SkipIfMissingResource(f.DynamicClient, CronJobGroupVersionResource, f.Namespace.Name)
+		e2eskipper.SkipIfMissingResource(f.DynamicClient, CronJobGroupVersionResource, f.Namespace.Name)
 
 		ginkgo.By("Create the cronjob")
 		cronJob := newCronJob("simple", "*/1 * * * ?")
@@ -1086,7 +1087,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		err = wait.PollImmediate(500*time.Millisecond, 2*time.Minute, func() (bool, error) {
 			jobs, err := f.ClientSet.BatchV1().Jobs(f.Namespace.Name).List(metav1.ListOptions{})
 			if err != nil {
-				return false, fmt.Errorf("Failed to list jobs: %v", err)
+				return false, fmt.Errorf("failed to list jobs: %v", err)
 			}
 			return len(jobs.Items) > 0, nil
 		})

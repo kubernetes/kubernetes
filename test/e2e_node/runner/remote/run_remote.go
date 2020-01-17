@@ -39,7 +39,7 @@ import (
 	"k8s.io/kubernetes/test/e2e_node/remote"
 	"k8s.io/kubernetes/test/e2e_node/system"
 
-	"github.com/pborman/uuid"
+	"github.com/google/uuid"
 	"golang.org/x/oauth2/google"
 	compute "google.golang.org/api/compute/v0.beta"
 	"google.golang.org/api/option"
@@ -105,12 +105,14 @@ var (
 	suite          remote.TestSuite
 )
 
+// Archive contains path info in the archive.
 type Archive struct {
 	sync.Once
 	path string
 	err  error
 }
 
+// TestResult contains some information about the test results.
 type TestResult struct {
 	output string
 	err    error
@@ -129,22 +131,24 @@ type TestResult struct {
 //         project: gce-image-project
 //         machine: for benchmark only, the machine type (GCE instance) to run test
 //         tests: for benchmark only, a list of ginkgo focus strings to match tests
-
 // TODO(coufon): replace 'image' with 'node' in configurations
 // and we plan to support testing custom machines other than GCE by specifying host
 type ImageConfig struct {
 	Images map[string]GCEImage `json:"images"`
 }
 
+// Accelerator contains type and count about resource.
 type Accelerator struct {
 	Type  string `json:"type,omitempty"`
 	Count int64  `json:"count,omitempty"`
 }
 
+// Resources contains accelerators array.
 type Resources struct {
 	Accelerators []Accelerator `json:"accelerators,omitempty"`
 }
 
+// GCEImage contains some information about CGE Image.
 type GCEImage struct {
 	Image      string `json:"image,omitempty"`
 	ImageDesc  string `json:"image_description,omitempty"`
@@ -300,7 +304,7 @@ func main() {
 		}
 	}
 	if *instanceNamePrefix == "" {
-		*instanceNamePrefix = "tmp-node-e2e-" + uuid.NewUUID().String()[:8]
+		*instanceNamePrefix = "tmp-node-e2e-" + uuid.New().String()[:8]
 	}
 
 	// Setup coloring
@@ -428,23 +432,23 @@ func testHost(host string, deleteFiles bool, imageDesc, junitFilePrefix, ginkgoF
 		}
 	}
 	if strings.ToUpper(instance.Status) != "RUNNING" {
-		err = fmt.Errorf("instance %s not in state RUNNING, was %s.", host, instance.Status)
+		err = fmt.Errorf("instance %s not in state RUNNING, was %s", host, instance.Status)
 		return &TestResult{
 			err:    err,
 			host:   host,
 			exitOk: false,
 		}
 	}
-	externalIp := getExternalIp(instance)
-	if len(externalIp) > 0 {
-		remote.AddHostnameIp(host, externalIp)
+	externalIP := getExternalIP(instance)
+	if len(externalIP) > 0 {
+		remote.AddHostnameIP(host, externalIP)
 	}
 
 	path, err := arc.getArchive()
 	if err != nil {
 		// Don't log fatal because we need to do any needed cleanup contained in "defer" statements
 		return &TestResult{
-			err: fmt.Errorf("unable to create test archive: %v.", err),
+			err: fmt.Errorf("unable to create test archive: %v", err),
 		}
 	}
 
@@ -619,8 +623,10 @@ func createInstance(imageConfig *internalGCEImage) (string, error) {
 	}
 	i.Scheduling = &scheduling
 	i.Metadata = imageConfig.metadata
+	var insertionOperationName string
 	if _, err := computeService.Instances.Get(*project, *zone, i.Name).Do(); err != nil {
 		op, err := computeService.Instances.Insert(*project, *zone, i).Do()
+
 		if err != nil {
 			ret := fmt.Sprintf("could not create instance %s: API error: %v", name, err)
 			if op != nil {
@@ -628,27 +634,49 @@ func createInstance(imageConfig *internalGCEImage) (string, error) {
 			}
 			return "", fmt.Errorf(ret)
 		} else if op.Error != nil {
-			return "", fmt.Errorf("could not create instance %s: %+v", name, op.Error)
-		}
-	}
+			var errs []string
+			for _, insertErr := range op.Error.Errors {
+				errs = append(errs, fmt.Sprintf("%+v", insertErr))
+			}
+			return "", fmt.Errorf("could not create instance %s: %+v", name, errs)
 
+		}
+		insertionOperationName = op.Name
+	}
 	instanceRunning := false
 	for i := 0; i < 30 && !instanceRunning; i++ {
 		if i > 0 {
 			time.Sleep(time.Second * 20)
 		}
+		var insertionOperation *compute.Operation
+		insertionOperation, err = computeService.ZoneOperations.Get(*project, *zone, insertionOperationName).Do()
+		if err != nil {
+			continue
+		}
+		if strings.ToUpper(insertionOperation.Status) != "DONE" {
+			err = fmt.Errorf("instance insert operation %s not in state DONE, was %s", name, insertionOperation.Status)
+			continue
+		}
+		if insertionOperation.Error != nil {
+			var errs []string
+			for _, insertErr := range insertionOperation.Error.Errors {
+				errs = append(errs, fmt.Sprintf("%+v", insertErr))
+			}
+			return name, fmt.Errorf("could not create instance %s: %+v", name, errs)
+		}
+
 		var instance *compute.Instance
 		instance, err = computeService.Instances.Get(*project, *zone, name).Do()
 		if err != nil {
 			continue
 		}
 		if strings.ToUpper(instance.Status) != "RUNNING" {
-			err = fmt.Errorf("instance %s not in state RUNNING, was %s.", name, instance.Status)
+			err = fmt.Errorf("instance %s not in state RUNNING, was %s", name, instance.Status)
 			continue
 		}
-		externalIp := getExternalIp(instance)
-		if len(externalIp) > 0 {
-			remote.AddHostnameIp(name, externalIp)
+		externalIP := getExternalIP(instance)
+		if len(externalIP) > 0 {
+			remote.AddHostnameIP(name, externalIP)
 		}
 		// TODO(random-liu): Remove the docker version check. Use some other command to check
 		// instance readiness.
@@ -699,7 +727,7 @@ func isCloudInitUsed(metadata *compute.Metadata) bool {
 	return false
 }
 
-func getExternalIp(instance *compute.Instance) string {
+func getExternalIP(instance *compute.Instance) string {
 	for i := range instance.NetworkInterfaces {
 		ni := instance.NetworkInterfaces[i]
 		for j := range ni.AccessConfigs {
@@ -785,7 +813,7 @@ func imageToInstanceName(imageConfig *internalGCEImage) string {
 	}
 	// For benchmark test, node name has the format 'machine-image-uuid' to run
 	// different machine types with the same image in parallel
-	return imageConfig.machine + "-" + imageConfig.image + "-" + uuid.NewUUID().String()[:8]
+	return imageConfig.machine + "-" + imageConfig.image + "-" + uuid.New().String()[:8]
 }
 
 func sourceImage(image, imageProject string) string {

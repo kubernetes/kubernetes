@@ -4,6 +4,20 @@
 
 `hyperkube` is built for multiple architectures and _the image is pushed automatically on every release._
 
+#### Images for development scenarios
+
+During the development process, it's effective to just build only the required binaries for specific
+architecture and generate single hyperkube image from it. The following shows how to generate
+linux/amd64 hyperkube image:
+
+```console
+# Run the following from the top level kubernetes directory, to build the binaries necessary for creating hyperkube image.
+$ KUBE_BUILD_PLATFORMS=linux/amd64 make kube-apiserver kube-controller-manager kube-proxy kube-scheduler kubectl kubelet
+
+# Create and push the hyperkube image
+$ REGISTRY=<registry> VERSION=<image version> ARCH=amd64 make -C cluster/images/hyperkube push
+```
+
 #### How to release by hand
 
 ```console

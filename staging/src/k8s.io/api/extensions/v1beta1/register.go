@@ -47,7 +47,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&Deployment{},
 		&DeploymentList{},
 		&DeploymentRollback{},
-		&ReplicationControllerDummy{},
 		&Scale{},
 		&DaemonSetList{},
 		&DaemonSet{},

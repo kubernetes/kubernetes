@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -71,7 +72,7 @@ var _ = utils.SIGDescribe("Volume FStype [Feature:vsphere]", func() {
 		namespace string
 	)
 	ginkgo.BeforeEach(func() {
-		framework.SkipUnlessProviderIs("vsphere")
+		e2eskipper.SkipUnlessProviderIs("vsphere")
 		Bootstrap(f)
 		client = f.ClientSet
 		namespace = f.Namespace.Name
@@ -130,6 +131,7 @@ func invokeTestForInvalidFstype(f *framework.Framework, client clientset.Interfa
 	framework.ExpectError(err)
 
 	eventList, err := client.CoreV1().Events(namespace).List(metav1.ListOptions{})
+	framework.ExpectNoError(err)
 
 	// Detach and delete volume
 	detachVolume(f, client, pod, persistentvolumes[0].Spec.VsphereVolume.VolumePath)
@@ -144,7 +146,7 @@ func invokeTestForInvalidFstype(f *framework.Framework, client clientset.Interfa
 			isFound = true
 		}
 	}
-	gomega.Expect(isFound).To(gomega.BeTrue(), "Unable to verify MountVolume.MountDevice failure")
+	framework.ExpectEqual(isFound, true, "Unable to verify MountVolume.MountDevice failure")
 }
 
 func createVolume(client clientset.Interface, namespace string, scParameters map[string]string) (*v1.PersistentVolumeClaim, []*v1.PersistentVolume) {

@@ -111,69 +111,30 @@ func TestConverter_byteSlice(t *testing.T) {
 func TestConverter_MismatchedTypes(t *testing.T) {
 	c := NewConverter(DefaultNameFunc)
 
-	err := c.RegisterConversionFunc(
-		func(in *[]string, out *int, s Scope) error {
-			if str, err := strconv.Atoi((*in)[0]); err != nil {
-				return err
-			} else {
-				*out = str
-				return nil
-			}
+	convertFn := func(in *[]string, out *int, s Scope) error {
+		if str, err := strconv.Atoi((*in)[0]); err != nil {
+			return err
+		} else {
+			*out = str
+			return nil
+		}
+	}
+	if err := c.RegisterUntypedConversionFunc(
+		(*[]string)(nil), (*int)(nil),
+		func(a, b interface{}, s Scope) error {
+			return convertFn(a.(*[]string), b.(*int), s)
 		},
-	)
-	if err != nil {
+	); err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
 	src := []string{"5"}
 	var dest *int
-	err = c.Convert(&src, &dest, 0, nil)
-	if err != nil {
+	if err := c.Convert(&src, &dest, 0, nil); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if e, a := 5, *dest; e != a {
 		t.Errorf("expected %#v, got %#v", e, a)
-	}
-}
-
-func TestConverter_DefaultConvert(t *testing.T) {
-	type A struct {
-		Foo string
-		Baz int
-	}
-	type B struct {
-		Bar string
-		Baz int
-	}
-	c := NewConverter(DefaultNameFunc)
-	c.Debug = testLogger(t)
-	c.nameFunc = func(t reflect.Type) string { return "MyType" }
-
-	// Ensure conversion funcs can call DefaultConvert to get default behavior,
-	// then fixup remaining fields manually
-	err := c.RegisterConversionFunc(func(in *A, out *B, s Scope) error {
-		if err := s.DefaultConvert(in, out, IgnoreMissingFields); err != nil {
-			return err
-		}
-		out.Bar = in.Foo
-		return nil
-	})
-	if err != nil {
-		t.Fatalf("unexpected error %v", err)
-	}
-
-	x := A{"hello, intrepid test reader!", 3}
-	y := B{}
-
-	err = c.Convert(&x, &y, 0, nil)
-	if err != nil {
-		t.Fatalf("unexpected error %v", err)
-	}
-	if e, a := x.Foo, y.Bar; e != a {
-		t.Errorf("expected %v, got %v", e, a)
-	}
-	if e, a := x.Baz, y.Baz; e != a {
-		t.Errorf("expected %v, got %v", e, a)
 	}
 }
 
@@ -229,26 +190,35 @@ func TestConverter_CallsRegisteredFunctions(t *testing.T) {
 	type C struct{}
 	c := NewConverter(DefaultNameFunc)
 	c.Debug = testLogger(t)
-	err := c.RegisterConversionFunc(func(in *A, out *B, s Scope) error {
+	convertFn1 := func(in *A, out *B, s Scope) error {
 		out.Bar = in.Foo
 		return s.Convert(&in.Baz, &out.Baz, 0)
-	})
-	if err != nil {
+	}
+	if err := c.RegisterUntypedConversionFunc(
+		(*A)(nil), (*B)(nil),
+		func(a, b interface{}, s Scope) error {
+			return convertFn1(a.(*A), b.(*B), s)
+		},
+	); err != nil {
 		t.Fatalf("unexpected error %v", err)
 	}
-	err = c.RegisterConversionFunc(func(in *B, out *A, s Scope) error {
+	convertFn2 := func(in *B, out *A, s Scope) error {
 		out.Foo = in.Bar
 		return s.Convert(&in.Baz, &out.Baz, 0)
-	})
-	if err != nil {
+	}
+	if err := c.RegisterUntypedConversionFunc(
+		(*B)(nil), (*A)(nil),
+		func(a, b interface{}, s Scope) error {
+			return convertFn2(a.(*B), b.(*A), s)
+		},
+	); err != nil {
 		t.Fatalf("unexpected error %v", err)
 	}
 
 	x := A{"hello, intrepid test reader!", 3}
 	y := B{}
 
-	err = c.Convert(&x, &y, 0, nil)
-	if err != nil {
+	if err := c.Convert(&x, &y, 0, nil); err != nil {
 		t.Fatalf("unexpected error %v", err)
 	}
 	if e, a := x.Foo, y.Bar; e != a {
@@ -261,8 +231,7 @@ func TestConverter_CallsRegisteredFunctions(t *testing.T) {
 	z := B{"all your test are belong to us", 42}
 	w := A{}
 
-	err = c.Convert(&z, &w, 0, nil)
-	if err != nil {
+	if err := c.Convert(&z, &w, 0, nil); err != nil {
 		t.Fatalf("unexpected error %v", err)
 	}
 	if e, a := z.Bar, w.Foo; e != a {
@@ -272,14 +241,18 @@ func TestConverter_CallsRegisteredFunctions(t *testing.T) {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 
-	err = c.RegisterConversionFunc(func(in *A, out *C, s Scope) error {
+	convertFn3 := func(in *A, out *C, s Scope) error {
 		return fmt.Errorf("C can't store an A, silly")
-	})
-	if err != nil {
+	}
+	if err := c.RegisterUntypedConversionFunc(
+		(*A)(nil), (*C)(nil),
+		func(a, b interface{}, s Scope) error {
+			return convertFn3(a.(*A), b.(*C), s)
+		},
+	); err != nil {
 		t.Fatalf("unexpected error %v", err)
 	}
-	err = c.Convert(&A{}, &C{}, 0, nil)
-	if err == nil {
+	if err := c.Convert(&A{}, &C{}, 0, nil); err == nil {
 		t.Errorf("unexpected non-error")
 	}
 }
@@ -290,10 +263,16 @@ func TestConverter_IgnoredConversion(t *testing.T) {
 
 	count := 0
 	c := NewConverter(DefaultNameFunc)
-	if err := c.RegisterConversionFunc(func(in *A, out *B, s Scope) error {
+	convertFn := func(in *A, out *B, s Scope) error {
 		count++
 		return nil
-	}); err != nil {
+	}
+	if err := c.RegisterUntypedConversionFunc(
+		(*A)(nil), (*B)(nil),
+		func(a, b interface{}, s Scope) error {
+			return convertFn(a.(*A), b.(*B), s)
+		},
+	); err != nil {
 		t.Fatalf("unexpected error %v", err)
 	}
 	if err := c.RegisterIgnoredConversion(&A{}, &B{}); err != nil {
@@ -337,14 +316,26 @@ func TestConverter_GeneratedConversionOverridden(t *testing.T) {
 	type A struct{}
 	type B struct{}
 	c := NewConverter(DefaultNameFunc)
-	if err := c.RegisterConversionFunc(func(in *A, out *B, s Scope) error {
+	convertFn1 := func(in *A, out *B, s Scope) error {
 		return nil
-	}); err != nil {
+	}
+	if err := c.RegisterUntypedConversionFunc(
+		(*A)(nil), (*B)(nil),
+		func(a, b interface{}, s Scope) error {
+			return convertFn1(a.(*A), b.(*B), s)
+		},
+	); err != nil {
 		t.Fatalf("unexpected error %v", err)
 	}
-	if err := c.RegisterGeneratedConversionFunc(func(in *A, out *B, s Scope) error {
+	convertFn2 := func(in *A, out *B, s Scope) error {
 		return fmt.Errorf("generated function should be overridden")
-	}); err != nil {
+	}
+	if err := c.RegisterGeneratedUntypedConversionFunc(
+		(*A)(nil), (*B)(nil),
+		func(a, b interface{}, s Scope) error {
+			return convertFn2(a.(*A), b.(*B), s)
+		},
+	); err != nil {
 		t.Fatalf("unexpected error %v", err)
 	}
 
@@ -359,21 +350,36 @@ func TestConverter_WithConversionOverridden(t *testing.T) {
 	type A struct{}
 	type B struct{}
 	c := NewConverter(DefaultNameFunc)
-	if err := c.RegisterConversionFunc(func(in *A, out *B, s Scope) error {
+	convertFn1 := func(in *A, out *B, s Scope) error {
 		return fmt.Errorf("conversion function should be overridden")
-	}); err != nil {
+	}
+	if err := c.RegisterUntypedConversionFunc(
+		(*A)(nil), (*B)(nil),
+		func(a, b interface{}, s Scope) error {
+			return convertFn1(a.(*A), b.(*B), s)
+		},
+	); err != nil {
 		t.Fatalf("unexpected error %v", err)
 	}
-	if err := c.RegisterGeneratedConversionFunc(func(in *A, out *B, s Scope) error {
+	convertFn2 := func(in *A, out *B, s Scope) error {
 		return fmt.Errorf("generated function should be overridden")
-	}); err != nil {
+	}
+	if err := c.RegisterGeneratedUntypedConversionFunc(
+		(*A)(nil), (*B)(nil),
+		func(a, b interface{}, s Scope) error {
+			return convertFn2(a.(*A), b.(*B), s)
+		},
+	); err != nil {
 		t.Fatalf("unexpected error %v", err)
 	}
 
 	ext := NewConversionFuncs()
-	ext.Add(func(in *A, out *B, s Scope) error {
-		return nil
-	})
+	ext.AddUntyped(
+		(*A)(nil), (*B)(nil),
+		func(a, b interface{}, s Scope) error {
+			return nil
+		},
+	)
 	newc := c.WithConversions(ext)
 
 	a := A{}
@@ -394,13 +400,19 @@ func TestConverter_MapsStringArrays(t *testing.T) {
 	}
 	c := NewConverter(DefaultNameFunc)
 	c.Debug = testLogger(t)
-	if err := c.RegisterConversionFunc(func(input *[]string, out *string, s Scope) error {
+	convertFn1 := func(input *[]string, out *string, s Scope) error {
 		if len(*input) == 0 {
 			*out = ""
 		}
 		*out = (*input)[0]
 		return nil
-	}); err != nil {
+	}
+	if err := c.RegisterUntypedConversionFunc(
+		(*[]string)(nil), (*string)(nil),
+		func(a, b interface{}, s Scope) error {
+			return convertFn1(a.(*[]string), b.(*string), s)
+		},
+	); err != nil {
 		t.Fatalf("unexpected error %v", err)
 	}
 
@@ -416,7 +428,7 @@ func TestConverter_MapsStringArrays(t *testing.T) {
 		t.Error("unexpected non-error")
 	}
 
-	if err := c.RegisterConversionFunc(func(input *[]string, out *int, s Scope) error {
+	convertFn2 := func(input *[]string, out *int, s Scope) error {
 		if len(*input) == 0 {
 			*out = 0
 		}
@@ -427,7 +439,13 @@ func TestConverter_MapsStringArrays(t *testing.T) {
 		}
 		*out = i
 		return nil
-	}); err != nil {
+	}
+	if err := c.RegisterUntypedConversionFunc(
+		(*[]string)(nil), (*int)(nil),
+		func(a, b interface{}, s Scope) error {
+			return convertFn2(a.(*[]string), b.(*int), s)
+		},
+	); err != nil {
 		t.Fatalf("unexpected error %v", err)
 	}
 
@@ -447,13 +465,19 @@ func TestConverter_MapsStringArraysWithMappingKey(t *testing.T) {
 	}
 	c := NewConverter(DefaultNameFunc)
 	c.Debug = testLogger(t)
-	if err := c.RegisterConversionFunc(func(input *[]string, out *string, s Scope) error {
+	convertFn := func(input *[]string, out *string, s Scope) error {
 		if len(*input) == 0 {
 			*out = ""
 		}
 		*out = (*input)[0]
 		return nil
-	}); err != nil {
+	}
+	if err := c.RegisterUntypedConversionFunc(
+		(*[]string)(nil), (*string)(nil),
+		func(a, b interface{}, s Scope) error {
+			return convertFn(a.(*[]string), b.(*string), s)
+		},
+	); err != nil {
 		t.Fatalf("unexpected error %v", err)
 	}
 
@@ -536,38 +560,45 @@ func TestConverter_MapElemAddr(t *testing.T) {
 	}
 	c := NewConverter(DefaultNameFunc)
 	c.Debug = testLogger(t)
-	err := c.RegisterConversionFunc(
-		func(in *int, out *string, s Scope) error {
-			*out = fmt.Sprintf("%v", *in)
-			return nil
+	convertFn1 := func(in *int, out *string, s Scope) error {
+		*out = fmt.Sprintf("%v", *in)
+		return nil
+	}
+	if err := c.RegisterUntypedConversionFunc(
+		(*int)(nil), (*string)(nil),
+		func(a, b interface{}, s Scope) error {
+			return convertFn1(a.(*int), b.(*string), s)
 		},
-	)
-	if err != nil {
+	); err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	err = c.RegisterConversionFunc(
-		func(in *string, out *int, s Scope) error {
-			if str, err := strconv.Atoi(*in); err != nil {
-				return err
-			} else {
-				*out = str
-				return nil
-			}
+	convertFn2 := func(in *string, out *int, s Scope) error {
+		if str, err := strconv.Atoi(*in); err != nil {
+			return err
+		} else {
+			*out = str
+			return nil
+		}
+	}
+	if err := c.RegisterUntypedConversionFunc(
+		(*string)(nil), (*int)(nil),
+		func(a, b interface{}, s Scope) error {
+			return convertFn2(a.(*string), b.(*int), s)
 		},
-	)
-	if err != nil {
+	); err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 	f := fuzz.New().NilChance(0).NumElements(3, 3)
 	first := Foo{}
 	second := Bar{}
 	f.Fuzz(&first)
-	err = c.Convert(&first, &second, AllowDifferentFieldTypeNames, nil)
-	if err != nil {
+	if err := c.Convert(&first, &second, AllowDifferentFieldTypeNames, nil); err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 	third := Foo{}
-	err = c.Convert(&second, &third, AllowDifferentFieldTypeNames, nil)
+	if err := c.Convert(&second, &third, AllowDifferentFieldTypeNames, nil); err != nil {
+		t.Fatalf("error on Convert: %v", err)
+	}
 	if e, a := first, third; !reflect.DeepEqual(e, a) {
 		t.Errorf("Unexpected diff: %v", diff.ObjectDiff(e, a))
 	}
@@ -582,22 +613,24 @@ func TestConverter_tags(t *testing.T) {
 	}
 	c := NewConverter(DefaultNameFunc)
 	c.Debug = testLogger(t)
-	err := c.RegisterConversionFunc(
-		func(in *string, out *string, s Scope) error {
-			if e, a := "foo", s.SrcTag().Get("test"); e != a {
-				t.Errorf("expected %v, got %v", e, a)
-			}
-			if e, a := "bar", s.DestTag().Get("test"); e != a {
-				t.Errorf("expected %v, got %v", e, a)
-			}
-			return nil
+	convertFn := func(in *string, out *string, s Scope) error {
+		if e, a := "foo", s.SrcTag().Get("test"); e != a {
+			t.Errorf("expected %v, got %v", e, a)
+		}
+		if e, a := "bar", s.DestTag().Get("test"); e != a {
+			t.Errorf("expected %v, got %v", e, a)
+		}
+		return nil
+	}
+	if err := c.RegisterUntypedConversionFunc(
+		(*string)(nil), (*string)(nil),
+		func(a, b interface{}, s Scope) error {
+			return convertFn(a.(*string), b.(*string), s)
 		},
-	)
-	if err != nil {
+	); err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	err = c.Convert(&Foo{}, &Bar{}, AllowDifferentFieldTypeNames, nil)
-	if err != nil {
+	if err := c.Convert(&Foo{}, &Bar{}, AllowDifferentFieldTypeNames, nil); err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 }
@@ -608,33 +641,38 @@ func TestConverter_meta(t *testing.T) {
 	c := NewConverter(DefaultNameFunc)
 	c.Debug = testLogger(t)
 	checks := 0
-	err := c.RegisterConversionFunc(
-		func(in *Foo, out *Bar, s Scope) error {
-			if s.Meta() == nil {
-				t.Errorf("Meta did not get passed!")
-			}
-			checks++
-			s.Convert(&in.A, &out.A, 0)
-			return nil
+	convertFn1 := func(in *Foo, out *Bar, s Scope) error {
+		if s.Meta() == nil {
+			t.Errorf("Meta did not get passed!")
+		}
+		checks++
+		s.Convert(&in.A, &out.A, 0)
+		return nil
+	}
+	if err := c.RegisterUntypedConversionFunc(
+		(*Foo)(nil), (*Bar)(nil),
+		func(a, b interface{}, s Scope) error {
+			return convertFn1(a.(*Foo), b.(*Bar), s)
 		},
-	)
-	if err != nil {
+	); err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	err = c.RegisterConversionFunc(
-		func(in *string, out *string, s Scope) error {
-			if s.Meta() == nil {
-				t.Errorf("Meta did not get passed a second time!")
-			}
-			checks++
-			return nil
+	convertFn2 := func(in *string, out *string, s Scope) error {
+		if s.Meta() == nil {
+			t.Errorf("Meta did not get passed a second time!")
+		}
+		checks++
+		return nil
+	}
+	if err := c.RegisterUntypedConversionFunc(
+		(*string)(nil), (*string)(nil),
+		func(a, b interface{}, s Scope) error {
+			return convertFn2(a.(*string), b.(*string), s)
 		},
-	)
-	if err != nil {
+	); err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	err = c.Convert(&Foo{}, &Bar{}, 0, &Meta{})
-	if err != nil {
+	if err := c.Convert(&Foo{}, &Bar{}, 0, &Meta{}); err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 	if checks != 2 {

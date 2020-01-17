@@ -14,6 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# shellcheck disable=SC2034 # Variables sourced in other scripts.
+
 # Common utilities, variables and checks for all build scripts.
 set -o errexit
 set -o nounset
@@ -92,15 +94,15 @@ readonly KUBE_CONTAINER_RSYNC_PORT=8730
 # $1 - server architecture
 kube::build::get_docker_wrapped_binaries() {
   local arch=$1
-  local debian_base_version=v1.0.0
-  local debian_iptables_version=v11.0.2
+  local debian_base_version=v2.0.0
+  local debian_iptables_version=v12.0.1
   ### If you change any of these lists, please also update DOCKERIZED_BINARIES
   ### in build/BUILD. And kube::golang::server_image_targets
   local targets=(
-    kube-apiserver,"${KUBE_BASE_IMAGE_REGISTRY}/debian-base-${arch}:${debian_base_version}"
-    kube-controller-manager,"${KUBE_BASE_IMAGE_REGISTRY}/debian-base-${arch}:${debian_base_version}"
-    kube-scheduler,"${KUBE_BASE_IMAGE_REGISTRY}/debian-base-${arch}:${debian_base_version}"
-    kube-proxy,"${KUBE_BASE_IMAGE_REGISTRY}/debian-iptables-${arch}:${debian_iptables_version}"
+    "kube-apiserver,${KUBE_BASE_IMAGE_REGISTRY}/debian-base-${arch}:${debian_base_version}"
+    "kube-controller-manager,${KUBE_BASE_IMAGE_REGISTRY}/debian-base-${arch}:${debian_base_version}"
+    "kube-scheduler,${KUBE_BASE_IMAGE_REGISTRY}/debian-base-${arch}:${debian_base_version}"
+    "kube-proxy,${KUBE_BASE_IMAGE_REGISTRY}/debian-iptables-${arch}:${debian_iptables_version}"
   )
 
   echo "${targets[@]}"
@@ -304,7 +306,7 @@ function kube::build::has_ip() {
 # Detect if a specific image exists
 #
 # $1 - image repo name
-# #2 - image tag
+# $2 - image tag
 function kube::build::docker_image_exists() {
   [[ -n $1 && -n $2 ]] || {
     kube::log::error "Internal error. Image not specified in docker_image_exists."

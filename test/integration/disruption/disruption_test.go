@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/api/policy/v1beta1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -163,6 +163,9 @@ func TestPDBWithScaleSubresource(t *testing.T) {
 	waitPDBStable(t, clientSet, 4, nsName, pdb.Name)
 
 	newPdb, err := clientSet.PolicyV1beta1().PodDisruptionBudgets(nsName).Get(pdb.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Errorf("Error getting PodDisruptionBudget: %v", err)
+	}
 
 	if expected, found := int32(replicas), newPdb.Status.ExpectedPods; expected != found {
 		t.Errorf("Expected %d, but found %d", expected, found)
@@ -170,7 +173,7 @@ func TestPDBWithScaleSubresource(t *testing.T) {
 	if expected, found := int32(replicas)-maxUnavailable, newPdb.Status.DesiredHealthy; expected != found {
 		t.Errorf("Expected %d, but found %d", expected, found)
 	}
-	if expected, found := maxUnavailable, newPdb.Status.PodDisruptionsAllowed; expected != found {
+	if expected, found := maxUnavailable, newPdb.Status.DisruptionsAllowed; expected != found {
 		t.Errorf("Expected %d, but found %d", expected, found)
 	}
 }

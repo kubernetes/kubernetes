@@ -47,7 +47,7 @@ func TestDeleteRoute(t *testing.T) {
 		nodeInformerSynced: func() bool { return true },
 	}
 	route := cloudprovider.Route{TargetNode: "node", DestinationCIDR: "1.2.3.4/24"}
-	routeName := mapNodeNameToRouteName(route.TargetNode, route.DestinationCIDR)
+	routeName := mapNodeNameToRouteName(false, route.TargetNode, route.DestinationCIDR)
 
 	fakeRoutes.FakeStore = map[string]map[string]network.Route{
 		cloud.RouteTableName: {
@@ -80,7 +80,7 @@ func TestDeleteRoute(t *testing.T) {
 		nodeName: nodeCIDR,
 	}
 	route1 := cloudprovider.Route{
-		TargetNode:      mapRouteNameToNodeName(nodeName),
+		TargetNode:      mapRouteNameToNodeName(false, nodeName),
 		DestinationCIDR: nodeCIDR,
 	}
 	err = cloud.DeleteRoute(context.TODO(), "cluster", &route1)
@@ -137,8 +137,11 @@ func TestCreateRoute(t *testing.T) {
 	if len(fakeTable.Calls) != 1 || fakeTable.Calls[0] != "Get" {
 		t.Errorf("unexpected calls create if not exists, exists: %v", fakeTable.Calls)
 	}
+	if len(fakeRoutes.Calls) != 1 || fakeRoutes.Calls[0] != "CreateOrUpdate" {
+		t.Errorf("unexpected route calls create if not exists, exists: %v", fakeRoutes.Calls)
+	}
 
-	routeName := mapNodeNameToRouteName(route.TargetNode, string(route.DestinationCIDR))
+	routeName := mapNodeNameToRouteName(false, route.TargetNode, string(route.DestinationCIDR))
 	routeInfo, found := fakeRoutes.FakeStore[cloud.RouteTableName][routeName]
 	if !found {
 		t.Errorf("could not find route: %v in %v", routeName, fakeRoutes.FakeStore)
@@ -154,13 +157,31 @@ func TestCreateRoute(t *testing.T) {
 		t.Errorf("Expected IP address: %s, saw %s", nodeIP, *routeInfo.NextHopIPAddress)
 	}
 
+	// test create again without real creation, clean fakeRoute calls
+	fakeRoutes.Calls = []string{}
+	routeInfo.Name = &routeName
+	route.Name = routeName
+	expectedTable.RouteTablePropertiesFormat = &network.RouteTablePropertiesFormat{
+		Routes: &[]network.Route{routeInfo},
+	}
+	cloud.rtCache.Set(cloud.RouteTableName, &expectedTable)
+
+	err = cloud.CreateRoute(context.TODO(), "cluster", "unused", &route)
+	if err != nil {
+		t.Errorf("unexpected error creating route: %v", err)
+		t.FailNow()
+	}
+	if len(fakeRoutes.Calls) != 0 {
+		t.Errorf("unexpected route calls create if not exists, exists: %v", fakeRoutes.Calls)
+	}
+
 	// test create route for unmanaged nodes.
 	nodeName := "node1"
 	nodeCIDR := "4.3.2.1/24"
 	cloud.unmanagedNodes.Insert(nodeName)
 	cloud.routeCIDRs = map[string]string{}
 	route1 := cloudprovider.Route{
-		TargetNode:      mapRouteNameToNodeName(nodeName),
+		TargetNode:      mapRouteNameToNodeName(false, nodeName),
 		DestinationCIDR: nodeCIDR,
 	}
 	err = cloud.CreateRoute(context.TODO(), "cluster", "unused", &route1)
@@ -326,7 +347,7 @@ func TestProcessRoutes(t *testing.T) {
 			expectedRoute: []cloudprovider.Route{
 				{
 					Name:            "name",
-					TargetNode:      mapRouteNameToNodeName("name"),
+					TargetNode:      mapRouteNameToNodeName(false, "name"),
 					DestinationCIDR: "1.2.3.4/16",
 				},
 			},
@@ -355,12 +376,12 @@ func TestProcessRoutes(t *testing.T) {
 			expectedRoute: []cloudprovider.Route{
 				{
 					Name:            "name",
-					TargetNode:      mapRouteNameToNodeName("name"),
+					TargetNode:      mapRouteNameToNodeName(false, "name"),
 					DestinationCIDR: "1.2.3.4/16",
 				},
 				{
 					Name:            "name2",
-					TargetNode:      mapRouteNameToNodeName("name2"),
+					TargetNode:      mapRouteNameToNodeName(false, "name2"),
 					DestinationCIDR: "5.6.7.8/16",
 				},
 			},
@@ -368,7 +389,7 @@ func TestProcessRoutes(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		routes, err := processRoutes(test.rt, test.exists, test.err)
+		routes, err := processRoutes(false, test.rt, test.exists, test.err)
 		if test.expectErr {
 			if err == nil {
 				t.Errorf("%s: unexpected non-error", test.name)
@@ -423,11 +444,11 @@ func TestRouteNameFuncs(t *testing.T) {
 	v6CIDR := "fd3e:5f02:6ec0:30ba::/64"
 	nodeName := "thisNode"
 
-	routeName := mapNodeNameToRouteName(types.NodeName(nodeName), v4CIDR)
-	outNodeName := mapRouteNameToNodeName(routeName)
+	routeName := mapNodeNameToRouteName(false, types.NodeName(nodeName), v4CIDR)
+	outNodeName := mapRouteNameToNodeName(false, routeName)
 	assert.Equal(t, string(outNodeName), nodeName)
 
-	routeName = mapNodeNameToRouteName(types.NodeName(nodeName), v6CIDR)
-	outNodeName = mapRouteNameToNodeName(routeName)
+	routeName = mapNodeNameToRouteName(false, types.NodeName(nodeName), v6CIDR)
+	outNodeName = mapRouteNameToNodeName(false, routeName)
 	assert.Equal(t, string(outNodeName), nodeName)
 }

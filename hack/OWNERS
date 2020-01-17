@@ -6,8 +6,8 @@ reviewers:
   - eparis
   - fejta
   - ixdy
-  - jbeda
   - juanvallejo
+  - hwdef
   - lavalamp
   - SataQiu
   - spiffxp
@@ -23,7 +23,6 @@ approvers:
   - eparis
   - fejta
   - ixdy
-  - jbeda
   - lavalamp
   - liggitt
   - pwittrock
@@ -33,3 +32,5 @@ approvers:
   - sttts
   - vishh
   - zmerlynn
+emeritus_approvers:
+  - jbeda

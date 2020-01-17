@@ -39,6 +39,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -333,7 +334,11 @@ func syncOne(sj *batchv1beta1.CronJob, js []batchv1.Job, now time.Time, jc jobCo
 	}
 	jobResp, err := jc.CreateJob(sj.Namespace, jobReq)
 	if err != nil {
-		recorder.Eventf(sj, v1.EventTypeWarning, "FailedCreate", "Error creating job: %v", err)
+		// If the namespace is being torn down, we can safely ignore
+		// this error since all subsequent creations will fail.
+		if !errors.HasStatusCause(err, v1.NamespaceTerminatingCause) {
+			recorder.Eventf(sj, v1.EventTypeWarning, "FailedCreate", "Error creating job: %v", err)
+		}
 		return
 	}
 	klog.V(4).Infof("Created Job %s for %s", jobResp.Name, nameForLog)

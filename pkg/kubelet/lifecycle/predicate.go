@@ -134,10 +134,6 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 			reason = fmt.Sprintf("OutOf%s", re.ResourceName)
 			message = re.Error()
 			klog.V(2).Infof("Predicate failed on Pod: %v, for reason: %v", format.Pod(admitPod), message)
-		case *predicates.FailureReason:
-			reason = re.GetReason()
-			message = fmt.Sprintf("Failure: %s", re.GetReason())
-			klog.V(2).Infof("Predicate failed on Pod: %v, for reason: %v", format.Pod(admitPod), message)
 		default:
 			reason = "UnexpectedPredicateFailureType"
 			message = fmt.Sprintf("GeneralPredicates failed due to %v, which is unexpected.", r)

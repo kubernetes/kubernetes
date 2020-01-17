@@ -82,6 +82,18 @@ func nametomib(name string) (mib []_C_int, err error) {
 	return buf[0 : n/siz], nil
 }
 
+func direntIno(buf []byte) (uint64, bool) {
+	return readInt(buf, unsafe.Offsetof(Dirent{}.Fileno), unsafe.Sizeof(Dirent{}.Fileno))
+}
+
+func direntReclen(buf []byte) (uint64, bool) {
+	return readInt(buf, unsafe.Offsetof(Dirent{}.Reclen), unsafe.Sizeof(Dirent{}.Reclen))
+}
+
+func direntNamlen(buf []byte) (uint64, bool) {
+	return readInt(buf, unsafe.Offsetof(Dirent{}.Namlen), unsafe.Sizeof(Dirent{}.Namlen))
+}
+
 func Pipe(p []int) (err error) {
 	return Pipe2(p, 0)
 }
@@ -362,7 +374,21 @@ func Getdents(fd int, buf []byte) (n int, err error) {
 
 func Getdirentries(fd int, buf []byte, basep *uintptr) (n int, err error) {
 	if supportsABI(_ino64First) {
-		return getdirentries_freebsd12(fd, buf, basep)
+		if basep == nil || unsafe.Sizeof(*basep) == 8 {
+			return getdirentries_freebsd12(fd, buf, (*uint64)(unsafe.Pointer(basep)))
+		}
+		// The freebsd12 syscall needs a 64-bit base. On 32-bit machines
+		// we can't just use the basep passed in. See #32498.
+		var base uint64 = uint64(*basep)
+		n, err = getdirentries_freebsd12(fd, buf, &base)
+		*basep = uintptr(base)
+		if base>>32 != 0 {
+			// We can't stuff the base back into a uintptr, so any
+			// future calls would be suspect. Generate an error.
+			// EIO is allowed by getdirentries.
+			err = EIO
+		}
+		return
 	}
 
 	// The old syscall entries are smaller than the new. Use 1/4 of the original
@@ -404,22 +430,22 @@ func roundup(x, y int) int {
 
 func (s *Stat_t) convertFrom(old *stat_freebsd11_t) {
 	*s = Stat_t{
-		Dev:      uint64(old.Dev),
-		Ino:      uint64(old.Ino),
-		Nlink:    uint64(old.Nlink),
-		Mode:     old.Mode,
-		Uid:      old.Uid,
-		Gid:      old.Gid,
-		Rdev:     uint64(old.Rdev),
-		Atim:     old.Atim,
-		Mtim:     old.Mtim,
-		Ctim:     old.Ctim,
-		Birthtim: old.Birthtim,
-		Size:     old.Size,
-		Blocks:   old.Blocks,
-		Blksize:  old.Blksize,
-		Flags:    old.Flags,
-		Gen:      uint64(old.Gen),
+		Dev:     uint64(old.Dev),
+		Ino:     uint64(old.Ino),
+		Nlink:   uint64(old.Nlink),
+		Mode:    old.Mode,
+		Uid:     old.Uid,
+		Gid:     old.Gid,
+		Rdev:    uint64(old.Rdev),
+		Atim:    old.Atim,
+		Mtim:    old.Mtim,
+		Ctim:    old.Ctim,
+		Btim:    old.Btim,
+		Size:    old.Size,
+		Blocks:  old.Blocks,
+		Blksize: old.Blksize,
+		Flags:   old.Flags,
+		Gen:     uint64(old.Gen),
 	}
 }
 
@@ -507,6 +533,70 @@ func Sendfile(outfd int, infd int, offset *int64, count int) (written int, err e
 	return sendfile(outfd, infd, offset, count)
 }
 
+//sys	ptrace(request int, pid int, addr uintptr, data int) (err error)
+
+func PtraceAttach(pid int) (err error) {
+	return ptrace(PTRACE_ATTACH, pid, 0, 0)
+}
+
+func PtraceCont(pid int, signal int) (err error) {
+	return ptrace(PTRACE_CONT, pid, 1, signal)
+}
+
+func PtraceDetach(pid int) (err error) {
+	return ptrace(PTRACE_DETACH, pid, 1, 0)
+}
+
+func PtraceGetFpRegs(pid int, fpregsout *FpReg) (err error) {
+	return ptrace(PTRACE_GETFPREGS, pid, uintptr(unsafe.Pointer(fpregsout)), 0)
+}
+
+func PtraceGetFsBase(pid int, fsbase *int64) (err error) {
+	return ptrace(PTRACE_GETFSBASE, pid, uintptr(unsafe.Pointer(fsbase)), 0)
+}
+
+func PtraceGetRegs(pid int, regsout *Reg) (err error) {
+	return ptrace(PTRACE_GETREGS, pid, uintptr(unsafe.Pointer(regsout)), 0)
+}
+
+func PtraceIO(req int, pid int, addr uintptr, out []byte, countin int) (count int, err error) {
+	ioDesc := PtraceIoDesc{Op: int32(req), Offs: (*byte)(unsafe.Pointer(addr)), Addr: (*byte)(unsafe.Pointer(&out[0])), Len: uint(countin)}
+	err = ptrace(PTRACE_IO, pid, uintptr(unsafe.Pointer(&ioDesc)), 0)
+	return int(ioDesc.Len), err
+}
+
+func PtraceLwpEvents(pid int, enable int) (err error) {
+	return ptrace(PTRACE_LWPEVENTS, pid, 0, enable)
+}
+
+func PtraceLwpInfo(pid int, info uintptr) (err error) {
+	return ptrace(PTRACE_LWPINFO, pid, info, int(unsafe.Sizeof(PtraceLwpInfoStruct{})))
+}
+
+func PtracePeekData(pid int, addr uintptr, out []byte) (count int, err error) {
+	return PtraceIO(PIOD_READ_D, pid, addr, out, SizeofLong)
+}
+
+func PtracePeekText(pid int, addr uintptr, out []byte) (count int, err error) {
+	return PtraceIO(PIOD_READ_I, pid, addr, out, SizeofLong)
+}
+
+func PtracePokeData(pid int, addr uintptr, data []byte) (count int, err error) {
+	return PtraceIO(PIOD_WRITE_D, pid, addr, data, SizeofLong)
+}
+
+func PtracePokeText(pid int, addr uintptr, data []byte) (count int, err error) {
+	return PtraceIO(PIOD_WRITE_I, pid, addr, data, SizeofLong)
+}
+
+func PtraceSetRegs(pid int, regs *Reg) (err error) {
+	return ptrace(PTRACE_SETREGS, pid, uintptr(unsafe.Pointer(regs)), 0)
+}
+
+func PtraceSingleStep(pid int) (err error) {
+	return ptrace(PTRACE_SINGLESTEP, pid, 1, 0)
+}
+
 /*
  * Exposed directly
  */
@@ -555,7 +645,7 @@ func Sendfile(outfd int, infd int, offset *int64, count int) (written int, err e
 //sys	Fsync(fd int) (err error)
 //sys	Ftruncate(fd int, length int64) (err error)
 //sys	getdirentries(fd int, buf []byte, basep *uintptr) (n int, err error)
-//sys	getdirentries_freebsd12(fd int, buf []byte, basep *uintptr) (n int, err error)
+//sys	getdirentries_freebsd12(fd int, buf []byte, basep *uint64) (n int, err error)
 //sys	Getdtablesize() (size int)
 //sysnb	Getegid() (egid int)
 //sysnb	Geteuid() (uid int)

@@ -16,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e_node
+package e2enode
 
 import (
 	"fmt"
@@ -36,7 +36,9 @@ import (
 )
 
 const (
+	// TimeSeriesTag is the tag for time series.
 	TimeSeriesTag = "[Result:TimeSeries]"
+	// TimeSeriesEnd is the end tag for time series.
 	TimeSeriesEnd = "[Finish:TimeSeries]"
 )
 

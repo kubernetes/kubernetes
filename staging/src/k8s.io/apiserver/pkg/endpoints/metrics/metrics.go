@@ -74,14 +74,6 @@ var (
 		// should be all lowercase and separated by underscores.
 		[]string{"verb", "dry_run", "group", "version", "resource", "subresource", "scope", "component", "client", "contentType", "code"},
 	)
-	deprecatedRequestCounter = compbasemetrics.NewCounterVec(
-		&compbasemetrics.CounterOpts{
-			Name:           "apiserver_request_count",
-			Help:           "(Deprecated) Counter of apiserver requests broken out for each verb, group, version, resource, scope, component, client, and HTTP response contentType and code.",
-			StabilityLevel: compbasemetrics.ALPHA,
-		},
-		[]string{"verb", "group", "version", "resource", "subresource", "scope", "component", "client", "contentType", "code"},
-	)
 	longRunningRequestGauge = compbasemetrics.NewGaugeVec(
 		&compbasemetrics.GaugeOpts{
 			Name:           "apiserver_longrunning_gauge",
@@ -103,27 +95,6 @@ var (
 		},
 		[]string{"verb", "dry_run", "group", "version", "resource", "subresource", "scope", "component"},
 	)
-	deprecatedRequestLatencies = compbasemetrics.NewHistogramVec(
-		&compbasemetrics.HistogramOpts{
-			Name: "apiserver_request_latencies",
-			Help: "(Deprecated) Response latency distribution in microseconds for each verb, group, version, resource, subresource, scope and component.",
-			// Use buckets ranging from 125 ms to 8 seconds.
-			Buckets:        compbasemetrics.ExponentialBuckets(125000, 2.0, 7),
-			StabilityLevel: compbasemetrics.ALPHA,
-		},
-		[]string{"verb", "group", "version", "resource", "subresource", "scope", "component"},
-	)
-	deprecatedRequestLatenciesSummary = compbasemetrics.NewSummaryVec(
-		&compbasemetrics.SummaryOpts{
-			Name: "apiserver_request_latencies_summary",
-			Help: "(Deprecated) Response latency summary in microseconds for each verb, group, version, resource, subresource, scope and component.",
-			// Make the sliding window of 5h.
-			// TODO: The value for this should be based on our SLI definition (medium term).
-			MaxAge:         5 * time.Hour,
-			StabilityLevel: compbasemetrics.ALPHA,
-		},
-		[]string{"verb", "group", "version", "resource", "subresource", "scope", "component"},
-	)
 	responseSizes = compbasemetrics.NewHistogramVec(
 		&compbasemetrics.HistogramOpts{
 			Name: "apiserver_response_sizes",
@@ -139,14 +110,6 @@ var (
 		&compbasemetrics.CounterOpts{
 			Name:           "apiserver_dropped_requests_total",
 			Help:           "Number of requests dropped with 'Try again later' response",
-			StabilityLevel: compbasemetrics.ALPHA,
-		},
-		[]string{"requestKind"},
-	)
-	DeprecatedDroppedRequests = compbasemetrics.NewCounterVec(
-		&compbasemetrics.CounterOpts{
-			Name:           "apiserver_dropped_requests",
-			Help:           "(Deprecated) Number of requests dropped with 'Try again later' response",
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
 		[]string{"requestKind"},
@@ -177,7 +140,7 @@ var (
 		},
 		[]string{"group", "version", "kind"},
 	)
-	// Because of volatality of the base metric this is pre-aggregated one. Instead of reporing current usage all the time
+	// Because of volatility of the base metric this is pre-aggregated one. Instead of reporting current usage all the time
 	// it reports maximal usage during the last second.
 	currentInflightRequests = compbasemetrics.NewGaugeVec(
 		&compbasemetrics.GaugeOpts{
@@ -187,22 +150,28 @@ var (
 		},
 		[]string{"requestKind"},
 	)
+
+	requestTerminationsTotal = compbasemetrics.NewCounterVec(
+		&compbasemetrics.CounterOpts{
+			Name:           "apiserver_request_terminations_total",
+			Help:           "Number of requests which apiserver terminated in self-defense.",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"verb", "group", "version", "resource", "subresource", "scope", "component", "code"},
+	)
 	kubectlExeRegexp = regexp.MustCompile(`^.*((?i:kubectl\.exe))`)
 
 	metrics = []resettableCollector{
 		requestCounter,
-		deprecatedRequestCounter,
 		longRunningRequestGauge,
 		requestLatencies,
-		deprecatedRequestLatencies,
-		deprecatedRequestLatenciesSummary,
 		responseSizes,
 		DroppedRequests,
-		DeprecatedDroppedRequests,
 		RegisteredWatchers,
 		WatchEvents,
 		WatchEventsSizes,
 		currentInflightRequests,
+		requestTerminationsTotal,
 	}
 )
 
@@ -236,10 +205,11 @@ func UpdateInflightRequestMetrics(nonmutating, mutating int) {
 	currentInflightRequests.WithLabelValues(MutatingKind).Set(float64(mutating))
 }
 
-// Record records a single request to the standard metrics endpoints. For use by handlers that perform their own
-// processing. All API paths should use InstrumentRouteFunc implicitly. Use this instead of MonitorRequest if
-// you already have a RequestInfo object.
-func Record(req *http.Request, requestInfo *request.RequestInfo, component, contentType string, code int, responseSizeInBytes int, elapsed time.Duration) {
+// RecordRequestTermination records that the request was terminated early as part of a resource
+// preservation or apiserver self-defense mechanism (e.g. timeouts, maxinflight throttling,
+// proxyHandler errors). RecordRequestTermination should only be called zero or one times
+// per request.
+func RecordRequestTermination(req *http.Request, requestInfo *request.RequestInfo, component string, code int) {
 	if requestInfo == nil {
 		requestInfo = &request.RequestInfo{Verb: req.Method, Path: req.URL.Path}
 	}
@@ -251,9 +221,9 @@ func Record(req *http.Request, requestInfo *request.RequestInfo, component, cont
 	// However, we need to tweak it e.g. to differentiate GET from LIST.
 	verb := canonicalVerb(strings.ToUpper(req.Method), scope)
 	if requestInfo.IsResourceRequest {
-		MonitorRequest(req, verb, requestInfo.APIGroup, requestInfo.APIVersion, requestInfo.Resource, requestInfo.Subresource, scope, component, contentType, code, responseSizeInBytes, elapsed)
+		requestTerminationsTotal.WithLabelValues(cleanVerb(verb, req), requestInfo.APIGroup, requestInfo.APIVersion, requestInfo.Resource, requestInfo.Subresource, scope, component, codeToString(code)).Inc()
 	} else {
-		MonitorRequest(req, verb, "", "", "", requestInfo.Path, scope, component, contentType, code, responseSizeInBytes, elapsed)
+		requestTerminationsTotal.WithLabelValues(cleanVerb(verb, req), "", "", "", requestInfo.Path, scope, component, codeToString(code)).Inc()
 	}
 }
 
@@ -287,13 +257,9 @@ func MonitorRequest(req *http.Request, verb, group, version, resource, subresour
 	reportedVerb := cleanVerb(verb, req)
 	dryRun := cleanDryRun(req.URL)
 	client := cleanUserAgent(utilnet.GetHTTPClient(req))
-	elapsedMicroseconds := float64(elapsed / time.Microsecond)
 	elapsedSeconds := elapsed.Seconds()
 	requestCounter.WithLabelValues(reportedVerb, dryRun, group, version, resource, subresource, scope, component, client, contentType, codeToString(httpCode)).Inc()
-	deprecatedRequestCounter.WithLabelValues(reportedVerb, group, version, resource, subresource, scope, component, client, contentType, codeToString(httpCode)).Inc()
 	requestLatencies.WithLabelValues(reportedVerb, dryRun, group, version, resource, subresource, scope, component).Observe(elapsedSeconds)
-	deprecatedRequestLatencies.WithLabelValues(reportedVerb, group, version, resource, subresource, scope, component).Observe(elapsedMicroseconds)
-	deprecatedRequestLatenciesSummary.WithLabelValues(reportedVerb, group, version, resource, subresource, scope, component).Observe(elapsedMicroseconds)
 	// We are only interested in response sizes of read requests.
 	if verb == "GET" || verb == "LIST" {
 		responseSizes.WithLabelValues(reportedVerb, group, version, resource, subresource, scope, component).Observe(float64(respSize))

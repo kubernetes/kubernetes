@@ -558,6 +558,32 @@ func TestReconcileEndpoints(t *testing.T) {
 
 }
 
+func TestEmptySubsets(t *testing.T) {
+	ns := metav1.NamespaceDefault
+	om := func(name string) metav1.ObjectMeta {
+		return metav1.ObjectMeta{Namespace: ns, Name: name}
+	}
+	endpoints := &corev1.EndpointsList{
+		Items: []corev1.Endpoints{{
+			ObjectMeta: om("foo"),
+			Subsets:    nil,
+		}},
+	}
+	fakeClient := fake.NewSimpleClientset()
+	if endpoints != nil {
+		fakeClient = fake.NewSimpleClientset(endpoints)
+	}
+	epAdapter := reconcilers.NewEndpointsAdapter(fakeClient.CoreV1(), nil)
+	reconciler := reconcilers.NewMasterCountEndpointReconciler(1, epAdapter)
+	endpointPorts := []corev1.EndpointPort{
+		{Name: "foo", Port: 8080, Protocol: "TCP"},
+	}
+	err := reconciler.RemoveEndpoints("foo", net.ParseIP("1.2.3.4"), endpointPorts)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
 func TestCreateOrUpdateMasterService(t *testing.T) {
 	ns := metav1.NamespaceDefault
 	om := func(name string) metav1.ObjectMeta {

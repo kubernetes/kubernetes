@@ -133,7 +133,7 @@ func (n *linuxCgroupNotifier) Start(eventCh chan<- struct{}) {
 }
 
 // wait waits up to notifierRefreshInterval for an event on the Epoll FD for the
-// eventfd we are concerned about.  It returns an error if one occurrs, and true
+// eventfd we are concerned about.  It returns an error if one occurs, and true
 // if the consumer should read from the eventfd.
 func wait(epfd, eventfd int, timeout time.Duration) (bool, error) {
 	events := make([]unix.EpollEvent, numFdEvents+1)

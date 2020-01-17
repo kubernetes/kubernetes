@@ -45,16 +45,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1alpha1.TTLAfterFinishedControllerConfiguration)(nil), (*config.TTLAfterFinishedControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_TTLAfterFinishedControllerConfiguration_To_config_TTLAfterFinishedControllerConfiguration(a.(*v1alpha1.TTLAfterFinishedControllerConfiguration), b.(*config.TTLAfterFinishedControllerConfiguration), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*config.TTLAfterFinishedControllerConfiguration)(nil), (*v1alpha1.TTLAfterFinishedControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_TTLAfterFinishedControllerConfiguration_To_v1alpha1_TTLAfterFinishedControllerConfiguration(a.(*config.TTLAfterFinishedControllerConfiguration), b.(*v1alpha1.TTLAfterFinishedControllerConfiguration), scope)
-	}); err != nil {
-		return err
-	}
 	if err := s.AddConversionFunc((*config.TTLAfterFinishedControllerConfiguration)(nil), (*v1alpha1.TTLAfterFinishedControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_config_TTLAfterFinishedControllerConfiguration_To_v1alpha1_TTLAfterFinishedControllerConfiguration(a.(*config.TTLAfterFinishedControllerConfiguration), b.(*v1alpha1.TTLAfterFinishedControllerConfiguration), scope)
 	}); err != nil {

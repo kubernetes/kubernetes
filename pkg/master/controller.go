@@ -30,11 +30,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	genericapiserver "k8s.io/apiserver/pkg/server"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/master/reconcilers"
 	"k8s.io/kubernetes/pkg/registry/core/rangeallocation"
 	corerest "k8s.io/kubernetes/pkg/registry/core/rest"
@@ -92,10 +90,7 @@ func (c *completedConfig) NewBootstrapController(legacyRESTStorage corerest.Lega
 		klog.Fatalf("failed to get listener address: %v", err)
 	}
 
-	systemNamespaces := []string{metav1.NamespaceSystem, metav1.NamespacePublic}
-	if utilfeature.DefaultFeatureGate.Enabled(features.NodeLease) {
-		systemNamespaces = append(systemNamespaces, corev1.NamespaceNodeLease)
-	}
+	systemNamespaces := []string{metav1.NamespaceSystem, metav1.NamespacePublic, corev1.NamespaceNodeLease}
 
 	return &Controller{
 		ServiceClient:   serviceClient,

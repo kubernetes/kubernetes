@@ -39,8 +39,9 @@ func TestPolicyRestrictedCanAdmitPodResult(t *testing.T) {
 	}
 
 	for _, tc := range tcases {
-		policy := NewRestrictedPolicy()
-		result := policy.CanAdmitPodResult(&tc.hint)
+		numaNodes := []int{0, 1}
+		policy := NewRestrictedPolicy(numaNodes)
+		result := policy.(*restrictedPolicy).canAdmitPodResult(&tc.hint)
 
 		if result.Admit != tc.expected {
 			t.Errorf("Expected Admit field in result to be %t, got %t", tc.expected, result.Admit)
@@ -55,4 +56,14 @@ func TestPolicyRestrictedCanAdmitPodResult(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestRestrictedPolicyMerge(t *testing.T) {
+	numaNodes := []int{0, 1}
+	policy := NewRestrictedPolicy(numaNodes)
+
+	tcases := commonPolicyMergeTestCases(numaNodes)
+	tcases = append(tcases, policy.(*restrictedPolicy).mergeTestCases(numaNodes)...)
+
+	testPolicyMerge(policy, tcases, t)
 }

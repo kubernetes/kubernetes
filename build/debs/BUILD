@@ -148,7 +148,7 @@ genrule(
     name = "cri-tools-data-%s" % goarch,
     package_dir = "/usr/bin",
     tags = ["manual"],
-    deps = ["@cri_tools_%s//file" % goarch],
+    deps = ["@cri_tools_linux-%s//file" % goarch],
 ) for goarch in NODE_PLATFORMS["linux"]]
 
 [k8s_deb(

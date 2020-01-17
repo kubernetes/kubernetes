@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e_node
+package e2enode
 
 import (
 	"fmt"
@@ -23,6 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeletresourcemetricsv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/resourcemetrics/v1alpha1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	"k8s.io/kubernetes/test/e2e/framework/metrics"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
 
@@ -71,19 +72,19 @@ var _ = framework.KubeDescribe("ResourceMetricsAPI", func() {
 
 			matchV1alpha1Expectations := gstruct.MatchAllKeys(gstruct.Keys{
 				"scrape_error": gstruct.Ignore(),
-				"node_cpu_usage_seconds_total": gstruct.MatchAllElements(nodeId, gstruct.Elements{
+				"node_cpu_usage_seconds_total": gstruct.MatchAllElements(nodeID, gstruct.Elements{
 					"": boundedSample(1, 1e6),
 				}),
-				"node_memory_working_set_bytes": gstruct.MatchAllElements(nodeId, gstruct.Elements{
+				"node_memory_working_set_bytes": gstruct.MatchAllElements(nodeID, gstruct.Elements{
 					"": boundedSample(10*volume.Mb, memoryLimit),
 				}),
 
-				"container_cpu_usage_seconds_total": gstruct.MatchElements(containerId, gstruct.IgnoreExtras, gstruct.Elements{
+				"container_cpu_usage_seconds_total": gstruct.MatchElements(containerID, gstruct.IgnoreExtras, gstruct.Elements{
 					fmt.Sprintf("%s::%s::%s", f.Namespace.Name, pod0, "busybox-container"): boundedSample(0, 100),
 					fmt.Sprintf("%s::%s::%s", f.Namespace.Name, pod1, "busybox-container"): boundedSample(0, 100),
 				}),
 
-				"container_memory_working_set_bytes": gstruct.MatchAllElements(containerId, gstruct.Elements{
+				"container_memory_working_set_bytes": gstruct.MatchAllElements(containerID, gstruct.Elements{
 					fmt.Sprintf("%s::%s::%s", f.Namespace.Name, pod0, "busybox-container"): boundedSample(10*volume.Kb, 80*volume.Mb),
 					fmt.Sprintf("%s::%s::%s", f.Namespace.Name, pod1, "busybox-container"): boundedSample(10*volume.Kb, 80*volume.Mb),
 				}),
@@ -101,7 +102,7 @@ var _ = framework.KubeDescribe("ResourceMetricsAPI", func() {
 				return
 			}
 			if framework.TestContext.DumpLogsOnFailure {
-				framework.LogFailedContainers(f.ClientSet, f.Namespace.Name, framework.Logf)
+				e2ekubectl.LogFailedContainers(f.ClientSet, f.Namespace.Name, framework.Logf)
 			}
 			ginkgo.By("Recording processes in system cgroups")
 			recordSystemCgroupProcesses()
@@ -113,11 +114,11 @@ func getV1alpha1ResourceMetrics() (metrics.KubeletMetrics, error) {
 	return metrics.GrabKubeletMetricsWithoutProxy(framework.TestContext.NodeName+":10255", "/metrics/resource/"+kubeletresourcemetricsv1alpha1.Version)
 }
 
-func nodeId(element interface{}) string {
+func nodeID(element interface{}) string {
 	return ""
 }
 
-func containerId(element interface{}) string {
+func containerID(element interface{}) string {
 	el := element.(*model.Sample)
 	return fmt.Sprintf("%s::%s::%s", el.Metric["namespace"], el.Metric["pod"], el.Metric["container"])
 }

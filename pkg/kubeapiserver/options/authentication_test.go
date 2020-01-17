@@ -27,6 +27,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/authenticatorfactory"
+	"k8s.io/apiserver/pkg/authentication/request/headerrequest"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	kubeauthenticator "k8s.io/kubernetes/pkg/kubeapiserver/authenticator"
 )
@@ -145,7 +146,7 @@ func TestToAuthenticationConfig(t *testing.T) {
 		Anonymous:                   false,
 		BasicAuthFile:               "/testBasicAuthFile",
 		BootstrapToken:              false,
-		ClientVerifyOptionFn:        nil, // this is nil because you can't compare functions
+		ClientCAContentProvider:     nil, // this is nil because you can't compare functions
 		TokenAuthFile:               "/testTokenFile",
 		OIDCIssuerURL:               "testIssuerURL",
 		OIDCClientID:                "testClientID",
@@ -161,11 +162,11 @@ func TestToAuthenticationConfig(t *testing.T) {
 		TokenFailureCacheTTL: 0,
 
 		RequestHeaderConfig: &authenticatorfactory.RequestHeaderConfig{
-			UsernameHeaders:     []string{"x-remote-user"},
-			GroupHeaders:        []string{"x-remote-group"},
-			ExtraHeaderPrefixes: []string{"x-remote-extra-"},
-			VerifyOptionFn:      nil, // this is nil because you can't compare functions
-			AllowedClientNames:  []string{"kube-aggregator"},
+			UsernameHeaders:     headerrequest.StaticStringSlice{"x-remote-user"},
+			GroupHeaders:        headerrequest.StaticStringSlice{"x-remote-group"},
+			ExtraHeaderPrefixes: headerrequest.StaticStringSlice{"x-remote-extra-"},
+			CAContentProvider:   nil, // this is nil because you can't compare functions
+			AllowedClientNames:  headerrequest.StaticStringSlice{"kube-aggregator"},
 		},
 	}
 
@@ -175,14 +176,14 @@ func TestToAuthenticationConfig(t *testing.T) {
 	}
 
 	// nil these out because you cannot compare pointers.  Ensure they are non-nil first
-	if resultConfig.ClientVerifyOptionFn == nil {
+	if resultConfig.ClientCAContentProvider == nil {
 		t.Error("missing client verify")
 	}
-	if resultConfig.RequestHeaderConfig.VerifyOptionFn == nil {
+	if resultConfig.RequestHeaderConfig.CAContentProvider == nil {
 		t.Error("missing requestheader verify")
 	}
-	resultConfig.ClientVerifyOptionFn = nil
-	resultConfig.RequestHeaderConfig.VerifyOptionFn = nil
+	resultConfig.ClientCAContentProvider = nil
+	resultConfig.RequestHeaderConfig.CAContentProvider = nil
 
 	if !reflect.DeepEqual(resultConfig, expectConfig) {
 		t.Error(cmp.Diff(resultConfig, expectConfig))

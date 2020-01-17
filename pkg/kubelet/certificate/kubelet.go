@@ -21,11 +21,13 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"fmt"
+	"math"
 	"net"
 	"sort"
+	"time"
 
 	certificates "k8s.io/api/certificates/v1beta1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
 	certificatesclient "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
@@ -52,16 +54,37 @@ func NewKubeletServerCertificateManager(kubeClient clientset.Interface, kubeCfg 
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize server certificate store: %v", err)
 	}
-	var certificateExpiration = compbasemetrics.NewGauge(
-		&compbasemetrics.GaugeOpts{
-			Namespace:      metrics.KubeletSubsystem,
-			Subsystem:      "certificate_manager",
-			Name:           "server_expiration_seconds",
-			Help:           "Gauge of the lifetime of a certificate. The value is the date the certificate will expire in seconds since January 1, 1970 UTC.",
+	var certificateRenewFailure = compbasemetrics.NewCounter(
+		&compbasemetrics.CounterOpts{
+			Subsystem:      metrics.KubeletSubsystem,
+			Name:           "server_expiration_renew_errors",
+			Help:           "Counter of certificate renewal errors.",
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
 	)
-	legacyregistry.MustRegister(certificateExpiration)
+	legacyregistry.MustRegister(certificateRenewFailure)
+
+	certificateRotationAge := compbasemetrics.NewHistogram(
+		&compbasemetrics.HistogramOpts{
+			Subsystem: metrics.KubeletSubsystem,
+			Name:      "certificate_manager_server_rotation_seconds",
+			Help:      "Histogram of the number of seconds the previous certificate lived before being rotated.",
+			Buckets: []float64{
+				60,        // 1  minute
+				3600,      // 1  hour
+				14400,     // 4  hours
+				86400,     // 1  day
+				604800,    // 1  week
+				2592000,   // 1  month
+				7776000,   // 3  months
+				15552000,  // 6  months
+				31104000,  // 1  year
+				124416000, // 4  years
+			},
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+	)
+	legacyregistry.MustRegister(certificateRotationAge)
 
 	getTemplate := func() *x509.CertificateRequest {
 		hostnames, ips := addressesToHostnamesAndIPs(getAddresses())
@@ -98,12 +121,31 @@ func NewKubeletServerCertificateManager(kubeClient clientset.Interface, kubeCfg 
 			// authenticate itself to a TLS client.
 			certificates.UsageServerAuth,
 		},
-		CertificateStore:      certificateStore,
-		CertificateExpiration: certificateExpiration,
+		CertificateStore:        certificateStore,
+		CertificateRotation:     certificateRotationAge,
+		CertificateRenewFailure: certificateRenewFailure,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize server certificate manager: %v", err)
 	}
+	legacyregistry.RawMustRegister(compbasemetrics.NewGaugeFunc(
+		compbasemetrics.GaugeOpts{
+			Subsystem: metrics.KubeletSubsystem,
+			Name:      "certificate_manager_server_ttl_seconds",
+			Help: "Gauge of the shortest TTL (time-to-live) of " +
+				"the Kubelet's serving certificate. The value is in seconds " +
+				"until certificate expiry (negative if already expired). If " +
+				"serving certificate is invalid or unused, the value will " +
+				"be +INF.",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		func() float64 {
+			if c := m.Current(); c != nil && c.Leaf != nil {
+				return c.Leaf.NotAfter.Sub(time.Now()).Seconds()
+			}
+			return math.Inf(1)
+		},
+	))
 	return m, nil
 }
 
@@ -177,6 +219,16 @@ func NewKubeletClientCertificateManager(
 		},
 	)
 	legacyregistry.Register(certificateExpiration)
+	var certificateRenewFailure = compbasemetrics.NewCounter(
+		&compbasemetrics.CounterOpts{
+			Namespace:      metrics.KubeletSubsystem,
+			Subsystem:      "certificate_manager",
+			Name:           "client_expiration_renew_errors",
+			Help:           "Counter of certificate renewal errors.",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+	)
+	legacyregistry.Register(certificateRenewFailure)
 
 	m, err := certificate.NewManager(&certificate.Config{
 		ClientFn: clientFn,
@@ -209,8 +261,8 @@ func NewKubeletClientCertificateManager(
 		BootstrapCertificatePEM: bootstrapCertData,
 		BootstrapKeyPEM:         bootstrapKeyData,
 
-		CertificateStore:      certificateStore,
-		CertificateExpiration: certificateExpiration,
+		CertificateStore:        certificateStore,
+		CertificateRenewFailure: certificateRenewFailure,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize client certificate manager: %v", err)

@@ -249,6 +249,10 @@ type mapEncoder struct {
 }
 
 func (encoder *mapEncoder) Encode(ptr unsafe.Pointer, stream *Stream) {
+	if *(*unsafe.Pointer)(ptr) == nil {
+		stream.WriteNil()
+		return
+	}
 	stream.WriteObjectStart()
 	iter := encoder.mapType.UnsafeIterate(ptr)
 	for i := 0; iter.HasNext(); i++ {

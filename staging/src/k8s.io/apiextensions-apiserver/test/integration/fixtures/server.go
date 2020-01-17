@@ -21,7 +21,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/pborman/uuid"
+	"github.com/google/uuid"
 	"k8s.io/apiextensions-apiserver/pkg/cmd/server/options"
 
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -59,7 +59,7 @@ users:
 	fakeKubeConfig.Close()
 
 	s, err := servertesting.StartTestServer(t, nil, append([]string{
-		"--etcd-prefix", uuid.New(),
+		"--etcd-prefix", uuid.New().String(),
 		"--etcd-servers", strings.Join(IntegrationEtcdServers(), ","),
 		"--authentication-skip-lookup",
 		"--authentication-kubeconfig", fakeKubeConfig.Name(),

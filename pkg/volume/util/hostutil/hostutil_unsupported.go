@@ -22,7 +22,7 @@ import (
 	"errors"
 	"os"
 
-	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/utils/mount"
 )
 
 // HostUtil is an HostUtils implementation that allows compilation on

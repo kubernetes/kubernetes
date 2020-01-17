@@ -21,15 +21,16 @@ import (
 	"os"
 	"runtime"
 
-	"k8s.io/api/core/v1"
+	"k8s.io/klog"
+	"k8s.io/utils/mount"
+	utilstrings "k8s.io/utils/strings"
+
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/recyclerclient"
-	utilstrings "k8s.io/utils/strings"
 )
 
 func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
@@ -87,10 +88,6 @@ func (plugin *nfsPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
 func (plugin *nfsPlugin) CanSupport(spec *volume.Spec) bool {
 	return (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.NFS != nil) ||
 		(spec.Volume != nil && spec.Volume.NFS != nil)
-}
-
-func (plugin *nfsPlugin) IsMigratedToCSI() bool {
-	return false
 }
 
 func (plugin *nfsPlugin) RequiresRemount() bool {
@@ -206,15 +203,15 @@ func (nfsMounter *nfsMounter) CanMount() error {
 	exec := nfsMounter.plugin.host.GetExec(nfsMounter.plugin.GetPluginName())
 	switch runtime.GOOS {
 	case "linux":
-		if _, err := exec.Run("test", "-x", "/sbin/mount.nfs"); err != nil {
+		if _, err := exec.Command("test", "-x", "/sbin/mount.nfs").CombinedOutput(); err != nil {
 			return fmt.Errorf("Required binary /sbin/mount.nfs is missing")
 		}
-		if _, err := exec.Run("test", "-x", "/sbin/mount.nfs4"); err != nil {
+		if _, err := exec.Command("test", "-x", "/sbin/mount.nfs4").CombinedOutput(); err != nil {
 			return fmt.Errorf("Required binary /sbin/mount.nfs4 is missing")
 		}
 		return nil
 	case "darwin":
-		if _, err := exec.Run("test", "-x", "/sbin/mount_nfs"); err != nil {
+		if _, err := exec.Command("test", "-x", "/sbin/mount_nfs").CombinedOutput(); err != nil {
 			return fmt.Errorf("Required binary /sbin/mount_nfs is missing")
 		}
 	}

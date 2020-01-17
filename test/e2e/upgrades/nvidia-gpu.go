@@ -22,7 +22,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/scheduling"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 )
 
 const (
@@ -54,7 +53,7 @@ func (t *NvidiaGPUUpgradeTest) Test(f *framework.Framework, done <-chan struct{}
 		// MasterUpgrade should be totally hitless.
 		job, err := jobutil.GetJob(f.ClientSet, f.Namespace.Name, "cuda-add")
 		framework.ExpectNoError(err)
-		gomega.Expect(job.Status.Failed).To(gomega.BeZero(), "Job pods failed during master upgrade: %v", job.Status.Failed)
+		framework.ExpectEqual(job.Status.Failed, 0, "Job pods failed during master upgrade: %v", job.Status.Failed)
 	}
 }
 

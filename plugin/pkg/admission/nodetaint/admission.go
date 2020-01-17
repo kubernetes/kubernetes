@@ -21,18 +21,14 @@ import (
 	"fmt"
 	"io"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apiserver/pkg/admission"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/component-base/featuregate"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 const (
 	// PluginName is the name of the plugin.
 	PluginName = "TaintNodesByCondition"
-	// TaintNodeNotReady is the not-ready label as specified in the API.
-	TaintNodeNotReady = "node.kubernetes.io/not-ready"
 )
 
 // Register registers a plugin
@@ -46,16 +42,13 @@ func Register(plugins *admission.Plugins) {
 // This plugin identifies requests from nodes
 func NewPlugin() *Plugin {
 	return &Plugin{
-		Handler:  admission.NewHandler(admission.Create),
-		features: utilfeature.DefaultFeatureGate,
+		Handler: admission.NewHandler(admission.Create),
 	}
 }
 
 // Plugin holds state for and implements the admission plugin.
 type Plugin struct {
 	*admission.Handler
-	// allows overriding for testing
-	features featuregate.FeatureGate
 }
 
 var (
@@ -68,11 +61,6 @@ var (
 
 // Admit is the main function that checks node identity and adds taints as needed.
 func (p *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
-	// If TaintNodesByCondition is not enabled, we don't need to do anything.
-	if !p.features.Enabled(features.TaintNodesByCondition) {
-		return nil
-	}
-
 	// Our job is just to taint nodes.
 	if a.GetResource().GroupResource() != nodeResource || a.GetSubresource() != "" {
 		return nil
@@ -83,18 +71,18 @@ func (p *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.
 		return admission.NewForbidden(a, fmt.Errorf("unexpected type %T", a.GetObject()))
 	}
 
-	// Taint node with NotReady taint at creation if TaintNodesByCondition is
-	// enabled. This is needed to make sure that nodes are added to the cluster
-	// with the NotReady taint. Otherwise, a new node may receive the taint with
-	// some delay causing pods to be scheduled on a not-ready node.
-	// Node controller will remove the taint when the node becomes ready.
+	// Taint node with NotReady taint at creation. This is needed to make sure
+	// that nodes are added to the cluster with the NotReady taint. Otherwise,
+	// a new node may receive the taint with some delay causing pods to be
+	// scheduled on a not-ready node. Node controller will remove the taint
+	// when the node becomes ready.
 	addNotReadyTaint(node)
 	return nil
 }
 
 func addNotReadyTaint(node *api.Node) {
 	notReadyTaint := api.Taint{
-		Key:    TaintNodeNotReady,
+		Key:    v1.TaintNodeNotReady,
 		Effect: api.TaintEffectNoSchedule,
 	}
 	for _, taint := range node.Spec.Taints {

@@ -25,18 +25,19 @@ import (
 	"runtime"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	"k8s.io/klog"
+	"k8s.io/utils/mount"
+	utilstrings "k8s.io/utils/strings"
+
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	volumehelpers "k8s.io/cloud-provider/volume/helpers"
-	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
-	utilstrings "k8s.io/utils/strings"
 )
 
 // This is the primary entrypoint for volume plugins.
@@ -83,10 +84,6 @@ func (plugin *vsphereVolumePlugin) GetVolumeName(spec *volume.Spec) (string, err
 func (plugin *vsphereVolumePlugin) CanSupport(spec *volume.Spec) bool {
 	return (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.VsphereVolume != nil) ||
 		(spec.Volume != nil && spec.Volume.VsphereVolume != nil)
-}
-
-func (plugin *vsphereVolumePlugin) IsMigratedToCSI() bool {
-	return false
 }
 
 func (plugin *vsphereVolumePlugin) RequiresRemount() bool {

@@ -54,6 +54,11 @@ type Selector interface {
 
 	// Make a deep copy of the selector.
 	DeepCopySelector() Selector
+
+	// RequiresExactMatch allows a caller to introspect whether a given selector
+	// requires a single specific label to be set, and if so returns the value it
+	// requires.
+	RequiresExactMatch(label string) (value string, found bool)
 }
 
 // Everything returns a selector that matches all labels.
@@ -63,12 +68,13 @@ func Everything() Selector {
 
 type nothingSelector struct{}
 
-func (n nothingSelector) Matches(_ Labels) bool              { return false }
-func (n nothingSelector) Empty() bool                        { return false }
-func (n nothingSelector) String() string                     { return "" }
-func (n nothingSelector) Add(_ ...Requirement) Selector      { return n }
-func (n nothingSelector) Requirements() (Requirements, bool) { return nil, false }
-func (n nothingSelector) DeepCopySelector() Selector         { return n }
+func (n nothingSelector) Matches(_ Labels) bool                                      { return false }
+func (n nothingSelector) Empty() bool                                                { return false }
+func (n nothingSelector) String() string                                             { return "" }
+func (n nothingSelector) Add(_ ...Requirement) Selector                              { return n }
+func (n nothingSelector) Requirements() (Requirements, bool)                         { return nil, false }
+func (n nothingSelector) DeepCopySelector() Selector                                 { return n }
+func (n nothingSelector) RequiresExactMatch(label string) (value string, found bool) { return "", false }
 
 // Nothing returns a selector that matches no labels
 func Nothing() Selector {
@@ -356,6 +362,23 @@ func (lsel internalSelector) String() string {
 		reqs = append(reqs, lsel[ix].String())
 	}
 	return strings.Join(reqs, ",")
+}
+
+// RequiresExactMatch introspect whether a given selector requires a single specific field
+// to be set, and if so returns the value it requires.
+func (lsel internalSelector) RequiresExactMatch(label string) (value string, found bool) {
+	for ix := range lsel {
+		if lsel[ix].key == label {
+			switch lsel[ix].operator {
+			case selection.Equals, selection.DoubleEquals, selection.In:
+				if len(lsel[ix].strValues) == 1 {
+					return lsel[ix].strValues[0], true
+				}
+			}
+			return "", false
+		}
+	}
+	return "", false
 }
 
 // Token represents constant definition for lexer token
@@ -850,7 +873,7 @@ func SelectorFromSet(ls Set) Selector {
 	if ls == nil || len(ls) == 0 {
 		return internalSelector{}
 	}
-	var requirements internalSelector
+	requirements := make([]Requirement, 0, len(ls))
 	for label, value := range ls {
 		r, err := NewRequirement(label, selection.Equals, []string{value})
 		if err == nil {
@@ -862,7 +885,7 @@ func SelectorFromSet(ls Set) Selector {
 	}
 	// sort to have deterministic string representation
 	sort.Sort(ByKey(requirements))
-	return requirements
+	return internalSelector(requirements)
 }
 
 // SelectorFromValidatedSet returns a Selector which will match exactly the given Set.
@@ -872,13 +895,13 @@ func SelectorFromValidatedSet(ls Set) Selector {
 	if ls == nil || len(ls) == 0 {
 		return internalSelector{}
 	}
-	var requirements internalSelector
+	requirements := make([]Requirement, 0, len(ls))
 	for label, value := range ls {
 		requirements = append(requirements, Requirement{key: label, operator: selection.Equals, strValues: []string{value}})
 	}
 	// sort to have deterministic string representation
 	sort.Sort(ByKey(requirements))
-	return requirements
+	return internalSelector(requirements)
 }
 
 // ParseToRequirements takes a string representing a selector and returns a list of

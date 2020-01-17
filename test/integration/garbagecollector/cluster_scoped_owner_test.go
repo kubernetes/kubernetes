@@ -24,7 +24,7 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -119,7 +119,7 @@ func TestClusterScopedOwners(t *testing.T) {
 	if err := wait.Poll(5*time.Second, 300*time.Second, func() (bool, error) {
 		_, err := clientSet.CoreV1().ConfigMaps(ns.Name).Get("cm-missing", metav1.GetOptions{})
 		switch {
-		case errors.IsNotFound(err):
+		case apierrors.IsNotFound(err):
 			return true, nil
 		case err != nil:
 			return false, err

@@ -23,6 +23,10 @@ treated as "reconcile class addons" for now.
 - Resources under `$ADDON_PATH` need to have either one of these two labels.
 Otherwise it will be omitted.
 
+#### Images
+
+addon-manager images are pushed to `k8s.gcr.io`. As addon-manager is built for multiple architectures, there is an image per architecture in the format - `k8s.gcr.io/kube-addon-manager-$(ARCH):$(VERSION)`. The list of existing images and version can be found in gcr.io/google-containers/.
+
 #### How to release
 
 The `addon-manager` is built for multiple architectures.

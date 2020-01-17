@@ -20,12 +20,32 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/util/exec"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 )
 
+// Result holds the execution result of remote execution command.
+type Result struct {
+	Host   string
+	Cmd    string
+	Stdout string
+	Stderr string
+	Code   int
+}
+
+// LogResult records result log
+func LogResult(result Result) {
+	remote := result.Host
+	framework.Logf("exec %s: command:   %s", remote, result.Cmd)
+	framework.Logf("exec %s: stdout:    %q", remote, result.Stdout)
+	framework.Logf("exec %s: stderr:    %q", remote, result.Stderr)
+	framework.Logf("exec %s: exit code: %d", remote, result.Code)
+}
+
 // HostExec represents interface we require to execute commands on remote host.
 type HostExec interface {
+	Execute(cmd string, node *v1.Node) (Result, error)
 	IssueCommandWithResult(cmd string, node *v1.Node) (string, error)
 	IssueCommand(cmd string, node *v1.Node) error
 	Cleanup()
@@ -84,21 +104,35 @@ func (h *hostExecutor) launchNodeExecPod(node string) *v1.Pod {
 	return pod
 }
 
-// IssueCommandWithResult issues command on given node and returns stdout.
-func (h *hostExecutor) IssueCommandWithResult(cmd string, node *v1.Node) (string, error) {
+// Execute executes the command on the given node. If there is no error
+// performing the remote command execution, the stdout, stderr and exit code
+// are returned.
+// This works like ssh.SSH(...) utility.
+func (h *hostExecutor) Execute(cmd string, node *v1.Node) (Result, error) {
+	result, err := h.exec(cmd, node)
+	if codeExitErr, ok := err.(exec.CodeExitError); ok {
+		// extract the exit code of remote command and silence the command
+		// non-zero exit code error
+		result.Code = codeExitErr.ExitStatus()
+		err = nil
+	}
+	return result, err
+}
+
+func (h *hostExecutor) exec(cmd string, node *v1.Node) (Result, error) {
+	result := Result{
+		Host: node.Name,
+		Cmd:  cmd,
+	}
 	pod, ok := h.nodeExecPods[node.Name]
 	if !ok {
 		pod = h.launchNodeExecPod(node.Name)
 		if pod == nil {
-			return "", fmt.Errorf("failed to create hostexec pod for node %q", node)
+			return result, fmt.Errorf("failed to create hostexec pod for node %q", node)
 		}
 		h.nodeExecPods[node.Name] = pod
 	}
 	args := []string{
-		"exec",
-		fmt.Sprintf("--namespace=%v", pod.Namespace),
-		pod.Name,
-		"--",
 		"nsenter",
 		"--mount=/rootfs/proc/1/ns/mnt",
 		"--",
@@ -106,7 +140,27 @@ func (h *hostExecutor) IssueCommandWithResult(cmd string, node *v1.Node) (string
 		"-c",
 		cmd,
 	}
-	return framework.RunKubectl(args...)
+	containerName := pod.Spec.Containers[0].Name
+	var err error
+	result.Stdout, result.Stderr, err = h.Framework.ExecWithOptions(framework.ExecOptions{
+		Command:            args,
+		Namespace:          pod.Namespace,
+		PodName:            pod.Name,
+		ContainerName:      containerName,
+		Stdin:              nil,
+		CaptureStdout:      true,
+		CaptureStderr:      true,
+		PreserveWhitespace: true,
+	})
+	return result, err
+}
+
+// IssueCommandWithResult issues command on the given node and returns stdout as
+// result. It returns error if there are some issues executing the command or
+// the command exits non-zero.
+func (h *hostExecutor) IssueCommandWithResult(cmd string, node *v1.Node) (string, error) {
+	result, err := h.exec(cmd, node)
+	return result.Stdout, err
 }
 
 // IssueCommand works like IssueCommandWithResult, but discards result.

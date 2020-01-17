@@ -9,7 +9,6 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//staging/src/k8s.io/client-go/deprecated-dynamic:all-srcs",
         "//staging/src/k8s.io/client-go/discovery:all-srcs",
         "//staging/src/k8s.io/client-go/dynamic:all-srcs",
         "//staging/src/k8s.io/client-go/examples/create-update-delete-deployment:all-srcs",
@@ -43,8 +42,10 @@ filegroup(
         "//staging/src/k8s.io/client-go/listers/coordination/v1beta1:all-srcs",
         "//staging/src/k8s.io/client-go/listers/core/v1:all-srcs",
         "//staging/src/k8s.io/client-go/listers/discovery/v1alpha1:all-srcs",
+        "//staging/src/k8s.io/client-go/listers/discovery/v1beta1:all-srcs",
         "//staging/src/k8s.io/client-go/listers/events/v1beta1:all-srcs",
         "//staging/src/k8s.io/client-go/listers/extensions/v1beta1:all-srcs",
+        "//staging/src/k8s.io/client-go/listers/flowcontrol/v1alpha1:all-srcs",
         "//staging/src/k8s.io/client-go/listers/imagepolicy/v1alpha1:all-srcs",
         "//staging/src/k8s.io/client-go/listers/networking/v1:all-srcs",
         "//staging/src/k8s.io/client-go/listers/networking/v1beta1:all-srcs",

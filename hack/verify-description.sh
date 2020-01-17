@@ -14,6 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This script checks API-related files for missing descriptions and outputs a
+# list of structs and fields that are missing descriptions.
+# Usage: `hack/verify-description.sh`.
+
 set -o errexit
 set -o nounset
 set -o pipefail

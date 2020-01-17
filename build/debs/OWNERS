@@ -2,7 +2,6 @@
 
 reviewers:
   - luxas
-  - jbeda
   - mikedanese
   - pipejakob
   - chuckha
@@ -10,8 +9,9 @@ reviewers:
   - release-engineering-reviewers
 approvers:
   - luxas
-  - jbeda
   - mikedanese
   - pipejakob
   - timothysc
   - release-engineering-approvers
+emeritus_approvers:
+  - jbeda

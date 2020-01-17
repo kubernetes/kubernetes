@@ -24,7 +24,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -64,7 +64,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		ginkgo.By("Creating a ResourceQuota")
 		quotaName := "test-quota"
 		resourceQuota := newTestResourceQuota(quotaName)
-		resourceQuota, err = createResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuota)
+		_, err = createResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuota)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Ensuring resource quota status is calculated")
@@ -243,7 +243,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		requests[v1.ResourceCPU] = resource.MustParse("600m")
 		requests[v1.ResourceMemory] = resource.MustParse("100Mi")
 		pod = newTestPodForQuota(f, "fail-pod", requests, v1.ResourceList{})
-		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
+		_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
 		framework.ExpectError(err)
 
 		ginkgo.By("Not allowing a pod to be created that exceeds remaining quota(validation on extended resources)")
@@ -255,7 +255,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		requests[v1.ResourceName(extendedResourceName)] = resource.MustParse("2")
 		limits[v1.ResourceName(extendedResourceName)] = resource.MustParse("2")
 		pod = newTestPodForQuota(f, "fail-pod-for-extended-resource", requests, limits)
-		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
+		_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
 		framework.ExpectError(err)
 
 		ginkgo.By("Ensuring a pod cannot update its resource requirements")
@@ -679,7 +679,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		limits[v1.ResourceCPU] = resource.MustParse("1")
 		limits[v1.ResourceMemory] = resource.MustParse("400Mi")
 		pod := newTestPodForQuota(f, podName, requests, limits)
-		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
+		_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Ensuring resource quota with not terminating scope captures the pod usage")
@@ -718,7 +718,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		pod = newTestPodForQuota(f, podName, requests, limits)
 		activeDeadlineSeconds := int64(3600)
 		pod.Spec.ActiveDeadlineSeconds = &activeDeadlineSeconds
-		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
+		_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Ensuring resource quota with terminating scope captures the pod usage")
@@ -886,7 +886,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 
 		ginkgo.By("Verifying the deleted ResourceQuota")
 		_, err = client.CoreV1().ResourceQuotas(ns).Get(quotaName, metav1.GetOptions{})
-		framework.ExpectEqual(errors.IsNotFound(err), true)
+		framework.ExpectEqual(apierrors.IsNotFound(err), true)
 	})
 })
 
@@ -995,7 +995,7 @@ var _ = SIGDescribe("ResourceQuota [Feature:ScopeSelectors]", func() {
 		limits[v1.ResourceCPU] = resource.MustParse("1")
 		limits[v1.ResourceMemory] = resource.MustParse("400Mi")
 		pod := newTestPodForQuota(f, podName, requests, limits)
-		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
+		_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Ensuring resource quota with not terminating scope captures the pod usage")
@@ -1034,7 +1034,7 @@ var _ = SIGDescribe("ResourceQuota [Feature:ScopeSelectors]", func() {
 		pod = newTestPodForQuota(f, podName, requests, limits)
 		activeDeadlineSeconds := int64(3600)
 		pod.Spec.ActiveDeadlineSeconds = &activeDeadlineSeconds
-		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
+		_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Ensuring resource quota with terminating scope captures the pod usage")
@@ -1076,7 +1076,7 @@ var _ = SIGDescribe("ResourceQuota [Feature:PodPriority]", func() {
 	ginkgo.It("should verify ResourceQuota's priority class scope (quota set to pod count: 1) against a pod with same priority class.", func() {
 
 		_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(&schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: "pclass1"}, Value: int32(1000)})
-		framework.ExpectEqual(err == nil || errors.IsAlreadyExists(err), true)
+		framework.ExpectEqual(err == nil || apierrors.IsAlreadyExists(err), true)
 
 		hard := v1.ResourceList{}
 		hard[v1.ResourcePods] = resource.MustParse("1")
@@ -1115,7 +1115,7 @@ var _ = SIGDescribe("ResourceQuota [Feature:PodPriority]", func() {
 	ginkgo.It("should verify ResourceQuota's priority class scope (quota set to pod count: 1) against 2 pods with same priority class.", func() {
 
 		_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(&schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: "pclass2"}, Value: int32(1000)})
-		framework.ExpectEqual(err == nil || errors.IsAlreadyExists(err), true)
+		framework.ExpectEqual(err == nil || apierrors.IsAlreadyExists(err), true)
 
 		hard := v1.ResourceList{}
 		hard[v1.ResourcePods] = resource.MustParse("1")
@@ -1144,7 +1144,7 @@ var _ = SIGDescribe("ResourceQuota [Feature:PodPriority]", func() {
 		ginkgo.By("Creating 2nd pod with priority class should fail")
 		podName2 := "testpod-pclass2-2"
 		pod2 := newTestPodForQuotaWithPriority(f, podName2, v1.ResourceList{}, v1.ResourceList{}, "pclass2")
-		pod2, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod2)
+		_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod2)
 		framework.ExpectError(err)
 
 		ginkgo.By("Deleting first pod")
@@ -1160,7 +1160,7 @@ var _ = SIGDescribe("ResourceQuota [Feature:PodPriority]", func() {
 	ginkgo.It("should verify ResourceQuota's priority class scope (quota set to pod count: 1) against 2 pods with different priority class.", func() {
 
 		_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(&schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: "pclass3"}, Value: int32(1000)})
-		framework.ExpectEqual(err == nil || errors.IsAlreadyExists(err), true)
+		framework.ExpectEqual(err == nil || apierrors.IsAlreadyExists(err), true)
 
 		hard := v1.ResourceList{}
 		hard[v1.ResourcePods] = resource.MustParse("1")
@@ -1206,10 +1206,10 @@ var _ = SIGDescribe("ResourceQuota [Feature:PodPriority]", func() {
 
 	ginkgo.It("should verify ResourceQuota's multiple priority class scope (quota set to pod count: 2) against 2 pods with same priority classes.", func() {
 		_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(&schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: "pclass5"}, Value: int32(1000)})
-		framework.ExpectEqual(err == nil || errors.IsAlreadyExists(err), true)
+		framework.ExpectEqual(err == nil || apierrors.IsAlreadyExists(err), true)
 
 		_, err = f.ClientSet.SchedulingV1().PriorityClasses().Create(&schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: "pclass6"}, Value: int32(1000)})
-		framework.ExpectEqual(err == nil || errors.IsAlreadyExists(err), true)
+		framework.ExpectEqual(err == nil || apierrors.IsAlreadyExists(err), true)
 
 		hard := v1.ResourceList{}
 		hard[v1.ResourcePods] = resource.MustParse("2")
@@ -1261,7 +1261,7 @@ var _ = SIGDescribe("ResourceQuota [Feature:PodPriority]", func() {
 	ginkgo.It("should verify ResourceQuota's priority class scope (quota set to pod count: 1) against a pod with different priority class (ScopeSelectorOpNotIn).", func() {
 
 		_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(&schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: "pclass7"}, Value: int32(1000)})
-		framework.ExpectEqual(err == nil || errors.IsAlreadyExists(err), true)
+		framework.ExpectEqual(err == nil || apierrors.IsAlreadyExists(err), true)
 
 		hard := v1.ResourceList{}
 		hard[v1.ResourcePods] = resource.MustParse("1")
@@ -1295,7 +1295,7 @@ var _ = SIGDescribe("ResourceQuota [Feature:PodPriority]", func() {
 	ginkgo.It("should verify ResourceQuota's priority class scope (quota set to pod count: 1) against a pod with different priority class (ScopeSelectorOpExists).", func() {
 
 		_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(&schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: "pclass8"}, Value: int32(1000)})
-		framework.ExpectEqual(err == nil || errors.IsAlreadyExists(err), true)
+		framework.ExpectEqual(err == nil || apierrors.IsAlreadyExists(err), true)
 
 		hard := v1.ResourceList{}
 		hard[v1.ResourcePods] = resource.MustParse("1")
@@ -1334,7 +1334,7 @@ var _ = SIGDescribe("ResourceQuota [Feature:PodPriority]", func() {
 	ginkgo.It("should verify ResourceQuota's priority class scope (cpu, memory quota set) against a pod with same priority class.", func() {
 
 		_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(&schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: "pclass9"}, Value: int32(1000)})
-		framework.ExpectEqual(err == nil || errors.IsAlreadyExists(err), true)
+		framework.ExpectEqual(err == nil || apierrors.IsAlreadyExists(err), true)
 
 		hard := v1.ResourceList{}
 		hard[v1.ResourcePods] = resource.MustParse("1")
@@ -1714,7 +1714,7 @@ func updateResourceQuotaUntilUsageAppears(c clientset.Interface, ns, quotaName s
 		resourceQuota.Spec.Hard[resourceName] = current
 		_, err = c.CoreV1().ResourceQuotas(ns).Update(resourceQuota)
 		// ignoring conflicts since someone else may already updated it.
-		if errors.IsConflict(err) {
+		if apierrors.IsConflict(err) {
 			return false, nil
 		}
 		return false, err

@@ -53,7 +53,7 @@ func SetInitDynamicDefaults(cfg *kubeadmapi.InitConfiguration) error {
 	if err := SetAPIEndpointDynamicDefaults(&cfg.LocalAPIEndpoint); err != nil {
 		return err
 	}
-	return SetClusterDynamicDefaults(&cfg.ClusterConfiguration, cfg.LocalAPIEndpoint.AdvertiseAddress, cfg.LocalAPIEndpoint.BindPort)
+	return SetClusterDynamicDefaults(&cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint)
 }
 
 // SetBootstrapTokensDynamicDefaults checks and sets configuration values for the BootstrapTokens object
@@ -141,16 +141,9 @@ func SetAPIEndpointDynamicDefaults(cfg *kubeadmapi.APIEndpoint) error {
 }
 
 // SetClusterDynamicDefaults checks and sets values for the ClusterConfiguration object
-func SetClusterDynamicDefaults(cfg *kubeadmapi.ClusterConfiguration, advertiseAddress string, bindPort int32) error {
+func SetClusterDynamicDefaults(cfg *kubeadmapi.ClusterConfiguration, LocalAPIEndpoint *kubeadmapi.APIEndpoint) error {
 	// Default all the embedded ComponentConfig structs
-	componentconfigs.Known.Default(cfg)
-
-	ip := net.ParseIP(advertiseAddress)
-	if ip.To4() != nil {
-		cfg.ComponentConfigs.KubeProxy.BindAddress = kubeadmapiv1beta2.DefaultProxyBindAddressv4
-	} else {
-		cfg.ComponentConfigs.KubeProxy.BindAddress = kubeadmapiv1beta2.DefaultProxyBindAddressv6
-	}
+	componentconfigs.Default(cfg, LocalAPIEndpoint)
 
 	// Resolve possible version labels and validate version string
 	if err := NormalizeKubernetesVersion(cfg); err != nil {
@@ -166,7 +159,7 @@ func SetClusterDynamicDefaults(cfg *kubeadmapi.ClusterConfiguration, advertiseAd
 			return err
 		}
 		if port == "" {
-			cfg.ControlPlaneEndpoint = net.JoinHostPort(host, strconv.FormatInt(int64(bindPort), 10))
+			cfg.ControlPlaneEndpoint = net.JoinHostPort(host, strconv.FormatInt(int64(LocalAPIEndpoint.BindPort), 10))
 		}
 	}
 
@@ -243,10 +236,9 @@ func BytesToInitConfiguration(b []byte) (*kubeadmapi.InitConfiguration, error) {
 }
 
 // documentMapToInitConfiguration converts a map of GVKs and YAML documents to defaulted and validated configuration object.
-func documentMapToInitConfiguration(gvkmap map[schema.GroupVersionKind][]byte, allowDeprecated bool) (*kubeadmapi.InitConfiguration, error) {
+func documentMapToInitConfiguration(gvkmap kubeadmapi.DocumentMap, allowDeprecated bool) (*kubeadmapi.InitConfiguration, error) {
 	var initcfg *kubeadmapi.InitConfiguration
 	var clustercfg *kubeadmapi.ClusterConfiguration
-	decodedComponentConfigObjects := map[componentconfigs.RegistrationKind]runtime.Object{}
 
 	for gvk, fileContent := range gvkmap {
 		// first, check if this GVK is supported and possibly not deprecated
@@ -256,18 +248,6 @@ func documentMapToInitConfiguration(gvkmap map[schema.GroupVersionKind][]byte, a
 
 		// verify the validity of the YAML
 		strict.VerifyUnmarshalStrict(fileContent, gvk)
-
-		// Try to get the registration for the ComponentConfig based on the kind
-		regKind := componentconfigs.RegistrationKind(gvk.Kind)
-		if registration, found := componentconfigs.Known[regKind]; found {
-			// Unmarshal the bytes from the YAML document into a runtime.Object containing the ComponentConfiguration struct
-			obj, err := registration.Unmarshal(fileContent)
-			if err != nil {
-				return nil, err
-			}
-			decodedComponentConfigObjects[regKind] = obj
-			continue
-		}
 
 		if kubeadmutil.GroupVersionKindsHasInitConfiguration(gvk) {
 			// Set initcfg to an empty struct value the deserializer will populate
@@ -290,7 +270,10 @@ func documentMapToInitConfiguration(gvkmap map[schema.GroupVersionKind][]byte, a
 			continue
 		}
 
-		fmt.Printf("[config] WARNING: Ignored YAML document with GroupVersionKind %v\n", gvk)
+		// If the group is neither a kubeadm core type or of a supported component config group, we dump a warning about it being ignored
+		if !componentconfigs.Scheme.IsGroupRegistered(gvk.Group) {
+			fmt.Printf("[config] WARNING: Ignored YAML document with GroupVersionKind %v\n", gvk)
+		}
 	}
 
 	// Enforce that InitConfiguration and/or ClusterConfiguration has to exist among the YAML documents
@@ -313,16 +296,9 @@ func documentMapToInitConfiguration(gvkmap map[schema.GroupVersionKind][]byte, a
 		initcfg.ClusterConfiguration = *clustercfg
 	}
 
-	// Save the loaded ComponentConfig objects in the initcfg object
-	for kind, obj := range decodedComponentConfigObjects {
-		if registration, found := componentconfigs.Known[kind]; found {
-			if ok := registration.SetToInternalConfig(obj, &initcfg.ClusterConfiguration); !ok {
-				return nil, errors.Errorf("couldn't save componentconfig value for kind %q", string(kind))
-			}
-		} else {
-			// This should never happen in practice
-			fmt.Printf("[config] WARNING: Decoded a kind that couldn't be saved to the internal configuration: %q\n", string(kind))
-		}
+	// Load any component configs
+	if err := componentconfigs.FetchFromDocumentMap(&initcfg.ClusterConfiguration, gvkmap); err != nil {
+		return nil, err
 	}
 
 	// Applies dynamic defaults to settings not provided with flags

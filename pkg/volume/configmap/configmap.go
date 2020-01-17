@@ -19,15 +19,16 @@ package configmap
 import (
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	"k8s.io/klog"
+	"k8s.io/utils/mount"
+	utilstrings "k8s.io/utils/strings"
+
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
-	utilstrings "k8s.io/utils/strings"
 )
 
 // ProbeVolumePlugins is the entry point for plugin detection in a package.
@@ -75,10 +76,6 @@ func (plugin *configMapPlugin) GetVolumeName(spec *volume.Spec) (string, error) 
 
 func (plugin *configMapPlugin) CanSupport(spec *volume.Spec) bool {
 	return spec.Volume != nil && spec.Volume.ConfigMap != nil
-}
-
-func (plugin *configMapPlugin) IsMigratedToCSI() bool {
-	return false
 }
 
 func (plugin *configMapPlugin) RequiresRemount() bool {

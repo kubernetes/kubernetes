@@ -17,6 +17,7 @@ limitations under the License.
 package cert
 
 import (
+	"bytes"
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
@@ -58,4 +59,15 @@ func ParseCertsPEM(pemCerts []byte) ([]*x509.Certificate, error) {
 		return certs, errors.New("data does not contain any valid RSA or ECDSA certificates")
 	}
 	return certs, nil
+}
+
+// EncodeCertificates returns the PEM-encoded byte array that represents by the specified certs.
+func EncodeCertificates(certs ...*x509.Certificate) ([]byte, error) {
+	b := bytes.Buffer{}
+	for _, cert := range certs {
+		if err := pem.Encode(&b, &pem.Block{Type: CertificateBlockType, Bytes: cert.Raw}); err != nil {
+			return []byte{}, err
+		}
+	}
+	return b.Bytes(), nil
 }

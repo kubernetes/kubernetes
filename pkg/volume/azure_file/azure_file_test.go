@@ -33,7 +33,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/fake"
 	fakecloud "k8s.io/cloud-provider/fake"
-	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/utils/mount"
+
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/legacy-cloud-providers/azure"
@@ -46,7 +47,7 @@ func TestCanSupport(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(t, tmpDir, nil, nil))
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/azure-file")
 	if err != nil {
@@ -70,7 +71,7 @@ func TestGetAccessModes(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(t, tmpDir, nil, nil))
 
 	plug, err := plugMgr.FindPersistentPluginByName("kubernetes.io/azure-file")
 	if err != nil {
@@ -87,13 +88,9 @@ func getAzureTestCloud(t *testing.T) *azure.Cloud {
                 "aadClientSecret": "--aad-client-secret--"
         }`
 	configReader := strings.NewReader(config)
-	cloud, err := azure.NewCloud(configReader)
+	azureCloud, err := azure.NewCloudWithoutFeatureGates(configReader)
 	if err != nil {
 		t.Error(err)
-	}
-	azureCloud, ok := cloud.(*azure.Cloud)
-	if !ok {
-		t.Error("NewCloud returned incorrect type")
 	}
 	return azureCloud
 }
@@ -109,20 +106,20 @@ func getTestTempDir(t *testing.T) string {
 func TestPluginAzureCloudProvider(t *testing.T) {
 	tmpDir := getTestTempDir(t)
 	defer os.RemoveAll(tmpDir)
-	testPlugin(t, tmpDir, volumetest.NewFakeVolumeHostWithCloudProvider(tmpDir, nil, nil, getAzureTestCloud(t)))
+	testPlugin(t, tmpDir, volumetest.NewFakeVolumeHostWithCloudProvider(t, tmpDir, nil, nil, getAzureTestCloud(t)))
 }
 
 func TestPluginWithoutCloudProvider(t *testing.T) {
 	tmpDir := getTestTempDir(t)
 	defer os.RemoveAll(tmpDir)
-	testPlugin(t, tmpDir, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
+	testPlugin(t, tmpDir, volumetest.NewFakeVolumeHost(t, tmpDir, nil, nil))
 }
 
 func TestPluginWithOtherCloudProvider(t *testing.T) {
 	tmpDir := getTestTempDir(t)
 	defer os.RemoveAll(tmpDir)
 	cloud := &fakecloud.Cloud{}
-	testPlugin(t, tmpDir, volumetest.NewFakeVolumeHostWithCloudProvider(tmpDir, nil, nil, cloud))
+	testPlugin(t, tmpDir, volumetest.NewFakeVolumeHostWithCloudProvider(t, tmpDir, nil, nil, cloud))
 }
 
 func testPlugin(t *testing.T, tmpDir string, volumeHost volume.VolumeHost) {
@@ -142,7 +139,7 @@ func testPlugin(t *testing.T, tmpDir string, volumeHost volume.VolumeHost) {
 			},
 		},
 	}
-	fake := &mount.FakeMounter{}
+	fake := mount.NewFakeMounter(nil)
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: types.UID("poduid")}}
 	mounter, err := plug.(*azureFilePlugin).newMounterInternal(volume.NewSpecFromVolume(spec), pod, &fakeAzureSvc{}, fake)
 	if err != nil {
@@ -168,7 +165,7 @@ func testPlugin(t *testing.T, tmpDir string, volumeHost volume.VolumeHost) {
 		}
 	}
 
-	unmounter, err := plug.(*azureFilePlugin).newUnmounterInternal("vol1", types.UID("poduid"), &mount.FakeMounter{})
+	unmounter, err := plug.(*azureFilePlugin).newUnmounterInternal("vol1", types.UID("poduid"), mount.NewFakeMounter(nil))
 	if err != nil {
 		t.Errorf("Failed to make a new Unmounter: %v", err)
 	}
@@ -217,7 +214,7 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 	client := fake.NewSimpleClientset(pv, claim)
 
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost("/tmp/fake", client, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(t, "/tmp/fake", client, nil))
 	plug, _ := plugMgr.FindPluginByName(azureFilePluginName)
 
 	// readOnly bool is supplied by persistent-claim volume source when its mounter creates other volumes
@@ -249,7 +246,7 @@ func TestMounterAndUnmounterTypeAssert(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(t, tmpDir, nil, nil))
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/azure-file")
 	if err != nil {
@@ -264,7 +261,7 @@ func TestMounterAndUnmounterTypeAssert(t *testing.T) {
 			},
 		},
 	}
-	fake := &mount.FakeMounter{}
+	fake := mount.NewFakeMounter(nil)
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: types.UID("poduid")}}
 	mounter, err := plug.(*azureFilePlugin).newMounterInternal(volume.NewSpecFromVolume(spec), pod, &fakeAzureSvc{}, fake)
 	if err != nil {
@@ -274,7 +271,7 @@ func TestMounterAndUnmounterTypeAssert(t *testing.T) {
 		t.Errorf("Volume Mounter can be type-assert to Unmounter")
 	}
 
-	unmounter, err := plug.(*azureFilePlugin).newUnmounterInternal("vol1", types.UID("poduid"), &mount.FakeMounter{})
+	unmounter, err := plug.(*azureFilePlugin).newUnmounterInternal("vol1", types.UID("poduid"), mount.NewFakeMounter(nil))
 	if err != nil {
 		t.Errorf("MounterInternal() failed: %v", err)
 	}

@@ -47,6 +47,7 @@ go_test(
         "policy_none_test.go",
         "policy_restricted_test.go",
         "policy_single_numa_node_test.go",
+        "policy_test.go",
         "topology_manager_test.go",
     ],
     embed = [":go_default_library"],

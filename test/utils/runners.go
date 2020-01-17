@@ -30,7 +30,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -979,29 +979,29 @@ func (*TrivialNodePrepareStrategy) CleanupDependentObjects(nodeName string, clie
 }
 
 type LabelNodePrepareStrategy struct {
-	labelKey   string
-	labelValue string
+	LabelKey   string
+	LabelValue string
 }
 
 var _ PrepareNodeStrategy = &LabelNodePrepareStrategy{}
 
 func NewLabelNodePrepareStrategy(labelKey string, labelValue string) *LabelNodePrepareStrategy {
 	return &LabelNodePrepareStrategy{
-		labelKey:   labelKey,
-		labelValue: labelValue,
+		LabelKey:   labelKey,
+		LabelValue: labelValue,
 	}
 }
 
 func (s *LabelNodePrepareStrategy) PreparePatch(*v1.Node) []byte {
-	labelString := fmt.Sprintf("{\"%v\":\"%v\"}", s.labelKey, s.labelValue)
+	labelString := fmt.Sprintf("{\"%v\":\"%v\"}", s.LabelKey, s.LabelValue)
 	patch := fmt.Sprintf(`{"metadata":{"labels":%v}}`, labelString)
 	return []byte(patch)
 }
 
 func (s *LabelNodePrepareStrategy) CleanupNode(node *v1.Node) *v1.Node {
 	nodeCopy := node.DeepCopy()
-	if node.Labels != nil && len(node.Labels[s.labelKey]) != 0 {
-		delete(nodeCopy.Labels, s.labelKey)
+	if node.Labels != nil && len(node.Labels[s.LabelKey]) != 0 {
+		delete(nodeCopy.Labels, s.LabelKey)
 	}
 	return nodeCopy
 }
@@ -1019,22 +1019,26 @@ func (*LabelNodePrepareStrategy) CleanupDependentObjects(nodeName string, client
 // set to nil.
 type NodeAllocatableStrategy struct {
 	// Node.status.allocatable to fill to all nodes.
-	nodeAllocatable map[v1.ResourceName]string
+	NodeAllocatable map[v1.ResourceName]string
 	// Map <driver_name> -> VolumeNodeResources to fill into csiNode.spec.drivers[<driver_name>].
-	csiNodeAllocatable map[string]*storagev1beta1.VolumeNodeResources
+	CsiNodeAllocatable map[string]*storagev1beta1.VolumeNodeResources
 	// List of in-tree volume plugins migrated to CSI.
-	migratedPlugins []string
+	MigratedPlugins []string
 }
 
 var _ PrepareNodeStrategy = &NodeAllocatableStrategy{}
 
 func NewNodeAllocatableStrategy(nodeAllocatable map[v1.ResourceName]string, csiNodeAllocatable map[string]*storagev1beta1.VolumeNodeResources, migratedPlugins []string) *NodeAllocatableStrategy {
-	return &NodeAllocatableStrategy{nodeAllocatable, csiNodeAllocatable, migratedPlugins}
+	return &NodeAllocatableStrategy{
+		NodeAllocatable:    nodeAllocatable,
+		CsiNodeAllocatable: csiNodeAllocatable,
+		MigratedPlugins:    migratedPlugins,
+	}
 }
 
 func (s *NodeAllocatableStrategy) PreparePatch(node *v1.Node) []byte {
 	newNode := node.DeepCopy()
-	for name, value := range s.nodeAllocatable {
+	for name, value := range s.NodeAllocatable {
 		newNode.Status.Allocatable[name] = resource.MustParse(value)
 	}
 
@@ -1056,7 +1060,7 @@ func (s *NodeAllocatableStrategy) PreparePatch(node *v1.Node) []byte {
 
 func (s *NodeAllocatableStrategy) CleanupNode(node *v1.Node) *v1.Node {
 	nodeCopy := node.DeepCopy()
-	for name := range s.nodeAllocatable {
+	for name := range s.NodeAllocatable {
 		delete(nodeCopy.Status.Allocatable, name)
 	}
 	return nodeCopy
@@ -1067,7 +1071,7 @@ func (s *NodeAllocatableStrategy) createCSINode(nodeName string, client clientse
 		ObjectMeta: metav1.ObjectMeta{
 			Name: nodeName,
 			Annotations: map[string]string{
-				v1.MigratedPluginsAnnotationKey: strings.Join(s.migratedPlugins, ","),
+				v1.MigratedPluginsAnnotationKey: strings.Join(s.MigratedPlugins, ","),
 			},
 		},
 		Spec: storagev1beta1.CSINodeSpec{
@@ -1075,7 +1079,7 @@ func (s *NodeAllocatableStrategy) createCSINode(nodeName string, client clientse
 		},
 	}
 
-	for driver, allocatable := range s.csiNodeAllocatable {
+	for driver, allocatable := range s.CsiNodeAllocatable {
 		d := storagev1beta1.CSINodeDriver{
 			Name:        driver,
 			Allocatable: allocatable,
@@ -1085,16 +1089,16 @@ func (s *NodeAllocatableStrategy) createCSINode(nodeName string, client clientse
 	}
 
 	_, err := client.StorageV1beta1().CSINodes().Create(csiNode)
-	if apierrs.IsAlreadyExists(err) {
+	if apierrors.IsAlreadyExists(err) {
 		// Something created CSINode instance after we checked it did not exist.
 		// Make the caller to re-try PrepareDependentObjects by returning Conflict error
-		err = apierrs.NewConflict(storagev1beta1.Resource("csinodes"), nodeName, err)
+		err = apierrors.NewConflict(storagev1beta1.Resource("csinodes"), nodeName, err)
 	}
 	return err
 }
 
 func (s *NodeAllocatableStrategy) updateCSINode(csiNode *storagev1beta1.CSINode, client clientset.Interface) error {
-	for driverName, allocatable := range s.csiNodeAllocatable {
+	for driverName, allocatable := range s.CsiNodeAllocatable {
 		found := false
 		for i, driver := range csiNode.Spec.Drivers {
 			if driver.Name == driverName {
@@ -1112,7 +1116,7 @@ func (s *NodeAllocatableStrategy) updateCSINode(csiNode *storagev1beta1.CSINode,
 			csiNode.Spec.Drivers = append(csiNode.Spec.Drivers, d)
 		}
 	}
-	csiNode.Annotations[v1.MigratedPluginsAnnotationKey] = strings.Join(s.migratedPlugins, ",")
+	csiNode.Annotations[v1.MigratedPluginsAnnotationKey] = strings.Join(s.MigratedPlugins, ",")
 
 	_, err := client.StorageV1beta1().CSINodes().Update(csiNode)
 	return err
@@ -1121,7 +1125,7 @@ func (s *NodeAllocatableStrategy) updateCSINode(csiNode *storagev1beta1.CSINode,
 func (s *NodeAllocatableStrategy) PrepareDependentObjects(node *v1.Node, client clientset.Interface) error {
 	csiNode, err := client.StorageV1beta1().CSINodes().Get(node.Name, metav1.GetOptions{})
 	if err != nil {
-		if apierrs.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			return s.createCSINode(node.Name, client)
 		}
 		return err
@@ -1132,13 +1136,13 @@ func (s *NodeAllocatableStrategy) PrepareDependentObjects(node *v1.Node, client 
 func (s *NodeAllocatableStrategy) CleanupDependentObjects(nodeName string, client clientset.Interface) error {
 	csiNode, err := client.StorageV1beta1().CSINodes().Get(nodeName, metav1.GetOptions{})
 	if err != nil {
-		if apierrs.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			return nil
 		}
 		return err
 	}
 
-	for driverName := range s.csiNodeAllocatable {
+	for driverName := range s.CsiNodeAllocatable {
 		for i, driver := range csiNode.Spec.Drivers {
 			if driver.Name == driverName {
 				csiNode.Spec.Drivers[i].Allocatable = nil
@@ -1146,6 +1150,41 @@ func (s *NodeAllocatableStrategy) CleanupDependentObjects(nodeName string, clien
 		}
 	}
 	return s.updateCSINode(csiNode, client)
+}
+
+// UniqueNodeLabelStrategy sets a unique label for each node.
+type UniqueNodeLabelStrategy struct {
+	LabelKey string
+}
+
+var _ PrepareNodeStrategy = &UniqueNodeLabelStrategy{}
+
+func NewUniqueNodeLabelStrategy(labelKey string) *UniqueNodeLabelStrategy {
+	return &UniqueNodeLabelStrategy{
+		LabelKey: labelKey,
+	}
+}
+
+func (s *UniqueNodeLabelStrategy) PreparePatch(*v1.Node) []byte {
+	labelString := fmt.Sprintf("{\"%v\":\"%v\"}", s.LabelKey, string(uuid.NewUUID()))
+	patch := fmt.Sprintf(`{"metadata":{"labels":%v}}`, labelString)
+	return []byte(patch)
+}
+
+func (s *UniqueNodeLabelStrategy) CleanupNode(node *v1.Node) *v1.Node {
+	nodeCopy := node.DeepCopy()
+	if node.Labels != nil && len(node.Labels[s.LabelKey]) != 0 {
+		delete(nodeCopy.Labels, s.LabelKey)
+	}
+	return nodeCopy
+}
+
+func (*UniqueNodeLabelStrategy) PrepareDependentObjects(node *v1.Node, client clientset.Interface) error {
+	return nil
+}
+
+func (*UniqueNodeLabelStrategy) CleanupDependentObjects(nodeName string, client clientset.Interface) error {
+	return nil
 }
 
 func DoPrepareNode(client clientset.Interface, node *v1.Node, strategy PrepareNodeStrategy) error {
@@ -1158,7 +1197,7 @@ func DoPrepareNode(client clientset.Interface, node *v1.Node, strategy PrepareNo
 		if _, err = client.CoreV1().Nodes().Patch(node.Name, types.MergePatchType, []byte(patch)); err == nil {
 			break
 		}
-		if !apierrs.IsConflict(err) {
+		if !apierrors.IsConflict(err) {
 			return fmt.Errorf("Error while applying patch %v to Node %v: %v", string(patch), node.Name, err)
 		}
 		time.Sleep(100 * time.Millisecond)
@@ -1171,7 +1210,7 @@ func DoPrepareNode(client clientset.Interface, node *v1.Node, strategy PrepareNo
 		if err = strategy.PrepareDependentObjects(node, client); err == nil {
 			break
 		}
-		if !apierrs.IsConflict(err) {
+		if !apierrors.IsConflict(err) {
 			return fmt.Errorf("Error while preparing objects for node %s: %s", node.Name, err)
 		}
 		time.Sleep(100 * time.Millisecond)
@@ -1196,7 +1235,7 @@ func DoCleanupNode(client clientset.Interface, nodeName string, strategy Prepare
 		if _, err = client.CoreV1().Nodes().Update(updatedNode); err == nil {
 			break
 		}
-		if !apierrs.IsConflict(err) {
+		if !apierrors.IsConflict(err) {
 			return fmt.Errorf("Error when updating Node %v: %v", nodeName, err)
 		}
 		time.Sleep(100 * time.Millisecond)
@@ -1210,7 +1249,7 @@ func DoCleanupNode(client clientset.Interface, nodeName string, strategy Prepare
 		if err == nil {
 			break
 		}
-		if !apierrs.IsConflict(err) {
+		if !apierrors.IsConflict(err) {
 			return fmt.Errorf("Error when cleaning up Node %v objects: %v", nodeName, err)
 		}
 		time.Sleep(100 * time.Millisecond)

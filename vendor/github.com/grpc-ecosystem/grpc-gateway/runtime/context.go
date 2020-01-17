@@ -1,14 +1,16 @@
 package runtime
 
 import (
+	"context"
+	"encoding/base64"
 	"fmt"
 	"net"
 	"net/http"
+	"net/textproto"
 	"strconv"
 	"strings"
 	"time"
 
-	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/grpclog"
 	"google.golang.org/grpc/metadata"
@@ -19,7 +21,8 @@ import (
 // parameters to or from a gRPC call.
 const MetadataHeaderPrefix = "Grpc-Metadata-"
 
-// MetadataPrefix is the prefix for grpc-gateway supplied custom metadata fields.
+// MetadataPrefix is prepended to permanent HTTP header keys (as specified
+// by the IANA) when added to the gRPC context.
 const MetadataPrefix = "grpcgateway-"
 
 // MetadataTrailerPrefix is prepended to gRPC metadata as it is converted to
@@ -27,6 +30,7 @@ const MetadataPrefix = "grpcgateway-"
 const MetadataTrailerPrefix = "Grpc-Trailer-"
 
 const metadataGrpcTimeout = "Grpc-Timeout"
+const metadataHeaderBinarySuffix = "-Bin"
 
 const xForwardedFor = "X-Forwarded-For"
 const xForwardedHost = "X-Forwarded-Host"
@@ -36,6 +40,14 @@ var (
 	// header isn't present. If the value is 0 the sent `context` will not have a timeout.
 	DefaultContextTimeout = 0 * time.Second
 )
+
+func decodeBinHeader(v string) ([]byte, error) {
+	if len(v)%4 == 0 {
+		// Input was padded, or padding was not necessary.
+		return base64.StdEncoding.DecodeString(v)
+	}
+	return base64.RawStdEncoding.DecodeString(v)
+}
 
 /*
 AnnotateContext adds context information such as metadata from the request.
@@ -57,11 +69,22 @@ func AnnotateContext(ctx context.Context, mux *ServeMux, req *http.Request) (con
 
 	for key, vals := range req.Header {
 		for _, val := range vals {
+			key = textproto.CanonicalMIMEHeaderKey(key)
 			// For backwards-compatibility, pass through 'authorization' header with no prefix.
-			if strings.ToLower(key) == "authorization" {
+			if key == "Authorization" {
 				pairs = append(pairs, "authorization", val)
 			}
 			if h, ok := mux.incomingHeaderMatcher(key); ok {
+				// Handles "-bin" metadata in grpc, since grpc will do another base64
+				// encode before sending to server, we need to decode it first.
+				if strings.HasSuffix(key, metadataHeaderBinarySuffix) {
+					b, err := decodeBinHeader(val)
+					if err != nil {
+						return nil, status.Errorf(codes.InvalidArgument, "invalid binary header %s: %s", key, err)
+					}
+
+					val = string(b)
+				}
 				pairs = append(pairs, h, val)
 			}
 		}
@@ -80,7 +103,7 @@ func AnnotateContext(ctx context.Context, mux *ServeMux, req *http.Request) (con
 				pairs = append(pairs, strings.ToLower(xForwardedFor), fmt.Sprintf("%s, %s", fwd, remoteIP))
 			}
 		} else {
-			grpclog.Printf("invalid remote addr: %s", addr)
+			grpclog.Infof("invalid remote addr: %s", addr)
 		}
 	}
 
@@ -91,8 +114,8 @@ func AnnotateContext(ctx context.Context, mux *ServeMux, req *http.Request) (con
 		return ctx, nil
 	}
 	md := metadata.Pairs(pairs...)
-	if mux.metadataAnnotator != nil {
-		md = metadata.Join(md, mux.metadataAnnotator(ctx, req))
+	for _, mda := range mux.metadataAnnotators {
+		md = metadata.Join(md, mda(ctx, req))
 	}
 	return metadata.NewOutgoingContext(ctx, md), nil
 }

@@ -45,6 +45,7 @@ const (
 	autoscalingGroup    = "autoscaling"
 	batchGroup          = "batch"
 	certificatesGroup   = "certificates.k8s.io"
+	coordinationGroup   = "coordination.k8s.io"
 	discoveryGroup      = "discovery.k8s.io"
 	extensionsGroup     = "extensions"
 	policyGroup         = "policy"
@@ -142,6 +143,9 @@ func NodeRules() []rbacv1.PolicyRule {
 		// for it to be signed. This allows the kubelet to rotate it's own certificate.
 		rbacv1helpers.NewRule("create", "get", "list", "watch").Groups(certificatesGroup).Resources("certificatesigningrequests").RuleOrDie(),
 
+		// Leases
+		rbacv1helpers.NewRule("get", "create", "update", "patch", "delete").Groups("coordination.k8s.io").Resources("leases").RuleOrDie(),
+
 		// CSI
 		rbacv1helpers.NewRule("get").Groups(storageGroup).Resources("volumeattachments").RuleOrDie(),
 	}
@@ -168,11 +172,6 @@ func NodeRules() []rbacv1.PolicyRule {
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
 		csiNodeInfoRule := rbacv1helpers.NewRule("get", "create", "update", "patch", "delete").Groups("storage.k8s.io").Resources("csinodes").RuleOrDie()
 		nodePolicyRules = append(nodePolicyRules, csiNodeInfoRule)
-	}
-
-	// Node leases
-	if utilfeature.DefaultFeatureGate.Enabled(features.NodeLease) {
-		nodePolicyRules = append(nodePolicyRules, rbacv1helpers.NewRule("get", "create", "update", "patch", "delete").Groups("coordination.k8s.io").Resources("leases").RuleOrDie())
 	}
 
 	// RuntimeClass
@@ -394,10 +393,17 @@ func ClusterRoles() []rbacv1.ClusterRole {
 			ObjectMeta: metav1.ObjectMeta{Name: "system:kube-controller-manager"},
 			Rules: []rbacv1.PolicyRule{
 				eventsRule(),
-				rbacv1helpers.NewRule("create").Groups(legacyGroup).Resources("endpoints", "secrets", "serviceaccounts").RuleOrDie(),
+				// Needed for leader election.
+				rbacv1helpers.NewRule("create").Groups(coordinationGroup).Resources("leases").RuleOrDie(),
+				rbacv1helpers.NewRule("get", "update").Groups(coordinationGroup).Resources("leases").Names("kube-controller-manager").RuleOrDie(),
+				// TODO: Remove once we fully migrate to lease in leader-election.
+				rbacv1helpers.NewRule("create").Groups(legacyGroup).Resources("endpoints").RuleOrDie(),
+				rbacv1helpers.NewRule("get", "update").Groups(legacyGroup).Resources("endpoints").Names("kube-controller-manager").RuleOrDie(),
+				// Fundamental resources.
+				rbacv1helpers.NewRule("create").Groups(legacyGroup).Resources("secrets", "serviceaccounts").RuleOrDie(),
 				rbacv1helpers.NewRule("delete").Groups(legacyGroup).Resources("secrets").RuleOrDie(),
-				rbacv1helpers.NewRule("get").Groups(legacyGroup).Resources("endpoints", "namespaces", "secrets", "serviceaccounts", "configmaps").RuleOrDie(),
-				rbacv1helpers.NewRule("update").Groups(legacyGroup).Resources("endpoints", "secrets", "serviceaccounts").RuleOrDie(),
+				rbacv1helpers.NewRule("get").Groups(legacyGroup).Resources("namespaces", "secrets", "serviceaccounts", "configmaps").RuleOrDie(),
+				rbacv1helpers.NewRule("update").Groups(legacyGroup).Resources("secrets", "serviceaccounts").RuleOrDie(),
 				// Needed to check API access.  These creates are non-mutating
 				rbacv1helpers.NewRule("create").Groups(authenticationGroup).Resources("tokenreviews").RuleOrDie(),
 				rbacv1helpers.NewRule("create").Groups(authorizationGroup).Resources("subjectaccessreviews").RuleOrDie(),
@@ -429,16 +435,6 @@ func ClusterRoles() []rbacv1.ClusterRole {
 			},
 		},
 		{
-			// a role for the csi external attacher
-			ObjectMeta: metav1.ObjectMeta{Name: "system:csi-external-attacher"},
-			Rules: []rbacv1.PolicyRule{
-				rbacv1helpers.NewRule("get", "list", "watch", "update", "patch").Groups(legacyGroup).Resources("persistentvolumes").RuleOrDie(),
-				rbacv1helpers.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
-				rbacv1helpers.NewRule("get", "list", "watch", "update", "patch").Groups(storageGroup).Resources("volumeattachments").RuleOrDie(),
-				rbacv1helpers.NewRule("get", "list", "watch", "create", "update", "patch").Groups(legacyGroup).Resources("events").RuleOrDie(),
-			},
-		},
-		{
 			// a role making the csrapprover controller approve a node client CSR
 			ObjectMeta: metav1.ObjectMeta{Name: "system:certificates.k8s.io:certificatesigningrequests:nodeclient"},
 			Rules: []rbacv1.PolicyRule{
@@ -465,7 +461,7 @@ func ClusterRoles() []rbacv1.ClusterRole {
 	// node-proxier role is used by kube-proxy.
 	nodeProxierRules := []rbacv1.PolicyRule{
 		rbacv1helpers.NewRule("list", "watch").Groups(legacyGroup).Resources("services", "endpoints").RuleOrDie(),
-		rbacv1helpers.NewRule("get").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
+		rbacv1helpers.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
 
 		eventsRule(),
 	}
@@ -481,8 +477,11 @@ func ClusterRoles() []rbacv1.ClusterRole {
 		eventsRule(),
 		// This is for leaderlease access
 		// TODO: scope this to the kube-system namespace
+		rbacv1helpers.NewRule("create").Groups(coordinationGroup).Resources("leases").RuleOrDie(),
+		rbacv1helpers.NewRule("get", "update").Groups(coordinationGroup).Resources("leases").Names("kube-scheduler").RuleOrDie(),
+		// TODO: Remove once we fully migrate to lease in leader-election.
 		rbacv1helpers.NewRule("create").Groups(legacyGroup).Resources("endpoints").RuleOrDie(),
-		rbacv1helpers.NewRule("get", "update", "patch", "delete").Groups(legacyGroup).Resources("endpoints").Names("kube-scheduler").RuleOrDie(),
+		rbacv1helpers.NewRule("get", "update").Groups(legacyGroup).Resources("endpoints").Names("kube-scheduler").RuleOrDie(),
 
 		// Fundamental resources
 		rbacv1helpers.NewRule(Read...).Groups(legacyGroup).Resources("nodes").RuleOrDie(),
@@ -499,31 +498,13 @@ func ClusterRoles() []rbacv1.ClusterRole {
 		// Needed to check API access. These creates are non-mutating
 		rbacv1helpers.NewRule("create").Groups(authenticationGroup).Resources("tokenreviews").RuleOrDie(),
 		rbacv1helpers.NewRule("create").Groups(authorizationGroup).Resources("subjectaccessreviews").RuleOrDie(),
-	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) &&
-		utilfeature.DefaultFeatureGate.Enabled(features.AttachVolumeLimit) {
-		kubeSchedulerRules = append(kubeSchedulerRules, rbacv1helpers.NewRule(Read...).Groups(storageGroup).Resources("csinodes").RuleOrDie())
+		// Needed for volume limits
+		rbacv1helpers.NewRule(Read...).Groups(storageGroup).Resources("csinodes").RuleOrDie(),
 	}
 	roles = append(roles, rbacv1.ClusterRole{
 		// a role to use for the kube-scheduler
 		ObjectMeta: metav1.ObjectMeta{Name: "system:kube-scheduler"},
 		Rules:      kubeSchedulerRules,
-	})
-
-	externalProvisionerRules := []rbacv1.PolicyRule{
-		rbacv1helpers.NewRule("create", "delete", "get", "list", "watch").Groups(legacyGroup).Resources("persistentvolumes").RuleOrDie(),
-		rbacv1helpers.NewRule("get", "list", "watch", "update", "patch").Groups(legacyGroup).Resources("persistentvolumeclaims").RuleOrDie(),
-		rbacv1helpers.NewRule("list", "watch").Groups(storageGroup).Resources("storageclasses").RuleOrDie(),
-		rbacv1helpers.NewRule("get", "list", "watch", "create", "update", "patch").Groups(legacyGroup).Resources("events").RuleOrDie(),
-		rbacv1helpers.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
-	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
-		externalProvisionerRules = append(externalProvisionerRules, rbacv1helpers.NewRule("get", "watch", "list").Groups("storage.k8s.io").Resources("csinodes").RuleOrDie())
-	}
-	roles = append(roles, rbacv1.ClusterRole{
-		// a role for the csi external provisioner
-		ObjectMeta: metav1.ObjectMeta{Name: "system:csi-external-provisioner"},
-		Rules:      externalProvisionerRules,
 	})
 
 	addClusterRoleLabel(roles)

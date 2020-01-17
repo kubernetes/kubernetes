@@ -687,6 +687,63 @@ func TestStoreDelete(t *testing.T) {
 	}
 }
 
+func TestStoreGracefulDeleteWithResourceVersion(t *testing.T) {
+	podA := &example.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+		Spec:       example.PodSpec{NodeName: "machine"},
+	}
+
+	testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
+	destroyFunc, registry := NewTestGenericStoreRegistry(t)
+	defer destroyFunc()
+
+	defaultDeleteStrategy := testRESTStrategy{scheme, names.SimpleNameGenerator, true, false, true}
+	registry.DeleteStrategy = testGracefulStrategy{defaultDeleteStrategy}
+
+	// test failure condition
+	_, _, err := registry.Delete(testContext, podA.Name, rest.ValidateAllObjectFunc, nil)
+	if !errors.IsNotFound(err) {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	// create pod
+	_, err = registry.Create(testContext, podA, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	// try to get a item which should be deleted
+	obj, err := registry.Get(testContext, podA.Name, &metav1.GetOptions{})
+	if errors.IsNotFound(err) {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	accessor, err := meta.Accessor(obj)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	resourceVersion := accessor.GetResourceVersion()
+
+	options := metav1.NewDeleteOptions(0)
+	options.Preconditions = &metav1.Preconditions{ResourceVersion: &resourceVersion}
+
+	// delete object
+	_, wasDeleted, err := registry.Delete(testContext, podA.Name, rest.ValidateAllObjectFunc, options)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if !wasDeleted {
+		t.Errorf("unexpected, pod %s should have been deleted immediately", podA.Name)
+	}
+
+	// try to get a item which should be deleted
+	_, err = registry.Get(testContext, podA.Name, &metav1.GetOptions{})
+	if !errors.IsNotFound(err) {
+		t.Errorf("Unexpected error: %v", err)
+	}
+}
+
 // TestGracefulStoreCanDeleteIfExistingGracePeriodZero tests recovery from
 // race condition where the graceful delete is unable to complete
 // in prior operation, but the pod remains with deletion timestamp

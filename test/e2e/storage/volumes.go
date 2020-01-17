@@ -108,7 +108,7 @@ var _ = utils.SIGDescribe("Volumes", func() {
 					ExpectedContent: "this is the second file",
 				},
 			}
-			volume.TestVolumeClient(cs, config, nil, "" /* fsType */, tests)
+			volume.TestVolumeClient(f, config, nil, "" /* fsType */, tests)
 		})
 	})
 })

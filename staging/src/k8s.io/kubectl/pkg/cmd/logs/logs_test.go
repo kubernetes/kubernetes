@@ -47,8 +47,12 @@ func TestLog(t *testing.T) {
 			name: "v1 - pod log",
 			opts: func(streams genericclioptions.IOStreams) *LogsOptions {
 				mock := &logTestMock{
-					logsForObjectRequests: []restclient.ResponseWrapper{
-						&responseWrapperMock{data: strings.NewReader("test log content\n")},
+					logsForObjectRequests: map[corev1.ObjectReference]restclient.ResponseWrapper{
+						{
+							Kind:      "Pod",
+							Name:      "some-pod",
+							FieldPath: "spec.containers{some-container}",
+						}: &responseWrapperMock{data: strings.NewReader("test log content\n")},
 					},
 				}
 
@@ -61,13 +65,91 @@ func TestLog(t *testing.T) {
 			expectedOutSubstrings: []string{"test log content\n"},
 		},
 		{
+			name: "pod logs with prefix",
+			opts: func(streams genericclioptions.IOStreams) *LogsOptions {
+				mock := &logTestMock{
+					logsForObjectRequests: map[corev1.ObjectReference]restclient.ResponseWrapper{
+						{
+							Kind:      "Pod",
+							Name:      "test-pod",
+							FieldPath: "spec.containers{test-container}",
+						}: &responseWrapperMock{data: strings.NewReader("test log content\n")},
+					},
+				}
+
+				o := NewLogsOptions(streams, false)
+				o.LogsForObject = mock.mockLogsForObject
+				o.ConsumeRequestFn = mock.mockConsumeRequest
+				o.Prefix = true
+
+				return o
+			},
+			expectedOutSubstrings: []string{"[pod/test-pod/test-container] test log content\n"},
+		},
+		{
+			name: "pod logs with prefix: init container",
+			opts: func(streams genericclioptions.IOStreams) *LogsOptions {
+				mock := &logTestMock{
+					logsForObjectRequests: map[corev1.ObjectReference]restclient.ResponseWrapper{
+						{
+							Kind:      "Pod",
+							Name:      "test-pod",
+							FieldPath: "spec.initContainers{test-container}",
+						}: &responseWrapperMock{data: strings.NewReader("test log content\n")},
+					},
+				}
+
+				o := NewLogsOptions(streams, false)
+				o.LogsForObject = mock.mockLogsForObject
+				o.ConsumeRequestFn = mock.mockConsumeRequest
+				o.Prefix = true
+
+				return o
+			},
+			expectedOutSubstrings: []string{"[pod/test-pod/test-container] test log content\n"},
+		},
+		{
+			name: "pod logs with prefix: ephemeral container",
+			opts: func(streams genericclioptions.IOStreams) *LogsOptions {
+				mock := &logTestMock{
+					logsForObjectRequests: map[corev1.ObjectReference]restclient.ResponseWrapper{
+						{
+							Kind:      "Pod",
+							Name:      "test-pod",
+							FieldPath: "spec.ephemeralContainers{test-container}",
+						}: &responseWrapperMock{data: strings.NewReader("test log content\n")},
+					},
+				}
+
+				o := NewLogsOptions(streams, false)
+				o.LogsForObject = mock.mockLogsForObject
+				o.ConsumeRequestFn = mock.mockConsumeRequest
+				o.Prefix = true
+
+				return o
+			},
+			expectedOutSubstrings: []string{"[pod/test-pod/test-container] test log content\n"},
+		},
+		{
 			name: "get logs from multiple requests sequentially",
 			opts: func(streams genericclioptions.IOStreams) *LogsOptions {
 				mock := &logTestMock{
-					logsForObjectRequests: []restclient.ResponseWrapper{
-						&responseWrapperMock{data: strings.NewReader("test log content from source 1\n")},
-						&responseWrapperMock{data: strings.NewReader("test log content from source 2\n")},
-						&responseWrapperMock{data: strings.NewReader("test log content from source 3\n")},
+					logsForObjectRequests: map[corev1.ObjectReference]restclient.ResponseWrapper{
+						{
+							Kind:      "Pod",
+							Name:      "some-pod-1",
+							FieldPath: "spec.containers{some-container}",
+						}: &responseWrapperMock{data: strings.NewReader("test log content from source 1\n")},
+						{
+							Kind:      "Pod",
+							Name:      "some-pod-2",
+							FieldPath: "spec.containers{some-container}",
+						}: &responseWrapperMock{data: strings.NewReader("test log content from source 2\n")},
+						{
+							Kind:      "Pod",
+							Name:      "some-pod-3",
+							FieldPath: "spec.containers{some-container}",
+						}: &responseWrapperMock{data: strings.NewReader("test log content from source 3\n")},
 					},
 				}
 
@@ -77,8 +159,9 @@ func TestLog(t *testing.T) {
 				return o
 			},
 			expectedOutSubstrings: []string{
-				// Order in this case must always be the same, because we read requests sequentially
-				"test log content from source 1\ntest log content from source 2\ntest log content from source 3\n",
+				"test log content from source 1\n",
+				"test log content from source 2\n",
+				"test log content from source 3\n",
 			},
 		},
 		{
@@ -86,10 +169,22 @@ func TestLog(t *testing.T) {
 			opts: func(streams genericclioptions.IOStreams) *LogsOptions {
 				wg := &sync.WaitGroup{}
 				mock := &logTestMock{
-					logsForObjectRequests: []restclient.ResponseWrapper{
-						&responseWrapperMock{data: strings.NewReader("test log content from source 1\n")},
-						&responseWrapperMock{data: strings.NewReader("test log content from source 2\n")},
-						&responseWrapperMock{data: strings.NewReader("test log content from source 3\n")},
+					logsForObjectRequests: map[corev1.ObjectReference]restclient.ResponseWrapper{
+						{
+							Kind:      "Pod",
+							Name:      "some-pod-1",
+							FieldPath: "spec.containers{some-container-1}",
+						}: &responseWrapperMock{data: strings.NewReader("test log content from source 1\n")},
+						{
+							Kind:      "Pod",
+							Name:      "some-pod-2",
+							FieldPath: "spec.containers{some-container-2}",
+						}: &responseWrapperMock{data: strings.NewReader("test log content from source 2\n")},
+						{
+							Kind:      "Pod",
+							Name:      "some-pod-3",
+							FieldPath: "spec.containers{some-container-3}",
+						}: &responseWrapperMock{data: strings.NewReader("test log content from source 3\n")},
 					},
 					wg: wg,
 				}
@@ -112,10 +207,22 @@ func TestLog(t *testing.T) {
 			opts: func(streams genericclioptions.IOStreams) *LogsOptions {
 				wg := &sync.WaitGroup{}
 				mock := &logTestMock{
-					logsForObjectRequests: []restclient.ResponseWrapper{
-						&responseWrapperMock{data: strings.NewReader("test log content\n")},
-						&responseWrapperMock{data: strings.NewReader("test log content\n")},
-						&responseWrapperMock{data: strings.NewReader("test log content\n")},
+					logsForObjectRequests: map[corev1.ObjectReference]restclient.ResponseWrapper{
+						{
+							Kind:      "Pod",
+							Name:      "test-pod-1",
+							FieldPath: "spec.containers{test-container-1}",
+						}: &responseWrapperMock{data: strings.NewReader("test log content\n")},
+						{
+							Kind:      "Pod",
+							Name:      "test-pod-2",
+							FieldPath: "spec.containers{test-container-2}",
+						}: &responseWrapperMock{data: strings.NewReader("test log content\n")},
+						{
+							Kind:      "Pod",
+							Name:      "test-pod-3",
+							FieldPath: "spec.containers{test-container-3}",
+						}: &responseWrapperMock{data: strings.NewReader("test log content\n")},
 					},
 					wg: wg,
 				}
@@ -134,7 +241,7 @@ func TestLog(t *testing.T) {
 			name: "fail if LogsForObject fails",
 			opts: func(streams genericclioptions.IOStreams) *LogsOptions {
 				o := NewLogsOptions(streams, false)
-				o.LogsForObject = func(restClientGetter genericclioptions.RESTClientGetter, object, options runtime.Object, timeout time.Duration, allContainers bool) ([]restclient.ResponseWrapper, error) {
+				o.LogsForObject = func(restClientGetter genericclioptions.RESTClientGetter, object, options runtime.Object, timeout time.Duration, allContainers bool) (map[corev1.ObjectReference]restclient.ResponseWrapper, error) {
 					return nil, errors.New("Error from the LogsForObject")
 				}
 				return o
@@ -145,9 +252,17 @@ func TestLog(t *testing.T) {
 			name: "fail to get logs, if ConsumeRequestFn fails",
 			opts: func(streams genericclioptions.IOStreams) *LogsOptions {
 				mock := &logTestMock{
-					logsForObjectRequests: []restclient.ResponseWrapper{
-						&responseWrapperMock{},
-						&responseWrapperMock{},
+					logsForObjectRequests: map[corev1.ObjectReference]restclient.ResponseWrapper{
+						{
+							Kind:      "Pod",
+							Name:      "test-pod-1",
+							FieldPath: "spec.containers{test-container-1}",
+						}: &responseWrapperMock{},
+						{
+							Kind:      "Pod",
+							Name:      "test-pod-2",
+							FieldPath: "spec.containers{test-container-1}",
+						}: &responseWrapperMock{},
 					},
 				}
 
@@ -161,14 +276,65 @@ func TestLog(t *testing.T) {
 			expectedErr: "Error from the ConsumeRequestFn",
 		},
 		{
+			name: "follow logs from multiple requests concurrently with prefix",
+			opts: func(streams genericclioptions.IOStreams) *LogsOptions {
+				wg := &sync.WaitGroup{}
+				mock := &logTestMock{
+					logsForObjectRequests: map[corev1.ObjectReference]restclient.ResponseWrapper{
+						{
+							Kind:      "Pod",
+							Name:      "test-pod-1",
+							FieldPath: "spec.containers{test-container-1}",
+						}: &responseWrapperMock{data: strings.NewReader("test log content from source 1\n")},
+						{
+							Kind:      "Pod",
+							Name:      "test-pod-2",
+							FieldPath: "spec.containers{test-container-2}",
+						}: &responseWrapperMock{data: strings.NewReader("test log content from source 2\n")},
+						{
+							Kind:      "Pod",
+							Name:      "test-pod-3",
+							FieldPath: "spec.containers{test-container-3}",
+						}: &responseWrapperMock{data: strings.NewReader("test log content from source 3\n")},
+					},
+					wg: wg,
+				}
+				wg.Add(3)
+
+				o := NewLogsOptions(streams, false)
+				o.LogsForObject = mock.mockLogsForObject
+				o.ConsumeRequestFn = mock.mockConsumeRequest
+				o.Follow = true
+				o.Prefix = true
+				return o
+			},
+			expectedOutSubstrings: []string{
+				"[pod/test-pod-1/test-container-1] test log content from source 1\n",
+				"[pod/test-pod-2/test-container-2] test log content from source 2\n",
+				"[pod/test-pod-3/test-container-3] test log content from source 3\n",
+			},
+		},
+		{
 			name: "fail to follow logs from multiple requests, if ConsumeRequestFn fails",
 			opts: func(streams genericclioptions.IOStreams) *LogsOptions {
 				wg := &sync.WaitGroup{}
 				mock := &logTestMock{
-					logsForObjectRequests: []restclient.ResponseWrapper{
-						&responseWrapperMock{},
-						&responseWrapperMock{},
-						&responseWrapperMock{},
+					logsForObjectRequests: map[corev1.ObjectReference]restclient.ResponseWrapper{
+						{
+							Kind:      "Pod",
+							Name:      "test-pod-1",
+							FieldPath: "spec.containers{test-container-1}",
+						}: &responseWrapperMock{},
+						{
+							Kind:      "Pod",
+							Name:      "test-pod-2",
+							FieldPath: "spec.containers{test-container-2}",
+						}: &responseWrapperMock{},
+						{
+							Kind:      "Pod",
+							Name:      "test-pod-3",
+							FieldPath: "spec.containers{test-container-3}",
+						}: &responseWrapperMock{},
 					},
 					wg: wg,
 				}
@@ -188,7 +354,13 @@ func TestLog(t *testing.T) {
 			name: "fail to follow logs, if ConsumeRequestFn fails",
 			opts: func(streams genericclioptions.IOStreams) *LogsOptions {
 				mock := &logTestMock{
-					logsForObjectRequests: []restclient.ResponseWrapper{&responseWrapperMock{}},
+					logsForObjectRequests: map[corev1.ObjectReference]restclient.ResponseWrapper{
+						{
+							Kind:      "Pod",
+							Name:      "test-pod-1",
+							FieldPath: "spec.containers{test-container-1}",
+						}: &responseWrapperMock{},
+					},
 				}
 
 				o := NewLogsOptions(streams, false)
@@ -505,7 +677,7 @@ func (r *responseWrapperMock) Stream() (io.ReadCloser, error) {
 }
 
 type logTestMock struct {
-	logsForObjectRequests []restclient.ResponseWrapper
+	logsForObjectRequests map[corev1.ObjectReference]restclient.ResponseWrapper
 
 	// We need a WaitGroup in some test cases to make sure that we fetch logs concurrently.
 	// These test cases will finish successfully without the WaitGroup, but the WaitGroup
@@ -530,7 +702,7 @@ func (l *logTestMock) mockConsumeRequest(request restclient.ResponseWrapper, out
 	return err
 }
 
-func (l *logTestMock) mockLogsForObject(restClientGetter genericclioptions.RESTClientGetter, object, options runtime.Object, timeout time.Duration, allContainers bool) ([]restclient.ResponseWrapper, error) {
+func (l *logTestMock) mockLogsForObject(restClientGetter genericclioptions.RESTClientGetter, object, options runtime.Object, timeout time.Duration, allContainers bool) (map[corev1.ObjectReference]restclient.ResponseWrapper, error) {
 	switch object.(type) {
 	case *corev1.Pod:
 		_, ok := options.(*corev1.PodLogOptions)

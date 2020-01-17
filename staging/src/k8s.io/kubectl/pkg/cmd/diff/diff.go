@@ -257,6 +257,7 @@ type InfoObject struct {
 	Force           bool
 	ServerSideApply bool
 	ForceConflicts  bool
+	genericclioptions.IOStreams
 }
 
 var _ Object = &InfoObject{}
@@ -325,7 +326,7 @@ func (obj InfoObject) Merged() (runtime.Object, error) {
 		ResourceVersion: resourceVersion,
 	}
 
-	_, result, err := patcher.Patch(obj.Info.Object, modified, obj.Info.Source, obj.Info.Namespace, obj.Info.Name, nil)
+	_, result, err := patcher.Patch(obj.Info.Object, modified, obj.Info.Source, obj.Info.Namespace, obj.Info.Name, obj.ErrOut)
 	return result, err
 }
 
@@ -492,6 +493,7 @@ func (o *DiffOptions) Run() error {
 				Force:           force,
 				ServerSideApply: o.ServerSideApply,
 				ForceConflicts:  o.ForceConflicts,
+				IOStreams:       o.Diff.IOStreams,
 			}
 
 			err = differ.Diff(obj, printer)

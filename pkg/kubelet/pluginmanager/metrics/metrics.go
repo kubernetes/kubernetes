@@ -19,8 +19,8 @@ package metrics
 import (
 	"sync"
 
-	"github.com/prometheus/client_golang/prometheus"
-	"k8s.io/klog"
+	"k8s.io/component-base/metrics"
+	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
 )
 
@@ -32,11 +32,13 @@ const (
 var (
 	registerMetrics sync.Once
 
-	totalPluginsDesc = prometheus.NewDesc(
+	totalPluginsDesc = metrics.NewDesc(
 		pluginManagerTotalPlugins,
 		"Number of plugins in Plugin Manager",
 		[]string{"socket_path", "state"},
 		nil,
+		metrics.ALPHA,
+		"",
 	)
 )
 
@@ -55,35 +57,33 @@ func (pc pluginCount) add(state, pluginName string) {
 // Register registers Plugin Manager metrics.
 func Register(asw cache.ActualStateOfWorld, dsw cache.DesiredStateOfWorld) {
 	registerMetrics.Do(func() {
-		prometheus.MustRegister(&totalPluginsCollector{asw, dsw})
+		legacyregistry.CustomMustRegister(&totalPluginsCollector{asw: asw, dsw: dsw})
 	})
 }
 
 type totalPluginsCollector struct {
+	metrics.BaseStableCollector
+
 	asw cache.ActualStateOfWorld
 	dsw cache.DesiredStateOfWorld
 }
 
-var _ prometheus.Collector = &totalPluginsCollector{}
+var _ metrics.StableCollector = &totalPluginsCollector{}
 
-// Describe implements the prometheus.Collector interface.
-func (c *totalPluginsCollector) Describe(ch chan<- *prometheus.Desc) {
+// DescribeWithStability implements the metrics.StableCollector interface.
+func (c *totalPluginsCollector) DescribeWithStability(ch chan<- *metrics.Desc) {
 	ch <- totalPluginsDesc
 }
 
-// Collect implements the prometheus.Collector interface.
-func (c *totalPluginsCollector) Collect(ch chan<- prometheus.Metric) {
+// CollectWithStability implements the metrics.StableCollector interface.
+func (c *totalPluginsCollector) CollectWithStability(ch chan<- metrics.Metric) {
 	for stateName, pluginCount := range c.getPluginCount() {
 		for socketPath, count := range pluginCount {
-			metric, err := prometheus.NewConstMetric(totalPluginsDesc,
-				prometheus.GaugeValue,
+			ch <- metrics.NewLazyConstMetric(totalPluginsDesc,
+				metrics.GaugeValue,
 				float64(count),
 				socketPath,
 				stateName)
-			if err != nil {
-				klog.Warningf("Failed to create metric : %v", err)
-			}
-			ch <- metric
 		}
 	}
 }

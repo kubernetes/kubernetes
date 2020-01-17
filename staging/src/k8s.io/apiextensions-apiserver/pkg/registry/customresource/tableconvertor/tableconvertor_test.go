@@ -76,7 +76,7 @@ func Test_cellForJSONValue(t *testing.T) {
 
 func Test_convertor_ConvertToTable(t *testing.T) {
 	type fields struct {
-		headers           []metav1beta1.TableColumnDefinition
+		headers           []metav1.TableColumnDefinition
 		additionalColumns []*jsonpath.JSONPath
 	}
 	type args struct {
@@ -88,13 +88,13 @@ func Test_convertor_ConvertToTable(t *testing.T) {
 		name    string
 		fields  fields
 		args    args
-		want    *metav1beta1.Table
+		want    *metav1.Table
 		wantErr bool
 	}{
 		{
 			name: "Return table for object",
 			fields: fields{
-				headers: []metav1beta1.TableColumnDefinition{{Name: "name", Type: "string"}},
+				headers: []metav1.TableColumnDefinition{{Name: "name", Type: "string"}},
 			},
 			args: args{
 				obj: &metav1beta1.PartialObjectMetadata{
@@ -102,9 +102,9 @@ func Test_convertor_ConvertToTable(t *testing.T) {
 				},
 				tableOptions: nil,
 			},
-			want: &metav1beta1.Table{
-				ColumnDefinitions: []metav1beta1.TableColumnDefinition{{Name: "name", Type: "string"}},
-				Rows: []metav1beta1.TableRow{
+			want: &metav1.Table{
+				ColumnDefinitions: []metav1.TableColumnDefinition{{Name: "name", Type: "string"}},
+				Rows: []metav1.TableRow{
 					{
 						Cells: []interface{}{"blah"},
 						Object: runtime.RawExtension{
@@ -119,7 +119,7 @@ func Test_convertor_ConvertToTable(t *testing.T) {
 		{
 			name: "Return table for list",
 			fields: fields{
-				headers: []metav1beta1.TableColumnDefinition{{Name: "name", Type: "string"}},
+				headers: []metav1.TableColumnDefinition{{Name: "name", Type: "string"}},
 			},
 			args: args{
 				obj: &metav1beta1.PartialObjectMetadataList{
@@ -130,9 +130,9 @@ func Test_convertor_ConvertToTable(t *testing.T) {
 				},
 				tableOptions: nil,
 			},
-			want: &metav1beta1.Table{
-				ColumnDefinitions: []metav1beta1.TableColumnDefinition{{Name: "name", Type: "string"}},
-				Rows: []metav1beta1.TableRow{
+			want: &metav1.Table{
+				ColumnDefinitions: []metav1.TableColumnDefinition{{Name: "name", Type: "string"}},
+				Rows: []metav1.TableRow{
 					{
 						Cells: []interface{}{"blah"},
 						Object: runtime.RawExtension{
@@ -155,17 +155,17 @@ func Test_convertor_ConvertToTable(t *testing.T) {
 		{
 			name: "Accept TableOptions",
 			fields: fields{
-				headers: []metav1beta1.TableColumnDefinition{{Name: "name", Type: "string"}},
+				headers: []metav1.TableColumnDefinition{{Name: "name", Type: "string"}},
 			},
 			args: args{
 				obj: &metav1beta1.PartialObjectMetadata{
 					ObjectMeta: metav1.ObjectMeta{Name: "blah", CreationTimestamp: metav1.NewTime(time.Unix(1, 0))},
 				},
-				tableOptions: &metav1beta1.TableOptions{},
+				tableOptions: &metav1.TableOptions{},
 			},
-			want: &metav1beta1.Table{
-				ColumnDefinitions: []metav1beta1.TableColumnDefinition{{Name: "name", Type: "string"}},
-				Rows: []metav1beta1.TableRow{
+			want: &metav1.Table{
+				ColumnDefinitions: []metav1.TableColumnDefinition{{Name: "name", Type: "string"}},
+				Rows: []metav1.TableRow{
 					{
 						Cells: []interface{}{"blah"},
 						Object: runtime.RawExtension{
@@ -180,16 +180,16 @@ func Test_convertor_ConvertToTable(t *testing.T) {
 		{
 			name: "Omit headers from TableOptions",
 			fields: fields{
-				headers: []metav1beta1.TableColumnDefinition{{Name: "name", Type: "string"}},
+				headers: []metav1.TableColumnDefinition{{Name: "name", Type: "string"}},
 			},
 			args: args{
 				obj: &metav1beta1.PartialObjectMetadata{
 					ObjectMeta: metav1.ObjectMeta{Name: "blah", CreationTimestamp: metav1.NewTime(time.Unix(1, 0))},
 				},
-				tableOptions: &metav1beta1.TableOptions{NoHeaders: true},
+				tableOptions: &metav1.TableOptions{NoHeaders: true},
 			},
-			want: &metav1beta1.Table{
-				Rows: []metav1beta1.TableRow{
+			want: &metav1.Table{
+				Rows: []metav1.TableRow{
 					{
 						Cells: []interface{}{"blah"},
 						Object: runtime.RawExtension{

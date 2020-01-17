@@ -61,6 +61,7 @@ const (
 	seedContainer2 = 5000
 	seedSandbox2   = 6000
 	seedContainer3 = 7000
+	seedSandbox3   = 8000
 )
 
 const (
@@ -77,6 +78,7 @@ const (
 	cName5 = "container5-name"
 	cName6 = "container6-name"
 	cName7 = "container7-name"
+	cName8 = "container8-name"
 )
 
 func TestCRIListPodStats(t *testing.T) {
@@ -109,10 +111,15 @@ func TestCRIListPodStats(t *testing.T) {
 		containerStats4    = makeFakeContainerStats(container4, imageFsMountpoint)
 		containerLogStats4 = makeFakeLogStats(4000)
 
+		// Running pod with a terminated container and a running container
 		sandbox3           = makeFakePodSandbox("sandbox3-name", "sandbox3-uid", "sandbox3-ns", false)
+		sandbox3Cgroup     = "/" + cm.GetPodCgroupNameSuffix(types.UID(sandbox3.PodSandboxStatus.Metadata.Uid))
 		container5         = makeFakeContainer(sandbox3, cName5, 0, true)
 		containerStats5    = makeFakeContainerStats(container5, imageFsMountpoint)
 		containerLogStats5 = makeFakeLogStats(5000)
+		container8         = makeFakeContainer(sandbox3, cName8, 0, false)
+		containerStats8    = makeFakeContainerStats(container8, imageFsMountpoint)
+		containerLogStats8 = makeFakeLogStats(6000)
 
 		// Terminated pod sandbox
 		sandbox4        = makeFakePodSandbox("sandbox1-name", "sandbox1-uid", "sandbox1-ns", true)
@@ -153,6 +160,7 @@ func TestCRIListPodStats(t *testing.T) {
 		sandbox2.PodSandboxStatus.Id:  getTestContainerInfo(seedSandbox2, pName2, sandbox2.PodSandboxStatus.Metadata.Namespace, leaky.PodInfraContainerName),
 		sandbox2Cgroup:                getTestContainerInfo(seedSandbox2, "", "", ""),
 		container4.ContainerStatus.Id: getTestContainerInfo(seedContainer3, pName2, sandbox2.PodSandboxStatus.Metadata.Namespace, cName3),
+		sandbox3Cgroup:                getTestContainerInfo(seedSandbox3, "", "", ""),
 	}
 
 	options := cadvisorapiv2.RequestOptions{
@@ -170,10 +178,10 @@ func TestCRIListPodStats(t *testing.T) {
 		sandbox0, sandbox1, sandbox2, sandbox3, sandbox4, sandbox5,
 	})
 	fakeRuntimeService.SetFakeContainers([]*critest.FakeContainer{
-		container0, container1, container2, container3, container4, container5, container6, container7,
+		container0, container1, container2, container3, container4, container5, container6, container7, container8,
 	})
 	fakeRuntimeService.SetFakeContainerStats([]*runtimeapi.ContainerStats{
-		containerStats0, containerStats1, containerStats2, containerStats3, containerStats4, containerStats5, containerStats6, containerStats7,
+		containerStats0, containerStats1, containerStats2, containerStats3, containerStats4, containerStats5, containerStats6, containerStats7, containerStats8,
 	})
 
 	ephemeralVolumes := makeFakeVolumeStats([]string{"ephVolume1, ephVolumes2"})
@@ -189,6 +197,7 @@ func TestCRIListPodStats(t *testing.T) {
 		kuberuntime.BuildContainerLogsDirectory("sandbox1-ns", "sandbox1-name", types.UID("sandbox1-uid"), cName2):               containerLogStats2,
 		kuberuntime.BuildContainerLogsDirectory("sandbox2-ns", "sandbox2-name", types.UID("sandbox2-uid"), cName3):               containerLogStats4,
 		kuberuntime.BuildContainerLogsDirectory("sandbox3-ns", "sandbox3-name", types.UID("sandbox3-uid"), cName5):               containerLogStats5,
+		kuberuntime.BuildContainerLogsDirectory("sandbox3-ns", "sandbox3-name", types.UID("sandbox3-uid"), cName8):               containerLogStats8,
 		filepath.Join(kuberuntime.BuildPodLogsDirectory("sandbox0-ns", "sandbox0-name", types.UID("sandbox0-uid")), podLogName0): podLogStats0,
 		filepath.Join(kuberuntime.BuildPodLogsDirectory("sandbox1-ns", "sandbox1-name", types.UID("sandbox1-uid")), podLogName1): podLogStats1,
 	}
@@ -296,14 +305,12 @@ func TestCRIListPodStats(t *testing.T) {
 	assert.Equal(sandbox3.CreatedAt, p3.StartTime.UnixNano())
 	assert.Equal(1, len(p3.Containers))
 
-	c5 := p3.Containers[0]
-	assert.Equal(cName5, c5.Name)
-	assert.Equal(container5.CreatedAt, c5.StartTime.UnixNano())
-	assert.NotNil(c5.CPU.Time)
-	assert.Zero(*c5.CPU.UsageCoreNanoSeconds)
-	assert.Zero(*c5.CPU.UsageNanoCores)
-	assert.NotNil(c5.Memory.Time)
-	assert.Zero(*c5.Memory.WorkingSetBytes)
+	c8 := p3.Containers[0]
+	assert.Equal(cName8, c8.Name)
+	assert.Equal(container8.CreatedAt, c8.StartTime.UnixNano())
+	assert.NotNil(c8.CPU.Time)
+	assert.NotNil(c8.Memory.Time)
+	checkCRIPodCPUAndMemoryStats(assert, p3, infos[sandbox3Cgroup].Stats[0])
 
 	mockCadvisor.AssertExpectations(t)
 }
@@ -333,9 +340,13 @@ func TestCRIListPodCPUAndMemoryStats(t *testing.T) {
 		container4      = makeFakeContainer(sandbox2, cName3, 1, false)
 		containerStats4 = makeFakeContainerStats(container4, imageFsMountpoint)
 
+		// Running pod with a terminated container and a running container
 		sandbox3        = makeFakePodSandbox("sandbox3-name", "sandbox3-uid", "sandbox3-ns", false)
+		sandbox3Cgroup  = "/" + cm.GetPodCgroupNameSuffix(types.UID(sandbox3.PodSandboxStatus.Metadata.Uid))
 		container5      = makeFakeContainer(sandbox3, cName5, 0, true)
 		containerStats5 = makeFakeContainerStats(container5, imageFsMountpoint)
+		container8      = makeFakeContainer(sandbox3, cName8, 0, false)
+		containerStats8 = makeFakeContainerStats(container8, imageFsMountpoint)
 
 		// Terminated pod sandbox
 		sandbox4        = makeFakePodSandbox("sandbox1-name", "sandbox1-uid", "sandbox1-ns", true)
@@ -370,6 +381,7 @@ func TestCRIListPodCPUAndMemoryStats(t *testing.T) {
 		sandbox2.PodSandboxStatus.Id:  getTestContainerInfo(seedSandbox2, pName2, sandbox2.PodSandboxStatus.Metadata.Namespace, leaky.PodInfraContainerName),
 		sandbox2Cgroup:                getTestContainerInfo(seedSandbox2, "", "", ""),
 		container4.ContainerStatus.Id: getTestContainerInfo(seedContainer3, pName2, sandbox2.PodSandboxStatus.Metadata.Namespace, cName3),
+		sandbox3Cgroup:                getTestContainerInfo(seedSandbox3, "", "", ""),
 	}
 
 	options := cadvisorapiv2.RequestOptions{
@@ -384,10 +396,10 @@ func TestCRIListPodCPUAndMemoryStats(t *testing.T) {
 		sandbox0, sandbox1, sandbox2, sandbox3, sandbox4, sandbox5,
 	})
 	fakeRuntimeService.SetFakeContainers([]*critest.FakeContainer{
-		container0, container1, container2, container3, container4, container5, container6, container7,
+		container0, container1, container2, container3, container4, container5, container6, container7, container8,
 	})
 	fakeRuntimeService.SetFakeContainerStats([]*runtimeapi.ContainerStats{
-		containerStats0, containerStats1, containerStats2, containerStats3, containerStats4, containerStats5, containerStats6, containerStats7,
+		containerStats0, containerStats1, containerStats2, containerStats3, containerStats4, containerStats5, containerStats6, containerStats7, containerStats8,
 	})
 
 	ephemeralVolumes := makeFakeVolumeStats([]string{"ephVolume1, ephVolumes2"})
@@ -484,14 +496,12 @@ func TestCRIListPodCPUAndMemoryStats(t *testing.T) {
 	assert.Equal(sandbox3.CreatedAt, p3.StartTime.UnixNano())
 	assert.Equal(1, len(p3.Containers))
 
-	c5 := p3.Containers[0]
-	assert.Equal(cName5, c5.Name)
-	assert.Equal(container5.CreatedAt, c5.StartTime.UnixNano())
-	assert.NotNil(c5.CPU.Time)
-	assert.Zero(*c5.CPU.UsageCoreNanoSeconds)
-	assert.Zero(*c5.CPU.UsageNanoCores)
-	assert.NotNil(c5.Memory.Time)
-	assert.Zero(*c5.Memory.WorkingSetBytes)
+	c8 := p3.Containers[0]
+	assert.Equal(cName8, c8.Name)
+	assert.Equal(container8.CreatedAt, c8.StartTime.UnixNano())
+	assert.NotNil(c8.CPU.Time)
+	assert.NotNil(c8.Memory.Time)
+	checkCRIPodCPUAndMemoryStats(assert, p3, infos[sandbox3Cgroup].Stats[0])
 
 	mockCadvisor.AssertExpectations(t)
 }

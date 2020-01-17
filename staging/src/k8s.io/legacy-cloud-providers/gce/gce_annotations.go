@@ -58,6 +58,11 @@ const (
 	// created in.
 	ServiceAnnotationILBAllowGlobalAccess = "networking.gke.io/internal-load-balancer-allow-global-access"
 
+	// ServiceAnnotationILBSubnet is annotated on a service with the name of the subnetwork
+	// the ILB IP Address should be assigned from. By default, this is the subnetwork that the
+	// cluster is created in.
+	ServiceAnnotationILBSubnet = "networking.gke.io/internal-load-balancer-subnet"
+
 	// NetworkTierAnnotationKey is annotated on a Service object to indicate which
 	// network tier a GCP LB should use. The valid values are "Standard" and
 	// "Premium" (default).
@@ -132,10 +137,20 @@ func GetServiceNetworkTier(service *v1.Service) (cloud.NetworkTier, error) {
 type ILBOptions struct {
 	// AllowGlobalAccess Indicates whether global access is allowed for the LoadBalancer
 	AllowGlobalAccess bool
+	// SubnetName indicates which subnet the LoadBalancer VIPs should be assigned from
+	SubnetName string
 }
 
 // GetLoadBalancerAnnotationAllowGlobalAccess returns if global access is enabled
 // for the given loadbalancer service.
 func GetLoadBalancerAnnotationAllowGlobalAccess(service *v1.Service) bool {
 	return service.Annotations[ServiceAnnotationILBAllowGlobalAccess] == "true"
+}
+
+// GetLoadBalancerAnnotationSubnet returns the configured subnet to assign LoadBalancer IP from.
+func GetLoadBalancerAnnotationSubnet(service *v1.Service) string {
+	if val, exists := service.Annotations[ServiceAnnotationILBSubnet]; exists {
+		return val
+	}
+	return ""
 }

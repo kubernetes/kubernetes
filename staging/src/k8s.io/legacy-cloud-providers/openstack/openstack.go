@@ -221,7 +221,6 @@ func (cfg Config) toAuth3Options() tokens3.AuthOptions {
 func configFromEnv() (cfg Config, ok bool) {
 	cfg.Global.AuthURL = os.Getenv("OS_AUTH_URL")
 	cfg.Global.Username = os.Getenv("OS_USERNAME")
-	cfg.Global.Password = os.Getenv("OS_PASSWORD")
 	cfg.Global.Region = os.Getenv("OS_REGION_NAME")
 	cfg.Global.UserID = os.Getenv("OS_USER_ID")
 	cfg.Global.TrustID = os.Getenv("OS_TRUST_ID")

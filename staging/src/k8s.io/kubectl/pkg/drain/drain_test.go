@@ -17,8 +17,10 @@ limitations under the License.
 package drain
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"reflect"
 	"sort"
@@ -44,6 +46,7 @@ func TestDeletePods(t *testing.T) {
 		description       string
 		interval          time.Duration
 		timeout           time.Duration
+		ctxTimeoutEarly   bool
 		expectPendingPods bool
 		expectError       bool
 		expectedError     *error
@@ -90,6 +93,39 @@ func TestDeletePods(t *testing.T) {
 			},
 		},
 		{
+			description:       "Context Canceled",
+			interval:          1000 * time.Millisecond,
+			timeout:           5 * time.Second,
+			ctxTimeoutEarly:   true,
+			expectPendingPods: true,
+			expectError:       true,
+			expectedError:     &wait.ErrWaitTimeout,
+			getPodFn: func(namespace, name string) (*corev1.Pod, error) {
+				oldPodMap, _ := createPods(false)
+				if oldPod, found := oldPodMap[name]; found {
+					return &oldPod, nil
+				}
+				return nil, fmt.Errorf("%q: not found", name)
+			},
+		},
+		{
+			description:       "Skip Deleted Pod",
+			interval:          200 * time.Millisecond,
+			timeout:           3 * time.Second,
+			expectPendingPods: false,
+			expectError:       false,
+			expectedError:     nil,
+			getPodFn: func(namespace, name string) (*corev1.Pod, error) {
+				oldPodMap, _ := createPods(false)
+				if oldPod, found := oldPodMap[name]; found {
+					dTime := &metav1.Time{Time: time.Now().Add(time.Duration(100) * time.Second * -1)}
+					oldPod.ObjectMeta.SetDeletionTimestamp(dTime)
+					return &oldPod, nil
+				}
+				return nil, fmt.Errorf("%q: not found", name)
+			},
+		},
+		{
 			description:       "Client error could be passed out",
 			interval:          200 * time.Millisecond,
 			timeout:           5 * time.Second,
@@ -105,13 +141,38 @@ func TestDeletePods(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.description, func(t *testing.T) {
 			_, pods := createPods(false)
-			pendingPods, err := waitForDelete(pods, test.interval, test.timeout, false, test.getPodFn, nil)
+			var ctx context.Context
+			var cancel context.CancelFunc
+			ctx = context.Background()
+			if test.ctxTimeoutEarly {
+				ctx, cancel = context.WithTimeout(ctx, 100*time.Millisecond)
+				defer cancel()
+			}
+			params := waitForDeleteParams{
+				ctx:                             ctx,
+				pods:                            pods,
+				interval:                        test.interval,
+				timeout:                         test.timeout,
+				usingEviction:                   false,
+				getPodFn:                        test.getPodFn,
+				onDoneFn:                        nil,
+				globalTimeout:                   time.Duration(math.MaxInt64),
+				out:                             os.Stdout,
+				skipWaitForDeleteTimeoutSeconds: 10,
+			}
+			start := time.Now()
+			pendingPods, err := waitForDelete(params)
+			elapsed := time.Since(start)
 
 			if test.expectError {
 				if err == nil {
 					t.Fatalf("%s: unexpected non-error", test.description)
 				} else if test.expectedError != nil {
-					if *test.expectedError != err {
+					if test.ctxTimeoutEarly {
+						if elapsed >= test.timeout {
+							t.Fatalf("%s: the supplied context did not effectively cancel the waitForDelete", test.description)
+						}
+					} else if *test.expectedError != err {
 						t.Fatalf("%s: the error does not match expected error", test.description)
 					}
 				}
@@ -217,90 +278,114 @@ func TestCheckEvictionSupport(t *testing.T) {
 }
 
 func TestDeleteOrEvict(t *testing.T) {
-	for _, evictionSupported := range []bool{true, false} {
-		evictionSupported := evictionSupported
-		t.Run(fmt.Sprintf("evictionSupported=%v", evictionSupported),
-			func(t *testing.T) {
-				h := &Helper{
-					Out:                os.Stdout,
-					GracePeriodSeconds: 10,
-				}
+	tests := []struct {
+		description       string
+		evictionSupported bool
+		disableEviction   bool
+	}{
+		{
+			description:       "eviction supported/enabled",
+			evictionSupported: true,
+			disableEviction:   false,
+		},
+		{
+			description:       "eviction unsupported/disabled",
+			evictionSupported: false,
+			disableEviction:   false,
+		},
+		{
+			description:       "eviction supported/disabled",
+			evictionSupported: true,
+			disableEviction:   true,
+		},
+		{
+			description:       "eviction unsupported/disabled",
+			evictionSupported: false,
+			disableEviction:   false,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.description, func(t *testing.T) {
+			h := &Helper{
+				Out:                os.Stdout,
+				GracePeriodSeconds: 10,
+			}
 
-				// Create 4 pods, and try to remove the first 2
-				var expectedEvictions []policyv1beta1.Eviction
-				var create []runtime.Object
-				deletePods := []corev1.Pod{}
-				for i := 1; i <= 4; i++ {
-					pod := &corev1.Pod{}
-					pod.Name = fmt.Sprintf("mypod-%d", i)
-					pod.Namespace = "default"
+			// Create 4 pods, and try to remove the first 2
+			var expectedEvictions []policyv1beta1.Eviction
+			var create []runtime.Object
+			deletePods := []corev1.Pod{}
+			for i := 1; i <= 4; i++ {
+				pod := &corev1.Pod{}
+				pod.Name = fmt.Sprintf("mypod-%d", i)
+				pod.Namespace = "default"
 
-					create = append(create, pod)
-					if i <= 2 {
-						deletePods = append(deletePods, *pod)
+				create = append(create, pod)
+				if i <= 2 {
+					deletePods = append(deletePods, *pod)
 
-						if evictionSupported {
-							eviction := policyv1beta1.Eviction{}
-							eviction.Kind = "Eviction"
-							eviction.APIVersion = "policy/v1"
-							eviction.Namespace = pod.Namespace
-							eviction.Name = pod.Name
+					if tc.evictionSupported && !tc.disableEviction {
+						eviction := policyv1beta1.Eviction{}
+						eviction.Kind = "Eviction"
+						eviction.APIVersion = "policy/v1"
+						eviction.Namespace = pod.Namespace
+						eviction.Name = pod.Name
 
-							gracePeriodSeconds := int64(h.GracePeriodSeconds)
-							eviction.DeleteOptions = &metav1.DeleteOptions{
-								GracePeriodSeconds: &gracePeriodSeconds,
-							}
-
-							expectedEvictions = append(expectedEvictions, eviction)
+						gracePeriodSeconds := int64(h.GracePeriodSeconds)
+						eviction.DeleteOptions = &metav1.DeleteOptions{
+							GracePeriodSeconds: &gracePeriodSeconds,
 						}
+
+						expectedEvictions = append(expectedEvictions, eviction)
 					}
 				}
+			}
 
-				// Build the fake client
-				k := fake.NewSimpleClientset(create...)
-				if evictionSupported {
-					addEvictionSupport(t, k)
-				}
-				h.Client = k
+			// Build the fake client
+			k := fake.NewSimpleClientset(create...)
+			if tc.evictionSupported {
+				addEvictionSupport(t, k)
+			}
+			h.Client = k
+			h.DisableEviction = tc.disableEviction
+			// Do the eviction
+			if err := h.DeleteOrEvictPods(deletePods); err != nil {
+				t.Fatalf("error from DeleteOrEvictPods: %v", err)
+			}
 
-				// Do the eviction
-				if err := h.DeleteOrEvictPods(deletePods); err != nil {
-					t.Fatalf("error from DeleteOrEvictPods: %v", err)
-				}
-
-				// Test that other pods are still there
-				var remainingPods []string
-				{
-					podList, err := k.CoreV1().Pods("").List(metav1.ListOptions{})
-					if err != nil {
-						t.Fatalf("error listing pods: %v", err)
-					}
-
-					for _, pod := range podList.Items {
-						remainingPods = append(remainingPods, pod.Namespace+"/"+pod.Name)
-					}
-					sort.Strings(remainingPods)
-				}
-				expected := []string{"default/mypod-3", "default/mypod-4"}
-				if !reflect.DeepEqual(remainingPods, expected) {
-					t.Errorf("unexpected remaining pods after DeleteOrEvictPods; actual %v; expected %v", remainingPods, expected)
+			// Test that other pods are still there
+			var remainingPods []string
+			{
+				podList, err := k.CoreV1().Pods("").List(metav1.ListOptions{})
+				if err != nil {
+					t.Fatalf("error listing pods: %v", err)
 				}
 
-				// Test that pods were evicted as expected
-				var actualEvictions []policyv1beta1.Eviction
-				for _, action := range k.Actions() {
-					if action.GetVerb() != "create" || action.GetResource().Resource != "pods" || action.GetSubresource() != "eviction" {
-						continue
-					}
-					eviction := *action.(ktest.CreateAction).GetObject().(*policyv1beta1.Eviction)
-					actualEvictions = append(actualEvictions, eviction)
+				for _, pod := range podList.Items {
+					remainingPods = append(remainingPods, pod.Namespace+"/"+pod.Name)
 				}
-				sort.Slice(actualEvictions, func(i, j int) bool {
-					return actualEvictions[i].Name < actualEvictions[j].Name
-				})
-				if !reflect.DeepEqual(actualEvictions, expectedEvictions) {
-					t.Errorf("unexpected evictions; actual %v; expected %v", actualEvictions, expectedEvictions)
+				sort.Strings(remainingPods)
+			}
+			expected := []string{"default/mypod-3", "default/mypod-4"}
+			if !reflect.DeepEqual(remainingPods, expected) {
+				t.Errorf("%s: unexpected remaining pods after DeleteOrEvictPods; actual %v; expected %v", tc.description, remainingPods, expected)
+			}
+
+			// Test that pods were evicted as expected
+			var actualEvictions []policyv1beta1.Eviction
+			for _, action := range k.Actions() {
+				if action.GetVerb() != "create" || action.GetResource().Resource != "pods" || action.GetSubresource() != "eviction" {
+					continue
 				}
+				eviction := *action.(ktest.CreateAction).GetObject().(*policyv1beta1.Eviction)
+				actualEvictions = append(actualEvictions, eviction)
+			}
+			sort.Slice(actualEvictions, func(i, j int) bool {
+				return actualEvictions[i].Name < actualEvictions[j].Name
 			})
+			if !reflect.DeepEqual(actualEvictions, expectedEvictions) {
+				t.Errorf("%s: unexpected evictions; actual %v; expected %v", tc.description, actualEvictions, expectedEvictions)
+			}
+		})
 	}
 }

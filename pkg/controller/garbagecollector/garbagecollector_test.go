@@ -409,6 +409,16 @@ func TestProcessEvent(t *testing.T) {
 	}
 }
 
+func BenchmarkReferencesDiffs(t *testing.B) {
+	t.ReportAllocs()
+	t.ResetTimer()
+	for n := 0; n < t.N; n++ {
+		old := []metav1.OwnerReference{{UID: "1"}, {UID: "2"}}
+		new := []metav1.OwnerReference{{UID: "2"}, {UID: "3"}}
+		referencesDiffs(old, new)
+	}
+}
+
 // TestDependentsRace relies on golang's data race detector to check if there is
 // data race among in the dependents field.
 func TestDependentsRace(t *testing.T) {

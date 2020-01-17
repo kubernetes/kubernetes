@@ -99,7 +99,7 @@ func NewCmdPluginList(f cmdutil.Factory, streams genericclioptions.IOStreams) *c
 func (o *PluginListOptions) Complete(cmd *cobra.Command) error {
 	o.Verifier = &CommandOverrideVerifier{
 		root:        cmd.Root(),
-		seenPlugins: make(map[string]string, 0),
+		seenPlugins: make(map[string]string),
 	}
 
 	o.PluginPaths = filepath.SplitList(os.Getenv("PATH"))

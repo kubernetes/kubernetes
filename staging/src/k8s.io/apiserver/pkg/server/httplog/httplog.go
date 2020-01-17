@@ -158,9 +158,17 @@ func (rl *respLogger) Log() {
 	latency := time.Since(rl.startTime)
 	if klog.V(3) {
 		if !rl.hijacked {
-			klog.InfoDepth(1, fmt.Sprintf("%s %s: (%v) %v%v%v [%s %s]", rl.req.Method, rl.req.RequestURI, latency, rl.status, rl.statusStack, rl.addedInfo, rl.req.UserAgent(), rl.req.RemoteAddr))
+			klog.InfoDepth(1, fmt.Sprintf("verb=%q URI=%q latency=%v resp=%v UserAgent=%q srcIP=%q: %v%v",
+				rl.req.Method, rl.req.RequestURI,
+				latency, rl.status,
+				rl.req.UserAgent(), rl.req.RemoteAddr,
+				rl.statusStack, rl.addedInfo,
+			))
 		} else {
-			klog.InfoDepth(1, fmt.Sprintf("%s %s: (%v) hijacked [%s %s]", rl.req.Method, rl.req.RequestURI, latency, rl.req.UserAgent(), rl.req.RemoteAddr))
+			klog.InfoDepth(1, fmt.Sprintf("verb=%q URI=%q latency=%v UserAgent=%q srcIP=%q: hijacked",
+				rl.req.Method, rl.req.RequestURI,
+				latency, rl.req.UserAgent(), rl.req.RemoteAddr,
+			))
 		}
 	}
 }

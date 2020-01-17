@@ -6,7 +6,6 @@ go_library(
     name = "go_default_library",
     srcs = [
         "fixtures.go",
-        "logging.go",
         "wait.go",
     ],
     importpath = "k8s.io/kubernetes/test/e2e/framework/deployment",
@@ -16,10 +15,7 @@ go_library(
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/uuid:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/watch:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
-        "//staging/src/k8s.io/client-go/tools/watch:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//test/utils:go_default_library",
         "//test/utils/image:go_default_library",

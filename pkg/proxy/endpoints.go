@@ -26,13 +26,19 @@ import (
 	"k8s.io/klog"
 
 	v1 "k8s.io/api/core/v1"
-	discovery "k8s.io/api/discovery/v1alpha1"
+	discovery "k8s.io/api/discovery/v1beta1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
 	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
 	utilnet "k8s.io/utils/net"
+)
+
+var supportedEndpointSliceAddressTypes = sets.NewString(
+	string(discovery.AddressTypeIP), // IP is a deprecated address type
+	string(discovery.AddressTypeIPv4),
+	string(discovery.AddressTypeIPv6),
 )
 
 // BaseEndpointInfo contains base information that defines an endpoint.
@@ -42,7 +48,8 @@ import (
 type BaseEndpointInfo struct {
 	Endpoint string // TODO: should be an endpointString type
 	// IsLocal indicates whether the endpoint is running in same host as kube-proxy.
-	IsLocal bool
+	IsLocal  bool
+	Topology map[string]string
 }
 
 var _ Endpoint = &BaseEndpointInfo{}
@@ -55,6 +62,11 @@ func (info *BaseEndpointInfo) String() string {
 // GetIsLocal is part of proxy.Endpoint interface.
 func (info *BaseEndpointInfo) GetIsLocal() bool {
 	return info.IsLocal
+}
+
+// GetTopology returns the topology information of the endpoint.
+func (info *BaseEndpointInfo) GetTopology() map[string]string {
+	return info.Topology
 }
 
 // IP returns just the IP part of the endpoint, it's a part of proxy.Endpoint interface.
@@ -72,10 +84,11 @@ func (info *BaseEndpointInfo) Equal(other Endpoint) bool {
 	return info.String() == other.String() && info.GetIsLocal() == other.GetIsLocal()
 }
 
-func newBaseEndpointInfo(IP string, port int, isLocal bool) *BaseEndpointInfo {
+func newBaseEndpointInfo(IP string, port int, isLocal bool, topology map[string]string) *BaseEndpointInfo {
 	return &BaseEndpointInfo{
 		Endpoint: net.JoinHostPort(IP, strconv.Itoa(port)),
 		IsLocal:  isLocal,
+		Topology: topology,
 	}
 }
 
@@ -92,7 +105,7 @@ type EndpointChangeTracker struct {
 	items map[types.NamespacedName]*endpointsChange
 	// makeEndpointInfo allows proxier to inject customized information when processing endpoint.
 	makeEndpointInfo makeEndpointFunc
-	// endpointSliceCache holds a simplified version of endpoint slices
+	// endpointSliceCache holds a simplified version of endpoint slices.
 	endpointSliceCache *EndpointSliceCache
 	// isIPv6Mode indicates if change tracker is under IPv6/IPv4 mode. Nil means not applicable.
 	isIPv6Mode *bool
@@ -173,6 +186,11 @@ func (ect *EndpointChangeTracker) Update(previous, current *v1.Endpoints) bool {
 // It returns true if items changed, otherwise return false. Will add/update/delete items of EndpointsChangeMap.
 // If removeSlice is true, slice will be removed, otherwise it will be added or updated.
 func (ect *EndpointChangeTracker) EndpointSliceUpdate(endpointSlice *discovery.EndpointSlice, removeSlice bool) bool {
+	if !supportedEndpointSliceAddressTypes.Has(string(endpointSlice.AddressType)) {
+		klog.V(4).Infof("EndpointSlice address type not supported by kube-proxy: %s", endpointSlice.AddressType)
+		return false
+	}
+
 	// This should never happen
 	if endpointSlice == nil {
 		klog.Error("Nil endpointSlice passed to EndpointSliceUpdate")
@@ -190,39 +208,54 @@ func (ect *EndpointChangeTracker) EndpointSliceUpdate(endpointSlice *discovery.E
 	ect.lock.Lock()
 	defer ect.lock.Unlock()
 
-	change, ok := ect.items[namespacedName]
-	if !ok {
-		change = &endpointsChange{}
-		change.previous = ect.endpointSliceCache.EndpointsMap(namespacedName)
-		ect.items[namespacedName] = change
+	changeNeeded := ect.endpointSliceCache.updatePending(endpointSlice, removeSlice)
+
+	if changeNeeded {
+		metrics.EndpointChangesPending.Inc()
+		if t := getLastChangeTriggerTime(endpointSlice.Annotations); !t.IsZero() {
+			ect.lastChangeTriggerTimes[namespacedName] =
+				append(ect.lastChangeTriggerTimes[namespacedName], t)
+		}
 	}
 
-	if removeSlice {
-		ect.endpointSliceCache.Delete(endpointSlice)
-	} else {
-		ect.endpointSliceCache.Update(endpointSlice)
+	return changeNeeded
+}
+
+// checkoutChanges returns a list of pending endpointsChanges and marks them as
+// applied.
+func (ect *EndpointChangeTracker) checkoutChanges() []*endpointsChange {
+	ect.lock.Lock()
+	defer ect.lock.Unlock()
+
+	metrics.EndpointChangesPending.Set(0)
+
+	if ect.endpointSliceCache != nil {
+		return ect.endpointSliceCache.checkoutChanges()
 	}
 
-	if t := getLastChangeTriggerTime(endpointSlice.Annotations); !t.IsZero() {
-		ect.lastChangeTriggerTimes[namespacedName] =
-			append(ect.lastChangeTriggerTimes[namespacedName], t)
+	changes := []*endpointsChange{}
+	for _, change := range ect.items {
+		changes = append(changes, change)
 	}
+	ect.items = make(map[types.NamespacedName]*endpointsChange)
+	return changes
+}
 
-	change.current = ect.endpointSliceCache.EndpointsMap(namespacedName)
-	// if change.previous equal to change.current, it means no change
-	if reflect.DeepEqual(change.previous, change.current) {
-		delete(ect.items, namespacedName)
-		// Reset the lastChangeTriggerTimes for this service. Given that the network programming
-		// SLI is defined as the duration between a time of an event and a time when the network was
-		// programmed to incorporate that event, if there are events that happened between two
-		// consecutive syncs and that canceled each other out, e.g. pod A added -> pod A deleted,
-		// there will be no network programming for them and thus no network programming latency metric
-		// should be exported.
-		delete(ect.lastChangeTriggerTimes, namespacedName)
+// checkoutTriggerTimes applies the locally cached trigger times to a map of
+// trigger times that have been passed in and empties the local cache.
+func (ect *EndpointChangeTracker) checkoutTriggerTimes(lastChangeTriggerTimes *map[types.NamespacedName][]time.Time) {
+	ect.lock.Lock()
+	defer ect.lock.Unlock()
+
+	for k, v := range ect.lastChangeTriggerTimes {
+		prev, ok := (*lastChangeTriggerTimes)[k]
+		if !ok {
+			(*lastChangeTriggerTimes)[k] = v
+		} else {
+			(*lastChangeTriggerTimes)[k] = append(prev, v...)
+		}
 	}
-
-	metrics.EndpointChangesPending.Set(float64(len(ect.items)))
-	return len(ect.items) > 0
+	ect.lastChangeTriggerTimes = make(map[types.NamespacedName][]time.Time)
 }
 
 // getLastChangeTriggerTime returns the time.Time value of the
@@ -332,7 +365,7 @@ func (ect *EndpointChangeTracker) endpointsToEndpointsMap(endpoints *v1.Endpoint
 					continue
 				}
 				isLocal := addr.NodeName != nil && *addr.NodeName == ect.hostname
-				baseEndpointInfo := newBaseEndpointInfo(addr.IP, int(port.Port), isLocal)
+				baseEndpointInfo := newBaseEndpointInfo(addr.IP, int(port.Port), isLocal, nil)
 				if ect.makeEndpointInfo != nil {
 					endpointsMap[svcPortName] = append(endpointsMap[svcPortName], ect.makeEndpointInfo(baseEndpointInfo))
 				} else {
@@ -351,29 +384,19 @@ func (ect *EndpointChangeTracker) endpointsToEndpointsMap(endpoints *v1.Endpoint
 // The changes map is cleared after applying them.
 // In addition it returns (via argument) and resets the lastChangeTriggerTimes for all endpoints
 // that were changed and will result in syncing the proxy rules.
-func (em EndpointsMap) apply(changes *EndpointChangeTracker, staleEndpoints *[]ServiceEndpoint,
+func (em EndpointsMap) apply(ect *EndpointChangeTracker, staleEndpoints *[]ServiceEndpoint,
 	staleServiceNames *[]ServicePortName, lastChangeTriggerTimes *map[types.NamespacedName][]time.Time) {
-	if changes == nil {
+	if ect == nil {
 		return
 	}
-	changes.lock.Lock()
-	defer changes.lock.Unlock()
-	for _, change := range changes.items {
+
+	changes := ect.checkoutChanges()
+	for _, change := range changes {
 		em.unmerge(change.previous)
 		em.merge(change.current)
 		detectStaleConnections(change.previous, change.current, staleEndpoints, staleServiceNames)
 	}
-	changes.items = make(map[types.NamespacedName]*endpointsChange)
-	metrics.EndpointChangesPending.Set(0)
-	for k, v := range changes.lastChangeTriggerTimes {
-		prev, ok := (*lastChangeTriggerTimes)[k]
-		if !ok {
-			(*lastChangeTriggerTimes)[k] = v
-		} else {
-			(*lastChangeTriggerTimes)[k] = append(prev, v...)
-		}
-	}
-	changes.lastChangeTriggerTimes = make(map[types.NamespacedName][]time.Time)
+	ect.checkoutTriggerTimes(lastChangeTriggerTimes)
 }
 
 // Merge ensures that the current EndpointsMap contains all <service, endpoints> pairs from the EndpointsMap passed in.

@@ -90,6 +90,43 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 					},
 				},
 			}
+			stabilizationWindow := int32(c.RandUint64())
+			maxPolicy := autoscaling.MaxPolicySelect
+			minPolicy := autoscaling.MinPolicySelect
+			s.Behavior = &autoscaling.HorizontalPodAutoscalerBehavior{
+				ScaleUp: &autoscaling.HPAScalingRules{
+					StabilizationWindowSeconds: &stabilizationWindow,
+					SelectPolicy:               &maxPolicy,
+					Policies: []autoscaling.HPAScalingPolicy{
+						{
+							Type:          autoscaling.PodsScalingPolicy,
+							Value:         int32(c.RandUint64()),
+							PeriodSeconds: int32(c.RandUint64()),
+						},
+						{
+							Type:          autoscaling.PercentScalingPolicy,
+							Value:         int32(c.RandUint64()),
+							PeriodSeconds: int32(c.RandUint64()),
+						},
+					},
+				},
+				ScaleDown: &autoscaling.HPAScalingRules{
+					StabilizationWindowSeconds: &stabilizationWindow,
+					SelectPolicy:               &minPolicy,
+					Policies: []autoscaling.HPAScalingPolicy{
+						{
+							Type:          autoscaling.PodsScalingPolicy,
+							Value:         int32(c.RandUint64()),
+							PeriodSeconds: int32(c.RandUint64()),
+						},
+						{
+							Type:          autoscaling.PercentScalingPolicy,
+							Value:         int32(c.RandUint64()),
+							PeriodSeconds: int32(c.RandUint64()),
+						},
+					},
+				},
+			}
 		},
 		func(s *autoscaling.HorizontalPodAutoscalerStatus, c fuzz.Continue) {
 			c.FuzzNoCustom(s) // fuzz self without calling this function again

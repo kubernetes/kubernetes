@@ -130,7 +130,7 @@ func (v *validatingObjectWalker) doNode() {
 	}
 }
 
-func (v *validatingObjectWalker) doScalar(t schema.Scalar) ValidationErrors {
+func (v *validatingObjectWalker) doScalar(t *schema.Scalar) ValidationErrors {
 	if errs := v.validateScalar(t, &v.value, ""); len(errs) > 0 {
 		return errs
 	}
@@ -141,8 +141,8 @@ func (v *validatingObjectWalker) doScalar(t schema.Scalar) ValidationErrors {
 	return nil
 }
 
-func (v *validatingObjectWalker) visitListItems(t schema.List, list *value.List) (errs ValidationErrors) {
-	observedKeys := map[string]struct{}{}
+func (v *validatingObjectWalker) visitListItems(t *schema.List, list *value.List) (errs ValidationErrors) {
+	observedKeys := fieldpath.MakePathElementSet(len(list.Items))
 	for i, child := range list.Items {
 		pe, err := listItemToPathElement(t, i, child)
 		if err != nil {
@@ -152,11 +152,10 @@ func (v *validatingObjectWalker) visitListItems(t schema.List, list *value.List)
 			// this element.
 			continue
 		}
-		keyStr := pe.String()
-		if _, found := observedKeys[keyStr]; found {
-			errs = append(errs, v.errorf("duplicate entries for key %v", keyStr)...)
+		if observedKeys.Has(pe) {
+			errs = append(errs, v.errorf("duplicate entries for key %v", pe.String())...)
 		}
-		observedKeys[keyStr] = struct{}{}
+		observedKeys.Insert(pe)
 		v2 := v.prepareDescent(pe, t.ElementType)
 		v2.value = child
 		errs = append(errs, v2.validate()...)
@@ -167,7 +166,7 @@ func (v *validatingObjectWalker) visitListItems(t schema.List, list *value.List)
 	return errs
 }
 
-func (v *validatingObjectWalker) doList(t schema.List) (errs ValidationErrors) {
+func (v *validatingObjectWalker) doList(t *schema.List) (errs ValidationErrors) {
 	list, err := listValue(v.value)
 	if err != nil {
 		return v.error(err)
@@ -186,21 +185,13 @@ func (v *validatingObjectWalker) doList(t schema.List) (errs ValidationErrors) {
 	return errs
 }
 
-func (v *validatingObjectWalker) visitMapItems(t schema.Map, m *value.Map) (errs ValidationErrors) {
-	fieldTypes := map[string]schema.TypeRef{}
-	for i := range t.Fields {
-		// I don't want to use the loop variable since a reference
-		// might outlive the loop iteration (in an error message).
-		f := t.Fields[i]
-		fieldTypes[f.Name] = f.Type
-	}
-
+func (v *validatingObjectWalker) visitMapItems(t *schema.Map, m *value.Map) (errs ValidationErrors) {
 	for i := range m.Items {
 		item := &m.Items[i]
 		pe := fieldpath.PathElement{FieldName: &item.Name}
 
-		if tr, ok := fieldTypes[item.Name]; ok {
-			v2 := v.prepareDescent(pe, tr)
+		if sf, ok := t.FindField(item.Name); ok {
+			v2 := v.prepareDescent(pe, sf.Type)
 			v2.value = item.Value
 			errs = append(errs, v2.validate()...)
 			v.finishDescent(v2)
@@ -215,7 +206,7 @@ func (v *validatingObjectWalker) visitMapItems(t schema.Map, m *value.Map) (errs
 	return errs
 }
 
-func (v *validatingObjectWalker) doMap(t schema.Map) (errs ValidationErrors) {
+func (v *validatingObjectWalker) doMap(t *schema.Map) (errs ValidationErrors) {
 	m, err := mapValue(v.value)
 	if err != nil {
 		return v.error(err)

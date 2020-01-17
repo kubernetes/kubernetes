@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/containermap"
 	testutil "k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state/testing"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 )
@@ -35,6 +36,7 @@ func TestCheckpointStateRestore(t *testing.T) {
 		description       string
 		checkpointContent string
 		policyName        string
+		initialContainers containermap.ContainerMap
 		expectedError     string
 		expectedState     *stateMemory
 	}{
@@ -42,6 +44,7 @@ func TestCheckpointStateRestore(t *testing.T) {
 			"Restore non-existing checkpoint",
 			"",
 			"none",
+			containermap.ContainerMap{},
 			"",
 			&stateMemory{},
 		},
@@ -51,9 +54,10 @@ func TestCheckpointStateRestore(t *testing.T) {
 				"policyName": "none",
 				"defaultCPUSet": "4-6",
 				"entries": {},
-				"checksum": 2912033808
+				"checksum": 354655845
 			}`,
 			"none",
+			containermap.ContainerMap{},
 			"",
 			&stateMemory{
 				defaultCPUSet: cpuset.NewCPUSet(4, 5, 6),
@@ -65,17 +69,22 @@ func TestCheckpointStateRestore(t *testing.T) {
 				"policyName": "none",
 				"defaultCPUSet": "1-3",
 				"entries": {
-					"container1": "4-6",
-					"container2": "1-3"
+					"pod": {
+						"container1": "4-6",
+						"container2": "1-3"
+					}
 				},
-				"checksum": 1535905563
+				"checksum": 3610638499
 			}`,
 			"none",
+			containermap.ContainerMap{},
 			"",
 			&stateMemory{
 				assignments: ContainerCPUAssignments{
-					"container1": cpuset.NewCPUSet(4, 5, 6),
-					"container2": cpuset.NewCPUSet(1, 2, 3),
+					"pod": map[string]cpuset.CPUSet{
+						"container1": cpuset.NewCPUSet(4, 5, 6),
+						"container2": cpuset.NewCPUSet(1, 2, 3),
+					},
 				},
 				defaultCPUSet: cpuset.NewCPUSet(1, 2, 3),
 			},
@@ -89,6 +98,7 @@ func TestCheckpointStateRestore(t *testing.T) {
 				"checksum": 1337
 			}`,
 			"none",
+			containermap.ContainerMap{},
 			"checkpoint is corrupted",
 			&stateMemory{},
 		},
@@ -96,6 +106,7 @@ func TestCheckpointStateRestore(t *testing.T) {
 			"Restore checkpoint with invalid JSON",
 			`{`,
 			"none",
+			containermap.ContainerMap{},
 			"unexpected end of JSON input",
 			&stateMemory{},
 		},
@@ -105,9 +116,10 @@ func TestCheckpointStateRestore(t *testing.T) {
 				"policyName": "other",
 				"defaultCPUSet": "1-3",
 				"entries": {},
-				"checksum": 4195836012
+				"checksum": 1394507217
 			}`,
 			"none",
+			containermap.ContainerMap{},
 			`configured policy "none" differs from state checkpoint policy "other"`,
 			&stateMemory{},
 		},
@@ -117,9 +129,10 @@ func TestCheckpointStateRestore(t *testing.T) {
 				"policyName": "none",
 				"defaultCPUSet": "1.3",
 				"entries": {},
-				"checksum": 1025273327
+				"checksum": 3021697696
 			}`,
 			"none",
+			containermap.ContainerMap{},
 			`could not parse default cpu set "1.3": strconv.Atoi: parsing "1.3": invalid syntax`,
 			&stateMemory{},
 		},
@@ -129,14 +142,60 @@ func TestCheckpointStateRestore(t *testing.T) {
 				"policyName": "none",
 				"defaultCPUSet": "1-3",
 				"entries": {
-					"container1": "4-6",
-					"container2": "asd"
+					"pod": {
+						"container1": "4-6",
+						"container2": "asd"
+					}
 				},
-				"checksum": 2764213924
+				"checksum": 962272150
 			}`,
 			"none",
-			`could not parse cpuset "asd" for container id "container2": strconv.Atoi: parsing "asd": invalid syntax`,
+			containermap.ContainerMap{},
+			`could not parse cpuset "asd" for container "container2" in pod "pod": strconv.Atoi: parsing "asd": invalid syntax`,
 			&stateMemory{},
+		},
+		{
+			"Restore checkpoint from checkpoint with v1 checksum",
+			`{
+				"policyName": "none",
+				"defaultCPUSet": "1-3",
+				"checksum": 1694838852
+			}`,
+			"none",
+			containermap.ContainerMap{},
+			"",
+			&stateMemory{
+				defaultCPUSet: cpuset.NewCPUSet(1, 2, 3),
+			},
+		},
+		{
+			"Restore checkpoint with migration",
+			`{
+				"policyName": "none",
+				"defaultCPUSet": "1-3",
+				"entries": {
+					"containerID1": "4-6",
+					"containerID2": "1-3"
+				},
+				"checksum": 3680390589
+			}`,
+			"none",
+			func() containermap.ContainerMap {
+				cm := containermap.NewContainerMap()
+				cm.Add("pod", "container1", "containerID1")
+				cm.Add("pod", "container2", "containerID2")
+				return cm
+			}(),
+			"",
+			&stateMemory{
+				assignments: ContainerCPUAssignments{
+					"pod": map[string]cpuset.CPUSet{
+						"container1": cpuset.NewCPUSet(4, 5, 6),
+						"container2": cpuset.NewCPUSet(1, 2, 3),
+					},
+				},
+				defaultCPUSet: cpuset.NewCPUSet(1, 2, 3),
+			},
 		},
 	}
 
@@ -159,7 +218,7 @@ func TestCheckpointStateRestore(t *testing.T) {
 				}
 			}
 
-			restoredState, err := NewCheckpointState(testingDir, testingCheckpoint, tc.policyName)
+			restoredState, err := NewCheckpointState(testingDir, testingCheckpoint, tc.policyName, tc.initialContainers)
 			if err != nil {
 				if strings.TrimSpace(tc.expectedError) != "" {
 					tc.expectedError = "could not restore state from checkpoint: " + tc.expectedError
@@ -189,8 +248,10 @@ func TestCheckpointStateStore(t *testing.T) {
 		{
 			"Store assignments",
 			&stateMemory{
-				assignments: map[string]cpuset.CPUSet{
-					"container1": cpuset.NewCPUSet(1, 5, 8),
+				assignments: map[string]map[string]cpuset.CPUSet{
+					"pod": {
+						"container1": cpuset.NewCPUSet(1, 5, 8),
+					},
 				},
 			},
 		},
@@ -206,7 +267,7 @@ func TestCheckpointStateStore(t *testing.T) {
 			// ensure there is no previous checkpoint
 			cpm.RemoveCheckpoint(testingCheckpoint)
 
-			cs1, err := NewCheckpointState(testingDir, testingCheckpoint, "none")
+			cs1, err := NewCheckpointState(testingDir, testingCheckpoint, "none", nil)
 			if err != nil {
 				t.Fatalf("could not create testing checkpointState instance: %v", err)
 			}
@@ -216,7 +277,7 @@ func TestCheckpointStateStore(t *testing.T) {
 			cs1.SetCPUAssignments(tc.expectedState.assignments)
 
 			// restore checkpoint with previously stored values
-			cs2, err := NewCheckpointState(testingDir, testingCheckpoint, "none")
+			cs2, err := NewCheckpointState(testingDir, testingCheckpoint, "none", nil)
 			if err != nil {
 				t.Fatalf("could not create testing checkpointState instance: %v", err)
 			}
@@ -230,28 +291,34 @@ func TestCheckpointStateHelpers(t *testing.T) {
 	testCases := []struct {
 		description   string
 		defaultCPUset cpuset.CPUSet
-		containers    map[string]cpuset.CPUSet
+		assignments   map[string]map[string]cpuset.CPUSet
 	}{
 		{
 			description:   "One container",
 			defaultCPUset: cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7, 8),
-			containers: map[string]cpuset.CPUSet{
-				"c1": cpuset.NewCPUSet(0, 1),
+			assignments: map[string]map[string]cpuset.CPUSet{
+				"pod": {
+					"c1": cpuset.NewCPUSet(0, 1),
+				},
 			},
 		},
 		{
 			description:   "Two containers",
 			defaultCPUset: cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7, 8),
-			containers: map[string]cpuset.CPUSet{
-				"c1": cpuset.NewCPUSet(0, 1),
-				"c2": cpuset.NewCPUSet(2, 3, 4, 5),
+			assignments: map[string]map[string]cpuset.CPUSet{
+				"pod": {
+					"c1": cpuset.NewCPUSet(0, 1),
+					"c2": cpuset.NewCPUSet(2, 3, 4, 5),
+				},
 			},
 		},
 		{
 			description:   "Container without assigned cpus",
 			defaultCPUset: cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7, 8),
-			containers: map[string]cpuset.CPUSet{
-				"c1": cpuset.NewCPUSet(),
+			assignments: map[string]map[string]cpuset.CPUSet{
+				"pod": {
+					"c1": cpuset.NewCPUSet(),
+				},
 			},
 		},
 	}
@@ -266,21 +333,23 @@ func TestCheckpointStateHelpers(t *testing.T) {
 			// ensure there is no previous checkpoint
 			cpm.RemoveCheckpoint(testingCheckpoint)
 
-			state, err := NewCheckpointState(testingDir, testingCheckpoint, "none")
+			state, err := NewCheckpointState(testingDir, testingCheckpoint, "none", nil)
 			if err != nil {
 				t.Fatalf("could not create testing checkpointState instance: %v", err)
 			}
 			state.SetDefaultCPUSet(tc.defaultCPUset)
 
-			for container, set := range tc.containers {
-				state.SetCPUSet(container, set)
-				if cpus, _ := state.GetCPUSet(container); !cpus.Equals(set) {
-					t.Fatalf("state inconsistent, got %q instead of %q", set, cpus)
-				}
+			for pod := range tc.assignments {
+				for container, set := range tc.assignments[pod] {
+					state.SetCPUSet(pod, container, set)
+					if cpus, _ := state.GetCPUSet(pod, container); !cpus.Equals(set) {
+						t.Fatalf("state inconsistent, got %q instead of %q", set, cpus)
+					}
 
-				state.Delete(container)
-				if _, ok := state.GetCPUSet(container); ok {
-					t.Fatal("deleted container still existing in state")
+					state.Delete(pod, container)
+					if _, ok := state.GetCPUSet(pod, container); ok {
+						t.Fatal("deleted container still existing in state")
+					}
 				}
 			}
 		})
@@ -291,34 +360,38 @@ func TestCheckpointStateClear(t *testing.T) {
 	testCases := []struct {
 		description   string
 		defaultCPUset cpuset.CPUSet
-		containers    map[string]cpuset.CPUSet
+		assignments   map[string]map[string]cpuset.CPUSet
 	}{
 		{
 			"Valid state",
 			cpuset.NewCPUSet(1, 5, 10),
-			map[string]cpuset.CPUSet{
-				"container1": cpuset.NewCPUSet(1, 4),
+			map[string]map[string]cpuset.CPUSet{
+				"pod": {
+					"container1": cpuset.NewCPUSet(1, 4),
+				},
 			},
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			state, err := NewCheckpointState(testingDir, testingCheckpoint, "none")
+			state, err := NewCheckpointState(testingDir, testingCheckpoint, "none", nil)
 			if err != nil {
 				t.Fatalf("could not create testing checkpointState instance: %v", err)
 			}
 
 			state.SetDefaultCPUSet(tc.defaultCPUset)
-			state.SetCPUAssignments(tc.containers)
+			state.SetCPUAssignments(tc.assignments)
 
 			state.ClearState()
 			if !cpuset.NewCPUSet().Equals(state.GetDefaultCPUSet()) {
 				t.Fatal("cleared state with non-empty default cpu set")
 			}
-			for container := range tc.containers {
-				if _, ok := state.GetCPUSet(container); ok {
-					t.Fatalf("container %q with non-default cpu set in cleared state", container)
+			for pod := range tc.assignments {
+				for container := range tc.assignments[pod] {
+					if _, ok := state.GetCPUSet(pod, container); ok {
+						t.Fatalf("container %q in pod %q with non-default cpu set in cleared state", container, pod)
+					}
 				}
 			}
 		})

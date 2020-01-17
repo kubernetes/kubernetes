@@ -47,8 +47,7 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 	"k8s.io/apiserver/plugin/pkg/authenticator/token/tokentest"
 	"k8s.io/apiserver/plugin/pkg/authenticator/token/webhook"
-	"k8s.io/client-go/tools/clientcmd/api/v1"
-	"k8s.io/kubernetes/pkg/api/testapi"
+	v1 "k8s.io/client-go/tools/clientcmd/api/v1"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -86,7 +85,7 @@ func getTestWebhookTokenAuth(serverURL string) (authenticator.Request, error) {
 	if err := json.NewEncoder(kubecfgFile).Encode(config); err != nil {
 		return nil, err
 	}
-	webhookTokenAuth, err := webhook.New(kubecfgFile.Name(), nil)
+	webhookTokenAuth, err := webhook.New(kubecfgFile.Name(), "v1beta1", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -94,26 +93,45 @@ func getTestWebhookTokenAuth(serverURL string) (authenticator.Request, error) {
 }
 
 func path(resource, namespace, name string) string {
-	return testapi.Default.ResourcePath(resource, namespace, name)
+	return pathWithPrefix("", resource, namespace, name)
 }
 
 func pathWithPrefix(prefix, resource, namespace, name string) string {
-	return testapi.Default.ResourcePathWithPrefix(prefix, resource, namespace, name)
+	path := "/api/v1"
+	if prefix != "" {
+		path = path + "/" + prefix
+	}
+	if namespace != "" {
+		path = path + "/namespaces/" + namespace
+	}
+	// Resource names are lower case.
+	resource = strings.ToLower(resource)
+	if resource != "" {
+		path = path + "/" + resource
+	}
+	if name != "" {
+		path = path + "/" + name
+	}
+	return path
 }
 
 func pathWithSubResource(resource, namespace, name, subresource string) string {
-	return testapi.Default.SubResourcePath(resource, namespace, name, subresource)
+	path := pathWithPrefix("", resource, namespace, name)
+	if subresource != "" {
+		path = path + "/" + subresource
+	}
+	return path
 }
 
 func timeoutPath(resource, namespace, name string) string {
-	return addTimeoutFlag(testapi.Default.ResourcePath(resource, namespace, name))
+	return addTimeoutFlag(path(resource, namespace, name))
 }
 
 // Bodies for requests used in subsequent tests.
 var aPod = `
 {
   "kind": "Pod",
-  "apiVersion": "` + testapi.Groups[api.GroupName].GroupVersion().String() + `",
+  "apiVersion": "v1",
   "metadata": {
     "name": "a",
     "creationTimestamp": null%s
@@ -131,7 +149,7 @@ var aPod = `
 var aRC = `
 {
   "kind": "ReplicationController",
-  "apiVersion": "` + testapi.Groups[api.GroupName].GroupVersion().String() + `",
+  "apiVersion": "v1",
   "metadata": {
     "name": "a",
     "labels": {
@@ -164,7 +182,7 @@ var aRC = `
 var aService = `
 {
   "kind": "Service",
-  "apiVersion": "` + testapi.Groups[api.GroupName].GroupVersion().String() + `",
+  "apiVersion": "v1",
   "metadata": {
     "name": "a",
     "labels": {
@@ -188,7 +206,7 @@ var aService = `
 var aNode = `
 {
   "kind": "Node",
-  "apiVersion": "` + testapi.Groups[api.GroupName].GroupVersion().String() + `",
+  "apiVersion": "v1",
   "metadata": {
     "name": "a"%s
   },
@@ -202,7 +220,7 @@ func aEvent(namespace string) string {
 	return `
 {
   "kind": "Event",
-  "apiVersion": "` + testapi.Groups[api.GroupName].GroupVersion().String() + `",
+  "apiVersion": "v1",
   "metadata": {
     "name": "a"%s
   },
@@ -219,7 +237,7 @@ func aEvent(namespace string) string {
 var aBinding = `
 {
   "kind": "Binding",
-  "apiVersion": "` + testapi.Groups[api.GroupName].GroupVersion().String() + `",
+  "apiVersion": "v1",
   "metadata": {
     "name": "a"%s
   },
@@ -242,7 +260,7 @@ var emptyEndpoints = `
 var aEndpoints = `
 {
   "kind": "Endpoints",
-  "apiVersion": "` + testapi.Groups[api.GroupName].GroupVersion().String() + `",
+  "apiVersion": "v1",
   "metadata": {
     "name": "a"%s
   },
@@ -267,7 +285,7 @@ var aEndpoints = `
 var deleteNow = `
 {
   "kind": "DeleteOptions",
-  "apiVersion": "` + testapi.Groups[api.GroupName].GroupVersion().String() + `",
+  "apiVersion": "v1",
   "gracePeriodSeconds": 0%s
 }
 `
@@ -442,11 +460,11 @@ func TestAuthModeAlwaysAllow(t *testing.T) {
 		}
 		func() {
 			resp, err := transport.RoundTrip(req)
-			defer resp.Body.Close()
 			if err != nil {
 				t.Logf("case %v", r)
 				t.Fatalf("unexpected error: %v", err)
 			}
+			defer resp.Body.Close()
 			b, _ := ioutil.ReadAll(resp.Body)
 			if _, ok := r.statusCodes[resp.StatusCode]; !ok {
 				t.Logf("case %v", r)
@@ -523,11 +541,11 @@ func TestAuthModeAlwaysDeny(t *testing.T) {
 		}
 		func() {
 			resp, err := transport.RoundTrip(req)
-			defer resp.Body.Close()
 			if err != nil {
 				t.Logf("case %v", r)
 				t.Fatalf("unexpected error: %v", err)
 			}
+			defer resp.Body.Close()
 			if resp.StatusCode != http.StatusForbidden {
 				t.Logf("case %v", r)
 				t.Errorf("Expected status Forbidden but got status %v", resp.Status)
@@ -592,11 +610,11 @@ func TestAliceNotForbiddenOrUnauthorized(t *testing.T) {
 
 		func() {
 			resp, err := transport.RoundTrip(req)
-			defer resp.Body.Close()
 			if err != nil {
 				t.Logf("case %v", r)
 				t.Fatalf("unexpected error: %v", err)
 			}
+			defer resp.Body.Close()
 			b, _ := ioutil.ReadAll(resp.Body)
 			if _, ok := r.statusCodes[resp.StatusCode]; !ok {
 				t.Logf("case %v", r)
@@ -644,11 +662,11 @@ func TestBobIsForbidden(t *testing.T) {
 
 		func() {
 			resp, err := transport.RoundTrip(req)
-			defer resp.Body.Close()
 			if err != nil {
 				t.Logf("case %v", r)
 				t.Fatalf("unexpected error: %v", err)
 			}
+			defer resp.Body.Close()
 			// Expect all of bob's actions to return Forbidden
 			if resp.StatusCode != http.StatusForbidden {
 				t.Logf("case %v", r)
@@ -687,11 +705,11 @@ func TestUnknownUserIsUnauthorized(t *testing.T) {
 		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
 		func() {
 			resp, err := transport.RoundTrip(req)
-			defer resp.Body.Close()
 			if err != nil {
 				t.Logf("case %v", r)
 				t.Fatalf("unexpected error: %v", err)
 			}
+			defer resp.Body.Close()
 			// Expect all of unauthenticated user's request to be "Unauthorized"
 			if resp.StatusCode != http.StatusUnauthorized {
 				t.Logf("case %v", r)
@@ -751,11 +769,11 @@ func TestImpersonateIsForbidden(t *testing.T) {
 
 		func() {
 			resp, err := transport.RoundTrip(req)
-			defer resp.Body.Close()
 			if err != nil {
 				t.Logf("case %v", r)
 				t.Fatalf("unexpected error: %v", err)
 			}
+			defer resp.Body.Close()
 			// Expect all of bob's actions to return Forbidden
 			if resp.StatusCode != http.StatusForbidden {
 				t.Logf("case %v", r)
@@ -776,11 +794,11 @@ func TestImpersonateIsForbidden(t *testing.T) {
 		req.Header.Set("Impersonate-User", "alice")
 		func() {
 			resp, err := transport.RoundTrip(req)
-			defer resp.Body.Close()
 			if err != nil {
 				t.Logf("case %v", r)
 				t.Fatalf("unexpected error: %v", err)
 			}
+			defer resp.Body.Close()
 			// Expect all the requests to be allowed, don't care what they actually do
 			if resp.StatusCode == http.StatusForbidden {
 				t.Logf("case %v", r)
@@ -802,11 +820,11 @@ func TestImpersonateIsForbidden(t *testing.T) {
 
 		func() {
 			resp, err := transport.RoundTrip(req)
-			defer resp.Body.Close()
 			if err != nil {
 				t.Logf("case %v", r)
 				t.Fatalf("unexpected error: %v", err)
 			}
+			defer resp.Body.Close()
 			// Expect all of bob's actions to return Forbidden
 			if resp.StatusCode != http.StatusForbidden {
 				t.Logf("case %v", r)
@@ -827,11 +845,11 @@ func TestImpersonateIsForbidden(t *testing.T) {
 		req.Header.Set("Impersonate-User", serviceaccount.MakeUsername("default", "default"))
 		func() {
 			resp, err := transport.RoundTrip(req)
-			defer resp.Body.Close()
 			if err != nil {
 				t.Logf("case %v", r)
 				t.Fatalf("unexpected error: %v", err)
 			}
+			defer resp.Body.Close()
 			// Expect all the requests to be allowed, don't care what they actually do
 			if resp.StatusCode == http.StatusForbidden {
 				t.Logf("case %v", r)
@@ -908,11 +926,11 @@ func TestAuthorizationAttributeDetermination(t *testing.T) {
 		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
 		func() {
 			resp, err := transport.RoundTrip(req)
-			defer resp.Body.Close()
 			if err != nil {
 				t.Logf("case %v", r)
 				t.Fatalf("unexpected error: %v", err)
 			}
+			defer resp.Body.Close()
 
 			found := false
 			for i := currentAuthorizationAttributesIndex; i < len(trackingAuthorizer.requestAttributes); i++ {
@@ -1006,11 +1024,11 @@ func TestNamespaceAuthorization(t *testing.T) {
 		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
 		func() {
 			resp, err := transport.RoundTrip(req)
-			defer resp.Body.Close()
 			if err != nil {
 				t.Logf("case %v", r)
 				t.Fatalf("unexpected error: %v", err)
 			}
+			defer resp.Body.Close()
 			b, _ := ioutil.ReadAll(resp.Body)
 			if _, ok := r.statusCodes[resp.StatusCode]; !ok {
 				t.Logf("case %v", r)
@@ -1091,11 +1109,11 @@ func TestKindAuthorization(t *testing.T) {
 		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
 		{
 			resp, err := transport.RoundTrip(req)
-			defer resp.Body.Close()
 			if err != nil {
 				t.Logf("case %v", r)
 				t.Fatalf("unexpected error: %v", err)
 			}
+			defer resp.Body.Close()
 			b, _ := ioutil.ReadAll(resp.Body)
 			if _, ok := r.statusCodes[resp.StatusCode]; !ok {
 				t.Logf("case %v", r)
@@ -1155,11 +1173,11 @@ func TestReadOnlyAuthorization(t *testing.T) {
 		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
 		func() {
 			resp, err := transport.RoundTrip(req)
-			defer resp.Body.Close()
 			if err != nil {
 				t.Logf("case %v", r)
 				t.Fatalf("unexpected error: %v", err)
 			}
+			defer resp.Body.Close()
 			if _, ok := r.statusCodes[resp.StatusCode]; !ok {
 				t.Logf("case %v", r)
 				t.Errorf("Expected status one of %v, but got %v", r.statusCodes, resp.StatusCode)
@@ -1205,11 +1223,11 @@ func TestWebhookTokenAuthenticator(t *testing.T) {
 
 		func() {
 			resp, err := transport.RoundTrip(req)
-			defer resp.Body.Close()
 			if err != nil {
 				t.Logf("case %v", r)
 				t.Fatalf("unexpected error: %v", err)
 			}
+			defer resp.Body.Close()
 			// Expect all of Bob's actions to return Forbidden
 			if resp.StatusCode != http.StatusForbidden {
 				t.Logf("case %v", r)

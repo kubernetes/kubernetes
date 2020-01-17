@@ -41,12 +41,15 @@ import (
 )
 
 var (
-	verbose   = flag.Bool("verbose", false, "print more information")
-	cross     = flag.Bool("cross", true, "build for all platforms")
-	platforms = flag.String("platform", "", "comma-separated list of platforms to typecheck")
-	timings   = flag.Bool("time", false, "output times taken for each phase")
-	defuses   = flag.Bool("defuse", false, "output defs/uses")
-	serial    = flag.Bool("serial", false, "don't type check platforms in parallel")
+	verbose    = flag.Bool("verbose", false, "print more information")
+	cross      = flag.Bool("cross", true, "build for all platforms")
+	platforms  = flag.String("platform", "", "comma-separated list of platforms to typecheck")
+	timings    = flag.Bool("time", false, "output times taken for each phase")
+	defuses    = flag.Bool("defuse", false, "output defs/uses")
+	serial     = flag.Bool("serial", false, "don't type check platforms in parallel")
+	skipTest   = flag.Bool("skip-test", false, "don't type check test code")
+	tags       = flag.String("tags", "", "comma-separated list of build tags to apply in addition to go's defaults")
+	ignoreDirs = flag.String("ignore-dirs", "", "comma-separated list of directories to ignore in addition to the default hardcoded list including staging, vendor, and hidden dirs")
 
 	isTerminal = terminal.IsTerminal(int(os.Stdout.Fd()))
 	logPrefix  = ""
@@ -62,6 +65,24 @@ var (
 	}
 	darwinPlatString  = "darwin/386,darwin/amd64"
 	windowsPlatString = "windows/386,windows/amd64"
+
+	// directories we always ignore
+	standardIgnoreDirs = []string{
+		// Staging code is symlinked from vendor/k8s.io, and uses import
+		// paths as if it were inside of vendor/. It fails typechecking
+		// inside of staging/, but works when typechecked as part of vendor/.
+		"staging",
+		// OS-specific vendor code tends to be imported by OS-specific
+		// packages. We recursively typecheck imported vendored packages for
+		// each OS, but don't typecheck everything for every OS.
+		"vendor",
+		"_output",
+		// This is a weird one. /testdata/ is *mostly* ignored by Go,
+		// and this translates to kubernetes/vendor not working.
+		// edit/record.go doesn't compile without gopkg.in/yaml.v2
+		// in $GOSRC/$GOROOT (both typecheck and the shell script).
+		"pkg/kubectl/cmd/testdata/edit",
+	}
 )
 
 type analyzer struct {
@@ -79,6 +100,10 @@ func newAnalyzer(platform string) *analyzer {
 	platSplit := strings.Split(platform, "/")
 	ctx.GOOS, ctx.GOARCH = platSplit[0], platSplit[1]
 	ctx.CgoEnabled = true
+	if *tags != "" {
+		tagsSplit := strings.Split(*tags, ",")
+		ctx.BuildTags = append(ctx.BuildTags, tagsSplit...)
+	}
 
 	a := &analyzer{
 		platform:  platform,
@@ -158,6 +183,9 @@ func (a *analyzer) filterFiles(fs map[string]*ast.File) []*ast.File {
 	files := []*ast.File{}
 	for _, f := range fs {
 		fpath := a.fset.File(f.Pos()).Name()
+		if *skipTest && strings.HasSuffix(fpath, "_test.go") {
+			continue
+		}
 		dir, name := filepath.Split(fpath)
 		matches, err := a.ctx.MatchFile(dir, name)
 		if err != nil {
@@ -219,7 +247,8 @@ func (a *analyzer) typeCheck(dir string, files []*ast.File) error {
 }
 
 type collector struct {
-	dirs []string
+	dirs       []string
+	ignoreDirs []string
 }
 
 // handlePath walks the filesystem recursively, collecting directories,
@@ -231,22 +260,13 @@ func (c *collector) handlePath(path string, info os.FileInfo, err error) error {
 	}
 	if info.IsDir() {
 		// Ignore hidden directories (.git, .cache, etc)
-		if len(path) > 1 && path[0] == '.' ||
-			// Staging code is symlinked from vendor/k8s.io, and uses import
-			// paths as if it were inside of vendor/. It fails typechecking
-			// inside of staging/, but works when typechecked as part of vendor/.
-			path == "staging" ||
-			// OS-specific vendor code tends to be imported by OS-specific
-			// packages. We recursively typecheck imported vendored packages for
-			// each OS, but don't typecheck everything for every OS.
-			path == "vendor" ||
-			path == "_output" ||
-			// This is a weird one. /testdata/ is *mostly* ignored by Go,
-			// and this translates to kubernetes/vendor not working.
-			// edit/record.go doesn't compile without gopkg.in/yaml.v2
-			// in $GOSRC/$GOROOT (both typecheck and the shell script).
-			path == "pkg/kubectl/cmd/testdata/edit" {
+		if len(path) > 1 && path[0] == '.' {
 			return filepath.SkipDir
+		}
+		for _, dir := range c.ignoreDirs {
+			if path == dir {
+				return filepath.SkipDir
+			}
 		}
 		c.dirs = append(c.dirs, path)
 	}
@@ -310,7 +330,13 @@ func main() {
 		args = append(args, ".")
 	}
 
-	c := collector{}
+	c := collector{
+		ignoreDirs: append([]string(nil), standardIgnoreDirs...),
+	}
+	if *ignoreDirs != "" {
+		c.ignoreDirs = append(c.ignoreDirs, strings.Split(*ignoreDirs, ",")...)
+	}
+
 	for _, arg := range args {
 		err := filepath.Walk(arg, c.handlePath)
 		if err != nil {

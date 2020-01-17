@@ -24,14 +24,13 @@ import (
 
 	"github.com/pkg/errors"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	netutil "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 // Waiter is an interface for waiting for criteria in Kubernetes to happen
@@ -157,7 +156,7 @@ func (w *KubeWaiter) WaitForHealthyKubelet(initalTimeout time.Duration, healthzE
 // WaitForKubeletAndFunc waits primarily for the function f to execute, even though it might take some time. If that takes a long time, and the kubelet
 // /healthz continuously are unhealthy, kubeadm will error out after a period of exponential backoff
 func (w *KubeWaiter) WaitForKubeletAndFunc(f func() error) error {
-	errorChan := make(chan error)
+	errorChan := make(chan error, 1)
 
 	go func(errC chan error, waiter Waiter) {
 		if err := waiter.WaitForHealthyKubelet(40*time.Second, fmt.Sprintf("http://localhost:%d/healthz", kubeadmconstants.KubeletHealthzPort)); err != nil {
@@ -246,7 +245,7 @@ func getStaticPodSingleHash(client clientset.Interface, nodeName string, compone
 		return "", err
 	}
 
-	staticPodHash := staticPod.Annotations[kubetypes.ConfigHashAnnotationKey]
+	staticPodHash := staticPod.Annotations["kubernetes.io/config.hash"]
 	fmt.Printf("Static pod: %s hash: %s\n", staticPodName, staticPodHash)
 	return staticPodHash, nil
 }

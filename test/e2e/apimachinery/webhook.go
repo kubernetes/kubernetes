@@ -30,7 +30,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	crdclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
@@ -59,20 +59,19 @@ const (
 	serviceName     = "e2e-test-webhook"
 	roleBindingName = "webhook-auth-reader"
 
-	skipNamespaceLabelKey     = "skip-webhook-admission"
-	skipNamespaceLabelValue   = "yes"
-	skippedNamespaceName      = "exempted-namesapce"
-	disallowedPodName         = "disallowed-pod"
-	toBeAttachedPodName       = "to-be-attached-pod"
-	hangingPodName            = "hanging-pod"
-	disallowedConfigMapName   = "disallowed-configmap"
-	nonDeletableConfigmapName = "nondeletable-configmap"
-	allowedConfigMapName      = "allowed-configmap"
-	failNamespaceLabelKey     = "fail-closed-webhook"
-	failNamespaceLabelValue   = "yes"
-	failNamespaceName         = "fail-closed-namesapce"
-	addedLabelKey             = "added-label"
-	addedLabelValue           = "yes"
+	skipNamespaceLabelKey   = "skip-webhook-admission"
+	skipNamespaceLabelValue = "yes"
+	skippedNamespaceName    = "exempted-namesapce"
+	disallowedPodName       = "disallowed-pod"
+	toBeAttachedPodName     = "to-be-attached-pod"
+	hangingPodName          = "hanging-pod"
+	disallowedConfigMapName = "disallowed-configmap"
+	allowedConfigMapName    = "allowed-configmap"
+	failNamespaceLabelKey   = "fail-closed-webhook"
+	failNamespaceLabelValue = "yes"
+	failNamespaceName       = "fail-closed-namesapce"
+	addedLabelKey           = "added-label"
+	addedLabelValue         = "yes"
 )
 
 var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
@@ -740,7 +739,7 @@ func createAuthReaderRoleBinding(f *framework.Framework, namespace string) {
 			},
 		},
 	})
-	if err != nil && errors.IsAlreadyExists(err) {
+	if err != nil && apierrors.IsAlreadyExists(err) {
 		framework.Logf("role binding %s already exists", roleBindingName)
 	} else {
 		framework.ExpectNoError(err, "creating role binding %s:webhook to access configMap", namespace)
@@ -996,7 +995,7 @@ func testMutatingConfigMapWebhook(f *framework.Framework) {
 	client := f.ClientSet
 	configMap := toBeMutatedConfigMap(f)
 	mutatedConfigMap, err := client.CoreV1().ConfigMaps(f.Namespace.Name).Create(configMap)
-	gomega.Expect(err).To(gomega.BeNil())
+	framework.ExpectNoError(err)
 	expectedConfigMapData := map[string]string{
 		"mutation-start":   "yes",
 		"mutation-stage-1": "yes",
@@ -1121,7 +1120,7 @@ func testWebhook(f *framework.Framework) {
 		framework.Failf("expect error %q, got %q", "deadline", err.Error())
 	}
 	// ensure the pod was not actually created
-	if _, err := client.CoreV1().Pods(f.Namespace.Name).Get(pod.Name, metav1.GetOptions{}); !errors.IsNotFound(err) {
+	if _, err := client.CoreV1().Pods(f.Namespace.Name).Get(pod.Name, metav1.GetOptions{}); !apierrors.IsNotFound(err) {
 		framework.Failf("expect notfound error looking for rejected pod, got %v", err)
 	}
 
@@ -1187,36 +1186,6 @@ func testWebhook(f *framework.Framework) {
 	framework.ExpectNoError(err, "failed to create configmap %s in namespace: %s", configmap.Name, skippedNamespaceName)
 }
 
-func testBlockingConfigmapDeletion(f *framework.Framework) {
-	ginkgo.By("create a configmap that should be denied by the webhook when deleting")
-	client := f.ClientSet
-	configmap := nonDeletableConfigmap(f)
-	_, err := client.CoreV1().ConfigMaps(f.Namespace.Name).Create(configmap)
-	framework.ExpectNoError(err, "failed to create configmap %s in namespace: %s", configmap.Name, f.Namespace.Name)
-
-	ginkgo.By("deleting the configmap should be denied by the webhook")
-	err = client.CoreV1().ConfigMaps(f.Namespace.Name).Delete(configmap.Name, &metav1.DeleteOptions{})
-	framework.ExpectError(err, "deleting configmap %s in namespace: %s should be denied", configmap.Name, f.Namespace.Name)
-	expectedErrMsg1 := "the configmap cannot be deleted because it contains unwanted key and value"
-	if !strings.Contains(err.Error(), expectedErrMsg1) {
-		framework.Failf("expect error contains %q, got %q", expectedErrMsg1, err.Error())
-	}
-
-	ginkgo.By("remove the offending key and value from the configmap data")
-	toCompliantFn := func(cm *v1.ConfigMap) {
-		if cm.Data == nil {
-			cm.Data = map[string]string{}
-		}
-		cm.Data["webhook-e2e-test"] = "webhook-allow"
-	}
-	_, err = updateConfigMap(client, f.Namespace.Name, configmap.Name, toCompliantFn)
-	framework.ExpectNoError(err, "failed to update configmap %s in namespace: %s", configmap.Name, f.Namespace.Name)
-
-	ginkgo.By("deleting the updated configmap should be successful")
-	err = client.CoreV1().ConfigMaps(f.Namespace.Name).Delete(configmap.Name, &metav1.DeleteOptions{})
-	framework.ExpectNoError(err, "failed to delete configmap %s in namespace: %s", configmap.Name, f.Namespace.Name)
-}
-
 func testAttachingPodWebhook(f *framework.Framework) {
 	ginkgo.By("create a pod")
 	client := f.ClientSet
@@ -1229,7 +1198,7 @@ func testAttachingPodWebhook(f *framework.Framework) {
 	ginkgo.By("'kubectl attach' the pod, should be denied by the webhook")
 	timer := time.NewTimer(30 * time.Second)
 	defer timer.Stop()
-	_, err = framework.NewKubectlCommand("attach", fmt.Sprintf("--namespace=%v", f.Namespace.Name), pod.Name, "-i", "-c=container1").WithTimeout(timer.C).Exec()
+	_, err = framework.NewKubectlCommand(f.Namespace.Name, "attach", fmt.Sprintf("--namespace=%v", f.Namespace.Name), pod.Name, "-i", "-c=container1").WithTimeout(timer.C).Exec()
 	framework.ExpectError(err, "'kubectl attach' the pod, should be denied by the webhook")
 	if e, a := "attaching to pod 'to-be-attached-pod' is not allowed", err.Error(); !strings.Contains(a, e) {
 		framework.Failf("unexpected 'kubectl attach' error message. expected to contain %q, got %q", e, a)
@@ -1327,7 +1296,7 @@ func testFailClosedWebhook(f *framework.Framework) {
 	}
 	_, err = client.CoreV1().ConfigMaps(failNamespaceName).Create(configmap)
 	framework.ExpectError(err, "create configmap in namespace: %s should be unconditionally rejected by the webhook", failNamespaceName)
-	if !errors.IsInternalError(err) {
+	if !apierrors.IsInternalError(err) {
 		framework.Failf("expect an internal error, got %#v", err)
 	}
 }
@@ -1659,17 +1628,6 @@ func namedNonCompliantConfigMap(name string, f *framework.Framework) *v1.ConfigM
 	}
 }
 
-func nonDeletableConfigmap(f *framework.Framework) *v1.ConfigMap {
-	return &v1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: nonDeletableConfigmapName,
-		},
-		Data: map[string]string{
-			"webhook-e2e-test": "webhook-nondeletable",
-		},
-	}
-}
-
 func toBeMutatedConfigMap(f *framework.Framework) *v1.ConfigMap {
 	return namedToBeMutatedConfigMap("to-be-mutated", f)
 }
@@ -1703,7 +1661,7 @@ func updateConfigMap(c clientset.Interface, ns, name string, update updateConfig
 			return true, nil
 		}
 		// Only retry update on conflict
-		if !errors.IsConflict(err) {
+		if !apierrors.IsConflict(err) {
 			return false, err
 		}
 		return false, nil
@@ -1725,7 +1683,7 @@ func updateCustomResource(c dynamic.ResourceInterface, ns, name string, update u
 			return true, nil
 		}
 		// Only retry update on conflict
-		if !errors.IsConflict(err) {
+		if !apierrors.IsConflict(err) {
 			return false, err
 		}
 		return false, nil

@@ -102,9 +102,6 @@ type EventRecorder interface {
 	// Eventf is just like Event, but with Sprintf for the message field.
 	Eventf(object runtime.Object, eventtype, reason, messageFmt string, args ...interface{})
 
-	// PastEventf is just like Eventf, but with an option to specify the event's 'timestamp' field.
-	PastEventf(object runtime.Object, timestamp metav1.Time, eventtype, reason, messageFmt string, args ...interface{})
-
 	// AnnotatedEventf is just like eventf, but with annotations attached
 	AnnotatedEventf(object runtime.Object, annotations map[string]string, eventtype, reason, messageFmt string, args ...interface{})
 }
@@ -130,6 +127,25 @@ type EventBroadcaster interface {
 
 	// Shutdown shuts down the broadcaster
 	Shutdown()
+}
+
+// EventRecorderAdapter is a wrapper around a "k8s.io/client-go/tools/record".EventRecorder
+// implementing the new "k8s.io/client-go/tools/events".EventRecorder interface.
+type EventRecorderAdapter struct {
+	recorder EventRecorder
+}
+
+// NewEventRecorderAdapter returns an adapter implementing the new
+// "k8s.io/client-go/tools/events".EventRecorder interface.
+func NewEventRecorderAdapter(recorder EventRecorder) *EventRecorderAdapter {
+	return &EventRecorderAdapter{
+		recorder: recorder,
+	}
+}
+
+// Eventf is a wrapper around v1 Eventf
+func (a *EventRecorderAdapter) Eventf(regarding, _ runtime.Object, eventtype, reason, action, note string, args ...interface{}) {
+	a.recorder.Eventf(regarding, eventtype, reason, note, args...)
 }
 
 // Creates a new event broadcaster.
@@ -322,10 +338,6 @@ func (recorder *recorderImpl) Event(object runtime.Object, eventtype, reason, me
 
 func (recorder *recorderImpl) Eventf(object runtime.Object, eventtype, reason, messageFmt string, args ...interface{}) {
 	recorder.Event(object, eventtype, reason, fmt.Sprintf(messageFmt, args...))
-}
-
-func (recorder *recorderImpl) PastEventf(object runtime.Object, timestamp metav1.Time, eventtype, reason, messageFmt string, args ...interface{}) {
-	recorder.generateEvent(object, nil, timestamp, eventtype, reason, fmt.Sprintf(messageFmt, args...))
 }
 
 func (recorder *recorderImpl) AnnotatedEventf(object runtime.Object, annotations map[string]string, eventtype, reason, messageFmt string, args ...interface{}) {

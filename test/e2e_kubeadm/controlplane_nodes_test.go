@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e_kubeadm
+package kubeadm
 
 import (
 	corev1 "k8s.io/api/core/v1"
@@ -33,7 +33,7 @@ const (
 
 // Define container for all the test specification aimed at verifying
 // that kubeadm configures the control-plane node as expected
-var _ = KubeadmDescribe("control-plane node", func() {
+var _ = Describe("control-plane node", func() {
 
 	// Get an instance of the k8s test framework
 	f := framework.NewDefaultFramework("control-plane node")

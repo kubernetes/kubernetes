@@ -22,13 +22,12 @@ import (
 	"testing"
 
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -247,8 +246,6 @@ func makeContainersWithImages(images []string) []v1.Container {
 // TestEvenPodsSpreadPriority verifies that EvenPodsSpread priority functions well.
 func TestEvenPodsSpreadPriority(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EvenPodsSpread, true)()
-	// Apply feature gates to enable EvenPodsSpread
-	defer algorithmprovider.ApplyFeatureGates()()
 
 	context := initTest(t, "eps-priority")
 	cs := context.clientSet
@@ -346,7 +343,7 @@ func TestEvenPodsSpreadPriority(t *testing.T) {
 				}
 			}
 			testPod, err := cs.CoreV1().Pods(tt.incomingPod.Namespace).Create(tt.incomingPod)
-			if err != nil && !errors.IsInvalid(err) {
+			if err != nil && !apierrors.IsInvalid(err) {
 				t.Fatalf("Test Failed: error while creating pod during test: %v", err)
 			}
 

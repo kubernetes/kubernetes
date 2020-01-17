@@ -19,6 +19,7 @@ package bitmask
 import (
 	"fmt"
 	"math/bits"
+	"strconv"
 )
 
 // BitMask interface allows hint providers to create BitMasks for TopologyHints
@@ -140,7 +141,13 @@ func (s *bitMask) IsNarrowerThan(mask BitMask) bool {
 
 // String converts mask to string
 func (s *bitMask) String() string {
-	return fmt.Sprintf("%064b", *s)
+	grouping := 2
+	for shift := 64 - grouping; shift > 0; shift -= grouping {
+		if *s > (1 << uint(shift)) {
+			return fmt.Sprintf("%0"+strconv.Itoa(shift+grouping)+"b", *s)
+		}
+	}
+	return fmt.Sprintf("%0"+strconv.Itoa(grouping)+"b", *s)
 }
 
 // Count counts number of bits in mask set to one

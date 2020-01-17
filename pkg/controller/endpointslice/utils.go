@@ -17,30 +17,30 @@ limitations under the License.
 package endpointslice
 
 import (
-	"crypto/md5"
-	"encoding/hex"
 	"fmt"
 	"reflect"
-	"sort"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	discovery "k8s.io/api/discovery/v1alpha1"
+	discovery "k8s.io/api/discovery/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/discovery/validation"
-	"k8s.io/kubernetes/pkg/util/hash"
+	endpointutil "k8s.io/kubernetes/pkg/controller/util/endpoint"
+	utilnet "k8s.io/utils/net"
 )
 
 // podEndpointChanged returns true if the results of podToEndpoint are different
 // for the pods passed to this function.
 func podEndpointChanged(pod1, pod2 *corev1.Pod) bool {
-	endpoint1 := podToEndpoint(pod1, &corev1.Node{})
-	endpoint2 := podToEndpoint(pod2, &corev1.Node{})
+	endpoint1 := podToEndpoint(pod1, &corev1.Node{}, &corev1.Service{Spec: corev1.ServiceSpec{}})
+	endpoint2 := podToEndpoint(pod2, &corev1.Node{}, &corev1.Service{Spec: corev1.ServiceSpec{}})
 
 	endpoint1.TargetRef.ResourceVersion = ""
 	endpoint2.TargetRef.ResourceVersion = ""
@@ -49,7 +49,7 @@ func podEndpointChanged(pod1, pod2 *corev1.Pod) bool {
 }
 
 // podToEndpoint returns an Endpoint object generated from a Pod and Node.
-func podToEndpoint(pod *corev1.Pod, node *corev1.Node) discovery.Endpoint {
+func podToEndpoint(pod *corev1.Pod, node *corev1.Node, service *corev1.Service) discovery.Endpoint {
 	// Build out topology information. This is currently limited to hostname,
 	// zone, and region, but this will be expanded in the future.
 	topology := map[string]string{}
@@ -71,9 +71,9 @@ func podToEndpoint(pod *corev1.Pod, node *corev1.Node) discovery.Endpoint {
 		}
 	}
 
-	ready := podutil.IsPodReady(pod)
-	return discovery.Endpoint{
-		Addresses: getEndpointAddresses(pod.Status),
+	ready := service.Spec.PublishNotReadyAddresses || podutil.IsPodReady(pod)
+	ep := discovery.Endpoint{
+		Addresses: getEndpointAddresses(pod.Status, service),
 		Conditions: discovery.EndpointConditions{
 			Ready: &ready,
 		},
@@ -86,6 +86,12 @@ func podToEndpoint(pod *corev1.Pod, node *corev1.Node) discovery.Endpoint {
 			ResourceVersion: pod.ObjectMeta.ResourceVersion,
 		},
 	}
+
+	if endpointutil.ShouldSetHostname(pod, service) {
+		ep.Hostname = &pod.Spec.Hostname
+	}
+
+	return ep
 }
 
 // getEndpointPorts returns a list of EndpointPorts generated from a Service
@@ -121,16 +127,23 @@ func getEndpointPorts(service *corev1.Service, pod *corev1.Pod) []discovery.Endp
 }
 
 // getEndpointAddresses returns a list of addresses generated from a pod status.
-func getEndpointAddresses(podStatus corev1.PodStatus) []string {
-	if len(podStatus.PodIPs) > 1 {
-		addresss := []string{}
-		for _, podIP := range podStatus.PodIPs {
-			addresss = append(addresss, podIP.IP)
+func getEndpointAddresses(podStatus corev1.PodStatus, service *corev1.Service) []string {
+	addresses := []string{}
+
+	for _, podIP := range podStatus.PodIPs {
+		isIPv6PodIP := utilnet.IsIPv6String(podIP.IP)
+		if isIPv6PodIP == isIPv6Service(service) {
+			addresses = append(addresses, podIP.IP)
 		}
-		return addresss
 	}
 
-	return []string{podStatus.PodIP}
+	return addresses
+}
+
+// isIPv6Service returns true if the Service uses IPv6 addresses.
+func isIPv6Service(service *corev1.Service) bool {
+	// IPFamily is not guaranteed to be set, even in an IPv6 only cluster.
+	return (service.Spec.IPFamily != nil && *service.Spec.IPFamily == corev1.IPv6Protocol) || utilnet.IsIPv6String(service.Spec.ClusterIP)
 }
 
 // endpointsEqualBeyondHash returns true if endpoints have equal attributes
@@ -159,7 +172,10 @@ func newEndpointSlice(service *corev1.Service, endpointMeta *endpointMeta) *disc
 	ownerRef := metav1.NewControllerRef(service, gvk)
 	return &discovery.EndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{
-			Labels:          map[string]string{discovery.LabelServiceName: service.Name},
+			Labels: map[string]string{
+				discovery.LabelServiceName: service.Name,
+				discovery.LabelManagedBy:   controllerName,
+			},
 			GenerateName:    getEndpointSlicePrefix(service.Name),
 			OwnerReferences: []metav1.OwnerReference{*ownerRef},
 			Namespace:       service.Namespace,
@@ -222,6 +238,27 @@ func getSliceToFill(endpointSlices []*discovery.EndpointSlice, numEndpoints, max
 	return closestSlice
 }
 
+// getEndpointSliceFromDeleteAction parses an EndpointSlice from a delete action.
+func getEndpointSliceFromDeleteAction(obj interface{}) *discovery.EndpointSlice {
+	if endpointSlice, ok := obj.(*discovery.EndpointSlice); ok {
+		// Enqueue all the services that the pod used to be a member of.
+		// This is the same thing we do when we add a pod.
+		return endpointSlice
+	}
+	// If we reached here it means the pod was deleted but its final state is unrecorded.
+	tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
+	if !ok {
+		utilruntime.HandleError(fmt.Errorf("Couldn't get object from tombstone %#v", obj))
+		return nil
+	}
+	endpointSlice, ok := tombstone.Obj.(*discovery.EndpointSlice)
+	if !ok {
+		utilruntime.HandleError(fmt.Errorf("Tombstone contained object that is not a EndpointSlice: %#v", obj))
+		return nil
+	}
+	return endpointSlice
+}
+
 // addTriggerTimeAnnotation adds a triggerTime annotation to an EndpointSlice
 func addTriggerTimeAnnotation(endpointSlice *discovery.EndpointSlice, triggerTime time.Time) {
 	if endpointSlice.Annotations == nil {
@@ -235,19 +272,17 @@ func addTriggerTimeAnnotation(endpointSlice *discovery.EndpointSlice, triggerTim
 	}
 }
 
-// deepHashObject creates a unique hash string from a go object.
-func deepHashObjectToString(objectToWrite interface{}) string {
-	hasher := md5.New()
-	hash.DeepHashObject(hasher, objectToWrite)
-	return hex.EncodeToString(hasher.Sum(nil)[0:])
-}
-
-// portMapKey is used to uniquely identify groups of endpoint ports.
-type portMapKey string
-
-func newPortMapKey(endpointPorts []discovery.EndpointPort) portMapKey {
-	sort.Sort(portsInOrder(endpointPorts))
-	return portMapKey(deepHashObjectToString(endpointPorts))
+// serviceControllerKey returns a controller key for a Service but derived from
+// an EndpointSlice.
+func serviceControllerKey(endpointSlice *discovery.EndpointSlice) (string, error) {
+	if endpointSlice == nil {
+		return "", fmt.Errorf("nil EndpointSlice passed to serviceControllerKey()")
+	}
+	serviceName, ok := endpointSlice.Labels[discovery.LabelServiceName]
+	if !ok || serviceName == "" {
+		return "", fmt.Errorf("EndpointSlice missing %s label", discovery.LabelServiceName)
+	}
+	return fmt.Sprintf("%s/%s", endpointSlice.Namespace, serviceName), nil
 }
 
 // endpointSliceEndpointLen helps sort endpoint slices by the number of
@@ -258,15 +293,4 @@ func (sl endpointSliceEndpointLen) Len() int      { return len(sl) }
 func (sl endpointSliceEndpointLen) Swap(i, j int) { sl[i], sl[j] = sl[j], sl[i] }
 func (sl endpointSliceEndpointLen) Less(i, j int) bool {
 	return len(sl[i].Endpoints) > len(sl[j].Endpoints)
-}
-
-// portsInOrder helps sort endpoint ports in a consistent way for hashing.
-type portsInOrder []discovery.EndpointPort
-
-func (sl portsInOrder) Len() int      { return len(sl) }
-func (sl portsInOrder) Swap(i, j int) { sl[i], sl[j] = sl[j], sl[i] }
-func (sl portsInOrder) Less(i, j int) bool {
-	h1 := deepHashObjectToString(sl[i])
-	h2 := deepHashObjectToString(sl[j])
-	return h1 < h2
 }

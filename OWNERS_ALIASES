@@ -17,10 +17,8 @@ aliases:
   sig-auth-authenticators-reviewers:
     - deads2k
     - enj
-    - jianhuiz
     - lavalamp
     - liggitt
-    - mbohlool
     - mikedanese
     - sttts
     - wojtek-t
@@ -30,16 +28,13 @@ aliases:
     - liggitt
     - mikedanese
   sig-auth-authorizers-reviewers:
-    - david-mcmahon
     - deads2k
     - dims
     - enj
     - erictune
     - jianhuiz
-    - krousey
     - lavalamp
     - liggitt
-    - mbohlool
     - mikedanese
     - mml
     - ncdc
@@ -56,16 +51,13 @@ aliases:
   sig-auth-certificates-reviewers:
     - awly
     - caesarxuchao
-    - david-mcmahon
     - deads2k
     - dims
     - enj
     - errordeveloper
-    - hongchaodeng
     - jianhuiz
     - lavalamp
     - liggitt
-    - mbohlool
     - mikedanese
     - smarterclayton
     - sttts
@@ -81,7 +73,6 @@ aliases:
     - immutableT
     - lavalamp
     - liggitt
-    - sakshamsharma
     - smarterclayton
     - wojtek-t
 
@@ -102,11 +93,9 @@ aliases:
     - tallclair
   sig-auth-policy-reviewers:
     - deads2k
-    - hongchaodeng
     - jianhuiz
     - liggitt
     - mbohlool
-    - pweil-
     - tallclair
     - krmayankk
 
@@ -144,6 +133,7 @@ aliases:
     - childsb
 
   sig-scheduling-maintainers:
+    - alculquicondor
     - bsalamat
     - k82cn
     - wojtek-t
@@ -161,6 +151,7 @@ aliases:
     - draveness
     - hex108
     - alculquicondor
+    - liu-cong
 
   sig-cli-maintainers:
     - adohe
@@ -181,9 +172,7 @@ aliases:
     - derekwaynecarr
     - dixudx
     - dims
-    - dshulyak
     - eparis
-    - ghodss
     - juanvallejo
     - mengqiy
     - rootfs
@@ -223,9 +212,7 @@ aliases:
     - pmorie
     - resouer
     - sjenning
-    - sjpotter
     - tallclair
-    - tmrts
     - vishh
     - yifan-gu
     - yujuhong
@@ -236,7 +223,6 @@ aliases:
     - caseydavenport
     - danwinship
     - dcbw
-    - dnardo
     - freehan
     - johnbelamaric
     - mrhohn
@@ -247,7 +233,6 @@ aliases:
     - caseydavenport
     - danwinship
     - dcbw
-    - dnardo
     - freehan
     - johnbelamaric
     - mrhohn
@@ -294,6 +279,8 @@ aliases:
     - coffeepac
     - monotek
     - logicalhan
+    - RainbowMango
+    - serathius
 
   api-approvers:
     - erictune
@@ -394,7 +381,6 @@ aliases:
     - soltysh
     - piosz
     - jsafrane
-    - jbeda
 
   # api-reviewers targeted by sig area
   # see https://git.k8s.io/community/sig-architecture/api-review-process.md#training-reviews
@@ -430,6 +416,14 @@ aliases:
     - derekwaynecarr
     - tallclair
     - yujuhong
+
+  sig-scalability-approvers:
+    - mm4tt
+    - wojtek-t
+
+  sig-scalability-reviewers:
+    - mm4tt
+    - wojtek-t
   
   sig-scheduling-api-reviewers:
       - bsalamat
@@ -455,6 +449,7 @@ aliases:
     - sttts
     - soltysh
   feature-approvers:
+    - andrewsykim     # Cloud Provider
     - bgrant0607      # Architecture
     - brancz          # Instrumentation
     - bsalamat        # Scheduling
@@ -472,7 +467,6 @@ aliases:
     - kow3ns          # Apps
     - lavalamp        # API Machinery
     - liggitt         # Auth
-    - lukemarsden     # Cluster Lifecycle
     - luxas           # Cluster Lifecycle
     - marcoceppi      # On Premise
     - mattfarina      # Apps
@@ -491,3 +485,9 @@ aliases:
     - timothysc       # Cluster Lifecycle, Scheduling
     - wojtek-t        # Scalability
     - zehicle         # Cluster Ops
+
+  # conformance aliases https://git.k8s.io/enhancements/keps/sig-architecture/20190412-conformance-behaviors.md
+  conformance-behavior-approvers:
+    - bgrant0607
+    - smarterclayton
+    - johnbelamaric

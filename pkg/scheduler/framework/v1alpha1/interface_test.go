@@ -74,3 +74,49 @@ func TestStatus(t *testing.T) {
 		}
 	}
 }
+
+// The String() method relies on the value and order of the status codes to function properly.
+func TestStatusCodes(t *testing.T) {
+	assertStatusCode(t, Success, 0)
+	assertStatusCode(t, Error, 1)
+	assertStatusCode(t, Unschedulable, 2)
+	assertStatusCode(t, UnschedulableAndUnresolvable, 3)
+	assertStatusCode(t, Wait, 4)
+	assertStatusCode(t, Skip, 5)
+}
+
+func assertStatusCode(t *testing.T, code Code, value int) {
+	if int(code) != value {
+		t.Errorf("Status code %q should have a value of %v but got %v", code.String(), value, int(code))
+	}
+}
+
+func TestPluginToStatusMerge(t *testing.T) {
+	tests := []struct {
+		statusMap PluginToStatus
+		wantCode  Code
+	}{
+		{
+			statusMap: PluginToStatus{"p1": NewStatus(Error), "p2": NewStatus(Unschedulable)},
+			wantCode:  Error,
+		},
+		{
+			statusMap: PluginToStatus{"p1": NewStatus(Success), "p2": NewStatus(Unschedulable)},
+			wantCode:  Unschedulable,
+		},
+		{
+			statusMap: PluginToStatus{"p1": NewStatus(Success), "p2": NewStatus(UnschedulableAndUnresolvable), "p3": NewStatus(Unschedulable)},
+			wantCode:  UnschedulableAndUnresolvable,
+		},
+		{
+			wantCode: Success,
+		},
+	}
+
+	for i, test := range tests {
+		gotStatus := test.statusMap.Merge()
+		if test.wantCode != gotStatus.Code() {
+			t.Errorf("test #%v, wantCode %v, gotCode %v", i, test.wantCode, gotStatus.Code())
+		}
+	}
+}

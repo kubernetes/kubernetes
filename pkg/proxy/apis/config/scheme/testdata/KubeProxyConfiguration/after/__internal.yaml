@@ -1,0 +1,43 @@
+BindAddress: ""
+ClientConnection:
+  AcceptContentTypes: ""
+  Burst: 0
+  ContentType: ""
+  Kubeconfig: ""
+  QPS: 0
+ClusterCIDR: ""
+ConfigSyncPeriod: 0s
+Conntrack:
+  MaxPerCore: null
+  Min: null
+  TCPCloseWaitTimeout: null
+  TCPEstablishedTimeout: null
+EnableProfiling: false
+FeatureGates: null
+HealthzBindAddress: ""
+HostnameOverride: ""
+IPTables:
+  MasqueradeAll: false
+  MasqueradeBit: null
+  MinSyncPeriod: 0s
+  SyncPeriod: 0s
+IPVS:
+  ExcludeCIDRs: null
+  MinSyncPeriod: 0s
+  Scheduler: ""
+  StrictARP: false
+  SyncPeriod: 0s
+  TCPFinTimeout: 0s
+  TCPTimeout: 0s
+  UDPTimeout: 0s
+MetricsBindAddress: ""
+Mode: ""
+NodePortAddresses: null
+OOMScoreAdj: null
+PortRange: ""
+ShowHiddenMetricsForVersion: ""
+UDPIdleTimeout: 0s
+Winkernel:
+  EnableDSR: false
+  NetworkName: ""
+  SourceVip: ""

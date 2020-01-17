@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e_kubeadm
+package kubeadm
 
 import (
 	"fmt"
@@ -50,7 +50,7 @@ var (
 
 // Important! please note that kubeadm-certs is not created by default (still alpha)
 // in case you want to skip this test use SKIP=copy-certs
-var _ = KubeadmDescribe("kubeadm-certs [copy-certs]", func() {
+var _ = Describe("kubeadm-certs [copy-certs]", func() {
 
 	// Get an instance of the k8s test framework
 	f := framework.NewDefaultFramework("kubeadm-certs")

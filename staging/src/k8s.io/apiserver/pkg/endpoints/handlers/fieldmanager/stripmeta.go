@@ -64,8 +64,8 @@ func (f *stripMetaManager) Update(liveObj, newObj runtime.Object, managed Manage
 }
 
 // Apply implements Manager.
-func (f *stripMetaManager) Apply(liveObj runtime.Object, patch []byte, managed Managed, manager string, force bool) (runtime.Object, Managed, error) {
-	newObj, managed, err := f.fieldManager.Apply(liveObj, patch, managed, manager, force)
+func (f *stripMetaManager) Apply(liveObj, appliedObj runtime.Object, managed Managed, manager string, force bool) (runtime.Object, Managed, error) {
+	newObj, managed, err := f.fieldManager.Apply(liveObj, appliedObj, managed, manager, force)
 	if err != nil {
 		return nil, nil, err
 	}

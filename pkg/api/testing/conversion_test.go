@@ -21,13 +21,13 @@ import (
 	"math/rand"
 	"testing"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
@@ -63,7 +63,7 @@ func BenchmarkNodeConversion(b *testing.B) {
 		b.Fatalf("Unexpected error while reading file: %v", err)
 	}
 	var node api.Node
-	if err := runtime.DecodeInto(testapi.Default.Codec(), data, &node); err != nil {
+	if err := runtime.DecodeInto(legacyscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), data, &node); err != nil {
 		b.Fatalf("Unexpected error decoding node: %v", err)
 	}
 
@@ -93,7 +93,7 @@ func BenchmarkReplicationControllerConversion(b *testing.B) {
 		b.Fatalf("Unexpected error while reading file: %v", err)
 	}
 	var replicationController api.ReplicationController
-	if err := runtime.DecodeInto(testapi.Default.Codec(), data, &replicationController); err != nil {
+	if err := runtime.DecodeInto(legacyscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), data, &replicationController); err != nil {
 		b.Fatalf("Unexpected error decoding node: %v", err)
 	}
 

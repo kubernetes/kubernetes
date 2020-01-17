@@ -3,9 +3,10 @@
 approvers:
 - thockin
 - dchen1107
-- matchstick
 - freehan
 - dcbw
+emeritus_approvers:
+- matchstick
 reviewers:
 - sig-network-reviewers
 labels:

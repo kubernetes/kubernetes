@@ -23,7 +23,7 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
@@ -46,13 +46,16 @@ func newTokenSecret(tokenID, tokenSecret string) *v1.Secret {
 	}
 }
 
-func GenerateTokenId() (string, error) {
+// GenerateTokenID generates tokenID.
+func GenerateTokenID() (string, error) {
 	tokenID, err := randBytes(TokenIDBytes)
 	if err != nil {
 		return "", err
 	}
 	return tokenID, nil
 }
+
+// GenerateTokenSecret generates tokenSecret.
 func GenerateTokenSecret() (string, error) {
 	tokenSecret, err := randBytes(TokenSecretBytes)
 	if err != nil {
@@ -74,10 +77,13 @@ func addSecretExpiration(s *v1.Secret, expiration string) {
 	s.Data[bootstrapapi.BootstrapTokenExpirationKey] = []byte(expiration)
 }
 
+// TimeStringFromNow returns the time as a string from now.
+// e.g: 2019-12-03T14:30:40+08:00.
 func TimeStringFromNow(delta time.Duration) string {
 	return time.Now().Add(delta).Format(time.RFC3339)
 }
 
+// WaitforSignedClusterInfoByBootStrapToken waits for signed cluster info by bootstrap token.
 func WaitforSignedClusterInfoByBootStrapToken(c clientset.Interface, tokenID string) error {
 
 	return wait.Poll(framework.Poll, 2*time.Minute, func() (bool, error) {
@@ -94,6 +100,7 @@ func WaitforSignedClusterInfoByBootStrapToken(c clientset.Interface, tokenID str
 	})
 }
 
+// WaitForSignedClusterInfoGetUpdatedByBootstrapToken waits for signed cluster info to be updated by bootstrap token.
 func WaitForSignedClusterInfoGetUpdatedByBootstrapToken(c clientset.Interface, tokenID string, signedToken string) error {
 
 	return wait.Poll(framework.Poll, 2*time.Minute, func() (bool, error) {
@@ -110,6 +117,7 @@ func WaitForSignedClusterInfoGetUpdatedByBootstrapToken(c clientset.Interface, t
 	})
 }
 
+// WaitForSignedClusterInfoByBootstrapTokenToDisappear waits for signed cluster info to be disappeared by bootstrap token.
 func WaitForSignedClusterInfoByBootstrapTokenToDisappear(c clientset.Interface, tokenID string) error {
 
 	return wait.Poll(framework.Poll, 2*time.Minute, func() (bool, error) {
@@ -126,21 +134,23 @@ func WaitForSignedClusterInfoByBootstrapTokenToDisappear(c clientset.Interface, 
 	})
 }
 
+// WaitForBootstrapTokenSecretToDisappear waits for bootstrap token secret to be disappeared.
 func WaitForBootstrapTokenSecretToDisappear(c clientset.Interface, tokenID string) error {
 
 	return wait.Poll(framework.Poll, 1*time.Minute, func() (bool, error) {
 		_, err := c.CoreV1().Secrets(metav1.NamespaceSystem).Get(bootstrapapi.BootstrapTokenSecretPrefix+tokenID, metav1.GetOptions{})
-		if apierrs.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			return true, nil
 		}
 		return false, nil
 	})
 }
 
+// WaitForBootstrapTokenSecretNotDisappear waits for bootstrap token secret not to be disappeared and takes time for the specified timeout as success path.
 func WaitForBootstrapTokenSecretNotDisappear(c clientset.Interface, tokenID string, t time.Duration) error {
 	err := wait.Poll(framework.Poll, t, func() (bool, error) {
 		secret, err := c.CoreV1().Secrets(metav1.NamespaceSystem).Get(bootstrapapi.BootstrapTokenSecretPrefix+tokenID, metav1.GetOptions{})
-		if apierrs.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			return true, errors.New("secret not exists")
 		}
 		if secret != nil {

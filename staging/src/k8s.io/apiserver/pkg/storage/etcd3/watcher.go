@@ -25,13 +25,13 @@ import (
 	"strings"
 	"sync"
 
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/value"
 
-	"github.com/coreos/etcd/clientv3"
+	"go.etcd.io/etcd/clientv3"
 	"k8s.io/klog"
 )
 
@@ -191,6 +191,15 @@ func (wc *watchChan) sync() error {
 	return nil
 }
 
+// logWatchChannelErr checks whether the error is about mvcc revision compaction which is regarded as warning
+func logWatchChannelErr(err error) {
+	if !strings.Contains(err.Error(), "mvcc: required revision has been compacted") {
+		klog.Errorf("watch chan error: %v", err)
+	} else {
+		klog.Warningf("watch chan error: %v", err)
+	}
+}
+
 // startWatching does:
 // - get current objects if initialRev=0; set initialRev to current rev
 // - watch on given key and send events to process.
@@ -211,14 +220,14 @@ func (wc *watchChan) startWatching(watchClosedCh chan struct{}) {
 		if wres.Err() != nil {
 			err := wres.Err()
 			// If there is an error on server (e.g. compaction), the channel will return it before closed.
-			klog.Errorf("watch chan error: %v", err)
+			logWatchChannelErr(err)
 			wc.sendError(err)
 			return
 		}
 		for _, e := range wres.Events {
 			parsedEvent, err := parseEvent(e)
 			if err != nil {
-				klog.Errorf("watch chan error: %v", err)
+				logWatchChannelErr(err)
 				wc.sendError(err)
 				return
 			}
@@ -332,10 +341,10 @@ func (wc *watchChan) transform(e *event) (res *watch.Event) {
 
 func transformErrorToEvent(err error) *watch.Event {
 	err = interpretWatchError(err)
-	if _, ok := err.(apierrs.APIStatus); !ok {
-		err = apierrs.NewInternalError(err)
+	if _, ok := err.(apierrors.APIStatus); !ok {
+		err = apierrors.NewInternalError(err)
 	}
-	status := err.(apierrs.APIStatus).Status()
+	status := err.(apierrors.APIStatus).Status()
 	return &watch.Event{
 		Type:   watch.Error,
 		Object: &status,

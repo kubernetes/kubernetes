@@ -23,7 +23,6 @@ import (
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/kubectl/pkg/scheme"
 	deploymentutil "k8s.io/kubectl/pkg/util/deployment"
 )
 
@@ -59,7 +58,7 @@ type StatefulSetStatusViewer struct{}
 // Status returns a message describing deployment status, and a bool value indicating if the status is considered done.
 func (s *DeploymentStatusViewer) Status(obj runtime.Unstructured, revision int64) (string, bool, error) {
 	deployment := &appsv1.Deployment{}
-	err := scheme.Scheme.Convert(obj, deployment, nil)
+	err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.UnstructuredContent(), deployment)
 	if err != nil {
 		return "", false, fmt.Errorf("failed to convert %T to %T: %v", obj, deployment, err)
 	}
@@ -97,7 +96,7 @@ func (s *DaemonSetStatusViewer) Status(obj runtime.Unstructured, revision int64)
 	//ignoring revision as DaemonSets does not have history yet
 
 	daemon := &appsv1.DaemonSet{}
-	err := scheme.Scheme.Convert(obj, daemon, nil)
+	err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.UnstructuredContent(), daemon)
 	if err != nil {
 		return "", false, fmt.Errorf("failed to convert %T to %T: %v", obj, daemon, err)
 	}
@@ -120,7 +119,7 @@ func (s *DaemonSetStatusViewer) Status(obj runtime.Unstructured, revision int64)
 // Status returns a message describing statefulset status, and a bool value indicating if the status is considered done.
 func (s *StatefulSetStatusViewer) Status(obj runtime.Unstructured, revision int64) (string, bool, error) {
 	sts := &appsv1.StatefulSet{}
-	err := scheme.Scheme.Convert(obj, sts, nil)
+	err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.UnstructuredContent(), sts)
 	if err != nil {
 		return "", false, fmt.Errorf("failed to convert %T to %T: %v", obj, sts, err)
 	}

@@ -94,6 +94,7 @@ func New(imageFsInfoProvider ImageFsInfoProvider, rootPath string, cgroupRoots [
 		cadvisormetrics.NetworkUsageMetrics:     struct{}{},
 		cadvisormetrics.AcceleratorUsageMetrics: struct{}{},
 		cadvisormetrics.AppMetrics:              struct{}{},
+		cadvisormetrics.ProcessMetrics:          struct{}{},
 	}
 	if usingLegacyStats {
 		includedMetrics[cadvisormetrics.DiskUsageMetrics] = struct{}{}

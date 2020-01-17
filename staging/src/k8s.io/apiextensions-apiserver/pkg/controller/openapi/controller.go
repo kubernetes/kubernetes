@@ -33,9 +33,10 @@ import (
 	"k8s.io/klog"
 	"k8s.io/kube-openapi/pkg/handler"
 
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
-	informers "k8s.io/apiextensions-apiserver/pkg/client/informers/internalversion/apiextensions/internalversion"
-	listers "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/internalversion"
+	apiextensionshelpers "k8s.io/apiextensions-apiserver/pkg/apihelpers"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	informers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions/v1"
+	listers "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/controller/openapi/builder"
 )
 
@@ -99,7 +100,7 @@ func (c *Controller) Run(staticSpec *spec.Swagger, openAPIService *handler.OpenA
 		return
 	}
 	for _, crd := range crds {
-		if !apiextensions.IsCRDConditionTrue(crd, apiextensions.Established) {
+		if !apiextensionshelpers.IsCRDConditionTrue(crd, apiextensionsv1.Established) {
 			continue
 		}
 		newSpecs, changed, err := buildVersionSpecs(crd, nil)
@@ -163,7 +164,7 @@ func (c *Controller) sync(name string) error {
 	}
 
 	// do we have to remove all specs of this CRD?
-	if errors.IsNotFound(err) || !apiextensions.IsCRDConditionTrue(crd, apiextensions.Established) {
+	if errors.IsNotFound(err) || !apiextensionshelpers.IsCRDConditionTrue(crd, apiextensionsv1.Established) {
 		if _, found := c.crdSpecs[name]; !found {
 			return nil
 		}
@@ -194,7 +195,7 @@ func (c *Controller) sync(name string) error {
 	return c.updateSpecLocked()
 }
 
-func buildVersionSpecs(crd *apiextensions.CustomResourceDefinition, oldSpecs map[string]*spec.Swagger) (map[string]*spec.Swagger, bool, error) {
+func buildVersionSpecs(crd *apiextensionsv1.CustomResourceDefinition, oldSpecs map[string]*spec.Swagger) (map[string]*spec.Swagger, bool, error) {
 	newSpecs := map[string]*spec.Swagger{}
 	anyChanged := false
 	for _, v := range crd.Spec.Versions {
@@ -234,26 +235,26 @@ func (c *Controller) updateSpecLocked() error {
 }
 
 func (c *Controller) addCustomResourceDefinition(obj interface{}) {
-	castObj := obj.(*apiextensions.CustomResourceDefinition)
+	castObj := obj.(*apiextensionsv1.CustomResourceDefinition)
 	klog.V(4).Infof("Adding customresourcedefinition %s", castObj.Name)
 	c.enqueue(castObj)
 }
 
 func (c *Controller) updateCustomResourceDefinition(oldObj, newObj interface{}) {
-	castNewObj := newObj.(*apiextensions.CustomResourceDefinition)
+	castNewObj := newObj.(*apiextensionsv1.CustomResourceDefinition)
 	klog.V(4).Infof("Updating customresourcedefinition %s", castNewObj.Name)
 	c.enqueue(castNewObj)
 }
 
 func (c *Controller) deleteCustomResourceDefinition(obj interface{}) {
-	castObj, ok := obj.(*apiextensions.CustomResourceDefinition)
+	castObj, ok := obj.(*apiextensionsv1.CustomResourceDefinition)
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
 			klog.Errorf("Couldn't get object from tombstone %#v", obj)
 			return
 		}
-		castObj, ok = tombstone.Obj.(*apiextensions.CustomResourceDefinition)
+		castObj, ok = tombstone.Obj.(*apiextensionsv1.CustomResourceDefinition)
 		if !ok {
 			klog.Errorf("Tombstone contained object that is not expected %#v", obj)
 			return
@@ -263,6 +264,6 @@ func (c *Controller) deleteCustomResourceDefinition(obj interface{}) {
 	c.enqueue(castObj)
 }
 
-func (c *Controller) enqueue(obj *apiextensions.CustomResourceDefinition) {
+func (c *Controller) enqueue(obj *apiextensionsv1.CustomResourceDefinition) {
 	c.queue.Add(obj.Name)
 }

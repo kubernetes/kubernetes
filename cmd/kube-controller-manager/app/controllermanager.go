@@ -360,7 +360,6 @@ func KnownControllers() []string {
 // ControllersDisabledByDefault is the set of controllers which is disabled by default
 var ControllersDisabledByDefault = sets.NewString(
 	"bootstrapsigner",
-	"endpointslice",
 	"tokencleaner",
 )
 
@@ -421,7 +420,7 @@ func NewControllerInitializers(loopMode ControllerLoopMode) map[string]InitFunc 
 func GetAvailableResources(clientBuilder controller.ControllerClientBuilder) (map[schema.GroupVersionResource]bool, error) {
 	client := clientBuilder.ClientOrDie("controller-discovery")
 	discoveryClient := client.Discovery()
-	resourceMap, err := discoveryClient.ServerResources()
+	_, resourceMap, err := discoveryClient.ServerGroupsAndResources()
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("unable to get all supported resources from server: %v", err))
 	}

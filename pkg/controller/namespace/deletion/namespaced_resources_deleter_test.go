@@ -82,7 +82,7 @@ func TestFinalizeNamespaceFunc(t *testing.T) {
 	if len(finalizers) != 1 {
 		t.Errorf("There should be a single finalizer remaining")
 	}
-	if "other" != string(finalizers[0]) {
+	if string(finalizers[0]) != "other" {
 		t.Errorf("Unexpected finalizer value, %v", finalizers[0])
 	}
 }

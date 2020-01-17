@@ -57,10 +57,13 @@ import (
 // detach controller.
 // The list of plugins is manually compiled. This code and the plugin
 // initialization code for kubelet really, really need a through refactor.
-func ProbeAttachableVolumePlugins() []volume.VolumePlugin {
+func ProbeAttachableVolumePlugins() ([]volume.VolumePlugin, error) {
+	var err error
 	allPlugins := []volume.VolumePlugin{}
-
-	allPlugins = appendAttachableLegacyProviderVolumes(allPlugins)
+	allPlugins, err = appendAttachableLegacyProviderVolumes(allPlugins, utilfeature.DefaultFeatureGate)
+	if err != nil {
+		return allPlugins, err
+	}
 	allPlugins = append(allPlugins, portworx.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, scaleio.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, storageos.ProbeVolumePlugins()...)
@@ -68,7 +71,7 @@ func ProbeAttachableVolumePlugins() []volume.VolumePlugin {
 	allPlugins = append(allPlugins, iscsi.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, rbd.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, csi.ProbeVolumePlugins()...)
-	return allPlugins
+	return allPlugins, nil
 }
 
 // GetDynamicPluginProber gets the probers of dynamically discoverable plugins
@@ -79,23 +82,26 @@ func GetDynamicPluginProber(config persistentvolumeconfig.VolumeConfiguration) v
 }
 
 // ProbeExpandableVolumePlugins returns volume plugins which are expandable
-func ProbeExpandableVolumePlugins(config persistentvolumeconfig.VolumeConfiguration) []volume.VolumePlugin {
+func ProbeExpandableVolumePlugins(config persistentvolumeconfig.VolumeConfiguration) ([]volume.VolumePlugin, error) {
+	var err error
 	allPlugins := []volume.VolumePlugin{}
-
-	allPlugins = appendExpandableLegacyProviderVolumes(allPlugins)
+	allPlugins, err = appendExpandableLegacyProviderVolumes(allPlugins, utilfeature.DefaultFeatureGate)
+	if err != nil {
+		return allPlugins, err
+	}
 	allPlugins = append(allPlugins, portworx.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, glusterfs.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, rbd.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, scaleio.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, storageos.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, fc.ProbeVolumePlugins()...)
-	return allPlugins
+	return allPlugins, nil
 }
 
 // ProbeControllerVolumePlugins collects all persistent volume plugins into an
 // easy to use list. Only volume plugins that implement any of
 // provisioner/recycler/deleter interface should be returned.
-func ProbeControllerVolumePlugins(cloud cloudprovider.Interface, config persistentvolumeconfig.VolumeConfiguration) []volume.VolumePlugin {
+func ProbeControllerVolumePlugins(cloud cloudprovider.Interface, config persistentvolumeconfig.VolumeConfiguration) ([]volume.VolumePlugin, error) {
 	allPlugins := []volume.VolumePlugin{}
 
 	// The list of plugins to probe is decided by this binary, not
@@ -131,7 +137,11 @@ func ProbeControllerVolumePlugins(cloud cloudprovider.Interface, config persiste
 	// add rbd provisioner
 	allPlugins = append(allPlugins, rbd.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, quobyte.ProbeVolumePlugins()...)
-	allPlugins = appendLegacyProviderVolumes(allPlugins)
+	var err error
+	allPlugins, err = appendExpandableLegacyProviderVolumes(allPlugins, utilfeature.DefaultFeatureGate)
+	if err != nil {
+		return allPlugins, err
+	}
 
 	allPlugins = append(allPlugins, flocker.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, portworx.ProbeVolumePlugins()...)
@@ -143,7 +153,7 @@ func ProbeControllerVolumePlugins(cloud cloudprovider.Interface, config persiste
 		allPlugins = append(allPlugins, csi.ProbeVolumePlugins()...)
 	}
 
-	return allPlugins
+	return allPlugins, nil
 }
 
 // AttemptToLoadRecycler tries decoding a pod from a filepath for use as a recycler for a volume.

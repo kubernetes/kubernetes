@@ -31,7 +31,6 @@ import (
 	"github.com/lithammer/dedent"
 	"github.com/spf13/cobra"
 	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
-	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
@@ -198,12 +197,12 @@ func TestConfigImagesListRunWithoutPath(t *testing.T) {
 
 func TestImagesPull(t *testing.T) {
 	fcmd := fakeexec.FakeCmd{
-		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
-			func() ([]byte, error) { return nil, nil },
-			func() ([]byte, error) { return nil, nil },
-			func() ([]byte, error) { return nil, nil },
-			func() ([]byte, error) { return nil, nil },
-			func() ([]byte, error) { return nil, nil },
+		CombinedOutputScript: []fakeexec.FakeAction{
+			func() ([]byte, []byte, error) { return nil, nil, nil },
+			func() ([]byte, []byte, error) { return nil, nil, nil },
+			func() ([]byte, []byte, error) { return nil, nil, nil },
+			func() ([]byte, []byte, error) { return nil, nil, nil },
+			func() ([]byte, []byte, error) { return nil, nil, nil },
 		},
 	}
 
@@ -299,7 +298,7 @@ func TestNewCmdConfigPrintActionDefaults(t *testing.T) {
 			expectedKinds: []string{
 				constants.ClusterConfigurationKind,
 				constants.InitConfigurationKind,
-				string(componentconfigs.KubeProxyConfigurationKind),
+				"KubeProxyConfiguration",
 			},
 			componentConfigs: "KubeProxyConfiguration",
 			cmdProc:          NewCmdConfigPrintInitDefaults,
@@ -309,8 +308,8 @@ func TestNewCmdConfigPrintActionDefaults(t *testing.T) {
 			expectedKinds: []string{
 				constants.ClusterConfigurationKind,
 				constants.InitConfigurationKind,
-				string(componentconfigs.KubeProxyConfigurationKind),
-				string(componentconfigs.KubeletConfigurationKind),
+				"KubeProxyConfiguration",
+				"KubeletConfiguration",
 			},
 			componentConfigs: "KubeProxyConfiguration,KubeletConfiguration",
 			cmdProc:          NewCmdConfigPrintInitDefaults,
@@ -326,7 +325,7 @@ func TestNewCmdConfigPrintActionDefaults(t *testing.T) {
 			name: "JoinConfiguration: KubeProxyConfiguration",
 			expectedKinds: []string{
 				constants.JoinConfigurationKind,
-				string(componentconfigs.KubeProxyConfigurationKind),
+				"KubeProxyConfiguration",
 			},
 			componentConfigs: "KubeProxyConfiguration",
 			cmdProc:          NewCmdConfigPrintJoinDefaults,
@@ -335,8 +334,8 @@ func TestNewCmdConfigPrintActionDefaults(t *testing.T) {
 			name: "JoinConfiguration: KubeProxyConfiguration and KubeletConfiguration",
 			expectedKinds: []string{
 				constants.JoinConfigurationKind,
-				string(componentconfigs.KubeProxyConfigurationKind),
-				string(componentconfigs.KubeletConfigurationKind),
+				"KubeProxyConfiguration",
+				"KubeletConfiguration",
 			},
 			componentConfigs: "KubeProxyConfiguration,KubeletConfiguration",
 			cmdProc:          NewCmdConfigPrintJoinDefaults,

@@ -105,25 +105,25 @@ dragonfly_amd64)
 freebsd_386)
 	mkerrors="$mkerrors -m32"
 	mksyscall="go run mksyscall.go -l32"
-	mksysnum="go run mksysnum.go 'https://svn.freebsd.org/base/stable/10/sys/kern/syscalls.master'"
+	mksysnum="go run mksysnum.go 'https://svn.freebsd.org/base/stable/11/sys/kern/syscalls.master'"
 	mktypes="GOARCH=$GOARCH go tool cgo -godefs"
 	;;
 freebsd_amd64)
 	mkerrors="$mkerrors -m64"
-	mksysnum="go run mksysnum.go 'https://svn.freebsd.org/base/stable/10/sys/kern/syscalls.master'"
+	mksysnum="go run mksysnum.go 'https://svn.freebsd.org/base/stable/11/sys/kern/syscalls.master'"
 	mktypes="GOARCH=$GOARCH go tool cgo -godefs"
 	;;
 freebsd_arm)
 	mkerrors="$mkerrors"
 	mksyscall="go run mksyscall.go -l32 -arm"
-	mksysnum="go run mksysnum.go 'https://svn.freebsd.org/base/stable/10/sys/kern/syscalls.master'"
+	mksysnum="go run mksysnum.go 'https://svn.freebsd.org/base/stable/11/sys/kern/syscalls.master'"
 	# Let the type of C char be signed for making the bare syscall
 	# API consistent across platforms.
 	mktypes="GOARCH=$GOARCH go tool cgo -godefs -- -fsigned-char"
 	;;
 freebsd_arm64)
 	mkerrors="$mkerrors -m64"
-	mksysnum="go run mksysnum.go 'https://svn.freebsd.org/base/stable/10/sys/kern/syscalls.master'"
+	mksysnum="go run mksysnum.go 'https://svn.freebsd.org/base/stable/11/sys/kern/syscalls.master'"
 	mktypes="GOARCH=$GOARCH go tool cgo -godefs"
 	;;
 netbsd_386)
@@ -146,31 +146,46 @@ netbsd_arm)
 	# API consistent across platforms.
 	mktypes="GOARCH=$GOARCH go tool cgo -godefs -- -fsigned-char"
 	;;
+netbsd_arm64)
+	mkerrors="$mkerrors -m64"
+	mksyscall="go run mksyscall.go -netbsd"
+	mksysnum="go run mksysnum.go 'http://cvsweb.netbsd.org/bsdweb.cgi/~checkout~/src/sys/kern/syscalls.master'"
+	mktypes="GOARCH=$GOARCH go tool cgo -godefs"
+	;;
 openbsd_386)
 	mkerrors="$mkerrors -m32"
 	mksyscall="go run mksyscall.go -l32 -openbsd"
-	mksysctl="./mksysctl_openbsd.pl"
+	mksysctl="go run mksysctl_openbsd.go"
 	mksysnum="go run mksysnum.go 'https://cvsweb.openbsd.org/cgi-bin/cvsweb/~checkout~/src/sys/kern/syscalls.master'"
 	mktypes="GOARCH=$GOARCH go tool cgo -godefs"
 	;;
 openbsd_amd64)
 	mkerrors="$mkerrors -m64"
 	mksyscall="go run mksyscall.go -openbsd"
-	mksysctl="./mksysctl_openbsd.pl"
+	mksysctl="go run mksysctl_openbsd.go"
 	mksysnum="go run mksysnum.go 'https://cvsweb.openbsd.org/cgi-bin/cvsweb/~checkout~/src/sys/kern/syscalls.master'"
 	mktypes="GOARCH=$GOARCH go tool cgo -godefs"
 	;;
 openbsd_arm)
 	mkerrors="$mkerrors"
 	mksyscall="go run mksyscall.go -l32 -openbsd -arm"
-	mksysctl="./mksysctl_openbsd.pl"
+	mksysctl="go run mksysctl_openbsd.go"
+	mksysnum="go run mksysnum.go 'https://cvsweb.openbsd.org/cgi-bin/cvsweb/~checkout~/src/sys/kern/syscalls.master'"
+	# Let the type of C char be signed for making the bare syscall
+	# API consistent across platforms.
+	mktypes="GOARCH=$GOARCH go tool cgo -godefs -- -fsigned-char"
+	;;
+openbsd_arm64)
+	mkerrors="$mkerrors -m64"
+	mksyscall="go run mksyscall.go -openbsd"
+	mksysctl="go run mksysctl_openbsd.go"
 	mksysnum="go run mksysnum.go 'https://cvsweb.openbsd.org/cgi-bin/cvsweb/~checkout~/src/sys/kern/syscalls.master'"
 	# Let the type of C char be signed for making the bare syscall
 	# API consistent across platforms.
 	mktypes="GOARCH=$GOARCH go tool cgo -godefs -- -fsigned-char"
 	;;
 solaris_amd64)
-	mksyscall="./mksyscall_solaris.pl"
+	mksyscall="go run mksyscall_solaris.go"
 	mkerrors="$mkerrors -m64"
 	mksysnum=
 	mktypes="GOARCH=$GOARCH go tool cgo -godefs"
@@ -207,8 +222,6 @@ esac
 	esac
 	if [ -n "$mksysctl" ]; then echo "$mksysctl |gofmt >$zsysctl"; fi
 	if [ -n "$mksysnum" ]; then echo "$mksysnum |gofmt >zsysnum_$GOOSARCH.go"; fi
-	if [ -n "$mktypes" ]; then
-		echo "$mktypes types_$GOOS.go | go run mkpost.go > ztypes_$GOOSARCH.go";
+	if [ -n "$mktypes" ]; then echo "$mktypes types_$GOOS.go | go run mkpost.go > ztypes_$GOOSARCH.go"; fi
 	if [ -n "$mkasm" ]; then echo "$mkasm $GOARCH"; fi
-	fi
 ) | $run

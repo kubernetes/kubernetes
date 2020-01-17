@@ -7,6 +7,8 @@ go_library(
         "apply_edit_last_applied.go",
         "apply_set_last_applied.go",
         "apply_view_last_applied.go",
+        "patcher.go",
+        "prune.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/kubectl/pkg/cmd/apply",
     importpath = "k8s.io/kubectl/pkg/cmd/apply",
@@ -50,7 +52,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["apply_test.go"],
-    data = ["//staging/src/k8s.io/kubectl/test/data"],
+    data = ["//staging/src/k8s.io/kubectl/testdata"],
     embed = [":go_default_library"],
     deps = [
         "//staging/src/k8s.io/api/apps/v1:go_default_library",

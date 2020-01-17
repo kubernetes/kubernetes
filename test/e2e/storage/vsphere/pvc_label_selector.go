@@ -24,6 +24,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -59,7 +60,7 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:LabelSelector]", func() {
 		nodeInfo   *NodeInfo
 	)
 	ginkgo.BeforeEach(func() {
-		framework.SkipUnlessProviderIs("vsphere")
+		e2eskipper.SkipUnlessProviderIs("vsphere")
 		c = f.ClientSet
 		ns = f.Namespace.Name
 		Bootstrap(f)

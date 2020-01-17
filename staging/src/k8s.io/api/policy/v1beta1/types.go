@@ -47,7 +47,7 @@ type PodDisruptionBudgetSpec struct {
 // PodDisruptionBudgetStatus represents information about the status of a
 // PodDisruptionBudget. Status may trail the actual state of a system.
 type PodDisruptionBudgetStatus struct {
-	// Most recent generation observed when updating this PDB status. PodDisruptionsAllowed and other
+	// Most recent generation observed when updating this PDB status. DisruptionsAllowed and other
 	// status information is valid only if observedGeneration equals to PDB's object generation.
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty" protobuf:"varint,1,opt,name=observedGeneration"`
@@ -67,7 +67,7 @@ type PodDisruptionBudgetStatus struct {
 	DisruptedPods map[string]metav1.Time `json:"disruptedPods,omitempty" protobuf:"bytes,2,rep,name=disruptedPods"`
 
 	// Number of pod disruptions that are currently allowed.
-	PodDisruptionsAllowed int32 `json:"disruptionsAllowed" protobuf:"varint,3,opt,name=disruptionsAllowed"`
+	DisruptionsAllowed int32 `json:"disruptionsAllowed" protobuf:"varint,3,opt,name=disruptionsAllowed"`
 
 	// current number of healthy pods
 	CurrentHealthy int32 `json:"currentHealthy" protobuf:"varint,4,opt,name=currentHealthy"`

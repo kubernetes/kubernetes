@@ -18,14 +18,12 @@ package dynamic
 
 import (
 	"fmt"
-	"io"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/rest"
@@ -282,31 +280,10 @@ func (c *dynamicResourceClient) List(opts metav1.ListOptions) (*unstructured.Uns
 }
 
 func (c *dynamicResourceClient) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	internalGV := schema.GroupVersions{
-		{Group: c.resource.Group, Version: runtime.APIVersionInternal},
-		// always include the legacy group as a decoding target to handle non-error `Status` return types
-		{Group: "", Version: runtime.APIVersionInternal},
-	}
-	s := &rest.Serializers{
-		Encoder: watchNegotiatedSerializerInstance.EncoderForVersion(watchJsonSerializerInfo.Serializer, c.resource.GroupVersion()),
-		Decoder: watchNegotiatedSerializerInstance.DecoderToVersion(watchJsonSerializerInfo.Serializer, internalGV),
-
-		RenegotiatedDecoder: func(contentType string, params map[string]string) (runtime.Decoder, error) {
-			return watchNegotiatedSerializerInstance.DecoderToVersion(watchJsonSerializerInfo.Serializer, internalGV), nil
-		},
-		StreamingSerializer: watchJsonSerializerInfo.StreamSerializer.Serializer,
-		Framer:              watchJsonSerializerInfo.StreamSerializer.Framer,
-	}
-
-	wrappedDecoderFn := func(body io.ReadCloser) streaming.Decoder {
-		framer := s.Framer.NewFrameReader(body)
-		return streaming.NewDecoder(framer, s.StreamingSerializer)
-	}
-
 	opts.Watch = true
 	return c.client.client.Get().AbsPath(c.makeURLSegments("")...).
 		SpecificallyVersionedParams(&opts, dynamicParameterCodec, versionV1).
-		WatchWithSpecificDecoders(wrappedDecoderFn, unstructured.UnstructuredJSONScheme)
+		Watch()
 }
 
 func (c *dynamicResourceClient) Patch(name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (*unstructured.Unstructured, error) {

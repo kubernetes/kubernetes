@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -71,7 +72,7 @@ var _ = utils.SIGDescribe("Verify Volume Attach Through vpxd Restart [Feature:vs
 
 	ginkgo.BeforeEach(func() {
 		// Requires SSH access to vCenter.
-		framework.SkipUnlessProviderIs("vsphere")
+		e2eskipper.SkipUnlessProviderIs("vsphere")
 
 		Bootstrap(f)
 		client = f.ClientSet
@@ -99,7 +100,7 @@ var _ = utils.SIGDescribe("Verify Volume Attach Through vpxd Restart [Feature:vs
 	})
 
 	ginkgo.It("verify volume remains attached through vpxd restart", func() {
-		framework.SkipUnlessSSHKeyPresent()
+		e2eskipper.SkipUnlessSSHKeyPresent()
 
 		for vcHost, nodes := range vcNodesMap {
 			var (

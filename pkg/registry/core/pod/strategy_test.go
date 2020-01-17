@@ -18,6 +18,7 @@ package pod
 
 import (
 	"context"
+	"net/http"
 	"net/url"
 	"reflect"
 	"testing"
@@ -34,8 +35,8 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/kubelet/client"
 
-	// install all api groups for testing
-	_ "k8s.io/kubernetes/pkg/api/testapi"
+	// ensure types are installed
+	_ "k8s.io/kubernetes/pkg/apis/core/install"
 )
 
 func TestMatchPod(t *testing.T) {
@@ -319,33 +320,63 @@ func (g mockPodGetter) Get(context.Context, string, *metav1.GetOptions) (runtime
 
 func TestCheckLogLocation(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
+	fakePodName := "test"
 	tcs := []struct {
-		in          *api.Pod
-		opts        *api.PodLogOptions
-		expectedErr error
+		name              string
+		in                *api.Pod
+		opts              *api.PodLogOptions
+		expectedErr       error
+		expectedTransport http.RoundTripper
 	}{
 		{
+			name: "simple",
 			in: &api.Pod{
-				Spec:   api.PodSpec{},
-				Status: api.PodStatus{},
-			},
-			opts:        &api.PodLogOptions{},
-			expectedErr: errors.NewBadRequest("a container name must be specified for pod test"),
-		},
-		{
-			in: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: fakePodName},
 				Spec: api.PodSpec{
 					Containers: []api.Container{
 						{Name: "mycontainer"},
 					},
+					NodeName: "foo",
 				},
 				Status: api.PodStatus{},
 			},
-			opts:        &api.PodLogOptions{},
-			expectedErr: nil,
+			opts:              &api.PodLogOptions{},
+			expectedErr:       nil,
+			expectedTransport: fakeSecureRoundTripper,
 		},
 		{
+			name: "insecure",
 			in: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: fakePodName},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{Name: "mycontainer"},
+					},
+					NodeName: "foo",
+				},
+				Status: api.PodStatus{},
+			},
+			opts: &api.PodLogOptions{
+				InsecureSkipTLSVerifyBackend: true,
+			},
+			expectedErr:       nil,
+			expectedTransport: fakeInsecureRoundTripper,
+		},
+		{
+			name: "missing container",
+			in: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: fakePodName},
+				Spec:       api.PodSpec{},
+				Status:     api.PodStatus{},
+			},
+			opts:              &api.PodLogOptions{},
+			expectedErr:       errors.NewBadRequest("a container name must be specified for pod test"),
+			expectedTransport: nil,
+		},
+		{
+			name: "choice of two containers",
+			in: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: fakePodName},
 				Spec: api.PodSpec{
 					Containers: []api.Container{
 						{Name: "container1"},
@@ -354,11 +385,14 @@ func TestCheckLogLocation(t *testing.T) {
 				},
 				Status: api.PodStatus{},
 			},
-			opts:        &api.PodLogOptions{},
-			expectedErr: errors.NewBadRequest("a container name must be specified for pod test, choose one of: [container1 container2]"),
+			opts:              &api.PodLogOptions{},
+			expectedErr:       errors.NewBadRequest("a container name must be specified for pod test, choose one of: [container1 container2]"),
+			expectedTransport: nil,
 		},
 		{
+			name: "initcontainers",
 			in: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: fakePodName},
 				Spec: api.PodSpec{
 					Containers: []api.Container{
 						{Name: "container1"},
@@ -370,11 +404,14 @@ func TestCheckLogLocation(t *testing.T) {
 				},
 				Status: api.PodStatus{},
 			},
-			opts:        &api.PodLogOptions{},
-			expectedErr: errors.NewBadRequest("a container name must be specified for pod test, choose one of: [container1 container2] or one of the init containers: [initcontainer1]"),
+			opts:              &api.PodLogOptions{},
+			expectedErr:       errors.NewBadRequest("a container name must be specified for pod test, choose one of: [container1 container2] or one of the init containers: [initcontainer1]"),
+			expectedTransport: nil,
 		},
 		{
+			name: "bad container",
 			in: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: fakePodName},
 				Spec: api.PodSpec{
 					Containers: []api.Container{
 						{Name: "container1"},
@@ -386,30 +423,45 @@ func TestCheckLogLocation(t *testing.T) {
 			opts: &api.PodLogOptions{
 				Container: "unknown",
 			},
-			expectedErr: errors.NewBadRequest("container unknown is not valid for pod test"),
+			expectedErr:       errors.NewBadRequest("container unknown is not valid for pod test"),
+			expectedTransport: nil,
 		},
 		{
+			name: "good with two containers",
 			in: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: fakePodName},
 				Spec: api.PodSpec{
 					Containers: []api.Container{
 						{Name: "container1"},
 						{Name: "container2"},
 					},
+					NodeName: "foo",
 				},
 				Status: api.PodStatus{},
 			},
 			opts: &api.PodLogOptions{
 				Container: "container2",
 			},
-			expectedErr: nil,
+			expectedErr:       nil,
+			expectedTransport: fakeSecureRoundTripper,
 		},
 	}
 	for _, tc := range tcs {
-		getter := &mockPodGetter{tc.in}
-		_, _, err := LogLocation(getter, nil, ctx, "test", tc.opts)
-		if !reflect.DeepEqual(err, tc.expectedErr) {
-			t.Errorf("expected %v, got %v", tc.expectedErr, err)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			getter := &mockPodGetter{tc.in}
+			connectionGetter := &mockConnectionInfoGetter{&client.ConnectionInfo{
+				Transport:                      fakeSecureRoundTripper,
+				InsecureSkipTLSVerifyTransport: fakeInsecureRoundTripper,
+			}}
+
+			_, actualTransport, err := LogLocation(getter, connectionGetter, ctx, fakePodName, tc.opts)
+			if !reflect.DeepEqual(err, tc.expectedErr) {
+				t.Errorf("expected %v, got %v", tc.expectedErr, err)
+			}
+			if actualTransport != tc.expectedTransport {
+				t.Errorf("expected %v, got %v", tc.expectedTransport, actualTransport)
+			}
+		})
 	}
 }
 
@@ -564,3 +616,16 @@ func TestGetPodIP(t *testing.T) {
 		})
 	}
 }
+
+type fakeTransport struct {
+	val string
+}
+
+func (f fakeTransport) RoundTrip(*http.Request) (*http.Response, error) {
+	return nil, nil
+}
+
+var (
+	fakeSecureRoundTripper   = fakeTransport{val: "secure"}
+	fakeInsecureRoundTripper = fakeTransport{val: "insecure"}
+)

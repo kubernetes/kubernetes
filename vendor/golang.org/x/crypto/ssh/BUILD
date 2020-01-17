@@ -20,6 +20,7 @@ go_library(
         "mux.go",
         "server.go",
         "session.go",
+        "ssh_gss.go",
         "streamlocal.go",
         "tcpip.go",
         "transport.go",

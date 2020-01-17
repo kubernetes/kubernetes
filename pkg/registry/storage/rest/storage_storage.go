@@ -135,6 +135,15 @@ func (p RESTStorageProvider) v1Storage(apiResourceConfigSource serverstorage.API
 		"volumeattachments/status": volumeAttachmentStorage.Status,
 	}
 
+	// register csinodes if CSINodeInfo feature gate is enabled
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
+		csiNodeStorage, err := csinodestore.NewStorage(restOptionsGetter)
+		if err != nil {
+			return nil, err
+		}
+		storage["csinodes"] = csiNodeStorage.CSINode
+	}
+
 	return storage, nil
 }
 

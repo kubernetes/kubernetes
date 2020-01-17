@@ -27,8 +27,7 @@ import (
 // This is a copy of BoostrapToken struct from ../kubeadm/types.go with 2 additions:
 // metav1.TypeMeta and metav1.ObjectMeta
 type BootstrapToken struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:",inline"`
+	metav1.TypeMeta `json:",inline"`
 
 	kubeadmapiv1beta2.BootstrapToken
 }

@@ -27,7 +27,7 @@ import (
 	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/features"
@@ -153,11 +153,11 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 				framework.Logf("Token %s has not expired yet", firstToken)
 				return false, nil
 			}
-			if err != nil && !errors.IsResourceExpired(err) {
+			if err != nil && !apierrors.IsResourceExpired(err) {
 				return false, err
 			}
 			framework.Logf("got error %s", err)
-			status, ok := err.(errors.APIStatus)
+			status, ok := err.(apierrors.APIStatus)
 			if !ok {
 				return false, fmt.Errorf("expect error to implement the APIStatus interface, got %v", reflect.TypeOf(err))
 			}

@@ -78,6 +78,7 @@ func newFakeKubeRuntimeManager(runtimeService internalapi.RuntimeService, imageS
 		cpuCFSQuota:         false,
 		cpuCFSQuotaPeriod:   metav1.Duration{Duration: time.Microsecond * 100},
 		livenessManager:     proberesults.NewManager(),
+		startupManager:      proberesults.NewManager(),
 		containerRefManager: kubecontainer.NewRefManager(),
 		machineInfo:         machineInfo,
 		osInterface:         osInterface,

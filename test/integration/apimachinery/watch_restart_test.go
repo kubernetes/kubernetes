@@ -34,7 +34,6 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	watchtools "k8s.io/client-go/tools/watch"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -75,8 +74,7 @@ func TestWatchRestartsIfTimeoutNotReached(t *testing.T) {
 	defer closeFn()
 
 	config := &restclient.Config{
-		Host:          s.URL,
-		ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Groups[corev1.GroupName].GroupVersion()},
+		Host: s.URL,
 	}
 
 	namespaceObject := framework.CreateTestingNamespace("retry-watch", s, t)

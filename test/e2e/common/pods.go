@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"time"
@@ -47,14 +48,10 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var (
+const (
 	buildBackOffDuration = time.Minute
 	syncLoopFrequency    = 10 * time.Second
 	maxBackOffTolerance  = time.Duration(1.3 * float64(kubelet.MaxContainerBackOff))
-	// maxReadyStatusUpdateTolerance specifies the latency that allows kubelet to update pod status.
-	// When kubelet is under heavy load (tests may be parallelized), the delay may be longer, hence
-	// causing tests to be flaky.
-	maxReadyStatusUpdateTolerance = 10 * time.Second
 )
 
 // testHostIP tests that a pod gets a host IP
@@ -156,6 +153,22 @@ func getRestartDelay(podClient *framework.PodClient, podName string, containerNa
 		}
 	}
 	return 0, fmt.Errorf("timeout getting pod restart delay")
+}
+
+// expectNoErrorWithRetries checks if an error occurs with the given retry count.
+func expectNoErrorWithRetries(fn func() error, maxRetries int, explain ...interface{}) {
+	var err error
+	for i := 0; i < maxRetries; i++ {
+		err = fn()
+		if err == nil {
+			return
+		}
+		framework.Logf("(Attempt %d of %d) Unexpected error occurred: %v", i+1, maxRetries, err)
+	}
+	if err != nil {
+		debug.PrintStack()
+	}
+	gomega.ExpectWithOffset(1, err).NotTo(gomega.HaveOccurred(), explain...)
 }
 
 var _ = framework.KubeDescribe("Pods", func() {
@@ -263,7 +276,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		select {
 		case <-listCompleted:
 			select {
-			case event, _ := <-w.ResultChan():
+			case event := <-w.ResultChan():
 				if event.Type != watch.Added {
 					framework.Failf("Failed to observe pod creation: %v", event)
 				}
@@ -313,7 +326,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		timer := time.After(framework.DefaultPodDeletionTimeout)
 		for !deleted {
 			select {
-			case event, _ := <-w.ResultChan():
+			case event := <-w.ResultChan():
 				switch event.Type {
 				case watch.Deleted:
 					lastPod = event.Object.(*v1.Pod)
@@ -526,7 +539,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 			"FOOSERVICE_PORT_8765_TCP=",
 			"FOOSERVICE_PORT_8765_TCP_ADDR=",
 		}
-		framework.ExpectNoErrorWithRetries(func() error {
+		expectNoErrorWithRetries(func() error {
 			return f.MatchContainerOutput(pod, containerName, expectedVars, gomega.ContainSubstring)
 		}, maxRetries, "Container should have service environment variables set")
 	})
@@ -604,10 +617,10 @@ var _ = framework.KubeDescribe("Pods", func() {
 				buf.Write(msg[1:])
 			}
 			if buf.Len() == 0 {
-				return fmt.Errorf("Unexpected output from server")
+				return fmt.Errorf("unexpected output from server")
 			}
 			if !strings.Contains(buf.String(), "remote execution test") {
-				return fmt.Errorf("Expected to find 'remote execution test' in %q", buf.String())
+				return fmt.Errorf("expected to find 'remote execution test' in %q", buf.String())
 			}
 			return nil
 		}, time.Minute, 10*time.Second).Should(gomega.BeNil())
@@ -799,7 +812,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		}
 
 		validatePodReadiness := func(expectReady bool) {
-			err := wait.Poll(time.Second, maxReadyStatusUpdateTolerance, func() (bool, error) {
+			err := wait.Poll(time.Second, wait.ForeverTestTimeout, func() (bool, error) {
 				podReady := podClient.PodIsReady(podName)
 				res := expectReady == podReady
 				if !res {
@@ -812,14 +825,15 @@ var _ = framework.KubeDescribe("Pods", func() {
 
 		ginkgo.By("submitting the pod to kubernetes")
 		podClient.CreateSync(pod)
-		gomega.Expect(podClient.PodIsReady(podName)).To(gomega.BeFalse(), "Expect pod's Ready condition to be false initially.")
+		framework.ExpectEqual(podClient.PodIsReady(podName), false, "Expect pod's Ready condition to be false initially.")
 
 		ginkgo.By(fmt.Sprintf("patching pod status with condition %q to true", readinessGate1))
 		_, err := podClient.Patch(podName, types.StrategicMergePatchType, []byte(fmt.Sprintf(patchStatusFmt, readinessGate1, "True")), "status")
 		framework.ExpectNoError(err)
 		// Sleep for 10 seconds.
-		time.Sleep(maxReadyStatusUpdateTolerance)
-		gomega.Expect(podClient.PodIsReady(podName)).To(gomega.BeFalse(), "Expect pod's Ready condition to be false with only one condition in readinessGates equal to True")
+		time.Sleep(syncLoopFrequency)
+		// Verify the pod is still not ready
+		framework.ExpectEqual(podClient.PodIsReady(podName), false, "Expect pod's Ready condition to be false with only one condition in readinessGates equal to True")
 
 		ginkgo.By(fmt.Sprintf("patching pod status with condition %q to true", readinessGate2))
 		_, err = podClient.Patch(podName, types.StrategicMergePatchType, []byte(fmt.Sprintf(patchStatusFmt, readinessGate2, "True")), "status")

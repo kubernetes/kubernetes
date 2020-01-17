@@ -29,6 +29,7 @@ import (
 	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2eperf "k8s.io/kubernetes/test/e2e/framework/perf"
+	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
 	"k8s.io/kubernetes/test/e2e/perftype"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -70,7 +71,7 @@ func runResourceTrackingTest(f *framework.Framework, podsPerNode int, nodeNames 
 	rcName := fmt.Sprintf("resource%d-%s", totalPods, string(uuid.NewUUID()))
 
 	// TODO: Use a more realistic workload
-	err := framework.RunRC(testutils.RCConfig{
+	err := e2erc.RunRC(testutils.RCConfig{
 		Client:    f.ClientSet,
 		Name:      rcName,
 		Namespace: f.Namespace.Name,
@@ -118,7 +119,7 @@ func runResourceTrackingTest(f *framework.Framework, podsPerNode int, nodeNames 
 	verifyCPULimits(expectedCPU, cpuSummary)
 
 	ginkgo.By("Deleting the RC")
-	framework.DeleteRCAndWaitForGC(f.ClientSet, f.Namespace.Name, rcName)
+	e2erc.DeleteRCAndWaitForGC(f.ClientSet, f.Namespace.Name, rcName)
 }
 
 func verifyMemoryLimits(c clientset.Interface, expected e2ekubelet.ResourceUsagePerContainer, actual e2ekubelet.ResourceUsagePerNode) {

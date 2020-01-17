@@ -17,6 +17,8 @@ limitations under the License.
 package multipoint
 
 import (
+	"context"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
@@ -26,10 +28,10 @@ import (
 // extension points. It communicates through state with another function.
 type CommunicatingPlugin struct{}
 
-var _ = framework.ReservePlugin(CommunicatingPlugin{})
-var _ = framework.PreBindPlugin(CommunicatingPlugin{})
+var _ framework.ReservePlugin = CommunicatingPlugin{}
+var _ framework.PreBindPlugin = CommunicatingPlugin{}
 
-// Name is the name of the plug used in Registry and configurations.
+// Name is the name of the plugin used in Registry and configurations.
 const Name = "multipoint-communicating-plugin"
 
 // Name returns name of the plugin. It is used in logs, etc.
@@ -41,15 +43,15 @@ type stateData struct {
 	data string
 }
 
-func (f *stateData) Clone() framework.StateData {
+func (s *stateData) Clone() framework.StateData {
 	copy := &stateData{
-		data: f.data,
+		data: s.data,
 	}
 	return copy
 }
 
 // Reserve is the functions invoked by the framework at "reserve" extension point.
-func (mc CommunicatingPlugin) Reserve(state *framework.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
+func (mc CommunicatingPlugin) Reserve(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
 	if pod == nil {
 		return framework.NewStatus(framework.Error, "pod cannot be nil")
 	}
@@ -62,7 +64,7 @@ func (mc CommunicatingPlugin) Reserve(state *framework.CycleState, pod *v1.Pod, 
 }
 
 // PreBind is the functions invoked by the framework at "prebind" extension point.
-func (mc CommunicatingPlugin) PreBind(state *framework.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
+func (mc CommunicatingPlugin) PreBind(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
 	if pod == nil {
 		return framework.NewStatus(framework.Error, "pod cannot be nil")
 	}

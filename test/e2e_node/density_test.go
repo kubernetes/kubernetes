@@ -16,16 +16,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e_node
+package e2enode
 
 import (
 	"fmt"
+	"math"
 	"sort"
 	"strconv"
 	"sync"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -533,23 +534,55 @@ func createBatchPodSequential(f *framework.Framework, pods []*v1.Pod) (time.Dura
 	return batchLag, e2eLags
 }
 
+// verifyLatencyWithinThreshold verifies whether 50, 90 and 99th percentiles of a latency metric are
+// within the expected threshold.
+func verifyLatencyWithinThreshold(threshold, actual e2emetrics.LatencyMetric, metricName string) error {
+	if actual.Perc50 > threshold.Perc50 {
+		return fmt.Errorf("too high %v latency 50th percentile: %v", metricName, actual.Perc50)
+	}
+	if actual.Perc90 > threshold.Perc90 {
+		return fmt.Errorf("too high %v latency 90th percentile: %v", metricName, actual.Perc90)
+	}
+	if actual.Perc99 > threshold.Perc99 {
+		return fmt.Errorf("too high %v latency 99th percentile: %v", metricName, actual.Perc99)
+	}
+	return nil
+}
+
+// extractLatencyMetrics returns latency metrics for each percentile(50th, 90th and 99th).
+func extractLatencyMetrics(latencies []e2emetrics.PodLatencyData) e2emetrics.LatencyMetric {
+	length := len(latencies)
+	perc50 := latencies[int(math.Ceil(float64(length*50)/100))-1].Latency
+	perc90 := latencies[int(math.Ceil(float64(length*90)/100))-1].Latency
+	perc99 := latencies[int(math.Ceil(float64(length*99)/100))-1].Latency
+	perc100 := latencies[length-1].Latency
+	return e2emetrics.LatencyMetric{Perc50: perc50, Perc90: perc90, Perc99: perc99, Perc100: perc100}
+}
+
+// printLatencies outputs latencies to log with readable format.
+func printLatencies(latencies []e2emetrics.PodLatencyData, header string) {
+	metrics := extractLatencyMetrics(latencies)
+	framework.Logf("10%% %s: %v", header, latencies[(len(latencies)*9)/10:])
+	framework.Logf("perc50: %v, perc90: %v, perc99: %v", metrics.Perc50, metrics.Perc90, metrics.Perc99)
+}
+
 // logAndVerifyLatency verifies that whether pod creation latency satisfies the limit.
 func logAndVerifyLatency(batchLag time.Duration, e2eLags []e2emetrics.PodLatencyData, podStartupLimits e2emetrics.LatencyMetric,
 	podBatchStartupLimit time.Duration, testInfo map[string]string, isVerify bool) {
-	e2emetrics.PrintLatencies(e2eLags, "worst client e2e total latencies")
+	printLatencies(e2eLags, "worst client e2e total latencies")
 
 	// TODO(coufon): do not trust 'kubelet' metrics since they are not reset!
 	latencyMetrics, _ := getPodStartLatency(kubeletAddr)
 	framework.Logf("Kubelet Prometheus metrics (not reset):\n%s", framework.PrettyPrintJSON(latencyMetrics))
 
-	podStartupLatency := e2emetrics.ExtractLatencyMetrics(e2eLags)
+	podStartupLatency := extractLatencyMetrics(e2eLags)
 
 	// log latency perf data
 	logPerfData(getLatencyPerfData(podStartupLatency, testInfo), "latency")
 
 	if isVerify {
 		// check whether e2e pod startup time is acceptable.
-		framework.ExpectNoError(e2emetrics.VerifyLatencyWithinThreshold(podStartupLimits, podStartupLatency, "pod startup"))
+		framework.ExpectNoError(verifyLatencyWithinThreshold(podStartupLimits, podStartupLatency, "pod startup"))
 
 		// check bactch pod creation latency
 		if podBatchStartupLimit > 0 {

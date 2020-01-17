@@ -25,11 +25,12 @@ import (
 	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	storageutils "k8s.io/kubernetes/test/e2e/storage/utils"
@@ -45,8 +46,8 @@ var _ TestSuite = &ephemeralTestSuite{}
 func InitEphemeralTestSuite() TestSuite {
 	return &ephemeralTestSuite{
 		tsInfo: TestSuiteInfo{
-			name: "ephemeral",
-			testPatterns: []testpatterns.TestPattern{
+			Name: "ephemeral",
+			TestPatterns: []testpatterns.TestPattern{
 				{
 					Name:    "inline ephemeral CSI volume",
 					VolType: testpatterns.CSIInlineVolume,
@@ -56,14 +57,14 @@ func InitEphemeralTestSuite() TestSuite {
 	}
 }
 
-func (p *ephemeralTestSuite) getTestSuiteInfo() TestSuiteInfo {
+func (p *ephemeralTestSuite) GetTestSuiteInfo() TestSuiteInfo {
 	return p.tsInfo
 }
 
-func (p *ephemeralTestSuite) skipRedundantSuite(driver TestDriver, pattern testpatterns.TestPattern) {
+func (p *ephemeralTestSuite) SkipRedundantSuite(driver TestDriver, pattern testpatterns.TestPattern) {
 }
 
-func (p *ephemeralTestSuite) defineTests(driver TestDriver, pattern testpatterns.TestPattern) {
+func (p *ephemeralTestSuite) DefineTests(driver TestDriver, pattern testpatterns.TestPattern) {
 	type local struct {
 		config        *PerTestConfig
 		driverCleanup func()
@@ -80,7 +81,7 @@ func (p *ephemeralTestSuite) defineTests(driver TestDriver, pattern testpatterns
 		ok := false
 		eDriver, ok = driver.(EphemeralTestDriver)
 		if !ok {
-			framework.Skipf("Driver %s doesn't support ephemeral inline volumes -- skipping", dInfo.Name)
+			e2eskipper.Skipf("Driver %s doesn't support ephemeral inline volumes -- skipping", dInfo.Name)
 		}
 	})
 
@@ -107,10 +108,9 @@ func (p *ephemeralTestSuite) defineTests(driver TestDriver, pattern testpatterns
 	}
 
 	cleanup := func() {
-		if l.driverCleanup != nil {
-			l.driverCleanup()
-			l.driverCleanup = nil
-		}
+		err := tryFunc(l.driverCleanup)
+		framework.ExpectNoError(err, "while cleaning up driver")
+		l.driverCleanup = nil
 	}
 
 	ginkgo.It("should create read-only inline ephemeral volume", func() {
@@ -119,7 +119,7 @@ func (p *ephemeralTestSuite) defineTests(driver TestDriver, pattern testpatterns
 
 		l.testCase.ReadOnly = true
 		l.testCase.RunningPodCheck = func(pod *v1.Pod) interface{} {
-			storageutils.VerifyExecInPodSucceed(pod, "mount | grep /mnt/test | grep ro,")
+			storageutils.VerifyExecInPodSucceed(f, pod, "mount | grep /mnt/test | grep ro,")
 			return nil
 		}
 		l.testCase.TestEphemeral()
@@ -131,7 +131,7 @@ func (p *ephemeralTestSuite) defineTests(driver TestDriver, pattern testpatterns
 
 		l.testCase.ReadOnly = false
 		l.testCase.RunningPodCheck = func(pod *v1.Pod) interface{} {
-			storageutils.VerifyExecInPodSucceed(pod, "mount | grep /mnt/test | grep rw,")
+			storageutils.VerifyExecInPodSucceed(f, pod, "mount | grep /mnt/test | grep rw,")
 			return nil
 		}
 		l.testCase.TestEphemeral()
@@ -160,8 +160,8 @@ func (p *ephemeralTestSuite) defineTests(driver TestDriver, pattern testpatterns
 			// visible in the other.
 			if !readOnly && !shared {
 				ginkgo.By("writing data in one pod and checking for it in the second")
-				storageutils.VerifyExecInPodSucceed(pod, "touch /mnt/test-0/hello-world")
-				storageutils.VerifyExecInPodSucceed(pod2, "[ ! -f /mnt/test-0/hello-world ]")
+				storageutils.VerifyExecInPodSucceed(f, pod, "touch /mnt/test-0/hello-world")
+				storageutils.VerifyExecInPodSucceed(f, pod2, "[ ! -f /mnt/test-0/hello-world ]")
 			}
 
 			defer StopPod(f.ClientSet, pod2)
@@ -247,7 +247,7 @@ func (t EphemeralTest) TestEphemeral() {
 			VolumeAttributes: attributes,
 		}
 		if readOnly && !t.ReadOnly {
-			framework.Skipf("inline ephemeral volume #%d is read-only, but the test needs a read/write volume", i)
+			e2eskipper.Skipf("inline ephemeral volume #%d is read-only, but the test needs a read/write volume", i)
 		}
 		csiVolumes = append(csiVolumes, csi)
 	}
@@ -371,7 +371,7 @@ func CSIInlineVolumesEnabled(c clientset.Interface, ns string) (bool, error) {
 		// Pod was created, feature supported.
 		StopPod(c, pod)
 		return true, nil
-	case errors.IsInvalid(err):
+	case apierrors.IsInvalid(err):
 		// "Invalid" because it uses a feature that isn't supported.
 		return false, nil
 	default:

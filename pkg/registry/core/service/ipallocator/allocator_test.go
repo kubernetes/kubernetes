@@ -225,6 +225,11 @@ func TestRangeSize(t *testing.T) {
 			addrs: 256,
 		},
 		{
+			name:  "supported large IPv4 cidr",
+			cidr:  "10.96.0.0/12",
+			addrs: 1048576,
+		},
+		{
 			name:  "unsupported IPv4 cidr",
 			cidr:  "192.168.1.0/1",
 			addrs: 0,

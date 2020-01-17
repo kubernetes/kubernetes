@@ -33,16 +33,16 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/util"
+	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/kustomize"
 )
 
 const (
-	// kubeControllerManagerAddressArg represents the address argument of the kube-controller-manager configuration.
-	kubeControllerManagerAddressArg = "address"
+	// kubeControllerManagerBindAddressArg represents the bind-address argument of the kube-controller-manager configuration.
+	kubeControllerManagerBindAddressArg = "bind-address"
 
-	// kubeSchedulerAddressArg represents the address argument of the kube-scheduler configuration.
-	kubeSchedulerAddressArg = "address"
+	// kubeSchedulerBindAddressArg represents the bind-address argument of the kube-scheduler configuration.
+	kubeSchedulerBindAddressArg = "bind-address"
 )
 
 // ComponentPod returns a Pod object from the container and volume specifications
@@ -148,7 +148,7 @@ func GetExtraParameters(overrides map[string]string, defaults map[string]string)
 // KustomizeStaticPod applies patches defined in kustomizeDir to a static Pod manifest
 func KustomizeStaticPod(pod *v1.Pod, kustomizeDir string) (*v1.Pod, error) {
 	// marshal the pod manifest into yaml
-	serialized, err := util.MarshalToYaml(pod, v1.SchemeGroupVersion)
+	serialized, err := kubeadmutil.MarshalToYaml(pod, v1.SchemeGroupVersion)
 	if err != nil {
 		return pod, errors.Wrapf(err, "failed to marshal manifest to YAML")
 	}
@@ -164,7 +164,7 @@ func KustomizeStaticPod(pod *v1.Pod, kustomizeDir string) (*v1.Pod, error) {
 	}
 
 	// unmarshal kustomized yaml back into a pod manifest
-	obj, err := util.UnmarshalFromYaml(kustomized, v1.SchemeGroupVersion)
+	obj, err := kubeadmutil.UnmarshalFromYaml(kustomized, v1.SchemeGroupVersion)
 	if err != nil {
 		return pod, errors.Wrap(err, "failed to unmarshal kustomize manifest from YAML")
 	}
@@ -186,7 +186,7 @@ func WriteStaticPodToDisk(componentName, manifestDir string, pod v1.Pod) error {
 	}
 
 	// writes the pod to disk
-	serialized, err := util.MarshalToYaml(&pod, v1.SchemeGroupVersion)
+	serialized, err := kubeadmutil.MarshalToYaml(&pod, v1.SchemeGroupVersion)
 	if err != nil {
 		return errors.Wrapf(err, "failed to marshal manifest for %q to YAML", componentName)
 	}
@@ -207,7 +207,7 @@ func ReadStaticPodFromDisk(manifestPath string) (*v1.Pod, error) {
 		return &v1.Pod{}, errors.Wrapf(err, "failed to read manifest for %q", manifestPath)
 	}
 
-	obj, err := util.UnmarshalFromYaml(buf, v1.SchemeGroupVersion)
+	obj, err := kubeadmutil.UnmarshalFromYaml(buf, v1.SchemeGroupVersion)
 	if err != nil {
 		return &v1.Pod{}, errors.Errorf("failed to unmarshal manifest for %q from YAML: %v", manifestPath, err)
 	}
@@ -244,7 +244,7 @@ func GetAPIServerProbeAddress(endpoint *kubeadmapi.APIEndpoint) string {
 	// probes do not support the Downward API we cannot dynamically set the advertise address to
 	// the node's IP. The only option then is to use localhost.
 	if endpoint != nil && endpoint.AdvertiseAddress != "" {
-		return endpoint.AdvertiseAddress
+		return getProbeAddress(endpoint.AdvertiseAddress)
 	}
 
 	return "127.0.0.1"
@@ -252,16 +252,16 @@ func GetAPIServerProbeAddress(endpoint *kubeadmapi.APIEndpoint) string {
 
 // GetControllerManagerProbeAddress returns the kubernetes controller manager probe address
 func GetControllerManagerProbeAddress(cfg *kubeadmapi.ClusterConfiguration) string {
-	if addr, exists := cfg.ControllerManager.ExtraArgs[kubeControllerManagerAddressArg]; exists {
-		return addr
+	if addr, exists := cfg.ControllerManager.ExtraArgs[kubeControllerManagerBindAddressArg]; exists {
+		return getProbeAddress(addr)
 	}
 	return "127.0.0.1"
 }
 
 // GetSchedulerProbeAddress returns the kubernetes scheduler probe address
 func GetSchedulerProbeAddress(cfg *kubeadmapi.ClusterConfiguration) string {
-	if addr, exists := cfg.Scheduler.ExtraArgs[kubeSchedulerAddressArg]; exists {
-		return addr
+	if addr, exists := cfg.Scheduler.ExtraArgs[kubeSchedulerBindAddressArg]; exists {
+		return getProbeAddress(addr)
 	}
 	return "127.0.0.1"
 }
@@ -269,8 +269,11 @@ func GetSchedulerProbeAddress(cfg *kubeadmapi.ClusterConfiguration) string {
 // GetEtcdProbeEndpoint takes a kubeadm Etcd configuration object and attempts to parse
 // the first URL in the listen-metrics-urls argument, returning an etcd probe hostname,
 // port and scheme
-func GetEtcdProbeEndpoint(cfg *kubeadmapi.Etcd) (string, int, v1.URIScheme) {
+func GetEtcdProbeEndpoint(cfg *kubeadmapi.Etcd, isIPv6 bool) (string, int, v1.URIScheme) {
 	localhost := "127.0.0.1"
+	if isIPv6 {
+		localhost = "::1"
+	}
 	if cfg.Local == nil || cfg.Local.ExtraArgs == nil {
 		return localhost, kubeadmconstants.EtcdMetricsPort, v1.URISchemeHTTP
 	}
@@ -295,7 +298,7 @@ func GetEtcdProbeEndpoint(cfg *kubeadmapi.Etcd) (string, int, v1.URIScheme) {
 		port := kubeadmconstants.EtcdMetricsPort
 		portStr := parsedURL.Port()
 		if len(portStr) != 0 {
-			p, err := util.ParsePort(portStr)
+			p, err := kubeadmutil.ParsePort(portStr)
 			if err == nil {
 				port = p
 			}
@@ -317,4 +320,17 @@ func ManifestFilesAreEqual(path1, path2 string) (bool, error) {
 	}
 
 	return bytes.Equal(content1, content2), nil
+}
+
+// getProbeAddress returns a valid probe address.
+// Kubeadm uses the bind-address to configure the probe address. It's common to use the
+// unspecified address "0.0.0.0" or "::" as bind-address when we want to listen in all interfaces,
+// however this address can't be used as probe #86504.
+// If the address is an unspecified address getProbeAddress returns empty,
+// that means that kubelet will use the PodIP as probe address.
+func getProbeAddress(addr string) string {
+	if addr == "0.0.0.0" || addr == "::" {
+		return ""
+	}
+	return addr
 }

@@ -28,6 +28,7 @@ readonly RELEASE_STAGE="${LOCAL_OUTPUT_ROOT}/release-stage"
 readonly RELEASE_TARS="${LOCAL_OUTPUT_ROOT}/release-tars"
 readonly RELEASE_IMAGES="${LOCAL_OUTPUT_ROOT}/release-images"
 
+KUBE_BUILD_HYPERKUBE=${KUBE_BUILD_HYPERKUBE:-y}
 KUBE_BUILD_CONFORMANCE=${KUBE_BUILD_CONFORMANCE:-y}
 KUBE_BUILD_PULL_LATEST_IMAGES=${KUBE_BUILD_PULL_LATEST_IMAGES:-y}
 
@@ -278,6 +279,23 @@ function kube::release::sha1() {
   fi
 }
 
+function kube::release::build_hyperkube_image() {
+  local -r arch="$1"
+  local -r registry="$2"
+  local -r version="$3"
+  local -r save_dir="${4-}"
+  kube::log::status "Building hyperkube image for arch: ${arch}"
+  ARCH="${arch}" REGISTRY="${registry}" VERSION="${version}" \
+    make -C cluster/images/hyperkube/ build >/dev/null
+
+  local hyperkube_tag="${registry}/hyperkube-${arch}:${version}"
+  if [[ -n "${save_dir}" ]]; then
+    "${DOCKER[@]}" save "${hyperkube_tag}" > "${save_dir}/hyperkube-${arch}.tar"
+  fi
+  kube::log::status "Deleting hyperkube image ${hyperkube_tag}"
+  "${DOCKER[@]}" rmi "${hyperkube_tag}" &>/dev/null || true
+}
+
 function kube::release::build_conformance_image() {
   local -r arch="$1"
   local -r registry="$2"
@@ -309,7 +327,10 @@ function kube::release::create_docker_images_for_server() {
     local images_dir="${RELEASE_IMAGES}/${arch}"
     mkdir -p "${images_dir}"
 
-    local -r docker_registry="${KUBE_DOCKER_REGISTRY}"
+    # k8s.gcr.io is the constant tag in the docker archives, this is also the default for config scripts in GKE.
+    # We can use KUBE_DOCKER_REGISTRY to include and extra registry in the docker archive.
+    # If we use KUBE_DOCKER_REGISTRY="k8s.gcr.io", then the extra tag (same) is ignored, see release_docker_image_tag below.
+    local -r docker_registry="k8s.gcr.io"
     # Docker tags cannot contain '+'
     local docker_tag="${KUBE_GIT_VERSION/+/_}"
     if [[ -z "${docker_tag}" ]]; then
@@ -375,6 +396,10 @@ EOF
       ) &
     done
 
+    if [[ "${KUBE_BUILD_HYPERKUBE}" =~ [yY] ]]; then
+      kube::release::build_hyperkube_image "${arch}" "${docker_registry}" \
+        "${docker_tag}" "${images_dir}" &
+    fi
     if [[ "${KUBE_BUILD_CONFORMANCE}" =~ [yY] ]]; then
       kube::release::build_conformance_image "${arch}" "${docker_registry}" \
         "${docker_tag}" "${images_dir}" &
@@ -413,6 +438,7 @@ function kube::release::package_kube_manifests_tarball() {
     cp "${src_dir}/${internal_manifest}" "${dst_dir}"
   done
   cp "${KUBE_ROOT}/cluster/gce/gci/configure-helper.sh" "${dst_dir}/gci-configure-helper.sh"
+  cp "${KUBE_ROOT}/cluster/gce/gci/configure-kubeapiserver.sh" "${dst_dir}/configure-kubeapiserver.sh"
   if [[ -e "${KUBE_ROOT}/cluster/gce/gci/gke-internal-configure-helper.sh" ]]; then
     cp "${KUBE_ROOT}/cluster/gce/gci/gke-internal-configure-helper.sh" "${dst_dir}/"
   fi

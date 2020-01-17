@@ -30,9 +30,9 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -115,7 +115,7 @@ func TestServiceAccountTokenAutoCreate(t *testing.T) {
 	}
 
 	// Create service account
-	serviceAccount, err := c.CoreV1().ServiceAccounts(ns).Create(&v1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: name}})
+	_, err = c.CoreV1().ServiceAccounts(ns).Create(&v1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: name}})
 	if err != nil {
 		t.Fatalf("Service Account not created: %v", err)
 	}
@@ -145,7 +145,7 @@ func TestServiceAccountTokenAutoCreate(t *testing.T) {
 	}
 
 	// Trigger creation of a new referenced token
-	serviceAccount, err = c.CoreV1().ServiceAccounts(ns).Get(name, metav1.GetOptions{})
+	serviceAccount, err := c.CoreV1().ServiceAccounts(ns).Get(name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -207,7 +207,7 @@ func TestServiceAccountTokenAutoMount(t *testing.T) {
 
 	// Create "my" namespace
 	_, err = c.CoreV1().Namespaces().Create(&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ns}})
-	if err != nil && !errors.IsAlreadyExists(err) {
+	if err != nil && !apierrors.IsAlreadyExists(err) {
 		t.Fatalf("could not create namespace: %v", err)
 	}
 
@@ -290,13 +290,13 @@ func TestServiceAccountTokenAuthentication(t *testing.T) {
 
 	// Create "my" namespace
 	_, err = c.CoreV1().Namespaces().Create(&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: myns}})
-	if err != nil && !errors.IsAlreadyExists(err) {
+	if err != nil && !apierrors.IsAlreadyExists(err) {
 		t.Fatalf("could not create namespace: %v", err)
 	}
 
 	// Create "other" namespace
 	_, err = c.CoreV1().Namespaces().Create(&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: otherns}})
-	if err != nil && !errors.IsAlreadyExists(err) {
+	if err != nil && !apierrors.IsAlreadyExists(err) {
 		t.Fatalf("could not create namespace: %v", err)
 	}
 
@@ -446,12 +446,13 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 	masterConfig.GenericConfig.Authentication.Authenticator = authenticator
 	masterConfig.GenericConfig.Authorization.Authorizer = authorizer
 	masterConfig.GenericConfig.AdmissionControl = serviceAccountAdmission
-	framework.RunAMasterUsingServer(masterConfig, apiServer, h)
+	_, _, kubeAPIServerCloseFn := framework.RunAMasterUsingServer(masterConfig, apiServer, h)
 
 	// Start the service account and service account token controllers
 	stopCh := make(chan struct{})
 	stop := func() {
 		close(stopCh)
+		kubeAPIServerCloseFn()
 		apiServer.Close()
 	}
 
@@ -495,7 +496,7 @@ func getServiceAccount(c *clientset.Clientset, ns string, name string, shouldWai
 	var err error
 	err = wait.Poll(time.Second, 10*time.Second, func() (bool, error) {
 		user, err = c.CoreV1().ServiceAccounts(ns).Get(name, metav1.GetOptions{})
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			return false, nil
 		}
 		if err != nil {
@@ -512,7 +513,7 @@ func getReferencedServiceAccountToken(c *clientset.Clientset, ns string, name st
 
 	findToken := func() (bool, error) {
 		user, err := c.CoreV1().ServiceAccounts(ns).Get(name, metav1.GetOptions{})
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			return false, nil
 		}
 		if err != nil {
@@ -521,7 +522,7 @@ func getReferencedServiceAccountToken(c *clientset.Clientset, ns string, name st
 
 		for _, ref := range user.Secrets {
 			secret, err := c.CoreV1().Secrets(ns).Get(ref.Name, metav1.GetOptions{})
-			if errors.IsNotFound(err) {
+			if apierrors.IsNotFound(err) {
 				continue
 			}
 			if err != nil {
@@ -585,8 +586,8 @@ func doServiceAccountAPIRequests(t *testing.T, c *clientset.Clientset, ns string
 
 	for _, op := range readOps {
 		err := op()
-		unauthorizedError := errors.IsUnauthorized(err)
-		forbiddenError := errors.IsForbidden(err)
+		unauthorizedError := apierrors.IsUnauthorized(err)
+		forbiddenError := apierrors.IsForbidden(err)
 
 		switch {
 		case !authenticated && !unauthorizedError:
@@ -602,8 +603,8 @@ func doServiceAccountAPIRequests(t *testing.T, c *clientset.Clientset, ns string
 
 	for _, op := range writeOps {
 		err := op()
-		unauthorizedError := errors.IsUnauthorized(err)
-		forbiddenError := errors.IsForbidden(err)
+		unauthorizedError := apierrors.IsUnauthorized(err)
+		forbiddenError := apierrors.IsForbidden(err)
 
 		switch {
 		case !authenticated && !unauthorizedError:

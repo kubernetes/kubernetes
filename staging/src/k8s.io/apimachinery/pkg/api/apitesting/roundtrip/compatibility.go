@@ -26,6 +26,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	fuzz "github.com/google/gofuzz"
@@ -39,6 +40,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/apimachinery/pkg/runtime/serializer/protobuf"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
@@ -221,11 +223,29 @@ func CompatibilityTestFuzzer(scheme *runtime.Scheme, fuzzFuncs []interface{}) *f
 	fuzzer := fuzz.NewWithSeed(0).NilChance(0).NumElements(1, 1).MaxDepth(20)
 	fuzzer = fuzzer.Funcs(genericfuzzer.Funcs(serializer.NewCodecFactory(scheme))...)
 	fuzzString := 1
+	fuzzIntOrString := 1
+	fuzzMicroTime := int64(1)
 	fuzzer.Funcs(
 		// avoid crazy strings
 		func(s *string, c fuzz.Continue) {
 			fuzzString++
 			*s = strconv.Itoa(fuzzString)
+		},
+		func(i **intstr.IntOrString, c fuzz.Continue) {
+			fuzzIntOrString++
+			tmp := intstr.FromInt(fuzzIntOrString)
+			_ = tmp
+			*i = &tmp
+		},
+		func(t **metav1.MicroTime, c fuzz.Continue) {
+			if t != nil && *t != nil {
+				// use type-defined fuzzing for non-nil objects
+				(*t).Fuzz(c)
+				return
+			}
+			fuzzMicroTime++
+			tmp := metav1.NewMicroTime(time.Unix(fuzzMicroTime, 0))
+			*t = &tmp
 		},
 		// limit managed fields to two levels
 		func(f *[]metav1.ManagedFieldsEntry, c fuzz.Continue) {
@@ -280,20 +300,20 @@ func (c *CompatibilityTestOptions) runCurrentVersionTest(t *testing.T, gvk schem
 	} else {
 		if !bytes.Equal(expectedJSON, actualJSON) {
 			t.Errorf("json differs")
-			t.Log(cmp.Diff(string(expectedJSON), string(actualJSON)))
+			t.Log(cmp.Diff(string(actualJSON), string(expectedJSON)))
 			needsUpdate = true
 		}
 
 		if !bytes.Equal(expectedYAML, actualYAML) {
 			t.Errorf("yaml differs")
-			t.Log(cmp.Diff(string(expectedYAML), string(actualYAML)))
+			t.Log(cmp.Diff(string(actualYAML), string(expectedYAML)))
 			needsUpdate = true
 		}
 
 		if !bytes.Equal(expectedProto, actualProto) {
 			t.Errorf("proto differs")
 			needsUpdate = true
-			t.Log(cmp.Diff(dumpProto(t, expectedProto[4:]), dumpProto(t, actualProto[4:])))
+			t.Log(cmp.Diff(dumpProto(t, actualProto[4:]), dumpProto(t, expectedProto[4:])))
 			// t.Logf("json (for locating the offending field based on surrounding data): %s", string(expectedJSON))
 		}
 	}

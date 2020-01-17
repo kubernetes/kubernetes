@@ -17,8 +17,6 @@ limitations under the License.
 package server
 
 import (
-	"crypto/tls"
-	"crypto/x509"
 	"fmt"
 	"net"
 	"net/http"
@@ -32,7 +30,7 @@ import (
 
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/go-openapi/spec"
-	"github.com/pborman/uuid"
+	"github.com/google/uuid"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -56,6 +54,7 @@ import (
 	apiopenapi "k8s.io/apiserver/pkg/endpoints/openapi"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic"
+	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	"k8s.io/apiserver/pkg/server/egressselector"
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
 	"k8s.io/apiserver/pkg/server/healthz"
@@ -63,7 +62,6 @@ import (
 	serverstore "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/client-go/informers"
 	restclient "k8s.io/client-go/rest"
-	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/component-base/logs"
 	"k8s.io/klog"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
@@ -234,13 +232,13 @@ type SecureServingInfo struct {
 
 	// Cert is the main server cert which is used if SNI does not match. Cert must be non-nil and is
 	// allowed to be in SNICerts.
-	Cert *tls.Certificate
+	Cert dynamiccertificates.CertKeyContentProvider
 
-	// SNICerts are the TLS certificates by name used for SNI.
-	SNICerts map[string]*tls.Certificate
+	// SNICerts are the TLS certificates used for SNI.
+	SNICerts []dynamiccertificates.SNICertKeyContentProvider
 
 	// ClientCA is the certificate bundle for all the signers that you'll recognize for incoming client certificates
-	ClientCA *x509.CertPool
+	ClientCA dynamiccertificates.CAContentProvider
 
 	// MinTLSVersion optionally overrides the minimum TLS version supported.
 	// Values are from tls package constants (https://golang.org/pkg/crypto/tls/#pkg-constants).
@@ -347,22 +345,19 @@ func DefaultOpenAPIConfig(getDefinitions openapicommon.GetOpenAPIDefinitions, de
 	}
 }
 
-func (c *AuthenticationInfo) ApplyClientCert(clientCAFile string, servingInfo *SecureServingInfo) error {
-	if servingInfo != nil {
-		if len(clientCAFile) > 0 {
-			clientCAs, err := certutil.CertsFromFile(clientCAFile)
-			if err != nil {
-				return fmt.Errorf("unable to load client CA file: %v", err)
-			}
-			if servingInfo.ClientCA == nil {
-				servingInfo.ClientCA = x509.NewCertPool()
-			}
-			for _, cert := range clientCAs {
-				servingInfo.ClientCA.AddCert(cert)
-			}
-		}
+func (c *AuthenticationInfo) ApplyClientCert(clientCA dynamiccertificates.CAContentProvider, servingInfo *SecureServingInfo) error {
+	if servingInfo == nil {
+		return nil
+	}
+	if clientCA == nil {
+		return nil
+	}
+	if servingInfo.ClientCA == nil {
+		servingInfo.ClientCA = clientCA
+		return nil
 	}
 
+	servingInfo.ClientCA = dynamiccertificates.NewUnionCAContentProvider(servingInfo.ClientCA, clientCA)
 	return nil
 }
 
@@ -732,7 +727,7 @@ func AuthorizeClientBearerToken(loopback *restclient.Config, authn *Authenticati
 	}
 
 	privilegedLoopbackToken := loopback.BearerToken
-	var uid = uuid.NewRandom().String()
+	var uid = uuid.New().String()
 	tokens := make(map[string]*user.DefaultInfo)
 	tokens[privilegedLoopbackToken] = &user.DefaultInfo{
 		Name:   user.APIServerUser,

@@ -26,8 +26,8 @@ set -o pipefail
 ### Hardcoded constants
 DEFAULT_CNI_VERSION="v0.7.5"
 DEFAULT_CNI_SHA1="52e9d2de8a5f927307d9397308735658ee44ab8d"
-DEFAULT_NPD_VERSION="v0.7.1"
-DEFAULT_NPD_SHA1="a9cae965973d586bf5206ad4fe5aae07e6bfd154"
+DEFAULT_NPD_VERSION="v0.8.0"
+DEFAULT_NPD_SHA1="9406c975b1b035995a137029a004622b905b4e7f"
 DEFAULT_CRICTL_VERSION="v1.16.1"
 DEFAULT_CRICTL_SHA1="8d7b788bf0a52bd3248407c6ebf779ffead27c99"
 DEFAULT_MOUNTER_TAR_SHA="8003b798cf33c7f91320cd6ee5cec4fa22244571"
@@ -292,6 +292,11 @@ function install-exec-auth-plugin {
   local -r plugin_url="${EXEC_AUTH_PLUGIN_URL}"
   local -r plugin_sha1="${EXEC_AUTH_PLUGIN_SHA1}"
 
+  if is-preloaded "gke-exec-auth-plugin" "${plugin_sha1}"; then
+    echo "gke-exec-auth-plugin is preloaded"
+    return
+  fi
+
   echo "Downloading gke-exec-auth-plugin binary"
   download-or-bust "${plugin_sha1}" "${plugin_url}"
   mv "${KUBE_HOME}/gke-exec-auth-plugin" "${KUBE_BIN}/gke-exec-auth-plugin"
@@ -336,6 +341,7 @@ function install-kube-manifests {
       xargs sed -ri "s@(image\":\s+\")k8s.gcr.io@\1${kube_addon_registry}@"
   fi
   cp "${dst_dir}/kubernetes/gci-trusty/gci-configure-helper.sh" "${KUBE_BIN}/configure-helper.sh"
+  cp "${dst_dir}/kubernetes/gci-trusty/configure-kubeapiserver.sh" "${KUBE_BIN}/configure-kubeapiserver.sh"
   if [[ -e "${dst_dir}/kubernetes/gci-trusty/gke-internal-configure-helper.sh" ]]; then
     cp "${dst_dir}/kubernetes/gci-trusty/gke-internal-configure-helper.sh" "${KUBE_BIN}/"
   fi

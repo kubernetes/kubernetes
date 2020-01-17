@@ -81,10 +81,6 @@ func (t *dnsTestCommon) init() {
 	}
 }
 
-func (t *dnsTestCommon) checkDNSRecord(name string, predicate func([]string) bool, timeout time.Duration) {
-	t.checkDNSRecordFrom(name, predicate, "kube-dns", timeout)
-}
-
 func (t *dnsTestCommon) checkDNSRecordFrom(name string, predicate func([]string) bool, target string, timeout time.Duration) {
 	var actual []string
 
@@ -118,7 +114,6 @@ func (t *dnsTestCommon) runDig(dnsName, target string) []string {
 	case "cluster-dns":
 	case "cluster-dns-ipv6":
 		cmd = append(cmd, "AAAA")
-		break
 	default:
 		panic(fmt.Errorf("invalid target: " + target))
 	}
@@ -269,6 +264,7 @@ func (t *dnsTestCommon) deleteCoreDNSPods() {
 	options := metav1.ListOptions{LabelSelector: label.String()}
 
 	pods, err := t.f.ClientSet.CoreV1().Pods("kube-system").List(options)
+	framework.ExpectNoError(err, "failed to list pods of kube-system with label %q", label.String())
 	podClient := t.c.CoreV1().Pods(metav1.NamespaceSystem)
 
 	for _, pod := range pods.Items {
@@ -612,14 +608,6 @@ func validateTargetedProbeOutput(f *framework.Framework, pod *v1.Pod, fileNames 
 	assertFilesContain(fileNames, "results", pod, f.ClientSet, true, value)
 
 	framework.Logf("DNS probes using %s succeeded\n", pod.Name)
-}
-
-func reverseArray(arr []string) []string {
-	for i := 0; i < len(arr)/2; i++ {
-		j := len(arr) - i - 1
-		arr[i], arr[j] = arr[j], arr[i]
-	}
-	return arr
 }
 
 func generateDNSUtilsPod() *v1.Pod {

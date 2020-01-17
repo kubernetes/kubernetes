@@ -269,6 +269,9 @@ type ContentConfig struct {
 	GroupVersion *schema.GroupVersion
 	// NegotiatedSerializer is used for obtaining encoders and decoders for multiple
 	// supported media types.
+	//
+	// TODO: NegotiatedSerializer will be phased out as internal clients are removed
+	//   from Kubernetes.
 	NegotiatedSerializer runtime.NegotiatedSerializer
 }
 
@@ -282,14 +285,6 @@ func RESTClientFor(config *Config) (*RESTClient, error) {
 	}
 	if config.NegotiatedSerializer == nil {
 		return nil, fmt.Errorf("NegotiatedSerializer is required when initializing a RESTClient")
-	}
-	qps := config.QPS
-	if config.QPS == 0.0 {
-		qps = DefaultQPS
-	}
-	burst := config.Burst
-	if config.Burst == 0 {
-		burst = DefaultBurst
 	}
 
 	baseURL, versionedAPIPath, err := defaultServerUrlFor(config)
@@ -310,7 +305,33 @@ func RESTClientFor(config *Config) (*RESTClient, error) {
 		}
 	}
 
-	return NewRESTClient(baseURL, versionedAPIPath, config.ContentConfig, qps, burst, config.RateLimiter, httpClient)
+	rateLimiter := config.RateLimiter
+	if rateLimiter == nil {
+		qps := config.QPS
+		if config.QPS == 0.0 {
+			qps = DefaultQPS
+		}
+		burst := config.Burst
+		if config.Burst == 0 {
+			burst = DefaultBurst
+		}
+		if qps > 0 {
+			rateLimiter = flowcontrol.NewTokenBucketRateLimiter(qps, burst)
+		}
+	}
+
+	var gv schema.GroupVersion
+	if config.GroupVersion != nil {
+		gv = *config.GroupVersion
+	}
+	clientContent := ClientContentConfig{
+		AcceptContentTypes: config.AcceptContentTypes,
+		ContentType:        config.ContentType,
+		GroupVersion:       gv,
+		Negotiator:         runtime.NewClientNegotiator(config.NegotiatedSerializer, gv),
+	}
+
+	return NewRESTClient(baseURL, versionedAPIPath, clientContent, rateLimiter, httpClient)
 }
 
 // UnversionedRESTClientFor is the same as RESTClientFor, except that it allows
@@ -338,13 +359,33 @@ func UnversionedRESTClientFor(config *Config) (*RESTClient, error) {
 		}
 	}
 
-	versionConfig := config.ContentConfig
-	if versionConfig.GroupVersion == nil {
-		v := metav1.SchemeGroupVersion
-		versionConfig.GroupVersion = &v
+	rateLimiter := config.RateLimiter
+	if rateLimiter == nil {
+		qps := config.QPS
+		if config.QPS == 0.0 {
+			qps = DefaultQPS
+		}
+		burst := config.Burst
+		if config.Burst == 0 {
+			burst = DefaultBurst
+		}
+		if qps > 0 {
+			rateLimiter = flowcontrol.NewTokenBucketRateLimiter(qps, burst)
+		}
 	}
 
-	return NewRESTClient(baseURL, versionedAPIPath, versionConfig, config.QPS, config.Burst, config.RateLimiter, httpClient)
+	gv := metav1.SchemeGroupVersion
+	if config.GroupVersion != nil {
+		gv = *config.GroupVersion
+	}
+	clientContent := ClientContentConfig{
+		AcceptContentTypes: config.AcceptContentTypes,
+		ContentType:        config.ContentType,
+		GroupVersion:       gv,
+		Negotiator:         runtime.NewClientNegotiator(config.NegotiatedSerializer, gv),
+	}
+
+	return NewRESTClient(baseURL, versionedAPIPath, clientContent, rateLimiter, httpClient)
 }
 
 // SetKubernetesDefaults sets default values on the provided client config for accessing the

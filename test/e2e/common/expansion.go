@@ -377,8 +377,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 		}
 
 		ginkgo.By("creating the pod with failed condition")
-		var podClient *framework.PodClient
-		podClient = f.PodClient()
+		var podClient *framework.PodClient = f.PodClient()
 		pod = podClient.Create(pod)
 
 		err := e2epod.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace, framework.PodStartShortTimeout)
@@ -469,8 +468,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 		}
 
 		ginkgo.By("creating the pod")
-		var podClient *framework.PodClient
-		podClient = f.PodClient()
+		var podClient *framework.PodClient = f.PodClient()
 		pod = podClient.Create(pod)
 
 		ginkgo.By("waiting for pod running")
@@ -607,8 +605,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 
 		// Start pod
 		ginkgo.By(fmt.Sprintf("Creating pod %s", pod.Name))
-		var podClient *framework.PodClient
-		podClient = f.PodClient()
+		var podClient *framework.PodClient = f.PodClient()
 		pod = podClient.Create(pod)
 		defer func() {
 			e2epod.DeletePodWithWait(f.ClientSet, pod)
@@ -640,9 +637,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 })
 
 func testPodFailSubpath(f *framework.Framework, pod *v1.Pod) {
-
-	var podClient *framework.PodClient
-	podClient = f.PodClient()
+	var podClient *framework.PodClient = f.PodClient()
 	pod = podClient.Create(pod)
 
 	defer func() {

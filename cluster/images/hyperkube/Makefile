@@ -20,9 +20,13 @@
 REGISTRY?=staging-k8s.gcr.io
 ARCH?=amd64
 OUT_DIR?=_output
-HYPERKUBE_BIN?=$(shell pwd)/../../../$(OUT_DIR)/dockerized/bin/linux/$(ARCH)/hyperkube
 
 BASEIMAGE=k8s.gcr.io/debian-hyperkube-base-$(ARCH):0.12.1
+
+LOCAL_OUTPUT_PATH=$(shell pwd)/../../../$(OUT_DIR)/local/bin/linux/$(ARCH)
+DOCKERIZED_OUTPUT_PATH=$(shell pwd)/../../../$(OUT_DIR)/dockerized/bin/linux/$(ARCH)
+OUTPUT_PATH?=$(shell test -d $(LOCAL_OUTPUT_PATH) && echo $(LOCAL_OUTPUT_PATH) || echo $(DOCKERIZED_OUTPUT_PATH))
+
 TEMP_DIR:=$(shell mktemp -d -t hyperkubeXXXXXX)
 
 all: build
@@ -33,7 +37,9 @@ ifndef VERSION
     $(error VERSION is undefined)
 endif
 	cp -r ./* ${TEMP_DIR}
-	cp ${HYPERKUBE_BIN} ${TEMP_DIR}
+
+	tar -cvzf ${TEMP_DIR}/binaries.tgz  -C ${OUTPUT_PATH} kube-apiserver kube-controller-manager \
+		kube-proxy kube-scheduler kubectl kubelet
 
 	chmod a+rx ${TEMP_DIR}/hyperkube
 

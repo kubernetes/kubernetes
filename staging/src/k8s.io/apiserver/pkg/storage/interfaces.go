@@ -218,7 +218,7 @@ type Interface interface {
 	// err := s.GuaranteedUpdate(
 	//     "myKey", &MyType{}, true,
 	//     func(input runtime.Object, res ResponseMeta) (runtime.Object, *uint64, error) {
-	//       // Before each incovation of the user defined function, "input" is reset to
+	//       // Before each invocation of the user defined function, "input" is reset to
 	//       // current contents for "myKey" in database.
 	//       curr := input.(*MyType)  // Guaranteed to succeed.
 	//

@@ -70,6 +70,28 @@ func (e *StatusError) DebugError() (string, []interface{}) {
 	return "server response object: %#v", []interface{}{e.ErrStatus}
 }
 
+// HasStatusCause returns true if the provided error has a details cause
+// with the provided type name.
+func HasStatusCause(err error, name metav1.CauseType) bool {
+	_, ok := StatusCause(err, name)
+	return ok
+}
+
+// StatusCause returns the named cause from the provided error if it exists and
+// the error is of the type APIStatus. Otherwise it returns false.
+func StatusCause(err error, name metav1.CauseType) (metav1.StatusCause, bool) {
+	apierr, ok := err.(APIStatus)
+	if !ok || apierr == nil || apierr.Status().Details == nil {
+		return metav1.StatusCause{}, false
+	}
+	for _, cause := range apierr.Status().Details.Causes {
+		if cause.Type == name {
+			return cause, true
+		}
+	}
+	return metav1.StatusCause{}, false
+}
+
 // UnexpectedObjectError can be returned by FromObject if it's passed a non-status object.
 type UnexpectedObjectError struct {
 	Object runtime.Object
@@ -201,6 +223,7 @@ func NewApplyConflict(causes []metav1.StatusCause, message string) *StatusError 
 }
 
 // NewGone returns an error indicating the item no longer available at the server and no forwarding address is known.
+// DEPRECATED: Please use NewResourceExpired instead.
 func NewGone(message string) *StatusError {
 	return &StatusError{metav1.Status{
 		Status:  metav1.StatusFailure,

@@ -500,6 +500,9 @@ func (decoder *generalStructDecoder) Decode(ptr unsafe.Pointer, iter *Iterator) 
 	if !iter.readObjectStart() {
 		return
 	}
+	if !iter.incrementDepth() {
+		return
+	}
 	var c byte
 	for c = ','; c == ','; c = iter.nextToken() {
 		decoder.decodeOneField(ptr, iter)
@@ -510,6 +513,7 @@ func (decoder *generalStructDecoder) Decode(ptr unsafe.Pointer, iter *Iterator) 
 	if c != '}' {
 		iter.ReportError("struct Decode", `expect }, but found `+string([]byte{c}))
 	}
+	iter.decrementDepth()
 }
 
 func (decoder *generalStructDecoder) decodeOneField(ptr unsafe.Pointer, iter *Iterator) {
@@ -571,6 +575,9 @@ func (decoder *oneFieldStructDecoder) Decode(ptr unsafe.Pointer, iter *Iterator)
 	if !iter.readObjectStart() {
 		return
 	}
+	if !iter.incrementDepth() {
+		return
+	}
 	for {
 		if iter.readFieldHash() == decoder.fieldHash {
 			decoder.fieldDecoder.Decode(ptr, iter)
@@ -584,6 +591,7 @@ func (decoder *oneFieldStructDecoder) Decode(ptr unsafe.Pointer, iter *Iterator)
 	if iter.Error != nil && iter.Error != io.EOF {
 		iter.Error = fmt.Errorf("%v.%s", decoder.typ, iter.Error.Error())
 	}
+	iter.decrementDepth()
 }
 
 type twoFieldsStructDecoder struct {
@@ -596,6 +604,9 @@ type twoFieldsStructDecoder struct {
 
 func (decoder *twoFieldsStructDecoder) Decode(ptr unsafe.Pointer, iter *Iterator) {
 	if !iter.readObjectStart() {
+		return
+	}
+	if !iter.incrementDepth() {
 		return
 	}
 	for {
@@ -614,6 +625,7 @@ func (decoder *twoFieldsStructDecoder) Decode(ptr unsafe.Pointer, iter *Iterator
 	if iter.Error != nil && iter.Error != io.EOF {
 		iter.Error = fmt.Errorf("%v.%s", decoder.typ, iter.Error.Error())
 	}
+	iter.decrementDepth()
 }
 
 type threeFieldsStructDecoder struct {
@@ -628,6 +640,9 @@ type threeFieldsStructDecoder struct {
 
 func (decoder *threeFieldsStructDecoder) Decode(ptr unsafe.Pointer, iter *Iterator) {
 	if !iter.readObjectStart() {
+		return
+	}
+	if !iter.incrementDepth() {
 		return
 	}
 	for {
@@ -648,6 +663,7 @@ func (decoder *threeFieldsStructDecoder) Decode(ptr unsafe.Pointer, iter *Iterat
 	if iter.Error != nil && iter.Error != io.EOF {
 		iter.Error = fmt.Errorf("%v.%s", decoder.typ, iter.Error.Error())
 	}
+	iter.decrementDepth()
 }
 
 type fourFieldsStructDecoder struct {
@@ -664,6 +680,9 @@ type fourFieldsStructDecoder struct {
 
 func (decoder *fourFieldsStructDecoder) Decode(ptr unsafe.Pointer, iter *Iterator) {
 	if !iter.readObjectStart() {
+		return
+	}
+	if !iter.incrementDepth() {
 		return
 	}
 	for {
@@ -686,6 +705,7 @@ func (decoder *fourFieldsStructDecoder) Decode(ptr unsafe.Pointer, iter *Iterato
 	if iter.Error != nil && iter.Error != io.EOF {
 		iter.Error = fmt.Errorf("%v.%s", decoder.typ, iter.Error.Error())
 	}
+	iter.decrementDepth()
 }
 
 type fiveFieldsStructDecoder struct {
@@ -704,6 +724,9 @@ type fiveFieldsStructDecoder struct {
 
 func (decoder *fiveFieldsStructDecoder) Decode(ptr unsafe.Pointer, iter *Iterator) {
 	if !iter.readObjectStart() {
+		return
+	}
+	if !iter.incrementDepth() {
 		return
 	}
 	for {
@@ -728,6 +751,7 @@ func (decoder *fiveFieldsStructDecoder) Decode(ptr unsafe.Pointer, iter *Iterato
 	if iter.Error != nil && iter.Error != io.EOF {
 		iter.Error = fmt.Errorf("%v.%s", decoder.typ, iter.Error.Error())
 	}
+	iter.decrementDepth()
 }
 
 type sixFieldsStructDecoder struct {
@@ -748,6 +772,9 @@ type sixFieldsStructDecoder struct {
 
 func (decoder *sixFieldsStructDecoder) Decode(ptr unsafe.Pointer, iter *Iterator) {
 	if !iter.readObjectStart() {
+		return
+	}
+	if !iter.incrementDepth() {
 		return
 	}
 	for {
@@ -774,6 +801,7 @@ func (decoder *sixFieldsStructDecoder) Decode(ptr unsafe.Pointer, iter *Iterator
 	if iter.Error != nil && iter.Error != io.EOF {
 		iter.Error = fmt.Errorf("%v.%s", decoder.typ, iter.Error.Error())
 	}
+	iter.decrementDepth()
 }
 
 type sevenFieldsStructDecoder struct {
@@ -796,6 +824,9 @@ type sevenFieldsStructDecoder struct {
 
 func (decoder *sevenFieldsStructDecoder) Decode(ptr unsafe.Pointer, iter *Iterator) {
 	if !iter.readObjectStart() {
+		return
+	}
+	if !iter.incrementDepth() {
 		return
 	}
 	for {
@@ -824,6 +855,7 @@ func (decoder *sevenFieldsStructDecoder) Decode(ptr unsafe.Pointer, iter *Iterat
 	if iter.Error != nil && iter.Error != io.EOF {
 		iter.Error = fmt.Errorf("%v.%s", decoder.typ, iter.Error.Error())
 	}
+	iter.decrementDepth()
 }
 
 type eightFieldsStructDecoder struct {
@@ -848,6 +880,9 @@ type eightFieldsStructDecoder struct {
 
 func (decoder *eightFieldsStructDecoder) Decode(ptr unsafe.Pointer, iter *Iterator) {
 	if !iter.readObjectStart() {
+		return
+	}
+	if !iter.incrementDepth() {
 		return
 	}
 	for {
@@ -878,6 +913,7 @@ func (decoder *eightFieldsStructDecoder) Decode(ptr unsafe.Pointer, iter *Iterat
 	if iter.Error != nil && iter.Error != io.EOF {
 		iter.Error = fmt.Errorf("%v.%s", decoder.typ, iter.Error.Error())
 	}
+	iter.decrementDepth()
 }
 
 type nineFieldsStructDecoder struct {
@@ -904,6 +940,9 @@ type nineFieldsStructDecoder struct {
 
 func (decoder *nineFieldsStructDecoder) Decode(ptr unsafe.Pointer, iter *Iterator) {
 	if !iter.readObjectStart() {
+		return
+	}
+	if !iter.incrementDepth() {
 		return
 	}
 	for {
@@ -936,6 +975,7 @@ func (decoder *nineFieldsStructDecoder) Decode(ptr unsafe.Pointer, iter *Iterato
 	if iter.Error != nil && iter.Error != io.EOF {
 		iter.Error = fmt.Errorf("%v.%s", decoder.typ, iter.Error.Error())
 	}
+	iter.decrementDepth()
 }
 
 type tenFieldsStructDecoder struct {
@@ -964,6 +1004,9 @@ type tenFieldsStructDecoder struct {
 
 func (decoder *tenFieldsStructDecoder) Decode(ptr unsafe.Pointer, iter *Iterator) {
 	if !iter.readObjectStart() {
+		return
+	}
+	if !iter.incrementDepth() {
 		return
 	}
 	for {
@@ -998,6 +1041,7 @@ func (decoder *tenFieldsStructDecoder) Decode(ptr unsafe.Pointer, iter *Iterator
 	if iter.Error != nil && iter.Error != io.EOF {
 		iter.Error = fmt.Errorf("%v.%s", decoder.typ, iter.Error.Error())
 	}
+	iter.decrementDepth()
 }
 
 type structFieldDecoder struct {

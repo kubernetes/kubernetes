@@ -45,15 +45,13 @@ import (
 	"strconv"
 	"time"
 
-	"k8s.io/api/core/v1"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -85,9 +83,6 @@ const (
 	// PodCleanupTimeout is a waiting period for pod to be cleaned up and unmount its volumes so we
 	// don't tear down containers with NFS/Ceph/Gluster server too early.
 	PodCleanupTimeout = 20 * time.Second
-
-	// Template for iSCSI IQN.
-	iSCSIIQNTemplate = "iqn.2003-01.io.k8s:e2e.%s"
 )
 
 // SizeRange encapsulates a range of sizes specified as minimum and maximum quantity strings
@@ -209,74 +204,11 @@ func NewGlusterfsServer(cs clientset.Interface, namespace string) (config TestCo
 	return config, pod, ip
 }
 
-// NewISCSIServer is an iSCSI-specific wrapper for CreateStorageServer.
-func NewISCSIServer(cs clientset.Interface, namespace string) (config TestConfig, pod *v1.Pod, ip, iqn string) {
-	// Generate cluster-wide unique IQN
-	iqn = fmt.Sprintf(iSCSIIQNTemplate, namespace)
-	config = TestConfig{
-		Namespace:   namespace,
-		Prefix:      "iscsi",
-		ServerImage: imageutils.GetE2EImage(imageutils.VolumeISCSIServer),
-		ServerArgs:  []string{iqn},
-		ServerVolumes: map[string]string{
-			// iSCSI container needs to insert modules from the host
-			"/lib/modules": "/lib/modules",
-			// iSCSI container needs to configure kernel
-			"/sys/kernel": "/sys/kernel",
-			// iSCSI source "block devices" must be available on the host
-			"/srv/iscsi": "/srv/iscsi",
-		},
-		ServerReadyMessage: "iscsi target started",
-		ServerHostNetwork:  true,
-	}
-	pod, ip = CreateStorageServer(cs, config)
-	// Make sure the client runs on the same node as server so we don't need to open any firewalls.
-	config.ClientNodeName = pod.Spec.NodeName
-	return config, pod, ip, iqn
-}
-
-// NewRBDServer is a CephRBD-specific wrapper for CreateStorageServer.
-func NewRBDServer(cs clientset.Interface, namespace string) (config TestConfig, pod *v1.Pod, secret *v1.Secret, ip string) {
-	config = TestConfig{
-		Namespace:   namespace,
-		Prefix:      "rbd",
-		ServerImage: imageutils.GetE2EImage(imageutils.VolumeRBDServer),
-		ServerPorts: []int{6789},
-		ServerVolumes: map[string]string{
-			"/lib/modules": "/lib/modules",
-		},
-		ServerReadyMessage: "Ceph is ready",
-	}
-	pod, ip = CreateStorageServer(cs, config)
-	// create secrets for the server
-	secret = &v1.Secret{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Secret",
-			APIVersion: "v1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: config.Prefix + "-secret",
-		},
-		Data: map[string][]byte{
-			// from test/images/volumes-tester/rbd/keyring
-			"key": []byte("AQDRrKNVbEevChAAEmRC+pW/KBVHxa0w/POILA=="),
-		},
-		Type: "kubernetes.io/rbd",
-	}
-
-	secret, err := cs.CoreV1().Secrets(config.Namespace).Create(secret)
-	if err != nil {
-		framework.Failf("Failed to create secrets for Ceph RBD: %v", err)
-	}
-
-	return config, pod, secret, ip
-}
-
-// CreateStorageServer is a wrapper for StartVolumeServer(). A storage server config is passed in, and a pod pointer
+// CreateStorageServer is a wrapper for startVolumeServer(). A storage server config is passed in, and a pod pointer
 // and ip address string are returned.
 // Note: Expect() is called so no error is returned.
 func CreateStorageServer(cs clientset.Interface, config TestConfig) (pod *v1.Pod, ip string) {
-	pod = StartVolumeServer(cs, config)
+	pod = startVolumeServer(cs, config)
 	gomega.Expect(pod).NotTo(gomega.BeNil(), "storage server pod should not be nil")
 	ip = pod.Status.PodIP
 	gomega.Expect(len(ip)).NotTo(gomega.BeZero(), fmt.Sprintf("pod %s's IP should not be empty", pod.Name))
@@ -284,10 +216,10 @@ func CreateStorageServer(cs clientset.Interface, config TestConfig) (pod *v1.Pod
 	return pod, ip
 }
 
-// StartVolumeServer starts a container specified by config.serverImage and exports all
+// startVolumeServer starts a container specified by config.serverImage and exports all
 // config.serverPorts from it. The returned pod should be used to get the server
 // IP address and create appropriate VolumeSource.
-func StartVolumeServer(client clientset.Interface, config TestConfig) *v1.Pod {
+func startVolumeServer(client clientset.Interface, config TestConfig) *v1.Pod {
 	podClient := client.CoreV1().Pods(config.Namespace)
 
 	portCount := len(config.ServerPorts)
@@ -373,7 +305,7 @@ func StartVolumeServer(client clientset.Interface, config TestConfig) *v1.Pod {
 	serverPod, err := podClient.Create(serverPod)
 	// ok if the server pod already exists. TODO: make this controllable by callers
 	if err != nil {
-		if apierrs.IsAlreadyExists(err) {
+		if apierrors.IsAlreadyExists(err) {
 			framework.Logf("Ignore \"already-exists\" error, re-get pod...")
 			ginkgo.By(fmt.Sprintf("re-getting the %q server pod", serverPodName))
 			serverPod, err = podClient.Get(serverPodName, metav1.GetOptions{})
@@ -401,31 +333,6 @@ func StartVolumeServer(client clientset.Interface, config TestConfig) *v1.Pod {
 	return pod
 }
 
-// CleanUpVolumeServer is a wrapper of cleanup function for volume server without secret created by specific CreateStorageServer function.
-func CleanUpVolumeServer(f *framework.Framework, serverPod *v1.Pod) {
-	CleanUpVolumeServerWithSecret(f, serverPod, nil)
-}
-
-// CleanUpVolumeServerWithSecret is a wrapper of cleanup function for volume server with secret created by specific CreateStorageServer function.
-func CleanUpVolumeServerWithSecret(f *framework.Framework, serverPod *v1.Pod, secret *v1.Secret) {
-	cs := f.ClientSet
-	ns := f.Namespace
-
-	if secret != nil {
-		framework.Logf("Deleting server secret %q...", secret.Name)
-		err := cs.CoreV1().Secrets(ns.Name).Delete(secret.Name, &metav1.DeleteOptions{})
-		if err != nil {
-			framework.Logf("Delete secret failed: %v", err)
-		}
-	}
-
-	e2elog.Logf("Deleting server pod %q...", serverPod.Name)
-	err := e2epod.DeletePodWithWait(cs, serverPod)
-	if err != nil {
-		framework.Logf("Server pod delete failed: %v", err)
-	}
-}
-
 // TestCleanup cleans both server and client pods.
 func TestCleanup(f *framework.Framework, config TestConfig) {
 	ginkgo.By(fmt.Sprint("cleaning the environment after ", config.Prefix))
@@ -443,7 +350,7 @@ func TestCleanup(f *framework.Framework, config TestConfig) {
 	}
 }
 
-func runVolumeTesterPod(client clientset.Interface, config TestConfig, podSuffix string, fsGroup *int64, tests []Test) (*v1.Pod, error) {
+func runVolumeTesterPod(client clientset.Interface, config TestConfig, podSuffix string, privileged bool, fsGroup *int64, tests []Test) (*v1.Pod, error) {
 	ginkgo.By(fmt.Sprint("starting ", config.Prefix, "-", podSuffix))
 	var gracePeriod int64 = 1
 	var command string
@@ -488,6 +395,17 @@ func runVolumeTesterPod(client clientset.Interface, config TestConfig, podSuffix
 
 	for i, test := range tests {
 		volumeName := fmt.Sprintf("%s-%s-%d", config.Prefix, "volume", i)
+
+		// We need to make the container privileged when SELinux is enabled on the
+		// host,  so the test can write data to a location like /tmp. Also, due to
+		// the Docker bug below, it's not currently possible to map a device with
+		// a privileged container, so we don't go privileged for block volumes.
+		// https://github.com/moby/moby/issues/35991
+		if privileged && test.Mode == v1.PersistentVolumeBlock {
+			privileged = false
+		}
+		clientPod.Spec.Containers[0].SecurityContext = GenerateSecurityContext(privileged)
+
 		if test.Mode == v1.PersistentVolumeBlock {
 			clientPod.Spec.Containers[0].VolumeDevices = append(clientPod.Spec.Containers[0].VolumeDevices, v1.VolumeDevice{
 				Name:       volumeName,
@@ -517,28 +435,28 @@ func runVolumeTesterPod(client clientset.Interface, config TestConfig, podSuffix
 	return clientPod, nil
 }
 
-func testVolumeContent(client clientset.Interface, pod *v1.Pod, fsGroup *int64, fsType string, tests []Test) {
+func testVolumeContent(f *framework.Framework, pod *v1.Pod, fsGroup *int64, fsType string, tests []Test) {
 	ginkgo.By("Checking that text file contents are perfect.")
 	for i, test := range tests {
 		if test.Mode == v1.PersistentVolumeBlock {
 			// Block: check content
 			deviceName := fmt.Sprintf("/opt/%d", i)
-			commands := GenerateReadBlockCmd(deviceName, len(test.ExpectedContent))
+			commands := generateReadBlockCmd(deviceName, len(test.ExpectedContent))
 			_, err := framework.LookForStringInPodExec(pod.Namespace, pod.Name, commands, test.ExpectedContent, time.Minute)
 			framework.ExpectNoError(err, "failed: finding the contents of the block device %s.", deviceName)
 
 			// Check that it's a real block device
-			utils.CheckVolumeModeOfPath(pod, test.Mode, deviceName)
+			utils.CheckVolumeModeOfPath(f, pod, test.Mode, deviceName)
 		} else {
 			// Filesystem: check content
 			fileName := fmt.Sprintf("/opt/%d/%s", i, test.File)
-			commands := GenerateReadFileCmd(fileName)
+			commands := generateReadFileCmd(fileName)
 			_, err := framework.LookForStringInPodExec(pod.Namespace, pod.Name, commands, test.ExpectedContent, time.Minute)
 			framework.ExpectNoError(err, "failed: finding the contents of the mounted file %s.", fileName)
 
 			// Check that a directory has been mounted
 			dirName := filepath.Dir(fileName)
-			utils.CheckVolumeModeOfPath(pod, test.Mode, dirName)
+			utils.CheckVolumeModeOfPath(f, pod, test.Mode, dirName)
 
 			if !framework.NodeOSDistroIs("windows") {
 				// Filesystem: check fsgroup
@@ -563,28 +481,32 @@ func testVolumeContent(client clientset.Interface, pod *v1.Pod, fsGroup *int64, 
 // and check that the pod sees expected data, e.g. from the server pod.
 // Multiple Tests can be specified to mount multiple volumes to a single
 // pod.
-func TestVolumeClient(client clientset.Interface, config TestConfig, fsGroup *int64, fsType string, tests []Test) {
-	clientPod, err := runVolumeTesterPod(client, config, "client", fsGroup, tests)
+func TestVolumeClient(f *framework.Framework, config TestConfig, fsGroup *int64, fsType string, tests []Test) {
+	clientPod, err := runVolumeTesterPod(f.ClientSet, config, "client", false, fsGroup, tests)
 	if err != nil {
 		framework.Failf("Failed to create client pod: %v", err)
 
 	}
-	framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(client, clientPod))
-	testVolumeContent(client, clientPod, fsGroup, fsType, tests)
+	framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(f.ClientSet, clientPod))
+	testVolumeContent(f, clientPod, fsGroup, fsType, tests)
 }
 
 // InjectContent inserts index.html with given content into given volume. It does so by
 // starting and auxiliary pod which writes the file there.
 // The volume must be writable.
-func InjectContent(client clientset.Interface, config TestConfig, fsGroup *int64, fsType string, tests []Test) {
-	injectorPod, err := runVolumeTesterPod(client, config, "injector", fsGroup, tests)
+func InjectContent(f *framework.Framework, config TestConfig, fsGroup *int64, fsType string, tests []Test) {
+	privileged := true
+	if framework.NodeOSDistroIs("windows") {
+		privileged = false
+	}
+	injectorPod, err := runVolumeTesterPod(f.ClientSet, config, "injector", privileged, fsGroup, tests)
 	if err != nil {
 		framework.Failf("Failed to create injector pod: %v", err)
 		return
 	}
 	defer func() {
-		e2epod.DeletePodOrFail(client, injectorPod.Namespace, injectorPod.Name)
-		e2epod.WaitForPodToDisappear(client, injectorPod.Namespace, injectorPod.Name, labels.Everything(), framework.Poll, framework.PodDeleteTimeout)
+		e2epod.DeletePodOrFail(f.ClientSet, injectorPod.Namespace, injectorPod.Name)
+		e2epod.WaitForPodToDisappear(f.ClientSet, injectorPod.Namespace, injectorPod.Name, labels.Everything(), framework.Poll, framework.PodDeleteTimeout)
 	}()
 
 	ginkgo.By("Writing text file contents in the container.")
@@ -593,33 +515,20 @@ func InjectContent(client clientset.Interface, config TestConfig, fsGroup *int64
 		if test.Mode == v1.PersistentVolumeBlock {
 			// Block: write content
 			deviceName := fmt.Sprintf("/opt/%d", i)
-			commands = append(commands, GenerateWriteBlockCmd(test.ExpectedContent, deviceName)...)
+			commands = append(commands, generateWriteBlockCmd(test.ExpectedContent, deviceName)...)
 
 		} else {
 			// Filesystem: write content
 			fileName := fmt.Sprintf("/opt/%d/%s", i, test.File)
-			commands = append(commands, GenerateWriteFileCmd(test.ExpectedContent, fileName)...)
+			commands = append(commands, generateWriteFileCmd(test.ExpectedContent, fileName)...)
 		}
-		out, err := framework.RunKubectl(commands...)
+		out, err := framework.RunKubectl(injectorPod.Namespace, commands...)
 		framework.ExpectNoError(err, "failed: writing the contents: %s", out)
 	}
 
 	// Check that the data have been really written in this pod.
 	// This tests non-persistent volume types
-	testVolumeContent(client, injectorPod, fsGroup, fsType, tests)
-}
-
-// CreateGCEVolume creates PersistentVolumeSource for GCEVolume.
-func CreateGCEVolume() (*v1.PersistentVolumeSource, string) {
-	diskName, err := e2epv.CreatePDWithRetry()
-	framework.ExpectNoError(err)
-	return &v1.PersistentVolumeSource{
-		GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
-			PDName:   diskName,
-			FSType:   "ext3",
-			ReadOnly: false,
-		},
-	}, diskName
+	testVolumeContent(f, injectorPod, fsGroup, fsType, tests)
 }
 
 // GenerateScriptCmd generates the corresponding command lines to execute a command.
@@ -634,45 +543,20 @@ func GenerateScriptCmd(command string) []string {
 	return commands
 }
 
-// GenerateWriteBlockCmd generates the corresponding command lines to write to a block device the given content.
-// Depending on the Node OS is Windows or linux, the command will use powershell or /bin/sh
-func GenerateWriteBlockCmd(content, fullPath string) []string {
+// generateWriteCmd is used by generateWriteBlockCmd and generateWriteFileCmd
+func generateWriteCmd(content, path string) []string {
 	var commands []string
 	if !framework.NodeOSDistroIs("windows") {
-		commands = []string{"/bin/sh", "-c", "echo '" + content + "' > " + fullPath}
+		commands = []string{"/bin/sh", "-c", "echo '" + content + "' > " + path}
 	} else {
-		commands = []string{"powershell", "/c", "echo '" + content + "' > " + fullPath}
+		commands = []string{"powershell", "/c", "echo '" + content + "' > " + path}
 	}
 	return commands
 }
 
-// GenerateWriteFileCmd generates the corresponding command lines to write a file with the given content and file path.
+// generateReadBlockCmd generates the corresponding command lines to read from a block device with the given file path.
 // Depending on the Node OS is Windows or linux, the command will use powershell or /bin/sh
-func GenerateWriteFileCmd(content, fullPath string) []string {
-	var commands []string
-	if !framework.NodeOSDistroIs("windows") {
-		commands = []string{"/bin/sh", "-c", "echo '" + content + "' > " + fullPath}
-	} else {
-		commands = []string{"powershell", "/c", "echo '" + content + "' > " + fullPath}
-	}
-	return commands
-}
-
-// GenerateReadFileCmd generates the corresponding command lines to read from a file with the given file path.
-// Depending on the Node OS is Windows or linux, the command will use powershell or /bin/sh
-func GenerateReadFileCmd(fullPath string) []string {
-	var commands []string
-	if !framework.NodeOSDistroIs("windows") {
-		commands = []string{"cat", fullPath}
-	} else {
-		commands = []string{"powershell", "/c", "type " + fullPath}
-	}
-	return commands
-}
-
-// GenerateReadBlockCmd generates the corresponding command lines to read from a block device with the given file path.
-// Depending on the Node OS is Windows or linux, the command will use powershell or /bin/sh
-func GenerateReadBlockCmd(fullPath string, numberOfCharacters int) []string {
+func generateReadBlockCmd(fullPath string, numberOfCharacters int) []string {
 	var commands []string
 	if !framework.NodeOSDistroIs("windows") {
 		commands = []string{"head", "-c", strconv.Itoa(numberOfCharacters), fullPath}
@@ -683,23 +567,28 @@ func GenerateReadBlockCmd(fullPath string, numberOfCharacters int) []string {
 	return commands
 }
 
-// GenerateWriteandExecuteScriptFileCmd generates the corresponding command lines to write a file with the given file path
-// and also execute this file.
+// generateWriteBlockCmd generates the corresponding command lines to write to a block device the given content.
 // Depending on the Node OS is Windows or linux, the command will use powershell or /bin/sh
-func GenerateWriteandExecuteScriptFileCmd(content, fileName, filePath string) []string {
-	// for windows cluster, modify the Pod spec.
-	if framework.NodeOSDistroIs("windows") {
-		scriptName := fmt.Sprintf("%s.ps1", fileName)
-		fullPath := filepath.Join(filePath, scriptName)
+func generateWriteBlockCmd(content, fullPath string) []string {
+	return generateWriteCmd(content, fullPath)
+}
 
-		cmd := "echo \"" + content + "\" > " + fullPath + "; .\\" + fullPath
-		framework.Logf("generated pod command %s", cmd)
-		return []string{"powershell", "/c", cmd}
+// generateReadFileCmd generates the corresponding command lines to read from a file with the given file path.
+// Depending on the Node OS is Windows or linux, the command will use powershell or /bin/sh
+func generateReadFileCmd(fullPath string) []string {
+	var commands []string
+	if !framework.NodeOSDistroIs("windows") {
+		commands = []string{"cat", fullPath}
+	} else {
+		commands = []string{"powershell", "/c", "type " + fullPath}
 	}
-	scriptName := fmt.Sprintf("%s.sh", fileName)
-	fullPath := filepath.Join(filePath, scriptName)
-	cmd := fmt.Sprintf("echo \"%s\" > %s; chmod u+x %s; %s;", content, fullPath, fullPath, fullPath)
-	return []string{"/bin/sh", "-ec", cmd}
+	return commands
+}
+
+// generateWriteFileCmd generates the corresponding command lines to write a file with the given content and file path.
+// Depending on the Node OS is Windows or linux, the command will use powershell or /bin/sh
+func generateWriteFileCmd(content, fullPath string) []string {
+	return generateWriteCmd(content, fullPath)
 }
 
 // GenerateSecurityContext generates the corresponding container security context with the given inputs

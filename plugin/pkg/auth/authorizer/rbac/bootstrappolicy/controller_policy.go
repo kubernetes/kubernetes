@@ -255,7 +255,7 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "pod-garbage-collector"},
 		Rules: []rbacv1.PolicyRule{
 			rbacv1helpers.NewRule("list", "watch", "delete").Groups(legacyGroup).Resources("pods").RuleOrDie(),
-			rbacv1helpers.NewRule("list").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
+			rbacv1helpers.NewRule("get", "list").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
 		},
 	})
 	addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{

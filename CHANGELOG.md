@@ -1,13 +1,14 @@
 ## Development release:
 
-- [CHANGELOG-1.16.md](https://github.com/kubernetes/kubernetes/blob/master/CHANGELOG-1.16.md)
+- [CHANGELOG-1.17.md](https://github.com/kubernetes/kubernetes/blob/master/CHANGELOG-1.17.md)
 
 ## Current release:
 
-- [CHANGELOG-1.15.md](https://github.com/kubernetes/kubernetes/blob/master/CHANGELOG-1.15.md)
+- [CHANGELOG-1.16.md](https://github.com/kubernetes/kubernetes/blob/master/CHANGELOG-1.16.md)
 
 ## Older releases:
 
+- [CHANGELOG-1.15.md](https://github.com/kubernetes/kubernetes/blob/master/CHANGELOG-1.15.md)
 - [CHANGELOG-1.14.md](https://github.com/kubernetes/kubernetes/blob/master/CHANGELOG-1.14.md)
 - [CHANGELOG-1.13.md](https://github.com/kubernetes/kubernetes/blob/master/CHANGELOG-1.13.md)
 - [CHANGELOG-1.12.md](https://github.com/kubernetes/kubernetes/blob/master/CHANGELOG-1.12.md)

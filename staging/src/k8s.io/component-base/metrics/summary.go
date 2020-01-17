@@ -44,7 +44,7 @@ func NewSummary(opts *SummaryOpts) *Summary {
 		lazyMetric:  lazyMetric{},
 	}
 	s.setPrometheusSummary(noopMetric{})
-	s.lazyInit(s)
+	s.lazyInit(s, BuildFQName(opts.Namespace, opts.Subsystem, opts.Name))
 	return s
 }
 
@@ -98,7 +98,7 @@ func NewSummaryVec(opts *SummaryOpts, labels []string) *SummaryVec {
 		originalLabels: labels,
 		lazyMetric:     lazyMetric{},
 	}
-	v.lazyInit(v)
+	v.lazyInit(v, BuildFQName(opts.Namespace, opts.Subsystem, opts.Name))
 	return v
 }
 
@@ -159,4 +159,13 @@ func (v *SummaryVec) Delete(labels map[string]string) bool {
 		return false // since we haven't created the metric, we haven't deleted a metric with the passed in values
 	}
 	return v.SummaryVec.Delete(labels)
+}
+
+// Reset deletes all metrics in this vector.
+func (v *SummaryVec) Reset() {
+	if !v.IsCreated() {
+		return
+	}
+
+	v.SummaryVec.Reset()
 }

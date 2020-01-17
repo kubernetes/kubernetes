@@ -24,8 +24,7 @@ import (
 
 	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -46,7 +45,7 @@ type HandlerRunner interface {
 // RuntimeHelper wraps kubelet to make container runtime
 // able to get necessary informations like the RunContainerOptions, DNS settings, Host IP.
 type RuntimeHelper interface {
-	GenerateRunContainerOptions(pod *v1.Pod, container *v1.Container, podIP string) (contOpts *RunContainerOptions, cleanupAction func(), err error)
+	GenerateRunContainerOptions(pod *v1.Pod, container *v1.Container, podIP string, podIPs []string) (contOpts *RunContainerOptions, cleanupAction func(), err error)
 	GetPodDNS(pod *v1.Pod) (dnsConfig *runtimeapi.DNSConfig, err error)
 	// GetPodCgroupParent returns the CgroupName identifier, and its literal cgroupfs form on the host
 	// of a pod.
@@ -208,12 +207,6 @@ func (irecorder *innerEventRecorder) Eventf(object runtime.Object, eventtype, re
 		irecorder.recorder.Eventf(ref, eventtype, reason, messageFmt, args...)
 	}
 
-}
-
-func (irecorder *innerEventRecorder) PastEventf(object runtime.Object, timestamp metav1.Time, eventtype, reason, messageFmt string, args ...interface{}) {
-	if ref, ok := irecorder.shouldRecordEvent(object); ok {
-		irecorder.recorder.PastEventf(ref, timestamp, eventtype, reason, messageFmt, args...)
-	}
 }
 
 func (irecorder *innerEventRecorder) AnnotatedEventf(object runtime.Object, annotations map[string]string, eventtype, reason, messageFmt string, args ...interface{}) {

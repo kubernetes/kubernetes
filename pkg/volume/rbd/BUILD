@@ -18,7 +18,6 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/volume/rbd",
     deps = [
         "//pkg/features:go_default_library",
-        "//pkg/util/mount:go_default_library",
         "//pkg/util/node:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/util:go_default_library",
@@ -35,6 +34,8 @@ go_library(
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/cloud-provider/volume/helpers:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/utils/exec:go_default_library",
+        "//vendor/k8s.io/utils/mount:go_default_library",
         "//vendor/k8s.io/utils/path:go_default_library",
         "//vendor/k8s.io/utils/strings:go_default_library",
     ],
@@ -45,7 +46,6 @@ go_test(
     srcs = ["rbd_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/util/mount:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/testing:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
@@ -55,6 +55,7 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/util/uuid:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/fake:go_default_library",
         "//staging/src/k8s.io/client-go/util/testing:go_default_library",
+        "//vendor/k8s.io/utils/mount:go_default_library",
     ],
 )
 

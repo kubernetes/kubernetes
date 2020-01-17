@@ -81,7 +81,7 @@ func runCleanupNode(c workflow.RunData) error {
 		klog.Warningf("[reset] Failed to remove containers: %v\n", err)
 	}
 
-	r.AddDirsToClean("/etc/cni/net.d", "/var/lib/dockershim", "/var/run/kubernetes", "/var/lib/cni")
+	r.AddDirsToClean("/var/lib/dockershim", "/var/run/kubernetes", "/var/lib/cni")
 
 	// Remove contents from the config and pki directories
 	klog.V(1).Infoln("[reset] Removing contents from the config and pki directories")
@@ -128,7 +128,7 @@ func resetConfigDir(configPathDir, pkiPathDir string) {
 	fmt.Printf("[reset] Deleting contents of config directories: %v\n", dirsToClean)
 	for _, dir := range dirsToClean {
 		if err := CleanDir(dir); err != nil {
-			klog.Warningf("[reset] Failed to remove directory: %q [%v]\n", dir, err)
+			klog.Warningf("[reset] Failed to delete contents of %q directory: %v", dir, err)
 		}
 	}
 
