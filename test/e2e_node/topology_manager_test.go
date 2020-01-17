@@ -17,10 +17,16 @@ limitations under the License.
 package e2enode
 
 import (
+	"context"
 	"fmt"
+	"os/exec"
+	"strconv"
+	"strings"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
@@ -29,7 +35,9 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -37,16 +45,52 @@ import (
 
 // Helper for makeTopologyManagerPod().
 type tmCtnAttribute struct {
-	ctnName    string
-	cpuRequest string
-	cpuLimit   string
+	ctnName     string
+	cpuRequest  string
+	cpuLimit    string
+	devResource string
+}
+
+func detectNUMANodes() int {
+	outData, err := exec.Command("/bin/sh", "-c", "lscpu | grep \"NUMA node(s):\" | cut -d \":\" -f 2").Output()
+	framework.ExpectNoError(err)
+
+	numaNodes, err := strconv.Atoi(strings.TrimSpace(string(outData)))
+	framework.ExpectNoError(err)
+
+	return numaNodes
+}
+
+// TODO: what about HT?
+func detectCoresPerSocket() int {
+	outData, err := exec.Command("/bin/sh", "-c", "lscpu | grep \"Core(s) per socket:\" | cut -d \":\" -f 2").Output()
+	framework.ExpectNoError(err)
+
+	coreCount, err := strconv.Atoi(strings.TrimSpace(string(outData)))
+	framework.ExpectNoError(err)
+
+	return coreCount
+}
+
+func detectSRIOVDevices() int {
+	outData, err := exec.Command("/bin/sh", "-c", "ls /sys/bus/pci/devices/*/sriov_totalvfs | wc -w").Output()
+	framework.ExpectNoError(err)
+
+	devCount, err := strconv.Atoi(strings.TrimSpace(string(outData)))
+	framework.ExpectNoError(err)
+
+	return devCount
 }
 
 // makeTopologyMangerPod returns a pod with the provided tmCtnAttributes.
 func makeTopologyManagerPod(podName string, tmCtnAttributes []tmCtnAttribute) *v1.Pod {
+	cpusetCmd := "grep Cpus_allowed_list /proc/self/status | cut -f2 && sleep 1d"
+	return makeTopologyManagerTestPod(podName, cpusetCmd, tmCtnAttributes)
+}
+
+func makeTopologyManagerTestPod(podName, podCmd string, tmCtnAttributes []tmCtnAttribute) *v1.Pod {
 	var containers []v1.Container
 	for _, ctnAttr := range tmCtnAttributes {
-		cpusetCmd := fmt.Sprintf("grep Cpus_allowed_list /proc/self/status | cut -f2 && sleep 1d")
 		ctn := v1.Container{
 			Name:  ctnAttr.ctnName,
 			Image: busyboxImage,
@@ -60,7 +104,11 @@ func makeTopologyManagerPod(podName string, tmCtnAttributes []tmCtnAttribute) *v
 					v1.ResourceName(v1.ResourceMemory): resource.MustParse("100Mi"),
 				},
 			},
-			Command: []string{"sh", "-c", cpusetCmd},
+			Command: []string{"sh", "-c", podCmd},
+		}
+		if ctnAttr.devResource != "" {
+			ctn.Resources.Requests[v1.ResourceName(ctnAttr.devResource)] = resource.MustParse("1")
+			ctn.Resources.Limits[v1.ResourceName(ctnAttr.devResource)] = resource.MustParse("1")
 		}
 		containers = append(containers, ctn)
 	}
@@ -121,7 +169,60 @@ func configureTopologyManagerInKubelet(f *framework.Framework, oldCfg *kubeletco
 	}, time.Minute, time.Second).Should(gomega.BeTrue())
 }
 
-func runTopologyManagerSuiteTests(f *framework.Framework) {
+// getSRIOVDevicePluginPod returns the Device Plugin pod for sriov resources in e2e tests.
+func getSRIOVDevicePluginPod() *v1.Pod {
+	ds := readDaemonSetV1OrDie(testfiles.ReadOrDie(SRIOVDevicePluginDSYAML))
+	p := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      SRIOVDevicePluginName,
+			Namespace: metav1.NamespaceSystem,
+		},
+
+		Spec: ds.Spec.Template.Spec,
+	}
+
+	return p
+}
+
+func readConfigMapV1OrDie(objBytes []byte) *v1.ConfigMap {
+	v1.AddToScheme(appsScheme)
+	requiredObj, err := runtime.Decode(appsCodecs.UniversalDecoder(v1.SchemeGroupVersion), objBytes)
+	if err != nil {
+		panic(err)
+	}
+	return requiredObj.(*v1.ConfigMap)
+}
+
+func readServiceAccountV1OrDie(objBytes []byte) *v1.ServiceAccount {
+	v1.AddToScheme(appsScheme)
+	requiredObj, err := runtime.Decode(appsCodecs.UniversalDecoder(v1.SchemeGroupVersion), objBytes)
+	if err != nil {
+		panic(err)
+	}
+	return requiredObj.(*v1.ServiceAccount)
+}
+
+// numberOfResources returns the number of resources advertised by a node.
+func numberOfResources(node *v1.Node, resourceKey string) int64 {
+	val, ok := node.Status.Capacity[v1.ResourceName(resourceKey)]
+
+	if !ok {
+		return 0
+	}
+
+	return val.Value()
+}
+
+func deletePodInNamespace(f *framework.Framework, namespace, name string) {
+	gp := int64(0)
+	deleteOptions := metav1.DeleteOptions{
+		GracePeriodSeconds: &gp,
+	}
+	err := f.ClientSet.CoreV1().Pods(namespace).Delete(context.TODO(), name, &deleteOptions)
+	framework.ExpectNoError(err)
+}
+
+func runTopologyManagerPolicySuiteTests(f *framework.Framework) {
 	var cpuCap, cpuAlloc int64
 	var cpuListString, expAllowedCPUsListRegex string
 	var cpuList []int
@@ -347,9 +448,72 @@ func runTopologyManagerSuiteTests(f *framework.Framework) {
 	waitForContainerRemoval(pod2.Spec.Containers[0].Name, pod2.Name, pod2.Namespace)
 }
 
+func runTopologyManagerNodeAlignmentSuiteTests(f *framework.Framework) {
+	var err error
+
+	configMap := readConfigMapV1OrDie(testfiles.ReadOrDie(SRIOVDevicePluginCMYAML))
+	ginkgo.By(fmt.Sprintf("Creating configMap %v/%v", metav1.NamespaceSystem, configMap.Name))
+	if _, err = f.ClientSet.CoreV1().ConfigMaps(metav1.NamespaceSystem).Create(context.TODO(), configMap, metav1.CreateOptions{}); err != nil {
+		framework.Failf("unable to create test configMap %s: %v", configMap.Name, err)
+	}
+
+	serviceAccount := readServiceAccountV1OrDie(testfiles.ReadOrDie(SRIOVDevicePluginSAYAML))
+	ginkgo.By(fmt.Sprintf("Creating serviceAccount %v/%v", metav1.NamespaceSystem, serviceAccount.Name))
+	if _, err = f.ClientSet.CoreV1().ServiceAccounts(metav1.NamespaceSystem).Create(context.TODO(), serviceAccount, metav1.CreateOptions{}); err != nil {
+		framework.Failf("unable to create test serviceAccount %s: %v", serviceAccount.Name, err)
+	}
+
+	e2enode.WaitForNodeToBeReady(f.ClientSet, framework.TestContext.NodeName, 5*time.Minute)
+
+	dp := getSRIOVDevicePluginPod()
+	dp.Spec.NodeName = framework.TestContext.NodeName
+
+	ginkgo.By("Create SRIOV device plugin pod")
+	dpPod, err := f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Create(context.TODO(), dp, metav1.CreateOptions{})
+	framework.ExpectNoError(err)
+
+	ginkgo.By("Waiting for devices to become available on the local node")
+	gomega.Eventually(func() bool {
+		node := getLocalNode(f)
+		framework.Logf("Node status: %v", node.Status.Capacity)
+		return numberOfResources(node, SRIOVResourceName) > 0
+	}, 5*time.Minute, framework.Poll).Should(gomega.BeTrue())
+	framework.Logf("Successfully created device plugin pod")
+
+	ginkgo.By("running a Gu pod")
+	ctnAttrs := []tmCtnAttribute{
+		{
+			ctnName:     "gu-container",
+			cpuRequest:  "1000m",
+			cpuLimit:    "1000m",
+			devResource: SRIOVResourceName,
+		},
+	}
+
+	pod := makeTopologyManagerTestPod("gu-pod", "env && sleep 1d", ctnAttrs)
+	pod = f.PodClient().CreateSync(pod)
+
+	ginkgo.By("validating the Gu pod")
+	_, err = e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, pod.Spec.Containers[0].Name)
+	framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
+		pod.Spec.Containers[0].Name, pod.Name)
+
+	ginkgo.By("by deleting the pods and waiting for container removal")
+	deletePods(f, []string{pod.Name})
+	waitForContainerRemoval(pod.Spec.Containers[0].Name, pod.Name, pod.Namespace)
+
+	framework.Logf("deleting the SRIOV device plugin pod %s/%s and waiting for container %s removal",
+		dpPod.Namespace, dpPod.Name, dpPod.Spec.Containers[0].Name)
+	deletePodInNamespace(f, dpPod.Namespace, dpPod.Name)
+	waitForContainerRemoval(dpPod.Spec.Containers[0].Name, dpPod.Name, dpPod.Namespace)
+}
+
 func runTopologyManagerTests(f *framework.Framework) {
-	ginkgo.It("run Topology Manager test suite", func() {
-		oldCfg, err := getCurrentKubeletConfig()
+	var oldCfg *kubeletconfig.KubeletConfiguration
+	var err error
+
+	ginkgo.It("run Topology Manager policy test suite", func() {
+		oldCfg, err = getCurrentKubeletConfig()
 		framework.ExpectNoError(err)
 
 		var policies = []string{topologymanager.PolicySingleNumaNode, topologymanager.PolicyRestricted,
@@ -362,13 +526,45 @@ func runTopologyManagerTests(f *framework.Framework) {
 
 			configureTopologyManagerInKubelet(f, oldCfg, policy)
 			// Run the tests
-			runTopologyManagerSuiteTests(f)
+			runTopologyManagerPolicySuiteTests(f)
 		}
 		// restore kubelet config
 		setOldKubeletConfig(f, oldCfg)
 
-		// Debug sleep to allow time to look at kubelet config
-		time.Sleep(5 * time.Minute)
+		// Delete state file to allow repeated runs
+		deleteStateFile()
+	})
+
+	ginkgo.It("run Topology Manager node alignment test suite", func() {
+		numaNodes := detectNUMANodes()
+		coreCount := detectCoresPerSocket()
+		sriovdevCount := detectSRIOVDevices()
+
+		if numaNodes < 2 {
+			e2eskipper.Skipf("this test is meant to run on a multi-node NUMA system")
+		}
+		if coreCount < 4 {
+			e2eskipper.Skipf("this test is meant to run on a system with at least 4 cores per socket")
+		}
+		if sriovdevCount == 0 {
+			e2eskipper.Skipf("this test is meant to run on a system with at least one SRIOV device")
+		}
+
+		oldCfg, err = getCurrentKubeletConfig()
+		framework.ExpectNoError(err)
+
+		policy := topologymanager.PolicySingleNumaNode
+
+		// Configure Topology Manager
+		ginkgo.By(fmt.Sprintf("by configuring Topology Manager policy to %s", policy))
+		framework.Logf("Configuring topology Manager policy to %s", policy)
+
+		configureTopologyManagerInKubelet(f, oldCfg, policy)
+
+		runTopologyManagerNodeAlignmentSuiteTests(f)
+
+		// restore kubelet config
+		setOldKubeletConfig(f, oldCfg)
 
 		// Delete state file to allow repeated runs
 		deleteStateFile()
