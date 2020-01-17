@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	testutils "k8s.io/kubernetes/test/utils"
 )
 
@@ -47,7 +48,7 @@ var _ = ginkgo.Describe("Recreate [Feature:Recreate]", func() {
 	var ps *testutils.PodStore
 	systemNamespace := metav1.NamespaceSystem
 	ginkgo.BeforeEach(func() {
-		framework.SkipUnlessProviderIs("gce", "gke")
+		e2eskipper.SkipUnlessProviderIs("gce", "gke")
 		var err error
 		numNodes, err := e2enode.TotalRegistered(f.ClientSet)
 		framework.ExpectNoError(err)
