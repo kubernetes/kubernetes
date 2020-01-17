@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "header_rules.go",
         "options.go",
+        "stream.go",
         "uri_path.go",
         "v4.go",
     ],
@@ -16,6 +17,7 @@ go_library(
         "//vendor/github.com/aws/aws-sdk-go/aws/credentials:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/aws/request:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/internal/sdkio:go_default_library",
+        "//vendor/github.com/aws/aws-sdk-go/internal/strings:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/private/protocol/rest:go_default_library",
     ],
 )

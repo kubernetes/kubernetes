@@ -3,6 +3,10 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = [
+        "cabundle_transport.go",
+        "cabundle_transport_1_5.go",
+        "cabundle_transport_1_6.go",
+        "credentials.go",
         "doc.go",
         "env_config.go",
         "session.go",

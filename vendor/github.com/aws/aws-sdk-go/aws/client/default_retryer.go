@@ -1,6 +1,7 @@
 package client
 
 import (
+	"math"
 	"strconv"
 	"time"
 
@@ -9,20 +10,47 @@ import (
 )
 
 // DefaultRetryer implements basic retry logic using exponential backoff for
-// most services. If you want to implement custom retry logic, implement the
-// request.Retryer interface or create a structure type that composes this
-// struct and override the specific methods. For example, to override only
-// the MaxRetries method:
+// most services. If you want to implement custom retry logic, you can implement the
+// request.Retryer interface.
 //
-//		type retryer struct {
-//      client.DefaultRetryer
-//    }
-//
-//    // This implementation always has 100 max retries
-//    func (d retryer) MaxRetries() int { return 100 }
 type DefaultRetryer struct {
+	// Num max Retries is the number of max retries that will be performed.
+	// By default, this is zero.
 	NumMaxRetries int
+
+	// MinRetryDelay is the minimum retry delay after which retry will be performed.
+	// If not set, the value is 0ns.
+	MinRetryDelay time.Duration
+
+	// MinThrottleRetryDelay is the minimum retry delay when throttled.
+	// If not set, the value is 0ns.
+	MinThrottleDelay time.Duration
+
+	// MaxRetryDelay is the maximum retry delay before which retry must be performed.
+	// If not set, the value is 0ns.
+	MaxRetryDelay time.Duration
+
+	// MaxThrottleDelay is the maximum retry delay when throttled.
+	// If not set, the value is 0ns.
+	MaxThrottleDelay time.Duration
 }
+
+const (
+	// DefaultRetryerMaxNumRetries sets maximum number of retries
+	DefaultRetryerMaxNumRetries = 3
+
+	// DefaultRetryerMinRetryDelay sets minimum retry delay
+	DefaultRetryerMinRetryDelay = 30 * time.Millisecond
+
+	// DefaultRetryerMinThrottleDelay sets minimum delay when throttled
+	DefaultRetryerMinThrottleDelay = 500 * time.Millisecond
+
+	// DefaultRetryerMaxRetryDelay sets maximum retry delay
+	DefaultRetryerMaxRetryDelay = 300 * time.Second
+
+	// DefaultRetryerMaxThrottleDelay sets maximum delay when throttled
+	DefaultRetryerMaxThrottleDelay = 300 * time.Second
+)
 
 // MaxRetries returns the number of maximum returns the service will use to make
 // an individual API request.
@@ -30,61 +58,94 @@ func (d DefaultRetryer) MaxRetries() int {
 	return d.NumMaxRetries
 }
 
+// setRetryerDefaults sets the default values of the retryer if not set
+func (d *DefaultRetryer) setRetryerDefaults() {
+	if d.MinRetryDelay == 0 {
+		d.MinRetryDelay = DefaultRetryerMinRetryDelay
+	}
+	if d.MaxRetryDelay == 0 {
+		d.MaxRetryDelay = DefaultRetryerMaxRetryDelay
+	}
+	if d.MinThrottleDelay == 0 {
+		d.MinThrottleDelay = DefaultRetryerMinThrottleDelay
+	}
+	if d.MaxThrottleDelay == 0 {
+		d.MaxThrottleDelay = DefaultRetryerMaxThrottleDelay
+	}
+}
+
 // RetryRules returns the delay duration before retrying this request again
 func (d DefaultRetryer) RetryRules(r *request.Request) time.Duration {
-	// Set the upper limit of delay in retrying at ~five minutes
-	minTime := 30
-	throttle := d.shouldThrottle(r)
-	if throttle {
-		if delay, ok := getRetryDelay(r); ok {
-			return delay
-		}
 
-		minTime = 500
+	// if number of max retries is zero, no retries will be performed.
+	if d.NumMaxRetries == 0 {
+		return 0
+	}
+
+	// Sets default value for retryer members
+	d.setRetryerDefaults()
+
+	// minDelay is the minimum retryer delay
+	minDelay := d.MinRetryDelay
+
+	var initialDelay time.Duration
+
+	isThrottle := r.IsErrorThrottle()
+	if isThrottle {
+		if delay, ok := getRetryAfterDelay(r); ok {
+			initialDelay = delay
+		}
+		minDelay = d.MinThrottleDelay
 	}
 
 	retryCount := r.RetryCount
-	if throttle && retryCount > 8 {
-		retryCount = 8
-	} else if retryCount > 13 {
-		retryCount = 13
+
+	// maxDelay the maximum retryer delay
+	maxDelay := d.MaxRetryDelay
+
+	if isThrottle {
+		maxDelay = d.MaxThrottleDelay
 	}
 
-	delay := (1 << uint(retryCount)) * (sdkrand.SeededRand.Intn(minTime) + minTime)
-	return time.Duration(delay) * time.Millisecond
+	var delay time.Duration
+
+	// Logic to cap the retry count based on the minDelay provided
+	actualRetryCount := int(math.Log2(float64(minDelay))) + 1
+	if actualRetryCount < 63-retryCount {
+		delay = time.Duration(1<<uint64(retryCount)) * getJitterDelay(minDelay)
+		if delay > maxDelay {
+			delay = getJitterDelay(maxDelay / 2)
+		}
+	} else {
+		delay = getJitterDelay(maxDelay / 2)
+	}
+	return delay + initialDelay
+}
+
+// getJitterDelay returns a jittered delay for retry
+func getJitterDelay(duration time.Duration) time.Duration {
+	return time.Duration(sdkrand.SeededRand.Int63n(int64(duration)) + int64(duration))
 }
 
 // ShouldRetry returns true if the request should be retried.
 func (d DefaultRetryer) ShouldRetry(r *request.Request) bool {
+
+	// ShouldRetry returns false if number of max retries is 0.
+	if d.NumMaxRetries == 0 {
+		return false
+	}
+
 	// If one of the other handlers already set the retry state
 	// we don't want to override it based on the service's state
 	if r.Retryable != nil {
 		return *r.Retryable
 	}
-
-	if r.HTTPResponse.StatusCode >= 500 && r.HTTPResponse.StatusCode != 501 {
-		return true
-	}
-	return r.IsErrorRetryable() || d.shouldThrottle(r)
-}
-
-// ShouldThrottle returns true if the request should be throttled.
-func (d DefaultRetryer) shouldThrottle(r *request.Request) bool {
-	switch r.HTTPResponse.StatusCode {
-	case 429:
-	case 502:
-	case 503:
-	case 504:
-	default:
-		return r.IsErrorThrottle()
-	}
-
-	return true
+	return r.IsErrorRetryable() || r.IsErrorThrottle()
 }
 
 // This will look in the Retry-After header, RFC 7231, for how long
 // it will wait before attempting another request
-func getRetryDelay(r *request.Request) (time.Duration, bool) {
+func getRetryAfterDelay(r *request.Request) (time.Duration, bool) {
 	if !canUseRetryAfterHeader(r) {
 		return 0, false
 	}
