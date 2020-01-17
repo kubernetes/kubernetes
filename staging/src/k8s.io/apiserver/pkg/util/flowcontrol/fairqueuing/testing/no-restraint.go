@@ -31,6 +31,10 @@ func NewNoRestraintFactory() fq.QueueSetFactory {
 
 type noRestraintFactory struct{}
 
+func (noRestraintFactory) CheckConfig(config fq.QueueSetConfig) error {
+	return nil
+}
+
 func (noRestraintFactory) NewQueueSet(config fq.QueueSetConfig) (fq.QueueSet, error) {
 	return noRestraint{}, nil
 }

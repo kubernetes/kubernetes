@@ -23,6 +23,14 @@ import (
 
 // QueueSetFactory is used to create QueueSet objects.
 type QueueSetFactory interface {
+	// CheckConfig returns nil if and only if the given configuration
+	// is valid.  For a given factory object, the behavior of this
+	// method does not vary over time.
+	CheckConfig(QueueSetConfig) error
+
+	// NewQueueSet constructs a new QueueSet having the given
+	// configuration.  Returns a non-nil error if and only if
+	// CheckConfig would return a non-nil error.
 	NewQueueSet(config QueueSetConfig) (QueueSet, error)
 }
 
@@ -34,19 +42,26 @@ type QueueSetFactory interface {
 // .  Some day we may have connections between priority levels, but
 // today is not that day.
 type QueueSet interface {
-	// SetConfiguration updates the configuration
+	// SetConfiguration updates the configuration.  Fails and returns
+	// a non-nil error if and only if a call to the factory's
+	// CheckConfig method would return a non-nil error.  If the
+	// config's DesiredNumQueues field is zero then the other
+	// queuing-specific config parameters are not changed, so that the
+	// queues continue draining as before.
 	SetConfiguration(QueueSetConfig) error
 
-	// Quiesce controls whether the QueueSet is operating normally or is quiescing.
-	// A quiescing QueueSet drains as normal but does not admit any
-	// new requests. Passing a non-nil handler means the system should
-	// be quiescing, a nil handler means the system should operate
-	// normally. A call to Wait while the system is quiescing
-	// will be rebuffed by returning tryAnother=true. If all the
-	// queues have no requests waiting nor executing while the system
-	// is quiescing then the handler will eventually be called with no
-	// locks held (even if the system becomes non-quiescing between the
-	// triggering state and the required call).
+	// Quiesce controls whether the QueueSet is operating normally or
+	// is quiescing.  A quiescing QueueSet drains as normal but does
+	// not admit any new requests. Passing a non-nil handler means the
+	// system should be quiescing, a nil handler means the system
+	// should operate normally. A call to Wait while the system is
+	// quiescing will be rebuffed by returning tryAnother=true. If all
+	// the queues have no requests waiting nor executing while the
+	// system is quiescing then the handler will eventually be called
+	// with no locks held (even if the system becomes non-quiescing
+	// between the triggering state and the required call).  In Go
+	// Memory Model terms, the triggering state happens before the
+	// call to the EmptyHandler.
 	Quiesce(EmptyHandler)
 
 	// Wait uses the given hashValue as the source of entropy as it
@@ -56,11 +71,13 @@ type QueueSet interface {
 	// tryAnother==true at return then the QueueSet has become
 	// undesirable and the client should try to find a different
 	// QueueSet to use; execute and afterExecution are irrelevant in
-	// this case.  Otherwise, if execute then the client should start
-	// executing the request and, once the request finishes execution
-	// or is canceled, call afterExecution().  Otherwise the client
-	// should not execute the request and afterExecution is
-	// irrelevant.
+	// this case.  In the terms of the Go Memory Model, there was a
+	// call to Quiesce with a non-nil handler that happened before
+	// this return from Wait.  Otherwise, if execute then the client
+	// should start executing the request and, once the request
+	// finishes execution or is canceled, call afterExecution().
+	// Otherwise the client should not execute the request and
+	// afterExecution is irrelevant.
 	Wait(ctx context.Context, hashValue uint64, descr1, descr2 interface{}) (tryAnother, execute bool, afterExecution func())
 }
 
@@ -68,17 +85,22 @@ type QueueSet interface {
 type QueueSetConfig struct {
 	// Name is used to identify a queue set, allowing for descriptive information about its intended use
 	Name string
+
 	// ConcurrencyLimit is the maximum number of requests of this QueueSet that may be executing at a time
 	ConcurrencyLimit int
+
 	// DesiredNumQueues is the number of queues that the API says
 	// should exist now.  This may be zero, in which case
 	// QueueLengthLimit, HandSize, and RequestWaitLimit are ignored.
 	DesiredNumQueues int
+
 	// QueueLengthLimit is the maximum number of requests that may be waiting in a given queue at a time
 	QueueLengthLimit int
+
 	// HandSize is a parameter of shuffle sharding.  Upon arrival of a request, a queue is chosen by randomly
 	// dealing a "hand" of this many queues and then picking one of minimum length.
 	HandSize int
+
 	// RequestWaitLimit is the maximum amount of time that a request may wait in a queue.
 	// If, by the end of that time, the request has not been dispatched then it is rejected.
 	RequestWaitLimit time.Duration

@@ -145,7 +145,7 @@ func TestNoRestraint(t *testing.T) {
 	config := fq.QueueSetConfig{}
 	nr, err := nrf.NewQueueSet(config)
 	if err != nil {
-		t.Fatalf("QueueSet creation failed with %v", err)
+		t.Error(err)
 	}
 	exerciseQueueSetUniformScenario(t, "NoRestraint", nr, []uniformClient{
 		{1001001001, 5, 10, time.Second, time.Second},
@@ -166,9 +166,12 @@ func TestUniformFlows(t *testing.T) {
 		HandSize:         3,
 		RequestWaitLimit: 10 * time.Minute,
 	}
+	if err := qsf.CheckConfig(config); err != nil {
+		t.Error(err)
+	}
 	qs, err := qsf.NewQueueSet(config)
 	if err != nil {
-		t.Fatalf("QueueSet creation failed with %v", err)
+		t.Error(err)
 	}
 
 	exerciseQueueSetUniformScenario(t, "UniformFlows", qs, []uniformClient{
@@ -190,9 +193,12 @@ func TestDifferentFlows(t *testing.T) {
 		HandSize:         3,
 		RequestWaitLimit: 10 * time.Minute,
 	}
+	if err := qsf.CheckConfig(config); err != nil {
+		t.Error(err)
+	}
 	qs, err := qsf.NewQueueSet(config)
 	if err != nil {
-		t.Fatalf("QueueSet creation failed with %v", err)
+		t.Error(err)
 	}
 
 	exerciseQueueSetUniformScenario(t, "DifferentFlows", qs, []uniformClient{
@@ -210,13 +216,13 @@ func TestDifferentFlowsWithoutQueuing(t *testing.T) {
 		Name:             "TestDifferentFlowsWithoutQueuing",
 		ConcurrencyLimit: 4,
 		DesiredNumQueues: 0,
-		QueueLengthLimit: 6,
-		HandSize:         3,
-		RequestWaitLimit: 10 * time.Minute,
+	}
+	if err := qsf.CheckConfig(config); err != nil {
+		t.Error(err)
 	}
 	qs, err := qsf.NewQueueSet(config)
 	if err != nil {
-		t.Fatalf("QueueSet creation failed with %v", err)
+		t.Error(err)
 	}
 
 	exerciseQueueSetUniformScenario(t, "DifferentFlowsWithoutQueuing", qs, []uniformClient{
@@ -238,9 +244,12 @@ func TestTimeout(t *testing.T) {
 		HandSize:         1,
 		RequestWaitLimit: 0,
 	}
+	if err := qsf.CheckConfig(config); err != nil {
+		t.Error(err)
+	}
 	qs, err := qsf.NewQueueSet(config)
 	if err != nil {
-		t.Fatalf("QueueSet creation failed with %v", err)
+		t.Error(err)
 	}
 
 	exerciseQueueSetUniformScenario(t, "Timeout", qs, []uniformClient{

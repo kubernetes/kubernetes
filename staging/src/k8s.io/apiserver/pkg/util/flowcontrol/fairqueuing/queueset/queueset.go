@@ -22,10 +22,10 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/apimachinery/pkg/util/runtime"
-
 	"github.com/pkg/errors"
+
 	"k8s.io/apimachinery/pkg/util/clock"
+	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/util/flowcontrol/counter"
 	fq "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing"
 	"k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/promise/lockingpromise"
@@ -72,6 +72,10 @@ type queueSet struct {
 	// non-zero (if ever).
 	config fq.QueueSetConfig
 
+	// If `config.DesiredNumQueues` is non-zero then dealer is not nil
+	// and is good for `config`.
+	dealer *shufflesharding.Dealer
+
 	// queues may be longer than the desired number, while the excess
 	// queues are still draining.
 	queues []*queue
@@ -96,7 +100,28 @@ type queueSet struct {
 	totRequestsExecuting int
 
 	emptyHandler fq.EmptyHandler
-	dealer       *shufflesharding.Dealer
+}
+
+// CheckConfig returns an error if the given configuration is invalid.
+// It does this by delegating to a private function that both checks
+// validity and creates a Dealer if appropriate.
+func (qsf queueSetFactory) CheckConfig(config fq.QueueSetConfig) error {
+	_, err := checkConfig(config)
+	return err
+}
+
+// checkConfig returns a non-nil Dealer if the config is valid and
+// calls for one, and returns a non-nil error if the given config is
+// invalid.
+func checkConfig(config fq.QueueSetConfig) (*shufflesharding.Dealer, error) {
+	if config.DesiredNumQueues == 0 {
+		return nil, nil
+	}
+	dealer, err := shufflesharding.NewDealer(config.DesiredNumQueues, config.HandSize)
+	if err != nil {
+		err = errors.Wrap(err, "the QueueSetConfig implies an invalid shuffle sharding config (DesiredNumQueues is deckSize)")
+	}
+	return dealer, err
 }
 
 // NewQueueSet creates a new QueueSet object.
@@ -107,6 +132,8 @@ func (qsf queueSetFactory) NewQueueSet(config fq.QueueSetConfig) (fq.QueueSet, e
 		counter:              qsf.counter,
 		estimatedServiceTime: 60,
 		config:               config,
+		queues:               createQueues(config.DesiredNumQueues, 0),
+		virtualTime:          0,
 		lastRealTime:         qsf.clock.Now(),
 	}
 	err := fq.SetConfiguration(config)
@@ -125,8 +152,8 @@ func createQueues(n, baseIndex int) []*queue {
 	return fqqueues
 }
 
-// SetConfiguration is used to set the configuration for a queueSet
-// update handling for when fields are updated is handled here as well -
+// SetConfiguration is used to set the configuration for a queueSet.
+// Update handling for when fields are updated is handled here as well -
 // eg: if DesiredNum is increased, SetConfiguration reconciles by
 // adding more queues.
 func (qs *queueSet) SetConfiguration(config fq.QueueSetConfig) error {
@@ -136,9 +163,9 @@ func (qs *queueSet) SetConfiguration(config fq.QueueSetConfig) error {
 
 	if config.DesiredNumQueues > 0 {
 		var err error
-		dealer, err = shufflesharding.NewDealer(config.DesiredNumQueues, config.HandSize)
+		dealer, err = checkConfig(config)
 		if err != nil {
-			return errors.Wrap(err, "shuffle sharding dealer creation failed")
+			return err
 		}
 		// Adding queues is the only thing that requires immediate action
 		// Removing queues is handled by omitting indexes >DesiredNum from
@@ -415,6 +442,9 @@ func (qs *queueSet) chooseQueueIndexLocked(hashValue uint64, descr1, descr2 inte
 	bestQueueLen := int(math.MaxInt32)
 	// the dealer uses the current desired number of queues, which is no larger than the number in `qs.queues`.
 	qs.dealer.Deal(hashValue, func(queueIdx int) {
+		if queueIdx < 0 || queueIdx >= len(qs.queues) {
+			return
+		}
 		thisLen := len(qs.queues[queueIdx].requests)
 		klog.V(7).Infof("QS(%s): For request %#+v %#+v considering queue %d of length %d", qs.config.Name, descr1, descr2, queueIdx, thisLen)
 		if thisLen < bestQueueLen {
