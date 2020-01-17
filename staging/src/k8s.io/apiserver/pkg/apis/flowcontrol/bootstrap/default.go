@@ -25,7 +25,6 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 )
 
-
 // The objects that define an apiserver's initial behavior.  The
 // registered defaulting procedures make no changes to these
 // particular objects (this is verified in the unit tests of the
