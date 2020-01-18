@@ -10,7 +10,7 @@ require (
 	github.com/go-openapi/spec v0.19.3
 	github.com/go-openapi/strfmt v0.19.3
 	github.com/go-openapi/validate v0.19.5
-	github.com/gogo/protobuf v1.2.2-0.20190723190241-65acae22fc9d
+	github.com/gogo/protobuf v1.3.1
 	github.com/google/go-cmp v0.3.0
 	github.com/google/gofuzz v1.0.0
 	github.com/google/uuid v1.1.1
@@ -19,7 +19,7 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.4.0
 	go.etcd.io/etcd v0.0.0-20191023171146-3cf2f69b5738
-	google.golang.org/grpc v1.23.1
+	google.golang.org/grpc v1.26.0
 	gopkg.in/yaml.v2 v2.2.7
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0

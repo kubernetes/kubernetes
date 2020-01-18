@@ -298,7 +298,7 @@ github.com/go-ozzo/ozzo-validation/is
 github.com/go-stack/stack
 # github.com/godbus/dbus v0.0.0-20181101234600-2ff6f7ffd60f => github.com/godbus/dbus v0.0.0-20181101234600-2ff6f7ffd60f
 github.com/godbus/dbus
-# github.com/gogo/protobuf v1.2.2-0.20190723190241-65acae22fc9d => github.com/gogo/protobuf v1.2.2-0.20190723190241-65acae22fc9d
+# github.com/gogo/protobuf v1.3.1 => github.com/gogo/protobuf v1.3.1
 github.com/gogo/protobuf/gogoproto
 github.com/gogo/protobuf/plugin/compare
 github.com/gogo/protobuf/plugin/defaultcheck
@@ -620,7 +620,7 @@ github.com/prometheus/client_golang/prometheus
 github.com/prometheus/client_golang/prometheus/internal
 github.com/prometheus/client_golang/prometheus/promhttp
 github.com/prometheus/client_golang/prometheus/testutil
-# github.com/prometheus/client_model v0.1.0 => github.com/prometheus/client_model v0.1.0
+# github.com/prometheus/client_model v0.0.0-20190812154241-14fe0d1b01d4 => github.com/prometheus/client_model v0.0.0-20190812154241-14fe0d1b01d4
 github.com/prometheus/client_model/go
 # github.com/prometheus/common v0.4.1 => github.com/prometheus/common v0.4.1
 github.com/prometheus/common/expfmt
@@ -1000,12 +1000,14 @@ google.golang.org/appengine/internal/modules
 google.golang.org/appengine/internal/remote_api
 google.golang.org/appengine/internal/urlfetch
 google.golang.org/appengine/urlfetch
-# google.golang.org/genproto v0.0.0-20190502173448-54afdca5d873 => google.golang.org/genproto v0.0.0-20190502173448-54afdca5d873
+# google.golang.org/genproto v0.0.0-20190819201941-24fa4b261c55 => google.golang.org/genproto v0.0.0-20190819201941-24fa4b261c55
 google.golang.org/genproto/googleapis/api/httpbody
 google.golang.org/genproto/googleapis/rpc/status
 google.golang.org/genproto/protobuf/field_mask
-# google.golang.org/grpc v1.23.1 => google.golang.org/grpc v1.23.1
+# google.golang.org/grpc v1.26.0 => google.golang.org/grpc v1.26.0
 google.golang.org/grpc
+google.golang.org/grpc/attributes
+google.golang.org/grpc/backoff
 google.golang.org/grpc/balancer
 google.golang.org/grpc/balancer/base
 google.golang.org/grpc/balancer/roundrobin
@@ -1023,10 +1025,13 @@ google.golang.org/grpc/internal
 google.golang.org/grpc/internal/backoff
 google.golang.org/grpc/internal/balancerload
 google.golang.org/grpc/internal/binarylog
+google.golang.org/grpc/internal/buffer
 google.golang.org/grpc/internal/channelz
 google.golang.org/grpc/internal/envconfig
 google.golang.org/grpc/internal/grpcrand
 google.golang.org/grpc/internal/grpcsync
+google.golang.org/grpc/internal/resolver/dns
+google.golang.org/grpc/internal/resolver/passthrough
 google.golang.org/grpc/internal/syscall
 google.golang.org/grpc/internal/transport
 google.golang.org/grpc/keepalive

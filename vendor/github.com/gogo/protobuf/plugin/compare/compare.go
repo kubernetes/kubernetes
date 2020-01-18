@@ -425,9 +425,63 @@ func (p *plugin) generateMessage(file *generator.FileDescriptor, message *genera
 			p.In()
 			p.P(`return -1`)
 			p.Out()
-			p.P(`} else if c := this.`, fieldname, `.Compare(that1.`, fieldname, `); c != 0 {`)
+			p.P(`} else {`)
+			p.In()
+
+			// Generate two type switches in order to compare the
+			// types of the oneofs. If they are of the same type
+			// call Compare, otherwise return 1 or -1.
+			p.P(`thisType := -1`)
+			p.P(`switch this.`, fieldname, `.(type) {`)
+			for i, subfield := range message.Field {
+				if *subfield.OneofIndex == *field.OneofIndex {
+					ccTypeName := p.OneOfTypeName(message, subfield)
+					p.P(`case *`, ccTypeName, `:`)
+					p.In()
+					p.P(`thisType = `, i)
+					p.Out()
+				}
+			}
+			p.P(`default:`)
+			p.In()
+			p.P(`panic(fmt.Sprintf("compare: unexpected type %T in oneof", this.`, fieldname, `))`)
+			p.Out()
+			p.P(`}`)
+
+			p.P(`that1Type := -1`)
+			p.P(`switch that1.`, fieldname, `.(type) {`)
+			for i, subfield := range message.Field {
+				if *subfield.OneofIndex == *field.OneofIndex {
+					ccTypeName := p.OneOfTypeName(message, subfield)
+					p.P(`case *`, ccTypeName, `:`)
+					p.In()
+					p.P(`that1Type = `, i)
+					p.Out()
+				}
+			}
+			p.P(`default:`)
+			p.In()
+			p.P(`panic(fmt.Sprintf("compare: unexpected type %T in oneof", that1.`, fieldname, `))`)
+			p.Out()
+			p.P(`}`)
+
+			p.P(`if thisType == that1Type {`)
+			p.In()
+			p.P(`if c := this.`, fieldname, `.Compare(that1.`, fieldname, `); c != 0 {`)
 			p.In()
 			p.P(`return c`)
+			p.Out()
+			p.P(`}`)
+			p.Out()
+			p.P(`} else if thisType < that1Type {`)
+			p.In()
+			p.P(`return -1`)
+			p.Out()
+			p.P(`} else if thisType > that1Type {`)
+			p.In()
+			p.P(`return 1`)
+			p.Out()
+			p.P(`}`)
 			p.Out()
 			p.P(`}`)
 		} else {

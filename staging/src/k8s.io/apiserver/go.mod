@@ -17,7 +17,7 @@ require (
 	github.com/evanphx/json-patch v4.2.0+incompatible
 	github.com/go-openapi/jsonreference v0.19.3 // indirect
 	github.com/go-openapi/spec v0.19.3
-	github.com/gogo/protobuf v1.2.2-0.20190723190241-65acae22fc9d
+	github.com/gogo/protobuf v1.3.1
 	github.com/google/go-cmp v0.3.0
 	github.com/google/gofuzz v1.0.0
 	github.com/google/uuid v1.1.1
@@ -30,7 +30,7 @@ require (
 	github.com/pkg/errors v0.8.1
 	github.com/pquerna/cachecontrol v0.0.0-20171018203845-0dec1b30a021 // indirect
 	github.com/prometheus/client_golang v1.0.0
-	github.com/prometheus/client_model v0.1.0
+	github.com/prometheus/client_model v0.0.0-20190812154241-14fe0d1b01d4
 	github.com/sirupsen/logrus v1.4.2 // indirect
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.4.0
@@ -39,8 +39,7 @@ require (
 	golang.org/x/crypto v0.0.0-20190820162420-60c769a6c586
 	golang.org/x/net v0.0.0-20191004110552-13f9640d40b9
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
-	google.golang.org/genproto v0.0.0-20190502173448-54afdca5d873 // indirect
-	google.golang.org/grpc v1.23.1
+	google.golang.org/grpc v1.26.0
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/square/go-jose.v2 v2.2.2
 	gopkg.in/yaml.v2 v2.2.7

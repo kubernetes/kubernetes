@@ -60,7 +60,7 @@ require (
 	github.com/go-openapi/validate v0.19.5
 	github.com/go-ozzo/ozzo-validation v3.5.0+incompatible // indirect
 	github.com/godbus/dbus v0.0.0-20181101234600-2ff6f7ffd60f // indirect
-	github.com/gogo/protobuf v1.2.2-0.20190723190241-65acae22fc9d
+	github.com/gogo/protobuf v1.3.1
 	github.com/golang/groupcache v0.0.0-20160516000752-02826c3e7903
 	github.com/golang/mock v1.2.0
 	github.com/google/cadvisor v0.35.0
@@ -99,7 +99,7 @@ require (
 	github.com/pmezard/go-difflib v1.0.0
 	github.com/pquerna/ffjson v0.0.0-20180717144149-af8b230fcd20 // indirect
 	github.com/prometheus/client_golang v1.0.0
-	github.com/prometheus/client_model v0.1.0
+	github.com/prometheus/client_model v0.0.0-20190812154241-14fe0d1b01d4
 	github.com/prometheus/common v0.4.1
 	github.com/quobyte/api v0.1.2
 	github.com/robfig/cron v1.1.0
@@ -129,7 +129,7 @@ require (
 	gonum.org/v1/gonum v0.6.2
 	gonum.org/v1/netlib v0.0.0-20190331212654-76723241ea4e // indirect
 	google.golang.org/api v0.6.1-0.20190607001116-5213b8090861
-	google.golang.org/grpc v1.23.1
+	google.golang.org/grpc v1.26.0
 	gopkg.in/gcfg.v1 v1.2.0
 	gopkg.in/square/go-jose.v2 v2.2.2
 	gopkg.in/yaml.v2 v2.2.7
@@ -216,6 +216,7 @@ replace (
 	github.com/bradfitz/go-smtpd => github.com/bradfitz/go-smtpd v0.0.0-20170404230938-deb6d6237625
 	github.com/caddyserver/caddy => github.com/caddyserver/caddy v1.0.3
 	github.com/cenkalti/backoff => github.com/cenkalti/backoff v2.1.1+incompatible
+	github.com/census-instrumentation/opencensus-proto => github.com/census-instrumentation/opencensus-proto v0.2.1
 	github.com/cespare/prettybench => github.com/cespare/prettybench v0.0.0-20150116022406-03b8cfe5406c
 	github.com/chai2010/gettext-go => github.com/chai2010/gettext-go v0.0.0-20160711120539-c6fed771bfd5
 	github.com/checkpoint-restore/go-criu => github.com/checkpoint-restore/go-criu v0.0.0-20181120144056-17b0214f6c48 // 17b0214f6c48 is the SHA for git tag 3.11
@@ -252,6 +253,8 @@ replace (
 	github.com/dustin/go-humanize => github.com/dustin/go-humanize v1.0.0
 	github.com/elazarl/goproxy => github.com/elazarl/goproxy v0.0.0-20180725130230-947c36da3153 // 947c36da3153 is the SHA for git tag v1.11
 	github.com/emicklei/go-restful => github.com/emicklei/go-restful v2.9.5+incompatible
+	github.com/envoyproxy/go-control-plane => github.com/envoyproxy/go-control-plane v0.9.1-0.20191026205805-5f8ba28d4473
+	github.com/envoyproxy/protoc-gen-validate => github.com/envoyproxy/protoc-gen-validate v0.1.0
 	github.com/euank/go-kmsg-parser => github.com/euank/go-kmsg-parser v2.0.0+incompatible
 	github.com/evanphx/json-patch => github.com/evanphx/json-patch v4.2.0+incompatible
 	github.com/exponent-io/jsonpath => github.com/exponent-io/jsonpath v0.0.0-20151013193312-d6023ce2651d
@@ -293,7 +296,7 @@ replace (
 	github.com/go-toolsmith/typep => github.com/go-toolsmith/typep v1.0.0
 	github.com/gobwas/glob => github.com/gobwas/glob v0.2.3
 	github.com/godbus/dbus => github.com/godbus/dbus v0.0.0-20181101234600-2ff6f7ffd60f
-	github.com/gogo/protobuf => github.com/gogo/protobuf v1.2.2-0.20190723190241-65acae22fc9d
+	github.com/gogo/protobuf => github.com/gogo/protobuf v1.3.1
 	github.com/golang/freetype => github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0
 	github.com/golang/glog => github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
 	github.com/golang/groupcache => github.com/golang/groupcache v0.0.0-20160516000752-02826c3e7903
@@ -424,7 +427,7 @@ replace (
 	github.com/pquerna/cachecontrol => github.com/pquerna/cachecontrol v0.0.0-20171018203845-0dec1b30a021
 	github.com/pquerna/ffjson => github.com/pquerna/ffjson v0.0.0-20180717144149-af8b230fcd20
 	github.com/prometheus/client_golang => github.com/prometheus/client_golang v1.0.0
-	github.com/prometheus/client_model => github.com/prometheus/client_model v0.1.0
+	github.com/prometheus/client_model => github.com/prometheus/client_model v0.0.0-20190812154241-14fe0d1b01d4
 	github.com/prometheus/common => github.com/prometheus/common v0.4.1
 	github.com/prometheus/procfs => github.com/prometheus/procfs v0.0.2
 	github.com/quasilyte/go-consistent => github.com/quasilyte/go-consistent v0.0.0-20190521200055-c6f3937de18c
@@ -507,8 +510,8 @@ replace (
 	gonum.org/v1/plot => gonum.org/v1/plot v0.0.0-20190515093506-e2840ee46a6b
 	google.golang.org/api => google.golang.org/api v0.6.1-0.20190607001116-5213b8090861
 	google.golang.org/appengine => google.golang.org/appengine v1.5.0
-	google.golang.org/genproto => google.golang.org/genproto v0.0.0-20190502173448-54afdca5d873
-	google.golang.org/grpc => google.golang.org/grpc v1.23.1
+	google.golang.org/genproto => google.golang.org/genproto v0.0.0-20190819201941-24fa4b261c55
+	google.golang.org/grpc => google.golang.org/grpc v1.26.0
 	gopkg.in/airbrake/gobrake.v2 => gopkg.in/airbrake/gobrake.v2 v2.0.9
 	gopkg.in/alecthomas/kingpin.v2 => gopkg.in/alecthomas/kingpin.v2 v2.2.6
 	gopkg.in/check.v1 => gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127

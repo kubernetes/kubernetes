@@ -648,33 +648,56 @@ func recvAndDecompress(p *parser, s *transport.Stream, dc Decompressor, maxRecei
 		return nil, st.Err()
 	}
 
+	var size int
 	if pf == compressionMade {
 		// To match legacy behavior, if the decompressor is set by WithDecompressor or RPCDecompressor,
 		// use this decompressor as the default.
 		if dc != nil {
 			d, err = dc.Do(bytes.NewReader(d))
-			if err != nil {
-				return nil, status.Errorf(codes.Internal, "grpc: failed to decompress the received message %v", err)
-			}
+			size = len(d)
 		} else {
-			dcReader, err := compressor.Decompress(bytes.NewReader(d))
-			if err != nil {
-				return nil, status.Errorf(codes.Internal, "grpc: failed to decompress the received message %v", err)
-			}
-			// Read from LimitReader with limit max+1. So if the underlying
-			// reader is over limit, the result will be bigger than max.
-			d, err = ioutil.ReadAll(io.LimitReader(dcReader, int64(maxReceiveMessageSize)+1))
-			if err != nil {
-				return nil, status.Errorf(codes.Internal, "grpc: failed to decompress the received message %v", err)
-			}
+			d, size, err = decompress(compressor, d, maxReceiveMessageSize)
 		}
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "grpc: failed to decompress the received message %v", err)
+		}
+	} else {
+		size = len(d)
 	}
-	if len(d) > maxReceiveMessageSize {
+	if size > maxReceiveMessageSize {
 		// TODO: Revisit the error code. Currently keep it consistent with java
 		// implementation.
-		return nil, status.Errorf(codes.ResourceExhausted, "grpc: received message larger than max (%d vs. %d)", len(d), maxReceiveMessageSize)
+		return nil, status.Errorf(codes.ResourceExhausted, "grpc: received message larger than max (%d vs. %d)", size, maxReceiveMessageSize)
 	}
 	return d, nil
+}
+
+// Using compressor, decompress d, returning data and size.
+// Optionally, if data will be over maxReceiveMessageSize, just return the size.
+func decompress(compressor encoding.Compressor, d []byte, maxReceiveMessageSize int) ([]byte, int, error) {
+	dcReader, err := compressor.Decompress(bytes.NewReader(d))
+	if err != nil {
+		return nil, 0, err
+	}
+	if sizer, ok := compressor.(interface {
+		DecompressedSize(compressedBytes []byte) int
+	}); ok {
+		if size := sizer.DecompressedSize(d); size >= 0 {
+			if size > maxReceiveMessageSize {
+				return nil, size, nil
+			}
+			// size is used as an estimate to size the buffer, but we
+			// will read more data if available.
+			// +MinRead so ReadFrom will not reallocate if size is correct.
+			buf := bytes.NewBuffer(make([]byte, 0, size+bytes.MinRead))
+			bytesRead, err := buf.ReadFrom(io.LimitReader(dcReader, int64(maxReceiveMessageSize)+1))
+			return buf.Bytes(), int(bytesRead), err
+		}
+	}
+	// Read from LimitReader with limit max+1. So if the underlying
+	// reader is over limit, the result will be bigger than max.
+	d, err = ioutil.ReadAll(io.LimitReader(dcReader, int64(maxReceiveMessageSize)+1))
+	return d, len(d), err
 }
 
 // For the two compressor parameters, both should not be set, but if they are,
