@@ -112,7 +112,7 @@ function kube::release::package_src_tarball() {
     git archive -o "${src_tarball}" HEAD
   else
     find "${KUBE_ROOT}" -mindepth 1 -maxdepth 1 \
-      -not \( \
+      ! \( \
         \( -path "${KUBE_ROOT}"/_\*       -o \
            -path "${KUBE_ROOT}"/.git\*    -o \
            -path "${KUBE_ROOT}"/.config\* -o \
@@ -348,7 +348,6 @@ function kube::release::create_docker_images_for_server() {
     local images_dir
     binary_dir="$1"
     arch="$2"
-    binary_name
     binaries=$(kube::build::get_docker_wrapped_binaries "${arch}")
     images_dir="${RELEASE_IMAGES}/${arch}"
     mkdir -p "${images_dir}"
@@ -466,15 +465,10 @@ function kube::release::package_kube_manifests_tarball() {
     cp "${KUBE_ROOT}/cluster/gce/gci/gke-internal-configure-helper.sh" "${dst_dir}/"
   fi
   cp "${KUBE_ROOT}/cluster/gce/gci/health-monitor.sh" "${dst_dir}/health-monitor.sh"
-  local objects
-  objects=$(cd "${KUBE_ROOT}/cluster/addons" && find . \( -name \*.yaml -or -name \*.yaml.in -or -name \*.json \) | grep -v demo)
-  tar c -C "${KUBE_ROOT}/cluster/addons" "${objects}" | tar x -C "${dst_dir}"
   # Merge GCE-specific addons with general purpose addons.
-  local gce_objects
-  gce_objects=$(cd "${KUBE_ROOT}/cluster/gce/addons" && find . \( -name \*.yaml -or -name \*.yaml.in -or -name \*.json \) \( -not -name \*demo\* \))
-  if [[ -n ${gce_objects} ]]; then
-    tar c -C "${KUBE_ROOT}/cluster/gce/addons" "${gce_objects}" | tar x -C "${dst_dir}"
-  fi
+  for d in cluster/addons cluster/gce/addons; do
+    find "${KUBE_ROOT}/${d}" \( \( -name \*.yaml -o -name \*.yaml.in -o -name \*.json \) -a ! \( -name \*demo\* \) \) -print0 | tar c --transform "s|${KUBE_ROOT#/*}/${d}||" --null -T - | "${TAR}" x -C "${dst_dir}"
+  done
 
   kube::release::clean_cruft
 
