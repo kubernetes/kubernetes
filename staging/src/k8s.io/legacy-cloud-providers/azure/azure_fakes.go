@@ -772,7 +772,7 @@ type fakeStorageAccountClient struct {
 	mutex     *sync.Mutex
 	FakeStore map[string]map[string]storage.Account
 	Keys      storage.AccountListKeysResult
-	Accounts  storage.AccountListResult
+	Accounts  []storage.Account
 	Err       error
 }
 
@@ -825,7 +825,7 @@ func (fSAC *fakeStorageAccountClient) ListKeys(ctx context.Context, resourceGrou
 	return fSAC.Keys, nil
 }
 
-func (fSAC *fakeStorageAccountClient) ListByResourceGroup(ctx context.Context, resourceGroupName string) (result storage.AccountListResult, err *retry.Error) {
+func (fSAC *fakeStorageAccountClient) ListByResourceGroup(ctx context.Context, resourceGroupName string) (result []storage.Account, err *retry.Error) {
 	return fSAC.Accounts, nil
 }
 
