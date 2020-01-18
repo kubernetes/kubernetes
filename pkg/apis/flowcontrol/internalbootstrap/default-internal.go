@@ -31,13 +31,16 @@ import (
 // reachable from this map.
 var MandatoryFlowSchemas = internalizeFSes(bootstrap.MandatoryFlowSchemas)
 
-// MandatoryPriorityLevels holds the untyped renditions of the
+// MandatoryPriorityLevelConfigurations holds the untyped renditions of the
 // mandatory priority level configuration objects.  In this map the
 // key is the object's name and the value is the
 // `*PriorityLevelConfiguration`.  Nobody should mutate anything
 // reachable from this map.
 var MandatoryPriorityLevelConfigurations = internalizePLs(bootstrap.MandatoryPriorityLevelConfigurations)
 
+// NewAPFScheme constructs and returns a Scheme configured to handle
+// the API object types that are used to configure API Priority and
+// Fairness
 func NewAPFScheme() *runtime.Scheme {
 	scheme := runtime.NewScheme()
 	install.Install(scheme)
