@@ -130,7 +130,6 @@ aliases:
 
   sig-storage-reviewers:
     - saad-ali
-    - childsb
 
   sig-scheduling-maintainers:
     - alculquicondor
@@ -455,7 +454,6 @@ aliases:
     - bsalamat        # Scheduling
     - calebamiles     # Release
     - caseydavenport  # Network
-    - childsb         # Storage
     - countspongebob  # Scalability
     - csbell          # Multicluster
     - dcbw            # Network
