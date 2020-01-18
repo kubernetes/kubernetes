@@ -117,7 +117,6 @@
 
 ## Downloads for v1.17.1
 
-
 filename | sha512 hash
 -------- | -----------
 [kubernetes.tar.gz](https://dl.k8s.io/v1.17.1/kubernetes.tar.gz) | `b75a513ac1edc366a0ab829866687c4937485a00a0621a729860ae95fa278ecdadf37d63e608b2259e1c683dd01faf26eb828636710d9864e6f092b1a3cfd1cf`
