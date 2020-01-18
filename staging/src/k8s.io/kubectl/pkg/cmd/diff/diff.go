@@ -130,7 +130,7 @@ type DiffProgram struct {
 	genericclioptions.IOStreams
 }
 
-func (d *DiffProgram) getCommand(args ...string) exec.Cmd {
+func (d *DiffProgram) getCommand(args ...string) (string, exec.Cmd) {
 	diff := ""
 	if envDiff := os.Getenv("KUBECTL_EXTERNAL_DIFF"); envDiff != "" {
 		diff = envDiff
@@ -143,12 +143,16 @@ func (d *DiffProgram) getCommand(args ...string) exec.Cmd {
 	cmd.SetStdout(d.Out)
 	cmd.SetStderr(d.ErrOut)
 
-	return cmd
+	return diff, cmd
 }
 
 // Run runs the detected diff program. `from` and `to` are the directory to diff.
 func (d *DiffProgram) Run(from, to string) error {
-	return d.getCommand(from, to).Run()
+	diff, cmd := d.getCommand(from, to)
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to run %q: %v", diff, err)
+	}
+	return nil
 }
 
 // Printer is used to print an object.
