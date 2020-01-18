@@ -25,7 +25,11 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 )
 
-// The objects that define an apiserver's initial behavior
+// The objects that define an apiserver's initial behavior.  The
+// registered defaulting procedures make no changes to these
+// particular objects (this is verified in the unit tests of the
+// internalbootstrap package; it can not be verified in this package
+// because that would require importing k8s.io/kubernetes).
 var (
 	MandatoryPriorityLevelConfigurations = []*flowcontrol.PriorityLevelConfiguration{
 		MandatoryPriorityLevelConfigurationExempt,
@@ -37,7 +41,7 @@ var (
 	}
 )
 
-// The objects that define an apiserver's initial behavior
+// The objects that define the current suggested additional configuration
 var (
 	SuggestedPriorityLevelConfigurations = []*flowcontrol.PriorityLevelConfiguration{
 		// "system" priority-level is for the system components that affects self-maintenance of the
