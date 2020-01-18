@@ -32,6 +32,7 @@ import (
 	"github.com/onsi/ginkgo"
 	"golang.org/x/oauth2/google"
 	gcm "google.golang.org/api/monitoring/v3"
+	"google.golang.org/api/option"
 )
 
 var (
@@ -76,6 +77,7 @@ func testStackdriverMonitoring(f *framework.Framework, pods, allPodsCPU int, per
 
 	ctx := context.Background()
 	client, err := google.DefaultClient(ctx, gcm.CloudPlatformScope)
+	framework.ExpectNoError(err)
 
 	// Hack for running tests locally
 	// If this is your use case, create application default credentials:
@@ -90,7 +92,7 @@ func testStackdriverMonitoring(f *framework.Framework, pods, allPodsCPU int, per
 		client := oauth2.NewClient(oauth2.NoContext, ts)
 	*/
 
-	gcmService, err := gcm.New(client)
+	gcmService, err := gcm.NewService(ctx, option.WithHTTPClient(client))
 
 	// set this env var if accessing Stackdriver test endpoint (default is prod):
 	// $ export STACKDRIVER_API_ENDPOINT_OVERRIDE=https://test-monitoring.sandbox.googleapis.com/
