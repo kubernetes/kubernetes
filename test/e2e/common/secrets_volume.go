@@ -21,6 +21,7 @@ import (
 	"path"
 
 	"k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -368,9 +369,55 @@ var _ = ginkgo.Describe("[sig-storage] Secrets", func() {
 		gomega.Eventually(pollDeleteLogs, podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("Error reading file /etc/secret-volumes/delete/data-1"))
 	})
 
-	//The secret is in pending during volume creation until the secret objects are available
-	//or until mount the secret volume times out. There is no secret object defined for the pod, so it should return timout exception unless it is marked optional.
-	//Slow (~5 mins)
+	// It should be forbidden to change data for secrets marked as immutable, but
+	// allowed to modify its metadata independently of its state.
+	ginkgo.It("should be immutable if `immutable` field is set [Feature:ImmutableEphemeralVolume]", func() {
+		name := "immutable"
+		secret := secretForTest(f.Namespace.Name, name)
+
+		currentSecret, err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(secret)
+		framework.ExpectNoError(err, "Failed to create secret %q in namespace %q", secret.Name, secret.Namespace)
+
+		currentSecret.Data["data-4"] = []byte("value-4\n")
+		currentSecret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Update(currentSecret)
+		framework.ExpectNoError(err, "Failed to update secret %q in namespace %q", secret.Name, secret.Namespace)
+
+		// Mark secret as immutable.
+		trueVal := true
+		currentSecret.Immutable = &trueVal
+		currentSecret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Update(currentSecret)
+		framework.ExpectNoError(err, "Failed to mark secret %q in namespace %q as immutable", secret.Name, secret.Namespace)
+
+		// Ensure data can't be changed now.
+		currentSecret.Data["data-5"] = []byte("value-5\n")
+		_, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Update(currentSecret)
+		framework.ExpectEqual(apierrors.IsInvalid(err), true)
+
+		// Ensure secret can't be switched from immutable to mutable.
+		currentSecret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Get(name, metav1.GetOptions{})
+		framework.ExpectNoError(err, "Failed to get secret %q in namespace %q", secret.Name, secret.Namespace)
+		framework.ExpectEqual(*currentSecret.Immutable, true)
+
+		falseVal := false
+		currentSecret.Immutable = &falseVal
+		_, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Update(currentSecret)
+		framework.ExpectEqual(apierrors.IsInvalid(err), true)
+
+		// Ensure that metadata can be changed.
+		currentSecret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Get(name, metav1.GetOptions{})
+		framework.ExpectNoError(err, "Failed to get secret %q in namespace %q", secret.Name, secret.Namespace)
+		currentSecret.Labels = map[string]string{"label1": "value1"}
+		_, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Update(currentSecret)
+		framework.ExpectNoError(err, "Failed to update secret %q in namespace %q", secret.Name, secret.Namespace)
+
+		// Ensure that immutable secret can be deleted.
+		err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Delete(name, &metav1.DeleteOptions{})
+		framework.ExpectNoError(err, "Failed to delete secret %q in namespace %q", secret.Name, secret.Namespace)
+	})
+
+	// The secret is in pending during volume creation until the secret objects are available
+	// or until mount the secret volume times out. There is no secret object defined for the pod, so it should return timout exception unless it is marked optional.
+	// Slow (~5 mins)
 	ginkgo.It("Should fail non-optional pod creation due to secret object does not exist [Slow]", func() {
 		volumeMountPath := "/etc/secret-volumes"
 		podName := "pod-secrets-" + string(uuid.NewUUID())
@@ -378,9 +425,9 @@ var _ = ginkgo.Describe("[sig-storage] Secrets", func() {
 		framework.ExpectError(err, "created pod %q with non-optional secret in namespace %q", podName, f.Namespace.Name)
 	})
 
-	//Secret object defined for the pod, If a key is specified which is not present in the secret,
+	// Secret object defined for the pod, If a key is specified which is not present in the secret,
 	// the volume setup will error unless it is marked optional, during the pod creation.
-	//Slow (~5 mins)
+	// Slow (~5 mins)
 	ginkgo.It("Should fail non-optional pod creation due to the key in the secret object does not exist [Slow]", func() {
 		volumeMountPath := "/etc/secret-volumes"
 		podName := "pod-secrets-" + string(uuid.NewUUID())
@@ -548,7 +595,7 @@ func createNonOptionalSecretPod(f *framework.Framework, volumeMountPath, podName
 	createContainerName := "creates-volume-test"
 	createVolumeName := "creates-volume"
 
-	//creating a pod without secret object created, by mentioning the secret volume source reference name
+	// creating a pod without secret object created, by mentioning the secret volume source reference name
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: podName,
@@ -603,7 +650,7 @@ func createNonOptionalSecretPodWithSecret(f *framework.Framework, volumeMountPat
 	if secret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(secret); err != nil {
 		framework.Failf("unable to create test secret %s: %v", secret.Name, err)
 	}
-	//creating a pod with secret object, with the key which is not present in secret object.
+	// creating a pod with secret object, with the key which is not present in secret object.
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: podName,

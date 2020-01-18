@@ -5005,6 +5005,16 @@ func ValidateSecretUpdate(newSecret, oldSecret *core.Secret) field.ErrorList {
 	}
 
 	allErrs = append(allErrs, ValidateImmutableField(newSecret.Type, oldSecret.Type, field.NewPath("type"))...)
+	if oldSecret.Immutable != nil && *oldSecret.Immutable {
+		if !reflect.DeepEqual(newSecret.Immutable, oldSecret.Immutable) {
+			allErrs = append(allErrs, field.Forbidden(field.NewPath("immutable"), "field is immutable when `immutable` is set"))
+		}
+		if !reflect.DeepEqual(newSecret.Data, oldSecret.Data) {
+			allErrs = append(allErrs, field.Forbidden(field.NewPath("data"), "field is immutable when `immutable` is set"))
+		}
+		// We don't validate StringData, as it was already converted back to Data
+		// before validation is happening.
+	}
 
 	allErrs = append(allErrs, ValidateSecret(newSecret)...)
 	return allErrs
@@ -5051,8 +5061,20 @@ func ValidateConfigMap(cfg *core.ConfigMap) field.ErrorList {
 func ValidateConfigMapUpdate(newCfg, oldCfg *core.ConfigMap) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, ValidateObjectMetaUpdate(&newCfg.ObjectMeta, &oldCfg.ObjectMeta, field.NewPath("metadata"))...)
-	allErrs = append(allErrs, ValidateConfigMap(newCfg)...)
 
+	if oldCfg.Immutable != nil && *oldCfg.Immutable {
+		if !reflect.DeepEqual(newCfg.Immutable, oldCfg.Immutable) {
+			allErrs = append(allErrs, field.Forbidden(field.NewPath("immutable"), "field is immutable when `immutable` is set"))
+		}
+		if !reflect.DeepEqual(newCfg.Data, oldCfg.Data) {
+			allErrs = append(allErrs, field.Forbidden(field.NewPath("data"), "field is immutable when `immutable` is set"))
+		}
+		if !reflect.DeepEqual(newCfg.BinaryData, oldCfg.BinaryData) {
+			allErrs = append(allErrs, field.Forbidden(field.NewPath("binaryData"), "field is immutable when `immutable` is set"))
+		}
+	}
+
+	allErrs = append(allErrs, ValidateConfigMap(newCfg)...)
 	return allErrs
 }
 

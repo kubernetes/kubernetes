@@ -455,6 +455,14 @@ message ConfigMap {
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
+  // Immutable, if set to true, ensures that data stored in the ConfigMap cannot
+  // be updated (only object metadata can be modified).
+  // If not set to true, the field can be modified at any time.
+  // Defaulted to nil.
+  // This is an alpha field enabled by ImmutableEphemeralVolumes feature gate.
+  // +optional
+  optional bool immutable = 4;
+
   // Data contains the configuration data.
   // Each key must consist of alphanumeric characters, '-', '_' or '.'.
   // Values with non-UTF-8 byte sequences must use the BinaryData field.
@@ -4255,6 +4263,14 @@ message Secret {
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+
+  // Immutable, if set to true, ensures that data stored in the Secret cannot
+  // be updated (only object metadata can be modified).
+  // If not set to true, the field can be modified at any time.
+  // Defaulted to nil.
+  // This is an alpha field enabled by ImmutableEphemeralVolumes feature gate.
+  // +optional
+  optional bool immutable = 5;
 
   // Data contains the secret data. Each key must consist of alphanumeric
   // characters, '-', '_' or '.'. The serialized form of the secret data is a
