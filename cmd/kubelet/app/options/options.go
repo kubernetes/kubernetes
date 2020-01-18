@@ -55,6 +55,7 @@ const defaultRootDir = "/var/lib/kubelet"
 type KubeletFlags struct {
 	KubeConfig          string
 	BootstrapKubeconfig string
+	VersionJSON         bool
 
 	// Insert a probability of random errors during calls to the master.
 	ChaosChance float64
@@ -351,6 +352,7 @@ func (f *KubeletFlags) AddFlags(mainfs *pflag.FlagSet) {
 
 	fs.StringVar(&f.KubeletConfigFile, "config", f.KubeletConfigFile, "The Kubelet will load its initial configuration from this file. The path may be absolute or relative; relative paths start at the Kubelet's current working directory. Omit this flag to use the built-in default configuration values. Command-line flags override configuration from this file.")
 	fs.StringVar(&f.KubeConfig, "kubeconfig", f.KubeConfig, "Path to a kubeconfig file, specifying how to connect to the API server. Providing --kubeconfig enables API server mode, omitting --kubeconfig enables standalone mode.")
+	fs.BoolVar(&f.VersionJSON, "version-json", f.VersionJSON, "Prints complete version information and quit. ")
 
 	fs.StringVar(&f.BootstrapKubeconfig, "bootstrap-kubeconfig", f.BootstrapKubeconfig, "Path to a kubeconfig file that will be used to get client certificate for kubelet. "+
 		"If the file specified by --kubeconfig does not exist, the bootstrap kubeconfig is used to request a client certificate from the API server. "+
