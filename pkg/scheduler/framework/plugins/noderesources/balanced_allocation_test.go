@@ -28,7 +28,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
-	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
+	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
 )
 
 // getExistingVolumeCountForNode gets the current number of volumes on node.
@@ -379,7 +379,7 @@ func TestNodeResourcesBalancedAllocation(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(test.pods, test.nodes))
+			snapshot := cache.NewSnapshot(test.pods, test.nodes)
 			if len(test.pod.Spec.Volumes) > 0 {
 				maxVolumes := 5
 				nodeInfoList, _ := snapshot.NodeInfos().List()

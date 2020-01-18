@@ -51,7 +51,6 @@ import (
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	"k8s.io/kubernetes/pkg/scheduler/listers"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
-	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
 )
 
 const (
@@ -432,7 +431,7 @@ func newConfigFactoryWithFrameworkRegistry(
 	client clientset.Interface, hardPodAffinitySymmetricWeight int32, stopCh <-chan struct{},
 	registry framework.Registry) *Configurator {
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
-	snapshot := nodeinfosnapshot.NewEmptySnapshot()
+	snapshot := internalcache.NewEmptySnapshot()
 	return &Configurator{
 		client:                         client,
 		informerFactory:                informerFactory,

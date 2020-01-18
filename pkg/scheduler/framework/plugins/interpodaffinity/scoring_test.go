@@ -26,7 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
-	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
+	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
 )
 
 func TestPreferredAffinity(t *testing.T) {
@@ -517,7 +517,7 @@ func TestPreferredAffinity(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			state := framework.NewCycleState()
-			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(test.pods, test.nodes))
+			snapshot := cache.NewSnapshot(test.pods, test.nodes)
 			p := &InterPodAffinity{
 				sharedLister:          snapshot,
 				hardPodAffinityWeight: 1,
@@ -623,7 +623,7 @@ func TestPreferredAffinityWithHardPodAffinitySymmetricWeight(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			state := framework.NewCycleState()
-			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(test.pods, test.nodes))
+			snapshot := cache.NewSnapshot(test.pods, test.nodes)
 			fh, _ := framework.NewFramework(nil, nil, nil, framework.WithSnapshotSharedLister(snapshot))
 
 			args := &runtime.Unknown{Raw: []byte(fmt.Sprintf(`{"hardPodAffinityWeight":%d}`, test.hardPodAffinityWeight))}

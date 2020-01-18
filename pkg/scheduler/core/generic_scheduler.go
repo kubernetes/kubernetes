@@ -45,7 +45,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/listers"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
-	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
 	utiltrace "k8s.io/utils/trace"
@@ -138,7 +137,7 @@ type genericScheduler struct {
 	schedulingQueue          internalqueue.SchedulingQueue
 	framework                framework.Framework
 	extenders                []algorithm.SchedulerExtender
-	nodeInfoSnapshot         *nodeinfosnapshot.Snapshot
+	nodeInfoSnapshot         *internalcache.Snapshot
 	volumeBinder             *volumebinder.VolumeBinder
 	pvcLister                corelisters.PersistentVolumeClaimLister
 	pdbLister                policylisters.PodDisruptionBudgetLister
@@ -152,7 +151,7 @@ type genericScheduler struct {
 // functions.
 func (g *genericScheduler) Snapshot() error {
 	// Used for all fit and priority funcs.
-	return g.cache.UpdateNodeInfoSnapshot(g.nodeInfoSnapshot)
+	return g.cache.UpdateSnapshot(g.nodeInfoSnapshot)
 }
 
 // Framework returns the framework instance.
@@ -1097,7 +1096,7 @@ func podPassesBasicChecks(pod *v1.Pod, pvcLister corelisters.PersistentVolumeCla
 func NewGenericScheduler(
 	cache internalcache.Cache,
 	podQueue internalqueue.SchedulingQueue,
-	nodeInfoSnapshot *nodeinfosnapshot.Snapshot,
+	nodeInfoSnapshot *internalcache.Snapshot,
 	framework framework.Framework,
 	extenders []algorithm.SchedulerExtender,
 	volumeBinder *volumebinder.VolumeBinder,

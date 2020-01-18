@@ -24,7 +24,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
-	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
+	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
@@ -435,7 +435,7 @@ func TestPodTopologySpreadScore(t *testing.T) {
 			allNodes := append([]*v1.Node{}, tt.nodes...)
 			allNodes = append(allNodes, tt.failedNodes...)
 			state := framework.NewCycleState()
-			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(tt.existingPods, allNodes))
+			snapshot := cache.NewSnapshot(tt.existingPods, allNodes)
 			p := &PodTopologySpread{sharedLister: snapshot}
 
 			status := p.PostFilter(context.Background(), state, tt.pod, tt.nodes, nil)
@@ -505,7 +505,7 @@ func BenchmarkTestPodTopologySpreadScore(b *testing.B) {
 		b.Run(tt.name, func(b *testing.B) {
 			existingPods, allNodes, filteredNodes := st.MakeNodesAndPodsForEvenPodsSpread(tt.pod.Labels, tt.existingPodsNum, tt.allNodesNum, tt.filteredNodesNum)
 			state := framework.NewCycleState()
-			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(existingPods, allNodes))
+			snapshot := cache.NewSnapshot(existingPods, allNodes)
 			p := &PodTopologySpread{sharedLister: snapshot}
 
 			status := p.PostFilter(context.Background(), state, tt.pod, filteredNodes, nil)
@@ -564,7 +564,7 @@ func BenchmarkTestDefaultEvenPodsSpreadPriority(b *testing.B) {
 				SpreadConstraint(1, v1.LabelZoneFailureDomain, softSpread, st.MakeLabelSelector().Exists("foo").Obj()).Obj()
 			existingPods, allNodes, filteredNodes := st.MakeNodesAndPodsForEvenPodsSpread(pod.Labels, tt.existingPodsNum, tt.allNodesNum, tt.allNodesNum)
 			state := framework.NewCycleState()
-			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(existingPods, allNodes))
+			snapshot := cache.NewSnapshot(existingPods, allNodes)
 			p := &PodTopologySpread{sharedLister: snapshot}
 
 			status := p.PostFilter(context.Background(), state, pod, filteredNodes, nil)
