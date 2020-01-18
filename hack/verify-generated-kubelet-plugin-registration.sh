@@ -14,6 +14,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This script checks whether updating of kubelet plugin registration API is
+# needed or not. We should run
+# `hack/update-generated-kubelet-plugin-registration.sh` if kubelet plugin
+# registration API is out of date.
+# Usage: `hack/verify-generated-kubelet-plugin-registration.sh`.
+
 set -o errexit
 set -o nounset
 set -o pipefail

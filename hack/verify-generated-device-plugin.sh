@@ -14,6 +14,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This script checks whether updating of device plugin API is needed or not. We
+# should run `hack/update-generated-device-plugin.sh` if device plugin API is
+# out of date.
+# Usage: `hack/verify-generated-device-plugin.sh`.
+
 set -o errexit
 set -o nounset
 set -o pipefail

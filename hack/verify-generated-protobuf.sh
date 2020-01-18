@@ -14,6 +14,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This script checks whether updating of the packages which explicitly
+# requesting generation is needed or not. We should run
+# `hack/update-generated-protobuf.sh` if those packages are out of date.
+# Usage: `hack/verify-generated-protobuf.sh`.
+
 set -o errexit
 set -o nounset
 set -o pipefail

@@ -14,6 +14,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This script verifies that the expected results are obtained when creating each
+# type of file(e.g. codegen tool itself, a file in a package that needs codegen,
+# and etc.) for verification and then generating the code(executes
+# `make generated_files`).
+# Usage: `hack/verify-generated-files-remake.sh`.
+
 set -o errexit
 set -o nounset
 set -o pipefail
