@@ -26,6 +26,7 @@ import (
 
 	"github.com/pkg/errors"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/clock"
@@ -225,28 +226,46 @@ func (cfgCtl *configController) initializeConfigController(informerFactory kubei
 	cfgCtl.plInformerSynced = pli.Informer().HasSynced
 	cfgCtl.fsLister = fsi.Lister()
 	cfgCtl.fsInformerSynced = fsi.Informer().HasSynced
-	pli.Informer().AddEventHandler(cfgCtl)
-	fsi.Informer().AddEventHandler(cfgCtl)
-}
+	pli.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: func(obj interface{}) {
+			pl := obj.(*fctypesv1a1.PriorityLevelConfiguration)
+			klog.V(7).Infof("triggered API priority and fairness config reloading due to creation of PLC %s", pl.Name)
+			cfgCtl.configQueue.Add(0)
+		},
+		UpdateFunc: func(oldObj, newObj interface{}) {
+			newPL := newObj.(*fctypesv1a1.PriorityLevelConfiguration)
+			oldPL := oldObj.(*fctypesv1a1.PriorityLevelConfiguration)
+			if !apiequality.Semantic.DeepEqual(oldPL.Spec, newPL.Spec) {
+				klog.V(7).Infof("triggered API priority and fairness config reloading due to spec update of PLC %s", newPL.Name)
+				cfgCtl.configQueue.Add(0)
+			}
+		},
+		DeleteFunc: func(obj interface{}) {
+			name, _ := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
+			klog.V(7).Infof("triggered API priority and fairness config reloading due to deletion of PLC %s", name)
+			cfgCtl.configQueue.Add(0)
 
-func (cfgCtl *configController) triggerReload() {
-	klog.V(7).Info("triggered request-management system reloading")
-	cfgCtl.configQueue.Add(0)
-}
+		}})
+	fsi.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: func(obj interface{}) {
+			fs := obj.(*fctypesv1a1.FlowSchema)
+			klog.V(7).Infof("triggered API priority and fairness config reloading due to creation of FS %s", fs.Name)
+			cfgCtl.configQueue.Add(0)
+		},
+		UpdateFunc: func(oldObj, newObj interface{}) {
+			newFS := newObj.(*fctypesv1a1.FlowSchema)
+			oldFS := oldObj.(*fctypesv1a1.FlowSchema)
+			if !apiequality.Semantic.DeepEqual(oldFS.Spec, newFS.Spec) {
+				klog.V(7).Infof("triggered API priority and fairness config reloading due to spec update of FS %s", newFS.Name)
+				cfgCtl.configQueue.Add(0)
+			}
+		},
+		DeleteFunc: func(obj interface{}) {
+			name, _ := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
+			klog.V(7).Infof("triggered API priority and fairness config reloading due to deletion of FS %s", name)
+			cfgCtl.configQueue.Add(0)
 
-// OnAdd handles notification from an informer of object creation
-func (cfgCtl *configController) OnAdd(obj interface{}) {
-	cfgCtl.triggerReload()
-}
-
-// OnUpdate handles notification from an informer of object update
-func (cfgCtl *configController) OnUpdate(oldObj, newObj interface{}) {
-	cfgCtl.triggerReload()
-}
-
-// OnDelete handles notification from an informer of object deletion
-func (cfgCtl *configController) OnDelete(obj interface{}) {
-	cfgCtl.triggerReload()
+		}})
 }
 
 func (cfgCtl *configController) Run(stopCh <-chan struct{}) error {
