@@ -152,7 +152,11 @@ type priorityLevelState struct {
 	// config is not exempt, nil otherwise.  Every non-nil value
 	// points to a value that has been approved by the CheckConfig
 	// method of the controller's QueueSetFactory.
-	qsConfig *fq.QueueSetConfig
+	// qsConfig *fq.QueueSetConfig
+
+	// qsCompleter holds the QueueSetCompleter derived from `config`
+	// and `queues` if config is not exempt, nil otherwise.
+	qsCompleter fq.QueueSetCompleter
 
 	queues fq.QueueSet
 
@@ -323,6 +327,7 @@ func (cfgCtl *configController) digestConfigObjects(newPLs []*fctypesv1a1.Priori
 	// Pretend broken ones do not exist.
 	for _, pl := range newPLs {
 		state := oldCfgState.priorityLevelStates[pl.Name]
+		var err error
 		if state == nil {
 			state = &priorityLevelState{
 				config: pl.Spec,
@@ -337,8 +342,7 @@ func (cfgCtl *configController) digestConfigObjects(newPLs []*fctypesv1a1.Priori
 				state.queues.Quiesce(nil)
 			}
 		}
-		var err error
-		state.qsConfig, err = qscOfPL(cfgCtl.queueSetFactory, pl, cfgCtl.requestWaitLimit)
+		state.qsCompleter, err = qscOfPL(cfgCtl.queueSetFactory, state.queues, pl, cfgCtl.requestWaitLimit)
 		if err != nil {
 			klog.Warningf(err.Error())
 			continue
@@ -452,23 +456,15 @@ func (cfgCtl *configController) digestConfigObjects(newPLs []*fctypesv1a1.Priori
 			continue
 		}
 
-		plState.qsConfig.ConcurrencyLimit = int(math.Ceil(float64(cfgCtl.serverConcurrencyLimit) * float64(plState.config.Limited.AssuredConcurrencyShares) / shareSum))
-		metrics.UpdateSharedConcurrencyLimit(plName, plState.qsConfig.ConcurrencyLimit)
+		concurrencyLimit := int(math.Ceil(float64(cfgCtl.serverConcurrencyLimit) * float64(plState.config.Limited.AssuredConcurrencyShares) / shareSum))
+		metrics.UpdateSharedConcurrencyLimit(plName, concurrencyLimit)
 
 		if plState.queues == nil {
-			klog.V(5).Infof("Introducing queues for priority level %q: config=%#+v, concurrencyLimit=%d, quiescent=%v (shares=%v, shareSum=%v)", plName, plState.config, plState.qsConfig.ConcurrencyLimit, plState.emptyHandler != nil, plState.config.Limited.AssuredConcurrencyShares, shareSum)
-			var qscErr error
-			plState.queues, qscErr = cfgCtl.queueSetFactory.NewQueueSet(*plState.qsConfig)
-			if qscErr != nil {
-				panic(plState.qsConfig)
-			}
+			klog.V(5).Infof("Introducing queues for priority level %q: config=%#+v, concurrencyLimit=%d, quiescent=%v (shares=%v, shareSum=%v)", plName, plState.config, concurrencyLimit, plState.emptyHandler != nil, plState.config.Limited.AssuredConcurrencyShares, shareSum)
 		} else {
-			klog.V(5).Infof("Retaining queues for priority level %q: config=%#+v, concurrencyLimit=%d, quiescent=%v (shares=%v, shareSum=%v)", plName, plState.config, plState.qsConfig.ConcurrencyLimit, plState.emptyHandler != nil, plState.config.Limited.AssuredConcurrencyShares, shareSum)
-			qscErr := plState.queues.SetConfiguration(*plState.qsConfig)
-			if qscErr != nil {
-				panic(plState.qsConfig)
-			}
+			klog.V(5).Infof("Retaining queues for priority level %q: config=%#+v, concurrencyLimit=%d, quiescent=%v (shares=%v, shareSum=%v)", plName, plState.config, concurrencyLimit, plState.emptyHandler != nil, plState.config.Limited.AssuredConcurrencyShares, shareSum)
 		}
+		plState.queues = plState.qsCompleter.GetQueueSet(fq.DispatchingConfig{ConcurrencyLimit: concurrencyLimit})
 	}
 
 	// The new config has been constructed, pass to filter for use.
@@ -510,10 +506,10 @@ func (cfgCtl *configController) digestConfigObjects(newPLs []*fctypesv1a1.Priori
 	}
 }
 
-// qscOfPL returns a pointer to an appropriate QueueSetConfig or nil
-// if no queuing is called for.  Returns nil and an error if the given
+// qscOfPL returns a pointer to an appropriate QueuingConfig or nil
+// if no limiting is called for.  Returns nil and an error if the given
 // object is malformed in a way that is a problem for this package.
-func qscOfPL(qsf fq.QueueSetFactory, pl *fctypesv1a1.PriorityLevelConfiguration, requestWaitLimit time.Duration) (*fq.QueueSetConfig, error) {
+func qscOfPL(qsf fq.QueueSetFactory, queues fq.QueueSet, pl *fctypesv1a1.PriorityLevelConfiguration, requestWaitLimit time.Duration) (fq.QueueSetCompleter, error) {
 	if (pl.Spec.Type == fctypesv1a1.PriorityLevelEnablementExempt) != (pl.Spec.Limited == nil) {
 		return nil, errors.New("broken union structure at the top")
 	}
@@ -523,21 +519,27 @@ func qscOfPL(qsf fq.QueueSetFactory, pl *fctypesv1a1.PriorityLevelConfiguration,
 	if (pl.Spec.Limited.LimitResponse.Type == fctypesv1a1.LimitResponseTypeReject) != (pl.Spec.Limited.LimitResponse.Queuing == nil) {
 		return nil, errors.New("broken union structure for limit response")
 	}
-	qc := pl.Spec.Limited.LimitResponse.Queuing
-	qsc := fq.QueueSetConfig{Name: pl.Name}
-	if qc != nil {
-		qsc = fq.QueueSetConfig{Name: pl.Name,
-			DesiredNumQueues: int(qc.Queues),
-			QueueLengthLimit: int(qc.QueueLengthLimit),
-			HandSize:         int(qc.HandSize),
+	qcAPI := pl.Spec.Limited.LimitResponse.Queuing
+	qcQS := fq.QueuingConfig{Name: pl.Name}
+	if qcAPI != nil {
+		qcQS = fq.QueuingConfig{Name: pl.Name,
+			DesiredNumQueues: int(qcAPI.Queues),
+			QueueLengthLimit: int(qcAPI.QueueLengthLimit),
+			HandSize:         int(qcAPI.HandSize),
 			RequestWaitLimit: requestWaitLimit,
 		}
 	}
-	err := qsf.CheckConfig(qsc)
-	if err != nil {
-		return nil, errors.Wrap(err, fmt.Sprintf("priority level %q has QueuingConfiguration %#+v, which caused QueueSetFactory::CheckConfig to fail", pl.Name, *qc))
+	var qsc fq.QueueSetCompleter
+	var err error
+	if queues != nil {
+		qsc, err = queues.QualifyQueuingConfig(qcQS)
+	} else {
+		qsc, err = qsf.QualifyQueuingConfig(qcQS)
 	}
-	return &qsc, nil
+	if err != nil {
+		err = errors.Wrap(err, fmt.Sprintf("priority level %q has QueuingConfiguration %#+v, which is invalid", pl.Name, *qcAPI))
+	}
+	return qsc, err
 }
 
 func (cfgCtl *configController) syncFlowSchemaStatus(fs *fctypesv1a1.FlowSchema, isDangling bool) {
@@ -568,15 +570,18 @@ func (cfgCtl *configController) syncFlowSchemaStatus(fs *fctypesv1a1.FlowSchema,
 	}
 }
 
+// imaginePL adds a priority level based on one of the mandatory ones
 func (cfgState *configState) imaginePL(qsf fq.QueueSetFactory, proto *fctypesv1a1.PriorityLevelConfiguration, requestWaitLimit time.Duration, shareSum *float64) {
 	klog.Warningf("No %s PriorityLevelConfiguration found, imagining one", proto.Name)
-	qsConfig, err := qscOfPL(qsf, proto, requestWaitLimit)
+	qsCompleter, err := qscOfPL(qsf, nil, proto, requestWaitLimit)
 	if err != nil {
+		// This can not happen because proto is one of the mandatory
+		// objects and these are not erroneous
 		panic(err)
 	}
 	cfgState.priorityLevelStates[proto.Name] = &priorityLevelState{
-		config:   proto.Spec,
-		qsConfig: qsConfig,
+		config:      proto.Spec,
+		qsCompleter: qsCompleter,
 	}
 	if proto.Spec.Limited != nil {
 		*shareSum += float64(proto.Spec.Limited.AssuredConcurrencyShares)

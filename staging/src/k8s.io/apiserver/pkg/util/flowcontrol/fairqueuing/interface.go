@@ -21,17 +21,22 @@ import (
 	"time"
 )
 
-// QueueSetFactory is used to create QueueSet objects.
+// QueueSetFactory is used to create QueueSet objects.  Creation, like
+// config update, is done in two phases: the first phase consumes the
+// QueuingConfig and the second consumes the DispatchingConfig.  They
+// are separated so that errors from the first phase can be found
+// before committing to a concurrency allotment for the second.
 type QueueSetFactory interface {
-	// CheckConfig returns nil if and only if the given configuration
-	// is valid.  For a given factory object, the behavior of this
-	// method does not vary over time.
-	CheckConfig(QueueSetConfig) error
+	// QualifyQueuingConfig does the first phase of creating a QueueSet
+	QualifyQueuingConfig(QueuingConfig) (QueueSetCompleter, error)
+}
 
-	// NewQueueSet constructs a new QueueSet having the given
-	// configuration.  Returns a non-nil error if and only if
-	// CheckConfig would return a non-nil error.
-	NewQueueSet(config QueueSetConfig) (QueueSet, error)
+// QueueSetCompleter finishes the two-step process of creating or
+// reconfiguring a QueueSet
+type QueueSetCompleter interface {
+	// GetQueueSet returns a QueueSet configured by the given
+	// dispatching configuration.
+	GetQueueSet(DispatchingConfig) QueueSet
 }
 
 // QueueSet is the abstraction for the queuing and dispatching
@@ -42,13 +47,14 @@ type QueueSetFactory interface {
 // .  Some day we may have connections between priority levels, but
 // today is not that day.
 type QueueSet interface {
-	// SetConfiguration updates the configuration.  Fails and returns
-	// a non-nil error if and only if a call to the factory's
-	// CheckConfig method would return a non-nil error.  If the
-	// config's DesiredNumQueues field is zero then the other
+	// QualifyQueuingConfig starts the two-step process of updating
+	// the configuration.  No change is made until GetQueueSet is
+	// called.  If `C := X.QualifyQueuingConfig(q)` then
+	// `C.GetQueueSet(d)` returns the same value `X`.  If the
+	// QueuingConfig's DesiredNumQueues field is zero then the other
 	// queuing-specific config parameters are not changed, so that the
 	// queues continue draining as before.
-	SetConfiguration(QueueSetConfig) error
+	QualifyQueuingConfig(QueuingConfig) (QueueSetCompleter, error)
 
 	// Quiesce controls whether the QueueSet is operating normally or
 	// is quiescing.  A quiescing QueueSet drains as normal but does
@@ -81,13 +87,10 @@ type QueueSet interface {
 	Wait(ctx context.Context, hashValue uint64, descr1, descr2 interface{}) (tryAnother, execute bool, afterExecution func())
 }
 
-// QueueSetConfig defines the configuration of a QueueSet.
-type QueueSetConfig struct {
+// QueuingConfig defines the configuration of the queuing aspect of a QueueSet.
+type QueuingConfig struct {
 	// Name is used to identify a queue set, allowing for descriptive information about its intended use
 	Name string
-
-	// ConcurrencyLimit is the maximum number of requests of this QueueSet that may be executing at a time
-	ConcurrencyLimit int
 
 	// DesiredNumQueues is the number of queues that the API says
 	// should exist now.  This may be zero, in which case
@@ -100,10 +103,16 @@ type QueueSetConfig struct {
 	// HandSize is a parameter of shuffle sharding.  Upon arrival of a request, a queue is chosen by randomly
 	// dealing a "hand" of this many queues and then picking one of minimum length.
 	HandSize int
-
+	
 	// RequestWaitLimit is the maximum amount of time that a request may wait in a queue.
 	// If, by the end of that time, the request has not been dispatched then it is rejected.
 	RequestWaitLimit time.Duration
+}
+
+// DispatchingConfig defines the configuration of the dispatching aspect of a QueueSet.
+type DispatchingConfig struct {
+	// ConcurrencyLimit is the maximum number of requests of this QueueSet that may be executing at a time
+	ConcurrencyLimit int
 }
 
 // EmptyHandler is used to notify the callee when all the queues

@@ -141,12 +141,11 @@ func init() {
 func TestNoRestraint(t *testing.T) {
 	now := time.Now()
 	clk, counter := clock.NewFakeEventClock(now, 0, nil)
-	nrf := test.NewNoRestraintFactory()
-	config := fq.QueueSetConfig{}
-	nr, err := nrf.NewQueueSet(config)
+	nrc, err := test.NewNoRestraintFactory().QualifyQueuingConfig(fq.QueuingConfig{})
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
+	nr := nrc.GetQueueSet(fq.DispatchingConfig{})
 	exerciseQueueSetUniformScenario(t, "NoRestraint", nr, []uniformClient{
 		{1001001001, 5, 10, time.Second, time.Second},
 		{2002002002, 2, 10, time.Second, time.Second / 2},
@@ -158,21 +157,18 @@ func TestUniformFlows(t *testing.T) {
 
 	clk, counter := clock.NewFakeEventClock(now, 0, nil)
 	qsf := NewQueueSetFactory(clk, counter)
-	config := fq.QueueSetConfig{
+	qCfg := fq.QueuingConfig{
 		Name:             "TestUniformFlows",
-		ConcurrencyLimit: 4,
 		DesiredNumQueues: 8,
 		QueueLengthLimit: 6,
 		HandSize:         3,
 		RequestWaitLimit: 10 * time.Minute,
 	}
-	if err := qsf.CheckConfig(config); err != nil {
-		t.Error(err)
-	}
-	qs, err := qsf.NewQueueSet(config)
+	qsc, err := qsf.QualifyQueuingConfig(qCfg)
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
+	qs := qsc.GetQueueSet(fq.DispatchingConfig{ConcurrencyLimit: 4})
 
 	exerciseQueueSetUniformScenario(t, "UniformFlows", qs, []uniformClient{
 		{1001001001, 5, 10, time.Second, time.Second},
@@ -185,21 +181,18 @@ func TestDifferentFlows(t *testing.T) {
 
 	clk, counter := clock.NewFakeEventClock(now, 0, nil)
 	qsf := NewQueueSetFactory(clk, counter)
-	config := fq.QueueSetConfig{
+	qCfg := fq.QueuingConfig{
 		Name:             "TestDifferentFlows",
-		ConcurrencyLimit: 4,
 		DesiredNumQueues: 8,
 		QueueLengthLimit: 6,
 		HandSize:         3,
 		RequestWaitLimit: 10 * time.Minute,
 	}
-	if err := qsf.CheckConfig(config); err != nil {
-		t.Error(err)
-	}
-	qs, err := qsf.NewQueueSet(config)
+	qsc, err := qsf.QualifyQueuingConfig(qCfg)
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
+	qs := qsc.GetQueueSet(fq.DispatchingConfig{ConcurrencyLimit: 4})
 
 	exerciseQueueSetUniformScenario(t, "DifferentFlows", qs, []uniformClient{
 		{1001001001, 6, 10, time.Second, time.Second},
@@ -212,18 +205,15 @@ func TestDifferentFlowsWithoutQueuing(t *testing.T) {
 
 	clk, counter := clock.NewFakeEventClock(now, 0, nil)
 	qsf := NewQueueSetFactory(clk, counter)
-	config := fq.QueueSetConfig{
+	qCfg := fq.QueuingConfig{
 		Name:             "TestDifferentFlowsWithoutQueuing",
-		ConcurrencyLimit: 4,
 		DesiredNumQueues: 0,
 	}
-	if err := qsf.CheckConfig(config); err != nil {
-		t.Error(err)
-	}
-	qs, err := qsf.NewQueueSet(config)
+	qsc, err := qsf.QualifyQueuingConfig(qCfg)
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
+	qs := qsc.GetQueueSet(fq.DispatchingConfig{ConcurrencyLimit: 4})
 
 	exerciseQueueSetUniformScenario(t, "DifferentFlowsWithoutQueuing", qs, []uniformClient{
 		{1001001001, 6, 10, time.Second, 57 * time.Millisecond},
@@ -236,21 +226,18 @@ func TestTimeout(t *testing.T) {
 
 	clk, counter := clock.NewFakeEventClock(now, 0, nil)
 	qsf := NewQueueSetFactory(clk, counter)
-	config := fq.QueueSetConfig{
+	qCfg := fq.QueuingConfig{
 		Name:             "TestTimeout",
-		ConcurrencyLimit: 1,
 		DesiredNumQueues: 128,
 		QueueLengthLimit: 128,
 		HandSize:         1,
 		RequestWaitLimit: 0,
 	}
-	if err := qsf.CheckConfig(config); err != nil {
-		t.Error(err)
-	}
-	qs, err := qsf.NewQueueSet(config)
+	qsc, err := qsf.QualifyQueuingConfig(qCfg)
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
+	qs := qsc.GetQueueSet(fq.DispatchingConfig{ConcurrencyLimit: 1})
 
 	exerciseQueueSetUniformScenario(t, "Timeout", qs, []uniformClient{
 		{1001001001, 5, 100, time.Second, time.Second},
