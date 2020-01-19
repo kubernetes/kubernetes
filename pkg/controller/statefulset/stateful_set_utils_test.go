@@ -469,3 +469,73 @@ func newStatefulSet(replicas int) *apps.StatefulSet {
 	}
 	return newStatefulSetWithVolumes(replicas, "foo", petMounts, podMounts)
 }
+
+func newStatefulSetWithLabels(replicas int, name string, uid types.UID, labels map[string]string) *apps.StatefulSet {
+	// Converting all the map-only selectors to set-based selectors.
+	var testMatchExpressions []metav1.LabelSelectorRequirement
+	for key, value := range labels {
+		sel := metav1.LabelSelectorRequirement{
+			Key:      key,
+			Operator: metav1.LabelSelectorOpIn,
+			Values:   []string{value},
+		}
+		testMatchExpressions = append(testMatchExpressions, sel)
+	}
+	return &apps.StatefulSet{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "StatefulSet",
+			APIVersion: "apps/v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: v1.NamespaceDefault,
+			UID:       uid,
+		},
+		Spec: apps.StatefulSetSpec{
+			Selector: &metav1.LabelSelector{
+				// Purposely leaving MatchLabels nil, so to ensure it will break if any link
+				// in the chain ignores the set-based MatchExpressions.
+				MatchLabels:      nil,
+				MatchExpressions: testMatchExpressions,
+			},
+			Replicas: func() *int32 { i := int32(replicas); return &i }(),
+			Template: v1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: labels,
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:  "nginx",
+							Image: "nginx",
+							VolumeMounts: []v1.VolumeMount{
+								{Name: "datadir", MountPath: "/tmp/"},
+								{Name: "home", MountPath: "/home"},
+							},
+						},
+					},
+					Volumes: []v1.Volume{{
+						Name: "home",
+						VolumeSource: v1.VolumeSource{
+							HostPath: &v1.HostPathVolumeSource{
+								Path: fmt.Sprintf("/tmp/%v", "home"),
+							},
+						}}},
+				},
+			},
+			VolumeClaimTemplates: []v1.PersistentVolumeClaim{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "datadir"},
+					Spec: v1.PersistentVolumeClaimSpec{
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceStorage: *resource.NewQuantity(1, resource.BinarySI),
+							},
+						},
+					},
+				},
+			},
+			ServiceName: "governingsvc",
+		},
+	}
+}

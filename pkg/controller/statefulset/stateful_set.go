@@ -311,14 +311,13 @@ func (ssc *StatefulSetController) adoptOrphanRevisions(set *apps.StatefulSet) er
 	if err != nil {
 		return err
 	}
-	hasOrphans := false
+	orphanRevisions := make([]*apps.ControllerRevision, 0)
 	for i := range revisions {
 		if metav1.GetControllerOf(revisions[i]) == nil {
-			hasOrphans = true
-			break
+			orphanRevisions = append(orphanRevisions, revisions[i])
 		}
 	}
-	if hasOrphans {
+	if len(orphanRevisions) > 0 {
 		fresh, err := ssc.kubeClient.AppsV1().StatefulSets(set.Namespace).Get(set.Name, metav1.GetOptions{})
 		if err != nil {
 			return err
@@ -326,7 +325,7 @@ func (ssc *StatefulSetController) adoptOrphanRevisions(set *apps.StatefulSet) er
 		if fresh.UID != set.UID {
 			return fmt.Errorf("original StatefulSet %v/%v is gone: got uid %v, wanted %v", set.Namespace, set.Name, fresh.UID, set.UID)
 		}
-		return ssc.control.AdoptOrphanRevisions(set, revisions)
+		return ssc.control.AdoptOrphanRevisions(set, orphanRevisions)
 	}
 	return nil
 }
