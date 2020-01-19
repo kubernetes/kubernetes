@@ -1,6 +1,5 @@
 cluster/images/etcd-version-monitor
 cluster/images/etcd/migrate
-pkg/controller/daemon
 pkg/controller/deployment
 pkg/controller/disruption
 pkg/controller/garbagecollector
