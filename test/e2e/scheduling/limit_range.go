@@ -47,12 +47,11 @@ var _ = SIGDescribe("LimitRange", func() {
 	f := framework.NewDefaultFramework("limitrange")
 
 	/*
-		Release : v1.15
+		Release : v1.18
 		Testname: LimitRange, resources
 		Description: Creating a Limitrange and verifying the creation of Limitrange, updating the Limitrange and validating the Limitrange. Creating Pods with resources and validate the pod resources are applied to the Limitrange
 	*/
-	//note: this test case can be promoted to conformance after verified the stability of the test case
-	ginkgo.It("should create a LimitRange with defaults and ensure pod has those defaults applied.", func() {
+	framework.ConformanceIt("should create a LimitRange with defaults and ensure pod has those defaults applied.", func() {
 		ginkgo.By("Creating a LimitRange")
 		min := getResourceList("50m", "100Mi", "100Gi")
 		max := getResourceList("500m", "500Mi", "500Gi")
