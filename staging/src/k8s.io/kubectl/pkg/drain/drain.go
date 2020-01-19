@@ -180,12 +180,13 @@ func (d *Helper) GetPodsForDeletion(nodeName string) (*podDeleteList, []error) {
 				break
 			}
 		}
-		if status.delete {
-			pods = append(pods, podDelete{
-				pod:    pod,
-				status: status,
-			})
-		}
+		// Add the pod to podDeleteList no matter what podDeleteStatus is,
+		// those pods whose podDeleteStatus is false like DaemonSet will
+		// be catched by list.errors()
+		pods = append(pods, podDelete{
+			pod:    pod,
+			status: status,
+		})
 	}
 
 	list := &podDeleteList{items: pods}
