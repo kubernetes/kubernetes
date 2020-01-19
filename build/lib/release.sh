@@ -376,7 +376,9 @@ function kube::release::create_docker_images_for_server() {
 
       local oldifs=$IFS
       IFS=","
-      set "$wrappable"
+      # Word splitting is most intentional here
+      # shellcheck disable=SC2086
+      set $wrappable
       IFS=$oldifs
 
       local binary_name="$1"
