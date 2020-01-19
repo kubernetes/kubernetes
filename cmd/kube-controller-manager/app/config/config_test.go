@@ -100,10 +100,12 @@ apiVersion: kubecontrollermanager.config.k8s.io/v1alpha1`),
 		},
 		{
 			desc: "full from yaml",
-			file: fullConfig(),
+			file: customConfig(),
 			expect: func() *kubectrlmgrconfig.KubeControllerManagerConfiguration {
 				conf := newConfig(t)
 				conf.Generic.Port = 1234
+				conf.Generic.ClientConnection.Burst = 10
+				conf.ResourceQuotaController.ConcurrentResourceQuotaSyncs = 15
 				return conf
 			}(),
 		},
@@ -162,11 +164,15 @@ func addFile(fs utilfs.Filesystem, path string, file string) error {
 	return utilfiles.ReplaceFile(fs, path, []byte(file))
 }
 
-func fullConfig() *string {
+func customConfig() *string {
 	c := `kind: KubeControllerManagerConfiguration
 apiVersion: kubecontrollermanager.config.k8s.io/v1alpha1
-Generic:
+Generic: 					# GenericControllerConfiguration
   Port: 1234
-  Address: 0.0.0.0`
+  Address: 0.0.0.0
+  ClientConnection:			# ClientConnectionConfiguration
+    burst: 10
+ResourceQuotaController:	# ResourceQuotaControllerConfiguration
+  ConcurrentResourceQuotaSyncs: 15`
 	return &c
 }
