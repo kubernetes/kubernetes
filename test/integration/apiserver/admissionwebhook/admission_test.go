@@ -148,7 +148,7 @@ var (
 		gvr("authorization.k8s.io", "v1beta1", "selfsubjectaccessreviews"):  `{"metadata": {"name": "", "namespace":""}, "spec": {"resourceAttributes": {"name":"name1", "namespace":""}}}`,
 		gvr("authorization.k8s.io", "v1beta1", "selfsubjectrulesreviews"):   `{"metadata": {"name": "", "namespace":"` + testNamespace + `"}, "spec": {"namespace":"` + testNamespace + `"}}`,
 		gvr("flowcontrol.apiserver.k8s.io", "v1alpha1", "flowschemas"):      `{"metadata": {"name": "admission-test"}, "spec": {"priorityLevelConfiguration": {"name":"eman"}}}`,
-		gvr("flowcontrol.apiserver.k8s.io", "v1alpha1", "prioritylevelconfigurations"):      `{"metadata": {"name": "admission-test"}, "spec": {"type": "Exempt"}}`,
+		gvr("flowcontrol.apiserver.k8s.io", "v1alpha1", "prioritylevelconfigurations"):      `{"metadata": {"name": "admission-test"}, "spec": {"type": "Limited", "limited": {"assuredConcurrencyShares":42, "limitResponse":{"type":"Reject"}}}}`,
 
 		// Other Non persistent resources
 	}
