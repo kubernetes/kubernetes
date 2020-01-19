@@ -40,6 +40,7 @@ NET_PLUGIN=${NET_PLUGIN:-""}
 # eg: "/etc/cni/net.d" for config files, and "/opt/cni/bin" for binaries.
 CNI_CONF_DIR=${CNI_CONF_DIR:-""}
 CNI_BIN_DIR=${CNI_BIN_DIR:-""}
+CLUSTER_CIDR=${CLUSTER_CIDR:-10.1.0.0/16}
 SERVICE_CLUSTER_IP_RANGE=${SERVICE_CLUSTER_IP_RANGE:-10.0.0.0/24}
 FIRST_SERVICE_CLUSTER_IP=${FIRST_SERVICE_CLUSTER_IP:-10.0.0.1}
 # if enabled, must set CGROUP_ROOT
@@ -614,7 +615,7 @@ EOF
 function start_controller_manager {
     node_cidr_args=()
     if [[ "${NET_PLUGIN}" == "kubenet" ]]; then
-      node_cidr_args=("--allocate-node-cidrs=true" "--cluster-cidr=10.1.0.0/16")
+      node_cidr_args=("--allocate-node-cidrs=true" "--cluster-cidr=${CLUSTER_CIDR}")
     fi
 
     cloud_config_arg=("--cloud-provider=${CLOUD_PROVIDER}" "--cloud-config=${CLOUD_CONFIG}")
@@ -658,7 +659,7 @@ function start_cloud_controller_manager {
 
     node_cidr_args=()
     if [[ "${NET_PLUGIN}" == "kubenet" ]]; then
-      node_cidr_args=("--allocate-node-cidrs=true" "--cluster-cidr=10.1.0.0/16")
+      node_cidr_args=("--allocate-node-cidrs=true" "--cluster-cidr=${CLUSTER_CIDR}")
     fi
 
     CLOUD_CTLRMGR_LOG=${LOG_DIR}/cloud-controller-manager.log
