@@ -372,17 +372,10 @@ function kube::release::create_docker_images_for_server() {
         docker_build_opts='--pull'
     fi
 
-    for wrappable in "${binaries[@]}"; do
+    for wrappable in $binaries; do
 
-      local oldifs=$IFS
-      IFS=","
-      # Word splitting is most intentional here
-      # shellcheck disable=SC2086
-      set $wrappable
-      IFS=$oldifs
-
-      local binary_name="$1"
-      local base_image="$2"
+      local binary_name=${wrappable%%,*}
+      local base_image=${wrappable##*,}
       local binary_file_path="${binary_dir}/${binary_name}"
       local docker_build_path="${binary_file_path}.dockerbuild"
       local docker_file_path="${docker_build_path}/Dockerfile"
