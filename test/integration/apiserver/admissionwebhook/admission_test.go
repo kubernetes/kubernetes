@@ -137,18 +137,18 @@ var (
 	// stubDataOverrides holds either non persistent resources' definitions or resources where default stub needs to be overridden.
 	stubDataOverrides = map[schema.GroupVersionResource]string{
 		// Non persistent Reviews resource
-		gvr("authentication.k8s.io", "v1", "tokenreviews"):                  `{"metadata": {"name": "tokenreview"}, "spec": {"token": "token", "audience": ["audience1","audience2"]}}`,
-		gvr("authentication.k8s.io", "v1beta1", "tokenreviews"):             `{"metadata": {"name": "tokenreview"}, "spec": {"token": "token", "audience": ["audience1","audience2"]}}`,
-		gvr("authorization.k8s.io", "v1", "localsubjectaccessreviews"):      `{"metadata": {"name": "", "namespace":"` + testNamespace + `"}, "spec": {"uid": "token", "user": "user1","groups": ["group1","group2"],"resourceAttributes": {"name":"name1","namespace":"` + testNamespace + `"}}}`,
-		gvr("authorization.k8s.io", "v1", "subjectaccessreviews"):           `{"metadata": {"name": "", "namespace":""}, "spec": {"user":"user1","resourceAttributes": {"name":"name1", "namespace":"` + testNamespace + `"}}}`,
-		gvr("authorization.k8s.io", "v1", "selfsubjectaccessreviews"):       `{"metadata": {"name": "", "namespace":""}, "spec": {"resourceAttributes": {"name":"name1", "namespace":""}}}`,
-		gvr("authorization.k8s.io", "v1", "selfsubjectrulesreviews"):        `{"metadata": {"name": "", "namespace":"` + testNamespace + `"}, "spec": {"namespace":"` + testNamespace + `"}}`,
-		gvr("authorization.k8s.io", "v1beta1", "localsubjectaccessreviews"): `{"metadata": {"name": "", "namespace":"` + testNamespace + `"}, "spec": {"uid": "token", "user": "user1","groups": ["group1","group2"],"resourceAttributes": {"name":"name1","namespace":"` + testNamespace + `"}}}`,
-		gvr("authorization.k8s.io", "v1beta1", "subjectaccessreviews"):      `{"metadata": {"name": "", "namespace":""}, "spec": {"user":"user1","resourceAttributes": {"name":"name1", "namespace":"` + testNamespace + `"}}}`,
-		gvr("authorization.k8s.io", "v1beta1", "selfsubjectaccessreviews"):  `{"metadata": {"name": "", "namespace":""}, "spec": {"resourceAttributes": {"name":"name1", "namespace":""}}}`,
-		gvr("authorization.k8s.io", "v1beta1", "selfsubjectrulesreviews"):   `{"metadata": {"name": "", "namespace":"` + testNamespace + `"}, "spec": {"namespace":"` + testNamespace + `"}}`,
-		gvr("flowcontrol.apiserver.k8s.io", "v1alpha1", "flowschemas"):      `{"metadata": {"name": "admission-test"}, "spec": {"priorityLevelConfiguration": {"name":"eman"}}}`,
-		gvr("flowcontrol.apiserver.k8s.io", "v1alpha1", "prioritylevelconfigurations"):      `{"metadata": {"name": "admission-test"}, "spec": {"type": "Limited", "limited": {"assuredConcurrencyShares":42, "limitResponse":{"type":"Reject"}}}}`,
+		gvr("authentication.k8s.io", "v1", "tokenreviews"):                             `{"metadata": {"name": "tokenreview"}, "spec": {"token": "token", "audience": ["audience1","audience2"]}}`,
+		gvr("authentication.k8s.io", "v1beta1", "tokenreviews"):                        `{"metadata": {"name": "tokenreview"}, "spec": {"token": "token", "audience": ["audience1","audience2"]}}`,
+		gvr("authorization.k8s.io", "v1", "localsubjectaccessreviews"):                 `{"metadata": {"name": "", "namespace":"` + testNamespace + `"}, "spec": {"uid": "token", "user": "user1","groups": ["group1","group2"],"resourceAttributes": {"name":"name1","namespace":"` + testNamespace + `"}}}`,
+		gvr("authorization.k8s.io", "v1", "subjectaccessreviews"):                      `{"metadata": {"name": "", "namespace":""}, "spec": {"user":"user1","resourceAttributes": {"name":"name1", "namespace":"` + testNamespace + `"}}}`,
+		gvr("authorization.k8s.io", "v1", "selfsubjectaccessreviews"):                  `{"metadata": {"name": "", "namespace":""}, "spec": {"resourceAttributes": {"name":"name1", "namespace":""}}}`,
+		gvr("authorization.k8s.io", "v1", "selfsubjectrulesreviews"):                   `{"metadata": {"name": "", "namespace":"` + testNamespace + `"}, "spec": {"namespace":"` + testNamespace + `"}}`,
+		gvr("authorization.k8s.io", "v1beta1", "localsubjectaccessreviews"):            `{"metadata": {"name": "", "namespace":"` + testNamespace + `"}, "spec": {"uid": "token", "user": "user1","groups": ["group1","group2"],"resourceAttributes": {"name":"name1","namespace":"` + testNamespace + `"}}}`,
+		gvr("authorization.k8s.io", "v1beta1", "subjectaccessreviews"):                 `{"metadata": {"name": "", "namespace":""}, "spec": {"user":"user1","resourceAttributes": {"name":"name1", "namespace":"` + testNamespace + `"}}}`,
+		gvr("authorization.k8s.io", "v1beta1", "selfsubjectaccessreviews"):             `{"metadata": {"name": "", "namespace":""}, "spec": {"resourceAttributes": {"name":"name1", "namespace":""}}}`,
+		gvr("authorization.k8s.io", "v1beta1", "selfsubjectrulesreviews"):              `{"metadata": {"name": "", "namespace":"` + testNamespace + `"}, "spec": {"namespace":"` + testNamespace + `"}}`,
+		gvr("flowcontrol.apiserver.k8s.io", "v1alpha1", "flowschemas"):                 `{"metadata": {"name": "admission-test"}, "spec": {"priorityLevelConfiguration": {"name":"eman"}}}`,
+		gvr("flowcontrol.apiserver.k8s.io", "v1alpha1", "prioritylevelconfigurations"): `{"metadata": {"name": "admission-test"}, "spec": {"type": "Limited", "limited": {"assuredConcurrencyShares":42, "limitResponse":{"type":"Reject"}}}}`,
 
 		// Other Non persistent resources
 	}
