@@ -1,9 +1,4 @@
-package(default_visibility = ["//visibility:public"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
@@ -12,6 +7,7 @@ go_library(
         "utils.go",
     ],
     importpath = "k8s.io/kubernetes/test/integration",
+    visibility = ["//visibility:public"],
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
@@ -61,6 +57,7 @@ filegroup(
         "//test/integration/master:all-srcs",
         "//test/integration/metrics:all-srcs",
         "//test/integration/namespace:all-srcs",
+        "//test/integration/network:all-srcs",
         "//test/integration/node:all-srcs",
         "//test/integration/objectmeta:all-srcs",
         "//test/integration/openshift:all-srcs",
@@ -83,4 +80,5 @@ filegroup(
         "//test/integration/volumescheduling:all-srcs",
     ],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )
