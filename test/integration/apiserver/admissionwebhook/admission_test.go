@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"k8s.io/kubernetes/pkg/apis/flowcontrol"
 	"net/http"
 	"net/http/httptest"
 	"sort"
@@ -48,7 +49,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	dynamic "k8s.io/client-go/dynamic"
+	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/retry"
@@ -134,6 +135,9 @@ var (
 		gvr("extensions", "v1beta1", "replicationcontrollers/scale"): gvr("", "v1", "replicationcontrollers"),
 	}
 
+	prioLevelConfRef = flowcontrol.PriorityLevelConfigurationReference{
+		Name: "system-bar",
+	}
 	// stubDataOverrides holds either non persistent resources' definitions or resources where default stub needs to be overridden.
 	stubDataOverrides = map[schema.GroupVersionResource]string{
 		// Non persistent Reviews resource
@@ -147,6 +151,8 @@ var (
 		gvr("authorization.k8s.io", "v1beta1", "subjectaccessreviews"):      `{"metadata": {"name": "", "namespace":""}, "spec": {"user":"user1","resourceAttributes": {"name":"name1", "namespace":"` + testNamespace + `"}}}`,
 		gvr("authorization.k8s.io", "v1beta1", "selfsubjectaccessreviews"):  `{"metadata": {"name": "", "namespace":""}, "spec": {"resourceAttributes": {"name":"name1", "namespace":""}}}`,
 		gvr("authorization.k8s.io", "v1beta1", "selfsubjectrulesreviews"):   `{"metadata": {"name": "", "namespace":"` + testNamespace + `"}, "spec": {"namespace":"` + testNamespace + `"}}`,
+		gvr("flowcontrol.apiserver.k8s.io", "v1alpha1", "flowschemas"):      `{"metadata": {"name": "", "namespace":"` + testNamespace + `"}, "spec": {"namespace":"` + testNamespace + `"}}`,
+		gvr("flowcontrol.apiserver.k8s.io", "v1alpha1", "prioritylevelconfigurations"):      `{"metadata": {"name": "", "namespace":"` + testNamespace + `"}, "spec": {"namespace":"` + testNamespace + `", "priorityLevelConfiguration": {"name":"name1"}}}`,
 
 		// Other Non persistent resources
 	}
