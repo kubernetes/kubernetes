@@ -17,9 +17,13 @@ limitations under the License.
 package e2enode
 
 import (
+	"bytes"
+	"context"
 	"fmt"
+	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/client"
+	"io"
 	"os"
-	"os/exec"
 	"os/user"
 	"time"
 
@@ -95,8 +99,20 @@ func (dp *dockerPuller) Name() string {
 }
 
 func (dp *dockerPuller) Pull(image string) ([]byte, error) {
-	// TODO(random-liu): Use docker client to get rid of docker binary dependency.
-	return exec.Command("docker", "pull", image).CombinedOutput()
+	c, err := client.NewClient(defaultDockerEndpoint, "", nil, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create docker client: %v", err)
+	}
+
+	ctx := context.Background()
+	out, err := c.ImagePull(ctx, image, types.ImagePullOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to pull docker image: %v", err)
+	}
+
+	var res bytes.Buffer
+	io.Copy(&res, out)
+	return res.Bytes(), nil
 }
 
 type remotePuller struct {
