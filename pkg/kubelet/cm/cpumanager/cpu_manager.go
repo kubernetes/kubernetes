@@ -167,7 +167,6 @@ func NewManager(cpuPolicyName string, reconcilePeriod time.Duration, machineInfo
 	manager := &manager{
 		policy:                     policy,
 		reconcilePeriod:            reconcilePeriod,
-		containerMap:               containermap.NewContainerMap(),
 		topology:                   topo,
 		nodeAllocatableReservation: nodeAllocatableReservation,
 		stateFileDirectory:         stateFileDirectory,
@@ -183,8 +182,9 @@ func (m *manager) Start(activePods ActivePodsFunc, sourcesReady config.SourcesRe
 	m.activePods = activePods
 	m.podStatusProvider = podStatusProvider
 	m.containerRuntime = containerRuntime
+	m.containerMap = initialContainers
 
-	stateImpl, err := state.NewCheckpointState(m.stateFileDirectory, cpuManagerStateFileName, m.policy.Name(), initialContainers)
+	stateImpl, err := state.NewCheckpointState(m.stateFileDirectory, cpuManagerStateFileName, m.policy.Name(), m.containerMap)
 	if err != nil {
 		klog.Errorf("[cpumanager] could not initialize checkpoint manager: %v, please drain node and remove policy state file", err)
 		return err
