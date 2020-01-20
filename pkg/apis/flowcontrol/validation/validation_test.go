@@ -987,16 +987,6 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 			expectedErrors: field.ErrorList{},
 		},
 		{
-			name: "wrong exempt should fail",
-			priorityLevelConfiguration: &flowcontrol.PriorityLevelConfiguration{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: flowcontrol.PriorityLevelConfigurationNameExempt,
-				},
-				Spec: badSpec,
-			},
-			expectedErrors: field.ErrorList{field.Invalid(field.NewPath("spec"), badSpec, "spec of 'exempt' must equal the fixed value")},
-		},
-		{
 			name: "limited requires more details",
 			priorityLevelConfiguration: &flowcontrol.PriorityLevelConfiguration{
 				ObjectMeta: metav1.ObjectMeta{
@@ -1040,36 +1030,6 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 							Queuing: &flowcontrol.QueuingConfiguration{
 								Queues:           512,
 								HandSize:         4,
-								QueueLengthLimit: 100,
-							}}}},
-			},
-			expectedErrors: field.ErrorList{field.Forbidden(field.NewPath("spec").Child("limited").Child("limitResponse").Child("queuing"), "must be nil if limited.limitResponse.type is not Limited")},
-		},
-		{
-			name: "wrong backstop spec should fail",
-			priorityLevelConfiguration: &flowcontrol.PriorityLevelConfiguration{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: flowcontrol.PriorityLevelConfigurationNameCatchAll,
-				},
-				Spec: badSpec,
-			},
-			expectedErrors: field.ErrorList{field.Invalid(field.NewPath("spec"), badSpec, "spec of 'catch-all' must equal the fixed value")},
-		},
-		{
-			name: "backstop should work",
-			priorityLevelConfiguration: &flowcontrol.PriorityLevelConfiguration{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: flowcontrol.PriorityLevelConfigurationNameCatchAll,
-				},
-				Spec: flowcontrol.PriorityLevelConfigurationSpec{
-					Type: flowcontrol.PriorityLevelEnablementLimited,
-					Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
-						AssuredConcurrencyShares: 100,
-						LimitResponse: flowcontrol.LimitResponse{
-							Type: flowcontrol.LimitResponseTypeReject,
-							Queuing: &flowcontrol.QueuingConfiguration{
-								Queues:           128,
-								HandSize:         6,
 								QueueLengthLimit: 100,
 							}}}},
 			},
