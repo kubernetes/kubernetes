@@ -381,7 +381,7 @@ func (cfgCtl *configController) digestConfigObjects(newPLs []*fctypesv1a1.Priori
 
 	// The new config has been constructed, pass to filter for use.
 	cfgCtl.curState.Store(meal.newCfgState)
-	klog.V(5).Infof("Switched to new API Priority and Farness configuration")
+	klog.V(5).Infof("Switched to new API Priority and Fairness configuration")
 
 	// We delay the calls to QueueSet::Quiesce so that the following
 	// proof works.
@@ -607,7 +607,7 @@ func (cfgCtl *configController) syncFlowSchemaStatus(fs *fctypesv1a1.FlowSchema,
 			Type: fctypesv1a1.FlowSchemaConditionDangling,
 		}
 	}
-
+	oldStatus := danglingCondition.Status
 	switch {
 	case isDangling && danglingCondition.Status != fctypesv1a1.ConditionTrue:
 		danglingCondition.Status = fctypesv1a1.ConditionTrue
@@ -619,7 +619,7 @@ func (cfgCtl *configController) syncFlowSchemaStatus(fs *fctypesv1a1.FlowSchema,
 		// the dangling status is already in sync, skip updating
 		return
 	}
-
+	klog.V(4).Infof("Updating the %q Condition of FlowSchema %s to %#+v because the previous ConditionStatus was %q", fctypesv1a1.FlowSchemaConditionDangling, fs.Name, *danglingCondition, oldStatus)
 	apihelpers.SetFlowSchemaCondition(fs, *danglingCondition)
 
 	_, err := cfgCtl.flowcontrolClient.FlowSchemas().UpdateStatus(fs)
