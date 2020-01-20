@@ -46,7 +46,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/duration"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
@@ -527,8 +526,8 @@ func AddHandlers(h printers.PrintHandler) {
 		{Name: "PriorityLevel", Type: "string", Description: flowcontrolv1alpha1.PriorityLevelConfigurationReference{}.SwaggerDoc()["name"]},
 		{Name: "MatchingPrecedence", Type: "string", Description: flowcontrolv1alpha1.FlowSchemaSpec{}.SwaggerDoc()["matchingPrecedence"]},
 		{Name: "DistinguisherMethod", Type: "string", Description: flowcontrolv1alpha1.FlowSchemaSpec{}.SwaggerDoc()["distinguisherMethod"]},
-		{Name: "MatchesAll", Type: "bolean", Description: "matches all requests"},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+		{Name: "MissingPL", Type: "string", Description: "references a broken or non-existent PriorityLevelConfiguration"},
 	}
 	h.TableHandler(flowSchemaColumnDefinitions, printFlowSchema)
 	h.TableHandler(flowSchemaColumnDefinitions, printFlowSchemaList)
@@ -2272,51 +2271,6 @@ func printVolumeAttachmentList(list *storage.VolumeAttachmentList, options print
 	return rows, nil
 }
 
-func fsMatchesAll(obj *flowcontrol.FlowSchema) bool {
-	var allResources, allNonResources [2]bool
-	for _, prws := range obj.Spec.Rules {
-		allAuth, allUnauth := false, false
-		for _, subj := range prws.Subjects {
-			if subj.Group == nil {
-				continue
-			}
-			allAuth = allAuth || subj.Group.Name == user.AllAuthenticated
-			allUnauth = allUnauth || subj.Group.Name == user.AllUnauthenticated
-		}
-		anyAll := allAuth || allUnauth
-		if !anyAll {
-			continue
-		}
-		for _, nrr := range prws.NonResourceRules {
-			if hasWildcard(nrr.Verbs) && hasWildcard(nrr.NonResourceURLs) {
-				allNonResources[0] = allNonResources[0] || allAuth
-				allNonResources[1] = allNonResources[1] || allUnauth
-				break
-			}
-		}
-		for _, rr := range prws.ResourceRules {
-			if hasWildcard(rr.Verbs) && hasWildcard(rr.APIGroups) && hasWildcard(rr.Resources) && rr.ClusterScope && hasWildcard(rr.Namespaces) {
-				allResources[0] = allResources[0] || allAuth
-				allResources[1] = allResources[1] || allUnauth
-				break
-			}
-		}
-		if allResources[0] && allResources[1] && allNonResources[0] && allNonResources[1] {
-			return true
-		}
-	}
-	return false
-}
-
-func hasWildcard(arr []string) bool {
-	for _, elt := range arr {
-		if elt == "*" {
-			return true
-		}
-	}
-	return false
-}
-
 func printFlowSchema(obj *flowcontrol.FlowSchema, options printers.GenerateOptions) ([]metav1.TableRow, error) {
 	row := metav1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
@@ -2328,7 +2282,14 @@ func printFlowSchema(obj *flowcontrol.FlowSchema, options printers.GenerateOptio
 	if obj.Spec.DistinguisherMethod != nil {
 		distinguisherMethod = string(obj.Spec.DistinguisherMethod.Type)
 	}
-	row.Cells = append(row.Cells, name, plName, obj.Spec.MatchingPrecedence, distinguisherMethod, fsMatchesAll(obj), translateTimestampSince(obj.CreationTimestamp))
+	badPLRef := "?"
+	for _, cond := range obj.Status.Conditions {
+		if cond.Type == flowcontrol.FlowSchemaConditionDangling {
+			badPLRef = string(cond.Status)
+			break
+		}
+	}
+	row.Cells = append(row.Cells, name, plName, obj.Spec.MatchingPrecedence, distinguisherMethod, translateTimestampSince(obj.CreationTimestamp), badPLRef)
 
 	return []metav1.TableRow{row}, nil
 }

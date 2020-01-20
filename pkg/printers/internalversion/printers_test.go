@@ -4890,8 +4890,8 @@ func TestPrintFlowSchema(t *testing.T) {
 					}},
 				},
 			},
-			// Columns: Name, PriorityLevelName, MatchingPrecedence, DistinguisherMethod, MatchesAll, Age
-			expected: []metav1.TableRow{{Cells: []interface{}{"all-matcher", "allee", int32(math.MaxInt32), "ByUser", true, "0s"}}},
+			// Columns: Name, PriorityLevelName, MatchingPrecedence, DistinguisherMethod, Age, MissingPL
+			expected: []metav1.TableRow{{Cells: []interface{}{"all-matcher", "allee", int32(math.MaxInt32), "ByUser", "0s", "?"}}},
 		}, {
 			fs: flowcontrol.FlowSchema{
 				ObjectMeta: metav1.ObjectMeta{
@@ -4928,9 +4928,16 @@ func TestPrintFlowSchema(t *testing.T) {
 						}},
 					}},
 				},
+				Status: flowcontrol.FlowSchemaStatus{
+					Conditions: []flowcontrol.FlowSchemaCondition{{
+						Type:               flowcontrol.FlowSchemaConditionDangling,
+						Status:             "True",
+						LastTransitionTime: metav1.Time{Time: time.Now().Add(-time.Hour)},
+					}},
+				},
 			},
-			// Columns: Name, PriorityLevelName, MatchingPrecedence, DistinguisherMethod, MatchesAll, Age
-			expected: []metav1.TableRow{{Cells: []interface{}{"some-matcher", "allee", int32(0), "ByNamespace", false, "5m"}}},
+			// Columns: Name, PriorityLevelName, MatchingPrecedence, DistinguisherMethod, Age, MissingPL
+			expected: []metav1.TableRow{{Cells: []interface{}{"some-matcher", "allee", int32(0), "ByNamespace", "5m", "True"}}},
 		}, {
 			fs: flowcontrol.FlowSchema{
 				ObjectMeta: metav1.ObjectMeta{
@@ -4956,8 +4963,8 @@ func TestPrintFlowSchema(t *testing.T) {
 					}},
 				},
 			},
-			// Columns: Name, PriorityLevelName, MatchingPrecedence, DistinguisherMethod, MatchesAll, Age
-			expected: []metav1.TableRow{{Cells: []interface{}{"exempt", "allee", int32(0), "<none>", false, "5m"}}},
+			// Columns: Name, PriorityLevelName, MatchingPrecedence, DistinguisherMethod, Age, MissingPL
+			expected: []metav1.TableRow{{Cells: []interface{}{"exempt", "allee", int32(0), "<none>", "5m", "?"}}},
 		},
 	}
 
