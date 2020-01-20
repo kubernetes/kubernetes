@@ -133,21 +133,23 @@ func (op *PortAllocationOperation) AllocateNext() (int, error) {
 		// If no ports are already being allocated by this operation,
 		// then choose a sensible guess for a dummy port number
 		var lastPort int
-		for _, allocatedPort := range op.allocated {
-			if allocatedPort > lastPort {
-				lastPort = allocatedPort
-			}
-		}
+
 		if len(op.allocated) == 0 {
 			lastPort = 32768
+		} else {
+			for _, allocatedPort := range op.allocated {
+				if allocatedPort > lastPort {
+					lastPort = allocatedPort
+				}
+			}
 		}
 
 		// Try to find the next non allocated port.
 		// If too many ports are full, just reuse one,
 		// since this is just a dummy value.
-		for port := lastPort + 1; port < 100; port++ {
-			err := op.Allocate(port)
-			if err == nil {
+		for offset := 1; offset < 100; offset++ {
+			port := lastPort + offset
+			if err := op.Allocate(port); err == nil {
 				return port, nil
 			}
 		}
