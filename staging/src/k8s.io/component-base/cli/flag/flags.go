@@ -47,7 +47,6 @@ func WarnWordSepNormalizeFunc(f *pflag.FlagSet, name string) pflag.NormalizedNam
 func InitFlags() {
 	pflag.CommandLine.SetNormalizeFunc(WordSepNormalizeFunc)
 	pflag.CommandLine.AddGoFlagSet(goflag.CommandLine)
-	pflag.Parse()
 	pflag.VisitAll(func(flag *pflag.Flag) {
 		klog.V(2).Infof("FLAG: --%s=%q", flag.Name, flag.Value)
 	})
