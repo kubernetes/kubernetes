@@ -162,7 +162,7 @@ func (d *namespacedResourcesDeleter) initOpCache() {
 	if len(resources) == 0 {
 		klog.Fatalf("Unable to get any supported resources from server: %v", err)
 	}
-	deletableGroupVersionResources := []schema.GroupVersionResource{}
+
 	for _, rl := range resources {
 		gv, err := schema.ParseGroupVersion(rl.GroupVersion)
 		if err != nil {
@@ -183,7 +183,6 @@ func (d *namespacedResourcesDeleter) initOpCache() {
 					d.opCache.setNotSupported(operationKey{operation: op, gvr: gvr})
 				}
 			}
-			deletableGroupVersionResources = append(deletableGroupVersionResources, gvr)
 		}
 	}
 }
