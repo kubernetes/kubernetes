@@ -20,7 +20,6 @@ pkg/registry/core/service/ipallocator
 pkg/registry/core/service/portallocator
 pkg/registry/core/service/storage
 pkg/util/coverage
-pkg/util/netsh
 pkg/volume
 pkg/volume/awsebs
 pkg/volume/azure_dd
