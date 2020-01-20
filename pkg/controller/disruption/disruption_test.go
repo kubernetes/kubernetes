@@ -639,12 +639,9 @@ func TestReplicationController(t *testing.T) {
 	// about the RC.  This is a known bug.  TODO(mml): file issue
 	ps.VerifyPdbStatus(t, pdbName, 0, 0, 0, 0, map[string]metav1.Time{})
 
-	pods := []*v1.Pod{}
-
 	for i := int32(0); i < 3; i++ {
 		pod, _ := newPod(t, fmt.Sprintf("foobar %d", i))
 		updatePodOwnerToRc(t, pod, rc)
-		pods = append(pods, pod)
 		pod.Labels = labels
 		add(t, dc.podStore, pod)
 		dc.sync(pdbName)
@@ -680,12 +677,9 @@ func TestStatefulSetController(t *testing.T) {
 	// about the SS.  This is a known bug.  TODO(mml): file issue
 	ps.VerifyPdbStatus(t, pdbName, 0, 0, 0, 0, map[string]metav1.Time{})
 
-	pods := []*v1.Pod{}
-
 	for i := int32(0); i < 3; i++ {
 		pod, _ := newPod(t, fmt.Sprintf("foobar %d", i))
 		updatePodOwnerToSs(t, pod, ss)
-		pods = append(pods, pod)
 		pod.Labels = labels
 		add(t, dc.podStore, pod)
 		dc.sync(pdbName)
