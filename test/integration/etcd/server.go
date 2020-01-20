@@ -125,22 +125,20 @@ func StartRealMasterOrDie(t *testing.T, configFuncs ...func(*options.ServerRunOp
 
 	kubeClient := clientset.NewForConfigOrDie(kubeClientConfig)
 
-	go func() {
-		// Catch panics that occur in this go routine so we get a comprehensible failure
-		defer func() {
-			if err := recover(); err != nil {
-				t.Errorf("Unexpected panic trying to start API master: %#v", err)
-			}
-		}()
-
-		prepared, err := kubeAPIServer.PrepareRun()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := prepared.Run(stopCh); err != nil {
-			t.Fatal(err)
+	// Catch panics that occur in this go routine so we get a comprehensible failure
+	defer func() {
+		if err := recover(); err != nil {
+			t.Errorf("Unexpected panic trying to start API master: %#v", err)
 		}
 	}()
+
+	prepared, err := kubeAPIServer.PrepareRun()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := prepared.Run(stopCh); err != nil {
+		t.Fatal(err)
+	}
 
 	lastHealth := ""
 	attempt := 0
@@ -174,7 +172,7 @@ func StartRealMasterOrDie(t *testing.T, configFuncs ...func(*options.ServerRunOp
 	restMapper := restmapper.NewDeferredDiscoveryRESTMapper(discoveryClient)
 	restMapper.Reset()
 
-	serverResources, err := kubeClient.Discovery().ServerResources()
+	_, serverResources, err := kubeClient.Discovery().ServerGroupsAndResources()
 	if err != nil {
 		t.Fatal(err)
 	}
