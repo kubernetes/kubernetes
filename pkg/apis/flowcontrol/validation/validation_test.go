@@ -978,47 +978,6 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 			name: "forbid queuing details when not queuing",
 			priorityLevelConfiguration: &flowcontrol.PriorityLevelConfiguration{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: flowcontrol.PriorityLevelConfigurationNameExempt,
-				},
-				Spec: flowcontrol.PriorityLevelConfigurationSpec{
-					Type: flowcontrol.PriorityLevelEnablementExempt,
-				},
-			},
-			expectedErrors: field.ErrorList{},
-		},
-		{
-			name: "limited requires more details",
-			priorityLevelConfiguration: &flowcontrol.PriorityLevelConfiguration{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "broken-limited",
-				},
-				Spec: flowcontrol.PriorityLevelConfigurationSpec{
-					Type: flowcontrol.PriorityLevelEnablementLimited,
-				},
-			},
-			expectedErrors: field.ErrorList{field.Required(field.NewPath("spec").Child("limited"), "must not be empty when type is Limited")},
-		},
-		{
-			name: "max-in-flight should work",
-			priorityLevelConfiguration: &flowcontrol.PriorityLevelConfiguration{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "max-in-flight",
-				},
-				Spec: flowcontrol.PriorityLevelConfigurationSpec{
-					Type: flowcontrol.PriorityLevelEnablementLimited,
-					Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
-						AssuredConcurrencyShares: 42,
-						LimitResponse: flowcontrol.LimitResponse{
-							Type: flowcontrol.LimitResponseTypeReject},
-					},
-				},
-			},
-			expectedErrors: field.ErrorList{},
-		},
-		{
-			name: "forbid queuing details when not queuing",
-			priorityLevelConfiguration: &flowcontrol.PriorityLevelConfiguration{
-				ObjectMeta: metav1.ObjectMeta{
 					Name: "system-foo",
 				},
 				Spec: flowcontrol.PriorityLevelConfigurationSpec{
