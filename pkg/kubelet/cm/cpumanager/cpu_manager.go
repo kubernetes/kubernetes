@@ -321,12 +321,6 @@ func (m *manager) removeStaleState() {
 
 	// Get the list of active pods.
 	activePods := m.activePods()
-	if len(activePods) == 0 {
-		// If there are no active pods, skip the removal of stale state.
-		// Since this function is called periodically, we will just try again
-		// next time this function is called.
-		return
-	}
 
 	// Build a list of (podUID, containerName) pairs for all containers in all active Pods.
 	activeContainers := make(map[string]map[string]struct{})

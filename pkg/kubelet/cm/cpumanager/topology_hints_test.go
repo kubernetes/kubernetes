@@ -23,6 +23,7 @@ import (
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
@@ -238,6 +239,18 @@ func TestGetTopologyHints(t *testing.T) {
 	for _, tc := range tcases {
 		topology, _ := topology.Discover(&machineInfo, numaNodeInfo)
 
+		var activePods []*v1.Pod
+		for p := range tc.assignments {
+			pod := v1.Pod{}
+			pod.UID = types.UID(p)
+			for c := range tc.assignments[p] {
+				container := v1.Container{}
+				container.Name = c
+				pod.Spec.Containers = append(pod.Spec.Containers, container)
+			}
+			activePods = append(activePods, &pod)
+		}
+
 		m := manager{
 			policy: &staticPolicy{
 				topology: topology,
@@ -247,7 +260,7 @@ func TestGetTopologyHints(t *testing.T) {
 				defaultCPUSet: tc.defaultCPUSet,
 			},
 			topology:          topology,
-			activePods:        func() []*v1.Pod { return nil },
+			activePods:        func() []*v1.Pod { return activePods },
 			podStatusProvider: mockPodStatusProvider{},
 			sourcesReady:      &sourcesReadyStub{},
 		}
