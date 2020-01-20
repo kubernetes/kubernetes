@@ -14,6 +14,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This script checks import restrictions. The script looks for a file called
+# `.import-restrictions` in each directory, then all imports of the package are
+# checked against each "rule" in the file.
+# Usage: `hack/verify-import-boss.sh`.
+
 set -o errexit
 set -o nounset
 set -o pipefail
