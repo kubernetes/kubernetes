@@ -50,11 +50,9 @@ function create-kubemark-master {
     export KUBE_GCE_ENABLE_IP_ALIASES=true
     export KUBE_GCE_NODE_IPAM_MODE=RangeAllocator
 
-    # Disable all addons. They are running outside of the kubemark cluster.
+    # Disable some addons. We do not replicate them in Kubemark cluster.
     export KUBE_ENABLE_CLUSTER_AUTOSCALER=false
     export KUBE_ENABLE_CLUSTER_DNS=false
-    export KUBE_ENABLE_NODE_LOGGING=false
-    export KUBE_ENABLE_METRICS_SERVER=false
     export KUBE_ENABLE_L7_LOADBALANCING="none"
 
     # Unset env variables set by kubetest for 'root cluster'. We need recompute them
