@@ -18,6 +18,7 @@ package webhook
 
 import (
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -27,6 +28,7 @@ import (
 )
 
 func TestPatches(t *testing.T) {
+	sidecarImage = "test-image"
 	testCases := []struct {
 		patch    string
 		initial  interface{}
@@ -75,6 +77,36 @@ func TestPatches(t *testing.T) {
 						{
 							Image:     "webhook-added-image",
 							Name:      "webhook-added-init-container",
+							Resources: corev1.ResourceRequirements{},
+						},
+					},
+				},
+			},
+		},
+		{
+			patch: fmt.Sprintf(podsSidecarPatch, sidecarImage),
+			initial: corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Image:     "image1",
+							Name:      "container1",
+							Resources: corev1.ResourceRequirements{},
+						},
+					},
+				},
+			},
+			expected: &corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Image:     "image1",
+							Name:      "container1",
+							Resources: corev1.ResourceRequirements{},
+						},
+						{
+							Image:     sidecarImage,
+							Name:      "webhook-added-sidecar",
 							Resources: corev1.ResourceRequirements{},
 						},
 					},
