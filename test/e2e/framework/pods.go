@@ -226,7 +226,7 @@ func (c *PodClient) WaitForErrorEventOrSuccess(pod *v1.Pod) (*v1.Event, error) {
 		}
 		for _, e := range evnts.Items {
 			switch e.Reason {
-			case events.KillingContainer, events.FailedToCreateContainer, sysctl.UnsupportedReason, sysctl.ForbiddenReason:
+			case events.KillingContainer, events.FailedToCreateContainer, sysctl.ForbiddenReason:
 				ev = &e
 				return true, nil
 			case events.StartedContainer:
