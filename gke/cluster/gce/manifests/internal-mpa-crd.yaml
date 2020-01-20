@@ -1,0 +1,138 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: multidimpodautoscalers.autoscaling.gke.io
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+spec:
+  group: autoscaling.gke.io
+  scope: Namespaced
+  names:
+    plural: multidimpodautoscalers
+    singular: multidimpodautoscaler
+    kind: MultidimPodAutoscaler
+    shortNames:
+    - mpa
+  versions:
+  - name: v1beta1
+    served: true
+    storage: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        required: ["spec"]
+        properties:
+          spec:
+            type: object
+            required: ["scaleTargetRef", "goals", "constraints"]
+            properties:
+              scaleTargetRef:
+                type: object
+                properties:
+                  kind:
+                    type: string
+                  name:
+                    type: string
+                  apiVersion:
+                    type: string
+              goals:
+                type: object
+                required: ["metrics"]
+                properties:
+                  metrics:
+                    type: array
+                    items:
+                      type: object
+                      required: ["type", "resource"]
+                      properties:
+                        type:
+                          type: string
+                          enum: ["Resource"]
+                        resource:
+                          type: object
+                          required: ["name", "target"]
+                          properties:
+                            name:
+                              type: string
+                              enum: ["cpu"]
+                            target:
+                              type: object
+                              properties:
+                                type:
+                                  type: string
+                                  enum: ["Utilization", "Value", "AverageValue"]
+                                value:
+                                  x-kubernetes-int-or-string: true
+                                averageValue:
+                                  x-kubernetes-int-or-string: true
+                                averageUtilization:
+                                  type: integer
+                                  minimum: 0
+                                  maximum: 100
+              constraints:
+                type: object
+                required: ["containerControlledResources"]
+                properties:
+                  global:
+                    type: object
+                    properties:
+                      minReplicas:
+                        type: integer
+                        minimum: 0
+                        default: 1
+                      maxReplicas:
+                        type: integer
+                        minimum: 0
+                      requests:
+                        type: object
+                        properties:
+                          minAllowed:
+                            type: object
+                            x-kubernetes-preserve-unknown-fields: true
+                          maxAllowed:
+                            type: object
+                            x-kubernetes-preserve-unknown-fields: true
+                  pod:
+                    type: object
+                    properties:
+                      requests:
+                        type: object
+                        properties:
+                          minAllowed:
+                            type: object
+                            x-kubernetes-preserve-unknown-fields: true
+                          maxAllowed:
+                            type: object
+                            x-kubernetes-preserve-unknown-fields: true
+                  containerControlledResources:
+                    type: array
+                    items:
+                      type: string
+                      enum: ["memory"]
+                  container:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        name:
+                          type: string
+                        requests:
+                          type: object
+                          properties:
+                            minAllowed:
+                              type: object
+                              x-kubernetes-preserve-unknown-fields: true
+                            maxAllowed:
+                              type: object
+                              x-kubernetes-preserve-unknown-fields: true
+              policy:
+                type: object
+                properties:
+                  updateMode:
+                    type: string
+                    enum: ["Auto"]
+          status:
+            type: object
+            x-kubernetes-preserve-unknown-fields: true
+    subresources:
+      status: {}
