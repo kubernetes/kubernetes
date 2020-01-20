@@ -383,8 +383,7 @@ func (d *portworxVolumeDeleter) Delete() error {
 
 type portworxVolumeProvisioner struct {
 	*portworxVolume
-	options   volume.VolumeOptions
-	namespace string
+	options volume.VolumeOptions
 }
 
 var _ volume.Provisioner = &portworxVolumeProvisioner{}
