@@ -55,8 +55,7 @@ func NewCheckpointState(stateDir, checkpointName, policyName string, initialCont
 
 	if err := stateCheckpoint.restoreState(); err != nil {
 		//lint:ignore ST1005 user-facing error message
-		return nil, fmt.Errorf("could not restore state from checkpoint: %v\n"+
-			"Please drain this node and delete the CPU manager checkpoint file %q before restarting Kubelet.",
+		return nil, fmt.Errorf("could not restore state from checkpoint: %v, please drain this node and delete the CPU manager checkpoint file %q before restarting Kubelet",
 			err, path.Join(stateDir, checkpointName))
 	}
 
@@ -100,8 +99,7 @@ func (sc *stateCheckpoint) restoreState() error {
 		checkpointV1 = &CPUManagerCheckpointV1{} // reset it back to 0
 		if err = sc.checkpointManager.GetCheckpoint(sc.checkpointName, checkpointV2); err != nil {
 			if err == errors.ErrCheckpointNotFound {
-				sc.storeState()
-				return nil
+				return sc.storeState()
 			}
 			return err
 		}
@@ -142,7 +140,7 @@ func (sc *stateCheckpoint) restoreState() error {
 }
 
 // saves state to a checkpoint, caller is responsible for locking
-func (sc *stateCheckpoint) storeState() {
+func (sc *stateCheckpoint) storeState() error {
 	checkpoint := NewCPUManagerCheckpoint()
 	checkpoint.PolicyName = sc.policyName
 	checkpoint.DefaultCPUSet = sc.cache.GetDefaultCPUSet().String()
@@ -156,10 +154,11 @@ func (sc *stateCheckpoint) storeState() {
 	}
 
 	err := sc.checkpointManager.CreateCheckpoint(sc.checkpointName, checkpoint)
-
 	if err != nil {
-		panic("[cpumanager] could not save checkpoint: " + err.Error())
+		klog.Errorf("[cpumanager] could not save checkpoint: %v", err)
+		return err
 	}
+	return nil
 }
 
 // GetCPUSet returns current CPU set
@@ -200,7 +199,10 @@ func (sc *stateCheckpoint) SetCPUSet(podUID string, containerName string, cset c
 	sc.mux.Lock()
 	defer sc.mux.Unlock()
 	sc.cache.SetCPUSet(podUID, containerName, cset)
-	sc.storeState()
+	err := sc.storeState()
+	if err != nil {
+		klog.Warningf("store state to checkpoint error: %v", err)
+	}
 }
 
 // SetDefaultCPUSet sets default CPU set
@@ -208,7 +210,10 @@ func (sc *stateCheckpoint) SetDefaultCPUSet(cset cpuset.CPUSet) {
 	sc.mux.Lock()
 	defer sc.mux.Unlock()
 	sc.cache.SetDefaultCPUSet(cset)
-	sc.storeState()
+	err := sc.storeState()
+	if err != nil {
+		klog.Warningf("store state to checkpoint error: %v", err)
+	}
 }
 
 // SetCPUAssignments sets CPU to pod assignments
@@ -216,7 +221,10 @@ func (sc *stateCheckpoint) SetCPUAssignments(a ContainerCPUAssignments) {
 	sc.mux.Lock()
 	defer sc.mux.Unlock()
 	sc.cache.SetCPUAssignments(a)
-	sc.storeState()
+	err := sc.storeState()
+	if err != nil {
+		klog.Warningf("store state to checkpoint error: %v", err)
+	}
 }
 
 // Delete deletes assignment for specified pod
@@ -224,7 +232,10 @@ func (sc *stateCheckpoint) Delete(podUID string, containerName string) {
 	sc.mux.Lock()
 	defer sc.mux.Unlock()
 	sc.cache.Delete(podUID, containerName)
-	sc.storeState()
+	err := sc.storeState()
+	if err != nil {
+		klog.Warningf("store state to checkpoint error: %v", err)
+	}
 }
 
 // ClearState clears the state and saves it in a checkpoint
@@ -232,5 +243,8 @@ func (sc *stateCheckpoint) ClearState() {
 	sc.mux.Lock()
 	defer sc.mux.Unlock()
 	sc.cache.ClearState()
-	sc.storeState()
+	err := sc.storeState()
+	if err != nil {
+		klog.Warningf("store state to checkpoint error: %v", err)
+	}
 }

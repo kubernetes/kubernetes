@@ -25,7 +25,7 @@ import (
 // Policy implements logic for pod container to CPU assignment.
 type Policy interface {
 	Name() string
-	Start(s state.State)
+	Start(s state.State) error
 	// AddContainer call is idempotent
 	AddContainer(s state.State, pod *v1.Pod, container *v1.Container) error
 	// RemoveContainer call is idempotent
