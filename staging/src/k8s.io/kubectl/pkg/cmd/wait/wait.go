@@ -116,6 +116,8 @@ func NewCmdWait(restClientGetter genericclioptions.RESTClientGetter, streams gen
 		Run: func(cmd *cobra.Command, args []string) {
 			o, err := flags.ToOptions(args)
 			cmdutil.CheckErr(err)
+			err = o.WaitUntilAvailable(flags.ForCondition)
+			cmdutil.CheckErr(err)
 			err = o.RunWait()
 			cmdutil.CheckErr(err)
 		},
@@ -252,6 +254,26 @@ func (o *WaitOptions) RunWait() error {
 	return err
 }
 
+func (o *WaitOptions) WaitUntilAvailable(forCondition string) error {
+	if strings.HasPrefix(forCondition, "condition=") {
+		// Wait for the resources to be available
+		return wait.PollImmediate(10*time.Second, o.Timeout, func() (bool, error) {
+			visitCount := 0
+			err := o.ResourceFinder.Do().Visit(func(info *resource.Info, err error) error {
+				if err != nil {
+					return err
+				}
+				visitCount++
+				return nil
+			})
+			if err != nil {
+				return false, err
+			}
+			return visitCount > 0, nil
+		})
+	}
+	return nil
+}
 // IsDeleted is a condition func for waiting for something to be deleted
 func IsDeleted(info *resource.Info, o *WaitOptions) (runtime.Object, bool, error) {
 	endTime := time.Now().Add(o.Timeout)
