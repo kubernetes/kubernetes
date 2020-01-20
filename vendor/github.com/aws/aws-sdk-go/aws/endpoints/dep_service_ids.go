@@ -2,7 +2,7 @@ package endpoints
 
 // Service identifiers
 //
-// Deprecated: Use client package's EndpointID value instead of these
+// Deprecated: Use client package's EndpointsID value instead of these
 // ServiceIDs. These IDs are not maintained, and are out of date.
 const (
 	A4bServiceID                          = "a4b"                          // A4b.

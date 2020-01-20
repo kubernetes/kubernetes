@@ -25,6 +25,8 @@ var noEscape [256]bool
 
 var errValueNotSet = fmt.Errorf("value not set")
 
+var byteSliceType = reflect.TypeOf([]byte{})
+
 func init() {
 	for i := 0; i < len(noEscape); i++ {
 		// AWS expects every character except these to be escaped
@@ -94,6 +96,14 @@ func buildLocationElements(r *request.Request, v reflect.Value, buildGETQuery bo
 				continue
 			}
 
+			// Support the ability to customize values to be marshaled as a
+			// blob even though they were modeled as a string. Required for S3
+			// API operations like SSECustomerKey is modeled as stirng but
+			// required to be base64 encoded in request.
+			if field.Tag.Get("marshal-as") == "blob" {
+				m = m.Convert(byteSliceType)
+			}
+
 			var err error
 			switch field.Tag.Get("location") {
 			case "headers": // header maps
@@ -137,7 +147,7 @@ func buildBody(r *request.Request, v reflect.Value) {
 					case string:
 						r.SetStringBody(reader)
 					default:
-						r.Error = awserr.New("SerializationError",
+						r.Error = awserr.New(request.ErrCodeSerialization,
 							"failed to encode REST request",
 							fmt.Errorf("unknown payload type %s", payload.Type()))
 					}
@@ -152,8 +162,11 @@ func buildHeader(header *http.Header, v reflect.Value, name string, tag reflect.
 	if err == errValueNotSet {
 		return nil
 	} else if err != nil {
-		return awserr.New("SerializationError", "failed to encode REST request", err)
+		return awserr.New(request.ErrCodeSerialization, "failed to encode REST request", err)
 	}
+
+	name = strings.TrimSpace(name)
+	str = strings.TrimSpace(str)
 
 	header.Add(name, str)
 
@@ -167,11 +180,13 @@ func buildHeaderMap(header *http.Header, v reflect.Value, tag reflect.StructTag)
 		if err == errValueNotSet {
 			continue
 		} else if err != nil {
-			return awserr.New("SerializationError", "failed to encode REST request", err)
+			return awserr.New(request.ErrCodeSerialization, "failed to encode REST request", err)
 
 		}
+		keyStr := strings.TrimSpace(key.String())
+		str = strings.TrimSpace(str)
 
-		header.Add(prefix+key.String(), str)
+		header.Add(prefix+keyStr, str)
 	}
 	return nil
 }
@@ -181,7 +196,7 @@ func buildURI(u *url.URL, v reflect.Value, name string, tag reflect.StructTag) e
 	if err == errValueNotSet {
 		return nil
 	} else if err != nil {
-		return awserr.New("SerializationError", "failed to encode REST request", err)
+		return awserr.New(request.ErrCodeSerialization, "failed to encode REST request", err)
 	}
 
 	u.Path = strings.Replace(u.Path, "{"+name+"}", value, -1)
@@ -214,7 +229,7 @@ func buildQueryString(query url.Values, v reflect.Value, name string, tag reflec
 		if err == errValueNotSet {
 			return nil
 		} else if err != nil {
-			return awserr.New("SerializationError", "failed to encode REST request", err)
+			return awserr.New(request.ErrCodeSerialization, "failed to encode REST request", err)
 		}
 		query.Set(name, str)
 	}

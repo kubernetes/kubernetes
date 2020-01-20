@@ -1,6 +1,7 @@
 package xmlutil
 
 import (
+	"bytes"
 	"encoding/base64"
 	"encoding/xml"
 	"fmt"
@@ -10,8 +11,26 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/private/protocol"
 )
+
+// UnmarshalXMLError unmarshals the XML error from the stream into the value
+// type specified. The value must be a pointer. If the message fails to
+// unmarshal, the message content will be included in the returned error as a
+// awserr.UnmarshalError.
+func UnmarshalXMLError(v interface{}, stream io.Reader) error {
+	var errBuf bytes.Buffer
+	body := io.TeeReader(stream, &errBuf)
+
+	err := xml.NewDecoder(body).Decode(v)
+	if err != nil && err != io.EOF {
+		return awserr.NewUnmarshalError(err,
+			"failed to unmarshal error message", errBuf.Bytes())
+	}
+
+	return nil
+}
 
 // UnmarshalXML deserializes an xml.Decoder into the container v. V
 // needs to match the shape of the XML expected to be decoded.
