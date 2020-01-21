@@ -626,6 +626,7 @@ func TestPreFilterPlugins(t *testing.T) {
 			t.Errorf("AddPod called %v, expected: 1", preFilter2.RemoveCalled)
 		}
 	})
+
 }
 
 func TestFilterPlugins(t *testing.T) {
@@ -849,9 +850,7 @@ func TestFilterPlugins(t *testing.T) {
 }
 
 func TestRecordingMetrics(t *testing.T) {
-	state := &CycleState{
-		recordPluginMetrics: true,
-	}
+	state := &CycleState{recordFrameworkMetrics: true}
 	tests := []struct {
 		name               string
 		action             func(f Framework)
