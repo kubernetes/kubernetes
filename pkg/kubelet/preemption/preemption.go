@@ -31,7 +31,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 )
 
 const message = "Preempted in order to admit critical pod"
@@ -61,16 +60,16 @@ func NewCriticalPodAdmissionHandler(getPodsFunc eviction.ActivePodsFunc, killPod
 
 // HandleAdmissionFailure gracefully handles admission rejection, and, in some cases,
 // to allow admission of the pod despite its previous failure.
-func (c *CriticalPodAdmissionHandler) HandleAdmissionFailure(admitPod *v1.Pod, failureReasons []predicates.PredicateFailureReason) (bool, []predicates.PredicateFailureReason, error) {
+func (c *CriticalPodAdmissionHandler) HandleAdmissionFailure(admitPod *v1.Pod, failureReasons []lifecycle.PredicateFailureReason) ([]lifecycle.PredicateFailureReason, error) {
 	if !kubetypes.IsCriticalPod(admitPod) {
-		return false, failureReasons, nil
+		return failureReasons, nil
 	}
 	// InsufficientResourceError is not a reason to reject a critical pod.
 	// Instead of rejecting, we free up resources to admit it, if no other reasons for rejection exist.
-	nonResourceReasons := []predicates.PredicateFailureReason{}
+	nonResourceReasons := []lifecycle.PredicateFailureReason{}
 	resourceReasons := []*admissionRequirement{}
 	for _, reason := range failureReasons {
-		if r, ok := reason.(*predicates.InsufficientResourceError); ok {
+		if r, ok := reason.(*lifecycle.InsufficientResourceError); ok {
 			resourceReasons = append(resourceReasons, &admissionRequirement{
 				resourceName: r.ResourceName,
 				quantity:     r.GetInsufficientAmount(),
@@ -81,11 +80,11 @@ func (c *CriticalPodAdmissionHandler) HandleAdmissionFailure(admitPod *v1.Pod, f
 	}
 	if len(nonResourceReasons) > 0 {
 		// Return only reasons that are not resource related, since critical pods cannot fail admission for resource reasons.
-		return false, nonResourceReasons, nil
+		return nonResourceReasons, nil
 	}
 	err := c.evictPodsToFreeRequests(admitPod, admissionRequirementList(resourceReasons))
 	// if no error is returned, preemption succeeded and the pod is safe to admit.
-	return err == nil, nil, err
+	return nil, err
 }
 
 // evictPodsToFreeRequests takes a list of insufficient resources, and attempts to free them by evicting pods
