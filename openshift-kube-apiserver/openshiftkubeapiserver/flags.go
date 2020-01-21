@@ -102,7 +102,7 @@ func ConfigToFlags(kubeAPIServerConfig *kubecontrolplanev1.KubeAPIServerConfig) 
 	}
 	configflags.SetIfUnset(args, "allow-privileged", "true")
 	configflags.SetIfUnset(args, "anonymous-auth", "true")
-	configflags.SetIfUnset(args, "authorization-mode", "RBAC", "Node") // overridden later, but this runs the poststarthook for bootstrapping RBAC
+	configflags.SetIfUnset(args, "authorization-mode", "Scope", "SystemMasters", "RBAC", "Node") // overridden later, but this runs the poststarthook for bootstrapping RBAC
 	for flag, value := range configflags.AuditFlags(&kubeAPIServerConfig.AuditConfig, configflags.ArgsWithPrefix(args, "audit-")) {
 		configflags.SetIfUnset(args, flag, value...)
 	}
