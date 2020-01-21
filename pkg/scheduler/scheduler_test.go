@@ -44,7 +44,6 @@ import (
 	clientcache "k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/events"
 	volumescheduling "k8s.io/kubernetes/pkg/controller/volume/scheduling"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/core"
 	frameworkplugins "k8s.io/kubernetes/pkg/scheduler/framework/plugins"
@@ -144,7 +143,7 @@ func (es mockScheduler) Schedule(ctx context.Context, state *framework.CycleStat
 	return es.result, es.err
 }
 
-func (es mockScheduler) Extenders() []algorithm.SchedulerExtender {
+func (es mockScheduler) Extenders() []core.SchedulerExtender {
 	return nil
 }
 func (es mockScheduler) Preempt(ctx context.Context, state *framework.CycleState, pod *v1.Pod, scheduleErr error) (*v1.Node, []*v1.Pod, []*v1.Pod, error) {
@@ -614,7 +613,7 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache internalcache.C
 		internalqueue.NewSchedulingQueue(nil),
 		internalcache.NewEmptySnapshot(),
 		fwk,
-		[]algorithm.SchedulerExtender{},
+		[]core.SchedulerExtender{},
 		nil,
 		informerFactory.Core().V1().PersistentVolumeClaims().Lister(),
 		informerFactory.Policy().V1beta1().PodDisruptionBudgets().Lister(),
@@ -941,14 +940,14 @@ priorities:
 func TestSchedulerBinding(t *testing.T) {
 	table := []struct {
 		podName      string
-		extenders    []algorithm.SchedulerExtender
+		extenders    []core.SchedulerExtender
 		wantBinderID int
 		name         string
 	}{
 		{
 			name:    "the extender is not a binder",
 			podName: "pod0",
-			extenders: []algorithm.SchedulerExtender{
+			extenders: []core.SchedulerExtender{
 				&fakeExtender{isBinder: false, interestedPodName: "pod0"},
 			},
 			wantBinderID: -1, // default binding.
@@ -956,7 +955,7 @@ func TestSchedulerBinding(t *testing.T) {
 		{
 			name:    "one of the extenders is a binder and interested in pod",
 			podName: "pod0",
-			extenders: []algorithm.SchedulerExtender{
+			extenders: []core.SchedulerExtender{
 				&fakeExtender{isBinder: false, interestedPodName: "pod0"},
 				&fakeExtender{isBinder: true, interestedPodName: "pod0"},
 			},
@@ -965,7 +964,7 @@ func TestSchedulerBinding(t *testing.T) {
 		{
 			name:    "one of the extenders is a binder, but not interested in pod",
 			podName: "pod1",
-			extenders: []algorithm.SchedulerExtender{
+			extenders: []core.SchedulerExtender{
 				&fakeExtender{isBinder: false, interestedPodName: "pod1"},
 				&fakeExtender{isBinder: true, interestedPodName: "pod0"},
 			},
