@@ -37,7 +37,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
@@ -110,7 +109,7 @@ type Configurator struct {
 }
 
 // create a scheduler from a set of registered plugins.
-func (c *Configurator) create(extenders []algorithm.SchedulerExtender) (*Scheduler, error) {
+func (c *Configurator) create(extenders []core.SchedulerExtender) (*Scheduler, error) {
 	framework, err := framework.NewFramework(
 		c.registry,
 		c.plugins,
@@ -186,7 +185,7 @@ func (c *Configurator) createFromProvider(providerName string) (*Scheduler, erro
 	pluginConfig = append(pluginConfig, c.pluginConfig...)
 	c.pluginConfig = pluginConfig
 
-	return c.create([]algorithm.SchedulerExtender{})
+	return c.create([]core.SchedulerExtender{})
 }
 
 // createFromConfig creates a scheduler from the configuration file
@@ -227,9 +226,9 @@ func (c *Configurator) createFromConfig(policy schedulerapi.Policy) (*Scheduler,
 		}
 	}
 
-	var extenders []algorithm.SchedulerExtender
+	var extenders []core.SchedulerExtender
 	if len(policy.Extenders) != 0 {
-		var ignorableExtenders []algorithm.SchedulerExtender
+		var ignorableExtenders []core.SchedulerExtender
 		var ignoredExtendedResources []string
 		for ii := range policy.Extenders {
 			klog.V(2).Infof("Creating extender with config %+v", policy.Extenders[ii])

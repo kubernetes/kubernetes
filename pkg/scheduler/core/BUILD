@@ -10,7 +10,6 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/api/v1/pod:go_default_library",
-        "//pkg/scheduler/algorithm:go_default_library",
         "//pkg/scheduler/apis/config:go_default_library",
         "//pkg/scheduler/apis/extender/v1:go_default_library",
         "//pkg/scheduler/framework/v1alpha1:go_default_library",
@@ -45,7 +44,6 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//pkg/api/v1/pod:go_default_library",
-        "//pkg/scheduler/algorithm:go_default_library",
         "//pkg/scheduler/apis/config:go_default_library",
         "//pkg/scheduler/apis/extender/v1:go_default_library",
         "//pkg/scheduler/framework/plugins/defaultpodtopologyspread:go_default_library",

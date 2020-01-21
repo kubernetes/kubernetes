@@ -36,7 +36,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	extenderv1 "k8s.io/kubernetes/pkg/scheduler/apis/extender/v1"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultpodtopologyspread"
@@ -807,7 +806,7 @@ func TestGenericScheduler(t *testing.T) {
 				internalqueue.NewSchedulingQueue(nil),
 				snapshot,
 				fwk,
-				[]algorithm.SchedulerExtender{},
+				[]SchedulerExtender{},
 				nil,
 				pvcLister,
 				informerFactory.Policy().V1beta1().PodDisruptionBudgets().Lister(),
@@ -1152,7 +1151,7 @@ func TestZeroRequest(t *testing.T) {
 				nil,
 				emptySnapshot,
 				fwk,
-				[]algorithm.SchedulerExtender{},
+				[]SchedulerExtender{},
 				nil,
 				nil,
 				nil,
@@ -1611,7 +1610,7 @@ func TestSelectNodesForPreemption(t *testing.T) {
 				internalqueue.NewSchedulingQueue(nil),
 				snapshot,
 				fwk,
-				[]algorithm.SchedulerExtender{},
+				[]SchedulerExtender{},
 				nil,
 				nil,
 				informerFactory.Policy().V1beta1().PodDisruptionBudgets().Lister(),
@@ -2374,7 +2373,7 @@ func TestPreempt(t *testing.T) {
 				cachedNodeInfo.SetNode(node)
 				cachedNodeInfoMap[node.Name] = cachedNodeInfo
 			}
-			var extenders []algorithm.SchedulerExtender
+			var extenders []SchedulerExtender
 			for _, extender := range test.extenders {
 				// Set nodeInfoMap as extenders cached node information.
 				extender.cachedNodeNameToInfo = cachedNodeInfoMap
