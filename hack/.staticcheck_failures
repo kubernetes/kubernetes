@@ -104,9 +104,4 @@ vendor/k8s.io/kubectl/pkg/cmd/rollingupdate
 vendor/k8s.io/kubectl/pkg/cmd/scale
 vendor/k8s.io/kubectl/pkg/cmd/set
 vendor/k8s.io/kubectl/pkg/cmd/testing
-vendor/k8s.io/kubectl/pkg/cmd/top
-vendor/k8s.io/kubectl/pkg/cmd/util/editor
-vendor/k8s.io/kubectl/pkg/cmd/wait
-vendor/k8s.io/kubectl/pkg/describe/versioned
-vendor/k8s.io/kubectl/pkg/scale
 vendor/k8s.io/metrics/pkg/client/custom_metrics
