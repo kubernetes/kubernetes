@@ -199,6 +199,9 @@ func (o ProxyOptions) Validate() error {
 // RunProxy checks given arguments and executes command
 func (o ProxyOptions) RunProxy() error {
 	server, err := proxy.NewServer(o.staticDir, o.apiPrefix, o.staticPrefix, o.filter, o.clientConfig, o.keepalive)
+	if err != nil {
+		klog.Fatal(err)
+	}
 
 	if err != nil {
 		return err
