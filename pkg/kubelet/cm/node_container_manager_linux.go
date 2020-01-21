@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog"
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/stats/pidlimit"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -110,7 +111,7 @@ func (cm *containerManagerImpl) enforceNodeAllocatableCgroups() error {
 	// Now apply kube reserved and system reserved limits if required.
 	if nc.EnforceNodeAllocatable.Has(kubetypes.SystemReservedEnforcementKey) {
 		klog.V(2).Infof("Enforcing System reserved on cgroup %q with limits: %+v", nc.SystemReservedCgroupName, nc.SystemReserved)
-		if err := enforceExistingCgroup(cm.cgroupManager, cm.cgroupManager.CgroupName(nc.SystemReservedCgroupName), nc.SystemReserved); err != nil {
+		if err := enforceExistingCgroup(cm.cgroupManager, cm.cgroupManager.CgroupName(nc.SystemReservedCgroupName), nc.SystemReserved, cm.NodeConfig.ReservedSystemCPUs); err != nil {
 			message := fmt.Sprintf("Failed to enforce System Reserved Cgroup Limits on %q: %v", nc.SystemReservedCgroupName, err)
 			cm.recorder.Event(nodeRef, v1.EventTypeWarning, events.FailedNodeAllocatableEnforcement, message)
 			return fmt.Errorf(message)
@@ -119,7 +120,7 @@ func (cm *containerManagerImpl) enforceNodeAllocatableCgroups() error {
 	}
 	if nc.EnforceNodeAllocatable.Has(kubetypes.KubeReservedEnforcementKey) {
 		klog.V(2).Infof("Enforcing kube reserved on cgroup %q with limits: %+v", nc.KubeReservedCgroupName, nc.KubeReserved)
-		if err := enforceExistingCgroup(cm.cgroupManager, cm.cgroupManager.CgroupName(nc.KubeReservedCgroupName), nc.KubeReserved); err != nil {
+		if err := enforceExistingCgroup(cm.cgroupManager, cm.cgroupManager.CgroupName(nc.KubeReservedCgroupName), nc.KubeReserved, cpuset.NewCPUSet()); err != nil {
 			message := fmt.Sprintf("Failed to enforce Kube Reserved Cgroup Limits on %q: %v", nc.KubeReservedCgroupName, err)
 			cm.recorder.Event(nodeRef, v1.EventTypeWarning, events.FailedNodeAllocatableEnforcement, message)
 			return fmt.Errorf(message)
@@ -130,7 +131,7 @@ func (cm *containerManagerImpl) enforceNodeAllocatableCgroups() error {
 }
 
 // enforceExistingCgroup updates the limits `rl` on existing cgroup `cName` using `cgroupManager` interface.
-func enforceExistingCgroup(cgroupManager CgroupManager, cName CgroupName, rl v1.ResourceList) error {
+func enforceExistingCgroup(cgroupManager CgroupManager, cName CgroupName, rl v1.ResourceList, cpus cpuset.CPUSet) error {
 	cgroupConfig := &CgroupConfig{
 		Name:               cName,
 		ResourceParameters: getCgroupConfig(rl),
@@ -138,7 +139,8 @@ func enforceExistingCgroup(cgroupManager CgroupManager, cName CgroupName, rl v1.
 	if cgroupConfig.ResourceParameters == nil {
 		return fmt.Errorf("%q cgroup is not config properly", cgroupConfig.Name)
 	}
-	klog.V(4).Infof("Enforcing limits on cgroup %q with %d cpu shares, %d bytes of memory, and %d processes", cName, cgroupConfig.ResourceParameters.CpuShares, cgroupConfig.ResourceParameters.Memory, cgroupConfig.ResourceParameters.PidsLimit)
+	cgroupConfig.ResourceParameters.CpuSet = cpus
+	klog.V(4).Infof("Enforcing limits on cgroup %q with %d cpu shares, %d bytes of memory, %d processes, and cpuset '%s'", cName, cgroupConfig.ResourceParameters.CpuShares, cgroupConfig.ResourceParameters.Memory, cgroupConfig.ResourceParameters.PidsLimit, cpus)
 	if !cgroupManager.Exists(cgroupConfig.Name) {
 		return fmt.Errorf("%q cgroup does not exist", cgroupConfig.Name)
 	}

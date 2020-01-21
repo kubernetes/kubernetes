@@ -329,6 +329,7 @@ func getSupportedSubsystems() map[subsystem]bool {
 		&cgroupfs.MemoryGroup{}: true,
 		&cgroupfs.CpuGroup{}:    true,
 		&cgroupfs.PidsGroup{}:   false,
+		&cgroupfs.CpusetGroup{}: false, // currently needed only for setting cpuset for system-reserved cgroup
 	}
 	// not all hosts support hugetlb cgroup, and in the absent of hugetlb, we will fail silently by reporting no capacity.
 	supportedSubsystems[&cgroupfs.HugetlbGroup{}] = false
@@ -439,6 +440,12 @@ func (m *cgroupManagerImpl) toResources(resourceConfig *ResourceConfig) *libcont
 			Pagesize: pageSize,
 			Limit:    uint64(0),
 		})
+	}
+
+	// Empty CPUSet means that it hasn't been declared for this cgroup.
+	// Only add the CPUSet to resources when it's declared.
+	if !resourceConfig.CpuSet.IsEmpty() {
+		resources.CpusetCpus = resourceConfig.CpuSet.String()
 	}
 	return resources
 }

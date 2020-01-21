@@ -19,6 +19,7 @@ package cm
 import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 )
 
 // ResourceConfig holds information about all the supported cgroup resource parameters.
@@ -35,6 +36,8 @@ type ResourceConfig struct {
 	HugePageLimit map[int64]int64
 	// Maximum number of pids
 	PidsLimit *int64
+	// CPUSet for the cgroup.
+	CpuSet cpuset.CPUSet
 }
 
 // CgroupName is the abstract name of a cgroup prior to any driver specific conversion.
