@@ -32,8 +32,17 @@ run_kubectl_diff_tests() {
 
     kubectl apply -f hack/testdata/pod.yaml
 
-    output_message=$(! kubectl diff -f hack/testdata/pod-changed.yaml)
+    # Make sure that diffing the resource right after returns nothing (0 exit code).
+    kubectl diff -f hack/testdata/pod.yaml
+
+    # Make sure that:
+    # 1. the exit code for diff is 1 because it found a difference
+    # 2. the difference contains the changed image
+    output_message=$(kubectl diff -f hack/testdata/pod-changed.yaml || test $? -eq 1)
     kube::test::if_has_string "${output_message}" 'k8s.gcr.io/pause:3.0'
+
+    # Test that we have a return code bigger than 1 if there is an error when diffing
+    kubectl diff -f hack/testdata/invalid-pod.yaml || test $? -gt 1
 
     kubectl delete -f hack/testdata/pod.yaml
 
