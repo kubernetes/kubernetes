@@ -141,22 +141,18 @@ func WithMaxInFlightLimit(
 
 			select {
 			case c <- true:
-				var mutatingLen, readOnlyLen int
-				if isMutatingRequest {
-					mutatingLen = len(mutatingChan)
-				} else {
-					readOnlyLen = len(nonMutatingChan)
-				}
-
 				defer func() {
 					<-c
-					if isMutatingRequest {
-						watermark.recordMutating(mutatingLen)
-					} else {
-						watermark.recordReadOnly(readOnlyLen)
-					}
-
 				}()
+
+				go func() {
+					if isMutatingRequest {
+						watermark.recordMutating(len(mutatingChan))
+					} else {
+						watermark.recordReadOnly(len(nonMutatingChan))
+					}
+				}()
+
 				handler.ServeHTTP(w, r)
 
 			default:
