@@ -23,6 +23,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
+	"sync"
 	"time"
 
 	"k8s.io/apiserver/pkg/storage/value"
@@ -43,6 +44,43 @@ type Service interface {
 	Encrypt(data []byte) ([]byte, error)
 }
 
+type dek struct {
+	ciphertext  []byte
+	transformer value.Transformer
+	rotateAt    time.Time
+}
+
+func (d *dek) shouldRotate() bool {
+	return time.Now().After(d.rotateAt)
+}
+
+func newDEK(service Service, ttl time.Duration, baseTransformerFunc func(cipher.Block) value.Transformer) (*dek, error) {
+	plaintext, err := generateKey(32)
+	if err != nil {
+		return nil, err
+	}
+
+	ciphertext, err := service.Encrypt(plaintext)
+	if err != nil {
+		// Do NOT wrap this err using fmt.Errorf() or similar functions
+		// because this gRPC status error has useful error code when
+		// record the metric.
+		return nil, err
+	}
+
+	block, err := aes.NewCipher(plaintext)
+	if err != nil {
+		return nil, err
+	}
+
+	return &dek{
+			ciphertext:  ciphertext,
+			rotateAt:    time.Now().Add(ttl),
+			transformer: baseTransformerFunc(block),
+		},
+		nil
+}
+
 type envelopeTransformer struct {
 	envelopeService Service
 
@@ -53,13 +91,17 @@ type envelopeTransformer struct {
 	baseTransformerFunc func(cipher.Block) value.Transformer
 
 	cacheEnabled bool
+
+	dekCacheTTL time.Duration
+	currentDEK  *dek
+	mux         sync.RWMutex
 }
 
 // NewEnvelopeTransformer returns a transformer which implements a KEK-DEK based envelope encryption scheme.
 // It uses envelopeService to encrypt and decrypt DEKs. Respective DEKs (in encrypted form) are prepended to
 // the data items they encrypt. A cache (of size cacheSize) is maintained to store the most recently
 // used decrypted DEKs in memory.
-func NewEnvelopeTransformer(envelopeService Service, cacheSize int, baseTransformerFunc func(cipher.Block) value.Transformer) (value.Transformer, error) {
+func NewEnvelopeTransformer(envelopeService Service, cacheSize int, dekTTL time.Duration, baseTransformerFunc func(cipher.Block) value.Transformer) (value.Transformer, error) {
 	var (
 		cache *lru.Cache
 		err   error
@@ -71,11 +113,14 @@ func NewEnvelopeTransformer(envelopeService Service, cacheSize int, baseTransfor
 			return nil, err
 		}
 	}
+
 	return &envelopeTransformer{
 		envelopeService:     envelopeService,
 		transformers:        cache,
 		baseTransformerFunc: baseTransformerFunc,
 		cacheEnabled:        cacheSize > 0,
+		dekCacheTTL:         dekTTL,
+		currentDEK:          &dek{},
 	}, nil
 }
 
@@ -117,20 +162,7 @@ func (t *envelopeTransformer) TransformFromStorage(data []byte, context value.Co
 
 // TransformToStorage encrypts data to be written to disk using envelope encryption.
 func (t *envelopeTransformer) TransformToStorage(data []byte, context value.Context) ([]byte, error) {
-	newKey, err := generateKey(32)
-	if err != nil {
-		return nil, err
-	}
-
-	encKey, err := t.envelopeService.Encrypt(newKey)
-	if err != nil {
-		// Do NOT wrap this err using fmt.Errorf() or similar functions
-		// because this gRPC status error has useful error code when
-		// record the metric.
-		return nil, err
-	}
-
-	transformer, err := t.addTransformer(encKey, newKey)
+	dekCiphertext, transformer, err := t.rotate()
 	if err != nil {
 		return nil, err
 	}
@@ -142,11 +174,40 @@ func (t *envelopeTransformer) TransformToStorage(data []byte, context value.Cont
 	// Append the length of the encrypted DEK as the first 2 bytes.
 	b := cryptobyte.NewBuilder(nil)
 	b.AddUint16LengthPrefixed(func(b *cryptobyte.Builder) {
-		b.AddBytes([]byte(encKey))
+		b.AddBytes(dekCiphertext)
 	})
 	b.AddBytes(result)
 
 	return b.Bytes()
+}
+
+func (t *envelopeTransformer) rotate() ([]byte, value.Transformer, error) {
+	var err error
+
+	t.mux.RLock()
+	if !t.currentDEK.shouldRotate() {
+		t.mux.RUnlock()
+		return t.currentDEK.ciphertext, t.currentDEK.transformer, nil
+	}
+	t.mux.RUnlock()
+
+	t.mux.Lock()
+	defer t.mux.Unlock()
+	if !t.currentDEK.shouldRotate() {
+		return t.currentDEK.ciphertext, t.currentDEK.transformer, nil
+	}
+
+	t.currentDEK, err = newDEK(t.envelopeService, t.dekCacheTTL, t.baseTransformerFunc)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Cache the new transformer.
+	if t.cacheEnabled {
+		t.transformers.Add(base64.StdEncoding.EncodeToString(t.currentDEK.ciphertext), t.currentDEK.transformer)
+	}
+
+	return t.currentDEK.ciphertext, t.currentDEK.transformer, err
 }
 
 var _ value.Transformer = &envelopeTransformer{}

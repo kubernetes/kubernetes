@@ -25,6 +25,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"k8s.io/apiserver/pkg/storage/value"
 	aestransformer "k8s.io/apiserver/pkg/storage/value/encrypt/aes"
@@ -34,18 +35,20 @@ const (
 	testText              = "abcdefghijklmnopqrstuvwxyz"
 	testContextText       = "0123456789"
 	testEnvelopeCacheSize = 10
+	testDEKTTL            = 0
 )
 
 // testEnvelopeService is a mock Envelope service which can be used to simulate remote Envelope services
 // for testing of Envelope based encryption providers.
 type testEnvelopeService struct {
-	disabled   bool
-	keyVersion string
+	disabled        bool
+	keyVersion      string
+	encryptRequests [][]byte
 }
 
 func (t *testEnvelopeService) Decrypt(data []byte) ([]byte, error) {
 	if t.disabled {
-		return nil, fmt.Errorf("Envelope service was disabled")
+		return nil, fmt.Errorf("envelope service was disabled")
 	}
 	dataChunks := strings.SplitN(string(data), ":", 2)
 	if len(dataChunks) != 2 {
@@ -55,8 +58,9 @@ func (t *testEnvelopeService) Decrypt(data []byte) ([]byte, error) {
 }
 
 func (t *testEnvelopeService) Encrypt(data []byte) ([]byte, error) {
+	t.encryptRequests = append(t.encryptRequests, data)
 	if t.disabled {
-		return nil, fmt.Errorf("Envelope service was disabled")
+		return nil, fmt.Errorf("envelope service was disabled")
 	}
 	return []byte(t.keyVersion + ":" + base64.StdEncoding.EncodeToString(data)), nil
 }
@@ -97,7 +101,7 @@ func TestEnvelopeCaching(t *testing.T) {
 	for _, tt := range testCases {
 		t.Run(tt.desc, func(t *testing.T) {
 			envelopeService := newTestEnvelopeService()
-			envelopeTransformer, err := NewEnvelopeTransformer(envelopeService, tt.cacheSize, aestransformer.NewCBCTransformer)
+			envelopeTransformer, err := NewEnvelopeTransformer(envelopeService, tt.cacheSize, testDEKTTL, aestransformer.NewCBCTransformer)
 			if err != nil {
 				t.Fatalf("failed to initialize envelope transformer: %v", err)
 			}
@@ -131,7 +135,7 @@ func TestEnvelopeCaching(t *testing.T) {
 
 // Makes Envelope transformer hit cache limit, throws error if it misbehaves.
 func TestEnvelopeCacheLimit(t *testing.T) {
-	envelopeTransformer, err := NewEnvelopeTransformer(newTestEnvelopeService(), testEnvelopeCacheSize, aestransformer.NewCBCTransformer)
+	envelopeTransformer, err := NewEnvelopeTransformer(newTestEnvelopeService(), testEnvelopeCacheSize, testDEKTTL, aestransformer.NewCBCTransformer)
 	if err != nil {
 		t.Fatalf("failed to initialize envelope transformer: %v", err)
 	}
@@ -165,8 +169,38 @@ func TestEnvelopeCacheLimit(t *testing.T) {
 	}
 }
 
+func TestDEKCaching(t *testing.T) {
+	envelopeService := newTestEnvelopeService()
+	envelopeTransformer, err := NewEnvelopeTransformer(envelopeService, 1, 1*time.Hour, aestransformer.NewCBCTransformer)
+	if err != nil {
+		t.Fatalf("failed to initialize envelope transformer: %v", err)
+	}
+	context := value.DefaultContext([]byte(testContextText))
+
+	firstRequest := []byte("first")
+	_, err = envelopeTransformer.TransformToStorage(firstRequest, context)
+	if err != nil {
+		t.Fatalf("envelopeTransformer: error while transforming data to storage: %s", err)
+	}
+	if bytes.Equal(envelopeService.encryptRequests[0], firstRequest) {
+		t.Fatalf("Expected KMS Service to receive the first request %v", firstRequest)
+	}
+
+	// Second call to to TransformToStorage should be handled via the cashed DEK.
+	_, err = envelopeTransformer.TransformToStorage([]byte("second"), context)
+	if err != nil {
+		t.Fatalf("envelopeTransformer: error while transforming data to storage: %s", err)
+	}
+	if bytes.Equal(envelopeService.encryptRequests[0], firstRequest) {
+		t.Fatalf("Expected KMS Service to process only the first request%v", firstRequest)
+	}
+	if len(envelopeService.encryptRequests) != 1 {
+		t.Fatalf("Got %d want 1 for cache size", len(envelopeService.encryptRequests))
+	}
+}
+
 func BenchmarkEnvelopeCBCRead(b *testing.B) {
-	envelopeTransformer, err := NewEnvelopeTransformer(newTestEnvelopeService(), testEnvelopeCacheSize, aestransformer.NewCBCTransformer)
+	envelopeTransformer, err := NewEnvelopeTransformer(newTestEnvelopeService(), testEnvelopeCacheSize, testDEKTTL, aestransformer.NewCBCTransformer)
 	if err != nil {
 		b.Fatalf("failed to initialize envelope transformer: %v", err)
 	}
@@ -184,7 +218,7 @@ func BenchmarkAESCBCRead(b *testing.B) {
 }
 
 func BenchmarkEnvelopeGCMRead(b *testing.B) {
-	envelopeTransformer, err := NewEnvelopeTransformer(newTestEnvelopeService(), testEnvelopeCacheSize, aestransformer.NewGCMTransformer)
+	envelopeTransformer, err := NewEnvelopeTransformer(newTestEnvelopeService(), testEnvelopeCacheSize, testDEKTTL, aestransformer.NewGCMTransformer)
 	if err != nil {
 		b.Fatalf("failed to initialize envelope transformer: %v", err)
 	}
@@ -226,7 +260,7 @@ func benchmarkRead(b *testing.B, transformer value.Transformer, valueLength int)
 // remove after 1.13
 func TestBackwardsCompatibility(t *testing.T) {
 	envelopeService := newTestEnvelopeService()
-	envelopeTransformerInst, err := NewEnvelopeTransformer(envelopeService, testEnvelopeCacheSize, aestransformer.NewCBCTransformer)
+	envelopeTransformerInst, err := NewEnvelopeTransformer(envelopeService, testEnvelopeCacheSize, testDEKTTL, aestransformer.NewCBCTransformer)
 	if err != nil {
 		t.Fatalf("failed to initialize envelope transformer: %v", err)
 	}

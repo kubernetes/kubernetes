@@ -50,6 +50,8 @@ const (
 	kmsTransformerPrefixV1       = "k8s:enc:kms:v1:"
 	kmsPluginHealthzNegativeTTL  = 3 * time.Second
 	kmsPluginHealthzPositiveTTL  = 20 * time.Second
+
+	dekCacheTTL = 10 * time.Second
 )
 
 type kmsPluginHealthzResponse struct {
@@ -373,7 +375,7 @@ func GetSecretboxPrefixTransformer(config *apiserverconfig.SecretboxConfiguratio
 // getEnvelopePrefixTransformer returns a prefix transformer from the provided config.
 // envelopeService is used as the root of trust.
 func getEnvelopePrefixTransformer(config *apiserverconfig.KMSConfiguration, envelopeService envelope.Service, prefix string) (value.PrefixTransformer, error) {
-	envelopeTransformer, err := envelope.NewEnvelopeTransformer(envelopeService, int(*config.CacheSize), aestransformer.NewCBCTransformer)
+	envelopeTransformer, err := envelope.NewEnvelopeTransformer(envelopeService, int(*config.CacheSize), dekCacheTTL, aestransformer.NewCBCTransformer)
 	if err != nil {
 		return value.PrefixTransformer{}, err
 	}
