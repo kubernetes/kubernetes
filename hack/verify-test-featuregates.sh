@@ -14,6 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This script checks whether mutable global feature gate is invocated correctly
+# in `*_test.go` files.
+# Usage: `hack/verify-test-featuregates.sh`.
+
 set -o errexit
 set -o nounset
 set -o pipefail

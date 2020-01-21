@@ -14,6 +14,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This script lints each package by `staticcheck`.
+# Usage: `hack/verify-staticcheck.sh`.
+# NOTE: To ignore issues detected a package, add it to the
+# `.staticcheck_failures` blacklist.
+
 set -o errexit
 set -o nounset
 set -o pipefail

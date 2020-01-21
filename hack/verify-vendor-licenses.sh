@@ -14,6 +14,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This script checks whether updating of vendor licenses file is needed
+# or not. We should run `hack/update-vendor-licenses.sh` and commit the results,
+# if actually updates them.
+# Usage: `hack/verify-vendor-licenses.sh`.
+
 set -o errexit
 set -o nounset
 set -o pipefail
