@@ -751,7 +751,7 @@ function create-master-auth {
       # append_or_replace_prefixed_line.
       rm "${basic_auth_csv}"
     fi
-    append_or_replace_prefixed_line "${basic_auth_csv}" "${KUBE_PASSWORD},${KUBE_USER},"      "admin,system:masters"
+    append_or_replace_prefixed_line "${basic_auth_csv}" "\"${KUBE_PASSWORD}\",${KUBE_USER},"      "admin,system:masters"
   fi
 
   local -r known_tokens_csv="${auth_dir}/known_tokens.csv"

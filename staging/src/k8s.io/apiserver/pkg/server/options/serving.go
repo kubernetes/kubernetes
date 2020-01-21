@@ -214,17 +214,17 @@ func (s *SecureServingOptions) ApplyTo(config **server.SecureServingInfo) error 
 		return nil
 	}
 
+	lc := net.ListenConfig{}
+
+	if s.PermitPortSharing {
+		lc.Control = permitPortReuse
+	}
+
 	if s.Listener == nil {
 		var err error
 		addr := net.JoinHostPort(s.BindAddress.String(), strconv.Itoa(s.BindPort))
 
-		c := net.ListenConfig{}
-
-		if s.PermitPortSharing {
-			c.Control = permitPortReuse
-		}
-
-		s.Listener, s.BindPort, err = CreateListener(s.BindNetwork, addr, c)
+		s.Listener, s.BindPort, err = CreateListener(s.BindNetwork, addr, lc)
 		if err != nil {
 			return fmt.Errorf("failed to create listener: %v", err)
 		}
