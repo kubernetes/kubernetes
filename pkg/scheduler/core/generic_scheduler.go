@@ -37,7 +37,6 @@ import (
 	policylisters "k8s.io/client-go/listers/policy/v1beta1"
 	"k8s.io/client-go/util/workqueue"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	extenderv1 "k8s.io/kubernetes/pkg/scheduler/apis/extender/v1"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
@@ -111,7 +110,7 @@ type ScheduleAlgorithm interface {
 	Preempt(context.Context, *framework.CycleState, *v1.Pod, error) (selectedNode *v1.Node, preemptedPods []*v1.Pod, cleanupNominatedPods []*v1.Pod, err error)
 	// Prioritizers returns a slice of priority config. This is exposed for
 	// testing.
-	Extenders() []algorithm.SchedulerExtender
+	Extenders() []SchedulerExtender
 	// Snapshot snapshots scheduler cache and node infos. This is needed
 	// for cluster autoscaler integration.
 	// TODO(#85691): remove this once CA migrates to creating a Framework instead of a full scheduler.
@@ -136,7 +135,7 @@ type genericScheduler struct {
 	cache                    internalcache.Cache
 	schedulingQueue          internalqueue.SchedulingQueue
 	framework                framework.Framework
-	extenders                []algorithm.SchedulerExtender
+	extenders                []SchedulerExtender
 	nodeInfoSnapshot         *internalcache.Snapshot
 	volumeBinder             *volumebinder.VolumeBinder
 	pvcLister                corelisters.PersistentVolumeClaimLister
@@ -241,7 +240,7 @@ func (g *genericScheduler) Schedule(ctx context.Context, state *framework.CycleS
 	}, err
 }
 
-func (g *genericScheduler) Extenders() []algorithm.SchedulerExtender {
+func (g *genericScheduler) Extenders() []SchedulerExtender {
 	return g.extenders
 }
 
@@ -1098,7 +1097,7 @@ func NewGenericScheduler(
 	podQueue internalqueue.SchedulingQueue,
 	nodeInfoSnapshot *internalcache.Snapshot,
 	framework framework.Framework,
-	extenders []algorithm.SchedulerExtender,
+	extenders []SchedulerExtender,
 	volumeBinder *volumebinder.VolumeBinder,
 	pvcLister corelisters.PersistentVolumeClaimLister,
 	pdbLister policylisters.PodDisruptionBudgetLister,
