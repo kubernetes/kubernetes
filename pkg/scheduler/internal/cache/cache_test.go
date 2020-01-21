@@ -235,6 +235,7 @@ func TestAssumePodScheduled(t *testing.T) {
 
 type testExpirePodStruct struct {
 	pod         *v1.Pod
+	finishBind  bool
 	assumedTime time.Time
 }
 
@@ -254,6 +255,7 @@ func TestExpirePod(t *testing.T) {
 	testPods := []*v1.Pod{
 		makeBasePod(t, nodeName, "test-1", "100m", "500", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 80, Protocol: "TCP"}}),
 		makeBasePod(t, nodeName, "test-2", "200m", "1Ki", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 8080, Protocol: "TCP"}}),
+		makeBasePod(t, nodeName, "test-3", "200m", "1Ki", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 8080, Protocol: "TCP"}}),
 	}
 	now := time.Now()
 	ttl := 10 * time.Second
@@ -264,26 +266,28 @@ func TestExpirePod(t *testing.T) {
 		wNodeInfo *schedulernodeinfo.NodeInfo
 	}{{ // assumed pod would expires
 		pods: []*testExpirePodStruct{
-			{pod: testPods[0], assumedTime: now},
+			{pod: testPods[0], finishBind: true, assumedTime: now},
 		},
 		cleanupTime: now.Add(2 * ttl),
 		wNodeInfo:   schedulernodeinfo.NewNodeInfo(),
-	}, { // first one would expire, second one would not.
+	}, { // first one would expire, second and third would not.
 		pods: []*testExpirePodStruct{
-			{pod: testPods[0], assumedTime: now},
-			{pod: testPods[1], assumedTime: now.Add(3 * ttl / 2)},
+			{pod: testPods[0], finishBind: true, assumedTime: now},
+			{pod: testPods[1], finishBind: true, assumedTime: now.Add(3 * ttl / 2)},
+			{pod: testPods[2]},
 		},
 		cleanupTime: now.Add(2 * ttl),
 		wNodeInfo: newNodeInfo(
 			&schedulernodeinfo.Resource{
-				MilliCPU: 200,
-				Memory:   1024,
+				MilliCPU: 400,
+				Memory:   2048,
 			},
 			&schedulernodeinfo.Resource{
-				MilliCPU: 200,
-				Memory:   1024,
+				MilliCPU: 400,
+				Memory:   2048,
 			},
-			[]*v1.Pod{testPods[1]},
+			// Order gets altered when removing pods.
+			[]*v1.Pod{testPods[2], testPods[1]},
 			newHostPortInfoBuilder().add("TCP", "127.0.0.1", 8080).build(),
 			make(map[string]*schedulernodeinfo.ImageStateSummary),
 		),
@@ -294,11 +298,18 @@ func TestExpirePod(t *testing.T) {
 			cache := newSchedulerCache(ttl, time.Second, nil)
 
 			for _, pod := range tt.pods {
-				if err := assumeAndFinishBinding(cache, pod.pod, pod.assumedTime); err != nil {
-					t.Fatalf("assumePod failed: %v", err)
+				if err := cache.AssumePod(pod.pod); err != nil {
+					t.Fatal(err)
+				}
+				if !pod.finishBind {
+					continue
+				}
+				if err := cache.finishBinding(pod.pod, pod.assumedTime); err != nil {
+					t.Fatal(err)
 				}
 			}
-			// pods that have assumedTime + ttl < cleanupTime will get expired and removed
+			// pods that got bound and have assumedTime + ttl < cleanupTime will get
+			// expired and removed
 			cache.cleanupAssumedPods(tt.cleanupTime)
 			n := cache.nodes[nodeName]
 			if err := deepEqualWithoutGeneration(n, tt.wNodeInfo); err != nil {
