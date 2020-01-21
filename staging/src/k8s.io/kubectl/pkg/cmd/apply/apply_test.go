@@ -29,7 +29,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/googleapis/gnostic/OpenAPIv2"
 	"github.com/spf13/cobra"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -1387,77 +1386,5 @@ func TestForceApply(t *testing.T) {
 				t.Fatalf("unexpected error output: %s", errBuf.String())
 			}
 		})
-	}
-}
-
-func TestDryRunVerifier(t *testing.T) {
-	dryRunVerifier := DryRunVerifier{
-		Finder: cmdutil.NewCRDFinder(func() ([]schema.GroupKind, error) {
-			return []schema.GroupKind{
-				{
-					Group: "crd.com",
-					Kind:  "MyCRD",
-				},
-				{
-					Group: "crd.com",
-					Kind:  "MyNewCRD",
-				},
-			}, nil
-		}),
-		OpenAPIGetter: &fakeSchema,
-	}
-
-	err := dryRunVerifier.HasSupport(schema.GroupVersionKind{Group: "", Version: "v1", Kind: "NodeProxyOptions"})
-	if err == nil {
-		t.Fatalf("NodeProxyOptions doesn't support dry-run, yet no error found")
-	}
-
-	err = dryRunVerifier.HasSupport(schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Pod"})
-	if err != nil {
-		t.Fatalf("Pod should support dry-run: %v", err)
-	}
-
-	err = dryRunVerifier.HasSupport(schema.GroupVersionKind{Group: "crd.com", Version: "v1", Kind: "MyCRD"})
-	if err != nil {
-		t.Fatalf("MyCRD should support dry-run: %v", err)
-	}
-
-	err = dryRunVerifier.HasSupport(schema.GroupVersionKind{Group: "crd.com", Version: "v1", Kind: "Random"})
-	if err == nil {
-		t.Fatalf("Random doesn't support dry-run, yet no error found")
-	}
-}
-
-type EmptyOpenAPI struct{}
-
-func (EmptyOpenAPI) OpenAPISchema() (*openapi_v2.Document, error) {
-	return &openapi_v2.Document{}, nil
-}
-
-func TestDryRunVerifierNoOpenAPI(t *testing.T) {
-	dryRunVerifier := DryRunVerifier{
-		Finder: cmdutil.NewCRDFinder(func() ([]schema.GroupKind, error) {
-			return []schema.GroupKind{
-				{
-					Group: "crd.com",
-					Kind:  "MyCRD",
-				},
-				{
-					Group: "crd.com",
-					Kind:  "MyNewCRD",
-				},
-			}, nil
-		}),
-		OpenAPIGetter: EmptyOpenAPI{},
-	}
-
-	err := dryRunVerifier.HasSupport(schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Pod"})
-	if err == nil {
-		t.Fatalf("Pod doesn't support dry-run, yet no error found")
-	}
-
-	err = dryRunVerifier.HasSupport(schema.GroupVersionKind{Group: "crd.com", Version: "v1", Kind: "MyCRD"})
-	if err == nil {
-		t.Fatalf("MyCRD doesn't support dry-run, yet no error found")
 	}
 }
