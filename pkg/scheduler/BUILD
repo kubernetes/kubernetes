@@ -114,7 +114,6 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/scheduler/algorithm:all-srcs",
         "//pkg/scheduler/algorithmprovider:all-srcs",
         "//pkg/scheduler/api:all-srcs",
         "//pkg/scheduler/apis/config:all-srcs",
