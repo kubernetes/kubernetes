@@ -288,7 +288,7 @@ type CSIDriverSpec struct {
 	// "csi.storage.k8s.io/pod.name": pod.Name
 	// "csi.storage.k8s.io/pod.namespace": pod.Namespace
 	// "csi.storage.k8s.io/pod.uid": string(pod.UID)
-	// "csi.storage.k8s.io/ephemeral": "true" iff the volume is an ephemeral inline volume
+	// "csi.storage.k8s.io/ephemeral": "true" if the volume is an ephemeral inline volume
 	//                                 defined by a CSIVolumeSource, otherwise "false"
 	//
 	// "csi.storage.k8s.io/ephemeral" is a new feature in Kubernetes 1.16. It is only
