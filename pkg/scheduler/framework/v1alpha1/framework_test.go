@@ -1064,6 +1064,46 @@ func TestRunBindPlugins(t *testing.T) {
 			injects:    []Code{Skip, Success, Error},
 			wantStatus: Success,
 		},
+		{
+			name:       "no bind plugin, returns default binder",
+			injects:    []Code{},
+			wantStatus: Success,
+		},
+		{
+			name:       "invalid status",
+			injects:    []Code{Unschedulable},
+			wantStatus: Error,
+		},
+		{
+			name:       "simple error",
+			injects:    []Code{Error},
+			wantStatus: Error,
+		},
+		{
+			name:       "success on second, returns success",
+			injects:    []Code{Skip, Success},
+			wantStatus: Success,
+		},
+		{
+			name:       "invalid status, returns error",
+			injects:    []Code{Skip, UnschedulableAndUnresolvable},
+			wantStatus: Error,
+		},
+		{
+			name:       "error after success status, returns success",
+			injects:    []Code{Success, Error},
+			wantStatus: Success,
+		},
+		{
+			name:       "success before invalid status, returns success",
+			injects:    []Code{Success, Error},
+			wantStatus: Success,
+		},
+		{
+			name:       "success after error status, returns error",
+			injects:    []Code{Error, Success},
+			wantStatus: Error,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
