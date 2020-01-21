@@ -151,7 +151,7 @@ func NewCmdEnv(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Co
 		DisableFlagsInUseLine: true,
 		Short:                 "Update environment variables on a pod template",
 		Long:                  envLong,
-		Example:               fmt.Sprintf(envExample),
+		Example:               envExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())
