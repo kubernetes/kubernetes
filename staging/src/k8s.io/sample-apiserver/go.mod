@@ -6,7 +6,7 @@ go 1.13
 
 require (
 	github.com/go-openapi/spec v0.19.3
-	github.com/google/gofuzz v1.0.0
+	github.com/google/gofuzz v1.1.0
 	github.com/spf13/cobra v0.0.5
 	k8s.io/apimachinery v0.0.0
 	k8s.io/apiserver v0.0.0
