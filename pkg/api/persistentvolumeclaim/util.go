@@ -77,5 +77,5 @@ func dataSourceIsEnabled(pvcSpec *core.PersistentVolumeClaimSpec) bool {
 			return true
 		}
 	}
-	return false
+	return true
 }

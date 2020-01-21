@@ -1930,7 +1930,7 @@ func ValidatePersistentVolumeClaimSpec(spec *core.PersistentVolumeClaimSpec, fld
 			allErrs = append(allErrs, field.Required(fldPath.Child("dataSource", "name"), ""))
 		}
 
-		groupKind := schema.GroupKind{Group: "", Kind: spec.DataSource.Kind}
+		/*groupKind := schema.GroupKind{Group: "", Kind: spec.DataSource.Kind}
 		if spec.DataSource.APIGroup != nil {
 			groupKind.Group = string(*spec.DataSource.APIGroup)
 		}
@@ -1940,7 +1940,7 @@ func ValidatePersistentVolumeClaimSpec(spec *core.PersistentVolumeClaimSpec, fld
 		}
 		if !supportedDataSourceAPIGroupKinds[groupKind] {
 			allErrs = append(allErrs, field.NotSupported(fldPath.Child("dataSource"), groupKind.String(), groupKindList))
-		}
+		}*/
 	}
 
 	return allErrs
