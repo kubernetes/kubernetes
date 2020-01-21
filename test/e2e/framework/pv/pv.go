@@ -31,6 +31,7 @@ import (
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1/util"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 )
 
 const (
@@ -795,6 +796,6 @@ func GetDefaultStorageClassName(c clientset.Interface) (string, error) {
 func SkipIfNoDefaultStorageClass(c clientset.Interface) {
 	_, err := GetDefaultStorageClassName(c)
 	if err != nil {
-		framework.Skipf("error finding default storageClass : %v", err)
+		e2eskipper.Skipf("error finding default storageClass : %v", err)
 	}
 }
