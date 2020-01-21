@@ -11,7 +11,6 @@ require (
 	github.com/gogo/protobuf v1.3.1
 	github.com/json-iterator/go v1.1.8 // indirect
 	github.com/mailru/easyjson v0.7.0 // indirect
-	github.com/modern-go/reflect2 v1.0.1 // indirect
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.4.0 // indirect
 	golang.org/x/net v0.0.0-20191004110552-13f9640d40b9 // indirect
@@ -19,7 +18,7 @@ require (
 	gopkg.in/yaml.v2 v2.2.7 // indirect
 	k8s.io/gengo v0.0.0-20190822140433-26a664648505
 	k8s.io/klog v1.0.0
-	k8s.io/kube-openapi v0.0.0-20191107075043-30be4d16710a
+	k8s.io/kube-openapi v0.0.0-20200121204235-bf4fb3bd569c
 )
 
 replace (
