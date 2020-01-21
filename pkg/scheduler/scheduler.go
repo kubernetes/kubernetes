@@ -267,9 +267,7 @@ func New(client clientset.Interface,
 		time.Duration(options.bindTimeoutSeconds)*time.Second,
 	)
 
-	registry := frameworkplugins.NewInTreeRegistry(&frameworkplugins.RegistryArgs{
-		VolumeBinder: volumeBinder,
-	})
+	registry := frameworkplugins.NewInTreeRegistry()
 	if err := registry.Merge(options.frameworkOutOfTreeRegistry); err != nil {
 		return nil, err
 	}

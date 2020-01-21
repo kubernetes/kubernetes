@@ -435,7 +435,7 @@ func newConfigFactoryWithFrameworkRegistry(
 func newConfigFactory(
 	client clientset.Interface, hardPodAffinitySymmetricWeight int32, stopCh <-chan struct{}) *Configurator {
 	return newConfigFactoryWithFrameworkRegistry(client, hardPodAffinitySymmetricWeight, stopCh,
-		frameworkplugins.NewInTreeRegistry(&frameworkplugins.RegistryArgs{}))
+		frameworkplugins.NewInTreeRegistry())
 }
 
 type fakeExtender struct {
