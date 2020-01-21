@@ -180,7 +180,6 @@
 				"k8s.io/kubernetes/pkg/proxy/util",
 				"k8s.io/kubernetes/pkg/registry/core/service/allocator",
 				"k8s.io/kubernetes/pkg/registry/core/service/portallocator",
-				"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util",
 				"k8s.io/kubernetes/pkg/scheduler/api",
 				"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper",
 				"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity",

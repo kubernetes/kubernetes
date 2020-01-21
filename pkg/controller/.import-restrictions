@@ -240,8 +240,6 @@
         "k8s.io/kubernetes/pkg/kubelet/util/format",
         "k8s.io/kubernetes/pkg/quota",
         "k8s.io/kubernetes/pkg/registry/core/secret",
-        "k8s.io/kubernetes/pkg/scheduler/algorithm",
-        "k8s.io/kubernetes/pkg/scheduler/algorithm/predicates",
         "k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper",
         "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1",
         "k8s.io/kubernetes/pkg/scheduler/nodeinfo",
