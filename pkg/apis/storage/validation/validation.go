@@ -419,6 +419,7 @@ func validateCSIDriverSpec(
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, validateAttachRequired(spec.AttachRequired, fldPath.Child("attachedRequired"))...)
 	allErrs = append(allErrs, validatePodInfoOnMount(spec.PodInfoOnMount, fldPath.Child("podInfoOnMount"))...)
+	allErrs = append(allErrs, validateStorageCapacity(spec.StorageCapacity, fldPath.Child("storageCapacity"))...)
 	allErrs = append(allErrs, validateVolumeLifecycleModes(spec.VolumeLifecycleModes, fldPath.Child("volumeLifecycleModes"))...)
 	return allErrs
 }
@@ -437,6 +438,16 @@ func validateAttachRequired(attachRequired *bool, fldPath *field.Path) field.Err
 func validatePodInfoOnMount(podInfoOnMount *bool, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if podInfoOnMount == nil {
+		allErrs = append(allErrs, field.Required(fldPath, ""))
+	}
+
+	return allErrs
+}
+
+// validateStorageCapacity tests if storageCapacity is set for CSIDriver.
+func validateStorageCapacity(storageCapacity *bool, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if storageCapacity == nil && utilfeature.DefaultFeatureGate.Enabled(features.CSIStorageCapacity) {
 		allErrs = append(allErrs, field.Required(fldPath, ""))
 	}
 
