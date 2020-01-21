@@ -169,7 +169,7 @@ func newDefaultFramework() framework.Framework {
 	pl, pls := defaultCfg.FrameworkPlugins, defaultCfg.FrameworkPluginConfig
 	fakeClient := fake.NewSimpleClientset()
 	fwk, err := framework.NewFramework(
-		frameworkplugins.NewInTreeRegistry(&frameworkplugins.RegistryArgs{}),
+		frameworkplugins.NewInTreeRegistry(),
 		pl,
 		pls,
 		framework.WithClientSet(fakeClient),

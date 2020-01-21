@@ -181,7 +181,7 @@ func TestSchedulerCreation(t *testing.T) {
 
 	// Test case for when a plugin name in frameworkOutOfTreeRegistry already exist in defaultRegistry.
 	fakeFrameworkPluginName := ""
-	for name := range frameworkplugins.NewInTreeRegistry(&frameworkplugins.RegistryArgs{}) {
+	for name := range frameworkplugins.NewInTreeRegistry() {
 		fakeFrameworkPluginName = name
 		break
 	}
@@ -484,7 +484,7 @@ func TestSchedulerNoPhantomPodAfterDelete(t *testing.T) {
 func setupTestSchedulerWithOnePodOnNode(t *testing.T, queuedPodStore *clientcache.FIFO, scache internalcache.Cache,
 	informerFactory informers.SharedInformerFactory, stop chan struct{}, pod *v1.Pod, node *v1.Node, fns ...st.RegisterPluginFunc) (*Scheduler, chan *v1.Binding, chan error) {
 
-	scheduler, bindingChan, errChan := setupTestScheduler(queuedPodStore, scache, informerFactory, nil, fns...)
+	scheduler, bindingChan, errChan := setupTestScheduler(queuedPodStore, scache, informerFactory, nil, nil, fns...)
 
 	informerFactory.Start(stop)
 	informerFactory.WaitForCacheSync(stop)
@@ -568,7 +568,7 @@ func TestSchedulerFailedSchedulingReasons(t *testing.T) {
 		st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 		st.RegisterFilterPlugin("PodFitsResources", noderesources.NewFit),
 	}
-	scheduler, _, errChan := setupTestScheduler(queuedPodStore, scache, informerFactory, nil, fns...)
+	scheduler, _, errChan := setupTestScheduler(queuedPodStore, scache, informerFactory, nil, nil, fns...)
 
 	informerFactory.Start(stop)
 	informerFactory.WaitForCacheSync(stop)
@@ -595,8 +595,12 @@ func TestSchedulerFailedSchedulingReasons(t *testing.T) {
 
 // queuedPodStore: pods queued before processing.
 // scache: scheduler cache that might contain assumed pods.
-func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache internalcache.Cache, informerFactory informers.SharedInformerFactory, recorder events.EventRecorder, fns ...st.RegisterPluginFunc) (*Scheduler, chan *v1.Binding, chan error) {
+func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache internalcache.Cache, informerFactory informers.SharedInformerFactory, recorder events.EventRecorder, fakeVolumeBinder *volumebinder.VolumeBinder, fns ...st.RegisterPluginFunc) (*Scheduler, chan *v1.Binding, chan error) {
 	registry := framework.Registry{}
+	if fakeVolumeBinder == nil {
+		// Create default volume binder if it didn't set.
+		fakeVolumeBinder = volumebinder.NewFakeVolumeBinder(&volumescheduling.FakeVolumeBinderConfig{AllBound: true})
+	}
 	// TODO: instantiate the plugins dynamically.
 	plugins := &schedulerapi.Plugins{
 		QueueSort: &schedulerapi.PluginSet{},
@@ -607,7 +611,7 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache internalcache.C
 	for _, f := range fns {
 		f(&registry, plugins, pluginConfigs)
 	}
-	fwk, _ := framework.NewFramework(registry, plugins, pluginConfigs)
+	fwk, _ := framework.NewFramework(registry, plugins, pluginConfigs, framework.WithVolumeBinder(fakeVolumeBinder))
 	algo := core.NewGenericScheduler(
 		scache,
 		internalqueue.NewSchedulingQueue(nil),
@@ -647,7 +651,7 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache internalcache.C
 		podConditionUpdater: fakePodConditionUpdater{},
 		podPreemptor:        fakePodPreemptor{},
 		Framework:           fwk,
-		VolumeBinder:        volumebinder.NewFakeVolumeBinder(&volumescheduling.FakeVolumeBinderConfig{AllBound: true}),
+		VolumeBinder:        fakeVolumeBinder,
 		client:              client,
 	}
 
@@ -673,14 +677,11 @@ func setupTestSchedulerWithVolumeBinding(fakeVolumeBinder *volumebinder.VolumeBi
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
 
 	recorder := broadcaster.NewRecorder(scheme.Scheme, "scheduler")
-	volumeBindingNewFunc := func(_ *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
-		return volumebinding.NewFromVolumeBinder(fakeVolumeBinder), nil
-	}
 	fns := []st.RegisterPluginFunc{
 		st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-		st.RegisterFilterPlugin(volumebinding.Name, volumeBindingNewFunc),
+		st.RegisterFilterPlugin(volumebinding.Name, volumebinding.New),
 	}
-	s, bindingChan, errChan := setupTestScheduler(queuedPodStore, scache, informerFactory, recorder, fns...)
+	s, bindingChan, errChan := setupTestScheduler(queuedPodStore, scache, informerFactory, recorder, fakeVolumeBinder, fns...)
 	informerFactory.Start(stop)
 	informerFactory.WaitForCacheSync(stop)
 	s.VolumeBinder = fakeVolumeBinder
