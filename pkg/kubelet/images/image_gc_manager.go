@@ -27,9 +27,9 @@ import (
 	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/record"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/container"
@@ -170,7 +170,7 @@ func NewImageGCManager(runtime container.Runtime, statsProvider StatsProvider, r
 }
 
 func (im *realImageGCManager) Start() {
-	go wait.Until(func() {
+	monitorImages := func() {
 		// Initial detection make detected time "unknown" in the past.
 		var ts time.Time
 		if im.initialized {
@@ -182,19 +182,35 @@ func (im *realImageGCManager) Start() {
 		} else {
 			im.initialized = true
 		}
-	}, 5*time.Minute, wait.NeverStop)
+	}
 
-	// Start a goroutine periodically updates image cache.
-	// TODO(random-liu): Merge this with the previous loop.
-	go wait.Until(func() {
+	updateImages := func() {
 		images, err := im.runtime.ListImages()
 		if err != nil {
 			klog.Warningf("[imageGCManager] Failed to update image list: %v", err)
 		} else {
 			im.imageCache.set(images)
 		}
-	}, 30*time.Second, wait.NeverStop)
+	}
 
+	// Should we want/need to for testing, we could make this `clock` variable
+	// part of the `ImageGCManager` struct, which would make mocking
+	// trivial.
+	clock := clock.RealClock{}
+
+	imageMonitorTicker := clock.NewTicker(5 * time.Minute)
+	imageUpdaterTicker := clock.NewTicker(30 * time.Second)
+
+	go func() {
+		for {
+			select {
+			case <-imageMonitorTicker.C():
+				go monitorImages()
+			case <-imageUpdaterTicker.C():
+				go updateImages()
+			}
+		}
+	}()
 }
 
 // Get a list of images on this node
