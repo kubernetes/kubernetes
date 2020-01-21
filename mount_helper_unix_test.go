@@ -100,7 +100,8 @@ func TestParseMountInfo(t *testing.T) {
 			MountInfo{
 				ID:             189,
 				ParentID:       80,
-				MajorMinor:     "8:1",
+				Major:          8,
+				Minor:          1,
 				Root:           "/var/lib/kubelet",
 				Source:         "/dev/sda1",
 				MountPoint:     "/var/lib/kubelet",
@@ -116,7 +117,8 @@ func TestParseMountInfo(t *testing.T) {
 			MountInfo{
 				ID:             222,
 				ParentID:       24,
-				MajorMinor:     "253:0",
+				Major:          253,
+				Minor:          0,
 				Root:           "/tmp/src",
 				Source:         "/dev/mapper/vagrant--vg-root",
 				MountPoint:     "/mnt/dst",
@@ -132,7 +134,8 @@ func TestParseMountInfo(t *testing.T) {
 			MountInfo{
 				ID:             224,
 				ParentID:       62,
-				MajorMinor:     "253:0",
+				Major:          253,
+				Minor:          0,
 				Root:           "/var/lib/docker/devicemapper/test/shared",
 				Source:         "/dev/mapper/ssd-root",
 				MountPoint:     "/var/lib/docker/devicemapper/test/shared",
@@ -148,7 +151,8 @@ func TestParseMountInfo(t *testing.T) {
 			MountInfo{
 				ID:             28,
 				ParentID:       18,
-				MajorMinor:     "0:24",
+				Major:          0,
+				Minor:          24,
 				Root:           "/",
 				Source:         "tmpfs",
 				MountPoint:     "/sys/fs/cgroup",
@@ -164,7 +168,8 @@ func TestParseMountInfo(t *testing.T) {
 			MountInfo{
 				ID:             29,
 				ParentID:       28,
-				MajorMinor:     "0:25",
+				Major:          0,
+				Minor:          25,
 				Root:           "/",
 				Source:         "cgroup",
 				MountPoint:     "/sys/fs/cgroup/systemd",
@@ -180,7 +185,8 @@ func TestParseMountInfo(t *testing.T) {
 			MountInfo{
 				ID:             31,
 				ParentID:       28,
-				MajorMinor:     "0:27",
+				Major:          0,
+				Minor:          27,
 				Root:           "/",
 				Source:         "cgroup",
 				MountPoint:     "/sys/fs/cgroup/cpuset",
@@ -203,6 +209,101 @@ func TestParseMountInfo(t *testing.T) {
 			if info.ID == test.id {
 				found = true
 				if !reflect.DeepEqual(info, test.expectedInfo) {
+					t.Errorf("Test case %q:\n expected: %+v\n got:      %+v", test.name, test.expectedInfo, info)
+				}
+				break
+			}
+		}
+		if !found {
+			t.Errorf("Test case %q: mountPoint %d not found", test.name, test.id)
+		}
+	}
+}
+
+func TestBadParseMountInfo(t *testing.T) {
+	tests := []struct {
+		info         string
+		name         string
+		id           int
+		expectedInfo *MountInfo
+		error        string
+	}{
+		{
+			`224 62 253:0 /var/lib/docker/devicemapper/test/shared /var/lib/docker/devicemapper/test/shared rw,relatime master:1 shared:44 - ext4 /dev/mapper/ssd-root rw,seclabel,data=ordered`,
+			"good major:minor field",
+			224,
+			&MountInfo{
+				ID:             224,
+				ParentID:       62,
+				Major:          253,
+				Minor:          0,
+				Root:           "/var/lib/docker/devicemapper/test/shared",
+				Source:         "/dev/mapper/ssd-root",
+				MountPoint:     "/var/lib/docker/devicemapper/test/shared",
+				OptionalFields: []string{"master:1", "shared:44"},
+				FsType:         "ext4",
+				MountOptions:   []string{"rw", "relatime"},
+				SuperOptions:   []string{"rw", "seclabel", "data=ordered"},
+			},
+			"",
+		},
+		{
+			`224 62 /var/lib/docker/devicemapper/test/shared /var/lib/docker/devicemapper/test/shared rw,relatime master:1 shared:44 - ext4 /dev/mapper/ssd-root rw,seclabel,data=ordered`,
+			"missing major:minor field",
+			224,
+			nil,
+			`parsing '224 62 /var/lib/docker/devicemapper/test/shared /var/lib/docker/devicemapper/test/shared rw,relatime master:1 shared:44 - ext4 /dev/mapper/ssd-root rw,seclabel,data=ordered' failed: unexpected minor:major pair [/var/lib/docker/devicemapper/test/shared]`,
+		},
+		{
+			`224 62 :0 /var/lib/docker/devicemapper/test/shared /var/lib/docker/devicemapper/test/shared rw,relatime master:1 shared:44 - ext4 /dev/mapper/ssd-root rw,seclabel,data=ordered`,
+			"empty major field",
+			224,
+			nil,
+			`parsing '' failed: unable to parse major device id, err:strconv.Atoi: parsing "": invalid syntax`,
+		},
+		{
+			`224 62 253: /var/lib/docker/devicemapper/test/shared /var/lib/docker/devicemapper/test/shared rw,relatime master:1 shared:44 - ext4 /dev/mapper/ssd-root rw,seclabel,data=ordered`,
+			"empty minor field",
+			224,
+			nil,
+			`parsing '' failed: unable to parse minor device id, err:strconv.Atoi: parsing "": invalid syntax`,
+		},
+		{
+			`224 62 foo:0 /var/lib/docker/devicemapper/test/shared /var/lib/docker/devicemapper/test/shared rw,relatime master:1 shared:44 - ext4 /dev/mapper/ssd-root rw,seclabel,data=ordered`,
+			"alphabet in major field",
+			224,
+			nil,
+			`parsing 'foo' failed: unable to parse major device id, err:strconv.Atoi: parsing "foo": invalid syntax`,
+		},
+		{
+			`224 62 253:bar /var/lib/docker/devicemapper/test/shared /var/lib/docker/devicemapper/test/shared rw,relatime master:1 shared:44 - ext4 /dev/mapper/ssd-root rw,seclabel,data=ordered`,
+			"alphabet in minor field",
+			224,
+			nil,
+			`parsing 'bar' failed: unable to parse minor device id, err:strconv.Atoi: parsing "bar": invalid syntax`,
+		},
+	}
+
+	for _, test := range tests {
+		tempDir, filename, err := writeFile(test.info)
+		if err != nil {
+			t.Fatalf("cannot create temporary file: %v", err)
+		}
+		defer os.RemoveAll(tempDir)
+
+		infos, err := ParseMountInfo(filename)
+		if err != nil {
+			if err.Error() != test.error {
+				t.Errorf("Test case %q:\n expected error: %+v\n got:      %+v", test.name, test.error, err.Error())
+			}
+			continue
+		}
+
+		found := false
+		for _, info := range infos {
+			if info.ID == test.id {
+				found = true
+				if !reflect.DeepEqual(info, *test.expectedInfo) {
 					t.Errorf("Test case %q:\n expected: %+v\n got:      %+v", test.name, test.expectedInfo, info)
 				}
 				break
