@@ -4,21 +4,21 @@ import (
 	"io/ioutil"
 	"path"
 
+	configv1 "github.com/openshift/api/config/v1"
+	kubecontrolplanev1 "github.com/openshift/api/kubecontrolplane/v1"
+	osinv1 "github.com/openshift/api/osin/v1"
+	"github.com/openshift/library-go/pkg/config/helpers"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apiserver/pkg/server"
 	"k8s.io/client-go/tools/clientcmd/api"
 	aggregatorapiserver "k8s.io/kube-aggregator/pkg/apiserver"
 	"k8s.io/kubernetes/openshift-kube-apiserver/configdefault"
 	"k8s.io/kubernetes/pkg/capabilities"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac/bootstrappolicy"
-
-	configv1 "github.com/openshift/api/config/v1"
-	kubecontrolplanev1 "github.com/openshift/api/kubecontrolplane/v1"
-	osinv1 "github.com/openshift/api/osin/v1"
-	"github.com/openshift/library-go/pkg/config/helpers"
 )
 
 func GetOpenshiftConfig(openshiftConfigFile string) (*kubecontrolplanev1.KubeAPIServerConfig, error) {
@@ -78,4 +78,8 @@ func ForceGlobalInitializationForOpenShift() {
 	// TODO, we should scrub these out
 	bootstrappolicy.ClusterRoles = bootstrappolicy.OpenshiftClusterRoles
 	bootstrappolicy.ClusterRoleBindings = bootstrappolicy.OpenshiftClusterRoleBindings
+
+	// we need to have the authorization chain place something before system:masters
+	// SkipSystemMastersAuthorizer disable implicitly added system/master authz, and turn it into another authz mode "SystemMasters", to be added via authorization-mode
+	server.SkipSystemMastersAuthorizer()
 }

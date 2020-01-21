@@ -45,8 +45,6 @@ func NewOpenShiftKubeAPIServerConfigPatch(kubeAPIServerConfig *kubecontrolplanev
 
 		// AUTHORIZER
 		genericConfig.RequestInfoResolver = apiserverconfig.OpenshiftRequestInfoResolver()
-		authorizer := NewAuthorizer(kubeInformers)
-		genericConfig.Authorization.Authorizer = authorizer
 		// END AUTHORIZER
 
 		// Inject OpenShift API long running endpoints (like for binary builds).
