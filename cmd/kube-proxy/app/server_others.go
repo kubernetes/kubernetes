@@ -376,7 +376,8 @@ func tryIPVSProxy(khandle ipvs.KernelHandler, ipsetver ipvs.IPSetVersioner, kcom
 	useIPVSProxy, err := ipvs.CanUseIPVSProxier(khandle, ipsetver)
 	if err != nil {
 		// Try to fallback to iptables before falling back to userspace
-		utilruntime.HandleError(fmt.Errorf("can't determine whether to use ipvs proxy, error: %v", err))
+		utilruntime.HandleError(fmt.Errorf("can't determine whether to use ipvs proxy, trying iptables proxier: %v", err))
+		return tryIPTablesProxy(kcompat)
 	}
 	if useIPVSProxy {
 		return proxyModeIPVS
