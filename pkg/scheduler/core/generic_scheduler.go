@@ -187,7 +187,7 @@ func (g *genericScheduler) Schedule(ctx context.Context, state *framework.CycleS
 	}
 	trace.Step("Running prefilter plugins done")
 
-	startPredicateEvalTime := time.Now()
+	startNodeFitEvalTime := time.Now()
 	filteredNodes, filteredNodesStatuses, err := g.findNodesThatFitPod(ctx, state, pod)
 	if err != nil {
 		return result, err
@@ -208,8 +208,9 @@ func (g *genericScheduler) Schedule(ctx context.Context, state *framework.CycleS
 		}
 	}
 	trace.Step("Running postfilter plugins done")
-	metrics.DeprecatedSchedulingAlgorithmPredicateEvaluationSecondsDuration.Observe(metrics.SinceInSeconds(startPredicateEvalTime))
-	metrics.DeprecatedSchedulingDuration.WithLabelValues(metrics.PredicateEvaluation).Observe(metrics.SinceInSeconds(startPredicateEvalTime))
+	metrics.NodeFitEvaluationSeconds.Observe(metrics.SinceInSeconds(startNodeFitEvalTime))
+	metrics.DeprecatedSchedulingAlgorithmPredicateEvaluationSecondsDuration.Observe(metrics.SinceInSeconds(startNodeFitEvalTime))
+	metrics.DeprecatedSchedulingDuration.WithLabelValues(metrics.PredicateEvaluation).Observe(metrics.SinceInSeconds(startNodeFitEvalTime))
 
 	startPriorityEvalTime := time.Now()
 	// When only one node after predicate, just use it.

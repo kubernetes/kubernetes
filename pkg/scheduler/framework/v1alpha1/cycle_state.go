@@ -55,16 +55,18 @@ func NewCycleState() *CycleState {
 	}
 }
 
-// ShouldRecordPluginMetrics returns whether PluginExecutionDuration metrics should be recorded.
-func (c *CycleState) ShouldRecordPluginMetrics() bool {
+// ShouldRecordFrameworkMetrics returns whether certain metrics should be recorded for a scheduling cycle.
+// For performance reasons, we sample metrics for framework executions that are called multiple times per scheduling
+// cycle, such as running multiple plugins, or invoking filter extension point for many nodes.
+func (c *CycleState) ShouldRecordFrameworkMetrics() bool {
 	if c == nil {
 		return false
 	}
 	return c.recordPluginMetrics
 }
 
-// SetRecordPluginMetrics sets recordPluginMetrics to the given value.
-func (c *CycleState) SetRecordPluginMetrics(flag bool) {
+// SetRecordFrameworkMetrics sets recordPluginMetrics to the given value.
+func (c *CycleState) SetRecordFrameworkMetrics(flag bool) {
 	if c == nil {
 		return
 	}

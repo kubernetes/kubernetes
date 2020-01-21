@@ -92,6 +92,15 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
+	NodeFitEvaluationSeconds = metrics.NewHistogram(
+		&metrics.HistogramOpts{
+			Subsystem:         SchedulerSubsystem,
+			Name:              "node_fit_evaluation_seconds",
+			Help:              "Duration to find nodes that fit for a pod in seconds",
+			Buckets:           metrics.ExponentialBuckets(0.001, 2, 15),
+			StabilityLevel:    metrics.ALPHA,
+		},
+	)
 	DeprecatedSchedulingAlgorithmPredicateEvaluationSecondsDuration = metrics.NewHistogram(
 		&metrics.HistogramOpts{
 			Subsystem:         SchedulerSubsystem,
