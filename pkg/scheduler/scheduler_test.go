@@ -67,30 +67,6 @@ var (
 	emptyFramework, _ = framework.NewFramework(emptyPluginRegistry, nil, nil)
 )
 
-type fakePodConditionUpdater struct{}
-
-func (fc fakePodConditionUpdater) update(pod *v1.Pod, podCondition *v1.PodCondition) error {
-	return nil
-}
-
-type fakePodPreemptor struct{}
-
-func (fp fakePodPreemptor) getUpdatedPod(pod *v1.Pod) (*v1.Pod, error) {
-	return pod, nil
-}
-
-func (fp fakePodPreemptor) deletePod(pod *v1.Pod) error {
-	return nil
-}
-
-func (fp fakePodPreemptor) setNominatedNodeName(pod *v1.Pod, nomNodeName string) error {
-	return nil
-}
-
-func (fp fakePodPreemptor) removeNominatedNodeName(pod *v1.Pod) error {
-	return nil
-}
-
 func podWithID(id, desiredHost string) *v1.Pod {
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -276,10 +252,10 @@ func TestScheduler(t *testing.T) {
 			var gotBinding *v1.Binding
 			sCache := &fakecache.Cache{
 				ForgetFunc: func(pod *v1.Pod) {
-					gotForgetPod = pod
+					gotForgetPod = pod.DeepCopy()
 				},
 				AssumeFunc: func(pod *v1.Pod) {
-					gotAssumedPod = pod
+					gotAssumedPod = pod.DeepCopy()
 				},
 				IsAssumedPodFunc: func(pod *v1.Pod) bool {
 					if pod == nil || gotAssumedPod == nil {
@@ -298,11 +274,10 @@ func TestScheduler(t *testing.T) {
 			})
 
 			s := &Scheduler{
-				SchedulerCache:      sCache,
-				Algorithm:           item.algo,
-				podConditionUpdater: fakePodConditionUpdater{},
+				SchedulerCache: sCache,
+				Algorithm:      item.algo,
 				Error: func(p *framework.PodInfo, err error) {
-					gotPod = p.Pod
+					gotPod = p.Pod.DeepCopy()
 					gotError = err
 				},
 				NextPod: func() *framework.PodInfo {
@@ -644,12 +619,10 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache internalcache.C
 		Error: func(p *framework.PodInfo, err error) {
 			errChan <- err
 		},
-		Recorder:            &events.FakeRecorder{},
-		podConditionUpdater: fakePodConditionUpdater{},
-		podPreemptor:        fakePodPreemptor{},
-		Framework:           fwk,
-		VolumeBinder:        volumebinder.NewFakeVolumeBinder(&volumescheduling.FakeVolumeBinderConfig{AllBound: true}),
-		client:              client,
+		Recorder:     &events.FakeRecorder{},
+		Framework:    fwk,
+		VolumeBinder: volumebinder.NewFakeVolumeBinder(&volumescheduling.FakeVolumeBinderConfig{AllBound: true}),
+		client:       client,
 	}
 
 	if recorder != nil {
