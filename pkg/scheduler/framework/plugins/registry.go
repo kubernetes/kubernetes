@@ -17,7 +17,6 @@ limitations under the License.
 package plugins
 
 import (
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultpodtopologyspread"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/imagelocality"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
@@ -37,18 +36,12 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumerestrictions"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumezone"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
-	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
 )
-
-// RegistryArgs arguments needed to create default plugin factories.
-type RegistryArgs struct {
-	VolumeBinder *volumebinder.VolumeBinder
-}
 
 // NewInTreeRegistry builds the registry with all the in-tree plugins.
 // A scheduler that runs out of tree plugins can register additional plugins
 // through the WithFrameworkOutOfTreeRegistry option.
-func NewInTreeRegistry(args *RegistryArgs) framework.Registry {
+func NewInTreeRegistry() framework.Registry {
 	return framework.Registry{
 		defaultpodtopologyspread.Name:              defaultpodtopologyspread.New,
 		imagelocality.Name:                         imagelocality.New,
@@ -65,19 +58,17 @@ func NewInTreeRegistry(args *RegistryArgs) framework.Registry {
 		noderesources.LeastAllocatedName:           noderesources.NewLeastAllocated,
 		noderesources.RequestedToCapacityRatioName: noderesources.NewRequestedToCapacityRatio,
 		noderesources.ResourceLimitsName:           noderesources.NewResourceLimits,
-		volumebinding.Name: func(_ *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
-			return volumebinding.NewFromVolumeBinder(args.VolumeBinder), nil
-		},
-		volumerestrictions.Name:        volumerestrictions.New,
-		volumezone.Name:                volumezone.New,
-		nodevolumelimits.CSIName:       nodevolumelimits.NewCSI,
-		nodevolumelimits.EBSName:       nodevolumelimits.NewEBS,
-		nodevolumelimits.GCEPDName:     nodevolumelimits.NewGCEPD,
-		nodevolumelimits.AzureDiskName: nodevolumelimits.NewAzureDisk,
-		nodevolumelimits.CinderName:    nodevolumelimits.NewCinder,
-		interpodaffinity.Name:          interpodaffinity.New,
-		nodelabel.Name:                 nodelabel.New,
-		serviceaffinity.Name:           serviceaffinity.New,
-		queuesort.Name:                 queuesort.New,
+		volumebinding.Name:                         volumebinding.New,
+		volumerestrictions.Name:                    volumerestrictions.New,
+		volumezone.Name:                            volumezone.New,
+		nodevolumelimits.CSIName:                   nodevolumelimits.NewCSI,
+		nodevolumelimits.EBSName:                   nodevolumelimits.NewEBS,
+		nodevolumelimits.GCEPDName:                 nodevolumelimits.NewGCEPD,
+		nodevolumelimits.AzureDiskName:             nodevolumelimits.NewAzureDisk,
+		nodevolumelimits.CinderName:                nodevolumelimits.NewCinder,
+		interpodaffinity.Name:                      interpodaffinity.New,
+		nodelabel.Name:                             nodelabel.New,
+		serviceaffinity.Name:                       serviceaffinity.New,
+		queuesort.Name:                             queuesort.New,
 	}
 }
