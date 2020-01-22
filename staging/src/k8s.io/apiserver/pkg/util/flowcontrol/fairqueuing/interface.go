@@ -27,16 +27,16 @@ import (
 // are separated so that errors from the first phase can be found
 // before committing to a concurrency allotment for the second.
 type QueueSetFactory interface {
-	// QualifyQueuingConfig does the first phase of creating a QueueSet
-	QualifyQueuingConfig(QueuingConfig) (QueueSetCompleter, error)
+	// BeginConstruction does the first phase of creating a QueueSet
+	BeginConstruction(QueuingConfig) (QueueSetCompleter, error)
 }
 
 // QueueSetCompleter finishes the two-step process of creating or
 // reconfiguring a QueueSet
 type QueueSetCompleter interface {
-	// GetQueueSet returns a QueueSet configured by the given
+	// Complete returns a QueueSet configured by the given
 	// dispatching configuration.
-	GetQueueSet(DispatchingConfig) QueueSet
+	Complete(DispatchingConfig) QueueSet
 }
 
 // QueueSet is the abstraction for the queuing and dispatching
@@ -47,14 +47,14 @@ type QueueSetCompleter interface {
 // .  Some day we may have connections between priority levels, but
 // today is not that day.
 type QueueSet interface {
-	// QualifyQueuingConfig starts the two-step process of updating
-	// the configuration.  No change is made until GetQueueSet is
-	// called.  If `C := X.QualifyQueuingConfig(q)` then
-	// `C.GetQueueSet(d)` returns the same value `X`.  If the
+	// BeginConfigChange starts the two-step process of updating
+	// the configuration.  No change is made until Complete is
+	// called.  If `C := X.BeginConstruction(q)` then
+	// `C.Complete(d)` returns the same value `X`.  If the
 	// QueuingConfig's DesiredNumQueues field is zero then the other
 	// queuing-specific config parameters are not changed, so that the
 	// queues continue draining as before.
-	QualifyQueuingConfig(QueuingConfig) (QueueSetCompleter, error)
+	BeginConfigChange(QueuingConfig) (QueueSetCompleter, error)
 
 	// Quiesce controls whether the QueueSet is operating normally or
 	// is quiescing.  A quiescing QueueSet drains as normal but does

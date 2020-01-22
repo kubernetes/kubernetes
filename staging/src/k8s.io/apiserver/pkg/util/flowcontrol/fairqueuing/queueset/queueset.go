@@ -114,7 +114,7 @@ func NewQueueSetFactory(c clock.PassiveClock, counter counter.GoRoutineCounter) 
 	}
 }
 
-func (qsf *queueSetFactory) QualifyQueuingConfig(qCfg fq.QueuingConfig) (fq.QueueSetCompleter, error) {
+func (qsf *queueSetFactory) BeginConstruction(qCfg fq.QueuingConfig) (fq.QueueSetCompleter, error) {
 	dealer, err := checkConfig(qCfg)
 	if err != nil {
 		return nil, err
@@ -139,7 +139,7 @@ func checkConfig(qCfg fq.QueuingConfig) (*shufflesharding.Dealer, error) {
 	return dealer, err
 }
 
-func (qsc *queueSetCompleter) GetQueueSet(dCfg fq.DispatchingConfig) fq.QueueSet {
+func (qsc *queueSetCompleter) Complete(dCfg fq.DispatchingConfig) fq.QueueSet {
 	qs := qsc.theSet
 	if qs == nil {
 		qs = &queueSet{
@@ -164,7 +164,7 @@ func createQueues(n, baseIndex int) []*queue {
 	return fqqueues
 }
 
-func (qs *queueSet) QualifyQueuingConfig(qCfg fq.QueuingConfig) (fq.QueueSetCompleter, error) {
+func (qs *queueSet) BeginConfigChange(qCfg fq.QueuingConfig) (fq.QueueSetCompleter, error) {
 	dealer, err := checkConfig(qCfg)
 	if err != nil {
 		return nil, err

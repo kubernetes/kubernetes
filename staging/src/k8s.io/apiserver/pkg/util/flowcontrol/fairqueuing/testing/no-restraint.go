@@ -35,15 +35,15 @@ type noRestraintCompeter struct{}
 
 type noRestraint struct{}
 
-func (noRestraintFactory) QualifyQueuingConfig(qCfg fq.QueuingConfig) (fq.QueueSetCompleter, error) {
+func (noRestraintFactory) BeginConstruction(qCfg fq.QueuingConfig) (fq.QueueSetCompleter, error) {
 	return noRestraintCompeter{}, nil
 }
 
-func (noRestraintCompeter) GetQueueSet(dCfg fq.DispatchingConfig) fq.QueueSet {
+func (noRestraintCompeter) Complete(dCfg fq.DispatchingConfig) fq.QueueSet {
 	return noRestraint{}
 }
 
-func (noRestraint) QualifyQueuingConfig(qCfg fq.QueuingConfig) (fq.QueueSetCompleter, error) {
+func (noRestraint) BeginConfigChange(qCfg fq.QueuingConfig) (fq.QueueSetCompleter, error) {
 	return noRestraintCompeter{}, nil
 }
 
