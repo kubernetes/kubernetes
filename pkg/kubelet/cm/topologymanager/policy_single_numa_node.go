@@ -17,7 +17,6 @@ limitations under the License.
 package topologymanager
 
 import (
-	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 )
@@ -72,49 +71,19 @@ func filterSingleNumaHints(allResourcesHints [][]TopologyHint) [][]TopologyHint 
 	return filteredResourcesHints
 }
 
-func (p *singleNumaNodePolicy) mergeProvidersHints(providersHints []map[string][]TopologyHint) TopologyHint {
+func (p *singleNumaNodePolicy) mergeProvidersHints(filteredHints [][]TopologyHint) TopologyHint {
 	// Set the default affinity as an any-numa affinity containing the list
 	// of NUMA Nodes available on this machine.
 	defaultAffinity, _ := bitmask.NewBitMask(p.numaNodes...)
 
-	// Loop through all provider hints and save an accumulated list of the
-	// hints returned by each hint provider. If no hints are provided, assume
-	// that provider has no preference for topology-aware allocation.
-	var allProviderHints [][]TopologyHint
-	for _, hints := range providersHints {
-		// If hints is nil, insert a single, preferred any-numa hint into allProviderHints.
-		if len(hints) == 0 {
-			klog.Infof("[topologymanager] Hint Provider has no preference for NUMA affinity with any resource")
-			allProviderHints = append(allProviderHints, []TopologyHint{{nil, true}})
-			continue
-		}
-
-		// Otherwise, accumulate the hints for each resource type into allProviderHints.
-		for resource := range hints {
-			if hints[resource] == nil {
-				klog.Infof("[topologymanager] Hint Provider has no preference for NUMA affinity with resource '%s'", resource)
-				allProviderHints = append(allProviderHints, []TopologyHint{{nil, true}})
-				continue
-			}
-
-			if len(hints[resource]) == 0 {
-				klog.Infof("[topologymanager] Hint Provider has no possible NUMA affinities for resource '%s'", resource)
-				allProviderHints = append(allProviderHints, []TopologyHint{{nil, false}})
-				continue
-			}
-
-			allProviderHints = append(allProviderHints, hints[resource])
-		}
-	}
-
 	// Filter to only include don't cares and hints with a single NUMA node.
-	allProviderHints = filterSingleNumaHints(allProviderHints)
+	filteredHints = filterSingleNumaHints(filteredHints)
 
 	// Set the bestHint to return from this function as {nil false}.
 	// This will only be returned if no better hint can be found when
 	// merging hints from each hint provider.
 	bestHint := TopologyHint{defaultAffinity, false}
-	iterateAllProviderTopologyHints(allProviderHints, func(permutation []TopologyHint) {
+	iterateAllProviderTopologyHints(filteredHints, func(permutation []TopologyHint) {
 		// Get the NUMANodeAffinity from each hint in the permutation and see if any
 		// of them encode unpreferred allocations.
 		mergedHint := mergePermutation(p.numaNodes, permutation)
@@ -158,7 +127,8 @@ func (p *singleNumaNodePolicy) mergeProvidersHints(providersHints []map[string][
 }
 
 func (p *singleNumaNodePolicy) Merge(providersHints []map[string][]TopologyHint) (TopologyHint, lifecycle.PodAdmitResult) {
-	hint := p.mergeProvidersHints(providersHints)
+	filteredHints := filterProvidersHints(providersHints)
+	hint := p.mergeProvidersHints(filteredHints)
 	admit := p.canAdmitPodResult(&hint)
 	return hint, admit
 }
