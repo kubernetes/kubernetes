@@ -17,6 +17,7 @@ limitations under the License.
 package topologymanager
 
 import (
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 )
@@ -57,6 +58,39 @@ func mergePermutation(numaNodes []int, permutation []TopologyHint) TopologyHint 
 	// Build a mergedHint from the merged affinity mask, indicating if an
 	// preferred allocation was used to generate the affinity mask or not.
 	return TopologyHint{mergedAffinity, preferred}
+}
+
+func filterProvidersHints(providersHints []map[string][]TopologyHint) [][]TopologyHint {
+	// Loop through all hint providers and save an accumulated list of the
+	// hints returned by each hint provider. If no hints are provided, assume
+	// that provider has no preference for topology-aware allocation.
+	var allProviderHints [][]TopologyHint
+	for _, hints := range providersHints {
+		// If hints is nil, insert a single, preferred any-numa hint into allProviderHints.
+		if len(hints) == 0 {
+			klog.Infof("[topologymanager] Hint Provider has no preference for NUMA affinity with any resource")
+			allProviderHints = append(allProviderHints, []TopologyHint{{nil, true}})
+			continue
+		}
+
+		// Otherwise, accumulate the hints for each resource type into allProviderHints.
+		for resource := range hints {
+			if hints[resource] == nil {
+				klog.Infof("[topologymanager] Hint Provider has no preference for NUMA affinity with resource '%s'", resource)
+				allProviderHints = append(allProviderHints, []TopologyHint{{nil, true}})
+				continue
+			}
+
+			if len(hints[resource]) == 0 {
+				klog.Infof("[topologymanager] Hint Provider has no possible NUMA affinities for resource '%s'", resource)
+				allProviderHints = append(allProviderHints, []TopologyHint{{nil, false}})
+				continue
+			}
+
+			allProviderHints = append(allProviderHints, hints[resource])
+		}
+	}
+	return allProviderHints
 }
 
 // Iterate over all permutations of hints in 'allProviderHints [][]TopologyHint'.
