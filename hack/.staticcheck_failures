@@ -45,7 +45,6 @@ test/e2e/apps
 test/e2e/autoscaling
 test/e2e/instrumentation/logging/stackdriver
 test/integration/deployment
-test/integration/etcd
 test/integration/examples
 test/integration/framework
 test/integration/garbagecollector
