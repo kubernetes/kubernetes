@@ -251,9 +251,11 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 	if len(f.queueSortPlugins) == 0 {
 		return nil, fmt.Errorf("no queue sort plugin is enabled")
 	}
-
 	if len(f.queueSortPlugins) > 1 {
 		return nil, fmt.Errorf("only one queue sort plugin can be enabled")
+	}
+	if len(f.bindPlugins) == 0 {
+		return nil, fmt.Errorf("at least one bind plugin is needed")
 	}
 
 	return f, nil
@@ -653,7 +655,7 @@ func (f *framework) RunBindPlugins(ctx context.Context, state *CycleState, pod *
 			continue
 		}
 		if !status.IsSuccess() {
-			msg := fmt.Sprintf("bind plugin %q failed to bind pod \"%v/%v\": %v", bp.Name(), pod.Namespace, pod.Name, status.Message())
+			msg := fmt.Sprintf("plugin %q failed to bind pod \"%v/%v\": %v", bp.Name(), pod.Namespace, pod.Name, status.Message())
 			klog.Error(msg)
 			return NewStatus(Error, msg)
 		}

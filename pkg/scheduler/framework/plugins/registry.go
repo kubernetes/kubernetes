@@ -17,6 +17,7 @@ limitations under the License.
 package plugins
 
 import (
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultpodtopologyspread"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/imagelocality"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
@@ -70,5 +71,6 @@ func NewInTreeRegistry() framework.Registry {
 		nodelabel.Name:                             nodelabel.New,
 		serviceaffinity.Name:                       serviceaffinity.New,
 		queuesort.Name:                             queuesort.New,
+		defaultbinder.Name:                         defaultbinder.New,
 	}
 }

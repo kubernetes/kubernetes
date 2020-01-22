@@ -480,9 +480,9 @@ type Framework interface {
 
 	// RunBindPlugins runs the set of configured bind plugins. A bind plugin may choose
 	// whether or not to handle the given Pod. If a bind plugin chooses to skip the
-	// binding, it should return code=4("skip") status. Otherwise, it should return "Error"
+	// binding, it should return code=5("skip") status. Otherwise, it should return "Error"
 	// or "Success". If none of the plugins handled binding, RunBindPlugins returns
-	// code=4("skip") status.
+	// code=5("skip") status.
 	RunBindPlugins(ctx context.Context, state *CycleState, pod *v1.Pod, nodeName string) *Status
 
 	// HasFilterPlugins returns true if at least one filter plugin is defined.
