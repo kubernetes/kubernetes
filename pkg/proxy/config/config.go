@@ -240,7 +240,7 @@ func (c *EndpointSliceConfig) handleAddEndpointSlice(obj interface{}) {
 		return
 	}
 	for _, h := range c.eventHandlers {
-		klog.V(4).Infof("Calling handler.OnEndpointSliceUpdate %+v", endpointSlice)
+		klog.V(4).Infof("Calling handler.OnEndpointSliceAdd %+v", endpointSlice)
 		h.OnEndpointSliceAdd(endpointSlice)
 	}
 }
