@@ -236,10 +236,10 @@ function install-node-problem-detector {
 
 function install-cni-binaries {
   if [[ -n "${CNI_VERSION:-}" ]]; then
-      local -r cni_tar="cni-plugins-amd64-${CNI_VERSION}.tgz"
+      local -r cni_tar="${CNI_TAR_PREFIX}${CNI_VERSION}.tgz"
       local -r cni_sha1="${CNI_SHA1}"
   else
-      local -r cni_tar="cni-plugins-amd64-${DEFAULT_CNI_VERSION}.tgz"
+      local -r cni_tar="${CNI_TAR_PREFIX}${DEFAULT_CNI_VERSION}.tgz"
       local -r cni_sha1="${DEFAULT_CNI_SHA1}"
   fi
   if is-preloaded "${cni_tar}" "${cni_sha1}"; then
