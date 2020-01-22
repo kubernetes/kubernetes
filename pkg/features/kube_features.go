@@ -17,7 +17,6 @@ limitations under the License.
 package features
 
 import (
-	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -626,14 +625,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	genericfeatures.DryRun:                  {Default: true, PreRelease: featuregate.Beta},
 	genericfeatures.ServerSideApply:         {Default: true, PreRelease: featuregate.Beta},
 	genericfeatures.APIPriorityAndFairness:  {Default: false, PreRelease: featuregate.Alpha},
-
-	// inherited features from apiextensions-apiserver, relisted here to get a conflict if it is changed
-	// unintentionally on either side:
-	apiextensionsfeatures.CustomResourceValidation:        {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
-	apiextensionsfeatures.CustomResourceSubresources:      {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
-	apiextensionsfeatures.CustomResourceWebhookConversion: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
-	apiextensionsfeatures.CustomResourcePublishOpenAPI:    {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
-	apiextensionsfeatures.CustomResourceDefaulting:        {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // TODO: remove in 1.18
 
 	// features that enable backwards compatibility but are scheduled to be removed
 	// ...
