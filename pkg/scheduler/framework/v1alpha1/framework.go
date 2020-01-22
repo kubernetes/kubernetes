@@ -22,7 +22,7 @@ import (
 	"reflect"
 	"time"
 
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -39,12 +39,13 @@ import (
 )
 
 const (
+	// Filter is the name of the filter extension point.
+	Filter = "Filter"
 	// Specifies the maximum timeout a permit plugin can return.
 	maxTimeout                  time.Duration = 15 * time.Minute
 	preFilter                                 = "PreFilter"
 	preFilterExtensionAddPod                  = "PreFilterExtensionAddPod"
 	preFilterExtensionRemovePod               = "PreFilterExtensionRemovePod"
-	filter                                    = "Filter"
 	postFilter                                = "PostFilter"
 	score                                     = "Score"
 	scoreExtensionNormalize                   = "ScoreExtensionNormalize"
@@ -351,10 +352,6 @@ func (f *framework) RunPreFilterExtensionAddPod(
 	podToAdd *v1.Pod,
 	nodeInfo *schedulernodeinfo.NodeInfo,
 ) (status *Status) {
-	startTime := time.Now()
-	defer func() {
-		metrics.FrameworkExtensionPointDuration.WithLabelValues(preFilterExtensionAddPod, status.Code().String()).Observe(metrics.SinceInSeconds(startTime))
-	}()
 	for _, pl := range f.preFilterPlugins {
 		if pl.PreFilterExtensions() == nil {
 			continue
@@ -391,10 +388,6 @@ func (f *framework) RunPreFilterExtensionRemovePod(
 	podToRemove *v1.Pod,
 	nodeInfo *schedulernodeinfo.NodeInfo,
 ) (status *Status) {
-	startTime := time.Now()
-	defer func() {
-		metrics.FrameworkExtensionPointDuration.WithLabelValues(preFilterExtensionRemovePod, status.Code().String()).Observe(metrics.SinceInSeconds(startTime))
-	}()
 	for _, pl := range f.preFilterPlugins {
 		if pl.PreFilterExtensions() == nil {
 			continue
@@ -432,10 +425,6 @@ func (f *framework) RunFilterPlugins(
 	nodeInfo *schedulernodeinfo.NodeInfo,
 ) PluginToStatus {
 	var firstFailedStatus *Status
-	startTime := time.Now()
-	defer func() {
-		metrics.FrameworkExtensionPointDuration.WithLabelValues(filter, firstFailedStatus.Code().String()).Observe(metrics.SinceInSeconds(startTime))
-	}()
 	statuses := make(PluginToStatus)
 	for _, pl := range f.filterPlugins {
 		pluginStatus := f.runFilterPlugin(ctx, pl, state, pod, nodeInfo)
@@ -466,7 +455,7 @@ func (f *framework) runFilterPlugin(ctx context.Context, pl FilterPlugin, state 
 	}
 	startTime := time.Now()
 	status := pl.Filter(ctx, state, pod, nodeInfo)
-	f.metricsRecorder.observePluginDurationAsync(filter, pl.Name(), status, metrics.SinceInSeconds(startTime))
+	f.metricsRecorder.observePluginDurationAsync(Filter, pl.Name(), status, metrics.SinceInSeconds(startTime))
 	return status
 }
 
