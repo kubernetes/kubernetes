@@ -894,12 +894,17 @@ func (g *genericScheduler) selectNodesForPreemption(
 // This function is stable and does not change the order of received pods. So, if it
 // receives a sorted list, grouping will preserve the order of the input list.
 func filterPodsWithPDBViolation(pods []*v1.Pod, pdbs []*policy.PodDisruptionBudget) (violatingPods, nonViolatingPods []*v1.Pod) {
+	pdbsAllowed := make([]int32, len(pdbs))
+	for i, pdb := range pdbs {
+		pdbsAllowed[i] = pdb.Status.DisruptionsAllowed
+	}
+
 	for _, obj := range pods {
 		pod := obj
 		pdbForPodIsViolated := false
 		// A pod with no labels will not match any PDB. So, no need to check.
 		if len(pod.Labels) != 0 {
-			for _, pdb := range pdbs {
+			for i, pdb := range pdbs {
 				if pdb.Namespace != pod.Namespace {
 					continue
 				}
@@ -912,9 +917,11 @@ func filterPodsWithPDBViolation(pods []*v1.Pod, pdbs []*policy.PodDisruptionBudg
 					continue
 				}
 				// We have found a matching PDB.
-				if pdb.Status.DisruptionsAllowed <= 0 {
+				if pdbsAllowed[i] <= 0 {
 					pdbForPodIsViolated = true
 					break
+				} else {
+					pdbsAllowed[i]--
 				}
 			}
 		}

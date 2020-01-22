@@ -28,6 +28,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	policy "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -1181,11 +1182,16 @@ func printNodeToVictims(nodeToVictims map[*v1.Node]*extenderv1.Victims) string {
 	return output
 }
 
-func checkPreemptionVictims(expected map[string]map[string]bool, nodeToPods map[*v1.Node]*extenderv1.Victims) error {
+type victims struct {
+	pods             sets.String
+	numPDBViolations int64
+}
+
+func checkPreemptionVictims(expected map[string]victims, nodeToPods map[*v1.Node]*extenderv1.Victims) error {
 	if len(expected) == len(nodeToPods) {
 		for k, victims := range nodeToPods {
-			if expPods, ok := expected[k.Name]; ok {
-				if len(victims.Pods) != len(expPods) {
+			if expVictims, ok := expected[k.Name]; ok {
+				if len(victims.Pods) != len(expVictims.pods) {
 					return fmt.Errorf("unexpected number of pods. expected: %v, got: %v", expected, printNodeToVictims(nodeToPods))
 				}
 				prevPriority := int32(math.MaxInt32)
@@ -1195,9 +1201,12 @@ func checkPreemptionVictims(expected map[string]map[string]bool, nodeToPods map[
 						return fmt.Errorf("pod %v of node %v was not sorted by priority", p.Name, k)
 					}
 					prevPriority = *p.Spec.Priority
-					if _, ok := expPods[p.Name]; !ok {
-						return fmt.Errorf("pod %v was not expected. Expected: %v", p.Name, expPods)
+					if !expVictims.pods.Has(p.Name) {
+						return fmt.Errorf("pod %v was not expected. Expected: %v", p.Name, expVictims.pods)
 					}
+				}
+				if expVictims.numPDBViolations != victims.NumPDBViolations {
+					return fmt.Errorf("unexpected numPDBViolations. expected: %d, got: %d", expVictims.numPDBViolations, victims.NumPDBViolations)
 				}
 			} else {
 				return fmt.Errorf("unexpected machines. expected: %v, got: %v", expected, printNodeToVictims(nodeToPods))
@@ -1277,8 +1286,9 @@ func TestSelectNodesForPreemption(t *testing.T) {
 		nodes                   []string
 		pod                     *v1.Pod
 		pods                    []*v1.Pod
+		pdbs                    []*policy.PodDisruptionBudget
 		filterReturnCode        framework.Code
-		expected                map[string]map[string]bool // Map from node name to a list of pods names which should be preempted.
+		expected                map[string]victims
 		expectedNumFilterCalled int32
 	}{
 		{
@@ -1293,7 +1303,7 @@ func TestSelectNodesForPreemption(t *testing.T) {
 			pods: []*v1.Pod{
 				{ObjectMeta: metav1.ObjectMeta{Name: "a", UID: types.UID("a")}, Spec: v1.PodSpec{Priority: &midPriority, NodeName: "machine1"}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "b", UID: types.UID("b")}, Spec: v1.PodSpec{Priority: &midPriority, NodeName: "machine2"}}},
-			expected:                map[string]map[string]bool{},
+			expected:                map[string]victims{},
 			expectedNumFilterCalled: 2,
 		},
 		{
@@ -1308,7 +1318,7 @@ func TestSelectNodesForPreemption(t *testing.T) {
 			pods: []*v1.Pod{
 				{ObjectMeta: metav1.ObjectMeta{Name: "a", UID: types.UID("a")}, Spec: v1.PodSpec{Priority: &midPriority, NodeName: "machine1"}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "b", UID: types.UID("b")}, Spec: v1.PodSpec{Priority: &midPriority, NodeName: "machine2"}}},
-			expected:                map[string]map[string]bool{"machine1": {}, "machine2": {}},
+			expected:                map[string]victims{"machine1": {}, "machine2": {}},
 			expectedNumFilterCalled: 4,
 		},
 		{
@@ -1323,7 +1333,7 @@ func TestSelectNodesForPreemption(t *testing.T) {
 			pods: []*v1.Pod{
 				{ObjectMeta: metav1.ObjectMeta{Name: "a", UID: types.UID("a")}, Spec: v1.PodSpec{Priority: &midPriority, NodeName: "machine1"}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "b", UID: types.UID("b")}, Spec: v1.PodSpec{Priority: &midPriority, NodeName: "machine2"}}},
-			expected:                map[string]map[string]bool{"machine1": {}},
+			expected:                map[string]victims{"machine1": {}},
 			expectedNumFilterCalled: 3,
 		},
 		{
@@ -1338,7 +1348,7 @@ func TestSelectNodesForPreemption(t *testing.T) {
 			pods: []*v1.Pod{
 				{ObjectMeta: metav1.ObjectMeta{Name: "a", UID: types.UID("a")}, Spec: v1.PodSpec{Containers: largeContainers, Priority: &midPriority, NodeName: "machine1"}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "b", UID: types.UID("b")}, Spec: v1.PodSpec{Containers: largeContainers, Priority: &midPriority, NodeName: "machine2"}}},
-			expected:                map[string]map[string]bool{"machine1": {"a": true}, "machine2": {"b": true}},
+			expected:                map[string]victims{"machine1": {pods: sets.NewString("a")}, "machine2": {pods: sets.NewString("b")}},
 			expectedNumFilterCalled: 4,
 		},
 		{
@@ -1353,7 +1363,7 @@ func TestSelectNodesForPreemption(t *testing.T) {
 			pods: []*v1.Pod{
 				{ObjectMeta: metav1.ObjectMeta{Name: "a", UID: types.UID("a")}, Spec: v1.PodSpec{Containers: largeContainers, Priority: &midPriority, NodeName: "machine1"}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "b", UID: types.UID("b")}, Spec: v1.PodSpec{Containers: largeContainers, Priority: &midPriority, NodeName: "machine2"}}},
-			expected:                map[string]map[string]bool{},
+			expected:                map[string]victims{},
 			expectedNumFilterCalled: 2,
 		},
 		{
@@ -1369,7 +1379,7 @@ func TestSelectNodesForPreemption(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "a", UID: types.UID("a")}, Spec: v1.PodSpec{Containers: smallContainers, Priority: &lowPriority, NodeName: "machine1"}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "b", UID: types.UID("b")}, Spec: v1.PodSpec{Containers: largeContainers, Priority: &midPriority, NodeName: "machine1"}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "c", UID: types.UID("c")}, Spec: v1.PodSpec{Containers: largeContainers, Priority: &midPriority, NodeName: "machine2"}}},
-			expected:                map[string]map[string]bool{"machine1": {"b": true}, "machine2": {"c": true}},
+			expected:                map[string]victims{"machine1": {pods: sets.NewString("b")}, "machine2": {pods: sets.NewString("c")}},
 			expectedNumFilterCalled: 5,
 		},
 		{
@@ -1387,7 +1397,7 @@ func TestSelectNodesForPreemption(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "c", UID: types.UID("c")}, Spec: v1.PodSpec{Containers: mediumContainers, Priority: &midPriority, NodeName: "machine1"}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "d", UID: types.UID("d")}, Spec: v1.PodSpec{Containers: smallContainers, Priority: &highPriority, NodeName: "machine1"}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "e", UID: types.UID("e")}, Spec: v1.PodSpec{Containers: largeContainers, Priority: &highPriority, NodeName: "machine2"}}},
-			expected:                map[string]map[string]bool{"machine1": {"b": true, "c": true}},
+			expected:                map[string]victims{"machine1": {pods: sets.NewString("b", "c")}},
 			expectedNumFilterCalled: 5,
 		},
 		{
@@ -1405,7 +1415,7 @@ func TestSelectNodesForPreemption(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "c", UID: types.UID("c")}, Spec: v1.PodSpec{Containers: mediumContainers, Priority: &midPriority, NodeName: "machine1"}, Status: v1.PodStatus{StartTime: &startTime20190105}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "d", UID: types.UID("d")}, Spec: v1.PodSpec{Containers: smallContainers, Priority: &highPriority, NodeName: "machine1"}, Status: v1.PodStatus{StartTime: &startTime20190104}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "e", UID: types.UID("e")}, Spec: v1.PodSpec{Containers: largeContainers, Priority: &highPriority, NodeName: "machine2"}, Status: v1.PodStatus{StartTime: &startTime20190103}}},
-			expected:                map[string]map[string]bool{"machine1": {"a": true, "c": true}},
+			expected:                map[string]victims{"machine1": {pods: sets.NewString("a", "c")}},
 			expectedNumFilterCalled: 5,
 		},
 		{
@@ -1441,7 +1451,7 @@ func TestSelectNodesForPreemption(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "b", UID: types.UID("b")}, Spec: v1.PodSpec{Containers: smallContainers, Priority: &midPriority, NodeName: "machine1"}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "d", UID: types.UID("d")}, Spec: v1.PodSpec{Containers: smallContainers, Priority: &highPriority, NodeName: "machine1"}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "e", UID: types.UID("e")}, Spec: v1.PodSpec{Containers: largeContainers, Priority: &highPriority, NodeName: "machine2"}}},
-			expected:                map[string]map[string]bool{"machine1": {"a": true}, "machine2": {}},
+			expected:                map[string]victims{"machine1": {pods: sets.NewString("a")}, "machine2": {}},
 			expectedNumFilterCalled: 4,
 		},
 		{
@@ -1522,9 +1532,9 @@ func TestSelectNodesForPreemption(t *testing.T) {
 					Status:     v1.PodStatus{Phase: v1.PodRunning},
 				},
 			},
-			expected: map[string]map[string]bool{
-				"node-a": {"pod-a2": true},
-				"node-b": {"pod-b1": true},
+			expected: map[string]victims{
+				"node-a": {pods: sets.NewString("pod-a2")},
+				"node-b": {pods: sets.NewString("pod-b1")},
 			},
 			expectedNumFilterCalled: 6,
 		},
@@ -1541,8 +1551,25 @@ func TestSelectNodesForPreemption(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "a", UID: types.UID("a")}, Spec: v1.PodSpec{Containers: largeContainers, Priority: &midPriority, NodeName: "machine1"}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "b", UID: types.UID("b")}, Spec: v1.PodSpec{Containers: largeContainers, Priority: &midPriority, NodeName: "machine2"}}},
 			filterReturnCode:        framework.Unschedulable,
-			expected:                map[string]map[string]bool{},
+			expected:                map[string]victims{},
 			expectedNumFilterCalled: 2,
+		},
+		{
+			name: "preemption with violation of same pdb",
+			registerPlugins: []st.RegisterPluginFunc{
+				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				st.RegisterFilterPlugin(noderesources.FitName, noderesources.NewFit),
+				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+			},
+			nodes: []string{"machine1"},
+			pod:   &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1", UID: types.UID("pod1")}, Spec: v1.PodSpec{Containers: veryLargeContainers, Priority: &highPriority}},
+			pods: []*v1.Pod{
+				{ObjectMeta: metav1.ObjectMeta{Name: "a", UID: types.UID("a"), Labels: map[string]string{"app": "foo"}}, Spec: v1.PodSpec{Containers: mediumContainers, Priority: &midPriority, NodeName: "machine1"}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "b", UID: types.UID("b"), Labels: map[string]string{"app": "foo"}}, Spec: v1.PodSpec{Containers: mediumContainers, Priority: &midPriority, NodeName: "machine1"}}},
+			pdbs: []*policy.PodDisruptionBudget{
+				{Spec: policy.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "foo"}}}, Status: policy.PodDisruptionBudgetStatus{DisruptionsAllowed: 1}}},
+			expected:                map[string]victims{"machine1": {pods: sets.NewString("a", "b"), numPDBViolations: 1}},
+			expectedNumFilterCalled: 3,
 		},
 	}
 	labelKeys := []string{"hostname", "zone", "region"}
@@ -1617,7 +1644,7 @@ func TestSelectNodesForPreemption(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			nodeToPods, err := g.selectNodesForPreemption(context.Background(), state, test.pod, nodeInfos, nil)
+			nodeToPods, err := g.selectNodesForPreemption(context.Background(), state, test.pod, nodeInfos, test.pdbs)
 			if err != nil {
 				t.Error(err)
 			}
