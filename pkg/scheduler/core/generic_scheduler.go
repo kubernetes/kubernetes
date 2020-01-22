@@ -490,6 +490,15 @@ func (g *genericScheduler) findNodesThatPassFilters(ctx context.Context, state *
 		}
 	}
 
+	beginCheckNode := time.Now()
+	statusCode := framework.Success
+	defer func() {
+		// We record Filter extension point latency here instead of in framework.go because framework.RunFilterPlugins
+		// function is called for each node, whereas we want to have an overall latency for all nodes per scheduling cycle.
+		// Note that this latency also includes latency for `addNominatedPods`, which calls framework.RunPreFilterAddPod.
+		metrics.FrameworkExtensionPointDuration.WithLabelValues(framework.Filter, statusCode.String()).Observe(metrics.SinceInSeconds(beginCheckNode))
+	}()
+
 	// Stops searching for more nodes once the configured number of feasible nodes
 	// are found.
 	workqueue.ParallelizeUntil(ctx, 16, len(allNodes), checkNode)
@@ -498,6 +507,7 @@ func (g *genericScheduler) findNodesThatPassFilters(ctx context.Context, state *
 
 	filtered = filtered[:filteredLen]
 	if err := errCh.ReceiveError(); err != nil {
+		statusCode = framework.Error
 		return nil, err
 	}
 	return filtered, nil
