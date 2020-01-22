@@ -135,10 +135,10 @@ func StartRealMasterOrDie(t *testing.T, configFuncs ...func(*options.ServerRunOp
 
 		prepared, err := kubeAPIServer.PrepareRun()
 		if err != nil {
-			t.Fatal(err)
+			t.Error(err)
 		}
 		if err := prepared.Run(stopCh); err != nil {
-			t.Fatal(err)
+			t.Error(err)
 		}
 	}()
 
@@ -174,7 +174,7 @@ func StartRealMasterOrDie(t *testing.T, configFuncs ...func(*options.ServerRunOp
 	restMapper := restmapper.NewDeferredDiscoveryRESTMapper(discoveryClient)
 	restMapper.Reset()
 
-	serverResources, err := kubeClient.Discovery().ServerResources()
+	_, serverResources, err := kubeClient.Discovery().ServerGroupsAndResources()
 	if err != nil {
 		t.Fatal(err)
 	}
