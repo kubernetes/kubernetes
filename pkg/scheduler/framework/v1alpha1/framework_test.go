@@ -894,30 +894,6 @@ func TestRecordingMetrics(t *testing.T) {
 			wantStatus:         Success,
 		},
 		{
-			name:               "PreFilterAddPod - Success",
-			action:             func(f Framework) { f.RunPreFilterExtensionAddPod(context.Background(), state, pod, nil, nil) },
-			wantExtensionPoint: "PreFilterExtensionAddPod",
-			wantStatus:         Success,
-		},
-		{
-			name:               "PreFilterRemovePod - Success",
-			action:             func(f Framework) { f.RunPreFilterExtensionRemovePod(context.Background(), state, pod, nil, nil) },
-			wantExtensionPoint: "PreFilterExtensionRemovePod",
-			wantStatus:         Success,
-		},
-		{
-			name:               "PreFilterRemovePod - Success",
-			action:             func(f Framework) { f.RunPreFilterPlugins(context.Background(), state, pod) },
-			wantExtensionPoint: "PreFilter",
-			wantStatus:         Success,
-		},
-		{
-			name:               "Filter - Success",
-			action:             func(f Framework) { f.RunFilterPlugins(context.Background(), state, pod, nil) },
-			wantExtensionPoint: "Filter",
-			wantStatus:         Success,
-		},
-		{
 			name:               "PostFilter - Success",
 			action:             func(f Framework) { f.RunPostFilterPlugins(context.Background(), state, pod, nil, nil) },
 			wantExtensionPoint: "PostFilter",
@@ -971,27 +947,6 @@ func TestRecordingMetrics(t *testing.T) {
 			action:             func(f Framework) { f.RunPreFilterPlugins(context.Background(), state, pod) },
 			inject:             injectedResult{PreFilterStatus: int(Error)},
 			wantExtensionPoint: "PreFilter",
-			wantStatus:         Error,
-		},
-		{
-			name:               "PreFilterAddPod - Error",
-			action:             func(f Framework) { f.RunPreFilterExtensionAddPod(context.Background(), state, pod, nil, nil) },
-			inject:             injectedResult{PreFilterAddPodStatus: int(Error)},
-			wantExtensionPoint: "PreFilterExtensionAddPod",
-			wantStatus:         Error,
-		},
-		{
-			name:               "PreFilterRemovePod - Error",
-			action:             func(f Framework) { f.RunPreFilterExtensionRemovePod(context.Background(), state, pod, nil, nil) },
-			inject:             injectedResult{PreFilterRemovePodStatus: int(Error)},
-			wantExtensionPoint: "PreFilterExtensionRemovePod",
-			wantStatus:         Error,
-		},
-		{
-			name:               "Filter - Error",
-			action:             func(f Framework) { f.RunFilterPlugins(context.Background(), state, pod, nil) },
-			inject:             injectedResult{FilterStatus: int(Error)},
-			wantExtensionPoint: "Filter",
 			wantStatus:         Error,
 		},
 		{
