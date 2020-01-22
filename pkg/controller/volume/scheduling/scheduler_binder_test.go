@@ -113,6 +113,10 @@ var (
 	zone1Labels = map[string]string{v1.LabelZoneFailureDomain: "us-east-1", v1.LabelZoneRegion: "us-east-1a"}
 )
 
+func init() {
+	klog.InitFlags(nil)
+}
+
 type testEnv struct {
 	client                  clientset.Interface
 	reactor                 *pvtesting.VolumeReactor
