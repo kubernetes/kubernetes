@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
@@ -288,7 +289,7 @@ var _ = framework.KubeDescribe("Downward API [Serial] [Disruptive] [NodeFeature:
 
 	ginkgo.Context("Downward API tests for local ephemeral storage", func() {
 		ginkgo.BeforeEach(func() {
-			framework.SkipUnlessLocalEphemeralStorageEnabled()
+			e2eskipper.SkipUnlessLocalEphemeralStorageEnabled()
 		})
 
 		ginkgo.It("should provide container's limits.ephemeral-storage and requests.ephemeral-storage as env vars", func() {
