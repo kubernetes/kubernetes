@@ -155,10 +155,8 @@ func TestPolicySingleNumaNodeFilterHints(t *testing.T) {
 		},
 	}
 
-	numaNodes := []int{0, 1, 2, 3}
 	for _, tc := range tcases {
-		policy := NewSingleNumaNodePolicy(numaNodes)
-		actual := policy.(*singleNumaNodePolicy).filterHints(tc.allResources)
+		actual := filterSingleNumaHints(tc.allResources)
 		if !reflect.DeepEqual(tc.expectedResources, actual) {
 			t.Errorf("Test Case: %s", tc.name)
 			t.Errorf("Expected result to be %v, got %v", tc.expectedResources, actual)
