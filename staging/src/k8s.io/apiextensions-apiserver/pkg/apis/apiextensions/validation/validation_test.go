@@ -25,7 +25,6 @@ import (
 	apiextensionsfuzzer "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/fuzzer"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
-	"k8s.io/apiextensions-apiserver/pkg/features"
 	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -33,9 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/component-base/featuregate"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/utils/pointer"
 )
 
@@ -78,12 +74,10 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 		},
 	}
 	tests := []struct {
-		name             string
-		resource         *apiextensions.CustomResourceDefinition
-		requestGV        schema.GroupVersion
-		errors           []validationMatch
-		enabledFeatures  []featuregate.Feature
-		disabledFeatures []featuregate.Feature
+		name      string
+		resource  *apiextensions.CustomResourceDefinition
+		requestGV schema.GroupVersion
+		errors    []validationMatch
 	}{
 		{
 			name: "invalid types allowed via v1beta1",
@@ -1645,8 +1639,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 					StoredVersions: []string{"version"},
 				},
 			},
-			enabledFeatures: []featuregate.Feature{features.CustomResourceDefaulting},
-			requestGV:       apiextensionsv1beta1.SchemeGroupVersion,
+			requestGV: apiextensionsv1beta1.SchemeGroupVersion,
 			errors: []validationMatch{
 				forbidden("spec", "validation", "openAPIV3Schema", "properties[a]", "default"), // disallowed via v1beta1
 			},
@@ -1683,8 +1676,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 					StoredVersions: []string{"version"},
 				},
 			},
-			enabledFeatures: []featuregate.Feature{features.CustomResourceDefaulting},
-			requestGV:       apiextensionsv1.SchemeGroupVersion,
+			requestGV: apiextensionsv1.SchemeGroupVersion,
 		},
 		{
 			name: "x-kubernetes-int-or-string without structural",
@@ -1937,7 +1929,6 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 				required("spec", "validation", "openAPIV3Schema", "properties[a]", "type"),
 				required("spec", "validation", "openAPIV3Schema", "type"),
 			},
-			enabledFeatures: []featuregate.Feature{features.CustomResourceDefaulting},
 		},
 		{
 			name: "defaults with enabled feature gate, structural schema",
@@ -1971,8 +1962,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 					StoredVersions: []string{"version"},
 				},
 			},
-			errors:          []validationMatch{},
-			enabledFeatures: []featuregate.Feature{features.CustomResourceDefaulting},
+			errors: []validationMatch{},
 		},
 		{
 			name: "defaults in value validation with enabled feature gate, structural schema",
@@ -2029,7 +2019,6 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 				forbidden("spec", "validation", "openAPIV3Schema", "properties[a]", "anyOf[0]", "default"),
 				forbidden("spec", "validation", "openAPIV3Schema", "properties[a]", "oneOf[0]", "default"),
 			},
-			enabledFeatures: []featuregate.Feature{features.CustomResourceDefaulting},
 		},
 		{
 			name: "invalid defaults with enabled feature gate, structural schema",
@@ -2203,8 +2192,6 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 				invalid("spec", "validation", "openAPIV3Schema", "properties[e]", "properties[preserveUnknownFields]", "default"),
 				invalid("spec", "validation", "openAPIV3Schema", "properties[e]", "properties[nestedProperties]", "default"),
 			},
-
-			enabledFeatures: []featuregate.Feature{features.CustomResourceDefaulting},
 		},
 		{
 			name: "additionalProperties at resource root",
@@ -2254,7 +2241,6 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 				required("spec", "validation", "openAPIV3Schema", "properties[embedded1]", "properties"),
 				forbidden("spec", "validation", "openAPIV3Schema", "properties[embedded2]", "additionalProperties"),
 			},
-			enabledFeatures: []featuregate.Feature{features.CustomResourceDefaulting},
 		},
 		{
 			// TODO: remove in a follow-up. This blocks is here for easy review.
@@ -2448,7 +2434,6 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 				// Invalid value: wrongly typed
 				invalid("spec", "versions[3]", "schema", "openAPIV3Schema", "properties[embedded]", "properties[metadata]", "properties[name]", "default"),
 			},
-			enabledFeatures: []featuregate.Feature{features.CustomResourceDefaulting},
 		},
 		{
 			name: "default inside additionalSchema",
@@ -2509,7 +2494,6 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 				// Forbidden: must not be set inside additionalProperties applying to object metadata
 				forbidden("spec", "validation", "openAPIV3Schema", "properties[embedded]", "properties[metadata]", "properties[annotations]", "additionalProperties", "default"),
 			},
-			enabledFeatures: []featuregate.Feature{features.CustomResourceDefaulting},
 		},
 		{
 			name: "top-level metadata default",
@@ -2555,7 +2539,6 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 			errors: []validationMatch{
 				forbidden("spec", "validation", "openAPIV3Schema", "properties[metadata]", "default"),
 			},
-			enabledFeatures: []featuregate.Feature{features.CustomResourceDefaulting},
 		},
 		{
 			name: "embedded metadata defaults",
@@ -3937,7 +3920,6 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 				required("spec", "validation", "openAPIV3Schema", "properties[spanning-defaults-with-missing-typemeta]", "default", "embedded", "apiVersion"),
 				required("spec", "validation", "openAPIV3Schema", "properties[spanning-defaults-with-missing-typemeta]", "default", "embedded", "kind"),
 			},
-			enabledFeatures: []featuregate.Feature{features.CustomResourceDefaulting},
 		},
 		{
 			name: "contradicting meta field types",
@@ -4086,18 +4068,11 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 				invalid("spec", "validation", "openAPIV3Schema", "properties[nested]", "properties[invalid]", "properties[kind]", "type"),
 				invalid("spec", "validation", "openAPIV3Schema", "properties[nested]", "properties[invalid]", "properties[metadata]", "type"),
 			},
-			enabledFeatures: []featuregate.Feature{features.CustomResourceDefaulting},
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			for _, gate := range tc.enabledFeatures {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, gate, true)()
-			}
-			for _, gate := range tc.disabledFeatures {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, gate, false)()
-			}
 
 			// duplicate defaulting behaviour
 			if tc.resource.Spec.Conversion != nil && tc.resource.Spec.Conversion.Strategy == apiextensions.WebhookConverter && len(tc.resource.Spec.Conversion.ConversionReviewVersions) == 0 {
@@ -4132,13 +4107,11 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 
 func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 	tests := []struct {
-		name             string
-		old              *apiextensions.CustomResourceDefinition
-		resource         *apiextensions.CustomResourceDefinition
-		requestGV        schema.GroupVersion
-		errors           []validationMatch
-		enabledFeatures  []featuregate.Feature
-		disabledFeatures []featuregate.Feature
+		name      string
+		old       *apiextensions.CustomResourceDefinition
+		resource  *apiextensions.CustomResourceDefinition
+		requestGV schema.GroupVersion
+		errors    []validationMatch
 	}{
 		{
 			name: "invalid type updates allowed via v1beta1",
@@ -5880,9 +5853,8 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 					StoredVersions: []string{"version"},
 				},
 			},
-			requestGV:       apiextensionsv1beta1.SchemeGroupVersion,
-			errors:          []validationMatch{forbidden("spec.validation.openAPIV3Schema.properties[a].default")},
-			enabledFeatures: []featuregate.Feature{features.CustomResourceDefaulting},
+			requestGV: apiextensionsv1beta1.SchemeGroupVersion,
+			errors:    []validationMatch{forbidden("spec.validation.openAPIV3Schema.properties[a].default")},
 		},
 		{
 			name: "setting defaults with enabled feature gate via v1",
@@ -5963,9 +5935,8 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 					StoredVersions: []string{"version"},
 				},
 			},
-			requestGV:       apiextensionsv1.SchemeGroupVersion,
-			errors:          []validationMatch{},
-			enabledFeatures: []featuregate.Feature{features.CustomResourceDefaulting},
+			requestGV: apiextensionsv1.SchemeGroupVersion,
+			errors:    []validationMatch{},
 		},
 		{
 			name: "add default with enabled feature gate, structural schema, without pruning",
@@ -6032,19 +6003,11 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 			errors: []validationMatch{
 				invalid("spec", "preserveUnknownFields"),
 			},
-			enabledFeatures: []featuregate.Feature{features.CustomResourceDefaulting},
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			for _, gate := range tc.enabledFeatures {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, gate, true)()
-			}
-			for _, gate := range tc.disabledFeatures {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, gate, false)()
-			}
-
 			errs := ValidateCustomResourceDefinitionUpdate(tc.resource, tc.old, tc.requestGV)
 			seenErrs := make([]bool, len(errs))
 
