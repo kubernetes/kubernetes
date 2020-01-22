@@ -76,9 +76,6 @@ func (p *singleNumaNodePolicy) mergeProvidersHints(filteredHints [][]TopologyHin
 	// of NUMA Nodes available on this machine.
 	defaultAffinity, _ := bitmask.NewBitMask(p.numaNodes...)
 
-	// Filter to only include don't cares and hints with a single NUMA node.
-	filteredHints = filterSingleNumaHints(filteredHints)
-
 	// Set the bestHint to return from this function as {nil false}.
 	// This will only be returned if no better hint can be found when
 	// merging hints from each hint provider.
@@ -128,7 +125,9 @@ func (p *singleNumaNodePolicy) mergeProvidersHints(filteredHints [][]TopologyHin
 
 func (p *singleNumaNodePolicy) Merge(providersHints []map[string][]TopologyHint) (TopologyHint, lifecycle.PodAdmitResult) {
 	filteredHints := filterProvidersHints(providersHints)
-	hint := p.mergeProvidersHints(filteredHints)
+	// Filter to only include don't cares and hints with a single NUMA node.
+	singleNumaHints := filterSingleNumaHints(filteredHints)
+	hint := p.mergeProvidersHints(singleNumaHints)
 	admit := p.canAdmitPodResult(&hint)
 	return hint, admit
 }
