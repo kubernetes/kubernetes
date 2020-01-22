@@ -391,7 +391,17 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Deleting a ReplicationController")
-		err = f.ClientSet.CoreV1().ReplicationControllers(f.Namespace.Name).Delete(replicationController.Name, nil)
+		// Without the delete options, the object isn't actually
+		// removed until the GC verifies that all children have been
+		// detached. ReplicationControllers default to "orphan", which
+		// is different from most resources. (Why? To preserve a common
+		// workflow from prior to the GC's introduction.)
+		err = f.ClientSet.CoreV1().ReplicationControllers(f.Namespace.Name).Delete(replicationController.Name, &metav1.DeleteOptions{
+			PropagationPolicy: func() *metav1.DeletionPropagation {
+				p := metav1.DeletePropagationBackground
+				return &p
+			}(),
+		})
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Ensuring resource quota status released usage")
