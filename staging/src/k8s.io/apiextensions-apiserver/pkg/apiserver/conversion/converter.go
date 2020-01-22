@@ -44,13 +44,11 @@ var converterMetricFactorySingleton = newConverterMertricFactory()
 // NewCRConverterFactory creates a new CRConverterFactory
 func NewCRConverterFactory(serviceResolver webhook.ServiceResolver, authResolverWrapper webhook.AuthenticationInfoResolverWrapper) (*CRConverterFactory, error) {
 	converterFactory := &CRConverterFactory{}
-	if utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceWebhookConversion) {
-		webhookConverterFactory, err := newWebhookConverterFactory(serviceResolver, authResolverWrapper)
-		if err != nil {
-			return nil, err
-		}
-		converterFactory.webhookConverterFactory = webhookConverterFactory
+	webhookConverterFactory, err := newWebhookConverterFactory(serviceResolver, authResolverWrapper)
+	if err != nil {
+		return nil, err
 	}
+	converterFactory.webhookConverterFactory = webhookConverterFactory
 	return converterFactory, nil
 }
 
@@ -66,9 +64,6 @@ func (m *CRConverterFactory) NewConverter(crd *apiextensionsv1.CustomResourceDef
 	case apiextensionsv1.NoneConverter:
 		converter = &nopConverter{}
 	case apiextensionsv1.WebhookConverter:
-		if !utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceWebhookConversion) {
-			return nil, nil, fmt.Errorf("webhook conversion is disabled on this cluster")
-		}
 		converter, err = m.webhookConverterFactory.NewWebhookConverter(crd)
 		if err != nil {
 			return nil, nil, err
