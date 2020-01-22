@@ -71,63 +71,17 @@ func filterSingleNumaHints(allResourcesHints [][]TopologyHint) [][]TopologyHint 
 	return filteredResourcesHints
 }
 
-func (p *singleNumaNodePolicy) mergeProvidersHints(filteredHints [][]TopologyHint) TopologyHint {
-	// Set the default affinity as an any-numa affinity containing the list
-	// of NUMA Nodes available on this machine.
-	defaultAffinity, _ := bitmask.NewBitMask(p.numaNodes...)
-
-	// Set the bestHint to return from this function as {nil false}.
-	// This will only be returned if no better hint can be found when
-	// merging hints from each hint provider.
-	bestHint := TopologyHint{defaultAffinity, false}
-	iterateAllProviderTopologyHints(filteredHints, func(permutation []TopologyHint) {
-		// Get the NUMANodeAffinity from each hint in the permutation and see if any
-		// of them encode unpreferred allocations.
-		mergedHint := mergePermutation(p.numaNodes, permutation)
-
-		// Only consider mergedHints that result in a NUMANodeAffinity > 0 to
-		// replace the current bestHint.
-		if mergedHint.NUMANodeAffinity.Count() == 0 {
-			return
-		}
-
-		// If the current bestHint is non-preferred and the new mergedHint is
-		// preferred, always choose the preferred hint over the non-preferred one.
-		if mergedHint.Preferred && !bestHint.Preferred {
-			bestHint = mergedHint
-			return
-		}
-
-		// If the current bestHint is preferred and the new mergedHint is
-		// non-preferred, never update bestHint, regardless of mergedHint's
-		// narowness.
-		if !mergedHint.Preferred && bestHint.Preferred {
-			return
-		}
-
-		// If mergedHint and bestHint has the same preference, only consider
-		// mergedHints that have a narrower NUMANodeAffinity than the
-		// NUMANodeAffinity in the current bestHint.
-		if !mergedHint.NUMANodeAffinity.IsNarrowerThan(bestHint.NUMANodeAffinity) {
-			return
-		}
-
-		// In all other cases, update bestHint to the current mergedHint
-		bestHint = mergedHint
-	})
-
-	if bestHint.NUMANodeAffinity.IsEqual(defaultAffinity) {
-		bestHint = TopologyHint{nil, bestHint.Preferred}
-	}
-
-	return bestHint
-}
-
 func (p *singleNumaNodePolicy) Merge(providersHints []map[string][]TopologyHint) (TopologyHint, lifecycle.PodAdmitResult) {
 	filteredHints := filterProvidersHints(providersHints)
 	// Filter to only include don't cares and hints with a single NUMA node.
 	singleNumaHints := filterSingleNumaHints(filteredHints)
-	hint := p.mergeProvidersHints(singleNumaHints)
-	admit := p.canAdmitPodResult(&hint)
-	return hint, admit
+	bestHint := mergeFilteredHints(p.numaNodes, singleNumaHints)
+
+	defaultAffinity, _ := bitmask.NewBitMask(p.numaNodes...)
+	if bestHint.NUMANodeAffinity.IsEqual(defaultAffinity) {
+		bestHint = TopologyHint{nil, bestHint.Preferred}
+	}
+
+	admit := p.canAdmitPodResult(&bestHint)
+	return bestHint, admit
 }
