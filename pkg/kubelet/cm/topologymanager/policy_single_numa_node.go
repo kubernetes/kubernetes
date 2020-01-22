@@ -55,7 +55,7 @@ func (p *singleNumaNodePolicy) canAdmitPodResult(hint *TopologyHint) lifecycle.P
 }
 
 // Return hints that have valid bitmasks with exactly one bit set.
-func (p *singleNumaNodePolicy) filterHints(allResourcesHints [][]TopologyHint) [][]TopologyHint {
+func filterSingleNumaHints(allResourcesHints [][]TopologyHint) [][]TopologyHint {
 	var filteredResourcesHints [][]TopologyHint
 	for _, oneResourceHints := range allResourcesHints {
 		var filtered []TopologyHint
@@ -108,7 +108,7 @@ func (p *singleNumaNodePolicy) mergeProvidersHints(providersHints []map[string][
 	}
 
 	// Filter to only include don't cares and hints with a single NUMA node.
-	allProviderHints = p.filterHints(allProviderHints)
+	allProviderHints = filterSingleNumaHints(allProviderHints)
 
 	// Set the bestHint to return from this function as {nil false}.
 	// This will only be returned if no better hint can be found when
