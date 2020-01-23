@@ -1736,7 +1736,7 @@ k8s.io/kube-aggregator/pkg/registry/apiservice/etcd
 k8s.io/kube-aggregator/pkg/registry/apiservice/rest
 # k8s.io/kube-controller-manager v0.0.0 => ./staging/src/k8s.io/kube-controller-manager
 k8s.io/kube-controller-manager/config/v1alpha1
-# k8s.io/kube-openapi v0.0.0-20191107075043-30be4d16710a => k8s.io/kube-openapi v0.0.0-20191107075043-30be4d16710a
+# k8s.io/kube-openapi v0.0.0-20200121204235-bf4fb3bd569c => k8s.io/kube-openapi v0.0.0-20200121204235-bf4fb3bd569c
 k8s.io/kube-openapi/cmd/openapi-gen
 k8s.io/kube-openapi/cmd/openapi-gen/args
 k8s.io/kube-openapi/pkg/aggregator
@@ -1957,12 +1957,12 @@ sigs.k8s.io/kustomize/pkg/transformers
 sigs.k8s.io/kustomize/pkg/transformers/config
 sigs.k8s.io/kustomize/pkg/transformers/config/defaultconfig
 sigs.k8s.io/kustomize/pkg/types
-# sigs.k8s.io/structured-merge-diff v1.0.1-0.20191108220359-b1b620dd3f06 => sigs.k8s.io/structured-merge-diff v1.0.1-0.20191108220359-b1b620dd3f06
-sigs.k8s.io/structured-merge-diff/fieldpath
-sigs.k8s.io/structured-merge-diff/merge
-sigs.k8s.io/structured-merge-diff/schema
-sigs.k8s.io/structured-merge-diff/typed
-sigs.k8s.io/structured-merge-diff/value
+# sigs.k8s.io/structured-merge-diff/v3 v3.0.0-20200121225636-0fb62c1057dd => sigs.k8s.io/structured-merge-diff/v3 v3.0.0-20200121225636-0fb62c1057dd
+sigs.k8s.io/structured-merge-diff/v3/fieldpath
+sigs.k8s.io/structured-merge-diff/v3/merge
+sigs.k8s.io/structured-merge-diff/v3/schema
+sigs.k8s.io/structured-merge-diff/v3/typed
+sigs.k8s.io/structured-merge-diff/v3/value
 # sigs.k8s.io/yaml v1.1.0 => sigs.k8s.io/yaml v1.1.0
 sigs.k8s.io/yaml
 # vbom.ml/util v0.0.0-20160121211510-db5cfe13f5cc => vbom.ml/util v0.0.0-20160121211510-db5cfe13f5cc
