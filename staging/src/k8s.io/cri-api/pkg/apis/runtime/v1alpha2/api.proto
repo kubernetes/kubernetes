@@ -35,6 +35,40 @@ service RuntimeService {
     // Version returns the runtime name, runtime version, and runtime API version.
     rpc Version(VersionRequest) returns (VersionResponse) {}
 
+    // CreateContainer creates a new container in specified PodSandbox
+    rpc CreateContainer(CreateContainerRequest) returns (CreateContainerResponse) {}
+    // StartContainer starts the container.
+    rpc StartContainer(StartContainerRequest) returns (StartContainerResponse) {}
+    // StopContainer stops a running container with a grace period (i.e., timeout).
+    // This call is idempotent, and must not return an error if the container has
+    // already been stopped.
+    // TODO: what must the runtime do after the grace period is reached?
+    rpc StopContainer(StopContainerRequest) returns (StopContainerResponse) {}
+    // RemoveContainer removes the container. If the container is running, the
+    // container must be forcibly removed.
+    // This call is idempotent, and must not return an error if the container has
+    // already been removed.
+    rpc RemoveContainer(RemoveContainerRequest) returns (RemoveContainerResponse) {}
+    // ListContainers lists all containers by filters.
+    rpc ListContainers(ListContainersRequest) returns (ListContainersResponse) {}
+    // ContainerStatus returns status of the container. If the container is not
+    // present, returns an error.
+    rpc ContainerStatus(ContainerStatusRequest) returns (ContainerStatusResponse) {}
+    // UpdateContainerResources updates ContainerConfig of the container.
+    rpc UpdateContainerResources(UpdateContainerResourcesRequest) returns (UpdateContainerResourcesResponse) {}
+    // ExecSync runs a command in a container synchronously.
+    rpc ExecSync(ExecSyncRequest) returns (ExecSyncResponse) {}
+    // Exec prepares a streaming endpoint to execute a command in the container.
+    rpc Exec(ExecRequest) returns (ExecResponse) {}
+    // Attach prepares a streaming endpoint to attach to a running container.
+    rpc Attach(AttachRequest) returns (AttachResponse) {}
+    // ReopenContainerLog asks runtime to reopen the stdout/stderr log file
+    // for the container. This is often called after the log file has been
+    // rotated. If the container is not running, container runtime can choose
+    // to either create a new log file and return nil, or return an error.
+    // Once it returns error, new container log file MUST NOT be created.
+    rpc ReopenContainerLog(ReopenContainerLogRequest) returns (ReopenContainerLogResponse) {}
+
     // RunPodSandbox creates and starts a pod-level sandbox. Runtimes must ensure
     // the sandbox is in the ready state on success.
     rpc RunPodSandbox(RunPodSandboxRequest) returns (RunPodSandboxResponse) {}
@@ -58,41 +92,6 @@ service RuntimeService {
     rpc PodSandboxStatus(PodSandboxStatusRequest) returns (PodSandboxStatusResponse) {}
     // ListPodSandbox returns a list of PodSandboxes.
     rpc ListPodSandbox(ListPodSandboxRequest) returns (ListPodSandboxResponse) {}
-
-    // CreateContainer creates a new container in specified PodSandbox
-    rpc CreateContainer(CreateContainerRequest) returns (CreateContainerResponse) {}
-    // StartContainer starts the container.
-    rpc StartContainer(StartContainerRequest) returns (StartContainerResponse) {}
-    // StopContainer stops a running container with a grace period (i.e., timeout).
-    // This call is idempotent, and must not return an error if the container has
-    // already been stopped.
-    // TODO: what must the runtime do after the grace period is reached?
-    rpc StopContainer(StopContainerRequest) returns (StopContainerResponse) {}
-    // RemoveContainer removes the container. If the container is running, the
-    // container must be forcibly removed.
-    // This call is idempotent, and must not return an error if the container has
-    // already been removed.
-    rpc RemoveContainer(RemoveContainerRequest) returns (RemoveContainerResponse) {}
-    // ListContainers lists all containers by filters.
-    rpc ListContainers(ListContainersRequest) returns (ListContainersResponse) {}
-    // ContainerStatus returns status of the container. If the container is not
-    // present, returns an error.
-    rpc ContainerStatus(ContainerStatusRequest) returns (ContainerStatusResponse) {}
-    // UpdateContainerResources updates ContainerConfig of the container.
-    rpc UpdateContainerResources(UpdateContainerResourcesRequest) returns (UpdateContainerResourcesResponse) {}
-    // ReopenContainerLog asks runtime to reopen the stdout/stderr log file
-    // for the container. This is often called after the log file has been
-    // rotated. If the container is not running, container runtime can choose
-    // to either create a new log file and return nil, or return an error.
-    // Once it returns error, new container log file MUST NOT be created.
-    rpc ReopenContainerLog(ReopenContainerLogRequest) returns (ReopenContainerLogResponse) {}
-
-    // ExecSync runs a command in a container synchronously.
-    rpc ExecSync(ExecSyncRequest) returns (ExecSyncResponse) {}
-    // Exec prepares a streaming endpoint to execute a command in the container.
-    rpc Exec(ExecRequest) returns (ExecResponse) {}
-    // Attach prepares a streaming endpoint to attach to a running container.
-    rpc Attach(AttachRequest) returns (AttachResponse) {}
     // PortForward prepares a streaming endpoint to forward ports from a PodSandbox.
     rpc PortForward(PortForwardRequest) returns (PortForwardResponse) {}
 
