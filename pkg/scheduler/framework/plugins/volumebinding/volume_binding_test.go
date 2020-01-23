@@ -26,7 +26,6 @@ import (
 	volumescheduling "k8s.io/kubernetes/pkg/controller/volume/scheduling"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
-	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
 )
 
 func TestVolumeBinding(t *testing.T) {
@@ -110,7 +109,7 @@ func TestVolumeBinding(t *testing.T) {
 		t.Run(item.name, func(t *testing.T) {
 			nodeInfo := schedulernodeinfo.NewNodeInfo()
 			nodeInfo.SetNode(item.node)
-			fakeVolumeBinder := volumebinder.NewFakeVolumeBinder(item.volumeBinderConfig)
+			fakeVolumeBinder := volumescheduling.NewFakeVolumeBinder(item.volumeBinderConfig)
 			p := &VolumeBinding{
 				binder: fakeVolumeBinder,
 			}

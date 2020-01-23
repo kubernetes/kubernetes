@@ -30,12 +30,12 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog"
+	volumescheduling "k8s.io/kubernetes/pkg/controller/volume/scheduling"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
-	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
 )
 
 const (
@@ -78,7 +78,7 @@ type framework struct {
 
 	clientSet       clientset.Interface
 	informerFactory informers.SharedInformerFactory
-	volumeBinder    *volumebinder.VolumeBinder
+	volumeBinder    volumescheduling.SchedulerVolumeBinder
 
 	metricsRecorder *metricsRecorder
 
@@ -119,7 +119,7 @@ type frameworkOptions struct {
 	informerFactory      informers.SharedInformerFactory
 	snapshotSharedLister schedulerlisters.SharedLister
 	metricsRecorder      *metricsRecorder
-	volumeBinder         *volumebinder.VolumeBinder
+	volumeBinder         volumescheduling.SchedulerVolumeBinder
 	runAllFilters        bool
 }
 
@@ -163,7 +163,7 @@ func withMetricsRecorder(recorder *metricsRecorder) Option {
 }
 
 // WithVolumeBinder sets volume binder for the scheduling framework.
-func WithVolumeBinder(binder *volumebinder.VolumeBinder) Option {
+func WithVolumeBinder(binder volumescheduling.SchedulerVolumeBinder) Option {
 	return func(o *frameworkOptions) {
 		o.volumeBinder = binder
 	}
@@ -881,7 +881,7 @@ func (f *framework) SharedInformerFactory() informers.SharedInformerFactory {
 }
 
 // VolumeBinder returns the volume binder used by scheduler.
-func (f *framework) VolumeBinder() *volumebinder.VolumeBinder {
+func (f *framework) VolumeBinder() volumescheduling.SchedulerVolumeBinder {
 	return f.volumeBinder
 }
 

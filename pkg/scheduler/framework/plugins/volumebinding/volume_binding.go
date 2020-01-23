@@ -21,14 +21,14 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	volumescheduling "k8s.io/kubernetes/pkg/controller/volume/scheduling"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
-	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
 )
 
 // VolumeBinding is a plugin that binds pod volumes in scheduling.
 type VolumeBinding struct {
-	binder *volumebinder.VolumeBinder
+	binder volumescheduling.SchedulerVolumeBinder
 }
 
 var _ framework.FilterPlugin = &VolumeBinding{}
@@ -79,7 +79,7 @@ func (pl *VolumeBinding) Filter(ctx context.Context, cs *framework.CycleState, p
 		return nil
 	}
 
-	unboundSatisfied, boundSatisfied, err := pl.binder.Binder.FindPodVolumes(pod, node)
+	unboundSatisfied, boundSatisfied, err := pl.binder.FindPodVolumes(pod, node)
 
 	if err != nil {
 		return framework.NewStatus(framework.Error, err.Error())

@@ -37,6 +37,7 @@ import (
 	policylisters "k8s.io/client-go/listers/policy/v1beta1"
 	"k8s.io/client-go/util/workqueue"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	volumescheduling "k8s.io/kubernetes/pkg/controller/volume/scheduling"
 	extenderv1 "k8s.io/kubernetes/pkg/scheduler/apis/extender/v1"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
@@ -45,7 +46,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	"k8s.io/kubernetes/pkg/scheduler/util"
-	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
 	utiltrace "k8s.io/utils/trace"
 )
 
@@ -137,7 +137,7 @@ type genericScheduler struct {
 	framework                framework.Framework
 	extenders                []SchedulerExtender
 	nodeInfoSnapshot         *internalcache.Snapshot
-	volumeBinder             *volumebinder.VolumeBinder
+	volumeBinder             volumescheduling.SchedulerVolumeBinder
 	pvcLister                corelisters.PersistentVolumeClaimLister
 	pdbLister                policylisters.PodDisruptionBudgetLister
 	disablePreemption        bool
@@ -1108,7 +1108,7 @@ func NewGenericScheduler(
 	nodeInfoSnapshot *internalcache.Snapshot,
 	framework framework.Framework,
 	extenders []SchedulerExtender,
-	volumeBinder *volumebinder.VolumeBinder,
+	volumeBinder volumescheduling.SchedulerVolumeBinder,
 	pvcLister corelisters.PersistentVolumeClaimLister,
 	pdbLister policylisters.PodDisruptionBudgetLister,
 	disablePreemption bool,

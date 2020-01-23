@@ -13,12 +13,12 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1",
     visibility = ["//visibility:public"],
     deps = [
+        "//pkg/controller/volume/scheduling:go_default_library",
         "//pkg/scheduler/apis/config:go_default_library",
         "//pkg/scheduler/listers:go_default_library",
         "//pkg/scheduler/metrics:go_default_library",
         "//pkg/scheduler/nodeinfo:go_default_library",
         "//pkg/scheduler/util:go_default_library",
-        "//pkg/scheduler/volumebinder:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",

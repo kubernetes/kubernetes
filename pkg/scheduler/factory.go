@@ -36,6 +36,7 @@ import (
 	policylisters "k8s.io/client-go/listers/policy/v1beta1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog"
+	volumescheduling "k8s.io/kubernetes/pkg/controller/volume/scheduling"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -50,7 +51,6 @@ import (
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	cachedebugger "k8s.io/kubernetes/pkg/scheduler/internal/cache/debugger"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
-	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
 )
 
 const (
@@ -83,7 +83,7 @@ type Configurator struct {
 	hardPodAffinitySymmetricWeight int32
 
 	// Handles volume binding decisions
-	volumeBinder *volumebinder.VolumeBinder
+	volumeBinder volumescheduling.SchedulerVolumeBinder
 
 	// Disable pod preemption or not.
 	disablePreemption bool
