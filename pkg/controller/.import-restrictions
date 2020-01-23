@@ -74,6 +74,7 @@
         "k8s.io/apimachinery/pkg/version",
         "k8s.io/api/imagepolicy/v1alpha1",
         "k8s.io/apiserver/pkg/admission",
+        "k8s.io/apiserver/pkg/server/dynamiccertificates",
         "k8s.io/apiserver/pkg/storage",
         "k8s.io/api/batch/v2alpha1",
         "k8s.io/apiserver/pkg/registry/rest",
