@@ -993,7 +993,7 @@ func TestApplyConvertsManagedFieldsVersion(t *testing.T) {
 		Time:       actual.Time,
 		FieldsType: "FieldsV1",
 		FieldsV1: &metav1.FieldsV1{
-			Raw: []byte(`{"f:metadata":{"f:labels":{"f:sidecar_version":{}}},"f:spec":{"f:template":{"f:spec":{"f:containers":{"k:{\"name\":\"sidecar\"}":{"f:image":{},"f:name":{},".":{}}}}}}}`),
+			Raw: []byte(`{"f:metadata":{"f:labels":{"f:sidecar_version":{}}},"f:spec":{"f:template":{"f:spec":{"f:containers":{"k:{\"name\":\"sidecar\"}":{".":{},"f:image":{},"f:name":{}}}}}}}`),
 		},
 	}
 
