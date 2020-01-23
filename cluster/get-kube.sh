@@ -125,8 +125,15 @@ function create_cluster {
 # Get default service account credentials of the VM.
 GCE_METADATA_INTERNAL="http://metadata.google.internal/computeMetadata/v1/instance"
 function get-credentials {
-  curl "${GCE_METADATA_INTERNAL}/service-accounts/default/token" -H "Metadata-Flavor: Google" -s | python -c \
-    'import sys; import json; print(json.loads(sys.stdin.read())["access_token"])'
+  local token=''
+  # If a default credential is set, we should use it instead of relying
+  # on VM credentials (Workload Identity)
+  token="$(gcloud auth application-default print-access-token || echo '')"
+  if [[ -z "${token}" ]] && [[ $(valid-storage-scope) ]]; then
+    token="$(curl "${GCE_METADATA_INTERNAL}/service-accounts/default/token" -H "Metadata-Flavor: Google" -s | python -c \
+      'import sys; import json; print(json.loads(sys.stdin.read())["access_token"])' || echo '')"
+  fi
+  echo "${token}"
 }
 
 function valid-storage-scope {
@@ -242,7 +249,7 @@ if "${need_download}"; then
     # if the url belongs to GCS API we should use oauth2_token in the headers
     curl_headers=""
     if { [[ "${KUBERNETES_PROVIDER:-gce}" == "gce" ]] || [[ "${KUBERNETES_PROVIDER}" == "gke" ]] ; } &&
-       [[ "$kubernetes_tar_url" =~ ^https://storage.googleapis.com.* ]] && valid-storage-scope ; then
+       [[ "$kubernetes_tar_url" =~ ^https://storage.googleapis.com.* ]]; then
       curl_headers="Authorization: Bearer $(get-credentials)"
     fi
     curl ${curl_headers:+-H "${curl_headers}"} -fL --retry 3 --keepalive-time 2 "${kubernetes_tar_url}" -o "${file}"
