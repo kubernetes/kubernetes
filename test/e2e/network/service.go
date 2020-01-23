@@ -2494,6 +2494,68 @@ var _ = SIGDescribe("Services", func() {
 		framework.ExpectNoError(verifyServeHostnameServiceDown(cs, host, svcDisabledIP, servicePort))
 	})
 
+	ginkgo.It("should implement service.kubernetes.io/endpoint-controller-name", func() {
+		// this test uses e2essh.NodeSSHHosts that does not work if a Node only reports LegacyHostIP
+		e2eskipper.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
+		// this test does not work if the Node does not support SSH Key
+		e2eskipper.SkipUnlessSSHKeyPresent()
+
+		ns := f.Namespace.Name
+		numPods, _ := 3, defaultServeHostnameServicePort
+		serviceEndpoointNameLabels := map[string]string{"service.kubernetes.io/endpoint-controller-name": "foo-bar"}
+
+		// We will create 2 services to test creating services in both states and also dynamic updates
+		// svcDisabled: Created with the label, will always be disabled. We create this early and
+		//              test again late to make sure it never becomes available.
+		// svcToggled: Created without the label then the label is toggled verifying reachability at each step.
+
+		ginkgo.By("creating endpoint-disabled in namespace " + ns)
+		svcDisabled := getServeHostnameService("endpoint-disabled")
+		svcDisabled.ObjectMeta.Labels = serviceEndpoointNameLabels
+		_, svcDisabledIP, err := StartServeHostnameService(cs, svcDisabled, ns, numPods)
+		framework.ExpectNoError(err, "failed to create replication controller with service: %s in the namespace: %s", svcDisabledIP, ns)
+
+		ginkgo.By("creating service in namespace " + ns)
+		svcToggled := getServeHostnameService("service-proxy-toggled")
+		_, svcToggledIP, err := StartServeHostnameService(cs, svcToggled, ns, numPods)
+		framework.ExpectNoError(err, "failed to create replication controller with service: %s in the namespace: %s", svcToggledIP, ns)
+
+		jig := e2eservice.NewTestJig(cs, ns, svcToggled.ObjectMeta.Name)
+
+		hosts, err := e2essh.NodeSSHHosts(cs)
+		framework.ExpectNoError(err, "failed to find external/internal IPs for every node")
+		if len(hosts) == 0 {
+			framework.Failf("No ssh-able nodes")
+		}
+
+		ginkgo.By("verifying service has endpoints")
+		framework.ExpectNoError(validateEndpoints(cs, ns, svcToggled.ObjectMeta.Name))
+
+		ginkgo.By("verifying endpoint-disabled has no endpoint")
+		framework.ExpectNoError(validateNoEndpoints(cs, ns, svcDisabled.ObjectMeta.Name))
+
+		ginkgo.By("adding endpoint-controller-name label")
+		_, err = jig.UpdateService(func(svc *v1.Service) {
+			svc.ObjectMeta.Labels = serviceEndpoointNameLabels
+		})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("verifying service is not up")
+		framework.ExpectNoError(validateNoEndpoints(cs, ns, svcDisabled.ObjectMeta.Name))
+
+		ginkgo.By("removing endpoint-controller-name annotation")
+		_, err = jig.UpdateService(func(svc *v1.Service) {
+			svc.ObjectMeta.Labels = nil
+		})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("verifying service has endpoints")
+		framework.ExpectNoError(validateEndpoints(cs, ns, svcToggled.ObjectMeta.Name))
+
+		ginkgo.By("verifying service-disabled is still not up")
+		framework.ExpectNoError(validateNoEndpoints(cs, ns, svcDisabled.ObjectMeta.Name))
+	})
+
 	ginkgo.It("should implement service.kubernetes.io/headless", func() {
 		// this test uses e2essh.NodeSSHHosts that does not work if a Node only reports LegacyHostIP
 		e2eskipper.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
@@ -3341,4 +3403,27 @@ func validateEndpointsPorts(c clientset.Interface, namespace, serviceName string
 		framework.Logf("Can't list pod debug info: %v", err)
 	}
 	return fmt.Errorf("Timed out waiting for service %s in namespace %s to expose endpoints %v (%v elapsed)", serviceName, namespace, expectedEndpoints, framework.ServiceStartTimeout)
+}
+
+// validateNoEndpoints validates that the given service exists without any endpoints
+func validateNoEndpoints(c clientset.Interface, namespace, serviceName string) error {
+	ep, err := c.CoreV1().Endpoints(namespace).Get(serviceName, metav1.GetOptions{})
+	if err != nil && len(ep.Subsets) == 0 {
+		return nil
+	}
+	portsByPodUID := e2eendpoints.GetContainerPortsByPodUID(ep)
+	return fmt.Errorf("Unexpected endpoints: found %v, %v", portsByPodUID, err)
+}
+
+// validateNoEndpoints validates that the given service exists without any endpoints
+func validateEndpoints(c clientset.Interface, namespace, serviceName string) error {
+	ep, err := c.CoreV1().Endpoints(namespace).Get(serviceName, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("Unexpected error: %v", err)
+	}
+
+	if len(ep.Subsets) > 0 {
+		return nil
+	}
+	return fmt.Errorf("Unexpected endpoints: no endpoints found")
 }
