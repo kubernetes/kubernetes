@@ -203,6 +203,12 @@ var ErrWaitTimeout = errors.New("timed out waiting for the condition")
 // if the loop should be aborted.
 type ConditionFunc func() (done bool, err error)
 
+// runConditionWithCrashProtection runs a ConditionFunc with crash protection
+func runConditionWithCrashProtection(condition ConditionFunc) (bool, error) {
+	defer runtime.HandleCrash()
+	return condition()
+}
+
 // Backoff holds parameters applied to a Backoff function.
 type Backoff struct {
 	// The initial duration.
@@ -289,7 +295,7 @@ func contextForChannel(parentCh <-chan struct{}) (context.Context, context.Cance
 // In all other cases, ErrWaitTimeout is returned.
 func ExponentialBackoff(backoff Backoff, condition ConditionFunc) error {
 	for backoff.Steps > 0 {
-		if ok, err := condition(); err != nil || ok {
+		if ok, err := runConditionWithCrashProtection(condition); err != nil || ok {
 			return err
 		}
 		if backoff.Steps == 1 {
@@ -335,7 +341,7 @@ func PollImmediate(interval, timeout time.Duration, condition ConditionFunc) err
 }
 
 func pollImmediateInternal(wait WaitFunc, condition ConditionFunc) error {
-	done, err := condition()
+	done, err := runConditionWithCrashProtection(condition)
 	if err != nil {
 		return err
 	}
@@ -364,7 +370,7 @@ func PollInfinite(interval time.Duration, condition ConditionFunc) error {
 // Some intervals may be missed if the condition takes too long or the time
 // window is too short.
 func PollImmediateInfinite(interval time.Duration, condition ConditionFunc) error {
-	done, err := condition()
+	done, err := runConditionWithCrashProtection(condition)
 	if err != nil {
 		return err
 	}
@@ -431,7 +437,7 @@ func WaitFor(wait WaitFunc, fn ConditionFunc, done <-chan struct{}) error {
 	for {
 		select {
 		case _, open := <-c:
-			ok, err := fn()
+			ok, err := runConditionWithCrashProtection(fn)
 			if err != nil {
 				return err
 			}
