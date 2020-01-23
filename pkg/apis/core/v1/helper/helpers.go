@@ -395,22 +395,37 @@ type taintsFilterFunc func(*v1.Taint) bool
 
 // TolerationsTolerateTaintsWithFilter checks if given tolerations tolerates
 // all the taints that apply to the filter in given taint list.
+// DEPRECATED: Please use FindMatchingUntoleratedTaint instead.
 func TolerationsTolerateTaintsWithFilter(tolerations []v1.Toleration, taints []v1.Taint, applyFilter taintsFilterFunc) bool {
-	if len(taints) == 0 {
-		return true
-	}
+	_, isUntolerated := FindMatchingUntoleratedTaint(taints, tolerations, applyFilter)
+	return !isUntolerated
+}
 
-	for i := range taints {
-		if applyFilter != nil && !applyFilter(&taints[i]) {
+// FindMatchingUntoleratedTaint checks if the given tolerations tolerates
+// all the filtered taints, and returns the first taint without a toleration
+func FindMatchingUntoleratedTaint(taints []v1.Taint, tolerations []v1.Toleration, inclusionFilter taintsFilterFunc) (v1.Taint, bool) {
+	filteredTaints := getFilteredTaints(taints, inclusionFilter)
+	for _, taint := range filteredTaints {
+		if !TolerationsTolerateTaint(tolerations, &taint) {
+			return taint, true
+		}
+	}
+	return v1.Taint{}, false
+}
+
+// getFilteredTaints returns a list of taints satisfying the filter predicate
+func getFilteredTaints(taints []v1.Taint, inclusionFilter taintsFilterFunc) []v1.Taint {
+	if inclusionFilter == nil {
+		return taints
+	}
+	filteredTaints := []v1.Taint{}
+	for _, taint := range taints {
+		if !inclusionFilter(&taint) {
 			continue
 		}
-
-		if !TolerationsTolerateTaint(tolerations, &taints[i]) {
-			return false
-		}
+		filteredTaints = append(filteredTaints, taint)
 	}
-
-	return true
+	return filteredTaints
 }
 
 // Returns true and list of Tolerations matching all Taints if all are tolerated, or false otherwise.
