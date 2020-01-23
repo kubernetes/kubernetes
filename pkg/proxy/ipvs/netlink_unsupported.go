@@ -61,3 +61,5 @@ func (h *emptyHandle) ListBindAddress(devName string) ([]string, error) {
 func (h *emptyHandle) GetLocalAddresses(dev, filterDev string) (sets.String, error) {
 	return nil, fmt.Errorf("netlink is not supported in this platform")
 }
+
+var _ NetLinkHandle = &emptyHandle{}

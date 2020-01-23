@@ -11,6 +11,7 @@ go_test(
     srcs = [
         "graceful_termination_test.go",
         "ipset_test.go",
+        "netlink_test.go",
         "proxier_test.go",
     ],
     embed = [":go_default_library"],

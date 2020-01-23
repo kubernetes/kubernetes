@@ -270,19 +270,32 @@ type realIPGetter struct {
 }
 
 // NodeIPs returns all LOCAL type IP addresses from host which are taken as the Node IPs of NodePort service.
-// It will list source IP exists in local route table with `kernel` protocol type, and filter out IPVS proxier
+// It will list every IP address of the host network devices, and filter out IPVS proxier
 // created dummy device `kube-ipvs0` For example,
-// $ ip route show table local type local proto kernel
-// 10.0.0.1 dev kube-ipvs0  scope host  src 10.0.0.1
-// 10.0.0.10 dev kube-ipvs0  scope host  src 10.0.0.10
-// 10.0.0.252 dev kube-ipvs0  scope host  src 10.0.0.252
-// 100.106.89.164 dev eth0  scope host  src 100.106.89.164
-// 127.0.0.0/8 dev lo  scope host  src 127.0.0.1
-// 127.0.0.1 dev lo  scope host  src 127.0.0.1
-// 172.17.0.1 dev docker0  scope host  src 172.17.0.1
-// 192.168.122.1 dev virbr0  scope host  src 192.168.122.1
-// Then filter out dev==kube-ipvs0, and cut the unique src IP fields,
-// Node IP set: [100.106.89.164, 127.0.0.1, 192.168.122.1]
+//$ ip addr show
+//1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
+//    inet 127.0.0.1/8 scope host lo
+//       valid_lft forever preferred_lft forever
+//2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UP group default qlen 1000
+//    inet 192.168.1.46/24 brd 192.168.1.255 scope global noprefixroute enp3s0
+//       valid_lft forever preferred_lft forever
+//    inet 192.168.1.47/24 scope global secondary enp3s0
+//       valid_lft forever preferred_lft forever
+//4: docker0: <NO-CARRIER,BROADCAST,MULTICAST,UP> mtu 1500 qdisc noqueue state DOWN group default
+//    inet 172.17.0.1/16 brd 172.17.255.255 scope global docker0
+//       valid_lft forever preferred_lft forever
+//5: kube-ipvs0: <BROADCAST,NOARP> mtu 1500 qdisc noop state DOWN group default
+//    inet 10.0.0.1/32 brd 10.0.0.1 scope global kube-ipvs0
+//       valid_lft forever preferred_lft forever
+//    inet 10.0.0.10/32 brd 10.0.0.10 scope global kube-ipvs0
+//       valid_lft forever preferred_lft forever
+//    inet 10.0.0.241/32 brd 10.0.0.241 scope global kube-ipvs0
+//       valid_lft forever preferred_lft forever
+//6: cbr0: <BROADCAST,MULTICAST,PROMISC,UP,LOWER_UP> mtu 1500 qdisc htb state UP group default qlen 1000
+//    inet 10.1.0.1/24 scope global cbr0
+//       valid_lft forever preferred_lft forever
+// Then filter out dev==kube-ipvs0, and aggregate all other IP addresses,
+// Node IP set: [10.1.0.1 127.0.0.1 172.17.0.1 192.168.1.46 192.168.1.47]
 func (r *realIPGetter) NodeIPs() (ips []net.IP, err error) {
 	// Pass in empty filter device name for list all LOCAL type addresses.
 	nodeAddress, err := r.nl.GetLocalAddresses("", DefaultDummyDevice)

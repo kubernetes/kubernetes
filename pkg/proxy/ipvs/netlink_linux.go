@@ -123,72 +123,77 @@ func (h *netlinkHandle) ListBindAddress(devName string) ([]string, error) {
 	return ips, nil
 }
 
-// GetLocalAddresses lists all LOCAL type IP addresses from host based on filter device.
-// If dev is not specified, it's equivalent to exec:
-// $ ip route show table local type local proto kernel
-// 10.0.0.1 dev kube-ipvs0  scope host  src 10.0.0.1
-// 10.0.0.10 dev kube-ipvs0  scope host  src 10.0.0.10
-// 10.0.0.252 dev kube-ipvs0  scope host  src 10.0.0.252
-// 100.106.89.164 dev eth0  scope host  src 100.106.89.164
-// 127.0.0.0/8 dev lo  scope host  src 127.0.0.1
-// 127.0.0.1 dev lo  scope host  src 127.0.0.1
-// 172.17.0.1 dev docker0  scope host  src 172.17.0.1
-// 192.168.122.1 dev virbr0  scope host  src 192.168.122.1
-// Then cut the unique src IP fields,
-// --> result set: [10.0.0.1, 10.0.0.10, 10.0.0.252, 100.106.89.164, 127.0.0.1, 192.168.122.1]
-
-// If dev is specified, it's equivalent to exec:
-// $ ip route show table local type local proto kernel dev kube-ipvs0
-// 10.0.0.1  scope host  src 10.0.0.1
-// 10.0.0.10  scope host  src 10.0.0.10
-// Then cut the unique src IP fields,
-// --> result set: [10.0.0.1, 10.0.0.10]
-
-// If filterDev is specified, the result will discard route of specified device and cut src from other routes.
+// GetLocalAddresses lists LOCAL type IP addresses by iterating over network devices and getting their IP addresses.
+// If dev is not specified, all LOCAL type IP addresses of host network devices will be returned.
+// If dev is specified, only LOCAL type IP addresses of dev will be returned.
+// If filterDev is specified, the result will discard IP addresses of filterDev.
 func (h *netlinkHandle) GetLocalAddresses(dev, filterDev string) (sets.String, error) {
-	chosenLinkIndex, filterLinkIndex := -1, -1
+	var ifaces []net.Interface
+	var err error
+	var filterIfaceIndex = -1
+
 	if dev != "" {
-		link, err := h.LinkByName(dev)
+		// get specified interface by name
+		iface, err := net.InterfaceByName(dev)
 		if err != nil {
-			return nil, fmt.Errorf("error get device %s, err: %v", filterDev, err)
+			return nil, fmt.Errorf("error get device %s, err: %v", dev, err)
 		}
-		chosenLinkIndex = link.Attrs().Index
-	} else if filterDev != "" {
-		link, err := h.LinkByName(filterDev)
+		ifaces = []net.Interface{*iface}
+	} else {
+		// list all interfaces
+		ifaces, err = net.Interfaces()
+		if err != nil {
+			return nil, fmt.Errorf("error list all interfaces: %v", err)
+		}
+	}
+
+	if filterDev != "" {
+		iface, err := net.InterfaceByName(filterDev)
 		if err != nil {
 			return nil, fmt.Errorf("error get filter device %s, err: %v", filterDev, err)
 		}
-		filterLinkIndex = link.Attrs().Index
+		filterIfaceIndex = iface.Index
 	}
 
-	routeFilter := &netlink.Route{
-		Table:    unix.RT_TABLE_LOCAL,
-		Type:     unix.RTN_LOCAL,
-		Protocol: unix.RTPROT_KERNEL,
-	}
-	filterMask := netlink.RT_FILTER_TABLE | netlink.RT_FILTER_TYPE | netlink.RT_FILTER_PROTOCOL
-
-	// find chosen device
-	if chosenLinkIndex != -1 {
-		routeFilter.LinkIndex = chosenLinkIndex
-		filterMask |= netlink.RT_FILTER_OIF
-	}
-	routes, err := h.RouteListFiltered(netlink.FAMILY_ALL, routeFilter, filterMask)
-	if err != nil {
-		return nil, fmt.Errorf("error list route table, err: %v", err)
-	}
 	res := sets.NewString()
-	for _, route := range routes {
-		if route.LinkIndex == filterLinkIndex {
+
+	// iterate over each interface
+	for _, iface := range ifaces {
+		// skip filterDev
+		if iface.Index == filterIfaceIndex {
 			continue
 		}
-		if h.isIPv6 {
-			if route.Dst.IP.To4() == nil && !route.Dst.IP.IsLinkLocalUnicast() {
-				res.Insert(route.Dst.IP.String())
+		addrs, err := iface.Addrs()
+		if err != nil {
+			return nil, fmt.Errorf("error get IP addresses of interface %s: %v", iface.Name, err)
+		}
+		// iterate over addresses on each interface
+		for _, addr := range addrs {
+			var ip net.IP
+			switch v := addr.(type) {
+			case *net.IPNet:
+				ip = v.IP
+			case *net.IPAddr:
+				ip = v.IP
 			}
-		} else if route.Src != nil {
-			res.Insert(route.Src.String())
+			if ip == nil || ip.IsLinkLocalUnicast() {
+				continue
+			}
+			if h.isIPv6 {
+				if ip.To4() == nil {
+					// insert IPv6 addresses
+					res.Insert(ip.String())
+				}
+			} else {
+				if ip.To4() != nil {
+					// insert IPv4 addresses
+					res.Insert(ip.String())
+				}
+			}
 		}
 	}
+
 	return res, nil
 }
+
+var _ NetLinkHandle = &netlinkHandle{}
