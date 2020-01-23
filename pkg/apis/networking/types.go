@@ -254,7 +254,22 @@ type IngressSpec struct {
 	// no rule matches, all traffic is sent to the default backend.
 	// +optional
 	Rules []IngressRule
+
+	// Class references an IngressClass resource in kube-system. This is used
+	// by the cluster Ingress controllers to determine which controller operates
+	// on this resource.
+	Class IngressClass
 	// TODO: Add the ability to specify load-balancer IP through claims
+}
+
+// IngressClass represents the class of the Ingress, referenced by the
+// ingress.spec.
+type IngressClass struct {
+	metav1.TypeMeta
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+	// +optional
+	metav1.ObjectMeta
 }
 
 // IngressTLS describes the transport layer security associated with an Ingress.
