@@ -12,8 +12,8 @@ go_library(
     deps = [
         "//pkg/kubelet/dockershim:go_default_library",
         "//pkg/kubelet/util:go_default_library",
-        "//staging/src/k8s.io/cri-api/pkg/apis/runtime/v1alpha2:go_default_library",
         "//vendor/google.golang.org/grpc:go_default_library",
+        "//vendor/k8s.io/cri-api/pkg/apis/runtime/v1alpha2:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ],
 )

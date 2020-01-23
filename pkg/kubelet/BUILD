@@ -139,12 +139,12 @@ go_library(
         "//staging/src/k8s.io/client-go/util/flowcontrol:go_default_library",
         "//staging/src/k8s.io/cloud-provider:go_default_library",
         "//staging/src/k8s.io/cloud-provider/api:go_default_library",
-        "//staging/src/k8s.io/cri-api/pkg/apis:go_default_library",
-        "//staging/src/k8s.io/cri-api/pkg/apis/runtime/v1alpha2:go_default_library",
         "//staging/src/k8s.io/kubelet/pkg/apis/pluginregistration/v1:go_default_library",
         "//third_party/forked/golang/expansion:go_default_library",
         "//vendor/github.com/golang/groupcache/lru:go_default_library",
         "//vendor/github.com/google/cadvisor/info/v1:go_default_library",
+        "//vendor/k8s.io/cri-api/pkg/apis:go_default_library",
+        "//vendor/k8s.io/cri-api/pkg/apis/runtime/v1alpha2:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
         "//vendor/k8s.io/utils/integer:go_default_library",
@@ -257,10 +257,10 @@ go_test(
         "//vendor/k8s.io/utils/mount:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:android": [
-            "//staging/src/k8s.io/cri-api/pkg/apis/runtime/v1alpha2:go_default_library",
+            "//vendor/k8s.io/cri-api/pkg/apis/runtime/v1alpha2:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:linux": [
-            "//staging/src/k8s.io/cri-api/pkg/apis/runtime/v1alpha2:go_default_library",
+            "//vendor/k8s.io/cri-api/pkg/apis/runtime/v1alpha2:go_default_library",
         ],
         "//conditions:default": [],
     }),

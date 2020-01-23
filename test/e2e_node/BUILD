@@ -43,8 +43,6 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/component-base/featuregate:go_default_library",
-        "//staging/src/k8s.io/cri-api/pkg/apis:go_default_library",
-        "//staging/src/k8s.io/cri-api/pkg/apis/runtime/v1alpha2:go_default_library",
         "//staging/src/k8s.io/kubelet/config/v1beta1:go_default_library",
         "//test/e2e/common:go_default_library",
         "//test/e2e/framework:go_default_library",
@@ -58,6 +56,8 @@ go_library(
         "//vendor/github.com/coreos/go-systemd/util:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
         "//vendor/github.com/onsi/gomega:go_default_library",
+        "//vendor/k8s.io/cri-api/pkg/apis:go_default_library",
+        "//vendor/k8s.io/cri-api/pkg/apis/runtime/v1alpha2:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:android": [
@@ -188,8 +188,6 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/watch:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/client-go/tools/watch:go_default_library",
-        "//staging/src/k8s.io/cri-api/pkg/apis:go_default_library",
-        "//staging/src/k8s.io/cri-api/pkg/apis/runtime/v1alpha2:go_default_library",
         "//test/e2e/common:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//test/e2e/framework/gpu:go_default_library",
@@ -213,6 +211,8 @@ go_test(
         "//vendor/github.com/onsi/gomega/gstruct:go_default_library",
         "//vendor/github.com/onsi/gomega/types:go_default_library",
         "//vendor/github.com/prometheus/common/model:go_default_library",
+        "//vendor/k8s.io/cri-api/pkg/apis:go_default_library",
+        "//vendor/k8s.io/cri-api/pkg/apis/runtime/v1alpha2:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
         "//vendor/k8s.io/utils/mount:go_default_library",
     ] + select({

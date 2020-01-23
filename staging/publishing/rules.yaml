@@ -1479,34 +1479,6 @@ rules:
     - repository: code-generator
       branch: release-1.17
 
-- destination: cri-api
-  library: true
-  branches:
-  - source:
-      branch: master
-      dir: staging/src/k8s.io/cri-api
-    name: master
-  - source:
-      branch: release-1.15
-      dir: staging/src/k8s.io/cri-api
-    name: release-1.15
-    go: 1.12.17
-  - source:
-      branch: release-1.16
-      dir: staging/src/k8s.io/cri-api
-    name: release-1.16
-    go: 1.13.9
-  - source:
-      branch: release-1.17
-      dir: staging/src/k8s.io/cri-api
-    name: release-1.17
-    go: 1.13.9
-  - source:
-      branch: release-1.18
-      dir: staging/src/k8s.io/cri-api
-    name: release-1.18
-    go: 1.13.9
-
 - destination: kubectl
   library: true
   branches:

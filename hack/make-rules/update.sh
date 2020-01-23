@@ -46,7 +46,6 @@ fi
 BASH_TARGETS="
 	update-generated-protobuf
 	update-codegen
-	update-generated-runtime
 	update-generated-device-plugin
 	update-generated-api-compatibility-data
 	update-generated-docs

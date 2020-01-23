@@ -469,6 +469,7 @@ filegroup(
         "//vendor/honnef.co/go/tools/stylecheck:all-srcs",
         "//vendor/honnef.co/go/tools/unused:all-srcs",
         "//vendor/honnef.co/go/tools/version:all-srcs",
+        "//vendor/k8s.io/cri-api/pkg/apis:all-srcs",
         "//vendor/k8s.io/gengo/args:all-srcs",
         "//vendor/k8s.io/gengo/examples/deepcopy-gen/generators:all-srcs",
         "//vendor/k8s.io/gengo/examples/defaulter-gen/generators:all-srcs",

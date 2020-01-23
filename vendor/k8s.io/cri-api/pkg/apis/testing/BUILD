@@ -11,8 +11,8 @@ go_library(
     importpath = "k8s.io/cri-api/pkg/apis/testing",
     visibility = ["//visibility:public"],
     deps = [
-        "//staging/src/k8s.io/cri-api/pkg/apis/runtime/v1alpha2:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
+        "//vendor/k8s.io/cri-api/pkg/apis/runtime/v1alpha2:go_default_library",
     ],
 )
 
