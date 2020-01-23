@@ -574,8 +574,18 @@ var _ = SIGDescribe("Garbage collector", func() {
 		if err := deployClient.Delete(deployment.ObjectMeta.Name, deleteOptions); err != nil {
 			framework.Failf("failed to delete the deployment: %v", err)
 		}
-		ginkgo.By("wait for 30 seconds to see if the garbage collector mistakenly deletes the rs")
-		time.Sleep(30 * time.Second)
+		ginkgo.By("wait for deployment deletion to see if the garbage collector mistakenly deletes the rs")
+		err = wait.PollImmediate(500*time.Millisecond, 1*time.Minute, func() (bool, error) {
+			dList, err := deployClient.List(metav1.ListOptions{})
+			if err != nil {
+				return false, fmt.Errorf("failed to list deployments: %v", err)
+			}
+			return len(dList.Items) == 0, nil
+		})
+		if err != nil {
+			framework.Failf("Failed to wait for the Deployment to be deleted: %v", err)
+		}
+		// Once the deployment object is gone, we'll know the GC has finished performing any relevant actions.
 		objects := map[string]int{"Deployments": 0, "ReplicaSets": 1, "Pods": 2}
 		ok, err := verifyRemainingObjects(f, objects)
 		if err != nil {
