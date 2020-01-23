@@ -316,6 +316,13 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 
 	// Initialize CPU manager
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CPUManager) {
+		cpusetMountPoint, found := subsystems.MountPoints["cpuset"]
+		if !found || len(cpusetMountPoint) == 0 {
+			return nil, fmt.Errorf("cpuset cgroup mount point not found")
+		}
+
+		cpusetPath := path.Join(cpusetMountPoint, cgroupManager.Name(cgroupRoot))
+
 		cm.cpuManager, err = cpumanager.NewManager(
 			nodeConfig.ExperimentalCPUManagerPolicy,
 			nodeConfig.ExperimentalCPUManagerReconcilePeriod,
@@ -325,6 +332,7 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 			cm.GetNodeAllocatableReservation(),
 			nodeConfig.KubeletRootDir,
 			cm.topologyManager,
+			cpusetPath,
 		)
 		if err != nil {
 			klog.Errorf("failed to initialize cpu manager: %v", err)

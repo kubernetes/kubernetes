@@ -18,6 +18,9 @@ package cpumanager
 
 import (
 	"fmt"
+	"io/ioutil"
+	"path"
+	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog"
@@ -75,6 +78,8 @@ type staticPolicy struct {
 	topology *topology.CPUTopology
 	// set of CPUs that is not available for exclusive assignment
 	reserved cpuset.CPUSet
+	// set of CPUs that is available in the top-level cpuset cgroup
+	available cpuset.CPUSet
 	// topology manager reference to get container Topology affinity
 	affinity topologymanager.Store
 }
@@ -82,11 +87,35 @@ type staticPolicy struct {
 // Ensure staticPolicy implements Policy interface
 var _ Policy = &staticPolicy{}
 
+func readCPUSet(cgroupRoot string) (cpuset.CPUSet, error) {
+	fileName := path.Join(cgroupRoot, "cpuset.cpus")
+
+	data, err := ioutil.ReadFile(fileName)
+	if err != nil {
+		return cpuset.NewCPUSet(), err
+	}
+
+	cpus, err := cpuset.Parse(strings.TrimSpace(string(data)))
+	if err != nil {
+		return cpuset.NewCPUSet(), err
+	}
+
+	return cpus, nil
+}
+
 // NewStaticPolicy returns a CPU manager policy that does not change CPU
 // assignments for exclusively pinned guaranteed containers after the main
 // container process starts.
-func NewStaticPolicy(topology *topology.CPUTopology, numReservedCPUs int, reservedCPUs cpuset.CPUSet, affinity topologymanager.Store) (Policy, error) {
-	allCPUs := topology.CPUDetails.CPUs()
+func NewStaticPolicy(topology *topology.CPUTopology, numReservedCPUs int, reservedCPUs cpuset.CPUSet, affinity topologymanager.Store, cgroupPath string) (Policy, error) {
+	// It can be that the the cgroup root (provided with --cgroup-root kubelet
+	// command line option) has an already restricted set of CPUs. This means
+	// that the "reserved" set needs to contain the CPUs on which we can't
+	// run any containers.
+	available, err := readCPUSet(cgroupPath)
+	if err != nil {
+		return nil, err
+	}
+
 	var reserved cpuset.CPUSet
 	if reservedCPUs.Size() > 0 {
 		reserved = reservedCPUs
@@ -96,7 +125,7 @@ func NewStaticPolicy(topology *topology.CPUTopology, numReservedCPUs int, reserv
 		//
 		// For example: Given a system with 8 CPUs available and HT enabled,
 		// if numReservedCPUs=2, then reserved={0,4}
-		reserved, _ = takeByTopology(topology, allCPUs, numReservedCPUs)
+		reserved, _ = takeByTopology(topology, available, numReservedCPUs)
 	}
 
 	if reserved.Size() != numReservedCPUs {
@@ -107,9 +136,10 @@ func NewStaticPolicy(topology *topology.CPUTopology, numReservedCPUs int, reserv
 	klog.Infof("[cpumanager] reserved %d CPUs (\"%s\") not available for exclusive assignment", reserved.Size(), reserved)
 
 	return &staticPolicy{
-		topology: topology,
-		reserved: reserved,
-		affinity: affinity,
+		topology:  topology,
+		reserved:  reserved,
+		available: available,
+		affinity:  affinity,
 	}, nil
 }
 
@@ -135,8 +165,7 @@ func (p *staticPolicy) validateState(s state.State) error {
 			return fmt.Errorf("default cpuset cannot be empty")
 		}
 		// state is empty initialize
-		allCPUs := p.topology.CPUDetails.CPUs()
-		s.SetDefaultCPUSet(allCPUs)
+		s.SetDefaultCPUSet(p.available)
 		return nil
 	}
 
@@ -175,9 +204,9 @@ func (p *staticPolicy) validateState(s state.State) error {
 		}
 	}
 	totalKnownCPUs = totalKnownCPUs.UnionAll(tmpCPUSets)
-	if !totalKnownCPUs.Equals(p.topology.CPUDetails.CPUs()) {
+	if !totalKnownCPUs.Equals(p.available) {
 		return fmt.Errorf("current set of available CPUs \"%s\" doesn't match with CPUs in state \"%s\"",
-			p.topology.CPUDetails.CPUs().String(), totalKnownCPUs.String())
+			p.available, totalKnownCPUs.String())
 	}
 
 	return nil
