@@ -5,7 +5,6 @@ pkg/controller/deployment
 pkg/controller/garbagecollector
 pkg/controller/nodeipam
 pkg/controller/podautoscaler
-pkg/controller/podgc
 pkg/controller/replicaset
 pkg/controller/resourcequota
 pkg/controller/statefulset
