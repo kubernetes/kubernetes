@@ -77,7 +77,7 @@ func GetServicePrincipalToken(config *AzureAuthConfig, env *azure.Environment) (
 			env.ServiceManagementEndpoint)
 	}
 
-	oauthConfig, err := adal.NewOAuthConfigWithAPIVersion(env.ActiveDirectoryEndpoint, config.TenantID, nil)
+	oauthConfig, err := adal.NewOAuthConfig(env.ActiveDirectoryEndpoint, config.TenantID)
 	if err != nil {
 		return nil, fmt.Errorf("creating the OAuth config: %v", err)
 	}
