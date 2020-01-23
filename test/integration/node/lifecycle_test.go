@@ -28,13 +28,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/controller/nodelifecycle"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/plugin/pkg/admission/defaulttolerationseconds"
 	"k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction"
 	pluginapi "k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction/apis/podtolerationrestriction"
@@ -109,9 +106,6 @@ func TestTaintBasedEvictions(t *testing.T) {
 		},
 	}
 
-	// Enable TaintBasedEvictions
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TaintBasedEvictions, true)()
-
 	// Build admission chain handler.
 	podTolerations := podtolerationrestriction.NewPodTolerationsPlugin(&pluginapi.Configuration{})
 	admission := admission.NewChainHandler(
@@ -156,7 +150,6 @@ func TestTaintBasedEvictions(t *testing.T) {
 				50,               // Large cluster threshold
 				0.55,             // Unhealthy zone threshold
 				true,             // Run taint manager
-				true,             // Use taint based evictions
 			)
 			if err != nil {
 				t.Errorf("Failed to create node controller: %v", err)
