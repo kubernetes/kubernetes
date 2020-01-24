@@ -29,7 +29,6 @@ pkg/volume/local
 pkg/volume/portworx
 pkg/volume/quobyte
 pkg/volume/rbd
-pkg/volume/scaleio
 pkg/volume/storageos
 pkg/volume/util
 pkg/volume/util/fsquota
