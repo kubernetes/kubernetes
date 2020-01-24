@@ -22,53 +22,11 @@ import (
 )
 
 const (
-	// Every feature gate should add method here following this template:
-	//
-	// // owner: @username
-	// // alpha: v1.4
-	// MyFeature() bool
-
-	// owner: @sttts, @nikhita
-	// alpha: v1.8
-	// beta: v1.9
-	// GA: v1.16
-	//
-	// CustomResourceValidation is a list of validation methods for CustomResources
-	CustomResourceValidation featuregate.Feature = "CustomResourceValidation"
-
-	// owner: @roycaihw, @sttts
-	// alpha: v1.14
-	// beta: v1.15
-	// GA: v1.16
-	//
-	// CustomResourcePublishOpenAPI enables publishing of CRD OpenAPI specs.
-	CustomResourcePublishOpenAPI featuregate.Feature = "CustomResourcePublishOpenAPI"
-
-	// owner: @sttts, @nikhita
-	// alpha: v1.10
-	// beta: v1.11
-	// GA: v1.16
-	//
-	// CustomResourceSubresources defines the subresources for CustomResources
-	CustomResourceSubresources featuregate.Feature = "CustomResourceSubresources"
-
-	// owner: @mbohlool, @roycaihw
-	// alpha: v1.13
-	// beta: v1.15
-	// GA: v1.16
-	//
-	// CustomResourceWebhookConversion defines the webhook conversion for Custom Resources.
-	CustomResourceWebhookConversion featuregate.Feature = "CustomResourceWebhookConversion"
-
-	// owner: @sttts
-	// alpha: v1.15
-	// beta: v1.16
-	// GA: v1.17
-	//
-	// CustomResourceDefaulting enables OpenAPI defaulting in CustomResources.
-	//
-	// TODO: remove in 1.18
-	CustomResourceDefaulting featuregate.Feature = "CustomResourceDefaulting"
+// Every feature gate should add method here following this template:
+//
+// // owner: @username
+// // alpha: v1.4
+// MyFeature() bool
 )
 
 func init() {
@@ -78,10 +36,4 @@ func init() {
 // defaultKubernetesFeatureGates consists of all known Kubernetes-specific feature keys.
 // To add a new feature, define a key for it above and add it here. The features will be
 // available throughout Kubernetes binaries.
-var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
-	CustomResourceValidation:        {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
-	CustomResourceSubresources:      {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
-	CustomResourceWebhookConversion: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
-	CustomResourcePublishOpenAPI:    {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
-	CustomResourceDefaulting:        {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
-}
+var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{}
