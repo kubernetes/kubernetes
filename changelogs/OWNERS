@@ -1,0 +1,22 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+filters:
+  ".*":
+    reviewers:
+      - brendandburns
+      - dchen1107
+      - lavalamp
+      - smarterclayton
+      - thockin
+      - liggitt
+    approvers:
+      - bgrant0607
+      - brendandburns
+      - dchen1107
+      - lavalamp
+      - smarterclayton
+      - thockin
+      - wojtek-t
+      - liggitt
+    emeritus_approvers:
+      - jbeda
