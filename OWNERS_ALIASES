@@ -269,6 +269,7 @@ aliases:
   sig-instrumentation-approvers:
     - piosz
     - brancz
+    - serathius
   sig-instrumentation-reviewers:
     - kawych
     - s-urbaniak
