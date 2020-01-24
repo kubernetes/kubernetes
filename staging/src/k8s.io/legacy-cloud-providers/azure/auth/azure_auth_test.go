@@ -97,7 +97,7 @@ func TestGetServicePrincipalToken(t *testing.T) {
 	token, err := GetServicePrincipalToken(config, env)
 	assert.NoError(t, err)
 
-	oauthConfig, err := adal.NewOAuthConfigWithAPIVersion(env.ActiveDirectoryEndpoint, config.TenantID, nil)
+	oauthConfig, err := adal.NewOAuthConfig(env.ActiveDirectoryEndpoint, config.TenantID)
 	assert.NoError(t, err)
 
 	spt, err := adal.NewServicePrincipalToken(*oauthConfig, config.AADClientID, config.AADClientSecret, env.ServiceManagementEndpoint)
