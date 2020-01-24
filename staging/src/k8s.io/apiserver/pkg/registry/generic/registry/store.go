@@ -975,6 +975,11 @@ func (e *Store) Delete(ctx context.Context, name string, deleteValidation rest.V
 	return out, true, err
 }
 
+// DeleteReturnsDeletedObject implements the rest.MayReturnFullObjectDeleter interface
+func (e *Store) DeleteReturnsDeletedObject() bool {
+	return e.ReturnDeletedObject
+}
+
 // DeleteCollection removes all items returned by List with a given ListOptions from storage.
 //
 // DeleteCollection is currently NOT atomic. It can happen that only subset of objects
