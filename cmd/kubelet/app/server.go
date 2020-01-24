@@ -643,7 +643,18 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, featureGate f
 		}
 
 		var reservedSystemCPUs cpuset.CPUSet
+		var staticCPUs cpuset.CPUSet
 		var errParse error
+
+		if s.StaticCPUs != "" {
+			staticCPUs, errParse = cpuset.Parse(s.StaticCPUs)
+			if errParse != nil {
+				klog.Infof("Invalid StaticCPUs \"%s\"", s.StaticCPUs)
+				return errParse
+			}
+		} else {
+			staticCPUs = cpuset.NewCPUSet()
+		}
 		if s.ReservedSystemCPUs != "" {
 			reservedSystemCPUs, errParse = cpuset.Parse(s.ReservedSystemCPUs)
 			if errParse != nil {
@@ -726,6 +737,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, featureGate f
 					KubeReserved:             kubeReserved,
 					SystemReserved:           systemReserved,
 					ReservedSystemCPUs:       reservedSystemCPUs,
+					StaticCPUs:               staticCPUs,
 					HardEvictionThresholds:   hardEvictionThresholds,
 				},
 				QOSReserved:                           *experimentalQOSReserved,

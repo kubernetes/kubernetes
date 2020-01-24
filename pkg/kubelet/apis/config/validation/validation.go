@@ -153,6 +153,12 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration) error 
 		}
 	}
 
+	if kc.StaticCPUs != "" {
+		if _, err := cpuset.Parse(kc.StaticCPUs); err != nil {
+			allErrors = append(allErrors, fmt.Errorf("unable to parse --static-cpus, error: %v", err))
+		}
+	}
+
 	if err := validateKubeletOSConfiguration(kc); err != nil {
 		allErrors = append(allErrors, err)
 	}
