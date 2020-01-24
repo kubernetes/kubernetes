@@ -42,7 +42,7 @@ const etcdTimeout = 2 * time.Second
 
 // Exponential backoff for etcd operations
 var etcdBackoff = wait.Backoff{
-	Steps:    9,
+	Steps:    11,
 	Duration: 50 * time.Millisecond,
 	Factor:   2.0,
 	Jitter:   0.1,
@@ -128,9 +128,9 @@ func NewFromCluster(client clientset.Interface, certificatesDir string) (*Client
 }
 
 // dialTimeout is the timeout for failing to establish a connection.
-// It is set to 20 seconds as times shorter than that will cause TLS connections to fail
+// It is set to >20 seconds as times shorter than that will cause TLS connections to fail
 // on heavily loaded arm64 CPUs (issue #64649)
-const dialTimeout = 20 * time.Second
+const dialTimeout = 40 * time.Second
 
 // Sync synchronizes client's endpoints with the known endpoints from the etcd membership.
 func (c *Client) Sync() error {
