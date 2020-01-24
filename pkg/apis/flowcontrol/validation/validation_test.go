@@ -1013,14 +1013,10 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 				Spec: flowcontrol.PriorityLevelConfigurationSpec{
 					Type: flowcontrol.PriorityLevelEnablementLimited,
 					Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
-						AssuredConcurrencyShares: 100,
+						AssuredConcurrencyShares: 1,
 						LimitResponse: flowcontrol.LimitResponse{
-							Type: flowcontrol.LimitResponseTypeQueue,
-							Queuing: &flowcontrol.QueuingConfiguration{
-								Queues:           128,
-								HandSize:         6,
-								QueueLengthLimit: 100,
-							}}}},
+							Type: flowcontrol.LimitResponseTypeReject,
+						}}},
 			},
 			expectedErrors: field.ErrorList{},
 		},
