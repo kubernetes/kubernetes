@@ -322,6 +322,7 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 			machineInfo,
 			numaNodeInfo,
 			nodeConfig.NodeAllocatableConfig.ReservedSystemCPUs,
+			nodeConfig.NodeAllocatableConfig.StaticCPUs,
 			cm.GetNodeAllocatableReservation(),
 			nodeConfig.KubeletRootDir,
 			cm.topologyManager,

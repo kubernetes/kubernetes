@@ -77,6 +77,8 @@ type staticPolicy struct {
 	reserved cpuset.CPUSet
 	// topology manager reference to get container Topology affinity
 	affinity topologymanager.Store
+	// restricted set of CPUs that are available for exclusive assignment
+	staticCPUs cpuset.CPUSet
 }
 
 // Ensure staticPolicy implements Policy interface
@@ -85,7 +87,7 @@ var _ Policy = &staticPolicy{}
 // NewStaticPolicy returns a CPU manager policy that does not change CPU
 // assignments for exclusively pinned guaranteed containers after the main
 // container process starts.
-func NewStaticPolicy(topology *topology.CPUTopology, numReservedCPUs int, reservedCPUs cpuset.CPUSet, affinity topologymanager.Store) (Policy, error) {
+func NewStaticPolicy(topology *topology.CPUTopology, numReservedCPUs int, reservedCPUs cpuset.CPUSet, staticCPUs cpuset.CPUSet, affinity topologymanager.Store) (Policy, error) {
 	allCPUs := topology.CPUDetails.CPUs()
 	var reserved cpuset.CPUSet
 	if reservedCPUs.Size() > 0 {
@@ -105,11 +107,13 @@ func NewStaticPolicy(topology *topology.CPUTopology, numReservedCPUs int, reserv
 	}
 
 	klog.Infof("[cpumanager] reserved %d CPUs (\"%s\") not available for exclusive assignment", reserved.Size(), reserved)
+	klog.Infof("[cpumanager] staticCPUs %d: (\"%s\") only available for exclusive assignment", staticCPUs.Size(), staticCPUs)
 
 	return &staticPolicy{
 		topology: topology,
 		reserved: reserved,
 		affinity: affinity,
+		staticCPUs:   staticCPUs,
 	}, nil
 }
 
@@ -185,7 +189,11 @@ func (p *staticPolicy) validateState(s state.State) error {
 
 // assignableCPUs returns the set of unassigned CPUs minus the reserved set.
 func (p *staticPolicy) assignableCPUs(s state.State) cpuset.CPUSet {
-	return s.GetDefaultCPUSet().Difference(p.reserved)
+	var nonStaticCPUs cpuset.CPUSet
+	if !p.staticCPUs.IsEmpty() {
+	    nonStaticCPUs = s.GetDefaultCPUSet().Difference(p.staticCPUs)
+	}
+	return s.GetDefaultCPUSet().Difference(p.reserved).Difference(nonStaticCPUs)
 }
 
 func (p *staticPolicy) AddContainer(s state.State, pod *v1.Pod, container *v1.Container) error {
