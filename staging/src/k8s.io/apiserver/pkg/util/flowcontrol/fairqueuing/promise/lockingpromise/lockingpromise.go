@@ -23,12 +23,12 @@ import (
 	"k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/promise"
 )
 
-// promisoid is the data and reading behavior common to all the
-// promise-like abstractions implemented here.  This implementation is
-// based on a condition variable.  This implementation tracks active
-// goroutines: the given counter is decremented for a goroutine
-// waiting for this varible to be set and incremented when such a
-// goroutine is unblocked.
+// promisoid is the data and behavior common to all the promise-like
+// abstractions implemented here.  This implementation is based on a
+// condition variable.  This implementation tracks active goroutines:
+// the given counter is decremented for a goroutine waiting for this
+// varible to be set and incremented when such a goroutine is
+// unblocked.
 type promisoid struct {
 	lock          sync.Locker
 	cond          sync.Cond
@@ -63,6 +63,16 @@ func (pr *promisoid) IsSetLocked() bool {
 	return pr.isSet
 }
 
+func (pr *promisoid) SetLocked(value interface{}) {
+	pr.isSet = true
+	pr.value = value
+	if pr.waitingCount > 0 {
+		pr.activeCounter.Add(pr.waitingCount)
+		pr.waitingCount = 0
+		pr.cond.Broadcast()
+	}
+}
+
 type writeOnce struct {
 	promisoid
 }
@@ -88,13 +98,7 @@ func (wr *writeOnce) SetLocked(value interface{}) bool {
 	if wr.isSet {
 		return false
 	}
-	wr.isSet = true
-	wr.value = value
-	if wr.waitingCount > 0 {
-		wr.activeCounter.Add(wr.waitingCount)
-		wr.waitingCount = 0
-		wr.cond.Broadcast()
-	}
+	wr.promisoid.SetLocked(value)
 	return true
 }
 
@@ -117,14 +121,4 @@ func (wr *writeMultiple) Set(value interface{}) {
 	wr.lock.Lock()
 	defer wr.lock.Unlock()
 	wr.SetLocked(value)
-}
-
-func (wr *writeMultiple) SetLocked(value interface{}) {
-	wr.isSet = true
-	wr.value = value
-	if wr.waitingCount > 0 {
-		wr.activeCounter.Add(wr.waitingCount)
-		wr.waitingCount = 0
-		wr.cond.Broadcast()
-	}
 }

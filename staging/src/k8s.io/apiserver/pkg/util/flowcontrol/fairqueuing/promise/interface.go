@@ -16,8 +16,10 @@ limitations under the License.
 
 package promise
 
-// This file defines interfaces for promsies and futures and related
-// things.
+// This file defines interfaces for promises and futures and related
+// things.  These are about coordination among multiple goroutines and
+// so are safe for concurrent calls --- although moderated in some
+// cases by a requirement that the caller hold a certain lock.
 
 // Readable represents a variable that is initially not set and later
 // becomes set.  Some instances may be set to multiple values in
@@ -39,10 +41,16 @@ type Readable interface {
 type LockingReadable interface {
 	Readable
 
-	// GetLocked is like Get but the caller must already hold the lock
+	// GetLocked is like Get but the caller must already hold the
+	// lock.  GetLocked may release, and later re-acquire, the lock
+	// any number of times.  Get may acquire, and later release, the
+	// lock any number of times.
 	GetLocked() interface{}
 
-	// IsSetLocked is like IsSet but the caller must already hold the lock
+	// IsSetLocked is like IsSet but the caller must already hold the
+	// lock.  IsSetLocked may release, and later re-acquire, the lock
+	// any number of times.  IsSet may acquire, and later release, the
+	// lock any number of times.
 	IsSetLocked() bool
 }
 
@@ -52,7 +60,8 @@ type WriteOnceOnly interface {
 	// Set normally writes a value into this variable, unblocks every
 	// goroutine waiting for this variable to have a value, and
 	// returns true.  In the unhappy case that this variable is
-	// already set, this method returns false.
+	// already set, this method returns false without modifying the
+	// variable's value.
 	Set(interface{}) bool
 }
 
@@ -64,14 +73,23 @@ type WriteOnce interface {
 	WriteOnceOnly
 }
 
+// LockingWriteOnceOnly is a WriteOnceOnly whose implementation is
+// protected by a lock.
+type LockingWriteOnceOnly interface {
+	WriteOnceOnly
+
+	// SetLocked is like Set but the caller must already hold the
+	// lock.  SetLocked may release, and later re-acquire, the lock
+	// any number of times.  Set may acquire, and later release, the
+	// lock any number of times
+	SetLocked(interface{}) bool
+}
+
 // LockingWriteOnce is a WriteOnce whose implementation is protected
 // by a lock.
 type LockingWriteOnce interface {
 	LockingReadable
-	WriteOnceOnly
-
-	// SetLocked is like Set but the caller must already hold the lock
-	SetLocked(interface{}) bool
+	LockingWriteOnceOnly
 }
 
 // WriteMultipleOnly represents a variable that is initially not set
@@ -91,12 +109,21 @@ type WriteMultiple interface {
 	WriteMultipleOnly
 }
 
+// LockingWriteMultipleOnly is a WriteMultipleOnly whose
+// implementation is protected by a lock.
+type LockingWriteMultipleOnly interface {
+	WriteMultipleOnly
+
+	// SetLocked is like Set but the caller must already hold the
+	// lock.  SetLocked may release, and later re-acquire, the lock
+	// any number of times.  Set may acquire, and later release, the
+	// lock any number of times
+	SetLocked(interface{})
+}
+
 // LockingWriteMultiple is a WriteMultiple whose implementation is
 // protected by a lock.
 type LockingWriteMultiple interface {
 	LockingReadable
-	WriteMultipleOnly
-
-	// SetLocked is like Set but the caller must already hold the lock
-	SetLocked(interface{})
+	LockingWriteMultipleOnly
 }
