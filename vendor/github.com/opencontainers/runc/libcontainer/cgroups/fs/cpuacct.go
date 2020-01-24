@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/opencontainers/runc/libcontainer/cgroups"
+	"github.com/opencontainers/runc/libcontainer/cgroups/fscommon"
 	"github.com/opencontainers/runc/libcontainer/configs"
 	"github.com/opencontainers/runc/libcontainer/system"
 )
@@ -51,7 +52,7 @@ func (s *CpuacctGroup) GetStats(path string, stats *cgroups.Stats) error {
 		return err
 	}
 
-	totalUsage, err := getCgroupParamUint(path, "cpuacct.usage")
+	totalUsage, err := fscommon.GetCgroupParamUint(path, "cpuacct.usage")
 	if err != nil {
 		return err
 	}
@@ -85,8 +86,8 @@ func getCpuUsageBreakdown(path string) (uint64, uint64, error) {
 		return 0, 0, err
 	}
 	fields := strings.Fields(string(data))
-	if len(fields) != 4 {
-		return 0, 0, fmt.Errorf("failure - %s is expected to have 4 fields", filepath.Join(path, cgroupCpuacctStat))
+	if len(fields) < 4 {
+		return 0, 0, fmt.Errorf("failure - %s is expected to have at least 4 fields", filepath.Join(path, cgroupCpuacctStat))
 	}
 	if fields[0] != userField {
 		return 0, 0, fmt.Errorf("unexpected field %q in %q, expected %q", fields[0], cgroupCpuacctStat, userField)
