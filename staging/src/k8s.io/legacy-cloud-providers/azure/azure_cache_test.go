@@ -202,3 +202,23 @@ func TestCacheNoConcurrentGet(t *testing.T) {
 	assert.Equal(t, 1, dataSource.called)
 	assert.Equal(t, val, v, "cache should get correct data")
 }
+
+func TestCacheForceRefresh(t *testing.T) {
+	key := "key1"
+	val := &fakeDataObj{}
+	data := map[string]*fakeDataObj{
+		key: val,
+	}
+	dataSource, cache := newFakeCache(t)
+	dataSource.set(data)
+
+	v, err := cache.Get(key, cacheReadTypeDefault)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, dataSource.called)
+	assert.Equal(t, val, v, "cache should get correct data")
+
+	v, err = cache.Get(key, cacheReadTypeForceRefresh)
+	assert.NoError(t, err)
+	assert.Equal(t, 2, dataSource.called)
+	assert.Equal(t, val, v, "should refetch unexpired data as forced refresh")
+}
