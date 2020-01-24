@@ -29,6 +29,8 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	errorsutil "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	certutil "k8s.io/client-go/util/cert"
@@ -90,8 +92,8 @@ func getInitConfigurationFromCluster(kubeconfigDir string, client clientset.Inte
 		if err := getNodeRegistration(kubeconfigDir, client, &initcfg.NodeRegistration); err != nil {
 			return nil, errors.Wrap(err, "failed to get node registration")
 		}
-		// gets the APIEndpoint for the current node from then ClusterStatus in the kubeadm-config ConfigMap
-		if err := getAPIEndpoint(configMap.Data, initcfg.NodeRegistration.Name, &initcfg.LocalAPIEndpoint); err != nil {
+		// gets the APIEndpoint for the current node
+		if err := getAPIEndpoint(client, initcfg.NodeRegistration.Name, &initcfg.LocalAPIEndpoint); err != nil {
 			return nil, errors.Wrap(err, "failed to getAPIEndpoint")
 		}
 	} else {
@@ -181,23 +183,83 @@ func getNodeNameFromKubeletConfig(kubeconfigDir string) (string, error) {
 	return strings.TrimPrefix(cert.Subject.CommonName, constants.NodesUserPrefix), nil
 }
 
-// getAPIEndpoint returns the APIEndpoint for the current node
-func getAPIEndpoint(data map[string]string, nodeName string, apiEndpoint *kubeadmapi.APIEndpoint) error {
-	// gets the ClusterStatus from kubeadm-config
-	clusterStatus, err := UnmarshalClusterStatus(data)
+func getAPIEndpoint(client clientset.Interface, nodeName string, apiEndpoint *kubeadmapi.APIEndpoint) error {
+	return getAPIEndpointWithBackoff(client, nodeName, apiEndpoint, constants.StaticPodMirroringDefaultRetry)
+}
+
+func getAPIEndpointWithBackoff(client clientset.Interface, nodeName string, apiEndpoint *kubeadmapi.APIEndpoint, backoff wait.Backoff) error {
+	var err error
+	var errs []error
+
+	if err = getAPIEndpointFromPodAnnotation(client, nodeName, apiEndpoint, backoff); err == nil {
+		return nil
+	}
+	errs = append(errs, errors.WithMessagef(err, "could not retrieve API endpoints for node %q using pod annotations", nodeName))
+
+	// NB: this is a fallback when there is no annotation found in the API server pod that contains
+	//     the API endpoint, and so we fallback to reading the ClusterStatus struct present in the
+	//     kubeadm-config ConfigMap. This can happen for example, when performing the first
+	//     `kubeadm upgrade apply` and `kubeadm upgrade node` cycle on the whole cluster. This logic
+	//     will be removed when the cluster status struct is removed from the kubeadm-config ConfigMap.
+	if err = getAPIEndpointFromClusterStatus(client, nodeName, apiEndpoint); err == nil {
+		return nil
+	}
+	errs = append(errs, errors.WithMessagef(err, "could not retrieve API endpoints for node %q using cluster status", nodeName))
+
+	return errorsutil.NewAggregate(errs)
+}
+
+func getAPIEndpointFromPodAnnotation(client clientset.Interface, nodeName string, apiEndpoint *kubeadmapi.APIEndpoint, backoff wait.Backoff) error {
+	var rawAPIEndpoint string
+	var lastErr error
+	// Let's tolerate some unexpected transient failures from the API server or load balancers. Also, if
+	// static pods were not yet mirrored into the API server we want to wait for this propagation.
+	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
+		rawAPIEndpoint, lastErr = getRawAPIEndpointFromPodAnnotationWithoutRetry(client, nodeName)
+		return lastErr == nil, nil
+	})
 	if err != nil {
 		return err
 	}
-
-	// gets the APIEndpoint for the current machine from the ClusterStatus
-	e, ok := clusterStatus.APIEndpoints[nodeName]
-	if !ok {
-		return errors.New("failed to get APIEndpoint information for this node")
+	parsedAPIEndpoint, err := kubeadmapi.APIEndpointFromString(rawAPIEndpoint)
+	if err != nil {
+		return errors.Wrapf(err, "could not parse API endpoint for node %q", nodeName)
 	}
-
-	apiEndpoint.AdvertiseAddress = e.AdvertiseAddress
-	apiEndpoint.BindPort = e.BindPort
+	*apiEndpoint = parsedAPIEndpoint
 	return nil
+}
+
+func getRawAPIEndpointFromPodAnnotationWithoutRetry(client clientset.Interface, nodeName string) (string, error) {
+	podList, err := client.CoreV1().Pods(metav1.NamespaceSystem).List(
+		context.TODO(),
+		metav1.ListOptions{
+			FieldSelector: fmt.Sprintf("spec.nodeName=%s", nodeName),
+			LabelSelector: fmt.Sprintf("component=%s,tier=%s", constants.KubeAPIServer, constants.ControlPlaneTier),
+		},
+	)
+	if err != nil {
+		return "", errors.Wrap(err, "could not retrieve list of pods to determine api server endpoints")
+	}
+	if len(podList.Items) != 1 {
+		return "", errors.Errorf("API server pod for node name %q has %d entries, only one was expected", nodeName, len(podList.Items))
+	}
+	if apiServerEndpoint, ok := podList.Items[0].Annotations[constants.KubeAPIServerAdvertiseAddressEndpointAnnotationKey]; ok {
+		return apiServerEndpoint, nil
+	}
+	return "", errors.Errorf("API server pod for node name %q hasn't got a %q annotation, cannot retrieve API endpoint", nodeName, constants.KubeAPIServerAdvertiseAddressEndpointAnnotationKey)
+}
+
+// TODO: remove after 1.20, when the ClusterStatus struct is removed from the kubeadm-config ConfigMap.
+func getAPIEndpointFromClusterStatus(client clientset.Interface, nodeName string, apiEndpoint *kubeadmapi.APIEndpoint) error {
+	clusterStatus, err := GetClusterStatus(client)
+	if err != nil {
+		return errors.Wrap(err, "could not retrieve cluster status")
+	}
+	if statusAPIEndpoint, ok := clusterStatus.APIEndpoints[nodeName]; ok {
+		*apiEndpoint = statusAPIEndpoint
+		return nil
+	}
+	return errors.Errorf("could not find node %s in the cluster status", nodeName)
 }
 
 // GetClusterStatus returns the kubeadm cluster status read from the kubeadm-config ConfigMap

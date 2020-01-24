@@ -19,6 +19,7 @@ package etcd
 import (
 	"context"
 	"crypto/tls"
+	"fmt"
 	"net"
 	"net/url"
 	"path/filepath"
@@ -30,6 +31,7 @@ import (
 	"go.etcd.io/etcd/clientv3"
 	"go.etcd.io/etcd/pkg/transport"
 	"google.golang.org/grpc"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog"
@@ -86,23 +88,16 @@ func New(endpoints []string, ca, cert, key string) (*Client, error) {
 	return &client, nil
 }
 
-// NewFromCluster creates an etcd client for the etcd endpoints defined in the ClusterStatus value stored in
-// the kubeadm-config ConfigMap in kube-system namespace.
-// Once created, the client synchronizes client's endpoints with the known endpoints from the etcd membership API (reality check).
+// NewFromCluster creates an etcd client for the etcd endpoints present in etcd member list. In order to compose this information,
+// it will first discover at least one etcd endpoint to connect to. Once created, the client synchronizes client's endpoints with
+// the known endpoints from the etcd membership API, since it is the authoritative source of truth for the list of available members.
 func NewFromCluster(client clientset.Interface, certificatesDir string) (*Client, error) {
-	// etcd is listening the API server advertise address on each control-plane node
-	// so it is necessary to get the list of endpoints from kubeadm cluster status before connecting
+	// Discover at least one etcd endpoint to connect to by inspecting the existing etcd pods
 
-	// Gets the cluster status
-	clusterStatus, err := config.GetClusterStatus(client)
+	// Get the list of etcd endpoints
+	endpoints, err := getEtcdEndpoints(client)
 	if err != nil {
 		return nil, err
-	}
-
-	// Get the list of etcd endpoints from cluster status
-	endpoints := []string{}
-	for _, e := range clusterStatus.APIEndpoints {
-		endpoints = append(endpoints, GetClientURLByIP(e.AdvertiseAddress))
 	}
 	klog.V(1).Infof("etcd endpoints read from pods: %s", strings.Join(endpoints, ","))
 
@@ -125,6 +120,83 @@ func NewFromCluster(client clientset.Interface, certificatesDir string) (*Client
 	klog.V(1).Infof("update etcd endpoints: %s", strings.Join(etcdClient.Endpoints, ","))
 
 	return etcdClient, nil
+}
+
+// getEtcdEndpoints returns the list of etcd endpoints.
+func getEtcdEndpoints(client clientset.Interface) ([]string, error) {
+	return getEtcdEndpointsWithBackoff(client, constants.StaticPodMirroringDefaultRetry)
+}
+
+func getEtcdEndpointsWithBackoff(client clientset.Interface, backoff wait.Backoff) ([]string, error) {
+	etcdEndpoints, err := getRawEtcdEndpointsFromPodAnnotation(client, backoff)
+	if err != nil {
+		// NB: this is a fallback when there is no annotation found in the etcd pods that contains
+		//     the client URL, and so we fallback to reading the ClusterStatus struct present in the
+		//     kubeadm-config ConfigMap. This can happen for example, when performing the first
+		//     `kubeadm upgrade apply`. This logic will be removed when the cluster status struct
+		//     is removed from the kubeadm-config ConfigMap.
+		return getRawEtcdEndpointsFromClusterStatus(client)
+	}
+	return etcdEndpoints, nil
+}
+
+// getRawEtcdEndpointsFromPodAnnotation returns the list of endpoints as reported on etcd's pod annotations using the given backoff
+func getRawEtcdEndpointsFromPodAnnotation(client clientset.Interface, backoff wait.Backoff) ([]string, error) {
+	etcdEndpoints := []string{}
+	var lastErr error
+	// Let's tolerate some unexpected transient failures from the API server or load balancers. Also, if
+	// static pods were not yet mirrored into the API server we want to wait for this propagation.
+	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
+		if etcdEndpoints, lastErr = getRawEtcdEndpointsFromPodAnnotationWithoutRetry(client); lastErr != nil {
+			return false, nil
+		}
+		// If the list of etcd endpoints is empty we want to retry: this can happen if joining a secondary
+		// control plane while the primary control plane didn't mirror its static pods yet.
+		return len(etcdEndpoints) > 0, nil
+	})
+	if err != nil {
+		if lastErr != nil {
+			return []string{}, errors.Wrap(lastErr, "could not retrieve the list of etcd endpoints")
+		}
+		return []string{}, errors.Wrap(err, "could not retrieve the list of etcd endpoints")
+	}
+	return etcdEndpoints, nil
+}
+
+func getRawEtcdEndpointsFromPodAnnotationWithoutRetry(client clientset.Interface) ([]string, error) {
+	klog.V(3).Infof("retrieving etcd endpoints from %q annotation in etcd Pods", constants.EtcdAdvertiseClientUrlsAnnotationKey)
+	podList, err := client.CoreV1().Pods(metav1.NamespaceSystem).List(
+		context.TODO(),
+		metav1.ListOptions{
+			LabelSelector: fmt.Sprintf("component=%s,tier=%s", constants.Etcd, constants.ControlPlaneTier),
+		},
+	)
+	if err != nil {
+		return []string{}, err
+	}
+	etcdEndpoints := []string{}
+	for _, pod := range podList.Items {
+		etcdEndpoint, ok := pod.ObjectMeta.Annotations[constants.EtcdAdvertiseClientUrlsAnnotationKey]
+		if !ok {
+			return []string{}, errors.Errorf("etcd Pod %q is missing the %q annotation; cannot infer etcd advertise client URL", pod.ObjectMeta.Name, constants.EtcdAdvertiseClientUrlsAnnotationKey)
+		}
+		etcdEndpoints = append(etcdEndpoints, etcdEndpoint)
+	}
+	return etcdEndpoints, nil
+}
+
+// TODO: remove after 1.20, when the ClusterStatus struct is removed from the kubeadm-config ConfigMap.
+func getRawEtcdEndpointsFromClusterStatus(client clientset.Interface) ([]string, error) {
+	klog.V(3).Info("retrieving etcd endpoints from the cluster status")
+	clusterStatus, err := config.GetClusterStatus(client)
+	if err != nil {
+		return []string{}, err
+	}
+	etcdEndpoints := []string{}
+	for _, e := range clusterStatus.APIEndpoints {
+		etcdEndpoints = append(etcdEndpoints, GetClientURLByIP(e.AdvertiseAddress))
+	}
+	return etcdEndpoints, nil
 }
 
 // dialTimeout is the timeout for failing to establish a connection.

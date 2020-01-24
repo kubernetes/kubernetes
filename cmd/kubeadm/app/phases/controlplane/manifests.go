@@ -59,7 +59,8 @@ func GetStaticPodSpecs(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmap
 			LivenessProbe:   staticpodutil.LivenessProbe(staticpodutil.GetAPIServerProbeAddress(endpoint), "/healthz", int(endpoint.BindPort), v1.URISchemeHTTPS),
 			Resources:       staticpodutil.ComponentResources("250m"),
 			Env:             kubeadmutil.GetProxyEnvVars(),
-		}, mounts.GetVolumes(kubeadmconstants.KubeAPIServer)),
+		}, mounts.GetVolumes(kubeadmconstants.KubeAPIServer),
+			map[string]string{kubeadmconstants.KubeAPIServerAdvertiseAddressEndpointAnnotationKey: endpoint.String()}),
 		kubeadmconstants.KubeControllerManager: staticpodutil.ComponentPod(v1.Container{
 			Name:            kubeadmconstants.KubeControllerManager,
 			Image:           images.GetKubernetesImage(kubeadmconstants.KubeControllerManager, cfg),
@@ -69,7 +70,7 @@ func GetStaticPodSpecs(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmap
 			LivenessProbe:   staticpodutil.LivenessProbe(staticpodutil.GetControllerManagerProbeAddress(cfg), "/healthz", kubeadmconstants.KubeControllerManagerPort, v1.URISchemeHTTPS),
 			Resources:       staticpodutil.ComponentResources("200m"),
 			Env:             kubeadmutil.GetProxyEnvVars(),
-		}, mounts.GetVolumes(kubeadmconstants.KubeControllerManager)),
+		}, mounts.GetVolumes(kubeadmconstants.KubeControllerManager), nil),
 		kubeadmconstants.KubeScheduler: staticpodutil.ComponentPod(v1.Container{
 			Name:            kubeadmconstants.KubeScheduler,
 			Image:           images.GetKubernetesImage(kubeadmconstants.KubeScheduler, cfg),
@@ -79,7 +80,7 @@ func GetStaticPodSpecs(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmap
 			LivenessProbe:   staticpodutil.LivenessProbe(staticpodutil.GetSchedulerProbeAddress(cfg), "/healthz", kubeadmconstants.KubeSchedulerPort, v1.URISchemeHTTPS),
 			Resources:       staticpodutil.ComponentResources("100m"),
 			Env:             kubeadmutil.GetProxyEnvVars(),
-		}, mounts.GetVolumes(kubeadmconstants.KubeScheduler)),
+		}, mounts.GetVolumes(kubeadmconstants.KubeScheduler), nil),
 	}
 	return staticPodSpecs
 }
