@@ -84,6 +84,8 @@ const (
 	HasFilesystemErrors MountErrorType = "HasFilesystemErrors"
 	UnformattedReadOnly MountErrorType = "UnformattedReadOnly"
 	FormatFailed        MountErrorType = "FormatFailed"
+	GetDiskFormatFailed MountErrorType = "GetDiskFormatFailed"
+	UnknownMountError   MountErrorType = "UnknownMountError"
 )
 
 type MountError struct {
@@ -91,16 +93,16 @@ type MountError struct {
 	Message string
 }
 
-func (mountError *MountError) String() string {
+func (mountError MountError) String() string {
 	return mountError.Message
 }
 
-func (mountError *MountError) Error() string {
+func (mountError MountError) Error() string {
 	return mountError.Message
 }
 
 func NewMountError(mountErrorValue MountErrorType, format string, args ...interface{}) error {
-	mountError := &MountError{
+	mountError := MountError{
 		Type:    mountErrorValue,
 		Message: fmt.Sprintf(format, args...),
 	}
