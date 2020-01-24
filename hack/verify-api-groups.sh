@@ -44,7 +44,7 @@ for register_file in "${register_files[@]}"; do
 	group_dirname="${group_dirname%%"/*"}"
 	group_name=""
 	if grep -q 'GroupName = "' "${register_file}"; then
-		group_name=$(grep -q 'GroupName = "' "${register_file}" | cut -d\" -f2 -)
+		group_name=$(grep 'GroupName = "' "${register_file}" | cut -d\" -f2 -)
 	else
 		echo "${register_file} is missing \"const GroupName =\""
 		exit 1
@@ -56,8 +56,10 @@ for register_file in "${register_files[@]}"; do
 		group_dirnames+=("${group_dirname}")
 		expected_install_packages+=("${package}")
 	else
-		version=$(echo "${group_dirname}" | cut -d/ -f2 -)
-		external_group_versions+=("${group_name}/${version}")
+		version=$(echo "${group_dirname}" | rev | cut -d/ -f1 | rev)
+		if [[ ${version} =~ v[0-9] ]]; then
+			external_group_versions+=("${group_name}/${version}")
+		fi
 	fi
 done
 
