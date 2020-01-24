@@ -578,11 +578,7 @@ func LoadClientset() (*clientset.Clientset, error) {
 	return clientset.NewForConfig(config)
 }
 
-// RandomSuffix provides a random string to append to pods,services,rcs.
-// TODO: Allow service names to have the same form as names
-//       for pods and replication controllers so we don't
-//       need to use such a function and can instead
-//       use the UUID utility function.
+// RandomSuffix provides a random sequence to append to pods,services,rcs.
 func RandomSuffix() string {
 	return strconv.Itoa(rand.Intn(10000))
 }
