@@ -44,16 +44,19 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 	clientset "k8s.io/client-go/kubernetes"
+	scheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
-	"k8s.io/kubernetes/test/e2e/manifest"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -466,7 +469,7 @@ func (j *TestJig) CreateIngress(manifestPath, ns string, ingAnnotations map[stri
 	}
 	j.Logger.Infof("Parsing ingress from %v", filepath.Join(manifestPath, "ing.yaml"))
 
-	j.Ingress, err = manifest.IngressFromManifest(filepath.Join(manifestPath, "ing.yaml"))
+	j.Ingress, err = ingressFromManifest(filepath.Join(manifestPath, "ing.yaml"))
 	framework.ExpectNoError(err)
 	j.Ingress.Namespace = ns
 	j.Ingress.Annotations = map[string]string{IngressClassKey: j.Class}
@@ -478,6 +481,50 @@ func (j *TestJig) CreateIngress(manifestPath, ns string, ingAnnotations map[stri
 	framework.ExpectNoError(err)
 }
 
+// marshalToYaml marshals an object into YAML for a given GroupVersion.
+// The object must be known in SupportedMediaTypes() for the Codecs under "client-go/kubernetes/scheme".
+func marshalToYaml(obj runtime.Object, gv schema.GroupVersion) ([]byte, error) {
+	mediaType := "application/yaml"
+	info, ok := runtime.SerializerInfoForMediaType(scheme.Codecs.SupportedMediaTypes(), mediaType)
+	if !ok {
+		return []byte{}, fmt.Errorf("unsupported media type %q", mediaType)
+	}
+	encoder := scheme.Codecs.EncoderForVersion(info.Serializer, gv)
+	return runtime.Encode(encoder, obj)
+}
+
+// ingressFromManifest reads a .json/yaml file and returns the ingress in it.
+func ingressFromManifest(fileName string) (*networkingv1beta1.Ingress, error) {
+	var ing networkingv1beta1.Ingress
+	data, err := testfiles.Read(fileName)
+	if err != nil {
+		return nil, err
+	}
+
+	json, err := utilyaml.ToJSON(data)
+	if err != nil {
+		return nil, err
+	}
+	if err := runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), json, &ing); err != nil {
+		return nil, err
+	}
+	return &ing, nil
+}
+
+// ingressToManifest generates a yaml file in the given path with the given ingress.
+// Assumes that a directory exists at the given path.
+func ingressToManifest(ing *networkingv1beta1.Ingress, path string) error {
+	serialized, err := marshalToYaml(ing, networkingv1beta1.SchemeGroupVersion)
+	if err != nil {
+		return fmt.Errorf("failed to marshal ingress %v to YAML: %v", ing, err)
+	}
+
+	if err := ioutil.WriteFile(path, serialized, 0600); err != nil {
+		return fmt.Errorf("error in writing ingress to file: %s", err)
+	}
+	return nil
+}
+
 // runCreate runs the required command to create the given ingress.
 func (j *TestJig) runCreate(ing *networkingv1beta1.Ingress) (*networkingv1beta1.Ingress, error) {
 	if j.Class != MulticlusterIngressClassValue {
@@ -485,7 +532,7 @@ func (j *TestJig) runCreate(ing *networkingv1beta1.Ingress) (*networkingv1beta1.
 	}
 	// Use kubemci to create a multicluster ingress.
 	filePath := framework.TestContext.OutputDir + "/mci.yaml"
-	if err := manifest.IngressToManifest(ing, filePath); err != nil {
+	if err := ingressToManifest(ing, filePath); err != nil {
 		return nil, err
 	}
 	_, err := framework.RunKubemciWithKubeconfig("create", ing.Name, fmt.Sprintf("--ingress=%s", filePath))
@@ -500,7 +547,7 @@ func (j *TestJig) runUpdate(ing *networkingv1beta1.Ingress) (*networkingv1beta1.
 	// Use kubemci to update a multicluster ingress.
 	// kubemci does not have an update command. We use "create --force" to update an existing ingress.
 	filePath := framework.TestContext.OutputDir + "/mci.yaml"
-	if err := manifest.IngressToManifest(ing, filePath); err != nil {
+	if err := ingressToManifest(ing, filePath); err != nil {
 		return nil, err
 	}
 	_, err := framework.RunKubemciWithKubeconfig("create", ing.Name, fmt.Sprintf("--ingress=%s", filePath), "--force")
@@ -607,7 +654,7 @@ func (j *TestJig) runDelete(ing *networkingv1beta1.Ingress) error {
 	}
 	// Use kubemci to delete a multicluster ingress.
 	filePath := framework.TestContext.OutputDir + "/mci.yaml"
-	if err := manifest.IngressToManifest(ing, filePath); err != nil {
+	if err := ingressToManifest(ing, filePath); err != nil {
 		return err
 	}
 	_, err := framework.RunKubemciWithKubeconfig("delete", ing.Name, fmt.Sprintf("--ingress=%s", filePath))

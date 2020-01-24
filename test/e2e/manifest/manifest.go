@@ -17,16 +17,11 @@ limitations under the License.
 package manifest
 
 import (
-	"fmt"
-	"io/ioutil"
-
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
-	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
@@ -84,38 +79,6 @@ func SvcFromManifest(fileName string) (*v1.Service, error) {
 		return nil, err
 	}
 	return &svc, nil
-}
-
-// IngressFromManifest reads a .json/yaml file and returns the ingress in it.
-func IngressFromManifest(fileName string) (*networkingv1beta1.Ingress, error) {
-	var ing networkingv1beta1.Ingress
-	data, err := testfiles.Read(fileName)
-	if err != nil {
-		return nil, err
-	}
-
-	json, err := utilyaml.ToJSON(data)
-	if err != nil {
-		return nil, err
-	}
-	if err := runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), json, &ing); err != nil {
-		return nil, err
-	}
-	return &ing, nil
-}
-
-// IngressToManifest generates a yaml file in the given path with the given ingress.
-// Assumes that a directory exists at the given path.
-func IngressToManifest(ing *networkingv1beta1.Ingress, path string) error {
-	serialized, err := marshalToYaml(ing, networkingv1beta1.SchemeGroupVersion)
-	if err != nil {
-		return fmt.Errorf("failed to marshal ingress %v to YAML: %v", ing, err)
-	}
-
-	if err := ioutil.WriteFile(path, serialized, 0600); err != nil {
-		return fmt.Errorf("error in writing ingress to file: %s", err)
-	}
-	return nil
 }
 
 // StatefulSetFromManifest returns a StatefulSet from a manifest stored in fileName in the Namespace indicated by ns.
@@ -180,16 +143,4 @@ func RoleFromManifest(fileName, ns string) (*rbacv1.Role, error) {
 	}
 	role.Namespace = ns
 	return &role, nil
-}
-
-// marshalToYaml marshals an object into YAML for a given GroupVersion.
-// The object must be known in SupportedMediaTypes() for the Codecs under "client-go/kubernetes/scheme".
-func marshalToYaml(obj runtime.Object, gv schema.GroupVersion) ([]byte, error) {
-	mediaType := "application/yaml"
-	info, ok := runtime.SerializerInfoForMediaType(scheme.Codecs.SupportedMediaTypes(), mediaType)
-	if !ok {
-		return []byte{}, fmt.Errorf("unsupported media type %q", mediaType)
-	}
-	encoder := scheme.Codecs.EncoderForVersion(info.Serializer, gv)
-	return runtime.Encode(encoder, obj)
 }
