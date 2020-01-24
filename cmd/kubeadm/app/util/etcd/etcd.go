@@ -303,12 +303,20 @@ func (c *Client) AddMember(name string, peerAddrs string) ([]Member, error) {
 	// Returns the updated list of etcd members
 	ret := []Member{}
 	for _, m := range resp.Members {
-		// fixes the entry for the joining member (that doesn't have a name set in the initialCluster returned by etcd)
-		if m.Name == "" {
-			ret = append(ret, Member{Name: name, PeerURL: m.PeerURLs[0]})
-		} else {
-			ret = append(ret, Member{Name: m.Name, PeerURL: m.PeerURLs[0]})
+		// If the peer address matches, this is the member we are adding.
+		// Use the name we passed to the function.
+		if peerAddrs == m.PeerURLs[0] {
+			ret = append(ret, Member{Name: name, PeerURL: peerAddrs})
+			continue
 		}
+		// Otherwise, we are processing other existing etcd members returned by AddMembers.
+		memberName := m.Name
+		// In some cases during concurrent join, some members can end up without a name.
+		// Use the member ID as name for those.
+		if len(memberName) == 0 {
+			memberName = strconv.FormatUint(m.ID, 16)
+		}
+		ret = append(ret, Member{Name: memberName, PeerURL: m.PeerURLs[0]})
 	}
 
 	// Add the new member client address to the list of endpoints
