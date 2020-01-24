@@ -1,14 +1,14 @@
 // +build armbe mips mips64p32
 
-package internal
+package ebpf
 
 import (
 	"unsafe"
 )
 
-// Pointer wraps an unsafe.Pointer to be 64bit to
+// ptr wraps an unsafe.Pointer to be 64bit to
 // conform to the syscall specification.
-type Pointer struct {
+type syscallPtr struct {
 	pad uint32
 	ptr unsafe.Pointer
 }

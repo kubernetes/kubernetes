@@ -30,7 +30,6 @@ const (
 	PerfBitWatermark         = linux.PerfBitWatermark
 	PERF_SAMPLE_RAW          = linux.PERF_SAMPLE_RAW
 	PERF_FLAG_FD_CLOEXEC     = linux.PERF_FLAG_FD_CLOEXEC
-	RLIM_INFINITY            = linux.RLIM_INFINITY
 )
 
 // Statfs_t is a wrapper
@@ -116,12 +115,4 @@ type PerfEventAttr = linux.PerfEventAttr
 // PerfEventOpen is a wrapper
 func PerfEventOpen(attr *PerfEventAttr, pid int, cpu int, groupFd int, flags int) (fd int, err error) {
 	return linux.PerfEventOpen(attr, pid, cpu, groupFd, flags)
-}
-
-// Utsname is a wrapper
-type Utsname = linux.Utsname
-
-// Uname is a wrapper
-func Uname(buf *Utsname) (err error) {
-	return linux.Uname(buf)
 }

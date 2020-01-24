@@ -86,8 +86,8 @@ github.com/chai2010/gettext-go v0.0.0-20160711120539-c6fed771bfd5/go.mod h1:/iP1
 github.com/checkpoint-restore/go-criu v0.0.0-20181120144056-17b0214f6c48 h1:AQMF0Xixllgf29MKlx/TGEhRk7bEDX5kxz8Ui8lOvEs=
 github.com/checkpoint-restore/go-criu v0.0.0-20181120144056-17b0214f6c48/go.mod h1:TrMrLQfeENAPYPRsJuq3jsqdlRh3lvi6trTZJG8+tho=
 github.com/cheekybits/genny v0.0.0-20170328200008-9127e812e1e9/go.mod h1:+tQajlRqAUrPI7DOSpB0XAqZYtQakVtB7wXkRAgjxjQ=
-github.com/cilium/ebpf v0.0.0-20200110133405-4032b1d8aae3 h1:i8+1fuPLjSgAYXUyBlHNhFwjcfAsP4ufiuH1+PWkyDU=
-github.com/cilium/ebpf v0.0.0-20200110133405-4032b1d8aae3/go.mod h1:MA5e5Lr8slmEg9bt0VpxxWqJlO4iwu3FBdHUzV7wQVg=
+github.com/cilium/ebpf v0.0.0-20191025125908-95b36a581eed h1:/UgmF+cZTm9kp4uJ122y/9cVhczNJCgAgAeH2FfzPeg=
+github.com/cilium/ebpf v0.0.0-20191025125908-95b36a581eed/go.mod h1:MA5e5Lr8slmEg9bt0VpxxWqJlO4iwu3FBdHUzV7wQVg=
 github.com/client9/misspell v0.3.4 h1:ta993UF76GwbvJcIo3Y68y/M3WxlpEHPWIGDkJYwzJI=
 github.com/client9/misspell v0.3.4/go.mod h1:qj6jICC3Q7zFZvVWo7KLAzC3yx5G7kyvSDkc90ppPyw=
 github.com/clusterhq/flocker-go v0.0.0-20160920122132-2b8b7259d313 h1:eIHD9GNM3Hp7kcRW5mvcz7WTR3ETeoYYKwpgA04kaXE=

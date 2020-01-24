@@ -13,24 +13,17 @@ import (
 	"github.com/pkg/errors"
 )
 
-func marshalPtr(data interface{}, length int) (internal.Pointer, error) {
-	if data == nil {
-		if length == 0 {
-			return internal.NewPointer(nil), nil
-		}
-		return internal.Pointer{}, errors.New("can't use nil as key of map")
-	}
-
+func marshalPtr(data interface{}, length int) (syscallPtr, error) {
 	if ptr, ok := data.(unsafe.Pointer); ok {
-		return internal.NewPointer(ptr), nil
+		return newPtr(ptr), nil
 	}
 
 	buf, err := marshalBytes(data, length)
 	if err != nil {
-		return internal.Pointer{}, err
+		return syscallPtr{}, err
 	}
 
-	return internal.NewSlicePointer(buf), nil
+	return newPtr(unsafe.Pointer(&buf[0])), nil
 }
 
 func marshalBytes(data interface{}, length int) (buf []byte, err error) {
@@ -59,13 +52,13 @@ func marshalBytes(data interface{}, length int) (buf []byte, err error) {
 	return buf, nil
 }
 
-func makeBuffer(dst interface{}, length int) (internal.Pointer, []byte) {
+func makeBuffer(dst interface{}, length int) (syscallPtr, []byte) {
 	if ptr, ok := dst.(unsafe.Pointer); ok {
-		return internal.NewPointer(ptr), nil
+		return newPtr(ptr), nil
 	}
 
 	buf := make([]byte, length)
-	return internal.NewSlicePointer(buf), buf
+	return newPtr(unsafe.Pointer(&buf[0])), buf
 }
 
 func unmarshalBytes(data interface{}, buf []byte) error {
@@ -106,21 +99,21 @@ func unmarshalBytes(data interface{}, buf []byte) error {
 // Values are initialized to zero if the slice has less elements than CPUs.
 //
 // slice must have a type like []elementType.
-func marshalPerCPUValue(slice interface{}, elemLength int) (internal.Pointer, error) {
+func marshalPerCPUValue(slice interface{}, elemLength int) (syscallPtr, error) {
 	sliceType := reflect.TypeOf(slice)
 	if sliceType.Kind() != reflect.Slice {
-		return internal.Pointer{}, errors.New("per-CPU value requires slice")
+		return syscallPtr{}, errors.New("per-CPU value requires slice")
 	}
 
 	possibleCPUs, err := internal.PossibleCPUs()
 	if err != nil {
-		return internal.Pointer{}, err
+		return syscallPtr{}, err
 	}
 
 	sliceValue := reflect.ValueOf(slice)
 	sliceLen := sliceValue.Len()
 	if sliceLen > possibleCPUs {
-		return internal.Pointer{}, errors.Errorf("per-CPU value exceeds number of CPUs")
+		return syscallPtr{}, errors.Errorf("per-CPU value exceeds number of CPUs")
 	}
 
 	alignedElemLength := align(elemLength, 8)
@@ -130,14 +123,14 @@ func marshalPerCPUValue(slice interface{}, elemLength int) (internal.Pointer, er
 		elem := sliceValue.Index(i).Interface()
 		elemBytes, err := marshalBytes(elem, elemLength)
 		if err != nil {
-			return internal.Pointer{}, err
+			return syscallPtr{}, err
 		}
 
 		offset := i * alignedElemLength
 		copy(buf[offset:offset+elemLength], elemBytes)
 	}
 
-	return internal.NewSlicePointer(buf), nil
+	return newPtr(unsafe.Pointer(&buf[0])), nil
 }
 
 // unmarshalPerCPUValue decodes a buffer into a slice containing one value per

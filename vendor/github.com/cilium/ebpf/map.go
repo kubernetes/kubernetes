@@ -2,9 +2,9 @@ package ebpf
 
 import (
 	"fmt"
+	"unsafe"
 
 	"github.com/cilium/ebpf/internal"
-	"github.com/cilium/ebpf/internal/btf"
 	"github.com/cilium/ebpf/internal/unix"
 
 	"github.com/pkg/errors"
@@ -20,12 +20,8 @@ type MapSpec struct {
 	ValueSize  uint32
 	MaxEntries uint32
 	Flags      uint32
-
 	// InnerMap is used as a template for ArrayOfMaps and HashOfMaps
 	InnerMap *MapSpec
-
-	// The BTF associated with this map.
-	BTF *btf.Map
 }
 
 func (ms *MapSpec) String() string {
@@ -53,9 +49,8 @@ func (ms *MapSpec) Copy() *MapSpec {
 // Implement encoding.BinaryMarshaler or encoding.BinaryUnmarshaler
 // if you require custom encoding.
 type Map struct {
-	name string
-	fd   *internal.FD
-	abi  MapABI
+	fd  *bpfFD
+	abi MapABI
 	// Per CPU maps return values larger than the size in the spec
 	fullValueSize int
 }
@@ -67,14 +62,14 @@ func NewMapFromFD(fd int) (*Map, error) {
 	if fd < 0 {
 		return nil, errors.New("invalid fd")
 	}
-	bpfFd := internal.NewFD(uint32(fd))
+	bpfFd := newBPFFD(uint32(fd))
 
-	name, abi, err := newMapABIFromFd(bpfFd)
+	abi, err := newMapABIFromFd(bpfFd)
 	if err != nil {
-		bpfFd.Forget()
+		bpfFd.forget()
 		return nil, err
 	}
-	return newMap(bpfFd, name, abi)
+	return newMap(bpfFd, abi)
 }
 
 // NewMap creates a new Map.
@@ -82,47 +77,30 @@ func NewMapFromFD(fd int) (*Map, error) {
 // Creating a map for the first time will perform feature detection
 // by creating small, temporary maps.
 func NewMap(spec *MapSpec) (*Map, error) {
-	if spec.BTF == nil {
-		return newMapWithBTF(spec, nil)
-	}
-
-	handle, err := btf.NewHandle(btf.MapSpec(spec.BTF))
-	if err != nil && !btf.IsNotSupported(err) {
-		return nil, errors.Wrap(err, "can't load BTF")
-	}
-
-	return newMapWithBTF(spec, handle)
-}
-
-func newMapWithBTF(spec *MapSpec, handle *btf.Handle) (*Map, error) {
 	if spec.Type != ArrayOfMaps && spec.Type != HashOfMaps {
-		return createMap(spec, nil, handle)
+		return createMap(spec, nil)
 	}
 
 	if spec.InnerMap == nil {
 		return nil, errors.Errorf("%s requires InnerMap", spec.Type)
 	}
 
-	template, err := createMap(spec.InnerMap, nil, handle)
+	template, err := createMap(spec.InnerMap, nil)
 	if err != nil {
 		return nil, err
 	}
 	defer template.Close()
 
-	return createMap(spec, template.fd, handle)
+	return createMap(spec, template.fd)
 }
 
-func createMap(spec *MapSpec, inner *internal.FD, handle *btf.Handle) (*Map, error) {
+func createMap(spec *MapSpec, inner *bpfFD) (*Map, error) {
 	spec = spec.Copy()
 
 	switch spec.Type {
 	case ArrayOfMaps:
 		fallthrough
 	case HashOfMaps:
-		if err := haveNestedMaps(); err != nil {
-			return nil, err
-		}
-
 		if spec.ValueSize != 0 && spec.ValueSize != 4 {
 			return nil, errors.Errorf("ValueSize must be zero or four for map of map")
 		}
@@ -157,16 +135,10 @@ func createMap(spec *MapSpec, inner *internal.FD, handle *btf.Handle) (*Map, err
 
 	if inner != nil {
 		var err error
-		attr.innerMapFd, err = inner.Value()
+		attr.innerMapFd, err = inner.value()
 		if err != nil {
 			return nil, errors.Wrap(err, "map create")
 		}
-	}
-
-	if handle != nil && spec.BTF != nil {
-		attr.btfFd = uint32(handle.FD())
-		attr.btfKeyTypeID = btf.MapKey(spec.BTF).ID()
-		attr.btfValueTypeID = btf.MapValue(spec.BTF).ID()
 	}
 
 	name, err := newBPFObjName(spec.Name)
@@ -174,7 +146,7 @@ func createMap(spec *MapSpec, inner *internal.FD, handle *btf.Handle) (*Map, err
 		return nil, errors.Wrap(err, "map create")
 	}
 
-	if haveObjName() == nil {
+	if haveObjName.Result() {
 		attr.mapName = name
 	}
 
@@ -183,12 +155,11 @@ func createMap(spec *MapSpec, inner *internal.FD, handle *btf.Handle) (*Map, err
 		return nil, errors.Wrap(err, "map create")
 	}
 
-	return newMap(fd, spec.Name, newMapABIFromSpec(spec))
+	return newMap(fd, newMapABIFromSpec(spec))
 }
 
-func newMap(fd *internal.FD, name string, abi *MapABI) (*Map, error) {
+func newMap(fd *bpfFD, abi *MapABI) (*Map, error) {
 	m := &Map{
-		name,
 		fd,
 		*abi,
 		int(abi.ValueSize),
@@ -208,10 +179,7 @@ func newMap(fd *internal.FD, name string, abi *MapABI) (*Map, error) {
 }
 
 func (m *Map) String() string {
-	if m.name != "" {
-		return fmt.Sprintf("%s(%s)#%v", m.abi.Type, m.name, m.fd)
-	}
-	return fmt.Sprintf("%s#%v", m.abi.Type, m.fd)
+	return fmt.Sprintf("%s#%d", m.abi.Type, m.fd)
 }
 
 // ABI gets the ABI of the Map
@@ -274,28 +242,12 @@ func (m *Map) Lookup(key, valueOut interface{}) error {
 	}
 }
 
-// LookupAndDelete retrieves and deletes a value from a Map.
-func (m *Map) LookupAndDelete(key, valueOut interface{}) error {
-	valuePtr, valueBytes := makeBuffer(valueOut, m.fullValueSize)
-
-	keyPtr, err := marshalPtr(key, int(m.abi.KeySize))
-	if err != nil {
-		return errors.WithMessage(err, "can't marshal key")
-	}
-
-	if err := bpfMapLookupAndDelete(m.fd, keyPtr, valuePtr); err != nil {
-		return errors.WithMessage(err, "lookup and delete and delete failed")
-	}
-
-	return unmarshalBytes(valueOut, valueBytes)
-}
-
 // LookupBytes gets a value from Map.
 //
 // Returns a nil value if a key doesn't exist.
 func (m *Map) LookupBytes(key interface{}) ([]byte, error) {
 	valueBytes := make([]byte, m.fullValueSize)
-	valuePtr := internal.NewSlicePointer(valueBytes)
+	valuePtr := newPtr(unsafe.Pointer(&valueBytes[0]))
 
 	err := m.lookup(key, valuePtr)
 	if IsNotExist(err) {
@@ -305,7 +257,7 @@ func (m *Map) LookupBytes(key interface{}) ([]byte, error) {
 	return valueBytes, err
 }
 
-func (m *Map) lookup(key interface{}, valueOut internal.Pointer) error {
+func (m *Map) lookup(key interface{}, valueOut syscallPtr) error {
 	keyPtr, err := marshalPtr(key, int(m.abi.KeySize))
 	if err != nil {
 		return errors.WithMessage(err, "can't marshal key")
@@ -343,7 +295,7 @@ func (m *Map) Update(key, value interface{}, flags MapUpdateFlags) error {
 		return errors.WithMessage(err, "can't marshal key")
 	}
 
-	var valuePtr internal.Pointer
+	var valuePtr syscallPtr
 	if m.abi.Type.hasPerCPUValue() {
 		valuePtr, err = marshalPerCPUValue(value, int(m.abi.ValueSize))
 	} else {
@@ -394,7 +346,7 @@ func (m *Map) NextKey(key, nextKeyOut interface{}) error {
 // Use Iterate if you want to traverse all entries in the map.
 func (m *Map) NextKeyBytes(key interface{}) ([]byte, error) {
 	nextKey := make([]byte, m.abi.KeySize)
-	nextKeyPtr := internal.NewSlicePointer(nextKey)
+	nextKeyPtr := newPtr(unsafe.Pointer(&nextKey[0]))
 
 	err := m.nextKey(key, nextKeyPtr)
 	if IsNotExist(err) {
@@ -404,9 +356,9 @@ func (m *Map) NextKeyBytes(key interface{}) ([]byte, error) {
 	return nextKey, err
 }
 
-func (m *Map) nextKey(key interface{}, nextKeyOut internal.Pointer) error {
+func (m *Map) nextKey(key interface{}, nextKeyOut syscallPtr) error {
 	var (
-		keyPtr internal.Pointer
+		keyPtr syscallPtr
 		err    error
 	)
 
@@ -439,14 +391,14 @@ func (m *Map) Close() error {
 		return nil
 	}
 
-	return m.fd.Close()
+	return m.fd.close()
 }
 
 // FD gets the file descriptor of the Map.
 //
 // Calling this function is invalid after Close has been called.
 func (m *Map) FD() int {
-	fd, err := m.fd.Value()
+	fd, err := m.fd.value()
 	if err != nil {
 		// Best effort: -1 is the number most likely to be an
 		// invalid file descriptor.
@@ -467,12 +419,12 @@ func (m *Map) Clone() (*Map, error) {
 		return nil, nil
 	}
 
-	dup, err := m.fd.Dup()
+	dup, err := m.fd.dup()
 	if err != nil {
 		return nil, errors.Wrap(err, "can't clone map")
 	}
 
-	return newMap(dup, m.name, &m.abi)
+	return newMap(dup, &m.abi)
 }
 
 // Pin persists the map past the lifetime of the process that created it.
@@ -484,19 +436,19 @@ func (m *Map) Pin(fileName string) error {
 
 // LoadPinnedMap load a Map from a BPF file.
 //
-// The function is not compatible with nested maps.
-// Use LoadPinnedMapExplicit in these situations.
+// Requires at least Linux 4.13, and is not compatible with
+// nested maps. Use LoadPinnedMapExplicit in these situations.
 func LoadPinnedMap(fileName string) (*Map, error) {
 	fd, err := bpfGetObject(fileName)
 	if err != nil {
 		return nil, err
 	}
-	name, abi, err := newMapABIFromFd(fd)
+	abi, err := newMapABIFromFd(fd)
 	if err != nil {
-		_ = fd.Close()
+		_ = fd.close()
 		return nil, err
 	}
-	return newMap(fd, name, abi)
+	return newMap(fd, abi)
 }
 
 // LoadPinnedMapExplicit loads a map with explicit parameters.
@@ -505,7 +457,7 @@ func LoadPinnedMapExplicit(fileName string, abi *MapABI) (*Map, error) {
 	if err != nil {
 		return nil, err
 	}
-	return newMap(fd, "", abi)
+	return newMap(fd, abi)
 }
 
 func unmarshalMap(buf []byte) (*Map, error) {
@@ -521,18 +473,18 @@ func unmarshalMap(buf []byte) (*Map, error) {
 		return nil, err
 	}
 
-	name, abi, err := newMapABIFromFd(fd)
+	abi, err := newMapABIFromFd(fd)
 	if err != nil {
-		_ = fd.Close()
+		_ = fd.close()
 		return nil, err
 	}
 
-	return newMap(fd, name, abi)
+	return newMap(fd, abi)
 }
 
 // MarshalBinary implements BinaryMarshaler.
 func (m *Map) MarshalBinary() ([]byte, error) {
-	fd, err := m.fd.Value()
+	fd, err := m.fd.value()
 	if err != nil {
 		return nil, err
 	}
