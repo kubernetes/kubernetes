@@ -109,6 +109,26 @@ func (ss *scaleSet) newVMSSVirtualMachinesCache() (*timedCache, error) {
 	getter := func(key string) (interface{}, error) {
 		localCache := &sync.Map{} // [nodeName]*vmssVirtualMachinesEntry
 
+		oldCache := make(map[string]vmssVirtualMachinesEntry)
+
+		if ss.vmssVMCache != nil {
+			// get old cache before refreshing the cache
+			entry, exists, err := ss.vmssVMCache.store.GetByKey(vmssVirtualMachinesKey)
+			if err != nil {
+				return nil, err
+			}
+			if exists {
+				cached := entry.(*cacheEntry).data
+				if cached != nil {
+					virtualMachines := cached.(*sync.Map)
+					virtualMachines.Range(func(key, value interface{}) bool {
+						oldCache[key.(string)] = *value.(*vmssVirtualMachinesEntry)
+						return true
+					})
+				}
+			}
+		}
+
 		allResourceGroups, err := ss.GetResourceGroups()
 		if err != nil {
 			return nil, err
@@ -141,7 +161,37 @@ func (ss *scaleSet) newVMSSVirtualMachinesCache() (*timedCache, error) {
 						virtualMachine: &vm,
 						lastUpdate:     time.Now().UTC(),
 					})
+
+					if _, exists := oldCache[computerName]; exists {
+						delete(oldCache, computerName)
+					}
 				}
+			}
+
+			// add old missing cache data with nil entries to prevent aggressive
+			// ARM calls during cache invalidation
+			for name, vmEntry := range oldCache {
+				// if the nil cache entry has existed for 15 minutes in the cache
+				// then it should not be added back to the cache
+				if vmEntry.virtualMachine == nil || time.Since(vmEntry.lastUpdate) > 15*time.Minute {
+					klog.V(5).Infof("ignoring expired entries from old cache for %s", name)
+					continue
+				}
+				lastUpdate := time.Now().UTC()
+				if vmEntry.virtualMachine == nil {
+					// if this is already a nil entry then keep the time the nil
+					// entry was first created, so we can cleanup unwanted entries
+					lastUpdate = vmEntry.lastUpdate
+				}
+
+				klog.V(5).Infof("adding old entries to new cache for %s", name)
+				localCache.Store(name, &vmssVirtualMachinesEntry{
+					resourceGroup:  vmEntry.resourceGroup,
+					vmssName:       vmEntry.vmssName,
+					instanceID:     vmEntry.instanceID,
+					virtualMachine: nil,
+					lastUpdate:     lastUpdate,
+				})
 			}
 		}
 
