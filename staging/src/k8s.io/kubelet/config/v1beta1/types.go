@@ -714,6 +714,8 @@ type KubeletConfiguration struct {
 	// This provide a "static" CPU list rather than the "dynamic" list by system-reserved and kube-reserved.
 	// This option overwrites CPUs provided by system-reserved and kube-reserved.
 	ReservedSystemCPUs string `json:"reservedSystemCPUs,omitempty"`
+	// This StaticCPUs option restricts the list of CPUs that will be used for an exclusive assignment for containers with guaranteed QOS to only the specified list.
+	StaticCPUs string `json:"staticCPUs,omitempty"`
 	// This flag helps kubelet identify absolute name of top level cgroup used to enforce `SystemReserved` compute resource reservation for OS system daemons.
 	// Refer to [Node Allocatable](https://git.k8s.io/community/contributors/design-proposals/node/node-allocatable.md) doc for more information.
 	// Dynamic Kubelet Config (beta): This field should not be updated without a full node

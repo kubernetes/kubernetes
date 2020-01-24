@@ -335,6 +335,8 @@ type KubeletConfiguration struct {
 	// This provide a "static" CPU list rather than the "dynamic" list by system-reserved and kube-reserved.
 	// This option overwrites CPUs provided by system-reserved and kube-reserved.
 	ReservedSystemCPUs string
+	// This StaticCPUs option restricts the list of CPUs that will be used for an exclusive assignment for containers with guaranteed QOS to only the specified list.
+	StaticCPUs string
 }
 
 // KubeletAuthorizationMode denotes the authorization mode for the kubelet
