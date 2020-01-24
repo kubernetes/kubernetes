@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	genericapiserver "k8s.io/apiserver/pkg/server"
+	"k8s.io/apiserver/pkg/server/egressselector"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/client-go/pkg/version"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
@@ -133,6 +134,10 @@ type APIAggregator struct {
 
 	// openAPIAggregationController downloads and merges OpenAPI specs.
 	openAPIAggregationController *openapicontroller.AggregationController
+
+	// egressSelector selects the proper egress dialer to communicate with the custom apiserver
+	// overwrites proxyTransport dialer if not nil
+	egressSelector *egressselector.EgressSelector
 }
 
 // Complete fills in any fields not set that are required to have valid data. It's mutating the receiver.
@@ -184,6 +189,7 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		APIRegistrationInformers: informerFactory,
 		serviceResolver:          c.ExtraConfig.ServiceResolver,
 		openAPIConfig:            openAPIConfig,
+		egressSelector:           c.GenericConfig.EgressSelector,
 	}
 
 	apiGroupInfo := apiservicerest.NewRESTStorage(c.GenericConfig.MergedResourceConfig, c.GenericConfig.RESTOptionsGetter)
@@ -217,6 +223,7 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		c.ExtraConfig.ProxyClientCert,
 		c.ExtraConfig.ProxyClientKey,
 		s.serviceResolver,
+		c.GenericConfig.EgressSelector,
 	)
 	if err != nil {
 		return nil, err
@@ -301,6 +308,7 @@ func (s *APIAggregator) AddAPIService(apiService *v1.APIService) error {
 		proxyClientKey:  s.proxyClientKey,
 		proxyTransport:  s.proxyTransport,
 		serviceResolver: s.serviceResolver,
+		egressSelector:  s.egressSelector,
 	}
 	proxyHandler.updateAPIService(apiService)
 	if s.openAPIAggregationController != nil {
