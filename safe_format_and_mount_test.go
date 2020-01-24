@@ -21,7 +21,6 @@ import (
 	"io/ioutil"
 	"os"
 	"runtime"
-	"strings"
 	"testing"
 
 	"k8s.io/utils/exec"
@@ -60,12 +59,12 @@ func TestSafeFormatAndMount(t *testing.T) {
 	}
 	defer os.RemoveAll(mntDir)
 	tests := []struct {
-		description   string
-		fstype        string
-		mountOptions  []string
-		execScripts   []ExecArgs
-		mountErrs     []error
-		expectedError error
+		description  string
+		fstype       string
+		mountOptions []string
+		execScripts  []ExecArgs
+		mountErrs    []error
+		expErrorType MountErrorType
 	}{
 		{
 			description:  "Test a read only mount of an already formatted device",
@@ -90,7 +89,7 @@ func TestSafeFormatAndMount(t *testing.T) {
 			execScripts: []ExecArgs{
 				{"blkid", []string{"-p", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", "/dev/foo"}, "", &testingexec.FakeExitError{Status: 2}},
 			},
-			expectedError: fmt.Errorf("cannot mount unformatted disk /dev/foo as we are manipulating it in read-only mode"),
+			expErrorType: UnformattedReadOnly,
 		},
 		{
 			description: "Test a normal mount of unformatted device",
@@ -107,7 +106,7 @@ func TestSafeFormatAndMount(t *testing.T) {
 				{"blkid", []string{"-p", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", "/dev/foo"}, "DEVNAME=/dev/foo\nTYPE=ext4\n", nil},
 				{"fsck", []string{"-a", "/dev/foo"}, "", &testingexec.FakeExitError{Status: 4}},
 			},
-			expectedError: fmt.Errorf("'fsck' found errors on device /dev/foo but could not correct them"),
+			expErrorType: HasFilesystemErrors,
 		},
 		{
 			description: "Test 'fsck' fails with exit status 1 (errors found and corrected)",
@@ -133,7 +132,7 @@ func TestSafeFormatAndMount(t *testing.T) {
 				{"blkid", []string{"-p", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", "/dev/foo"}, "DEVNAME=/dev/foo\nPTTYPE=dos\n", nil},
 				{"fsck", []string{"-a", "/dev/foo"}, "", nil},
 			},
-			expectedError: fmt.Errorf("unknown filesystem type '(null)'"),
+			expErrorType: FilesystemMismatch,
 		},
 		{
 			description: "Test that 'blkid' is called and confirms unformatted disk, format fails",
@@ -143,7 +142,7 @@ func TestSafeFormatAndMount(t *testing.T) {
 				{"blkid", []string{"-p", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", "/dev/foo"}, "", &testingexec.FakeExitError{Status: 2}},
 				{"mkfs.ext4", []string{"-F", "-m0", "/dev/foo"}, "", fmt.Errorf("formatting failed")},
 			},
-			expectedError: fmt.Errorf("formatting failed"),
+			expErrorType: FormatFailed,
 		},
 		{
 			description: "Test that 'blkid' is called and confirms unformatted disk, format passes, second mount fails",
@@ -153,7 +152,7 @@ func TestSafeFormatAndMount(t *testing.T) {
 				{"blkid", []string{"-p", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", "/dev/foo"}, "", &testingexec.FakeExitError{Status: 2}},
 				{"mkfs.ext4", []string{"-F", "-m0", "/dev/foo"}, "", nil},
 			},
-			expectedError: fmt.Errorf("unknown filesystem type '(null)'"),
+			expErrorType: UnknownMountError,
 		},
 		{
 			description: "Test that 'blkid' is called and confirms unformatted disk, format passes, mount passes",
@@ -162,7 +161,6 @@ func TestSafeFormatAndMount(t *testing.T) {
 				{"blkid", []string{"-p", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", "/dev/foo"}, "", &testingexec.FakeExitError{Status: 2}},
 				{"mkfs.ext4", []string{"-F", "-m0", "/dev/foo"}, "", nil},
 			},
-			expectedError: nil,
 		},
 		{
 			description: "Test that 'blkid' is called and confirms unformatted disk, format passes, mount passes with ext3",
@@ -171,7 +169,6 @@ func TestSafeFormatAndMount(t *testing.T) {
 				{"blkid", []string{"-p", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", "/dev/foo"}, "", &testingexec.FakeExitError{Status: 2}},
 				{"mkfs.ext3", []string{"-F", "-m0", "/dev/foo"}, "", nil},
 			},
-			expectedError: nil,
 		},
 		{
 			description: "test that none ext4 fs does not get called with ext4 options.",
@@ -180,7 +177,6 @@ func TestSafeFormatAndMount(t *testing.T) {
 				{"blkid", []string{"-p", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", "/dev/foo"}, "", &testingexec.FakeExitError{Status: 2}},
 				{"mkfs.xfs", []string{"/dev/foo"}, "", nil},
 			},
-			expectedError: nil,
 		},
 		{
 			description: "Test that 'blkid' is called and reports ext4 partition",
@@ -198,7 +194,7 @@ func TestSafeFormatAndMount(t *testing.T) {
 				{"blkid", []string{"-p", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", "/dev/foo"}, "", &testingexec.FakeExitError{Status: 4}},
 				{"mkfs.xfs", []string{"/dev/foo"}, "", nil},
 			},
-			expectedError: fmt.Errorf("exit 4"),
+			expErrorType: GetDiskFormatFailed,
 		},
 		{
 			description: "Test that 'xfs_repair' is called only once, no need to repair the filesystem",
@@ -207,7 +203,6 @@ func TestSafeFormatAndMount(t *testing.T) {
 				{"blkid", []string{"-p", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", "/dev/foo"}, "DEVNAME=/dev/foo\nTYPE=xfs\n", nil},
 				{"xfs_repair", []string{"-n", "/dev/foo"}, "", nil},
 			},
-			expectedError: nil,
 		},
 		{
 			description: "Test that 'xfs_repair' is called twice and repair the filesystem",
@@ -217,7 +212,6 @@ func TestSafeFormatAndMount(t *testing.T) {
 				{"xfs_repair", []string{"-n", "/dev/foo"}, "", &testingexec.FakeExitError{Status: 1}},
 				{"xfs_repair", []string{"/dev/foo"}, "\ndone\n", nil},
 			},
-			expectedError: nil,
 		},
 		{
 			description: "Test that 'xfs_repair' is called twice and repair the filesystem, but mount failed",
@@ -228,7 +222,7 @@ func TestSafeFormatAndMount(t *testing.T) {
 				{"xfs_repair", []string{"-n", "/dev/foo"}, "", &testingexec.FakeExitError{Status: 1}},
 				{"xfs_repair", []string{"/dev/foo"}, "\ndone\n", nil},
 			},
-			expectedError: fmt.Errorf("unknown filesystem type '(null)'"),
+			expErrorType: UnknownMountError,
 		},
 		{
 			description: "Test that 'xfs_repair' is called twice but could not repair the filesystem",
@@ -238,7 +232,7 @@ func TestSafeFormatAndMount(t *testing.T) {
 				{"xfs_repair", []string{"-n", "/dev/foo"}, "", &testingexec.FakeExitError{Status: 1}},
 				{"xfs_repair", []string{"/dev/foo"}, "\nAn error occurred\n", &testingexec.FakeExitError{Status: 1}},
 			},
-			expectedError: fmt.Errorf("'xfs_repair' found errors on device %s but could not correct them: %v", "/dev/foo", "\nAn error occurred\n"),
+			expErrorType: HasFilesystemErrors,
 		},
 	}
 
@@ -260,7 +254,7 @@ func TestSafeFormatAndMount(t *testing.T) {
 		device := "/dev/foo"
 		dest := mntDir
 		err := mounter.FormatAndMount(device, dest, test.fstype, test.mountOptions)
-		if test.expectedError == nil {
+		if len(test.expErrorType) == 0 {
 			if err != nil {
 				t.Errorf("test \"%s\" unexpected non-error: %v", test.description, err)
 			}
@@ -277,8 +271,12 @@ func TestSafeFormatAndMount(t *testing.T) {
 				t.Errorf("test \"%s\" the correct device was not mounted", test.description)
 			}
 		} else {
-			if err == nil || !strings.HasPrefix(err.Error(), test.expectedError.Error()) {
-				t.Errorf("test \"%s\" unexpected error: \n          [%v]. \nExpecting [%v]", test.description, err, test.expectedError)
+			mntErr, ok := err.(MountError)
+			if !ok {
+				t.Errorf("mount error not of mount error type: %v", err)
+			}
+			if mntErr.Type != test.expErrorType {
+				t.Errorf("test \"%s\" unexpected error: \n          [%v]. \nExpecting err type[%v]", test.description, err, test.expErrorType)
 			}
 		}
 	}

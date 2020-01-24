@@ -315,12 +315,12 @@ func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, 
 	}
 
 	options = append(options, "defaults")
-	var mountErrorValue MountErrorType
+	mountErrorValue := UnknownMountError
 
 	// Check if the disk is already formatted
 	existingFormat, err := mounter.GetDiskFormat(source)
 	if err != nil {
-		return err
+		return NewMountError(GetDiskFormatFailed, "failed to get disk format of disk %s: %v", source, err)
 	}
 
 	// Use 'ext4' as the default
