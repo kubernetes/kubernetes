@@ -54,8 +54,8 @@ const (
 	storageclass2  = "sc-vsan"
 	storageclass3  = "sc-spbm"
 	storageclass4  = "sc-user-specified-ds"
-	DummyDiskName  = "kube-dummyDisk.vmdk"
-	ProviderPrefix = "vsphere://"
+	dummyDiskName  = "kube-dummyDisk.vmdk"
+	providerPrefix = "vsphere://"
 )
 
 // volumeState represents the state of a volume.
@@ -446,7 +446,7 @@ func getCanonicalVolumePath(ctx context.Context, dc *object.Datacenter, volumePa
 	dsFolder := dsPath[0]
 	// Get the datastore folder ID if datastore or folder doesn't exist in datastoreFolderIDMap
 	if !isValidUUID(dsFolder) {
-		dummyDiskVolPath := "[" + datastore + "] " + dsFolder + "/" + DummyDiskName
+		dummyDiskVolPath := "[" + datastore + "] " + dsFolder + "/" + dummyDiskName
 		// Querying a non-existent dummy disk on the datastore folder.
 		// It would fail and return an folder ID in the error message.
 		_, err := getVirtualDiskPage83Data(ctx, dc, dummyDiskVolPath)
@@ -546,9 +546,8 @@ func getVirtualDeviceByPath(ctx context.Context, vm *object.VirtualMachine, disk
 				if matchVirtualDiskAndVolPath(backing.FileName, diskPath) {
 					framework.Logf("Found VirtualDisk backing with filename %q for diskPath %q", backing.FileName, diskPath)
 					return device, nil
-				} else {
-					framework.Logf("VirtualDisk backing filename %q does not match with diskPath %q", backing.FileName, diskPath)
 				}
+				framework.Logf("VirtualDisk backing filename %q does not match with diskPath %q", backing.FileName, diskPath)
 			}
 		}
 	}
@@ -745,10 +744,10 @@ func diskIsAttached(volPath string, nodeName string) (bool, error) {
 // getUUIDFromProviderID strips ProviderPrefix - "vsphere://" from the providerID
 // this gives the VM UUID which can be used to find Node VM from vCenter
 func getUUIDFromProviderID(providerID string) string {
-	return strings.TrimPrefix(providerID, ProviderPrefix)
+	return strings.TrimPrefix(providerID, providerPrefix)
 }
 
-// GetAllReadySchedulableNodeInfos returns NodeInfo objects for all nodes with Ready and schedulable state
+// GetReadySchedulableNodeInfos returns NodeInfo objects for all nodes with Ready and schedulable state
 func GetReadySchedulableNodeInfos() []*NodeInfo {
 	nodeList, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
 	framework.ExpectNoError(err)

@@ -31,7 +31,7 @@ import (
 )
 
 const (
-	DiskSizeSCName = "disksizesc"
+	diskSizeSCName = "disksizesc"
 )
 
 /*
@@ -68,7 +68,7 @@ var _ = utils.SIGDescribe("Volume Disk Size [Feature:vsphere]", func() {
 		expectedDiskSize := "1Mi"
 
 		ginkgo.By("Creating Storage Class")
-		storageclass, err := client.StorageV1().StorageClasses().Create(getVSphereStorageClassSpec(DiskSizeSCName, scParameters, nil, ""))
+		storageclass, err := client.StorageV1().StorageClasses().Create(getVSphereStorageClassSpec(diskSizeSCName, scParameters, nil, ""))
 		framework.ExpectNoError(err)
 		defer client.StorageV1().StorageClasses().Delete(storageclass.Name, nil)
 

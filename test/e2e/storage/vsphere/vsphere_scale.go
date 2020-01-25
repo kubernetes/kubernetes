@@ -129,7 +129,7 @@ var _ = utils.SIGDescribe("vcp at scale [Feature:vsphere] ", func() {
 			case storageclass1:
 				scParams = nil
 			case storageclass2:
-				scParams[Policy_HostFailuresToTolerate] = "1"
+				scParams[PolicyHostFailuresToTolerate] = "1"
 			case storageclass3:
 				scParams[SpbmStoragePolicy] = policyName
 			case storageclass4:
