@@ -1459,14 +1459,14 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 
 	genContainerStatuses := func(previousStatus []v1.ContainerStatus, containers []v1.Container, isInitContainer bool) map[string]*v1.ContainerStatus {
 
-		// Set all container statuses to default waiting state
-		statuses := make(map[string]*v1.ContainerStatus, len(containers))
-
 		// Fetch old containers statuses from old pod status.
 		oldStatuses := make(map[string]v1.ContainerStatus, len(containers))
 		for _, status := range previousStatus {
 			oldStatuses[status.Name] = status
 		}
+
+		// Set all container statuses to default waiting state
+		statuses := make(map[string]*v1.ContainerStatus, len(containers))
 
 		for _, container := range containers {
 			status := &v1.ContainerStatus{
@@ -1474,8 +1474,7 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 				Image: container.Image,
 				State: defaultWaitingState,
 			}
-			oldStatus, found := oldStatuses[container.Name]
-			if found {
+			if oldStatus, found := oldStatuses[container.Name]; found {
 				if oldStatus.State.Terminated != nil {
 					// Do not update status on terminated init containers as
 					// they be removed at any time.
@@ -1489,8 +1488,6 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 			statuses[container.Name] = status
 		}
 
-		// Make the latest container status comes first.
-		sort.Sort(sort.Reverse(kubecontainer.SortContainerStatusesByCreationTime(podStatus.ContainerStatuses)))
 		// Set container statuses according to the statuses seen in pod status
 		containerSeen := map[string]int{}
 		for _, cStatus := range podStatus.ContainerStatuses {
@@ -1550,6 +1547,9 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 		return statuses
 	}
 
+	// Make the latest container status comes first.
+	sort.Sort(sort.Reverse(kubecontainer.SortContainerStatusesByCreationTime(podStatus.ContainerStatuses)))
+
 	// Sort the container statuses since clients of this interface expect the list
 	// of containers in a pod has a deterministic order.
 	var containerStatuses []v1.ContainerStatus
@@ -1561,16 +1561,6 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 	}
 	sort.Sort(kubetypes.SortedContainerStatuses(containerStatuses))
 	apiPodStatus.ContainerStatuses = containerStatuses
-
-	if hasInitContainers {
-		var initContainerStatus []v1.ContainerStatus
-		statuses = genContainerStatuses(oldPodStatus.InitContainerStatuses, pod.Spec.InitContainers, true)
-		for _, status := range statuses {
-			initContainerStatus = append(initContainerStatus, *status)
-		}
-		kubetypes.SortInitContainerStatuses(pod, initContainerStatus)
-		apiPodStatus.InitContainerStatuses = initContainerStatus
-	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) {
 		var ephemeralContainerStatus []v1.ContainerStatus
@@ -1584,9 +1574,19 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 		for _, status := range statuses {
 			ephemeralContainerStatus = append(ephemeralContainerStatus, *status)
 		}
-		kubetypes.SortInitContainerStatuses(pod, ephemeralContainerStatus)
 		apiPodStatus.EphemeralContainerStatuses = ephemeralContainerStatus
 	}
+
+	if hasInitContainers {
+		var initContainerStatus []v1.ContainerStatus
+		statuses = genContainerStatuses(oldPodStatus.InitContainerStatuses, pod.Spec.InitContainers, true)
+		for _, status := range statuses {
+			initContainerStatus = append(initContainerStatus, *status)
+		}
+		kubetypes.SortInitContainerStatuses(pod, initContainerStatus)
+		apiPodStatus.InitContainerStatuses = initContainerStatus
+	}
+
 }
 
 // ServeLogs returns logs of current machine.
