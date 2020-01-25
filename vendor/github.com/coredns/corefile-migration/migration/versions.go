@@ -95,7 +95,100 @@ func addOptionToPlugin(pl *corefile.Plugin, newOption *corefile.Option) (*corefi
 }
 
 var Versions = map[string]release{
+	"1.6.6": {
+		priorVersion:   "1.6.5",
+		dockerImageSHA: "41bee6992c2ed0f4628fcef75751048927bcd6b1cee89c79f6acb63ca5474d5a",
+		defaultConf: `.:53 {
+    errors
+    health {
+        lameduck 5s
+    }
+    kubernetes * *** {
+        pods insecure
+        upstream
+        fallthrough in-addr.arpa ip6.arpa
+        ttl 30
+    }
+    prometheus :9153
+    forward . *
+    cache 30
+    loop
+    reload
+    loadbalance
+}`,
+		plugins: map[string]plugin{
+			"errors": {
+				options: map[string]option{
+					"consolidate": {},
+				},
+			},
+			"log": {
+				options: map[string]option{
+					"class": {},
+				},
+			},
+			"health": {
+				options: map[string]option{},
+			},
+			"ready":    {},
+			"autopath": {},
+			"kubernetes": {
+				options: map[string]option{
+					"endpoint": {
+						status: ignored,
+						action: useFirstArgumentOnly,
+					},
+					"tls":                {},
+					"kubeconfig":         {},
+					"namespaces":         {},
+					"labels":             {},
+					"pods":               {},
+					"endpoint_pod_names": {},
+					"upstream": {
+						status: ignored,
+						action: removeOption,
+					},
+					"ttl":         {},
+					"noendpoints": {},
+					"transfer":    {},
+					"fallthrough": {},
+					"ignore":      {},
+				},
+			},
+			"k8s_external": {
+				options: map[string]option{
+					"apex": {},
+					"ttl":  {},
+				},
+			},
+			"prometheus": {},
+			"forward": {
+				options: map[string]option{
+					"except":         {},
+					"force_tcp":      {},
+					"prefer_udp":     {},
+					"expire":         {},
+					"max_fails":      {},
+					"tls":            {},
+					"tls_servername": {},
+					"policy":         {},
+					"health_check":   {},
+				},
+			},
+			"cache": {
+				options: map[string]option{
+					"success":  {},
+					"denial":   {},
+					"prefetch": {},
+				},
+			},
+			"loop":        {},
+			"reload":      {},
+			"loadbalance": {},
+		},
+	},
 	"1.6.5": {
+		nextVersion:    "1.6.6",
 		priorVersion:   "1.6.4",
 		dockerImageSHA: "7ec975f167d815311a7136c32e70735f0d00b73781365df1befd46ed35bd4fe7",
 		defaultConf: `.:53 {

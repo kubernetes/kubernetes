@@ -181,7 +181,7 @@ github.com/containernetworking/cni/pkg/types
 github.com/containernetworking/cni/pkg/types/020
 github.com/containernetworking/cni/pkg/types/current
 github.com/containernetworking/cni/pkg/version
-# github.com/coredns/corefile-migration v1.0.4 => github.com/coredns/corefile-migration v1.0.4
+# github.com/coredns/corefile-migration v1.0.5 => github.com/coredns/corefile-migration v1.0.5
 github.com/coredns/corefile-migration/migration
 github.com/coredns/corefile-migration/migration/corefile
 # github.com/coreos/go-oidc v2.1.0+incompatible => github.com/coreos/go-oidc v2.1.0+incompatible
