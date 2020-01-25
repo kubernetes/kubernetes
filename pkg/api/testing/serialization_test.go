@@ -292,10 +292,6 @@ func TestBadJSONRejection(t *testing.T) {
 	if _, err1 := runtime.Decode(legacyscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), badJSONUnknownType); err1 == nil {
 		t.Errorf("Did not reject despite use of unknown type: %s", badJSONUnknownType)
 	}
-	/*badJSONKindMismatch := []byte(`{"kind": "Pod"}`)
-	if err2 := DecodeInto(badJSONKindMismatch, &Node{}); err2 == nil {
-		t.Errorf("Kind is set but doesn't match the object type: %s", badJSONKindMismatch)
-	}*/
 }
 
 // TestUnversionedTypes establishes that the default codec can encode and
