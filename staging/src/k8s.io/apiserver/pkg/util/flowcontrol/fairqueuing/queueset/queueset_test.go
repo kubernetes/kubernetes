@@ -141,12 +141,11 @@ func init() {
 func TestNoRestraint(t *testing.T) {
 	now := time.Now()
 	clk, counter := clock.NewFakeEventClock(now, 0, nil)
-	nrf := test.NewNoRestraintFactory()
-	config := fq.QueueSetConfig{}
-	nr, err := nrf.NewQueueSet(config)
+	nrc, err := test.NewNoRestraintFactory().BeginConstruction(fq.QueuingConfig{})
 	if err != nil {
-		t.Fatalf("QueueSet creation failed with %v", err)
+		t.Fatal(err)
 	}
+	nr := nrc.Complete(fq.DispatchingConfig{})
 	exerciseQueueSetUniformScenario(t, "NoRestraint", nr, []uniformClient{
 		{1001001001, 5, 10, time.Second, time.Second},
 		{2002002002, 2, 10, time.Second, time.Second / 2},
@@ -158,18 +157,18 @@ func TestUniformFlows(t *testing.T) {
 
 	clk, counter := clock.NewFakeEventClock(now, 0, nil)
 	qsf := NewQueueSetFactory(clk, counter)
-	config := fq.QueueSetConfig{
+	qCfg := fq.QueuingConfig{
 		Name:             "TestUniformFlows",
-		ConcurrencyLimit: 4,
 		DesiredNumQueues: 8,
 		QueueLengthLimit: 6,
 		HandSize:         3,
 		RequestWaitLimit: 10 * time.Minute,
 	}
-	qs, err := qsf.NewQueueSet(config)
+	qsc, err := qsf.BeginConstruction(qCfg)
 	if err != nil {
-		t.Fatalf("QueueSet creation failed with %v", err)
+		t.Fatal(err)
 	}
+	qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: 4})
 
 	exerciseQueueSetUniformScenario(t, "UniformFlows", qs, []uniformClient{
 		{1001001001, 5, 10, time.Second, time.Second},
@@ -182,18 +181,18 @@ func TestDifferentFlows(t *testing.T) {
 
 	clk, counter := clock.NewFakeEventClock(now, 0, nil)
 	qsf := NewQueueSetFactory(clk, counter)
-	config := fq.QueueSetConfig{
+	qCfg := fq.QueuingConfig{
 		Name:             "TestDifferentFlows",
-		ConcurrencyLimit: 4,
 		DesiredNumQueues: 8,
 		QueueLengthLimit: 6,
 		HandSize:         3,
 		RequestWaitLimit: 10 * time.Minute,
 	}
-	qs, err := qsf.NewQueueSet(config)
+	qsc, err := qsf.BeginConstruction(qCfg)
 	if err != nil {
-		t.Fatalf("QueueSet creation failed with %v", err)
+		t.Fatal(err)
 	}
+	qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: 4})
 
 	exerciseQueueSetUniformScenario(t, "DifferentFlows", qs, []uniformClient{
 		{1001001001, 6, 10, time.Second, time.Second},
@@ -206,18 +205,15 @@ func TestDifferentFlowsWithoutQueuing(t *testing.T) {
 
 	clk, counter := clock.NewFakeEventClock(now, 0, nil)
 	qsf := NewQueueSetFactory(clk, counter)
-	config := fq.QueueSetConfig{
+	qCfg := fq.QueuingConfig{
 		Name:             "TestDifferentFlowsWithoutQueuing",
-		ConcurrencyLimit: 4,
 		DesiredNumQueues: 0,
-		QueueLengthLimit: 6,
-		HandSize:         3,
-		RequestWaitLimit: 10 * time.Minute,
 	}
-	qs, err := qsf.NewQueueSet(config)
+	qsc, err := qsf.BeginConstruction(qCfg)
 	if err != nil {
-		t.Fatalf("QueueSet creation failed with %v", err)
+		t.Fatal(err)
 	}
+	qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: 4})
 
 	exerciseQueueSetUniformScenario(t, "DifferentFlowsWithoutQueuing", qs, []uniformClient{
 		{1001001001, 6, 10, time.Second, 57 * time.Millisecond},
@@ -230,20 +226,65 @@ func TestTimeout(t *testing.T) {
 
 	clk, counter := clock.NewFakeEventClock(now, 0, nil)
 	qsf := NewQueueSetFactory(clk, counter)
-	config := fq.QueueSetConfig{
+	qCfg := fq.QueuingConfig{
 		Name:             "TestTimeout",
-		ConcurrencyLimit: 1,
 		DesiredNumQueues: 128,
 		QueueLengthLimit: 128,
 		HandSize:         1,
 		RequestWaitLimit: 0,
 	}
-	qs, err := qsf.NewQueueSet(config)
+	qsc, err := qsf.BeginConstruction(qCfg)
 	if err != nil {
-		t.Fatalf("QueueSet creation failed with %v", err)
+		t.Fatal(err)
 	}
+	qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: 1})
 
 	exerciseQueueSetUniformScenario(t, "Timeout", qs, []uniformClient{
 		{1001001001, 5, 100, time.Second, time.Second},
 	}, time.Second*10, true, false, clk, counter)
+}
+
+func TestContextCancel(t *testing.T) {
+	now := time.Now()
+	clk, counter := clock.NewFakeEventClock(now, 0, nil)
+	qsf := NewQueueSetFactory(clk, counter)
+	qCfg := fq.QueuingConfig{
+		Name:             "TestTimeout",
+		DesiredNumQueues: 11,
+		QueueLengthLimit: 11,
+		HandSize:         1,
+		RequestWaitLimit: 15 * time.Second,
+	}
+	qsc, err := qsf.BeginConstruction(qCfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: 1})
+	counter.Add(1) // account for the goroutine running this test
+	ctx1 := context.Background()
+	another1, exec1, cleanup1 := qs.Wait(ctx1, 1, "test", "one")
+	if another1 || !exec1 {
+		t.Errorf("Unexpected: another1=%v, exec1=%v", another1, exec1)
+		return
+	}
+	defer cleanup1()
+	ctx2, cancel2 := context.WithCancel(context.Background())
+	tBefore := time.Now()
+	go func() {
+		time.Sleep(time.Second)
+		cancel2()
+	}()
+	another2, exec2, cleanup2 := qs.Wait(ctx2, 2, "test", "two")
+	tAfter := time.Now()
+	if another2 || exec2 {
+		t.Errorf("Unexpected: another2=%v, exec2=%v", another2, exec2)
+		if exec2 {
+			defer cleanup2()
+		}
+	} else {
+		dt := tAfter.Sub(tBefore)
+		if dt < time.Second || dt > 2*time.Second {
+			t.Errorf("Unexpected: dt=%d", dt)
+		}
+	}
 }
