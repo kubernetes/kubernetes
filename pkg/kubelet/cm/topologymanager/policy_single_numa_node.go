@@ -17,7 +17,6 @@ limitations under the License.
 package topologymanager
 
 import (
-	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 )
@@ -55,7 +54,7 @@ func (p *singleNumaNodePolicy) canAdmitPodResult(hint *TopologyHint) lifecycle.P
 }
 
 // Return hints that have valid bitmasks with exactly one bit set.
-func (p *singleNumaNodePolicy) filterHints(allResourcesHints [][]TopologyHint) [][]TopologyHint {
+func filterSingleNumaHints(allResourcesHints [][]TopologyHint) [][]TopologyHint {
 	var filteredResourcesHints [][]TopologyHint
 	for _, oneResourceHints := range allResourcesHints {
 		var filtered []TopologyHint
@@ -72,93 +71,17 @@ func (p *singleNumaNodePolicy) filterHints(allResourcesHints [][]TopologyHint) [
 	return filteredResourcesHints
 }
 
-func (p *singleNumaNodePolicy) mergeProvidersHints(providersHints []map[string][]TopologyHint) TopologyHint {
-	// Set the default affinity as an any-numa affinity containing the list
-	// of NUMA Nodes available on this machine.
-	defaultAffinity, _ := bitmask.NewBitMask(p.numaNodes...)
-
-	// Loop through all provider hints and save an accumulated list of the
-	// hints returned by each hint provider. If no hints are provided, assume
-	// that provider has no preference for topology-aware allocation.
-	var allProviderHints [][]TopologyHint
-	for _, hints := range providersHints {
-		// If hints is nil, insert a single, preferred any-numa hint into allProviderHints.
-		if len(hints) == 0 {
-			klog.Infof("[topologymanager] Hint Provider has no preference for NUMA affinity with any resource")
-			allProviderHints = append(allProviderHints, []TopologyHint{{nil, true}})
-			continue
-		}
-
-		// Otherwise, accumulate the hints for each resource type into allProviderHints.
-		for resource := range hints {
-			if hints[resource] == nil {
-				klog.Infof("[topologymanager] Hint Provider has no preference for NUMA affinity with resource '%s'", resource)
-				allProviderHints = append(allProviderHints, []TopologyHint{{nil, true}})
-				continue
-			}
-
-			if len(hints[resource]) == 0 {
-				klog.Infof("[topologymanager] Hint Provider has no possible NUMA affinities for resource '%s'", resource)
-				allProviderHints = append(allProviderHints, []TopologyHint{{nil, false}})
-				continue
-			}
-
-			allProviderHints = append(allProviderHints, hints[resource])
-		}
-	}
-
+func (p *singleNumaNodePolicy) Merge(providersHints []map[string][]TopologyHint) (TopologyHint, lifecycle.PodAdmitResult) {
+	filteredHints := filterProvidersHints(providersHints)
 	// Filter to only include don't cares and hints with a single NUMA node.
-	allProviderHints = p.filterHints(allProviderHints)
+	singleNumaHints := filterSingleNumaHints(filteredHints)
+	bestHint := mergeFilteredHints(p.numaNodes, singleNumaHints)
 
-	// Set the bestHint to return from this function as {nil false}.
-	// This will only be returned if no better hint can be found when
-	// merging hints from each hint provider.
-	bestHint := TopologyHint{defaultAffinity, false}
-	iterateAllProviderTopologyHints(allProviderHints, func(permutation []TopologyHint) {
-		// Get the NUMANodeAffinity from each hint in the permutation and see if any
-		// of them encode unpreferred allocations.
-		mergedHint := mergePermutation(p.numaNodes, permutation)
-
-		// Only consider mergedHints that result in a NUMANodeAffinity > 0 to
-		// replace the current bestHint.
-		if mergedHint.NUMANodeAffinity.Count() == 0 {
-			return
-		}
-
-		// If the current bestHint is non-preferred and the new mergedHint is
-		// preferred, always choose the preferred hint over the non-preferred one.
-		if mergedHint.Preferred && !bestHint.Preferred {
-			bestHint = mergedHint
-			return
-		}
-
-		// If the current bestHint is preferred and the new mergedHint is
-		// non-preferred, never update bestHint, regardless of mergedHint's
-		// narowness.
-		if !mergedHint.Preferred && bestHint.Preferred {
-			return
-		}
-
-		// If mergedHint and bestHint has the same preference, only consider
-		// mergedHints that have a narrower NUMANodeAffinity than the
-		// NUMANodeAffinity in the current bestHint.
-		if !mergedHint.NUMANodeAffinity.IsNarrowerThan(bestHint.NUMANodeAffinity) {
-			return
-		}
-
-		// In all other cases, update bestHint to the current mergedHint
-		bestHint = mergedHint
-	})
-
+	defaultAffinity, _ := bitmask.NewBitMask(p.numaNodes...)
 	if bestHint.NUMANodeAffinity.IsEqual(defaultAffinity) {
 		bestHint = TopologyHint{nil, bestHint.Preferred}
 	}
 
-	return bestHint
-}
-
-func (p *singleNumaNodePolicy) Merge(providersHints []map[string][]TopologyHint) (TopologyHint, lifecycle.PodAdmitResult) {
-	hint := p.mergeProvidersHints(providersHints)
-	admit := p.canAdmitPodResult(&hint)
-	return hint, admit
+	admit := p.canAdmitPodResult(&bestHint)
+	return bestHint, admit
 }

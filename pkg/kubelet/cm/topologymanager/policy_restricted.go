@@ -52,7 +52,8 @@ func (p *restrictedPolicy) canAdmitPodResult(hint *TopologyHint) lifecycle.PodAd
 }
 
 func (p *restrictedPolicy) Merge(providersHints []map[string][]TopologyHint) (TopologyHint, lifecycle.PodAdmitResult) {
-	hint := p.mergeProvidersHints(providersHints)
+	filteredHints := filterProvidersHints(providersHints)
+	hint := mergeFilteredHints(p.numaNodes, filteredHints)
 	admit := p.canAdmitPodResult(&hint)
 	return hint, admit
 }
