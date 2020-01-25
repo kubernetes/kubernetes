@@ -31,7 +31,7 @@ import (
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	nodectlr "k8s.io/kubernetes/pkg/controller/nodelifecycle"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/system"
 )
 
@@ -98,7 +98,7 @@ func isNodeConditionSetAsExpected(node *v1.Node, conditionType v1.NodeConditionT
 							conditionType, node.Name, cond.Status == v1.ConditionTrue, taints)
 					}
 					if !silent {
-						e2elog.Logf(msg)
+						framework.Logf(msg)
 					}
 					return false
 				}
@@ -107,7 +107,7 @@ func isNodeConditionSetAsExpected(node *v1.Node, conditionType v1.NodeConditionT
 					return true
 				}
 				if !silent {
-					e2elog.Logf("Condition %s of node %s is %v instead of %t. Reason: %v, message: %v",
+					framework.Logf("Condition %s of node %s is %v instead of %t. Reason: %v, message: %v",
 						conditionType, node.Name, cond.Status == v1.ConditionTrue, wantTrue, cond.Reason, cond.Message)
 				}
 				return false
@@ -116,7 +116,7 @@ func isNodeConditionSetAsExpected(node *v1.Node, conditionType v1.NodeConditionT
 				return true
 			}
 			if !silent {
-				e2elog.Logf("Condition %s of node %s is %v instead of %t. Reason: %v, message: %v",
+				framework.Logf("Condition %s of node %s is %v instead of %t. Reason: %v, message: %v",
 					conditionType, node.Name, cond.Status == v1.ConditionTrue, wantTrue, cond.Reason, cond.Message)
 			}
 			return false
@@ -124,7 +124,7 @@ func isNodeConditionSetAsExpected(node *v1.Node, conditionType v1.NodeConditionT
 
 	}
 	if !silent {
-		e2elog.Logf("Couldn't find condition %v on node %v", conditionType, node.Name)
+		framework.Logf("Couldn't find condition %v on node %v", conditionType, node.Name)
 	}
 	return false
 }
@@ -166,7 +166,7 @@ func Filter(nodeList *v1.NodeList, fn func(node v1.Node) bool) {
 func TotalRegistered(c clientset.Interface) (int, error) {
 	nodes, err := waitListSchedulableNodes(c)
 	if err != nil {
-		e2elog.Logf("Failed to list nodes: %v", err)
+		framework.Logf("Failed to list nodes: %v", err)
 		return 0, err
 	}
 	return len(nodes.Items), nil
@@ -176,7 +176,7 @@ func TotalRegistered(c clientset.Interface) (int, error) {
 func TotalReady(c clientset.Interface) (int, error) {
 	nodes, err := waitListSchedulableNodes(c)
 	if err != nil {
-		e2elog.Logf("Failed to list nodes: %v", err)
+		framework.Logf("Failed to list nodes: %v", err)
 		return 0, err
 	}
 
@@ -190,7 +190,7 @@ func TotalReady(c clientset.Interface) (int, error) {
 // GetExternalIP returns node external IP concatenated with port 22 for ssh
 // e.g. 1.2.3.4:22
 func GetExternalIP(node *v1.Node) (string, error) {
-	e2elog.Logf("Getting external IP address for %s", node.Name)
+	framework.Logf("Getting external IP address for %s", node.Name)
 	host := ""
 	for _, a := range node.Status.Addresses {
 		if a.Type == v1.NodeExternalIP && a.Address != "" {
@@ -404,7 +404,7 @@ func isNodeUntaintedWithNonblocking(node *v1.Node, nonblockingTaints string) boo
 
 	taints, err := nodeInfo.Taints()
 	if err != nil {
-		e2elog.Failf("Can't test predicates for node %s: %v", node.Name, err)
+		framework.Failf("Can't test predicates for node %s: %v", node.Name, err)
 		return false
 	}
 

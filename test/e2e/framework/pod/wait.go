@@ -36,7 +36,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	"k8s.io/kubernetes/test/e2e/framework"
 	e2eresource "k8s.io/kubernetes/test/e2e/framework/resource"
 	testutils "k8s.io/kubernetes/test/utils"
 )
@@ -106,7 +106,7 @@ func errorBadPodsStates(badPods []v1.Pod, desiredPods int, ns, desiredState stri
 func WaitForPodsRunningReady(c clientset.Interface, ns string, minPods, allowedNotReadyPods int32, timeout time.Duration, ignoreLabels map[string]string) error {
 	ignoreSelector := labels.SelectorFromSet(map[string]string{})
 	start := time.Now()
-	e2elog.Logf("Waiting up to %v for all pods (need at least %d) in namespace '%s' to be running and ready",
+	framework.Logf("Waiting up to %v for all pods (need at least %d) in namespace '%s' to be running and ready",
 		timeout, minPods, ns)
 	wg := sync.WaitGroup{}
 	wg.Add(1)
@@ -124,7 +124,7 @@ func WaitForPodsRunningReady(c clientset.Interface, ns string, minPods, allowedN
 
 		rcList, err := c.CoreV1().ReplicationControllers(ns).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
-			e2elog.Logf("Error getting replication controllers in namespace '%s': %v", ns, err)
+			framework.Logf("Error getting replication controllers in namespace '%s': %v", ns, err)
 			if testutils.IsRetryableAPIError(err) {
 				return false, nil
 			}
@@ -137,7 +137,7 @@ func WaitForPodsRunningReady(c clientset.Interface, ns string, minPods, allowedN
 
 		rsList, err := c.AppsV1().ReplicaSets(ns).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
-			e2elog.Logf("Error getting replication sets in namespace %q: %v", ns, err)
+			framework.Logf("Error getting replication sets in namespace %q: %v", ns, err)
 			if testutils.IsRetryableAPIError(err) {
 				return false, nil
 			}
@@ -150,7 +150,7 @@ func WaitForPodsRunningReady(c clientset.Interface, ns string, minPods, allowedN
 
 		podList, err := c.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
-			e2elog.Logf("Error getting pods in namespace '%s': %v", ns, err)
+			framework.Logf("Error getting pods in namespace '%s': %v", ns, err)
 			if testutils.IsRetryableAPIError(err) {
 				return false, nil
 			}
@@ -169,25 +169,25 @@ func WaitForPodsRunningReady(c clientset.Interface, ns string, minPods, allowedN
 			case res && err == nil:
 				nOk++
 			case pod.Status.Phase == v1.PodSucceeded:
-				e2elog.Logf("The status of Pod %s is Succeeded, skipping waiting", pod.ObjectMeta.Name)
+				framework.Logf("The status of Pod %s is Succeeded, skipping waiting", pod.ObjectMeta.Name)
 				// it doesn't make sense to wait for this pod
 				continue
 			case pod.Status.Phase != v1.PodFailed:
-				e2elog.Logf("The status of Pod %s is %s (Ready = false), waiting for it to be either Running (with Ready = true) or Failed", pod.ObjectMeta.Name, pod.Status.Phase)
+				framework.Logf("The status of Pod %s is %s (Ready = false), waiting for it to be either Running (with Ready = true) or Failed", pod.ObjectMeta.Name, pod.Status.Phase)
 				notReady++
 				badPods = append(badPods, pod)
 			default:
 				if metav1.GetControllerOf(&pod) == nil {
-					e2elog.Logf("Pod %s is Failed, but it's not controlled by a controller", pod.ObjectMeta.Name)
+					framework.Logf("Pod %s is Failed, but it's not controlled by a controller", pod.ObjectMeta.Name)
 					badPods = append(badPods, pod)
 				}
 				//ignore failed pods that are controlled by some controller
 			}
 		}
 
-		e2elog.Logf("%d / %d pods in namespace '%s' are running and ready (%d seconds elapsed)",
+		framework.Logf("%d / %d pods in namespace '%s' are running and ready (%d seconds elapsed)",
 			nOk, len(podList.Items), ns, int(time.Since(start).Seconds()))
-		e2elog.Logf("expected %d pod replicas in namespace '%s', %d are Running and Ready.", replicas, ns, replicaOk)
+		framework.Logf("expected %d pod replicas in namespace '%s', %d are Running and Ready.", replicas, ns, replicaOk)
 
 		if replicaOk == replicas && nOk >= minPods && len(badPods) == 0 {
 			return true, nil
@@ -199,30 +199,30 @@ func WaitForPodsRunningReady(c clientset.Interface, ns string, minPods, allowedN
 		if !ignoreNotReady {
 			return errors.New(errorBadPodsStates(badPods, desiredPods, ns, "RUNNING and READY", timeout))
 		}
-		e2elog.Logf("Number of not-ready pods (%d) is below the allowed threshold (%d).", notReady, allowedNotReadyPods)
+		framework.Logf("Number of not-ready pods (%d) is below the allowed threshold (%d).", notReady, allowedNotReadyPods)
 	}
 	return nil
 }
 
 // WaitForPodCondition waits a pods to be matched to the given condition.
 func WaitForPodCondition(c clientset.Interface, ns, podName, desc string, timeout time.Duration, condition podCondition) error {
-	e2elog.Logf("Waiting up to %v for pod %q in namespace %q to be %q", timeout, podName, ns, desc)
+	framework.Logf("Waiting up to %v for pod %q in namespace %q to be %q", timeout, podName, ns, desc)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(poll) {
 		pod, err := c.CoreV1().Pods(ns).Get(context.TODO(), podName, metav1.GetOptions{})
 		if err != nil {
 			if apierrors.IsNotFound(err) {
-				e2elog.Logf("Pod %q in namespace %q not found. Error: %v", podName, ns, err)
+				framework.Logf("Pod %q in namespace %q not found. Error: %v", podName, ns, err)
 				return err
 			}
-			e2elog.Logf("Get pod %q in namespace %q failed, ignoring for %v. Error: %v", podName, ns, poll, err)
+			framework.Logf("Get pod %q in namespace %q failed, ignoring for %v. Error: %v", podName, ns, poll, err)
 			continue
 		}
 		// log now so that current pod info is reported before calling `condition()`
-		e2elog.Logf("Pod %q: Phase=%q, Reason=%q, readiness=%t. Elapsed: %v",
+		framework.Logf("Pod %q: Phase=%q, Reason=%q, readiness=%t. Elapsed: %v",
 			podName, pod.Status.Phase, pod.Status.Reason, podutil.IsPodReady(pod), time.Since(start))
 		if done, err := condition(pod); done {
 			if err == nil {
-				e2elog.Logf("Pod %q satisfied condition %q", podName, desc)
+				framework.Logf("Pod %q satisfied condition %q", podName, desc)
 			}
 			return err
 		}
@@ -292,7 +292,7 @@ func WaitForPodNameUnschedulableInNamespace(c clientset.Interface, podName, name
 // WaitForMatchPodsCondition finds match pods based on the input ListOptions.
 // waits and checks if all match pods are in the given podCondition
 func WaitForMatchPodsCondition(c clientset.Interface, opts metav1.ListOptions, desc string, timeout time.Duration, condition podCondition) error {
-	e2elog.Logf("Waiting up to %v for matching pods' status to be %s", timeout, desc)
+	framework.Logf("Waiting up to %v for matching pods' status to be %s", timeout, desc)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(poll) {
 		pods, err := c.CoreV1().Pods(metav1.NamespaceAll).List(context.TODO(), opts)
 		if err != nil {
@@ -311,7 +311,7 @@ func WaitForMatchPodsCondition(c clientset.Interface, opts metav1.ListOptions, d
 		if len(conditionNotMatch) <= 0 {
 			return err
 		}
-		e2elog.Logf("%d pods are not %s: %v", len(conditionNotMatch), desc, conditionNotMatch)
+		framework.Logf("%d pods are not %s: %v", len(conditionNotMatch), desc, conditionNotMatch)
 	}
 	return fmt.Errorf("gave up waiting for matching pods to be '%s' after %v", desc, timeout)
 }
@@ -397,7 +397,7 @@ func WaitForPodNotFoundInNamespace(c clientset.Interface, podName, ns string, ti
 // WaitForPodToDisappear waits the given timeout duration for the specified pod to disappear.
 func WaitForPodToDisappear(c clientset.Interface, ns, podName string, label labels.Selector, interval, timeout time.Duration) error {
 	return wait.PollImmediate(interval, timeout, func() (bool, error) {
-		e2elog.Logf("Waiting for pod %s to disappear", podName)
+		framework.Logf("Waiting for pod %s to disappear", podName)
 		options := metav1.ListOptions{LabelSelector: label.String()}
 		pods, err := c.CoreV1().Pods(ns).List(context.TODO(), options)
 		if err != nil {
@@ -409,13 +409,13 @@ func WaitForPodToDisappear(c clientset.Interface, ns, podName string, label labe
 		found := false
 		for _, pod := range pods.Items {
 			if pod.Name == podName {
-				e2elog.Logf("Pod %s still exists", podName)
+				framework.Logf("Pod %s still exists", podName)
 				found = true
 				break
 			}
 		}
 		if !found {
-			e2elog.Logf("Pod %s no longer exists", podName)
+			framework.Logf("Pod %s no longer exists", podName)
 			return true, nil
 		}
 		return false, nil
@@ -511,7 +511,7 @@ func WaitForPodsWithLabelRunningReady(c clientset.Interface, ns string, label la
 		func() (bool, error) {
 			pods, err = WaitForPodsWithLabel(c, ns, label)
 			if err != nil {
-				e2elog.Logf("Failed to list pods: %v", err)
+				framework.Logf("Failed to list pods: %v", err)
 				if testutils.IsRetryableAPIError(err) {
 					return false, nil
 				}
@@ -524,7 +524,7 @@ func WaitForPodsWithLabelRunningReady(c clientset.Interface, ns string, label la
 				}
 			}
 			if current != num {
-				e2elog.Logf("Got %v pods running and ready, expect: %v", current, num)
+				framework.Logf("Got %v pods running and ready, expect: %v", current, num)
 				return false, nil
 			}
 			return true, nil
@@ -560,7 +560,7 @@ func WaitForNRestartablePods(ps *testutils.PodStore, expect int, timeout time.Du
 		pods = FilterNonRestartablePods(allPods)
 		if len(pods) != expect {
 			errLast = fmt.Errorf("expected to find %d pods but found only %d", expect, len(pods))
-			e2elog.Logf("Error getting pods: %v", errLast)
+			framework.Logf("Error getting pods: %v", errLast)
 			return false, nil
 		}
 		return true, nil

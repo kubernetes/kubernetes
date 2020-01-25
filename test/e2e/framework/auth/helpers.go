@@ -29,7 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	v1authorization "k8s.io/client-go/kubernetes/typed/authorization/v1"
 	v1rbac "k8s.io/client-go/kubernetes/typed/rbac/v1"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 const (
@@ -152,13 +152,13 @@ func IsRBACEnabled(crGetter v1rbac.ClusterRolesGetter) bool {
 	isRBACEnabledOnce.Do(func() {
 		crs, err := crGetter.ClusterRoles().List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
-			e2elog.Logf("Error listing ClusterRoles; assuming RBAC is disabled: %v", err)
+			framework.Logf("Error listing ClusterRoles; assuming RBAC is disabled: %v", err)
 			isRBACEnabled = false
 		} else if crs == nil || len(crs.Items) == 0 {
-			e2elog.Logf("No ClusterRoles found; assuming RBAC is disabled.")
+			framework.Logf("No ClusterRoles found; assuming RBAC is disabled.")
 			isRBACEnabled = false
 		} else {
-			e2elog.Logf("Found ClusterRoles; assuming RBAC is enabled.")
+			framework.Logf("Found ClusterRoles; assuming RBAC is enabled.")
 			isRBACEnabled = true
 		}
 	})
