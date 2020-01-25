@@ -62,14 +62,19 @@ func (pl *TaintToleration) Filter(ctx context.Context, state *framework.CycleSta
 		return framework.NewStatus(framework.Error, err.Error())
 	}
 
-	if v1helper.TolerationsTolerateTaintsWithFilter(pod.Spec.Tolerations, taints, func(t *v1.Taint) bool {
+	filterPredicate := func(t *v1.Taint) bool {
 		// PodToleratesNodeTaints is only interested in NoSchedule and NoExecute taints.
 		return t.Effect == v1.TaintEffectNoSchedule || t.Effect == v1.TaintEffectNoExecute
-	}) {
+	}
+
+	taint, isUntolerated := v1helper.FindMatchingUntoleratedTaint(taints, pod.Spec.Tolerations, filterPredicate)
+	if !isUntolerated {
 		return nil
 	}
 
-	return framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonNotMatch)
+	errReason := fmt.Sprintf("node(s) had taint {%s: %s}, that the pod didn't tolerate",
+		taint.Key, taint.Value)
+	return framework.NewStatus(framework.UnschedulableAndUnresolvable, errReason)
 }
 
 // postFilterState computed at PostFilter and used at Score.
