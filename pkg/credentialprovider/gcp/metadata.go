@@ -50,7 +50,7 @@ var gceProductNameFile = "/sys/class/dmi/id/product_name"
 
 // For these urls, the parts of the host name can be glob, for example '*.gcr.io" will match
 // "foo.gcr.io" and "bar.gcr.io".
-var containerRegistryUrls = []string{"container.cloud.google.com", "gcr.io", "*.gcr.io"}
+var containerRegistryUrls = []string{"container.cloud.google.com", "gcr.io", "*.gcr.io", "*.pkg.dev"}
 
 var metadataHeader = &http.Header{
 	"Metadata-Flavor": []string{"Google"},
