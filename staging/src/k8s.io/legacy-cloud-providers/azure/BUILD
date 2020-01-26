@@ -13,7 +13,6 @@ go_library(
         "azure_backoff.go",
         "azure_blobDiskController.go",
         "azure_cache.go",
-        "azure_client.go",
         "azure_config.go",
         "azure_controller_common.go",
         "azure_controller_standard.go",

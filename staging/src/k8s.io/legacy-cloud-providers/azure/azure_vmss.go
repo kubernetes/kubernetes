@@ -40,6 +40,9 @@ import (
 )
 
 var (
+	// virtualMachineScaleSetsDeallocating indicates VMSS instances are in Deallocating state.
+	virtualMachineScaleSetsDeallocating = "Deallocating"
+
 	// ErrorNotVmssInstance indicates an instance is not belongint to any vmss.
 	ErrorNotVmssInstance = errors.New("not a vmss instance")
 
