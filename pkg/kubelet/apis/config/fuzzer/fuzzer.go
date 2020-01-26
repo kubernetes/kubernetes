@@ -96,6 +96,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.ContainerLogMaxSize = "10Mi"
 			obj.ConfigMapAndSecretChangeDetectionStrategy = "Watch"
 			obj.AllowedUnsafeSysctls = []string{}
+			obj.VolumePluginDir = kubeletconfigv1beta1.DefaultVolumePluginDir
 		},
 	}
 }

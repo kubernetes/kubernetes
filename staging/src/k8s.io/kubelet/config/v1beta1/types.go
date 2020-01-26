@@ -755,6 +755,13 @@ type KubeletConfiguration struct {
 	// Default: []
 	// +optional
 	AllowedUnsafeSysctls []string `json:"allowedUnsafeSysctls,omitempty"`
+	// volumePluginDir is the full path of the directory in which to search
+	// for additional third party volume plugins.
+	// Dynamic Kubelet Config (beta): If dynamically updating this field, consider that changing
+	// the volumePluginDir may disrupt workloads relying on third party volume plugins.
+	// Default: "/usr/libexec/kubernetes/kubelet-plugins/volume/exec/"
+	// +optional
+	VolumePluginDir string `json:"volumePluginDir,omitempty"`
 }
 
 type KubeletAuthorizationMode string
