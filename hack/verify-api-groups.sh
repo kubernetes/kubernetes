@@ -56,10 +56,8 @@ for register_file in "${register_files[@]}"; do
 		group_dirnames+=("${group_dirname}")
 		expected_install_packages+=("${package}")
 	else
-		version=$(echo "${group_dirname}" | rev | cut -d/ -f1 | rev)
-		if [[ ${version} =~ v[0-9] ]]; then
-			external_group_versions+=("${group_name}/${version}")
-		fi
+		version=$(echo "${group_dirname}" | cut -d/ -f2 -)
+		external_group_versions+=("${group_name}/${version}")
 	fi
 done
 
