@@ -25,6 +25,7 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
@@ -2356,5 +2357,182 @@ func TestTruncatePodHostname(t *testing.T) {
 		output, err := truncatePodHostnameIfNeeded("test-pod", test.input)
 		assert.NoError(t, err)
 		assert.Equal(t, test.output, output)
+	}
+}
+
+func TestConvertStatusToAPIStatus(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	kubelet := testKubelet.kubelet
+	containerName := "container"
+	initContainerName := "initContainer"
+	ephemeralContainerName := "ephemeralContainer"
+	specContainerList := []v1.Container{
+		{Name: containerName},
+	}
+	// init
+	specInitContainerList := []v1.Container{
+		{Name: initContainerName},
+	}
+	// ephemeral
+	ephemeralContainerList := []v1.EphemeralContainer{
+		{EphemeralContainerCommon: v1.EphemeralContainerCommon{Name: ephemeralContainerName}},
+	}
+	pod := podWithUIDNameNs("uid1", "foo", "test")
+	podStatus := &kubecontainer.PodStatus{
+		ID:        pod.UID,
+		Name:      pod.Name,
+		Namespace: pod.Namespace,
+		//		ContainerStatuses: cStatuses,
+	}
+	for _, test := range []struct {
+		name          string
+		podSpec       v1.PodSpec
+		cStatuses     []*kubecontainer.ContainerStatus
+		wantContainer *v1.PodStatus
+	}{
+		{
+			name: "regular container",
+			podSpec: v1.PodSpec{
+				Containers: specContainerList,
+			},
+			cStatuses: []*kubecontainer.ContainerStatus{
+				{
+					ID:   kubecontainer.BuildContainerID("test", "1"),
+					Name: containerName,
+				},
+			},
+			wantContainer: &v1.PodStatus{
+				PodIPs:   []v1.PodIP{},
+				QOSClass: v1.PodQOSBestEffort,
+				ContainerStatuses: []v1.ContainerStatus{
+					{
+						ContainerID: "test://1",
+						Name:        containerName,
+						State: v1.ContainerState{
+							Waiting: &v1.ContainerStateWaiting{
+								Reason:  "",
+								Message: "",
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "init container",
+			podSpec: v1.PodSpec{
+				Containers:     specContainerList,
+				InitContainers: specInitContainerList,
+			},
+			cStatuses: []*kubecontainer.ContainerStatus{
+				{
+					ID:   kubecontainer.BuildContainerID("test", "1"),
+					Name: containerName,
+				},
+				{
+					ID:   kubecontainer.BuildContainerID("test", "2"),
+					Name: initContainerName,
+				},
+			},
+			wantContainer: &v1.PodStatus{
+				PodIPs:   []v1.PodIP{},
+				QOSClass: v1.PodQOSBestEffort,
+				ContainerStatuses: []v1.ContainerStatus{
+					{
+						ContainerID: "test://1",
+						Name:        containerName,
+						State: v1.ContainerState{
+							Waiting: &v1.ContainerStateWaiting{
+								Reason:  "",
+								Message: "",
+							},
+						},
+					},
+				},
+				InitContainerStatuses: []v1.ContainerStatus{
+					{
+						ContainerID: "test://2",
+						Name:        initContainerName,
+						State: v1.ContainerState{
+							Waiting: &v1.ContainerStateWaiting{
+								Reason:  "",
+								Message: "",
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "ephemeral container",
+			podSpec: v1.PodSpec{
+				Containers:          specContainerList,
+				InitContainers:      specInitContainerList,
+				EphemeralContainers: ephemeralContainerList,
+			},
+			cStatuses: []*kubecontainer.ContainerStatus{
+				{
+					ID:   kubecontainer.BuildContainerID("test", "1"),
+					Name: containerName,
+				},
+				{
+					ID:   kubecontainer.BuildContainerID("test", "2"),
+					Name: initContainerName,
+				},
+				{
+					ID:   kubecontainer.BuildContainerID("test", "3"),
+					Name: ephemeralContainerName,
+				},
+			},
+			wantContainer: &v1.PodStatus{
+				PodIPs:   []v1.PodIP{},
+				QOSClass: v1.PodQOSBestEffort,
+				ContainerStatuses: []v1.ContainerStatus{
+					{
+						ContainerID: "test://1",
+						Name:        containerName,
+						State: v1.ContainerState{
+							Waiting: &v1.ContainerStateWaiting{
+								Reason:  "",
+								Message: "",
+							},
+						},
+					},
+				},
+				InitContainerStatuses: []v1.ContainerStatus{
+					{
+						ContainerID: "test://2",
+						Name:        initContainerName,
+						State: v1.ContainerState{
+							Waiting: &v1.ContainerStateWaiting{
+								Reason:  "",
+								Message: "",
+							},
+						},
+					},
+				},
+				EphemeralContainerStatuses: []v1.ContainerStatus{
+					{
+						ContainerID: "test://3",
+						Name:        ephemeralContainerName,
+						State: v1.ContainerState{
+							Waiting: &v1.ContainerStateWaiting{
+								Reason:  "",
+								Message: "",
+							},
+						},
+					},
+				},
+			},
+		},
+	} {
+		pod.Spec = test.podSpec
+		podStatus.ContainerStatuses = test.cStatuses
+		apiStatus := kubelet.convertStatusToAPIStatus(pod, podStatus)
+		if diff := cmp.Diff(test.wantContainer, apiStatus); diff != "" {
+			t.Fatalf("convertStatusToAPIStatus for %q returned diff (-want +got):%v", test.name, diff)
+		}
 	}
 }
