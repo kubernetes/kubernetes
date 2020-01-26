@@ -110,6 +110,9 @@ type Framework struct {
 	// the various afterEaches
 	afterEaches map[string]AfterEachActionFunc
 
+	// beforeEachStarted indicates that BeforeEach has started
+	beforeEachStarted bool
+
 	// configuration for framework's client
 	Options Options
 
@@ -179,6 +182,8 @@ func NewFramework(baseName string, options Options, client clientset.Interface) 
 
 // BeforeEach gets a client and makes a namespace.
 func (f *Framework) BeforeEach() {
+	f.beforeEachStarted = true
+
 	// The fact that we need this feels like a bug in ginkgo.
 	// https://github.com/onsi/ginkgo/issues/222
 	f.cleanupHandle = AddCleanupAction(f.AfterEach)
@@ -356,7 +361,19 @@ func (f *Framework) AddAfterEach(name string, fn AfterEachActionFunc) {
 
 // AfterEach deletes the namespace, after reading its events.
 func (f *Framework) AfterEach() {
+	// If BeforeEach never started AfterEach should be skipped.
+	// Currently some tests under e2e/storage have this condition.
+	if !f.beforeEachStarted {
+		return
+	}
+
 	RemoveCleanupAction(f.cleanupHandle)
+
+	// This should not happen. Given ClientSet is a public field a test must have updated it!
+	// Error out early before any API calls during cleanup.
+	if f.ClientSet == nil {
+		Failf("The framework ClientSet must not be nil at this point")
+	}
 
 	// DeleteNamespace at the very end in defer, to avoid any
 	// expectation failures preventing deleting the namespace.
