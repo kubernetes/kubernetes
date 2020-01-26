@@ -18,12 +18,15 @@ package options
 
 import (
 	"github.com/spf13/pflag"
-	"k8s.io/apiserver/pkg/util/feature"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
+	"k8s.io/apiserver/pkg/util/feature"
+	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/component-base/featuregate"
 )
 
@@ -125,7 +128,14 @@ func (o *RecommendedOptions) ApplyTo(config *server.RecommendedConfig) error {
 	if err := o.EgressSelector.ApplyTo(&config.Config); err != nil {
 		return err
 	}
-
+	if feature.DefaultFeatureGate.Enabled(features.APIPriorityAndFairness) {
+		config.FlowControl = utilflowcontrol.New(
+			config.SharedInformerFactory,
+			kubernetes.NewForConfigOrDie(config.ClientConfig).FlowcontrolV1alpha1(),
+			config.MaxRequestsInFlight+config.MaxMutatingRequestsInFlight,
+			config.RequestTimeout/4,
+		)
+	}
 	return nil
 }
 

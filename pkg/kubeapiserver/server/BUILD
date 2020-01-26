@@ -11,8 +11,10 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/kubeapiserver/server",
     deps = [
         "//staging/src/k8s.io/apiserver/pkg/endpoints/filters:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/features:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server/filters:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
     ],
 )
 

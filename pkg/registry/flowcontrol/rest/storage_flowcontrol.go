@@ -155,24 +155,24 @@ func ensure(flowcontrolClientSet flowcontrolclient.FlowcontrolV1alpha1Interface,
 	for _, flowSchema := range flowSchemas {
 		_, err := flowcontrolClientSet.FlowSchemas().Create(flowSchema)
 		if apierrors.IsAlreadyExists(err) {
-			klog.V(3).Infof("system preset FlowSchema %s already exists, skipping creating", flowSchema.Name)
+			klog.V(3).Infof("Suggested FlowSchema %s already exists, skipping creating", flowSchema.Name)
 			continue
 		}
 		if err != nil {
-			return fmt.Errorf("cannot create FlowSchema %s due to %v", flowSchema.Name, err)
+			return fmt.Errorf("cannot create suggested FlowSchema %s due to %v", flowSchema.Name, err)
 		}
-		klog.V(3).Infof("created system preset FlowSchema %s", flowSchema.Name)
+		klog.V(3).Infof("Created suggested FlowSchema %s", flowSchema.Name)
 	}
 	for _, priorityLevelConfiguration := range priorityLevels {
 		_, err := flowcontrolClientSet.PriorityLevelConfigurations().Create(priorityLevelConfiguration)
 		if apierrors.IsAlreadyExists(err) {
-			klog.V(3).Infof("system preset PriorityLevelConfiguration %s already exists, skipping creating", priorityLevelConfiguration.Name)
+			klog.V(3).Infof("Suggested PriorityLevelConfiguration %s already exists, skipping creating", priorityLevelConfiguration.Name)
 			continue
 		}
 		if err != nil {
-			return fmt.Errorf("cannot create PriorityLevelConfiguration %s due to %v", priorityLevelConfiguration.Name, err)
+			return fmt.Errorf("cannot create suggested PriorityLevelConfiguration %s due to %v", priorityLevelConfiguration.Name, err)
 		}
-		klog.V(3).Infof("created system preset PriorityLevelConfiguration %s", priorityLevelConfiguration.Name)
+		klog.V(3).Infof("Created suggested PriorityLevelConfiguration %s", priorityLevelConfiguration.Name)
 	}
 	return nil
 }
@@ -183,42 +183,46 @@ func upgrade(flowcontrolClientSet flowcontrolclient.FlowcontrolV1alpha1Interface
 		if err == nil {
 			// TODO(yue9944882): extract existing version from label and compare
 			// TODO(yue9944882): create w/ version string attached
-			identical, err := flowSchemaHasWrongSpec(expectedFlowSchema, actualFlowSchema)
+			wrongSpec, err := flowSchemaHasWrongSpec(expectedFlowSchema, actualFlowSchema)
 			if err != nil {
 				return fmt.Errorf("failed checking if mandatory FlowSchema %s is up-to-date due to %v, will retry later", expectedFlowSchema.Name, err)
 			}
-			if !identical {
+			if wrongSpec {
 				if _, err := flowcontrolClientSet.FlowSchemas().Update(expectedFlowSchema); err != nil {
 					return fmt.Errorf("failed upgrading mandatory FlowSchema %s due to %v, will retry later", expectedFlowSchema.Name, err)
+				} else {
+					klog.V(3).Infof("Updated mandatory FlowSchema %s because its spec was %#+v but it must be %#+v", expectedFlowSchema.Name, actualFlowSchema.Spec, expectedFlowSchema.Spec)
 				}
 			}
 			continue
 		}
 		if !apierrors.IsNotFound(err) {
-			return fmt.Errorf("failed getting FlowSchema %s due to %v, will retry later", expectedFlowSchema.Name, err)
+			return fmt.Errorf("failed getting mandatory FlowSchema %s due to %v, will retry later", expectedFlowSchema.Name, err)
 		}
 		_, err = flowcontrolClientSet.FlowSchemas().Create(expectedFlowSchema)
 		if apierrors.IsAlreadyExists(err) {
-			klog.V(3).Infof("system preset FlowSchema %s already exists, skipping creating", expectedFlowSchema.Name)
+			klog.V(3).Infof("Mandatory FlowSchema %s already exists, skipping creating", expectedFlowSchema.Name)
 			continue
 		}
 		if err != nil {
-			return fmt.Errorf("cannot create FlowSchema %s due to %v", expectedFlowSchema.Name, err)
+			return fmt.Errorf("cannot create mandatory FlowSchema %s due to %v", expectedFlowSchema.Name, err)
 		}
-		klog.V(3).Infof("created system preset FlowSchema %s", expectedFlowSchema.Name)
+		klog.V(3).Infof("Created mandatory FlowSchema %s", expectedFlowSchema.Name)
 	}
 	for _, expectedPriorityLevelConfiguration := range priorityLevels {
 		actualPriorityLevelConfiguration, err := flowcontrolClientSet.PriorityLevelConfigurations().Get(expectedPriorityLevelConfiguration.Name, metav1.GetOptions{})
 		if err == nil {
 			// TODO(yue9944882): extract existing version from label and compare
 			// TODO(yue9944882): create w/ version string attached
-			identical, err := priorityLevelHasWrongSpec(expectedPriorityLevelConfiguration, actualPriorityLevelConfiguration)
+			wrongSpec, err := priorityLevelHasWrongSpec(expectedPriorityLevelConfiguration, actualPriorityLevelConfiguration)
 			if err != nil {
 				return fmt.Errorf("failed checking if mandatory PriorityLevelConfiguration %s is up-to-date due to %v, will retry later", expectedPriorityLevelConfiguration.Name, err)
 			}
-			if !identical {
+			if wrongSpec {
 				if _, err := flowcontrolClientSet.PriorityLevelConfigurations().Update(expectedPriorityLevelConfiguration); err != nil {
 					return fmt.Errorf("failed upgrading mandatory PriorityLevelConfiguration %s due to %v, will retry later", expectedPriorityLevelConfiguration.Name, err)
+				} else {
+					klog.V(3).Infof("Updated mandatory PriorityLevelConfiguration %s because its spec was %#+v but must be %#+v", expectedPriorityLevelConfiguration.Name, actualPriorityLevelConfiguration.Spec, expectedPriorityLevelConfiguration.Spec)
 				}
 			}
 			continue
@@ -228,13 +232,13 @@ func upgrade(flowcontrolClientSet flowcontrolclient.FlowcontrolV1alpha1Interface
 		}
 		_, err = flowcontrolClientSet.PriorityLevelConfigurations().Create(expectedPriorityLevelConfiguration)
 		if apierrors.IsAlreadyExists(err) {
-			klog.V(3).Infof("system preset PriorityLevelConfiguration %s already exists, skipping creating", expectedPriorityLevelConfiguration.Name)
+			klog.V(3).Infof("Mandatory PriorityLevelConfiguration %s already exists, skipping creating", expectedPriorityLevelConfiguration.Name)
 			continue
 		}
 		if err != nil {
-			return fmt.Errorf("cannot create PriorityLevelConfiguration %s due to %v", expectedPriorityLevelConfiguration.Name, err)
+			return fmt.Errorf("cannot create mandatory PriorityLevelConfiguration %s due to %v", expectedPriorityLevelConfiguration.Name, err)
 		}
-		klog.V(3).Infof("created system preset PriorityLevelConfiguration %s", expectedPriorityLevelConfiguration.Name)
+		klog.V(3).Infof("Created mandatory PriorityLevelConfiguration %s", expectedPriorityLevelConfiguration.Name)
 	}
 	return nil
 }

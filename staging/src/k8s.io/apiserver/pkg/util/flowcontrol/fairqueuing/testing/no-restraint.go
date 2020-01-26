@@ -35,6 +35,8 @@ type noRestraintCompeter struct{}
 
 type noRestraint struct{}
 
+type noRestraintRequest struct{}
+
 func (noRestraintFactory) BeginConstruction(qCfg fq.QueuingConfig) (fq.QueueSetCompleter, error) {
 	return noRestraintCompeter{}, nil
 }
@@ -47,9 +49,14 @@ func (noRestraint) BeginConfigChange(qCfg fq.QueuingConfig) (fq.QueueSetComplete
 	return noRestraintCompeter{}, nil
 }
 
-func (noRestraint) Quiesce(fq.EmptyHandler) {
+func (noRestraint) IsIdle() bool {
+	return false
 }
 
-func (noRestraint) Wait(ctx context.Context, hashValue uint64, descr1, descr2 interface{}) (quiescent, execute bool, afterExecution func()) {
-	return false, true, func() {}
+func (noRestraint) StartRequest(ctx context.Context, hashValue uint64, descr1, descr2 interface{}) (fq.Request, bool) {
+	return noRestraintRequest{}, false
+}
+
+func (noRestraintRequest) Wait() (execute, idle bool, afterExecution func() bool) {
+	return true, false, func() bool { return false }
 }

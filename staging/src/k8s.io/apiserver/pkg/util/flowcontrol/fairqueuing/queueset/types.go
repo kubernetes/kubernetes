@@ -17,6 +17,7 @@ limitations under the License.
 package queueset
 
 import (
+	"context"
 	"time"
 
 	"k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/promise"
@@ -25,6 +26,11 @@ import (
 // request is a temporary container for "requests" with additional
 // tracking fields required for the functionality FQScheduler
 type request struct {
+	qs  *queueSet
+	ctx context.Context
+
+	// The relevant queue.  Is nil if this request did not go through
+	// a queue.
 	queue *queue
 
 	// startTime is the real time when the request began executing
@@ -43,6 +49,9 @@ type request struct {
 	// descr1 and descr2 are not used in any logic but they appear in
 	// log messages
 	descr1, descr2 interface{}
+
+	// Indicates whether client has called Request::Wait()
+	waitStarted bool
 }
 
 // queue is an array of requests with additional metadata required for
