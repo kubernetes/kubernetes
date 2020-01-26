@@ -21,9 +21,12 @@ import (
 	"os"
 	"testing"
 	"time"
+
+	"k8s.io/klog"
 )
 
 func TestMain(m *testing.M) {
 	rand.Seed(time.Now().UnixNano())
+	klog.InitFlags(nil)
 	os.Exit(m.Run())
 }
