@@ -56,9 +56,11 @@ type queueSetCompleter struct {
 // described in this package's doc, and a pointer to one implements
 // the QueueSet interface.  The clock, GoRoutineCounter, and estimated
 // service time should not be changed; the fields listed after the
-// lock must be accessed only while holding the lock.
-// This is not yet designed to support limiting concurrency without
-// queuing (this will need to be added soon).
+// lock must be accessed only while holding the lock.  The methods of
+// this type follow the naming convention that the suffix "Locked"
+// means the caller must hold the lock; for a method whose name does
+// not end in "Locked" either acquires the lock or does not care about
+// locking.
 type queueSet struct {
 	clock                clock.PassiveClock
 	counter              counter.GoRoutineCounter
@@ -102,8 +104,6 @@ type queueSet struct {
 	// sum, over all the queues, of the number of requests executing
 	// from that queue.
 	totRequestsExecuting int
-
-	emptyHandler fq.EmptyHandler
 }
 
 // NewQueueSetFactory creates a new QueueSetFactory object
@@ -233,7 +233,7 @@ func (qs *queueSet) StartRequest(ctx context.Context, hashValue uint64, descr1, 
 			klog.V(5).Infof("QS(%s): rejecting request %#+v %#+v because %d are executing and the limit is %d", qs.qCfg.Name, descr1, descr2, qs.totRequestsExecuting, qs.dCfg.ConcurrencyLimit)
 			return nil, qs.isIdleLocked()
 		}
-		req = qs.dispatchSansQueue(ctx, descr1, descr2)
+		req = qs.dispatchSansQueueLocked(ctx, descr1, descr2)
 		metrics.UpdateFlowControlRequestsExecuting(qs.qCfg.Name, qs.totRequestsExecuting)
 		return req, false
 	}
@@ -359,12 +359,12 @@ func (qs *queueSet) syncTimeLocked() {
 	realNow := qs.clock.Now()
 	timeSinceLast := realNow.Sub(qs.lastRealTime).Seconds()
 	qs.lastRealTime = realNow
-	qs.virtualTime += timeSinceLast * qs.getVirtualTimeRatio()
+	qs.virtualTime += timeSinceLast * qs.getVirtualTimeRatioLocked()
 }
 
 // getVirtualTimeRatio calculates the rate at which virtual time has
 // been advancing, according to the logic in `doc.go`.
-func (qs *queueSet) getVirtualTimeRatio() float64 {
+func (qs *queueSet) getVirtualTimeRatioLocked() float64 {
 	activeQueues := 0
 	reqs := 0
 	for _, queue := range qs.queues {
@@ -423,9 +423,6 @@ func (qs *queueSet) chooseQueueIndexLocked(hashValue uint64, descr1, descr2 inte
 	bestQueueLen := int(math.MaxInt32)
 	// the dealer uses the current desired number of queues, which is no larger than the number in `qs.queues`.
 	qs.dealer.Deal(hashValue, func(queueIdx int) {
-		if queueIdx < 0 || queueIdx >= len(qs.queues) {
-			return
-		}
 		thisLen := len(qs.queues[queueIdx].requests)
 		klog.V(7).Infof("QS(%s): For request %#+v %#+v considering queue %d of length %d", qs.qCfg.Name, descr1, descr2, queueIdx, thisLen)
 		if thisLen < bestQueueLen {
@@ -514,7 +511,7 @@ func (qs *queueSet) dispatchAsMuchAsPossibleLocked() {
 	}
 }
 
-func (qs *queueSet) dispatchSansQueue(ctx context.Context, descr1, descr2 interface{}) *request {
+func (qs *queueSet) dispatchSansQueueLocked(ctx context.Context, descr1, descr2 interface{}) *request {
 	now := qs.clock.Now()
 	req := &request{
 		qs:          qs,
@@ -669,11 +666,6 @@ func (qs *queueSet) finishRequestLocked(r *request) {
 		if qs.robinIndex >= r.queue.index {
 			qs.robinIndex--
 		}
-
-		// At this point, if the qs is quiescing,
-		// has zero requests executing, and has zero requests enqueued
-		// then a call to the EmptyHandler should be forked.
-		qs.maybeForkEmptyHandlerLocked()
 	}
 }
 
@@ -685,18 +677,6 @@ func removeQueueAndUpdateIndexes(queues []*queue, index int) []*queue {
 		keptQueues[i].index--
 	}
 	return keptQueues
-}
-
-func (qs *queueSet) maybeForkEmptyHandlerLocked() {
-	if qs.emptyHandler != nil && qs.totRequestsWaiting == 0 &&
-		qs.totRequestsExecuting == 0 {
-		qs.preCreateOrUnblockGoroutine()
-		go func(eh fq.EmptyHandler) {
-			defer runtime.HandleCrash()
-			defer qs.goroutineDoneOrBlocked()
-			eh.HandleEmpty()
-		}(qs.emptyHandler)
-	}
 }
 
 // preCreateOrUnblockGoroutine needs to be called before creating a
