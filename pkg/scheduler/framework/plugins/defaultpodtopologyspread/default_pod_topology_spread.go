@@ -67,10 +67,19 @@ func (s *postFilterState) Clone() framework.StateData {
 	return s
 }
 
+// skipDefaultPodTopologySpread returns true if the pod's TopologySpreadConstraints are specified.
+func skipDefaultPodTopologySpread(pod *v1.Pod) bool {
+	return len(pod.Spec.TopologySpreadConstraints) != 0
+}
+
 // Score invoked at the Score extension point.
 // The "score" returned in this function is the matching number of pods on the `nodeName`,
 // it is normalized later.
 func (pl *DefaultPodTopologySpread) Score(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) (int64, *framework.Status) {
+	if skipDefaultPodTopologySpread(pod) {
+		return 0, nil
+	}
+
 	c, err := state.Read(postFilterStateKey)
 	if err != nil {
 		return 0, framework.NewStatus(framework.Error, fmt.Sprintf("Error reading %q from cycleState: %v", postFilterStateKey, err))
@@ -96,6 +105,10 @@ func (pl *DefaultPodTopologySpread) Score(ctx context.Context, state *framework.
 // where zone information is included on the nodes, it favors nodes
 // in zones with fewer existing matching pods.
 func (pl *DefaultPodTopologySpread) NormalizeScore(ctx context.Context, state *framework.CycleState, pod *v1.Pod, scores framework.NodeScoreList) *framework.Status {
+	if skipDefaultPodTopologySpread(pod) {
+		return nil
+	}
+
 	countsByZone := make(map[string]int64, 10)
 	maxCountByZone := int64(0)
 	maxCountByNodeName := int64(0)
