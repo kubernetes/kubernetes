@@ -19,9 +19,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//build/debs:all-srcs",
         "//build/release-tars:all-srcs",
-        "//build/rpms:all-srcs",
         "//build/visible_to:all-srcs",
     ],
     tags = ["automanaged"],
@@ -55,10 +53,6 @@ DOCKERIZED_BINARIES = {
     architectures = SERVER_PLATFORMS["linux"],
     base = meta["base"],
     cmd = ["/usr/bin/" + binary],
-    debs = select(for_platforms(
-        for_server = ["//build/debs:%s-{ARCH}.deb" % binary],
-        only_os = "linux",
-    )),
     # Since the multi_arch_container macro replaces the {ARCH} format string,
     # we need to escape the stamping vars.
     docker_push_tags = ["{{STABLE_DOCKER_PUSH_REGISTRY}}/%s-{ARCH}:{{STABLE_DOCKER_TAG}}" % binary],
