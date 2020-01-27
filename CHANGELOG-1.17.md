@@ -744,8 +744,6 @@ Renamed FeatureGate RequestManagement to APIPriorityAndFairness.  This feature g
 - Update to use go1.12.12 ([#84064](https://github.com/kubernetes/kubernetes/pull/84064), [@cblecker](https://github.com/cblecker))
 - Update to go 1.12.10 ([#83139](https://github.com/kubernetes/kubernetes/pull/83139), [@cblecker](https://github.com/cblecker))
 - Update default etcd server version to 3.4.3 ([#84329](https://github.com/kubernetes/kubernetes/pull/84329), [@jingyih](https://github.com/jingyih))
-- Upgrade default etcd server version to 3.3.17 ([#83804](https://github.com/kubernetes/kubernetes/pull/83804), [@jpbetz](https://github.com/jpbetz))
-- Upgrade to etcd client 3.3.17 to fix bug where etcd client does not parse IPv6 addresses correctly when members are joining, and to fix bug where failover on multi-member etcd cluster fails certificate check on DNS mismatch ([#83801](https://github.com/kubernetes/kubernetes/pull/83801), [@jpbetz](https://github.com/jpbetz))
 
 ### Detailed go Dependency Changes
 
