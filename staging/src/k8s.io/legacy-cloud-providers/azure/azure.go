@@ -227,21 +227,21 @@ type Cloud struct {
 	Config
 	Environment azure.Environment
 
-	RoutesClient                    RoutesClient
-	SubnetsClient                   SubnetsClient
-	InterfacesClient                InterfacesClient
-	RouteTablesClient               RouteTablesClient
-	LoadBalancerClient              LoadBalancersClient
-	PublicIPAddressesClient         PublicIPAddressesClient
-	SecurityGroupsClient            SecurityGroupsClient
-	VirtualMachinesClient           VirtualMachinesClient
-	StorageAccountClient            StorageAccountClient
-	DisksClient                     DisksClient
-	SnapshotsClient                 SnapshotsClient
+	RoutesClient                    routeclient.Interface
+	SubnetsClient                   subnetclient.Interface
+	InterfacesClient                interfaceclient.Interface
+	RouteTablesClient               routetableclient.Interface
+	LoadBalancerClient              loadbalancerclient.Interface
+	PublicIPAddressesClient         publicipclient.Interface
+	SecurityGroupsClient            securitygroupclient.Interface
+	VirtualMachinesClient           vmclient.Interface
+	StorageAccountClient            storageaccountclient.Interface
+	DisksClient                     diskclient.Interface
+	SnapshotsClient                 snapshotclient.Interface
 	FileClient                      FileClient
-	VirtualMachineScaleSetsClient   VirtualMachineScaleSetsClient
-	VirtualMachineScaleSetVMsClient VirtualMachineScaleSetVMsClient
-	VirtualMachineSizesClient       VirtualMachineSizesClient
+	VirtualMachineScaleSetsClient   vmssclient.Interface
+	VirtualMachineScaleSetVMsClient vmssvmclient.Interface
+	VirtualMachineSizesClient       vmsizeclient.Interface
 
 	ResourceRequestBackoff wait.Backoff
 	metadata               *InstanceMetadataService
