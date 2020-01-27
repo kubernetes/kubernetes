@@ -21,6 +21,8 @@ import (
 
 	fctypesv1a1 "k8s.io/api/flowcontrol/v1alpha1"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
+	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/apiserver/pkg/endpoints/request"
 )
 
 // Tests whether a given request and FlowSchema match.  Nobody mutates
@@ -35,34 +37,25 @@ func matchesFlowSchema(digest RequestDigest, flowSchema *fctypesv1a1.FlowSchema)
 }
 
 func matchesPolicyRule(digest RequestDigest, policyRule *fctypesv1a1.PolicyRulesWithSubjects) bool {
-	subjectMatches := false
-	for _, subject := range policyRule.Subjects {
-		if matchesSubject(digest, subject) {
-			subjectMatches = true
-			break
-		}
-	}
-	if !subjectMatches {
+	if !matchesASubject(digest.User, policyRule.Subjects) {
 		return false
 	}
 	if digest.RequestInfo.IsResourceRequest {
-		for _, rr := range policyRule.ResourceRules {
-			if matchesResourcePolicyRule(digest, rr) {
-				return true
-			}
-		}
-	} else {
-		for _, rr := range policyRule.NonResourceRules {
-			if matchesNonResourcePolicyRule(digest, rr) {
-				return true
-			}
+		return matchesAResourceRule(digest.RequestInfo, policyRule.ResourceRules)
+	}
+	return matchesANonResourceRule(digest.RequestInfo, policyRule.NonResourceRules)
+}
+
+func matchesASubject(user user.Info, subjects []fctypesv1a1.Subject) bool {
+	for _, subject := range subjects {
+		if matchesSubject(user, subject) {
+			return true
 		}
 	}
 	return false
 }
 
-func matchesSubject(digest RequestDigest, subject fctypesv1a1.Subject) bool {
-	user := digest.User
+func matchesSubject(user user.Info, subject fctypesv1a1.Subject) bool {
 	switch subject.Kind {
 	case fctypesv1a1.SubjectKindUser:
 		return subject.User != nil && (subject.User.Name == fctypesv1a1.NameAll || subject.User.Name == user.GetName())
@@ -102,27 +95,45 @@ func serviceAccountMatchesNamespace(namespace string, username string) bool {
 	return strings.HasPrefix(username, ServiceAccountUsernameSeparator)
 }
 
-func matchesResourcePolicyRule(digest RequestDigest, policyRule fctypesv1a1.ResourcePolicyRule) bool {
-	if !matchPolicyRuleVerb(policyRule.Verbs, digest.RequestInfo.Verb) {
-		return false
+func matchesAResourceRule(ri *request.RequestInfo, rules []fctypesv1a1.ResourcePolicyRule) bool {
+	for _, rr := range rules {
+		if matchesResourcePolicyRule(ri, rr) {
+			return true
+		}
 	}
-	if !matchPolicyRuleResource(policyRule.Resources, digest.RequestInfo.Resource) {
-		return false
-	}
-	if !matchPolicyRuleAPIGroup(policyRule.APIGroups, digest.RequestInfo.APIGroup) {
-		return false
-	}
-	if len(digest.RequestInfo.Namespace) == 0 {
-		return policyRule.ClusterScope
-	}
-	return containsString(digest.RequestInfo.Namespace, policyRule.Namespaces, fctypesv1a1.NamespaceEvery)
+	return false
 }
 
-func matchesNonResourcePolicyRule(digest RequestDigest, policyRule fctypesv1a1.NonResourcePolicyRule) bool {
-	if !matchPolicyRuleVerb(policyRule.Verbs, digest.RequestInfo.Verb) {
+func matchesResourcePolicyRule(ri *request.RequestInfo, policyRule fctypesv1a1.ResourcePolicyRule) bool {
+	if !matchPolicyRuleVerb(policyRule.Verbs, ri.Verb) {
 		return false
 	}
-	return matchPolicyRuleNonResourceURL(policyRule.NonResourceURLs, digest.RequestInfo.Path)
+	if !matchPolicyRuleResource(policyRule.Resources, ri.Resource, ri.Subresource) {
+		return false
+	}
+	if !matchPolicyRuleAPIGroup(policyRule.APIGroups, ri.APIGroup) {
+		return false
+	}
+	if len(ri.Namespace) == 0 {
+		return policyRule.ClusterScope
+	}
+	return containsString(ri.Namespace, policyRule.Namespaces, fctypesv1a1.NamespaceEvery)
+}
+
+func matchesANonResourceRule(ri *request.RequestInfo, rules []fctypesv1a1.NonResourcePolicyRule) bool {
+	for _, rr := range rules {
+		if matchesNonResourcePolicyRule(ri, rr) {
+			return true
+		}
+	}
+	return false
+}
+
+func matchesNonResourcePolicyRule(ri *request.RequestInfo, policyRule fctypesv1a1.NonResourcePolicyRule) bool {
+	if !matchPolicyRuleVerb(policyRule.Verbs, ri.Verb) {
+		return false
+	}
+	return matchPolicyRuleNonResourceURL(policyRule.NonResourceURLs, ri.Path)
 }
 
 func matchPolicyRuleVerb(policyRuleVerbs []string, requestVerb string) bool {
@@ -137,8 +148,16 @@ func matchPolicyRuleAPIGroup(policyRuleAPIGroups []string, requestAPIGroup strin
 	return containsString(requestAPIGroup, policyRuleAPIGroups, fctypesv1a1.APIGroupAll)
 }
 
-func matchPolicyRuleResource(policyRuleRequestResources []string, requestResource string) bool {
-	return containsString(requestResource, policyRuleRequestResources, fctypesv1a1.ResourceAll)
+func rsJoin(requestResource, requestSubresource string) string {
+	seekString := requestResource
+	if requestSubresource != "" {
+		seekString = requestResource + "/" + requestSubresource
+	}
+	return seekString
+}
+
+func matchPolicyRuleResource(policyRuleRequestResources []string, requestResource, requestSubresource string) bool {
+	return containsString(rsJoin(requestResource, requestSubresource), policyRuleRequestResources, fctypesv1a1.ResourceAll)
 }
 
 // containsString returns true if either `x` or `wildcard` is in

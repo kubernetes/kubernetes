@@ -62,7 +62,7 @@ var mandFSs = func() map[string]*fcv1a1.FlowSchema {
 
 func TestDigestConfig(t *testing.T) {
 	rngOuter := rand.New(rand.NewSource(1234567890123456789))
-	for i := 1; i <= 10; i++ {
+	for i := 1; i <= 20; i++ {
 		rng := rand.New(rand.NewSource(int64(rngOuter.Uint64())))
 		t.Run(fmt.Sprintf("trial%d:", i), func(t *testing.T) {
 			clientset := clientsetfake.NewSimpleClientset()
@@ -102,7 +102,7 @@ func TestDigestConfig(t *testing.T) {
 				}
 
 				j++
-				if j > 10 {
+				if j > 20 {
 					break
 				}
 
@@ -291,15 +291,15 @@ func genFSs(t *testing.T, rng *rand.Rand, trial string, goodPLNames, badPLNames 
 		newFSs = append(newFSs, fs)
 		newGoodFSMap[fs.Name] = fs
 		newFSDigestses[fs.Name] = &flowSchemaDigests{matches: matches, mismatches: mismatches}
-		t.Logf("Generated good FlowSchema %#+v", fs)
+		t.Logf("For trial %s, adding good FlowSchema %#+v", trial, fs)
 	}
 	if n == 0 || rng.Float32() < 0.5 {
 		addGood(fcboot.MandatoryFlowSchemaCatchAll, nil, nil)
 	}
 	for i := 1; i <= n; i++ {
-		fs, valid, _, _, matches, mismatches := genFS(t, rng, fmt.Sprintf("%s-fs%d", trial, i), goodPLNames, badPLNames)
+		fs, valid, _, _, matchesR, matchesN, mismatchesR, mismatchesN := genFS(t, rng, fmt.Sprintf("%s-fs%d", trial, i), false, goodPLNames, badPLNames)
 		if valid {
-			addGood(fs, matches, mismatches)
+			addGood(fs, append(matchesR, matchesN...), append(mismatchesR, mismatchesN...))
 		} else {
 			newFSs = append(newFSs, fs)
 		}
