@@ -72,7 +72,7 @@ func (cs callSet) FindMatch(receiver interface{}, method string, args []interfac
 	for _, call := range expected {
 		err := call.matches(args)
 		if err != nil {
-			fmt.Fprintf(&callsErrors, "\n%v", err)
+			_, _ = fmt.Fprintf(&callsErrors, "\n%v", err)
 		} else {
 			return call, nil
 		}
@@ -83,12 +83,12 @@ func (cs callSet) FindMatch(receiver interface{}, method string, args []interfac
 	exhausted := cs.exhausted[key]
 	for _, call := range exhausted {
 		if err := call.matches(args); err != nil {
-			fmt.Fprintf(&callsErrors, "\n%v", err)
+			_, _ = fmt.Fprintf(&callsErrors, "\n%v", err)
 		}
 	}
 
 	if len(expected)+len(exhausted) == 0 {
-		fmt.Fprintf(&callsErrors, "there are no expected calls of the method %q for that receiver", method)
+		_, _ = fmt.Fprintf(&callsErrors, "there are no expected calls of the method %q for that receiver", method)
 	}
 
 	return nil, fmt.Errorf(callsErrors.String())
