@@ -254,7 +254,7 @@ func WaitForPodTerminatedInNamespace(c clientset.Interface, podName, reason, nam
 
 // waitForPodSuccessInNamespaceTimeout returns nil if the pod reached state success, or an error if it reached failure or ran too long.
 func waitForPodSuccessInNamespaceTimeout(c clientset.Interface, podName string, namespace string, timeout time.Duration) error {
-	return WaitForPodCondition(c, namespace, podName, "success or failure", timeout, func(pod *v1.Pod) (bool, error) {
+	return WaitForPodCondition(c, namespace, podName, "Succeeded or Failed", timeout, func(pod *v1.Pod) (bool, error) {
 		if pod.Spec.RestartPolicy == v1.RestartPolicyAlways {
 			return true, fmt.Errorf("pod %q will never terminate with a succeeded state since its restart policy is Always", podName)
 		}
