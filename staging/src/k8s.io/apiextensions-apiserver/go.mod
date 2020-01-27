@@ -6,6 +6,7 @@ go 1.13
 
 require (
 	github.com/emicklei/go-restful v2.9.5+incompatible
+	github.com/go-openapi/analysis v0.19.7 // indirect
 	github.com/go-openapi/errors v0.19.2
 	github.com/go-openapi/spec v0.19.3
 	github.com/go-openapi/strfmt v0.19.3
@@ -34,8 +35,16 @@ require (
 )
 
 replace (
+	github.com/go-openapi/analysis => github.com/go-openapi/analysis v0.19.5
+	github.com/gophercloud/gophercloud => github.com/gophercloud/gophercloud v0.1.0
+	github.com/hashicorp/golang-lru => github.com/hashicorp/golang-lru v0.5.1
+	github.com/konsorten/go-windows-terminal-sequences => github.com/konsorten/go-windows-terminal-sequences v1.0.1
+	github.com/prometheus/client_golang => github.com/prometheus/client_golang v1.0.0
 	golang.org/x/sys => golang.org/x/sys v0.0.0-20190813064441-fde4db37ae7a // pinned to release-branch.go1.13
+	golang.org/x/time => golang.org/x/time v0.0.0-20190308202827-9d24e82272b4
 	golang.org/x/tools => golang.org/x/tools v0.0.0-20190821162956-65e3620a7ae7 // pinned to release-branch.go1.13
+	google.golang.org/api => google.golang.org/api v0.6.1-0.20190607001116-5213b8090861
+	gopkg.in/square/go-jose.v2 => gopkg.in/square/go-jose.v2 v2.2.2
 	k8s.io/api => ../api
 	k8s.io/apiextensions-apiserver => ../apiextensions-apiserver
 	k8s.io/apimachinery => ../apimachinery
