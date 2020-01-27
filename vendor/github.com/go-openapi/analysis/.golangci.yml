@@ -25,3 +25,8 @@ linters:
     # linter rather than changing code that works.
     # see: https://github.com/kyoh86/scopelint/issues/4
     - scopelint
+    - godox
+    - gocognit
+    - whitespace
+    - wsl
+    - funlen

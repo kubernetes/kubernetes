@@ -273,7 +273,7 @@ github.com/ghodss/yaml
 # github.com/go-bindata/go-bindata v3.1.1+incompatible => github.com/go-bindata/go-bindata v3.1.1+incompatible
 github.com/go-bindata/go-bindata
 github.com/go-bindata/go-bindata/go-bindata
-# github.com/go-openapi/analysis v0.19.5 => github.com/go-openapi/analysis v0.19.5
+# github.com/go-openapi/analysis v0.19.7 => github.com/go-openapi/analysis v0.19.7
 github.com/go-openapi/analysis
 github.com/go-openapi/analysis/internal
 # github.com/go-openapi/errors v0.19.2 => github.com/go-openapi/errors v0.19.2

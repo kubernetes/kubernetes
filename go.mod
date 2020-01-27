@@ -53,7 +53,7 @@ require (
 	github.com/evanphx/json-patch v4.2.0+incompatible
 	github.com/fsnotify/fsnotify v1.4.7
 	github.com/go-bindata/go-bindata v3.1.1+incompatible
-	github.com/go-openapi/analysis v0.19.5
+	github.com/go-openapi/analysis v0.19.7
 	github.com/go-openapi/loads v0.19.4
 	github.com/go-openapi/spec v0.19.3
 	github.com/go-openapi/strfmt v0.19.3
@@ -273,7 +273,7 @@ replace (
 	github.com/go-logfmt/logfmt => github.com/go-logfmt/logfmt v0.3.0
 	github.com/go-logr/logr => github.com/go-logr/logr v0.1.0
 	github.com/go-ole/go-ole => github.com/go-ole/go-ole v1.2.1
-	github.com/go-openapi/analysis => github.com/go-openapi/analysis v0.19.5
+	github.com/go-openapi/analysis => github.com/go-openapi/analysis v0.19.7
 	github.com/go-openapi/errors => github.com/go-openapi/errors v0.19.2
 	github.com/go-openapi/jsonpointer => github.com/go-openapi/jsonpointer v0.19.3
 	github.com/go-openapi/jsonreference => github.com/go-openapi/jsonreference v0.19.3
