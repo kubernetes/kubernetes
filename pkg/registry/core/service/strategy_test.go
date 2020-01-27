@@ -329,15 +329,79 @@ func TestBeforeUpdate(t *testing.T) {
 			expectErr: true,
 		},
 		{
-			name:            "clear IP family is allowed (defaulted back by before update)",
+			name:            "IPFamily is defaulted by the storage family",
 			enableDualStack: true,
 			tweakSvc: func(oldSvc, newSvc *api.Service) {
 				oldSvc.Spec.IPFamily = nil
+				newSvc.Spec.IPFamily = nil
 			},
 			expectErr: false,
 			expectObj: func(t *testing.T, svc *api.Service) {
 				if svc.Spec.IPFamily == nil {
 					t.Errorf("ipfamily was not defaulted")
+				}
+			},
+		},
+		{
+			name:            "IPFamily is defaulted by the cluster IP",
+			enableDualStack: true,
+			tweakSvc: func(oldSvc, newSvc *api.Service) {
+				oldSvc.Spec.IPFamily = nil
+				oldSvc.Spec.ClusterIP = "172.10.0.1"
+				newSvc.Spec.IPFamily = nil
+				newSvc.Spec.ClusterIP = "172.10.0.1"
+			},
+			expectErr: false,
+			expectObj: func(t *testing.T, svc *api.Service) {
+				if svc.Spec.IPFamily == nil {
+					t.Errorf("ipfamily was not defaulted")
+				}
+			},
+		},
+		{
+			name:            "IPFamily is removed when new service type is external",
+			enableDualStack: true,
+			tweakSvc: func(oldSvc, newSvc *api.Service) {
+				oldFamily := oldSvc.Spec.IPFamily
+				newSvc.Spec.Type = api.ServiceTypeExternalName
+				newSvc.Spec.IPFamily = oldFamily
+				newSvc.Spec.ExternalName = "www.google.com"
+			},
+			expectErr: false,
+			expectObj: func(t *testing.T, svc *api.Service) {
+				if svc.Spec.IPFamily != nil {
+					t.Errorf("ipfamily was defaulted: %v", *svc.Spec.IPFamily)
+				}
+			},
+		},
+		{
+			name:            "IPFamily is not removed when new service is headless",
+			enableDualStack: true,
+			tweakSvc: func(oldSvc, newSvc *api.Service) {
+				newSvc.Spec.ClusterIP = api.ClusterIPNone
+				family := api.IPv4Protocol
+				newSvc.Spec.IPFamily = &family
+			},
+			expectErr: false,
+			expectObj: func(t *testing.T, svc *api.Service) {
+				if svc.Spec.IPFamily == nil {
+					t.Errorf("ipfamily was not defaulted: %v", *svc.Spec.IPFamily)
+				}
+			},
+		},
+		{
+			name:            "IPFamily is not removed when new service is headless and has an empty selector",
+			enableDualStack: true,
+			tweakSvc: func(oldSvc, newSvc *api.Service) {
+				newSvc.Spec.ClusterIP = api.ClusterIPNone
+				newSvc.Spec.Selector = nil
+				family := api.IPv4Protocol
+				newSvc.Spec.IPFamily = &family
+			},
+			expectErr: false,
+			expectObj: func(t *testing.T, svc *api.Service) {
+				if svc.Spec.IPFamily == nil {
+					t.Errorf("ipfamily was defaulted: %v", *svc.Spec.IPFamily)
 				}
 			},
 		},

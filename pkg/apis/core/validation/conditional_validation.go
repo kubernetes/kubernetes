@@ -74,18 +74,28 @@ func validateIPFamily(service, oldService *api.Service, allowedIPFamilies []api.
 		return errs
 	}
 
+	// ExternalName or headless services may allow IPFamily nil (select all pod addresses), or either IP family (select only addresses in that family)
+	// because they are primarily focused on exposing DNS records and the flexibility to filter or expose those addresses is
+	// useful to end users. For instance, a service might start as nil (dual stack) and both A and AAAA records would be
+	// exposed. Then an end user might wish to stop exposing A records by switching the IPFamily to IPv6.
+	isServiceDNSFocused := service.Spec.Type == api.ServiceTypeExternalName || service.Spec.ClusterIP == api.ClusterIPNone
+
 	// PrepareCreate, PrepareUpdate, and test cases must all set IPFamily when the gate is on
 	if service.Spec.IPFamily == nil {
+		if isServiceDNSFocused {
+			return errs
+		}
+
 		errs = append(errs, field.Required(field.NewPath("spec", "ipFamily"), "programmer error, must be set or defaulted by other fields"))
 		return errs
 	}
 
-	// A user is not allowed to change the IPFamily field.
-	// NOTE: The initial implementation of this field allowed IPFamily to be changed for ExternalName services.
-	//       That has been removed and the field is now immutable for all service types. Relaxing immutability for
-	//       things of this type is generally easier than adding it later (which is not backwards compatible).
+	// A user is not allowed to change the IPFamily field unless the service is intended for use with DNS, which
+	// is more flexible to which addresses are returned (headless and external name services)
 	if oldService != nil && oldService.Spec.IPFamily != nil {
-		errs = append(errs, ValidateImmutableField(service.Spec.IPFamily, oldService.Spec.IPFamily, field.NewPath("spec", "ipFamily"))...)
+		if !isServiceDNSFocused {
+			errs = append(errs, ValidateImmutableField(service.Spec.IPFamily, oldService.Spec.IPFamily, field.NewPath("spec", "ipFamily"))...)
+		}
 	}
 
 	// Verify the IPFamily is one of the allowed families

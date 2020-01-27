@@ -425,7 +425,7 @@ func TestValidateServiceIPFamily(t *testing.T) {
 			expectErr: []string{"spec.ipFamily: Invalid value: \"IPv4\": field is immutable"},
 		},
 		{
-			name:             "not allowed to change ipfamily for external name (change from 1.17 alpha behavior)",
+			name:             "allowed to change ipfamily for external name",
 			dualStackEnabled: true,
 			ipFamilies:       []api.IPFamily{api.IPv4Protocol},
 			svc: &api.Service{
@@ -440,7 +440,63 @@ func TestValidateServiceIPFamily(t *testing.T) {
 					IPFamily: &ipv6,
 				},
 			},
-			expectErr: []string{"spec.ipFamily: Invalid value: \"IPv4\": field is immutable"},
+			expectErr: nil,
+		},
+		{
+			name:             "allowed to clear ipfamily for external name",
+			dualStackEnabled: true,
+			ipFamilies:       []api.IPFamily{api.IPv4Protocol},
+			svc: &api.Service{
+				Spec: api.ServiceSpec{
+					Type: api.ServiceTypeExternalName,
+				},
+			},
+			oldSvc: &api.Service{
+				Spec: api.ServiceSpec{
+					Type:     api.ServiceTypeExternalName,
+					IPFamily: &ipv6,
+				},
+			},
+			expectErr: nil,
+		},
+		{
+			name:             "allowed to change ipfamily for headless service",
+			dualStackEnabled: true,
+			ipFamilies:       []api.IPFamily{api.IPv4Protocol},
+			svc: &api.Service{
+				Spec: api.ServiceSpec{
+					Type:      api.ServiceTypeClusterIP,
+					ClusterIP: api.ClusterIPNone,
+					IPFamily:  &ipv4,
+				},
+			},
+			oldSvc: &api.Service{
+				Spec: api.ServiceSpec{
+					Type:      api.ServiceTypeClusterIP,
+					ClusterIP: api.ClusterIPNone,
+					IPFamily:  &ipv6,
+				},
+			},
+			expectErr: nil,
+		},
+		{
+			name:             "allowed to clear ipfamily for headless service",
+			dualStackEnabled: true,
+			ipFamilies:       []api.IPFamily{api.IPv4Protocol},
+			svc: &api.Service{
+				Spec: api.ServiceSpec{
+					Type:      api.ServiceTypeClusterIP,
+					ClusterIP: api.ClusterIPNone,
+				},
+			},
+			oldSvc: &api.Service{
+				Spec: api.ServiceSpec{
+					Type:      api.ServiceTypeClusterIP,
+					ClusterIP: api.ClusterIPNone,
+					IPFamily:  &ipv6,
+				},
+			},
+			expectErr: nil,
 		},
 
 		{

@@ -96,9 +96,21 @@ func (strategy svcStrategy) PrepareForCreate(ctx context.Context, obj runtime.Ob
 	service.Status = api.ServiceStatus{}
 
 	// perform contextual defaulting to the configured family, if no family has been defaulted
-	if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) && service.Spec.IPFamily == nil {
-		family := strategy.ipFamilies[0]
-		service.Spec.IPFamily = &family
+	if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
+		serviceHasCustomEndpoints := service.Spec.ClusterIP == api.ClusterIPNone && len(service.Spec.Selector) == 0
+		ipFamilyForbidden := service.Spec.Type == api.ServiceTypeExternalName
+		ipFamilyNotDefaulted := ipFamilyForbidden || serviceHasCustomEndpoints
+		if service.Spec.IPFamily == nil {
+			if ipFamilyNotDefaulted {
+			} else {
+				family := strategy.ipFamilies[0]
+				service.Spec.IPFamily = &family
+			}
+		} else {
+			if ipFamilyForbidden {
+				service.Spec.IPFamily = nil
+			}
+		}
 	}
 
 	dropServiceDisabledFields(service, nil)
@@ -111,12 +123,24 @@ func (strategy svcStrategy) PrepareForUpdate(ctx context.Context, obj, old runti
 	newService.Status = oldService.Status
 
 	// perform contextual defaulting to the configured family, if no family has been defaulted
-	if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) && newService.Spec.IPFamily == nil {
-		if oldService.Spec.IPFamily != nil {
-			newService.Spec.IPFamily = oldService.Spec.IPFamily
+	if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
+		serviceHasCustomEndpoints := newService.Spec.ClusterIP == api.ClusterIPNone && len(newService.Spec.Selector) == 0
+		ipFamilyForbidden := newService.Spec.Type == api.ServiceTypeExternalName
+		ipFamilyNotDefaulted := ipFamilyForbidden || serviceHasCustomEndpoints
+		if newService.Spec.IPFamily == nil {
+			if ipFamilyNotDefaulted {
+			} else {
+				if oldService.Spec.IPFamily != nil {
+					newService.Spec.IPFamily = oldService.Spec.IPFamily
+				} else {
+					family := strategy.ipFamilies[0]
+					newService.Spec.IPFamily = &family
+				}
+			}
 		} else {
-			family := strategy.ipFamilies[0]
-			newService.Spec.IPFamily = &family
+			if ipFamilyForbidden {
+				newService.Spec.IPFamily = nil
+			}
 		}
 	}
 
