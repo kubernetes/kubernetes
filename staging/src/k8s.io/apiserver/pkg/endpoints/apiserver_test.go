@@ -3181,11 +3181,6 @@ func TestDeleteWithOptionsQuery(t *testing.T) {
 	}
 	if res.StatusCode != http.StatusOK {
 		t.Fatalf("unexpected response: %s %#v", request.URL, res)
-		s, err := ioutil.ReadAll(res.Body)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		t.Logf(string(s))
 	}
 	if simpleStorage.deleted != ID {
 		t.Fatalf("Unexpected delete: %s, expected %s", simpleStorage.deleted, ID)
