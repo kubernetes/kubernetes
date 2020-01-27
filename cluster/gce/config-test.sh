@@ -440,6 +440,9 @@ SCHEDULING_ALGORITHM_PROVIDER="${SCHEDULING_ALGORITHM_PROVIDER:-}"
 # Optional: install a default StorageClass
 ENABLE_DEFAULT_STORAGE_CLASS="${ENABLE_DEFAULT_STORAGE_CLASS:-true}"
 
+# Optional: install an in-tree StorageClass with NTFS fsType for Windows
+ENABLE_TEST_WINDOWS_STORAGE_CLASS="${ENABLE_TEST_WINDOWS_STORAGE_CLASS:-true}"
+
 # Optional: install volume snapshot CRDs
 ENABLE_VOLUME_SNAPSHOTS="${ENABLE_VOLUME_SNAPSHOTS:-true}"
 

@@ -48,6 +48,7 @@ const (
 	mysqlGaleraManifestPath = "test/e2e/testing-manifests/statefulset/mysql-galera"
 	redisManifestPath       = "test/e2e/testing-manifests/statefulset/redis"
 	cockroachDBManifestPath = "test/e2e/testing-manifests/statefulset/cockroachdb"
+	dataMountPath           = "/data"
 	// We don't restart MySQL cluster regardless of restartCluster, since MySQL doesn't handle restart well
 	restartCluster = true
 
@@ -95,11 +96,20 @@ var _ = SIGDescribe("StatefulSet", func() {
 		headlessSvcName := "test"
 		var statefulPodMounts, podMounts []v1.VolumeMount
 		var ss *appsv1.StatefulSet
+		var scName string
 
 		ginkgo.BeforeEach(func() {
-			statefulPodMounts = []v1.VolumeMount{{Name: "datadir", MountPath: "/data/"}}
+			if framework.NodeOSDistroIs("windows") {
+				scName, _ = e2epv.GetWindowsStorageClassName(c)
+			}
+
+			statefulPodMounts = []v1.VolumeMount{{Name: "datadir", MountPath: dataMountPath}}
 			podMounts = []v1.VolumeMount{{Name: "home", MountPath: "/home"}}
-			ss = e2esset.NewStatefulSet(ssName, ns, headlessSvcName, 2, statefulPodMounts, podMounts, labels)
+			if scName != "" {
+				ss = e2esset.NewStatefulSetWithStorageClass(ssName, ns, headlessSvcName, scName, 2, statefulPodMounts, podMounts, labels)
+			} else {
+				ss = e2esset.NewStatefulSet(ssName, ns, headlessSvcName, 2, statefulPodMounts, podMounts, labels)
+			}
 
 			ginkgo.By("Creating service " + headlessSvcName + " in namespace " + ns)
 			headlessService := e2eservice.CreateServiceSpec(headlessSvcName, "", true, labels)
@@ -117,9 +127,9 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 		// This can't be Conformance yet because it depends on a default
 		// StorageClass and a dynamic provisioner.
-		ginkgo.It("should provide basic identity", func() {
+		ginkgo.It("should provide basic identity [sig-windows]", func() {
 			ginkgo.By("Creating statefulset " + ssName + " in namespace " + ns)
-			e2epv.SkipIfNoDefaultStorageClass(c)
+			e2epv.SkipIfNoStorageClass(c)
 			*(ss.Spec.Replicas) = 3
 			e2esset.PauseNewPods(ss)
 
@@ -130,7 +140,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			e2esset.Saturate(c, ss)
 
 			ginkgo.By("Verifying statefulset mounted data directory is usable")
-			framework.ExpectNoError(e2esset.CheckMount(c, ss, "/data"))
+			framework.ExpectNoError(e2esset.CheckMount(c, ss, dataMountPath))
 
 			ginkgo.By("Verifying statefulset provides a stable hostname for each pod")
 			framework.ExpectNoError(e2esset.CheckHostname(c, ss))
@@ -147,7 +157,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			e2esset.WaitForRunningAndReady(c, *ss.Spec.Replicas, ss)
 
 			ginkgo.By("Verifying statefulset mounted data directory is usable")
-			framework.ExpectNoError(e2esset.CheckMount(c, ss, "/data"))
+			framework.ExpectNoError(e2esset.CheckMount(c, ss, dataMountPath))
 
 			cmd = "if [ \"$(cat /data/hostname)\" = \"$(hostname)\" ]; then exit 0; else exit 1; fi"
 			ginkgo.By("Running " + cmd + " in all stateful pods")
@@ -156,9 +166,9 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 		// This can't be Conformance yet because it depends on a default
 		// StorageClass and a dynamic provisioner.
-		ginkgo.It("should adopt matching orphans and release non-matching pods", func() {
+		ginkgo.It("should adopt matching orphans and release non-matching pods [sig-windows]", func() {
 			ginkgo.By("Creating statefulset " + ssName + " in namespace " + ns)
-			e2epv.SkipIfNoDefaultStorageClass(c)
+			e2epv.SkipIfNoStorageClass(c)
 			*(ss.Spec.Replicas) = 1
 			e2esset.PauseNewPods(ss)
 
@@ -241,9 +251,9 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 		// This can't be Conformance yet because it depends on a default
 		// StorageClass and a dynamic provisioner.
-		ginkgo.It("should not deadlock when a pod's predecessor fails", func() {
+		ginkgo.It("should not deadlock when a pod's predecessor fails [sig-windows]", func() {
 			ginkgo.By("Creating statefulset " + ssName + " in namespace " + ns)
-			e2epv.SkipIfNoDefaultStorageClass(c)
+			e2epv.SkipIfNoStorageClass(c)
 			*(ss.Spec.Replicas) = 2
 			e2esset.PauseNewPods(ss)
 
@@ -277,9 +287,9 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 		// This can't be Conformance yet because it depends on a default
 		// StorageClass and a dynamic provisioner.
-		ginkgo.It("should perform rolling updates and roll backs of template modifications with PVCs", func() {
+		ginkgo.It("should perform rolling updates and roll backs of template modifications with PVCs [sig-windows]", func() {
 			ginkgo.By("Creating a new StatefulSet with PVCs")
-			e2epv.SkipIfNoDefaultStorageClass(c)
+			e2epv.SkipIfNoStorageClass(c)
 			*(ss.Spec.Replicas) = 3
 			rollbackTest(c, ns, ss)
 		})

@@ -53,6 +53,10 @@ const (
 
 	// VolumeSelectorKey is the key for volume selector.
 	VolumeSelectorKey = "e2e-pv-pool"
+
+	// IsWindowsStorageClassAnnotation represents a StorageClass annotation that
+	// marks a class as the Windows compatible StorageClass for e2e tests.
+	IsWindowsStorageClassAnnotation = "e2e.storageclass.kubernetes.io/windows-compatible-class"
 )
 
 var (
@@ -799,4 +803,53 @@ func SkipIfNoDefaultStorageClass(c clientset.Interface) {
 	if err != nil {
 		e2eskipper.Skipf("error finding default storageClass : %v", err)
 	}
+}
+
+// GetWindowsStorageClassName returns Windows storageClass or return error
+func GetWindowsStorageClassName(c clientset.Interface) (string, error) {
+	list, err := c.StorageV1().StorageClasses().List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		return "", fmt.Errorf("Error listing storage classes: %v", err)
+	}
+	var scName string
+	for _, sc := range list.Items {
+		if IsWindowsAnnotation(sc.ObjectMeta) {
+			if len(scName) != 0 {
+				return "", fmt.Errorf("Multiple Windows storage classes found: %q and %q", scName, sc.Name)
+			}
+			scName = sc.Name
+		}
+	}
+	if len(scName) == 0 {
+		return "", fmt.Errorf("No Windows storage class found")
+	}
+	return scName, nil
+}
+
+// SkipIfNoWindowsStorageClass skips tests if no Windows SC can be found.
+func SkipIfNoWindowsStorageClass(c clientset.Interface) {
+	_, err := GetWindowsStorageClassName(c)
+	if err != nil {
+		e2eskipper.Skipf("error finding windows storageClass : %v", err)
+	}
+}
+
+// SkipIfNoStorageClass skips tests if no default SC for linux or Windows SC
+func SkipIfNoStorageClass(c clientset.Interface) {
+	if framework.NodeOSDistroIs("windows") {
+		SkipIfNoWindowsStorageClass(c)
+	} else {
+		SkipIfNoDefaultStorageClass(c)
+	}
+
+}
+
+// IsWindowsAnnotation returns a boolean if
+// the annotation IsWindowsStorageClassAnnotation is set
+func IsWindowsAnnotation(obj metav1.ObjectMeta) bool {
+	if obj.Annotations[IsWindowsStorageClassAnnotation] == "true" {
+		return true
+	}
+
+	return false
 }

@@ -2438,6 +2438,9 @@ EOF
   if [[ "${ENABLE_DEFAULT_STORAGE_CLASS:-}" == "true" ]]; then
     setup-addon-manifests "addons" "storage-class/gce"
   fi
+  if [[ "${ENABLE_TEST_WINDOWS_STORAGE_CLASS:-}" == "true" ]]; then
+    setup-addon-manifests "addons" "storage-class/gce/windows"
+  fi
   if [[ "${ENABLE_VOLUME_SNAPSHOTS:-}" == "true" ]]; then
     setup-addon-manifests "addons" "volumesnapshots/crd"
     setup-addon-manifests "addons" "volumesnapshots/volume-snapshot-controller"

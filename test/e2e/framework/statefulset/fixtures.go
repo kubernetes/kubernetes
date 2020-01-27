@@ -42,7 +42,23 @@ func NewStatefulSet(name, ns, governingSvcName string, replicas int32, statefulP
 	for _, m := range statefulPodMounts {
 		claims = append(claims, NewStatefulSetPVC(m.Name))
 	}
+	return createStatefulSet(name, ns, governingSvcName, replicas, mounts, createHostPathVols(podMounts), claims, labels)
+}
 
+// NewStatefulSetWithStorageClass creates a new Webserver StatefulSet for testing. The StatefulSet is named name, is in namespace ns,
+// statefulPodsMounts are the mounts that will be backed by PVs with specified storageclass. podsMounts are the mounts that are mounted directly
+// to the Pod. labels are the labels that will be usd for the StatefulSet selector.
+func NewStatefulSetWithStorageClass(name, ns, governingSvcName, storageclass string, replicas int32, statefulPodMounts []v1.VolumeMount, podMounts []v1.VolumeMount, labels map[string]string) *appsv1.StatefulSet {
+	mounts := append(statefulPodMounts, podMounts...)
+	claims := []v1.PersistentVolumeClaim{}
+	for _, m := range statefulPodMounts {
+		claims = append(claims, NewStatefulSetPVCWithStorageClass(m.Name, storageclass))
+	}
+	return createStatefulSet(name, ns, governingSvcName, replicas, mounts, createHostPathVols(podMounts), claims, labels)
+}
+
+func createHostPathVols(podMounts []v1.VolumeMount) []v1.Volume {
+	hostPathType := v1.HostPathDirectoryOrCreate
 	vols := []v1.Volume{}
 	for _, m := range podMounts {
 		vols = append(vols, v1.Volume{
@@ -50,11 +66,14 @@ func NewStatefulSet(name, ns, governingSvcName string, replicas int32, statefulP
 			VolumeSource: v1.VolumeSource{
 				HostPath: &v1.HostPathVolumeSource{
 					Path: fmt.Sprintf("/tmp/%v", m.Name),
+					Type: &hostPathType,
 				},
 			},
 		})
 	}
-
+	return vols
+}
+func createStatefulSet(name, ns, governingSvcName string, replicas int32, mounts []v1.VolumeMount, vols []v1.Volume, claims []v1.PersistentVolumeClaim, labels map[string]string) *appsv1.StatefulSet {
 	return &appsv1.StatefulSet{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "StatefulSet",
@@ -109,6 +128,14 @@ func NewStatefulSetPVC(name string) v1.PersistentVolumeClaim {
 			},
 		},
 	}
+}
+
+// NewStatefulSetPVCWithStorageClass returns a PersistentVolumeClaim named name, with specified storageclass
+// for testing StatefulSets.
+func NewStatefulSetPVCWithStorageClass(name, storageclass string) v1.PersistentVolumeClaim {
+	claim := NewStatefulSetPVC(name)
+	claim.Spec.StorageClassName = &storageclass
+	return claim
 }
 
 func hasPauseProbe(pod *v1.Pod) bool {

@@ -1,0 +1,12 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: standard-ntfs 
+  annotations:
+    e2e.storageclass.kubernetes.io/windows-compatible-class: "true"
+  labels:
+    addonmanager.kubernetes.io/mode: EnsureExists
+provisioner: kubernetes.io/gce-pd
+parameters:
+  type: pd-standard
+  fstype: NTFS
