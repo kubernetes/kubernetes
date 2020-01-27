@@ -44,10 +44,19 @@ func (pl *DefaultPodTopologySpread) Name() string {
 	return Name
 }
 
+// skipDefaultPodTopologySpread returns true if the pod's TopologySpreadConstraints is specified
+// The pod's spread behavior will be calculated in workload level
+func skipDefaultPodTopologySpread(pod *v1.Pod) bool {
+	return pod.Spec.TopologySpreadConstraints != nil
+}
+
 // Score invoked at the Score extension point.
 // The "score" returned in this function is the matching number of pods on the `nodeName`,
 // it is normalized later.
 func (pl *DefaultPodTopologySpread) Score(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) (int64, *framework.Status) {
+	if skipDefaultPodTopologySpread(pod) {
+		return 0, nil
+	}
 	nodeInfo, err := pl.handle.SnapshotSharedLister().NodeInfos().Get(nodeName)
 	if err != nil {
 		return 0, framework.NewStatus(framework.Error, fmt.Sprintf("getting node %q from Snapshot: %v", nodeName, err))
@@ -60,6 +69,9 @@ func (pl *DefaultPodTopologySpread) Score(ctx context.Context, state *framework.
 
 // NormalizeScore invoked after scoring all nodes.
 func (pl *DefaultPodTopologySpread) NormalizeScore(ctx context.Context, state *framework.CycleState, pod *v1.Pod, scores framework.NodeScoreList) *framework.Status {
+	if skipDefaultPodTopologySpread(pod) {
+		return nil
+	}
 	meta := migration.PriorityMetadata(state)
 	err := pl.calculateSpreadPriorityReduce(pod, meta, pl.handle.SnapshotSharedLister(), scores)
 	return migration.ErrorToFrameworkStatus(err)

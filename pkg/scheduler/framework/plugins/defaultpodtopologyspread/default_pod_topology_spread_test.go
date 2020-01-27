@@ -337,6 +337,33 @@ func TestDefaultPodTopologySpreadScore(t *testing.T) {
 			expectedList: []framework.NodeScore{{Name: "machine1", Score: 0}, {Name: "machine2", Score: 50}},
 			name:         "Another stateful set with partial pod label matches",
 		},
+		{
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels:          labels1,
+					OwnerReferences: controllerRef("StatefulSet", "name", "abc123"),
+				},
+				Spec: v1.PodSpec{
+					TopologySpreadConstraints: []v1.TopologySpreadConstraint{
+						{
+							MaxSkew:           1,
+							TopologyKey:       "foo",
+							WhenUnsatisfiable: v1.DoNotSchedule,
+						},
+					},
+				},
+			},
+			pods: []*v1.Pod{
+				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels2, OwnerReferences: controllerRef("StatefulSet", "name", "abc123")}},
+				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("StatefulSet", "name", "abc123")}},
+				{Spec: zone2Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("StatefulSet", "name", "abc123")}},
+			},
+			nodes: []string{"machine1", "machine2"},
+			sss:   []*apps.StatefulSet{{Spec: apps.StatefulSetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"baz": "blah"}}}}},
+			// We use StatefulSet, instead of ReplicationController. The result should be exactly as above.
+			expectedList: []framework.NodeScore{{Name: "machine1", Score: 0}, {Name: "machine2", Score: 0}},
+			name:         "Another stateful set with partial pod label matches",
+		},
 	}
 
 	for _, test := range tests {
