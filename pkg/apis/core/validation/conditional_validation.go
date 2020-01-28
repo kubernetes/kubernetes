@@ -62,12 +62,14 @@ func validateIPFamily(service, oldService *api.Service, allowedIPFamilies []api.
 		return errs
 	}
 
-	// If the gate is off, setting or changing IPFamily is not allowed
+	// If the gate is off, setting or changing IPFamily is not allowed, but clearing it is
 	if !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
-		if oldService != nil {
-			errs = append(errs, ValidateImmutableField(service.Spec.IPFamily, oldService.Spec.IPFamily, field.NewPath("spec", "ipFamily"))...)
-		} else if service.Spec.IPFamily != nil {
-			errs = append(errs, field.Forbidden(field.NewPath("spec", "ipFamily"), "programmer error, must be cleared when the dual-stack feature gate is off"))
+		if service.Spec.IPFamily != nil {
+			if oldService != nil {
+				errs = append(errs, ValidateImmutableField(service.Spec.IPFamily, oldService.Spec.IPFamily, field.NewPath("spec", "ipFamily"))...)
+			} else {
+				errs = append(errs, field.Forbidden(field.NewPath("spec", "ipFamily"), "programmer error, must be cleared when the dual-stack feature gate is off"))
+			}
 		}
 		return errs
 	}

@@ -465,6 +465,25 @@ func TestValidateServiceIPFamily(t *testing.T) {
 			},
 			expectErr: []string{"spec.ipFamily: Forbidden: programmer error, must be cleared when the dual-stack feature gate is off"},
 		},
+		{
+			name:             "ipfamily allowed to be cleared when dual stack is off",
+			dualStackEnabled: false,
+			ipFamilies:       []api.IPFamily{api.IPv4Protocol},
+			svc: &api.Service{
+				Spec: api.ServiceSpec{
+					Type:      api.ServiceTypeClusterIP,
+					ClusterIP: "127.0.0.1",
+				},
+			},
+			oldSvc: &api.Service{
+				Spec: api.ServiceSpec{
+					Type:      api.ServiceTypeClusterIP,
+					ClusterIP: "127.0.0.1",
+					IPFamily:  &ipv4,
+				},
+			},
+			expectErr: nil,
+		},
 	}
 
 	for _, tc := range testCases {
