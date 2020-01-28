@@ -472,6 +472,57 @@ func TestReflectorNotPaginatingNotConsistentReads(t *testing.T) {
 	}
 }
 
+func TestReflectorPaginatingNonConsistentReadsIfWatchCacheDisabled(t *testing.T) {
+	var stopCh chan struct{}
+	s := NewStore(MetaNamespaceKeyFunc)
+
+	lw := &testLW{
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+			// Stop once the reflector begins watching since we're only interested in the list.
+			close(stopCh)
+			fw := watch.NewFake()
+			return fw, nil
+		},
+		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+			// Check that default pager limit is set.
+			if options.Limit != 500 {
+				t.Fatalf("Expected list Limit of 500 but got %d", options.Limit)
+			}
+			pods := make([]v1.Pod, 10)
+			for i := 0; i < 10; i++ {
+				pods[i] = v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("pod-%d", i), ResourceVersion: fmt.Sprintf("%d", i)}}
+			}
+			switch options.Continue {
+			case "":
+				return &v1.PodList{ListMeta: metav1.ListMeta{ResourceVersion: "10", Continue: "C1"}, Items: pods[0:4]}, nil
+			case "C1":
+				return &v1.PodList{ListMeta: metav1.ListMeta{ResourceVersion: "10", Continue: "C2"}, Items: pods[4:8]}, nil
+			case "C2":
+				return &v1.PodList{ListMeta: metav1.ListMeta{ResourceVersion: "10"}, Items: pods[8:10]}, nil
+			default:
+				t.Fatalf("Unrecognized continue: %s", options.Continue)
+			}
+			return nil, nil
+		},
+	}
+	r := NewReflector(lw, &v1.Pod{}, s, 0)
+
+	// Initial list should initialize paginatedResult in the reflector.
+	stopCh = make(chan struct{})
+	r.ListAndWatch(stopCh)
+	if results := s.List(); len(results) != 10 {
+		t.Errorf("Expected 10 results, got %d", len(results))
+	}
+
+	// Since initial list for ResourceVersion="0" was paginated, the subsequent
+	// ones should also be paginated.
+	stopCh = make(chan struct{})
+	r.ListAndWatch(stopCh)
+	if results := s.List(); len(results) != 10 {
+		t.Errorf("Expected 10 results, got %d", len(results))
+	}
+}
+
 // TestReflectorResyncWithResourceVersion ensures that a reflector keeps track of the ResourceVersion and sends
 // it in relist requests to prevent the reflector from traveling back in time if the relist is to a api-server or
 // etcd that is partitioned and serving older data than the reflector has already processed.

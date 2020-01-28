@@ -304,7 +304,7 @@ func TestListResourceVersion0(t *testing.T) {
 
 			p := pager.New(pager.SimplePageFunc(pagerFn))
 			p.PageSize = 3
-			listObj, err := p.List(context.Background(), metav1.ListOptions{ResourceVersion: "0"})
+			listObj, _, err := p.List(context.Background(), metav1.ListOptions{ResourceVersion: "0"})
 			if err != nil {
 				t.Fatalf("Unexpected list error: %v", err)
 			}
@@ -360,7 +360,7 @@ func TestAPIListChunking(t *testing.T) {
 			return list, err
 		}),
 	}
-	listObj, err := p.List(context.Background(), metav1.ListOptions{})
+	listObj, _, err := p.List(context.Background(), metav1.ListOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}

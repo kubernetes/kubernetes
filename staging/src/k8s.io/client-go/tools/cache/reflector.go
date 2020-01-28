@@ -75,6 +75,9 @@ type Reflector struct {
 	ShouldResync func() bool
 	// clock allows tests to manipulate time
 	clock clock.Clock
+	// paginatedResult defines whether pagination should be forced for list calls.
+	// It is set based on the result of the initial list call.
+	paginatedResult bool
 	// lastSyncResourceVersion is the resource version token last
 	// observed when doing a sync with the underlying store
 	// it is thread safe, but not synchronized with the underlying store
@@ -209,6 +212,7 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 		initTrace := trace.New("Reflector ListAndWatch", trace.Field{"name", r.name})
 		defer initTrace.LogIfLong(10 * time.Second)
 		var list runtime.Object
+		var paginatedResult bool
 		var err error
 		listCh := make(chan struct{}, 1)
 		panicCh := make(chan interface{}, 1)
@@ -223,26 +227,30 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 			pager := pager.New(pager.SimplePageFunc(func(opts metav1.ListOptions) (runtime.Object, error) {
 				return r.listerWatcher.List(opts)
 			}))
-			if r.WatchListPageSize != 0 {
+			switch {
+			case r.WatchListPageSize != 0:
 				pager.PageSize = r.WatchListPageSize
-			} else {
+			case r.paginatedResult:
+				// We got a paginated result initially. Assume this resource and server honor
+				// paging requests (i.e. watch cache is probably disabled) and leave the default
+				// pager size set.
+			case options.ResourceVersion != "" && options.ResourceVersion != "0":
 				// User didn't explicitly request pagination.
-				if options.ResourceVersion != "" && options.ResourceVersion != "0" {
-					// We also don't turn off pagination for ResourceVersion="0", since watch cache
-					// is ignoring Limit in that case anyway, and if watchcache is not enabled we
-					// don't introduce regression.
-
-					// With ResourceVersion != "", we have a possibility to list from watch cache,
-					// but we do that (for ResourceVersion != "0") only if Limit is unset.
-					// To avoid thundering herd on etcd (e.g. on master upgrades), we explicitly
-					// switch off pagination to force listing from watch cache (if enabled).
-					// With the existing semantic of RV (result is at least as fresh as provided RV),
-					// this is correct and doesn't lead to going back in time.
-					pager.PageSize = 0
-				}
+				//
+				// With ResourceVersion != "", we have a possibility to list from watch cache,
+				// but we do that (for ResourceVersion != "0") only if Limit is unset.
+				// To avoid thundering herd on etcd (e.g. on master upgrades), we explicitly
+				// switch off pagination to force listing from watch cache (if enabled).
+				// With the existing semantic of RV (result is at least as fresh as provided RV),
+				// this is correct and doesn't lead to going back in time.
+				//
+				// We also don't turn off pagination for ResourceVersion="0", since watch cache
+				// is ignoring Limit in that case anyway, and if watch cache is not enabled
+				// we don't introduce regression.
+				pager.PageSize = 0
 			}
 
-			list, err = pager.List(context.Background(), options)
+			list, paginatedResult, err = pager.List(context.Background(), options)
 			if isExpiredError(err) {
 				r.setIsLastSyncResourceVersionExpired(true)
 				// Retry immediately if the resource version used to list is expired.
@@ -250,7 +258,7 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 				// continuation pages, but the pager might not be enabled, or the full list might fail because the
 				// resource version it is listing at is expired, so we need to fallback to resourceVersion="" in all
 				// to recover and ensure the reflector makes forward progress.
-				list, err = pager.List(context.Background(), metav1.ListOptions{ResourceVersion: r.relistResourceVersion()})
+				list, paginatedResult, err = pager.List(context.Background(), metav1.ListOptions{ResourceVersion: r.relistResourceVersion()})
 			}
 			close(listCh)
 		}()
@@ -264,6 +272,21 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 		if err != nil {
 			return fmt.Errorf("%s: Failed to list %v: %v", r.name, r.expectedTypeName, err)
 		}
+
+		// We check if the list was paginated and if so set the paginatedResult based on that.
+		// However, we want to do that only for the initial list (which is the only case
+		// when we set ResourceVersion="0"). The reasoning behind it is that later, in some
+		// situations we may force listing directly from etcd (by setting ResourceVersion="")
+		// which will return paginated result, even if watch cache is enabled. However, in
+		// that case, we still want to prefer sending requests to watch cache if possible.
+		//
+		// Paginated result returned for request with ResourceVersion="0" mean that watch
+		// cache is disabled and there are a lot of objects of a given type. In such case,
+		// there is no need to prefer listing from watch cache.
+		if options.ResourceVersion == "0" && paginatedResult {
+			r.paginatedResult = true
+		}
+
 		r.setIsLastSyncResourceVersionExpired(false) // list was successful
 		initTrace.Step("Objects listed")
 		listMetaInterface, err := meta.ListAccessor(list)
