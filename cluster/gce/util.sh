@@ -83,14 +83,16 @@ function set-linux-node-image() {
 # Requires:
 #   WINDOWS_NODE_OS_DISTRIBUTION
 # Sets:
-#   WINDOWS_NODE_IMAGE_FAMILY
 #   WINDOWS_NODE_IMAGE_PROJECT
+#   WINDOWS_NODE_IMAGE
 function set-windows-node-image() {
   WINDOWS_NODE_IMAGE_PROJECT="windows-cloud"
   if [[ "${WINDOWS_NODE_OS_DISTRIBUTION}" == "win2019" ]]; then
-    WINDOWS_NODE_IMAGE_FAMILY="windows-2019-core-for-containers"
+    WINDOWS_NODE_IMAGE="windows-server-2019-dc-core-for-containers-v20200114"
+  elif [[ "${WINDOWS_NODE_OS_DISTRIBUTION}" == "win1909" ]]; then
+    WINDOWS_NODE_IMAGE="windows-server-1909-dc-core-for-containers-v20200114"
   elif [[ "${WINDOWS_NODE_OS_DISTRIBUTION}" == "win1809" ]]; then
-    WINDOWS_NODE_IMAGE_FAMILY="windows-1809-core-for-containers"
+    WINDOWS_NODE_IMAGE="windows-server-1809-dc-core-for-containers-v20200114"
   else
     echo "Unknown WINDOWS_NODE_OS_DISTRIBUTION ${WINDOWS_NODE_OS_DISTRIBUTION}" >&2
     exit 1
@@ -2206,9 +2208,7 @@ function create-node-template() {
   if [[ "${os}" == 'linux' ]]; then
       node_image_flags="--image-project ${NODE_IMAGE_PROJECT} --image ${NODE_IMAGE}"
   elif [[ "${os}" == 'windows' ]]; then
-      # TODO(pjh): revert back to using WINDOWS_NODE_IMAGE_FAMILY instead of
-      # pinning to the v20190312 image once #76666 is resolved.
-      node_image_flags="--image-project ${WINDOWS_NODE_IMAGE_PROJECT} --image=windows-server-1809-dc-core-for-containers-v20190709"
+      node_image_flags="--image-project ${WINDOWS_NODE_IMAGE_PROJECT} --image ${WINDOWS_NODE_IMAGE}"
   else
       echo "Unknown OS ${os}" >&2
       exit 1
