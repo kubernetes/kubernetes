@@ -371,7 +371,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 
 // waitForFailure waits for pod to fail.
 func waitForFailure(f *framework.Framework, name string, timeout time.Duration) {
-	gomega.Expect(e2epod.WaitForPodCondition(f.ClientSet, f.Namespace.Name, name, "success or failure", timeout,
+	gomega.Expect(e2epod.WaitForPodCondition(f.ClientSet, f.Namespace.Name, name, fmt.Sprintf("%s or %s", v1.PodSucceeded, v1.PodFailed), timeout,
 		func(pod *v1.Pod) (bool, error) {
 			switch pod.Status.Phase {
 			case v1.PodFailed:

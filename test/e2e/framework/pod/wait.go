@@ -253,8 +253,8 @@ func WaitForPodTerminatedInNamespace(c clientset.Interface, podName, reason, nam
 }
 
 // waitForPodSuccessInNamespaceTimeout returns nil if the pod reached state success, or an error if it reached failure or ran too long.
-func waitForPodSuccessInNamespaceTimeout(c clientset.Interface, podName string, namespace string, timeout time.Duration) error {
-	return WaitForPodCondition(c, namespace, podName, "success or failure", timeout, func(pod *v1.Pod) (bool, error) {
+func waitForPodSuccessInNamespaceTimeout(c clientset.Interface, podName, namespace string, timeout time.Duration) error {
+	return WaitForPodCondition(c, namespace, podName, fmt.Sprintf("%s or %s", v1.PodSucceeded, v1.PodFailed), timeout, func(pod *v1.Pod) (bool, error) {
 		if pod.Spec.RestartPolicy == v1.RestartPolicyAlways {
 			return true, fmt.Errorf("pod %q will never terminate with a succeeded state since its restart policy is Always", podName)
 		}
@@ -275,12 +275,12 @@ func waitForPodSuccessInNamespaceTimeout(c clientset.Interface, podName string, 
 // if the pod Get api returns an error (IsNotFound or other), or if the pod failed with an unexpected reason.
 // Typically called to test that the passed-in pod is Pending and Unschedulable.
 func WaitForPodNameUnschedulableInNamespace(c clientset.Interface, podName, namespace string) error {
-	return WaitForPodCondition(c, namespace, podName, "Unschedulable", podStartTimeout, func(pod *v1.Pod) (bool, error) {
+	return WaitForPodCondition(c, namespace, podName, v1.PodReasonUnschedulable, podStartTimeout, func(pod *v1.Pod) (bool, error) {
 		// Only consider Failed pods. Successful pods will be deleted and detected in
 		// waitForPodCondition's Get call returning `IsNotFound`
 		if pod.Status.Phase == v1.PodPending {
 			for _, cond := range pod.Status.Conditions {
-				if cond.Type == v1.PodScheduled && cond.Status == v1.ConditionFalse && cond.Reason == "Unschedulable" {
+				if cond.Type == v1.PodScheduled && cond.Status == v1.ConditionFalse && cond.Reason == v1.PodReasonUnschedulable {
 					return true, nil
 				}
 			}
