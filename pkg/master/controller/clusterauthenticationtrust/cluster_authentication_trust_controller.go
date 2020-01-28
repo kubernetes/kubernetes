@@ -27,7 +27,6 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -109,7 +108,7 @@ func NewClusterAuthenticationTrustController(requiredAuthenticationData ClusterA
 				return cast.Name == configMapName
 			}
 			if tombstone, ok := obj.(cache.DeletedFinalStateUnknown); ok {
-				if cast, ok := tombstone.Obj.(*apiextensions.CustomResourceDefinition); ok {
+				if cast, ok := tombstone.Obj.(*corev1.ConfigMap); ok {
 					return cast.Name == configMapName
 				}
 			}
