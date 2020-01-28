@@ -33,11 +33,13 @@ import (
 	"k8s.io/gengo/generator"
 	"k8s.io/gengo/namer"
 	"k8s.io/gengo/types"
+	"sigs.k8s.io/yaml"
 
 	"k8s.io/klog"
 )
 
 const (
+	goModFile          = "go.mod"
 	importBossFileType = "import-boss"
 )
 
@@ -58,7 +60,7 @@ func DefaultNameSystem() string {
 func Packages(c *generator.Context, arguments *args.GeneratorArgs) generator.Packages {
 	pkgs := generator.Packages{}
 	c.FileTypes = map[string]generator.FileType{
-		importBossFileType: importRuleFile{},
+		importBossFileType: importRuleFile{c},
 	}
 
 	for _, p := range c.Universe {
@@ -70,6 +72,7 @@ func Packages(c *generator.Context, arguments *args.GeneratorArgs) generator.Pac
 		pkgs = append(pkgs, &generator.DefaultPackage{
 			PackageName: p.Name,
 			PackagePath: p.Path,
+			Source:      p.SourcePath,
 			// GeneratorFunc returns a list of generators. Each generator makes a
 			// single file.
 			GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
@@ -96,10 +99,19 @@ type Rule struct {
 	ForbiddenPrefixes []string
 }
 
+type InverseRule struct {
+	Rule
+	// True if the rule is to be applied to transitive imports.
+	Transitive bool
+}
+
 type fileFormat struct {
 	CurrentImports []string
 
-	Rules []Rule
+	Rules        []Rule
+	InverseRules []InverseRule
+
+	path string
 }
 
 func readFile(path string) (*fileFormat, error) {
@@ -109,10 +121,11 @@ func readFile(path string) (*fileFormat, error) {
 	}
 
 	var current fileFormat
-	err = json.Unmarshal(currentBytes, &current)
+	err = yaml.Unmarshal(currentBytes, &current)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't unmarshal %v: %v", path, err)
 	}
+	current.path = path
 	return &current, nil
 }
 
@@ -131,10 +144,12 @@ func writeFile(path string, ff *fileFormat) error {
 }
 
 // This does the actual checking, since it knows the literal destination file.
-type importRuleFile struct{}
+type importRuleFile struct {
+	context *generator.Context
+}
 
-func (importRuleFile) AssembleFile(f *generator.File, path string) error {
-	return nil
+func (irf importRuleFile) AssembleFile(f *generator.File, path string) error {
+	return irf.VerifyFile(f, path)
 }
 
 // TODO: make a flag to enable this, or expose this information in some other way.
@@ -169,62 +184,99 @@ func removeLastDir(path string) (newPath, removedDir string) {
 	return filepath.Join(filepath.Dir(dir), file), filepath.Base(dir)
 }
 
-// Keep going up a directory until we find an .import-restrictions file.
-func recursiveRead(path string) (*fileFormat, string, error) {
+// isGoModRoot checks if a directory is the root directory for a package
+// by checking for the existence of a 'go.mod' file in that directory.
+func isGoModRoot(path string) bool {
+	_, err := os.Stat(filepath.Join(filepath.Dir(path), goModFile))
+	return err == nil
+}
+
+// recursiveRead collects all '.import-restriction' files, between the current directory,
+// and the package root when Go modules are enabled, or $GOPATH/src when they are not.
+func recursiveRead(path string) ([]*fileFormat, error) {
+	restrictionFiles := make([]*fileFormat, 0)
+
 	for {
 		if _, err := os.Stat(path); err == nil {
-			ff, err := readFile(path)
-			return ff, path, err
+			rules, err := readFile(path)
+			if err != nil {
+				return nil, err
+			}
+
+			restrictionFiles = append(restrictionFiles, rules)
 		}
 
 		nextPath, removedDir := removeLastDir(path)
-		if nextPath == path || removedDir == "src" {
+		if nextPath == path || isGoModRoot(path) || removedDir == "src" {
 			break
 		}
+
 		path = nextPath
 	}
-	return nil, "", nil
+
+	return restrictionFiles, nil
 }
 
-func (importRuleFile) VerifyFile(f *generator.File, path string) error {
-	rules, actualPath, err := recursiveRead(path)
+func (irf importRuleFile) VerifyFile(f *generator.File, path string) error {
+	restrictionFiles, err := recursiveRead(filepath.Join(f.PackageSourcePath, f.Name))
 	if err != nil {
 		return fmt.Errorf("error finding rules file: %v", err)
 	}
 
-	if rules == nil {
-		// No restrictions on this directory.
-		return nil
+	if err := irf.verifyRules(restrictionFiles, f); err != nil {
+		return err
+	}
+
+	return irf.verifyInverseRules(restrictionFiles, f)
+}
+
+func (irf importRuleFile) verifyRules(restrictionFiles []*fileFormat, f *generator.File) error {
+	selectors := make([][]*regexp.Regexp, len(restrictionFiles))
+	for i, restrictionFile := range restrictionFiles {
+		for _, r := range restrictionFile.Rules {
+			re, err := regexp.Compile(r.SelectorRegexp)
+			if err != nil {
+				return fmt.Errorf("regexp `%s` in file %q doesn't compile: %v", r.SelectorRegexp, restrictionFile.path, err)
+			}
+
+			selectors[i] = append(selectors[i], re)
+		}
 	}
 
 	forbiddenImports := map[string]string{}
 	allowedMismatchedImports := []string{}
-	for _, r := range rules.Rules {
-		re, err := regexp.Compile(r.SelectorRegexp)
-		if err != nil {
-			return fmt.Errorf("regexp `%s` in file %q doesn't compile: %v", r.SelectorRegexp, actualPath, err)
-		}
-		for v := range f.Imports {
-			klog.V(4).Infof("Checking %v matches %v: %v\n", r.SelectorRegexp, v, re.MatchString(v))
-			if !re.MatchString(v) {
-				continue
-			}
-			for _, forbidden := range r.ForbiddenPrefixes {
-				klog.V(4).Infof("Checking %v against %v\n", v, forbidden)
-				if strings.HasPrefix(v, forbidden) {
-					forbiddenImports[v] = forbidden
+
+	for v := range f.Imports {
+		explicitlyAllowed := false
+
+	NextRestrictionFiles:
+		for i, rules := range restrictionFiles {
+			for j, r := range rules.Rules {
+				matching := selectors[i][j].MatchString(v)
+				klog.V(5).Infof("Checking %v matches %v: %v\n", r.SelectorRegexp, v, matching)
+				if !matching {
+					continue
 				}
-			}
-			found := false
-			for _, allowed := range r.AllowedPrefixes {
-				klog.V(4).Infof("Checking %v against %v\n", v, allowed)
-				if strings.HasPrefix(v, allowed) {
-					found = true
-					break
+				for _, forbidden := range r.ForbiddenPrefixes {
+					klog.V(4).Infof("Checking %v against %v\n", v, forbidden)
+					if strings.HasPrefix(v, forbidden) {
+						forbiddenImports[v] = forbidden
+					}
 				}
-			}
-			if !found {
-				allowedMismatchedImports = append(allowedMismatchedImports, v)
+				for _, allowed := range r.AllowedPrefixes {
+					klog.V(4).Infof("Checking %v against %v\n", v, allowed)
+					if strings.HasPrefix(v, allowed) {
+						explicitlyAllowed = true
+						break
+					}
+				}
+
+				if !explicitlyAllowed {
+					allowedMismatchedImports = append(allowedMismatchedImports, v)
+				} else {
+					klog.V(2).Infof("%v importing %v allowed by %v\n", f.PackagePath, v, restrictionFiles[i].path)
+					break NextRestrictionFiles
+				}
 			}
 		}
 	}
@@ -243,8 +295,85 @@ func (importRuleFile) VerifyFile(f *generator.File, path string) error {
 		}
 		return errors.New(errorBuilder.String())
 	}
-	if len(rules.Rules) > 0 {
-		klog.V(2).Infof("%v passes rules found in %v\n", path, actualPath)
+
+	return nil
+}
+
+// verifyInverseRules checks that all packages that import a package are allowed to import it.
+func (irf importRuleFile) verifyInverseRules(restrictionFiles []*fileFormat, f *generator.File) error {
+	// compile all Selector regex in all restriction files
+	selectors := make([][]*regexp.Regexp, len(restrictionFiles))
+	for i, restrictionFile := range restrictionFiles {
+		for _, r := range restrictionFile.InverseRules {
+			re, err := regexp.Compile(r.SelectorRegexp)
+			if err != nil {
+				return fmt.Errorf("regexp `%s` in file %q doesn't compile: %v", r.SelectorRegexp, restrictionFile.path, err)
+			}
+
+			selectors[i] = append(selectors[i], re)
+		}
+	}
+
+	directImport := map[string]bool{}
+	for _, imp := range irf.context.IncomingImports()[f.PackagePath] {
+		directImport[imp] = true
+	}
+
+	forbiddenImports := map[string]string{}
+	allowedMismatchedImports := []string{}
+
+	for _, v := range irf.context.TransitiveIncomingImports()[f.PackagePath] {
+		explicitlyAllowed := false
+
+	NextRestrictionFiles:
+		for i, rules := range restrictionFiles {
+			for j, r := range rules.InverseRules {
+				if !r.Transitive && !directImport[v] {
+					continue
+				}
+
+				re := selectors[i][j]
+				matching := re.MatchString(v)
+				klog.V(4).Infof("Checking %v matches %v (importing %v: %v\n", r.SelectorRegexp, v, f.PackagePath, matching)
+				if !matching {
+					continue
+				}
+				for _, forbidden := range r.ForbiddenPrefixes {
+					klog.V(4).Infof("Checking %v against %v\n", v, forbidden)
+					if strings.HasPrefix(v, forbidden) {
+						forbiddenImports[v] = forbidden
+					}
+				}
+				for _, allowed := range r.AllowedPrefixes {
+					klog.V(4).Infof("Checking %v against %v\n", v, allowed)
+					if strings.HasPrefix(v, allowed) {
+						explicitlyAllowed = true
+						break
+					}
+				}
+				if !explicitlyAllowed {
+					allowedMismatchedImports = append(allowedMismatchedImports, v)
+				} else {
+					klog.V(2).Infof("%v importing %v allowed by %v\n", v, f.PackagePath, restrictionFiles[i].path)
+					break NextRestrictionFiles
+				}
+			}
+		}
+	}
+
+	if len(forbiddenImports) > 0 || len(allowedMismatchedImports) > 0 {
+		var errorBuilder strings.Builder
+		for i, f := range forbiddenImports {
+			fmt.Fprintf(&errorBuilder, "(inverse): import %v has forbidden prefix %v\n", i, f)
+		}
+		if len(allowedMismatchedImports) > 0 {
+			sort.Sort(sort.StringSlice(allowedMismatchedImports))
+			fmt.Fprintf(&errorBuilder, "(inverse): the following imports did not match any allowed prefix:\n")
+			for _, i := range allowedMismatchedImports {
+				fmt.Fprintf(&errorBuilder, "  %v\n", i)
+			}
+		}
+		return errors.New(errorBuilder.String())
 	}
 
 	return nil

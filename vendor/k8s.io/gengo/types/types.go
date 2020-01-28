@@ -135,6 +135,10 @@ type Package struct {
 	// package name).
 	Variables map[string]*Type
 
+	// Global constants within this package, indexed by their name (*not* including
+	// package name).
+	Constants map[string]*Type
+
 	// Packages imported by this package, indexed by (canonicalized)
 	// package path.
 	Imports map[string]*Package
@@ -193,6 +197,20 @@ func (p *Package) Variable(varName string) *Type {
 	return t
 }
 
+// Constant gets the given constant Type in this Package. If the constant is
+// not already defined, this will add it. If a constant is added, it's the caller's
+// responsibility to finish construction of the constant by setting Underlying
+// to the correct type.
+func (p *Package) Constant(constName string) *Type {
+	if t, ok := p.Constants[constName]; ok {
+		return t
+	}
+	t := &Type{Name: Name{Package: p.Path, Name: constName}}
+	t.Kind = DeclarationOf
+	p.Constants[constName] = t
+	return t
+}
+
 // HasImport returns true if p imports packageName. Package names include the
 // package directory.
 func (p *Package) HasImport(packageName string) bool {
@@ -229,6 +247,14 @@ func (u Universe) Variable(n Name) *Type {
 	return u.Package(n.Package).Variable(n.Name)
 }
 
+// Constant returns the canonical constant for the given fully-qualified name.
+// If a non-existing constant is requested, this will create (a marker for) it.
+// If a marker is created, it's the caller's responsibility to finish
+// construction of the constant by setting Underlying to the correct type.
+func (u Universe) Constant(n Name) *Type {
+	return u.Package(n.Package).Constant(n.Name)
+}
+
 // AddImports registers import lines for packageName. May be called multiple times.
 // You are responsible for canonicalizing all package paths.
 func (u Universe) AddImports(packagePath string, importPaths ...string) {
@@ -251,6 +277,7 @@ func (u Universe) Package(packagePath string) *Package {
 		Types:     map[string]*Type{},
 		Functions: map[string]*Type{},
 		Variables: map[string]*Type{},
+		Constants: map[string]*Type{},
 		Imports:   map[string]*Package{},
 	}
 	u[packagePath] = p
