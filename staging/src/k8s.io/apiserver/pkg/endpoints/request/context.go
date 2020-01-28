@@ -22,6 +22,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/utils/trace"
 )
 
 // The key type is unexported to prevent collisions
@@ -39,6 +40,9 @@ const (
 
 	// audiencesKey is the context key for request audiences.
 	audiencesKey
+
+	// audiencesKey is the context key for request audiences.
+	traceStepKey
 )
 
 // NewContext instantiates a base context object for request flows.
@@ -82,6 +86,17 @@ func WithUser(parent context.Context, user user.Info) context.Context {
 func UserFrom(ctx context.Context) (user.Info, bool) {
 	user, ok := ctx.Value(userKey).(user.Info)
 	return user, ok
+}
+
+// WithTraceStep returns a copy of parent in which the trace object value is set
+func WithTraceStep(parent context.Context, traceStep func(msg string, fields ...trace.Field)) context.Context {
+	return WithValue(parent, traceStepKey, traceStep)
+}
+
+// TraceFrom returns the value of the user key on the ctx
+func TraceFrom(ctx context.Context) (func(msg string, fields ...trace.Field), bool) {
+	trace, ok := ctx.Value(traceStepKey).(func(msg string, fields ...trace.Field))
+	return trace, ok
 }
 
 // WithAuditEvent returns set audit event struct.
