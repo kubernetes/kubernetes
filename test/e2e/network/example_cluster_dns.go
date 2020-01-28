@@ -193,9 +193,8 @@ func waitForServiceResponding(c clientset.Interface, ns, name string) error {
 		defer cancel()
 
 		body, err := proxyRequest.Namespace(ns).
-			Context(ctx).
 			Name(name).
-			Do(context.TODO()).
+			Do(ctx).
 			Raw()
 		if err != nil {
 			if ctx.Err() != nil {

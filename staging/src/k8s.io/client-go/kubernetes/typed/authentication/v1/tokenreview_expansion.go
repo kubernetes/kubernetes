@@ -34,10 +34,9 @@ func (c *tokenReviews) Create(tokenReview *authenticationapi.TokenReview) (resul
 func (c *tokenReviews) CreateContext(ctx context.Context, tokenReview *authenticationapi.TokenReview) (result *authenticationapi.TokenReview, err error) {
 	result = &authenticationapi.TokenReview{}
 	err = c.client.Post().
-		Context(ctx).
 		Resource("tokenreviews").
 		Body(tokenReview).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }

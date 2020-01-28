@@ -247,14 +247,13 @@ func (rc *ResourceConsumer) sendConsumeCPURequest(millicores int) {
 		proxyRequest, err := e2eservice.GetServicesProxyRequest(rc.clientSet, rc.clientSet.CoreV1().RESTClient().Post())
 		framework.ExpectNoError(err)
 		req := proxyRequest.Namespace(rc.nsName).
-			Context(ctx).
 			Name(rc.controllerName).
 			Suffix("ConsumeCPU").
 			Param("millicores", strconv.Itoa(millicores)).
 			Param("durationSec", strconv.Itoa(rc.consumptionTimeInSeconds)).
 			Param("requestSizeMillicores", strconv.Itoa(rc.requestSizeInMillicores))
 		framework.Logf("ConsumeCPU URL: %v", *req.URL())
-		_, err = req.DoRaw(context.TODO())
+		_, err = req.DoRaw(ctx)
 		if err != nil {
 			framework.Logf("ConsumeCPU failure: %v", err)
 			return false, nil
@@ -274,14 +273,13 @@ func (rc *ResourceConsumer) sendConsumeMemRequest(megabytes int) {
 		proxyRequest, err := e2eservice.GetServicesProxyRequest(rc.clientSet, rc.clientSet.CoreV1().RESTClient().Post())
 		framework.ExpectNoError(err)
 		req := proxyRequest.Namespace(rc.nsName).
-			Context(ctx).
 			Name(rc.controllerName).
 			Suffix("ConsumeMem").
 			Param("megabytes", strconv.Itoa(megabytes)).
 			Param("durationSec", strconv.Itoa(rc.consumptionTimeInSeconds)).
 			Param("requestSizeMegabytes", strconv.Itoa(rc.requestSizeInMegabytes))
 		framework.Logf("ConsumeMem URL: %v", *req.URL())
-		_, err = req.DoRaw(context.TODO())
+		_, err = req.DoRaw(ctx)
 		if err != nil {
 			framework.Logf("ConsumeMem failure: %v", err)
 			return false, nil
@@ -301,7 +299,6 @@ func (rc *ResourceConsumer) sendConsumeCustomMetric(delta int) {
 		proxyRequest, err := e2eservice.GetServicesProxyRequest(rc.clientSet, rc.clientSet.CoreV1().RESTClient().Post())
 		framework.ExpectNoError(err)
 		req := proxyRequest.Namespace(rc.nsName).
-			Context(ctx).
 			Name(rc.controllerName).
 			Suffix("BumpMetric").
 			Param("metric", customMetricName).
@@ -309,7 +306,7 @@ func (rc *ResourceConsumer) sendConsumeCustomMetric(delta int) {
 			Param("durationSec", strconv.Itoa(rc.consumptionTimeInSeconds)).
 			Param("requestSizeMetrics", strconv.Itoa(rc.requestSizeCustomMetric))
 		framework.Logf("ConsumeCustomMetric URL: %v", *req.URL())
-		_, err = req.DoRaw(context.TODO())
+		_, err = req.DoRaw(ctx)
 		if err != nil {
 			framework.Logf("ConsumeCustomMetric failure: %v", err)
 			return false, nil

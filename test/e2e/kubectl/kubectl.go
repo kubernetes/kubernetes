@@ -2368,13 +2368,12 @@ func makeRequestToGuestbook(c clientset.Interface, cmd, value string, ns string)
 	defer cancel()
 
 	result, err := proxyRequest.Namespace(ns).
-		Context(ctx).
 		Name("frontend").
 		Suffix("/guestbook").
 		Param("cmd", cmd).
 		Param("key", "messages").
 		Param("value", value).
-		Do(context.TODO()).
+		Do(ctx).
 		Raw()
 	return string(result), err
 }

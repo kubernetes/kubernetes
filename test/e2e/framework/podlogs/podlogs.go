@@ -47,8 +47,7 @@ import (
 //    rpc error: code = Unknown desc = Error: No such container: 41a...
 // when the pod gets deleted while streaming.
 func LogsForPod(ctx context.Context, cs clientset.Interface, ns, pod string, opts *v1.PodLogOptions) (io.ReadCloser, error) {
-	req := cs.CoreV1().Pods(ns).GetLogs(pod, opts)
-	return req.Context(ctx).Stream(context.TODO())
+	return cs.CoreV1().Pods(ns).GetLogs(pod, opts).Stream(ctx)
 }
 
 // LogOutput determines where output from CopyAllLogs goes.

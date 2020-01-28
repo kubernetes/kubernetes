@@ -94,9 +94,8 @@ func ClusterLevelLoggingWithKibana(f *framework.Framework) {
 		defer cancel()
 
 		_, err = req.Namespace(metav1.NamespaceSystem).
-			Context(ctx).
 			Name("kibana-logging").
-			DoRaw(context.TODO())
+			DoRaw(ctx)
 		if err != nil {
 			framework.Logf("Proxy call to kibana-logging failed: %v", err)
 			return false, nil

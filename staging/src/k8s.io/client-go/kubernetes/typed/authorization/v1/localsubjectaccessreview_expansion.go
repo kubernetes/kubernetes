@@ -34,11 +34,10 @@ func (c *localSubjectAccessReviews) Create(sar *authorizationapi.LocalSubjectAcc
 func (c *localSubjectAccessReviews) CreateContext(ctx context.Context, sar *authorizationapi.LocalSubjectAccessReview) (result *authorizationapi.LocalSubjectAccessReview, err error) {
 	result = &authorizationapi.LocalSubjectAccessReview{}
 	err = c.client.Post().
-		Context(ctx).
 		Namespace(c.ns).
 		Resource("localsubjectaccessreviews").
 		Body(sar).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }

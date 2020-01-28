@@ -18,6 +18,7 @@ package logs
 
 import (
 	"bufio"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -404,7 +405,7 @@ func (o LogsOptions) addPrefixIfNeeded(ref corev1.ObjectReference, writer io.Wri
 // Because the function is defined to read from request until io.EOF, it does
 // not treat an io.EOF as an error to be reported.
 func DefaultConsumeRequest(request rest.ResponseWrapper, out io.Writer) error {
-	readCloser, err := request.Stream()
+	readCloser, err := request.Stream(context.TODO())
 	if err != nil {
 		return err
 	}

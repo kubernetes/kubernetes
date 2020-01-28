@@ -198,7 +198,7 @@ type tokenReviewV1Client struct {
 
 func (t *tokenReviewV1Client) CreateContext(ctx context.Context, review *authenticationv1.TokenReview) (*authenticationv1.TokenReview, error) {
 	result := &authenticationv1.TokenReview{}
-	err := t.w.RestClient.Post().Context(ctx).Body(review).Do(context.TODO()).Into(result)
+	err := t.w.RestClient.Post().Body(review).Do(ctx).Into(result)
 	return result, err
 }
 
@@ -209,7 +209,7 @@ type tokenReviewV1beta1Client struct {
 func (t *tokenReviewV1beta1Client) CreateContext(ctx context.Context, review *authenticationv1.TokenReview) (*authenticationv1.TokenReview, error) {
 	v1beta1Review := &authenticationv1beta1.TokenReview{Spec: v1SpecToV1beta1Spec(&review.Spec)}
 	v1beta1Result := &authenticationv1beta1.TokenReview{}
-	err := t.w.RestClient.Post().Context(ctx).Body(v1beta1Review).Do(context.TODO()).Into(v1beta1Result)
+	err := t.w.RestClient.Post().Body(v1beta1Review).Do(ctx).Into(v1beta1Result)
 	if err != nil {
 		return nil, err
 	}

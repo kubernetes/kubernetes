@@ -289,7 +289,7 @@ type subjectAccessReviewV1Client struct {
 
 func (t *subjectAccessReviewV1Client) CreateContext(ctx context.Context, subjectAccessReview *authorizationv1.SubjectAccessReview) (*authorizationv1.SubjectAccessReview, error) {
 	result := &authorizationv1.SubjectAccessReview{}
-	err := t.w.RestClient.Post().Context(ctx).Body(subjectAccessReview).Do(context.TODO()).Into(result)
+	err := t.w.RestClient.Post().Body(subjectAccessReview).Do(ctx).Into(result)
 	return result, err
 }
 
@@ -300,7 +300,7 @@ type subjectAccessReviewV1beta1Client struct {
 func (t *subjectAccessReviewV1beta1Client) CreateContext(ctx context.Context, subjectAccessReview *authorizationv1.SubjectAccessReview) (*authorizationv1.SubjectAccessReview, error) {
 	v1beta1Review := &authorizationv1beta1.SubjectAccessReview{Spec: v1SpecToV1beta1Spec(&subjectAccessReview.Spec)}
 	v1beta1Result := &authorizationv1beta1.SubjectAccessReview{}
-	err := t.w.RestClient.Post().Context(ctx).Body(v1beta1Review).Do(context.TODO()).Into(v1beta1Result)
+	err := t.w.RestClient.Post().Body(v1beta1Review).Do(ctx).Into(v1beta1Result)
 	if err == nil {
 		subjectAccessReview.Status = v1beta1StatusToV1Status(&v1beta1Result.Status)
 	}
