@@ -5006,7 +5006,7 @@ func ValidateSecretUpdate(newSecret, oldSecret *core.Secret) field.ErrorList {
 
 	allErrs = append(allErrs, ValidateImmutableField(newSecret.Type, oldSecret.Type, field.NewPath("type"))...)
 	if oldSecret.Immutable != nil && *oldSecret.Immutable {
-		if !reflect.DeepEqual(newSecret.Immutable, oldSecret.Immutable) {
+		if newSecret.Immutable == nil || !*newSecret.Immutable {
 			allErrs = append(allErrs, field.Forbidden(field.NewPath("immutable"), "field is immutable when `immutable` is set"))
 		}
 		if !reflect.DeepEqual(newSecret.Data, oldSecret.Data) {
@@ -5063,7 +5063,7 @@ func ValidateConfigMapUpdate(newCfg, oldCfg *core.ConfigMap) field.ErrorList {
 	allErrs = append(allErrs, ValidateObjectMetaUpdate(&newCfg.ObjectMeta, &oldCfg.ObjectMeta, field.NewPath("metadata"))...)
 
 	if oldCfg.Immutable != nil && *oldCfg.Immutable {
-		if !reflect.DeepEqual(newCfg.Immutable, oldCfg.Immutable) {
+		if newCfg.Immutable == nil || !*newCfg.Immutable {
 			allErrs = append(allErrs, field.Forbidden(field.NewPath("immutable"), "field is immutable when `immutable` is set"))
 		}
 		if !reflect.DeepEqual(newCfg.Data, oldCfg.Data) {
