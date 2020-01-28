@@ -25,55 +25,201 @@ import (
 	"time"
 
 	"github.com/Azure/go-autorest/autorest/adal"
+	"github.com/Azure/go-autorest/autorest/azure"
 )
 
-func TestAzureTokenSource(t *testing.T) {
-	fakeAccessToken := "fake token 1"
-	fakeSource := fakeTokenSource{
-		accessToken: fakeAccessToken,
-		expiresOn:   strconv.FormatInt(time.Now().Add(3600*time.Second).Unix(), 10),
-	}
-	cfg := make(map[string]string)
-	persiter := &fakePersister{cache: make(map[string]string)}
-	tokenCache := newAzureTokenCache()
-	tokenSource := newAzureTokenSource(&fakeSource, tokenCache, cfg, persiter)
-	token, err := tokenSource.Token()
-	if err != nil {
-		t.Errorf("failed to retrieve the token form cache: %v", err)
-	}
-
-	wantCacheLen := 1
-	if len(tokenCache.cache) != wantCacheLen {
-		t.Errorf("Token() cache length error: got %v, want %v", len(tokenCache.cache), wantCacheLen)
-	}
-
-	if token != tokenCache.cache[azureTokenKey] {
-		t.Error("Token() returned token != cached token")
-	}
-
-	wantCfg := token2Cfg(token)
-	persistedCfg := persiter.Cache()
-
-	wantCfgLen := len(wantCfg)
-	persistedCfgLen := len(persistedCfg)
-	if wantCfgLen != persistedCfgLen {
-		t.Errorf("wantCfgLen and persistedCfgLen do not match, wantCfgLen=%v, persistedCfgLen=%v", wantCfgLen, persistedCfgLen)
-	}
-
-	for k, v := range persistedCfg {
-		if strings.Compare(v, wantCfg[k]) != 0 {
-			t.Errorf("Token() persisted cfg %s: got %v, want %v", k, v, wantCfg[k])
+func TestAzureAuthProvider(t *testing.T) {
+	t.Run("validate against invalid configurations", func(t *testing.T) {
+		vectors := []struct {
+			cfg           map[string]string
+			expectedError string
+		}{
+			{
+				cfg: map[string]string{
+					cfgClientID:    "foo",
+					cfgApiserverID: "foo",
+					cfgTenantID:    "foo",
+					cfgConfigMode:  "-1",
+				},
+				expectedError: "config-mode:-1 is not a valid mode",
+			},
+			{
+				cfg: map[string]string{
+					cfgClientID:    "foo",
+					cfgApiserverID: "foo",
+					cfgTenantID:    "foo",
+					cfgConfigMode:  "2",
+				},
+				expectedError: "config-mode:2 is not a valid mode",
+			},
+			{
+				cfg: map[string]string{
+					cfgClientID:    "foo",
+					cfgApiserverID: "foo",
+					cfgTenantID:    "foo",
+					cfgConfigMode:  "foo",
+				},
+				expectedError: "failed to parse config-mode, error: strconv.Atoi: parsing \"foo\": invalid syntax",
+			},
 		}
-	}
 
-	fakeSource.accessToken = "fake token 2"
-	token, err = tokenSource.Token()
-	if err != nil {
-		t.Errorf("failed to retrieve the cached token: %v", err)
-	}
+		for _, v := range vectors {
+			persister := &fakePersister{}
+			_, err := newAzureAuthProvider("", v.cfg, persister)
+			if !strings.Contains(err.Error(), v.expectedError) {
+				t.Errorf("cfg %v should fail with message containing '%s'. actual: '%s'", v.cfg, v.expectedError, err)
+			}
+		}
+	})
 
-	if token.token.AccessToken != fakeAccessToken {
-		t.Errorf("Token() didn't return the cached token")
+	t.Run("it should return non-nil provider in happy cases", func(t *testing.T) {
+		vectors := []struct {
+			cfg                map[string]string
+			expectedConfigMode configMode
+		}{
+			{
+				cfg: map[string]string{
+					cfgClientID:    "foo",
+					cfgApiserverID: "foo",
+					cfgTenantID:    "foo",
+				},
+				expectedConfigMode: configModeDefault,
+			},
+			{
+				cfg: map[string]string{
+					cfgClientID:    "foo",
+					cfgApiserverID: "foo",
+					cfgTenantID:    "foo",
+					cfgConfigMode:  "0",
+				},
+				expectedConfigMode: configModeDefault,
+			},
+			{
+				cfg: map[string]string{
+					cfgClientID:    "foo",
+					cfgApiserverID: "foo",
+					cfgTenantID:    "foo",
+					cfgConfigMode:  "1",
+				},
+				expectedConfigMode: configModeOmitSPNPrefix,
+			},
+		}
+
+		for _, v := range vectors {
+			persister := &fakePersister{}
+			provider, err := newAzureAuthProvider("", v.cfg, persister)
+			if err != nil {
+				t.Errorf("newAzureAuthProvider should not fail with '%s'", err)
+			}
+			if provider == nil {
+				t.Fatalf("newAzureAuthProvider should return non-nil provider")
+			}
+			azureProvider := provider.(*azureAuthProvider)
+			if azureProvider == nil {
+				t.Errorf("newAzureAuthProvider should return an instance of type azureAuthProvider")
+			}
+			ts := azureProvider.tokenSource.(*azureTokenSource)
+			if ts == nil {
+				t.Errorf("azureAuthProvider should be an instance of azureTokenSource")
+			}
+			if ts.configMode != v.expectedConfigMode {
+				t.Errorf("expected configMode: %d, actual: %d", v.expectedConfigMode, ts.configMode)
+			}
+		}
+	})
+}
+
+func TestTokenSourceDeviceCode(t *testing.T) {
+	var (
+		clientID    = "clientID"
+		tenantID    = "tenantID"
+		apiserverID = "apiserverID"
+		configMode  = configModeDefault
+		azureEnv    = azure.Environment{}
+	)
+	t.Run("validate to create azureTokenSourceDeviceCode", func(t *testing.T) {
+		if _, err := newAzureTokenSourceDeviceCode(azureEnv, clientID, tenantID, apiserverID, configModeDefault); err != nil {
+			t.Errorf("newAzureTokenSourceDeviceCode should not have failed. err: %s", err)
+		}
+
+		if _, err := newAzureTokenSourceDeviceCode(azureEnv, clientID, tenantID, apiserverID, configModeOmitSPNPrefix); err != nil {
+			t.Errorf("newAzureTokenSourceDeviceCode should not have failed. err: %s", err)
+		}
+
+		_, err := newAzureTokenSourceDeviceCode(azureEnv, "", tenantID, apiserverID, configMode)
+		actual := "client-id is empty"
+		if err.Error() != actual {
+			t.Errorf("newAzureTokenSourceDeviceCode should have failed. expected: %s, actual: %s", actual, err)
+		}
+
+		_, err = newAzureTokenSourceDeviceCode(azureEnv, clientID, "", apiserverID, configMode)
+		actual = "tenant-id is empty"
+		if err.Error() != actual {
+			t.Errorf("newAzureTokenSourceDeviceCode should have failed. expected: %s, actual: %s", actual, err)
+		}
+
+		_, err = newAzureTokenSourceDeviceCode(azureEnv, clientID, tenantID, "", configMode)
+		actual = "apiserver-id is empty"
+		if err.Error() != actual {
+			t.Errorf("newAzureTokenSourceDeviceCode should have failed. expected: %s, actual: %s", actual, err)
+		}
+	})
+}
+func TestAzureTokenSource(t *testing.T) {
+	configModes := []configMode{configModeOmitSPNPrefix, configModeDefault}
+	expectedConfigModes := []string{"1", "0"}
+
+	for i, configMode := range configModes {
+		t.Run("validate token against cache", func(t *testing.T) {
+			fakeAccessToken := "fake token 1"
+			fakeSource := fakeTokenSource{
+				accessToken: fakeAccessToken,
+				expiresOn:   strconv.FormatInt(time.Now().Add(3600*time.Second).Unix(), 10),
+			}
+			cfg := make(map[string]string)
+			persiter := &fakePersister{cache: make(map[string]string)}
+			tokenCache := newAzureTokenCache()
+			tokenSource := newAzureTokenSource(&fakeSource, tokenCache, cfg, configMode, persiter)
+			token, err := tokenSource.Token()
+			if err != nil {
+				t.Errorf("failed to retrieve the token form cache: %v", err)
+			}
+
+			wantCacheLen := 1
+			if len(tokenCache.cache) != wantCacheLen {
+				t.Errorf("Token() cache length error: got %v, want %v", len(tokenCache.cache), wantCacheLen)
+			}
+
+			if token != tokenCache.cache[azureTokenKey] {
+				t.Error("Token() returned token != cached token")
+			}
+
+			wantCfg := token2Cfg(token)
+			wantCfg[cfgConfigMode] = expectedConfigModes[i]
+			persistedCfg := persiter.Cache()
+
+			wantCfgLen := len(wantCfg)
+			persistedCfgLen := len(persistedCfg)
+			if wantCfgLen != persistedCfgLen {
+				t.Errorf("wantCfgLen and persistedCfgLen do not match, wantCfgLen=%v, persistedCfgLen=%v", wantCfgLen, persistedCfgLen)
+			}
+
+			for k, v := range persistedCfg {
+				if strings.Compare(v, wantCfg[k]) != 0 {
+					t.Errorf("Token() persisted cfg %s: got %v, want %v", k, v, wantCfg[k])
+				}
+			}
+
+			fakeSource.accessToken = "fake token 2"
+			token, err = tokenSource.Token()
+			if err != nil {
+				t.Errorf("failed to retrieve the cached token: %v", err)
+			}
+
+			if token.token.AccessToken != fakeAccessToken {
+				t.Errorf("Token() didn't return the cached token")
+			}
+		})
 	}
 }
 
