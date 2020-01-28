@@ -119,8 +119,44 @@ func RESTConfigFromKubeConfig(configBytes []byte) (*restclient.Config, error) {
 	return clientConfig.ClientConfig()
 }
 
+// RawConfig returns the merged result of all overrides
 func (config *DirectClientConfig) RawConfig() (clientcmdapi.Config, error) {
-	return config.config, nil
+	rawConfig := &config.config
+
+	// AuthInfo
+	if rawConfig.AuthInfos != nil {
+		configAuthInfo, err := config.getAuthInfo()
+		if err != nil {
+			return clientcmdapi.Config{}, err
+		}
+
+		authInfoName, _ := config.getAuthInfoName()
+		rawConfig.AuthInfos[authInfoName] = &configAuthInfo
+	}
+
+	// ClusterInfo
+	if rawConfig.Clusters != nil {
+		configClusterInfo, err := config.getCluster()
+		if err != nil {
+			return clientcmdapi.Config{}, err
+		}
+		clusterName, _ := config.getClusterName()
+		rawConfig.Clusters[clusterName] = &configClusterInfo
+	}
+
+	// Context
+	currentContext, _ := config.getContextName()
+	rawConfig.CurrentContext = currentContext
+
+	// CurrentContext
+	context, err := config.getContext()
+	if err != nil {
+		return clientcmdapi.Config{}, err
+	}
+
+	rawConfig.Contexts[currentContext] = &context
+
+	return *rawConfig, nil
 }
 
 // ClientConfig implements ClientConfig
@@ -372,7 +408,7 @@ func (config *DirectClientConfig) ConfirmUsable() error {
 // getContextName returns the default, or user-set context name, and a boolean that indicates
 // whether the default context name has been overwritten by a user-set flag, or left as its default value
 func (config *DirectClientConfig) getContextName() (string, bool) {
-	if len(config.overrides.CurrentContext) != 0 {
+	if config.overrides != nil && len(config.overrides.CurrentContext) != 0 {
 		return config.overrides.CurrentContext, true
 	}
 	if len(config.contextName) != 0 {
@@ -411,11 +447,18 @@ func (config *DirectClientConfig) getContext() (clientcmdapi.Context, error) {
 
 	mergedContext := clientcmdapi.NewContext()
 	if configContext, exists := contexts[contextName]; exists {
-		mergo.MergeWithOverwrite(mergedContext, configContext)
+		if err := mergo.MergeWithOverwrite(mergedContext, configContext); err != nil {
+			return clientcmdapi.Context{}, fmt.Errorf("merge failed")
+		}
 	} else if required {
 		return clientcmdapi.Context{}, fmt.Errorf("context %q does not exist", contextName)
 	}
-	mergo.MergeWithOverwrite(mergedContext, config.overrides.Context)
+
+	if config.overrides != nil {
+		if err := mergo.MergeWithOverwrite(mergedContext, config.overrides.Context); err != nil {
+			return clientcmdapi.Context{}, fmt.Errorf("merge failed")
+		}
+	}
 
 	return *mergedContext, nil
 }
