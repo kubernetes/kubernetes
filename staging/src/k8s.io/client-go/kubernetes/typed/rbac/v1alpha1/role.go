@@ -19,6 +19,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"context"
 	"time"
 
 	v1alpha1 "k8s.io/api/rbac/v1alpha1"
@@ -70,7 +71,7 @@ func (c *roles) Get(name string, options v1.GetOptions) (result *v1alpha1.Role, 
 		Resource("roles").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -87,7 +88,7 @@ func (c *roles) List(opts v1.ListOptions) (result *v1alpha1.RoleList, err error)
 		Resource("roles").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -104,7 +105,7 @@ func (c *roles) Watch(opts v1.ListOptions) (watch.Interface, error) {
 		Resource("roles").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch()
+		Watch(context.TODO())
 }
 
 // Create takes the representation of a role and creates it.  Returns the server's representation of the role, and an error, if there is any.
@@ -114,7 +115,7 @@ func (c *roles) Create(role *v1alpha1.Role) (result *v1alpha1.Role, err error) {
 		Namespace(c.ns).
 		Resource("roles").
 		Body(role).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -127,7 +128,7 @@ func (c *roles) Update(role *v1alpha1.Role) (result *v1alpha1.Role, err error) {
 		Resource("roles").
 		Name(role.Name).
 		Body(role).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -139,7 +140,7 @@ func (c *roles) Delete(name string, options *v1.DeleteOptions) error {
 		Resource("roles").
 		Name(name).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -155,7 +156,7 @@ func (c *roles) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListO
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Timeout(timeout).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -168,7 +169,7 @@ func (c *roles) Patch(name string, pt types.PatchType, data []byte, subresources
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }

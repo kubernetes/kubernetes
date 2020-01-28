@@ -19,6 +19,7 @@ limitations under the License.
 package v1
 
 import (
+	"context"
 	"time"
 
 	v1 "k8s.io/api/storage/v1"
@@ -68,7 +69,7 @@ func (c *volumeAttachments) Get(name string, options metav1.GetOptions) (result 
 		Resource("volumeattachments").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -84,7 +85,7 @@ func (c *volumeAttachments) List(opts metav1.ListOptions) (result *v1.VolumeAtta
 		Resource("volumeattachments").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -100,7 +101,7 @@ func (c *volumeAttachments) Watch(opts metav1.ListOptions) (watch.Interface, err
 		Resource("volumeattachments").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch()
+		Watch(context.TODO())
 }
 
 // Create takes the representation of a volumeAttachment and creates it.  Returns the server's representation of the volumeAttachment, and an error, if there is any.
@@ -109,7 +110,7 @@ func (c *volumeAttachments) Create(volumeAttachment *v1.VolumeAttachment) (resul
 	err = c.client.Post().
 		Resource("volumeattachments").
 		Body(volumeAttachment).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -121,7 +122,7 @@ func (c *volumeAttachments) Update(volumeAttachment *v1.VolumeAttachment) (resul
 		Resource("volumeattachments").
 		Name(volumeAttachment.Name).
 		Body(volumeAttachment).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -136,7 +137,7 @@ func (c *volumeAttachments) UpdateStatus(volumeAttachment *v1.VolumeAttachment) 
 		Name(volumeAttachment.Name).
 		SubResource("status").
 		Body(volumeAttachment).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -147,7 +148,7 @@ func (c *volumeAttachments) Delete(name string, options *metav1.DeleteOptions) e
 		Resource("volumeattachments").
 		Name(name).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -162,7 +163,7 @@ func (c *volumeAttachments) DeleteCollection(options *metav1.DeleteOptions, list
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Timeout(timeout).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -174,7 +175,7 @@ func (c *volumeAttachments) Patch(name string, pt types.PatchType, data []byte, 
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }

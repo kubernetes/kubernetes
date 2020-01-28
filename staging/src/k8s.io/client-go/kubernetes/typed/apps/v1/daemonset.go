@@ -19,6 +19,7 @@ limitations under the License.
 package v1
 
 import (
+	"context"
 	"time"
 
 	v1 "k8s.io/api/apps/v1"
@@ -71,7 +72,7 @@ func (c *daemonSets) Get(name string, options metav1.GetOptions) (result *v1.Dae
 		Resource("daemonsets").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -88,7 +89,7 @@ func (c *daemonSets) List(opts metav1.ListOptions) (result *v1.DaemonSetList, er
 		Resource("daemonsets").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -105,7 +106,7 @@ func (c *daemonSets) Watch(opts metav1.ListOptions) (watch.Interface, error) {
 		Resource("daemonsets").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch()
+		Watch(context.TODO())
 }
 
 // Create takes the representation of a daemonSet and creates it.  Returns the server's representation of the daemonSet, and an error, if there is any.
@@ -115,7 +116,7 @@ func (c *daemonSets) Create(daemonSet *v1.DaemonSet) (result *v1.DaemonSet, err 
 		Namespace(c.ns).
 		Resource("daemonsets").
 		Body(daemonSet).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -128,7 +129,7 @@ func (c *daemonSets) Update(daemonSet *v1.DaemonSet) (result *v1.DaemonSet, err 
 		Resource("daemonsets").
 		Name(daemonSet.Name).
 		Body(daemonSet).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -144,7 +145,7 @@ func (c *daemonSets) UpdateStatus(daemonSet *v1.DaemonSet) (result *v1.DaemonSet
 		Name(daemonSet.Name).
 		SubResource("status").
 		Body(daemonSet).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -156,7 +157,7 @@ func (c *daemonSets) Delete(name string, options *metav1.DeleteOptions) error {
 		Resource("daemonsets").
 		Name(name).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -172,7 +173,7 @@ func (c *daemonSets) DeleteCollection(options *metav1.DeleteOptions, listOptions
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Timeout(timeout).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -185,7 +186,7 @@ func (c *daemonSets) Patch(name string, pt types.PatchType, data []byte, subreso
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }

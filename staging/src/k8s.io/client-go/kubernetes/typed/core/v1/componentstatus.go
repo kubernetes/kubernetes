@@ -19,6 +19,7 @@ limitations under the License.
 package v1
 
 import (
+	"context"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -67,7 +68,7 @@ func (c *componentStatuses) Get(name string, options metav1.GetOptions) (result 
 		Resource("componentstatuses").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -83,7 +84,7 @@ func (c *componentStatuses) List(opts metav1.ListOptions) (result *v1.ComponentS
 		Resource("componentstatuses").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -99,7 +100,7 @@ func (c *componentStatuses) Watch(opts metav1.ListOptions) (watch.Interface, err
 		Resource("componentstatuses").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch()
+		Watch(context.TODO())
 }
 
 // Create takes the representation of a componentStatus and creates it.  Returns the server's representation of the componentStatus, and an error, if there is any.
@@ -108,7 +109,7 @@ func (c *componentStatuses) Create(componentStatus *v1.ComponentStatus) (result 
 	err = c.client.Post().
 		Resource("componentstatuses").
 		Body(componentStatus).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -120,7 +121,7 @@ func (c *componentStatuses) Update(componentStatus *v1.ComponentStatus) (result 
 		Resource("componentstatuses").
 		Name(componentStatus.Name).
 		Body(componentStatus).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -131,7 +132,7 @@ func (c *componentStatuses) Delete(name string, options *metav1.DeleteOptions) e
 		Resource("componentstatuses").
 		Name(name).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -146,7 +147,7 @@ func (c *componentStatuses) DeleteCollection(options *metav1.DeleteOptions, list
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Timeout(timeout).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -158,7 +159,7 @@ func (c *componentStatuses) Patch(name string, pt types.PatchType, data []byte, 
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }

@@ -19,6 +19,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"context"
 	"time"
 
 	v1alpha1 "k8s.io/api/scheduling/v1alpha1"
@@ -67,7 +68,7 @@ func (c *priorityClasses) Get(name string, options v1.GetOptions) (result *v1alp
 		Resource("priorityclasses").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -83,7 +84,7 @@ func (c *priorityClasses) List(opts v1.ListOptions) (result *v1alpha1.PriorityCl
 		Resource("priorityclasses").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -99,7 +100,7 @@ func (c *priorityClasses) Watch(opts v1.ListOptions) (watch.Interface, error) {
 		Resource("priorityclasses").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch()
+		Watch(context.TODO())
 }
 
 // Create takes the representation of a priorityClass and creates it.  Returns the server's representation of the priorityClass, and an error, if there is any.
@@ -108,7 +109,7 @@ func (c *priorityClasses) Create(priorityClass *v1alpha1.PriorityClass) (result 
 	err = c.client.Post().
 		Resource("priorityclasses").
 		Body(priorityClass).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -120,7 +121,7 @@ func (c *priorityClasses) Update(priorityClass *v1alpha1.PriorityClass) (result 
 		Resource("priorityclasses").
 		Name(priorityClass.Name).
 		Body(priorityClass).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -131,7 +132,7 @@ func (c *priorityClasses) Delete(name string, options *v1.DeleteOptions) error {
 		Resource("priorityclasses").
 		Name(name).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -146,7 +147,7 @@ func (c *priorityClasses) DeleteCollection(options *v1.DeleteOptions, listOption
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Timeout(timeout).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -158,7 +159,7 @@ func (c *priorityClasses) Patch(name string, pt types.PatchType, data []byte, su
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }

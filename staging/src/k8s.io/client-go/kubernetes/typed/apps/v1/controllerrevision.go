@@ -19,6 +19,7 @@ limitations under the License.
 package v1
 
 import (
+	"context"
 	"time"
 
 	v1 "k8s.io/api/apps/v1"
@@ -70,7 +71,7 @@ func (c *controllerRevisions) Get(name string, options metav1.GetOptions) (resul
 		Resource("controllerrevisions").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -87,7 +88,7 @@ func (c *controllerRevisions) List(opts metav1.ListOptions) (result *v1.Controll
 		Resource("controllerrevisions").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -104,7 +105,7 @@ func (c *controllerRevisions) Watch(opts metav1.ListOptions) (watch.Interface, e
 		Resource("controllerrevisions").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch()
+		Watch(context.TODO())
 }
 
 // Create takes the representation of a controllerRevision and creates it.  Returns the server's representation of the controllerRevision, and an error, if there is any.
@@ -114,7 +115,7 @@ func (c *controllerRevisions) Create(controllerRevision *v1.ControllerRevision) 
 		Namespace(c.ns).
 		Resource("controllerrevisions").
 		Body(controllerRevision).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -127,7 +128,7 @@ func (c *controllerRevisions) Update(controllerRevision *v1.ControllerRevision) 
 		Resource("controllerrevisions").
 		Name(controllerRevision.Name).
 		Body(controllerRevision).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -139,7 +140,7 @@ func (c *controllerRevisions) Delete(name string, options *metav1.DeleteOptions)
 		Resource("controllerrevisions").
 		Name(name).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -155,7 +156,7 @@ func (c *controllerRevisions) DeleteCollection(options *metav1.DeleteOptions, li
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Timeout(timeout).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -168,7 +169,7 @@ func (c *controllerRevisions) Patch(name string, pt types.PatchType, data []byte
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }

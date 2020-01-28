@@ -19,6 +19,7 @@ limitations under the License.
 package internalversion
 
 import (
+	"context"
 	"time"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -71,7 +72,7 @@ func (c *testTypes) Get(name string, options v1.GetOptions) (result *example3io.
 		Resource("testtypes").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -88,7 +89,7 @@ func (c *testTypes) List(opts v1.ListOptions) (result *example3io.TestTypeList, 
 		Resource("testtypes").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -105,7 +106,7 @@ func (c *testTypes) Watch(opts v1.ListOptions) (watch.Interface, error) {
 		Resource("testtypes").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch()
+		Watch(context.TODO())
 }
 
 // Create takes the representation of a testType and creates it.  Returns the server's representation of the testType, and an error, if there is any.
@@ -115,7 +116,7 @@ func (c *testTypes) Create(testType *example3io.TestType) (result *example3io.Te
 		Namespace(c.ns).
 		Resource("testtypes").
 		Body(testType).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -128,7 +129,7 @@ func (c *testTypes) Update(testType *example3io.TestType) (result *example3io.Te
 		Resource("testtypes").
 		Name(testType.Name).
 		Body(testType).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -144,7 +145,7 @@ func (c *testTypes) UpdateStatus(testType *example3io.TestType) (result *example
 		Name(testType.Name).
 		SubResource("status").
 		Body(testType).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -156,7 +157,7 @@ func (c *testTypes) Delete(name string, options *v1.DeleteOptions) error {
 		Resource("testtypes").
 		Name(name).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -172,7 +173,7 @@ func (c *testTypes) DeleteCollection(options *v1.DeleteOptions, listOptions v1.L
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Timeout(timeout).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -185,7 +186,7 @@ func (c *testTypes) Patch(name string, pt types.PatchType, data []byte, subresou
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }

@@ -19,6 +19,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"context"
 	"time"
 
 	v1alpha1 "k8s.io/api/rbac/v1alpha1"
@@ -67,7 +68,7 @@ func (c *clusterRoleBindings) Get(name string, options v1.GetOptions) (result *v
 		Resource("clusterrolebindings").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -83,7 +84,7 @@ func (c *clusterRoleBindings) List(opts v1.ListOptions) (result *v1alpha1.Cluste
 		Resource("clusterrolebindings").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -99,7 +100,7 @@ func (c *clusterRoleBindings) Watch(opts v1.ListOptions) (watch.Interface, error
 		Resource("clusterrolebindings").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch()
+		Watch(context.TODO())
 }
 
 // Create takes the representation of a clusterRoleBinding and creates it.  Returns the server's representation of the clusterRoleBinding, and an error, if there is any.
@@ -108,7 +109,7 @@ func (c *clusterRoleBindings) Create(clusterRoleBinding *v1alpha1.ClusterRoleBin
 	err = c.client.Post().
 		Resource("clusterrolebindings").
 		Body(clusterRoleBinding).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -120,7 +121,7 @@ func (c *clusterRoleBindings) Update(clusterRoleBinding *v1alpha1.ClusterRoleBin
 		Resource("clusterrolebindings").
 		Name(clusterRoleBinding.Name).
 		Body(clusterRoleBinding).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -131,7 +132,7 @@ func (c *clusterRoleBindings) Delete(name string, options *v1.DeleteOptions) err
 		Resource("clusterrolebindings").
 		Name(name).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -146,7 +147,7 @@ func (c *clusterRoleBindings) DeleteCollection(options *v1.DeleteOptions, listOp
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Timeout(timeout).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -158,7 +159,7 @@ func (c *clusterRoleBindings) Patch(name string, pt types.PatchType, data []byte
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }

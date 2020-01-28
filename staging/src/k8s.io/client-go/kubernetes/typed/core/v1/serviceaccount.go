@@ -19,6 +19,7 @@ limitations under the License.
 package v1
 
 import (
+	"context"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -70,7 +71,7 @@ func (c *serviceAccounts) Get(name string, options metav1.GetOptions) (result *v
 		Resource("serviceaccounts").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -87,7 +88,7 @@ func (c *serviceAccounts) List(opts metav1.ListOptions) (result *v1.ServiceAccou
 		Resource("serviceaccounts").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -104,7 +105,7 @@ func (c *serviceAccounts) Watch(opts metav1.ListOptions) (watch.Interface, error
 		Resource("serviceaccounts").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch()
+		Watch(context.TODO())
 }
 
 // Create takes the representation of a serviceAccount and creates it.  Returns the server's representation of the serviceAccount, and an error, if there is any.
@@ -114,7 +115,7 @@ func (c *serviceAccounts) Create(serviceAccount *v1.ServiceAccount) (result *v1.
 		Namespace(c.ns).
 		Resource("serviceaccounts").
 		Body(serviceAccount).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -127,7 +128,7 @@ func (c *serviceAccounts) Update(serviceAccount *v1.ServiceAccount) (result *v1.
 		Resource("serviceaccounts").
 		Name(serviceAccount.Name).
 		Body(serviceAccount).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -139,7 +140,7 @@ func (c *serviceAccounts) Delete(name string, options *metav1.DeleteOptions) err
 		Resource("serviceaccounts").
 		Name(name).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -155,7 +156,7 @@ func (c *serviceAccounts) DeleteCollection(options *metav1.DeleteOptions, listOp
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Timeout(timeout).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -168,7 +169,7 @@ func (c *serviceAccounts) Patch(name string, pt types.PatchType, data []byte, su
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }

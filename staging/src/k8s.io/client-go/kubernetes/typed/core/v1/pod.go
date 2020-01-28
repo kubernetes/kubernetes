@@ -19,6 +19,7 @@ limitations under the License.
 package v1
 
 import (
+	"context"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -74,7 +75,7 @@ func (c *pods) Get(name string, options metav1.GetOptions) (result *v1.Pod, err 
 		Resource("pods").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -91,7 +92,7 @@ func (c *pods) List(opts metav1.ListOptions) (result *v1.PodList, err error) {
 		Resource("pods").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -108,7 +109,7 @@ func (c *pods) Watch(opts metav1.ListOptions) (watch.Interface, error) {
 		Resource("pods").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch()
+		Watch(context.TODO())
 }
 
 // Create takes the representation of a pod and creates it.  Returns the server's representation of the pod, and an error, if there is any.
@@ -118,7 +119,7 @@ func (c *pods) Create(pod *v1.Pod) (result *v1.Pod, err error) {
 		Namespace(c.ns).
 		Resource("pods").
 		Body(pod).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -131,7 +132,7 @@ func (c *pods) Update(pod *v1.Pod) (result *v1.Pod, err error) {
 		Resource("pods").
 		Name(pod.Name).
 		Body(pod).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -147,7 +148,7 @@ func (c *pods) UpdateStatus(pod *v1.Pod) (result *v1.Pod, err error) {
 		Name(pod.Name).
 		SubResource("status").
 		Body(pod).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -159,7 +160,7 @@ func (c *pods) Delete(name string, options *metav1.DeleteOptions) error {
 		Resource("pods").
 		Name(name).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -175,7 +176,7 @@ func (c *pods) DeleteCollection(options *metav1.DeleteOptions, listOptions metav
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Timeout(timeout).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -188,7 +189,7 @@ func (c *pods) Patch(name string, pt types.PatchType, data []byte, subresources 
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -202,7 +203,7 @@ func (c *pods) GetEphemeralContainers(podName string, options metav1.GetOptions)
 		Name(podName).
 		SubResource("ephemeralcontainers").
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -216,7 +217,7 @@ func (c *pods) UpdateEphemeralContainers(podName string, ephemeralContainers *v1
 		Name(podName).
 		SubResource("ephemeralcontainers").
 		Body(ephemeralContainers).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }

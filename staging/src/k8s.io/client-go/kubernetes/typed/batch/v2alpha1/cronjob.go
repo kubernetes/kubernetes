@@ -19,6 +19,7 @@ limitations under the License.
 package v2alpha1
 
 import (
+	"context"
 	"time"
 
 	v2alpha1 "k8s.io/api/batch/v2alpha1"
@@ -71,7 +72,7 @@ func (c *cronJobs) Get(name string, options v1.GetOptions) (result *v2alpha1.Cro
 		Resource("cronjobs").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -88,7 +89,7 @@ func (c *cronJobs) List(opts v1.ListOptions) (result *v2alpha1.CronJobList, err 
 		Resource("cronjobs").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -105,7 +106,7 @@ func (c *cronJobs) Watch(opts v1.ListOptions) (watch.Interface, error) {
 		Resource("cronjobs").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch()
+		Watch(context.TODO())
 }
 
 // Create takes the representation of a cronJob and creates it.  Returns the server's representation of the cronJob, and an error, if there is any.
@@ -115,7 +116,7 @@ func (c *cronJobs) Create(cronJob *v2alpha1.CronJob) (result *v2alpha1.CronJob, 
 		Namespace(c.ns).
 		Resource("cronjobs").
 		Body(cronJob).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -128,7 +129,7 @@ func (c *cronJobs) Update(cronJob *v2alpha1.CronJob) (result *v2alpha1.CronJob, 
 		Resource("cronjobs").
 		Name(cronJob.Name).
 		Body(cronJob).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -144,7 +145,7 @@ func (c *cronJobs) UpdateStatus(cronJob *v2alpha1.CronJob) (result *v2alpha1.Cro
 		Name(cronJob.Name).
 		SubResource("status").
 		Body(cronJob).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -156,7 +157,7 @@ func (c *cronJobs) Delete(name string, options *v1.DeleteOptions) error {
 		Resource("cronjobs").
 		Name(name).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -172,7 +173,7 @@ func (c *cronJobs) DeleteCollection(options *v1.DeleteOptions, listOptions v1.Li
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Timeout(timeout).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -185,7 +186,7 @@ func (c *cronJobs) Patch(name string, pt types.PatchType, data []byte, subresour
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }

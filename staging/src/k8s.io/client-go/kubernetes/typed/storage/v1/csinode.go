@@ -19,6 +19,7 @@ limitations under the License.
 package v1
 
 import (
+	"context"
 	"time"
 
 	v1 "k8s.io/api/storage/v1"
@@ -67,7 +68,7 @@ func (c *cSINodes) Get(name string, options metav1.GetOptions) (result *v1.CSINo
 		Resource("csinodes").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -83,7 +84,7 @@ func (c *cSINodes) List(opts metav1.ListOptions) (result *v1.CSINodeList, err er
 		Resource("csinodes").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -99,7 +100,7 @@ func (c *cSINodes) Watch(opts metav1.ListOptions) (watch.Interface, error) {
 		Resource("csinodes").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch()
+		Watch(context.TODO())
 }
 
 // Create takes the representation of a cSINode and creates it.  Returns the server's representation of the cSINode, and an error, if there is any.
@@ -108,7 +109,7 @@ func (c *cSINodes) Create(cSINode *v1.CSINode) (result *v1.CSINode, err error) {
 	err = c.client.Post().
 		Resource("csinodes").
 		Body(cSINode).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -120,7 +121,7 @@ func (c *cSINodes) Update(cSINode *v1.CSINode) (result *v1.CSINode, err error) {
 		Resource("csinodes").
 		Name(cSINode.Name).
 		Body(cSINode).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -131,7 +132,7 @@ func (c *cSINodes) Delete(name string, options *metav1.DeleteOptions) error {
 		Resource("csinodes").
 		Name(name).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -146,7 +147,7 @@ func (c *cSINodes) DeleteCollection(options *metav1.DeleteOptions, listOptions m
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Timeout(timeout).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -158,7 +159,7 @@ func (c *cSINodes) Patch(name string, pt types.PatchType, data []byte, subresour
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
