@@ -31,6 +31,8 @@ DEFAULT_NPD_SHA1="9406c975b1b035995a137029a004622b905b4e7f"
 DEFAULT_CRICTL_VERSION="v1.17.0"
 DEFAULT_CRICTL_SHA1="5c18f4e52ab524d429063b78d086dd18b894aae7"
 DEFAULT_MOUNTER_TAR_SHA="8003b798cf33c7f91320cd6ee5cec4fa22244571"
+OVERRIDE_RUNC_VERSION="v1.0.0-rc10"
+OVERRIDE_RUNC_SHA1="a2fab3406b71d66eb4720c1f9cf9dc6dca669382"
 ###
 
 # Use --retry-connrefused opt only if it's supported by curl.
@@ -285,6 +287,40 @@ EOF
   chmod a+x "${KUBE_BIN}/crictl"
 }
 
+# Install runc binary.
+function install-runc {
+  if [[ "$(uname -s)" != "Linux" ]]; then
+    return
+  fi
+  if [[ "$(uname -m)" != "x86_64" ]]; then
+    return
+  fi
+  if [[ -n "${OVERRIDE_RUNC_VERSION:-}" ]]; then
+    local -r runc_version="${OVERRIDE_RUNC_VERSION}"
+    local -r runc_sha1="${OVERRIDE_RUNC_SHA1}"
+  else
+    return
+  fi
+  local -r runc="runc.amd64"
+
+  if is-preloaded "${runc}" "${runc_sha1}"; then
+    echo "runc is preloaded"
+    # test the binary
+    runc --version
+    return
+  fi
+
+  echo "Downloading runc"
+  local -r runc_path="https://github.com/opencontainers/runc/releases/download/"
+  download-or-bust "${runc_sha1}" "${runc_path}/${runc_version}/${runc}"
+  chmod a+x "${KUBE_HOME}/${runc}"
+  which runc
+  mv "${KUBE_HOME}/${runc}" `which runc`
+
+  # test the binary
+  runc --version
+}
+
 function install-exec-auth-plugin {
   if [[ ! "${EXEC_AUTH_PLUGIN_URL:-}" ]]; then
       return
@@ -393,6 +429,10 @@ function load-docker-images {
 # and places them into suitable directories. Files are placed in /home/kubernetes.
 function install-kube-binary-config {
   cd "${KUBE_HOME}"
+
+  (set -x
+     install-runc)
+
   local -r server_binary_tar_urls=( $(split-commas "${SERVER_BINARY_TAR_URL}") )
   local -r server_binary_tar="${server_binary_tar_urls[0]##*/}"
   if [[ -n "${SERVER_BINARY_TAR_HASH:-}" ]]; then
