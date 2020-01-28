@@ -466,7 +466,7 @@ func TestCPUManagerAddWithInitContainers(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		policy, _ := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs, cpuset.NewCPUSet(), topologymanager.NewFakeManager())
+		policy, _ := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs, cpuset.NewCPUSet(), cpuset.NewCPUSet(), topologymanager.NewFakeManager())
 
 		state := &mockState{
 			assignments:   testCase.stAssignments,

@@ -41,6 +41,7 @@ type staticPolicyTest struct {
 	expErr          error
 	expCPUAlloc     bool
 	expCSet         cpuset.CPUSet
+	staticCPUs      cpuset.CPUSet
 }
 
 func TestStaticPolicyName(t *testing.T) {
@@ -433,10 +434,42 @@ func TestStaticPolicyAdd(t *testing.T) {
 			expCPUAlloc:     false,
 			expCSet:         cpuset.NewCPUSet(),
 		},
+		{
+			description: "not enough staticCPUs",
+			topo:        topoQuadSocketFourWayHT,
+			stAssignments: state.ContainerCPUAssignments{
+				"fakePod": map[string]cpuset.CPUSet{
+					"fakeContainer100": largeTopoCPUSet.Difference(cpuset.NewCPUSet(10, 11, 53, 37, 55, 67, 52)),
+				},
+			},
+			stDefaultCPUSet: cpuset.NewCPUSet(10, 11, 53, 37, 55, 67, 52),
+			staticCPUs:      cpuset.NewCPUSet(10, 12, 15, 23),
+			pod:             makePod("fakePod", "fakeContainer5", "2000m", "2000m"),
+			expErr:          fmt.Errorf("not enough cpus available to satisfy request"),
+			expCPUAlloc:     false,
+			expCSet:         cpuset.NewCPUSet(),
+		},
+		{
+			// staticCPUs list is provided
+			// Expect allocation of all the CPUs only from this list..
+			description: "allocation from staticCPUs list",
+			topo:        topoQuadSocketFourWayHT,
+			stAssignments: state.ContainerCPUAssignments{
+				"fakePod": map[string]cpuset.CPUSet{
+					"fakeContainer100": largeTopoCPUSet.Difference(cpuset.NewCPUSet(10, 11, 53, 37, 55, 67, 52)),
+				},
+			},
+			stDefaultCPUSet: cpuset.NewCPUSet(10, 11, 53, 67, 52),
+			pod:             makePod("fakePod", "fakeContainer5", "2000m", "2000m"),
+			expErr:          nil,
+			expCPUAlloc:     true,
+			expCSet:         cpuset.NewCPUSet(52, 53),
+			staticCPUs:      cpuset.NewCPUSet(53, 67, 52),
+		},
 	}
 
 	for _, testCase := range testCases {
-		policy, _ := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs, cpuset.NewCPUSet(), cpuset.NewCPUSet(), topologymanager.NewFakeManager())
+		policy, _ := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs, cpuset.NewCPUSet(), testCase.staticCPUs, topologymanager.NewFakeManager())
 
 		st := &mockState{
 			assignments:   testCase.stAssignments,
@@ -567,6 +600,7 @@ func TestTopologyAwareAllocateCPUs(t *testing.T) {
 		numRequested    int
 		socketMask      bitmask.BitMask
 		expCSet         cpuset.CPUSet
+		staticCPUs      cpuset.CPUSet
 	}{
 		{
 			description:     "Request 2 CPUs, No BitMask",
@@ -576,6 +610,7 @@ func TestTopologyAwareAllocateCPUs(t *testing.T) {
 			numRequested:    2,
 			socketMask:      nil,
 			expCSet:         cpuset.NewCPUSet(0, 6),
+			staticCPUs:      cpuset.NewCPUSet(),
 		},
 		{
 			description:     "Request 2 CPUs, BitMask on Socket 0",
@@ -587,7 +622,8 @@ func TestTopologyAwareAllocateCPUs(t *testing.T) {
 				mask, _ := bitmask.NewBitMask(0)
 				return mask
 			}(),
-			expCSet: cpuset.NewCPUSet(0, 6),
+			expCSet:    cpuset.NewCPUSet(0, 6),
+			staticCPUs: cpuset.NewCPUSet(),
 		},
 		{
 			description:     "Request 2 CPUs, BitMask on Socket 1",
@@ -599,7 +635,8 @@ func TestTopologyAwareAllocateCPUs(t *testing.T) {
 				mask, _ := bitmask.NewBitMask(1)
 				return mask
 			}(),
-			expCSet: cpuset.NewCPUSet(1, 7),
+			expCSet:    cpuset.NewCPUSet(1, 7),
+			staticCPUs: cpuset.NewCPUSet(),
 		},
 		{
 			description:     "Request 8 CPUs, BitMask on Socket 0",
@@ -611,7 +648,8 @@ func TestTopologyAwareAllocateCPUs(t *testing.T) {
 				mask, _ := bitmask.NewBitMask(0)
 				return mask
 			}(),
-			expCSet: cpuset.NewCPUSet(0, 6, 2, 8, 4, 10, 1, 7),
+			expCSet:    cpuset.NewCPUSet(0, 6, 2, 8, 4, 10, 1, 7),
+			staticCPUs: cpuset.NewCPUSet(),
 		},
 		{
 			description:     "Request 8 CPUs, BitMask on Socket 1",
@@ -623,11 +661,32 @@ func TestTopologyAwareAllocateCPUs(t *testing.T) {
 				mask, _ := bitmask.NewBitMask(1)
 				return mask
 			}(),
-			expCSet: cpuset.NewCPUSet(1, 7, 3, 9, 5, 11, 0, 6),
+			expCSet:    cpuset.NewCPUSet(1, 7, 3, 9, 5, 11, 0, 6),
+			staticCPUs: cpuset.NewCPUSet(),
+		},
+		{
+			description:     "Request 2 CPUs, static CPUs 10, 11",
+			topo:            topoDualSocketHT,
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
+			numRequested:    2,
+			socketMask:      nil,
+			expCSet:         cpuset.NewCPUSet(10, 11),
+			staticCPUs:      cpuset.NewCPUSet(10, 11),
+		},
+		{
+			description:     "Request 2 CPUs, static CPUs 10, 11",
+			topo:            topoDualSocketHT,
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
+			numRequested:    2,
+			socketMask:      nil,
+			expCSet:         cpuset.NewCPUSet(10, 11),
+			staticCPUs:      cpuset.NewCPUSet(10, 11),
 		},
 	}
 	for _, tc := range testCases {
-		p, _ := NewStaticPolicy(tc.topo, 0, cpuset.NewCPUSet(), cpuset.NewCPUSet(), topologymanager.NewFakeManager())
+		p, _ := NewStaticPolicy(tc.topo, 0, cpuset.NewCPUSet(), tc.staticCPUs, topologymanager.NewFakeManager())
 		policy := p.(*staticPolicy)
 		st := &mockState{
 			assignments:   tc.stAssignments,
@@ -701,6 +760,18 @@ func TestStaticPolicyStartWithResvList(t *testing.T) {
 			stDefaultCPUSet: cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
 			expNewErr:       fmt.Errorf("[cpumanager] unable to reserve the required amount of CPUs (size of 0-1 did not equal 1)"),
 			staticCPUs:      cpuset.NewCPUSet(),
+		},
+		{
+			description:     "not enough available static cpus",
+			topo:            topoDualSocketHT,
+			numReservedCPUs: 2,
+			reserved:        cpuset.NewCPUSet(0, 1),
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
+			//expNewErr:       fmt.Errorf("[cpumanager] unable to reserve the required amount of CPUs (size of 0-1 did not equal 1)"),
+			expNewErr:  nil,
+			staticCPUs: cpuset.NewCPUSet(11),
+			expCSet:    cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
 		},
 	}
 	for _, testCase := range testCases {
