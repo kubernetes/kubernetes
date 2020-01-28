@@ -17,6 +17,7 @@ limitations under the License.
 package master
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -211,7 +212,7 @@ func TestCRDOpenAPI(t *testing.T) {
 	etcd.CreateTestCRDs(t, apiextensionsclient, false, structuralCRD)
 
 	getPublishedSchema := func(defName string) (*spec.Schema, error) {
-		bs, err := kubeclient.RESTClient().Get().AbsPath("openapi", "v2").DoRaw()
+		bs, err := kubeclient.RESTClient().Get().AbsPath("openapi", "v2").DoRaw(context.TODO())
 		if err != nil {
 			return nil, err
 		}

@@ -38,7 +38,7 @@ func (c *localSubjectAccessReviews) CreateContext(ctx context.Context, sar *auth
 		Namespace(c.ns).
 		Resource("localsubjectaccessreviews").
 		Body(sar).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }

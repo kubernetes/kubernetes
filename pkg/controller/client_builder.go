@@ -22,7 +22,7 @@ import (
 	"time"
 
 	v1authenticationapi "k8s.io/api/authentication/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -207,7 +207,7 @@ func (b SAControllerClientBuilder) getAuthenticatedConfig(sa *v1.ServiceAccount,
 	if err != nil {
 		return nil, false, err
 	}
-	err = client.Get().AbsPath("/apis").Do().Error()
+	err = client.Get().AbsPath("/apis").Do(context.TODO()).Error()
 	if apierrors.IsUnauthorized(err) {
 		klog.Warningf("Token for %s/%s did not authenticate correctly: %v", sa.Namespace, sa.Name, err)
 		return nil, false, nil

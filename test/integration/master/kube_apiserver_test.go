@@ -18,6 +18,7 @@ package master
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -27,6 +28,7 @@ import (
 	"time"
 
 	"github.com/go-openapi/spec"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
@@ -97,7 +99,7 @@ func TestRun(t *testing.T) {
 }
 
 func endpointReturnsStatusOK(client *kubernetes.Clientset, path string) bool {
-	res := client.CoreV1().RESTClient().Get().AbsPath(path).Do()
+	res := client.CoreV1().RESTClient().Get().AbsPath(path).Do(context.TODO())
 	var status int
 	res.StatusCode(&status)
 	return status == http.StatusOK
@@ -132,7 +134,7 @@ func TestOpenAPIDelegationChainPlumbing(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	result := kubeclient.RESTClient().Get().AbsPath("/openapi/v2").Do()
+	result := kubeclient.RESTClient().Get().AbsPath("/openapi/v2").Do(context.TODO())
 	status := 0
 	result.StatusCode(&status)
 	if status != http.StatusOK {
@@ -343,7 +345,7 @@ func triggerSpecUpdateWithProbeCRD(t *testing.T, apiextensionsclient *apiextensi
 }
 
 func specHasProbe(clientset *apiextensionsclientset.Clientset, probe string) (bool, error) {
-	bs, err := clientset.RESTClient().Get().AbsPath("openapi", "v2").DoRaw()
+	bs, err := clientset.RESTClient().Get().AbsPath("openapi", "v2").DoRaw(context.TODO())
 	if err != nil {
 		return false, err
 	}
@@ -351,7 +353,7 @@ func specHasProbe(clientset *apiextensionsclientset.Clientset, probe string) (bo
 }
 
 func getOpenAPIPath(clientset *apiextensionsclientset.Clientset, path string) (spec.PathItem, bool, error) {
-	bs, err := clientset.RESTClient().Get().AbsPath("openapi", "v2").DoRaw()
+	bs, err := clientset.RESTClient().Get().AbsPath("openapi", "v2").DoRaw(context.TODO())
 	if err != nil {
 		return spec.PathItem{}, false, err
 	}
@@ -367,7 +369,7 @@ func getOpenAPIPath(clientset *apiextensionsclientset.Clientset, path string) (s
 }
 
 func getOpenAPIDefinition(clientset *apiextensionsclientset.Clientset, definition string) (spec.Schema, bool, error) {
-	bs, err := clientset.RESTClient().Get().AbsPath("openapi", "v2").DoRaw()
+	bs, err := clientset.RESTClient().Get().AbsPath("openapi", "v2").DoRaw(context.TODO())
 	if err != nil {
 		return spec.Schema{}, false, err
 	}

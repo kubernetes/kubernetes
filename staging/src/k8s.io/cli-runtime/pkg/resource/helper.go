@@ -17,6 +17,7 @@ limitations under the License.
 package resource
 
 import (
+	"context"
 	"strconv"
 
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -72,7 +73,7 @@ func (m *Helper) Get(namespace, name string, export bool) (runtime.Object, error
 		// TODO: I should be part of GetOptions
 		req.Param("export", strconv.FormatBool(export))
 	}
-	return req.Do().Get()
+	return req.Do(context.TODO()).Get()
 }
 
 func (m *Helper) List(namespace, apiVersion string, export bool, options *metav1.ListOptions) (runtime.Object, error) {
@@ -84,7 +85,7 @@ func (m *Helper) List(namespace, apiVersion string, export bool, options *metav1
 		// TODO: I should be part of ListOptions
 		req.Param("export", strconv.FormatBool(export))
 	}
-	return req.Do().Get()
+	return req.Do(context.TODO()).Get()
 }
 
 func (m *Helper) Watch(namespace, apiVersion string, options *metav1.ListOptions) (watch.Interface, error) {
@@ -93,7 +94,7 @@ func (m *Helper) Watch(namespace, apiVersion string, options *metav1.ListOptions
 		NamespaceIfScoped(namespace, m.NamespaceScoped).
 		Resource(m.Resource).
 		VersionedParams(options, metav1.ParameterCodec).
-		Watch()
+		Watch(context.TODO())
 }
 
 func (m *Helper) WatchSingle(namespace, name, resourceVersion string) (watch.Interface, error) {
@@ -105,7 +106,7 @@ func (m *Helper) WatchSingle(namespace, name, resourceVersion string) (watch.Int
 			Watch:           true,
 			FieldSelector:   fields.OneTermEqualSelector("metadata.name", name).String(),
 		}, metav1.ParameterCodec).
-		Watch()
+		Watch(context.TODO())
 }
 
 func (m *Helper) Delete(namespace, name string) (runtime.Object, error) {
@@ -125,7 +126,7 @@ func (m *Helper) DeleteWithOptions(namespace, name string, options *metav1.Delet
 		Resource(m.Resource).
 		Name(name).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Get()
 }
 
@@ -163,7 +164,7 @@ func (m *Helper) createResource(c RESTClient, resource, namespace string, obj ru
 		Resource(resource).
 		VersionedParams(options, metav1.ParameterCodec).
 		Body(obj).
-		Do().
+		Do(context.TODO()).
 		Get()
 }
 func (m *Helper) Patch(namespace, name string, pt types.PatchType, data []byte, options *metav1.PatchOptions) (runtime.Object, error) {
@@ -179,7 +180,7 @@ func (m *Helper) Patch(namespace, name string, pt types.PatchType, data []byte, 
 		Name(name).
 		VersionedParams(options, metav1.ParameterCodec).
 		Body(data).
-		Do().
+		Do(context.TODO()).
 		Get()
 }
 
@@ -198,7 +199,7 @@ func (m *Helper) Replace(namespace, name string, overwrite bool, obj runtime.Obj
 	}
 	if version == "" && overwrite {
 		// Retrieve the current version of the object to overwrite the server object
-		serverObj, err := c.Get().NamespaceIfScoped(namespace, m.NamespaceScoped).Resource(m.Resource).Name(name).Do().Get()
+		serverObj, err := c.Get().NamespaceIfScoped(namespace, m.NamespaceScoped).Resource(m.Resource).Name(name).Do(context.TODO()).Get()
 		if err != nil {
 			// The object does not exist, but we want it to be created
 			return m.replaceResource(c, m.Resource, namespace, name, obj, options)
@@ -222,6 +223,6 @@ func (m *Helper) replaceResource(c RESTClient, resource, namespace, name string,
 		Name(name).
 		VersionedParams(options, metav1.ParameterCodec).
 		Body(obj).
-		Do().
+		Do(context.TODO()).
 		Get()
 }

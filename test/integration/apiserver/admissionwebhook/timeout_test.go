@@ -17,6 +17,7 @@ limitations under the License.
 package admissionwebhook
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
@@ -291,7 +292,7 @@ func testWebhookTimeout(t *testing.T, watchCache bool) {
 			}
 
 			// set the timeout parameter manually so we don't actually cut off the request client-side, and wait for the server response
-			err = client.CoreV1().RESTClient().Post().Resource("pods").Namespace(ns).Body(body).Param("timeout", fmt.Sprintf("%ds", tt.timeoutSeconds)).Do().Error()
+			err = client.CoreV1().RESTClient().Post().Resource("pods").Namespace(ns).Body(body).Param("timeout", fmt.Sprintf("%ds", tt.timeoutSeconds)).Do(context.TODO()).Error()
 			// _, err = testClient.CoreV1().Pods(ns).Create(pod)
 
 			if tt.expectError {

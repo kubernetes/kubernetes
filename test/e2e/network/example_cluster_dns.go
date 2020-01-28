@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -194,7 +195,7 @@ func waitForServiceResponding(c clientset.Interface, ns, name string) error {
 		body, err := proxyRequest.Namespace(ns).
 			Context(ctx).
 			Name(name).
-			Do().
+			Do(context.TODO()).
 			Raw()
 		if err != nil {
 			if ctx.Err() != nil {

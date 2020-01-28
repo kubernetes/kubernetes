@@ -17,6 +17,8 @@ limitations under the License.
 package v1
 
 import (
+	"context"
+
 	authenticationv1 "k8s.io/api/authentication/v1"
 )
 
@@ -35,7 +37,7 @@ func (c *serviceAccounts) CreateToken(name string, tr *authenticationv1.TokenReq
 		SubResource("token").
 		Name(name).
 		Body(tr).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return result, err
 }

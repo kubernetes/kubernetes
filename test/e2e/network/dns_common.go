@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	dnsutil "github.com/miekg/dns"
+
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -533,7 +534,7 @@ func assertFilesContain(fileNames []string, fileDir string, pod *v1.Pod, client 
 				SubResource("proxy").
 				Name(pod.Name).
 				Suffix(fileDir, fileName).
-				Do().Raw()
+				Do(context.TODO()).Raw()
 
 			if err != nil {
 				if ctx.Err() != nil {

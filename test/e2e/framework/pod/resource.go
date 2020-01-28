@@ -103,7 +103,7 @@ func (r ProxyResponseChecker) CheckAllResponses() (done bool, err error) {
 			Resource("pods").
 			SubResource("proxy").
 			Name(string(pod.Name)).
-			Do().
+			Do(context.TODO()).
 			Raw()
 
 		if err != nil {
@@ -516,7 +516,7 @@ func getPodLogsInternal(c clientset.Interface, namespace, podName, containerName
 		Name(podName).SubResource("log").
 		Param("container", containerName).
 		Param("previous", strconv.FormatBool(previous)).
-		Do().
+		Do(context.TODO()).
 		Raw()
 	if err != nil {
 		return "", err

@@ -17,6 +17,7 @@ limitations under the License.
 package custom_metrics
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 
@@ -116,7 +117,7 @@ func (m *rootScopedMetrics) getForNamespace(namespace string, metricName string,
 		Namespace(namespace).
 		Name(metricName).
 		VersionedParams(params, scheme.ParameterCodec).
-		Do()
+		Do(context.TODO())
 
 	metricObj, err := versionConverter.ConvertResultToVersion(result, v1beta2.SchemeGroupVersion)
 	if err != nil {
@@ -158,7 +159,7 @@ func (m *rootScopedMetrics) GetForObject(groupKind schema.GroupKind, name string
 		Name(name).
 		SubResource(metricName).
 		VersionedParams(params, scheme.ParameterCodec).
-		Do()
+		Do(context.TODO())
 
 	metricObj, err := versionConverter.ConvertResultToVersion(result, v1beta2.SchemeGroupVersion)
 	if err != nil {
@@ -201,7 +202,7 @@ func (m *rootScopedMetrics) GetForObjects(groupKind schema.GroupKind, selector l
 		Name(v1beta1.AllObjects).
 		SubResource(metricName).
 		VersionedParams(params, scheme.ParameterCodec).
-		Do()
+		Do(context.TODO())
 
 	metricObj, err := versionConverter.ConvertResultToVersion(result, v1beta2.SchemeGroupVersion)
 	if err != nil {
@@ -240,7 +241,7 @@ func (m *namespacedMetrics) GetForObject(groupKind schema.GroupKind, name string
 		Name(name).
 		SubResource(metricName).
 		VersionedParams(params, scheme.ParameterCodec).
-		Do()
+		Do(context.TODO())
 
 	metricObj, err := versionConverter.ConvertResultToVersion(result, v1beta2.SchemeGroupVersion)
 	if err != nil {
@@ -279,7 +280,7 @@ func (m *namespacedMetrics) GetForObjects(groupKind schema.GroupKind, selector l
 		Name(v1beta1.AllObjects).
 		SubResource(metricName).
 		VersionedParams(params, scheme.ParameterCodec).
-		Do()
+		Do(context.TODO())
 
 	metricObj, err := versionConverter.ConvertResultToVersion(result, v1beta2.SchemeGroupVersion)
 	if err != nil {

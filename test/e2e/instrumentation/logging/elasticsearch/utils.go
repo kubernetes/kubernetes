@@ -17,6 +17,7 @@ limitations under the License.
 package elasticsearch
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strconv"
@@ -100,7 +101,7 @@ func (p *esLogProvider) Init() error {
 		// Query against the root URL for Elasticsearch.
 		response := proxyRequest.Namespace(api.NamespaceSystem).
 			Name("elasticsearch-logging").
-			Do()
+			Do(context.TODO())
 		err = response.Error()
 		response.StatusCode(&statusCode)
 
@@ -135,7 +136,7 @@ func (p *esLogProvider) Init() error {
 			Name("elasticsearch-logging").
 			Suffix("_cluster/health").
 			Param("level", "indices").
-			DoRaw()
+			DoRaw(context.TODO())
 		if err != nil {
 			continue
 		}
@@ -189,9 +190,8 @@ func (p *esLogProvider) ReadEntries(name string) []utils.LogEntry {
 		Name("elasticsearch-logging").
 		Suffix("_search").
 		Param("q", query).
-		// Ask for more in case we included some unrelated records in our query
 		Param("size", strconv.Itoa(searchPageSize)).
-		DoRaw()
+		DoRaw(context.TODO())
 	if err != nil {
 		framework.Logf("Failed to make proxy call to elasticsearch-logging: %v", err)
 		return nil

@@ -37,7 +37,7 @@ func (c *selfSubjectRulesReviews) CreateContext(ctx context.Context, srr *author
 		Context(ctx).
 		Resource("selfsubjectrulesreviews").
 		Body(srr).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }

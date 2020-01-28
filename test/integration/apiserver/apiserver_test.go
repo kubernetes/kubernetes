@@ -188,7 +188,7 @@ func Test4xxStatusCodeInvalidPatch(t *testing.T) {
 		AbsPath("/apis/apps/v1").
 		Namespace("default").
 		Resource("deployments").
-		Body(obj).Do().Get()
+		Body(obj).Do(context.TODO()).Get()
 	if err != nil {
 		t.Fatalf("Failed to create object: %v: %v", err, resp)
 	}
@@ -197,7 +197,7 @@ func Test4xxStatusCodeInvalidPatch(t *testing.T) {
 		Namespace("default").
 		Resource("deployments").
 		Name("deployment").
-		Body([]byte(`{"metadata":{"annotations":{"foo":["bar"]}}}`)).Do()
+		Body([]byte(`{"metadata":{"annotations":{"foo":["bar"]}}}`)).Do(context.TODO())
 	var statusCode int
 	result.StatusCode(&statusCode)
 	if statusCode != 422 {
@@ -208,7 +208,7 @@ func Test4xxStatusCodeInvalidPatch(t *testing.T) {
 		Namespace("default").
 		Resource("deployments").
 		Name("deployment").
-		Body([]byte(`{"metadata":{"annotations":{"foo":["bar"]}}}`)).Do()
+		Body([]byte(`{"metadata":{"annotations":{"foo":["bar"]}}}`)).Do(context.TODO())
 	result.StatusCode(&statusCode)
 	if statusCode != 422 {
 		t.Fatalf("Expected status code to be 422, got %v (%#v)", statusCode, result)
@@ -998,7 +998,7 @@ func TestAPICRDProtobuf(t *testing.T) {
 			w, err := client.Get().
 				Resource(resource).NamespaceIfScoped(obj.GetNamespace(), len(obj.GetNamespace()) > 0).Name(obj.GetName()).SubResource(tc.subresource).
 				SetHeader("Accept", tc.accept).
-				Stream()
+				Stream(context.TODO())
 			if (tc.wantErr != nil) != (err != nil) {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -1611,7 +1611,7 @@ func TestTransform(t *testing.T) {
 					FieldSelector:   fields.OneTermEqualSelector("metadata.name", obj.GetName()).String(),
 				}, metav1.ParameterCodec).
 				Param("includeObject", string(tc.includeObject)).
-				Stream()
+				Stream(context.TODO())
 			if (tc.wantErr != nil) != (err != nil) {
 				t.Fatalf("unexpected error: %v", err)
 			}

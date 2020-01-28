@@ -293,7 +293,7 @@ func getHealthz(checkName string, clientConfig *rest.Config) (int, error) {
 		return 0, fmt.Errorf("failed to create a client: %v", err)
 	}
 
-	result := client.CoreV1().RESTClient().Get().AbsPath(fmt.Sprintf("/healthz/%v", checkName)).Do()
+	result := client.CoreV1().RESTClient().Get().AbsPath(fmt.Sprintf("/healthz/%v", checkName)).Do(context.TODO())
 	status := 0
 	result.StatusCode(&status)
 	return status, nil

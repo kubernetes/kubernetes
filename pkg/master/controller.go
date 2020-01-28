@@ -17,6 +17,7 @@ limitations under the License.
 package master
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/http"
@@ -210,7 +211,7 @@ func (c *Controller) RunKubernetesService(ch chan struct{}) {
 	// wait until process is ready
 	wait.PollImmediateUntil(100*time.Millisecond, func() (bool, error) {
 		var code int
-		c.healthClient.Get().AbsPath("/healthz").Do().StatusCode(&code)
+		c.healthClient.Get().AbsPath("/healthz").Do(context.TODO()).StatusCode(&code)
 		return code == http.StatusOK, nil
 	}, ch)
 

@@ -37,7 +37,7 @@ func (c *selfSubjectAccessReviews) CreateContext(ctx context.Context, sar *autho
 		Context(ctx).
 		Resource("selfsubjectaccessreviews").
 		Body(sar).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }

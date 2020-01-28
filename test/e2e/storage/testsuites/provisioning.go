@@ -17,6 +17,7 @@ limitations under the License.
 package testsuites
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -608,7 +609,7 @@ func StopPod(c clientset.Interface, pod *v1.Pod) {
 	if pod == nil {
 		return
 	}
-	body, err := c.CoreV1().Pods(pod.Namespace).GetLogs(pod.Name, &v1.PodLogOptions{}).Do().Raw()
+	body, err := c.CoreV1().Pods(pod.Namespace).GetLogs(pod.Name, &v1.PodLogOptions{}).Do(context.TODO()).Raw()
 	if err != nil {
 		framework.Logf("Error getting logs for pod %s: %v", pod.Name, err)
 	} else {

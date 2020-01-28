@@ -17,6 +17,7 @@ limitations under the License.
 package podlogs
 
 import (
+	"context"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -137,7 +138,7 @@ func TestInsecurePodLogs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	insecureResult := clientSet.CoreV1().Pods("ns").GetLogs(pod.Name, &corev1.PodLogOptions{InsecureSkipTLSVerifyBackend: true}).Do()
+	insecureResult := clientSet.CoreV1().Pods("ns").GetLogs(pod.Name, &corev1.PodLogOptions{InsecureSkipTLSVerifyBackend: true}).Do(context.TODO())
 	if err := insecureResult.Error(); err != nil {
 		t.Fatal(err)
 	}
@@ -147,7 +148,7 @@ func TestInsecurePodLogs(t *testing.T) {
 		t.Fatal(insecureStatusCode)
 	}
 
-	secureResult := clientSet.CoreV1().Pods("ns").GetLogs(pod.Name, &corev1.PodLogOptions{}).Do()
+	secureResult := clientSet.CoreV1().Pods("ns").GetLogs(pod.Name, &corev1.PodLogOptions{}).Do(context.TODO())
 	if err := secureResult.Error(); err == nil || !strings.Contains(err.Error(), "x509: certificate signed by unknown authority") {
 		t.Fatal(err)
 	}

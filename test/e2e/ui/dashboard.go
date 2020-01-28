@@ -75,7 +75,7 @@ var _ = SIGDescribe("Kubernetes Dashboard [Feature:Dashboard]", func() {
 				Context(ctx).
 				Name(utilnet.JoinSchemeNamePort("https", uiServiceName, "")).
 				Timeout(framework.SingleCallTimeout).
-				Do().
+				Do(context.TODO()).
 				StatusCode(&status).
 				Error()
 			if err != nil {

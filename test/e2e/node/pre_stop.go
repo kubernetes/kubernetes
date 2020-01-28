@@ -141,7 +141,7 @@ func testPreStop(c clientset.Interface, ns string) {
 			SubResource("proxy").
 			Name(podDescr.Name).
 			Suffix("read").
-			DoRaw()
+			DoRaw(context.TODO())
 
 		if err != nil {
 			if ctx.Err() != nil {

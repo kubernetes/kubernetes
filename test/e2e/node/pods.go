@@ -17,6 +17,7 @@ limitations under the License.
 package node
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -103,7 +104,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 			ginkgo.By("deleting the pod gracefully")
 			var lastPod v1.Pod
 			var statusCode int
-			err = f.ClientSet.CoreV1().RESTClient().Delete().AbsPath("/api/v1/namespaces", pod.Namespace, "pods", pod.Name).Param("gracePeriodSeconds", "30").Do().StatusCode(&statusCode).Into(&lastPod)
+			err = f.ClientSet.CoreV1().RESTClient().Delete().AbsPath("/api/v1/namespaces", pod.Namespace, "pods", pod.Name).Param("gracePeriodSeconds", "30").Do(context.TODO()).StatusCode(&statusCode).Into(&lastPod)
 			framework.ExpectNoError(err, "failed to use http client to send delete")
 			framework.ExpectEqual(statusCode, http.StatusOK, "failed to delete gracefully by client request")
 

@@ -17,6 +17,7 @@ limitations under the License.
 package external_metrics
 
 import (
+	"context"
 	"fmt"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -88,7 +89,7 @@ func (m *namespacedMetrics) List(metricName string, metricSelector labels.Select
 		VersionedParams(&metav1.ListOptions{
 			LabelSelector: metricSelector.String(),
 		}, metav1.ParameterCodec).
-		Do().
+		Do(context.TODO()).
 		Into(res)
 
 	if err != nil {

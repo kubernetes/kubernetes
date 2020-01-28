@@ -17,6 +17,7 @@ limitations under the License.
 package apiserver
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -228,7 +229,7 @@ func waitForWardleRunning(t *testing.T, wardleToKASKubeConfig *rest.Config, ward
 			return false, nil
 		}
 		healthStatus := 0
-		result := wardleClient.Discovery().RESTClient().Get().AbsPath("/healthz").Do().StatusCode(&healthStatus)
+		result := wardleClient.Discovery().RESTClient().Get().AbsPath("/healthz").Do(context.TODO()).StatusCode(&healthStatus)
 		lastHealthContent, lastHealthErr = result.Raw()
 		if healthStatus != http.StatusOK {
 			return false, nil
@@ -345,7 +346,7 @@ func createKubeConfig(clientCfg *rest.Config) *clientcmdapi.Config {
 }
 
 func readResponse(client rest.Interface, location string) ([]byte, error) {
-	return client.Get().AbsPath(location).DoRaw()
+	return client.Get().AbsPath(location).DoRaw(context.TODO())
 }
 
 func testAPIGroupList(t *testing.T, client rest.Interface) {

@@ -17,6 +17,7 @@ limitations under the License.
 package apiclient
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -77,7 +78,7 @@ func (w *KubeWaiter) WaitForAPI() error {
 	start := time.Now()
 	return wait.PollImmediate(kubeadmconstants.APICallRetryInterval, w.timeout, func() (bool, error) {
 		healthStatus := 0
-		w.client.Discovery().RESTClient().Get().AbsPath("/healthz").Do().StatusCode(&healthStatus)
+		w.client.Discovery().RESTClient().Get().AbsPath("/healthz").Do(context.TODO()).StatusCode(&healthStatus)
 		if healthStatus != http.StatusOK {
 			return false, nil
 		}

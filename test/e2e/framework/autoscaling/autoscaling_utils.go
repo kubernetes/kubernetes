@@ -38,6 +38,7 @@ import (
 	testutils "k8s.io/kubernetes/test/utils"
 
 	"github.com/onsi/ginkgo"
+
 	scaleclient "k8s.io/client-go/scale"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
@@ -253,7 +254,7 @@ func (rc *ResourceConsumer) sendConsumeCPURequest(millicores int) {
 			Param("durationSec", strconv.Itoa(rc.consumptionTimeInSeconds)).
 			Param("requestSizeMillicores", strconv.Itoa(rc.requestSizeInMillicores))
 		framework.Logf("ConsumeCPU URL: %v", *req.URL())
-		_, err = req.DoRaw()
+		_, err = req.DoRaw(context.TODO())
 		if err != nil {
 			framework.Logf("ConsumeCPU failure: %v", err)
 			return false, nil
@@ -280,7 +281,7 @@ func (rc *ResourceConsumer) sendConsumeMemRequest(megabytes int) {
 			Param("durationSec", strconv.Itoa(rc.consumptionTimeInSeconds)).
 			Param("requestSizeMegabytes", strconv.Itoa(rc.requestSizeInMegabytes))
 		framework.Logf("ConsumeMem URL: %v", *req.URL())
-		_, err = req.DoRaw()
+		_, err = req.DoRaw(context.TODO())
 		if err != nil {
 			framework.Logf("ConsumeMem failure: %v", err)
 			return false, nil
@@ -308,7 +309,7 @@ func (rc *ResourceConsumer) sendConsumeCustomMetric(delta int) {
 			Param("durationSec", strconv.Itoa(rc.consumptionTimeInSeconds)).
 			Param("requestSizeMetrics", strconv.Itoa(rc.requestSizeCustomMetric))
 		framework.Logf("ConsumeCustomMetric URL: %v", *req.URL())
-		_, err = req.DoRaw()
+		_, err = req.DoRaw(context.TODO())
 		if err != nil {
 			framework.Logf("ConsumeCustomMetric failure: %v", err)
 			return false, nil

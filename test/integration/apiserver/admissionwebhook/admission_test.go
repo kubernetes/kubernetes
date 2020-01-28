@@ -17,6 +17,7 @@ limitations under the License.
 package admissionwebhook
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
@@ -1016,11 +1017,11 @@ func testPodConnectSubresource(c *testContext) {
 		var err error
 		switch c.gvr {
 		case gvr("", "v1", "pods/exec"):
-			err = c.clientset.CoreV1().RESTClient().Verb(httpMethod).Namespace(pod.GetNamespace()).Resource("pods").Name(pod.GetName()).SubResource("exec").Do().Error()
+			err = c.clientset.CoreV1().RESTClient().Verb(httpMethod).Namespace(pod.GetNamespace()).Resource("pods").Name(pod.GetName()).SubResource("exec").Do(context.TODO()).Error()
 		case gvr("", "v1", "pods/attach"):
-			err = c.clientset.CoreV1().RESTClient().Verb(httpMethod).Namespace(pod.GetNamespace()).Resource("pods").Name(pod.GetName()).SubResource("attach").Do().Error()
+			err = c.clientset.CoreV1().RESTClient().Verb(httpMethod).Namespace(pod.GetNamespace()).Resource("pods").Name(pod.GetName()).SubResource("attach").Do(context.TODO()).Error()
 		case gvr("", "v1", "pods/portforward"):
-			err = c.clientset.CoreV1().RESTClient().Verb(httpMethod).Namespace(pod.GetNamespace()).Resource("pods").Name(pod.GetName()).SubResource("portforward").Do().Error()
+			err = c.clientset.CoreV1().RESTClient().Verb(httpMethod).Namespace(pod.GetNamespace()).Resource("pods").Name(pod.GetName()).SubResource("portforward").Do(context.TODO()).Error()
 		default:
 			c.t.Errorf("unknown subresource %#v", c.gvr)
 			return
@@ -1061,19 +1062,19 @@ func testPodBindingEviction(c *testContext) {
 		err = c.clientset.CoreV1().RESTClient().Post().Namespace(pod.GetNamespace()).Resource("bindings").Body(&corev1.Binding{
 			ObjectMeta: metav1.ObjectMeta{Name: pod.GetName()},
 			Target:     corev1.ObjectReference{Name: "foo", Kind: "Node", APIVersion: "v1"},
-		}).Do().Error()
+		}).Do(context.TODO()).Error()
 
 	case gvr("", "v1", "pods/binding"):
 		err = c.clientset.CoreV1().RESTClient().Post().Namespace(pod.GetNamespace()).Resource("pods").Name(pod.GetName()).SubResource("binding").Body(&corev1.Binding{
 			ObjectMeta: metav1.ObjectMeta{Name: pod.GetName()},
 			Target:     corev1.ObjectReference{Name: "foo", Kind: "Node", APIVersion: "v1"},
-		}).Do().Error()
+		}).Do(context.TODO()).Error()
 
 	case gvr("", "v1", "pods/eviction"):
 		err = c.clientset.CoreV1().RESTClient().Post().Namespace(pod.GetNamespace()).Resource("pods").Name(pod.GetName()).SubResource("eviction").Body(&policyv1beta1.Eviction{
 			ObjectMeta:    metav1.ObjectMeta{Name: pod.GetName()},
 			DeleteOptions: forceDelete,
-		}).Do().Error()
+		}).Do(context.TODO()).Error()
 
 	default:
 		c.t.Errorf("unhandled resource %#v", c.gvr)
@@ -1124,7 +1125,7 @@ func testSubresourceProxy(c *testContext) {
 		// set expectations
 		c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), schema.GroupVersionKind{}, v1beta1.Connect, obj.GetName(), obj.GetNamespace(), true, false, false)
 		// run the request. we don't actually care if the request is successful, just that admission gets called as expected
-		err = request.Resource(gvrWithoutSubresources.Resource).Name(obj.GetName()).SubResource(subresources...).Do().Error()
+		err = request.Resource(gvrWithoutSubresources.Resource).Name(obj.GetName()).SubResource(subresources...).Do(context.TODO()).Error()
 		if err != nil {
 			c.t.Logf("debug: result of subresource proxy (error expected): %v", err)
 		}

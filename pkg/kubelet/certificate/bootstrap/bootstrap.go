@@ -291,7 +291,7 @@ func waitForServer(cfg restclient.Config, deadline time.Duration) error {
 
 	var connected bool
 	wait.JitterUntil(func() {
-		if _, err := cli.Get().AbsPath("/healthz").Do().Raw(); err != nil {
+		if _, err := cli.Get().AbsPath("/healthz").Do(context.TODO()).Raw(); err != nil {
 			klog.Infof("Failed to connect to apiserver: %v", err)
 			return
 		}

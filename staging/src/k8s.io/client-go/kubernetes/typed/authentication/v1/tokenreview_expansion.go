@@ -37,7 +37,7 @@ func (c *tokenReviews) CreateContext(ctx context.Context, tokenReview *authentic
 		Context(ctx).
 		Resource("tokenreviews").
 		Body(tokenReview).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }

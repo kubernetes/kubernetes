@@ -24,6 +24,7 @@ import (
 	"time"
 
 	jsonpatch "github.com/evanphx/json-patch"
+
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/klog"
 
@@ -250,7 +251,7 @@ func (a *mutatingDispatcher) callAttrMutatingHook(ctx context.Context, h *admiss
 		}
 	}
 
-	if err := r.Do().Into(response); err != nil {
+	if err := r.Do(context.TODO()).Into(response); err != nil {
 		return false, &webhookutil.ErrCallingWebhook{WebhookName: h.Name, Reason: err}
 	}
 	trace.Step("Request completed")
