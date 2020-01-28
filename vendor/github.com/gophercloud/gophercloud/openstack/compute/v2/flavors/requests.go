@@ -16,7 +16,7 @@ type ListOptsBuilder interface {
 	field is boolean, the request options are ternary, which is why AccessType is
 	a string. The following values are allowed:
 
-	The AccessType arguement is optional, and if it is not supplied, OpenStack
+	The AccessType argument is optional, and if it is not supplied, OpenStack
 	returns the PublicAccess flavors.
 */
 type AccessType string

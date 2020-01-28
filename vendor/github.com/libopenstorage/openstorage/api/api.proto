@@ -362,11 +362,11 @@ message Alert {
   int64 alert_type = 3;
   // Message describing the Alert
   string message = 4;
-  //Timestamp when Alert occured
+  //Timestamp when Alert occurred
   google.protobuf.Timestamp timestamp = 5;	
-  // ResourceId where Alert occured
+  // ResourceId where Alert occurred
   string resource_id = 6;
-  // Resource where Alert occured
+  // Resource where Alert occurred
   ResourceType resource = 7;
   // Cleared Flag
   bool cleared = 8;

@@ -411,7 +411,7 @@ func GetMasterAndWorkerNodes(c clientset.Interface) (sets.String, *v1.NodeList, 
 }
 
 // IsNodeUntainted tests whether a fake pod can be scheduled on "node", given its current taints.
-// TODO: need to discuss wether to return bool and error type
+// TODO: need to discuss whether to return bool and error type
 func IsNodeUntainted(node *v1.Node) bool {
 	return isNodeUntaintedWithNonblocking(node, "")
 }

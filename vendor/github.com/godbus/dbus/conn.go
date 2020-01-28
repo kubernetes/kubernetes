@@ -292,7 +292,7 @@ func (conn *Conn) inWorker() {
 		msg, err := conn.ReadMessage()
 		if err != nil {
 			if _, ok := err.(InvalidMessageError); !ok {
-				// Some read error occured (usually EOF); we can't really do
+				// Some read error occurred (usually EOF); we can't really do
 				// anything but to shut down all stuff and returns errors to all
 				// pending replies.
 				conn.Close()

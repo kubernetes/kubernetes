@@ -1338,11 +1338,11 @@ type Alert struct {
 	AlertType int64 `protobuf:"varint,3,opt,name=alert_type,json=alertType" json:"alert_type,omitempty"`
 	// Message describing the Alert
 	Message string `protobuf:"bytes,4,opt,name=message" json:"message,omitempty"`
-	// Timestamp when Alert occured
+	// Timestamp when Alert occurred
 	Timestamp *google_protobuf.Timestamp `protobuf:"bytes,5,opt,name=timestamp" json:"timestamp,omitempty"`
-	// ResourceId where Alert occured
+	// ResourceId where Alert occurred
 	ResourceId string `protobuf:"bytes,6,opt,name=resource_id,json=resourceId" json:"resource_id,omitempty"`
-	// Resource where Alert occured
+	// Resource where Alert occurred
 	Resource ResourceType `protobuf:"varint,7,opt,name=resource,enum=openstorage.api.ResourceType" json:"resource,omitempty"`
 	// Cleared Flag
 	Cleared bool `protobuf:"varint,8,opt,name=cleared" json:"cleared,omitempty"`

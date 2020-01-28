@@ -60,7 +60,7 @@ func (a authCookieSha1) HandleData(data []byte) ([]byte, AuthStatus) {
 
 // getCookie searches for the cookie identified by id in context and returns
 // the cookie content or nil. (Since HandleData can't return a specific error,
-// but only whether an error occured, this function also doesn't bother to
+// but only whether an error occurred, this function also doesn't bother to
 // return an error.)
 func (a authCookieSha1) getCookie(context, id []byte) []byte {
 	file, err := os.Open(a.home + "/.dbus-keyrings/" + string(context))

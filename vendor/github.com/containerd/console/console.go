@@ -22,7 +22,7 @@ type Console interface {
 	SetRaw() error
 	// DisableEcho disables echo on the console
 	DisableEcho() error
-	// Reset restores the console to its orignal state
+	// Reset restores the console to its original state
 	Reset() error
 	// Size returns the window size of the console
 	Size() (WinSize, error)

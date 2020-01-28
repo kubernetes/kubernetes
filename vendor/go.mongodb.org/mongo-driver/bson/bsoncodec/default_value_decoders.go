@@ -31,7 +31,7 @@ type DefaultValueDecoders struct{}
 // RegisterDefaultDecoders will register the decoder methods attached to DefaultValueDecoders with
 // the provided RegistryBuilder.
 //
-// There is no support for decoding map[string]interface{} becuase there is no decoder for
+// There is no support for decoding map[string]interface{} because there is no decoder for
 // interface{}, so users must either register this decoder themselves or use the
 // EmptyInterfaceDecoder avaialble in the bson package.
 func (dvd DefaultValueDecoders) RegisterDefaultDecoders(rb *RegistryBuilder) {

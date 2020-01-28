@@ -189,7 +189,7 @@ func (p Pager) AllPages() (Page, error) {
 		err = p.EachPage(func(page Page) (bool, error) {
 			b := page.GetBody().([]byte)
 			pagesSlice = append(pagesSlice, b)
-			// seperate pages with a comma
+			// separate pages with a comma
 			pagesSlice = append(pagesSlice, []byte{10})
 			return true, nil
 		})

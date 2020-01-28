@@ -14,7 +14,7 @@
 // one Unicode code point (rune) at a time. All runes that are letters (category L)
 // or numbers (category N) are considered valid characters. They are mapped to
 // lower case, and included in the output. All other runes are considered
-// invalid characters. Invalid characters that preceed the first valid character,
+// invalid characters. Invalid characters that precede the first valid character,
 // as well as invalid character that follow the last valid character
 // are dropped completely. All other sequences of invalid characters
 // between two valid characters are replaced with a single dash character '-'.

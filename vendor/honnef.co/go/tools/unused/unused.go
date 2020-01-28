@@ -103,7 +103,7 @@ import (
     from method to type.
 
   - (8.3) All interface methods are marked as used, even if they never get
-    called. This is to accomodate sum types (unexported interface
+    called. This is to accommodate sum types (unexported interface
     method that must exist but never gets called.)
 
   - (8.4) All embedded interfaces are marked as used. This is an

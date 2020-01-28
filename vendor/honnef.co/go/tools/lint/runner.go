@@ -438,7 +438,7 @@ func NewRunner(stats *Stats) (*Runner, error) {
 // diagnostics as well as extracted ignore directives.
 //
 // Note that diagnostics have not been filtered at this point yet, to
-// accomodate cumulative analyzes that require additional steps to
+// accommodate cumulative analyzes that require additional steps to
 // produce diagnostics.
 func (r *Runner) Run(cfg *packages.Config, patterns []string, analyzers []*analysis.Analyzer, hasCumulative bool) ([]*Package, error) {
 	r.analyzerIDs = analyzerIDs{m: map[*analysis.Analyzer]int{}}

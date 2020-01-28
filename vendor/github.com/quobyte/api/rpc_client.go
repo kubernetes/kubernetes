@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	emptyResponse string = "Empty result and no error occured"
+	emptyResponse string = "Empty result and no error occurred"
 )
 
 type request struct {

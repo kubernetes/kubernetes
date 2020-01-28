@@ -205,8 +205,8 @@ func resolveWithIndexGo(ix *resolve.RuleIndex, imp string, from label.Label) (la
 
 	for _, m := range matches {
 		// Apply vendoring logic for Go libraries. A library in a vendor directory
-		// is only visible in the parent tree. Vendored libraries supercede
-		// non-vendored libraries, and libraries closer to from.Pkg supercede
+		// is only visible in the parent tree. Vendored libraries supersede
+		// non-vendored libraries, and libraries closer to from.Pkg supersede
 		// those further up the tree.
 		isVendored := false
 		vendorRoot := ""

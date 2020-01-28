@@ -127,7 +127,7 @@ func (conn *Conn) Auth(methods []Auth) error {
 // tryAuth tries to authenticate with m as the mechanism, using state as the
 // initial authState and in for reading input. It returns (nil, true) on
 // success, (nil, false) on a REJECTED and (someErr, false) if some other
-// error occured.
+// error occurred.
 func (conn *Conn) tryAuth(m Auth, state authState, in *bufio.Reader) (error, bool) {
 	for {
 		s, err := authReadLine(in)
