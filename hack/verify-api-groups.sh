@@ -44,7 +44,7 @@ for register_file in "${register_files[@]}"; do
 	group_dirname="${group_dirname%%"/*"}"
 	group_name=""
 	if grep -q 'GroupName = "' "${register_file}"; then
-		group_name=$(grep -q 'GroupName = "' "${register_file}" | cut -d\" -f2 -)
+		group_name=$(grep 'GroupName = "' "${register_file}" | cut -d\" -f2 -)
 	else
 		echo "${register_file} is missing \"const GroupName =\""
 		exit 1
