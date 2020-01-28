@@ -216,17 +216,26 @@ func podToEndpointAddressForService(svc *v1.Service, pod *v1.Pod) (*v1.EndpointA
 		return podToEndpointAddress(pod), nil
 	}
 
-	// api-server service controller ensured that the service got the correct IP Family
-	// according to user setup, here we only need to match EndPoint IPs' family to service
-	// actual IP family. as in, we don't need to check service.IPFamily
+	// for non-headless services, the api-server service controller ensured that the service got the
+	// correct IP Family according to user setup, here we only need to match EndPoint IPs' family
+	// to service actual IP family.
 
-	ipv6ClusterIP := utilnet.IsIPv6String(svc.Spec.ClusterIP)
+	isIPv6Service := utilnet.IsIPv6String(svc.Spec.ClusterIP)
+
+	// for headless services ClusterIP is not set, so we filter by the spec.IPFamily field
+	// if spec.IPFamily is nil it defaults to IPv4
+	// TODO for headless services without spec.IPFamily it should be possible to return
+	// all Pods IPs as endpoints
+	if svc.Spec.ClusterIP == api.ClusterIPNone && svc.Spec.IPFamily != nil {
+		isIPv6Service = *svc.Spec.IPFamily == v1.IPv6Protocol
+	}
+
 	for _, podIP := range pod.Status.PodIPs {
 		ipv6PodIP := utilnet.IsIPv6String(podIP.IP)
 		// same family?
 		// TODO (khenidak) when we remove the max of 2 PodIP limit from pods
 		// we will have to return multiple endpoint addresses
-		if ipv6ClusterIP == ipv6PodIP {
+		if isIPv6Service == ipv6PodIP {
 			return &v1.EndpointAddress{
 				IP:       podIP.IP,
 				NodeName: &pod.Spec.NodeName,

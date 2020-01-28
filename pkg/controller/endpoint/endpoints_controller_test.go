@@ -1102,6 +1102,9 @@ func TestShouldPodBeInEndpoints(t *testing.T) {
 	}
 }
 func TestPodToEndpointAddressForService(t *testing.T) {
+	ip4family := v1.IPv4Protocol
+	ip6family := v1.IPv6Protocol
+
 	testCases := []struct {
 		name               string
 		expectedEndPointIP string
@@ -1182,6 +1185,51 @@ func TestPodToEndpointAddressForService(t *testing.T) {
 			service: v1.Service{
 				Spec: v1.ServiceSpec{
 					ClusterIP: "3000::1",
+				},
+			},
+		},
+		{
+			name:               "headless v4 service, in a dual stack cluster. dual stack enabled",
+			expectedEndPointIP: "1.2.3.4",
+
+			enableDualStack:    true,
+			expectError:        false,
+			enableDualStackPod: true,
+
+			service: v1.Service{
+				Spec: v1.ServiceSpec{
+					ClusterIP: "None",
+					IPFamily:  &ip4family,
+				},
+			},
+		},
+		{
+			name:               "headless v6 service, in a dual stack cluster. dual stack enabled",
+			expectedEndPointIP: "2000::0",
+
+			enableDualStack:    true,
+			expectError:        false,
+			enableDualStackPod: true,
+
+			service: v1.Service{
+				Spec: v1.ServiceSpec{
+					ClusterIP: "None",
+					IPFamily:  &ip6family,
+				},
+			},
+		},
+		{
+			name:               "headless nil ipFamily service, in a dual stack cluster. dual stack enabled",
+			expectedEndPointIP: "1.2.3.4",
+
+			enableDualStack:    true,
+			expectError:        false,
+			enableDualStackPod: true,
+
+			service: v1.Service{
+				Spec: v1.ServiceSpec{
+					ClusterIP: "None",
+					IPFamily:  nil,
 				},
 			},
 		},
