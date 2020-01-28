@@ -18,6 +18,7 @@ package cpumanager
 
 import (
 	"fmt"
+	"path"
 	"reflect"
 	"strconv"
 	"strings"
@@ -43,6 +44,18 @@ import (
 type mockState struct {
 	assignments   state.ContainerCPUAssignments
 	defaultCPUSet cpuset.CPUSet
+}
+
+func createCgroupFile(cpus cpuset.CPUSet) (string, error) {
+	dir, err := ioutil.TempDir("/tmp/", "cpu_manager_cgroup_test")
+	if err != nil {
+		return "", fmt.Errorf("cannot create tmp directory for cgroup file: %s", err.Error())
+	}
+	err = ioutil.WriteFile(path.Join(dir, "cpuset.cpus"), []byte(cpus.String()), 0600)
+	if err != nil {
+		return "", fmt.Errorf("cannot create cpuset cgroup file: %s", err.Error())
+	}
+	return dir, nil
 }
 
 func (s *mockState) GetCPUSet(podUID string, containerName string) (cpuset.CPUSet, bool) {
@@ -207,6 +220,11 @@ func makeMultiContainerPod(initCPUs, appCPUs []struct{ request, limit string }) 
 }
 
 func TestCPUManagerAdd(t *testing.T) {
+	fakeCgroupPath, err := createCgroupFile(cpuset.NewCPUSet(0, 1, 2, 3))
+	if err != nil {
+		t.Errorf("error with cpuset file: %v", err)
+	}
+	defer os.RemoveAll(fakeCgroupPath)
 	testPolicy, _ := NewStaticPolicy(
 		&topology.CPUTopology{
 			NumCPUs:    4,
@@ -221,7 +239,8 @@ func TestCPUManagerAdd(t *testing.T) {
 		},
 		0,
 		cpuset.NewCPUSet(),
-		topologymanager.NewFakeManager())
+		topologymanager.NewFakeManager(),
+		fakeCgroupPath)
 	testCases := []struct {
 		description string
 		updateErr   error
@@ -465,7 +484,12 @@ func TestCPUManagerAddWithInitContainers(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		policy, _ := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs, cpuset.NewCPUSet(), topologymanager.NewFakeManager())
+		fakeCgroupPath, err := createCgroupFile(testCase.topo.CPUDetails.CPUs())
+		if err != nil {
+			t.Errorf("error with cpuset file: %v", err)
+		}
+		defer os.RemoveAll(fakeCgroupPath)
+		policy, _ := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs, cpuset.NewCPUSet(), topologymanager.NewFakeManager(), fakeCgroupPath)
 
 		state := &mockState{
 			assignments:   testCase.stAssignments,
@@ -598,9 +622,13 @@ func TestCPUManagerGenerate(t *testing.T) {
 			if err != nil {
 				t.Errorf("cannot create state file: %s", err.Error())
 			}
+			err = ioutil.WriteFile(path.Join(sDir, "cpuset.cpus"), []byte("0-3"), 0600)
+			if err != nil {
+				t.Errorf("cannot create cpuset file: %s", err.Error())
+			}
 			defer os.RemoveAll(sDir)
 
-			mgr, err := NewManager(testCase.cpuPolicyName, 5*time.Second, machineInfo, nil, cpuset.NewCPUSet(), testCase.nodeAllocatableReservation, sDir, topologymanager.NewFakeManager())
+			mgr, err := NewManager(testCase.cpuPolicyName, 5*time.Second, machineInfo, nil, cpuset.NewCPUSet(), testCase.nodeAllocatableReservation, sDir, topologymanager.NewFakeManager(), sDir)
 			if testCase.expectedError != nil {
 				if !strings.Contains(err.Error(), testCase.expectedError.Error()) {
 					t.Errorf("Unexpected error message. Have: %s wants %s", err.Error(), testCase.expectedError.Error())
@@ -954,6 +982,11 @@ func TestReconcileState(t *testing.T) {
 // above test cases are without kubelet --reserved-cpus cmd option
 // the following tests are with --reserved-cpus configured
 func TestCPUManagerAddWithResvList(t *testing.T) {
+	fakeCgroupPath, err := createCgroupFile(cpuset.NewCPUSet(0, 1, 2, 3))
+	if err != nil {
+		t.Errorf("error with cpuset file: %v", err)
+	}
+	defer os.RemoveAll(fakeCgroupPath)
 	testPolicy, _ := NewStaticPolicy(
 		&topology.CPUTopology{
 			NumCPUs:    4,
@@ -968,7 +1001,8 @@ func TestCPUManagerAddWithResvList(t *testing.T) {
 		},
 		1,
 		cpuset.NewCPUSet(0),
-		topologymanager.NewFakeManager())
+		topologymanager.NewFakeManager(),
+		fakeCgroupPath)
 	testCases := []struct {
 		description string
 		updateErr   error
