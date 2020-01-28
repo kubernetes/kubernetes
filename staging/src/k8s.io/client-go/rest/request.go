@@ -786,6 +786,7 @@ func (r *Request) request(ctx context.Context, fn func(*http.Request, *http.Resp
 	maxRetries := 10
 	retries := 0
 	for {
+
 		url := r.URL().String()
 		req, err := http.NewRequest(r.verb, url, r.body)
 		if err != nil {
