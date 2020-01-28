@@ -1098,6 +1098,8 @@ message PullImageRequest {
     AuthConfig auth = 2;
     // Config of the PodSandbox, which is used to pull image in PodSandbox context.
     PodSandboxConfig sandbox_config = 3;
+    // Timeout in seconds to pull the image. Default: 0 (run forever).
+    int64 timeout = 4;
 }
 
 message PullImageResponse {
