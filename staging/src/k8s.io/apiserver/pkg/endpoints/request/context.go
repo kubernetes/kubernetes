@@ -88,12 +88,12 @@ func UserFrom(ctx context.Context) (user.Info, bool) {
 	return user, ok
 }
 
-// WithTraceStep returns a copy of parent in which the trace object value is set
+// WithTraceStep returns a copy of parent in which the trace step function value is set
 func WithTraceStep(parent context.Context, traceStep func(msg string, fields ...trace.Field)) context.Context {
 	return WithValue(parent, traceStepKey, traceStep)
 }
 
-// TraceFrom returns the value of the user key on the ctx
+// TraceFrom returns the value of the trace step key on the ctx
 func TraceFrom(ctx context.Context) (func(msg string, fields ...trace.Field), bool) {
 	trace, ok := ctx.Value(traceStepKey).(func(msg string, fields ...trace.Field))
 	return trace, ok
