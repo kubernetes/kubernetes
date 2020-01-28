@@ -29,45 +29,73 @@ import (
 	"sync"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	k8sRuntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/util/goroutinemap/exponentialbackoff"
-	"k8s.io/kubernetes/pkg/volume/util/types"
+	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 )
 
 const (
 	// EmptyUniquePodName is a UniquePodName for empty string.
-	EmptyUniquePodName types.UniquePodName = types.UniquePodName("")
+	EmptyUniquePodName volumetypes.UniquePodName = volumetypes.UniquePodName("")
 
 	// EmptyUniqueVolumeName is a UniqueVolumeName for empty string
 	EmptyUniqueVolumeName v1.UniqueVolumeName = v1.UniqueVolumeName("")
+
+	// EmptyNodeName is a NodeName for empty string
+	EmptyNodeName types.NodeName = types.NodeName("")
 )
 
 // NestedPendingOperations defines the supported set of operations.
 type NestedPendingOperations interface {
-	// Run adds the concatenation of volumeName and podName to the list of
-	// running operations and spawns a new go routine to execute operationFunc.
-	// If an operation with the same volumeName, same or empty podName
-	// and same operationName exits, an AlreadyExists or ExponentialBackoff
-	// error is returned. If an operation with same volumeName and podName
-	// has ExponentialBackoff error but operationName is different, exponential
-	// backoff is reset and operation is allowed to proceed.
-	// This enables multiple operations to execute in parallel for the same
-	// volumeName as long as they have different podName.
+
+	// Run adds the concatenation of volumeName and one of podName or nodeName to
+	// the list of running operations and spawns a new go routine to execute
+	// OperationFunc inside generatedOperations.
+
+	// volumeName, podName, and nodeName collectively form the operation key.
+	// The following forms of operation keys are supported:
+	// - volumeName empty, podName empty, nodeName empty
+	//   This key does not have any conflicting keys.
+	// - volumeName exists, podName empty, nodeName empty
+	//   This key conflicts with all other keys with the same volumeName.
+	// - volumeName exists, podName exists, nodeName empty
+	//   This key conflicts with:
+	//   - the same volumeName and podName
+	//   - the same volumeName, but no podName
+	// - volumeName exists, podName empty, nodeName exists
+	//   This key conflicts with:
+	//   - the same volumeName and nodeName
+	//   - the same volumeName but no nodeName
+
+	// If an operation with the same operationName and a conflicting key exists,
+	// an AlreadyExists or ExponentialBackoff error is returned.
+	// If an operation with a conflicting key has ExponentialBackoff error but
+	// operationName is different, exponential backoff is reset and operation is
+	// allowed to proceed.
+
 	// Once the operation is complete, the go routine is terminated and the
-	// concatenation of volumeName and podName is removed from the list of
-	// executing operations allowing a new operation to be started with the
-	// volumeName without error.
-	Run(volumeName v1.UniqueVolumeName, podName types.UniquePodName, generatedOperations types.GeneratedOperations) error
+	// concatenation of volumeName and (podName or nodeName) is removed from the
+	// list of executing operations allowing a new operation to be started with
+	// the volumeName without error.
+	Run(
+		volumeName v1.UniqueVolumeName,
+		podName volumetypes.UniquePodName,
+		nodeName types.NodeName,
+		generatedOperations volumetypes.GeneratedOperations) error
 
 	// Wait blocks until all operations are completed. This is typically
 	// necessary during tests - the test should wait until all operations finish
 	// and evaluate results after that.
 	Wait()
 
-	// IsOperationPending returns true if an operation for the given volumeName and podName is pending,
-	// otherwise it returns false
-	IsOperationPending(volumeName v1.UniqueVolumeName, podName types.UniquePodName) bool
+	// IsOperationPending returns true if an operation for the given volumeName
+	// and one of podName or nodeName is pending, otherwise it returns false
+	IsOperationPending(
+		volumeName v1.UniqueVolumeName,
+		podName volumetypes.UniquePodName,
+		nodeName types.NodeName) bool
 }
 
 // NewNestedPendingOperations returns a new instance of NestedPendingOperations.
@@ -88,8 +116,7 @@ type nestedPendingOperations struct {
 }
 
 type operation struct {
-	volumeName       v1.UniqueVolumeName
-	podName          types.UniquePodName
+	key              operationKey
 	operationName    string
 	operationPending bool
 	expBackoff       exponentialbackoff.ExponentialBackoff
@@ -97,22 +124,24 @@ type operation struct {
 
 func (grm *nestedPendingOperations) Run(
 	volumeName v1.UniqueVolumeName,
-	podName types.UniquePodName,
-	generatedOperations types.GeneratedOperations) error {
+	podName volumetypes.UniquePodName,
+	nodeName types.NodeName,
+	generatedOperations volumetypes.GeneratedOperations) error {
 	grm.lock.Lock()
 	defer grm.lock.Unlock()
-	opExists, previousOpIndex := grm.isOperationExists(volumeName, podName)
+
+	opKey := operationKey{volumeName, podName, nodeName}
+
+	opExists, previousOpIndex := grm.isOperationExists(opKey)
 	if opExists {
 		previousOp := grm.operations[previousOpIndex]
 		// Operation already exists
 		if previousOp.operationPending {
 			// Operation is pending
-			operationKey := getOperationKey(volumeName, podName)
-			return NewAlreadyExistsError(operationKey)
+			return NewAlreadyExistsError(opKey)
 		}
 
-		operationKey := getOperationKey(volumeName, podName)
-		backOffErr := previousOp.expBackoff.SafeToRetry(operationKey)
+		backOffErr := previousOp.expBackoff.SafeToRetry(opKey.String())
 		if backOffErr != nil {
 			if previousOp.operationName == generatedOperations.OperationName {
 				return backOffErr
@@ -124,15 +153,13 @@ func (grm *nestedPendingOperations) Run(
 
 		// Update existing operation to mark as pending.
 		grm.operations[previousOpIndex].operationPending = true
-		grm.operations[previousOpIndex].volumeName = volumeName
-		grm.operations[previousOpIndex].podName = podName
+		grm.operations[previousOpIndex].key = opKey
 	} else {
 		// Create a new operation
 		grm.operations = append(grm.operations,
 			operation{
+				key:              opKey,
 				operationPending: true,
-				volumeName:       volumeName,
-				podName:          podName,
 				operationName:    generatedOperations.OperationName,
 				expBackoff:       exponentialbackoff.ExponentialBackoff{},
 			})
@@ -142,7 +169,7 @@ func (grm *nestedPendingOperations) Run(
 		// Handle unhandled panics (very unlikely)
 		defer k8sRuntime.HandleCrash()
 		// Handle completion of and error, if any, from operationFunc()
-		defer grm.operationComplete(volumeName, podName, &detailedErr)
+		defer grm.operationComplete(opKey, &detailedErr)
 		return generatedOperations.Run()
 	}()
 
@@ -151,12 +178,14 @@ func (grm *nestedPendingOperations) Run(
 
 func (grm *nestedPendingOperations) IsOperationPending(
 	volumeName v1.UniqueVolumeName,
-	podName types.UniquePodName) bool {
+	podName volumetypes.UniquePodName,
+	nodeName types.NodeName) bool {
 
 	grm.lock.RLock()
 	defer grm.lock.RUnlock()
 
-	exist, previousOpIndex := grm.isOperationExists(volumeName, podName)
+	opKey := operationKey{volumeName, podName, nodeName}
+	exist, previousOpIndex := grm.isOperationExists(opKey)
 	if exist && grm.operations[previousOpIndex].operationPending {
 		return true
 	}
@@ -164,59 +193,52 @@ func (grm *nestedPendingOperations) IsOperationPending(
 }
 
 // This is an internal function and caller should acquire and release the lock
-func (grm *nestedPendingOperations) isOperationExists(
-	volumeName v1.UniqueVolumeName,
-	podName types.UniquePodName) (bool, int) {
+func (grm *nestedPendingOperations) isOperationExists(key operationKey) (bool, int) {
 
 	// If volumeName is empty, operation can be executed concurrently
-	if volumeName == EmptyUniqueVolumeName {
+	if key.volumeName == EmptyUniqueVolumeName {
 		return false, -1
 	}
 
 	for previousOpIndex, previousOp := range grm.operations {
-		if previousOp.volumeName != volumeName {
-			// No match, keep searching
-			continue
-		}
+		volumeNameMatch := previousOp.key.volumeName == key.volumeName
 
-		if previousOp.podName != EmptyUniquePodName &&
-			podName != EmptyUniquePodName &&
-			previousOp.podName != podName {
-			// No match, keep searching
-			continue
-		}
+		podNameMatch := previousOp.key.podName == EmptyUniquePodName ||
+			key.podName == EmptyUniquePodName ||
+			previousOp.key.podName == key.podName
 
-		// Match
-		return true, previousOpIndex
+		nodeNameMatch := previousOp.key.nodeName == EmptyNodeName ||
+			key.nodeName == EmptyNodeName ||
+			previousOp.key.nodeName == key.nodeName
+
+		if volumeNameMatch && podNameMatch && nodeNameMatch {
+			return true, previousOpIndex
+		}
 	}
+
 	return false, -1
 }
 
-func (grm *nestedPendingOperations) getOperation(
-	volumeName v1.UniqueVolumeName,
-	podName types.UniquePodName) (uint, error) {
+func (grm *nestedPendingOperations) getOperation(key operationKey) (uint, error) {
 	// Assumes lock has been acquired by caller.
 
 	for i, op := range grm.operations {
-		if op.volumeName == volumeName &&
-			op.podName == podName {
+		if op.key.volumeName == key.volumeName &&
+			op.key.podName == key.podName {
 			return uint(i), nil
 		}
 	}
 
-	logOperationKey := getOperationKey(volumeName, podName)
-	return 0, fmt.Errorf("Operation %q not found", logOperationKey)
+	return 0, fmt.Errorf("Operation %q not found", key)
 }
 
-func (grm *nestedPendingOperations) deleteOperation(
+func (grm *nestedPendingOperations) deleteOperation(key operationKey) {
 	// Assumes lock has been acquired by caller.
-	volumeName v1.UniqueVolumeName,
-	podName types.UniquePodName) {
 
 	opIndex := -1
 	for i, op := range grm.operations {
-		if op.volumeName == volumeName &&
-			op.podName == podName {
+		if op.key.volumeName == key.volumeName &&
+			op.key.podName == key.podName {
 			opIndex = i
 			break
 		}
@@ -227,8 +249,7 @@ func (grm *nestedPendingOperations) deleteOperation(
 	grm.operations = grm.operations[:len(grm.operations)-1]
 }
 
-func (grm *nestedPendingOperations) operationComplete(
-	volumeName v1.UniqueVolumeName, podName types.UniquePodName, err *error) {
+func (grm *nestedPendingOperations) operationComplete(key operationKey, err *error) {
 	// Defer operations are executed in Last-In is First-Out order. In this case
 	// the lock is acquired first when operationCompletes begins, and is
 	// released when the method finishes, after the lock is released cond is
@@ -239,24 +260,20 @@ func (grm *nestedPendingOperations) operationComplete(
 
 	if *err == nil || !grm.exponentialBackOffOnError {
 		// Operation completed without error, or exponentialBackOffOnError disabled
-		grm.deleteOperation(volumeName, podName)
+		grm.deleteOperation(key)
 		if *err != nil {
 			// Log error
-			logOperationKey := getOperationKey(volumeName, podName)
-			klog.Errorf("operation %s failed with: %v",
-				logOperationKey,
-				*err)
+			klog.Errorf("operation %s failed with: %v", key, *err)
 		}
 		return
 	}
 
 	// Operation completed with error and exponentialBackOffOnError Enabled
-	existingOpIndex, getOpErr := grm.getOperation(volumeName, podName)
+	existingOpIndex, getOpErr := grm.getOperation(key)
 	if getOpErr != nil {
 		// Failed to find existing operation
-		logOperationKey := getOperationKey(volumeName, podName)
 		klog.Errorf("Operation %s completed. error: %v. exponentialBackOffOnError is enabled, but failed to get operation to update.",
-			logOperationKey,
+			key,
 			*err)
 		return
 	}
@@ -265,10 +282,8 @@ func (grm *nestedPendingOperations) operationComplete(
 	grm.operations[existingOpIndex].operationPending = false
 
 	// Log error
-	operationKey :=
-		getOperationKey(volumeName, podName)
 	klog.Errorf("%v", grm.operations[existingOpIndex].expBackoff.
-		GenerateNoRetriesPermittedMsg(operationKey))
+		GenerateNoRetriesPermittedMsg(key.String()))
 }
 
 func (grm *nestedPendingOperations) Wait() {
@@ -280,21 +295,22 @@ func (grm *nestedPendingOperations) Wait() {
 	}
 }
 
-func getOperationKey(
-	volumeName v1.UniqueVolumeName, podName types.UniquePodName) string {
-	podNameStr := ""
-	if podName != EmptyUniquePodName {
-		podNameStr = fmt.Sprintf(" (%q)", podName)
-	}
+type operationKey struct {
+	volumeName v1.UniqueVolumeName
+	podName    volumetypes.UniquePodName
+	nodeName   types.NodeName
+}
 
-	return fmt.Sprintf("%q%s",
-		volumeName,
-		podNameStr)
+func (key operationKey) String() string {
+	return fmt.Sprintf("{volumeName=%q, podName=%q, nodeName=%q}",
+		key.volumeName,
+		key.podName,
+		key.nodeName)
 }
 
 // NewAlreadyExistsError returns a new instance of AlreadyExists error.
-func NewAlreadyExistsError(operationKey string) error {
-	return alreadyExistsError{operationKey}
+func NewAlreadyExistsError(key operationKey) error {
+	return alreadyExistsError{key}
 }
 
 // IsAlreadyExists returns true if an error returned from
@@ -313,7 +329,7 @@ func IsAlreadyExists(err error) bool {
 // new operation can not be started because an operation with the same operation
 // name is already executing.
 type alreadyExistsError struct {
-	operationKey string
+	operationKey operationKey
 }
 
 var _ error = alreadyExistsError{}
