@@ -43,6 +43,10 @@ import (
 	"github.com/onsi/gomega"
 )
 
+const (
+	numalignCmd = `export CPULIST_ALLOWED=$( awk -F":\t*" '/Cpus_allowed_list/ { print $2 }' /proc/self/status); env; sleep 1d`
+)
+
 // Helper for makeTopologyManagerPod().
 type tmCtnAttribute struct {
 	ctnName     string
@@ -220,6 +224,18 @@ func deletePodInNamespace(f *framework.Framework, namespace, name string) {
 	}
 	err := f.ClientSet.CoreV1().Pods(namespace).Delete(context.TODO(), name, &deleteOptions)
 	framework.ExpectNoError(err)
+}
+
+func validatePodAlignment(f *framework.Framework, pod *v1.Pod, numaNodes int) {
+	ginkgo.By("validating the Gu pod")
+	logs, err := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, pod.Spec.Containers[0].Name)
+	framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
+		pod.Spec.Containers[0].Name, pod.Name)
+
+	framework.Logf("got pod logs: %v", logs)
+	numaRes, err := checkNUMAAlignment(f, pod, logs, numaNodes)
+	framework.ExpectNoError(err, "NUMA Alignment check failed for [%s] of pod [%s]: %s",
+		pod.Spec.Containers[0].Name, pod.Name, numaRes.String())
 }
 
 func runTopologyManagerPolicySuiteTests(f *framework.Framework) {
@@ -448,7 +464,29 @@ func runTopologyManagerPolicySuiteTests(f *framework.Framework) {
 	waitForContainerRemoval(pod2.Spec.Containers[0].Name, pod2.Name, pod2.Namespace)
 }
 
-func runTopologyManagerNodeAlignmentSuiteTests(f *framework.Framework) {
+func runTopologyManagerNodeAlignmentSinglePodTest(f *framework.Framework, numaNodes int) {
+	ginkgo.By("allocate aligned resources for a single pod")
+	ctnAttrs := []tmCtnAttribute{
+		{
+			ctnName:     "gu-container",
+			cpuRequest:  "1000m",
+			cpuLimit:    "1000m",
+			devResource: SRIOVResourceName,
+		},
+	}
+
+	pod := makeTopologyManagerTestPod("gu-pod", numalignCmd, ctnAttrs)
+	pod = f.PodClient().CreateSync(pod)
+
+	validatePodAlignment(f, pod, numaNodes)
+
+	framework.Logf("deleting the pod %s/%s and waiting for container %s removal",
+		pod.Namespace, pod.Name, pod.Spec.Containers[0].Name)
+	deletePods(f, []string{pod.Name})
+	waitForContainerRemoval(pod.Spec.Containers[0].Name, pod.Name, pod.Namespace)
+}
+
+func runTopologyManagerNodeAlignmentSuiteTests(f *framework.Framework, numaNodes int) {
 	var err error
 
 	configMap := readConfigMapV1OrDie(testfiles.ReadOrDie(SRIOVDevicePluginCMYAML))
@@ -480,27 +518,7 @@ func runTopologyManagerNodeAlignmentSuiteTests(f *framework.Framework) {
 	}, 5*time.Minute, framework.Poll).Should(gomega.BeTrue())
 	framework.Logf("Successfully created device plugin pod")
 
-	ginkgo.By("running a Gu pod")
-	ctnAttrs := []tmCtnAttribute{
-		{
-			ctnName:     "gu-container",
-			cpuRequest:  "1000m",
-			cpuLimit:    "1000m",
-			devResource: SRIOVResourceName,
-		},
-	}
-
-	pod := makeTopologyManagerTestPod("gu-pod", "env && sleep 1d", ctnAttrs)
-	pod = f.PodClient().CreateSync(pod)
-
-	ginkgo.By("validating the Gu pod")
-	_, err = e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, pod.Spec.Containers[0].Name)
-	framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
-		pod.Spec.Containers[0].Name, pod.Name)
-
-	ginkgo.By("by deleting the pods and waiting for container removal")
-	deletePods(f, []string{pod.Name})
-	waitForContainerRemoval(pod.Spec.Containers[0].Name, pod.Name, pod.Namespace)
+	runTopologyManagerNodeAlignmentSinglePodTest(f, numaNodes)
 
 	framework.Logf("deleting the SRIOV device plugin pod %s/%s and waiting for container %s removal",
 		dpPod.Namespace, dpPod.Name, dpPod.Spec.Containers[0].Name)
@@ -561,7 +579,7 @@ func runTopologyManagerTests(f *framework.Framework) {
 
 		configureTopologyManagerInKubelet(f, oldCfg, policy)
 
-		runTopologyManagerNodeAlignmentSuiteTests(f)
+		runTopologyManagerNodeAlignmentSuiteTests(f, numaNodes)
 
 		// restore kubelet config
 		setOldKubeletConfig(f, oldCfg)
