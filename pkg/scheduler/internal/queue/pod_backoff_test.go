@@ -17,15 +17,17 @@ limitations under the License.
 package queue
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
 	ktypes "k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/clock"
 )
 
 func TestBackoffPod(t *testing.T) {
-	bpm := NewPodBackoffMap(1*time.Second, 10*time.Second)
-
+	timestamp := time.Now()
+	bpm := NewPodBackoffMap(1*time.Second, 10*time.Second, clock.NewFakeClock(timestamp))
 	tests := []struct {
 		podID            ktypes.NamespacedName
 		expectedDuration time.Duration
@@ -61,20 +63,23 @@ func TestBackoffPod(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
-		// Backoff the pod
-		bpm.BackoffPod(test.podID)
-		// Get backoff duration for the pod
-		duration := bpm.calculateBackoffDuration(test.podID)
-
-		if duration != test.expectedDuration {
-			t.Errorf("expected: %s, got %s for pod %s", test.expectedDuration.String(), duration.String(), test.podID)
-		}
+	for i, test := range tests {
+		t.Run(fmt.Sprintf("step %d", i), func(t *testing.T) {
+			bpm.BackoffPod(test.podID)
+			backoff, ok := bpm.GetBackoffTime(test.podID)
+			if !ok {
+				t.Errorf("%v should be backed off", test.podID)
+			}
+			duration := backoff.Sub(timestamp)
+			if duration != test.expectedDuration {
+				t.Errorf("expected: %s, got %s for pod %s", test.expectedDuration.String(), duration.String(), test.podID)
+			}
+		})
 	}
 }
 
 func TestClearPodBackoff(t *testing.T) {
-	bpm := NewPodBackoffMap(1*time.Second, 60*time.Second)
+	bpm := NewPodBackoffMap(1*time.Second, 60*time.Second, clock.NewFakeClock(time.Now()))
 	// Clear backoff on an not existed pod
 	bpm.clearPodBackoff(ktypes.NamespacedName{Namespace: "ns", Name: "not-existed"})
 	// Backoff twice for pod foo
