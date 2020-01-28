@@ -14,7 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# A single script that lists all of the [Feature:.+] tests in our e2e suite.
+# This script lists all of the [Feature:.+] tests in our e2e suite.
+# Usage: `hack/list-feature-tests.sh`.
+
 set -o errexit
 set -o nounset
 set -o pipefail

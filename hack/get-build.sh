@@ -14,6 +14,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This script retrieves the specified version of the Kubernetes tar.gz file via
+# Google Cloud Storage.
+# Usage: `hack/get-build.sh <version number or publication>`.
+# Example: `./hack/get-build.sh release/latest`.
+
 set -o errexit
 set -o nounset
 set -o pipefail
