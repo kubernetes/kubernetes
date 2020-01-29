@@ -41,7 +41,7 @@ const (
 	// audiencesKey is the context key for request audiences.
 	audiencesKey
 
-	// audiencesKey is the context key for request audiences.
+	// traceStepKey is the context key for request audiences.
 	traceStepKey
 )
 

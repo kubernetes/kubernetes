@@ -230,6 +230,17 @@ func (a *mutatingDispatcher) callAttrMutatingHook(ctx context.Context, h *admiss
 			utiltrace.Field{"subresource", attr.GetSubresource()},
 			utiltrace.Field{"operation", attr.GetOperation()},
 			utiltrace.Field{"UID", uid})
+	} else {
+		trace := utiltrace.New("Call mutating webhook",
+			utiltrace.Field{"configuration", configurationName},
+			utiltrace.Field{"webhook", h.Name},
+			utiltrace.Field{"resource", attr.GetResource()},
+			utiltrace.Field{"subresource", attr.GetSubresource()},
+			utiltrace.Field{"operation", attr.GetOperation()},
+			utiltrace.Field{"UID", uid})
+
+		traceStep = trace.Step
+		defer trace.LogIfLong(500 * time.Millisecond)
 	}
 
 	// if the webhook has a specific timeout, wrap the context to apply it

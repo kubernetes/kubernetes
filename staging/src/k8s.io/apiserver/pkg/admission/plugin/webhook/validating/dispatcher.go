@@ -32,6 +32,7 @@ import (
 	webhookerrors "k8s.io/apiserver/pkg/admission/plugin/webhook/errors"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
 	webhookrequest "k8s.io/apiserver/pkg/admission/plugin/webhook/request"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	webhookutil "k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/klog"
 	utiltrace "k8s.io/utils/trace"
@@ -180,14 +181,28 @@ func (d *validatingDispatcher) callHook(ctx context.Context, h *v1.ValidatingWeb
 	if err != nil {
 		return &webhookutil.ErrCallingWebhook{WebhookName: h.Name, Reason: err}
 	}
-	trace := utiltrace.New("Call validating webhook",
-		utiltrace.Field{"configuration", invocation.Webhook.GetConfigurationName()},
-		utiltrace.Field{"webhook", h.Name},
-		utiltrace.Field{"resource", attr.GetResource()},
-		utiltrace.Field{"subresource", attr.GetSubresource()},
-		utiltrace.Field{"operation", attr.GetOperation()},
-		utiltrace.Field{"UID", uid})
-	defer trace.LogIfLong(500 * time.Millisecond)
+
+	traceStep, ok := genericapirequest.TraceFrom(ctx)
+	if ok {
+		traceStep("Call validating webhook",
+			utiltrace.Field{"configuration", invocation.Webhook.GetConfigurationName()},
+			utiltrace.Field{"webhook", h.Name},
+			utiltrace.Field{"resource", attr.GetResource()},
+			utiltrace.Field{"subresource", attr.GetSubresource()},
+			utiltrace.Field{"operation", attr.GetOperation()},
+			utiltrace.Field{"UID", uid})
+	} else {
+		trace := utiltrace.New("Call validating webhook",
+			utiltrace.Field{"configuration", invocation.Webhook.GetConfigurationName()},
+			utiltrace.Field{"webhook", h.Name},
+			utiltrace.Field{"resource", attr.GetResource()},
+			utiltrace.Field{"subresource", attr.GetSubresource()},
+			utiltrace.Field{"operation", attr.GetOperation()},
+			utiltrace.Field{"UID", uid})
+		traceStep = trace.Step
+		defer trace.LogIfLong(500 * time.Millisecond)
+
+	}
 
 	// if the webhook has a specific timeout, wrap the context to apply it
 	if h.TimeoutSeconds != nil {
@@ -214,7 +229,7 @@ func (d *validatingDispatcher) callHook(ctx context.Context, h *v1.ValidatingWeb
 	if err := r.Do(ctx).Into(response); err != nil {
 		return &webhookutil.ErrCallingWebhook{WebhookName: h.Name, Reason: err}
 	}
-	trace.Step("Request completed")
+	traceStep("Request completed")
 
 	result, err := webhookrequest.VerifyAdmissionResponse(uid, false, response)
 	if err != nil {
