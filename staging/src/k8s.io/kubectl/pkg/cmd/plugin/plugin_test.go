@@ -108,7 +108,6 @@ func TestPluginPathsAreValid(t *testing.T) {
 				return ioutil.TempFile(tempDir, "notkubectl-")
 			},
 			expectErr: "unable to find any kubectl plugins in your PATH",
-			expectErrOut: "\n",
 		},
 		{
 			name:        "ensure de-duplicated plugin-paths slice",

@@ -169,7 +169,6 @@ func (o *PluginListOptions) Run() error {
 		}
 	}
 	if len(pluginErrors) > 0 {
-		fmt.Fprintln(o.ErrOut)
 		errs := bytes.NewBuffer(nil)
 		for _, e := range pluginErrors {
 			fmt.Fprintln(errs, e)
