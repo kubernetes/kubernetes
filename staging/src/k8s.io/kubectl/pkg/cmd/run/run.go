@@ -58,47 +58,35 @@ import (
 )
 
 var (
-	runLong = templates.LongDesc(i18n.T(`
-		Create and run a particular image, possibly replicated.
-
-		Creates a deployment or job to manage the created container(s).`))
+	runLong = templates.LongDesc(i18n.T(`Create and run a particular image in a pod.`))
 
 	runExample = templates.Examples(i18n.T(`
-		# Start a single instance of nginx.
+		# Start a nginx pod.
 		kubectl run nginx --image=nginx
 
-		# Start a single instance of hazelcast and let the container expose port 5701 .
+		# Start a hazelcast pod and let the container expose port 5701.
 		kubectl run hazelcast --image=hazelcast/hazelcast --port=5701
 
-		# Start a single instance of hazelcast and set environment variables "DNS_DOMAIN=cluster" and "POD_NAMESPACE=default" in the container.
+		# Start a hazelcast pod and set environment variables "DNS_DOMAIN=cluster" and "POD_NAMESPACE=default" in the container.
 		kubectl run hazelcast --image=hazelcast/hazelcast --env="DNS_DOMAIN=cluster" --env="POD_NAMESPACE=default"
 
-		# Start a single instance of hazelcast and set labels "app=hazelcast" and "env=prod" in the container.
+		# Start a hazelcast pod and set labels "app=hazelcast" and "env=prod" in the container.
 		kubectl run hazelcast --image=hazelcast/hazelcast --labels="app=hazelcast,env=prod"
-
-		# Start a replicated instance of nginx.
-		kubectl run nginx --image=nginx --replicas=5
 
 		# Dry run. Print the corresponding API objects without creating them.
 		kubectl run nginx --image=nginx --dry-run
 
-		# Start a single instance of nginx, but overload the spec of the deployment with a partial set of values parsed from JSON.
+		# Start a nginx pod, but overload the spec with a partial set of values parsed from JSON.
 		kubectl run nginx --image=nginx --overrides='{ "apiVersion": "v1", "spec": { ... } }'
 
-		# Start a pod of busybox and keep it in the foreground, don't restart it if it exits.
+		# Start a busybox pod and keep it in the foreground, don't restart it if it exits.
 		kubectl run -i -t busybox --image=busybox --restart=Never
 
-		# Start the nginx container using the default command, but use custom arguments (arg1 .. argN) for that command.
+		# Start the nginx pod using the default command, but use custom arguments (arg1 .. argN) for that command.
 		kubectl run nginx --image=nginx -- <arg1> <arg2> ... <argN>
 
-		# Start the nginx container using a different command and custom arguments.
-		kubectl run nginx --image=nginx --command -- <cmd> <arg1> ... <argN>
-
-		# Start the perl container to compute π to 2000 places and print it out.
-		kubectl run pi --image=perl --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(2000)'
-
-		# Start the cron job to compute π to 2000 places and print it out every 5 minutes.
-		kubectl run pi --schedule="0/5 * * * ?" --image=perl --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(2000)'`))
+		# Start the nginx pod using a different command and custom arguments.
+		kubectl run nginx --image=nginx --command -- <cmd> <arg1> ... <argN>`))
 )
 
 const (
@@ -147,6 +135,8 @@ func NewRunOptions(streams genericclioptions.IOStreams) *RunOptions {
 		DeleteFlags: delete.NewDeleteFlags("to use to replace the resource."),
 		RecordFlags: genericclioptions.NewRecordFlags(),
 
+		Generator: generateversioned.RunPodV1GeneratorName,
+
 		Recorder: genericclioptions.NoopRecorder{},
 
 		IOStreams: streams,
@@ -157,7 +147,7 @@ func NewCmdRun(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Co
 	o := NewRunOptions(streams)
 
 	cmd := &cobra.Command{
-		Use:                   "run NAME --image=image [--env=\"key=value\"] [--port=port] [--replicas=replicas] [--dry-run=bool] [--overrides=inline-json] [--command] -- [COMMAND] [args...]",
+		Use:                   "run NAME --image=image [--env=\"key=value\"] [--port=port] [--dry-run=bool] [--overrides=inline-json] [--command] -- [COMMAND] [args...]",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Run a particular image on the cluster"),
 		Long:                  runLong,
@@ -181,15 +171,17 @@ func NewCmdRun(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Co
 func addRunFlags(cmd *cobra.Command, opt *RunOptions) {
 	cmdutil.AddDryRunFlag(cmd)
 	cmd.Flags().StringVar(&opt.Generator, "generator", opt.Generator, i18n.T("The name of the API generator to use, see http://kubernetes.io/docs/user-guide/kubectl-conventions/#generators for a list."))
+	cmd.Flags().MarkDeprecated("generator", "has no effect and will be removed in the future.")
 	cmd.Flags().StringVar(&opt.Image, "image", opt.Image, i18n.T("The image for the container to run."))
 	cmd.MarkFlagRequired("image")
 	cmd.Flags().String("image-pull-policy", "", i18n.T("The image pull policy for the container. If left empty, this value will not be specified by the client and defaulted by the server"))
 	cmd.Flags().IntP("replicas", "r", 1, "Number of replicas to create for this container. Default is 1.")
+	cmd.Flags().MarkDeprecated("replicas", "has no effect and will be removed in the future.")
 	cmd.Flags().Bool("rm", false, "If true, delete resources created in this command for attached containers.")
 	cmd.Flags().String("overrides", "", i18n.T("An inline JSON override for the generated object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field."))
-	cmd.Flags().StringArray("env", []string{}, "Environment variables to set in the container")
-	cmd.Flags().String("serviceaccount", "", "Service account to set in the pod spec")
-	cmd.Flags().StringVar(&opt.Port, "port", opt.Port, i18n.T("The port that this container exposes.  If --expose is true, this is also the port used by the service that is created."))
+	cmd.Flags().StringArray("env", []string{}, "Environment variables to set in the container.")
+	cmd.Flags().String("serviceaccount", "", "Service account to set in the pod spec.")
+	cmd.Flags().StringVar(&opt.Port, "port", opt.Port, i18n.T("The port that this container exposes."))
 	cmd.Flags().Int("hostport", -1, "The host port mapping for the container port. To demonstrate a single-machine container.")
 	cmd.Flags().StringP("labels", "l", "", "Comma separated labels to apply to the pod(s). Will override previous values.")
 	cmd.Flags().BoolVarP(&opt.Interactive, "stdin", "i", opt.Interactive, "Keep stdin open on the container(s) in the pod, even if nothing is attached.")
@@ -200,11 +192,14 @@ func addRunFlags(cmd *cobra.Command, opt *RunOptions) {
 	cmd.Flags().Bool("command", false, "If true and extra arguments are present, use them as the 'command' field in the container, rather than the 'args' field which is the default.")
 	cmd.Flags().String("requests", "", i18n.T("The resource requirement requests for this container.  For example, 'cpu=100m,memory=256Mi'.  Note that server side components may assign requests depending on the server configuration, such as limit ranges."))
 	cmd.Flags().String("limits", "", i18n.T("The resource requirement limits for this container.  For example, 'cpu=200m,memory=512Mi'.  Note that server side components may assign limits depending on the server configuration, such as limit ranges."))
-	cmd.Flags().BoolVar(&opt.Expose, "expose", opt.Expose, "If true, a public, external service is created for the container(s) which are run")
+	cmd.Flags().BoolVar(&opt.Expose, "expose", opt.Expose, "If true, service is created for the container(s) which are run")
 	cmd.Flags().String("service-generator", "service/v2", i18n.T("The name of the generator to use for creating a service.  Only used if --expose is true"))
+	cmd.Flags().MarkDeprecated("service-generator", "and will be removed in the future.")
 	cmd.Flags().String("service-overrides", "", i18n.T("An inline JSON override for the generated service object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.  Only used if --expose is true."))
+	cmd.Flags().MarkDeprecated("service-overrides", "and will be removed in the future.")
 	cmd.Flags().BoolVar(&opt.Quiet, "quiet", opt.Quiet, "If true, suppress prompt messages.")
 	cmd.Flags().StringVar(&opt.Schedule, "schedule", opt.Schedule, i18n.T("A schedule in the Cron format the job should be run with."))
+	cmd.Flags().MarkDeprecated("schedule", "has no effect and will be removed in the future.")
 }
 
 func (o *RunOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
@@ -308,48 +303,10 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 		return err
 	}
 
-	clientset, err := f.KubernetesClientSet()
-	if err != nil {
-		return err
-	}
-
-	generatorName := o.Generator
-	if len(o.Schedule) != 0 && len(generatorName) == 0 {
-		generatorName = generateversioned.CronJobV1Beta1GeneratorName
-	}
-	if len(generatorName) == 0 {
-		switch restartPolicy {
-		case corev1.RestartPolicyAlways:
-			generatorName = generateversioned.DeploymentAppsV1GeneratorName
-		case corev1.RestartPolicyOnFailure:
-			generatorName = generateversioned.JobV1GeneratorName
-		case corev1.RestartPolicyNever:
-			generatorName = generateversioned.RunPodV1GeneratorName
-		}
-
-		// Falling back because the generator was not provided and the default one could be unavailable.
-		generatorNameTemp, err := generateversioned.FallbackGeneratorNameIfNecessary(generatorName, clientset.Discovery(), o.ErrOut)
-		if err != nil {
-			return err
-		}
-		if generatorNameTemp != generatorName {
-			cmdutil.Warning(o.ErrOut, generatorName, generatorNameTemp)
-		} else {
-			generatorName = generatorNameTemp
-		}
-	}
-
 	generators := generateversioned.GeneratorFn("run")
-	generator, found := generators[generatorName]
+	generator, found := generators[generateversioned.RunPodV1GeneratorName]
 	if !found {
-		return cmdutil.UsageErrorf(cmd, "generator %q not found", generatorName)
-	}
-
-	// start deprecating all generators except for 'run-pod/v1' which will be
-	// the only supported on a route to simple kubectl run which should mimic
-	// docker run
-	if generatorName != generateversioned.RunPodV1GeneratorName {
-		fmt.Fprintf(o.ErrOut, "kubectl run --generator=%s is DEPRECATED and will be removed in a future version. Use kubectl run --generator=%s or kubectl create instead.\n", generatorName, generateversioned.RunPodV1GeneratorName)
+		return cmdutil.UsageErrorf(cmd, "generator %q not found", o.Generator)
 	}
 
 	names := generator.ParamNames()

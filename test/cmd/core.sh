@@ -1010,18 +1010,18 @@ __EOF__
   # Post-condition: Only the default kubernetes services exist
   kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:'
 
-  ### Create deployent and service
-  # Pre-condition: no deployment exists
-  kube::test::wait_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" ''
+  ### Create pod and service
+  # Pre-condition: no pod exists
+  kube::test::wait_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
-  kubectl run testmetadata --image=nginx --replicas=2 --port=80 --expose --service-overrides='{ "metadata": { "annotations": { "zone-context": "home" } } } '
+  kubectl run testmetadata --image=nginx --port=80 --expose --service-overrides='{ "metadata": { "annotations": { "zone-context": "home" } } } '
   # Check result
-  kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" 'testmetadata:'
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'testmetadata:'
   kube::test::get_object_assert 'service testmetadata' "{{.metadata.annotations}}" "map\[zone-context:home\]"
 
-  ### Expose deployment as a new service
+  ### Expose pod as a new service
   # Command
-  kubectl expose deployment testmetadata  --port=1000 --target-port=80 --type=NodePort --name=exposemetadata --overrides='{ "metadata": { "annotations": { "zone-context": "work" } } } '
+  kubectl expose pod testmetadata  --port=1000 --target-port=80 --type=NodePort --name=exposemetadata --overrides='{ "metadata": { "annotations": { "zone-context": "work" } } } '
   # Check result
   kube::test::get_object_assert 'service exposemetadata' "{{.metadata.annotations}}" "map\[zone-context:work\]"
 
@@ -1031,7 +1031,7 @@ __EOF__
   if [[ "${WAIT_FOR_DELETION:-}" == "true" ]]; then
     kube::test::wait_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:'
   fi
-  kubectl delete deployment testmetadata "${kube_flags[@]}"
+  kubectl delete pod testmetadata "${kube_flags[@]}"
   if [[ "${WAIT_FOR_DELETION:-}" == "true" ]]; then
     kube::test::wait_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" ''
   fi

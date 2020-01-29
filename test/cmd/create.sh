@@ -95,10 +95,10 @@ run_create_job_tests() {
 
     # Test kubectl create job from cronjob
     # Pre-Condition: create a cronjob
-    kubectl run test-pi --schedule="* */5 * * *" --generator=cronjob/v1beta1 "--image=$IMAGE_PERL" --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(10)'
+    kubectl create cronjob test-pi --schedule="* */5 * * *" "--image=$IMAGE_PERL" -- perl -Mbignum=bpi -wle 'print bpi(10)'
     kubectl create job my-pi --from=cronjob/test-pi
     # Post-condition: container args contain expected command
-    output_message=$(kubectl get job my-pi -o go-template='{{(index .spec.template.spec.containers 0).args}}' "${kube_flags[@]}")
+    output_message=$(kubectl get job my-pi -o go-template='{{(index .spec.template.spec.containers 0).command}}' "${kube_flags[@]}")
     kube::test::if_has_string "${output_message}" "perl -Mbignum=bpi -wle print bpi(10)"
 
     # Clean up

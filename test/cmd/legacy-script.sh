@@ -572,15 +572,6 @@ runTests() {
     record_command run_crd_tests
   fi
 
-  #################
-  # Run cmd w img #
-  #################
-
-  if kube::test::if_supports_resource "${deployments}" ; then
-    record_command run_cmd_with_img_tests
-  fi
-
-
   #####################################
   # Recursive Resources via directory #
   #####################################
