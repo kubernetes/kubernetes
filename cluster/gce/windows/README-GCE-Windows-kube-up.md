@@ -84,14 +84,15 @@ Now bring up a cluster using one of the following two methods:
 ```
 # Invoke kube-up.sh with these environment variables:
 #   PROJECT: text name of your GCP project.
-#   KUBERNETES_SKIP_CONFIRM: skips any kube-up prompts.
-PROJECT=${CLOUDSDK_CORE_PROJECT} KUBERNETES_SKIP_CONFIRM=y ./cluster/kube-up.sh
+#   KUBE_UP_AUTOMATIC_CLEANUP (optional): cleans up existing cluster without
+#     prompting.
+PROJECT=${CLOUDSDK_CORE_PROJECT} KUBE_UP_AUTOMATIC_CLEANUP=true ./cluster/kube-up.sh
 ```
 
 To teardown the cluster run:
 
 ```
-PROJECT=${CLOUDSDK_CORE_PROJECT} KUBERNETES_SKIP_CONFIRM=y ./cluster/kube-down.sh
+PROJECT=${CLOUDSDK_CORE_PROJECT} ./cluster/kube-down.sh
 ```
 
 #### 2b. Create a Kubernetes end-to-end (E2E) test cluster	
