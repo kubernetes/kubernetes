@@ -52,7 +52,8 @@ type Interface interface {
 	Wait(ctx context.Context, requestDigest fcfc.RequestDigest) (execute bool, afterExecute func())
 
 	// Run monitors config objects from the main apiservers and causes
-	// any needed changes to local behavior
+	// any needed changes to local behavior.  This method ceases
+	// activity and returns after the given channel is closed.
 	Run(stopCh <-chan struct{}) error
 }
 

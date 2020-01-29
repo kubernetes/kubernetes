@@ -22,6 +22,7 @@ import (
 	"math"
 	"sort"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/pkg/errors"
@@ -92,7 +93,9 @@ type RequestDigest struct {
 	User        user.Info
 }
 
-// `*configController` implements Controller
+// `*configController` implements Controller.  The methods of this
+// type and cfgMeal follow the convention that the suffix "Locked"
+// means that the caller must hold the configController lock.
 type configController struct {
 	queueSetFactory fq.QueueSetFactory
 
@@ -520,6 +523,9 @@ func (meal *cfgMeal) finishQueueSetReconfigsLocked() {
 			continue
 		}
 
+		// The use of math.Ceil here means that the results might sum
+		// to a little more than serverConcurrencyLimit but the
+		// difference will be negligible.
 		concurrencyLimit := int(math.Ceil(float64(meal.cfgCtl.serverConcurrencyLimit) * float64(plState.config.Limited.AssuredConcurrencyShares) / meal.shareSum))
 		metrics.UpdateSharedConcurrencyLimit(plName, concurrencyLimit)
 
@@ -630,12 +636,12 @@ func (cfgCtl *configController) Match(rd RequestDigest) (string, *fctypesv1a1.Fl
 			plState.numPending++
 			matchID := &plName
 			klog.V(7).Infof("Match(%#+v) => fsName=%q, distMethod=%#+v, plName=%q, matchID=%p", rd, fs.Name, fs.Spec.DistinguisherMethod, plName, matchID)
-			startCalls := 0
+			var startCalls int32
 			startFn := func(ctx context.Context, hashValue uint64) (execute bool, afterExecution func()) {
-				startCalls++
-				klog.V(7).Infof("For matchID=%p, startFn(ctx, %v) startCalls:=%d", matchID, hashValue, startCalls)
-				if startCalls > 1 {
-					panic(fmt.Sprintf("Match(%#+v) => fsName=%q, distMethod=%#+v, plName=%q, matchID=%p startCalls:=%d", rd, fs.Name, fs.Spec.DistinguisherMethod, plName, matchID, startCalls))
+				newStarts := atomic.AddInt32(&startCalls, 1)
+				klog.V(7).Infof("For matchID=%p, startFn(ctx, %v) startCalls:=%d", matchID, hashValue, newStarts)
+				if newStarts > 1 {
+					panic(fmt.Sprintf("Match(%#+v) => fsName=%q, distMethod=%#+v, plName=%q, matchID=%p startCalls:=%d", rd, fs.Name, fs.Spec.DistinguisherMethod, plName, matchID, newStarts))
 				}
 				req := func() fq.Request {
 					cfgCtl.lock.Lock()
@@ -657,12 +663,12 @@ func (cfgCtl *configController) Match(rd RequestDigest) (string, *fctypesv1a1.Fl
 					cfgCtl.maybeReap(plName)
 				}
 				klog.V(7).Infof("For matchID=%p, startFn(..) => exec=%v, execID=%p", matchID, exec, execID)
-				afterCalls := 0
+				var afterCalls int32
 				return exec, func() {
-					afterCalls++
-					klog.V(7).Infof("For matchID=%p, execID=%p, after() calls:=%d", matchID, execID, afterCalls)
-					if afterCalls > 1 {
-						panic(fmt.Sprintf("Match(%#+v) => fsName=%q, distMethod=%#+v, plName=%q, matchID=%p, execID=%p, afterCalls:=%d", rd, fs.Name, fs.Spec.DistinguisherMethod, plName, matchID, execID, afterCalls))
+					newAfter := atomic.AddInt32(&afterCalls, 1)
+					klog.V(7).Infof("For matchID=%p, execID=%p, after() calls:=%d", matchID, execID, newAfter)
+					if newAfter > 1 {
+						panic(fmt.Sprintf("Match(%#+v) => fsName=%q, distMethod=%#+v, plName=%q, matchID=%p, execID=%p, afterCalls:=%d", rd, fs.Name, fs.Spec.DistinguisherMethod, plName, matchID, execID, newAfter))
 					}
 					idle3 := afterExec()
 					if idle3 {
