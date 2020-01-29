@@ -52,6 +52,8 @@ func (sr Stringer) GoString() string {
 		return ToJSON(*typed)
 	case *fcv1a1.FlowDistinguisherMethod:
 		return ToJSON(*typed)
+	case *fcv1a1.PolicyRulesWithSubjects:
+		return ToJSON(*typed)
 	case *fcv1a1.PriorityLevelConfiguration:
 		return ToJSON(*typed)
 	case *fcv1a1.LimitedPriorityLevelConfiguration:

@@ -41,7 +41,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
-        "digest_test.go",
+        "controller_test.go",
         "gen_test.go",
         "match_test.go",
     ],

@@ -66,6 +66,39 @@ func genPL(rng *rand.Rand, name string) (*fcv1a1.PriorityLevelConfiguration, boo
 	return plc, err == nil
 }
 
+// A FlowSchema together with characteristics relevant to testing
+type fsTestingRecord struct {
+	fs                            *fcv1a1.FlowSchema
+	matchesAllResourceRequests    bool
+	matchesAllNonResourceRequests bool
+	matchingRDigests              []RequestDigest
+	matchingNDigests              []RequestDigest
+	skippingRDigests              []RequestDigest
+	skippingNDigests              []RequestDigest
+}
+
+func (ftr *fsTestingRecord) addDigest(digest RequestDigest, matches bool) {
+	if matches {
+		if digest.RequestInfo.IsResourceRequest {
+			ftr.matchingRDigests = append(ftr.matchingRDigests, digest)
+		} else {
+			ftr.matchingNDigests = append(ftr.matchingNDigests, digest)
+		}
+	} else {
+		if digest.RequestInfo.IsResourceRequest {
+			ftr.skippingRDigests = append(ftr.skippingRDigests, digest)
+		} else {
+			ftr.skippingNDigests = append(ftr.skippingNDigests, digest)
+		}
+	}
+}
+
+func (ftr *fsTestingRecord) addDigests(digests []RequestDigest, matches bool) {
+	for _, digest := range digests {
+		ftr.addDigest(digest, matches)
+	}
+}
+
 // genFS creates a FlowSchema with the given name and randomly
 // generated spec, along with four lists of digests: matching
 // resource-style, matching non-resource-style, non-matching
@@ -80,7 +113,7 @@ func genPL(rng *rand.Rand, name string) (*fcv1a1.PriorityLevelConfiguration, boo
 // the flow schema matches every RequestDigest for a resource request.
 // The third returned bool indicates whether the flow schema matches
 // every RequestDigest for a non-resource request.
-func genFS(t *testing.T, rng *rand.Rand, name string, mayMatchClusterScope bool, goodPLNames, badPLNames sets.String) (*fcv1a1.FlowSchema, bool, bool, bool, []RequestDigest, []RequestDigest, []RequestDigest, []RequestDigest) {
+func genFS(t *testing.T, rng *rand.Rand, name string, mayMatchClusterScope bool, goodPLNames, badPLNames sets.String) (*fsTestingRecord, bool) {
 	fs := &fcv1a1.FlowSchema{
 		ObjectMeta: metav1.ObjectMeta{Name: name},
 		Spec:       fcv1a1.FlowSchemaSpec{}}
@@ -100,30 +133,14 @@ func genFS(t *testing.T, rng *rand.Rand, name string, mayMatchClusterScope bool,
 				stringp{s: "fubar", p: 0.1}))
 		fs.Spec.DistinguisherMethod = &fcv1a1.FlowDistinguisherMethod{fdmt}
 	}
+	// 5% chance of zero rules, otherwise draw from 1--6 biased low
+	nRules := (1 + rng.Intn(3)) * (1 + rng.Intn(2)) * ((19 + rng.Intn(20)) / 20)
+	ftr := &fsTestingRecord{fs: fs,
+		matchesAllResourceRequests:    nRules > 0 && rng.Float32() < 0.1,
+		matchesAllNonResourceRequests: nRules > 0 && rng.Float32() < 0.1}
 	fs.Spec.Rules = []fcv1a1.PolicyRulesWithSubjects{}
-	matchingRDigests := []RequestDigest{}
-	matchingNDigests := []RequestDigest{}
-	skippingRDigests := []RequestDigest{}
-	skippingNDigests := []RequestDigest{}
-
-	// We are going to independently generate each rule and its
-	// associated matching and non-matching ("skipping") digests, and
-	// then simply put them all together in the result.  The rule
-	// generator takes special care to produce digest lists for which
-	// this is correct (so that one rule does not match any of another
-	// rule's skipping digests).
-
-	if rng.Float32() < 0.05 {
-		// Produce a FlowSchema with zero rules.
-		// Gen some digests to test against.
-		_, _, matchingRDigests, matchingNDigests, _, _ := genPolicyRuleWithSubjects(t, rng, name+"-1", false, false, false, false, false)
-		return fs, valid, false, false, nil, nil, matchingRDigests, matchingNDigests
-	}
-	matchEveryResourceRequest := rng.Float32() < 0.1
-	matchEveryNonResourceRequest := rng.Float32() < 0.1
-	nRules := (1 + rng.Intn(3)) * (1 + rng.Intn(2))
 	everyResourceMatcher := -1
-	if matchEveryResourceRequest {
+	if ftr.matchesAllResourceRequests {
 		if mayMatchClusterScope {
 			everyResourceMatcher = 0
 		} else {
@@ -131,9 +148,9 @@ func genFS(t *testing.T, rng *rand.Rand, name string, mayMatchClusterScope bool,
 		}
 	}
 	everyNonResourceMatcher := -1
-	if matchEveryNonResourceRequest {
+	if ftr.matchesAllNonResourceRequests {
 		if mayMatchClusterScope {
-			everyResourceMatcher = 0
+			everyNonResourceMatcher = 0
 		} else {
 			everyNonResourceMatcher = rng.Intn(nRules)
 		}
@@ -141,16 +158,19 @@ func genFS(t *testing.T, rng *rand.Rand, name string, mayMatchClusterScope bool,
 	// Allow only one rule if mayMatchClusterScope because that breaks
 	// cross-rule exclusion.
 	for i := 0; i < nRules && (i == 0 || !mayMatchClusterScope); i++ {
-		rule, ruleValid, ruleMatchingRDigests, ruleMatchingNDigests, ruleSkippingRDigests, ruleSkippingNDigests := genPolicyRuleWithSubjects(t, rng, fmt.Sprintf("%s-%d", name, i+1), mayMatchClusterScope, matchEveryResourceRequest, matchEveryNonResourceRequest, i == everyResourceMatcher, i == everyNonResourceMatcher)
+		rule, ruleValid, ruleMatchingRDigests, ruleMatchingNDigests, ruleSkippingRDigests, ruleSkippingNDigests := genPolicyRuleWithSubjects(t, rng, fmt.Sprintf("%s-%d", name, i+1), mayMatchClusterScope, ftr.matchesAllResourceRequests, ftr.matchesAllNonResourceRequests, i == everyResourceMatcher, i == everyNonResourceMatcher)
 		valid = valid && ruleValid
 		fs.Spec.Rules = append(fs.Spec.Rules, rule)
-		matchingRDigests = append(matchingRDigests, ruleMatchingRDigests...)
-		matchingNDigests = append(matchingNDigests, ruleMatchingNDigests...)
-		skippingRDigests = append(skippingRDigests, ruleSkippingRDigests...)
-		skippingNDigests = append(skippingNDigests, ruleSkippingNDigests...)
+		ftr.addDigests(ruleMatchingRDigests, true)
+		ftr.addDigests(ruleMatchingNDigests, true)
+		ftr.addDigests(ruleSkippingRDigests, false)
+		ftr.addDigests(ruleSkippingNDigests, false)
 	}
-	t.Logf("Returning name=%s, plRef=%q, valid=%v, matchEveryResourceRequest=%v, matchEveryNonResourceRequest=%v for mayMatchClusterScope=%v", fs.Name, fs.Spec.PriorityLevelConfiguration.Name, valid, matchEveryResourceRequest, matchEveryNonResourceRequest, mayMatchClusterScope)
-	return fs, valid, matchEveryResourceRequest, matchEveryNonResourceRequest, matchingRDigests, matchingNDigests, skippingRDigests, skippingNDigests
+	if nRules == 0 {
+		_, _, _, _, ftr.skippingRDigests, ftr.skippingNDigests = genPolicyRuleWithSubjects(t, rng, name+"-1", false, false, false, false, false)
+	}
+	t.Logf("Returning name=%s, plRef=%q, valid=%v, matchesAllResourceRequests=%v, matchesAllNonResourceRequests=%v for mayMatchClusterScope=%v", fs.Name, fs.Spec.PriorityLevelConfiguration.Name, valid, ftr.matchesAllResourceRequests, ftr.matchesAllNonResourceRequests, mayMatchClusterScope)
+	return ftr, valid
 }
 
 var noextra = make(map[string][]string)
@@ -237,7 +257,7 @@ func genPolicyRuleWithSubjects(t *testing.T, rng *rand.Rand, pfx string, mayMatc
 		_, _, _, skippingNRIs = genNonResourceRule(rng, pfx+"-o", false, someMatchesAllNonResourceRequests)
 	}
 	rule := fcv1a1.PolicyRulesWithSubjects{subjects, resourceRules, nonResourceRules}
-	t.Logf("For pfx=%s, mayMatchClusterScope=%v, someMatchesAllResourceRequests=%v, someMatchesAllNonResourceRequests=%v: generated prws=%#+v, valid=%v, marr=%v, manrr=%v, mu=%#+v, su=%#+v, mrr=%#+v, mnr=%#+v, srr=%#+v, snr=%#+v", pfx, mayMatchClusterScope, someMatchesAllResourceRequests, someMatchesAllNonResourceRequests, fcfmt.Fmt(rule), valid, matchAllResourceRequests, matchAllNonResourceRequests, fcfmt.Fmt(matchingUIs), fcfmt.Fmt(skippingUIs), fcfmt.Fmt(matchingRRIs), fcfmt.Fmt(matchingNRIs), fcfmt.Fmt(skippingRRIs), fcfmt.Fmt(skippingNRIs))
+	t.Logf("For pfx=%s, mayMatchClusterScope=%v, someMatchesAllResourceRequests=%v, someMatchesAllNonResourceRequests=%v, marr=%v, manrr=%v: generated prws=%#+v, valid=%v, mu=%#+v, su=%#+v, mrr=%#+v, mnr=%#+v, srr=%#+v, snr=%#+v", pfx, mayMatchClusterScope, someMatchesAllResourceRequests, someMatchesAllNonResourceRequests, matchAllResourceRequests, matchAllNonResourceRequests, fcfmt.Fmt(rule), valid, fcfmt.Fmt(matchingUIs), fcfmt.Fmt(skippingUIs), fcfmt.Fmt(matchingRRIs), fcfmt.Fmt(matchingNRIs), fcfmt.Fmt(skippingRRIs), fcfmt.Fmt(skippingNRIs))
 	matchingRDigests := cross(matchingUIs, matchingRRIs)
 	skippingRDigests := append(append(cross(matchingUIs, skippingRRIs),
 		cross(skippingUIs, matchingRRIs)...),

@@ -32,21 +32,21 @@ func TestMatching(t *testing.T) {
 	for i := 0; i < 300; i++ {
 		rng := rand.New(rand.NewSource(int64(rngOuter.Uint64())))
 		t.Run(fmt.Sprintf("trial%d:", i), func(t *testing.T) {
-			fs, valid, _, _, matchingRDigests, matchingNDigests, skippingRDigests, skippingNDigests := genFS(t, rng, fmt.Sprintf("fs%d", i), rng.Float32() < 0.2, goodPLNames, badPLNames)
+			ftr, valid := genFS(t, rng, fmt.Sprintf("fs%d", i), rng.Float32() < 0.2, goodPLNames, badPLNames)
 			if !valid {
-				t.Logf("Not testing invalid %#+v", fcfmt.Fmt(fs))
+				t.Logf("Not testing invalid %#+v", fcfmt.Fmt(ftr.fs))
 				return
 			}
-			for _, digest := range append(matchingRDigests, matchingNDigests...) {
-				a := matchesFlowSchema(digest, fs)
+			for _, digest := range append(ftr.matchingRDigests, ftr.matchingNDigests...) {
+				a := matchesFlowSchema(digest, ftr.fs)
 				if !a {
-					t.Errorf("Fail: Expected %#+v to match %#+v but it did not", fcfmt.Fmt(fs), digest)
+					t.Errorf("Fail: Expected %#+v to match %#+v but it did not", fcfmt.Fmt(ftr.fs), digest)
 				}
 			}
-			for _, digest := range append(skippingRDigests, skippingNDigests...) {
-				a := matchesFlowSchema(digest, fs)
+			for _, digest := range append(ftr.skippingRDigests, ftr.skippingNDigests...) {
+				a := matchesFlowSchema(digest, ftr.fs)
 				if a {
-					t.Errorf("Fail: Expected %#+v to not match %#+v but it did", fcfmt.Fmt(fs), digest)
+					t.Errorf("Fail: Expected %#+v to not match %#+v but it did", fcfmt.Fmt(ftr.fs), digest)
 				}
 			}
 		})

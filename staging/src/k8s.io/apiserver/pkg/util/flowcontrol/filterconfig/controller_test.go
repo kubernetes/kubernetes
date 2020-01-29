@@ -297,11 +297,11 @@ func genFSs(t *testing.T, rng *rand.Rand, trial string, goodPLNames, badPLNames 
 		addGood(fcboot.MandatoryFlowSchemaCatchAll, nil, nil)
 	}
 	for i := 1; i <= n; i++ {
-		fs, valid, _, _, matchesR, matchesN, mismatchesR, mismatchesN := genFS(t, rng, fmt.Sprintf("%s-fs%d", trial, i), false, goodPLNames, badPLNames)
+		ftr, valid := genFS(t, rng, fmt.Sprintf("%s-fs%d", trial, i), false, goodPLNames, badPLNames)
 		if valid {
-			addGood(fs, append(matchesR, matchesN...), append(mismatchesR, mismatchesN...))
+			addGood(ftr.fs, append(ftr.matchingRDigests, ftr.matchingNDigests...), append(ftr.skippingRDigests, ftr.skippingNDigests...))
 		} else {
-			newFSs = append(newFSs, fs)
+			newFSs = append(newFSs, ftr.fs)
 		}
 	}
 	if n == 0 || rng.Float32() < 0.5 {
