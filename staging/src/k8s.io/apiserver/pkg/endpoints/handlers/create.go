@@ -137,31 +137,26 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 		if len(name) == 0 {
 			_, name, _ = scope.Namer.ObjectName(obj)
 		}
-		admissionAttributes := admission.NewAttributesRecord(obj, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Create, options, dryrun.IsDryRun(options.DryRun), userInfo)
-		if mutatingAdmission, ok := admit.(admission.MutationInterface); ok && mutatingAdmission.Handles(admission.Create) {
-			err = mutatingAdmission.Admit(ctx, admissionAttributes, scope)
-			if err != nil {
-				scope.err(err, w, req)
-				return
-			}
-		}
-
-		if scope.FieldManager != nil {
-			liveObj, err := scope.Creater.New(scope.Kind)
-			if err != nil {
-				scope.err(fmt.Errorf("failed to create new object (Create for %v): %v", scope.Kind, err), w, req)
-				return
-			}
-
-			obj, err = scope.FieldManager.Update(liveObj, obj, managerOrUserAgent(options.FieldManager, req.UserAgent()))
-			if err != nil {
-				scope.err(fmt.Errorf("failed to update object (Create for %v) managed fields: %v", scope.Kind, err), w, req)
-				return
-			}
-		}
 
 		trace.Step("About to store object in database")
 		result, err := finishRequest(timeout, func() (runtime.Object, error) {
+			if scope.FieldManager != nil {
+				liveObj, err := scope.Creater.New(scope.Kind)
+				if err != nil {
+					return nil, fmt.Errorf("failed to create new object (Create for %v): %v", scope.Kind, err)
+				}
+				obj, err = scope.FieldManager.Update(liveObj, obj, managerOrUserAgent(options.FieldManager, req.UserAgent()))
+				if err != nil {
+					return nil, fmt.Errorf("failed to update object (Create for %v) managed fields: %v", scope.Kind, err)
+				}
+			}
+
+			admissionAttributes := admission.NewAttributesRecord(obj, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Create, options, dryrun.IsDryRun(options.DryRun), userInfo)
+			if mutatingAdmission, ok := admit.(admission.MutationInterface); ok && mutatingAdmission.Handles(admission.Create) {
+				if err := mutatingAdmission.Admit(ctx, admissionAttributes, scope); err != nil {
+					return nil, err
+				}
+			}
 			return r.Create(
 				ctx,
 				name,
