@@ -183,22 +183,18 @@ func (d *validatingDispatcher) callHook(ctx context.Context, h *v1.ValidatingWeb
 	}
 
 	traceStep, ok := genericapirequest.TraceFrom(ctx)
+	fields := []utiltrace.Field{
+		utiltrace.Field{"configuration", invocation.Webhook.GetConfigurationName()},
+		utiltrace.Field{"webhook", h.Name},
+		utiltrace.Field{"resource", attr.GetResource()},
+		utiltrace.Field{"subresource", attr.GetSubresource()},
+		utiltrace.Field{"operation", attr.GetOperation()},
+		utiltrace.Field{"UID", uid},
+	}
 	if ok {
-		traceStep("Call validating webhook",
-			utiltrace.Field{"configuration", invocation.Webhook.GetConfigurationName()},
-			utiltrace.Field{"webhook", h.Name},
-			utiltrace.Field{"resource", attr.GetResource()},
-			utiltrace.Field{"subresource", attr.GetSubresource()},
-			utiltrace.Field{"operation", attr.GetOperation()},
-			utiltrace.Field{"UID", uid})
+		traceStep("Call validating webhook", fields...)
 	} else {
-		trace := utiltrace.New("Call validating webhook",
-			utiltrace.Field{"configuration", invocation.Webhook.GetConfigurationName()},
-			utiltrace.Field{"webhook", h.Name},
-			utiltrace.Field{"resource", attr.GetResource()},
-			utiltrace.Field{"subresource", attr.GetSubresource()},
-			utiltrace.Field{"operation", attr.GetOperation()},
-			utiltrace.Field{"UID", uid})
+		trace := utiltrace.New("Call validating webhook", fields...)
 		traceStep = trace.Step
 		defer trace.LogIfLong(500 * time.Millisecond)
 

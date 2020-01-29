@@ -222,22 +222,18 @@ func (a *mutatingDispatcher) callAttrMutatingHook(ctx context.Context, h *admiss
 		return false, &webhookutil.ErrCallingWebhook{WebhookName: h.Name, Reason: err}
 	}
 	traceStep, ok := genericapirequest.TraceFrom(ctx)
+	fields := []utiltrace.Field{
+		utiltrace.Field{"configuration", configurationName},
+		utiltrace.Field{"webhook", h.Name},
+		utiltrace.Field{"resource", attr.GetResource()},
+		utiltrace.Field{"subresource", attr.GetSubresource()},
+		utiltrace.Field{"operation", attr.GetOperation()},
+		utiltrace.Field{"UID", uid},
+	}
 	if ok {
-		traceStep("Call mutating webhook",
-			utiltrace.Field{"configuration", configurationName},
-			utiltrace.Field{"webhook", h.Name},
-			utiltrace.Field{"resource", attr.GetResource()},
-			utiltrace.Field{"subresource", attr.GetSubresource()},
-			utiltrace.Field{"operation", attr.GetOperation()},
-			utiltrace.Field{"UID", uid})
+		traceStep("Call mutating webhook", fields...)
 	} else {
-		trace := utiltrace.New("Call mutating webhook",
-			utiltrace.Field{"configuration", configurationName},
-			utiltrace.Field{"webhook", h.Name},
-			utiltrace.Field{"resource", attr.GetResource()},
-			utiltrace.Field{"subresource", attr.GetSubresource()},
-			utiltrace.Field{"operation", attr.GetOperation()},
-			utiltrace.Field{"UID", uid})
+		trace := utiltrace.New("Call mutating webhook", fields...)
 
 		traceStep = trace.Step
 		defer trace.LogIfLong(500 * time.Millisecond)
