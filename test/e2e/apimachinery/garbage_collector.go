@@ -959,6 +959,35 @@ var _ = SIGDescribe("Garbage collector", func() {
 			framework.Failf("failed to delete owner resource %q: %v", ownerName, err)
 		}
 
+		// Create and delete an unrelated instance of the custom resource in foreground deletion mode,
+		// so we have a signal when GC is aware of this custom resource type
+		canaryName := names.SimpleNameGenerator.GenerateName("canary")
+		canary := &unstructured.Unstructured{
+			Object: map[string]interface{}{
+				"apiVersion": apiVersion,
+				"kind":       definition.Spec.Names.Kind,
+				"metadata":   map[string]interface{}{"name": canaryName}},
+		}
+		_, err = resourceClient.Create(canary, metav1.CreateOptions{})
+		if err != nil {
+			framework.Failf("failed to create canary resource %q: %v", canaryName, err)
+		}
+		framework.Logf("created canary resource %q", canaryName)
+		foreground := metav1.DeletePropagationForeground
+		err = resourceClient.Delete(canaryName, &metav1.DeleteOptions{PropagationPolicy: &foreground})
+		if err != nil {
+			framework.Failf("failed to delete canary resource %q: %v", canaryName, err)
+		}
+		// Wait for the canary foreground finalization to complete, which means GC is aware of our new custom resource type
+		var lastCanary *unstructured.Unstructured
+		if err := wait.PollImmediate(5*time.Second, 3*time.Minute, func() (bool, error) {
+			lastCanary, err = resourceClient.Get(dependentName, metav1.GetOptions{})
+			return apierrors.IsNotFound(err), nil
+		}); err != nil {
+			framework.Logf("canary last state: %#v", lastCanary)
+			framework.Failf("failed waiting for canary resource %q to be deleted", canaryName)
+		}
+
 		// Ensure the dependent is deleted.
 		var lastDependent *unstructured.Unstructured
 		var err2 error
