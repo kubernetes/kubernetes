@@ -85,13 +85,13 @@ __EOF__
   ### kubectl cordon update with --dry-run does not mark node unschedulable
   # Pre-condition: node is schedulable
   kube::test::get_object_assert "nodes 127.0.0.1" "{{.spec.unschedulable}}" '<no value>'
-  kubectl cordon "127.0.0.1" --dry-run
+  kubectl cordon "127.0.0.1" --dry-run=client
   kube::test::get_object_assert "nodes 127.0.0.1" "{{.spec.unschedulable}}" '<no value>'
 
   ### kubectl drain update with --dry-run does not mark node unschedulable
   # Pre-condition: node is schedulable
   kube::test::get_object_assert "nodes 127.0.0.1" "{{.spec.unschedulable}}" '<no value>'
-  kubectl drain "127.0.0.1" --dry-run
+  kubectl drain "127.0.0.1" --dry-run=client
   # Post-condition: node still exists, node is still schedulable
   kube::test::get_object_assert nodes "{{range.items}}{{$id_field}}:{{end}}" '127.0.0.1:'
   kube::test::get_object_assert "nodes 127.0.0.1" "{{.spec.unschedulable}}" '<no value>'
@@ -113,7 +113,7 @@ __EOF__
   ### kubectl uncordon update with --dry-run is a no-op
   # Pre-condition: node is already schedulable
   kube::test::get_object_assert "nodes 127.0.0.1" "{{.spec.unschedulable}}" '<no value>'
-  response=$(kubectl uncordon "127.0.0.1" --dry-run)
+  response=$(kubectl uncordon "127.0.0.1" --dry-run=client)
   kube::test::if_has_string "${response}" 'already uncordoned'
   # Post-condition: node is still schedulable
   kube::test::get_object_assert "nodes 127.0.0.1" "{{.spec.unschedulable}}" '<no value>'

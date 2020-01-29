@@ -226,13 +226,13 @@ func TestNewCmdToken(t *testing.T) {
 		},
 		{
 			name:          "valid: delete from --kubeconfig",
-			args:          []string{"delete", "abcdef.1234567890123456", "--dry-run", "--kubeconfig=" + fullPath},
+			args:          []string{"delete", "abcdef.1234567890123456", "--dry-run=client", "--kubeconfig=" + fullPath},
 			configToWrite: testConfigToken,
 			expectedError: false,
 		},
 		{
 			name:          "valid: delete from " + clientcmd.RecommendedConfigPathEnvVar,
-			args:          []string{"delete", "abcdef.1234567890123456", "--dry-run"},
+			args:          []string{"delete", "abcdef.1234567890123456", "--dry-run=client"},
 			configToWrite: testConfigToken,
 			kubeConfigEnv: fullPath,
 			expectedError: false,

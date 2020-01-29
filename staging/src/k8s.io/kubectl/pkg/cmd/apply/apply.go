@@ -386,6 +386,15 @@ func (o *ApplyOptions) Run() error {
 	if len(infos) == 0 {
 		return fmt.Errorf("no objects passed to apply")
 	}
+	// Add Deprecation notices for both --dry-run and --server-dry-run
+	if o.DryRun {
+		fmt.Fprintf(o.ErrOut, "kubectl apply --dry-run with boolean values is DEPRECATED and will be removed in a future version.\n.The new values it supports are `kubectl apply --dry-run=server/client/none`.\n")
+	}
+
+	if o.ServerDryRun {
+		fmt.Fprintf(o.ErrOut, "kubectl apply --server-dry-run is DEPRECATED and will be removed in a future version.\nIn order to convert, instead of kubectl apply --server-dry-run, use kubectl apply --dry-run=server.\n")
+	}
+
 	for _, info := range infos {
 
 		// If server-dry-run is requested but the type doesn't support it, fail right away.
@@ -413,6 +422,7 @@ func (o *ApplyOptions) Run() error {
 				FieldManager: o.FieldManager,
 			}
 			if o.ServerDryRun {
+				fmt.Fprintf(o.ErrOut, "kubectl apply --server-dry-run is DEPRECATED and will be removed in a future version.\nIn order to convert, instead of kubectl apply --server-dry-run, use kubectl apply --dry-run=server.\n")
 				options.DryRun = []string{metav1.DryRunAll}
 			}
 

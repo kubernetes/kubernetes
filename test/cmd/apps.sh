@@ -79,7 +79,7 @@ run_daemonset_history_tests() {
   kube::test::get_object_assert daemonset "{{range.items}}{{${container_len:?}}}{{end}}" "2"
   kube::test::wait_object_assert controllerrevisions "{{range.items}}{{${annotations_field:?}}}:{{end}}" ".*rollingupdate-daemonset-rv2.yaml --record.*"
   # Rollback to revision 1 with dry-run - should be no-op
-  kubectl rollout undo daemonset --dry-run=true "${kube_flags[@]:?}"
+  kubectl rollout undo daemonset --dry-run=client "${kube_flags[@]:?}"
   kube::test::get_object_assert daemonset "{{range.items}}{{${image_field0:?}}}:{{end}}" "${IMAGE_DAEMONSET_R2}:"
   kube::test::get_object_assert daemonset "{{range.items}}{{${image_field1:?}}}:{{end}}" "${IMAGE_DAEMONSET_R2_2}:"
   kube::test::get_object_assert daemonset "{{range.items}}{{${container_len:?}}}{{end}}" "2"
@@ -289,7 +289,7 @@ run_deployment_tests() {
   kubectl apply -f hack/testdata/deployment-revision2.yaml "${kube_flags[@]:?}"
   kube::test::get_object_assert deployment.apps "{{range.items}}{{${image_field0:?}}}:{{end}}" "${IMAGE_DEPLOYMENT_R2}:"
   # Rollback to revision 1 with dry-run - should be no-op
-  kubectl rollout undo deployment nginx --dry-run=true "${kube_flags[@]:?}" | grep "test-cmd"
+  kubectl rollout undo deployment nginx --dry-run=client "${kube_flags[@]:?}" | grep "test-cmd"
   kube::test::get_object_assert deployment.apps "{{range.items}}{{${image_field0:?}}}:{{end}}" "${IMAGE_DEPLOYMENT_R2}:"
   # Rollback to revision 1
   kubectl rollout undo deployment nginx --to-revision=1 "${kube_flags[@]:?}"
@@ -431,7 +431,7 @@ run_statefulset_history_tests() {
   kube::test::get_object_assert statefulset "{{range.items}}{{${container_len:?}}}{{end}}" "2"
   kube::test::wait_object_assert controllerrevisions "{{range.items}}{{${annotations_field:?}}}:{{end}}" ".*rollingupdate-statefulset-rv2.yaml --record.*"
   # Rollback to revision 1 with dry-run - should be no-op
-  kubectl rollout undo statefulset --dry-run=true "${kube_flags[@]:?}"
+  kubectl rollout undo statefulset --dry-run=client "${kube_flags[@]:?}"
   kube::test::get_object_assert statefulset "{{range.items}}{{${image_field0:?}}}:{{end}}" "${IMAGE_STATEFULSET_R2}:"
   kube::test::get_object_assert statefulset "{{range.items}}{{${image_field1:?}}}:{{end}}" "${IMAGE_PAUSE_V2}:"
   kube::test::get_object_assert statefulset "{{range.items}}{{${container_len:?}}}{{end}}" "2"

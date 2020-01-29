@@ -20,7 +20,6 @@ package app
 import (
 	"context"
 	"crypto/tls"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -174,15 +173,6 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 				return
 			}
 
-			if kubeletFlags.VersionJSON {
-				clientVersion := version.Get()
-				y, err := json.MarshalIndent(&clientVersion, "", "  ")
-				if err != nil {
-					klog.Fatal(err)
-				}
-				fmt.Printf(string(y))
-				os.Exit(0)
-			}
 			// short-circuit on verflag
 			verflag.PrintAndExitIfRequested()
 			utilflag.PrintFlags(cleanFlagSet)
