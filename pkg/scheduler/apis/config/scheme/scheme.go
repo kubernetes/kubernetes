@@ -23,6 +23,7 @@ import (
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	kubeschedulerconfigv1 "k8s.io/kubernetes/pkg/scheduler/apis/config/v1"
 	kubeschedulerconfigv1alpha1 "k8s.io/kubernetes/pkg/scheduler/apis/config/v1alpha1"
+	kubeschedulerconfigv1alpha2 "k8s.io/kubernetes/pkg/scheduler/apis/config/v1alpha2"
 )
 
 var (
@@ -42,5 +43,6 @@ func AddToScheme(scheme *runtime.Scheme) {
 	utilruntime.Must(kubeschedulerconfig.AddToScheme(Scheme))
 	utilruntime.Must(kubeschedulerconfigv1.AddToScheme(Scheme))
 	utilruntime.Must(kubeschedulerconfigv1alpha1.AddToScheme(Scheme))
+	utilruntime.Must(kubeschedulerconfigv1alpha2.AddToScheme(Scheme))
 	utilruntime.Must(scheme.SetVersionPriority(kubeschedulerconfigv1alpha1.SchemeGroupVersion))
 }

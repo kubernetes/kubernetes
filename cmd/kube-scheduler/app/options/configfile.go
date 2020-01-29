@@ -28,6 +28,7 @@ import (
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	kubeschedulerscheme "k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
 	kubeschedulerconfigv1alpha1 "k8s.io/kubernetes/pkg/scheduler/apis/config/v1alpha1"
+	kubeschedulerconfigv1alpha2 "k8s.io/kubernetes/pkg/scheduler/apis/config/v1alpha2"
 )
 
 func loadConfigFromFile(file string) (*kubeschedulerconfig.KubeSchedulerConfiguration, error) {
@@ -55,6 +56,7 @@ func loadConfig(data []byte) (*kubeschedulerconfig.KubeSchedulerConfiguration, e
 		_, lenientCodecs, lenientErr := codec.NewLenientSchemeAndCodecs(
 			kubeschedulerconfig.AddToScheme,
 			kubeschedulerconfigv1alpha1.AddToScheme,
+			kubeschedulerconfigv1alpha2.AddToScheme,
 		)
 		if lenientErr != nil {
 			return nil, lenientErr
@@ -76,7 +78,7 @@ func WriteConfigFile(fileName string, cfg *kubeschedulerconfig.KubeSchedulerConf
 		return fmt.Errorf("unable to locate encoder -- %q is not a supported media type", mediaType)
 	}
 
-	encoder := kubeschedulerscheme.Codecs.EncoderForVersion(info.Serializer, kubeschedulerconfigv1alpha1.SchemeGroupVersion)
+	encoder := kubeschedulerscheme.Codecs.EncoderForVersion(info.Serializer, kubeschedulerconfigv1alpha2.SchemeGroupVersion)
 
 	configFile, err := os.Create(fileName)
 	if err != nil {
