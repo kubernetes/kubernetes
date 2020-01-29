@@ -208,6 +208,7 @@ test/e2e/common/runtime.go: "should report termination message  from file when p
 test/e2e/common/secrets.go: "should be consumable from pods in env vars"
 test/e2e/common/secrets.go: "should be consumable via the environment"
 test/e2e/common/secrets.go: "should fail to create secret due to empty secret key"
+test/e2e/common/secrets.go: "should patch a secret"
 test/e2e/common/secrets_volume.go: "should be consumable from pods in volume"
 test/e2e/common/secrets_volume.go: "should be consumable from pods in volume with defaultMode set"
 test/e2e/common/secrets_volume.go: "should be consumable from pods in volume as non-root with defaultMode and fsGroup set"
