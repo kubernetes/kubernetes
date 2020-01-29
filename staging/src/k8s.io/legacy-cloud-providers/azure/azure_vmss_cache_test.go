@@ -23,8 +23,10 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-07-01/compute"
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/stretchr/testify/assert"
+	cloudprovider "k8s.io/cloud-provider"
 )
 
 func TestExtractVmssVMName(t *testing.T) {
@@ -111,4 +113,27 @@ func TestVMSSVMCache(t *testing.T) {
 	assert.Equal(t, "vmss", ssName)
 	assert.Equal(t, to.String(vm.InstanceID), instanceID)
 	assert.Equal(t, &vm, realVM)
+}
+
+func TestVMSSVMCacheWithDeletingNodes(t *testing.T) {
+	vmssName := "vmss"
+	vmList := []string{"vmssee6c2000000", "vmssee6c2000001", "vmssee6c2000002"}
+	ss, err := newTestScaleSetWithState(vmssName, "", 0, vmList, "Deleting")
+	assert.NoError(t, err)
+
+	virtualMachines, rerr := ss.VirtualMachineScaleSetVMsClient.List(
+		context.Background(), "rg", "vmss", "")
+	assert.Nil(t, rerr)
+	assert.Equal(t, 3, len(virtualMachines))
+	for i := range virtualMachines {
+		vm := virtualMachines[i]
+		vmName := to.String(vm.OsProfile.ComputerName)
+		assert.Equal(t, vm.ProvisioningState, to.StringPtr(string(compute.ProvisioningStateDeleting)))
+
+		ssName, instanceID, realVM, err := ss.getVmssVM(vmName, cacheReadTypeDefault)
+		assert.Nil(t, realVM)
+		assert.Equal(t, "", ssName)
+		assert.Equal(t, instanceID, ssName)
+		assert.Equal(t, cloudprovider.InstanceNotFound, err)
+	}
 }
