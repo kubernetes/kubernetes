@@ -84,7 +84,7 @@ message FlowSchemaList {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // `items` is a list of FlowSchemas.
-  // +listType=set
+  // +listType=atomic
   repeated FlowSchema items = 2;
 }
 
@@ -110,7 +110,7 @@ message FlowSchemaSpec {
   // `rules` describes which requests will match this flow schema. This FlowSchema matches a request if and only if
   // at least one member of rules matches the request.
   // if it is an empty slice, there will be no requests matching the FlowSchema.
-  // +listType=set
+  // +listType=atomic
   // +optional
   repeated PolicyRulesWithSubjects rules = 4;
 }
@@ -210,20 +210,20 @@ message PolicyRulesWithSubjects {
   // subjects is the list of normal user, serviceaccount, or group that this rule cares about.
   // There must be at least one member in this slice.
   // A slice that includes both the system:authenticated and system:unauthenticated user groups matches every request.
-  // +listType=set
+  // +listType=atomic
   // Required.
   repeated Subject subjects = 1;
 
   // `resourceRules` is a slice of ResourcePolicyRules that identify matching requests according to their verb and the
   // target resource.
   // At least one of `resourceRules` and `nonResourceRules` has to be non-empty.
-  // +listType=set
+  // +listType=atomic
   // +optional
   repeated ResourcePolicyRule resourceRules = 2;
 
   // `nonResourceRules` is a list of NonResourcePolicyRules that identify matching requests according to their verb
   // and the target non-resource URL.
-  // +listType=set
+  // +listType=atomic
   // +optional
   repeated NonResourcePolicyRule nonResourceRules = 3;
 }
@@ -275,7 +275,7 @@ message PriorityLevelConfigurationList {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // `items` is a list of request-priorities.
-  // +listType=set
+  // +listType=atomic
   repeated PriorityLevelConfiguration items = 2;
 }
 
