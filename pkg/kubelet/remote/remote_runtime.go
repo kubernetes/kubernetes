@@ -92,8 +92,8 @@ func (r *RemoteRuntimeService) Version(apiVersion string) (*runtimeapi.VersionRe
 // RunPodSandbox creates and starts a pod-level sandbox. Runtimes should ensure
 // the sandbox is in ready state.
 func (r *RemoteRuntimeService) RunPodSandbox(config *runtimeapi.PodSandboxConfig, runtimeHandler string) (string, error) {
-	// Use 2 times longer timeout for sandbox operation (4 mins by default)
-	// TODO: Make the pod sandbox timeout configurable.
+	// Use 2 times longer connectionTimeout for sandbox operation (4 mins by default)
+	// TODO: Make the pod sandbox connectionTimeout configurable.
 	ctx, cancel := getContextWithTimeout(r.timeout * 2)
 	defer cancel()
 
@@ -226,9 +226,9 @@ func (r *RemoteRuntimeService) StartContainer(containerID string) error {
 	return nil
 }
 
-// StopContainer stops a running container with a grace period (i.e., timeout).
+// StopContainer stops a running container with a grace period (i.e., connectionTimeout).
 func (r *RemoteRuntimeService) StopContainer(containerID string, timeout int64) error {
-	// Use timeout + default timeout (2 minutes) as timeout to leave extra time
+	// Use connectionTimeout + default connectionTimeout (2 minutes) as connectionTimeout to leave extra time
 	// for SIGKILL container and request latency.
 	t := r.timeout + time.Duration(timeout)*time.Second
 	ctx, cancel := getContextWithTimeout(t)
@@ -328,11 +328,11 @@ func (r *RemoteRuntimeService) UpdateContainerResources(containerID string, reso
 // ExecSync executes a command in the container, and returns the stdout output.
 // If command exits with a non-zero exit code, an error is returned.
 func (r *RemoteRuntimeService) ExecSync(containerID string, cmd []string, timeout time.Duration) (stdout []byte, stderr []byte, err error) {
-	// Do not set timeout when timeout is 0.
+	// Do not set connectionTimeout when connectionTimeout is 0.
 	var ctx context.Context
 	var cancel context.CancelFunc
 	if timeout != 0 {
-		// Use timeout + default timeout (2 minutes) as timeout to leave some time for
+		// Use connectionTimeout + default connectionTimeout (2 minutes) as connectionTimeout to leave some time for
 		// the runtime to do cleanup.
 		ctx, cancel = getContextWithTimeout(r.timeout + timeout)
 	} else {
@@ -483,8 +483,8 @@ func (r *RemoteRuntimeService) ContainerStats(containerID string) (*runtimeapi.C
 }
 
 func (r *RemoteRuntimeService) ListContainerStats(filter *runtimeapi.ContainerStatsFilter) ([]*runtimeapi.ContainerStats, error) {
-	// Do not set timeout, because writable layer stats collection takes time.
-	// TODO(random-liu): Should we assume runtime should cache the result, and set timeout here?
+	// Do not set connectionTimeout, because writable layer stats collection takes time.
+	// TODO(random-liu): Should we assume runtime should cache the result, and set connectionTimeout here?
 	ctx, cancel := getContextWithCancel()
 	defer cancel()
 

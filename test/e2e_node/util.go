@@ -417,6 +417,8 @@ func runCommand(cmd ...string) (string, error) {
 func getCRIClient() (internalapi.RuntimeService, internalapi.ImageManagerService, error) {
 	// connection timeout for CRI service connection
 	const connectionTimeout = 2 * time.Minute
+	// image pull timeout for CRI service
+	const imagePullProgressDeadline = 1 * time.Minute
 	runtimeEndpoint := framework.TestContext.ContainerRuntimeEndpoint
 	r, err := remote.NewRemoteRuntimeService(runtimeEndpoint, connectionTimeout)
 	if err != nil {
@@ -428,7 +430,7 @@ func getCRIClient() (internalapi.RuntimeService, internalapi.ImageManagerService
 		//explicitly specified
 		imageManagerEndpoint = framework.TestContext.ImageServiceEndpoint
 	}
-	i, err := remote.NewRemoteImageService(imageManagerEndpoint, connectionTimeout)
+	i, err := remote.NewRemoteImageService(imageManagerEndpoint, connectionTimeout, imagePullProgressDeadline)
 	if err != nil {
 		return nil, nil, err
 	}

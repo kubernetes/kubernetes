@@ -28,7 +28,7 @@ import (
 // grpc library default is 4MB
 const maxMsgSize = 1024 * 1024 * 16
 
-// getContextWithTimeout returns a context with timeout.
+// getContextWithTimeout returns a context with connectionTimeout.
 func getContextWithTimeout(timeout time.Duration) (context.Context, context.CancelFunc) {
 	return context.WithTimeout(context.Background(), timeout)
 }
