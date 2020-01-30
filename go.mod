@@ -65,7 +65,7 @@ require (
 	github.com/golang/mock v1.3.1
 	github.com/google/cadvisor v0.35.0
 	github.com/google/go-cmp v0.3.0
-	github.com/google/gofuzz v1.0.0
+	github.com/google/gofuzz v1.1.0
 	github.com/google/uuid v1.1.1
 	github.com/googleapis/gnostic v0.1.0
 	github.com/gorilla/context v1.1.1 // indirect
@@ -327,7 +327,7 @@ replace (
 	github.com/google/go-cmp => github.com/google/go-cmp v0.3.0
 	github.com/google/go-github => github.com/google/go-github v17.0.0+incompatible
 	github.com/google/go-querystring => github.com/google/go-querystring v1.0.0
-	github.com/google/gofuzz => github.com/google/gofuzz v1.0.0
+	github.com/google/gofuzz => github.com/google/gofuzz v1.1.0
 	github.com/google/martian => github.com/google/martian v2.1.0+incompatible
 	github.com/google/pprof => github.com/google/pprof v0.0.0-20181206194817-3ea8567a2e57
 	github.com/google/renameio => github.com/google/renameio v0.1.0
