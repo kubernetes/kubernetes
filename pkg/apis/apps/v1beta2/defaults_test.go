@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	appsv1beta2 "k8s.io/api/apps/v1beta2"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -174,6 +174,8 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 	var defaultPartition int32 = 0
 	var defaultReplicas int32 = 1
 
+	filesystem := v1.PersistentVolumeFilesystem
+
 	period := int64(v1.DefaultTerminationGracePeriodSeconds)
 	defaultTemplate := v1.PodTemplateSpec{
 		Spec: v1.PodSpec{
@@ -254,6 +256,50 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 				Spec: appsv1beta2.StatefulSetSpec{
 					Replicas:            &defaultReplicas,
 					Template:            defaultTemplate,
+					PodManagementPolicy: appsv1beta2.ParallelPodManagement,
+					UpdateStrategy: appsv1beta2.StatefulSetUpdateStrategy{
+						Type: appsv1beta2.RollingUpdateStatefulSetStrategyType,
+						RollingUpdate: &appsv1beta2.RollingUpdateStatefulSetStrategy{
+							Partition: &defaultPartition,
+						},
+					},
+					RevisionHistoryLimit: utilpointer.Int32Ptr(10),
+				},
+			},
+		},
+		{ // Volume template defaults.
+			original: &appsv1beta2.StatefulSet{
+				Spec: appsv1beta2.StatefulSetSpec{
+					Template: defaultTemplate,
+					VolumeClaimTemplates: []v1.PersistentVolumeClaim{{
+						ObjectMeta: metav1.ObjectMeta{Name: "www"},
+						Spec: v1.PersistentVolumeClaimSpec{
+							AccessModes:      []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
+							StorageClassName: utilpointer.StringPtr("my-storage-class"),
+							Resources:        v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Gi")}},
+						},
+					}},
+					PodManagementPolicy: appsv1beta2.ParallelPodManagement,
+				},
+			},
+			expected: &appsv1beta2.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: defaultLabels,
+				},
+				Spec: appsv1beta2.StatefulSetSpec{
+					Replicas: &defaultReplicas,
+					Template: defaultTemplate,
+					VolumeClaimTemplates: []v1.PersistentVolumeClaim{{
+						TypeMeta:   metav1.TypeMeta{Kind: "PersistentVolumeClaim", APIVersion: "v1"},
+						ObjectMeta: metav1.ObjectMeta{Name: "www"},
+						Spec: v1.PersistentVolumeClaimSpec{
+							AccessModes:      []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
+							StorageClassName: utilpointer.StringPtr("my-storage-class"),
+							Resources:        v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Gi")}},
+							VolumeMode:       &filesystem,
+						},
+						Status: v1.PersistentVolumeClaimStatus{Phase: v1.ClaimPending},
+					}},
 					PodManagementPolicy: appsv1beta2.ParallelPodManagement,
 					UpdateStrategy: appsv1beta2.StatefulSetUpdateStrategy{
 						Type: appsv1beta2.RollingUpdateStatefulSetStrategyType,

@@ -75,6 +75,18 @@ func SetDefaults_StatefulSet(obj *appsv1beta2.StatefulSet) {
 		obj.Spec.RevisionHistoryLimit = new(int32)
 		*obj.Spec.RevisionHistoryLimit = 10
 	}
+
+	// Ensure apiVersion/kind are populated on volume template objects.
+	// This matches the population that was performed < 1.17.x by conversion.
+	// See http://issue.k8s.io/87583
+	for i := range obj.Spec.VolumeClaimTemplates {
+		if len(obj.Spec.VolumeClaimTemplates[i].APIVersion) == 0 {
+			obj.Spec.VolumeClaimTemplates[i].APIVersion = "v1"
+		}
+		if len(obj.Spec.VolumeClaimTemplates[i].Kind) == 0 {
+			obj.Spec.VolumeClaimTemplates[i].Kind = "PersistentVolumeClaim"
+		}
+	}
 }
 
 // SetDefaults_Deployment sets additional defaults compared to its counterpart
