@@ -17,6 +17,7 @@ limitations under the License.
 package apimachinery
 
 import (
+	"encoding/json"
 	"fmt"
 	"sync/atomic"
 	"time"
@@ -872,7 +873,8 @@ var _ = SIGDescribe("Garbage collector", func() {
 			}
 			return false, nil
 		}); err != nil {
-			framework.Logf("pods are %#v", pods.Items)
+			data, _ := json.Marshal(pods.Items)
+			framework.Logf("pods are %s", string(data))
 			framework.Failf("failed to wait for all pods to be deleted: %v", err)
 		}
 	})
