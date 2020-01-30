@@ -30,15 +30,16 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
-	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/proxy"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/clusterinfo"
 	nodebootstraptoken "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/node"
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
 	patchnodephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/patchnode"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
-	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
+
+	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
+	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/proxy"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 )
 
 // PerformPostUpgradeTasks runs nearly the same functions as 'kubeadm init' would do
@@ -95,7 +96,6 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitCon
 		errs = append(errs, err)
 	}
 
-	// Upgrade kube-dns/CoreDNS and kube-proxy
 	if err := dns.EnsureDNSAddon(&cfg.ClusterConfiguration, client); err != nil {
 		errs = append(errs, err)
 	}
