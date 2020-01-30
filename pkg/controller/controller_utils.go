@@ -755,6 +755,12 @@ func (s ActivePods) Less(i, j int) bool {
 		if err1 == nil && err2 == nil {
 			return s1 > s2
 		}
+		if err1 != nil && err2 == nil {
+			return true
+		}
+		if err1 == nil && err2 != nil {
+			return false
+		}
 	}
 	// 1. Unassigned < assigned
 	// If only one of the pods is unassigned, the unassigned one is smaller
