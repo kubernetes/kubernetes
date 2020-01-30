@@ -41,8 +41,8 @@ const (
 	// audiencesKey is the context key for request audiences.
 	audiencesKey
 
-	// traceStepKey is the context key for request audiences.
-	traceStepKey
+	// tracePtrKey is the context key for trace pointer.
+	tracePtrKey
 )
 
 // NewContext instantiates a base context object for request flows.
@@ -88,15 +88,27 @@ func UserFrom(ctx context.Context) (user.Info, bool) {
 	return user, ok
 }
 
-// WithTraceStep returns a copy of parent in which the trace step function value is set
-func WithTraceStep(parent context.Context, traceStep func(msg string, fields ...trace.Field)) context.Context {
-	return WithValue(parent, traceStepKey, traceStep)
+// WithTracePtr returns a copy of parent context in which the trace pointer value is set
+func WithTracePtr(parent context.Context, trace *trace.Trace) context.Context {
+	return context.WithValue(parent, tracePtrKey, trace)
 }
 
-// TraceFrom returns the value of the trace step key on the ctx
-func TraceFrom(ctx context.Context) (func(msg string, fields ...trace.Field), bool) {
-	trace, ok := ctx.Value(traceStepKey).(func(msg string, fields ...trace.Field))
+// TracePtrFrom returns the value of the trace pointer  on the ctx
+func TracePtrFrom(ctx context.Context) (*trace.Trace, bool) {
+	trace, ok := ctx.Value(tracePtrKey).(*trace.Trace)
 	return trace, ok
+}
+
+// NewNestedInContext adds a new trace to the nestedTrace array of the trace that is in the context
+// If there is no trace, it creates a new trace
+func NewNestedInContext(ctx context.Context, name string, fields ...trace.Field) *trace.Trace {
+	parentTrace, ok := TracePtrFrom(ctx)
+	if !ok {
+		parentTrace = trace.New(name, fields...)
+		WithTracePtr(ctx, parentTrace)
+	}
+	newTrace := parentTrace.Nest(name, fields...)
+	return newTrace
 }
 
 // WithAuditEvent returns set audit event struct.

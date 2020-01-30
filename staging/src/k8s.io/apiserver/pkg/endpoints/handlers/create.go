@@ -76,7 +76,7 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 		ctx, cancel := context.WithTimeout(req.Context(), timeout)
 		defer cancel()
 		ctx = request.WithNamespace(ctx, namespace)
-		ctx = request.WithTraceStep(ctx, trace.Step)
+		ctx = request.WithTracePtr(ctx, trace)
 		outputMediaType, _, err := negotiation.NegotiateOutputMediaType(req, scope.Serializer, scope)
 		if err != nil {
 			scope.err(err, w, req)
