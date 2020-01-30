@@ -17,6 +17,7 @@ limitations under the License.
 package scale
 
 import (
+	"context"
 	"fmt"
 
 	autoscaling "k8s.io/api/autoscaling/v1"
@@ -154,7 +155,7 @@ func (c *namespacedScaleClient) Get(resource schema.GroupResource, name string) 
 		Resource(gvr.Resource).
 		Name(name).
 		SubResource("scale").
-		Do()
+		Do(context.TODO())
 	if err := result.Error(); err != nil {
 		return nil, err
 	}
@@ -196,7 +197,7 @@ func (c *namespacedScaleClient) Update(resource schema.GroupResource, scale *aut
 		Name(scale.Name).
 		SubResource("scale").
 		Body(scaleUpdateBytes).
-		Do()
+		Do(context.TODO())
 	if err := result.Error(); err != nil {
 		// propagate "raw" error from the API
 		// this allows callers to interpret underlying Reason field
@@ -216,7 +217,7 @@ func (c *namespacedScaleClient) Patch(gvr schema.GroupVersionResource, name stri
 		Name(name).
 		SubResource("scale").
 		Body(data).
-		Do()
+		Do(context.TODO())
 	if err := result.Error(); err != nil {
 		return nil, err
 	}

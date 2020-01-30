@@ -19,6 +19,7 @@ limitations under the License.
 package v1
 
 import (
+	"context"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -70,7 +71,7 @@ func (c *limitRanges) Get(name string, options metav1.GetOptions) (result *v1.Li
 		Resource("limitranges").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -87,7 +88,7 @@ func (c *limitRanges) List(opts metav1.ListOptions) (result *v1.LimitRangeList, 
 		Resource("limitranges").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -104,7 +105,7 @@ func (c *limitRanges) Watch(opts metav1.ListOptions) (watch.Interface, error) {
 		Resource("limitranges").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch()
+		Watch(context.TODO())
 }
 
 // Create takes the representation of a limitRange and creates it.  Returns the server's representation of the limitRange, and an error, if there is any.
@@ -114,7 +115,7 @@ func (c *limitRanges) Create(limitRange *v1.LimitRange) (result *v1.LimitRange, 
 		Namespace(c.ns).
 		Resource("limitranges").
 		Body(limitRange).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -127,7 +128,7 @@ func (c *limitRanges) Update(limitRange *v1.LimitRange) (result *v1.LimitRange, 
 		Resource("limitranges").
 		Name(limitRange.Name).
 		Body(limitRange).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -139,7 +140,7 @@ func (c *limitRanges) Delete(name string, options *metav1.DeleteOptions) error {
 		Resource("limitranges").
 		Name(name).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -155,7 +156,7 @@ func (c *limitRanges) DeleteCollection(options *metav1.DeleteOptions, listOption
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Timeout(timeout).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -168,7 +169,7 @@ func (c *limitRanges) Patch(name string, pt types.PatchType, data []byte, subres
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }

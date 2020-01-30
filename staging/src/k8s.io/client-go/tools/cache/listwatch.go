@@ -17,6 +17,8 @@ limitations under the License.
 package cache
 
 import (
+	"context"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -82,7 +84,7 @@ func NewFilteredListWatchFromClient(c Getter, resource string, namespace string,
 			Namespace(namespace).
 			Resource(resource).
 			VersionedParams(&options, metav1.ParameterCodec).
-			Do().
+			Do(context.TODO()).
 			Get()
 	}
 	watchFunc := func(options metav1.ListOptions) (watch.Interface, error) {
@@ -92,7 +94,7 @@ func NewFilteredListWatchFromClient(c Getter, resource string, namespace string,
 			Namespace(namespace).
 			Resource(resource).
 			VersionedParams(&options, metav1.ParameterCodec).
-			Watch()
+			Watch(context.TODO())
 	}
 	return &ListWatch{ListFunc: listFunc, WatchFunc: watchFunc}
 }

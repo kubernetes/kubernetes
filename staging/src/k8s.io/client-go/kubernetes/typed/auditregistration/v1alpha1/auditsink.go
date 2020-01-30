@@ -19,6 +19,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"context"
 	"time"
 
 	v1alpha1 "k8s.io/api/auditregistration/v1alpha1"
@@ -67,7 +68,7 @@ func (c *auditSinks) Get(name string, options v1.GetOptions) (result *v1alpha1.A
 		Resource("auditsinks").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -83,7 +84,7 @@ func (c *auditSinks) List(opts v1.ListOptions) (result *v1alpha1.AuditSinkList, 
 		Resource("auditsinks").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -99,7 +100,7 @@ func (c *auditSinks) Watch(opts v1.ListOptions) (watch.Interface, error) {
 		Resource("auditsinks").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch()
+		Watch(context.TODO())
 }
 
 // Create takes the representation of a auditSink and creates it.  Returns the server's representation of the auditSink, and an error, if there is any.
@@ -108,7 +109,7 @@ func (c *auditSinks) Create(auditSink *v1alpha1.AuditSink) (result *v1alpha1.Aud
 	err = c.client.Post().
 		Resource("auditsinks").
 		Body(auditSink).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -120,7 +121,7 @@ func (c *auditSinks) Update(auditSink *v1alpha1.AuditSink) (result *v1alpha1.Aud
 		Resource("auditsinks").
 		Name(auditSink.Name).
 		Body(auditSink).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -131,7 +132,7 @@ func (c *auditSinks) Delete(name string, options *v1.DeleteOptions) error {
 		Resource("auditsinks").
 		Name(name).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -146,7 +147,7 @@ func (c *auditSinks) DeleteCollection(options *v1.DeleteOptions, listOptions v1.
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Timeout(timeout).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -158,7 +159,7 @@ func (c *auditSinks) Patch(name string, pt types.PatchType, data []byte, subreso
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }

@@ -19,6 +19,7 @@ limitations under the License.
 package v1
 
 import (
+	"context"
 	"time"
 
 	v1 "k8s.io/api/admissionregistration/v1"
@@ -67,7 +68,7 @@ func (c *validatingWebhookConfigurations) Get(name string, options metav1.GetOpt
 		Resource("validatingwebhookconfigurations").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -83,7 +84,7 @@ func (c *validatingWebhookConfigurations) List(opts metav1.ListOptions) (result 
 		Resource("validatingwebhookconfigurations").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -99,7 +100,7 @@ func (c *validatingWebhookConfigurations) Watch(opts metav1.ListOptions) (watch.
 		Resource("validatingwebhookconfigurations").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch()
+		Watch(context.TODO())
 }
 
 // Create takes the representation of a validatingWebhookConfiguration and creates it.  Returns the server's representation of the validatingWebhookConfiguration, and an error, if there is any.
@@ -108,7 +109,7 @@ func (c *validatingWebhookConfigurations) Create(validatingWebhookConfiguration 
 	err = c.client.Post().
 		Resource("validatingwebhookconfigurations").
 		Body(validatingWebhookConfiguration).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -120,7 +121,7 @@ func (c *validatingWebhookConfigurations) Update(validatingWebhookConfiguration 
 		Resource("validatingwebhookconfigurations").
 		Name(validatingWebhookConfiguration.Name).
 		Body(validatingWebhookConfiguration).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -131,7 +132,7 @@ func (c *validatingWebhookConfigurations) Delete(name string, options *metav1.De
 		Resource("validatingwebhookconfigurations").
 		Name(name).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -146,7 +147,7 @@ func (c *validatingWebhookConfigurations) DeleteCollection(options *metav1.Delet
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Timeout(timeout).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -158,7 +159,7 @@ func (c *validatingWebhookConfigurations) Patch(name string, pt types.PatchType,
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }

@@ -17,6 +17,7 @@ limitations under the License.
 package v1beta1
 
 import (
+	"context"
 	"fmt"
 
 	"k8s.io/api/events/v1beta1"
@@ -51,7 +52,7 @@ func (e *events) CreateWithEventNamespace(event *v1beta1.Event) (*v1beta1.Event,
 		NamespaceIfScoped(event.Namespace, len(event.Namespace) > 0).
 		Resource("events").
 		Body(event).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return result, err
 }
@@ -72,7 +73,7 @@ func (e *events) UpdateWithEventNamespace(event *v1beta1.Event) (*v1beta1.Event,
 		Resource("events").
 		Name(event.Name).
 		Body(event).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return result, err
 }
@@ -92,7 +93,7 @@ func (e *events) PatchWithEventNamespace(event *v1beta1.Event, data []byte) (*v1
 		Resource("events").
 		Name(event.Name).
 		Body(data).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return result, err
 }

@@ -17,6 +17,7 @@ limitations under the License.
 package integration
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"sort"
@@ -1010,7 +1011,7 @@ func TestStatusGetAndPatch(t *testing.T) {
 		Resource("customresourcedefinitions").
 		Name(noxuDefinition.Name).
 		SubResource("status").
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	if err != nil {
 		t.Fatal(err)

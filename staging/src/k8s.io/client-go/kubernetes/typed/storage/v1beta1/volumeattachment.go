@@ -19,6 +19,7 @@ limitations under the License.
 package v1beta1
 
 import (
+	"context"
 	"time"
 
 	v1beta1 "k8s.io/api/storage/v1beta1"
@@ -68,7 +69,7 @@ func (c *volumeAttachments) Get(name string, options v1.GetOptions) (result *v1b
 		Resource("volumeattachments").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -84,7 +85,7 @@ func (c *volumeAttachments) List(opts v1.ListOptions) (result *v1beta1.VolumeAtt
 		Resource("volumeattachments").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -100,7 +101,7 @@ func (c *volumeAttachments) Watch(opts v1.ListOptions) (watch.Interface, error) 
 		Resource("volumeattachments").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch()
+		Watch(context.TODO())
 }
 
 // Create takes the representation of a volumeAttachment and creates it.  Returns the server's representation of the volumeAttachment, and an error, if there is any.
@@ -109,7 +110,7 @@ func (c *volumeAttachments) Create(volumeAttachment *v1beta1.VolumeAttachment) (
 	err = c.client.Post().
 		Resource("volumeattachments").
 		Body(volumeAttachment).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -121,7 +122,7 @@ func (c *volumeAttachments) Update(volumeAttachment *v1beta1.VolumeAttachment) (
 		Resource("volumeattachments").
 		Name(volumeAttachment.Name).
 		Body(volumeAttachment).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -136,7 +137,7 @@ func (c *volumeAttachments) UpdateStatus(volumeAttachment *v1beta1.VolumeAttachm
 		Name(volumeAttachment.Name).
 		SubResource("status").
 		Body(volumeAttachment).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -147,7 +148,7 @@ func (c *volumeAttachments) Delete(name string, options *v1.DeleteOptions) error
 		Resource("volumeattachments").
 		Name(name).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -162,7 +163,7 @@ func (c *volumeAttachments) DeleteCollection(options *v1.DeleteOptions, listOpti
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Timeout(timeout).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -174,7 +175,7 @@ func (c *volumeAttachments) Patch(name string, pt types.PatchType, data []byte, 
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }

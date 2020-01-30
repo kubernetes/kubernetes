@@ -34,10 +34,9 @@ func (c *selfSubjectRulesReviews) Create(srr *authorizationapi.SelfSubjectRulesR
 func (c *selfSubjectRulesReviews) CreateContext(ctx context.Context, srr *authorizationapi.SelfSubjectRulesReview) (result *authorizationapi.SelfSubjectRulesReview, err error) {
 	result = &authorizationapi.SelfSubjectRulesReview{}
 	err = c.client.Post().
-		Context(ctx).
 		Resource("selfsubjectrulesreviews").
 		Body(srr).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }

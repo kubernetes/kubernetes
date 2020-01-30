@@ -19,6 +19,7 @@ limitations under the License.
 package v1
 
 import (
+	"context"
 	"time"
 
 	v1 "k8s.io/api/admissionregistration/v1"
@@ -67,7 +68,7 @@ func (c *mutatingWebhookConfigurations) Get(name string, options metav1.GetOptio
 		Resource("mutatingwebhookconfigurations").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -83,7 +84,7 @@ func (c *mutatingWebhookConfigurations) List(opts metav1.ListOptions) (result *v
 		Resource("mutatingwebhookconfigurations").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -99,7 +100,7 @@ func (c *mutatingWebhookConfigurations) Watch(opts metav1.ListOptions) (watch.In
 		Resource("mutatingwebhookconfigurations").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch()
+		Watch(context.TODO())
 }
 
 // Create takes the representation of a mutatingWebhookConfiguration and creates it.  Returns the server's representation of the mutatingWebhookConfiguration, and an error, if there is any.
@@ -108,7 +109,7 @@ func (c *mutatingWebhookConfigurations) Create(mutatingWebhookConfiguration *v1.
 	err = c.client.Post().
 		Resource("mutatingwebhookconfigurations").
 		Body(mutatingWebhookConfiguration).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -120,7 +121,7 @@ func (c *mutatingWebhookConfigurations) Update(mutatingWebhookConfiguration *v1.
 		Resource("mutatingwebhookconfigurations").
 		Name(mutatingWebhookConfiguration.Name).
 		Body(mutatingWebhookConfiguration).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -131,7 +132,7 @@ func (c *mutatingWebhookConfigurations) Delete(name string, options *metav1.Dele
 		Resource("mutatingwebhookconfigurations").
 		Name(name).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -146,7 +147,7 @@ func (c *mutatingWebhookConfigurations) DeleteCollection(options *metav1.DeleteO
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Timeout(timeout).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -158,7 +159,7 @@ func (c *mutatingWebhookConfigurations) Patch(name string, pt types.PatchType, d
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }

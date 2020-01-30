@@ -42,6 +42,8 @@ import (
 	"github.com/elazarl/goproxy"
 	openapi_v2 "github.com/googleapis/gnostic/OpenAPIv2"
 
+	"sigs.k8s.io/yaml"
+
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -81,7 +83,6 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	uexec "k8s.io/utils/exec"
 	"k8s.io/utils/pointer"
-	"sigs.k8s.io/yaml"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -2054,13 +2055,12 @@ func makeRequestToGuestbook(c clientset.Interface, cmd, value string, ns string)
 	defer cancel()
 
 	result, err := proxyRequest.Namespace(ns).
-		Context(ctx).
 		Name("frontend").
 		Suffix("/guestbook").
 		Param("cmd", cmd).
 		Param("key", "messages").
 		Param("value", value).
-		Do().
+		Do(ctx).
 		Raw()
 	return string(result), err
 }
@@ -2145,7 +2145,7 @@ func getUDData(jpgExpected string, ns string) func(clientset.Interface, string) 
 			SubResource("proxy").
 			Name(podID).
 			Suffix("data.json").
-			Do().
+			Do(context.TODO()).
 			Raw()
 
 		if err != nil {

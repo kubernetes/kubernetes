@@ -35,10 +35,9 @@ func (c *subjectAccessReviews) Create(sar *authorizationapi.SubjectAccessReview)
 func (c *subjectAccessReviews) CreateContext(ctx context.Context, sar *authorizationapi.SubjectAccessReview) (result *authorizationapi.SubjectAccessReview, err error) {
 	result = &authorizationapi.SubjectAccessReview{}
 	err = c.client.Post().
-		Context(ctx).
 		Resource("subjectaccessreviews").
 		Body(sar).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }

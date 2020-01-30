@@ -23,6 +23,7 @@ a serivce
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -273,7 +274,7 @@ func main() {
 		hostname, err := proxyRequest.
 			Namespace(ns).
 			Name("serve-hostnames").
-			DoRaw()
+			DoRaw(context.TODO())
 		if err != nil {
 			klog.Infof("After %v while making a proxy call got error %v", time.Since(start), err)
 			continue
@@ -303,7 +304,7 @@ func main() {
 				hostname, err := proxyRequest.
 					Namespace(ns).
 					Name("serve-hostnames").
-					DoRaw()
+					DoRaw(context.TODO())
 				klog.V(4).Infof("Proxy call in namespace %s took %v", ns, time.Since(t))
 				if err != nil {
 					klog.Warningf("Call failed during iteration %d query %d : %v", i, query, err)

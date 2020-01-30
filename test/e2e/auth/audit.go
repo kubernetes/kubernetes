@@ -17,6 +17,7 @@ limitations under the License.
 package auth
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -733,7 +734,7 @@ func expectEvents(f *framework.Framework, expectedEvents []utils.AuditEvent) {
 	pollingTimeout := 5 * time.Minute
 	err := wait.Poll(pollingInterval, pollingTimeout, func() (bool, error) {
 		// Fetch the log stream.
-		stream, err := f.ClientSet.CoreV1().RESTClient().Get().AbsPath("/logs/kube-apiserver-audit.log").Stream()
+		stream, err := f.ClientSet.CoreV1().RESTClient().Get().AbsPath("/logs/kube-apiserver-audit.log").Stream(context.TODO())
 		if err != nil {
 			return false, err
 		}

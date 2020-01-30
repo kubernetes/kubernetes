@@ -19,6 +19,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"context"
 	"time"
 
 	v1alpha1 "k8s.io/api/flowcontrol/v1alpha1"
@@ -68,7 +69,7 @@ func (c *priorityLevelConfigurations) Get(name string, options v1.GetOptions) (r
 		Resource("prioritylevelconfigurations").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -84,7 +85,7 @@ func (c *priorityLevelConfigurations) List(opts v1.ListOptions) (result *v1alpha
 		Resource("prioritylevelconfigurations").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -100,7 +101,7 @@ func (c *priorityLevelConfigurations) Watch(opts v1.ListOptions) (watch.Interfac
 		Resource("prioritylevelconfigurations").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch()
+		Watch(context.TODO())
 }
 
 // Create takes the representation of a priorityLevelConfiguration and creates it.  Returns the server's representation of the priorityLevelConfiguration, and an error, if there is any.
@@ -109,7 +110,7 @@ func (c *priorityLevelConfigurations) Create(priorityLevelConfiguration *v1alpha
 	err = c.client.Post().
 		Resource("prioritylevelconfigurations").
 		Body(priorityLevelConfiguration).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -121,7 +122,7 @@ func (c *priorityLevelConfigurations) Update(priorityLevelConfiguration *v1alpha
 		Resource("prioritylevelconfigurations").
 		Name(priorityLevelConfiguration.Name).
 		Body(priorityLevelConfiguration).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -136,7 +137,7 @@ func (c *priorityLevelConfigurations) UpdateStatus(priorityLevelConfiguration *v
 		Name(priorityLevelConfiguration.Name).
 		SubResource("status").
 		Body(priorityLevelConfiguration).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -147,7 +148,7 @@ func (c *priorityLevelConfigurations) Delete(name string, options *v1.DeleteOpti
 		Resource("prioritylevelconfigurations").
 		Name(name).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -162,7 +163,7 @@ func (c *priorityLevelConfigurations) DeleteCollection(options *v1.DeleteOptions
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Timeout(timeout).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -174,7 +175,7 @@ func (c *priorityLevelConfigurations) Patch(name string, pt types.PatchType, dat
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }

@@ -397,7 +397,7 @@ func (c *$.type|privatePlural$) List(opts $.ListOptions|raw$) (result *$.resultT
 		Resource("$.type|resource$").
 		VersionedParams(&opts, $.schemeParameterCodec|raw$).
 		Timeout(timeout).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -418,7 +418,7 @@ func (c *$.type|privatePlural$) List($.type|private$Name string, opts $.ListOpti
 		SubResource("$.subresourcePath$").
 		VersionedParams(&opts, $.schemeParameterCodec|raw$).
 		Timeout(timeout).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -433,7 +433,7 @@ func (c *$.type|privatePlural$) Get(name string, options $.GetOptions|raw$) (res
 		Resource("$.type|resource$").
 		Name(name).
 		VersionedParams(&options, $.schemeParameterCodec|raw$).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -449,7 +449,7 @@ func (c *$.type|privatePlural$) Get($.type|private$Name string, options $.GetOpt
 		Name($.type|private$Name).
 		SubResource("$.subresourcePath$").
 		VersionedParams(&options, $.schemeParameterCodec|raw$).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -463,7 +463,7 @@ func (c *$.type|privatePlural$) Delete(name string, options *$.DeleteOptions|raw
 		Resource("$.type|resource$").
 		Name(name).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 `
@@ -481,7 +481,7 @@ func (c *$.type|privatePlural$) DeleteCollection(options *$.DeleteOptions|raw$, 
 		VersionedParams(&listOptions, $.schemeParameterCodec|raw$).
 		Timeout(timeout).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 `
@@ -496,7 +496,7 @@ func (c *$.type|privatePlural$) Create($.type|private$Name string, $.inputType|p
 		Name($.type|private$Name).
 		SubResource("$.subresourcePath$").
 		Body($.inputType|private$).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -510,7 +510,7 @@ func (c *$.type|privatePlural$) Create($.inputType|private$ *$.inputType|raw$) (
 		$if .namespaced$Namespace(c.ns).$end$
 		Resource("$.type|resource$").
 		Body($.inputType|private$).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -526,7 +526,7 @@ func (c *$.type|privatePlural$) Update($.type|private$Name string, $.inputType|p
 		Name($.type|private$Name).
 		SubResource("$.subresourcePath$").
 		Body($.inputType|private$).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -541,7 +541,7 @@ func (c *$.type|privatePlural$) Update($.inputType|private$ *$.inputType|raw$) (
 		Resource("$.type|resource$").
 		Name($.inputType|private$.Name).
 		Body($.inputType|private$).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -559,7 +559,7 @@ func (c *$.type|privatePlural$) UpdateStatus($.type|private$ *$.type|raw$) (resu
 		Name($.type|private$.Name).
 		SubResource("status").
 		Body($.type|private$).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -578,7 +578,7 @@ func (c *$.type|privatePlural$) Watch(opts $.ListOptions|raw$) ($.watchInterface
 		Resource("$.type|resource$").
 		VersionedParams(&opts, $.schemeParameterCodec|raw$).
 		Timeout(timeout).
-		Watch()
+		Watch(context.TODO())
 }
 `
 
@@ -592,7 +592,7 @@ func (c *$.type|privatePlural$) Patch(name string, pt $.PatchType|raw$, data []b
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }

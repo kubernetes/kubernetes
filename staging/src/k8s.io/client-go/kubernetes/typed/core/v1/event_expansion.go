@@ -17,9 +17,10 @@ limitations under the License.
 package v1
 
 import (
+	"context"
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -54,7 +55,7 @@ func (e *events) CreateWithEventNamespace(event *v1.Event) (*v1.Event, error) {
 		NamespaceIfScoped(event.Namespace, len(event.Namespace) > 0).
 		Resource("events").
 		Body(event).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return result, err
 }
@@ -71,7 +72,7 @@ func (e *events) UpdateWithEventNamespace(event *v1.Event) (*v1.Event, error) {
 		Resource("events").
 		Name(event.Name).
 		Body(event).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return result, err
 }
@@ -91,7 +92,7 @@ func (e *events) PatchWithEventNamespace(incompleteEvent *v1.Event, data []byte)
 		Resource("events").
 		Name(incompleteEvent.Name).
 		Body(data).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return result, err
 }

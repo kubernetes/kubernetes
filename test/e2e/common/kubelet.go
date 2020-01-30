@@ -18,11 +18,12 @@ package common
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"strings"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -64,7 +65,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 			})
 			gomega.Eventually(func() string {
 				sinceTime := metav1.NewTime(time.Now().Add(time.Duration(-1 * time.Hour)))
-				rc, err := podClient.GetLogs(podName, &v1.PodLogOptions{SinceTime: &sinceTime}).Stream()
+				rc, err := podClient.GetLogs(podName, &v1.PodLogOptions{SinceTime: &sinceTime}).Stream(context.TODO())
 				if err != nil {
 					return ""
 				}
@@ -167,7 +168,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 			})
 
 			gomega.Eventually(func() error {
-				rc, err := podClient.GetLogs(podName, &v1.PodLogOptions{}).Stream()
+				rc, err := podClient.GetLogs(podName, &v1.PodLogOptions{}).Stream(context.TODO())
 				if err != nil {
 					return err
 				}
@@ -215,7 +216,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 				},
 			})
 			gomega.Eventually(func() string {
-				rc, err := podClient.GetLogs(podName, &v1.PodLogOptions{}).Stream()
+				rc, err := podClient.GetLogs(podName, &v1.PodLogOptions{}).Stream(context.TODO())
 				if err != nil {
 					return ""
 				}

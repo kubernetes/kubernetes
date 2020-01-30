@@ -19,6 +19,7 @@ limitations under the License.
 package v1
 
 import (
+	"context"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -70,7 +71,7 @@ func (c *configMaps) Get(name string, options metav1.GetOptions) (result *v1.Con
 		Resource("configmaps").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -87,7 +88,7 @@ func (c *configMaps) List(opts metav1.ListOptions) (result *v1.ConfigMapList, er
 		Resource("configmaps").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -104,7 +105,7 @@ func (c *configMaps) Watch(opts metav1.ListOptions) (watch.Interface, error) {
 		Resource("configmaps").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch()
+		Watch(context.TODO())
 }
 
 // Create takes the representation of a configMap and creates it.  Returns the server's representation of the configMap, and an error, if there is any.
@@ -114,7 +115,7 @@ func (c *configMaps) Create(configMap *v1.ConfigMap) (result *v1.ConfigMap, err 
 		Namespace(c.ns).
 		Resource("configmaps").
 		Body(configMap).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -127,7 +128,7 @@ func (c *configMaps) Update(configMap *v1.ConfigMap) (result *v1.ConfigMap, err 
 		Resource("configmaps").
 		Name(configMap.Name).
 		Body(configMap).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -139,7 +140,7 @@ func (c *configMaps) Delete(name string, options *metav1.DeleteOptions) error {
 		Resource("configmaps").
 		Name(name).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -155,7 +156,7 @@ func (c *configMaps) DeleteCollection(options *metav1.DeleteOptions, listOptions
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Timeout(timeout).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -168,7 +169,7 @@ func (c *configMaps) Patch(name string, pt types.PatchType, data []byte, subreso
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }

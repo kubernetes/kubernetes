@@ -19,6 +19,7 @@ limitations under the License.
 package v1
 
 import (
+	"context"
 	"time"
 
 	v1 "k8s.io/api/coordination/v1"
@@ -70,7 +71,7 @@ func (c *leases) Get(name string, options metav1.GetOptions) (result *v1.Lease, 
 		Resource("leases").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -87,7 +88,7 @@ func (c *leases) List(opts metav1.ListOptions) (result *v1.LeaseList, err error)
 		Resource("leases").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -104,7 +105,7 @@ func (c *leases) Watch(opts metav1.ListOptions) (watch.Interface, error) {
 		Resource("leases").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch()
+		Watch(context.TODO())
 }
 
 // Create takes the representation of a lease and creates it.  Returns the server's representation of the lease, and an error, if there is any.
@@ -114,7 +115,7 @@ func (c *leases) Create(lease *v1.Lease) (result *v1.Lease, err error) {
 		Namespace(c.ns).
 		Resource("leases").
 		Body(lease).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -127,7 +128,7 @@ func (c *leases) Update(lease *v1.Lease) (result *v1.Lease, err error) {
 		Resource("leases").
 		Name(lease.Name).
 		Body(lease).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -139,7 +140,7 @@ func (c *leases) Delete(name string, options *metav1.DeleteOptions) error {
 		Resource("leases").
 		Name(name).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -155,7 +156,7 @@ func (c *leases) DeleteCollection(options *metav1.DeleteOptions, listOptions met
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Timeout(timeout).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -168,7 +169,7 @@ func (c *leases) Patch(name string, pt types.PatchType, data []byte, subresource
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }

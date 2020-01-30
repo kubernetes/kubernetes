@@ -19,6 +19,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"context"
 	"time"
 
 	v1alpha1 "k8s.io/api/flowcontrol/v1alpha1"
@@ -68,7 +69,7 @@ func (c *flowSchemas) Get(name string, options v1.GetOptions) (result *v1alpha1.
 		Resource("flowschemas").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -84,7 +85,7 @@ func (c *flowSchemas) List(opts v1.ListOptions) (result *v1alpha1.FlowSchemaList
 		Resource("flowschemas").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -100,7 +101,7 @@ func (c *flowSchemas) Watch(opts v1.ListOptions) (watch.Interface, error) {
 		Resource("flowschemas").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch()
+		Watch(context.TODO())
 }
 
 // Create takes the representation of a flowSchema and creates it.  Returns the server's representation of the flowSchema, and an error, if there is any.
@@ -109,7 +110,7 @@ func (c *flowSchemas) Create(flowSchema *v1alpha1.FlowSchema) (result *v1alpha1.
 	err = c.client.Post().
 		Resource("flowschemas").
 		Body(flowSchema).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -121,7 +122,7 @@ func (c *flowSchemas) Update(flowSchema *v1alpha1.FlowSchema) (result *v1alpha1.
 		Resource("flowschemas").
 		Name(flowSchema.Name).
 		Body(flowSchema).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -136,7 +137,7 @@ func (c *flowSchemas) UpdateStatus(flowSchema *v1alpha1.FlowSchema) (result *v1a
 		Name(flowSchema.Name).
 		SubResource("status").
 		Body(flowSchema).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -147,7 +148,7 @@ func (c *flowSchemas) Delete(name string, options *v1.DeleteOptions) error {
 		Resource("flowschemas").
 		Name(name).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -162,7 +163,7 @@ func (c *flowSchemas) DeleteCollection(options *v1.DeleteOptions, listOptions v1
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Timeout(timeout).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -174,7 +175,7 @@ func (c *flowSchemas) Patch(name string, pt types.PatchType, data []byte, subres
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }

@@ -19,6 +19,7 @@ limitations under the License.
 package v1beta1
 
 import (
+	"context"
 	"time"
 
 	v1beta1 "k8s.io/api/networking/v1beta1"
@@ -71,7 +72,7 @@ func (c *ingresses) Get(name string, options v1.GetOptions) (result *v1beta1.Ing
 		Resource("ingresses").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -88,7 +89,7 @@ func (c *ingresses) List(opts v1.ListOptions) (result *v1beta1.IngressList, err 
 		Resource("ingresses").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -105,7 +106,7 @@ func (c *ingresses) Watch(opts v1.ListOptions) (watch.Interface, error) {
 		Resource("ingresses").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch()
+		Watch(context.TODO())
 }
 
 // Create takes the representation of a ingress and creates it.  Returns the server's representation of the ingress, and an error, if there is any.
@@ -115,7 +116,7 @@ func (c *ingresses) Create(ingress *v1beta1.Ingress) (result *v1beta1.Ingress, e
 		Namespace(c.ns).
 		Resource("ingresses").
 		Body(ingress).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -128,7 +129,7 @@ func (c *ingresses) Update(ingress *v1beta1.Ingress) (result *v1beta1.Ingress, e
 		Resource("ingresses").
 		Name(ingress.Name).
 		Body(ingress).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -144,7 +145,7 @@ func (c *ingresses) UpdateStatus(ingress *v1beta1.Ingress) (result *v1beta1.Ingr
 		Name(ingress.Name).
 		SubResource("status").
 		Body(ingress).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -156,7 +157,7 @@ func (c *ingresses) Delete(name string, options *v1.DeleteOptions) error {
 		Resource("ingresses").
 		Name(name).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -172,7 +173,7 @@ func (c *ingresses) DeleteCollection(options *v1.DeleteOptions, listOptions v1.L
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Timeout(timeout).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -185,7 +186,7 @@ func (c *ingresses) Patch(name string, pt types.PatchType, data []byte, subresou
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }

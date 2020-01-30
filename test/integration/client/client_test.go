@@ -17,6 +17,7 @@ limitations under the License.
 package client
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"reflect"
@@ -263,7 +264,7 @@ func TestPatch(t *testing.T) {
 			Namespace("default").
 			Name(name).
 			Body(body).
-			Do()
+			Do(context.TODO())
 		if result.Error() != nil {
 			return result.Error()
 		}
@@ -341,7 +342,7 @@ func TestPatchWithCreateOnUpdate(t *testing.T) {
 	}
 
 	patchEndpoint := func(json []byte) (runtime.Object, error) {
-		return c.CoreV1().RESTClient().Patch(types.MergePatchType).Resource("endpoints").Namespace("default").Name("patchendpoint").Body(json).Do().Get()
+		return c.CoreV1().RESTClient().Patch(types.MergePatchType).Resource("endpoints").Namespace("default").Name("patchendpoint").Body(json).Do(context.TODO()).Get()
 	}
 
 	// Make sure patch doesn't get to CreateOnUpdate
@@ -496,7 +497,7 @@ func TestSingleWatch(t *testing.T) {
 			Watch:           true,
 			FieldSelector:   fields.OneTermEqualSelector("metadata.name", "event-9").String(),
 		}, metav1.ParameterCodec).
-		Watch()
+		Watch(context.TODO())
 
 	if err != nil {
 		t.Fatalf("Failed watch: %v", err)
@@ -757,7 +758,7 @@ func runSelfLinkTestOnNamespace(t *testing.T, c clientset.Interface, namespace s
 	if err != nil {
 		t.Fatalf("Failed creating selflinktest pod: %v", err)
 	}
-	if err = c.CoreV1().RESTClient().Get().RequestURI(pod.SelfLink).Do().Into(pod); err != nil {
+	if err = c.CoreV1().RESTClient().Get().RequestURI(pod.SelfLink).Do(context.TODO()).Into(pod); err != nil {
 		t.Errorf("Failed listing pod with supplied self link '%v': %v", pod.SelfLink, err)
 	}
 
@@ -766,7 +767,7 @@ func runSelfLinkTestOnNamespace(t *testing.T, c clientset.Interface, namespace s
 		t.Errorf("Failed listing pods: %v", err)
 	}
 
-	if err = c.CoreV1().RESTClient().Get().RequestURI(podList.SelfLink).Do().Into(podList); err != nil {
+	if err = c.CoreV1().RESTClient().Get().RequestURI(podList.SelfLink).Do(context.TODO()).Into(podList); err != nil {
 		t.Errorf("Failed listing pods with supplied self link '%v': %v", podList.SelfLink, err)
 	}
 
@@ -777,7 +778,7 @@ func runSelfLinkTestOnNamespace(t *testing.T, c clientset.Interface, namespace s
 			continue
 		}
 		found = true
-		err = c.CoreV1().RESTClient().Get().RequestURI(item.SelfLink).Do().Into(pod)
+		err = c.CoreV1().RESTClient().Get().RequestURI(item.SelfLink).Do(context.TODO()).Into(pod)
 		if err != nil {
 			t.Errorf("Failed listing pod with supplied self link '%v': %v", item.SelfLink, err)
 		}

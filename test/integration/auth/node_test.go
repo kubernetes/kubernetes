@@ -17,6 +17,7 @@ limitations under the License.
 package auth
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"strings"
@@ -84,7 +85,7 @@ func TestNodeAuthorizer(t *testing.T) {
 
 	// Wait for a healthy server
 	for {
-		result := superuserClient.CoreV1().RESTClient().Get().AbsPath("/healthz").Do()
+		result := superuserClient.CoreV1().RESTClient().Get().AbsPath("/healthz").Do(context.TODO())
 		_, err := result.Raw()
 		if err == nil {
 			break

@@ -174,7 +174,7 @@ func (a *Plugin) admitPod(ctx context.Context, pod *api.Pod, attributes admissio
 		review.Status = entry.(v1alpha1.ImageReviewStatus)
 	} else {
 		result := a.webhook.WithExponentialBackoff(ctx, func() rest.Result {
-			return a.webhook.RestClient.Post().Context(ctx).Body(review).Do()
+			return a.webhook.RestClient.Post().Body(review).Do(ctx)
 		})
 
 		if err := result.Error(); err != nil {

@@ -17,6 +17,7 @@ limitations under the License.
 package metrics
 
 import (
+	"context"
 	"fmt"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -241,7 +242,7 @@ func (g *Grabber) getMetricsFromPod(client clientset.Interface, podName string, 
 		SubResource("proxy").
 		Name(fmt.Sprintf("%v:%v", podName, port)).
 		Suffix("metrics").
-		Do().Raw()
+		Do(context.TODO()).Raw()
 	if err != nil {
 		return "", err
 	}

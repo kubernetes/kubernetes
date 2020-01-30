@@ -18,6 +18,7 @@ package rawhttp
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -80,7 +81,7 @@ func raw(restClient *rest.RESTClient, streams genericclioptions.IOStreams, url, 
 		return fmt.Errorf("unknown requestType: %q", requestType)
 	}
 
-	stream, err := request.Stream()
+	stream, err := request.Stream(context.TODO())
 	if err != nil {
 		return err
 	}

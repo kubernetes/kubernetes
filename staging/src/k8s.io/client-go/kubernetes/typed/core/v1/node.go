@@ -19,6 +19,7 @@ limitations under the License.
 package v1
 
 import (
+	"context"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -68,7 +69,7 @@ func (c *nodes) Get(name string, options metav1.GetOptions) (result *v1.Node, er
 		Resource("nodes").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -84,7 +85,7 @@ func (c *nodes) List(opts metav1.ListOptions) (result *v1.NodeList, err error) {
 		Resource("nodes").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -100,7 +101,7 @@ func (c *nodes) Watch(opts metav1.ListOptions) (watch.Interface, error) {
 		Resource("nodes").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch()
+		Watch(context.TODO())
 }
 
 // Create takes the representation of a node and creates it.  Returns the server's representation of the node, and an error, if there is any.
@@ -109,7 +110,7 @@ func (c *nodes) Create(node *v1.Node) (result *v1.Node, err error) {
 	err = c.client.Post().
 		Resource("nodes").
 		Body(node).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -121,7 +122,7 @@ func (c *nodes) Update(node *v1.Node) (result *v1.Node, err error) {
 		Resource("nodes").
 		Name(node.Name).
 		Body(node).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -136,7 +137,7 @@ func (c *nodes) UpdateStatus(node *v1.Node) (result *v1.Node, err error) {
 		Name(node.Name).
 		SubResource("status").
 		Body(node).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -147,7 +148,7 @@ func (c *nodes) Delete(name string, options *metav1.DeleteOptions) error {
 		Resource("nodes").
 		Name(name).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -162,7 +163,7 @@ func (c *nodes) DeleteCollection(options *metav1.DeleteOptions, listOptions meta
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Timeout(timeout).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -174,7 +175,7 @@ func (c *nodes) Patch(name string, pt types.PatchType, data []byte, subresources
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }

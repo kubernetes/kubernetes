@@ -19,6 +19,7 @@ limitations under the License.
 package v1beta1
 
 import (
+	"context"
 	"time"
 
 	v1beta1 "k8s.io/api/extensions/v1beta1"
@@ -74,7 +75,7 @@ func (c *replicaSets) Get(name string, options v1.GetOptions) (result *v1beta1.R
 		Resource("replicasets").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -91,7 +92,7 @@ func (c *replicaSets) List(opts v1.ListOptions) (result *v1beta1.ReplicaSetList,
 		Resource("replicasets").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -108,7 +109,7 @@ func (c *replicaSets) Watch(opts v1.ListOptions) (watch.Interface, error) {
 		Resource("replicasets").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch()
+		Watch(context.TODO())
 }
 
 // Create takes the representation of a replicaSet and creates it.  Returns the server's representation of the replicaSet, and an error, if there is any.
@@ -118,7 +119,7 @@ func (c *replicaSets) Create(replicaSet *v1beta1.ReplicaSet) (result *v1beta1.Re
 		Namespace(c.ns).
 		Resource("replicasets").
 		Body(replicaSet).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -131,7 +132,7 @@ func (c *replicaSets) Update(replicaSet *v1beta1.ReplicaSet) (result *v1beta1.Re
 		Resource("replicasets").
 		Name(replicaSet.Name).
 		Body(replicaSet).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -147,7 +148,7 @@ func (c *replicaSets) UpdateStatus(replicaSet *v1beta1.ReplicaSet) (result *v1be
 		Name(replicaSet.Name).
 		SubResource("status").
 		Body(replicaSet).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -159,7 +160,7 @@ func (c *replicaSets) Delete(name string, options *v1.DeleteOptions) error {
 		Resource("replicasets").
 		Name(name).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -175,7 +176,7 @@ func (c *replicaSets) DeleteCollection(options *v1.DeleteOptions, listOptions v1
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Timeout(timeout).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -188,7 +189,7 @@ func (c *replicaSets) Patch(name string, pt types.PatchType, data []byte, subres
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -202,7 +203,7 @@ func (c *replicaSets) GetScale(replicaSetName string, options v1.GetOptions) (re
 		Name(replicaSetName).
 		SubResource("scale").
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -216,7 +217,7 @@ func (c *replicaSets) UpdateScale(replicaSetName string, scale *v1beta1.Scale) (
 		Name(replicaSetName).
 		SubResource("scale").
 		Body(scale).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }

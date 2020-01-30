@@ -36,7 +36,7 @@ import (
 
 	"github.com/pkg/errors"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 )
@@ -47,8 +47,7 @@ import (
 //    rpc error: code = Unknown desc = Error: No such container: 41a...
 // when the pod gets deleted while streaming.
 func LogsForPod(ctx context.Context, cs clientset.Interface, ns, pod string, opts *v1.PodLogOptions) (io.ReadCloser, error) {
-	req := cs.CoreV1().Pods(ns).GetLogs(pod, opts)
-	return req.Context(ctx).Stream()
+	return cs.CoreV1().Pods(ns).GetLogs(pod, opts).Stream(ctx)
 }
 
 // LogOutput determines where output from CopyAllLogs goes.

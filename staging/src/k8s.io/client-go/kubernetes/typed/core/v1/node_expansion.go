@@ -17,7 +17,9 @@ limitations under the License.
 package v1
 
 import (
-	"k8s.io/api/core/v1"
+	"context"
+
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -37,7 +39,7 @@ func (c *nodes) PatchStatus(nodeName string, data []byte) (*v1.Node, error) {
 		Name(nodeName).
 		SubResource("status").
 		Body(data).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return result, err
 }

@@ -19,6 +19,7 @@ limitations under the License.
 package v1
 
 import (
+	"context"
 	"time"
 
 	v1 "k8s.io/api/apps/v1"
@@ -75,7 +76,7 @@ func (c *replicaSets) Get(name string, options metav1.GetOptions) (result *v1.Re
 		Resource("replicasets").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -92,7 +93,7 @@ func (c *replicaSets) List(opts metav1.ListOptions) (result *v1.ReplicaSetList, 
 		Resource("replicasets").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -109,7 +110,7 @@ func (c *replicaSets) Watch(opts metav1.ListOptions) (watch.Interface, error) {
 		Resource("replicasets").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch()
+		Watch(context.TODO())
 }
 
 // Create takes the representation of a replicaSet and creates it.  Returns the server's representation of the replicaSet, and an error, if there is any.
@@ -119,7 +120,7 @@ func (c *replicaSets) Create(replicaSet *v1.ReplicaSet) (result *v1.ReplicaSet, 
 		Namespace(c.ns).
 		Resource("replicasets").
 		Body(replicaSet).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -132,7 +133,7 @@ func (c *replicaSets) Update(replicaSet *v1.ReplicaSet) (result *v1.ReplicaSet, 
 		Resource("replicasets").
 		Name(replicaSet.Name).
 		Body(replicaSet).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -148,7 +149,7 @@ func (c *replicaSets) UpdateStatus(replicaSet *v1.ReplicaSet) (result *v1.Replic
 		Name(replicaSet.Name).
 		SubResource("status").
 		Body(replicaSet).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -160,7 +161,7 @@ func (c *replicaSets) Delete(name string, options *metav1.DeleteOptions) error {
 		Resource("replicasets").
 		Name(name).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -176,7 +177,7 @@ func (c *replicaSets) DeleteCollection(options *metav1.DeleteOptions, listOption
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Timeout(timeout).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -189,7 +190,7 @@ func (c *replicaSets) Patch(name string, pt types.PatchType, data []byte, subres
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -203,7 +204,7 @@ func (c *replicaSets) GetScale(replicaSetName string, options metav1.GetOptions)
 		Name(replicaSetName).
 		SubResource("scale").
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -217,7 +218,7 @@ func (c *replicaSets) UpdateScale(replicaSetName string, scale *autoscalingv1.Sc
 		Name(replicaSetName).
 		SubResource("scale").
 		Body(scale).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }

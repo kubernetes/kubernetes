@@ -19,6 +19,7 @@ limitations under the License.
 package v1beta1
 
 import (
+	"context"
 	"time"
 
 	v1beta1 "k8s.io/api/storage/v1beta1"
@@ -67,7 +68,7 @@ func (c *storageClasses) Get(name string, options v1.GetOptions) (result *v1beta
 		Resource("storageclasses").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -83,7 +84,7 @@ func (c *storageClasses) List(opts v1.ListOptions) (result *v1beta1.StorageClass
 		Resource("storageclasses").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -99,7 +100,7 @@ func (c *storageClasses) Watch(opts v1.ListOptions) (watch.Interface, error) {
 		Resource("storageclasses").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch()
+		Watch(context.TODO())
 }
 
 // Create takes the representation of a storageClass and creates it.  Returns the server's representation of the storageClass, and an error, if there is any.
@@ -108,7 +109,7 @@ func (c *storageClasses) Create(storageClass *v1beta1.StorageClass) (result *v1b
 	err = c.client.Post().
 		Resource("storageclasses").
 		Body(storageClass).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -120,7 +121,7 @@ func (c *storageClasses) Update(storageClass *v1beta1.StorageClass) (result *v1b
 		Resource("storageclasses").
 		Name(storageClass.Name).
 		Body(storageClass).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -131,7 +132,7 @@ func (c *storageClasses) Delete(name string, options *v1.DeleteOptions) error {
 		Resource("storageclasses").
 		Name(name).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -146,7 +147,7 @@ func (c *storageClasses) DeleteCollection(options *v1.DeleteOptions, listOptions
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Timeout(timeout).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -158,7 +159,7 @@ func (c *storageClasses) Patch(name string, pt types.PatchType, data []byte, sub
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }

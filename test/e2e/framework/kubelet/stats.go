@@ -98,7 +98,7 @@ func ProxyRequest(c clientset.Interface, node, endpoint string, port int) (restc
 			SubResource("proxy").
 			Name(fmt.Sprintf("%v:%v", node, port)).
 			Suffix(endpoint).
-			Do()
+			Do(context.TODO())
 
 		finished <- struct{}{}
 	}()
@@ -220,12 +220,11 @@ func GetStatsSummary(c clientset.Interface, nodeName string) (*kubeletstatsv1alp
 	defer cancel()
 
 	data, err := c.CoreV1().RESTClient().Get().
-		Context(ctx).
 		Resource("nodes").
 		SubResource("proxy").
 		Name(fmt.Sprintf("%v:%v", nodeName, ports.KubeletPort)).
 		Suffix("stats/summary").
-		Do().Raw()
+		Do(ctx).Raw()
 
 	if err != nil {
 		return nil, err
@@ -246,7 +245,7 @@ func getNodeStatsSummary(c clientset.Interface, nodeName string) (*kubeletstatsv
 		Name(fmt.Sprintf("%v:%v", nodeName, ports.KubeletPort)).
 		Suffix("stats/summary").
 		SetHeader("Content-Type", "application/json").
-		Do().Raw()
+		Do(context.TODO()).Raw()
 
 	if err != nil {
 		return nil, err

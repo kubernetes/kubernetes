@@ -17,6 +17,7 @@ limitations under the License.
 package integration
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -164,7 +165,7 @@ func TestTableGet(t *testing.T) {
 				Resource(crd.Spec.Names.Plural).
 				SetHeader("Accept", fmt.Sprintf("application/json;as=Table;v=%s;g=%s, application/json", metav1beta1.SchemeGroupVersion.Version, metav1beta1.GroupName)).
 				VersionedParams(&metav1beta1.TableOptions{}, parameterCodec).
-				Do().
+				Do(context.TODO()).
 				Get()
 			if err != nil {
 				t.Fatalf("failed to list %v resources: %v", gvk, err)
@@ -262,7 +263,7 @@ func TestTableGet(t *testing.T) {
 				Resource(crd.Spec.Names.Plural).
 				SetHeader("Accept", fmt.Sprintf("application/json;as=Table;v=%s;g=%s, application/json", metav1.SchemeGroupVersion.Version, metav1.GroupName)).
 				VersionedParams(&metav1.TableOptions{}, parameterCodec).
-				Do().
+				Do(context.TODO()).
 				Get()
 			if err != nil {
 				t.Fatalf("failed to list %v resources: %v", gvk, err)

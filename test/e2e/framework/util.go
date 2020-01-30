@@ -38,6 +38,7 @@ import (
 	"time"
 
 	"golang.org/x/net/websocket"
+
 	"k8s.io/klog"
 
 	"github.com/onsi/ginkgo"
@@ -1017,7 +1018,7 @@ func getKubeletPods(c clientset.Interface, node string) (*v1.PodList, error) {
 			SubResource("proxy").
 			Name(fmt.Sprintf("%v:%v", node, ports.KubeletPort)).
 			Suffix("pods").
-			Do()
+			Do(context.TODO())
 
 		finished <- struct{}{}
 	}()

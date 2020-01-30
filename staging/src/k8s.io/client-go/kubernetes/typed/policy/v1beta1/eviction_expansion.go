@@ -17,6 +17,8 @@ limitations under the License.
 package v1beta1
 
 import (
+	"context"
+
 	policy "k8s.io/api/policy/v1beta1"
 )
 
@@ -33,6 +35,6 @@ func (c *evictions) Evict(eviction *policy.Eviction) error {
 		Name(eviction.Name).
 		SubResource("eviction").
 		Body(eviction).
-		Do().
+		Do(context.TODO()).
 		Error()
 }

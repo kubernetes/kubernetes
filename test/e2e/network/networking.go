@@ -17,6 +17,7 @@ limitations under the License.
 package network
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -138,7 +139,7 @@ var _ = SIGDescribe("Networking", func() {
 			ginkgo.By(fmt.Sprintf("testing: %s", test.path))
 			data, err := f.ClientSet.CoreV1().RESTClient().Get().
 				AbsPath(test.path).
-				DoRaw()
+				DoRaw(context.TODO())
 			if err != nil {
 				framework.Failf("ginkgo.Failed: %v\nBody: %s", err, string(data))
 			}

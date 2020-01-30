@@ -19,6 +19,7 @@ limitations under the License.
 package v2beta1
 
 import (
+	"context"
 	"time"
 
 	v2beta1 "k8s.io/api/autoscaling/v2beta1"
@@ -71,7 +72,7 @@ func (c *horizontalPodAutoscalers) Get(name string, options v1.GetOptions) (resu
 		Resource("horizontalpodautoscalers").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -88,7 +89,7 @@ func (c *horizontalPodAutoscalers) List(opts v1.ListOptions) (result *v2beta1.Ho
 		Resource("horizontalpodautoscalers").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -105,7 +106,7 @@ func (c *horizontalPodAutoscalers) Watch(opts v1.ListOptions) (watch.Interface, 
 		Resource("horizontalpodautoscalers").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch()
+		Watch(context.TODO())
 }
 
 // Create takes the representation of a horizontalPodAutoscaler and creates it.  Returns the server's representation of the horizontalPodAutoscaler, and an error, if there is any.
@@ -115,7 +116,7 @@ func (c *horizontalPodAutoscalers) Create(horizontalPodAutoscaler *v2beta1.Horiz
 		Namespace(c.ns).
 		Resource("horizontalpodautoscalers").
 		Body(horizontalPodAutoscaler).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -128,7 +129,7 @@ func (c *horizontalPodAutoscalers) Update(horizontalPodAutoscaler *v2beta1.Horiz
 		Resource("horizontalpodautoscalers").
 		Name(horizontalPodAutoscaler.Name).
 		Body(horizontalPodAutoscaler).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -144,7 +145,7 @@ func (c *horizontalPodAutoscalers) UpdateStatus(horizontalPodAutoscaler *v2beta1
 		Name(horizontalPodAutoscaler.Name).
 		SubResource("status").
 		Body(horizontalPodAutoscaler).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -156,7 +157,7 @@ func (c *horizontalPodAutoscalers) Delete(name string, options *v1.DeleteOptions
 		Resource("horizontalpodautoscalers").
 		Name(name).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -172,7 +173,7 @@ func (c *horizontalPodAutoscalers) DeleteCollection(options *v1.DeleteOptions, l
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Timeout(timeout).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -185,7 +186,7 @@ func (c *horizontalPodAutoscalers) Patch(name string, pt types.PatchType, data [
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }

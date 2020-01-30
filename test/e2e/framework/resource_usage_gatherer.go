@@ -294,12 +294,11 @@ func getStatsSummary(c clientset.Interface, nodeName string) (*kubeletstatsv1alp
 	defer cancel()
 
 	data, err := c.CoreV1().RESTClient().Get().
-		Context(ctx).
 		Resource("nodes").
 		SubResource("proxy").
 		Name(fmt.Sprintf("%v:%v", nodeName, ports.KubeletPort)).
 		Suffix("stats/summary").
-		Do().Raw()
+		Do(ctx).Raw()
 
 	if err != nil {
 		return nil, err

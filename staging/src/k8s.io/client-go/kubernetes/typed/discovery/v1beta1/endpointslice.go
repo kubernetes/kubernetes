@@ -19,6 +19,7 @@ limitations under the License.
 package v1beta1
 
 import (
+	"context"
 	"time"
 
 	v1beta1 "k8s.io/api/discovery/v1beta1"
@@ -70,7 +71,7 @@ func (c *endpointSlices) Get(name string, options v1.GetOptions) (result *v1beta
 		Resource("endpointslices").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -87,7 +88,7 @@ func (c *endpointSlices) List(opts v1.ListOptions) (result *v1beta1.EndpointSlic
 		Resource("endpointslices").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -104,7 +105,7 @@ func (c *endpointSlices) Watch(opts v1.ListOptions) (watch.Interface, error) {
 		Resource("endpointslices").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch()
+		Watch(context.TODO())
 }
 
 // Create takes the representation of a endpointSlice and creates it.  Returns the server's representation of the endpointSlice, and an error, if there is any.
@@ -114,7 +115,7 @@ func (c *endpointSlices) Create(endpointSlice *v1beta1.EndpointSlice) (result *v
 		Namespace(c.ns).
 		Resource("endpointslices").
 		Body(endpointSlice).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -127,7 +128,7 @@ func (c *endpointSlices) Update(endpointSlice *v1beta1.EndpointSlice) (result *v
 		Resource("endpointslices").
 		Name(endpointSlice.Name).
 		Body(endpointSlice).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -139,7 +140,7 @@ func (c *endpointSlices) Delete(name string, options *v1.DeleteOptions) error {
 		Resource("endpointslices").
 		Name(name).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -155,7 +156,7 @@ func (c *endpointSlices) DeleteCollection(options *v1.DeleteOptions, listOptions
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Timeout(timeout).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -168,7 +169,7 @@ func (c *endpointSlices) Patch(name string, pt types.PatchType, data []byte, sub
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
