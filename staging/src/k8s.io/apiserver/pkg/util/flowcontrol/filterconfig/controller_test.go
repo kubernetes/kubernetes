@@ -72,7 +72,6 @@ type ctlTestState struct {
 	existingPLs map[string]*fcv1a1.PriorityLevelConfiguration
 	existingFSs map[string]*fcv1a1.FlowSchema
 	tracer      *fcv1a1.FlowSchema
-	ftrs        map[string]*fsTestingRecord
 	lock        sync.Mutex
 	queues      map[string]*ctlTestQueueSet
 }
@@ -230,7 +229,7 @@ func (cfgCtl *configController) copyState() (priorityLevelStates map[string]*pri
 
 func (cts *ctlTestState) establishAPIObjects(trialStep string, traceValue int32, newPLs map[string]*fcv1a1.PriorityLevelConfiguration, newFSs map[string]*fcv1a1.FlowSchema) {
 	plIfc := cts.fcIfc.PriorityLevelConfigurations()
-	for plName, _ := range cts.existingPLs {
+	for plName := range cts.existingPLs {
 		if newPLs[plName] == nil {
 			err := plIfc.Delete(plName, nil)
 			if err == nil {
@@ -266,7 +265,7 @@ func (cts *ctlTestState) establishAPIObjects(trialStep string, traceValue int32,
 	cts.existingPLs = newExistingPLs
 
 	fsIfc := cts.fcIfc.FlowSchemas()
-	for fsName, _ := range cts.existingFSs {
+	for fsName := range cts.existingFSs {
 		if newFSs[fsName] == nil {
 			err := fsIfc.Delete(fsName, nil)
 			if err == nil {

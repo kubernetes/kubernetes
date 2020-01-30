@@ -525,26 +525,6 @@ func genNonResourceRule(rng *rand.Rand, pfx string, matchAllNonResources, someMa
 	return nrr, matchingRIs, skippingRIs
 }
 
-type stringp struct {
-	s string
-	p float32
-}
-
-func pickString(rng *rand.Rand, choices ...stringp) string {
-	var sum float32
-	for _, sp := range choices {
-		sum += sp.p
-	}
-	x := rng.Float32() * sum
-	for _, sp := range choices {
-		x -= sp.p
-		if x <= 0 {
-			return sp.s
-		}
-	}
-	return choices[len(choices)-1].s
-}
-
 func pickSetString(rng *rand.Rand, set sets.String) string {
 	i, n := 0, rng.Intn(len(set))
 	for s := range set {
