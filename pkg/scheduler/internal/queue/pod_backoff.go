@@ -21,12 +21,14 @@ import (
 	"time"
 
 	ktypes "k8s.io/apimachinery/pkg/types"
+	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 // PodBackoffMap is a structure that stores backoff related information for pods
 type PodBackoffMap struct {
 	// lock for performing actions on this PodBackoffMap
-	lock sync.RWMutex
+	lock  sync.RWMutex
+	clock util.Clock
 	// initial backoff duration
 	initialDuration time.Duration
 	// maximal backoff duration
@@ -38,8 +40,9 @@ type PodBackoffMap struct {
 }
 
 // NewPodBackoffMap creates a PodBackoffMap with initial duration and max duration.
-func NewPodBackoffMap(initialDuration, maxDuration time.Duration) *PodBackoffMap {
+func NewPodBackoffMap(initialDuration, maxDuration time.Duration, clock util.Clock) *PodBackoffMap {
 	return &PodBackoffMap{
+		clock:             clock,
 		initialDuration:   initialDuration,
 		maxDuration:       maxDuration,
 		podAttempts:       make(map[ktypes.NamespacedName]int),
@@ -91,12 +94,16 @@ func (pbm *PodBackoffMap) ClearPodBackoff(nsPod ktypes.NamespacedName) {
 
 // CleanupPodsCompletesBackingoff execute garbage collection on the pod backoff,
 // i.e, it will remove a pod from the PodBackoffMap if
-// lastUpdateTime + maxBackoffDuration is before the current timestamp
+// lastUpdateTime + maxDuration >> timestamp
+// We should wait longer than the maxDuration so that the pod gets a chance to
+// (1) move to the active queue and (2) get an schedule attempt.
 func (pbm *PodBackoffMap) CleanupPodsCompletesBackingoff() {
 	pbm.lock.Lock()
 	defer pbm.lock.Unlock()
 	for pod, value := range pbm.podLastUpdateTime {
-		if value.Add(pbm.maxDuration).Before(time.Now()) {
+		// Here we assume that maxDuration should be enough for a pod to move up the
+		// active queue and get an schedule attempt.
+		if value.Add(2 * pbm.maxDuration).Before(pbm.clock.Now()) {
 			pbm.clearPodBackoff(pod)
 		}
 	}
@@ -106,7 +113,7 @@ func (pbm *PodBackoffMap) CleanupPodsCompletesBackingoff() {
 // and increases its numberOfAttempts by 1
 func (pbm *PodBackoffMap) BackoffPod(nsPod ktypes.NamespacedName) {
 	pbm.lock.Lock()
-	pbm.podLastUpdateTime[nsPod] = time.Now()
+	pbm.podLastUpdateTime[nsPod] = pbm.clock.Now()
 	pbm.podAttempts[nsPod]++
 	pbm.lock.Unlock()
 }
