@@ -20,7 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -387,7 +387,7 @@ func (p *csiPlugin) NewMounter(
 
 	// Save volume info in pod dir
 	dir := mounter.GetPath()
-	dataDir := path.Dir(dir) // dropoff /mount at end
+	dataDir := filepath.Dir(dir) // dropoff /mount at end
 
 	if err := os.MkdirAll(dataDir, 0750); err != nil {
 		return nil, errors.New(log("failed to create dir %#v:  %v", dataDir, err))
@@ -438,7 +438,7 @@ func (p *csiPlugin) NewUnmounter(specName string, podUID types.UID) (volume.Unmo
 
 	// load volume info from file
 	dir := unmounter.GetPath()
-	dataDir := path.Dir(dir) // dropoff /mount at end
+	dataDir := filepath.Dir(dir) // dropoff /mount at end
 	data, err := loadVolumeData(dataDir, volDataFileName)
 	if err != nil {
 		return nil, errors.New(log("unmounter failed to load volume data file [%s]: %v", dir, err))
