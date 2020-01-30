@@ -291,6 +291,8 @@ func New(client clientset.Interface,
 		nodeInfoSnapshot:               snapshot,
 	}
 
+	metrics.Register()
+
 	var sched *Scheduler
 	source := options.schedulerAlgorithmSource
 	switch {
@@ -322,7 +324,6 @@ func New(client clientset.Interface,
 	default:
 		return nil, fmt.Errorf("unsupported algorithm source: %v", source)
 	}
-	metrics.Register()
 	// Additional tweaks to the config produced by the configurator.
 	sched.Recorder = recorder
 	sched.DisablePreemption = options.disablePreemption

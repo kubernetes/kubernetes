@@ -56,10 +56,13 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		}, []string{"result"})
 	// PodScheduleSuccesses counts how many pods were scheduled.
+	// This metric will be initialized again in Register() to assure the metric is not no-op metric.
 	PodScheduleSuccesses = scheduleAttempts.With(metrics.Labels{"result": "scheduled"})
 	// PodScheduleFailures counts how many pods could not be scheduled.
+	// This metric will be initialized again in Register() to assure the metric is not no-op metric.
 	PodScheduleFailures = scheduleAttempts.With(metrics.Labels{"result": "unschedulable"})
 	// PodScheduleErrors counts how many pods could not be scheduled due to a scheduler error.
+	// This metric will be initialized again in Register() to assure the metric is not no-op metric.
 	PodScheduleErrors            = scheduleAttempts.With(metrics.Labels{"result": "error"})
 	DeprecatedSchedulingDuration = metrics.NewSummaryVec(
 		&metrics.SummaryOpts{
@@ -262,6 +265,9 @@ func Register() {
 			legacyregistry.MustRegister(metric)
 		}
 		volumeschedulingmetrics.RegisterVolumeSchedulingMetrics()
+		PodScheduleSuccesses = scheduleAttempts.With(metrics.Labels{"result": "scheduled"})
+		PodScheduleFailures = scheduleAttempts.With(metrics.Labels{"result": "unschedulable"})
+		PodScheduleErrors = scheduleAttempts.With(metrics.Labels{"result": "error"})
 	})
 }
 
