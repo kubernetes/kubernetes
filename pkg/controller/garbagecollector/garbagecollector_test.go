@@ -910,7 +910,7 @@ func expectSyncNotBlocked(fakeDiscoveryClient *fakeServerResources, workerLock *
 	workerLockAcquired := make(chan struct{})
 	go func() {
 		workerLock.Lock()
-		workerLock.Unlock()
+		defer workerLock.Unlock()
 		close(workerLockAcquired)
 	}()
 	select {
