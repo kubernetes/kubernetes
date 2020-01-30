@@ -242,6 +242,7 @@ func New(client clientset.Interface,
 	recorder events.EventRecorder,
 	stopCh <-chan struct{},
 	opts ...Option) (*Scheduler, error) {
+	metrics.Register()
 
 	stopEverything := stopCh
 	if stopEverything == nil {
@@ -322,7 +323,6 @@ func New(client clientset.Interface,
 	default:
 		return nil, fmt.Errorf("unsupported algorithm source: %v", source)
 	}
-	metrics.Register()
 	// Additional tweaks to the config produced by the configurator.
 	sched.Recorder = recorder
 	sched.DisablePreemption = options.disablePreemption
