@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -206,15 +207,18 @@ func readServiceAccountV1OrDie(objBytes []byte) *v1.ServiceAccount {
 	return requiredObj.(*v1.ServiceAccount)
 }
 
-// numberOfResources returns the number of resources advertised by a node.
-func numberOfResources(node *v1.Node, resourceKey string) int64 {
-	val, ok := node.Status.Capacity[v1.ResourceName(resourceKey)]
-
-	if !ok {
-		return 0
+func findSRIOVResource(node *v1.Node) (string, int64) {
+	re := regexp.MustCompile(`^intel.com/.*sriov.*`)
+	for key, val := range node.Status.Capacity {
+		resource := string(key)
+		if re.MatchString(resource) {
+			v := val.Value()
+			if v > 0 {
+				return resource, v
+			}
+		}
 	}
-
-	return val.Value()
+	return "", 0
 }
 
 func deletePodInNamespace(f *framework.Framework, namespace, name string) {
@@ -464,14 +468,14 @@ func runTopologyManagerPolicySuiteTests(f *framework.Framework) {
 	waitForContainerRemoval(pod2.Spec.Containers[0].Name, pod2.Name, pod2.Namespace)
 }
 
-func runTopologyManagerNodeAlignmentSinglePodTest(f *framework.Framework, numaNodes int) {
+func runTopologyManagerNodeAlignmentSinglePodTest(f *framework.Framework, sriovResourceName string, numaNodes int) {
 	ginkgo.By("allocate aligned resources for a single pod")
 	ctnAttrs := []tmCtnAttribute{
 		{
 			ctnName:     "gu-container",
 			cpuRequest:  "1000m",
 			cpuLimit:    "1000m",
-			devResource: SRIOVResourceName,
+			devResource: sriovResourceName,
 		},
 	}
 
@@ -510,15 +514,18 @@ func runTopologyManagerNodeAlignmentSuiteTests(f *framework.Framework, numaNodes
 	dpPod, err := f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Create(context.TODO(), dp, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
+	sriovResourceName := ""
+	var sriovResourceAmount int64
 	ginkgo.By("Waiting for devices to become available on the local node")
 	gomega.Eventually(func() bool {
 		node := getLocalNode(f)
 		framework.Logf("Node status: %v", node.Status.Capacity)
-		return numberOfResources(node, SRIOVResourceName) > 0
+		sriovResourceName, sriovResourceAmount = findSRIOVResource(node)
+		return sriovResourceAmount > 0
 	}, 5*time.Minute, framework.Poll).Should(gomega.BeTrue())
-	framework.Logf("Successfully created device plugin pod")
+	framework.Logf("Successfully created device plugin pod, detected SRIOV device %q", sriovResourceName)
 
-	runTopologyManagerNodeAlignmentSinglePodTest(f, numaNodes)
+	runTopologyManagerNodeAlignmentSinglePodTest(f, sriovResourceName, numaNodes)
 
 	framework.Logf("deleting the SRIOV device plugin pod %s/%s and waiting for container %s removal",
 		dpPod.Namespace, dpPod.Name, dpPod.Spec.Containers[0].Name)

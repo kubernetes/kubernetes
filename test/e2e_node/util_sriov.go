@@ -17,8 +17,6 @@ limitations under the License.
 package e2enode
 
 const (
-	// SRIOVResourceName is the name of the example resource which is used in the e2e test
-	SRIOVResourceName = "intel.com/intel_sriov_netdevice" // TODO make it configurable
 	// SRIOVDevicePluginCMYAML is the path of the config map to configure the sriov device plugin.
 	SRIOVDevicePluginCMYAML = "test/e2e_node/testing-manifests/sriovdp-cm.yaml"
 	// SRIOVDevicePluginDSYAML is the path of the daemonset template of the sriov device plugin. // TODO: Parametrize it by making it a feature in TestFramework.
