@@ -315,6 +315,7 @@ func assembleStats(msg []byte) (SvcStats, error) {
 func assembleService(attrs []syscall.NetlinkRouteAttr) (*Service, error) {
 
 	var s Service
+	var addressBytes []byte
 
 	for _, attr := range attrs {
 
@@ -327,11 +328,7 @@ func assembleService(attrs []syscall.NetlinkRouteAttr) (*Service, error) {
 		case ipvsSvcAttrProtocol:
 			s.Protocol = native.Uint16(attr.Value)
 		case ipvsSvcAttrAddress:
-			ip, err := parseIP(attr.Value, s.AddressFamily)
-			if err != nil {
-				return nil, err
-			}
-			s.Address = ip
+			addressBytes = attr.Value
 		case ipvsSvcAttrPort:
 			s.Port = binary.BigEndian.Uint16(attr.Value)
 		case ipvsSvcAttrFWMark:
@@ -353,6 +350,16 @@ func assembleService(attrs []syscall.NetlinkRouteAttr) (*Service, error) {
 		}
 
 	}
+
+	// parse Address after parse AddressFamily incase of parseIP error
+	if addressBytes != nil {
+		ip, err := parseIP(addressBytes, s.AddressFamily)
+		if err != nil {
+			return nil, err
+		}
+		s.Address = ip
+	}
+
 	return &s, nil
 }
 
@@ -416,18 +423,18 @@ func (i *Handle) doCmdWithoutAttr(cmd uint8) ([][]byte, error) {
 func assembleDestination(attrs []syscall.NetlinkRouteAttr) (*Destination, error) {
 
 	var d Destination
+	var addressBytes []byte
 
 	for _, attr := range attrs {
 
 		attrType := int(attr.Attr.Type)
 
 		switch attrType {
+
+		case ipvsDestAttrAddressFamily:
+			d.AddressFamily = native.Uint16(attr.Value)
 		case ipvsDestAttrAddress:
-			ip, err := parseIP(attr.Value, syscall.AF_INET)
-			if err != nil {
-				return nil, err
-			}
-			d.Address = ip
+			addressBytes = attr.Value
 		case ipvsDestAttrPort:
 			d.Port = binary.BigEndian.Uint16(attr.Value)
 		case ipvsDestAttrForwardingMethod:
@@ -438,8 +445,6 @@ func assembleDestination(attrs []syscall.NetlinkRouteAttr) (*Destination, error)
 			d.UpperThreshold = native.Uint32(attr.Value)
 		case ipvsDestAttrLowerThreshold:
 			d.LowerThreshold = native.Uint32(attr.Value)
-		case ipvsDestAttrAddressFamily:
-			d.AddressFamily = native.Uint16(attr.Value)
 		case ipvsDestAttrActiveConnections:
 			d.ActiveConnections = int(native.Uint16(attr.Value))
 		case ipvsDestAttrInactiveConnections:
@@ -452,6 +457,16 @@ func assembleDestination(attrs []syscall.NetlinkRouteAttr) (*Destination, error)
 			d.Stats = DstStats(stats)
 		}
 	}
+
+	// parse Address after parse AddressFamily incase of parseIP error
+	if addressBytes != nil {
+		ip, err := parseIP(addressBytes, d.AddressFamily)
+		if err != nil {
+			return nil, err
+		}
+		d.Address = ip
+	}
+
 	return &d, nil
 }
 
