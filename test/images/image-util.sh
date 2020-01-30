@@ -133,6 +133,8 @@ push() {
 
   # The manifest command is still experimental as of Docker 18.09.2
   export DOCKER_CLI_EXPERIMENTAL="enabled"
+  # reset manifest list; needed in case multiple images are being built / pushed.
+  manifest=()
   # Make archs list into image manifest. Eg: 'amd64 ppc64le' to '${REGISTRY}/${image}-amd64:${TAG} ${REGISTRY}/${image}-ppc64le:${TAG}'
   while IFS='' read -r line; do manifest+=("$line"); done < <(echo "$archs" | ${SED} -e "s~[^ ]*~$REGISTRY\/$image\-&:$TAG~g")
   docker manifest create --amend "${REGISTRY}/${image}:${TAG}" "${manifest[@]}"
