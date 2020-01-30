@@ -51,7 +51,7 @@ func ServiceIPRange(passedServiceClusterIPRange net.IPNet, passedAPIServiceClust
 			return net.IPNet{}, net.IP{}, err
 		}
 	} else if !serviceClusterIPRange.Contains(passedAPIServiceClusterIP) {
-		return net.IPNet{}, net.IP{}, fmt.Errorf("the service cluster IP must be in the range of %s", serviceClusterIPRange)
+		return net.IPNet{}, net.IP{}, fmt.Errorf("the service cluster IP address must be in the range of %s", serviceClusterIPRange)
 	}
 	klog.V(4).Infof("Setting service IP to %q (read-write).", passedAPIServiceClusterIP)
 

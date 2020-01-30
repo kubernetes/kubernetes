@@ -17,25 +17,30 @@ limitations under the License.
 package app
 
 import (
+	"net"
 	"testing"
 )
 
 func TestGetServiceIPAndRanges(t *testing.T) {
 	tests := []struct {
-		body                    string
-		apiServerServiceIP      string
-		primaryServiceIPRange   string
-		secondaryServiceIPRange string
-		expectedError           bool
+		kubernetesServiceClusterIP net.IP
+		serviceClusterIPRanges     string
+		apiServerServiceIP         string
+		primaryServiceIPRange      string
+		secondaryServiceIPRange    string
+		expectedError              bool
 	}{
-		{"", "10.0.0.1", "10.0.0.0/24", "<nil>", false},
-		{"192.0.2.1/24", "192.0.2.1", "192.0.2.0/24", "<nil>", false},
-		{"192.0.2.1/24,192.168.128.0/17", "192.0.2.1", "192.0.2.0/24", "192.168.128.0/17", false},
-		{"192.0.2.1/30,192.168.128.0/17", "<nil>", "<nil>", "<nil>", true},
+		{nil, "", "10.0.0.1", "10.0.0.0/24", "<nil>", false},
+		{nil, "192.0.2.1/24", "192.0.2.1", "192.0.2.0/24", "<nil>", false},
+		{net.ParseIP("192.0.2.4"), "192.0.2.1/24", "192.0.2.4", "192.0.2.0/24", "<nil>", false},
+		{net.ParseIP("192.1.2.2"), "192.0.2.1/24", "<nil>", "<nil>", "<nil>", true},
+		{nil, "192.0.2.1/24,192.168.128.0/17", "192.0.2.1", "192.0.2.0/24", "192.168.128.0/17", false},
+		{net.ParseIP("192.0.2.5"), "192.0.2.1/24,192.168.128.0/17", "192.0.2.5", "192.0.2.0/24", "192.168.128.0/17", false},
+		{nil, "192.0.2.1/30,192.168.128.0/17", "<nil>", "<nil>", "<nil>", true},
 	}
 
 	for _, test := range tests {
-		apiServerServiceIP, primaryServiceIPRange, secondaryServiceIPRange, err := getServiceIPAndRanges(test.body)
+		apiServerServiceIP, primaryServiceIPRange, secondaryServiceIPRange, err := getServiceIPAndRanges(test.kubernetesServiceClusterIP, test.serviceClusterIPRanges)
 
 		if apiServerServiceIP.String() != test.apiServerServiceIP {
 			t.Errorf("expected apiServerServiceIP: %s, got: %s", test.apiServerServiceIP, apiServerServiceIP.String())
@@ -50,7 +55,7 @@ func TestGetServiceIPAndRanges(t *testing.T) {
 		}
 
 		if (err == nil) == test.expectedError {
-			t.Errorf("expected err to be: %t, but it was %t", test.expectedError, !test.expectedError)
+			t.Errorf("expected err to be: %t, but it was %t, %v", test.expectedError, !test.expectedError, err)
 		}
 	}
 }

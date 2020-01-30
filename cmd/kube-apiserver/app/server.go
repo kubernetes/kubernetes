@@ -317,7 +317,7 @@ func CreateKubeAPIServerConfig(
 			Tunneler: nodeTunneler,
 
 			ServiceIPRange:          s.PrimaryServiceClusterIPRange,
-			APIServerServiceIP:      s.APIServerServiceIP,
+			APIServerServiceIP:      s.KubernetesServiceClusterIP,
 			SecondaryServiceIPRange: s.SecondaryServiceClusterIPRange,
 
 			APIServerServicePort: 443,
@@ -557,12 +557,12 @@ func Complete(s *options.ServerRunOptions) (completedServerRunOptions, error) {
 	var err error
 	// process s.ServiceClusterIPRange from list to Primary and Secondary
 	// we process secondary only if provided by user
-	s.APIServerServiceIP, s.PrimaryServiceClusterIPRange, s.SecondaryServiceClusterIPRange, err = getServiceIPAndRanges(s.KubernetesServiceClusterIP, s.ServiceClusterIPRanges)
+	s.KubernetesServiceClusterIP, s.PrimaryServiceClusterIPRange, s.SecondaryServiceClusterIPRange, err = getServiceIPAndRanges(s.KubernetesServiceClusterIP, s.ServiceClusterIPRanges)
 	if err != nil {
 		return options, err
 	}
 
-	if err := s.SecureServing.MaybeDefaultWithSelfSignedCerts(s.GenericServerRunOptions.AdvertiseAddress.String(), []string{"kubernetes.default.svc", "kubernetes.default", "kubernetes"}, []net.IP{s.APIServerServiceIP}); err != nil {
+	if err := s.SecureServing.MaybeDefaultWithSelfSignedCerts(s.GenericServerRunOptions.AdvertiseAddress.String(), []string{"kubernetes.default.svc", "kubernetes.default", "kubernetes"}, []net.IP{s.KubernetesServiceClusterIP}); err != nil {
 		return options, fmt.Errorf("error creating self-signed certificates: %v", err)
 	}
 
@@ -667,23 +667,15 @@ func buildServiceResolver(enabledAggregatorRouting bool, hostname string, inform
 	return serviceResolver
 }
 
-func getServiceIPAndRanges(kubernetesServiceClusterIP, serviceClusterIPRanges string) (net.IP, net.IPNet, net.IPNet, error) {
+func getServiceIPAndRanges(apiServerServiceIP net.IP, serviceClusterIPRanges string) (net.IP, net.IPNet, net.IPNet, error) {
 	serviceClusterIPRangeList := []string{}
 	if serviceClusterIPRanges != "" {
 		serviceClusterIPRangeList = strings.Split(serviceClusterIPRanges, ",")
 	}
 
-	var apiServerServiceIP net.IP
 	var primaryServiceIPRange net.IPNet
 	var secondaryServiceIPRange net.IPNet
 	var err error
-
-	if kubernetesServiceClusterIP != "" {
-		apiServerServiceIP = net.ParseIP(kubernetesServiceClusterIP)
-		if apiServerServiceIP == nil {
-			return net.IP{}, net.IPNet{}, net.IPNet{}, fmt.Errorf("kubernetes-service-cluster-ip %s is not a valid IP", kubernetesServiceClusterIP)
-		}
-	}
 
 	// nothing provided by user, use default range (only applies to the Primary)
 	if len(serviceClusterIPRangeList) == 0 {
@@ -715,9 +707,9 @@ func getServiceIPAndRanges(kubernetesServiceClusterIP, serviceClusterIPRanges st
 			return net.IP{}, net.IPNet{}, net.IPNet{}, fmt.Errorf("service-cluster-ip-range[1] is not an ip net")
 		}
 		secondaryServiceIPRange = *secondaryServiceClusterCIDR
-		secondaryServiceIPRange, _, err = master.ServiceIPRange(secondaryServiceIPRange, apiServerServiceIP)
+		secondaryServiceIPRange, _, err = master.ServiceIPRange(secondaryServiceIPRange, nil)
 		if err != nil {
-			return net.IP{}, net.IPNet{}, net.IPNet{}, fmt.Errorf("error determining service IP ranges for secondary service cidr: %v", err)
+			return net.IP{}, net.IPNet{}, net.IPNet{}, fmt.Errorf("error determining service IP ranges for secondary service CIDR: %v", err)
 		}
 	}
 	return apiServerServiceIP, primaryServiceIPRange, secondaryServiceIPRange, nil

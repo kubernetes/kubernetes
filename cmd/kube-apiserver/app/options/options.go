@@ -55,7 +55,7 @@ type ServerRunOptions struct {
 	EventTTL                   time.Duration
 	KubeletConfig              kubeletclient.KubeletClientConfig
 	KubernetesServiceNodePort  int
-	KubernetesServiceClusterIP string
+	KubernetesServiceClusterIP net.IP
 	MaxConnectionBytesPerSec   int64
 	// ServiceClusterIPRange is mapped to input provided by user
 	ServiceClusterIPRanges string
@@ -63,8 +63,6 @@ type ServerRunOptions struct {
 	// of parsing ServiceClusterIPRange into actual values
 	PrimaryServiceClusterIPRange   net.IPNet
 	SecondaryServiceClusterIPRange net.IPNet
-	// APIServerServiceIP is the result of parsing KubernetesServiceClusterIP
-	APIServerServiceIP net.IP
 
 	ServiceNodePortRange utilnet.PortRange
 	SSHKeyfile           string
@@ -198,9 +196,9 @@ func (s *ServerRunOptions) Flags() (fss cliflag.NamedFlagSets) {
 		"of type NodePort, using this as the value of the port. If zero, the Kubernetes master "+
 		"service will be of type ClusterIP.")
 
-	fs.StringVar(&s.KubernetesServiceClusterIP, "kubernetes-service-cluster-ip", s.KubernetesServiceClusterIP, ""+
-		"If non-empty, the Kubernetes master service (which apiserver creates/maintains) will use "+
-		"the IP as cluster-internal ip. If empty, it will be service cluster ip range base + 1.")
+	fs.IPVar(&s.KubernetesServiceClusterIP, "kubernetes-service-cluster-ip", s.KubernetesServiceClusterIP, ""+
+		"If non-empty, the Kubernetes master service (which apiserver creates/maintains) will use the "+
+		"IP address as cluster-internal IP address. If empty, it will be the service cluster IP range base + 1.")
 
 	// TODO (khenidak) change documentation as we move IPv6DualStack feature from ALPHA to BETA
 	fs.StringVar(&s.ServiceClusterIPRanges, "service-cluster-ip-range", s.ServiceClusterIPRanges, ""+
