@@ -18,6 +18,7 @@ package podtopologyspread
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -1227,23 +1228,27 @@ func TestSingleConstraint(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			snapshot := cache.NewSnapshot(tt.existingPods, tt.nodes)
-			p := &PodTopologySpread{sharedLister: snapshot}
-			state := framework.NewCycleState()
-			preFilterStatus := p.PreFilter(context.Background(), state, tt.pod)
-			if !preFilterStatus.IsSuccess() {
-				t.Errorf("preFilter failed with status: %v", preFilterStatus)
-			}
-
-			for _, node := range tt.nodes {
-				nodeInfo, _ := snapshot.NodeInfos().Get(node.Name)
-				status := p.Filter(context.Background(), state, tt.pod, nodeInfo)
-				if status.IsSuccess() != tt.fits[node.Name] {
-					t.Errorf("[%s]: expected %v got %v", node.Name, tt.fits[node.Name], status.IsSuccess())
+		for _, runPreFilter := range []bool{true, false} {
+			t.Run(fmt.Sprintf("%v (runPreFilter=%v)", tt.name, runPreFilter), func(t *testing.T) {
+				snapshot := cache.NewSnapshot(tt.existingPods, tt.nodes)
+				p := &PodTopologySpread{sharedLister: snapshot}
+				state := framework.NewCycleState()
+				if runPreFilter {
+					preFilterStatus := p.PreFilter(context.Background(), state, tt.pod)
+					if !preFilterStatus.IsSuccess() {
+						t.Errorf("preFilter failed with status: %v", preFilterStatus)
+					}
 				}
-			}
-		})
+
+				for _, node := range tt.nodes {
+					nodeInfo, _ := snapshot.NodeInfos().Get(node.Name)
+					status := p.Filter(context.Background(), state, tt.pod, nodeInfo)
+					if status.IsSuccess() != tt.fits[node.Name] {
+						t.Errorf("[%s]: expected %v got %v", node.Name, tt.fits[node.Name], status.IsSuccess())
+					}
+				}
+			})
+		}
 	}
 }
 
@@ -1427,22 +1432,26 @@ func TestMultipleConstraints(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			snapshot := cache.NewSnapshot(tt.existingPods, tt.nodes)
-			p := &PodTopologySpread{sharedLister: snapshot}
-			state := framework.NewCycleState()
-			preFilterStatus := p.PreFilter(context.Background(), state, tt.pod)
-			if !preFilterStatus.IsSuccess() {
-				t.Errorf("preFilter failed with status: %v", preFilterStatus)
-			}
-
-			for _, node := range tt.nodes {
-				nodeInfo, _ := snapshot.NodeInfos().Get(node.Name)
-				status := p.Filter(context.Background(), state, tt.pod, nodeInfo)
-				if status.IsSuccess() != tt.fits[node.Name] {
-					t.Errorf("[%s]: expected %v got %v", node.Name, tt.fits[node.Name], status.IsSuccess())
+		for _, runPreFilter := range []bool{true, false} {
+			t.Run(fmt.Sprintf("%v (runPreFilter=%v)", tt.name, runPreFilter), func(t *testing.T) {
+				snapshot := cache.NewSnapshot(tt.existingPods, tt.nodes)
+				p := &PodTopologySpread{sharedLister: snapshot}
+				state := framework.NewCycleState()
+				if runPreFilter {
+					preFilterStatus := p.PreFilter(context.Background(), state, tt.pod)
+					if !preFilterStatus.IsSuccess() {
+						t.Errorf("preFilter failed with status: %v", preFilterStatus)
+					}
 				}
-			}
-		})
+
+				for _, node := range tt.nodes {
+					nodeInfo, _ := snapshot.NodeInfos().Get(node.Name)
+					status := p.Filter(context.Background(), state, tt.pod, nodeInfo)
+					if status.IsSuccess() != tt.fits[node.Name] {
+						t.Errorf("[%s]: expected %v got %v", node.Name, tt.fits[node.Name], status.IsSuccess())
+					}
+				}
+			})
+		}
 	}
 }

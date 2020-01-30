@@ -280,6 +280,78 @@ func calPreFilterState(pod *v1.Pod, allNodes []*schedulernodeinfo.NodeInfo) (*pr
 	return &s, nil
 }
 
+// fit checks if pod is a good fit on the given node.
+func (pl *PodTopologySpread) fit(pod *v1.Pod, nodeInfo *nodeinfo.NodeInfo) *framework.Status {
+	constraints, err := filterTopologySpreadConstraints(pod.Spec.TopologySpreadConstraints, v1.DoNotSchedule)
+	if err != nil {
+		return framework.NewStatus(framework.Error, err.Error())
+	}
+
+	podLabelSet := labels.Set(pod.Labels)
+	for _, c := range constraints {
+		// The node won't be a fit if it doesn't have c.topologyKey present.
+		tpKey := c.topologyKey
+		tpVal, ok := nodeInfo.Node().Labels[tpKey]
+		if !ok {
+			klog.V(5).Infof("node '%s' doesn't have required label '%s'", nodeInfo.Node().Name, tpKey)
+			return framework.NewStatus(framework.Unschedulable, ErrReasonConstraintsNotMatch)
+		}
+
+		tpPairToMatchNum := make(map[topologyPair]int32)
+		// Iterate through all nodes.
+		nodeInfos, _ := pl.sharedLister.NodeInfos().List()
+		for _, nodeInfo := range nodeInfos {
+			// (1) Ensure the node matches the incoming Pod's node selector/affinity, if specified.
+			if !pluginhelper.PodMatchesNodeSelectorAndAffinityTerms(pod, nodeInfo.Node()) {
+				continue
+			}
+			// (2) Ensure the node has c.topologyKey present.
+			tpVal, ok := nodeInfo.Node().Labels[tpKey]
+			if !ok {
+				continue
+			}
+			// (3) Check each existingPod on current node:
+			// (3.1) If it matches, add 1 to tpPairToMatchNum[topologyPair].
+			// (3.2) In the end, check if tpPairToMatchNum[topologyPair] is instantiated or not.
+			// If not, instantiate it with value 0 to indicate the topologyPair is legit.
+			pair := topologyPair{key: tpKey, value: tpVal}
+			for _, existingPod := range nodeInfo.Pods() {
+				if existingPod.Namespace != pod.Namespace {
+					continue
+				}
+				if c.selector.Matches(labels.Set(existingPod.Labels)) {
+					tpPairToMatchNum[pair]++
+				}
+			}
+			if _, ok := tpPairToMatchNum[pair]; !ok {
+				tpPairToMatchNum[pair] = 0
+			}
+		}
+
+		// Update global minMatchNum.
+		var minMatchNum int32 = math.MaxInt32
+		for _, num := range tpPairToMatchNum {
+			if minMatchNum > num {
+				minMatchNum = num
+			}
+		}
+
+		// Verify if it violates the following criteria:
+		// 'existing matching num' + 'if self-match (1 or 0)' - 'global min matching num' <= 'maxSkew'
+		pair := topologyPair{key: tpKey, value: tpVal}
+		matchNum := tpPairToMatchNum[pair]
+		selfMatchNum := int32(0)
+		if c.selector.Matches(podLabelSet) {
+			selfMatchNum = 1
+		}
+		skew := matchNum + selfMatchNum - minMatchNum
+		if skew > c.maxSkew {
+			return framework.NewStatus(framework.Unschedulable, ErrReasonConstraintsNotMatch)
+		}
+	}
+	return nil
+}
+
 // Filter invoked at the filter extension point.
 func (pl *PodTopologySpread) Filter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodeInfo *nodeinfo.NodeInfo) *framework.Status {
 	node := nodeInfo.Node()
@@ -291,10 +363,9 @@ func (pl *PodTopologySpread) Filter(ctx context.Context, cycleState *framework.C
 	if err != nil {
 		return framework.NewStatus(framework.Error, err.Error())
 	}
-	// nil preFilterState is illegal.
+	// nil preFilterState has to go through a brute-forced slow path.
 	if s == nil {
-		// TODO(autoscaler): get it implemented.
-		return framework.NewStatus(framework.Error, "preFilterState not pre-computed for PodTopologySpread Plugin")
+		return pl.fit(pod, nodeInfo)
 	}
 
 	// However, "empty" preFilterState is legit which tolerates every toSchedule Pod.
@@ -305,7 +376,7 @@ func (pl *PodTopologySpread) Filter(ctx context.Context, cycleState *framework.C
 	podLabelSet := labels.Set(pod.Labels)
 	for _, c := range s.constraints {
 		tpKey := c.topologyKey
-		tpVal, ok := node.Labels[c.topologyKey]
+		tpVal, ok := node.Labels[tpKey]
 		if !ok {
 			klog.V(5).Infof("node '%s' doesn't have required label '%s'", node.Name, tpKey)
 			return framework.NewStatus(framework.Unschedulable, ErrReasonConstraintsNotMatch)
