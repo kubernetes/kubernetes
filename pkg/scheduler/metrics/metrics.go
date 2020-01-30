@@ -60,10 +60,13 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		}, []string{"result"})
 	// PodScheduleSuccesses counts how many pods were scheduled.
+	// This metric will be initialized again in Register() to assure the metric is not no-op metric.
 	PodScheduleSuccesses = scheduleAttempts.With(prometheus.Labels{"result": "scheduled"})
 	// PodScheduleFailures counts how many pods could not be scheduled.
+	// This metric will be initialized again in Register() to assure the metric is not no-op metric.
 	PodScheduleFailures = scheduleAttempts.With(prometheus.Labels{"result": "unschedulable"})
 	// PodScheduleErrors counts how many pods could not be scheduled due to a scheduler error.
+	// This metric will be initialized again in Register() to assure the metric is not no-op metric.
 	PodScheduleErrors = scheduleAttempts.With(prometheus.Labels{"result": "error"})
 	SchedulingLatency = metrics.NewSummaryVec(
 		&metrics.SummaryOpts{
@@ -252,6 +255,9 @@ func Register() {
 			legacyregistry.MustRegister(metric)
 		}
 		volumescheduling.RegisterVolumeSchedulingMetrics()
+		PodScheduleSuccesses = scheduleAttempts.With(prometheus.Labels{"result": "scheduled"})
+		PodScheduleFailures = scheduleAttempts.With(prometheus.Labels{"result": "unschedulable"})
+		PodScheduleErrors = scheduleAttempts.With(prometheus.Labels{"result": "error"})
 	})
 }
 
