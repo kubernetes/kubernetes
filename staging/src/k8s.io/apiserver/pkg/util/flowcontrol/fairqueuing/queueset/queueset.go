@@ -18,6 +18,7 @@ package queueset
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"sync"
 	"time"
@@ -280,11 +281,9 @@ func (qs *queueSet) StartRequest(ctx context.Context, hashValue uint64, descr1, 
 		go func() {
 			defer runtime.HandleCrash()
 			qs.goroutineDoneOrBlocked()
-			select {
-			case <-doneCh:
-				klog.V(6).Infof("QS(%s): Context of request %#+v %#+v is Done", qs.qCfg.Name, descr1, descr2)
-				qs.cancelWait(req)
-			}
+			_ = <-doneCh
+			klog.V(6).Infof("QS(%s): Context of request %#+v %#+v is Done", qs.qCfg.Name, descr1, descr2)
+			qs.cancelWait(req)
 			qs.goroutineDoneOrBlocked()
 		}()
 	}
@@ -299,7 +298,7 @@ func (req *request) Wait() (bool, bool, func() (idle bool)) {
 	if req.waitStarted {
 		// This can not happen, because the client is forbidden to
 		// call Wait twice on the same request
-		panic(*req)
+		panic(fmt.Sprintf("Multiple calls to the Wait method, QueueSet=%s, startTime=%s, descr1=%#+v, descr2=%#+v", req.qs.qCfg.Name, req.startTime, req.descr1, req.descr2))
 	}
 	req.waitStarted = true
 
@@ -311,7 +310,7 @@ func (req *request) Wait() (bool, bool, func() (idle bool)) {
 	qs.syncTimeLocked()
 	decision, isDecision := decisionAny.(requestDecision)
 	if !isDecision {
-		klog.Errorf("QS(%s): Impossible decision %#+v (of type %T) for request %#+v %#+v", qs.qCfg.Name, decisionAny, decisionAny, req.descr1, req.descr2)
+		panic(fmt.Sprintf("QS(%s): Impossible decision %#+v (of type %T) for request %#+v %#+v", qs.qCfg.Name, decisionAny, decisionAny, req.descr1, req.descr2))
 		decision = decisionExecute // yeah, this is a no-op
 	}
 	switch decision {

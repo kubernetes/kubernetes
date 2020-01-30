@@ -32,11 +32,7 @@ func TestMatching(t *testing.T) {
 	for i := 0; i < 300; i++ {
 		rng := rand.New(rand.NewSource(int64(rngOuter.Uint64())))
 		t.Run(fmt.Sprintf("trial%d:", i), func(t *testing.T) {
-			ftr, valid := genFS(t, rng, fmt.Sprintf("fs%d", i), rng.Float32() < 0.2, goodPLNames, badPLNames)
-			if !valid {
-				t.Logf("Not testing invalid %#+v", fcfmt.Fmt(ftr.fs))
-				return
-			}
+			ftr, _ := genFS(t, rng, fmt.Sprintf("fs%d", i), rng.Float32() < 0.2, goodPLNames, badPLNames)
 			for _, digest := range append(ftr.matchingRDigests, ftr.matchingNDigests...) {
 				a := matchesFlowSchema(digest, ftr.fs)
 				if !a {
@@ -60,11 +56,8 @@ func TestPolicyRules(t *testing.T) {
 		t.Run(fmt.Sprintf("trial%d:", i), func(t *testing.T) {
 			r := rng.Float32()
 			n := rng.Float32()
-			policyRule, valid, matchingRDigests, matchingNDigests, skippingRDigests, skippingNDigests := genPolicyRuleWithSubjects(t, rng, fmt.Sprintf("t%d", i), rng.Float32() < 0.2, r < 0.10, n < 0.10, r < 0.05, n < 0.05)
-			t.Logf("policyRule=%#+v, valid=%v, mrd=%#+v, mnd=%#+v, srd=%#+v, snd=%#+v", fcfmt.Fmt(policyRule), valid, matchingRDigests, matchingNDigests, skippingRDigests, skippingNDigests)
-			if !valid {
-				return
-			}
+			policyRule, matchingRDigests, matchingNDigests, skippingRDigests, skippingNDigests := genPolicyRuleWithSubjects(t, rng, fmt.Sprintf("t%d", i), rng.Float32() < 0.2, r < 0.10, n < 0.10, r < 0.05, n < 0.05)
+			t.Logf("policyRule=%#+v, mrd=%#+v, mnd=%#+v, srd=%#+v, snd=%#+v", fcfmt.Fmt(policyRule), matchingRDigests, matchingNDigests, skippingRDigests, skippingNDigests)
 			for _, digest := range append(matchingRDigests, matchingNDigests...) {
 				if !matchesPolicyRule(digest, &policyRule) {
 					t.Logf("Expected %#+v to match %#+v but it did not", fcfmt.Fmt(policyRule), digest)

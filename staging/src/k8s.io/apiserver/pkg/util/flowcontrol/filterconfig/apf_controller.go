@@ -61,6 +61,11 @@ import (
 // undesired becomes completely unused, all the config objects are
 // read and processed as a whole.
 
+// To support synchronization in testing, the controller keeps track
+// of the latest priority level referenced by a FlowSchema of this
+// name.
+const tracerName = "tracer.kube-system"
+
 // Controller maintains eventual consistency with the API objects that
 // configure API Priority and Fairness, and provides a procedural
 // interface to the configured behavior.
@@ -119,8 +124,17 @@ type configController struct {
 	// requestWaitLimit comes from server configuration.
 	requestWaitLimit time.Duration
 
-	// This must be locked while accessing flowSchemas or priorityLevelStates
+	// This must be locked while accessing flowSchemas or
+	// priorityLevelStates.  It is the lock involved in
+	// LockingWriteMultiple.
 	lock sync.Mutex
+
+	// tracedValue holds the latest MatchingPrecedence from a
+	// FlowSchema with the tracer name.
+	tracedValue int32
+
+	// this condition is broadcast whenever tracedValue changes
+	traceCond sync.Cond
 
 	// flowSchemas holds the flow schema objects, sorted by increasing
 	// numerical (decreasing logical) matching precedence.  Every
@@ -194,6 +208,7 @@ func NewTestableController(
 		flowcontrolClient:      flowcontrolClient,
 		priorityLevelStates:    make(map[string]*priorityLevelState),
 	}
+	cfgCtl.traceCond = *sync.NewCond(&cfgCtl.lock)
 	klog.V(2).Infof("NewTestableController with serverConcurrencyLimit=%d, requestWaitLimit=%s", serverConcurrencyLimit, requestWaitLimit)
 	cfgCtl.initializeConfigController(informerFactory)
 	cfgCtl.digestConfigObjects(nil, nil)
@@ -251,6 +266,12 @@ func (cfgCtl *configController) initializeConfigController(informerFactory kubei
 			cfgCtl.configQueue.Add(0)
 
 		}})
+}
+
+func (cfgCtl *configController) hasWork() bool {
+	cfgCtl.lock.Lock()
+	defer cfgCtl.lock.Unlock()
+	return cfgCtl.configQueue.Len() != 0
 }
 
 func (cfgCtl *configController) Run(stopCh <-chan struct{}) error {
@@ -436,6 +457,9 @@ func (meal *cfgMeal) digestFlowSchemasLocked(newFSs []*fctypesv1a1.FlowSchema) {
 			panic(fmt.Sprintf("Given two FlowSchema objects with the same name: %#+v and %#+v", fcfmt.Fmt(otherFS), fcfmt.Fmt(fs)))
 		}
 		fsMap[fs.Name] = fs
+		if fs.Name == tracerName {
+			meal.cfgCtl.setTracedValueLocked(fs.Spec.MatchingPrecedence)
+		}
 		_, goodPriorityRef := meal.newPLStates[fs.Spec.PriorityLevelConfiguration.Name]
 
 		// Ensure the object's status reflects whether its priority
@@ -703,4 +727,20 @@ func (cfgCtl *configController) maybeReapLocked(plName string, plState *priority
 	}
 	klog.V(3).Infof("Triggered API Priority and Fairness config reload because priority level %s became idle", plName)
 	cfgCtl.configQueue.Add(0)
+}
+
+func (cfgCtl *configController) setTracedValueLocked(val int32) {
+	klog.V(4).Infof("Setting traced value to %v", val)
+	cfgCtl.tracedValue = val
+	cfgCtl.traceCond.Broadcast()
+}
+
+func (cfgCtl *configController) waitForTracedValue(val int32) {
+	cfgCtl.lock.Lock()
+	defer cfgCtl.lock.Unlock()
+	for cfgCtl.tracedValue < val {
+		klog.V(4).Infof("Waiting for traced reference to reach %v", val)
+		cfgCtl.traceCond.Wait()
+	}
+	klog.V(4).Infof("Traced reference became %v", cfgCtl.tracedValue)
 }

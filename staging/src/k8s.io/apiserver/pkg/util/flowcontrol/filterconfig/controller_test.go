@@ -21,16 +21,21 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"sync"
 	"testing"
 	"time"
 
 	fcv1a1 "k8s.io/api/flowcontrol/v1alpha1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
 	fcboot "k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap"
+	fq "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing"
 	fcfmt "k8s.io/apiserver/pkg/util/flowcontrol/format"
 	"k8s.io/client-go/informers"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
+	fcclient "k8s.io/client-go/kubernetes/typed/flowcontrol/v1alpha1"
 	"k8s.io/klog"
 )
 
@@ -60,9 +65,68 @@ var mandFSs = func() map[string]*fcv1a1.FlowSchema {
 	return ans
 }()
 
+type ctlTestState struct {
+	t           *testing.T
+	cfgCtl      *configController
+	fcIfc       fcclient.FlowcontrolV1alpha1Interface
+	existingPLs map[string]*fcv1a1.PriorityLevelConfiguration
+	existingFSs map[string]*fcv1a1.FlowSchema
+	tracer      *fcv1a1.FlowSchema
+	ftrs        map[string]*fsTestingRecord
+	lock        sync.Mutex
+	queues      map[string]*ctlTestQueueSet
+}
+
+var _ fq.QueueSetFactory = (*ctlTestState)(nil)
+
+type ctlTestQueueSetCompleter struct {
+	cts *ctlTestState
+	qc  fq.QueuingConfig
+}
+
+type ctlTestQueueSet struct {
+	cts *ctlTestState
+	qc  fq.QueuingConfig
+	dc  fq.DispatchingConfig
+}
+
+type ctlTestRequest struct {
+	cts            *ctlTestState
+	qsName         string
+	descr1, descr2 interface{}
+}
+
+func (cts *ctlTestState) BeginConstruction(qc fq.QueuingConfig) (fq.QueueSetCompleter, error) {
+	return ctlTestQueueSetCompleter{cts, qc}, nil
+}
+
+func (cqs *ctlTestQueueSet) BeginConfigChange(qc fq.QueuingConfig) (fq.QueueSetCompleter, error) {
+	return ctlTestQueueSetCompleter{cqs.cts, qc}, nil
+}
+
+func (cqc ctlTestQueueSetCompleter) Complete(dc fq.DispatchingConfig) fq.QueueSet {
+	cqc.cts.lock.Lock()
+	defer cqc.cts.lock.Unlock()
+	qs := &ctlTestQueueSet{cqc.cts, cqc.qc, dc}
+	cqc.cts.queues[cqc.qc.Name] = qs
+	return qs
+}
+
+func (cqs *ctlTestQueueSet) IsIdle() bool {
+	return false
+}
+
+func (cqs *ctlTestQueueSet) StartRequest(ctx context.Context, hashValue uint64, descr1, descr2 interface{}) (req fq.Request, idle bool) {
+	return &ctlTestRequest{cqs.cts, cqs.qc.Name, descr1, descr2}, false
+}
+
+func (ctr *ctlTestRequest) Wait() (execute, idle bool, afterExecution func() (idle bool)) {
+	return true, false, func() (idle bool) { return false }
+}
+
 func TestDigestConfig(t *testing.T) {
 	rngOuter := rand.New(rand.NewSource(1234567890123456789))
-	for i := 1; i <= 20; i++ {
+	for i := 1; i <= 10; i++ {
 		rng := rand.New(rand.NewSource(int64(rngOuter.Uint64())))
 		t.Run(fmt.Sprintf("trial%d:", i), func(t *testing.T) {
 			clientset := clientsetfake.NewSimpleClientset()
@@ -75,40 +139,52 @@ func TestDigestConfig(t *testing.T) {
 				time.Minute, // request wait limit
 				noRestraintQSF,
 			).(*configController)
+			cts := &ctlTestState{t: t,
+				cfgCtl:      ctl,
+				fcIfc:       flowcontrolClient,
+				existingFSs: map[string]*fcv1a1.FlowSchema{},
+				existingPLs: map[string]*fcv1a1.PriorityLevelConfiguration{},
+			}
+			stopCh := make(chan struct{})
+			// informerFactory.Start(stopCh)
+			go informerFactory.Flowcontrol().V1alpha1().FlowSchemas().Informer().Run(stopCh)
+			go informerFactory.Flowcontrol().V1alpha1().PriorityLevelConfigurations().Informer().Run(stopCh)
+			go ctl.Run(stopCh)
 			oldPLStates := map[string]*priorityLevelState{}
-			trialName := fmt.Sprintf("trial%d-0", i)
-			_, newGoodPLMap, newGoodPLNames, newBadPLNames := genPLs(rng, trialName, sets.NewString(), 0)
-			_, newGoodFSMap, newFSDigestses := genFSs(t, rng, trialName, newGoodPLNames, newBadPLNames, 0)
+			trialStep := fmt.Sprintf("trial%d-0", i)
+			_, newGoodPLMap, newGoodPLNames, newBadPLNames := genPLs(rng, trialStep, sets.NewString(), 0)
+			_, newFSMap, newGoodFSMap, newFSDigestses := genFSs(t, rng, trialStep, newGoodPLNames, newBadPLNames, 0)
 			for j := 0; ; {
-				t.Logf("For %s, newGoodPLNames=%#+v", trialName, newGoodPLNames)
-				t.Logf("For %s, newGoodFSMap=%#+v", trialName, newGoodFSMap)
+				t.Logf("For %s, newGoodPLNames=%#+v", trialStep, newGoodPLNames)
+				t.Logf("For %s, newGoodFSMap=%#+v", trialStep, newGoodFSMap)
 				// Check that the latest digestion did the right thing
 				expectedPLNames := newGoodPLNames.Union(sets.StringKeySet(oldPLStates))
 				expectedPLNames = expectedPLNames.Union(sets.StringKeySet(mandPLs))
-				if e, a := expectedPLNames, sets.StringKeySet(ctl.priorityLevelStates); !e.Equal(a) {
-					t.Errorf("Fail at %s: e=%v, a=%v", trialName, e, a)
+				priorityLevelStates, fss := ctl.copyState()
+				if e, a := expectedPLNames, sets.StringKeySet(priorityLevelStates); !e.Equal(a) {
+					t.Errorf("Fail at %s: e=%v, a=%v", trialStep, e, a)
 				}
 				for plName := range expectedPLNames {
-					plState := ctl.priorityLevelStates[plName]
-					checkNewPLState(t, trialName, plName, plState, oldPLStates, newGoodPLMap)
+					plState := priorityLevelStates[plName]
+					checkNewPLState(t, trialStep, plName, plState, oldPLStates, newGoodPLMap)
 				}
 				testFSNames := sets.StringKeySet(newGoodFSMap).Union(sets.StringKeySet(mandFSs))
-				for _, fs := range ctl.flowSchemas {
-					checkNewFS(t, ctl, trialName, fs, newGoodFSMap, newFSDigestses[fs.Name])
+				for _, fs := range fss {
+					checkNewFS(t, ctl, trialStep, fs, newGoodFSMap, newFSDigestses[fs.Name])
 					testFSNames.Delete(fs.Name)
 				}
 				if len(testFSNames) > 0 {
-					t.Errorf("Fail at %s: ctl did not retain FlowSchemas %#+v", trialName, testFSNames)
+					t.Errorf("Fail at %s: ctl did not retain FlowSchemas %#+v", trialStep, testFSNames)
 				}
 
 				j++
-				if j > 20 {
+				if j > 10 {
 					break
 				}
 
 				// Calculate expected survivors
 				nextPLStates := map[string]*priorityLevelState{}
-				for oldPLName, oldPLState := range ctl.priorityLevelStates {
+				for oldPLName, oldPLState := range priorityLevelStates {
 					if mandPLs[oldPLName] != nil || oldPLState.queues != nil && !(oldPLState.quiescing && oldPLState.queues.IsIdle()) {
 						oldState := *oldPLState
 						nextPLStates[oldPLName] = &oldState
@@ -117,23 +193,147 @@ func TestDigestConfig(t *testing.T) {
 				oldPLStates = nextPLStates
 
 				// Now create a new config and digest it
-				trialName = fmt.Sprintf("trial%d-%d", i, j)
+				trialStep = fmt.Sprintf("trial%d-%d", i, j)
 				var newPLs []*fcv1a1.PriorityLevelConfiguration
 				var newFSs []*fcv1a1.FlowSchema
-				newPLs, newGoodPLMap, newGoodPLNames, newBadPLNames = genPLs(rng, trialName, expectedPLNames, 1+rng.Intn(4))
-				newFSs, newGoodFSMap, newFSDigestses = genFSs(t, rng, trialName, newGoodPLNames, newBadPLNames, 1+rng.Intn(6))
+				newPLs, newGoodPLMap, newGoodPLNames, newBadPLNames = genPLs(rng, trialStep, expectedPLNames, 1+rng.Intn(4))
+				newFSs, newFSMap, newGoodFSMap, newFSDigestses = genFSs(t, rng, trialStep, newGoodPLNames, newBadPLNames, 1+rng.Intn(6))
 
-				for _, newPL := range newPLs {
-					t.Logf("For %s, digesting newPL=%#+v", trialName, fcfmt.Fmt(newPL))
+				if true {
+					cts.establishAPIObjects(trialStep, int32(i*10+j), newGoodPLMap, newFSMap)
+				} else {
+					for _, newPL := range newPLs {
+						t.Logf("For %s, digesting newPL=%#+v", trialStep, fcfmt.Fmt(newPL))
+					}
+					for _, newFS := range newFSs {
+						t.Logf("For %s, digesting newFS=%#+v", trialStep, fcfmt.Fmt(newFS))
+					}
+					ctl.digestConfigObjects(newPLs, newFSs)
 				}
-				for _, newFS := range newFSs {
-					t.Logf("For %s, digesting newFS=%#+v", trialName, fcfmt.Fmt(newFS))
-				}
-
-				ctl.digestConfigObjects(newPLs, newFSs)
 			}
+			close(stopCh)
 		})
 	}
+}
+
+func (cfgCtl *configController) copyState() (priorityLevelStates map[string]*priorityLevelState, fss []*fcv1a1.FlowSchema) {
+	cfgCtl.lock.Lock()
+	defer cfgCtl.lock.Unlock()
+	fss = append(fss, cfgCtl.flowSchemas...)
+	priorityLevelStates = make(map[string]*priorityLevelState, len(cfgCtl.priorityLevelStates))
+	for k, v := range cfgCtl.priorityLevelStates {
+		priorityLevelStates[k] = v
+	}
+	klog.V(7).Infof("Copied state pls=%#+v, fss=%#+v", priorityLevelStates, fss)
+	return
+}
+
+func (cts *ctlTestState) establishAPIObjects(trialStep string, traceValue int32, newPLs map[string]*fcv1a1.PriorityLevelConfiguration, newFSs map[string]*fcv1a1.FlowSchema) {
+	plIfc := cts.fcIfc.PriorityLevelConfigurations()
+	for plName, _ := range cts.existingPLs {
+		if newPLs[plName] == nil {
+			err := plIfc.Delete(plName, nil)
+			if err == nil {
+				cts.t.Logf("%s: deleted undesired PriorityLevelConfiguration %s", trialStep, plName)
+			} else {
+				cts.t.Errorf("%s: failed to delete undesired PriorityLevelConfiguration %s: %s", trialStep, plName, err.Error())
+			}
+		}
+	}
+	newExistingPLs := map[string]*fcv1a1.PriorityLevelConfiguration{}
+	for plName, pl := range newPLs {
+		oldPL := cts.existingPLs[plName]
+		if oldPL != nil {
+			modPL := oldPL.DeepCopy()
+			modPL.Spec = pl.Spec
+			retPL, err := plIfc.Update(modPL)
+			if err == nil {
+				cts.t.Logf("%s: updated PriorityLevelConfiguration %#+v", trialStep, fcfmt.Fmt(modPL))
+			} else {
+				cts.t.Errorf("%s: failed to update PriorityLevelConfiguration %#+v: %s", trialStep, fcfmt.Fmt(modPL), err.Error())
+			}
+			newExistingPLs[plName] = retPL
+		} else {
+			retPL, err := plIfc.Create(pl)
+			if err == nil {
+				cts.t.Logf("%s: created PriorityLevelConfiguration %#+v", trialStep, fcfmt.Fmt(pl))
+			} else {
+				cts.t.Errorf("%s: failed to create PriorityLevelConfiguration %#+v: %s", trialStep, fcfmt.Fmt(pl), err.Error())
+			}
+			newExistingPLs[plName] = retPL
+		}
+	}
+	cts.existingPLs = newExistingPLs
+
+	fsIfc := cts.fcIfc.FlowSchemas()
+	for fsName, _ := range cts.existingFSs {
+		if newFSs[fsName] == nil {
+			err := fsIfc.Delete(fsName, nil)
+			if err == nil {
+				cts.t.Logf("%s: deleted undesired FlowSchema %s", trialStep, fsName)
+			} else {
+				cts.t.Errorf("%s: failed to delete undesired FlowSchema %s: %s", trialStep, fsName, err.Error())
+			}
+		}
+	}
+	newExistingFSs := map[string]*fcv1a1.FlowSchema{}
+	for fsName, fs := range newFSs {
+		oldFS := cts.existingFSs[fsName]
+		if oldFS != nil {
+			modFS := oldFS.DeepCopy()
+			modFS.Spec = fs.Spec
+			retFS, err := fsIfc.Update(modFS)
+			if err == nil {
+				cts.t.Logf("%s: updated FlowSchema %#+v", trialStep, fcfmt.Fmt(modFS))
+			} else {
+				cts.t.Errorf("%s: failed to update FlowSchema %#+v: %s", trialStep, fcfmt.Fmt(modFS), err.Error())
+			}
+			newExistingFSs[fsName] = retFS
+		} else {
+			retFS, err := fsIfc.Create(fs)
+			if err == nil {
+				cts.t.Logf("%s: created FlowSchema %#+v", trialStep, fcfmt.Fmt(fs))
+			} else {
+				cts.t.Errorf("%s: failed to create FlowSchema %#+v: %s", trialStep, fcfmt.Fmt(fs), err.Error())
+			}
+			newExistingFSs[fsName] = retFS
+		}
+	}
+	cts.existingFSs = newExistingFSs
+
+	// Now we have to wait for all those changes to be processed.
+	time.Sleep(500 * time.Millisecond)
+	// Wait for the controller to think it has nothing to do
+	wait.PollImmediate(250*time.Millisecond, 2*time.Second, func() (bool, error) {
+		return !cts.cfgCtl.hasWork(), nil
+	})
+	// Fire a tracer
+	var err error
+	if cts.tracer == nil {
+		cts.tracer, err = fsIfc.Create(&fcv1a1.FlowSchema{
+			ObjectMeta: metav1.ObjectMeta{Name: tracerName},
+			Spec: fcv1a1.FlowSchemaSpec{
+				PriorityLevelConfiguration: fcv1a1.PriorityLevelConfigurationReference{"exempt"},
+				MatchingPrecedence:         traceValue},
+			Status: fcv1a1.FlowSchemaStatus{
+				Conditions: []fcv1a1.FlowSchemaCondition{{
+					Type:   fcv1a1.FlowSchemaConditionDangling,
+					Status: fcv1a1.ConditionFalse}},
+			}})
+	} else {
+		t2 := cts.tracer.DeepCopy()
+		t2.Spec.MatchingPrecedence = traceValue
+		cts.tracer, err = fsIfc.Update(t2)
+	}
+	if err != nil {
+		panic(err)
+	}
+	cts.t.Logf("Created tracer %#+v", fcfmt.Fmt(cts.tracer))
+	if false {
+		return
+	}
+	// Wait for it to be processed
+	cts.cfgCtl.waitForTracedValue(traceValue)
 }
 
 func checkNewPLState(t *testing.T, trialName, plName string, plState *priorityLevelState, oldPLStates map[string]*priorityLevelState, newGoodPLMap map[string]*fcv1a1.PriorityLevelConfiguration) {
@@ -163,8 +363,8 @@ func checkNewPLState(t *testing.T, trialName, plName string, plState *priorityLe
 		t.Errorf("Fail at %s/%s: missing new priorityLevelState", trialName, plName)
 		return
 	}
-	if e, a := *expectedSpec, plState.config; e != a {
-		t.Errorf("Fail at %s/%s: e=%#+v, a=%#+v", trialName, plName, e, a)
+	if e, a := *expectedSpec, plState.config; !apiequality.Semantic.DeepEqual(e, a) {
+		t.Errorf("Fail at %s/%s: e=%#+v, a=%#+v", trialName, plName, fcfmt.Fmt(e), fcfmt.Fmt(a))
 	}
 	isExempt := expectedSpec.Type == fcv1a1.PriorityLevelEnablementExempt
 	if e, a := isExempt, (plState.qsCompleter == nil); e != a {
@@ -187,6 +387,9 @@ func checkNewPLState(t *testing.T, trialName, plName string, plState *priorityLe
 }
 
 func checkNewFS(t *testing.T, ctl *configController, trialName string, fs *fcv1a1.FlowSchema, newGoodFSMap map[string]*fcv1a1.FlowSchema, digests *flowSchemaDigests) {
+	if fs.Name == tracerName {
+		return
+	}
 	orig := newGoodFSMap[fs.Name]
 	for _, mfs := range fcboot.MandatoryFlowSchemas {
 		if fs.Name == mfs.Name {
@@ -242,40 +445,29 @@ func checkNewFS(t *testing.T, ctl *configController, trialName string, fs *fcv1a
 	}
 }
 
-func genPLs(rng *rand.Rand, trial string, oldPLNames sets.String, n int) (pls []*fcv1a1.PriorityLevelConfiguration, goodPLs map[string]*fcv1a1.PriorityLevelConfiguration, goodNames, badNames sets.String) {
+func genPLs(rng *rand.Rand, trial string, oldPLNames sets.String, n int) (pls []*fcv1a1.PriorityLevelConfiguration, plMap map[string]*fcv1a1.PriorityLevelConfiguration, goodNames, badNames sets.String) {
 	pls = make([]*fcv1a1.PriorityLevelConfiguration, 0, n)
-	goodPLs = make(map[string]*fcv1a1.PriorityLevelConfiguration, n)
+	plMap = make(map[string]*fcv1a1.PriorityLevelConfiguration, n)
 	goodNames = sets.NewString()
-	badNames = sets.NewString()
+	badNames = sets.NewString(trial+"-nopl1", trial+"-nopl2")
 	addGood := func(pl *fcv1a1.PriorityLevelConfiguration) {
-		goodPLs[pl.Name] = pl
-		goodNames.Insert(pl.Name)
 		pls = append(pls, pl)
+		plMap[pl.Name] = pl
+		goodNames.Insert(pl.Name)
 	}
 	for i := 1; i <= n; i++ {
-		pl, valid := genPL(rng, fmt.Sprintf("%s-pl%d", trial, i))
-		if valid {
-			addGood(pl)
-		} else {
-			badNames.Insert(pl.Name)
-			pls = append(pls, pl)
-		}
+		pl := genPL(rng, fmt.Sprintf("%s-pl%d", trial, i))
+		addGood(pl)
 	}
 	for oldPLName := range oldPLNames {
 		if _, has := mandPLs[oldPLName]; has {
 			continue
 		}
 		if rng.Float32() < 0.67 {
-			pl, valid := genPL(rng, oldPLName)
-			if valid {
-				addGood(pl)
-			} else {
-				badNames.Insert(pl.Name)
-				pls = append(pls, pl)
-			}
+			pl := genPL(rng, oldPLName)
+			addGood(pl)
 		}
 	}
-	badNames.Insert(trial + "-nopl")
 	for _, pl := range mandPLs {
 		if n == 0 || rng.Float32() < 0.5 && !(goodNames.Has(pl.Name) || badNames.Has(pl.Name)) {
 			addGood(pl)
@@ -284,24 +476,30 @@ func genPLs(rng *rand.Rand, trial string, oldPLNames sets.String, n int) (pls []
 	return
 }
 
-func genFSs(t *testing.T, rng *rand.Rand, trial string, goodPLNames, badPLNames sets.String, n int) (newFSs []*fcv1a1.FlowSchema, newGoodFSMap map[string]*fcv1a1.FlowSchema, newFSDigestses map[string]*flowSchemaDigests) {
+func genFSs(t *testing.T, rng *rand.Rand, trial string, goodPLNames, badPLNames sets.String, n int) (newFSs []*fcv1a1.FlowSchema, newFSMap, newGoodFSMap map[string]*fcv1a1.FlowSchema, newFSDigestses map[string]*flowSchemaDigests) {
+	newFSMap = map[string]*fcv1a1.FlowSchema{}
 	newGoodFSMap = map[string]*fcv1a1.FlowSchema{}
 	newFSDigestses = map[string]*flowSchemaDigests{}
-	addGood := func(fs *fcv1a1.FlowSchema, matches, mismatches []RequestDigest) {
+	add := func(fs *fcv1a1.FlowSchema) {
 		newFSs = append(newFSs, fs)
+		newFSMap[fs.Name] = fs
+	}
+	addGood := func(fs *fcv1a1.FlowSchema, matches, mismatches []RequestDigest) {
+		add(fs)
 		newGoodFSMap[fs.Name] = fs
 		newFSDigestses[fs.Name] = &flowSchemaDigests{matches: matches, mismatches: mismatches}
-		t.Logf("For trial %s, adding good FlowSchema %#+v", trial, fs)
+		t.Logf("For trial %s, adding good FlowSchema %#+v", trial, fcfmt.Fmt(fs))
 	}
 	if n == 0 || rng.Float32() < 0.5 {
 		addGood(fcboot.MandatoryFlowSchemaCatchAll, nil, nil)
 	}
 	for i := 1; i <= n; i++ {
-		ftr, valid := genFS(t, rng, fmt.Sprintf("%s-fs%d", trial, i), false, goodPLNames, badPLNames)
-		if valid {
+		ftr, wellFormed := genFS(t, rng, fmt.Sprintf("%s-fs%d", trial, i), false, goodPLNames, badPLNames)
+		if wellFormed {
 			addGood(ftr.fs, append(ftr.matchingRDigests, ftr.matchingNDigests...), append(ftr.skippingRDigests, ftr.skippingNDigests...))
 		} else {
-			newFSs = append(newFSs, ftr.fs)
+			add(ftr.fs)
+			t.Logf("For trial %s, adding bad FlowSchema %#+v", trial, fcfmt.Fmt(ftr.fs))
 		}
 	}
 	if n == 0 || rng.Float32() < 0.5 {

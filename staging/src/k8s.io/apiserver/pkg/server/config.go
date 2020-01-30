@@ -612,9 +612,9 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		}
 	}
 
-	requestManagerConfigControllerHookName := "apiserver/request-management-config-controller"
-	if feature.DefaultFeatureGate.Enabled(features.APIPriorityAndFairness) && !s.isPostStartHookRegistered(requestManagerConfigControllerHookName) {
-		err := s.AddPostStartHook(requestManagerConfigControllerHookName, func(context PostStartHookContext) error {
+	const priorityAndFairnessConfigConsumerHookName = "priority-and-fairness-config-consumer"
+	if feature.DefaultFeatureGate.Enabled(features.APIPriorityAndFairness) && !s.isPostStartHookRegistered(priorityAndFairnessConfigConsumerHookName) {
+		err := s.AddPostStartHook(priorityAndFairnessConfigConsumerHookName, func(context PostStartHookContext) error {
 			go c.FlowControl.Run(context.StopCh)
 			return nil
 		})

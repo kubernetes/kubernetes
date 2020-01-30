@@ -21,10 +21,8 @@ import (
 	"net/http"
 	"runtime"
 
-	// TODO: decide whether to use the existing metrics, which
-	// categorize according to mutating vs readonly, or make new
-	// metrics because this filter does not pay attention to that
-	// distinction
+	// TODO: decide whether to also generate the old metrics, which
+	// categorize according to mutating vs readonly.
 
 	// "k8s.io/apiserver/pkg/endpoints/metrics"
 
