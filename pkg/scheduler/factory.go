@@ -25,8 +25,9 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
@@ -169,20 +170,17 @@ func (c *Configurator) create(extenders []core.SchedulerExtender) (*Scheduler, e
 // createFromProvider creates a scheduler from the name of a registered algorithm provider.
 func (c *Configurator) createFromProvider(providerName string) (*Scheduler, error) {
 	klog.V(2).Infof("Creating scheduler from algorithm provider '%v'", providerName)
-	r := algorithmprovider.NewRegistry(int64(c.hardPodAffinitySymmetricWeight))
-	provider, exist := r[providerName]
+	r := algorithmprovider.NewRegistry()
+	defaultPlugins, exist := r[providerName]
 	if !exist {
 		return nil, fmt.Errorf("algorithm provider %q is not registered", providerName)
 	}
 
 	// Combine the provided plugins with the ones from component config.
-	var defaultPlugins schedulerapi.Plugins
-	defaultPlugins.Append(provider.FrameworkPlugins)
 	defaultPlugins.Apply(c.plugins)
-	c.plugins = &defaultPlugins
+	c.plugins = defaultPlugins
 
-	var pluginConfig []schedulerapi.PluginConfig
-	pluginConfig = append(pluginConfig, provider.FrameworkPluginConfig...)
+	pluginConfig := []schedulerapi.PluginConfig{c.interPodAffinityPluginConfig()}
 	pluginConfig = append(pluginConfig, c.pluginConfig...)
 	c.pluginConfig = pluginConfig
 
@@ -268,12 +266,8 @@ func (c *Configurator) createFromConfig(policy schedulerapi.Policy) (*Scheduler,
 
 	klog.V(2).Infof("Creating scheduler with fit predicates '%v' and priority functions '%v'", predicateKeys, priorityKeys)
 
-	if c.hardPodAffinitySymmetricWeight < 1 || c.hardPodAffinitySymmetricWeight > 100 {
-		return nil, fmt.Errorf("invalid hardPodAffinitySymmetricWeight: %d, must be in the range 1-100", c.hardPodAffinitySymmetricWeight)
-	}
-
 	args.InterPodAffinityArgs = &interpodaffinity.Args{
-		HardPodAffinityWeight: c.hardPodAffinitySymmetricWeight,
+		HardPodAffinityWeight: &c.hardPodAffinitySymmetricWeight,
 	}
 
 	pluginsForPredicates, pluginConfigForPredicates, err := getPredicateConfigs(predicateKeys, lr, args)
@@ -310,6 +304,15 @@ func (c *Configurator) createFromConfig(policy schedulerapi.Policy) (*Scheduler,
 	c.pluginConfig = pluginConfig
 
 	return c.create(extenders)
+}
+
+func (c *Configurator) interPodAffinityPluginConfig() schedulerapi.PluginConfig {
+	return schedulerapi.PluginConfig{
+		Name: interpodaffinity.Name,
+		Args: runtime.Unknown{
+			Raw: []byte(fmt.Sprintf(`{"hardPodAffinityWeight":%d}`, c.hardPodAffinitySymmetricWeight)),
+		},
+	}
 }
 
 // getPriorityConfigs returns priorities configuration: ones that will run as priorities and ones that will run
@@ -436,7 +439,7 @@ func MakeDefaultErrorFunc(client clientset.Interface, podQueue internalqueue.Sch
 		// Retry asynchronously.
 		// Note that this is extremely rudimentary and we need a more real error handling path.
 		go func() {
-			defer runtime.HandleCrash()
+			defer utilruntime.HandleCrash()
 			podID := types.NamespacedName{
 				Namespace: pod.Namespace,
 				Name:      pod.Name,

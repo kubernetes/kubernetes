@@ -25,12 +25,18 @@ import (
 	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
 )
 
-// Name is the name of the plugin used in the plugin registry and configurations.
-const Name = "InterPodAffinity"
+const (
+	// Name is the name of the plugin used in the plugin registry and configurations.
+	Name = "InterPodAffinity"
+
+	defaultHardPodAffinityWeight int32 = 1
+	minHardPodAffinityWeight     int32 = 0
+	maxHardPodAffinityWeight     int32 = 100
+)
 
 // Args holds the args that are used to configure the plugin.
 type Args struct {
-	HardPodAffinityWeight int32 `json:"hardPodAffinityWeight,omitempty"`
+	HardPodAffinityWeight *int32 `json:"hardPodAffinityWeight,omitempty"`
 }
 
 var _ framework.PreFilterPlugin = &InterPodAffinity{}
@@ -55,14 +61,31 @@ func New(plArgs *runtime.Unknown, h framework.FrameworkHandle) (framework.Plugin
 	if h.SnapshotSharedLister() == nil {
 		return nil, fmt.Errorf("SnapshotSharedlister is nil")
 	}
-
 	args := &Args{}
 	if err := framework.DecodeInto(plArgs, args); err != nil {
 		return nil, err
 	}
-
-	return &InterPodAffinity{
+	if err := validateArgs(args); err != nil {
+		return nil, err
+	}
+	pl := &InterPodAffinity{
 		sharedLister:          h.SnapshotSharedLister(),
-		hardPodAffinityWeight: args.HardPodAffinityWeight,
-	}, nil
+		hardPodAffinityWeight: defaultHardPodAffinityWeight,
+	}
+	if args.HardPodAffinityWeight != nil {
+		pl.hardPodAffinityWeight = *args.HardPodAffinityWeight
+	}
+	return pl, nil
+}
+
+func validateArgs(args *Args) error {
+	if args.HardPodAffinityWeight == nil {
+		return nil
+	}
+
+	weight := *args.HardPodAffinityWeight
+	if weight < minHardPodAffinityWeight || weight > maxHardPodAffinityWeight {
+		return fmt.Errorf("invalid args.hardPodAffinityWeight: %d, must be in the range %d-%d", weight, minHardPodAffinityWeight, maxHardPodAffinityWeight)
+	}
+	return nil
 }

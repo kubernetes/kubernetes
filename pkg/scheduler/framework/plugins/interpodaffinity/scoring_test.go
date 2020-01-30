@@ -627,7 +627,10 @@ func TestPreferredAffinityWithHardPodAffinitySymmetricWeight(t *testing.T) {
 			fh, _ := framework.NewFramework(nil, nil, nil, framework.WithSnapshotSharedLister(snapshot))
 
 			args := &runtime.Unknown{Raw: []byte(fmt.Sprintf(`{"hardPodAffinityWeight":%d}`, test.hardPodAffinityWeight))}
-			p, _ := New(args, fh)
+			p, err := New(args, fh)
+			if err != nil {
+				t.Fatal(err)
+			}
 			status := p.(framework.PostFilterPlugin).PostFilter(context.Background(), state, test.pod, test.nodes, nil)
 			if !status.IsSuccess() {
 				t.Errorf("unexpected error: %v", status)
