@@ -27,24 +27,31 @@ import (
 
 // DefaultingTest run defaulting tests for given scheme
 func DefaultingTest(t *testing.T, scheme *runtime.Scheme, codecs serializer.CodecFactory) {
-	tc := GetDefaultingTestCases(scheme)
-	RunTestsOnYAMLData(t, scheme, tc, codecs)
+	cases := GetDefaultingTestCases(t, scheme, codecs)
+	RunTestsOnYAMLData(t, cases)
 }
 
 // GetDefaultingTestCases returns defaulting testcases for given scheme
-func GetDefaultingTestCases(scheme *runtime.Scheme) []TestCase {
+func GetDefaultingTestCases(t *testing.T, scheme *runtime.Scheme, codecs serializer.CodecFactory) []TestCase {
 	cases := []TestCase{}
 	for gvk := range scheme.AllKnownTypes() {
+		if gvk.Version == runtime.APIVersionInternal {
+			continue
+		}
 		beforeDir := fmt.Sprintf("testdata/%s/before", gvk.Kind)
 		afterDir := fmt.Sprintf("testdata/%s/after", gvk.Kind)
 		filename := fmt.Sprintf("%s.yaml", gvk.Version)
 
+		codec, err := getCodecForGV(codecs, gvk.GroupVersion())
+		if err != nil {
+			t.Fatal(err)
+		}
+
 		cases = append(cases, TestCase{
 			name:  fmt.Sprintf("default_%s", gvk.Version),
 			in:    filepath.Join(beforeDir, filename),
-			inGVK: gvk,
 			out:   filepath.Join(afterDir, filename),
-			outGV: gvk.GroupVersion(),
+			codec: codec,
 		})
 	}
 	return cases

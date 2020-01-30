@@ -18,75 +18,92 @@ package testing
 
 import (
 	"fmt"
-	"os"
+	"io/ioutil"
 	"path/filepath"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 // RoundTripTest runs roundtrip tests for given scheme
 func RoundTripTest(t *testing.T, scheme *runtime.Scheme, codecs serializer.CodecFactory) {
-	tc := GetRoundtripTestCases(scheme, nil)
-	RunTestsOnYAMLData(t, scheme, tc, codecs)
-}
-
-// TestCase defines a testcase for roundtrip and defaulting tests
-type TestCase struct {
-	name, in, out string
-	inGVK         schema.GroupVersionKind
-	outGV         schema.GroupVersion
+	tc := GetRoundtripTestCases(t, scheme, codecs)
+	RunTestsOnYAMLData(t, tc)
 }
 
 // GetRoundtripTestCases returns the testcases for roundtrip testing for given scheme
-func GetRoundtripTestCases(scheme *runtime.Scheme, disallowMarshalGroupVersions sets.String) []TestCase {
+func GetRoundtripTestCases(t *testing.T, scheme *runtime.Scheme, codecs serializer.CodecFactory) []TestCase {
 	cases := []TestCase{}
 	versionsForKind := map[schema.GroupKind][]string{}
 	for gvk := range scheme.AllKnownTypes() {
-		versionsForKind[gvk.GroupKind()] = append(versionsForKind[gvk.GroupKind()], gvk.Version)
+		if gvk.Version != runtime.APIVersionInternal {
+			versionsForKind[gvk.GroupKind()] = append(versionsForKind[gvk.GroupKind()], gvk.Version)
+		}
 	}
 
 	for gk, versions := range versionsForKind {
-		for _, vin := range versions {
-			if vin == runtime.APIVersionInternal {
-				continue // Don't try to deserialize the internal version
-			}
-			for _, vout := range versions {
-				inGVK := schema.GroupVersionKind{Group: gk.Group, Version: vin, Kind: gk.Kind}
-				marshalGV := schema.GroupVersion{Group: gk.Group, Version: vout}
-				if disallowMarshalGroupVersions.Has(marshalGV.String()) {
-					continue // Don't marshal a gv that is blacklisted
-				}
-				testdir := filepath.Join("testdata", gk.Kind, fmt.Sprintf("%sTo%s", vin, vout))
-				utilruntime.Must(filepath.Walk(testdir, func(path string, info os.FileInfo, err error) error {
-					if err != nil {
-						return err
-					}
-					if info.IsDir() {
-						if info.Name() == fmt.Sprintf("%sTo%s", vin, vout) {
-							return nil
-						}
-						return filepath.SkipDir
-					}
-					if filepath.Ext(info.Name()) != ".yaml" {
-						return nil
-					}
-					cases = append(cases, TestCase{
-						name:  fmt.Sprintf("%sTo%s", vin, vout),
-						in:    filepath.Join(testdir, info.Name()),
-						inGVK: inGVK,
-						out:   filepath.Join(testdir, fmt.Sprintf("%s.after_roundtrip", info.Name())),
-						outGV: marshalGV,
-					})
+		testdir := filepath.Join("testdata", gk.Kind, "roundtrip")
+		dirs, err := ioutil.ReadDir(testdir)
+		if err != nil {
+			t.Fatalf("failed to read testdir %s: %v", testdir, err)
+		}
 
-					return nil
-				}))
+		for _, dir := range dirs {
+			for _, vin := range versions {
+				for _, vout := range versions {
+					marshalGVK := gk.WithVersion(vout)
+					codec, err := getCodecForGV(codecs, marshalGVK.GroupVersion())
+					if err != nil {
+						t.Fatalf("failed to get codec for %v: %v", marshalGVK.GroupVersion().String(), err)
+					}
+
+					testname := dir.Name()
+					cases = append(cases, TestCase{
+						name:  fmt.Sprintf("%sTo%s_%s", vin, vout, testname),
+						in:    filepath.Join(testdir, testname, vin+".yaml"),
+						out:   filepath.Join(testdir, testname, vout+".yaml"),
+						codec: codec,
+					})
+				}
 			}
 		}
 	}
 	return cases
+}
+
+func roundTrip(t *testing.T, tc TestCase) {
+	object := decodeYAML(t, tc.in, tc.codec)
+
+	// original object of internal type
+	original := object
+
+	// encode (serialize) the object using the provided codec
+	data, err := runtime.Encode(tc.codec, object)
+	if err != nil {
+		t.Fatalf("failed to encode object: %v", err)
+	}
+
+	// ensure that the encoding should not alter the object
+	if !apiequality.Semantic.DeepEqual(original, object) {
+		t.Fatalf("encode altered the object, diff (- want, + got): \n%v", cmp.Diff(original, object))
+	}
+
+	// decode (deserialize) the encoded data back into an object
+	obj2, err := runtime.Decode(tc.codec, data)
+	if err != nil {
+		t.Fatalf("failed to decode: %v", err)
+	}
+
+	// ensure that the object produced from decoding the encoded data is equal
+	// to the original object
+	if !apiequality.Semantic.DeepEqual(original, obj2) {
+		t.Fatalf("object was not the same after roundtrip, diff (- want, + got):\n%v", cmp.Diff(object, obj2))
+	}
+
+	// match with the input file, checks if they're the same after roundtrip
+	matchOutputFile(t, data, tc.out)
 }
