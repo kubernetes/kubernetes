@@ -321,12 +321,12 @@ var (
 		},
 	)
 	// RunPodSandboxDuration is a Histogram that tracks the duration (in seconds) it takes to run Pod Sandbox operations.
-	// Broken down by RuntimeClass.
+	// Broken down by RuntimeClass.Handler.
 	RunPodSandboxDuration = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
 			Subsystem: KubeletSubsystem,
 			Name:      RunPodSandboxDurationKey,
-			Help:      "Duration in seconds of the run_podsandbox operations. Broken down by RuntimeClass.",
+			Help:      "Duration in seconds of the run_podsandbox operations. Broken down by RuntimeClass.Handler.",
 			// Use DefBuckets for now, will customize the buckets if necessary.
 			Buckets:        metrics.DefBuckets,
 			StabilityLevel: metrics.ALPHA,
@@ -334,12 +334,12 @@ var (
 		[]string{"runtime_handler"},
 	)
 	// RunPodSandboxErrors is a Counter that tracks the cumulative number of Pod Sandbox operations errors.
-	// Broken down by RuntimeClass.
+	// Broken down by RuntimeClass.Handler.
 	RunPodSandboxErrors = metrics.NewCounterVec(
 		&metrics.CounterOpts{
 			Subsystem:      KubeletSubsystem,
 			Name:           RunPodSandboxErrorsKey,
-			Help:           "Cumulative number of the run_podsandbox operation errors by RuntimeClass.",
+			Help:           "Cumulative number of the run_podsandbox operation errors by RuntimeClass.Handler.",
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"runtime_handler"},
@@ -392,6 +392,8 @@ func Register(containerCache kubecontainer.RuntimeCache, collectors ...metrics.S
 		legacyregistry.MustRegister(DevicePluginAllocationDuration)
 		legacyregistry.MustRegister(RunningContainerCount)
 		legacyregistry.MustRegister(RunningPodCount)
+		legacyregistry.MustRegister(RunPodSandboxDuration)
+		legacyregistry.MustRegister(RunPodSandboxErrors)
 		if utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) {
 			legacyregistry.MustRegister(AssignedConfig)
 			legacyregistry.MustRegister(ActiveConfig)
