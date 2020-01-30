@@ -26,26 +26,31 @@ import (
 )
 
 func TestMatching(t *testing.T) {
+	checkFTR(t, mandFTRExempt)
+	checkFTR(t, mandFTRCatchAll)
 	rngOuter := rand.New(rand.NewSource(42))
 	goodPLNames := sets.NewString("pl1", "pl2", "pl3", "pl4", "pl5")
 	badPLNames := sets.NewString("ql1", "ql2", "ql3", "ql4", "ql5")
 	for i := 0; i < 300; i++ {
 		rng := rand.New(rand.NewSource(int64(rngOuter.Uint64())))
 		t.Run(fmt.Sprintf("trial%d:", i), func(t *testing.T) {
-			ftr, _ := genFS(t, rng, fmt.Sprintf("fs%d", i), rng.Float32() < 0.2, goodPLNames, badPLNames)
-			for _, digest := range append(ftr.matchingRDigests, ftr.matchingNDigests...) {
-				a := matchesFlowSchema(digest, ftr.fs)
-				if !a {
-					t.Errorf("Fail: Expected %#+v to match %#+v but it did not", fcfmt.Fmt(ftr.fs), digest)
-				}
-			}
-			for _, digest := range append(ftr.skippingRDigests, ftr.skippingNDigests...) {
-				a := matchesFlowSchema(digest, ftr.fs)
-				if a {
-					t.Errorf("Fail: Expected %#+v to not match %#+v but it did", fcfmt.Fmt(ftr.fs), digest)
-				}
-			}
+			ftr := genFS(t, rng, fmt.Sprintf("fs%d", i), rng.Float32() < 0.2, goodPLNames, badPLNames)
+			checkFTR(t, ftr)
 		})
+	}
+}
+
+func checkFTR(t *testing.T, ftr *fsTestingRecord) {
+	for expectMatch, digests1 := range ftr.digests {
+		t.Logf("%s.digests[%v] = %#+v", ftr.fs.Name, expectMatch, digests1)
+		for _, digests2 := range digests1 {
+			for _, digest := range digests2 {
+				actualMatch := matchesFlowSchema(digest, ftr.fs)
+				if expectMatch != actualMatch {
+					t.Errorf("Fail for %#+v vs %#+v: expectedMatch=%v, actualMatch=%v", fcfmt.Fmt(ftr.fs), digest, expectMatch, actualMatch)
+				}
+			}
+		}
 	}
 }
 

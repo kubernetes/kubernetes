@@ -26,7 +26,6 @@ import (
 	"time"
 
 	fcv1a1 "k8s.io/api/flowcontrol/v1alpha1"
-	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -39,11 +38,6 @@ import (
 	"k8s.io/klog"
 )
 
-type flowSchemaDigests struct {
-	matches    []RequestDigest
-	mismatches []RequestDigest
-}
-
 func TestMain(m *testing.M) {
 	klog.InitFlags(nil)
 	os.Exit(m.Run())
@@ -52,14 +46,6 @@ func TestMain(m *testing.M) {
 var mandPLs = func() map[string]*fcv1a1.PriorityLevelConfiguration {
 	ans := make(map[string]*fcv1a1.PriorityLevelConfiguration)
 	for _, mand := range fcboot.MandatoryPriorityLevelConfigurations {
-		ans[mand.Name] = mand
-	}
-	return ans
-}()
-
-var mandFSs = func() map[string]*fcv1a1.FlowSchema {
-	ans := make(map[string]*fcv1a1.FlowSchema)
-	for _, mand := range fcboot.MandatoryFlowSchemas {
 		ans[mand.Name] = mand
 	}
 	return ans
@@ -123,7 +109,14 @@ func (ctr *ctlTestRequest) Wait() (execute, idle bool, afterExecution func() (id
 	return true, false, func() (idle bool) { return false }
 }
 
-func TestDigestConfig(t *testing.T) {
+func (cts *ctlTestState) hasNonIdleQueueSet(name string) bool {
+	cts.lock.Lock()
+	defer cts.lock.Unlock()
+	qs := cts.queues[name]
+	return qs != nil
+}
+
+func TestConfigConsumer(t *testing.T) {
 	rngOuter := rand.New(rand.NewSource(1234567890123456789))
 	for i := 1; i <= 10; i++ {
 		rng := rand.New(rand.NewSource(int64(rngOuter.Uint64())))
@@ -131,49 +124,35 @@ func TestDigestConfig(t *testing.T) {
 			clientset := clientsetfake.NewSimpleClientset()
 			informerFactory := informers.NewSharedInformerFactory(clientset, 0)
 			flowcontrolClient := clientset.FlowcontrolV1alpha1()
+			cts := &ctlTestState{t: t,
+				fcIfc:       flowcontrolClient,
+				existingFSs: map[string]*fcv1a1.FlowSchema{},
+				existingPLs: map[string]*fcv1a1.PriorityLevelConfiguration{},
+				queues:      map[string]*ctlTestQueueSet{},
+			}
 			ctl := NewTestableController(
 				informerFactory,
 				flowcontrolClient,
 				100,         // server concurrency limit
 				time.Minute, // request wait limit
-				noRestraintQSF,
+				cts,
 			).(*configController)
-			cts := &ctlTestState{t: t,
-				cfgCtl:      ctl,
-				fcIfc:       flowcontrolClient,
-				existingFSs: map[string]*fcv1a1.FlowSchema{},
-				existingPLs: map[string]*fcv1a1.PriorityLevelConfiguration{},
-			}
+			cts.cfgCtl = ctl
 			stopCh := make(chan struct{})
 			// informerFactory.Start(stopCh)
 			go informerFactory.Flowcontrol().V1alpha1().FlowSchemas().Informer().Run(stopCh)
 			go informerFactory.Flowcontrol().V1alpha1().PriorityLevelConfigurations().Informer().Run(stopCh)
 			go ctl.Run(stopCh)
-			oldPLStates := map[string]*priorityLevelState{}
+			oldPLNames := sets.NewString()
 			trialStep := fmt.Sprintf("trial%d-0", i)
-			_, newGoodPLMap, newGoodPLNames, newBadPLNames := genPLs(rng, trialStep, sets.NewString(), 0)
-			_, newFSMap, newGoodFSMap, newFSDigestses := genFSs(t, rng, trialStep, newGoodPLNames, newBadPLNames, 0)
+			_, _, newGoodPLNames, newBadPLNames := genPLs(rng, trialStep, oldPLNames, 0)
+			_, _, newFTRs, newCatchAlls := genFSs(t, rng, trialStep, newGoodPLNames, newBadPLNames, 0)
 			for j := 0; ; {
 				t.Logf("For %s, newGoodPLNames=%#+v", trialStep, newGoodPLNames)
-				t.Logf("For %s, newGoodFSMap=%#+v", trialStep, newGoodFSMap)
+				t.Logf("For %s, newFTRs=%#+v", trialStep, newFTRs)
 				// Check that the latest digestion did the right thing
-				expectedPLNames := newGoodPLNames.Union(sets.StringKeySet(oldPLStates))
-				expectedPLNames = expectedPLNames.Union(sets.StringKeySet(mandPLs))
-				priorityLevelStates, fss := ctl.copyState()
-				if e, a := expectedPLNames, sets.StringKeySet(priorityLevelStates); !e.Equal(a) {
-					t.Errorf("Fail at %s: e=%v, a=%v", trialStep, e, a)
-				}
-				for plName := range expectedPLNames {
-					plState := priorityLevelStates[plName]
-					checkNewPLState(t, trialStep, plName, plState, oldPLStates, newGoodPLMap)
-				}
-				testFSNames := sets.StringKeySet(newGoodFSMap).Union(sets.StringKeySet(mandFSs))
-				for _, fs := range fss {
-					checkNewFS(t, ctl, trialStep, fs, newGoodFSMap, newFSDigestses[fs.Name])
-					testFSNames.Delete(fs.Name)
-				}
-				if len(testFSNames) > 0 {
-					t.Errorf("Fail at %s: ctl did not retain FlowSchemas %#+v", trialStep, testFSNames)
+				for _, ftr := range newFTRs {
+					checkNewFS(t, ctl, trialStep, ftr, newCatchAlls)
 				}
 
 				j++
@@ -182,21 +161,22 @@ func TestDigestConfig(t *testing.T) {
 				}
 
 				// Calculate expected survivors
-				nextPLStates := map[string]*priorityLevelState{}
-				for oldPLName, oldPLState := range priorityLevelStates {
-					if mandPLs[oldPLName] != nil || oldPLState.queues != nil && !(oldPLState.quiescing && oldPLState.queues.IsIdle()) {
-						oldState := *oldPLState
-						nextPLStates[oldPLName] = &oldState
+				nextPLNames := sets.NewString()
+				for oldPLName := range oldPLNames {
+					if mandPLs[oldPLName] != nil || cts.hasNonIdleQueueSet(oldPLName) {
+						nextPLNames.Insert(oldPLName)
 					}
 				}
-				oldPLStates = nextPLStates
+				oldPLNames = nextPLNames.Union(newGoodPLNames)
 
 				// Now create a new config and digest it
 				trialStep = fmt.Sprintf("trial%d-%d", i, j)
 				var newPLs []*fcv1a1.PriorityLevelConfiguration
 				var newFSs []*fcv1a1.FlowSchema
-				newPLs, newGoodPLMap, newGoodPLNames, newBadPLNames = genPLs(rng, trialStep, expectedPLNames, 1+rng.Intn(4))
-				newFSs, newFSMap, newGoodFSMap, newFSDigestses = genFSs(t, rng, trialStep, newGoodPLNames, newBadPLNames, 1+rng.Intn(6))
+				var newFSMap map[string]*fcv1a1.FlowSchema
+				var newGoodPLMap map[string]*fcv1a1.PriorityLevelConfiguration
+				newPLs, newGoodPLMap, newGoodPLNames, newBadPLNames = genPLs(rng, trialStep, oldPLNames, 1+rng.Intn(4))
+				newFSs, newFSMap, newFTRs, newCatchAlls = genFSs(t, rng, trialStep, newGoodPLNames, newBadPLNames, 1+rng.Intn(6))
 
 				if true {
 					cts.establishAPIObjects(trialStep, int32(i*10+j), newGoodPLMap, newFSMap)
@@ -213,18 +193,6 @@ func TestDigestConfig(t *testing.T) {
 			close(stopCh)
 		})
 	}
-}
-
-func (cfgCtl *configController) copyState() (priorityLevelStates map[string]*priorityLevelState, fss []*fcv1a1.FlowSchema) {
-	cfgCtl.lock.Lock()
-	defer cfgCtl.lock.Unlock()
-	fss = append(fss, cfgCtl.flowSchemas...)
-	priorityLevelStates = make(map[string]*priorityLevelState, len(cfgCtl.priorityLevelStates))
-	for k, v := range cfgCtl.priorityLevelStates {
-		priorityLevelStates[k] = v
-	}
-	klog.V(7).Infof("Copied state pls=%#+v, fss=%#+v", priorityLevelStates, fss)
-	return
 }
 
 func (cts *ctlTestState) establishAPIObjects(trialStep string, traceValue int32, newPLs map[string]*fcv1a1.PriorityLevelConfiguration, newFSs map[string]*fcv1a1.FlowSchema) {
@@ -335,109 +303,32 @@ func (cts *ctlTestState) establishAPIObjects(trialStep string, traceValue int32,
 	cts.cfgCtl.waitForTracedValue(traceValue)
 }
 
-func checkNewPLState(t *testing.T, trialName, plName string, plState *priorityLevelState, oldPLStates map[string]*priorityLevelState, newGoodPLMap map[string]*fcv1a1.PriorityLevelConfiguration) {
-	var expectedSpec *fcv1a1.PriorityLevelConfigurationSpec
-	pl, inNew := newGoodPLMap[plName]
-	if inNew {
-		expectedSpec = &pl.Spec
-	}
-	ost, inOld := oldPLStates[plName]
-	if expectedSpec == nil && inOld {
-		expectedSpec = &ost.config
-	}
-	var isMand bool
-	for _, mpl := range fcboot.MandatoryPriorityLevelConfigurations {
-		if plName == mpl.Name {
-			isMand = true
-			if expectedSpec == nil {
-				expectedSpec = &mpl.Spec
-			}
-		}
-	}
-	if expectedSpec == nil {
-		t.Errorf("Fail at %s/%s: Inexplicable entry %#+v", trialName, plName, plState)
-		return
-	}
-	if plState == nil {
-		t.Errorf("Fail at %s/%s: missing new priorityLevelState", trialName, plName)
-		return
-	}
-	if e, a := *expectedSpec, plState.config; !apiequality.Semantic.DeepEqual(e, a) {
-		t.Errorf("Fail at %s/%s: e=%#+v, a=%#+v", trialName, plName, fcfmt.Fmt(e), fcfmt.Fmt(a))
-	}
-	isExempt := expectedSpec.Type == fcv1a1.PriorityLevelEnablementExempt
-	if e, a := isExempt, (plState.qsCompleter == nil); e != a {
-		t.Errorf("Fail at %s/%s: e=%v, a=%v", trialName, plName, e, a)
-	}
-	if e, a := isExempt, (plState.queues == nil); e != a {
-		t.Errorf("Fail at %s/%s: e=%v, a=%v", trialName, plName, e, a)
-	}
-	if inOld {
-		if e, a := ost.queues, plState.queues; e != a {
-			t.Errorf("Fail at %s/%s: e=%p, a=%p", trialName, plName, e, a)
-		}
-	}
-	if e, a := !(inNew || isMand), plState.quiescing; e != a {
-		t.Errorf("Fail at %s/%s: e=%v, a=%v", trialName, plName, e, a)
-	}
-	if e, a := 0, plState.numPending; e != a {
-		t.Errorf("Fail at %s/%s: e=%v, a=%v", trialName, plName, e, a)
-	}
-}
-
-func checkNewFS(t *testing.T, ctl *configController, trialName string, fs *fcv1a1.FlowSchema, newGoodFSMap map[string]*fcv1a1.FlowSchema, digests *flowSchemaDigests) {
+func checkNewFS(t *testing.T, ctl *configController, trialName string, ftr *fsTestingRecord, catchAlls map[bool]*fcv1a1.FlowSchema) {
+	fs := ftr.fs
 	if fs.Name == tracerName {
 		return
 	}
-	orig := newGoodFSMap[fs.Name]
-	for _, mfs := range fcboot.MandatoryFlowSchemas {
-		if fs.Name == mfs.Name {
-			if orig == nil {
-				orig = mfs
-			}
-		}
-	}
-	if orig == nil {
-		t.Errorf("Fail at %s: Inexplicable entry %#+v", trialName, *fs)
-		return
-	}
-	if e, a := orig.Spec, fs.Spec; !apiequality.Semantic.DeepEqual(e, a) {
-		t.Errorf("Fail at %s/%s: e=%#+v, a=%#+v", trialName, fs.Name, fcfmt.Fmt(e), fcfmt.Fmt(a))
-	}
-	if digests != nil {
-		for _, rd := range digests.matches {
-			matchFSName, matchDistMethod, matchPLName, startFn := ctl.Match(rd)
-			t.Logf("Considering FlowSchema %s, Match(%#+v) => %q, %#+v, %q, %v", fs.Name, rd, matchFSName, matchDistMethod, matchPLName, startFn)
-			if matchFSName == orig.Name {
-				if e, a := orig.Spec.DistinguisherMethod, matchDistMethod; !apiequality.Semantic.DeepEqual(e, a) {
-					t.Errorf("Fail at %s/%s: Got DistinguisherMethod %#+v for %#+v", trialName, fs.Name, a, fcfmt.Fmt(orig))
+	for matches, digests1 := range ftr.digests {
+		for isResource, digests2 := range digests1 {
+			for _, rd := range digests2 {
+				matchFSName, matchDistMethod, matchPLName, startFn := ctl.Match(rd)
+				expectedMatch := matches && ftr.wellFormed && (fsPrecedes(fs, catchAlls[isResource]) || fs.Name == catchAlls[isResource].Name)
+				t.Logf("Considering FlowSchema %s, expectedMatch=%v, isResource=%v: Match(%#+v) => %q, %#+v, %q, %v", fs.Name, expectedMatch, isResource, rd, matchFSName, matchDistMethod, matchPLName, startFn)
+				if e, a := expectedMatch, matchFSName == fs.Name; e != a {
+					t.Errorf("Fail at %s/%s: matchFSName=%q", trialName, fs.Name, matchFSName)
 				}
-				if e, a := orig.Spec.PriorityLevelConfiguration.Name, matchPLName; e != a {
-					t.Errorf("Fail at %s/%s: e=%v, a=%v", trialName, fs.Name, e, a)
+				if matchFSName == fs.Name {
+					if e, a := fs.Spec.PriorityLevelConfiguration.Name, matchPLName; e != a {
+						t.Errorf("Fail at %s/%s: e=%v, a=%v", trialName, fs.Name, e, a)
+					}
 				}
-			} else if matchFSName == fcv1a1.FlowSchemaNameCatchAll && fs.Spec.MatchingPrecedence < fcv1a1.FlowSchemaMaxMatchingPrecedence {
-				t.Errorf("Fail at %s/%s: Failed expected match for %#+v against %#+v", trialName, fs.Name, rd, fcfmt.Fmt(orig))
-			}
-			if startFn != nil {
-				exec, after := startFn(context.Background(), 47)
-				t.Logf("startFn(..) => %v, %p", exec, after)
-				if exec {
-					after()
-					t.Log("called after()")
-				}
-			}
-		}
-		for _, rd := range digests.mismatches {
-			matchFSName, _, _, startFn := ctl.Match(rd)
-			if matchFSName == orig.Name {
-				t.Errorf("Fail at %s/%s: Digest %#+v unexpectedly matched schema %#+v", trialName, fs.Name, rd, fcfmt.Fmt(fs))
-			}
-			if startFn != nil {
-				exec, after := startFn(context.Background(), 74)
-				t.Logf("startFn(..) => %v, %p", exec, after)
-				if exec {
-					after()
-					t.Log("called after()")
+				if startFn != nil {
+					exec, after := startFn(context.Background(), 47)
+					t.Logf("startFn(..) => %v, %p", exec, after)
+					if exec {
+						after()
+						t.Log("called after()")
+					}
 				}
 			}
 		}
@@ -475,34 +366,45 @@ func genPLs(rng *rand.Rand, trial string, oldPLNames sets.String, n int) (pls []
 	return
 }
 
-func genFSs(t *testing.T, rng *rand.Rand, trial string, goodPLNames, badPLNames sets.String, n int) (newFSs []*fcv1a1.FlowSchema, newFSMap, newGoodFSMap map[string]*fcv1a1.FlowSchema, newFSDigestses map[string]*flowSchemaDigests) {
+func genFSs(t *testing.T, rng *rand.Rand, trial string, goodPLNames, badPLNames sets.String, n int) (newFSs []*fcv1a1.FlowSchema, newFSMap map[string]*fcv1a1.FlowSchema, newFTRs map[string]*fsTestingRecord, catchAlls map[bool]*fcv1a1.FlowSchema) {
+	newFTRs = map[string]*fsTestingRecord{}
+	catchAlls = map[bool]*fcv1a1.FlowSchema{
+		false: fcboot.MandatoryFlowSchemaCatchAll,
+		true:  fcboot.MandatoryFlowSchemaCatchAll}
 	newFSMap = map[string]*fcv1a1.FlowSchema{}
-	newGoodFSMap = map[string]*fcv1a1.FlowSchema{}
-	newFSDigestses = map[string]*flowSchemaDigests{}
-	add := func(fs *fcv1a1.FlowSchema) {
-		newFSs = append(newFSs, fs)
-		newFSMap[fs.Name] = fs
-	}
-	addGood := func(fs *fcv1a1.FlowSchema, matches, mismatches []RequestDigest) {
-		add(fs)
-		newGoodFSMap[fs.Name] = fs
-		newFSDigestses[fs.Name] = &flowSchemaDigests{matches: matches, mismatches: mismatches}
-		t.Logf("For trial %s, adding good FlowSchema %#+v", trial, fcfmt.Fmt(fs))
+	add := func(ftr *fsTestingRecord) {
+		newFSs = append(newFSs, ftr.fs)
+		newFSMap[ftr.fs.Name] = ftr.fs
+		newFTRs[ftr.fs.Name] = ftr
+		if ftr.wellFormed {
+			if ftr.matchesAllNonResourceRequests && fsPrecedes(ftr.fs, catchAlls[false]) {
+				catchAlls[false] = ftr.fs
+			}
+			if ftr.matchesAllResourceRequests && fsPrecedes(ftr.fs, catchAlls[true]) {
+				catchAlls[true] = ftr.fs
+			}
+		}
+		t.Logf("For trial %s, adding wf=%v FlowSchema %#+v", trial, ftr.wellFormed, fcfmt.Fmt(ftr.fs))
 	}
 	if n == 0 || rng.Float32() < 0.5 {
-		addGood(fcboot.MandatoryFlowSchemaCatchAll, nil, nil)
+		add(mandFTRCatchAll)
 	}
 	for i := 1; i <= n; i++ {
-		ftr, wellFormed := genFS(t, rng, fmt.Sprintf("%s-fs%d", trial, i), false, goodPLNames, badPLNames)
-		if wellFormed {
-			addGood(ftr.fs, append(ftr.matchingRDigests, ftr.matchingNDigests...), append(ftr.skippingRDigests, ftr.skippingNDigests...))
-		} else {
-			add(ftr.fs)
-			t.Logf("For trial %s, adding bad FlowSchema %#+v", trial, fcfmt.Fmt(ftr.fs))
-		}
+		ftr := genFS(t, rng, fmt.Sprintf("%s-fs%d", trial, i), false, goodPLNames, badPLNames)
+		add(ftr)
 	}
 	if n == 0 || rng.Float32() < 0.5 {
-		addGood(fcboot.MandatoryFlowSchemaExempt, nil, nil)
+		add(mandFTRExempt)
 	}
 	return
+}
+
+func fsPrecedes(a, b *fcv1a1.FlowSchema) bool {
+	if a.Spec.MatchingPrecedence < b.Spec.MatchingPrecedence {
+		return true
+	}
+	if a.Spec.MatchingPrecedence == b.Spec.MatchingPrecedence {
+		return a.Name < b.Name
+	}
+	return false
 }

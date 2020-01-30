@@ -25,6 +25,7 @@ import (
 	fcv1a1 "k8s.io/api/flowcontrol/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	fcboot "k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	fqtesting "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/testing"
@@ -62,29 +63,17 @@ func genPL(rng *rand.Rand, name string) *fcv1a1.PriorityLevelConfiguration {
 
 // A FlowSchema together with characteristics relevant to testing
 type fsTestingRecord struct {
-	fs                            *fcv1a1.FlowSchema
+	fs *fcv1a1.FlowSchema
+	// Does this reference an existing priority level?
+	wellFormed                    bool
 	matchesAllResourceRequests    bool
 	matchesAllNonResourceRequests bool
-	matchingRDigests              []RequestDigest
-	matchingNDigests              []RequestDigest
-	skippingRDigests              []RequestDigest
-	skippingNDigests              []RequestDigest
+	// maps `matches bool` to `isResourceRequest bool` to digests
+	digests map[bool]map[bool][]RequestDigest
 }
 
 func (ftr *fsTestingRecord) addDigest(digest RequestDigest, matches bool) {
-	if matches {
-		if digest.RequestInfo.IsResourceRequest {
-			ftr.matchingRDigests = append(ftr.matchingRDigests, digest)
-		} else {
-			ftr.matchingNDigests = append(ftr.matchingNDigests, digest)
-		}
-	} else {
-		if digest.RequestInfo.IsResourceRequest {
-			ftr.skippingRDigests = append(ftr.skippingRDigests, digest)
-		} else {
-			ftr.skippingNDigests = append(ftr.skippingNDigests, digest)
-		}
-	}
+	ftr.digests[matches][digest.RequestInfo.IsResourceRequest] = append(ftr.digests[matches][digest.RequestInfo.IsResourceRequest], digest)
 }
 
 func (ftr *fsTestingRecord) addDigests(digests []RequestDigest, matches bool) {
@@ -98,6 +87,96 @@ var flowDistinguisherMethodTypes = sets.NewString(
 	string(fcv1a1.FlowDistinguisherMethodByNamespaceType),
 )
 
+var mandFTRExempt = &fsTestingRecord{
+	fs:         fcboot.MandatoryFlowSchemaExempt,
+	wellFormed: true,
+	digests: map[bool]map[bool][]RequestDigest{
+		false: {
+			false: {{
+				RequestInfo: &request.RequestInfo{
+					IsResourceRequest: false,
+					Path:              "/foo/bar",
+					Verb:              "frobulate"},
+				User: &user.DefaultInfo{
+					Name:   "nobody",
+					Groups: []string{user.AllAuthenticated, "nogroup"},
+				},
+			}},
+			true: {{
+				RequestInfo: &request.RequestInfo{
+					IsResourceRequest: true,
+					Verb:              "mandate",
+					APIGroup:          "nogroup",
+					Namespace:         "nospace",
+					Resource:          "nons",
+				},
+				User: &user.DefaultInfo{
+					Name:   "nobody",
+					Groups: []string{user.AllAuthenticated, "nogroup"},
+				},
+			}},
+		},
+		true: {
+			false: {{
+				RequestInfo: &request.RequestInfo{
+					IsResourceRequest: false,
+					Path:              "/foo/bar",
+					Verb:              "frobulate"},
+				User: &user.DefaultInfo{
+					Name:   "nobody",
+					Groups: []string{user.AllAuthenticated, user.SystemPrivilegedGroup},
+				},
+			}},
+			true: {{
+				RequestInfo: &request.RequestInfo{
+					IsResourceRequest: true,
+					Verb:              "mandate",
+					APIGroup:          "nogroup",
+					Namespace:         "nospace",
+					Resource:          "nons",
+				},
+				User: &user.DefaultInfo{
+					Name:   "nobody",
+					Groups: []string{user.AllAuthenticated, user.SystemPrivilegedGroup},
+				},
+			}},
+		},
+	},
+}
+
+var mandFTRCatchAll = &fsTestingRecord{
+	fs:         fcboot.MandatoryFlowSchemaCatchAll,
+	wellFormed: true,
+	digests: map[bool]map[bool][]RequestDigest{
+		false: {},
+		true: {
+			false: {{
+				RequestInfo: &request.RequestInfo{
+					IsResourceRequest: false,
+					Path:              "/foo/bar",
+					Verb:              "frobulate"},
+				User: &user.DefaultInfo{
+					Name:   "nobody",
+					Groups: []string{user.AllAuthenticated, "nogroup"},
+				},
+			}},
+			true: {{
+				RequestInfo: &request.RequestInfo{
+					IsResourceRequest: true,
+					Verb:              "mandate",
+					APIGroup:          "nogroup",
+					Namespace:         "nospace",
+					Resource:          "nons",
+				},
+				User: &user.DefaultInfo{
+					Name:   "nobody",
+					Groups: []string{user.AllAuthenticated, "nogroup"},
+				},
+			}},
+		},
+	},
+}
+
 // genFS creates a valid FlowSchema with the given name and randomly
 // generated spec, along with characteristics relevant to testing.
 // When all the FlowSchemas in a collection are generated with
@@ -106,19 +185,27 @@ var flowDistinguisherMethodTypes = sets.NewString(
 // match any schema in the collection.  The generated spec is
 // relatively likely to be well formed but might not be.  An ill
 // formed spec references a priority level drawn from badPLNames.
-// goodPLNames may be empty, but badPLNames may not.  The returned
-// bool indicates whether the returned object is well formed.
-func genFS(t *testing.T, rng *rand.Rand, name string, mayMatchClusterScope bool, goodPLNames, badPLNames sets.String) (*fsTestingRecord, bool) {
+// goodPLNames may be empty, but badPLNames may not.
+func genFS(t *testing.T, rng *rand.Rand, name string, mayMatchClusterScope bool, goodPLNames, badPLNames sets.String) *fsTestingRecord {
 	fs := &fcv1a1.FlowSchema{
 		ObjectMeta: metav1.ObjectMeta{Name: name},
 		Spec:       fcv1a1.FlowSchemaSpec{}}
-	wellFormed := true
+	// 5% chance of zero rules, otherwise draw from 1--6 biased low
+	nRules := (1 + rng.Intn(3)) * (1 + rng.Intn(2)) * ((19 + rng.Intn(20)) / 20)
+	ftr := &fsTestingRecord{fs: fs,
+		wellFormed:                    true,
+		matchesAllResourceRequests:    nRules > 0 && rng.Float32() < 0.1,
+		matchesAllNonResourceRequests: nRules > 0 && rng.Float32() < 0.1,
+		digests: map[bool]map[bool][]RequestDigest{
+			false: {false: {}, true: {}},
+			true:  {false: {}, true: {}}},
+	}
 	dangleStatus := fcv1a1.ConditionFalse
 	if rng.Float32() < 0.9 && len(goodPLNames) > 0 {
 		fs.Spec.PriorityLevelConfiguration = fcv1a1.PriorityLevelConfigurationReference{pickSetString(rng, goodPLNames)}
 	} else {
 		fs.Spec.PriorityLevelConfiguration = fcv1a1.PriorityLevelConfigurationReference{pickSetString(rng, badPLNames)}
-		wellFormed = false
+		ftr.wellFormed = false
 		dangleStatus = fcv1a1.ConditionTrue
 	}
 	fs.Status.Conditions = []fcv1a1.FlowSchemaCondition{{
@@ -129,11 +216,6 @@ func genFS(t *testing.T, rng *rand.Rand, name string, mayMatchClusterScope bool,
 		fdmt := fcv1a1.FlowDistinguisherMethodType(pickSetString(rng, flowDistinguisherMethodTypes))
 		fs.Spec.DistinguisherMethod = &fcv1a1.FlowDistinguisherMethod{fdmt}
 	}
-	// 5% chance of zero rules, otherwise draw from 1--6 biased low
-	nRules := (1 + rng.Intn(3)) * (1 + rng.Intn(2)) * ((19 + rng.Intn(20)) / 20)
-	ftr := &fsTestingRecord{fs: fs,
-		matchesAllResourceRequests:    nRules > 0 && rng.Float32() < 0.1,
-		matchesAllNonResourceRequests: nRules > 0 && rng.Float32() < 0.1}
 	fs.Spec.Rules = []fcv1a1.PolicyRulesWithSubjects{}
 	everyResourceMatcher := -1
 	if ftr.matchesAllResourceRequests {
@@ -162,10 +244,13 @@ func genFS(t *testing.T, rng *rand.Rand, name string, mayMatchClusterScope bool,
 		ftr.addDigests(ruleSkippingNDigests, false)
 	}
 	if nRules == 0 {
-		_, _, _, ftr.skippingRDigests, ftr.skippingNDigests = genPolicyRuleWithSubjects(t, rng, name+"-1", false, false, false, false, false)
+		var skippingRDigests, skippingNDigests []RequestDigest
+		_, _, _, skippingRDigests, skippingNDigests = genPolicyRuleWithSubjects(t, rng, name+"-1", false, false, false, false, false)
+		ftr.addDigests(skippingRDigests, false)
+		ftr.addDigests(skippingNDigests, false)
 	}
-	t.Logf("Returning name=%s, plRef=%q, wellFormed=%v, matchesAllResourceRequests=%v, matchesAllNonResourceRequests=%v for mayMatchClusterScope=%v", fs.Name, fs.Spec.PriorityLevelConfiguration.Name, wellFormed, ftr.matchesAllResourceRequests, ftr.matchesAllNonResourceRequests, mayMatchClusterScope)
-	return ftr, wellFormed
+	t.Logf("Returning name=%s, plRef=%q, wellFormed=%v, matchesAllResourceRequests=%v, matchesAllNonResourceRequests=%v for mayMatchClusterScope=%v", fs.Name, fs.Spec.PriorityLevelConfiguration.Name, ftr.wellFormed, ftr.matchesAllResourceRequests, ftr.matchesAllNonResourceRequests, mayMatchClusterScope)
+	return ftr
 }
 
 var noextra = make(map[string][]string)

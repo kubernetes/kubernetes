@@ -703,9 +703,13 @@ func (cfgCtl *configController) Match(rd RequestDigest) (string, *fctypesv1a1.Fl
 			return fs.Name, fs.Spec.DistinguisherMethod, plName, startFn
 		}
 	}
+	var lastFS *fctypesv1a1.FlowSchema
+	if len(cfgCtl.flowSchemas) > 0 {
+		lastFS = cfgCtl.flowSchemas[len(cfgCtl.flowSchemas)-1]
+	}
 	// This can never happen because every configState has a
-	// FlowSchema that matches everything
-	panic(rd)
+	// FlowSchema that matches everything.
+	panic(fmt.Sprintf("No match; rd=%#+v, lastFS=%#+v", rd, fcfmt.Fmt(lastFS)))
 }
 
 // Call this after getting a clue that the given priority level is undesired and idle
