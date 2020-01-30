@@ -236,6 +236,8 @@ function Set-EnvironmentVars {
     "NODE_DIR" = ${kube_env}['NODE_DIR']
     "CNI_DIR" = ${kube_env}['CNI_DIR']
     "CNI_CONFIG_DIR" = ${kube_env}['CNI_CONFIG_DIR']
+    "WINDOWS_CNI_STORAGE_PATH" = ${kube_env}['WINDOWS_CNI_STORAGE_PATH']
+    "WINDOWS_CNI_VERSION" = ${kube_env}['WINDOWS_CNI_VERSION']
     "PKI_DIR" = ${kube_env}['PKI_DIR']
     "CA_FILE_PATH" = ${kube_env}['CA_FILE_PATH']
     "KUBELET_CONFIG" = ${kube_env}['KUBELET_CONFIG_FILE']
@@ -300,7 +302,7 @@ function Download-HelperScripts {
     return
   }
   MustDownload-File -OutFile ${env:K8S_DIR}\hns.psm1 `
-    -URLs "https://www.googleapis.com/storage/v1/b/gke-release/o/winnode%2fconfig%2fsdn%2fmaster%2fhns.psm1?alt=media"
+    -URLs "https://storage.googleapis.com/gke-release/winnode/config/sdn/master/hns.psm1"
 }
 
 # Takes the Windows version string from the cluster bash scripts (e.g.
@@ -916,7 +918,7 @@ function Configure-HostNetworkingService {
 function Configure-GcePdTools {
   if (ShouldWrite-File ${env:K8S_DIR}\GetGcePdName.dll) {
     MustDownload-File -OutFile ${env:K8S_DIR}\GetGcePdName.dll `
-      -URLs "https://www.googleapis.com/storage/v1/b/gke-release/o/winnode%2fconfig%2fgce-tools%2fmaster%2fGetGcePdName%2fGetGcePdName.dll?alt=media"
+      -URLs "https://storage.googleapis.com/gke-release/winnode/config/gce-tools/master/GetGcePdName/GetGcePdName.dll"
   }
   if (-not (Test-Path $PsHome\profile.ps1)) {
     New-Item -path $PsHome\profile.ps1 -type file
@@ -953,16 +955,14 @@ function Configure-CniNetworking {
 #   CLUSTER_IP_RANGE
 #   SERVICE_CLUSTER_IP_RANGE
 function Configure_Dockerd_CniNetworking {
-  $CNI_RELEASE_VERSION = 'v0.8.5'
   if ((ShouldWrite-File ${env:CNI_DIR}\win-bridge.exe) -or
       (ShouldWrite-File ${env:CNI_DIR}\host-local.exe)) {
     $tmp_dir = 'C:\cni_tmp'
     New-Item $tmp_dir -ItemType 'directory' -Force | Out-Null
 
-    $release_url = ('https://storage.googleapis.com/k8s-artifacts-cni/release%2f' +
-        $CNI_RELEASE_VERSION + '%2f')
+    $release_url = (${env:WINDOWS_CNI_STORAGE_PATH} + '/' + ${env:WINDOWS_CNI_VERSION} + '/')
     $tgz_url = ($release_url +
-        "cni-plugins-windows-amd64-$CNI_RELEASE_VERSION.tgz")
+        "cni-plugins-windows-amd64-${env:WINDOWS_CNI_VERSION}.tgz")
     $sha_url = ($tgz_url + ".sha1")
     MustDownload-File -URLs $sha_url -OutFile $tmp_dir\cni-plugins.sha1
     $sha1_val = ($(Get-Content $tmp_dir\cni-plugins.sha1) -split ' ',2)[0]
@@ -1582,8 +1582,8 @@ function Install-LoggingAgent {
     return
   }
 
-  $url = ("https://www.googleapis.com/storage/v1/b/gke-release/o/winnode%2fstackdriver%2f" +
-          "StackdriverLogging-${STACKDRIVER_VERSION}.exe?alt=media")
+  $url = ("https://storage.googleapis.com/gke-release/winnode/stackdriver/" +
+          "StackdriverLogging-${STACKDRIVER_VERSION}.exe")
   $tmp_dir = 'C:\stackdriver_tmp'
   New-Item $tmp_dir -ItemType 'directory' -Force | Out-Null
   $installer_file = "${tmp_dir}\StackdriverLogging-${STACKDRIVER_VERSION}.exe"
