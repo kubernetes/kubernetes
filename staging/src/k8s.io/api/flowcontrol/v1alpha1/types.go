@@ -84,7 +84,7 @@ type FlowSchemaList struct {
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// `items` is a list of FlowSchemas.
-	// +listType=set
+	// +listType=atomic
 	Items []FlowSchema `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
@@ -107,7 +107,7 @@ type FlowSchemaSpec struct {
 	// `rules` describes which requests will match this flow schema. This FlowSchema matches a request if and only if
 	// at least one member of rules matches the request.
 	// if it is an empty slice, there will be no requests matching the FlowSchema.
-	// +listType=set
+	// +listType=atomic
 	// +optional
 	Rules []PolicyRulesWithSubjects `json:"rules,omitempty" protobuf:"bytes,4,rep,name=rules"`
 }
@@ -152,18 +152,18 @@ type PolicyRulesWithSubjects struct {
 	// subjects is the list of normal user, serviceaccount, or group that this rule cares about.
 	// There must be at least one member in this slice.
 	// A slice that includes both the system:authenticated and system:unauthenticated user groups matches every request.
-	// +listType=set
+	// +listType=atomic
 	// Required.
 	Subjects []Subject `json:"subjects" protobuf:"bytes,1,rep,name=subjects"`
 	// `resourceRules` is a slice of ResourcePolicyRules that identify matching requests according to their verb and the
 	// target resource.
 	// At least one of `resourceRules` and `nonResourceRules` has to be non-empty.
-	// +listType=set
+	// +listType=atomic
 	// +optional
 	ResourceRules []ResourcePolicyRule `json:"resourceRules,omitempty" protobuf:"bytes,2,opt,name=resourceRules"`
 	// `nonResourceRules` is a list of NonResourcePolicyRules that identify matching requests according to their verb
 	// and the target non-resource URL.
-	// +listType=set
+	// +listType=atomic
 	// +optional
 	NonResourceRules []NonResourcePolicyRule `json:"nonResourceRules,omitempty" protobuf:"bytes,3,opt,name=nonResourceRules"`
 }
@@ -350,7 +350,7 @@ type PriorityLevelConfigurationList struct {
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 	// `items` is a list of request-priorities.
-	// +listType=set
+	// +listType=atomic
 	Items []PriorityLevelConfiguration `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
