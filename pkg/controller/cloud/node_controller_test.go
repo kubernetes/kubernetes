@@ -30,6 +30,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/cloud-provider"
@@ -229,6 +230,7 @@ func TestNodeInitialized(t *testing.T) {
 		cloud:                     fakeCloud,
 		recorder:                  eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"}),
 		nodeStatusUpdateFrequency: 1 * time.Second,
+		serverVersion:             version.MustParseSemantic("v1.17.0"),
 	}
 	eventBroadcaster.StartLogging(klog.Infof)
 
@@ -289,10 +291,11 @@ func TestNodeIgnored(t *testing.T) {
 
 	eventBroadcaster := record.NewBroadcaster()
 	cloudNodeController := &CloudNodeController{
-		kubeClient:   fnh,
-		nodeInformer: factory.Core().V1().Nodes(),
-		cloud:        fakeCloud,
-		recorder:     eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"}),
+		kubeClient:    fnh,
+		nodeInformer:  factory.Core().V1().Nodes(),
+		cloud:         fakeCloud,
+		recorder:      eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"}),
+		serverVersion: version.MustParseSemantic("v1.17.0"),
 	}
 	eventBroadcaster.StartLogging(klog.Infof)
 
@@ -362,10 +365,11 @@ func TestGCECondition(t *testing.T) {
 
 	eventBroadcaster := record.NewBroadcaster()
 	cloudNodeController := &CloudNodeController{
-		kubeClient:   fnh,
-		nodeInformer: factory.Core().V1().Nodes(),
-		cloud:        fakeCloud,
-		recorder:     eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"}),
+		kubeClient:    fnh,
+		nodeInformer:  factory.Core().V1().Nodes(),
+		cloud:         fakeCloud,
+		recorder:      eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"}),
+		serverVersion: version.MustParseSemantic("v1.17.0"),
 	}
 	eventBroadcaster.StartLogging(klog.Infof)
 
@@ -451,10 +455,11 @@ func TestZoneInitialized(t *testing.T) {
 
 	eventBroadcaster := record.NewBroadcaster()
 	cloudNodeController := &CloudNodeController{
-		kubeClient:   fnh,
-		nodeInformer: factory.Core().V1().Nodes(),
-		cloud:        fakeCloud,
-		recorder:     eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"}),
+		kubeClient:    fnh,
+		nodeInformer:  factory.Core().V1().Nodes(),
+		cloud:         fakeCloud,
+		recorder:      eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"}),
+		serverVersion: version.MustParseSemantic("v1.17.0"),
 	}
 	eventBroadcaster.StartLogging(klog.Infof)
 
@@ -468,6 +473,92 @@ func TestZoneInitialized(t *testing.T) {
 		"Node Region not correctly updated")
 	assert.Equal(t, "us-west-1a", fnh.UpdatedNodes[0].ObjectMeta.Labels[v1.LabelZoneFailureDomainStable],
 		"Node FailureDomain not correctly updated")
+	assert.Equal(t, "us-west", fnh.UpdatedNodes[0].ObjectMeta.Labels[v1.LabelZoneRegion],
+		"Node Region not correctly updated")
+	assert.Equal(t, "us-west-1a", fnh.UpdatedNodes[0].ObjectMeta.Labels[v1.LabelZoneFailureDomain],
+		"Node FailureDomain not correctly updated")
+}
+
+// Test_ZoneInitialized_Pre_v1_17 tests that GA topology labels are not added against a Kubernetes control plane
+// version that is < v1.17.0
+func Test_ZoneInitialized_Pre_v1_17(t *testing.T) {
+	fnh := &testutil.FakeNodeHandler{
+		Existing: []*v1.Node{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+					Labels:            map[string]string{},
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:               v1.NodeReady,
+							Status:             v1.ConditionUnknown,
+							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						},
+					},
+				},
+				Spec: v1.NodeSpec{
+					Taints: []v1.Taint{
+						{
+							Key:    schedulerapi.TaintExternalCloudProvider,
+							Value:  "true",
+							Effect: v1.TaintEffectNoSchedule,
+						},
+					},
+				},
+			},
+		},
+		Clientset:      fake.NewSimpleClientset(&v1.PodList{}),
+		DeleteWaitChan: make(chan struct{}),
+	}
+
+	factory := informers.NewSharedInformerFactory(fnh, 0)
+
+	fakeCloud := &fakecloud.Cloud{
+		InstanceTypes: map[types.NodeName]string{
+			types.NodeName("node0"): "t1.micro",
+		},
+		Addresses: []v1.NodeAddress{
+			{
+				Type:    v1.NodeHostName,
+				Address: "node0.cloud.internal",
+			},
+			{
+				Type:    v1.NodeInternalIP,
+				Address: "10.0.0.1",
+			},
+			{
+				Type:    v1.NodeExternalIP,
+				Address: "132.143.154.163",
+			},
+		},
+		Provider: "aws",
+		Zone: cloudprovider.Zone{
+			FailureDomain: "us-west-1a",
+			Region:        "us-west",
+		},
+		Err: nil,
+	}
+
+	eventBroadcaster := record.NewBroadcaster()
+	cloudNodeController := &CloudNodeController{
+		kubeClient:    fnh,
+		nodeInformer:  factory.Core().V1().Nodes(),
+		cloud:         fakeCloud,
+		recorder:      eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"}),
+		serverVersion: version.MustParseSemantic("v1.16.5"),
+	}
+	eventBroadcaster.StartLogging(klog.Infof)
+
+	cloudNodeController.AddCloudNode(context.TODO(), fnh.Existing[0])
+
+	assert.Equal(t, 1, len(fnh.UpdatedNodes), "Node was not updated")
+	assert.Equal(t, "node0", fnh.UpdatedNodes[0].Name, "Node was not updated")
+	assert.Equal(t, 2, len(fnh.UpdatedNodes[0].ObjectMeta.Labels),
+		"Node label for Region and Zone were not set")
 	assert.Equal(t, "us-west", fnh.UpdatedNodes[0].ObjectMeta.Labels[v1.LabelZoneRegion],
 		"Node Region not correctly updated")
 	assert.Equal(t, "us-west-1a", fnh.UpdatedNodes[0].ObjectMeta.Labels[v1.LabelZoneFailureDomain],
@@ -549,6 +640,7 @@ func TestNodeAddresses(t *testing.T) {
 		cloud:                     fakeCloud,
 		nodeStatusUpdateFrequency: 1 * time.Second,
 		recorder:                  eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"}),
+		serverVersion:             version.MustParseSemantic("v1.17.0"),
 	}
 	eventBroadcaster.StartLogging(klog.Infof)
 
@@ -661,6 +753,7 @@ func TestNodeProvidedIPAddresses(t *testing.T) {
 		cloud:                     fakeCloud,
 		nodeStatusUpdateFrequency: 1 * time.Second,
 		recorder:                  eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"}),
+		serverVersion:             version.MustParseSemantic("v1.17.0"),
 	}
 	eventBroadcaster.StartLogging(klog.Infof)
 
@@ -681,12 +774,14 @@ func TestNodeProvidedIPAddresses(t *testing.T) {
 func Test_reconcileNodeLabels(t *testing.T) {
 	testcases := []struct {
 		name           string
+		serverVersion  *version.Version
 		labels         map[string]string
 		expectedLabels map[string]string
 		expectedErr    error
 	}{
 		{
-			name: "requires reconcile",
+			name:          "requires reconcile",
+			serverVersion: version.MustParseSemantic("v1.17.0"),
 			labels: map[string]string{
 				v1.LabelZoneFailureDomain: "foo",
 				v1.LabelZoneRegion:        "bar",
@@ -703,7 +798,8 @@ func Test_reconcileNodeLabels(t *testing.T) {
 			expectedErr: nil,
 		},
 		{
-			name: "doesn't require reconcile",
+			name:          "doesn't require reconcile",
+			serverVersion: version.MustParseSemantic("v1.17.0"),
 			labels: map[string]string{
 				v1.LabelZoneFailureDomain:       "foo",
 				v1.LabelZoneRegion:              "bar",
@@ -723,7 +819,8 @@ func Test_reconcileNodeLabels(t *testing.T) {
 			expectedErr: nil,
 		},
 		{
-			name: "require reconcile -- secondary labels are different from primary",
+			name:          "require reconcile -- secondary labels are different from primary",
+			serverVersion: version.MustParseSemantic("v1.17.0"),
 			labels: map[string]string{
 				v1.LabelZoneFailureDomain:       "foo",
 				v1.LabelZoneRegion:              "bar",
@@ -742,6 +839,21 @@ func Test_reconcileNodeLabels(t *testing.T) {
 			},
 			expectedErr: nil,
 		},
+		{
+			name:          "doesn't requires reconcile cause server version is less than v.1.17.0",
+			serverVersion: version.MustParseSemantic("v1.16.0"),
+			labels: map[string]string{
+				v1.LabelZoneFailureDomain: "foo",
+				v1.LabelZoneRegion:        "bar",
+				v1.LabelInstanceType:      "the-best-type",
+			},
+			expectedLabels: map[string]string{
+				v1.LabelZoneFailureDomain: "foo",
+				v1.LabelZoneRegion:        "bar",
+				v1.LabelInstanceType:      "the-best-type",
+			},
+			expectedErr: nil,
+		},
 	}
 
 	for _, test := range testcases {
@@ -757,8 +869,9 @@ func Test_reconcileNodeLabels(t *testing.T) {
 			factory := informers.NewSharedInformerFactory(clientset, 0)
 
 			cnc := &CloudNodeController{
-				kubeClient:   clientset,
-				nodeInformer: factory.Core().V1().Nodes(),
+				kubeClient:    clientset,
+				nodeInformer:  factory.Core().V1().Nodes(),
+				serverVersion: test.serverVersion,
 			}
 
 			// activate node informer
@@ -976,9 +1089,10 @@ func TestNodeAddressesNotUpdate(t *testing.T) {
 	}
 
 	cloudNodeController := &CloudNodeController{
-		kubeClient:   fnh,
-		nodeInformer: factory.Core().V1().Nodes(),
-		cloud:        fakeCloud,
+		kubeClient:    fnh,
+		nodeInformer:  factory.Core().V1().Nodes(),
+		cloud:         fakeCloud,
+		serverVersion: version.MustParseSemantic("v1.17.0"),
 	}
 
 	cloudNodeController.updateNodeAddress(context.TODO(), fnh.Existing[0], fakeCloud)
@@ -1060,6 +1174,7 @@ func TestNodeProviderID(t *testing.T) {
 		cloud:                     fakeCloud,
 		nodeStatusUpdateFrequency: 1 * time.Second,
 		recorder:                  eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"}),
+		serverVersion:             version.MustParseSemantic("v1.17.0"),
 	}
 	eventBroadcaster.StartLogging(klog.Infof)
 
@@ -1143,6 +1258,7 @@ func TestNodeProviderIDAlreadySet(t *testing.T) {
 		cloud:                     fakeCloud,
 		nodeStatusUpdateFrequency: 1 * time.Second,
 		recorder:                  eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"}),
+		serverVersion:             version.MustParseSemantic("v1.17.0"),
 	}
 	eventBroadcaster.StartLogging(klog.Infof)
 
@@ -1221,6 +1337,7 @@ func TestNodeProviderIDError(t *testing.T) {
 		cloud:                     fakeCloud,
 		nodeStatusUpdateFrequency: 1 * time.Second,
 		recorder:                  eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"}),
+		serverVersion:             version.MustParseSemantic("v1.17.0"),
 	}
 	eventBroadcaster.StartLogging(klog.Infof)
 
@@ -1309,6 +1426,7 @@ func TestNodeProviderIDNotImplemented(t *testing.T) {
 		cloud:                     fakeCloud,
 		nodeStatusUpdateFrequency: 1 * time.Second,
 		recorder:                  eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"}),
+		serverVersion:             version.MustParseSemantic("v1.17.0"),
 	}
 	eventBroadcaster.StartLogging(klog.Infof)
 

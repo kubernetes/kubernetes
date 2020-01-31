@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -53,6 +54,7 @@ var labelReconcileInfo = []struct {
 	primaryKey            string
 	secondaryKey          string
 	ensureSecondaryExists bool
+	afterVersion          *version.Version
 }{
 	{
 		// Reconcile the beta and the GA zone label using the beta label as
@@ -61,6 +63,7 @@ var labelReconcileInfo = []struct {
 		primaryKey:            v1.LabelZoneFailureDomain,
 		secondaryKey:          v1.LabelZoneFailureDomainStable,
 		ensureSecondaryExists: true,
+		afterVersion:          version.MustParseSemantic("v1.17.0"),
 	},
 	{
 		// Reconcile the beta and the stable region label using the beta label as
@@ -69,6 +72,7 @@ var labelReconcileInfo = []struct {
 		primaryKey:            v1.LabelZoneRegion,
 		secondaryKey:          v1.LabelZoneRegionStable,
 		ensureSecondaryExists: true,
+		afterVersion:          version.MustParseSemantic("v1.17.0"),
 	},
 	{
 		// Reconcile the beta and the stable instance-type label using the beta label as
@@ -77,6 +81,7 @@ var labelReconcileInfo = []struct {
 		primaryKey:            v1.LabelInstanceType,
 		secondaryKey:          v1.LabelInstanceTypeStable,
 		ensureSecondaryExists: true,
+		afterVersion:          version.MustParseSemantic("v1.17.0"),
 	},
 }
 
@@ -87,9 +92,10 @@ var UpdateNodeSpecBackoff = wait.Backoff{
 }
 
 type CloudNodeController struct {
-	nodeInformer coreinformers.NodeInformer
-	kubeClient   clientset.Interface
-	recorder     record.EventRecorder
+	nodeInformer  coreinformers.NodeInformer
+	kubeClient    clientset.Interface
+	recorder      record.EventRecorder
+	serverVersion *version.Version
 
 	cloud cloudprovider.Interface
 
@@ -114,10 +120,21 @@ func NewCloudNodeController(
 		return nil, errors.New("cloud provider does not support instances")
 	}
 
+	serverVersion, err := kubeClient.Discovery().ServerVersion()
+	if err != nil {
+		return nil, fmt.Errorf("error discovering Kubernetes server version: %v", err)
+	}
+
+	serverSemver, err := version.ParseSemantic(serverVersion.String())
+	if err != nil {
+		return nil, fmt.Errorf("could not parse semantic Kubernetes version %q, err: %v", serverVersion, err)
+	}
+
 	cnc := &CloudNodeController{
 		nodeInformer:              nodeInformer,
 		kubeClient:                kubeClient,
 		recorder:                  recorder,
+		serverVersion:             serverSemver,
 		cloud:                     cloud,
 		nodeStatusUpdateFrequency: nodeStatusUpdateFrequency,
 	}
@@ -191,6 +208,16 @@ func (cnc *CloudNodeController) reconcileNodeLabels(nodeName string) error {
 
 	labelsToUpdate := map[string]string{}
 	for _, r := range labelReconcileInfo {
+		// If server version is before afterVersion of each labelReconcileInfo, then skip
+		// attempting to reconcile primary/secondary node labels.
+		// This ensures that a version of the CCM that is newer than Kubernetes does not add
+		// node labels that are unknown to that Kubernetes version.
+		// For example: a CCM that imports k8s.io/kubernetes@v1.17.1 should not add GA zone/region
+		// topology labels if the control plane is still on v1.16
+		if cnc.isServerVersionLessThan(r.afterVersion) {
+			continue
+		}
+
 		primaryValue, primaryExists := node.Labels[r.primaryKey]
 		secondaryValue, secondaryExists := node.Labels[r.secondaryKey]
 
@@ -453,8 +480,11 @@ func (cnc *CloudNodeController) getNodeModifiersFromCloudProvider(ctx context.Co
 			if n.Labels == nil {
 				n.Labels = map[string]string{}
 			}
+
 			n.Labels[v1.LabelInstanceType] = instanceType
-			n.Labels[v1.LabelInstanceTypeStable] = instanceType
+			if cnc.shouldSupportStableNodeLabels() {
+				n.Labels[v1.LabelInstanceTypeStable] = instanceType
+			}
 		})
 	}
 
@@ -470,8 +500,11 @@ func (cnc *CloudNodeController) getNodeModifiersFromCloudProvider(ctx context.Co
 				if n.Labels == nil {
 					n.Labels = map[string]string{}
 				}
+
 				n.Labels[v1.LabelZoneFailureDomain] = zone.FailureDomain
-				n.Labels[v1.LabelZoneFailureDomainStable] = zone.FailureDomain
+				if cnc.shouldSupportStableNodeLabels() {
+					n.Labels[v1.LabelZoneFailureDomainStable] = zone.FailureDomain
+				}
 			})
 		}
 		if zone.Region != "" {
@@ -481,12 +514,28 @@ func (cnc *CloudNodeController) getNodeModifiersFromCloudProvider(ctx context.Co
 				if n.Labels == nil {
 					n.Labels = map[string]string{}
 				}
+
 				n.Labels[v1.LabelZoneRegion] = zone.Region
-				n.Labels[v1.LabelZoneRegionStable] = zone.Region
+				if cnc.shouldSupportStableNodeLabels() {
+					n.Labels[v1.LabelZoneRegionStable] = zone.Region
+				}
 			})
 		}
 	}
 	return nodeModifiers, nil
+}
+
+// shouldSupportStableNodeLabels return true if the current server version is >= v1.17.0 where the following
+// node topology labels were introduced
+//   * topology.kubernetes.io/zone
+//   * topology.kubernetes.io/region
+//   * node.kubernetes.io/instance-type
+func (cnc *CloudNodeController) shouldSupportStableNodeLabels() bool {
+	return cnc.serverVersion.AtLeast(version.MustParseSemantic("v1.17.0"))
+}
+
+func (cnc *CloudNodeController) isServerVersionLessThan(v *version.Version) bool {
+	return cnc.serverVersion.LessThan(v)
 }
 
 func getCloudTaint(taints []v1.Taint) *v1.Taint {
