@@ -9,6 +9,7 @@ go_library(
         "framework.go",
         "gmsa.go",
         "hybrid_network.go",
+        "kubelet_stats.go",
         "memory_limits.go",
         "networking.go",
         "service.go",
