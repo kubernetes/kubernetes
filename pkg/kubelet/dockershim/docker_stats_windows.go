@@ -22,7 +22,9 @@ import (
 	"context"
 	"time"
 
+	"github.com/Microsoft/hcsshim"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	"k8s.io/klog"
 )
 
 func (ds *dockerService) getContainerStats(containerID string) (*runtimeapi.ContainerStats, error) {
@@ -31,7 +33,18 @@ func (ds *dockerService) getContainerStats(containerID string) (*runtimeapi.Cont
 		return nil, err
 	}
 
-	statsJSON, err := ds.client.GetContainerStats(containerID)
+	hcsshim_container, err := hcsshim.OpenContainer(containerID)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		closeErr := hcsshim_container.Close()
+		if closeErr != nil {
+			klog.Errorf("Error closing container '%s': %v", containerID, closeErr)
+		}
+	}()
+
+	stats, err := hcsshim_container.Statistics()
 	if err != nil {
 		return nil, err
 	}
@@ -47,7 +60,6 @@ func (ds *dockerService) getContainerStats(containerID string) (*runtimeapi.Cont
 	}
 	status := statusResp.GetStatus()
 
-	dockerStats := statsJSON.Stats
 	timestamp := time.Now().UnixNano()
 	containerStats := &runtimeapi.ContainerStats{
 		Attributes: &runtimeapi.ContainerAttributes{
@@ -58,13 +70,12 @@ func (ds *dockerService) getContainerStats(containerID string) (*runtimeapi.Cont
 		},
 		Cpu: &runtimeapi.CpuUsage{
 			Timestamp: timestamp,
-			// have to multiply cpu usage by 100 since docker stats units is in 100's of nano seconds for Windows
-			// see https://github.com/moby/moby/blob/v1.13.1/api/types/stats.go#L22
-			UsageCoreNanoSeconds: &runtimeapi.UInt64Value{Value: dockerStats.CPUStats.CPUUsage.TotalUsage * 100},
+			// have to multiply cpu usage by 100 since stats units is in 100's of nano seconds for Windows
+			UsageCoreNanoSeconds: &runtimeapi.UInt64Value{Value: stats.Processor.TotalRuntime100ns * 100},
 		},
 		Memory: &runtimeapi.MemoryUsage{
 			Timestamp:       timestamp,
-			WorkingSetBytes: &runtimeapi.UInt64Value{Value: dockerStats.MemoryStats.PrivateWorkingSet},
+			WorkingSetBytes: &runtimeapi.UInt64Value{Value: stats.Memory.UsagePrivateWorkingSetBytes},
 		},
 		WritableLayer: &runtimeapi.FilesystemUsage{
 			Timestamp: timestamp,
