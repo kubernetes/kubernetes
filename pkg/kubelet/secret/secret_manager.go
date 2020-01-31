@@ -145,8 +145,14 @@ func NewWatchingSecretManager(kubeClient clientset.Interface) Manager {
 	newSecret := func() runtime.Object {
 		return &v1.Secret{}
 	}
+	isImmutable := func(object runtime.Object) bool {
+		if secret, ok := object.(*v1.Secret); ok {
+			return secret.Immutable != nil && *secret.Immutable
+		}
+		return false
+	}
 	gr := corev1.Resource("secret")
 	return &secretManager{
-		manager: manager.NewWatchBasedManager(listSecret, watchSecret, newSecret, gr, getSecretNames),
+		manager: manager.NewWatchBasedManager(listSecret, watchSecret, newSecret, isImmutable, gr, getSecretNames),
 	}
 }
