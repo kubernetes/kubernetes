@@ -4424,8 +4424,15 @@ func ValidateNodeSpecificAnnotations(annotations map[string]string, fldPath *fie
 	return allErrs
 }
 
+// NodeValidationOptions contains the different settings for node validation
+type NodeValidationOptions struct {
+	// Should node a spec containing more than one huge page resource (with different sizes)
+	// with pre-allocated memory trigger validation errors
+	ValidateSingleHugePageResource bool
+}
+
 // ValidateNode tests if required fields in the node are set.
-func ValidateNode(node *core.Node) field.ErrorList {
+func ValidateNode(node *core.Node, opts NodeValidationOptions) field.ErrorList {
 	fldPath := field.NewPath("metadata")
 	allErrs := ValidateObjectMeta(&node.ObjectMeta, false, ValidateNodeName, fldPath)
 	allErrs = append(allErrs, ValidateNodeSpecificAnnotations(node.ObjectMeta.Annotations, fldPath.Child("annotations"))...)
@@ -4436,7 +4443,7 @@ func ValidateNode(node *core.Node) field.ErrorList {
 	// Only validate spec.
 	// All status fields are optional and can be updated later.
 	// That said, if specified, we need to ensure they are valid.
-	allErrs = append(allErrs, ValidateNodeResources(node)...)
+	allErrs = append(allErrs, ValidateNodeResources(node, opts)...)
 
 	// validate PodCIDRS only if we need to
 	if len(node.Spec.PodCIDRs) > 0 {
@@ -4476,13 +4483,33 @@ func ValidateNode(node *core.Node) field.ErrorList {
 }
 
 // ValidateNodeResources is used to make sure a node has valid capacity and allocatable values.
-func ValidateNodeResources(node *core.Node) field.ErrorList {
+func ValidateNodeResources(node *core.Node, opts NodeValidationOptions) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if opts.ValidateSingleHugePageResource {
+		allErrs = append(allErrs, ValidateNodeSingleHugePageResources(node)...)
+	}
+
+	// Validate resource quantities in capacity.
+	for k, v := range node.Status.Capacity {
+		resPath := field.NewPath("status", "capacity", string(k))
+		allErrs = append(allErrs, ValidateResourceQuantityValue(string(k), v, resPath)...)
+	}
+
+	// Validate resource quantities in allocatable.
+	for k, v := range node.Status.Allocatable {
+		resPath := field.NewPath("status", "allocatable", string(k))
+		allErrs = append(allErrs, ValidateResourceQuantityValue(string(k), v, resPath)...)
+	}
+	return allErrs
+}
+
+// ValidateNodeHugePageResources is used to make sure a node has valid capacity and allocatable values for the huge page resources.
+func ValidateNodeSingleHugePageResources(node *core.Node) field.ErrorList {
 	allErrs := field.ErrorList{}
 	// Validate resource quantities in capacity.
 	hugePageSizes := sets.NewString()
 	for k, v := range node.Status.Capacity {
 		resPath := field.NewPath("status", "capacity", string(k))
-		allErrs = append(allErrs, ValidateResourceQuantityValue(string(k), v, resPath)...)
 		// track any huge page size that has a positive value
 		if helper.IsHugePageResourceName(k) && v.Value() > int64(0) {
 			hugePageSizes.Insert(string(k))
@@ -4495,7 +4522,6 @@ func ValidateNodeResources(node *core.Node) field.ErrorList {
 	hugePageSizes = sets.NewString()
 	for k, v := range node.Status.Allocatable {
 		resPath := field.NewPath("status", "allocatable", string(k))
-		allErrs = append(allErrs, ValidateResourceQuantityValue(string(k), v, resPath)...)
 		// track any huge page size that has a positive value
 		if helper.IsHugePageResourceName(k) && v.Value() > int64(0) {
 			hugePageSizes.Insert(string(k))
@@ -4508,7 +4534,7 @@ func ValidateNodeResources(node *core.Node) field.ErrorList {
 }
 
 // ValidateNodeUpdate tests to make sure a node update can be applied.  Modifies oldNode.
-func ValidateNodeUpdate(node, oldNode *core.Node) field.ErrorList {
+func ValidateNodeUpdate(node, oldNode *core.Node, opts NodeValidationOptions) field.ErrorList {
 	fldPath := field.NewPath("metadata")
 	allErrs := ValidateObjectMetaUpdate(&node.ObjectMeta, &oldNode.ObjectMeta, fldPath)
 	allErrs = append(allErrs, ValidateNodeSpecificAnnotations(node.ObjectMeta.Annotations, fldPath.Child("annotations"))...)
@@ -4519,7 +4545,7 @@ func ValidateNodeUpdate(node, oldNode *core.Node) field.ErrorList {
 	// 	allErrs = append(allErrs, field.Invalid("status", node.Status, "must be empty"))
 	// }
 
-	allErrs = append(allErrs, ValidateNodeResources(node)...)
+	allErrs = append(allErrs, ValidateNodeResources(node, opts)...)
 
 	// Validate no duplicate addresses in node status.
 	addresses := make(map[core.NodeAddress]bool)
