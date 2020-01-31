@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
+	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -103,57 +104,77 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 		var podRes v1.ResourceList
 		// Create one pod per node that uses a lot of the node's resources.
 		ginkgo.By("Create pods that use 60% of node resources.")
-		pods := make([]*v1.Pod, len(nodeList.Items))
+		pods := make([]*v1.Pod, 0, len(nodeList.Items))
+		allPods, err := cs.CoreV1().Pods(metav1.NamespaceAll).List(metav1.ListOptions{})
+		framework.ExpectNoError(err)
 		for i, node := range nodeList.Items {
+			currentCPUUsage, currentMemUsage := getCurrentPodUsageOnTheNode(node.Name, allPods.Items, podRequestedResource)
+			framework.Logf("Current cpu and memory usage %v, %v", currentCPUUsage, currentMemUsage)
 			cpuAllocatable, found := node.Status.Allocatable["cpu"]
 			framework.ExpectEqual(found, true)
-			milliCPU := cpuAllocatable.MilliValue() * 40 / 100
+			milliCPU := cpuAllocatable.MilliValue()
+			milliCPU = int64(float64(milliCPU-currentCPUUsage) * float64(0.6))
 			memAllocatable, found := node.Status.Allocatable["memory"]
 			framework.ExpectEqual(found, true)
-			memory := memAllocatable.Value() * 60 / 100
+			memory := memAllocatable.Value()
+			memory = int64(float64(memory-currentMemUsage) * float64(0.6))
+			// If a node is already heavily utilized let not's create a pod there.
+			if milliCPU <= 0 || memory <= 0 {
+				framework.Logf("Node is heavily utilized, let's not create a pod here")
+				continue
+			}
 			podRes = v1.ResourceList{}
 			podRes[v1.ResourceCPU] = *resource.NewMilliQuantity(int64(milliCPU), resource.DecimalSI)
 			podRes[v1.ResourceMemory] = *resource.NewQuantity(int64(memory), resource.BinarySI)
 
 			// make the first pod low priority and the rest medium priority.
 			priorityName := mediumPriorityClassName
-			if i == 0 {
+			if len(pods) == 0 {
 				priorityName = lowPriorityClassName
 			}
-			pods[i] = createPausePod(f, pausePodConfig{
+			pods = append(pods, createPausePod(f, pausePodConfig{
 				Name:              fmt.Sprintf("pod%d-%v", i, priorityName),
 				PriorityClassName: priorityName,
 				Resources: &v1.ResourceRequirements{
 					Requests: podRes,
 				},
-			})
+				NodeName: node.Name,
+			}))
 			framework.Logf("Created pod: %v", pods[i].Name)
+		}
+		if len(pods) < 2 {
+			framework.Failf("We need at least two pods to be created but" +
+				"all nodes are already heavily utilized, so preemption tests cannot be run")
 		}
 		ginkgo.By("Wait for pods to be scheduled.")
 		for _, pod := range pods {
 			framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(cs, pod))
 		}
 
-		ginkgo.By("Run a high priority pod that use 60% of a node resources.")
-		// Create a high priority pod and make sure it is scheduled.
+		// Set the pod request to the first pod's resources (should be low priority pod)
+		podRes = pods[0].Spec.Containers[0].Resources.Requests
+
+		ginkgo.By("Run a high priority pod that has same requirements as that of lower priority pod")
+		// Create a high priority pod and make sure it is scheduled on the same node as the low priority pod.
 		runPausePod(f, pausePodConfig{
 			Name:              "preemptor-pod",
 			PriorityClassName: highPriorityClassName,
 			Resources: &v1.ResourceRequirements{
 				Requests: podRes,
 			},
+			NodeName: pods[0].Spec.NodeName,
 		})
-		// Make sure that the lowest priority pod is deleted.
+
 		preemptedPod, err := cs.CoreV1().Pods(pods[0].Namespace).Get(pods[0].Name, metav1.GetOptions{})
-		podDeleted := (err != nil && apierrors.IsNotFound(err)) ||
+		podPreempted := (err != nil && apierrors.IsNotFound(err)) ||
 			(err == nil && preemptedPod.DeletionTimestamp != nil)
-		framework.ExpectEqual(podDeleted, true)
-		// Other pods (mid priority ones) should be present.
 		for i := 1; i < len(pods); i++ {
 			livePod, err := cs.CoreV1().Pods(pods[i].Namespace).Get(pods[i].Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 			gomega.Expect(livePod.DeletionTimestamp).To(gomega.BeNil())
 		}
+
+		framework.ExpectEqual(podPreempted, true)
 	})
 
 	// This test verifies that when a critical pod is created and no node with
@@ -163,21 +184,32 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 		var podRes v1.ResourceList
 		// Create one pod per node that uses a lot of the node's resources.
 		ginkgo.By("Create pods that use 60% of node resources.")
-		pods := make([]*v1.Pod, len(nodeList.Items))
+		pods := make([]*v1.Pod, 0, len(nodeList.Items))
+		allPods, err := cs.CoreV1().Pods(metav1.NamespaceAll).List(metav1.ListOptions{})
+		framework.ExpectNoError(err)
 		for i, node := range nodeList.Items {
+			currentCPUUsage, currentMemUsage := getCurrentPodUsageOnTheNode(node.Name, allPods.Items, podRequestedResource)
+			framework.Logf("Current cpu usage and memory usage is %v, %v", currentCPUUsage, currentMemUsage)
 			cpuAllocatable, found := node.Status.Allocatable["cpu"]
 			framework.ExpectEqual(found, true)
-			milliCPU := cpuAllocatable.MilliValue() * 40 / 100
+			milliCPU := cpuAllocatable.MilliValue()
+			milliCPU = int64(float64(milliCPU-currentCPUUsage) * float64(0.6))
 			memAllocatable, found := node.Status.Allocatable["memory"]
 			framework.ExpectEqual(found, true)
-			memory := memAllocatable.Value() * 60 / 100
+			memory := memAllocatable.Value()
+			memory = int64(float64(memory-currentMemUsage) * float64(0.6))
 			podRes = v1.ResourceList{}
+			// If a node is already heavily utilized let not's create a pod there.
+			if milliCPU <= 0 || memory <= 0 {
+				framework.Logf("Node is heavily utilized, let's not create a pod there")
+				continue
+			}
 			podRes[v1.ResourceCPU] = *resource.NewMilliQuantity(int64(milliCPU), resource.DecimalSI)
 			podRes[v1.ResourceMemory] = *resource.NewQuantity(int64(memory), resource.BinarySI)
 
 			// make the first pod low priority and the rest medium priority.
 			priorityName := mediumPriorityClassName
-			if i == 0 {
+			if len(pods) == 0 {
 				priorityName = lowPriorityClassName
 			}
 			pods[i] = createPausePod(f, pausePodConfig{
@@ -186,15 +218,22 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 				Resources: &v1.ResourceRequirements{
 					Requests: podRes,
 				},
+				NodeName: node.Name,
 			})
 			framework.Logf("Created pod: %v", pods[i].Name)
+		}
+		if len(pods) < 2 {
+			framework.Skipf("We need at least two pods to be created but" +
+				"all nodes are already heavily utilized, so preemption tests cannot be run")
 		}
 		ginkgo.By("Wait for pods to be scheduled.")
 		for _, pod := range pods {
 			framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(cs, pod))
 		}
 
-		ginkgo.By("Run a critical pod that use 60% of a node resources.")
+		// We want this pod to be preempted
+		podRes = pods[0].Spec.Containers[0].Resources.Requests
+		ginkgo.By("Run a critical pod that use same resources as that of a lower priority pod")
 		// Create a critical pod and make sure it is scheduled.
 		defer func() {
 			// Clean-up the critical pod
@@ -211,18 +250,25 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 			Resources: &v1.ResourceRequirements{
 				Requests: podRes,
 			},
+			NodeName: pods[0].Spec.NodeName,
 		})
+
+		defer func() {
+			// Clean-up the critical pod
+			err := f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Delete("critical-pod", metav1.NewDeleteOptions(0))
+			framework.ExpectNoError(err)
+		}()
 		// Make sure that the lowest priority pod is deleted.
 		preemptedPod, err := cs.CoreV1().Pods(pods[0].Namespace).Get(pods[0].Name, metav1.GetOptions{})
-		podDeleted := (err != nil && apierrors.IsNotFound(err)) ||
+		podPreempted := (err != nil && apierrors.IsNotFound(err)) ||
 			(err == nil && preemptedPod.DeletionTimestamp != nil)
-		framework.ExpectEqual(podDeleted, true)
-		// Other pods (mid priority ones) should be present.
 		for i := 1; i < len(pods); i++ {
 			livePod, err := cs.CoreV1().Pods(pods[i].Namespace).Get(pods[i].Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 			gomega.Expect(livePod.DeletionTimestamp).To(gomega.BeNil())
 		}
+
+		framework.ExpectEqual(podPreempted, true)
 	})
 })
 
@@ -515,4 +561,18 @@ func waitForPreemptingWithTimeout(f *framework.Framework, pod *v1.Pod, timeout t
 		return false, err
 	})
 	framework.ExpectNoError(err, "pod %v/%v failed to preempt other pods", pod.Namespace, pod.Name)
+}
+
+func getCurrentPodUsageOnTheNode(nodeName string, pods []v1.Pod, resource *v1.ResourceRequirements) (int64, int64) {
+	totalRequestedCPUResource := resource.Requests.Cpu().MilliValue()
+	totalRequestedMemResource := resource.Requests.Memory().Value()
+	for _, pod := range pods {
+		if pod.Spec.NodeName != nodeName || v1qos.GetPodQOS(&pod) == v1.PodQOSBestEffort {
+			continue
+		}
+		result := getNonZeroRequests(&pod)
+		totalRequestedCPUResource += result.MilliCPU
+		totalRequestedMemResource += result.Memory
+	}
+	return totalRequestedCPUResource, totalRequestedMemResource
 }
