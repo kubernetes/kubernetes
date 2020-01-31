@@ -115,7 +115,7 @@ func (ss *scaleSet) getVMSS(vmssName string, crt cacheReadType) (*compute.Virtua
 		return vmss, nil
 	}
 
-	klog.V(3).Infof("Couldn't find VMSS with name %s, refreshing the cache", vmssName)
+	klog.V(2).Infof("Couldn't find VMSS with name %s, refreshing the cache", vmssName)
 	ss.vmssCache.Delete(vmssKey)
 	vmss, err = getter(vmssName)
 	if err != nil {
@@ -131,19 +131,21 @@ func (ss *scaleSet) getVMSS(vmssName string, crt cacheReadType) (*compute.Virtua
 // getVmssVM gets virtualMachineScaleSetVM by nodeName from cache.
 // It returns cloudprovider.InstanceNotFound if node does not belong to any scale sets.
 func (ss *scaleSet) getVmssVM(nodeName string, crt cacheReadType) (string, string, *compute.VirtualMachineScaleSetVM, error) {
-	getter := func(nodeName string) (string, string, *compute.VirtualMachineScaleSetVM, error) {
+	getter := func(nodeName string, crt cacheReadType) (string, string, *compute.VirtualMachineScaleSetVM, bool, error) {
+		var found bool
 		cached, err := ss.vmssVMCache.Get(vmssVirtualMachinesKey, crt)
 		if err != nil {
-			return "", "", nil, err
+			return "", "", nil, found, err
 		}
 
 		virtualMachines := cached.(*sync.Map)
 		if vm, ok := virtualMachines.Load(nodeName); ok {
 			result := vm.(*vmssVirtualMachinesEntry)
-			return result.vmssName, result.instanceID, result.virtualMachine, nil
+			found = true
+			return result.vmssName, result.instanceID, result.virtualMachine, found, nil
 		}
 
-		return "", "", nil, nil
+		return "", "", nil, found, nil
 	}
 
 	_, err := getScaleSetVMInstanceID(nodeName)
@@ -151,22 +153,24 @@ func (ss *scaleSet) getVmssVM(nodeName string, crt cacheReadType) (string, strin
 		return "", "", nil, err
 	}
 
-	vmssName, instanceID, vm, err := getter(nodeName)
+	vmssName, instanceID, vm, found, err := getter(nodeName, crt)
 	if err != nil {
 		return "", "", nil, err
 	}
-	if vm != nil {
+
+	if !found {
+		klog.V(2).Infof("Couldn't find VMSS VM with nodeName %s, refreshing the cache", nodeName)
+		vmssName, instanceID, vm, found, err = getter(nodeName, cacheReadTypeForceRefresh)
+		if err != nil {
+			return "", "", nil, err
+		}
+	}
+
+	if found && vm != nil {
 		return vmssName, instanceID, vm, nil
 	}
 
-	klog.V(3).Infof("Couldn't find VMSS VM with nodeName %s, refreshing the cache", nodeName)
-	ss.vmssVMCache.Delete(vmssVirtualMachinesKey)
-	vmssName, instanceID, vm, err = getter(nodeName)
-	if err != nil {
-		return "", "", nil, err
-	}
-
-	if vm == nil {
+	if !found || vm == nil {
 		return "", "", nil, cloudprovider.InstanceNotFound
 	}
 	return vmssName, instanceID, vm, nil
@@ -197,7 +201,7 @@ func (ss *scaleSet) GetPowerStatusByNodeName(name string) (powerState string, er
 // getCachedVirtualMachineByInstanceID gets scaleSetVMInfo from cache.
 // The node must belong to one of scale sets.
 func (ss *scaleSet) getVmssVMByInstanceID(resourceGroup, scaleSetName, instanceID string, crt cacheReadType) (*compute.VirtualMachineScaleSetVM, error) {
-	getter := func() (vm *compute.VirtualMachineScaleSetVM, found bool, err error) {
+	getter := func(crt cacheReadType) (vm *compute.VirtualMachineScaleSetVM, found bool, err error) {
 		cached, err := ss.vmssVMCache.Get(vmssVirtualMachinesKey, crt)
 		if err != nil {
 			return nil, false, err
@@ -220,21 +224,21 @@ func (ss *scaleSet) getVmssVMByInstanceID(resourceGroup, scaleSetName, instanceI
 		return vm, found, nil
 	}
 
-	vm, found, err := getter()
-	if err != nil {
-		return nil, err
-	}
-	if found {
-		return vm, nil
-	}
-
-	klog.V(3).Infof("Couldn't find VMSS VM with scaleSetName %q and instanceID %q, refreshing the cache", scaleSetName, instanceID)
-	ss.vmssVMCache.Delete(vmssVirtualMachinesKey)
-	vm, found, err = getter()
+	vm, found, err := getter(crt)
 	if err != nil {
 		return nil, err
 	}
 	if !found {
+		klog.V(2).Infof("Couldn't find VMSS VM with scaleSetName %q and instanceID %q, refreshing the cache", scaleSetName, instanceID)
+		vm, found, err = getter(cacheReadTypeForceRefresh)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if found && vm != nil {
+		return vm, nil
+	}
+	if !found || vm == nil {
 		return nil, cloudprovider.InstanceNotFound
 	}
 
