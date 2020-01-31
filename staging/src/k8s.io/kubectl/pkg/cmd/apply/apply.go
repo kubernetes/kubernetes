@@ -32,7 +32,6 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
-	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/klog"
 	"k8s.io/kubectl/pkg/cmd/delete"
@@ -60,8 +59,8 @@ type ApplyOptions struct {
 	ForceConflicts  bool
 	FieldManager    string
 	Selector        string
-	DryRun          bool
-	ServerDryRun    bool
+	DryRunStrategy  cmdutil.DryRunStrategy
+	DryRunVerifier  *resource.DryRunVerifier
 	Prune           bool
 	PruneResources  []pruneResource
 	cmdBaseName     string
@@ -70,12 +69,11 @@ type ApplyOptions struct {
 	OpenAPIPatch    bool
 	PruneWhitelist  []string
 
-	Validator       validation.Schema
-	Builder         *resource.Builder
-	Mapper          meta.RESTMapper
-	DynamicClient   dynamic.Interface
-	DiscoveryClient discovery.DiscoveryInterface
-	OpenAPISchema   openapi.Resources
+	Validator     validation.Schema
+	Builder       *resource.Builder
+	Mapper        meta.RESTMapper
+	DynamicClient dynamic.Interface
+	OpenAPISchema openapi.Resources
 
 	Namespace        string
 	EnforceNamespace bool
@@ -192,7 +190,7 @@ func NewCmdApply(baseName string, f cmdutil.Factory, ioStreams genericclioptions
 	cmd.Flags().BoolVar(&o.All, "all", o.All, "Select all resources in the namespace of the specified resource types.")
 	cmd.Flags().StringArrayVar(&o.PruneWhitelist, "prune-whitelist", o.PruneWhitelist, "Overwrite the default whitelist with <group/version/kind> for --prune")
 	cmd.Flags().BoolVar(&o.OpenAPIPatch, "openapi-patch", o.OpenAPIPatch, "If true, use openapi to calculate diff when the openapi presents and the resource can be found in the openapi spec. Otherwise, fall back to use baked-in types.")
-	cmd.Flags().BoolVar(&o.ServerDryRun, "server-dry-run", o.ServerDryRun, "If true, request will be sent to server with dry-run flag, which means the modifications won't be persisted.")
+	cmd.Flags().Bool("server-dry-run", false, "If true, request will be sent to server with dry-run flag, which means the modifications won't be persisted.")
 	cmd.Flags().MarkDeprecated("server-dry-run", "--server-dry-run is deprecated and can be replaced with --dry-run=server.")
 	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddServerSideApplyFlags(cmd)
@@ -210,39 +208,42 @@ func (o *ApplyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	var err error
 	o.ServerSideApply = cmdutil.GetServerSideApplyFlag(cmd)
 	o.ForceConflicts = cmdutil.GetForceConflictsFlag(cmd)
-	o.FieldManager = cmdutil.GetFieldManagerFlag(cmd)
-	o.DryRun = cmdutil.GetClientSideDryRun(cmd)
+	o.DryRunStrategy, err = cmdutil.GetDryRunStrategy(cmd)
+	if err != nil {
+		return err
+	}
 	o.DynamicClient, err = f.DynamicClient()
 	if err != nil {
 		return err
 	}
-
-	o.DiscoveryClient, err = f.ToDiscoveryClient()
+	discoveryClient, err := f.ToDiscoveryClient()
 	if err != nil {
 		return err
 	}
+	o.DryRunVerifier = resource.NewDryRunVerifier(o.DynamicClient, discoveryClient)
+	o.FieldManager = cmdutil.GetFieldManagerFlag(cmd)
 
 	if o.ForceConflicts && !o.ServerSideApply {
 		return fmt.Errorf("--force-conflicts only works with --server-side")
 	}
 
-	if o.DryRun && o.ServerSideApply {
-		return fmt.Errorf("--dry-run doesn't work with --server-side (did you mean --server-dry-run instead?)")
+	if o.DryRunStrategy == cmdutil.DryRunClient && o.ServerSideApply {
+		return fmt.Errorf("--dry-run=client doesn't work with --server-side (did you mean --dry-run=server instead?)")
 	}
 
-	if o.DryRun && o.ServerDryRun {
-		return fmt.Errorf("--dry-run and --server-dry-run can't be used together")
+	var deprecatedServerDryRunFlag = cmdutil.GetFlagBool(cmd, "server-dry-run")
+	if o.DryRunStrategy == cmdutil.DryRunClient && deprecatedServerDryRunFlag {
+		return fmt.Errorf("--dry-run=client and --server-dry-run can't be used together (did you mean --dry-run=server instead?)")
+	}
+
+	if o.DryRunStrategy == cmdutil.DryRunNone && deprecatedServerDryRunFlag {
+		o.DryRunStrategy = cmdutil.DryRunServer
 	}
 
 	// allow for a success message operation to be specified at print time
 	o.ToPrinter = func(operation string) (printers.ResourcePrinter, error) {
 		o.PrintFlags.NamePrintFlags.Operation = operation
-		if o.DryRun {
-			o.PrintFlags.Complete("%s (dry run)")
-		}
-		if o.ServerDryRun {
-			o.PrintFlags.Complete("%s (server dry run)")
-		}
+		cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.DryRunStrategy)
 		return o.PrintFlags.ToPrinter()
 	}
 
@@ -397,11 +398,11 @@ func (o *ApplyOptions) Run() error {
 			}
 
 			helper := resource.NewHelper(info.Client, info.Mapping)
-			if o.ServerDryRun {
-				if err := resource.VerifyDryRun(info.Mapping.GroupVersionKind, o.DynamicClient, o.DiscoveryClient); err != nil {
+			if o.DryRunStrategy == cmdutil.DryRunServer {
+				if err := o.DryRunVerifier.HasSupport(info.Mapping.GroupVersionKind); err != nil {
 					return err
 				}
-				helper.DryRun(o.ServerDryRun)
+				helper.DryRun(true)
 			}
 			obj, err := helper.Patch(
 				info.Namespace,
@@ -471,14 +472,14 @@ See http://k8s.io/docs/reference/using-api/api-concepts/#conflicts`, err)
 				return cmdutil.AddSourceToErr("creating", info.Source, err)
 			}
 
-			if !o.DryRun {
+			if o.DryRunStrategy != cmdutil.DryRunClient {
 				// Then create the resource and skip the three-way merge
 				helper := resource.NewHelper(info.Client, info.Mapping)
-				if o.ServerDryRun {
-					if err := resource.VerifyDryRun(info.Mapping.GroupVersionKind, o.DynamicClient, o.DiscoveryClient); err != nil {
+				if o.DryRunStrategy == cmdutil.DryRunServer {
+					if err := o.DryRunVerifier.HasSupport(info.Mapping.GroupVersionKind); err != nil {
 						return cmdutil.AddSourceToErr("creating", info.Source, err)
 					}
-					helper.DryRun(o.ServerDryRun)
+					helper.DryRun(true)
 				}
 				obj, err := helper.Create(info.Namespace, true, info.Object)
 				if err != nil {
@@ -509,7 +510,7 @@ See http://k8s.io/docs/reference/using-api/api-concepts/#conflicts`, err)
 			return err
 		}
 
-		if !o.DryRun {
+		if o.DryRunStrategy != cmdutil.DryRunClient {
 			metadata, _ := meta.Accessor(info.Object)
 			annotationMap := metadata.GetAnnotations()
 			if _, ok := annotationMap[corev1.LastAppliedConfigAnnotation]; !ok {
