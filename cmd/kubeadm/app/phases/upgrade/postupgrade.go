@@ -17,29 +17,23 @@ limitations under the License.
 package upgrade
 
 import (
-	"context"
 	"os"
 
 	"github.com/pkg/errors"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
 	errorsutil "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/version"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/proxy"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/clusterinfo"
 	nodebootstraptoken "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/node"
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
 	patchnodephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/patchnode"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
-
-	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
-	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/proxy"
-	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 )
 
 // PerformPostUpgradeTasks runs nearly the same functions as 'kubeadm init' would do
@@ -96,56 +90,11 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitCon
 		errs = append(errs, err)
 	}
 
-	if err := dns.EnsureDNSAddon(&cfg.ClusterConfiguration, client); err != nil {
-		errs = append(errs, err)
-	}
-	// Remove the old DNS deployment if a new DNS service is now used (kube-dns to CoreDNS or vice versa)
-	if err := removeOldDNSDeploymentIfAnotherDNSIsUsed(&cfg.ClusterConfiguration, client, dryRun); err != nil {
-		errs = append(errs, err)
-	}
-
 	if err := proxy.EnsureProxyAddon(&cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint, client); err != nil {
 		errs = append(errs, err)
 	}
+
 	return errorsutil.NewAggregate(errs)
-}
-
-func removeOldDNSDeploymentIfAnotherDNSIsUsed(cfg *kubeadmapi.ClusterConfiguration, client clientset.Interface, dryRun bool) error {
-	return apiclient.TryRunCommand(func() error {
-		installedDeploymentName := kubeadmconstants.KubeDNSDeploymentName
-		deploymentToDelete := kubeadmconstants.CoreDNSDeploymentName
-
-		if cfg.DNS.Type == kubeadmapi.CoreDNS {
-			installedDeploymentName = kubeadmconstants.CoreDNSDeploymentName
-			deploymentToDelete = kubeadmconstants.KubeDNSDeploymentName
-		}
-
-		nodes, err := client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{
-			FieldSelector: fields.Set{"spec.unschedulable": "false"}.AsSelector().String(),
-		})
-		if err != nil {
-			return err
-		}
-
-		// If we're dry-running or there are no scheduable nodes available, we don't need to wait for the new DNS addon to become ready
-		if !dryRun && len(nodes.Items) != 0 {
-			dnsDeployment, err := client.AppsV1().Deployments(metav1.NamespaceSystem).Get(context.TODO(), installedDeploymentName, metav1.GetOptions{})
-			if err != nil {
-				return err
-			}
-			if dnsDeployment.Status.ReadyReplicas == 0 {
-				return errors.New("the DNS deployment isn't ready yet")
-			}
-		}
-
-		// We don't want to wait for the DNS deployment above to become ready when dryrunning (as it never will)
-		// but here we should execute the DELETE command against the dryrun clientset, as it will only be logged
-		err = apiclient.DeleteDeploymentForeground(client, metav1.NamespaceSystem, deploymentToDelete)
-		if err != nil && !apierrors.IsNotFound(err) {
-			return err
-		}
-		return nil
-	}, 10)
 }
 
 func writeKubeletConfigFiles(client clientset.Interface, cfg *kubeadmapi.InitConfiguration, newK8sVer *version.Version, dryRun bool) error {

@@ -34,24 +34,16 @@ import (
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 )
 
-// GetUpgradeVariables is a function
-func GetUpgradeVariables(kubeConfigPath string, cfgPath string, dryRun bool, newK8sVersion string) (clientset.Interface, *kubeadmapi.InitConfiguration, VersionGetter, error) {
-	client, err := GetClient(kubeConfigPath, dryRun)
-	if err != nil {
-		return nil, nil, nil, errors.Wrapf(err, "couldn't create a Kubernetes client from file %q", kubeConfigPath)
-	}
+// GetConfiguration is a function
+func GetConfiguration(client clientset.Interface, cfgPath string, newK8sVersion string) (*kubeadmapi.InitConfiguration, VersionGetter, error) {
 
 	var cfg *kubeadmapi.InitConfiguration
+	var err error
 	if cfgPath != "" {
 		klog.Warning("WARNING: Usage of the --config flag for reconfiguring the cluster during upgrade is not recommended!")
 		cfg, err = configutil.LoadInitConfigurationFromFile(cfgPath)
 	} else {
 		cfg, err = configutil.FetchInitConfigurationFromCluster(client, os.Stdout, "upgrade/config", false)
-	}
-
-	// If a new k8s version should be set, apply the change before printing the config
-	if len(newK8sVersion) != 0 {
-		cfg.KubernetesVersion = newK8sVersion
 	}
 
 	if err != nil {
@@ -60,49 +52,54 @@ func GetUpgradeVariables(kubeConfigPath string, cfgPath string, dryRun bool, new
 			fmt.Println("[upgrade/config] Without this information, 'kubeadm upgrade' won't know how to configure your upgraded cluster.")
 			fmt.Println("")
 			fmt.Println("[upgrade/config] Next steps:")
-			fmt.Printf("\t- OPTION 1: Run 'kubeadm config upload from-flags' and specify the same CLI arguments you passed to 'kubeadm init' when you created your control-plane.\n")
-			fmt.Printf("\t- OPTION 2: Run 'kubeadm config upload from-file' and specify the same config file you passed to 'kubeadm init' when you created your control-plane.\n")
-			fmt.Printf("\t- OPTION 3: Pass a config file to 'kubeadm upgrade' using the --config flag.\n")
+			fmt.Println("\t- OPTION 1: Run 'kubeadm config upload from-flags' and specify the same CLI arguments you passed to 'kubeadm init' when you created your control-plane.")
+			fmt.Println("\t- OPTION 2: Run 'kubeadm config upload from-file' and specify the same config file you passed to 'kubeadm init' when you created your control-plane.")
+			fmt.Println("\t- OPTION 3: Pass a config file to 'kubeadm upgrade' using the --config flag.")
 			fmt.Println("")
 			err = errors.Errorf("the ConfigMap %q in the %s namespace used for getting configuration information was not found", constants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
 		}
-		return nil, nil, nil, errors.Wrap(err, "[upgrade/config] FATAL")
+		return nil, nil, errors.Wrap(err, "[upgrade/config] FATAL")
 	}
 
-	return client, cfg, NewOfflineVersionGetter(NewKubeVersionGetter(client), newK8sVersion), nil
+	if len(newK8sVersion) != 0 {
+		cfg.KubernetesVersion = newK8sVersion
+	}
+
+	return cfg, NewOfflineVersionGetter(NewKubeVersionGetter(client), newK8sVersion), nil
 }
 
 // GetClient gets a real or fake client depending on whether the user is dry-running or not
 func GetClient(file string, dryRun bool) (clientset.Interface, error) {
-	if dryRun {
-		dryRunGetter, err := apiclient.NewClientBackedDryRunGetterFromKubeconfig(file)
-		if err != nil {
-			return nil, err
-		}
-
-		// In order for fakeclient.Discovery().ServerVersion() to return the backing API Server's
-		// real version; we have to do some clever API machinery tricks. First, we get the real
-		// API Server's version
-		realServerVersion, err := dryRunGetter.Client().Discovery().ServerVersion()
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to get server version")
-		}
-
-		// Get the fake clientset
-		dryRunOpts := apiclient.GetDefaultDryRunClientOptions(dryRunGetter, os.Stdout)
-		// Print GET and LIST requests
-		dryRunOpts.PrintGETAndLIST = true
-		fakeclient := apiclient.NewDryRunClientWithOpts(dryRunOpts)
-		// As we know the return of Discovery() of the fake clientset is of type *fakediscovery.FakeDiscovery
-		// we can convert it to that struct.
-		fakeclientDiscovery, ok := fakeclient.Discovery().(*fakediscovery.FakeDiscovery)
-		if !ok {
-			return nil, errors.New("couldn't set fake discovery's server version")
-		}
-		// Lastly, set the right server version to be used
-		fakeclientDiscovery.FakedServerVersion = realServerVersion
-		// return the fake clientset used for dry-running
-		return fakeclient, nil
+	if !dryRun {
+		return kubeconfigutil.ClientSetFromFile(file)
 	}
-	return kubeconfigutil.ClientSetFromFile(file)
+
+	dryRunGetter, err := apiclient.NewClientBackedDryRunGetterFromKubeconfig(file)
+	if err != nil {
+		return nil, err
+	}
+
+	// In order for fakeclient.Discovery().ServerVersion() to return the backing API Server's
+	// real version; we have to do some clever API machinery tricks. First, we get the real
+	// API Server's version
+	realServerVersion, err := dryRunGetter.Client().Discovery().ServerVersion()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get server version")
+	}
+
+	// Get the fake clientset
+	dryRunOpts := apiclient.GetDefaultDryRunClientOptions(dryRunGetter, os.Stdout)
+	// Print GET and LIST requests
+	dryRunOpts.PrintGETAndLIST = true
+	fakeclient := apiclient.NewDryRunClientWithOpts(dryRunOpts)
+	// As we know the return of Discovery() of the fake clientset is of type *fakediscovery.FakeDiscovery
+	// we can convert it to that struct.
+	fakeclientDiscovery, ok := fakeclient.Discovery().(*fakediscovery.FakeDiscovery)
+	if !ok {
+		return nil, errors.New("couldn't set fake discovery's server version")
+	}
+	// Lastly, set the right server version to be used
+	fakeclientDiscovery.FakedServerVersion = realServerVersion
+	// return the fake clientset used for dry-running
+	return fakeclient, nil
 }

@@ -81,7 +81,6 @@ func EnforceUpgradeVersionPolicies(newK8sVersionStr string, newK8sVersion *versi
 
 	versionSkewErrs := upgrade.EnforceVersionPolicies(versionGetter, newK8sVersionStr, newK8sVersion, allowExperimentalUpgrades, allowRCUpgrades)
 	if versionSkewErrs != nil {
-
 		if len(versionSkewErrs.Mandatory) > 0 {
 			return errors.Errorf("the --version argument is invalid due to these fatal errors:\n\n%v\nPlease fix the misalignments highlighted above and try upgrading again",
 				kubeadmutil.FormatErrMsg(versionSkewErrs.Mandatory))

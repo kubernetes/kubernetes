@@ -30,7 +30,8 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
-	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/upgrade/apply"
+	phases "k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/upgrade/apply"
+	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
@@ -157,7 +158,7 @@ func runApply(flags *applyFlags, userVersion string) error {
 
 	// Now; perform the upgrade procedure
 	klog.V(1).Infoln("[upgrade/apply] performing upgrade")
-	if err := PerformControlPlaneUpgrade(flags, applyData.Client(), applyData.Waiter(), applyData.Cfg()); err != nil {
+	if err := PerformControlPlaneUpgrade(flags, applyData); err != nil {
 		return errors.Wrap(err, "[upgrade/apply] FATAL")
 	}
 
@@ -165,6 +166,12 @@ func runApply(flags *applyFlags, userVersion string) error {
 	klog.V(1).Infoln("[upgrade/postupgrade] running post-upgrade tasks")
 	if err := upgrade.PerformPostUpgradeTasks(applyData.Client(), applyData.Cfg(), applyData.UserVersion(), flags.dryRun); err != nil {
 		return errors.Wrap(err, "[upgrade/postupgrade] FATAL post-upgrade error")
+	}
+
+	// perform addon tasks
+	klog.V(1).Infoln("[upgrade/addons] upgrading addons")
+	if err := dns.UpgradeDNSAddon(applyData.Client(), applyData.Cfg(), flags.dryRun); err != nil {
+		return errors.Wrap(err, "[upgrade/addons] FATAL addons error")
 	}
 
 	if flags.dryRun {
@@ -183,7 +190,12 @@ func runApply(flags *applyFlags, userVersion string) error {
 func newApplyData(flags *applyFlags, userVersion string) (*applyData, error) {
 
 	klog.V(1).Infoln("[upgrade/apply] retrieving configuration from cluster")
-	client, cfg, versionGetter, err := upgrade.GetUpgradeVariables(flags.applyPlanFlags.kubeConfigPath, flags.applyPlanFlags.cfgPath, flags.dryRun, userVersion)
+	client, err := upgrade.GetClient(flags.applyPlanFlags.kubeConfigPath, flags.dryRun)
+	if err != nil {
+		return nil, errors.Wrapf(err, "couldn't create a Kubernetes client from file %q", flags.applyPlanFlags.kubeConfigPath)
+	}
+
+	cfg, versionGetter, err := upgrade.GetConfiguration(client, flags.applyPlanFlags.cfgPath, userVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -322,14 +334,15 @@ func EnforceVersionPolicies(newK8sVersionStr string, newK8sVersion *version.Vers
 }
 
 // PerformControlPlaneUpgrade actually performs the upgrade procedure for the cluster of your type (self-hosted or static-pod-hosted)
-func PerformControlPlaneUpgrade(flags *applyFlags, client clientset.Interface, waiter apiclient.Waiter, internalcfg *kubeadmapi.InitConfiguration) error {
+func PerformControlPlaneUpgrade(flags *applyFlags, data *applyData) error {
+	// clientset.Interface, waiter apiclient.Waiter, internalcfg *kubeadmapi.InitConfiguration) error {
 
 	// OK, the cluster is hosted using static pods. Upgrade a static-pod hosted cluster
-	fmt.Printf("[upgrade/apply] Upgrading your Static Pod-hosted control plane to version %q...\n", internalcfg.KubernetesVersion)
+	fmt.Printf("[upgrade/apply] Upgrading your Static Pod-hosted control plane to version %q...\n", data.Cfg().KubernetesVersion)
 
 	if flags.dryRun {
-		return upgrade.DryRunStaticPodUpgrade(flags.kustomizeDir, internalcfg)
+		return upgrade.DryRunStaticPodUpgrade(flags.kustomizeDir, data.Cfg())
 	}
 
-	return upgrade.PerformStaticPodUpgrade(client, waiter, internalcfg, flags.etcdUpgrade, flags.renewCerts, flags.kustomizeDir)
+	return upgrade.PerformStaticPodUpgrade(data.Client(), data.Waiter(), data.Cfg(), flags.etcdUpgrade, flags.renewCerts, flags.kustomizeDir)
 }

@@ -31,8 +31,10 @@ import (
 	rbac "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	kuberuntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	errorsutil "k8s.io/apimachinery/pkg/util/errors"
 	clientset "k8s.io/client-go/kubernetes"
 	clientsetscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog"
@@ -647,4 +649,57 @@ func omitHostnameInTranslation(forwardIPs []string) ([]string, error) {
 	forwardIPs = forwardIPs[:index]
 
 	return forwardIPs, nil
+}
+
+// UpgradeDNSAddon upgrades addons
+func UpgradeDNSAddon(client clientset.Interface, cfg *kubeadmapi.InitConfiguration, dryRun bool) error {
+	errs := []error{}
+	// Upgrade kube-dns/CoreDNS and kube-proxy
+	if err := EnsureDNSAddon(&cfg.ClusterConfiguration, client); err != nil {
+		errs = append(errs, err)
+	}
+	// Remove the old DNS deployment if a new DNS service is now used (kube-dns to CoreDNS or vice versa)
+	if err := removeOldDNSDeploymentIfAnotherDNSIsUsed(&cfg.ClusterConfiguration, client, dryRun); err != nil {
+		errs = append(errs, err)
+	}
+
+	return errorsutil.NewAggregate(errs)
+}
+
+func removeOldDNSDeploymentIfAnotherDNSIsUsed(cfg *kubeadmapi.ClusterConfiguration, client clientset.Interface, dryRun bool) error {
+	return apiclient.TryRunCommand(func() error {
+		installedDeploymentName := kubeadmconstants.KubeDNSDeploymentName
+		deploymentToDelete := kubeadmconstants.CoreDNSDeploymentName
+
+		if cfg.DNS.Type == kubeadmapi.CoreDNS {
+			installedDeploymentName = kubeadmconstants.CoreDNSDeploymentName
+			deploymentToDelete = kubeadmconstants.KubeDNSDeploymentName
+		}
+
+		nodes, err := client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{
+			FieldSelector: fields.Set{"spec.unschedulable": "false"}.AsSelector().String(),
+		})
+		if err != nil {
+			return err
+		}
+
+		// If we're dry-running or there are no scheduable nodes available, we don't need to wait for the new DNS addon to become ready
+		if !dryRun && len(nodes.Items) != 0 {
+			dnsDeployment, err := client.AppsV1().Deployments(metav1.NamespaceSystem).Get(context.TODO(), installedDeploymentName, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			if dnsDeployment.Status.ReadyReplicas == 0 {
+				return errors.New("the DNS deployment isn't ready yet")
+			}
+		}
+
+		// We don't want to wait for the DNS deployment above to become ready when dryrunning (as it never will)
+		// but here we should execute the DELETE command against the dryrun clientset, as it will only be logged
+		err = apiclient.DeleteDeploymentForeground(client, metav1.NamespaceSystem, deploymentToDelete)
+		if err != nil && !apierrors.IsNotFound(err) {
+			return err
+		}
+		return nil
+	}, 10)
 }

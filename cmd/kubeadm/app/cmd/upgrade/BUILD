@@ -22,6 +22,7 @@ go_library(
         "//cmd/kubeadm/app/cmd/util:go_default_library",
         "//cmd/kubeadm/app/constants:go_default_library",
         "//cmd/kubeadm/app/features:go_default_library",
+        "//cmd/kubeadm/app/phases/addons/dns:go_default_library",
         "//cmd/kubeadm/app/phases/controlplane:go_default_library",
         "//cmd/kubeadm/app/phases/upgrade:go_default_library",
         "//cmd/kubeadm/app/util:go_default_library",
