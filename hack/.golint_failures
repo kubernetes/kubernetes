@@ -442,7 +442,6 @@ staging/src/k8s.io/cloud-provider
 staging/src/k8s.io/code-generator/cmd/client-gen/args
 staging/src/k8s.io/code-generator/cmd/client-gen/generators/fake
 staging/src/k8s.io/code-generator/cmd/client-gen/generators/scheme
-staging/src/k8s.io/code-generator/cmd/client-gen/types
 staging/src/k8s.io/code-generator/cmd/conversion-gen/generators
 staging/src/k8s.io/code-generator/cmd/go-to-protobuf/protobuf
 staging/src/k8s.io/code-generator/cmd/lister-gen/generators

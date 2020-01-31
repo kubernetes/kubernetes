@@ -102,6 +102,7 @@ func ToGroupVersionInfo(groups []GroupVersions, groupGoNames map[GroupVersion]st
 	return groupVersionPackages
 }
 
+// ToGroupInstallPackages is a helper function used by generators for groups.
 func ToGroupInstallPackages(groups []GroupVersions, groupGoNames map[GroupVersion]string) []GroupInstallPackage {
 	var groupInstallPackages []GroupInstallPackage
 	for _, group := range groups {
