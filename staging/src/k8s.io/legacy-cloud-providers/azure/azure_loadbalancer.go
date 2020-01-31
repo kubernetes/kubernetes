@@ -126,11 +126,11 @@ func (az *Cloud) GetLoadBalancer(ctx context.Context, clusterName string, servic
 	return status, true, nil
 }
 
-func getPublicIPDomainNameLabel(service *v1.Service) string {
+func getPublicIPDomainNameLabel(service *v1.Service) (string, bool) {
 	if labelName, found := service.Annotations[ServiceAnnotationDNSLabelName]; found {
-		return labelName
+		return labelName, found
 	}
-	return ""
+	return "", false
 }
 
 // EnsureLoadBalancer creates a new load balancer 'name', or updates the existing one. Returns the status of the balancer
@@ -491,7 +491,7 @@ func (az *Cloud) findServiceIPAddress(ctx context.Context, clusterName string, s
 	return lbStatus.Ingress[0].IP, nil
 }
 
-func (az *Cloud) ensurePublicIPExists(service *v1.Service, pipName string, domainNameLabel, clusterName string, shouldPIPExisted bool) (*network.PublicIPAddress, error) {
+func (az *Cloud) ensurePublicIPExists(service *v1.Service, pipName string, domainNameLabel, clusterName string, shouldPIPExisted, foundDNSLabelAnnotation bool) (*network.PublicIPAddress, error) {
 	pipResourceGroup := az.getPublicIPAddressResourceGroup(service)
 	pip, existsPip, err := az.getPublicIPAddress(pipResourceGroup, pipName)
 	if err != nil {
@@ -531,11 +531,13 @@ func (az *Cloud) ensurePublicIPExists(service *v1.Service, pipName string, domai
 		}
 		klog.V(2).Infof("ensurePublicIPExists for service(%s): pip(%s) - creating", serviceName, *pip.Name)
 	}
-	if len(domainNameLabel) == 0 {
-		pip.PublicIPAddressPropertiesFormat.DNSSettings = nil
-	} else {
-		pip.PublicIPAddressPropertiesFormat.DNSSettings = &network.PublicIPAddressDNSSettings{
-			DomainNameLabel: &domainNameLabel,
+	if foundDNSLabelAnnotation {
+		if len(domainNameLabel) == 0 {
+			pip.PublicIPAddressPropertiesFormat.DNSSettings = nil
+		} else {
+			pip.PublicIPAddressPropertiesFormat.DNSSettings = &network.PublicIPAddressDNSSettings{
+				DomainNameLabel: &domainNameLabel,
+			}
 		}
 	}
 
@@ -762,8 +764,8 @@ func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, 
 				if err != nil {
 					return nil, err
 				}
-				domainNameLabel := getPublicIPDomainNameLabel(service)
-				pip, err := az.ensurePublicIPExists(service, pipName, domainNameLabel, clusterName, shouldPIPExisted)
+				domainNameLabel, found := getPublicIPDomainNameLabel(service)
+				pip, err := az.ensurePublicIPExists(service, pipName, domainNameLabel, clusterName, shouldPIPExisted, found)
 				if err != nil {
 					return nil, err
 				}
@@ -1433,8 +1435,8 @@ func (az *Cloud) reconcilePublicIP(clusterName string, service *v1.Service, lbNa
 	if !isInternal && wantLb {
 		// Confirm desired public ip resource exists
 		var pip *network.PublicIPAddress
-		domainNameLabel := getPublicIPDomainNameLabel(service)
-		if pip, err = az.ensurePublicIPExists(service, desiredPipName, domainNameLabel, clusterName, shouldPIPExisted); err != nil {
+		domainNameLabel, found := getPublicIPDomainNameLabel(service)
+		if pip, err = az.ensurePublicIPExists(service, desiredPipName, domainNameLabel, clusterName, shouldPIPExisted, found); err != nil {
 			return nil, err
 		}
 		return pip, nil
