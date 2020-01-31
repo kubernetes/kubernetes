@@ -11,6 +11,7 @@ go_library(
         "gmsa_full.go",
         "gmsa_kubelet.go",
         "hybrid_network.go",
+        "kubelet_stats.go",
         "memory_limits.go",
         "networking.go",
         "security_context.go",
