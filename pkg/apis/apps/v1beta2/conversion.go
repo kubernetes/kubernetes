@@ -21,12 +21,14 @@ import (
 	"strconv"
 
 	appsv1beta2 "k8s.io/api/apps/v1beta2"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	autoscaling "k8s.io/kubernetes/pkg/apis/autoscaling"
+	"k8s.io/kubernetes/pkg/apis/core"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 )
 
@@ -254,4 +256,46 @@ func deepCopyStringMap(m map[string]string) map[string]string {
 		ret[k] = v
 	}
 	return ret
+}
+
+// Convert_v1beta2_StatefulSetSpec_To_apps_StatefulSetSpec augments auto-conversion to preserve < 1.17 behavior
+// setting apiVersion/kind in nested persistent volume claim objects.
+func Convert_v1beta2_StatefulSetSpec_To_apps_StatefulSetSpec(in *appsv1beta2.StatefulSetSpec, out *apps.StatefulSetSpec, s conversion.Scope) error {
+	if err := autoConvert_v1beta2_StatefulSetSpec_To_apps_StatefulSetSpec(in, out, s); err != nil {
+		return err
+	}
+	// set APIVersion/Kind to behave the same as reflective conversion < 1.17.
+	// see http://issue.k8s.io/87583
+	if out.VolumeClaimTemplates != nil {
+		// copy so we don't modify the input
+		templatesCopy := make([]core.PersistentVolumeClaim, len(out.VolumeClaimTemplates))
+		copy(templatesCopy, out.VolumeClaimTemplates)
+		out.VolumeClaimTemplates = templatesCopy
+		for i := range out.VolumeClaimTemplates {
+			out.VolumeClaimTemplates[i].APIVersion = ""
+			out.VolumeClaimTemplates[i].Kind = ""
+		}
+	}
+	return nil
+}
+
+// Convert_apps_StatefulSetSpec_To_v1beta2_StatefulSetSpec augments auto-conversion to preserve < 1.17 behavior
+// setting apiVersion/kind in nested persistent volume claim objects.
+func Convert_apps_StatefulSetSpec_To_v1beta2_StatefulSetSpec(in *apps.StatefulSetSpec, out *appsv1beta2.StatefulSetSpec, s conversion.Scope) error {
+	if err := autoConvert_apps_StatefulSetSpec_To_v1beta2_StatefulSetSpec(in, out, s); err != nil {
+		return err
+	}
+	// set APIVersion/Kind to behave the same as reflective conversion < 1.17.
+	// see http://issue.k8s.io/87583
+	if out.VolumeClaimTemplates != nil {
+		// copy so we don't modify the input
+		templatesCopy := make([]corev1.PersistentVolumeClaim, len(out.VolumeClaimTemplates))
+		copy(templatesCopy, out.VolumeClaimTemplates)
+		out.VolumeClaimTemplates = templatesCopy
+		for i := range out.VolumeClaimTemplates {
+			out.VolumeClaimTemplates[i].APIVersion = "v1"
+			out.VolumeClaimTemplates[i].Kind = "PersistentVolumeClaim"
+		}
+	}
+	return nil
 }
