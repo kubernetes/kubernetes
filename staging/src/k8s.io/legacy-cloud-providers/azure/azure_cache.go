@@ -38,6 +38,9 @@ const (
 	// active/expired. If entry doesn't exist in cache, then data is fetched
 	// using getter, saved in cache and returned
 	cacheReadTypeUnsafe
+	// cacheReadTypeForceRefresh force refreshes the cache even if the cache entry
+	// is not expired
+	cacheReadTypeForceRefresh
 )
 
 // getFunc defines a getter function for timedCache.
@@ -120,20 +123,20 @@ func (t *timedCache) Get(key string, crt cacheReadType) (interface{}, error) {
 	entry.lock.Lock()
 	defer entry.lock.Unlock()
 
-	// entry exists
-	if entry.data != nil {
+	// entry exists and if cache is not force refreshed
+	if entry.data != nil && crt != cacheReadTypeForceRefresh {
 		// allow unsafe read, so return data even if expired
 		if crt == cacheReadTypeUnsafe {
 			return entry.data, nil
 		}
 		// if cached data is not expired, return cached data
-		if time.Since(entry.createdOn) < t.ttl {
+		if crt == cacheReadTypeDefault && time.Since(entry.createdOn) < t.ttl {
 			return entry.data, nil
 		}
 	}
-	// Data is not cached yet or cache data is expired, cache it by getter.
-	// entry is locked before getting to ensure concurrent gets don't result in
-	// multiple ARM calls.
+	// Data is not cached yet, cache data is expired or requested force refresh
+	// cache it by getter. entry is locked before getting to ensure concurrent
+	// gets don't result in multiple ARM calls.
 	data, err := t.getter(key)
 	if err != nil {
 		return nil, err
