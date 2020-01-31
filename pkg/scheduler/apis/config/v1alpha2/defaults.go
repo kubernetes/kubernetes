@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright 2020 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package v1alpha2
 
 import (
 	"net"
@@ -22,7 +22,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	componentbaseconfigv1alpha1 "k8s.io/component-base/config/v1alpha1"
-	kubeschedulerconfigv1alpha1 "k8s.io/kube-scheduler/config/v1alpha1"
+	"k8s.io/kube-scheduler/config/v1alpha2"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 
 	// this package shouldn't really depend on other k8s.io/kubernetes code
@@ -35,7 +35,7 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 }
 
 // SetDefaults_KubeSchedulerConfiguration sets additional defaults
-func SetDefaults_KubeSchedulerConfiguration(obj *kubeschedulerconfigv1alpha1.KubeSchedulerConfiguration) {
+func SetDefaults_KubeSchedulerConfiguration(obj *v1alpha2.KubeSchedulerConfiguration) {
 	if obj.SchedulerName == nil {
 		val := api.DefaultSchedulerName
 		obj.SchedulerName = &val
@@ -48,7 +48,7 @@ func SetDefaults_KubeSchedulerConfiguration(obj *kubeschedulerconfigv1alpha1.Kub
 
 	if obj.AlgorithmSource.Policy == nil &&
 		(obj.AlgorithmSource.Provider == nil || len(*obj.AlgorithmSource.Provider) == 0) {
-		val := kubeschedulerconfigv1alpha1.SchedulerDefaultProviderName
+		val := v1alpha2.SchedulerDefaultProviderName
 		obj.AlgorithmSource.Provider = &val
 	}
 
@@ -122,10 +122,10 @@ func SetDefaults_KubeSchedulerConfiguration(obj *kubeschedulerconfigv1alpha1.Kub
 		obj.LeaderElection.ResourceLock = "endpointsleases"
 	}
 	if len(obj.LeaderElection.LockObjectNamespace) == 0 && len(obj.LeaderElection.ResourceNamespace) == 0 {
-		obj.LeaderElection.LockObjectNamespace = kubeschedulerconfigv1alpha1.SchedulerDefaultLockObjectNamespace
+		obj.LeaderElection.LockObjectNamespace = v1alpha2.SchedulerDefaultLockObjectNamespace
 	}
 	if len(obj.LeaderElection.LockObjectName) == 0 && len(obj.LeaderElection.ResourceName) == 0 {
-		obj.LeaderElection.LockObjectName = kubeschedulerconfigv1alpha1.SchedulerDefaultLockObjectName
+		obj.LeaderElection.LockObjectName = v1alpha2.SchedulerDefaultLockObjectName
 	}
 
 	if len(obj.ClientConnection.ContentType) == 0 {
