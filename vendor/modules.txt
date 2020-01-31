@@ -1024,7 +1024,7 @@ gopkg.in/square/go-jose.v2/jwt
 gopkg.in/tomb.v1
 # gopkg.in/warnings.v0 v0.1.1 => gopkg.in/warnings.v0 v0.1.1
 gopkg.in/warnings.v0
-# gopkg.in/yaml.v2 v2.2.4 => gopkg.in/yaml.v2 v2.2.4
+# gopkg.in/yaml.v2 v2.2.8 => gopkg.in/yaml.v2 v2.2.8
 gopkg.in/yaml.v2
 # k8s.io/api v0.0.0 => ./staging/src/k8s.io/api
 k8s.io/api/admission/v1beta1
