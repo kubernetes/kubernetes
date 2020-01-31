@@ -28,10 +28,10 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
-
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
@@ -187,7 +187,7 @@ var _ = SIGDescribe("HugePages [Serial] [Feature:HugePages][NodeFeature:HugePage
 		ginkgo.BeforeEach(func() {
 			ginkgo.By("verifying hugepages are supported")
 			if !isHugePageSupported() {
-				framework.Skipf("skipping test because hugepages are not supported")
+				e2eskipper.Skipf("skipping test because hugepages are not supported")
 				return
 			}
 			ginkgo.By("configuring the host to reserve a number of pre-allocated hugepages")

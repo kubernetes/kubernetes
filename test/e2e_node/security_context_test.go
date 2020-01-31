@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
@@ -75,7 +76,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 			isEnabled, err := isSharedPIDNamespaceSupported()
 			framework.ExpectNoError(err)
 			if !isEnabled {
-				framework.Skipf("Skipped because shared PID namespace is not supported by this docker version.")
+				e2eskipper.Skipf("Skipped because shared PID namespace is not supported by this docker version.")
 			}
 
 			ginkgo.By("Create a pod with shared PID namespace.")

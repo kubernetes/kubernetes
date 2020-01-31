@@ -17,7 +17,6 @@ limitations under the License.
 package e2enode
 
 import (
-	"github.com/onsi/ginkgo"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -25,6 +24,9 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+
+	"github.com/onsi/ginkgo"
 )
 
 const (
@@ -113,7 +115,7 @@ var _ = framework.KubeDescribe("ContainerLogPath [NodeConformance]", func() {
 					d, err := getDockerLoggingDriver()
 					framework.ExpectNoError(err)
 					if d != "json-file" {
-						framework.Skipf("Skipping because Docker daemon is using a logging driver other than \"json-file\": %s", d)
+						e2eskipper.Skipf("Skipping because Docker daemon is using a logging driver other than \"json-file\": %s", d)
 					}
 					// Even if JSON logging is in use, this test fails if SELinux support
 					// is enabled, since the isolation provided by the SELinux policy
@@ -126,7 +128,7 @@ var _ = framework.KubeDescribe("ContainerLogPath [NodeConformance]", func() {
 					e, err := isDockerSELinuxSupportEnabled()
 					framework.ExpectNoError(err)
 					if e {
-						framework.Skipf("Skipping because Docker daemon is running with SELinux support enabled")
+						e2eskipper.Skipf("Skipping because Docker daemon is running with SELinux support enabled")
 					}
 				}
 

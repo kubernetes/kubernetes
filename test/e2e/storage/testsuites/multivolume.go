@@ -574,7 +574,7 @@ func ensureTopologyRequirements(nodeSelection *e2epod.NodeSelection, nodes *v1.N
 		}
 	}
 	if len(suitableTopologies) == 0 {
-		framework.Skipf("No topology with at least %d nodes found - skipping", minCount)
+		e2eskipper.Skipf("No topology with at least %d nodes found - skipping", minCount)
 	}
 	// Take the first suitable topology
 	e2epod.SetNodeAffinityTopologyRequirement(nodeSelection, suitableTopologies[0])

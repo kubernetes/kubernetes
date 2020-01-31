@@ -5,7 +5,20 @@ go_library(
     srcs = ["skipper.go"],
     importpath = "k8s.io/kubernetes/test/e2e/framework/skipper",
     visibility = ["//visibility:public"],
-    deps = ["//test/e2e/framework:go_default_library"],
+    deps = [
+        "//pkg/features:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/version:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        "//staging/src/k8s.io/client-go/discovery:go_default_library",
+        "//staging/src/k8s.io/client-go/dynamic:go_default_library",
+        "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
+        "//test/e2e/framework:go_default_library",
+        "//test/e2e/framework/ginkgowrapper:go_default_library",
+        "//test/e2e/framework/ssh:go_default_library",
+    ],
 )
 
 filegroup(

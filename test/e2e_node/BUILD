@@ -194,6 +194,7 @@ go_test(
         "//test/e2e/framework/metrics:go_default_library",
         "//test/e2e/framework/node:go_default_library",
         "//test/e2e/framework/pod:go_default_library",
+        "//test/e2e/framework/skipper:go_default_library",
         "//test/e2e/framework/testfiles:go_default_library",
         "//test/e2e/framework/volume:go_default_library",
         "//test/e2e_node/perf/workloads:go_default_library",

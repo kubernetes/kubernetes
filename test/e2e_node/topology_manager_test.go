@@ -21,15 +21,15 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
-
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -232,7 +232,7 @@ func runTopologyManagerSuiteTests(f *framework.Framework) {
 
 	// Skip rest of the tests if CPU capacity < 3.
 	if cpuCap < 3 {
-		framework.Skipf("Skipping rest of the CPU Manager tests since CPU capacity < 3")
+		e2eskipper.Skipf("Skipping rest of the CPU Manager tests since CPU capacity < 3")
 	}
 
 	ginkgo.By("running a Gu pod requesting multiple CPUs")

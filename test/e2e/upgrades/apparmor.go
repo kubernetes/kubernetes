@@ -22,6 +22,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2esecurity "k8s.io/kubernetes/test/e2e/framework/security"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -39,7 +40,7 @@ func (AppArmorUpgradeTest) Name() string { return "apparmor-upgrade" }
 // Skip returns true when this test can be skipped.
 func (AppArmorUpgradeTest) Skip(upgCtx UpgradeContext) bool {
 	supportedImages := make(map[string]bool)
-	for _, d := range framework.AppArmorDistros {
+	for _, d := range e2eskipper.AppArmorDistros {
 		supportedImages[d] = true
 	}
 
