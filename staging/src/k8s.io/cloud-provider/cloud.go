@@ -98,6 +98,10 @@ func GetInstanceProviderID(ctx context.Context, cloud Interface, nodeName types.
 	}
 	instanceID, err := instances.InstanceID(ctx, nodeName)
 	if err != nil {
+		if err == NotImplemented {
+			return "", err
+		}
+
 		return "", fmt.Errorf("failed to get instance ID from cloud provider: %v", err)
 	}
 	return cloud.ProviderName() + "://" + instanceID, nil

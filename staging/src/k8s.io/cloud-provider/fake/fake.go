@@ -68,6 +68,7 @@ type Cloud struct {
 	Addresses     []v1.NodeAddress
 	addressesMux  sync.Mutex
 	ExtID         map[types.NodeName]string
+	ExtIDErr      map[types.NodeName]error
 	InstanceTypes map[types.NodeName]string
 	Machines      []types.NodeName
 	NodeResources *v1.NodeResources
@@ -252,9 +253,17 @@ func (f *Cloud) NodeAddressesByProviderID(ctx context.Context, providerID string
 	return f.Addresses, f.Err
 }
 
-// InstanceID returns the cloud provider ID of the node with the specified Name.
+// InstanceID returns the cloud provider ID of the node with the specified Name, unless an entry
+// for the node exists in ExtIDError, in which case it returns the desired error (to facilitate
+// testing of error handling).
 func (f *Cloud) InstanceID(ctx context.Context, nodeName types.NodeName) (string, error) {
 	f.addCall("instance-id")
+
+	err, ok := f.ExtIDErr[nodeName]
+	if ok {
+		return "", err
+	}
+
 	return f.ExtID[nodeName], nil
 }
 
