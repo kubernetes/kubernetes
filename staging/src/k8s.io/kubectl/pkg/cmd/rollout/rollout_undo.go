@@ -104,7 +104,7 @@ func NewCmdRolloutUndo(f cmdutil.Factory, streams genericclioptions.IOStreams) *
 // Complete completes al the required options
 func (o *UndoOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	o.Resources = args
-	o.DryRun = cmdutil.GetDryRunFlag(cmd)
+	o.DryRun = cmdutil.GetClientSideDryRun(cmd)
 
 	var err error
 	if o.Namespace, o.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace(); err != nil {

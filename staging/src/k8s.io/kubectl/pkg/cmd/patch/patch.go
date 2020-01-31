@@ -139,7 +139,7 @@ func (o *PatchOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 	}
 
 	o.outputFormat = cmdutil.GetFlagString(cmd, "output")
-	o.dryRun = cmdutil.GetFlagBool(cmd, "dry-run")
+	o.dryRun = cmdutil.GetClientSideDryRun(cmd)
 
 	o.ToPrinter = func(operation string) (printers.ResourcePrinter, error) {
 		o.PrintFlags.NamePrintFlags.Operation = operation

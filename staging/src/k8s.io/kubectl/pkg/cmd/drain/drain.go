@@ -211,7 +211,7 @@ func (o *DrainCmdOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 		return cmdutil.UsageErrorf(cmd, "error: cannot specify both a node name and a --selector option")
 	}
 
-	o.drainer.DryRun = cmdutil.GetDryRunFlag(cmd)
+	o.drainer.DryRun = cmdutil.GetClientSideDryRun(cmd)
 
 	if o.drainer.Client, err = f.KubernetesClientSet(); err != nil {
 		return err

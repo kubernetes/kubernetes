@@ -133,7 +133,7 @@ func (o *CreateCronJobOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, a
 	o.Builder = f.NewBuilder()
 	o.Cmd = cmd
 
-	o.DryRun = cmdutil.GetDryRunFlag(cmd)
+	o.DryRun = cmdutil.GetClientSideDryRun(cmd)
 	if o.DryRun {
 		o.PrintFlags.Complete("%s (dry run)")
 	}

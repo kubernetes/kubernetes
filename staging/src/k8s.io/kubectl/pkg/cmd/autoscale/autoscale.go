@@ -134,7 +134,7 @@ func NewCmdAutoscale(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *
 // Complete verifies command line arguments and loads data from the command environment
 func (o *AutoscaleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	var err error
-	o.dryRun = cmdutil.GetFlagBool(cmd, "dry-run")
+	o.dryRun = cmdutil.GetClientSideDryRun(cmd)
 	o.createAnnotation = cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag)
 	o.builder = f.NewBuilder()
 	discoveryClient, err := f.ToDiscoveryClient()

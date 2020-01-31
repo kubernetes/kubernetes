@@ -128,7 +128,7 @@ func (o *SetServiceAccountOptions) Complete(f cmdutil.Factory, cmd *cobra.Comman
 	}
 
 	o.shortOutput = cmdutil.GetFlagString(cmd, "output") == "name"
-	o.dryRun = cmdutil.GetDryRunFlag(cmd)
+	o.dryRun = cmdutil.GetClientSideDryRun(cmd)
 	o.output = cmdutil.GetFlagString(cmd, "output")
 	o.updatePodSpecForObject = polymorphichelpers.UpdatePodSpecForObjectFn
 

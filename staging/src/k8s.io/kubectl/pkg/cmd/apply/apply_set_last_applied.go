@@ -118,7 +118,7 @@ func NewCmdApplySetLastApplied(f cmdutil.Factory, ioStreams genericclioptions.IO
 
 // Complete populates dry-run and output flag options.
 func (o *SetLastAppliedOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
-	o.dryRun = cmdutil.GetDryRunFlag(cmd)
+	o.dryRun = cmdutil.GetClientSideDryRun(cmd)
 	o.output = cmdutil.GetFlagString(cmd, "output")
 	o.shortOutput = o.output == "name"
 
