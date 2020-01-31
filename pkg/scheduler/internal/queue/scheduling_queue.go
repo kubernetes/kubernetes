@@ -233,7 +233,7 @@ func NewPriorityQueue(
 	pq := &PriorityQueue{
 		clock:            options.clock,
 		stop:             stop,
-		podBackoff:       NewPodBackoffMap(options.podInitialBackoffDuration, options.podMaxBackoffDuration),
+		podBackoff:       NewPodBackoffMap(options.podInitialBackoffDuration, options.podMaxBackoffDuration, options.clock),
 		activeQ:          heap.NewWithRecorder(podInfoKeyFunc, comp, metrics.NewActivePodsRecorder()),
 		unschedulableQ:   newUnschedulablePodsMap(metrics.NewUnschedulablePodsRecorder()),
 		nominatedPods:    newNominatedPodMap(),
