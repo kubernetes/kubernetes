@@ -357,11 +357,16 @@ func (cnc *CloudNodeController) initializeNode(ctx context.Context, node *v1.Nod
 			providerID, err := cloudprovider.GetInstanceProviderID(ctx, cnc.cloud, types.NodeName(curNode.Name))
 			if err == nil {
 				curNode.Spec.ProviderID = providerID
+			} else if err == cloudprovider.NotImplemented {
+				// if the cloud provider being used does not support provider IDs,
+				// we can safely continue since we will attempt to set node
+				// addresses given the node name in getNodeAddressesByProviderIDOrName
+				klog.Warningf("cloud provider does not set node provider ID, using node name to discover node %s", node.Name)
 			} else {
-				// we should attempt to set providerID on curNode, but
-				// we can continue if we fail since we will attempt to set
-				// node addresses given the node name in getNodeAddressesByProviderIDOrName
-				klog.Errorf("failed to set node provider id: %v", err)
+				// if the cloud provider being used supports provider IDs, we want
+				// to propagate the error so that we re-try in the future; if we
+				// do not, the taint will be removed, and this will not be retried
+				return err
 			}
 		}
 
