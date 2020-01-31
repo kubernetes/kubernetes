@@ -41,11 +41,29 @@ import (
 const (
 	// Used to list instances in all states(RUNNING and other) - https://cloud.google.com/compute/docs/reference/rest/v1/instanceGroups/listInstances
 	allInstances = "ALL"
+	// ILBFinalizerV1 key is used to identify ILB services whose resources are managed by service controller.
+	ILBFinalizerV1 = "gke.networking.io/l4-ilb-v1"
+	// ILBFinalizerV2 is the finalizer used by newer controllers that implement Internal LoadBalancer services.
+	ILBFinalizerV2 = "gke.networking.io/l4-ilb-v2"
 )
 
 func (g *Cloud) ensureInternalLoadBalancer(clusterName, clusterID string, svc *v1.Service, existingFwdRule *compute.ForwardingRule, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
-	if g.AlphaFeatureGate.Enabled(AlphaFeatureILBSubsets) {
+	if g.AlphaFeatureGate.Enabled(AlphaFeatureILBSubsets) && existingFwdRule == nil {
+		// When ILBSubsets is enabled, new ILB services will not be processed here.
+		// Services that have existing GCE resources created by this controller will continue to update.
+		g.eventRecorder.Eventf(svc, v1.EventTypeNormal, "SkippingEnsureInternalLoadBalancer",
+			"Skipped ensureInternalLoadBalancer since %s feature is enabled.", AlphaFeatureILBSubsets)
 		return nil, cloudprovider.ImplementedElsewhere
+	}
+	if hasFinalizer(svc, ILBFinalizerV2) {
+		// Another controller is handling the resources for this service.
+		g.eventRecorder.Eventf(svc, v1.EventTypeNormal, "SkippingEnsureInternalLoadBalancer",
+			"Skipped ensureInternalLoadBalancer as service contains '%s' finalizer.", ILBFinalizerV2)
+		return nil, cloudprovider.ImplementedElsewhere
+	}
+	if err := addFinalizer(svc, g.client.CoreV1(), ILBFinalizerV1); err != nil {
+		klog.Errorf("Failed to attach finalizer '%s' on service %s/%s - %v", ILBFinalizerV1, svc.Namespace, svc.Name, err)
+		return nil, err
 	}
 
 	nm := types.NamespacedName{Name: svc.Name, Namespace: svc.Namespace}
@@ -295,6 +313,11 @@ func (g *Cloud) ensureInternalLoadBalancerDeleted(clusterName, clusterID string,
 	// Try deleting instance groups - expect ResourceInuse error if needed by other LBs
 	igName := makeInstanceGroupName(clusterID)
 	if err := g.ensureInternalInstanceGroupsDeleted(igName); err != nil && !isInUsedByError(err) {
+		return err
+	}
+
+	if err := removeFinalizer(svc, g.client.CoreV1(), ILBFinalizerV1); err != nil {
+		klog.Errorf("Failed to remove finalizer '%s' on service %s/%s - %v", ILBFinalizerV1, svc.Namespace, svc.Name, err)
 		return err
 	}
 
