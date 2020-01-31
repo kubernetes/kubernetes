@@ -914,12 +914,3 @@ func highestSupportedVersion(versions []string) (*utilversion.Version, error) {
 	}
 	return highestSupportedVersion, nil
 }
-
-func isV0Version(version string) bool {
-	parsedVersion, err := utilversion.ParseGeneric(version)
-	if err != nil {
-		return false
-	}
-
-	return parsedVersion.Major() == 0
-}
