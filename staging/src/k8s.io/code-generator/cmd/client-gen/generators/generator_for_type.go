@@ -43,7 +43,9 @@ type genClientForType struct {
 var _ generator.Generator = &genClientForType{}
 
 // Filter ignores all but one type because we're making a single file per type.
-func (g *genClientForType) Filter(c *generator.Context, t *types.Type) bool { return t == g.typeToMatch }
+func (g *genClientForType) Filter(c *generator.Context, t *types.Type) bool {
+	return t == g.typeToMatch
+}
 
 func (g *genClientForType) Namers(c *generator.Context) namer.NameSystems {
 	return namer.NameSystems{
@@ -116,9 +118,10 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 				"type":          t,
 				"inputType":     &inputType,
 				"resultType":    &resultType,
-				"DeleteOptions": c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "DeleteOptions"}),
-				"ListOptions":   c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "ListOptions"}),
+				"CreateOptions": c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "CreateOptions"}),
 				"GetOptions":    c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "GetOptions"}),
+				"ListOptions":   c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "ListOptions"}),
+				"UpdateOptions": c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "UpdateOptions"}),
 				"PatchType":     c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/types", Name: "PatchType"}),
 			},
 		})
@@ -135,9 +138,12 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 		"subresourcePath":      "",
 		"GroupGoName":          g.groupGoName,
 		"Version":              namer.IC(g.version),
+		"CreateOptions":        c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "CreateOptions"}),
 		"DeleteOptions":        c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "DeleteOptions"}),
-		"ListOptions":          c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "ListOptions"}),
 		"GetOptions":           c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "GetOptions"}),
+		"ListOptions":          c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "ListOptions"}),
+		"PatchOptions":         c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "PatchOptions"}),
+		"UpdateOptions":        c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "UpdateOptions"}),
 		"PatchType":            c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/types", Name: "PatchType"}),
 		"watchInterface":       c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/watch", Name: "Interface"}),
 		"RESTClientInterface":  c.Universe.Type(types.Name{Package: "k8s.io/client-go/rest", Name: "Interface"}),
@@ -304,22 +310,22 @@ func generateInterface(tags util.Tags) string {
 }
 
 var subresourceDefaultVerbTemplates = map[string]string{
-	"create": `Create(ctx context.Context, $.type|private$Name string, $.inputType|private$ *$.inputType|raw$) (*$.resultType|raw$, error)`,
+	"create": `Create(ctx context.Context, $.type|private$Name string, $.inputType|private$ *$.inputType|raw$, opts $.CreateOptions|raw$) (*$.resultType|raw$, error)`,
 	"list":   `List(ctx context.Context, $.type|private$Name string, opts $.ListOptions|raw$) (*$.resultType|raw$List, error)`,
-	"update": `Update(ctx context.Context, $.type|private$Name string, $.inputType|private$ *$.inputType|raw$) (*$.resultType|raw$, error)`,
+	"update": `Update(ctx context.Context, $.type|private$Name string, $.inputType|private$ *$.inputType|raw$, opts $.UpdateOptions|raw$) (*$.resultType|raw$, error)`,
 	"get":    `Get(ctx context.Context, $.type|private$Name string, options $.GetOptions|raw$) (*$.resultType|raw$, error)`,
 }
 
 var defaultVerbTemplates = map[string]string{
-	"create":           `Create(context.Context, *$.inputType|raw$) (*$.resultType|raw$, error)`,
-	"update":           `Update(context.Context, *$.inputType|raw$) (*$.resultType|raw$, error)`,
-	"updateStatus":     `UpdateStatus(context.Context, *$.type|raw$) (*$.type|raw$, error)`,
-	"delete":           `Delete(ctx context.Context, name string, options *$.DeleteOptions|raw$) error`,
-	"deleteCollection": `DeleteCollection(ctx context.Context, options *$.DeleteOptions|raw$, listOptions $.ListOptions|raw$) error`,
-	"get":              `Get(ctx context.Context, name string, options $.GetOptions|raw$) (*$.resultType|raw$, error)`,
+	"create":           `Create(ctx context.Context, $.inputType|private$ *$.inputType|raw$, opts $.CreateOptions|raw$) (*$.resultType|raw$, error)`,
+	"update":           `Update(ctx context.Context, $.inputType|private$ *$.inputType|raw$, opts $.UpdateOptions|raw$) (*$.resultType|raw$, error)`,
+	"updateStatus":     `UpdateStatus(ctx context.Context, $.inputType|private$ *$.type|raw$, opts $.UpdateOptions|raw$) (*$.type|raw$, error)`,
+	"delete":           `Delete(ctx context.Context, name string, opts *$.DeleteOptions|raw$) error`,
+	"deleteCollection": `DeleteCollection(ctx context.Context, opts *$.DeleteOptions|raw$, listOpts $.ListOptions|raw$) error`,
+	"get":              `Get(ctx context.Context, name string, opts $.GetOptions|raw$) (*$.resultType|raw$, error)`,
 	"list":             `List(ctx context.Context, opts $.ListOptions|raw$) (*$.resultType|raw$List, error)`,
 	"watch":            `Watch(ctx context.Context, opts $.ListOptions|raw$) ($.watchInterface|raw$, error)`,
-	"patch":            `Patch(ctx context.Context, name string, pt $.PatchType|raw$, data []byte, subresources ...string) (result *$.resultType|raw$, err error)`,
+	"patch":            `Patch(ctx context.Context, name string, pt $.PatchType|raw$, data []byte, opts $.PatchOptions|raw$, subresources ...string) (result *$.resultType|raw$, err error)`,
 }
 
 // group client will implement this interface.
@@ -488,13 +494,14 @@ func (c *$.type|privatePlural$) DeleteCollection(ctx context.Context, options *$
 
 var createSubresourceTemplate = `
 // Create takes the representation of a $.inputType|private$ and creates it.  Returns the server's representation of the $.resultType|private$, and an error, if there is any.
-func (c *$.type|privatePlural$) Create(ctx context.Context, $.type|private$Name string, $.inputType|private$ *$.inputType|raw$) (result *$.resultType|raw$, err error) {
+func (c *$.type|privatePlural$) Create(ctx context.Context, $.type|private$Name string, $.inputType|private$ *$.inputType|raw$, opts $.CreateOptions|raw$) (result *$.resultType|raw$, err error) {
 	result = &$.resultType|raw${}
 	err = c.client.Post().
 		$if .namespaced$Namespace(c.ns).$end$
 		Resource("$.type|resource$").
 		Name($.type|private$Name).
 		SubResource("$.subresourcePath$").
+		VersionedParams(&opts, $.schemeParameterCodec|raw$).
 		Body($.inputType|private$).
 		Do(ctx).
 		Into(result)
@@ -504,11 +511,12 @@ func (c *$.type|privatePlural$) Create(ctx context.Context, $.type|private$Name 
 
 var createTemplate = `
 // Create takes the representation of a $.inputType|private$ and creates it.  Returns the server's representation of the $.resultType|private$, and an error, if there is any.
-func (c *$.type|privatePlural$) Create(ctx context.Context, $.inputType|private$ *$.inputType|raw$) (result *$.resultType|raw$, err error) {
+func (c *$.type|privatePlural$) Create(ctx context.Context, $.inputType|private$ *$.inputType|raw$, opts $.CreateOptions|raw$) (result *$.resultType|raw$, err error) {
 	result = &$.resultType|raw${}
 	err = c.client.Post().
 		$if .namespaced$Namespace(c.ns).$end$
 		Resource("$.type|resource$").
+		VersionedParams(&opts, $.schemeParameterCodec|raw$).
 		Body($.inputType|private$).
 		Do(ctx).
 		Into(result)
@@ -518,13 +526,14 @@ func (c *$.type|privatePlural$) Create(ctx context.Context, $.inputType|private$
 
 var updateSubresourceTemplate = `
 // Update takes the top resource name and the representation of a $.inputType|private$ and updates it. Returns the server's representation of the $.resultType|private$, and an error, if there is any.
-func (c *$.type|privatePlural$) Update(ctx context.Context, $.type|private$Name string, $.inputType|private$ *$.inputType|raw$) (result *$.resultType|raw$, err error) {
+func (c *$.type|privatePlural$) Update(ctx context.Context, $.type|private$Name string, $.inputType|private$ *$.inputType|raw$, opts $.UpdateOptions|raw$) (result *$.resultType|raw$, err error) {
 	result = &$.resultType|raw${}
 	err = c.client.Put().
 		$if .namespaced$Namespace(c.ns).$end$
 		Resource("$.type|resource$").
 		Name($.type|private$Name).
 		SubResource("$.subresourcePath$").
+		VersionedParams(&opts, $.schemeParameterCodec|raw$).
 		Body($.inputType|private$).
 		Do(ctx).
 		Into(result)
@@ -534,12 +543,13 @@ func (c *$.type|privatePlural$) Update(ctx context.Context, $.type|private$Name 
 
 var updateTemplate = `
 // Update takes the representation of a $.inputType|private$ and updates it. Returns the server's representation of the $.resultType|private$, and an error, if there is any.
-func (c *$.type|privatePlural$) Update(ctx context.Context, $.inputType|private$ *$.inputType|raw$) (result *$.resultType|raw$, err error) {
+func (c *$.type|privatePlural$) Update(ctx context.Context, $.inputType|private$ *$.inputType|raw$, opts $.UpdateOptions|raw$) (result *$.resultType|raw$, err error) {
 	result = &$.resultType|raw${}
 	err = c.client.Put().
 		$if .namespaced$Namespace(c.ns).$end$
 		Resource("$.type|resource$").
 		Name($.inputType|private$.Name).
+		VersionedParams(&opts, $.schemeParameterCodec|raw$).
 		Body($.inputType|private$).
 		Do(ctx).
 		Into(result)
@@ -550,14 +560,14 @@ func (c *$.type|privatePlural$) Update(ctx context.Context, $.inputType|private$
 var updateStatusTemplate = `
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-
-func (c *$.type|privatePlural$) UpdateStatus(ctx context.Context, $.type|private$ *$.type|raw$) (result *$.type|raw$, err error) {
+func (c *$.type|privatePlural$) UpdateStatus(ctx context.Context, $.type|private$ *$.type|raw$, opts $.UpdateOptions|raw$) (result *$.type|raw$, err error) {
 	result = &$.type|raw${}
 	err = c.client.Put().
 		$if .namespaced$Namespace(c.ns).$end$
 		Resource("$.type|resource$").
 		Name($.type|private$.Name).
 		SubResource("status").
+		VersionedParams(&opts, $.schemeParameterCodec|raw$).
 		Body($.type|private$).
 		Do(ctx).
 		Into(result)
@@ -584,13 +594,14 @@ func (c *$.type|privatePlural$) Watch(ctx context.Context, opts $.ListOptions|ra
 
 var patchTemplate = `
 // Patch applies the patch and returns the patched $.resultType|private$.
-func (c *$.type|privatePlural$) Patch(ctx context.Context, name string, pt $.PatchType|raw$, data []byte, subresources ...string) (result *$.resultType|raw$, err error) {
+func (c *$.type|privatePlural$) Patch(ctx context.Context, name string, pt $.PatchType|raw$, data []byte, opts $.PatchOptions|raw$, subresources ...string) (result *$.resultType|raw$, err error) {
 	result = &$.resultType|raw${}
 	err = c.client.Patch(pt).
 		$if .namespaced$Namespace(c.ns).$end$
 		Resource("$.type|resource$").
-		SubResource(subresources...).
 		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&opts, $.schemeParameterCodec|raw$).
 		Body(data).
 		Do(ctx).
 		Into(result)
