@@ -27,6 +27,7 @@ import (
 type NetworkingV1Interface interface {
 	RESTClient() rest.Interface
 	IngressesGetter
+	IngressClassesGetter
 	NetworkPoliciesGetter
 }
 
@@ -37,6 +38,10 @@ type NetworkingV1Client struct {
 
 func (c *NetworkingV1Client) Ingresses(namespace string) IngressInterface {
 	return newIngresses(c, namespace)
+}
+
+func (c *NetworkingV1Client) IngressClasses() IngressClassInterface {
+	return newIngressClasses(c)
 }
 
 func (c *NetworkingV1Client) NetworkPolicies(namespace string) NetworkPolicyInterface {

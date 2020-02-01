@@ -135,7 +135,7 @@ func TestCreate(t *testing.T) {
 	noDefaultBackendAndRules.Spec.Rules = []networking.IngressRule{}
 	badPath := validIngress()
 	badPath.Spec.Rules = toIngressRules(map[string]IngressRuleValues{
-		"foo.bar.com": {"/invalid[": "svc"}})
+		"foo.bar.com": {"./invalid[": "svc"}})
 	test.TestCreate(
 		// valid
 		ingress,
@@ -174,7 +174,7 @@ func TestUpdate(t *testing.T) {
 		func(obj runtime.Object) runtime.Object {
 			object := obj.(*networking.Ingress)
 			object.Spec.Rules = toIngressRules(map[string]IngressRuleValues{
-				"foo.bar.com": {"/invalid[": "svc"}})
+				"foo.bar.com": {"./invalid[": "svc"}})
 			return object
 		},
 	)

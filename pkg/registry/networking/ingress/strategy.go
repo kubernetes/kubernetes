@@ -69,15 +69,14 @@ func (ingressStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Ob
 
 }
 
-// Validate validates a new Ingress.
+// Validate validates ingresses on create.
 func (ingressStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	var requestGV schema.GroupVersion
 	if requestInfo, ok := request.RequestInfoFrom(ctx); ok {
 		requestGV = schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}
 	}
 	ingress := obj.(*networking.Ingress)
-	err := validation.ValidateIngress(ingress, requestGV)
-	return err
+	return validation.ValidateIngressCreate(ingress, requestGV)
 }
 
 // Canonicalize normalizes the object after validation.
@@ -89,15 +88,13 @@ func (ingressStrategy) AllowCreateOnUpdate() bool {
 	return false
 }
 
-// ValidateUpdate is the default update validation for an end user.
+// ValidateUpdate validates ingresses on update.
 func (ingressStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	var requestGV schema.GroupVersion
 	if requestInfo, ok := request.RequestInfoFrom(ctx); ok {
 		requestGV = schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}
 	}
-	validationErrorList := validation.ValidateIngress(obj.(*networking.Ingress), requestGV)
-	updateErrorList := validation.ValidateIngressUpdate(obj.(*networking.Ingress), old.(*networking.Ingress), requestGV)
-	return append(validationErrorList, updateErrorList...)
+	return validation.ValidateIngressUpdate(obj.(*networking.Ingress), old.(*networking.Ingress), requestGV)
 }
 
 // AllowUnconditionalUpdate is the default update policy for Ingress objects.

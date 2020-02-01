@@ -18,10 +18,11 @@ package validation
 
 import (
 	"fmt"
-	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	"strings"
 	"testing"
 
+	networkingv1beta1 "k8s.io/api/networking/v1beta1"
+	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -30,6 +31,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/networking"
 	"k8s.io/kubernetes/pkg/features"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 func TestValidateNetworkPolicy(t *testing.T) {
@@ -992,6 +994,70 @@ func TestValidateIngress(t *testing.T) {
 	}
 }
 
+func TestValidateIngressCreate(t *testing.T) {
+	validDefaultBackend := &networking.IngressBackend{
+		ServiceName: "default-backend",
+		ServicePort: intstr.FromInt(80),
+	}
+	validObjectMeta := metav1.ObjectMeta{Name: "test123", Namespace: "test123"}
+	validObjectMetaAnnotation := metav1.ObjectMeta{
+		Name:        "test123",
+		Namespace:   "test123",
+		Annotations: map[string]string{annotationIngressClass: "foo"},
+	}
+
+	testCases := map[string]struct {
+		ingress      networking.Ingress
+		expectedErrs field.ErrorList
+	}{
+		"class field set": {
+			ingress: networking.Ingress{
+				ObjectMeta: validObjectMeta,
+				Spec: networking.IngressSpec{
+					Class:          utilpointer.StringPtr("bar"),
+					DefaultBackend: validDefaultBackend,
+				},
+			},
+			expectedErrs: field.ErrorList{},
+		},
+		"class annotation set": {
+			ingress: networking.Ingress{
+				ObjectMeta: validObjectMetaAnnotation,
+				Spec: networking.IngressSpec{
+					DefaultBackend: validDefaultBackend,
+				},
+			},
+			expectedErrs: field.ErrorList{},
+		},
+		"class field and annotation set": {
+			ingress: networking.Ingress{
+				ObjectMeta: validObjectMetaAnnotation,
+				Spec: networking.IngressSpec{
+					Class:          utilpointer.StringPtr("bar"),
+					DefaultBackend: validDefaultBackend,
+				},
+			},
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("annotations").Child(annotationIngressClass), "foo", "can not be set when the class field is also set")},
+		},
+	}
+
+	for name, testCase := range testCases {
+		t.Run(name, func(t *testing.T) {
+			errs := ValidateIngressCreate(&testCase.ingress, networkingv1beta1.SchemeGroupVersion)
+
+			if len(errs) != len(testCase.expectedErrs) {
+				t.Fatalf("Expected %d errors, got %d (%+v)", len(testCase.expectedErrs), len(errs), errs)
+			}
+
+			for i, err := range errs {
+				if err.Error() != testCase.expectedErrs[i].Error() {
+					t.Fatalf("Expected error: %v, got %v", testCase.expectedErrs[i].Error(), err.Error())
+				}
+			}
+		})
+	}
+}
+
 func TestValidateIngressRuleValue(t *testing.T) {
 	fldPath := field.NewPath("testing.http.paths[0].path")
 	testCases := map[string]struct {
@@ -1252,5 +1318,140 @@ func TestValidateIngressStatusUpdate(t *testing.T) {
 				t.Errorf("unexpected error: %q, expected: %q", err, k)
 			}
 		}
+	}
+}
+
+func TestValidateIngressClass(t *testing.T) {
+	testCases := map[string]struct {
+		ingressClass networking.IngressClass
+		expectedErrs field.ErrorList
+	}{
+		"valid name, valid controller": {
+			ingressClass: networking.IngressClass{
+				ObjectMeta: metav1.ObjectMeta{Name: "test123"},
+				Spec: networking.IngressClassSpec{
+					Controller: "foo.co/bar",
+				},
+			},
+			expectedErrs: field.ErrorList{},
+		},
+		"invalid name, valid controller": {
+			ingressClass: networking.IngressClass{
+				ObjectMeta: metav1.ObjectMeta{Name: "test*123"},
+				Spec: networking.IngressClassSpec{
+					Controller: "foo.co/bar",
+				},
+			},
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("metadata").Child("name"), "test*123", "a DNS-1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')")},
+		},
+		"valid name, empty controller": {
+			ingressClass: networking.IngressClass{
+				ObjectMeta: metav1.ObjectMeta{Name: "test123"},
+				Spec: networking.IngressClassSpec{
+					Controller: "",
+				},
+			},
+			expectedErrs: field.ErrorList{field.Required(field.NewPath("spec").Child("controller"), "")},
+		},
+		"valid name, controller max length": {
+			ingressClass: networking.IngressClass{
+				ObjectMeta: metav1.ObjectMeta{Name: "test123"},
+				Spec: networking.IngressClassSpec{
+					Controller: "foo.co/" + strings.Repeat("a", 243),
+				},
+			},
+			expectedErrs: field.ErrorList{},
+		},
+		"valid name, controller too long": {
+			ingressClass: networking.IngressClass{
+				ObjectMeta: metav1.ObjectMeta{Name: "test123"},
+				Spec: networking.IngressClassSpec{
+					Controller: "foo.co/" + strings.Repeat("a", 244),
+				},
+			},
+			expectedErrs: field.ErrorList{field.TooLong(field.NewPath("spec").Child("controller"), "", 250)},
+		},
+	}
+
+	for name, testCase := range testCases {
+		t.Run(name, func(t *testing.T) {
+			errs := ValidateIngressClass(&testCase.ingressClass)
+
+			if len(errs) != len(testCase.expectedErrs) {
+				t.Fatalf("Expected %d errors, got %d (%+v)", len(testCase.expectedErrs), len(errs), errs)
+			}
+
+			for i, err := range errs {
+				if err.Error() != testCase.expectedErrs[i].Error() {
+					t.Fatalf("Expected error: %v, got %v", testCase.expectedErrs[i].Error(), err.Error())
+				}
+			}
+		})
+	}
+}
+
+func TestValidateIngressClassUpdate(t *testing.T) {
+	testCases := map[string]struct {
+		newIngressClass networking.IngressClass
+		oldIngressClass networking.IngressClass
+		expectedErrs    field.ErrorList
+	}{
+		"name change": {
+			newIngressClass: networking.IngressClass{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "test123",
+					ResourceVersion: "2",
+				},
+				Spec: networking.IngressClassSpec{
+					Controller: "foo.co/bar",
+				},
+			},
+			oldIngressClass: networking.IngressClass{
+				ObjectMeta: metav1.ObjectMeta{Name: "test123"},
+				Spec: networking.IngressClassSpec{
+					Controller: "foo.co/different",
+				},
+			},
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec").Child("controller"), "foo.co/bar", apimachineryvalidation.FieldImmutableErrorMsg)},
+		},
+		"parameters change": {
+			newIngressClass: networking.IngressClass{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "test123",
+					ResourceVersion: "2",
+				},
+				Spec: networking.IngressClassSpec{
+					Controller: "foo.co/bar",
+					Parameters: &api.TypedLocalObjectReference{
+						APIGroup: utilpointer.StringPtr("v1"),
+						Kind:     "ConfigMap",
+						Name:     "foo",
+					},
+				},
+			},
+			oldIngressClass: networking.IngressClass{
+				ObjectMeta: metav1.ObjectMeta{Name: "test123"},
+				Spec: networking.IngressClassSpec{
+					Controller: "foo.co/bar",
+				},
+			},
+			expectedErrs: field.ErrorList{},
+		},
+	}
+
+	for name, testCase := range testCases {
+		t.Run(name, func(t *testing.T) {
+			errs := ValidateIngressClassUpdate(&testCase.newIngressClass, &testCase.oldIngressClass)
+
+			if len(errs) != len(testCase.expectedErrs) {
+				t.Fatalf("Expected %d errors, got %d (%+v)", len(testCase.expectedErrs), len(errs), errs)
+			}
+
+			for i, err := range errs {
+				if err.Error() != testCase.expectedErrs[i].Error() {
+					t.Fatalf("Expected error: %v, got %v", testCase.expectedErrs[i].Error(), err.Error())
+				}
+			}
+		})
 	}
 }

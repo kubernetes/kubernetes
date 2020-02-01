@@ -22,7 +22,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-var defaultPathType = networkingv1.PathTypeImplementationSpecific
+var (
+	defaultPathType = networkingv1.PathTypeImplementationSpecific
+)
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	return RegisterDefaults(scheme)

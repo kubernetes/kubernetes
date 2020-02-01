@@ -48,6 +48,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&IngressList{},
 		&NetworkPolicy{},
 		&NetworkPolicyList{},
+		&IngressClass{},
+		&IngressClassList{},
 	)
 
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)

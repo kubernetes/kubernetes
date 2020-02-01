@@ -256,7 +256,6 @@ func TestSetIngressPathDefaults(t *testing.T) {
 			expected: &networkingv1.HTTPIngressPath{PathType: &pathTypeExact},
 		},
 	}
-
 	for name, testCase := range testCases {
 		t.Run(name, func(t *testing.T) {
 			ingressOriginal := &networkingv1.Ingress{
@@ -294,6 +293,7 @@ func TestSetIngressPathDefaults(t *testing.T) {
 }
 
 func roundTrip(t *testing.T, obj runtime.Object) runtime.Object {
+	t.Helper()
 	data, err := runtime.Encode(legacyscheme.Codecs.LegacyCodec(SchemeGroupVersion), obj)
 	if err != nil {
 		t.Errorf("%v\n %#v", err, obj)

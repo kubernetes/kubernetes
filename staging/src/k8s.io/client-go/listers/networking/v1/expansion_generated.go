@@ -26,6 +26,10 @@ type IngressListerExpansion interface{}
 // IngressNamespaceLister.
 type IngressNamespaceListerExpansion interface{}
 
+// IngressClassListerExpansion allows custom methods to be added to
+// IngressClassLister.
+type IngressClassListerExpansion interface{}
+
 // NetworkPolicyListerExpansion allows custom methods to be added to
 // NetworkPolicyLister.
 type NetworkPolicyListerExpansion interface{}

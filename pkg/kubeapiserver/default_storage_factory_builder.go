@@ -54,7 +54,7 @@ func NewStorageFactoryConfig() *StorageFactoryConfig {
 
 	resources := []schema.GroupVersionResource{
 		batch.Resource("cronjobs").WithVersion("v1beta1"),
-		networking.Resource("ingresses").WithVersion("v1beta1"),
+		networking.Resource("ingresses").WithVersion("v1"),
 		apisstorage.Resource("csidrivers").WithVersion("v1beta1"),
 	}
 

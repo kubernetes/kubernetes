@@ -19,6 +19,7 @@ limitations under the License.
 package v1
 
 import (
+	"context"
 	time "time"
 
 	networkingv1 "k8s.io/api/networking/v1"
@@ -61,13 +62,13 @@ func NewFilteredIngressInformer(client kubernetes.Interface, namespace string, r
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.NetworkingV1().Ingresses(namespace).List(options)
+				return client.NetworkingV1().Ingresses(namespace).List(context.TODO(), options)
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.NetworkingV1().Ingresses(namespace).Watch(options)
+				return client.NetworkingV1().Ingresses(namespace).Watch(context.TODO(), options)
 			},
 		},
 		&networkingv1.Ingress{},

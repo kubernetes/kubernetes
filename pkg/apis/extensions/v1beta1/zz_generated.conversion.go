@@ -1406,6 +1406,7 @@ func Convert_networking_IngressRuleValue_To_v1beta1_IngressRuleValue(in *network
 }
 
 func autoConvert_v1beta1_IngressSpec_To_networking_IngressSpec(in *v1beta1.IngressSpec, out *networking.IngressSpec, s conversion.Scope) error {
+	out.Class = (*string)(unsafe.Pointer(in.Class))
 	// WARNING: in.Backend requires manual conversion: does not exist in peer-type
 	out.TLS = *(*[]networking.IngressTLS)(unsafe.Pointer(&in.TLS))
 	out.Rules = *(*[]networking.IngressRule)(unsafe.Pointer(&in.Rules))
@@ -1413,6 +1414,7 @@ func autoConvert_v1beta1_IngressSpec_To_networking_IngressSpec(in *v1beta1.Ingre
 }
 
 func autoConvert_networking_IngressSpec_To_v1beta1_IngressSpec(in *networking.IngressSpec, out *v1beta1.IngressSpec, s conversion.Scope) error {
+	out.Class = (*string)(unsafe.Pointer(in.Class))
 	// WARNING: in.DefaultBackend requires manual conversion: does not exist in peer-type
 	out.TLS = *(*[]v1beta1.IngressTLS)(unsafe.Pointer(&in.TLS))
 	out.Rules = *(*[]v1beta1.IngressRule)(unsafe.Pointer(&in.Rules))

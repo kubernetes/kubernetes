@@ -210,7 +210,7 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		gvr("extensions", "v1beta1", "ingresses"): {
 			Stub:             `{"metadata": {"name": "ingress1"}, "spec": {"backend": {"serviceName": "service", "servicePort": 5000}}}`,
 			ExpectedEtcdPath: "/registry/ingress/" + namespace + "/ingress1",
-			ExpectedGVK:      gvkP("networking.k8s.io", "v1beta1", "Ingress"),
+			ExpectedGVK:      gvkP("networking.k8s.io", "v1", "Ingress"),
 		},
 		// --
 
@@ -218,10 +218,21 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		gvr("networking.k8s.io", "v1beta1", "ingresses"): {
 			Stub:             `{"metadata": {"name": "ingress2"}, "spec": {"backend": {"serviceName": "service", "servicePort": 5000}}}`,
 			ExpectedEtcdPath: "/registry/ingress/" + namespace + "/ingress2",
+			ExpectedGVK:      gvkP("networking.k8s.io", "v1", "Ingress"),
 		},
 		// --
 
 		// k8s.io/kubernetes/pkg/apis/networking/v1
+		gvr("networking.k8s.io", "v1", "ingresses"): {
+			Stub:             `{"metadata": {"name": "ingress3"}, "spec": {"class": "foo", "defaultBackend": {"serviceName": "service", "servicePort": 5000}}}`,
+			ExpectedEtcdPath: "/registry/ingress/" + namespace + "/ingress3",
+		},
+
+		gvr("networking.k8s.io", "v1", "ingressclasses"): {
+			Stub:             `{"metadata": {"name": "ingressclass2"}, "spec": {"controller": "example.com/controller"}}`,
+			ExpectedEtcdPath: "/registry/ingressclasses/ingressclass2",
+		},
+
 		gvr("networking.k8s.io", "v1", "networkpolicies"): {
 			Stub:             `{"metadata": {"name": "np2"}, "spec": {"podSelector": {"matchLabels": {"e": "f"}}}}`,
 			ExpectedEtcdPath: "/registry/networkpolicies/" + namespace + "/np2",

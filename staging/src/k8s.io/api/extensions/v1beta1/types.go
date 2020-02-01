@@ -569,6 +569,19 @@ type IngressList struct {
 
 // IngressSpec describes the Ingress the user wishes to exist.
 type IngressSpec struct {
+	// Class is the name of the IngressClass cluster resource. The associated
+	// IngressClass defines which controller will implement the resource.
+	// This replaces the deprecated `kubernetes.io/ingress.class` annotation.
+	// For backwards compatibility, when that annotation is set, it must be
+	// given precedence over this field. The controller may emit a warning if
+	// the field and annotation have different values. Implementations of this
+	// API may choose to ignore Ingresses without a class specified.
+	// An IngressClass resource may be marked as default, which can be used to
+	// set a default value for this field. For more information, refer to the
+	// IngressClass documentation.
+	// +optional
+	Class *string `json:"class,omitempty" protobuf:"bytes,4,opt,name=class"`
+
 	// A default backend capable of servicing requests that don't match any
 	// rule. At least one of 'backend' or 'rules' must be specified. This field
 	// is optional to allow the loadbalancer controller or defaulting logic to
@@ -698,8 +711,8 @@ const (
 type HTTPIngressPath struct {
 	// Path is matched against the path of an incoming request. Currently it can
 	// contain characters disallowed from the conventional "path" part of a URL
-	// as defined by RFC 3986. Paths must begin with a '/'. If unspecified, the
-	// path defaults to a catch all sending traffic to the backend.
+	// as defined by RFC 3986. Paths must begin with a '/'. When unspecified,
+	// all paths from incoming requests are matched.
 	// +optional
 	Path string `json:"path,omitempty" protobuf:"bytes,1,opt,name=path"`
 

@@ -19,6 +19,8 @@ limitations under the License.
 package fake
 
 import (
+	"context"
+
 	networkingv1 "k8s.io/api/networking/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
@@ -39,7 +41,7 @@ var ingressesResource = schema.GroupVersionResource{Group: "networking.k8s.io", 
 var ingressesKind = schema.GroupVersionKind{Group: "networking.k8s.io", Version: "v1", Kind: "Ingress"}
 
 // Get takes name of the ingress, and returns the corresponding ingress object, and an error if there is any.
-func (c *FakeIngresses) Get(name string, options v1.GetOptions) (result *networkingv1.Ingress, err error) {
+func (c *FakeIngresses) Get(ctx context.Context, name string, options v1.GetOptions) (result *networkingv1.Ingress, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(ingressesResource, c.ns, name), &networkingv1.Ingress{})
 
@@ -50,7 +52,7 @@ func (c *FakeIngresses) Get(name string, options v1.GetOptions) (result *network
 }
 
 // List takes label and field selectors, and returns the list of Ingresses that match those selectors.
-func (c *FakeIngresses) List(opts v1.ListOptions) (result *networkingv1.IngressList, err error) {
+func (c *FakeIngresses) List(ctx context.Context, opts v1.ListOptions) (result *networkingv1.IngressList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewListAction(ingressesResource, ingressesKind, c.ns, opts), &networkingv1.IngressList{})
 
@@ -72,14 +74,14 @@ func (c *FakeIngresses) List(opts v1.ListOptions) (result *networkingv1.IngressL
 }
 
 // Watch returns a watch.Interface that watches the requested ingresses.
-func (c *FakeIngresses) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeIngresses) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(ingressesResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a ingress and creates it.  Returns the server's representation of the ingress, and an error, if there is any.
-func (c *FakeIngresses) Create(ingress *networkingv1.Ingress) (result *networkingv1.Ingress, err error) {
+func (c *FakeIngresses) Create(ctx context.Context, ingress *networkingv1.Ingress, opts v1.CreateOptions) (result *networkingv1.Ingress, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(ingressesResource, c.ns, ingress), &networkingv1.Ingress{})
 
@@ -90,7 +92,7 @@ func (c *FakeIngresses) Create(ingress *networkingv1.Ingress) (result *networkin
 }
 
 // Update takes the representation of a ingress and updates it. Returns the server's representation of the ingress, and an error, if there is any.
-func (c *FakeIngresses) Update(ingress *networkingv1.Ingress) (result *networkingv1.Ingress, err error) {
+func (c *FakeIngresses) Update(ctx context.Context, ingress *networkingv1.Ingress, opts v1.UpdateOptions) (result *networkingv1.Ingress, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(ingressesResource, c.ns, ingress), &networkingv1.Ingress{})
 
@@ -102,7 +104,7 @@ func (c *FakeIngresses) Update(ingress *networkingv1.Ingress) (result *networkin
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeIngresses) UpdateStatus(ingress *networkingv1.Ingress) (*networkingv1.Ingress, error) {
+func (c *FakeIngresses) UpdateStatus(ctx context.Context, ingress *networkingv1.Ingress, opts v1.UpdateOptions) (*networkingv1.Ingress, error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateSubresourceAction(ingressesResource, "status", c.ns, ingress), &networkingv1.Ingress{})
 
@@ -113,7 +115,7 @@ func (c *FakeIngresses) UpdateStatus(ingress *networkingv1.Ingress) (*networking
 }
 
 // Delete takes name of the ingress and deletes it. Returns an error if one occurs.
-func (c *FakeIngresses) Delete(name string, options *v1.DeleteOptions) error {
+func (c *FakeIngresses) Delete(ctx context.Context, name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(ingressesResource, c.ns, name), &networkingv1.Ingress{})
 
@@ -121,7 +123,7 @@ func (c *FakeIngresses) Delete(name string, options *v1.DeleteOptions) error {
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeIngresses) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *FakeIngresses) DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(ingressesResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &networkingv1.IngressList{})
@@ -129,7 +131,7 @@ func (c *FakeIngresses) DeleteCollection(options *v1.DeleteOptions, listOptions 
 }
 
 // Patch applies the patch and returns the patched ingress.
-func (c *FakeIngresses) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *networkingv1.Ingress, err error) {
+func (c *FakeIngresses) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *networkingv1.Ingress, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(ingressesResource, c.ns, name, pt, data, subresources...), &networkingv1.Ingress{})
 

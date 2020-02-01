@@ -3009,6 +3009,43 @@ func TestDescribeResourceQuota(t *testing.T) {
 	}
 }
 
+func TestDescribeIngressClass(t *testing.T) {
+	fake := fake.NewSimpleClientset(&networkingv1.IngressClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "example-class",
+		},
+		Spec: networkingv1.IngressClassSpec{
+			Controller: "example.com/controller",
+			Parameters: &corev1.TypedLocalObjectReference{
+				APIGroup: utilpointer.StringPtr("v1"),
+				Kind:     "ConfigMap",
+				Name:     "example-parameters",
+			},
+		},
+	})
+
+	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
+	d := IngressClassDescriber{c}
+	out, err := d.Describe("", "example-class", describe.DescriberSettings{})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	expectedOut := `Name:         example-class
+Labels:       <none>
+Annotations:  <none>
+Controller:   example.com/controller
+Parameters:
+  APIGroup:  v1
+  Kind:      ConfigMap
+  Name:      example-parameters` + "\n"
+
+	if out != expectedOut {
+		t.Logf(out)
+		t.Errorf("expected : %q\n but got output:\n %q", expectedOut, out)
+	}
+}
+
 func TestDescribeNetworkPolicies(t *testing.T) {
 	expectedTime, err := time.Parse("2006-01-02 15:04:05 Z0700 MST", "2017-06-04 21:45:56 -0700 PDT")
 	if err != nil {

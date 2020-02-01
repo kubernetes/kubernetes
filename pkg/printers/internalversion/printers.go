@@ -198,6 +198,7 @@ func AddHandlers(h printers.PrintHandler) {
 
 	ingressColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "Class", Type: "string", Description: "The name of the IngressClass resource that should be used for additional configuration"},
 		{Name: "Hosts", Type: "string", Description: "Hosts that incoming requests are matched against before the ingress rule"},
 		{Name: "Address", Type: "string", Description: "Address is a list containing ingress points for the load-balancer"},
 		{Name: "Ports", Type: "string", Description: "Ports of TLS configurations that open"},
@@ -205,6 +206,15 @@ func AddHandlers(h printers.PrintHandler) {
 	}
 	h.TableHandler(ingressColumnDefinitions, printIngress)
 	h.TableHandler(ingressColumnDefinitions, printIngressList)
+
+	ingressClassColumnDefinitions := []metav1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "Controller", Type: "string", Description: "Controller that is responsible for handling this class"},
+		{Name: "Parameters", Type: "string", Description: "A reference to a resource with additional parameters"},
+		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+	}
+	h.TableHandler(ingressClassColumnDefinitions, printIngressClass)
+	h.TableHandler(ingressClassColumnDefinitions, printIngressClassList)
 
 	statefulSetColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
@@ -1132,11 +1142,15 @@ func printIngress(obj *networking.Ingress, options printers.GenerateOptions) ([]
 	row := metav1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
+	className := "<none>"
+	if obj.Spec.Class != nil {
+		className = *obj.Spec.Class
+	}
 	hosts := formatHosts(obj.Spec.Rules)
 	address := loadBalancerStatusStringer(obj.Status.LoadBalancer, options.Wide)
 	ports := formatPorts(obj.Spec.TLS)
 	createTime := translateTimestampSince(obj.CreationTimestamp)
-	row.Cells = append(row.Cells, obj.Name, hosts, address, ports, createTime)
+	row.Cells = append(row.Cells, obj.Name, className, hosts, address, ports, createTime)
 	return []metav1.TableRow{row}, nil
 }
 
@@ -1144,6 +1158,31 @@ func printIngressList(list *networking.IngressList, options printers.GenerateOpt
 	rows := make([]metav1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printIngress(&list.Items[i], options)
+		if err != nil {
+			return nil, err
+		}
+		rows = append(rows, r...)
+	}
+	return rows, nil
+}
+
+func printIngressClass(obj *networking.IngressClass, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	row := metav1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
+	}
+	parameters := "<none>"
+	if obj.Spec.Parameters != nil {
+		parameters = fmt.Sprintf("%s/%s", obj.Spec.Parameters.Kind, obj.Spec.Parameters.Name)
+	}
+	createTime := translateTimestampSince(obj.CreationTimestamp)
+	row.Cells = append(row.Cells, obj.Name, obj.Spec.Controller, parameters, createTime)
+	return []metav1.TableRow{row}, nil
+}
+
+func printIngressClassList(list *networking.IngressClassList, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	rows := make([]metav1.TableRow, 0, len(list.Items))
+	for i := range list.Items {
+		r, err := printIngressClass(&list.Items[i], options)
 		if err != nil {
 			return nil, err
 		}

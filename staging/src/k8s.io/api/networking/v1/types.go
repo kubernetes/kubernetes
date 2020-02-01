@@ -243,10 +243,23 @@ type IngressList struct {
 
 // IngressSpec describes the Ingress the user wishes to exist.
 type IngressSpec struct {
+	// Class is the name of the IngressClass cluster resource. The associated
+	// IngressClass defines which controller will implement the resource.
+	// This replaces the deprecated `kubernetes.io/ingress.class` annotation.
+	// For backwards compatibility, when that annotation is set, it must be
+	// given precedence over this field. The controller may emit a warning if
+	// the field and annotation have different values. Implementations of this
+	// API should ignore Ingresses without a class specified.
+	// An IngressClass resource may be marked as default, which can be used to
+	// set a default value for this field. For more information, refer to the
+	// IngressClass documentation.
+	// +optional
+	Class *string `json:"class,omitempty" protobuf:"bytes,4,opt,name=class"`
+
 	// The default backend capable of servicing requests that don't match any
-	// rule. At least one of 'defaultBackend' or 'rules' must be specified. This field
-	// is optional to allow the loadbalancer controller or defaulting logic to
-	// specify a global default.
+	// rule. If rules is empty, DefaultBackend must be specified. If
+	// DefaultBackend is not set, the handling of requests that do not match any
+	// of the rules will be up to the Ingress controller.
 	// +optional
 	DefaultBackend *IngressBackend `json:"defaultBackend,omitempty" protobuf:"bytes,1,opt,name=defaultBackend"`
 
@@ -263,6 +276,60 @@ type IngressSpec struct {
 	// +optional
 	Rules []IngressRule `json:"rules,omitempty" protobuf:"bytes,3,rep,name=rules"`
 	// TODO: Add the ability to specify load-balancer IP through claims
+}
+
+// +genclient
+// +genclient:nonNamespaced
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// IngressClass represents the class of the Ingress, referenced by the Ingress
+// Spec. The `ingressclass.kubernetes.io/is-default-class` annotation can be
+// used to indicate that an IngressClass should be considered default. When a
+// single IngressClass resource has this annotation set to true, new Ingress
+// resources without a class specified will be assigned this default class.
+type IngressClass struct {
+	metav1.TypeMeta `json:",inline"`
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// Spec is the desired state of the IngressClass.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	// +optional
+	Spec IngressClassSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
+}
+
+// IngressClassSpec provides information about the class of an Ingress.
+type IngressClassSpec struct {
+	// Controller refers to the name of the controller that should handle this
+	// class. This allows for different "flavors" that are controlled by the
+	// same controller. For example, you may have different Parameters for the
+	// same implementing controller. This should be specified as a
+	// domain-prefixed path no more than 250 characters in length, e.g.
+	// "acme.io/ingress-controller". This field is immutable.
+	Controller string `json:"controller,omitempty" protobuf:"bytes,1,opt,name=controller"`
+
+	// Parameters is a link to a resource containing additional configuration
+	// for the controller. This is optional if the controller does not require
+	// extra parameters. Example configuration resources include
+	// `core.ConfigMap` or a controller specific Custom Resource.
+	// +optional
+	Parameters *v1.TypedLocalObjectReference `json:"parameters,omitempty" protobuf:"bytes,2,opt,name=parameters"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// IngressClassList is a collection of IngressClasses.
+type IngressClassList struct {
+	metav1.TypeMeta `json:",inline"`
+	// Standard list metadata.
+	// +optional
+	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// Items is the list of IngressClasses.
+	// +listType=set
+	Items []IngressClass `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
 // IngressTLS describes the transport layer security associated with an Ingress.
@@ -291,28 +358,30 @@ type IngressStatus struct {
 }
 
 // IngressRule represents the rules mapping the paths under a specified host to
-// the related backend services. Incoming requests are first evaluated for a host
-// match, then routed to the backend associated with the matching IngressRuleValue.
+// the related backend services. Incoming requests are first evaluated for a
+// host match, then routed to the backend associated with the matching
+// IngressRuleValue.
 type IngressRule struct {
 	// Host is the fully qualified domain name of a network host, as defined
 	// by RFC 3986. Note the following deviations from the "host" part of the
 	// URI as defined in the RFC:
-	// 1. IPs are not allowed. Currently an IngressRuleValue can only apply to the
-	//	  IP in the Spec of the parent Ingress.
+	// 1. IPs are not allowed. Currently an IngressRuleValue can only apply to
+	//    the IP in the Spec of the parent Ingress.
 	// 2. The `:` delimiter is not respected because ports are not allowed.
 	//	  Currently the port of an Ingress is implicitly :80 for http and
 	//	  :443 for https.
 	// Both these may change in the future.
-	// Incoming requests are matched against the host before the IngressRuleValue.
-	// If the host is unspecified, the Ingress routes all traffic based on the
-	// specified IngressRuleValue.
+	// Incoming requests are matched against the host before the
+	// IngressRuleValue. If the host is unspecified, the Ingress routes all
+	// traffic based on the specified IngressRuleValue.
 	// +optional
 	Host string `json:"host,omitempty" protobuf:"bytes,1,opt,name=host"`
-	// IngressRuleValue represents a rule to route requests for this IngressRule.
-	// If unspecified, the rule defaults to a http catch-all. Whether that sends
-	// just traffic matching the host to the default backend or all traffic to the
-	// default backend, is left to the controller fulfilling the Ingress. Http is
-	// currently the only supported IngressRuleValue.
+	// IngressRuleValue represents a rule to route requests for this
+	// IngressRule. If unspecified, the rule defaults to a http catch-all.
+	// Whether that sends just traffic matching the host to the default backend
+	// or all traffic to the default backend, is left to the controller
+	// fulfilling the Ingress. Http is currently the only supported
+	// IngressRuleValue.
 	// +optional
 	IngressRuleValue `json:",inline,omitempty" protobuf:"bytes,2,opt,name=ingressRuleValue"`
 }
@@ -351,13 +420,13 @@ const (
 	// PathTypeExact matches the URL path exactly.
 	PathTypeExact = PathType("Exact")
 
-	// PathTypePrefix matches based on a URL path prefix split by '/'. Matching is
-	// done on a path element by element basis. A path element refers is the
+	// PathTypePrefix matches based on a URL path prefix split by '/'. Matching
+	// is done on a path element by element basis. A path element refers is the
 	// list of labels in the path split by the '/' separator. A request is a
-	// match for path p if every p is an element-wise prefix of p of the
-	// request path. Note that if the last element of the path is a substring
-	// of the last element in request path, it is not a match (e.g. /foo/bar
-	// matches /foo/bar/baz, but does not match /foo/barbaz).
+	// match for path p if every p is an element-wise prefix of p of the request
+	// path. Note that if the last element of the path is a substring of the
+	// last element in request path, it is not a match (e.g. /foo/bar matches
+	// /foo/bar/baz, but does not match /foo/barbaz).
 	PathTypePrefix = PathType("Prefix")
 
 	// PathTypeImplementationSpecific matching is up to the IngressClass.
@@ -372,26 +441,14 @@ const (
 type HTTPIngressPath struct {
 	// Path is matched against the path of an incoming request. Currently it can
 	// contain characters disallowed from the conventional "path" part of a URL
-	// as defined by RFC 3986. Paths must begin with a '/'. If unspecified, the
-	// path defaults to a catch all sending traffic to the backend.
+	// as defined by RFC 3986. Paths must begin with a '/'. When unspecified,
+	// all paths from incoming requests are matched.
 	// +optional
 	Path string `json:"path,omitempty" protobuf:"bytes,1,opt,name=path"`
 
 	// PathType determines the interpretation of the Path matching. PathType can
-	// be one of the following values:
-	// * Exact: Matches the URL path exactly.
-	// * Prefix: Matches based on a URL path prefix split by '/'. Matching is
-	//   done on a path element by element basis. A path element refers is the
-	//   list of labels in the path split by the '/' separator. A request is a
-	//   match for path p if every p is an element-wise prefix of p of the
-	//   request path. Note that if the last element of the path is a substring
-	//   of the last element in request path, it is not a match (e.g. /foo/bar
-	//   matches /foo/bar/baz, but does not match /foo/barbaz).
-	// * ImplementationSpecific: Interpretation of the Path matching is up to
-	//   the IngressClass. Implementations can treat this as a separate PathType
-	//   or treat it identically to Prefix or Exact path types.
-	// Implementations are required to support all path types.
-	// Defaults to ImplementationSpecific.
+	// be one of Exact, Prefix, or ImplementationSpecific. Implementations are
+	// required to support all path types. Defaults to ImplementationSpecific.
 	PathType *PathType `json:"pathType,omitempty" protobuf:"bytes,3,opt,name=pathType"`
 
 	// Backend defines the referenced service endpoint to which the traffic
