@@ -75,9 +75,11 @@ func newScaleSet(az *Cloud) (VMSet, error) {
 		availabilitySet: newAvailabilitySet(az),
 	}
 
-	ss.availabilitySetNodesCache, err = ss.newAvailabilitySetNodesCache()
-	if err != nil {
-		return nil, err
+	if !ss.DisableAvailabilitySetNodes {
+		ss.availabilitySetNodesCache, err = ss.newAvailabilitySetNodesCache()
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	ss.vmssCache, err = ss.newVMSSCache()

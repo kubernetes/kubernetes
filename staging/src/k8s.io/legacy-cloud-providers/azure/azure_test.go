@@ -1511,6 +1511,8 @@ func TestNewCloudFromJSON(t *testing.T) {
 		"loadBalancerCacheTTLInSeconds": 100,
 		"nsgCacheTTLInSeconds": 100,
 		"routeTableCacheTTLInSeconds": 100,
+		"vmType": "vmss",
+		"disableAvailabilitySetNodes": true
 	}`
 	validateConfig(t, config)
 }
@@ -1568,6 +1570,8 @@ vmCacheTTLInSeconds: 100
 loadBalancerCacheTTLInSeconds: 100
 nsgCacheTTLInSeconds: 100
 routeTableCacheTTLInSeconds: 100
+vmType: vmss
+disableAvailabilitySetNodes: true
 `
 	validateConfig(t, config)
 }
@@ -1664,6 +1668,12 @@ func validateConfig(t *testing.T, config string) {
 	}
 	if azureCloud.RouteTableCacheTTLInSeconds != 100 {
 		t.Errorf("got incorrect value for routeTableCacheTTLInSeconds")
+	}
+	if azureCloud.VMType != vmTypeVMSS {
+		t.Errorf("got incorrect value for vmType")
+	}
+	if !azureCloud.DisableAvailabilitySetNodes {
+		t.Errorf("got incorrect value for disableAvailabilitySetNodes")
 	}
 }
 

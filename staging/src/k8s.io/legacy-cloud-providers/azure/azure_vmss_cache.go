@@ -256,6 +256,12 @@ func (ss *scaleSet) newAvailabilitySetNodesCache() (*timedCache, error) {
 }
 
 func (ss *scaleSet) isNodeManagedByAvailabilitySet(nodeName string, crt cacheReadType) (bool, error) {
+	// Assume all nodes are managed by VMSS when DisableAvailabilitySetNodes is enabled.
+	if ss.DisableAvailabilitySetNodes {
+		klog.V(2).Infof("Assuming node %q is managed by VMSS since DisableAvailabilitySetNodes is set to true", nodeName)
+		return false, nil
+	}
+
 	cached, err := ss.availabilitySetNodesCache.Get(availabilitySetNodesKey, crt)
 	if err != nil {
 		return false, err
