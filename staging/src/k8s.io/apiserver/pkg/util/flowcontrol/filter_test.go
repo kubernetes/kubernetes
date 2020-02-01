@@ -28,6 +28,6 @@ func BenchmarkCRC(b *testing.B) {
 
 func BenchmarkSHA(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		 shaFlowID("supercalifragilistic expialidocious", "the sound of it is something quite atrocious")
+		shaFlowID("supercalifragilistic expialidocious", "the sound of it is something quite atrocious")
 	}
 }

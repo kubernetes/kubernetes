@@ -161,8 +161,9 @@ func hashFlowID(fsName, fDistinguisher string) uint64 {
 
 func shaFlowID(fsName, fDistinguisher string) uint64 {
 	hash := sha256.New()
+	var sep = [1]byte{0}
 	hash.Write([]byte(fsName))
-	hash.Write([]byte{1})
+	hash.Write(sep[:])
 	hash.Write([]byte(fDistinguisher))
 	var sum [32]byte
 	hash.Sum(sum[:0])
