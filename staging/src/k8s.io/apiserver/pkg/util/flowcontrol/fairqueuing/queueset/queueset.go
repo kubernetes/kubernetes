@@ -282,6 +282,12 @@ func (qs *queueSet) StartRequest(ctx context.Context, hashValue uint64, descr1, 
 			defer runtime.HandleCrash()
 			qs.goroutineDoneOrBlocked()
 			_ = <-doneCh
+			// Whatever goroutine unblocked the preceding receive MUST
+			// have already either (a) incremented qs.counter or (b)
+			// known that said counter is not actually counting or (c)
+			// known that the count does not need to be accurate.
+			// BTW, the count only needs to be accurate in a test that
+			// uses FakeEventClock::Run().
 			klog.V(6).Infof("QS(%s): Context of request %#+v %#+v is Done", qs.qCfg.Name, descr1, descr2)
 			qs.cancelWait(req)
 			qs.goroutineDoneOrBlocked()

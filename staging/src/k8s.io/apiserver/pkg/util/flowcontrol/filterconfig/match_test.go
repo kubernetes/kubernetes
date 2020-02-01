@@ -56,7 +56,7 @@ func checkFTR(t *testing.T, ftr *fsTestingRecord) {
 
 func TestPolicyRules(t *testing.T) {
 	rngOuter := rand.New(rand.NewSource(42))
-	for i := 0; i < 100; i++ {
+	for i := 0; i < 300; i++ {
 		rng := rand.New(rand.NewSource(int64(rngOuter.Uint64())))
 		t.Run(fmt.Sprintf("trial%d:", i), func(t *testing.T) {
 			r := rng.Float32()
@@ -65,12 +65,12 @@ func TestPolicyRules(t *testing.T) {
 			t.Logf("policyRule=%#+v, mrd=%#+v, mnd=%#+v, srd=%#+v, snd=%#+v", fcfmt.Fmt(policyRule), matchingRDigests, matchingNDigests, skippingRDigests, skippingNDigests)
 			for _, digest := range append(matchingRDigests, matchingNDigests...) {
 				if !matchesPolicyRule(digest, &policyRule) {
-					t.Logf("Expected %#+v to match %#+v but it did not", fcfmt.Fmt(policyRule), digest)
+					t.Errorf("Fail: expected %#+v to match %#+v but it did not", fcfmt.Fmt(policyRule), digest)
 				}
 			}
 			for _, digest := range append(skippingRDigests, skippingNDigests...) {
 				if matchesPolicyRule(digest, &policyRule) {
-					t.Logf("Expected %#+v to not match %#+v but it did", fcfmt.Fmt(policyRule), digest)
+					t.Errorf("Fail: expected %#+v to not match %#+v but it did", fcfmt.Fmt(policyRule), digest)
 				}
 			}
 		})

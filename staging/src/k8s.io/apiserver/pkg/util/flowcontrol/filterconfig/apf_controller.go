@@ -104,8 +104,8 @@ type RequestDigest struct {
 type configController struct {
 	queueSetFactory fq.QueueSetFactory
 
-	// configQueue holds TypedConfigObjectReference values, identifying
-	// config objects that need to be processed
+	// configQueue holds `(interface{})(0)` when the configuration
+	// objects need to be reprocessed.
 	configQueue workqueue.RateLimitingInterface
 
 	plLister         fclistersv1a1.PriorityLevelConfigurationLister
@@ -150,9 +150,6 @@ type configController struct {
 // priorityLevelState holds the state specific to a priority level.
 type priorityLevelState struct {
 	// config holds the configuration after defaulting logic has been applied.
-	// Exempt may be true while there are queues, in the case of a priority
-	// level that recently switched from being non-exempt to exempt and whose
-	// queues are still draining.
 	// If there are queues then their parameters are here.
 	config fctypesv1a1.PriorityLevelConfigurationSpec
 
@@ -211,7 +208,8 @@ func NewTestableController(
 	cfgCtl.traceCond = *sync.NewCond(&cfgCtl.lock)
 	klog.V(2).Infof("NewTestableController with serverConcurrencyLimit=%d, requestWaitLimit=%s", serverConcurrencyLimit, requestWaitLimit)
 	cfgCtl.initializeConfigController(informerFactory)
-	cfgCtl.digestConfigObjects(nil, nil)
+	// ensure the data structure reflects the mandatory config
+	cfgCtl.lockAndDigestConfigObjects(nil, nil)
 	return cfgCtl
 }
 
@@ -352,8 +350,10 @@ type cfgMeal struct {
 	// These keep track of which mandatory objects have been digested
 	haveExemptPL, haveCatchAllPL, haveExemptFS, haveCatchAllFS bool
 
-	// buffered FlowSchema status updates to do.
-	// Do them when the lock is not held, of course.
+	// Buffered FlowSchema status updates to do.  Do them when the
+	// lock is not held, to avoid a deadlock due to such a request
+	// provoking a call into this controller while the lock held
+	// waiting on that request to complete.
 	fsStatusUpdates []fsStatusUpdate
 }
 
@@ -445,7 +445,7 @@ func (meal *cfgMeal) digestNewPLsLocked(newPLs []*fctypesv1a1.PriorityLevelConfi
 // use.  We do this before holding over old priority levels so that
 // requests stop going to those levels and FlowSchemaStatus values
 // reflect this.  This function also adds any missing mandatory
-// FlowSchema objects.  The given objects must all have disstinct
+// FlowSchema objects.  The given objects must all have distinct
 // names.
 func (meal *cfgMeal) digestFlowSchemasLocked(newFSs []*fctypesv1a1.FlowSchema) {
 	fsSeq := make(apihelpers.FlowSchemaSequence, 0, len(newFSs))
@@ -510,7 +510,7 @@ func (meal *cfgMeal) processOldPLsLocked() {
 		if plName == fctypesv1a1.PriorityLevelConfigurationNameExempt && !meal.haveExemptPL || plName == fctypesv1a1.PriorityLevelConfigurationNameCatchAll && !meal.haveCatchAllPL {
 			klog.V(3).Infof("Retaining mandatory priority level %q despite lack of API object", plName)
 		} else {
-			if plState.queues == nil || plState.quiescing && plState.numPending == 0 && plState.queues.IsIdle() {
+			if plState.queues == nil || plState.numPending == 0 && plState.queues.IsIdle() {
 				// Either there are no queues or they are done
 				// draining and no use is coming from another
 				// goroutine

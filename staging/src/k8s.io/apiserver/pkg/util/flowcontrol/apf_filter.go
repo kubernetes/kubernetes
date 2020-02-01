@@ -19,6 +19,7 @@ package flowcontrol
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/binary"
 	"hash/crc64"
 	"strconv"
 	"time"
@@ -148,36 +149,29 @@ func computeFlowDistinguisher(rd fcfc.RequestDigest, method *fctypesv1a1.FlowDis
 	}
 }
 
-var hash32 bool
+var hashByCRC bool
 
 // hashFlowID hashes the inputs into 64-bits
 func hashFlowID(fsName, fDistinguisher string) uint64 {
-	if hash32 {
-		return hash32FlowID(fsName, fDistinguisher)
+	if hashByCRC {
+		return crcFlowID(fsName, fDistinguisher)
 	}
-	return hash256FlowID(fsName, fDistinguisher)
+	return shaFlowID(fsName, fDistinguisher)
 }
 
-func hash256FlowID(fsName, fDistinguisher string) uint64 {
+func shaFlowID(fsName, fDistinguisher string) uint64 {
 	hash := sha256.New()
 	hash.Write([]byte(fsName))
 	hash.Write([]byte{1})
 	hash.Write([]byte(fDistinguisher))
-	var sum [8]byte
-	hash.Sum(sum[:])
-	return uint64(sum[0])<<0 +
-		uint64(sum[1])<<8 +
-		uint64(sum[2])<<16 +
-		uint64(sum[3])<<24 +
-		uint64(sum[4])<<32 +
-		uint64(sum[6])<<40 +
-		uint64(sum[6])<<48 +
-		uint64(sum[7])<<56
+	var sum [32]byte
+	hash.Sum(sum[:0])
+	return binary.LittleEndian.Uint64(sum[:8])
 }
 
 var crcHashTable = crc64.MakeTable(crc64.ECMA)
 
-func hash32FlowID(fsName, fDistinguisher string) uint64 {
+func crcFlowID(fsName, fDistinguisher string) uint64 {
 	var hash uint64
 	hash = crc64.Update(hash, crcHashTable, []byte(fsName))
 	hash = crc64.Update(hash, crcHashTable, []byte{1})

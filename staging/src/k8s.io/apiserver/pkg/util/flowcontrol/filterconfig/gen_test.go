@@ -291,7 +291,14 @@ func genPolicyRuleWithSubjects(t *testing.T, rng *rand.Rand, pfx string, mayMatc
 		skippingUIs = append(skippingUIs, ssus...)
 	}
 	if matchAllResourceRequests || matchAllNonResourceRequests {
-		subjects = append(subjects, mkGroupSubject("system:authenticated"), mkGroupSubject("system:unauthenticated"))
+		switch rng.Intn(3) {
+		case 0:
+			subjects = append(subjects, mkUserSubject("*"))
+		case 1:
+			subjects = append(subjects, mkGroupSubject("*"))
+		default:
+			subjects = append(subjects, mkGroupSubject("system:authenticated"), mkGroupSubject("system:unauthenticated"))
+		}
 		matchingUIs = append(matchingUIs, skippingUIs...)
 	}
 	if someMatchesAllResourceRequests || someMatchesAllNonResourceRequests {
@@ -427,6 +434,13 @@ var groupCover = []string{"system:authenticated", "system:unauthenticated"}
 
 func mg(rng *rand.Rand) string {
 	return groupCover[rng.Intn(len(groupCover))]
+}
+
+func mkUserSubject(username string) fcv1a1.Subject {
+	return fcv1a1.Subject{
+		Kind: fcv1a1.SubjectKindUser,
+		User: &fcv1a1.UserSubject{username},
+	}
 }
 
 func mkGroupSubject(group string) fcv1a1.Subject {

@@ -47,13 +47,14 @@ type QueueSetCompleter interface {
 // .  Some day we may have connections between priority levels, but
 // today is not that day.
 type QueueSet interface {
-	// BeginConfigChange starts the two-step process of updating
-	// the configuration.  No change is made until Complete is
-	// called.  If `C := X.BeginConstruction(q)` then
-	// `C.Complete(d)` returns the same value `X`.  If the
-	// QueuingConfig's DesiredNumQueues field is zero then the other
-	// queuing-specific config parameters are not changed, so that the
-	// queues continue draining as before.
+	// BeginConfigChange starts the two-step process of updating the
+	// configuration.  No change is made until Complete is called.  If
+	// `C := X.BeginConstruction(q)` then `C.Complete(d)` returns the
+	// same value `X`.  If the QueuingConfig's DesiredNumQueues field
+	// is zero then the other queuing-specific config parameters are
+	// not changed, so that the queues continue draining as before.
+	// In any case, reconfiguration does not discard any queue unless
+	// and until it is undesired and empty.
 	BeginConfigChange(QueuingConfig) (QueueSetCompleter, error)
 
 	// IsIdle returns a bool indicating whether the QueueSet was idle

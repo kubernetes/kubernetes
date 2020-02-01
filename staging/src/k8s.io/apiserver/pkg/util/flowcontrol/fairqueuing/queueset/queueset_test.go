@@ -291,6 +291,8 @@ func TestContextCancel(t *testing.T) {
 	tBefore := time.Now()
 	go func() {
 		time.Sleep(time.Second)
+		// account for unblocking the goroutine that waits on cancelation
+		counter.Add(1)
 		cancel2()
 	}()
 	req2, idle2a := qs.StartRequest(ctx2, 2, "test", "two")

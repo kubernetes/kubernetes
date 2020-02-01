@@ -60,7 +60,19 @@ func matchesSubject(user user.Info, subject fctypesv1a1.Subject) bool {
 	case fctypesv1a1.SubjectKindUser:
 		return subject.User != nil && (subject.User.Name == fctypesv1a1.NameAll || subject.User.Name == user.GetName())
 	case fctypesv1a1.SubjectKindGroup:
-		return subject.Group != nil && (containsString(subject.Group.Name, user.GetGroups(), fctypesv1a1.NameAll))
+		if subject.Group == nil {
+			return false
+		}
+		seek := subject.Group.Name
+		if seek == "*" {
+			return true
+		}
+		for _, userGroup := range user.GetGroups() {
+			if userGroup == seek {
+				return true
+			}
+		}
+		return false
 	case fctypesv1a1.SubjectKindServiceAccount:
 		if subject.ServiceAccount == nil {
 			return false
