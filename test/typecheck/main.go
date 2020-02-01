@@ -105,6 +105,9 @@ func newAnalyzer(platform string) *analyzer {
 		ctx.BuildTags = append(ctx.BuildTags, tagsSplit...)
 	}
 
+	// add selinux tag explicitly
+	ctx.BuildTags = append(ctx.BuildTags, "selinux")
+
 	a := &analyzer{
 		platform:  platform,
 		fset:      token.NewFileSet(),
