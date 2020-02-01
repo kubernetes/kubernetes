@@ -29,6 +29,9 @@ import (
 // BuildInsecureHandlerChain sets up the server to listen to http. Should be removed.
 func BuildInsecureHandlerChain(apiHandler http.Handler, c *server.Config) http.Handler {
 	handler := apiHandler
+	// Temporarily disable APIPriorityAndFairness during development
+	// so that /debug/pprof works even while this feature is totally
+	// hosed
 	if feature.DefaultFeatureGate.Enabled(features.APIPriorityAndFairness) && false {
 		handler = genericfilters.WithPriorityAndFairness(handler, c.LongRunningFunc, c.FlowControl)
 	} else {

@@ -17,24 +17,17 @@ limitations under the License.
 package flowcontrol
 
 import (
-	"encoding/binary"
 	"testing"
 )
 
 func BenchmarkCRC(b *testing.B) {
-	var buf [8]byte
-	var ans uint64
 	for i := 0; i < b.N; i++ {
-		binary.LittleEndian.PutUint64(buf[:], uint64(i)+ans)
-		ans = crcFlowID("benchmarking", string(buf[:]))
+		crcFlowID("supercalifragilistic expialidocious", "the sound of it is something quite atrocious")
 	}
 }
 
 func BenchmarkSHA(b *testing.B) {
-	var buf [8]byte
-	var ans uint64
 	for i := 0; i < b.N; i++ {
-		binary.LittleEndian.PutUint64(buf[:], uint64(i)+ans)
-		ans = shaFlowID("benchmarking", string(buf[:]))
+		 shaFlowID("supercalifragilistic expialidocious", "the sound of it is something quite atrocious")
 	}
 }

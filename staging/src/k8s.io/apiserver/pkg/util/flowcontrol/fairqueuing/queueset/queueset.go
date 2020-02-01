@@ -317,7 +317,6 @@ func (req *request) Wait() (bool, bool, func() (idle bool)) {
 	decision, isDecision := decisionAny.(requestDecision)
 	if !isDecision {
 		panic(fmt.Sprintf("QS(%s): Impossible decision %#+v (of type %T) for request %#+v %#+v", qs.qCfg.Name, decisionAny, decisionAny, req.descr1, req.descr2))
-		decision = decisionExecute // yeah, this is a no-op
 	}
 	switch decision {
 	case decisionReject:
@@ -487,7 +486,7 @@ func (qs *queueSet) rejectOrEnqueueLocked(request *request) bool {
 	return true
 }
 
-// enqueues a request into it queue.
+// enqueues a request into its queue.
 func (qs *queueSet) enqueueLocked(request *request) {
 	queue := request.queue
 	if len(queue.requests) == 0 && queue.requestsExecuting == 0 {
