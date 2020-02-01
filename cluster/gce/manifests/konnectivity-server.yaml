@@ -14,7 +14,7 @@ spec:
     image: gcr.io/google-containers/proxy-server:v0.0.3
     resources:
       requests:
-        cpu: 40m
+        cpu: 25m
     command: [ "/proxy-server"{{ konnectivity_args }} ]
     livenessProbe:
       httpGet:
