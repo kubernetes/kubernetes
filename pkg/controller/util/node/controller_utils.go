@@ -117,7 +117,7 @@ func SetPodTerminationReason(kubeClient clientset.Interface, pod *v1.Pod, nodeNa
 
 // MarkPodsNotReady updates ready status of given pods running on
 // given node from master return true if success
-func MarkPodsNotReady(kubeClient clientset.Interface, pods []*v1.Pod, nodeName string) error {
+func MarkPodsNotReady(kubeClient clientset.Interface, recorder record.EventRecorder, pods []*v1.Pod, nodeName string) error {
 	klog.V(2).Infof("Update ready status of pods on node [%v]", nodeName)
 
 	errMsg := []string{}
@@ -136,6 +136,7 @@ func MarkPodsNotReady(kubeClient clientset.Interface, pods []*v1.Pod, nodeName s
 					break
 				}
 				klog.V(2).Infof("Updating ready status of pod %v to false", pod.Name)
+				recorder.Eventf(pod, v1.EventTypeNormal, "NodeNotReady", "Marking for updating Pod %s unready from Node %s", pod.Name, nodeName)
 				_, err := kubeClient.CoreV1().Pods(pod.Namespace).UpdateStatus(pod)
 				if err != nil {
 					if apierrors.IsNotFound(err) {
