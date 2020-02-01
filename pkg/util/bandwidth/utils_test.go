@@ -29,42 +29,107 @@ func TestExtractPodBandwidthResources(t *testing.T) {
 	four, _ := resource.ParseQuantity("4M")
 	ten, _ := resource.ParseQuantity("10M")
 	twenty, _ := resource.ParseQuantity("20M")
+	fourG, _ := resource.ParseQuantity("4G")
 
-	testPod := func(ingress, egress string) *api.Pod {
+	testPod := func(ingressRate, ingressBurst, egressRate, egressBurst string) *api.Pod {
 		pod := &api.Pod{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{}}}
-		if len(ingress) != 0 {
-			pod.Annotations["kubernetes.io/ingress-bandwidth"] = ingress
+		if len(ingressRate) != 0 {
+			pod.Annotations["kubernetes.io/ingress-bandwidth"] = ingressRate
 		}
-		if len(egress) != 0 {
-			pod.Annotations["kubernetes.io/egress-bandwidth"] = egress
+		if len(ingressBurst) != 0 {
+			pod.Annotations["kubernetes.io/ingress-burst"] = ingressBurst
+		}
+		if len(egressRate) != 0 {
+			pod.Annotations["kubernetes.io/egress-bandwidth"] = egressRate
+		}
+		if len(egressBurst) != 0 {
+			pod.Annotations["kubernetes.io/egress-burst"] = egressBurst
 		}
 		return pod
 	}
 
 	tests := []struct {
 		pod             *api.Pod
-		expectedIngress *resource.Quantity
-		expectedEgress  *resource.Quantity
+		expectedIngress *Limit
+		expectedEgress  *Limit
 		expectError     bool
 	}{
 		{
 			pod: &api.Pod{},
 		},
 		{
-			pod:             testPod("10M", ""),
-			expectedIngress: &ten,
+			pod: testPod("10M", "20M", "10M", "4G"),
+			expectedIngress: &Limit{
+				Rate:  &ten,
+				Burst: &twenty,
+			},
+			expectedEgress: &Limit{
+				Rate:  &ten,
+				Burst: &fourG,
+			},
 		},
 		{
-			pod:            testPod("", "10M"),
-			expectedEgress: &ten,
+			pod: testPod("10M", "10M", "10M", ""),
+			expectedIngress: &Limit{
+				Rate:  &ten,
+				Burst: &ten,
+			},
+			expectedEgress: &Limit{
+				Rate:  &ten,
+				Burst: nil,
+			},
 		},
 		{
-			pod:             testPod("4M", "20M"),
-			expectedIngress: &four,
-			expectedEgress:  &twenty,
+			pod: testPod("4M", "", "10M", "4M"),
+			expectedIngress: &Limit{
+				Rate:  &four,
+				Burst: nil,
+			},
+			expectedEgress: &Limit{
+				Rate:  &ten,
+				Burst: &four,
+			},
+		},
+		// lower than min bandwidth should error
+		{
+			pod:         testPod("0.5b", "10M", "10M", "10M"),
+			expectError: true,
+		},
+		// greater than max bandwidth should error
+		{
+			pod:         testPod("2P", "4M", "20M", "10M"),
+			expectError: true,
+		},
+		// lower than min burst should error
+		{
+			pod:         testPod("10M", "0.5b", "10M", "4M"),
+			expectError: true,
+		},
+		// greater than max burst should error
+		{
+			pod:         testPod("10M", "5G", "10M", "4M"),
+			expectError: true,
+		},
+		// only burst is set should error
+		{
+			pod:         testPod("", "4G", "", ""),
+			expectError: true,
+		},
+		// bad bandwidth and/or burst should error
+		{
+			pod:         testPod("foo", "", "", ""),
+			expectError: true,
 		},
 		{
-			pod:         testPod("foo", ""),
+			pod:         testPod("4M", "foo", "", ""),
+			expectError: true,
+		},
+		{
+			pod:         testPod("", "", "foo", ""),
+			expectError: true,
+		},
+		{
+			pod:         testPod("", "", "4M", "bar"),
 			expectError: true,
 		},
 	}

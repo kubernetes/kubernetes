@@ -429,7 +429,7 @@ func (plugin *kubenetNetworkPlugin) addTrafficShaping(id kubecontainer.Container
 				return fmt.Errorf("failed to setup traffic shaping for pod ip%s", ip)
 			}
 
-			if err := shaper.ReconcileCIDR(fmt.Sprintf("%v/%v", ip, mask), egress, ingress); err != nil {
+			if err := shaper.ReconcileCIDR(fmt.Sprintf("%v/%v", ip, mask), egress.Rate, ingress.Rate); err != nil {
 				return fmt.Errorf("failed to add pod to shaper: %v", err)
 			}
 		}

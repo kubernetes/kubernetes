@@ -95,12 +95,10 @@ type cniBandwidthEntry struct {
 	// IngressRate is the bandwidth rate in bits per second for traffic through container. 0 for no limit. If ingressRate is set, ingressBurst must also be set
 	IngressRate int `json:"ingressRate,omitempty"`
 	// IngressBurst is the bandwidth burst in bits for traffic through container. 0 for no limit. If ingressBurst is set, ingressRate must also be set
-	// NOTE: it's not used for now and default to 0.
 	IngressBurst int `json:"ingressBurst,omitempty"`
 	// EgressRate is the bandwidth is the bandwidth rate in bits per second for traffic through container. 0 for no limit. If egressRate is set, egressBurst must also be set
 	EgressRate int `json:"egressRate,omitempty"`
 	// EgressBurst is the bandwidth burst in bits for traffic through container. 0 for no limit. If egressBurst is set, egressRate must also be set
-	// NOTE: it's not used for now and default to 0.
 	EgressBurst int `json:"egressBurst,omitempty"`
 }
 
@@ -435,12 +433,20 @@ func (plugin *cniNetworkPlugin) buildCNIRuntimeConf(podName string, podNs string
 			// see: https://github.com/containernetworking/cni/blob/master/CONVENTIONS.md and
 			// https://github.com/containernetworking/plugins/blob/master/plugins/meta/bandwidth/README.md
 			// Rates are in bits per second, burst values are in bits.
-			bandwidthParam.IngressRate = int(ingress.Value())
-			bandwidthParam.IngressBurst = math.MaxInt32 // no limit
+			bandwidthParam.IngressRate = int(ingress.Rate.Value())
+			if ingress.Burst != nil {
+				bandwidthParam.IngressBurst = int(ingress.Burst.Value())
+			} else {
+				bandwidthParam.IngressBurst = math.MaxInt32
+			}
 		}
 		if egress != nil {
-			bandwidthParam.EgressRate = int(egress.Value())
-			bandwidthParam.EgressBurst = math.MaxInt32 // no limit
+			bandwidthParam.EgressRate = int(egress.Rate.Value())
+			if egress.Burst != nil {
+				bandwidthParam.EgressBurst = int(egress.Burst.Value())
+			} else {
+				bandwidthParam.EgressBurst = math.MaxInt32
+			}
 		}
 		rt.CapabilityArgs[bandwidthCapability] = bandwidthParam
 	}
