@@ -42,7 +42,7 @@ func (f *FakeRecorder) Eventf(object runtime.Object, eventtype, reason, messageF
 }
 
 func (f *FakeRecorder) AnnotatedEventf(object runtime.Object, annotations map[string]string, eventtype, reason, messageFmt string, args ...interface{}) {
-	f.Eventf(object, eventtype, reason, messageFmt, args)
+	f.Eventf(object, eventtype, reason, messageFmt, args...)
 }
 
 // NewFakeRecorder creates new fake event recorder with event channel with
