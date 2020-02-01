@@ -21,8 +21,10 @@ import (
 	"strconv"
 
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/kubernetes/pkg/apis/apps"
+	"k8s.io/kubernetes/pkg/apis/core"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 )
 
@@ -197,4 +199,46 @@ func deepCopyStringMap(m map[string]string) map[string]string {
 		ret[k] = v
 	}
 	return ret
+}
+
+// Convert_apps_StatefulSetSpec_To_v1_StatefulSetSpec augments auto-conversion to preserve < 1.17 behavior
+// setting apiVersion/kind in nested persistent volume claim objects.
+func Convert_v1_StatefulSetSpec_To_apps_StatefulSetSpec(in *appsv1.StatefulSetSpec, out *apps.StatefulSetSpec, s conversion.Scope) error {
+	if err := autoConvert_v1_StatefulSetSpec_To_apps_StatefulSetSpec(in, out, s); err != nil {
+		return err
+	}
+	// set APIVersion/Kind to behave the same as reflective conversion < 1.17.
+	// see http://issue.k8s.io/87583
+	if out.VolumeClaimTemplates != nil {
+		// copy so we don't modify the input
+		templatesCopy := make([]core.PersistentVolumeClaim, len(out.VolumeClaimTemplates))
+		copy(templatesCopy, out.VolumeClaimTemplates)
+		out.VolumeClaimTemplates = templatesCopy
+		for i := range out.VolumeClaimTemplates {
+			out.VolumeClaimTemplates[i].APIVersion = ""
+			out.VolumeClaimTemplates[i].Kind = ""
+		}
+	}
+	return nil
+}
+
+// Convert_apps_StatefulSetSpec_To_v1_StatefulSetSpec augments auto-conversion to preserve < 1.17 behavior
+// setting apiVersion/kind in nested persistent volume claim objects.
+func Convert_apps_StatefulSetSpec_To_v1_StatefulSetSpec(in *apps.StatefulSetSpec, out *appsv1.StatefulSetSpec, s conversion.Scope) error {
+	if err := autoConvert_apps_StatefulSetSpec_To_v1_StatefulSetSpec(in, out, s); err != nil {
+		return err
+	}
+	// set APIVersion/Kind to behave the same as reflective conversion < 1.17.
+	// see http://issue.k8s.io/87583
+	if out.VolumeClaimTemplates != nil {
+		// copy so we don't modify the input
+		templatesCopy := make([]corev1.PersistentVolumeClaim, len(out.VolumeClaimTemplates))
+		copy(templatesCopy, out.VolumeClaimTemplates)
+		out.VolumeClaimTemplates = templatesCopy
+		for i := range out.VolumeClaimTemplates {
+			out.VolumeClaimTemplates[i].APIVersion = "v1"
+			out.VolumeClaimTemplates[i].Kind = "PersistentVolumeClaim"
+		}
+	}
+	return nil
 }
