@@ -42,26 +42,26 @@ import (
    The test environment is illustrated below:
 
    datacenter-1
-	--->cluster-vsan-1 (zone-a)          			 ____________________	 _________________
-		--->host-1 	   : master     		|                    |	|		  |
-		--->host-2 	   : node1  ___________________ |                    |	|		  |
-		--->host-3 (zone-c): node2 |  		       ||    vsanDatastore   |	|		  |
-					   |  localDatastore   ||		     |	|		  |
-					   |___________________||____________________|	|   sharedVmfs-0  |
-	--->cluster-vsan-2 (zone-b) 	  			 ____________________	|		  |
-		--->host-4 	   : node3     			|                    |	|		  |
-		--->host-5 	   : node4      		|  vsanDatastore (1) |	|		  |
-		--->host-6       				|                    |	|		  |
-								|____________________|  |_________________|
-	--->cluster-3 (zone-c)		    ___________________
-		--->host-7 	   : node5 |                   |
-					   | localDatastore (1)|
-					   |___________________|
+        --->cluster-vsan-1 (zone-a)                              ____________________    _________________
+                --->host-1         : master                     |                    |  |                 |
+                --->host-2         : node1  ___________________ |                    |  |                 |
+                --->host-3 (zone-c): node2 |                   ||    vsanDatastore   |  |                 |
+                                           |  localDatastore   ||                    |  |                 |
+                                           |___________________||____________________|  |   sharedVmfs-0  |
+        --->cluster-vsan-2 (zone-b)                              ____________________   |                 |
+                --->host-4         : node3                      |                    |  |                 |
+                --->host-5         : node4                      |  vsanDatastore (1) |  |                 |
+                --->host-6                                      |                    |  |                 |
+                                                                |____________________|  |_________________|
+        --->cluster-3 (zone-c)              ___________________
+                --->host-7         : node5 |                   |
+                                           | localDatastore (1)|
+                                           |___________________|
    datacenter-2
-	--->cluster-1 (zone-d)		    ___________________
-		--->host-8	   : node6 |		       |
-					   |  localDatastore   |
-					   |___________________|
+        --->cluster-1 (zone-d)             ___________________
+                --->host-8        : node6 |                   |
+                                          |  localDatastore   |
+                                          |___________________|
 
 	Testbed description :
 	1. cluster-vsan-1 is tagged with zone-a. So, vsanDatastore inherits zone-a since all the hosts under zone-a have vsanDatastore mounted on them.
