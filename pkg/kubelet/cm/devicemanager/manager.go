@@ -369,10 +369,30 @@ func (m *ManagerImpl) allocatePodResources(pod *v1.Pod) error {
 
 // Allocate is the call that you can use to allocate a set of devices
 // from the registered device plugins.
-func (m *ManagerImpl) Allocate(pod *v1.Pod) error {
+func (m *ManagerImpl) Allocate(pod *v1.Pod, container *v1.Container) error {
+	// TODO: This function does not yet do what it is supposed to. The call to
+	// allocatePodResources() below is still allocating devices to a pod all at
+	// once. We need to unroll this logic to allow it to allocate devices on a
+	// container-by-container basis instead. The main challenge will be
+	// ensuring that we "reuse" devices from init containers when allocating
+	// devices to app containers (just as the logic inside
+	// allocatePodResources() currently does). The hard part being that we will
+	// need to maintain the 'devicesToReuse' present in allocatePodResources()
+	// across invocations of Allocate().
+	//
+	// My initial inclination to solve this with the least coode churn is:
+	//   1) Create a new type called PodReusableDevices, defined as:
+	//			type PodReusableDevices map[string]map[string]sets.String
+	//   2) Instantiate a PodReusableDevices map as a new field of the
+	//      devicemanager called devicesToReuse (similar to the local
+	//      devicesToReuse variable currently in allocatePodResources)
+	//   3) Use devicesToReuse[string(pod.UID) just as devicesToReuse is used
+	//      today, being careful to create / destroy the nested maps where
+	//      appropriate.
+
 	err := m.allocatePodResources(pod)
 	if err != nil {
-		klog.Errorf("Failed to allocate device plugin resource for pod %s: %v", string(pod.UID), err)
+		klog.Errorf("Failed to allocate device plugin resource for pod %s, container %s: %v", string(pod.UID), container.Name, err)
 		return err
 	}
 	return nil
@@ -864,8 +884,8 @@ func (m *ManagerImpl) GetDeviceRunContainerOptions(pod *v1.Pod, container *v1.Co
 		}
 	}
 	if needsReAllocate {
-		klog.V(2).Infof("needs re-allocate device plugin resources for pod %s", podUID)
-		if err := m.allocatePodResources(pod); err != nil {
+		klog.V(2).Infof("needs re-allocate device plugin resources for pod %s, container %s", podUID, container.Name)
+		if err := m.Allocate(pod, container); err != nil {
 			return nil, err
 		}
 	}
