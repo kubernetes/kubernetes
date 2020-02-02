@@ -46,7 +46,12 @@ func runDockershim(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 
 	// Create and start the CRI shim running as a grpc server.
 	streamingConfig := getStreamingConfig(kubeCfg, kubeDeps, crOptions)
-	ds, err := dockershim.NewDockerService(kubeDeps.DockerClientConfig, crOptions.PodSandboxImage, streamingConfig,
+	dockerClientConfig := &dockershim.ClientConfig{
+		DockerEndpoint:            kubeDeps.DockerOptions.DockerEndpoint,
+		RuntimeRequestTimeout:     kubeDeps.DockerOptions.RuntimeRequestTimeout,
+		ImagePullProgressDeadline: kubeDeps.DockerOptions.ImagePullProgressDeadline,
+	}
+	ds, err := dockershim.NewDockerService(dockerClientConfig, crOptions.PodSandboxImage, streamingConfig,
 		&pluginSettings, runtimeCgroups, kubeCfg.CgroupDriver, crOptions.DockershimRootDirectory, !crOptions.RedirectContainerStreaming)
 	if err != nil {
 		return err
