@@ -77,6 +77,10 @@ type HintProvider interface {
 	// a consensus "best" hint. The hint providers may subsequently query the
 	// topology manager to influence actual resource assignment.
 	GetTopologyHints(pod *v1.Pod, container *v1.Container) map[string][]TopologyHint
+	// Allocate triggers resource allocation to occur on the HintProvider after
+	// all hints have been gathered and the aggregated Hint is available via a
+	// call to Store.GetAffinity().
+	Allocate(pod *v1.Pod, container *v1.Container) error
 }
 
 //Store interface is to allow Hint Providers to retrieve pod affinity
@@ -176,6 +180,16 @@ func (m *manager) accumulateProvidersHints(pod *v1.Pod, container *v1.Container)
 	return providersHints
 }
 
+func (m *manager) allocateAlignedResources(pod *v1.Pod, container *v1.Container) error {
+	for _, provider := range m.hintProviders {
+		err := provider.Allocate(pod, container)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // Collect Hints from hint providers and pass to policy to retrieve the best one.
 func (m *manager) calculateAffinity(pod *v1.Pod, container *v1.Container) (TopologyHint, bool) {
 	providersHints := m.accumulateProvidersHints(pod, container)
@@ -216,7 +230,6 @@ func (m *manager) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitR
 
 	klog.Infof("[topologymanager] Topology Admit Handler")
 	pod := attrs.Pod
-	hints := make(map[string]TopologyHint)
 
 	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
 		result, admit := m.calculateAffinity(pod, &container)
@@ -227,11 +240,22 @@ func (m *manager) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitR
 				Admit:   false,
 			}
 		}
-		hints[container.Name] = result
-	}
 
-	m.podTopologyHints[string(pod.UID)] = hints
-	klog.Infof("[topologymanager] Topology Affinity for Pod: %v are %v", pod.UID, m.podTopologyHints[string(pod.UID)])
+		klog.Infof("[topologymanager] Topology Affinity for (pod: %v container: %v): %v", pod.UID, container.Name, result)
+		if m.podTopologyHints[string(pod.UID)] == nil {
+			m.podTopologyHints[string(pod.UID)] = make(map[string]TopologyHint)
+		}
+		m.podTopologyHints[string(pod.UID)][container.Name] = result
+
+		err := m.allocateAlignedResources(pod, &container)
+		if err != nil {
+			return lifecycle.PodAdmitResult{
+				Message: fmt.Sprintf("Allocate failed due to %v, which is unexpected", err),
+				Reason:  "UnexpectedAdmissionError",
+				Admit:   false,
+			}
+		}
+	}
 
 	return lifecycle.PodAdmitResult{Admit: true}
 }
