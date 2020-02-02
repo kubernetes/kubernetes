@@ -73,8 +73,8 @@ func getDiskLinkByDevName(io ioHandler, devLinkPath, devName string) (string, er
 }
 
 func scsiHostRescan(io ioHandler, exec utilexec.Interface) {
-	scsi_path := "/sys/class/scsi_host/"
-	if dirs, err := io.ReadDir(scsi_path); err == nil {
+	scsiPath := "/sys/class/scsi_host/"
+	if dirs, err := io.ReadDir(scsiPath); err == nil {
 		for _, f := range dirs {
 			name := scsiPath + f.Name() + "/scan"
 			data := []byte("- - -")
