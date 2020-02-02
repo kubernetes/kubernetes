@@ -177,7 +177,7 @@ func (m *manager) accumulateProvidersHints(pod v1.Pod, container v1.Container) (
 }
 
 // Collect Hints from hint providers and pass to policy to retrieve the best one.
-func (m *manager) calculateAffinity(pod v1.Pod, container v1.Container) (TopologyHint, lifecycle.PodAdmitResult) {
+func (m *manager) calculateAffinity(pod v1.Pod, container v1.Container) (TopologyHint, bool) {
 	providersHints := m.accumulateProvidersHints(pod, container)
 	bestHint, admit := m.policy.Merge(providersHints)
 	klog.Infof("[topologymanager] ContainerTopologyHint: %v", bestHint)
@@ -216,17 +216,23 @@ func (m *manager) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitR
 			Admit: true,
 		}
 	}
+
 	pod := attrs.Pod
-	c := make(map[string]TopologyHint)
+	hints := make(map[string]TopologyHint)
 
 	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
-		result, admitPod := m.calculateAffinity(*pod, container)
-		if !admitPod.Admit {
-			return admitPod
+		result, admit := m.calculateAffinity(*pod, container)
+		if !admit {
+			return lifecycle.PodAdmitResult{
+				Message: "Resources cannot be allocated with Topology locality",
+				Reason:  "TopologyAffinityError",
+				Admit:   false,
+			}
 		}
-		c[container.Name] = result
+		hints[container.Name] = result
 	}
-	m.podTopologyHints[string(pod.UID)] = c
+
+	m.podTopologyHints[string(pod.UID)] = hints
 	klog.Infof("[topologymanager] Topology Affinity for Pod: %v are %v", pod.UID, m.podTopologyHints[string(pod.UID)])
 
 	return lifecycle.PodAdmitResult{

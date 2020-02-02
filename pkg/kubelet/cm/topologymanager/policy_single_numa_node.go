@@ -18,7 +18,6 @@ package topologymanager
 
 import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
-	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 )
 
 type singleNumaNodePolicy struct {
@@ -40,17 +39,11 @@ func (p *singleNumaNodePolicy) Name() string {
 	return PolicySingleNumaNode
 }
 
-func (p *singleNumaNodePolicy) canAdmitPodResult(hint *TopologyHint) lifecycle.PodAdmitResult {
+func (p *singleNumaNodePolicy) canAdmitPodResult(hint *TopologyHint) bool {
 	if !hint.Preferred {
-		return lifecycle.PodAdmitResult{
-			Admit:   false,
-			Reason:  "Topology Affinity Error",
-			Message: "Resources cannot be allocated with Topology Locality",
-		}
+		return false
 	}
-	return lifecycle.PodAdmitResult{
-		Admit: true,
-	}
+	return true
 }
 
 // Return hints that have valid bitmasks with exactly one bit set.
@@ -71,7 +64,7 @@ func filterSingleNumaHints(allResourcesHints [][]TopologyHint) [][]TopologyHint 
 	return filteredResourcesHints
 }
 
-func (p *singleNumaNodePolicy) Merge(providersHints []map[string][]TopologyHint) (TopologyHint, lifecycle.PodAdmitResult) {
+func (p *singleNumaNodePolicy) Merge(providersHints []map[string][]TopologyHint) (TopologyHint, bool) {
 	filteredHints := filterProvidersHints(providersHints)
 	// Filter to only include don't cares and hints with a single NUMA node.
 	singleNumaHints := filterSingleNumaHints(filteredHints)

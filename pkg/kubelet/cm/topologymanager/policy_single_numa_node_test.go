@@ -39,17 +39,8 @@ func TestPolicySingleNumaNodeCanAdmitPodResult(t *testing.T) {
 		policy := NewSingleNumaNodePolicy(numaNodes)
 		result := policy.(*singleNumaNodePolicy).canAdmitPodResult(&tc.hint)
 
-		if result.Admit != tc.expected {
-			t.Errorf("Expected Admit field in result to be %t, got %t", tc.expected, result.Admit)
-		}
-
-		if tc.expected == false {
-			if len(result.Reason) == 0 {
-				t.Errorf("Expected Reason field to be not empty")
-			}
-			if len(result.Message) == 0 {
-				t.Errorf("Expected Message field to be not empty")
-			}
+		if result != tc.expected {
+			t.Errorf("Expected result to be %t, got %t", tc.expected, result)
 		}
 	}
 }

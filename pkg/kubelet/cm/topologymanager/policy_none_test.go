@@ -17,7 +17,6 @@ limitations under the License.
 package topologymanager
 
 import (
-	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"testing"
 )
 
@@ -61,8 +60,8 @@ func TestPolicyNoneCanAdmitPodResult(t *testing.T) {
 		policy := NewNonePolicy()
 		result := policy.(*nonePolicy).canAdmitPodResult(&tc.hint)
 
-		if result.Admit != tc.expected {
-			t.Errorf("Expected Admit field in result to be %t, got %t", tc.expected, result.Admit)
+		if result != tc.expected {
+			t.Errorf("Expected result to be %t, got %t", tc.expected, result)
 		}
 	}
 }
@@ -72,13 +71,13 @@ func TestPolicyNoneMerge(t *testing.T) {
 		name           string
 		providersHints []map[string][]TopologyHint
 		expectedHint   TopologyHint
-		expectedAdmit  lifecycle.PodAdmitResult
+		expectedAdmit  bool
 	}{
 		{
 			name:           "merged empty providers hints",
 			providersHints: []map[string][]TopologyHint{},
 			expectedHint:   TopologyHint{},
-			expectedAdmit:  lifecycle.PodAdmitResult{Admit: true},
+			expectedAdmit:  true,
 		},
 		{
 			name: "merge with a single provider with a single preferred resource",
@@ -88,7 +87,7 @@ func TestPolicyNoneMerge(t *testing.T) {
 				},
 			},
 			expectedHint:  TopologyHint{},
-			expectedAdmit: lifecycle.PodAdmitResult{Admit: true},
+			expectedAdmit: true,
 		},
 		{
 			name: "merge with a single provider with a single non-preferred resource",
@@ -98,14 +97,14 @@ func TestPolicyNoneMerge(t *testing.T) {
 				},
 			},
 			expectedHint:  TopologyHint{},
-			expectedAdmit: lifecycle.PodAdmitResult{Admit: true},
+			expectedAdmit: true,
 		},
 	}
 
 	for _, tc := range tcases {
 		policy := NewNonePolicy()
 		result, admit := policy.Merge(tc.providersHints)
-		if !result.IsEqual(tc.expectedHint) || admit.Admit != tc.expectedAdmit.Admit {
+		if !result.IsEqual(tc.expectedHint) || admit != tc.expectedAdmit {
 			t.Errorf("Test Case: %s: Expected merge hint to be %v, got %v", tc.name, tc.expectedHint, result)
 		}
 	}
