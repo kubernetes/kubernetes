@@ -124,7 +124,7 @@ func NewManager(numaNodeInfo cputopology.NUMANodeInfo, topologyPolicyName string
 		numaNodes = append(numaNodes, node)
 	}
 
-	if len(numaNodes) > maxAllowableNUMANodes {
+	if topologyPolicyName != PolicyNone && len(numaNodes) > maxAllowableNUMANodes {
 		return nil, fmt.Errorf("unsupported on machines with more than %v NUMA Nodes", maxAllowableNUMANodes)
 	}
 
@@ -209,14 +209,12 @@ func (m *manager) RemoveContainer(containerID string) error {
 }
 
 func (m *manager) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
-	klog.Infof("[topologymanager] Topology Admit Handler")
-	if m.policy.Name() == "none" {
-		klog.Infof("[topologymanager] Skipping calculate topology affinity as policy: none")
-		return lifecycle.PodAdmitResult{
-			Admit: true,
-		}
+	// Unconditionally admit the pod if we are running with the 'none' policy.
+	if m.policy.Name() == PolicyNone {
+		return lifecycle.PodAdmitResult{Admit: true}
 	}
 
+	klog.Infof("[topologymanager] Topology Admit Handler")
 	pod := attrs.Pod
 	hints := make(map[string]TopologyHint)
 
@@ -235,7 +233,5 @@ func (m *manager) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitR
 	m.podTopologyHints[string(pod.UID)] = hints
 	klog.Infof("[topologymanager] Topology Affinity for Pod: %v are %v", pod.UID, m.podTopologyHints[string(pod.UID)])
 
-	return lifecycle.PodAdmitResult{
-		Admit: true,
-	}
+	return lifecycle.PodAdmitResult{Admit: true}
 }
