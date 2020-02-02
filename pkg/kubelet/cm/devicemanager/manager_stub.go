@@ -45,7 +45,7 @@ func (h *ManagerStub) Stop() error {
 }
 
 // Allocate simply returns nil.
-func (h *ManagerStub) Allocate(pod *v1.Pod) error {
+func (h *ManagerStub) Allocate(pod *v1.Pod, container *v1.Container) error {
 	return nil
 }
 
