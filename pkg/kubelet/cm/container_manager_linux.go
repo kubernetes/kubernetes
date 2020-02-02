@@ -672,7 +672,11 @@ func (cm *containerManagerImpl) GetResources(pod *v1.Pod, container *v1.Containe
 }
 
 func (cm *containerManagerImpl) UpdatePluginResources(node *schedulernodeinfo.NodeInfo, attrs *lifecycle.PodAdmitAttributes) error {
-	return cm.deviceManager.Allocate(node, attrs)
+	err := cm.deviceManager.Allocate(attrs.Pod)
+	if err != nil {
+		return err
+	}
+	return cm.deviceManager.UpdatePluginResources(node, attrs)
 }
 
 func (cm *containerManagerImpl) GetTopologyPodAdmitHandler() topologymanager.Manager {

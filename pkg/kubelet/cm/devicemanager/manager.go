@@ -369,13 +369,17 @@ func (m *ManagerImpl) allocatePodResources(pod *v1.Pod) error {
 
 // Allocate is the call that you can use to allocate a set of devices
 // from the registered device plugins.
-func (m *ManagerImpl) Allocate(node *schedulernodeinfo.NodeInfo, attrs *lifecycle.PodAdmitAttributes) error {
-	pod := attrs.Pod
+func (m *ManagerImpl) Allocate(pod *v1.Pod) error {
 	err := m.allocatePodResources(pod)
 	if err != nil {
 		klog.Errorf("Failed to allocate device plugin resource for pod %s: %v", string(pod.UID), err)
 		return err
 	}
+	return nil
+}
+
+func (m *ManagerImpl) UpdatePluginResources(node *schedulernodeinfo.NodeInfo, attrs *lifecycle.PodAdmitAttributes) error {
+	pod := attrs.Pod
 
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
