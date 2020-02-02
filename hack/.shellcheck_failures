@@ -1,5 +1,4 @@
 ./build/lib/release.sh
-./cluster/common.sh
 ./cluster/gce/config-default.sh
 ./cluster/gce/config-test.sh
 ./cluster/gce/gci/configure-helper.sh
