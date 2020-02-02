@@ -112,7 +112,7 @@ func (p *mockPolicy) RemoveContainer(s state.State, podUID string, containerName
 	return p.err
 }
 
-func (p *mockPolicy) GetTopologyHints(s state.State, pod v1.Pod, container v1.Container) map[string][]topologymanager.TopologyHint {
+func (p *mockPolicy) GetTopologyHints(s state.State, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
 	return nil
 }
 

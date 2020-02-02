@@ -413,7 +413,7 @@ func TestGetTopologyHints(t *testing.T) {
 			}
 		}
 
-		hints := m.GetTopologyHints(*pod, pod.Spec.Containers[0])
+		hints := m.GetTopologyHints(pod, &pod.Spec.Containers[0])
 
 		for r := range tc.expectedHints {
 			sort.SliceStable(hints[r], func(i, j int) bool {

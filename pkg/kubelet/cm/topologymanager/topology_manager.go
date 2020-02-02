@@ -76,7 +76,7 @@ type HintProvider interface {
 	// this function for each hint provider, and merges the hints to produce
 	// a consensus "best" hint. The hint providers may subsequently query the
 	// topology manager to influence actual resource assignment.
-	GetTopologyHints(pod v1.Pod, container v1.Container) map[string][]TopologyHint
+	GetTopologyHints(pod *v1.Pod, container *v1.Container) map[string][]TopologyHint
 }
 
 //Store interface is to allow Hint Providers to retrieve pod affinity
@@ -164,7 +164,7 @@ func (m *manager) GetAffinity(podUID string, containerName string) TopologyHint 
 	return m.podTopologyHints[podUID][containerName]
 }
 
-func (m *manager) accumulateProvidersHints(pod v1.Pod, container v1.Container) (providersHints []map[string][]TopologyHint) {
+func (m *manager) accumulateProvidersHints(pod *v1.Pod, container *v1.Container) (providersHints []map[string][]TopologyHint) {
 	// Loop through all hint providers and save an accumulated list of the
 	// hints returned by each hint provider.
 	for _, provider := range m.hintProviders {
@@ -177,7 +177,7 @@ func (m *manager) accumulateProvidersHints(pod v1.Pod, container v1.Container) (
 }
 
 // Collect Hints from hint providers and pass to policy to retrieve the best one.
-func (m *manager) calculateAffinity(pod v1.Pod, container v1.Container) (TopologyHint, bool) {
+func (m *manager) calculateAffinity(pod *v1.Pod, container *v1.Container) (TopologyHint, bool) {
 	providersHints := m.accumulateProvidersHints(pod, container)
 	bestHint, admit := m.policy.Merge(providersHints)
 	klog.Infof("[topologymanager] ContainerTopologyHint: %v", bestHint)
@@ -221,7 +221,7 @@ func (m *manager) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitR
 	hints := make(map[string]TopologyHint)
 
 	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
-		result, admit := m.calculateAffinity(*pod, container)
+		result, admit := m.calculateAffinity(pod, &container)
 		if !admit {
 			return lifecycle.PodAdmitResult{
 				Message: "Resources cannot be allocated with Topology locality",
