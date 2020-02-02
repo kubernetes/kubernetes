@@ -46,7 +46,7 @@ const (
 	preFilter                                 = "PreFilter"
 	preFilterExtensionAddPod                  = "PreFilterExtensionAddPod"
 	preFilterExtensionRemovePod               = "PreFilterExtensionRemovePod"
-	postFilter                                = "PostFilter"
+	preScore                                  = "PreScore"
 	score                                     = "Score"
 	scoreExtensionNormalize                   = "ScoreExtensionNormalize"
 	preBind                                   = "PreBind"
@@ -67,7 +67,7 @@ type framework struct {
 	queueSortPlugins      []QueueSortPlugin
 	preFilterPlugins      []PreFilterPlugin
 	filterPlugins         []FilterPlugin
-	postFilterPlugins     []PostFilterPlugin
+	preScorePlugins       []PreScorePlugin
 	scorePlugins          []ScorePlugin
 	reservePlugins        []ReservePlugin
 	preBindPlugins        []PreBindPlugin
@@ -103,7 +103,7 @@ func (f *framework) getExtensionPoints(plugins *config.Plugins) []extensionPoint
 		{plugins.PreFilter, &f.preFilterPlugins},
 		{plugins.Filter, &f.filterPlugins},
 		{plugins.Reserve, &f.reservePlugins},
-		{plugins.PostFilter, &f.postFilterPlugins},
+		{plugins.PreScore, &f.preScorePlugins},
 		{plugins.Score, &f.scorePlugins},
 		{plugins.PreBind, &f.preBindPlugins},
 		{plugins.Bind, &f.bindPlugins},
@@ -461,10 +461,10 @@ func (f *framework) runFilterPlugin(ctx context.Context, pl FilterPlugin, state 
 	return status
 }
 
-// RunPostFilterPlugins runs the set of configured post-filter plugins. If any
-// of these plugins returns any status other than "Success", the given node is
+// RunPreScorePlugins runs the set of configured pre-score plugins. If any
+// of these plugins returns any status other than "Success", the given pod is
 // rejected. The filteredNodeStatuses is the set of filtered nodes and their statuses.
-func (f *framework) RunPostFilterPlugins(
+func (f *framework) RunPreScorePlugins(
 	ctx context.Context,
 	state *CycleState,
 	pod *v1.Pod,
@@ -473,12 +473,12 @@ func (f *framework) RunPostFilterPlugins(
 ) (status *Status) {
 	startTime := time.Now()
 	defer func() {
-		metrics.FrameworkExtensionPointDuration.WithLabelValues(postFilter, status.Code().String()).Observe(metrics.SinceInSeconds(startTime))
+		metrics.FrameworkExtensionPointDuration.WithLabelValues(preScore, status.Code().String()).Observe(metrics.SinceInSeconds(startTime))
 	}()
-	for _, pl := range f.postFilterPlugins {
-		status = f.runPostFilterPlugin(ctx, pl, state, pod, nodes, filteredNodesStatuses)
+	for _, pl := range f.preScorePlugins {
+		status = f.runPreScorePlugin(ctx, pl, state, pod, nodes, filteredNodesStatuses)
 		if !status.IsSuccess() {
-			msg := fmt.Sprintf("error while running %q postfilter plugin for pod %q: %v", pl.Name(), pod.Name, status.Message())
+			msg := fmt.Sprintf("error while running %q prescore plugin for pod %q: %v", pl.Name(), pod.Name, status.Message())
 			klog.Error(msg)
 			return NewStatus(Error, msg)
 		}
@@ -487,13 +487,13 @@ func (f *framework) RunPostFilterPlugins(
 	return nil
 }
 
-func (f *framework) runPostFilterPlugin(ctx context.Context, pl PostFilterPlugin, state *CycleState, pod *v1.Pod, nodes []*v1.Node, filteredNodesStatuses NodeToStatusMap) *Status {
+func (f *framework) runPreScorePlugin(ctx context.Context, pl PreScorePlugin, state *CycleState, pod *v1.Pod, nodes []*v1.Node, filteredNodesStatuses NodeToStatusMap) *Status {
 	if !state.ShouldRecordPluginMetrics() {
-		return pl.PostFilter(ctx, state, pod, nodes, filteredNodesStatuses)
+		return pl.PreScore(ctx, state, pod, nodes, filteredNodesStatuses)
 	}
 	startTime := time.Now()
-	status := pl.PostFilter(ctx, state, pod, nodes, filteredNodesStatuses)
-	f.metricsRecorder.observePluginDurationAsync(postFilter, pl.Name(), status, metrics.SinceInSeconds(startTime))
+	status := pl.PreScore(ctx, state, pod, nodes, filteredNodesStatuses)
+	f.metricsRecorder.observePluginDurationAsync(preScore, pl.Name(), status, metrics.SinceInSeconds(startTime))
 	return status
 }
 

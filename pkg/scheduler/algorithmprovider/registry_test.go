@@ -76,7 +76,7 @@ func TestClusterAutoscalerProvider(t *testing.T) {
 				{Name: interpodaffinity.Name},
 			},
 		},
-		PostFilter: &schedulerapi.PluginSet{
+		PreScore: &schedulerapi.PluginSet{
 			Enabled: []schedulerapi.Plugin{
 				{Name: interpodaffinity.Name},
 				{Name: defaultpodtopologyspread.Name},
@@ -149,7 +149,7 @@ func TestApplyFeatureGates(t *testing.T) {
 						{Name: interpodaffinity.Name},
 					},
 				},
-				PostFilter: &schedulerapi.PluginSet{
+				PreScore: &schedulerapi.PluginSet{
 					Enabled: []schedulerapi.Plugin{
 						{Name: interpodaffinity.Name},
 						{Name: defaultpodtopologyspread.Name},
@@ -211,7 +211,7 @@ func TestApplyFeatureGates(t *testing.T) {
 						{Name: podtopologyspread.Name},
 					},
 				},
-				PostFilter: &schedulerapi.PluginSet{
+				PreScore: &schedulerapi.PluginSet{
 					Enabled: []schedulerapi.Plugin{
 						{Name: interpodaffinity.Name},
 						{Name: defaultpodtopologyspread.Name},

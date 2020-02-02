@@ -213,8 +213,8 @@ func (in *Plugins) DeepCopyInto(out *Plugins) {
 		*out = new(PluginSet)
 		(*in).DeepCopyInto(*out)
 	}
-	if in.PostFilter != nil {
-		in, out := &in.PostFilter, &out.PostFilter
+	if in.PreScore != nil {
+		in, out := &in.PreScore, &out.PreScore
 		*out = new(PluginSet)
 		(*in).DeepCopyInto(*out)
 	}

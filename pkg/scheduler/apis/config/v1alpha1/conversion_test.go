@@ -19,7 +19,11 @@ package v1alpha1
 import (
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+
 	conversion "k8s.io/apimachinery/pkg/conversion"
+	"k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	componentbaseconfig "k8s.io/component-base/config"
 	componentbaseconfigv1alpha1 "k8s.io/component-base/config/v1alpha1"
 	v1alpha1 "k8s.io/kube-scheduler/config/v1alpha1"
@@ -189,5 +193,209 @@ func TestConfigToV1alpha1KubeSchedulerLeaderElectionConfiguration(t *testing.T) 
 		if err != nil && !scenario.expectedToFailed {
 			t.Errorf("Unexpected failure for scenario: %s - %+v", name, err)
 		}
+	}
+}
+
+func TestConvertBetweenV1Alpha1PluginsAndConfigPlugins(t *testing.T) {
+	// weight is assigned to score plugins
+	weight := int32(10)
+	// DummyWeight is a placeholder for the v1alpha1.plugins' weight will be filled with zero when
+	// convert back from config.
+	dummyWeight := int32(42)
+	v1alpha1Plugins := v1alpha1.Plugins{
+		QueueSort: &v1alpha1.PluginSet{
+			Enabled: []v1alpha1.Plugin{
+				{Name: "queuesort-plugin", Weight: &dummyWeight},
+			},
+			Disabled: []v1alpha1.Plugin{
+				{Name: "disabled-queuesort-plugin", Weight: &dummyWeight},
+			},
+		},
+		PreFilter: &v1alpha1.PluginSet{
+			Enabled: []v1alpha1.Plugin{
+				{Name: "prefilter-plugin", Weight: &dummyWeight},
+			},
+			Disabled: []v1alpha1.Plugin{
+				{Name: "disabled-prefilter-plugin", Weight: &dummyWeight},
+			},
+		},
+		Filter: &v1alpha1.PluginSet{
+			Enabled: []v1alpha1.Plugin{
+				{Name: "filter-plugin", Weight: &dummyWeight},
+			},
+			Disabled: []v1alpha1.Plugin{
+				{Name: "disabled-filter-plugin", Weight: &dummyWeight},
+			},
+		},
+		PostFilter: &v1alpha1.PluginSet{
+			Enabled: []v1alpha1.Plugin{
+				{Name: "postfilter-plugin", Weight: &dummyWeight},
+			},
+			Disabled: []v1alpha1.Plugin{
+				{Name: "disabled-postfilter-plugin", Weight: &dummyWeight},
+			},
+		},
+		Score: &v1alpha1.PluginSet{
+			Enabled: []v1alpha1.Plugin{
+				{Name: "score-plugin", Weight: &weight},
+			},
+			Disabled: []v1alpha1.Plugin{
+				{Name: "disabled-score-plugin", Weight: &weight},
+			},
+		},
+		Reserve: &v1alpha1.PluginSet{
+			Enabled: []v1alpha1.Plugin{
+				{Name: "reserve-plugin", Weight: &dummyWeight},
+			},
+			Disabled: []v1alpha1.Plugin{
+				{Name: "disabled-reserve-plugin", Weight: &dummyWeight},
+			},
+		},
+		Permit: &v1alpha1.PluginSet{
+			Enabled: []v1alpha1.Plugin{
+				{Name: "permit-plugin", Weight: &dummyWeight},
+			},
+			Disabled: []v1alpha1.Plugin{
+				{Name: "disabled-permit-plugin", Weight: &dummyWeight},
+			},
+		},
+		PreBind: &v1alpha1.PluginSet{
+			Enabled: []v1alpha1.Plugin{
+				{Name: "prebind-plugin", Weight: &dummyWeight},
+			},
+			Disabled: []v1alpha1.Plugin{
+				{Name: "disabled-prebind-plugin", Weight: &dummyWeight},
+			},
+		},
+		Bind: &v1alpha1.PluginSet{
+			Enabled: []v1alpha1.Plugin{
+				{Name: "bind-plugin", Weight: &dummyWeight},
+			},
+			Disabled: []v1alpha1.Plugin{
+				{Name: "disabled-bind-plugin", Weight: &dummyWeight},
+			},
+		},
+		PostBind: &v1alpha1.PluginSet{
+			Enabled: []v1alpha1.Plugin{
+				{Name: "postbind-plugin", Weight: &dummyWeight},
+			},
+			Disabled: []v1alpha1.Plugin{
+				{Name: "disabled-postbind-plugin", Weight: &dummyWeight},
+			},
+		},
+		Unreserve: &v1alpha1.PluginSet{
+			Enabled: []v1alpha1.Plugin{
+				{Name: "unreserve-plugin", Weight: &dummyWeight},
+			},
+			Disabled: []v1alpha1.Plugin{
+				{Name: "disabled-unreserve-plugin", Weight: &dummyWeight},
+			},
+		},
+	}
+	configPlugins := config.Plugins{
+		QueueSort: &config.PluginSet{
+			Enabled: []config.Plugin{
+				{Name: "queuesort-plugin", Weight: dummyWeight},
+			},
+			Disabled: []config.Plugin{
+				{Name: "disabled-queuesort-plugin", Weight: dummyWeight},
+			},
+		},
+		PreFilter: &config.PluginSet{
+			Enabled: []config.Plugin{
+				{Name: "prefilter-plugin", Weight: dummyWeight},
+			},
+			Disabled: []config.Plugin{
+				{Name: "disabled-prefilter-plugin", Weight: dummyWeight},
+			},
+		},
+		Filter: &config.PluginSet{
+			Enabled: []config.Plugin{
+				{Name: "filter-plugin", Weight: dummyWeight},
+			},
+			Disabled: []config.Plugin{
+				{Name: "disabled-filter-plugin", Weight: dummyWeight},
+			},
+		},
+		PreScore: &config.PluginSet{
+			Enabled: []config.Plugin{
+				{Name: "postfilter-plugin", Weight: dummyWeight},
+			},
+			Disabled: []config.Plugin{
+				{Name: "disabled-postfilter-plugin", Weight: dummyWeight},
+			},
+		},
+		Score: &config.PluginSet{
+			Enabled: []config.Plugin{
+				{Name: "score-plugin", Weight: weight},
+			},
+			Disabled: []config.Plugin{
+				{Name: "disabled-score-plugin", Weight: weight},
+			},
+		},
+		Reserve: &config.PluginSet{
+			Enabled: []config.Plugin{
+				{Name: "reserve-plugin", Weight: dummyWeight},
+			},
+			Disabled: []config.Plugin{
+				{Name: "disabled-reserve-plugin", Weight: dummyWeight},
+			},
+		},
+		Permit: &config.PluginSet{
+			Enabled: []config.Plugin{
+				{Name: "permit-plugin", Weight: dummyWeight},
+			},
+			Disabled: []config.Plugin{
+				{Name: "disabled-permit-plugin", Weight: dummyWeight},
+			},
+		},
+		PreBind: &config.PluginSet{
+			Enabled: []config.Plugin{
+				{Name: "prebind-plugin", Weight: dummyWeight},
+			},
+			Disabled: []config.Plugin{
+				{Name: "disabled-prebind-plugin", Weight: dummyWeight},
+			},
+		},
+		Bind: &config.PluginSet{
+			Enabled: []config.Plugin{
+				{Name: "bind-plugin", Weight: dummyWeight},
+			},
+			Disabled: []config.Plugin{
+				{Name: "disabled-bind-plugin", Weight: dummyWeight},
+			},
+		},
+		PostBind: &config.PluginSet{
+			Enabled: []config.Plugin{
+				{Name: "postbind-plugin", Weight: dummyWeight},
+			},
+			Disabled: []config.Plugin{
+				{Name: "disabled-postbind-plugin", Weight: dummyWeight},
+			},
+		},
+		Unreserve: &config.PluginSet{
+			Enabled: []config.Plugin{
+				{Name: "unreserve-plugin", Weight: dummyWeight},
+			},
+			Disabled: []config.Plugin{
+				{Name: "disabled-unreserve-plugin", Weight: dummyWeight},
+			},
+		},
+	}
+	convertedConfigPlugins := config.Plugins{}
+	convertedV1Alpha1Plugins := v1alpha1.Plugins{}
+	scheme := runtime.NewScheme()
+	utilruntime.Must(AddToScheme(scheme))
+	if err := scheme.Convert(&v1alpha1Plugins, &convertedConfigPlugins, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := scheme.Convert(&configPlugins, &convertedV1Alpha1Plugins, nil); err != nil {
+		t.Fatal(err)
+	}
+	if diff := cmp.Diff(configPlugins, convertedConfigPlugins); diff != "" {
+		t.Errorf("unexpected plugins diff (-want, +got): %s", diff)
+	}
+	if diff := cmp.Diff(v1alpha1Plugins, convertedV1Alpha1Plugins); diff != "" {
+		t.Errorf("unexpected plugins diff (-want, +got): %s", diff)
 	}
 }

@@ -62,9 +62,9 @@ type ReservePlugin struct {
 	failReserve      bool
 }
 
-type PostFilterPlugin struct {
-	numPostFilterCalled int
-	failPostFilter      bool
+type PreScorePlugin struct {
+	numPreScoreCalled int
+	failPreScore      bool
 }
 
 type PreBindPlugin struct {
@@ -111,7 +111,7 @@ const (
 	scorePluginName              = "score-plugin"
 	scoreWithNormalizePluginName = "score-with-normalize-plugin"
 	filterPluginName             = "filter-plugin"
-	postFilterPluginName         = "postfilter-plugin"
+	preScorePluginName           = "prescore-plugin"
 	reservePluginName            = "reserve-plugin"
 	preBindPluginName            = "prebind-plugin"
 	unreservePluginName          = "unreserve-plugin"
@@ -125,7 +125,7 @@ var _ framework.FilterPlugin = &FilterPlugin{}
 var _ framework.ScorePlugin = &ScorePlugin{}
 var _ framework.ScorePlugin = &ScoreWithNormalizePlugin{}
 var _ framework.ReservePlugin = &ReservePlugin{}
-var _ framework.PostFilterPlugin = &PostFilterPlugin{}
+var _ framework.PreScorePlugin = &PreScorePlugin{}
 var _ framework.PreBindPlugin = &PreBindPlugin{}
 var _ framework.BindPlugin = &BindPlugin{}
 var _ framework.PostBindPlugin = &PostBindPlugin{}
@@ -242,24 +242,24 @@ func (rp *ReservePlugin) reset() {
 }
 
 // Name returns name of the plugin.
-func (*PostFilterPlugin) Name() string {
-	return postFilterPluginName
+func (*PreScorePlugin) Name() string {
+	return preScorePluginName
 }
 
-// PostFilter is a test function.
-func (pfp *PostFilterPlugin) PostFilter(ctx context.Context, _ *framework.CycleState, pod *v1.Pod, _ []*v1.Node, _ framework.NodeToStatusMap) *framework.Status {
-	pfp.numPostFilterCalled++
-	if pfp.failPostFilter {
+// PreScore is a test function.
+func (pfp *PreScorePlugin) PreScore(ctx context.Context, _ *framework.CycleState, pod *v1.Pod, _ []*v1.Node, _ framework.NodeToStatusMap) *framework.Status {
+	pfp.numPreScoreCalled++
+	if pfp.failPreScore {
 		return framework.NewStatus(framework.Error, fmt.Sprintf("injecting failure for pod %v", pod.Name))
 	}
 
 	return nil
 }
 
-// reset used to reset postfilter plugin.
-func (pfp *PostFilterPlugin) reset() {
-	pfp.numPostFilterCalled = 0
-	pfp.failPostFilter = false
+// reset used to reset prescore plugin.
+func (pfp *PreScorePlugin) reset() {
+	pfp.numPreScoreCalled = 0
+	pfp.failPreScore = false
 }
 
 // Name returns name of the plugin.
@@ -1396,31 +1396,31 @@ func TestFilterPlugin(t *testing.T) {
 	}
 }
 
-// TestPostFilterPlugin tests invocation of post-filter plugins.
-func TestPostFilterPlugin(t *testing.T) {
-	// Create a plugin registry for testing. Register only a post-filter plugin.
-	postFilterPlugin := &PostFilterPlugin{}
-	registry := framework.Registry{postFilterPluginName: newPlugin(postFilterPlugin)}
+// TestPreScorePlugin tests invocation of pre-score plugins.
+func TestPreScorePlugin(t *testing.T) {
+	// Create a plugin registry for testing. Register only a pre-score plugin.
+	preScorePlugin := &PreScorePlugin{}
+	registry := framework.Registry{preScorePluginName: newPlugin(preScorePlugin)}
 
-	// Setup initial post-filter plugin for testing.
+	// Setup initial pre-score plugin for testing.
 	plugins := &schedulerconfig.Plugins{
-		PostFilter: &schedulerconfig.PluginSet{
+		PreScore: &schedulerconfig.PluginSet{
 			Enabled: []schedulerconfig.Plugin{
 				{
-					Name: postFilterPluginName,
+					Name: preScorePluginName,
 				},
 			},
 		},
 	}
 
 	// Create the master and the scheduler with the test plugin set.
-	testCtx := initTestSchedulerForFrameworkTest(t, initTestMaster(t, "post-filter-plugin", nil), 2,
+	testCtx := initTestSchedulerForFrameworkTest(t, initTestMaster(t, "pre-score-plugin", nil), 2,
 		scheduler.WithFrameworkPlugins(plugins),
 		scheduler.WithFrameworkOutOfTreeRegistry(registry))
 	defer cleanupTest(t, testCtx)
 
 	for _, fail := range []bool{false, true} {
-		postFilterPlugin.failPostFilter = fail
+		preScorePlugin.failPreScore = fail
 		// Create a best effort pod.
 		pod, err := createPausePod(testCtx.clientSet,
 			initPausePod(testCtx.clientSet, &pausePodConfig{Name: "test-pod", Namespace: testCtx.ns.Name}))
@@ -1438,11 +1438,11 @@ func TestPostFilterPlugin(t *testing.T) {
 			}
 		}
 
-		if postFilterPlugin.numPostFilterCalled == 0 {
-			t.Errorf("Expected the post-filter plugin to be called.")
+		if preScorePlugin.numPreScoreCalled == 0 {
+			t.Errorf("Expected the pre-score plugin to be called.")
 		}
 
-		postFilterPlugin.reset()
+		preScorePlugin.reset()
 		cleanupPods(testCtx.clientSet, t, []*v1.Pod{pod})
 	}
 }

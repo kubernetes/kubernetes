@@ -51,9 +51,9 @@ func RegisterScorePlugin(pluginName string, pluginNewFunc framework.PluginFactor
 	return RegisterPluginAsExtensionsWithWeight(pluginName, weight, pluginNewFunc, "Score")
 }
 
-// RegisterPostFilterPlugin returns a function to register a Score Plugin to a given registry.
-func RegisterPostFilterPlugin(pluginName string, pluginNewFunc framework.PluginFactory) RegisterPluginFunc {
-	return RegisterPluginAsExtensions(pluginName, pluginNewFunc, "PostFilter")
+// RegisterPreScorePlugin returns a function to register a Score Plugin to a given registry.
+func RegisterPreScorePlugin(pluginName string, pluginNewFunc framework.PluginFactory) RegisterPluginFunc {
+	return RegisterPluginAsExtensions(pluginName, pluginNewFunc, "PreScore")
 }
 
 // RegisterBindPlugin returns a function to register a Bind Plugin to a given registry.
@@ -91,8 +91,8 @@ func getPluginSetByExtension(plugins *schedulerapi.Plugins, extension string) *s
 		return initializeIfNeeded(&plugins.Filter)
 	case "PreFilter":
 		return initializeIfNeeded(&plugins.PreFilter)
-	case "PostFilter":
-		return initializeIfNeeded(&plugins.PostFilter)
+	case "PreScore":
+		return initializeIfNeeded(&plugins.PreScore)
 	case "Score":
 		return initializeIfNeeded(&plugins.Score)
 	case "Bind":

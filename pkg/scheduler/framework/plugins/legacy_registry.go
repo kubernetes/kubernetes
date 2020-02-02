@@ -330,12 +330,12 @@ func NewLegacyRegistry() *LegacyRegistry {
 	registry.registerPriorityConfigProducer(SelectorSpreadPriority,
 		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			plugins.Score = appendToPluginSet(plugins.Score, defaultpodtopologyspread.Name, &args.Weight)
-			plugins.PostFilter = appendToPluginSet(plugins.PostFilter, defaultpodtopologyspread.Name, nil)
+			plugins.PreScore = appendToPluginSet(plugins.PreScore, defaultpodtopologyspread.Name, nil)
 			return
 		})
 	registry.registerPriorityConfigProducer(TaintTolerationPriority,
 		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
-			plugins.PostFilter = appendToPluginSet(plugins.PostFilter, tainttoleration.Name, nil)
+			plugins.PreScore = appendToPluginSet(plugins.PreScore, tainttoleration.Name, nil)
 			plugins.Score = appendToPluginSet(plugins.Score, tainttoleration.Name, &args.Weight)
 			return
 		})
@@ -351,7 +351,7 @@ func NewLegacyRegistry() *LegacyRegistry {
 		})
 	registry.registerPriorityConfigProducer(InterPodAffinityPriority,
 		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
-			plugins.PostFilter = appendToPluginSet(plugins.PostFilter, interpodaffinity.Name, nil)
+			plugins.PreScore = appendToPluginSet(plugins.PreScore, interpodaffinity.Name, nil)
 			plugins.Score = appendToPluginSet(plugins.Score, interpodaffinity.Name, &args.Weight)
 			pluginConfig = append(pluginConfig, makePluginConfig(interpodaffinity.Name, args.InterPodAffinityArgs))
 			return
@@ -420,7 +420,7 @@ func NewLegacyRegistry() *LegacyRegistry {
 
 		registry.registerPriorityConfigProducer(EvenPodsSpreadPriority,
 			func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
-				plugins.PostFilter = appendToPluginSet(plugins.PostFilter, podtopologyspread.Name, nil)
+				plugins.PreScore = appendToPluginSet(plugins.PreScore, podtopologyspread.Name, nil)
 				plugins.Score = appendToPluginSet(plugins.Score, podtopologyspread.Name, &args.Weight)
 				return
 			})
@@ -433,7 +433,7 @@ func NewLegacyRegistry() *LegacyRegistry {
 
 		registry.registerPriorityConfigProducer(ResourceLimitsPriority,
 			func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
-				plugins.PostFilter = appendToPluginSet(plugins.PostFilter, noderesources.ResourceLimitsName, nil)
+				plugins.PreScore = appendToPluginSet(plugins.PreScore, noderesources.ResourceLimitsName, nil)
 				plugins.Score = appendToPluginSet(plugins.Score, noderesources.ResourceLimitsName, &args.Weight)
 				return
 			})

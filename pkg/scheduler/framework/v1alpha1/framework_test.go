@@ -169,8 +169,8 @@ func (pl *TestPlugin) Filter(ctx context.Context, state *CycleState, pod *v1.Pod
 	return NewStatus(Code(pl.inj.FilterStatus), "injected filter status")
 }
 
-func (pl *TestPlugin) PostFilter(ctx context.Context, state *CycleState, pod *v1.Pod, nodes []*v1.Node, filteredNodesStatuses NodeToStatusMap) *Status {
-	return NewStatus(Code(pl.inj.PostFilterStatus), "injected status")
+func (pl *TestPlugin) PreScore(ctx context.Context, state *CycleState, pod *v1.Pod, nodes []*v1.Node, filteredNodesStatuses NodeToStatusMap) *Status {
+	return NewStatus(Code(pl.inj.PreScoreStatus), "injected status")
 }
 
 func (pl *TestPlugin) Reserve(ctx context.Context, state *CycleState, p *v1.Pod, nodeName string) *Status {
@@ -1328,9 +1328,9 @@ func TestRecordingMetrics(t *testing.T) {
 			wantStatus:         Success,
 		},
 		{
-			name:               "PostFilter - Success",
-			action:             func(f Framework) { f.RunPostFilterPlugins(context.Background(), state, pod, nil, nil) },
-			wantExtensionPoint: "PostFilter",
+			name:               "PreScore - Success",
+			action:             func(f Framework) { f.RunPreScorePlugins(context.Background(), state, pod, nil, nil) },
+			wantExtensionPoint: "PreScore",
 			wantStatus:         Success,
 		},
 		{
@@ -1384,10 +1384,10 @@ func TestRecordingMetrics(t *testing.T) {
 			wantStatus:         Error,
 		},
 		{
-			name:               "PostFilter - Error",
-			action:             func(f Framework) { f.RunPostFilterPlugins(context.Background(), state, pod, nil, nil) },
-			inject:             injectedResult{PostFilterStatus: int(Error)},
-			wantExtensionPoint: "PostFilter",
+			name:               "PreScore - Error",
+			action:             func(f Framework) { f.RunPreScorePlugins(context.Background(), state, pod, nil, nil) },
+			inject:             injectedResult{PreScoreStatus: int(Error)},
+			wantExtensionPoint: "PreScore",
 			wantStatus:         Error,
 		},
 		{
@@ -1441,16 +1441,16 @@ func TestRecordingMetrics(t *testing.T) {
 				})
 			pluginSet := &config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin, Weight: 1}}}
 			plugins := &config.Plugins{
-				Score:      pluginSet,
-				PreFilter:  pluginSet,
-				Filter:     pluginSet,
-				PostFilter: pluginSet,
-				Reserve:    pluginSet,
-				Permit:     pluginSet,
-				PreBind:    pluginSet,
-				Bind:       pluginSet,
-				PostBind:   pluginSet,
-				Unreserve:  pluginSet,
+				Score:     pluginSet,
+				PreFilter: pluginSet,
+				Filter:    pluginSet,
+				PreScore:  pluginSet,
+				Reserve:   pluginSet,
+				Permit:    pluginSet,
+				PreBind:   pluginSet,
+				Bind:      pluginSet,
+				PostBind:  pluginSet,
+				Unreserve: pluginSet,
 			}
 			recorder := newMetricsRecorder(100, time.Nanosecond)
 			f, err := newFrameworkWithQueueSortAndBind(r, plugins, emptyArgs, withMetricsRecorder(recorder))
@@ -1682,7 +1682,7 @@ type injectedResult struct {
 	PreFilterAddPodStatus    int   `json:"preFilterAddPodStatus,omitempty"`
 	PreFilterRemovePodStatus int   `json:"preFilterRemovePodStatus,omitempty"`
 	FilterStatus             int   `json:"filterStatus,omitempty"`
-	PostFilterStatus         int   `json:"postFilterStatus,omitempty"`
+	PreScoreStatus           int   `json:"preScoreStatus,omitempty"`
 	ReserveStatus            int   `json:"reserveStatus,omitempty"`
 	PreBindStatus            int   `json:"preBindStatus,omitempty"`
 	BindStatus               int   `json:"bindStatus,omitempty"`

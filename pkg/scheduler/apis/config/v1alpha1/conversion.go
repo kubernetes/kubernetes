@@ -66,3 +66,39 @@ func Convert_config_KubeSchedulerLeaderElectionConfiguration_To_v1alpha1_KubeSch
 	out.LockObjectName = in.ResourceName
 	return nil
 }
+
+func Convert_v1alpha1_Plugins_To_config_Plugins(in *v1alpha1.Plugins, out *config.Plugins, s conversion.Scope) error {
+	if err := autoConvert_v1alpha1_Plugins_To_config_Plugins(in, out, s); err != nil {
+		return err
+	}
+
+	if in.PostFilter != nil {
+		postFilter, preScore := &in.PostFilter, &out.PreScore
+		*preScore = new(config.PluginSet)
+		if err := Convert_v1alpha1_PluginSet_To_config_PluginSet(*postFilter, *preScore, s); err != nil {
+			return err
+		}
+	} else {
+		out.PreScore = nil
+	}
+
+	return nil
+}
+
+func Convert_config_Plugins_To_v1alpha1_Plugins(in *config.Plugins, out *v1alpha1.Plugins, s conversion.Scope) error {
+	if err := autoConvert_config_Plugins_To_v1alpha1_Plugins(in, out, s); err != nil {
+		return err
+	}
+
+	if in.PreScore != nil {
+		preScore, postFilter := &in.PreScore, &out.PostFilter
+		*postFilter = new(v1alpha1.PluginSet)
+		if err := Convert_config_PluginSet_To_v1alpha1_PluginSet(*preScore, *postFilter, s); err != nil {
+			return err
+		}
+	} else {
+		out.PostFilter = nil
+	}
+
+	return nil
+}
