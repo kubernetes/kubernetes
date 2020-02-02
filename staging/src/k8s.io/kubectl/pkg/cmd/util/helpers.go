@@ -115,6 +115,18 @@ func CheckErr(err error) {
 	checkErr(err, fatalErrHandler)
 }
 
+// CheckDiffErr prints a user friendly error to STDERR and exits with a
+// non-zero and non-one exit code. Unrecognized errors will be printed
+// with an "error: " prefix.
+//
+// This method is meant specifically for `kubectl diff` and may be used
+// by other commands.
+func CheckDiffErr(err error) {
+	checkErr(err, func(msg string, code int) {
+		fatalErrHandler(msg, code+1)
+	})
+}
+
 // checkErr formats a given error as a string and calls the passed handleErr
 // func with that string and an kubectl exit code.
 func checkErr(err error, handleErr func(string, int)) {
