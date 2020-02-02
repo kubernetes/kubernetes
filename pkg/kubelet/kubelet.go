@@ -71,7 +71,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/configmap"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim"
-	dockerremote "k8s.io/kubernetes/pkg/kubelet/dockershim/remote"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/images"
@@ -306,46 +305,15 @@ func PreInitRuntimeService(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 
 	switch containerRuntime {
 	case kubetypes.DockerContainerRuntime:
-		// TODO: These need to become arguments to a standalone docker shim.
-		pluginSettings := dockershim.NetworkPluginSettings{
-			HairpinMode:        kubeletconfiginternal.HairpinMode(kubeCfg.HairpinMode),
-			NonMasqueradeCIDR:  nonMasqueradeCIDR,
-			PluginName:         crOptions.NetworkPluginName,
-			PluginConfDir:      crOptions.CNIConfDir,
-			PluginBinDirString: crOptions.CNIBinDir,
-			PluginCacheDir:     crOptions.CNICacheDir,
-			MTU:                int(crOptions.NetworkPluginMTU),
-		}
-
-		// Create and start the CRI shim running as a grpc server.
-		streamingConfig := getStreamingConfig(kubeCfg, kubeDeps, crOptions)
-		ds, err := dockershim.NewDockerService(kubeDeps.DockerClientConfig, crOptions.PodSandboxImage, streamingConfig,
-			&pluginSettings, runtimeCgroups, kubeCfg.CgroupDriver, crOptions.DockershimRootDirectory, !crOptions.RedirectContainerStreaming)
-		if err != nil {
-			return err
-		}
-		if crOptions.RedirectContainerStreaming {
-			kubeDeps.criHandler = ds
-		}
-
-		// The unix socket for kubelet <-> dockershim communication, dockershim start before runtime service init.
-		klog.V(5).Infof("RemoteRuntimeEndpoint: %q, RemoteImageEndpoint: %q",
+		runDockershim(
+			kubeCfg,
+			kubeDeps,
+			crOptions,
+			runtimeCgroups,
 			remoteRuntimeEndpoint,
-			remoteImageEndpoint)
-		klog.V(2).Infof("Starting the GRPC server for the docker CRI shim.")
-		dockerServer := dockerremote.NewDockerServer(remoteRuntimeEndpoint, ds)
-		if err := dockerServer.Start(); err != nil {
-			return err
-		}
-
-		// Create dockerLegacyService when the logging driver is not supported.
-		supported, err := ds.IsCRISupportedLogDriver()
-		if err != nil {
-			return err
-		}
-		if !supported {
-			kubeDeps.dockerLegacyService = ds
-		}
+			remoteImageEndpoint,
+			nonMasqueradeCIDR,
+		)
 	case kubetypes.RemoteContainerRuntime:
 		// No-op.
 		break

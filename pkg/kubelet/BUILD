@@ -13,6 +13,7 @@ go_library(
         "doc.go",
         "errors.go",
         "kubelet.go",
+        "kubelet_dockershim.go",
         "kubelet_getters.go",
         "kubelet_network.go",
         "kubelet_network_linux.go",

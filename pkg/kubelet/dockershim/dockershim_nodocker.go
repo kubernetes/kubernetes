@@ -1,0 +1,3 @@
+// +build dockerless
+
+package dockershim
