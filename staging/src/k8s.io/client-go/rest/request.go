@@ -30,6 +30,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"golang.org/x/net/http2"
@@ -51,6 +52,9 @@ var (
 	// throttled (via the provided rateLimiter) for more than longThrottleLatency will
 	// be logged.
 	longThrottleLatency = 50 * time.Millisecond
+
+	// extraLongThrottleLatency defines the threshold for logging requests at log level 2.
+	extraLongThrottleLatency = 1 * time.Second
 )
 
 // HTTPClient is an interface for testing a request object.
@@ -547,11 +551,42 @@ func (r *Request) tryThrottle(ctx context.Context) error {
 
 	err := r.rateLimiter.Wait(ctx)
 
-	if latency := time.Since(now); latency > longThrottleLatency {
+	latency := time.Since(now)
+	if latency > longThrottleLatency {
 		klog.V(3).Infof("Throttling request took %v, request: %s:%s", latency, r.verb, r.URL().String())
+	}
+	if latency > extraLongThrottleLatency {
+		globalThrottledLogger.Log(2, fmt.Sprintf("Throttling request took %v, request: %s:%s", latency, r.verb, r.URL().String()))
 	}
 
 	return err
+}
+
+type throttledLogger struct {
+	logTimeLock    sync.RWMutex
+	lastLogTime    time.Time
+	minLogInterval time.Duration
+}
+
+var globalThrottledLogger = &throttledLogger{
+	minLogInterval: 1 * time.Second,
+}
+
+func (b *throttledLogger) Log(level klog.Level, message string) {
+	if bool(klog.V(level)) {
+		if func() bool {
+			b.logTimeLock.RLock()
+			defer b.logTimeLock.RUnlock()
+			return time.Since(b.lastLogTime) > b.minLogInterval
+		}() {
+			b.logTimeLock.Lock()
+			defer b.logTimeLock.Unlock()
+			if time.Since(b.lastLogTime) > b.minLogInterval {
+				klog.V(level).Info(message)
+				b.lastLogTime = time.Now()
+			}
+		}
+	}
 }
 
 // Watch attempts to begin watching the requested location.
