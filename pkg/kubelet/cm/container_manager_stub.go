@@ -117,7 +117,7 @@ func (cm *containerManagerStub) ShouldResetExtendedResourceCapacity() bool {
 	return cm.shouldResetExtendedResourceCapacity
 }
 
-func (cm *containerManagerStub) GetTopologyPodAdmitHandler() topologymanager.Manager {
+func (cm *containerManagerStub) GetTopologyPodAdmitHandler() lifecycle.PodAdmitHandler {
 	return nil
 }
 
