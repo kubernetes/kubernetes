@@ -610,6 +610,14 @@ func TestCacherNoLeakWithMultipleWatchers(t *testing.T) {
 	wg := &sync.WaitGroup{}
 
 	wg.Add(1)
+	errMsgCh := make(chan string, 1)
+	defer func() {
+		select {
+		case errMsg := <-errMsgCh:
+			t.Fatal(errMsg)
+		default:
+		}
+	}()
 	go func() {
 		defer wg.Done()
 		for {
@@ -620,7 +628,8 @@ func TestCacherNoLeakWithMultipleWatchers(t *testing.T) {
 				ctx, _ := context.WithTimeout(context.Background(), 3*time.Second)
 				w, err := cacher.Watch(ctx, "pods/ns", "0", pred)
 				if err != nil {
-					t.Fatalf("Failed to create watch: %v", err)
+					errMsgCh <- fmt.Sprintf("Failed to create watch: %v", err)
+					return
 				}
 				w.Stop()
 			}
@@ -678,6 +687,15 @@ func testCacherSendBookmarkEvents(t *testing.T, allowWatchBookmarks, expectedBoo
 	}
 
 	resourceVersion := uint64(1000)
+
+	errMsgCh := make(chan string, 1)
+	defer func() {
+		select {
+		case errMsg := <-errMsgCh:
+			t.Fatal(errMsg)
+		default:
+		}
+	}()
 	go func() {
 		deadline := time.Now().Add(time.Second)
 		for i := 0; time.Now().Before(deadline); i++ {
@@ -688,7 +706,8 @@ func testCacherSendBookmarkEvents(t *testing.T, allowWatchBookmarks, expectedBoo
 					ResourceVersion: fmt.Sprintf("%v", resourceVersion+uint64(i)),
 				}})
 			if err != nil {
-				t.Fatalf("failed to add a pod: %v", err)
+				errMsgCh <- fmt.Sprintf("failed to add a pod: %v", err)
+				return
 			}
 			time.Sleep(100 * time.Millisecond)
 		}

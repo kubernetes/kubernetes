@@ -132,7 +132,14 @@ func TestCachingObjectRaces(t *testing.T) {
 	numWorkers := 1000
 	wg := &sync.WaitGroup{}
 	wg.Add(numWorkers)
-
+	errMsgCh := make(chan string, 1)
+	defer func() {
+		select {
+		case errMsg := <-errMsgCh:
+			t.Fatal(errMsg)
+		default:
+		}
+	}()
 	for i := 0; i < numWorkers; i++ {
 		go func() {
 			defer wg.Done()
@@ -149,7 +156,11 @@ func TestCachingObjectRaces(t *testing.T) {
 			}
 			accessor, err := meta.Accessor(object.GetObject())
 			if err != nil {
-				t.Fatalf("failed to get accessor: %v", err)
+				select {
+				case errMsgCh <- fmt.Sprintf("failed to get accessor: %v", err):
+				default:
+				}
+				return
 			}
 			if selfLink := accessor.GetSelfLink(); selfLink != "selfLink" {
 				t.Errorf("unexpected selfLink: %s", selfLink)

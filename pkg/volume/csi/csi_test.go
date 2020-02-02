@@ -302,12 +302,21 @@ func TestCSI_VolumeAll(t *testing.T) {
 				if err != nil {
 					t.Fatal("csiTest.VolumeAll failed to create new attacher: ", err)
 				}
-
+				errMsgCh := make(chan string, 1)
+				defer func() {
+					errMsg := <-errMsgCh // This won't block: errMsgCh will always has a message
+					if errMsg != "" {
+						t.Fatal(errMsg)
+					}
+				}()
 				// creates VolumeAttachment and blocks until it is marked attached (done by external attacher)
 				go func(spec *volume.Spec, nodeName types.NodeName) {
 					attachID, err := volAttacher.Attach(spec, nodeName)
 					if err != nil {
-						t.Fatalf("csiTest.VolumeAll attacher.Attach failed: %s", err)
+						errMsgCh <- fmt.Sprintf("csiTest.VolumeAll attacher.Attach failed: %s", err)
+						return
+					} else {
+						errMsgCh <- ""
 					}
 					t.Logf("csiTest.VolumeAll got attachID %s", attachID)
 

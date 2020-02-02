@@ -919,16 +919,25 @@ func TestWatchBookmarksWithCorrectResourceVersion(t *testing.T) {
 
 	done := make(chan struct{})
 	defer close(done)
+	errMsgCh := make(chan string, 1)
+	defer func() {
+		errMsg := <-errMsgCh
+		if errMsg != "" {
+			t.Fatal(errMsg)
+		}
+	}()
 	go func() {
 		for i := 0; i < 100; i++ {
 			select {
 			case <-done:
+				errMsgCh <- ""
 				return
 			default:
 				pod := fmt.Sprintf("foo-%d", i)
 				err := createPod(etcdStorage, makeTestPod(pod))
 				if err != nil {
-					t.Fatalf("failed to create pod %v: %v", pod, err)
+					errMsgCh <- fmt.Sprintf("failed to create pod %v: %v", pod, err)
+					return
 				}
 				time.Sleep(time.Second / 100)
 			}

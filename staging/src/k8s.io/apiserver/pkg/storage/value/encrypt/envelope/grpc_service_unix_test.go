@@ -131,14 +131,32 @@ func TestTimeouts(t *testing.T) {
 			testCompletedWG.Add(1)
 			defer testCompletedWG.Done()
 
+			errMsgCh1 := make(chan string, 1)
+			errMsgCh2 := make(chan string, 1)
+			defer func() { // Create two deferred functions in case multiple errors happen
+				errMsg := <-errMsgCh1
+				if errMsg != "" {
+					t.Fatal(errMsg)
+				}
+			}()
+			defer func() {
+				errMsg := <-errMsgCh2
+				if errMsg != "" {
+					t.Fatal(errMsg)
+				}
+			}()
+
 			kubeAPIServerWG.Add(1)
 			go func() {
 				// Simulating late start of kube-apiserver - plugin is up before kube-apiserver, if requested by the testcase.
 				time.Sleep(tt.kubeAPIServerDelay)
 
-				service, err = NewGRPCService(socketName.endpoint, tt.callTimeout)
+				service, err = NewGRPCService(socketName, tt.callTimeout)
 				if err != nil {
-					t.Fatalf("failed to create envelope service, error: %v", err)
+					errMsgCh1 <- fmt.Sprintf("failed to create envelope service, error: %v", err)
+					return
+				} else {
+					errMsgCh1 <- ""
 				}
 				defer destroyService(service)
 				kubeAPIServerWG.Done()
@@ -151,14 +169,14 @@ func TestTimeouts(t *testing.T) {
 				// Simulating delayed start of kms-plugin, kube-apiserver is up before the plugin, if requested by the testcase.
 				time.Sleep(tt.pluginDelay)
 
-				f, err := mock.NewBase64Plugin(socketName.path)
+				f, err := startFakeKMSProvider(kmsapiVersion, socketName)
 				if err != nil {
-					t.Fatalf("failed to construct test KMS provider server, error: %v", err)
+					errMsgCh2 <- fmt.Sprintf("failed to start test KMS provider server, error: %v", err)
+					return
+				} else {
+					errMsgCh2 <- ""
 				}
-				if err := f.Start(); err != nil {
-					t.Fatalf("Failed to start test KMS provider server, error: %v", err)
-				}
-				defer f.CleanUp()
+				defer f.Stop()
 				kmsPluginWG.Done()
 				// Keeping plugin up to process requests.
 				testCompletedWG.Wait()
@@ -221,6 +239,13 @@ func TestIntermittentConnectionLoss(t *testing.T) {
 
 	wg1.Add(1)
 	wg2.Add(1)
+	errMsgCh := make(chan string, 1)
+	defer func() {
+		errMsg := <-errMsgCh
+		if errMsg != "" {
+			t.Fatal(errMsg)
+		}
+	}()
 	go func() {
 		defer wg2.Done()
 		// Call service to encrypt data.
@@ -228,7 +253,9 @@ func TestIntermittentConnectionLoss(t *testing.T) {
 		wg1.Done()
 		_, err := service.Encrypt(data)
 		if err != nil {
-			t.Fatalf("failed when executing encrypt, error: %v", err)
+			errMsgCh <- fmt.Sprintf("failed when executing encrypt, error: %v", err)
+		} else {
+			errMsgCh <- ""
 		}
 	}()
 

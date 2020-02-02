@@ -140,12 +140,23 @@ func TestCachingTokenSourceRace(t *testing.T) {
 
 		var wg sync.WaitGroup
 		wg.Add(100)
-
+		errMsgCh := make(chan string, 1)
+		defer func() {
+			select {
+			case errMsg := <-errMsgCh:
+				t.Fatal(errMsg)
+			default:
+			}
+		}()
 		for i := 0; i < 100; i++ {
 			go func() {
 				defer wg.Done()
 				if _, err := ts.Token(); err != nil {
-					t.Fatalf("err: %v", err)
+					select {
+					case errMsgCh <- fmt.Sprintf("err: %v", err):
+					default:
+					}
+					return
 				}
 			}()
 		}
