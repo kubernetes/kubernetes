@@ -30,6 +30,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -648,17 +649,6 @@ func getTestManager(tmpDir string, activePods ActivePodsFunc, testRes []TestReso
 	return testManager, nil
 }
 
-func getTestNodeInfo(allocatable v1.ResourceList) *schedulernodeinfo.NodeInfo {
-	cachedNode := &v1.Node{
-		Status: v1.NodeStatus{
-			Allocatable: allocatable,
-		},
-	}
-	nodeInfo := &schedulernodeinfo.NodeInfo{}
-	nodeInfo.SetNode(cachedNode)
-	return nodeInfo
-}
-
 type TestResource struct {
 	resourceName     string
 	resourceQuantity resource.Quantity
@@ -686,7 +676,6 @@ func TestPodContainerDeviceAllocation(t *testing.T) {
 	tmpDir, err := ioutil.TempDir("", "checkpoint")
 	as.Nil(err)
 	defer os.RemoveAll(tmpDir)
-	nodeInfo := getTestNodeInfo(v1.ResourceList{})
 	testManager, err := getTestManager(tmpDir, podsStub.getActivePods, testResources)
 	as.Nil(err)
 
@@ -738,7 +727,7 @@ func TestPodContainerDeviceAllocation(t *testing.T) {
 		pod := testCase.testPod
 		activePods = append(activePods, pod)
 		podsStub.updateActivePods(activePods)
-		err := testManager.Allocate(nodeInfo, &lifecycle.PodAdmitAttributes{Pod: pod})
+		err := testManager.Allocate(pod)
 		if !reflect.DeepEqual(err, testCase.expErr) {
 			t.Errorf("DevicePluginManager error (%v). expected error: %v but got: %v",
 				testCase.description, testCase.expErr, err)
@@ -780,7 +769,6 @@ func TestInitContainerDeviceAllocation(t *testing.T) {
 	podsStub := activePodsStub{
 		activePods: []*v1.Pod{},
 	}
-	nodeInfo := getTestNodeInfo(v1.ResourceList{})
 	tmpDir, err := ioutil.TempDir("", "checkpoint")
 	as.Nil(err)
 	defer os.RemoveAll(tmpDir)
@@ -834,7 +822,7 @@ func TestInitContainerDeviceAllocation(t *testing.T) {
 		},
 	}
 	podsStub.updateActivePods([]*v1.Pod{podWithPluginResourcesInInitContainers})
-	err = testManager.Allocate(nodeInfo, &lifecycle.PodAdmitAttributes{Pod: podWithPluginResourcesInInitContainers})
+	err = testManager.Allocate(podWithPluginResourcesInInitContainers)
 	as.Nil(err)
 	podUID := string(podWithPluginResourcesInInitContainers.UID)
 	initCont1 := podWithPluginResourcesInInitContainers.Spec.InitContainers[0].Name
@@ -855,7 +843,10 @@ func TestInitContainerDeviceAllocation(t *testing.T) {
 	as.Equal(0, normalCont1Devices.Intersection(normalCont2Devices).Len())
 }
 
-func TestSanitizeNodeAllocatable(t *testing.T) {
+func TestUpdatePluginResources(t *testing.T) {
+	pod := &v1.Pod{}
+	pod.UID = types.UID("testPod")
+
 	resourceName1 := "domain1.com/resource1"
 	devID1 := "dev1"
 
@@ -876,6 +867,8 @@ func TestSanitizeNodeAllocatable(t *testing.T) {
 		podDevices:        make(podDevices),
 		checkpointManager: ckm,
 	}
+	testManager.podDevices[string(pod.UID)] = make(containerDevices)
+
 	// require one of resource1 and one of resource2
 	testManager.allocatedDevices[resourceName1] = sets.NewString()
 	testManager.allocatedDevices[resourceName1].Insert(devID1)
@@ -893,7 +886,7 @@ func TestSanitizeNodeAllocatable(t *testing.T) {
 	nodeInfo := &schedulernodeinfo.NodeInfo{}
 	nodeInfo.SetNode(cachedNode)
 
-	testManager.sanitizeNodeAllocatable(nodeInfo)
+	testManager.UpdatePluginResources(nodeInfo, &lifecycle.PodAdmitAttributes{Pod: pod})
 
 	allocatableScalarResources := nodeInfo.AllocatableResource().ScalarResources
 	// allocatable in nodeInfo is less than needed, should update
@@ -918,7 +911,6 @@ func TestDevicePreStartContainer(t *testing.T) {
 	tmpDir, err := ioutil.TempDir("", "checkpoint")
 	as.Nil(err)
 	defer os.RemoveAll(tmpDir)
-	nodeInfo := getTestNodeInfo(v1.ResourceList{})
 
 	testManager, err := getTestManager(tmpDir, podsStub.getActivePods, []TestResource{res1})
 	as.Nil(err)
@@ -936,7 +928,7 @@ func TestDevicePreStartContainer(t *testing.T) {
 	activePods := []*v1.Pod{}
 	activePods = append(activePods, pod)
 	podsStub.updateActivePods(activePods)
-	err = testManager.Allocate(nodeInfo, &lifecycle.PodAdmitAttributes{Pod: pod})
+	err = testManager.Allocate(pod)
 	as.Nil(err)
 	runContainerOpts, err := testManager.GetDeviceRunContainerOptions(pod, &pod.Spec.Containers[0])
 	as.Nil(err)
