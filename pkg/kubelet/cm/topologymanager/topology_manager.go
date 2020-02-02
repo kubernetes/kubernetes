@@ -194,10 +194,17 @@ func (m *manager) AddContainer(pod *v1.Pod, containerID string) error {
 }
 
 func (m *manager) RemoveContainer(containerID string) error {
+	klog.Infof("[topologymanager] RemoveContainer - Container ID: %v", containerID)
+
 	podUIDString := m.podMap[containerID]
-	delete(m.podTopologyHints, podUIDString)
 	delete(m.podMap, containerID)
-	klog.Infof("[topologymanager] RemoveContainer - Container ID: %v podTopologyHints: %v", containerID, m.podTopologyHints)
+	if _, exists := m.podTopologyHints[podUIDString]; exists {
+		delete(m.podTopologyHints[podUIDString], containerID)
+		if len(m.podTopologyHints[podUIDString]) == 0 {
+			delete(m.podTopologyHints, podUIDString)
+		}
+	}
+
 	return nil
 }
 
