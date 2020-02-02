@@ -765,12 +765,22 @@ function construct-linux-kubelet-flags {
       flags+=" --kubeconfig=/var/lib/kubelet/bootstrap-kubeconfig"
       flags+=" --register-schedulable=false"
     fi
+    if [[ "${MASTER_OS_DISTRIBUTION}" == "ubuntu" ]]; then
+      # Configure the file path for host dns configuration
+      # as ubuntu uses systemd-resolved
+      flags+=" --resolv-conf=/run/systemd/resolve/resolv.conf"
+    fi
   else # For nodes
     flags+=" ${NODE_KUBELET_TEST_ARGS:-}"
     flags+=" --bootstrap-kubeconfig=/var/lib/kubelet/bootstrap-kubeconfig"
     flags+=" --kubeconfig=/var/lib/kubelet/kubeconfig"
     if [[ "${node_type}" == "heapster" ]]; then
         flags+=" ${HEAPSTER_KUBELET_TEST_ARGS:-}"
+    fi
+    if [[ "${NODE_OS_DISTRIBUTION}" == "ubuntu" ]]; then
+      # Configure the file path for host dns configuration
+      # as ubuntu uses systemd-resolved
+      flags+=" --resolv-conf=/run/systemd/resolve/resolv.conf"
     fi
   fi
   # Network plugin
@@ -2925,7 +2935,7 @@ function attach-internal-master-ip() {
   echo "Setting ${name}'s aliases to '${aliases}' (added ${ip})"
   # Attach ${ip} to ${name}
   gcloud compute instances network-interfaces update "${name}" --project "${PROJECT}" --zone "${zone}" --aliases="${aliases}"
-  run-gcloud-command "${name}" "${zone}" "sudo ip route add to local ${ip}/32 dev eth0"
+  run-gcloud-command "${name}" "${zone}" 'sudo ip route add to local '${ip}'/32 dev $(ip route | grep default | awk '\''{print $5}'\'')' || true
   return $?
 }
 
@@ -2943,7 +2953,7 @@ function detach-internal-master-ip() {
   echo "Setting ${name}'s aliases to '${aliases}' (removed ${ip})"
   # Detach ${MASTER_NAME}-internal-ip from ${name}
   gcloud compute instances network-interfaces update "${name}" --project "${PROJECT}" --zone "${zone}" --aliases="${aliases}"
-  run-gcloud-command "${name}" "${zone}" "sudo ip route del to local ${ip}/32 dev eth0"
+  run-gcloud-command "${name}" "${zone}" 'sudo ip route del to local '${ip}'/32 dev $(ip route | grep default | awk '\''{print $5}'\'')' || true
   return $?
 }
 
