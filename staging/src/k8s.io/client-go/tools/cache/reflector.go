@@ -66,10 +66,10 @@ type Reflector struct {
 	store Store
 	// listerWatcher is used to perform lists and watches.
 	listerWatcher ListerWatcher
-	// period controls timing between an unsuccessful watch ending and
-	// the beginning of the next list.
-	period time.Duration
-	// The period at which ShouldResync is invoked
+
+	// backoff manages backoff of ListWatch
+	backoffManager wait.BackoffManager
+
 	resyncPeriod time.Duration
 	// ShouldResync is invoked periodically and whenever it returns `true` the Store's Resync operation is invoked
 	ShouldResync func() bool
@@ -127,13 +127,17 @@ func NewReflector(lw ListerWatcher, expectedType interface{}, store Store, resyn
 
 // NewNamedReflector same as NewReflector, but with a specified name for logging
 func NewNamedReflector(name string, lw ListerWatcher, expectedType interface{}, store Store, resyncPeriod time.Duration) *Reflector {
+	realClock := &clock.RealClock{}
 	r := &Reflector{
 		name:          name,
 		listerWatcher: lw,
 		store:         store,
-		period:        time.Second,
-		resyncPeriod:  resyncPeriod,
-		clock:         &clock.RealClock{},
+		// We used to make the call every 1sec (1 QPS), the goal here is to achieve ~98% traffic reduction when
+		// API server is not healthy. With these parameters, backoff will stop at [30,60) sec interval which is
+		// 0.22 QPS. If we don't backoff for 2min, assume API server is healthy and we reset the backoff.
+		backoffManager: wait.NewExponentialBackoffManager(800*time.Millisecond, 30*time.Second, 2*time.Minute, 2.0, 1.0, realClock),
+		resyncPeriod:   resyncPeriod,
+		clock:          realClock,
 	}
 	r.setExpectedType(expectedType)
 	return r
@@ -168,12 +172,13 @@ var internalPackages = []string{"client-go/tools/cache/"}
 // objects and subsequent deltas.
 // Run will exit when stopCh is closed.
 func (r *Reflector) Run(stopCh <-chan struct{}) {
-	klog.V(3).Infof("Starting reflector %v (%s) from %s", r.expectedTypeName, r.resyncPeriod, r.name)
-	wait.Until(func() {
+	klog.V(2).Infof("Starting reflector %s (%s) from %s", r.expectedTypeName, r.resyncPeriod, r.name)
+	wait.BackoffUntil(func() {
 		if err := r.ListAndWatch(stopCh); err != nil {
 			utilruntime.HandleError(err)
 		}
-	}, r.period, stopCh)
+	}, r.backoffManager, true, stopCh)
+	klog.V(2).Infof("Stopping reflector %s (%s) from %s", r.expectedTypeName, r.resyncPeriod, r.name)
 }
 
 var (
