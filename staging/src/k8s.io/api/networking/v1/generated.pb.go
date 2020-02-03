@@ -25,7 +25,6 @@ import (
 	io "io"
 
 	proto "github.com/gogo/protobuf/proto"
-
 	k8s_io_api_core_v1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -48,10 +47,66 @@ var _ = math.Inf
 // proto package needs to be updated.
 const _ = proto.GoGoProtoPackageIsVersion3 // please upgrade the proto package
 
+func (m *HTTPIngressPath) Reset()      { *m = HTTPIngressPath{} }
+func (*HTTPIngressPath) ProtoMessage() {}
+func (*HTTPIngressPath) Descriptor() ([]byte, []int) {
+	return fileDescriptor_1c72867a70a7cc90, []int{0}
+}
+func (m *HTTPIngressPath) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *HTTPIngressPath) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	b = b[:cap(b)]
+	n, err := m.MarshalToSizedBuffer(b)
+	if err != nil {
+		return nil, err
+	}
+	return b[:n], nil
+}
+func (m *HTTPIngressPath) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_HTTPIngressPath.Merge(m, src)
+}
+func (m *HTTPIngressPath) XXX_Size() int {
+	return m.Size()
+}
+func (m *HTTPIngressPath) XXX_DiscardUnknown() {
+	xxx_messageInfo_HTTPIngressPath.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_HTTPIngressPath proto.InternalMessageInfo
+
+func (m *HTTPIngressRuleValue) Reset()      { *m = HTTPIngressRuleValue{} }
+func (*HTTPIngressRuleValue) ProtoMessage() {}
+func (*HTTPIngressRuleValue) Descriptor() ([]byte, []int) {
+	return fileDescriptor_1c72867a70a7cc90, []int{1}
+}
+func (m *HTTPIngressRuleValue) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *HTTPIngressRuleValue) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	b = b[:cap(b)]
+	n, err := m.MarshalToSizedBuffer(b)
+	if err != nil {
+		return nil, err
+	}
+	return b[:n], nil
+}
+func (m *HTTPIngressRuleValue) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_HTTPIngressRuleValue.Merge(m, src)
+}
+func (m *HTTPIngressRuleValue) XXX_Size() int {
+	return m.Size()
+}
+func (m *HTTPIngressRuleValue) XXX_DiscardUnknown() {
+	xxx_messageInfo_HTTPIngressRuleValue.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_HTTPIngressRuleValue proto.InternalMessageInfo
+
 func (m *IPBlock) Reset()      { *m = IPBlock{} }
 func (*IPBlock) ProtoMessage() {}
 func (*IPBlock) Descriptor() ([]byte, []int) {
-	return fileDescriptor_1c72867a70a7cc90, []int{0}
+	return fileDescriptor_1c72867a70a7cc90, []int{2}
 }
 func (m *IPBlock) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -76,10 +131,234 @@ func (m *IPBlock) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_IPBlock proto.InternalMessageInfo
 
+func (m *Ingress) Reset()      { *m = Ingress{} }
+func (*Ingress) ProtoMessage() {}
+func (*Ingress) Descriptor() ([]byte, []int) {
+	return fileDescriptor_1c72867a70a7cc90, []int{3}
+}
+func (m *Ingress) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *Ingress) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	b = b[:cap(b)]
+	n, err := m.MarshalToSizedBuffer(b)
+	if err != nil {
+		return nil, err
+	}
+	return b[:n], nil
+}
+func (m *Ingress) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_Ingress.Merge(m, src)
+}
+func (m *Ingress) XXX_Size() int {
+	return m.Size()
+}
+func (m *Ingress) XXX_DiscardUnknown() {
+	xxx_messageInfo_Ingress.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_Ingress proto.InternalMessageInfo
+
+func (m *IngressBackend) Reset()      { *m = IngressBackend{} }
+func (*IngressBackend) ProtoMessage() {}
+func (*IngressBackend) Descriptor() ([]byte, []int) {
+	return fileDescriptor_1c72867a70a7cc90, []int{4}
+}
+func (m *IngressBackend) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *IngressBackend) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	b = b[:cap(b)]
+	n, err := m.MarshalToSizedBuffer(b)
+	if err != nil {
+		return nil, err
+	}
+	return b[:n], nil
+}
+func (m *IngressBackend) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_IngressBackend.Merge(m, src)
+}
+func (m *IngressBackend) XXX_Size() int {
+	return m.Size()
+}
+func (m *IngressBackend) XXX_DiscardUnknown() {
+	xxx_messageInfo_IngressBackend.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_IngressBackend proto.InternalMessageInfo
+
+func (m *IngressList) Reset()      { *m = IngressList{} }
+func (*IngressList) ProtoMessage() {}
+func (*IngressList) Descriptor() ([]byte, []int) {
+	return fileDescriptor_1c72867a70a7cc90, []int{5}
+}
+func (m *IngressList) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *IngressList) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	b = b[:cap(b)]
+	n, err := m.MarshalToSizedBuffer(b)
+	if err != nil {
+		return nil, err
+	}
+	return b[:n], nil
+}
+func (m *IngressList) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_IngressList.Merge(m, src)
+}
+func (m *IngressList) XXX_Size() int {
+	return m.Size()
+}
+func (m *IngressList) XXX_DiscardUnknown() {
+	xxx_messageInfo_IngressList.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_IngressList proto.InternalMessageInfo
+
+func (m *IngressRule) Reset()      { *m = IngressRule{} }
+func (*IngressRule) ProtoMessage() {}
+func (*IngressRule) Descriptor() ([]byte, []int) {
+	return fileDescriptor_1c72867a70a7cc90, []int{6}
+}
+func (m *IngressRule) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *IngressRule) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	b = b[:cap(b)]
+	n, err := m.MarshalToSizedBuffer(b)
+	if err != nil {
+		return nil, err
+	}
+	return b[:n], nil
+}
+func (m *IngressRule) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_IngressRule.Merge(m, src)
+}
+func (m *IngressRule) XXX_Size() int {
+	return m.Size()
+}
+func (m *IngressRule) XXX_DiscardUnknown() {
+	xxx_messageInfo_IngressRule.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_IngressRule proto.InternalMessageInfo
+
+func (m *IngressRuleValue) Reset()      { *m = IngressRuleValue{} }
+func (*IngressRuleValue) ProtoMessage() {}
+func (*IngressRuleValue) Descriptor() ([]byte, []int) {
+	return fileDescriptor_1c72867a70a7cc90, []int{7}
+}
+func (m *IngressRuleValue) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *IngressRuleValue) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	b = b[:cap(b)]
+	n, err := m.MarshalToSizedBuffer(b)
+	if err != nil {
+		return nil, err
+	}
+	return b[:n], nil
+}
+func (m *IngressRuleValue) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_IngressRuleValue.Merge(m, src)
+}
+func (m *IngressRuleValue) XXX_Size() int {
+	return m.Size()
+}
+func (m *IngressRuleValue) XXX_DiscardUnknown() {
+	xxx_messageInfo_IngressRuleValue.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_IngressRuleValue proto.InternalMessageInfo
+
+func (m *IngressSpec) Reset()      { *m = IngressSpec{} }
+func (*IngressSpec) ProtoMessage() {}
+func (*IngressSpec) Descriptor() ([]byte, []int) {
+	return fileDescriptor_1c72867a70a7cc90, []int{8}
+}
+func (m *IngressSpec) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *IngressSpec) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	b = b[:cap(b)]
+	n, err := m.MarshalToSizedBuffer(b)
+	if err != nil {
+		return nil, err
+	}
+	return b[:n], nil
+}
+func (m *IngressSpec) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_IngressSpec.Merge(m, src)
+}
+func (m *IngressSpec) XXX_Size() int {
+	return m.Size()
+}
+func (m *IngressSpec) XXX_DiscardUnknown() {
+	xxx_messageInfo_IngressSpec.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_IngressSpec proto.InternalMessageInfo
+
+func (m *IngressStatus) Reset()      { *m = IngressStatus{} }
+func (*IngressStatus) ProtoMessage() {}
+func (*IngressStatus) Descriptor() ([]byte, []int) {
+	return fileDescriptor_1c72867a70a7cc90, []int{9}
+}
+func (m *IngressStatus) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *IngressStatus) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	b = b[:cap(b)]
+	n, err := m.MarshalToSizedBuffer(b)
+	if err != nil {
+		return nil, err
+	}
+	return b[:n], nil
+}
+func (m *IngressStatus) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_IngressStatus.Merge(m, src)
+}
+func (m *IngressStatus) XXX_Size() int {
+	return m.Size()
+}
+func (m *IngressStatus) XXX_DiscardUnknown() {
+	xxx_messageInfo_IngressStatus.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_IngressStatus proto.InternalMessageInfo
+
+func (m *IngressTLS) Reset()      { *m = IngressTLS{} }
+func (*IngressTLS) ProtoMessage() {}
+func (*IngressTLS) Descriptor() ([]byte, []int) {
+	return fileDescriptor_1c72867a70a7cc90, []int{10}
+}
+func (m *IngressTLS) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *IngressTLS) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	b = b[:cap(b)]
+	n, err := m.MarshalToSizedBuffer(b)
+	if err != nil {
+		return nil, err
+	}
+	return b[:n], nil
+}
+func (m *IngressTLS) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_IngressTLS.Merge(m, src)
+}
+func (m *IngressTLS) XXX_Size() int {
+	return m.Size()
+}
+func (m *IngressTLS) XXX_DiscardUnknown() {
+	xxx_messageInfo_IngressTLS.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_IngressTLS proto.InternalMessageInfo
+
 func (m *NetworkPolicy) Reset()      { *m = NetworkPolicy{} }
 func (*NetworkPolicy) ProtoMessage() {}
 func (*NetworkPolicy) Descriptor() ([]byte, []int) {
-	return fileDescriptor_1c72867a70a7cc90, []int{1}
+	return fileDescriptor_1c72867a70a7cc90, []int{11}
 }
 func (m *NetworkPolicy) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -107,7 +386,7 @@ var xxx_messageInfo_NetworkPolicy proto.InternalMessageInfo
 func (m *NetworkPolicyEgressRule) Reset()      { *m = NetworkPolicyEgressRule{} }
 func (*NetworkPolicyEgressRule) ProtoMessage() {}
 func (*NetworkPolicyEgressRule) Descriptor() ([]byte, []int) {
-	return fileDescriptor_1c72867a70a7cc90, []int{2}
+	return fileDescriptor_1c72867a70a7cc90, []int{12}
 }
 func (m *NetworkPolicyEgressRule) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -135,7 +414,7 @@ var xxx_messageInfo_NetworkPolicyEgressRule proto.InternalMessageInfo
 func (m *NetworkPolicyIngressRule) Reset()      { *m = NetworkPolicyIngressRule{} }
 func (*NetworkPolicyIngressRule) ProtoMessage() {}
 func (*NetworkPolicyIngressRule) Descriptor() ([]byte, []int) {
-	return fileDescriptor_1c72867a70a7cc90, []int{3}
+	return fileDescriptor_1c72867a70a7cc90, []int{13}
 }
 func (m *NetworkPolicyIngressRule) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -163,7 +442,7 @@ var xxx_messageInfo_NetworkPolicyIngressRule proto.InternalMessageInfo
 func (m *NetworkPolicyList) Reset()      { *m = NetworkPolicyList{} }
 func (*NetworkPolicyList) ProtoMessage() {}
 func (*NetworkPolicyList) Descriptor() ([]byte, []int) {
-	return fileDescriptor_1c72867a70a7cc90, []int{4}
+	return fileDescriptor_1c72867a70a7cc90, []int{14}
 }
 func (m *NetworkPolicyList) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -191,7 +470,7 @@ var xxx_messageInfo_NetworkPolicyList proto.InternalMessageInfo
 func (m *NetworkPolicyPeer) Reset()      { *m = NetworkPolicyPeer{} }
 func (*NetworkPolicyPeer) ProtoMessage() {}
 func (*NetworkPolicyPeer) Descriptor() ([]byte, []int) {
-	return fileDescriptor_1c72867a70a7cc90, []int{5}
+	return fileDescriptor_1c72867a70a7cc90, []int{15}
 }
 func (m *NetworkPolicyPeer) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -219,7 +498,7 @@ var xxx_messageInfo_NetworkPolicyPeer proto.InternalMessageInfo
 func (m *NetworkPolicyPort) Reset()      { *m = NetworkPolicyPort{} }
 func (*NetworkPolicyPort) ProtoMessage() {}
 func (*NetworkPolicyPort) Descriptor() ([]byte, []int) {
-	return fileDescriptor_1c72867a70a7cc90, []int{6}
+	return fileDescriptor_1c72867a70a7cc90, []int{16}
 }
 func (m *NetworkPolicyPort) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -247,7 +526,7 @@ var xxx_messageInfo_NetworkPolicyPort proto.InternalMessageInfo
 func (m *NetworkPolicySpec) Reset()      { *m = NetworkPolicySpec{} }
 func (*NetworkPolicySpec) ProtoMessage() {}
 func (*NetworkPolicySpec) Descriptor() ([]byte, []int) {
-	return fileDescriptor_1c72867a70a7cc90, []int{7}
+	return fileDescriptor_1c72867a70a7cc90, []int{17}
 }
 func (m *NetworkPolicySpec) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -273,7 +552,17 @@ func (m *NetworkPolicySpec) XXX_DiscardUnknown() {
 var xxx_messageInfo_NetworkPolicySpec proto.InternalMessageInfo
 
 func init() {
+	proto.RegisterType((*HTTPIngressPath)(nil), "k8s.io.api.networking.v1.HTTPIngressPath")
+	proto.RegisterType((*HTTPIngressRuleValue)(nil), "k8s.io.api.networking.v1.HTTPIngressRuleValue")
 	proto.RegisterType((*IPBlock)(nil), "k8s.io.api.networking.v1.IPBlock")
+	proto.RegisterType((*Ingress)(nil), "k8s.io.api.networking.v1.Ingress")
+	proto.RegisterType((*IngressBackend)(nil), "k8s.io.api.networking.v1.IngressBackend")
+	proto.RegisterType((*IngressList)(nil), "k8s.io.api.networking.v1.IngressList")
+	proto.RegisterType((*IngressRule)(nil), "k8s.io.api.networking.v1.IngressRule")
+	proto.RegisterType((*IngressRuleValue)(nil), "k8s.io.api.networking.v1.IngressRuleValue")
+	proto.RegisterType((*IngressSpec)(nil), "k8s.io.api.networking.v1.IngressSpec")
+	proto.RegisterType((*IngressStatus)(nil), "k8s.io.api.networking.v1.IngressStatus")
+	proto.RegisterType((*IngressTLS)(nil), "k8s.io.api.networking.v1.IngressTLS")
 	proto.RegisterType((*NetworkPolicy)(nil), "k8s.io.api.networking.v1.NetworkPolicy")
 	proto.RegisterType((*NetworkPolicyEgressRule)(nil), "k8s.io.api.networking.v1.NetworkPolicyEgressRule")
 	proto.RegisterType((*NetworkPolicyIngressRule)(nil), "k8s.io.api.networking.v1.NetworkPolicyIngressRule")
@@ -288,58 +577,159 @@ func init() {
 }
 
 var fileDescriptor_1c72867a70a7cc90 = []byte{
-	// 804 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xb4, 0x55, 0xcf, 0x8f, 0xdb, 0x44,
-	0x14, 0x8e, 0x9d, 0x6c, 0x92, 0x4e, 0x28, 0x65, 0x07, 0x21, 0xac, 0x45, 0xd8, 0xc1, 0x17, 0x56,
-	0xaa, 0x18, 0x93, 0x16, 0x21, 0x6e, 0x08, 0x43, 0x29, 0x91, 0xba, 0xbb, 0xd1, 0x6c, 0x2f, 0x20,
-	0x90, 0x70, 0x9c, 0x59, 0xef, 0x34, 0xb1, 0xc7, 0x1a, 0x4f, 0x42, 0xf7, 0xc6, 0x9f, 0xc0, 0x1f,
-	0xc2, 0x91, 0x1b, 0x87, 0x72, 0xdc, 0x63, 0x8f, 0x3d, 0x59, 0xac, 0xf9, 0x2f, 0xf6, 0x84, 0x66,
-	0x3c, 0x89, 0xf3, 0xa3, 0x11, 0xd9, 0x15, 0xbd, 0x65, 0xde, 0xbc, 0xef, 0x7b, 0xf3, 0xde, 0xfb,
-	0xf2, 0x19, 0x7c, 0x35, 0xfe, 0x22, 0x43, 0x94, 0x79, 0xe3, 0xe9, 0x90, 0xf0, 0x84, 0x08, 0x92,
-	0x79, 0x33, 0x92, 0x8c, 0x18, 0xf7, 0xf4, 0x45, 0x90, 0x52, 0x2f, 0x21, 0xe2, 0x17, 0xc6, 0xc7,
-	0x34, 0x89, 0xbc, 0x59, 0xcf, 0x8b, 0x48, 0x42, 0x78, 0x20, 0xc8, 0x08, 0xa5, 0x9c, 0x09, 0x06,
-	0xad, 0x32, 0x13, 0x05, 0x29, 0x45, 0x55, 0x26, 0x9a, 0xf5, 0x0e, 0x3e, 0x89, 0xa8, 0x38, 0x9f,
-	0x0e, 0x51, 0xc8, 0x62, 0x2f, 0x62, 0x11, 0xf3, 0x14, 0x60, 0x38, 0x3d, 0x53, 0x27, 0x75, 0x50,
-	0xbf, 0x4a, 0xa2, 0x03, 0x77, 0xa9, 0x64, 0xc8, 0x38, 0x79, 0x4d, 0xb1, 0x83, 0xcf, 0xaa, 0x9c,
-	0x38, 0x08, 0xcf, 0x69, 0x42, 0xf8, 0x85, 0x97, 0x8e, 0x23, 0x19, 0xc8, 0xbc, 0x98, 0x88, 0xe0,
-	0x75, 0x28, 0x6f, 0x1b, 0x8a, 0x4f, 0x13, 0x41, 0x63, 0xb2, 0x01, 0xf8, 0xfc, 0xbf, 0x00, 0x59,
-	0x78, 0x4e, 0xe2, 0x60, 0x03, 0xf7, 0x70, 0x1b, 0x6e, 0x2a, 0xe8, 0xc4, 0xa3, 0x89, 0xc8, 0x04,
-	0x5f, 0x07, 0xb9, 0x27, 0xa0, 0xd5, 0x1f, 0xf8, 0x13, 0x16, 0x8e, 0x61, 0x17, 0x34, 0x42, 0x3a,
-	0xe2, 0x96, 0xd1, 0x35, 0x0e, 0xef, 0xf8, 0x6f, 0x5d, 0xe6, 0x4e, 0xad, 0xc8, 0x9d, 0xc6, 0xd7,
-	0xfd, 0x6f, 0x30, 0x56, 0x37, 0xd0, 0x05, 0x4d, 0xf2, 0x3c, 0x24, 0xa9, 0xb0, 0xcc, 0x6e, 0xfd,
-	0xf0, 0x8e, 0x0f, 0x8a, 0xdc, 0x69, 0x3e, 0x52, 0x11, 0xac, 0x6f, 0xdc, 0xbf, 0x0c, 0x70, 0xf7,
-	0xb8, 0xdc, 0xc4, 0x80, 0x4d, 0x68, 0x78, 0x01, 0x7f, 0x06, 0x6d, 0x39, 0x9b, 0x51, 0x20, 0x02,
-	0xc5, 0xdd, 0x79, 0xf0, 0x29, 0xaa, 0xd6, 0xb6, 0x78, 0x2a, 0x4a, 0xc7, 0x91, 0x0c, 0x64, 0x48,
-	0x66, 0xa3, 0x59, 0x0f, 0x9d, 0x0c, 0x9f, 0x91, 0x50, 0x1c, 0x11, 0x11, 0xf8, 0x50, 0xbf, 0x06,
-	0x54, 0x31, 0xbc, 0x60, 0x85, 0x47, 0xa0, 0x91, 0xa5, 0x24, 0xb4, 0x4c, 0xc5, 0x7e, 0x1f, 0x6d,
-	0x13, 0x05, 0x5a, 0x79, 0xd8, 0x69, 0x4a, 0xc2, 0xaa, 0x4d, 0x79, 0xc2, 0x8a, 0xc6, 0xfd, 0xc3,
-	0x00, 0xef, 0xaf, 0x64, 0x3e, 0x8a, 0x38, 0xc9, 0x32, 0x3c, 0x9d, 0x10, 0x38, 0x00, 0x7b, 0x29,
-	0xe3, 0x22, 0xb3, 0x8c, 0x6e, 0xfd, 0x06, 0xb5, 0x06, 0x8c, 0x0b, 0xff, 0xae, 0xae, 0xb5, 0x27,
-	0x4f, 0x19, 0x2e, 0x89, 0xe0, 0x63, 0x60, 0x0a, 0xa6, 0x06, 0x7a, 0x03, 0x3a, 0x42, 0xb8, 0x0f,
-	0x34, 0x9d, 0xf9, 0x94, 0x61, 0x53, 0x30, 0xf7, 0x4f, 0x03, 0x58, 0x2b, 0x59, 0xfd, 0xe4, 0x4d,
-	0xbe, 0xfb, 0x08, 0x34, 0xce, 0x38, 0x8b, 0x6f, 0xf3, 0xf2, 0xc5, 0xd0, 0xbf, 0xe5, 0x2c, 0xc6,
-	0x8a, 0xc6, 0x7d, 0x61, 0x80, 0xfd, 0x95, 0xcc, 0x27, 0x34, 0x13, 0xf0, 0xc7, 0x0d, 0xed, 0xa0,
-	0xdd, 0xb4, 0x23, 0xd1, 0x4a, 0x39, 0xef, 0xe8, 0x5a, 0xed, 0x79, 0x64, 0x49, 0x37, 0x4f, 0xc0,
-	0x1e, 0x15, 0x24, 0xce, 0x74, 0x0f, 0x1f, 0xef, 0xd8, 0x43, 0x35, 0x90, 0xbe, 0x44, 0xe3, 0x92,
-	0xc4, 0x7d, 0x61, 0xae, 0x75, 0x20, 0x7b, 0x85, 0x67, 0xa0, 0x93, 0xb2, 0xd1, 0x29, 0x99, 0x90,
-	0x50, 0x30, 0xae, 0x9b, 0x78, 0xb8, 0x63, 0x13, 0xc1, 0x90, 0x4c, 0xe6, 0x50, 0xff, 0x5e, 0x91,
-	0x3b, 0x9d, 0x41, 0xc5, 0x85, 0x97, 0x89, 0xe1, 0x73, 0xb0, 0x9f, 0x04, 0x31, 0xc9, 0xd2, 0x20,
-	0x24, 0x8b, 0x6a, 0xe6, 0xed, 0xab, 0xbd, 0x57, 0xe4, 0xce, 0xfe, 0xf1, 0x3a, 0x23, 0xde, 0x2c,
-	0x02, 0xbf, 0x03, 0x2d, 0x9a, 0x2a, 0x0b, 0xb1, 0xea, 0xaa, 0xde, 0x47, 0xdb, 0xe7, 0xa8, 0xbd,
-	0xc6, 0xef, 0x14, 0xb9, 0x33, 0x37, 0x1e, 0x3c, 0x87, 0xbb, 0xbf, 0xaf, 0x6b, 0x40, 0x0a, 0x0e,
-	0x3e, 0x06, 0x6d, 0xe5, 0x55, 0x21, 0x9b, 0x68, 0x6f, 0xba, 0x2f, 0xf7, 0x39, 0xd0, 0xb1, 0xeb,
-	0xdc, 0xf9, 0x60, 0xd3, 0xbc, 0xd1, 0xfc, 0x1a, 0x2f, 0xc0, 0xf0, 0x18, 0x34, 0xa4, 0x74, 0xf5,
-	0x54, 0xb6, 0x9b, 0x90, 0xf4, 0x4b, 0x54, 0xfa, 0x25, 0xea, 0x27, 0xe2, 0x84, 0x9f, 0x0a, 0x4e,
-	0x93, 0xc8, 0x6f, 0x4b, 0xc9, 0xca, 0x27, 0x61, 0xc5, 0xe3, 0x5e, 0xaf, 0x2f, 0x5c, 0x7a, 0x08,
-	0x7c, 0xf6, 0xbf, 0x2d, 0xfc, 0x5d, 0x2d, 0xb3, 0xed, 0x4b, 0xff, 0x09, 0xb4, 0x68, 0xf9, 0x27,
-	0xd7, 0x12, 0x7e, 0xb0, 0xa3, 0x84, 0x97, 0xac, 0xc1, 0xbf, 0xa7, 0xcb, 0xb4, 0xe6, 0xc1, 0x39,
-	0x27, 0xfc, 0x1e, 0x34, 0x49, 0xc9, 0x5e, 0x57, 0xec, 0xbd, 0x1d, 0xd9, 0x2b, 0xbf, 0xf4, 0xdf,
-	0xd6, 0xe4, 0x4d, 0x1d, 0xd3, 0x84, 0xf0, 0x4b, 0x39, 0x25, 0x99, 0xfb, 0xf4, 0x22, 0x25, 0x99,
-	0xd5, 0x50, 0xdf, 0x93, 0x0f, 0xcb, 0x66, 0x17, 0xe1, 0xeb, 0xdc, 0x01, 0xd5, 0x11, 0x2f, 0x23,
-	0xfc, 0xc3, 0xcb, 0x2b, 0xbb, 0xf6, 0xf2, 0xca, 0xae, 0xbd, 0xba, 0xb2, 0x6b, 0xbf, 0x16, 0xb6,
-	0x71, 0x59, 0xd8, 0xc6, 0xcb, 0xc2, 0x36, 0x5e, 0x15, 0xb6, 0xf1, 0x77, 0x61, 0x1b, 0xbf, 0xfd,
-	0x63, 0xd7, 0x7e, 0x30, 0x67, 0xbd, 0x7f, 0x03, 0x00, 0x00, 0xff, 0xff, 0xf7, 0x7b, 0xc9, 0x59,
-	0x67, 0x08, 0x00, 0x00,
+	// 1221 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xbc, 0x57, 0xcd, 0x6f, 0x1b, 0x45,
+	0x14, 0xcf, 0xfa, 0x23, 0x4e, 0x9e, 0xdb, 0xb4, 0x1d, 0x8a, 0xb0, 0x8a, 0xb0, 0xc3, 0x0a, 0xa8,
+	0xa1, 0x62, 0x97, 0xb8, 0x80, 0xb8, 0x21, 0xb6, 0x1f, 0x49, 0x50, 0x3e, 0xac, 0xb1, 0x85, 0x04,
+	0x02, 0x29, 0xeb, 0xf5, 0xc4, 0xde, 0x7a, 0xbd, 0xb3, 0xec, 0x8c, 0x43, 0x73, 0xe3, 0x00, 0x12,
+	0x47, 0xfe, 0x05, 0xee, 0x1c, 0x90, 0xe0, 0xc6, 0xa1, 0x1c, 0x73, 0xec, 0xb1, 0x27, 0x8b, 0x98,
+	0xff, 0x22, 0x27, 0x34, 0xb3, 0xe3, 0xdd, 0xb5, 0x1d, 0x63, 0xab, 0x54, 0xbd, 0x79, 0xdf, 0xc7,
+	0xef, 0x7d, 0xce, 0x7b, 0xcf, 0xf0, 0x59, 0xef, 0x13, 0x66, 0xb8, 0xd4, 0xec, 0x0d, 0x5a, 0x24,
+	0xf4, 0x09, 0x27, 0xcc, 0x3c, 0x21, 0x7e, 0x9b, 0x86, 0xa6, 0x62, 0xd8, 0x81, 0x6b, 0xfa, 0x84,
+	0x7f, 0x47, 0xc3, 0x9e, 0xeb, 0x77, 0xcc, 0x93, 0x2d, 0xb3, 0x43, 0x7c, 0x12, 0xda, 0x9c, 0xb4,
+	0x8d, 0x20, 0xa4, 0x9c, 0xa2, 0x52, 0x24, 0x69, 0xd8, 0x81, 0x6b, 0x24, 0x92, 0xc6, 0xc9, 0xd6,
+	0xad, 0xf7, 0x3b, 0x2e, 0xef, 0x0e, 0x5a, 0x86, 0x43, 0xfb, 0x66, 0x87, 0x76, 0xa8, 0x29, 0x15,
+	0x5a, 0x83, 0x63, 0xf9, 0x25, 0x3f, 0xe4, 0xaf, 0x08, 0xe8, 0x96, 0x9e, 0x32, 0xe9, 0xd0, 0x90,
+	0x5c, 0x62, 0xec, 0xd6, 0x87, 0x89, 0x4c, 0xdf, 0x76, 0xba, 0xae, 0x4f, 0xc2, 0x53, 0x33, 0xe8,
+	0x75, 0x04, 0x81, 0x99, 0x7d, 0xc2, 0xed, 0xcb, 0xb4, 0xcc, 0x79, 0x5a, 0xe1, 0xc0, 0xe7, 0x6e,
+	0x9f, 0xcc, 0x28, 0x7c, 0xbc, 0x48, 0x81, 0x39, 0x5d, 0xd2, 0xb7, 0x67, 0xf4, 0xee, 0xce, 0xd3,
+	0x1b, 0x70, 0xd7, 0x33, 0x5d, 0x9f, 0x33, 0x1e, 0x4e, 0x2b, 0xe9, 0x3f, 0x69, 0x70, 0x6d, 0xa7,
+	0xd9, 0xac, 0xef, 0xfa, 0x9d, 0x90, 0x30, 0x56, 0xb7, 0x79, 0x17, 0x6d, 0x42, 0x2e, 0xb0, 0x79,
+	0xb7, 0xa4, 0x6d, 0x6a, 0xd5, 0x75, 0xeb, 0xca, 0xd9, 0xb0, 0xb2, 0x32, 0x1a, 0x56, 0x72, 0x82,
+	0x87, 0x25, 0x07, 0x35, 0xa0, 0xd0, 0xb2, 0x9d, 0x1e, 0xf1, 0xdb, 0xa5, 0xcc, 0xa6, 0x56, 0x2d,
+	0xd6, 0xaa, 0xc6, 0xbc, 0x42, 0x18, 0x0a, 0xd9, 0x8a, 0xe4, 0xad, 0x6b, 0x0a, 0xae, 0xa0, 0x08,
+	0x78, 0x8c, 0xa4, 0x1f, 0xc3, 0xcd, 0x94, 0x27, 0x78, 0xe0, 0x91, 0x2f, 0x6c, 0x6f, 0x40, 0xd0,
+	0x01, 0xe4, 0x85, 0x51, 0x56, 0xd2, 0x36, 0xb3, 0xd5, 0x62, 0xed, 0xdd, 0xf9, 0xa6, 0xa6, 0x02,
+	0xb1, 0xae, 0x2a, 0x5b, 0x79, 0xf1, 0xc5, 0x70, 0x04, 0xa3, 0x1f, 0x42, 0x61, 0xb7, 0x6e, 0x79,
+	0xd4, 0xe9, 0x89, 0x48, 0x1d, 0xb7, 0x1d, 0x4e, 0x47, 0x7a, 0x6f, 0xf7, 0x3e, 0xc6, 0x92, 0x83,
+	0x74, 0x58, 0x25, 0x8f, 0x1d, 0x12, 0xf0, 0x52, 0x66, 0x33, 0x5b, 0x5d, 0xb7, 0x60, 0x34, 0xac,
+	0xac, 0x3e, 0x90, 0x14, 0xac, 0x38, 0xfa, 0x8f, 0x19, 0x28, 0x28, 0xb3, 0xe8, 0x08, 0xd6, 0x44,
+	0x23, 0xb4, 0x6d, 0x6e, 0x4b, 0xd4, 0x62, 0xed, 0x83, 0x94, 0xbf, 0x71, 0x5d, 0x8c, 0xa0, 0xd7,
+	0x11, 0x04, 0x66, 0x08, 0x69, 0xe1, 0xfb, 0x61, 0xeb, 0x11, 0x71, 0xf8, 0x3e, 0xe1, 0xb6, 0x85,
+	0x94, 0x1f, 0x90, 0xd0, 0x70, 0x8c, 0x8a, 0xb6, 0x21, 0xc7, 0x02, 0xe2, 0xa8, 0xc4, 0xbf, 0xbd,
+	0x30, 0xf1, 0x8d, 0x80, 0x38, 0x49, 0x68, 0xe2, 0x0b, 0x4b, 0x00, 0x74, 0x08, 0xab, 0x8c, 0xdb,
+	0x7c, 0xc0, 0x4a, 0x59, 0x09, 0x75, 0x7b, 0x31, 0x94, 0x14, 0xb7, 0x36, 0x14, 0xd8, 0x6a, 0xf4,
+	0x8d, 0x15, 0x8c, 0xfe, 0x9b, 0x06, 0x1b, 0x93, 0xd5, 0x46, 0x1f, 0x41, 0x91, 0x91, 0xf0, 0xc4,
+	0x75, 0xc8, 0x81, 0xdd, 0x27, 0x2a, 0xcf, 0xaf, 0x28, 0xfd, 0x62, 0x23, 0x61, 0xe1, 0xb4, 0x1c,
+	0xea, 0xc4, 0x6a, 0x75, 0x1a, 0x72, 0x15, 0xea, 0xfc, 0x44, 0x8a, 0x06, 0x37, 0xa2, 0x06, 0x37,
+	0x76, 0x7d, 0x7e, 0x18, 0x36, 0x78, 0xe8, 0xfa, 0x9d, 0x19, 0x43, 0x02, 0x0c, 0xa7, 0x91, 0xf5,
+	0xdf, 0x35, 0x28, 0x2a, 0x97, 0xf7, 0x5c, 0xc6, 0xd1, 0xd7, 0x33, 0xe5, 0x33, 0x96, 0x2b, 0x9f,
+	0xd0, 0x96, 0xc5, 0xbb, 0xae, 0x6c, 0xae, 0x8d, 0x29, 0xa9, 0xd2, 0x3d, 0x84, 0xbc, 0xcb, 0x49,
+	0x9f, 0xc9, 0x5e, 0x2a, 0xd6, 0xde, 0x5c, 0xfc, 0x68, 0xe2, 0x0e, 0xde, 0x15, 0x7a, 0x38, 0x52,
+	0xd7, 0x7f, 0x49, 0xbc, 0x16, 0xcf, 0x44, 0xb4, 0x71, 0x97, 0x32, 0x3e, 0xdd, 0xc6, 0x3b, 0x94,
+	0x71, 0x2c, 0x39, 0x28, 0x80, 0xeb, 0xee, 0xd4, 0xbb, 0x52, 0x59, 0x7d, 0x6f, 0xa1, 0x13, 0xb1,
+	0x86, 0x55, 0x52, 0xc8, 0xd7, 0xa7, 0x39, 0x78, 0x06, 0x5d, 0x3f, 0x82, 0x19, 0x29, 0xb4, 0x07,
+	0xb9, 0x2e, 0xe7, 0xc1, 0x25, 0x99, 0x9d, 0xff, 0x90, 0x13, 0xeb, 0x6b, 0x32, 0xa6, 0x66, 0xb3,
+	0x8e, 0x25, 0x8a, 0xfe, 0x43, 0x26, 0xce, 0x82, 0xe8, 0x6a, 0xd4, 0x86, 0x8d, 0x36, 0x39, 0xb6,
+	0x07, 0x1e, 0x57, 0xdd, 0xa7, 0xec, 0x2c, 0x3f, 0x9b, 0xd0, 0x68, 0x58, 0xd9, 0xb8, 0x3f, 0x81,
+	0x81, 0xa7, 0x30, 0xd1, 0x3d, 0xc8, 0x72, 0x6f, 0x5c, 0xc1, 0xb7, 0x16, 0x42, 0x37, 0xf7, 0x1a,
+	0x56, 0x51, 0xa5, 0x2d, 0xdb, 0xdc, 0x6b, 0x60, 0xa1, 0x8d, 0x3e, 0x87, 0x7c, 0x38, 0xf0, 0x88,
+	0x78, 0x79, 0xd9, 0xa5, 0x1e, 0xb1, 0xc8, 0x42, 0xd2, 0x0c, 0xe2, 0x8b, 0xe1, 0x08, 0x42, 0xff,
+	0x16, 0xae, 0x4e, 0x3c, 0x4f, 0x74, 0x04, 0x57, 0x3c, 0x6a, 0xb7, 0x2d, 0xdb, 0xb3, 0x7d, 0x87,
+	0x84, 0x2a, 0x0b, 0xef, 0xa4, 0x6d, 0x88, 0x0d, 0x27, 0xbb, 0x36, 0x25, 0xa7, 0x1e, 0xf7, 0x4d,
+	0x65, 0xe4, 0x4a, 0x9a, 0x87, 0x27, 0x10, 0x75, 0x1b, 0x20, 0x09, 0x0f, 0x55, 0x20, 0x2f, 0x7a,
+	0x2c, 0x9a, 0xcf, 0xeb, 0xd6, 0xba, 0xf0, 0x50, 0xb4, 0x1e, 0xc3, 0x11, 0x1d, 0xd5, 0x00, 0x18,
+	0x71, 0x42, 0xc2, 0xe5, 0x0c, 0xc8, 0xc8, 0x26, 0x8d, 0x67, 0x5c, 0x23, 0xe6, 0xe0, 0x94, 0x94,
+	0xfe, 0x97, 0x06, 0x57, 0x0f, 0xa2, 0x4c, 0xd4, 0xa9, 0xe7, 0x3a, 0xa7, 0x2f, 0x61, 0xb2, 0xee,
+	0x4f, 0x4c, 0xd6, 0x3b, 0xf3, 0x8b, 0x32, 0xe1, 0xd8, 0xbc, 0xf9, 0xaa, 0xff, 0xa1, 0xc1, 0x6b,
+	0x13, 0x92, 0x0f, 0x92, 0x17, 0x5b, 0x87, 0x7c, 0x40, 0x43, 0x3e, 0xde, 0x69, 0xcb, 0xda, 0x12,
+	0x33, 0x2b, 0xb5, 0xd5, 0x04, 0x02, 0x8e, 0x80, 0xd0, 0x36, 0x64, 0x38, 0x55, 0x6d, 0xb9, 0x34,
+	0x1c, 0x21, 0xa1, 0x05, 0x0a, 0x2e, 0xd3, 0xa4, 0x38, 0xc3, 0xa9, 0xfe, 0xa7, 0x06, 0xa5, 0x09,
+	0xa9, 0xf4, 0xa4, 0x79, 0xf1, 0x7e, 0xef, 0x43, 0xee, 0x38, 0xa4, 0xfd, 0xe7, 0xf1, 0x3c, 0x4e,
+	0xfa, 0xc3, 0x90, 0xf6, 0xb1, 0x84, 0xd1, 0x9f, 0x68, 0x70, 0x63, 0x42, 0xf2, 0x25, 0x8c, 0xf5,
+	0xbd, 0xc9, 0xb1, 0x7e, 0x7b, 0xc9, 0x18, 0xe6, 0x0c, 0xf7, 0x27, 0x99, 0xa9, 0x08, 0x44, 0xac,
+	0xe8, 0x18, 0x8a, 0x01, 0x6d, 0x37, 0x88, 0x47, 0x1c, 0x4e, 0xc7, 0x6f, 0xfa, 0xee, 0x92, 0x41,
+	0xd8, 0x2d, 0xe2, 0x8d, 0x55, 0xad, 0x6b, 0x62, 0x21, 0xd6, 0x13, 0x2c, 0x9c, 0x06, 0x46, 0x8f,
+	0xe1, 0x86, 0x6f, 0xf7, 0x09, 0x0b, 0x6c, 0x87, 0xc4, 0xd6, 0x32, 0xcf, 0x6f, 0xed, 0xd5, 0xd1,
+	0xb0, 0x72, 0xe3, 0x60, 0x1a, 0x11, 0xcf, 0x1a, 0x41, 0x3b, 0x50, 0x70, 0x03, 0x79, 0x96, 0xa9,
+	0x7b, 0xe4, 0xbf, 0xd6, 0x63, 0x74, 0xbf, 0x59, 0x45, 0x71, 0x48, 0xaa, 0x0f, 0x3c, 0x56, 0xd7,
+	0x7f, 0x9d, 0xee, 0x01, 0xd1, 0x70, 0x68, 0x1b, 0xd6, 0xe4, 0xc9, 0xeb, 0x50, 0x4f, 0x2d, 0xca,
+	0x3b, 0xa2, 0x9e, 0x75, 0x45, 0xbb, 0x18, 0x56, 0x5e, 0x9f, 0xfd, 0x0f, 0x60, 0x8c, 0xd9, 0x38,
+	0x56, 0x46, 0x07, 0x90, 0x0b, 0xfe, 0xcf, 0x55, 0x22, 0xf7, 0x98, 0x3c, 0x45, 0x24, 0x8e, 0x7e,
+	0x31, 0x5d, 0x70, 0xb9, 0xcd, 0x1e, 0xbd, 0xb0, 0x82, 0xc7, 0x57, 0xd0, 0xdc, 0xa2, 0x7f, 0x03,
+	0x05, 0xb5, 0xbf, 0x55, 0x0b, 0xd7, 0x96, 0x6c, 0xe1, 0xf4, 0x76, 0x8a, 0x0f, 0xfb, 0x31, 0x71,
+	0x8c, 0x89, 0xbe, 0x84, 0x55, 0x12, 0xa1, 0x47, 0xeb, 0x6e, 0x6b, 0x49, 0xf4, 0x64, 0x5e, 0x26,
+	0x27, 0xa7, 0xa2, 0x29, 0x40, 0xf4, 0xa9, 0xc8, 0x92, 0x90, 0x6d, 0x9e, 0x06, 0x84, 0x95, 0x72,
+	0x72, 0x03, 0xbd, 0x11, 0x05, 0x1b, 0x93, 0x2f, 0x86, 0x15, 0x48, 0x3e, 0x71, 0x5a, 0xc3, 0xaa,
+	0x9e, 0x9d, 0x97, 0x57, 0x9e, 0x9e, 0x97, 0x57, 0x9e, 0x9d, 0x97, 0x57, 0xbe, 0x1f, 0x95, 0xb5,
+	0xb3, 0x51, 0x59, 0x7b, 0x3a, 0x2a, 0x6b, 0xcf, 0x46, 0x65, 0xed, 0xef, 0x51, 0x59, 0xfb, 0xf9,
+	0x9f, 0xf2, 0xca, 0x57, 0x99, 0x93, 0xad, 0x7f, 0x03, 0x00, 0x00, 0xff, 0xff, 0x05, 0x71, 0xb8,
+	0xcf, 0xae, 0x0e, 0x00, 0x00,
+}
+
+func (m *HTTPIngressPath) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *HTTPIngressPath) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *HTTPIngressPath) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	{
+		size, err := m.Backend.MarshalToSizedBuffer(dAtA[:i])
+		if err != nil {
+			return 0, err
+		}
+		i -= size
+		i = encodeVarintGenerated(dAtA, i, uint64(size))
+	}
+	i--
+	dAtA[i] = 0x12
+	i -= len(m.Path)
+	copy(dAtA[i:], m.Path)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Path)))
+	i--
+	dAtA[i] = 0xa
+	return len(dAtA) - i, nil
+}
+
+func (m *HTTPIngressRuleValue) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *HTTPIngressRuleValue) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *HTTPIngressRuleValue) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.Paths) > 0 {
+		for iNdEx := len(m.Paths) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.Paths[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintGenerated(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0xa
+		}
+	}
+	return len(dAtA) - i, nil
 }
 
 func (m *IPBlock) Marshal() (dAtA []byte, err error) {
@@ -376,6 +766,350 @@ func (m *IPBlock) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	i = encodeVarintGenerated(dAtA, i, uint64(len(m.CIDR)))
 	i--
 	dAtA[i] = 0xa
+	return len(dAtA) - i, nil
+}
+
+func (m *Ingress) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *Ingress) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *Ingress) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	{
+		size, err := m.Status.MarshalToSizedBuffer(dAtA[:i])
+		if err != nil {
+			return 0, err
+		}
+		i -= size
+		i = encodeVarintGenerated(dAtA, i, uint64(size))
+	}
+	i--
+	dAtA[i] = 0x1a
+	{
+		size, err := m.Spec.MarshalToSizedBuffer(dAtA[:i])
+		if err != nil {
+			return 0, err
+		}
+		i -= size
+		i = encodeVarintGenerated(dAtA, i, uint64(size))
+	}
+	i--
+	dAtA[i] = 0x12
+	{
+		size, err := m.ObjectMeta.MarshalToSizedBuffer(dAtA[:i])
+		if err != nil {
+			return 0, err
+		}
+		i -= size
+		i = encodeVarintGenerated(dAtA, i, uint64(size))
+	}
+	i--
+	dAtA[i] = 0xa
+	return len(dAtA) - i, nil
+}
+
+func (m *IngressBackend) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *IngressBackend) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *IngressBackend) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	{
+		size, err := m.ServicePort.MarshalToSizedBuffer(dAtA[:i])
+		if err != nil {
+			return 0, err
+		}
+		i -= size
+		i = encodeVarintGenerated(dAtA, i, uint64(size))
+	}
+	i--
+	dAtA[i] = 0x12
+	i -= len(m.ServiceName)
+	copy(dAtA[i:], m.ServiceName)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.ServiceName)))
+	i--
+	dAtA[i] = 0xa
+	return len(dAtA) - i, nil
+}
+
+func (m *IngressList) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *IngressList) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *IngressList) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.Items) > 0 {
+		for iNdEx := len(m.Items) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.Items[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintGenerated(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x12
+		}
+	}
+	{
+		size, err := m.ListMeta.MarshalToSizedBuffer(dAtA[:i])
+		if err != nil {
+			return 0, err
+		}
+		i -= size
+		i = encodeVarintGenerated(dAtA, i, uint64(size))
+	}
+	i--
+	dAtA[i] = 0xa
+	return len(dAtA) - i, nil
+}
+
+func (m *IngressRule) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *IngressRule) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *IngressRule) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	{
+		size, err := m.IngressRuleValue.MarshalToSizedBuffer(dAtA[:i])
+		if err != nil {
+			return 0, err
+		}
+		i -= size
+		i = encodeVarintGenerated(dAtA, i, uint64(size))
+	}
+	i--
+	dAtA[i] = 0x12
+	i -= len(m.Host)
+	copy(dAtA[i:], m.Host)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Host)))
+	i--
+	dAtA[i] = 0xa
+	return len(dAtA) - i, nil
+}
+
+func (m *IngressRuleValue) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *IngressRuleValue) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *IngressRuleValue) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.HTTP != nil {
+		{
+			size, err := m.HTTP.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintGenerated(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *IngressSpec) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *IngressSpec) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *IngressSpec) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.Rules) > 0 {
+		for iNdEx := len(m.Rules) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.Rules[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintGenerated(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x1a
+		}
+	}
+	if len(m.TLS) > 0 {
+		for iNdEx := len(m.TLS) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.TLS[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintGenerated(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x12
+		}
+	}
+	if m.DefaultBackend != nil {
+		{
+			size, err := m.DefaultBackend.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintGenerated(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *IngressStatus) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *IngressStatus) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *IngressStatus) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	{
+		size, err := m.LoadBalancer.MarshalToSizedBuffer(dAtA[:i])
+		if err != nil {
+			return 0, err
+		}
+		i -= size
+		i = encodeVarintGenerated(dAtA, i, uint64(size))
+	}
+	i--
+	dAtA[i] = 0xa
+	return len(dAtA) - i, nil
+}
+
+func (m *IngressTLS) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *IngressTLS) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *IngressTLS) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	i -= len(m.SecretName)
+	copy(dAtA[i:], m.SecretName)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.SecretName)))
+	i--
+	dAtA[i] = 0x12
+	if len(m.Hosts) > 0 {
+		for iNdEx := len(m.Hosts) - 1; iNdEx >= 0; iNdEx-- {
+			i -= len(m.Hosts[iNdEx])
+			copy(dAtA[i:], m.Hosts[iNdEx])
+			i = encodeVarintGenerated(dAtA, i, uint64(len(m.Hosts[iNdEx])))
+			i--
+			dAtA[i] = 0xa
+		}
+	}
 	return len(dAtA) - i, nil
 }
 
@@ -753,6 +1487,34 @@ func encodeVarintGenerated(dAtA []byte, offset int, v uint64) int {
 	dAtA[offset] = uint8(v)
 	return base
 }
+func (m *HTTPIngressPath) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.Path)
+	n += 1 + l + sovGenerated(uint64(l))
+	l = m.Backend.Size()
+	n += 1 + l + sovGenerated(uint64(l))
+	return n
+}
+
+func (m *HTTPIngressRuleValue) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if len(m.Paths) > 0 {
+		for _, e := range m.Paths {
+			l = e.Size()
+			n += 1 + l + sovGenerated(uint64(l))
+		}
+	}
+	return n
+}
+
 func (m *IPBlock) Size() (n int) {
 	if m == nil {
 		return 0
@@ -767,6 +1529,130 @@ func (m *IPBlock) Size() (n int) {
 			n += 1 + l + sovGenerated(uint64(l))
 		}
 	}
+	return n
+}
+
+func (m *Ingress) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = m.ObjectMeta.Size()
+	n += 1 + l + sovGenerated(uint64(l))
+	l = m.Spec.Size()
+	n += 1 + l + sovGenerated(uint64(l))
+	l = m.Status.Size()
+	n += 1 + l + sovGenerated(uint64(l))
+	return n
+}
+
+func (m *IngressBackend) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.ServiceName)
+	n += 1 + l + sovGenerated(uint64(l))
+	l = m.ServicePort.Size()
+	n += 1 + l + sovGenerated(uint64(l))
+	return n
+}
+
+func (m *IngressList) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = m.ListMeta.Size()
+	n += 1 + l + sovGenerated(uint64(l))
+	if len(m.Items) > 0 {
+		for _, e := range m.Items {
+			l = e.Size()
+			n += 1 + l + sovGenerated(uint64(l))
+		}
+	}
+	return n
+}
+
+func (m *IngressRule) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.Host)
+	n += 1 + l + sovGenerated(uint64(l))
+	l = m.IngressRuleValue.Size()
+	n += 1 + l + sovGenerated(uint64(l))
+	return n
+}
+
+func (m *IngressRuleValue) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.HTTP != nil {
+		l = m.HTTP.Size()
+		n += 1 + l + sovGenerated(uint64(l))
+	}
+	return n
+}
+
+func (m *IngressSpec) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.DefaultBackend != nil {
+		l = m.DefaultBackend.Size()
+		n += 1 + l + sovGenerated(uint64(l))
+	}
+	if len(m.TLS) > 0 {
+		for _, e := range m.TLS {
+			l = e.Size()
+			n += 1 + l + sovGenerated(uint64(l))
+		}
+	}
+	if len(m.Rules) > 0 {
+		for _, e := range m.Rules {
+			l = e.Size()
+			n += 1 + l + sovGenerated(uint64(l))
+		}
+	}
+	return n
+}
+
+func (m *IngressStatus) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = m.LoadBalancer.Size()
+	n += 1 + l + sovGenerated(uint64(l))
+	return n
+}
+
+func (m *IngressTLS) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if len(m.Hosts) > 0 {
+		for _, s := range m.Hosts {
+			l = len(s)
+			n += 1 + l + sovGenerated(uint64(l))
+		}
+	}
+	l = len(m.SecretName)
+	n += 1 + l + sovGenerated(uint64(l))
 	return n
 }
 
@@ -915,6 +1801,32 @@ func sovGenerated(x uint64) (n int) {
 func sozGenerated(x uint64) (n int) {
 	return sovGenerated(uint64((x << 1) ^ uint64((int64(x) >> 63))))
 }
+func (this *HTTPIngressPath) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&HTTPIngressPath{`,
+		`Path:` + fmt.Sprintf("%v", this.Path) + `,`,
+		`Backend:` + strings.Replace(strings.Replace(this.Backend.String(), "IngressBackend", "IngressBackend", 1), `&`, ``, 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *HTTPIngressRuleValue) String() string {
+	if this == nil {
+		return "nil"
+	}
+	repeatedStringForPaths := "[]HTTPIngressPath{"
+	for _, f := range this.Paths {
+		repeatedStringForPaths += strings.Replace(strings.Replace(f.String(), "HTTPIngressPath", "HTTPIngressPath", 1), `&`, ``, 1) + ","
+	}
+	repeatedStringForPaths += "}"
+	s := strings.Join([]string{`&HTTPIngressRuleValue{`,
+		`Paths:` + repeatedStringForPaths + `,`,
+		`}`,
+	}, "")
+	return s
+}
 func (this *IPBlock) String() string {
 	if this == nil {
 		return "nil"
@@ -922,6 +1834,109 @@ func (this *IPBlock) String() string {
 	s := strings.Join([]string{`&IPBlock{`,
 		`CIDR:` + fmt.Sprintf("%v", this.CIDR) + `,`,
 		`Except:` + fmt.Sprintf("%v", this.Except) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *Ingress) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&Ingress{`,
+		`ObjectMeta:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.ObjectMeta), "ObjectMeta", "v1.ObjectMeta", 1), `&`, ``, 1) + `,`,
+		`Spec:` + strings.Replace(strings.Replace(this.Spec.String(), "IngressSpec", "IngressSpec", 1), `&`, ``, 1) + `,`,
+		`Status:` + strings.Replace(strings.Replace(this.Status.String(), "IngressStatus", "IngressStatus", 1), `&`, ``, 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *IngressBackend) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&IngressBackend{`,
+		`ServiceName:` + fmt.Sprintf("%v", this.ServiceName) + `,`,
+		`ServicePort:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.ServicePort), "IntOrString", "intstr.IntOrString", 1), `&`, ``, 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *IngressList) String() string {
+	if this == nil {
+		return "nil"
+	}
+	repeatedStringForItems := "[]Ingress{"
+	for _, f := range this.Items {
+		repeatedStringForItems += strings.Replace(strings.Replace(f.String(), "Ingress", "Ingress", 1), `&`, ``, 1) + ","
+	}
+	repeatedStringForItems += "}"
+	s := strings.Join([]string{`&IngressList{`,
+		`ListMeta:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.ListMeta), "ListMeta", "v1.ListMeta", 1), `&`, ``, 1) + `,`,
+		`Items:` + repeatedStringForItems + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *IngressRule) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&IngressRule{`,
+		`Host:` + fmt.Sprintf("%v", this.Host) + `,`,
+		`IngressRuleValue:` + strings.Replace(strings.Replace(this.IngressRuleValue.String(), "IngressRuleValue", "IngressRuleValue", 1), `&`, ``, 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *IngressRuleValue) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&IngressRuleValue{`,
+		`HTTP:` + strings.Replace(this.HTTP.String(), "HTTPIngressRuleValue", "HTTPIngressRuleValue", 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *IngressSpec) String() string {
+	if this == nil {
+		return "nil"
+	}
+	repeatedStringForTLS := "[]IngressTLS{"
+	for _, f := range this.TLS {
+		repeatedStringForTLS += strings.Replace(strings.Replace(f.String(), "IngressTLS", "IngressTLS", 1), `&`, ``, 1) + ","
+	}
+	repeatedStringForTLS += "}"
+	repeatedStringForRules := "[]IngressRule{"
+	for _, f := range this.Rules {
+		repeatedStringForRules += strings.Replace(strings.Replace(f.String(), "IngressRule", "IngressRule", 1), `&`, ``, 1) + ","
+	}
+	repeatedStringForRules += "}"
+	s := strings.Join([]string{`&IngressSpec{`,
+		`DefaultBackend:` + strings.Replace(this.DefaultBackend.String(), "IngressBackend", "IngressBackend", 1) + `,`,
+		`TLS:` + repeatedStringForTLS + `,`,
+		`Rules:` + repeatedStringForRules + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *IngressStatus) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&IngressStatus{`,
+		`LoadBalancer:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.LoadBalancer), "LoadBalancerStatus", "v11.LoadBalancerStatus", 1), `&`, ``, 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *IngressTLS) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&IngressTLS{`,
+		`Hosts:` + fmt.Sprintf("%v", this.Hosts) + `,`,
+		`SecretName:` + fmt.Sprintf("%v", this.SecretName) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -1049,6 +2064,211 @@ func valueToStringGenerated(v interface{}) string {
 	pv := reflect.Indirect(rv).Interface()
 	return fmt.Sprintf("*%v", pv)
 }
+func (m *HTTPIngressPath) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: HTTPIngressPath: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: HTTPIngressPath: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Path", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Path = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Backend", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.Backend.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *HTTPIngressRuleValue) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: HTTPIngressRuleValue: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: HTTPIngressRuleValue: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Paths", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Paths = append(m.Paths, HTTPIngressPath{})
+			if err := m.Paths[len(m.Paths)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
 func (m *IPBlock) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -1141,6 +2361,963 @@ func (m *IPBlock) Unmarshal(dAtA []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			m.Except = append(m.Except, string(dAtA[iNdEx:postIndex]))
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *Ingress) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: Ingress: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: Ingress: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ObjectMeta", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.ObjectMeta.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Spec", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.Spec.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Status", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.Status.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *IngressBackend) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: IngressBackend: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: IngressBackend: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ServiceName", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ServiceName = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ServicePort", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.ServicePort.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *IngressList) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: IngressList: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: IngressList: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ListMeta", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.ListMeta.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Items", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Items = append(m.Items, Ingress{})
+			if err := m.Items[len(m.Items)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *IngressRule) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: IngressRule: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: IngressRule: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Host", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Host = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field IngressRuleValue", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.IngressRuleValue.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *IngressRuleValue) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: IngressRuleValue: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: IngressRuleValue: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field HTTP", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.HTTP == nil {
+				m.HTTP = &HTTPIngressRuleValue{}
+			}
+			if err := m.HTTP.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *IngressSpec) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: IngressSpec: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: IngressSpec: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field DefaultBackend", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.DefaultBackend == nil {
+				m.DefaultBackend = &IngressBackend{}
+			}
+			if err := m.DefaultBackend.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field TLS", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.TLS = append(m.TLS, IngressTLS{})
+			if err := m.TLS[len(m.TLS)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Rules", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Rules = append(m.Rules, IngressRule{})
+			if err := m.Rules[len(m.Rules)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *IngressStatus) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: IngressStatus: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: IngressStatus: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field LoadBalancer", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.LoadBalancer.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *IngressTLS) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: IngressTLS: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: IngressTLS: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Hosts", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Hosts = append(m.Hosts, string(dAtA[iNdEx:postIndex]))
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SecretName", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.SecretName = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex

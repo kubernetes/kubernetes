@@ -235,12 +235,12 @@ type IngressList struct {
 
 // IngressSpec describes the Ingress the user wishes to exist.
 type IngressSpec struct {
-	// A default backend capable of servicing requests that don't match any
-	// rule. At least one of 'backend' or 'rules' must be specified. This field
+	// The default backend capable of servicing requests that don't match any
+	// rule. At least one of 'defaultBackend' or 'rules' must be specified. This field
 	// is optional to allow the loadbalancer controller or defaulting logic to
 	// specify a global default.
 	// +optional
-	Backend *IngressBackend
+	DefaultBackend *IngressBackend
 
 	// TLS configuration. Currently the Ingress only supports a single TLS
 	// port, 443. If multiple members of this list specify different hosts, they
