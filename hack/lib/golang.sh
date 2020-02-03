@@ -793,16 +793,6 @@ kube::golang::build_binaries() {
     gotags="selinux,$(echo "${GOFLAGS:-}" | sed -e 's|.*-tags=\([^-]*\).*|\1|')"
 
     local -a targets=()
-    local arg
-
-    for arg; do
-      if [[ "${arg}" == -* ]]; then
-        # Assume arguments starting with a dash are flags to pass to go.
-        goflags+=("${arg}")
-      else
-        targets+=("${arg}")
-      fi
-    done
 
     if [[ ${#targets[@]} -eq 0 ]]; then
       targets=("${KUBE_ALL_TARGETS[@]}")
