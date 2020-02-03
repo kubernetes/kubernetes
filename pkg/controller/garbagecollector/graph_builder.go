@@ -101,7 +101,7 @@ type GraphBuilder struct {
 	attemptToOrphan workqueue.RateLimitingInterface
 	// GraphBuilder and GC share the absentOwnerCache. Objects that are known to
 	// be non-existent are added to the cached.
-	absentOwnerCache *UIDCache
+	absentOwnerCache *ReferenceCache
 	sharedInformers  controller.InformerFactory
 	ignoredResources map[schema.GroupResource]struct{}
 }
@@ -600,7 +600,15 @@ func (gb *GraphBuilder) processGraphChanges() bool {
 		existingNode.dependentsLock.RLock()
 		defer existingNode.dependentsLock.RUnlock()
 		if len(existingNode.dependents) > 0 {
-			gb.absentOwnerCache.Add(accessor.GetUID())
+			gb.absentOwnerCache.Add(objectReference{
+				OwnerReference: metav1.OwnerReference{
+					APIVersion: event.gvk.GroupVersion().String(),
+					Kind:       event.gvk.Kind,
+					Name:       accessor.GetName(),
+					UID:        accessor.GetUID(),
+				},
+				Namespace: accessor.GetNamespace(),
+			})
 		}
 		for dep := range existingNode.dependents {
 			gb.attemptToDelete.Add(dep)

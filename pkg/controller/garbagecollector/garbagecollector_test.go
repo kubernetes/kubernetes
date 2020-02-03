@@ -398,7 +398,7 @@ func TestProcessEvent(t *testing.T) {
 				uidToNode:     make(map[types.UID]*node),
 			},
 			attemptToDelete:  workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
-			absentOwnerCache: NewUIDCache(2),
+			absentOwnerCache: NewReferenceCache(2),
 		}
 		for i := 0; i < len(scenario.events); i++ {
 			dependencyGraphBuilder.graphChanges.Add(&scenario.events[i])
@@ -528,7 +528,7 @@ func TestAbsentUIDCache(t *testing.T) {
 	defer srv.Close()
 	gc := setupGC(t, clientConfig)
 	defer close(gc.stop)
-	gc.absentOwnerCache = NewUIDCache(2)
+	gc.absentOwnerCache = NewReferenceCache(2)
 	gc.attemptToDeleteItem(podToGCNode(rc1Pod1))
 	gc.attemptToDeleteItem(podToGCNode(rc2Pod1))
 	// rc1 should already be in the cache, no request should be sent. rc1 should be promoted in the UIDCache
@@ -536,13 +536,13 @@ func TestAbsentUIDCache(t *testing.T) {
 	// after this call, rc2 should be evicted from the UIDCache
 	gc.attemptToDeleteItem(podToGCNode(rc3Pod1))
 	// check cache
-	if !gc.absentOwnerCache.Has(types.UID("1")) {
+	if !gc.absentOwnerCache.Has(objectReference{Namespace: "ns1", OwnerReference: metav1.OwnerReference{Kind: "ReplicationController", Name: "rc1", UID: "1", APIVersion: "v1"}}) {
 		t.Errorf("expected rc1 to be in the cache")
 	}
-	if gc.absentOwnerCache.Has(types.UID("2")) {
+	if gc.absentOwnerCache.Has(objectReference{Namespace: "ns1", OwnerReference: metav1.OwnerReference{Kind: "ReplicationController", Name: "rc2", UID: "2", APIVersion: "v1"}}) {
 		t.Errorf("expected rc2 to not exist in the cache")
 	}
-	if !gc.absentOwnerCache.Has(types.UID("3")) {
+	if !gc.absentOwnerCache.Has(objectReference{Namespace: "ns1", OwnerReference: metav1.OwnerReference{Kind: "ReplicationController", Name: "rc3", UID: "3", APIVersion: "v1"}}) {
 		t.Errorf("expected rc3 to be in the cache")
 	}
 	// check the request sent to the server
