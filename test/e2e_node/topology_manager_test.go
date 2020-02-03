@@ -46,7 +46,8 @@ import (
 )
 
 const (
-	numalignCmd = `export CPULIST_ALLOWED=$( awk -F":\t*" '/Cpus_allowed_list/ { print $2 }' /proc/self/status); env; sleep 1d`
+	numalignCmd   = `export CPULIST_ALLOWED=$( awk -F":\t*" '/Cpus_allowed_list/ { print $2 }' /proc/self/status); env; sleep 1d`
+	topologyError = "Topology Affinity Error" // XXX do we have a proper constant?
 )
 
 // Helper for makeTopologyManagerPod().
@@ -470,7 +471,7 @@ func runTopologyManagerPolicySuiteTests(f *framework.Framework) {
 	waitForContainerRemoval(pod2.Spec.Containers[0].Name, pod2.Name, pod2.Namespace)
 }
 
-func runTopologyManagerNodeAlignmentTest(f *framework.Framework, numaNodes, numPods int, cpuAmount, sriovResourceName, deviceAmount string) {
+func runTopologyManagerPositiveTest(f *framework.Framework, numaNodes, numPods int, cpuAmount, sriovResourceName, deviceAmount string) {
 	ginkgo.By(fmt.Sprintf("allocate aligned resources for a %d pod(s): cpuAmount=%s %s=%s", numPods, cpuAmount, sriovResourceName, deviceAmount))
 
 	var pods []*v1.Pod
@@ -506,6 +507,45 @@ func runTopologyManagerNodeAlignmentTest(f *framework.Framework, numaNodes, numP
 		deletePods(f, []string{pod.Name})
 		waitForContainerRemoval(pod.Spec.Containers[0].Name, pod.Name, pod.Namespace)
 	}
+}
+
+func runTopologyManagerNegativeTest(f *framework.Framework, numaNodes, numPods int, cpuAmount, sriovResourceName, deviceAmount string) {
+	ginkgo.By(fmt.Sprintf("allocate aligned resources for a %d pod(s): cpuAmount=%s %s=%s", numPods, cpuAmount, sriovResourceName, deviceAmount))
+
+	ctnAttrs := []tmCtnAttribute{
+		{
+			ctnName:       "gu-container",
+			cpuRequest:    cpuAmount,
+			cpuLimit:      cpuAmount,
+			deviceName:    sriovResourceName,
+			deviceRequest: deviceAmount,
+			deviceLimit:   deviceAmount,
+		},
+	}
+
+	podName := "gu-pod"
+	framework.Logf("creating pod %s attrs %v", podName, ctnAttrs)
+	pod := makeTopologyManagerTestPod(podName, numalignCmd, ctnAttrs)
+
+	pod = f.PodClient().Create(pod)
+	err := e2epod.WaitForPodCondition(f.ClientSet, f.Namespace.Name, pod.Name, "Failed", 30*time.Second, func(pod *v1.Pod) (bool, error) {
+		if pod.Status.Phase != v1.PodPending {
+			return true, nil
+		}
+		return false, nil
+	})
+	framework.ExpectNoError(err)
+	pod, err = f.PodClient().Get(context.TODO(), pod.Name, metav1.GetOptions{})
+	framework.ExpectNoError(err)
+
+	if pod.Status.Phase != v1.PodFailed {
+		framework.Failf("pod %s not failed: %v", pod.Name, pod.Status)
+	}
+	if pod.Status.Reason != topologyError {
+		framework.Failf("pod %s failed for wrong reason: %v", pod.Name, pod.Status)
+	}
+
+	deletePods(f, []string{pod.Name})
 }
 
 func runTopologyManagerNodeAlignmentSuiteTests(f *framework.Framework, numaNodes, coreCount int) {
@@ -555,13 +595,17 @@ func runTopologyManagerNodeAlignmentSuiteTests(f *framework.Framework, numaNodes
 	}, 5*time.Minute, framework.Poll).Should(gomega.BeTrue())
 	framework.Logf("Successfully created device plugin pod, detected %d SRIOV device %q", sriovResourceAmount, sriovResourceName)
 
+	threadsPerCore := 1
+	if isHTEnabled() {
+		threadsPerCore = 2
+	}
 	// could have been a loop, we unroll it to explain the testcases
 
 	// simplest case: one guaranteed core, one device
-	runTopologyManagerNodeAlignmentTest(f, numaNodes, 1, "1000m", sriovResourceName, "1")
+	runTopologyManagerPositiveTest(f, numaNodes, 1, "1000m", sriovResourceName, "1")
 
 	// two guaranteed cores, one device
-	runTopologyManagerNodeAlignmentTest(f, numaNodes, 1, "2000m", sriovResourceName, "1")
+	runTopologyManagerPositiveTest(f, numaNodes, 1, "2000m", sriovResourceName, "1")
 
 	// TODO: test taking an entire NUMA node.
 	// to do a meaningful test, we need to know:
@@ -571,11 +615,14 @@ func runTopologyManagerNodeAlignmentSuiteTests(f *framework.Framework, numaNodes
 	if sriovResourceAmount > 1 {
 		// no matter how busses are connected to NUMA nodes and SRIOV devices are installed, this function
 		// preconditions must ensure the following can be fulfilled
-		runTopologyManagerNodeAlignmentTest(f, numaNodes, 2, "1000m", sriovResourceName, "1")
-		runTopologyManagerNodeAlignmentTest(f, numaNodes, 2, "2000m", sriovResourceName, "1")
+		runTopologyManagerPositiveTest(f, numaNodes, 2, "1000m", sriovResourceName, "1")
+		runTopologyManagerPositiveTest(f, numaNodes, 2, "2000m", sriovResourceName, "1")
 
 		// testing more complex conditions require knowledge about the system cpu+bus topology
 	}
+
+	// overflow NUMA node capacity: cores
+	runTopologyManagerNegativeTest(f, numaNodes, 1, fmt.Sprintf("%dm", (1+threadsPerCore)*coreCount*1000), sriovResourceName, "1")
 
 	framework.Logf("deleting the SRIOV device plugin pod %s/%s and waiting for container %s removal",
 		dpPod.Namespace, dpPod.Name, dpPod.Spec.Containers[0].Name)
@@ -612,7 +659,7 @@ func runTopologyManagerTests(f *framework.Framework) {
 
 	ginkgo.It("run Topology Manager node alignment test suite", func() {
 		// this is a very rough check. We just want to rule out system that does NOT have
-		// any SRIOV device. A more proper check will be done in runTopologyManagerNodeAlignmentTest
+		// any SRIOV device. A more proper check will be done in runTopologyManagerPositiveTest
 		sriovdevCount := detectSRIOVDevices()
 		numaNodes := detectNUMANodes()
 		coreCount := detectCoresPerSocket()
