@@ -257,7 +257,12 @@ API rule violation: list_type_missing,k8s.io/api/extensions/v1beta1,RunAsUserStr
 API rule violation: list_type_missing,k8s.io/api/extensions/v1beta1,RuntimeClassStrategyOptions,AllowedRuntimeClassNames
 API rule violation: list_type_missing,k8s.io/api/extensions/v1beta1,SupplementalGroupsStrategyOptions,Ranges
 API rule violation: list_type_missing,k8s.io/api/imagepolicy/v1alpha1,ImageReviewSpec,Containers
+API rule violation: list_type_missing,k8s.io/api/networking/v1,HTTPIngressRuleValue,Paths
 API rule violation: list_type_missing,k8s.io/api/networking/v1,IPBlock,Except
+API rule violation: list_type_missing,k8s.io/api/networking/v1,IngressList,Items
+API rule violation: list_type_missing,k8s.io/api/networking/v1,IngressSpec,Rules
+API rule violation: list_type_missing,k8s.io/api/networking/v1,IngressSpec,TLS
+API rule violation: list_type_missing,k8s.io/api/networking/v1,IngressTLS,Hosts
 API rule violation: list_type_missing,k8s.io/api/networking/v1,NetworkPolicyEgressRule,Ports
 API rule violation: list_type_missing,k8s.io/api/networking/v1,NetworkPolicyEgressRule,To
 API rule violation: list_type_missing,k8s.io/api/networking/v1,NetworkPolicyIngressRule,From

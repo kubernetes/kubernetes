@@ -8,6 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "ingress.go",
         "interface.go",
         "networkpolicy.go",
     ],

@@ -17,6 +17,10 @@ limitations under the License.
 package validation
 
 import (
+	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
+	networkingv1beta1 "k8s.io/api/networking/v1beta1"
+
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"net"
 	"regexp"
 	"strings"
@@ -175,9 +179,9 @@ func ValidateIPBlock(ipb *networking.IPBlock, fldPath *field.Path) field.ErrorLi
 }
 
 // ValidateIngress tests if required fields in the Ingress are set.
-func ValidateIngress(ingress *networking.Ingress) field.ErrorList {
+func ValidateIngress(ingress *networking.Ingress, requestGV schema.GroupVersion) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMeta(&ingress.ObjectMeta, true, ValidateIngressName, field.NewPath("metadata"))
-	allErrs = append(allErrs, ValidateIngressSpec(&ingress.Spec, field.NewPath("spec"))...)
+	allErrs = append(allErrs, ValidateIngressSpec(&ingress.Spec, field.NewPath("spec"), requestGV)...)
 	return allErrs
 }
 
@@ -206,13 +210,17 @@ func validateIngressTLS(spec *networking.IngressSpec, fldPath *field.Path) field
 }
 
 // ValidateIngressSpec tests if required fields in the IngressSpec are set.
-func ValidateIngressSpec(spec *networking.IngressSpec, fldPath *field.Path) field.ErrorList {
+func ValidateIngressSpec(spec *networking.IngressSpec, fldPath *field.Path, requestGV schema.GroupVersion) field.ErrorList {
 	allErrs := field.ErrorList{}
-	// TODO: Is a default backend mandatory?
-	if spec.Backend != nil {
-		allErrs = append(allErrs, validateIngressBackend(spec.Backend, fldPath.Child("backend"))...)
+	if spec.DefaultBackend != nil {
+		allErrs = append(allErrs, validateIngressBackend(spec.DefaultBackend, fldPath.Child("defaultBackend"))...)
 	} else if len(spec.Rules) == 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath, spec.Rules, "either `backend` or `rules` must be specified"))
+		switch requestGV {
+		case networkingv1beta1.SchemeGroupVersion, extensionsv1beta1.SchemeGroupVersion:
+			allErrs = append(allErrs, field.Invalid(fldPath, spec.Rules, "either `backend` or `rules` must be specified"))
+		default:
+			allErrs = append(allErrs, field.Invalid(fldPath, spec.Rules, "either `defaultBackend` or `rules` must be specified"))
+		}
 	}
 	if len(spec.Rules) > 0 {
 		allErrs = append(allErrs, validateIngressRules(spec.Rules, fldPath.Child("rules"))...)
@@ -224,9 +232,9 @@ func ValidateIngressSpec(spec *networking.IngressSpec, fldPath *field.Path) fiel
 }
 
 // ValidateIngressUpdate tests if required fields in the Ingress are set.
-func ValidateIngressUpdate(ingress, oldIngress *networking.Ingress) field.ErrorList {
+func ValidateIngressUpdate(ingress, oldIngress *networking.Ingress, requestGV schema.GroupVersion) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&ingress.ObjectMeta, &oldIngress.ObjectMeta, field.NewPath("metadata"))
-	allErrs = append(allErrs, ValidateIngressSpec(&ingress.Spec, field.NewPath("spec"))...)
+	allErrs = append(allErrs, ValidateIngressSpec(&ingress.Spec, field.NewPath("spec"), requestGV)...)
 	return allErrs
 }
 

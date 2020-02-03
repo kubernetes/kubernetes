@@ -844,7 +844,7 @@ func TestPrintIngress(t *testing.T) {
 			CreationTimestamp: metav1.Time{Time: time.Now().AddDate(-10, 0, 0)},
 		},
 		Spec: networking.IngressSpec{
-			Backend: &networking.IngressBackend{
+			DefaultBackend: &networking.IngressBackend{
 				ServiceName: "svc",
 				ServicePort: intstr.FromInt(93),
 			},
