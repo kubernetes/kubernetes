@@ -101,31 +101,31 @@ func TestPluginPathsAreValid(t *testing.T) {
 		expectOut          string
 	}{
 		{
-			name:        "ensure no plugins found if no files begin with kubectl- prefix",
-			pluginPaths: []string{tempDir},
-			verifier:    newFakePluginPathVerifier(),
-			pluginFile: func() (*os.File, error) {
+			name:         "ensure no plugins found if no files begin with kubectl- prefix",
+			pluginPaths:  []string{tempDir},
+			verifier:     newFakePluginPathVerifier(),
+			pluginFile:   func() (*os.File, error) {
 				return ioutil.TempFile(tempDir, "notkubectl-")
 			},
-			expectErr: "unable to find any kubectl plugins in your PATH",
+			expectErr:    "error: unable to find any kubectl plugins in your PATH\n",
 		},
 		{
-			name:        "ensure de-duplicated plugin-paths slice",
-			pluginPaths: []string{tempDir, tempDir},
-			verifier:    newFakePluginPathVerifier(),
-			pluginFile: func() (*os.File, error) {
+			name:         "ensure de-duplicated plugin-paths slice",
+			pluginPaths:  []string{tempDir, tempDir},
+			verifier:     newFakePluginPathVerifier(),
+			pluginFile:   func() (*os.File, error) {
 				return ioutil.TempFile(tempDir, "kubectl-")
 			},
-			expectOut: "The following compatible plugins are available:",
+			expectOut:    "The following compatible plugins are available:",
 		},
 		{
-			name:        "ensure no errors when empty string or blank path are specified",
-			pluginPaths: []string{tempDir, "", " "},
-			verifier:    newFakePluginPathVerifier(),
-			pluginFile: func() (*os.File, error) {
+			name:         "ensure no errors when empty string or blank path are specified",
+			pluginPaths:  []string{tempDir, "", " "},
+			verifier:     newFakePluginPathVerifier(),
+			pluginFile:   func() (*os.File, error) {
 				return ioutil.TempFile(tempDir, "kubectl-")
 			},
-			expectOut: "The following compatible plugins are available:",
+			expectOut:    "The following compatible plugins are available:",
 		},
 	}
 
@@ -138,8 +138,6 @@ func TestPluginPathsAreValid(t *testing.T) {
 
 				PluginPaths: test.pluginPaths,
 			}
-			o.Out = out
-			o.ErrOut = errOut
 
 			// create files
 			if test.pluginFile != nil {
@@ -158,10 +156,11 @@ func TestPluginPathsAreValid(t *testing.T) {
 
 			err := o.Run()
 			if err == nil && len(test.expectErr) > 0 {
-				t.Fatalf("unexpected non-error: expecting %v", test.expectErr)
-			}
-			if err != nil && len(test.expectErr) == 0 {
-				t.Fatalf("unexpected error: %v - %v", err, errOut.String())
+				t.Fatalf("unexpected non-error: expected %v, but got nothing", test.expectErr)
+			} else if err != nil && len(test.expectErr) == 0 {
+				t.Fatalf("unexpected error: expected nothing, but got %v", err.Error())
+			} else if err != nil && err.Error() != test.expectErr {
+				t.Fatalf("unexpected error: expected %v, but got %v", test.expectErr, err.Error())
 			}
 
 			if len(test.expectErrOut) == 0 && errOut.Len() > 0 {
