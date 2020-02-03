@@ -15,8 +15,12 @@ go_test(
 
 go_library(
     name = "go_default_library",
-    srcs = ["cidr_set.go"],
+    srcs = [
+        "cidr_set.go",
+        "interfaces.go",
+    ],
     importpath = "k8s.io/kubernetes/pkg/controller/nodeipam/ipam/cidrset",
+    deps = ["//vendor/github.com/RoaringBitmap/roaring:go_default_library"],
 )
 
 filegroup(

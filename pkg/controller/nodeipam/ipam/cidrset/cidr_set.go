@@ -24,6 +24,34 @@ import (
 	"math/bits"
 	"net"
 	"sync"
+
+	"github.com/RoaringBitmap/roaring"
+)
+
+var (
+	// ErrCIDRRangeNoCIDRsRemaining occurs when there is no more space
+	// to allocate CIDR ranges.
+	ErrCIDRRangeNoCIDRsRemaining = errors.New(
+		"CIDR allocation failed; there are no remaining CIDRs left to allocate in the accepted range")
+	// ErrCIDRSetSubNetTooBig occurs when the subnet mask size is too
+	// big compared to the CIDR mask size.
+	ErrCIDRSetSubNetTooBig = errors.New(
+		"New CIDR set failed; the node CIDR size is too big")
+	// ErrCIDRAlreadyOccupied occurs when we try to allocate a subnet that is
+	// already in use
+	ErrCIDRAlreadyOccupied = errors.New(
+		"The CIDR can't not be occupied because is already in use")
+)
+
+const (
+	// The subnet mask size cannot be greater than 16 more than the cluster mask size
+	// TODO: https://github.com/kubernetes/kubernetes/issues/44918
+	// clusterSubnetMaxDiff limited to 16 due to the uncompressed bitmap
+	// Due to this limitation the subnet mask for IPv6 cluster cidr needs to be >= 48
+	// as default mask size for IPv6 is 64.
+	clusterSubnetMaxDiff = 16
+	// halfIPv6Len is the half of the IPv6 length
+	halfIPv6Len = net.IPv6len / 2
 )
 
 // CidrSet manages a set of CIDR ranges from which blocks of IPs can
@@ -39,27 +67,8 @@ type CidrSet struct {
 	subNetMaskSize  int
 }
 
-const (
-	// The subnet mask size cannot be greater than 16 more than the cluster mask size
-	// TODO: https://github.com/kubernetes/kubernetes/issues/44918
-	// clusterSubnetMaxDiff limited to 16 due to the uncompressed bitmap
-	// Due to this limitation the subnet mask for IPv6 cluster cidr needs to be >= 48
-	// as default mask size for IPv6 is 64.
-	clusterSubnetMaxDiff = 16
-	// halfIPv6Len is the half of the IPv6 length
-	halfIPv6Len = net.IPv6len / 2
-)
-
-var (
-	// ErrCIDRRangeNoCIDRsRemaining occurs when there is no more space
-	// to allocate CIDR ranges.
-	ErrCIDRRangeNoCIDRsRemaining = errors.New(
-		"CIDR allocation failed; there are no remaining CIDRs left to allocate in the accepted range")
-	// ErrCIDRSetSubNetTooBig occurs when the subnet mask size is too
-	// big compared to the CIDR mask size.
-	ErrCIDRSetSubNetTooBig = errors.New(
-		"New CIDR set failed; the node CIDR size is too big")
-)
+// CidrSet implements Interface
+var _ Interface = &CidrSet{}
 
 // NewCIDRSet creates a new CidrSet.
 func NewCIDRSet(clusterCIDR *net.IPNet, subNetMaskSize int) (*CidrSet, error) {
@@ -263,4 +272,231 @@ func (s *CidrSet) getIndexForIP(ip net.IP) (int, error) {
 	}
 
 	return 0, fmt.Errorf("invalid IP: %v", ip)
+}
+
+// A cluster has assigned a ClusterCIDR with mask X that is split into
+// different CIDRs assigned to the nodes with mask Y
+// The number of nodeCIDRs is equal to 2^(X-Y), i.e.:
+// a clusterCIDR 192.168.0.0/16 with nodes subnets of /24 gives 2^8 = 256 node subnets
+
+// cluster mask --->|
+// 11000000.10101000.00000000.00000000
+//                           |<-- subnetMask
+//        bitmap --->|       |<-- offset
+//
+// base = 192.168.0.0
+// offset = 0.0.0.255
+// subnet1 = 192.168.0.0/24
+// subnet2 = 192.168.1.0/24
+// ...
+// subnet256 = 192.168.255.0/24
+
+// Using a roaring bitmap to store the subnets allocated give us a maximum of 2^32 subnets
+// because it uses an uint32 index (2^32 = 4294967296 subnets.)
+
+// That's perfectly fine for IPv4, but for IPv6 it imposes a restriction:
+// The ClusterCIDR mask should be <= 32 than the Nodes masks.
+// The IPv6 default mask for a node is /64.
+
+const (
+	clusterSubnetRoaringMaxDiff = 32
+)
+
+// RoaringCidrSet manages a set of CIDR ranges from which blocks of IPs can
+// be allocated from.
+// It allocates the IP subnet addresses in a bitmap as an offset of the ClusterCIDR IP subnet
+// The masks of the ClusterCIDR and NodeCIDRs are known in advance
+type RoaringCidrSet struct {
+	sync.Mutex
+	clusterCIDR   *net.IPNet
+	subnetMask    net.IPMask
+	base          *big.Int
+	offset        *big.Int
+	maxCIDRs      int
+	nextCandidate int
+	used          *roaring.Bitmap
+}
+
+// RoaringCidrSet implements Interface
+var _ Interface = &RoaringCidrSet{}
+
+// NewCIDRSetRoaring creates a new CidrSet.
+func NewCIDRSetRoaring(clusterCIDR *net.IPNet, subNetMaskSize int) (*RoaringCidrSet, error) {
+	clusterMaskSize, maskLen := clusterCIDR.Mask.Size()
+	if subNetMaskSize-clusterMaskSize > clusterSubnetRoaringMaxDiff {
+		return nil, ErrCIDRSetSubNetTooBig
+	}
+	// To avoid issues we mask the IP address to ensure we get the subnet address
+	clusterCIDR.IP.Mask(clusterCIDR.Mask)
+	// Obtain the subnets mask
+	subnetMask := net.CIDRMask(subNetMaskSize, maskLen)
+	// Calculate the base address of the subnets based on the Cluster IP subnet address
+	base := bigForIP(clusterCIDR.IP.Mask(subnetMask))
+	// The offset is the size of the subnet, that's the same that 2^(inverse mask size)
+	offset := subnetSize(&net.IPNet{IP: nil, Mask: subnetMask})
+	// Obtain the max numbers of subnets in the cluster
+	maxCIDRs := 1 << uint32(subNetMaskSize-clusterMaskSize)
+	return &RoaringCidrSet{
+		clusterCIDR: clusterCIDR,
+		base:        base,
+		offset:      offset,
+		maxCIDRs:    maxCIDRs,
+		subnetMask:  subnetMask,
+		used:        roaring.NewBitmap(),
+	}, nil
+}
+
+// AllocateNext allocates the next free CIDR range and returns it.
+func (s *RoaringCidrSet) AllocateNext() (*net.IPNet, error) {
+	s.Lock()
+	defer s.Unlock()
+
+	// iterate over all the bitmap to find an unasiggned subnet
+	// we start checking from the nextCandidate variable
+	for i := 0; i < s.maxCIDRs; i++ {
+		candidate := (s.nextCandidate + i) % s.maxCIDRs
+		if s.used.CheckedAdd(uint32(candidate)) {
+			// set the CIDR range to assign and return the CIDR subnet
+			ip := addCIDROffset(s.base, s.offset, candidate)
+			s.nextCandidate = (candidate + 1) % s.maxCIDRs
+			return &net.IPNet{IP: ip.Mask(s.subnetMask), Mask: s.subnetMask}, nil
+		}
+	}
+	return nil, ErrCIDRRangeNoCIDRsRemaining
+
+}
+
+// Release releases the given CIDR range. It never errors
+func (s *RoaringCidrSet) Release(cidr *net.IPNet) error {
+	s.Lock()
+	defer s.Unlock()
+	if err := s.validate(cidr); err != nil {
+		return err
+	}
+	for _, subnet := range overlappingSubnets(cidr, s.subnetMask) {
+		// mask the IP address to obtain the corresponding subnet address
+		at := calculateCIDROffset(s.base, s.offset, subnet.IP.Mask(s.subnetMask))
+		s.used.Remove(uint32(at))
+	}
+	return nil
+}
+
+// Occupy marks the given CIDR range as used. Occupy does check if the CIDR
+// range was previously used.
+func (s *RoaringCidrSet) Occupy(cidr *net.IPNet) (err error) {
+	s.Lock()
+	defer s.Unlock()
+	if err := s.validate(cidr); err != nil {
+		return err
+	}
+	var positions []int
+	for _, subnet := range overlappingSubnets(cidr, s.subnetMask) {
+		// do we need to validate again?
+		// TODO: check corner cases
+		if err := s.validate(subnet); err != nil {
+			return err
+		}
+		// mask the IP address to obtain the corresponding subnet address
+		at := calculateCIDROffset(s.base, s.offset, subnet.IP)
+		if s.used.ContainsInt(at) {
+			return ErrCIDRAlreadyOccupied
+		}
+		positions = append(positions, at)
+	}
+	// Do the allocation
+	for _, pos := range positions {
+		s.used.AddInt(pos)
+	}
+	return err
+}
+
+// validate returns an error if the IP cidr is not valid
+// IP not in range or invalid Mask
+func (s *RoaringCidrSet) validate(cidr *net.IPNet) error {
+	// error if cidr is nil
+	if cidr == nil {
+		return fmt.Errorf("error getting indices for cluster cidr %v, cidr is nil", s.clusterCIDR)
+	}
+	// error if cidr does not belong to the cluster range
+	if !s.clusterCIDR.Contains(cidr.IP.Mask(s.clusterCIDR.Mask)) && !cidr.Contains(s.clusterCIDR.IP.Mask(cidr.Mask)) {
+		return fmt.Errorf("cidr %v is out the range of cluster cidr %v", cidr, s.clusterCIDR)
+	}
+	return nil
+}
+
+// allocated returns the number of CIDR allocated (only for testing)
+func (s *RoaringCidrSet) allocated() int {
+	return int(s.used.GetCardinality())
+}
+
+// bigForIP creates a big.Int based on the provided net.IP
+func bigForIP(ip net.IP) *big.Int {
+	b := ip.To4()
+	if b == nil {
+		b = ip.To16()
+	}
+	return big.NewInt(0).SetBytes(b)
+}
+
+// addCIDROffset adds the provided offset multiplied by the integer factor
+// to a base big.Int representing a net.IP
+func addCIDROffset(base *big.Int, offset *big.Int, factor int) net.IP {
+	offset = big.NewInt(1).Mul(offset, big.NewInt(int64(factor)))
+	return net.IP(big.NewInt(0).Add(base, offset).Bytes())
+}
+
+// calculateCIDROffset calculates the integer offset of ip from base such that
+// base + offset = ip. It requires ip >= base.
+func calculateCIDROffset(base *big.Int, offset *big.Int, ip net.IP) int {
+	cidrOffset := big.NewInt(0).Sub(bigForIP(ip), base)
+	return int(big.NewInt(1).Div(cidrOffset, offset).Int64())
+}
+
+// nextSubnet returns the next subnet address
+func nextSubnet(cidr *net.IPNet) *net.IPNet {
+	// Obtain the IP big number
+	bigIP := bigForIP(cidr.IP)
+	// Obtain the subnet size
+	bigMask := subnetSize(cidr)
+	// Obtain an IP that belongs to the next subnet
+	ip := net.IP(big.NewInt(0).Add(bigIP, bigMask).Bytes())
+	return &net.IPNet{IP: ip.Mask(cidr.Mask), Mask: cidr.Mask}
+}
+
+// subnetSize returns the size of a given subnet
+func subnetSize(cidr *net.IPNet) *big.Int {
+	ones, bits := cidr.Mask.Size()
+	var i, e = big.NewInt(2), big.NewInt(int64(bits - ones))
+	return big.NewInt(1).Exp(i, e, nil)
+}
+
+// overlappingSubnets returns a list with the subnets that overlaps
+// with the mask given.
+// If the mask is shorter it returns the super subnet
+// If the mask is larger it returns all the inner subnets
+func overlappingSubnets(cidr *net.IPNet, mask net.IPMask) []*net.IPNet {
+	var cidrs []*net.IPNet
+	cidrMaskSize, cidrMaskLen := cidr.Mask.Size()
+	maskSize, maskLen := mask.Size()
+	// If the mask length is different we are mixing ip families
+	if maskLen != cidrMaskLen {
+		return cidrs
+	}
+	// allocate the first subnet, corresponding to the cidr IP subnet address
+	// if the cidr mask is smaller than the mask we return only this subnet
+	cidrs = append(cidrs, &net.IPNet{IP: cidr.IP.Mask(cidr.Mask), Mask: mask})
+	// allocate the corresponding inner subnets if the mask given is smaller
+	if cidrMaskSize < maskSize {
+		// use big numbers to handle cases where masks > 32
+		one := big.NewInt(1)
+		start := big.NewInt(1)
+		// obtain the number of overlapping subnets
+		var x, e = big.NewInt(2), big.NewInt(int64(maskSize - cidrMaskSize))
+		end := big.NewInt(1).Exp(x, e, nil)
+		// append each subsequent subnet
+		for i := new(big.Int).Set(start); i.Cmp(end) < 0; i.Add(i, one) {
+			cidrs = append(cidrs, nextSubnet(cidrs[len(cidrs)-1]))
+		}
+	}
+	return cidrs
 }

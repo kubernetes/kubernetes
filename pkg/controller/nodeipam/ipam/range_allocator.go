@@ -21,7 +21,7 @@ import (
 	"net"
 	"sync"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -52,7 +52,7 @@ type rangeAllocator struct {
 	// cluster cidrs as passed in during controller creation
 	clusterCIDRs []*net.IPNet
 	// for each entry in clusterCIDRs we maintain a list of what is used and what is not
-	cidrSets []*cidrset.CidrSet
+	cidrSets []cidrset.Interface
 	// nodeLister is able to list/get nodes and is populated by the shared informer passed to controller
 	nodeLister corelisters.NodeLister
 	// nodesSynced returns true if the node shared informer has been synced at least once.
@@ -84,7 +84,7 @@ func NewCIDRRangeAllocator(client clientset.Interface, nodeInformer informers.No
 
 	// create a cidrSet for each cidr we operate on
 	// cidrSet are mapped to clusterCIDR by index
-	cidrSets := make([]*cidrset.CidrSet, len(allocatorParams.ClusterCIDRs))
+	cidrSets := make([]cidrset.Interface, len(allocatorParams.ClusterCIDRs))
 	for idx, cidr := range allocatorParams.ClusterCIDRs {
 		cidrSet, err := cidrset.NewCIDRSet(cidr, allocatorParams.NodeCIDRMaskSizes[idx])
 		if err != nil {
