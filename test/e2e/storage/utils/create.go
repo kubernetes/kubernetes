@@ -629,8 +629,8 @@ func PrettyPrint(item interface{}) string {
 // one provided via the KUBE_TEST_REPO_LIST env variable
 func patchContainerImages(containers []v1.Container) error {
 	var err error
-	for _, c := range containers {
-		c.Image, err = imageutils.ReplaceRegistryInImageURL(c.Image)
+	for i, c := range containers {
+		containers[i].Image, err = imageutils.ReplaceRegistryInImageURL(c.Image)
 		if err != nil {
 			return err
 		}
