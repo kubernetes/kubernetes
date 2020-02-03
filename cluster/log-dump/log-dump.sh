@@ -41,7 +41,7 @@ readonly master_ssh_supported_providers="gce aws kubernetes-anywhere"
 readonly node_ssh_supported_providers="gce gke aws kubernetes-anywhere"
 readonly gcloud_supported_providers="gce gke kubernetes-anywhere"
 
-readonly master_logfiles="kube-apiserver.log kube-apiserver-audit.log kube-scheduler.log kube-controller-manager.log etcd.log etcd-events.log glbc.log cluster-autoscaler.log kube-addon-manager.log fluentd.log kubelet.cov"
+readonly master_logfiles="kube-apiserver.log kube-apiserver-audit.log kube-scheduler.log kube-controller-manager.log etcd.log etcd-events.log glbc.log cluster-autoscaler.log kube-addon-manager.log konnectivity-server.log fluentd.log kubelet.cov"
 readonly node_logfiles="kube-proxy.log fluentd.log node-problem-detector.log kubelet.cov"
 readonly node_systemd_services="node-problem-detector"
 readonly hollow_node_logfiles="kubelet-hollow-node-*.log kubeproxy-hollow-node-*.log npd-hollow-node-*.log"
@@ -222,7 +222,7 @@ function export-windows-docker-event-log() {
 function save-windows-logs-via-diagnostics-tool() {
     local node="${1}"
     local dest_dir="${2}"
-    
+
     gcloud compute instances add-metadata ${node} --metadata enable-diagnostics=true --project=${PROJECT} --zone=${ZONE}
     local logs_archive_in_gcs=$(gcloud alpha compute diagnose export-logs ${node} --zone=${ZONE} --project=${PROJECT} | tail -n 1)
     local temp_local_path="${node}.zip"
