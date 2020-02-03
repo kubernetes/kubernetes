@@ -159,28 +159,26 @@ func (f *Fit) Filter(ctx context.Context, cycleState *framework.CycleState, pod 
 		insufficientResources = Fits(pod, nodeInfo, f.ignoredResources)
 	}
 
-	// We will keep all failure reasons.
-	var failureReasons []string
-	for _, r := range insufficientResources {
-		failureReasons = append(failureReasons, getErrReason(r.ResourceName))
-	}
-
 	if len(insufficientResources) != 0 {
+		// We will keep all failure reasons.
+		failureReasons := make([]string, 0, len(insufficientResources))
+		for _, r := range insufficientResources {
+			failureReasons = append(failureReasons, r.Reason)
+		}
 		return framework.NewStatus(framework.Unschedulable, failureReasons...)
 	}
 	return nil
 }
 
-func getErrReason(rn v1.ResourceName) string {
-	return fmt.Sprintf("Insufficient %v", rn)
-}
-
 // InsufficientResource describes what kind of resource limit is hit and caused the pod to not fit the node.
 type InsufficientResource struct {
 	ResourceName v1.ResourceName
-	Requested    int64
-	Used         int64
-	Capacity     int64
+	// We explicitly have a parameter for reason to avoid formatting a message on the fly
+	// for common resources, which is expensive for cluster autoscaler simulations.
+	Reason    string
+	Requested int64
+	Used      int64
+	Capacity  int64
 }
 
 // Fits checks if node have enough resources to host the pod.
@@ -189,12 +187,13 @@ func Fits(pod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo, ignoredExtendedReso
 }
 
 func fitsRequest(podRequest *preFilterState, nodeInfo *schedulernodeinfo.NodeInfo, ignoredExtendedResources sets.String) []InsufficientResource {
-	var insufficientResources []InsufficientResource
+	insufficientResources := make([]InsufficientResource, 0, 4)
 
 	allowedPodNumber := nodeInfo.AllowedPodNumber()
 	if len(nodeInfo.Pods())+1 > allowedPodNumber {
 		insufficientResources = append(insufficientResources, InsufficientResource{
 			v1.ResourcePods,
+			"Too many pods",
 			1,
 			int64(len(nodeInfo.Pods())),
 			int64(allowedPodNumber),
@@ -216,6 +215,7 @@ func fitsRequest(podRequest *preFilterState, nodeInfo *schedulernodeinfo.NodeInf
 	if allocatable.MilliCPU < podRequest.MilliCPU+nodeInfo.RequestedResource().MilliCPU {
 		insufficientResources = append(insufficientResources, InsufficientResource{
 			v1.ResourceCPU,
+			"Insufficient cpu",
 			podRequest.MilliCPU,
 			nodeInfo.RequestedResource().MilliCPU,
 			allocatable.MilliCPU,
@@ -224,6 +224,7 @@ func fitsRequest(podRequest *preFilterState, nodeInfo *schedulernodeinfo.NodeInf
 	if allocatable.Memory < podRequest.Memory+nodeInfo.RequestedResource().Memory {
 		insufficientResources = append(insufficientResources, InsufficientResource{
 			v1.ResourceMemory,
+			"Insufficient memory",
 			podRequest.Memory,
 			nodeInfo.RequestedResource().Memory,
 			allocatable.Memory,
@@ -232,6 +233,7 @@ func fitsRequest(podRequest *preFilterState, nodeInfo *schedulernodeinfo.NodeInf
 	if allocatable.EphemeralStorage < podRequest.EphemeralStorage+nodeInfo.RequestedResource().EphemeralStorage {
 		insufficientResources = append(insufficientResources, InsufficientResource{
 			v1.ResourceEphemeralStorage,
+			"Insufficient ephemeral-storage",
 			podRequest.EphemeralStorage,
 			nodeInfo.RequestedResource().EphemeralStorage,
 			allocatable.EphemeralStorage,
@@ -249,6 +251,7 @@ func fitsRequest(podRequest *preFilterState, nodeInfo *schedulernodeinfo.NodeInf
 		if allocatable.ScalarResources[rName] < rQuant+nodeInfo.RequestedResource().ScalarResources[rName] {
 			insufficientResources = append(insufficientResources, InsufficientResource{
 				rName,
+				fmt.Sprintf("Insufficient %v", rName),
 				podRequest.ScalarResources[rName],
 				nodeInfo.RequestedResource().ScalarResources[rName],
 				allocatable.ScalarResources[rName],

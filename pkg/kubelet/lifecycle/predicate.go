@@ -178,7 +178,10 @@ func removeMissingExtendedResources(pod *v1.Pod, nodeInfo *schedulernodeinfo.Nod
 // InsufficientResourceError is an error type that indicates what kind of resource limit is
 // hit and caused the unfitting failure.
 type InsufficientResourceError struct {
-	noderesources.InsufficientResource
+	ResourceName v1.ResourceName
+	Requested    int64
+	Used         int64
+	Capacity     int64
 }
 
 func (e *InsufficientResourceError) Error() string {
@@ -224,7 +227,12 @@ func GeneralPredicates(pod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) ([]Pre
 
 	var reasons []PredicateFailureReason
 	for _, r := range noderesources.Fits(pod, nodeInfo, nil) {
-		reasons = append(reasons, &InsufficientResourceError{InsufficientResource: r})
+		reasons = append(reasons, &InsufficientResourceError{
+			ResourceName: r.ResourceName,
+			Requested:    r.Requested,
+			Used:         r.Used,
+			Capacity:     r.Capacity,
+		})
 	}
 
 	if !pluginhelper.PodMatchesNodeSelectorAndAffinityTerms(pod, nodeInfo.Node()) {
