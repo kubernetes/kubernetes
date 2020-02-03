@@ -529,6 +529,11 @@ const (
 	//
 	// Enables a feature to make secrets and configmaps data immutable.
 	ImmutableEphemeralVolumes featuregate.Feature = "ImmutableEphemeralVolumes"
+	// owner: @aojea
+	// alpha: v1.19
+	//
+	// Enables roaring bitmaps on the IP allocator and NodeIPAM controller
+	RoaringBitmaps featuregate.Feature = "RoaringBitmaps"
 )
 
 func init() {
@@ -613,6 +618,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	PodDisruptionBudget:                            {Default: true, PreRelease: featuregate.Beta},
 	ServiceTopology:                                {Default: false, PreRelease: featuregate.Alpha},
 	ImmutableEphemeralVolumes:                      {Default: false, PreRelease: featuregate.Alpha},
+	RoaringBitmaps:                                 {Default: false, PreRelease: featuregate.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
