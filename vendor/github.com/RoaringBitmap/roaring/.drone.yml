@@ -1,0 +1,20 @@
+kind: pipeline
+name: default
+
+workspace:
+  base: /go
+  path: src/github.com/RoaringBitmap/roaring
+
+steps:
+- name: test
+  image: golang
+  commands:
+  - go get -t 
+  - go test 
+  - go test -race -run TestConcurrent*
+  - go build -tags appengine 
+  - go test -tags appengine 
+  - GOARCH=386 go build
+  - GOARCH=386 go test
+  - GOARCH=arm go build
+  - GOARCH=arm64 go build
