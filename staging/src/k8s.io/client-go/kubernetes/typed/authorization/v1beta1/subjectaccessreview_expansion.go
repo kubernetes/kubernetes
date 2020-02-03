@@ -24,12 +24,7 @@ import (
 
 // The SubjectAccessReviewExpansion interface allows manually adding extra methods to the AuthorizationInterface.
 type SubjectAccessReviewExpansion interface {
-	Create(sar *authorizationapi.SubjectAccessReview) (result *authorizationapi.SubjectAccessReview, err error)
 	CreateContext(ctx context.Context, sar *authorizationapi.SubjectAccessReview) (result *authorizationapi.SubjectAccessReview, err error)
-}
-
-func (c *subjectAccessReviews) Create(sar *authorizationapi.SubjectAccessReview) (result *authorizationapi.SubjectAccessReview, err error) {
-	return c.CreateContext(context.Background(), sar)
 }
 
 func (c *subjectAccessReviews) CreateContext(ctx context.Context, sar *authorizationapi.SubjectAccessReview) (result *authorizationapi.SubjectAccessReview, err error) {
