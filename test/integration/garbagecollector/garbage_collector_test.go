@@ -314,6 +314,100 @@ func deleteNamespaceOrDie(name string, c clientset.Interface, t *testing.T) {
 	}
 }
 
+func TestCrossNamespaceReferencesWithWatchCache(t *testing.T) {
+	testCrossNamespaceReferences(t, true)
+}
+func TestCrossNamespaceReferencesWithoutWatchCache(t *testing.T) {
+	testCrossNamespaceReferences(t, false)
+}
+
+func testCrossNamespaceReferences(t *testing.T, watchCache bool) {
+	var (
+		workers            = 5
+		validChildrenCount = 10
+		namespaceB         = "b"
+		namespaceA         = "a"
+	)
+
+	// Start the server
+	testServer := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{fmt.Sprintf("--watch-cache=%v", watchCache)}, framework.SharedEtcd())
+	defer func() {
+		if testServer != nil {
+			testServer.TearDownFn()
+		}
+	}()
+	clientSet, err := clientset.NewForConfig(testServer.ClientConfig)
+	if err != nil {
+		t.Fatalf("error creating clientset: %v", err)
+	}
+
+	createNamespaceOrDie(namespaceB, clientSet, t)
+	parent, err := clientSet.CoreV1().ConfigMaps(namespaceB).Create(context.TODO(), &v1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "parent"}}, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < validChildrenCount; i++ {
+		_, err := clientSet.CoreV1().Secrets(namespaceB).Create(context.TODO(), &v1.Secret{ObjectMeta: metav1.ObjectMeta{GenerateName: "child-", OwnerReferences: []metav1.OwnerReference{{Name: "parent", Kind: "ConfigMap", APIVersion: "v1", UID: parent.UID}}}}, metav1.CreateOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	createNamespaceOrDie(namespaceA, clientSet, t)
+
+	// Construct invalid owner references:
+	invalidOwnerReferences := []metav1.OwnerReference{}
+	for i := 0; i < 25; i++ {
+		invalidOwnerReferences = append(invalidOwnerReferences, metav1.OwnerReference{Name: "invalid", UID: types.UID(fmt.Sprintf("invalid-%d", i)), APIVersion: "test/v1", Kind: fmt.Sprintf("invalid%d", i)})
+	}
+	invalidOwnerReferences = append(invalidOwnerReferences, metav1.OwnerReference{Name: "invalid", UID: parent.UID, APIVersion: "v1", Kind: "Pod"})
+
+	invalidUIDs := []types.UID{}
+	for i := 0; i < workers; i++ {
+		invalidParent, err := clientSet.CoreV1().ConfigMaps(namespaceA).Create(context.TODO(), &v1.ConfigMap{ObjectMeta: metav1.ObjectMeta{GenerateName: "invalid-child-", OwnerReferences: invalidOwnerReferences}}, metav1.CreateOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		invalidChild, err := clientSet.CoreV1().Secrets(namespaceA).Create(context.TODO(), &v1.Secret{ObjectMeta: metav1.ObjectMeta{GenerateName: "invalid-child-", OwnerReferences: invalidOwnerReferences}}, metav1.CreateOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		invalidUIDs = append(invalidUIDs, invalidParent.UID, invalidChild.UID)
+	}
+
+	// start GC with existing objects in place to simulate controller-manager restart
+	ctx := setupWithServer(t, testServer, workers)
+	defer ctx.tearDown()
+	testServer = nil
+
+	// Wait until the GC graph fills
+	if err := wait.PollImmediate(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+		for _, uid := range invalidUIDs {
+			if !ctx.gc.GraphHasUID(uid) {
+				t.Log("waiting for all invalid object uids to appear in the GC graph")
+				return false, nil
+			}
+		}
+		return true, nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Wait for a little while to make sure they didn't trigger deletion of the valid children
+	if err := wait.Poll(time.Second, 5*time.Second, func() (bool, error) {
+		children, err := clientSet.CoreV1().Secrets(namespaceB).List(context.TODO(), metav1.ListOptions{})
+		if err != nil {
+			return false, err
+		}
+		if len(children.Items) != validChildrenCount {
+			return false, fmt.Errorf("expected %d children, got %d", validChildrenCount, len(children.Items))
+		}
+		return false, nil
+	}); err != nil && err != wait.ErrWaitTimeout {
+		t.Fatal(err)
+	}
+}
+
 // This test simulates the cascading deletion.
 func TestCascadingDeletion(t *testing.T) {
 	ctx := setup(t, 5)
