@@ -19,6 +19,7 @@ package e2enode
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"os/exec"
 	"regexp"
 	"strconv"
@@ -491,9 +492,21 @@ func runTopologyManagerNodeAlignmentSinglePodTest(f *framework.Framework, sriovR
 }
 
 func runTopologyManagerNodeAlignmentSuiteTests(f *framework.Framework, numaNodes int) {
+	cmData := testfiles.ReadOrDie(SRIOVDevicePluginCMYAML)
 	var err error
 
-	configMap := readConfigMapV1OrDie(testfiles.ReadOrDie(SRIOVDevicePluginCMYAML))
+	// the SRIOVDP configuration is hw-dependent, so we allow per-test-host customization.
+	framework.Logf("host-local SRIOV Device Plugin Config Map %q", framework.TestContext.SriovdpConfigMapFile)
+	if framework.TestContext.SriovdpConfigMapFile != "" {
+		cmData, err = ioutil.ReadFile(framework.TestContext.SriovdpConfigMapFile)
+		if err != nil {
+			framework.Failf("unable to load the SRIOV Device Plugin ConfigMap: %v", err)
+		}
+	} else {
+		framework.Logf("Using built-in SRIOV Device Plugin Config Map")
+	}
+
+	configMap := readConfigMapV1OrDie(cmData)
 	ginkgo.By(fmt.Sprintf("Creating configMap %v/%v", metav1.NamespaceSystem, configMap.Name))
 	if _, err = f.ClientSet.CoreV1().ConfigMaps(metav1.NamespaceSystem).Create(context.TODO(), configMap, metav1.CreateOptions{}); err != nil {
 		framework.Failf("unable to create test configMap %s: %v", configMap.Name, err)

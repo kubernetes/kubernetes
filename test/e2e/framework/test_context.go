@@ -167,6 +167,9 @@ type TestContextType struct {
 
 	// ProgressReportURL is the URL which progress updates will be posted to as tests complete. If empty, no updates are sent.
 	ProgressReportURL string
+
+	// SriovdpConfigMapFile is the path to the ConfigMap to configure the SRIOV device plugin on this host.
+	SriovdpConfigMapFile string
 }
 
 // NodeKillerConfig describes configuration of NodeKiller -- a utility to
