@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	informers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -37,6 +38,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam/cidrset"
 	nodeutil "k8s.io/kubernetes/pkg/controller/util/node"
+	"k8s.io/kubernetes/pkg/features"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 )
 
@@ -86,7 +88,13 @@ func NewCIDRRangeAllocator(client clientset.Interface, nodeInformer informers.No
 	// cidrSet are mapped to clusterCIDR by index
 	cidrSets := make([]cidrset.Interface, len(allocatorParams.ClusterCIDRs))
 	for idx, cidr := range allocatorParams.ClusterCIDRs {
-		cidrSet, err := cidrset.NewCIDRSet(cidr, allocatorParams.NodeCIDRMaskSizes[idx])
+		var cidrSet cidrset.Interface
+		var err error
+		if !utilfeature.DefaultFeatureGate.Enabled(features.RoaringBitmaps) {
+			cidrSet, err = cidrset.NewCIDRSet(cidr, allocatorParams.NodeCIDRMaskSizes[idx])
+		} else {
+			cidrSet, err = cidrset.NewCIDRSetRoaring(cidr, allocatorParams.NodeCIDRMaskSizes[idx])
+		}
 		if err != nil {
 			return nil, err
 		}
