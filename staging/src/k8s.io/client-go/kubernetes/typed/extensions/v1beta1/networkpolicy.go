@@ -38,14 +38,14 @@ type NetworkPoliciesGetter interface {
 
 // NetworkPolicyInterface has methods to work with NetworkPolicy resources.
 type NetworkPolicyInterface interface {
-	Create(*v1beta1.NetworkPolicy) (*v1beta1.NetworkPolicy, error)
-	Update(*v1beta1.NetworkPolicy) (*v1beta1.NetworkPolicy, error)
-	Delete(name string, options *v1.DeleteOptions) error
-	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string, options v1.GetOptions) (*v1beta1.NetworkPolicy, error)
-	List(opts v1.ListOptions) (*v1beta1.NetworkPolicyList, error)
-	Watch(opts v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.NetworkPolicy, err error)
+	Create(context.Context, *v1beta1.NetworkPolicy) (*v1beta1.NetworkPolicy, error)
+	Update(context.Context, *v1beta1.NetworkPolicy) (*v1beta1.NetworkPolicy, error)
+	Delete(ctx context.Context, name string, options *v1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error
+	Get(ctx context.Context, name string, options v1.GetOptions) (*v1beta1.NetworkPolicy, error)
+	List(ctx context.Context, opts v1.ListOptions) (*v1beta1.NetworkPolicyList, error)
+	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.NetworkPolicy, err error)
 	NetworkPolicyExpansion
 }
 
@@ -64,20 +64,20 @@ func newNetworkPolicies(c *ExtensionsV1beta1Client, namespace string) *networkPo
 }
 
 // Get takes name of the networkPolicy, and returns the corresponding networkPolicy object, and an error if there is any.
-func (c *networkPolicies) Get(name string, options v1.GetOptions) (result *v1beta1.NetworkPolicy, err error) {
+func (c *networkPolicies) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.NetworkPolicy, err error) {
 	result = &v1beta1.NetworkPolicy{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("networkpolicies").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of NetworkPolicies that match those selectors.
-func (c *networkPolicies) List(opts v1.ListOptions) (result *v1beta1.NetworkPolicyList, err error) {
+func (c *networkPolicies) List(ctx context.Context, opts v1.ListOptions) (result *v1beta1.NetworkPolicyList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -88,13 +88,13 @@ func (c *networkPolicies) List(opts v1.ListOptions) (result *v1beta1.NetworkPoli
 		Resource("networkpolicies").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Watch returns a watch.Interface that watches the requested networkPolicies.
-func (c *networkPolicies) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *networkPolicies) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -105,47 +105,47 @@ func (c *networkPolicies) Watch(opts v1.ListOptions) (watch.Interface, error) {
 		Resource("networkpolicies").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch(context.TODO())
+		Watch(ctx)
 }
 
 // Create takes the representation of a networkPolicy and creates it.  Returns the server's representation of the networkPolicy, and an error, if there is any.
-func (c *networkPolicies) Create(networkPolicy *v1beta1.NetworkPolicy) (result *v1beta1.NetworkPolicy, err error) {
+func (c *networkPolicies) Create(ctx context.Context, networkPolicy *v1beta1.NetworkPolicy) (result *v1beta1.NetworkPolicy, err error) {
 	result = &v1beta1.NetworkPolicy{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("networkpolicies").
 		Body(networkPolicy).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Update takes the representation of a networkPolicy and updates it. Returns the server's representation of the networkPolicy, and an error, if there is any.
-func (c *networkPolicies) Update(networkPolicy *v1beta1.NetworkPolicy) (result *v1beta1.NetworkPolicy, err error) {
+func (c *networkPolicies) Update(ctx context.Context, networkPolicy *v1beta1.NetworkPolicy) (result *v1beta1.NetworkPolicy, err error) {
 	result = &v1beta1.NetworkPolicy{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("networkpolicies").
 		Name(networkPolicy.Name).
 		Body(networkPolicy).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Delete takes name of the networkPolicy and deletes it. Returns an error if one occurs.
-func (c *networkPolicies) Delete(name string, options *v1.DeleteOptions) error {
+func (c *networkPolicies) Delete(ctx context.Context, name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("networkpolicies").
 		Name(name).
 		Body(options).
-		Do(context.TODO()).
+		Do(ctx).
 		Error()
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *networkPolicies) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *networkPolicies) DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	var timeout time.Duration
 	if listOptions.TimeoutSeconds != nil {
 		timeout = time.Duration(*listOptions.TimeoutSeconds) * time.Second
@@ -156,12 +156,12 @@ func (c *networkPolicies) DeleteCollection(options *v1.DeleteOptions, listOption
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Timeout(timeout).
 		Body(options).
-		Do(context.TODO()).
+		Do(ctx).
 		Error()
 }
 
 // Patch applies the patch and returns the patched networkPolicy.
-func (c *networkPolicies) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.NetworkPolicy, err error) {
+func (c *networkPolicies) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.NetworkPolicy, err error) {
 	result = &v1beta1.NetworkPolicy{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
@@ -169,7 +169,7 @@ func (c *networkPolicies) Patch(name string, pt types.PatchType, data []byte, su
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }

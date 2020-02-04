@@ -38,15 +38,15 @@ type DaemonSetsGetter interface {
 
 // DaemonSetInterface has methods to work with DaemonSet resources.
 type DaemonSetInterface interface {
-	Create(*v1beta2.DaemonSet) (*v1beta2.DaemonSet, error)
-	Update(*v1beta2.DaemonSet) (*v1beta2.DaemonSet, error)
-	UpdateStatus(*v1beta2.DaemonSet) (*v1beta2.DaemonSet, error)
-	Delete(name string, options *v1.DeleteOptions) error
-	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string, options v1.GetOptions) (*v1beta2.DaemonSet, error)
-	List(opts v1.ListOptions) (*v1beta2.DaemonSetList, error)
-	Watch(opts v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta2.DaemonSet, err error)
+	Create(context.Context, *v1beta2.DaemonSet) (*v1beta2.DaemonSet, error)
+	Update(context.Context, *v1beta2.DaemonSet) (*v1beta2.DaemonSet, error)
+	UpdateStatus(context.Context, *v1beta2.DaemonSet) (*v1beta2.DaemonSet, error)
+	Delete(ctx context.Context, name string, options *v1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error
+	Get(ctx context.Context, name string, options v1.GetOptions) (*v1beta2.DaemonSet, error)
+	List(ctx context.Context, opts v1.ListOptions) (*v1beta2.DaemonSetList, error)
+	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta2.DaemonSet, err error)
 	DaemonSetExpansion
 }
 
@@ -65,20 +65,20 @@ func newDaemonSets(c *AppsV1beta2Client, namespace string) *daemonSets {
 }
 
 // Get takes name of the daemonSet, and returns the corresponding daemonSet object, and an error if there is any.
-func (c *daemonSets) Get(name string, options v1.GetOptions) (result *v1beta2.DaemonSet, err error) {
+func (c *daemonSets) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta2.DaemonSet, err error) {
 	result = &v1beta2.DaemonSet{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("daemonsets").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of DaemonSets that match those selectors.
-func (c *daemonSets) List(opts v1.ListOptions) (result *v1beta2.DaemonSetList, err error) {
+func (c *daemonSets) List(ctx context.Context, opts v1.ListOptions) (result *v1beta2.DaemonSetList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -89,13 +89,13 @@ func (c *daemonSets) List(opts v1.ListOptions) (result *v1beta2.DaemonSetList, e
 		Resource("daemonsets").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Watch returns a watch.Interface that watches the requested daemonSets.
-func (c *daemonSets) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *daemonSets) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -106,30 +106,30 @@ func (c *daemonSets) Watch(opts v1.ListOptions) (watch.Interface, error) {
 		Resource("daemonsets").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch(context.TODO())
+		Watch(ctx)
 }
 
 // Create takes the representation of a daemonSet and creates it.  Returns the server's representation of the daemonSet, and an error, if there is any.
-func (c *daemonSets) Create(daemonSet *v1beta2.DaemonSet) (result *v1beta2.DaemonSet, err error) {
+func (c *daemonSets) Create(ctx context.Context, daemonSet *v1beta2.DaemonSet) (result *v1beta2.DaemonSet, err error) {
 	result = &v1beta2.DaemonSet{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("daemonsets").
 		Body(daemonSet).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Update takes the representation of a daemonSet and updates it. Returns the server's representation of the daemonSet, and an error, if there is any.
-func (c *daemonSets) Update(daemonSet *v1beta2.DaemonSet) (result *v1beta2.DaemonSet, err error) {
+func (c *daemonSets) Update(ctx context.Context, daemonSet *v1beta2.DaemonSet) (result *v1beta2.DaemonSet, err error) {
 	result = &v1beta2.DaemonSet{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("daemonsets").
 		Name(daemonSet.Name).
 		Body(daemonSet).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }
@@ -137,7 +137,7 @@ func (c *daemonSets) Update(daemonSet *v1beta2.DaemonSet) (result *v1beta2.Daemo
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 
-func (c *daemonSets) UpdateStatus(daemonSet *v1beta2.DaemonSet) (result *v1beta2.DaemonSet, err error) {
+func (c *daemonSets) UpdateStatus(ctx context.Context, daemonSet *v1beta2.DaemonSet) (result *v1beta2.DaemonSet, err error) {
 	result = &v1beta2.DaemonSet{}
 	err = c.client.Put().
 		Namespace(c.ns).
@@ -145,24 +145,24 @@ func (c *daemonSets) UpdateStatus(daemonSet *v1beta2.DaemonSet) (result *v1beta2
 		Name(daemonSet.Name).
 		SubResource("status").
 		Body(daemonSet).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Delete takes name of the daemonSet and deletes it. Returns an error if one occurs.
-func (c *daemonSets) Delete(name string, options *v1.DeleteOptions) error {
+func (c *daemonSets) Delete(ctx context.Context, name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("daemonsets").
 		Name(name).
 		Body(options).
-		Do(context.TODO()).
+		Do(ctx).
 		Error()
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *daemonSets) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *daemonSets) DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	var timeout time.Duration
 	if listOptions.TimeoutSeconds != nil {
 		timeout = time.Duration(*listOptions.TimeoutSeconds) * time.Second
@@ -173,12 +173,12 @@ func (c *daemonSets) DeleteCollection(options *v1.DeleteOptions, listOptions v1.
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Timeout(timeout).
 		Body(options).
-		Do(context.TODO()).
+		Do(ctx).
 		Error()
 }
 
 // Patch applies the patch and returns the patched daemonSet.
-func (c *daemonSets) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta2.DaemonSet, err error) {
+func (c *daemonSets) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta2.DaemonSet, err error) {
 	result = &v1beta2.DaemonSet{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
@@ -186,7 +186,7 @@ func (c *daemonSets) Patch(name string, pt types.PatchType, data []byte, subreso
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }

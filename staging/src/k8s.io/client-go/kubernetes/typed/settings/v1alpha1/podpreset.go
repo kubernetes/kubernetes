@@ -38,14 +38,14 @@ type PodPresetsGetter interface {
 
 // PodPresetInterface has methods to work with PodPreset resources.
 type PodPresetInterface interface {
-	Create(*v1alpha1.PodPreset) (*v1alpha1.PodPreset, error)
-	Update(*v1alpha1.PodPreset) (*v1alpha1.PodPreset, error)
-	Delete(name string, options *v1.DeleteOptions) error
-	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string, options v1.GetOptions) (*v1alpha1.PodPreset, error)
-	List(opts v1.ListOptions) (*v1alpha1.PodPresetList, error)
-	Watch(opts v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.PodPreset, err error)
+	Create(context.Context, *v1alpha1.PodPreset) (*v1alpha1.PodPreset, error)
+	Update(context.Context, *v1alpha1.PodPreset) (*v1alpha1.PodPreset, error)
+	Delete(ctx context.Context, name string, options *v1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error
+	Get(ctx context.Context, name string, options v1.GetOptions) (*v1alpha1.PodPreset, error)
+	List(ctx context.Context, opts v1.ListOptions) (*v1alpha1.PodPresetList, error)
+	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.PodPreset, err error)
 	PodPresetExpansion
 }
 
@@ -64,20 +64,20 @@ func newPodPresets(c *SettingsV1alpha1Client, namespace string) *podPresets {
 }
 
 // Get takes name of the podPreset, and returns the corresponding podPreset object, and an error if there is any.
-func (c *podPresets) Get(name string, options v1.GetOptions) (result *v1alpha1.PodPreset, err error) {
+func (c *podPresets) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.PodPreset, err error) {
 	result = &v1alpha1.PodPreset{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("podpresets").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of PodPresets that match those selectors.
-func (c *podPresets) List(opts v1.ListOptions) (result *v1alpha1.PodPresetList, err error) {
+func (c *podPresets) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.PodPresetList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -88,13 +88,13 @@ func (c *podPresets) List(opts v1.ListOptions) (result *v1alpha1.PodPresetList, 
 		Resource("podpresets").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Watch returns a watch.Interface that watches the requested podPresets.
-func (c *podPresets) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *podPresets) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -105,47 +105,47 @@ func (c *podPresets) Watch(opts v1.ListOptions) (watch.Interface, error) {
 		Resource("podpresets").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch(context.TODO())
+		Watch(ctx)
 }
 
 // Create takes the representation of a podPreset and creates it.  Returns the server's representation of the podPreset, and an error, if there is any.
-func (c *podPresets) Create(podPreset *v1alpha1.PodPreset) (result *v1alpha1.PodPreset, err error) {
+func (c *podPresets) Create(ctx context.Context, podPreset *v1alpha1.PodPreset) (result *v1alpha1.PodPreset, err error) {
 	result = &v1alpha1.PodPreset{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("podpresets").
 		Body(podPreset).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Update takes the representation of a podPreset and updates it. Returns the server's representation of the podPreset, and an error, if there is any.
-func (c *podPresets) Update(podPreset *v1alpha1.PodPreset) (result *v1alpha1.PodPreset, err error) {
+func (c *podPresets) Update(ctx context.Context, podPreset *v1alpha1.PodPreset) (result *v1alpha1.PodPreset, err error) {
 	result = &v1alpha1.PodPreset{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("podpresets").
 		Name(podPreset.Name).
 		Body(podPreset).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Delete takes name of the podPreset and deletes it. Returns an error if one occurs.
-func (c *podPresets) Delete(name string, options *v1.DeleteOptions) error {
+func (c *podPresets) Delete(ctx context.Context, name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("podpresets").
 		Name(name).
 		Body(options).
-		Do(context.TODO()).
+		Do(ctx).
 		Error()
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *podPresets) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *podPresets) DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	var timeout time.Duration
 	if listOptions.TimeoutSeconds != nil {
 		timeout = time.Duration(*listOptions.TimeoutSeconds) * time.Second
@@ -156,12 +156,12 @@ func (c *podPresets) DeleteCollection(options *v1.DeleteOptions, listOptions v1.
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Timeout(timeout).
 		Body(options).
-		Do(context.TODO()).
+		Do(ctx).
 		Error()
 }
 
 // Patch applies the patch and returns the patched podPreset.
-func (c *podPresets) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.PodPreset, err error) {
+func (c *podPresets) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.PodPreset, err error) {
 	result = &v1alpha1.PodPreset{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
@@ -169,7 +169,7 @@ func (c *podPresets) Patch(name string, pt types.PatchType, data []byte, subreso
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }

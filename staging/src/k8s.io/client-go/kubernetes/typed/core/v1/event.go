@@ -38,14 +38,14 @@ type EventsGetter interface {
 
 // EventInterface has methods to work with Event resources.
 type EventInterface interface {
-	Create(*v1.Event) (*v1.Event, error)
-	Update(*v1.Event) (*v1.Event, error)
-	Delete(name string, options *metav1.DeleteOptions) error
-	DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error
-	Get(name string, options metav1.GetOptions) (*v1.Event, error)
-	List(opts metav1.ListOptions) (*v1.EventList, error)
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Event, err error)
+	Create(context.Context, *v1.Event) (*v1.Event, error)
+	Update(context.Context, *v1.Event) (*v1.Event, error)
+	Delete(ctx context.Context, name string, options *metav1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, options *metav1.DeleteOptions, listOptions metav1.ListOptions) error
+	Get(ctx context.Context, name string, options metav1.GetOptions) (*v1.Event, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*v1.EventList, error)
+	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Event, err error)
 	EventExpansion
 }
 
@@ -64,20 +64,20 @@ func newEvents(c *CoreV1Client, namespace string) *events {
 }
 
 // Get takes name of the event, and returns the corresponding event object, and an error if there is any.
-func (c *events) Get(name string, options metav1.GetOptions) (result *v1.Event, err error) {
+func (c *events) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.Event, err error) {
 	result = &v1.Event{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("events").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of Events that match those selectors.
-func (c *events) List(opts metav1.ListOptions) (result *v1.EventList, err error) {
+func (c *events) List(ctx context.Context, opts metav1.ListOptions) (result *v1.EventList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -88,13 +88,13 @@ func (c *events) List(opts metav1.ListOptions) (result *v1.EventList, err error)
 		Resource("events").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Watch returns a watch.Interface that watches the requested events.
-func (c *events) Watch(opts metav1.ListOptions) (watch.Interface, error) {
+func (c *events) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -105,47 +105,47 @@ func (c *events) Watch(opts metav1.ListOptions) (watch.Interface, error) {
 		Resource("events").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch(context.TODO())
+		Watch(ctx)
 }
 
 // Create takes the representation of a event and creates it.  Returns the server's representation of the event, and an error, if there is any.
-func (c *events) Create(event *v1.Event) (result *v1.Event, err error) {
+func (c *events) Create(ctx context.Context, event *v1.Event) (result *v1.Event, err error) {
 	result = &v1.Event{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("events").
 		Body(event).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Update takes the representation of a event and updates it. Returns the server's representation of the event, and an error, if there is any.
-func (c *events) Update(event *v1.Event) (result *v1.Event, err error) {
+func (c *events) Update(ctx context.Context, event *v1.Event) (result *v1.Event, err error) {
 	result = &v1.Event{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("events").
 		Name(event.Name).
 		Body(event).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Delete takes name of the event and deletes it. Returns an error if one occurs.
-func (c *events) Delete(name string, options *metav1.DeleteOptions) error {
+func (c *events) Delete(ctx context.Context, name string, options *metav1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("events").
 		Name(name).
 		Body(options).
-		Do(context.TODO()).
+		Do(ctx).
 		Error()
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *events) DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error {
+func (c *events) DeleteCollection(ctx context.Context, options *metav1.DeleteOptions, listOptions metav1.ListOptions) error {
 	var timeout time.Duration
 	if listOptions.TimeoutSeconds != nil {
 		timeout = time.Duration(*listOptions.TimeoutSeconds) * time.Second
@@ -156,12 +156,12 @@ func (c *events) DeleteCollection(options *metav1.DeleteOptions, listOptions met
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Timeout(timeout).
 		Body(options).
-		Do(context.TODO()).
+		Do(ctx).
 		Error()
 }
 
 // Patch applies the patch and returns the patched event.
-func (c *events) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Event, err error) {
+func (c *events) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Event, err error) {
 	result = &v1.Event{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
@@ -169,7 +169,7 @@ func (c *events) Patch(name string, pt types.PatchType, data []byte, subresource
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }

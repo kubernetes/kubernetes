@@ -38,14 +38,14 @@ type RoleBindingsGetter interface {
 
 // RoleBindingInterface has methods to work with RoleBinding resources.
 type RoleBindingInterface interface {
-	Create(*v1alpha1.RoleBinding) (*v1alpha1.RoleBinding, error)
-	Update(*v1alpha1.RoleBinding) (*v1alpha1.RoleBinding, error)
-	Delete(name string, options *v1.DeleteOptions) error
-	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string, options v1.GetOptions) (*v1alpha1.RoleBinding, error)
-	List(opts v1.ListOptions) (*v1alpha1.RoleBindingList, error)
-	Watch(opts v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.RoleBinding, err error)
+	Create(context.Context, *v1alpha1.RoleBinding) (*v1alpha1.RoleBinding, error)
+	Update(context.Context, *v1alpha1.RoleBinding) (*v1alpha1.RoleBinding, error)
+	Delete(ctx context.Context, name string, options *v1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error
+	Get(ctx context.Context, name string, options v1.GetOptions) (*v1alpha1.RoleBinding, error)
+	List(ctx context.Context, opts v1.ListOptions) (*v1alpha1.RoleBindingList, error)
+	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.RoleBinding, err error)
 	RoleBindingExpansion
 }
 
@@ -64,20 +64,20 @@ func newRoleBindings(c *RbacV1alpha1Client, namespace string) *roleBindings {
 }
 
 // Get takes name of the roleBinding, and returns the corresponding roleBinding object, and an error if there is any.
-func (c *roleBindings) Get(name string, options v1.GetOptions) (result *v1alpha1.RoleBinding, err error) {
+func (c *roleBindings) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.RoleBinding, err error) {
 	result = &v1alpha1.RoleBinding{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("rolebindings").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of RoleBindings that match those selectors.
-func (c *roleBindings) List(opts v1.ListOptions) (result *v1alpha1.RoleBindingList, err error) {
+func (c *roleBindings) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.RoleBindingList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -88,13 +88,13 @@ func (c *roleBindings) List(opts v1.ListOptions) (result *v1alpha1.RoleBindingLi
 		Resource("rolebindings").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Watch returns a watch.Interface that watches the requested roleBindings.
-func (c *roleBindings) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *roleBindings) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -105,47 +105,47 @@ func (c *roleBindings) Watch(opts v1.ListOptions) (watch.Interface, error) {
 		Resource("rolebindings").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch(context.TODO())
+		Watch(ctx)
 }
 
 // Create takes the representation of a roleBinding and creates it.  Returns the server's representation of the roleBinding, and an error, if there is any.
-func (c *roleBindings) Create(roleBinding *v1alpha1.RoleBinding) (result *v1alpha1.RoleBinding, err error) {
+func (c *roleBindings) Create(ctx context.Context, roleBinding *v1alpha1.RoleBinding) (result *v1alpha1.RoleBinding, err error) {
 	result = &v1alpha1.RoleBinding{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("rolebindings").
 		Body(roleBinding).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Update takes the representation of a roleBinding and updates it. Returns the server's representation of the roleBinding, and an error, if there is any.
-func (c *roleBindings) Update(roleBinding *v1alpha1.RoleBinding) (result *v1alpha1.RoleBinding, err error) {
+func (c *roleBindings) Update(ctx context.Context, roleBinding *v1alpha1.RoleBinding) (result *v1alpha1.RoleBinding, err error) {
 	result = &v1alpha1.RoleBinding{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("rolebindings").
 		Name(roleBinding.Name).
 		Body(roleBinding).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Delete takes name of the roleBinding and deletes it. Returns an error if one occurs.
-func (c *roleBindings) Delete(name string, options *v1.DeleteOptions) error {
+func (c *roleBindings) Delete(ctx context.Context, name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("rolebindings").
 		Name(name).
 		Body(options).
-		Do(context.TODO()).
+		Do(ctx).
 		Error()
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *roleBindings) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *roleBindings) DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	var timeout time.Duration
 	if listOptions.TimeoutSeconds != nil {
 		timeout = time.Duration(*listOptions.TimeoutSeconds) * time.Second
@@ -156,12 +156,12 @@ func (c *roleBindings) DeleteCollection(options *v1.DeleteOptions, listOptions v
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Timeout(timeout).
 		Body(options).
-		Do(context.TODO()).
+		Do(ctx).
 		Error()
 }
 
 // Patch applies the patch and returns the patched roleBinding.
-func (c *roleBindings) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.RoleBinding, err error) {
+func (c *roleBindings) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.RoleBinding, err error) {
 	result = &v1alpha1.RoleBinding{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
@@ -169,7 +169,7 @@ func (c *roleBindings) Patch(name string, pt types.PatchType, data []byte, subre
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }

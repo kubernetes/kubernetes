@@ -38,15 +38,15 @@ type ReplicaSetsGetter interface {
 
 // ReplicaSetInterface has methods to work with ReplicaSet resources.
 type ReplicaSetInterface interface {
-	Create(*v1beta2.ReplicaSet) (*v1beta2.ReplicaSet, error)
-	Update(*v1beta2.ReplicaSet) (*v1beta2.ReplicaSet, error)
-	UpdateStatus(*v1beta2.ReplicaSet) (*v1beta2.ReplicaSet, error)
-	Delete(name string, options *v1.DeleteOptions) error
-	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string, options v1.GetOptions) (*v1beta2.ReplicaSet, error)
-	List(opts v1.ListOptions) (*v1beta2.ReplicaSetList, error)
-	Watch(opts v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta2.ReplicaSet, err error)
+	Create(context.Context, *v1beta2.ReplicaSet) (*v1beta2.ReplicaSet, error)
+	Update(context.Context, *v1beta2.ReplicaSet) (*v1beta2.ReplicaSet, error)
+	UpdateStatus(context.Context, *v1beta2.ReplicaSet) (*v1beta2.ReplicaSet, error)
+	Delete(ctx context.Context, name string, options *v1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error
+	Get(ctx context.Context, name string, options v1.GetOptions) (*v1beta2.ReplicaSet, error)
+	List(ctx context.Context, opts v1.ListOptions) (*v1beta2.ReplicaSetList, error)
+	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta2.ReplicaSet, err error)
 	ReplicaSetExpansion
 }
 
@@ -65,20 +65,20 @@ func newReplicaSets(c *AppsV1beta2Client, namespace string) *replicaSets {
 }
 
 // Get takes name of the replicaSet, and returns the corresponding replicaSet object, and an error if there is any.
-func (c *replicaSets) Get(name string, options v1.GetOptions) (result *v1beta2.ReplicaSet, err error) {
+func (c *replicaSets) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta2.ReplicaSet, err error) {
 	result = &v1beta2.ReplicaSet{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("replicasets").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of ReplicaSets that match those selectors.
-func (c *replicaSets) List(opts v1.ListOptions) (result *v1beta2.ReplicaSetList, err error) {
+func (c *replicaSets) List(ctx context.Context, opts v1.ListOptions) (result *v1beta2.ReplicaSetList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -89,13 +89,13 @@ func (c *replicaSets) List(opts v1.ListOptions) (result *v1beta2.ReplicaSetList,
 		Resource("replicasets").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Watch returns a watch.Interface that watches the requested replicaSets.
-func (c *replicaSets) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *replicaSets) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -106,30 +106,30 @@ func (c *replicaSets) Watch(opts v1.ListOptions) (watch.Interface, error) {
 		Resource("replicasets").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch(context.TODO())
+		Watch(ctx)
 }
 
 // Create takes the representation of a replicaSet and creates it.  Returns the server's representation of the replicaSet, and an error, if there is any.
-func (c *replicaSets) Create(replicaSet *v1beta2.ReplicaSet) (result *v1beta2.ReplicaSet, err error) {
+func (c *replicaSets) Create(ctx context.Context, replicaSet *v1beta2.ReplicaSet) (result *v1beta2.ReplicaSet, err error) {
 	result = &v1beta2.ReplicaSet{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("replicasets").
 		Body(replicaSet).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Update takes the representation of a replicaSet and updates it. Returns the server's representation of the replicaSet, and an error, if there is any.
-func (c *replicaSets) Update(replicaSet *v1beta2.ReplicaSet) (result *v1beta2.ReplicaSet, err error) {
+func (c *replicaSets) Update(ctx context.Context, replicaSet *v1beta2.ReplicaSet) (result *v1beta2.ReplicaSet, err error) {
 	result = &v1beta2.ReplicaSet{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("replicasets").
 		Name(replicaSet.Name).
 		Body(replicaSet).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }
@@ -137,7 +137,7 @@ func (c *replicaSets) Update(replicaSet *v1beta2.ReplicaSet) (result *v1beta2.Re
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 
-func (c *replicaSets) UpdateStatus(replicaSet *v1beta2.ReplicaSet) (result *v1beta2.ReplicaSet, err error) {
+func (c *replicaSets) UpdateStatus(ctx context.Context, replicaSet *v1beta2.ReplicaSet) (result *v1beta2.ReplicaSet, err error) {
 	result = &v1beta2.ReplicaSet{}
 	err = c.client.Put().
 		Namespace(c.ns).
@@ -145,24 +145,24 @@ func (c *replicaSets) UpdateStatus(replicaSet *v1beta2.ReplicaSet) (result *v1be
 		Name(replicaSet.Name).
 		SubResource("status").
 		Body(replicaSet).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Delete takes name of the replicaSet and deletes it. Returns an error if one occurs.
-func (c *replicaSets) Delete(name string, options *v1.DeleteOptions) error {
+func (c *replicaSets) Delete(ctx context.Context, name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("replicasets").
 		Name(name).
 		Body(options).
-		Do(context.TODO()).
+		Do(ctx).
 		Error()
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *replicaSets) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *replicaSets) DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	var timeout time.Duration
 	if listOptions.TimeoutSeconds != nil {
 		timeout = time.Duration(*listOptions.TimeoutSeconds) * time.Second
@@ -173,12 +173,12 @@ func (c *replicaSets) DeleteCollection(options *v1.DeleteOptions, listOptions v1
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Timeout(timeout).
 		Body(options).
-		Do(context.TODO()).
+		Do(ctx).
 		Error()
 }
 
 // Patch applies the patch and returns the patched replicaSet.
-func (c *replicaSets) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta2.ReplicaSet, err error) {
+func (c *replicaSets) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta2.ReplicaSet, err error) {
 	result = &v1beta2.ReplicaSet{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
@@ -186,7 +186,7 @@ func (c *replicaSets) Patch(name string, pt types.PatchType, data []byte, subres
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }

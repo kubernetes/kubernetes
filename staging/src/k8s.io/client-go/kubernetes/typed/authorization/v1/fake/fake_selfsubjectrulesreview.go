@@ -19,6 +19,8 @@ limitations under the License.
 package fake
 
 import (
+	"context"
+
 	v1 "k8s.io/api/authorization/v1"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	testing "k8s.io/client-go/testing"
@@ -34,7 +36,7 @@ var selfsubjectrulesreviewsResource = schema.GroupVersionResource{Group: "author
 var selfsubjectrulesreviewsKind = schema.GroupVersionKind{Group: "authorization.k8s.io", Version: "v1", Kind: "SelfSubjectRulesReview"}
 
 // Create takes the representation of a selfSubjectRulesReview and creates it.  Returns the server's representation of the selfSubjectRulesReview, and an error, if there is any.
-func (c *FakeSelfSubjectRulesReviews) Create(selfSubjectRulesReview *v1.SelfSubjectRulesReview) (result *v1.SelfSubjectRulesReview, err error) {
+func (c *FakeSelfSubjectRulesReviews) Create(ctx context.Context, selfSubjectRulesReview *v1.SelfSubjectRulesReview) (result *v1.SelfSubjectRulesReview, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootCreateAction(selfsubjectrulesreviewsResource, selfSubjectRulesReview), &v1.SelfSubjectRulesReview{})
 	if obj == nil {

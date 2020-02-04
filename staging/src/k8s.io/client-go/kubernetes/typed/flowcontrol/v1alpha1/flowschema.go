@@ -38,15 +38,15 @@ type FlowSchemasGetter interface {
 
 // FlowSchemaInterface has methods to work with FlowSchema resources.
 type FlowSchemaInterface interface {
-	Create(*v1alpha1.FlowSchema) (*v1alpha1.FlowSchema, error)
-	Update(*v1alpha1.FlowSchema) (*v1alpha1.FlowSchema, error)
-	UpdateStatus(*v1alpha1.FlowSchema) (*v1alpha1.FlowSchema, error)
-	Delete(name string, options *v1.DeleteOptions) error
-	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string, options v1.GetOptions) (*v1alpha1.FlowSchema, error)
-	List(opts v1.ListOptions) (*v1alpha1.FlowSchemaList, error)
-	Watch(opts v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.FlowSchema, err error)
+	Create(context.Context, *v1alpha1.FlowSchema) (*v1alpha1.FlowSchema, error)
+	Update(context.Context, *v1alpha1.FlowSchema) (*v1alpha1.FlowSchema, error)
+	UpdateStatus(context.Context, *v1alpha1.FlowSchema) (*v1alpha1.FlowSchema, error)
+	Delete(ctx context.Context, name string, options *v1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error
+	Get(ctx context.Context, name string, options v1.GetOptions) (*v1alpha1.FlowSchema, error)
+	List(ctx context.Context, opts v1.ListOptions) (*v1alpha1.FlowSchemaList, error)
+	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.FlowSchema, err error)
 	FlowSchemaExpansion
 }
 
@@ -63,19 +63,19 @@ func newFlowSchemas(c *FlowcontrolV1alpha1Client) *flowSchemas {
 }
 
 // Get takes name of the flowSchema, and returns the corresponding flowSchema object, and an error if there is any.
-func (c *flowSchemas) Get(name string, options v1.GetOptions) (result *v1alpha1.FlowSchema, err error) {
+func (c *flowSchemas) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.FlowSchema, err error) {
 	result = &v1alpha1.FlowSchema{}
 	err = c.client.Get().
 		Resource("flowschemas").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of FlowSchemas that match those selectors.
-func (c *flowSchemas) List(opts v1.ListOptions) (result *v1alpha1.FlowSchemaList, err error) {
+func (c *flowSchemas) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.FlowSchemaList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -85,13 +85,13 @@ func (c *flowSchemas) List(opts v1.ListOptions) (result *v1alpha1.FlowSchemaList
 		Resource("flowschemas").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Watch returns a watch.Interface that watches the requested flowSchemas.
-func (c *flowSchemas) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *flowSchemas) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -101,28 +101,28 @@ func (c *flowSchemas) Watch(opts v1.ListOptions) (watch.Interface, error) {
 		Resource("flowschemas").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch(context.TODO())
+		Watch(ctx)
 }
 
 // Create takes the representation of a flowSchema and creates it.  Returns the server's representation of the flowSchema, and an error, if there is any.
-func (c *flowSchemas) Create(flowSchema *v1alpha1.FlowSchema) (result *v1alpha1.FlowSchema, err error) {
+func (c *flowSchemas) Create(ctx context.Context, flowSchema *v1alpha1.FlowSchema) (result *v1alpha1.FlowSchema, err error) {
 	result = &v1alpha1.FlowSchema{}
 	err = c.client.Post().
 		Resource("flowschemas").
 		Body(flowSchema).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Update takes the representation of a flowSchema and updates it. Returns the server's representation of the flowSchema, and an error, if there is any.
-func (c *flowSchemas) Update(flowSchema *v1alpha1.FlowSchema) (result *v1alpha1.FlowSchema, err error) {
+func (c *flowSchemas) Update(ctx context.Context, flowSchema *v1alpha1.FlowSchema) (result *v1alpha1.FlowSchema, err error) {
 	result = &v1alpha1.FlowSchema{}
 	err = c.client.Put().
 		Resource("flowschemas").
 		Name(flowSchema.Name).
 		Body(flowSchema).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }
@@ -130,30 +130,30 @@ func (c *flowSchemas) Update(flowSchema *v1alpha1.FlowSchema) (result *v1alpha1.
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 
-func (c *flowSchemas) UpdateStatus(flowSchema *v1alpha1.FlowSchema) (result *v1alpha1.FlowSchema, err error) {
+func (c *flowSchemas) UpdateStatus(ctx context.Context, flowSchema *v1alpha1.FlowSchema) (result *v1alpha1.FlowSchema, err error) {
 	result = &v1alpha1.FlowSchema{}
 	err = c.client.Put().
 		Resource("flowschemas").
 		Name(flowSchema.Name).
 		SubResource("status").
 		Body(flowSchema).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Delete takes name of the flowSchema and deletes it. Returns an error if one occurs.
-func (c *flowSchemas) Delete(name string, options *v1.DeleteOptions) error {
+func (c *flowSchemas) Delete(ctx context.Context, name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
 		Resource("flowschemas").
 		Name(name).
 		Body(options).
-		Do(context.TODO()).
+		Do(ctx).
 		Error()
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *flowSchemas) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *flowSchemas) DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	var timeout time.Duration
 	if listOptions.TimeoutSeconds != nil {
 		timeout = time.Duration(*listOptions.TimeoutSeconds) * time.Second
@@ -163,19 +163,19 @@ func (c *flowSchemas) DeleteCollection(options *v1.DeleteOptions, listOptions v1
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Timeout(timeout).
 		Body(options).
-		Do(context.TODO()).
+		Do(ctx).
 		Error()
 }
 
 // Patch applies the patch and returns the patched flowSchema.
-func (c *flowSchemas) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.FlowSchema, err error) {
+func (c *flowSchemas) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.FlowSchema, err error) {
 	result = &v1alpha1.FlowSchema{}
 	err = c.client.Patch(pt).
 		Resource("flowschemas").
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }
