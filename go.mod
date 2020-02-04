@@ -541,7 +541,7 @@ replace (
 	gotest.tools => gotest.tools v2.2.0+incompatible
 	gotest.tools/gotestsum => gotest.tools/gotestsum v0.3.5
 	grpc.go4.org => grpc.go4.org v0.0.0-20170609214715-11d0a25b4919
-	honnef.co/go/tools => honnef.co/go/tools v0.0.1-2019.2.2
+	honnef.co/go/tools => honnef.co/go/tools v0.0.1-2019.2.3
 	k8s.io/api => ./staging/src/k8s.io/api
 	k8s.io/apiextensions-apiserver => ./staging/src/k8s.io/apiextensions-apiserver
 	k8s.io/apimachinery => ./staging/src/k8s.io/apimachinery

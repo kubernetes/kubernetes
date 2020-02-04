@@ -1088,7 +1088,7 @@ gotest.tools
 gotest.tools/gotestsum
 gotest.tools/gotestsum/internal/junitxml
 gotest.tools/gotestsum/testjson
-# honnef.co/go/tools v0.0.1-2019.2.3 => honnef.co/go/tools v0.0.1-2019.2.2
+# honnef.co/go/tools v0.0.1-2019.2.3 => honnef.co/go/tools v0.0.1-2019.2.3
 honnef.co/go/tools/arg
 honnef.co/go/tools/cmd/staticcheck
 honnef.co/go/tools/config
