@@ -34,6 +34,10 @@ import (
 	"k8s.io/kubectl/pkg/util/podutils"
 )
 
+// defaultLogsContainerAnnotationName is an annotation name that can be used to preselect the interesting container
+// from a pod when running kubectl logs.
+const defaultLogsContainerAnnotationName = "kubectl.kubernetes.io/default-logs-container"
+
 func logsForObject(restClientGetter genericclioptions.RESTClientGetter, object, options runtime.Object, timeout time.Duration, allContainers bool) (map[corev1.ObjectReference]rest.ResponseWrapper, error) {
 	clientConfig, err := restClientGetter.ToRESTConfig()
 	if err != nil {
@@ -69,6 +73,16 @@ func logsForObjectWithClient(clientset corev1client.CoreV1Interface, object, opt
 		return ret, nil
 
 	case *corev1.Pod:
+		// in case the "kubectl.kubernetes.io/default-logs-container" annotation is present, we preset the opts.Containers to default to selected
+		// container. This gives users ability to preselect the most interesting container in pod.
+		if annotations := t.GetAnnotations(); annotations != nil && len(opts.Container) == 0 && len(annotations[defaultLogsContainerAnnotationName]) > 0 {
+			containerName := annotations[defaultLogsContainerAnnotationName]
+			if exists, _ := findContainerByName(t, containerName); exists != nil {
+				opts.Container = containerName
+			} else {
+				fmt.Fprintf(os.Stderr, "Default container name %q not found in a pod\n", containerName)
+			}
+		}
 		// if allContainers is true, then we're going to locate all containers and then iterate through them. At that point, "allContainers" is false
 		if !allContainers {
 			var containerName string
