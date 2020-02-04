@@ -92,6 +92,9 @@ type ClusterConfiguration struct {
 	// DNS defines the options for the DNS add-on installed in the cluster.
 	DNS DNS `json:"dns,omitempty"`
 
+	// PauseImage defines the pause image to use in the cluster.
+	PauseImage *ImageMeta `json:"pause,omitempty"`
+
 	// CertificatesDir specifies where to store or look for all required certificates.
 	CertificatesDir string `json:"certificatesDir,omitempty"`
 

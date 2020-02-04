@@ -163,6 +163,11 @@ func (in *ClusterConfiguration) DeepCopyInto(out *ClusterConfiguration) {
 	in.ControllerManager.DeepCopyInto(&out.ControllerManager)
 	in.Scheduler.DeepCopyInto(&out.Scheduler)
 	out.DNS = in.DNS
+	if in.PauseImage != nil {
+		in, out := &in.PauseImage, &out.PauseImage
+		*out = new(ImageMeta)
+		**out = **in
+	}
 	if in.FeatureGates != nil {
 		in, out := &in.FeatureGates, &out.FeatureGates
 		*out = make(map[string]bool, len(*in))

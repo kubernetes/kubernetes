@@ -251,6 +251,24 @@ func TestGetAllImages(t *testing.T) {
 			},
 			expect: constants.KubeDNSDnsMasqNannyImageName,
 		},
+		{
+			name: "pause image uses default repository and tag",
+			cfg: &kubeadmapi.ClusterConfiguration{
+				ImageRepository: "test.repo",
+			},
+			expect: GetGenericImage("test.repo", "pause", constants.PauseVersion),
+		},
+		{
+			name: "pause image uses customized repository and tag",
+			cfg: &kubeadmapi.ClusterConfiguration{
+				ImageRepository: "test.repo",
+				PauseImage: &kubeadmapi.ImageMeta{
+					ImageRepository: "test.pause.repo",
+					ImageTag:        "test.pause.tag",
+				},
+			},
+			expect: GetGenericImage("test.pause.repo", "pause", "test.pause.tag"),
+		},
 	}
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
