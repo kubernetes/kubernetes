@@ -1,6 +1,6 @@
 # bitbucket.org/bertimus9/systemstat v0.0.0-20180207000608-0eeff89b0690 => bitbucket.org/bertimus9/systemstat v0.0.0-20180207000608-0eeff89b0690
 bitbucket.org/bertimus9/systemstat
-# cloud.google.com/go v0.38.0 => cloud.google.com/go v0.38.0
+# cloud.google.com/go v0.51.0 => cloud.google.com/go v0.38.0
 cloud.google.com/go/compute/metadata
 # github.com/Azure/azure-sdk-for-go v35.0.0+incompatible => github.com/Azure/azure-sdk-for-go v35.0.0+incompatible
 github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-07-01/compute
@@ -31,7 +31,7 @@ github.com/Azure/go-autorest/logger
 github.com/Azure/go-autorest/tracing
 # github.com/BurntSushi/toml v0.3.1 => github.com/BurntSushi/toml v0.3.1
 github.com/BurntSushi/toml
-# github.com/GoogleCloudPlatform/k8s-cloud-provider v0.0.0-20190822182118-27a4ced34534 => github.com/GoogleCloudPlatform/k8s-cloud-provider v0.0.0-20190822182118-27a4ced34534
+# github.com/GoogleCloudPlatform/k8s-cloud-provider v0.0.0-20200203062548-7bdc6cbb875a => github.com/GoogleCloudPlatform/k8s-cloud-provider v0.0.0-20200203062548-7bdc6cbb875a
 github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud
 github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/filter
 github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/meta
@@ -873,7 +873,7 @@ golang.org/x/crypto/ssh/terminal
 # golang.org/x/lint v0.0.0-20190409202823-959b441ac422 => golang.org/x/lint v0.0.0-20190409202823-959b441ac422
 golang.org/x/lint
 golang.org/x/lint/golint
-# golang.org/x/net v0.0.0-20191004110552-13f9640d40b9 => golang.org/x/net v0.0.0-20191004110552-13f9640d40b9
+# golang.org/x/net v0.0.0-20200114155413-6afb5195e5aa => golang.org/x/net v0.0.0-20191004110552-13f9640d40b9
 golang.org/x/net/bpf
 golang.org/x/net/context
 golang.org/x/net/context/ctxhttp
@@ -893,7 +893,7 @@ golang.org/x/net/ipv6
 golang.org/x/net/proxy
 golang.org/x/net/trace
 golang.org/x/net/websocket
-# golang.org/x/oauth2 v0.0.0-20190604053449-0f29369cfe45 => golang.org/x/oauth2 v0.0.0-20190604053449-0f29369cfe45
+# golang.org/x/oauth2 v0.0.0-20191202225959-858c2ad4c8b6 => golang.org/x/oauth2 v0.0.0-20190604053449-0f29369cfe45
 golang.org/x/oauth2
 golang.org/x/oauth2/google
 golang.org/x/oauth2/internal
@@ -902,7 +902,7 @@ golang.org/x/oauth2/jwt
 # golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e => golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
 golang.org/x/sync/errgroup
 golang.org/x/sync/singleflight
-# golang.org/x/sys v0.0.0-20191022100944-742c48ecaeb7 => golang.org/x/sys v0.0.0-20190813064441-fde4db37ae7a
+# golang.org/x/sys v0.0.0-20200116001909-b77594299b42 => golang.org/x/sys v0.0.0-20190813064441-fde4db37ae7a
 golang.org/x/sys/cpu
 golang.org/x/sys/unix
 golang.org/x/sys/windows
@@ -985,7 +985,7 @@ gonum.org/v1/gonum/lapack
 gonum.org/v1/gonum/lapack/gonum
 gonum.org/v1/gonum/lapack/lapack64
 gonum.org/v1/gonum/mat
-# google.golang.org/api v0.6.1-0.20190607001116-5213b8090861 => google.golang.org/api v0.6.1-0.20190607001116-5213b8090861
+# google.golang.org/api v0.15.1-0.20200106000736-b8fc810ca6b5 => google.golang.org/api v0.6.1-0.20190607001116-5213b8090861
 google.golang.org/api/compute/v0.alpha
 google.golang.org/api/compute/v0.beta
 google.golang.org/api/compute/v1
@@ -1013,7 +1013,7 @@ google.golang.org/appengine/internal/modules
 google.golang.org/appengine/internal/remote_api
 google.golang.org/appengine/internal/urlfetch
 google.golang.org/appengine/urlfetch
-# google.golang.org/genproto v0.0.0-20190819201941-24fa4b261c55 => google.golang.org/genproto v0.0.0-20190819201941-24fa4b261c55
+# google.golang.org/genproto v0.0.0-20200115191322-ca5a22157cba => google.golang.org/genproto v0.0.0-20190819201941-24fa4b261c55
 google.golang.org/genproto/googleapis/api/httpbody
 google.golang.org/genproto/googleapis/rpc/status
 google.golang.org/genproto/protobuf/field_mask

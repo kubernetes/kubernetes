@@ -492,6 +492,21 @@ func UpdateBetaRegionHealthCheckHook(ctx context.Context, key *meta.Key, obj *be
 	return nil
 }
 
+// UpdateRegionHealthCheckHook defines the hook for updating a HealthCheck. It
+// replaces the object with the same key in the mock with the updated object.
+func UpdateRegionHealthCheckHook(ctx context.Context, key *meta.Key, obj *ga.HealthCheck, m *cloud.MockRegionHealthChecks) error {
+	if _, err := m.Get(ctx, key); err != nil {
+		return err
+	}
+
+	obj.Name = key.Name
+	projectID := m.ProjectRouter.ProjectID(ctx, "ga", "healthChecks")
+	obj.SelfLink = cloud.SelfLink(meta.VersionGA, projectID, "healthChecks", key)
+
+	m.Objects[*key] = &cloud.MockRegionHealthChecksObj{Obj: obj}
+	return nil
+}
+
 // UpdateRegionBackendServiceHook defines the hook for updating a Region
 // BackendsService. It replaces the object with the same key in the mock with
 // the updated object.
@@ -655,6 +670,22 @@ func UpdateBetaRegionURLMapHook(ctx context.Context, key *meta.Key, obj *alpha.U
 	return nil
 }
 
+// UpdateRegionURLMapHook defines the hook for updating a GA Regional UrlMap.
+// It replaces the object with the same key in the mock with the updated object.
+func UpdateRegionURLMapHook(ctx context.Context, key *meta.Key, obj *ga.UrlMap, m *cloud.MockRegionUrlMaps) error {
+	_, err := m.Get(ctx, key)
+	if err != nil {
+		return err
+	}
+
+	obj.Name = key.Name
+	projectID := m.ProjectRouter.ProjectID(ctx, "ga", "urlMaps")
+	obj.SelfLink = cloud.SelfLink(meta.VersionGA, projectID, "urlMaps", key)
+
+	m.Objects[*key] = &cloud.MockRegionUrlMapsObj{Obj: obj}
+	return nil
+}
+
 // SetTargetGlobalForwardingRuleHook defines the hook for setting the target proxy for a GlobalForwardingRule.
 func SetTargetGlobalForwardingRuleHook(ctx context.Context, key *meta.Key, obj *ga.TargetReference, m *cloud.MockGlobalForwardingRules) error {
 	fw, err := m.Get(ctx, key)
@@ -754,6 +785,17 @@ func SetURLMapBetaRegionTargetHTTPSProxyHook(ctx context.Context, key *meta.Key,
 	return nil
 }
 
+// SetURLMapRegionTargetHTTPProxyHook defines the hook for setting the url map for a TargetHttpProxy.
+func SetURLMapRegionTargetHTTPSProxyHook(ctx context.Context, key *meta.Key, ref *ga.UrlMapReference, m *cloud.MockRegionTargetHttpsProxies) error {
+	tp, err := m.Get(ctx, key)
+	if err != nil {
+		return err
+	}
+
+	tp.UrlMap = ref.UrlMap
+	return nil
+}
+
 // SetURLMapAlphaTargetHTTPProxyHook defines the hook for setting the url map for a TargetHttpProxy.
 func SetURLMapAlphaTargetHTTPProxyHook(ctx context.Context, key *meta.Key, ref *alpha.UrlMapReference, m *cloud.MockAlphaTargetHttpProxies) error {
 	tp, err := m.Get(ctx, key)
@@ -787,6 +829,17 @@ func SetURLMapBetaRegionTargetHTTPProxyHook(ctx context.Context, key *meta.Key, 
 	return nil
 }
 
+// SetURLMapRegionTargetHTTPProxyHook defines the hook for setting the url map for a TargetHttpProxy.
+func SetURLMapRegionTargetHTTPProxyHook(ctx context.Context, key *meta.Key, ref *ga.UrlMapReference, m *cloud.MockRegionTargetHttpProxies) error {
+	tp, err := m.Get(ctx, key)
+	if err != nil {
+		return err
+	}
+
+	tp.UrlMap = ref.UrlMap
+	return nil
+}
+
 // SetSslCertificateTargetHTTPSProxyHook defines the hook for setting ssl certificates on a TargetHttpsProxy.
 func SetSslCertificateTargetHTTPSProxyHook(ctx context.Context, key *meta.Key, req *ga.TargetHttpsProxiesSetSslCertificatesRequest, m *cloud.MockTargetHttpsProxies) error {
 	tp, err := m.Get(ctx, key)
@@ -800,6 +853,16 @@ func SetSslCertificateTargetHTTPSProxyHook(ctx context.Context, key *meta.Key, r
 
 // SetSslCertificateAlphaTargetHTTPSProxyHook defines the hook for setting ssl certificates on a TargetHttpsProxy.
 func SetSslCertificateAlphaTargetHTTPSProxyHook(ctx context.Context, key *meta.Key, req *alpha.TargetHttpsProxiesSetSslCertificatesRequest, m *cloud.MockAlphaTargetHttpsProxies) error {
+	tp, err := m.Get(ctx, key)
+	if err != nil {
+		return err
+	}
+	tp.SslCertificates = req.SslCertificates
+	return nil
+}
+
+// SetSslCertificateAlphaTargetHTTPSProxyHook defines the hook for setting ssl certificates on a TargetHttpsProxy.
+func SetSslCertificateBetaTargetHTTPSProxyHook(ctx context.Context, key *meta.Key, req *beta.TargetHttpsProxiesSetSslCertificatesRequest, m *cloud.MockBetaTargetHttpsProxies) error {
 	tp, err := m.Get(ctx, key)
 	if err != nil {
 		return err
@@ -829,6 +892,49 @@ func SetSslCertificateBetaRegionTargetHTTPSProxyHook(ctx context.Context, key *m
 	tp.SslCertificates = req.SslCertificates
 	return nil
 }
+
+// SetSslCertificateRegionTargetHTTPSProxyHook defines the hook for setting ssl certificates on a TargetHttpsProxy.
+func SetSslCertificateRegionTargetHTTPSProxyHook(ctx context.Context, key *meta.Key, req *ga.TargetHttpsProxiesSetSslCertificatesRequest, m *cloud.MockRegionTargetHttpsProxies) error {
+	tp, err := m.Get(ctx, key)
+	if err != nil {
+		return err
+	}
+
+	tp.SslCertificates = req.SslCertificates
+	return nil
+}
+
+// SetSslCertificateTargetHTTPSProxyHook defines the hook for setting ssl certificates on a TargetHttpsProxy.
+func SetSslPolicyTargetHTTPSProxyHook(ctx context.Context, key *meta.Key, ref *ga.SslPolicyReference, m *cloud.MockTargetHttpsProxies) error {
+	tp, err := m.Get(ctx, key)
+	if err != nil {
+		return err
+	}
+
+	tp.SslPolicy = ref.SslPolicy
+	return nil
+}
+
+// SetSslCertificateAlphaTargetHTTPSProxyHook defines the hook for setting ssl certificates on a TargetHttpsProxy.
+func SetSslPolicyAlphaTargetHTTPSProxyHook(ctx context.Context, key *meta.Key, ref *alpha.SslPolicyReference, m *cloud.MockAlphaTargetHttpsProxies) error {
+	tp, err := m.Get(ctx, key)
+	if err != nil {
+		return err
+	}
+	tp.SslPolicy = ref.SslPolicy
+	return nil
+}
+
+// SetSslCertificateAlphaTargetHTTPSProxyHook defines the hook for setting ssl certificates on a TargetHttpsProxy.
+func SetSslPolicyBetaTargetHTTPSProxyHook(ctx context.Context, key *meta.Key, ref *beta.SslPolicyReference, m *cloud.MockBetaTargetHttpsProxies) error {
+	tp, err := m.Get(ctx, key)
+	if err != nil {
+		return err
+	}
+	tp.SslPolicy = ref.SslPolicy
+	return nil
+}
+
 
 // InsertFirewallsUnauthorizedErrHook mocks firewall insertion. A forbidden error will be thrown as return.
 func InsertFirewallsUnauthorizedErrHook(ctx context.Context, key *meta.Key, obj *ga.Firewall, m *cloud.MockFirewalls) (bool, error) {

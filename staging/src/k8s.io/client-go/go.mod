@@ -5,7 +5,7 @@ module k8s.io/client-go
 go 1.13
 
 require (
-	cloud.google.com/go v0.38.0 // indirect
+	cloud.google.com/go v0.51.0 // indirect
 	github.com/Azure/go-autorest/autorest v0.9.0
 	github.com/Azure/go-autorest/autorest/adal v0.5.0
 	github.com/davecgh/go-spew v1.1.1
@@ -24,10 +24,9 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.4.0
 	golang.org/x/crypto v0.0.0-20190820162420-60c769a6c586
-	golang.org/x/net v0.0.0-20191004110552-13f9640d40b9
-	golang.org/x/oauth2 v0.0.0-20190604053449-0f29369cfe45
+	golang.org/x/net v0.0.0-20200114155413-6afb5195e5aa
+	golang.org/x/oauth2 v0.0.0-20191202225959-858c2ad4c8b6
 	golang.org/x/time v0.0.0-20190308202827-9d24e82272b4
-	google.golang.org/appengine v1.5.0 // indirect
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
 	k8s.io/klog v1.0.0
@@ -36,8 +35,13 @@ require (
 )
 
 replace (
+	cloud.google.com/go => cloud.google.com/go v0.38.0
+	golang.org/x/net => golang.org/x/net v0.0.0-20191004110552-13f9640d40b9
+	golang.org/x/oauth2 => golang.org/x/oauth2 v0.0.0-20190604053449-0f29369cfe45
 	golang.org/x/sys => golang.org/x/sys v0.0.0-20190813064441-fde4db37ae7a // pinned to release-branch.go1.13
 	golang.org/x/tools => golang.org/x/tools v0.0.0-20190821162956-65e3620a7ae7 // pinned to release-branch.go1.13
+	google.golang.org/api => google.golang.org/api v0.6.1-0.20190607001116-5213b8090861
+	google.golang.org/genproto => google.golang.org/genproto v0.0.0-20190819201941-24fa4b261c55
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/client-go => ../client-go
