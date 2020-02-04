@@ -176,6 +176,7 @@ replace (
 	cloud.google.com/go/datastore => cloud.google.com/go/datastore v1.0.0
 	cloud.google.com/go/pubsub => cloud.google.com/go/pubsub v1.0.1
 	cloud.google.com/go/storage => cloud.google.com/go/storage v1.0.0
+	dmitri.shuralyov.com/gpu/mtl => dmitri.shuralyov.com/gpu/mtl v0.0.0-20190408044501-666a987793e9
 	github.com/Azure/azure-sdk-for-go => github.com/Azure/azure-sdk-for-go v35.0.0+incompatible
 	github.com/Azure/go-ansiterm => github.com/Azure/go-ansiterm v0.0.0-20170929234023-d6e3b3328b78
 	github.com/Azure/go-autorest/autorest => github.com/Azure/go-autorest/autorest v0.9.0
@@ -277,6 +278,7 @@ replace (
 	github.com/go-acme/lego => github.com/go-acme/lego v2.5.0+incompatible
 	github.com/go-bindata/go-bindata => github.com/go-bindata/go-bindata v3.1.1+incompatible
 	github.com/go-critic/go-critic => github.com/go-critic/go-critic v0.3.5-0.20190526074819-1df300866540
+	github.com/go-gl/glfw/v3.3/glfw => github.com/go-gl/glfw/v3.3/glfw v0.0.0-20191125211704-12ad95a8df72
 	github.com/go-kit/kit => github.com/go-kit/kit v0.8.0
 	github.com/go-lintpack/lintpack => github.com/go-lintpack/lintpack v0.5.2
 	github.com/go-logfmt/logfmt => github.com/go-logfmt/logfmt v0.3.0
@@ -501,7 +503,7 @@ replace (
 	go4.org => go4.org v0.0.0-20180809161055-417644f6feb5
 	golang.org/x/build => golang.org/x/build v0.0.0-20190927031335-2835ba2e683f
 	golang.org/x/crypto => golang.org/x/crypto v0.0.0-20190820162420-60c769a6c586
-	golang.org/x/exp => golang.org/x/exp v0.0.0-20190312203227-4b39c73a6495
+	golang.org/x/exp => golang.org/x/exp v0.0.0-20191227195350-da58074b4299
 	golang.org/x/image => golang.org/x/image v0.0.0-20190227222117-0694c2d4d067
 	golang.org/x/lint => golang.org/x/lint v0.0.0-20190409202823-959b441ac422
 	golang.org/x/mobile => golang.org/x/mobile v0.0.0-20190312151609-d3739f865fa6
