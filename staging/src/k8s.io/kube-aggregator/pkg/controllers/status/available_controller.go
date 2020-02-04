@@ -347,8 +347,11 @@ func (c *AvailableConditionController) sync(key string) error {
 }
 
 // updateAPIServiceStatus only issues an update if a change is detected.  We have a tight resync loop to quickly detect dead
-// apiservices.  Doing that means we don't want to quickly issue no-op updates.
+// apiservices. Doing that means we don't want to quickly issue no-op updates.
 func updateAPIServiceStatus(client apiregistrationclient.APIServicesGetter, originalAPIService, newAPIService *apiregistrationv1.APIService) (*apiregistrationv1.APIService, error) {
+	// update this metric on every sync operation to reflect the actual state
+	setUnavailableGauge(newAPIService)
+
 	if equality.Semantic.DeepEqual(originalAPIService.Status, newAPIService.Status) {
 		return newAPIService, nil
 	}
@@ -358,23 +361,7 @@ func updateAPIServiceStatus(client apiregistrationclient.APIServicesGetter, orig
 		return nil, err
 	}
 
-	// update metrics
-	wasAvailable := apiregistrationv1apihelper.IsAPIServiceConditionTrue(originalAPIService, apiregistrationv1.Available)
-	isAvailable := apiregistrationv1apihelper.IsAPIServiceConditionTrue(newAPIService, apiregistrationv1.Available)
-	if isAvailable != wasAvailable {
-		if isAvailable {
-			unavailableGauge.WithLabelValues(newAPIService.Name).Set(0.0)
-		} else {
-			unavailableGauge.WithLabelValues(newAPIService.Name).Set(1.0)
-
-			reason := "UnknownReason"
-			if newCondition := apiregistrationv1apihelper.GetAPIServiceConditionByType(newAPIService, apiregistrationv1.Available); newCondition != nil {
-				reason = newCondition.Reason
-			}
-			unavailableCounter.WithLabelValues(newAPIService.Name, reason).Inc()
-		}
-	}
-
+	setUnavailableCounter(originalAPIService, newAPIService)
 	return newAPIService, nil
 }
 
@@ -555,5 +542,30 @@ func (c *AvailableConditionController) deleteEndpoints(obj interface{}) {
 	}
 	for _, apiService := range c.getAPIServicesFor(castObj) {
 		c.queue.Add(apiService)
+	}
+}
+
+// setUnavailableGauge set the metrics so that it reflect the current state base on availability of the given service
+func setUnavailableGauge(newAPIService *apiregistrationv1.APIService) {
+	if apiregistrationv1apihelper.IsAPIServiceConditionTrue(newAPIService, apiregistrationv1.Available) {
+		unavailableGauge.WithLabelValues(newAPIService.Name).Set(0.0)
+		return
+	}
+
+	unavailableGauge.WithLabelValues(newAPIService.Name).Set(1.0)
+}
+
+// setUnavailableCounter increases the metrics only if the given service is unavailable and its APIServiceCondition has changed
+func setUnavailableCounter(originalAPIService, newAPIService *apiregistrationv1.APIService) {
+	wasAvailable := apiregistrationv1apihelper.IsAPIServiceConditionTrue(originalAPIService, apiregistrationv1.Available)
+	isAvailable := apiregistrationv1apihelper.IsAPIServiceConditionTrue(newAPIService, apiregistrationv1.Available)
+	statusChanged := isAvailable != wasAvailable
+
+	if statusChanged && !isAvailable {
+		reason := "UnknownReason"
+		if newCondition := apiregistrationv1apihelper.GetAPIServiceConditionByType(newAPIService, apiregistrationv1.Available); newCondition != nil {
+			reason = newCondition.Reason
+		}
+		unavailableCounter.WithLabelValues(newAPIService.Name, reason).Inc()
 	}
 }
