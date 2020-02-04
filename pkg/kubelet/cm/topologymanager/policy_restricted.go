@@ -41,9 +41,26 @@ func (p *restrictedPolicy) canAdmitPodResult(hint *TopologyHint) bool {
 	return true
 }
 
+// Return hints that have Preferred equels true.
+func filterRestrictedHints(allResourcesHints [][]TopologyHint) [][]TopologyHint {
+	var filteredResourcesHints [][]TopologyHint
+	for _, oneResourceHints := range allResourcesHints {
+		var filtered []TopologyHint
+		for _, hint := range oneResourceHints {
+			if hint.Preferred == true {
+				filtered = append(filtered, hint)
+			}
+		}
+		filteredResourcesHints = append(filteredResourcesHints, filtered)
+	}
+	return filteredResourcesHints
+}
+
 func (p *restrictedPolicy) Merge(providersHints []map[string][]TopologyHint) (TopologyHint, bool) {
 	filteredHints := filterProvidersHints(providersHints)
-	hint := mergeFilteredHints(p.numaNodes, filteredHints)
-	admit := p.canAdmitPodResult(&hint)
-	return hint, admit
+	// Filter to include Preferred hints
+	restrictedHints := filterRestrictedHints(filteredHints)
+	bestHint := mergeFilteredHints(p.numaNodes, restrictedHints)
+	admit := p.canAdmitPodResult(&bestHint)
+	return bestHint, admit
 }

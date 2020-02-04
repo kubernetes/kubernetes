@@ -49,12 +49,109 @@ func TestPolicyBestEffortCanAdmitPodResult(t *testing.T) {
 	}
 }
 
+func (p *bestEffortPolicy) mergeTestCasesSpecific(numaNodes []int) []policyMergeTestCase {
+	return []policyMergeTestCase{
+		{
+			name: "Two providers, 1 hint each, same mask, 1 preferred, 1 not 1/2",
+			hp: []HintProvider{
+				&mockHintProvider{
+					map[string][]TopologyHint{
+						"resource1": {
+							{
+								NUMANodeAffinity: NewTestBitMask(0),
+								Preferred:        true,
+							},
+						},
+					},
+				},
+				&mockHintProvider{
+					map[string][]TopologyHint{
+						"resource2": {
+							{
+								NUMANodeAffinity: NewTestBitMask(0),
+								Preferred:        false,
+							},
+						},
+					},
+				},
+			},
+			expected: TopologyHint{
+				NUMANodeAffinity: NewTestBitMask(0),
+				Preferred:        false,
+			},
+		},
+		{
+			name: "Two providers, 1 hint each, same mask, 1 preferred, 1 not 2/2",
+			hp: []HintProvider{
+				&mockHintProvider{
+					map[string][]TopologyHint{
+						"resource1": {
+							{
+								NUMANodeAffinity: NewTestBitMask(1),
+								Preferred:        true,
+							},
+						},
+					},
+				},
+				&mockHintProvider{
+					map[string][]TopologyHint{
+						"resource2": {
+							{
+								NUMANodeAffinity: NewTestBitMask(1),
+								Preferred:        false,
+							},
+						},
+					},
+				},
+			},
+			expected: TopologyHint{
+				NUMANodeAffinity: NewTestBitMask(1),
+				Preferred:        false,
+			},
+		},
+		{
+			name: "Two providers, 1 with 2 hints, 1 with single non-preferred hint matching",
+			hp: []HintProvider{
+				&mockHintProvider{
+					map[string][]TopologyHint{
+						"resource1": {
+							{
+								NUMANodeAffinity: NewTestBitMask(0),
+								Preferred:        true,
+							},
+							{
+								NUMANodeAffinity: NewTestBitMask(1),
+								Preferred:        true,
+							},
+						},
+					},
+				},
+				&mockHintProvider{
+					map[string][]TopologyHint{
+						"resource2": {
+							{
+								NUMANodeAffinity: NewTestBitMask(0, 1),
+								Preferred:        false,
+							},
+						},
+					},
+				},
+			},
+			expected: TopologyHint{
+				NUMANodeAffinity: NewTestBitMask(0),
+				Preferred:        false,
+			},
+		},
+	}
+}
+
 func TestPolicyBestEffortMerge(t *testing.T) {
 	numaNodes := []int{0, 1}
 	policy := NewBestEffortPolicy(numaNodes)
 
 	tcases := commonPolicyMergeTestCases(numaNodes)
 	tcases = append(tcases, policy.(*bestEffortPolicy).mergeTestCases(numaNodes)...)
+	tcases = append(tcases, policy.(*bestEffortPolicy).mergeTestCasesSpecific(numaNodes)...)
 
 	testPolicyMerge(policy, tcases, t)
 }
