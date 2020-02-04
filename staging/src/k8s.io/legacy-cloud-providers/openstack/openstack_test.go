@@ -95,7 +95,7 @@ func TestReadConfig(t *testing.T) {
 	env := clearEnviron(t)
 	defer resetEnviron(t, env)
 
-	os.Setenv("OS_PASSWORD", "mypass")
+	os.Setenv("OS_PASSWORD", "mypass") // Fake value for testing.
 	defer os.Unsetenv("OS_PASSWORD")
 
 	os.Setenv("OS_TENANT_NAME", "admin")
@@ -174,7 +174,7 @@ func TestReadConfig(t *testing.T) {
 func TestToAuthOptions(t *testing.T) {
 	cfg := Config{}
 	cfg.Global.Username = "user"
-	cfg.Global.Password = "pass"
+	cfg.Global.Password = "pass" // Fake value for testing.
 	cfg.Global.DomainID = "2a73b8f597c04551a0fdc8e95544be8a"
 	cfg.Global.DomainName = "local"
 	cfg.Global.AuthURL = "http://auth.url"
@@ -679,7 +679,7 @@ func TestInstanceIDFromProviderID(t *testing.T) {
 func TestToAuth3Options(t *testing.T) {
 	cfg := Config{}
 	cfg.Global.Username = "user"
-	cfg.Global.Password = "pass"
+	cfg.Global.Password = "pass" // Fake value for testing.
 	cfg.Global.DomainID = "2a73b8f597c04551a0fdc8e95544be8a"
 	cfg.Global.DomainName = "local"
 	cfg.Global.AuthURL = "http://auth.url"

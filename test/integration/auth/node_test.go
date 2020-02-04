@@ -45,6 +45,7 @@ import (
 func TestNodeAuthorizer(t *testing.T) {
 	const (
 		// Define credentials
+		// Fake values for testing.
 		tokenMaster      = "master-token"
 		tokenNodeUnknown = "unknown-token"
 		tokenNode1       = "node1-token"

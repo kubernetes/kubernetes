@@ -1546,7 +1546,7 @@ func TestToken(t *testing.T) {
 
 func TestUnmarshalClaimError(t *testing.T) {
 	// Ensure error strings returned by unmarshaling claims don't include the claim.
-	const token = "96bb299a-02e9-11e8-8673-54ee7553240e"
+	const token = "96bb299a-02e9-11e8-8673-54ee7553240e" // Fake token for testing.
 	payload := fmt.Sprintf(`{
 		"token": "%s"
 	}`, token)

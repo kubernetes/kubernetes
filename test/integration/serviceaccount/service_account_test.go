@@ -55,7 +55,7 @@ import (
 
 const (
 	rootUserName = "root"
-	rootToken    = "root-user-token"
+	rootToken    = "root-user-token" // Fake value for testing.
 
 	readOnlyServiceAccountName  = "ro"
 	readWriteServiceAccountName = "rw"
