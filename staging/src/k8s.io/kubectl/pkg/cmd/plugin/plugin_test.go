@@ -101,31 +101,31 @@ func TestPluginPathsAreValid(t *testing.T) {
 		expectOut          string
 	}{
 		{
-			name:         "ensure no plugins found if no files begin with kubectl- prefix",
-			pluginPaths:  []string{tempDir},
-			verifier:     newFakePluginPathVerifier(),
-			pluginFile:   func() (*os.File, error) {
+			name:        "ensure no plugins found if no files begin with kubectl- prefix",
+			pluginPaths: []string{tempDir},
+			verifier:    newFakePluginPathVerifier(),
+			pluginFile: func() (*os.File, error) {
 				return ioutil.TempFile(tempDir, "notkubectl-")
 			},
-			expectErr:    "error: unable to find any kubectl plugins in your PATH\n",
+			expectErr: "error: unable to find any kubectl plugins in your PATH\n",
 		},
 		{
-			name:         "ensure de-duplicated plugin-paths slice",
-			pluginPaths:  []string{tempDir, tempDir},
-			verifier:     newFakePluginPathVerifier(),
-			pluginFile:   func() (*os.File, error) {
+			name:        "ensure de-duplicated plugin-paths slice",
+			pluginPaths: []string{tempDir, tempDir},
+			verifier:    newFakePluginPathVerifier(),
+			pluginFile: func() (*os.File, error) {
 				return ioutil.TempFile(tempDir, "kubectl-")
 			},
-			expectOut:    "The following compatible plugins are available:",
+			expectOut: "The following compatible plugins are available:",
 		},
 		{
-			name:         "ensure no errors when empty string or blank path are specified",
-			pluginPaths:  []string{tempDir, "", " "},
-			verifier:     newFakePluginPathVerifier(),
-			pluginFile:   func() (*os.File, error) {
+			name:        "ensure no errors when empty string or blank path are specified",
+			pluginPaths: []string{tempDir, "", " "},
+			verifier:    newFakePluginPathVerifier(),
+			pluginFile: func() (*os.File, error) {
 				return ioutil.TempFile(tempDir, "kubectl-")
 			},
-			expectOut:    "The following compatible plugins are available:",
+			expectOut: "The following compatible plugins are available:",
 		},
 	}
 
