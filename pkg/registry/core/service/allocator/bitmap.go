@@ -18,6 +18,7 @@ package allocator
 
 import (
 	"errors"
+	"github.com/RoaringBitmap/roaring"
 	"math/big"
 	"math/rand"
 	"sync"
@@ -234,3 +235,163 @@ func (contiguousScanStrategy) AllocateBit(allocated *big.Int, max, count int) (i
 }
 
 var _ bitAllocator = contiguousScanStrategy{}
+
+// RoaringBitmap are compressed bitmaps which tend to outperform conventional
+// compressed bitmaps such as WAH, EWAH or Concise.
+// Each resource has an offset.  The internal structure is a roaring bitmap, with a bit for each offset.
+//
+// If a resource is taken, the bit at that offset is set to one.
+// r.count is always equal to the number of set bits and can be recalculated at any time
+// by counting the set bits in r.allocated.
+type RoaringBitmap struct {
+	// max is the maximum size of the usable items in the range
+	max int
+	// rangeSpec is the range specifier, matching RangeAllocation.Range
+	rangeSpec string
+
+	// lock guards the following members
+	lock sync.Mutex
+	// count is the number of currently allocated elements in the range
+	count int
+	// allocated is a bit array of the allocated items in the range
+	allocated *roaring.Bitmap
+}
+
+// AllocationBitmap implements Interface and Snapshottable
+var _ Interface = &RoaringBitmap{}
+var _ Snapshottable = &RoaringBitmap{}
+
+// NewRoaringAllocationMap creates an allocation bitmap using the contiguous scan strategy.
+func NewRoaringAllocationMap(max int, rangeSpec string) *RoaringBitmap {
+	a := RoaringBitmap{
+		allocated: roaring.NewBitmap(),
+		count:     0,
+		max:       max,
+		rangeSpec: rangeSpec,
+	}
+	return &a
+}
+
+// Allocate attempts to reserve the provided item.
+// Returns true if it was allocated, false if it was already in use
+func (r *RoaringBitmap) Allocate(offset int) (bool, error) {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
+	if !r.allocated.CheckedAdd(uint32(offset)) {
+		return false, nil
+	}
+	r.count++
+	return true, nil
+}
+
+// AllocateNext reserves one of the items from the pool.
+// it uses a random scan strategy
+// (0, false, nil) may be returned if there are no items left.
+func (r *RoaringBitmap) AllocateNext() (int, bool, error) {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
+	if r.count >= r.max {
+		return 0, false, nil
+	}
+
+	offset := 0
+	if r.count != 0 {
+		// start allocating on the theoretical position that will be free
+		// if we allocate values incrementally
+		offset = r.count
+
+		// start allocating on the last element
+		// this is ok meanwhile we don't allocate manually high values
+		// offset = int(r.allocated.Maximum())
+
+		// random strategy create more sparse values and is less performant
+		// offset = rand.Intn(r.max)
+	}
+	for i := 0; i < r.max; i++ {
+		at := (offset + i) % r.max
+		if r.allocated.CheckedAdd(uint32(at)) {
+			r.count++
+			return at, true, nil
+		}
+	}
+	return 0, false, nil
+}
+
+// Release releases the item back to the pool. Releasing an
+// unallocated item or an item out of the range is a no-op and
+// returns no error.
+func (r *RoaringBitmap) Release(offset int) error {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
+	if !r.allocated.ContainsInt(offset) {
+		return nil
+	}
+
+	r.allocated.Remove(uint32(offset))
+	r.count--
+	return nil
+}
+
+// ForEach calls the provided function for each allocated bit.  The
+// RoaringBitmap may not be modified while this loop is running.
+func (r *RoaringBitmap) ForEach(fn func(int)) {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+	i := r.allocated.Iterator()
+	counter := 0
+	for i.HasNext() {
+		counter++
+		fn(int(i.Next()))
+	}
+}
+
+// Has returns true if the provided item is already allocated and a call
+// to Allocate(offset) would fail.
+func (r *RoaringBitmap) Has(offset int) bool {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
+	return r.allocated.ContainsInt(offset)
+}
+
+// Free returns the count of items left in the range.
+func (r *RoaringBitmap) Free() int {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+	return r.max - r.count
+}
+
+// Snapshot saves the current state of the pool.
+func (r *RoaringBitmap) Snapshot() (string, []byte) {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+	// TODO: should we handle the error
+	buf, _ := r.allocated.ToBytes()
+	return r.rangeSpec, buf
+}
+
+// Restore restores the pool to the previously captured state.
+func (r *RoaringBitmap) Restore(rangeSpec string, data []byte) error {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
+	if r.rangeSpec != rangeSpec {
+		return errors.New("the provided range does not match the current range")
+	}
+
+	if data == nil {
+		r.allocated = roaring.NewBitmap()
+		r.count = 0
+	} else {
+		_, err := r.allocated.FromBuffer(data)
+		if err != nil {
+			return err
+		}
+		r.count = int(r.allocated.GetCardinality())
+	}
+
+	return nil
+}

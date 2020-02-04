@@ -14,6 +14,7 @@ go_library(
         "utils.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/registry/core/service/allocator",
+    deps = ["//vendor/github.com/RoaringBitmap/roaring:go_default_library"],
 )
 
 go_test(
