@@ -147,6 +147,7 @@ func (util *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner, node *v1.
 		return "", 0, nil, "", err
 	}
 
+	var disk *gcecloud.Disk
 	switch replicationType {
 	case replicationTypeRegionalPD:
 		selectedZones, err := volumehelpers.SelectZonesForVolume(zonePresent, zonesPresent, configuredZone, configuredZones, activezones, node, allowedTopologies, c.options.PVC.Name, maxRegionalPDZones)
@@ -154,12 +155,13 @@ func (util *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner, node *v1.
 			klog.V(2).Infof("Error selecting zones for regional GCE PD volume: %v", err)
 			return "", 0, nil, "", err
 		}
-		if err = cloud.CreateRegionalDisk(
+		disk, err = cloud.CreateRegionalDisk(
 			name,
 			diskType,
 			selectedZones,
 			int64(requestGB),
-			*c.options.CloudTags); err != nil {
+			*c.options.CloudTags)
+		if err != nil {
 			klog.V(2).Infof("Error creating regional GCE PD volume: %v", err)
 			return "", 0, nil, "", err
 		}
@@ -170,12 +172,13 @@ func (util *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner, node *v1.
 		if err != nil {
 			return "", 0, nil, "", err
 		}
-		if err := cloud.CreateDisk(
+		disk, err = cloud.CreateDisk(
 			name,
 			diskType,
 			selectedZone,
 			int64(requestGB),
-			*c.options.CloudTags); err != nil {
+			*c.options.CloudTags)
+		if err != nil {
 			klog.V(2).Infof("Error creating single-zone GCE PD volume: %v", err)
 			return "", 0, nil, "", err
 		}
@@ -185,7 +188,7 @@ func (util *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner, node *v1.
 		return "", 0, nil, "", fmt.Errorf("replication-type of '%s' is not supported", replicationType)
 	}
 
-	labels, err := cloud.GetAutoLabelsForPD(name, "" /* zone */)
+	labels, err := cloud.GetAutoLabelsForPD(disk)
 	if err != nil {
 		// We don't really want to leak the volume here...
 		klog.Errorf("error getting labels for volume %q: %v", name, err)
