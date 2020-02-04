@@ -62,10 +62,10 @@ require (
 	github.com/go-ozzo/ozzo-validation v3.5.0+incompatible // indirect
 	github.com/godbus/dbus v0.0.0-20181101234600-2ff6f7ffd60f // indirect
 	github.com/gogo/protobuf v1.3.1
-	github.com/golang/groupcache v0.0.0-20160516000752-02826c3e7903
+	github.com/golang/groupcache v0.0.0-20191227052852-215e87163ea7
 	github.com/golang/mock v1.3.1
 	github.com/google/cadvisor v0.35.0
-	github.com/google/go-cmp v0.3.0
+	github.com/google/go-cmp v0.3.1
 	github.com/google/gofuzz v1.1.0
 	github.com/google/uuid v1.1.1
 	github.com/googleapis/gnostic v0.1.0
@@ -121,12 +121,12 @@ require (
 	github.com/vmware/govmomi v0.20.3
 	go.etcd.io/etcd v0.0.0-20191023171146-3cf2f69b5738
 	golang.org/x/crypto v0.0.0-20190820162420-60c769a6c586
-	golang.org/x/lint v0.0.0-20190409202823-959b441ac422
+	golang.org/x/lint v0.0.0-20191125180803-fdd1cda4f05f
 	golang.org/x/net v0.0.0-20200114155413-6afb5195e5aa
 	golang.org/x/oauth2 v0.0.0-20191202225959-858c2ad4c8b6
 	golang.org/x/sys v0.0.0-20200116001909-b77594299b42
 	golang.org/x/time v0.0.0-20190308202827-9d24e82272b4
-	golang.org/x/tools v0.0.0-20190920225731-5eefd052ad72
+	golang.org/x/tools v0.0.0-20191227053925-7b8e75db28f4
 	gonum.org/v1/gonum v0.6.2
 	gonum.org/v1/netlib v0.0.0-20190331212654-76723241ea4e // indirect
 	google.golang.org/api v0.15.1-0.20200106000736-b8fc810ca6b5
@@ -136,7 +136,7 @@ require (
 	gopkg.in/yaml.v2 v2.2.8
 	gotest.tools v2.2.0+incompatible
 	gotest.tools/gotestsum v0.3.5
-	honnef.co/go/tools v0.0.1-2019.2.2
+	honnef.co/go/tools v0.0.1-2019.2.3
 	k8s.io/api v0.0.0
 	k8s.io/apiextensions-apiserver v0.0.0
 	k8s.io/apimachinery v0.0.0
@@ -171,7 +171,11 @@ require (
 
 replace (
 	bitbucket.org/bertimus9/systemstat => bitbucket.org/bertimus9/systemstat v0.0.0-20180207000608-0eeff89b0690
-	cloud.google.com/go => cloud.google.com/go v0.38.0
+	cloud.google.com/go => cloud.google.com/go v0.51.0
+	cloud.google.com/go/bigquery => cloud.google.com/go/bigquery v1.0.1
+	cloud.google.com/go/datastore => cloud.google.com/go/datastore v1.0.0
+	cloud.google.com/go/pubsub => cloud.google.com/go/pubsub v1.0.1
+	cloud.google.com/go/storage => cloud.google.com/go/storage v1.0.0
 	github.com/Azure/azure-sdk-for-go => github.com/Azure/azure-sdk-for-go v35.0.0+incompatible
 	github.com/Azure/go-ansiterm => github.com/Azure/go-ansiterm v0.0.0-20170929234023-d6e3b3328b78
 	github.com/Azure/go-autorest/autorest => github.com/Azure/go-autorest/autorest v0.9.0
