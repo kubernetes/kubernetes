@@ -82,7 +82,7 @@ func Sum() *Aggregation {
 // Distribution indicates that the desired aggregation is
 // a histogram distribution.
 //
-// An distribution aggregation may contain a histogram of the values in the
+// A distribution aggregation may contain a histogram of the values in the
 // population. The bucket boundaries for that histogram are described
 // by the bounds. This defines len(bounds)+1 buckets.
 //
@@ -99,13 +99,14 @@ func Sum() *Aggregation {
 // If len(bounds) is 1 then there is no finite buckets, and that single
 // element is the common boundary of the overflow and underflow buckets.
 func Distribution(bounds ...float64) *Aggregation {
-	return &Aggregation{
+	agg := &Aggregation{
 		Type:    AggTypeDistribution,
 		Buckets: bounds,
-		newData: func() AggregationData {
-			return newDistributionData(bounds)
-		},
 	}
+	agg.newData = func() AggregationData {
+		return newDistributionData(agg)
+	}
+	return agg
 }
 
 // LastValue only reports the last value recorded using this

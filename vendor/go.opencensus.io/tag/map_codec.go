@@ -168,7 +168,7 @@ func Encode(m *Map) []byte {
 	eg := &encoderGRPC{
 		buf: make([]byte, len(m.m)),
 	}
-	eg.writeByte(byte(tagsVersionID))
+	eg.writeByte(tagsVersionID)
 	for k, v := range m.m {
 		if v.m.ttl.ttl == valueTTLUnlimitedPropagation {
 			eg.writeByte(byte(keyTypeString))
