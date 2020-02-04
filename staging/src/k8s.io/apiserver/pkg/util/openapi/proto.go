@@ -20,7 +20,7 @@ import (
 	"encoding/json"
 
 	"github.com/go-openapi/spec"
-	openapi_v2 "github.com/googleapis/gnostic/OpenAPIv2"
+	openapi_v2 "github.com/googleapis/gnostic/openapiv2"
 	"github.com/googleapis/gnostic/compiler"
 	yaml "gopkg.in/yaml.v2"
 
