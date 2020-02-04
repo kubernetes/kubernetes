@@ -24,6 +24,8 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	batchv1 "k8s.io/api/batch/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -851,5 +853,66 @@ func getValidPodTemplateSpecForSelector(validSelector *metav1.LabelSelector) api
 			DNSPolicy:     api.DNSClusterFirst,
 			Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
 		},
+	}
+}
+
+func TestMatchJob(t *testing.T) {
+	testCases := []struct {
+		in            *batch.Job
+		fieldSelector fields.Selector
+		expectMatch   bool
+	}{
+		{
+			in: &batch.Job{
+				Status: batch.JobStatus{Succeeded: 5},
+			},
+			fieldSelector: fields.ParseSelectorOrDie("status.successful=5"),
+			expectMatch:   true,
+		},
+		{
+			in: &batch.Job{
+				Status: batch.JobStatus{Succeeded: 0},
+			},
+			fieldSelector: fields.ParseSelectorOrDie("status.successful=5"),
+			expectMatch:   false,
+		},
+		{
+			in: &batch.Job{
+				Status: batch.JobStatus{Active: 5},
+			},
+			fieldSelector: fields.ParseSelectorOrDie("status.active=5"),
+			expectMatch:   true,
+		},
+		{
+			in: &batch.Job{
+				Status: batch.JobStatus{Active: 0},
+			},
+			fieldSelector: fields.ParseSelectorOrDie("status.active=5"),
+			expectMatch:   false,
+		},
+		{
+			in: &batch.Job{
+				Status: batch.JobStatus{Failed: 5},
+			},
+			fieldSelector: fields.ParseSelectorOrDie("status.failed=5"),
+			expectMatch:   true,
+		},
+		{
+			in: &batch.Job{
+				Status: batch.JobStatus{Failed: 0},
+			},
+			fieldSelector: fields.ParseSelectorOrDie("status.failed=5"),
+			expectMatch:   false,
+		},
+	}
+	for _, testCase := range testCases {
+		m := MatchJob(labels.Everything(), testCase.fieldSelector)
+		result, err := m.Matches(testCase.in)
+		if err != nil {
+			t.Errorf("Unexpected error %v", err)
+		}
+		if result != testCase.expectMatch {
+			t.Errorf("Result %v, Expected %v, Selector: %v, Job: %v", result, testCase.expectMatch, testCase.fieldSelector.String(), testCase.in)
+		}
 	}
 }
