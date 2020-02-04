@@ -516,7 +516,7 @@ replace (
 	gonum.org/v1/plot => gonum.org/v1/plot v0.0.0-20190515093506-e2840ee46a6b
 	google.golang.org/api => google.golang.org/api v0.15.1-0.20200106000736-b8fc810ca6b5
 	google.golang.org/appengine => google.golang.org/appengine v1.5.0
-	google.golang.org/genproto => google.golang.org/genproto v0.0.0-20190819201941-24fa4b261c55
+	google.golang.org/genproto => google.golang.org/genproto v0.0.0-20200115191322-ca5a22157cba
 	google.golang.org/grpc => google.golang.org/grpc v1.26.0
 	gopkg.in/airbrake/gobrake.v2 => gopkg.in/airbrake/gobrake.v2 v2.0.9
 	gopkg.in/alecthomas/kingpin.v2 => gopkg.in/alecthomas/kingpin.v2 v2.2.6
