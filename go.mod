@@ -341,7 +341,7 @@ replace (
 	github.com/google/pprof => github.com/google/pprof v0.0.0-20191218002539-d4f498aebedc
 	github.com/google/renameio => github.com/google/renameio v0.1.0
 	github.com/google/uuid => github.com/google/uuid v1.1.1
-	github.com/googleapis/gax-go/v2 => github.com/googleapis/gax-go/v2 v2.0.4
+	github.com/googleapis/gax-go/v2 => github.com/googleapis/gax-go/v2 v2.0.5
 	github.com/googleapis/gnostic => github.com/googleapis/gnostic v0.1.0
 	github.com/gophercloud/gophercloud => github.com/gophercloud/gophercloud v0.1.0
 	github.com/gopherjs/gopherjs => github.com/gopherjs/gopherjs v0.0.0-20181017120253-0766667cb4d1

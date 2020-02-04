@@ -405,7 +405,7 @@ github.com/google/go-cmp/cmp/internal/value
 github.com/google/gofuzz
 # github.com/google/uuid v1.1.1 => github.com/google/uuid v1.1.1
 github.com/google/uuid
-# github.com/googleapis/gax-go/v2 v2.0.5 => github.com/googleapis/gax-go/v2 v2.0.4
+# github.com/googleapis/gax-go/v2 v2.0.5 => github.com/googleapis/gax-go/v2 v2.0.5
 github.com/googleapis/gax-go/v2
 # github.com/googleapis/gnostic v0.1.0 => github.com/googleapis/gnostic v0.1.0
 github.com/googleapis/gnostic/OpenAPIv2
