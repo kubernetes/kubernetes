@@ -181,7 +181,7 @@ func NewPriorityQueueWithClock(stop <-chan struct{}, clock util.Clock, fwk frame
 	pq := &PriorityQueue{
 		clock:            clock,
 		stop:             stop,
-		podBackoff:       NewPodBackoffMap(1*time.Second, 10*time.Second),
+		podBackoff:       NewPodBackoffMap(1*time.Second, 10*time.Second, clock),
 		activeQ:          util.NewHeapWithRecorder(podInfoKeyFunc, comp, metrics.NewActivePodsRecorder()),
 		unschedulableQ:   newUnschedulablePodsMap(metrics.NewUnschedulablePodsRecorder()),
 		nominatedPods:    newNominatedPodMap(),
