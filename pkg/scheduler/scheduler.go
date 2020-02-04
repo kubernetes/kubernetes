@@ -187,6 +187,9 @@ func New(client clientset.Interface,
 	for _, opt := range opts {
 		opt(&options)
 	}
+
+	metrics.Register()
+
 	// Set up the configurator which can create schedulers from configs.
 	configurator := factory.NewConfigFactory(&factory.ConfigFactoryArgs{
 		Client:                         client,
@@ -290,7 +293,6 @@ func initPolicyFromConfigMap(client clientset.Interface, policyRef *kubeschedule
 
 // NewFromConfig returns a new scheduler using the provided Config.
 func NewFromConfig(config *factory.Config) *Scheduler {
-	metrics.Register()
 	return &Scheduler{
 		SchedulerCache:      config.SchedulerCache,
 		Algorithm:           config.Algorithm,
