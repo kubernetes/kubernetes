@@ -419,6 +419,8 @@ func TestRepairLeakDualStack(t *testing.T) {
 
 func TestRepairWithExistingDualStack(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RoaringBitmaps, true)()
+
 	_, cidr, _ := net.ParseCIDR("192.168.1.0/24")
 	previous, err := ipallocator.NewCIDRRange(cidr)
 	if err != nil {
@@ -529,8 +531,9 @@ func TestRepairWithExistingDualStack(t *testing.T) {
 	if !secondaryAfter.Has(net.ParseIP("2000::1")) || !secondaryAfter.Has(net.ParseIP("2000::2")) {
 		t.Errorf("unexpected ipallocator state: %#v", secondaryAfter)
 	}
-	if free := secondaryAfter.Free(); free != 65532 {
-		t.Errorf("unexpected ipallocator state: %d free (number of free ips is not 65532)", free)
+	// TODO: value depends ont the RoaringBitmap feature gate
+	if free := secondaryAfter.Free(); free != 1048572 {
+		t.Errorf("unexpected ipallocator state: %d free (number of free ips is not 1048572)", free)
 	}
 
 }

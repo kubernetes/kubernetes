@@ -12,7 +12,9 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/registry/core/service/ipallocator",
     deps = [
         "//pkg/apis/core:go_default_library",
+        "//pkg/features:go_default_library",
         "//pkg/registry/core/service/allocator:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
     ],
 )
 

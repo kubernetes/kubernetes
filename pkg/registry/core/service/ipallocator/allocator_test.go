@@ -47,7 +47,7 @@ func TestAllocate(t *testing.T) {
 		},
 		{
 			name:             "IPv6",
-			cidr:             "2001:db8:1::/48",
+			cidr:             "2001:db8:1::/112",
 			free:             65534,
 			released:         "2001:db8:1::5",
 			outOfRange1:      "2001:db8::1",
@@ -67,7 +67,7 @@ func TestAllocate(t *testing.T) {
 		}
 		t.Logf("base: %v", r.base.Bytes())
 		if f := r.Free(); f != tc.free {
-			t.Errorf("Test %s unexpected free %d", tc.name, f)
+			t.Errorf("Test %s unexpected free %d expected %d", tc.name, f, tc.free)
 		}
 
 		rCIDR := r.CIDR()
@@ -106,7 +106,7 @@ func TestAllocate(t *testing.T) {
 			t.Errorf("Test %s unexpected free %d", tc.name, f)
 		}
 		if f := r.Used(); f != (tc.free - 1) {
-			t.Errorf("Test %s unexpected free %d", tc.name, f)
+			t.Errorf("Test %s unexpected used %d", tc.name, f)
 		}
 		ip, err := r.AllocateNext()
 		if err != nil {
@@ -138,7 +138,7 @@ func TestAllocate(t *testing.T) {
 			t.Errorf("Test %s unexpected free %d", tc.name, f)
 		}
 		if f := r.Used(); f != (tc.free - 1) {
-			t.Errorf("Test %s unexpected free %d", tc.name, f)
+			t.Errorf("Test %s unexpected used %d", tc.name, f)
 		}
 		if err := r.Allocate(released); err != nil {
 			t.Fatal(err)
@@ -147,70 +147,84 @@ func TestAllocate(t *testing.T) {
 			t.Errorf("Test %s unexpected free %d", tc.name, f)
 		}
 		if f := r.Used(); f != tc.free {
-			t.Errorf("Test %s unexpected free %d", tc.name, f)
+			t.Errorf("Test %s unexpected used %d", tc.name, f)
 		}
 	}
 }
 
 func TestAllocateTiny(t *testing.T) {
-	_, cidr, err := net.ParseCIDR("192.168.1.0/32")
-	if err != nil {
-		t.Fatal(err)
+	testCases := []string{
+		"192.168.1.0/32",
+		"2001:db9::/128",
 	}
-	r, err := NewCIDRRange(cidr)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if f := r.Free(); f != 0 {
-		t.Errorf("free: %d", f)
-	}
-	if _, err := r.AllocateNext(); err != ErrFull {
-		t.Error(err)
+
+	for _, tc := range testCases {
+		_, cidr, err := net.ParseCIDR(tc)
+		if err != nil {
+			t.Fatal(err)
+		}
+		r, err := NewCIDRRange(cidr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if f := r.Free(); f != 0 {
+			t.Errorf("free: %d", f)
+		}
+		if _, err := r.AllocateNext(); err != ErrFull {
+			t.Error(err)
+		}
 	}
 }
 
 func TestAllocateSmall(t *testing.T) {
-	_, cidr, err := net.ParseCIDR("192.168.1.240/30")
-	if err != nil {
-		t.Fatal(err)
+	testCases := []string{
+		"192.168.1.0/30",
+		"2001:db9::/126",
 	}
-	r, err := NewCIDRRange(cidr)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if f := r.Free(); f != 2 {
-		t.Errorf("free: %d", f)
-	}
-	found := sets.NewString()
-	for i := 0; i < 2; i++ {
-		ip, err := r.AllocateNext()
+
+	for _, tc := range testCases {
+		_, cidr, err := net.ParseCIDR(tc)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if found.Has(ip.String()) {
-			t.Fatalf("already reserved: %s", ip)
-		}
-		found.Insert(ip.String())
-	}
-	for s := range found {
-		if !r.Has(net.ParseIP(s)) {
-			t.Fatalf("missing: %s", s)
-		}
-		if err := r.Allocate(net.ParseIP(s)); err != ErrAllocated {
+		r, err := NewCIDRRange(cidr)
+		if err != nil {
 			t.Fatal(err)
 		}
-	}
-	for i := 0; i < 100; i++ {
-		if _, err := r.AllocateNext(); err != ErrFull {
-			t.Fatalf("suddenly became not-full: %#v", r)
+		if f := r.Free(); f != 2 {
+			t.Errorf("free: %d", f)
 		}
-	}
+		found := sets.NewString()
+		for i := 0; i < 2; i++ {
+			ip, err := r.AllocateNext()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if found.Has(ip.String()) {
+				t.Fatalf("already reserved: %s", ip)
+			}
+			found.Insert(ip.String())
+		}
+		for s := range found {
+			if !r.Has(net.ParseIP(s)) {
+				t.Fatalf("missing: %s", s)
+			}
+			if err := r.Allocate(net.ParseIP(s)); err != ErrAllocated {
+				t.Fatal(err)
+			}
+		}
+		for i := 0; i < 100; i++ {
+			if _, err := r.AllocateNext(); err != ErrFull {
+				t.Fatalf("suddenly became not-full: %#v", r)
+			}
+		}
 
-	if r.Free() != 0 && r.max != 2 {
-		t.Fatalf("unexpected range: %v", r)
-	}
+		if r.Free() != 0 && r.max != 2 {
+			t.Fatalf("unexpected range: %v", r)
+		}
 
-	t.Logf("allocated: %v", found)
+		t.Logf("allocated: %v", found)
+	}
 }
 
 func TestRangeSize(t *testing.T) {
@@ -230,19 +244,29 @@ func TestRangeSize(t *testing.T) {
 			addrs: 1048576,
 		},
 		{
+			name:  "limited large IPv4 cidr",
+			cidr:  "10.96.0.0/7",
+			addrs: MaxHostsSubnet,
+		},
+		{
 			name:  "unsupported IPv4 cidr",
 			cidr:  "192.168.1.0/1",
 			addrs: 0,
 		},
 		{
+			name:  "supported large IPv6 cidr",
+			cidr:  "2001:db8::/64",
+			addrs: MaxHostsSubnet,
+		},
+		{
 			name:  "supported IPv6 cidr",
-			cidr:  "2001:db8::/48",
+			cidr:  "2001:db8::/112",
 			addrs: 65536,
 		},
 		{
-			name:  "unsupported IPv6 mask",
-			cidr:  "2001:db8::/1",
-			addrs: 0,
+			name:  "limited IPv6 mask",
+			cidr:  "2001:db8::/48",
+			addrs: MaxHostsSubnet,
 		},
 	}
 
@@ -259,24 +283,54 @@ func TestRangeSize(t *testing.T) {
 }
 
 func TestForEach(t *testing.T) {
-	_, cidr, err := net.ParseCIDR("192.168.1.0/24")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	testCases := []sets.String{
-		sets.NewString(),
-		sets.NewString("192.168.1.1"),
-		sets.NewString("192.168.1.1", "192.168.1.254"),
-		sets.NewString("192.168.1.1", "192.168.1.128", "192.168.1.254"),
+	testCases := []struct {
+		cidr string
+		ips  sets.String
+	}{
+		{
+			cidr: "192.168.1.0/24",
+			ips:  sets.NewString(),
+		},
+		{
+			cidr: "192.168.1.0/24",
+			ips:  sets.NewString("192.168.1.1"),
+		},
+		{
+			cidr: "192.168.1.0/24",
+			ips:  sets.NewString("192.168.1.1", "192.168.1.254"),
+		},
+		{
+			cidr: "192.168.1.0/24",
+			ips:  sets.NewString("192.168.1.1", "192.168.1.128", "192.168.1.254"),
+		},
+		{
+			cidr: "2001:db8::/64",
+			ips:  sets.NewString(),
+		},
+		{
+			cidr: "2001:db8::/64",
+			ips:  sets.NewString("2001:db8::1"),
+		},
+		{
+			cidr: "2001:db8::/64",
+			ips:  sets.NewString("2001:db8::1", "2001:db8::ff"),
+		},
+		{
+			cidr: "2001:db8::/64",
+			ips:  sets.NewString("2001:db8::1", "2001:db8::ab", "2001:db8::ff"),
+		},
 	}
 
 	for i, tc := range testCases {
+		_, cidr, err := net.ParseCIDR(tc.cidr)
+		if err != nil {
+			t.Fatal(err)
+		}
 		r, err := NewCIDRRange(cidr)
 		if err != nil {
 			t.Fatal(err)
 		}
-		for ips := range tc {
+		for ips := range tc.ips {
 			ip := net.ParseIP(ips)
 			if err := r.Allocate(ip); err != nil {
 				t.Errorf("[%d] error allocating IP %v: %v", i, ip, err)
@@ -289,115 +343,131 @@ func TestForEach(t *testing.T) {
 		r.ForEach(func(ip net.IP) {
 			calls.Insert(ip.String())
 		})
-		if len(calls) != len(tc) {
-			t.Errorf("[%d] expected %d calls, got %d", i, len(tc), len(calls))
+		if len(calls) != len(tc.ips) {
+			t.Errorf("[%d] expected %d calls, got %d", i, len(tc.ips), len(calls))
 		}
-		if !calls.Equal(tc) {
-			t.Errorf("[%d] expected calls to equal testcase: %v vs %v", i, calls.List(), tc.List())
+		if !calls.Equal(tc.ips) {
+			t.Errorf("[%d] expected calls to equal testcase: %v vs %v", i, calls.List(), tc.ips.List())
 		}
 	}
 }
 
 func TestSnapshot(t *testing.T) {
-	_, cidr, err := net.ParseCIDR("192.168.1.0/24")
-	if err != nil {
-		t.Fatal(err)
+	testCases := []string{
+		"192.168.1.0/24",
+		"2001:db9::/64",
 	}
-	r, err := NewCIDRRange(cidr)
-	if err != nil {
-		t.Fatal(err)
-	}
-	ip := []net.IP{}
-	for i := 0; i < 10; i++ {
-		n, err := r.AllocateNext()
+
+	for _, tc := range testCases {
+		_, cidr, err := net.ParseCIDR(tc)
 		if err != nil {
 			t.Fatal(err)
 		}
-		ip = append(ip, n)
-	}
-
-	var dst api.RangeAllocation
-	err = r.Snapshot(&dst)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	_, network, err := net.ParseCIDR(dst.Range)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if !network.IP.Equal(cidr.IP) || network.Mask.String() != cidr.Mask.String() {
-		t.Fatalf("mismatched networks: %s : %s", network, cidr)
-	}
-
-	_, otherCidr, err := net.ParseCIDR("192.168.2.0/24")
-	if err != nil {
-		t.Fatal(err)
-	}
-	other, err := NewCIDRRange(otherCidr)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := r.Restore(otherCidr, dst.Data); err != ErrMismatchedNetwork {
-		t.Fatal(err)
-	}
-	other, err = NewCIDRRange(network)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := other.Restore(network, dst.Data); err != nil {
-		t.Fatal(err)
-	}
-
-	for _, n := range ip {
-		if !other.Has(n) {
-			t.Errorf("restored range does not have %s", n)
+		r, err := NewCIDRRange(cidr)
+		if err != nil {
+			t.Fatal(err)
 		}
-	}
-	if other.Free() != r.Free() {
-		t.Errorf("counts do not match: %d", other.Free())
+		ip := []net.IP{}
+		for i := 0; i < 10; i++ {
+			n, err := r.AllocateNext()
+			if err != nil {
+				t.Fatal(err)
+			}
+			ip = append(ip, n)
+		}
+
+		var dst api.RangeAllocation
+		err = r.Snapshot(&dst)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		_, network, err := net.ParseCIDR(dst.Range)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if !network.IP.Equal(cidr.IP) || network.Mask.String() != cidr.Mask.String() {
+			t.Fatalf("mismatched networks: %s : %s", network, cidr)
+		}
+
+		_, otherCidr, err := net.ParseCIDR("192.168.2.0/24")
+		if err != nil {
+			t.Fatal(err)
+		}
+		other, err := NewCIDRRange(otherCidr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := r.Restore(otherCidr, dst.Data); err != ErrMismatchedNetwork {
+			t.Fatal(err)
+		}
+		other, err = NewCIDRRange(network)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := other.Restore(network, dst.Data); err != nil {
+			t.Fatal(err)
+		}
+
+		for _, n := range ip {
+			if !other.Has(n) {
+				t.Errorf("restored range does not have %s", n)
+			}
+		}
+		if other.Free() != r.Free() {
+			t.Errorf("counts do not match: %d", other.Free())
+		}
 	}
 }
 
 func TestNewFromSnapshot(t *testing.T) {
-	_, cidr, err := net.ParseCIDR("192.168.0.0/24")
-	if err != nil {
-		t.Fatal(err)
+	testCases := []string{
+		"192.168.1.0/24",
+		"2001:db9::/108",
 	}
-	r, err := NewCIDRRange(cidr)
-	if err != nil {
-		t.Fatal(err)
-	}
-	allocated := []net.IP{}
-	for i := 0; i < 128; i++ {
-		ip, err := r.AllocateNext()
+
+	for _, tc := range testCases {
+		_, cidr, err := net.ParseCIDR(tc)
 		if err != nil {
 			t.Fatal(err)
 		}
-		allocated = append(allocated, ip)
-	}
+		size := int(RangeSize(cidr) / 2)
+		t.Logf("Size of cidr %s is: %d", tc, size)
+		r, err := NewCIDRRange(cidr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		allocated := []net.IP{}
+		for i := 0; i < size; i++ {
+			ip, err := r.AllocateNext()
+			if err != nil {
+				t.Fatal(err)
+			}
+			allocated = append(allocated, ip)
+		}
 
-	snapshot := api.RangeAllocation{}
-	if err = r.Snapshot(&snapshot); err != nil {
-		t.Fatal(err)
-	}
+		snapshot := api.RangeAllocation{}
+		if err = r.Snapshot(&snapshot); err != nil {
+			t.Fatal(err)
+		}
 
-	r, err = NewFromSnapshot(&snapshot)
-	if err != nil {
-		t.Fatal(err)
-	}
+		r, err = NewFromSnapshot(&snapshot)
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	if x := r.Free(); x != 126 {
-		t.Fatalf("expected 126 free IPs, got %d", x)
-	}
-	if x := r.Used(); x != 128 {
-		t.Fatalf("expected 128 used IPs, got %d", x)
-	}
+		if x := r.Free(); x != size-2 {
+			t.Fatalf("expected %d free IPs, got %d", size, x)
+		}
+		if x := r.Used(); x != size {
+			t.Fatalf("expected %d used IPs, got %d", size, x)
+		}
 
-	for _, ip := range allocated {
-		if !r.Has(ip) {
-			t.Fatalf("expected IP to be allocated, but it was not")
+		for _, ip := range allocated {
+			if !r.Has(ip) {
+				t.Fatalf("expected IP to be allocated, but it was not")
+			}
 		}
 	}
 }

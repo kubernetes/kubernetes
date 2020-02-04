@@ -205,9 +205,16 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 	}
 
 	serviceClusterIPAllocator, err := ipallocator.NewAllocatorCIDRRange(&serviceClusterIPRange, func(max int, rangeSpec string) (allocator.Interface, error) {
-		mem := allocator.NewAllocationMap(max, rangeSpec)
+		var etcd *serviceallocator.Etcd
+		var err error
+		if !utilfeature.DefaultFeatureGate.Enabled(features.RoaringBitmaps) {
+			mem := allocator.NewAllocationMap(max, rangeSpec)
+			etcd, err = serviceallocator.NewEtcd(mem, "/ranges/serviceips", api.Resource("serviceipallocations"), serviceStorageConfig)
+		} else {
+			mem := allocator.NewRoaringAllocationMap(max, rangeSpec)
+			etcd, err = serviceallocator.NewEtcd(mem, "/ranges/primaryserviceips", api.Resource("serviceipallocations"), serviceStorageConfig)
+		}
 		// TODO etcdallocator package to return a storage interface via the storageFactory
-		etcd, err := serviceallocator.NewEtcd(mem, "/ranges/serviceips", api.Resource("serviceipallocations"), serviceStorageConfig)
 		if err != nil {
 			return nil, err
 		}
@@ -224,9 +231,14 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 	if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) && c.SecondaryServiceIPRange.IP != nil {
 		var secondaryServiceClusterIPRegistry rangeallocation.RangeRegistry
 		secondaryServiceClusterIPAllocator, err = ipallocator.NewAllocatorCIDRRange(&c.SecondaryServiceIPRange, func(max int, rangeSpec string) (allocator.Interface, error) {
-			mem := allocator.NewAllocationMap(max, rangeSpec)
-			// TODO etcdallocator package to return a storage interface via the storageFactory
+			var mem allocator.Snapshottable
+			if !utilfeature.DefaultFeatureGate.Enabled(features.RoaringBitmaps) {
+				mem = allocator.NewAllocationMap(max, rangeSpec)
+			} else {
+				mem = allocator.NewRoaringAllocationMap(max, rangeSpec)
+			}
 			etcd, err := serviceallocator.NewEtcd(mem, "/ranges/secondaryserviceips", api.Resource("serviceipallocations"), serviceStorageConfig)
+
 			if err != nil {
 				return nil, err
 			}

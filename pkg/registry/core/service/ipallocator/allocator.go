@@ -19,10 +19,14 @@ package ipallocator
 import (
 	"errors"
 	"fmt"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/registry/core/service/allocator"
 	"math/big"
+
 	"net"
+
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/registry/core/service/allocator"
 )
 
 // Interface manages the allocation of IP addresses out of a range. Interface
@@ -37,6 +41,11 @@ type Interface interface {
 	// For testing
 	Has(ip net.IP) bool
 }
+
+// This constant represents the value used to limit the maximum number of hosts per subnet in IPv6
+// It's the number of hosts in an IPv6 /108 or IPv4 /8 subnet and was calculated based on the benchmarks
+// in pkg/registry/core/service/allocator/bitmap_test.go
+const MaxHostsSubnet = int64(16777216)
 
 var (
 	ErrFull              = errors.New("range is full")
@@ -97,7 +106,10 @@ func NewAllocatorCIDRRange(cidr *net.IPNet, allocatorFactory allocator.Allocator
 // Helper that wraps NewAllocatorCIDRRange, for creating a range backed by an in-memory store.
 func NewCIDRRange(cidr *net.IPNet) (*Range, error) {
 	return NewAllocatorCIDRRange(cidr, func(max int, rangeSpec string) (allocator.Interface, error) {
-		return allocator.NewAllocationMap(max, rangeSpec), nil
+		if !utilfeature.DefaultFeatureGate.Enabled(features.RoaringBitmaps) {
+			return allocator.NewAllocationMap(max, rangeSpec), nil
+		}
+		return allocator.NewRoaringAllocationMap(max, rangeSpec), nil
 	})
 }
 
@@ -272,15 +284,21 @@ func RangeSize(subnet *net.IPNet) int64 {
 	if bits == 32 && (bits-ones) >= 31 || bits == 128 && (bits-ones) >= 127 {
 		return 0
 	}
+	// The max size using roaring bitmaps will be limited to the
+	// MaxHostsSubnet constant that corresponds to an IPv4 /8 subnet mask
+	// or an IPv6 /104 subnet mask. This has to be limited due to the allocator
+	// performance and size with a high number of ip addresses.
+	if (bits-ones) >= 24 && utilfeature.DefaultFeatureGate.Enabled(features.RoaringBitmaps) {
+		return MaxHostsSubnet
+	}
 	// For IPv6, the max size will be limited to 65536
 	// This is due to the allocator keeping track of all the
 	// allocated IP's in a bitmap. This will keep the size of
 	// the bitmap to 64k.
-	if bits == 128 && (bits-ones) >= 16 {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.RoaringBitmaps) && bits == 128 && (bits-ones) >= 16 {
 		return int64(1) << uint(16)
-	} else {
-		return int64(1) << uint(bits-ones)
 	}
+	return int64(1) << uint(bits-ones)
 }
 
 // GetIndexedIP returns a net.IP that is subnet.IP + index in the contiguous IP space.
