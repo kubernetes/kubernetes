@@ -184,7 +184,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 								SubPathExpr: "$(POD_NAME)",
 							},
 							{
-								Name:      "workdir2",
+								Name:      "workdir1",
 								MountPath: "/testcontainer",
 							},
 						},
@@ -195,13 +195,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 					{
 						Name: "workdir1",
 						VolumeSource: v1.VolumeSource{
-							HostPath: &v1.HostPathVolumeSource{Path: "/tmp"},
-						},
-					},
-					{
-						Name: "workdir2",
-						VolumeSource: v1.VolumeSource{
-							HostPath: &v1.HostPathVolumeSource{Path: "/tmp"},
+							EmptyDir: &v1.EmptyDirVolumeSource{},
 						},
 					},
 				},
@@ -353,7 +347,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 								SubPathExpr: "$(ANNOTATION)/$(POD_NAME)",
 							},
 							{
-								Name:      "workdir2",
+								Name:      "workdir1",
 								MountPath: "/volume_mount",
 							},
 						},
@@ -363,13 +357,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 					{
 						Name: "workdir1",
 						VolumeSource: v1.VolumeSource{
-							HostPath: &v1.HostPathVolumeSource{Path: "/tmp"},
-						},
-					},
-					{
-						Name: "workdir2",
-						VolumeSource: v1.VolumeSource{
-							HostPath: &v1.HostPathVolumeSource{Path: "/tmp"},
+							EmptyDir: &v1.EmptyDirVolumeSource{},
 						},
 					},
 				},
@@ -443,7 +431,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 								SubPathExpr: "$(ANNOTATION)/$(POD_NAME)",
 							},
 							{
-								Name:      "workdir2",
+								Name:      "workdir1",
 								MountPath: "/volume_mount",
 							},
 						},
@@ -454,13 +442,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 					{
 						Name: "workdir1",
 						VolumeSource: v1.VolumeSource{
-							HostPath: &v1.HostPathVolumeSource{Path: "/tmp"},
-						},
-					},
-					{
-						Name: "workdir2",
-						VolumeSource: v1.VolumeSource{
-							HostPath: &v1.HostPathVolumeSource{Path: "/tmp"},
+							EmptyDir: &v1.EmptyDirVolumeSource{},
 						},
 					},
 				},
@@ -536,7 +518,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 								MountPath: "/subpath_mount",
 							},
 							{
-								Name:      "workdir2",
+								Name:      "workdir1",
 								MountPath: "/volume_mount",
 							},
 						},
@@ -566,7 +548,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 								SubPathExpr: "$(POD_NAME)",
 							},
 							{
-								Name:      "workdir2",
+								Name:      "workdir1",
 								MountPath: "/volume_mount",
 							},
 						},
@@ -577,13 +559,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 					{
 						Name: "workdir1",
 						VolumeSource: v1.VolumeSource{
-							HostPath: &v1.HostPathVolumeSource{Path: "/tmp"},
-						},
-					},
-					{
-						Name: "workdir2",
-						VolumeSource: v1.VolumeSource{
-							HostPath: &v1.HostPathVolumeSource{Path: "/tmp"},
+							EmptyDir: &v1.EmptyDirVolumeSource{},
 						},
 					},
 				},
