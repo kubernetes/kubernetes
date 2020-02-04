@@ -148,7 +148,14 @@ var _ = SIGDescribe("DisruptionController", func() {
 		if c.shouldDeny {
 			expectation = "should not allow an eviction"
 		}
-		ginkgo.It(fmt.Sprintf("evictions: %s => %s", c.description, expectation), func() {
+		// tests with exclusive set to true relies on HostPort to make sure
+		// only one pod from the replicaset is assigned to each node. This
+		// requires these tests to be run serially.
+		var serial string
+		if c.exclusive {
+			serial = " [Serial]"
+		}
+		ginkgo.It(fmt.Sprintf("evictions: %s => %s%s", c.description, expectation, serial), func() {
 			if c.skipForBigClusters {
 				e2eskipper.SkipUnlessNodeCountIsAtMost(bigClusterSize - 1)
 			}
