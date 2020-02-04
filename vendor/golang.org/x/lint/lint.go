@@ -198,7 +198,6 @@ func (f *file) lint() {
 	f.lintBlankImports()
 	f.lintExported()
 	f.lintNames()
-	f.lintVarDecls()
 	f.lintElses()
 	f.lintRanges()
 	f.lintErrorf()
@@ -975,84 +974,6 @@ var zeroLiteral = map[string]bool{
 	"0.":  true,
 	"0.0": true,
 	"0i":  true,
-}
-
-// lintVarDecls examines variable declarations. It complains about declarations with
-// redundant LHS types that can be inferred from the RHS.
-func (f *file) lintVarDecls() {
-	var lastGen *ast.GenDecl // last GenDecl entered.
-
-	f.walk(func(node ast.Node) bool {
-		switch v := node.(type) {
-		case *ast.GenDecl:
-			if v.Tok != token.CONST && v.Tok != token.VAR {
-				return false
-			}
-			lastGen = v
-			return true
-		case *ast.ValueSpec:
-			if lastGen.Tok == token.CONST {
-				return false
-			}
-			if len(v.Names) > 1 || v.Type == nil || len(v.Values) == 0 {
-				return false
-			}
-			rhs := v.Values[0]
-			// An underscore var appears in a common idiom for compile-time interface satisfaction,
-			// as in "var _ Interface = (*Concrete)(nil)".
-			if isIdent(v.Names[0], "_") {
-				return false
-			}
-			// If the RHS is a zero value, suggest dropping it.
-			zero := false
-			if lit, ok := rhs.(*ast.BasicLit); ok {
-				zero = zeroLiteral[lit.Value]
-			} else if isIdent(rhs, "nil") {
-				zero = true
-			}
-			if zero {
-				f.errorf(rhs, 0.9, category("zero-value"), "should drop = %s from declaration of var %s; it is the zero value", f.render(rhs), v.Names[0])
-				return false
-			}
-			lhsTyp := f.pkg.typeOf(v.Type)
-			rhsTyp := f.pkg.typeOf(rhs)
-
-			if !validType(lhsTyp) || !validType(rhsTyp) {
-				// Type checking failed (often due to missing imports).
-				return false
-			}
-
-			if !types.Identical(lhsTyp, rhsTyp) {
-				// Assignment to a different type is not redundant.
-				return false
-			}
-
-			// The next three conditions are for suppressing the warning in situations
-			// where we were unable to typecheck.
-
-			// If the LHS type is an interface, don't warn, since it is probably a
-			// concrete type on the RHS. Note that our feeble lexical check here
-			// will only pick up interface{} and other literal interface types;
-			// that covers most of the cases we care to exclude right now.
-			if _, ok := v.Type.(*ast.InterfaceType); ok {
-				return false
-			}
-			// If the RHS is an untyped const, only warn if the LHS type is its default type.
-			if defType, ok := f.isUntypedConst(rhs); ok && !isIdent(v.Type, defType) {
-				return false
-			}
-
-			f.errorf(v.Type, 0.8, category("type-inference"), "should omit type %s from declaration of var %s; it will be inferred from the right-hand side", f.render(v.Type), v.Names[0])
-			return false
-		}
-		return true
-	})
-}
-
-func validType(T types.Type) bool {
-	return T != nil &&
-		T != types.Typ[types.Invalid] &&
-		!strings.Contains(T.String(), "invalid type") // good but not foolproof
 }
 
 // lintElses examines else blocks. It complains about any else block whose if block ends in a return.

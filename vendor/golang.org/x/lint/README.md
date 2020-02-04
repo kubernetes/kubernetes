@@ -78,7 +78,7 @@ Optionally, add this to your `~/.vimrc` to automatically run `golint` on `:w`
 
 Add this to your `.emacs` file:
 
-    (add-to-list 'load-path (concat (getenv "GOPATH")  "/src/github.com/golang/lint/misc/emacs"))
+    (add-to-list 'load-path (concat (getenv "GOPATH")  "/src/golang.org/x/lint/misc/emacs/"))
     (require 'golint)
 
 If you have multiple entries in your GOPATH, replace `$GOPATH` with the right value.
