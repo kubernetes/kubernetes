@@ -21,6 +21,8 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
@@ -60,13 +62,12 @@ func NewContainerRuntimeOptions() *config.ContainerRuntimeOptions {
 		dockerEndpoint = "unix:///var/run/docker.sock"
 	}
 
-	return &config.ContainerRuntimeOptions{
+	crOptions := &config.ContainerRuntimeOptions{
 		ContainerRuntime:           kubetypes.DockerContainerRuntime,
 		RedirectContainerStreaming: false,
 		DockerEndpoint:             dockerEndpoint,
 		DockershimRootDirectory:    "/var/lib/dockershim",
 		PodSandboxImage:            defaultPodSandboxImage,
-		PodSandboxSeccomp:          defaultPodSandboxSeccomp,
 		ImagePullProgressDeadline:  metav1.Duration{Duration: 1 * time.Minute},
 		ExperimentalDockershim:     false,
 
@@ -75,4 +76,10 @@ func NewContainerRuntimeOptions() *config.ContainerRuntimeOptions {
 		CNIConfDir:  "/etc/cni/net.d",
 		CNICacheDir: "/var/lib/cni/cache",
 	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodSandboxSeccomp) {
+		crOptions.PodSandboxSeccomp = defaultPodSandboxSeccomp
+	}
+
+	return crOptions
 }

@@ -28,8 +28,10 @@ import (
 	dockercontainer "github.com/docker/docker/api/types/container"
 	dockerfilters "github.com/docker/docker/api/types/filters"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/klog"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/errors"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -652,7 +654,16 @@ func (ds *dockerService) makeSandboxDockerConfig(c *runtimeapi.PodSandboxConfig,
 	}
 
 	// Set security options.
-	securityOpts := ds.getSandBoxSecurityOpts(securityOptSeparator)
+	securityOpts, err := ds.getSecurityOpts(c.GetLinux().GetSecurityContext().GetSeccompProfilePath(), securityOptSeparator)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate sandbox security options for sandbox %q: %v", c.Metadata.Name, err)
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodSandboxSeccomp) {
+		// overrides sandbox seccomp with built-in profile
+		securityOpts = ds.getSandBoxSecurityOpts(securityOptSeparator)
+	}
+
 	hc.SecurityOpt = append(hc.SecurityOpt, securityOpts...)
 
 	applyExperimentalCreateConfig(createConfig, c.Annotations)

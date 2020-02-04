@@ -529,6 +529,12 @@ const (
 	//
 	// Enables a feature to make secrets and configmaps data immutable.
 	ImmutableEphemeralVolumes featuregate.Feature = "ImmutableEphemeralVolumes"
+
+	// owner: @pjbgf
+	// alpha: v1.18
+	//
+	// Enables a feature to add built-in seccomp profile to the pod sandbox container.
+	PodSandboxSeccomp featuregate.Feature = "PodSandboxSeccomp"
 )
 
 func init() {
@@ -613,6 +619,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	PodDisruptionBudget:                            {Default: true, PreRelease: featuregate.Beta},
 	ServiceTopology:                                {Default: false, PreRelease: featuregate.Alpha},
 	ImmutableEphemeralVolumes:                      {Default: false, PreRelease: featuregate.Alpha},
+	PodSandboxSeccomp:                              {Default: false, PreRelease: featuregate.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:

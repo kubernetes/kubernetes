@@ -28,7 +28,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/network"
@@ -158,6 +161,8 @@ func TestSandboxStatus(t *testing.T) {
 // TestSandboxHasLeastPrivilegesConfig tests that the sandbox is set with no-new-privileges
 // and it has a seccomp profile.
 func TestSandboxHasLeastPrivilegesConfig(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodSandboxSeccomp, true)()
+
 	ds, _, _ := newTestDockerService()
 	config := makeSandboxConfig("foo", "bar", "1", 0)
 	ds.podSandBoxSeccomp = `{defaultAction="SCMP_ACT_ERRNO"}`
