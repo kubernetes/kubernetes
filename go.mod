@@ -507,7 +507,7 @@ replace (
 	golang.org/x/image => golang.org/x/image v0.0.0-20190802002840-cff245a6509b
 	golang.org/x/lint => golang.org/x/lint v0.0.0-20191125180803-fdd1cda4f05f
 	golang.org/x/mobile => golang.org/x/mobile v0.0.0-20190719004257-d2bd2a29d028
-	golang.org/x/mod => golang.org/x/mod v0.0.0-20190513183733-4bf6d317e70e
+	golang.org/x/mod => golang.org/x/mod v0.1.0
 	golang.org/x/net => golang.org/x/net v0.0.0-20191004110552-13f9640d40b9
 	golang.org/x/oauth2 => golang.org/x/oauth2 v0.0.0-20191202225959-858c2ad4c8b6
 	golang.org/x/perf => golang.org/x/perf v0.0.0-20180704124530-6e6d33e29852
