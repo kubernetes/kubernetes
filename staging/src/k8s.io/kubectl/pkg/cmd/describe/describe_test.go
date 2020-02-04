@@ -248,15 +248,15 @@ func TestDescribeHelpMessage(t *testing.T) {
 func TestDescribeNoResourcesFound(t *testing.T) {
 	testNS := "testns"
 	testCases := []struct {
-		name            string
-		flags           map[string]string
-		namespace       string
-		expectedOutput  string
-		expectedErr	    string
+		name           string
+		flags          map[string]string
+		namespace      string
+		expectedOutput string
+		expectedErr    string
 	}{
 		{
 			name:           "all namespaces",
-			flags:           map[string]string{"all-namespaces": "true"},
+			flags:          map[string]string{"all-namespaces": "true"},
 			expectedOutput: "",
 			expectedErr:    "No resources found\n",
 		},

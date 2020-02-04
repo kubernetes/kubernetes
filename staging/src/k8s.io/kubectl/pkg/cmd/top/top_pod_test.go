@@ -452,12 +452,12 @@ func TestTopPodWithMetricsServer(t *testing.T) {
 func TestTopPodNoResourcesFound(t *testing.T) {
 	testNS := "testns"
 	testCases := []struct {
-		name            string
-		options         *TopPodOptions
-		namespace       string
-		expectedOutput  string
-		expectedErr	    string
-		expectedPath    string
+		name           string
+		options        *TopPodOptions
+		namespace      string
+		expectedOutput string
+		expectedErr    string
+		expectedPath   string
 	}{
 		{
 			name:           "all namespaces",
@@ -501,7 +501,7 @@ func TestTopPodNoResourcesFound(t *testing.T) {
 						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte(apibody)))}, nil
 					case p == "/apis":
 						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte(apisbodyWithMetrics)))}, nil
-					case p == "/api/v1/namespaces/" + testNS + "/pods":
+					case p == "/api/v1/namespaces/"+testNS+"/pods":
 						// Top Pod calls this endpoint to check if there are pods whenever it gets no metrics,
 						// so we need to return no pods for this test scenario
 						body, _ := marshallBody(metricsv1alpha1api.PodMetricsList{
