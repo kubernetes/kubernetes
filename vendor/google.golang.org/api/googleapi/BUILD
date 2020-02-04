@@ -9,7 +9,7 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/google.golang.org/api/googleapi",
     importpath = "google.golang.org/api/googleapi",
     visibility = ["//visibility:public"],
-    deps = ["//vendor/google.golang.org/api/googleapi/internal/uritemplates:go_default_library"],
+    deps = ["//vendor/google.golang.org/api/internal/third_party/uritemplates:go_default_library"],
 )
 
 filegroup(
@@ -23,7 +23,6 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//vendor/google.golang.org/api/googleapi/internal/uritemplates:all-srcs",
         "//vendor/google.golang.org/api/googleapi/transport:all-srcs",
     ],
     tags = ["automanaged"],

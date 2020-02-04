@@ -27,7 +27,11 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//vendor/google.golang.org/api/internal/gensupport:all-srcs",
+        "//vendor/google.golang.org/api/internal/third_party/uritemplates:all-srcs",
+    ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
 )

@@ -514,7 +514,7 @@ replace (
 	gonum.org/v1/gonum => gonum.org/v1/gonum v0.6.2
 	gonum.org/v1/netlib => gonum.org/v1/netlib v0.0.0-20190331212654-76723241ea4e
 	gonum.org/v1/plot => gonum.org/v1/plot v0.0.0-20190515093506-e2840ee46a6b
-	google.golang.org/api => google.golang.org/api v0.6.1-0.20190607001116-5213b8090861
+	google.golang.org/api => google.golang.org/api v0.15.1-0.20200106000736-b8fc810ca6b5
 	google.golang.org/appengine => google.golang.org/appengine v1.5.0
 	google.golang.org/genproto => google.golang.org/genproto v0.0.0-20190819201941-24fa4b261c55
 	google.golang.org/grpc => google.golang.org/grpc v1.26.0

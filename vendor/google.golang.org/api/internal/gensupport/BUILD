@@ -3,22 +3,22 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = [
-        "backoff.go",
         "buffer.go",
         "doc.go",
-        "header.go",
         "json.go",
         "jsonfloat.go",
         "media.go",
         "params.go",
         "resumable.go",
-        "retry.go",
         "send.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/google.golang.org/api/gensupport",
-    importpath = "google.golang.org/api/gensupport",
-    visibility = ["//visibility:public"],
-    deps = ["//vendor/google.golang.org/api/googleapi:go_default_library"],
+    importmap = "k8s.io/kubernetes/vendor/google.golang.org/api/internal/gensupport",
+    importpath = "google.golang.org/api/internal/gensupport",
+    visibility = ["//vendor/google.golang.org/api:__subpackages__"],
+    deps = [
+        "//vendor/github.com/googleapis/gax-go/v2:go_default_library",
+        "//vendor/google.golang.org/api/googleapi:go_default_library",
+    ],
 )
 
 filegroup(

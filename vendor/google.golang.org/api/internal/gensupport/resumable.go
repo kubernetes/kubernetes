@@ -12,6 +12,22 @@ import (
 	"net/http"
 	"sync"
 	"time"
+
+	gax "github.com/googleapis/gax-go/v2"
+)
+
+// Backoff is an interface around gax.Backoff's Pause method, allowing tests to provide their
+// own implementation.
+type Backoff interface {
+	Pause() time.Duration
+}
+
+// These are declared as global variables so that tests can overwrite them.
+var (
+	retryDeadline = 32 * time.Second
+	backoff       = func() Backoff {
+		return &gax.Backoff{Initial: 100 * time.Millisecond}
+	}
 )
 
 const (
@@ -39,9 +55,6 @@ type ResumableUpload struct {
 
 	// Callback is an optional function that will be periodically called with the cumulative number of bytes uploaded.
 	Callback func(int64)
-
-	// If not specified, a default exponential backoff strategy will be used.
-	Backoff BackoffStrategy
 }
 
 // Progress returns the number of bytes uploaded at this point.
@@ -138,15 +151,6 @@ func (rx *ResumableUpload) transferChunk(ctx context.Context) (*http.Response, e
 	return res, nil
 }
 
-func contextDone(ctx context.Context) bool {
-	select {
-	case <-ctx.Done():
-		return true
-	default:
-		return false
-	}
-}
-
 // Upload starts the process of a resumable upload with a cancellable context.
 // It retries using the provided back off strategy until cancelled or the
 // strategy indicates to stop retrying.
@@ -156,61 +160,82 @@ func contextDone(ctx context.Context) bool {
 // rx is private to the auto-generated API code.
 // Exactly one of resp or err will be nil.  If resp is non-nil, the caller must call resp.Body.Close.
 func (rx *ResumableUpload) Upload(ctx context.Context) (resp *http.Response, err error) {
-	var pause time.Duration
-	backoff := rx.Backoff
-	if backoff == nil {
-		backoff = DefaultBackoffStrategy()
+	var shouldRetry = func(status int, err error) bool {
+		if 500 <= status && status <= 599 {
+			return true
+		}
+		if status == statusTooManyRequests {
+			return true
+		}
+		if err == io.ErrUnexpectedEOF {
+			return true
+		}
+		if err, ok := err.(interface{ Temporary() bool }); ok {
+			return err.Temporary()
+		}
+		return false
 	}
 
-	for {
-		// Ensure that we return in the case of cancelled context, even if pause is 0.
-		if contextDone(ctx) {
-			return nil, ctx.Err()
-		}
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		case <-time.After(pause):
-		}
-
-		resp, err = rx.transferChunk(ctx)
-
-		var status int
-		if resp != nil {
-			status = resp.StatusCode
-		}
-
-		// Check if we should retry the request.
-		if shouldRetry(status, err) {
-			var retry bool
-			pause, retry = backoff.Pause()
-			if retry {
-				if resp != nil && resp.Body != nil {
-					resp.Body.Close()
-				}
-				continue
-			}
-		}
-
-		// If the chunk was uploaded successfully, but there's still
-		// more to go, upload the next chunk without any delay.
-		if statusResumeIncomplete(resp) {
-			pause = 0
-			backoff.Reset()
-			resp.Body.Close()
-			continue
-		}
-
-		// It's possible for err and resp to both be non-nil here, but we expose a simpler
-		// contract to our callers: exactly one of resp and err will be non-nil.  This means
-		// that any response body must be closed here before returning a non-nil error.
+	// There are a couple of cases where it's possible for err and resp to both
+	// be non-nil. However, we expose a simpler contract to our callers: exactly
+	// one of resp and err will be non-nil. This means that any response body
+	// must be closed here before returning a non-nil error.
+	var prepareReturn = func(resp *http.Response, err error) (*http.Response, error) {
 		if err != nil {
 			if resp != nil && resp.Body != nil {
 				resp.Body.Close()
 			}
 			return nil, err
 		}
-
 		return resp, nil
+	}
+
+	// Send all chunks.
+	for {
+		var pause time.Duration
+
+		// Each chunk gets its own initialized-at-zero retry.
+		bo := backoff()
+		quitAfter := time.After(retryDeadline)
+
+		// Retry loop for a single chunk.
+		for {
+			select {
+			case <-ctx.Done():
+				if err == nil {
+					err = ctx.Err()
+				}
+				return prepareReturn(resp, err)
+			case <-time.After(pause):
+			case <-quitAfter:
+				return prepareReturn(resp, err)
+			}
+
+			resp, err = rx.transferChunk(ctx)
+
+			var status int
+			if resp != nil {
+				status = resp.StatusCode
+			}
+
+			// Check if we should retry the request.
+			if !shouldRetry(status, err) {
+				break
+			}
+
+			pause = bo.Pause()
+			if resp != nil && resp.Body != nil {
+				resp.Body.Close()
+			}
+		}
+
+		// If the chunk was uploaded successfully, but there's still
+		// more to go, upload the next chunk without any delay.
+		if statusResumeIncomplete(resp) {
+			resp.Body.Close()
+			continue
+		}
+
+		return prepareReturn(resp, err)
 	}
 }

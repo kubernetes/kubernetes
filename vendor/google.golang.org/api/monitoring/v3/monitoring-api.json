@@ -1225,7 +1225,7 @@
                   "type": "string"
                 },
                 "orderBy": {
-                  "description": "Unsupported: must be left blank. The points in each time series are returned in reverse time order.",
+                  "description": "Unsupported: must be left blank. The points in each time series are currently returned in reverse time order (most recent to oldest).",
                   "location": "query",
                   "type": "string"
                 },
@@ -1265,7 +1265,7 @@
         "uptimeCheckConfigs": {
           "methods": {
             "create": {
-              "description": "Creates a new uptime check configuration.",
+              "description": "Creates a new Uptime check configuration.",
               "flatPath": "v3/projects/{projectsId}/uptimeCheckConfigs",
               "httpMethod": "POST",
               "id": "monitoring.projects.uptimeCheckConfigs.create",
@@ -1274,7 +1274,7 @@
               ],
               "parameters": {
                 "parent": {
-                  "description": "The project in which to create the uptime check. The format  is projects/[PROJECT_ID].",
+                  "description": "The project in which to create the Uptime check. The format  is projects/[PROJECT_ID].",
                   "location": "path",
                   "pattern": "^projects/[^/]+$",
                   "required": true,
@@ -1294,7 +1294,7 @@
               ]
             },
             "delete": {
-              "description": "Deletes an uptime check configuration. Note that this method will fail if the uptime check configuration is referenced by an alert policy or other dependent configs that would be rendered invalid by the deletion.",
+              "description": "Deletes an Uptime check configuration. Note that this method will fail if the Uptime check configuration is referenced by an alert policy or other dependent configs that would be rendered invalid by the deletion.",
               "flatPath": "v3/projects/{projectsId}/uptimeCheckConfigs/{uptimeCheckConfigsId}",
               "httpMethod": "DELETE",
               "id": "monitoring.projects.uptimeCheckConfigs.delete",
@@ -1303,7 +1303,7 @@
               ],
               "parameters": {
                 "name": {
-                  "description": "The uptime check configuration to delete. The format  is projects/[PROJECT_ID]/uptimeCheckConfigs/[UPTIME_CHECK_ID].",
+                  "description": "The Uptime check configuration to delete. The format  is projects/[PROJECT_ID]/uptimeCheckConfigs/[UPTIME_CHECK_ID].",
                   "location": "path",
                   "pattern": "^projects/[^/]+/uptimeCheckConfigs/[^/]+$",
                   "required": true,
@@ -1320,7 +1320,7 @@
               ]
             },
             "get": {
-              "description": "Gets a single uptime check configuration.",
+              "description": "Gets a single Uptime check configuration.",
               "flatPath": "v3/projects/{projectsId}/uptimeCheckConfigs/{uptimeCheckConfigsId}",
               "httpMethod": "GET",
               "id": "monitoring.projects.uptimeCheckConfigs.get",
@@ -1329,7 +1329,7 @@
               ],
               "parameters": {
                 "name": {
-                  "description": "The uptime check configuration to retrieve. The format  is projects/[PROJECT_ID]/uptimeCheckConfigs/[UPTIME_CHECK_ID].",
+                  "description": "The Uptime check configuration to retrieve. The format  is projects/[PROJECT_ID]/uptimeCheckConfigs/[UPTIME_CHECK_ID].",
                   "location": "path",
                   "pattern": "^projects/[^/]+/uptimeCheckConfigs/[^/]+$",
                   "required": true,
@@ -1347,7 +1347,7 @@
               ]
             },
             "list": {
-              "description": "Lists the existing valid uptime check configurations for the project, leaving out any invalid configurations.",
+              "description": "Lists the existing valid Uptime check configurations for the project (leaving out any invalid configurations).",
               "flatPath": "v3/projects/{projectsId}/uptimeCheckConfigs",
               "httpMethod": "GET",
               "id": "monitoring.projects.uptimeCheckConfigs.list",
@@ -1367,7 +1367,7 @@
                   "type": "string"
                 },
                 "parent": {
-                  "description": "The project whose uptime check configurations are listed. The format  is projects/[PROJECT_ID].",
+                  "description": "The project whose Uptime check configurations are listed. The format  is projects/[PROJECT_ID].",
                   "location": "path",
                   "pattern": "^projects/[^/]+$",
                   "required": true,
@@ -1385,7 +1385,7 @@
               ]
             },
             "patch": {
-              "description": "Updates an uptime check configuration. You can either replace the entire configuration with a new one or replace only certain fields in the current configuration by specifying the fields to be updated via \"updateMask\". Returns the updated configuration.",
+              "description": "Updates an Uptime check configuration. You can either replace the entire configuration with a new one or replace only certain fields in the current configuration by specifying the fields to be updated via updateMask. Returns the updated configuration.",
               "flatPath": "v3/projects/{projectsId}/uptimeCheckConfigs/{uptimeCheckConfigsId}",
               "httpMethod": "PATCH",
               "id": "monitoring.projects.uptimeCheckConfigs.patch",
@@ -1394,14 +1394,14 @@
               ],
               "parameters": {
                 "name": {
-                  "description": "A unique resource name for this UptimeCheckConfig. The format is:projects/[PROJECT_ID]/uptimeCheckConfigs/[UPTIME_CHECK_ID].This field should be omitted when creating the uptime check configuration; on create, the resource name is assigned by the server and included in the response.",
+                  "description": "A unique resource name for this Uptime check configuration. The format is:projects/[PROJECT_ID]/uptimeCheckConfigs/[UPTIME_CHECK_ID].This field should be omitted when creating the Uptime check configuration; on create, the resource name is assigned by the server and included in the response.",
                   "location": "path",
                   "pattern": "^projects/[^/]+/uptimeCheckConfigs/[^/]+$",
                   "required": true,
                   "type": "string"
                 },
                 "updateMask": {
-                  "description": "Optional. If present, only the listed fields in the current uptime check configuration are updated with values from the new configuration. If this field is empty, then the current configuration is completely replaced with the new configuration.",
+                  "description": "Optional. If present, only the listed fields in the current Uptime check configuration are updated with values from the new configuration. If this field is empty, then the current configuration is completely replaced with the new configuration.",
                   "format": "google-fieldmask",
                   "location": "query",
                   "type": "string"
@@ -1423,10 +1423,370 @@
         }
       }
     },
+    "services": {
+      "methods": {
+        "create": {
+          "description": "Create a Service.",
+          "flatPath": "v3/{v3Id}/{v3Id1}/services",
+          "httpMethod": "POST",
+          "id": "monitoring.services.create",
+          "parameterOrder": [
+            "parent"
+          ],
+          "parameters": {
+            "parent": {
+              "description": "Resource name of the parent workspace. Of the form projects/{project_id}.",
+              "location": "path",
+              "pattern": "^[^/]+/[^/]+$",
+              "required": true,
+              "type": "string"
+            },
+            "serviceId": {
+              "description": "Optional. The Service id to use for this Service. If omitted, an id will be generated instead. Must match the pattern a-z0-9-+",
+              "location": "query",
+              "type": "string"
+            }
+          },
+          "path": "v3/{+parent}/services",
+          "request": {
+            "$ref": "Service"
+          },
+          "response": {
+            "$ref": "Service"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/cloud-platform",
+            "https://www.googleapis.com/auth/monitoring"
+          ]
+        },
+        "delete": {
+          "description": "Soft delete this Service.",
+          "flatPath": "v3/{v3Id}/{v3Id1}/services/{servicesId}",
+          "httpMethod": "DELETE",
+          "id": "monitoring.services.delete",
+          "parameterOrder": [
+            "name"
+          ],
+          "parameters": {
+            "name": {
+              "description": "Resource name of the Service to delete. Of the form projects/{project_id}/service/{service_id}.",
+              "location": "path",
+              "pattern": "^[^/]+/[^/]+/services/[^/]+$",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "v3/{+name}",
+          "response": {
+            "$ref": "Empty"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/cloud-platform",
+            "https://www.googleapis.com/auth/monitoring"
+          ]
+        },
+        "get": {
+          "description": "Get the named Service.",
+          "flatPath": "v3/{v3Id}/{v3Id1}/services/{servicesId}",
+          "httpMethod": "GET",
+          "id": "monitoring.services.get",
+          "parameterOrder": [
+            "name"
+          ],
+          "parameters": {
+            "name": {
+              "description": "Resource name of the Service. Of the form projects/{project_id}/services/{service_id}.",
+              "location": "path",
+              "pattern": "^[^/]+/[^/]+/services/[^/]+$",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "v3/{+name}",
+          "response": {
+            "$ref": "Service"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/cloud-platform",
+            "https://www.googleapis.com/auth/monitoring",
+            "https://www.googleapis.com/auth/monitoring.read"
+          ]
+        },
+        "list": {
+          "description": "List Services for this workspace.",
+          "flatPath": "v3/{v3Id}/{v3Id1}/services",
+          "httpMethod": "GET",
+          "id": "monitoring.services.list",
+          "parameterOrder": [
+            "parent"
+          ],
+          "parameters": {
+            "filter": {
+              "description": "A filter specifying what Services to return. The filter currently supports the following fields:\n- `identifier_case`\n- `app_engine.module_id`\n- `cloud_endpoints.service`\n- `cluster_istio.location`\n- `cluster_istio.cluster_name`\n- `cluster_istio.service_namespace`\n- `cluster_istio.service_name`\nidentifier_case refers to which option in the identifier oneof is populated. For example, the filter identifier_case = \"CUSTOM\" would match all services with a value for the custom field. Valid options are \"CUSTOM\", \"APP_ENGINE\", \"CLOUD_ENDPOINTS\", and \"CLUSTER_ISTIO\".",
+              "location": "query",
+              "type": "string"
+            },
+            "pageSize": {
+              "description": "A non-negative number that is the maximum number of results to return. When 0, use default page size.",
+              "format": "int32",
+              "location": "query",
+              "type": "integer"
+            },
+            "pageToken": {
+              "description": "If this field is not empty then it must contain the nextPageToken value returned by a previous call to this method. Using this field causes the method to return additional results from the previous method call.",
+              "location": "query",
+              "type": "string"
+            },
+            "parent": {
+              "description": "Resource name of the parent Workspace. Of the form projects/{project_id}.",
+              "location": "path",
+              "pattern": "^[^/]+/[^/]+$",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "v3/{+parent}/services",
+          "response": {
+            "$ref": "ListServicesResponse"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/cloud-platform",
+            "https://www.googleapis.com/auth/monitoring",
+            "https://www.googleapis.com/auth/monitoring.read"
+          ]
+        },
+        "patch": {
+          "description": "Update this Service.",
+          "flatPath": "v3/{v3Id}/{v3Id1}/services/{servicesId}",
+          "httpMethod": "PATCH",
+          "id": "monitoring.services.patch",
+          "parameterOrder": [
+            "name"
+          ],
+          "parameters": {
+            "name": {
+              "description": "Resource name for this Service. Of the form projects/{project_id}/services/{service_id}.",
+              "location": "path",
+              "pattern": "^[^/]+/[^/]+/services/[^/]+$",
+              "required": true,
+              "type": "string"
+            },
+            "updateMask": {
+              "description": "A set of field paths defining which fields to use for the update.",
+              "format": "google-fieldmask",
+              "location": "query",
+              "type": "string"
+            }
+          },
+          "path": "v3/{+name}",
+          "request": {
+            "$ref": "Service"
+          },
+          "response": {
+            "$ref": "Service"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/cloud-platform",
+            "https://www.googleapis.com/auth/monitoring"
+          ]
+        }
+      },
+      "resources": {
+        "serviceLevelObjectives": {
+          "methods": {
+            "create": {
+              "description": "Create a ServiceLevelObjective for the given Service.",
+              "flatPath": "v3/{v3Id}/{v3Id1}/services/{servicesId}/serviceLevelObjectives",
+              "httpMethod": "POST",
+              "id": "monitoring.services.serviceLevelObjectives.create",
+              "parameterOrder": [
+                "parent"
+              ],
+              "parameters": {
+                "parent": {
+                  "description": "Resource name of the parent Service. Of the form projects/{project_id}/services/{service_id}.",
+                  "location": "path",
+                  "pattern": "^[^/]+/[^/]+/services/[^/]+$",
+                  "required": true,
+                  "type": "string"
+                },
+                "serviceLevelObjectiveId": {
+                  "description": "Optional. The ServiceLevelObjective id to use for this ServiceLevelObjective. If omitted, an id will be generated instead. Must match the pattern a-z0-9-+",
+                  "location": "query",
+                  "type": "string"
+                }
+              },
+              "path": "v3/{+parent}/serviceLevelObjectives",
+              "request": {
+                "$ref": "ServiceLevelObjective"
+              },
+              "response": {
+                "$ref": "ServiceLevelObjective"
+              },
+              "scopes": [
+                "https://www.googleapis.com/auth/cloud-platform",
+                "https://www.googleapis.com/auth/monitoring"
+              ]
+            },
+            "delete": {
+              "description": "Delete the given ServiceLevelObjective.",
+              "flatPath": "v3/{v3Id}/{v3Id1}/services/{servicesId}/serviceLevelObjectives/{serviceLevelObjectivesId}",
+              "httpMethod": "DELETE",
+              "id": "monitoring.services.serviceLevelObjectives.delete",
+              "parameterOrder": [
+                "name"
+              ],
+              "parameters": {
+                "name": {
+                  "description": "Resource name of the ServiceLevelObjective to delete. Of the form projects/{project_id}/services/{service_id}/serviceLevelObjectives/{slo_name}.",
+                  "location": "path",
+                  "pattern": "^[^/]+/[^/]+/services/[^/]+/serviceLevelObjectives/[^/]+$",
+                  "required": true,
+                  "type": "string"
+                }
+              },
+              "path": "v3/{+name}",
+              "response": {
+                "$ref": "Empty"
+              },
+              "scopes": [
+                "https://www.googleapis.com/auth/cloud-platform",
+                "https://www.googleapis.com/auth/monitoring"
+              ]
+            },
+            "get": {
+              "description": "Get a ServiceLevelObjective by name.",
+              "flatPath": "v3/{v3Id}/{v3Id1}/services/{servicesId}/serviceLevelObjectives/{serviceLevelObjectivesId}",
+              "httpMethod": "GET",
+              "id": "monitoring.services.serviceLevelObjectives.get",
+              "parameterOrder": [
+                "name"
+              ],
+              "parameters": {
+                "name": {
+                  "description": "Resource name of the ServiceLevelObjective to get. Of the form projects/{project_id}/services/{service_id}/serviceLevelObjectives/{slo_name}.",
+                  "location": "path",
+                  "pattern": "^[^/]+/[^/]+/services/[^/]+/serviceLevelObjectives/[^/]+$",
+                  "required": true,
+                  "type": "string"
+                },
+                "view": {
+                  "description": "View of the ServiceLevelObjective to return. If DEFAULT, return the ServiceLevelObjective as originally defined. If EXPLICIT and the ServiceLevelObjective is defined in terms of a BasicSli, replace the BasicSli with a RequestBasedSli spelling out how the SLI is computed.",
+                  "enum": [
+                    "VIEW_UNSPECIFIED",
+                    "FULL",
+                    "EXPLICIT"
+                  ],
+                  "location": "query",
+                  "type": "string"
+                }
+              },
+              "path": "v3/{+name}",
+              "response": {
+                "$ref": "ServiceLevelObjective"
+              },
+              "scopes": [
+                "https://www.googleapis.com/auth/cloud-platform",
+                "https://www.googleapis.com/auth/monitoring",
+                "https://www.googleapis.com/auth/monitoring.read"
+              ]
+            },
+            "list": {
+              "description": "List the ServiceLevelObjectives for the given Service.",
+              "flatPath": "v3/{v3Id}/{v3Id1}/services/{servicesId}/serviceLevelObjectives",
+              "httpMethod": "GET",
+              "id": "monitoring.services.serviceLevelObjectives.list",
+              "parameterOrder": [
+                "parent"
+              ],
+              "parameters": {
+                "filter": {
+                  "description": "A filter specifying what ServiceLevelObjectives to return.",
+                  "location": "query",
+                  "type": "string"
+                },
+                "pageSize": {
+                  "description": "A non-negative number that is the maximum number of results to return. When 0, use default page size.",
+                  "format": "int32",
+                  "location": "query",
+                  "type": "integer"
+                },
+                "pageToken": {
+                  "description": "If this field is not empty then it must contain the nextPageToken value returned by a previous call to this method. Using this field causes the method to return additional results from the previous method call.",
+                  "location": "query",
+                  "type": "string"
+                },
+                "parent": {
+                  "description": "Resource name of the parent Service. Of the form projects/{project_id}/services/{service_id}.",
+                  "location": "path",
+                  "pattern": "^[^/]+/[^/]+/services/[^/]+$",
+                  "required": true,
+                  "type": "string"
+                },
+                "view": {
+                  "description": "View of the ServiceLevelObjectives to return. If DEFAULT, return each ServiceLevelObjective as originally defined. If EXPLICIT and the ServiceLevelObjective is defined in terms of a BasicSli, replace the BasicSli with a RequestBasedSli spelling out how the SLI is computed.",
+                  "enum": [
+                    "VIEW_UNSPECIFIED",
+                    "FULL",
+                    "EXPLICIT"
+                  ],
+                  "location": "query",
+                  "type": "string"
+                }
+              },
+              "path": "v3/{+parent}/serviceLevelObjectives",
+              "response": {
+                "$ref": "ListServiceLevelObjectivesResponse"
+              },
+              "scopes": [
+                "https://www.googleapis.com/auth/cloud-platform",
+                "https://www.googleapis.com/auth/monitoring",
+                "https://www.googleapis.com/auth/monitoring.read"
+              ]
+            },
+            "patch": {
+              "description": "Update the given ServiceLevelObjective.",
+              "flatPath": "v3/{v3Id}/{v3Id1}/services/{servicesId}/serviceLevelObjectives/{serviceLevelObjectivesId}",
+              "httpMethod": "PATCH",
+              "id": "monitoring.services.serviceLevelObjectives.patch",
+              "parameterOrder": [
+                "name"
+              ],
+              "parameters": {
+                "name": {
+                  "description": "Resource name for this ServiceLevelObjective. Of the form projects/{project_id}/services/{service_id}/serviceLevelObjectives/{slo_name}.",
+                  "location": "path",
+                  "pattern": "^[^/]+/[^/]+/services/[^/]+/serviceLevelObjectives/[^/]+$",
+                  "required": true,
+                  "type": "string"
+                },
+                "updateMask": {
+                  "description": "A set of field paths defining which fields to use for the update.",
+                  "format": "google-fieldmask",
+                  "location": "query",
+                  "type": "string"
+                }
+              },
+              "path": "v3/{+name}",
+              "request": {
+                "$ref": "ServiceLevelObjective"
+              },
+              "response": {
+                "$ref": "ServiceLevelObjective"
+              },
+              "scopes": [
+                "https://www.googleapis.com/auth/cloud-platform",
+                "https://www.googleapis.com/auth/monitoring"
+              ]
+            }
+          }
+        }
+      }
+    },
     "uptimeCheckIps": {
       "methods": {
         "list": {
-          "description": "Returns the list of IPs that checkers run from",
+          "description": "Returns the list of IP addresses that checkers run from",
           "flatPath": "v3/uptimeCheckIps",
           "httpMethod": "GET",
           "id": "monitoring.uptimeCheckIps.list",
@@ -1457,7 +1817,7 @@
       }
     }
   },
-  "revision": "20190604",
+  "revision": "20191207",
   "rootUrl": "https://monitoring.googleapis.com/",
   "schemas": {
     "Aggregation": {
@@ -1566,7 +1926,7 @@
       "id": "AlertPolicy",
       "properties": {
         "combiner": {
-          "description": "How to combine the results of multiple conditions to determine if an incident should be opened.",
+          "description": "How to combine the results of multiple conditions to determine if an incident should be opened. If condition_time_series_query_language is present, this must be COMBINE_UNSPECIFIED.",
           "enum": [
             "COMBINE_UNSPECIFIED",
             "AND",
@@ -1582,7 +1942,7 @@
           "type": "string"
         },
         "conditions": {
-          "description": "A list of conditions for the policy. The conditions are combined by AND or OR according to the combiner field. If the combined conditions evaluate to true, then an incident is created. A policy can have from one to six conditions.",
+          "description": "A list of conditions for the policy. The conditions are combined by AND or OR according to the combiner field. If the combined conditions evaluate to true, then an incident is created. A policy can have from one to six conditions. If |condition_time_series_uery_language| is present, it must be the only |condition|.",
           "items": {
             "$ref": "Condition"
           },
@@ -1625,21 +1985,78 @@
           },
           "description": "User-supplied key/value data to be used for organizing and identifying the AlertPolicy objects.The field can contain up to 64 entries. Each key and value is limited to 63 Unicode characters or 128 bytes, whichever is smaller. Labels and values can contain only lowercase letters, numerals, underscores, and dashes. Keys must begin with a letter.",
           "type": "object"
+        },
+        "validity": {
+          "$ref": "Status",
+          "description": "Read-only description of how the alert policy is invalid. OK if the alert policy is valid. If not OK, the alert policy will not generate incidents."
         }
       },
       "type": "object"
     },
+    "AppEngine": {
+      "description": "App Engine service. Learn more at https://cloud.google.com/appengine.",
+      "id": "AppEngine",
+      "properties": {
+        "moduleId": {
+          "description": "The ID of the App Engine module underlying this service. Corresponds to the module_id resource label in the gae_app monitored resource: https://cloud.google.com/monitoring/api/resources#tag_gae_app",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "AvailabilityCriteria": {
+      "description": "Future parameters for the availability SLI.",
+      "id": "AvailabilityCriteria",
+      "properties": {},
+      "type": "object"
+    },
     "BasicAuthentication": {
-      "description": "A type of authentication to perform against the specified resource or URL that uses username and password. Currently, only Basic authentication is supported in Uptime Monitoring.",
+      "description": "The authentication parameters to provide to the specified resource or URL that requires a username and password. Currently, only Basic HTTP authentication (https://tools.ietf.org/html/rfc7617) is supported in Uptime checks.",
       "id": "BasicAuthentication",
       "properties": {
         "password": {
-          "description": "The password to authenticate.",
+          "description": "The password to use when authenticating with the HTTP server.",
           "type": "string"
         },
         "username": {
-          "description": "The username to authenticate.",
+          "description": "The username to use when authenticating with the HTTP server.",
           "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "BasicSli": {
+      "description": "An SLI measuring performance on a well-known service type. Performance will be computed on the basis of pre-defined metrics. The type of the service_resource determines the metrics to use and the service_resource.labels and metric_labels are used to construct a monitoring filter to filter that metric down to just the data relevant to this service.",
+      "id": "BasicSli",
+      "properties": {
+        "availability": {
+          "$ref": "AvailabilityCriteria",
+          "description": "Good service is defined to be the count of requests made to this service that return successfully."
+        },
+        "latency": {
+          "$ref": "LatencyCriteria",
+          "description": "Good service is defined to be the count of requests made to this service that are fast enough with respect to latency.threshold."
+        },
+        "location": {
+          "description": "OPTIONAL: The set of locations to which this SLI is relevant. Telemetry from other locations will not be used to calculate performance for this SLI. If omitted, this SLI applies to all locations in which the Service has activity. For service types that don't support breaking down by location, setting this field will result in an error.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "method": {
+          "description": "OPTIONAL: The set of RPCs to which this SLI is relevant. Telemetry from other methods will not be used to calculate performance for this SLI. If omitted, this SLI applies to all the Service's methods. For service types that don't support breaking down by method, setting this field will result in an error.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "version": {
+          "description": "OPTIONAL: The set of API versions to which this SLI is relevant. Telemetry from other API versions will not be used to calculate performance for this SLI. If omitted, this SLI applies to all API versions. For service types that don't support breaking down by version, setting this field will result in an error.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
         }
       },
       "type": "object"
@@ -1659,6 +2076,40 @@
         "linearBuckets": {
           "$ref": "Linear",
           "description": "The linear bucket."
+        }
+      },
+      "type": "object"
+    },
+    "CloudEndpoints": {
+      "description": "Cloud Endpoints service. Learn more at https://cloud.google.com/endpoints.",
+      "id": "CloudEndpoints",
+      "properties": {
+        "service": {
+          "description": "The name of the Cloud Endpoints service underlying this service. Corresponds to the service resource label in the api monitored resource: https://cloud.google.com/monitoring/api/resources#tag_api",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "ClusterIstio": {
+      "description": "Istio service. Learn more at http://istio.io.",
+      "id": "ClusterIstio",
+      "properties": {
+        "clusterName": {
+          "description": "The name of the Kubernetes cluster in which this Istio service is defined. Corresponds to the cluster_name resource label in k8s_cluster resources.",
+          "type": "string"
+        },
+        "location": {
+          "description": "The location of the Kubernetes cluster in which this Istio service is defined. Corresponds to the location resource label in k8s_cluster resources.",
+          "type": "string"
+        },
+        "serviceName": {
+          "description": "The name of the Istio service underlying this service. Corresponds to the destination_service_name metric label in Istio metrics.",
+          "type": "string"
+        },
+        "serviceNamespace": {
+          "description": "The namespace of the Istio service underlying this service. Corresponds to the destination_service_namespace metric label in Istio metrics.",
+          "type": "string"
         }
       },
       "type": "object"
@@ -1806,11 +2257,29 @@
       "type": "object"
     },
     "ContentMatcher": {
-      "description": "Used to perform string matching. It allows substring and regular expressions, together with their negations.",
+      "description": "Optional. Used to perform content matching. This allows matching based on substrings and regular expressions, together with their negations. Only the first 4\u0026nbsp;MB of an HTTP or HTTPS check's response (and the first 1\u0026nbsp;MB of a TCP check's response) are examined for purposes of content matching.",
       "id": "ContentMatcher",
       "properties": {
         "content": {
-          "description": "String or regex content to match (max 1024 bytes)",
+          "description": "String or regex content to match. Maximum 1024 bytes. An empty content string indicates no content matching is to be performed.",
+          "type": "string"
+        },
+        "matcher": {
+          "description": "The type of content matcher that will be applied to the server output, compared to the content string when the check is run.",
+          "enum": [
+            "CONTENT_MATCHER_OPTION_UNSPECIFIED",
+            "CONTAINS_STRING",
+            "NOT_CONTAINS_STRING",
+            "MATCHES_REGEX",
+            "NOT_MATCHES_REGEX"
+          ],
+          "enumDescriptions": [
+            "No content matcher type specified (maintained for backward compatibility, but deprecated for future use). Treated as CONTAINS_STRING.",
+            "Selects substring matching. The match succeeds if the output contains the content string. This is the default value for checks without a matcher option, or where the value of matcher is CONTENT_MATCHER_OPTION_UNSPECIFIED.",
+            "Selects negation of substring matching. The match succeeds if the output does NOT contain the content string.",
+            "Selects regular-expression matching. The match succeeds of the output matches the regular expression specified in the content string.",
+            "Selects negation of regular-expression matching. The match succeeds if the output does NOT match the regular expression specified in the content string."
+          ],
           "type": "string"
         }
       },
@@ -1843,11 +2312,15 @@
       "id": "CreateCollectdTimeSeriesResponse",
       "properties": {
         "payloadErrors": {
-          "description": "Records the error status for points that were not written due to an error.Failed requests for which nothing is written will return an error response instead.",
+          "description": "Records the error status for points that were not written due to an error in the request.Failed requests for which nothing is written will return an error response instead. Requests where data points were rejected by the backend will set summary instead.",
           "items": {
             "$ref": "CollectdPayloadError"
           },
           "type": "array"
+        },
+        "summary": {
+          "$ref": "CreateTimeSeriesSummary",
+          "description": "Aggregate statistics from writing the payloads. This field is omitted if all points were successfully written, so that the response is empty. This is for backwards compatibility with clients that log errors on any non-empty response."
         }
       },
       "type": "object"
@@ -1864,6 +2337,36 @@
           "type": "array"
         }
       },
+      "type": "object"
+    },
+    "CreateTimeSeriesSummary": {
+      "description": "Summary of the result of a failed request to write data to a time series.",
+      "id": "CreateTimeSeriesSummary",
+      "properties": {
+        "errors": {
+          "description": "The number of points that failed to be written. Order is not guaranteed.",
+          "items": {
+            "$ref": "Error"
+          },
+          "type": "array"
+        },
+        "successPointCount": {
+          "description": "The number of points that were successfully written.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "totalPointCount": {
+          "description": "The number of points in the request.",
+          "format": "int32",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "Custom": {
+      "description": "Custom view of service telemetry. Currently a place-holder pending final design.",
+      "id": "Custom",
+      "properties": {},
       "type": "object"
     },
     "Distribution": {
@@ -1911,6 +2414,21 @@
       },
       "type": "object"
     },
+    "DistributionCut": {
+      "description": "A DistributionCut defines a TimeSeries and thresholds used for measuring good service and total service. The TimeSeries must have ValueType =\nDISTRIBUTION and MetricKind = DELTA or MetricKind = CUMULATIVE. The computed good_service will be the count of values x in the Distribution such that range.min \u003c= x \u003c range.max.",
+      "id": "DistributionCut",
+      "properties": {
+        "distributionFilter": {
+          "description": "A monitoring filter (https://cloud.google.com/monitoring/api/v3/filters) specifying a TimeSeries aggregating values. Must have ValueType =\nDISTRIBUTION and MetricKind = DELTA or MetricKind = CUMULATIVE.",
+          "type": "string"
+        },
+        "range": {
+          "$ref": "GoogleMonitoringV3Range",
+          "description": "Range of values considered \"good.\" For a one-sided range, set one bound to an infinite value."
+        }
+      },
+      "type": "object"
+    },
     "Documentation": {
       "description": "A content string and a MIME type that describes the content string's format.",
       "id": "Documentation",
@@ -1944,6 +2462,22 @@
       "description": "A generic empty message that you can re-use to avoid defining duplicated empty messages in your APIs. A typical example is to use it as the request or the response type of an API method. For instance:\nservice Foo {\n  rpc Bar(google.protobuf.Empty) returns (google.protobuf.Empty);\n}\nThe JSON representation for Empty is empty JSON object {}.",
       "id": "Empty",
       "properties": {},
+      "type": "object"
+    },
+    "Error": {
+      "description": "Detailed information about an error category.",
+      "id": "Error",
+      "properties": {
+        "pointCount": {
+          "description": "The number of points that couldn't be written because of status.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "status": {
+          "$ref": "Status",
+          "description": "The status of the requested write operation."
+        }
+      },
       "type": "object"
     },
     "Exemplar": {
@@ -2145,6 +2679,23 @@
       },
       "type": "object"
     },
+    "GoogleMonitoringV3Range": {
+      "description": "Range of numerical values, inclusive of min and exclusive of max. If the open range \"\u003c range.max\" is desired, set range.min = -infinity. If the open range \"\u003e= range.min\" is desired, set range.max = infinity.",
+      "id": "GoogleMonitoringV3Range",
+      "properties": {
+        "max": {
+          "description": "Range maximum.",
+          "format": "double",
+          "type": "number"
+        },
+        "min": {
+          "description": "Range minimum.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "type": "object"
+    },
     "Group": {
       "description": "The description of a dynamic collection of monitored resources. Each group has a filter that is matched against monitored resources and their associated metadata. If a group's filter matches an available monitored resource, then that resource is a member of that group. Groups can contain any number of monitored resources, and each monitored resource can be a member of any number of groups.Groups can be nested in parent-child hierarchies. The parentName field identifies an optional parent for each group. If a group has a parent, then the only monitored resources available to be matched by the group's filter are the resources contained in the parent group. In other words, a group contains the monitored resources that match its filter and the filters of all the group's ancestors. A group without a parent can contain any monitored resource.For example, consider an infrastructure running a set of instances with two user-defined tags: \"environment\" and \"role\". A parent group has a filter, environment=\"production\". A child of that parent group has a filter, role=\"transcoder\". The parent group contains all instances in the production environment, regardless of their roles. The child group contains instances that have the transcoder role and are in the production environment.The monitored resources contained in a group can change at any moment, depending on what resources exist and what filters are associated with the group and its ancestors.",
       "id": "Group",
@@ -2173,7 +2724,7 @@
       "type": "object"
     },
     "HttpCheck": {
-      "description": "Information involved in an HTTP/HTTPS uptime check request.",
+      "description": "Information involved in an HTTP/HTTPS Uptime check request.",
       "id": "HttpCheck",
       "properties": {
         "authInfo": {
@@ -2184,31 +2735,35 @@
           "additionalProperties": {
             "type": "string"
           },
-          "description": "The list of headers to send as part of the uptime check request. If two headers have the same key and different values, they should be entered as a single header, with the value being a comma-separated list of all the desired values as described at https://www.w3.org/Protocols/rfc2616/rfc2616.txt (page 31). Entering two separate headers with the same key in a Create call will cause the first to be overwritten by the second. The maximum number of headers allowed is 100.",
+          "description": "The list of headers to send as part of the Uptime check request. If two headers have the same key and different values, they should be entered as a single header, with the value being a comma-separated list of all the desired values as described at https://www.w3.org/Protocols/rfc2616/rfc2616.txt (page 31). Entering two separate headers with the same key in a Create call will cause the first to be overwritten by the second. The maximum number of headers allowed is 100.",
           "type": "object"
         },
         "maskHeaders": {
-          "description": "Boolean specifiying whether to encrypt the header information. Encryption should be specified for any headers related to authentication that you do not wish to be seen when retrieving the configuration. The server will be responsible for encrypting the headers. On Get/List calls, if mask_headers is set to True then the headers will be obscured with ******.",
+          "description": "Boolean specifiying whether to encrypt the header information. Encryption should be specified for any headers related to authentication that you do not wish to be seen when retrieving the configuration. The server will be responsible for encrypting the headers. On Get/List calls, if mask_headers is set to true then the headers will be obscured with ******.",
           "type": "boolean"
         },
         "path": {
-          "description": "The path to the page to run the check against. Will be combined with the host (specified within the MonitoredResource) and port to construct the full URL. Optional (defaults to \"/\"). If the provided path does not begin with \"/\", it will be prepended automatically.",
+          "description": "Optional (defaults to \"/\"). The path to the page against which to run the check. Will be combined with the host (specified within the monitored_resource) and port to construct the full URL. If the provided path does not begin with \"/\", a \"/\" will be prepended automatically.",
           "type": "string"
         },
         "port": {
-          "description": "The port to the page to run the check against. Will be combined with host (specified within the MonitoredResource) and path to construct the full URL. Optional (defaults to 80 without SSL, or 443 with SSL).",
+          "description": "Optional (defaults to 80 when use_ssl is false, and 443 when use_ssl is true). The TCP port on the HTTP server against which to run the check. Will be combined with host (specified within the monitored_resource) and path to construct the full URL.",
           "format": "int32",
           "type": "integer"
         },
         "useSsl": {
           "description": "If true, use HTTPS instead of HTTP to run the check.",
           "type": "boolean"
+        },
+        "validateSsl": {
+          "description": "Boolean specifying whether to include SSL certificate validation as a part of the Uptime check. Only applies to checks where monitored_resource is set to uptime_url. If use_ssl is false, setting validate_ssl to true has no effect.",
+          "type": "boolean"
         }
       },
       "type": "object"
     },
     "InternalChecker": {
-      "description": "An internal checker allows uptime checks to run on private/internal GCP resources.",
+      "description": "An internal checker allows Uptime checks to run on private/internal GCP resources.",
       "id": "InternalChecker",
       "properties": {
         "displayName": {
@@ -2216,11 +2771,11 @@
           "type": "string"
         },
         "gcpZone": {
-          "description": "The GCP zone the uptime check should egress from. Only respected for internal uptime checks, where internal_network is specified.",
+          "description": "The GCP zone the Uptime check should egress from. Only respected for internal Uptime checks, where internal_network is specified.",
           "type": "string"
         },
         "name": {
-          "description": "A unique resource name for this InternalChecker. The format is:projects/[PROJECT_ID]/internalCheckers/[INTERNAL_CHECKER_ID].PROJECT_ID is the stackdriver workspace project for the uptime check config associated with the internal checker.",
+          "description": "A unique resource name for this InternalChecker. The format is:projects/[PROJECT_ID]/internalCheckers/[INTERNAL_CHECKER_ID].[PROJECT_ID] is the Stackdriver Workspace project for the Uptime check config associated with the internal checker.",
           "type": "string"
         },
         "network": {
@@ -2228,7 +2783,7 @@
           "type": "string"
         },
         "peerProjectId": {
-          "description": "The GCP project_id where the internal checker lives. Not necessary the same as the workspace project.",
+          "description": "The GCP project ID where the internal checker lives. Not necessary the same as the Workspace project.",
           "type": "string"
         },
         "state": {
@@ -2240,8 +2795,8 @@
           ],
           "enumDescriptions": [
             "An internal checker should never be in the unspecified state.",
-            "The checker is being created, provisioned, and configured. A checker in this state can be returned by ListInternalCheckers or GetInternalChecker, as well as by examining the longrunning.Operation that created it.",
-            "The checker is running and available for use. A checker in this state can be returned by ListInternalCheckers or GetInternalChecker as well as by examining the longrunning.Operation that created it. If a checker is being torn down, it is neither visible nor usable, so there is no \"deleting\" or \"down\" state."
+            "The checker is being created, provisioned, and configured. A checker in this state can be returned by ListInternalCheckers or GetInternalChecker, as well as by examining the long running Operation (https://cloud.google.com/apis/design/design_patterns#long_running_operations) that created it.",
+            "The checker is running and available for use. A checker in this state can be returned by ListInternalCheckers or GetInternalChecker as well as by examining the long running Operation (https://cloud.google.com/apis/design/design_patterns#long_running_operations) that created it. If a checker is being torn down, it is neither visible nor usable, so there is no \"deleting\" or \"down\" state."
           ],
           "type": "string"
         }
@@ -2257,7 +2812,7 @@
           "type": "string"
         },
         "key": {
-          "description": "The label key.",
+          "description": "The key for this label. The key must meet the following criteria:\nDoes not exceed 100 characters.\nMatches the following regular expression: [a-zA-Z][a-zA-Z0-9_]*\nThe first character must be an upper- or lower-case letter.\nThe remaining characters must be letters, digits, or underscores.",
           "type": "string"
         },
         "valueType": {
@@ -2268,10 +2823,22 @@
             "INT64"
           ],
           "enumDescriptions": [
-            "A variable-length string. This is the default.",
+            "A variable-length string, not to exceed 1,024 characters. This is the default value type.",
             "Boolean; true or false.",
             "A 64-bit signed integer."
           ],
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "LatencyCriteria": {
+      "description": "Parameters for a latency threshold SLI.",
+      "id": "LatencyCriteria",
+      "properties": {
+        "threshold": {
+          "description": "Good service is defined to be the count of requests made to this service that return in no more than threshold.",
+          "format": "google-duration",
           "type": "string"
         }
       },
@@ -2430,6 +2997,42 @@
       },
       "type": "object"
     },
+    "ListServiceLevelObjectivesResponse": {
+      "description": "The ListServiceLevelObjectives response.",
+      "id": "ListServiceLevelObjectivesResponse",
+      "properties": {
+        "nextPageToken": {
+          "description": "If there are more results than have been returned, then this field is set to a non-empty value. To see the additional results, use that value as pageToken in the next call to this method.",
+          "type": "string"
+        },
+        "serviceLevelObjectives": {
+          "description": "The ServiceLevelObjectives matching the specified filter.",
+          "items": {
+            "$ref": "ServiceLevelObjective"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "ListServicesResponse": {
+      "description": "The ListServices response.",
+      "id": "ListServicesResponse",
+      "properties": {
+        "nextPageToken": {
+          "description": "If there are more results than have been returned, then this field is set to a non-empty value. To see the additional results, use that value as pageToken in the next call to this method.",
+          "type": "string"
+        },
+        "services": {
+          "description": "The Services matching the specified filter.",
+          "items": {
+            "$ref": "Service"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
     "ListTimeSeriesResponse": {
       "description": "The ListTimeSeries response.",
       "id": "ListTimeSeriesResponse",
@@ -2464,12 +3067,12 @@
           "type": "string"
         },
         "totalSize": {
-          "description": "The total number of uptime check configurations for the project, irrespective of any pagination.",
+          "description": "The total number of Uptime check configurations for the project, irrespective of any pagination.",
           "format": "int32",
           "type": "integer"
         },
         "uptimeCheckConfigs": {
-          "description": "The returned uptime check configurations.",
+          "description": "The returned Uptime check configurations.",
           "items": {
             "$ref": "UptimeCheckConfig"
           },
@@ -2519,7 +3122,7 @@
       "id": "MetricAbsence",
       "properties": {
         "aggregations": {
-          "description": "Specifies the alignment of data points in individual time series as well as how to combine the retrieved time series together (such as when aggregating multiple streams on each resource to a single stream for each resource or when aggregating streams across all members of a group of resrouces). Multiple aggregations are applied in the order specified.This field is similar to the one in the MetricService.ListTimeSeries request. It is advisable to use the ListTimeSeries method when debugging this field.",
+          "description": "Specifies the alignment of data points in individual time series as well as how to combine the retrieved time series together (such as when aggregating multiple streams on each resource to a single stream for each resource or when aggregating streams across all members of a group of resrouces). Multiple aggregations are applied in the order specified.This field is similar to the one in the ListTimeSeries request. It is advisable to use the ListTimeSeries method when debugging this field.",
           "items": {
             "$ref": "Aggregation"
           },
@@ -2531,7 +3134,7 @@
           "type": "string"
         },
         "filter": {
-          "description": "A filter that identifies which time series should be compared with the threshold.The filter is similar to the one that is specified in the MetricService.ListTimeSeries request (that call is useful to verify the time series that will be retrieved / processed) and must specify the metric type and optionally may contain restrictions on resource type, resource labels, and metric labels. This field may not exceed 2048 Unicode characters in length.",
+          "description": "A filter that identifies which time series should be compared with the threshold.The filter is similar to the one that is specified in the ListTimeSeries request (that call is useful to verify the time series that will be retrieved / processed) and must specify the metric type and optionally may contain restrictions on resource type, resource labels, and metric labels. This field may not exceed 2048 Unicode characters in length.",
           "type": "string"
         },
         "trigger": {
@@ -2600,6 +3203,13 @@
           ],
           "type": "string"
         },
+        "monitoredResourceTypes": {
+          "description": "Read-only. If present, then a time series, which is identified partially by a metric type and a MonitoredResourceDescriptor, that is associated with this metric type can only be associated with one of the monitored resource types listed here.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "name": {
           "description": "The resource name of the metric descriptor.",
           "type": "string"
@@ -2609,7 +3219,7 @@
           "type": "string"
         },
         "unit": {
-          "description": "The unit in which the metric value is reported. It is only applicable if the value_type is INT64, DOUBLE, or DISTRIBUTION. The supported units are a subset of The Unified Code for Units of Measure (http://unitsofmeasure.org/ucum.html) standard:Basic units (UNIT)\nbit bit\nBy byte\ns second\nmin minute\nh hour\nd dayPrefixes (PREFIX)\nk kilo (10**3)\nM mega (10**6)\nG giga (10**9)\nT tera (10**12)\nP peta (10**15)\nE exa (10**18)\nZ zetta (10**21)\nY yotta (10**24)\nm milli (10**-3)\nu micro (10**-6)\nn nano (10**-9)\np pico (10**-12)\nf femto (10**-15)\na atto (10**-18)\nz zepto (10**-21)\ny yocto (10**-24)\nKi kibi (2**10)\nMi mebi (2**20)\nGi gibi (2**30)\nTi tebi (2**40)GrammarThe grammar also includes these connectors:\n/ division (as an infix operator, e.g. 1/s).\n. multiplication (as an infix operator, e.g. GBy.d)The grammar for a unit is as follows:\nExpression = Component { \".\" Component } { \"/\" Component } ;\n\nComponent = ( [ PREFIX ] UNIT | \"%\" ) [ Annotation ]\n          | Annotation\n          | \"1\"\n          ;\n\nAnnotation = \"{\" NAME \"}\" ;\nNotes:\nAnnotation is just a comment if it follows a UNIT and is  equivalent to 1 if it is used alone. For examples,  {requests}/s == 1/s, By{transmitted}/s == By/s.\nNAME is a sequence of non-blank printable ASCII characters not  containing '{' or '}'.\n1 represents dimensionless value 1, such as in 1/s.\n% represents dimensionless value 1/100, and annotates values giving  a percentage.",
+          "description": "Ki kibi (2^10)\nMi mebi (2^20)\nGi gibi (2^30)\nTi tebi (2^40)\nPi pebi (2^50)GrammarThe grammar also includes these connectors:\n/ division or ratio (as an infix operator). For examples,  kBy/{email} or MiBy/10ms (although you should almost never  have /s in a metric unit; rates should always be computed at  query time from the underlying cumulative or delta value).\n. multiplication or composition (as an infix operator). For  examples, GBy.d or k{watt}.h.The grammar for a unit is as follows:\nExpression = Component { \".\" Component } { \"/\" Component } ;\n\nComponent = ( [ PREFIX ] UNIT | \"%\" ) [ Annotation ]\n          | Annotation\n          | \"1\"\n          ;\n\nAnnotation = \"{\" NAME \"}\" ;\nNotes:\nAnnotation is just a comment if it follows a UNIT. If the annotation  is used alone, then the unit is equivalent to 1. For examples,  {request}/s == 1/s, By{transmitted}/s == By/s.\nNAME is a sequence of non-blank printable ASCII characters not  containing { or }.\n1 represents a unitary dimensionless  unit (https://en.wikipedia.org/wiki/Dimensionless_quantity) of 1, such  as in 1/s. It is typically used when none of the basic units are  appropriate. For example, \"new users per day\" can be represented as  1/d or {new-users}/d (and a metric value 5 would mean \"5 new  users). Alternatively, \"thousands of page views per day\" would be  represented as 1000/d or k1/d or k{page_views}/d (and a metric  value of 5.3 would mean \"5300 page views per day\").\n% represents dimensionless value of 1/100, and annotates values giving  a percentage (so the metric values are typically in the range of 0..100,  and a metric value 3 means \"3 percent\").\n10^2.% indicates a metric contains a ratio, typically in the range  0..1, that will be multiplied by 100 and displayed as a percentage  (so a metric value 0.03 means \"3 percent\").",
           "type": "string"
         },
         "valueType": {
@@ -2647,7 +3257,7 @@
           "type": "string"
         },
         "launchStage": {
-          "description": "Deprecated. Please use the MetricDescriptor.launch_stage instead. The launch stage of the metric definition.",
+          "description": "Deprecated. Must use the MetricDescriptor.launch_stage instead.",
           "enum": [
             "LAUNCH_STAGE_UNSPECIFIED",
             "EARLY_ACCESS",
@@ -2674,12 +3284,27 @@
       },
       "type": "object"
     },
+    "MetricRange": {
+      "description": "A MetricRange is used when each window is good when the value x of a single TimeSeries satisfies range.min \u003c= x \u003c range.max. The provided TimeSeries must have ValueType = INT64 or ValueType = DOUBLE and MetricKind = GAUGE.",
+      "id": "MetricRange",
+      "properties": {
+        "range": {
+          "$ref": "GoogleMonitoringV3Range",
+          "description": "Range of values considered \"good.\" For a one-sided range, set one bound to an infinite value."
+        },
+        "timeSeries": {
+          "description": "A monitoring filter (https://cloud.google.com/monitoring/api/v3/filters) specifying the TimeSeries to use for evaluating window quality.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
     "MetricThreshold": {
       "description": "A condition type that compares a collection of time series against a threshold.",
       "id": "MetricThreshold",
       "properties": {
         "aggregations": {
-          "description": "Specifies the alignment of data points in individual time series as well as how to combine the retrieved time series together (such as when aggregating multiple streams on each resource to a single stream for each resource or when aggregating streams across all members of a group of resrouces). Multiple aggregations are applied in the order specified.This field is similar to the one in the MetricService.ListTimeSeries request. It is advisable to use the ListTimeSeries method when debugging this field.",
+          "description": "Specifies the alignment of data points in individual time series as well as how to combine the retrieved time series together (such as when aggregating multiple streams on each resource to a single stream for each resource or when aggregating streams across all members of a group of resrouces). Multiple aggregations are applied in the order specified.This field is similar to the one in the ListTimeSeries request. It is advisable to use the ListTimeSeries method when debugging this field.",
           "items": {
             "$ref": "Aggregation"
           },
@@ -2708,14 +3333,14 @@
           "type": "string"
         },
         "denominatorAggregations": {
-          "description": "Specifies the alignment of data points in individual time series selected by denominatorFilter as well as how to combine the retrieved time series together (such as when aggregating multiple streams on each resource to a single stream for each resource or when aggregating streams across all members of a group of resources).When computing ratios, the aggregations and denominator_aggregations fields must use the same alignment period and produce time series that have the same periodicity and labels.This field is similar to the one in the MetricService.ListTimeSeries request. It is advisable to use the ListTimeSeries method when debugging this field.",
+          "description": "Specifies the alignment of data points in individual time series selected by denominatorFilter as well as how to combine the retrieved time series together (such as when aggregating multiple streams on each resource to a single stream for each resource or when aggregating streams across all members of a group of resources).When computing ratios, the aggregations and denominator_aggregations fields must use the same alignment period and produce time series that have the same periodicity and labels.",
           "items": {
             "$ref": "Aggregation"
           },
           "type": "array"
         },
         "denominatorFilter": {
-          "description": "A filter that identifies a time series that should be used as the denominator of a ratio that will be compared with the threshold. If a denominator_filter is specified, the time series specified by the filter field will be used as the numerator.The filter is similar to the one that is specified in the MetricService.ListTimeSeries request (that call is useful to verify the time series that will be retrieved / processed) and must specify the metric type and optionally may contain restrictions on resource type, resource labels, and metric labels. This field may not exceed 2048 Unicode characters in length.",
+          "description": "A filter that identifies a time series that should be used as the denominator of a ratio that will be compared with the threshold. If a denominator_filter is specified, the time series specified by the filter field will be used as the numerator.The filter must specify the metric type and optionally may contain restrictions on resource type, resource labels, and metric labels. This field may not exceed 2048 Unicode characters in length.",
           "type": "string"
         },
         "duration": {
@@ -2724,7 +3349,7 @@
           "type": "string"
         },
         "filter": {
-          "description": "A filter that identifies which time series should be compared with the threshold.The filter is similar to the one that is specified in the MetricService.ListTimeSeries request (that call is useful to verify the time series that will be retrieved / processed) and must specify the metric type and optionally may contain restrictions on resource type, resource labels, and metric labels. This field may not exceed 2048 Unicode characters in length.",
+          "description": "A filter that identifies which time series should be compared with the threshold.The filter is similar to the one that is specified in the ListTimeSeries request (that call is useful to verify the time series that will be retrieved / processed) and must specify the metric type and optionally may contain restrictions on resource type, resource labels, and metric labels. This field may not exceed 2048 Unicode characters in length.",
           "type": "string"
         },
         "thresholdValue": {
@@ -2758,7 +3383,7 @@
       "type": "object"
     },
     "MonitoredResourceDescriptor": {
-      "description": "An object that describes the schema of a MonitoredResource object using a type name and a set of labels. For example, the monitored resource descriptor for Google Compute Engine VM instances has a type of \"gce_instance\" and specifies the use of the labels \"instance_id\" and \"zone\" to identify particular VM instances.Different APIs can support different monitored resource types. APIs generally provide a list method that returns the monitored resource descriptors used by the API.Next ID: 10",
+      "description": "An object that describes the schema of a MonitoredResource object using a type name and a set of labels. For example, the monitored resource descriptor for Google Compute Engine VM instances has a type of \"gce_instance\" and specifies the use of the labels \"instance_id\" and \"zone\" to identify particular VM instances.Different APIs can support different monitored resource types. APIs generally provide a list method that returns the monitored resource descriptors used by the API.",
       "id": "MonitoredResourceDescriptor",
       "properties": {
         "description": {
@@ -2923,23 +3548,6 @@
           "description": "The full REST resource name for this descriptor. The syntax is:\nprojects/[PROJECT_ID]/notificationChannelDescriptors/[TYPE]\nIn the above, [TYPE] is the value of the type field.",
           "type": "string"
         },
-        "supportedTiers": {
-          "description": "The tiers that support this notification channel; the project service tier must be one of the supported_tiers.",
-          "enumDescriptions": [
-            "An invalid sentinel value, used to indicate that a tier has not been provided explicitly.",
-            "The Stackdriver Basic tier, a free tier of service that provides basic features, a moderate allotment of logs, and access to built-in metrics. A number of features are not available in this tier. For more details, see the service tiers documentation (https://cloud.google.com/monitoring/workspaces/tiers).",
-            "The Stackdriver Premium tier, a higher, more expensive tier of service that provides access to all Stackdriver features, lets you use Stackdriver with AWS accounts, and has a larger allotments for logs and metrics. For more details, see the service tiers documentation (https://cloud.google.com/monitoring/workspaces/tiers)."
-          ],
-          "items": {
-            "enum": [
-              "SERVICE_TIER_UNSPECIFIED",
-              "SERVICE_TIER_BASIC",
-              "SERVICE_TIER_PREMIUM"
-            ],
-            "type": "string"
-          },
-          "type": "array"
-        },
         "type": {
           "description": "The type of notification channel, such as \"email\", \"sms\", etc. Notification channel types are globally unique.",
           "type": "string"
@@ -2966,13 +3574,33 @@
       },
       "type": "object"
     },
+    "PerformanceThreshold": {
+      "description": "A PerformanceThreshold is used when each window is good when that window has a sufficiently high performance.",
+      "id": "PerformanceThreshold",
+      "properties": {
+        "basicSliPerformance": {
+          "$ref": "BasicSli",
+          "description": "BasicSli to evaluate to judge window quality."
+        },
+        "performance": {
+          "$ref": "RequestBasedSli",
+          "description": "RequestBasedSli to evaluate to judge window quality."
+        },
+        "threshold": {
+          "description": "If window performance \u003e= threshold, the window is counted as good.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "type": "object"
+    },
     "Point": {
       "description": "A single data point in a time series.",
       "id": "Point",
       "properties": {
         "interval": {
           "$ref": "TimeInterval",
-          "description": "The time interval to which the data point applies. For GAUGE metrics, only the end time of the interval is used. For DELTA metrics, the start and end time should specify a non-zero interval, with subsequent points specifying contiguous and non-overlapping intervals. For CUMULATIVE metrics, the start and end time should specify a non-zero interval, with subsequent points specifying the same start time and increasing end times, until an event resets the cumulative value to zero and sets a new start time for the following points."
+          "description": "The time interval to which the data point applies. For GAUGE metrics, the start time is optional, but if it is supplied, it must equal the end time. For DELTA metrics, the start and end time should specify a non-zero interval, with subsequent points specifying contiguous and non-overlapping intervals. For CUMULATIVE metrics, the start and end time should specify a non-zero interval, with subsequent points specifying the same start time and increasing end times, until an event resets the cumulative value to zero and sets a new start time for the following points."
         },
         "value": {
           "$ref": "TypedValue",
@@ -2998,12 +3626,27 @@
       },
       "type": "object"
     },
+    "RequestBasedSli": {
+      "description": "Service Level Indicators for which atomic units of service are counted directly.",
+      "id": "RequestBasedSli",
+      "properties": {
+        "distributionCut": {
+          "$ref": "DistributionCut",
+          "description": "distribution_cut is used when good_service is a count of values aggregated in a Distribution that fall into a good range. The total_service is the total count of all values aggregated in the Distribution."
+        },
+        "goodTotalRatio": {
+          "$ref": "TimeSeriesRatio",
+          "description": "good_total_ratio is used when the ratio of good_service to total_service is computed from two TimeSeries."
+        }
+      },
+      "type": "object"
+    },
     "ResourceGroup": {
       "description": "The resource submessage for group checks. It can be used instead of a monitored resource, when multiple resources are being monitored.",
       "id": "ResourceGroup",
       "properties": {
         "groupId": {
-          "description": "The group of resources being monitored. Should be only the group_id, not projects/\u003cproject_id\u003e/groups/\u003cgroup_id\u003e.",
+          "description": "The group of resources being monitored. Should be only the [GROUP_ID], and not the full-path projects/[PROJECT_ID]/groups/[GROUP_ID].",
           "type": "string"
         },
         "resourceType": {
@@ -3027,6 +3670,113 @@
       "description": "The SendNotificationChannelVerificationCode request.",
       "id": "SendNotificationChannelVerificationCodeRequest",
       "properties": {},
+      "type": "object"
+    },
+    "Service": {
+      "description": "A Service is a discrete, autonomous, and network-accessible unit, designed to solve an individual concern (Wikipedia (https://en.wikipedia.org/wiki/Service-orientation)). In Stackdriver Monitoring, a Service acts as the root resource under which operational aspects of the service are accessible.",
+      "id": "Service",
+      "properties": {
+        "appEngine": {
+          "$ref": "AppEngine",
+          "description": "Type used for App Engine services."
+        },
+        "cloudEndpoints": {
+          "$ref": "CloudEndpoints",
+          "description": "Type used for Cloud Endpoints services."
+        },
+        "clusterIstio": {
+          "$ref": "ClusterIstio",
+          "description": "Type used for Istio services that live in a Kubernetes cluster."
+        },
+        "custom": {
+          "$ref": "Custom",
+          "description": "Custom service type."
+        },
+        "displayName": {
+          "description": "Name used for UI elements listing this Service.",
+          "type": "string"
+        },
+        "name": {
+          "description": "Resource name for this Service. Of the form projects/{project_id}/services/{service_id}.",
+          "type": "string"
+        },
+        "telemetry": {
+          "$ref": "Telemetry",
+          "description": "Configuration for how to query telemetry on a Service."
+        }
+      },
+      "type": "object"
+    },
+    "ServiceLevelIndicator": {
+      "description": "A Service-Level Indicator (SLI) describes the \"performance\" of a service. For some services, the SLI is well-defined. In such cases, the SLI can be described easily by referencing the well-known SLI and providing the needed parameters. Alternatively, a \"custom\" SLI can be defined with a query to the underlying metric store. An SLI is defined to be good_service /\ntotal_service over any queried time interval. The value of performance always falls into the range 0 \u003c= performance \u003c= 1. A custom SLI describes how to compute this ratio, whether this is by dividing values from a pair of time series, cutting a Distribution into good and bad counts, or counting time windows in which the service complies with a criterion. For separation of concerns, a single Service-Level Indicator measures performance for only one aspect of service quality, such as fraction of successful queries or fast-enough queries.",
+      "id": "ServiceLevelIndicator",
+      "properties": {
+        "basicSli": {
+          "$ref": "BasicSli",
+          "description": "Basic SLI on a well-known service type."
+        },
+        "requestBased": {
+          "$ref": "RequestBasedSli",
+          "description": "Request-based SLIs"
+        },
+        "windowsBased": {
+          "$ref": "WindowsBasedSli",
+          "description": "Windows-based SLIs"
+        }
+      },
+      "type": "object"
+    },
+    "ServiceLevelObjective": {
+      "description": "A Service-Level Objective (SLO) describes a level of desired good service. It consists of a service-level indicator (SLI), a performance goal, and a period over which the objective is to be evaluated against that goal. The SLO can use SLIs defined in a number of different manners. Typical SLOs might include \"99% of requests in each rolling week have latency below 200 milliseconds\" or \"99.5% of requests in each calendar month return successfully.\"",
+      "id": "ServiceLevelObjective",
+      "properties": {
+        "calendarPeriod": {
+          "description": "A calendar period, semantically \"since the start of the current \u003ccalendar_period\u003e\". At this time, only DAY, WEEK, FORTNIGHT, and MONTH are supported.",
+          "enum": [
+            "CALENDAR_PERIOD_UNSPECIFIED",
+            "DAY",
+            "WEEK",
+            "FORTNIGHT",
+            "MONTH",
+            "QUARTER",
+            "HALF",
+            "YEAR"
+          ],
+          "enumDescriptions": [
+            "Undefined period, raises an error.",
+            "A day.",
+            "A week. Weeks begin on Monday, following ISO 8601 (https://en.wikipedia.org/wiki/ISO_week_date).",
+            "A fortnight. The first calendar fortnight of the year begins at the start of week 1 according to ISO 8601 (https://en.wikipedia.org/wiki/ISO_week_date).",
+            "A month.",
+            "A quarter. Quarters start on dates 1-Jan, 1-Apr, 1-Jul, and 1-Oct of each year.",
+            "A half-year. Half-years start on dates 1-Jan and 1-Jul.",
+            "A year."
+          ],
+          "type": "string"
+        },
+        "displayName": {
+          "description": "Name used for UI elements listing this SLO.",
+          "type": "string"
+        },
+        "goal": {
+          "description": "The fraction of service that must be good in order for this objective to be met. 0 \u003c goal \u003c= 0.999.",
+          "format": "double",
+          "type": "number"
+        },
+        "name": {
+          "description": "Resource name for this ServiceLevelObjective. Of the form projects/{project_id}/services/{service_id}/serviceLevelObjectives/{slo_name}.",
+          "type": "string"
+        },
+        "rollingPeriod": {
+          "description": "A rolling time period, semantically \"in the past \u003crolling_period\u003e\". Must be an integer multiple of 1 day no larger than 30 days.",
+          "format": "google-duration",
+          "type": "string"
+        },
+        "serviceLevelIndicator": {
+          "$ref": "ServiceLevelIndicator",
+          "description": "The definition of good service, used to measure and calculate the quality of the Service's performance with respect to a single aspect of service quality."
+        }
+      },
       "type": "object"
     },
     "SourceContext": {
@@ -3079,19 +3829,30 @@
       "type": "object"
     },
     "TcpCheck": {
-      "description": "Information required for a TCP uptime check request.",
+      "description": "Information required for a TCP Uptime check request.",
       "id": "TcpCheck",
       "properties": {
         "port": {
-          "description": "The port to the page to run the check against. Will be combined with host (specified within the MonitoredResource) to construct the full URL. Required.",
+          "description": "The TCP port on the server against which to run the check. Will be combined with host (specified within the monitored_resource) to construct the full URL. Required.",
           "format": "int32",
           "type": "integer"
         }
       },
       "type": "object"
     },
+    "Telemetry": {
+      "description": "Configuration for how to query telemetry on a Service.",
+      "id": "Telemetry",
+      "properties": {
+        "resourceName": {
+          "description": "The full name of the resource that defines this service. Formatted as described in https://cloud.google.com/apis/design/resource_names.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
     "TimeInterval": {
-      "description": "A time interval extending just after a start time through an end time. The start time must not be later than the end time. The default start time is the end time, making the startTime value technically optional. Whether this is useful depends on the MetricKind. If the start and end times are the same, the interval represents a point in time. This is appropriate for GAUGE metrics, but not for DELTA and CUMULATIVE metrics, which cover a span of time.",
+      "description": "A closed time interval. It extends from the start time to the end time, and includes both: [startTime, endTime]. Valid time intervals depend on the MetricKind of the metric value. In no case can the end time be earlier than the start time.\nFor a GAUGE metric, the startTime value is technically optional; if  no value is specified, the start time defaults to the value of the  end time, and the interval represents a single point in time. If both  start and end times are specified, they must be identical. Such an  interval is valid only for GAUGE metrics, which are point-in-time  measurements.\nFor DELTA and CUMULATIVE metrics, the start time must be earlier  than the end time.\nIn all cases, the start time of the next interval must be  at least a microsecond after the end time of the previous interval.  Because the interval is closed, if the start time of a new interval  is the same as the end time of the previous interval, data written  at the new start time could overwrite data written at the previous  end time.",
       "id": "TimeInterval",
       "properties": {
         "endTime": {
@@ -3166,6 +3927,25 @@
             "The value is a Distribution.",
             "The value is money."
           ],
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "TimeSeriesRatio": {
+      "description": "A TimeSeriesRatio specifies two TimeSeries to use for computing the good_service / total_service ratio. The specified TimeSeries must have ValueType = DOUBLE or ValueType = INT64 and must have MetricKind =\nDELTA or MetricKind = CUMULATIVE. The TimeSeriesRatio must specify exactly two of good, bad, and total, and the relationship good_service +\nbad_service = total_service will be assumed.",
+      "id": "TimeSeriesRatio",
+      "properties": {
+        "badServiceFilter": {
+          "description": "A monitoring filter (https://cloud.google.com/monitoring/api/v3/filters) specifying a TimeSeries quantifying bad service, either demanded service that was not provided or demanded service that was of inadequate quality. Must have ValueType = DOUBLE or ValueType = INT64 and must have MetricKind = DELTA or MetricKind = CUMULATIVE.",
+          "type": "string"
+        },
+        "goodServiceFilter": {
+          "description": "A monitoring filter (https://cloud.google.com/monitoring/api/v3/filters) specifying a TimeSeries quantifying good service provided. Must have ValueType = DOUBLE or ValueType = INT64 and must have MetricKind =\nDELTA or MetricKind = CUMULATIVE.",
+          "type": "string"
+        },
+        "totalServiceFilter": {
+          "description": "A monitoring filter (https://cloud.google.com/monitoring/api/v3/filters) specifying a TimeSeries quantifying total demanded service. Must have ValueType = DOUBLE or ValueType = INT64 and must have MetricKind =\nDELTA or MetricKind = CUMULATIVE.",
           "type": "string"
         }
       },
@@ -3270,14 +4050,14 @@
       "id": "UptimeCheckConfig",
       "properties": {
         "contentMatchers": {
-          "description": "The expected content on the page the check is run against. Currently, only the first entry in the list is supported, and other entries will be ignored. The server will look for an exact match of the string in the page response's content. This field is optional and should only be specified if a content match is required.",
+          "description": "The content that is expected to appear in the data returned by the target server against which the check is run. Currently, only the first entry in the content_matchers list is supported, and additional entries will be ignored. This field is optional and should only be specified if a content match is required as part of the/ Uptime check.",
           "items": {
             "$ref": "ContentMatcher"
           },
           "type": "array"
         },
         "displayName": {
-          "description": "A human-friendly name for the uptime check configuration. The display name should be unique within a Stackdriver Workspace in order to make it easier to identify; however, uniqueness is not enforced. Required.",
+          "description": "A human-friendly name for the Uptime check configuration. The display name should be unique within a Stackdriver Workspace in order to make it easier to identify; however, uniqueness is not enforced. Required.",
           "type": "string"
         },
         "httpCheck": {
@@ -3285,22 +4065,26 @@
           "description": "Contains information needed to make an HTTP or HTTPS check."
         },
         "internalCheckers": {
-          "description": "The internal checkers that this check will egress from. If is_internal is true and this list is empty, the check will egress from all the InternalCheckers configured for the project that owns this CheckConfig.",
+          "description": "The internal checkers that this check will egress from. If is_internal is true and this list is empty, the check will egress from all the InternalCheckers configured for the project that owns this UptimeCheckConfig.",
           "items": {
             "$ref": "InternalChecker"
           },
           "type": "array"
         },
+        "isInternal": {
+          "description": "If this is true, then checks are made only from the 'internal_checkers'. If it is false, then checks are made only from the 'selected_regions'. It is an error to provide 'selected_regions' when is_internal is true, or to provide 'internal_checkers' when is_internal is false.",
+          "type": "boolean"
+        },
         "monitoredResource": {
           "$ref": "MonitoredResource",
-          "description": "The monitored resource (https://cloud.google.com/monitoring/api/resources) associated with the configuration. The following monitored resource types are supported for uptime checks:  uptime_url  gce_instance  gae_app  aws_ec2_instance  aws_elb_load_balancer"
+          "description": "The monitored resource (https://cloud.google.com/monitoring/api/resources) associated with the configuration. The following monitored resource types are supported for Uptime checks:  uptime_url,  gce_instance,  gae_app,  aws_ec2_instance,  aws_elb_load_balancer"
         },
         "name": {
-          "description": "A unique resource name for this UptimeCheckConfig. The format is:projects/[PROJECT_ID]/uptimeCheckConfigs/[UPTIME_CHECK_ID].This field should be omitted when creating the uptime check configuration; on create, the resource name is assigned by the server and included in the response.",
+          "description": "A unique resource name for this Uptime check configuration. The format is:projects/[PROJECT_ID]/uptimeCheckConfigs/[UPTIME_CHECK_ID].This field should be omitted when creating the Uptime check configuration; on create, the resource name is assigned by the server and included in the response.",
           "type": "string"
         },
         "period": {
-          "description": "How often, in seconds, the uptime check is performed. Currently, the only supported values are 60s (1 minute), 300s (5 minutes), 600s (10 minutes), and 900s (15 minutes). Optional, defaults to 60s.",
+          "description": "How often, in seconds, the Uptime check is performed. Currently, the only supported values are 60s (1 minute), 300s (5 minutes), 600s (10 minutes), and 900s (15 minutes). Optional, defaults to 60s.",
           "format": "google-duration",
           "type": "string"
         },
@@ -3309,9 +4093,9 @@
           "description": "The group resource associated with the configuration."
         },
         "selectedRegions": {
-          "description": "The list of regions from which the check will be run. Some regions contain one location, and others contain more than one. If this field is specified, enough regions to include a minimum of 3 locations must be provided, or an error message is returned. Not specifying this field will result in uptime checks running from all regions.",
+          "description": "The list of regions from which the check will be run. Some regions contain one location, and others contain more than one. If this field is specified, enough regions must be provided to include a minimum of 3 locations. Not specifying this field will result in Uptime checks running from all available regions.",
           "enumDescriptions": [
-            "Default value if no region is specified. Will result in uptime checks running from all regions.",
+            "Default value if no region is specified. Will result in Uptime checks running from all regions.",
             "Allows checks to run from locations within the United States of America.",
             "Allows checks to run from locations within the continent of Europe.",
             "Allows checks to run from locations within the continent of South America.",
@@ -3346,7 +4130,7 @@
       "id": "UptimeCheckIp",
       "properties": {
         "ipAddress": {
-          "description": "The IP address from which the uptime check originates. This is a full IP address (not an IP address range). Most IP addresses, as of this publication, are in IPv4 format; however, one should not rely on the IP addresses being in IPv4 format indefinitely and should support interpreting this field in either IPv4 or IPv6 format.",
+          "description": "The IP address from which the Uptime check originates. This is a fully specified IP address (not an IP address range). Most IP addresses, as of this publication, are in IPv4 format; however, one should not rely on the IP addresses being in IPv4 format indefinitely, and should support interpreting this field in either IPv4 or IPv6 format.",
           "type": "string"
         },
         "location": {
@@ -3363,7 +4147,7 @@
             "ASIA_PACIFIC"
           ],
           "enumDescriptions": [
-            "Default value if no region is specified. Will result in uptime checks running from all regions.",
+            "Default value if no region is specified. Will result in Uptime checks running from all regions.",
             "Allows checks to run from locations within the United States of America.",
             "Allows checks to run from locations within the continent of Europe.",
             "Allows checks to run from locations within the continent of South America.",
@@ -3380,6 +4164,34 @@
       "properties": {
         "code": {
           "description": "The verification code that was delivered to the channel as a result of invoking the SendNotificationChannelVerificationCode API method or that was retrieved from a verified channel via GetNotificationChannelVerificationCode. For example, one might have \"G-123456\" or \"TKNZGhhd2EyN3I1MnRnMjRv\" (in general, one is only guaranteed that the code is valid UTF-8; one should not make any assumptions regarding the structure or format of the code).",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "WindowsBasedSli": {
+      "description": "A WindowsBasedSli defines good_service as the count of time windows for which the provided service was of good quality. Criteria for determining if service was good are embedded in the window_criterion.",
+      "id": "WindowsBasedSli",
+      "properties": {
+        "goodBadMetricFilter": {
+          "description": "A monitoring filter (https://cloud.google.com/monitoring/api/v3/filters) specifying a TimeSeries with ValueType = BOOL. The window is good if any true values appear in the window.",
+          "type": "string"
+        },
+        "goodTotalRatioThreshold": {
+          "$ref": "PerformanceThreshold",
+          "description": "A window is good if its performance is high enough."
+        },
+        "metricMeanInRange": {
+          "$ref": "MetricRange",
+          "description": "A window is good if the metric's value is in a good range, averaged across returned streams."
+        },
+        "metricSumInRange": {
+          "$ref": "MetricRange",
+          "description": "A window is good if the metric's value is in a good range, summed across returned streams."
+        },
+        "windowPeriod": {
+          "description": "Duration over which window quality is evaluated. Must be an integer fraction of a day and at least 60s.",
+          "format": "google-duration",
           "type": "string"
         }
       },
