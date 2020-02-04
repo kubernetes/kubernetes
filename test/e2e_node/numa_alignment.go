@@ -18,6 +18,7 @@ package e2enode
 
 import (
 	"fmt"
+	"io/ioutil"
 	"sort"
 	"strconv"
 	"strings"
@@ -73,6 +74,18 @@ func (R *numaPodResources) String() string {
 		b.WriteString(fmt.Sprintf("PCI %s=%02d\n", k, nodeNum))
 	}
 	return b.String()
+}
+
+func getCPUsPerNUMANode(nodeNum int) ([]int, error) {
+	nodeCPUList, err := ioutil.ReadFile(fmt.Sprintf("/sys/devices/system/node/node%d/cpulist", nodeNum))
+	if err != nil {
+		return nil, err
+	}
+	cpus, err := cpuset.Parse(strings.TrimSpace(string(nodeCPUList)))
+	if err != nil {
+		return nil, err
+	}
+	return cpus.ToSlice(), nil
 }
 
 func getCPUToNUMANodeMapFromEnv(f *framework.Framework, pod *v1.Pod, environ map[string]string, numaNodes int) (map[int]int, error) {

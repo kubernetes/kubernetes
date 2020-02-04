@@ -132,7 +132,27 @@ func makeTopologyManagerTestPod(podName, podCmd string, tmCtnAttributes []tmCtnA
 	}
 }
 
-func configureTopologyManagerInKubelet(f *framework.Framework, oldCfg *kubeletconfig.KubeletConfiguration, policy string) {
+func findNUMANodeWithoutSRIOVDevices(configMap *v1.ConfigMap, numaNodes int) (int, bool) {
+	for nodeNum := 0; nodeNum < numaNodes; nodeNum++ {
+		value, ok := configMap.Annotations[fmt.Sprintf("pcidevice_node%d", nodeNum)]
+		if !ok {
+			framework.Logf("missing pcidevice annotation for NUMA node %d", nodeNum)
+			return -1, false
+		}
+		v, err := strconv.Atoi(value)
+		if err != nil {
+			framework.Failf("error getting the PCI device count on NUMA node %d: %v", nodeNum, err)
+		}
+		if v == 0 {
+			framework.Logf("NUMA node %d has no SRIOV devices attached", nodeNum)
+			return nodeNum, true
+		}
+		framework.Logf("NUMA node %d has %d SRIOV devices attached", nodeNum, v)
+	}
+	return -1, false
+}
+
+func configureTopologyManagerInKubelet(f *framework.Framework, oldCfg *kubeletconfig.KubeletConfiguration, policy string, configMap *v1.ConfigMap, numaNodes int) string {
 	// Configure Topology Manager in Kubelet with policy.
 	newCfg := oldCfg.DeepCopy()
 	if newCfg.FeatureGates == nil {
@@ -153,18 +173,25 @@ func configureTopologyManagerInKubelet(f *framework.Framework, oldCfg *kubeletco
 	// Set the CPU Manager reconcile period to 1 second.
 	newCfg.CPUManagerReconcilePeriod = metav1.Duration{Duration: 1 * time.Second}
 
-	// The Kubelet panics if either kube-reserved or system-reserved is not set
-	// when CPU Manager is enabled. Set cpu in kube-reserved > 0 so that
-	// kubelet doesn't panic.
-	if newCfg.KubeReserved == nil {
-		newCfg.KubeReserved = map[string]string{}
-	}
+	if nodeNum, ok := findNUMANodeWithoutSRIOVDevices(configMap, numaNodes); ok {
+		cpus, err := getCPUsPerNUMANode(nodeNum)
+		framework.Logf("NUMA Node %d doesn't seem to have attached SRIOV devices and has cpus=%v", nodeNum, cpus)
+		framework.ExpectNoError(err)
+		newCfg.ReservedSystemCPUs = fmt.Sprintf("%d", cpus[len(cpus)-1])
+	} else {
+		// The Kubelet panics if either kube-reserved or system-reserved is not set
+		// when CPU Manager is enabled. Set cpu in kube-reserved > 0 so that
+		// kubelet doesn't panic.
+		if newCfg.KubeReserved == nil {
+			newCfg.KubeReserved = map[string]string{}
+		}
 
-	if _, ok := newCfg.KubeReserved["cpu"]; !ok {
-		newCfg.KubeReserved["cpu"] = "200m"
+		if _, ok := newCfg.KubeReserved["cpu"]; !ok {
+			newCfg.KubeReserved["cpu"] = "200m"
+		}
 	}
 	// Dump the config -- debug
-	framework.Logf("New kublet config is %s", *newCfg)
+	framework.Logf("New kubelet config is %s", *newCfg)
 
 	// Update the Kubelet configuration.
 	framework.ExpectNoError(setKubeletConfiguration(f, newCfg))
@@ -175,6 +202,8 @@ func configureTopologyManagerInKubelet(f *framework.Framework, oldCfg *kubeletco
 		framework.ExpectNoError(err)
 		return nodes == 1
 	}, time.Minute, time.Second).Should(gomega.BeTrue())
+
+	return newCfg.ReservedSystemCPUs
 }
 
 // getSRIOVDevicePluginPod returns the Device Plugin pod for sriov resources in e2e tests.
@@ -548,14 +577,14 @@ func runTopologyManagerNegativeTest(f *framework.Framework, numaNodes, numPods i
 	deletePods(f, []string{pod.Name})
 }
 
-func runTopologyManagerNodeAlignmentSuiteTests(f *framework.Framework, numaNodes, coreCount int) {
+func getSRIOVDevicePluginConfigMap(cmFile string) *v1.ConfigMap {
 	cmData := testfiles.ReadOrDie(SRIOVDevicePluginCMYAML)
 	var err error
 
 	// the SRIOVDP configuration is hw-dependent, so we allow per-test-host customization.
-	framework.Logf("host-local SRIOV Device Plugin Config Map %q", framework.TestContext.SriovdpConfigMapFile)
-	if framework.TestContext.SriovdpConfigMapFile != "" {
-		cmData, err = ioutil.ReadFile(framework.TestContext.SriovdpConfigMapFile)
+	framework.Logf("host-local SRIOV Device Plugin Config Map %q", cmFile)
+	if cmFile != "" {
+		cmData, err = ioutil.ReadFile(cmFile)
 		if err != nil {
 			framework.Failf("unable to load the SRIOV Device Plugin ConfigMap: %v", err)
 		}
@@ -563,7 +592,12 @@ func runTopologyManagerNodeAlignmentSuiteTests(f *framework.Framework, numaNodes
 		framework.Logf("Using built-in SRIOV Device Plugin Config Map")
 	}
 
-	configMap := readConfigMapV1OrDie(cmData)
+	return readConfigMapV1OrDie(cmData)
+}
+
+func runTopologyManagerNodeAlignmentSuiteTests(f *framework.Framework, configMap *v1.ConfigMap, reservedSystemCPUs string, numaNodes, coreCount int) {
+	var err error
+
 	ginkgo.By(fmt.Sprintf("Creating configMap %v/%v", metav1.NamespaceSystem, configMap.Name))
 	if _, err = f.ClientSet.CoreV1().ConfigMaps(metav1.NamespaceSystem).Create(context.TODO(), configMap, metav1.CreateOptions{}); err != nil {
 		framework.Failf("unable to create test configMap %s: %v", configMap.Name, err)
@@ -607,10 +641,10 @@ func runTopologyManagerNodeAlignmentSuiteTests(f *framework.Framework, numaNodes
 	// two guaranteed cores, one device
 	runTopologyManagerPositiveTest(f, numaNodes, 1, "2000m", sriovResourceName, "1")
 
-	// TODO: test taking an entire NUMA node.
-	// to do a meaningful test, we need to know:
-	// - where are the reserved CPUs placed (which NUMA node)
-	// - where are the SRIOV device attacched to (which NUMA node(s))
+	// take an entire socket; but for that, we need to have reserved CPUs on another one.
+	if reservedSystemCPUs != "" {
+		runTopologyManagerPositiveTest(f, numaNodes, 1, fmt.Sprintf("%dm", threadsPerCore*coreCount*1000), sriovResourceName, "1")
+	}
 
 	if sriovResourceAmount > 1 {
 		// no matter how busses are connected to NUMA nodes and SRIOV devices are installed, this function
@@ -646,7 +680,7 @@ func runTopologyManagerTests(f *framework.Framework) {
 			ginkgo.By(fmt.Sprintf("by configuring Topology Manager policy to %s", policy))
 			framework.Logf("Configuring topology Manager policy to %s", policy)
 
-			configureTopologyManagerInKubelet(f, oldCfg, policy)
+			configureTopologyManagerInKubelet(f, oldCfg, policy, nil, 0)
 			// Run the tests
 			runTopologyManagerPolicySuiteTests(f)
 		}
@@ -674,6 +708,8 @@ func runTopologyManagerTests(f *framework.Framework) {
 			e2eskipper.Skipf("this test is meant to run on a system with at least one SRIOV device")
 		}
 
+		configMap := getSRIOVDevicePluginConfigMap(framework.TestContext.SriovdpConfigMapFile)
+
 		oldCfg, err = getCurrentKubeletConfig()
 		framework.ExpectNoError(err)
 
@@ -683,9 +719,9 @@ func runTopologyManagerTests(f *framework.Framework) {
 		ginkgo.By(fmt.Sprintf("by configuring Topology Manager policy to %s", policy))
 		framework.Logf("Configuring topology Manager policy to %s", policy)
 
-		configureTopologyManagerInKubelet(f, oldCfg, policy)
+		reservedSystemCPUs := configureTopologyManagerInKubelet(f, oldCfg, policy, configMap, numaNodes)
 
-		runTopologyManagerNodeAlignmentSuiteTests(f, numaNodes, coreCount)
+		runTopologyManagerNodeAlignmentSuiteTests(f, configMap, reservedSystemCPUs, numaNodes, coreCount)
 
 		// restore kubelet config
 		setOldKubeletConfig(f, oldCfg)
