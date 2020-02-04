@@ -46,7 +46,7 @@ require (
 	k8s.io/metrics v0.0.0
 	k8s.io/utils v0.0.0-20191217005138-9e5e9d854fcc
 	sigs.k8s.io/kustomize v2.0.3+incompatible
-	sigs.k8s.io/yaml v1.1.0
+	sigs.k8s.io/yaml v1.2.0
 	vbom.ml/util v0.0.0-20160121211510-db5cfe13f5cc
 )
 
