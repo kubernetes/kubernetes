@@ -104,6 +104,10 @@ func TLSConfigFor(c *Config) (*tls.Config, error) {
 			// Note: static key/cert data always take precedence over cert
 			// callback.
 			if staticCert != nil {
+				err := warnIfExpired(staticCert)
+				if err != nil {
+					return nil, err
+				}
 				return staticCert, nil
 			}
 			// key/cert files lead to ReloadTLSFiles being set - takes precedence over cert callback
@@ -117,6 +121,10 @@ func TLSConfigFor(c *Config) (*tls.Config, error) {
 				}
 				// GetCert may return empty value, meaning no cert.
 				if cert != nil {
+					err = warnIfExpired(cert)
+					if err != nil {
+						return nil, err
+					}
 					return cert, nil
 				}
 			}
@@ -129,6 +137,24 @@ func TLSConfigFor(c *Config) (*tls.Config, error) {
 	}
 
 	return tlsConfig, nil
+}
+
+// warnIfExpired checks the NotAfter date of the certificate and compares it to
+// the local system time, logging a warning if the cert is expired.
+func warnIfExpired(c *tls.Certificate) error {
+	now := time.Now()
+	for _, certData := range c.Certificate {
+		parsedCert, err := x509.ParseCertificate(certData)
+		if err != nil {
+			return err
+		}
+		notAfter := parsedCert.NotAfter
+		cn := parsedCert.Subject.CommonName
+		if notAfter.Before(now) {
+			klog.Warningf("Certificate for '%s' is expired according to your host's system clock and may be rejected by the server", cn)
+		}
+	}
+	return nil
 }
 
 // loadTLSFiles copies the data from the CertFile, KeyFile, and CAFile fields into the CertData,
@@ -298,6 +324,10 @@ func cachingCertificateLoader(certFile, keyFile string) func() (*tls.Certificate
 			defer currentMtx.RUnlock()
 		}
 
+		err := warnIfExpired(current.cert)
+		if err != nil {
+			return nil, err
+		}
 		return current.cert, current.err
 	}
 }

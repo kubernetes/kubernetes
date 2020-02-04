@@ -40,6 +40,7 @@ source "${KUBE_ROOT}/test/cmd/delete.sh"
 source "${KUBE_ROOT}/test/cmd/diff.sh"
 source "${KUBE_ROOT}/test/cmd/discovery.sh"
 source "${KUBE_ROOT}/test/cmd/exec.sh"
+source "${KUBE_ROOT}/test/cmd/expired-cert.sh"
 source "${KUBE_ROOT}/test/cmd/generic-resources.sh"
 source "${KUBE_ROOT}/test/cmd/get.sh"
 source "${KUBE_ROOT}/test/cmd/kubeconfig.sh"
@@ -942,6 +943,12 @@ runTests() {
   ####################
 
   record_command run_wait_tests
+
+  #######################
+  # Client Certificates #
+  #######################
+
+  record_command run_expired_cert_tests
 
   cleanup_tests
 }
