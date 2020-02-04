@@ -114,13 +114,13 @@ type TCPTransport struct {
 
 	// TLSConfig is the config needed to use TLS when connecting to konnectivity server
 	// +optional
-	TLSConfig *TLSConfig `json:"tlsConfig,omitempty"`
+	TLSConfig *TLSConfig
 }
 
 // UDSTransport provides the information to connect to konnectivity server via UDS
 type UDSTransport struct {
 	// UDSName is the name of the unix domain socket to connect to konnectivity server
-	// This does not use a unix:// prefix. (Eg: /etc/srv/kubernetes/konnectivity/konnectivity-server.socket)
+	// This does not use a unix:// prefix. (Eg: /etc/srv/kubernetes/konnectivity-server/konnectivity-server.socket)
 	UDSName string
 }
 
@@ -129,22 +129,23 @@ type UDSTransport struct {
 type TLSConfig struct {
 	// caBundle is the file location of the CA to be used to determine trust with the konnectivity server.
 	// Must be absent/empty HTTPConnect using the plain http
-	// Must be configured for HTTPConnect using the https protocol
+	// If absent while using the HTTPConnect protocol with HTTPS
+	// default to system trust roots
 	// Misconfiguration will cause an error
 	// +optional
-	CABundle string `json:"caBundle,omitempty"`
+	CABundle string
 
 	// clientKey is the file location of the client key to authenticate with the konnectivity server
 	// Must be absent/empty HTTPConnect using the plain http
 	// Must be configured for HTTPConnect using the https protocol
 	// Misconfiguration will cause an error
 	// +optional
-	ClientKey string `json:"clientKey,omitempty"`
+	ClientKey string
 
 	// clientCert is the file location of the client certificate to authenticate with the konnectivity server
 	// Must be absent/empty HTTPConnect using the plain http
 	// Must be configured for HTTPConnect using the https protocol
 	// Misconfiguration will cause an error
 	// +optional
-	ClientCert string `json:"clientCert,omitempty"`
+	ClientCert string
 }

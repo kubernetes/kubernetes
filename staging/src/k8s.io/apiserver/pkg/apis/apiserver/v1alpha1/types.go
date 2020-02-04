@@ -110,17 +110,17 @@ type Transport struct {
 type TCPTransport struct {
 	// URL is the location of the konnectivity server to connect to.
 	// As an example it might be "https://127.0.0.1:8131"
-	URL string
+	URL string `json:"url,omitempty"`
 
 	// TLSConfig is the config needed to use TLS when connecting to konnectivity server
 	// +optional
-	TLSConfig *TLSConfig
+	TLSConfig *TLSConfig `json:"tlsConfig,omitempty"`
 }
 
 // UDSTransport provides the information to connect to konnectivity server via UDS
 type UDSTransport struct {
 	// UDSName is the name of the unix domain socket to connect to konnectivity server
-	UDSName string
+	UDSName string `json:"udsName,omitempty"`
 }
 
 // TLSConfig provides the authentication information to connect to konnectivity server
@@ -128,14 +128,14 @@ type UDSTransport struct {
 type TLSConfig struct {
 	// caBundle is the file location of the CA to be used to determine trust with the konnectivity server.
 	// Must be absent/empty HTTPConnect using the plain http
-	// Must be configured for HTTPConnect using the https protocol
+	// If absent while using the HTTPConnect protocol with HTTPS
+	// default to system trust roots
 	// Misconfiguration will cause an error
 	// +optional
 	CABundle string `json:"caBundle,omitempty"`
 
 	// clientKey is the file location of the client key to be used in mtls handshakes with the konnectivity server.
 	// Must be absent/empty HTTPConnect using the plain http
-	// Must be configured for HTTPConnect using the https protocol
 	// Misconfiguration will cause an error
 	// +optional
 	ClientKey string `json:"clientKey,omitempty"`

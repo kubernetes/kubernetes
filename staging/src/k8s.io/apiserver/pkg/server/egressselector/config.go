@@ -148,16 +148,13 @@ func validateTCPConnection(connection apiserver.Connection, fldPath *field.Path)
 			"nil",
 			"TLSConfig config should be present for HTTPConnect via tcp"))
 	} else if strings.HasPrefix(connection.Transport.TCP.URL, "https://") {
-		if connection.Transport.TCP.TLSConfig.CABundle == "" {
-			allErrs = append(allErrs, field.Invalid(
-				fldPath.Child("tlsConfig", "caBundle"),
-				"nil",
-				"HTTPConnect via https requires caBundle"))
-		} else if exists, err := path.Exists(path.CheckFollowSymlink, connection.Transport.TCP.TLSConfig.CABundle); exists == false || err != nil {
-			allErrs = append(allErrs, field.Invalid(
-				fldPath.Child("tlsConfig", "caBundle"),
-				connection.Transport.TCP.TLSConfig.CABundle,
-				"HTTPConnect ca bundle does not exist"))
+		if connection.Transport.TCP.TLSConfig.CABundle != "" {
+			if exists, err := path.Exists(path.CheckFollowSymlink, connection.Transport.TCP.TLSConfig.CABundle); exists == false || err != nil {
+				allErrs = append(allErrs, field.Invalid(
+					fldPath.Child("tlsConfig", "caBundle"),
+					connection.Transport.TCP.TLSConfig.CABundle,
+					"HTTPConnect ca bundle does not exist"))
+			}
 		}
 		if connection.Transport.TCP.TLSConfig.ClientCert == "" {
 			allErrs = append(allErrs, field.Invalid(

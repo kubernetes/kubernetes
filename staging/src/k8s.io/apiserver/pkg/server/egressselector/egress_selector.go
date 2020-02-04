@@ -138,13 +138,17 @@ func createConnectTCPDialer(tcpTransport *apiserver.TCPTransport) (utilnet.DialF
 		return nil, fmt.Errorf("failed to read key pair %s & %s, got %v", clientCert, clientKey, err)
 	}
 	certPool := x509.NewCertPool()
-	certBytes, err := ioutil.ReadFile(caCert)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read cert file %s, got %v", caCert, err)
-	}
-	ok := certPool.AppendCertsFromPEM(certBytes)
-	if !ok {
-		return nil, fmt.Errorf("failed to append CA cert to the cert pool")
+	if caCert != "" {
+		certBytes, err := ioutil.ReadFile(caCert)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read cert file %s, got %v", caCert, err)
+		}
+		ok := certPool.AppendCertsFromPEM(certBytes)
+		if !ok {
+			return nil, fmt.Errorf("failed to append CA cert to the cert pool")
+		}
+	} else {
+		certPool = nil
 	}
 	contextDialer := func(ctx context.Context, network, addr string) (net.Conn, error) {
 		klog.V(4).Infof("Sending request to %q.", addr)
