@@ -25,7 +25,7 @@ import (
 type pluginDefaults flexVolumePlugin
 
 func logPrefix(plugin *flexVolumePlugin) string {
-	return "flexVolume driver " + plugin.driverName + ": "
+	return "flexVolume driver " + plugin.driverName + ": %s %s"
 }
 
 func (plugin *pluginDefaults) GetVolumeName(spec *volume.Spec) (string, error) {
