@@ -16,6 +16,7 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/kubelet/remote",
     deps = [
+        "//pkg/kubelet/remote/metrics:go_default_library",
         "//pkg/kubelet/util:go_default_library",
         "//pkg/kubelet/util/logreduction:go_default_library",
         "//staging/src/k8s.io/cri-api/pkg/apis:go_default_library",
@@ -38,6 +39,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//pkg/kubelet/remote/fake:all-srcs",
+        "//pkg/kubelet/remote/metrics:all-srcs",
     ],
     tags = ["automanaged"],
 )

@@ -28,6 +28,7 @@ import (
 
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	"k8s.io/kubernetes/pkg/kubelet/remote/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/kubelet/util/logreduction"
 	utilexec "k8s.io/utils/exec"
@@ -61,6 +62,8 @@ func NewRemoteRuntimeService(endpoint string, connectionTimeout time.Duration) (
 		klog.Errorf("Connect remote runtime %s failed: %v", addr, err)
 		return nil, err
 	}
+
+	metrics.Register()
 
 	return &RemoteRuntimeService{
 		timeout:       connectionTimeout,
@@ -302,6 +305,9 @@ func (r *RemoteRuntimeService) ContainerStatus(containerID string) (*runtimeapi.
 		if err := verifyContainerStatus(resp.Status); err != nil {
 			klog.Errorf("ContainerStatus of %q failed: %v", containerID, err)
 			return nil, err
+		}
+		if resp.Status.GetReason() == "OOMKilled" {
+			metrics.RemoteContainerOOMCounter.WithLabelValues("").Inc()
 		}
 	}
 
