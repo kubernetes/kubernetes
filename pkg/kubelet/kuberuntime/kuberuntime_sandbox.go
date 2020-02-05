@@ -27,6 +27,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/klog"
+	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/types"
@@ -137,17 +138,28 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(pod *v1.Pod, attemp
 	return podSandboxConfig, nil
 }
 
+// If PodSandboxSeccomp is enabled, overwrites pod level profile with SeccompProfileRuntimeDefault
+// This allows for pod level profiles to be applied only for user-containers, making them less privileged.
+func (m *kubeGenericRuntimeManager) getSandboxSeccompProfilePath(pod *v1.Pod) string {
+	// TODO: Allow for json seccomp profiles to be sent across to CRI, alongside with the "no-new-privileges" flag.
+	// This would allow for defaultPodSandboxSeccomp to be used instead.
+	profileName := m.getSeccompProfileFromAnnotations(pod.Annotations, "")
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodSandboxSeccomp) {
+		profileName = core.SeccompProfileRuntimeDefault
+	}
+
+	return profileName
+}
+
 // generatePodSandboxLinuxConfig generates LinuxPodSandboxConfig from v1.Pod.
 func (m *kubeGenericRuntimeManager) generatePodSandboxLinuxConfig(pod *v1.Pod) (*runtimeapi.LinuxPodSandboxConfig, error) {
 	cgroupParent := m.runtimeHelper.GetPodCgroupParent(pod)
 	lc := &runtimeapi.LinuxPodSandboxConfig{
 		CgroupParent: cgroupParent,
 		SecurityContext: &runtimeapi.LinuxSandboxSecurityContext{
-			Privileged: kubecontainer.HasPrivilegedContainer(pod),
-
-			// Seccomp profile will be overwritten by the container runtime
-			// Leaving this here for: 1. backwards compatibility 2. ensure that at least one seccomp will be applied
-			SeccompProfilePath: m.getSeccompProfileFromAnnotations(pod.Annotations, ""),
+			Privileged:         kubecontainer.HasPrivilegedContainer(pod),
+			SeccompProfilePath: m.getSandboxSeccompProfilePath(pod),
 		},
 	}
 
