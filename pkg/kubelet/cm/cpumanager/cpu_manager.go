@@ -232,7 +232,7 @@ func (m *manager) Allocate(p *v1.Pod, c *v1.Container) error {
 	//}
 
 	// Call down into the policy to assign this container CPUs if required.
-	err := m.policy.AddContainer(m.state, p, c)
+	err := m.policy.Allocate(m.state, p, c)
 	if err != nil {
 		klog.Errorf("[cpumanager] Allocate error: %v", err)
 		return err

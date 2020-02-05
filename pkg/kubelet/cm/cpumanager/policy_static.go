@@ -188,9 +188,9 @@ func (p *staticPolicy) assignableCPUs(s state.State) cpuset.CPUSet {
 	return s.GetDefaultCPUSet().Difference(p.reserved)
 }
 
-func (p *staticPolicy) AddContainer(s state.State, pod *v1.Pod, container *v1.Container) error {
+func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Container) error {
 	if numCPUs := p.guaranteedCPUs(pod, container); numCPUs != 0 {
-		klog.Infof("[cpumanager] static policy: AddContainer (pod: %s, container: %s)", pod.Name, container.Name)
+		klog.Infof("[cpumanager] static policy: Allocate (pod: %s, container: %s)", pod.Name, container.Name)
 		// container belongs in an exclusively allocated pool
 
 		if _, ok := s.GetCPUSet(string(pod.UID), container.Name); ok {

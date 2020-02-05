@@ -104,7 +104,7 @@ func (p *mockPolicy) Start(s state.State) error {
 	return p.err
 }
 
-func (p *mockPolicy) AddContainer(s state.State, pod *v1.Pod, container *v1.Container) error {
+func (p *mockPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Container) error {
 	return p.err
 }
 
