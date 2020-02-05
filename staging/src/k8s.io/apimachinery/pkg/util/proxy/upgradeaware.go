@@ -250,7 +250,7 @@ func (noSuppressPanicError) Write(p []byte) (n int, err error) {
 // tryUpgrade returns true if the request was handled.
 func (h *UpgradeAwareHandler) tryUpgrade(w http.ResponseWriter, req *http.Request) bool {
 	if !httpstream.IsUpgradeRequest(req) {
-		klog.V(6).Infof("Request was not an upgrade")
+		klog.V(4).Infof("Request was not an upgrade")
 		return false
 	}
 
@@ -272,15 +272,15 @@ func (h *UpgradeAwareHandler) tryUpgrade(w http.ResponseWriter, req *http.Reques
 	// handles this in the non-upgrade path.
 	utilnet.AppendForwardedForHeader(clone)
 	if h.InterceptRedirects {
-		klog.V(6).Infof("Connecting to backend proxy (intercepting redirects) %s\n  Headers: %v", &location, clone.Header)
+		klog.V(5).Infof("Connecting to backend proxy (intercepting redirects) %s\n  Headers: %v", &location, clone.Header)
 		backendConn, rawResponse, err = utilnet.ConnectWithRedirects(req.Method, &location, clone.Header, req.Body, utilnet.DialerFunc(h.DialForUpgrade), h.RequireSameHostRedirects)
 	} else {
-		klog.V(6).Infof("Connecting to backend proxy (direct dial) %s\n  Headers: %v", &location, clone.Header)
+		klog.V(5).Infof("Connecting to backend proxy (direct dial) %s\n  Headers: %v", &location, clone.Header)
 		clone.URL = &location
 		backendConn, err = h.DialForUpgrade(clone)
 	}
 	if err != nil {
-		klog.V(6).Infof("Proxy connection error: %v", err)
+		klog.V(3).Infof("Proxy connection error: %v", err)
 		h.Responder.Error(w, req, err)
 		return true
 	}
@@ -289,7 +289,7 @@ func (h *UpgradeAwareHandler) tryUpgrade(w http.ResponseWriter, req *http.Reques
 	// determine the http response code from the backend by reading from rawResponse+backendConn
 	backendHTTPResponse, headerBytes, err := getResponse(io.MultiReader(bytes.NewReader(rawResponse), backendConn))
 	if err != nil {
-		klog.V(6).Infof("Proxy connection error: %v", err)
+		klog.V(3).Infof("Proxy connection error: %v", err)
 		h.Responder.Error(w, req, err)
 		return true
 	}
@@ -302,13 +302,13 @@ func (h *UpgradeAwareHandler) tryUpgrade(w http.ResponseWriter, req *http.Reques
 	// hijacking should be the last step in the upgrade.
 	requestHijacker, ok := w.(http.Hijacker)
 	if !ok {
-		klog.V(6).Infof("Unable to hijack response writer: %T", w)
+		klog.V(3).Infof("Unable to hijack response writer: %T", w)
 		h.Responder.Error(w, req, fmt.Errorf("request connection cannot be hijacked: %T", w))
 		return true
 	}
 	requestHijackedConn, _, err := requestHijacker.Hijack()
 	if err != nil {
-		klog.V(6).Infof("Unable to hijack response: %v", err)
+		klog.V(3).Infof("Unable to hijack response: %v", err)
 		h.Responder.Error(w, req, fmt.Errorf("error hijacking connection: %v", err))
 		return true
 	}
@@ -316,7 +316,7 @@ func (h *UpgradeAwareHandler) tryUpgrade(w http.ResponseWriter, req *http.Reques
 
 	if backendHTTPResponse.StatusCode != http.StatusSwitchingProtocols {
 		// If the backend did not upgrade the request, echo the response from the backend to the client and return, closing the connection.
-		klog.V(6).Infof("Proxy upgrade error, status code %d", backendHTTPResponse.StatusCode)
+		klog.V(3).Infof("Proxy upgrade error, status code %d", backendHTTPResponse.StatusCode)
 		// set read/write deadlines
 		deadline := time.Now().Add(10 * time.Second)
 		backendConn.SetReadDeadline(deadline)
@@ -332,7 +332,7 @@ func (h *UpgradeAwareHandler) tryUpgrade(w http.ResponseWriter, req *http.Reques
 
 	// Forward raw response bytes back to client.
 	if len(rawResponse) > 0 {
-		klog.V(6).Infof("Writing %d bytes to hijacked connection", len(rawResponse))
+		klog.V(5).Infof("Writing %d bytes to hijacked connection", len(rawResponse))
 		if _, err = requestHijackedConn.Write(rawResponse); err != nil {
 			utilruntime.HandleError(fmt.Errorf("Error proxying response from backend to client: %v", err))
 		}
@@ -379,7 +379,7 @@ func (h *UpgradeAwareHandler) tryUpgrade(w http.ResponseWriter, req *http.Reques
 	case <-writerComplete:
 	case <-readerComplete:
 	}
-	klog.V(6).Infof("Disconnecting from backend proxy %s\n  Headers: %v", &location, clone.Header)
+	klog.V(5).Infof("Disconnecting from backend proxy %s\n  Headers: %v", &location, clone.Header)
 
 	return true
 }
