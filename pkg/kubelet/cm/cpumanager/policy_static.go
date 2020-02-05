@@ -209,6 +209,17 @@ func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Contai
 			return err
 		}
 		s.SetCPUSet(string(pod.UID), container.Name, cpuset)
+
+		// Check if the container that has just been allocated resources is an init container.
+		// If so, release its CPUs back into the shared pool so they can be reallocated.
+		for _, initContainer := range pod.Spec.InitContainers {
+			if container.Name == initContainer.Name {
+				if toRelease, ok := s.GetCPUSet(string(pod.UID), container.Name); ok {
+					// Mutate the shared pool, adding released cpus.
+					s.SetDefaultCPUSet(s.GetDefaultCPUSet().Union(toRelease))
+				}
+			}
+		}
 	}
 	// container belongs in the shared pool (nothing to do; use default cpuset)
 	return nil

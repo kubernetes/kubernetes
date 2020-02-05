@@ -215,22 +215,6 @@ func (m *manager) Allocate(p *v1.Pod, c *v1.Container) error {
 	m.Lock()
 	defer m.Unlock()
 
-	// TODO: Reuse CPUs allocated to init containers to mimic functionality
-	// from previous implementation below. Logic should probably be pushed into
-	// the policy now instead of doing it at this level.
-
-	//// Proactively remove CPUs from init containers that have already run.
-	//// They are guaranteed to have run to completion before any other
-	//// container is run.
-	//for _, initContainer := range p.Spec.InitContainers {
-	//	if c.Name != initContainer.Name {
-	//		err := m.policyRemoveContainerByRef(string(p.UID), initContainer.Name)
-	//		if err != nil {
-	//			klog.Warningf("[cpumanager] unable to remove init container (pod: %s, container: %s, error: %v)", string(p.UID), initContainer.Name, err)
-	//		}
-	//	}
-	//}
-
 	// Call down into the policy to assign this container CPUs if required.
 	err := m.policy.Allocate(m.state, p, c)
 	if err != nil {
