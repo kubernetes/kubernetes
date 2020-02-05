@@ -255,7 +255,8 @@ func calPreFilterState(pod *v1.Pod, allNodes []*schedulernodeinfo.NodeInfo) (*pr
 			matchTotal := int32(0)
 			// nodeInfo.Pods() can be empty; or all pods don't fit
 			for _, existingPod := range nodeInfo.Pods() {
-				if existingPod.Namespace != pod.Namespace {
+				// Bypass terminating Pod (see #87621).
+				if existingPod.DeletionTimestamp != nil || existingPod.Namespace != pod.Namespace {
 					continue
 				}
 				if constraint.selector.Matches(labels.Set(existingPod.Labels)) {
