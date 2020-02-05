@@ -77,7 +77,7 @@ func (c *FakeComponentStatuses) Watch(ctx context.Context, opts v1.ListOptions) 
 }
 
 // Create takes the representation of a componentStatus and creates it.  Returns the server's representation of the componentStatus, and an error, if there is any.
-func (c *FakeComponentStatuses) Create(ctx context.Context, componentStatus *corev1.ComponentStatus) (result *corev1.ComponentStatus, err error) {
+func (c *FakeComponentStatuses) Create(ctx context.Context, componentStatus *corev1.ComponentStatus, opts v1.CreateOptions) (result *corev1.ComponentStatus, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootCreateAction(componentstatusesResource, componentStatus), &corev1.ComponentStatus{})
 	if obj == nil {
@@ -87,7 +87,7 @@ func (c *FakeComponentStatuses) Create(ctx context.Context, componentStatus *cor
 }
 
 // Update takes the representation of a componentStatus and updates it. Returns the server's representation of the componentStatus, and an error, if there is any.
-func (c *FakeComponentStatuses) Update(ctx context.Context, componentStatus *corev1.ComponentStatus) (result *corev1.ComponentStatus, err error) {
+func (c *FakeComponentStatuses) Update(ctx context.Context, componentStatus *corev1.ComponentStatus, opts v1.UpdateOptions) (result *corev1.ComponentStatus, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootUpdateAction(componentstatusesResource, componentStatus), &corev1.ComponentStatus{})
 	if obj == nil {
@@ -112,7 +112,7 @@ func (c *FakeComponentStatuses) DeleteCollection(ctx context.Context, options *v
 }
 
 // Patch applies the patch and returns the patched componentStatus.
-func (c *FakeComponentStatuses) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *corev1.ComponentStatus, err error) {
+func (c *FakeComponentStatuses) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *corev1.ComponentStatus, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootPatchSubresourceAction(componentstatusesResource, name, pt, data, subresources...), &corev1.ComponentStatus{})
 	if obj == nil {

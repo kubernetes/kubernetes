@@ -38,15 +38,15 @@ type APIServicesGetter interface {
 
 // APIServiceInterface has methods to work with APIService resources.
 type APIServiceInterface interface {
-	Create(context.Context, *v1.APIService) (*v1.APIService, error)
-	Update(context.Context, *v1.APIService) (*v1.APIService, error)
-	UpdateStatus(context.Context, *v1.APIService) (*v1.APIService, error)
-	Delete(ctx context.Context, name string, options *metav1.DeleteOptions) error
-	DeleteCollection(ctx context.Context, options *metav1.DeleteOptions, listOptions metav1.ListOptions) error
-	Get(ctx context.Context, name string, options metav1.GetOptions) (*v1.APIService, error)
+	Create(ctx context.Context, aPIService *v1.APIService, opts metav1.CreateOptions) (*v1.APIService, error)
+	Update(ctx context.Context, aPIService *v1.APIService, opts metav1.UpdateOptions) (*v1.APIService, error)
+	UpdateStatus(ctx context.Context, aPIService *v1.APIService, opts metav1.UpdateOptions) (*v1.APIService, error)
+	Delete(ctx context.Context, name string, opts *metav1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.APIService, error)
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.APIServiceList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.APIService, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.APIService, err error)
 	APIServiceExpansion
 }
 
@@ -105,10 +105,11 @@ func (c *aPIServices) Watch(ctx context.Context, opts metav1.ListOptions) (watch
 }
 
 // Create takes the representation of a aPIService and creates it.  Returns the server's representation of the aPIService, and an error, if there is any.
-func (c *aPIServices) Create(ctx context.Context, aPIService *v1.APIService) (result *v1.APIService, err error) {
+func (c *aPIServices) Create(ctx context.Context, aPIService *v1.APIService, opts metav1.CreateOptions) (result *v1.APIService, err error) {
 	result = &v1.APIService{}
 	err = c.client.Post().
 		Resource("apiservices").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(aPIService).
 		Do(ctx).
 		Into(result)
@@ -116,11 +117,12 @@ func (c *aPIServices) Create(ctx context.Context, aPIService *v1.APIService) (re
 }
 
 // Update takes the representation of a aPIService and updates it. Returns the server's representation of the aPIService, and an error, if there is any.
-func (c *aPIServices) Update(ctx context.Context, aPIService *v1.APIService) (result *v1.APIService, err error) {
+func (c *aPIServices) Update(ctx context.Context, aPIService *v1.APIService, opts metav1.UpdateOptions) (result *v1.APIService, err error) {
 	result = &v1.APIService{}
 	err = c.client.Put().
 		Resource("apiservices").
 		Name(aPIService.Name).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(aPIService).
 		Do(ctx).
 		Into(result)
@@ -129,13 +131,13 @@ func (c *aPIServices) Update(ctx context.Context, aPIService *v1.APIService) (re
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-
-func (c *aPIServices) UpdateStatus(ctx context.Context, aPIService *v1.APIService) (result *v1.APIService, err error) {
+func (c *aPIServices) UpdateStatus(ctx context.Context, aPIService *v1.APIService, opts metav1.UpdateOptions) (result *v1.APIService, err error) {
 	result = &v1.APIService{}
 	err = c.client.Put().
 		Resource("apiservices").
 		Name(aPIService.Name).
 		SubResource("status").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(aPIService).
 		Do(ctx).
 		Into(result)
@@ -168,12 +170,13 @@ func (c *aPIServices) DeleteCollection(ctx context.Context, options *metav1.Dele
 }
 
 // Patch applies the patch and returns the patched aPIService.
-func (c *aPIServices) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.APIService, err error) {
+func (c *aPIServices) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.APIService, err error) {
 	result = &v1.APIService{}
 	err = c.client.Patch(pt).
 		Resource("apiservices").
-		SubResource(subresources...).
 		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

@@ -81,7 +81,7 @@ func (c *FakeSecrets) Watch(ctx context.Context, opts v1.ListOptions) (watch.Int
 }
 
 // Create takes the representation of a secret and creates it.  Returns the server's representation of the secret, and an error, if there is any.
-func (c *FakeSecrets) Create(ctx context.Context, secret *corev1.Secret) (result *corev1.Secret, err error) {
+func (c *FakeSecrets) Create(ctx context.Context, secret *corev1.Secret, opts v1.CreateOptions) (result *corev1.Secret, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(secretsResource, c.ns, secret), &corev1.Secret{})
 
@@ -92,7 +92,7 @@ func (c *FakeSecrets) Create(ctx context.Context, secret *corev1.Secret) (result
 }
 
 // Update takes the representation of a secret and updates it. Returns the server's representation of the secret, and an error, if there is any.
-func (c *FakeSecrets) Update(ctx context.Context, secret *corev1.Secret) (result *corev1.Secret, err error) {
+func (c *FakeSecrets) Update(ctx context.Context, secret *corev1.Secret, opts v1.UpdateOptions) (result *corev1.Secret, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(secretsResource, c.ns, secret), &corev1.Secret{})
 
@@ -119,7 +119,7 @@ func (c *FakeSecrets) DeleteCollection(ctx context.Context, options *v1.DeleteOp
 }
 
 // Patch applies the patch and returns the patched secret.
-func (c *FakeSecrets) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *corev1.Secret, err error) {
+func (c *FakeSecrets) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *corev1.Secret, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(secretsResource, c.ns, name, pt, data, subresources...), &corev1.Secret{})
 

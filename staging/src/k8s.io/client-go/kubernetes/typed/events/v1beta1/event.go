@@ -38,14 +38,14 @@ type EventsGetter interface {
 
 // EventInterface has methods to work with Event resources.
 type EventInterface interface {
-	Create(context.Context, *v1beta1.Event) (*v1beta1.Event, error)
-	Update(context.Context, *v1beta1.Event) (*v1beta1.Event, error)
-	Delete(ctx context.Context, name string, options *v1.DeleteOptions) error
-	DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(ctx context.Context, name string, options v1.GetOptions) (*v1beta1.Event, error)
+	Create(ctx context.Context, event *v1beta1.Event, opts v1.CreateOptions) (*v1beta1.Event, error)
+	Update(ctx context.Context, event *v1beta1.Event, opts v1.UpdateOptions) (*v1beta1.Event, error)
+	Delete(ctx context.Context, name string, opts *v1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts *v1.DeleteOptions, listOpts v1.ListOptions) error
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1beta1.Event, error)
 	List(ctx context.Context, opts v1.ListOptions) (*v1beta1.EventList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.Event, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.Event, err error)
 	EventExpansion
 }
 
@@ -109,11 +109,12 @@ func (c *events) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interfac
 }
 
 // Create takes the representation of a event and creates it.  Returns the server's representation of the event, and an error, if there is any.
-func (c *events) Create(ctx context.Context, event *v1beta1.Event) (result *v1beta1.Event, err error) {
+func (c *events) Create(ctx context.Context, event *v1beta1.Event, opts v1.CreateOptions) (result *v1beta1.Event, err error) {
 	result = &v1beta1.Event{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("events").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(event).
 		Do(ctx).
 		Into(result)
@@ -121,12 +122,13 @@ func (c *events) Create(ctx context.Context, event *v1beta1.Event) (result *v1be
 }
 
 // Update takes the representation of a event and updates it. Returns the server's representation of the event, and an error, if there is any.
-func (c *events) Update(ctx context.Context, event *v1beta1.Event) (result *v1beta1.Event, err error) {
+func (c *events) Update(ctx context.Context, event *v1beta1.Event, opts v1.UpdateOptions) (result *v1beta1.Event, err error) {
 	result = &v1beta1.Event{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("events").
 		Name(event.Name).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(event).
 		Do(ctx).
 		Into(result)
@@ -161,13 +163,14 @@ func (c *events) DeleteCollection(ctx context.Context, options *v1.DeleteOptions
 }
 
 // Patch applies the patch and returns the patched event.
-func (c *events) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.Event, err error) {
+func (c *events) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.Event, err error) {
 	result = &v1beta1.Event{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("events").
-		SubResource(subresources...).
 		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

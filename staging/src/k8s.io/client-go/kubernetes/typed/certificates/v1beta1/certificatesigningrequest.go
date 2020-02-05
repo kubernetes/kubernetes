@@ -38,15 +38,15 @@ type CertificateSigningRequestsGetter interface {
 
 // CertificateSigningRequestInterface has methods to work with CertificateSigningRequest resources.
 type CertificateSigningRequestInterface interface {
-	Create(context.Context, *v1beta1.CertificateSigningRequest) (*v1beta1.CertificateSigningRequest, error)
-	Update(context.Context, *v1beta1.CertificateSigningRequest) (*v1beta1.CertificateSigningRequest, error)
-	UpdateStatus(context.Context, *v1beta1.CertificateSigningRequest) (*v1beta1.CertificateSigningRequest, error)
-	Delete(ctx context.Context, name string, options *v1.DeleteOptions) error
-	DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(ctx context.Context, name string, options v1.GetOptions) (*v1beta1.CertificateSigningRequest, error)
+	Create(ctx context.Context, certificateSigningRequest *v1beta1.CertificateSigningRequest, opts v1.CreateOptions) (*v1beta1.CertificateSigningRequest, error)
+	Update(ctx context.Context, certificateSigningRequest *v1beta1.CertificateSigningRequest, opts v1.UpdateOptions) (*v1beta1.CertificateSigningRequest, error)
+	UpdateStatus(ctx context.Context, certificateSigningRequest *v1beta1.CertificateSigningRequest, opts v1.UpdateOptions) (*v1beta1.CertificateSigningRequest, error)
+	Delete(ctx context.Context, name string, opts *v1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts *v1.DeleteOptions, listOpts v1.ListOptions) error
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1beta1.CertificateSigningRequest, error)
 	List(ctx context.Context, opts v1.ListOptions) (*v1beta1.CertificateSigningRequestList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.CertificateSigningRequest, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.CertificateSigningRequest, err error)
 	CertificateSigningRequestExpansion
 }
 
@@ -105,10 +105,11 @@ func (c *certificateSigningRequests) Watch(ctx context.Context, opts v1.ListOpti
 }
 
 // Create takes the representation of a certificateSigningRequest and creates it.  Returns the server's representation of the certificateSigningRequest, and an error, if there is any.
-func (c *certificateSigningRequests) Create(ctx context.Context, certificateSigningRequest *v1beta1.CertificateSigningRequest) (result *v1beta1.CertificateSigningRequest, err error) {
+func (c *certificateSigningRequests) Create(ctx context.Context, certificateSigningRequest *v1beta1.CertificateSigningRequest, opts v1.CreateOptions) (result *v1beta1.CertificateSigningRequest, err error) {
 	result = &v1beta1.CertificateSigningRequest{}
 	err = c.client.Post().
 		Resource("certificatesigningrequests").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(certificateSigningRequest).
 		Do(ctx).
 		Into(result)
@@ -116,11 +117,12 @@ func (c *certificateSigningRequests) Create(ctx context.Context, certificateSign
 }
 
 // Update takes the representation of a certificateSigningRequest and updates it. Returns the server's representation of the certificateSigningRequest, and an error, if there is any.
-func (c *certificateSigningRequests) Update(ctx context.Context, certificateSigningRequest *v1beta1.CertificateSigningRequest) (result *v1beta1.CertificateSigningRequest, err error) {
+func (c *certificateSigningRequests) Update(ctx context.Context, certificateSigningRequest *v1beta1.CertificateSigningRequest, opts v1.UpdateOptions) (result *v1beta1.CertificateSigningRequest, err error) {
 	result = &v1beta1.CertificateSigningRequest{}
 	err = c.client.Put().
 		Resource("certificatesigningrequests").
 		Name(certificateSigningRequest.Name).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(certificateSigningRequest).
 		Do(ctx).
 		Into(result)
@@ -129,13 +131,13 @@ func (c *certificateSigningRequests) Update(ctx context.Context, certificateSign
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-
-func (c *certificateSigningRequests) UpdateStatus(ctx context.Context, certificateSigningRequest *v1beta1.CertificateSigningRequest) (result *v1beta1.CertificateSigningRequest, err error) {
+func (c *certificateSigningRequests) UpdateStatus(ctx context.Context, certificateSigningRequest *v1beta1.CertificateSigningRequest, opts v1.UpdateOptions) (result *v1beta1.CertificateSigningRequest, err error) {
 	result = &v1beta1.CertificateSigningRequest{}
 	err = c.client.Put().
 		Resource("certificatesigningrequests").
 		Name(certificateSigningRequest.Name).
 		SubResource("status").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(certificateSigningRequest).
 		Do(ctx).
 		Into(result)
@@ -168,12 +170,13 @@ func (c *certificateSigningRequests) DeleteCollection(ctx context.Context, optio
 }
 
 // Patch applies the patch and returns the patched certificateSigningRequest.
-func (c *certificateSigningRequests) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.CertificateSigningRequest, err error) {
+func (c *certificateSigningRequests) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.CertificateSigningRequest, err error) {
 	result = &v1beta1.CertificateSigningRequest{}
 	err = c.client.Patch(pt).
 		Resource("certificatesigningrequests").
-		SubResource(subresources...).
 		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

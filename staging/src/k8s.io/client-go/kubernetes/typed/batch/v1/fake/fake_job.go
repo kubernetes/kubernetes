@@ -81,7 +81,7 @@ func (c *FakeJobs) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interf
 }
 
 // Create takes the representation of a job and creates it.  Returns the server's representation of the job, and an error, if there is any.
-func (c *FakeJobs) Create(ctx context.Context, job *batchv1.Job) (result *batchv1.Job, err error) {
+func (c *FakeJobs) Create(ctx context.Context, job *batchv1.Job, opts v1.CreateOptions) (result *batchv1.Job, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(jobsResource, c.ns, job), &batchv1.Job{})
 
@@ -92,7 +92,7 @@ func (c *FakeJobs) Create(ctx context.Context, job *batchv1.Job) (result *batchv
 }
 
 // Update takes the representation of a job and updates it. Returns the server's representation of the job, and an error, if there is any.
-func (c *FakeJobs) Update(ctx context.Context, job *batchv1.Job) (result *batchv1.Job, err error) {
+func (c *FakeJobs) Update(ctx context.Context, job *batchv1.Job, opts v1.UpdateOptions) (result *batchv1.Job, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(jobsResource, c.ns, job), &batchv1.Job{})
 
@@ -104,7 +104,7 @@ func (c *FakeJobs) Update(ctx context.Context, job *batchv1.Job) (result *batchv
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeJobs) UpdateStatus(ctx context.Context, job *batchv1.Job) (*batchv1.Job, error) {
+func (c *FakeJobs) UpdateStatus(ctx context.Context, job *batchv1.Job, opts v1.UpdateOptions) (*batchv1.Job, error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateSubresourceAction(jobsResource, "status", c.ns, job), &batchv1.Job{})
 
@@ -131,7 +131,7 @@ func (c *FakeJobs) DeleteCollection(ctx context.Context, options *v1.DeleteOptio
 }
 
 // Patch applies the patch and returns the patched job.
-func (c *FakeJobs) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *batchv1.Job, err error) {
+func (c *FakeJobs) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *batchv1.Job, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(jobsResource, c.ns, name, pt, data, subresources...), &batchv1.Job{})
 

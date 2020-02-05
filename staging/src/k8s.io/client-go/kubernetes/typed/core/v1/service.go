@@ -38,14 +38,14 @@ type ServicesGetter interface {
 
 // ServiceInterface has methods to work with Service resources.
 type ServiceInterface interface {
-	Create(context.Context, *v1.Service) (*v1.Service, error)
-	Update(context.Context, *v1.Service) (*v1.Service, error)
-	UpdateStatus(context.Context, *v1.Service) (*v1.Service, error)
-	Delete(ctx context.Context, name string, options *metav1.DeleteOptions) error
-	Get(ctx context.Context, name string, options metav1.GetOptions) (*v1.Service, error)
+	Create(ctx context.Context, service *v1.Service, opts metav1.CreateOptions) (*v1.Service, error)
+	Update(ctx context.Context, service *v1.Service, opts metav1.UpdateOptions) (*v1.Service, error)
+	UpdateStatus(ctx context.Context, service *v1.Service, opts metav1.UpdateOptions) (*v1.Service, error)
+	Delete(ctx context.Context, name string, opts *metav1.DeleteOptions) error
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.Service, error)
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.ServiceList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Service, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Service, err error)
 	ServiceExpansion
 }
 
@@ -109,11 +109,12 @@ func (c *services) Watch(ctx context.Context, opts metav1.ListOptions) (watch.In
 }
 
 // Create takes the representation of a service and creates it.  Returns the server's representation of the service, and an error, if there is any.
-func (c *services) Create(ctx context.Context, service *v1.Service) (result *v1.Service, err error) {
+func (c *services) Create(ctx context.Context, service *v1.Service, opts metav1.CreateOptions) (result *v1.Service, err error) {
 	result = &v1.Service{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("services").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(service).
 		Do(ctx).
 		Into(result)
@@ -121,12 +122,13 @@ func (c *services) Create(ctx context.Context, service *v1.Service) (result *v1.
 }
 
 // Update takes the representation of a service and updates it. Returns the server's representation of the service, and an error, if there is any.
-func (c *services) Update(ctx context.Context, service *v1.Service) (result *v1.Service, err error) {
+func (c *services) Update(ctx context.Context, service *v1.Service, opts metav1.UpdateOptions) (result *v1.Service, err error) {
 	result = &v1.Service{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("services").
 		Name(service.Name).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(service).
 		Do(ctx).
 		Into(result)
@@ -135,14 +137,14 @@ func (c *services) Update(ctx context.Context, service *v1.Service) (result *v1.
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-
-func (c *services) UpdateStatus(ctx context.Context, service *v1.Service) (result *v1.Service, err error) {
+func (c *services) UpdateStatus(ctx context.Context, service *v1.Service, opts metav1.UpdateOptions) (result *v1.Service, err error) {
 	result = &v1.Service{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("services").
 		Name(service.Name).
 		SubResource("status").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(service).
 		Do(ctx).
 		Into(result)
@@ -161,13 +163,14 @@ func (c *services) Delete(ctx context.Context, name string, options *metav1.Dele
 }
 
 // Patch applies the patch and returns the patched service.
-func (c *services) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Service, err error) {
+func (c *services) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Service, err error) {
 	result = &v1.Service{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("services").
-		SubResource(subresources...).
 		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

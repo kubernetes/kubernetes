@@ -82,7 +82,7 @@ func (c *FakeReplicationControllers) Watch(ctx context.Context, opts v1.ListOpti
 }
 
 // Create takes the representation of a replicationController and creates it.  Returns the server's representation of the replicationController, and an error, if there is any.
-func (c *FakeReplicationControllers) Create(ctx context.Context, replicationController *corev1.ReplicationController) (result *corev1.ReplicationController, err error) {
+func (c *FakeReplicationControllers) Create(ctx context.Context, replicationController *corev1.ReplicationController, opts v1.CreateOptions) (result *corev1.ReplicationController, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(replicationcontrollersResource, c.ns, replicationController), &corev1.ReplicationController{})
 
@@ -93,7 +93,7 @@ func (c *FakeReplicationControllers) Create(ctx context.Context, replicationCont
 }
 
 // Update takes the representation of a replicationController and updates it. Returns the server's representation of the replicationController, and an error, if there is any.
-func (c *FakeReplicationControllers) Update(ctx context.Context, replicationController *corev1.ReplicationController) (result *corev1.ReplicationController, err error) {
+func (c *FakeReplicationControllers) Update(ctx context.Context, replicationController *corev1.ReplicationController, opts v1.UpdateOptions) (result *corev1.ReplicationController, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(replicationcontrollersResource, c.ns, replicationController), &corev1.ReplicationController{})
 
@@ -105,7 +105,7 @@ func (c *FakeReplicationControllers) Update(ctx context.Context, replicationCont
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeReplicationControllers) UpdateStatus(ctx context.Context, replicationController *corev1.ReplicationController) (*corev1.ReplicationController, error) {
+func (c *FakeReplicationControllers) UpdateStatus(ctx context.Context, replicationController *corev1.ReplicationController, opts v1.UpdateOptions) (*corev1.ReplicationController, error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateSubresourceAction(replicationcontrollersResource, "status", c.ns, replicationController), &corev1.ReplicationController{})
 
@@ -132,7 +132,7 @@ func (c *FakeReplicationControllers) DeleteCollection(ctx context.Context, optio
 }
 
 // Patch applies the patch and returns the patched replicationController.
-func (c *FakeReplicationControllers) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *corev1.ReplicationController, err error) {
+func (c *FakeReplicationControllers) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *corev1.ReplicationController, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(replicationcontrollersResource, c.ns, name, pt, data, subresources...), &corev1.ReplicationController{})
 
@@ -154,7 +154,7 @@ func (c *FakeReplicationControllers) GetScale(ctx context.Context, replicationCo
 }
 
 // UpdateScale takes the representation of a scale and updates it. Returns the server's representation of the scale, and an error, if there is any.
-func (c *FakeReplicationControllers) UpdateScale(ctx context.Context, replicationControllerName string, scale *autoscalingv1.Scale) (result *autoscalingv1.Scale, err error) {
+func (c *FakeReplicationControllers) UpdateScale(ctx context.Context, replicationControllerName string, scale *autoscalingv1.Scale, opts v1.UpdateOptions) (result *autoscalingv1.Scale, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateSubresourceAction(replicationcontrollersResource, "scale", c.ns, scale), &autoscalingv1.Scale{})
 

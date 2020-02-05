@@ -77,7 +77,7 @@ func (c *FakeCustomResourceDefinitions) Watch(ctx context.Context, opts v1.ListO
 }
 
 // Create takes the representation of a customResourceDefinition and creates it.  Returns the server's representation of the customResourceDefinition, and an error, if there is any.
-func (c *FakeCustomResourceDefinitions) Create(ctx context.Context, customResourceDefinition *apiextensionsv1.CustomResourceDefinition) (result *apiextensionsv1.CustomResourceDefinition, err error) {
+func (c *FakeCustomResourceDefinitions) Create(ctx context.Context, customResourceDefinition *apiextensionsv1.CustomResourceDefinition, opts v1.CreateOptions) (result *apiextensionsv1.CustomResourceDefinition, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootCreateAction(customresourcedefinitionsResource, customResourceDefinition), &apiextensionsv1.CustomResourceDefinition{})
 	if obj == nil {
@@ -87,7 +87,7 @@ func (c *FakeCustomResourceDefinitions) Create(ctx context.Context, customResour
 }
 
 // Update takes the representation of a customResourceDefinition and updates it. Returns the server's representation of the customResourceDefinition, and an error, if there is any.
-func (c *FakeCustomResourceDefinitions) Update(ctx context.Context, customResourceDefinition *apiextensionsv1.CustomResourceDefinition) (result *apiextensionsv1.CustomResourceDefinition, err error) {
+func (c *FakeCustomResourceDefinitions) Update(ctx context.Context, customResourceDefinition *apiextensionsv1.CustomResourceDefinition, opts v1.UpdateOptions) (result *apiextensionsv1.CustomResourceDefinition, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootUpdateAction(customresourcedefinitionsResource, customResourceDefinition), &apiextensionsv1.CustomResourceDefinition{})
 	if obj == nil {
@@ -98,7 +98,7 @@ func (c *FakeCustomResourceDefinitions) Update(ctx context.Context, customResour
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeCustomResourceDefinitions) UpdateStatus(ctx context.Context, customResourceDefinition *apiextensionsv1.CustomResourceDefinition) (*apiextensionsv1.CustomResourceDefinition, error) {
+func (c *FakeCustomResourceDefinitions) UpdateStatus(ctx context.Context, customResourceDefinition *apiextensionsv1.CustomResourceDefinition, opts v1.UpdateOptions) (*apiextensionsv1.CustomResourceDefinition, error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootUpdateSubresourceAction(customresourcedefinitionsResource, "status", customResourceDefinition), &apiextensionsv1.CustomResourceDefinition{})
 	if obj == nil {
@@ -123,7 +123,7 @@ func (c *FakeCustomResourceDefinitions) DeleteCollection(ctx context.Context, op
 }
 
 // Patch applies the patch and returns the patched customResourceDefinition.
-func (c *FakeCustomResourceDefinitions) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *apiextensionsv1.CustomResourceDefinition, err error) {
+func (c *FakeCustomResourceDefinitions) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *apiextensionsv1.CustomResourceDefinition, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootPatchSubresourceAction(customresourcedefinitionsResource, name, pt, data, subresources...), &apiextensionsv1.CustomResourceDefinition{})
 	if obj == nil {

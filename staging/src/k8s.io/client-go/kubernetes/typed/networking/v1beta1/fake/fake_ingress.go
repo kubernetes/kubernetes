@@ -81,7 +81,7 @@ func (c *FakeIngresses) Watch(ctx context.Context, opts v1.ListOptions) (watch.I
 }
 
 // Create takes the representation of a ingress and creates it.  Returns the server's representation of the ingress, and an error, if there is any.
-func (c *FakeIngresses) Create(ctx context.Context, ingress *v1beta1.Ingress) (result *v1beta1.Ingress, err error) {
+func (c *FakeIngresses) Create(ctx context.Context, ingress *v1beta1.Ingress, opts v1.CreateOptions) (result *v1beta1.Ingress, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(ingressesResource, c.ns, ingress), &v1beta1.Ingress{})
 
@@ -92,7 +92,7 @@ func (c *FakeIngresses) Create(ctx context.Context, ingress *v1beta1.Ingress) (r
 }
 
 // Update takes the representation of a ingress and updates it. Returns the server's representation of the ingress, and an error, if there is any.
-func (c *FakeIngresses) Update(ctx context.Context, ingress *v1beta1.Ingress) (result *v1beta1.Ingress, err error) {
+func (c *FakeIngresses) Update(ctx context.Context, ingress *v1beta1.Ingress, opts v1.UpdateOptions) (result *v1beta1.Ingress, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(ingressesResource, c.ns, ingress), &v1beta1.Ingress{})
 
@@ -104,7 +104,7 @@ func (c *FakeIngresses) Update(ctx context.Context, ingress *v1beta1.Ingress) (r
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeIngresses) UpdateStatus(ctx context.Context, ingress *v1beta1.Ingress) (*v1beta1.Ingress, error) {
+func (c *FakeIngresses) UpdateStatus(ctx context.Context, ingress *v1beta1.Ingress, opts v1.UpdateOptions) (*v1beta1.Ingress, error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateSubresourceAction(ingressesResource, "status", c.ns, ingress), &v1beta1.Ingress{})
 
@@ -131,7 +131,7 @@ func (c *FakeIngresses) DeleteCollection(ctx context.Context, options *v1.Delete
 }
 
 // Patch applies the patch and returns the patched ingress.
-func (c *FakeIngresses) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.Ingress, err error) {
+func (c *FakeIngresses) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.Ingress, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(ingressesResource, c.ns, name, pt, data, subresources...), &v1beta1.Ingress{})
 

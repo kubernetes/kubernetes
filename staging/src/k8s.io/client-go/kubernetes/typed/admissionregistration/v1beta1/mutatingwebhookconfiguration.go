@@ -38,14 +38,14 @@ type MutatingWebhookConfigurationsGetter interface {
 
 // MutatingWebhookConfigurationInterface has methods to work with MutatingWebhookConfiguration resources.
 type MutatingWebhookConfigurationInterface interface {
-	Create(context.Context, *v1beta1.MutatingWebhookConfiguration) (*v1beta1.MutatingWebhookConfiguration, error)
-	Update(context.Context, *v1beta1.MutatingWebhookConfiguration) (*v1beta1.MutatingWebhookConfiguration, error)
-	Delete(ctx context.Context, name string, options *v1.DeleteOptions) error
-	DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(ctx context.Context, name string, options v1.GetOptions) (*v1beta1.MutatingWebhookConfiguration, error)
+	Create(ctx context.Context, mutatingWebhookConfiguration *v1beta1.MutatingWebhookConfiguration, opts v1.CreateOptions) (*v1beta1.MutatingWebhookConfiguration, error)
+	Update(ctx context.Context, mutatingWebhookConfiguration *v1beta1.MutatingWebhookConfiguration, opts v1.UpdateOptions) (*v1beta1.MutatingWebhookConfiguration, error)
+	Delete(ctx context.Context, name string, opts *v1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts *v1.DeleteOptions, listOpts v1.ListOptions) error
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1beta1.MutatingWebhookConfiguration, error)
 	List(ctx context.Context, opts v1.ListOptions) (*v1beta1.MutatingWebhookConfigurationList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.MutatingWebhookConfiguration, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.MutatingWebhookConfiguration, err error)
 	MutatingWebhookConfigurationExpansion
 }
 
@@ -104,10 +104,11 @@ func (c *mutatingWebhookConfigurations) Watch(ctx context.Context, opts v1.ListO
 }
 
 // Create takes the representation of a mutatingWebhookConfiguration and creates it.  Returns the server's representation of the mutatingWebhookConfiguration, and an error, if there is any.
-func (c *mutatingWebhookConfigurations) Create(ctx context.Context, mutatingWebhookConfiguration *v1beta1.MutatingWebhookConfiguration) (result *v1beta1.MutatingWebhookConfiguration, err error) {
+func (c *mutatingWebhookConfigurations) Create(ctx context.Context, mutatingWebhookConfiguration *v1beta1.MutatingWebhookConfiguration, opts v1.CreateOptions) (result *v1beta1.MutatingWebhookConfiguration, err error) {
 	result = &v1beta1.MutatingWebhookConfiguration{}
 	err = c.client.Post().
 		Resource("mutatingwebhookconfigurations").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(mutatingWebhookConfiguration).
 		Do(ctx).
 		Into(result)
@@ -115,11 +116,12 @@ func (c *mutatingWebhookConfigurations) Create(ctx context.Context, mutatingWebh
 }
 
 // Update takes the representation of a mutatingWebhookConfiguration and updates it. Returns the server's representation of the mutatingWebhookConfiguration, and an error, if there is any.
-func (c *mutatingWebhookConfigurations) Update(ctx context.Context, mutatingWebhookConfiguration *v1beta1.MutatingWebhookConfiguration) (result *v1beta1.MutatingWebhookConfiguration, err error) {
+func (c *mutatingWebhookConfigurations) Update(ctx context.Context, mutatingWebhookConfiguration *v1beta1.MutatingWebhookConfiguration, opts v1.UpdateOptions) (result *v1beta1.MutatingWebhookConfiguration, err error) {
 	result = &v1beta1.MutatingWebhookConfiguration{}
 	err = c.client.Put().
 		Resource("mutatingwebhookconfigurations").
 		Name(mutatingWebhookConfiguration.Name).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(mutatingWebhookConfiguration).
 		Do(ctx).
 		Into(result)
@@ -152,12 +154,13 @@ func (c *mutatingWebhookConfigurations) DeleteCollection(ctx context.Context, op
 }
 
 // Patch applies the patch and returns the patched mutatingWebhookConfiguration.
-func (c *mutatingWebhookConfigurations) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.MutatingWebhookConfiguration, err error) {
+func (c *mutatingWebhookConfigurations) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.MutatingWebhookConfiguration, err error) {
 	result = &v1beta1.MutatingWebhookConfiguration{}
 	err = c.client.Patch(pt).
 		Resource("mutatingwebhookconfigurations").
-		SubResource(subresources...).
 		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

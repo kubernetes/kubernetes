@@ -39,15 +39,15 @@ type ServiceAccountsGetter interface {
 
 // ServiceAccountInterface has methods to work with ServiceAccount resources.
 type ServiceAccountInterface interface {
-	Create(context.Context, *v1.ServiceAccount) (*v1.ServiceAccount, error)
-	Update(context.Context, *v1.ServiceAccount) (*v1.ServiceAccount, error)
-	Delete(ctx context.Context, name string, options *metav1.DeleteOptions) error
-	DeleteCollection(ctx context.Context, options *metav1.DeleteOptions, listOptions metav1.ListOptions) error
-	Get(ctx context.Context, name string, options metav1.GetOptions) (*v1.ServiceAccount, error)
+	Create(ctx context.Context, serviceAccount *v1.ServiceAccount, opts metav1.CreateOptions) (*v1.ServiceAccount, error)
+	Update(ctx context.Context, serviceAccount *v1.ServiceAccount, opts metav1.UpdateOptions) (*v1.ServiceAccount, error)
+	Delete(ctx context.Context, name string, opts *metav1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.ServiceAccount, error)
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.ServiceAccountList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.ServiceAccount, err error)
-	CreateToken(ctx context.Context, serviceAccountName string, tokenRequest *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ServiceAccount, err error)
+	CreateToken(ctx context.Context, serviceAccountName string, tokenRequest *authenticationv1.TokenRequest, opts metav1.CreateOptions) (*authenticationv1.TokenRequest, error)
 
 	ServiceAccountExpansion
 }
@@ -112,11 +112,12 @@ func (c *serviceAccounts) Watch(ctx context.Context, opts metav1.ListOptions) (w
 }
 
 // Create takes the representation of a serviceAccount and creates it.  Returns the server's representation of the serviceAccount, and an error, if there is any.
-func (c *serviceAccounts) Create(ctx context.Context, serviceAccount *v1.ServiceAccount) (result *v1.ServiceAccount, err error) {
+func (c *serviceAccounts) Create(ctx context.Context, serviceAccount *v1.ServiceAccount, opts metav1.CreateOptions) (result *v1.ServiceAccount, err error) {
 	result = &v1.ServiceAccount{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("serviceaccounts").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(serviceAccount).
 		Do(ctx).
 		Into(result)
@@ -124,12 +125,13 @@ func (c *serviceAccounts) Create(ctx context.Context, serviceAccount *v1.Service
 }
 
 // Update takes the representation of a serviceAccount and updates it. Returns the server's representation of the serviceAccount, and an error, if there is any.
-func (c *serviceAccounts) Update(ctx context.Context, serviceAccount *v1.ServiceAccount) (result *v1.ServiceAccount, err error) {
+func (c *serviceAccounts) Update(ctx context.Context, serviceAccount *v1.ServiceAccount, opts metav1.UpdateOptions) (result *v1.ServiceAccount, err error) {
 	result = &v1.ServiceAccount{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("serviceaccounts").
 		Name(serviceAccount.Name).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(serviceAccount).
 		Do(ctx).
 		Into(result)
@@ -164,13 +166,14 @@ func (c *serviceAccounts) DeleteCollection(ctx context.Context, options *metav1.
 }
 
 // Patch applies the patch and returns the patched serviceAccount.
-func (c *serviceAccounts) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.ServiceAccount, err error) {
+func (c *serviceAccounts) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ServiceAccount, err error) {
 	result = &v1.ServiceAccount{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("serviceaccounts").
-		SubResource(subresources...).
 		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)
@@ -178,13 +181,14 @@ func (c *serviceAccounts) Patch(ctx context.Context, name string, pt types.Patch
 }
 
 // CreateToken takes the representation of a tokenRequest and creates it.  Returns the server's representation of the tokenRequest, and an error, if there is any.
-func (c *serviceAccounts) CreateToken(ctx context.Context, serviceAccountName string, tokenRequest *authenticationv1.TokenRequest) (result *authenticationv1.TokenRequest, err error) {
+func (c *serviceAccounts) CreateToken(ctx context.Context, serviceAccountName string, tokenRequest *authenticationv1.TokenRequest, opts metav1.CreateOptions) (result *authenticationv1.TokenRequest, err error) {
 	result = &authenticationv1.TokenRequest{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("serviceaccounts").
 		Name(serviceAccountName).
 		SubResource("token").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(tokenRequest).
 		Do(ctx).
 		Into(result)

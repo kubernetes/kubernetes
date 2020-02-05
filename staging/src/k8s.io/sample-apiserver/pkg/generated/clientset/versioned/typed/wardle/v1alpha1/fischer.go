@@ -38,14 +38,14 @@ type FischersGetter interface {
 
 // FischerInterface has methods to work with Fischer resources.
 type FischerInterface interface {
-	Create(context.Context, *v1alpha1.Fischer) (*v1alpha1.Fischer, error)
-	Update(context.Context, *v1alpha1.Fischer) (*v1alpha1.Fischer, error)
-	Delete(ctx context.Context, name string, options *v1.DeleteOptions) error
-	DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(ctx context.Context, name string, options v1.GetOptions) (*v1alpha1.Fischer, error)
+	Create(ctx context.Context, fischer *v1alpha1.Fischer, opts v1.CreateOptions) (*v1alpha1.Fischer, error)
+	Update(ctx context.Context, fischer *v1alpha1.Fischer, opts v1.UpdateOptions) (*v1alpha1.Fischer, error)
+	Delete(ctx context.Context, name string, opts *v1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts *v1.DeleteOptions, listOpts v1.ListOptions) error
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1alpha1.Fischer, error)
 	List(ctx context.Context, opts v1.ListOptions) (*v1alpha1.FischerList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.Fischer, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.Fischer, err error)
 	FischerExpansion
 }
 
@@ -104,10 +104,11 @@ func (c *fischers) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interf
 }
 
 // Create takes the representation of a fischer and creates it.  Returns the server's representation of the fischer, and an error, if there is any.
-func (c *fischers) Create(ctx context.Context, fischer *v1alpha1.Fischer) (result *v1alpha1.Fischer, err error) {
+func (c *fischers) Create(ctx context.Context, fischer *v1alpha1.Fischer, opts v1.CreateOptions) (result *v1alpha1.Fischer, err error) {
 	result = &v1alpha1.Fischer{}
 	err = c.client.Post().
 		Resource("fischers").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(fischer).
 		Do(ctx).
 		Into(result)
@@ -115,11 +116,12 @@ func (c *fischers) Create(ctx context.Context, fischer *v1alpha1.Fischer) (resul
 }
 
 // Update takes the representation of a fischer and updates it. Returns the server's representation of the fischer, and an error, if there is any.
-func (c *fischers) Update(ctx context.Context, fischer *v1alpha1.Fischer) (result *v1alpha1.Fischer, err error) {
+func (c *fischers) Update(ctx context.Context, fischer *v1alpha1.Fischer, opts v1.UpdateOptions) (result *v1alpha1.Fischer, err error) {
 	result = &v1alpha1.Fischer{}
 	err = c.client.Put().
 		Resource("fischers").
 		Name(fischer.Name).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(fischer).
 		Do(ctx).
 		Into(result)
@@ -152,12 +154,13 @@ func (c *fischers) DeleteCollection(ctx context.Context, options *v1.DeleteOptio
 }
 
 // Patch applies the patch and returns the patched fischer.
-func (c *fischers) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.Fischer, err error) {
+func (c *fischers) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.Fischer, err error) {
 	result = &v1alpha1.Fischer{}
 	err = c.client.Patch(pt).
 		Resource("fischers").
-		SubResource(subresources...).
 		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

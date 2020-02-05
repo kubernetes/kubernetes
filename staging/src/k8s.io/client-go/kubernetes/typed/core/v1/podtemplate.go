@@ -38,14 +38,14 @@ type PodTemplatesGetter interface {
 
 // PodTemplateInterface has methods to work with PodTemplate resources.
 type PodTemplateInterface interface {
-	Create(context.Context, *v1.PodTemplate) (*v1.PodTemplate, error)
-	Update(context.Context, *v1.PodTemplate) (*v1.PodTemplate, error)
-	Delete(ctx context.Context, name string, options *metav1.DeleteOptions) error
-	DeleteCollection(ctx context.Context, options *metav1.DeleteOptions, listOptions metav1.ListOptions) error
-	Get(ctx context.Context, name string, options metav1.GetOptions) (*v1.PodTemplate, error)
+	Create(ctx context.Context, podTemplate *v1.PodTemplate, opts metav1.CreateOptions) (*v1.PodTemplate, error)
+	Update(ctx context.Context, podTemplate *v1.PodTemplate, opts metav1.UpdateOptions) (*v1.PodTemplate, error)
+	Delete(ctx context.Context, name string, opts *metav1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.PodTemplate, error)
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.PodTemplateList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.PodTemplate, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.PodTemplate, err error)
 	PodTemplateExpansion
 }
 
@@ -109,11 +109,12 @@ func (c *podTemplates) Watch(ctx context.Context, opts metav1.ListOptions) (watc
 }
 
 // Create takes the representation of a podTemplate and creates it.  Returns the server's representation of the podTemplate, and an error, if there is any.
-func (c *podTemplates) Create(ctx context.Context, podTemplate *v1.PodTemplate) (result *v1.PodTemplate, err error) {
+func (c *podTemplates) Create(ctx context.Context, podTemplate *v1.PodTemplate, opts metav1.CreateOptions) (result *v1.PodTemplate, err error) {
 	result = &v1.PodTemplate{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("podtemplates").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(podTemplate).
 		Do(ctx).
 		Into(result)
@@ -121,12 +122,13 @@ func (c *podTemplates) Create(ctx context.Context, podTemplate *v1.PodTemplate) 
 }
 
 // Update takes the representation of a podTemplate and updates it. Returns the server's representation of the podTemplate, and an error, if there is any.
-func (c *podTemplates) Update(ctx context.Context, podTemplate *v1.PodTemplate) (result *v1.PodTemplate, err error) {
+func (c *podTemplates) Update(ctx context.Context, podTemplate *v1.PodTemplate, opts metav1.UpdateOptions) (result *v1.PodTemplate, err error) {
 	result = &v1.PodTemplate{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("podtemplates").
 		Name(podTemplate.Name).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(podTemplate).
 		Do(ctx).
 		Into(result)
@@ -161,13 +163,14 @@ func (c *podTemplates) DeleteCollection(ctx context.Context, options *metav1.Del
 }
 
 // Patch applies the patch and returns the patched podTemplate.
-func (c *podTemplates) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.PodTemplate, err error) {
+func (c *podTemplates) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.PodTemplate, err error) {
 	result = &v1.PodTemplate{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("podtemplates").
-		SubResource(subresources...).
 		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

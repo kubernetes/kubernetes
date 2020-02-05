@@ -38,15 +38,15 @@ type TestTypesGetter interface {
 
 // TestTypeInterface has methods to work with TestType resources.
 type TestTypeInterface interface {
-	Create(context.Context, *v1.TestType) (*v1.TestType, error)
-	Update(context.Context, *v1.TestType) (*v1.TestType, error)
-	UpdateStatus(context.Context, *v1.TestType) (*v1.TestType, error)
-	Delete(ctx context.Context, name string, options *metav1.DeleteOptions) error
-	DeleteCollection(ctx context.Context, options *metav1.DeleteOptions, listOptions metav1.ListOptions) error
-	Get(ctx context.Context, name string, options metav1.GetOptions) (*v1.TestType, error)
+	Create(ctx context.Context, testType *v1.TestType, opts metav1.CreateOptions) (*v1.TestType, error)
+	Update(ctx context.Context, testType *v1.TestType, opts metav1.UpdateOptions) (*v1.TestType, error)
+	UpdateStatus(ctx context.Context, testType *v1.TestType, opts metav1.UpdateOptions) (*v1.TestType, error)
+	Delete(ctx context.Context, name string, opts *metav1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.TestType, error)
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.TestTypeList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.TestType, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.TestType, err error)
 	TestTypeExpansion
 }
 
@@ -110,11 +110,12 @@ func (c *testTypes) Watch(ctx context.Context, opts metav1.ListOptions) (watch.I
 }
 
 // Create takes the representation of a testType and creates it.  Returns the server's representation of the testType, and an error, if there is any.
-func (c *testTypes) Create(ctx context.Context, testType *v1.TestType) (result *v1.TestType, err error) {
+func (c *testTypes) Create(ctx context.Context, testType *v1.TestType, opts metav1.CreateOptions) (result *v1.TestType, err error) {
 	result = &v1.TestType{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("testtypes").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(testType).
 		Do(ctx).
 		Into(result)
@@ -122,12 +123,13 @@ func (c *testTypes) Create(ctx context.Context, testType *v1.TestType) (result *
 }
 
 // Update takes the representation of a testType and updates it. Returns the server's representation of the testType, and an error, if there is any.
-func (c *testTypes) Update(ctx context.Context, testType *v1.TestType) (result *v1.TestType, err error) {
+func (c *testTypes) Update(ctx context.Context, testType *v1.TestType, opts metav1.UpdateOptions) (result *v1.TestType, err error) {
 	result = &v1.TestType{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("testtypes").
 		Name(testType.Name).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(testType).
 		Do(ctx).
 		Into(result)
@@ -136,14 +138,14 @@ func (c *testTypes) Update(ctx context.Context, testType *v1.TestType) (result *
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-
-func (c *testTypes) UpdateStatus(ctx context.Context, testType *v1.TestType) (result *v1.TestType, err error) {
+func (c *testTypes) UpdateStatus(ctx context.Context, testType *v1.TestType, opts metav1.UpdateOptions) (result *v1.TestType, err error) {
 	result = &v1.TestType{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("testtypes").
 		Name(testType.Name).
 		SubResource("status").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(testType).
 		Do(ctx).
 		Into(result)
@@ -178,13 +180,14 @@ func (c *testTypes) DeleteCollection(ctx context.Context, options *metav1.Delete
 }
 
 // Patch applies the patch and returns the patched testType.
-func (c *testTypes) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.TestType, err error) {
+func (c *testTypes) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.TestType, err error) {
 	result = &v1.TestType{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("testtypes").
-		SubResource(subresources...).
 		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

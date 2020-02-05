@@ -38,14 +38,14 @@ type ConfigMapsGetter interface {
 
 // ConfigMapInterface has methods to work with ConfigMap resources.
 type ConfigMapInterface interface {
-	Create(context.Context, *v1.ConfigMap) (*v1.ConfigMap, error)
-	Update(context.Context, *v1.ConfigMap) (*v1.ConfigMap, error)
-	Delete(ctx context.Context, name string, options *metav1.DeleteOptions) error
-	DeleteCollection(ctx context.Context, options *metav1.DeleteOptions, listOptions metav1.ListOptions) error
-	Get(ctx context.Context, name string, options metav1.GetOptions) (*v1.ConfigMap, error)
+	Create(ctx context.Context, configMap *v1.ConfigMap, opts metav1.CreateOptions) (*v1.ConfigMap, error)
+	Update(ctx context.Context, configMap *v1.ConfigMap, opts metav1.UpdateOptions) (*v1.ConfigMap, error)
+	Delete(ctx context.Context, name string, opts *metav1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.ConfigMap, error)
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.ConfigMapList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.ConfigMap, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ConfigMap, err error)
 	ConfigMapExpansion
 }
 
@@ -109,11 +109,12 @@ func (c *configMaps) Watch(ctx context.Context, opts metav1.ListOptions) (watch.
 }
 
 // Create takes the representation of a configMap and creates it.  Returns the server's representation of the configMap, and an error, if there is any.
-func (c *configMaps) Create(ctx context.Context, configMap *v1.ConfigMap) (result *v1.ConfigMap, err error) {
+func (c *configMaps) Create(ctx context.Context, configMap *v1.ConfigMap, opts metav1.CreateOptions) (result *v1.ConfigMap, err error) {
 	result = &v1.ConfigMap{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("configmaps").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(configMap).
 		Do(ctx).
 		Into(result)
@@ -121,12 +122,13 @@ func (c *configMaps) Create(ctx context.Context, configMap *v1.ConfigMap) (resul
 }
 
 // Update takes the representation of a configMap and updates it. Returns the server's representation of the configMap, and an error, if there is any.
-func (c *configMaps) Update(ctx context.Context, configMap *v1.ConfigMap) (result *v1.ConfigMap, err error) {
+func (c *configMaps) Update(ctx context.Context, configMap *v1.ConfigMap, opts metav1.UpdateOptions) (result *v1.ConfigMap, err error) {
 	result = &v1.ConfigMap{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("configmaps").
 		Name(configMap.Name).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(configMap).
 		Do(ctx).
 		Into(result)
@@ -161,13 +163,14 @@ func (c *configMaps) DeleteCollection(ctx context.Context, options *metav1.Delet
 }
 
 // Patch applies the patch and returns the patched configMap.
-func (c *configMaps) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.ConfigMap, err error) {
+func (c *configMaps) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ConfigMap, err error) {
 	result = &v1.ConfigMap{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("configmaps").
-		SubResource(subresources...).
 		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

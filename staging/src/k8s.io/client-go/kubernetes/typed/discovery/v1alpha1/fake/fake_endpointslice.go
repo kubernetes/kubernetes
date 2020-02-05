@@ -81,7 +81,7 @@ func (c *FakeEndpointSlices) Watch(ctx context.Context, opts v1.ListOptions) (wa
 }
 
 // Create takes the representation of a endpointSlice and creates it.  Returns the server's representation of the endpointSlice, and an error, if there is any.
-func (c *FakeEndpointSlices) Create(ctx context.Context, endpointSlice *v1alpha1.EndpointSlice) (result *v1alpha1.EndpointSlice, err error) {
+func (c *FakeEndpointSlices) Create(ctx context.Context, endpointSlice *v1alpha1.EndpointSlice, opts v1.CreateOptions) (result *v1alpha1.EndpointSlice, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(endpointslicesResource, c.ns, endpointSlice), &v1alpha1.EndpointSlice{})
 
@@ -92,7 +92,7 @@ func (c *FakeEndpointSlices) Create(ctx context.Context, endpointSlice *v1alpha1
 }
 
 // Update takes the representation of a endpointSlice and updates it. Returns the server's representation of the endpointSlice, and an error, if there is any.
-func (c *FakeEndpointSlices) Update(ctx context.Context, endpointSlice *v1alpha1.EndpointSlice) (result *v1alpha1.EndpointSlice, err error) {
+func (c *FakeEndpointSlices) Update(ctx context.Context, endpointSlice *v1alpha1.EndpointSlice, opts v1.UpdateOptions) (result *v1alpha1.EndpointSlice, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(endpointslicesResource, c.ns, endpointSlice), &v1alpha1.EndpointSlice{})
 
@@ -119,7 +119,7 @@ func (c *FakeEndpointSlices) DeleteCollection(ctx context.Context, options *v1.D
 }
 
 // Patch applies the patch and returns the patched endpointSlice.
-func (c *FakeEndpointSlices) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.EndpointSlice, err error) {
+func (c *FakeEndpointSlices) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.EndpointSlice, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(endpointslicesResource, c.ns, name, pt, data, subresources...), &v1alpha1.EndpointSlice{})
 

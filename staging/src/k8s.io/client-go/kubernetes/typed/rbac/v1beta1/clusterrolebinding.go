@@ -38,14 +38,14 @@ type ClusterRoleBindingsGetter interface {
 
 // ClusterRoleBindingInterface has methods to work with ClusterRoleBinding resources.
 type ClusterRoleBindingInterface interface {
-	Create(context.Context, *v1beta1.ClusterRoleBinding) (*v1beta1.ClusterRoleBinding, error)
-	Update(context.Context, *v1beta1.ClusterRoleBinding) (*v1beta1.ClusterRoleBinding, error)
-	Delete(ctx context.Context, name string, options *v1.DeleteOptions) error
-	DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(ctx context.Context, name string, options v1.GetOptions) (*v1beta1.ClusterRoleBinding, error)
+	Create(ctx context.Context, clusterRoleBinding *v1beta1.ClusterRoleBinding, opts v1.CreateOptions) (*v1beta1.ClusterRoleBinding, error)
+	Update(ctx context.Context, clusterRoleBinding *v1beta1.ClusterRoleBinding, opts v1.UpdateOptions) (*v1beta1.ClusterRoleBinding, error)
+	Delete(ctx context.Context, name string, opts *v1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts *v1.DeleteOptions, listOpts v1.ListOptions) error
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1beta1.ClusterRoleBinding, error)
 	List(ctx context.Context, opts v1.ListOptions) (*v1beta1.ClusterRoleBindingList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.ClusterRoleBinding, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.ClusterRoleBinding, err error)
 	ClusterRoleBindingExpansion
 }
 
@@ -104,10 +104,11 @@ func (c *clusterRoleBindings) Watch(ctx context.Context, opts v1.ListOptions) (w
 }
 
 // Create takes the representation of a clusterRoleBinding and creates it.  Returns the server's representation of the clusterRoleBinding, and an error, if there is any.
-func (c *clusterRoleBindings) Create(ctx context.Context, clusterRoleBinding *v1beta1.ClusterRoleBinding) (result *v1beta1.ClusterRoleBinding, err error) {
+func (c *clusterRoleBindings) Create(ctx context.Context, clusterRoleBinding *v1beta1.ClusterRoleBinding, opts v1.CreateOptions) (result *v1beta1.ClusterRoleBinding, err error) {
 	result = &v1beta1.ClusterRoleBinding{}
 	err = c.client.Post().
 		Resource("clusterrolebindings").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(clusterRoleBinding).
 		Do(ctx).
 		Into(result)
@@ -115,11 +116,12 @@ func (c *clusterRoleBindings) Create(ctx context.Context, clusterRoleBinding *v1
 }
 
 // Update takes the representation of a clusterRoleBinding and updates it. Returns the server's representation of the clusterRoleBinding, and an error, if there is any.
-func (c *clusterRoleBindings) Update(ctx context.Context, clusterRoleBinding *v1beta1.ClusterRoleBinding) (result *v1beta1.ClusterRoleBinding, err error) {
+func (c *clusterRoleBindings) Update(ctx context.Context, clusterRoleBinding *v1beta1.ClusterRoleBinding, opts v1.UpdateOptions) (result *v1beta1.ClusterRoleBinding, err error) {
 	result = &v1beta1.ClusterRoleBinding{}
 	err = c.client.Put().
 		Resource("clusterrolebindings").
 		Name(clusterRoleBinding.Name).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(clusterRoleBinding).
 		Do(ctx).
 		Into(result)
@@ -152,12 +154,13 @@ func (c *clusterRoleBindings) DeleteCollection(ctx context.Context, options *v1.
 }
 
 // Patch applies the patch and returns the patched clusterRoleBinding.
-func (c *clusterRoleBindings) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.ClusterRoleBinding, err error) {
+func (c *clusterRoleBindings) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.ClusterRoleBinding, err error) {
 	result = &v1beta1.ClusterRoleBinding{}
 	err = c.client.Patch(pt).
 		Resource("clusterrolebindings").
-		SubResource(subresources...).
 		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

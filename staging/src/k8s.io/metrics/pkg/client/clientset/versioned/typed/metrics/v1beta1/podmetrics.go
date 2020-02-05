@@ -37,7 +37,7 @@ type PodMetricsesGetter interface {
 
 // PodMetricsInterface has methods to work with PodMetrics resources.
 type PodMetricsInterface interface {
-	Get(ctx context.Context, name string, options v1.GetOptions) (*v1beta1.PodMetrics, error)
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1beta1.PodMetrics, error)
 	List(ctx context.Context, opts v1.ListOptions) (*v1beta1.PodMetricsList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
 	PodMetricsExpansion

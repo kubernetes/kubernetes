@@ -22,6 +22,8 @@ import (
 	"context"
 
 	v1beta1 "k8s.io/api/authorization/v1beta1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	scheme "k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
 )
 
@@ -33,7 +35,7 @@ type SelfSubjectRulesReviewsGetter interface {
 
 // SelfSubjectRulesReviewInterface has methods to work with SelfSubjectRulesReview resources.
 type SelfSubjectRulesReviewInterface interface {
-	Create(context.Context, *v1beta1.SelfSubjectRulesReview) (*v1beta1.SelfSubjectRulesReview, error)
+	Create(ctx context.Context, selfSubjectRulesReview *v1beta1.SelfSubjectRulesReview, opts v1.CreateOptions) (*v1beta1.SelfSubjectRulesReview, error)
 	SelfSubjectRulesReviewExpansion
 }
 
@@ -50,10 +52,11 @@ func newSelfSubjectRulesReviews(c *AuthorizationV1beta1Client) *selfSubjectRules
 }
 
 // Create takes the representation of a selfSubjectRulesReview and creates it.  Returns the server's representation of the selfSubjectRulesReview, and an error, if there is any.
-func (c *selfSubjectRulesReviews) Create(ctx context.Context, selfSubjectRulesReview *v1beta1.SelfSubjectRulesReview) (result *v1beta1.SelfSubjectRulesReview, err error) {
+func (c *selfSubjectRulesReviews) Create(ctx context.Context, selfSubjectRulesReview *v1beta1.SelfSubjectRulesReview, opts v1.CreateOptions) (result *v1beta1.SelfSubjectRulesReview, err error) {
 	result = &v1beta1.SelfSubjectRulesReview{}
 	err = c.client.Post().
 		Resource("selfsubjectrulesreviews").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(selfSubjectRulesReview).
 		Do(ctx).
 		Into(result)

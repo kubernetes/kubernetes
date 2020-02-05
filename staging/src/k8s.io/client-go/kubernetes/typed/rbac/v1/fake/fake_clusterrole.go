@@ -77,7 +77,7 @@ func (c *FakeClusterRoles) Watch(ctx context.Context, opts v1.ListOptions) (watc
 }
 
 // Create takes the representation of a clusterRole and creates it.  Returns the server's representation of the clusterRole, and an error, if there is any.
-func (c *FakeClusterRoles) Create(ctx context.Context, clusterRole *rbacv1.ClusterRole) (result *rbacv1.ClusterRole, err error) {
+func (c *FakeClusterRoles) Create(ctx context.Context, clusterRole *rbacv1.ClusterRole, opts v1.CreateOptions) (result *rbacv1.ClusterRole, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootCreateAction(clusterrolesResource, clusterRole), &rbacv1.ClusterRole{})
 	if obj == nil {
@@ -87,7 +87,7 @@ func (c *FakeClusterRoles) Create(ctx context.Context, clusterRole *rbacv1.Clust
 }
 
 // Update takes the representation of a clusterRole and updates it. Returns the server's representation of the clusterRole, and an error, if there is any.
-func (c *FakeClusterRoles) Update(ctx context.Context, clusterRole *rbacv1.ClusterRole) (result *rbacv1.ClusterRole, err error) {
+func (c *FakeClusterRoles) Update(ctx context.Context, clusterRole *rbacv1.ClusterRole, opts v1.UpdateOptions) (result *rbacv1.ClusterRole, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootUpdateAction(clusterrolesResource, clusterRole), &rbacv1.ClusterRole{})
 	if obj == nil {
@@ -112,7 +112,7 @@ func (c *FakeClusterRoles) DeleteCollection(ctx context.Context, options *v1.Del
 }
 
 // Patch applies the patch and returns the patched clusterRole.
-func (c *FakeClusterRoles) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *rbacv1.ClusterRole, err error) {
+func (c *FakeClusterRoles) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *rbacv1.ClusterRole, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootPatchSubresourceAction(clusterrolesResource, name, pt, data, subresources...), &rbacv1.ClusterRole{})
 	if obj == nil {

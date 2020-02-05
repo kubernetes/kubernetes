@@ -38,17 +38,17 @@ type PodsGetter interface {
 
 // PodInterface has methods to work with Pod resources.
 type PodInterface interface {
-	Create(context.Context, *v1.Pod) (*v1.Pod, error)
-	Update(context.Context, *v1.Pod) (*v1.Pod, error)
-	UpdateStatus(context.Context, *v1.Pod) (*v1.Pod, error)
-	Delete(ctx context.Context, name string, options *metav1.DeleteOptions) error
-	DeleteCollection(ctx context.Context, options *metav1.DeleteOptions, listOptions metav1.ListOptions) error
-	Get(ctx context.Context, name string, options metav1.GetOptions) (*v1.Pod, error)
+	Create(ctx context.Context, pod *v1.Pod, opts metav1.CreateOptions) (*v1.Pod, error)
+	Update(ctx context.Context, pod *v1.Pod, opts metav1.UpdateOptions) (*v1.Pod, error)
+	UpdateStatus(ctx context.Context, pod *v1.Pod, opts metav1.UpdateOptions) (*v1.Pod, error)
+	Delete(ctx context.Context, name string, opts *metav1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.Pod, error)
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.PodList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Pod, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Pod, err error)
 	GetEphemeralContainers(ctx context.Context, podName string, options metav1.GetOptions) (*v1.EphemeralContainers, error)
-	UpdateEphemeralContainers(ctx context.Context, podName string, ephemeralContainers *v1.EphemeralContainers) (*v1.EphemeralContainers, error)
+	UpdateEphemeralContainers(ctx context.Context, podName string, ephemeralContainers *v1.EphemeralContainers, opts metav1.UpdateOptions) (*v1.EphemeralContainers, error)
 
 	PodExpansion
 }
@@ -113,11 +113,12 @@ func (c *pods) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interf
 }
 
 // Create takes the representation of a pod and creates it.  Returns the server's representation of the pod, and an error, if there is any.
-func (c *pods) Create(ctx context.Context, pod *v1.Pod) (result *v1.Pod, err error) {
+func (c *pods) Create(ctx context.Context, pod *v1.Pod, opts metav1.CreateOptions) (result *v1.Pod, err error) {
 	result = &v1.Pod{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("pods").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(pod).
 		Do(ctx).
 		Into(result)
@@ -125,12 +126,13 @@ func (c *pods) Create(ctx context.Context, pod *v1.Pod) (result *v1.Pod, err err
 }
 
 // Update takes the representation of a pod and updates it. Returns the server's representation of the pod, and an error, if there is any.
-func (c *pods) Update(ctx context.Context, pod *v1.Pod) (result *v1.Pod, err error) {
+func (c *pods) Update(ctx context.Context, pod *v1.Pod, opts metav1.UpdateOptions) (result *v1.Pod, err error) {
 	result = &v1.Pod{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("pods").
 		Name(pod.Name).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(pod).
 		Do(ctx).
 		Into(result)
@@ -139,14 +141,14 @@ func (c *pods) Update(ctx context.Context, pod *v1.Pod) (result *v1.Pod, err err
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-
-func (c *pods) UpdateStatus(ctx context.Context, pod *v1.Pod) (result *v1.Pod, err error) {
+func (c *pods) UpdateStatus(ctx context.Context, pod *v1.Pod, opts metav1.UpdateOptions) (result *v1.Pod, err error) {
 	result = &v1.Pod{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("pods").
 		Name(pod.Name).
 		SubResource("status").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(pod).
 		Do(ctx).
 		Into(result)
@@ -181,13 +183,14 @@ func (c *pods) DeleteCollection(ctx context.Context, options *metav1.DeleteOptio
 }
 
 // Patch applies the patch and returns the patched pod.
-func (c *pods) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Pod, err error) {
+func (c *pods) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Pod, err error) {
 	result = &v1.Pod{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("pods").
-		SubResource(subresources...).
 		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)
@@ -209,13 +212,14 @@ func (c *pods) GetEphemeralContainers(ctx context.Context, podName string, optio
 }
 
 // UpdateEphemeralContainers takes the top resource name and the representation of a ephemeralContainers and updates it. Returns the server's representation of the ephemeralContainers, and an error, if there is any.
-func (c *pods) UpdateEphemeralContainers(ctx context.Context, podName string, ephemeralContainers *v1.EphemeralContainers) (result *v1.EphemeralContainers, err error) {
+func (c *pods) UpdateEphemeralContainers(ctx context.Context, podName string, ephemeralContainers *v1.EphemeralContainers, opts metav1.UpdateOptions) (result *v1.EphemeralContainers, err error) {
 	result = &v1.EphemeralContainers{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("pods").
 		Name(podName).
 		SubResource("ephemeralcontainers").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(ephemeralContainers).
 		Do(ctx).
 		Into(result)

@@ -38,14 +38,14 @@ type EndpointSlicesGetter interface {
 
 // EndpointSliceInterface has methods to work with EndpointSlice resources.
 type EndpointSliceInterface interface {
-	Create(context.Context, *v1alpha1.EndpointSlice) (*v1alpha1.EndpointSlice, error)
-	Update(context.Context, *v1alpha1.EndpointSlice) (*v1alpha1.EndpointSlice, error)
-	Delete(ctx context.Context, name string, options *v1.DeleteOptions) error
-	DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(ctx context.Context, name string, options v1.GetOptions) (*v1alpha1.EndpointSlice, error)
+	Create(ctx context.Context, endpointSlice *v1alpha1.EndpointSlice, opts v1.CreateOptions) (*v1alpha1.EndpointSlice, error)
+	Update(ctx context.Context, endpointSlice *v1alpha1.EndpointSlice, opts v1.UpdateOptions) (*v1alpha1.EndpointSlice, error)
+	Delete(ctx context.Context, name string, opts *v1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts *v1.DeleteOptions, listOpts v1.ListOptions) error
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1alpha1.EndpointSlice, error)
 	List(ctx context.Context, opts v1.ListOptions) (*v1alpha1.EndpointSliceList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.EndpointSlice, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.EndpointSlice, err error)
 	EndpointSliceExpansion
 }
 
@@ -109,11 +109,12 @@ func (c *endpointSlices) Watch(ctx context.Context, opts v1.ListOptions) (watch.
 }
 
 // Create takes the representation of a endpointSlice and creates it.  Returns the server's representation of the endpointSlice, and an error, if there is any.
-func (c *endpointSlices) Create(ctx context.Context, endpointSlice *v1alpha1.EndpointSlice) (result *v1alpha1.EndpointSlice, err error) {
+func (c *endpointSlices) Create(ctx context.Context, endpointSlice *v1alpha1.EndpointSlice, opts v1.CreateOptions) (result *v1alpha1.EndpointSlice, err error) {
 	result = &v1alpha1.EndpointSlice{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("endpointslices").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(endpointSlice).
 		Do(ctx).
 		Into(result)
@@ -121,12 +122,13 @@ func (c *endpointSlices) Create(ctx context.Context, endpointSlice *v1alpha1.End
 }
 
 // Update takes the representation of a endpointSlice and updates it. Returns the server's representation of the endpointSlice, and an error, if there is any.
-func (c *endpointSlices) Update(ctx context.Context, endpointSlice *v1alpha1.EndpointSlice) (result *v1alpha1.EndpointSlice, err error) {
+func (c *endpointSlices) Update(ctx context.Context, endpointSlice *v1alpha1.EndpointSlice, opts v1.UpdateOptions) (result *v1alpha1.EndpointSlice, err error) {
 	result = &v1alpha1.EndpointSlice{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("endpointslices").
 		Name(endpointSlice.Name).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(endpointSlice).
 		Do(ctx).
 		Into(result)
@@ -161,13 +163,14 @@ func (c *endpointSlices) DeleteCollection(ctx context.Context, options *v1.Delet
 }
 
 // Patch applies the patch and returns the patched endpointSlice.
-func (c *endpointSlices) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.EndpointSlice, err error) {
+func (c *endpointSlices) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.EndpointSlice, err error) {
 	result = &v1alpha1.EndpointSlice{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("endpointslices").
-		SubResource(subresources...).
 		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

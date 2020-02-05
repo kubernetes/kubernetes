@@ -81,7 +81,7 @@ func (c *FakeServices) Watch(ctx context.Context, opts v1.ListOptions) (watch.In
 }
 
 // Create takes the representation of a service and creates it.  Returns the server's representation of the service, and an error, if there is any.
-func (c *FakeServices) Create(ctx context.Context, service *corev1.Service) (result *corev1.Service, err error) {
+func (c *FakeServices) Create(ctx context.Context, service *corev1.Service, opts v1.CreateOptions) (result *corev1.Service, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(servicesResource, c.ns, service), &corev1.Service{})
 
@@ -92,7 +92,7 @@ func (c *FakeServices) Create(ctx context.Context, service *corev1.Service) (res
 }
 
 // Update takes the representation of a service and updates it. Returns the server's representation of the service, and an error, if there is any.
-func (c *FakeServices) Update(ctx context.Context, service *corev1.Service) (result *corev1.Service, err error) {
+func (c *FakeServices) Update(ctx context.Context, service *corev1.Service, opts v1.UpdateOptions) (result *corev1.Service, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(servicesResource, c.ns, service), &corev1.Service{})
 
@@ -104,7 +104,7 @@ func (c *FakeServices) Update(ctx context.Context, service *corev1.Service) (res
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeServices) UpdateStatus(ctx context.Context, service *corev1.Service) (*corev1.Service, error) {
+func (c *FakeServices) UpdateStatus(ctx context.Context, service *corev1.Service, opts v1.UpdateOptions) (*corev1.Service, error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateSubresourceAction(servicesResource, "status", c.ns, service), &corev1.Service{})
 
@@ -123,7 +123,7 @@ func (c *FakeServices) Delete(ctx context.Context, name string, options *v1.Dele
 }
 
 // Patch applies the patch and returns the patched service.
-func (c *FakeServices) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *corev1.Service, err error) {
+func (c *FakeServices) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *corev1.Service, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(servicesResource, c.ns, name, pt, data, subresources...), &corev1.Service{})
 

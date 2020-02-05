@@ -81,7 +81,7 @@ func (c *FakePods) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interf
 }
 
 // Create takes the representation of a pod and creates it.  Returns the server's representation of the pod, and an error, if there is any.
-func (c *FakePods) Create(ctx context.Context, pod *corev1.Pod) (result *corev1.Pod, err error) {
+func (c *FakePods) Create(ctx context.Context, pod *corev1.Pod, opts v1.CreateOptions) (result *corev1.Pod, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(podsResource, c.ns, pod), &corev1.Pod{})
 
@@ -92,7 +92,7 @@ func (c *FakePods) Create(ctx context.Context, pod *corev1.Pod) (result *corev1.
 }
 
 // Update takes the representation of a pod and updates it. Returns the server's representation of the pod, and an error, if there is any.
-func (c *FakePods) Update(ctx context.Context, pod *corev1.Pod) (result *corev1.Pod, err error) {
+func (c *FakePods) Update(ctx context.Context, pod *corev1.Pod, opts v1.UpdateOptions) (result *corev1.Pod, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(podsResource, c.ns, pod), &corev1.Pod{})
 
@@ -104,7 +104,7 @@ func (c *FakePods) Update(ctx context.Context, pod *corev1.Pod) (result *corev1.
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakePods) UpdateStatus(ctx context.Context, pod *corev1.Pod) (*corev1.Pod, error) {
+func (c *FakePods) UpdateStatus(ctx context.Context, pod *corev1.Pod, opts v1.UpdateOptions) (*corev1.Pod, error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateSubresourceAction(podsResource, "status", c.ns, pod), &corev1.Pod{})
 
@@ -131,7 +131,7 @@ func (c *FakePods) DeleteCollection(ctx context.Context, options *v1.DeleteOptio
 }
 
 // Patch applies the patch and returns the patched pod.
-func (c *FakePods) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *corev1.Pod, err error) {
+func (c *FakePods) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *corev1.Pod, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(podsResource, c.ns, name, pt, data, subresources...), &corev1.Pod{})
 
@@ -153,7 +153,7 @@ func (c *FakePods) GetEphemeralContainers(ctx context.Context, podName string, o
 }
 
 // UpdateEphemeralContainers takes the representation of a ephemeralContainers and updates it. Returns the server's representation of the ephemeralContainers, and an error, if there is any.
-func (c *FakePods) UpdateEphemeralContainers(ctx context.Context, podName string, ephemeralContainers *corev1.EphemeralContainers) (result *corev1.EphemeralContainers, err error) {
+func (c *FakePods) UpdateEphemeralContainers(ctx context.Context, podName string, ephemeralContainers *corev1.EphemeralContainers, opts v1.UpdateOptions) (result *corev1.EphemeralContainers, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateSubresourceAction(podsResource, "ephemeralcontainers", c.ns, ephemeralContainers), &corev1.EphemeralContainers{})
 

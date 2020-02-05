@@ -77,7 +77,7 @@ func (c *FakeNodes) Watch(ctx context.Context, opts v1.ListOptions) (watch.Inter
 }
 
 // Create takes the representation of a node and creates it.  Returns the server's representation of the node, and an error, if there is any.
-func (c *FakeNodes) Create(ctx context.Context, node *corev1.Node) (result *corev1.Node, err error) {
+func (c *FakeNodes) Create(ctx context.Context, node *corev1.Node, opts v1.CreateOptions) (result *corev1.Node, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootCreateAction(nodesResource, node), &corev1.Node{})
 	if obj == nil {
@@ -87,7 +87,7 @@ func (c *FakeNodes) Create(ctx context.Context, node *corev1.Node) (result *core
 }
 
 // Update takes the representation of a node and updates it. Returns the server's representation of the node, and an error, if there is any.
-func (c *FakeNodes) Update(ctx context.Context, node *corev1.Node) (result *corev1.Node, err error) {
+func (c *FakeNodes) Update(ctx context.Context, node *corev1.Node, opts v1.UpdateOptions) (result *corev1.Node, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootUpdateAction(nodesResource, node), &corev1.Node{})
 	if obj == nil {
@@ -98,7 +98,7 @@ func (c *FakeNodes) Update(ctx context.Context, node *corev1.Node) (result *core
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeNodes) UpdateStatus(ctx context.Context, node *corev1.Node) (*corev1.Node, error) {
+func (c *FakeNodes) UpdateStatus(ctx context.Context, node *corev1.Node, opts v1.UpdateOptions) (*corev1.Node, error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootUpdateSubresourceAction(nodesResource, "status", node), &corev1.Node{})
 	if obj == nil {
@@ -123,7 +123,7 @@ func (c *FakeNodes) DeleteCollection(ctx context.Context, options *v1.DeleteOpti
 }
 
 // Patch applies the patch and returns the patched node.
-func (c *FakeNodes) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *corev1.Node, err error) {
+func (c *FakeNodes) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *corev1.Node, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootPatchSubresourceAction(nodesResource, name, pt, data, subresources...), &corev1.Node{})
 	if obj == nil {

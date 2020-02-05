@@ -77,7 +77,7 @@ func (c *FakeNamespaces) Watch(ctx context.Context, opts v1.ListOptions) (watch.
 }
 
 // Create takes the representation of a namespace and creates it.  Returns the server's representation of the namespace, and an error, if there is any.
-func (c *FakeNamespaces) Create(ctx context.Context, namespace *corev1.Namespace) (result *corev1.Namespace, err error) {
+func (c *FakeNamespaces) Create(ctx context.Context, namespace *corev1.Namespace, opts v1.CreateOptions) (result *corev1.Namespace, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootCreateAction(namespacesResource, namespace), &corev1.Namespace{})
 	if obj == nil {
@@ -87,7 +87,7 @@ func (c *FakeNamespaces) Create(ctx context.Context, namespace *corev1.Namespace
 }
 
 // Update takes the representation of a namespace and updates it. Returns the server's representation of the namespace, and an error, if there is any.
-func (c *FakeNamespaces) Update(ctx context.Context, namespace *corev1.Namespace) (result *corev1.Namespace, err error) {
+func (c *FakeNamespaces) Update(ctx context.Context, namespace *corev1.Namespace, opts v1.UpdateOptions) (result *corev1.Namespace, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootUpdateAction(namespacesResource, namespace), &corev1.Namespace{})
 	if obj == nil {
@@ -98,7 +98,7 @@ func (c *FakeNamespaces) Update(ctx context.Context, namespace *corev1.Namespace
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeNamespaces) UpdateStatus(ctx context.Context, namespace *corev1.Namespace) (*corev1.Namespace, error) {
+func (c *FakeNamespaces) UpdateStatus(ctx context.Context, namespace *corev1.Namespace, opts v1.UpdateOptions) (*corev1.Namespace, error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootUpdateSubresourceAction(namespacesResource, "status", namespace), &corev1.Namespace{})
 	if obj == nil {
@@ -115,7 +115,7 @@ func (c *FakeNamespaces) Delete(ctx context.Context, name string, options *v1.De
 }
 
 // Patch applies the patch and returns the patched namespace.
-func (c *FakeNamespaces) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *corev1.Namespace, err error) {
+func (c *FakeNamespaces) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *corev1.Namespace, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootPatchSubresourceAction(namespacesResource, name, pt, data, subresources...), &corev1.Namespace{})
 	if obj == nil {

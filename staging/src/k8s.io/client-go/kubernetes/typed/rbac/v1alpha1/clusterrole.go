@@ -38,14 +38,14 @@ type ClusterRolesGetter interface {
 
 // ClusterRoleInterface has methods to work with ClusterRole resources.
 type ClusterRoleInterface interface {
-	Create(context.Context, *v1alpha1.ClusterRole) (*v1alpha1.ClusterRole, error)
-	Update(context.Context, *v1alpha1.ClusterRole) (*v1alpha1.ClusterRole, error)
-	Delete(ctx context.Context, name string, options *v1.DeleteOptions) error
-	DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(ctx context.Context, name string, options v1.GetOptions) (*v1alpha1.ClusterRole, error)
+	Create(ctx context.Context, clusterRole *v1alpha1.ClusterRole, opts v1.CreateOptions) (*v1alpha1.ClusterRole, error)
+	Update(ctx context.Context, clusterRole *v1alpha1.ClusterRole, opts v1.UpdateOptions) (*v1alpha1.ClusterRole, error)
+	Delete(ctx context.Context, name string, opts *v1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts *v1.DeleteOptions, listOpts v1.ListOptions) error
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1alpha1.ClusterRole, error)
 	List(ctx context.Context, opts v1.ListOptions) (*v1alpha1.ClusterRoleList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.ClusterRole, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.ClusterRole, err error)
 	ClusterRoleExpansion
 }
 
@@ -104,10 +104,11 @@ func (c *clusterRoles) Watch(ctx context.Context, opts v1.ListOptions) (watch.In
 }
 
 // Create takes the representation of a clusterRole and creates it.  Returns the server's representation of the clusterRole, and an error, if there is any.
-func (c *clusterRoles) Create(ctx context.Context, clusterRole *v1alpha1.ClusterRole) (result *v1alpha1.ClusterRole, err error) {
+func (c *clusterRoles) Create(ctx context.Context, clusterRole *v1alpha1.ClusterRole, opts v1.CreateOptions) (result *v1alpha1.ClusterRole, err error) {
 	result = &v1alpha1.ClusterRole{}
 	err = c.client.Post().
 		Resource("clusterroles").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(clusterRole).
 		Do(ctx).
 		Into(result)
@@ -115,11 +116,12 @@ func (c *clusterRoles) Create(ctx context.Context, clusterRole *v1alpha1.Cluster
 }
 
 // Update takes the representation of a clusterRole and updates it. Returns the server's representation of the clusterRole, and an error, if there is any.
-func (c *clusterRoles) Update(ctx context.Context, clusterRole *v1alpha1.ClusterRole) (result *v1alpha1.ClusterRole, err error) {
+func (c *clusterRoles) Update(ctx context.Context, clusterRole *v1alpha1.ClusterRole, opts v1.UpdateOptions) (result *v1alpha1.ClusterRole, err error) {
 	result = &v1alpha1.ClusterRole{}
 	err = c.client.Put().
 		Resource("clusterroles").
 		Name(clusterRole.Name).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(clusterRole).
 		Do(ctx).
 		Into(result)
@@ -152,12 +154,13 @@ func (c *clusterRoles) DeleteCollection(ctx context.Context, options *v1.DeleteO
 }
 
 // Patch applies the patch and returns the patched clusterRole.
-func (c *clusterRoles) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.ClusterRole, err error) {
+func (c *clusterRoles) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.ClusterRole, err error) {
 	result = &v1alpha1.ClusterRole{}
 	err = c.client.Patch(pt).
 		Resource("clusterroles").
-		SubResource(subresources...).
 		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

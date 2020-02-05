@@ -81,7 +81,7 @@ func (c *FakeRoleBindings) Watch(ctx context.Context, opts v1.ListOptions) (watc
 }
 
 // Create takes the representation of a roleBinding and creates it.  Returns the server's representation of the roleBinding, and an error, if there is any.
-func (c *FakeRoleBindings) Create(ctx context.Context, roleBinding *v1beta1.RoleBinding) (result *v1beta1.RoleBinding, err error) {
+func (c *FakeRoleBindings) Create(ctx context.Context, roleBinding *v1beta1.RoleBinding, opts v1.CreateOptions) (result *v1beta1.RoleBinding, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(rolebindingsResource, c.ns, roleBinding), &v1beta1.RoleBinding{})
 
@@ -92,7 +92,7 @@ func (c *FakeRoleBindings) Create(ctx context.Context, roleBinding *v1beta1.Role
 }
 
 // Update takes the representation of a roleBinding and updates it. Returns the server's representation of the roleBinding, and an error, if there is any.
-func (c *FakeRoleBindings) Update(ctx context.Context, roleBinding *v1beta1.RoleBinding) (result *v1beta1.RoleBinding, err error) {
+func (c *FakeRoleBindings) Update(ctx context.Context, roleBinding *v1beta1.RoleBinding, opts v1.UpdateOptions) (result *v1beta1.RoleBinding, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(rolebindingsResource, c.ns, roleBinding), &v1beta1.RoleBinding{})
 
@@ -119,7 +119,7 @@ func (c *FakeRoleBindings) DeleteCollection(ctx context.Context, options *v1.Del
 }
 
 // Patch applies the patch and returns the patched roleBinding.
-func (c *FakeRoleBindings) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.RoleBinding, err error) {
+func (c *FakeRoleBindings) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.RoleBinding, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(rolebindingsResource, c.ns, name, pt, data, subresources...), &v1beta1.RoleBinding{})
 

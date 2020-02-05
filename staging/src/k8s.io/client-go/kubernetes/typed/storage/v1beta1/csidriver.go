@@ -38,14 +38,14 @@ type CSIDriversGetter interface {
 
 // CSIDriverInterface has methods to work with CSIDriver resources.
 type CSIDriverInterface interface {
-	Create(context.Context, *v1beta1.CSIDriver) (*v1beta1.CSIDriver, error)
-	Update(context.Context, *v1beta1.CSIDriver) (*v1beta1.CSIDriver, error)
-	Delete(ctx context.Context, name string, options *v1.DeleteOptions) error
-	DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(ctx context.Context, name string, options v1.GetOptions) (*v1beta1.CSIDriver, error)
+	Create(ctx context.Context, cSIDriver *v1beta1.CSIDriver, opts v1.CreateOptions) (*v1beta1.CSIDriver, error)
+	Update(ctx context.Context, cSIDriver *v1beta1.CSIDriver, opts v1.UpdateOptions) (*v1beta1.CSIDriver, error)
+	Delete(ctx context.Context, name string, opts *v1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts *v1.DeleteOptions, listOpts v1.ListOptions) error
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1beta1.CSIDriver, error)
 	List(ctx context.Context, opts v1.ListOptions) (*v1beta1.CSIDriverList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.CSIDriver, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.CSIDriver, err error)
 	CSIDriverExpansion
 }
 
@@ -104,10 +104,11 @@ func (c *cSIDrivers) Watch(ctx context.Context, opts v1.ListOptions) (watch.Inte
 }
 
 // Create takes the representation of a cSIDriver and creates it.  Returns the server's representation of the cSIDriver, and an error, if there is any.
-func (c *cSIDrivers) Create(ctx context.Context, cSIDriver *v1beta1.CSIDriver) (result *v1beta1.CSIDriver, err error) {
+func (c *cSIDrivers) Create(ctx context.Context, cSIDriver *v1beta1.CSIDriver, opts v1.CreateOptions) (result *v1beta1.CSIDriver, err error) {
 	result = &v1beta1.CSIDriver{}
 	err = c.client.Post().
 		Resource("csidrivers").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(cSIDriver).
 		Do(ctx).
 		Into(result)
@@ -115,11 +116,12 @@ func (c *cSIDrivers) Create(ctx context.Context, cSIDriver *v1beta1.CSIDriver) (
 }
 
 // Update takes the representation of a cSIDriver and updates it. Returns the server's representation of the cSIDriver, and an error, if there is any.
-func (c *cSIDrivers) Update(ctx context.Context, cSIDriver *v1beta1.CSIDriver) (result *v1beta1.CSIDriver, err error) {
+func (c *cSIDrivers) Update(ctx context.Context, cSIDriver *v1beta1.CSIDriver, opts v1.UpdateOptions) (result *v1beta1.CSIDriver, err error) {
 	result = &v1beta1.CSIDriver{}
 	err = c.client.Put().
 		Resource("csidrivers").
 		Name(cSIDriver.Name).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(cSIDriver).
 		Do(ctx).
 		Into(result)
@@ -152,12 +154,13 @@ func (c *cSIDrivers) DeleteCollection(ctx context.Context, options *v1.DeleteOpt
 }
 
 // Patch applies the patch and returns the patched cSIDriver.
-func (c *cSIDrivers) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.CSIDriver, err error) {
+func (c *cSIDrivers) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.CSIDriver, err error) {
 	result = &v1beta1.CSIDriver{}
 	err = c.client.Patch(pt).
 		Resource("csidrivers").
-		SubResource(subresources...).
 		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

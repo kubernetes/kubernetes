@@ -77,7 +77,7 @@ func (c *FakeRuntimeClasses) Watch(ctx context.Context, opts v1.ListOptions) (wa
 }
 
 // Create takes the representation of a runtimeClass and creates it.  Returns the server's representation of the runtimeClass, and an error, if there is any.
-func (c *FakeRuntimeClasses) Create(ctx context.Context, runtimeClass *v1alpha1.RuntimeClass) (result *v1alpha1.RuntimeClass, err error) {
+func (c *FakeRuntimeClasses) Create(ctx context.Context, runtimeClass *v1alpha1.RuntimeClass, opts v1.CreateOptions) (result *v1alpha1.RuntimeClass, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootCreateAction(runtimeclassesResource, runtimeClass), &v1alpha1.RuntimeClass{})
 	if obj == nil {
@@ -87,7 +87,7 @@ func (c *FakeRuntimeClasses) Create(ctx context.Context, runtimeClass *v1alpha1.
 }
 
 // Update takes the representation of a runtimeClass and updates it. Returns the server's representation of the runtimeClass, and an error, if there is any.
-func (c *FakeRuntimeClasses) Update(ctx context.Context, runtimeClass *v1alpha1.RuntimeClass) (result *v1alpha1.RuntimeClass, err error) {
+func (c *FakeRuntimeClasses) Update(ctx context.Context, runtimeClass *v1alpha1.RuntimeClass, opts v1.UpdateOptions) (result *v1alpha1.RuntimeClass, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootUpdateAction(runtimeclassesResource, runtimeClass), &v1alpha1.RuntimeClass{})
 	if obj == nil {
@@ -112,7 +112,7 @@ func (c *FakeRuntimeClasses) DeleteCollection(ctx context.Context, options *v1.D
 }
 
 // Patch applies the patch and returns the patched runtimeClass.
-func (c *FakeRuntimeClasses) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.RuntimeClass, err error) {
+func (c *FakeRuntimeClasses) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.RuntimeClass, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootPatchSubresourceAction(runtimeclassesResource, name, pt, data, subresources...), &v1alpha1.RuntimeClass{})
 	if obj == nil {

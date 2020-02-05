@@ -82,7 +82,7 @@ func (c *FakeDeployments) Watch(ctx context.Context, opts v1.ListOptions) (watch
 }
 
 // Create takes the representation of a deployment and creates it.  Returns the server's representation of the deployment, and an error, if there is any.
-func (c *FakeDeployments) Create(ctx context.Context, deployment *appsv1.Deployment) (result *appsv1.Deployment, err error) {
+func (c *FakeDeployments) Create(ctx context.Context, deployment *appsv1.Deployment, opts v1.CreateOptions) (result *appsv1.Deployment, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(deploymentsResource, c.ns, deployment), &appsv1.Deployment{})
 
@@ -93,7 +93,7 @@ func (c *FakeDeployments) Create(ctx context.Context, deployment *appsv1.Deploym
 }
 
 // Update takes the representation of a deployment and updates it. Returns the server's representation of the deployment, and an error, if there is any.
-func (c *FakeDeployments) Update(ctx context.Context, deployment *appsv1.Deployment) (result *appsv1.Deployment, err error) {
+func (c *FakeDeployments) Update(ctx context.Context, deployment *appsv1.Deployment, opts v1.UpdateOptions) (result *appsv1.Deployment, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(deploymentsResource, c.ns, deployment), &appsv1.Deployment{})
 
@@ -105,7 +105,7 @@ func (c *FakeDeployments) Update(ctx context.Context, deployment *appsv1.Deploym
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeDeployments) UpdateStatus(ctx context.Context, deployment *appsv1.Deployment) (*appsv1.Deployment, error) {
+func (c *FakeDeployments) UpdateStatus(ctx context.Context, deployment *appsv1.Deployment, opts v1.UpdateOptions) (*appsv1.Deployment, error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateSubresourceAction(deploymentsResource, "status", c.ns, deployment), &appsv1.Deployment{})
 
@@ -132,7 +132,7 @@ func (c *FakeDeployments) DeleteCollection(ctx context.Context, options *v1.Dele
 }
 
 // Patch applies the patch and returns the patched deployment.
-func (c *FakeDeployments) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *appsv1.Deployment, err error) {
+func (c *FakeDeployments) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *appsv1.Deployment, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(deploymentsResource, c.ns, name, pt, data, subresources...), &appsv1.Deployment{})
 
@@ -154,7 +154,7 @@ func (c *FakeDeployments) GetScale(ctx context.Context, deploymentName string, o
 }
 
 // UpdateScale takes the representation of a scale and updates it. Returns the server's representation of the scale, and an error, if there is any.
-func (c *FakeDeployments) UpdateScale(ctx context.Context, deploymentName string, scale *autoscalingv1.Scale) (result *autoscalingv1.Scale, err error) {
+func (c *FakeDeployments) UpdateScale(ctx context.Context, deploymentName string, scale *autoscalingv1.Scale, opts v1.UpdateOptions) (result *autoscalingv1.Scale, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateSubresourceAction(deploymentsResource, "scale", c.ns, scale), &autoscalingv1.Scale{})
 

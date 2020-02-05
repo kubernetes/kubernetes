@@ -38,14 +38,14 @@ type RoleBindingsGetter interface {
 
 // RoleBindingInterface has methods to work with RoleBinding resources.
 type RoleBindingInterface interface {
-	Create(context.Context, *v1.RoleBinding) (*v1.RoleBinding, error)
-	Update(context.Context, *v1.RoleBinding) (*v1.RoleBinding, error)
-	Delete(ctx context.Context, name string, options *metav1.DeleteOptions) error
-	DeleteCollection(ctx context.Context, options *metav1.DeleteOptions, listOptions metav1.ListOptions) error
-	Get(ctx context.Context, name string, options metav1.GetOptions) (*v1.RoleBinding, error)
+	Create(ctx context.Context, roleBinding *v1.RoleBinding, opts metav1.CreateOptions) (*v1.RoleBinding, error)
+	Update(ctx context.Context, roleBinding *v1.RoleBinding, opts metav1.UpdateOptions) (*v1.RoleBinding, error)
+	Delete(ctx context.Context, name string, opts *metav1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.RoleBinding, error)
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.RoleBindingList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.RoleBinding, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.RoleBinding, err error)
 	RoleBindingExpansion
 }
 
@@ -109,11 +109,12 @@ func (c *roleBindings) Watch(ctx context.Context, opts metav1.ListOptions) (watc
 }
 
 // Create takes the representation of a roleBinding and creates it.  Returns the server's representation of the roleBinding, and an error, if there is any.
-func (c *roleBindings) Create(ctx context.Context, roleBinding *v1.RoleBinding) (result *v1.RoleBinding, err error) {
+func (c *roleBindings) Create(ctx context.Context, roleBinding *v1.RoleBinding, opts metav1.CreateOptions) (result *v1.RoleBinding, err error) {
 	result = &v1.RoleBinding{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("rolebindings").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(roleBinding).
 		Do(ctx).
 		Into(result)
@@ -121,12 +122,13 @@ func (c *roleBindings) Create(ctx context.Context, roleBinding *v1.RoleBinding) 
 }
 
 // Update takes the representation of a roleBinding and updates it. Returns the server's representation of the roleBinding, and an error, if there is any.
-func (c *roleBindings) Update(ctx context.Context, roleBinding *v1.RoleBinding) (result *v1.RoleBinding, err error) {
+func (c *roleBindings) Update(ctx context.Context, roleBinding *v1.RoleBinding, opts metav1.UpdateOptions) (result *v1.RoleBinding, err error) {
 	result = &v1.RoleBinding{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("rolebindings").
 		Name(roleBinding.Name).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(roleBinding).
 		Do(ctx).
 		Into(result)
@@ -161,13 +163,14 @@ func (c *roleBindings) DeleteCollection(ctx context.Context, options *metav1.Del
 }
 
 // Patch applies the patch and returns the patched roleBinding.
-func (c *roleBindings) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.RoleBinding, err error) {
+func (c *roleBindings) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.RoleBinding, err error) {
 	result = &v1.RoleBinding{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("rolebindings").
-		SubResource(subresources...).
 		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

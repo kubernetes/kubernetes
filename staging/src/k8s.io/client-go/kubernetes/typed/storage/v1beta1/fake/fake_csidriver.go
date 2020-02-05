@@ -77,7 +77,7 @@ func (c *FakeCSIDrivers) Watch(ctx context.Context, opts v1.ListOptions) (watch.
 }
 
 // Create takes the representation of a cSIDriver and creates it.  Returns the server's representation of the cSIDriver, and an error, if there is any.
-func (c *FakeCSIDrivers) Create(ctx context.Context, cSIDriver *v1beta1.CSIDriver) (result *v1beta1.CSIDriver, err error) {
+func (c *FakeCSIDrivers) Create(ctx context.Context, cSIDriver *v1beta1.CSIDriver, opts v1.CreateOptions) (result *v1beta1.CSIDriver, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootCreateAction(csidriversResource, cSIDriver), &v1beta1.CSIDriver{})
 	if obj == nil {
@@ -87,7 +87,7 @@ func (c *FakeCSIDrivers) Create(ctx context.Context, cSIDriver *v1beta1.CSIDrive
 }
 
 // Update takes the representation of a cSIDriver and updates it. Returns the server's representation of the cSIDriver, and an error, if there is any.
-func (c *FakeCSIDrivers) Update(ctx context.Context, cSIDriver *v1beta1.CSIDriver) (result *v1beta1.CSIDriver, err error) {
+func (c *FakeCSIDrivers) Update(ctx context.Context, cSIDriver *v1beta1.CSIDriver, opts v1.UpdateOptions) (result *v1beta1.CSIDriver, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootUpdateAction(csidriversResource, cSIDriver), &v1beta1.CSIDriver{})
 	if obj == nil {
@@ -112,7 +112,7 @@ func (c *FakeCSIDrivers) DeleteCollection(ctx context.Context, options *v1.Delet
 }
 
 // Patch applies the patch and returns the patched cSIDriver.
-func (c *FakeCSIDrivers) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.CSIDriver, err error) {
+func (c *FakeCSIDrivers) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.CSIDriver, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootPatchSubresourceAction(csidriversResource, name, pt, data, subresources...), &v1beta1.CSIDriver{})
 	if obj == nil {

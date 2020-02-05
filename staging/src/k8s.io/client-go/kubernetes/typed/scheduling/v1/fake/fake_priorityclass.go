@@ -77,7 +77,7 @@ func (c *FakePriorityClasses) Watch(ctx context.Context, opts v1.ListOptions) (w
 }
 
 // Create takes the representation of a priorityClass and creates it.  Returns the server's representation of the priorityClass, and an error, if there is any.
-func (c *FakePriorityClasses) Create(ctx context.Context, priorityClass *schedulingv1.PriorityClass) (result *schedulingv1.PriorityClass, err error) {
+func (c *FakePriorityClasses) Create(ctx context.Context, priorityClass *schedulingv1.PriorityClass, opts v1.CreateOptions) (result *schedulingv1.PriorityClass, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootCreateAction(priorityclassesResource, priorityClass), &schedulingv1.PriorityClass{})
 	if obj == nil {
@@ -87,7 +87,7 @@ func (c *FakePriorityClasses) Create(ctx context.Context, priorityClass *schedul
 }
 
 // Update takes the representation of a priorityClass and updates it. Returns the server's representation of the priorityClass, and an error, if there is any.
-func (c *FakePriorityClasses) Update(ctx context.Context, priorityClass *schedulingv1.PriorityClass) (result *schedulingv1.PriorityClass, err error) {
+func (c *FakePriorityClasses) Update(ctx context.Context, priorityClass *schedulingv1.PriorityClass, opts v1.UpdateOptions) (result *schedulingv1.PriorityClass, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootUpdateAction(priorityclassesResource, priorityClass), &schedulingv1.PriorityClass{})
 	if obj == nil {
@@ -112,7 +112,7 @@ func (c *FakePriorityClasses) DeleteCollection(ctx context.Context, options *v1.
 }
 
 // Patch applies the patch and returns the patched priorityClass.
-func (c *FakePriorityClasses) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *schedulingv1.PriorityClass, err error) {
+func (c *FakePriorityClasses) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *schedulingv1.PriorityClass, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootPatchSubresourceAction(priorityclassesResource, name, pt, data, subresources...), &schedulingv1.PriorityClass{})
 	if obj == nil {
