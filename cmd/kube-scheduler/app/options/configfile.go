@@ -41,9 +41,8 @@ func loadConfigFromFile(file string) (*kubeschedulerconfig.KubeSchedulerConfigur
 }
 
 func loadConfig(data []byte) (*kubeschedulerconfig.KubeSchedulerConfiguration, error) {
-	configObj := &kubeschedulerconfig.KubeSchedulerConfiguration{}
 	// The UniversalDecoder runs defaulting and returns the internal type by default.
-	err := runtime.DecodeInto(kubeschedulerscheme.Codecs.UniversalDecoder(), data, configObj)
+	obj, gvk, err := kubeschedulerscheme.Codecs.UniversalDecoder().Decode(data, nil, nil)
 	if err != nil {
 		// Try strict decoding first. If that fails decode with a lenient
 		// decoder, which has only v1alpha1 registered, and log a warning.
@@ -56,18 +55,20 @@ func loadConfig(data []byte) (*kubeschedulerconfig.KubeSchedulerConfiguration, e
 		_, lenientCodecs, lenientErr := codec.NewLenientSchemeAndCodecs(
 			kubeschedulerconfig.AddToScheme,
 			kubeschedulerconfigv1alpha1.AddToScheme,
-			kubeschedulerconfigv1alpha2.AddToScheme,
 		)
 		if lenientErr != nil {
 			return nil, lenientErr
 		}
-		if lenientErr = runtime.DecodeInto(lenientCodecs.UniversalDecoder(), data, configObj); lenientErr != nil {
-			return nil, fmt.Errorf("failed lenient decoding: %v", err)
+		obj, gvk, lenientErr = lenientCodecs.UniversalDecoder().Decode(data, nil, nil)
+		if lenientErr != nil {
+			return nil, err
 		}
 		klog.Warningf("using lenient decoding as strict decoding failed: %v", err)
 	}
-
-	return configObj, nil
+	if cfgObj, ok := obj.(*kubeschedulerconfig.KubeSchedulerConfiguration); ok {
+		return cfgObj, nil
+	}
+	return nil, fmt.Errorf("couldn't decode as KubeSchedulerConfiguration, got %s: ", gvk)
 }
 
 // WriteConfigFile writes the config into the given file name as YAML.
