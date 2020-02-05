@@ -19,6 +19,7 @@ limitations under the License.
 package fake
 
 import (
+	authenticationv1 "k8s.io/api/authentication/v1"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
@@ -125,4 +126,15 @@ func (c *FakeServiceAccounts) Patch(name string, pt types.PatchType, data []byte
 		return nil, err
 	}
 	return obj.(*corev1.ServiceAccount), err
+}
+
+// CreateToken takes the representation of a tokenRequest and creates it.  Returns the server's representation of the tokenRequest, and an error, if there is any.
+func (c *FakeServiceAccounts) CreateToken(serviceAccountName string, tokenRequest *authenticationv1.TokenRequest) (result *authenticationv1.TokenRequest, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewCreateSubresourceAction(serviceaccountsResource, serviceAccountName, "token", c.ns, tokenRequest), &authenticationv1.TokenRequest{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*authenticationv1.TokenRequest), err
 }

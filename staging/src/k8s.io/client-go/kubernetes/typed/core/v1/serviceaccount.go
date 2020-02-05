@@ -22,6 +22,7 @@ import (
 	"context"
 	"time"
 
+	authenticationv1 "k8s.io/api/authentication/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -46,6 +47,8 @@ type ServiceAccountInterface interface {
 	List(opts metav1.ListOptions) (*v1.ServiceAccountList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.ServiceAccount, err error)
+	CreateToken(serviceAccountName string, tokenRequest *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error)
+
 	ServiceAccountExpansion
 }
 
@@ -169,6 +172,20 @@ func (c *serviceAccounts) Patch(name string, pt types.PatchType, data []byte, su
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
+		Do(context.TODO()).
+		Into(result)
+	return
+}
+
+// CreateToken takes the representation of a tokenRequest and creates it.  Returns the server's representation of the tokenRequest, and an error, if there is any.
+func (c *serviceAccounts) CreateToken(serviceAccountName string, tokenRequest *authenticationv1.TokenRequest) (result *authenticationv1.TokenRequest, err error) {
+	result = &authenticationv1.TokenRequest{}
+	err = c.client.Post().
+		Namespace(c.ns).
+		Resource("serviceaccounts").
+		Name(serviceAccountName).
+		SubResource("token").
+		Body(tokenRequest).
 		Do(context.TODO()).
 		Into(result)
 	return

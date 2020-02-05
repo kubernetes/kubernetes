@@ -19,6 +19,9 @@ limitations under the License.
 package v1beta1
 
 import (
+	"context"
+
+	v1beta1 "k8s.io/api/authorization/v1beta1"
 	rest "k8s.io/client-go/rest"
 )
 
@@ -30,6 +33,7 @@ type LocalSubjectAccessReviewsGetter interface {
 
 // LocalSubjectAccessReviewInterface has methods to work with LocalSubjectAccessReview resources.
 type LocalSubjectAccessReviewInterface interface {
+	Create(*v1beta1.LocalSubjectAccessReview) (*v1beta1.LocalSubjectAccessReview, error)
 	LocalSubjectAccessReviewExpansion
 }
 
@@ -45,4 +49,16 @@ func newLocalSubjectAccessReviews(c *AuthorizationV1beta1Client, namespace strin
 		client: c.RESTClient(),
 		ns:     namespace,
 	}
+}
+
+// Create takes the representation of a localSubjectAccessReview and creates it.  Returns the server's representation of the localSubjectAccessReview, and an error, if there is any.
+func (c *localSubjectAccessReviews) Create(localSubjectAccessReview *v1beta1.LocalSubjectAccessReview) (result *v1beta1.LocalSubjectAccessReview, err error) {
+	result = &v1beta1.LocalSubjectAccessReview{}
+	err = c.client.Post().
+		Namespace(c.ns).
+		Resource("localsubjectaccessreviews").
+		Body(localSubjectAccessReview).
+		Do(context.TODO()).
+		Into(result)
+	return
 }
