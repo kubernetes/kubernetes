@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "endpointset.go",
         "endpointslice_controller.go",
+        "endpointslice_tracker.go",
         "reconciler.go",
         "utils.go",
     ],
@@ -49,6 +50,7 @@ go_test(
     name = "go_default_test",
     srcs = [
         "endpointslice_controller_test.go",
+        "endpointslice_tracker_test.go",
         "reconciler_test.go",
         "utils_test.go",
     ],
