@@ -111,7 +111,7 @@ func (m *FakeLegacyHandler) Nodes() v1core.NodeInterface {
 }
 
 // Create adds a new Node to the fake store.
-func (m *FakeNodeHandler) Create(_ context.Context, node *v1.Node) (*v1.Node, error) {
+func (m *FakeNodeHandler) Create(_ context.Context, node *v1.Node, _ metav1.CreateOptions) (*v1.Node, error) {
 	m.lock.Lock()
 	defer func() {
 		m.RequestCount++
@@ -202,7 +202,7 @@ func (m *FakeNodeHandler) DeleteCollection(_ context.Context, opt *metav1.Delete
 }
 
 // Update updates a Node in the fake store.
-func (m *FakeNodeHandler) Update(_ context.Context, node *v1.Node) (*v1.Node, error) {
+func (m *FakeNodeHandler) Update(_ context.Context, node *v1.Node, _ metav1.UpdateOptions) (*v1.Node, error) {
 	m.lock.Lock()
 	defer func() {
 		m.RequestCount++
@@ -221,7 +221,7 @@ func (m *FakeNodeHandler) Update(_ context.Context, node *v1.Node) (*v1.Node, er
 }
 
 // UpdateStatus updates a status of a Node in the fake store.
-func (m *FakeNodeHandler) UpdateStatus(_ context.Context, node *v1.Node) (*v1.Node, error) {
+func (m *FakeNodeHandler) UpdateStatus(_ context.Context, node *v1.Node, _ metav1.UpdateOptions) (*v1.Node, error) {
 	m.lock.Lock()
 	defer func() {
 		m.RequestCount++
@@ -266,7 +266,7 @@ func (m *FakeNodeHandler) UpdateStatus(_ context.Context, node *v1.Node) (*v1.No
 // PatchStatus patches a status of a Node in the fake store.
 func (m *FakeNodeHandler) PatchStatus(ctx context.Context, nodeName string, data []byte) (*v1.Node, error) {
 	m.RequestCount++
-	return m.Patch(ctx, nodeName, types.StrategicMergePatchType, data, "status")
+	return m.Patch(ctx, nodeName, types.StrategicMergePatchType, data, metav1.PatchOptions{}, "status")
 }
 
 // Watch watches Nodes in a fake store.
@@ -275,7 +275,7 @@ func (m *FakeNodeHandler) Watch(_ context.Context, opts metav1.ListOptions) (wat
 }
 
 // Patch patches a Node in the fake store.
-func (m *FakeNodeHandler) Patch(_ context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (*v1.Node, error) {
+func (m *FakeNodeHandler) Patch(_ context.Context, name string, pt types.PatchType, data []byte, _ metav1.PatchOptions, subresources ...string) (*v1.Node, error) {
 	m.lock.Lock()
 	defer func() {
 		m.RequestCount++

@@ -148,7 +148,7 @@ type fakeClient struct {
 	failureType failureType
 }
 
-func (c *fakeClient) Create(context.Context, *certificates.CertificateSigningRequest) (*certificates.CertificateSigningRequest, error) {
+func (c *fakeClient) Create(context.Context, *certificates.CertificateSigningRequest, metav1.CreateOptions) (*certificates.CertificateSigningRequest, error) {
 	if c.failureType == createError {
 		return nil, fmt.Errorf("fakeClient failed creating request")
 	}
