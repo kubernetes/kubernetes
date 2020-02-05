@@ -5,6 +5,12 @@ startup --expand_configs_in_place
 # https://github.com/bazelbuild/bazel/issues/7899
 build --host_force_python=PY2
 
+startup --host_jvm_args=-Xms2g
+startup --host_jvm_args=-Xmx4g
+run --local_cpu_resources=HOST_CPUS*.5
+run --local_ram_resources=4096
+run --jobs=HOST_CPUS*.5
+
 # Show us information about failures.
 build --verbose_failures
 test --test_output=errors
