@@ -240,7 +240,7 @@ func (d *Helper) evictPods(pods []corev1.Pod, policyGroupVersion string, getPodF
 				select {
 				case <-ctx.Done():
 					// return here or we'll leak a goroutine.
-					returnCh <- fmt.Errorf("error when evicting pod %q: global timeout reached: %v", pod.Name, globalTimeout)
+					returnCh <- fmt.Errorf("error when evicting pod %q in namespace %q: global timeout reached: %v", pod.Name, pod.Namespace, globalTimeout)
 					return
 				default:
 				}
@@ -251,10 +251,10 @@ func (d *Helper) evictPods(pods []corev1.Pod, policyGroupVersion string, getPodF
 					returnCh <- nil
 					return
 				} else if apierrors.IsTooManyRequests(err) {
-					fmt.Fprintf(d.ErrOut, "error when evicting pod %q (will retry after 5s): %v\n", pod.Name, err)
+					fmt.Fprintf(d.ErrOut, "error when evicting pod %q in namespace %q (will retry after 5s): %v\n", pod.Name, pod.Namespace, err)
 					time.Sleep(5 * time.Second)
 				} else {
-					returnCh <- fmt.Errorf("error when evicting pod %q: %v", pod.Name, err)
+					returnCh <- fmt.Errorf("error when evicting pod %q in namespace %q: %v", pod.Name, pod.Namespace, err)
 					return
 				}
 			}
