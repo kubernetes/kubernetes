@@ -226,7 +226,9 @@ func NewLegacyRegistry() *LegacyRegistry {
 			// GeneralPredicate is a combination of predicates.
 			plugins.Filter = appendToPluginSet(plugins.Filter, noderesources.FitName, nil)
 			plugins.PreFilter = appendToPluginSet(plugins.PreFilter, noderesources.FitName, nil)
-			pluginConfig = append(pluginConfig, makePluginConfig(noderesources.FitName, args.NodeResourcesFitArgs))
+			if args.NodeResourcesFitArgs != nil {
+				pluginConfig = append(pluginConfig, makePluginConfig(noderesources.FitName, args.NodeResourcesFitArgs))
+			}
 			plugins.Filter = appendToPluginSet(plugins.Filter, nodename.Name, nil)
 			plugins.Filter = appendToPluginSet(plugins.Filter, nodeports.Name, nil)
 			plugins.PreFilter = appendToPluginSet(plugins.PreFilter, nodeports.Name, nil)
@@ -242,7 +244,9 @@ func NewLegacyRegistry() *LegacyRegistry {
 		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			plugins.Filter = appendToPluginSet(plugins.Filter, noderesources.FitName, nil)
 			plugins.PreFilter = appendToPluginSet(plugins.PreFilter, noderesources.FitName, nil)
-			pluginConfig = append(pluginConfig, makePluginConfig(noderesources.FitName, args.NodeResourcesFitArgs))
+			if args.NodeResourcesFitArgs != nil {
+				pluginConfig = append(pluginConfig, makePluginConfig(noderesources.FitName, args.NodeResourcesFitArgs))
+			}
 			return
 		})
 	registry.registerPredicateConfigProducer(HostNamePred,
@@ -315,13 +319,17 @@ func NewLegacyRegistry() *LegacyRegistry {
 	registry.registerPredicateConfigProducer(CheckNodeLabelPresencePred,
 		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			plugins.Filter = appendToPluginSet(plugins.Filter, nodelabel.Name, nil)
-			pluginConfig = append(pluginConfig, makePluginConfig(nodelabel.Name, args.NodeLabelArgs))
+			if args.NodeLabelArgs != nil {
+				pluginConfig = append(pluginConfig, makePluginConfig(nodelabel.Name, args.NodeLabelArgs))
+			}
 			return
 		})
 	registry.registerPredicateConfigProducer(CheckServiceAffinityPred,
 		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			plugins.Filter = appendToPluginSet(plugins.Filter, serviceaffinity.Name, nil)
-			pluginConfig = append(pluginConfig, makePluginConfig(serviceaffinity.Name, args.ServiceAffinityArgs))
+			if args.ServiceAffinityArgs != nil {
+				pluginConfig = append(pluginConfig, makePluginConfig(serviceaffinity.Name, args.ServiceAffinityArgs))
+			}
 			plugins.PreFilter = appendToPluginSet(plugins.PreFilter, serviceaffinity.Name, nil)
 			return
 		})
@@ -353,7 +361,9 @@ func NewLegacyRegistry() *LegacyRegistry {
 		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			plugins.PreScore = appendToPluginSet(plugins.PreScore, interpodaffinity.Name, nil)
 			plugins.Score = appendToPluginSet(plugins.Score, interpodaffinity.Name, &args.Weight)
-			pluginConfig = append(pluginConfig, makePluginConfig(interpodaffinity.Name, args.InterPodAffinityArgs))
+			if args.InterPodAffinityArgs != nil {
+				pluginConfig = append(pluginConfig, makePluginConfig(interpodaffinity.Name, args.InterPodAffinityArgs))
+			}
 			return
 		})
 	registry.registerPriorityConfigProducer(NodePreferAvoidPodsPriority,
@@ -379,7 +389,9 @@ func NewLegacyRegistry() *LegacyRegistry {
 	registry.registerPriorityConfigProducer(noderesources.RequestedToCapacityRatioName,
 		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			plugins.Score = appendToPluginSet(plugins.Score, noderesources.RequestedToCapacityRatioName, &args.Weight)
-			pluginConfig = append(pluginConfig, makePluginConfig(noderesources.RequestedToCapacityRatioName, args.RequestedToCapacityRatioArgs))
+			if args.RequestedToCapacityRatioArgs != nil {
+				pluginConfig = append(pluginConfig, makePluginConfig(noderesources.RequestedToCapacityRatioName, args.RequestedToCapacityRatioArgs))
+			}
 			return
 		})
 
@@ -390,7 +402,9 @@ func NewLegacyRegistry() *LegacyRegistry {
 			// priorities specified in Policy have the same weight).
 			weight := args.Weight * int32(len(args.NodeLabelArgs.PresentLabelsPreference)+len(args.NodeLabelArgs.AbsentLabelsPreference))
 			plugins.Score = appendToPluginSet(plugins.Score, nodelabel.Name, &weight)
-			pluginConfig = append(pluginConfig, makePluginConfig(nodelabel.Name, args.NodeLabelArgs))
+			if args.NodeLabelArgs != nil {
+				pluginConfig = append(pluginConfig, makePluginConfig(nodelabel.Name, args.NodeLabelArgs))
+			}
 			return
 		})
 	registry.registerPriorityConfigProducer(serviceaffinity.Name,
@@ -400,7 +414,9 @@ func NewLegacyRegistry() *LegacyRegistry {
 			// priorities specified in Policy have the same weight).
 			weight := args.Weight * int32(len(args.ServiceAffinityArgs.AntiAffinityLabelsPreference))
 			plugins.Score = appendToPluginSet(plugins.Score, serviceaffinity.Name, &weight)
-			pluginConfig = append(pluginConfig, makePluginConfig(serviceaffinity.Name, args.ServiceAffinityArgs))
+			if args.ServiceAffinityArgs != nil {
+				pluginConfig = append(pluginConfig, makePluginConfig(serviceaffinity.Name, args.ServiceAffinityArgs))
+			}
 			return
 		})
 
