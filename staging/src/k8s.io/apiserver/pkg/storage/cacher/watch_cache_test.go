@@ -318,7 +318,7 @@ func TestMarker(t *testing.T) {
 
 func TestWaitUntilFreshAndList(t *testing.T) {
 	store := newTestWatchCache(3, &cache.Indexers{
-		"label": func(obj interface{}) ([]string, error) {
+		"l:label": func(obj interface{}) ([]string, error) {
 			pod, ok := obj.(*v1.Pod)
 			if !ok {
 				return nil, fmt.Errorf("not a pod %#v", obj)
@@ -328,7 +328,7 @@ func TestWaitUntilFreshAndList(t *testing.T) {
 			}
 			return nil, nil
 		},
-		"spec.nodeName": func(obj interface{}) ([]string, error) {
+		"f:spec.nodeName": func(obj interface{}) ([]string, error) {
 			pod, ok := obj.(*v1.Pod)
 			if !ok {
 				return nil, fmt.Errorf("not a pod %#v", obj)
@@ -358,8 +358,8 @@ func TestWaitUntilFreshAndList(t *testing.T) {
 
 	// list by label index.
 	matchValues := []storage.MatchValue{
-		{IndexName: "label", Value: "value1"},
-		{IndexName: "spec.nodeName", Value: "node2"},
+		{IndexName: "l:label", Value: "value1"},
+		{IndexName: "f:spec.nodeName", Value: "node2"},
 	}
 	list, resourceVersion, err = store.WaitUntilFreshAndList(5, matchValues, nil)
 	if err != nil {
@@ -374,8 +374,8 @@ func TestWaitUntilFreshAndList(t *testing.T) {
 
 	// list with spec.nodeName index.
 	matchValues = []storage.MatchValue{
-		{IndexName: "not-exist-label", Value: "whatever"},
-		{IndexName: "spec.nodeName", Value: "node2"},
+		{IndexName: "l:not-exist-label", Value: "whatever"},
+		{IndexName: "f:spec.nodeName", Value: "node2"},
 	}
 	list, resourceVersion, err = store.WaitUntilFreshAndList(5, matchValues, nil)
 	if err != nil {
@@ -390,7 +390,7 @@ func TestWaitUntilFreshAndList(t *testing.T) {
 
 	// list with index not exists.
 	matchValues = []storage.MatchValue{
-		{IndexName: "not-exist-label", Value: "whatever"},
+		{IndexName: "l:not-exist-label", Value: "whatever"},
 	}
 	list, resourceVersion, err = store.WaitUntilFreshAndList(5, matchValues, nil)
 	if resourceVersion != 5 {

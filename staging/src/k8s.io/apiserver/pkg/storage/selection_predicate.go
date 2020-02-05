@@ -137,13 +137,23 @@ func (s *SelectionPredicate) MatcherIndex() []MatchValue {
 	var result []MatchValue
 	for _, field := range s.IndexFields {
 		if value, ok := s.Field.RequiresExactMatch(field); ok {
-			result = append(result, MatchValue{IndexName: field, Value: value})
+			result = append(result, MatchValue{IndexName: FieldIndex(field), Value: value})
 		}
 	}
 	for _, label := range s.IndexLabels {
 		if value, ok := s.Label.RequiresExactMatch(label); ok {
-			result = append(result, MatchValue{IndexName: label, Value: value})
+			result = append(result, MatchValue{IndexName: LabelIndex(label), Value: value})
 		}
 	}
 	return result
+}
+
+// LabelIndex add prefix for label index.
+func LabelIndex(label string) string {
+	return "l:" + label
+}
+
+// FiledIndex add prefix for field index.
+func FieldIndex(field string) string {
+	return "f:" + field
 }

@@ -356,7 +356,10 @@ func (w *watchCache) WaitUntilFreshAndList(resourceVersion uint64, matchValues [
 		return nil, 0, err
 	}
 
-	// TODO: use the smallest key size index.
+	// This isn't the place where we do "final filtering" - only some "prefiltering" is happening here. So the only
+	// requirement here is to NOT miss anything that should be returned. We can return as many non-matching items as we
+	// want - they will be filtered out later. The fact that we return less things is only further performance improvement.
+	// TODO: if multiple indexes match, return the one with the fewest items, so as to do as much filtering as possible.
 	for _, matchValue := range matchValues {
 		if result, err := w.store.ByIndex(matchValue.IndexName, matchValue.Value); err == nil {
 			return result, w.resourceVersion, nil
