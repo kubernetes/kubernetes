@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
+	"k8s.io/client-go/tools/cache"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
@@ -1327,5 +1328,88 @@ func TestPendingPodsMetric(t *testing.T) {
 				t.Errorf("UnschedulablePods: Expected %v, got %v", test.expected[2], unschedulableNum)
 			}
 		})
+	}
+}
+
+func TestBackOffFlow(t *testing.T) {
+	cl := clock.NewFakeClock(time.Now())
+	q := NewPriorityQueueWithClock(nil, cl, nil)
+	steps := []struct {
+		wantBackoff time.Duration
+	}{
+		{wantBackoff: time.Second},
+		{wantBackoff: 2 * time.Second},
+		{wantBackoff: 4 * time.Second},
+		{wantBackoff: 8 * time.Second},
+		{wantBackoff: 10 * time.Second},
+		{wantBackoff: 10 * time.Second},
+		{wantBackoff: 10 * time.Second},
+	}
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-pod",
+			Namespace: "test-ns",
+			UID:       "test-uid",
+		},
+	}
+	podID := nsNameForPod(pod)
+	podKey, err := cache.MetaNamespaceKeyFunc(pod)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := q.Add(pod); err != nil {
+		t.Fatal(err)
+	}
+
+	for i, step := range steps {
+		t.Run(fmt.Sprintf("step %d", i), func(t *testing.T) {
+			timestamp := cl.Now()
+			// Simulate schedule attempt.
+			pod, err := q.Pop()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := q.AddUnschedulableIfNotPresent(pod, int64(i)); err != nil {
+				t.Fatal(err)
+			}
+
+			// An event happens.
+			q.MoveAllToActiveQueue()
+
+			if _, ok, _ := q.podBackoffQ.GetByKey(podKey); !ok {
+				t.Errorf("pod %v is not in the backoff queue", podID)
+			}
+
+			// Check backoff duration.
+			deadline, ok := q.podBackoff.GetBackoffTime(podID)
+			if !ok {
+				t.Errorf("didn't get backoff for pod %s", podID)
+			}
+			backoff := deadline.Sub(timestamp)
+			if backoff != step.wantBackoff {
+				t.Errorf("got backoff %s, want %s", backoff, step.wantBackoff)
+			}
+
+			// Simulate routine that continuously flushes the backoff queue.
+			cl.Step(time.Millisecond)
+			q.flushBackoffQCompleted()
+			// Still in backoff queue after an early flush.
+			if _, ok, _ := q.podBackoffQ.GetByKey(podKey); !ok {
+				t.Errorf("pod %v is not in the backoff queue", podID)
+			}
+			// Moved out of the backoff queue after timeout.
+			cl.Step(backoff)
+			q.flushBackoffQCompleted()
+			if _, ok, _ := q.podBackoffQ.GetByKey(podKey); ok {
+				t.Errorf("pod %v is still in the backoff queue", podID)
+			}
+		})
+	}
+	// After some time, backoff information is cleared.
+	cl.Step(time.Hour)
+	q.podBackoff.CleanupPodsCompletesBackingoff()
+	_, ok := q.podBackoff.GetBackoffTime(podID)
+	if ok {
+		t.Errorf("backoff information for pod %s was not cleared", podID)
 	}
 }
