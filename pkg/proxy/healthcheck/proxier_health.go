@@ -81,16 +81,25 @@ func newProxierHealthServer(listener listener, httpServerFactory httpServerFacto
 
 // Updated updates the lastUpdated timestamp.
 func (hs *ProxierHealthServer) Updated() {
+	if hs == nil {
+		return
+	}
 	hs.lastUpdated.Store(hs.clock.Now())
 }
 
 // QueuedUpdate updates the lastQueued timestamp.
 func (hs *ProxierHealthServer) QueuedUpdate() {
+	if hs == nil {
+		return
+	}
 	hs.lastQueued.Store(hs.clock.Now())
 }
 
 // Run starts the healthz http server and returns.
 func (hs *ProxierHealthServer) Run() {
+	if hs == nil {
+		return
+	}
 	serveMux := http.NewServeMux()
 	serveMux.Handle("/healthz", healthzHandler{hs: hs})
 	server := hs.httpFactory.New(hs.addr, serveMux)
