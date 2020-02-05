@@ -19,6 +19,9 @@ limitations under the License.
 package v1beta1
 
 import (
+	"context"
+
+	v1beta1 "k8s.io/api/authorization/v1beta1"
 	rest "k8s.io/client-go/rest"
 )
 
@@ -30,6 +33,7 @@ type SubjectAccessReviewsGetter interface {
 
 // SubjectAccessReviewInterface has methods to work with SubjectAccessReview resources.
 type SubjectAccessReviewInterface interface {
+	Create(*v1beta1.SubjectAccessReview) (*v1beta1.SubjectAccessReview, error)
 	SubjectAccessReviewExpansion
 }
 
@@ -43,4 +47,15 @@ func newSubjectAccessReviews(c *AuthorizationV1beta1Client) *subjectAccessReview
 	return &subjectAccessReviews{
 		client: c.RESTClient(),
 	}
+}
+
+// Create takes the representation of a subjectAccessReview and creates it.  Returns the server's representation of the subjectAccessReview, and an error, if there is any.
+func (c *subjectAccessReviews) Create(subjectAccessReview *v1beta1.SubjectAccessReview) (result *v1beta1.SubjectAccessReview, err error) {
+	result = &v1beta1.SubjectAccessReview{}
+	err = c.client.Post().
+		Resource("subjectaccessreviews").
+		Body(subjectAccessReview).
+		Do(context.TODO()).
+		Into(result)
+	return
 }

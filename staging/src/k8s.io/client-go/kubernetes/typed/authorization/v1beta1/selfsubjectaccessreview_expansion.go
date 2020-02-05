@@ -23,12 +23,7 @@ import (
 )
 
 type SelfSubjectAccessReviewExpansion interface {
-	Create(sar *authorizationapi.SelfSubjectAccessReview) (result *authorizationapi.SelfSubjectAccessReview, err error)
 	CreateContext(ctx context.Context, sar *authorizationapi.SelfSubjectAccessReview) (result *authorizationapi.SelfSubjectAccessReview, err error)
-}
-
-func (c *selfSubjectAccessReviews) Create(sar *authorizationapi.SelfSubjectAccessReview) (result *authorizationapi.SelfSubjectAccessReview, err error) {
-	return c.CreateContext(context.Background(), sar)
 }
 
 func (c *selfSubjectAccessReviews) CreateContext(ctx context.Context, sar *authorizationapi.SelfSubjectAccessReview) (result *authorizationapi.SelfSubjectAccessReview, err error) {

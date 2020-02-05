@@ -23,12 +23,7 @@ import (
 )
 
 type TokenReviewExpansion interface {
-	Create(tokenReview *authenticationapi.TokenReview) (result *authenticationapi.TokenReview, err error)
 	CreateContext(ctx context.Context, tokenReview *authenticationapi.TokenReview) (result *authenticationapi.TokenReview, err error)
-}
-
-func (c *tokenReviews) Create(tokenReview *authenticationapi.TokenReview) (result *authenticationapi.TokenReview, err error) {
-	return c.CreateContext(context.Background(), tokenReview)
 }
 
 func (c *tokenReviews) CreateContext(ctx context.Context, tokenReview *authenticationapi.TokenReview) (result *authenticationapi.TokenReview, err error) {

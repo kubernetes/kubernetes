@@ -19,6 +19,9 @@ limitations under the License.
 package v1
 
 import (
+	"context"
+
+	v1 "k8s.io/api/authentication/v1"
 	rest "k8s.io/client-go/rest"
 )
 
@@ -30,6 +33,7 @@ type TokenReviewsGetter interface {
 
 // TokenReviewInterface has methods to work with TokenReview resources.
 type TokenReviewInterface interface {
+	Create(*v1.TokenReview) (*v1.TokenReview, error)
 	TokenReviewExpansion
 }
 
@@ -43,4 +47,15 @@ func newTokenReviews(c *AuthenticationV1Client) *tokenReviews {
 	return &tokenReviews{
 		client: c.RESTClient(),
 	}
+}
+
+// Create takes the representation of a tokenReview and creates it.  Returns the server's representation of the tokenReview, and an error, if there is any.
+func (c *tokenReviews) Create(tokenReview *v1.TokenReview) (result *v1.TokenReview, err error) {
+	result = &v1.TokenReview{}
+	err = c.client.Post().
+		Resource("tokenreviews").
+		Body(tokenReview).
+		Do(context.TODO()).
+		Into(result)
+	return
 }

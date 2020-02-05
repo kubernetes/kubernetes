@@ -23,12 +23,7 @@ import (
 )
 
 type LocalSubjectAccessReviewExpansion interface {
-	Create(sar *authorizationapi.LocalSubjectAccessReview) (result *authorizationapi.LocalSubjectAccessReview, err error)
 	CreateContext(ctx context.Context, sar *authorizationapi.LocalSubjectAccessReview) (result *authorizationapi.LocalSubjectAccessReview, err error)
-}
-
-func (c *localSubjectAccessReviews) Create(sar *authorizationapi.LocalSubjectAccessReview) (result *authorizationapi.LocalSubjectAccessReview, err error) {
-	return c.CreateContext(context.Background(), sar)
 }
 
 func (c *localSubjectAccessReviews) CreateContext(ctx context.Context, sar *authorizationapi.LocalSubjectAccessReview) (result *authorizationapi.LocalSubjectAccessReview, err error) {

@@ -23,10 +23,6 @@ import (
 	core "k8s.io/client-go/testing"
 )
 
-func (c *FakeSelfSubjectAccessReviews) Create(sar *authorizationapi.SelfSubjectAccessReview) (result *authorizationapi.SelfSubjectAccessReview, err error) {
-	return c.CreateContext(context.Background(), sar)
-}
-
 func (c *FakeSelfSubjectAccessReviews) CreateContext(ctx context.Context, sar *authorizationapi.SelfSubjectAccessReview) (result *authorizationapi.SelfSubjectAccessReview, err error) {
 	obj, err := c.Fake.Invokes(core.NewRootCreateAction(authorizationapi.SchemeGroupVersion.WithResource("selfsubjectaccessreviews"), sar), &authorizationapi.SelfSubjectAccessReview{})
 	return obj.(*authorizationapi.SelfSubjectAccessReview), err
