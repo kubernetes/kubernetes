@@ -393,6 +393,59 @@ function load-docker-images {
   fi
 }
 
+# If we are on ubuntu we can try to install docker
+function install-docker {
+  # bailout if we are not on ubuntu
+  if ! command -v apt-get >/dev/null 2>&1; then
+    echo "Unable to install automatically install docker. Bailing out..."
+    return
+  fi
+  # Install Docker deps, some of these are already installed in the image but
+  # that's fine since they won't re-install and we can reuse the code below
+  # for another image someday.
+  apt-get update
+  apt-get install -y --no-install-recommends \
+    apt-transport-https \
+    ca-certificates \
+    socat \
+    curl \
+    gnupg2 \
+    software-properties-common \
+    lsb-release
+
+  # Add the Docker apt-repository
+  curl -fsSL https://download.docker.com/linux/$(. /etc/os-release; echo "$ID")/gpg \
+    | apt-key add -
+  add-apt-repository \
+    "deb [arch=amd64] https://download.docker.com/linux/$(. /etc/os-release; echo "$ID") \
+    $(lsb_release -cs) stable"
+
+  # Install Docker
+  apt-get update && \
+    apt-get install -y --no-install-recommends ${GCI_DOCKER_VERSION:-"docker-ce=5:19.03.*"}
+  rm -rf /var/lib/apt/lists/*
+}
+
+function ensure-container-runtime {
+  container_runtime="${CONTAINER_RUNTIME:-docker}"
+  if [[ "${container_runtime}" == "docker" ]]; then
+    if ! command -v docker >/dev/null 2>&1; then
+      install-docker
+      if ! command -v docker >/dev/null 2>&1; then
+        echo "ERROR docker not found. Aborting."
+        exit 2
+      fi
+    fi
+    docker version
+  elif [[ "${container_runtime}" == "containerd" ]]; then
+    if ! command -v ctr >/dev/null 2>&1; then
+      echo "ERROR ctr not found. Aborting."
+      exit 2
+    fi
+    ctr version
+  fi
+}
+
 # Downloads kubernetes binaries and kube-system manifest tarball, unpacks them,
 # and places them into suitable directories. Files are placed in /home/kubernetes.
 function install-kube-binary-config {
@@ -491,6 +544,9 @@ download-kubelet-config "${KUBE_HOME}/kubelet-config.yaml"
 if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
   download-kube-master-certs
 fi
+
+# ensure chosen container runtime is present
+ensure-container-runtime
 
 # binaries and kube-system manifests
 install-kube-binary-config
