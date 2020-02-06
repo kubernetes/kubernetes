@@ -104,10 +104,6 @@ func (kl *Kubelet) tryRegisterWithAPIServer(node *v1.Node) bool {
 	}
 
 	originalNode := existingNode.DeepCopy()
-	if originalNode == nil {
-		klog.Errorf("Nil %q node object", kl.nodeName)
-		return false
-	}
 
 	klog.Infof("Node %s was previously registered", kl.nodeName)
 
