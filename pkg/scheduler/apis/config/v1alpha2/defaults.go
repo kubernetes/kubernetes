@@ -121,11 +121,11 @@ func SetDefaults_KubeSchedulerConfiguration(obj *v1alpha2.KubeSchedulerConfigura
 	if len(obj.LeaderElection.ResourceLock) == 0 {
 		obj.LeaderElection.ResourceLock = "endpointsleases"
 	}
-	if len(obj.LeaderElection.LockObjectNamespace) == 0 && len(obj.LeaderElection.ResourceNamespace) == 0 {
-		obj.LeaderElection.LockObjectNamespace = v1alpha2.SchedulerDefaultLockObjectNamespace
+	if len(obj.LeaderElection.ResourceNamespace) == 0 {
+		obj.LeaderElection.ResourceNamespace = v1alpha2.SchedulerDefaultLockObjectNamespace
 	}
-	if len(obj.LeaderElection.LockObjectName) == 0 && len(obj.LeaderElection.ResourceName) == 0 {
-		obj.LeaderElection.LockObjectName = v1alpha2.SchedulerDefaultLockObjectName
+	if len(obj.LeaderElection.ResourceName) == 0 {
+		obj.LeaderElection.ResourceName = v1alpha2.SchedulerDefaultLockObjectName
 	}
 
 	if len(obj.ClientConnection.ContentType) == 0 {
