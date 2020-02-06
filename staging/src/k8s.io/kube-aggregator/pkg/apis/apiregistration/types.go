@@ -48,6 +48,7 @@ type APIServiceSpec struct {
 	// on port 443
 	// If the Service is nil, that means the handling for the API groupversion is handled locally on this server.
 	// The call will simply delegate to the normal handler chain to be fulfilled.
+	// +optional
 	Service *ServiceReference
 	// Group is the API group name this server hosts
 	Group string

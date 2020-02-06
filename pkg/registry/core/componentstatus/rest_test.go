@@ -22,6 +22,10 @@ import (
 	"strings"
 	"testing"
 
+	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
+
 	"net/http"
 	"net/url"
 	"time"
@@ -82,6 +86,44 @@ func TestList_NoError(t *testing.T) {
 	}
 	expect := &api.ComponentStatusList{
 		Items: []api.ComponentStatus{*(createTestStatus("test1", api.ConditionTrue, "ok", ""))},
+	}
+	if e, a := expect, got; !reflect.DeepEqual(e, a) {
+		t.Errorf("Got unexpected object. Diff: %s", diff.ObjectDiff(e, a))
+	}
+}
+
+func TestList_WithLabelSelectors(t *testing.T) {
+	r := NewTestREST(testResponse{result: probe.Success, data: "ok"})
+	opts := metainternalversion.ListOptions{
+		LabelSelector: labels.SelectorFromSet(map[string]string{
+			"testLabel": "testValue",
+		}),
+	}
+	got, err := r.List(genericapirequest.NewContext(), &opts)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	expect := &api.ComponentStatusList{
+		Items: []api.ComponentStatus{},
+	}
+	if e, a := expect, got; !reflect.DeepEqual(e, a) {
+		t.Errorf("Got unexpected object. Diff: %s", diff.ObjectDiff(e, a))
+	}
+}
+
+func TestList_WithFieldSelectors(t *testing.T) {
+	r := NewTestREST(testResponse{result: probe.Success, data: "ok"})
+	opts := metainternalversion.ListOptions{
+		FieldSelector: fields.SelectorFromSet(map[string]string{
+			"testField": "testValue",
+		}),
+	}
+	got, err := r.List(genericapirequest.NewContext(), &opts)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	expect := &api.ComponentStatusList{
+		Items: []api.ComponentStatus{},
 	}
 	if e, a := expect, got; !reflect.DeepEqual(e, a) {
 		t.Errorf("Got unexpected object. Diff: %s", diff.ObjectDiff(e, a))

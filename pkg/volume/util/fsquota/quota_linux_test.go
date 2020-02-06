@@ -21,16 +21,18 @@ package fsquota
 import (
 	"fmt"
 	"io/ioutil"
+	"os"
+	"strings"
+	"testing"
+
+	"k8s.io/utils/mount"
+
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume/util/fsquota/common"
-	"os"
-	"strings"
-	"testing"
 )
 
 const dummyMountData = `sysfs /sys sysfs rw,nosuid,nodev,noexec,relatime 0 0
@@ -43,27 +45,9 @@ tmpfs /tmp tmpfs rw,nosuid,nodev 0 0
 /dev/sdb1 /virt xfs rw,noatime,attr2,inode64,usrquota,prjquota 0 0
 `
 
-const dummyMountDataPquota = `tmpfs /tmp tmpfs rw,nosuid,nodev 0 0
-/dev/sda1 /boot ext4 rw,relatime 0 0
-/dev/mapper/fedora-root / ext4 rw,noatime 0 0
-/dev/mapper/fedora-home /home ext4 rw,noatime 0 0
-/dev/sdb1 /mnt/virt xfs rw,noatime,attr2,inode64,usrquota,prjquota 0 0
-`
-const dummyMountDataNoPquota = `tmpfs /tmp tmpfs rw,nosuid,nodev 0 0
-/dev/sda1 /boot ext4 rw,relatime 0 0
-/dev/mapper/fedora-root / ext4 rw,noatime 0 0
-/dev/mapper/fedora-home /home ext4 rw,noatime 0 0
-/dev/sdb1 /mnt/virt xfs rw,noatime,attr2,inode64,usrquota 0 0
-`
-
-const dummyMountTest = `/dev/sda1 / ext4 rw,noatime 0 0
-/dev/sda2 /quota ext4 rw,prjquota 0 0
-/dev/sda3 /noquota ext4 rw 0 0
-`
-
 func dummyFakeMount1() mount.Interface {
-	return &mount.FakeMounter{
-		MountPoints: []mount.MountPoint{
+	return mount.NewFakeMounter(
+		[]mount.MountPoint{
 			{
 				Device: "tmpfs",
 				Path:   "/tmp",
@@ -94,8 +78,7 @@ func dummyFakeMount1() mount.Interface {
 				Type:   "xfs",
 				Opts:   []string{"rw", "relatime", "attr2", "inode64", "usrquota", "prjquota"},
 			},
-		},
-	}
+		})
 }
 
 type backingDevTest struct {
@@ -252,9 +235,7 @@ var dummyMountPoints = []mount.MountPoint{
 }
 
 func dummyQuotaTest() mount.Interface {
-	return &mount.FakeMounter{
-		MountPoints: dummyMountPoints,
-	}
+	return mount.NewFakeMounter(dummyMountPoints)
 }
 
 func dummySetFSInfo(path string) {

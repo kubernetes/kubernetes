@@ -28,7 +28,6 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 )
 
 // Utilities for dealing with Jobs and CronJobs and time.
@@ -94,7 +93,7 @@ func getRecentUnmetScheduleTimes(sj batchv1beta1.CronJob, now time.Time) ([]time
 	starts := []time.Time{}
 	sched, err := cron.ParseStandard(sj.Spec.Schedule)
 	if err != nil {
-		return starts, fmt.Errorf("Unparseable schedule: %s : %s", sj.Spec.Schedule, err)
+		return starts, fmt.Errorf("unparseable schedule: %s : %s", sj.Spec.Schedule, err)
 	}
 
 	var earliestTime time.Time
@@ -163,9 +162,7 @@ func getJobFromTemplate(sj *batchv1beta1.CronJob, scheduledTime time.Time) (*bat
 			OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(sj, controllerKind)},
 		},
 	}
-	if err := legacyscheme.Scheme.Convert(&sj.Spec.JobTemplate.Spec, &job.Spec, nil); err != nil {
-		return nil, fmt.Errorf("unable to convert job template: %v", err)
-	}
+	sj.Spec.JobTemplate.Spec.DeepCopyInto(&job.Spec)
 	return job, nil
 }
 

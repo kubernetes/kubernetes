@@ -232,7 +232,7 @@ WaitForStreams:
 				ctx.resizeStream = stream
 				go waitStreamReply(stream.replySent, replyChan, stop)
 			default:
-				runtime.HandleError(fmt.Errorf("Unexpected stream type: %q", streamType))
+				runtime.HandleError(fmt.Errorf("unexpected stream type: %q", streamType))
 			}
 		case <-replyChan:
 			receivedStreams++
@@ -283,7 +283,7 @@ WaitForStreams:
 				ctx.resizeStream = stream
 				go waitStreamReply(stream.replySent, replyChan, stop)
 			default:
-				runtime.HandleError(fmt.Errorf("Unexpected stream type: %q", streamType))
+				runtime.HandleError(fmt.Errorf("unexpected stream type: %q", streamType))
 			}
 		case <-replyChan:
 			receivedStreams++
@@ -331,7 +331,7 @@ WaitForStreams:
 				ctx.stderrStream = stream
 				go waitStreamReply(stream.replySent, replyChan, stop)
 			default:
-				runtime.HandleError(fmt.Errorf("Unexpected stream type: %q", streamType))
+				runtime.HandleError(fmt.Errorf("unexpected stream type: %q", streamType))
 			}
 		case <-replyChan:
 			receivedStreams++
@@ -385,7 +385,7 @@ WaitForStreams:
 				ctx.stderrStream = stream
 				go waitStreamReply(stream.replySent, replyChan, stop)
 			default:
-				runtime.HandleError(fmt.Errorf("Unexpected stream type: %q", streamType))
+				runtime.HandleError(fmt.Errorf("unexpected stream type: %q", streamType))
 			}
 		case <-replyChan:
 			receivedStreams++

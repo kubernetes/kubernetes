@@ -21,7 +21,6 @@ go_library(
     visibility = ["//vendor/github.com/Microsoft/hcsshim:__subpackages__"],
     deps = [
         "//vendor/github.com/Microsoft/go-winio:go_default_library",
-        "//vendor/github.com/Microsoft/hcsshim/internal/guestrequest:go_default_library",
         "//vendor/github.com/Microsoft/hcsshim/internal/interop:go_default_library",
         "//vendor/github.com/Microsoft/hcsshim/internal/logfields:go_default_library",
         "//vendor/github.com/Microsoft/hcsshim/internal/schema1:go_default_library",

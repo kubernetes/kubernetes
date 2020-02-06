@@ -27,12 +27,13 @@ import (
 
 	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/proxy"
+	"k8s.io/kubernetes/pkg/proxy/config"
 	"k8s.io/kubernetes/pkg/util/netsh"
 )
 
@@ -80,40 +81,23 @@ func logTimeout(err error) bool {
 // Proxier is a simple proxy for TCP connections between a localhost:lport
 // and services that provide the actual implementations.
 type Proxier struct {
+	// EndpointSlice support has not been added for this proxier yet.
+	config.NoopEndpointSliceHandler
+	// TODO(imroc): implement node handler for winuserspace proxier.
+	config.NoopNodeHandler
+
 	loadBalancer   LoadBalancer
 	mu             sync.Mutex // protects serviceMap
 	serviceMap     map[ServicePortPortalName]*serviceInfo
 	syncPeriod     time.Duration
 	udpIdleTimeout time.Duration
-	portMapMutex   sync.Mutex
-	portMap        map[portMapKey]*portMapValue
 	numProxyLoops  int32 // use atomic ops to access this; mostly for testing
 	netsh          netsh.Interface
 	hostIP         net.IP
 }
 
-// assert Proxier is a ProxyProvider
-var _ proxy.ProxyProvider = &Proxier{}
-
-// A key for the portMap.  The ip has to be a string because slices can't be map
-// keys.
-type portMapKey struct {
-	ip       string
-	port     int
-	protocol v1.Protocol
-}
-
-func (k *portMapKey) String() string {
-	return fmt.Sprintf("%s/%s", net.JoinHostPort(k.ip, strconv.Itoa(k.port)), k.protocol)
-}
-
-// A value for the portMap
-type portMapValue struct {
-	owner  ServicePortPortalName
-	socket interface {
-		Close() error
-	}
-}
+// assert Proxier is a proxy.Provider
+var _ proxy.Provider = &Proxier{}
 
 var (
 	// ErrProxyOnLocalhost is returned by NewProxier if the user requests a proxier on
@@ -148,7 +132,6 @@ func createProxier(loadBalancer LoadBalancer, listenIP net.IP, netsh netsh.Inter
 	return &Proxier{
 		loadBalancer:   loadBalancer,
 		serviceMap:     make(map[ServicePortPortalName]*serviceInfo),
-		portMap:        make(map[portMapKey]*portMapValue),
 		syncPeriod:     syncPeriod,
 		udpIdleTimeout: udpIdleTimeout,
 		netsh:          netsh,
@@ -185,7 +168,7 @@ func (proxier *Proxier) cleanupStaleStickySessions() {
 			},
 			Port: name.Port,
 		}
-		if servicePortNameMap[servicePortName] == false {
+		if !servicePortNameMap[servicePortName] {
 			// ensure cleanup sticky sessions only gets called once per serviceportname
 			servicePortNameMap[servicePortName] = true
 			proxier.loadBalancer.CleanupStaleStickySessions(servicePortName)

@@ -20,14 +20,13 @@ import (
 	"sort"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/scheme"
 	ref "k8s.io/client-go/tools/reference"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -1093,7 +1092,7 @@ func TestVolumeModeCheck(t *testing.T) {
 			pvc:                makeVolumeModePVC("8G", &filesystemMode, nil),
 			enableBlock:        true,
 		},
-		"feature enabled - pvc nil and pv filesytem": {
+		"feature enabled - pvc nil and pv filesystem": {
 			isExpectedMismatch: false,
 			vol:                createVolumeModeFilesystemTestVolume(),
 			pvc:                makeVolumeModePVC("8G", nil, nil),
@@ -1118,19 +1117,19 @@ func TestVolumeModeCheck(t *testing.T) {
 			enableBlock:        true,
 		},
 		"feature disabled - pvc block and pv filesystem": {
-			isExpectedMismatch: false,
+			isExpectedMismatch: true,
 			vol:                createVolumeModeFilesystemTestVolume(),
 			pvc:                makeVolumeModePVC("8G", &blockMode, nil),
 			enableBlock:        false,
 		},
 		"feature disabled - pvc filesystem and pv block": {
-			isExpectedMismatch: false,
+			isExpectedMismatch: true,
 			vol:                createVolumeModeBlockTestVolume(),
 			pvc:                makeVolumeModePVC("8G", &filesystemMode, nil),
 			enableBlock:        false,
 		},
 		"feature disabled - pvc block and pv block": {
-			isExpectedMismatch: false,
+			isExpectedMismatch: true,
 			vol:                createVolumeModeBlockTestVolume(),
 			pvc:                makeVolumeModePVC("8G", &blockMode, nil),
 			enableBlock:        false,
@@ -1146,10 +1145,7 @@ func TestVolumeModeCheck(t *testing.T) {
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, scenario.enableBlock)()
-			expectedMismatch, err := pvutil.CheckVolumeModeMismatches(&scenario.pvc.Spec, &scenario.vol.Spec)
-			if err != nil {
-				t.Errorf("Unexpected failure for checkVolumeModeMismatches: %v", err)
-			}
+			expectedMismatch := pvutil.CheckVolumeModeMismatches(&scenario.pvc.Spec, &scenario.vol.Spec)
 			// expected to match but either got an error or no returned pvmatch
 			if expectedMismatch && !scenario.isExpectedMismatch {
 				t.Errorf("Unexpected failure for scenario, expected not to mismatch on modes but did: %s", name)
@@ -1222,7 +1218,7 @@ func TestFilteringVolumeModes(t *testing.T) {
 			enableBlock:     false,
 		},
 		"2-2 feature disabled - pvc mode is block and pv mode is block - fields should be dropped by api and not analyzed with gate disabled": {
-			isExpectedMatch: true,
+			isExpectedMatch: false,
 			vol:             createTestVolOrderedIndex(createVolumeModeBlockTestVolume()),
 			pvc:             makeVolumeModePVC("8G", &blockMode, nil),
 			enableBlock:     false,
@@ -1399,7 +1395,7 @@ func TestFindingPreboundVolumes(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "claim01",
 			Namespace: "myns",
-			SelfLink:  testapi.Default.SelfLink("pvc", ""),
+			SelfLink:  "/api/v1/namespaces/myns/persistentvolumeclaims/claim01",
 		},
 		Spec: v1.PersistentVolumeClaimSpec{
 			AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},

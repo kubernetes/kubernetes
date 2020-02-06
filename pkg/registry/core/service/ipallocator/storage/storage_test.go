@@ -27,6 +27,7 @@ import (
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	"k8s.io/apiserver/pkg/storage/storagebackend/factory"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/registry/core/service/allocator"
 	allocatorstore "k8s.io/kubernetes/pkg/registry/core/service/allocator/storage"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
@@ -41,13 +42,22 @@ func newStorage(t *testing.T) (*etcd3testing.EtcdTestServer, ipallocator.Interfa
 	}
 
 	var backing allocator.Interface
-	storage := ipallocator.NewAllocatorCIDRRange(cidr, func(max int, rangeSpec string) allocator.Interface {
+	storage, err := ipallocator.NewAllocatorCIDRRange(cidr, func(max int, rangeSpec string) (allocator.Interface, error) {
 		mem := allocator.NewAllocationMap(max, rangeSpec)
 		backing = mem
-		etcd := allocatorstore.NewEtcd(mem, "/ranges/serviceips", api.Resource("serviceipallocations"), etcdStorage)
-		return etcd
+		etcd, err := allocatorstore.NewEtcd(mem, "/ranges/serviceips", api.Resource("serviceipallocations"), etcdStorage)
+		if err != nil {
+			return nil, err
+		}
+		return etcd, nil
 	})
-	s, d := generic.NewRawStorage(etcdStorage)
+	if err != nil {
+		t.Fatalf("unexpected error creating etcd: %v", err)
+	}
+	s, d, err := generic.NewRawStorage(etcdStorage)
+	if err != nil {
+		t.Fatalf("Couldn't create storage: %v", err)
+	}
 	destroyFunc := func() {
 		d()
 		server.Terminate(t)

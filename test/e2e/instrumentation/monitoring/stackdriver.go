@@ -23,16 +23,16 @@ import (
 	"os"
 	"time"
 
-	"golang.org/x/oauth2/google"
-
-	"github.com/onsi/ginkgo"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2eautoscaling "k8s.io/kubernetes/test/e2e/framework/autoscaling"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	instrumentation "k8s.io/kubernetes/test/e2e/instrumentation/common"
 
+	"github.com/onsi/ginkgo"
+	"golang.org/x/oauth2/google"
 	gcm "google.golang.org/api/monitoring/v3"
+	"google.golang.org/api/option"
 )
 
 var (
@@ -61,7 +61,7 @@ var (
 
 var _ = instrumentation.SIGDescribe("Stackdriver Monitoring", func() {
 	ginkgo.BeforeEach(func() {
-		framework.SkipUnlessProviderIs("gce", "gke")
+		e2eskipper.SkipUnlessProviderIs("gce", "gke")
 	})
 
 	f := framework.NewDefaultFramework("stackdriver-monitoring")
@@ -77,6 +77,7 @@ func testStackdriverMonitoring(f *framework.Framework, pods, allPodsCPU int, per
 
 	ctx := context.Background()
 	client, err := google.DefaultClient(ctx, gcm.CloudPlatformScope)
+	framework.ExpectNoError(err)
 
 	// Hack for running tests locally
 	// If this is your use case, create application default credentials:
@@ -84,14 +85,14 @@ func testStackdriverMonitoring(f *framework.Framework, pods, allPodsCPU int, per
 	// and uncomment following lines (comment out the two lines above): (DON'T set the env var below)
 	/*
 		ts, err := google.DefaultTokenSource(oauth2.NoContext)
-		e2elog.Logf("Couldn't get application default credentials, %v", err)
+		framework.Logf("Couldn't get application default credentials, %v", err)
 		if err != nil {
-			e2elog.Failf("Error accessing application default credentials, %v", err)
+			framework.Failf("Error accessing application default credentials, %v", err)
 		}
 		client := oauth2.NewClient(oauth2.NoContext, ts)
 	*/
 
-	gcmService, err := gcm.New(client)
+	gcmService, err := gcm.NewService(ctx, option.WithHTTPClient(client))
 
 	// set this env var if accessing Stackdriver test endpoint (default is prod):
 	// $ export STACKDRIVER_API_ENDPOINT_OVERRIDE=https://test-monitoring.sandbox.googleapis.com/
@@ -102,7 +103,7 @@ func testStackdriverMonitoring(f *framework.Framework, pods, allPodsCPU int, per
 
 	framework.ExpectNoError(err)
 
-	rc := common.NewDynamicResourceConsumer(rcName, f.Namespace.Name, common.KindDeployment, pods, allPodsCPU, memoryUsed, 0, perPodCPU, memoryLimit, f.ClientSet, f.ScalesGetter)
+	rc := e2eautoscaling.NewDynamicResourceConsumer(rcName, f.Namespace.Name, e2eautoscaling.KindDeployment, pods, allPodsCPU, memoryUsed, 0, perPodCPU, memoryLimit, f.ClientSet, f.ScalesGetter)
 	defer rc.CleanUp()
 
 	rc.WaitForReplicas(pods, 15*time.Minute)
@@ -111,7 +112,7 @@ func testStackdriverMonitoring(f *framework.Framework, pods, allPodsCPU int, per
 	pollingFunction := checkForMetrics(projectID, gcmService, time.Now(), metricsMap, allPodsCPU, perPodCPU)
 	err = wait.Poll(pollFrequency, pollTimeout, pollingFunction)
 	if err != nil {
-		e2elog.Logf("Missing metrics: %+v\n", metricsMap)
+		framework.Logf("Missing metrics: %+v\n", metricsMap)
 	}
 	framework.ExpectNoError(err)
 }
@@ -130,9 +131,9 @@ func checkForMetrics(projectID string, gcmService *gcm.Service, start time.Time,
 			if len(ts) > 0 {
 				counter = counter + 1
 				metricsMap[metric] = true
-				e2elog.Logf("Received %v timeseries for metric %v\n", len(ts), metric)
+				framework.Logf("Received %v timeseries for metric %v\n", len(ts), metric)
 			} else {
-				e2elog.Logf("No timeseries for metric %v\n", metric)
+				framework.Logf("No timeseries for metric %v\n", metric)
 			}
 
 			var sum float64
@@ -149,10 +150,10 @@ func checkForMetrics(projectID string, gcmService *gcm.Service, start time.Time,
 						}
 					}
 					sum = sum + *max.Value.DoubleValue
-					e2elog.Logf("Received %v points for metric %v\n",
+					framework.Logf("Received %v points for metric %v\n",
 						len(t.Points), metric)
 				}
-				e2elog.Logf("Most recent cpu/utilization sum*cpu/limit: %v\n", sum*float64(cpuLimit))
+				framework.Logf("Most recent cpu/utilization sum*cpu/limit: %v\n", sum*float64(cpuLimit))
 				if math.Abs(sum*float64(cpuLimit)-float64(cpuUsed)) > tolerance*float64(cpuUsed) {
 					return false, nil
 				}

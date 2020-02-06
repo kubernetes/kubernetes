@@ -17,6 +17,7 @@ limitations under the License.
 package integration
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -67,7 +68,7 @@ func TestYAML(t *testing.T) {
 		result, err := rest.Get().
 			SetHeader("Accept", "application/yaml").
 			AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version).
-			DoRaw()
+			DoRaw(context.TODO())
 		if err != nil {
 			t.Fatal(err, string(result))
 		}
@@ -88,7 +89,7 @@ func TestYAML(t *testing.T) {
 		result, err := rest.Get().
 			SetHeader("Accept", "application/yaml").
 			AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural, "missingname").
-			DoRaw()
+			DoRaw(context.TODO())
 		if !errors.IsNotFound(err) {
 			t.Fatalf("expected not found, got %v", err)
 		}
@@ -124,7 +125,7 @@ values:
 			SetHeader("Content-Type", "application/yaml").
 			AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
 			Body(yamlBody).
-			DoRaw()
+			DoRaw(context.TODO())
 		if err != nil {
 			t.Fatal(err, string(result))
 		}
@@ -159,7 +160,7 @@ values:
 		result, err := rest.Get().
 			SetHeader("Accept", "application/yaml").
 			AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural, "mytest").
-			DoRaw()
+			DoRaw(context.TODO())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -192,7 +193,7 @@ values:
 		result, err := rest.Get().
 			SetHeader("Accept", "application/yaml").
 			AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
-			DoRaw()
+			DoRaw(context.TODO())
 		if err != nil {
 			t.Fatal(err, string(result))
 		}
@@ -237,7 +238,7 @@ values:
 			SetHeader("Accept", "application/yaml").
 			AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
 			Param("watch", "true").
-			DoRaw()
+			DoRaw(context.TODO())
 		if !errors.IsNotAcceptable(err) {
 			t.Fatalf("expected not acceptable error, got %v (%s)", err, string(result))
 		}
@@ -274,7 +275,7 @@ values:
 			SetHeader("Content-Type", "application/yaml").
 			AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural, "mytest").
 			Body(yamlBody).
-			DoRaw()
+			DoRaw(context.TODO())
 		if err != nil {
 			t.Fatal(err, string(result))
 		}
@@ -315,7 +316,7 @@ values:
 			SetHeader("Content-Type", "application/yaml").
 			AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural, "mytest").
 			Body(yamlBody).
-			DoRaw()
+			DoRaw(context.TODO())
 		if !errors.IsUnsupportedMediaType(err) {
 			t.Fatalf("Expected bad request, got %v\n%s", err, string(result))
 		}
@@ -336,7 +337,7 @@ values:
 		result, err := rest.Delete().
 			SetHeader("Accept", "application/yaml").
 			AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural, "mytest").
-			DoRaw()
+			DoRaw(context.TODO())
 		if err != nil {
 			t.Fatal(err, string(result))
 		}
@@ -398,7 +399,7 @@ spec:
 			SetHeader("Content-Type", "application/yaml").
 			AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
 			Body(yamlBody).
-			DoRaw()
+			DoRaw(context.TODO())
 		if err != nil {
 			t.Fatal(err, string(result))
 		}
@@ -427,7 +428,7 @@ spec:
 		result, err := rest.Get().
 			SetHeader("Accept", "application/yaml").
 			AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural, "mytest", "status").
-			DoRaw()
+			DoRaw(context.TODO())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -467,7 +468,7 @@ status:
 			SetHeader("Content-Type", "application/yaml").
 			AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural, "mytest", "status").
 			Body(yamlBody).
-			DoRaw()
+			DoRaw(context.TODO())
 		if err != nil {
 			t.Fatal(err, string(result))
 		}
@@ -500,7 +501,7 @@ status:
 		result, err := rest.Get().
 			SetHeader("Accept", "application/yaml").
 			AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural, "mytest", "scale").
-			DoRaw()
+			DoRaw(context.TODO())
 		if err != nil {
 			t.Fatal(err)
 		}

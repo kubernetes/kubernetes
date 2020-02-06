@@ -25,11 +25,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
 const (
-	DiskSizeSCName = "disksizesc"
+	diskSizeSCName = "disksizesc"
 )
 
 /*
@@ -50,7 +52,7 @@ var _ = utils.SIGDescribe("Volume Disk Size [Feature:vsphere]", func() {
 		datastore    string
 	)
 	ginkgo.BeforeEach(func() {
-		framework.SkipUnlessProviderIs("vsphere")
+		e2eskipper.SkipUnlessProviderIs("vsphere")
 		Bootstrap(f)
 		client = f.ClientSet
 		namespace = f.Namespace.Name
@@ -66,17 +68,17 @@ var _ = utils.SIGDescribe("Volume Disk Size [Feature:vsphere]", func() {
 		expectedDiskSize := "1Mi"
 
 		ginkgo.By("Creating Storage Class")
-		storageclass, err := client.StorageV1().StorageClasses().Create(getVSphereStorageClassSpec(DiskSizeSCName, scParameters, nil))
+		storageclass, err := client.StorageV1().StorageClasses().Create(getVSphereStorageClassSpec(diskSizeSCName, scParameters, nil, ""))
 		framework.ExpectNoError(err)
 		defer client.StorageV1().StorageClasses().Delete(storageclass.Name, nil)
 
 		ginkgo.By("Creating PVC using the Storage Class")
-		pvclaim, err := framework.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClass(namespace, diskSize, storageclass))
+		pvclaim, err := e2epv.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClass(namespace, diskSize, storageclass))
 		framework.ExpectNoError(err)
-		defer framework.DeletePersistentVolumeClaim(client, pvclaim.Name, namespace)
+		defer e2epv.DeletePersistentVolumeClaim(client, pvclaim.Name, namespace)
 
 		ginkgo.By("Waiting for claim to be in bound phase")
-		err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, pvclaim.Namespace, pvclaim.Name, framework.Poll, 2*time.Minute)
+		err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, pvclaim.Namespace, pvclaim.Name, framework.Poll, 2*time.Minute)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Getting new copy of PVC")

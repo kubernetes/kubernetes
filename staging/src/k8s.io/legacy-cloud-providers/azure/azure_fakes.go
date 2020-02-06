@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2017 The Kubernetes Authors.
 
@@ -18,21 +20,22 @@ package azure
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/rand"
 	"net/http"
 	"strings"
 	"sync"
 
-	"k8s.io/api/core/v1"
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-07-01/compute"
+	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2019-06-01/network"
+	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2019-06-01/storage"
+	"github.com/Azure/go-autorest/autorest/to"
+
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	cloudprovider "k8s.io/cloud-provider"
-
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-03-01/compute"
-	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2018-08-01/network"
-	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2018-07-01/storage"
-	"github.com/Azure/go-autorest/autorest"
-	"github.com/Azure/go-autorest/autorest/to"
+	"k8s.io/legacy-cloud-providers/azure/retry"
 )
 
 var (
@@ -51,7 +54,7 @@ func newFakeAzureLBClient() *fakeAzureLBClient {
 	return fLBC
 }
 
-func (fLBC *fakeAzureLBClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, loadBalancerName string, parameters network.LoadBalancer, etag string) (resp *http.Response, err error) {
+func (fLBC *fakeAzureLBClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, loadBalancerName string, parameters network.LoadBalancer, etag string) *retry.Error {
 	fLBC.mutex.Lock()
 	defer fLBC.mutex.Unlock()
 
@@ -71,26 +74,24 @@ func (fLBC *fakeAzureLBClient) CreateOrUpdate(ctx context.Context, resourceGroup
 	}
 	fLBC.FakeStore[resourceGroupName][loadBalancerName] = parameters
 
-	return nil, nil
+	return nil
 }
 
-func (fLBC *fakeAzureLBClient) Delete(ctx context.Context, resourceGroupName string, loadBalancerName string) (resp *http.Response, err error) {
+func (fLBC *fakeAzureLBClient) Delete(ctx context.Context, resourceGroupName string, loadBalancerName string) *retry.Error {
 	fLBC.mutex.Lock()
 	defer fLBC.mutex.Unlock()
 
 	if rgLBs, ok := fLBC.FakeStore[resourceGroupName]; ok {
 		if _, ok := rgLBs[loadBalancerName]; ok {
 			delete(rgLBs, loadBalancerName)
-			return nil, nil
+			return nil
 		}
 	}
 
-	return &http.Response{
-		StatusCode: http.StatusNotFound,
-	}, nil
+	return nil
 }
 
-func (fLBC *fakeAzureLBClient) Get(ctx context.Context, resourceGroupName string, loadBalancerName string, expand string) (result network.LoadBalancer, err error) {
+func (fLBC *fakeAzureLBClient) Get(ctx context.Context, resourceGroupName string, loadBalancerName string, expand string) (result network.LoadBalancer, err *retry.Error) {
 	fLBC.mutex.Lock()
 	defer fLBC.mutex.Unlock()
 	if _, ok := fLBC.FakeStore[resourceGroupName]; ok {
@@ -98,13 +99,14 @@ func (fLBC *fakeAzureLBClient) Get(ctx context.Context, resourceGroupName string
 			return entity, nil
 		}
 	}
-	return result, autorest.DetailedError{
-		StatusCode: http.StatusNotFound,
-		Message:    "Not such LB",
-	}
+	return result, retry.GetError(
+		&http.Response{
+			StatusCode: http.StatusNotFound,
+		},
+		errors.New("Not such LB"))
 }
 
-func (fLBC *fakeAzureLBClient) List(ctx context.Context, resourceGroupName string) (result []network.LoadBalancer, err error) {
+func (fLBC *fakeAzureLBClient) List(ctx context.Context, resourceGroupName string) (result []network.LoadBalancer, err *retry.Error) {
 	fLBC.mutex.Lock()
 	defer fLBC.mutex.Unlock()
 
@@ -142,7 +144,7 @@ func newFakeAzurePIPClient(subscriptionID string) *fakeAzurePIPClient {
 	return fAPC
 }
 
-func (fAPC *fakeAzurePIPClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, publicIPAddressName string, parameters network.PublicIPAddress) (resp *http.Response, err error) {
+func (fAPC *fakeAzurePIPClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, publicIPAddressName string, parameters network.PublicIPAddress) *retry.Error {
 	fAPC.mutex.Lock()
 	defer fAPC.mutex.Unlock()
 
@@ -163,26 +165,28 @@ func (fAPC *fakeAzurePIPClient) CreateOrUpdate(ctx context.Context, resourceGrou
 
 	fAPC.FakeStore[resourceGroupName][publicIPAddressName] = parameters
 
-	return nil, nil
+	return nil
 }
 
-func (fAPC *fakeAzurePIPClient) Delete(ctx context.Context, resourceGroupName string, publicIPAddressName string) (resp *http.Response, err error) {
+func (fAPC *fakeAzurePIPClient) Delete(ctx context.Context, resourceGroupName string, publicIPAddressName string) *retry.Error {
 	fAPC.mutex.Lock()
 	defer fAPC.mutex.Unlock()
 
 	if rgPIPs, ok := fAPC.FakeStore[resourceGroupName]; ok {
 		if _, ok := rgPIPs[publicIPAddressName]; ok {
 			delete(rgPIPs, publicIPAddressName)
-			return nil, nil
+			return nil
 		}
 	}
 
-	return &http.Response{
-		StatusCode: http.StatusNotFound,
-	}, nil
+	return retry.GetError(
+		&http.Response{
+			StatusCode: http.StatusNotFound,
+		},
+		errors.New("Not such PIP"))
 }
 
-func (fAPC *fakeAzurePIPClient) Get(ctx context.Context, resourceGroupName string, publicIPAddressName string, expand string) (result network.PublicIPAddress, err error) {
+func (fAPC *fakeAzurePIPClient) Get(ctx context.Context, resourceGroupName string, publicIPAddressName string, expand string) (result network.PublicIPAddress, err *retry.Error) {
 	fAPC.mutex.Lock()
 	defer fAPC.mutex.Unlock()
 	if _, ok := fAPC.FakeStore[resourceGroupName]; ok {
@@ -190,13 +194,29 @@ func (fAPC *fakeAzurePIPClient) Get(ctx context.Context, resourceGroupName strin
 			return entity, nil
 		}
 	}
-	return result, autorest.DetailedError{
-		StatusCode: http.StatusNotFound,
-		Message:    "Not such PIP",
-	}
+	return result, retry.GetError(
+		&http.Response{
+			StatusCode: http.StatusNotFound,
+		},
+		errors.New("Not such PIP"))
 }
 
-func (fAPC *fakeAzurePIPClient) List(ctx context.Context, resourceGroupName string) (result []network.PublicIPAddress, err error) {
+func (fAPC *fakeAzurePIPClient) GetVirtualMachineScaleSetPublicIPAddress(ctx context.Context, resourceGroupName string, virtualMachineScaleSetName string, virtualmachineIndex string, networkInterfaceName string, IPConfigurationName string, publicIPAddressName string, expand string) (result network.PublicIPAddress, err *retry.Error) {
+	fAPC.mutex.Lock()
+	defer fAPC.mutex.Unlock()
+	if _, ok := fAPC.FakeStore[resourceGroupName]; ok {
+		if entity, ok := fAPC.FakeStore[resourceGroupName][publicIPAddressName]; ok {
+			return entity, nil
+		}
+	}
+	return result, retry.GetError(
+		&http.Response{
+			StatusCode: http.StatusNotFound,
+		},
+		errors.New("Not such PIP"))
+}
+
+func (fAPC *fakeAzurePIPClient) List(ctx context.Context, resourceGroupName string) (result []network.PublicIPAddress, err *retry.Error) {
 	fAPC.mutex.Lock()
 	defer fAPC.mutex.Unlock()
 
@@ -230,7 +250,7 @@ func newFakeAzureInterfacesClient() *fakeAzureInterfacesClient {
 	return fIC
 }
 
-func (fIC *fakeAzureInterfacesClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, networkInterfaceName string, parameters network.Interface) (resp *http.Response, err error) {
+func (fIC *fakeAzureInterfacesClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, networkInterfaceName string, parameters network.Interface) *retry.Error {
 	fIC.mutex.Lock()
 	defer fIC.mutex.Unlock()
 
@@ -239,10 +259,10 @@ func (fIC *fakeAzureInterfacesClient) CreateOrUpdate(ctx context.Context, resour
 	}
 	fIC.FakeStore[resourceGroupName][networkInterfaceName] = parameters
 
-	return nil, nil
+	return nil
 }
 
-func (fIC *fakeAzureInterfacesClient) Get(ctx context.Context, resourceGroupName string, networkInterfaceName string, expand string) (result network.Interface, err error) {
+func (fIC *fakeAzureInterfacesClient) Get(ctx context.Context, resourceGroupName string, networkInterfaceName string, expand string) (result network.Interface, err *retry.Error) {
 	fIC.mutex.Lock()
 	defer fIC.mutex.Unlock()
 	if _, ok := fIC.FakeStore[resourceGroupName]; ok {
@@ -250,13 +270,14 @@ func (fIC *fakeAzureInterfacesClient) Get(ctx context.Context, resourceGroupName
 			return entity, nil
 		}
 	}
-	return result, autorest.DetailedError{
-		StatusCode: http.StatusNotFound,
-		Message:    "Not such Interface",
-	}
+	return result, retry.GetError(
+		&http.Response{
+			StatusCode: http.StatusNotFound,
+		},
+		errors.New("Not such Interface"))
 }
 
-func (fIC *fakeAzureInterfacesClient) GetVirtualMachineScaleSetNetworkInterface(ctx context.Context, resourceGroupName string, virtualMachineScaleSetName string, virtualmachineIndex string, networkInterfaceName string, expand string) (result network.Interface, err error) {
+func (fIC *fakeAzureInterfacesClient) GetVirtualMachineScaleSetNetworkInterface(ctx context.Context, resourceGroupName string, virtualMachineScaleSetName string, virtualmachineIndex string, networkInterfaceName string, expand string) (result network.Interface, err *retry.Error) {
 	fIC.mutex.Lock()
 	defer fIC.mutex.Unlock()
 	if _, ok := fIC.FakeStore[resourceGroupName]; ok {
@@ -264,10 +285,11 @@ func (fIC *fakeAzureInterfacesClient) GetVirtualMachineScaleSetNetworkInterface(
 			return entity, nil
 		}
 	}
-	return result, autorest.DetailedError{
-		StatusCode: http.StatusNotFound,
-		Message:    "Not such Interface",
-	}
+	return result, retry.GetError(
+		&http.Response{
+			StatusCode: http.StatusNotFound,
+		},
+		errors.New("Not such Interface"))
 }
 
 func (fIC *fakeAzureInterfacesClient) setFakeStore(store map[string]map[string]network.Interface) {
@@ -289,7 +311,7 @@ func newFakeAzureVirtualMachinesClient() *fakeAzureVirtualMachinesClient {
 	return fVMC
 }
 
-func (fVMC *fakeAzureVirtualMachinesClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, VMName string, parameters compute.VirtualMachine, source string) (resp *http.Response, err error) {
+func (fVMC *fakeAzureVirtualMachinesClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, VMName string, parameters compute.VirtualMachine, source string) *retry.Error {
 	fVMC.mutex.Lock()
 	defer fVMC.mutex.Unlock()
 
@@ -298,10 +320,21 @@ func (fVMC *fakeAzureVirtualMachinesClient) CreateOrUpdate(ctx context.Context, 
 	}
 	fVMC.FakeStore[resourceGroupName][VMName] = parameters
 
-	return nil, nil
+	return nil
 }
 
-func (fVMC *fakeAzureVirtualMachinesClient) Get(ctx context.Context, resourceGroupName string, VMName string, expand compute.InstanceViewTypes) (result compute.VirtualMachine, err error) {
+func (fVMC *fakeAzureVirtualMachinesClient) Update(ctx context.Context, resourceGroupName string, VMName string, parameters compute.VirtualMachineUpdate, source string) *retry.Error {
+	fVMC.mutex.Lock()
+	defer fVMC.mutex.Unlock()
+
+	if _, ok := fVMC.FakeStore[resourceGroupName]; !ok {
+		fVMC.FakeStore[resourceGroupName] = make(map[string]compute.VirtualMachine)
+	}
+
+	return nil
+}
+
+func (fVMC *fakeAzureVirtualMachinesClient) Get(ctx context.Context, resourceGroupName string, VMName string, expand compute.InstanceViewTypes) (result compute.VirtualMachine, err *retry.Error) {
 	fVMC.mutex.Lock()
 	defer fVMC.mutex.Unlock()
 	if _, ok := fVMC.FakeStore[resourceGroupName]; ok {
@@ -309,13 +342,14 @@ func (fVMC *fakeAzureVirtualMachinesClient) Get(ctx context.Context, resourceGro
 			return entity, nil
 		}
 	}
-	return result, autorest.DetailedError{
-		StatusCode: http.StatusNotFound,
-		Message:    "Not such VM",
-	}
+	return result, retry.GetError(
+		&http.Response{
+			StatusCode: http.StatusNotFound,
+		},
+		errors.New("Not such VM"))
 }
 
-func (fVMC *fakeAzureVirtualMachinesClient) List(ctx context.Context, resourceGroupName string) (result []compute.VirtualMachine, err error) {
+func (fVMC *fakeAzureVirtualMachinesClient) List(ctx context.Context, resourceGroupName string) (result []compute.VirtualMachine, err *retry.Error) {
 	fVMC.mutex.Lock()
 	defer fVMC.mutex.Unlock()
 
@@ -348,7 +382,7 @@ func newFakeAzureSubnetsClient() *fakeAzureSubnetsClient {
 	return fASC
 }
 
-func (fASC *fakeAzureSubnetsClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, virtualNetworkName string, subnetName string, subnetParameters network.Subnet) (resp *http.Response, err error) {
+func (fASC *fakeAzureSubnetsClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, virtualNetworkName string, subnetName string, subnetParameters network.Subnet) *retry.Error {
 	fASC.mutex.Lock()
 	defer fASC.mutex.Unlock()
 
@@ -358,10 +392,10 @@ func (fASC *fakeAzureSubnetsClient) CreateOrUpdate(ctx context.Context, resource
 	}
 	fASC.FakeStore[rgVnet][subnetName] = subnetParameters
 
-	return nil, nil
+	return nil
 }
 
-func (fASC *fakeAzureSubnetsClient) Delete(ctx context.Context, resourceGroupName string, virtualNetworkName string, subnetName string) (resp *http.Response, err error) {
+func (fASC *fakeAzureSubnetsClient) Delete(ctx context.Context, resourceGroupName string, virtualNetworkName string, subnetName string) *retry.Error {
 	fASC.mutex.Lock()
 	defer fASC.mutex.Unlock()
 
@@ -369,16 +403,18 @@ func (fASC *fakeAzureSubnetsClient) Delete(ctx context.Context, resourceGroupNam
 	if rgSubnets, ok := fASC.FakeStore[rgVnet]; ok {
 		if _, ok := rgSubnets[subnetName]; ok {
 			delete(rgSubnets, subnetName)
-			return nil, nil
+			return nil
 		}
 	}
 
-	return &http.Response{
-		StatusCode: http.StatusNotFound,
-	}, nil
+	return retry.GetError(
+		&http.Response{
+			StatusCode: http.StatusNotFound,
+		},
+		errors.New("Not such Subnet"))
 }
 
-func (fASC *fakeAzureSubnetsClient) Get(ctx context.Context, resourceGroupName string, virtualNetworkName string, subnetName string, expand string) (result network.Subnet, err error) {
+func (fASC *fakeAzureSubnetsClient) Get(ctx context.Context, resourceGroupName string, virtualNetworkName string, subnetName string, expand string) (result network.Subnet, err *retry.Error) {
 	fASC.mutex.Lock()
 	defer fASC.mutex.Unlock()
 	rgVnet := strings.Join([]string{resourceGroupName, virtualNetworkName}, "AND")
@@ -387,13 +423,14 @@ func (fASC *fakeAzureSubnetsClient) Get(ctx context.Context, resourceGroupName s
 			return entity, nil
 		}
 	}
-	return result, autorest.DetailedError{
-		StatusCode: http.StatusNotFound,
-		Message:    "Not such Subnet",
-	}
+	return result, retry.GetError(
+		&http.Response{
+			StatusCode: http.StatusNotFound,
+		},
+		errors.New("Not such Subnet"))
 }
 
-func (fASC *fakeAzureSubnetsClient) List(ctx context.Context, resourceGroupName string, virtualNetworkName string) (result []network.Subnet, err error) {
+func (fASC *fakeAzureSubnetsClient) List(ctx context.Context, resourceGroupName string, virtualNetworkName string) (result []network.Subnet, err *retry.Error) {
 	fASC.mutex.Lock()
 	defer fASC.mutex.Unlock()
 
@@ -420,7 +457,7 @@ func newFakeAzureNSGClient() *fakeAzureNSGClient {
 	return fNSG
 }
 
-func (fNSG *fakeAzureNSGClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, networkSecurityGroupName string, parameters network.SecurityGroup, etag string) (resp *http.Response, err error) {
+func (fNSG *fakeAzureNSGClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, networkSecurityGroupName string, parameters network.SecurityGroup, etag string) *retry.Error {
 	fNSG.mutex.Lock()
 	defer fNSG.mutex.Unlock()
 
@@ -430,33 +467,35 @@ func (fNSG *fakeAzureNSGClient) CreateOrUpdate(ctx context.Context, resourceGrou
 
 	if nsg, ok := fNSG.FakeStore[resourceGroupName][networkSecurityGroupName]; ok {
 		if etag != "" && to.String(nsg.Etag) != "" && etag != to.String(nsg.Etag) {
-			return &http.Response{
+			return retry.GetError(&http.Response{
 				StatusCode: http.StatusPreconditionFailed,
-			}, errPreconditionFailedEtagMismatch
+			}, errPreconditionFailedEtagMismatch)
 		}
 	}
 	fNSG.FakeStore[resourceGroupName][networkSecurityGroupName] = parameters
 
-	return nil, nil
+	return nil
 }
 
-func (fNSG *fakeAzureNSGClient) Delete(ctx context.Context, resourceGroupName string, networkSecurityGroupName string) (resp *http.Response, err error) {
+func (fNSG *fakeAzureNSGClient) Delete(ctx context.Context, resourceGroupName string, networkSecurityGroupName string) *retry.Error {
 	fNSG.mutex.Lock()
 	defer fNSG.mutex.Unlock()
 
 	if rgSGs, ok := fNSG.FakeStore[resourceGroupName]; ok {
 		if _, ok := rgSGs[networkSecurityGroupName]; ok {
 			delete(rgSGs, networkSecurityGroupName)
-			return nil, nil
+			return nil
 		}
 	}
 
-	return &http.Response{
-		StatusCode: http.StatusNotFound,
-	}, nil
+	return retry.GetError(
+		&http.Response{
+			StatusCode: http.StatusNotFound,
+		},
+		errors.New("Not such NSG"))
 }
 
-func (fNSG *fakeAzureNSGClient) Get(ctx context.Context, resourceGroupName string, networkSecurityGroupName string, expand string) (result network.SecurityGroup, err error) {
+func (fNSG *fakeAzureNSGClient) Get(ctx context.Context, resourceGroupName string, networkSecurityGroupName string, expand string) (result network.SecurityGroup, err *retry.Error) {
 	fNSG.mutex.Lock()
 	defer fNSG.mutex.Unlock()
 	if _, ok := fNSG.FakeStore[resourceGroupName]; ok {
@@ -464,13 +503,14 @@ func (fNSG *fakeAzureNSGClient) Get(ctx context.Context, resourceGroupName strin
 			return entity, nil
 		}
 	}
-	return result, autorest.DetailedError{
-		StatusCode: http.StatusNotFound,
-		Message:    "Not such NSG",
-	}
+	return result, retry.GetError(
+		&http.Response{
+			StatusCode: http.StatusNotFound,
+		},
+		errors.New("Not such NSG"))
 }
 
-func (fNSG *fakeAzureNSGClient) List(ctx context.Context, resourceGroupName string) (result []network.SecurityGroup, err error) {
+func (fNSG *fakeAzureNSGClient) List(ctx context.Context, resourceGroupName string) (result []network.SecurityGroup, err *retry.Error) {
 	fNSG.mutex.Lock()
 	defer fNSG.mutex.Unlock()
 
@@ -508,7 +548,7 @@ func (fVMC *fakeVirtualMachineScaleSetVMsClient) setFakeStore(store map[string]m
 	fVMC.FakeStore = store
 }
 
-func (fVMC *fakeVirtualMachineScaleSetVMsClient) List(ctx context.Context, resourceGroupName string, virtualMachineScaleSetName string, filter string, selectParameter string, expand string) (result []compute.VirtualMachineScaleSetVM, err error) {
+func (fVMC *fakeVirtualMachineScaleSetVMsClient) List(ctx context.Context, resourceGroupName string, virtualMachineScaleSetName string, expand string) (result []compute.VirtualMachineScaleSetVM, err *retry.Error) {
 	fVMC.mutex.Lock()
 	defer fVMC.mutex.Unlock()
 
@@ -522,7 +562,7 @@ func (fVMC *fakeVirtualMachineScaleSetVMsClient) List(ctx context.Context, resou
 	return result, nil
 }
 
-func (fVMC *fakeVirtualMachineScaleSetVMsClient) Get(ctx context.Context, resourceGroupName string, VMScaleSetName string, instanceID string) (result compute.VirtualMachineScaleSetVM, err error) {
+func (fVMC *fakeVirtualMachineScaleSetVMsClient) Get(ctx context.Context, resourceGroupName string, VMScaleSetName string, instanceID string, expand compute.InstanceViewTypes) (result compute.VirtualMachineScaleSetVM, err *retry.Error) {
 	fVMC.mutex.Lock()
 	defer fVMC.mutex.Unlock()
 
@@ -533,22 +573,14 @@ func (fVMC *fakeVirtualMachineScaleSetVMsClient) Get(ctx context.Context, resour
 		}
 	}
 
-	return result, autorest.DetailedError{
-		StatusCode: http.StatusNotFound,
-		Message:    "No such VirtualMachineScaleSetVM",
-	}
+	return result, retry.GetError(
+		&http.Response{
+			StatusCode: http.StatusNotFound,
+		},
+		errors.New("Not such VirtualMachineScaleSetVM"))
 }
 
-func (fVMC *fakeVirtualMachineScaleSetVMsClient) GetInstanceView(ctx context.Context, resourceGroupName string, VMScaleSetName string, instanceID string) (result compute.VirtualMachineScaleSetVMInstanceView, err error) {
-	_, err = fVMC.Get(ctx, resourceGroupName, VMScaleSetName, instanceID)
-	if err != nil {
-		return result, err
-	}
-
-	return result, nil
-}
-
-func (fVMC *fakeVirtualMachineScaleSetVMsClient) Update(ctx context.Context, resourceGroupName string, VMScaleSetName string, instanceID string, parameters compute.VirtualMachineScaleSetVM, source string) (resp *http.Response, err error) {
+func (fVMC *fakeVirtualMachineScaleSetVMsClient) Update(ctx context.Context, resourceGroupName string, VMScaleSetName string, instanceID string, parameters compute.VirtualMachineScaleSetVM, source string) *retry.Error {
 	fVMC.mutex.Lock()
 	defer fVMC.mutex.Unlock()
 
@@ -559,7 +591,7 @@ func (fVMC *fakeVirtualMachineScaleSetVMsClient) Update(ctx context.Context, res
 		}
 	}
 
-	return nil, nil
+	return nil
 }
 
 type fakeVirtualMachineScaleSetsClient struct {
@@ -582,7 +614,7 @@ func (fVMSSC *fakeVirtualMachineScaleSetsClient) setFakeStore(store map[string]m
 	fVMSSC.FakeStore = store
 }
 
-func (fVMSSC *fakeVirtualMachineScaleSetsClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, VMScaleSetName string, parameters compute.VirtualMachineScaleSet) (resp *http.Response, err error) {
+func (fVMSSC *fakeVirtualMachineScaleSetsClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, VMScaleSetName string, parameters compute.VirtualMachineScaleSet) *retry.Error {
 	fVMSSC.mutex.Lock()
 	defer fVMSSC.mutex.Unlock()
 
@@ -591,10 +623,10 @@ func (fVMSSC *fakeVirtualMachineScaleSetsClient) CreateOrUpdate(ctx context.Cont
 	}
 	fVMSSC.FakeStore[resourceGroupName][VMScaleSetName] = parameters
 
-	return nil, nil
+	return nil
 }
 
-func (fVMSSC *fakeVirtualMachineScaleSetsClient) Get(ctx context.Context, resourceGroupName string, VMScaleSetName string) (result compute.VirtualMachineScaleSet, err error) {
+func (fVMSSC *fakeVirtualMachineScaleSetsClient) Get(ctx context.Context, resourceGroupName string, VMScaleSetName string) (result compute.VirtualMachineScaleSet, err *retry.Error) {
 	fVMSSC.mutex.Lock()
 	defer fVMSSC.mutex.Unlock()
 
@@ -604,13 +636,14 @@ func (fVMSSC *fakeVirtualMachineScaleSetsClient) Get(ctx context.Context, resour
 		}
 	}
 
-	return result, autorest.DetailedError{
-		StatusCode: http.StatusNotFound,
-		Message:    "No such ScaleSet",
-	}
+	return result, retry.GetError(
+		&http.Response{
+			StatusCode: http.StatusNotFound,
+		},
+		errors.New("Not such ScaleSet"))
 }
 
-func (fVMSSC *fakeVirtualMachineScaleSetsClient) List(ctx context.Context, resourceGroupName string) (result []compute.VirtualMachineScaleSet, err error) {
+func (fVMSSC *fakeVirtualMachineScaleSetsClient) List(ctx context.Context, resourceGroupName string) (result []compute.VirtualMachineScaleSet, err *retry.Error) {
 	fVMSSC.mutex.Lock()
 	defer fVMSSC.mutex.Unlock()
 
@@ -624,13 +657,14 @@ func (fVMSSC *fakeVirtualMachineScaleSetsClient) List(ctx context.Context, resou
 	return result, nil
 }
 
-func (fVMSSC *fakeVirtualMachineScaleSetsClient) UpdateInstances(ctx context.Context, resourceGroupName string, VMScaleSetName string, VMInstanceIDs compute.VirtualMachineScaleSetVMInstanceRequiredIDs) (resp *http.Response, err error) {
-	return nil, nil
+func (fVMSSC *fakeVirtualMachineScaleSetsClient) UpdateInstances(ctx context.Context, resourceGroupName string, VMScaleSetName string, VMInstanceIDs compute.VirtualMachineScaleSetVMInstanceRequiredIDs) *retry.Error {
+	return nil
 }
 
 type fakeRoutesClient struct {
 	mutex     *sync.Mutex
 	FakeStore map[string]map[string]network.Route
+	Calls     []string
 }
 
 func newFakeRoutesClient() *fakeRoutesClient {
@@ -640,32 +674,38 @@ func newFakeRoutesClient() *fakeRoutesClient {
 	return fRC
 }
 
-func (fRC *fakeRoutesClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, routeTableName string, routeName string, routeParameters network.Route, etag string) (resp *http.Response, err error) {
+func (fRC *fakeRoutesClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, routeTableName string, routeName string, routeParameters network.Route, etag string) *retry.Error {
 	fRC.mutex.Lock()
 	defer fRC.mutex.Unlock()
+
+	fRC.Calls = append(fRC.Calls, "CreateOrUpdate")
 
 	if _, ok := fRC.FakeStore[routeTableName]; !ok {
 		fRC.FakeStore[routeTableName] = make(map[string]network.Route)
 	}
 	fRC.FakeStore[routeTableName][routeName] = routeParameters
 
-	return nil, nil
+	return nil
 }
 
-func (fRC *fakeRoutesClient) Delete(ctx context.Context, resourceGroupName string, routeTableName string, routeName string) (resp *http.Response, err error) {
+func (fRC *fakeRoutesClient) Delete(ctx context.Context, resourceGroupName string, routeTableName string, routeName string) *retry.Error {
 	fRC.mutex.Lock()
 	defer fRC.mutex.Unlock()
+
+	fRC.Calls = append(fRC.Calls, "Delete")
 
 	if routes, ok := fRC.FakeStore[routeTableName]; ok {
 		if _, ok := routes[routeName]; ok {
 			delete(routes, routeName)
-			return nil, nil
+			return nil
 		}
 	}
 
-	return &http.Response{
-		StatusCode: http.StatusNotFound,
-	}, nil
+	return retry.GetError(
+		&http.Response{
+			StatusCode: http.StatusNotFound,
+		},
+		errors.New("Not such Route"))
 }
 
 type fakeRouteTablesClient struct {
@@ -681,7 +721,7 @@ func newFakeRouteTablesClient() *fakeRouteTablesClient {
 	return fRTC
 }
 
-func (fRTC *fakeRouteTablesClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, routeTableName string, parameters network.RouteTable, etag string) (resp *http.Response, err error) {
+func (fRTC *fakeRouteTablesClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, routeTableName string, parameters network.RouteTable, etag string) *retry.Error {
 	fRTC.mutex.Lock()
 	defer fRTC.mutex.Unlock()
 
@@ -692,10 +732,10 @@ func (fRTC *fakeRouteTablesClient) CreateOrUpdate(ctx context.Context, resourceG
 	}
 	fRTC.FakeStore[resourceGroupName][routeTableName] = parameters
 
-	return nil, nil
+	return nil
 }
 
-func (fRTC *fakeRouteTablesClient) Get(ctx context.Context, resourceGroupName string, routeTableName string, expand string) (result network.RouteTable, err error) {
+func (fRTC *fakeRouteTablesClient) Get(ctx context.Context, resourceGroupName string, routeTableName string, expand string) (result network.RouteTable, err *retry.Error) {
 	fRTC.mutex.Lock()
 	defer fRTC.mutex.Unlock()
 
@@ -706,10 +746,11 @@ func (fRTC *fakeRouteTablesClient) Get(ctx context.Context, resourceGroupName st
 			return entity, nil
 		}
 	}
-	return result, autorest.DetailedError{
-		StatusCode: http.StatusNotFound,
-		Message:    "Not such RouteTable",
-	}
+	return result, retry.GetError(
+		&http.Response{
+			StatusCode: http.StatusNotFound,
+		},
+		errors.New("Not such RouteTable"))
 }
 
 type fakeFileClient struct {
@@ -731,7 +772,7 @@ type fakeStorageAccountClient struct {
 	mutex     *sync.Mutex
 	FakeStore map[string]map[string]storage.Account
 	Keys      storage.AccountListKeysResult
-	Accounts  storage.AccountListResult
+	Accounts  []storage.Account
 	Err       error
 }
 
@@ -742,7 +783,7 @@ func newFakeStorageAccountClient() *fakeStorageAccountClient {
 	return fSAC
 }
 
-func (fSAC *fakeStorageAccountClient) Create(ctx context.Context, resourceGroupName string, accountName string, parameters storage.AccountCreateParameters) (resp *http.Response, err error) {
+func (fSAC *fakeStorageAccountClient) Create(ctx context.Context, resourceGroupName string, accountName string, parameters storage.AccountCreateParameters) *retry.Error {
 	fSAC.mutex.Lock()
 	defer fSAC.mutex.Unlock()
 
@@ -759,42 +800,36 @@ func (fSAC *fakeStorageAccountClient) Create(ctx context.Context, resourceGroupN
 		AccountProperties: &storage.AccountProperties{},
 	}
 
-	return nil, nil
+	return nil
 }
 
-func (fSAC *fakeStorageAccountClient) Delete(ctx context.Context, resourceGroupName string, accountName string) (result autorest.Response, err error) {
+func (fSAC *fakeStorageAccountClient) Delete(ctx context.Context, resourceGroupName string, accountName string) *retry.Error {
 	fSAC.mutex.Lock()
 	defer fSAC.mutex.Unlock()
 
 	if rgAccounts, ok := fSAC.FakeStore[resourceGroupName]; ok {
 		if _, ok := rgAccounts[accountName]; ok {
 			delete(rgAccounts, accountName)
-			result.Response = &http.Response{
-				StatusCode: http.StatusAccepted,
-			}
-			return result, nil
+			return nil
 		}
 	}
 
-	result.Response = &http.Response{
-		StatusCode: http.StatusNotFound,
-	}
-	err = autorest.DetailedError{
-		StatusCode: http.StatusNotFound,
-		Message:    "Not such StorageAccount",
-	}
-	return result, err
+	return retry.GetError(
+		&http.Response{
+			StatusCode: http.StatusNotFound,
+		},
+		errors.New("Not such StorageAccount"))
 }
 
-func (fSAC *fakeStorageAccountClient) ListKeys(ctx context.Context, resourceGroupName string, accountName string) (result storage.AccountListKeysResult, err error) {
-	return fSAC.Keys, fSAC.Err
+func (fSAC *fakeStorageAccountClient) ListKeys(ctx context.Context, resourceGroupName string, accountName string) (result storage.AccountListKeysResult, err *retry.Error) {
+	return fSAC.Keys, nil
 }
 
-func (fSAC *fakeStorageAccountClient) ListByResourceGroup(ctx context.Context, resourceGroupName string) (result storage.AccountListResult, err error) {
-	return fSAC.Accounts, fSAC.Err
+func (fSAC *fakeStorageAccountClient) ListByResourceGroup(ctx context.Context, resourceGroupName string) (result []storage.Account, err *retry.Error) {
+	return fSAC.Accounts, nil
 }
 
-func (fSAC *fakeStorageAccountClient) GetProperties(ctx context.Context, resourceGroupName string, accountName string) (result storage.Account, err error) {
+func (fSAC *fakeStorageAccountClient) GetProperties(ctx context.Context, resourceGroupName string, accountName string) (result storage.Account, err *retry.Error) {
 	fSAC.mutex.Lock()
 	defer fSAC.mutex.Unlock()
 
@@ -804,10 +839,11 @@ func (fSAC *fakeStorageAccountClient) GetProperties(ctx context.Context, resourc
 		}
 	}
 
-	return result, autorest.DetailedError{
-		StatusCode: http.StatusNotFound,
-		Message:    "Not such StorageAccount",
-	}
+	return result, retry.GetError(
+		&http.Response{
+			StatusCode: http.StatusNotFound,
+		},
+		errors.New("Not such StorageAccount"))
 }
 
 type fakeDisksClient struct {
@@ -822,7 +858,7 @@ func newFakeDisksClient() *fakeDisksClient {
 	return fDC
 }
 
-func (fDC *fakeDisksClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, diskName string, diskParameter compute.Disk) (resp *http.Response, err error) {
+func (fDC *fakeDisksClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, diskName string, diskParameter compute.Disk) *retry.Error {
 	fDC.mutex.Lock()
 	defer fDC.mutex.Unlock()
 
@@ -831,26 +867,28 @@ func (fDC *fakeDisksClient) CreateOrUpdate(ctx context.Context, resourceGroupNam
 	}
 	fDC.FakeStore[resourceGroupName][diskName] = diskParameter
 
-	return nil, nil
+	return nil
 }
 
-func (fDC *fakeDisksClient) Delete(ctx context.Context, resourceGroupName string, diskName string) (resp *http.Response, err error) {
+func (fDC *fakeDisksClient) Delete(ctx context.Context, resourceGroupName string, diskName string) *retry.Error {
 	fDC.mutex.Lock()
 	defer fDC.mutex.Unlock()
 
 	if rgDisks, ok := fDC.FakeStore[resourceGroupName]; ok {
 		if _, ok := rgDisks[diskName]; ok {
 			delete(rgDisks, diskName)
-			return nil, nil
+			return nil
 		}
 	}
 
-	return &http.Response{
-		StatusCode: http.StatusAccepted,
-	}, nil
+	return retry.GetError(
+		&http.Response{
+			StatusCode: http.StatusNotFound,
+		},
+		errors.New("Not such Disk"))
 }
 
-func (fDC *fakeDisksClient) Get(ctx context.Context, resourceGroupName string, diskName string) (result compute.Disk, err error) {
+func (fDC *fakeDisksClient) Get(ctx context.Context, resourceGroupName string, diskName string) (result compute.Disk, err *retry.Error) {
 	fDC.mutex.Lock()
 	defer fDC.mutex.Unlock()
 
@@ -860,10 +898,11 @@ func (fDC *fakeDisksClient) Get(ctx context.Context, resourceGroupName string, d
 		}
 	}
 
-	return result, autorest.DetailedError{
-		StatusCode: http.StatusNotFound,
-		Message:    "Not such Disk",
-	}
+	return result, retry.GetError(
+		&http.Response{
+			StatusCode: http.StatusNotFound,
+		},
+		errors.New("Not such Disk"))
 }
 
 type fakeVMSet struct {
@@ -924,15 +963,15 @@ func (f *fakeVMSet) EnsureBackendPoolDeleted(service *v1.Service, backendPoolID,
 	return fmt.Errorf("unimplemented")
 }
 
-func (f *fakeVMSet) AttachDisk(isManagedDisk bool, diskName, diskURI string, nodeName types.NodeName, lun int32, cachingMode compute.CachingTypes) error {
+func (f *fakeVMSet) AttachDisk(isManagedDisk bool, diskName, diskURI string, nodeName types.NodeName, lun int32, cachingMode compute.CachingTypes, diskEncryptionSetID string) error {
 	return fmt.Errorf("unimplemented")
 }
 
-func (f *fakeVMSet) DetachDisk(diskName, diskURI string, nodeName types.NodeName) (*http.Response, error) {
-	return nil, fmt.Errorf("unimplemented")
+func (f *fakeVMSet) DetachDisk(diskName, diskURI string, nodeName types.NodeName) error {
+	return fmt.Errorf("unimplemented")
 }
 
-func (f *fakeVMSet) GetDataDisks(nodeName types.NodeName) ([]compute.DataDisk, error) {
+func (f *fakeVMSet) GetDataDisks(nodeName types.NodeName, crt cacheReadType) ([]compute.DataDisk, error) {
 	return nil, fmt.Errorf("unimplemented")
 }
 

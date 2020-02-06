@@ -18,20 +18,54 @@ package upgrade
 
 import (
 	"io/ioutil"
+	"os"
 	"testing"
+
+	"github.com/pkg/errors"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
-const (
-	testUpgradeDiffConfig   = `testdata/diff_controlplane_config.yaml`
-	testUpgradeDiffManifest = `testdata/diff_dummy_manifest.yaml`
-)
+func createTestRunDiffFile(contents []byte) (string, error) {
+	file, err := ioutil.TempFile("", "kubeadm-upgrade-diff-config-*.yaml")
+	if err != nil {
+		return "", errors.Wrap(err, "failed to create temporary test file")
+	}
+	if _, err := file.Write([]byte(contents)); err != nil {
+		return "", errors.Wrap(err, "failed to write to temporary test file")
+	}
+	if err := file.Close(); err != nil {
+		return "", errors.Wrap(err, "failed to close temporary test file")
+	}
+	return file.Name(), nil
+}
 
 func TestRunDiff(t *testing.T) {
+	currentVersion := "v" + constants.CurrentKubernetesVersion.String()
+
+	// create a temporary file with valid ClusterConfiguration
+	testUpgradeDiffConfigContents := []byte("apiVersion: kubeadm.k8s.io/v1beta2\n" +
+		"kind: ClusterConfiguration\n" +
+		"kubernetesVersion: " + currentVersion)
+	testUpgradeDiffConfig, err := createTestRunDiffFile(testUpgradeDiffConfigContents)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(testUpgradeDiffConfig)
+
+	// create a temporary manifest file with dummy contents
+	testUpgradeDiffManifestContents := []byte("some-contents")
+	testUpgradeDiffManifest, err := createTestRunDiffFile(testUpgradeDiffManifestContents)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(testUpgradeDiffManifest)
+
 	flags := &diffFlags{
 		cfgPath: "",
 		out:     ioutil.Discard,
 	}
 
+	// TODO: Add test cases for empty cfgPath, it should automatically fetch cfg from cluster
 	testCases := []struct {
 		name            string
 		args            []string

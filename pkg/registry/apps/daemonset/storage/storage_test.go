@@ -39,7 +39,10 @@ func newStorage(t *testing.T) (*REST, *StatusREST, *etcd3testing.EtcdTestServer)
 		DeleteCollectionWorkers: 1,
 		ResourcePrefix:          "daemonsets",
 	}
-	daemonSetStorage, statusStorage := NewREST(restOptions)
+	daemonSetStorage, statusStorage, err := NewREST(restOptions)
+	if err != nil {
+		t.Fatalf("unexpected error from REST storage: %v", err)
+	}
 	return daemonSetStorage, statusStorage, server
 }
 

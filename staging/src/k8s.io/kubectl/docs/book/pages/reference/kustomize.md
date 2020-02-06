@@ -97,7 +97,7 @@ as well as `namePrefix`'s and `nameSuffix`'s.
 
 | Name          | Type      | Desc                                |
 | :------------ | :-------- | :---------------------------------- |
-| **behavior**  | string    | Merge behavior when the ConfigMap generator is defined in a base.  May be one of `create`, `replace`, `merge. |
+| **behavior**  | string    | Merge behavior when the ConfigMap generator is defined in a base.  May be one of `create`, `replace`, `merge`. |
 | **env**       | string    | Single file to generate ConfigMap data entries from.  Should be a path to a local *env* file, e.g. `path/to/file.env`, where each line of the file is a `key=value` pair.  *Each line* will appear as an entry in the ConfigMap data field. |
 | **files**     | []string  | List of files to generate ConfigMap data entries from. Each item should be a path to a local file, e.g. `path/to/file.config`, and the filename will appear as an entry in the ConfigMap data field with its contents as a value.  |
 | **literals**  | []string  | List of literal ConfigMap data entries. Each item should be a key and literal value, e.g. `somekey=somevalue`, and the key/value will appear as an entry in the ConfigMap data field.|
@@ -185,7 +185,7 @@ as well as `namePrefix`'s and `nameSuffix`'s.
 
 | Name          | Type    | Desc                                |
 | :------------ | :------ | :---------------------------------- |
-| **behavior**  | string  | Merge behavior when the Secret generator is defined in a base.  May be one of `create`, `replace`, `merge. |
+| **behavior**  | string  | Merge behavior when the Secret generator is defined in a base.  May be one of `create`, `replace`, `merge`. |
 | **env**       | string  | Single file to generate Secret data entries from.  Should be a path to a local *env* file, e.g. `path/to/file.env`, where each line of the file is a `key=value` pair.  *Each line* will appear as an entry in the Secret data field. |
 | **files**     | []string  | List of files to generate Secret data entries from. Each item should be a path to a local file, e.g. `path/to/file.config`, and the filename will appear as an entry in the ConfigMap data field with its contents as a value.  |
 | **literals**  | []string  | List of literal Secret data entries. Each item should be a key and literal value, e.g. `somekey=somevalue`, and the key/value will appear as an entry in the Secret data field.|

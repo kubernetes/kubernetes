@@ -40,6 +40,10 @@ const (
 	// before terminating request and returning Timeout error with retry
 	// after suggestion.
 	blockTimeout = 3 * time.Second
+
+	// resourceVersionTooHighRetrySeconds is the seconds before a operation should be retried by the client
+	// after receiving a 'too high resource version' error.
+	resourceVersionTooHighRetrySeconds = 1
 )
 
 // watchCacheEvent is a single "watch event" that is send to users of
@@ -219,7 +223,7 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, upd
 		return err
 	}
 
-	watchCacheEvent := &watchCacheEvent{
+	wcEvent := &watchCacheEvent{
 		Type:            event.Type,
 		Object:          elem.Object,
 		ObjLabels:       elem.Labels,
@@ -242,12 +246,12 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, upd
 		}
 		if exists {
 			previousElem := previous.(*storeElement)
-			watchCacheEvent.PrevObject = previousElem.Object
-			watchCacheEvent.PrevObjLabels = previousElem.Labels
-			watchCacheEvent.PrevObjFields = previousElem.Fields
+			wcEvent.PrevObject = previousElem.Object
+			wcEvent.PrevObjLabels = previousElem.Labels
+			wcEvent.PrevObjFields = previousElem.Fields
 		}
 
-		w.updateCache(watchCacheEvent)
+		w.updateCache(wcEvent)
 		w.resourceVersion = resourceVersion
 		defer w.cond.Broadcast()
 
@@ -260,7 +264,7 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, upd
 	// This is safe as long as there is at most one call to processEvent in flight
 	// at any point in time.
 	if w.eventHandler != nil {
-		w.eventHandler(watchCacheEvent)
+		w.eventHandler(wcEvent)
 	}
 	return nil
 }
@@ -303,8 +307,8 @@ func (w *watchCache) waitUntilFreshAndBlock(resourceVersion uint64, trace *utilt
 	}
 	for w.resourceVersion < resourceVersion {
 		if w.clock.Since(startTime) >= blockTimeout {
-			// Timeout with retry after 1 second.
-			return errors.NewTimeoutError(fmt.Sprintf("Too large resource version: %v, current: %v", resourceVersion, w.resourceVersion), 1)
+			// Request that the client retry after 'resourceVersionTooHighRetrySeconds' seconds.
+			return storage.NewTooLargeResourceVersionError(resourceVersion, w.resourceVersion, resourceVersionTooHighRetrySeconds)
 		}
 		w.cond.Wait()
 	}
@@ -464,7 +468,7 @@ func (w *watchCache) GetAllEventsSinceThreadUnsafe(resourceVersion uint64) ([]*w
 		return result, nil
 	}
 	if resourceVersion < oldest-1 {
-		return nil, errors.NewGone(fmt.Sprintf("too old resource version: %d (%d)", resourceVersion, oldest-1))
+		return nil, errors.NewResourceExpired(fmt.Sprintf("too old resource version: %d (%d)", resourceVersion, oldest-1))
 	}
 
 	// Binary search the smallest index at which resourceVersion is greater than the given one.

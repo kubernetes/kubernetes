@@ -23,13 +23,13 @@ import (
 	"testing"
 
 	api "k8s.io/api/core/v1"
+	"k8s.io/api/storage/v1beta1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
-	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 )
 
 func prepareBlockMapperTest(plug *csiPlugin, specVolumeName string, t *testing.T) (*csiBlockMapper, *volume.Spec, *api.PersistentVolume, error) {
@@ -46,6 +46,40 @@ func prepareBlockMapperTest(plug *csiPlugin, specVolumeName string, t *testing.T
 	}
 	csiMapper := mapper.(*csiBlockMapper)
 	return csiMapper, spec, pv, nil
+}
+
+func prepareBlockUnmapperTest(plug *csiPlugin, specVolumeName string, t *testing.T) (*csiBlockMapper, *volume.Spec, *api.PersistentVolume, error) {
+	registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
+	pv := makeTestPV(specVolumeName, 10, testDriver, testVol)
+	spec := volume.NewSpecFromPersistentVolume(pv, pv.Spec.PersistentVolumeSource.CSI.ReadOnly)
+
+	// save volume data
+	dir := getVolumeDeviceDataDir(pv.ObjectMeta.Name, plug.host)
+	if err := os.MkdirAll(dir, 0755); err != nil && !os.IsNotExist(err) {
+		t.Errorf("failed to create dir [%s]: %v", dir, err)
+	}
+
+	if err := saveVolumeData(
+		dir,
+		volDataFileName,
+		map[string]string{
+			volDataKey.specVolID:  pv.ObjectMeta.Name,
+			volDataKey.driverName: testDriver,
+			volDataKey.volHandle:  testVol,
+		},
+	); err != nil {
+		t.Fatalf("failed to save volume data: %v", err)
+	}
+
+	unmapper, err := plug.NewBlockVolumeUnmapper(pv.ObjectMeta.Name, testPodUID)
+	if err != nil {
+		t.Fatalf("failed to make a new Unmapper: %v", err)
+	}
+
+	csiUnmapper := unmapper.(*csiBlockMapper)
+	csiUnmapper.csiClient = setupClient(t, true)
+
+	return csiUnmapper, spec, pv, nil
 }
 
 func TestBlockMapperGetGlobalMapPath(t *testing.T) {
@@ -140,12 +174,12 @@ func TestBlockMapperGetPublishPath(t *testing.T) {
 		{
 			name:           "simple specName",
 			specVolumeName: "spec-0",
-			path:           filepath.Join(tmpDir, fmt.Sprintf("plugins/kubernetes.io/csi/volumeDevices/publish/%s", "spec-0")),
+			path:           filepath.Join(tmpDir, fmt.Sprintf("plugins/kubernetes.io/csi/volumeDevices/publish/%s/%s", "spec-0", testPodUID)),
 		},
 		{
 			name:           "specName with dots",
 			specVolumeName: "test.spec.1",
-			path:           filepath.Join(tmpDir, fmt.Sprintf("plugins/kubernetes.io/csi/volumeDevices/publish/%s", "test.spec.1")),
+			path:           filepath.Join(tmpDir, fmt.Sprintf("plugins/kubernetes.io/csi/volumeDevices/publish/%s/%s", "test.spec.1", testPodUID)),
 		},
 	}
 	for _, tc := range testCases {
@@ -209,15 +243,6 @@ func TestBlockMapperSetupDevice(t *testing.T) {
 
 	plug, tmpDir := newTestPlugin(t, nil)
 	defer os.RemoveAll(tmpDir)
-	fakeClient := fakeclient.NewSimpleClientset()
-	host := volumetest.NewFakeVolumeHostWithCSINodeName(
-		tmpDir,
-		fakeClient,
-		nil,
-		"fakeNode",
-		nil,
-	)
-	plug.host = host
 
 	csiMapper, _, pv, err := prepareBlockMapperTest(plug, "test-pv", t)
 	if err != nil {
@@ -238,15 +263,9 @@ func TestBlockMapperSetupDevice(t *testing.T) {
 	}
 	t.Log("created attachement ", attachID)
 
-	devicePath, err := csiMapper.SetUpDevice()
+	err = csiMapper.SetUpDevice()
 	if err != nil {
 		t.Fatalf("mapper failed to SetupDevice: %v", err)
-	}
-
-	// Check if SetUpDevice returns the right path
-	publishPath := csiMapper.getPublishPath()
-	if devicePath != publishPath {
-		t.Fatalf("mapper.SetupDevice returned unexpected path %s instead of %v", devicePath, publishPath)
 	}
 
 	// Check if NodeStageVolume staged to the right path
@@ -259,32 +278,13 @@ func TestBlockMapperSetupDevice(t *testing.T) {
 	if svol.Path != stagingPath {
 		t.Errorf("csi server expected device path %s, got %s", stagingPath, svol.Path)
 	}
-
-	// Check if NodePublishVolume published to the right path
-	pvols := csiMapper.csiClient.(*fakeCsiDriverClient).nodeClient.GetNodePublishedVolumes()
-	pvol, ok := pvols[csiMapper.volumeID]
-	if !ok {
-		t.Error("csi server may not have received NodePublishVolume call")
-	}
-	if pvol.Path != publishPath {
-		t.Errorf("csi server expected path %s, got %s", publishPath, pvol.Path)
-	}
 }
 
-func TestBlockMapperMapDevice(t *testing.T) {
+func TestBlockMapperMapPodDevice(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIBlockVolume, true)()
 
 	plug, tmpDir := newTestPlugin(t, nil)
 	defer os.RemoveAll(tmpDir)
-	fakeClient := fakeclient.NewSimpleClientset()
-	host := volumetest.NewFakeVolumeHostWithCSINodeName(
-		tmpDir,
-		fakeClient,
-		nil,
-		"fakeNode",
-		nil,
-	)
-	plug.host = host
 
 	csiMapper, _, pv, err := prepareBlockMapperTest(plug, "test-pv", t)
 	if err != nil {
@@ -305,52 +305,67 @@ func TestBlockMapperMapDevice(t *testing.T) {
 	}
 	t.Log("created attachement ", attachID)
 
-	devicePath, err := csiMapper.SetUpDevice()
-	if err != nil {
-		t.Fatalf("mapper failed to SetupDevice: %v", err)
-	}
-	globalMapPath, err := csiMapper.GetGlobalMapPath(csiMapper.spec)
+	// Map device to global and pod device map path
+	path, err := csiMapper.MapPodDevice()
 	if err != nil {
 		t.Fatalf("mapper failed to GetGlobalMapPath: %v", err)
 	}
 
-	// Actual SetupDevice should create a symlink to or a bind mout of device in devicePath.
-	// Create dummy file there before calling MapDevice to test it properly.
-	fd, err := os.Create(devicePath)
+	// Check if NodePublishVolume published to the right path
+	pvols := csiMapper.csiClient.(*fakeCsiDriverClient).nodeClient.GetNodePublishedVolumes()
+	pvol, ok := pvols[csiMapper.volumeID]
+	if !ok {
+		t.Error("csi server may not have received NodePublishVolume call")
+	}
+
+	publishPath := csiMapper.getPublishPath()
+	if pvol.Path != publishPath {
+		t.Errorf("csi server expected path %s, got %s", publishPath, pvol.Path)
+	}
+	if path != publishPath {
+		t.Errorf("csi server expected path %s, but MapPodDevice returned %s", publishPath, path)
+	}
+}
+
+func TestBlockMapperMapPodDeviceNotSupportAttach(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIBlockVolume, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIDriverRegistry, true)()
+
+	fakeClient := fakeclient.NewSimpleClientset()
+	attachRequired := false
+	fakeDriver := &v1beta1.CSIDriver{
+		ObjectMeta: meta.ObjectMeta{
+			Name: testDriver,
+		},
+		Spec: v1beta1.CSIDriverSpec{
+			AttachRequired: &attachRequired,
+		},
+	}
+	_, err := fakeClient.StorageV1beta1().CSIDrivers().Create(fakeDriver)
 	if err != nil {
-		t.Fatalf("mapper failed to create dummy file in devicePath: %v", err)
+		t.Fatalf("Failed to create a fakeDriver: %v", err)
 	}
-	if err := fd.Close(); err != nil {
-		t.Fatalf("mapper failed to close dummy file in devicePath: %v", err)
+
+	// after the driver is created, create the plugin. newTestPlugin waits for the informer to sync,
+	// such that csiMapper.SetUpDevice below sees the VolumeAttachment object in the lister.
+
+	plug, tmpDir := newTestPlugin(t, fakeClient)
+	defer os.RemoveAll(tmpDir)
+
+	csiMapper, _, _, err := prepareBlockMapperTest(plug, "test-pv", t)
+	if err != nil {
+		t.Fatalf("Failed to make a new Mapper: %v", err)
 	}
+	csiMapper.csiClient = setupClient(t, true)
 
 	// Map device to global and pod device map path
-	volumeMapPath, volName := csiMapper.GetPodDeviceMapPath()
-	err = csiMapper.MapDevice(devicePath, globalMapPath, volumeMapPath, volName, csiMapper.podUID)
+	path, err := csiMapper.MapPodDevice()
 	if err != nil {
 		t.Fatalf("mapper failed to GetGlobalMapPath: %v", err)
 	}
-
-	// Check if symlink {globalMapPath}/{podUID} exists
-	globalMapFilePath := filepath.Join(globalMapPath, string(csiMapper.podUID))
-	if _, err := os.Stat(globalMapFilePath); err != nil {
-		if os.IsNotExist(err) {
-			t.Errorf("mapper.MapDevice failed, symlink in globalMapPath not created: %v", err)
-			t.Errorf("mapper.MapDevice devicePath:%v, globalMapPath: %v, globalMapFilePath: %v",
-				devicePath, globalMapPath, globalMapFilePath)
-		} else {
-			t.Errorf("mapper.MapDevice failed: %v", err)
-		}
-	}
-
-	// Check if symlink {volumeMapPath}/{volName} exists
-	volumeMapFilePath := filepath.Join(volumeMapPath, volName)
-	if _, err := os.Stat(volumeMapFilePath); err != nil {
-		if os.IsNotExist(err) {
-			t.Errorf("mapper.MapDevice failed, symlink in volumeMapPath not created: %v", err)
-		} else {
-			t.Errorf("mapper.MapDevice failed: %v", err)
-		}
+	publishPath := csiMapper.getPublishPath()
+	if path != publishPath {
+		t.Errorf("path %s and %s doesn't match", path, publishPath)
 	}
 }
 
@@ -359,15 +374,6 @@ func TestBlockMapperTearDownDevice(t *testing.T) {
 
 	plug, tmpDir := newTestPlugin(t, nil)
 	defer os.RemoveAll(tmpDir)
-	fakeClient := fakeclient.NewSimpleClientset()
-	host := volumetest.NewFakeVolumeHostWithCSINodeName(
-		tmpDir,
-		fakeClient,
-		nil,
-		"fakeNode",
-		nil,
-	)
-	plug.host = host
 
 	_, spec, pv, err := prepareBlockMapperTest(plug, "test-pv", t)
 	if err != nil {

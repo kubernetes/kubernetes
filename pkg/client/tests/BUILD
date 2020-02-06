@@ -17,7 +17,6 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
-        "//pkg/api/testapi:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/core/install:go_default_library",
         "//pkg/kubelet/server/portforward:go_default_library",

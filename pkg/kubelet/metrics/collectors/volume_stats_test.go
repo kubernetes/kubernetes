@@ -20,8 +20,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/prometheus/client_golang/prometheus/testutil"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/component-base/metrics/testutil"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	statstest "k8s.io/kubernetes/pkg/kubelet/server/stats/testing"
 )
@@ -34,17 +34,17 @@ func TestVolumeStatsCollector(t *testing.T) {
 	// Fixed metadata on type and help text. We prepend this to every expected
 	// output so we only have to modify a single place when doing adjustments.
 	const metadata = `
-		# HELP kubelet_volume_stats_available_bytes Number of available bytes in the volume
+		# HELP kubelet_volume_stats_available_bytes [ALPHA] Number of available bytes in the volume
 		# TYPE kubelet_volume_stats_available_bytes gauge
-		# HELP kubelet_volume_stats_capacity_bytes Capacity in bytes of the volume
+		# HELP kubelet_volume_stats_capacity_bytes [ALPHA] Capacity in bytes of the volume
 		# TYPE kubelet_volume_stats_capacity_bytes gauge
-		# HELP kubelet_volume_stats_inodes Maximum number of inodes in the volume
+		# HELP kubelet_volume_stats_inodes [ALPHA] Maximum number of inodes in the volume
 		# TYPE kubelet_volume_stats_inodes gauge
-		# HELP kubelet_volume_stats_inodes_free Number of free inodes in the volume
+		# HELP kubelet_volume_stats_inodes_free [ALPHA] Number of free inodes in the volume
 		# TYPE kubelet_volume_stats_inodes_free gauge
-		# HELP kubelet_volume_stats_inodes_used Number of used inodes in the volume
+		# HELP kubelet_volume_stats_inodes_used [ALPHA] Number of used inodes in the volume
 		# TYPE kubelet_volume_stats_inodes_used gauge
-		# HELP kubelet_volume_stats_used_bytes Number of used bytes in the volume
+		# HELP kubelet_volume_stats_used_bytes [ALPHA] Number of used bytes in the volume
 		# TYPE kubelet_volume_stats_used_bytes gauge
 	`
 
@@ -132,7 +132,7 @@ func TestVolumeStatsCollector(t *testing.T) {
 	mockStatsProvider := new(statstest.StatsProvider)
 	mockStatsProvider.On("ListPodStats").Return(podStats, nil)
 	mockStatsProvider.On("ListPodStatsAndUpdateCPUNanoCoreUsage").Return(podStats, nil)
-	if err := testutil.CollectAndCompare(&volumeStatsCollector{statsProvider: mockStatsProvider}, strings.NewReader(want), metrics...); err != nil {
+	if err := testutil.CustomCollectAndCompare(&volumeStatsCollector{statsProvider: mockStatsProvider}, strings.NewReader(want), metrics...); err != nil {
 		t.Errorf("unexpected collecting result:\n%s", err)
 	}
 }

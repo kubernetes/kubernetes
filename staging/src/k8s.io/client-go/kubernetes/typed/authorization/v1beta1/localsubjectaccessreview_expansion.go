@@ -17,20 +17,22 @@ limitations under the License.
 package v1beta1
 
 import (
+	"context"
+
 	authorizationapi "k8s.io/api/authorization/v1beta1"
 )
 
 type LocalSubjectAccessReviewExpansion interface {
-	Create(sar *authorizationapi.LocalSubjectAccessReview) (result *authorizationapi.LocalSubjectAccessReview, err error)
+	CreateContext(ctx context.Context, sar *authorizationapi.LocalSubjectAccessReview) (result *authorizationapi.LocalSubjectAccessReview, err error)
 }
 
-func (c *localSubjectAccessReviews) Create(sar *authorizationapi.LocalSubjectAccessReview) (result *authorizationapi.LocalSubjectAccessReview, err error) {
+func (c *localSubjectAccessReviews) CreateContext(ctx context.Context, sar *authorizationapi.LocalSubjectAccessReview) (result *authorizationapi.LocalSubjectAccessReview, err error) {
 	result = &authorizationapi.LocalSubjectAccessReview{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("localsubjectaccessreviews").
 		Body(sar).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }

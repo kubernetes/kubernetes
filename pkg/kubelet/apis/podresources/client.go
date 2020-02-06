@@ -36,9 +36,9 @@ func GetClient(socket string, connectionTimeout time.Duration, maxMsgSize int) (
 	ctx, cancel := context.WithTimeout(context.Background(), connectionTimeout)
 	defer cancel()
 
-	conn, err := grpc.DialContext(ctx, addr, grpc.WithInsecure(), grpc.WithDialer(dialer), grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxMsgSize)))
+	conn, err := grpc.DialContext(ctx, addr, grpc.WithInsecure(), grpc.WithContextDialer(dialer), grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxMsgSize)))
 	if err != nil {
-		return nil, nil, fmt.Errorf("Error dialing socket %s: %v", socket, err)
+		return nil, nil, fmt.Errorf("error dialing socket %s: %v", socket, err)
 	}
 	return podresourcesapi.NewPodResourcesListerClient(conn), conn, nil
 }

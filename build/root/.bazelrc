@@ -1,14 +1,23 @@
 startup --expand_configs_in_place
 
+# https://github.com/kubernetes/kubernetes/pull/79807
+# https://github.com/bazelbuild/rules_docker/issues/842
+# https://github.com/bazelbuild/bazel/issues/7899
+build --host_force_python=PY2
+
 # Show us information about failures.
 build --verbose_failures
 test --test_output=errors
 
 # Include git version info
+build --stamp
 build --workspace_status_command hack/print-workspace-status.sh
 
 # Make /tmp hermetic
 build --sandbox_tmpfs_path=/tmp
+
+# This tag is required to build github.com/opencontainers/selinux correctly
+build --define gotags=selinux
 
 # Ensure that Bazel never runs as root, which can cause unit tests to fail.
 # This flag requires Bazel 0.5.0+

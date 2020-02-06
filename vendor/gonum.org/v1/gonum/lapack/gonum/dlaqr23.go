@@ -29,8 +29,8 @@ import (
 //
 // ktop and kbot determine a block [ktop:kbot+1,ktop:kbot+1] along the diagonal
 // of H. It must hold that
-//  0 <= ilo <= ihi < n,     if n > 0,
-//  ilo == 0 and ihi == -1,  if n == 0,
+//  0 <= ilo <= ihi < n     if n > 0,
+//  ilo == 0 and ihi == -1  if n == 0,
 // and the block must be isolated, that is, it must hold that
 //  ktop == 0   or H[ktop,ktop-1] == 0,
 //  kbot == n-1 or H[kbot+1,kbot] == 0,

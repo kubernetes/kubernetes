@@ -21,15 +21,17 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
-	"github.com/coreos/etcd/clientv3"
-	"github.com/coreos/etcd/pkg/transport"
+	"go.etcd.io/etcd/clientv3"
+	"go.etcd.io/etcd/pkg/transport"
+	"google.golang.org/grpc"
 	"sigs.k8s.io/yaml"
 
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	serveroptions "k8s.io/apiextensions-apiserver/pkg/cmd/server/options"
-	"k8s.io/apiextensions-apiserver/pkg/features"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -38,9 +40,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/json"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/utils/pointer"
 )
 
@@ -61,6 +61,7 @@ func TestPostInvalidObjectMeta(t *testing.T) {
 
 	obj := fixtures.NewNoxuInstance("default", "foo")
 	unstructured.SetNestedField(obj.UnstructuredContent(), int64(42), "metadata", "unknown")
+	unstructured.SetNestedField(obj.UnstructuredContent(), nil, "metadata", "generation")
 	unstructured.SetNestedField(obj.UnstructuredContent(), map[string]interface{}{"foo": int64(42), "bar": "abc"}, "metadata", "labels")
 	_, err = instantiateCustomResource(t, obj, noxuResourceClient, noxuDefinition)
 	if err == nil {
@@ -84,6 +85,14 @@ func TestPostInvalidObjectMeta(t *testing.T) {
 		t.Errorf("unexpected error getting metadata.unknown: %v", err)
 	} else if found {
 		t.Errorf("unexpected metadata.unknown=%#v: expected this to be pruned", unknown)
+	}
+
+	if generation, found, err := unstructured.NestedInt64(obj.UnstructuredContent(), "metadata", "generation"); err != nil {
+		t.Errorf("unexpected error getting metadata.generation: %v", err)
+	} else if !found {
+		t.Errorf("expected metadata.generation=1: got: %d", generation)
+	} else if generation != 1 {
+		t.Errorf("unexpected metadata.generation=%d: expected this to be set to 1", generation)
 	}
 }
 
@@ -128,17 +137,21 @@ func TestInvalidObjectMetaInStorage(t *testing.T) {
 		t.Fatal(err)
 	}
 	tlsInfo := transport.TLSInfo{
-		CertFile: restOptions.StorageConfig.Transport.CertFile,
-		KeyFile:  restOptions.StorageConfig.Transport.KeyFile,
-		CAFile:   restOptions.StorageConfig.Transport.CAFile,
+		CertFile:      restOptions.StorageConfig.Transport.CertFile,
+		KeyFile:       restOptions.StorageConfig.Transport.KeyFile,
+		TrustedCAFile: restOptions.StorageConfig.Transport.TrustedCAFile,
 	}
 	tlsConfig, err := tlsInfo.ClientConfig()
 	if err != nil {
 		t.Fatal(err)
 	}
 	etcdConfig := clientv3.Config{
-		Endpoints: restOptions.StorageConfig.Transport.ServerList,
-		TLS:       tlsConfig,
+		Endpoints:   restOptions.StorageConfig.Transport.ServerList,
+		DialTimeout: 20 * time.Second,
+		DialOptions: []grpc.DialOption{
+			grpc.WithBlock(), // block until the underlying connection is up
+		},
+		TLS: tlsConfig,
 	}
 	etcdclient, err := clientv3.New(etcdConfig)
 	if err != nil {
@@ -149,6 +162,8 @@ func TestInvalidObjectMetaInStorage(t *testing.T) {
 
 	original := fixtures.NewNoxuInstance("default", "foo")
 	unstructured.SetNestedField(original.UnstructuredContent(), int64(42), "metadata", "unknown")
+	unstructured.SetNestedField(original.UnstructuredContent(), nil, "metadata", "generation")
+
 	unstructured.SetNestedField(original.UnstructuredContent(), map[string]interface{}{"foo": int64(42), "bar": "abc"}, "metadata", "annotations")
 	unstructured.SetNestedField(original.UnstructuredContent(), map[string]interface{}{"invalid": "x y"}, "metadata", "labels")
 	unstructured.SetNestedField(original.UnstructuredContent(), int64(42), "embedded", "metadata", "unknown")
@@ -190,6 +205,16 @@ func TestInvalidObjectMetaInStorage(t *testing.T) {
 		t.Errorf("Unexpected error: %v", err)
 	} else if found {
 		t.Errorf("Unexpected to find embedded.metadata.unknown=%#v", unknown)
+	}
+
+	t.Logf("Checking that metadata.generation=1")
+
+	if generation, found, err := unstructured.NestedInt64(obj.UnstructuredContent(), "metadata", "generation"); err != nil {
+		t.Errorf("unexpected error getting metadata.generation: %v", err)
+	} else if !found {
+		t.Errorf("expected metadata.generation=1: got: %d", generation)
+	} else if generation != 1 {
+		t.Errorf("unexpected metadata.generation=%d: expected this to be set to 1", generation)
 	}
 
 	t.Logf("Checking that ObjectMeta is pruned from wrongly-typed annotations")
@@ -253,22 +278,28 @@ func TestInvalidObjectMetaInStorage(t *testing.T) {
 	}
 }
 
-var embeddedResourceFixture = &apiextensionsv1beta1.CustomResourceDefinition{
-	ObjectMeta: metav1.ObjectMeta{Name: "foos.tests.apiextensions.k8s.io"},
-	Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
-		Group:   "tests.apiextensions.k8s.io",
-		Version: "v1beta1",
-		Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
+var embeddedResourceFixture = &apiextensionsv1.CustomResourceDefinition{
+	ObjectMeta: metav1.ObjectMeta{Name: "foos.tests.example.com"},
+	Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+		Group: "tests.example.com",
+		Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
+			{
+				Name:    "v1beta1",
+				Storage: true,
+				Served:  true,
+				Subresources: &apiextensionsv1.CustomResourceSubresources{
+					Status: &apiextensionsv1.CustomResourceSubresourceStatus{},
+				},
+			},
+		},
+		Names: apiextensionsv1.CustomResourceDefinitionNames{
 			Plural:   "foos",
 			Singular: "foo",
 			Kind:     "Foo",
 			ListKind: "FooList",
 		},
-		Scope:                 apiextensionsv1beta1.ClusterScoped,
-		PreserveUnknownFields: pointer.BoolPtr(false),
-		Subresources: &apiextensionsv1beta1.CustomResourceSubresources{
-			Status: &apiextensionsv1beta1.CustomResourceSubresourceStatus{},
-		},
+		Scope:                 apiextensionsv1.ClusterScoped,
+		PreserveUnknownFields: false,
 	},
 }
 
@@ -301,25 +332,11 @@ properties:
       kind: Pod
       labels:
         foo: bar
-  invalidDefaults:
-    type: object
-    properties:
-      embedded:
-        type: object
-        x-kubernetes-embedded-resource: true
-        x-kubernetes-preserve-unknown-fields: true
-        default:
-          apiVersion: "foo/v1"
-          kind: "%"
-          metadata:
-            labels:
-              foo: bar
-              abc: "x y"
 `
 
 	embeddedResourceInstance = `
 kind: Foo
-apiVersion: tests.apiextensions.k8s.io/v1beta1
+apiVersion: tests.example.com/v1beta1
 embedded:
   apiVersion: foo/v1
   kind: Foo
@@ -348,7 +365,7 @@ embeddedNested:
 
 	expectedEmbeddedResourceInstance = `
 kind: Foo
-apiVersion: tests.apiextensions.k8s.io/v1beta1
+apiVersion: tests.example.com/v1beta1
 embedded:
   apiVersion: foo/v1
   kind: Foo
@@ -379,7 +396,7 @@ defaults:
 
 	wronglyTypedEmbeddedResourceInstance = `
 kind: Foo
-apiVersion: tests.apiextensions.k8s.io/v1beta1
+apiVersion: tests.example.com/v1beta1
 embedded:
   apiVersion: foo/v1
   kind: Foo
@@ -390,7 +407,7 @@ embedded:
 
 	invalidEmbeddedResourceInstance = `
 kind: Foo
-apiVersion: tests.apiextensions.k8s.io/v1beta1
+apiVersion: tests.example.com/v1beta1
 embedded:
   apiVersion: foo/v1
   kind: "%"
@@ -411,8 +428,6 @@ invalidDefaults: {}
 )
 
 func TestEmbeddedResources(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CustomResourceDefaulting, true)()
-
 	tearDownFn, apiExtensionClient, dynamicClient, err := fixtures.StartDefaultServerWithClients(t)
 	if err != nil {
 		t.Fatal(err)
@@ -420,18 +435,18 @@ func TestEmbeddedResources(t *testing.T) {
 	defer tearDownFn()
 
 	crd := embeddedResourceFixture.DeepCopy()
-	crd.Spec.Validation = &apiextensionsv1beta1.CustomResourceValidation{}
-	if err := yaml.Unmarshal([]byte(embeddedResourceSchema), &crd.Spec.Validation.OpenAPIV3Schema); err != nil {
+	crd.Spec.Versions[0].Schema = &apiextensionsv1.CustomResourceValidation{}
+	if err := yaml.Unmarshal([]byte(embeddedResourceSchema), &crd.Spec.Versions[0].Schema.OpenAPIV3Schema); err != nil {
 		t.Fatal(err)
 	}
 
-	crd, err = fixtures.CreateNewCustomResourceDefinition(crd, apiExtensionClient, dynamicClient)
+	crd, err = fixtures.CreateNewV1CustomResourceDefinition(crd, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	t.Logf("Creating CR and expect 'unspecified' fields to be pruned inside ObjectMetas")
-	fooClient := dynamicClient.Resource(schema.GroupVersionResource{crd.Spec.Group, crd.Spec.Version, crd.Spec.Names.Plural})
+	fooClient := dynamicClient.Resource(schema.GroupVersionResource{crd.Spec.Group, crd.Spec.Versions[0].Name, crd.Spec.Names.Plural})
 	foo := &unstructured.Unstructured{}
 	if err := yaml.Unmarshal([]byte(embeddedResourceInstance), &foo.Object); err != nil {
 		t.Fatal(err)
@@ -494,8 +509,6 @@ func TestEmbeddedResources(t *testing.T) {
 		` embeddedNested.metadata.name: Invalid value: ".."`,
 		` embeddedNested.embedded.kind: Invalid value: "%"`,
 		` embeddedNested.embedded.metadata.name: Invalid value: ".."`,
-		` invalidDefaults.embedded.kind: Invalid value: "%"`,
-		` invalidDefaults.embedded.metadata.labels: Invalid value: "x y"`,
 	}
 	for _, s := range invalidErrors {
 		if !strings.Contains(err.Error(), s) {

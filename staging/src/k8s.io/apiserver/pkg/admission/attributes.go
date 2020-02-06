@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation"
+	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/authentication/user"
 )
 
@@ -42,10 +43,15 @@ type attributesRecord struct {
 
 	// other elements are always accessed in single goroutine.
 	// But ValidatingAdmissionWebhook add annotations concurrently.
-	annotations     map[string]string
+	annotations     map[string]annotation
 	annotationsLock sync.RWMutex
 
 	reinvocationContext ReinvocationContext
+}
+
+type annotation struct {
+	level auditinternal.Level
+	value string
 }
 
 func NewAttributesRecord(object runtime.Object, oldObject runtime.Object, kind schema.GroupVersionKind, namespace, name string, resource schema.GroupVersionResource, subresource string, operation Operation, operationOptions runtime.Object, dryRun bool, userInfo user.Info) Attributes {
@@ -111,7 +117,7 @@ func (record *attributesRecord) GetUserInfo() user.Info {
 
 // getAnnotations implements privateAnnotationsGetter.It's a private method used
 // by WithAudit decorator.
-func (record *attributesRecord) getAnnotations() map[string]string {
+func (record *attributesRecord) getAnnotations(maxLevel auditinternal.Level) map[string]string {
 	record.annotationsLock.RLock()
 	defer record.annotationsLock.RUnlock()
 
@@ -120,26 +126,36 @@ func (record *attributesRecord) getAnnotations() map[string]string {
 	}
 	cp := make(map[string]string, len(record.annotations))
 	for key, value := range record.annotations {
-		cp[key] = value
+		if value.level.Less(maxLevel) || value.level == maxLevel {
+			cp[key] = value.value
+		}
 	}
 	return cp
 }
 
+// AddAnnotation adds an annotation to attributesRecord with Metadata audit level
 func (record *attributesRecord) AddAnnotation(key, value string) error {
+	return record.AddAnnotationWithLevel(key, value, auditinternal.LevelMetadata)
+}
+
+func (record *attributesRecord) AddAnnotationWithLevel(key, value string, level auditinternal.Level) error {
 	if err := checkKeyFormat(key); err != nil {
 		return err
 	}
-
+	if level.Less(auditinternal.LevelMetadata) {
+		return fmt.Errorf("admission annotations are not allowed to be set at audit level lower than Metadata, key: %q, level: %s", key, level)
+	}
 	record.annotationsLock.Lock()
 	defer record.annotationsLock.Unlock()
 
 	if record.annotations == nil {
-		record.annotations = make(map[string]string)
+		record.annotations = make(map[string]annotation)
 	}
-	if v, ok := record.annotations[key]; ok && v != value {
-		return fmt.Errorf("admission annotations are not allowd to be overwritten, key:%q, old value: %q, new value:%q", key, record.annotations[key], value)
+	annotation := annotation{level: level, value: value}
+	if v, ok := record.annotations[key]; ok && v != annotation {
+		return fmt.Errorf("admission annotations are not allowd to be overwritten, key:%q, old value: %v, new value: %v", key, record.annotations[key], annotation)
 	}
-	record.annotations[key] = value
+	record.annotations[key] = annotation
 	return nil
 }
 

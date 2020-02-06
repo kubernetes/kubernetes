@@ -32,11 +32,6 @@ KUBE_BUILD_HYPERKUBE=${KUBE_BUILD_HYPERKUBE:-y}
 KUBE_BUILD_CONFORMANCE=${KUBE_BUILD_CONFORMANCE:-y}
 KUBE_BUILD_PULL_LATEST_IMAGES=${KUBE_BUILD_PULL_LATEST_IMAGES:-y}
 
-# The mondo test tarball is deprecated as of Kubernetes 1.14, and the default
-# will be set to 'n' in a future release.
-# See KEP sig-testing/20190118-breaking-apart-the-kubernetes-test-tarball
-KUBE_BUILD_MONDO_TEST_TARBALL=${KUBE_BUILD_MONDO_TEST_TARBALL:-y}
-
 # Validate a ci version
 #
 # Globals:
@@ -223,11 +218,6 @@ function kube::release::build_server_images() {
     cp "${KUBE_SERVER_IMAGE_BINARIES[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
       "${release_stage}/server/bin/"
 
-    # if we are building hyperkube, we also need to copy that binary
-    if [[ "${KUBE_BUILD_HYPERKUBE}" =~ [yY] ]]; then
-      cp "${LOCAL_OUTPUT_BINPATH}/${platform}/hyperkube" "${release_stage}/server/bin"
-    fi
-
     kube::release::create_docker_images_for_server "${release_stage}/server/bin" "${arch}"
   done
 }
@@ -337,6 +327,9 @@ function kube::release::create_docker_images_for_server() {
     local images_dir="${RELEASE_IMAGES}/${arch}"
     mkdir -p "${images_dir}"
 
+    # k8s.gcr.io is the constant tag in the docker archives, this is also the default for config scripts in GKE.
+    # We can use KUBE_DOCKER_REGISTRY to include and extra registry in the docker archive.
+    # If we use KUBE_DOCKER_REGISTRY="k8s.gcr.io", then the extra tag (same) is ignored, see release_docker_image_tag below.
     local -r docker_registry="k8s.gcr.io"
     # Docker tags cannot contain '+'
     local docker_tag="${KUBE_GIT_VERSION/+/_}"
@@ -344,6 +337,15 @@ function kube::release::create_docker_images_for_server() {
       kube::log::error "git version information missing; cannot create Docker tag"
       return 1
     fi
+
+    # provide `--pull` argument to `docker build` if `KUBE_BUILD_PULL_LATEST_IMAGES`
+    # is set to y or Y; otherwise try to build the image without forcefully
+    # pulling the latest base image.
+    local DOCKER_BUILD_OPTS=()
+    if [[ "${KUBE_BUILD_PULL_LATEST_IMAGES}" =~ [yY] ]]; then
+        DOCKER_BUILD_OPTS+=("--pull")
+    fi
+    local -r docker_build_opts="${DOCKER_BUILD_OPTS[@]}"
 
     for wrappable in "${binaries[@]}"; do
 
@@ -357,17 +359,7 @@ function kube::release::create_docker_images_for_server() {
       local docker_build_path="${binary_dir}/${binary_name}.dockerbuild"
       local docker_file_path="${docker_build_path}/Dockerfile"
       local binary_file_path="${binary_dir}/${binary_name}"
-      local docker_image_tag="${docker_registry}"
-      if [[ ${arch} == "amd64" ]]; then
-        # If we are building a amd64 docker image, preserve the original
-        # image name
-        docker_image_tag+="/${binary_name}:${docker_tag}"
-      else
-        # If we are building a docker image for another architecture,
-        # append the arch in the image tag
-        docker_image_tag+="/${binary_name}-${arch}:${docker_tag}"
-      fi
-
+      local docker_image_tag="${docker_registry}/${binary_name}-${arch}:${docker_tag}"
 
       kube::log::status "Starting docker build for image: ${binary_name}-${arch}"
       (
@@ -385,19 +377,11 @@ EOF
           echo "COPY nsswitch.conf /etc/" >> "${docker_file_path}"
         fi
 
-        # provide `--pull` argument to `docker build` if `KUBE_BUILD_PULL_LATEST_IMAGES`
-        # is set to y or Y; otherwise try to build the image without forcefully
-        # pulling the latest base image.
-        local -a docker_build_opts=()
-        if [[ "${KUBE_BUILD_PULL_LATEST_IMAGES}" =~ [yY] ]]; then
-            docker_build_opts+=("--pull")
-        fi
-        "${DOCKER[@]}" build "${docker_build_opts[@]}" -q -t "${docker_image_tag}" "${docker_build_path}" >/dev/null
+        "${DOCKER[@]}" build ${docker_build_opts} -q -t "${docker_image_tag}" "${docker_build_path}" >/dev/null
         # If we are building an official/alpha/beta release we want to keep
         # docker images and tag them appropriately.
-        local release_docker_image_tag=""
-        if [[ -n "${KUBE_DOCKER_IMAGE_TAG-}" && -n "${KUBE_DOCKER_REGISTRY-}" && $docker_registry != $KUBE_DOCKER_REGISTRY ]]; then
-          release_docker_image_tag="${KUBE_DOCKER_REGISTRY}/${binary_name}-${arch}:${KUBE_DOCKER_IMAGE_TAG}"
+        local -r release_docker_image_tag="${KUBE_DOCKER_REGISTRY-$docker_registry}/${binary_name}-${arch}:${KUBE_DOCKER_IMAGE_TAG-$docker_tag}"
+        if [[ "${release_docker_image_tag}" != "${docker_image_tag}" ]]; then
           kube::log::status "Tagging docker image ${docker_image_tag} as ${release_docker_image_tag}"
           "${DOCKER[@]}" rmi "${release_docker_image_tag}" 2>/dev/null || true
           "${DOCKER[@]}" tag "${docker_image_tag}" "${release_docker_image_tag}" 2>/dev/null
@@ -407,11 +391,8 @@ EOF
         rm -rf "${docker_build_path}"
         ln "${binary_dir}/${binary_name}.tar" "${images_dir}/"
 
-        if [[ -z "${KUBE_DOCKER_IMAGE_TAG-}" || -z "${KUBE_DOCKER_REGISTRY-}" ]]; then
-          # not a release
-          kube::log::status "Deleting docker image ${docker_image_tag}"
-          "${DOCKER[@]}" rmi "${docker_image_tag}" &>/dev/null || true
-        fi
+        kube::log::status "Deleting docker image ${docker_image_tag}"
+        "${DOCKER[@]}" rmi "${docker_image_tag}" &>/dev/null || true
       ) &
     done
 
@@ -446,6 +427,7 @@ function kube::release::package_kube_manifests_tarball() {
   cp "${src_dir}/etcd.manifest" "${dst_dir}"
   cp "${src_dir}/kube-scheduler.manifest" "${dst_dir}"
   cp "${src_dir}/kube-apiserver.manifest" "${dst_dir}"
+  cp "${src_dir}/konnectivity-server.yaml" "${dst_dir}"
   cp "${src_dir}/abac-authz-policy.jsonl" "${dst_dir}"
   cp "${src_dir}/kube-controller-manager.manifest" "${dst_dir}"
   cp "${src_dir}/kube-addon-manager.yaml" "${dst_dir}"
@@ -456,6 +438,7 @@ function kube::release::package_kube_manifests_tarball() {
     cp "${src_dir}/${internal_manifest}" "${dst_dir}"
   done
   cp "${KUBE_ROOT}/cluster/gce/gci/configure-helper.sh" "${dst_dir}/gci-configure-helper.sh"
+  cp "${KUBE_ROOT}/cluster/gce/gci/configure-kubeapiserver.sh" "${dst_dir}/configure-kubeapiserver.sh"
   if [[ -e "${KUBE_ROOT}/cluster/gce/gci/gke-internal-configure-helper.sh" ]]; then
     cp "${KUBE_ROOT}/cluster/gce/gci/gke-internal-configure-helper.sh" "${dst_dir}/"
   fi
@@ -539,48 +522,6 @@ function kube::release::package_test_tarballs() {
 
   local portable_tarball_name="${RELEASE_TARS}/kubernetes-test-portable.tar.gz"
   kube::release::create_tarball "${portable_tarball_name}" "${release_stage}/.."
-
-  if [[ "${KUBE_BUILD_MONDO_TEST_TARBALL}" =~ [yY] ]]; then
-    kube::log::status "Building tarball: test mondo (deprecated by KEP sig-testing/20190118-breaking-apart-the-kubernetes-test-tarball)"
-    local platform
-    for platform in "${KUBE_TEST_PLATFORMS[@]}"; do
-      local test_bins=("${KUBE_TEST_BINARIES[@]}")
-      if [[ "${platform%/*}" == "windows" ]]; then
-        test_bins=("${KUBE_TEST_BINARIES_WIN[@]}")
-      fi
-      mkdir -p "${release_stage}/platforms/${platform}"
-      # This fancy expression will expand to prepend a path
-      # (${LOCAL_OUTPUT_BINPATH}/${platform}/) to every item in the
-      # test_bins array.
-      cp "${test_bins[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
-        "${release_stage}/platforms/${platform}"
-    done
-    for platform in "${KUBE_TEST_SERVER_PLATFORMS[@]}"; do
-      mkdir -p "${release_stage}/platforms/${platform}"
-      # This fancy expression will expand to prepend a path
-      # (${LOCAL_OUTPUT_BINPATH}/${platform}/) to every item in the
-      # KUBE_TEST_SERVER_BINARIES array.
-      cp "${KUBE_TEST_SERVER_BINARIES[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
-        "${release_stage}/platforms/${platform}"
-    done
-
-    cat <<EOF > "${release_stage}/DEPRECATION_NOTICE"
-The mondo test tarball containing binaries for all platforms is
-DEPRECATED as of Kubernetes 1.14.
-
-Users of this tarball should migrate to using the platform-specific
-tarballs in combination with the "portable" tarball which contains
-scripts, test images, and other manifests.
-
-For more details, please see KEP
-sig-testing/20190118-breaking-apart-the-kubernetes-test-tarball.
-EOF
-
-    kube::release::clean_cruft
-
-    local package_name="${RELEASE_TARS}/kubernetes-test.tar.gz"
-    kube::release::create_tarball "${package_name}" "${release_stage}/.."
-  fi
 }
 
 # This is all the platform-independent stuff you need to run/install kubernetes.

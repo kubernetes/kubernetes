@@ -261,6 +261,7 @@ process := &libcontainer.Process{
 	Stdin:  os.Stdin,
 	Stdout: os.Stdout,
 	Stderr: os.Stderr,
+	Init:   true,
 }
 
 err := container.Run(process)

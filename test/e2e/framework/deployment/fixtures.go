@@ -17,78 +17,22 @@ limitations under the License.
 package deployment
 
 import (
-	"context"
 	"fmt"
-	"time"
-
-	"github.com/onsi/ginkgo"
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
-	watchtools "k8s.io/client-go/tools/watch"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 // UpdateDeploymentWithRetries updates the specified deployment with retries.
 func UpdateDeploymentWithRetries(c clientset.Interface, namespace, name string, applyUpdate testutils.UpdateDeploymentFunc) (*appsv1.Deployment, error) {
-	return testutils.UpdateDeploymentWithRetries(c, namespace, name, applyUpdate, e2elog.Logf, poll, pollShortTimeout)
-}
-
-// CheckDeploymentRevisionAndImage checks if the input deployment's and its new replica set's revision and image are as expected.
-func CheckDeploymentRevisionAndImage(c clientset.Interface, ns, deploymentName, revision, image string) error {
-	return testutils.CheckDeploymentRevisionAndImage(c, ns, deploymentName, revision, image)
-}
-
-// WatchRecreateDeployment watches Recreate deployments and ensures no new pods will run at the same time with
-// old pods.
-func WatchRecreateDeployment(c clientset.Interface, d *appsv1.Deployment) error {
-	if d.Spec.Strategy.Type != appsv1.RecreateDeploymentStrategyType {
-		return fmt.Errorf("deployment %q does not use a Recreate strategy: %s", d.Name, d.Spec.Strategy.Type)
-	}
-
-	w, err := c.AppsV1().Deployments(d.Namespace).Watch(metav1.SingleObject(metav1.ObjectMeta{Name: d.Name, ResourceVersion: d.ResourceVersion}))
-	if err != nil {
-		return err
-	}
-
-	status := d.Status
-
-	condition := func(event watch.Event) (bool, error) {
-		d := event.Object.(*appsv1.Deployment)
-		status = d.Status
-
-		if d.Status.UpdatedReplicas > 0 && d.Status.Replicas != d.Status.UpdatedReplicas {
-			_, allOldRSs, err := deploymentutil.GetOldReplicaSets(d, c.AppsV1())
-			newRS, nerr := deploymentutil.GetNewReplicaSet(d, c.AppsV1())
-			if err == nil && nerr == nil {
-				e2elog.Logf("%+v", d)
-				logReplicaSetsOfDeployment(d, allOldRSs, newRS)
-				logPodsOfDeployment(c, d, append(allOldRSs, newRS))
-			}
-			return false, fmt.Errorf("deployment %q is running new pods alongside old pods: %#v", d.Name, status)
-		}
-
-		return *(d.Spec.Replicas) == d.Status.Replicas &&
-			*(d.Spec.Replicas) == d.Status.UpdatedReplicas &&
-			d.Generation <= d.Status.ObservedGeneration, nil
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-	defer cancel()
-	_, err = watchtools.UntilWithoutRetry(ctx, w, condition)
-	if err == wait.ErrWaitTimeout {
-		err = fmt.Errorf("deployment %q never completed: %#v", d.Name, status)
-	}
-	return err
+	return testutils.UpdateDeploymentWithRetries(c, namespace, name, applyUpdate, framework.Logf, poll, pollShortTimeout)
 }
 
 // NewDeployment returns a deployment spec with the specified argument.
@@ -131,7 +75,7 @@ func CreateDeployment(client clientset.Interface, replicas int32, podLabels map[
 	if err != nil {
 		return nil, fmt.Errorf("deployment %q Create API error: %v", deploymentSpec.Name, err)
 	}
-	e2elog.Logf("Waiting deployment %q to complete", deploymentSpec.Name)
+	framework.Logf("Waiting deployment %q to complete", deploymentSpec.Name)
 	err = WaitForDeploymentComplete(client, deployment)
 	if err != nil {
 		return nil, fmt.Errorf("deployment %q failed to complete: %v", deploymentSpec.Name, err)
@@ -157,14 +101,6 @@ func GetPodsForDeployment(client clientset.Interface, deployment *appsv1.Deploym
 		return nil, fmt.Errorf("Failed to list Pods of Deployment %q: %v", deployment.Name, err)
 	}
 	return podList, nil
-}
-
-// RunDeployment runs a delopyment with the specified config.
-func RunDeployment(config testutils.DeploymentConfig) error {
-	ginkgo.By(fmt.Sprintf("creating deployment %s in namespace %s", config.Name, config.Namespace))
-	config.NodeDumpFunc = framework.DumpNodeDebugInfo
-	config.ContainerDumpFunc = framework.LogFailedContainers
-	return testutils.RunDeployment(config)
 }
 
 // testDeployment creates a deployment definition based on the namespace. The deployment references the PVC's

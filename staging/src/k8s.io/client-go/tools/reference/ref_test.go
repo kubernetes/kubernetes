@@ -37,29 +37,31 @@ func TestGetReferenceRefVersion(t *testing.T) {
 	tests := []struct {
 		name               string
 		input              *TestRuntimeObj
+		groupVersion       schema.GroupVersion
 		expectedRefVersion string
 	}{
 		{
-			name: "api from selflink",
+			name: "v1 GV from scheme",
 			input: &TestRuntimeObj{
-				ObjectMeta: metav1.ObjectMeta{SelfLink: "/api/v1/namespaces"},
+				ObjectMeta: metav1.ObjectMeta{SelfLink: "/bad-selflink/unused"},
 			},
+			groupVersion:       schema.GroupVersion{Group: "", Version: "v1"},
 			expectedRefVersion: "v1",
 		},
 		{
-			name: "foo.group/v3 from selflink",
+			name: "foo.group/v3 GV from scheme",
 			input: &TestRuntimeObj{
-				ObjectMeta: metav1.ObjectMeta{SelfLink: "/apis/foo.group/v3/namespaces"},
+				ObjectMeta: metav1.ObjectMeta{SelfLink: "/bad-selflink/unused"},
 			},
+			groupVersion:       schema.GroupVersion{Group: "foo.group", Version: "v3"},
 			expectedRefVersion: "foo.group/v3",
 		},
 	}
 
-	scheme := runtime.NewScheme()
-	scheme.AddKnownTypes(schema.GroupVersion{Group: "this", Version: "is ignored"}, &TestRuntimeObj{})
-
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			scheme := runtime.NewScheme()
+			scheme.AddKnownTypes(test.groupVersion, &TestRuntimeObj{})
 			ref, err := GetReference(scheme, test.input)
 			if err != nil {
 				t.Fatal(err)

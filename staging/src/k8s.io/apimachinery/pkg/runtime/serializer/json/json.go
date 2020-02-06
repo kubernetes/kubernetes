@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer/recognizer"
 	"k8s.io/apimachinery/pkg/util/framer"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
+	"k8s.io/klog"
 )
 
 // NewSerializer creates a JSON serializer that handles encoding versioned objects into the proper JSON form. If typer
@@ -53,11 +54,26 @@ func NewYAMLSerializer(meta MetaFactory, creater runtime.ObjectCreater, typer ru
 // and are immutable.
 func NewSerializerWithOptions(meta MetaFactory, creater runtime.ObjectCreater, typer runtime.ObjectTyper, options SerializerOptions) *Serializer {
 	return &Serializer{
-		meta:    meta,
-		creater: creater,
-		typer:   typer,
-		options: options,
+		meta:       meta,
+		creater:    creater,
+		typer:      typer,
+		options:    options,
+		identifier: identifier(options),
 	}
+}
+
+// identifier computes Identifier of Encoder based on the given options.
+func identifier(options SerializerOptions) runtime.Identifier {
+	result := map[string]string{
+		"name":   "json",
+		"yaml":   strconv.FormatBool(options.Yaml),
+		"pretty": strconv.FormatBool(options.Pretty),
+	}
+	identifier, err := json.Marshal(result)
+	if err != nil {
+		klog.Fatalf("Failed marshaling identifier for json Serializer: %v", err)
+	}
+	return runtime.Identifier(identifier)
 }
 
 // SerializerOptions holds the options which are used to configure a JSON/YAML serializer.
@@ -85,6 +101,8 @@ type Serializer struct {
 	options SerializerOptions
 	creater runtime.ObjectCreater
 	typer   runtime.ObjectTyper
+
+	identifier runtime.Identifier
 }
 
 // Serializer implements Serializer
@@ -188,16 +206,6 @@ func gvkWithDefaults(actual, defaultGVK schema.GroupVersionKind) schema.GroupVer
 // On success or most errors, the method will return the calculated schema kind.
 // The gvk calculate priority will be originalData > default gvk > into
 func (s *Serializer) Decode(originalData []byte, gvk *schema.GroupVersionKind, into runtime.Object) (runtime.Object, *schema.GroupVersionKind, error) {
-	if versioned, ok := into.(*runtime.VersionedObjects); ok {
-		into = versioned.Last()
-		obj, actual, err := s.Decode(originalData, gvk, into)
-		if err != nil {
-			return nil, actual, err
-		}
-		versioned.Objects = []runtime.Object{obj}
-		return versioned, actual, nil
-	}
-
 	data := originalData
 	if s.options.Yaml {
 		altered, err := yaml.YAMLToJSON(data)
@@ -286,6 +294,13 @@ func (s *Serializer) Decode(originalData []byte, gvk *schema.GroupVersionKind, i
 
 // Encode serializes the provided object to the given writer.
 func (s *Serializer) Encode(obj runtime.Object, w io.Writer) error {
+	if co, ok := obj.(runtime.CacheableObject); ok {
+		return co.CacheEncode(s.Identifier(), s.doEncode, w)
+	}
+	return s.doEncode(obj, w)
+}
+
+func (s *Serializer) doEncode(obj runtime.Object, w io.Writer) error {
 	if s.options.Yaml {
 		json, err := caseSensitiveJsonIterator.Marshal(obj)
 		if err != nil {
@@ -309,6 +324,11 @@ func (s *Serializer) Encode(obj runtime.Object, w io.Writer) error {
 	}
 	encoder := json.NewEncoder(w)
 	return encoder.Encode(obj)
+}
+
+// Identifier implements runtime.Encoder interface.
+func (s *Serializer) Identifier() runtime.Identifier {
+	return s.identifier
 }
 
 // RecognizesData implements the RecognizingDecoder interface.

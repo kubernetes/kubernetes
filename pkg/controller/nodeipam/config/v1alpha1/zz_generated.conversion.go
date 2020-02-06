@@ -45,16 +45,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1alpha1.NodeIPAMControllerConfiguration)(nil), (*config.NodeIPAMControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_NodeIPAMControllerConfiguration_To_config_NodeIPAMControllerConfiguration(a.(*v1alpha1.NodeIPAMControllerConfiguration), b.(*config.NodeIPAMControllerConfiguration), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*config.NodeIPAMControllerConfiguration)(nil), (*v1alpha1.NodeIPAMControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_NodeIPAMControllerConfiguration_To_v1alpha1_NodeIPAMControllerConfiguration(a.(*config.NodeIPAMControllerConfiguration), b.(*v1alpha1.NodeIPAMControllerConfiguration), scope)
-	}); err != nil {
-		return err
-	}
 	if err := s.AddConversionFunc((*config.NodeIPAMControllerConfiguration)(nil), (*v1alpha1.NodeIPAMControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_config_NodeIPAMControllerConfiguration_To_v1alpha1_NodeIPAMControllerConfiguration(a.(*config.NodeIPAMControllerConfiguration), b.(*v1alpha1.NodeIPAMControllerConfiguration), scope)
 	}); err != nil {
@@ -92,12 +82,18 @@ func Convert_v1_GroupResource_To_v1alpha1_GroupResource(in *v1.GroupResource, ou
 
 func autoConvert_v1alpha1_NodeIPAMControllerConfiguration_To_config_NodeIPAMControllerConfiguration(in *v1alpha1.NodeIPAMControllerConfiguration, out *config.NodeIPAMControllerConfiguration, s conversion.Scope) error {
 	out.ServiceCIDR = in.ServiceCIDR
+	out.SecondaryServiceCIDR = in.SecondaryServiceCIDR
 	out.NodeCIDRMaskSize = in.NodeCIDRMaskSize
+	out.NodeCIDRMaskSizeIPv4 = in.NodeCIDRMaskSizeIPv4
+	out.NodeCIDRMaskSizeIPv6 = in.NodeCIDRMaskSizeIPv6
 	return nil
 }
 
 func autoConvert_config_NodeIPAMControllerConfiguration_To_v1alpha1_NodeIPAMControllerConfiguration(in *config.NodeIPAMControllerConfiguration, out *v1alpha1.NodeIPAMControllerConfiguration, s conversion.Scope) error {
 	out.ServiceCIDR = in.ServiceCIDR
+	out.SecondaryServiceCIDR = in.SecondaryServiceCIDR
 	out.NodeCIDRMaskSize = in.NodeCIDRMaskSize
+	out.NodeCIDRMaskSizeIPv4 = in.NodeCIDRMaskSizeIPv4
+	out.NodeCIDRMaskSizeIPv6 = in.NodeCIDRMaskSizeIPv6
 	return nil
 }

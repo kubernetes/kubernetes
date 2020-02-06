@@ -72,6 +72,10 @@ func (p *testPager) PagedList(ctx context.Context, options metav1.ListOptions) (
 		p.t.Errorf("invariant violated, expected limit %d and continue %s, got %#v", p.expectPage, expectedContinue, options)
 		return nil, fmt.Errorf("invariant violated")
 	}
+	if options.Continue != "" && options.ResourceVersion != "" {
+		p.t.Errorf("invariant violated, specifying resource version (%s) is not allowed when using continue (%s).", options.ResourceVersion, options.Continue)
+		return nil, fmt.Errorf("invariant violated")
+	}
 	var list metainternalversion.List
 	total := options.Limit
 	if total == 0 {
@@ -116,6 +120,7 @@ func (p *testPager) ExpiresOnSecondPageThenFullList(ctx context.Context, options
 	}
 	return p.PagedList(ctx, options)
 }
+
 func TestListPager_List(t *testing.T) {
 	type fields struct {
 		PageSize          int64
@@ -131,43 +136,50 @@ func TestListPager_List(t *testing.T) {
 		fields    fields
 		args      args
 		want      runtime.Object
+		wantPaged bool
 		wantErr   bool
 		isExpired bool
 	}{
 		{
-			name:   "empty page",
-			fields: fields{PageSize: 10, PageFn: (&testPager{t: t, expectPage: 10, remaining: 0, rv: "rv:20"}).PagedList},
-			args:   args{},
-			want:   list(0, "rv:20"),
+			name:      "empty page",
+			fields:    fields{PageSize: 10, PageFn: (&testPager{t: t, expectPage: 10, remaining: 0, rv: "rv:20"}).PagedList},
+			args:      args{},
+			want:      list(0, "rv:20"),
+			wantPaged: false,
 		},
 		{
-			name:   "one page",
-			fields: fields{PageSize: 10, PageFn: (&testPager{t: t, expectPage: 10, remaining: 9, rv: "rv:20"}).PagedList},
-			args:   args{},
-			want:   list(9, "rv:20"),
+			name:      "one page",
+			fields:    fields{PageSize: 10, PageFn: (&testPager{t: t, expectPage: 10, remaining: 9, rv: "rv:20"}).PagedList},
+			args:      args{},
+			want:      list(9, "rv:20"),
+			wantPaged: false,
 		},
 		{
-			name:   "one full page",
-			fields: fields{PageSize: 10, PageFn: (&testPager{t: t, expectPage: 10, remaining: 10, rv: "rv:20"}).PagedList},
-			args:   args{},
-			want:   list(10, "rv:20"),
+			name:      "one full page",
+			fields:    fields{PageSize: 10, PageFn: (&testPager{t: t, expectPage: 10, remaining: 10, rv: "rv:20"}).PagedList},
+			args:      args{},
+			want:      list(10, "rv:20"),
+			wantPaged: false,
 		},
 		{
-			name:   "two pages",
-			fields: fields{PageSize: 10, PageFn: (&testPager{t: t, expectPage: 10, remaining: 11, rv: "rv:20"}).PagedList},
-			args:   args{},
-			want:   list(11, "rv:20"),
+			name:      "two pages",
+			fields:    fields{PageSize: 10, PageFn: (&testPager{t: t, expectPage: 10, remaining: 11, rv: "rv:20"}).PagedList},
+			args:      args{},
+			want:      list(11, "rv:20"),
+			wantPaged: true,
 		},
 		{
-			name:   "three pages",
-			fields: fields{PageSize: 10, PageFn: (&testPager{t: t, expectPage: 10, remaining: 21, rv: "rv:20"}).PagedList},
-			args:   args{},
-			want:   list(21, "rv:20"),
+			name:      "three pages",
+			fields:    fields{PageSize: 10, PageFn: (&testPager{t: t, expectPage: 10, remaining: 21, rv: "rv:20"}).PagedList},
+			args:      args{},
+			want:      list(21, "rv:20"),
+			wantPaged: true,
 		},
 		{
 			name:      "expires on second page",
 			fields:    fields{PageSize: 10, PageFn: (&testPager{t: t, expectPage: 10, remaining: 21, rv: "rv:20"}).ExpiresOnSecondPage},
 			args:      args{},
+			wantPaged: true,
 			wantErr:   true,
 			isExpired: true,
 		},
@@ -178,8 +190,16 @@ func TestListPager_List(t *testing.T) {
 				PageSize:          10,
 				PageFn:            (&testPager{t: t, expectPage: 10, remaining: 21, rv: "rv:20"}).ExpiresOnSecondPageThenFullList,
 			},
-			args: args{},
-			want: list(21, "rv:20"),
+			args:      args{},
+			want:      list(21, "rv:20"),
+			wantPaged: true,
+		},
+		{
+			name:      "two pages with resourceVersion",
+			fields:    fields{PageSize: 10, PageFn: (&testPager{t: t, expectPage: 10, remaining: 11, rv: "rv:20"}).PagedList},
+			args:      args{options: metav1.ListOptions{ResourceVersion: "rv:10"}},
+			want:      list(11, "rv:20"),
+			wantPaged: true,
 		},
 	}
 	for _, tt := range tests {
@@ -193,7 +213,7 @@ func TestListPager_List(t *testing.T) {
 			if ctx == nil {
 				ctx = context.Background()
 			}
-			got, err := p.List(ctx, tt.args.options)
+			got, paginatedResult, err := p.List(ctx, tt.args.options)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ListPager.List() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -201,6 +221,9 @@ func TestListPager_List(t *testing.T) {
 			if tt.isExpired != errors.IsResourceExpired(err) {
 				t.Errorf("ListPager.List() error = %v, isExpired %v", err, tt.isExpired)
 				return
+			}
+			if tt.wantPaged != paginatedResult {
+				t.Errorf("paginatedResult = %t, want %t", paginatedResult, tt.wantPaged)
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("ListPager.List() = %v, want %v", got, tt.want)

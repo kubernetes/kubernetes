@@ -17,23 +17,24 @@ limitations under the License.
 package apimachinery
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
 	"time"
 
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 func extinguish(f *framework.Framework, totalNS int, maxAllowedAfterDel int, maxSeconds int) {
@@ -59,7 +60,7 @@ func extinguish(f *framework.Framework, totalNS int, maxAllowedAfterDel int, max
 	deleteFilter := []string{"nslifetest"}
 	deleted, err := framework.DeleteNamespaces(f.ClientSet, deleteFilter, nil /* skipFilter */)
 	framework.ExpectNoError(err, "failed to delete namespace(s) containing: %s", deleteFilter)
-	gomega.Expect(len(deleted)).To(gomega.Equal(totalNS))
+	framework.ExpectEqual(len(deleted), totalNS)
 
 	ginkgo.By("Waiting for namespaces to vanish")
 	//Now POLL until all namespaces have been eradicated.
@@ -76,7 +77,7 @@ func extinguish(f *framework.Framework, totalNS int, maxAllowedAfterDel int, max
 				}
 			}
 			if cnt > maxAllowedAfterDel {
-				e2elog.Logf("Remaining namespaces : %v", cnt)
+				framework.Logf("Remaining namespaces : %v", cnt)
 				return false, nil
 			}
 			return true, nil
@@ -123,7 +124,7 @@ func ensurePodsAreRemovedWhenNamespaceIsDeleted(f *framework.Framework) {
 	framework.ExpectNoError(wait.Poll(1*time.Second, time.Duration(maxWaitSeconds)*time.Second,
 		func() (bool, error) {
 			_, err = f.ClientSet.CoreV1().Namespaces().Get(namespace.Name, metav1.GetOptions{})
-			if err != nil && errors.IsNotFound(err) {
+			if err != nil && apierrors.IsNotFound(err) {
 				return true, nil
 			}
 			return false, nil
@@ -180,7 +181,7 @@ func ensureServicesAreRemovedWhenNamespaceIsDeleted(f *framework.Framework) {
 	framework.ExpectNoError(wait.Poll(1*time.Second, time.Duration(maxWaitSeconds)*time.Second,
 		func() (bool, error) {
 			_, err = f.ClientSet.CoreV1().Namespaces().Get(namespace.Name, metav1.GetOptions{})
-			if err != nil && errors.IsNotFound(err) {
+			if err != nil && apierrors.IsNotFound(err) {
 				return true, nil
 			}
 			return false, nil
@@ -247,5 +248,35 @@ var _ = SIGDescribe("Namespaces [Serial]", func() {
 	// On hold until etcd3; see #7372
 	ginkgo.It("should always delete fast (ALL of 100 namespaces in 150 seconds) [Feature:ComprehensiveNamespaceDraining]",
 		func() { extinguish(f, 100, 0, 150) })
+
+	/*
+	   Release : v1.18
+	   Testname: Namespace patching
+	   Description: A Namespace is created.
+	   The Namespace is patched.
+	   The Namespace and MUST now include the new Label.
+	*/
+	framework.ConformanceIt("should patch a Namespace", func() {
+		ginkgo.By("creating a Namespace")
+		namespaceName := "nspatchtest-" + string(uuid.NewUUID())
+		ns, err := f.CreateNamespace(namespaceName, nil)
+		framework.ExpectNoError(err, "failed creating Namespace")
+		namespaceName = ns.ObjectMeta.Name
+
+		ginkgo.By("patching the Namespace")
+		nspatch, err := json.Marshal(map[string]interface{}{
+			"metadata": map[string]interface{}{
+				"labels": map[string]string{"testLabel": "testValue"},
+			},
+		})
+		framework.ExpectNoError(err, "failed to marshal JSON patch data")
+		_, err = f.ClientSet.CoreV1().Namespaces().Patch(namespaceName, types.StrategicMergePatchType, []byte(nspatch))
+		framework.ExpectNoError(err, "failed to patch Namespace")
+
+		ginkgo.By("get the Namespace and ensuring it has the label")
+		namespace, err := f.ClientSet.CoreV1().Namespaces().Get(namespaceName, metav1.GetOptions{})
+		framework.ExpectNoError(err, "failed to get Namespace")
+		framework.ExpectEqual(namespace.ObjectMeta.Labels["testLabel"], "testValue", "namespace not patched")
+	})
 
 })

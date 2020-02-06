@@ -169,13 +169,13 @@ then the container image would be `foo:1bb359ccce344ca5d263cd257958ea035c978fd3`
 
 A simple way to push an image that was just built without manually updating the image tags is to
 download the [kustomize standalone](https://github.com/kubernetes-sigs/kustomize/) tool and run
-`kustomize edit set imagetag` command to update the tags for you.
+`kustomize edit set image` command to update the tags for you.
 
 **Example:** Set the latest git commit SHA as the image tag for `foo` images.
 
 {% sample lang="yaml" %}
 ```bash
-kustomize edit set imagetag foo:$(git log -n 1 --pretty=format:"%H")
+kustomize edit set image foo:$(git log -n 1 --pretty=format:"%H")
 kubectl apply -f .
 ```
 {% endmethod %}

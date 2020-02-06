@@ -128,12 +128,12 @@ func ensureTags(gvk schema.GroupVersionKind, tp reflect.Type, parents []reflect.
 			f := tp.Field(i)
 			jsonTag := f.Tag.Get("json")
 			if len(jsonTag) == 0 {
-				errs = append(errs, fmt.Errorf("External types should have json tags. %#v tags on field %v are: %s.\n%s", gvk, f.Name, f.Tag, fmtParentString(parents)))
+				errs = append(errs, fmt.Errorf("external types should have json tags. %#v tags on field %v are: %s.\n%s", gvk, f.Name, f.Tag, fmtParentString(parents)))
 			}
 
 			jsonTagName := strings.Split(jsonTag, ",")[0]
 			if len(jsonTagName) > 0 && (jsonTagName[0] < 'a' || jsonTagName[0] > 'z') && jsonTagName != "-" && allowedNonstandardJSONNames[tp] != jsonTagName {
-				errs = append(errs, fmt.Errorf("External types should have json names starting with lowercase letter. %#v has json tag on field %v with name %s.\n%s", gvk, f.Name, jsonTagName, fmtParentString(parents)))
+				errs = append(errs, fmt.Errorf("external types should have json names starting with lowercase letter. %#v has json tag on field %v with name %s.\n%s", gvk, f.Name, jsonTagName, fmtParentString(parents)))
 			}
 
 			errs = append(errs, ensureTags(gvk, f.Type, parents, allowedNonstandardJSONNames)...)

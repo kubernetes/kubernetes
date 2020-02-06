@@ -23,9 +23,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/storage/names"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // svcStrategy implements behavior for Services
@@ -47,6 +49,8 @@ func (svcStrategy) NamespaceScoped() bool {
 func (svcStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	service := obj.(*api.Service)
 	service.Status = api.ServiceStatus{}
+
+	dropServiceDisabledFields(service, nil)
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
@@ -54,6 +58,8 @@ func (svcStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 	newService := obj.(*api.Service)
 	oldService := old.(*api.Service)
 	newService.Status = oldService.Status
+
+	dropServiceDisabledFields(newService, oldService)
 }
 
 // Validate validates a new service.
@@ -102,6 +108,41 @@ func (svcStrategy) Export(ctx context.Context, obj runtime.Object, exact bool) e
 		}
 	}
 	return nil
+}
+
+// dropServiceDisabledFields drops fields that are not used if their associated feature gates
+// are not enabled.  The typical pattern is:
+//     if !utilfeature.DefaultFeatureGate.Enabled(features.MyFeature) && !myFeatureInUse(oldSvc) {
+//         newSvc.Spec.MyFeature = nil
+//     }
+func dropServiceDisabledFields(newSvc *api.Service, oldSvc *api.Service) {
+	// Drop IPFamily if DualStack is not enabled
+	if !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) && !serviceIPFamilyInUse(oldSvc) {
+		newSvc.Spec.IPFamily = nil
+	}
+	// Drop TopologyKeys if ServiceTopology is not enabled
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ServiceTopology) && !topologyKeysInUse(oldSvc) {
+		newSvc.Spec.TopologyKeys = nil
+	}
+}
+
+// returns true if svc.Spec.ServiceIPFamily field is in use
+func serviceIPFamilyInUse(svc *api.Service) bool {
+	if svc == nil {
+		return false
+	}
+	if svc.Spec.IPFamily != nil {
+		return true
+	}
+	return false
+}
+
+// returns true if svc.Spec.TopologyKeys field is in use
+func topologyKeysInUse(svc *api.Service) bool {
+	if svc == nil {
+		return false
+	}
+	return len(svc.Spec.TopologyKeys) > 0
 }
 
 type serviceStatusStrategy struct {

@@ -23,7 +23,7 @@ import (
 	"path"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -157,20 +157,26 @@ func (m *podContainerManagerImpl) tryKillingCgroupProcesses(podCgroup CgroupName
 	var errlist []error
 	// os.Kill often errors out,
 	// We try killing all the pids multiple times
+	removed := map[int]bool{}
 	for i := 0; i < 5; i++ {
 		if i != 0 {
-			klog.V(3).Infof("Attempt %v failed to kill all unwanted process. Retyring", i)
+			klog.V(3).Infof("Attempt %v failed to kill all unwanted process from cgroup: %v. Retyring", i, podCgroup)
 		}
 		errlist = []error{}
 		for _, pid := range pidsToKill {
-			klog.V(3).Infof("Attempt to kill process with pid: %v", pid)
+			if _, ok := removed[pid]; ok {
+				continue
+			}
+			klog.V(3).Infof("Attempt to kill process with pid: %v from cgroup: %v", pid, podCgroup)
 			if err := m.killOnePid(pid); err != nil {
-				klog.V(3).Infof("failed to kill process with pid: %v", pid)
+				klog.V(3).Infof("failed to kill process with pid: %v from cgroup: %v", pid, podCgroup)
 				errlist = append(errlist, err)
+			} else {
+				removed[pid] = true
 			}
 		}
 		if len(errlist) == 0 {
-			klog.V(3).Infof("successfully killed all unwanted processes.")
+			klog.V(3).Infof("successfully killed all unwanted processes from cgroup: %v", podCgroup)
 			return nil
 		}
 	}

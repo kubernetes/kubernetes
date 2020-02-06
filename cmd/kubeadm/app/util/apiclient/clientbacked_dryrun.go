@@ -113,7 +113,7 @@ func (clg *ClientBackedDryRunGetter) Client() clientset.Interface {
 }
 
 // decodeUnversionedIntoAPIObject converts the *unversioned.Unversioned object returned from the dynamic client
-// to bytes; and then decodes it back _to an external api version (k8s.io/api vs k8s.io/kubernetes/pkg/api*)_ using the normal API machinery
+// to bytes; and then decodes it back _to an external api version (k8s.io/api)_ using the normal API machinery
 func decodeUnstructuredIntoAPIObject(action core.Action, unstructuredObj runtime.Unstructured) (runtime.Object, error) {
 	objBytes, err := json.Marshal(unstructuredObj)
 	if err != nil {

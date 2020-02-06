@@ -56,7 +56,7 @@ message NodeMetrics {
 // NodeMetricsList is a list of NodeMetrics.
 message NodeMetricsList {
   // Standard list metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // List of node metrics.
@@ -80,7 +80,7 @@ message PodMetrics {
 // PodMetricsList is a list of PodMetrics.
 message PodMetricsList {
   // Standard list metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // List of pod metrics.

@@ -19,6 +19,7 @@ package util
 import (
 	"errors"
 	"fmt"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"path"
 	"strings"
 	"testing"
@@ -106,19 +107,22 @@ func TestValidConvenientForUserVersion(t *testing.T) {
 
 func TestVersionFromNetwork(t *testing.T) {
 	type T struct {
-		Content       string
-		Expected      string
-		ErrorExpected bool
+		Content              string
+		Expected             string
+		FetcherErrorExpected bool
+		ErrorExpected        bool
 	}
+
+	currentVersion := normalizedBuildVersion(constants.CurrentKubernetesVersion.String())
+
 	cases := map[string]T{
-		"stable":     {"stable-1", "v1.4.6", false}, // recursive pointer to stable-1
-		"stable-1":   {"v1.4.6", "v1.4.6", false},
-		"stable-1.3": {"v1.3.10", "v1.3.10", false},
-		"latest":     {"v1.6.0-alpha.0", "v1.6.0-alpha.0", false},
-		"latest-1.3": {"v1.3.11-beta.0", "v1.3.11-beta.0", false},
-		"empty":      {"", "", true},
-		"garbage":    {"<?xml version='1.0'?><Error><Code>NoSuchKey</Code><Message>The specified key does not exist.</Message></Error>", "", true},
-		"unknown":    {"The requested URL was not found on this server.", "", true},
+		"stable":          {"stable-1", "v1.4.6", false, false}, // recursive pointer to stable-1
+		"stable-1":        {"v1.4.6", "v1.4.6", false, false},
+		"stable-1.3":      {"v1.3.10", "v1.3.10", false, false},
+		"latest":          {"v1.6.0-alpha.0", "v1.6.0-alpha.0", false, false},
+		"latest-1.3":      {"v1.3.11-beta.0", "v1.3.11-beta.0", false, false},
+		"latest-1.5":      {"", currentVersion, true, false}, // fallback to currentVersion on fetcher error
+		"invalid-version": {"", "", false, true},             // invalid version cannot be parsed
 	}
 
 	for k, v := range cases {
@@ -128,7 +132,7 @@ func TestVersionFromNetwork(t *testing.T) {
 				key := strings.TrimSuffix(path.Base(url), ".txt")
 				res, found := cases[key]
 				if found {
-					if v.ErrorExpected {
+					if v.FetcherErrorExpected {
 						return "error", errors.New("expected error")
 					}
 					return res.Content, nil
@@ -190,11 +194,10 @@ func TestSplitVersion(t *testing.T) {
 		{"v1.8.0-alpha.2.1231+afabd012389d53a", "https://dl.k8s.io/release", "v1.8.0-alpha.2.1231+afabd012389d53a", true},
 		{"release/v1.7.0", "https://dl.k8s.io/release", "v1.7.0", true},
 		{"release/latest-1.7", "https://dl.k8s.io/release", "latest-1.7", true},
-		// CI builds area, lookup actual builds at ci-cross/*.txt
+		// CI builds area
 		{"ci/latest", "https://dl.k8s.io/ci", "latest", true},
-		{"ci-cross/latest", "https://dl.k8s.io/ci-cross", "latest", true},
+		{"ci/k8s-master", "https://dl.k8s.io/ci", "k8s-master", true},
 		{"ci/latest-1.7", "https://dl.k8s.io/ci", "latest-1.7", true},
-		{"ci-cross/latest-1.7", "https://dl.k8s.io/ci-cross", "latest-1.7", true},
 		// unknown label in default (release) area: splitVersion validate only areas.
 		{"unknown-1", "https://dl.k8s.io/release", "unknown-1", true},
 		// unknown area, not valid input.
@@ -233,9 +236,8 @@ func TestKubernetesIsCIVersion(t *testing.T) {
 		{"release/v1.0.0", false},
 		// CI builds
 		{"ci/latest-1", true},
-		{"ci-cross/latest", true},
+		{"ci/k8s-master", true},
 		{"ci/v1.9.0-alpha.1.123+acbcbfd53bfa0a", true},
-		{"ci-cross/v1.9.0-alpha.1.123+acbcbfd53bfa0a", true},
 	}
 
 	for _, tc := range cases {
@@ -264,9 +266,7 @@ func TestCIBuildVersion(t *testing.T) {
 		{"release/0invalid", "", false},
 		// CI or custom builds
 		{"ci/v1.9.0-alpha.1.123+acbcbfd53bfa0a", "v1.9.0-alpha.1.123+acbcbfd53bfa0a", true},
-		{"ci-cross/v1.9.0-alpha.1.123+acbcbfd53bfa0a", "v1.9.0-alpha.1.123+acbcbfd53bfa0a", true},
 		{"ci/1.9.0-alpha.1.123+acbcbfd53bfa0a", "v1.9.0-alpha.1.123+acbcbfd53bfa0a", true},
-		{"ci-cross/1.9.0-alpha.1.123+acbcbfd53bfa0a", "v1.9.0-alpha.1.123+acbcbfd53bfa0a", true},
 		{"ci/0invalid", "", false},
 	}
 

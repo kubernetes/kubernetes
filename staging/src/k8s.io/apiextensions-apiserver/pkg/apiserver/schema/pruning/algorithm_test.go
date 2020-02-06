@@ -636,6 +636,7 @@ func BenchmarkDeepCopy(b *testing.B) {
 
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
+		//lint:ignore SA4010 the result of append is never used, it's acceptable since in benchmark testing.
 		instances = append(instances, runtime.DeepCopyJSON(obj))
 	}
 }

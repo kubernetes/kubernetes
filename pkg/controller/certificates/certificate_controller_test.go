@@ -55,6 +55,7 @@ func TestCertificateController(t *testing.T) {
 	}
 
 	controller := NewCertificateController(
+		"test",
 		client,
 		informerFactory.Certificates().V1beta1().CertificateSigningRequests(),
 		handler,

@@ -29,9 +29,9 @@ import (
 	pkiutil "k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 )
 
-// SetupCertificateAuthorithy is a utility function for kubeadm testing that creates a
-// CertificateAuthorithy cert/key pair
-func SetupCertificateAuthorithy(t *testing.T) (*x509.Certificate, crypto.Signer) {
+// SetupCertificateAuthority is a utility function for kubeadm testing that creates a
+// CertificateAuthority cert/key pair
+func SetupCertificateAuthority(t *testing.T) (*x509.Certificate, crypto.Signer) {
 	caCert, caKey, err := pkiutil.NewCertificateAuthority(&certutil.Config{CommonName: "kubernetes"})
 	if err != nil {
 		t.Fatalf("failure while generating CA certificate and key: %v", err)

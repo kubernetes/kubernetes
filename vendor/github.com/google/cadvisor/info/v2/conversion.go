@@ -124,6 +124,9 @@ func ContainerStatsFromV1(containerName string, spec *v1.ContainerSpec, stats []
 				Interfaces: val.Network.Interfaces,
 			}
 		}
+		if spec.HasProcesses {
+			stat.Processes = &val.Processes
+		}
 		if spec.HasFilesystem {
 			if len(val.Filesystem) == 1 {
 				stat.Filesystem = &FilesystemStats{
@@ -179,6 +182,9 @@ func DeprecatedStatsFromV1(cont *v1.ContainerInfo) []DeprecatedContainerStats {
 		}
 		if stat.HasNetwork {
 			stat.Network.Interfaces = val.Network.Interfaces
+		}
+		if stat.HasProcesses {
+			stat.Processes = val.Processes
 		}
 		if stat.HasFilesystem {
 			stat.Filesystem = val.Filesystem
@@ -255,6 +261,7 @@ func ContainerSpecFromV1(specV1 *v1.ContainerSpec, aliases []string, namespace s
 		HasMemory:        specV1.HasMemory,
 		HasFilesystem:    specV1.HasFilesystem,
 		HasNetwork:       specV1.HasNetwork,
+		HasProcesses:     specV1.HasProcesses,
 		HasDiskIo:        specV1.HasDiskIo,
 		HasCustomMetrics: specV1.HasCustomMetrics,
 		Image:            specV1.Image,

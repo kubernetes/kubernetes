@@ -17,6 +17,7 @@ limitations under the License.
 package nodelease
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -278,6 +279,151 @@ func TestRetryUpdateLease(t *testing.T) {
 			}
 			if err := c.retryUpdateLease(nil); tc.expectErr != (err != nil) {
 				t.Fatalf("got %v, expected %v", err != nil, tc.expectErr)
+			}
+		})
+	}
+}
+
+func TestUpdateUsingLatestLease(t *testing.T) {
+	nodeName := "foo"
+	node := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: nodeName,
+			UID:  types.UID("foo-uid"),
+		},
+	}
+
+	notFoundErr := apierrors.NewNotFound(coordinationv1.Resource("lease"), nodeName)
+	internalErr := apierrors.NewInternalError(errors.New("unreachable code"))
+
+	makeLease := func(name, resourceVersion string) *coordinationv1.Lease {
+		return &coordinationv1.Lease{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:       corev1.NamespaceNodeLease,
+				Name:            name,
+				ResourceVersion: resourceVersion,
+			},
+		}
+	}
+
+	cases := []struct {
+		desc                       string
+		existingObjs               []runtime.Object
+		latestLease                *coordinationv1.Lease
+		updateReactor              func(action clienttesting.Action) (bool, runtime.Object, error)
+		getReactor                 func(action clienttesting.Action) (bool, runtime.Object, error)
+		createReactor              func(action clienttesting.Action) (bool, runtime.Object, error)
+		expectLatestLease          bool
+		expectLeaseResourceVersion string
+	}{
+		{
+			desc:          "latestLease is nil and need to create",
+			existingObjs:  []runtime.Object{node},
+			latestLease:   nil,
+			updateReactor: nil,
+			getReactor: func(action clienttesting.Action) (bool, runtime.Object, error) {
+				return true, nil, notFoundErr
+			},
+			createReactor: func(action clienttesting.Action) (bool, runtime.Object, error) {
+				return true, makeLease(nodeName, "1"), nil
+			},
+			expectLatestLease:          true,
+			expectLeaseResourceVersion: "1",
+		},
+		{
+			desc:          "latestLease is nil and need to create, node doesn't exist",
+			existingObjs:  nil,
+			latestLease:   nil,
+			updateReactor: nil,
+			getReactor: func(action clienttesting.Action) (bool, runtime.Object, error) {
+				return true, nil, notFoundErr
+			},
+			createReactor: func(action clienttesting.Action) (bool, runtime.Object, error) {
+				return true, makeLease(nodeName, "1"), nil
+			},
+			expectLatestLease:          false,
+			expectLeaseResourceVersion: "1",
+		},
+		{
+			desc:         "latestLease is nil and need to update",
+			existingObjs: []runtime.Object{node},
+			latestLease:  nil,
+			updateReactor: func(action clienttesting.Action) (bool, runtime.Object, error) {
+				return true, makeLease(nodeName, "2"), nil
+			},
+			getReactor: func(action clienttesting.Action) (bool, runtime.Object, error) {
+				return true, makeLease(nodeName, "1"), nil
+			},
+			expectLatestLease:          true,
+			expectLeaseResourceVersion: "2",
+		},
+		{
+			desc:         "latestLease exist and need to update",
+			existingObjs: []runtime.Object{node},
+			latestLease:  makeLease(nodeName, "1"),
+			updateReactor: func(action clienttesting.Action) (bool, runtime.Object, error) {
+				return true, makeLease(nodeName, "2"), nil
+			},
+			expectLatestLease:          true,
+			expectLeaseResourceVersion: "2",
+		},
+		{
+			desc:         "update with latest lease failed",
+			existingObjs: []runtime.Object{node},
+			latestLease:  makeLease(nodeName, "1"),
+			updateReactor: func() func(action clienttesting.Action) (bool, runtime.Object, error) {
+				i := 0
+				return func(action clienttesting.Action) (bool, runtime.Object, error) {
+					i++
+					switch i {
+					case 1:
+						return true, nil, notFoundErr
+					case 2:
+						return true, makeLease(nodeName, "3"), nil
+					default:
+						t.Fatalf("unexpect call update lease")
+						return true, nil, internalErr
+					}
+				}
+			}(),
+			getReactor: func(action clienttesting.Action) (bool, runtime.Object, error) {
+				return true, makeLease(nodeName, "2"), nil
+			},
+			expectLatestLease:          true,
+			expectLeaseResourceVersion: "3",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.desc, func(t *testing.T) {
+			cl := fake.NewSimpleClientset(tc.existingObjs...)
+			if tc.updateReactor != nil {
+				cl.PrependReactor("update", "leases", tc.updateReactor)
+			}
+			if tc.getReactor != nil {
+				cl.PrependReactor("get", "leases", tc.getReactor)
+			}
+			if tc.createReactor != nil {
+				cl.PrependReactor("create", "leases", tc.createReactor)
+			}
+			c := &controller{
+				clock:                clock.NewFakeClock(time.Now()),
+				client:               cl,
+				leaseClient:          cl.CoordinationV1().Leases(corev1.NamespaceNodeLease),
+				holderIdentity:       node.Name,
+				leaseDurationSeconds: 10,
+				latestLease:          tc.latestLease,
+			}
+
+			c.sync()
+
+			if tc.expectLatestLease {
+				if tc.expectLeaseResourceVersion != c.latestLease.ResourceVersion {
+					t.Fatalf("latestLease RV got %v, expected %v", c.latestLease.ResourceVersion, tc.expectLeaseResourceVersion)
+				}
+			} else {
+				if c.latestLease != nil {
+					t.Fatalf("unexpected latestLease: %v", c.latestLease)
+				}
 			}
 		})
 	}

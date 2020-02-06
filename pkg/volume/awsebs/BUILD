@@ -10,6 +10,9 @@ go_library(
     name = "go_default_library",
     srcs = [
         "attacher.go",
+        "attacher_linux.go",
+        "attacher_unsupported.go",
+        "attacher_windows.go",
         "aws_ebs.go",
         "aws_ebs_block.go",
         "aws_util.go",
@@ -18,7 +21,6 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/volume/awsebs",
     deps = [
         "//pkg/features:go_default_library",
-        "//pkg/util/mount:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/util:go_default_library",
         "//pkg/volume/util/volumepathhandler:go_default_library",
@@ -32,6 +34,7 @@ go_library(
         "//staging/src/k8s.io/cloud-provider/volume/helpers:go_default_library",
         "//staging/src/k8s.io/legacy-cloud-providers/aws:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/utils/mount:go_default_library",
         "//vendor/k8s.io/utils/strings:go_default_library",
     ],
 )
@@ -45,7 +48,6 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/util/mount:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/testing:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
@@ -58,6 +60,7 @@ go_test(
         "//staging/src/k8s.io/legacy-cloud-providers/aws:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/utils/mount:go_default_library",
     ],
 )
 

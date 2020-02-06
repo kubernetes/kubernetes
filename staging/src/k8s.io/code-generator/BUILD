@@ -17,6 +17,7 @@ filegroup(
         "//staging/src/k8s.io/code-generator/cmd/import-boss:all-srcs",
         "//staging/src/k8s.io/code-generator/cmd/informer-gen:all-srcs",
         "//staging/src/k8s.io/code-generator/cmd/lister-gen:all-srcs",
+        "//staging/src/k8s.io/code-generator/cmd/openapi-gen:all-srcs",
         "//staging/src/k8s.io/code-generator/cmd/register-gen:all-srcs",
         "//staging/src/k8s.io/code-generator/cmd/set-gen:all-srcs",
         "//staging/src/k8s.io/code-generator/hack:all-srcs",

@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2016 The Kubernetes Authors.
 
@@ -20,8 +22,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2018-07-01/storage"
+	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2019-06-01/storage"
 	"github.com/Azure/go-autorest/autorest/to"
+
 	"k8s.io/klog"
 )
 
@@ -33,16 +36,13 @@ type accountWithLocation struct {
 func (az *Cloud) getStorageAccounts(matchingAccountType, matchingAccountKind, resourceGroup, matchingLocation string) ([]accountWithLocation, error) {
 	ctx, cancel := getContextWithCancel()
 	defer cancel()
-	result, err := az.StorageAccountClient.ListByResourceGroup(ctx, resourceGroup)
-	if err != nil {
-		return nil, err
-	}
-	if result.Value == nil {
-		return nil, fmt.Errorf("unexpected error when listing storage accounts from resource group %s", resourceGroup)
+	result, rerr := az.StorageAccountClient.ListByResourceGroup(ctx, resourceGroup)
+	if rerr != nil {
+		return nil, rerr.Error()
 	}
 
 	accounts := []accountWithLocation{}
-	for _, acct := range *result.Value {
+	for _, acct := range result {
 		if acct.Name != nil && acct.Location != nil && acct.Sku != nil {
 			storageType := string((*acct.Sku).Name)
 			if matchingAccountType != "" && !strings.EqualFold(matchingAccountType, storageType) {
@@ -69,9 +69,9 @@ func (az *Cloud) GetStorageAccesskey(account, resourceGroup string) (string, err
 	ctx, cancel := getContextWithCancel()
 	defer cancel()
 
-	result, err := az.StorageAccountClient.ListKeys(ctx, resourceGroup, account)
-	if err != nil {
-		return "", err
+	result, rerr := az.StorageAccountClient.ListKeys(ctx, resourceGroup, account)
+	if rerr != nil {
+		return "", rerr.Error()
 	}
 	if result.Keys == nil {
 		return "", fmt.Errorf("empty keys")
@@ -129,9 +129,9 @@ func (az *Cloud) EnsureStorageAccount(accountName, accountType, accountKind, res
 
 			ctx, cancel := getContextWithCancel()
 			defer cancel()
-			_, err := az.StorageAccountClient.Create(ctx, resourceGroup, accountName, cp)
-			if err != nil {
-				return "", "", fmt.Errorf(fmt.Sprintf("Failed to create storage account %s, error: %s", accountName, err))
+			rerr := az.StorageAccountClient.Create(ctx, resourceGroup, accountName, cp)
+			if rerr != nil {
+				return "", "", fmt.Errorf(fmt.Sprintf("Failed to create storage account %s, error: %v", accountName, rerr))
 			}
 		}
 	}

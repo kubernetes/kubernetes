@@ -33,19 +33,49 @@ var (
 	_ = Ticker(&fakeTicker{})
 )
 
+type SettablePassiveClock interface {
+	PassiveClock
+	SetTime(time.Time)
+}
+
+func exercisePassiveClock(t *testing.T, pc SettablePassiveClock) {
+	t1 := time.Now()
+	t2 := t1.Add(time.Hour)
+	pc.SetTime(t1)
+	tx := pc.Now()
+	if tx != t1 {
+		t.Errorf("SetTime(%#+v); Now() => %#+v", t1, tx)
+	}
+	dx := pc.Since(t1)
+	if dx != 0 {
+		t.Errorf("Since() => %v", dx)
+	}
+	pc.SetTime(t2)
+	dx = pc.Since(t1)
+	if dx != time.Hour {
+		t.Errorf("Since() => %v", dx)
+	}
+	tx = pc.Now()
+	if tx != t2 {
+		t.Errorf("Now() => %#+v", tx)
+	}
+}
+
+func TestFakePassiveClock(t *testing.T) {
+	startTime := time.Now()
+	tc := NewFakePassiveClock(startTime)
+	exercisePassiveClock(t, tc)
+}
+
 func TestFakeClock(t *testing.T) {
 	startTime := time.Now()
 	tc := NewFakeClock(startTime)
+	exercisePassiveClock(t, tc)
+	tc.SetTime(startTime)
 	tc.Step(time.Second)
 	now := tc.Now()
 	if now.Sub(startTime) != time.Second {
 		t.Errorf("input: %s now=%s gap=%s expected=%s", startTime, now, now.Sub(startTime), time.Second)
-	}
-
-	tt := tc.Now()
-	tc.SetTime(tt.Add(time.Hour))
-	if tc.Since(tt) != time.Hour {
-		t.Errorf("input: %s now=%s gap=%s expected=%s", tt, tc.Now(), tc.Since(tt), time.Hour)
 	}
 }
 

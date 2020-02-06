@@ -221,19 +221,28 @@ func validateKubeConfig(outDir, filename string, config *clientcmdapi.Config) er
 		return errors.Wrapf(err, "failed to load kubeconfig file %s that already exists on disk", kubeConfigFilePath)
 	}
 
-	expectedCtx := config.CurrentContext
-	expectedCluster := config.Contexts[expectedCtx].Cluster
-	currentCtx := currentConfig.CurrentContext
-	if currentConfig.Contexts[currentCtx] == nil {
+	expectedCtx, exists := config.Contexts[config.CurrentContext]
+	if !exists {
+		return errors.Errorf("failed to find expected context %s", config.CurrentContext)
+	}
+	expectedCluster := expectedCtx.Cluster
+	currentCtx, exists := currentConfig.Contexts[currentConfig.CurrentContext]
+	if !exists {
 		return errors.Errorf("failed to find CurrentContext in Contexts of the kubeconfig file %s", kubeConfigFilePath)
 	}
-	currentCluster := currentConfig.Contexts[currentCtx].Cluster
+	currentCluster := currentCtx.Cluster
 	if currentConfig.Clusters[currentCluster] == nil {
 		return errors.Errorf("failed to find the given CurrentContext Cluster in Clusters of the kubeconfig file %s", kubeConfigFilePath)
 	}
 
+	// Make sure the compared CAs are whitespace-trimmed. The function clientcmd.LoadFromFile() just decodes
+	// the base64 CA and places it raw in the v1.Config object. In case the user has extra whitespace
+	// in the CA they used to create a kubeconfig this comparison to a generated v1.Config will otherwise fail.
+	caCurrent := bytes.TrimSpace(currentConfig.Clusters[currentCluster].CertificateAuthorityData)
+	caExpected := bytes.TrimSpace(config.Clusters[expectedCluster].CertificateAuthorityData)
+
 	// If the current CA cert on disk doesn't match the expected CA cert, error out because we have a file, but it's stale
-	if !bytes.Equal(currentConfig.Clusters[currentCluster].CertificateAuthorityData, config.Clusters[expectedCluster].CertificateAuthorityData) {
+	if !bytes.Equal(caCurrent, caExpected) {
 		return errors.Errorf("a kubeconfig file %q exists already but has got the wrong CA cert", kubeConfigFilePath)
 	}
 	// If the current API Server location on disk doesn't match the expected API server, error out because we have a file, but it's stale

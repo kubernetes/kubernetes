@@ -17,6 +17,7 @@ limitations under the License.
 package podautoscaler
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -29,7 +30,7 @@ import (
 
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2beta1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta/testrestmapper"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -55,11 +56,11 @@ import (
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 )
 
-func (w fakeResponseWrapper) DoRaw() ([]byte, error) {
+func (w fakeResponseWrapper) DoRaw(context.Context) ([]byte, error) {
 	return w.raw, nil
 }
 
-func (w fakeResponseWrapper) Stream() (io.ReadCloser, error) {
+func (w fakeResponseWrapper) Stream(context.Context) (io.ReadCloser, error) {
 	return nil, nil
 }
 

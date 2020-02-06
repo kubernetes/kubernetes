@@ -29,7 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
@@ -43,6 +43,13 @@ const (
 	E2E Suite = "e2e"
 	// NodeE2E represents a test suite for node e2e.
 	NodeE2E Suite = "node e2e"
+)
+
+var (
+	// non-Administrator Windows user used in tests. This is the Windows equivalent of the Linux non-root UID usage.
+	nonAdminTestUserName = "ContainerUser"
+	// non-root UID used in tests.
+	nonRootTestUserID = int64(1000)
 )
 
 // CurrentSuite represents current test suite.
@@ -59,23 +66,25 @@ var CommonImageWhiteList = sets.NewString(
 	imageutils.GetE2EImage(imageutils.Mounttest),
 	imageutils.GetE2EImage(imageutils.MounttestUser),
 	imageutils.GetE2EImage(imageutils.Nginx),
+	imageutils.GetE2EImage(imageutils.Httpd),
 	imageutils.GetE2EImage(imageutils.TestWebserver),
 	imageutils.GetE2EImage(imageutils.VolumeNFSServer),
 	imageutils.GetE2EImage(imageutils.VolumeGlusterServer),
+	imageutils.GetE2EImage(imageutils.NonRoot),
 )
 
 type testImagesStruct struct {
-	AgnhostImage      string
-	BusyBoxImage      string
-	GBFrontendImage   string
-	GBRedisSlaveImage string
-	KittenImage       string
-	MounttestImage    string
-	NautilusImage     string
-	NginxImage        string
-	NginxNewImage     string
-	PauseImage        string
-	RedisImage        string
+	AgnhostImage   string
+	BusyBoxImage   string
+	KittenImage    string
+	MounttestImage string
+	NautilusImage  string
+	NginxImage     string
+	NginxNewImage  string
+	HttpdImage     string
+	HttpdNewImage  string
+	PauseImage     string
+	RedisImage     string
 }
 
 var testImages testImagesStruct
@@ -84,13 +93,13 @@ func init() {
 	testImages = testImagesStruct{
 		imageutils.GetE2EImage(imageutils.Agnhost),
 		imageutils.GetE2EImage(imageutils.BusyBox),
-		imageutils.GetE2EImage(imageutils.GBFrontend),
-		imageutils.GetE2EImage(imageutils.GBRedisSlave),
 		imageutils.GetE2EImage(imageutils.Kitten),
 		imageutils.GetE2EImage(imageutils.Mounttest),
 		imageutils.GetE2EImage(imageutils.Nautilus),
 		imageutils.GetE2EImage(imageutils.Nginx),
 		imageutils.GetE2EImage(imageutils.NginxNew),
+		imageutils.GetE2EImage(imageutils.Httpd),
+		imageutils.GetE2EImage(imageutils.HttpdNew),
 		imageutils.GetE2EImage(imageutils.Pause),
 		imageutils.GetE2EImage(imageutils.Redis),
 	}
@@ -101,11 +110,11 @@ func SubstituteImageName(content string) string {
 	contentWithImageName := new(bytes.Buffer)
 	tmpl, err := template.New("imagemanifest").Parse(content)
 	if err != nil {
-		e2elog.Failf("Failed Parse the template: %v", err)
+		framework.Failf("Failed Parse the template: %v", err)
 	}
 	err = tmpl.Execute(contentWithImageName, testImages)
 	if err != nil {
-		e2elog.Failf("Failed executing template: %v", err)
+		framework.Failf("Failed executing template: %v", err)
 	}
 	return contentWithImageName.String()
 }
@@ -136,10 +145,15 @@ func NewSVCByName(c clientset.Interface, ns, name string) error {
 }
 
 // NewRCByName creates a replication controller with a selector by name of name.
-func NewRCByName(c clientset.Interface, ns, name string, replicas int32, gracePeriod *int64) (*v1.ReplicationController, error) {
+func NewRCByName(c clientset.Interface, ns, name string, replicas int32, gracePeriod *int64, containerArgs []string) (*v1.ReplicationController, error) {
 	ginkgo.By(fmt.Sprintf("creating replication controller %s", name))
-	return c.CoreV1().ReplicationControllers(ns).Create(framework.RcByNamePort(
-		name, replicas, framework.ServeHostnameImage, 9376, v1.ProtocolTCP, map[string]string{}, gracePeriod))
+
+	if containerArgs == nil {
+		containerArgs = []string{"serve-hostname"}
+	}
+
+	return c.CoreV1().ReplicationControllers(ns).Create(rcByNamePort(
+		name, replicas, framework.ServeHostnameImage, containerArgs, 9376, v1.ProtocolTCP, map[string]string{}, gracePeriod))
 }
 
 // RestartNodes restarts specific nodes.
@@ -185,4 +199,26 @@ func RestartNodes(c clientset.Interface, nodes []v1.Node) error {
 		}
 	}
 	return nil
+}
+
+// rcByNamePort returns a ReplicationController with specified name and port
+func rcByNamePort(name string, replicas int32, image string, containerArgs []string, port int, protocol v1.Protocol,
+	labels map[string]string, gracePeriod *int64) *v1.ReplicationController {
+
+	return e2erc.ByNameContainer(name, replicas, labels, v1.Container{
+		Name:  name,
+		Image: image,
+		Args:  containerArgs,
+		Ports: []v1.ContainerPort{{ContainerPort: int32(port), Protocol: protocol}},
+	}, gracePeriod)
+}
+
+// setPodNonRootUser configures the Pod to run as a non-root user.
+// For Windows, it sets the RunAsUserName field to ContainerUser, and for Linux, it sets the RunAsUser field to 1000.
+func setPodNonRootUser(pod *v1.Pod) {
+	if framework.NodeOSDistroIs("windows") {
+		pod.Spec.SecurityContext.WindowsOptions = &v1.WindowsSecurityContextOptions{RunAsUserName: &nonAdminTestUserName}
+	} else {
+		pod.Spec.SecurityContext.RunAsUser = &nonRootTestUserID
+	}
 }

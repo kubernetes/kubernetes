@@ -32,6 +32,12 @@ import (
 // WrapRegistererWith provides a way to add fixed labels to a subset of
 // Collectors. It should not be used to add fixed labels to all metrics exposed.
 //
+// Conflicts between Collectors registered through the original Registerer with
+// Collectors registered through the wrapping Registerer will still be
+// detected. Any AlreadyRegisteredError returned by the Register method of
+// either Registerer will contain the ExistingCollector in the form it was
+// provided to the respective registry.
+//
 // The Collector example demonstrates a use of WrapRegistererWith.
 func WrapRegistererWith(labels Labels, reg Registerer) Registerer {
 	return &wrappingRegisterer{
@@ -54,6 +60,12 @@ func WrapRegistererWith(labels Labels, reg Registerer) Registerer {
 // (see NewGoCollector) and the process collector (see NewProcessCollector). (In
 // fact, those metrics are already prefixed with “go_” or “process_”,
 // respectively.)
+//
+// Conflicts between Collectors registered through the original Registerer with
+// Collectors registered through the wrapping Registerer will still be
+// detected. Any AlreadyRegisteredError returned by the Register method of
+// either Registerer will contain the ExistingCollector in the form it was
+// provided to the respective registry.
 func WrapRegistererWithPrefix(prefix string, reg Registerer) Registerer {
 	return &wrappingRegisterer{
 		wrappedRegisterer: reg,
@@ -120,6 +132,15 @@ func (c *wrappingCollector) Describe(ch chan<- *Desc) {
 	}()
 	for desc := range wrappedCh {
 		ch <- wrapDesc(desc, c.prefix, c.labels)
+	}
+}
+
+func (c *wrappingCollector) unwrapRecursively() Collector {
+	switch wc := c.wrappedCollector.(type) {
+	case *wrappingCollector:
+		return wc.unwrapRecursively()
+	default:
+		return wc
 	}
 }
 

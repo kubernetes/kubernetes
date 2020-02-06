@@ -19,6 +19,7 @@ limitations under the License.
 package v1
 
 import (
+	"context"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -70,7 +71,7 @@ func (c *podTemplates) Get(name string, options metav1.GetOptions) (result *v1.P
 		Resource("podtemplates").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -87,7 +88,7 @@ func (c *podTemplates) List(opts metav1.ListOptions) (result *v1.PodTemplateList
 		Resource("podtemplates").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -104,7 +105,7 @@ func (c *podTemplates) Watch(opts metav1.ListOptions) (watch.Interface, error) {
 		Resource("podtemplates").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch()
+		Watch(context.TODO())
 }
 
 // Create takes the representation of a podTemplate and creates it.  Returns the server's representation of the podTemplate, and an error, if there is any.
@@ -114,7 +115,7 @@ func (c *podTemplates) Create(podTemplate *v1.PodTemplate) (result *v1.PodTempla
 		Namespace(c.ns).
 		Resource("podtemplates").
 		Body(podTemplate).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -127,7 +128,7 @@ func (c *podTemplates) Update(podTemplate *v1.PodTemplate) (result *v1.PodTempla
 		Resource("podtemplates").
 		Name(podTemplate.Name).
 		Body(podTemplate).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -139,7 +140,7 @@ func (c *podTemplates) Delete(name string, options *metav1.DeleteOptions) error 
 		Resource("podtemplates").
 		Name(name).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -155,7 +156,7 @@ func (c *podTemplates) DeleteCollection(options *metav1.DeleteOptions, listOptio
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Timeout(timeout).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -168,7 +169,7 @@ func (c *podTemplates) Patch(name string, pt types.PatchType, data []byte, subre
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }

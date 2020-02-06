@@ -30,6 +30,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission/install:all-srcs",
+        "//staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission/v1:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission/v1alpha1:all-srcs",
     ],
     tags = ["automanaged"],

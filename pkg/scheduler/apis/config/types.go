@@ -17,8 +17,11 @@ limitations under the License.
 package config
 
 import (
+	"math"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	componentbaseconfig "k8s.io/component-base/config"
 )
 
@@ -50,7 +53,7 @@ type KubeSchedulerConfiguration struct {
 	AlgorithmSource SchedulerAlgorithmSource
 	// RequiredDuringScheduling affinity is not symmetric, but there is an implicit PreferredDuringScheduling affinity rule
 	// corresponding to every RequiredDuringScheduling affinity rule.
-	// HardPodAffinitySymmetricWeight represents the weight of implicit PreferredDuringScheduling affinity rule, in the range 0-100.
+	// HardPodAffinitySymmetricWeight represents the weight of implicit PreferredDuringScheduling affinity rule, in the range [0-100].
 	HardPodAffinitySymmetricWeight int32
 
 	// LeaderElection defines the configuration of leader election client.
@@ -86,7 +89,17 @@ type KubeSchedulerConfiguration struct {
 	// Duration to wait for a binding operation to complete before timing out
 	// Value must be non-negative integer. The value zero indicates no waiting.
 	// If this value is nil, the default value will be used.
-	BindTimeoutSeconds *int64
+	BindTimeoutSeconds int64
+
+	// PodInitialBackoffSeconds is the initial backoff for unschedulable pods.
+	// If specified, it must be greater than 0. If this value is null, the default value (1s)
+	// will be used.
+	PodInitialBackoffSeconds int64
+
+	// PodMaxBackoffSeconds is the max backoff for unschedulable pods.
+	// If specified, it must be greater than or equal to podInitialBackoffSeconds. If this value is null,
+	// the default value (10s) will be used.
+	PodMaxBackoffSeconds int64
 
 	// Plugins specify the set of plugins that should be enabled or disabled. Enabled plugins are the
 	// ones that should be enabled in addition to the default plugins. Disabled plugins are any of the
@@ -130,7 +143,7 @@ type SchedulerPolicyFileSource struct {
 type SchedulerPolicyConfigMapSource struct {
 	// Namespace is the namespace of the policy config map.
 	Namespace string
-	// Name is the name of hte policy config map.
+	// Name is the name of the policy config map.
 	Name string
 }
 
@@ -138,10 +151,6 @@ type SchedulerPolicyConfigMapSource struct {
 // to include scheduler specific configuration.
 type KubeSchedulerLeaderElectionConfiguration struct {
 	componentbaseconfig.LeaderElectionConfiguration
-	// LockObjectNamespace defines the namespace of the lock object
-	LockObjectNamespace string
-	// LockObjectName defines the lock object name
-	LockObjectName string
 }
 
 // Plugins include multiple extension points. When specified, the list of plugins for
@@ -164,9 +173,6 @@ type Plugins struct {
 
 	// Score is a list of plugins that should be invoked when ranking nodes that have passed the filtering phase.
 	Score *PluginSet
-
-	// NormalizeScore is a list of plugins that should be invoked after the scoring phase to normalize scores.
-	NormalizeScore *PluginSet
 
 	// Reserve is a list of plugins invoked when reserving a node to run the pod.
 	Reserve *PluginSet
@@ -215,4 +221,102 @@ type PluginConfig struct {
 	Name string
 	// Args defines the arguments passed to the plugins at the time of initialization. Args can have arbitrary structure.
 	Args runtime.Unknown
+}
+
+/*
+ * NOTE: The following variables and methods are intentionally left out of the staging mirror.
+ */
+const (
+	// DefaultPercentageOfNodesToScore defines the percentage of nodes of all nodes
+	// that once found feasible, the scheduler stops looking for more nodes.
+	// A value of 0 means adaptive, meaning the scheduler figures out a proper default.
+	DefaultPercentageOfNodesToScore = 0
+
+	// MaxCustomPriorityScore is the max score UtilizationShapePoint expects.
+	MaxCustomPriorityScore int64 = 10
+
+	// MaxTotalScore is the maximum total score.
+	MaxTotalScore int64 = math.MaxInt64
+
+	// MaxWeight defines the max weight value allowed for custom PriorityPolicy
+	MaxWeight = MaxTotalScore / MaxCustomPriorityScore
+)
+
+func appendPluginSet(dst *PluginSet, src *PluginSet) *PluginSet {
+	if dst == nil {
+		dst = &PluginSet{}
+	}
+	if src != nil {
+		dst.Enabled = append(dst.Enabled, src.Enabled...)
+		dst.Disabled = append(dst.Disabled, src.Disabled...)
+	}
+	return dst
+}
+
+// Append appends src Plugins to current Plugins. If a PluginSet is nil, it will
+// be created.
+func (p *Plugins) Append(src *Plugins) {
+	if p == nil || src == nil {
+		return
+	}
+	p.QueueSort = appendPluginSet(p.QueueSort, src.QueueSort)
+	p.PreFilter = appendPluginSet(p.PreFilter, src.PreFilter)
+	p.Filter = appendPluginSet(p.Filter, src.Filter)
+	p.PostFilter = appendPluginSet(p.PostFilter, src.PostFilter)
+	p.Score = appendPluginSet(p.Score, src.Score)
+	p.Reserve = appendPluginSet(p.Reserve, src.Reserve)
+	p.Permit = appendPluginSet(p.Permit, src.Permit)
+	p.PreBind = appendPluginSet(p.PreBind, src.PreBind)
+	p.Bind = appendPluginSet(p.Bind, src.Bind)
+	p.PostBind = appendPluginSet(p.PostBind, src.PostBind)
+	p.Unreserve = appendPluginSet(p.Unreserve, src.Unreserve)
+}
+
+// Apply merges the plugin configuration from custom plugins, handling disabled sets.
+func (p *Plugins) Apply(customPlugins *Plugins) {
+	if customPlugins == nil {
+		return
+	}
+
+	p.QueueSort = mergePluginSets(p.QueueSort, customPlugins.QueueSort)
+	p.PreFilter = mergePluginSets(p.PreFilter, customPlugins.PreFilter)
+	p.Filter = mergePluginSets(p.Filter, customPlugins.Filter)
+	p.PostFilter = mergePluginSets(p.PostFilter, customPlugins.PostFilter)
+	p.Score = mergePluginSets(p.Score, customPlugins.Score)
+	p.Reserve = mergePluginSets(p.Reserve, customPlugins.Reserve)
+	p.Permit = mergePluginSets(p.Permit, customPlugins.Permit)
+	p.PreBind = mergePluginSets(p.PreBind, customPlugins.PreBind)
+	p.Bind = mergePluginSets(p.Bind, customPlugins.Bind)
+	p.PostBind = mergePluginSets(p.PostBind, customPlugins.PostBind)
+	p.Unreserve = mergePluginSets(p.Unreserve, customPlugins.Unreserve)
+}
+
+func mergePluginSets(defaultPluginSet, customPluginSet *PluginSet) *PluginSet {
+	if customPluginSet == nil {
+		customPluginSet = &PluginSet{}
+	}
+
+	if defaultPluginSet == nil {
+		defaultPluginSet = &PluginSet{}
+	}
+
+	disabledPlugins := sets.NewString()
+	for _, disabledPlugin := range customPluginSet.Disabled {
+		disabledPlugins.Insert(disabledPlugin.Name)
+	}
+
+	enabledPlugins := []Plugin{}
+	if !disabledPlugins.Has("*") {
+		for _, defaultEnabledPlugin := range defaultPluginSet.Enabled {
+			if disabledPlugins.Has(defaultEnabledPlugin.Name) {
+				continue
+			}
+
+			enabledPlugins = append(enabledPlugins, defaultEnabledPlugin)
+		}
+	}
+
+	enabledPlugins = append(enabledPlugins, customPluginSet.Enabled...)
+
+	return &PluginSet{Enabled: enabledPlugins}
 }

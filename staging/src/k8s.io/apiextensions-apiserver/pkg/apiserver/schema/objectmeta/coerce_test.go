@@ -167,6 +167,7 @@ func TestGetObjectMetaNils(t *testing.T) {
 			"apiVersion": "v1",
 			"metadata": map[string]interface{}{
 				"generateName": nil,
+				"generation":   nil,
 				"labels": map[string]interface{}{
 					"foo": nil,
 				},
@@ -179,7 +180,10 @@ func TestGetObjectMetaNils(t *testing.T) {
 		t.Fatal(err)
 	}
 	if o.GenerateName != "" {
-		t.Errorf("expected null json value to be read as \"\" string, but got: %q", o.GenerateName)
+		t.Errorf("expected null json generateName value to be read as \"\" string, but got: %q", o.GenerateName)
+	}
+	if o.Generation != 0 {
+		t.Errorf("expected null json generation value to be read as zero, but got: %q", o.Generation)
 	}
 	if got, expected := o.Labels, map[string]string{"foo": ""}; !reflect.DeepEqual(got, expected) {
 		t.Errorf("unexpected labels, expected=%#v, got=%#v", expected, got)
@@ -197,6 +201,9 @@ func TestGetObjectMetaNils(t *testing.T) {
 	}
 	if got, expected := o.GenerateName, pod.ObjectMeta.GenerateName; got != expected {
 		t.Errorf("expected generatedName to be %q, got %q", expected, got)
+	}
+	if got, expected := o.Generation, pod.ObjectMeta.Generation; got != expected {
+		t.Errorf("expected generation to be %q, got %q", expected, got)
 	}
 	if got, expected := o.Labels, pod.ObjectMeta.Labels; !reflect.DeepEqual(got, expected) {
 		t.Errorf("expected labels to be %v, got %v", expected, got)

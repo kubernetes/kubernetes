@@ -23,9 +23,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// ContainerRuntimeOptions defines options for the container runtime.
 type ContainerRuntimeOptions struct {
-
-	// General options.
+	// General Options.
 
 	// ContainerRuntime is the container runtime to use.
 	ContainerRuntime string
@@ -78,11 +78,12 @@ type ContainerRuntimeOptions struct {
 	CNICacheDir string
 }
 
+// AddFlags adds flags to the container runtime, according to ContainerRuntimeOptions.
 func (s *ContainerRuntimeOptions) AddFlags(fs *pflag.FlagSet) {
 	dockerOnlyWarning := "This docker-specific flag only works when container-runtime is set to docker."
 
 	// General settings.
-	fs.StringVar(&s.ContainerRuntime, "container-runtime", s.ContainerRuntime, "The container runtime to use. Possible values: 'docker', 'remote', 'rkt (deprecated)'.")
+	fs.StringVar(&s.ContainerRuntime, "container-runtime", s.ContainerRuntime, "The container runtime to use. Possible values: 'docker', 'remote'.")
 	fs.StringVar(&s.RuntimeCgroups, "runtime-cgroups", s.RuntimeCgroups, "Optional absolute name of cgroups to create and run the runtime in.")
 	fs.BoolVar(&s.RedirectContainerStreaming, "redirect-container-streaming", s.RedirectContainerStreaming, "Enables container streaming redirect. If false, kubelet will proxy container streaming data between apiserver and container runtime; if true, kubelet will return an http redirect to apiserver, and apiserver will access container runtime directly. The proxy approach is more secure, but introduces some overhead. The redirect approach is more performant, but less secure because the connection between apiserver and container runtime may not be authenticated.")
 

@@ -49,14 +49,17 @@ type ReplicaSetStorage struct {
 	Scale      *ScaleREST
 }
 
-func NewStorage(optsGetter generic.RESTOptionsGetter) ReplicaSetStorage {
-	replicaSetRest, replicaSetStatusRest := NewREST(optsGetter)
+func NewStorage(optsGetter generic.RESTOptionsGetter) (ReplicaSetStorage, error) {
+	replicaSetRest, replicaSetStatusRest, err := NewREST(optsGetter)
+	if err != nil {
+		return ReplicaSetStorage{}, err
+	}
 
 	return ReplicaSetStorage{
 		ReplicaSet: replicaSetRest,
 		Status:     replicaSetStatusRest,
 		Scale:      &ScaleREST{store: replicaSetRest.Store},
-	}
+	}, nil
 }
 
 type REST struct {
@@ -65,7 +68,7 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against ReplicaSet.
-func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
+func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 	store := &genericregistry.Store{
 		NewFunc:                  func() runtime.Object { return &apps.ReplicaSet{} },
 		NewListFunc:              func() runtime.Object { return &apps.ReplicaSetList{} },
@@ -80,13 +83,13 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 	}
 	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: replicaset.GetAttrs}
 	if err := store.CompleteWithOptions(options); err != nil {
-		panic(err) // TODO: Propagate error up
+		return nil, nil, err
 	}
 
 	statusStore := *store
 	statusStore.UpdateStrategy = replicaset.StatusStrategy
 
-	return &REST{store, []string{"all"}}, &StatusREST{store: &statusStore}
+	return &REST{store, []string{"all"}}, &StatusREST{store: &statusStore}, nil
 }
 
 // Implement ShortNamesProvider
@@ -222,17 +225,17 @@ func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.Update
 }
 
 func toScaleCreateValidation(f rest.ValidateObjectFunc) rest.ValidateObjectFunc {
-	return func(obj runtime.Object) error {
+	return func(ctx context.Context, obj runtime.Object) error {
 		scale, err := scaleFromReplicaSet(obj.(*apps.ReplicaSet))
 		if err != nil {
 			return err
 		}
-		return f(scale)
+		return f(ctx, scale)
 	}
 }
 
 func toScaleUpdateValidation(f rest.ValidateObjectUpdateFunc) rest.ValidateObjectUpdateFunc {
-	return func(obj, old runtime.Object) error {
+	return func(ctx context.Context, obj, old runtime.Object) error {
 		newScale, err := scaleFromReplicaSet(obj.(*apps.ReplicaSet))
 		if err != nil {
 			return err
@@ -241,7 +244,7 @@ func toScaleUpdateValidation(f rest.ValidateObjectUpdateFunc) rest.ValidateObjec
 		if err != nil {
 			return err
 		}
-		return f(newScale, oldScale)
+		return f(ctx, newScale, oldScale)
 	}
 }
 

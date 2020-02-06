@@ -77,7 +77,10 @@ func main() {
 	flags.StringVar(&opts.targetVersion, "target-version", "", "version of etcd to migrate to. Format must be '<major>.<minor>.<patch>'")
 	flags.StringVar(&opts.targetStorage, "target-storage", "", "storage version of etcd to migrate to, one of: etcd2, etcd3")
 	flags.StringVar(&opts.etcdServerArgs, "etcd-server-extra-args", "", "additional etcd server args for starting etcd servers during migration steps, --peer-* TLS cert flags should be added for etcd clusters with more than 1 member that use mutual TLS for peer communication.")
-	migrateCmd.Execute()
+	err := migrateCmd.Execute()
+	if err != nil {
+		fmt.Printf("Failed to execute migratecmd: %s", err)
+	}
 }
 
 // runMigrate validates the command line flags and starts the migration.

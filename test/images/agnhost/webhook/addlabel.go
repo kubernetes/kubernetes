@@ -19,7 +19,7 @@ package webhook
 import (
 	"encoding/json"
 
-	"k8s.io/api/admission/v1beta1"
+	"k8s.io/api/admission/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog"
 )
@@ -37,7 +37,7 @@ const (
 )
 
 // Add a label {"added-label": "yes"} to the object
-func addLabel(ar v1beta1.AdmissionReview) *v1beta1.AdmissionResponse {
+func addLabel(ar v1.AdmissionReview) *v1.AdmissionResponse {
 	klog.V(2).Info("calling add-label")
 	obj := struct {
 		metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -46,13 +46,13 @@ func addLabel(ar v1beta1.AdmissionReview) *v1beta1.AdmissionResponse {
 	err := json.Unmarshal(raw, &obj)
 	if err != nil {
 		klog.Error(err)
-		return toAdmissionResponse(err)
+		return toV1AdmissionResponse(err)
 	}
 
-	reviewResponse := v1beta1.AdmissionResponse{}
+	reviewResponse := v1.AdmissionResponse{}
 	reviewResponse.Allowed = true
 
-	pt := v1beta1.PatchTypeJSONPatch
+	pt := v1.PatchTypeJSONPatch
 	labelValue, hasLabel := obj.ObjectMeta.Labels["added-label"]
 	switch {
 	case len(obj.ObjectMeta.Labels) == 0:

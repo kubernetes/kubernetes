@@ -17,11 +17,13 @@ limitations under the License.
 package fake
 
 import (
+	"context"
+
 	authenticationapi "k8s.io/api/authentication/v1beta1"
 	core "k8s.io/client-go/testing"
 )
 
-func (c *FakeTokenReviews) Create(tokenReview *authenticationapi.TokenReview) (result *authenticationapi.TokenReview, err error) {
+func (c *FakeTokenReviews) CreateContext(ctx context.Context, tokenReview *authenticationapi.TokenReview) (result *authenticationapi.TokenReview, err error) {
 	obj, err := c.Fake.Invokes(core.NewRootCreateAction(authenticationapi.SchemeGroupVersion.WithResource("tokenreviews"), tokenReview), &authenticationapi.TokenReview{})
 	return obj.(*authenticationapi.TokenReview), err
 }

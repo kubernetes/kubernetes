@@ -19,6 +19,7 @@ limitations under the License.
 package v1
 
 import (
+	"context"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -68,7 +69,7 @@ func (c *persistentVolumes) Get(name string, options metav1.GetOptions) (result 
 		Resource("persistentvolumes").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -84,7 +85,7 @@ func (c *persistentVolumes) List(opts metav1.ListOptions) (result *v1.Persistent
 		Resource("persistentvolumes").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -100,7 +101,7 @@ func (c *persistentVolumes) Watch(opts metav1.ListOptions) (watch.Interface, err
 		Resource("persistentvolumes").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch()
+		Watch(context.TODO())
 }
 
 // Create takes the representation of a persistentVolume and creates it.  Returns the server's representation of the persistentVolume, and an error, if there is any.
@@ -109,7 +110,7 @@ func (c *persistentVolumes) Create(persistentVolume *v1.PersistentVolume) (resul
 	err = c.client.Post().
 		Resource("persistentvolumes").
 		Body(persistentVolume).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -121,7 +122,7 @@ func (c *persistentVolumes) Update(persistentVolume *v1.PersistentVolume) (resul
 		Resource("persistentvolumes").
 		Name(persistentVolume.Name).
 		Body(persistentVolume).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -136,7 +137,7 @@ func (c *persistentVolumes) UpdateStatus(persistentVolume *v1.PersistentVolume) 
 		Name(persistentVolume.Name).
 		SubResource("status").
 		Body(persistentVolume).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -147,7 +148,7 @@ func (c *persistentVolumes) Delete(name string, options *metav1.DeleteOptions) e
 		Resource("persistentvolumes").
 		Name(name).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -162,7 +163,7 @@ func (c *persistentVolumes) DeleteCollection(options *metav1.DeleteOptions, list
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Timeout(timeout).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -174,7 +175,7 @@ func (c *persistentVolumes) Patch(name string, pt types.PatchType, data []byte, 
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }

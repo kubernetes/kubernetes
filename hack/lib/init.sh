@@ -23,10 +23,10 @@ set -o pipefail
 unset CDPATH
 
 # Until all GOPATH references are removed from all build scripts as well,
-# explicitly reset to auto mode to avoid picking up user-set GO111MODULE preferences.
+# explicitly disable module mode to avoid picking up user-set GO111MODULE preferences.
 # As individual scripts (like hack/update-vendor.sh) make use of go modules,
 # they can explicitly set GO111MODULE=on
-export GO111MODULE=auto
+export GO111MODULE=off
 
 # The root of the build/dist directory
 KUBE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
@@ -63,7 +63,9 @@ export KUBE_OUTPUT_HOSTBIN
 # most preferred version for a group should appear first
 KUBE_AVAILABLE_GROUP_VERSIONS="${KUBE_AVAILABLE_GROUP_VERSIONS:-\
 v1 \
+admissionregistration.k8s.io/v1 \
 admissionregistration.k8s.io/v1beta1 \
+admission.k8s.io/v1 \
 admission.k8s.io/v1beta1 \
 apps/v1 \
 apps/v1beta1 \
@@ -82,6 +84,8 @@ batch/v2alpha1 \
 certificates.k8s.io/v1beta1 \
 coordination.k8s.io/v1beta1 \
 coordination.k8s.io/v1 \
+discovery.k8s.io/v1alpha1 \
+discovery.k8s.io/v1beta1 \
 extensions/v1beta1 \
 events.k8s.io/v1beta1 \
 imagepolicy.k8s.io/v1alpha1 \
@@ -100,6 +104,7 @@ settings.k8s.io/v1alpha1 \
 storage.k8s.io/v1beta1 \
 storage.k8s.io/v1 \
 storage.k8s.io/v1alpha1 \
+flowcontrol.apiserver.k8s.io/v1alpha1 \
 }"
 
 # not all group versions are exposed by the server.  This list contains those
@@ -109,6 +114,7 @@ KUBE_NONSERVER_GROUP_VERSIONS="
  abac.authorization.kubernetes.io/v1beta1 \
  componentconfig/v1alpha1 \
  imagepolicy.k8s.io/v1alpha1\
+ admission.k8s.io/v1\
  admission.k8s.io/v1beta1\
 "
 export KUBE_NONSERVER_GROUP_VERSIONS

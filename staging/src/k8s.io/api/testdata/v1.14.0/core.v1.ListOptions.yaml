@@ -1,9 +1,0 @@
-apiVersion: v1
-continue: "5"
-fieldSelector: "3"
-kind: ListOptions
-labelSelector: "2"
-limit: 6780787122834727873
-resourceVersion: "4"
-timeoutSeconds: -6346486728535475627
-watch: true

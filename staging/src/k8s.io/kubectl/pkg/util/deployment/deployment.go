@@ -87,8 +87,8 @@ func GetAllReplicaSets(deployment *appsv1.Deployment, c appsclient.AppsV1Interfa
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	oldRSes, allOldRSes := findOldReplicaSets(deployment, rsList)
 	newRS := findNewReplicaSet(deployment, rsList)
+	oldRSes, allOldRSes := findOldReplicaSets(deployment, rsList, newRS)
 	return oldRSes, allOldRSes, newRS, nil
 }
 
@@ -181,10 +181,9 @@ func (o replicaSetsByCreationTimestamp) Less(i, j int) bool {
 
 // // FindOldReplicaSets returns the old replica sets targeted by the given Deployment, with the given slice of RSes.
 // // Note that the first set of old replica sets doesn't include the ones with no pods, and the second set of old replica sets include all old replica sets.
-func findOldReplicaSets(deployment *appsv1.Deployment, rsList []*appsv1.ReplicaSet) ([]*appsv1.ReplicaSet, []*appsv1.ReplicaSet) {
+func findOldReplicaSets(deployment *appsv1.Deployment, rsList []*appsv1.ReplicaSet, newRS *appsv1.ReplicaSet) ([]*appsv1.ReplicaSet, []*appsv1.ReplicaSet) {
 	var requiredRSs []*appsv1.ReplicaSet
 	var allRSs []*appsv1.ReplicaSet
-	newRS := findNewReplicaSet(deployment, rsList)
 	for _, rs := range rsList {
 		// Filter out new replica set
 		if newRS != nil && rs.UID == newRS.UID {

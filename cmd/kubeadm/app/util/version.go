@@ -28,7 +28,7 @@ import (
 
 	netutil "k8s.io/apimachinery/pkg/util/net"
 	versionutil "k8s.io/apimachinery/pkg/util/version"
-	pkgversion "k8s.io/client-go/pkg/version"
+	pkgversion "k8s.io/component-base/version"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
@@ -40,7 +40,7 @@ const (
 var (
 	kubeReleaseBucketURL  = "https://dl.k8s.io"
 	kubeReleaseRegex      = regexp.MustCompile(`^v?(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)([-0-9a-zA-Z_\.+]*)?$`)
-	kubeReleaseLabelRegex = regexp.MustCompile(`^[[:lower:]]+(-[-\w_\.]+)?$`)
+	kubeReleaseLabelRegex = regexp.MustCompile(`(k8s-master|((latest|stable)+(-[1-9](\.[1-9]([0-9])?)?)?))\z`)
 	kubeBucketPrefixes    = regexp.MustCompile(`^((release|ci|ci-cross)/)?([-\w_\.+]+)$`)
 )
 
@@ -61,6 +61,7 @@ var (
 //  latest      (latest release, including alpha/beta)
 //  latest-1    (latest release in 1.x, including alpha/beta)
 //  latest-1.0  (and similarly 1.1, 1.2, 1.3, ...)
+//  k8s-master  (latest cross build)
 func KubernetesReleaseVersion(version string) (string, error) {
 	return kubernetesReleaseVersion(version, fetchFromURL)
 }
@@ -96,10 +97,6 @@ func kubernetesReleaseVersion(version string, fetcher func(string, time.Duration
 		url := fmt.Sprintf("%s/%s.txt", bucketURL, versionLabel)
 		body, err := fetcher(url, getReleaseVersionTimeout)
 		if err != nil {
-			// If the network operaton was successful but the server did not reply with StatusOK
-			if body != "" {
-				return "", err
-			}
 			if clientVersionErr == nil {
 				// Handle air-gapped environments by falling back to the client version.
 				klog.Warningf("could not fetch a Kubernetes version from the internet: %v", err)

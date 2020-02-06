@@ -203,27 +203,41 @@ var ErrWaitTimeout = errors.New("timed out waiting for the condition")
 // if the loop should be aborted.
 type ConditionFunc func() (done bool, err error)
 
+// runConditionWithCrashProtection runs a ConditionFunc with crash protection
+func runConditionWithCrashProtection(condition ConditionFunc) (bool, error) {
+	defer runtime.HandleCrash()
+	return condition()
+}
+
 // Backoff holds parameters applied to a Backoff function.
 type Backoff struct {
 	// The initial duration.
 	Duration time.Duration
-	// Duration is multiplied by factor each iteration. Must be greater
-	// than or equal to zero.
+	// Duration is multiplied by factor each iteration, if factor is not zero
+	// and the limits imposed by Steps and Cap have not been reached.
+	// Should not be negative.
+	// The jitter does not contribute to the updates to the duration parameter.
 	Factor float64
-	// The amount of jitter applied each iteration. Jitter is applied after
-	// cap.
+	// The sleep at each iteration is the duration plus an additional
+	// amount chosen uniformly at random from the interval between
+	// zero and `jitter*duration`.
 	Jitter float64
-	// The number of steps before duration stops changing. If zero, initial
-	// duration is always used. Used for exponential backoff in combination
-	// with Factor.
+	// The remaining number of iterations in which the duration
+	// parameter may change (but progress can be stopped earlier by
+	// hitting the cap). If not positive, the duration is not
+	// changed. Used for exponential backoff in combination with
+	// Factor and Cap.
 	Steps int
-	// The returned duration will never be greater than cap *before* jitter
-	// is applied. The actual maximum cap is `cap * (1.0 + jitter)`.
+	// A limit on revised values of the duration parameter. If a
+	// multiplication by the factor parameter would make the duration
+	// exceed the cap then the duration is set to the cap and the
+	// steps parameter is set to zero.
 	Cap time.Duration
 }
 
-// Step returns the next interval in the exponential backoff. This method
-// will mutate the provided backoff.
+// Step (1) returns an amount of time to sleep determined by the
+// original Duration and Jitter and (2) mutates the provided Backoff
+// to update its Steps and Duration.
 func (b *Backoff) Step() time.Duration {
 	if b.Steps < 1 {
 		if b.Jitter > 0 {
@@ -271,17 +285,17 @@ func contextForChannel(parentCh <-chan struct{}) (context.Context, context.Cance
 
 // ExponentialBackoff repeats a condition check with exponential backoff.
 //
-// It checks the condition up to Steps times, increasing the wait by multiplying
-// the previous duration by Factor.
-//
-// If Jitter is greater than zero, a random amount of each duration is added
-// (between duration and duration*(1+jitter)).
-//
-// If the condition never returns true, ErrWaitTimeout is returned. All other
-// errors terminate immediately.
+// It repeatedly checks the condition and then sleeps, using `backoff.Step()`
+// to determine the length of the sleep and adjust Duration and Steps.
+// Stops and returns as soon as:
+// 1. the condition check returns true or an error,
+// 2. `backoff.Steps` checks of the condition have been done, or
+// 3. a sleep truncated by the cap on duration has been completed.
+// In case (1) the returned error is what the condition function returned.
+// In all other cases, ErrWaitTimeout is returned.
 func ExponentialBackoff(backoff Backoff, condition ConditionFunc) error {
 	for backoff.Steps > 0 {
-		if ok, err := condition(); err != nil || ok {
+		if ok, err := runConditionWithCrashProtection(condition); err != nil || ok {
 			return err
 		}
 		if backoff.Steps == 1 {
@@ -327,7 +341,7 @@ func PollImmediate(interval, timeout time.Duration, condition ConditionFunc) err
 }
 
 func pollImmediateInternal(wait WaitFunc, condition ConditionFunc) error {
-	done, err := condition()
+	done, err := runConditionWithCrashProtection(condition)
 	if err != nil {
 		return err
 	}
@@ -356,7 +370,7 @@ func PollInfinite(interval time.Duration, condition ConditionFunc) error {
 // Some intervals may be missed if the condition takes too long or the time
 // window is too short.
 func PollImmediateInfinite(interval time.Duration, condition ConditionFunc) error {
-	done, err := condition()
+	done, err := runConditionWithCrashProtection(condition)
 	if err != nil {
 		return err
 	}
@@ -423,7 +437,7 @@ func WaitFor(wait WaitFunc, fn ConditionFunc, done <-chan struct{}) error {
 	for {
 		select {
 		case _, open := <-c:
-			ok, err := fn()
+			ok, err := runConditionWithCrashProtection(fn)
 			if err != nil {
 				return err
 			}

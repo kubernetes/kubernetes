@@ -327,7 +327,7 @@ run_recursive_resources_tests() {
   # Pre-condition: no replication controller exists
   kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
-  ! kubectl create -f hack/testdata/recursive/rc --recursive "${kube_flags[@]}"
+  ! kubectl create -f hack/testdata/recursive/rc --recursive "${kube_flags[@]}" || exit 1
   # Post-condition: frontend replication controller is created
   kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" 'busybox0:busybox1:'
 
@@ -387,7 +387,7 @@ run_recursive_resources_tests() {
   kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
   # Create deployments (revision 1) recursively from directory of YAML files
-  ! kubectl create -f hack/testdata/recursive/deployment --recursive "${kube_flags[@]}"
+  ! kubectl create -f hack/testdata/recursive/deployment --recursive "${kube_flags[@]}" || exit 1
   kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" 'nginx0-deployment:nginx1-deployment:'
   kube::test::get_object_assert deployment "{{range.items}}{{$image_field0}}:{{end}}" "${IMAGE_NGINX}:${IMAGE_NGINX}:"
   ## Rollback the deployments to revision 1 recursively
@@ -418,7 +418,7 @@ run_recursive_resources_tests() {
   # Clean up
   unset PRESERVE_ERR_FILE
   rm "${ERROR_FILE}"
-  ! kubectl delete -f hack/testdata/recursive/deployment --recursive "${kube_flags[@]}" --grace-period=0 --force
+  ! kubectl delete -f hack/testdata/recursive/deployment --recursive "${kube_flags[@]}" --grace-period=0 --force || exit 1
   sleep 1
 
   ### Rollout on multiple replication controllers recursively - these tests ensure that rollouts cannot be performed on resources that don't support it
@@ -426,7 +426,7 @@ run_recursive_resources_tests() {
   kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
   # Create replication controllers recursively from directory of YAML files
-  ! kubectl create -f hack/testdata/recursive/rc --recursive "${kube_flags[@]}"
+  ! kubectl create -f hack/testdata/recursive/rc --recursive "${kube_flags[@]}" || exit 1
   kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" 'busybox0:busybox1:'
   # Command
   ## Attempt to rollback the replication controllers to revision 1 recursively
@@ -445,9 +445,9 @@ run_recursive_resources_tests() {
   # Post-condition: busybox0 & busybox1 should error as they are RC's, and since busybox2 is malformed, it should error
   kube::test::if_has_string "${output_message}" "Object 'Kind' is missing"
   kube::test::if_has_string "${output_message}" 'replicationcontrollers "busybox0" resuming is not supported'
-  kube::test::if_has_string "${output_message}" 'replicationcontrollers "busybox0" resuming is not supported'
+  kube::test::if_has_string "${output_message}" 'replicationcontrollers "busybox1" resuming is not supported'
   # Clean up
-  ! kubectl delete -f hack/testdata/recursive/rc --recursive "${kube_flags[@]}" --grace-period=0 --force
+  ! kubectl delete -f hack/testdata/recursive/rc --recursive "${kube_flags[@]}" --grace-period=0 --force || exit 1
   sleep 1
 
   set +o nounset

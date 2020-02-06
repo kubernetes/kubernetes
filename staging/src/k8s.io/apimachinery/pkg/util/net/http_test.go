@@ -427,6 +427,7 @@ func TestConnectWithRedirects(t *testing.T) {
 			require.NoError(t, err, "unexpected request error")
 
 			result, err := ioutil.ReadAll(resp.Body)
+			assert.Nil(t, err)
 			require.NoError(t, resp.Body.Close())
 			if test.expectedRedirects < len(test.redirects) {
 				// Expect the last redirect to be returned.
@@ -435,6 +436,59 @@ func TestConnectWithRedirects(t *testing.T) {
 				assert.NotEqual(t, resultString, string(result), "wrong content")
 			} else {
 				assert.Equal(t, resultString, string(result), "stream content does not match")
+			}
+		})
+	}
+}
+
+func TestAllowsHTTP2(t *testing.T) {
+	testcases := []struct {
+		Name         string
+		Transport    *http.Transport
+		ExpectAllows bool
+	}{
+		{
+			Name:         "empty",
+			Transport:    &http.Transport{},
+			ExpectAllows: true,
+		},
+		{
+			Name:         "empty tlsconfig",
+			Transport:    &http.Transport{TLSClientConfig: &tls.Config{}},
+			ExpectAllows: true,
+		},
+		{
+			Name:         "zero-length NextProtos",
+			Transport:    &http.Transport{TLSClientConfig: &tls.Config{NextProtos: []string{}}},
+			ExpectAllows: true,
+		},
+		{
+			Name:         "includes h2 in NextProtos after",
+			Transport:    &http.Transport{TLSClientConfig: &tls.Config{NextProtos: []string{"http/1.1", "h2"}}},
+			ExpectAllows: true,
+		},
+		{
+			Name:         "includes h2 in NextProtos before",
+			Transport:    &http.Transport{TLSClientConfig: &tls.Config{NextProtos: []string{"h2", "http/1.1"}}},
+			ExpectAllows: true,
+		},
+		{
+			Name:         "includes h2 in NextProtos between",
+			Transport:    &http.Transport{TLSClientConfig: &tls.Config{NextProtos: []string{"http/1.1", "h2", "h3"}}},
+			ExpectAllows: true,
+		},
+		{
+			Name:         "excludes h2 in NextProtos",
+			Transport:    &http.Transport{TLSClientConfig: &tls.Config{NextProtos: []string{"http/1.1"}}},
+			ExpectAllows: false,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.Name, func(t *testing.T) {
+			allows := allowsHTTP2(tc.Transport)
+			if allows != tc.ExpectAllows {
+				t.Errorf("expected %v, got %v", tc.ExpectAllows, allows)
 			}
 		})
 	}

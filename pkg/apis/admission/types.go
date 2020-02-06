@@ -95,10 +95,10 @@ type AdmissionRequest struct {
 	Operation Operation
 	// UserInfo is information about the requesting user
 	UserInfo authentication.UserInfo
-	// Object is the object from the incoming request prior to default values being applied
+	// Object is the object from the incoming request.
 	// +optional
 	Object runtime.Object
-	// OldObject is the existing object. Only populated for UPDATE requests.
+	// OldObject is the existing object. Only populated for DELETE and UPDATE requests.
 	// +optional
 	OldObject runtime.Object
 	// DryRun indicates that modifications will definitely not be persisted for this request.

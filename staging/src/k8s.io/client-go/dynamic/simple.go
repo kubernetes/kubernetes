@@ -17,15 +17,14 @@ limitations under the License.
 package dynamic
 
 import (
+	"context"
 	"fmt"
-	"io"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/rest"
@@ -113,7 +112,7 @@ func (c *dynamicResourceClient) Create(obj *unstructured.Unstructured, opts meta
 		AbsPath(append(c.makeURLSegments(name), subresources...)...).
 		Body(outBytes).
 		SpecificallyVersionedParams(&opts, dynamicParameterCodec, versionV1).
-		Do()
+		Do(context.TODO())
 	if err := result.Error(); err != nil {
 		return nil, err
 	}
@@ -148,7 +147,7 @@ func (c *dynamicResourceClient) Update(obj *unstructured.Unstructured, opts meta
 		AbsPath(append(c.makeURLSegments(name), subresources...)...).
 		Body(outBytes).
 		SpecificallyVersionedParams(&opts, dynamicParameterCodec, versionV1).
-		Do()
+		Do(context.TODO())
 	if err := result.Error(); err != nil {
 		return nil, err
 	}
@@ -184,7 +183,7 @@ func (c *dynamicResourceClient) UpdateStatus(obj *unstructured.Unstructured, opt
 		AbsPath(append(c.makeURLSegments(name), "status")...).
 		Body(outBytes).
 		SpecificallyVersionedParams(&opts, dynamicParameterCodec, versionV1).
-		Do()
+		Do(context.TODO())
 	if err := result.Error(); err != nil {
 		return nil, err
 	}
@@ -216,7 +215,7 @@ func (c *dynamicResourceClient) Delete(name string, opts *metav1.DeleteOptions, 
 		Delete().
 		AbsPath(append(c.makeURLSegments(name), subresources...)...).
 		Body(deleteOptionsByte).
-		Do()
+		Do(context.TODO())
 	return result.Error()
 }
 
@@ -234,7 +233,7 @@ func (c *dynamicResourceClient) DeleteCollection(opts *metav1.DeleteOptions, lis
 		AbsPath(c.makeURLSegments("")...).
 		Body(deleteOptionsByte).
 		SpecificallyVersionedParams(&listOptions, dynamicParameterCodec, versionV1).
-		Do()
+		Do(context.TODO())
 	return result.Error()
 }
 
@@ -242,7 +241,7 @@ func (c *dynamicResourceClient) Get(name string, opts metav1.GetOptions, subreso
 	if len(name) == 0 {
 		return nil, fmt.Errorf("name is required")
 	}
-	result := c.client.client.Get().AbsPath(append(c.makeURLSegments(name), subresources...)...).SpecificallyVersionedParams(&opts, dynamicParameterCodec, versionV1).Do()
+	result := c.client.client.Get().AbsPath(append(c.makeURLSegments(name), subresources...)...).SpecificallyVersionedParams(&opts, dynamicParameterCodec, versionV1).Do(context.TODO())
 	if err := result.Error(); err != nil {
 		return nil, err
 	}
@@ -258,7 +257,7 @@ func (c *dynamicResourceClient) Get(name string, opts metav1.GetOptions, subreso
 }
 
 func (c *dynamicResourceClient) List(opts metav1.ListOptions) (*unstructured.UnstructuredList, error) {
-	result := c.client.client.Get().AbsPath(c.makeURLSegments("")...).SpecificallyVersionedParams(&opts, dynamicParameterCodec, versionV1).Do()
+	result := c.client.client.Get().AbsPath(c.makeURLSegments("")...).SpecificallyVersionedParams(&opts, dynamicParameterCodec, versionV1).Do(context.TODO())
 	if err := result.Error(); err != nil {
 		return nil, err
 	}
@@ -282,31 +281,10 @@ func (c *dynamicResourceClient) List(opts metav1.ListOptions) (*unstructured.Uns
 }
 
 func (c *dynamicResourceClient) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	internalGV := schema.GroupVersions{
-		{Group: c.resource.Group, Version: runtime.APIVersionInternal},
-		// always include the legacy group as a decoding target to handle non-error `Status` return types
-		{Group: "", Version: runtime.APIVersionInternal},
-	}
-	s := &rest.Serializers{
-		Encoder: watchNegotiatedSerializerInstance.EncoderForVersion(watchJsonSerializerInfo.Serializer, c.resource.GroupVersion()),
-		Decoder: watchNegotiatedSerializerInstance.DecoderToVersion(watchJsonSerializerInfo.Serializer, internalGV),
-
-		RenegotiatedDecoder: func(contentType string, params map[string]string) (runtime.Decoder, error) {
-			return watchNegotiatedSerializerInstance.DecoderToVersion(watchJsonSerializerInfo.Serializer, internalGV), nil
-		},
-		StreamingSerializer: watchJsonSerializerInfo.StreamSerializer.Serializer,
-		Framer:              watchJsonSerializerInfo.StreamSerializer.Framer,
-	}
-
-	wrappedDecoderFn := func(body io.ReadCloser) streaming.Decoder {
-		framer := s.Framer.NewFrameReader(body)
-		return streaming.NewDecoder(framer, s.StreamingSerializer)
-	}
-
 	opts.Watch = true
 	return c.client.client.Get().AbsPath(c.makeURLSegments("")...).
 		SpecificallyVersionedParams(&opts, dynamicParameterCodec, versionV1).
-		WatchWithSpecificDecoders(wrappedDecoderFn, unstructured.UnstructuredJSONScheme)
+		Watch(context.TODO())
 }
 
 func (c *dynamicResourceClient) Patch(name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (*unstructured.Unstructured, error) {
@@ -318,7 +296,7 @@ func (c *dynamicResourceClient) Patch(name string, pt types.PatchType, data []by
 		AbsPath(append(c.makeURLSegments(name), subresources...)...).
 		Body(data).
 		SpecificallyVersionedParams(&opts, dynamicParameterCodec, versionV1).
-		Do()
+		Do(context.TODO())
 	if err := result.Error(); err != nil {
 		return nil, err
 	}

@@ -14,7 +14,7 @@ import "gonum.org/v1/gonum/blas"
 // Q is represented as a product of elementary reflectors,
 //  Q = H_{k-1} * ... * H_1 * H_0
 // where k = min(m,n) and each H_i has the form
-//  H_i = I - tau[i] * v_i * v_i^T
+//  H_i = I - tau[i] * v_i * v_iᵀ
 // Vector v_i has v[m-k+i+1:m] = 0, v[m-k+i] = 1, and v[:m-k+i+1] is stored on
 // exit in A[0:m-k+i-1, n-k+i].
 //

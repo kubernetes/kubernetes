@@ -18,6 +18,7 @@ filegroup(
         "etcd.manifest",
         "etcd-empty-dir-cleanup.yaml",
         "glbc.manifest",
+        "konnectivity-server.yaml",
         "kube-addon-manager.yaml",
         "kube-apiserver.manifest",
         "kube-controller-manager.manifest",

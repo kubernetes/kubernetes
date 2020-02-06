@@ -29,24 +29,24 @@ import (
 // Forked from test/e2e/framework because the e2e framework is quite bloated
 // for our purposes here, and modified to remove undesired logging.
 
-func runCmdNoWrap(command string, args ...string) (string, string, error) {
+func runCmdNoWrap(command string, args ...string) (string, string, int, error) {
 	var bout, berr bytes.Buffer
 	cmd := exec.Command(command, args...)
 	cmd.Stdout = &bout
 	cmd.Stderr = &berr
 	err := cmd.Run()
 	stdout, stderr := bout.String(), berr.String()
-	return stdout, stderr, err
+	return stdout, stderr, cmd.ProcessState.ExitCode(), err
 }
 
 // RunCmd is a utility function for kubeadm testing that executes a specified command
-func RunCmd(command string, args ...string) (string, string, error) {
-	stdout, stderr, err := runCmdNoWrap(command, args...)
+func RunCmd(command string, args ...string) (string, string, int, error) {
+	stdout, stderr, retcode, err := runCmdNoWrap(command, args...)
 	if err != nil {
-		return stdout, stderr, errors.Wrapf(err, "error running %s %v; \nstdout %q, \nstderr %q, \ngot error",
-			command, args, stdout, stderr)
+		return stdout, stderr, retcode, errors.Wrapf(err, "error running %s %v; \nretcode %d, \nstdout %q, \nstderr %q, \ngot error",
+			command, args, retcode, stdout, stderr)
 	}
-	return stdout, stderr, nil
+	return stdout, stderr, retcode, nil
 }
 
 // RunSubCommand is a utility function for kubeadm testing that executes a Cobra sub command

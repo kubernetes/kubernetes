@@ -145,7 +145,7 @@ func (rc *reconciler) reconcile() {
 	for _, pluginToRegister := range rc.desiredStateOfWorld.GetPluginsToRegister() {
 		if !rc.actualStateOfWorld.PluginExistsWithCorrectTimestamp(pluginToRegister) {
 			klog.V(5).Infof(pluginToRegister.GenerateMsgDetailed("Starting operationExecutor.RegisterPlugin", ""))
-			err := rc.operationExecutor.RegisterPlugin(pluginToRegister.SocketPath, pluginToRegister.FoundInDeprecatedDir, pluginToRegister.Timestamp, rc.getHandlers(), rc.actualStateOfWorld)
+			err := rc.operationExecutor.RegisterPlugin(pluginToRegister.SocketPath, pluginToRegister.Timestamp, rc.getHandlers(), rc.actualStateOfWorld)
 			if err != nil &&
 				!goroutinemap.IsAlreadyExists(err) &&
 				!exponentialbackoff.IsExponentialBackoff(err) {

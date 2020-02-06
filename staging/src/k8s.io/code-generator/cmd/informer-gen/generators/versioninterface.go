@@ -68,7 +68,7 @@ func (g *versionInterfaceGenerator) GenerateType(c *generator.Context, t *types.
 
 	sw.Do(versionTemplate, m)
 	for _, typeDef := range g.types {
-		tags, err := util.ParseClientGenTags(typeDef.SecondClosestCommentLines)
+		tags, err := util.ParseClientGenTags(append(typeDef.SecondClosestCommentLines, typeDef.CommentLines...))
 		if err != nil {
 			return err
 		}

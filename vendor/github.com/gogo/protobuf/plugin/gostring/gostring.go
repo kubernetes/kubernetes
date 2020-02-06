@@ -157,7 +157,7 @@ func (p *gostring) Generate(file *generator.FileDescriptor) {
 			continue
 		}
 		p.atleastOne = true
-		packageName := file.PackageName()
+		packageName := file.GoPackageName()
 
 		ccTypeName := generator.CamelCaseSlice(message.TypeName())
 		p.P(`func (this *`, ccTypeName, `) GoString() string {`)
@@ -225,7 +225,7 @@ func (p *gostring) Generate(file *generator.FileDescriptor) {
 				p.P(`s = append(s, "`, fieldname, `: " + `, mapName, `+ ",\n")`)
 				p.Out()
 				p.P(`}`)
-			} else if (field.IsMessage() && !gogoproto.IsCustomType(field) && !gogoproto.IsStdTime(field) && !gogoproto.IsStdDuration(field)) || p.IsGroup(field) {
+			} else if (field.IsMessage() && !gogoproto.IsCustomType(field) && !gogoproto.IsStdType(field)) || p.IsGroup(field) {
 				if nullable || repeated {
 					p.P(`if this.`, fieldname, ` != nil {`)
 					p.In()
@@ -238,10 +238,10 @@ func (p *gostring) Generate(file *generator.FileDescriptor) {
 					} else {
 						goTyp, _ := p.GoType(message, field)
 						goTyp = strings.Replace(goTyp, "[]", "", 1)
-						p.P("vs := make([]*", goTyp, ", len(this.", fieldname, "))")
+						p.P("vs := make([]", goTyp, ", len(this.", fieldname, "))")
 						p.P("for i := range vs {")
 						p.In()
-						p.P("vs[i] = &this.", fieldname, "[i]")
+						p.P("vs[i] = this.", fieldname, "[i]")
 						p.Out()
 						p.P("}")
 						p.P(`s = append(s, "`, fieldname, `: " + `, fmtPkg.Use(), `.Sprintf("%#v", vs) + ",\n")`)

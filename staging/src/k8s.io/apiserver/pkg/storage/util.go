@@ -39,14 +39,6 @@ func EverythingFunc(runtime.Object) bool {
 	return true
 }
 
-func NoTriggerFunc() []MatchValue {
-	return nil
-}
-
-func NoTriggerPublisher(runtime.Object) []MatchValue {
-	return nil
-}
-
 func NamespaceKeyFunc(prefix string, obj runtime.Object) (string, error) {
 	meta, err := meta.Accessor(obj)
 	if err != nil {

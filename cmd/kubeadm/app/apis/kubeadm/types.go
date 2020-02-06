@@ -19,8 +19,8 @@ package kubeadm
 import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
-	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
+
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -62,9 +62,9 @@ type InitConfiguration struct {
 type ClusterConfiguration struct {
 	metav1.TypeMeta
 
-	// ComponentConfigs holds internal ComponentConfig struct types known to kubeadm, should long-term only exist in the internal kubeadm API
+	// ComponentConfigs holds component configs known to kubeadm, should long-term only exist in the internal kubeadm API
 	// +k8s:conversion-gen=false
-	ComponentConfigs ComponentConfigs
+	ComponentConfigs ComponentConfigMap
 
 	// Etcd holds configuration for etcd.
 	Etcd Etcd
@@ -114,6 +114,8 @@ type ClusterConfiguration struct {
 	CIImageRepository string
 
 	// UseHyperKubeImage controls if hyperkube should be used for Kubernetes components instead of their respective separate images
+	// DEPRECATED: As hyperkube is itself deprecated, this fields is too. It will be removed in future kubeadm config versions, kubeadm
+	// will print multiple warnings when set to true, and at some point it may become ignored.
 	UseHyperKubeImage bool
 
 	// FeatureGates enabled by the user.
@@ -179,14 +181,6 @@ type ImageMeta struct {
 	//TODO: evaluate if we need also a ImageName based on user feedbacks
 }
 
-// ComponentConfigs holds known internal ComponentConfig types for other components
-type ComponentConfigs struct {
-	// Kubelet holds the ComponentConfiguration for the kubelet
-	Kubelet *kubeletconfig.KubeletConfiguration
-	// KubeProxy holds the ComponentConfiguration for the kube-proxy
-	KubeProxy *kubeproxyconfig.KubeProxyConfiguration
-}
-
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ClusterStatus contains the cluster status. The ClusterStatus will be stored in the kubeadm-config
@@ -222,7 +216,7 @@ type NodeRegistrationOptions struct {
 
 	// Taints specifies the taints the Node API object should be registered with. If this field is unset, i.e. nil, in the `kubeadm init` process
 	// it will be defaulted to []v1.Taint{'node-role.kubernetes.io/master=""'}. If you don't want to taint your control-plane node, set this field to an
-	// empty slice, i.e. `taints: {}` in the YAML file. This field is solely used for Node registration.
+	// empty slice, i.e. `taints: []` in the YAML file. This field is solely used for Node registration.
 	Taints []v1.Taint
 
 	// KubeletExtraArgs passes through extra arguments to the kubelet. The arguments here are passed to the kubelet command line via the environment file
@@ -422,3 +416,25 @@ type HostPathMount struct {
 	// PathType is the type of the HostPath.
 	PathType v1.HostPathType
 }
+
+// DocumentMap is a convenient way to describe a map between a YAML document and its GVK type
+// +k8s:deepcopy-gen=false
+type DocumentMap map[schema.GroupVersionKind][]byte
+
+// ComponentConfig holds a known component config
+type ComponentConfig interface {
+	// DeepCopy should create a new deep copy of the component config in place
+	DeepCopy() ComponentConfig
+
+	// Marshal is marshalling the config into a YAML document returned as a byte slice
+	Marshal() ([]byte, error)
+
+	// Unmarshal loads the config from a document map. No config in the document map is no error.
+	Unmarshal(docmap DocumentMap) error
+
+	// Default patches the component config with kubeadm preferred defaults
+	Default(cfg *ClusterConfiguration, localAPIEndpoint *APIEndpoint)
+}
+
+// ComponentConfigMap is a map between a group name (as in GVK group) and a ComponentConfig
+type ComponentConfigMap map[string]ComponentConfig

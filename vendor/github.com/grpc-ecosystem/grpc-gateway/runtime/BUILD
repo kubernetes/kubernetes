@@ -7,9 +7,12 @@ go_library(
         "convert.go",
         "doc.go",
         "errors.go",
+        "fieldmask.go",
         "handler.go",
+        "marshal_httpbodyproto.go",
         "marshal_json.go",
         "marshal_jsonpb.go",
+        "marshal_proto.go",
         "marshaler.go",
         "marshaler_registry.go",
         "mux.go",
@@ -24,9 +27,15 @@ go_library(
     deps = [
         "//vendor/github.com/golang/protobuf/jsonpb:go_default_library",
         "//vendor/github.com/golang/protobuf/proto:go_default_library",
-        "//vendor/github.com/grpc-ecosystem/grpc-gateway/runtime/internal:go_default_library",
+        "//vendor/github.com/golang/protobuf/protoc-gen-go/generator:go_default_library",
+        "//vendor/github.com/golang/protobuf/ptypes/any:go_default_library",
+        "//vendor/github.com/golang/protobuf/ptypes/duration:go_default_library",
+        "//vendor/github.com/golang/protobuf/ptypes/timestamp:go_default_library",
+        "//vendor/github.com/golang/protobuf/ptypes/wrappers:go_default_library",
+        "//vendor/github.com/grpc-ecosystem/grpc-gateway/internal:go_default_library",
         "//vendor/github.com/grpc-ecosystem/grpc-gateway/utilities:go_default_library",
-        "//vendor/golang.org/x/net/context:go_default_library",
+        "//vendor/google.golang.org/genproto/googleapis/api/httpbody:go_default_library",
+        "//vendor/google.golang.org/genproto/protobuf/field_mask:go_default_library",
         "//vendor/google.golang.org/grpc/codes:go_default_library",
         "//vendor/google.golang.org/grpc/grpclog:go_default_library",
         "//vendor/google.golang.org/grpc/metadata:go_default_library",
@@ -43,10 +52,7 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [
-        ":package-srcs",
-        "//vendor/github.com/grpc-ecosystem/grpc-gateway/runtime/internal:all-srcs",
-    ],
+    srcs = [":package-srcs"],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
 )

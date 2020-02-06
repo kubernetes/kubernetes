@@ -24,7 +24,6 @@ import (
 	"path"
 	"testing"
 
-	"github.com/kardianos/osext"
 	"k8s.io/klog"
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -127,7 +126,7 @@ const (
 
 // startInternalServices starts the internal services in a separate process.
 func (e *E2EServices) startInternalServices() (*server, error) {
-	testBin, err := osext.Executable()
+	testBin, err := os.Executable()
 	if err != nil {
 		return nil, fmt.Errorf("can't get current binary: %v", err)
 	}

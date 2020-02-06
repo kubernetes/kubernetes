@@ -33,6 +33,7 @@ import (
 	daemonconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/daemon/config/v1alpha1"
 	deploymentconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/deployment/config/v1alpha1"
 	endpointconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/endpoint/config/v1alpha1"
+	endpointsliceconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/endpointslice/config/v1alpha1"
 	garbagecollectorconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/garbagecollector/config/v1alpha1"
 	jobconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/job/config/v1alpha1"
 	namespaceconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/namespace/config/v1alpha1"
@@ -45,6 +46,7 @@ import (
 	resourcequotaconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/resourcequota/config/v1alpha1"
 	serviceconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/service/config/v1alpha1"
 	serviceaccountconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/serviceaccount/config/v1alpha1"
+	statefulsetconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/statefulset/config/v1alpha1"
 	ttlafterfinishedconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/ttlafterfinished/config/v1alpha1"
 	attachdetachconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/volume/attachdetach/config/v1alpha1"
 	persistentvolumeconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/config/v1alpha1"
@@ -77,16 +79,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1alpha1.GenericControllerManagerConfiguration)(nil), (*config.GenericControllerManagerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_GenericControllerManagerConfiguration_To_config_GenericControllerManagerConfiguration(a.(*v1alpha1.GenericControllerManagerConfiguration), b.(*config.GenericControllerManagerConfiguration), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*config.GenericControllerManagerConfiguration)(nil), (*v1alpha1.GenericControllerManagerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_GenericControllerManagerConfiguration_To_v1alpha1_GenericControllerManagerConfiguration(a.(*config.GenericControllerManagerConfiguration), b.(*v1alpha1.GenericControllerManagerConfiguration), scope)
-	}); err != nil {
-		return err
-	}
 	if err := s.AddGeneratedConversionFunc((*v1alpha1.GroupResource)(nil), (*v1.GroupResource)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1alpha1_GroupResource_To_v1_GroupResource(a.(*v1alpha1.GroupResource), b.(*v1.GroupResource), scope)
 	}); err != nil {
@@ -94,16 +86,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddGeneratedConversionFunc((*v1.GroupResource)(nil), (*v1alpha1.GroupResource)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1_GroupResource_To_v1alpha1_GroupResource(a.(*v1.GroupResource), b.(*v1alpha1.GroupResource), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*v1alpha1.KubeCloudSharedConfiguration)(nil), (*config.KubeCloudSharedConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_KubeCloudSharedConfiguration_To_config_KubeCloudSharedConfiguration(a.(*v1alpha1.KubeCloudSharedConfiguration), b.(*config.KubeCloudSharedConfiguration), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*config.KubeCloudSharedConfiguration)(nil), (*v1alpha1.KubeCloudSharedConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_KubeCloudSharedConfiguration_To_v1alpha1_KubeCloudSharedConfiguration(a.(*config.KubeCloudSharedConfiguration), b.(*v1alpha1.KubeCloudSharedConfiguration), scope)
 	}); err != nil {
 		return err
 	}
@@ -303,10 +285,16 @@ func autoConvert_v1alpha1_KubeControllerManagerConfiguration_To_config_KubeContr
 	if err := deploymentconfigv1alpha1.Convert_v1alpha1_DeploymentControllerConfiguration_To_config_DeploymentControllerConfiguration(&in.DeploymentController, &out.DeploymentController, s); err != nil {
 		return err
 	}
+	if err := statefulsetconfigv1alpha1.Convert_v1alpha1_StatefulSetControllerConfiguration_To_config_StatefulSetControllerConfiguration(&in.StatefulSetController, &out.StatefulSetController, s); err != nil {
+		return err
+	}
 	if err := Convert_v1alpha1_DeprecatedControllerConfiguration_To_config_DeprecatedControllerConfiguration(&in.DeprecatedController, &out.DeprecatedController, s); err != nil {
 		return err
 	}
 	if err := endpointconfigv1alpha1.Convert_v1alpha1_EndpointControllerConfiguration_To_config_EndpointControllerConfiguration(&in.EndpointController, &out.EndpointController, s); err != nil {
+		return err
+	}
+	if err := endpointsliceconfigv1alpha1.Convert_v1alpha1_EndpointSliceControllerConfiguration_To_config_EndpointSliceControllerConfiguration(&in.EndpointSliceController, &out.EndpointSliceController, s); err != nil {
 		return err
 	}
 	if err := garbagecollectorconfigv1alpha1.Convert_v1alpha1_GarbageCollectorControllerConfiguration_To_config_GarbageCollectorControllerConfiguration(&in.GarbageCollectorController, &out.GarbageCollectorController, s); err != nil {
@@ -378,10 +366,16 @@ func autoConvert_config_KubeControllerManagerConfiguration_To_v1alpha1_KubeContr
 	if err := deploymentconfigv1alpha1.Convert_config_DeploymentControllerConfiguration_To_v1alpha1_DeploymentControllerConfiguration(&in.DeploymentController, &out.DeploymentController, s); err != nil {
 		return err
 	}
+	if err := statefulsetconfigv1alpha1.Convert_config_StatefulSetControllerConfiguration_To_v1alpha1_StatefulSetControllerConfiguration(&in.StatefulSetController, &out.StatefulSetController, s); err != nil {
+		return err
+	}
 	if err := Convert_config_DeprecatedControllerConfiguration_To_v1alpha1_DeprecatedControllerConfiguration(&in.DeprecatedController, &out.DeprecatedController, s); err != nil {
 		return err
 	}
 	if err := endpointconfigv1alpha1.Convert_config_EndpointControllerConfiguration_To_v1alpha1_EndpointControllerConfiguration(&in.EndpointController, &out.EndpointController, s); err != nil {
+		return err
+	}
+	if err := endpointsliceconfigv1alpha1.Convert_config_EndpointSliceControllerConfiguration_To_v1alpha1_EndpointSliceControllerConfiguration(&in.EndpointSliceController, &out.EndpointSliceController, s); err != nil {
 		return err
 	}
 	if err := garbagecollectorconfigv1alpha1.Convert_config_GarbageCollectorControllerConfiguration_To_v1alpha1_GarbageCollectorControllerConfiguration(&in.GarbageCollectorController, &out.GarbageCollectorController, s); err != nil {

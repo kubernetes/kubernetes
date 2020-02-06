@@ -127,6 +127,12 @@ func finalizeNamespace(config *initConfig) error {
 		return errors.Wrap(err, "close exec fds")
 	}
 
+	if config.Cwd != "" {
+		if err := unix.Chdir(config.Cwd); err != nil {
+			return fmt.Errorf("chdir to cwd (%q) set in config.json failed: %v", config.Cwd, err)
+		}
+	}
+
 	capabilities := &configs.Capabilities{}
 	if config.Capabilities != nil {
 		capabilities = config.Capabilities
@@ -153,11 +159,6 @@ func finalizeNamespace(config *initConfig) error {
 	}
 	if err := w.ApplyCaps(); err != nil {
 		return errors.Wrap(err, "apply caps")
-	}
-	if config.Cwd != "" {
-		if err := unix.Chdir(config.Cwd); err != nil {
-			return fmt.Errorf("chdir to cwd (%q) set in config.json failed: %v", config.Cwd, err)
-		}
 	}
 	return nil
 }

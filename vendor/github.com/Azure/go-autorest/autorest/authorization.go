@@ -15,6 +15,8 @@ package autorest
 //  limitations under the License.
 
 import (
+	"crypto/tls"
+	"encoding/base64"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -30,6 +32,8 @@ const (
 	apiKeyAuthorizerHeader      = "Ocp-Apim-Subscription-Key"
 	bingAPISdkHeader            = "X-BingApis-SDK-Client"
 	golangBingAPISdkHeaderValue = "Go-SDK"
+	authorization               = "Authorization"
+	basic                       = "Basic"
 )
 
 // Authorizer is the interface that provides a PrepareDecorator used to supply request
@@ -68,7 +72,7 @@ func NewAPIKeyAuthorizer(headers map[string]interface{}, queryParameters map[str
 	return &APIKeyAuthorizer{headers: headers, queryParameters: queryParameters}
 }
 
-// WithAuthorization returns a PrepareDecorator that adds an HTTP headers and Query Paramaters
+// WithAuthorization returns a PrepareDecorator that adds an HTTP headers and Query Parameters.
 func (aka *APIKeyAuthorizer) WithAuthorization() PrepareDecorator {
 	return func(p Preparer) Preparer {
 		return DecoratePreparer(p, WithHeaders(aka.headers), WithQueryParameters(aka.queryParameters))
@@ -145,11 +149,11 @@ type BearerAuthorizerCallback struct {
 
 // NewBearerAuthorizerCallback creates a bearer authorization callback.  The callback
 // is invoked when the HTTP request is submitted.
-func NewBearerAuthorizerCallback(sender Sender, callback BearerAuthorizerCallbackFunc) *BearerAuthorizerCallback {
-	if sender == nil {
-		sender = &http.Client{}
+func NewBearerAuthorizerCallback(s Sender, callback BearerAuthorizerCallbackFunc) *BearerAuthorizerCallback {
+	if s == nil {
+		s = sender(tls.RenegotiateNever)
 	}
-	return &BearerAuthorizerCallback{sender: sender, callback: callback}
+	return &BearerAuthorizerCallback{sender: s, callback: callback}
 }
 
 // WithAuthorization returns a PrepareDecorator that adds an HTTP Authorization header whose value
@@ -256,4 +260,77 @@ func (egta EventGridKeyAuthorizer) WithAuthorization() PrepareDecorator {
 		"aeg-sas-key": egta.topicKey,
 	}
 	return NewAPIKeyAuthorizerWithHeaders(headers).WithAuthorization()
+}
+
+// BasicAuthorizer implements basic HTTP authorization by adding the Authorization HTTP header
+// with the value "Basic <TOKEN>" where <TOKEN> is a base64-encoded username:password tuple.
+type BasicAuthorizer struct {
+	userName string
+	password string
+}
+
+// NewBasicAuthorizer creates a new BasicAuthorizer with the specified username and password.
+func NewBasicAuthorizer(userName, password string) *BasicAuthorizer {
+	return &BasicAuthorizer{
+		userName: userName,
+		password: password,
+	}
+}
+
+// WithAuthorization returns a PrepareDecorator that adds an HTTP Authorization header whose
+// value is "Basic " followed by the base64-encoded username:password tuple.
+func (ba *BasicAuthorizer) WithAuthorization() PrepareDecorator {
+	headers := make(map[string]interface{})
+	headers[authorization] = basic + " " + base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", ba.userName, ba.password)))
+
+	return NewAPIKeyAuthorizerWithHeaders(headers).WithAuthorization()
+}
+
+// MultiTenantServicePrincipalTokenAuthorizer provides authentication across tenants.
+type MultiTenantServicePrincipalTokenAuthorizer interface {
+	WithAuthorization() PrepareDecorator
+}
+
+// NewMultiTenantServicePrincipalTokenAuthorizer crates a BearerAuthorizer using the given token provider
+func NewMultiTenantServicePrincipalTokenAuthorizer(tp adal.MultitenantOAuthTokenProvider) MultiTenantServicePrincipalTokenAuthorizer {
+	return &multiTenantSPTAuthorizer{tp: tp}
+}
+
+type multiTenantSPTAuthorizer struct {
+	tp adal.MultitenantOAuthTokenProvider
+}
+
+// WithAuthorization returns a PrepareDecorator that adds an HTTP Authorization header using the
+// primary token along with the auxiliary authorization header using the auxiliary tokens.
+//
+// By default, the token will be automatically refreshed through the Refresher interface.
+func (mt multiTenantSPTAuthorizer) WithAuthorization() PrepareDecorator {
+	return func(p Preparer) Preparer {
+		return PreparerFunc(func(r *http.Request) (*http.Request, error) {
+			r, err := p.Prepare(r)
+			if err != nil {
+				return r, err
+			}
+			if refresher, ok := mt.tp.(adal.RefresherWithContext); ok {
+				err = refresher.EnsureFreshWithContext(r.Context())
+				if err != nil {
+					var resp *http.Response
+					if tokError, ok := err.(adal.TokenRefreshError); ok {
+						resp = tokError.Response()
+					}
+					return r, NewErrorWithError(err, "azure.multiTenantSPTAuthorizer", "WithAuthorization", resp,
+						"Failed to refresh one or more Tokens for request to %s", r.URL)
+				}
+			}
+			r, err = Prepare(r, WithHeader(headerAuthorization, fmt.Sprintf("Bearer %s", mt.tp.PrimaryOAuthToken())))
+			if err != nil {
+				return r, err
+			}
+			auxTokens := mt.tp.AuxiliaryOAuthTokens()
+			for i := range auxTokens {
+				auxTokens[i] = fmt.Sprintf("Bearer %s", auxTokens[i])
+			}
+			return Prepare(r, WithHeader(headerAuxAuthorization, strings.Join(auxTokens, "; ")))
+		})
+	}
 }

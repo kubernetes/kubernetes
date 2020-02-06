@@ -105,17 +105,13 @@ func NodeSSHHosts(c clientset.Interface) ([]string, error) {
 	nodelist := waitListSchedulableNodesOrDie(c)
 
 	hosts := nodeAddresses(nodelist, v1.NodeExternalIP)
-	// If ExternalIPs aren't set, assume the test programs can reach the
-	// InternalIP. Simplified exception logic here assumes that the hosts will
-	// either all have ExternalIP or none will. Simplifies handling here and
-	// should be adequate since the setting of the external IPs is provider
-	// specific: they should either all have them or none of them will.
-	if len(hosts) == 0 {
+	// If  ExternalIPs aren't available for all nodes, try falling back to the InternalIPs.
+	if len(hosts) < len(nodelist.Items) {
 		e2elog.Logf("No external IP address on nodes, falling back to internal IPs")
 		hosts = nodeAddresses(nodelist, v1.NodeInternalIP)
 	}
 
-	// Error if any node didn't have an external/internal IP.
+	// Error if neither External nor Internal IPs weren't available for all nodes.
 	if len(hosts) != len(nodelist.Items) {
 		return hosts, fmt.Errorf(
 			"only found %d IPs on nodes, but found %d nodes. Nodelist: %v",
@@ -166,7 +162,7 @@ func SSH(cmd, host, provider string) (Result, error) {
 	}
 
 	if bastion := os.Getenv("KUBE_SSH_BASTION"); len(bastion) > 0 {
-		stdout, stderr, code, err := RunSSHCommandViaBastion(cmd, result.User, bastion, host, signer)
+		stdout, stderr, code, err := runSSHCommandViaBastion(cmd, result.User, bastion, host, signer)
 		result.Stdout = stdout
 		result.Stderr = stderr
 		result.Code = code
@@ -181,11 +177,11 @@ func SSH(cmd, host, provider string) (Result, error) {
 	return result, err
 }
 
-// RunSSHCommandViaBastion returns the stdout, stderr, and exit code from running cmd on
+// runSSHCommandViaBastion returns the stdout, stderr, and exit code from running cmd on
 // host as specific user, along with any SSH-level error. It uses an SSH proxy to connect
 // to bastion, then via that tunnel connects to the remote host. Similar to
 // sshutil.RunSSHCommand but scoped to the needs of the test infrastructure.
-func RunSSHCommandViaBastion(cmd, user, bastion, host string, signer ssh.Signer) (string, string, int, error) {
+func runSSHCommandViaBastion(cmd, user, bastion, host string, signer ssh.Signer) (string, string, int, error) {
 	// Setup the config, dial the server, and open a session.
 	config := &ssh.ClientConfig{
 		User:            user,

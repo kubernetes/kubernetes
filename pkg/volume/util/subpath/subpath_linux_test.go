@@ -30,8 +30,7 @@ import (
 	"testing"
 
 	"k8s.io/klog"
-
-	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/utils/mount"
 )
 
 func TestSafeMakeDir(t *testing.T) {
@@ -409,6 +408,7 @@ func TestCleanSubPaths(t *testing.T) {
 		// Function that validates directory structure after the test
 		validate    func(base string) error
 		expectError bool
+		unmount     func(path string) error
 	}{
 		{
 			name: "not-exists",
@@ -539,6 +539,64 @@ func TestCleanSubPaths(t *testing.T) {
 				return validateDirExists(baseSubdir)
 			},
 		},
+		{
+			name: "subpath-with-files",
+			prepare: func(base string) ([]mount.MountPoint, error) {
+				containerPath := filepath.Join(base, containerSubPathDirectoryName, testVol, "container1")
+				if err := os.MkdirAll(containerPath, defaultPerm); err != nil {
+					return nil, err
+				}
+
+				file0 := filepath.Join(containerPath, "0")
+				if err := ioutil.WriteFile(file0, []byte{}, defaultPerm); err != nil {
+					return nil, err
+				}
+
+				dir1 := filepath.Join(containerPath, "1")
+				if err := os.MkdirAll(filepath.Join(dir1, "my-dir-1"), defaultPerm); err != nil {
+					return nil, err
+				}
+
+				dir2 := filepath.Join(containerPath, "2")
+				if err := os.MkdirAll(filepath.Join(dir2, "my-dir-2"), defaultPerm); err != nil {
+					return nil, err
+				}
+
+				file3 := filepath.Join(containerPath, "3")
+				if err := ioutil.WriteFile(file3, []byte{}, defaultPerm); err != nil {
+					return nil, err
+				}
+
+				mounts := []mount.MountPoint{
+					{Device: "/dev/sdb", Path: file0},
+					{Device: "/dev/sdc", Path: dir1},
+					{Device: "/dev/sdd", Path: dir2},
+					{Device: "/dev/sde", Path: file3},
+				}
+				return mounts, nil
+			},
+			unmount: func(mountpath string) error {
+				err := filepath.Walk(mountpath, func(path string, info os.FileInfo, err error) error {
+					if path == mountpath {
+						// Skip top level directory
+						return nil
+					}
+
+					if err = os.Remove(path); err != nil {
+						return err
+					}
+					return filepath.SkipDir
+				})
+				if err != nil {
+					return fmt.Errorf("error processing %s: %s", mountpath, err)
+				}
+
+				return nil
+			},
+			validate: func(base string) error {
+				return validateDirNotExists(filepath.Join(base, containerSubPathDirectoryName))
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -553,7 +611,8 @@ func TestCleanSubPaths(t *testing.T) {
 			t.Fatalf("failed to prepare test %q: %v", test.name, err.Error())
 		}
 
-		fm := &mount.FakeMounter{MountPoints: mounts}
+		fm := mount.NewFakeMounter(mounts)
+		fm.UnmountFunc = test.unmount
 
 		err = doCleanSubPaths(fm, base, testVol)
 		if err != nil && !test.expectError {
@@ -582,7 +641,7 @@ func setupFakeMounter(testMounts []string) *mount.FakeMounter {
 	for _, mountPoint := range testMounts {
 		mounts = append(mounts, mount.MountPoint{Device: "/foo", Path: mountPoint})
 	}
-	return &mount.FakeMounter{MountPoints: mounts}
+	return mount.NewFakeMounter(mounts)
 }
 
 func getTestPaths(base string) (string, string) {

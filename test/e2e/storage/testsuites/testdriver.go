@@ -17,7 +17,7 @@ limitations under the License.
 package testsuites
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -28,7 +28,7 @@ import (
 
 // TestDriver represents an interface for a driver to be tested in TestSuite.
 // Except for GetDriverInfo, all methods will be called at test runtime and thus
-// can use framework.Skipf, framework.Fatal, Gomega assertions, etc.
+// can use e2eskipper.Skipf, framework.Fatal, Gomega assertions, etc.
 type TestDriver interface {
 	// GetDriverInfo returns DriverInfo for the TestDriver. This must be static
 	// information.
@@ -94,11 +94,30 @@ type DynamicPVTestDriver interface {
 	// It will set fsType to the StorageClass, if TestDriver supports it.
 	// It will return nil, if the TestDriver doesn't support it.
 	GetDynamicProvisionStorageClass(config *PerTestConfig, fsType string) *storagev1.StorageClass
+}
 
-	// GetClaimSize returns the size of the volume that is to be provisioned ("5Gi", "1Mi").
-	// The size must be chosen so that the resulting volume is large enough for all
-	// enabled tests and within the range supported by the underlying storage.
-	GetClaimSize() string
+// EphemeralTestDriver represents an interface for a TestDriver that supports ephemeral inline volumes.
+type EphemeralTestDriver interface {
+	TestDriver
+
+	// GetVolume returns the volume attributes for a certain
+	// inline ephemeral volume, enumerated starting with #0. Some
+	// tests might require more than one volume. They can all be
+	// the same or different, depending what the driver supports
+	// and/or wants to test.
+	//
+	// For each volume, the test driver can return volume attributes,
+	// whether the resulting volume is shared between different pods (i.e.
+	// changes made in one pod are visible in another), and whether the
+	// volume can be mounted read/write or only read-only.
+	GetVolume(config *PerTestConfig, volumeNumber int) (attributes map[string]string, shared bool, readOnly bool)
+
+	// GetCSIDriverName returns the name that was used when registering with
+	// kubelet. Depending on how the driver was deployed, this can be different
+	// from DriverInfo.Name. Starting with Kubernetes 1.16, there must also
+	// be a CSIDriver object under the same name with a "mode" field that enables
+	// usage of the driver for ephemeral inline volumes.
+	GetCSIDriverName(config *PerTestConfig) string
 }
 
 // SnapshottableTestDriver represents an interface for a TestDriver that supports DynamicSnapshot
@@ -114,11 +133,12 @@ type Capability string
 
 // Constants related to capability
 const (
-	CapPersistence Capability = "persistence" // data is persisted across pod restarts
-	CapBlock       Capability = "block"       // raw block mode
-	CapFsGroup     Capability = "fsGroup"     // volume ownership via fsGroup
-	CapExec        Capability = "exec"        // exec a file in the volume
-	CapDataSource  Capability = "dataSource"  // support populate data from snapshot
+	CapPersistence        Capability = "persistence"        // data is persisted across pod restarts
+	CapBlock              Capability = "block"              // raw block mode
+	CapFsGroup            Capability = "fsGroup"            // volume ownership via fsGroup
+	CapExec               Capability = "exec"               // exec a file in the volume
+	CapSnapshotDataSource Capability = "snapshotDataSource" // support populate data from snapshot
+	CapPVCDataSource      Capability = "pvcDataSource"      // support populate data from pvc
 
 	// multiple pods on a node can use the same volume concurrently;
 	// for CSI, see:
@@ -127,7 +147,12 @@ const (
 	// - NodeStageVolume in the spec
 	CapMultiPODs Capability = "multipods"
 
-	CapRWX Capability = "RWX" // support ReadWriteMany access modes
+	CapRWX                 Capability = "RWX"                 // support ReadWriteMany access modes
+	CapControllerExpansion Capability = "controllerExpansion" // support volume expansion for controller
+	CapNodeExpansion       Capability = "nodeExpansion"       // support volume expansion for node
+	CapVolumeLimits        Capability = "volumeLimits"        // support volume limits (can be *very* slow)
+	CapSingleNodeVolume    Capability = "singleNodeVolume"    // support volume that can run on single node (like hostpath)
+	CapTopology            Capability = "topology"            // support topology
 )
 
 // DriverInfo represents static information about a TestDriver.
@@ -141,11 +166,27 @@ type DriverInfo struct {
 	InTreePluginName string
 	FeatureTag       string // FeatureTag for the driver
 
-	MaxFileSize          int64               // Max file size to be tested for this driver
-	SupportedFsType      sets.String         // Map of string for supported fs type
-	SupportedMountOption sets.String         // Map of string for supported mount option
-	RequiredMountOption  sets.String         // Map of string for required mount option (Optional)
-	Capabilities         map[Capability]bool // Map that represents plugin capabilities
+	// Maximum single file size supported by this driver
+	MaxFileSize int64
+	// The range of disk size supported by this driver
+	SupportedSizeRange volume.SizeRange
+	// Map of string for supported fs type
+	SupportedFsType sets.String
+	// Map of string for supported mount option
+	SupportedMountOption sets.String
+	// [Optional] Map of string for required mount option
+	RequiredMountOption sets.String
+	// Map that represents plugin capabilities
+	Capabilities map[Capability]bool
+	// [Optional] List of access modes required for provisioning, defaults to
+	// RWO if unset
+	RequiredAccessModes []v1.PersistentVolumeAccessMode
+	// [Optional] List of topology keys driver supports
+	TopologyKeys []string
+	// [Optional] Number of allowed topologies the driver requires.
+	// Only relevant if TopologyKeys is set. Defaults to 1.
+	// Example: multi-zonal disk requires at least 2 allowed topologies.
+	NumAllowedTopologies int
 }
 
 // PerTestConfig represents parameters that control test execution.

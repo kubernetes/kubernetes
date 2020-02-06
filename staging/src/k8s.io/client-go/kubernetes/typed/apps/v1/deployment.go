@@ -19,6 +19,7 @@ limitations under the License.
 package v1
 
 import (
+	"context"
 	"time"
 
 	v1 "k8s.io/api/apps/v1"
@@ -75,7 +76,7 @@ func (c *deployments) Get(name string, options metav1.GetOptions) (result *v1.De
 		Resource("deployments").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -92,7 +93,7 @@ func (c *deployments) List(opts metav1.ListOptions) (result *v1.DeploymentList, 
 		Resource("deployments").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -109,7 +110,7 @@ func (c *deployments) Watch(opts metav1.ListOptions) (watch.Interface, error) {
 		Resource("deployments").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch()
+		Watch(context.TODO())
 }
 
 // Create takes the representation of a deployment and creates it.  Returns the server's representation of the deployment, and an error, if there is any.
@@ -119,7 +120,7 @@ func (c *deployments) Create(deployment *v1.Deployment) (result *v1.Deployment, 
 		Namespace(c.ns).
 		Resource("deployments").
 		Body(deployment).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -132,7 +133,7 @@ func (c *deployments) Update(deployment *v1.Deployment) (result *v1.Deployment, 
 		Resource("deployments").
 		Name(deployment.Name).
 		Body(deployment).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -148,7 +149,7 @@ func (c *deployments) UpdateStatus(deployment *v1.Deployment) (result *v1.Deploy
 		Name(deployment.Name).
 		SubResource("status").
 		Body(deployment).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -160,7 +161,7 @@ func (c *deployments) Delete(name string, options *metav1.DeleteOptions) error {
 		Resource("deployments").
 		Name(name).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -176,7 +177,7 @@ func (c *deployments) DeleteCollection(options *metav1.DeleteOptions, listOption
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Timeout(timeout).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -189,7 +190,7 @@ func (c *deployments) Patch(name string, pt types.PatchType, data []byte, subres
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -203,7 +204,7 @@ func (c *deployments) GetScale(deploymentName string, options metav1.GetOptions)
 		Name(deploymentName).
 		SubResource("scale").
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -217,7 +218,7 @@ func (c *deployments) UpdateScale(deploymentName string, scale *autoscalingv1.Sc
 		Name(deploymentName).
 		SubResource("scale").
 		Body(scale).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }

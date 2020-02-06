@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"strings"
 	"sync"
 	"text/tabwriter"
 	"time"
@@ -28,14 +27,13 @@ import (
 	"github.com/onsi/ginkgo"
 
 	v1 "k8s.io/api/core/v1"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2eresource "k8s.io/kubernetes/test/e2e/framework/resource"
@@ -215,7 +213,7 @@ func WaitForPodCondition(c clientset.Interface, ns, podName, desc string, timeou
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(poll) {
 		pod, err := c.CoreV1().Pods(ns).Get(podName, metav1.GetOptions{})
 		if err != nil {
-			if apierrs.IsNotFound(err) {
+			if apierrors.IsNotFound(err) {
 				e2elog.Logf("Pod %q in namespace %q not found. Error: %v", podName, ns, err)
 				return err
 			}
@@ -255,8 +253,8 @@ func WaitForPodTerminatedInNamespace(c clientset.Interface, podName, reason, nam
 }
 
 // waitForPodSuccessInNamespaceTimeout returns nil if the pod reached state success, or an error if it reached failure or ran too long.
-func waitForPodSuccessInNamespaceTimeout(c clientset.Interface, podName string, namespace string, timeout time.Duration) error {
-	return WaitForPodCondition(c, namespace, podName, "success or failure", timeout, func(pod *v1.Pod) (bool, error) {
+func waitForPodSuccessInNamespaceTimeout(c clientset.Interface, podName, namespace string, timeout time.Duration) error {
+	return WaitForPodCondition(c, namespace, podName, fmt.Sprintf("%s or %s", v1.PodSucceeded, v1.PodFailed), timeout, func(pod *v1.Pod) (bool, error) {
 		if pod.Spec.RestartPolicy == v1.RestartPolicyAlways {
 			return true, fmt.Errorf("pod %q will never terminate with a succeeded state since its restart policy is Always", podName)
 		}
@@ -277,12 +275,12 @@ func waitForPodSuccessInNamespaceTimeout(c clientset.Interface, podName string, 
 // if the pod Get api returns an error (IsNotFound or other), or if the pod failed with an unexpected reason.
 // Typically called to test that the passed-in pod is Pending and Unschedulable.
 func WaitForPodNameUnschedulableInNamespace(c clientset.Interface, podName, namespace string) error {
-	return WaitForPodCondition(c, namespace, podName, "Unschedulable", podStartTimeout, func(pod *v1.Pod) (bool, error) {
+	return WaitForPodCondition(c, namespace, podName, v1.PodReasonUnschedulable, podStartTimeout, func(pod *v1.Pod) (bool, error) {
 		// Only consider Failed pods. Successful pods will be deleted and detected in
 		// waitForPodCondition's Get call returning `IsNotFound`
 		if pod.Status.Phase == v1.PodPending {
 			for _, cond := range pod.Status.Conditions {
-				if cond.Type == v1.PodScheduled && cond.Status == v1.ConditionFalse && cond.Reason == "Unschedulable" {
+				if cond.Type == v1.PodScheduled && cond.Status == v1.ConditionFalse && cond.Reason == v1.PodReasonUnschedulable {
 					return true, nil
 				}
 			}
@@ -348,27 +346,6 @@ func WaitForPodRunningInNamespace(c clientset.Interface, pod *v1.Pod) error {
 	return WaitTimeoutForPodRunningInNamespace(c, pod.Name, pod.Namespace, podStartTimeout)
 }
 
-// WaitTimeoutForPodEvent waits the given timeout duration for a pod event to occur.
-func WaitTimeoutForPodEvent(c clientset.Interface, podName, namespace, eventSelector, msg string, timeout time.Duration) error {
-	return wait.PollImmediate(poll, timeout, eventOccurred(c, podName, namespace, eventSelector, msg))
-}
-
-func eventOccurred(c clientset.Interface, podName, namespace, eventSelector, msg string) wait.ConditionFunc {
-	options := metav1.ListOptions{FieldSelector: eventSelector}
-	return func() (bool, error) {
-		events, err := c.CoreV1().Events(namespace).List(options)
-		if err != nil {
-			return false, fmt.Errorf("got error while getting pod events: %s", err)
-		}
-		for _, event := range events.Items {
-			if strings.Contains(event.Message, msg) {
-				return true, nil
-			}
-		}
-		return false, nil
-	}
-}
-
 // WaitTimeoutForPodNoLongerRunningInNamespace waits the given timeout duration for the specified pod to stop.
 func WaitTimeoutForPodNoLongerRunningInNamespace(c clientset.Interface, podName, namespace string, timeout time.Duration) error {
 	return wait.PollImmediate(poll, timeout, podCompleted(c, podName, namespace))
@@ -410,7 +387,7 @@ func WaitForPodSuccessInNamespaceSlow(c clientset.Interface, podName string, nam
 func WaitForPodNotFoundInNamespace(c clientset.Interface, podName, ns string, timeout time.Duration) error {
 	return wait.PollImmediate(poll, timeout, func() (bool, error) {
 		_, err := c.CoreV1().Pods(ns).Get(podName, metav1.GetOptions{})
-		if apierrs.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			return true, nil // done
 		}
 		if err != nil {
@@ -556,49 +533,6 @@ func WaitForPodsWithLabelRunningReady(c clientset.Interface, ns string, label la
 			return true, nil
 		})
 	return pods, err
-}
-
-// WaitForPodsInactive waits until there are no active pods left in the PodStore.
-// This is to make a fair comparison of deletion time between DeleteRCAndPods
-// and DeleteRCAndWaitForGC, because the RC controller decreases status.replicas
-// when the pod is inactvie.
-func WaitForPodsInactive(ps *testutils.PodStore, interval, timeout time.Duration) error {
-	var activePods []*v1.Pod
-	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
-		pods := ps.List()
-		activePods = controller.FilterActivePods(pods)
-		if len(activePods) != 0 {
-			return false, nil
-		}
-		return true, nil
-	})
-
-	if err == wait.ErrWaitTimeout {
-		for _, pod := range activePods {
-			e2elog.Logf("ERROR: Pod %q running on %q is still active", pod.Name, pod.Spec.NodeName)
-		}
-		return fmt.Errorf("there are %d active pods. E.g. %q on node %q", len(activePods), activePods[0].Name, activePods[0].Spec.NodeName)
-	}
-	return err
-}
-
-// WaitForPodsGone waits until there are no pods left in the PodStore.
-func WaitForPodsGone(ps *testutils.PodStore, interval, timeout time.Duration) error {
-	var pods []*v1.Pod
-	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
-		if pods = ps.List(); len(pods) == 0 {
-			return true, nil
-		}
-		return false, nil
-	})
-
-	if err == wait.ErrWaitTimeout {
-		for _, pod := range pods {
-			e2elog.Logf("ERROR: Pod %q still exists. Node: %q", pod.Name, pod.Spec.NodeName)
-		}
-		return fmt.Errorf("there are %d pods left. E.g. %q on node %q", len(pods), pods[0].Name, pods[0].Spec.NodeName)
-	}
-	return err
 }
 
 // WaitForPodsReady waits for the pods to become ready.

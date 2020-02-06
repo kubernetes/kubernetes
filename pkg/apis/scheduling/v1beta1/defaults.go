@@ -19,7 +19,7 @@ package v1beta1
 import (
 	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/api/scheduling/v1beta1"
-	"k8s.io/apimachinery/pkg/runtime"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/features"
 )

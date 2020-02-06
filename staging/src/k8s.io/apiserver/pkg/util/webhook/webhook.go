@@ -18,6 +18,7 @@ limitations under the License.
 package webhook
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -35,9 +36,28 @@ import (
 // timeout of the HTTP request, including reading the response body.
 const defaultRequestTimeout = 30 * time.Second
 
+// GenericWebhook defines a generic client for webhooks with commonly used capabilities,
+// such as retry requests.
 type GenericWebhook struct {
 	RestClient     *rest.RESTClient
 	InitialBackoff time.Duration
+	ShouldRetry    func(error) bool
+}
+
+// DefaultShouldRetry is a default implementation for the GenericWebhook ShouldRetry function property.
+// If the error reason is one of: networking (connection reset) or http (InternalServerError (500), GatewayTimeout (504), TooManyRequests (429)),
+// or apierrors.SuggestsClientDelay() returns true, then the function advises a retry.
+// Otherwise it returns false for an immediate fail.
+func DefaultShouldRetry(err error) bool {
+	// these errors indicate a transient error that should be retried.
+	if net.IsConnectionReset(err) || apierrors.IsInternalError(err) || apierrors.IsTimeout(err) || apierrors.IsTooManyRequests(err) {
+		return true
+	}
+	// if the error sends the Retry-After header, we respect it as an explicit confirmation we should retry.
+	if _, shouldRetry := apierrors.SuggestsClientDelay(err); shouldRetry {
+		return true
+	}
+	return false
 }
 
 // NewGenericWebhook creates a new GenericWebhook from the provided kubeconfig file.
@@ -68,6 +88,10 @@ func newGenericWebhook(scheme *runtime.Scheme, codecFactory serializer.CodecFact
 	// Set this to something reasonable so request to webhooks don't hang forever.
 	clientConfig.Timeout = requestTimeout
 
+	// Avoid client-side rate limiting talking to the webhook backend.
+	// Rate limiting should happen when deciding how many requests to serve.
+	clientConfig.QPS = -1
+
 	codec := codecFactory.LegacyCodec(groupVersions...)
 	clientConfig.ContentConfig.NegotiatedSerializer = serializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{Serializer: codec})
 
@@ -76,23 +100,28 @@ func newGenericWebhook(scheme *runtime.Scheme, codecFactory serializer.CodecFact
 		return nil, err
 	}
 
-	return &GenericWebhook{restClient, initialBackoff}, nil
+	return &GenericWebhook{restClient, initialBackoff, DefaultShouldRetry}, nil
 }
 
 // WithExponentialBackoff will retry webhookFn() up to 5 times with exponentially increasing backoff when
-// it returns an error for which apierrors.SuggestsClientDelay() or apierrors.IsInternalError() returns true.
-func (g *GenericWebhook) WithExponentialBackoff(webhookFn func() rest.Result) rest.Result {
+// it returns an error for which this GenericWebhook's ShouldRetry function returns true, confirming it to
+// be retriable. If no ShouldRetry has been defined for the webhook, then the default one is used (DefaultShouldRetry).
+func (g *GenericWebhook) WithExponentialBackoff(ctx context.Context, webhookFn func() rest.Result) rest.Result {
 	var result rest.Result
-	WithExponentialBackoff(g.InitialBackoff, func() error {
+	shouldRetry := g.ShouldRetry
+	if shouldRetry == nil {
+		shouldRetry = DefaultShouldRetry
+	}
+	WithExponentialBackoff(ctx, g.InitialBackoff, func() error {
 		result = webhookFn()
 		return result.Error()
-	})
+	}, shouldRetry)
 	return result
 }
 
-// WithExponentialBackoff will retry webhookFn() up to 5 times with exponentially increasing backoff when
-// it returns an error for which apierrors.SuggestsClientDelay() or apierrors.IsInternalError() returns true.
-func WithExponentialBackoff(initialBackoff time.Duration, webhookFn func() error) error {
+// WithExponentialBackoff will retry webhookFn up to 5 times with exponentially increasing backoff when
+// it returns an error for which shouldRetry returns true, confirming it to be retriable.
+func WithExponentialBackoff(ctx context.Context, initialBackoff time.Duration, webhookFn func() error, shouldRetry func(error) bool) error {
 	backoff := wait.Backoff{
 		Duration: initialBackoff,
 		Factor:   1.5,
@@ -103,12 +132,11 @@ func WithExponentialBackoff(initialBackoff time.Duration, webhookFn func() error
 	var err error
 	wait.ExponentialBackoff(backoff, func() (bool, error) {
 		err = webhookFn()
-		// these errors indicate a transient error that should be retried.
-		if net.IsConnectionReset(err) || apierrors.IsInternalError(err) || apierrors.IsTimeout(err) || apierrors.IsTooManyRequests(err) {
-			return false, nil
+		if ctx.Err() != nil {
+			// we timed out or were cancelled, we should not retry
+			return true, err
 		}
-		// if the error sends the Retry-After header, we respect it as an explicit confirmation we should retry.
-		if _, shouldRetry := apierrors.SuggestsClientDelay(err); shouldRetry {
+		if shouldRetry(err) {
 			return false, nil
 		}
 		if err != nil {

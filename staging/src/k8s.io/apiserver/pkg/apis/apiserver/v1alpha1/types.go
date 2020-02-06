@@ -48,3 +48,63 @@ type AdmissionPluginConfiguration struct {
 	// +optional
 	Configuration *runtime.Unknown `json:"configuration"`
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// EgressSelectorConfiguration provides versioned configuration for egress selector clients.
+type EgressSelectorConfiguration struct {
+	metav1.TypeMeta `json:",inline"`
+
+	// connectionServices contains a list of egress selection client configurations
+	EgressSelections []EgressSelection `json:"egressSelections"`
+}
+
+// EgressSelection provides the configuration for a single egress selection client.
+type EgressSelection struct {
+	// name is the name of the egress selection.
+	// Currently supported values are "Master", "Etcd" and "Cluster"
+	Name string `json:"name"`
+
+	// connection is the exact information used to configure the egress selection
+	Connection Connection `json:"connection"`
+}
+
+// Connection provides the configuration for a single egress selection client.
+type Connection struct {
+	// type is the type of connection used to connect from client to network/konnectivity server.
+	// Currently supported values are "http-connect" and "direct".
+	Type string `json:"type"`
+
+	// httpConnect is the config needed to use http-connect to the konnectivity server.
+	// Absence when the type is "http-connect" will cause an error
+	// Presence when the type is "direct" will also cause an error
+	// +optional
+	HTTPConnect *HTTPConnectConfig `json:"httpConnect,omitempty"`
+}
+
+type HTTPConnectConfig struct {
+	// url is the location of the proxy server to connect to.
+	// As an example it might be "https://127.0.0.1:8131"
+	URL string `json:"url"`
+
+	// caBundle is the file location of the CA to be used to determine trust with the konnectivity server.
+	// Must be absent/empty http-connect using the plain http
+	// Must be configured for http-connect using the https protocol
+	// Misconfiguration will cause an error
+	// +optional
+	CABundle string `json:"caBundle,omitempty"`
+
+	// clientKey is the file location of the client key to be used in mtls handshakes with the konnectivity server.
+	// Must be absent/empty http-connect using the plain http
+	// Must be configured for http-connect using the https protocol
+	// Misconfiguration will cause an error
+	// +optional
+	ClientKey string `json:"clientKey,omitempty"`
+
+	// clientCert is the file location of the client certificate to be used in mtls handshakes with the konnectivity server.
+	// Must be absent/empty http-connect using the plain http
+	// Must be configured for http-connect using the https protocol
+	// Misconfiguration will cause an error
+	// +optional
+	ClientCert string `json:"clientCert,omitempty"`
+}

@@ -25,22 +25,27 @@ import (
 	"k8s.io/apiserver/pkg/server/httplog"
 )
 
-// WithPanicRecovery wraps an http Handler to recover and log panics.
+// WithPanicRecovery wraps an http Handler to recover and log panics (except in the special case of http.ErrAbortHandler panics, which suppress logging).
 func WithPanicRecovery(handler http.Handler) http.Handler {
 	return withPanicRecovery(handler, func(w http.ResponseWriter, req *http.Request, err interface{}) {
+		if err == http.ErrAbortHandler {
+			// honor the http.ErrAbortHandler sentinel panic value:
+			//   ErrAbortHandler is a sentinel panic value to abort a handler.
+			//   While any panic from ServeHTTP aborts the response to the client,
+			//   panicking with ErrAbortHandler also suppresses logging of a stack trace to the server's error log.
+			return
+		}
 		http.Error(w, "This request caused apiserver to panic. Look in the logs for details.", http.StatusInternalServerError)
 		klog.Errorf("apiserver panic'd on %v %v", req.Method, req.RequestURI)
 	})
 }
 
 func withPanicRecovery(handler http.Handler, crashHandler func(http.ResponseWriter, *http.Request, interface{})) http.Handler {
+	handler = httplog.WithLogging(handler, httplog.DefaultStacktracePred)
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		defer runtime.HandleCrash(func(err interface{}) {
 			crashHandler(w, req, err)
 		})
-
-		logger := httplog.NewLogged(req, &w)
-		defer logger.Log()
 
 		// Dispatch to the internal handler
 		handler.ServeHTTP(w, req)

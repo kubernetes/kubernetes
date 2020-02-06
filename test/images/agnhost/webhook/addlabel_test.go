@@ -22,7 +22,7 @@ import (
 	"testing"
 
 	jsonpatch "github.com/evanphx/json-patch"
-	"k8s.io/api/admission/v1beta1"
+	"k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -58,7 +58,7 @@ func TestAddLabel(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			review := v1beta1.AdmissionReview{Request: &v1beta1.AdmissionRequest{Object: runtime.RawExtension{Raw: raw}}}
+			review := v1.AdmissionReview{Request: &v1.AdmissionRequest{Object: runtime.RawExtension{Raw: raw}}}
 			response := addLabel(review)
 			if response.Patch != nil {
 				patchObj, err := jsonpatch.DecodePatch([]byte(response.Patch))

@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
@@ -42,7 +41,7 @@ var _ = framework.KubeDescribe("Container Runtime", func() {
 			/*
 				Release : v1.13
 				Testname: Container Runtime, Restart Policy, Pod Phases
-				Description: If the restart policy is set to ‘Always’, Pod MUST be restarted when terminated, If restart policy is ‘OnFailure’, Pod MUST be started only if it is terminated with non-zero exit code. If the restart policy is ‘Never’, Pod MUST never be restarted. All these three test cases MUST verify the restart counts accordingly.
+				Description: If the restart policy is set to 'Always', Pod MUST be restarted when terminated, If restart policy is 'OnFailure', Pod MUST be started only if it is terminated with non-zero exit code. If the restart policy is 'Never', Pod MUST never be restarted. All these three test cases MUST verify the restart counts accordingly.
 			*/
 			framework.ConformanceIt("should run with the expected status [NodeConformance]", func() {
 				restartCountVolumeName := "restart-count"
@@ -112,7 +111,9 @@ while true; do sleep 1; done
 					gomega.Eventually(terminateContainer.GetPhase, ContainerStatusRetryTimeout, ContainerStatusPollInterval).Should(gomega.Equal(testCase.Phase))
 
 					ginkgo.By(fmt.Sprintf("Container '%s': should get the expected 'Ready' condition", testContainer.Name))
-					gomega.Expect(terminateContainer.IsReady()).Should(gomega.Equal(testCase.Ready))
+					isReady, err := terminateContainer.IsReady()
+					framework.ExpectEqual(isReady, testCase.Ready)
+					framework.ExpectNoError(err)
 
 					status, err := terminateContainer.GetStatus()
 					framework.ExpectNoError(err)
@@ -130,6 +131,8 @@ while true; do sleep 1; done
 		ginkgo.Context("on terminated container", func() {
 			rootUser := int64(0)
 			nonRootUser := int64(10000)
+			adminUserName := "ContainerAdministrator"
+			nonAdminUserName := "ContainerUser"
 
 			// Create and then terminate the container under defined PodPhase to verify if termination message matches the expected output. Lastly delete the created container.
 			matchTerminationMessage := func(container v1.Container, expectedPhase v1.PodPhase, expectedMsg gomegatypes.GomegaMatcher) {
@@ -155,7 +158,7 @@ while true; do sleep 1; done
 				framework.ExpectEqual(GetContainerState(status.State), ContainerStateTerminated)
 
 				ginkgo.By("the termination message should be set")
-				e2elog.Logf("Expected: %v to match Container's Termination Message: %v --", expectedMsg, status.State.Terminated.Message)
+				framework.Logf("Expected: %v to match Container's Termination Message: %v --", expectedMsg, status.State.Terminated.Message)
 				gomega.Expect(status.State.Terminated.Message).Should(expectedMsg)
 
 				ginkgo.By("delete the container")
@@ -164,14 +167,19 @@ while true; do sleep 1; done
 
 			ginkgo.It("should report termination message [LinuxOnly] if TerminationMessagePath is set [NodeConformance]", func() {
 				// Cannot mount files in Windows Containers.
+				// TODO(claudiub): Remove [LinuxOnly] tag once Containerd becomes the default
+				// container runtime on Windows.
 				container := v1.Container{
 					Image:                  framework.BusyBoxImage,
 					Command:                []string{"/bin/sh", "-c"},
 					Args:                   []string{"/bin/echo -n DONE > /dev/termination-log"},
 					TerminationMessagePath: "/dev/termination-log",
-					SecurityContext: &v1.SecurityContext{
-						RunAsUser: &rootUser,
-					},
+					SecurityContext:        &v1.SecurityContext{},
+				}
+				if framework.NodeOSDistroIs("windows") {
+					container.SecurityContext.WindowsOptions = &v1.WindowsSecurityContextOptions{RunAsUserName: &adminUserName}
+				} else {
+					container.SecurityContext.RunAsUser = &rootUser
 				}
 				matchTerminationMessage(container, v1.PodSucceeded, gomega.Equal("DONE"))
 			})
@@ -183,14 +191,19 @@ while true; do sleep 1; done
 				[LinuxOnly]: Tagged LinuxOnly due to use of 'uid' and unable to mount files in Windows Containers.
 			*/
 			framework.ConformanceIt("should report termination message [LinuxOnly] if TerminationMessagePath is set as non-root user and at a non-default path [NodeConformance]", func() {
+				// TODO(claudiub): Remove [LinuxOnly] tag once Containerd becomes the default
+				// container runtime on Windows
 				container := v1.Container{
 					Image:                  framework.BusyBoxImage,
 					Command:                []string{"/bin/sh", "-c"},
 					Args:                   []string{"/bin/echo -n DONE > /dev/termination-custom-log"},
 					TerminationMessagePath: "/dev/termination-custom-log",
-					SecurityContext: &v1.SecurityContext{
-						RunAsUser: &nonRootUser,
-					},
+					SecurityContext:        &v1.SecurityContext{},
+				}
+				if framework.NodeOSDistroIs("windows") {
+					container.SecurityContext.WindowsOptions = &v1.WindowsSecurityContextOptions{RunAsUserName: &nonAdminUserName}
+				} else {
+					container.SecurityContext.RunAsUser = &nonRootUser
 				}
 				matchTerminationMessage(container, v1.PodSucceeded, gomega.Equal("DONE"))
 			})
@@ -346,9 +359,9 @@ while true; do sleep 1; done
 						break
 					}
 					if i < flakeRetry {
-						e2elog.Logf("No.%d attempt failed: %v, retrying...", i, err)
+						framework.Logf("No.%d attempt failed: %v, retrying...", i, err)
 					} else {
-						e2elog.Failf("All %d attempts failed: %v", flakeRetry, err)
+						framework.Failf("All %d attempts failed: %v", flakeRetry, err)
 					}
 				}
 			}
@@ -358,30 +371,10 @@ while true; do sleep 1; done
 				imagePullTest(image, false, v1.PodPending, true, false)
 			})
 
-			ginkgo.It("should not be able to pull non-existing image from gcr.io [NodeConformance]", func() {
-				image := imageutils.GetE2EImage(imageutils.Invalid)
-				imagePullTest(image, false, v1.PodPending, true, false)
-			})
-
-			ginkgo.It("should be able to pull image from gcr.io [NodeConformance]", func() {
-				image := imageutils.GetE2EImage(imageutils.DebianBase)
-				isWindows := false
-				if framework.NodeOSDistroIs("windows") {
-					image = imageutils.GetE2EImage(imageutils.WindowsNanoServer)
-					isWindows = true
-				}
-				imagePullTest(image, false, v1.PodRunning, false, isWindows)
-			})
-
-			ginkgo.It("should be able to pull image from docker hub [NodeConformance]", func() {
-				image := imageutils.GetE2EImage(imageutils.Alpine)
-				isWindows := false
-				if framework.NodeOSDistroIs("windows") {
-					// TODO(claudiub): Switch to nanoserver image manifest list.
-					image = "e2eteam/busybox:1.29"
-					isWindows = true
-				}
-				imagePullTest(image, false, v1.PodRunning, false, isWindows)
+			ginkgo.It("should be able to pull image [NodeConformance]", func() {
+				// NOTE(claudiub): The agnhost image is supposed to work on both Linux and Windows.
+				image := imageutils.GetE2EImage(imageutils.Agnhost)
+				imagePullTest(image, false, v1.PodRunning, false, false)
 			})
 
 			ginkgo.It("should not be able to pull from private registry without secret [NodeConformance]", func() {

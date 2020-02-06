@@ -17,6 +17,7 @@ limitations under the License.
 package auth
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strings"
@@ -29,7 +30,6 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -38,7 +38,7 @@ import (
 // TODO(etune): remove this test once a more comprehensive built-in authorizer is implemented.
 type sarAuthorizer struct{}
 
-func (sarAuthorizer) Authorize(a authorizer.Attributes) (authorizer.Decision, string, error) {
+func (sarAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
 	if a.GetUser().GetName() == "dave" {
 		return authorizer.DecisionNoOpinion, "no", errors.New("I'm sorry, Dave")
 	}
@@ -61,7 +61,7 @@ func TestSubjectAccessReview(t *testing.T) {
 	_, s, closeFn := framework.RunAMaster(masterConfig)
 	defer closeFn()
 
-	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Groups[api.GroupName].GroupVersion()}})
+	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL})
 
 	tests := []struct {
 		name           string
@@ -156,7 +156,7 @@ func TestSelfSubjectAccessReview(t *testing.T) {
 	_, s, closeFn := framework.RunAMaster(masterConfig)
 	defer closeFn()
 
-	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Groups[api.GroupName].GroupVersion()}})
+	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL})
 
 	tests := []struct {
 		name           string
@@ -235,7 +235,7 @@ func TestLocalSubjectAccessReview(t *testing.T) {
 	_, s, closeFn := framework.RunAMaster(masterConfig)
 	defer closeFn()
 
-	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Groups[api.GroupName].GroupVersion()}})
+	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL})
 
 	tests := []struct {
 		name           string

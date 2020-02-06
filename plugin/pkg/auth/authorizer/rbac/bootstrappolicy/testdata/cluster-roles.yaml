@@ -236,11 +236,13 @@ items:
     - configmaps
     - endpoints
     - persistentvolumeclaims
+    - persistentvolumeclaims/status
     - pods
     - replicationcontrollers
     - replicationcontrollers/scale
     - serviceaccounts
     - services
+    - services/status
     verbs:
     - get
     - list
@@ -274,12 +276,16 @@ items:
     resources:
     - controllerrevisions
     - daemonsets
+    - daemonsets/status
     - deployments
     - deployments/scale
+    - deployments/status
     - replicasets
     - replicasets/scale
+    - replicasets/status
     - statefulsets
     - statefulsets/scale
+    - statefulsets/status
     verbs:
     - get
     - list
@@ -288,6 +294,7 @@ items:
     - autoscaling
     resources:
     - horizontalpodautoscalers
+    - horizontalpodautoscalers/status
     verbs:
     - get
     - list
@@ -296,7 +303,9 @@ items:
     - batch
     resources:
     - cronjobs
+    - cronjobs/status
     - jobs
+    - jobs/status
     verbs:
     - get
     - list
@@ -305,12 +314,16 @@ items:
     - extensions
     resources:
     - daemonsets
+    - daemonsets/status
     - deployments
     - deployments/scale
+    - deployments/status
     - ingresses
+    - ingresses/status
     - networkpolicies
     - replicasets
     - replicasets/scale
+    - replicasets/status
     - replicationcontrollers/scale
     verbs:
     - get
@@ -320,6 +333,7 @@ items:
     - policy
     resources:
     - poddisruptionbudgets
+    - poddisruptionbudgets/status
     verbs:
     - get
     - list
@@ -328,6 +342,7 @@ items:
     - networking.k8s.io
     resources:
     - ingresses
+    - ingresses/status
     - networkpolicies
     verbs:
     - get
@@ -412,119 +427,6 @@ items:
     creationTimestamp: null
     labels:
       kubernetes.io/bootstrapping: rbac-defaults
-    name: system:csi-external-attacher
-  rules:
-  - apiGroups:
-    - ""
-    resources:
-    - persistentvolumes
-    verbs:
-    - get
-    - list
-    - patch
-    - update
-    - watch
-  - apiGroups:
-    - ""
-    resources:
-    - nodes
-    verbs:
-    - get
-    - list
-    - watch
-  - apiGroups:
-    - storage.k8s.io
-    resources:
-    - volumeattachments
-    verbs:
-    - get
-    - list
-    - patch
-    - update
-    - watch
-  - apiGroups:
-    - ""
-    resources:
-    - events
-    verbs:
-    - create
-    - get
-    - list
-    - patch
-    - update
-    - watch
-- apiVersion: rbac.authorization.k8s.io/v1
-  kind: ClusterRole
-  metadata:
-    annotations:
-      rbac.authorization.kubernetes.io/autoupdate: "true"
-    creationTimestamp: null
-    labels:
-      kubernetes.io/bootstrapping: rbac-defaults
-    name: system:csi-external-provisioner
-  rules:
-  - apiGroups:
-    - ""
-    resources:
-    - persistentvolumes
-    verbs:
-    - create
-    - delete
-    - get
-    - list
-    - watch
-  - apiGroups:
-    - ""
-    resources:
-    - persistentvolumeclaims
-    verbs:
-    - get
-    - list
-    - patch
-    - update
-    - watch
-  - apiGroups:
-    - storage.k8s.io
-    resources:
-    - storageclasses
-    verbs:
-    - list
-    - watch
-  - apiGroups:
-    - ""
-    resources:
-    - events
-    verbs:
-    - create
-    - get
-    - list
-    - patch
-    - update
-    - watch
-  - apiGroups:
-    - ""
-    resources:
-    - nodes
-    verbs:
-    - get
-    - list
-    - watch
-  - apiGroups:
-    - storage.k8s.io
-    resources:
-    - csinodes
-    verbs:
-    - get
-    - list
-    - watch
-- apiVersion: rbac.authorization.k8s.io/v1
-  kind: ClusterRole
-  metadata:
-    annotations:
-      rbac.authorization.kubernetes.io/autoupdate: "true"
-    creationTimestamp: null
-    labels:
-      kubernetes.io/bootstrapping: rbac-defaults
     name: system:discovery
   rules:
   - nonResourceURLs:
@@ -533,6 +435,7 @@ items:
     - /apis
     - /apis/*
     - /healthz
+    - /livez
     - /openapi
     - /openapi/*
     - /readyz
@@ -600,6 +503,7 @@ items:
   rules:
   - apiGroups:
     - ""
+    - events.k8s.io
     resources:
     - events
     verbs:
@@ -607,9 +511,38 @@ items:
     - patch
     - update
   - apiGroups:
+    - coordination.k8s.io
+    resources:
+    - leases
+    verbs:
+    - create
+  - apiGroups:
+    - coordination.k8s.io
+    resourceNames:
+    - kube-controller-manager
+    resources:
+    - leases
+    verbs:
+    - get
+    - update
+  - apiGroups:
     - ""
     resources:
     - endpoints
+    verbs:
+    - create
+  - apiGroups:
+    - ""
+    resourceNames:
+    - kube-controller-manager
+    resources:
+    - endpoints
+    verbs:
+    - get
+    - update
+  - apiGroups:
+    - ""
+    resources:
     - secrets
     - serviceaccounts
     verbs:
@@ -624,7 +557,6 @@ items:
     - ""
     resources:
     - configmaps
-    - endpoints
     - namespaces
     - secrets
     - serviceaccounts
@@ -633,7 +565,6 @@ items:
   - apiGroups:
     - ""
     resources:
-    - endpoints
     - secrets
     - serviceaccounts
     verbs:
@@ -693,11 +624,27 @@ items:
   rules:
   - apiGroups:
     - ""
+    - events.k8s.io
     resources:
     - events
     verbs:
     - create
     - patch
+    - update
+  - apiGroups:
+    - coordination.k8s.io
+    resources:
+    - leases
+    verbs:
+    - create
+  - apiGroups:
+    - coordination.k8s.io
+    resourceNames:
+    - kube-scheduler
+    resources:
+    - leases
+    verbs:
+    - get
     - update
   - apiGroups:
     - ""
@@ -712,9 +659,7 @@ items:
     resources:
     - endpoints
     verbs:
-    - delete
     - get
-    - patch
     - update
   - apiGroups:
     - ""
@@ -966,6 +911,16 @@ items:
     - list
     - watch
   - apiGroups:
+    - coordination.k8s.io
+    resources:
+    - leases
+    verbs:
+    - create
+    - delete
+    - get
+    - patch
+    - update
+  - apiGroups:
     - storage.k8s.io
     resources:
     - volumeattachments
@@ -997,16 +952,6 @@ items:
     - storage.k8s.io
     resources:
     - csinodes
-    verbs:
-    - create
-    - delete
-    - get
-    - patch
-    - update
-  - apiGroups:
-    - coordination.k8s.io
-    resources:
-    - leases
     verbs:
     - create
     - delete
@@ -1064,6 +1009,7 @@ items:
     - patch
   - apiGroups:
     - ""
+    - events.k8s.io
     resources:
     - events
     verbs:
@@ -1094,14 +1040,24 @@ items:
     - nodes
     verbs:
     - get
+    - list
+    - watch
   - apiGroups:
     - ""
+    - events.k8s.io
     resources:
     - events
     verbs:
     - create
     - patch
     - update
+  - apiGroups:
+    - discovery.k8s.io
+    resources:
+    - endpointslices
+    verbs:
+    - list
+    - watch
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: ClusterRole
   metadata:
@@ -1147,6 +1103,7 @@ items:
     - watch
   - apiGroups:
     - ""
+    - events.k8s.io
     resources:
     - events
     verbs:
@@ -1165,6 +1122,7 @@ items:
   rules:
   - nonResourceURLs:
     - /healthz
+    - /livez
     - /readyz
     - /version
     - /version/

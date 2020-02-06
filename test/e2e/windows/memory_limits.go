@@ -35,7 +35,8 @@ import (
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
@@ -48,7 +49,7 @@ var _ = SIGDescribe("[Feature:Windows] Memory Limits [Serial] [Slow]", func() {
 
 	ginkgo.BeforeEach(func() {
 		// NOTE(vyta): these tests are Windows specific
-		framework.SkipUnlessNodeOSDistroIs("windows")
+		e2eskipper.SkipUnlessNodeOSDistroIs("windows")
 	})
 
 	ginkgo.Context("Allocatable node memory", func() {
@@ -85,10 +86,10 @@ type nodeMemory struct {
 func checkNodeAllocatableTest(f *framework.Framework) {
 
 	nodeMem := getNodeMemory(f)
-	e2elog.Logf("nodeMem says: %+v", nodeMem)
+	framework.Logf("nodeMem says: %+v", nodeMem)
 
 	// calculate the allocatable mem based on capacity - reserved amounts
-	calculatedNodeAlloc := nodeMem.capacity.Copy()
+	calculatedNodeAlloc := nodeMem.capacity.DeepCopy()
 	calculatedNodeAlloc.Sub(nodeMem.systemReserve)
 	calculatedNodeAlloc.Sub(nodeMem.kubeReserve)
 	calculatedNodeAlloc.Sub(nodeMem.softEviction)
@@ -126,7 +127,7 @@ func overrideAllocatableMemoryTest(f *framework.Framework, allocatablePods int) 
 		for _, e := range eventList.Items {
 			// Look for an event that shows FailedScheduling
 			if e.Type == "Warning" && e.Reason == "FailedScheduling" && e.InvolvedObject.Name == failurePods[0].ObjectMeta.Name {
-				e2elog.Logf("Found %+v event with message %+v", e.Reason, e.Message)
+				framework.Logf("Found %+v event with message %+v", e.Reason, e.Message)
 				return true
 			}
 		}
@@ -187,7 +188,7 @@ func getNodeMemory(f *framework.Framework) nodeMemory {
 
 	// Assuming that agent nodes have the same config
 	// Make sure there is >0 agent nodes, then use the first one for info
-	gomega.Expect(nodeList.Size()).NotTo(gomega.Equal(0))
+	framework.ExpectNotEqual(nodeList.Size(), 0)
 
 	ginkgo.By("Getting memory details from node status and kubelet config")
 
@@ -195,7 +196,7 @@ func getNodeMemory(f *framework.Framework) nodeMemory {
 
 	nodeName := nodeList.Items[0].ObjectMeta.Name
 
-	kubeletConfig, err := getCurrentKubeletConfig(nodeName)
+	kubeletConfig, err := getCurrentKubeletConfig(nodeName, f.Namespace.Name)
 	framework.ExpectNoError(err)
 
 	systemReserve, err := resource.ParseQuantity(kubeletConfig.SystemReserved["memory"])
@@ -250,9 +251,9 @@ func getTotalAllocatableMemory(f *framework.Framework) *resource.Quantity {
 }
 
 // getCurrentKubeletConfig modified from test/e2e_node/util.go
-func getCurrentKubeletConfig(nodeName string) (*kubeletconfig.KubeletConfiguration, error) {
+func getCurrentKubeletConfig(nodeName, namespace string) (*kubeletconfig.KubeletConfiguration, error) {
 
-	resp := pollConfigz(5*time.Minute, 5*time.Second, nodeName)
+	resp := pollConfigz(5*time.Minute, 5*time.Second, nodeName, namespace)
 	kubeCfg, err := decodeConfigz(resp)
 	if err != nil {
 		return nil, err
@@ -261,10 +262,11 @@ func getCurrentKubeletConfig(nodeName string) (*kubeletconfig.KubeletConfigurati
 }
 
 // Causes the test to fail, or returns a status 200 response from the /configz endpoint
-func pollConfigz(timeout time.Duration, pollInterval time.Duration, nodeName string) *http.Response {
+func pollConfigz(timeout time.Duration, pollInterval time.Duration, nodeName, namespace string) *http.Response {
 	// start local proxy, so we can send graceful deletion over query string, rather than body parameter
 	ginkgo.By("Opening proxy to cluster")
-	cmd := framework.KubectlCmd("proxy", "-p", "0")
+	tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, namespace)
+	cmd := tk.KubectlCmd("proxy", "-p", "0")
 	stdout, stderr, err := framework.StartCmdAndStreamOutput(cmd)
 	framework.ExpectNoError(err)
 	defer stdout.Close()
@@ -294,11 +296,11 @@ func pollConfigz(timeout time.Duration, pollInterval time.Duration, nodeName str
 	gomega.Eventually(func() bool {
 		resp, err = client.Do(req)
 		if err != nil {
-			e2elog.Logf("Failed to get /configz, retrying. Error: %v", err)
+			framework.Logf("Failed to get /configz, retrying. Error: %v", err)
 			return false
 		}
 		if resp.StatusCode != 200 {
-			e2elog.Logf("/configz response status not 200, retrying. Response was: %+v", resp)
+			framework.Logf("/configz response status not 200, retrying. Response was: %+v", resp)
 			return false
 		}
 

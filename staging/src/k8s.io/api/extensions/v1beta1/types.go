@@ -67,13 +67,6 @@ type Scale struct {
 	Status ScaleStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
 
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// Dummy definition
-type ReplicationControllerDummy struct {
-	metav1.TypeMeta `json:",inline"`
-}
-
 // +genclient
 // +genclient:method=GetScale,verb=get,subresource=scale,result=Scale
 // +genclient:method=UpdateScale,verb=update,subresource=scale,input=Scale,result=Scale
@@ -930,7 +923,6 @@ type PodSecurityPolicySpec struct {
 	AllowedFlexVolumes []AllowedFlexVolume `json:"allowedFlexVolumes,omitempty" protobuf:"bytes,18,rep,name=allowedFlexVolumes"`
 	// AllowedCSIDrivers is a whitelist of inline CSI drivers that must be explicitly set to be embedded within a pod spec.
 	// An empty value indicates that any CSI driver can be used for inline ephemeral volumes.
-	// This is an alpha field, and is only honored if the API server enables the CSIInlineVolume feature gate.
 	// +optional
 	AllowedCSIDrivers []AllowedCSIDriver `json:"allowedCSIDrivers,omitempty" protobuf:"bytes,23,rep,name=allowedCSIDrivers"`
 	// allowedUnsafeSysctls is a list of explicitly allowed unsafe sysctls, defaults to none.
@@ -986,7 +978,7 @@ type AllowedHostPath struct {
 // Deprecated: use FSType from policy API Group instead.
 type FSType string
 
-var (
+const (
 	AzureFile             FSType = "azureFile"
 	Flocker               FSType = "flocker"
 	FlexVolume            FSType = "flexVolume"
@@ -1297,7 +1289,7 @@ type NetworkPolicyIngressRule struct {
 	// List of sources which should be able to access the pods selected for this rule.
 	// Items in this list are combined using a logical OR operation.
 	// If this field is empty or missing, this rule matches all sources (traffic not restricted by source).
-	// If this field is present and contains at least on item, this rule allows traffic only if the
+	// If this field is present and contains at least one item, this rule allows traffic only if the
 	// traffic matches at least one item in the from list.
 	// +optional
 	From []NetworkPolicyPeer `json:"from,omitempty" protobuf:"bytes,2,rep,name=from"`
@@ -1342,15 +1334,15 @@ type NetworkPolicyPort struct {
 }
 
 // DEPRECATED 1.9 - This group version of IPBlock is deprecated by networking/v1/IPBlock.
-// IPBlock describes a particular CIDR (Ex. "192.168.1.1/24") that is allowed to the pods
-// matched by a NetworkPolicySpec's podSelector. The except entry describes CIDRs that should
-// not be included within this rule.
+// IPBlock describes a particular CIDR (Ex. "192.168.1.1/24","2001:db9::/64") that is allowed
+// to the pods matched by a NetworkPolicySpec's podSelector. The except entry describes CIDRs
+// that should not be included within this rule.
 type IPBlock struct {
 	// CIDR is a string representing the IP Block
-	// Valid examples are "192.168.1.1/24"
+	// Valid examples are "192.168.1.1/24" or "2001:db9::/64"
 	CIDR string `json:"cidr" protobuf:"bytes,1,name=cidr"`
 	// Except is a slice of CIDRs that should not be included within an IP Block
-	// Valid examples are "192.168.1.1/24"
+	// Valid examples are "192.168.1.1/24" or "2001:db9::/64"
 	// Except values will be rejected if they are outside the CIDR range
 	// +optional
 	Except []string `json:"except,omitempty" protobuf:"bytes,2,rep,name=except"`

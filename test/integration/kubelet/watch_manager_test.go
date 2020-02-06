@@ -40,6 +40,7 @@ func TestWatchBasedManager(t *testing.T) {
 	defer server.TearDownFn()
 
 	server.ClientConfig.QPS = 10000
+	server.ClientConfig.Burst = 10000
 	client, err := kubernetes.NewForConfig(server.ClientConfig)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -60,6 +61,7 @@ func TestWatchBasedManager(t *testing.T) {
 	// create 1000 secrets in parallel
 	t.Log(time.Now(), "creating 1000 secrets")
 	wg := sync.WaitGroup{}
+	errCh := make(chan error, 1)
 	for i := 0; i < 10; i++ {
 		wg.Add(1)
 		go func(i int) {
@@ -67,17 +69,27 @@ func TestWatchBasedManager(t *testing.T) {
 			for j := 0; j < 100; j++ {
 				name := fmt.Sprintf("s%d", i*100+j)
 				if _, err := client.CoreV1().Secrets(testNamespace).Create(&v1.Secret{ObjectMeta: metav1.ObjectMeta{Name: name}}); err != nil {
-					t.Fatal(err)
+					select {
+					case errCh <- err:
+					default:
+					}
 				}
 			}
 			fmt.Print(".")
 		}(i)
 	}
+
 	wg.Wait()
+	select {
+	case err := <-errCh:
+		t.Fatal(err)
+	default:
+	}
 	t.Log(time.Now(), "finished creating 1000 secrets")
 
 	// fetch all secrets
 	wg = sync.WaitGroup{}
+	errCh = make(chan error, 1)
 	for i := 0; i < 10; i++ {
 		wg.Add(1)
 		go func(i int) {
@@ -98,7 +110,10 @@ func TestWatchBasedManager(t *testing.T) {
 					return true, nil
 				})
 				if err != nil {
-					t.Fatalf("failed on %s: %v", name, err)
+					select {
+					case errCh <- fmt.Errorf("failed on :%s: %v", name, err):
+					default:
+					}
 				}
 				if d := time.Since(start); d > time.Second {
 					t.Logf("%s took %v", name, d)
@@ -106,5 +121,11 @@ func TestWatchBasedManager(t *testing.T) {
 			}
 		}(i)
 	}
+
 	wg.Wait()
+	select {
+	case err = <-errCh:
+		t.Fatal(err)
+	default:
+	}
 }

@@ -34,6 +34,7 @@ filegroup(
         ":package-srcs",
         "//pkg/apis/admissionregistration/fuzzer:all-srcs",
         "//pkg/apis/admissionregistration/install:all-srcs",
+        "//pkg/apis/admissionregistration/v1:all-srcs",
         "//pkg/apis/admissionregistration/v1beta1:all-srcs",
         "//pkg/apis/admissionregistration/validation:all-srcs",
     ],

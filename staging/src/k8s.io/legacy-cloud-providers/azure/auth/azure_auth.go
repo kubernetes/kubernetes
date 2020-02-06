@@ -21,11 +21,18 @@ import (
 	"crypto/x509"
 	"fmt"
 	"io/ioutil"
+	"strings"
 
 	"github.com/Azure/go-autorest/autorest/adal"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"golang.org/x/crypto/pkcs12"
+
 	"k8s.io/klog"
+)
+
+const (
+	// ADFSIdentitySystem is the override value for tenantID on Azure Stack clouds.
+	ADFSIdentitySystem = "adfs"
 )
 
 var (
@@ -55,10 +62,23 @@ type AzureAuthConfig struct {
 	UserAssignedIdentityID string `json:"userAssignedIdentityID,omitempty" yaml:"userAssignedIdentityID,omitempty"`
 	// The ID of the Azure Subscription that the cluster is deployed in
 	SubscriptionID string `json:"subscriptionId,omitempty" yaml:"subscriptionId,omitempty"`
+	// IdentitySystem indicates the identity provider. Relevant only to hybrid clouds (Azure Stack).
+	// Allowed values are 'azure_ad' (default), 'adfs'.
+	IdentitySystem string `json:"identitySystem,omitempty" yaml:"identitySystem,omitempty"`
+	// ResourceManagerEndpoint is the cloud's resource manager endpoint. If set, cloud provider queries this endpoint
+	// in order to generate an autorest.Environment instance instead of using one of the pre-defined Environments.
+	ResourceManagerEndpoint string `json:"resourceManagerEndpoint,omitempty" yaml:"resourceManagerEndpoint,omitempty"`
 }
 
 // GetServicePrincipalToken creates a new service principal token based on the configuration
 func GetServicePrincipalToken(config *AzureAuthConfig, env *azure.Environment) (*adal.ServicePrincipalToken, error) {
+	var tenantID string
+	if strings.EqualFold(config.IdentitySystem, ADFSIdentitySystem) {
+		tenantID = ADFSIdentitySystem
+	} else {
+		tenantID = config.TenantID
+	}
+
 	if config.UseManagedIdentityExtension {
 		klog.V(2).Infoln("azure: using managed identity extension to retrieve access token")
 		msiEndpoint, err := adal.GetMSIVMEndpoint()
@@ -77,7 +97,7 @@ func GetServicePrincipalToken(config *AzureAuthConfig, env *azure.Environment) (
 			env.ServiceManagementEndpoint)
 	}
 
-	oauthConfig, err := adal.NewOAuthConfig(env.ActiveDirectoryEndpoint, config.TenantID)
+	oauthConfig, err := adal.NewOAuthConfig(env.ActiveDirectoryEndpoint, tenantID)
 	if err != nil {
 		return nil, fmt.Errorf("creating the OAuth config: %v", err)
 	}
@@ -112,13 +132,24 @@ func GetServicePrincipalToken(config *AzureAuthConfig, env *azure.Environment) (
 	return nil, ErrorNoAuth
 }
 
-// ParseAzureEnvironment returns azure environment by name
-func ParseAzureEnvironment(cloudName string) (*azure.Environment, error) {
+// ParseAzureEnvironment returns the azure environment.
+// If 'resourceManagerEndpoint' is set, the environment is computed by quering the cloud's resource manager endpoint.
+// Otherwise, a pre-defined Environment is looked up by name.
+func ParseAzureEnvironment(cloudName, resourceManagerEndpoint, identitySystem string) (*azure.Environment, error) {
 	var env azure.Environment
 	var err error
-	if cloudName == "" {
+	if resourceManagerEndpoint != "" {
+		klog.V(4).Infof("Loading environment from resource manager endpoint: %s", resourceManagerEndpoint)
+		nameOverride := azure.OverrideProperty{Key: azure.EnvironmentName, Value: cloudName}
+		env, err = azure.EnvironmentFromURL(resourceManagerEndpoint, nameOverride)
+		if err == nil {
+			azureStackOverrides(&env, resourceManagerEndpoint, identitySystem)
+		}
+	} else if cloudName == "" {
+		klog.V(4).Info("Using public cloud environment")
 		env = azure.PublicCloud
 	} else {
+		klog.V(4).Infof("Using %s environment", cloudName)
 		env, err = azure.EnvironmentFromName(cloudName)
 	}
 	return &env, err
@@ -137,4 +168,16 @@ func decodePkcs12(pkcs []byte, password string) (*x509.Certificate, *rsa.Private
 	}
 
 	return certificate, rsaPrivateKey, nil
+}
+
+// azureStackOverrides ensures that the Environment matches what AKSe currently generates for Azure Stack
+func azureStackOverrides(env *azure.Environment, resourceManagerEndpoint, identitySystem string) {
+	env.ManagementPortalURL = strings.Replace(resourceManagerEndpoint, "https://management.", "https://portal.", -1)
+	env.ServiceManagementEndpoint = env.TokenAudience
+	env.ResourceManagerVMDNSSuffix = strings.Replace(resourceManagerEndpoint, "https://management.", "cloudapp.", -1)
+	env.ResourceManagerVMDNSSuffix = strings.TrimSuffix(env.ResourceManagerVMDNSSuffix, "/")
+	if strings.EqualFold(identitySystem, ADFSIdentitySystem) {
+		env.ActiveDirectoryEndpoint = strings.TrimSuffix(env.ActiveDirectoryEndpoint, "/")
+		env.ActiveDirectoryEndpoint = strings.TrimSuffix(env.ActiveDirectoryEndpoint, "adfs")
+	}
 }

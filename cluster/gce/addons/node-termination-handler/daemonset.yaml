@@ -17,8 +17,6 @@ spec:
     metadata:
       labels:
         k8s-app: node-termination-handler
-      annotations:
-        scheduler.alpha.kubernetes.io/critical-pod: ''
     spec:
       priorityClassName: system-node-critical
       # Necessary to reboot node

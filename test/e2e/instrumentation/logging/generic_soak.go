@@ -23,14 +23,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/config"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	instrumentation "k8s.io/kubernetes/test/e2e/instrumentation/common"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+
+	"github.com/onsi/ginkgo"
 )
 
 var loggingSoak struct {
@@ -62,14 +62,14 @@ var _ = instrumentation.SIGDescribe("Logging soak [Performance] [Slow] [Disrupti
 				defer wg.Done()
 				defer ginkgo.GinkgoRecover()
 				wave := fmt.Sprintf("wave%v", strconv.Itoa(i))
-				e2elog.Logf("Starting logging soak, wave = %v", wave)
+				framework.Logf("Starting logging soak, wave = %v", wave)
 				RunLogPodsWithSleepOf(f, kbRateInSeconds, wave, totalLogTime)
-				e2elog.Logf("Completed logging soak, wave %v", i)
+				framework.Logf("Completed logging soak, wave %v", i)
 			}()
 			// Niceness.
 			time.Sleep(loggingSoak.TimeBetweenWaves)
 		}
-		e2elog.Logf("Waiting on all %v logging soak waves to complete", loggingSoak.Scale)
+		framework.Logf("Waiting on all %v logging soak waves to complete", loggingSoak.Scale)
 		wg.Wait()
 	})
 })
@@ -78,9 +78,10 @@ var _ = instrumentation.SIGDescribe("Logging soak [Performance] [Slow] [Disrupti
 // was produced in each and every pod at least once.  The final arg is the timeout for the test to verify all the pods got logs.
 func RunLogPodsWithSleepOf(f *framework.Framework, sleep time.Duration, podname string, timeout time.Duration) {
 
-	nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
+	nodes, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
+	framework.ExpectNoError(err)
 	totalPods := len(nodes.Items)
-	gomega.Expect(totalPods).NotTo(gomega.Equal(0))
+	framework.ExpectNotEqual(totalPods, 0)
 
 	kilobyte := strings.Repeat("logs-123", 128) // 8*128=1024 = 1KB of text.
 
@@ -123,8 +124,8 @@ func RunLogPodsWithSleepOf(f *framework.Framework, sleep time.Duration, podname 
 	pods, err := logSoakVerification.WaitFor(totalPods, timeout+largeClusterForgiveness)
 
 	if err != nil {
-		e2elog.Failf("Error in wait... %v", err)
+		framework.Failf("Error in wait... %v", err)
 	} else if len(pods) < totalPods {
-		e2elog.Failf("Only got %v out of %v", len(pods), totalPods)
+		framework.Failf("Only got %v out of %v", len(pods), totalPods)
 	}
 }

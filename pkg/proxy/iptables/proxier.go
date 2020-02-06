@@ -26,21 +26,24 @@ import (
 	"encoding/base32"
 	"fmt"
 	"net"
+	"reflect"
 	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"k8s.io/klog"
-
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
+	discovery "k8s.io/api/discovery/v1beta1"
 	"k8s.io/apimachinery/pkg/types"
-	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/klog"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
+	"k8s.io/kubernetes/pkg/proxy/metaproxier"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
 	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
 	"k8s.io/kubernetes/pkg/util/async"
@@ -52,15 +55,6 @@ import (
 )
 
 const (
-	// iptablesMinVersion is the minimum version of iptables for which we will use the Proxier
-	// from this package instead of the userspace Proxier.  While most of the
-	// features we need were available earlier, the '-C' flag was added more
-	// recently.  We use that indirectly in Ensure* functions, and if we don't
-	// have it, we have to be extra careful about the exact args we feed in being
-	// the same as the args we read back (iptables itself normalizes some args).
-	// This is the "new" Proxier, so we require "new" versions of tools.
-	iptablesMinVersion = utiliptables.MinCheckVersion
-
 	// the services chain
 	kubeServicesChain utiliptables.Chain = "KUBE-SERVICES"
 
@@ -83,12 +77,6 @@ const (
 	kubeForwardChain utiliptables.Chain = "KUBE-FORWARD"
 )
 
-// Versioner can query the current iptables version.
-type Versioner interface {
-	// returns "X.Y.Z"
-	GetVersion() (string, error)
-}
-
 // KernelCompatTester tests whether the required kernel capabilities are
 // present to run the iptables proxier.
 type KernelCompatTester interface {
@@ -96,33 +84,15 @@ type KernelCompatTester interface {
 }
 
 // CanUseIPTablesProxier returns true if we should use the iptables Proxier
-// instead of the "classic" userspace Proxier.  This is determined by checking
-// the iptables version and for the existence of kernel features. It may return
-// an error if it fails to get the iptables version without error, in which
-// case it will also return false.
-func CanUseIPTablesProxier(iptver Versioner, kcompat KernelCompatTester) (bool, error) {
-	minVersion, err := utilversion.ParseGeneric(iptablesMinVersion)
-	if err != nil {
-		return false, err
-	}
-	versionString, err := iptver.GetVersion()
-	if err != nil {
-		return false, err
-	}
-	version, err := utilversion.ParseGeneric(versionString)
-	if err != nil {
-		return false, err
-	}
-	if version.LessThan(minVersion) {
-		return false, nil
-	}
-
-	// Check that the kernel supports what we need.
+// instead of the "classic" userspace Proxier.
+func CanUseIPTablesProxier(kcompat KernelCompatTester) (bool, error) {
 	if err := kcompat.IsCompatible(); err != nil {
 		return false, err
 	}
 	return true, nil
 }
+
+var _ KernelCompatTester = LinuxKernelCompatTester{}
 
 // LinuxKernelCompatTester is the Linux implementation of KernelCompatTester
 type LinuxKernelCompatTester struct{}
@@ -131,7 +101,6 @@ type LinuxKernelCompatTester struct{}
 // that it exists.  If this Proxier is chosen, we'll initialize it as we
 // need.
 func (lkct LinuxKernelCompatTester) IsCompatible() error {
-
 	_, err := utilsysctl.New().GetSysctl(sysctlRouteLocalnet)
 	return err
 }
@@ -216,13 +185,16 @@ type Proxier struct {
 	serviceMap   proxy.ServiceMap
 	endpointsMap proxy.EndpointsMap
 	portsMap     map[utilproxy.LocalPort]utilproxy.Closeable
-	// endpointsSynced and servicesSynced are set to true when corresponding
-	// objects are synced after startup. This is used to avoid updating iptables
-	// with some partial data after kube-proxy restart.
-	endpointsSynced bool
-	servicesSynced  bool
-	initialized     int32
-	syncRunner      *async.BoundedFrequencyRunner // governs calls to syncProxyRules
+	nodeLabels   map[string]string
+	// endpointsSynced, endpointSlicesSynced, and servicesSynced are set to true
+	// when corresponding objects are synced after startup. This is used to avoid
+	// updating iptables with some partial data after kube-proxy restart.
+	endpointsSynced      bool
+	endpointSlicesSynced bool
+	servicesSynced       bool
+	initialized          int32
+	syncRunner           *async.BoundedFrequencyRunner // governs calls to syncProxyRules
+	syncPeriod           time.Duration
 
 	// These are effectively const and do not need the mutex to be held.
 	iptables       utiliptables.Interface
@@ -234,8 +206,9 @@ type Proxier struct {
 	nodeIP         net.IP
 	portMapper     utilproxy.PortOpener
 	recorder       record.EventRecorder
-	healthChecker  healthcheck.Server
-	healthzServer  healthcheck.HealthzUpdater
+
+	serviceHealthServer healthcheck.ServiceHealthServer
+	healthzServer       healthcheck.ProxierHealthUpdater
 
 	// Since converting probabilities (floats) to strings is expensive
 	// and we are using only probabilities in the format of 1/n, we are
@@ -272,8 +245,8 @@ func (l *listenPortOpener) OpenLocalPort(lp *utilproxy.LocalPort) (utilproxy.Clo
 	return openLocalPort(lp)
 }
 
-// Proxier implements ProxyProvider
-var _ proxy.ProxyProvider = &Proxier{}
+// Proxier implements proxy.Provider
+var _ proxy.Provider = &Proxier{}
 
 // NewProxier returns a new Proxier given an iptables Interface instance.
 // Because of the iptables logic, it is assumed that there is only a single Proxier active on a machine.
@@ -291,7 +264,7 @@ func NewProxier(ipt utiliptables.Interface,
 	hostname string,
 	nodeIP net.IP,
 	recorder record.EventRecorder,
-	healthzServer healthcheck.HealthzUpdater,
+	healthzServer healthcheck.ProxierHealthUpdater,
 	nodePortAddresses []string,
 ) (*Proxier, error) {
 	// Set the route_localnet sysctl we need for
@@ -312,18 +285,15 @@ func NewProxier(ipt utiliptables.Interface,
 	masqueradeValue := 1 << uint(masqueradeBit)
 	masqueradeMark := fmt.Sprintf("%#08x/%#08x", masqueradeValue, masqueradeValue)
 
-	if nodeIP == nil {
-		klog.Warning("invalid nodeIP, initializing kube-proxy with 127.0.0.1 as nodeIP")
-		nodeIP = net.ParseIP("127.0.0.1")
-	}
-
 	if len(clusterCIDR) == 0 {
 		klog.Warning("clusterCIDR not specified, unable to distinguish between internal and external traffic")
 	} else if utilnet.IsIPv6CIDRString(clusterCIDR) != ipt.IsIpv6() {
 		return nil, fmt.Errorf("clusterCIDR %s has incorrect IP version: expect isIPv6=%t", clusterCIDR, ipt.IsIpv6())
 	}
 
-	healthChecker := healthcheck.NewServer(hostname, recorder, nil, nil) // use default implementations of deps
+	endpointSlicesEnabled := utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceProxying)
+
+	serviceHealthServer := healthcheck.NewServiceHealthServer(hostname, recorder)
 
 	isIPv6 := ipt.IsIpv6()
 	proxier := &Proxier{
@@ -331,7 +301,8 @@ func NewProxier(ipt utiliptables.Interface,
 		serviceMap:               make(proxy.ServiceMap),
 		serviceChanges:           proxy.NewServiceChangeTracker(newServiceInfo, &isIPv6, recorder),
 		endpointsMap:             make(proxy.EndpointsMap),
-		endpointsChanges:         proxy.NewEndpointChangeTracker(hostname, newEndpointInfo, &isIPv6, recorder),
+		endpointsChanges:         proxy.NewEndpointChangeTracker(hostname, newEndpointInfo, &isIPv6, recorder, endpointSlicesEnabled),
+		syncPeriod:               syncPeriod,
 		iptables:                 ipt,
 		masqueradeAll:            masqueradeAll,
 		masqueradeMark:           masqueradeMark,
@@ -341,7 +312,7 @@ func NewProxier(ipt utiliptables.Interface,
 		nodeIP:                   nodeIP,
 		portMapper:               &listenPortOpener{},
 		recorder:                 recorder,
-		healthChecker:            healthChecker,
+		serviceHealthServer:      serviceHealthServer,
 		healthzServer:            healthzServer,
 		precomputedProbabilities: make([]string, 0, 1001),
 		iptablesData:             bytes.NewBuffer(nil),
@@ -355,8 +326,50 @@ func NewProxier(ipt utiliptables.Interface,
 	}
 	burstSyncs := 2
 	klog.V(3).Infof("minSyncPeriod: %v, syncPeriod: %v, burstSyncs: %d", minSyncPeriod, syncPeriod, burstSyncs)
-	proxier.syncRunner = async.NewBoundedFrequencyRunner("sync-runner", proxier.syncProxyRules, minSyncPeriod, syncPeriod, burstSyncs)
+	// We pass syncPeriod to ipt.Monitor, which will call us only if it needs to.
+	// We need to pass *some* maxInterval to NewBoundedFrequencyRunner anyway though.
+	// time.Hour is arbitrary.
+	proxier.syncRunner = async.NewBoundedFrequencyRunner("sync-runner", proxier.syncProxyRules, minSyncPeriod, time.Hour, burstSyncs)
+	go ipt.Monitor(utiliptables.Chain("KUBE-PROXY-CANARY"),
+		[]utiliptables.Table{utiliptables.TableMangle, utiliptables.TableNAT, utiliptables.TableFilter},
+		proxier.syncProxyRules, syncPeriod, wait.NeverStop)
 	return proxier, nil
+}
+
+// NewDualStackProxier creates a MetaProxier instance, with IPv4 and IPv6 proxies.
+func NewDualStackProxier(
+	ipt [2]utiliptables.Interface,
+	sysctl utilsysctl.Interface,
+	exec utilexec.Interface,
+	syncPeriod time.Duration,
+	minSyncPeriod time.Duration,
+	masqueradeAll bool,
+	masqueradeBit int,
+	clusterCIDR [2]string,
+	hostname string,
+	nodeIP [2]net.IP,
+	recorder record.EventRecorder,
+	healthzServer healthcheck.ProxierHealthUpdater,
+	nodePortAddresses []string,
+) (proxy.Provider, error) {
+	// Create an ipv4 instance of the single-stack proxier
+	ipv4Proxier, err := NewProxier(ipt[0], sysctl,
+		exec, syncPeriod, minSyncPeriod,
+		masqueradeAll, masqueradeBit, clusterCIDR[0], hostname, nodeIP[0],
+		recorder, healthzServer, nodePortAddresses)
+	if err != nil {
+		return nil, fmt.Errorf("unable to create ipv4 proxier: %v", err)
+	}
+
+	ipv6Proxier, err := NewProxier(ipt[1], sysctl,
+		exec, syncPeriod, minSyncPeriod,
+		masqueradeAll, masqueradeBit, clusterCIDR[1], hostname, nodeIP[1],
+		recorder, healthzServer, nodePortAddresses)
+	if err != nil {
+		return nil, fmt.Errorf("unable to create ipv6 proxier: %v", err)
+	}
+
+	return metaproxier.NewMetaProxier(ipv4Proxier, ipv6Proxier), nil // TODO move meta-proxier to mode-neutral package
 }
 
 type iptablesJumpChain struct {
@@ -408,7 +421,7 @@ func CleanupLeftovers(ipt utiliptables.Interface) (encounteredError bool) {
 		natRules := bytes.NewBuffer(nil)
 		writeLine(natChains, "*nat")
 		// Start with chains we know we need to remove.
-		for _, chain := range []utiliptables.Chain{kubeServicesChain, kubeNodePortsChain, kubePostroutingChain, KubeMarkMasqChain} {
+		for _, chain := range []utiliptables.Chain{kubeServicesChain, kubeNodePortsChain, kubePostroutingChain} {
 			if _, found := existingNATChains[chain]; found {
 				chainString := string(chain)
 				writeBytesLine(natChains, existingNATChains[chain]) // flush
@@ -429,6 +442,7 @@ func CleanupLeftovers(ipt utiliptables.Interface) (encounteredError bool) {
 		err = ipt.Restore(utiliptables.TableNAT, natLines, utiliptables.NoFlushTables, utiliptables.RestoreCounters)
 		if err != nil {
 			klog.Errorf("Failed to execute iptables-restore for %s: %v", utiliptables.TableNAT, err)
+			metrics.IptablesRestoreFailuresTotal.Inc()
 			encounteredError = true
 		}
 	}
@@ -455,6 +469,7 @@ func CleanupLeftovers(ipt utiliptables.Interface) (encounteredError bool) {
 		// Write it.
 		if err := ipt.Restore(utiliptables.TableFilter, filterLines, utiliptables.NoFlushTables, utiliptables.RestoreCounters); err != nil {
 			klog.Errorf("Failed to execute iptables-restore for %s: %v", utiliptables.TableFilter, err)
+			metrics.IptablesRestoreFailuresTotal.Inc()
 			encounteredError = true
 		}
 	}
@@ -462,7 +477,7 @@ func CleanupLeftovers(ipt utiliptables.Interface) (encounteredError bool) {
 }
 
 func computeProbability(n int) string {
-	return fmt.Sprintf("%0.5f", 1.0/float64(n))
+	return fmt.Sprintf("%0.10f", 1.0/float64(n))
 }
 
 // This assumes proxier.mu is held
@@ -485,6 +500,9 @@ func (proxier *Proxier) probability(n int) string {
 
 // Sync is called to synchronize the proxier state to iptables as soon as possible.
 func (proxier *Proxier) Sync() {
+	if proxier.healthzServer != nil {
+		proxier.healthzServer.QueuedUpdate()
+	}
 	proxier.syncRunner.Run()
 }
 
@@ -492,7 +510,7 @@ func (proxier *Proxier) Sync() {
 func (proxier *Proxier) SyncLoop() {
 	// Update healthz timestamp at beginning in case Sync() never succeeds.
 	if proxier.healthzServer != nil {
-		proxier.healthzServer.UpdateTimestamp()
+		proxier.healthzServer.Updated()
 	}
 	proxier.syncRunner.Loop(wait.NeverStop)
 }
@@ -519,7 +537,7 @@ func (proxier *Proxier) OnServiceAdd(service *v1.Service) {
 // service object is observed.
 func (proxier *Proxier) OnServiceUpdate(oldService, service *v1.Service) {
 	if proxier.serviceChanges.Update(oldService, service) && proxier.isInitialized() {
-		proxier.syncRunner.Run()
+		proxier.Sync()
 	}
 }
 
@@ -535,7 +553,11 @@ func (proxier *Proxier) OnServiceDelete(service *v1.Service) {
 func (proxier *Proxier) OnServiceSynced() {
 	proxier.mu.Lock()
 	proxier.servicesSynced = true
-	proxier.setInitialized(proxier.servicesSynced && proxier.endpointsSynced)
+	if utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceProxying) {
+		proxier.setInitialized(proxier.endpointSlicesSynced)
+	} else {
+		proxier.setInitialized(proxier.endpointsSynced)
+	}
 	proxier.mu.Unlock()
 
 	// Sync unconditionally - this is called once per lifetime.
@@ -552,7 +574,7 @@ func (proxier *Proxier) OnEndpointsAdd(endpoints *v1.Endpoints) {
 // endpoints object is observed.
 func (proxier *Proxier) OnEndpointsUpdate(oldEndpoints, endpoints *v1.Endpoints) {
 	if proxier.endpointsChanges.Update(oldEndpoints, endpoints) && proxier.isInitialized() {
-		proxier.syncRunner.Run()
+		proxier.Sync()
 	}
 }
 
@@ -567,11 +589,104 @@ func (proxier *Proxier) OnEndpointsDelete(endpoints *v1.Endpoints) {
 func (proxier *Proxier) OnEndpointsSynced() {
 	proxier.mu.Lock()
 	proxier.endpointsSynced = true
-	proxier.setInitialized(proxier.servicesSynced && proxier.endpointsSynced)
+	proxier.setInitialized(proxier.servicesSynced)
 	proxier.mu.Unlock()
 
 	// Sync unconditionally - this is called once per lifetime.
 	proxier.syncProxyRules()
+}
+
+// OnEndpointSliceAdd is called whenever creation of a new endpoint slice object
+// is observed.
+func (proxier *Proxier) OnEndpointSliceAdd(endpointSlice *discovery.EndpointSlice) {
+	if proxier.endpointsChanges.EndpointSliceUpdate(endpointSlice, false) && proxier.isInitialized() {
+		proxier.Sync()
+	}
+}
+
+// OnEndpointSliceUpdate is called whenever modification of an existing endpoint
+// slice object is observed.
+func (proxier *Proxier) OnEndpointSliceUpdate(_, endpointSlice *discovery.EndpointSlice) {
+	if proxier.endpointsChanges.EndpointSliceUpdate(endpointSlice, false) && proxier.isInitialized() {
+		proxier.Sync()
+	}
+}
+
+// OnEndpointSliceDelete is called whenever deletion of an existing endpoint slice
+// object is observed.
+func (proxier *Proxier) OnEndpointSliceDelete(endpointSlice *discovery.EndpointSlice) {
+	if proxier.endpointsChanges.EndpointSliceUpdate(endpointSlice, true) && proxier.isInitialized() {
+		proxier.Sync()
+	}
+}
+
+// OnEndpointSlicesSynced is called once all the initial event handlers were
+// called and the state is fully propagated to local cache.
+func (proxier *Proxier) OnEndpointSlicesSynced() {
+	proxier.mu.Lock()
+	proxier.endpointSlicesSynced = true
+	proxier.setInitialized(proxier.servicesSynced)
+	proxier.mu.Unlock()
+
+	// Sync unconditionally - this is called once per lifetime.
+	proxier.syncProxyRules()
+}
+
+// OnNodeAdd is called whenever creation of new node object
+// is observed.
+func (proxier *Proxier) OnNodeAdd(node *v1.Node) {
+	if node.Name != proxier.hostname {
+		klog.Errorf("Received a watch event for a node %s that doesn't match the current node %v", node.Name, proxier.hostname)
+		return
+	}
+
+	if reflect.DeepEqual(proxier.nodeLabels, node.Labels) {
+		return
+	}
+
+	proxier.mu.Lock()
+	proxier.nodeLabels = node.Labels
+	proxier.mu.Unlock()
+
+	proxier.syncProxyRules()
+}
+
+// OnNodeUpdate is called whenever modification of an existing
+// node object is observed.
+func (proxier *Proxier) OnNodeUpdate(oldNode, node *v1.Node) {
+	if node.Name != proxier.hostname {
+		klog.Errorf("Received a watch event for a node %s that doesn't match the current node %v", node.Name, proxier.hostname)
+		return
+	}
+
+	if reflect.DeepEqual(proxier.nodeLabels, node.Labels) {
+		return
+	}
+
+	proxier.mu.Lock()
+	proxier.nodeLabels = node.Labels
+	proxier.mu.Unlock()
+
+	proxier.syncProxyRules()
+}
+
+// OnNodeDelete is called whever deletion of an existing node
+// object is observed.
+func (proxier *Proxier) OnNodeDelete(node *v1.Node) {
+	if node.Name != proxier.hostname {
+		klog.Errorf("Received a watch event for a node %s that doesn't match the current node %v", node.Name, proxier.hostname)
+		return
+	}
+	proxier.mu.Lock()
+	proxier.nodeLabels = nil
+	proxier.mu.Unlock()
+
+	proxier.syncProxyRules()
+}
+
+// OnNodeSynced is called once all the initial event handlers were
+// called and the state is fully propagated to local cache.
+func (proxier *Proxier) OnNodeSynced() {
 }
 
 // portProtoHash takes the ServicePortName and protocol for a service
@@ -651,14 +766,14 @@ func (proxier *Proxier) deleteEndpointConnections(connectionMap []proxy.ServiceE
 const endpointChainsNumberThreshold = 1000
 
 // Assumes proxier.mu is held.
-func (proxier *Proxier) appendServiceCommentLocked(args []string, svcName string) {
+func (proxier *Proxier) appendServiceCommentLocked(args []string, svcName string) []string {
 	// Not printing these comments, can reduce size of iptables (in case of large
 	// number of endpoints) even by 40%+. So if total number of endpoint chains
 	// is large enough, we simply drop those comments.
 	if proxier.endpointChainsNumber > endpointChainsNumberThreshold {
-		return
+		return args
 	}
-	args = append(args, "-m", "comment", "--comment", svcName)
+	return append(args, "-m", "comment", "--comment", svcName)
 }
 
 // This is where all of the iptables-save/restore calls happen.
@@ -668,17 +783,18 @@ func (proxier *Proxier) syncProxyRules() {
 	proxier.mu.Lock()
 	defer proxier.mu.Unlock()
 
-	start := time.Now()
-	defer func() {
-		metrics.SyncProxyRulesLatency.Observe(metrics.SinceInSeconds(start))
-		metrics.DeprecatedSyncProxyRulesLatency.Observe(metrics.SinceInMicroseconds(start))
-		klog.V(4).Infof("syncProxyRules took %v", time.Since(start))
-	}()
 	// don't sync rules till we've received services and endpoints
-	if !proxier.endpointsSynced || !proxier.servicesSynced {
+	if !proxier.isInitialized() {
 		klog.V(2).Info("Not syncing iptables until Services and Endpoints have been received from master")
 		return
 	}
+
+	// Keep track of how long syncs take.
+	start := time.Now()
+	defer func() {
+		metrics.SyncProxyRulesLatency.Observe(metrics.SinceInSeconds(start))
+		klog.V(4).Infof("syncProxyRules took %v", time.Since(start))
+	}()
 
 	// We assume that if this was called, we really want to sync them,
 	// even if nothing changed in the meantime. In other words, callers are
@@ -699,6 +815,14 @@ func (proxier *Proxier) syncProxyRules() {
 	}
 
 	klog.V(3).Info("Syncing iptables rules")
+
+	success := false
+	defer func() {
+		if !success {
+			klog.Infof("Sync failed; retrying in %s", proxier.syncPeriod)
+			proxier.syncRunner.RetryAfter(proxier.syncPeriod)
+		}
+	}()
 
 	// Create and link the kube chains.
 	for _, jump := range iptablesJumpChains {
@@ -772,12 +896,20 @@ func (proxier *Proxier) syncProxyRules() {
 	// Install the kubernetes-specific postrouting rules. We use a whole chain for
 	// this so that it is easier to flush and change, for example if the mark
 	// value should ever change.
-	writeLine(proxier.natRules, []string{
+	// NB: THIS MUST MATCH the corresponding code in the kubelet
+	masqRule := []string{
 		"-A", string(kubePostroutingChain),
 		"-m", "comment", "--comment", `"kubernetes service traffic requiring SNAT"`,
 		"-m", "mark", "--mark", proxier.masqueradeMark,
 		"-j", "MASQUERADE",
-	}...)
+	}
+	if proxier.iptables.HasRandomFully() {
+		masqRule = append(masqRule, "--random-fully")
+		klog.V(3).Info("Using `--random-fully` in the MASQUERADE rule for iptables")
+	} else {
+		klog.V(3).Info("Not using `--random-fully` in the MASQUERADE rule for iptables because the local version of iptables does not support it")
+	}
+	writeLine(proxier.natRules, masqRule...)
 
 	// Install the kubernetes-specific masquerade mark rule. We use a whole chain for
 	// this so that it is easier to flush and change, for example if the mark
@@ -823,7 +955,20 @@ func (proxier *Proxier) syncProxyRules() {
 		isIPv6 := utilnet.IsIPv6(svcInfo.ClusterIP())
 		protocol := strings.ToLower(string(svcInfo.Protocol()))
 		svcNameString := svcInfo.serviceNameString
-		hasEndpoints := len(proxier.endpointsMap[svcName]) > 0
+
+		allEndpoints := proxier.endpointsMap[svcName]
+
+		hasEndpoints := len(allEndpoints) > 0
+
+		// Service Topology will not be enabled in the following cases:
+		// 1. externalTrafficPolicy=Local (mutually exclusive with service topology).
+		// 2. ServiceTopology is not enabled.
+		// 3. EndpointSlice is not enabled (service topology depends on endpoint slice
+		// to get topology information).
+		if !svcInfo.OnlyNodeLocalEndpoints() && utilfeature.DefaultFeatureGate.Enabled(features.ServiceTopology) && utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceProxying) {
+			allEndpoints = proxy.FilterTopologyEndpoint(proxier.nodeLabels, svcInfo.TopologyKeys(), allEndpoints)
+			hasEndpoints = len(allEndpoints) > 0
+		}
 
 		svcChain := svcInfo.servicePortChainName
 		if hasEndpoints {
@@ -1133,12 +1278,13 @@ func (proxier *Proxier) syncProxyRules() {
 		endpoints = endpoints[:0]
 		endpointChains = endpointChains[:0]
 		var endpointChain utiliptables.Chain
-		for _, ep := range proxier.endpointsMap[svcName] {
+		for _, ep := range allEndpoints {
 			epInfo, ok := ep.(*endpointsInfo)
 			if !ok {
 				klog.Errorf("Failed to cast endpointsInfo %q", ep.String())
 				continue
 			}
+
 			endpoints = append(endpoints, epInfo)
 			endpointChain = epInfo.endpointChain(svcNameString, protocol)
 			endpointChains = append(endpointChains, endpointChain)
@@ -1158,7 +1304,7 @@ func (proxier *Proxier) syncProxyRules() {
 				args = append(args[:0],
 					"-A", string(svcChain),
 				)
-				proxier.appendServiceCommentLocked(args, svcNameString)
+				args = proxier.appendServiceCommentLocked(args, svcNameString)
 				args = append(args,
 					"-m", "recent", "--name", string(endpointChain),
 					"--rcheck", "--seconds", strconv.Itoa(svcInfo.StickyMaxAgeSeconds()), "--reap",
@@ -1170,13 +1316,10 @@ func (proxier *Proxier) syncProxyRules() {
 
 		// Now write loadbalancing & DNAT rules.
 		n := len(endpointChains)
-		localEndpoints := make([]*endpointsInfo, 0)
 		localEndpointChains := make([]utiliptables.Chain, 0)
 		for i, endpointChain := range endpointChains {
 			// Write ingress loadbalancing & DNAT rules only for services that request OnlyLocal traffic.
 			if svcInfo.OnlyNodeLocalEndpoints() && endpoints[i].IsLocal {
-				// These slices parallel each other; must be kept in sync
-				localEndpoints = append(localEndpoints, endpoints[i])
 				localEndpointChains = append(localEndpointChains, endpointChains[i])
 			}
 
@@ -1185,9 +1328,10 @@ func (proxier *Proxier) syncProxyRules() {
 				// Error parsing this endpoint has been logged. Skip to next endpoint.
 				continue
 			}
+
 			// Balancing rules in the per-service chain.
 			args = append(args[:0], "-A", string(svcChain))
-			proxier.appendServiceCommentLocked(args, svcNameString)
+			args = proxier.appendServiceCommentLocked(args, svcNameString)
 			if i < (n - 1) {
 				// Each rule is a probabilistic match.
 				args = append(args,
@@ -1201,7 +1345,7 @@ func (proxier *Proxier) syncProxyRules() {
 
 			// Rules in the per-endpoint chain.
 			args = append(args[:0], "-A", string(endpointChain))
-			proxier.appendServiceCommentLocked(args, svcNameString)
+			args = proxier.appendServiceCommentLocked(args, svcNameString)
 			// Handle traffic that loops back to the originator with SNAT.
 			writeLine(proxier.natRules, append(args,
 				"-s", utilproxy.ToCIDR(net.ParseIP(epIP)),
@@ -1401,15 +1545,20 @@ func (proxier *Proxier) syncProxyRules() {
 	err = proxier.iptables.RestoreAll(proxier.iptablesData.Bytes(), utiliptables.NoFlushTables, utiliptables.RestoreCounters)
 	if err != nil {
 		klog.Errorf("Failed to execute iptables-restore: %v", err)
+		metrics.IptablesRestoreFailuresTotal.Inc()
 		// Revert new local ports.
 		klog.V(2).Infof("Closing local ports after iptables-restore failure")
 		utilproxy.RevertPorts(replacementPortsMap, proxier.portsMap)
 		return
 	}
-	for _, lastChangeTriggerTime := range endpointUpdateResult.LastChangeTriggerTimes {
-		latency := metrics.SinceInSeconds(lastChangeTriggerTime)
-		metrics.NetworkProgrammingLatency.Observe(latency)
-		klog.V(4).Infof("Network programming took %f seconds", latency)
+	success = true
+
+	for name, lastChangeTriggerTimes := range endpointUpdateResult.LastChangeTriggerTimes {
+		for _, lastChangeTriggerTime := range lastChangeTriggerTimes {
+			latency := metrics.SinceInSeconds(lastChangeTriggerTime)
+			metrics.NetworkProgrammingLatency.Observe(latency)
+			klog.V(4).Infof("Network programming of %s took %f seconds", name, latency)
+		}
 	}
 
 	// Close old local ports and save new ones.
@@ -1420,19 +1569,18 @@ func (proxier *Proxier) syncProxyRules() {
 	}
 	proxier.portsMap = replacementPortsMap
 
-	// Update healthz timestamp.
 	if proxier.healthzServer != nil {
-		proxier.healthzServer.UpdateTimestamp()
+		proxier.healthzServer.Updated()
 	}
 	metrics.SyncProxyRulesLastTimestamp.SetToCurrentTime()
 
-	// Update healthchecks.  The endpoints list might include services that are
-	// not "OnlyLocal", but the services list will not, and the healthChecker
+	// Update service healthchecks.  The endpoints list might include services that are
+	// not "OnlyLocal", but the services list will not, and the serviceHealthServer
 	// will just drop those endpoints.
-	if err := proxier.healthChecker.SyncServices(serviceUpdateResult.HCServiceNodePorts); err != nil {
+	if err := proxier.serviceHealthServer.SyncServices(serviceUpdateResult.HCServiceNodePorts); err != nil {
 		klog.Errorf("Error syncing healthcheck services: %v", err)
 	}
-	if err := proxier.healthChecker.SyncEndpoints(endpointUpdateResult.HCEndpointsLocalIPSize); err != nil {
+	if err := proxier.serviceHealthServer.SyncEndpoints(endpointUpdateResult.HCEndpointsLocalIPSize); err != nil {
 		klog.Errorf("Error syncing healthcheck endpoints: %v", err)
 	}
 

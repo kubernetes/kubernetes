@@ -1,0 +1,52 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: csi-hostpath-resizer
+  labels:
+    app: csi-hostpath-resizer
+spec:
+  selector:
+    app: csi-hostpath-resizer
+  ports:
+    - name: dummy
+      port: 12345
+
+---
+kind: StatefulSet
+apiVersion: apps/v1
+metadata:
+  name: csi-hostpath-resizer
+spec:
+  serviceName: "csi-hostpath-resizer"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: csi-hostpath-resizer
+  template:
+    metadata:
+      labels:
+        app: csi-hostpath-resizer
+    spec:
+      serviceAccountName: csi-resizer
+      containers:
+        - name: csi-resizer
+          image: quay.io/k8scsi/csi-resizer:v0.4.0
+          args:
+            - "--v=5"
+            - "--csi-address=$(ADDRESS)"
+          env:
+            - name: ADDRESS
+              value: /csi/csi.sock
+          securityContext:
+            # This is necessary only for systems with SELinux, where
+            # non-privileged sidecar containers cannot access unix domain socket
+            # created by privileged CSI driver container.
+            privileged: true
+          volumeMounts:
+            - mountPath: /csi
+              name: socket-dir
+      volumes:
+        - hostPath:
+            path: /var/lib/kubelet/plugins/csi-hostpath
+            type: DirectoryOrCreate
+          name: socket-dir

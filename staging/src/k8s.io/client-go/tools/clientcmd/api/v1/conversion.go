@@ -25,220 +25,150 @@ import (
 	"k8s.io/client-go/tools/clientcmd/api"
 )
 
-func addConversionFuncs(scheme *runtime.Scheme) error {
-	return scheme.AddConversionFuncs(
-		func(in *Cluster, out *api.Cluster, s conversion.Scope) error {
-			return s.DefaultConvert(in, out, conversion.IgnoreMissingFields)
-		},
-		func(in *api.Cluster, out *Cluster, s conversion.Scope) error {
-			return s.DefaultConvert(in, out, conversion.IgnoreMissingFields)
-		},
-		func(in *Preferences, out *api.Preferences, s conversion.Scope) error {
-			return s.DefaultConvert(in, out, conversion.IgnoreMissingFields)
-		},
-		func(in *api.Preferences, out *Preferences, s conversion.Scope) error {
-			return s.DefaultConvert(in, out, conversion.IgnoreMissingFields)
-		},
-		func(in *AuthInfo, out *api.AuthInfo, s conversion.Scope) error {
-			return s.DefaultConvert(in, out, conversion.IgnoreMissingFields)
-		},
-		func(in *api.AuthInfo, out *AuthInfo, s conversion.Scope) error {
-			return s.DefaultConvert(in, out, conversion.IgnoreMissingFields)
-		},
-		func(in *Context, out *api.Context, s conversion.Scope) error {
-			return s.DefaultConvert(in, out, conversion.IgnoreMissingFields)
-		},
-		func(in *api.Context, out *Context, s conversion.Scope) error {
-			return s.DefaultConvert(in, out, conversion.IgnoreMissingFields)
-		},
+func Convert_Slice_v1_NamedCluster_To_Map_string_To_Pointer_api_Cluster(in *[]NamedCluster, out *map[string]*api.Cluster, s conversion.Scope) error {
+	for _, curr := range *in {
+		newCluster := api.NewCluster()
+		if err := Convert_v1_Cluster_To_api_Cluster(&curr.Cluster, newCluster, s); err != nil {
+			return err
+		}
+		if *out == nil {
+			*out = make(map[string]*api.Cluster)
+		}
+		if (*out)[curr.Name] == nil {
+			(*out)[curr.Name] = newCluster
+		} else {
+			return fmt.Errorf("error converting *[]NamedCluster into *map[string]*api.Cluster: duplicate name \"%v\" in list: %v", curr.Name, *in)
+		}
+	}
+	return nil
+}
 
-		func(in *Config, out *api.Config, s conversion.Scope) error {
-			out.CurrentContext = in.CurrentContext
-			if err := s.Convert(&in.Preferences, &out.Preferences, 0); err != nil {
-				return err
-			}
+func Convert_Map_string_To_Pointer_api_Cluster_To_Slice_v1_NamedCluster(in *map[string]*api.Cluster, out *[]NamedCluster, s conversion.Scope) error {
+	allKeys := make([]string, 0, len(*in))
+	for key := range *in {
+		allKeys = append(allKeys, key)
+	}
+	sort.Strings(allKeys)
 
-			out.Clusters = make(map[string]*api.Cluster)
-			if err := s.Convert(&in.Clusters, &out.Clusters, 0); err != nil {
-				return err
-			}
-			out.AuthInfos = make(map[string]*api.AuthInfo)
-			if err := s.Convert(&in.AuthInfos, &out.AuthInfos, 0); err != nil {
-				return err
-			}
-			out.Contexts = make(map[string]*api.Context)
-			if err := s.Convert(&in.Contexts, &out.Contexts, 0); err != nil {
-				return err
-			}
-			out.Extensions = make(map[string]runtime.Object)
-			if err := s.Convert(&in.Extensions, &out.Extensions, 0); err != nil {
-				return err
-			}
+	for _, key := range allKeys {
+		newCluster := (*in)[key]
+		oldCluster := Cluster{}
+		if err := Convert_api_Cluster_To_v1_Cluster(newCluster, &oldCluster, s); err != nil {
+			return err
+		}
+		namedCluster := NamedCluster{key, oldCluster}
+		*out = append(*out, namedCluster)
+	}
+	return nil
+}
+
+func Convert_Slice_v1_NamedAuthInfo_To_Map_string_To_Pointer_api_AuthInfo(in *[]NamedAuthInfo, out *map[string]*api.AuthInfo, s conversion.Scope) error {
+	for _, curr := range *in {
+		newAuthInfo := api.NewAuthInfo()
+		if err := Convert_v1_AuthInfo_To_api_AuthInfo(&curr.AuthInfo, newAuthInfo, s); err != nil {
+			return err
+		}
+		if *out == nil {
+			*out = make(map[string]*api.AuthInfo)
+		}
+		if (*out)[curr.Name] == nil {
+			(*out)[curr.Name] = newAuthInfo
+		} else {
+			return fmt.Errorf("error converting *[]NamedAuthInfo into *map[string]*api.AuthInfo: duplicate name \"%v\" in list: %v", curr.Name, *in)
+		}
+	}
+	return nil
+}
+
+func Convert_Map_string_To_Pointer_api_AuthInfo_To_Slice_v1_NamedAuthInfo(in *map[string]*api.AuthInfo, out *[]NamedAuthInfo, s conversion.Scope) error {
+	allKeys := make([]string, 0, len(*in))
+	for key := range *in {
+		allKeys = append(allKeys, key)
+	}
+	sort.Strings(allKeys)
+
+	for _, key := range allKeys {
+		newAuthInfo := (*in)[key]
+		oldAuthInfo := AuthInfo{}
+		if err := Convert_api_AuthInfo_To_v1_AuthInfo(newAuthInfo, &oldAuthInfo, s); err != nil {
+			return err
+		}
+		namedAuthInfo := NamedAuthInfo{key, oldAuthInfo}
+		*out = append(*out, namedAuthInfo)
+	}
+	return nil
+}
+
+func Convert_Slice_v1_NamedContext_To_Map_string_To_Pointer_api_Context(in *[]NamedContext, out *map[string]*api.Context, s conversion.Scope) error {
+	for _, curr := range *in {
+		newContext := api.NewContext()
+		if err := Convert_v1_Context_To_api_Context(&curr.Context, newContext, s); err != nil {
+			return err
+		}
+		if *out == nil {
+			*out = make(map[string]*api.Context)
+		}
+		if (*out)[curr.Name] == nil {
+			(*out)[curr.Name] = newContext
+		} else {
+			return fmt.Errorf("error converting *[]NamedContext into *map[string]*api.Context: duplicate name \"%v\" in list: %v", curr.Name, *in)
+		}
+	}
+	return nil
+}
+
+func Convert_Map_string_To_Pointer_api_Context_To_Slice_v1_NamedContext(in *map[string]*api.Context, out *[]NamedContext, s conversion.Scope) error {
+	allKeys := make([]string, 0, len(*in))
+	for key := range *in {
+		allKeys = append(allKeys, key)
+	}
+	sort.Strings(allKeys)
+
+	for _, key := range allKeys {
+		newContext := (*in)[key]
+		oldContext := Context{}
+		if err := Convert_api_Context_To_v1_Context(newContext, &oldContext, s); err != nil {
+			return err
+		}
+		namedContext := NamedContext{key, oldContext}
+		*out = append(*out, namedContext)
+	}
+	return nil
+}
+
+func Convert_Slice_v1_NamedExtension_To_Map_string_To_runtime_Object(in *[]NamedExtension, out *map[string]runtime.Object, s conversion.Scope) error {
+	for _, curr := range *in {
+		var newExtension runtime.Object
+		if err := runtime.Convert_runtime_RawExtension_To_runtime_Object(&curr.Extension, &newExtension, s); err != nil {
+			return err
+		}
+		if *out == nil {
+			*out = make(map[string]runtime.Object)
+		}
+		if (*out)[curr.Name] == nil {
+			(*out)[curr.Name] = newExtension
+		} else {
+			return fmt.Errorf("error converting *[]NamedExtension into *map[string]runtime.Object: duplicate name \"%v\" in list: %v", curr.Name, *in)
+		}
+	}
+	return nil
+}
+
+func Convert_Map_string_To_runtime_Object_To_Slice_v1_NamedExtension(in *map[string]runtime.Object, out *[]NamedExtension, s conversion.Scope) error {
+	allKeys := make([]string, 0, len(*in))
+	for key := range *in {
+		allKeys = append(allKeys, key)
+	}
+	sort.Strings(allKeys)
+
+	for _, key := range allKeys {
+		newExtension := (*in)[key]
+		oldExtension := runtime.RawExtension{}
+		if err := runtime.Convert_runtime_Object_To_runtime_RawExtension(&newExtension, &oldExtension, s); err != nil {
 			return nil
-		},
-		func(in *api.Config, out *Config, s conversion.Scope) error {
-			out.CurrentContext = in.CurrentContext
-			if err := s.Convert(&in.Preferences, &out.Preferences, 0); err != nil {
-				return err
-			}
-
-			out.Clusters = make([]NamedCluster, 0, 0)
-			if err := s.Convert(&in.Clusters, &out.Clusters, 0); err != nil {
-				return err
-			}
-			out.AuthInfos = make([]NamedAuthInfo, 0, 0)
-			if err := s.Convert(&in.AuthInfos, &out.AuthInfos, 0); err != nil {
-				return err
-			}
-			out.Contexts = make([]NamedContext, 0, 0)
-			if err := s.Convert(&in.Contexts, &out.Contexts, 0); err != nil {
-				return err
-			}
-			out.Extensions = make([]NamedExtension, 0, 0)
-			if err := s.Convert(&in.Extensions, &out.Extensions, 0); err != nil {
-				return err
-			}
-			return nil
-		},
-		func(in *[]NamedCluster, out *map[string]*api.Cluster, s conversion.Scope) error {
-			for _, curr := range *in {
-				newCluster := api.NewCluster()
-				if err := s.Convert(&curr.Cluster, newCluster, 0); err != nil {
-					return err
-				}
-				if (*out)[curr.Name] == nil {
-					(*out)[curr.Name] = newCluster
-				} else {
-					return fmt.Errorf("error converting *[]NamedCluster into *map[string]*api.Cluster: duplicate name \"%v\" in list: %v", curr.Name, *in)
-				}
-			}
-
-			return nil
-		},
-		func(in *map[string]*api.Cluster, out *[]NamedCluster, s conversion.Scope) error {
-			allKeys := make([]string, 0, len(*in))
-			for key := range *in {
-				allKeys = append(allKeys, key)
-			}
-			sort.Strings(allKeys)
-
-			for _, key := range allKeys {
-				newCluster := (*in)[key]
-				oldCluster := &Cluster{}
-				if err := s.Convert(newCluster, oldCluster, 0); err != nil {
-					return err
-				}
-
-				namedCluster := NamedCluster{key, *oldCluster}
-				*out = append(*out, namedCluster)
-			}
-
-			return nil
-		},
-		func(in *[]NamedAuthInfo, out *map[string]*api.AuthInfo, s conversion.Scope) error {
-			for _, curr := range *in {
-				newAuthInfo := api.NewAuthInfo()
-				if err := s.Convert(&curr.AuthInfo, newAuthInfo, 0); err != nil {
-					return err
-				}
-				if (*out)[curr.Name] == nil {
-					(*out)[curr.Name] = newAuthInfo
-				} else {
-					return fmt.Errorf("error converting *[]NamedAuthInfo into *map[string]*api.AuthInfo: duplicate name \"%v\" in list: %v", curr.Name, *in)
-				}
-			}
-
-			return nil
-		},
-		func(in *map[string]*api.AuthInfo, out *[]NamedAuthInfo, s conversion.Scope) error {
-			allKeys := make([]string, 0, len(*in))
-			for key := range *in {
-				allKeys = append(allKeys, key)
-			}
-			sort.Strings(allKeys)
-
-			for _, key := range allKeys {
-				newAuthInfo := (*in)[key]
-				oldAuthInfo := &AuthInfo{}
-				if err := s.Convert(newAuthInfo, oldAuthInfo, 0); err != nil {
-					return err
-				}
-
-				namedAuthInfo := NamedAuthInfo{key, *oldAuthInfo}
-				*out = append(*out, namedAuthInfo)
-			}
-
-			return nil
-		},
-		func(in *[]NamedContext, out *map[string]*api.Context, s conversion.Scope) error {
-			for _, curr := range *in {
-				newContext := api.NewContext()
-				if err := s.Convert(&curr.Context, newContext, 0); err != nil {
-					return err
-				}
-				if (*out)[curr.Name] == nil {
-					(*out)[curr.Name] = newContext
-				} else {
-					return fmt.Errorf("error converting *[]NamedContext into *map[string]*api.Context: duplicate name \"%v\" in list: %v", curr.Name, *in)
-				}
-			}
-
-			return nil
-		},
-		func(in *map[string]*api.Context, out *[]NamedContext, s conversion.Scope) error {
-			allKeys := make([]string, 0, len(*in))
-			for key := range *in {
-				allKeys = append(allKeys, key)
-			}
-			sort.Strings(allKeys)
-
-			for _, key := range allKeys {
-				newContext := (*in)[key]
-				oldContext := &Context{}
-				if err := s.Convert(newContext, oldContext, 0); err != nil {
-					return err
-				}
-
-				namedContext := NamedContext{key, *oldContext}
-				*out = append(*out, namedContext)
-			}
-
-			return nil
-		},
-		func(in *[]NamedExtension, out *map[string]runtime.Object, s conversion.Scope) error {
-			for _, curr := range *in {
-				var newExtension runtime.Object
-				if err := s.Convert(&curr.Extension, &newExtension, 0); err != nil {
-					return err
-				}
-				if (*out)[curr.Name] == nil {
-					(*out)[curr.Name] = newExtension
-				} else {
-					return fmt.Errorf("error converting *[]NamedExtension into *map[string]runtime.Object: duplicate name \"%v\" in list: %v", curr.Name, *in)
-				}
-			}
-
-			return nil
-		},
-		func(in *map[string]runtime.Object, out *[]NamedExtension, s conversion.Scope) error {
-			allKeys := make([]string, 0, len(*in))
-			for key := range *in {
-				allKeys = append(allKeys, key)
-			}
-			sort.Strings(allKeys)
-
-			for _, key := range allKeys {
-				newExtension := (*in)[key]
-				oldExtension := &runtime.RawExtension{}
-				if err := s.Convert(newExtension, oldExtension, 0); err != nil {
-					return err
-				}
-
-				namedExtension := NamedExtension{key, *oldExtension}
-				*out = append(*out, namedExtension)
-			}
-
-			return nil
-		},
-	)
+		}
+		namedExtension := NamedExtension{key, oldExtension}
+		*out = append(*out, namedExtension)
+	}
+	return nil
 }

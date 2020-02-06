@@ -68,7 +68,7 @@ func ValidateEvent(event *core.Event) field.ErrorList {
 			allErrs = append(allErrs, field.Required(field.NewPath("reportingInstance"), ""))
 		}
 		if len(event.ReportingInstance) > ReportingInstanceLengthLimit {
-			allErrs = append(allErrs, field.Invalid(field.NewPath("repotingIntance"), "", fmt.Sprintf("can have at most %v characters", ReportingInstanceLengthLimit)))
+			allErrs = append(allErrs, field.Invalid(field.NewPath("reportingInstance"), "", fmt.Sprintf("can have at most %v characters", ReportingInstanceLengthLimit)))
 		}
 		if len(event.Action) == 0 {
 			allErrs = append(allErrs, field.Required(field.NewPath("action"), ""))

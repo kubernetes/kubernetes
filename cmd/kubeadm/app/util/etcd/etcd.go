@@ -26,9 +26,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/coreos/etcd/clientv3"
-	"github.com/coreos/etcd/pkg/transport"
 	"github.com/pkg/errors"
+	"go.etcd.io/etcd/clientv3"
+	"go.etcd.io/etcd/pkg/transport"
+	"google.golang.org/grpc"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog"
@@ -37,10 +38,11 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 )
 
-// Exponential backoff for MemberAdd/Remove (values exclude jitter):
-// 0, 50, 150, 350, 750, 1550, 3150, 6350, 12750 ms
-var addRemoveBackoff = wait.Backoff{
-	Steps:    8,
+const etcdTimeout = 2 * time.Second
+
+// Exponential backoff for etcd operations
+var etcdBackoff = wait.Backoff{
+	Steps:    11,
 	Duration: 50 * time.Millisecond,
 	Factor:   2.0,
 	Jitter:   0.1,
@@ -48,8 +50,7 @@ var addRemoveBackoff = wait.Backoff{
 
 // ClusterInterrogator is an interface to get etcd cluster related information
 type ClusterInterrogator interface {
-	ClusterAvailable() (bool, error)
-	GetClusterStatus() (map[string]*clientv3.StatusResponse, error)
+	CheckClusterHealth() error
 	GetClusterVersions() (map[string]string, error)
 	GetVersion() (string, error)
 	WaitForClusterAvailable(retries int, retryInterval time.Duration) (bool, error)
@@ -126,23 +127,41 @@ func NewFromCluster(client clientset.Interface, certificatesDir string) (*Client
 	return etcdClient, nil
 }
 
+// dialTimeout is the timeout for failing to establish a connection.
+// It is set to >20 seconds as times shorter than that will cause TLS connections to fail
+// on heavily loaded arm64 CPUs (issue #64649)
+const dialTimeout = 40 * time.Second
+
 // Sync synchronizes client's endpoints with the known endpoints from the etcd membership.
 func (c *Client) Sync() error {
 	cli, err := clientv3.New(clientv3.Config{
 		Endpoints:   c.Endpoints,
-		DialTimeout: 20 * time.Second,
-		TLS:         c.TLS,
+		DialTimeout: dialTimeout,
+		DialOptions: []grpc.DialOption{
+			grpc.WithBlock(), // block until the underlying connection is up
+		},
+		TLS: c.TLS,
 	})
 	if err != nil {
 		return err
 	}
 	defer cli.Close()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	err = cli.Sync(ctx)
-	cancel()
+	// Syncs the list of endpoints
+	var lastError error
+	err = wait.ExponentialBackoff(etcdBackoff, func() (bool, error) {
+		ctx, cancel := context.WithTimeout(context.Background(), etcdTimeout)
+		err = cli.Sync(ctx)
+		cancel()
+		if err == nil {
+			return true, nil
+		}
+		klog.V(5).Infof("Failed to sync etcd endpoints: %v", err)
+		lastError = err
+		return false, nil
+	})
 	if err != nil {
-		return err
+		return lastError
 	}
 	klog.V(1).Infof("etcd endpoints read from etcd: %s", strings.Join(cli.Endpoints(), ","))
 
@@ -161,19 +180,33 @@ type Member struct {
 func (c *Client) GetMemberID(peerURL string) (uint64, error) {
 	cli, err := clientv3.New(clientv3.Config{
 		Endpoints:   c.Endpoints,
-		DialTimeout: 30 * time.Second,
-		TLS:         c.TLS,
+		DialTimeout: dialTimeout,
+		DialOptions: []grpc.DialOption{
+			grpc.WithBlock(), // block until the underlying connection is up
+		},
+		TLS: c.TLS,
 	})
 	if err != nil {
 		return 0, err
 	}
 	defer cli.Close()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	resp, err := cli.MemberList(ctx)
-	cancel()
+	// Gets the member list
+	var lastError error
+	var resp *clientv3.MemberListResponse
+	err = wait.ExponentialBackoff(etcdBackoff, func() (bool, error) {
+		ctx, cancel := context.WithTimeout(context.Background(), etcdTimeout)
+		resp, err = cli.MemberList(ctx)
+		cancel()
+		if err == nil {
+			return true, nil
+		}
+		klog.V(5).Infof("Failed to get etcd member list: %v", err)
+		lastError = err
+		return false, nil
+	})
 	if err != nil {
-		return 0, err
+		return 0, lastError
 	}
 
 	for _, member := range resp.Members {
@@ -188,8 +221,11 @@ func (c *Client) GetMemberID(peerURL string) (uint64, error) {
 func (c *Client) RemoveMember(id uint64) ([]Member, error) {
 	cli, err := clientv3.New(clientv3.Config{
 		Endpoints:   c.Endpoints,
-		DialTimeout: 30 * time.Second,
-		TLS:         c.TLS,
+		DialTimeout: dialTimeout,
+		DialOptions: []grpc.DialOption{
+			grpc.WithBlock(), // block until the underlying connection is up
+		},
+		TLS: c.TLS,
 	})
 	if err != nil {
 		return nil, err
@@ -199,11 +235,14 @@ func (c *Client) RemoveMember(id uint64) ([]Member, error) {
 	// Remove an existing member from the cluster
 	var lastError error
 	var resp *clientv3.MemberRemoveResponse
-	err = wait.ExponentialBackoff(addRemoveBackoff, func() (bool, error) {
-		resp, err = cli.MemberRemove(context.Background(), id)
+	err = wait.ExponentialBackoff(etcdBackoff, func() (bool, error) {
+		ctx, cancel := context.WithTimeout(context.Background(), etcdTimeout)
+		resp, err = cli.MemberRemove(ctx, id)
+		cancel()
 		if err == nil {
 			return true, nil
 		}
+		klog.V(5).Infof("Failed to remove etcd member: %v", err)
 		lastError = err
 		return false, nil
 	})
@@ -232,8 +271,11 @@ func (c *Client) AddMember(name string, peerAddrs string) ([]Member, error) {
 
 	cli, err := clientv3.New(clientv3.Config{
 		Endpoints:   c.Endpoints,
-		DialTimeout: 20 * time.Second,
-		TLS:         c.TLS,
+		DialTimeout: dialTimeout,
+		DialOptions: []grpc.DialOption{
+			grpc.WithBlock(), // block until the underlying connection is up
+		},
+		TLS: c.TLS,
 	})
 	if err != nil {
 		return nil, err
@@ -243,11 +285,14 @@ func (c *Client) AddMember(name string, peerAddrs string) ([]Member, error) {
 	// Adds a new member to the cluster
 	var lastError error
 	var resp *clientv3.MemberAddResponse
-	err = wait.ExponentialBackoff(addRemoveBackoff, func() (bool, error) {
-		resp, err = cli.MemberAdd(context.Background(), []string{peerAddrs})
+	err = wait.ExponentialBackoff(etcdBackoff, func() (bool, error) {
+		ctx, cancel := context.WithTimeout(context.Background(), etcdTimeout)
+		resp, err = cli.MemberAdd(ctx, []string{peerAddrs})
+		cancel()
 		if err == nil {
 			return true, nil
 		}
+		klog.V(5).Infof("Failed to add etcd member: %v", err)
 		lastError = err
 		return false, nil
 	})
@@ -258,12 +303,20 @@ func (c *Client) AddMember(name string, peerAddrs string) ([]Member, error) {
 	// Returns the updated list of etcd members
 	ret := []Member{}
 	for _, m := range resp.Members {
-		// fixes the entry for the joining member (that doesn't have a name set in the initialCluster returned by etcd)
-		if m.Name == "" {
-			ret = append(ret, Member{Name: name, PeerURL: m.PeerURLs[0]})
-		} else {
-			ret = append(ret, Member{Name: m.Name, PeerURL: m.PeerURLs[0]})
+		// If the peer address matches, this is the member we are adding.
+		// Use the name we passed to the function.
+		if peerAddrs == m.PeerURLs[0] {
+			ret = append(ret, Member{Name: name, PeerURL: peerAddrs})
+			continue
 		}
+		// Otherwise, we are processing other existing etcd members returned by AddMembers.
+		memberName := m.Name
+		// In some cases during concurrent join, some members can end up without a name.
+		// Use the member ID as name for those.
+		if len(memberName) == 0 {
+			memberName = strconv.FormatUint(m.ID, 16)
+		}
+		ret = append(ret, Member{Name: memberName, PeerURL: m.PeerURLs[0]})
 	}
 
 	// Add the new member client address to the list of endpoints
@@ -296,7 +349,7 @@ func (c *Client) GetVersion() (string, error) {
 // GetClusterVersions returns a map of the endpoints and their associated versions
 func (c *Client) GetClusterVersions() (map[string]string, error) {
 	versions := make(map[string]string)
-	statuses, err := c.GetClusterStatus()
+	statuses, err := c.getClusterStatus()
 	if err != nil {
 		return versions, err
 	}
@@ -307,21 +360,21 @@ func (c *Client) GetClusterVersions() (map[string]string, error) {
 	return versions, nil
 }
 
-// ClusterAvailable returns true if the cluster status indicates the cluster is available.
-func (c *Client) ClusterAvailable() (bool, error) {
-	_, err := c.GetClusterStatus()
-	if err != nil {
-		return false, err
-	}
-	return true, nil
+// CheckClusterHealth returns nil for status Up or error for status Down
+func (c *Client) CheckClusterHealth() error {
+	_, err := c.getClusterStatus()
+	return err
 }
 
-// GetClusterStatus returns nil for status Up or error for status Down
-func (c *Client) GetClusterStatus() (map[string]*clientv3.StatusResponse, error) {
+// getClusterStatus returns nil for status Up (along with endpoint status response map) or error for status Down
+func (c *Client) getClusterStatus() (map[string]*clientv3.StatusResponse, error) {
 	cli, err := clientv3.New(clientv3.Config{
 		Endpoints:   c.Endpoints,
-		DialTimeout: 5 * time.Second,
-		TLS:         c.TLS,
+		DialTimeout: dialTimeout,
+		DialOptions: []grpc.DialOption{
+			grpc.WithBlock(), // block until the underlying connection is up
+		},
+		TLS: c.TLS,
 	})
 	if err != nil {
 		return nil, err
@@ -330,12 +383,24 @@ func (c *Client) GetClusterStatus() (map[string]*clientv3.StatusResponse, error)
 
 	clusterStatus := make(map[string]*clientv3.StatusResponse)
 	for _, ep := range c.Endpoints {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		resp, err := cli.Status(ctx, ep)
-		cancel()
+		// Gets the member status
+		var lastError error
+		var resp *clientv3.StatusResponse
+		err = wait.ExponentialBackoff(etcdBackoff, func() (bool, error) {
+			ctx, cancel := context.WithTimeout(context.Background(), etcdTimeout)
+			resp, err = cli.Status(ctx, ep)
+			cancel()
+			if err == nil {
+				return true, nil
+			}
+			klog.V(5).Infof("Failed to get etcd status for %s: %v", ep, err)
+			lastError = err
+			return false, nil
+		})
 		if err != nil {
-			return nil, err
+			return nil, lastError
 		}
+
 		clusterStatus[ep] = resp
 	}
 	return clusterStatus, nil
@@ -349,7 +414,7 @@ func (c *Client) WaitForClusterAvailable(retries int, retryInterval time.Duratio
 			time.Sleep(retryInterval)
 		}
 		klog.V(2).Infof("[etcd] attempting to see if all cluster endpoints (%s) are available %d/%d", c.Endpoints, i+1, retries)
-		resp, err := c.ClusterAvailable()
+		_, err := c.getClusterStatus()
 		if err != nil {
 			switch err {
 			case context.DeadlineExceeded:
@@ -359,14 +424,9 @@ func (c *Client) WaitForClusterAvailable(retries int, retryInterval time.Duratio
 			}
 			continue
 		}
-		return resp, nil
+		return true, nil
 	}
 	return false, errors.New("timeout waiting for etcd cluster to be available")
-}
-
-// CheckConfigurationIsHA returns true if the given InitConfiguration etcd block appears to be an HA configuration.
-func CheckConfigurationIsHA(cfg *kubeadmapi.Etcd) bool {
-	return cfg.External != nil && len(cfg.External.Endpoints) > 1
 }
 
 // GetClientURL creates an HTTPS URL that uses the configured advertise

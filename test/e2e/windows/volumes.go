@@ -23,6 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
@@ -47,15 +48,16 @@ var _ = SIGDescribe("Windows volume mounts ", func() {
 				Medium: v1.StorageMediumDefault,
 			},
 		}
-
-		hostMapSource = v1.VolumeSource{
+		hostPathDirectoryOrCreate = v1.HostPathDirectoryOrCreate
+		hostMapSource             = v1.VolumeSource{
 			HostPath: &v1.HostPathVolumeSource{
 				Path: hostMapPath,
+				Type: &hostPathDirectoryOrCreate,
 			},
 		}
 	)
 	ginkgo.BeforeEach(func() {
-		framework.SkipUnlessNodeOSDistroIs("windows")
+		e2eskipper.SkipUnlessNodeOSDistroIs("windows")
 	})
 
 	ginkgo.Context("check volume mount permissions", func() {

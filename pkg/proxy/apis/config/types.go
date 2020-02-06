@@ -58,6 +58,15 @@ type KubeProxyIPVSConfiguration struct {
 	// strict ARP configure arp_ignore and arp_announce to avoid answering ARP queries
 	// from kube-ipvs0 interface
 	StrictARP bool
+	// tcpTimeout is the timeout value used for idle IPVS TCP sessions.
+	// The default value is 0, which preserves the current timeout value on the system.
+	TCPTimeout metav1.Duration
+	// tcpFinTimeout is the timeout value used for IPVS TCP sessions after receiving a FIN.
+	// The default value is 0, which preserves the current timeout value on the system.
+	TCPFinTimeout metav1.Duration
+	// udpTimeout is the timeout value used for IPVS UDP packets.
+	// The default value is 0, which preserves the current timeout value on the system.
+	UDPTimeout metav1.Duration
 }
 
 // KubeProxyConntrackConfiguration contains conntrack settings for
@@ -84,7 +93,7 @@ type KubeProxyWinkernelConfiguration struct {
 	// networkName is the name of the network kube-proxy will use
 	// to create endpoints and policies
 	NetworkName string
-	// sourceVip is the IP address of the source VIP endoint used for
+	// sourceVip is the IP address of the source VIP endpoint used for
 	// NAT when loadbalancing
 	SourceVip string
 	// enableDSR tells kube-proxy whether HNS policies should be created
@@ -153,6 +162,8 @@ type KubeProxyConfiguration struct {
 	NodePortAddresses []string
 	// winkernel contains winkernel-related configuration options.
 	Winkernel KubeProxyWinkernelConfiguration
+	// ShowHiddenMetricsForVersion is the version for which you want to show hidden metrics.
+	ShowHiddenMetricsForVersion string
 }
 
 // Currently, three modes of proxy are available in Linux platform: 'userspace' (older, going to be EOL), 'iptables'

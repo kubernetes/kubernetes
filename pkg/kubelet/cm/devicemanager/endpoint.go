@@ -26,7 +26,7 @@ import (
 	"google.golang.org/grpc"
 	"k8s.io/klog"
 
-	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1beta1"
+	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 )
 
 // endpoint maps to a single registered device plugin. It is responsible
@@ -177,8 +177,8 @@ func dial(unixSocketPath string) (pluginapi.DevicePluginClient, *grpc.ClientConn
 	defer cancel()
 
 	c, err := grpc.DialContext(ctx, unixSocketPath, grpc.WithInsecure(), grpc.WithBlock(),
-		grpc.WithDialer(func(addr string, timeout time.Duration) (net.Conn, error) {
-			return net.DialTimeout("unix", addr, timeout)
+		grpc.WithContextDialer(func(ctx context.Context, addr string) (net.Conn, error) {
+			return (&net.Dialer{}).DialContext(ctx, "unix", addr)
 		}),
 	)
 

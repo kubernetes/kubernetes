@@ -19,6 +19,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"context"
 	"time"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -61,7 +62,7 @@ func (c *nodeMetricses) Get(name string, options v1.GetOptions) (result *v1alpha
 		Resource("nodes").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -77,7 +78,7 @@ func (c *nodeMetricses) List(opts v1.ListOptions) (result *v1alpha1.NodeMetricsL
 		Resource("nodes").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -93,5 +94,5 @@ func (c *nodeMetricses) Watch(opts v1.ListOptions) (watch.Interface, error) {
 		Resource("nodes").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch()
+		Watch(context.TODO())
 }

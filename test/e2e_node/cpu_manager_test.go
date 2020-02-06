@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e_node
+package e2enode
 
 import (
 	"fmt"
@@ -23,7 +23,7 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
@@ -33,9 +33,11 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 // Helper for makeCPUManagerPod().
@@ -94,7 +96,7 @@ func getLocalNodeCPUDetails(f *framework.Framework) (cpuCapVal int64, cpuAllocVa
 	cpuCap := localNodeCap[v1.ResourceCPU]
 	localNodeAlloc := getLocalNode(f).Status.Allocatable
 	cpuAlloc := localNodeAlloc[v1.ResourceCPU]
-	cpuRes := cpuCap.Copy()
+	cpuRes := cpuCap.DeepCopy()
 	cpuRes.Sub(cpuAlloc)
 
 	// RoundUp reserved CPUs to get only integer cores.
@@ -106,7 +108,7 @@ func getLocalNodeCPUDetails(f *framework.Framework) (cpuCapVal int64, cpuAllocVa
 func waitForContainerRemoval(containerName, podName, podNS string) {
 	rs, _, err := getCRIClient()
 	framework.ExpectNoError(err)
-	Eventually(func() bool {
+	gomega.Eventually(func() bool {
 		containers, err := rs.ListContainers(&runtimeapi.ContainerFilter{
 			LabelSelector: map[string]string{
 				types.KubernetesPodNameLabel:       podName,
@@ -118,19 +120,19 @@ func waitForContainerRemoval(containerName, podName, podNS string) {
 			return false
 		}
 		return len(containers) == 0
-	}, 2*time.Minute, 1*time.Second).Should(BeTrue())
+	}, 2*time.Minute, 1*time.Second).Should(gomega.BeTrue())
 }
 
 func waitForStateFileCleanedUp() {
-	Eventually(func() bool {
-		restoredState, err := cpumanagerstate.NewCheckpointState("/var/lib/kubelet", "cpu_manager_state", "static")
+	gomega.Eventually(func() bool {
+		restoredState, err := cpumanagerstate.NewCheckpointState("/var/lib/kubelet", "cpu_manager_state", "static", nil)
 		framework.ExpectNoError(err, "failed to create testing cpumanager state instance")
 		assignments := restoredState.GetCPUAssignments()
 		if len(assignments) == 0 {
 			return true
 		}
 		return false
-	}, 2*time.Minute, 1*time.Second).Should(BeTrue())
+	}, 2*time.Minute, 1*time.Second).Should(gomega.BeTrue())
 }
 
 func isHTEnabled() bool {
@@ -178,10 +180,11 @@ func disableCPUManagerInKubelet(f *framework.Framework) (oldCfg *kubeletconfig.K
 	framework.ExpectNoError(setKubeletConfiguration(f, newCfg))
 
 	// Wait for the Kubelet to be ready.
-	Eventually(func() bool {
-		nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-		return len(nodeList.Items) == 1
-	}, time.Minute, time.Second).Should(BeTrue())
+	gomega.Eventually(func() bool {
+		nodes, err := e2enode.TotalReady(f.ClientSet)
+		framework.ExpectNoError(err)
+		return nodes == 1
+	}, time.Minute, time.Second).Should(gomega.BeTrue())
 
 	return oldCfg
 }
@@ -230,10 +233,11 @@ func enableCPUManagerInKubelet(f *framework.Framework, cleanStateFile bool) (old
 	framework.ExpectNoError(setKubeletConfiguration(f, newCfg))
 
 	// Wait for the Kubelet to be ready.
-	Eventually(func() bool {
-		nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-		return len(nodeList.Items) == 1
-	}, time.Minute, time.Second).Should(BeTrue())
+	gomega.Eventually(func() bool {
+		nodes, err := e2enode.TotalReady(f.ClientSet)
+		framework.ExpectNoError(err)
+		return nodes == 1
+	}, time.Minute, time.Second).Should(gomega.BeTrue())
 
 	return oldCfg
 }
@@ -249,18 +253,18 @@ func runCPUManagerTests(f *framework.Framework) {
 	var ctnAttrs []ctnAttribute
 	var pod, pod1, pod2 *v1.Pod
 
-	It("should assign CPUs as expected based on the Pod spec", func() {
+	ginkgo.It("should assign CPUs as expected based on the Pod spec", func() {
 		cpuCap, cpuAlloc, _ = getLocalNodeCPUDetails(f)
 
 		// Skip CPU Manager tests altogether if the CPU capacity < 2.
 		if cpuCap < 2 {
-			framework.Skipf("Skipping CPU Manager tests since the CPU capacity < 2")
+			e2eskipper.Skipf("Skipping CPU Manager tests since the CPU capacity < 2")
 		}
 
 		// Enable CPU Manager in the kubelet.
 		oldCfg = enableCPUManagerInKubelet(f, true)
 
-		By("running a non-Gu pod")
+		ginkgo.By("running a non-Gu pod")
 		ctnAttrs = []ctnAttribute{
 			{
 				ctnName:    "non-gu-container",
@@ -271,17 +275,17 @@ func runCPUManagerTests(f *framework.Framework) {
 		pod = makeCPUManagerPod("non-gu-pod", ctnAttrs)
 		pod = f.PodClient().CreateSync(pod)
 
-		By("checking if the expected cpuset was assigned")
+		ginkgo.By("checking if the expected cpuset was assigned")
 		expAllowedCPUsListRegex = fmt.Sprintf("^0-%d\n$", cpuCap-1)
 		err = f.PodClient().MatchContainerOutput(pod.Name, pod.Spec.Containers[0].Name, expAllowedCPUsListRegex)
 		framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
 			pod.Spec.Containers[0].Name, pod.Name)
 
-		By("by deleting the pods and waiting for container removal")
+		ginkgo.By("by deleting the pods and waiting for container removal")
 		deletePods(f, []string{pod.Name})
 		waitForContainerRemoval(pod.Spec.Containers[0].Name, pod.Name, pod.Namespace)
 
-		By("running a Gu pod")
+		ginkgo.By("running a Gu pod")
 		ctnAttrs = []ctnAttribute{
 			{
 				ctnName:    "gu-container",
@@ -292,7 +296,7 @@ func runCPUManagerTests(f *framework.Framework) {
 		pod = makeCPUManagerPod("gu-pod", ctnAttrs)
 		pod = f.PodClient().CreateSync(pod)
 
-		By("checking if the expected cpuset was assigned")
+		ginkgo.By("checking if the expected cpuset was assigned")
 		cpu1 = 1
 		if isHTEnabled() {
 			cpuList = cpuset.MustParse(getCPUSiblingList(0)).ToSlice()
@@ -303,11 +307,11 @@ func runCPUManagerTests(f *framework.Framework) {
 		framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
 			pod.Spec.Containers[0].Name, pod.Name)
 
-		By("by deleting the pods and waiting for container removal")
+		ginkgo.By("by deleting the pods and waiting for container removal")
 		deletePods(f, []string{pod.Name})
 		waitForContainerRemoval(pod.Spec.Containers[0].Name, pod.Name, pod.Namespace)
 
-		By("running multiple Gu and non-Gu pods")
+		ginkgo.By("running multiple Gu and non-Gu pods")
 		ctnAttrs = []ctnAttribute{
 			{
 				ctnName:    "gu-container",
@@ -328,7 +332,7 @@ func runCPUManagerTests(f *framework.Framework) {
 		pod2 = makeCPUManagerPod("non-gu-pod", ctnAttrs)
 		pod2 = f.PodClient().CreateSync(pod2)
 
-		By("checking if the expected cpuset was assigned")
+		ginkgo.By("checking if the expected cpuset was assigned")
 		cpu1 = 1
 		if isHTEnabled() {
 			cpuList = cpuset.MustParse(getCPUSiblingList(0)).ToSlice()
@@ -349,17 +353,17 @@ func runCPUManagerTests(f *framework.Framework) {
 		framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
 			pod2.Spec.Containers[0].Name, pod2.Name)
 
-		By("by deleting the pods and waiting for container removal")
+		ginkgo.By("by deleting the pods and waiting for container removal")
 		deletePods(f, []string{pod1.Name, pod2.Name})
 		waitForContainerRemoval(pod1.Spec.Containers[0].Name, pod1.Name, pod1.Namespace)
 		waitForContainerRemoval(pod2.Spec.Containers[0].Name, pod2.Name, pod2.Namespace)
 
 		// Skip rest of the tests if CPU capacity < 3.
 		if cpuCap < 3 {
-			framework.Skipf("Skipping rest of the CPU Manager tests since CPU capacity < 3")
+			e2eskipper.Skipf("Skipping rest of the CPU Manager tests since CPU capacity < 3")
 		}
 
-		By("running a Gu pod requesting multiple CPUs")
+		ginkgo.By("running a Gu pod requesting multiple CPUs")
 		ctnAttrs = []ctnAttribute{
 			{
 				ctnName:    "gu-container",
@@ -370,7 +374,7 @@ func runCPUManagerTests(f *framework.Framework) {
 		pod = makeCPUManagerPod("gu-pod", ctnAttrs)
 		pod = f.PodClient().CreateSync(pod)
 
-		By("checking if the expected cpuset was assigned")
+		ginkgo.By("checking if the expected cpuset was assigned")
 		cpuListString = "1-2"
 		if isHTEnabled() {
 			cpuListString = "2-3"
@@ -385,11 +389,11 @@ func runCPUManagerTests(f *framework.Framework) {
 		framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
 			pod.Spec.Containers[0].Name, pod.Name)
 
-		By("by deleting the pods and waiting for container removal")
+		ginkgo.By("by deleting the pods and waiting for container removal")
 		deletePods(f, []string{pod.Name})
 		waitForContainerRemoval(pod.Spec.Containers[0].Name, pod.Name, pod.Namespace)
 
-		By("running a Gu pod with multiple containers requesting integer CPUs")
+		ginkgo.By("running a Gu pod with multiple containers requesting integer CPUs")
 		ctnAttrs = []ctnAttribute{
 			{
 				ctnName:    "gu-container1",
@@ -405,7 +409,7 @@ func runCPUManagerTests(f *framework.Framework) {
 		pod = makeCPUManagerPod("gu-pod", ctnAttrs)
 		pod = f.PodClient().CreateSync(pod)
 
-		By("checking if the expected cpuset was assigned")
+		ginkgo.By("checking if the expected cpuset was assigned")
 		cpu1, cpu2 = 1, 2
 		if isHTEnabled() {
 			cpuList = cpuset.MustParse(getCPUSiblingList(0)).ToSlice()
@@ -419,16 +423,16 @@ func runCPUManagerTests(f *framework.Framework) {
 		framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
 			pod.Spec.Containers[0].Name, pod.Name)
 
-		err = f.PodClient().MatchContainerOutput(pod.Name, pod.Spec.Containers[0].Name, expAllowedCPUsListRegex)
+		err = f.PodClient().MatchContainerOutput(pod.Name, pod.Spec.Containers[1].Name, expAllowedCPUsListRegex)
 		framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
 			pod.Spec.Containers[1].Name, pod.Name)
 
-		By("by deleting the pods and waiting for container removal")
+		ginkgo.By("by deleting the pods and waiting for container removal")
 		deletePods(f, []string{pod.Name})
 		waitForContainerRemoval(pod.Spec.Containers[0].Name, pod.Name, pod.Namespace)
 		waitForContainerRemoval(pod.Spec.Containers[1].Name, pod.Name, pod.Namespace)
 
-		By("running multiple Gu pods")
+		ginkgo.By("running multiple Gu pods")
 		ctnAttrs = []ctnAttribute{
 			{
 				ctnName:    "gu-container1",
@@ -449,7 +453,7 @@ func runCPUManagerTests(f *framework.Framework) {
 		pod2 = makeCPUManagerPod("gu-pod2", ctnAttrs)
 		pod2 = f.PodClient().CreateSync(pod2)
 
-		By("checking if the expected cpuset was assigned")
+		ginkgo.By("checking if the expected cpuset was assigned")
 		cpu1, cpu2 = 1, 2
 		if isHTEnabled() {
 			cpuList = cpuset.MustParse(getCPUSiblingList(0)).ToSlice()
@@ -468,19 +472,19 @@ func runCPUManagerTests(f *framework.Framework) {
 		framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
 			pod2.Spec.Containers[0].Name, pod2.Name)
 
-		By("by deleting the pods and waiting for container removal")
+		ginkgo.By("by deleting the pods and waiting for container removal")
 		deletePods(f, []string{pod1.Name, pod2.Name})
 		waitForContainerRemoval(pod1.Spec.Containers[0].Name, pod1.Name, pod1.Namespace)
 		waitForContainerRemoval(pod2.Spec.Containers[0].Name, pod2.Name, pod2.Namespace)
 
-		By("test for automatically remove inactive pods from cpumanager state file.")
+		ginkgo.By("test for automatically remove inactive pods from cpumanager state file.")
 		// First running a Gu Pod,
 		// second disable cpu manager in kubelet,
 		// then delete the Gu Pod,
 		// then enable cpu manager in kubelet,
 		// at last wait for the reconcile process cleaned up the state file, if the assignments map is empty,
 		// it proves that the automatic cleanup in the reconcile process is in effect.
-		By("running a Gu pod for test remove")
+		ginkgo.By("running a Gu pod for test remove")
 		ctnAttrs = []ctnAttribute{
 			{
 				ctnName:    "gu-container-testremove",
@@ -491,7 +495,7 @@ func runCPUManagerTests(f *framework.Framework) {
 		pod = makeCPUManagerPod("gu-pod-testremove", ctnAttrs)
 		pod = f.PodClient().CreateSync(pod)
 
-		By("checking if the expected cpuset was assigned")
+		ginkgo.By("checking if the expected cpuset was assigned")
 		cpu1 = 1
 		if isHTEnabled() {
 			cpuList = cpuset.MustParse(getCPUSiblingList(0)).ToSlice()
@@ -502,19 +506,19 @@ func runCPUManagerTests(f *framework.Framework) {
 		framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
 			pod.Spec.Containers[0].Name, pod.Name)
 
-		By("disable cpu manager in kubelet")
+		ginkgo.By("disable cpu manager in kubelet")
 		disableCPUManagerInKubelet(f)
 
-		By("by deleting the pod and waiting for container removal")
+		ginkgo.By("by deleting the pod and waiting for container removal")
 		deletePods(f, []string{pod.Name})
 		waitForContainerRemoval(pod.Spec.Containers[0].Name, pod.Name, pod.Namespace)
 
-		By("enable cpu manager in kubelet without delete state file")
+		ginkgo.By("enable cpu manager in kubelet without delete state file")
 		enableCPUManagerInKubelet(f, false)
 
-		By("wait for the deleted pod to be cleaned up from the state file")
+		ginkgo.By("wait for the deleted pod to be cleaned up from the state file")
 		waitForStateFileCleanedUp()
-		By("the deleted pod has already been deleted from the state file")
+		ginkgo.By("the deleted pod has already been deleted from the state file")
 
 		setOldKubeletConfig(f, oldCfg)
 	})
@@ -524,7 +528,7 @@ func runCPUManagerTests(f *framework.Framework) {
 var _ = SIGDescribe("CPU Manager [Serial] [Feature:CPUManager][NodeAlphaFeature:CPUManager]", func() {
 	f := framework.NewDefaultFramework("cpu-manager-test")
 
-	Context("With kubeconfig updated with static CPU Manager policy run the CPU Manager tests", func() {
+	ginkgo.Context("With kubeconfig updated with static CPU Manager policy run the CPU Manager tests", func() {
 		runCPUManagerTests(f)
 	})
 })

@@ -24,7 +24,7 @@ import (
 	"testing"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 
 func TestNormalizationFuncGlobalExistence(t *testing.T) {
@@ -71,7 +71,7 @@ func TestKubectlCommandHandlesPlugins(t *testing.T) {
 			name:             "test that a plugin executable is found based on command args",
 			args:             []string{"kubectl", "foo", "--bar"},
 			expectPlugin:     "plugin/testdata/kubectl-foo",
-			expectPluginArgs: []string{"foo", "--bar"},
+			expectPluginArgs: []string{"--bar"},
 		},
 		{
 			name: "test that a plugin does not execute over an existing command by the same name",
@@ -100,11 +100,11 @@ func TestKubectlCommandHandlesPlugins(t *testing.T) {
 			}
 
 			if pluginsHandler.executedPlugin != test.expectPlugin {
-				t.Fatalf("unexpected plugin execution: expedcted %q, got %q", test.expectPlugin, pluginsHandler.executedPlugin)
+				t.Fatalf("unexpected plugin execution: expected %q, got %q", test.expectPlugin, pluginsHandler.executedPlugin)
 			}
 
 			if len(pluginsHandler.withArgs) != len(test.expectPluginArgs) {
-				t.Fatalf("unexpected plugin execution args: expedcted %q, got %q", test.expectPluginArgs, pluginsHandler.withArgs)
+				t.Fatalf("unexpected plugin execution args: expected %q, got %q", test.expectPluginArgs, pluginsHandler.withArgs)
 			}
 		})
 	}

@@ -130,5 +130,5 @@ var usageMap = map[x509.ExtKeyUsage]certsapi.KeyUsage{
 	x509.ExtKeyUsageTimeStamping:               certsapi.UsageTimestamping,
 	x509.ExtKeyUsageOCSPSigning:                certsapi.UsageOCSPSigning,
 	x509.ExtKeyUsageMicrosoftServerGatedCrypto: certsapi.UsageMicrosoftSGC,
-	x509.ExtKeyUsageNetscapeServerGatedCrypto:  certsapi.UsageNetscapSGC,
+	x509.ExtKeyUsageNetscapeServerGatedCrypto:  certsapi.UsageNetscapeSGC,
 }

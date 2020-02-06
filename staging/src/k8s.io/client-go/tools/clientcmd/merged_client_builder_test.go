@@ -24,19 +24,6 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
-type testLoader struct {
-	ClientConfigLoader
-
-	called bool
-	config *clientcmdapi.Config
-	err    error
-}
-
-func (l *testLoader) Load() (*clientcmdapi.Config, error) {
-	l.called = true
-	return l.config, l.err
-}
-
 type testClientConfig struct {
 	rawconfig          *clientcmdapi.Config
 	config             *restclient.Config

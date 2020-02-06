@@ -19,6 +19,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"context"
 	"time"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -71,7 +72,7 @@ func (c *flunders) Get(name string, options v1.GetOptions) (result *v1alpha1.Flu
 		Resource("flunders").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -88,7 +89,7 @@ func (c *flunders) List(opts v1.ListOptions) (result *v1alpha1.FlunderList, err 
 		Resource("flunders").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -105,7 +106,7 @@ func (c *flunders) Watch(opts v1.ListOptions) (watch.Interface, error) {
 		Resource("flunders").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch()
+		Watch(context.TODO())
 }
 
 // Create takes the representation of a flunder and creates it.  Returns the server's representation of the flunder, and an error, if there is any.
@@ -115,7 +116,7 @@ func (c *flunders) Create(flunder *v1alpha1.Flunder) (result *v1alpha1.Flunder, 
 		Namespace(c.ns).
 		Resource("flunders").
 		Body(flunder).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -128,7 +129,7 @@ func (c *flunders) Update(flunder *v1alpha1.Flunder) (result *v1alpha1.Flunder, 
 		Resource("flunders").
 		Name(flunder.Name).
 		Body(flunder).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -144,7 +145,7 @@ func (c *flunders) UpdateStatus(flunder *v1alpha1.Flunder) (result *v1alpha1.Flu
 		Name(flunder.Name).
 		SubResource("status").
 		Body(flunder).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -156,7 +157,7 @@ func (c *flunders) Delete(name string, options *v1.DeleteOptions) error {
 		Resource("flunders").
 		Name(name).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -172,7 +173,7 @@ func (c *flunders) DeleteCollection(options *v1.DeleteOptions, listOptions v1.Li
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Timeout(timeout).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -185,7 +186,7 @@ func (c *flunders) Patch(name string, pt types.PatchType, data []byte, subresour
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }

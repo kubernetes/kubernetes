@@ -87,8 +87,11 @@ process_content () {
      # - gopkg.in/square/go-jose.v2
      package_root=$(echo "${package}" |grep -oh '.*\.v[0-9]')
      ;;
-    *)
+    */*)
      package_root=$(echo "${package}" |awk -F/ '{ print $1"/"$2 }')
+     ;;
+    *)
+     package_root="${package}"
      ;;
   esac
 

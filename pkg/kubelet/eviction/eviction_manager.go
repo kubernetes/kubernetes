@@ -24,7 +24,7 @@ import (
 
 	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/clock"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -37,11 +37,9 @@ import (
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
-	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 )
 
 const (
@@ -138,20 +136,21 @@ func (m *managerImpl) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAd
 	if kubelettypes.IsCriticalPod(attrs.Pod) {
 		return lifecycle.PodAdmitResult{Admit: true}
 	}
-	// the node has memory pressure, admit if not best-effort
-	if hasNodeCondition(m.nodeConditions, v1.NodeMemoryPressure) {
+
+	// Conditions other than memory pressure reject all pods
+	nodeOnlyHasMemoryPressureCondition := hasNodeCondition(m.nodeConditions, v1.NodeMemoryPressure) && len(m.nodeConditions) == 1
+	if nodeOnlyHasMemoryPressureCondition {
 		notBestEffort := v1.PodQOSBestEffort != v1qos.GetPodQOS(attrs.Pod)
 		if notBestEffort {
 			return lifecycle.PodAdmitResult{Admit: true}
 		}
 
-		// When node has memory pressure and TaintNodesByCondition is enabled, check BestEffort Pod's toleration:
+		// When node has memory pressure, check BestEffort Pod's toleration:
 		// admit it if tolerates memory pressure taint, fail for other tolerations, e.g. DiskPressure.
-		if utilfeature.DefaultFeatureGate.Enabled(features.TaintNodesByCondition) &&
-			v1helper.TolerationsTolerateTaint(attrs.Pod.Spec.Tolerations, &v1.Taint{
-				Key:    schedulerapi.TaintNodeMemoryPressure,
-				Effect: v1.TaintEffectNoSchedule,
-			}) {
+		if v1helper.TolerationsTolerateTaint(attrs.Pod.Spec.Tolerations, &v1.Taint{
+			Key:    v1.TaintNodeMemoryPressure,
+			Effect: v1.TaintEffectNoSchedule,
+		}) {
 			return lifecycle.PodAdmitResult{Admit: true}
 		}
 	}
@@ -293,7 +292,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 
 	// determine the set of thresholds we need to drive eviction behavior (i.e. all grace periods are met)
 	thresholds = thresholdsMetGracePeriod(thresholdsFirstObservedAt, now)
-	debugLogThresholdsWithObservation("thresholds - grace periods satisified", thresholds, observations)
+	debugLogThresholdsWithObservation("thresholds - grace periods satisfied", thresholds, observations)
 
 	// update internal state
 	m.Lock()
@@ -364,7 +363,6 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 		timeObserved := observations[t.Signal].time
 		if !timeObserved.IsZero() {
 			metrics.EvictionStatsAge.WithLabelValues(string(t.Signal)).Observe(metrics.SinceInSeconds(timeObserved.Time))
-			metrics.DeprecatedEvictionStatsAge.WithLabelValues(string(t.Signal)).Observe(metrics.SinceInMicroseconds(timeObserved.Time))
 		}
 	}
 
@@ -377,6 +375,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 		}
 		message, annotations := evictionMessage(resourceToReclaim, pod, statsFunc)
 		if m.evictPod(pod, gracePeriodOverride, message, annotations) {
+			metrics.Evictions.WithLabelValues(string(thresholdToReclaim.Signal)).Inc()
 			return []*v1.Pod{pod}
 		}
 	}
@@ -497,7 +496,7 @@ func (m *managerImpl) podEphemeralStorageLimitEviction(podStats statsapi.PodStat
 	}
 
 	podEphemeralStorageTotalUsage := &resource.Quantity{}
-	fsStatsSet := []fsStatsType{}
+	var fsStatsSet []fsStatsType
 	if *m.dedicatedImageFs {
 		fsStatsSet = []fsStatsType{fsStatsLogs, fsStatsLocalVolumeSource}
 	} else {
@@ -547,19 +546,9 @@ func (m *managerImpl) evictPod(pod *v1.Pod, gracePeriodOverride int64, evictMsg 
 	// If the pod is marked as critical and static, and support for critical pod annotations is enabled,
 	// do not evict such pods. Static pods are not re-admitted after evictions.
 	// https://github.com/kubernetes/kubernetes/issues/40573 has more details.
-	if kubepod.IsStaticPod(pod) {
-		// need mirrorPod to check its "priority" value; static pod doesn't carry it
-		if mirrorPod, ok := m.mirrorPodFunc(pod); ok && mirrorPod != nil {
-			// skip only when it's a static and critical pod
-			if kubelettypes.IsCriticalPod(mirrorPod) {
-				klog.Errorf("eviction manager: cannot evict a critical static pod %s", format.Pod(pod))
-				return false
-			}
-		} else {
-			// we should never hit this
-			klog.Errorf("eviction manager: cannot get mirror pod from static pod %s, so cannot evict it", format.Pod(pod))
-			return false
-		}
+	if kubelettypes.IsCriticalPod(pod) {
+		klog.Errorf("eviction manager: cannot evict a critical pod %s", format.Pod(pod))
+		return false
 	}
 	status := v1.PodStatus{
 		Phase:   v1.PodFailed,

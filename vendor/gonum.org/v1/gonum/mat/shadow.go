@@ -4,23 +4,7 @@
 
 package mat
 
-import (
-	"gonum.org/v1/gonum/blas/blas64"
-)
-
-const (
-	// regionOverlap is the panic string used for the general case
-	// of a matrix region overlap between a source and destination.
-	regionOverlap = "mat: bad region: overlap"
-
-	// regionIdentity is the panic string used for the specific
-	// case of complete agreement between a source and a destination.
-	regionIdentity = "mat: bad region: identical"
-
-	// mismatchedStrides is the panic string used for overlapping
-	// data slices with differing strides.
-	mismatchedStrides = "mat: bad region: different strides"
-)
+import "gonum.org/v1/gonum/blas/blas64"
 
 // checkOverlap returns false if the receiver does not overlap data elements
 // referenced by the parameter and panics otherwise.
@@ -51,8 +35,9 @@ func checkOverlap(a, b blas64.General) bool {
 		return false
 	}
 
-	if a.Stride != b.Stride {
-		// Too hard, so assume the worst.
+	if a.Stride != b.Stride && a.Stride != 1 && b.Stride != 1 {
+		// Too hard, so assume the worst; if either stride
+		// is one it will be caught in rectanglesOverlap.
 		panic(mismatchedStrides)
 	}
 
@@ -60,7 +45,7 @@ func checkOverlap(a, b blas64.General) bool {
 		off = -off
 		a.Cols, b.Cols = b.Cols, a.Cols
 	}
-	if rectanglesOverlap(off, a.Cols, b.Cols, a.Stride) {
+	if rectanglesOverlap(off, a.Cols, b.Cols, min(a.Stride, b.Stride)) {
 		panic(regionOverlap)
 	}
 	return false
@@ -75,15 +60,20 @@ func (m *Dense) checkOverlapMatrix(a Matrix) bool {
 		return false
 	}
 	var amat blas64.General
-	switch a := a.(type) {
+	switch ar := a.(type) {
 	default:
 		return false
 	case RawMatrixer:
-		amat = a.RawMatrix()
+		amat = ar.RawMatrix()
 	case RawSymmetricer:
-		amat = generalFromSymmetric(a.RawSymmetric())
+		amat = generalFromSymmetric(ar.RawSymmetric())
+	case RawSymBander:
+		amat = generalFromSymmetricBand(ar.RawSymBand())
 	case RawTriangular:
-		amat = generalFromTriangular(a.RawTriangular())
+		amat = generalFromTriangular(ar.RawTriangular())
+	case RawVectorer:
+		r, c := a.Dims()
+		amat = generalFromVector(ar.RawVector(), r, c)
 	}
 	return m.checkOverlap(amat)
 }
@@ -97,15 +87,20 @@ func (s *SymDense) checkOverlapMatrix(a Matrix) bool {
 		return false
 	}
 	var amat blas64.General
-	switch a := a.(type) {
+	switch ar := a.(type) {
 	default:
 		return false
 	case RawMatrixer:
-		amat = a.RawMatrix()
+		amat = ar.RawMatrix()
 	case RawSymmetricer:
-		amat = generalFromSymmetric(a.RawSymmetric())
+		amat = generalFromSymmetric(ar.RawSymmetric())
+	case RawSymBander:
+		amat = generalFromSymmetricBand(ar.RawSymBand())
 	case RawTriangular:
-		amat = generalFromTriangular(a.RawTriangular())
+		amat = generalFromTriangular(ar.RawTriangular())
+	case RawVectorer:
+		r, c := a.Dims()
+		amat = generalFromVector(ar.RawVector(), r, c)
 	}
 	return s.checkOverlap(amat)
 }
@@ -130,15 +125,20 @@ func (t *TriDense) checkOverlapMatrix(a Matrix) bool {
 		return false
 	}
 	var amat blas64.General
-	switch a := a.(type) {
+	switch ar := a.(type) {
 	default:
 		return false
 	case RawMatrixer:
-		amat = a.RawMatrix()
+		amat = ar.RawMatrix()
 	case RawSymmetricer:
-		amat = generalFromSymmetric(a.RawSymmetric())
+		amat = generalFromSymmetric(ar.RawSymmetric())
+	case RawSymBander:
+		amat = generalFromSymmetricBand(ar.RawSymBand())
 	case RawTriangular:
-		amat = generalFromTriangular(a.RawTriangular())
+		amat = generalFromTriangular(ar.RawTriangular())
+	case RawVectorer:
+		r, c := a.Dims()
+		amat = generalFromVector(ar.RawVector(), r, c)
 	}
 	return t.checkOverlap(amat)
 }
@@ -179,48 +179,64 @@ func (v *VecDense) checkOverlap(a blas64.Vector) bool {
 		return false
 	}
 
-	if mat.Inc != a.Inc {
-		// Too hard, so assume the worst.
+	if mat.Inc != a.Inc && mat.Inc != 1 && a.Inc != 1 {
+		// Too hard, so assume the worst; if either
+		// increment is one it will be caught below.
 		panic(mismatchedStrides)
 	}
+	inc := min(mat.Inc, a.Inc)
 
-	if mat.Inc == 1 || off&mat.Inc == 0 {
+	if inc == 1 || off&inc == 0 {
 		panic(regionOverlap)
 	}
 	return false
 }
 
-// rectanglesOverlap returns whether the strided rectangles a and b overlap
-// when b is offset by off elements after a but has at least one element before
-// the end of a. off must be positive. a and b have aCols and bCols respectively.
-//
-// rectanglesOverlap works by shifting both matrices left such that the left
-// column of a is at 0. The column indexes are flattened by obtaining the shifted
-// relative left and right column positions modulo the common stride. This allows
-// direct comparison of the column offsets when the matrix backing data slices
-// are known to overlap.
-func rectanglesOverlap(off, aCols, bCols, stride int) bool {
-	if stride == 1 {
-		// Unit stride means overlapping data
-		// slices must overlap as matrices.
-		return true
+// generalFromVector returns a blas64.General with the backing
+// data and dimensions of a.
+func generalFromVector(a blas64.Vector, r, c int) blas64.General {
+	return blas64.General{
+		Rows:   r,
+		Cols:   c,
+		Stride: a.Inc,
+		Data:   a.Data,
 	}
+}
 
-	// Flatten the shifted matrix column positions
-	// so a starts at 0, modulo the common stride.
-	aTo := aCols
-	// The mod stride operations here make the from
-	// and to indexes comparable between a and b when
-	// the data slices of a and b overlap.
-	bFrom := off % stride
-	bTo := (bFrom + bCols) % stride
+func (s *SymBandDense) checkOverlap(a blas64.General) bool {
+	return checkOverlap(generalFromSymmetricBand(s.RawSymBand()), a)
+}
 
-	if bTo == 0 || bFrom < bTo {
-		// b matrix is not wrapped: compare for
-		// simple overlap.
-		return bFrom < aTo
+func (s *SymBandDense) checkOverlapMatrix(a Matrix) bool {
+	if s == a {
+		return false
 	}
+	var amat blas64.General
+	switch ar := a.(type) {
+	default:
+		return false
+	case RawMatrixer:
+		amat = ar.RawMatrix()
+	case RawSymmetricer:
+		amat = generalFromSymmetric(ar.RawSymmetric())
+	case RawSymBander:
+		amat = generalFromSymmetricBand(ar.RawSymBand())
+	case RawTriangular:
+		amat = generalFromTriangular(ar.RawTriangular())
+	case RawVectorer:
+		r, c := a.Dims()
+		amat = generalFromVector(ar.RawVector(), r, c)
+	}
+	return s.checkOverlap(amat)
+}
 
-	// b strictly wraps and so must overlap with a.
-	return true
+// generalFromSymmetricBand returns a blas64.General with the backing
+// data and dimensions of a.
+func generalFromSymmetricBand(a blas64.SymmetricBand) blas64.General {
+	return blas64.General{
+		Rows:   a.N,
+		Cols:   a.K + 1,
+		Data:   a.Data,
+		Stride: a.Stride,
+	}
 }

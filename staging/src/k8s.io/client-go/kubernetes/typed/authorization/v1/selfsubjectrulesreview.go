@@ -19,6 +19,9 @@ limitations under the License.
 package v1
 
 import (
+	"context"
+
+	v1 "k8s.io/api/authorization/v1"
 	rest "k8s.io/client-go/rest"
 )
 
@@ -30,6 +33,7 @@ type SelfSubjectRulesReviewsGetter interface {
 
 // SelfSubjectRulesReviewInterface has methods to work with SelfSubjectRulesReview resources.
 type SelfSubjectRulesReviewInterface interface {
+	Create(*v1.SelfSubjectRulesReview) (*v1.SelfSubjectRulesReview, error)
 	SelfSubjectRulesReviewExpansion
 }
 
@@ -43,4 +47,15 @@ func newSelfSubjectRulesReviews(c *AuthorizationV1Client) *selfSubjectRulesRevie
 	return &selfSubjectRulesReviews{
 		client: c.RESTClient(),
 	}
+}
+
+// Create takes the representation of a selfSubjectRulesReview and creates it.  Returns the server's representation of the selfSubjectRulesReview, and an error, if there is any.
+func (c *selfSubjectRulesReviews) Create(selfSubjectRulesReview *v1.SelfSubjectRulesReview) (result *v1.SelfSubjectRulesReview, err error) {
+	result = &v1.SelfSubjectRulesReview{}
+	err = c.client.Post().
+		Resource("selfsubjectrulesreviews").
+		Body(selfSubjectRulesReview).
+		Do(context.TODO()).
+		Into(result)
+	return
 }

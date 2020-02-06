@@ -36,9 +36,6 @@ rules:
   - apiGroups: [""]
     resources: ["persistentvolumeclaims/status"]
     verbs: ["update", "patch"]
-  - apiGroups: ["storage.k8s.io"]
-    resources: ["storageclasses"]
-    verbs: ["get", "list", "watch"]
   - apiGroups: [""]
     resources: ["events"]
     verbs: ["list", "watch", "create", "update", "patch"]
@@ -59,7 +56,7 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
 
 ---
-# Resizer must be able to work with leases in current namespace
+# Resizer must be able to work with end point in current namespace
 # if (and only if) leadership election is enabled
 kind: Role
 apiVersion: rbac.authorization.k8s.io/v1

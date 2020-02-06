@@ -22,7 +22,7 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/google/gofuzz"
+	fuzz "github.com/google/gofuzz"
 
 	apiv1 "k8s.io/api/core/v1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
@@ -50,6 +50,7 @@ func TestDefaulting(t *testing.T) {
 		{Group: "", Version: "v1", Kind: "ConfigMapList"}:                                         {},
 		{Group: "", Version: "v1", Kind: "Endpoints"}:                                             {},
 		{Group: "", Version: "v1", Kind: "EndpointsList"}:                                         {},
+		{Group: "", Version: "v1", Kind: "EphemeralContainers"}:                                   {},
 		{Group: "", Version: "v1", Kind: "Namespace"}:                                             {},
 		{Group: "", Version: "v1", Kind: "NamespaceList"}:                                         {},
 		{Group: "", Version: "v1", Kind: "Node"}:                                                  {},
@@ -78,6 +79,8 @@ func TestDefaulting(t *testing.T) {
 		{Group: "autoscaling", Version: "v1", Kind: "HorizontalPodAutoscalerList"}:                {},
 		{Group: "autoscaling", Version: "v2beta1", Kind: "HorizontalPodAutoscaler"}:               {},
 		{Group: "autoscaling", Version: "v2beta1", Kind: "HorizontalPodAutoscalerList"}:           {},
+		{Group: "autoscaling", Version: "v2beta2", Kind: "HorizontalPodAutoscaler"}:               {},
+		{Group: "autoscaling", Version: "v2beta2", Kind: "HorizontalPodAutoscalerList"}:           {},
 		{Group: "batch", Version: "v1", Kind: "Job"}:                                              {},
 		{Group: "batch", Version: "v1", Kind: "JobList"}:                                          {},
 		{Group: "batch", Version: "v1beta1", Kind: "CronJob"}:                                     {},
@@ -88,6 +91,10 @@ func TestDefaulting(t *testing.T) {
 		{Group: "batch", Version: "v2alpha1", Kind: "JobTemplate"}:                                {},
 		{Group: "certificates.k8s.io", Version: "v1beta1", Kind: "CertificateSigningRequest"}:     {},
 		{Group: "certificates.k8s.io", Version: "v1beta1", Kind: "CertificateSigningRequestList"}: {},
+		{Group: "discovery.k8s.io", Version: "v1alpha1", Kind: "EndpointSlice"}:                   {},
+		{Group: "discovery.k8s.io", Version: "v1alpha1", Kind: "EndpointSliceList"}:               {},
+		{Group: "discovery.k8s.io", Version: "v1beta1", Kind: "EndpointSlice"}:                    {},
+		{Group: "discovery.k8s.io", Version: "v1beta1", Kind: "EndpointSliceList"}:                {},
 		{Group: "kubeadm.k8s.io", Version: "v1alpha1", Kind: "MasterConfiguration"}:               {},
 		// This object contains only int fields which currently breaks the defaulting test because
 		// it's pretty stupid. Once we add non integer fields, we should uncomment this.
@@ -136,6 +143,10 @@ func TestDefaulting(t *testing.T) {
 		{Group: "admissionregistration.k8s.io", Version: "v1beta1", Kind: "ValidatingWebhookConfigurationList"}: {},
 		{Group: "admissionregistration.k8s.io", Version: "v1beta1", Kind: "MutatingWebhookConfiguration"}:       {},
 		{Group: "admissionregistration.k8s.io", Version: "v1beta1", Kind: "MutatingWebhookConfigurationList"}:   {},
+		{Group: "admissionregistration.k8s.io", Version: "v1", Kind: "ValidatingWebhookConfiguration"}:          {},
+		{Group: "admissionregistration.k8s.io", Version: "v1", Kind: "ValidatingWebhookConfigurationList"}:      {},
+		{Group: "admissionregistration.k8s.io", Version: "v1", Kind: "MutatingWebhookConfiguration"}:            {},
+		{Group: "admissionregistration.k8s.io", Version: "v1", Kind: "MutatingWebhookConfigurationList"}:        {},
 		{Group: "auditregistration.k8s.io", Version: "v1alpha1", Kind: "AuditSink"}:                             {},
 		{Group: "auditregistration.k8s.io", Version: "v1alpha1", Kind: "AuditSinkList"}:                         {},
 		{Group: "networking.k8s.io", Version: "v1", Kind: "NetworkPolicy"}:                                      {},

@@ -20,9 +20,11 @@ package fsquota
 
 import (
 	"errors"
+
+	"k8s.io/utils/mount"
+
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/util/mount"
 )
 
 // Dummy quota implementation for systems that do not implement support

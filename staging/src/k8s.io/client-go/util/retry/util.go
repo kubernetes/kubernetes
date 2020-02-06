@@ -42,38 +42,64 @@ var DefaultBackoff = wait.Backoff{
 	Jitter:   0.1,
 }
 
-// RetryConflict executes the provided function repeatedly, retrying if the server returns a conflicting
-// write. Callers should preserve previous executions if they wish to retry changes. It performs an
-// exponential backoff.
-//
-//     var pod *api.Pod
-//     err := RetryOnConflict(DefaultBackoff, func() (err error) {
-//       pod, err = c.Pods("mynamespace").UpdateStatus(podStatus)
-//       return
-//     })
-//     if err != nil {
-//       // may be conflict if max retries were hit
-//       return err
-//     }
-//     ...
-//
-// TODO: Make Backoff an interface?
-func RetryOnConflict(backoff wait.Backoff, fn func() error) error {
-	var lastConflictErr error
+// OnError allows the caller to retry fn in case the error returned by fn is retriable
+// according to the provided function. backoff defines the maximum retries and the wait
+// interval between two retries.
+func OnError(backoff wait.Backoff, retriable func(error) bool, fn func() error) error {
+	var lastErr error
 	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
 		err := fn()
 		switch {
 		case err == nil:
 			return true, nil
-		case errors.IsConflict(err):
-			lastConflictErr = err
+		case retriable(err):
+			lastErr = err
 			return false, nil
 		default:
 			return false, err
 		}
 	})
 	if err == wait.ErrWaitTimeout {
-		err = lastConflictErr
+		err = lastErr
 	}
 	return err
+}
+
+// RetryOnConflict is used to make an update to a resource when you have to worry about
+// conflicts caused by other code making unrelated updates to the resource at the same
+// time. fn should fetch the resource to be modified, make appropriate changes to it, try
+// to update it, and return (unmodified) the error from the update function. On a
+// successful update, RetryOnConflict will return nil. If the update function returns a
+// "Conflict" error, RetryOnConflict will wait some amount of time as described by
+// backoff, and then try again. On a non-"Conflict" error, or if it retries too many times
+// and gives up, RetryOnConflict will return an error to the caller.
+//
+//     err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+//         // Fetch the resource here; you need to refetch it on every try, since
+//         // if you got a conflict on the last update attempt then you need to get
+//         // the current version before making your own changes.
+//         pod, err := c.Pods("mynamespace").Get(name, metav1.GetOptions{})
+//         if err ! nil {
+//             return err
+//         }
+//
+//         // Make whatever updates to the resource are needed
+//         pod.Status.Phase = v1.PodFailed
+//
+//         // Try to update
+//         _, err = c.Pods("mynamespace").UpdateStatus(pod)
+//         // You have to return err itself here (not wrapped inside another error)
+//         // so that RetryOnConflict can identify it correctly.
+//         return err
+//     })
+//     if err != nil {
+//         // May be conflict if max retries were hit, or may be something unrelated
+//         // like permissions or a network error
+//         return err
+//     }
+//     ...
+//
+// TODO: Make Backoff an interface?
+func RetryOnConflict(backoff wait.Backoff, fn func() error) error {
+	return OnError(backoff, errors.IsConflict, fn)
 }

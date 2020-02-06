@@ -19,6 +19,7 @@ limitations under the License.
 package v1
 
 import (
+	"context"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -70,7 +71,7 @@ func (c *endpoints) Get(name string, options metav1.GetOptions) (result *v1.Endp
 		Resource("endpoints").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -87,7 +88,7 @@ func (c *endpoints) List(opts metav1.ListOptions) (result *v1.EndpointsList, err
 		Resource("endpoints").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -104,7 +105,7 @@ func (c *endpoints) Watch(opts metav1.ListOptions) (watch.Interface, error) {
 		Resource("endpoints").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch()
+		Watch(context.TODO())
 }
 
 // Create takes the representation of a endpoints and creates it.  Returns the server's representation of the endpoints, and an error, if there is any.
@@ -114,7 +115,7 @@ func (c *endpoints) Create(endpoints *v1.Endpoints) (result *v1.Endpoints, err e
 		Namespace(c.ns).
 		Resource("endpoints").
 		Body(endpoints).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -127,7 +128,7 @@ func (c *endpoints) Update(endpoints *v1.Endpoints) (result *v1.Endpoints, err e
 		Resource("endpoints").
 		Name(endpoints.Name).
 		Body(endpoints).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -139,7 +140,7 @@ func (c *endpoints) Delete(name string, options *metav1.DeleteOptions) error {
 		Resource("endpoints").
 		Name(name).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -155,7 +156,7 @@ func (c *endpoints) DeleteCollection(options *metav1.DeleteOptions, listOptions 
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Timeout(timeout).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -168,7 +169,7 @@ func (c *endpoints) Patch(name string, pt types.PatchType, data []byte, subresou
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }

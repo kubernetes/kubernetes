@@ -37,16 +37,6 @@ func init() {
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterConversions(s *runtime.Scheme) error {
-	if err := s.AddGeneratedConversionFunc((*v1beta1.Event)(nil), (*core.Event)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_Event_To_core_Event(a.(*v1beta1.Event), b.(*core.Event), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*core.Event)(nil), (*v1beta1.Event)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_core_Event_To_v1beta1_Event(a.(*core.Event), b.(*v1beta1.Event), scope)
-	}); err != nil {
-		return err
-	}
 	if err := s.AddGeneratedConversionFunc((*v1beta1.EventList)(nil), (*core.EventList)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1beta1_EventList_To_core_EventList(a.(*v1beta1.EventList), b.(*core.EventList), scope)
 	}); err != nil {

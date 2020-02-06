@@ -17,19 +17,21 @@ limitations under the License.
 package v1beta1
 
 import (
+	"context"
+
 	authorizationapi "k8s.io/api/authorization/v1beta1"
 )
 
 type SelfSubjectRulesReviewExpansion interface {
-	Create(srr *authorizationapi.SelfSubjectRulesReview) (result *authorizationapi.SelfSubjectRulesReview, err error)
+	CreateContext(ctx context.Context, srr *authorizationapi.SelfSubjectRulesReview) (result *authorizationapi.SelfSubjectRulesReview, err error)
 }
 
-func (c *selfSubjectRulesReviews) Create(srr *authorizationapi.SelfSubjectRulesReview) (result *authorizationapi.SelfSubjectRulesReview, err error) {
+func (c *selfSubjectRulesReviews) CreateContext(ctx context.Context, srr *authorizationapi.SelfSubjectRulesReview) (result *authorizationapi.SelfSubjectRulesReview, err error) {
 	result = &authorizationapi.SelfSubjectRulesReview{}
 	err = c.client.Post().
 		Resource("selfsubjectrulesreviews").
 		Body(srr).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }

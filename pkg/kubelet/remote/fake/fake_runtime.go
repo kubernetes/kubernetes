@@ -61,6 +61,15 @@ func (f *RemoteRuntime) Start(endpoint string) error {
 	}
 
 	go f.server.Serve(l)
+
+	// Set runtime and network conditions ready.
+	f.RuntimeService.FakeStatus = &kubeapi.RuntimeStatus{
+		Conditions: []*kubeapi.RuntimeCondition{
+			{Type: kubeapi.RuntimeReady, Status: true},
+			{Type: kubeapi.NetworkReady, Status: true},
+		},
+	}
+
 	return nil
 }
 
@@ -208,8 +217,6 @@ func (f *RemoteRuntime) ExecSync(ctx context.Context, req *kubeapi.ExecSyncReque
 			return nil, err
 		}
 		exitCode = int32(exitError.ExitStatus())
-
-		return nil, err
 	}
 
 	return &kubeapi.ExecSyncResponse{

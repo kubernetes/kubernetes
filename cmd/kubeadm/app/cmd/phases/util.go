@@ -17,7 +17,7 @@ limitations under the License.
 package phases
 
 import (
-	"k8s.io/client-go/pkg/version"
+	"k8s.io/component-base/version"
 	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 )
 

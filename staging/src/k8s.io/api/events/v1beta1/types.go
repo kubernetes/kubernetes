@@ -43,11 +43,11 @@ type Event struct {
 
 	// ID of the controller instance, e.g. `kubelet-xyzf`.
 	// +optional
-	ReportingInstance string `json:"reportingInstance,omitemtpy" protobuf:"bytes,5,opt,name=reportingInstance"`
+	ReportingInstance string `json:"reportingInstance,omitempty" protobuf:"bytes,5,opt,name=reportingInstance"`
 
 	// What action was taken/failed regarding to the regarding object.
 	// +optional
-	Action string `json:"action,omitemtpy" protobuf:"bytes,6,name=action"`
+	Action string `json:"action,omitempty" protobuf:"bytes,6,name=action"`
 
 	// Why the action was taken.
 	Reason string `json:"reason,omitempty" protobuf:"bytes,7,name=reason"`
@@ -114,7 +114,7 @@ const (
 type EventList struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 

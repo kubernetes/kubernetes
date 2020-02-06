@@ -28,8 +28,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/coreos/etcd/clientv3"
-	"k8s.io/klog"
+	"go.etcd.io/etcd/clientv3"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -41,6 +40,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/etcd3/metrics"
 	"k8s.io/apiserver/pkg/storage/value"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/klog"
 	utiltrace "k8s.io/utils/trace"
 )
 
@@ -119,15 +119,13 @@ func (s *store) Get(ctx context.Context, key string, resourceVersion string, out
 	if err != nil {
 		return err
 	}
+	if err = s.ensureMinimumResourceVersion(resourceVersion, uint64(getResp.Header.Revision)); err != nil {
+		return err
+	}
 
 	if len(getResp.Kvs) == 0 {
 		if ignoreNotFound {
 			return runtime.SetZeroValue(out)
-		}
-		if len(resourceVersion) > 0 {
-			if rv, err := s.versioner.ParseResourceVersion(resourceVersion); err == nil {
-				return storage.NewKeyNotFoundError(key, int64(rv))
-			}
 		}
 		return storage.NewKeyNotFoundError(key, 0)
 	}
@@ -213,7 +211,7 @@ func (s *store) conditionalDelete(ctx context.Context, key string, out runtime.O
 				return err
 			}
 		}
-		if err := validateDeletion(origState.obj); err != nil {
+		if err := validateDeletion(ctx, origState.obj); err != nil {
 			return err
 		}
 		startTime := time.Now()
@@ -241,7 +239,7 @@ func (s *store) conditionalDelete(ctx context.Context, key string, out runtime.O
 func (s *store) GuaranteedUpdate(
 	ctx context.Context, key string, out runtime.Object, ignoreNotFound bool,
 	preconditions *storage.Preconditions, tryUpdate storage.UpdateFunc, suggestion ...runtime.Object) error {
-	trace := utiltrace.New(fmt.Sprintf("GuaranteedUpdate etcd3: %s", getTypeName(out)))
+	trace := utiltrace.New("GuaranteedUpdate etcd3", utiltrace.Field{"type", getTypeName(out)})
 	defer trace.LogIfLong(500 * time.Millisecond)
 
 	v, err := conversion.EnforcePtr(out)
@@ -279,7 +277,20 @@ func (s *store) GuaranteedUpdate(
 	transformContext := authenticatedDataString(key)
 	for {
 		if err := preconditions.Check(key, origState.obj); err != nil {
-			return err
+			// If our data is already up to date, return the error
+			if !mustCheckData {
+				return err
+			}
+
+			// It's possible we were working with stale data
+			// Actually fetch
+			origState, err = getCurrentState()
+			if err != nil {
+				return err
+			}
+			mustCheckData = false
+			// Retry
+			continue
 		}
 
 		ret, ttl, err := s.updateState(origState, tryUpdate)
@@ -368,7 +379,11 @@ func (s *store) GuaranteedUpdate(
 
 // GetToList implements storage.Interface.GetToList.
 func (s *store) GetToList(ctx context.Context, key string, resourceVersion string, pred storage.SelectionPredicate, listObj runtime.Object) error {
-	trace := utiltrace.New(fmt.Sprintf("GetToList etcd3: key=%v, resourceVersion=%s, limit: %d, continue: %s", key, resourceVersion, pred.Limit, pred.Continue))
+	trace := utiltrace.New("GetToList etcd3",
+		utiltrace.Field{"key", key},
+		utiltrace.Field{"resourceVersion", resourceVersion},
+		utiltrace.Field{"limit", pred.Limit},
+		utiltrace.Field{"continue", pred.Continue})
 	defer trace.LogIfLong(500 * time.Millisecond)
 	listPtr, err := meta.GetItemsPtr(listObj)
 	if err != nil {
@@ -384,6 +399,9 @@ func (s *store) GetToList(ctx context.Context, key string, resourceVersion strin
 	getResp, err := s.client.KV.Get(ctx, key, s.getOps...)
 	metrics.RecordEtcdRequestLatency("get", getTypeName(listPtr), startTime)
 	if err != nil {
+		return err
+	}
+	if err = s.ensureMinimumResourceVersion(resourceVersion, uint64(getResp.Header.Revision)); err != nil {
 		return err
 	}
 
@@ -473,7 +491,11 @@ func encodeContinue(key, keyPrefix string, resourceVersion int64) (string, error
 
 // List implements storage.Interface.List.
 func (s *store) List(ctx context.Context, key, resourceVersion string, pred storage.SelectionPredicate, listObj runtime.Object) error {
-	trace := utiltrace.New(fmt.Sprintf("List etcd3: key=%v, resourceVersion=%s, limit: %d, continue: %s", key, resourceVersion, pred.Limit, pred.Continue))
+	trace := utiltrace.New("List etcd3",
+		utiltrace.Field{"key", key},
+		utiltrace.Field{"resourceVersion", resourceVersion},
+		utiltrace.Field{"limit", pred.Limit},
+		utiltrace.Field{"continue", pred.Continue})
 	defer trace.LogIfLong(500 * time.Millisecond)
 	listPtr, err := meta.GetItemsPtr(listObj)
 	if err != nil {
@@ -543,17 +565,6 @@ func (s *store) List(ctx context.Context, key, resourceVersion string, pred stor
 		options = append(options, clientv3.WithRange(rangeEnd))
 
 	default:
-		if len(resourceVersion) > 0 {
-			fromRV, err := s.versioner.ParseResourceVersion(resourceVersion)
-			if err != nil {
-				return apierrors.NewBadRequest(fmt.Sprintf("invalid resource version: %v", err))
-			}
-			if fromRV > 0 {
-				options = append(options, clientv3.WithRev(int64(fromRV)))
-			}
-			returnedRV = int64(fromRV)
-		}
-
 		options = append(options, clientv3.WithPrefix())
 	}
 
@@ -567,6 +578,9 @@ func (s *store) List(ctx context.Context, key, resourceVersion string, pred stor
 		metrics.RecordEtcdRequestLatency("list", getTypeName(listPtr), startTime)
 		if err != nil {
 			return interpretListError(err, len(pred.Continue) > 0, continueKey, keyPrefix)
+		}
+		if err = s.ensureMinimumResourceVersion(resourceVersion, uint64(getResp.Header.Revision)); err != nil {
+			return err
 		}
 		hasMore = getResp.More
 
@@ -780,6 +794,24 @@ func (s *store) ttlOpts(ctx context.Context, ttl int64) ([]clientv3.OpOption, er
 		return nil, err
 	}
 	return []clientv3.OpOption{clientv3.WithLease(id)}, nil
+}
+
+// ensureMinimumResourceVersion returns a 'too large resource' version error when the provided minimumResourceVersion is
+// greater than the most recent actualRevision available from storage.
+func (s *store) ensureMinimumResourceVersion(minimumResourceVersion string, actualRevision uint64) error {
+	if minimumResourceVersion == "" {
+		return nil
+	}
+	minimumRV, err := s.versioner.ParseResourceVersion(minimumResourceVersion)
+	if err != nil {
+		return apierrors.NewBadRequest(fmt.Sprintf("invalid resource version: %v", err))
+	}
+	// Enforce the storage.Interface guarantee that the resource version of the returned data
+	// "will be at least 'resourceVersion'".
+	if minimumRV > actualRevision {
+		return storage.NewTooLargeResourceVersionError(minimumRV, actualRevision, 0)
+	}
+	return nil
 }
 
 // decode decodes value of bytes into object. It will also set the object resource version to rev.

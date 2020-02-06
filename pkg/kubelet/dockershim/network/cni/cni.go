@@ -19,7 +19,6 @@ package cni
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"math"
 	"sort"
@@ -36,6 +35,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/network"
 	"k8s.io/kubernetes/pkg/util/bandwidth"
+	utilslice "k8s.io/kubernetes/pkg/util/slice"
 	utilexec "k8s.io/utils/exec"
 )
 
@@ -46,6 +46,13 @@ const (
 	// defaultSyncConfigPeriod is the default period to sync CNI config
 	// TODO: consider making this value configurable or to be a more appropriate value.
 	defaultSyncConfigPeriod = time.Second * 5
+
+	// supported capabilities
+	// https://github.com/containernetworking/cni/blob/master/CONVENTIONS.md
+	portMappingsCapability = "portMappings"
+	ipRangesCapability     = "ipRanges"
+	bandwidthCapability    = "bandwidth"
+	dnsCapability          = "dns"
 )
 
 type cniNetworkPlugin struct {
@@ -69,6 +76,7 @@ type cniNetwork struct {
 	name          string
 	NetworkConfig *libcni.NetworkConfigList
 	CNIConfig     libcni.CNI
+	Capabilities  []string
 }
 
 // cniPortMapping maps to the standard CNI portmapping Capability
@@ -149,8 +157,10 @@ func getDefaultCNINetwork(confDir string, binDirs []string) (*cniNetwork, error)
 	case err != nil:
 		return nil, err
 	case len(files) == 0:
-		return nil, fmt.Errorf("No networks found in %s", confDir)
+		return nil, fmt.Errorf("no networks found in %s", confDir)
 	}
+
+	cniConfig := &libcni.CNIConfig{Path: binDirs}
 
 	sort.Strings(files)
 	for _, confFile := range files {
@@ -181,20 +191,28 @@ func getDefaultCNINetwork(confDir string, binDirs []string) (*cniNetwork, error)
 			}
 		}
 		if len(confList.Plugins) == 0 {
-			klog.Warningf("CNI config list %s has no networks, skipping", confFile)
+			klog.Warningf("CNI config list %s has no networks, skipping", string(confList.Bytes[:maxStringLengthInLog(len(confList.Bytes))]))
+			continue
+		}
+
+		// Before using this CNI config, we have to validate it to make sure that
+		// all plugins of this config exist on disk
+		caps, err := cniConfig.ValidateNetworkList(context.TODO(), confList)
+		if err != nil {
+			klog.Warningf("Error validating CNI config list %s: %v", string(confList.Bytes[:maxStringLengthInLog(len(confList.Bytes))]), err)
 			continue
 		}
 
 		klog.V(4).Infof("Using CNI configuration file %s", confFile)
 
-		network := &cniNetwork{
+		return &cniNetwork{
 			name:          confList.Name,
 			NetworkConfig: confList,
-			CNIConfig:     &libcni.CNIConfig{Path: binDirs},
-		}
-		return network, nil
+			CNIConfig:     cniConfig,
+			Capabilities:  caps,
+		}, nil
 	}
-	return nil, fmt.Errorf("No valid networks found in %s", confDir)
+	return nil, fmt.Errorf("no valid networks found in %s", confDir)
 }
 
 func (plugin *cniNetworkPlugin) Init(host network.Host, hairpinMode kubeletconfig.HairpinMode, nonMasqueradeCIDR string, mtu int) error {
@@ -236,18 +254,13 @@ func (plugin *cniNetworkPlugin) setDefaultNetwork(n *cniNetwork) {
 
 func (plugin *cniNetworkPlugin) checkInitialized() error {
 	if plugin.getDefaultNetwork() == nil {
-		return errors.New("cni config uninitialized")
+		return fmt.Errorf("cni config uninitialized")
 	}
 
-	// If the CNI configuration has the ipRanges capability, we need a PodCIDR assigned
-	for _, p := range plugin.getDefaultNetwork().NetworkConfig.Plugins {
-		if p.Network.Capabilities["ipRanges"] {
-			if plugin.podCidr == "" {
-				return errors.New("no PodCIDR set")
-			}
-			break
-		}
+	if utilslice.ContainsString(plugin.getDefaultNetwork().Capabilities, ipRangesCapability, nil) && plugin.podCidr == "" {
+		return fmt.Errorf("cni config needs ipRanges but no PodCIDR set")
 	}
+
 	return nil
 }
 
@@ -293,14 +306,17 @@ func (plugin *cniNetworkPlugin) SetUpPod(namespace string, name string, id kubec
 		return fmt.Errorf("CNI failed to retrieve network namespace path: %v", err)
 	}
 
+	// Todo get the timeout from parent ctx
+	cniTimeoutCtx, cancelFunc := context.WithTimeout(context.Background(), network.CNITimeoutSec*time.Second)
+	defer cancelFunc()
 	// Windows doesn't have loNetwork. It comes only with Linux
 	if plugin.loNetwork != nil {
-		if _, err = plugin.addToNetwork(plugin.loNetwork, name, namespace, id, netnsPath, annotations, options); err != nil {
+		if _, err = plugin.addToNetwork(cniTimeoutCtx, plugin.loNetwork, name, namespace, id, netnsPath, annotations, options); err != nil {
 			return err
 		}
 	}
 
-	_, err = plugin.addToNetwork(plugin.getDefaultNetwork(), name, namespace, id, netnsPath, annotations, options)
+	_, err = plugin.addToNetwork(cniTimeoutCtx, plugin.getDefaultNetwork(), name, namespace, id, netnsPath, annotations, options)
 	return err
 }
 
@@ -315,14 +331,25 @@ func (plugin *cniNetworkPlugin) TearDownPod(namespace string, name string, id ku
 		klog.Warningf("CNI failed to retrieve network namespace path: %v", err)
 	}
 
-	return plugin.deleteFromNetwork(plugin.getDefaultNetwork(), name, namespace, id, netnsPath, nil)
+	// Todo get the timeout from parent ctx
+	cniTimeoutCtx, cancelFunc := context.WithTimeout(context.Background(), network.CNITimeoutSec*time.Second)
+	defer cancelFunc()
+	// Windows doesn't have loNetwork. It comes only with Linux
+	if plugin.loNetwork != nil {
+		// Loopback network deletion failure should not be fatal on teardown
+		if err := plugin.deleteFromNetwork(cniTimeoutCtx, plugin.loNetwork, name, namespace, id, netnsPath, nil); err != nil {
+			klog.Warningf("CNI failed to delete loopback network: %v", err)
+		}
+	}
+
+	return plugin.deleteFromNetwork(cniTimeoutCtx, plugin.getDefaultNetwork(), name, namespace, id, netnsPath, nil)
 }
 
 func podDesc(namespace, name string, id kubecontainer.ContainerID) string {
 	return fmt.Sprintf("%s_%s/%s", namespace, name, id.ID)
 }
 
-func (plugin *cniNetworkPlugin) addToNetwork(network *cniNetwork, podName string, podNamespace string, podSandboxID kubecontainer.ContainerID, podNetnsPath string, annotations, options map[string]string) (cnitypes.Result, error) {
+func (plugin *cniNetworkPlugin) addToNetwork(ctx context.Context, network *cniNetwork, podName string, podNamespace string, podSandboxID kubecontainer.ContainerID, podNetnsPath string, annotations, options map[string]string) (cnitypes.Result, error) {
 	rt, err := plugin.buildCNIRuntimeConf(podName, podNamespace, podSandboxID, podNetnsPath, annotations, options)
 	if err != nil {
 		klog.Errorf("Error adding network when building cni runtime conf: %v", err)
@@ -332,7 +359,7 @@ func (plugin *cniNetworkPlugin) addToNetwork(network *cniNetwork, podName string
 	pdesc := podDesc(podNamespace, podName, podSandboxID)
 	netConf, cniNet := network.NetworkConfig, network.CNIConfig
 	klog.V(4).Infof("Adding %s to network %s/%s netns %q", pdesc, netConf.Plugins[0].Network.Type, netConf.Name, podNetnsPath)
-	res, err := cniNet.AddNetworkList(context.TODO(), netConf, rt)
+	res, err := cniNet.AddNetworkList(ctx, netConf, rt)
 	if err != nil {
 		klog.Errorf("Error adding %s to network %s/%s: %v", pdesc, netConf.Plugins[0].Network.Type, netConf.Name, err)
 		return nil, err
@@ -341,7 +368,7 @@ func (plugin *cniNetworkPlugin) addToNetwork(network *cniNetwork, podName string
 	return res, nil
 }
 
-func (plugin *cniNetworkPlugin) deleteFromNetwork(network *cniNetwork, podName string, podNamespace string, podSandboxID kubecontainer.ContainerID, podNetnsPath string, annotations map[string]string) error {
+func (plugin *cniNetworkPlugin) deleteFromNetwork(ctx context.Context, network *cniNetwork, podName string, podNamespace string, podSandboxID kubecontainer.ContainerID, podNetnsPath string, annotations map[string]string) error {
 	rt, err := plugin.buildCNIRuntimeConf(podName, podNamespace, podSandboxID, podNetnsPath, annotations, nil)
 	if err != nil {
 		klog.Errorf("Error deleting network when building cni runtime conf: %v", err)
@@ -351,7 +378,7 @@ func (plugin *cniNetworkPlugin) deleteFromNetwork(network *cniNetwork, podName s
 	pdesc := podDesc(podNamespace, podName, podSandboxID)
 	netConf, cniNet := network.NetworkConfig, network.CNIConfig
 	klog.V(4).Infof("Deleting %s from network %s/%s netns %q", pdesc, netConf.Plugins[0].Network.Type, netConf.Name, podNetnsPath)
-	err = cniNet.DelNetworkList(context.TODO(), netConf, rt)
+	err = cniNet.DelNetworkList(ctx, netConf, rt)
 	// The pod may not get deleted successfully at the first time.
 	// Ignore "no such file or directory" error in case the network has already been deleted in previous attempts.
 	if err != nil && !strings.Contains(err.Error(), "no such file or directory") {
@@ -395,12 +422,12 @@ func (plugin *cniNetworkPlugin) buildCNIRuntimeConf(podName string, podNs string
 		})
 	}
 	rt.CapabilityArgs = map[string]interface{}{
-		"portMappings": portMappingsParam,
+		portMappingsCapability: portMappingsParam,
 	}
 
 	ingress, egress, err := bandwidth.ExtractPodBandwidthResources(annotations)
 	if err != nil {
-		return nil, fmt.Errorf("Error reading pod bandwidth annotations: %v", err)
+		return nil, fmt.Errorf("failed to get pod bandwidth from annotations: %v", err)
 	}
 	if ingress != nil || egress != nil {
 		bandwidthParam := cniBandwidthEntry{}
@@ -415,11 +442,11 @@ func (plugin *cniNetworkPlugin) buildCNIRuntimeConf(podName string, podNs string
 			bandwidthParam.EgressRate = int(egress.Value())
 			bandwidthParam.EgressBurst = math.MaxInt32 // no limit
 		}
-		rt.CapabilityArgs["bandwidth"] = bandwidthParam
+		rt.CapabilityArgs[bandwidthCapability] = bandwidthParam
 	}
 
 	// Set the PodCIDR
-	rt.CapabilityArgs["ipRanges"] = [][]cniIPRange{{{Subnet: plugin.podCidr}}}
+	rt.CapabilityArgs[ipRangesCapability] = [][]cniIPRange{{{Subnet: plugin.podCidr}}}
 
 	// Set dns capability args.
 	if dnsOptions, ok := options["dns"]; ok {
@@ -429,9 +456,19 @@ func (plugin *cniNetworkPlugin) buildCNIRuntimeConf(podName string, podNs string
 			return nil, fmt.Errorf("failed to unmarshal dns config %q: %v", dnsOptions, err)
 		}
 		if dnsParam := buildDNSCapabilities(&dnsConfig); dnsParam != nil {
-			rt.CapabilityArgs["dns"] = *dnsParam
+			rt.CapabilityArgs[dnsCapability] = *dnsParam
 		}
 	}
 
 	return rt, nil
+}
+
+func maxStringLengthInLog(length int) int {
+	// we allow no more than 4096-length strings to be logged
+	const maxStringLength = 4096
+
+	if length < maxStringLength {
+		return length
+	}
+	return maxStringLength
 }

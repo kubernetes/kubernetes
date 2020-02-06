@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2018 The Kubernetes Authors.
 
@@ -17,11 +19,11 @@ limitations under the License.
 package gce
 
 import (
-	"fmt"
-	"net/http"
+	"context"
 
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
 	compute "google.golang.org/api/compute/v1"
+	option "google.golang.org/api/option"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -33,6 +35,7 @@ type TestClusterValues struct {
 	SecondaryZoneName string
 	ClusterID         string
 	ClusterName       string
+	OnXPN             bool
 }
 
 // DefaultTestClusterValues Creates a reasonable set of default cluster values
@@ -48,12 +51,6 @@ func DefaultTestClusterValues() TestClusterValues {
 	}
 }
 
-type fakeRoundTripper struct{}
-
-func (*fakeRoundTripper) RoundTrip(*http.Request) (*http.Response, error) {
-	return nil, fmt.Errorf("err: test used fake http client")
-}
-
 // Stubs ClusterID so that ClusterID.getOrInitialize() does not require calling
 // gce.Initialize()
 func fakeClusterID(clusterID string) ClusterID {
@@ -67,8 +64,10 @@ func fakeClusterID(clusterID string) ClusterID {
 
 // NewFakeGCECloud constructs a fake GCE Cloud from the cluster values.
 func NewFakeGCECloud(vals TestClusterValues) *Cloud {
-	client := &http.Client{Transport: &fakeRoundTripper{}}
-	service, _ := compute.New(client)
+	service, err := compute.NewService(context.Background(), option.WithoutAuthentication())
+	if err != nil {
+		panic(err)
+	}
 	gce := &Cloud{
 		region:           vals.Region,
 		service:          service,
@@ -76,8 +75,14 @@ func NewFakeGCECloud(vals TestClusterValues) *Cloud {
 		projectID:        vals.ProjectID,
 		networkProjectID: vals.ProjectID,
 		ClusterID:        fakeClusterID(vals.ClusterID),
+		onXPN:            vals.OnXPN,
 	}
 	c := cloud.NewMockGCE(&gceProjectRouter{gce})
 	gce.c = c
 	return gce
+}
+
+// UpdateFakeGCECloud updates the fake GCE cloud with the specified values. Currently only the onXPN value is updated.
+func UpdateFakeGCECloud(g *Cloud, vals TestClusterValues) {
+	g.onXPN = vals.OnXPN
 }

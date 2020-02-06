@@ -57,6 +57,7 @@ import (
 )
 
 const secondInNanos = int64(time.Second / time.Nanosecond)
+const maxSecondsInDuration = 315576000000
 
 // Marshaler is a configurable object for converting between
 // protocol buffer objects and a JSON representation for them.
@@ -182,7 +183,12 @@ func (m *Marshaler) marshalObject(out *errWriter, v proto.Message, indent, typeU
 				return fmt.Errorf("failed to marshal type URL %q to JSON: %v", typeURL, err)
 			}
 			js["@type"] = (*json.RawMessage)(&turl)
-			if b, err = json.Marshal(js); err != nil {
+			if m.Indent != "" {
+				b, err = json.MarshalIndent(js, indent, m.Indent)
+			} else {
+				b, err = json.Marshal(js)
+			}
+			if err != nil {
 				return err
 			}
 		}
@@ -206,19 +212,26 @@ func (m *Marshaler) marshalObject(out *errWriter, v proto.Message, indent, typeU
 			// Any is a bit more involved.
 			return m.marshalAny(out, v, indent)
 		case "Duration":
-			// "Generated output always contains 0, 3, 6, or 9 fractional digits,
-			//  depending on required precision."
 			s, ns := s.Field(0).Int(), s.Field(1).Int()
+			if s < -maxSecondsInDuration || s > maxSecondsInDuration {
+				return fmt.Errorf("seconds out of range %v", s)
+			}
 			if ns <= -secondInNanos || ns >= secondInNanos {
 				return fmt.Errorf("ns out of range (%v, %v)", -secondInNanos, secondInNanos)
 			}
 			if (s > 0 && ns < 0) || (s < 0 && ns > 0) {
 				return errors.New("signs of seconds and nanos do not match")
 			}
-			if s < 0 {
+			// Generated output always contains 0, 3, 6, or 9 fractional digits,
+			// depending on required precision, followed by the suffix "s".
+			f := "%d.%09d"
+			if ns < 0 {
 				ns = -ns
+				if s == 0 {
+					f = "-%d.%09d"
+				}
 			}
-			x := fmt.Sprintf("%d.%09d", s, ns)
+			x := fmt.Sprintf(f, s, ns)
 			x = strings.TrimSuffix(x, "000")
 			x = strings.TrimSuffix(x, "000")
 			x = strings.TrimSuffix(x, ".000")

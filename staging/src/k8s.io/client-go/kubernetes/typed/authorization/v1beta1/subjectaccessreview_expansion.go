@@ -17,20 +17,22 @@ limitations under the License.
 package v1beta1
 
 import (
+	"context"
+
 	authorizationapi "k8s.io/api/authorization/v1beta1"
 )
 
 // The SubjectAccessReviewExpansion interface allows manually adding extra methods to the AuthorizationInterface.
 type SubjectAccessReviewExpansion interface {
-	Create(sar *authorizationapi.SubjectAccessReview) (result *authorizationapi.SubjectAccessReview, err error)
+	CreateContext(ctx context.Context, sar *authorizationapi.SubjectAccessReview) (result *authorizationapi.SubjectAccessReview, err error)
 }
 
-func (c *subjectAccessReviews) Create(sar *authorizationapi.SubjectAccessReview) (result *authorizationapi.SubjectAccessReview, err error) {
+func (c *subjectAccessReviews) CreateContext(ctx context.Context, sar *authorizationapi.SubjectAccessReview) (result *authorizationapi.SubjectAccessReview, err error) {
 	result = &authorizationapi.SubjectAccessReview{}
 	err = c.client.Post().
 		Resource("subjectaccessreviews").
 		Body(sar).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }

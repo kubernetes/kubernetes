@@ -50,6 +50,7 @@ go_library(
         "helper.go",
         "interfaces.go",
         "mapper.go",
+        "negotiate.go",
         "register.go",
         "scheme.go",
         "scheme_builder.go",

@@ -23,13 +23,11 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/scheduler/factory"
-
 	fakecache "k8s.io/kubernetes/pkg/scheduler/internal/cache/fake"
 )
 
 func TestSkipPodUpdate(t *testing.T) {
-	table := []struct {
+	for _, test := range []struct {
 		pod              *v1.Pod
 		isAssumedPodFunc func(*v1.Pod) bool
 		getPodFunc       func(*v1.Pod) *v1.Pod
@@ -103,16 +101,14 @@ func TestSkipPodUpdate(t *testing.T) {
 			},
 			expected: false,
 		},
-	}
-	for _, test := range table {
+	} {
 		t.Run(test.name, func(t *testing.T) {
-			c := NewFromConfig(&factory.Config{
+			c := &Scheduler{
 				SchedulerCache: &fakecache.Cache{
 					IsAssumedPodFunc: test.isAssumedPodFunc,
 					GetPodFunc:       test.getPodFunc,
 				},
-			},
-			)
+			}
 			got := c.skipPodUpdate(test.pod)
 			if got != test.expected {
 				t.Errorf("skipPodUpdate() = %t, expected = %t", got, test.expected)
@@ -125,7 +121,7 @@ func TestNodeAllocatableChanged(t *testing.T) {
 	newQuantity := func(value int64) resource.Quantity {
 		return *resource.NewQuantity(value, resource.BinarySI)
 	}
-	for _, c := range []struct {
+	for _, test := range []struct {
 		Name           string
 		Changed        bool
 		OldAllocatable v1.ResourceList
@@ -144,17 +140,19 @@ func TestNodeAllocatableChanged(t *testing.T) {
 			NewAllocatable: v1.ResourceList{v1.ResourceMemory: newQuantity(1024), v1.ResourceStorage: newQuantity(1024)},
 		},
 	} {
-		oldNode := &v1.Node{Status: v1.NodeStatus{Allocatable: c.OldAllocatable}}
-		newNode := &v1.Node{Status: v1.NodeStatus{Allocatable: c.NewAllocatable}}
-		changed := nodeAllocatableChanged(newNode, oldNode)
-		if changed != c.Changed {
-			t.Errorf("nodeAllocatableChanged should be %t, got %t", c.Changed, changed)
-		}
+		t.Run(test.Name, func(t *testing.T) {
+			oldNode := &v1.Node{Status: v1.NodeStatus{Allocatable: test.OldAllocatable}}
+			newNode := &v1.Node{Status: v1.NodeStatus{Allocatable: test.NewAllocatable}}
+			changed := nodeAllocatableChanged(newNode, oldNode)
+			if changed != test.Changed {
+				t.Errorf("nodeAllocatableChanged should be %t, got %t", test.Changed, changed)
+			}
+		})
 	}
 }
 
 func TestNodeLabelsChanged(t *testing.T) {
-	for _, c := range []struct {
+	for _, test := range []struct {
 		Name      string
 		Changed   bool
 		OldLabels map[string]string
@@ -174,17 +172,19 @@ func TestNodeLabelsChanged(t *testing.T) {
 			NewLabels: map[string]string{"foo": "bar", "test": "value"},
 		},
 	} {
-		oldNode := &v1.Node{ObjectMeta: metav1.ObjectMeta{Labels: c.OldLabels}}
-		newNode := &v1.Node{ObjectMeta: metav1.ObjectMeta{Labels: c.NewLabels}}
-		changed := nodeLabelsChanged(newNode, oldNode)
-		if changed != c.Changed {
-			t.Errorf("Test case %q failed: should be %t, got %t", c.Name, c.Changed, changed)
-		}
+		t.Run(test.Name, func(t *testing.T) {
+			oldNode := &v1.Node{ObjectMeta: metav1.ObjectMeta{Labels: test.OldLabels}}
+			newNode := &v1.Node{ObjectMeta: metav1.ObjectMeta{Labels: test.NewLabels}}
+			changed := nodeLabelsChanged(newNode, oldNode)
+			if changed != test.Changed {
+				t.Errorf("Test case %q failed: should be %t, got %t", test.Name, test.Changed, changed)
+			}
+		})
 	}
 }
 
 func TestNodeTaintsChanged(t *testing.T) {
-	for _, c := range []struct {
+	for _, test := range []struct {
 		Name      string
 		Changed   bool
 		OldTaints []v1.Taint
@@ -203,12 +203,14 @@ func TestNodeTaintsChanged(t *testing.T) {
 			NewTaints: []v1.Taint{{Key: "key", Value: "value2"}},
 		},
 	} {
-		oldNode := &v1.Node{Spec: v1.NodeSpec{Taints: c.OldTaints}}
-		newNode := &v1.Node{Spec: v1.NodeSpec{Taints: c.NewTaints}}
-		changed := nodeTaintsChanged(newNode, oldNode)
-		if changed != c.Changed {
-			t.Errorf("Test case %q failed: should be %t, not %t", c.Name, c.Changed, changed)
-		}
+		t.Run(test.Name, func(t *testing.T) {
+			oldNode := &v1.Node{Spec: v1.NodeSpec{Taints: test.OldTaints}}
+			newNode := &v1.Node{Spec: v1.NodeSpec{Taints: test.NewTaints}}
+			changed := nodeTaintsChanged(newNode, oldNode)
+			if changed != test.Changed {
+				t.Errorf("Test case %q failed: should be %t, not %t", test.Name, test.Changed, changed)
+			}
+		})
 	}
 }
 
@@ -218,7 +220,7 @@ func TestNodeConditionsChanged(t *testing.T) {
 		t.Errorf("NodeCondition type has changed. The nodeConditionsChanged() function must be reevaluated.")
 	}
 
-	for _, c := range []struct {
+	for _, test := range []struct {
 		Name          string
 		Changed       bool
 		OldConditions []v1.NodeCondition
@@ -255,11 +257,13 @@ func TestNodeConditionsChanged(t *testing.T) {
 			NewConditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}},
 		},
 	} {
-		oldNode := &v1.Node{Status: v1.NodeStatus{Conditions: c.OldConditions}}
-		newNode := &v1.Node{Status: v1.NodeStatus{Conditions: c.NewConditions}}
-		changed := nodeConditionsChanged(newNode, oldNode)
-		if changed != c.Changed {
-			t.Errorf("Test case %q failed: should be %t, got %t", c.Name, c.Changed, changed)
-		}
+		t.Run(test.Name, func(t *testing.T) {
+			oldNode := &v1.Node{Status: v1.NodeStatus{Conditions: test.OldConditions}}
+			newNode := &v1.Node{Status: v1.NodeStatus{Conditions: test.NewConditions}}
+			changed := nodeConditionsChanged(newNode, oldNode)
+			if changed != test.Changed {
+				t.Errorf("Test case %q failed: should be %t, got %t", test.Name, test.Changed, changed)
+			}
+		})
 	}
 }

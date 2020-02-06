@@ -1,7 +1,6 @@
 package convert
 
 import (
-	"errors"
 	"fmt"
 	"go/ast"
 )
@@ -24,7 +23,7 @@ func importsForRootNode(rootNode *ast.File) (imports *ast.GenDecl, err error) {
 		}
 	}
 
-	err = errors.New(fmt.Sprintf("Could not find imports for root node:\n\t%#v\n", rootNode))
+	err = fmt.Errorf("Could not find imports for root node:\n\t%#v\n", rootNode)
 	return
 }
 

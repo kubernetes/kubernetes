@@ -138,6 +138,8 @@ func (g *GenericPLEG) Healthy() (bool, error) {
 	if relistTime.IsZero() {
 		return false, fmt.Errorf("pleg has yet to be successful")
 	}
+	// Expose as metric so you can alert on `time()-pleg_last_seen_seconds > nn`
+	metrics.PLEGLastSeen.Set(float64(relistTime.Unix()))
 	elapsed := g.clock.Since(relistTime)
 	if elapsed > relistThreshold {
 		return false, fmt.Errorf("pleg was last seen active %v ago; threshold is %v", elapsed, relistThreshold)
@@ -190,13 +192,11 @@ func (g *GenericPLEG) relist() {
 
 	if lastRelistTime := g.getRelistTime(); !lastRelistTime.IsZero() {
 		metrics.PLEGRelistInterval.Observe(metrics.SinceInSeconds(lastRelistTime))
-		metrics.DeprecatedPLEGRelistInterval.Observe(metrics.SinceInMicroseconds(lastRelistTime))
 	}
 
 	timestamp := g.clock.Now()
 	defer func() {
 		metrics.PLEGRelistDuration.Observe(metrics.SinceInSeconds(timestamp))
-		metrics.DeprecatedPLEGRelistLatency.Observe(metrics.SinceInMicroseconds(timestamp))
 	}()
 
 	// Get all the pods.
@@ -209,6 +209,8 @@ func (g *GenericPLEG) relist() {
 	g.updateRelistTime(timestamp)
 
 	pods := kubecontainer.Pods(podList)
+	// update running pod and container count
+	updateRunningPodAndContainerMetrics(pods)
 	g.podRecords.setCurrent(pods)
 
 	// Compare the old and the current pods, and generate events.
@@ -253,7 +255,7 @@ func (g *GenericPLEG) relist() {
 				needsReinspection[pid] = pod
 
 				continue
-			} else if _, found := g.podsToReinspect[pid]; found {
+			} else {
 				// this pod was in the list to reinspect and we did so because it had events, so remove it
 				// from the list (we don't want the reinspection code below to inspect it a second time in
 				// this relist execution)
@@ -270,7 +272,7 @@ func (g *GenericPLEG) relist() {
 			select {
 			case g.eventChannel <- events[i]:
 			default:
-				metrics.PLEGDiscardEvents.WithLabelValues().Inc()
+				metrics.PLEGDiscardEvents.Inc()
 				klog.Error("event channel is full, discard this relist() cycle event")
 			}
 		}
@@ -363,17 +365,6 @@ func (g *GenericPLEG) getPodIPs(pid types.UID, status *kubecontainer.PodStatus) 
 		}
 	}
 
-	if len(status.SandboxStatuses) == 0 {
-		// Without sandboxes (which built-in runtimes like rkt don't report)
-		// look at all the container statuses, and if any containers are
-		// running then use the new pod IP
-		for _, containerStatus := range status.ContainerStatuses {
-			if containerStatus.State == kubecontainer.ContainerStateCreated || containerStatus.State == kubecontainer.ContainerStateRunning {
-				return status.IPs
-			}
-		}
-	}
-
 	// For pods with no ready containers or sandboxes (like exited pods)
 	// use the old status' pod IP
 	return oldStatus.IPs
@@ -429,6 +420,24 @@ func getContainerState(pod *kubecontainer.Pod, cid *kubecontainer.ContainerID) p
 	}
 
 	return state
+}
+
+func updateRunningPodAndContainerMetrics(pods []*kubecontainer.Pod) {
+	// Set the number of running pods in the parameter
+	metrics.RunningPodCount.Set(float64(len(pods)))
+	// intermediate map to store the count of each "container_state"
+	containerStateCount := make(map[string]int)
+
+	for _, pod := range pods {
+		containers := pod.Containers
+		for _, container := range containers {
+			// update the corresponding "container_state" in map to set value for the gaugeVec metrics
+			containerStateCount[string(container.State)]++
+		}
+	}
+	for key, value := range containerStateCount {
+		metrics.RunningContainerCount.WithLabelValues(key).Set(float64(value))
+	}
 }
 
 func (pr podRecords) getOld(id types.UID) *kubecontainer.Pod {

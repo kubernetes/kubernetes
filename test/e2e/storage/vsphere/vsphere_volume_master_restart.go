@@ -18,6 +18,8 @@ package vsphere
 
 import (
 	"fmt"
+	"strconv"
+	"time"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -26,10 +28,29 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
+
+// waitForKubeletUp waits for the kubelet on the given host to be up.
+func waitForKubeletUp(host string) error {
+	cmd := "curl http://localhost:" + strconv.Itoa(ports.KubeletReadOnlyPort) + "/healthz"
+	for start := time.Now(); time.Since(start) < time.Minute; time.Sleep(5 * time.Second) {
+		result, err := e2essh.SSH(cmd, host, framework.TestContext.Provider)
+		if err != nil || result.Code != 0 {
+			e2essh.LogResult(result)
+		}
+		if result.Stdout == "ok" {
+			return nil
+		}
+	}
+	return fmt.Errorf("waiting for kubelet timed out")
+}
 
 /*
 	Test to verify volume remains attached after kubelet restart on master node
@@ -57,16 +78,17 @@ var _ = utils.SIGDescribe("Volume Attach Verify [Feature:vsphere][Serial][Disrup
 		nodeInfo              *NodeInfo
 	)
 	ginkgo.BeforeEach(func() {
-		framework.SkipUnlessProviderIs("vsphere")
+		e2eskipper.SkipUnlessProviderIs("vsphere")
 		Bootstrap(f)
 		client = f.ClientSet
 		namespace = f.Namespace.Name
 		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(client, framework.TestContext.NodeSchedulableTimeout))
 
-		nodes := framework.GetReadySchedulableNodesOrDie(client)
+		nodes, err := e2enode.GetReadySchedulableNodes(client)
+		framework.ExpectNoError(err)
 		numNodes = len(nodes.Items)
 		if numNodes < 2 {
-			framework.Skipf("Requires at least %d nodes (not %d)", 2, len(nodes.Items))
+			e2eskipper.Skipf("Requires at least %d nodes (not %d)", 2, len(nodes.Items))
 		}
 		nodeInfo = TestContext.NodeMapper.GetNodeInfo(nodes.Items[0].Name)
 		for i := 0; i < numNodes; i++ {
@@ -81,6 +103,8 @@ var _ = utils.SIGDescribe("Volume Attach Verify [Feature:vsphere][Serial][Disrup
 	})
 
 	ginkgo.It("verify volume remains attached after master kubelet restart", func() {
+		e2eskipper.SkipUnlessSSHKeyPresent()
+
 		// Create pod on each node
 		for i := 0; i < numNodes; i++ {
 			ginkgo.By(fmt.Sprintf("%d: Creating a test vsphere volume", i))
@@ -92,7 +116,7 @@ var _ = utils.SIGDescribe("Volume Attach Verify [Feature:vsphere][Serial][Disrup
 			podspec := getVSpherePodSpecWithVolumePaths([]string{volumePath}, nodeKeyValueLabelList[i], nil)
 			pod, err := client.CoreV1().Pods(namespace).Create(podspec)
 			framework.ExpectNoError(err)
-			defer framework.DeletePodWithWait(f, client, pod)
+			defer e2epod.DeletePodWithWait(client, pod)
 
 			ginkgo.By("Waiting for pod to be ready")
 			gomega.Expect(e2epod.WaitForPodNameRunningInNamespace(client, pod.Name, namespace)).To(gomega.Succeed())
@@ -113,7 +137,7 @@ var _ = utils.SIGDescribe("Volume Attach Verify [Feature:vsphere][Serial][Disrup
 		framework.ExpectNoError(err, "Unable to restart kubelet on master node")
 
 		ginkgo.By("Verifying the kubelet on master node is up")
-		err = framework.WaitForKubeletUp(masterAddress)
+		err = waitForKubeletUp(masterAddress)
 		framework.ExpectNoError(err)
 
 		for i, pod := range pods {
@@ -124,7 +148,7 @@ var _ = utils.SIGDescribe("Volume Attach Verify [Feature:vsphere][Serial][Disrup
 			expectVolumeToBeAttached(nodeName, volumePath)
 
 			ginkgo.By(fmt.Sprintf("Deleting pod on node %s", nodeName))
-			err = framework.DeletePodWithWait(f, client, pod)
+			err = e2epod.DeletePodWithWait(client, pod)
 			framework.ExpectNoError(err)
 
 			ginkgo.By(fmt.Sprintf("Waiting for volume %s to be detached from the node %s", volumePath, nodeName))

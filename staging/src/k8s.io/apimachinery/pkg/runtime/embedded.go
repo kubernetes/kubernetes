@@ -134,9 +134,16 @@ func Convert_runtime_RawExtension_To_runtime_Object(in *RawExtension, out *Objec
 	return nil
 }
 
-func DefaultEmbeddedConversions() []interface{} {
-	return []interface{}{
-		Convert_runtime_Object_To_runtime_RawExtension,
-		Convert_runtime_RawExtension_To_runtime_Object,
+func RegisterEmbeddedConversions(s *Scheme) error {
+	if err := s.AddConversionFunc((*Object)(nil), (*RawExtension)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_runtime_Object_To_runtime_RawExtension(a.(*Object), b.(*RawExtension), scope)
+	}); err != nil {
+		return err
 	}
+	if err := s.AddConversionFunc((*RawExtension)(nil), (*Object)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_runtime_RawExtension_To_runtime_Object(a.(*RawExtension), b.(*Object), scope)
+	}); err != nil {
+		return err
+	}
+	return nil
 }

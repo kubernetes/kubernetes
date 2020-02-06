@@ -166,6 +166,9 @@ func DaemonSetFromManifest(fileName, ns string) (*appsv1.DaemonSet, error) {
 func RoleFromManifest(fileName, ns string) (*rbacv1.Role, error) {
 	var role rbacv1.Role
 	data, err := testfiles.Read(fileName)
+	if err != nil {
+		return nil, err
+	}
 
 	json, err := utilyaml.ToJSON(data)
 	if err != nil {

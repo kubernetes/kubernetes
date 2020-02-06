@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2016 The Kubernetes Authors.
 
@@ -20,16 +22,18 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"time"
 
-	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/utils/keymutex"
+	"k8s.io/utils/mount"
+
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/legacy-cloud-providers/vsphere"
-	"k8s.io/utils/keymutex"
 )
 
 type vsphereVMDKAttacher struct {
@@ -205,12 +209,17 @@ func (plugin *vsphereVolumePlugin) GetDeviceMountRefs(deviceMountPath string) ([
 
 // MountDevice mounts device to global mount point.
 func (attacher *vsphereVMDKAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) error {
+	klog.Info("vsphere MountDevice", devicePath, deviceMountPath)
 	mounter := attacher.host.GetMounter(vsphereVolumePluginName)
 	notMnt, err := mounter.IsLikelyNotMountPoint(deviceMountPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			if err := os.MkdirAll(deviceMountPath, 0750); err != nil {
-				klog.Errorf("Failed to create directory at %#v. err: %s", deviceMountPath, err)
+			dir := deviceMountPath
+			if runtime.GOOS == "windows" {
+				dir = filepath.Dir(deviceMountPath)
+			}
+			if err := os.MkdirAll(dir, 0750); err != nil {
+				klog.Errorf("Failed to create directory at %#v. err: %s", dir, err)
 				return err
 			}
 			notMnt = true

@@ -24,7 +24,7 @@ import (
 	"github.com/onsi/gomega/types"
 )
 
-const GOMEGA_VERSION = "1.5.0"
+const GOMEGA_VERSION = "1.7.0"
 
 const nilFailHandlerPanic = `You are trying to make an assertion, but Gomega's fail handler is nil.
 If you're using Ginkgo then you probably forgot to put your assertion in an It().
@@ -155,7 +155,7 @@ func Expect(actual interface{}, extra ...interface{}) Assertion {
 //    ExpectWithOffset(1, "foo").To(Equal("foo"))
 //
 // Unlike `Expect` and `Ω`, `ExpectWithOffset` takes an additional integer argument
-// this is used to modify the call-stack offset when computing line numbers.
+// that is used to modify the call-stack offset when computing line numbers.
 //
 // This is most useful in helper functions that make assertions.  If you want Gomega's
 // error message to refer to the calling line in the test (as opposed to the line in the helper function)
@@ -242,7 +242,7 @@ func EventuallyWithOffset(offset int, actual interface{}, intervals ...interface
 // assert that all other values are nil/zero.
 // This allows you to pass Consistently a function that returns a value and an error - a common pattern in Go.
 //
-// Consistently is useful in cases where you want to assert that something *does not happen* over a period of tiem.
+// Consistently is useful in cases where you want to assert that something *does not happen* over a period of time.
 // For example, you want to assert that a goroutine does *not* send data down a channel.  In this case, you could:
 //
 //   Consistently(channel).ShouldNot(Receive())
@@ -280,7 +280,7 @@ func SetDefaultEventuallyPollingInterval(t time.Duration) {
 	defaultEventuallyPollingInterval = t
 }
 
-// SetDefaultConsistentlyDuration sets  the default duration for Consistently. Consistently will verify that your condition is satsified for this long.
+// SetDefaultConsistentlyDuration sets  the default duration for Consistently. Consistently will verify that your condition is satisfied for this long.
 func SetDefaultConsistentlyDuration(t time.Duration) {
 	defaultConsistentlyDuration = t
 }
@@ -320,7 +320,7 @@ type GomegaAsyncAssertion = AsyncAssertion
 // All methods take a variadic optionalDescription argument.  This is passed on to fmt.Sprintf()
 // and is used to annotate failure messages.
 //
-// All methods return a bool that is true if hte assertion passed and false if it failed.
+// All methods return a bool that is true if the assertion passed and false if it failed.
 //
 // Example:
 //

@@ -1,0 +1,28 @@
+version: "{build}"
+image: Visual Studio 2017
+
+clone_folder: c:\gopath\src\gotest.tools
+
+environment:
+  PATH: c:\go110\bin;%PATH%
+  GOROOT: c:\go110
+  GOPATH: c:\gopath
+  DEPVERSION: v0.4.1
+
+init:
+  - git config --global core.symlinks true
+
+install:
+  - go version
+  - go env
+
+deploy: false
+
+build_script:
+  - appveyor DownloadFile https://github.com/golang/dep/releases/download/%DEPVERSION%/dep-windows-amd64.exe
+  - appveyor DownloadFile https://github.com/gotestyourself/gotestsum/releases/download/v0.3.0/gotestsum_0.3.0_windows_amd64.tar.gz
+  - tar -xzf gotestsum_0.3.0_windows_amd64.tar.gz
+  - dep-windows-amd64.exe ensure
+
+test_script:
+  - gotestsum

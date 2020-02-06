@@ -12,6 +12,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"syscall"
+	"time"
 	"unsafe"
 
 	"github.com/sirupsen/logrus"
@@ -443,6 +444,12 @@ func assembleDestination(attrs []syscall.NetlinkRouteAttr) (*Destination, error)
 			d.ActiveConnections = int(native.Uint16(attr.Value))
 		case ipvsDestAttrInactiveConnections:
 			d.InactiveConnections = int(native.Uint16(attr.Value))
+		case ipvsSvcAttrStats:
+			stats, err := assembleStats(attr.Value)
+			if err != nil {
+				return nil, err
+			}
+			d.Stats = DstStats(stats)
 		}
 	}
 	return &d, nil
@@ -495,6 +502,60 @@ func (i *Handle) doGetDestinationsCmd(s *Service, d *Destination) ([]*Destinatio
 		res = append(res, dest)
 	}
 	return res, nil
+}
+
+// parseConfig given a ipvs netlink response this function will respond with a valid config entry, an error otherwise
+func (i *Handle) parseConfig(msg []byte) (*Config, error) {
+	var c Config
+
+	//Remove General header for this message
+	hdr := deserializeGenlMsg(msg)
+	attrs, err := nl.ParseRouteAttr(msg[hdr.Len():])
+	if err != nil {
+		return nil, err
+	}
+
+	for _, attr := range attrs {
+		attrType := int(attr.Attr.Type)
+		switch attrType {
+		case ipvsCmdAttrTimeoutTCP:
+			c.TimeoutTCP = time.Duration(native.Uint32(attr.Value)) * time.Second
+		case ipvsCmdAttrTimeoutTCPFin:
+			c.TimeoutTCPFin = time.Duration(native.Uint32(attr.Value)) * time.Second
+		case ipvsCmdAttrTimeoutUDP:
+			c.TimeoutUDP = time.Duration(native.Uint32(attr.Value)) * time.Second
+		}
+	}
+
+	return &c, nil
+}
+
+// doGetConfigCmd a wrapper function to be used by GetConfig
+func (i *Handle) doGetConfigCmd() (*Config, error) {
+	msg, err := i.doCmdWithoutAttr(ipvsCmdGetConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	res, err := i.parseConfig(msg[0])
+	if err != nil {
+		return res, err
+	}
+	return res, nil
+}
+
+// doSetConfigCmd a wrapper function to be used by SetConfig
+func (i *Handle) doSetConfigCmd(c *Config) error {
+	req := newIPVSRequest(ipvsCmdSetConfig)
+	req.Seq = atomic.AddUint32(&i.seq, 1)
+
+	req.AddData(nl.NewRtAttr(ipvsCmdAttrTimeoutTCP, nl.Uint32Attr(uint32(c.TimeoutTCP.Seconds()))))
+	req.AddData(nl.NewRtAttr(ipvsCmdAttrTimeoutTCPFin, nl.Uint32Attr(uint32(c.TimeoutTCPFin.Seconds()))))
+	req.AddData(nl.NewRtAttr(ipvsCmdAttrTimeoutUDP, nl.Uint32Attr(uint32(c.TimeoutUDP.Seconds()))))
+
+	_, err := execute(i.sock, req, 0)
+
+	return err
 }
 
 // IPVS related netlink message format explained

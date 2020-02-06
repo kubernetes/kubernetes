@@ -19,6 +19,7 @@ limitations under the License.
 package v1beta1
 
 import (
+	"context"
 	"time"
 
 	v1beta1 "k8s.io/api/node/v1beta1"
@@ -67,7 +68,7 @@ func (c *runtimeClasses) Get(name string, options v1.GetOptions) (result *v1beta
 		Resource("runtimeclasses").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -83,7 +84,7 @@ func (c *runtimeClasses) List(opts v1.ListOptions) (result *v1beta1.RuntimeClass
 		Resource("runtimeclasses").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -99,7 +100,7 @@ func (c *runtimeClasses) Watch(opts v1.ListOptions) (watch.Interface, error) {
 		Resource("runtimeclasses").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch()
+		Watch(context.TODO())
 }
 
 // Create takes the representation of a runtimeClass and creates it.  Returns the server's representation of the runtimeClass, and an error, if there is any.
@@ -108,7 +109,7 @@ func (c *runtimeClasses) Create(runtimeClass *v1beta1.RuntimeClass) (result *v1b
 	err = c.client.Post().
 		Resource("runtimeclasses").
 		Body(runtimeClass).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -120,7 +121,7 @@ func (c *runtimeClasses) Update(runtimeClass *v1beta1.RuntimeClass) (result *v1b
 		Resource("runtimeclasses").
 		Name(runtimeClass.Name).
 		Body(runtimeClass).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -131,7 +132,7 @@ func (c *runtimeClasses) Delete(name string, options *v1.DeleteOptions) error {
 		Resource("runtimeclasses").
 		Name(name).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -146,7 +147,7 @@ func (c *runtimeClasses) DeleteCollection(options *v1.DeleteOptions, listOptions
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Timeout(timeout).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -158,7 +159,7 @@ func (c *runtimeClasses) Patch(name string, pt types.PatchType, data []byte, sub
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }

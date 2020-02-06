@@ -48,7 +48,7 @@ func TestCmdTokenGenerate(t *testing.T) {
 		t.Log("kubeadm cmd tests being skipped")
 		t.Skip()
 	}
-	stdout, _, err := RunCmd(kubeadmPath, "token", "generate")
+	stdout, _, _, err := RunCmd(kubeadmPath, "token", "generate")
 	if err != nil {
 		t.Fatalf("'kubeadm token generate' exited uncleanly: %v", err)
 	}
@@ -78,7 +78,7 @@ func TestCmdTokenGenerateTypoError(t *testing.T) {
 	}
 
 	kubeadmPath := getKubeadmPath()
-	_, _, err := RunCmd(kubeadmPath, "token", "genorate") // subtle typo
+	_, _, _, err := RunCmd(kubeadmPath, "token", "genorate") // subtle typo
 	if err == nil {
 		t.Error("'kubeadm token genorate' (a deliberate typo) exited without an error when we expected non-zero exit status")
 	}
@@ -101,7 +101,7 @@ func TestCmdTokenDelete(t *testing.T) {
 	kubeadmPath := getKubeadmPath()
 	for _, rt := range tests {
 		t.Run(rt.name, func(t *testing.T) {
-			_, _, actual := RunCmd(kubeadmPath, "token", "delete", rt.args)
+			_, _, _, actual := RunCmd(kubeadmPath, "token", "delete", rt.args)
 			if (actual == nil) != rt.expected {
 				t.Errorf(
 					"failed CmdTokenDelete running 'kubeadm token %s' with an error: %v\n\texpected: %t\n\t  actual: %t",

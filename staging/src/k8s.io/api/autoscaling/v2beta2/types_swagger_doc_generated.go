@@ -29,7 +29,7 @@ package v2beta2
 // AUTO-GENERATED FUNCTIONS START HERE. DO NOT EDIT.
 var map_CrossVersionObjectReference = map[string]string{
 	"":           "CrossVersionObjectReference contains enough information to let you identify the referred resource.",
-	"kind":       "Kind of the referent; More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds\"",
+	"kind":       "Kind of the referent; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds\"",
 	"name":       "Name of the referent; More info: http://kubernetes.io/docs/user-guide/identifiers#names",
 	"apiVersion": "API version of the referent",
 }
@@ -58,15 +58,47 @@ func (ExternalMetricStatus) SwaggerDoc() map[string]string {
 	return map_ExternalMetricStatus
 }
 
+var map_HPAScalingPolicy = map[string]string{
+	"":              "HPAScalingPolicy is a single policy which must hold true for a specified past interval.",
+	"type":          "Type is used to specify the scaling policy.",
+	"value":         "Value contains the amount of change which is permitted by the policy. It must be greater than zero",
+	"periodSeconds": "PeriodSeconds specifies the window of time for which the policy should hold true. PeriodSeconds must be greater than zero and less than or equal to 1800 (30 min).",
+}
+
+func (HPAScalingPolicy) SwaggerDoc() map[string]string {
+	return map_HPAScalingPolicy
+}
+
+var map_HPAScalingRules = map[string]string{
+	"":                           "HPAScalingRules configures the scaling behavior for one direction. These Rules are applied after calculating DesiredReplicas from metrics for the HPA. They can limit the scaling velocity by specifying scaling policies. They can prevent flapping by specifying the stabilization window, so that the number of replicas is not set instantly, instead, the safest value from the stabilization window is chosen.",
+	"stabilizationWindowSeconds": "StabilizationWindowSeconds is the number of seconds for which past recommendations should be considered while scaling up or scaling down. StabilizationWindowSeconds must be greater than or equal to zero and less than or equal to 3600 (one hour). If not set, use the default values: - For scale up: 0 (i.e. no stabilization is done). - For scale down: 300 (i.e. the stabilization window is 300 seconds long).",
+	"selectPolicy":               "selectPolicy is used to specify which policy should be used. If not set, the default value MaxPolicySelect is used.",
+	"policies":                   "policies is a list of potential scaling polices which can be used during scaling. At least one policy must be specified, otherwise the HPAScalingRules will be discarded as invalid",
+}
+
+func (HPAScalingRules) SwaggerDoc() map[string]string {
+	return map_HPAScalingRules
+}
+
 var map_HorizontalPodAutoscaler = map[string]string{
 	"":         "HorizontalPodAutoscaler is the configuration for a horizontal pod autoscaler, which automatically manages the replica count of any resource implementing the scale subresource based on the metrics specified.",
-	"metadata": "metadata is the standard object metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata",
-	"spec":     "spec is the specification for the behaviour of the autoscaler. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status.",
+	"metadata": "metadata is the standard object metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"spec":     "spec is the specification for the behaviour of the autoscaler. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status.",
 	"status":   "status is the current information about the autoscaler.",
 }
 
 func (HorizontalPodAutoscaler) SwaggerDoc() map[string]string {
 	return map_HorizontalPodAutoscaler
+}
+
+var map_HorizontalPodAutoscalerBehavior = map[string]string{
+	"":          "HorizontalPodAutoscalerBehavior configures the scaling behavior of the target in both Up and Down directions (scaleUp and scaleDown fields respectively).",
+	"scaleUp":   "scaleUp is scaling policy for scaling Up. If not set, the default value is the higher of:\n  * increase no more than 4 pods per 60 seconds\n  * double the number of pods per 60 seconds\nNo stabilization is used.",
+	"scaleDown": "scaleDown is scaling policy for scaling Down. If not set, the default value is to allow to scale down to minReplicas pods, with a 300 second stabilization window (i.e., the highest recommendation for the last 300sec is used).",
+}
+
+func (HorizontalPodAutoscalerBehavior) SwaggerDoc() map[string]string {
+	return map_HorizontalPodAutoscalerBehavior
 }
 
 var map_HorizontalPodAutoscalerCondition = map[string]string{
@@ -95,9 +127,10 @@ func (HorizontalPodAutoscalerList) SwaggerDoc() map[string]string {
 var map_HorizontalPodAutoscalerSpec = map[string]string{
 	"":               "HorizontalPodAutoscalerSpec describes the desired functionality of the HorizontalPodAutoscaler.",
 	"scaleTargetRef": "scaleTargetRef points to the target resource to scale, and is used to the pods for which metrics should be collected, as well as to actually change the replica count.",
-	"minReplicas":    "minReplicas is the lower limit for the number of replicas to which the autoscaler can scale down. It defaults to 1 pod.",
+	"minReplicas":    "minReplicas is the lower limit for the number of replicas to which the autoscaler can scale down.  It defaults to 1 pod.  minReplicas is allowed to be 0 if the alpha feature gate HPAScaleToZero is enabled and at least one Object or External metric is configured.  Scaling is active as long as at least one metric value is available.",
 	"maxReplicas":    "maxReplicas is the upper limit for the number of replicas to which the autoscaler can scale up. It cannot be less that minReplicas.",
 	"metrics":        "metrics contains the specifications for which to use to calculate the desired replica count (the maximum replica count across all metrics will be used).  The desired replica count is calculated multiplying the ratio between the target value and the current value by the current number of pods.  Ergo, metrics used must decrease as the pod count is increased, and vice-versa.  See the individual metric source types for more information about how each type of metric must respond. If not set, the default metric will be set to 80% average CPU utilization.",
+	"behavior":       "behavior configures the scaling behavior of the target in both Up and Down directions (scaleUp and scaleDown fields respectively). If not set, the default HPAScalingRules for scale up and scale down are used.",
 }
 
 func (HorizontalPodAutoscalerSpec) SwaggerDoc() map[string]string {

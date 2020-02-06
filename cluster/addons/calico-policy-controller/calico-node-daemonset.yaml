@@ -4,7 +4,6 @@ metadata:
   name: calico-node
   namespace: kube-system
   labels:
-    kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
     k8s-app: calico-node
 spec:
@@ -17,8 +16,6 @@ spec:
     metadata:
       labels:
         k8s-app: calico-node
-      annotations:
-        scheduler.alpha.kubernetes.io/critical-pod: ''
     spec:
       priorityClassName: system-node-critical
       nodeSelector:
@@ -28,78 +25,9 @@ spec:
       # Minimize downtime during a rolling upgrade or deletion; tell Kubernetes to do a "force
       # deletion": https://kubernetes.io/docs/concepts/workloads/pods/pod/#termination-of-pods.
       terminationGracePeriodSeconds: 0
-      containers:
-        # Runs calico/node container on each Kubernetes node.  This
-        # container programs network policy and routes on each
-        # host.
-        - name: calico-node
-          image: gcr.io/projectcalico-org/node:v3.3.1
-          env:
-            - name: CALICO_DISABLE_FILE_LOGGING
-              value: "true"
-            - name: CALICO_NETWORKING_BACKEND
-              value: "none"
-            - name: DATASTORE_TYPE
-              value: "kubernetes"
-            - name: FELIX_DEFAULTENDPOINTTOHOSTACTION
-              value: "ACCEPT"
-            - name: FELIX_HEALTHENABLED
-              value: "true"
-            - name: FELIX_IPV6SUPPORT
-              value: "false"
-            - name: FELIX_LOGSEVERITYSYS
-              value: "none"
-            - name: FELIX_LOGSEVERITYSCREEN
-              value: "info"
-            - name: FELIX_PROMETHEUSMETRICSENABLED
-              value: "true"
-            - name: FELIX_REPORTINGINTERVALSECS
-              value: "0"
-            - name: FELIX_TYPHAK8SSERVICENAME
-              value: "calico-typha"
-            - name: IP
-              value: ""
-            - name: NO_DEFAULT_POOLS
-              value: "true"
-            - name: NODENAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: spec.nodeName
-            - name: WAIT_FOR_DATASTORE
-              value: "true"
-          securityContext:
-            privileged: true
-          livenessProbe:
-            httpGet:
-              path: /liveness
-              port: 9099
-              host: localhost
-            periodSeconds: 10
-            initialDelaySeconds: 10
-            failureThreshold: 6
-          readinessProbe:
-            httpGet:
-              path: /readiness
-              port: 9099
-              host: localhost
-            periodSeconds: 10
-          volumeMounts:
-            - mountPath: /lib/modules
-              name: lib-modules
-              readOnly: true
-            - mountPath: /etc/calico
-              name: etc-calico
-              readOnly: true
-            - mountPath: /var/run/calico
-              name: var-run-calico
-              readOnly: false
-            - mountPath: /var/lib/calico
-              name: var-lib-calico
-              readOnly: false
-        # This container installs the Calico CNI binaries
-        # and CNI network config file on each node.
+      initContainers:
         - name: install-cni
-          image: gcr.io/projectcalico-org/cni:v3.3.1
+          image: gcr.io/projectcalico-org/cni:v3.8.4
           command: ["/install-cni.sh"]
           env:
             - name: CNI_CONF_NAME
@@ -108,7 +36,7 @@ spec:
               value: |-
                 {
                   "name": "k8s-pod-network",
-                  "cniVersion": "0.3.0",
+                  "cniVersion": "0.3.1",
                   "plugins": [
                     {
                       "type": "calico",
@@ -137,11 +65,91 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: spec.nodeName
+            # Prevents the container from sleeping forever.
+            - name: SLEEP
+              value: "false"
           volumeMounts:
             - mountPath: /host/opt/cni/bin
               name: cni-bin-dir
             - mountPath: /host/etc/cni/net.d
               name: cni-net-dir
+      containers:
+        # Runs calico/node container on each Kubernetes node.  This
+        # container programs network policy and routes on each
+        # host.
+        - name: calico-node
+          image: gcr.io/projectcalico-org/node:v3.8.4
+          env:
+            - name: CALICO_MANAGE_CNI
+              value: "true"
+            - name: CALICO_DISABLE_FILE_LOGGING
+              value: "true"
+            - name: CALICO_NETWORKING_BACKEND
+              value: "none"
+            - name: DATASTORE_TYPE
+              value: "kubernetes"
+            - name: FELIX_DEFAULTENDPOINTTOHOSTACTION
+              value: "ACCEPT"
+            - name: FELIX_HEALTHENABLED
+              value: "true"
+            - name: FELIX_IPV6SUPPORT
+              value: "false"
+            - name: FELIX_LOGSEVERITYSYS
+              value: "none"
+            - name: FELIX_LOGSEVERITYSCREEN
+              value: "info"
+            - name: FELIX_PROMETHEUSMETRICSENABLED
+              value: "true"
+            - name: FELIX_REPORTINGINTERVALSECS
+              value: "0"
+            - name: FELIX_TYPHAK8SSERVICENAME
+              value: "calico-typha"
+            - name: USE_POD_CIDR
+              value: "true"
+            - name: IP
+              value: ""
+            - name: NO_DEFAULT_POOLS
+              value: "true"
+            - name: NODENAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: WAIT_FOR_DATASTORE
+              value: "true"
+          securityContext:
+            privileged: true
+          livenessProbe:
+            httpGet:
+              path: /liveness
+              port: 9099
+              host: localhost
+            periodSeconds: 10
+            initialDelaySeconds: 10
+            failureThreshold: 6
+          readinessProbe:
+            httpGet:
+              path: /readiness
+              port: 9099
+              host: localhost
+            periodSeconds: 10
+          volumeMounts:
+            - mountPath: /host/etc/cni/net.d
+              name: cni-net-dir
+            - mountPath: /lib/modules
+              name: lib-modules
+              readOnly: true
+            - mountPath: /etc/calico
+              name: etc-calico
+              readOnly: true
+            - mountPath: /var/run/calico
+              name: var-run-calico
+              readOnly: false
+            - mountPath: /var/lib/calico
+              name: var-lib-calico
+              readOnly: false
+            - mountPath: /run/xtables.lock
+              name: xtables-lock
+              readOnly: false
       volumes:
         # Used to ensure proper kmods are installed.
         - name: lib-modules
@@ -165,6 +173,10 @@ spec:
         - name: var-lib-calico
           hostPath:
             path: /var/lib/calico
+        - name: xtables-lock
+          hostPath:
+            path: /run/xtables.lock
+            type: FileOrCreate
       tolerations:
         # Make sure calico/node gets scheduled on all nodes.
         - effect: NoSchedule

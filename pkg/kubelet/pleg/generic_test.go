@@ -21,15 +21,19 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/component-base/metrics/testutil"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 
 const (
@@ -641,5 +645,68 @@ func TestRelistIPChange(t *testing.T) {
 		assert.Equal(t, &statusCopy, actualStatus, tc.name)
 		assert.Nil(t, actualErr, tc.name)
 		assert.Exactly(t, []*PodLifecycleEvent{event}, actualEvents)
+	}
+}
+
+func TestRunningPodAndContainerCount(t *testing.T) {
+	fakeRuntime := &containertest.FakeRuntime{}
+	runtimeCache, _ := kubecontainer.NewRuntimeCache(fakeRuntime)
+	metrics.Register(runtimeCache)
+	testPleg := newTestGenericPLEG()
+	pleg, runtime := testPleg.pleg, testPleg.runtime
+
+	runtime.AllPodList = []*containertest.FakePod{
+		{Pod: &kubecontainer.Pod{
+			ID: "1234",
+			Containers: []*kubecontainer.Container{
+				createTestContainer("c1", kubecontainer.ContainerStateRunning),
+				createTestContainer("c2", kubecontainer.ContainerStateUnknown),
+				createTestContainer("c3", kubecontainer.ContainerStateUnknown),
+			},
+		}},
+		{Pod: &kubecontainer.Pod{
+			ID: "4567",
+			Containers: []*kubecontainer.Container{
+				createTestContainer("c1", kubecontainer.ContainerStateExited),
+			},
+		}},
+	}
+
+	pleg.relist()
+
+	tests := []struct {
+		name        string
+		metricsName string
+		wants       string
+	}{
+		{
+			name:        "test container count",
+			metricsName: "kubelet_running_container_count",
+			wants: `
+# HELP kubelet_running_container_count [ALPHA] Number of containers currently running
+# TYPE kubelet_running_container_count gauge
+kubelet_running_container_count{container_state="exited"} 1
+kubelet_running_container_count{container_state="running"} 1
+kubelet_running_container_count{container_state="unknown"} 2
+`,
+		},
+		{
+			name:        "test pod count",
+			metricsName: "kubelet_running_pod_count",
+			wants: `
+# HELP kubelet_running_pod_count [ALPHA] Number of pods currently running
+# TYPE kubelet_running_pod_count gauge
+kubelet_running_pod_count 2
+`,
+		},
+	}
+
+	for _, test := range tests {
+		tc := test
+		t.Run(tc.name, func(t *testing.T) {
+			if err := testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(tc.wants), tc.metricsName); err != nil {
+				t.Fatal(err)
+			}
+		})
 	}
 }

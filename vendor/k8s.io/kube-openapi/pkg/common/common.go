@@ -24,6 +24,12 @@ import (
 	"github.com/go-openapi/spec"
 )
 
+const (
+	// TODO: Make this configurable.
+	ExtensionPrefix = "x-kubernetes-"
+	ExtensionV2Schema = ExtensionPrefix + "v2-schema"
+)
+
 // OpenAPIDefinition describes single type. Normally these definitions are auto-generated using gen-openapi.
 type OpenAPIDefinition struct {
 	Schema       spec.Schema
@@ -41,6 +47,10 @@ type GetOpenAPIDefinitions func(ReferenceCallback) map[string]OpenAPIDefinition
 // possible.
 type OpenAPIDefinitionGetter interface {
 	OpenAPIDefinition() *OpenAPIDefinition
+}
+
+type OpenAPIV3DefinitionGetter interface {
+	OpenAPIV3Definition() *OpenAPIDefinition
 }
 
 type PathHandler interface {
@@ -171,4 +181,12 @@ func EscapeJsonPointer(p string) string {
 	p = strings.Replace(p, "~", "~0", -1)
 	p = strings.Replace(p, "/", "~1", -1)
 	return p
+}
+
+func EmbedOpenAPIDefinitionIntoV2Extension(main OpenAPIDefinition, embedded OpenAPIDefinition) OpenAPIDefinition {
+	if main.Schema.Extensions == nil {
+		main.Schema.Extensions = make(map[string]interface{})
+	}
+	main.Schema.Extensions[ExtensionV2Schema] = embedded.Schema
+	return main
 }

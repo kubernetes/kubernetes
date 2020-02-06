@@ -53,6 +53,9 @@ func TestPatch(t *testing.T) {
 
 	client := http.Client{}
 	request, err := http.NewRequest("PATCH", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, bytes.NewReader([]byte(`{"labels":{"foo":"bar"}}`)))
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 	request.Header.Set("Content-Type", "application/merge-patch+json; charset=UTF-8")
 	response, err := client.Do(request)
 	if err != nil {
@@ -94,6 +97,9 @@ func TestForbiddenForceOnNonApply(t *testing.T) {
 
 	client := http.Client{}
 	request, err := http.NewRequest("PATCH", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, bytes.NewReader([]byte(`{"labels":{"foo":"bar"}}`)))
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 	request.Header.Set("Content-Type", "application/merge-patch+json; charset=UTF-8")
 	_, err = client.Do(request)
 	if err != nil {
@@ -101,6 +107,9 @@ func TestForbiddenForceOnNonApply(t *testing.T) {
 	}
 
 	request, err = http.NewRequest("PATCH", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID+"?force=true", bytes.NewReader([]byte(`{"labels":{"foo":"bar"}}`)))
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 	request.Header.Set("Content-Type", "application/merge-patch+json; charset=UTF-8")
 	response, err := client.Do(request)
 	if err != nil {
@@ -111,6 +120,9 @@ func TestForbiddenForceOnNonApply(t *testing.T) {
 	}
 
 	request, err = http.NewRequest("PATCH", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID+"?force=false", bytes.NewReader([]byte(`{"labels":{"foo":"bar"}}`)))
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 	request.Header.Set("Content-Type", "application/merge-patch+json; charset=UTF-8")
 	response, err = client.Do(request)
 	if err != nil {
@@ -140,6 +152,9 @@ func TestPatchRequiresMatchingName(t *testing.T) {
 
 	client := http.Client{}
 	request, err := http.NewRequest("PATCH", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, bytes.NewReader([]byte(`{"metadata":{"name":"idbar"}}`)))
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 	request.Header.Set("Content-Type", "application/merge-patch+json")
 	response, err := client.Do(request)
 	if err != nil {

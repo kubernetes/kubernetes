@@ -24,9 +24,8 @@ import (
 	"time"
 
 	"k8s.io/component-base/logs"
+	_ "k8s.io/component-base/metrics/prometheus/clientgo" // load all the prometheus client-go plugins
 	"k8s.io/kubernetes/cmd/kube-apiserver/app"
-	_ "k8s.io/kubernetes/pkg/util/prometheusclientgo" // load all the prometheus client-go plugins
-	_ "k8s.io/kubernetes/pkg/version/prometheus"      // for version metric registration
 )
 
 func main() {

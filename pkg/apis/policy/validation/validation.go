@@ -35,12 +35,16 @@ import (
 	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
 )
 
+// ValidatePodDisruptionBudget validates a PodDisruptionBudget and returns an ErrorList
+// with any errors.
 func ValidatePodDisruptionBudget(pdb *policy.PodDisruptionBudget) field.ErrorList {
 	allErrs := ValidatePodDisruptionBudgetSpec(pdb.Spec, field.NewPath("spec"))
 	allErrs = append(allErrs, ValidatePodDisruptionBudgetStatus(pdb.Status, field.NewPath("status"))...)
 	return allErrs
 }
 
+// ValidatePodDisruptionBudgetSpec validates a PodDisruptionBudgetSpec and returns an ErrorList
+// with any errors.
 func ValidatePodDisruptionBudgetSpec(spec policy.PodDisruptionBudgetSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
@@ -63,9 +67,11 @@ func ValidatePodDisruptionBudgetSpec(spec policy.PodDisruptionBudgetSpec, fldPat
 	return allErrs
 }
 
+// ValidatePodDisruptionBudgetStatus validates a PodDisruptionBudgetStatus and returns an ErrorList
+// with any errors.
 func ValidatePodDisruptionBudgetStatus(status policy.PodDisruptionBudgetStatus, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.PodDisruptionsAllowed), fldPath.Child("podDisruptionsAllowed"))...)
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.DisruptionsAllowed), fldPath.Child("disruptionsAllowed"))...)
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.CurrentHealthy), fldPath.Child("currentHealthy"))...)
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.DesiredHealthy), fldPath.Child("desiredHealthy"))...)
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.ExpectedPods), fldPath.Child("expectedPods"))...)
@@ -78,6 +84,8 @@ func ValidatePodDisruptionBudgetStatus(status policy.PodDisruptionBudgetStatus, 
 // trailing dashes are allowed.
 var ValidatePodSecurityPolicyName = apimachineryvalidation.NameIsDNSSubdomain
 
+// ValidatePodSecurityPolicy validates a PodSecurityPolicy and returns an ErrorList
+// with any errors.
 func ValidatePodSecurityPolicy(psp *policy.PodSecurityPolicy) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, apivalidation.ValidateObjectMeta(&psp.ObjectMeta, false, ValidatePodSecurityPolicyName, field.NewPath("metadata"))...)
@@ -86,6 +94,8 @@ func ValidatePodSecurityPolicy(psp *policy.PodSecurityPolicy) field.ErrorList {
 	return allErrs
 }
 
+// ValidatePodSecurityPolicySpec validates a PodSecurityPolicySpec and returns an ErrorList
+// with any errors.
 func ValidatePodSecurityPolicySpec(spec *policy.PodSecurityPolicySpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
@@ -114,6 +124,8 @@ func ValidatePodSecurityPolicySpec(spec *policy.PodSecurityPolicySpec, fldPath *
 	return allErrs
 }
 
+// ValidatePodSecurityPolicySpecificAnnotations validates annotations and returns an ErrorList
+// with any errors.
 func ValidatePodSecurityPolicySpecificAnnotations(annotations map[string]string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
@@ -335,10 +347,13 @@ func validatePSPAllowedProcMountTypes(fldPath *field.Path, allowedProcMountTypes
 }
 
 const sysctlPatternSegmentFmt string = "([a-z0-9][-_a-z0-9]*)?[a-z0-9*]"
+
+// SysctlPatternFmt is a regex used for matching valid sysctl patterns.
 const SysctlPatternFmt string = "(" + apivalidation.SysctlSegmentFmt + "\\.)*" + sysctlPatternSegmentFmt
 
 var sysctlPatternRegexp = regexp.MustCompile("^" + SysctlPatternFmt + "$")
 
+// IsValidSysctlPattern checks if name is a valid sysctl pattern.
 func IsValidSysctlPattern(name string) bool {
 	if len(name) > apivalidation.SysctlMaxLength {
 		return false

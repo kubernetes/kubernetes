@@ -24,13 +24,13 @@ import (
 	"k8s.io/kubernetes/pkg/registry/settings/podpreset"
 )
 
-// rest implements a RESTStorage for replication controllers against etcd
+// REST implements a RESTStorage for pod presets against etcd.
 type REST struct {
 	*genericregistry.Store
 }
 
-// NewREST returns a RESTStorage object that will work against replication controllers.
-func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
+// NewREST returns a RESTStorage object that will work against pod presets.
+func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, error) {
 	store := &genericregistry.Store{
 		NewFunc:                  func() runtime.Object { return &settingsapi.PodPreset{} },
 		NewListFunc:              func() runtime.Object { return &settingsapi.PodPresetList{} },
@@ -42,8 +42,8 @@ func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
 	}
 	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {
-		panic(err) // TODO: Propagate error up
+		return nil, err
 	}
 
-	return &REST{store}
+	return &REST{store}, nil
 }

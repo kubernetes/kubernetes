@@ -17,6 +17,11 @@ func processAsyncHcsResult(err error, resultp *uint16, callbackNumber uintptr, e
 
 func waitForNotification(callbackNumber uintptr, expectedNotification hcsNotification, timeout *time.Duration) error {
 	callbackMapLock.RLock()
+	if _, ok := callbackMap[callbackNumber]; !ok {
+		callbackMapLock.RUnlock()
+		logrus.Errorf("failed to waitForNotification: callbackNumber %d does not exist in callbackMap", callbackNumber)
+		return ErrHandleClose
+	}
 	channels := callbackMap[callbackNumber].channels
 	callbackMapLock.RUnlock()
 

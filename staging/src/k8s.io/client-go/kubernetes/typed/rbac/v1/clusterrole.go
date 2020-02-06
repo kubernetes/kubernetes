@@ -19,6 +19,7 @@ limitations under the License.
 package v1
 
 import (
+	"context"
 	"time"
 
 	v1 "k8s.io/api/rbac/v1"
@@ -67,7 +68,7 @@ func (c *clusterRoles) Get(name string, options metav1.GetOptions) (result *v1.C
 		Resource("clusterroles").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -83,7 +84,7 @@ func (c *clusterRoles) List(opts metav1.ListOptions) (result *v1.ClusterRoleList
 		Resource("clusterroles").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -99,7 +100,7 @@ func (c *clusterRoles) Watch(opts metav1.ListOptions) (watch.Interface, error) {
 		Resource("clusterroles").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch()
+		Watch(context.TODO())
 }
 
 // Create takes the representation of a clusterRole and creates it.  Returns the server's representation of the clusterRole, and an error, if there is any.
@@ -108,7 +109,7 @@ func (c *clusterRoles) Create(clusterRole *v1.ClusterRole) (result *v1.ClusterRo
 	err = c.client.Post().
 		Resource("clusterroles").
 		Body(clusterRole).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -120,7 +121,7 @@ func (c *clusterRoles) Update(clusterRole *v1.ClusterRole) (result *v1.ClusterRo
 		Resource("clusterroles").
 		Name(clusterRole.Name).
 		Body(clusterRole).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -131,7 +132,7 @@ func (c *clusterRoles) Delete(name string, options *metav1.DeleteOptions) error 
 		Resource("clusterroles").
 		Name(name).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -146,7 +147,7 @@ func (c *clusterRoles) DeleteCollection(options *metav1.DeleteOptions, listOptio
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Timeout(timeout).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -158,7 +159,7 @@ func (c *clusterRoles) Patch(name string, pt types.PatchType, data []byte, subre
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }

@@ -165,10 +165,3 @@ func (c *Clientset) $.GroupGoName$$.Version$() $.PackageAlias$.$.GroupGoName$$.V
 	return &fake$.PackageAlias$.Fake$.GroupGoName$$.Version${Fake: &c.Fake}
 }
 `
-
-var clientsetInterfaceDefaultVersionImpl = `
-// $.GroupGoName$ retrieves the $.GroupGoName$$.Version$Client
-func (c *Clientset) $.GroupGoName$() $.PackageAlias$.$.GroupGoName$$.Version$Interface {
-	return &fake$.PackageAlias$.Fake$.GroupGoName$$.Version${Fake: &c.Fake}
-}
-`

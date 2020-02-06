@@ -1,1 +1,1 @@
-The original file is (or will be) https://github.com/kubernetes-csi/external-attacher/blob/master/deploy/kubernetes/rbac.yaml
+The original file is https://github.com/kubernetes-csi/external-attacher/blob/VERSION/deploy/kubernetes/rbac.yaml

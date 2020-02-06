@@ -27,11 +27,9 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 )
 
 const (
@@ -53,12 +51,12 @@ var _ = SIGDescribe("[Feature:NodeAuthorizer]", func() {
 
 		nodeList, err := f.ClientSet.CoreV1().Nodes().List(metav1.ListOptions{})
 		framework.ExpectNoError(err, "failed to list nodes in namespace: %s", ns)
-		gomega.Expect(len(nodeList.Items)).NotTo(gomega.Equal(0))
+		framework.ExpectNotEqual(len(nodeList.Items), 0)
 		nodeName = nodeList.Items[0].Name
 		asUser = nodeNamePrefix + nodeName
 		saName := "default"
 		sa, err := f.ClientSet.CoreV1().ServiceAccounts(ns).Get(saName, metav1.GetOptions{})
-		gomega.Expect(len(sa.Secrets)).NotTo(gomega.Equal(0))
+		framework.ExpectNotEqual(len(sa.Secrets), 0)
 		framework.ExpectNoError(err, "failed to retrieve service account (%s:%s)", ns, saName)
 		defaultSaSecret = sa.Secrets[0].Name
 		ginkgo.By("Creating a kubernetes client that impersonates a node")
@@ -74,17 +72,17 @@ var _ = SIGDescribe("[Feature:NodeAuthorizer]", func() {
 	})
 	ginkgo.It("Getting a non-existent secret should exit with the Forbidden error, not a NotFound error", func() {
 		_, err := c.CoreV1().Secrets(ns).Get("foo", metav1.GetOptions{})
-		gomega.Expect(apierrors.IsForbidden(err)).Should(gomega.Equal(true))
+		framework.ExpectEqual(apierrors.IsForbidden(err), true)
 	})
 
 	ginkgo.It("Getting an existing secret should exit with the Forbidden error", func() {
 		_, err := c.CoreV1().Secrets(ns).Get(defaultSaSecret, metav1.GetOptions{})
-		gomega.Expect(apierrors.IsForbidden(err)).Should(gomega.Equal(true))
+		framework.ExpectEqual(apierrors.IsForbidden(err), true)
 	})
 
 	ginkgo.It("Getting a non-existent configmap should exit with the Forbidden error, not a NotFound error", func() {
 		_, err := c.CoreV1().ConfigMaps(ns).Get("foo", metav1.GetOptions{})
-		gomega.Expect(apierrors.IsForbidden(err)).Should(gomega.Equal(true))
+		framework.ExpectEqual(apierrors.IsForbidden(err), true)
 	})
 
 	ginkgo.It("Getting an existing configmap should exit with the Forbidden error", func() {
@@ -101,7 +99,7 @@ var _ = SIGDescribe("[Feature:NodeAuthorizer]", func() {
 		_, err := f.ClientSet.CoreV1().ConfigMaps(ns).Create(configmap)
 		framework.ExpectNoError(err, "failed to create configmap (%s:%s) %+v", ns, configmap.Name, *configmap)
 		_, err = c.CoreV1().ConfigMaps(ns).Get(configmap.Name, metav1.GetOptions{})
-		gomega.Expect(apierrors.IsForbidden(err)).Should(gomega.Equal(true))
+		framework.ExpectEqual(apierrors.IsForbidden(err), true)
 	})
 
 	ginkgo.It("Getting a secret for a workload the node has access to should succeed", func() {
@@ -120,7 +118,7 @@ var _ = SIGDescribe("[Feature:NodeAuthorizer]", func() {
 
 		ginkgo.By("Node should not get the secret")
 		_, err = c.CoreV1().Secrets(ns).Get(secret.Name, metav1.GetOptions{})
-		gomega.Expect(apierrors.IsForbidden(err)).Should(gomega.Equal(true))
+		framework.ExpectEqual(apierrors.IsForbidden(err), true)
 
 		ginkgo.By("Create a pod that use the secret")
 		pod := &v1.Pod{
@@ -157,7 +155,7 @@ var _ = SIGDescribe("[Feature:NodeAuthorizer]", func() {
 		err = wait.Poll(itv, dur, func() (bool, error) {
 			_, err = c.CoreV1().Secrets(ns).Get(secret.Name, metav1.GetOptions{})
 			if err != nil {
-				e2elog.Logf("Failed to get secret %v, err: %v", secret.Name, err)
+				framework.Logf("Failed to get secret %v, err: %v", secret.Name, err)
 				return false, nil
 			}
 			return true, nil
@@ -175,12 +173,12 @@ var _ = SIGDescribe("[Feature:NodeAuthorizer]", func() {
 		}
 		ginkgo.By(fmt.Sprintf("Create node foo by user: %v", asUser))
 		_, err := c.CoreV1().Nodes().Create(node)
-		gomega.Expect(apierrors.IsForbidden(err)).Should(gomega.Equal(true))
+		framework.ExpectEqual(apierrors.IsForbidden(err), true)
 	})
 
 	ginkgo.It("A node shouldn't be able to delete another node", func() {
 		ginkgo.By(fmt.Sprintf("Create node foo by user: %v", asUser))
 		err := c.CoreV1().Nodes().Delete("foo", &metav1.DeleteOptions{})
-		gomega.Expect(apierrors.IsForbidden(err)).Should(gomega.Equal(true))
+		framework.ExpectEqual(apierrors.IsForbidden(err), true)
 	})
 })

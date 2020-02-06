@@ -23,6 +23,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -48,7 +49,7 @@ var _ = utils.SIGDescribe("Volume Provisioning On Clustered Datastore [Feature:v
 	)
 
 	ginkgo.BeforeEach(func() {
-		framework.SkipUnlessProviderIs("vsphere")
+		e2eskipper.SkipUnlessProviderIs("vsphere")
 		Bootstrap(f)
 		client = f.ClientSet
 		namespace = f.Namespace.Name
@@ -101,7 +102,7 @@ var _ = utils.SIGDescribe("Volume Provisioning On Clustered Datastore [Feature:v
 		expectVolumeToBeAttached(nodeName, volumePath)
 
 		ginkgo.By("Deleting pod")
-		err = framework.DeletePodWithWait(f, client, pod)
+		err = e2epod.DeletePodWithWait(client, pod)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Waiting for volumes to be detached from the node")

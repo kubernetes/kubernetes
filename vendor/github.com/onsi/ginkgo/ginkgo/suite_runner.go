@@ -41,7 +41,7 @@ func (r *SuiteRunner) compileInParallel(runners []*testrunner.TestRunner, numCom
 	//an array of channels - the nth runner's compilation output is sent to the nth channel in this array
 	//we read from these channels in order to ensure we run the suites in order
 	orderedCompilationOutputs := []chan compilationOutput{}
-	for _ = range runners {
+	for range runners {
 		orderedCompilationOutputs = append(orderedCompilationOutputs, make(chan compilationOutput, 1))
 	}
 

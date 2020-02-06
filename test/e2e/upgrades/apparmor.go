@@ -19,9 +19,10 @@ package upgrades
 import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
+	e2esecurity "k8s.io/kubernetes/test/e2e/framework/security"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -39,7 +40,7 @@ func (AppArmorUpgradeTest) Name() string { return "apparmor-upgrade" }
 // Skip returns true when this test can be skipped.
 func (AppArmorUpgradeTest) Skip(upgCtx UpgradeContext) bool {
 	supportedImages := make(map[string]bool)
-	for _, d := range common.AppArmorDistros {
+	for _, d := range e2eskipper.AppArmorDistros {
 		supportedImages[d] = true
 	}
 
@@ -54,11 +55,11 @@ func (AppArmorUpgradeTest) Skip(upgCtx UpgradeContext) bool {
 // Setup creates a secret and then verifies that a pod can consume it.
 func (t *AppArmorUpgradeTest) Setup(f *framework.Framework) {
 	ginkgo.By("Loading AppArmor profiles to nodes")
-	common.LoadAppArmorProfiles(f)
+	e2esecurity.LoadAppArmorProfiles(f.Namespace.Name, f.ClientSet)
 
 	// Create the initial test pod.
 	ginkgo.By("Creating a long-running AppArmor enabled pod.")
-	t.pod = common.CreateAppArmorTestPod(f, false, false)
+	t.pod = e2esecurity.CreateAppArmorTestPod(f.Namespace.Name, f.ClientSet, f.PodClient(), false, false)
 
 	// Verify initial state.
 	t.verifyNodesAppArmorEnabled(f)
@@ -69,7 +70,7 @@ func (t *AppArmorUpgradeTest) Setup(f *framework.Framework) {
 // pod can still consume the secret.
 func (t *AppArmorUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upgrade UpgradeType) {
 	<-done
-	if upgrade == MasterUpgrade || upgrade == ClusterUpgrade {
+	if upgrade == MasterUpgrade {
 		t.verifyPodStillUp(f)
 	}
 	t.verifyNodesAppArmorEnabled(f)
@@ -80,7 +81,7 @@ func (t *AppArmorUpgradeTest) Test(f *framework.Framework, done <-chan struct{},
 func (t *AppArmorUpgradeTest) Teardown(f *framework.Framework) {
 	// rely on the namespace deletion to clean up everything
 	ginkgo.By("Logging container failures")
-	framework.LogFailedContainers(f.ClientSet, f.Namespace.Name, e2elog.Logf)
+	e2ekubectl.LogFailedContainers(f.ClientSet, f.Namespace.Name, framework.Logf)
 }
 
 func (t *AppArmorUpgradeTest) verifyPodStillUp(f *framework.Framework) {
@@ -94,7 +95,7 @@ func (t *AppArmorUpgradeTest) verifyPodStillUp(f *framework.Framework) {
 
 func (t *AppArmorUpgradeTest) verifyNewPodSucceeds(f *framework.Framework) {
 	ginkgo.By("Verifying an AppArmor profile is enforced for a new pod")
-	common.CreateAppArmorTestPod(f, false, true)
+	e2esecurity.CreateAppArmorTestPod(f.Namespace.Name, f.ClientSet, f.PodClient(), false, true)
 }
 
 func (t *AppArmorUpgradeTest) verifyNodesAppArmorEnabled(f *framework.Framework) {

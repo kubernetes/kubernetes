@@ -22,7 +22,7 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/server/routes:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/component-base/config:go_default_library",
-        "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
+        "//staging/src/k8s.io/component-base/metrics/legacyregistry:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ],
 )

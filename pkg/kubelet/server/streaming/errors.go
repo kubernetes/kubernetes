@@ -20,25 +20,25 @@ import (
 	"net/http"
 	"strconv"
 
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
+	grpcstatus "google.golang.org/grpc/status"
 )
 
 // NewErrorStreamingDisabled creates an error for disabled streaming method.
 func NewErrorStreamingDisabled(method string) error {
-	return status.Errorf(codes.NotFound, "streaming method %s disabled", method)
+	return grpcstatus.Errorf(codes.NotFound, "streaming method %s disabled", method)
 }
 
 // NewErrorTooManyInFlight creates an error for exceeding the maximum number of in-flight requests.
 func NewErrorTooManyInFlight() error {
-	return status.Error(codes.ResourceExhausted, "maximum number of in-flight requests exceeded")
+	return grpcstatus.Error(codes.ResourceExhausted, "maximum number of in-flight requests exceeded")
 }
 
 // WriteError translates a CRI streaming error into an appropriate HTTP response.
 func WriteError(err error, w http.ResponseWriter) error {
+	s, _ := grpcstatus.FromError(err)
 	var status int
-	switch grpc.Code(err) {
+	switch s.Code() {
 	case codes.NotFound:
 		status = http.StatusNotFound
 	case codes.ResourceExhausted:

@@ -247,7 +247,7 @@ func (m *FakeNodeHandler) UpdateStatus(node *v1.Node) (*v1.Node, error) {
 	}
 
 	if !found {
-		return nil, fmt.Errorf("Not found node %v", node)
+		return nil, fmt.Errorf("not found node %v", node)
 	}
 
 	origNodeCopy.Status = node.Status
@@ -366,10 +366,6 @@ func (f *FakeRecorder) Event(obj runtime.Object, eventtype, reason, message stri
 // Eventf emits a fake formatted event to the fake recorder
 func (f *FakeRecorder) Eventf(obj runtime.Object, eventtype, reason, messageFmt string, args ...interface{}) {
 	f.Event(obj, eventtype, reason, fmt.Sprintf(messageFmt, args...))
-}
-
-// PastEventf is a no-op
-func (f *FakeRecorder) PastEventf(obj runtime.Object, timestamp metav1.Time, eventtype, reason, messageFmt string, args ...interface{}) {
 }
 
 // AnnotatedEventf emits a fake formatted event to the fake recorder

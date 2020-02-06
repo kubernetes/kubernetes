@@ -19,6 +19,7 @@ limitations under the License.
 package v1beta1
 
 import (
+	"context"
 	"time"
 
 	v1beta1 "k8s.io/api/events/v1beta1"
@@ -70,7 +71,7 @@ func (c *events) Get(name string, options v1.GetOptions) (result *v1beta1.Event,
 		Resource("events").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -87,7 +88,7 @@ func (c *events) List(opts v1.ListOptions) (result *v1beta1.EventList, err error
 		Resource("events").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -104,7 +105,7 @@ func (c *events) Watch(opts v1.ListOptions) (watch.Interface, error) {
 		Resource("events").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch()
+		Watch(context.TODO())
 }
 
 // Create takes the representation of a event and creates it.  Returns the server's representation of the event, and an error, if there is any.
@@ -114,7 +115,7 @@ func (c *events) Create(event *v1beta1.Event) (result *v1beta1.Event, err error)
 		Namespace(c.ns).
 		Resource("events").
 		Body(event).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -127,7 +128,7 @@ func (c *events) Update(event *v1beta1.Event) (result *v1beta1.Event, err error)
 		Resource("events").
 		Name(event.Name).
 		Body(event).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -139,7 +140,7 @@ func (c *events) Delete(name string, options *v1.DeleteOptions) error {
 		Resource("events").
 		Name(name).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -155,7 +156,7 @@ func (c *events) DeleteCollection(options *v1.DeleteOptions, listOptions v1.List
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Timeout(timeout).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -168,7 +169,7 @@ func (c *events) Patch(name string, pt types.PatchType, data []byte, subresource
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }

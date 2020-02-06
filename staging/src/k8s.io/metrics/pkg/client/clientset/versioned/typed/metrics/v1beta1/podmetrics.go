@@ -19,6 +19,7 @@ limitations under the License.
 package v1beta1
 
 import (
+	"context"
 	"time"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -64,7 +65,7 @@ func (c *podMetricses) Get(name string, options v1.GetOptions) (result *v1beta1.
 		Resource("pods").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -81,7 +82,7 @@ func (c *podMetricses) List(opts v1.ListOptions) (result *v1beta1.PodMetricsList
 		Resource("pods").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -98,5 +99,5 @@ func (c *podMetricses) Watch(opts v1.ListOptions) (watch.Interface, error) {
 		Resource("pods").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch()
+		Watch(context.TODO())
 }

@@ -24,6 +24,8 @@ import (
 	"k8s.io/client-go/discovery"
 	fakediscovery "k8s.io/client-go/discovery/fake"
 	clientset "k8s.io/client-go/kubernetes"
+	admissionregistrationv1 "k8s.io/client-go/kubernetes/typed/admissionregistration/v1"
+	fakeadmissionregistrationv1 "k8s.io/client-go/kubernetes/typed/admissionregistration/v1/fake"
 	admissionregistrationv1beta1 "k8s.io/client-go/kubernetes/typed/admissionregistration/v1beta1"
 	fakeadmissionregistrationv1beta1 "k8s.io/client-go/kubernetes/typed/admissionregistration/v1beta1/fake"
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
@@ -62,10 +64,16 @@ import (
 	fakecoordinationv1beta1 "k8s.io/client-go/kubernetes/typed/coordination/v1beta1/fake"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	fakecorev1 "k8s.io/client-go/kubernetes/typed/core/v1/fake"
+	discoveryv1alpha1 "k8s.io/client-go/kubernetes/typed/discovery/v1alpha1"
+	fakediscoveryv1alpha1 "k8s.io/client-go/kubernetes/typed/discovery/v1alpha1/fake"
+	discoveryv1beta1 "k8s.io/client-go/kubernetes/typed/discovery/v1beta1"
+	fakediscoveryv1beta1 "k8s.io/client-go/kubernetes/typed/discovery/v1beta1/fake"
 	eventsv1beta1 "k8s.io/client-go/kubernetes/typed/events/v1beta1"
 	fakeeventsv1beta1 "k8s.io/client-go/kubernetes/typed/events/v1beta1/fake"
 	extensionsv1beta1 "k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
 	fakeextensionsv1beta1 "k8s.io/client-go/kubernetes/typed/extensions/v1beta1/fake"
+	flowcontrolv1alpha1 "k8s.io/client-go/kubernetes/typed/flowcontrol/v1alpha1"
+	fakeflowcontrolv1alpha1 "k8s.io/client-go/kubernetes/typed/flowcontrol/v1alpha1/fake"
 	networkingv1 "k8s.io/client-go/kubernetes/typed/networking/v1"
 	fakenetworkingv1 "k8s.io/client-go/kubernetes/typed/networking/v1/fake"
 	networkingv1beta1 "k8s.io/client-go/kubernetes/typed/networking/v1beta1"
@@ -145,6 +153,11 @@ func (c *Clientset) Tracker() testing.ObjectTracker {
 }
 
 var _ clientset.Interface = &Clientset{}
+
+// AdmissionregistrationV1 retrieves the AdmissionregistrationV1Client
+func (c *Clientset) AdmissionregistrationV1() admissionregistrationv1.AdmissionregistrationV1Interface {
+	return &fakeadmissionregistrationv1.FakeAdmissionregistrationV1{Fake: &c.Fake}
+}
 
 // AdmissionregistrationV1beta1 retrieves the AdmissionregistrationV1beta1Client
 func (c *Clientset) AdmissionregistrationV1beta1() admissionregistrationv1beta1.AdmissionregistrationV1beta1Interface {
@@ -241,6 +254,16 @@ func (c *Clientset) CoreV1() corev1.CoreV1Interface {
 	return &fakecorev1.FakeCoreV1{Fake: &c.Fake}
 }
 
+// DiscoveryV1alpha1 retrieves the DiscoveryV1alpha1Client
+func (c *Clientset) DiscoveryV1alpha1() discoveryv1alpha1.DiscoveryV1alpha1Interface {
+	return &fakediscoveryv1alpha1.FakeDiscoveryV1alpha1{Fake: &c.Fake}
+}
+
+// DiscoveryV1beta1 retrieves the DiscoveryV1beta1Client
+func (c *Clientset) DiscoveryV1beta1() discoveryv1beta1.DiscoveryV1beta1Interface {
+	return &fakediscoveryv1beta1.FakeDiscoveryV1beta1{Fake: &c.Fake}
+}
+
 // EventsV1beta1 retrieves the EventsV1beta1Client
 func (c *Clientset) EventsV1beta1() eventsv1beta1.EventsV1beta1Interface {
 	return &fakeeventsv1beta1.FakeEventsV1beta1{Fake: &c.Fake}
@@ -249,6 +272,11 @@ func (c *Clientset) EventsV1beta1() eventsv1beta1.EventsV1beta1Interface {
 // ExtensionsV1beta1 retrieves the ExtensionsV1beta1Client
 func (c *Clientset) ExtensionsV1beta1() extensionsv1beta1.ExtensionsV1beta1Interface {
 	return &fakeextensionsv1beta1.FakeExtensionsV1beta1{Fake: &c.Fake}
+}
+
+// FlowcontrolV1alpha1 retrieves the FlowcontrolV1alpha1Client
+func (c *Clientset) FlowcontrolV1alpha1() flowcontrolv1alpha1.FlowcontrolV1alpha1Interface {
+	return &fakeflowcontrolv1alpha1.FakeFlowcontrolV1alpha1{Fake: &c.Fake}
 }
 
 // NetworkingV1 retrieves the NetworkingV1Client

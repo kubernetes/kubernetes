@@ -19,6 +19,7 @@ limitations under the License.
 package v1
 
 import (
+	"context"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -72,7 +73,7 @@ func (c *clusterTestTypes) Get(name string, options metav1.GetOptions) (result *
 		Resource("clustertesttypes").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -88,7 +89,7 @@ func (c *clusterTestTypes) List(opts metav1.ListOptions) (result *v1.ClusterTest
 		Resource("clustertesttypes").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -104,7 +105,7 @@ func (c *clusterTestTypes) Watch(opts metav1.ListOptions) (watch.Interface, erro
 		Resource("clustertesttypes").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch()
+		Watch(context.TODO())
 }
 
 // Create takes the representation of a clusterTestType and creates it.  Returns the server's representation of the clusterTestType, and an error, if there is any.
@@ -113,7 +114,7 @@ func (c *clusterTestTypes) Create(clusterTestType *v1.ClusterTestType) (result *
 	err = c.client.Post().
 		Resource("clustertesttypes").
 		Body(clusterTestType).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -125,7 +126,7 @@ func (c *clusterTestTypes) Update(clusterTestType *v1.ClusterTestType) (result *
 		Resource("clustertesttypes").
 		Name(clusterTestType.Name).
 		Body(clusterTestType).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -140,7 +141,7 @@ func (c *clusterTestTypes) UpdateStatus(clusterTestType *v1.ClusterTestType) (re
 		Name(clusterTestType.Name).
 		SubResource("status").
 		Body(clusterTestType).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -151,7 +152,7 @@ func (c *clusterTestTypes) Delete(name string, options *metav1.DeleteOptions) er
 		Resource("clustertesttypes").
 		Name(name).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -166,7 +167,7 @@ func (c *clusterTestTypes) DeleteCollection(options *metav1.DeleteOptions, listO
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Timeout(timeout).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -178,7 +179,7 @@ func (c *clusterTestTypes) Patch(name string, pt types.PatchType, data []byte, s
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -191,7 +192,7 @@ func (c *clusterTestTypes) GetScale(clusterTestTypeName string, options metav1.G
 		Name(clusterTestTypeName).
 		SubResource("scale").
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -204,7 +205,7 @@ func (c *clusterTestTypes) UpdateScale(clusterTestTypeName string, scale *autosc
 		Name(clusterTestTypeName).
 		SubResource("scale").
 		Body(scale).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }

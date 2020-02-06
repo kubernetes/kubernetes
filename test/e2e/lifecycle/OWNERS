@@ -4,3 +4,5 @@ approvers:
 - sig-cluster-lifecycle-maintainers
 reviewers:
 - sig-cluster-lifecycle
+labels:
+- sig/cluster-lifecycle

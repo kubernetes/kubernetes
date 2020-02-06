@@ -66,11 +66,6 @@ func (nodeStrategy) AllowCreateOnUpdate() bool {
 // PrepareForCreate clears fields that are not allowed to be set by end users on creation.
 func (nodeStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	node := obj.(*api.Node)
-	// Nodes allow *all* fields, including status, to be set on create.
-	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) {
-		node.Spec.ConfigSource = nil
-		node.Status.Config = nil
-	}
 	dropDisabledFields(node, nil)
 }
 
@@ -80,13 +75,22 @@ func (nodeStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Objec
 	oldNode := old.(*api.Node)
 	newNode.Status = oldNode.Status
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) && !nodeConfigSourceInUse(oldNode) {
-		newNode.Spec.ConfigSource = nil
-	}
 	dropDisabledFields(newNode, oldNode)
 }
 
 func dropDisabledFields(node *api.Node, oldNode *api.Node) {
+	// Nodes allow *all* fields, including status, to be set on create.
+	// for create
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) && oldNode == nil {
+		node.Spec.ConfigSource = nil
+		node.Status.Config = nil
+	}
+
+	// for update
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) && !nodeConfigSourceInUse(oldNode) && oldNode != nil {
+		node.Spec.ConfigSource = nil
+	}
+
 	if !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) && !multiNodeCIDRsInUse(oldNode) {
 		if len(node.Spec.PodCIDRs) > 1 {
 			node.Spec.PodCIDRs = node.Spec.PodCIDRs[0:1]
@@ -120,7 +124,12 @@ func nodeConfigSourceInUse(node *api.Node) bool {
 // Validate validates a new node.
 func (nodeStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	node := obj.(*api.Node)
-	return validation.ValidateNode(node)
+	opts := validation.NodeValidationOptions{
+		// This ensures new nodes have no more than one hugepages resource
+		// TODO: set to false in 1.19; 1.18 servers tolerate multiple hugepages resources on update
+		ValidateSingleHugePageResource: true,
+	}
+	return validation.ValidateNode(node, opts)
 }
 
 // Canonicalize normalizes the object after validation.
@@ -129,8 +138,14 @@ func (nodeStrategy) Canonicalize(obj runtime.Object) {
 
 // ValidateUpdate is the default update validation for an end user.
 func (nodeStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	errorList := validation.ValidateNode(obj.(*api.Node))
-	return append(errorList, validation.ValidateNodeUpdate(obj.(*api.Node), old.(*api.Node))...)
+	oldPassesSingleHugepagesValidation := len(validation.ValidateNodeSingleHugePageResources(old.(*api.Node))) == 0
+	opts := validation.NodeValidationOptions{
+		// This ensures the new node has no more than one hugepages resource, if the old node did as well.
+		// TODO: set to false in 1.19; 1.18 servers tolerate relaxed validation on update
+		ValidateSingleHugePageResource: oldPassesSingleHugepagesValidation,
+	}
+	errorList := validation.ValidateNode(obj.(*api.Node), opts)
+	return append(errorList, validation.ValidateNodeUpdate(obj.(*api.Node), old.(*api.Node), opts)...)
 }
 
 func (nodeStrategy) AllowUnconditionalUpdate() bool {
@@ -181,7 +196,13 @@ func nodeStatusConfigInUse(node *api.Node) bool {
 }
 
 func (nodeStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	return validation.ValidateNodeUpdate(obj.(*api.Node), old.(*api.Node))
+	oldPassesSingleHugepagesValidation := len(validation.ValidateNodeSingleHugePageResources(old.(*api.Node))) == 0
+	opts := validation.NodeValidationOptions{
+		// This ensures the new node has no more than one hugepages resource, if the old node did as well.
+		// TODO: set to false in 1.19; 1.18 servers tolerate relaxed validation on update
+		ValidateSingleHugePageResource: oldPassesSingleHugepagesValidation,
+	}
+	return validation.ValidateNodeUpdate(obj.(*api.Node), old.(*api.Node), opts)
 }
 
 // Canonicalize normalizes the object after validation.
@@ -221,10 +242,9 @@ func MatchNode(label labels.Selector, field fields.Selector) pkgstorage.Selectio
 	}
 }
 
-func NodeNameTriggerFunc(obj runtime.Object) []pkgstorage.MatchValue {
-	node := obj.(*api.Node)
-	result := pkgstorage.MatchValue{IndexName: "metadata.name", Value: node.ObjectMeta.Name}
-	return []pkgstorage.MatchValue{result}
+// NameTriggerFunc returns value metadata.namespace of given object.
+func NameTriggerFunc(obj runtime.Object) string {
+	return obj.(*api.Node).ObjectMeta.Name
 }
 
 // ResourceLocation returns a URL and transport which one can use to send traffic for the specified node.

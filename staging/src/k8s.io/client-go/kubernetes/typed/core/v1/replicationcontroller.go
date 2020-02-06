@@ -19,6 +19,7 @@ limitations under the License.
 package v1
 
 import (
+	"context"
 	"time"
 
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
@@ -75,7 +76,7 @@ func (c *replicationControllers) Get(name string, options metav1.GetOptions) (re
 		Resource("replicationcontrollers").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -92,7 +93,7 @@ func (c *replicationControllers) List(opts metav1.ListOptions) (result *v1.Repli
 		Resource("replicationcontrollers").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -109,7 +110,7 @@ func (c *replicationControllers) Watch(opts metav1.ListOptions) (watch.Interface
 		Resource("replicationcontrollers").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch()
+		Watch(context.TODO())
 }
 
 // Create takes the representation of a replicationController and creates it.  Returns the server's representation of the replicationController, and an error, if there is any.
@@ -119,7 +120,7 @@ func (c *replicationControllers) Create(replicationController *v1.ReplicationCon
 		Namespace(c.ns).
 		Resource("replicationcontrollers").
 		Body(replicationController).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -132,7 +133,7 @@ func (c *replicationControllers) Update(replicationController *v1.ReplicationCon
 		Resource("replicationcontrollers").
 		Name(replicationController.Name).
 		Body(replicationController).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -148,7 +149,7 @@ func (c *replicationControllers) UpdateStatus(replicationController *v1.Replicat
 		Name(replicationController.Name).
 		SubResource("status").
 		Body(replicationController).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -160,7 +161,7 @@ func (c *replicationControllers) Delete(name string, options *metav1.DeleteOptio
 		Resource("replicationcontrollers").
 		Name(name).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -176,7 +177,7 @@ func (c *replicationControllers) DeleteCollection(options *metav1.DeleteOptions,
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Timeout(timeout).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -189,7 +190,7 @@ func (c *replicationControllers) Patch(name string, pt types.PatchType, data []b
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -203,7 +204,7 @@ func (c *replicationControllers) GetScale(replicationControllerName string, opti
 		Name(replicationControllerName).
 		SubResource("scale").
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -217,7 +218,7 @@ func (c *replicationControllers) UpdateScale(replicationControllerName string, s
 		Name(replicationControllerName).
 		SubResource("scale").
 		Body(scale).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }

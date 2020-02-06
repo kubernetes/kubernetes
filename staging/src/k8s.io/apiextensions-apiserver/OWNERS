@@ -1,14 +1,16 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
+approvers:
+- deads2k
+- lavalamp
+- sttts
 reviewers:
 - deads2k
 - sttts
 - enisoc
 - mbohlool
 - yue9944882
-approvers:
-- deads2k
-- lavalamp
-- sttts
+- logicalhan
+- jpbetz
 labels:
 - sig/api-machinery

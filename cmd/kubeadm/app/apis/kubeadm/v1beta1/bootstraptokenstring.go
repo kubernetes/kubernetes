@@ -26,13 +26,14 @@ import (
 	bootstraputil "k8s.io/cluster-bootstrap/token/util"
 )
 
+// DEPRECATED - This group version of BootstrapTokenString is deprecated by apis/kubeadm/v1beta2/BootstrapTokenString.
 // BootstrapTokenString is a token of the format abcdef.abcdef0123456789 that is used
 // for both validation of the practically of the API server from a joining node's point
 // of view and as an authentication method for the node in the bootstrap phase of
 // "kubeadm join". This token is and should be short-lived
 type BootstrapTokenString struct {
-	ID     string
-	Secret string
+	ID     string `json:"-"`
+	Secret string `json:"-"`
 }
 
 // MarshalJSON implements the json.Marshaler interface.

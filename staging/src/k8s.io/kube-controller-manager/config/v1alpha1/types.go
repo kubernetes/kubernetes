@@ -102,12 +102,18 @@ type KubeControllerManagerConfiguration struct {
 	// DeploymentControllerConfiguration holds configuration for
 	// DeploymentController related features.
 	DeploymentController DeploymentControllerConfiguration
+	// StatefulSetControllerConfiguration holds configuration for
+	// StatefulSetController related features.
+	StatefulSetController StatefulSetControllerConfiguration
 	// DeprecatedControllerConfiguration holds configuration for some deprecated
 	// features.
 	DeprecatedController DeprecatedControllerConfiguration
 	// EndpointControllerConfiguration holds configuration for EndpointController
 	// related features.
 	EndpointController EndpointControllerConfiguration
+	// EndpointSliceControllerConfiguration holds configuration for
+	// EndpointSliceController related features.
+	EndpointSliceController EndpointSliceControllerConfiguration
 	// GarbageCollectorControllerConfiguration holds configuration for
 	// GarbageCollectorController related features.
 	GarbageCollectorController GarbageCollectorControllerConfiguration
@@ -260,6 +266,14 @@ type DeploymentControllerConfiguration struct {
 	DeploymentControllerSyncPeriod metav1.Duration
 }
 
+// StatefulSetControllerConfiguration contains elements describing StatefulSetController.
+type StatefulSetControllerConfiguration struct {
+	// concurrentStatefulSetSyncs is the number of statefulset objects that are
+	// allowed to sync concurrently. Larger number = more responsive statefulsets,
+	// but more CPU (and network) load.
+	ConcurrentStatefulSetSyncs int32
+}
+
 // DeprecatedControllerConfiguration contains elements be deprecated.
 type DeprecatedControllerConfiguration struct {
 	// DEPRECATED: deletingPodsQps is the number of nodes per second on which pods are deleted in
@@ -279,6 +293,25 @@ type EndpointControllerConfiguration struct {
 	// that will be done concurrently. Larger number = faster endpoint updating,
 	// but more CPU (and network) load.
 	ConcurrentEndpointSyncs int32
+
+	// EndpointUpdatesBatchPeriod describes the length of endpoint updates batching period.
+	// Processing of pod changes will be delayed by this duration to join them with potential
+	// upcoming updates and reduce the overall number of endpoints updates.
+	EndpointUpdatesBatchPeriod metav1.Duration
+}
+
+// EndpointSliceControllerConfiguration contains elements describing
+// EndpointSliceController.
+type EndpointSliceControllerConfiguration struct {
+	// concurrentServiceEndpointSyncs is the number of service endpoint syncing
+	// operations that will be done concurrently. Larger number = faster
+	// endpoint slice updating, but more CPU (and network) load.
+	ConcurrentServiceEndpointSyncs int32
+
+	// maxEndpointsPerSlice is the maximum number of endpoints that will be
+	// added to an EndpointSlice. More endpoints per slice will result in fewer
+	// and larger endpoint slices, but larger resources.
+	MaxEndpointsPerSlice int32
 }
 
 // GarbageCollectorControllerConfiguration contains elements describing GarbageCollectorController.
@@ -345,8 +378,14 @@ type NamespaceControllerConfiguration struct {
 type NodeIPAMControllerConfiguration struct {
 	// serviceCIDR is CIDR Range for Services in cluster.
 	ServiceCIDR string
+	// secondaryServiceCIDR is CIDR Range for Services in cluster. This is used in dual stack clusters. SecondaryServiceCIDR must be of different IP family than ServiceCIDR
+	SecondaryServiceCIDR string
 	// NodeCIDRMaskSize is the mask size for node cidr in cluster.
 	NodeCIDRMaskSize int32
+	// NodeCIDRMaskSizeIPv4 is the mask size for node cidr in dual-stack cluster.
+	NodeCIDRMaskSizeIPv4 int32
+	// NodeCIDRMaskSizeIPv6 is the mask size for node cidr in dual-stack cluster.
+	NodeCIDRMaskSizeIPv6 int32
 }
 
 // NodeLifecycleControllerConfiguration contains elements describing NodeLifecycleController.

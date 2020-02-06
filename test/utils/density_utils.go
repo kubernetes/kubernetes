@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
@@ -44,7 +44,7 @@ func AddLabelsToNode(c clientset.Interface, nodeName string, labels map[string]s
 	for attempt := 0; attempt < retries; attempt++ {
 		_, err = c.CoreV1().Nodes().Patch(nodeName, types.MergePatchType, []byte(patch))
 		if err != nil {
-			if !apierrs.IsConflict(err) {
+			if !apierrors.IsConflict(err) {
 				return err
 			}
 		} else {
@@ -76,7 +76,7 @@ func RemoveLabelOffNode(c clientset.Interface, nodeName string, labelKeys []stri
 		}
 		_, err = c.CoreV1().Nodes().Update(node)
 		if err != nil {
-			if !apierrs.IsConflict(err) {
+			if !apierrors.IsConflict(err) {
 				return err
 			} else {
 				klog.V(2).Infof("Conflict when trying to remove a labels %v from %v", labelKeys, nodeName)

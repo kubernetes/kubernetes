@@ -22,11 +22,11 @@ import (
 
 	"github.com/go-openapi/spec"
 
-	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
+	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 )
 
-func newAPIServiceForTest(name, group string, minGroupPriority, versionPriority int32, svc *apiregistration.ServiceReference) apiregistration.APIService {
-	r := apiregistration.APIService{}
+func newAPIServiceForTest(name, group string, minGroupPriority, versionPriority int32, svc *apiregistrationv1.ServiceReference) apiregistrationv1.APIService {
+	r := apiregistrationv1.APIService{}
 	r.Spec.Group = group
 	r.Spec.GroupPriorityMinimum = minGroupPriority
 	r.Spec.VersionPriority = versionPriority
@@ -48,19 +48,19 @@ func assertSortedServices(t *testing.T, actual []openAPISpecInfo, expectedNames 
 func TestAPIServiceSort(t *testing.T) {
 	list := []openAPISpecInfo{
 		{
-			apiService: newAPIServiceForTest("FirstService", "Group1", 10, 5, &apiregistration.ServiceReference{}),
+			apiService: newAPIServiceForTest("FirstService", "Group1", 10, 5, &apiregistrationv1.ServiceReference{}),
 			spec:       &spec.Swagger{},
 		},
 		{
-			apiService: newAPIServiceForTest("SecondService", "Group2", 15, 3, &apiregistration.ServiceReference{}),
+			apiService: newAPIServiceForTest("SecondService", "Group2", 15, 3, &apiregistrationv1.ServiceReference{}),
 			spec:       &spec.Swagger{},
 		},
 		{
-			apiService: newAPIServiceForTest("FirstServiceInternal", "Group1", 16, 3, &apiregistration.ServiceReference{}),
+			apiService: newAPIServiceForTest("FirstServiceInternal", "Group1", 16, 3, &apiregistrationv1.ServiceReference{}),
 			spec:       &spec.Swagger{},
 		},
 		{
-			apiService: newAPIServiceForTest("ThirdService", "Group3", 15, 3, &apiregistration.ServiceReference{}),
+			apiService: newAPIServiceForTest("ThirdService", "Group3", 15, 3, &apiregistrationv1.ServiceReference{}),
 			spec:       &spec.Swagger{},
 		},
 		{

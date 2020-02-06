@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2018 The Kubernetes Authors.
 
@@ -20,8 +22,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-03-01/compute"
-	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2018-08-01/network"
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-07-01/compute"
+	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2019-06-01/network"
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/stretchr/testify/assert"
 )
@@ -32,8 +34,12 @@ const (
 )
 
 func newTestScaleSet(scaleSetName, zone string, faultDomain int32, vmList []string) (*scaleSet, error) {
+	return newTestScaleSetWithState(scaleSetName, zone, faultDomain, vmList, "Running")
+}
+
+func newTestScaleSetWithState(scaleSetName, zone string, faultDomain int32, vmList []string, state string) (*scaleSet, error) {
 	cloud := getTestCloud()
-	setTestVirtualMachineCloud(cloud, scaleSetName, zone, faultDomain, vmList)
+	setTestVirtualMachineCloud(cloud, scaleSetName, zone, faultDomain, vmList, state)
 	ss, err := newScaleSet(cloud)
 	if err != nil {
 		return nil, err
@@ -42,7 +48,7 @@ func newTestScaleSet(scaleSetName, zone string, faultDomain int32, vmList []stri
 	return ss.(*scaleSet), nil
 }
 
-func setTestVirtualMachineCloud(ss *Cloud, scaleSetName, zone string, faultDomain int32, vmList []string) {
+func setTestVirtualMachineCloud(ss *Cloud, scaleSetName, zone string, faultDomain int32, vmList []string, state string) {
 	virtualMachineScaleSetsClient := newFakeVirtualMachineScaleSetsClient()
 	virtualMachineScaleSetVMsClient := newFakeVirtualMachineScaleSetVMsClient()
 	publicIPAddressesClient := newFakeAzurePIPClient("rg")
@@ -97,6 +103,7 @@ func setTestVirtualMachineCloud(ss *Cloud, scaleSetName, zone string, faultDomai
 		}
 		vmssVM := compute.VirtualMachineScaleSetVM{
 			VirtualMachineScaleSetVMProperties: &compute.VirtualMachineScaleSetVMProperties{
+				ProvisioningState: to.StringPtr(state),
 				OsProfile: &compute.OSProfile{
 					ComputerName: &nodeName,
 				},

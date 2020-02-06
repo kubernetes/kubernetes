@@ -379,8 +379,11 @@ func TestWaitUntilFreshAndListTimeout(t *testing.T) {
 	}()
 
 	_, _, err := store.WaitUntilFreshAndList(5, nil)
-	if err == nil {
-		t.Fatalf("unexpected lack of timeout error")
+	if !errors.IsTimeout(err) {
+		t.Errorf("expected timeout error but got: %v", err)
+	}
+	if !storage.IsTooLargeResourceVersion(err) {
+		t.Errorf("expected 'Too large resource version' cause in error but got: %v", err)
 	}
 }
 

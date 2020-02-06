@@ -691,15 +691,14 @@ filename | sha512 hash
 * [GCP] Added env variables to control CPU requests of kube-controller-manager and kube-scheduler. ([#68823](https://github.com/kubernetes/kubernetes/pull/68823), [@loburm](https://github.com/loburm))
 * Update Cluster Autoscaler to version 1.3.3. ([#68936](https://github.com/kubernetes/kubernetes/pull/68936), [@losipiuk](https://github.com/losipiuk))
 * Bump addon-manager to v8.7 ([#68299](https://github.com/kubernetes/kubernetes/pull/68299), [@MrHohn](https://github.com/MrHohn))
-    * - Support extra `--prune-whitelist` resources in kube-addon-manager.
-    * - Update kubectl to v1.10.7.
+    * Support extra `--prune-whitelist` resources in kube-addon-manager.
+    * Update kubectl to v1.10.7.
 * Support extra `--prune-whitelist` resources in kube-addon-manager. ([#67743](https://github.com/kubernetes/kubernetes/pull/67743), [@Random-Liu](https://github.com/Random-Liu))
     * Before, when users run admission webhook as an addon pod, after they remove the webhook, kube-addon-manager won't cleanup the webhook configuration `MutatingWebhookConfiguration`/`ValidationWebhookConfiguration`, because those resources are not prune-whitelisted. Cluster will go into a bad state that no pod can be admitted.
     * With this feature, users can config kube-addon-manager to whitelist those resources to fix this issue.
 * Bump ip-masq-agent to v2.1.1 ([#67916](https://github.com/kubernetes/kubernetes/pull/67916), [@MrHohn](https://github.com/MrHohn))
-    * - Update debian-iptables image for CVEs.
-    * - Change chain name to IP-MASQ to be compatible with the
-    * pre-injected masquerade rules.
+    * Update debian-iptables image for CVEs.
+    * Change chain name to IP-MASQ to be compatible with the pre-injected masquerade rules.
 * If `TaintNodesByCondition` is enabled, add `node.kubernetes.io/unschedulable` and `node.kubernetes.io/network-unavailable` automatically to DaemonSet pods. ([#64954](https://github.com/kubernetes/kubernetes/pull/64954), [@k82cn](https://github.com/k82cn))
 * Fix VMWare VM freezing bug by reverting [#51066](https://github.com/kubernetes/kubernetes/pull/51066) ([#67825](https://github.com/kubernetes/kubernetes/pull/67825), [@nikopen](https://github.com/nikopen))
 
@@ -926,7 +925,7 @@ filename | sha256 hash
 
 ### Action Required
 
-* ACTION REQUIRED: Removes defaulting of CSI file system type to ext4. All the production drivers listed under https://kubernetes-csi.github.io/docs/Drivers.html were inspected and should not be impacted after this change. If you are using a driver not in that list, please test the drivers on an updated test cluster first. ``` ([#65499](https://github.com/kubernetes/kubernetes/pull/65499), [@krunaljain](https://github.com/krunaljain))
+* ACTION REQUIRED: Removes defaulting of CSI file system type to ext4. All the production drivers listed under https://kubernetes-csi.github.io/docs/drivers.html were inspected and should not be impacted after this change. If you are using a driver not in that list, please test the drivers on an updated test cluster first. ([#65499](https://github.com/kubernetes/kubernetes/pull/65499), [@krunaljain](https://github.com/krunaljain))
 * kube-apiserver: the `Priority` admission plugin is now enabled by default when using `--enable-admission-plugins`. If using `--admission-control` to fully specify the set of admission plugins, the `Priority` admission plugin should be added if using the `PodPriority` feature, which is enabled by default in 1.11. ([#65739](https://github.com/kubernetes/kubernetes/pull/65739), [@liggitt](https://github.com/liggitt))
 * The `system-node-critical` and `system-cluster-critical` priority classes are now limited to the `kube-system` namespace by the `PodPriority` admission plugin. ([#65593](https://github.com/kubernetes/kubernetes/pull/65593), [@bsalamat](https://github.com/bsalamat))
 
@@ -1179,7 +1178,7 @@ controllerManagerExtraVolumes:
 * The Kubelet's deprecated `--allow-privileged` flag now defaults to true. This enables users to stop setting `--allow-privileged` in order to transition to `PodSecurityPolicy`. Previously, users had to continue setting `--allow-privileged`, because the default was false. ([#63442](https://github.com/kubernetes/kubernetes/pull/63442), [@mtaufen](https://github.com/mtaufen))
 * The old dynamic client has been replaced by a new one.  The previous dynamic client will exist for one release in `client-go/deprecated-dynamic`.  Switch as soon as possible. ([#63446](https://github.com/kubernetes/kubernetes/pull/63446), [@deads2k](https://github.com/deads2k))
 * In-tree support for openstack credentials is now deprecated. please use the "client-keystone-auth" from the cloud-provider-openstack repository. details on how to use this new capability is documented [here](https://github.com/kubernetes/cloud-provider-openstack/blob/master/docs/using-client-keystone-auth.md) ([#64346](https://github.com/kubernetes/kubernetes/pull/64346), [@dims](https://github.com/dims))
-* The GitRepo volume type is deprecated. To provision a container with a git repo, mount an `EmptyDir` into an `InitContainer` that clones the repo using git, then moEmptyDir` into the Pod's container.
+* The GitRepo volume type is deprecated. To provision a container with a git repo, mount an `EmptyDir` into an `InitContainer` that clones the repo using git, then mount the `EmptyDir` into the Pod's container.
 ([#63445](https://github.com/kubernetes/kubernetes/pull/63445), [@ericchiang](https://github.com/ericchiang))
 * Alpha annotation for PersistentVolume node affinity has been removed.  Update your PersistentVolumes to use the beta PersistentVolume.nodeAffinity field before upgrading to this release. ([#61816](https://github.com/kubernetes/kubernetes/pull/61816), [@wackxu
 ](https://github.com/wackxu))
@@ -1306,7 +1305,7 @@ You can now bind tokens to service requests. ([ref](https://github.com/kubernete
 * Azure VM names can now contain the underscore (`_`) character ([#63526](https://github.com/kubernetes/kubernetes/pull/63526), [@djsly](https://github.com/djsly))
 * Azure disks now support external resource groups.
 ([#64427](https://github.com/kubernetes/kubernetes/pull/64427), [@andyzhangx](https://github.com/andyzhangx))
-* Added reason message logs for non-existant Azure resources.
+* Added reason message logs for non-existent Azure resources.
 ([#64248](https://github.com/kubernetes/kubernetes/pull/64248), [@feiskyer](https://github.com/feiskyer))
 
 ### SIG CLI
@@ -1345,7 +1344,7 @@ You can now bind tokens to service requests. ([ref](https://github.com/kubernete
 * The `--cluster-name` parameter has been added to kubeadm init, enabling users to specify the cluster name in kubeconfig. ([#60852](https://github.com/kubernetes/kubernetes/pull/60852), [@karan](https://github.com/karan))
 * The logging feature for kubeadm commands now supports a verbosity setting. ([#57661](https://github.com/kubernetes/kubernetes/pull/57661), [@vbmade2000](https://github.com/vbmade2000))
 * kubeadm now has a join timeout that can be controlled via the `discoveryTimeout` config option. This option is set to 5 minutes by default. ([#60983](https://github.com/kubernetes/kubernetes/pull/60983), [@rosti](https://github.com/rosti))
-* Added the `writable` boolean option to kubeadm config. This option works on a per-volume basis for `ExtraVolumes` config keys. ([#60428](https://github.com/kubernetes/kubernetes/pul60428), [@rosti](https://github.com/rosti))
+* Added the `writable` boolean option to kubeadm config. This option works on a per-volume basis for `ExtraVolumes` config keys. ([#60428](https://github.com/kubernetes/kubernetes/pull/60428), [@rosti](https://github.com/rosti))
 * Added a new `kubeadm upgrade node config` command. ([#64624](https://github.com/kubernetes/kubernetes/pull/64624), [@luxas](https://github.com/luxas))
 * kubeadm now makes the CoreDNS container more secure by dropping (root) capabilities and improves the integrity of the container by running the whole container in read-only.  ([#64473](https://github.com/kubernetes/kubernetes/pull/64473), [@nberlee](https://github.com/nberlee))
 * kubeadm now detects the Docker cgroup driver and starts the kubelet with the matching driver. This eliminates a common error experienced by new users in when the Docker cgroup driver is not the same as the one set for the kubelet due to different Linux distributions setting different cgroup drivers for Docker, making it hard to start the kubelet properly.
@@ -1359,9 +1358,8 @@ You can now bind tokens to service requests. ([ref](https://github.com/kubernete
 * The `kubeadm config images pull` command can now be used to pull container images used by kubeadm. ([#63833](https://github.com/kubernetes/kubernetes/pull/63833), [@chuckha](https://github.com/chuckha))
 * kubeadm will now deploy CoreDNS by default instead of KubeDNS ([#63509](https://github.com/kubernetes/kubernetes/pull/63509), [@detiber](https://github.com/detiber))
 * Preflight checks for kubeadm no longer validate custom kube-apiserver, kube-controller-manager and kube-scheduler arguments. ([#63673](https://github.com/kubernetes/kubernetes/pull/63673), [@chuckha](https://github.com/chuckha))
-* Added a `kubeadm config images list` command that lists required container images for a kubeadm install. ([#63450](https://github.com/kubernetes/kubernetes/pull/63450), [@chuckha](https://github.com/chukha))
+* Added a `kubeadm config images list` command that lists required container images for a kubeadm install. ([#63450](https://github.com/kubernetes/kubernetes/pull/63450), [@chuckha](https://github.com/chuckha))
 * You can now use `kubeadm token` specifying `--kubeconfig`.  In this case, kubeadm searches the current user home path and the environment variable KUBECONFIG for existing files. If provided, the `--kubeconfig` flag will be honored instead. ([#62850](https://github.com/kubernetes/kubernetes/pull/62850), [@neolit123](https://github.com/neolit123))
-([#64988](https://github.com/kubernetes/kubernetes/pull/64988), [@detiber](https://github.com/detiber))
 * kubeadm now sets peer URLs for the default etcd instance. Previously we left the defaults, which meant the peer URL was unsecured.
 * Kubernetes now packages crictl in a cri-tools deb and rpm package. ([#64836](https://github.com/kubernetes/kubernetes/pull/64836), [@chuckha](https://github.com/chuckha))
 * kubeadm now prompts the user for confirmation when resetting a master node. ([#59115](https://github.com/kubernetes/kubernetes/pull/59115), [@alexbrand](https://github.com/alexbrand))
@@ -1402,7 +1400,7 @@ You can now bind tokens to service requests. ([ref](https://github.com/kubernete
 * Added e2e regression tests for kubelet security. ([#64140](https://github.com/kubernetes/kubernetes/pull/64140), [@dixudx](https://github.com/dixudx))
 * The maximum number of images the Kubelet will report in the Node status can now be controlled via the Kubelet's `--node-status-max-images` flag. The default (50) remains the same. ([#64170](https://github.com/kubernetes/kubernetes/pull/64170), [@mtaufen](https://github.com/mtaufen))
 * The Kubelet now exports metrics that report the assigned (`node_config_assigned`), last-known-good (`node_config_last_known_good`), and active (`node_config_active`) config sources, and a metric indicating whether the node is experiencing a config-related error (`node_config_error`). The config source metrics always report the value `1`, and carry the `node_config_name`, `node_config_uid`, `node_config_resource_version`, and `node_config_kubelet_key labels`, which identify the config version. The error metric reports `1` if there is an error, `0` otherwise. ([#57527](https://github.com/kubernetes/kubernetes/pull/57527), [@mtaufen](https://github.com/mtaufen))
-* You now have the ability to quota resources by priority. ([#57963](https://github.com/kubernetes/kubernetes/pull/57963), [@vikaschoudhary16](https://github.com/ikaschoudhary16))
+* You now have the ability to quota resources by priority. ([#57963](https://github.com/kubernetes/kubernetes/pull/57963), [@vikaschoudhary16](https://github.com/vikaschoudhary16))
 * The gRPC max message size in the remote container runtime has been increased to 16MB. ([#64672](https://github.com/kubernetes/kubernetes/pull/64672), [@mcluseau](https://github.com/mcluseau))
 * Added a feature gate for the plugin watcher. ([#64605](https://github.com/kubernetes/kubernetes/pull/64605), [@vikaschoudhary16](https://github.com/vikaschoudhary16))
 * The status of dynamic Kubelet config is now reported via Node.Status.Config, rather than the KubeletConfigOk node condition. ([#63314](https://github.com/kubernetes/kubernetes/pull/63314), [@mtaufen](https://github.com/mtaufen))
@@ -1507,7 +1505,7 @@ You can now bind tokens to service requests. ([ref](https://github.com/kubernete
 * Update crictl on GCE to v1.11.0. ([#65254](https://github.com/kubernetes/kubernetes/pull/65254))
 * CoreDNS is now v1.1.3 ([#64258](https://github.com/kubernetes/kubernetes/pull/64258))
 * Setup dns servers and search domains for Windows Pods in dockershim. Docker EE version >= 17.10.0 is required for propagating DNS to containers. ([#63905](https://github.com/kubernetes/kubernetes/pull/63905))
-* Update version of Istio addon from 0.5.1 to 0.8.0. See [full Istio release notes](https://istio.io/about/notes/0.6.html).([#64537](https://github.com/kubernetes/kubernetes/pull/64537))
+* Update version of Istio addon from 0.5.1 to 0.8.0. See [full Istio release notes](https://istio.io/news/releases/0.x/announcing-0.6/).([#64537](https://github.com/kubernetes/kubernetes/pull/64537))
 * Update cadvisor godeps to v0.30.0 ([#64800](https://github.com/kubernetes/kubernetes/pull/64800))
 * Update event-exporter to version v0.2.0  that supports old (gke_container/gce_instance) and new (k8s_container/k8s_node/k8s_pod) stackdriver resources. ([#63918](https://github.com/kubernetes/kubernetes/pull/63918))
 * Rev the Azure SDK for networking to 2017-06-01 ([#61955](https://github.com/kubernetes/kubernetes/pull/61955))
@@ -1539,7 +1537,7 @@ You can now bind tokens to service requests. ([ref](https://github.com/kubernete
 * Fixed detach of already detached CSI volumes. ([#63295](https://github.com/kubernetes/kubernetes/pull/63295), [@jsafrane](https://github.com/jsafrane))
 * fix rbd device works at block mode not get mapped to container  ([#64555](https://github.com/kubernetes/kubernetes/pull/64555), [@wenlxie](https://github.com/wenlxie))
 * Fixed an issue where Portworx PVCs remain in pending state when created using a StorageClass with empty parameters ([#64895](https://github.com/kubernetes/kubernetes/pull/64895), [@harsh-px](https://github.com/harsh-px)) storage
-* FIX: The OpenStack cloud providers DeleteRoute method fails to delete routes when it can’t find the corresponding instance in OpenStack. (#62729, databus23)
+* FIX: The OpenStack cloud providers DeleteRoute method fails to delete routes when it can’t find the corresponding instance in OpenStack. ([#62729](https://github.com/kubernetes/kubernetes/pull/62729), [@databus23](https://github.com/databus23))
 * [fluentd-gcp addon] Increase CPU limit for fluentd to 1 core to achieve 100kb/s throughput. ([#62430](https://github.com/kubernetes/kubernetes/pull/62430), [@bmoyles0117](https://github.com/bmoyles0117))
 * GCE: Fixed operation polling to adhere to the specified interval. Furthermore, operation errors are now returned instead of ignored. ([#64630](https://github.com/kubernetes/kubernetes/pull/64630), [@nicksardo](https://github.com/nicksardo))
 * Included kms-plugin-container.manifest to master nifests tarball. ([#65035](https://github.com/kubernetes/kubernetes/pull/65035), [@immutableT](https://github.com/immutableT))
@@ -1602,7 +1600,7 @@ You can now bind tokens to service requests. ([ref](https://github.com/kubernete
 * Fixed mounting of UNIX sockets(and other special files) in subpaths ([#61480](https://github.com/kubernetes/kubernetes/pull/61480), [@gnufscied](https://github.com/gnufied))
 * Fixed [#61123](https://github.com/kubernetes/kubernetes/pull/61123) by triggering syncer.Update on all cases including when a syncer is created ([#61124](https://github.com/kubernetes/kubernetes/pull/61124), [@satyasm](https://github.com/satyasm))
 * Fixed data race in node lifecycle controller ([#60831](https://github.com/kubernetes/kubernetes/pull/60831), [@resouer](https://github.com/resouer))
-* Fixed resultRun by resetting it to 0 on pod restart ([#62853](https://github.com/kubernetes/kubernetes/pull62853), [@tony612](https://github.com/tony612))
+* Fixed resultRun by resetting it to 0 on pod restart ([#62853](https://github.com/kubernetes/kubernetes/pull/62853), [@tony612](https://github.com/tony612))
 * Fixed the liveness probe to use `/bin/bash -c` instead of `/bin/bash c`. ([#63033](https://github.com/kubernetes/kubernetes/pull/63033), [@bmoyles0117](https://github.com/bmoyles0117))
 * Fixed scheduler informers to receive events for all the pods in the cluster. ([#63003](https://github.com/kubernetes/kubernetes/pull/63003), [@bsalamat](https://github.com/bsalamat))
 * Fixed in vSphere Cloud Provider to handle upgrades from kubernetes version less than v1.9.4 to v1.9.4 and above. ([#62919](https://github.com/kubernetes/kubernetes/pull/62919), [@abrarshivani](https://github.com/abrarshivani))
@@ -1666,7 +1664,7 @@ You can now bind tokens to service requests. ([ref](https://github.com/kubernete
 * stop kubelet to cloud provider integration potentially wedging kubelet sync loop ([#62543](https://github.com/kubernetes/kubernetes/pull/62543), [@ingvagabund](https://github.com/ingvagabund))
 * Set pod status to "Running" if there is at least one container still reporting as "Running" status and others are "Completed". ([#62642](https://github.com/kubernetes/kubernetes/pull/62642), [@ceshihao](https://github.com/ceshihao))
 * Fix memory cgroup notifications, and reduce associated log spam. ([#63220](https://github.com/kubernetes/kubernetes/pull/63220), [@dashpole](https://github.com/dashpole))
-* Remove never used NewCronJobControllerFromClient method (#59471, dmathieu)
+* Remove never used NewCronJobControllerFromClient method ([#59471](https://github.com/kubernetes/kubernetes/pull/59471), [@dmathieu](https://github.com/dmathieu))
 
 
 - [v1.11.0-rc.3](#v1110-rc3)
@@ -1966,7 +1964,7 @@ filename | sha256 hash
 * kubeadm: Add a new `kubeadm upgrade node config` command ([#64624](https://github.com/kubernetes/kubernetes/pull/64624), [@luxas](https://github.com/luxas))
 * Orphan delete is now supported for custom resources ([#63386](https://github.com/kubernetes/kubernetes/pull/63386), [@roycaihw](https://github.com/roycaihw))
 * Update version of Istio addon from 0.6.0 to 0.8.0. ([#64537](https://github.com/kubernetes/kubernetes/pull/64537), [@ostromart](https://github.com/ostromart))
-    * See https://istio.io/about/notes/0.8.html for full Isto release notes.
+    * See https://istio.io/news/2018/announcing-0.8/  for full Isto release notes.
 * Provides API support for external CSI storage drivers to support block volumes. ([#64723](https://github.com/kubernetes/kubernetes/pull/64723), [@vladimirvivien](https://github.com/vladimirvivien))
 * kubectl will list all allowed print formats when an invalid format is passed. ([#64371](https://github.com/kubernetes/kubernetes/pull/64371), [@CaoShuFeng](https://github.com/CaoShuFeng))
 * Use IONice to reduce IO priority of du and find ([#64800](https://github.com/kubernetes/kubernetes/pull/64800), [@dashpole](https://github.com/dashpole))
@@ -2321,8 +2319,7 @@ filename | sha256 hash
 * client-go developers: the new dynamic client is easier to use and the old is deprecated, you must switch. ([#62913](https://github.com/kubernetes/kubernetes/pull/62913), [@deads2k](https://github.com/deads2k))
 * Fix issue where on re-registration of device plugin, `allocatable` was not getting updated. This issue makes devices invisible to the Kubelet if device plugin restarts. Only work-around, if this fix is not there, is to restart the kubelet and then start device plugin. ([#63118](https://github.com/kubernetes/kubernetes/pull/63118), [@vikaschoudhary16](https://github.com/vikaschoudhary16))
 * Remove METADATA_AGENT_VERSION configuration option. ([#63000](https://github.com/kubernetes/kubernetes/pull/63000), [@kawych](https://github.com/kawych))
-* kubelets are no longer allowed to delete their own Node API object. Prior to 1.11, in rare circumstances related to cloudprovider node ID changes, kubelets would attempt to delete/recreate their Node object at startup. If a legacy kubelet encounters this situation, a cluster admin can remove the Node object: ([#62818](https://github.com/kubernetes/kubernetes/pull/62818), [@mikedanese](https://github.com/mikedanese))
-        * `kubectl delete node/<nodeName>`
+* kubelets are no longer allowed to delete their own Node API object. Prior to 1.11, in rare circumstances related to cloudprovider node ID changes, kubelets would attempt to delete/recreate their Node object at startup. If a legacy kubelet encounters this situation, a cluster admin can remove the Node object: `kubectl delete node/<nodeName>` ([#62818](https://github.com/kubernetes/kubernetes/pull/62818), [@mikedanese](https://github.com/mikedanese))
     * or grant self-deletion permission explicitly:
         * `kubectl create clusterrole self-deleting-nodes --verb=delete --resource=nodes`
         * `kubectl create clusterrolebinding self-deleting-nodes --clusterrole=self-deleting-nodes --group=system:nodes`
@@ -2434,7 +2431,7 @@ filename | sha256 hash
     * Fix a bug in DNS resolution for externalName services
     * and PTR records that need to query from upstream nameserver.
 * Update version of Istio addon from 0.5.1 to 0.6.0. ([#61911](https://github.com/kubernetes/kubernetes/pull/61911), [@ostromart](https://github.com/ostromart))
-    * See https://istio.io/about/notes/0.6.html for full Isto release notes.
+    * See https://istio.io/news/releases/0.x/announcing-0.6/ for full Isto release notes.
 * Phase `kubeadm alpha phase kubelet` is added to support dynamic kubelet configuration in kubeadm. ([#57224](https://github.com/kubernetes/kubernetes/pull/57224), [@xiangpengzhao](https://github.com/xiangpengzhao))
 * `kubeadm alpha phase kubeconfig user` supports groups (organizations) to be specified in client cert. ([#62627](https://github.com/kubernetes/kubernetes/pull/62627), [@xiangpengzhao](https://github.com/xiangpengzhao))
 * Fix user visible files creation for windows ([#62375](https://github.com/kubernetes/kubernetes/pull/62375), [@feiskyer](https://github.com/feiskyer))
@@ -2530,15 +2527,12 @@ filename | sha256 hash
 * Deployment will stop adding pod-template-hash labels/selector to ReplicaSets and Pods it adopts. Resources created by Deployments are not affected (will still have pod-template-hash labels/selector).  ([#61615](https://github.com/kubernetes/kubernetes/pull/61615), [@janetkuo](https://github.com/janetkuo))
 * kubectl: fixes issue with `-o yaml` and `-o json` omitting kind and apiVersion when used with `--dry-run` ([#61808](https://github.com/kubernetes/kubernetes/pull/61808), [@liggitt](https://github.com/liggitt))
 * Updated admission controller settings for Juju deployed Kubernetes clusters ([#61427](https://github.com/kubernetes/kubernetes/pull/61427), [@hyperbolic2346](https://github.com/hyperbolic2346))
-* Performance test framework and basic tests for the IPAM controller, to simulate behavior ([#61143](https://github.com/kubernetes/kubernetes/pull/61143), [@satyasm](https://github.com/satyasm))
-    * of the four supported modes under lightly loaded and loaded conditions, where load is
-    * defined as the number of operations to perform as against the configured kubernetes
-    * API server QPS.
+* Performance test framework and basic tests for the IPAM controller, to simulate behavior of the four supported modes under lightly loaded and loaded conditions, where load is defined as the number of operations to perform as against the configured kubernetes API server QPS. ([#61143](https://github.com/kubernetes/kubernetes/pull/61143), [@satyasm](https://github.com/satyasm))
 * kubernetes-master charm now properly clears the client-ca-file setting on the apiserver snap ([#61479](https://github.com/kubernetes/kubernetes/pull/61479), [@hyperbolic2346](https://github.com/hyperbolic2346))
 * Fix racy panics when using fake watches with ObjectTracker ([#61195](https://github.com/kubernetes/kubernetes/pull/61195), [@grantr](https://github.com/grantr))
 * [fluentd-gcp addon] Update event-exporter image to have the latest base image. ([#61727](https://github.com/kubernetes/kubernetes/pull/61727), [@crassirostris](https://github.com/crassirostris))
 * Use inline func to ensure unlock is executed ([#61644](https://github.com/kubernetes/kubernetes/pull/61644), [@resouer](https://github.com/resouer))
-* `kubectl apply view/edit-last-applied support completion. ([#60499](https://github.com/kubernetes/kubernetes/pull/60499), [@superbrothers](https://github.com/superbrothers))
+* `kubectl apply` view/edit-last-applied support completion. ([#60499](https://github.com/kubernetes/kubernetes/pull/60499), [@superbrothers](https://github.com/superbrothers))
 * Automatically add system critical priority classes at cluster boostrapping. ([#60519](https://github.com/kubernetes/kubernetes/pull/60519), [@bsalamat](https://github.com/bsalamat))
 * Ensure cloudprovider.InstanceNotFound is reported when the VM is not found on Azure ([#61531](https://github.com/kubernetes/kubernetes/pull/61531), [@feiskyer](https://github.com/feiskyer))
 * Azure cloud provider now supports specifying allowed service tags by annotation `service.beta.kubernetes.io/azure-allowed-service-tags` ([#61467](https://github.com/kubernetes/kubernetes/pull/61467), [@feiskyer](https://github.com/feiskyer))

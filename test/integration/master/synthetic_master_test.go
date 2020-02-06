@@ -18,6 +18,7 @@ package master
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -35,7 +36,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/group"
@@ -59,7 +60,7 @@ const (
 
 type allowAliceAuthorizer struct{}
 
-func (allowAliceAuthorizer) Authorize(a authorizer.Attributes) (authorizer.Decision, string, error) {
+func (allowAliceAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
 	if a.GetUser() != nil && a.GetUser().GetName() == "alice" {
 		return authorizer.DecisionAllow, "", nil
 	}
@@ -101,7 +102,7 @@ func TestKubernetesService(t *testing.T) {
 	defer closeFn()
 	coreClient := clientset.NewForConfigOrDie(config.GenericConfig.LoopbackClientConfig)
 	err := wait.PollImmediate(time.Millisecond*100, wait.ForeverTestTimeout, func() (bool, error) {
-		if _, err := coreClient.CoreV1().Services(metav1.NamespaceDefault).Get("kubernetes", metav1.GetOptions{}); err != nil && errors.IsNotFound(err) {
+		if _, err := coreClient.CoreV1().Services(metav1.NamespaceDefault).Get("kubernetes", metav1.GetOptions{}); err != nil && apierrors.IsNotFound(err) {
 			return false, nil
 		} else if err != nil {
 			return false, err
@@ -306,30 +307,36 @@ func TestObjectSizeResponses(t *testing.T) {
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL})
 
 	const DeploymentMegabyteSize = 100000
-	const DeploymentTwoMegabyteSize = 1000000
+	const DeploymentTwoMegabyteSize = 175000
+	const DeploymentThreeMegabyteSize = 250000
 
 	expectedMsgFor1MB := `etcdserver: request is too large`
 	expectedMsgFor2MB := `rpc error: code = ResourceExhausted desc = trying to send message larger than max`
-	expectedMsgForLargeAnnotation := `metadata.annotations: Too long: must have at most 262144 characters`
+	expectedMsgFor3MB := `Request entity too large: limit is 3145728`
+	expectedMsgForLargeAnnotation := `metadata.annotations: Too long: must have at most 262144 bytes`
 
-	deployment1 := constructBody("a", DeploymentMegabyteSize, "labels", t)    // >1 MB file
-	deployment2 := constructBody("a", DeploymentTwoMegabyteSize, "labels", t) // >2 MB file
+	deployment1 := constructBody("a", DeploymentMegabyteSize, "labels", t)      // >1 MB file
+	deployment2 := constructBody("a", DeploymentTwoMegabyteSize, "labels", t)   // >2 MB file
+	deployment3 := constructBody("a", DeploymentThreeMegabyteSize, "labels", t) // >3 MB file
 
-	deployment3 := constructBody("a", DeploymentMegabyteSize, "annotations", t)
+	deployment4 := constructBody("a", DeploymentMegabyteSize, "annotations", t)
 
-	deployment4 := constructBody("sample/sample", DeploymentMegabyteSize, "finalizers", t)    // >1 MB file
-	deployment5 := constructBody("sample/sample", DeploymentTwoMegabyteSize, "finalizers", t) // >2 MB file
+	deployment5 := constructBody("sample/sample", DeploymentMegabyteSize, "finalizers", t)      // >1 MB file
+	deployment6 := constructBody("sample/sample", DeploymentTwoMegabyteSize, "finalizers", t)   // >2 MB file
+	deployment7 := constructBody("sample/sample", DeploymentThreeMegabyteSize, "finalizers", t) // >3 MB file
 
 	requests := []struct {
 		size             string
 		deploymentObject *appsv1.Deployment
 		expectedMessage  string
 	}{
-		{"1 MB", deployment1, expectedMsgFor1MB},
-		{"2 MB", deployment2, expectedMsgFor2MB},
-		{"1 MB", deployment3, expectedMsgForLargeAnnotation},
-		{"1 MB", deployment4, expectedMsgFor1MB},
-		{"2 MB", deployment5, expectedMsgFor2MB},
+		{"1 MB labels", deployment1, expectedMsgFor1MB},
+		{"2 MB labels", deployment2, expectedMsgFor2MB},
+		{"3 MB labels", deployment3, expectedMsgFor3MB},
+		{"1 MB annotations", deployment4, expectedMsgForLargeAnnotation},
+		{"1 MB finalizers", deployment5, expectedMsgFor1MB},
+		{"2 MB finalizers", deployment6, expectedMsgFor2MB},
+		{"3 MB finalizers", deployment7, expectedMsgFor3MB},
 	}
 
 	for _, r := range requests {
@@ -379,33 +386,6 @@ var hpaV1 = `
 }
 `
 
-var deploymentExtensions = `
-{
-  "apiVersion": "extensions/v1beta1",
-  "kind": "Deployment",
-  "metadata": {
-     "name": "test-deployment1",
-     "namespace": "default"
-  },
-  "spec": {
-    "replicas": 1,
-    "template": {
-      "metadata": {
-        "labels": {
-          "app": "nginx0"
-        }
-      },
-      "spec": {
-        "containers": [{
-          "name": "nginx",
-          "image": "k8s.gcr.io/nginx:1.7.9"
-        }]
-      }
-    }
-  }
-}
-`
-
 var deploymentApps = `
 {
   "apiVersion": "apps/v1",
@@ -445,20 +425,6 @@ func autoscalingPath(resource, namespace, name string) string {
 	return path.Join("/apis/autoscaling/v1", namespace, resource, name)
 }
 
-func batchPath(resource, namespace, name string) string {
-	if namespace != "" {
-		namespace = path.Join("namespaces", namespace)
-	}
-	return path.Join("/apis/batch/v1", namespace, resource, name)
-}
-
-func extensionsPath(resource, namespace, name string) string {
-	if namespace != "" {
-		namespace = path.Join("namespaces", namespace)
-	}
-	return path.Join("/apis/extensions/v1beta1", namespace, resource, name)
-}
-
 func appsPath(resource, namespace, name string) string {
 	if namespace != "" {
 		namespace = path.Join("namespaces", namespace)
@@ -491,11 +457,11 @@ func TestAutoscalingGroupBackwardCompatibility(t *testing.T) {
 		}
 		func() {
 			resp, err := transport.RoundTrip(req)
-			defer resp.Body.Close()
 			if err != nil {
 				t.Logf("case %v", r)
 				t.Fatalf("unexpected error: %v", err)
 			}
+			defer resp.Body.Close()
 			b, _ := ioutil.ReadAll(resp.Body)
 			body := string(b)
 			if _, ok := r.expectedStatusCodes[resp.StatusCode]; !ok {
@@ -539,11 +505,11 @@ func TestAppsGroupBackwardCompatibility(t *testing.T) {
 		}
 		func() {
 			resp, err := transport.RoundTrip(req)
-			defer resp.Body.Close()
 			if err != nil {
 				t.Logf("case %v", r)
 				t.Fatalf("unexpected error: %v", err)
 			}
+			defer resp.Body.Close()
 			b, _ := ioutil.ReadAll(resp.Body)
 			body := string(b)
 			if _, ok := r.expectedStatusCodes[resp.StatusCode]; !ok {
@@ -702,10 +668,10 @@ func TestServiceAlloc(t *testing.T) {
 	// Wait until the default "kubernetes" service is created.
 	if err = wait.Poll(250*time.Millisecond, time.Minute, func() (bool, error) {
 		_, err := client.CoreV1().Services(metav1.NamespaceDefault).Get("kubernetes", metav1.GetOptions{})
-		if err != nil && !errors.IsNotFound(err) {
+		if err != nil && !apierrors.IsNotFound(err) {
 			return false, err
 		}
-		return !errors.IsNotFound(err), nil
+		return !apierrors.IsNotFound(err), nil
 	}); err != nil {
 		t.Fatalf("creating kubernetes service timed out")
 	}
@@ -884,7 +850,7 @@ func TestUpdateNodeObjects(t *testing.T) {
 					n.Status.Conditions = nil
 				}
 				if _, err := c.Nodes().UpdateStatus(n); err != nil {
-					if !errors.IsConflict(err) {
+					if !apierrors.IsConflict(err) {
 						fmt.Printf("[%d] error after %d: %v\n", node, i, err)
 						break
 					}

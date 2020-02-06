@@ -44,7 +44,9 @@ func runUpdateClusterStatus(c workflow.RunData) error {
 	// Reset the ClusterStatus for a given control-plane node.
 	cfg := r.Cfg()
 	if isControlPlane() && cfg != nil {
-		uploadconfig.ResetClusterStatusForNode(cfg.NodeRegistration.Name, r.Client())
+		if err := uploadconfig.ResetClusterStatusForNode(cfg.NodeRegistration.Name, r.Client()); err != nil {
+			return err
+		}
 	}
 
 	return nil

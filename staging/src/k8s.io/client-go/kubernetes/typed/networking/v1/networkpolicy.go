@@ -19,6 +19,7 @@ limitations under the License.
 package v1
 
 import (
+	"context"
 	"time"
 
 	v1 "k8s.io/api/networking/v1"
@@ -70,7 +71,7 @@ func (c *networkPolicies) Get(name string, options metav1.GetOptions) (result *v
 		Resource("networkpolicies").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -87,7 +88,7 @@ func (c *networkPolicies) List(opts metav1.ListOptions) (result *v1.NetworkPolic
 		Resource("networkpolicies").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -104,7 +105,7 @@ func (c *networkPolicies) Watch(opts metav1.ListOptions) (watch.Interface, error
 		Resource("networkpolicies").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch()
+		Watch(context.TODO())
 }
 
 // Create takes the representation of a networkPolicy and creates it.  Returns the server's representation of the networkPolicy, and an error, if there is any.
@@ -114,7 +115,7 @@ func (c *networkPolicies) Create(networkPolicy *v1.NetworkPolicy) (result *v1.Ne
 		Namespace(c.ns).
 		Resource("networkpolicies").
 		Body(networkPolicy).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -127,7 +128,7 @@ func (c *networkPolicies) Update(networkPolicy *v1.NetworkPolicy) (result *v1.Ne
 		Resource("networkpolicies").
 		Name(networkPolicy.Name).
 		Body(networkPolicy).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -139,7 +140,7 @@ func (c *networkPolicies) Delete(name string, options *metav1.DeleteOptions) err
 		Resource("networkpolicies").
 		Name(name).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -155,7 +156,7 @@ func (c *networkPolicies) DeleteCollection(options *metav1.DeleteOptions, listOp
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Timeout(timeout).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -168,7 +169,7 @@ func (c *networkPolicies) Patch(name string, pt types.PatchType, data []byte, su
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }

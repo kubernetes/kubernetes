@@ -590,6 +590,22 @@ func TestHTTPProxyCheck(t *testing.T) {
 			}, // Expected to go via proxy, range is not in 2001:db8::/48
 			expectWarnings: true,
 		},
+		{
+			name: "IPv6 direct access, no brackets",
+			check: HTTPProxyCheck{
+				Proto: "https",
+				Host:  "2001:db8::1:15",
+			}, // Expected to be accessed directly, part of 2001:db8::/48 in NO_PROXY
+			expectWarnings: false,
+		},
+		{
+			name: "IPv6 via proxy, no brackets",
+			check: HTTPProxyCheck{
+				Proto: "https",
+				Host:  "2001:db8:1::1:15",
+			}, // Expected to go via proxy, range is not in 2001:db8::/48
+			expectWarnings: true,
+		},
 	}
 
 	// Save current content of *_proxy and *_PROXY variables.
@@ -673,8 +689,8 @@ func TestKubeletVersionCheck(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.kubeletVersion, func(t *testing.T) {
 			fcmd := fakeexec.FakeCmd{
-				CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
-					func() ([]byte, error) { return []byte("Kubernetes " + tc.kubeletVersion), nil },
+				OutputScript: []fakeexec.FakeAction{
+					func() ([]byte, []byte, error) { return []byte("Kubernetes " + tc.kubeletVersion), nil, nil },
 				},
 			}
 			fexec := &fakeexec.FakeExec{
@@ -731,7 +747,7 @@ func TestSetHasItemOrAll(t *testing.T) {
 
 func TestImagePullCheck(t *testing.T) {
 	fcmd := fakeexec.FakeCmd{
-		RunScript: []fakeexec.FakeRunAction{
+		RunScript: []fakeexec.FakeAction{
 			// Test case 1: img1 and img2 exist, img3 doesn't exist
 			func() ([]byte, []byte, error) { return nil, nil, nil },
 			func() ([]byte, []byte, error) { return nil, nil, nil },
@@ -742,18 +758,35 @@ func TestImagePullCheck(t *testing.T) {
 			func() ([]byte, []byte, error) { return nil, nil, &fakeexec.FakeExitError{Status: 1} },
 			func() ([]byte, []byte, error) { return nil, nil, &fakeexec.FakeExitError{Status: 1} },
 		},
-		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
+		CombinedOutputScript: []fakeexec.FakeAction{
 			// Test case1: pull only img3
-			func() ([]byte, error) { return nil, nil },
+			func() ([]byte, []byte, error) { return nil, nil, nil },
 			// Test case 2: fail to pull image2 and image3
-			func() ([]byte, error) { return nil, nil },
-			func() ([]byte, error) { return []byte("error"), &fakeexec.FakeExitError{Status: 1} },
-			func() ([]byte, error) { return []byte("error"), &fakeexec.FakeExitError{Status: 1} },
+			// If the pull fails, it will be retried 5 times (see PullImageRetry in constants/constants.go)
+			func() ([]byte, []byte, error) { return nil, nil, nil },
+			func() ([]byte, []byte, error) { return []byte("error"), nil, &fakeexec.FakeExitError{Status: 1} },
+			func() ([]byte, []byte, error) { return []byte("error"), nil, &fakeexec.FakeExitError{Status: 1} },
+			func() ([]byte, []byte, error) { return []byte("error"), nil, &fakeexec.FakeExitError{Status: 1} },
+			func() ([]byte, []byte, error) { return []byte("error"), nil, &fakeexec.FakeExitError{Status: 1} },
+			func() ([]byte, []byte, error) { return []byte("error"), nil, &fakeexec.FakeExitError{Status: 1} },
+			func() ([]byte, []byte, error) { return []byte("error"), nil, &fakeexec.FakeExitError{Status: 1} },
+			func() ([]byte, []byte, error) { return []byte("error"), nil, &fakeexec.FakeExitError{Status: 1} },
+			func() ([]byte, []byte, error) { return []byte("error"), nil, &fakeexec.FakeExitError{Status: 1} },
+			func() ([]byte, []byte, error) { return []byte("error"), nil, &fakeexec.FakeExitError{Status: 1} },
+			func() ([]byte, []byte, error) { return []byte("error"), nil, &fakeexec.FakeExitError{Status: 1} },
 		},
 	}
 
 	fexec := fakeexec.FakeExec{
 		CommandScript: []fakeexec.FakeCommandAction{
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },

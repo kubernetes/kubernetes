@@ -17,6 +17,7 @@ limitations under the License.
 package serviceaccount
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"math/rand"
@@ -33,14 +34,13 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	genericadmissioninitializer "k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/storage/names"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/component-base/featuregate"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	kubefeatures "k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 )
 
@@ -91,11 +91,12 @@ type Plugin struct {
 
 	generateName func(string) string
 
-	featureGate featuregate.FeatureGate
+	boundServiceAccountTokenVolume bool
 }
 
 var _ admission.MutationInterface = &Plugin{}
 var _ admission.ValidationInterface = &Plugin{}
+var _ genericadmissioninitializer.WantsFeatures = &Plugin{}
 var _ = genericadmissioninitializer.WantsExternalKubeClientSet(&Plugin{})
 var _ = genericadmissioninitializer.WantsExternalKubeInformerFactory(&Plugin{})
 
@@ -116,9 +117,12 @@ func NewServiceAccount() *Plugin {
 		RequireAPIToken: true,
 
 		generateName: names.SimpleNameGenerator.GenerateName,
-
-		featureGate: utilfeature.DefaultFeatureGate,
 	}
+}
+
+// InspectFeatureGates allows setting bools without taking a dep on a global variable
+func (s *Plugin) InspectFeatureGates(featureGates featuregate.FeatureGate) {
+	s.boundServiceAccountTokenVolume = featureGates.Enabled(features.BoundServiceAccountTokenVolume)
 }
 
 // SetExternalKubeClientSet sets the client for the plugin
@@ -154,7 +158,7 @@ func (s *Plugin) ValidateInitialization() error {
 }
 
 // Admit verifies if the pod should be admitted
-func (s *Plugin) Admit(a admission.Attributes, o admission.ObjectInterfaces) (err error) {
+func (s *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) (err error) {
 	if shouldIgnore(a) {
 		return nil
 	}
@@ -165,7 +169,7 @@ func (s *Plugin) Admit(a admission.Attributes, o admission.ObjectInterfaces) (er
 	// That makes the kubelet very angry and confused, and it immediately deletes the pod (because the spec doesn't match)
 	// That said, don't allow mirror pods to reference ServiceAccounts or SecretVolumeSources either
 	if _, isMirrorPod := pod.Annotations[api.MirrorPodAnnotationKey]; isMirrorPod {
-		return s.Validate(a, o)
+		return s.Validate(ctx, a, o)
 	}
 
 	// Set the default service account if needed
@@ -192,11 +196,11 @@ func (s *Plugin) Admit(a admission.Attributes, o admission.ObjectInterfaces) (er
 		}
 	}
 
-	return s.Validate(a, o)
+	return s.Validate(ctx, a, o)
 }
 
 // Validate the data we obtained
-func (s *Plugin) Validate(a admission.Attributes, o admission.ObjectInterfaces) (err error) {
+func (s *Plugin) Validate(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) (err error) {
 	if shouldIgnore(a) {
 		return nil
 	}
@@ -420,12 +424,19 @@ func (s *Plugin) limitSecretReferences(serviceAccount *corev1.ServiceAccount, po
 }
 
 func (s *Plugin) mountServiceAccountToken(serviceAccount *corev1.ServiceAccount, pod *api.Pod) error {
-	// Find the name of a referenced ServiceAccountToken secret we can mount
-	serviceAccountToken, err := s.getReferencedServiceAccountToken(serviceAccount)
-	if err != nil {
-		return fmt.Errorf("Error looking up service account token for %s/%s: %v", serviceAccount.Namespace, serviceAccount.Name, err)
+	var (
+		// serviceAccountToken holds the name of a secret containing a legacy service account token
+		serviceAccountToken string
+		err                 error
+	)
+	if !s.boundServiceAccountTokenVolume {
+		// Find the name of a referenced ServiceAccountToken secret we can mount
+		serviceAccountToken, err = s.getReferencedServiceAccountToken(serviceAccount)
+		if err != nil {
+			return fmt.Errorf("Error looking up service account token for %s/%s: %v", serviceAccount.Namespace, serviceAccount.Name, err)
+		}
 	}
-	if len(serviceAccountToken) == 0 {
+	if len(serviceAccountToken) == 0 && !s.boundServiceAccountTokenVolume {
 		// We don't have an API token to mount, so return
 		if s.RequireAPIToken {
 			// If a token is required, this is considered an error
@@ -442,8 +453,8 @@ func (s *Plugin) mountServiceAccountToken(serviceAccount *corev1.ServiceAccount,
 	allVolumeNames := sets.NewString()
 	for _, volume := range pod.Spec.Volumes {
 		allVolumeNames.Insert(volume.Name)
-		if (!s.featureGate.Enabled(kubefeatures.BoundServiceAccountTokenVolume) && volume.Secret != nil && volume.Secret.SecretName == serviceAccountToken) ||
-			(s.featureGate.Enabled(kubefeatures.BoundServiceAccountTokenVolume) && strings.HasPrefix(volume.Name, ServiceAccountVolumeName+"-")) {
+		if (!s.boundServiceAccountTokenVolume && volume.Secret != nil && volume.Secret.SecretName == serviceAccountToken) ||
+			(s.boundServiceAccountTokenVolume && strings.HasPrefix(volume.Name, ServiceAccountVolumeName+"-")) {
 			tokenVolumeName = volume.Name
 			hasTokenVolume = true
 			break
@@ -452,7 +463,7 @@ func (s *Plugin) mountServiceAccountToken(serviceAccount *corev1.ServiceAccount,
 
 	// Determine a volume name for the ServiceAccountTokenSecret in case we need it
 	if len(tokenVolumeName) == 0 {
-		if s.featureGate.Enabled(kubefeatures.BoundServiceAccountTokenVolume) {
+		if s.boundServiceAccountTokenVolume {
 			tokenVolumeName = s.generateName(ServiceAccountVolumeName + "-")
 		} else {
 			// Try naming the volume the same as the serviceAccountToken, and uniquify if needed
@@ -509,7 +520,7 @@ func (s *Plugin) mountServiceAccountToken(serviceAccount *corev1.ServiceAccount,
 }
 
 func (s *Plugin) createVolume(tokenVolumeName, secretName string) api.Volume {
-	if s.featureGate.Enabled(kubefeatures.BoundServiceAccountTokenVolume) {
+	if s.boundServiceAccountTokenVolume {
 		return api.Volume{
 			Name: tokenVolumeName,
 			VolumeSource: api.VolumeSource{

@@ -5,9 +5,10 @@
 package socket
 
 import (
-	"errors"
 	"syscall"
 	"unsafe"
+
+	"golang.org/x/sys/windows"
 )
 
 func probeProtocolStack() int {
@@ -16,11 +17,11 @@ func probeProtocolStack() int {
 }
 
 const (
-	sysAF_UNSPEC = 0x0
-	sysAF_INET   = 0x2
-	sysAF_INET6  = 0x17
+	sysAF_UNSPEC = windows.AF_UNSPEC
+	sysAF_INET   = windows.AF_INET
+	sysAF_INET6  = windows.AF_INET6
 
-	sysSOCK_RAW = 0x3
+	sysSOCK_RAW = windows.SOCK_RAW
 )
 
 type sockaddrInet struct {
@@ -54,17 +55,17 @@ func setsockopt(s uintptr, level, name int, b []byte) error {
 }
 
 func recvmsg(s uintptr, h *msghdr, flags int) (int, error) {
-	return 0, errors.New("not implemented")
+	return 0, errNotImplemented
 }
 
 func sendmsg(s uintptr, h *msghdr, flags int) (int, error) {
-	return 0, errors.New("not implemented")
+	return 0, errNotImplemented
 }
 
 func recvmmsg(s uintptr, hs []mmsghdr, flags int) (int, error) {
-	return 0, errors.New("not implemented")
+	return 0, errNotImplemented
 }
 
 func sendmmsg(s uintptr, hs []mmsghdr, flags int) (int, error) {
-	return 0, errors.New("not implemented")
+	return 0, errNotImplemented
 }

@@ -21,7 +21,10 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/pkg/errors"
+
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/runtime"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubeletscheme "k8s.io/kubernetes/pkg/kubelet/apis/config/scheme"
@@ -36,101 +39,114 @@ const kubeletFile = "kubelet"
 
 func TestLoad(t *testing.T) {
 	cases := []struct {
-		desc   string
-		file   *string
-		expect *kubeletconfig.KubeletConfiguration
-		err    string
+		desc      string
+		file      *string
+		expect    *kubeletconfig.KubeletConfiguration
+		err       string
+		strictErr bool
 	}{
 		// missing file
 		{
-			"missing file",
-			nil,
-			nil,
-			"failed to read",
+			desc: "missing file",
+			err:  "failed to read",
 		},
 		// empty file
 		{
-			"empty file",
-			newString(``),
-			nil,
-			"was empty",
+			desc: "empty file",
+			file: newString(``),
+			err:  "was empty",
 		},
 		// invalid format
 		{
-			"invalid yaml",
-			newString(`*`),
-			nil,
-			"failed to decode",
+			desc: "invalid yaml",
+			file: newString(`*`),
+			err:  "failed to decode",
 		},
 		{
-			"invalid json",
-			newString(`{*`),
-			nil,
-			"failed to decode",
+			desc: "invalid json",
+			file: newString(`{*`),
+			err:  "failed to decode",
 		},
 		// invalid object
 		{
-			"missing kind",
-			newString(`{"apiVersion":"kubelet.config.k8s.io/v1beta1"}`),
-			nil,
-			"failed to decode",
+			desc: "missing kind",
+			file: newString(`{"apiVersion":"kubelet.config.k8s.io/v1beta1"}`),
+			err:  "failed to decode",
 		},
 		{
-			"missing version",
-			newString(`{"kind":"KubeletConfiguration"}`),
-			nil,
-			"failed to decode",
+			desc: "missing version",
+			file: newString(`{"kind":"KubeletConfiguration"}`),
+			err:  "failed to decode",
 		},
 		{
-			"unregistered kind",
-			newString(`{"kind":"BogusKind","apiVersion":"kubelet.config.k8s.io/v1beta1"}`),
-			nil,
-			"failed to decode",
+			desc: "unregistered kind",
+			file: newString(`{"kind":"BogusKind","apiVersion":"kubelet.config.k8s.io/v1beta1"}`),
+			err:  "failed to decode",
 		},
 		{
-			"unregistered version",
-			newString(`{"kind":"KubeletConfiguration","apiVersion":"bogusversion"}`),
-			nil,
-			"failed to decode",
+			desc: "unregistered version",
+			file: newString(`{"kind":"KubeletConfiguration","apiVersion":"bogusversion"}`),
+			err:  "failed to decode",
 		},
 
 		// empty object with correct kind and version should result in the defaults for that kind and version
 		{
-			"default from yaml",
-			newString(`kind: KubeletConfiguration
+			desc: "default from yaml",
+			file: newString(`kind: KubeletConfiguration
 apiVersion: kubelet.config.k8s.io/v1beta1`),
-			newConfig(t),
-			"",
+			expect: newConfig(t),
 		},
 		{
-			"default from json",
-			newString(`{"kind":"KubeletConfiguration","apiVersion":"kubelet.config.k8s.io/v1beta1"}`),
-			newConfig(t),
-			"",
+			desc:   "default from json",
+			file:   newString(`{"kind":"KubeletConfiguration","apiVersion":"kubelet.config.k8s.io/v1beta1"}`),
+			expect: newConfig(t),
 		},
 
 		// relative path
 		{
-			"yaml, relative path is resolved",
-			newString(fmt.Sprintf(`kind: KubeletConfiguration
+			desc: "yaml, relative path is resolved",
+			file: newString(fmt.Sprintf(`kind: KubeletConfiguration
 apiVersion: kubelet.config.k8s.io/v1beta1
 staticPodPath: %s`, relativePath)),
-			func() *kubeletconfig.KubeletConfiguration {
+			expect: func() *kubeletconfig.KubeletConfiguration {
 				kc := newConfig(t)
 				kc.StaticPodPath = filepath.Join(configDir, relativePath)
 				return kc
 			}(),
-			"",
 		},
 		{
-			"json, relative path is resolved",
-			newString(fmt.Sprintf(`{"kind":"KubeletConfiguration","apiVersion":"kubelet.config.k8s.io/v1beta1","staticPodPath":"%s"}`, relativePath)),
-			func() *kubeletconfig.KubeletConfiguration {
+			desc: "json, relative path is resolved",
+			file: newString(fmt.Sprintf(`{"kind":"KubeletConfiguration","apiVersion":"kubelet.config.k8s.io/v1beta1","staticPodPath":"%s"}`, relativePath)),
+			expect: func() *kubeletconfig.KubeletConfiguration {
 				kc := newConfig(t)
 				kc.StaticPodPath = filepath.Join(configDir, relativePath)
 				return kc
 			}(),
-			"",
+		},
+		{
+			// This should fail from v1beta2+
+			desc: "duplicate field",
+			file: newString(fmt.Sprintf(`kind: KubeletConfiguration
+apiVersion: kubelet.config.k8s.io/v1beta1
+staticPodPath: %s
+staticPodPath: %s/foo`, relativePath, relativePath)),
+			// err:       `key "staticPodPath" already set`,
+			// strictErr: true,
+			expect: func() *kubeletconfig.KubeletConfiguration {
+				kc := newConfig(t)
+				kc.StaticPodPath = filepath.Join(configDir, relativePath, "foo")
+				return kc
+			}(),
+		},
+		{
+			// This should fail from v1beta2+
+			desc: "unknown field",
+			file: newString(`kind: KubeletConfiguration
+apiVersion: kubelet.config.k8s.io/v1beta1
+foo: bar`),
+			// err:       "found unknown field: foo",
+			// strictErr: true,
+			expect: newConfig(t),
 		},
 	}
 
@@ -148,6 +164,10 @@ staticPodPath: %s`, relativePath)),
 				t.Fatalf("unexpected error: %v", err)
 			}
 			kc, err := loader.Load()
+
+			if c.strictErr && !runtime.IsStrictDecodingError(errors.Cause(err)) {
+				t.Fatalf("got error: %v, want strict decoding error", err)
+			}
 			if utiltest.SkipRest(t, c.desc, err, c.err) {
 				return
 			}

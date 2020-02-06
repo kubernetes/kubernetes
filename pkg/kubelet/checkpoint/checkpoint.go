@@ -91,9 +91,7 @@ func getPodKey(pod *v1.Pod) string {
 func LoadPods(cpm checkpointmanager.CheckpointManager) ([]*v1.Pod, error) {
 	pods := make([]*v1.Pod, 0)
 
-	var err error
-	checkpointKeys := []string{}
-	checkpointKeys, err = cpm.ListCheckpoints()
+	checkpointKeys, err := cpm.ListCheckpoints()
 	if err != nil {
 		klog.Errorf("Failed to list checkpoints: %v", err)
 	}

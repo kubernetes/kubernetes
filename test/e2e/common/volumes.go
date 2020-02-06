@@ -46,13 +46,14 @@ import (
 	"k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
 
 	"github.com/onsi/ginkgo"
 )
 
 // These tests need privileged containers, which are disabled by default.  Run
-// the test with "go run hack/e2e.go ... --ginkgo.focus=[Feature:Volumes]"
+// tests with "--ginkgo.focus=[Feature:Volumes]"
 var _ = ginkgo.Describe("[sig-storage] GCP Volumes", func() {
 	f := framework.NewDefaultFramework("gcp-volume")
 
@@ -62,7 +63,7 @@ var _ = ginkgo.Describe("[sig-storage] GCP Volumes", func() {
 	var c clientset.Interface
 
 	ginkgo.BeforeEach(func() {
-		framework.SkipUnlessNodeOSDistroIs("gci", "ubuntu", "custom")
+		e2eskipper.SkipUnlessNodeOSDistroIs("gci", "ubuntu", "custom")
 
 		namespace = f.Namespace
 		c = f.ClientSet
@@ -91,7 +92,7 @@ var _ = ginkgo.Describe("[sig-storage] GCP Volumes", func() {
 			}
 
 			// Must match content of test/images/volumes-tester/nfs/index.html
-			volume.TestVolumeClient(c, config, nil, "" /* fsType */, tests)
+			volume.TestVolumeClient(f, config, nil, "" /* fsType */, tests)
 		})
 	})
 
@@ -114,7 +115,7 @@ var _ = ginkgo.Describe("[sig-storage] GCP Volumes", func() {
 				},
 			}
 			// Must match content of test/images/volume-tester/nfs/index.html
-			volume.TestVolumeClient(c, config, nil, "" /* fsType */, tests)
+			volume.TestVolumeClient(f, config, nil, "" /* fsType */, tests)
 		})
 	})
 
@@ -147,7 +148,7 @@ var _ = ginkgo.Describe("[sig-storage] GCP Volumes", func() {
 					ExpectedContent: "Hello from GlusterFS!",
 				},
 			}
-			volume.TestVolumeClient(c, config, nil, "" /* fsType */, tests)
+			volume.TestVolumeClient(f, config, nil, "" /* fsType */, tests)
 		})
 	})
 })

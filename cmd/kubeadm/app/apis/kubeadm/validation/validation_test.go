@@ -20,16 +20,12 @@ import (
 	"io/ioutil"
 	"os"
 	"testing"
-	"time"
 
 	"github.com/spf13/pflag"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
-	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
-	utilpointer "k8s.io/utils/pointer"
 )
 
 func TestValidateToken(t *testing.T) {
@@ -194,29 +190,43 @@ func TestValidateIPFromString(t *testing.T) {
 
 func TestValidateIPNetFromString(t *testing.T) {
 	var tests = []struct {
-		name     string
-		subnet   string
-		minaddrs int64
-		expected bool
+		name           string
+		subnet         string
+		minaddrs       int64
+		checkDualStack bool
+		expected       bool
 	}{
-		{"invalid missing CIDR", "", 0, false},
-		{"invalid CIDR missing decimal points in IPv4 address and / mask", "1234", 0, false},
-		{"invalid CIDR use of letters instead of numbers and / mask", "abc", 0, false},
-		{"invalid IPv4 address provided instead of CIDR representation", "1.2.3.4", 0, false},
-		{"invalid IPv6 address provided instead of CIDR representation", "2001:db8::1", 0, false},
-		{"valid, but IPv4 CIDR too small. At least 10 addresses needed", "10.0.0.16/29", 10, false},
-		{"valid, but IPv6 CIDR too small. At least 10 addresses needed", "2001:db8::/125", 10, false},
-		{"valid IPv4 CIDR", "10.0.0.16/12", 10, true},
-		{"valid IPv6 CIDR", "2001:db8::/98", 10, true},
+		{"invalid missing CIDR", "", 0, false, false},
+		{"invalid CIDR missing decimal points in IPv4 address and / mask", "1234", 0, false, false},
+		{"invalid CIDR use of letters instead of numbers and / mask", "abc", 0, false, false},
+		{"invalid IPv4 address provided instead of CIDR representation", "1.2.3.4", 0, false, false},
+		{"invalid IPv6 address provided instead of CIDR representation", "2001:db8::1", 0, false, false},
+		{"valid, but IPv4 CIDR too small. At least 10 addresses needed", "10.0.0.16/29", 10, false, false},
+		{"valid, but IPv6 CIDR too small. At least 10 addresses needed", "2001:db8::/125", 10, false, false},
+		{"valid IPv4 CIDR", "10.0.0.16/12", 10, false, true},
+		{"valid IPv6 CIDR", "2001:db8::/98", 10, false, true},
+		// dual-stack:
+		{"invalid missing CIDR", "", 0, true, false},
+		{"invalid only an IPv4 CIDR specified", "10.0.0.16/12", 10, true, false},
+		{"invalid only an IPv6 CIDR specified", "2001:db8::/98", 10, true, false},
+		{"invalid IPv4 address provided instead of CIDR representation", "1.2.3.4,2001:db8::/98", 0, true, false},
+		{"invalid IPv6 address provided instead of CIDR representation", "2001:db8::1,10.0.0.16/12", 0, true, false},
+		{"valid, but IPv4 CIDR too small. At least 10 addresses needed", "10.0.0.16/29,2001:db8::/98", 10, true, false},
+		{"valid, but IPv6 CIDR too small. At least 10 addresses needed", "10.0.0.16/12,2001:db8::/125", 10, true, false},
+		{"valid, but only IPv4 family addresses specified. IPv6 CIDR is necessary.", "10.0.0.16/12,192.168.0.0/16", 10, true, false},
+		{"valid, but only IPv6 family addresses specified. IPv4 CIDR is necessary.", "2001:db8::/98,2005:db8::/98", 10, true, false},
+		{"valid IPv4 and IPv6 CIDR", "10.0.0.16/12,2001:db8::/98", 10, true, true},
+		{"valid IPv6 and IPv4 CIDR", "10.0.0.16/12,2001:db8::/98", 10, true, true},
 	}
 	for _, rt := range tests {
-		actual := ValidateIPNetFromString(rt.subnet, rt.minaddrs, nil)
+		actual := ValidateIPNetFromString(rt.subnet, rt.minaddrs, rt.checkDualStack, nil)
 		if (len(actual) == 0) != rt.expected {
 			t.Errorf(
-				"%s test case failed :\n\texpected: %t\n\t  actual: %t",
+				"%s test case failed :\n\texpected: %t\n\t  actual: %t\n\t  err(s): %v\n\t",
 				rt.name,
 				rt.expected,
 				(len(actual) == 0),
+				actual,
 			)
 		}
 	}
@@ -434,31 +444,6 @@ func TestValidateInitConfiguration(t *testing.T) {
 							DataDir: "/some/path",
 						},
 					},
-					ComponentConfigs: kubeadm.ComponentConfigs{
-						KubeProxy: &kubeproxyconfig.KubeProxyConfiguration{
-							BindAddress:        "192.168.59.103",
-							HealthzBindAddress: "0.0.0.0:10256",
-							MetricsBindAddress: "127.0.0.1:10249",
-							ClusterCIDR:        "192.168.59.0/24",
-							UDPIdleTimeout:     metav1.Duration{Duration: 1 * time.Second},
-							ConfigSyncPeriod:   metav1.Duration{Duration: 1 * time.Second},
-							IPTables: kubeproxyconfig.KubeProxyIPTablesConfiguration{
-								MasqueradeAll: true,
-								SyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
-								MinSyncPeriod: metav1.Duration{Duration: 2 * time.Second},
-							},
-							IPVS: kubeproxyconfig.KubeProxyIPVSConfiguration{
-								SyncPeriod:    metav1.Duration{Duration: 10 * time.Second},
-								MinSyncPeriod: metav1.Duration{Duration: 5 * time.Second},
-							},
-							Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
-								MaxPerCore:            utilpointer.Int32Ptr(1),
-								Min:                   utilpointer.Int32Ptr(1),
-								TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
-								TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5 * time.Second},
-							},
-						},
-					},
 					Networking: kubeadm.Networking{
 						ServiceSubnet: "10.96.0.1/12",
 						DNSDomain:     "cluster.local",
@@ -478,31 +463,6 @@ func TestValidateInitConfiguration(t *testing.T) {
 					Etcd: kubeadm.Etcd{
 						Local: &kubeadm.LocalEtcd{
 							DataDir: "/some/path",
-						},
-					},
-					ComponentConfigs: kubeadm.ComponentConfigs{
-						KubeProxy: &kubeproxyconfig.KubeProxyConfiguration{
-							BindAddress:        "192.168.59.103",
-							HealthzBindAddress: "0.0.0.0:10256",
-							MetricsBindAddress: "127.0.0.1:10249",
-							ClusterCIDR:        "192.168.59.0/24",
-							UDPIdleTimeout:     metav1.Duration{Duration: 1 * time.Second},
-							ConfigSyncPeriod:   metav1.Duration{Duration: 1 * time.Second},
-							IPTables: kubeproxyconfig.KubeProxyIPTablesConfiguration{
-								MasqueradeAll: true,
-								SyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
-								MinSyncPeriod: metav1.Duration{Duration: 2 * time.Second},
-							},
-							IPVS: kubeproxyconfig.KubeProxyIPVSConfiguration{
-								SyncPeriod:    metav1.Duration{Duration: 10 * time.Second},
-								MinSyncPeriod: metav1.Duration{Duration: 5 * time.Second},
-							},
-							Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
-								MaxPerCore:            utilpointer.Int32Ptr(1),
-								Min:                   utilpointer.Int32Ptr(1),
-								TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
-								TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5 * time.Second},
-							},
 						},
 					},
 					Networking: kubeadm.Networking{

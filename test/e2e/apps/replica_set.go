@@ -22,7 +22,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -30,9 +30,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/controller/replicaset"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	replicasetutil "k8s.io/kubernetes/test/e2e/framework/replicaset"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 
 	"github.com/onsi/ginkgo"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -96,9 +96,8 @@ var _ = SIGDescribe("ReplicaSet", func() {
 
 	ginkgo.It("should serve a basic image on each replica with a private image", func() {
 		// requires private images
-		framework.SkipUnlessProviderIs("gce", "gke")
-		privateimage := imageutils.GetConfig(imageutils.Agnhost)
-		privateimage.SetRegistry(imageutils.PrivateRegistry)
+		e2eskipper.SkipUnlessProviderIs("gce", "gke")
+		privateimage := imageutils.GetConfig(imageutils.AgnhostPrivate)
 		testReplicaSetServeImageOrFail(f, "private", privateimage.GetE2EImage())
 	})
 
@@ -125,7 +124,7 @@ func testReplicaSetServeImageOrFail(f *framework.Framework, test string, image s
 	// Create a ReplicaSet for a service that serves its hostname.
 	// The source for the Docker containter kubernetes/serve_hostname is
 	// in contrib/for-demos/serve_hostname
-	e2elog.Logf("Creating ReplicaSet %s", name)
+	framework.Logf("Creating ReplicaSet %s", name)
 	newRS := newRS(name, replicas, map[string]string{"name": name}, name, image, []string{"serve-hostname"})
 	newRS.Spec.Template.Spec.Containers[0].Ports = []v1.ContainerPort{{ContainerPort: 9376}}
 	_, err := f.ClientSet.AppsV1().ReplicaSets(f.Namespace.Name).Create(newRS)
@@ -138,7 +137,7 @@ func testReplicaSetServeImageOrFail(f *framework.Framework, test string, image s
 
 	// Wait for the pods to enter the running state. Waiting loops until the pods
 	// are running so non-running pods cause a timeout for this test.
-	e2elog.Logf("Ensuring a pod for ReplicaSet %q is running", name)
+	framework.Logf("Ensuring a pod for ReplicaSet %q is running", name)
 	running := int32(0)
 	for _, pod := range pods.Items {
 		if pod.DeletionTimestamp != nil {
@@ -154,7 +153,7 @@ func testReplicaSetServeImageOrFail(f *framework.Framework, test string, image s
 			}
 		}
 		framework.ExpectNoError(err)
-		e2elog.Logf("Pod %q is running (conditions: %+v)", pod.Name, pod.Status.Conditions)
+		framework.Logf("Pod %q is running (conditions: %+v)", pod.Name, pod.Status.Conditions)
 		running++
 	}
 
@@ -164,13 +163,13 @@ func testReplicaSetServeImageOrFail(f *framework.Framework, test string, image s
 	}
 
 	// Verify that something is listening.
-	e2elog.Logf("Trying to dial the pod")
+	framework.Logf("Trying to dial the pod")
 	retryTimeout := 2 * time.Minute
 	retryInterval := 5 * time.Second
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
 	err = wait.Poll(retryInterval, retryTimeout, e2epod.NewProxyResponseChecker(f.ClientSet, f.Namespace.Name, label, name, true, pods).CheckAllResponses)
 	if err != nil {
-		e2elog.Failf("Did not get expected responses within the timeout period of %.2f seconds.", retryTimeout.Seconds())
+		framework.Failf("Did not get expected responses within the timeout period of %.2f seconds.", retryTimeout.Seconds())
 	}
 }
 
@@ -291,7 +290,7 @@ func testRSAdoptMatchingAndReleaseNotMatching(f *framework.Framework) {
 	err = wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
 		p2, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(p.Name, metav1.GetOptions{})
 		// The Pod p should either be adopted or deleted by the ReplicaSet
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			return true, nil
 		}
 		framework.ExpectNoError(err)
@@ -317,7 +316,7 @@ func testRSAdoptMatchingAndReleaseNotMatching(f *framework.Framework) {
 
 		pod.Labels = map[string]string{"name": "not-matching-name"}
 		_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Update(pod)
-		if err != nil && errors.IsConflict(err) {
+		if err != nil && apierrors.IsConflict(err) {
 			return false, nil
 		}
 		if err != nil {

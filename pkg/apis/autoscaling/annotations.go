@@ -32,3 +32,7 @@ const HorizontalPodAutoscalerConditionsAnnotation = "autoscaling.alpha.kubernete
 // metrics are present.  This is here because it's used by both the v2beta1 defaulting
 // logic, and the pseudo-defaulting done in v1 conversion.
 const DefaultCPUUtilization = 80
+
+// BehaviorSpecsAnnotation is the annotation which holds the HPA constraints specs
+// when converting the `Behavior` field from autoscaling/v2beta2
+const BehaviorSpecsAnnotation = "autoscaling.alpha.kubernetes.io/behavior"

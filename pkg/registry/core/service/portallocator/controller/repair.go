@@ -121,7 +121,10 @@ func (c *Repair) runOnce() error {
 		return fmt.Errorf("unable to refresh the port block: %v", err)
 	}
 
-	rebuilt := portallocator.NewPortAllocator(c.portRange)
+	rebuilt, err := portallocator.NewPortAllocator(c.portRange)
+	if err != nil {
+		return fmt.Errorf("unable to create port allocator: %v", err)
+	}
 	// Check every Service's ports, and rebuild the state as we think it should be.
 	for i := range list.Items {
 		svc := &list.Items[i]

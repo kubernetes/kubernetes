@@ -112,7 +112,7 @@ type NetworkPluginSettings struct {
 	NonMasqueradeCIDR string
 	// PluginName is the name of the plugin, runtime shim probes for
 	PluginName string
-	// PluginBinDirsString is a list of directiores delimited by commas, in
+	// PluginBinDirString is a list of directiores delimited by commas, in
 	// which the binaries for the plugin with PluginName may be found.
 	PluginBinDirString string
 	// PluginBinDirs is an array of directories in which the binaries for
@@ -179,8 +179,6 @@ func NewDockerClientFromConfig(config *ClientConfig) libdocker.Interface {
 			config.DockerEndpoint,
 			config.RuntimeRequestTimeout,
 			config.ImagePullProgressDeadline,
-			config.WithTraceDisabled,
-			config.EnableSleep,
 		)
 		return client
 	}
@@ -311,7 +309,7 @@ type dockerService struct {
 	startLocalStreamingServer bool
 
 	// containerCleanupInfos maps container IDs to the `containerCleanupInfo` structs
-	// needed to clean up after containers have been started or removed.
+	// needed to clean up after containers have been removed.
 	// (see `applyPlatformSpecificDockerConfig` and `performPlatformSpecificContainerCleanup`
 	// methods for more info).
 	containerCleanupInfos map[string]*containerCleanupInfo
@@ -419,7 +417,7 @@ func (ds *dockerService) Start() error {
 }
 
 // initCleanup is responsible for cleaning up any crufts left by previous
-// runs. If there are any errros, it simply logs them.
+// runs. If there are any errors, it simply logs them.
 func (ds *dockerService) initCleanup() {
 	errors := ds.platformSpecificContainerInitCleanup()
 
@@ -527,7 +525,7 @@ func (ds *dockerService) getDockerVersionFromCache() (*dockertypes.Version, erro
 	}
 	dv, ok := value.(*dockertypes.Version)
 	if !ok {
-		return nil, fmt.Errorf("Converted to *dockertype.Version error")
+		return nil, fmt.Errorf("converted to *dockertype.Version error")
 	}
 	return dv, nil
 }

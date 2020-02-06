@@ -19,19 +19,23 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"reflect"
 	"testing"
 
+	cgroupfs "github.com/opencontainers/runc/libcontainer/cgroups/fs"
 	"github.com/stretchr/testify/assert"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 func makeExpectedConfig(m *kubeGenericRuntimeManager, pod *v1.Pod, containerIndex int) *runtimeapi.ContainerConfig {
 	container := &pod.Spec.Containers[containerIndex]
 	podIP := ""
 	restartCount := 0
-	opts, _, _ := m.runtimeHelper.GenerateRunContainerOptions(pod, container, podIP)
+	opts, _, _ := m.runtimeHelper.GenerateRunContainerOptions(pod, container, podIP, []string{podIP})
 	containerLogsPath := buildContainerLogsPath(container.Name, restartCount)
 	restartCountUint32 := uint32(restartCount)
 	envs := make([]*runtimeapi.KeyValue, len(opts.Envs))
@@ -89,7 +93,7 @@ func TestGenerateContainerConfig(t *testing.T) {
 	}
 
 	expectedConfig := makeExpectedConfig(m, pod, 0)
-	containerConfig, _, err := m.generateContainerConfig(&pod.Spec.Containers[0], pod, 0, "", pod.Spec.Containers[0].Image)
+	containerConfig, _, err := m.generateContainerConfig(&pod.Spec.Containers[0], pod, 0, "", pod.Spec.Containers[0].Image, []string{})
 	assert.NoError(t, err)
 	assert.Equal(t, expectedConfig, containerConfig, "generate container config for kubelet runtime v1.")
 	assert.Equal(t, runAsUser, containerConfig.GetLinux().GetSecurityContext().GetRunAsUser().GetValue(), "RunAsUser should be set")
@@ -120,7 +124,7 @@ func TestGenerateContainerConfig(t *testing.T) {
 		},
 	}
 
-	_, _, err = m.generateContainerConfig(&podWithContainerSecurityContext.Spec.Containers[0], podWithContainerSecurityContext, 0, "", podWithContainerSecurityContext.Spec.Containers[0].Image)
+	_, _, err = m.generateContainerConfig(&podWithContainerSecurityContext.Spec.Containers[0], podWithContainerSecurityContext, 0, "", podWithContainerSecurityContext.Spec.Containers[0].Image, []string{})
 	assert.Error(t, err)
 
 	imageID, _ := imageService.PullImage(&runtimeapi.ImageSpec{Image: "busybox"}, nil, nil)
@@ -132,6 +136,163 @@ func TestGenerateContainerConfig(t *testing.T) {
 	podWithContainerSecurityContext.Spec.Containers[0].SecurityContext.RunAsUser = nil
 	podWithContainerSecurityContext.Spec.Containers[0].SecurityContext.RunAsNonRoot = &runAsNonRootTrue
 
-	_, _, err = m.generateContainerConfig(&podWithContainerSecurityContext.Spec.Containers[0], podWithContainerSecurityContext, 0, "", podWithContainerSecurityContext.Spec.Containers[0].Image)
+	_, _, err = m.generateContainerConfig(&podWithContainerSecurityContext.Spec.Containers[0], podWithContainerSecurityContext, 0, "", podWithContainerSecurityContext.Spec.Containers[0].Image, []string{})
 	assert.Error(t, err, "RunAsNonRoot should fail for non-numeric username")
+}
+
+func TestGetHugepageLimitsFromResources(t *testing.T) {
+	var baseHugepage []*runtimeapi.HugepageLimit
+
+	// For each page size, limit to 0.
+	for _, pageSize := range cgroupfs.HugePageSizes {
+		baseHugepage = append(baseHugepage, &runtimeapi.HugepageLimit{
+			PageSize: pageSize,
+			Limit:    uint64(0),
+		})
+	}
+
+	tests := []struct {
+		name      string
+		resources v1.ResourceRequirements
+		expected  []*runtimeapi.HugepageLimit
+	}{
+		{
+			name: "Success2MB",
+			resources: v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					"hugepages-2Mi": resource.MustParse("2Mi"),
+				},
+			},
+			expected: []*runtimeapi.HugepageLimit{
+				{
+					PageSize: "2MB",
+					Limit:    2097152,
+				},
+			},
+		},
+		{
+			name: "Success1GB",
+			resources: v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					"hugepages-1Gi": resource.MustParse("2Gi"),
+				},
+			},
+			expected: []*runtimeapi.HugepageLimit{
+				{
+					PageSize: "1GB",
+					Limit:    2147483648,
+				},
+			},
+		},
+		{
+			name: "Skip2MB",
+			resources: v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					"hugepages-2MB": resource.MustParse("2Mi"),
+				},
+			},
+			expected: []*runtimeapi.HugepageLimit{
+				{
+					PageSize: "2MB",
+					Limit:    0,
+				},
+			},
+		},
+		{
+			name: "Skip1GB",
+			resources: v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					"hugepages-1GB": resource.MustParse("2Gi"),
+				},
+			},
+			expected: []*runtimeapi.HugepageLimit{
+				{
+					PageSize: "1GB",
+					Limit:    0,
+				},
+			},
+		},
+		{
+			name: "Success2MBand1GB",
+			resources: v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceName(v1.ResourceCPU): resource.MustParse("0"),
+					"hugepages-2Mi":                 resource.MustParse("2Mi"),
+					"hugepages-1Gi":                 resource.MustParse("2Gi"),
+				},
+			},
+			expected: []*runtimeapi.HugepageLimit{
+				{
+					PageSize: "2MB",
+					Limit:    2097152,
+				},
+				{
+					PageSize: "1GB",
+					Limit:    2147483648,
+				},
+			},
+		},
+		{
+			name: "Skip2MBand1GB",
+			resources: v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceName(v1.ResourceCPU): resource.MustParse("0"),
+					"hugepages-2MB":                 resource.MustParse("2Mi"),
+					"hugepages-1GB":                 resource.MustParse("2Gi"),
+				},
+			},
+			expected: []*runtimeapi.HugepageLimit{
+				{
+					PageSize: "2MB",
+					Limit:    0,
+				},
+				{
+					PageSize: "1GB",
+					Limit:    0,
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		// Validate if machine supports hugepage size that used in test case.
+		machineHugepageSupport := true
+		for _, hugepageLimit := range test.expected {
+			hugepageSupport := false
+			for _, pageSize := range cgroupfs.HugePageSizes {
+				if pageSize == hugepageLimit.PageSize {
+					hugepageSupport = true
+					break
+				}
+			}
+
+			if !hugepageSupport {
+				machineHugepageSupport = false
+				break
+			}
+		}
+
+		// Case of machine can't support hugepage size
+		if !machineHugepageSupport {
+			continue
+		}
+
+		expectedHugepages := baseHugepage
+		for _, hugepage := range test.expected {
+			for _, expectedHugepage := range expectedHugepages {
+				if expectedHugepage.PageSize == hugepage.PageSize {
+					expectedHugepage.Limit = hugepage.Limit
+				}
+			}
+		}
+
+		results := GetHugepageLimitsFromResources(test.resources)
+		if !reflect.DeepEqual(expectedHugepages, results) {
+			t.Errorf("%s test failed. Expected %v but got %v", test.name, expectedHugepages, results)
+		}
+
+		for _, hugepage := range baseHugepage {
+			hugepage.Limit = uint64(0)
+		}
+	}
 }

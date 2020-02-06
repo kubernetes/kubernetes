@@ -205,7 +205,7 @@ func TestStatefulPodControlNoOpUpdate(t *testing.T) {
 	control := NewRealStatefulPodControl(fakeClient, nil, nil, nil, recorder)
 	fakeClient.AddReactor("*", "*", func(action core.Action) (bool, runtime.Object, error) {
 		t.Error("no-op update should not make any client invocation")
-		return true, nil, apierrors.NewInternalError(errors.New("If we are here we have a problem"))
+		return true, nil, apierrors.NewInternalError(errors.New("if we are here we have a problem"))
 	})
 	if err := control.UpdateStatefulPod(set, pod); err != nil {
 		t.Errorf("Error returned on no-op update error: %s", err)
@@ -374,9 +374,9 @@ func TestStatefulPodControlUpdatePodConflictSuccess(t *testing.T) {
 		if !conflict {
 			conflict = true
 			return true, update.GetObject(), apierrors.NewConflict(action.GetResource().GroupResource(), pod.Name, errors.New("conflict"))
-		} else {
-			return true, update.GetObject(), nil
 		}
+		return true, update.GetObject(), nil
+
 	})
 	pod.Name = "goo-0"
 	if err := control.UpdateStatefulPod(set, pod); err != nil {

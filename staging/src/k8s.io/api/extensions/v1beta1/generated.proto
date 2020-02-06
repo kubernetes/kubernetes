@@ -458,16 +458,16 @@ message IDRange {
 }
 
 // DEPRECATED 1.9 - This group version of IPBlock is deprecated by networking/v1/IPBlock.
-// IPBlock describes a particular CIDR (Ex. "192.168.1.1/24") that is allowed to the pods
-// matched by a NetworkPolicySpec's podSelector. The except entry describes CIDRs that should
-// not be included within this rule.
+// IPBlock describes a particular CIDR (Ex. "192.168.1.1/24","2001:db9::/64") that is allowed
+// to the pods matched by a NetworkPolicySpec's podSelector. The except entry describes CIDRs
+// that should not be included within this rule.
 message IPBlock {
   // CIDR is a string representing the IP Block
-  // Valid examples are "192.168.1.1/24"
+  // Valid examples are "192.168.1.1/24" or "2001:db9::/64"
   optional string cidr = 1;
 
   // Except is a slice of CIDRs that should not be included within an IP Block
-  // Valid examples are "192.168.1.1/24"
+  // Valid examples are "192.168.1.1/24" or "2001:db9::/64"
   // Except values will be rejected if they are outside the CIDR range
   // +optional
   repeated string except = 2;
@@ -649,7 +649,7 @@ message NetworkPolicyIngressRule {
   // List of sources which should be able to access the pods selected for this rule.
   // Items in this list are combined using a logical OR operation.
   // If this field is empty or missing, this rule matches all sources (traffic not restricted by source).
-  // If this field is present and contains at least on item, this rule allows traffic only if the
+  // If this field is present and contains at least one item, this rule allows traffic only if the
   // traffic matches at least one item in the from list.
   // +optional
   repeated NetworkPolicyPeer from = 2;
@@ -873,7 +873,6 @@ message PodSecurityPolicySpec {
 
   // AllowedCSIDrivers is a whitelist of inline CSI drivers that must be explicitly set to be embedded within a pod spec.
   // An empty value indicates that any CSI driver can be used for inline ephemeral volumes.
-  // This is an alpha field, and is only honored if the API server enables the CSIInlineVolume feature gate.
   // +optional
   repeated AllowedCSIDriver allowedCSIDrivers = 23;
 
@@ -1024,10 +1023,6 @@ message ReplicaSetStatus {
   // +patchMergeKey=type
   // +patchStrategy=merge
   repeated ReplicaSetCondition conditions = 6;
-}
-
-// Dummy definition
-message ReplicationControllerDummy {
 }
 
 // DEPRECATED.

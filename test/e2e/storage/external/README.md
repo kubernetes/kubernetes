@@ -1,25 +1,29 @@
 When a test suite like test/e2e/e2e.test from Kubernetes includes this
-package, the -storage.testdriver parameter can be used one or more
+package, the `-storage.testdriver` parameter can be used one or more
 times to enabling testing of a certain pre-installed storage driver.
 
 The parameter takes as argument the name of a .yaml or .json file. The
-filename can be absolute or relative to --repo-root. The content of
+filename can be absolute or relative to `--repo-root`. The content of
 the file is used to populate a struct that defines how to test the
-driver. For a full definition of the struct see the external.go file.
+driver. For a full definition of the content see:
+- `struct driverDefinition` in [external.go](./external.go)
+- `struct TestDriver` and the `Cap` capability constants in [testdriver.go](../testsuites/testdriver.go)
 
-Here is an example for the CSI hostpath driver:
+Here is a minimal example for the CSI hostpath driver:
 
-    ShortName: mytest
     StorageClass:
       FromName: true
     SnapshotClass:
       FromName: true
     DriverInfo:
-      Name: csi-hostpath
+      Name: hostpath.csi.k8s.io
       Capabilities:
         persistence: true
-        dataSource: true
-        multipods: true
+
+The `prow.sh` script of the different CSI hostpath driver releases
+generates the actual definition that is used during CI testing, for
+example in
+[v1.2.0](https://github.com/kubernetes-csi/csi-driver-host-path/blob/v1.2.0/release-tools/prow.sh#L748-L763).
 
 Currently there is no checking for unknown fields, i.e. only file
 entries that match with struct entries are used and other entries are

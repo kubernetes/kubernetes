@@ -26,28 +26,18 @@ import (
 
 	"k8s.io/klog"
 
+	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 )
 
 // convertFunc is the user defined function for any conversion. The code in this file is a
 // template that can be use for any CR conversion given this function.
 type convertFunc func(Object *unstructured.Unstructured, version string) (*unstructured.Unstructured, metav1.Status)
-
-// conversionResponseFailureWithMessagef is a helper function to create an AdmissionResponse
-// with a formatted embedded error message.
-func conversionResponseFailureWithMessagef(msg string, params ...interface{}) *v1beta1.ConversionResponse {
-	return &v1beta1.ConversionResponse{
-		Result: metav1.Status{
-			Message: fmt.Sprintf(msg, params...),
-			Status:  metav1.StatusFailure,
-		},
-	}
-
-}
 
 func statusErrorWithMessage(msg string, params ...interface{}) metav1.Status {
 	return metav1.Status{
@@ -62,15 +52,20 @@ func statusSucceed() metav1.Status {
 	}
 }
 
-// doConversion converts the requested object given the conversion function and returns a conversion response.
-// failures will be reported as Reason in the conversion response.
-func doConversion(convertRequest *v1beta1.ConversionRequest, convert convertFunc) *v1beta1.ConversionResponse {
+// doConversionV1beta1 converts the requested objects in the v1beta1 ConversionRequest using the given conversion function and
+// returns a conversion response. Failures are reported with the Reason in the conversion response.
+func doConversionV1beta1(convertRequest *v1beta1.ConversionRequest, convert convertFunc) *v1beta1.ConversionResponse {
 	var convertedObjects []runtime.RawExtension
 	for _, obj := range convertRequest.Objects {
 		cr := unstructured.Unstructured{}
 		if err := cr.UnmarshalJSON(obj.Raw); err != nil {
 			klog.Error(err)
-			return conversionResponseFailureWithMessagef("failed to unmarshall object (%v) with error: %v", string(obj.Raw), err)
+			return &v1beta1.ConversionResponse{
+				Result: metav1.Status{
+					Message: fmt.Sprintf("failed to unmarshall object (%v) with error: %v", string(obj.Raw), err),
+					Status:  metav1.StatusFailure,
+				},
+			}
 		}
 		convertedCR, status := convert(&cr, convertRequest.DesiredAPIVersion)
 		if status.Status != metav1.StatusSuccess {
@@ -83,6 +78,37 @@ func doConversion(convertRequest *v1beta1.ConversionRequest, convert convertFunc
 		convertedObjects = append(convertedObjects, runtime.RawExtension{Object: convertedCR})
 	}
 	return &v1beta1.ConversionResponse{
+		ConvertedObjects: convertedObjects,
+		Result:           statusSucceed(),
+	}
+}
+
+// doConversionV1 converts the requested objects in the v1 ConversionRequest using the given conversion function and
+// returns a conversion response. Failures are reported with the Reason in the conversion response.
+func doConversionV1(convertRequest *v1.ConversionRequest, convert convertFunc) *v1.ConversionResponse {
+	var convertedObjects []runtime.RawExtension
+	for _, obj := range convertRequest.Objects {
+		cr := unstructured.Unstructured{}
+		if err := cr.UnmarshalJSON(obj.Raw); err != nil {
+			klog.Error(err)
+			return &v1.ConversionResponse{
+				Result: metav1.Status{
+					Message: fmt.Sprintf("failed to unmarshall object (%v) with error: %v", string(obj.Raw), err),
+					Status:  metav1.StatusFailure,
+				},
+			}
+		}
+		convertedCR, status := convert(&cr, convertRequest.DesiredAPIVersion)
+		if status.Status != metav1.StatusSuccess {
+			klog.Error(status.String())
+			return &v1.ConversionResponse{
+				Result: status,
+			}
+		}
+		convertedCR.SetAPIVersion(convertRequest.DesiredAPIVersion)
+		convertedObjects = append(convertedObjects, runtime.RawExtension{Object: convertedCR})
+	}
+	return &v1.ConversionResponse{
 		ConvertedObjects: convertedObjects,
 		Result:           statusSucceed(),
 	}
@@ -106,18 +132,52 @@ func serve(w http.ResponseWriter, r *http.Request, convert convertFunc) {
 	}
 
 	klog.V(2).Infof("handling request: %v", body)
-	convertReview := v1beta1.ConversionReview{}
-	if _, _, err := serializer.Decode(body, nil, &convertReview); err != nil {
+	obj, gvk, err := serializer.Decode(body, nil, nil)
+	if err != nil {
+		msg := fmt.Sprintf("failed to deserialize body (%v) with error %v", string(body), err)
 		klog.Error(err)
-		convertReview.Response = conversionResponseFailureWithMessagef("failed to deserialize body (%v) with error %v", string(body), err)
-	} else {
-		convertReview.Response = doConversion(convertReview.Request, convert)
-		convertReview.Response.UID = convertReview.Request.UID
+		http.Error(w, msg, http.StatusBadRequest)
+		return
 	}
-	klog.V(2).Info(fmt.Sprintf("sending response: %v", convertReview.Response))
 
-	// reset the request, it is not needed in a response.
-	convertReview.Request = &v1beta1.ConversionRequest{}
+	var responseObj runtime.Object
+	switch *gvk {
+	case v1beta1.SchemeGroupVersion.WithKind("ConversionReview"):
+		convertReview, ok := obj.(*v1beta1.ConversionReview)
+		if !ok {
+			msg := fmt.Sprintf("Expected v1beta1.ConversionReview but got: %T", obj)
+			klog.Errorf(msg)
+			http.Error(w, msg, http.StatusBadRequest)
+			return
+		}
+		convertReview.Response = doConversionV1beta1(convertReview.Request, convert)
+		convertReview.Response.UID = convertReview.Request.UID
+		klog.V(2).Info(fmt.Sprintf("sending response: %v", convertReview.Response))
+
+		// reset the request, it is not needed in a response.
+		convertReview.Request = &v1beta1.ConversionRequest{}
+		responseObj = convertReview
+	case v1.SchemeGroupVersion.WithKind("ConversionReview"):
+		convertReview, ok := obj.(*v1.ConversionReview)
+		if !ok {
+			msg := fmt.Sprintf("Expected v1.ConversionReview but got: %T", obj)
+			klog.Errorf(msg)
+			http.Error(w, msg, http.StatusBadRequest)
+			return
+		}
+		convertReview.Response = doConversionV1(convertReview.Request, convert)
+		convertReview.Response.UID = convertReview.Request.UID
+		klog.V(2).Info(fmt.Sprintf("sending response: %v", convertReview.Response))
+
+		// reset the request, it is not needed in a response.
+		convertReview.Request = &v1.ConversionRequest{}
+		responseObj = convertReview
+	default:
+		msg := fmt.Sprintf("Unsupported group version kind: %v", gvk)
+		klog.Error(err)
+		http.Error(w, msg, http.StatusBadRequest)
+		return
+	}
 
 	accept := r.Header.Get("Accept")
 	outSerializer := getOutputSerializer(accept)
@@ -127,7 +187,7 @@ func serve(w http.ResponseWriter, r *http.Request, convert convertFunc) {
 		http.Error(w, msg, http.StatusBadRequest)
 		return
 	}
-	err := outSerializer.Encode(&convertReview, w)
+	err = outSerializer.Encode(responseObj, w)
 	if err != nil {
 		klog.Error(err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -145,6 +205,16 @@ type mediaType struct {
 }
 
 var scheme = runtime.NewScheme()
+
+func init() {
+	addToScheme(scheme)
+}
+
+func addToScheme(scheme *runtime.Scheme) {
+	utilruntime.Must(v1.AddToScheme(scheme))
+	utilruntime.Must(v1beta1.AddToScheme(scheme))
+}
+
 var serializers = map[mediaType]runtime.Serializer{
 	{"application", "json"}: json.NewSerializer(json.DefaultMetaFactory, scheme, scheme, false),
 	{"application", "yaml"}: json.NewYAMLSerializer(json.DefaultMetaFactory, scheme, scheme),

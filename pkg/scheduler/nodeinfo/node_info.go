@@ -23,12 +23,12 @@ import (
 	"sync/atomic"
 
 	v1 "k8s.io/api/core/v1"
-	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
-	volumeutil "k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/kubernetes/pkg/features"
+	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 var (
@@ -47,18 +47,20 @@ type ImageStateSummary struct {
 // NodeInfo is node level aggregated information.
 type NodeInfo struct {
 	// Overall node information.
-	node    *v1.Node
-	csiNode *storagev1beta1.CSINode
+	node *v1.Node
 
 	pods             []*v1.Pod
 	podsWithAffinity []*v1.Pod
 	usedPorts        HostPortInfo
 
-	// Total requested resource of all pods on this node.
-	// It includes assumed pods which scheduler sends binding to apiserver but
-	// didn't get it as scheduled yet.
+	// Total requested resources of all pods on this node. This includes assumed
+	// pods, which scheduler has sent for binding, but may not be scheduled yet.
 	requestedResource *Resource
-	nonzeroRequest    *Resource
+	// Total requested resources of all pods on this node with a minimum value
+	// applied to each container's CPU and memory requests. This does not reflect
+	// the actual resource requests for this node, but is used to avoid scheduling
+	// many zero-request pods onto one node.
+	nonzeroRequest *Resource
 	// We store allocatedResources (which is Node.Status.Allocatable.*) explicitly
 	// as int64, to avoid conversions and accessing map.
 	allocatableResource *Resource
@@ -287,14 +289,6 @@ func (n *NodeInfo) Node() *v1.Node {
 	return n.node
 }
 
-// CSINode returns overall CSI-related information about this node.
-func (n *NodeInfo) CSINode() *storagev1beta1.CSINode {
-	if n == nil {
-		return nil
-	}
-	return n.csiNode
-}
-
 // Pods return all pods scheduled (including assumed to be) on this node.
 func (n *NodeInfo) Pods() []*v1.Pod {
 	if n == nil {
@@ -363,30 +357,6 @@ func (n *NodeInfo) SetTaints(newTaints []v1.Taint) {
 	n.taints = newTaints
 }
 
-// MemoryPressureCondition returns the memory pressure condition status on this node.
-func (n *NodeInfo) MemoryPressureCondition() v1.ConditionStatus {
-	if n == nil {
-		return v1.ConditionUnknown
-	}
-	return n.memoryPressureCondition
-}
-
-// DiskPressureCondition returns the disk pressure condition status on this node.
-func (n *NodeInfo) DiskPressureCondition() v1.ConditionStatus {
-	if n == nil {
-		return v1.ConditionUnknown
-	}
-	return n.diskPressureCondition
-}
-
-// PIDPressureCondition returns the pid pressure condition status on this node.
-func (n *NodeInfo) PIDPressureCondition() v1.ConditionStatus {
-	if n == nil {
-		return v1.ConditionUnknown
-	}
-	return n.pidPressureCondition
-}
-
 // RequestedResource returns aggregated resource request of pods on this node.
 func (n *NodeInfo) RequestedResource() Resource {
 	if n == nil {
@@ -444,7 +414,6 @@ func (n *NodeInfo) SetGeneration(newGeneration int64) {
 func (n *NodeInfo) Clone() *NodeInfo {
 	clone := &NodeInfo{
 		node:                    n.node,
-		csiNode:                 n.csiNode,
 		requestedResource:       n.requestedResource.Clone(),
 		nonzeroRequest:          n.nonzeroRequest.Clone(),
 		allocatableResource:     n.allocatableResource.Clone(),
@@ -482,24 +451,11 @@ func (n *NodeInfo) Clone() *NodeInfo {
 // VolumeLimits returns volume limits associated with the node
 func (n *NodeInfo) VolumeLimits() map[v1.ResourceName]int64 {
 	volumeLimits := map[v1.ResourceName]int64{}
-
 	for k, v := range n.AllocatableResource().ScalarResources {
 		if v1helper.IsAttachableVolumeResourceName(k) {
 			volumeLimits[k] = v
 		}
 	}
-
-	if n.csiNode != nil {
-		for i := range n.csiNode.Spec.Drivers {
-			d := n.csiNode.Spec.Drivers[i]
-			if d.Allocatable != nil && d.Allocatable.Count != nil {
-				// TODO: drop GetCSIAttachLimitKey once we don't get values from Node object
-				k := v1.ResourceName(volumeutil.GetCSIAttachLimitKey(d.Name))
-				volumeLimits[k] = int64(*d.Allocatable.Count)
-			}
-		}
-	}
-
 	return volumeLimits
 }
 
@@ -592,11 +548,21 @@ func (n *NodeInfo) RemovePod(pod *v1.Pod) error {
 			n.UpdateUsedPorts(pod, false)
 
 			n.generation = nextGeneration()
-
+			n.resetSlicesIfEmpty()
 			return nil
 		}
 	}
 	return fmt.Errorf("no corresponding pod %s in pods of node %s", pod.Name, n.node.Name)
+}
+
+// resets the slices to nil so that we can do DeepEqual in unit tests.
+func (n *NodeInfo) resetSlicesIfEmpty() {
+	if len(n.podsWithAffinity) == 0 {
+		n.podsWithAffinity = nil
+	}
+	if len(n.pods) == 0 {
+		n.pods = nil
+	}
 }
 
 func calculateResource(pod *v1.Pod) (res Resource, non0CPU int64, non0Mem int64) {
@@ -604,10 +570,23 @@ func calculateResource(pod *v1.Pod) (res Resource, non0CPU int64, non0Mem int64)
 	for _, c := range pod.Spec.Containers {
 		resPtr.Add(c.Resources.Requests)
 
-		non0CPUReq, non0MemReq := priorityutil.GetNonzeroRequests(&c.Resources.Requests)
+		non0CPUReq, non0MemReq := schedutil.GetNonzeroRequests(&c.Resources.Requests)
 		non0CPU += non0CPUReq
 		non0Mem += non0MemReq
 		// No non-zero resources for GPUs or opaque resources.
+	}
+
+	// If Overhead is being utilized, add to the total requests for the pod
+	if pod.Spec.Overhead != nil && utilfeature.DefaultFeatureGate.Enabled(features.PodOverhead) {
+		resPtr.Add(pod.Spec.Overhead)
+
+		if _, found := pod.Spec.Overhead[v1.ResourceCPU]; found {
+			non0CPU += pod.Spec.Overhead.Cpu().MilliValue()
+		}
+
+		if _, found := pod.Spec.Overhead[v1.ResourceMemory]; found {
+			non0Mem += pod.Spec.Overhead.Memory().Value()
+		}
 	}
 
 	return
@@ -653,28 +632,6 @@ func (n *NodeInfo) SetNode(node *v1.Node) error {
 	return nil
 }
 
-// RemoveNode removes the overall information about the node.
-func (n *NodeInfo) RemoveNode(node *v1.Node) error {
-	// We don't remove NodeInfo for because there can still be some pods on this node -
-	// this is because notifications about pods are delivered in a different watch,
-	// and thus can potentially be observed later, even though they happened before
-	// node removal. This is handled correctly in cache.go file.
-	n.node = nil
-	n.allocatableResource = &Resource{}
-	n.taints, n.taintsErr = nil, nil
-	n.memoryPressureCondition = v1.ConditionUnknown
-	n.diskPressureCondition = v1.ConditionUnknown
-	n.pidPressureCondition = v1.ConditionUnknown
-	n.imageStates = make(map[string]*ImageStateSummary)
-	n.generation = nextGeneration()
-	return nil
-}
-
-// SetCSINode sets the overall CSI-related node information.
-func (n *NodeInfo) SetCSINode(csiNode *storagev1beta1.CSINode) {
-	n.csiNode = csiNode
-}
-
 // FilterOutPods receives a list of pods and filters out those whose node names
 // are equal to the node of this NodeInfo, but are not found in the pods of this NodeInfo.
 //
@@ -694,7 +651,10 @@ func (n *NodeInfo) FilterOutPods(pods []*v1.Pod) []*v1.Pod {
 			continue
 		}
 		// If pod is on the given node, add it to 'filtered' only if it is present in nodeInfo.
-		podKey, _ := GetPodKey(p)
+		podKey, err := GetPodKey(p)
+		if err != nil {
+			continue
+		}
 		for _, np := range n.Pods() {
 			npodkey, _ := GetPodKey(np)
 			if npodkey == podKey {

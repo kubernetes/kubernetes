@@ -19,6 +19,7 @@ limitations under the License.
 package v1
 
 import (
+	"context"
 	"time"
 
 	v1 "k8s.io/apiextensions-apiserver/examples/client-go/pkg/apis/cr/v1"
@@ -70,7 +71,7 @@ func (c *examples) Get(name string, options metav1.GetOptions) (result *v1.Examp
 		Resource("examples").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -87,7 +88,7 @@ func (c *examples) List(opts metav1.ListOptions) (result *v1.ExampleList, err er
 		Resource("examples").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -104,7 +105,7 @@ func (c *examples) Watch(opts metav1.ListOptions) (watch.Interface, error) {
 		Resource("examples").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch()
+		Watch(context.TODO())
 }
 
 // Create takes the representation of a example and creates it.  Returns the server's representation of the example, and an error, if there is any.
@@ -114,7 +115,7 @@ func (c *examples) Create(example *v1.Example) (result *v1.Example, err error) {
 		Namespace(c.ns).
 		Resource("examples").
 		Body(example).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -127,7 +128,7 @@ func (c *examples) Update(example *v1.Example) (result *v1.Example, err error) {
 		Resource("examples").
 		Name(example.Name).
 		Body(example).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -139,7 +140,7 @@ func (c *examples) Delete(name string, options *metav1.DeleteOptions) error {
 		Resource("examples").
 		Name(name).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -155,7 +156,7 @@ func (c *examples) DeleteCollection(options *metav1.DeleteOptions, listOptions m
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Timeout(timeout).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -168,7 +169,7 @@ func (c *examples) Patch(name string, pt types.PatchType, data []byte, subresour
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }

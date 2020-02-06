@@ -19,8 +19,10 @@ limitations under the License.
 package v1
 
 import (
+	"context"
 	"time"
 
+	authenticationv1 "k8s.io/api/authentication/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -45,6 +47,8 @@ type ServiceAccountInterface interface {
 	List(opts metav1.ListOptions) (*v1.ServiceAccountList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.ServiceAccount, err error)
+	CreateToken(serviceAccountName string, tokenRequest *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error)
+
 	ServiceAccountExpansion
 }
 
@@ -70,7 +74,7 @@ func (c *serviceAccounts) Get(name string, options metav1.GetOptions) (result *v
 		Resource("serviceaccounts").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -87,7 +91,7 @@ func (c *serviceAccounts) List(opts metav1.ListOptions) (result *v1.ServiceAccou
 		Resource("serviceaccounts").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -104,7 +108,7 @@ func (c *serviceAccounts) Watch(opts metav1.ListOptions) (watch.Interface, error
 		Resource("serviceaccounts").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch()
+		Watch(context.TODO())
 }
 
 // Create takes the representation of a serviceAccount and creates it.  Returns the server's representation of the serviceAccount, and an error, if there is any.
@@ -114,7 +118,7 @@ func (c *serviceAccounts) Create(serviceAccount *v1.ServiceAccount) (result *v1.
 		Namespace(c.ns).
 		Resource("serviceaccounts").
 		Body(serviceAccount).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -127,7 +131,7 @@ func (c *serviceAccounts) Update(serviceAccount *v1.ServiceAccount) (result *v1.
 		Resource("serviceaccounts").
 		Name(serviceAccount.Name).
 		Body(serviceAccount).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -139,7 +143,7 @@ func (c *serviceAccounts) Delete(name string, options *metav1.DeleteOptions) err
 		Resource("serviceaccounts").
 		Name(name).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -155,7 +159,7 @@ func (c *serviceAccounts) DeleteCollection(options *metav1.DeleteOptions, listOp
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Timeout(timeout).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -168,7 +172,21 @@ func (c *serviceAccounts) Patch(name string, pt types.PatchType, data []byte, su
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
-		Do().
+		Do(context.TODO()).
+		Into(result)
+	return
+}
+
+// CreateToken takes the representation of a tokenRequest and creates it.  Returns the server's representation of the tokenRequest, and an error, if there is any.
+func (c *serviceAccounts) CreateToken(serviceAccountName string, tokenRequest *authenticationv1.TokenRequest) (result *authenticationv1.TokenRequest, err error) {
+	result = &authenticationv1.TokenRequest{}
+	err = c.client.Post().
+		Namespace(c.ns).
+		Resource("serviceaccounts").
+		Name(serviceAccountName).
+		SubResource("token").
+		Body(tokenRequest).
+		Do(context.TODO()).
 		Into(result)
 	return
 }

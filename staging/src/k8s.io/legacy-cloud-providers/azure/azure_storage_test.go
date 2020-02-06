@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2018 The Kubernetes Authors.
 
@@ -19,7 +21,7 @@ package azure
 import (
 	"testing"
 
-	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2018-07-01/storage"
+	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2019-06-01/storage"
 )
 
 func TestCreateFileShare(t *testing.T) {
@@ -42,7 +44,7 @@ func TestCreateFileShare(t *testing.T) {
 		acctKind string
 		loc      string
 		gb       int
-		accounts storage.AccountListResult
+		accounts []storage.Account
 		keys     storage.AccountListKeysResult
 		err      error
 
@@ -75,10 +77,8 @@ func TestCreateFileShare(t *testing.T) {
 			acctKind: kind,
 			loc:      location,
 			gb:       10,
-			accounts: storage.AccountListResult{
-				Value: &[]storage.Account{
-					{Name: &name, Sku: &storage.Sku{Name: storage.SkuName(sku)}, Kind: storage.Kind(kind), Location: &location},
-				},
+			accounts: []storage.Account{
+				{Name: &name, Sku: &storage.Sku{Name: storage.SkuName(sku)}, Kind: storage.Kind(kind), Location: &location},
 			},
 			keys: storage.AccountListKeysResult{
 				Keys: &[]storage.AccountKey{
@@ -95,10 +95,8 @@ func TestCreateFileShare(t *testing.T) {
 			acctKind: kind,
 			loc:      location,
 			gb:       10,
-			accounts: storage.AccountListResult{
-				Value: &[]storage.Account{
-					{Name: &bogus, Sku: &storage.Sku{Name: storage.SkuName(sku)}, Location: &location},
-				},
+			accounts: []storage.Account{
+				{Name: &bogus, Sku: &storage.Sku{Name: storage.SkuName(sku)}, Location: &location},
 			},
 			expectErr: true,
 		},
@@ -109,10 +107,8 @@ func TestCreateFileShare(t *testing.T) {
 			acctKind: kind,
 			loc:      location,
 			gb:       10,
-			accounts: storage.AccountListResult{
-				Value: &[]storage.Account{
-					{Name: &name, Sku: &storage.Sku{Name: storage.SkuName(sku)}, Location: &bogus},
-				},
+			accounts: []storage.Account{
+				{Name: &name, Sku: &storage.Sku{Name: storage.SkuName(sku)}, Location: &bogus},
 			},
 			expectErr: true,
 		},

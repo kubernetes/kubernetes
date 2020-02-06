@@ -16,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e_node
+package e2enode
 
 import (
 	"fmt"
@@ -26,10 +26,11 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	kubeletstatsv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
+	e2eperf "k8s.io/kubernetes/test/e2e/framework/perf"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 )
 
 var _ = SIGDescribe("Resource-usage [Serial] [Slow]", func() {
@@ -40,13 +41,13 @@ var _ = SIGDescribe("Resource-usage [Serial] [Slow]", func() {
 
 	var (
 		rc *ResourceCollector
-		om *framework.RuntimeOperationMonitor
+		om *e2ekubelet.RuntimeOperationMonitor
 	)
 
 	f := framework.NewDefaultFramework("resource-usage")
 
-	BeforeEach(func() {
-		om = framework.NewRuntimeOperationMonitor(f.ClientSet)
+	ginkgo.BeforeEach(func() {
+		om = e2ekubelet.NewRuntimeOperationMonitor(f.ClientSet)
 		// The test collects resource usage from a standalone Cadvisor pod.
 		// The Cadvsior of Kubelet has a housekeeping interval of 10s, which is too long to
 		// show the resource usage spikes. But changing its interval increases the overhead
@@ -55,25 +56,25 @@ var _ = SIGDescribe("Resource-usage [Serial] [Slow]", func() {
 		rc = NewResourceCollector(containerStatsPollingPeriod)
 	})
 
-	AfterEach(func() {
+	ginkgo.AfterEach(func() {
 		result := om.GetLatestRuntimeOperationErrorRate()
-		e2elog.Logf("runtime operation error metrics:\n%s", framework.FormatRuntimeOperationErrorRate(result))
+		framework.Logf("runtime operation error metrics:\n%s", e2ekubelet.FormatRuntimeOperationErrorRate(result))
 	})
 
 	// This test measures and verifies the steady resource usage of node is within limit
 	// It collects data from a standalone Cadvisor with housekeeping interval 1s.
 	// It verifies CPU percentiles and the lastest memory usage.
-	Context("regular resource usage tracking", func() {
+	ginkgo.Context("regular resource usage tracking", func() {
 		rTests := []resourceTest{
 			{
 				podsNr: 10,
-				cpuLimits: framework.ContainersCPUSummary{
+				cpuLimits: e2ekubelet.ContainersCPUSummary{
 					kubeletstatsv1alpha1.SystemContainerKubelet: {0.50: 0.30, 0.95: 0.35},
 					kubeletstatsv1alpha1.SystemContainerRuntime: {0.50: 0.30, 0.95: 0.40},
 				},
-				memLimits: framework.ResourceUsagePerContainer{
-					kubeletstatsv1alpha1.SystemContainerKubelet: &framework.ContainerResourceUsage{MemoryRSSInBytes: 200 * 1024 * 1024},
-					kubeletstatsv1alpha1.SystemContainerRuntime: &framework.ContainerResourceUsage{MemoryRSSInBytes: 400 * 1024 * 1024},
+				memLimits: e2ekubelet.ResourceUsagePerContainer{
+					kubeletstatsv1alpha1.SystemContainerKubelet: &e2ekubelet.ContainerResourceUsage{MemoryRSSInBytes: 200 * 1024 * 1024},
+					kubeletstatsv1alpha1.SystemContainerRuntime: &e2ekubelet.ContainerResourceUsage{MemoryRSSInBytes: 400 * 1024 * 1024},
 				},
 			},
 		}
@@ -81,7 +82,7 @@ var _ = SIGDescribe("Resource-usage [Serial] [Slow]", func() {
 		for _, testArg := range rTests {
 			itArg := testArg
 			desc := fmt.Sprintf("resource tracking for %d pods per node", itArg.podsNr)
-			It(desc, func() {
+			ginkgo.It(desc, func() {
 				testInfo := getTestNodeInfo(f, itArg.getTestName(), desc)
 
 				runResourceUsageTest(f, rc, itArg)
@@ -92,7 +93,7 @@ var _ = SIGDescribe("Resource-usage [Serial] [Slow]", func() {
 		}
 	})
 
-	Context("regular resource usage tracking", func() {
+	ginkgo.Context("regular resource usage tracking", func() {
 		rTests := []resourceTest{
 			{
 				podsNr: 0,
@@ -111,7 +112,7 @@ var _ = SIGDescribe("Resource-usage [Serial] [Slow]", func() {
 		for _, testArg := range rTests {
 			itArg := testArg
 			desc := fmt.Sprintf("resource tracking for %d pods per node [Benchmark]", itArg.podsNr)
-			It(desc, func() {
+			ginkgo.It(desc, func() {
 				testInfo := getTestNodeInfo(f, itArg.getTestName(), desc)
 
 				runResourceUsageTest(f, rc, itArg)
@@ -125,8 +126,8 @@ var _ = SIGDescribe("Resource-usage [Serial] [Slow]", func() {
 
 type resourceTest struct {
 	podsNr    int
-	cpuLimits framework.ContainersCPUSummary
-	memLimits framework.ResourceUsagePerContainer
+	cpuLimits e2ekubelet.ContainersCPUSummary
+	memLimits e2ekubelet.ResourceUsagePerContainer
 }
 
 func (rt *resourceTest) getTestName() string {
@@ -150,7 +151,7 @@ func runResourceUsageTest(f *framework.Framework, rc *ResourceCollector, testArg
 	defer deletePodsSync(f, append(pods, getCadvisorPod()))
 	defer rc.Stop()
 
-	By("Creating a batch of Pods")
+	ginkgo.By("Creating a batch of Pods")
 	f.PodClient().CreateBatch(pods)
 
 	// wait for a while to let the node be steady
@@ -160,16 +161,16 @@ func runResourceUsageTest(f *framework.Framework, rc *ResourceCollector, testArg
 	rc.LogLatest()
 	rc.Reset()
 
-	By("Start monitoring resource usage")
+	ginkgo.By("Start monitoring resource usage")
 	// Periodically dump the cpu summary until the deadline is met.
-	// Note that without calling framework.ResourceMonitor.Reset(), the stats
+	// Note that without calling e2ekubelet.ResourceMonitor.Reset(), the stats
 	// would occupy increasingly more memory. This should be fine
 	// for the current test duration, but we should reclaim the
 	// entries if we plan to monitor longer (e.g., 8 hours).
 	deadline := time.Now().Add(monitoringTime)
 	for time.Now().Before(deadline) {
 		timeLeft := deadline.Sub(time.Now())
-		e2elog.Logf("Still running...%v left", timeLeft)
+		framework.Logf("Still running...%v left", timeLeft)
 		if timeLeft < reportingPeriod {
 			time.Sleep(timeLeft)
 		} else {
@@ -178,33 +179,33 @@ func runResourceUsageTest(f *framework.Framework, rc *ResourceCollector, testArg
 		logPods(f.ClientSet)
 	}
 
-	By("Reporting overall resource usage")
+	ginkgo.By("Reporting overall resource usage")
 	logPods(f.ClientSet)
 }
 
 // logAndVerifyResource prints the resource usage as perf data and verifies whether resource usage satisfies the limit.
-func logAndVerifyResource(f *framework.Framework, rc *ResourceCollector, cpuLimits framework.ContainersCPUSummary,
-	memLimits framework.ResourceUsagePerContainer, testInfo map[string]string, isVerify bool) {
+func logAndVerifyResource(f *framework.Framework, rc *ResourceCollector, cpuLimits e2ekubelet.ContainersCPUSummary,
+	memLimits e2ekubelet.ResourceUsagePerContainer, testInfo map[string]string, isVerify bool) {
 	nodeName := framework.TestContext.NodeName
 
 	// Obtain memory PerfData
 	usagePerContainer, err := rc.GetLatest()
 	framework.ExpectNoError(err)
-	e2elog.Logf("%s", formatResourceUsageStats(usagePerContainer))
+	framework.Logf("%s", formatResourceUsageStats(usagePerContainer))
 
-	usagePerNode := make(framework.ResourceUsagePerNode)
+	usagePerNode := make(e2ekubelet.ResourceUsagePerNode)
 	usagePerNode[nodeName] = usagePerContainer
 
 	// Obtain CPU PerfData
 	cpuSummary := rc.GetCPUSummary()
-	e2elog.Logf("%s", formatCPUSummary(cpuSummary))
+	framework.Logf("%s", formatCPUSummary(cpuSummary))
 
-	cpuSummaryPerNode := make(framework.NodesCPUSummary)
+	cpuSummaryPerNode := make(e2ekubelet.NodesCPUSummary)
 	cpuSummaryPerNode[nodeName] = cpuSummary
 
 	// Print resource usage
-	logPerfData(framework.ResourceUsageToPerfDataWithLabels(usagePerNode, testInfo), "memory")
-	logPerfData(framework.CPUUsageToPerfDataWithLabels(cpuSummaryPerNode, testInfo), "cpu")
+	logPerfData(e2eperf.ResourceUsageToPerfDataWithLabels(usagePerNode, testInfo), "memory")
+	logPerfData(e2eperf.CPUUsageToPerfDataWithLabels(cpuSummaryPerNode, testInfo), "cpu")
 
 	// Verify resource usage
 	if isVerify {
@@ -213,7 +214,7 @@ func logAndVerifyResource(f *framework.Framework, rc *ResourceCollector, cpuLimi
 	}
 }
 
-func verifyMemoryLimits(c clientset.Interface, expected framework.ResourceUsagePerContainer, actual framework.ResourceUsagePerNode) {
+func verifyMemoryLimits(c clientset.Interface, expected e2ekubelet.ResourceUsagePerContainer, actual e2ekubelet.ResourceUsagePerNode) {
 	if expected == nil {
 		return
 	}
@@ -236,20 +237,20 @@ func verifyMemoryLimits(c clientset.Interface, expected framework.ResourceUsageP
 		}
 		if len(nodeErrs) > 0 {
 			errList = append(errList, fmt.Sprintf("node %v:\n %s", nodeName, strings.Join(nodeErrs, ", ")))
-			heapStats, err := framework.GetKubeletHeapStats(c, nodeName)
+			heapStats, err := e2ekubelet.GetKubeletHeapStats(c, nodeName)
 			if err != nil {
-				e2elog.Logf("Unable to get heap stats from %q", nodeName)
+				framework.Logf("Unable to get heap stats from %q", nodeName)
 			} else {
-				e2elog.Logf("Heap stats on %q\n:%v", nodeName, heapStats)
+				framework.Logf("Heap stats on %q\n:%v", nodeName, heapStats)
 			}
 		}
 	}
 	if len(errList) > 0 {
-		e2elog.Failf("Memory usage exceeding limits:\n %s", strings.Join(errList, "\n"))
+		framework.Failf("Memory usage exceeding limits:\n %s", strings.Join(errList, "\n"))
 	}
 }
 
-func verifyCPULimits(expected framework.ContainersCPUSummary, actual framework.NodesCPUSummary) {
+func verifyCPULimits(expected e2ekubelet.ContainersCPUSummary, actual e2ekubelet.NodesCPUSummary) {
 	if expected == nil {
 		return
 	}
@@ -279,15 +280,15 @@ func verifyCPULimits(expected framework.ContainersCPUSummary, actual framework.N
 		}
 	}
 	if len(errList) > 0 {
-		e2elog.Failf("CPU usage exceeding limits:\n %s", strings.Join(errList, "\n"))
+		framework.Failf("CPU usage exceeding limits:\n %s", strings.Join(errList, "\n"))
 	}
 }
 
 func logPods(c clientset.Interface) {
 	nodeName := framework.TestContext.NodeName
-	podList, err := framework.GetKubeletRunningPods(c, nodeName)
+	podList, err := e2ekubelet.GetKubeletRunningPods(c, nodeName)
 	if err != nil {
-		e2elog.Logf("Unable to retrieve kubelet pods for node %v", nodeName)
+		framework.Logf("Unable to retrieve kubelet pods for node %v", nodeName)
 	}
-	e2elog.Logf("%d pods are running on node %v", len(podList.Items), nodeName)
+	framework.Logf("%d pods are running on node %v", len(podList.Items), nodeName)
 }

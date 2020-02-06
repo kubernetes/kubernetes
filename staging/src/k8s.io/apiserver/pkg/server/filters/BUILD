@@ -9,7 +9,6 @@ load(
 go_test(
     name = "go_default_test",
     srcs = [
-        "compression_test.go",
         "content_type_test.go",
         "cors_test.go",
         "maxinflight_test.go",
@@ -32,7 +31,6 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = [
-        "compression.go",
         "content_type.go",
         "cors.go",
         "doc.go",
@@ -45,7 +43,9 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/server/filters",
     importpath = "k8s.io/apiserver/pkg/server/filters",
     deps = [
+        "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
@@ -55,7 +55,7 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/endpoints/metrics:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/endpoints/request:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server/httplog:go_default_library",
-        "//vendor/github.com/emicklei/go-restful:go_default_library",
+        "//staging/src/k8s.io/client-go/kubernetes/scheme:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ],
 )

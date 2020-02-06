@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -105,7 +105,7 @@ func (cc *ConformanceContainer) Present() (bool, error) {
 	if err == nil {
 		return true, nil
 	}
-	if errors.IsNotFound(err) {
+	if apierrors.IsNotFound(err) {
 		return false, nil
 	}
 	return false, err

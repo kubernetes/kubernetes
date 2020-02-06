@@ -36,7 +36,7 @@ import (
 
 	"github.com/pkg/errors"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 )
@@ -47,8 +47,7 @@ import (
 //    rpc error: code = Unknown desc = Error: No such container: 41a...
 // when the pod gets deleted while streaming.
 func LogsForPod(ctx context.Context, cs clientset.Interface, ns, pod string, opts *v1.PodLogOptions) (io.ReadCloser, error) {
-	req := cs.CoreV1().Pods(ns).GetLogs(pod, opts)
-	return req.Context(ctx).Stream()
+	return cs.CoreV1().Pods(ns).GetLogs(pod, opts).Stream(ctx)
 }
 
 // LogOutput determines where output from CopyAllLogs goes.
@@ -251,10 +250,10 @@ func WatchPods(ctx context.Context, cs clientset.Interface, ns string, to io.Wri
 						)
 					} else if cst.State.Running != nil {
 						fmt.Fprintf(buffer, "RUNNING")
-					} else if cst.State.Waiting != nil {
+					} else if cst.State.Terminated != nil {
 						fmt.Fprintf(buffer, "TERMINATED: %s - %s",
-							cst.State.Waiting.Reason,
-							cst.State.Waiting.Message,
+							cst.State.Terminated.Reason,
+							cst.State.Terminated.Message,
 						)
 					}
 					fmt.Fprintf(buffer, "\n")

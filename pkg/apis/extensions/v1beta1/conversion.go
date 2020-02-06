@@ -25,7 +25,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
@@ -33,45 +32,6 @@ import (
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/apis/networking"
 )
-
-func addConversionFuncs(scheme *runtime.Scheme) error {
-	// Add non-generated conversion functions
-	err := scheme.AddConversionFuncs(
-		Convert_autoscaling_ScaleStatus_To_v1beta1_ScaleStatus,
-		Convert_v1beta1_ScaleStatus_To_autoscaling_ScaleStatus,
-		Convert_apps_DeploymentSpec_To_v1beta1_DeploymentSpec,
-		Convert_v1beta1_DeploymentSpec_To_apps_DeploymentSpec,
-		Convert_apps_DeploymentStrategy_To_v1beta1_DeploymentStrategy,
-		Convert_v1beta1_DeploymentStrategy_To_apps_DeploymentStrategy,
-		Convert_apps_RollingUpdateDeployment_To_v1beta1_RollingUpdateDeployment,
-		Convert_v1beta1_RollingUpdateDeployment_To_apps_RollingUpdateDeployment,
-		Convert_apps_RollingUpdateDaemonSet_To_v1beta1_RollingUpdateDaemonSet,
-		Convert_v1beta1_RollingUpdateDaemonSet_To_apps_RollingUpdateDaemonSet,
-		Convert_apps_ReplicaSetSpec_To_v1beta1_ReplicaSetSpec,
-		Convert_v1beta1_ReplicaSetSpec_To_apps_ReplicaSetSpec,
-		Convert_v1beta1_NetworkPolicy_To_networking_NetworkPolicy,
-		Convert_networking_NetworkPolicy_To_v1beta1_NetworkPolicy,
-		Convert_v1beta1_NetworkPolicyIngressRule_To_networking_NetworkPolicyIngressRule,
-		Convert_networking_NetworkPolicyIngressRule_To_v1beta1_NetworkPolicyIngressRule,
-		Convert_v1beta1_NetworkPolicyList_To_networking_NetworkPolicyList,
-		Convert_networking_NetworkPolicyList_To_v1beta1_NetworkPolicyList,
-		Convert_v1beta1_NetworkPolicyPeer_To_networking_NetworkPolicyPeer,
-		Convert_networking_NetworkPolicyPeer_To_v1beta1_NetworkPolicyPeer,
-		Convert_v1beta1_NetworkPolicyPort_To_networking_NetworkPolicyPort,
-		Convert_networking_NetworkPolicyPort_To_v1beta1_NetworkPolicyPort,
-		Convert_v1beta1_NetworkPolicySpec_To_networking_NetworkPolicySpec,
-		Convert_networking_NetworkPolicySpec_To_v1beta1_NetworkPolicySpec,
-		Convert_v1beta1_IPBlock_To_networking_IPBlock,
-		Convert_networking_IPBlock_To_v1beta1_IPBlock,
-		Convert_networking_NetworkPolicyEgressRule_To_v1beta1_NetworkPolicyEgressRule,
-		Convert_v1beta1_NetworkPolicyEgressRule_To_networking_NetworkPolicyEgressRule,
-	)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
 
 func Convert_autoscaling_ScaleStatus_To_v1beta1_ScaleStatus(in *autoscaling.ScaleStatus, out *extensionsv1beta1.ScaleStatus, s conversion.Scope) error {
 	out.Replicas = int32(in.Replicas)

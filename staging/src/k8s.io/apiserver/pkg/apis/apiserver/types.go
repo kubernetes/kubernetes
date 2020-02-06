@@ -48,3 +48,52 @@ type AdmissionPluginConfiguration struct {
 	// +optional
 	Configuration *runtime.Unknown
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// EgressSelectorConfiguration provides versioned configuration for egress selector clients.
+type EgressSelectorConfiguration struct {
+	metav1.TypeMeta
+
+	// EgressSelections contains a list of egress selection client configurations
+	EgressSelections []EgressSelection
+}
+
+// EgressSelection provides the configuration for a single egress selection client.
+type EgressSelection struct {
+	// Name is the name of the egress selection.
+	// Currently supported values are "Master", "Etcd" and "Cluster"
+	Name string
+
+	// Connection is the exact information used to configure the egress selection
+	Connection Connection
+}
+
+// Connection provides the configuration for a single egress selection client.
+type Connection struct {
+	// Type is the type of connection used to connect from client to konnectivity server.
+	// Currently supported values are "http-connect" and "direct".
+	Type string
+
+	// httpConnect is the config needed to use http-connect to the konnectivity server.
+	// +optional
+	HTTPConnect *HTTPConnectConfig
+}
+
+type HTTPConnectConfig struct {
+	// URL is the location of the konnectivity server to connect to.
+	// As an example it might be "https://127.0.0.1:8131"
+	URL string
+
+	// CABundle is the file location of the CA to be used to determine trust with the konnectivity server.
+	// +optional
+	CABundle string
+
+	// ClientKey is the file location of the client key to be used in mtls handshakes with the konnectivity server.
+	// +optional
+	ClientKey string
+
+	// ClientCert is the file location of the client certificate to be used in mtls handshakes with the konnectivity server.
+	// +optional
+	ClientCert string
+}

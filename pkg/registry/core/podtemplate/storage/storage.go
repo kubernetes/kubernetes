@@ -27,12 +27,13 @@ import (
 	"k8s.io/kubernetes/pkg/registry/core/podtemplate"
 )
 
+// REST implements a RESTStorage for pod templates.
 type REST struct {
 	*genericregistry.Store
 }
 
 // NewREST returns a RESTStorage object that will work against pod templates.
-func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
+func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, error) {
 	store := &genericregistry.Store{
 		NewFunc:                  func() runtime.Object { return &api.PodTemplate{} },
 		NewListFunc:              func() runtime.Object { return &api.PodTemplateList{} },
@@ -49,7 +50,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
 	}
 	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {
-		panic(err) // TODO: Propagate error up
+		return nil, err
 	}
-	return &REST{store}
+	return &REST{store}, nil
 }

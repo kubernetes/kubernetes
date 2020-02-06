@@ -151,7 +151,7 @@ function get-credentials {
 }
 
 function valid-storage-scope {
-  curl "${GCE_METADATA_INTERNAL}/service-accounts/default/scopes" -H "Metadata-Flavor: Google" -s | grep -q "auth/devstorage"
+  curl "${GCE_METADATA_INTERNAL}/service-accounts/default/scopes" -H "Metadata-Flavor: Google" -s | grep -E "auth/devstorage|auth/cloud-platform"
 }
 
 function download_tarball() {
@@ -166,7 +166,7 @@ function download_tarball() {
   mkdir -p "${download_path}"
   if [[ $(which curl) ]]; then
     # if the url belongs to GCS API we should use oauth2_token in the headers
-    local curl_headers=""
+    curl_headers=""
     if { [[ "${KUBERNETES_PROVIDER:-gce}" == "gce" ]] || [[ "${KUBERNETES_PROVIDER}" == "gke" ]] ; } &&
        [[ "$url" =~ ^https://storage.googleapis.com.* ]] && valid-storage-scope ; then
       curl_headers="Authorization: Bearer $(get-credentials)"

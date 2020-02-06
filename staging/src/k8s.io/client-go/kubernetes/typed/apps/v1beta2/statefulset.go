@@ -19,6 +19,7 @@ limitations under the License.
 package v1beta2
 
 import (
+	"context"
 	"time"
 
 	v1beta2 "k8s.io/api/apps/v1beta2"
@@ -74,7 +75,7 @@ func (c *statefulSets) Get(name string, options v1.GetOptions) (result *v1beta2.
 		Resource("statefulsets").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -91,7 +92,7 @@ func (c *statefulSets) List(opts v1.ListOptions) (result *v1beta2.StatefulSetLis
 		Resource("statefulsets").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -108,7 +109,7 @@ func (c *statefulSets) Watch(opts v1.ListOptions) (watch.Interface, error) {
 		Resource("statefulsets").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch()
+		Watch(context.TODO())
 }
 
 // Create takes the representation of a statefulSet and creates it.  Returns the server's representation of the statefulSet, and an error, if there is any.
@@ -118,7 +119,7 @@ func (c *statefulSets) Create(statefulSet *v1beta2.StatefulSet) (result *v1beta2
 		Namespace(c.ns).
 		Resource("statefulsets").
 		Body(statefulSet).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -131,7 +132,7 @@ func (c *statefulSets) Update(statefulSet *v1beta2.StatefulSet) (result *v1beta2
 		Resource("statefulsets").
 		Name(statefulSet.Name).
 		Body(statefulSet).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -147,7 +148,7 @@ func (c *statefulSets) UpdateStatus(statefulSet *v1beta2.StatefulSet) (result *v
 		Name(statefulSet.Name).
 		SubResource("status").
 		Body(statefulSet).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -159,7 +160,7 @@ func (c *statefulSets) Delete(name string, options *v1.DeleteOptions) error {
 		Resource("statefulsets").
 		Name(name).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -175,7 +176,7 @@ func (c *statefulSets) DeleteCollection(options *v1.DeleteOptions, listOptions v
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Timeout(timeout).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -188,7 +189,7 @@ func (c *statefulSets) Patch(name string, pt types.PatchType, data []byte, subre
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -202,7 +203,7 @@ func (c *statefulSets) GetScale(statefulSetName string, options v1.GetOptions) (
 		Name(statefulSetName).
 		SubResource("scale").
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -216,7 +217,7 @@ func (c *statefulSets) UpdateScale(statefulSetName string, scale *v1beta2.Scale)
 		Name(statefulSetName).
 		SubResource("scale").
 		Body(scale).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }

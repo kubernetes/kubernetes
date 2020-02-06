@@ -426,7 +426,9 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 				}
 			}
 		}
-		r := NewLeaseEndpointReconciler(clientset.CoreV1(), fakeLeases)
+
+		epAdapter := EndpointsAdapter{endpointClient: clientset.CoreV1()}
+		r := NewLeaseEndpointReconciler(epAdapter, fakeLeases)
 		err := r.ReconcileEndpoints(test.serviceName, net.ParseIP(test.ip), test.endpointPorts, true)
 		if err != nil {
 			t.Errorf("case %q: unexpected error: %v", test.testName, err)
@@ -526,7 +528,8 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 					}
 				}
 			}
-			r := NewLeaseEndpointReconciler(clientset.CoreV1(), fakeLeases)
+			epAdapter := EndpointsAdapter{endpointClient: clientset.CoreV1()}
+			r := NewLeaseEndpointReconciler(epAdapter, fakeLeases)
 			err := r.ReconcileEndpoints(test.serviceName, net.ParseIP(test.ip), test.endpointPorts, false)
 			if err != nil {
 				t.Errorf("case %q: unexpected error: %v", test.testName, err)
@@ -614,6 +617,19 @@ func TestLeaseRemoveEndpoints(t *testing.T) {
 				}},
 			},
 		},
+		{
+			testName:      "endpoint with no subset",
+			serviceName:   "foo",
+			ip:            "5.6.7.8",
+			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
+			endpointKeys:  []string{"1.2.3.4", "4.3.2.2", "4.3.2.3", "4.3.2.4"},
+			endpoints: &corev1.EndpointsList{
+				Items: []corev1.Endpoints{{
+					ObjectMeta: om("foo"),
+					Subsets:    nil,
+				}},
+			},
+		},
 	}
 	for _, test := range stopTests {
 		t.Run(test.testName, func(t *testing.T) {
@@ -626,7 +642,8 @@ func TestLeaseRemoveEndpoints(t *testing.T) {
 					continue
 				}
 			}
-			r := NewLeaseEndpointReconciler(clientset.CoreV1(), fakeLeases)
+			epAdapter := EndpointsAdapter{endpointClient: clientset.CoreV1()}
+			r := NewLeaseEndpointReconciler(epAdapter, fakeLeases)
 			err := r.RemoveEndpoints(test.serviceName, net.ParseIP(test.ip), test.endpointPorts)
 			if err != nil {
 				t.Errorf("case %q: unexpected error: %v", test.testName, err)

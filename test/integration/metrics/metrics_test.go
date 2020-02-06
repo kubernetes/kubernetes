@@ -17,8 +17,8 @@ limitations under the License.
 package metrics
 
 import (
-	"bufio"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"runtime"
@@ -28,26 +28,15 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/kubernetes/test/integration/framework"
-
-	"github.com/golang/protobuf/proto"
-	prometheuspb "github.com/prometheus/client_model/go"
-	"k8s.io/klog"
 )
 
-const scrapeRequestHeader = "application/vnd.google.protobuf;proto=io.prometheus.client.MetricFamily;encoding=compact-text"
-
-func scrapeMetrics(s *httptest.Server) ([]*prometheuspb.MetricFamily, error) {
+func scrapeMetrics(s *httptest.Server) (testutil.Metrics, error) {
 	req, err := http.NewRequest("GET", s.URL+"/metrics", nil)
 	if err != nil {
 		return nil, fmt.Errorf("Unable to create http request: %v", err)
 	}
-	// Ask the prometheus exporter for its text protocol buffer format, since it's
-	// much easier to parse than its plain-text format. Don't use the serialized
-	// proto representation since it uses a non-standard varint delimiter between
-	// metric families.
-	req.Header.Add("Accept", scrapeRequestHeader)
-
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
@@ -57,31 +46,18 @@ func scrapeMetrics(s *httptest.Server) ([]*prometheuspb.MetricFamily, error) {
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("Non-200 response trying to scrape metrics from master: %v", resp)
 	}
-
-	// Each line in the response body should contain all the data for a single metric.
-	var metrics []*prometheuspb.MetricFamily
-	scanner := bufio.NewScanner(resp.Body)
-	// Increase buffer size, since default one is too small for reading
-	// the /metrics contents.
-	scanner.Buffer(make([]byte, 10), 131072)
-	for scanner.Scan() {
-		var metric prometheuspb.MetricFamily
-		if err := proto.UnmarshalText(scanner.Text(), &metric); err != nil {
-			return nil, fmt.Errorf("Failed to unmarshal line of metrics response: %v", err)
-		}
-		klog.V(4).Infof("Got metric %q", metric.GetName())
-		metrics = append(metrics, &metric)
+	metrics := testutil.NewMetrics()
+	data, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("Unable to read response: %v", resp)
 	}
-	return metrics, nil
+	err = testutil.ParseMetrics(string(data), &metrics)
+	return metrics, err
 }
 
-func checkForExpectedMetrics(t *testing.T, metrics []*prometheuspb.MetricFamily, expectedMetrics []string) {
-	foundMetrics := make(map[string]bool)
-	for _, metric := range metrics {
-		foundMetrics[metric.GetName()] = true
-	}
+func checkForExpectedMetrics(t *testing.T, metrics testutil.Metrics, expectedMetrics []string) {
 	for _, expected := range expectedMetrics {
-		if _, found := foundMetrics[expected]; !found {
+		if _, found := metrics[expected]; !found {
 			t.Errorf("Master metrics did not include expected metric %q", expected)
 		}
 	}
@@ -124,7 +100,7 @@ func TestApiserverMetrics(t *testing.T) {
 	}
 	checkForExpectedMetrics(t, metrics, []string{
 		"apiserver_request_total",
-		"apiserver_request_duration_seconds",
-		"etcd_request_duration_seconds",
+		"apiserver_request_duration_seconds_sum",
+		"etcd_request_duration_seconds_sum",
 	})
 }

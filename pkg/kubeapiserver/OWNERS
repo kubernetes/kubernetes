@@ -11,6 +11,7 @@ reviewers:
 - liggitt
 - sttts
 - cheftako
+- logicalhan
 labels:
 - sig/api-machinery
 - area/apiserver

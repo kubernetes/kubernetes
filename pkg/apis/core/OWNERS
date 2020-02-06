@@ -33,7 +33,6 @@ reviewers:
 - janetkuo
 - justinsb
 - pwittrock
-- roberthbailey
 - ncdc
 - tallclair
 - yifan-gu
@@ -42,6 +41,5 @@ reviewers:
 - soltysh
 - piosz
 - jsafrane
-- jbeda
 labels:
 - sig/apps

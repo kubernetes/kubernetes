@@ -14,6 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Please do not add any logic to this shell script. Add logic to the go code
+# that generates the set-gen program.
+
 set -o errexit
 set -o nounset
 set -o pipefail
@@ -34,10 +37,6 @@ clientgen=$(kube::util::find-binary "client-gen")
 listergen=$(kube::util::find-binary "lister-gen")
 informergen=$(kube::util::find-binary "informer-gen")
 
-# Please do not add any logic to this shell script. Add logic to the go code
-# that generates the set-gen program.
-#
-
 IFS=" " read -r -a GROUP_VERSIONS <<< "${KUBE_AVAILABLE_GROUP_VERSIONS}"
 GV_DIRS=()
 for gv in "${GROUP_VERSIONS[@]}"; do
@@ -49,9 +48,9 @@ for gv in "${GROUP_VERSIONS[@]}"; do
 
 
   # skip groups that aren't being served, clients for these don't matter
-    if [[ " ${KUBE_NONSERVER_GROUP_VERSIONS} " == *" ${gv} "* ]]; then
-      continue
-    fi
+  if [[ " ${KUBE_NONSERVER_GROUP_VERSIONS} " == *" ${gv} "* ]]; then
+    continue
+  fi
 
   GV_DIRS+=("${pkg_dir}")
 done

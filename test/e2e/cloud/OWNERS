@@ -4,12 +4,11 @@ approvers:
 - andrewsykim
 - cheftako
 - mcrute
-- d-nishi
 reviewers:
 - andrewsykim
 - cheftako
 - mcrute
+emeritus_approvers:
 - d-nishi
-
 labels:
 - sig/cloud-provider

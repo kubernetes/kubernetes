@@ -19,6 +19,7 @@ package rest
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -61,11 +62,15 @@ func (s *LocationStreamer) InputStream(ctx context.Context, apiVersion, acceptHe
 	if transport == nil {
 		transport = http.DefaultTransport
 	}
+
 	client := &http.Client{
 		Transport:     transport,
 		CheckRedirect: s.RedirectChecker,
 	}
 	req, err := http.NewRequest("GET", s.Location.String(), nil)
+	if err != nil {
+		return nil, false, "", fmt.Errorf("failed to construct request for %s, got %v", s.Location.String(), err)
+	}
 	// Pass the parent context down to the request to ensure that the resources
 	// will be release properly.
 	req = req.WithContext(ctx)

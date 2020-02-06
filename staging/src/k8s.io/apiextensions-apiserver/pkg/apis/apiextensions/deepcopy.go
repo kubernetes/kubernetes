@@ -268,5 +268,27 @@ func (in *JSONSchemaProps) DeepCopy() *JSONSchemaProps {
 		}
 	}
 
+	if in.XListMapKeys != nil {
+		in, out := &in.XListMapKeys, &out.XListMapKeys
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+
+	if in.XListType != nil {
+		in, out := &in.XListType, &out.XListType
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(string)
+			**out = **in
+		}
+	}
+
+	if in.XMapType != nil {
+		in, out := &in.XMapType, &out.XMapType
+		*out = new(string)
+		**out = **in
+	}
+
 	return out
 }

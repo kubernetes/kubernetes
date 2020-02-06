@@ -66,7 +66,7 @@ MIG_WAIT_UNTIL_STABLE_TIMEOUT=${MIG_WAIT_UNTIL_STABLE_TIMEOUT:-1800}
 
 MASTER_OS_DISTRIBUTION=${KUBE_MASTER_OS_DISTRIBUTION:-${KUBE_OS_DISTRIBUTION:-gci}}
 NODE_OS_DISTRIBUTION=${KUBE_NODE_OS_DISTRIBUTION:-${KUBE_OS_DISTRIBUTION:-gci}}
-WINDOWS_NODE_OS_DISTRIBUTION=${WINDOWS_NODE_OS_DISTRIBUTION:-win1809}
+WINDOWS_NODE_OS_DISTRIBUTION=${WINDOWS_NODE_OS_DISTRIBUTION:-win2019}
 
 if [[ "${MASTER_OS_DISTRIBUTION}" == "cos" ]]; then
     MASTER_OS_DISTRIBUTION="gci"
@@ -90,7 +90,7 @@ ALLOWED_NOTREADY_NODES="${ALLOWED_NOTREADY_NODES:-$(($(get-num-nodes) / 100))}"
 # you are updating the os image versions, update this variable.
 # Also please update corresponding image for node e2e at:
 # https://github.com/kubernetes/kubernetes/blob/master/test/e2e_node/jenkins/image-config.yaml
-GCI_VERSION=${KUBE_GCI_VERSION:-cos-73-11647-163-0}
+GCI_VERSION=${KUBE_GCI_VERSION:-cos-77-12371-114-0}
 MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-}
 MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-cos-cloud}
 NODE_IMAGE=${KUBE_GCE_NODE_IMAGE:-${GCI_VERSION}}
@@ -104,9 +104,7 @@ LOAD_IMAGE_COMMAND=${KUBE_LOAD_IMAGE_COMMAND:-}
 GCI_DOCKER_VERSION=${KUBE_GCI_DOCKER_VERSION:-}
 if [[ "${CONTAINER_RUNTIME}" == "containerd" ]]; then
   CONTAINER_RUNTIME_NAME=${KUBE_CONTAINER_RUNTIME_NAME:-containerd}
-  CONTAINER_RUNTIME_ENDPOINT=${KUBE_CONTAINER_RUNTIME_ENDPOINT:-unix:///run/containerd/containerd.sock}
   LOAD_IMAGE_COMMAND=${KUBE_LOAD_IMAGE_COMMAND:-ctr -n=k8s.io images import}
-  KUBELET_TEST_ARGS="${KUBELET_TEST_ARGS:-} --runtime-cgroups=/system.slice/containerd.service"
 fi
 
 # MASTER_EXTRA_METADATA is the extra instance metadata on master instance separated by commas.
@@ -138,8 +136,13 @@ if [[ "${KUBE_FEATURE_GATES:-}" == "AllAlpha=true" ]]; then
   RUNTIME_CONFIG="${KUBE_RUNTIME_CONFIG:-api/all=true}"
 fi
 
+# If feature gates includes AllAlpha or EndpointSlice, and EndpointSlice has not been disabled, add EndpointSlice controller to list of controllers to run.
+if [[ (( "${KUBE_FEATURE_GATES:-}" == *"AllAlpha=true"* ) || ( "${KUBE_FEATURE_GATES:-}" == *"EndpointSlice=true"* )) && "${KUBE_FEATURE_GATES:-}" != *"EndpointSlice=false"* ]]; then
+  RUN_CONTROLLERS="${RUN_CONTROLLERS:-*,endpointslice}"
+fi
+
 # Optional: set feature gates
-FEATURE_GATES="${KUBE_FEATURE_GATES:-ExperimentalCriticalPodAnnotation=true}"
+FEATURE_GATES="${KUBE_FEATURE_GATES:-}"
 
 TERMINATED_POD_GC_THRESHOLD=${TERMINATED_POD_GC_THRESHOLD:-100}
 
@@ -158,18 +161,6 @@ ENABLE_DOCKER_REGISTRY_CACHE=true
 #   glbc           - CE L7 Load Balancer Controller
 ENABLE_L7_LOADBALANCING="${KUBE_ENABLE_L7_LOADBALANCING:-glbc}"
 
-# Optional: Cluster monitoring to setup as part of the cluster bring up:
-#   none           - No cluster monitoring setup
-#   influxdb       - Heapster, InfluxDB, and Grafana
-#   google         - Heapster, Google Cloud Monitoring, and Google Cloud Logging
-#   stackdriver    - Heapster, Google Cloud Monitoring (schema container), and Google Cloud Logging
-#   googleinfluxdb - Enable influxdb and google (except GCM)
-#   standalone     - Heapster only. Metrics available via Heapster REST API.
-ENABLE_CLUSTER_MONITORING="${KUBE_ENABLE_CLUSTER_MONITORING:-standalone}"
-
-# Optional: Enable deploying separate prometheus stack for monitoring kubernetes cluster
-ENABLE_PROMETHEUS_MONITORING="${KUBE_ENABLE_PROMETHEUS_MONITORING:-false}"
-
 # Optional: Enable Metrics Server. Metrics Server should be enable everywhere,
 # since it's a critical component, but in the first release we need a way to disable
 # this in case of stability issues.
@@ -187,7 +178,14 @@ ENABLE_METADATA_AGENT="${KUBE_ENABLE_METADATA_AGENT:-none}"
 # Useful for scheduling heapster in large clusters with nodes of small size.
 HEAPSTER_MACHINE_TYPE="${HEAPSTER_MACHINE_TYPE:-}"
 
-# Set etcd image (e.g. k8s.gcr.io/etcd) and version (e.g. 3.3.10-1) if you need
+# Optional: Additional nodes would be created if their type and number is specified.
+# NUM_NODES would be lowered respectively.
+# Useful for running cluster-level addons that needs more resources than would fit
+# on small nodes, like network plugins.
+NUM_ADDITIONAL_NODES="${NUM_ADDITIONAL_NODES:-}"
+ADDITIONAL_MACHINE_TYPE="${ADDITIONAL_MACHINE_TYPE:-}"
+
+# Set etcd image (e.g. k8s.gcr.io/etcd) and version (e.g. 3.4.3-0) if you need
 # non-default version.
 ETCD_IMAGE="${TEST_ETCD_IMAGE:-}"
 ETCD_DOCKER_REPOSITORY="${TEST_ETCD_DOCKER_REPOSITORY:-}"
@@ -283,7 +281,11 @@ if [[ ${KUBE_ENABLE_INSECURE_REGISTRY:-false} == "true" ]]; then
 fi
 
 if [[ ! -z "${NODE_ACCELERATORS}" ]]; then
-    FEATURE_GATES="${FEATURE_GATES},DevicePlugins=true"
+    if [[ -z "${FEATURE_GATES:-}" ]]; then
+        FEATURE_GATES="DevicePlugins=true"
+    else
+        FEATURE_GATES="${FEATURE_GATES},DevicePlugins=true"
+    fi
     if [[ "${NODE_ACCELERATORS}" =~ .*type=([a-zA-Z0-9-]+).* ]]; then
         NON_MASTER_NODE_LABELS="${NON_MASTER_NODE_LABELS},cloud.google.com/gke-accelerator=${BASH_REMATCH[1]}"
     fi
@@ -319,9 +321,9 @@ NODE_PROBLEM_DETECTOR_TAR_HASH="${NODE_PROBLEM_DETECTOR_TAR_HASH:-}"
 NODE_PROBLEM_DETECTOR_RELEASE_PATH="${NODE_PROBLEM_DETECTOR_RELEASE_PATH:-}"
 NODE_PROBLEM_DETECTOR_CUSTOM_FLAGS="${NODE_PROBLEM_DETECTOR_CUSTOM_FLAGS:-}"
 
-CNI_STORAGE_PATH="${CNI_STORAGE_PATH:-https://storage.googleapis.com/kubernetes-release/network-plugins}"
-CNI_VERSION="${CNI_VERSION:-}"
 CNI_SHA1="${CNI_SHA1:-}"
+CNI_TAR_PREFIX="${CNI_TAR_PREFIX:-cni-plugins-linux-amd64-}"
+CNI_STORAGE_URL_BASE="${CNI_STORAGE_URL_BASE:-https://storage.googleapis.com/k8s-artifacts-cni/release}"
 
 # Optional: Create autoscaler for cluster's nodes.
 ENABLE_CLUSTER_AUTOSCALER="${KUBE_ENABLE_CLUSTER_AUTOSCALER:-false}"
@@ -383,7 +385,7 @@ fi
 CUSTOM_INGRESS_YAML="${CUSTOM_INGRESS_YAML:-}"
 
 if [[ -z "${KUBE_ADMISSION_CONTROL:-}" ]]; then
-  ADMISSION_CONTROL="NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,PodPreset,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,Priority,StorageObjectInUseProtection,PersistentVolumeClaimResize"
+  ADMISSION_CONTROL="NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,PodPreset,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,Priority,StorageObjectInUseProtection,PersistentVolumeClaimResize,RuntimeClass"
   if [[ "${ENABLE_POD_SECURITY_POLICY:-}" == "true" ]]; then
     ADMISSION_CONTROL="${ADMISSION_CONTROL},PodSecurityPolicy"
   fi
@@ -431,6 +433,9 @@ SCHEDULING_ALGORITHM_PROVIDER="${SCHEDULING_ALGORITHM_PROVIDER:-}"
 # Optional: install a default StorageClass
 ENABLE_DEFAULT_STORAGE_CLASS="${ENABLE_DEFAULT_STORAGE_CLASS:-true}"
 
+# Optional: install volume snapshot CRDs
+ENABLE_VOLUME_SNAPSHOTS="${ENABLE_VOLUME_SNAPSHOTS:-true}"
+
 # Optional: Enable legacy ABAC policy that makes all service accounts superusers.
 # Disabling this by default in tests ensures default RBAC policies are sufficient from 1.6+
 # Upgrade test jobs that go from a version < 1.6 to a version >= 1.6 should override this to be true.
@@ -460,7 +465,7 @@ fi
 # Fluentd requirements
 # YAML exists to trigger a configuration refresh when changes are made.
 FLUENTD_GCP_YAML_VERSION="v3.2.0"
-FLUENTD_GCP_VERSION="${FLUENTD_GCP_VERSION:-1.6.8}"
+FLUENTD_GCP_VERSION="${FLUENTD_GCP_VERSION:-1.6.17}"
 FLUENTD_GCP_MEMORY_LIMIT="${FLUENTD_GCP_MEMORY_LIMIT:-}"
 FLUENTD_GCP_CPU_REQUEST="${FLUENTD_GCP_CPU_REQUEST:-}"
 FLUENTD_GCP_MEMORY_REQUEST="${FLUENTD_GCP_MEMORY_REQUEST:-}"
@@ -521,6 +526,7 @@ WINDOWS_NODE_TAINTS="${WINDOWS_NODE_TAINTS:-node.kubernetes.io/os=win1809:NoSche
 
 # Whether to set up a private GCE cluster, i.e. a cluster where nodes have only private IPs.
 GCE_PRIVATE_CLUSTER="${KUBE_GCE_PRIVATE_CLUSTER:-false}"
+GCE_PRIVATE_CLUSTER_PORTS_PER_VM="${KUBE_GCE_PRIVATE_CLUSTER_PORTS_PER_VM:-}"
 
 ETCD_LISTEN_CLIENT_IP=0.0.0.0
 

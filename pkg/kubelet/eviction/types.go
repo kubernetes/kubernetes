@@ -40,7 +40,7 @@ const (
 
 // Config holds information about how eviction is configured.
 type Config struct {
-	// PressureTransitionPeriod is duration the kubelet has to wait before transititioning out of a pressure condition.
+	// PressureTransitionPeriod is duration the kubelet has to wait before transitioning out of a pressure condition.
 	PressureTransitionPeriod time.Duration
 	// Maximum allowed grace period (in seconds) to use when terminating pods in response to a soft eviction threshold being met.
 	MaxPodGracePeriodSeconds int64

@@ -19,6 +19,7 @@ limitations under the License.
 package v1
 
 import (
+	"context"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -70,7 +71,7 @@ func (c *secrets) Get(name string, options metav1.GetOptions) (result *v1.Secret
 		Resource("secrets").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -87,7 +88,7 @@ func (c *secrets) List(opts metav1.ListOptions) (result *v1.SecretList, err erro
 		Resource("secrets").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -104,7 +105,7 @@ func (c *secrets) Watch(opts metav1.ListOptions) (watch.Interface, error) {
 		Resource("secrets").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch()
+		Watch(context.TODO())
 }
 
 // Create takes the representation of a secret and creates it.  Returns the server's representation of the secret, and an error, if there is any.
@@ -114,7 +115,7 @@ func (c *secrets) Create(secret *v1.Secret) (result *v1.Secret, err error) {
 		Namespace(c.ns).
 		Resource("secrets").
 		Body(secret).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -127,7 +128,7 @@ func (c *secrets) Update(secret *v1.Secret) (result *v1.Secret, err error) {
 		Resource("secrets").
 		Name(secret.Name).
 		Body(secret).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -139,7 +140,7 @@ func (c *secrets) Delete(name string, options *metav1.DeleteOptions) error {
 		Resource("secrets").
 		Name(name).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -155,7 +156,7 @@ func (c *secrets) DeleteCollection(options *metav1.DeleteOptions, listOptions me
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Timeout(timeout).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -168,7 +169,7 @@ func (c *secrets) Patch(name string, pt types.PatchType, data []byte, subresourc
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }

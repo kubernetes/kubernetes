@@ -31,7 +31,6 @@ import (
 	"github.com/lithammer/dedent"
 	"github.com/spf13/cobra"
 	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
-	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
@@ -52,7 +51,9 @@ func TestNewCmdConfigImagesList(t *testing.T) {
 	var output bytes.Buffer
 	mockK8sVersion := dummyKubernetesVersion
 	images := NewCmdConfigImagesList(&output, &mockK8sVersion)
-	images.Run(nil, nil)
+	if err := images.RunE(nil, nil); err != nil {
+		t.Fatalf("Error from running the images command: %v", err)
+	}
 	actual := strings.Split(output.String(), "\n")
 	if len(actual) != defaultNumberOfImages {
 		t.Fatalf("Expected %v but found %v images", defaultNumberOfImages, len(actual))
@@ -196,12 +197,12 @@ func TestConfigImagesListRunWithoutPath(t *testing.T) {
 
 func TestImagesPull(t *testing.T) {
 	fcmd := fakeexec.FakeCmd{
-		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
-			func() ([]byte, error) { return nil, nil },
-			func() ([]byte, error) { return nil, nil },
-			func() ([]byte, error) { return nil, nil },
-			func() ([]byte, error) { return nil, nil },
-			func() ([]byte, error) { return nil, nil },
+		CombinedOutputScript: []fakeexec.FakeAction{
+			func() ([]byte, []byte, error) { return nil, nil, nil },
+			func() ([]byte, []byte, error) { return nil, nil, nil },
+			func() ([]byte, []byte, error) { return nil, nil, nil },
+			func() ([]byte, []byte, error) { return nil, nil, nil },
+			func() ([]byte, []byte, error) { return nil, nil, nil },
 		},
 	}
 
@@ -252,7 +253,9 @@ func TestMigrate(t *testing.T) {
 	if err := command.Flags().Set("new-config", newConfigPath); err != nil {
 		t.Fatalf("failed to set new-config flag")
 	}
-	command.Run(nil, nil)
+	if err := command.RunE(nil, nil); err != nil {
+		t.Fatalf("Error from running the migrate command: %v", err)
+	}
 	if _, err := configutil.LoadInitConfigurationFromFile(newConfigPath); err != nil {
 		t.Fatalf("Could not read output back into internal type: %v", err)
 	}
@@ -295,7 +298,7 @@ func TestNewCmdConfigPrintActionDefaults(t *testing.T) {
 			expectedKinds: []string{
 				constants.ClusterConfigurationKind,
 				constants.InitConfigurationKind,
-				string(componentconfigs.KubeProxyConfigurationKind),
+				"KubeProxyConfiguration",
 			},
 			componentConfigs: "KubeProxyConfiguration",
 			cmdProc:          NewCmdConfigPrintInitDefaults,
@@ -305,8 +308,8 @@ func TestNewCmdConfigPrintActionDefaults(t *testing.T) {
 			expectedKinds: []string{
 				constants.ClusterConfigurationKind,
 				constants.InitConfigurationKind,
-				string(componentconfigs.KubeProxyConfigurationKind),
-				string(componentconfigs.KubeletConfigurationKind),
+				"KubeProxyConfiguration",
+				"KubeletConfiguration",
 			},
 			componentConfigs: "KubeProxyConfiguration,KubeletConfiguration",
 			cmdProc:          NewCmdConfigPrintInitDefaults,
@@ -322,7 +325,7 @@ func TestNewCmdConfigPrintActionDefaults(t *testing.T) {
 			name: "JoinConfiguration: KubeProxyConfiguration",
 			expectedKinds: []string{
 				constants.JoinConfigurationKind,
-				string(componentconfigs.KubeProxyConfigurationKind),
+				"KubeProxyConfiguration",
 			},
 			componentConfigs: "KubeProxyConfiguration",
 			cmdProc:          NewCmdConfigPrintJoinDefaults,
@@ -331,8 +334,8 @@ func TestNewCmdConfigPrintActionDefaults(t *testing.T) {
 			name: "JoinConfiguration: KubeProxyConfiguration and KubeletConfiguration",
 			expectedKinds: []string{
 				constants.JoinConfigurationKind,
-				string(componentconfigs.KubeProxyConfigurationKind),
-				string(componentconfigs.KubeletConfigurationKind),
+				"KubeProxyConfiguration",
+				"KubeletConfiguration",
 			},
 			componentConfigs: "KubeProxyConfiguration,KubeletConfiguration",
 			cmdProc:          NewCmdConfigPrintJoinDefaults,
@@ -347,7 +350,9 @@ func TestNewCmdConfigPrintActionDefaults(t *testing.T) {
 			if err := command.Flags().Set("component-configs", test.componentConfigs); err != nil {
 				t.Fatalf("failed to set component-configs flag")
 			}
-			command.Run(nil, nil)
+			if err := command.RunE(nil, nil); err != nil {
+				t.Fatalf("Error from running the print command: %v", err)
+			}
 
 			gvkmap, err := kubeadmutil.SplitYAMLDocuments(output.Bytes())
 			if err != nil {

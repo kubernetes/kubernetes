@@ -4,11 +4,11 @@ approvers:
 - bowei
 - MrHohn
 - thockin
+emeritus_approvers:
 - matchstick
 reviewers:
 - bowei
 - MrHohn
 - thockin
-- matchstick
 labels:
 - sig/network

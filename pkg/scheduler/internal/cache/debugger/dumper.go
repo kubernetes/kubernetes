@@ -43,10 +43,10 @@ func (d *CacheDumper) DumpAll() {
 
 // dumpNodes writes NodeInfo to the scheduler logs.
 func (d *CacheDumper) dumpNodes() {
-	snapshot := d.cache.Snapshot()
+	dump := d.cache.Dump()
 	klog.Info("Dump of cached NodeInfo")
-	for _, nodeInfo := range snapshot.Nodes {
-		klog.Info(printNodeInfo(nodeInfo))
+	for _, nodeInfo := range dump.Nodes {
+		klog.Info(d.printNodeInfo(nodeInfo))
 	}
 }
 
@@ -61,13 +61,21 @@ func (d *CacheDumper) dumpSchedulingQueue() {
 }
 
 // printNodeInfo writes parts of NodeInfo to a string.
-func printNodeInfo(n *schedulernodeinfo.NodeInfo) string {
+func (d *CacheDumper) printNodeInfo(n *schedulernodeinfo.NodeInfo) string {
 	var nodeData strings.Builder
-	nodeData.WriteString(fmt.Sprintf("\nNode name: %+v\nRequested Resources: %+v\nAllocatable Resources:%+v\nNumber of Pods: %v\nPods:\n",
+	nodeData.WriteString(fmt.Sprintf("\nNode name: %+v\nRequested Resources: %+v\nAllocatable Resources:%+v\nScheduled Pods(number: %v):\n",
 		n.Node().Name, n.RequestedResource(), n.AllocatableResource(), len(n.Pods())))
 	// Dumping Pod Info
 	for _, p := range n.Pods() {
 		nodeData.WriteString(printPod(p))
+	}
+	// Dumping nominated pods info on the node
+	nominatedPods := d.podQueue.NominatedPodsForNode(n.Node().Name)
+	if len(nominatedPods) != 0 {
+		nodeData.WriteString(fmt.Sprintf("Nominated Pods(number: %v):\n", len(nominatedPods)))
+		for _, p := range nominatedPods {
+			nodeData.WriteString(printPod(p))
+		}
 	}
 	return nodeData.String()
 }

@@ -19,6 +19,7 @@ limitations under the License.
 package v1beta1
 
 import (
+	"context"
 	"time"
 
 	v1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
@@ -68,7 +69,7 @@ func (c *customResourceDefinitions) Get(name string, options v1.GetOptions) (res
 		Resource("customresourcedefinitions").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -84,7 +85,7 @@ func (c *customResourceDefinitions) List(opts v1.ListOptions) (result *v1beta1.C
 		Resource("customresourcedefinitions").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -100,7 +101,7 @@ func (c *customResourceDefinitions) Watch(opts v1.ListOptions) (watch.Interface,
 		Resource("customresourcedefinitions").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch()
+		Watch(context.TODO())
 }
 
 // Create takes the representation of a customResourceDefinition and creates it.  Returns the server's representation of the customResourceDefinition, and an error, if there is any.
@@ -109,7 +110,7 @@ func (c *customResourceDefinitions) Create(customResourceDefinition *v1beta1.Cus
 	err = c.client.Post().
 		Resource("customresourcedefinitions").
 		Body(customResourceDefinition).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -121,7 +122,7 @@ func (c *customResourceDefinitions) Update(customResourceDefinition *v1beta1.Cus
 		Resource("customresourcedefinitions").
 		Name(customResourceDefinition.Name).
 		Body(customResourceDefinition).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -136,7 +137,7 @@ func (c *customResourceDefinitions) UpdateStatus(customResourceDefinition *v1bet
 		Name(customResourceDefinition.Name).
 		SubResource("status").
 		Body(customResourceDefinition).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -147,7 +148,7 @@ func (c *customResourceDefinitions) Delete(name string, options *v1.DeleteOption
 		Resource("customresourcedefinitions").
 		Name(name).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -162,7 +163,7 @@ func (c *customResourceDefinitions) DeleteCollection(options *v1.DeleteOptions, 
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Timeout(timeout).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -174,7 +175,7 @@ func (c *customResourceDefinitions) Patch(name string, pt types.PatchType, data 
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }

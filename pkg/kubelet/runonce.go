@@ -116,7 +116,7 @@ func (kl *Kubelet) runPod(pod *v1.Pod, retryDelay time.Duration) error {
 	for {
 		status, err := kl.containerRuntime.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
 		if err != nil {
-			return fmt.Errorf("Unable to get status for pod %q: %v", format.Pod(pod), err)
+			return fmt.Errorf("unable to get status for pod %q: %v", format.Pod(pod), err)
 		}
 
 		if kl.isPodRunning(pod, status) {

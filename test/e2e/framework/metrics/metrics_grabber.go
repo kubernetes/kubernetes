@@ -17,6 +17,7 @@ limitations under the License.
 package metrics
 
 import (
+	"context"
 	"fmt"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -24,7 +25,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/master/ports"
-	"k8s.io/kubernetes/pkg/util/system"
+	"k8s.io/kubernetes/test/e2e/system"
 
 	"k8s.io/klog"
 )
@@ -63,7 +64,7 @@ func NewMetricsGrabber(c clientset.Interface, ec clientset.Interface, kubelets b
 		klog.Warning("Can't find any Nodes in the API server to grab metrics from")
 	}
 	for _, node := range nodeList.Items {
-		if system.IsMasterNode(node.Name) {
+		if system.DeprecatedMightBeMasterNode(node.Name) {
 			registeredMaster = true
 			masterName = node.Name
 			break
@@ -241,7 +242,7 @@ func (g *Grabber) getMetricsFromPod(client clientset.Interface, podName string, 
 		SubResource("proxy").
 		Name(fmt.Sprintf("%v:%v", podName, port)).
 		Suffix("metrics").
-		Do().Raw()
+		Do(context.TODO()).Raw()
 	if err != nil {
 		return "", err
 	}

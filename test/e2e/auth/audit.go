@@ -17,6 +17,7 @@ limitations under the License.
 package auth
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -37,7 +38,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/auth"
 	e2edeploy "k8s.io/kubernetes/test/e2e/framework/deployment"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -63,7 +64,7 @@ var _ = SIGDescribe("Advanced Audit [DisabledForLargeClusters][Flaky]", func() {
 	f := framework.NewDefaultFramework("audit")
 	var namespace string
 	ginkgo.BeforeEach(func() {
-		framework.SkipUnlessProviderIs("gce")
+		e2eskipper.SkipUnlessProviderIs("gce")
 		namespace = f.Namespace.Name
 	})
 
@@ -203,7 +204,7 @@ var _ = SIGDescribe("Advanced Audit [DisabledForLargeClusters][Flaky]", func() {
 
 	ginkgo.It("should audit API calls to create, get, update, patch, delete, list, watch deployments.", func() {
 		podLabels := map[string]string{"name": "audit-deployment-pod"}
-		d := e2edeploy.NewDeployment("audit-deployment", int32(1), podLabels, "redis", imageutils.GetE2EImage(imageutils.Redis), appsv1.RecreateDeploymentStrategyType)
+		d := e2edeploy.NewDeployment("audit-deployment", int32(1), podLabels, "agnhost", imageutils.GetE2EImage(imageutils.Agnhost), appsv1.RecreateDeploymentStrategyType)
 
 		_, err := f.ClientSet.AppsV1().Deployments(namespace).Create(d)
 		framework.ExpectNoError(err, "failed to create audit-deployment")
@@ -656,7 +657,7 @@ var _ = SIGDescribe("Advanced Audit [DisabledForLargeClusters][Flaky]", func() {
 	// test authorizer annotations, RBAC is required.
 	ginkgo.It("should audit API calls to get a pod with unauthorized user.", func() {
 		if !auth.IsRBACEnabled(f.ClientSet.RbacV1()) {
-			framework.Skipf("RBAC not enabled.")
+			e2eskipper.Skipf("RBAC not enabled.")
 		}
 
 		ginkgo.By("Creating a kubernetes client that impersonates an unauthorized anonymous user")
@@ -733,16 +734,16 @@ func expectEvents(f *framework.Framework, expectedEvents []utils.AuditEvent) {
 	pollingTimeout := 5 * time.Minute
 	err := wait.Poll(pollingInterval, pollingTimeout, func() (bool, error) {
 		// Fetch the log stream.
-		stream, err := f.ClientSet.CoreV1().RESTClient().Get().AbsPath("/logs/kube-apiserver-audit.log").Stream()
+		stream, err := f.ClientSet.CoreV1().RESTClient().Get().AbsPath("/logs/kube-apiserver-audit.log").Stream(context.TODO())
 		if err != nil {
 			return false, err
 		}
 		defer stream.Close()
 		missingReport, err := utils.CheckAuditLines(stream, expectedEvents, auditv1.SchemeGroupVersion)
 		if err != nil {
-			e2elog.Logf("Failed to observe audit events: %v", err)
+			framework.Logf("Failed to observe audit events: %v", err)
 		} else if len(missingReport.MissingEvents) > 0 {
-			e2elog.Logf(missingReport.String())
+			framework.Logf(missingReport.String())
 		}
 		return len(missingReport.MissingEvents) == 0, nil
 	})

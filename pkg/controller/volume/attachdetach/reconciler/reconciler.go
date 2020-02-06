@@ -219,7 +219,7 @@ func (rc *reconciler) reconcile() {
 				continue
 			}
 
-			// Trigger detach volume which requires verifing safe to detach step
+			// Trigger detach volume which requires verifying safe to detach step
 			// If timeout is true, skip verifySafeToDetach check
 			klog.V(5).Infof(attachedVolume.GenerateMsgDetailed("Starting attacherDetacher.DetachVolume", ""))
 			verifySafeToDetach := !timeout

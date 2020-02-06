@@ -40,12 +40,17 @@ import (
 
 func startCloudNodeController(ctx *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface, stopCh <-chan struct{}) (http.Handler, bool, error) {
 	// Start the CloudNodeController
-	nodeController := cloudcontrollers.NewCloudNodeController(
+	nodeController, err := cloudcontrollers.NewCloudNodeController(
 		ctx.SharedInformers.Core().V1().Nodes(),
 		// cloud node controller uses existing cluster role from node-controller
 		ctx.ClientBuilder.ClientOrDie("node-controller"),
 		cloud,
-		ctx.ComponentConfig.NodeStatusUpdateFrequency.Duration)
+		ctx.ComponentConfig.NodeStatusUpdateFrequency.Duration,
+	)
+	if err != nil {
+		klog.Warningf("failed to start cloud node controller: %s", err)
+		return nil, false, nil
+	}
 
 	go nodeController.Run(stopCh)
 

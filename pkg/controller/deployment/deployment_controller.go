@@ -45,9 +45,9 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/component-base/metrics/prometheus/ratelimiter"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/deployment/util"
-	"k8s.io/kubernetes/pkg/util/metrics"
 )
 
 const (
@@ -103,7 +103,7 @@ func NewDeploymentController(dInformer appsinformers.DeploymentInformer, rsInfor
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: client.CoreV1().Events("")})
 
 	if client != nil && client.CoreV1().RESTClient().GetRateLimiter() != nil {
-		if err := metrics.RegisterMetricAndTrackRateLimiterUsage("deployment_controller", client.CoreV1().RESTClient().GetRateLimiter()); err != nil {
+		if err := ratelimiter.RegisterMetricAndTrackRateLimiterUsage("deployment_controller", client.CoreV1().RESTClient().GetRateLimiter()); err != nil {
 			return nil, err
 		}
 	}
@@ -152,7 +152,7 @@ func (dc *DeploymentController) Run(workers int, stopCh <-chan struct{}) {
 	klog.Infof("Starting deployment controller")
 	defer klog.Infof("Shutting down deployment controller")
 
-	if !controller.WaitForCacheSync("deployment", stopCh, dc.dListerSynced, dc.rsListerSynced, dc.podListerSynced) {
+	if !cache.WaitForNamedCacheSync("deployment", stopCh, dc.dListerSynced, dc.rsListerSynced, dc.podListerSynced) {
 		return
 	}
 
@@ -231,7 +231,7 @@ func (dc *DeploymentController) addReplicaSet(obj interface{}) {
 // getDeploymentsForReplicaSet returns a list of Deployments that potentially
 // match a ReplicaSet.
 func (dc *DeploymentController) getDeploymentsForReplicaSet(rs *apps.ReplicaSet) []*apps.Deployment {
-	deployments, err := dc.dLister.GetDeploymentsForReplicaSet(rs)
+	deployments, err := util.GetDeploymentsForReplicaSet(dc.dLister, rs)
 	if err != nil || len(deployments) == 0 {
 		return nil
 	}
@@ -366,7 +366,7 @@ func (dc *DeploymentController) deletePod(obj interface{}) {
 		}
 		numPods := 0
 		for _, podList := range podMap {
-			numPods += len(podList.Items)
+			numPods += len(podList)
 		}
 		if numPods == 0 {
 			dc.enqueueDeployment(d)
@@ -475,7 +475,7 @@ func (dc *DeploymentController) processNextWorkItem() bool {
 }
 
 func (dc *DeploymentController) handleErr(err error, key interface{}) {
-	if err == nil {
+	if err == nil || errors.HasStatusCause(err, v1.NamespaceTerminatingCause) {
 		dc.queue.Forget(key)
 		return
 	}
@@ -525,7 +525,9 @@ func (dc *DeploymentController) getReplicaSetsForDeployment(d *apps.Deployment) 
 //
 // It returns a map from ReplicaSet UID to a list of Pods controlled by that RS,
 // according to the Pod's ControllerRef.
-func (dc *DeploymentController) getPodMapForDeployment(d *apps.Deployment, rsList []*apps.ReplicaSet) (map[types.UID]*v1.PodList, error) {
+// NOTE: The pod pointers returned by this method point the pod objects in the cache and thus
+// shouldn't be modified in any way.
+func (dc *DeploymentController) getPodMapForDeployment(d *apps.Deployment, rsList []*apps.ReplicaSet) (map[types.UID][]*v1.Pod, error) {
 	// Get all Pods that potentially belong to this Deployment.
 	selector, err := metav1.LabelSelectorAsSelector(d.Spec.Selector)
 	if err != nil {
@@ -536,9 +538,9 @@ func (dc *DeploymentController) getPodMapForDeployment(d *apps.Deployment, rsLis
 		return nil, err
 	}
 	// Group Pods by their controller (if it's in rsList).
-	podMap := make(map[types.UID]*v1.PodList, len(rsList))
+	podMap := make(map[types.UID][]*v1.Pod, len(rsList))
 	for _, rs := range rsList {
-		podMap[rs.UID] = &v1.PodList{}
+		podMap[rs.UID] = []*v1.Pod{}
 	}
 	for _, pod := range pods {
 		// Do not ignore inactive Pods because Recreate Deployments need to verify that no
@@ -548,8 +550,8 @@ func (dc *DeploymentController) getPodMapForDeployment(d *apps.Deployment, rsLis
 			continue
 		}
 		// Only append if we care about this UID.
-		if podList, ok := podMap[controllerRef.UID]; ok {
-			podList.Items = append(podList.Items, *pod)
+		if _, ok := podMap[controllerRef.UID]; ok {
+			podMap[controllerRef.UID] = append(podMap[controllerRef.UID], pod)
 		}
 	}
 	return podMap, nil

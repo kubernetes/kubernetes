@@ -40,6 +40,7 @@ NET_PLUGIN=${NET_PLUGIN:-""}
 # eg: "/etc/cni/net.d" for config files, and "/opt/cni/bin" for binaries.
 CNI_CONF_DIR=${CNI_CONF_DIR:-""}
 CNI_BIN_DIR=${CNI_BIN_DIR:-""}
+CLUSTER_CIDR=${CLUSTER_CIDR:-10.1.0.0/16}
 SERVICE_CLUSTER_IP_RANGE=${SERVICE_CLUSTER_IP_RANGE:-10.0.0.0/24}
 FIRST_SERVICE_CLUSTER_IP=${FIRST_SERVICE_CLUSTER_IP:-10.0.0.1}
 # if enabled, must set CGROUP_ROOT
@@ -74,11 +75,12 @@ ENABLE_DAEMON=${ENABLE_DAEMON:-false}
 HOSTNAME_OVERRIDE=${HOSTNAME_OVERRIDE:-"127.0.0.1"}
 EXTERNAL_CLOUD_PROVIDER=${EXTERNAL_CLOUD_PROVIDER:-false}
 EXTERNAL_CLOUD_PROVIDER_BINARY=${EXTERNAL_CLOUD_PROVIDER_BINARY:-""}
+EXTERNAL_CLOUD_VOLUME_PLUGIN=${EXTERNAL_CLOUD_VOLUME_PLUGIN:-""}
 CLOUD_PROVIDER=${CLOUD_PROVIDER:-""}
 CLOUD_CONFIG=${CLOUD_CONFIG:-""}
 FEATURE_GATES=${FEATURE_GATES:-"AllAlpha=false"}
 STORAGE_BACKEND=${STORAGE_BACKEND:-"etcd3"}
-STORAGE_MEDIA_TYPE=${STORAGE_MEDIA_TYPE:-""}
+STORAGE_MEDIA_TYPE=${STORAGE_MEDIA_TYPE:-"application/vnd.kubernetes.protobuf"}
 # preserve etcd data. you also need to set ETCD_DIR.
 PRESERVE_ETCD="${PRESERVE_ETCD:-false}"
 
@@ -89,6 +91,10 @@ ENABLE_CLUSTER_DASHBOARD=${KUBE_ENABLE_CLUSTER_DASHBOARD:-false}
 AUTHORIZATION_MODE=${AUTHORIZATION_MODE:-"Node,RBAC"}
 KUBECONFIG_TOKEN=${KUBECONFIG_TOKEN:-""}
 AUTH_ARGS=${AUTH_ARGS:-""}
+
+# WebHook Authentication and Authorization
+AUTHORIZATION_WEBHOOK_CONFIG_FILE=${AUTHORIZATION_WEBHOOK_CONFIG_FILE:-""}
+AUTHENTICATION_WEBHOOK_CONFIG_FILE=${AUTHENTICATION_WEBHOOK_CONFIG_FILE:-""}
 
 # Install a default storage class (enabled by default)
 DEFAULT_STORAGE_CLASS=${KUBE_DEFAULT_STORAGE_CLASS:-true}
@@ -129,11 +135,6 @@ if [ "${CLOUD_PROVIDER}" == "openstack" ]; then
     fi
 fi
 
-# warn if users are running with swap allowed
-if [ "${FAIL_SWAP_ON}" == "false" ]; then
-    echo "WARNING : The kubelet is configured to not fail even if swap is enabled; production deployments should disable swap."
-fi
-
 if [ "$(id -u)" != "0" ]; then
     echo "WARNING : This script MAY be run as root for docker socket / iptables functionality; if failures occur, retry as root." 2>&1
 fi
@@ -155,12 +156,12 @@ function usage {
 # This function guesses where the existing cached binary build is for the `-O`
 # flag
 function guess_built_binary_path {
-  local hyperkube_path
-  hyperkube_path=$(kube::util::find-binary "hyperkube")
-  if [[ -z "${hyperkube_path}" ]]; then
+  local apiserver_path
+  apiserver_path=$(kube::util::find-binary "kube-apiserver")
+  if [[ -z "${apiserver_path}" ]]; then
     return
   fi
-  echo -n "$(dirname "${hyperkube_path}")"
+  echo -n "$(dirname "${apiserver_path}")"
 }
 
 ### Allow user to supply the source directory.
@@ -192,7 +193,7 @@ do
 done
 
 if [ "x${GO_OUT}" == "x" ]; then
-    make -C "${KUBE_ROOT}" WHAT="cmd/kubectl cmd/hyperkube"
+    make -C "${KUBE_ROOT}" WHAT="cmd/kubectl cmd/kube-apiserver cmd/kube-controller-manager cmd/cloud-controller-manager cmd/kubelet cmd/kube-proxy cmd/kube-scheduler"
 else
     echo "skipped the build."
 fi
@@ -348,6 +349,10 @@ cleanup()
   # Check if the controller-manager is still running
   [[ -n "${CTLRMGR_PID-}" ]] && kube::util::read-array CTLRMGR_PIDS < <(pgrep -P "${CTLRMGR_PID}" ; ps -o pid= -p "${CTLRMGR_PID}")
   [[ -n "${CTLRMGR_PIDS-}" ]] && sudo kill "${CTLRMGR_PIDS[@]}" 2>/dev/null
+
+  # Check if the cloud-controller-manager is still running
+  [[ -n "${CLOUD_CTLRMGR_PID-}" ]] && kube::util::read-array CLOUD_CTLRMGR_PIDS < <(pgrep -P "${CLOUD_CTLRMGR_PID}" ; ps -o pid= -p "${CLOUD_CTLRMGR_PID}")
+  [[ -n "${CLOUD_CTLRMGR_PIDS-}" ]] && sudo kill "${CLOUD_CTLRMGR_PIDS[@]}" 2>/dev/null
 
   # Check if the kubelet is still running
   [[ -n "${KUBELET_PID-}" ]] && kube::util::read-array KUBELET_PIDS < <(pgrep -P "${KUBELET_PID}" ; ps -o pid= -p "${KUBELET_PID}")
@@ -528,7 +533,7 @@ function start_apiserver {
       cloud_config_arg="--cloud-provider=external"
     fi
 
-    if [[ -n "${AUDIT_POLICY_FILE}" ]]; then
+    if [[ -z "${AUDIT_POLICY_FILE}" ]]; then
       cat <<EOF > /tmp/kube-audit-policy-file
 # Log all requests at the Metadata level.
 apiVersion: audit.k8s.io/v1
@@ -541,7 +546,7 @@ EOF
 
     APISERVER_LOG=${LOG_DIR}/kube-apiserver.log
     # shellcheck disable=SC2086
-    ${CONTROLPLANE_SUDO} "${GO_OUT}/hyperkube" kube-apiserver "${authorizer_arg}" "${priv_arg}" ${runtime_config} \
+    ${CONTROLPLANE_SUDO} "${GO_OUT}/kube-apiserver" "${authorizer_arg}" "${priv_arg}" ${runtime_config} \
       ${cloud_config_arg} \
       "${advertise_address}" \
       "${node_port_range}" \
@@ -549,12 +554,16 @@ EOF
       --vmodule="${LOG_SPEC}" \
       --audit-policy-file="${AUDIT_POLICY_FILE}" \
       --audit-log-path="${LOG_DIR}/kube-apiserver-audit.log" \
+      --authorization-webhook-config-file="${AUTHORIZATION_WEBHOOK_CONFIG_FILE}" \
+      --authentication-token-webhook-config-file="${AUTHENTICATION_WEBHOOK_CONFIG_FILE}" \
       --cert-dir="${CERT_DIR}" \
       --client-ca-file="${CERT_DIR}/client-ca.crt" \
       --kubelet-client-certificate="${CERT_DIR}/client-kube-apiserver.crt" \
       --kubelet-client-key="${CERT_DIR}/client-kube-apiserver.key" \
       --service-account-key-file="${SERVICE_ACCOUNT_KEY}" \
       --service-account-lookup="${SERVICE_ACCOUNT_LOOKUP}" \
+      --service-account-issuer="https://kubernetes.default.svc" \
+      --service-account-signing-key-file="${SERVICE_ACCOUNT_KEY}" \
       --enable-admission-plugins="${ENABLE_ADMISSION_PLUGINS}" \
       --disable-admission-plugins="${DISABLE_ADMISSION_PLUGINS}" \
       --admission-control-config-file="${ADMISSION_CONTROL_CONFIG_FILE}" \
@@ -608,18 +617,18 @@ EOF
 function start_controller_manager {
     node_cidr_args=()
     if [[ "${NET_PLUGIN}" == "kubenet" ]]; then
-      node_cidr_args=("--allocate-node-cidrs=true" "--cluster-cidr=10.1.0.0/16")
+      node_cidr_args=("--allocate-node-cidrs=true" "--cluster-cidr=${CLUSTER_CIDR}")
     fi
 
     cloud_config_arg=("--cloud-provider=${CLOUD_PROVIDER}" "--cloud-config=${CLOUD_CONFIG}")
     if [[ "${EXTERNAL_CLOUD_PROVIDER:-}" == "true" ]]; then
       cloud_config_arg=("--cloud-provider=external")
-      cloud_config_arg+=("--external-cloud-volume-plugin=${CLOUD_PROVIDER}")
+      cloud_config_arg+=("--external-cloud-volume-plugin=${EXTERNAL_CLOUD_VOLUME_PLUGIN}")
       cloud_config_arg+=("--cloud-config=${CLOUD_CONFIG}")
     fi
 
     CTLRMGR_LOG=${LOG_DIR}/kube-controller-manager.log
-    ${CONTROLPLANE_SUDO} "${GO_OUT}/hyperkube" kube-controller-manager \
+    ${CONTROLPLANE_SUDO} "${GO_OUT}/kube-controller-manager" \
       --v="${LOG_LEVEL}" \
       --vmodule="${LOG_SPEC}" \
       --service-account-private-key-file="${SERVICE_ACCOUNT_KEY}" \
@@ -652,11 +661,11 @@ function start_cloud_controller_manager {
 
     node_cidr_args=()
     if [[ "${NET_PLUGIN}" == "kubenet" ]]; then
-      node_cidr_args=("--allocate-node-cidrs=true" "--cluster-cidr=10.1.0.0/16")
+      node_cidr_args=("--allocate-node-cidrs=true" "--cluster-cidr=${CLUSTER_CIDR}")
     fi
 
     CLOUD_CTLRMGR_LOG=${LOG_DIR}/cloud-controller-manager.log
-    ${CONTROLPLANE_SUDO} "${EXTERNAL_CLOUD_PROVIDER_BINARY:-"${GO_OUT}/hyperkube" cloud-controller-manager}" \
+    ${CONTROLPLANE_SUDO} "${EXTERNAL_CLOUD_PROVIDER_BINARY:-"${GO_OUT}/cloud-controller-manager"}" \
       --v="${LOG_LEVEL}" \
       --vmodule="${LOG_SPEC}" \
       "${node_cidr_args[@]:-}" \
@@ -670,6 +679,19 @@ function start_cloud_controller_manager {
     export CLOUD_CTLRMGR_PID=$!
 }
 
+function wait_node_ready(){
+  # check the nodes information after kubelet daemon start
+  local nodes_stats="${KUBECTL} --kubeconfig '${CERT_DIR}/admin.kubeconfig' get nodes"
+  local node_name=$HOSTNAME_OVERRIDE
+  local system_node_wait_time=30
+  local interval_time=2
+  kube::util::wait_for_success "$system_node_wait_time" "$interval_time" "$nodes_stats | grep $node_name"
+  if [ $? == "1" ]; then
+    echo "time out on waiting $node_name info"
+    exit 1
+  fi
+}
+
 function start_kubelet {
     KUBELET_LOG=${LOG_DIR}/kubelet.log
     mkdir -p "${POD_MANIFEST_PATH}" &>/dev/null || sudo mkdir -p "${POD_MANIFEST_PATH}"
@@ -677,7 +699,11 @@ function start_kubelet {
     cloud_config_arg=("--cloud-provider=${CLOUD_PROVIDER}" "--cloud-config=${CLOUD_CONFIG}")
     if [[ "${EXTERNAL_CLOUD_PROVIDER:-}" == "true" ]]; then
        cloud_config_arg=("--cloud-provider=external")
-       cloud_config_arg+=("--provider-id=$(hostname)")
+       if [[ "${CLOUD_PROVIDER:-}" == "aws" ]]; then
+         cloud_config_arg+=("--provider-id=$(curl http://169.254.169.254/latest/meta-data/instance-id)")
+       else
+         cloud_config_arg+=("--provider-id=$(hostname)")
+       fi
     fi
 
     mkdir -p "/var/lib/kubelet" &>/dev/null || sudo mkdir -p "/var/lib/kubelet"
@@ -765,12 +791,17 @@ function start_kubelet {
       ${KUBELET_FLAGS}
     )
 
+    # warn if users are running with swap allowed
+    if [ "${FAIL_SWAP_ON}" == "false" ]; then
+        echo "WARNING : The kubelet is configured to not fail even if swap is enabled; production deployments should disable swap."
+    fi
+    
     if [[ "${REUSE_CERTS}" != true ]]; then
         generate_kubelet_certs
     fi
 
     # shellcheck disable=SC2024
-    sudo -E "${GO_OUT}/hyperkube" kubelet "${all_kubelet_flags[@]}" >"${KUBELET_LOG}" 2>&1 &
+    sudo -E "${GO_OUT}/kubelet" "${all_kubelet_flags[@]}" >"${KUBELET_LOG}" 2>&1 &
     KUBELET_PID=$!
 
     # Quick check that kubelet is running.
@@ -783,6 +814,10 @@ function start_kubelet {
 
 function start_kubeproxy {
     PROXY_LOG=${LOG_DIR}/kube-proxy.log
+
+    # wait for kubelet collect node information
+    echo "wait kubelet ready"
+    wait_node_ready
 
     cat <<EOF > /tmp/kube-proxy.yaml
 apiVersion: kubeproxy.config.k8s.io/v1alpha1
@@ -807,7 +842,7 @@ EOF
     fi
 
     # shellcheck disable=SC2024
-    sudo "${GO_OUT}/hyperkube" kube-proxy \
+    sudo "${GO_OUT}/kube-proxy" \
       --v="${LOG_LEVEL}" \
       --config=/tmp/kube-proxy.yaml \
       --master="https://${API_HOST}:${API_SECURE_PORT}" >"${PROXY_LOG}" 2>&1 &
@@ -817,7 +852,7 @@ EOF
 function start_kubescheduler {
 
     SCHEDULER_LOG=${LOG_DIR}/kube-scheduler.log
-    ${CONTROLPLANE_SUDO} "${GO_OUT}/hyperkube" kube-scheduler \
+    ${CONTROLPLANE_SUDO} "${GO_OUT}/kube-scheduler" \
       --v="${LOG_LEVEL}" \
       --leader-elect=false \
       --kubeconfig "${CERT_DIR}"/scheduler.kubeconfig \
@@ -858,7 +893,7 @@ function start_kubedashboard {
         ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" apply -f "${KUBE_ROOT}/cluster/addons/dashboard/dashboard-secret.yaml"
         ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" apply -f "${KUBE_ROOT}/cluster/addons/dashboard/dashboard-configmap.yaml"
         ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" apply -f "${KUBE_ROOT}/cluster/addons/dashboard/dashboard-rbac.yaml"
-        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" apply -f "${KUBE_ROOT}/cluster/addons/dashboard/dashboard-controller.yaml"
+        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" apply -f "${KUBE_ROOT}/cluster/addons/dashboard/dashboard-deployment.yaml"
         ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" apply -f "${KUBE_ROOT}/cluster/addons/dashboard/dashboard-service.yaml"
         echo "kubernetes-dashboard deployment and service successfully deployed."
     fi
@@ -997,9 +1032,6 @@ if [[ "${START_MODE}" != "kubeletonly" ]]; then
   if [[ "${EXTERNAL_CLOUD_PROVIDER:-}" == "true" ]]; then
     start_cloud_controller_manager
   fi
-  if [[ "${START_MODE}" != "nokubeproxy" ]]; then
-    start_kubeproxy
-  fi
   start_kubescheduler
   start_kubedns
   if [[ "${ENABLE_NODELOCAL_DNS:-}" == "true" ]]; then
@@ -1025,6 +1057,11 @@ if [[ "${START_MODE}" != "nokubelet" ]]; then
     esac
 fi
 
+if [[ "${START_MODE}" != "kubeletonly" ]]; then
+  if [[ "${START_MODE}" != "nokubeproxy" ]]; then
+    start_kubeproxy
+  fi
+fi
 if [[ -n "${PSP_ADMISSION}" && "${AUTHORIZATION_MODE}" = *RBAC* ]]; then
   create_psp_policy
 fi

@@ -28,6 +28,10 @@ type FakeStorageV1 struct {
 	*testing.Fake
 }
 
+func (c *FakeStorageV1) CSINodes() v1.CSINodeInterface {
+	return &FakeCSINodes{c}
+}
+
 func (c *FakeStorageV1) StorageClasses() v1.StorageClassInterface {
 	return &FakeStorageClasses{c}
 }

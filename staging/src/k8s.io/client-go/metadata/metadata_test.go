@@ -236,7 +236,7 @@ func TestClient(t *testing.T) {
 			defer s.Close()
 
 			cfg := ConfigFor(&rest.Config{Host: s.URL})
-			client := NewConfigOrDie(cfg).(*Client)
+			client := NewForConfigOrDie(cfg).(*Client)
 			tt.want(t, client)
 		})
 	}

@@ -12,6 +12,7 @@ go_library(
         "doc.go",
         "register.go",
         "types.go",
+        "zz_generated.conversion.go",
         "zz_generated.deepcopy.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/tools/clientcmd/api/v1",

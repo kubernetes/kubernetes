@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e_kubeadm
+package kubeadm
 
 import (
 	appsv1 "k8s.io/api/apps/v1"
@@ -24,7 +24,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 
 	"github.com/onsi/gomega"
 	"github.com/onsi/gomega/gstruct"
@@ -168,7 +167,7 @@ func ExpectSubjectHasAccessToResource(c clientset.Interface, subjectKind, subjec
 			},
 		}
 	default:
-		e2elog.Failf("invalid subjectKind %s", subjectKind)
+		framework.Failf("invalid subjectKind %s", subjectKind)
 	}
 
 	s, err := c.AuthorizationV1().SubjectAccessReviews().Create(sar)

@@ -38,7 +38,7 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against DaemonSets.
-func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
+func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 	store := &genericregistry.Store{
 		NewFunc:                  func() runtime.Object { return &apps.DaemonSet{} },
 		NewListFunc:              func() runtime.Object { return &apps.DaemonSetList{} },
@@ -52,13 +52,13 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 	}
 	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {
-		panic(err) // TODO: Propagate error up
+		return nil, nil, err
 	}
 
 	statusStore := *store
 	statusStore.UpdateStrategy = daemonset.StatusStrategy
 
-	return &REST{store, []string{"all"}}, &StatusREST{store: &statusStore}
+	return &REST{store, []string{"all"}}, &StatusREST{store: &statusStore}, nil
 }
 
 // Implement ShortNamesProvider

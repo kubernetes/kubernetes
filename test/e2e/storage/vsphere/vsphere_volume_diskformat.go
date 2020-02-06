@@ -30,8 +30,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -67,7 +68,7 @@ var _ = utils.SIGDescribe("Volume Disk Format [Feature:vsphere]", func() {
 		nodeLabelValue    string
 	)
 	ginkgo.BeforeEach(func() {
-		framework.SkipUnlessProviderIs("vsphere")
+		e2eskipper.SkipUnlessProviderIs("vsphere")
 		Bootstrap(f)
 		client = f.ClientSet
 		namespace = f.Namespace.Name
@@ -103,12 +104,12 @@ var _ = utils.SIGDescribe("Volume Disk Format [Feature:vsphere]", func() {
 
 func invokeTest(f *framework.Framework, client clientset.Interface, namespace string, nodeName string, nodeKeyValueLabel map[string]string, diskFormat string) {
 
-	e2elog.Logf("Invoking Test for DiskFomat: %s", diskFormat)
+	framework.Logf("Invoking Test for DiskFomat: %s", diskFormat)
 	scParameters := make(map[string]string)
 	scParameters["diskformat"] = diskFormat
 
 	ginkgo.By("Creating Storage Class With DiskFormat")
-	storageClassSpec := getVSphereStorageClassSpec("thinsc", scParameters, nil)
+	storageClassSpec := getVSphereStorageClassSpec("thinsc", scParameters, nil, "")
 	storageclass, err := client.StorageV1().StorageClasses().Create(storageClassSpec)
 	framework.ExpectNoError(err)
 
@@ -124,7 +125,7 @@ func invokeTest(f *framework.Framework, client clientset.Interface, namespace st
 	}()
 
 	ginkgo.By("Waiting for claim to be in bound phase")
-	err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, pvclaim.Namespace, pvclaim.Name, framework.Poll, framework.ClaimProvisionTimeout)
+	err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, pvclaim.Namespace, pvclaim.Name, framework.Poll, framework.ClaimProvisionTimeout)
 	framework.ExpectNoError(err)
 
 	// Get new copy of the claim
@@ -149,11 +150,11 @@ func invokeTest(f *framework.Framework, client clientset.Interface, namespace st
 	gomega.Expect(e2epod.WaitForPodNameRunningInNamespace(client, pod.Name, namespace)).To(gomega.Succeed())
 
 	isAttached, err := diskIsAttached(pv.Spec.VsphereVolume.VolumePath, nodeName)
-	gomega.Expect(isAttached).To(gomega.BeTrue())
+	framework.ExpectEqual(isAttached, true)
 	framework.ExpectNoError(err)
 
 	ginkgo.By("Verify Disk Format")
-	gomega.Expect(verifyDiskFormat(client, nodeName, pv.Spec.VsphereVolume.VolumePath, diskFormat)).To(gomega.BeTrue(), "DiskFormat Verification Failed")
+	framework.ExpectEqual(verifyDiskFormat(client, nodeName, pv.Spec.VsphereVolume.VolumePath, diskFormat), true, "DiskFormat Verification Failed")
 
 	var volumePaths []string
 	volumePaths = append(volumePaths, pv.Spec.VsphereVolume.VolumePath)
@@ -195,7 +196,7 @@ func verifyDiskFormat(client clientset.Interface, nodeName string, pvVolumePath 
 		}
 	}
 
-	gomega.Expect(diskFound).To(gomega.BeTrue(), "Failed to find disk")
+	framework.ExpectEqual(diskFound, true, "Failed to find disk")
 	isDiskFormatCorrect := false
 	if diskFormat == "eagerzeroedthick" {
 		if eagerlyScrub == true && thinProvisioned == false {

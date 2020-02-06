@@ -17,6 +17,7 @@ limitations under the License.
 package webhook
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
@@ -36,7 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd/api/v1"
+	v1 "k8s.io/client-go/tools/clientcmd/api/v1"
 )
 
 const (
@@ -396,7 +397,7 @@ func TestTLSConfig(t *testing.T) {
 			wh, err := NewGenericWebhook(runtime.NewScheme(), scheme.Codecs, configFile, groupVersions, retryBackoff)
 
 			if err == nil {
-				err = wh.RestClient.Get().Do().Error()
+				err = wh.RestClient.Get().Do(context.TODO()).Error()
 			}
 
 			if err == nil {
@@ -465,7 +466,7 @@ func TestRequestTimeout(t *testing.T) {
 
 	resultCh := make(chan rest.Result)
 
-	go func() { resultCh <- wh.RestClient.Get().Do() }()
+	go func() { resultCh <- wh.RestClient.Get().Do(context.TODO()) }()
 	select {
 	case <-time.After(time.Second * 5):
 		t.Errorf("expected request to timeout after %s", requestTimeout)
@@ -550,8 +551,8 @@ func TestWithExponentialBackoff(t *testing.T) {
 		t.Fatalf("failed to create the webhook: %v", err)
 	}
 
-	result := wh.WithExponentialBackoff(func() rest.Result {
-		return wh.RestClient.Get().Do()
+	result := wh.WithExponentialBackoff(context.Background(), func() rest.Result {
+		return wh.RestClient.Get().Do(context.TODO())
 	})
 
 	var statusCode int
@@ -562,8 +563,8 @@ func TestWithExponentialBackoff(t *testing.T) {
 		t.Errorf("unexpected status code: %d", statusCode)
 	}
 
-	result = wh.WithExponentialBackoff(func() rest.Result {
-		return wh.RestClient.Get().Do()
+	result = wh.WithExponentialBackoff(context.Background(), func() rest.Result {
+		return wh.RestClient.Get().Do(context.TODO())
 	})
 
 	result.StatusCode(&statusCode)

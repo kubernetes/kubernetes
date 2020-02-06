@@ -34,7 +34,7 @@ func TestReconcileEndpoints(t *testing.T) {
 	om := func(name string) metav1.ObjectMeta {
 		return metav1.ObjectMeta{Namespace: ns, Name: name}
 	}
-	reconcile_tests := []struct {
+	reconcileTests := []struct {
 		testName          string
 		serviceName       string
 		ip                string
@@ -387,12 +387,13 @@ func TestReconcileEndpoints(t *testing.T) {
 			},
 		},
 	}
-	for _, test := range reconcile_tests {
+	for _, test := range reconcileTests {
 		fakeClient := fake.NewSimpleClientset()
 		if test.endpoints != nil {
 			fakeClient = fake.NewSimpleClientset(test.endpoints)
 		}
-		reconciler := reconcilers.NewMasterCountEndpointReconciler(test.additionalMasters+1, fakeClient.CoreV1())
+		epAdapter := reconcilers.NewEndpointsAdapter(fakeClient.CoreV1(), nil)
+		reconciler := reconcilers.NewMasterCountEndpointReconciler(test.additionalMasters+1, epAdapter)
 		err := reconciler.ReconcileEndpoints(test.serviceName, net.ParseIP(test.ip), test.endpointPorts, true)
 		if err != nil {
 			t.Errorf("case %q: unexpected error: %v", test.testName, err)
@@ -436,7 +437,7 @@ func TestReconcileEndpoints(t *testing.T) {
 
 	}
 
-	non_reconcile_tests := []struct {
+	nonReconcileTests := []struct {
 		testName          string
 		serviceName       string
 		ip                string
@@ -505,12 +506,13 @@ func TestReconcileEndpoints(t *testing.T) {
 			},
 		},
 	}
-	for _, test := range non_reconcile_tests {
+	for _, test := range nonReconcileTests {
 		fakeClient := fake.NewSimpleClientset()
 		if test.endpoints != nil {
 			fakeClient = fake.NewSimpleClientset(test.endpoints)
 		}
-		reconciler := reconcilers.NewMasterCountEndpointReconciler(test.additionalMasters+1, fakeClient.CoreV1())
+		epAdapter := reconcilers.NewEndpointsAdapter(fakeClient.CoreV1(), nil)
+		reconciler := reconcilers.NewMasterCountEndpointReconciler(test.additionalMasters+1, epAdapter)
 		err := reconciler.ReconcileEndpoints(test.serviceName, net.ParseIP(test.ip), test.endpointPorts, false)
 		if err != nil {
 			t.Errorf("case %q: unexpected error: %v", test.testName, err)
@@ -556,13 +558,39 @@ func TestReconcileEndpoints(t *testing.T) {
 
 }
 
+func TestEmptySubsets(t *testing.T) {
+	ns := metav1.NamespaceDefault
+	om := func(name string) metav1.ObjectMeta {
+		return metav1.ObjectMeta{Namespace: ns, Name: name}
+	}
+	endpoints := &corev1.EndpointsList{
+		Items: []corev1.Endpoints{{
+			ObjectMeta: om("foo"),
+			Subsets:    nil,
+		}},
+	}
+	fakeClient := fake.NewSimpleClientset()
+	if endpoints != nil {
+		fakeClient = fake.NewSimpleClientset(endpoints)
+	}
+	epAdapter := reconcilers.NewEndpointsAdapter(fakeClient.CoreV1(), nil)
+	reconciler := reconcilers.NewMasterCountEndpointReconciler(1, epAdapter)
+	endpointPorts := []corev1.EndpointPort{
+		{Name: "foo", Port: 8080, Protocol: "TCP"},
+	}
+	err := reconciler.RemoveEndpoints("foo", net.ParseIP("1.2.3.4"), endpointPorts)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
 func TestCreateOrUpdateMasterService(t *testing.T) {
 	ns := metav1.NamespaceDefault
 	om := func(name string) metav1.ObjectMeta {
 		return metav1.ObjectMeta{Namespace: ns, Name: name}
 	}
 
-	create_tests := []struct {
+	createTests := []struct {
 		testName     string
 		serviceName  string
 		servicePorts []corev1.ServicePort
@@ -590,7 +618,7 @@ func TestCreateOrUpdateMasterService(t *testing.T) {
 			},
 		},
 	}
-	for _, test := range create_tests {
+	for _, test := range createTests {
 		master := Controller{}
 		fakeClient := fake.NewSimpleClientset()
 		master.ServiceClient = fakeClient.CoreV1()
@@ -616,7 +644,7 @@ func TestCreateOrUpdateMasterService(t *testing.T) {
 		}
 	}
 
-	reconcile_tests := []struct {
+	reconcileTests := []struct {
 		testName     string
 		serviceName  string
 		servicePorts []corev1.ServicePort
@@ -872,7 +900,7 @@ func TestCreateOrUpdateMasterService(t *testing.T) {
 			expectUpdate: nil,
 		},
 	}
-	for _, test := range reconcile_tests {
+	for _, test := range reconcileTests {
 		master := Controller{}
 		fakeClient := fake.NewSimpleClientset(test.service)
 		master.ServiceClient = fakeClient.CoreV1()
@@ -901,7 +929,7 @@ func TestCreateOrUpdateMasterService(t *testing.T) {
 		}
 	}
 
-	non_reconcile_tests := []struct {
+	nonReconcileTests := []struct {
 		testName     string
 		serviceName  string
 		servicePorts []corev1.ServicePort
@@ -931,7 +959,7 @@ func TestCreateOrUpdateMasterService(t *testing.T) {
 			expectUpdate: nil,
 		},
 	}
-	for _, test := range non_reconcile_tests {
+	for _, test := range nonReconcileTests {
 		master := Controller{}
 		fakeClient := fake.NewSimpleClientset(test.service)
 		master.ServiceClient = fakeClient.CoreV1()

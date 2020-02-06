@@ -18,6 +18,7 @@ package resource
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -30,6 +31,8 @@ import (
 	"golang.org/x/text/encoding/unicode"
 	"golang.org/x/text/transform"
 
+	"sigs.k8s.io/kustomize/pkg/fs"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,12 +43,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/cli-runtime/pkg/kustomize"
-	"sigs.k8s.io/kustomize/pkg/fs"
 )
 
 const (
-	constSTDINstr       string = "STDIN"
-	stopValidateMessage        = "if you choose to ignore these errors, turn validation off with --validate=false"
+	constSTDINstr       = "STDIN"
+	stopValidateMessage = "if you choose to ignore these errors, turn validation off with --validate=false"
 )
 
 // Watchable describes a resource that can be watched for changes that occur on the server,
@@ -100,7 +102,7 @@ func (i *Info) Get() (err error) {
 	obj, err := NewHelper(i.Client, i.Mapping).Get(i.Namespace, i.Name, i.Export)
 	if err != nil {
 		if errors.IsNotFound(err) && len(i.Namespace) > 0 && i.Namespace != metav1.NamespaceDefault && i.Namespace != metav1.NamespaceAll {
-			err2 := i.Client.Get().AbsPath("api", "v1", "namespaces", i.Namespace).Do().Error()
+			err2 := i.Client.Get().AbsPath("api", "v1", "namespaces", i.Namespace).Do(context.TODO()).Error()
 			if err2 != nil && errors.IsNotFound(err2) {
 				return err2
 			}
@@ -158,7 +160,7 @@ func (i *Info) ObjectName() string {
 
 // String returns the general purpose string representation
 func (i *Info) String() string {
-	basicInfo := fmt.Sprintf("Name: %q, Namespace: %q\nObject: %+q", i.Name, i.Namespace, i.Object)
+	basicInfo := fmt.Sprintf("Name: %q, Namespace: %q", i.Name, i.Namespace)
 	if i.Mapping != nil {
 		mappingInfo := fmt.Sprintf("Resource: %q, GroupVersionKind: %q", i.Mapping.Resource.String(),
 			i.Mapping.GroupVersionKind.String())
@@ -372,10 +374,9 @@ func (v ContinueOnErrorVisitor) Visit(fn VisitorFunc) error {
 
 // FlattenListVisitor flattens any objects that runtime.ExtractList recognizes as a list
 // - has an "Items" public field that is a slice of runtime.Objects or objects satisfying
-// that interface - into multiple Infos. An error on any sub item (for instance, if a List
-// contains an object that does not have a registered client or resource) will terminate
-// the visit.
-// TODO: allow errors to be aggregated?
+// that interface - into multiple Infos. Returns nil in the case of no errors.
+// When an error is hit on sub items (for instance, if a List contains an object that does
+// not have a registered client or resource), returns an aggregate error.
 type FlattenListVisitor struct {
 	visitor Visitor
 	typer   runtime.ObjectTyper
@@ -425,20 +426,22 @@ func (v FlattenListVisitor) Visit(fn VisitorFunc) error {
 		if info.Mapping != nil && !info.Mapping.GroupVersionKind.Empty() {
 			preferredGVKs = append(preferredGVKs, info.Mapping.GroupVersionKind)
 		}
-
+		errs := []error{}
 		for i := range items {
 			item, err := v.mapper.infoForObject(items[i], v.typer, preferredGVKs)
 			if err != nil {
-				return err
+				errs = append(errs, err)
+				continue
 			}
 			if len(info.ResourceVersion) != 0 {
 				item.ResourceVersion = info.ResourceVersion
 			}
 			if err := fn(item, nil); err != nil {
-				return err
+				errs = append(errs, err)
 			}
 		}
-		return nil
+		return utilerrors.NewAggregate(errs)
+
 	})
 }
 
@@ -694,7 +697,7 @@ func RetrieveLazy(info *Info, err error) error {
 
 // CreateAndRefresh creates an object from input info and refreshes info with that object
 func CreateAndRefresh(info *Info) error {
-	obj, err := NewHelper(info.Client, info.Mapping).Create(info.Namespace, true, info.Object, nil)
+	obj, err := NewHelper(info.Client, info.Mapping).Create(info.Namespace, true, info.Object)
 	if err != nil {
 		return err
 	}

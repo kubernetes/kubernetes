@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2016 The Kubernetes Authors.
 
@@ -26,20 +28,27 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-03-01/compute"
-	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2018-08-01/network"
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-07-01/compute"
+	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2019-06-01/network"
 	"github.com/Azure/go-autorest/autorest/to"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog"
+
+	"k8s.io/component-base/featuregate"
+	utilnet "k8s.io/utils/net"
 )
 
 const (
+	// IPv6DualStack is here to avoid having to import features pkg
+	// and violate import rules
+	IPv6DualStack featuregate.Feature = "IPv6DualStack"
+
 	loadBalancerMinimumPriority = 500
 	loadBalancerMaximumPriority = 4096
 
@@ -56,20 +65,21 @@ const (
 	nodeLabelRole  = "kubernetes.io/role"
 	nicFailedState = "Failed"
 
-	storageAccountNameMaxLength = 24
+	storageAccountNameMaxLength   = 24
+	frontendIPConfigNameMaxLength = 80
+	loadBalancerRuleNameMaxLength = 80
 )
 
 var errNotInVMSet = errors.New("vm is not in the vmset")
 var providerIDRE = regexp.MustCompile(`^` + CloudProviderName + `://(?:.*)/Microsoft.Compute/virtualMachines/(.+)$`)
 var backendPoolIDRE = regexp.MustCompile(`^/subscriptions/(?:.*)/resourceGroups/(?:.*)/providers/Microsoft.Network/loadBalancers/(.+)/backendAddressPools/(?:.*)`)
 var nicResourceGroupRE = regexp.MustCompile(`.*/subscriptions/(?:.*)/resourceGroups/(.+)/providers/Microsoft.Network/networkInterfaces/(?:.*)`)
-var publicIPResourceGroupRE = regexp.MustCompile(`.*/subscriptions/(?:.*)/resourceGroups/(.+)/providers/Microsoft.Network/publicIPAddresses/(?:.*)`)
 
 // getStandardMachineID returns the full identifier of a virtual machine.
-func (az *Cloud) getStandardMachineID(resourceGroup, machineName string) string {
+func (az *Cloud) getStandardMachineID(subscriptionID, resourceGroup, machineName string) string {
 	return fmt.Sprintf(
 		machineIDTemplate,
-		az.SubscriptionID,
+		subscriptionID,
 		strings.ToLower(resourceGroup),
 		machineName)
 }
@@ -84,31 +94,31 @@ func (az *Cloud) getAvailabilitySetID(resourceGroup, availabilitySetName string)
 }
 
 // returns the full identifier of a loadbalancer frontendipconfiguration.
-func (az *Cloud) getFrontendIPConfigID(lbName, fipConfigName string) string {
+func (az *Cloud) getFrontendIPConfigID(lbName, rgName, fipConfigName string) string {
 	return fmt.Sprintf(
 		frontendIPConfigIDTemplate,
 		az.SubscriptionID,
-		az.ResourceGroup,
+		rgName,
 		lbName,
 		fipConfigName)
 }
 
 // returns the full identifier of a loadbalancer backendpool.
-func (az *Cloud) getBackendPoolID(lbName, backendPoolName string) string {
+func (az *Cloud) getBackendPoolID(lbName, rgName, backendPoolName string) string {
 	return fmt.Sprintf(
 		backendPoolIDTemplate,
 		az.SubscriptionID,
-		az.ResourceGroup,
+		rgName,
 		lbName,
 		backendPoolName)
 }
 
 // returns the full identifier of a loadbalancer probe.
-func (az *Cloud) getLoadBalancerProbeID(lbName, lbRuleName string) string {
+func (az *Cloud) getLoadBalancerProbeID(lbName, rgName, lbRuleName string) string {
 	return fmt.Sprintf(
 		loadBalancerProbeIDTemplate,
 		az.SubscriptionID,
-		az.ResourceGroup,
+		rgName,
 		lbName,
 		lbRuleName)
 }
@@ -127,6 +137,9 @@ func (az *Cloud) mapLoadBalancerNameToVMSet(lbName string, clusterName string) (
 // So we'd have a separate name for internal load balancer.
 // This would be the name for Azure LoadBalancer resource.
 func (az *Cloud) getAzureLoadBalancerName(clusterName string, vmSetName string, isInternal bool) string {
+	if az.LoadBalancerName != "" {
+		clusterName = az.LoadBalancerName
+	}
 	lbNamePrefix := vmSetName
 	if strings.EqualFold(vmSetName, az.vmSet.GetPrimaryVMSetName()) || az.useStandardLoadBalancer() {
 		lbNamePrefix = clusterName
@@ -215,20 +228,68 @@ func getPrimaryIPConfig(nic network.Interface) (*network.InterfaceIPConfiguratio
 	return nil, fmt.Errorf("failed to determine the primary ipconfig. nicname=%q", *nic.Name)
 }
 
+// returns first ip configuration on a nic by family
+func getIPConfigByIPFamily(nic network.Interface, IPv6 bool) (*network.InterfaceIPConfiguration, error) {
+	if nic.IPConfigurations == nil {
+		return nil, fmt.Errorf("nic.IPConfigurations for nic (nicname=%q) is nil", *nic.Name)
+	}
+
+	var ipVersion network.IPVersion
+	if IPv6 {
+		ipVersion = network.IPv6
+	} else {
+		ipVersion = network.IPv4
+	}
+	for _, ref := range *nic.IPConfigurations {
+		if ref.PrivateIPAddress != nil && ref.PrivateIPAddressVersion == ipVersion {
+			return &ref, nil
+		}
+	}
+	return nil, fmt.Errorf("failed to determine the ipconfig(IPv6=%v). nicname=%q", IPv6, *nic.Name)
+}
+
 func isInternalLoadBalancer(lb *network.LoadBalancer) bool {
 	return strings.HasSuffix(*lb.Name, InternalLoadBalancerNameSuffix)
 }
 
-func getBackendPoolName(clusterName string) string {
+// getBackendPoolName the LB BackendPool name for a service.
+// to ensure backword and forward compat:
+// SingleStack -v4 (pre v1.16) => BackendPool name == clusterName
+// SingleStack -v6 => BackendPool name == clusterName (all cluster bootstrap uses this name)
+// DualStack
+//	=> IPv4 BackendPool name == clusterName
+//  => IPv6 BackendPool name == <clusterName>-IPv6
+// This means:
+// clusters moving from IPv4 to duakstack will require no changes
+// clusters moving from IPv6 (while not seen in the wild, we can not rule out their existence)
+// to dualstack will require deleting backend pools (the reconciler will take care of creating correct backendpools)
+func getBackendPoolName(ipv6DualStackEnabled bool, clusterName string, service *v1.Service) string {
+	if !ipv6DualStackEnabled {
+		return clusterName
+	}
+	IPv6 := utilnet.IsIPv6String(service.Spec.ClusterIP)
+	if IPv6 {
+		return fmt.Sprintf("%v-IPv6", clusterName)
+	}
+
 	return clusterName
 }
 
-func (az *Cloud) getLoadBalancerRuleName(service *v1.Service, protocol v1.Protocol, port int32, subnetName *string) string {
+func (az *Cloud) getLoadBalancerRuleName(service *v1.Service, protocol v1.Protocol, port int32) string {
 	prefix := az.getRulePrefix(service)
-	if subnetName == nil {
-		return fmt.Sprintf("%s-%s-%d", prefix, protocol, port)
+	ruleName := fmt.Sprintf("%s-%s-%d", prefix, protocol, port)
+	subnet := subnet(service)
+	if subnet == nil {
+		return ruleName
 	}
-	return fmt.Sprintf("%s-%s-%s-%d", prefix, *subnetName, protocol, port)
+
+	// Load balancer rule name must be less or equal to 80 characters, so excluding the hyphen two segments cannot exceed 79
+	subnetSegment := *subnet
+	if len(ruleName)+len(subnetSegment)+1 > loadBalancerRuleNameMaxLength {
+		subnetSegment = subnetSegment[:loadBalancerRuleNameMaxLength-len(ruleName)-1]
+	}
+
+	return fmt.Sprintf("%s-%s-%s-%d", prefix, subnetSegment, protocol, port)
 }
 
 func (az *Cloud) getSecurityRuleName(service *v1.Service, port v1.ServicePort, sourceAddrPrefix string) string {
@@ -266,10 +327,17 @@ func (az *Cloud) serviceOwnsFrontendIP(fip network.FrontendIPConfiguration, serv
 	return strings.HasPrefix(*fip.Name, baseName)
 }
 
-func (az *Cloud) getFrontendIPConfigName(service *v1.Service, subnetName *string) string {
+func (az *Cloud) getFrontendIPConfigName(service *v1.Service) string {
 	baseName := az.GetLoadBalancerName(context.TODO(), "", service)
+	subnetName := subnet(service)
 	if subnetName != nil {
-		return fmt.Sprintf("%s-%s", baseName, *subnetName)
+		ipcName := fmt.Sprintf("%s-%s", baseName, *subnetName)
+
+		// Azure lb front end configuration name must not exceed 80 characters
+		if len(ipcName) > frontendIPConfigNameMaxLength {
+			ipcName = ipcName[:frontendIPConfigNameMaxLength]
+		}
+		return ipcName
 	}
 	return baseName
 }
@@ -323,14 +391,14 @@ func (as *availabilitySet) GetInstanceIDByNodeName(name string) (string, error) 
 	var machine compute.VirtualMachine
 	var err error
 
-	machine, err = as.getVirtualMachine(types.NodeName(name))
+	machine, err = as.getVirtualMachine(types.NodeName(name), cacheReadTypeUnsafe)
 	if err == cloudprovider.InstanceNotFound {
 		return "", cloudprovider.InstanceNotFound
 	}
 	if err != nil {
 		if as.CloudProviderBackoff {
 			klog.V(2).Infof("GetInstanceIDByNodeName(%s) backing off", name)
-			machine, err = as.GetVirtualMachineWithRetry(types.NodeName(name))
+			machine, err = as.GetVirtualMachineWithRetry(types.NodeName(name), cacheReadTypeUnsafe)
 			if err != nil {
 				klog.V(2).Infof("GetInstanceIDByNodeName(%s) abort backoff", name)
 				return "", err
@@ -351,7 +419,7 @@ func (as *availabilitySet) GetInstanceIDByNodeName(name string) (string, error) 
 
 // GetPowerStatusByNodeName returns the power state of the specified node.
 func (as *availabilitySet) GetPowerStatusByNodeName(name string) (powerState string, err error) {
-	vm, err := as.getVirtualMachine(types.NodeName(name))
+	vm, err := as.getVirtualMachine(types.NodeName(name), cacheReadTypeDefault)
 	if err != nil {
 		return powerState, err
 	}
@@ -366,7 +434,9 @@ func (as *availabilitySet) GetPowerStatusByNodeName(name string) (powerState str
 		}
 	}
 
-	return "", fmt.Errorf("failed to get power status for node %q", name)
+	// vm.InstanceView or vm.InstanceView.Statuses are nil when the VM is under deleting.
+	klog.V(3).Infof("InstanceView for node %q is nil, assuming it's stopped", name)
+	return vmPowerStateStopped, nil
 }
 
 // GetNodeNameByProviderID gets the node name by provider ID.
@@ -382,7 +452,7 @@ func (as *availabilitySet) GetNodeNameByProviderID(providerID string) (types.Nod
 
 // GetInstanceTypeByNodeName gets the instance type by node name.
 func (as *availabilitySet) GetInstanceTypeByNodeName(name string) (string, error) {
-	machine, err := as.getVirtualMachine(types.NodeName(name))
+	machine, err := as.getVirtualMachine(types.NodeName(name), cacheReadTypeUnsafe)
 	if err != nil {
 		klog.Errorf("as.GetInstanceTypeByNodeName(%s) failed: as.getVirtualMachine(%s) err=%v", name, name, err)
 		return "", err
@@ -394,7 +464,7 @@ func (as *availabilitySet) GetInstanceTypeByNodeName(name string) (string, error
 // GetZoneByNodeName gets availability zone for the specified node. If the node is not running
 // with availability zone, then it returns fault domain.
 func (as *availabilitySet) GetZoneByNodeName(name string) (cloudprovider.Zone, error) {
-	vm, err := as.getVirtualMachine(types.NodeName(name))
+	vm, err := as.getVirtualMachine(types.NodeName(name), cacheReadTypeUnsafe)
 	if err != nil {
 		return cloudprovider.Zone{}, err
 	}
@@ -408,15 +478,15 @@ func (as *availabilitySet) GetZoneByNodeName(name string) (cloudprovider.Zone, e
 			return cloudprovider.Zone{}, fmt.Errorf("failed to parse zone %q: %v", zones, err)
 		}
 
-		failureDomain = as.makeZone(zoneID)
+		failureDomain = as.makeZone(to.String(vm.Location), zoneID)
 	} else {
 		// Availability zone is not used for the node, falling back to fault domain.
-		failureDomain = strconv.Itoa(int(*vm.VirtualMachineProperties.InstanceView.PlatformFaultDomain))
+		failureDomain = strconv.Itoa(int(to.Int32(vm.VirtualMachineProperties.InstanceView.PlatformFaultDomain)))
 	}
 
 	zone := cloudprovider.Zone{
 		FailureDomain: failureDomain,
-		Region:        *(vm.Location),
+		Region:        to.String(vm.Location),
 	}
 	return zone, nil
 }
@@ -595,7 +665,7 @@ func extractResourceGroupByNicID(nicID string) (string, error) {
 func (as *availabilitySet) getPrimaryInterfaceWithVMSet(nodeName, vmSetName string) (network.Interface, error) {
 	var machine compute.VirtualMachine
 
-	machine, err := as.GetVirtualMachineWithRetry(types.NodeName(nodeName))
+	machine, err := as.GetVirtualMachineWithRetry(types.NodeName(nodeName), cacheReadTypeDefault)
 	if err != nil {
 		klog.V(2).Infof("GetPrimaryInterface(%s, %s) abort backoff", nodeName, vmSetName)
 		return network.Interface{}, err
@@ -637,9 +707,9 @@ func (as *availabilitySet) getPrimaryInterfaceWithVMSet(nodeName, vmSetName stri
 
 	ctx, cancel := getContextWithCancel()
 	defer cancel()
-	nic, err := as.InterfacesClient.Get(ctx, nicResourceGroup, nicName, "")
-	if err != nil {
-		return network.Interface{}, err
+	nic, rerr := as.InterfacesClient.Get(ctx, nicResourceGroup, nicName, "")
+	if rerr != nil {
+		return network.Interface{}, rerr.Error()
 	}
 
 	return nic, nil
@@ -667,9 +737,17 @@ func (as *availabilitySet) EnsureHostInPool(service *v1.Service, nodeName types.
 	}
 
 	var primaryIPConfig *network.InterfaceIPConfiguration
-	primaryIPConfig, err = getPrimaryIPConfig(nic)
-	if err != nil {
-		return err
+	if !as.Cloud.ipv6DualStackEnabled {
+		primaryIPConfig, err = getPrimaryIPConfig(nic)
+		if err != nil {
+			return err
+		}
+	} else {
+		ipv6 := utilnet.IsIPv6String(service.Spec.ClusterIP)
+		primaryIPConfig, err = getIPConfigByIPFamily(nic, ipv6)
+		if err != nil {
+			return err
+		}
 	}
 
 	foundPool := false

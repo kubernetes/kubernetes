@@ -39,4 +39,4 @@ type Snapshottable interface {
 	Restore(string, []byte) error
 }
 
-type AllocatorFactory func(max int, rangeSpec string) Interface
+type AllocatorFactory func(max int, rangeSpec string) (Interface, error)

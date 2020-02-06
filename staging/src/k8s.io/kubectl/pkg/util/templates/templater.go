@@ -44,6 +44,8 @@ func ActsAsRootCommand(cmd *cobra.Command, filters []string, groups ...CommandGr
 		CommandGroups: groups,
 		Filtered:      filters,
 	}
+	cmd.SetFlagErrorFunc(templater.FlagErrorFunc())
+	cmd.SilenceUsage = true
 	cmd.SetUsageFunc(templater.UsageFunc())
 	cmd.SetHelpFunc(templater.HelpFunc())
 	return templater
@@ -64,6 +66,18 @@ type templater struct {
 	RootCmd       *cobra.Command
 	CommandGroups
 	Filtered []string
+}
+
+func (templater *templater) FlagErrorFunc(exposedFlags ...string) func(*cobra.Command, error) error {
+	return func(c *cobra.Command, err error) error {
+		c.SilenceUsage = true
+		switch c.CalledAs() {
+		case "options":
+			return fmt.Errorf("%s\nRun '%s' without flags.", err, c.CommandPath())
+		default:
+			return fmt.Errorf("%s\nSee '%s --help' for usage.", err, c.CommandPath())
+		}
+	}
 }
 
 func (templater *templater) ExposeFlags(cmd *cobra.Command, flags ...string) FlagExposer {

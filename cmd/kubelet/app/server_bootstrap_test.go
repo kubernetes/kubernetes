@@ -34,16 +34,14 @@ import (
 	"testing"
 	"time"
 
-	cfsslconfig "github.com/cloudflare/cfssl/config"
-	cfsslsigner "github.com/cloudflare/cfssl/signer"
-	cfssllocal "github.com/cloudflare/cfssl/signer/local"
-
 	certapi "k8s.io/api/certificates/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	restclient "k8s.io/client-go/rest"
 	certutil "k8s.io/client-go/util/cert"
+	capihelper "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
+	"k8s.io/kubernetes/pkg/controller/certificates/authority"
 )
 
 // Test_buildClientCertificateManager validates that we can build a local client cert
@@ -93,7 +91,7 @@ func Test_buildClientCertificateManager(t *testing.T) {
 
 	// get an expired CSR (simulating historical output)
 	server.backdate = 2 * time.Hour
-	server.expectUserAgent = "FirstClient"
+	server.SetExpectUserAgent("FirstClient")
 	ok, err := r.RotateCerts()
 	if !ok || err != nil {
 		t.Fatalf("unexpected rotation err: %t %v", ok, err)
@@ -109,7 +107,7 @@ func Test_buildClientCertificateManager(t *testing.T) {
 	// if m.Current() == nil, then we try again and get a valid
 	// client
 	server.backdate = 0
-	server.expectUserAgent = "FirstClient"
+	server.SetExpectUserAgent("FirstClient")
 	if ok, err := r.RotateCerts(); !ok || err != nil {
 		t.Fatalf("unexpected rotation err: %t %v", ok, err)
 	}
@@ -122,7 +120,7 @@ func Test_buildClientCertificateManager(t *testing.T) {
 	}
 
 	// if m.Current() != nil, then we should use the second client
-	server.expectUserAgent = "SecondClient"
+	server.SetExpectUserAgent("SecondClient")
 	if ok, err := r.RotateCerts(); !ok || err != nil {
 		t.Fatalf("unexpected rotation err: %t %v", ok, err)
 	}
@@ -243,10 +241,22 @@ type csrSimulator struct {
 	serverCA         *x509.Certificate
 	backdate         time.Duration
 
+	userAgentLock   sync.Mutex
 	expectUserAgent string
 
 	lock sync.Mutex
 	csr  *certapi.CertificateSigningRequest
+}
+
+func (s *csrSimulator) SetExpectUserAgent(a string) {
+	s.userAgentLock.Lock()
+	defer s.userAgentLock.Unlock()
+	s.expectUserAgent = a
+}
+func (s *csrSimulator) ExpectUserAgent() string {
+	s.userAgentLock.Lock()
+	defer s.userAgentLock.Unlock()
+	return s.expectUserAgent
 }
 
 func (s *csrSimulator) ServeHTTP(w http.ResponseWriter, req *http.Request) {
@@ -258,11 +268,12 @@ func (s *csrSimulator) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	q := req.URL.Query()
 	q.Del("timeout")
 	q.Del("timeoutSeconds")
+	q.Del("allowWatchBookmarks")
 	req.URL.RawQuery = q.Encode()
 
 	t.Logf("Request %q %q %q", req.Method, req.URL, req.UserAgent())
 
-	if len(s.expectUserAgent) > 0 && req.UserAgent() != s.expectUserAgent {
+	if a := s.ExpectUserAgent(); len(a) > 0 && req.UserAgent() != a {
 		t.Errorf("Unexpected user agent: %s", req.UserAgent())
 	}
 
@@ -284,28 +295,22 @@ func (s *csrSimulator) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 		csr = csr.DeepCopy()
 		csr.ResourceVersion = "2"
-		var usages []string
-		for _, usage := range csr.Spec.Usages {
-			usages = append(usages, string(usage))
+		ca := &authority.CertificateAuthority{
+			Certificate: s.serverCA,
+			PrivateKey:  s.serverPrivateKey,
+			Backdate:    s.backdate,
 		}
-		policy := &cfsslconfig.Signing{
-			Default: &cfsslconfig.SigningProfile{
-				Usage:        usages,
-				Expiry:       time.Hour,
-				ExpiryString: time.Hour.String(),
-				Backdate:     s.backdate,
-			},
-		}
-		cfs, err := cfssllocal.NewSigner(s.serverPrivateKey, s.serverCA, cfsslsigner.DefaultSigAlgo(s.serverPrivateKey), policy)
+		cr, err := capihelper.ParseCSR(csr)
 		if err != nil {
 			t.Fatal(err)
 		}
-		csr.Status.Certificate, err = cfs.Sign(cfsslsigner.SignRequest{
-			Request: string(csr.Spec.Request),
+		der, err := ca.Sign(cr.Raw, authority.PermissiveSigningPolicy{
+			TTL: time.Hour,
 		})
 		if err != nil {
 			t.Fatal(err)
 		}
+		csr.Status.Certificate = pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der})
 		csr.Status.Conditions = []certapi.CertificateSigningRequestCondition{
 			{Type: certapi.CertificateApproved},
 		}

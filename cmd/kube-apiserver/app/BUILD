@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
@@ -30,13 +30,11 @@ go_library(
         "//pkg/registry/rbac/rest:go_default_library",
         "//pkg/serviceaccount:go_default_library",
         "//pkg/util/flag:go_default_library",
-        "//pkg/util/workqueue/prometheus:go_default_library",
-        "//pkg/version:go_default_library",
-        "//pkg/version/verflag:go_default_library",
         "//plugin/pkg/auth/authenticator/token/bootstrap:go_default_library",
+        "//staging/src/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1:go_default_library",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1:go_default_library",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/apiserver:go_default_library",
-        "//staging/src/k8s.io/apiextensions-apiserver/pkg/client/informers/internalversion:go_default_library",
+        "//staging/src/k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions:go_default_library",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/cmd/server/options:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
@@ -66,13 +64,17 @@ go_library(
         "//staging/src/k8s.io/cloud-provider:go_default_library",
         "//staging/src/k8s.io/component-base/cli/flag:go_default_library",
         "//staging/src/k8s.io/component-base/cli/globalflag:go_default_library",
-        "//staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration:go_default_library",
+        "//staging/src/k8s.io/component-base/metrics:go_default_library",
+        "//staging/src/k8s.io/component-base/metrics/prometheus/workqueue:go_default_library",
+        "//staging/src/k8s.io/component-base/version:go_default_library",
+        "//staging/src/k8s.io/component-base/version/verflag:go_default_library",
         "//staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1:go_default_library",
+        "//staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1/helper:go_default_library",
         "//staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1:go_default_library",
         "//staging/src/k8s.io/kube-aggregator/pkg/apiserver:go_default_library",
         "//staging/src/k8s.io/kube-aggregator/pkg/apiserver/scheme:go_default_library",
-        "//staging/src/k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset/typed/apiregistration/internalversion:go_default_library",
-        "//staging/src/k8s.io/kube-aggregator/pkg/client/informers/internalversion/apiregistration/internalversion:go_default_library",
+        "//staging/src/k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1:go_default_library",
+        "//staging/src/k8s.io/kube-aggregator/pkg/client/informers/externalversions/apiregistration/v1:go_default_library",
         "//staging/src/k8s.io/kube-aggregator/pkg/controllers/autoregister:go_default_library",
         "//vendor/github.com/go-openapi/spec:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
@@ -96,4 +98,10 @@ filegroup(
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["server_test.go"],
+    embed = [":go_default_library"],
 )

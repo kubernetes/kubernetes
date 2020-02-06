@@ -23,9 +23,10 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/pborman/uuid"
+	"github.com/google/uuid"
 	"k8s.io/klog"
 
+	authnv1 "k8s.io/api/authentication/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -57,7 +58,7 @@ func NewEventFromRequest(req *http.Request, level auditinternal.Level, attribs a
 	if ids != "" {
 		ev.AuditID = types.UID(ids)
 	} else {
-		ev.AuditID = types.UID(uuid.NewRandom().String())
+		ev.AuditID = types.UID(uuid.New().String())
 	}
 
 	ips := utilnet.SourceIPs(req)
@@ -68,9 +69,9 @@ func NewEventFromRequest(req *http.Request, level auditinternal.Level, attribs a
 
 	if user := attribs.GetUser(); user != nil {
 		ev.User.Username = user.GetName()
-		ev.User.Extra = map[string]auditinternal.ExtraValue{}
+		ev.User.Extra = map[string]authnv1.ExtraValue{}
 		for k, v := range user.GetExtra() {
-			ev.User.Extra[k] = auditinternal.ExtraValue(v)
+			ev.User.Extra[k] = authnv1.ExtraValue(v)
 		}
 		ev.User.Groups = user.GetGroups()
 		ev.User.UID = user.GetUID()
@@ -95,14 +96,14 @@ func LogImpersonatedUser(ae *auditinternal.Event, user user.Info) {
 	if ae == nil || ae.Level.Less(auditinternal.LevelMetadata) {
 		return
 	}
-	ae.ImpersonatedUser = &auditinternal.UserInfo{
+	ae.ImpersonatedUser = &authnv1.UserInfo{
 		Username: user.GetName(),
 	}
 	ae.ImpersonatedUser.Groups = user.GetGroups()
 	ae.ImpersonatedUser.UID = user.GetUID()
-	ae.ImpersonatedUser.Extra = map[string]auditinternal.ExtraValue{}
+	ae.ImpersonatedUser.Extra = map[string]authnv1.ExtraValue{}
 	for k, v := range user.GetExtra() {
-		ae.ImpersonatedUser.Extra[k] = auditinternal.ExtraValue(v)
+		ae.ImpersonatedUser.Extra[k] = authnv1.ExtraValue(v)
 	}
 }
 
@@ -228,16 +229,6 @@ func LogAnnotation(ae *auditinternal.Event, key, value string) {
 		return
 	}
 	ae.Annotations[key] = value
-}
-
-// LogAnnotations fills in the Annotations according to the annotations map.
-func LogAnnotations(ae *auditinternal.Event, annotations map[string]string) {
-	if ae == nil || ae.Level.Less(auditinternal.LevelMetadata) {
-		return
-	}
-	for key, value := range annotations {
-		LogAnnotation(ae, key, value)
-	}
 }
 
 // truncate User-Agent if too long, otherwise return it directly.
