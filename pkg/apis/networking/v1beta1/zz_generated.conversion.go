@@ -26,6 +26,7 @@ import (
 	v1beta1 "k8s.io/api/networking/v1beta1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	networking "k8s.io/kubernetes/pkg/apis/networking"
 )
 
@@ -241,7 +242,17 @@ func Convert_networking_IngressBackend_To_v1beta1_IngressBackend(in *networking.
 
 func autoConvert_v1beta1_IngressList_To_networking_IngressList(in *v1beta1.IngressList, out *networking.IngressList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]networking.Ingress)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]networking.Ingress, len(*in))
+		for i := range *in {
+			if err := Convert_v1beta1_Ingress_To_networking_Ingress(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -252,7 +263,17 @@ func Convert_v1beta1_IngressList_To_networking_IngressList(in *v1beta1.IngressLi
 
 func autoConvert_networking_IngressList_To_v1beta1_IngressList(in *networking.IngressList, out *v1beta1.IngressList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]v1beta1.Ingress)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]v1beta1.Ingress, len(*in))
+		for i := range *in {
+			if err := Convert_networking_Ingress_To_v1beta1_Ingress(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -332,8 +353,7 @@ func Convert_networking_IngressSpec_To_v1beta1_IngressSpec(in *networking.Ingres
 }
 
 func autoConvert_v1beta1_IngressStatus_To_networking_IngressStatus(in *v1beta1.IngressStatus, out *networking.IngressStatus, s conversion.Scope) error {
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.LoadBalancer, &out.LoadBalancer, 0); err != nil {
+	if err := v1.Convert_v1_LoadBalancerStatus_To_core_LoadBalancerStatus(&in.LoadBalancer, &out.LoadBalancer, s); err != nil {
 		return err
 	}
 	return nil
@@ -345,8 +365,7 @@ func Convert_v1beta1_IngressStatus_To_networking_IngressStatus(in *v1beta1.Ingre
 }
 
 func autoConvert_networking_IngressStatus_To_v1beta1_IngressStatus(in *networking.IngressStatus, out *v1beta1.IngressStatus, s conversion.Scope) error {
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.LoadBalancer, &out.LoadBalancer, 0); err != nil {
+	if err := v1.Convert_core_LoadBalancerStatus_To_v1_LoadBalancerStatus(&in.LoadBalancer, &out.LoadBalancer, s); err != nil {
 		return err
 	}
 	return nil
