@@ -65,8 +65,9 @@ const (
 	// AffinityTypeClientIP - affinity based on Client IP.
 	gceAffinityTypeClientIP = "CLIENT_IP"
 
-	operationPollInterval        = time.Second
-	maxTargetPoolCreateInstances = 200
+	operationPollInterval           = time.Second
+	maxTargetPoolCreateInstances    = 200
+	maxInstancesPerTargetPoolUpdate = 1000
 
 	// HTTP Load Balancer parameters
 	// Configure 8 second period for external health checks.
