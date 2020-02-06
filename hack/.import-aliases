@@ -57,5 +57,6 @@
   "k8s.io/kubernetes/test/e2e/framework/pod": "e2epod",
   "k8s.io/kubernetes/test/e2e/framework/resource": "e2eresource",
   "k8s.io/kubernetes/test/e2e/framework/service": "e2eservice",
+  "k8s.io/kubernetes/test/e2e/framework/skipper": "e2eskipper",
   "k8s.io/kubernetes/test/e2e/framework/ssh": "e2essh"
 }
