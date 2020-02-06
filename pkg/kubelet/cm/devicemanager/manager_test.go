@@ -728,7 +728,7 @@ func TestPodContainerDeviceAllocation(t *testing.T) {
 		pod := testCase.testPod
 		activePods = append(activePods, pod)
 		podsStub.updateActivePods(activePods)
-		err := testManager.Allocate(pod)
+		err := testManager.Allocate(pod, &pod.Spec.Containers[0])
 		if !reflect.DeepEqual(err, testCase.expErr) {
 			t.Errorf("DevicePluginManager error (%v). expected error: %v but got: %v",
 				testCase.description, testCase.expErr, err)
@@ -823,7 +823,12 @@ func TestInitContainerDeviceAllocation(t *testing.T) {
 		},
 	}
 	podsStub.updateActivePods([]*v1.Pod{podWithPluginResourcesInInitContainers})
-	err = testManager.Allocate(podWithPluginResourcesInInitContainers)
+	for _, container := range podWithPluginResourcesInInitContainers.Spec.InitContainers {
+		err = testManager.Allocate(podWithPluginResourcesInInitContainers, &container)
+	}
+	for _, container := range podWithPluginResourcesInInitContainers.Spec.Containers {
+		err = testManager.Allocate(podWithPluginResourcesInInitContainers, &container)
+	}
 	as.Nil(err)
 	podUID := string(podWithPluginResourcesInInitContainers.UID)
 	initCont1 := podWithPluginResourcesInInitContainers.Spec.InitContainers[0].Name
@@ -929,7 +934,7 @@ func TestDevicePreStartContainer(t *testing.T) {
 	activePods := []*v1.Pod{}
 	activePods = append(activePods, pod)
 	podsStub.updateActivePods(activePods)
-	err = testManager.Allocate(pod)
+	err = testManager.Allocate(pod, &pod.Spec.Containers[0])
 	as.Nil(err)
 	runContainerOpts, err := testManager.GetDeviceRunContainerOptions(pod, &pod.Spec.Containers[0])
 	as.Nil(err)
