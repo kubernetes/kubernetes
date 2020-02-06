@@ -48,22 +48,15 @@ func GetPodFullName(pod *v1.Pod) string {
 	return pod.Name + "_" + pod.Namespace
 }
 
-// GetPodStartTime returns start time of the given pod.
+// GetPodStartTime returns start time of the given pod or current timestamp
+// if it hasn't started yet.
 func GetPodStartTime(pod *v1.Pod) *metav1.Time {
 	if pod.Status.StartTime != nil {
 		return pod.Status.StartTime
 	}
-	// Should not reach here as the start time of a running time should not be nil
-	// Return current timestamp as the default value.
-	// This will not affect the calculation of earliest timestamp of all the pods on one node,
-	// because current timestamp is always after the StartTime of any pod in good state.
-	klog.Errorf("pod.Status.StartTime is nil for pod %s. Should not reach here.", pod.Name)
+	// Assumed pods and bound pods that haven't started don't have a StartTime yet.
 	return &metav1.Time{Time: time.Now()}
 }
-
-// lessFunc is a function that receives two items and returns true if the first
-// item should be placed before the second one when the list is sorted.
-type lessFunc = func(item1, item2 interface{}) bool
 
 // GetEarliestPodStartTime returns the earliest start time of all pods that
 // have the highest priority among all victims.
