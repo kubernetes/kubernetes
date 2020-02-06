@@ -79,3 +79,11 @@ func SetAffinity(nodeSelection *NodeSelection, nodeName string) {
 func SetAntiAffinity(nodeSelection *NodeSelection, nodeName string) {
 	setNodeAffinityRequirement(nodeSelection, v1.NodeSelectorOpNotIn, nodeName)
 }
+
+// SetNodeAffinity modifies the given pod object with
+// NodeAffinity to the given node name.
+func SetNodeAffinity(pod *v1.Pod, nodeName string) {
+	nodeSelection := &NodeSelection{}
+	SetAffinity(nodeSelection, nodeName)
+	pod.Spec.Affinity = nodeSelection.Affinity
+}
