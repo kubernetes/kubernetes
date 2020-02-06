@@ -60,16 +60,13 @@ func GetPodPriority(pod *v1.Pod) int32 {
 	return scheduling.DefaultPriorityWhenNoDefaultClassExists
 }
 
-// GetPodStartTime returns start time of the given pod.
+// GetPodStartTime returns start time of the given pod or current timestamp
+// if it hasn't started yet.
 func GetPodStartTime(pod *v1.Pod) *metav1.Time {
 	if pod.Status.StartTime != nil {
 		return pod.Status.StartTime
 	}
-	// Should not reach here as the start time of a running time should not be nil
-	// Return current timestamp as the default value.
-	// This will not affect the calculation of earliest timestamp of all the pods on one node,
-	// because current timestamp is always after the StartTime of any pod in good state.
-	klog.Errorf("pod.Status.StartTime is nil for pod %s. Should not reach here.", pod.Name)
+	// Assumed pods and bound pods that haven't started don't have a StartTime yet.
 	return &metav1.Time{Time: time.Now()}
 }
 
