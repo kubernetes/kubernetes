@@ -409,13 +409,28 @@ func BenchmarkNewObject(b *testing.B) {
 					APIVersion: "v1",
 				},
 			})
-
+			appliedObj := &unstructured.Unstructured{Object: map[string]interface{}{}}
+			if err := yaml.Unmarshal(test.obj, &appliedObj.Object); err != nil {
+				b.Fatalf("Failed to parse yaml object: %v", err)
+			}
 			b.Run("Update", func(b *testing.B) {
 				b.ReportAllocs()
 				b.ResetTimer()
 				for n := 0; n < b.N; n++ {
-					err := f.Update(newObj, "fieldmanager_test")
-					if err != nil {
+					if err := f.Update(newObj, "fieldmanager_test"); err != nil {
+						b.Fatal(err)
+					}
+					f.Reset()
+				}
+			})
+			b.Run("UpdateTwice", func(b *testing.B) {
+				b.ReportAllocs()
+				b.ResetTimer()
+				for n := 0; n < b.N; n++ {
+					if err := f.Update(newObj, "fieldmanager_test"); err != nil {
+						b.Fatal(err)
+					}
+					if err := f.Update(newObj, "fieldmanager_test_2"); err != nil {
 						b.Fatal(err)
 					}
 					f.Reset()
@@ -425,12 +440,20 @@ func BenchmarkNewObject(b *testing.B) {
 				b.ReportAllocs()
 				b.ResetTimer()
 				for n := 0; n < b.N; n++ {
-					appliedObj := &unstructured.Unstructured{Object: map[string]interface{}{}}
-					if err := yaml.Unmarshal(test.obj, &appliedObj.Object); err != nil {
-						b.Fatalf("error decoding YAML: %v", err)
+					if err := f.Apply(appliedObj, "fieldmanager_test", false); err != nil {
+						b.Fatal(err)
 					}
-					err := f.Apply(appliedObj, "fieldmanager_test", false)
-					if err != nil {
+					f.Reset()
+				}
+			})
+			b.Run("UpdateApply", func(b *testing.B) {
+				b.ReportAllocs()
+				b.ResetTimer()
+				for n := 0; n < b.N; n++ {
+					if err := f.Update(newObj, "fieldmanager_test"); err != nil {
+						b.Fatal(err)
+					}
+					if err := f.Apply(appliedObj, "fieldmanager_test", false); err != nil {
 						b.Fatal(err)
 					}
 					f.Reset()
