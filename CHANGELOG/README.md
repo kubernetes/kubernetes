@@ -1,15 +1,7 @@
 # CHANGELOGs
 
-## Development release
-
 - [CHANGELOG-1.18.md](./CHANGELOG-1.18.md)
-
-## Current release
-
 - [CHANGELOG-1.17.md](./CHANGELOG-1.17.md)
-
-## Older releases
-
 - [CHANGELOG-1.16.md](./CHANGELOG-1.16.md)
 - [CHANGELOG-1.15.md](./CHANGELOG-1.15.md)
 - [CHANGELOG-1.14.md](./CHANGELOG-1.14.md)
