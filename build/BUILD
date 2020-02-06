@@ -1,6 +1,7 @@
 package(default_visibility = ["//visibility:public"])
 
 load("@io_k8s_repo_infra//defs:build.bzl", "release_filegroup")
+load("@io_k8s_repo_infra//defs:pkg.bzl", "pkg_tar")
 load(":code_generation_test.bzl", "code_generation_test_suite")
 load(":container.bzl", "multi_arch_container", "multi_arch_container_push")
 load(":platforms.bzl", "SERVER_PLATFORMS", "for_platforms")
@@ -46,6 +47,14 @@ DOCKERIZED_BINARIES = {
     },
 }
 
+[pkg_tar(
+    name = "%s-data-%s.tar" % (binary, arch),
+    srcs = select({"@io_bazel_rules_go//go/platform:" + arch: ["//cmd/" + binary]}),
+    mode = "0755",
+    package_dir = "/usr/bin",
+    visibility = ["//visibility:private"],
+) for binary in DOCKERIZED_BINARIES.keys() for arch in SERVER_PLATFORMS["linux"]]
+
 # When pushing to gcr.io, we want to use an arch, since the archless name is now used for a
 # manifest list. Bazel doesn't support manifest lists (yet), so we can't do that either.
 [multi_arch_container(
@@ -64,6 +73,10 @@ DOCKERIZED_BINARIES = {
         "/usr/local/bin/" + binary: "/usr/bin/" + binary,
     },
     tags = ["manual"],
+    tars = select(for_platforms(
+        for_server = [":%s-data-{ARCH}.tar" % binary],
+        only_os = "linux",
+    )),
     visibility = ["//visibility:private"],
 ) for binary, meta in DOCKERIZED_BINARIES.items()]
 
