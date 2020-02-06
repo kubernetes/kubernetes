@@ -3,6 +3,7 @@
 reviewers:
   - bentheelder
   - eparis
+  - justaugustus
   - Katharine
   - mikedanese
   - zmerlynn
@@ -18,3 +19,4 @@ emeritus_approvers:
   - jbeda
 labels:
 - sig/cluster-lifecycle
+- area/release-eng
