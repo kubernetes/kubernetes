@@ -987,7 +987,8 @@ func makeLocalPodWithNodeName(config *localTestConfig, volume *localTestVolume, 
 	if pod == nil {
 		return
 	}
-	pod.Spec.NodeName = nodeName
+	// Use NodeSelector instead of NodeName so that the pod runs through the scheduler
+	pod.Spec.NodeSelector = map[string]string{v1.LabelHostname: nodeName}
 	return
 }
 

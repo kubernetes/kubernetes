@@ -150,11 +150,9 @@ func (s *subPathTestSuite) DefineTests(driver TestDriver, pattern testpatterns.T
 
 		subPath := f.Namespace.Name
 		l.pod = SubpathTestPod(f, subPath, string(volType), l.resource.VolSource, true)
-		l.pod.Spec.NodeName = l.config.ClientNodeName
 		l.pod.Spec.NodeSelector = l.config.ClientNodeSelector
 
 		l.formatPod = volumeFormatPod(f, l.resource.VolSource)
-		l.formatPod.Spec.NodeName = l.config.ClientNodeName
 		l.formatPod.Spec.NodeSelector = l.config.ClientNodeSelector
 
 		l.subPathDir = filepath.Join(volumePath, subPath)

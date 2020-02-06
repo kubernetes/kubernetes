@@ -177,9 +177,9 @@ var _ = utils.SIGDescribe("Flexvolumes", func() {
 		node, err = e2enode.GetRandomReadySchedulableNode(f.ClientSet)
 		framework.ExpectNoError(err)
 		config = volume.TestConfig{
-			Namespace:      ns.Name,
-			Prefix:         "flex",
-			ClientNodeName: node.Name,
+			Namespace:    ns.Name,
+			Prefix:       "flex",
+			NodeSelector: map[string]string{v1.LabelHostname: node.Name},
 		}
 		suffix = ns.Name
 	})

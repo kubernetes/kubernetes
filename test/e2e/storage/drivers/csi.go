@@ -174,10 +174,10 @@ func (h *hostpathCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.Per
 	node, err := e2enode.GetRandomReadySchedulableNode(cs)
 	framework.ExpectNoError(err)
 	config := &testsuites.PerTestConfig{
-		Driver:         h,
-		Prefix:         "hostpath",
-		Framework:      f,
-		ClientNodeName: node.Name,
+		Driver:             h,
+		Prefix:             "hostpath",
+		Framework:          f,
+		ClientNodeSelector: map[string]string{v1.LabelHostname: node.Name},
 	}
 
 	o := utils.PatchCSIOptions{
@@ -298,10 +298,10 @@ func (m *mockCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTest
 	node, err := e2enode.GetRandomReadySchedulableNode(cs)
 	framework.ExpectNoError(err)
 	config := &testsuites.PerTestConfig{
-		Driver:         m,
-		Prefix:         "mock",
-		Framework:      f,
-		ClientNodeName: node.Name,
+		Driver:             m,
+		Prefix:             "mock",
+		Framework:          f,
+		ClientNodeSelector: map[string]string{v1.LabelHostname: node.Name},
 	}
 
 	containerArgs := []string{"--name=csi-mock-" + f.UniqueName}
@@ -323,7 +323,7 @@ func (m *mockCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTest
 		DriverContainerName:      "mock",
 		DriverContainerArguments: containerArgs,
 		ProvisionerContainerName: "csi-provisioner",
-		NodeName:                 config.ClientNodeName,
+		NodeName:                 node.Name,
 		PodInfo:                  m.podInfo,
 		CanAttach:                &m.attachable,
 		VolumeLifecycleModes: &[]storagev1beta1.VolumeLifecycleMode{

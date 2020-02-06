@@ -23,7 +23,6 @@ import (
 // NodeSelection specifies where to run a pod, using a combination of fixed node name,
 // node selector and/or affinity.
 type NodeSelection struct {
-	Name     string
 	Selector map[string]string
 	Affinity *v1.Affinity
 }

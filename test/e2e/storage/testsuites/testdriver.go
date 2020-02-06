@@ -205,11 +205,6 @@ type PerTestConfig struct {
 	// The framework instance allocated for the current test.
 	Framework *framework.Framework
 
-	// If non-empty, then pods using a volume will be scheduled
-	// onto the node with this name. Otherwise Kubernetes will
-	// pick a node.
-	ClientNodeName string
-
 	// Some tests also support scheduling pods onto nodes with
 	// these label/value pairs. As not all tests use this field,
 	// a driver that absolutely needs the pods on a specific

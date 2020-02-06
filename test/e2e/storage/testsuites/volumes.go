@@ -246,7 +246,6 @@ func testScriptInPod(
 			},
 			RestartPolicy: v1.RestartPolicyNever,
 			NodeSelector:  config.ClientNodeSelector,
-			NodeName:      config.ClientNodeName,
 		},
 	}
 	ginkgo.By(fmt.Sprintf("Creating pod %s", pod.Name))

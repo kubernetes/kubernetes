@@ -129,8 +129,6 @@ type TestConfig struct {
 	WaitForCompletion bool
 	// ServerNodeName is the spec.nodeName to run server pod on.  Default is any node.
 	ServerNodeName string
-	// ClientNodeName is the spec.nodeName to run client pod on.  Default is any node.
-	ClientNodeName string
 	// NodeSelector to use in pod spec (server, client and injector pods).
 	NodeSelector map[string]string
 }
@@ -388,7 +386,6 @@ func runVolumeTesterPod(client clientset.Interface, config TestConfig, podSuffix
 			TerminationGracePeriodSeconds: &gracePeriod,
 			SecurityContext:               GeneratePodSecurityContext(fsGroup, seLinuxOptions),
 			Volumes:                       []v1.Volume{},
-			NodeName:                      config.ClientNodeName,
 			NodeSelector:                  config.NodeSelector,
 		},
 	}

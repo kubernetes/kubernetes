@@ -237,7 +237,6 @@ func makePodSpec(config volume.TestConfig, initCmd string, volsrc v1.VolumeSourc
 				},
 			},
 			RestartPolicy: v1.RestartPolicyNever, // want pod to fail if init container fails
-			NodeName:      config.ClientNodeName,
 			NodeSelector:  config.NodeSelector,
 		},
 	}

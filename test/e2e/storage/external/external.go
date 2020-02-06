@@ -22,6 +22,7 @@ import (
 
 	"github.com/pkg/errors"
 
+	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -329,10 +330,10 @@ func (d *driverDefinition) GetCSIDriverName(config *testsuites.PerTestConfig) st
 
 func (d *driverDefinition) PrepareTest(f *framework.Framework) (*testsuites.PerTestConfig, func()) {
 	config := &testsuites.PerTestConfig{
-		Driver:         d,
-		Prefix:         "external",
-		Framework:      f,
-		ClientNodeName: d.ClientNodeName,
+		Driver:             d,
+		Prefix:             "external",
+		Framework:          f,
+		ClientNodeSelector: map[string]string{v1.LabelHostname: d.ClientNodeName},
 	}
 	return config, func() {}
 }

@@ -441,7 +441,7 @@ func (i *iSCSIDriver) CreateVolume(config *testsuites.PerTestConfig, volType tes
 
 	c, serverPod, serverIP, iqn := newISCSIServer(cs, ns.Name)
 	config.ServerConfig = &c
-	config.ClientNodeName = c.ClientNodeName
+	config.ClientNodeSelector = c.NodeSelector
 	return &iSCSIVolume{
 		serverPod: serverPod,
 		serverIP:  serverIP,
@@ -472,7 +472,7 @@ func newISCSIServer(cs clientset.Interface, namespace string) (config volume.Tes
 	}
 	pod, ip = volume.CreateStorageServer(cs, config)
 	// Make sure the client runs on the same node as server so we don't need to open any firewalls.
-	config.ClientNodeName = pod.Spec.NodeName
+	config.NodeSelector = map[string]string{v1.LabelHostname: pod.Spec.NodeName}
 	return config, pod, ip, iqn
 }
 
@@ -819,7 +819,7 @@ func (h *hostPathDriver) CreateVolume(config *testsuites.PerTestConfig, volType 
 	// pods should be scheduled on the node
 	node, err := e2enode.GetRandomReadySchedulableNode(cs)
 	framework.ExpectNoError(err)
-	config.ClientNodeName = node.Name
+	config.ClientNodeSelector = map[string]string{v1.LabelHostname: node.Name}
 	return nil
 }
 
@@ -901,7 +901,7 @@ func (h *hostPathSymlinkDriver) CreateVolume(config *testsuites.PerTestConfig, v
 	// pods should be scheduled on the node
 	node, err := e2enode.GetRandomReadySchedulableNode(cs)
 	framework.ExpectNoError(err)
-	config.ClientNodeName = node.Name
+	config.ClientNodeSelector = map[string]string{v1.LabelHostname: node.Name}
 
 	cmd := fmt.Sprintf("mkdir %v -m 777 && ln -s %v %v", sourcePath, sourcePath, targetPath)
 	privileged := true
@@ -1857,10 +1857,10 @@ func (l *localDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestCo
 	}
 
 	return &testsuites.PerTestConfig{
-			Driver:         l,
-			Prefix:         "local",
-			Framework:      f,
-			ClientNodeName: l.node.Name,
+			Driver:             l,
+			Prefix:             "local",
+			Framework:          f,
+			ClientNodeSelector: map[string]string{v1.LabelHostname: l.node.Name},
 		}, func() {
 			l.hostExec.Cleanup()
 		}
@@ -1871,7 +1871,7 @@ func (l *localDriver) CreateVolume(config *testsuites.PerTestConfig, volType tes
 	case testpatterns.PreprovisionedPV:
 		node := l.node
 		// assign this to schedule pod on this node
-		config.ClientNodeName = node.Name
+		config.ClientNodeSelector = map[string]string{v1.LabelHostname: node.Name}
 		return &localVolume{
 			ltrMgr: l.ltrMgr,
 			ltr:    l.ltrMgr.Create(node, l.volumeType, nil),

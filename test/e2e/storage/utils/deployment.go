@@ -98,7 +98,10 @@ func PatchCSIDeployment(f *framework.Framework, o PatchCSIOptions, object interf
 		patchContainers(spec.Containers)
 		patchVolumes(spec.Volumes)
 		if o.NodeName != "" {
-			spec.NodeName = o.NodeName
+			// Don't directly set NodeName because it bypasses the scheduler and can
+			// cause kubelet to immediately Fail the pod if there's no space on the
+			// node.
+			spec.NodeSelector = map[string]string{v1.LabelHostname: o.NodeName}
 		}
 	}
 

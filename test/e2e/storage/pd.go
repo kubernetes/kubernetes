@@ -550,8 +550,8 @@ func testPDPod(diskNames []string, targetNode types.NodeName, readOnly bool, num
 			Name: "pd-test-" + string(uuid.NewUUID()),
 		},
 		Spec: v1.PodSpec{
-			Containers: containers,
-			NodeName:   string(targetNode),
+			Containers:   containers,
+			NodeSelector: map[string]string{v1.LabelHostname: string(targetNode)},
 		},
 	}
 

@@ -100,7 +100,7 @@ func (p *ephemeralTestSuite) DefineTests(driver TestDriver, pattern testpatterns
 			Client:     l.config.Framework.ClientSet,
 			Namespace:  f.Namespace.Name,
 			DriverName: eDriver.GetCSIDriverName(l.config),
-			Node:       e2epod.NodeSelection{Name: l.config.ClientNodeName},
+			Node:       e2epod.NodeSelection{Selector: l.config.ClientNodeSelector},
 			GetVolume: func(volumeNumber int) (map[string]string, bool, bool) {
 				return eDriver.GetVolume(l.config, volumeNumber)
 			},
@@ -290,7 +290,6 @@ func StartInPodWithInlineVolume(c clientset.Interface, ns, podName, command stri
 			},
 		},
 		Spec: v1.PodSpec{
-			NodeName:     node.Name,
 			NodeSelector: node.Selector,
 			Affinity:     node.Affinity,
 			Containers: []v1.Container{

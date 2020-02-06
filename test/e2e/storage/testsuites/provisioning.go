@@ -181,7 +181,7 @@ func (p *provisioningTestSuite) DefineTests(driver TestDriver, pattern testpatte
 
 		l.testCase.Class.MountOptions = dInfo.SupportedMountOption.Union(dInfo.RequiredMountOption).List()
 		l.testCase.PvCheck = func(claim *v1.PersistentVolumeClaim) {
-			PVWriteReadSingleNodeCheck(l.cs, claim, e2epod.NodeSelection{Name: l.config.ClientNodeName})
+			PVWriteReadSingleNodeCheck(l.cs, claim, e2epod.NodeSelection{Selector: l.config.ClientNodeSelector})
 		}
 		l.testCase.TestDynamicProvisioning()
 	})
@@ -201,14 +201,14 @@ func (p *provisioningTestSuite) DefineTests(driver TestDriver, pattern testpatte
 
 		dc := l.config.Framework.DynamicClient
 		vsc := sDriver.GetSnapshotClass(l.config)
-		dataSource, cleanupFunc := prepareSnapshotDataSourceForProvisioning(e2epod.NodeSelection{Name: l.config.ClientNodeName}, l.cs, dc, l.pvc, l.sc, vsc)
+		dataSource, cleanupFunc := prepareSnapshotDataSourceForProvisioning(e2epod.NodeSelection{Selector: l.config.ClientNodeSelector}, l.cs, dc, l.pvc, l.sc, vsc)
 		defer cleanupFunc()
 
 		l.pvc.Spec.DataSource = dataSource
 		l.testCase.PvCheck = func(claim *v1.PersistentVolumeClaim) {
 			ginkgo.By("checking whether the created volume has the pre-populated data")
 			command := fmt.Sprintf("grep '%s' /mnt/test/initialData", claim.Namespace)
-			RunInPodWithVolume(l.cs, claim.Namespace, claim.Name, "pvc-snapshot-tester", command, e2epod.NodeSelection{Name: l.config.ClientNodeName})
+			RunInPodWithVolume(l.cs, claim.Namespace, claim.Name, "pvc-snapshot-tester", command, e2epod.NodeSelection{Selector: l.config.ClientNodeSelector})
 		}
 		l.testCase.TestDynamicProvisioning()
 	})
@@ -221,14 +221,14 @@ func (p *provisioningTestSuite) DefineTests(driver TestDriver, pattern testpatte
 		defer cleanup()
 
 		dc := l.config.Framework.DynamicClient
-		dataSource, dataSourceCleanup := preparePVCDataSourceForProvisioning(e2epod.NodeSelection{Name: l.config.ClientNodeName}, l.cs, dc, l.sourcePVC, l.sc)
+		dataSource, dataSourceCleanup := preparePVCDataSourceForProvisioning(e2epod.NodeSelection{Selector: l.config.ClientNodeSelector}, l.cs, dc, l.sourcePVC, l.sc)
 		defer dataSourceCleanup()
 
 		l.pvc.Spec.DataSource = dataSource
 		l.testCase.PvCheck = func(claim *v1.PersistentVolumeClaim) {
 			ginkgo.By("checking whether the created volume has the pre-populated data")
 			command := fmt.Sprintf("grep '%s' /mnt/test/initialData", claim.Namespace)
-			RunInPodWithVolume(l.cs, claim.Namespace, claim.Name, "pvc-datasource-tester", command, e2epod.NodeSelection{Name: l.config.ClientNodeName})
+			RunInPodWithVolume(l.cs, claim.Namespace, claim.Name, "pvc-datasource-tester", command, e2epod.NodeSelection{Selector: l.config.ClientNodeSelector})
 		}
 		l.testCase.TestDynamicProvisioning()
 	})
@@ -404,7 +404,7 @@ func PVWriteReadSingleNodeCheck(client clientset.Interface, claim *v1.Persistent
 	if framework.NodeOSDistroIs("windows") {
 		command = "select-string 'hello world' /mnt/test/data"
 	}
-	RunInPodWithVolume(client, claim.Namespace, claim.Name, "pvc-volume-tester-reader", command, e2epod.NodeSelection{Name: actualNodeName})
+	RunInPodWithVolume(client, claim.Namespace, claim.Name, "pvc-volume-tester-reader", command, e2epod.NodeSelection{Selector: map[string]string{v1.LabelHostname: actualNodeName}})
 
 	return volume
 }
@@ -424,7 +424,7 @@ func PVWriteReadSingleNodeCheck(client clientset.Interface, claim *v1.Persistent
 //
 // This is a common test that can be called from a StorageClassTest.PvCheck.
 func PVMultiNodeCheck(client clientset.Interface, claim *v1.PersistentVolumeClaim, node e2epod.NodeSelection) {
-	framework.ExpectEqual(node.Name, "", "this test only works when not locked onto a single node")
+	framework.ExpectEqual(node.Selector[v1.LabelHostname], "", "this test only works when not locked onto a single node")
 
 	var pod *v1.Pod
 	defer func() {
@@ -567,7 +567,6 @@ func StartInPodWithVolume(c clientset.Interface, ns, claimName, podName, command
 			},
 		},
 		Spec: v1.PodSpec{
-			NodeName:     node.Name,
 			NodeSelector: node.Selector,
 			Affinity:     node.Affinity,
 			Containers: []v1.Container{
