@@ -23,24 +23,74 @@ type List interface {
 	// At returns the item at the given position in the map. It will
 	// panic if the index is out of range.
 	At(int) Value
+	// AtUsing uses the provided allocator and returns the item at the given
+	// position in the map. It will panic if the index is out of range.
+	// The returned Value should be given back to the Allocator when no longer needed
+	// by calling Allocator.Free(Value).
+	AtUsing(Allocator, int) Value
+	// Range returns a ListRange for iterating over the items in the list.
+	Range() ListRange
+	// RangeUsing uses the provided allocator and returns a ListRange for
+	// iterating over the items in the list.
+	// The returned Range should be given back to the Allocator when no longer needed
+	// by calling Allocator.Free(Value).
+	RangeUsing(Allocator) ListRange
+	// Equals compares the two lists, and return true if they are the same, false otherwise.
+	// Implementations can use ListEquals as a general implementation for this methods.
+	Equals(List) bool
+	// EqualsUsing uses the provided allocator and compares the two lists, and return true if
+	// they are the same, false otherwise. Implementations can use ListEqualsUsing as a general
+	// implementation for this methods.
+	EqualsUsing(Allocator, List) bool
+}
+
+// ListRange represents a single iteration across the items of a list.
+type ListRange interface {
+	// Next increments to the next item in the range, if there is one, and returns true, or returns false if there are no more items.
+	Next() bool
+	// Item returns the index and value of the current item in the range. or panics if there is no current item.
+	// For efficiency, Item may reuse the values returned by previous Item calls. Callers should be careful avoid holding
+	// pointers to the value returned by Item() that escape the iteration loop since they become invalid once either
+	// Item() or Allocator.Free() is called.
+	Item() (index int, value Value)
+}
+
+var EmptyRange = &emptyRange{}
+
+type emptyRange struct{}
+
+func (_ *emptyRange) Next() bool {
+	return false
+}
+
+func (_ *emptyRange) Item() (index int, value Value) {
+	panic("Item called on empty ListRange")
 }
 
 // ListEquals compares two lists lexically.
+// WARN: This is a naive implementation, calling lhs.Equals(rhs) is typically the most efficient.
 func ListEquals(lhs, rhs List) bool {
+	return ListEqualsUsing(HeapAllocator, lhs, rhs)
+}
+
+// ListEqualsUsing uses the provided allocator and compares two lists lexically.
+// WARN: This is a naive implementation, calling lhs.EqualsUsing(allocator, rhs) is typically the most efficient.
+func ListEqualsUsing(a Allocator, lhs, rhs List) bool {
 	if lhs.Length() != rhs.Length() {
 		return false
 	}
 
-	for i := 0; i < lhs.Length(); i++ {
-		lv := lhs.At(i)
-		rv := rhs.At(i)
-		if !Equals(lv, rv) {
-			lv.Recycle()
-			rv.Recycle()
+	lhsRange := lhs.RangeUsing(a)
+	defer a.Free(lhsRange)
+	rhsRange := rhs.RangeUsing(a)
+	defer a.Free(rhsRange)
+
+	for lhsRange.Next() && rhsRange.Next() {
+		_, lv := lhsRange.Item()
+		_, rv := rhsRange.Item()
+		if !EqualsUsing(a, lv, rv) {
 			return false
 		}
-		lv.Recycle()
-		rv.Recycle()
 	}
 	return true
 }
@@ -53,28 +103,37 @@ func ListLess(lhs, rhs List) bool {
 // ListCompare compares two lists lexically. The result will be 0 if l==rhs, -1
 // if l < rhs, and +1 if l > rhs.
 func ListCompare(lhs, rhs List) int {
-	i := 0
+	return ListCompareUsing(HeapAllocator, lhs, rhs)
+}
+
+// ListCompareUsing uses the provided allocator and compares two lists lexically. The result will be 0 if l==rhs, -1
+// if l < rhs, and +1 if l > rhs.
+func ListCompareUsing(a Allocator, lhs, rhs List) int {
+	lhsRange := lhs.RangeUsing(a)
+	defer a.Free(lhsRange)
+	rhsRange := rhs.RangeUsing(a)
+	defer a.Free(rhsRange)
+
 	for {
-		if i >= lhs.Length() && i >= rhs.Length() {
+		lhsOk := lhsRange.Next()
+		rhsOk := rhsRange.Next()
+		if !lhsOk && !rhsOk {
 			// Lists are the same length and all items are equal.
 			return 0
 		}
-		if i >= lhs.Length() {
+		if !lhsOk {
 			// LHS is shorter.
 			return -1
 		}
-		if i >= rhs.Length() {
+		if !rhsOk {
 			// RHS is shorter.
 			return 1
 		}
-		lv := lhs.At(i)
-		rv := rhs.At(i)
-		if c := Compare(lv, rv); c != 0 {
+		_, lv := lhsRange.Item()
+		_, rv := rhsRange.Item()
+		if c := CompareUsing(a, lv, rv); c != 0 {
 			return c
 		}
-		lv.Recycle()
-		rv.Recycle()
 		// The items are equal; continue.
-		i++
 	}
 }

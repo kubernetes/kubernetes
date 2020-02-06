@@ -27,7 +27,7 @@ type Field struct {
 	Value Value
 }
 
-// FieldList is a list of key-value pairs. Each field is expectUpdated to
+// FieldList is a list of key-value pairs. Each field is expected to
 // have a different name.
 type FieldList []Field
 

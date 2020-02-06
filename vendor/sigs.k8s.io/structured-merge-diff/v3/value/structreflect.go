@@ -19,113 +19,7 @@ package value
 import (
 	"fmt"
 	"reflect"
-	"sync"
-	"sync/atomic"
 )
-
-// reflectStructCache keeps track of json tag related data for structs and fields to speed up reflection.
-// TODO: This overlaps in functionality with the fieldCache in
-// https://github.com/kubernetes/kubernetes/blob/master/staging/src/k8s.io/apimachinery/pkg/runtime/converter.go#L57 but
-// is more efficient at lookup by json field name. The logic should be consolidated. Only one copy of the cache needs
-// to be kept for each running process.
-var (
-	reflectStructCache = newStructCache()
-)
-
-type structCache struct {
-	// use an atomic and copy-on-write since there are a fixed (typically very small) number of structs compiled into any
-	// go program using this cache
-	value atomic.Value
-	// mu is held by writers when performing load/modify/store operations on the cache, readers do not need to hold a
-	// read-lock since the atomic value is always read-only
-	mu sync.Mutex
-}
-
-type structCacheMap map[reflect.Type]structCacheEntry
-
-// structCacheEntry contains information about each struct field, keyed by json field name, that is expensive to
-// compute using reflection.
-type structCacheEntry map[string]*fieldCacheEntry
-
-// Get returns true and fieldCacheEntry for the given type if the type is in the cache. Otherwise Get returns false.
-func (c *structCache) Get(t reflect.Type) (map[string]*fieldCacheEntry, bool) {
-	entry, ok := c.value.Load().(structCacheMap)[t]
-	return entry, ok
-}
-
-// Set sets the fieldCacheEntry for the given type via a copy-on-write update to the struct cache.
-func (c *structCache) Set(t reflect.Type, m map[string]*fieldCacheEntry) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	currentCacheMap := c.value.Load().(structCacheMap)
-
-	if _, ok := currentCacheMap[t]; ok {
-		// Bail if the entry has been set while waiting for lock acquisition.
-		// This is safe since setting entries is idempotent.
-		return
-	}
-
-	newCacheMap := make(structCacheMap, len(currentCacheMap)+1)
-	for k, v := range currentCacheMap {
-		newCacheMap[k] = v
-	}
-	newCacheMap[t] = m
-	c.value.Store(newCacheMap)
-}
-
-func newStructCache() *structCache {
-	cache := &structCache{}
-	cache.value.Store(make(structCacheMap))
-	return cache
-}
-
-type fieldCacheEntry struct {
-	// isOmitEmpty is true if the field has the json 'omitempty' tag.
-	isOmitEmpty bool
-	// fieldPath is the field indices (see FieldByIndex) to lookup the value of
-	// a field in a reflect.Value struct. A path of field indices is used
-	// to support traversing to a field field in struct fields that have the 'inline'
-	// json tag.
-	fieldPath [][]int
-}
-
-func (f *fieldCacheEntry) getFieldFromStruct(structVal reflect.Value) reflect.Value {
-	// field might be field within 'inline' structs
-	for _, elem := range f.fieldPath {
-		structVal = structVal.FieldByIndex(elem)
-	}
-	return structVal
-}
-
-func getStructCacheEntry(t reflect.Type) structCacheEntry {
-	if hints, ok := reflectStructCache.Get(t); ok {
-		return hints
-	}
-
-	hints := map[string]*fieldCacheEntry{}
-	buildStructCacheEntry(t, hints, nil)
-
-	reflectStructCache.Set(t, hints)
-	return hints
-}
-
-func buildStructCacheEntry(t reflect.Type, infos map[string]*fieldCacheEntry, fieldPath [][]int) {
-	for i := 0; i < t.NumField(); i++ {
-		field := t.Field(i)
-		jsonName, omit, isInline, isOmitempty := lookupJsonTags(field)
-		if omit {
-			continue
-		}
-		if isInline {
-			buildStructCacheEntry(field.Type, infos, append(fieldPath, field.Index))
-			continue
-		}
-		info := &fieldCacheEntry{isOmitEmpty: isOmitempty, fieldPath: append(fieldPath, field.Index)}
-		infos[jsonName] = info
-
-	}
-}
 
 type structReflect struct {
 	valueReflect
@@ -133,48 +27,58 @@ type structReflect struct {
 
 func (r structReflect) Length() int {
 	i := 0
-	eachStructField(r.Value, func(s string, value reflect.Value) bool {
+	eachStructField(r.Value, func(_ *TypeReflectCacheEntry, s string, value reflect.Value) bool {
 		i++
 		return true
 	})
 	return i
 }
 
+func (r structReflect) Empty() bool {
+	return eachStructField(r.Value, func(_ *TypeReflectCacheEntry, s string, value reflect.Value) bool {
+		return false // exit early if the struct is non-empty
+	})
+}
+
 func (r structReflect) Get(key string) (Value, bool) {
-	if val, ok, _ := r.findJsonNameField(key); ok {
-		return mustWrapValueReflect(val), true
+	return r.GetUsing(HeapAllocator, key)
+}
+
+func (r structReflect) GetUsing(a Allocator, key string) (Value, bool) {
+	if val, ok := r.findJsonNameField(key); ok {
+		return a.allocValueReflect().mustReuse(val, nil, nil, nil), true
 	}
 	return nil, false
 }
 
 func (r structReflect) Has(key string) bool {
-	_, ok, _ := r.findJsonNameField(key)
+	_, ok := r.findJsonNameField(key)
 	return ok
 }
 
 func (r structReflect) Set(key string, val Value) {
-	fieldEntry, ok := getStructCacheEntry(r.Value.Type())[key]
+	fieldEntry, ok := TypeReflectEntryOf(r.Value.Type()).Fields()[key]
 	if !ok {
 		panic(fmt.Sprintf("key %s may not be set on struct %T: field does not exist", key, r.Value.Interface()))
 	}
-	oldVal := fieldEntry.getFieldFromStruct(r.Value)
+	oldVal := fieldEntry.GetFrom(r.Value)
 	newVal := reflect.ValueOf(val.Unstructured())
 	r.update(fieldEntry, key, oldVal, newVal)
 }
 
 func (r structReflect) Delete(key string) {
-	fieldEntry, ok := getStructCacheEntry(r.Value.Type())[key]
+	fieldEntry, ok := TypeReflectEntryOf(r.Value.Type()).Fields()[key]
 	if !ok {
 		panic(fmt.Sprintf("key %s may not be deleted on struct %T: field does not exist", key, r.Value.Interface()))
 	}
-	oldVal := fieldEntry.getFieldFromStruct(r.Value)
+	oldVal := fieldEntry.GetFrom(r.Value)
 	if oldVal.Kind() != reflect.Ptr && !fieldEntry.isOmitEmpty {
 		panic(fmt.Sprintf("key %s may not be deleted on struct: %T: value is neither a pointer nor an omitempty field", key, r.Value.Interface()))
 	}
 	r.update(fieldEntry, key, oldVal, reflect.Zero(oldVal.Type()))
 }
 
-func (r structReflect) update(fieldEntry *fieldCacheEntry, key string, oldVal, newVal reflect.Value) {
+func (r structReflect) update(fieldEntry *FieldCacheEntry, key string, oldVal, newVal reflect.Value) {
 	if oldVal.CanSet() {
 		oldVal.Set(newVal)
 		return
@@ -187,7 +91,7 @@ func (r structReflect) update(fieldEntry *fieldCacheEntry, key string, oldVal, n
 			panic("ParentMapKey must not be nil if ParentMap is not nil")
 		}
 		replacement := reflect.New(r.Value.Type()).Elem()
-		fieldEntry.getFieldFromStruct(replacement).Set(newVal)
+		fieldEntry.GetFrom(replacement).Set(newVal)
 		r.ParentMap.SetMapIndex(*r.ParentMapKey, replacement)
 		return
 	}
@@ -198,21 +102,25 @@ func (r structReflect) update(fieldEntry *fieldCacheEntry, key string, oldVal, n
 }
 
 func (r structReflect) Iterate(fn func(string, Value) bool) bool {
-	return eachStructField(r.Value, func(s string, value reflect.Value) bool {
-		v := mustWrapValueReflect(value)
-		defer v.Recycle()
-		return fn(s, v)
+	return r.IterateUsing(HeapAllocator, fn)
+}
+
+func (r structReflect) IterateUsing(a Allocator, fn func(string, Value) bool) bool {
+	vr := a.allocValueReflect()
+	defer a.Free(vr)
+	return eachStructField(r.Value, func(e *TypeReflectCacheEntry, s string, value reflect.Value) bool {
+		return fn(s, vr.mustReuse(value, e, nil, nil))
 	})
 }
 
-func eachStructField(structVal reflect.Value, fn func(string, reflect.Value) bool) bool {
-	for jsonName, fieldCacheEntry := range getStructCacheEntry(structVal.Type()) {
-		fieldVal := fieldCacheEntry.getFieldFromStruct(structVal)
-		if fieldCacheEntry.isOmitEmpty && (safeIsNil(fieldVal) || isZero(fieldVal)) {
+func eachStructField(structVal reflect.Value, fn func(*TypeReflectCacheEntry, string, reflect.Value) bool) bool {
+	for _, fieldCacheEntry := range TypeReflectEntryOf(structVal.Type()).OrderedFields() {
+		fieldVal := fieldCacheEntry.GetFrom(structVal)
+		if fieldCacheEntry.CanOmit(fieldVal) {
 			// omit it
 			continue
 		}
-		ok := fn(jsonName, fieldVal)
+		ok := fn(fieldCacheEntry.TypeEntry, fieldCacheEntry.JsonName, fieldVal)
 		if !ok {
 			return false
 		}
@@ -231,39 +139,70 @@ func (r structReflect) Unstructured() interface{} {
 }
 
 func (r structReflect) Equals(m Map) bool {
-	if rhsStruct, ok := m.(structReflect); ok {
-		return reflect.DeepEqual(r.Value.Interface(), rhsStruct.Value.Interface())
-	}
-	if r.Length() != m.Length() {
-		return false
-	}
-	structCacheEntry := getStructCacheEntry(r.Value.Type())
+	return r.EqualsUsing(HeapAllocator, m)
+}
 
-	return m.Iterate(func(s string, value Value) bool {
-		fieldCacheEntry, ok := structCacheEntry[s]
-		if !ok {
-			return false
-		}
-		lhsVal := fieldCacheEntry.getFieldFromStruct(r.Value)
-		return Equals(mustWrapValueReflect(lhsVal), value)
-	})
+func (r structReflect) EqualsUsing(a Allocator, m Map) bool {
+	// MapEquals uses zip and is fairly efficient for structReflect
+	return MapEqualsUsing(a, &r, m)
 }
 
 func (r structReflect) findJsonNameFieldAndNotEmpty(jsonName string) (reflect.Value, bool) {
-	structCacheEntry, ok := getStructCacheEntry(r.Value.Type())[jsonName]
+	structCacheEntry, ok := TypeReflectEntryOf(r.Value.Type()).Fields()[jsonName]
 	if !ok {
 		return reflect.Value{}, false
 	}
-	fieldVal := structCacheEntry.getFieldFromStruct(r.Value)
-	omit := structCacheEntry.isOmitEmpty && (safeIsNil(fieldVal) || isZero(fieldVal))
-	return fieldVal, !omit
+	fieldVal := structCacheEntry.GetFrom(r.Value)
+	return fieldVal, !structCacheEntry.CanOmit(fieldVal)
 }
 
-func (r structReflect) findJsonNameField(jsonName string) (val reflect.Value, ok bool, omitEmpty bool) {
-	structCacheEntry, ok := getStructCacheEntry(r.Value.Type())[jsonName]
+func (r structReflect) findJsonNameField(jsonName string) (val reflect.Value, ok bool) {
+	structCacheEntry, ok := TypeReflectEntryOf(r.Value.Type()).Fields()[jsonName]
 	if !ok {
-		return reflect.Value{}, false, false
+		return reflect.Value{}, false
 	}
-	fieldVal := structCacheEntry.getFieldFromStruct(r.Value)
-	return fieldVal, true, structCacheEntry.isOmitEmpty
+	fieldVal := structCacheEntry.GetFrom(r.Value)
+	return fieldVal, !structCacheEntry.CanOmit(fieldVal)
+}
+
+func (r structReflect) Zip(other Map, order MapTraverseOrder, fn func(key string, lhs, rhs Value) bool) bool {
+	return r.ZipUsing(HeapAllocator, other, order, fn)
+}
+
+func (r structReflect) ZipUsing(a Allocator, other Map, order MapTraverseOrder, fn func(key string, lhs, rhs Value) bool) bool {
+	if otherStruct, ok := other.(*structReflect); ok && r.Value.Type() == otherStruct.Value.Type() {
+		lhsvr, rhsvr := a.allocValueReflect(), a.allocValueReflect()
+		defer a.Free(lhsvr)
+		defer a.Free(rhsvr)
+		return r.structZip(otherStruct, lhsvr, rhsvr, fn)
+	}
+	return defaultMapZip(a, &r, other, order, fn)
+}
+
+// structZip provides an optimized zip for structReflect types. The zip is always lexical key ordered since there is
+// no additional cost to ordering the zip for structured types.
+func (r structReflect) structZip(other *structReflect, lhsvr, rhsvr *valueReflect, fn func(key string, lhs, rhs Value) bool) bool {
+	lhsVal := r.Value
+	rhsVal := other.Value
+
+	for _, fieldCacheEntry := range TypeReflectEntryOf(lhsVal.Type()).OrderedFields() {
+		lhsFieldVal := fieldCacheEntry.GetFrom(lhsVal)
+		rhsFieldVal := fieldCacheEntry.GetFrom(rhsVal)
+		lhsOmit := fieldCacheEntry.CanOmit(lhsFieldVal)
+		rhsOmit := fieldCacheEntry.CanOmit(rhsFieldVal)
+		if lhsOmit && rhsOmit {
+			continue
+		}
+		var lhsVal, rhsVal Value
+		if !lhsOmit {
+			lhsVal = lhsvr.mustReuse(lhsFieldVal, fieldCacheEntry.TypeEntry, nil, nil)
+		}
+		if !rhsOmit {
+			rhsVal = rhsvr.mustReuse(rhsFieldVal, fieldCacheEntry.TypeEntry, nil, nil)
+		}
+		if !fn(fieldCacheEntry.JsonName, lhsVal, rhsVal) {
+			return false
+		}
+	}
+	return true
 }
