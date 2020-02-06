@@ -21,9 +21,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/onsi/ginkgo"
-	"k8s.io/utils/mount"
-
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,7 +28,11 @@ import (
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/volume/util/fsquota"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	"k8s.io/utils/mount"
+
+	"github.com/onsi/ginkgo"
 )
 
 const (
@@ -61,7 +62,7 @@ func runOneQuotaTest(f *framework.Framework, quotasRequested bool) {
 			if quotasRequested && !supportsQuotas("/var/lib/kubelet") {
 				// No point in running this as a positive test if quotas are not
 				// enabled on the underlying filesystem.
-				framework.Skipf("Cannot run LocalStorageCapacityIsolationQuotaMonitoring on filesystem without project quota enabled")
+				e2eskipper.Skipf("Cannot run LocalStorageCapacityIsolationQuotaMonitoring on filesystem without project quota enabled")
 			}
 			// setting a threshold to 0% disables; non-empty map overrides default value (necessary due to omitempty)
 			initialConfig.EvictionHard = map[string]string{"memory.available": "0%"}

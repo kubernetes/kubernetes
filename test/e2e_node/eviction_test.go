@@ -36,6 +36,7 @@ import (
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -76,7 +77,7 @@ var _ = framework.KubeDescribe("InodeEviction [Slow] [Serial] [Disruptive][NodeF
 			summary := eventuallyGetSummary()
 			inodesFree := *summary.Node.Fs.InodesFree
 			if inodesFree <= inodesConsumed {
-				framework.Skipf("Too few inodes free on the host for the InodeEviction test to run")
+				e2eskipper.Skipf("Too few inodes free on the host for the InodeEviction test to run")
 			}
 			initialConfig.EvictionHard = map[string]string{string(evictionapi.SignalNodeFsInodesFree): fmt.Sprintf("%d", inodesFree-inodesConsumed)}
 			initialConfig.EvictionMinimumReclaim = map[string]string{}
@@ -112,7 +113,7 @@ var _ = framework.KubeDescribe("ImageGCNoEviction [Slow] [Serial] [Disruptive][N
 			summary := eventuallyGetSummary()
 			inodesFree := *summary.Node.Fs.InodesFree
 			if inodesFree <= inodesConsumed {
-				framework.Skipf("Too few inodes free on the host for the InodeEviction test to run")
+				e2eskipper.Skipf("Too few inodes free on the host for the InodeEviction test to run")
 			}
 			initialConfig.EvictionHard = map[string]string{string(evictionapi.SignalNodeFsInodesFree): fmt.Sprintf("%d", inodesFree-inodesConsumed)}
 			initialConfig.EvictionMinimumReclaim = map[string]string{}
@@ -203,7 +204,7 @@ var _ = framework.KubeDescribe("LocalStorageSoftEviction [Slow] [Serial] [Disrup
 			summary := eventuallyGetSummary()
 			availableBytes := *(summary.Node.Fs.AvailableBytes)
 			if availableBytes <= uint64(diskConsumed.Value()) {
-				framework.Skipf("Too little disk free on the host for the LocalStorageSoftEviction test to run")
+				e2eskipper.Skipf("Too little disk free on the host for the LocalStorageSoftEviction test to run")
 			}
 			initialConfig.EvictionSoft = map[string]string{string(evictionapi.SignalNodeFsAvailable): fmt.Sprintf("%d", availableBytes-uint64(diskConsumed.Value()))}
 			initialConfig.EvictionSoftGracePeriod = map[string]string{string(evictionapi.SignalNodeFsAvailable): "1m"}
@@ -295,7 +296,7 @@ var _ = framework.KubeDescribe("PriorityMemoryEvictionOrdering [Slow] [Serial] [
 			summary := eventuallyGetSummary()
 			availableBytes := *(summary.Node.Memory.AvailableBytes)
 			if availableBytes <= uint64(memoryConsumed.Value()) {
-				framework.Skipf("Too little memory free on the host for the PriorityMemoryEvictionOrdering test to run")
+				e2eskipper.Skipf("Too little memory free on the host for the PriorityMemoryEvictionOrdering test to run")
 			}
 			initialConfig.EvictionHard = map[string]string{string(evictionapi.SignalMemoryAvailable): fmt.Sprintf("%d", availableBytes-uint64(memoryConsumed.Value()))}
 			initialConfig.EvictionMinimumReclaim = map[string]string{}
@@ -352,7 +353,7 @@ var _ = framework.KubeDescribe("PriorityLocalStorageEvictionOrdering [Slow] [Ser
 			summary := eventuallyGetSummary()
 			availableBytes := *(summary.Node.Fs.AvailableBytes)
 			if availableBytes <= uint64(diskConsumed.Value()) {
-				framework.Skipf("Too little disk free on the host for the PriorityLocalStorageEvictionOrdering test to run")
+				e2eskipper.Skipf("Too little disk free on the host for the PriorityLocalStorageEvictionOrdering test to run")
 			}
 			initialConfig.EvictionHard = map[string]string{string(evictionapi.SignalNodeFsAvailable): fmt.Sprintf("%d", availableBytes-uint64(diskConsumed.Value()))}
 			initialConfig.EvictionMinimumReclaim = map[string]string{}

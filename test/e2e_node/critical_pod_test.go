@@ -27,6 +27,7 @@ import (
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
@@ -52,7 +53,7 @@ var _ = framework.KubeDescribe("CriticalPod [Serial] [Disruptive] [NodeFeature:C
 			configEnabled, err := isKubeletConfigEnabled(f)
 			framework.ExpectNoError(err)
 			if !configEnabled {
-				framework.Skipf("unable to run test without dynamic kubelet config enabled.")
+				e2eskipper.Skipf("unable to run test without dynamic kubelet config enabled.")
 			}
 			// because adminssion Priority enable, If the priority class is not found, the Pod is rejected.
 			node := getNodeName(f)
