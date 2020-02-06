@@ -148,9 +148,6 @@ func autoConvert_v1alpha2_KubeSchedulerConfiguration_To_config_KubeSchedulerConf
 	if err := Convert_v1alpha2_SchedulerAlgorithmSource_To_config_SchedulerAlgorithmSource(&in.AlgorithmSource, &out.AlgorithmSource, s); err != nil {
 		return err
 	}
-	if err := v1.Convert_Pointer_int32_To_int32(&in.HardPodAffinitySymmetricWeight, &out.HardPodAffinitySymmetricWeight, s); err != nil {
-		return err
-	}
 	if err := Convert_v1alpha2_KubeSchedulerLeaderElectionConfiguration_To_config_KubeSchedulerLeaderElectionConfiguration(&in.LeaderElection, &out.LeaderElection, s); err != nil {
 		return err
 	}
@@ -204,9 +201,6 @@ func autoConvert_config_KubeSchedulerConfiguration_To_v1alpha2_KubeSchedulerConf
 		return err
 	}
 	if err := Convert_config_SchedulerAlgorithmSource_To_v1alpha2_SchedulerAlgorithmSource(&in.AlgorithmSource, &out.AlgorithmSource, s); err != nil {
-		return err
-	}
-	if err := v1.Convert_int32_To_Pointer_int32(&in.HardPodAffinitySymmetricWeight, &out.HardPodAffinitySymmetricWeight, s); err != nil {
 		return err
 	}
 	if err := Convert_config_KubeSchedulerLeaderElectionConfiguration_To_v1alpha2_KubeSchedulerLeaderElectionConfiguration(&in.LeaderElection, &out.LeaderElection, s); err != nil {

@@ -44,10 +44,6 @@ type KubeSchedulerConfiguration struct {
 	SchedulerName *string `json:"schedulerName,omitempty"`
 	// AlgorithmSource specifies the scheduler algorithm source.
 	AlgorithmSource SchedulerAlgorithmSource `json:"algorithmSource"`
-	// RequiredDuringScheduling affinity is not symmetric, but there is an implicit PreferredDuringScheduling affinity rule
-	// corresponding to every RequiredDuringScheduling affinity rule.
-	// HardPodAffinitySymmetricWeight represents the weight of implicit PreferredDuringScheduling affinity rule, in the range 0-100.
-	HardPodAffinitySymmetricWeight *int32 `json:"hardPodAffinitySymmetricWeight,omitempty"`
 
 	// LeaderElection defines the configuration of leader election client.
 	LeaderElection KubeSchedulerLeaderElectionConfiguration `json:"leaderElection"`

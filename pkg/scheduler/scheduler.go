@@ -126,14 +126,13 @@ func (sched *Scheduler) Cache() internalcache.Cache {
 }
 
 type schedulerOptions struct {
-	schedulerName                  string
-	schedulerAlgorithmSource       schedulerapi.SchedulerAlgorithmSource
-	hardPodAffinitySymmetricWeight int32
-	disablePreemption              bool
-	percentageOfNodesToScore       int32
-	bindTimeoutSeconds             int64
-	podInitialBackoffSeconds       int64
-	podMaxBackoffSeconds           int64
+	schedulerName            string
+	schedulerAlgorithmSource schedulerapi.SchedulerAlgorithmSource
+	disablePreemption        bool
+	percentageOfNodesToScore int32
+	bindTimeoutSeconds       int64
+	podInitialBackoffSeconds int64
+	podMaxBackoffSeconds     int64
 	// Contains out-of-tree plugins to be merged with the in-tree registry.
 	frameworkOutOfTreeRegistry framework.Registry
 	// Plugins and PluginConfig set from ComponentConfig.
@@ -155,13 +154,6 @@ func WithName(schedulerName string) Option {
 func WithAlgorithmSource(source schedulerapi.SchedulerAlgorithmSource) Option {
 	return func(o *schedulerOptions) {
 		o.schedulerAlgorithmSource = source
-	}
-}
-
-// WithHardPodAffinitySymmetricWeight sets hardPodAffinitySymmetricWeight for Scheduler, the default value is 1
-func WithHardPodAffinitySymmetricWeight(hardPodAffinitySymmetricWeight int32) Option {
-	return func(o *schedulerOptions) {
-		o.hardPodAffinitySymmetricWeight = hardPodAffinitySymmetricWeight
 	}
 }
 
@@ -227,12 +219,11 @@ var defaultSchedulerOptions = schedulerOptions{
 	schedulerAlgorithmSource: schedulerapi.SchedulerAlgorithmSource{
 		Provider: defaultAlgorithmSourceProviderName(),
 	},
-	hardPodAffinitySymmetricWeight: v1.DefaultHardPodAffinitySymmetricWeight,
-	disablePreemption:              false,
-	percentageOfNodesToScore:       schedulerapi.DefaultPercentageOfNodesToScore,
-	bindTimeoutSeconds:             BindTimeoutSeconds,
-	podInitialBackoffSeconds:       int64(internalqueue.DefaultPodInitialBackoffDuration.Seconds()),
-	podMaxBackoffSeconds:           int64(internalqueue.DefaultPodMaxBackoffDuration.Seconds()),
+	disablePreemption:        false,
+	percentageOfNodesToScore: schedulerapi.DefaultPercentageOfNodesToScore,
+	bindTimeoutSeconds:       BindTimeoutSeconds,
+	podInitialBackoffSeconds: int64(internalqueue.DefaultPodInitialBackoffDuration.Seconds()),
+	podMaxBackoffSeconds:     int64(internalqueue.DefaultPodMaxBackoffDuration.Seconds()),
 }
 
 // New returns a Scheduler
@@ -272,23 +263,22 @@ func New(client clientset.Interface,
 	snapshot := internalcache.NewEmptySnapshot()
 
 	configurator := &Configurator{
-		client:                         client,
-		informerFactory:                informerFactory,
-		podInformer:                    podInformer,
-		volumeBinder:                   volumeBinder,
-		schedulerCache:                 schedulerCache,
-		StopEverything:                 stopEverything,
-		hardPodAffinitySymmetricWeight: options.hardPodAffinitySymmetricWeight,
-		disablePreemption:              options.disablePreemption,
-		percentageOfNodesToScore:       options.percentageOfNodesToScore,
-		bindTimeoutSeconds:             options.bindTimeoutSeconds,
-		podInitialBackoffSeconds:       options.podInitialBackoffSeconds,
-		podMaxBackoffSeconds:           options.podMaxBackoffSeconds,
-		enableNonPreempting:            utilfeature.DefaultFeatureGate.Enabled(kubefeatures.NonPreemptingPriority),
-		registry:                       registry,
-		plugins:                        options.frameworkPlugins,
-		pluginConfig:                   options.frameworkPluginConfig,
-		nodeInfoSnapshot:               snapshot,
+		client:                   client,
+		informerFactory:          informerFactory,
+		podInformer:              podInformer,
+		volumeBinder:             volumeBinder,
+		schedulerCache:           schedulerCache,
+		StopEverything:           stopEverything,
+		disablePreemption:        options.disablePreemption,
+		percentageOfNodesToScore: options.percentageOfNodesToScore,
+		bindTimeoutSeconds:       options.bindTimeoutSeconds,
+		podInitialBackoffSeconds: options.podInitialBackoffSeconds,
+		podMaxBackoffSeconds:     options.podMaxBackoffSeconds,
+		enableNonPreempting:      utilfeature.DefaultFeatureGate.Enabled(kubefeatures.NonPreemptingPriority),
+		registry:                 registry,
+		plugins:                  options.frameworkPlugins,
+		pluginConfig:             options.frameworkPluginConfig,
+		nodeInfoSnapshot:         snapshot,
 	}
 
 	metrics.Register()

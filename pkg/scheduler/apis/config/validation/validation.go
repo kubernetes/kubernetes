@@ -44,9 +44,6 @@ func ValidateKubeSchedulerConfiguration(cc *config.KubeSchedulerConfiguration) f
 	for _, msg := range validation.IsValidSocketAddr(cc.MetricsBindAddress) {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("metricsBindAddress"), cc.MetricsBindAddress, msg))
 	}
-	if cc.HardPodAffinitySymmetricWeight < 0 || cc.HardPodAffinitySymmetricWeight > 100 {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("hardPodAffinitySymmetricWeight"), cc.HardPodAffinitySymmetricWeight, "not in valid range [0-100]"))
-	}
 	if cc.PercentageOfNodesToScore < 0 || cc.PercentageOfNodesToScore > 100 {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("percentageOfNodesToScore"),
 			cc.PercentageOfNodesToScore, "not in valid range [0-100]"))

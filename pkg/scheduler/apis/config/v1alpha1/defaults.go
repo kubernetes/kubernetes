@@ -41,11 +41,6 @@ func SetDefaults_KubeSchedulerConfiguration(obj *kubeschedulerconfigv1alpha1.Kub
 		obj.SchedulerName = &val
 	}
 
-	if obj.HardPodAffinitySymmetricWeight == nil {
-		val := api.DefaultHardPodAffinitySymmetricWeight
-		obj.HardPodAffinitySymmetricWeight = &val
-	}
-
 	if obj.AlgorithmSource.Policy == nil &&
 		(obj.AlgorithmSource.Provider == nil || len(*obj.AlgorithmSource.Provider) == 0) {
 		val := kubeschedulerconfigv1alpha1.SchedulerDefaultProviderName

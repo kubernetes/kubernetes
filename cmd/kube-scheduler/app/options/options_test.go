@@ -134,6 +134,18 @@ leaderElection:
 		t.Fatal(err)
 	}
 
+	v1alpha1Config := filepath.Join(tmpDir, "kubeconfig_v1alpha1.yaml")
+	if err := ioutil.WriteFile(v1alpha1Config, []byte(fmt.Sprintf(`
+apiVersion: kubescheduler.config.k8s.io/v1alpha1
+kind: KubeSchedulerConfiguration
+clientConnection:
+  kubeconfig: "%s"
+leaderElection:
+  leaderElect: true
+hardPodAffinitySymmetricWeight: 3`, configKubeconfig)), os.FileMode(0600)); err != nil {
+		t.Fatal(err)
+	}
+
 	unknownFieldConfigLenient := filepath.Join(tmpDir, "scheduler_invalid_unknown_field_lenient.yaml")
 	if err := ioutil.WriteFile(unknownFieldConfigLenient, []byte(fmt.Sprintf(`
 apiVersion: kubescheduler.config.k8s.io/v1alpha1
@@ -307,11 +319,10 @@ plugins:
 			},
 			expectedUsername: "config",
 			expectedConfig: kubeschedulerconfig.KubeSchedulerConfiguration{
-				SchedulerName:                  "default-scheduler",
-				AlgorithmSource:                kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &defaultSource},
-				HardPodAffinitySymmetricWeight: 1,
-				HealthzBindAddress:             "0.0.0.0:10251",
-				MetricsBindAddress:             "0.0.0.0:10251",
+				SchedulerName:      "default-scheduler",
+				AlgorithmSource:    kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &defaultSource},
+				HealthzBindAddress: "0.0.0.0:10251",
+				MetricsBindAddress: "0.0.0.0:10251",
 				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
 					EnableProfiling:           true,
 					EnableContentionProfiling: true,
@@ -399,11 +410,10 @@ plugins:
 			},
 			expectedUsername: "flag",
 			expectedConfig: kubeschedulerconfig.KubeSchedulerConfiguration{
-				SchedulerName:                  "default-scheduler",
-				AlgorithmSource:                kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &defaultSource},
-				HardPodAffinitySymmetricWeight: 1,
-				HealthzBindAddress:             "", // defaults empty when not running from config file
-				MetricsBindAddress:             "", // defaults empty when not running from config file
+				SchedulerName:      "default-scheduler",
+				AlgorithmSource:    kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &defaultSource},
+				HealthzBindAddress: "", // defaults empty when not running from config file
+				MetricsBindAddress: "", // defaults empty when not running from config file
 				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
 					EnableProfiling:           true,
 					EnableContentionProfiling: true,
@@ -464,11 +474,10 @@ plugins:
 				},
 			},
 			expectedConfig: kubeschedulerconfig.KubeSchedulerConfiguration{
-				SchedulerName:                  "default-scheduler",
-				AlgorithmSource:                kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &defaultSource},
-				HardPodAffinitySymmetricWeight: 1,
-				HealthzBindAddress:             "", // defaults empty when not running from config file
-				MetricsBindAddress:             "", // defaults empty when not running from config file
+				SchedulerName:      "default-scheduler",
+				AlgorithmSource:    kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &defaultSource},
+				HealthzBindAddress: "", // defaults empty when not running from config file
+				MetricsBindAddress: "", // defaults empty when not running from config file
 				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
 					EnableProfiling:           true,
 					EnableContentionProfiling: true,
@@ -504,11 +513,10 @@ plugins:
 			},
 			expectedUsername: "config",
 			expectedConfig: kubeschedulerconfig.KubeSchedulerConfiguration{
-				SchedulerName:                  "default-scheduler",
-				AlgorithmSource:                kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &defaultSource},
-				HardPodAffinitySymmetricWeight: 1,
-				HealthzBindAddress:             "0.0.0.0:10251",
-				MetricsBindAddress:             "0.0.0.0:10251",
+				SchedulerName:      "default-scheduler",
+				AlgorithmSource:    kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &defaultSource},
+				HealthzBindAddress: "0.0.0.0:10251",
+				MetricsBindAddress: "0.0.0.0:10251",
 				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
 					EnableProfiling:           true,
 					EnableContentionProfiling: true,
@@ -578,11 +586,10 @@ plugins:
 			},
 			expectedUsername: "config",
 			expectedConfig: kubeschedulerconfig.KubeSchedulerConfiguration{
-				SchedulerName:                  "default-scheduler",
-				AlgorithmSource:                kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &defaultSource},
-				HardPodAffinitySymmetricWeight: 1,
-				HealthzBindAddress:             "0.0.0.0:10251",
-				MetricsBindAddress:             "0.0.0.0:10251",
+				SchedulerName:      "default-scheduler",
+				AlgorithmSource:    kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &defaultSource},
+				HealthzBindAddress: "0.0.0.0:10251",
+				MetricsBindAddress: "0.0.0.0:10251",
 				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
 					EnableProfiling:           true,
 					EnableContentionProfiling: true,
@@ -633,20 +640,113 @@ plugins:
 			expectedError: "no configuration has been provided",
 		},
 		{
+			name: "Deprecated HardPodAffinitySymmetricWeight",
+			options: &Options{
+				ComponentConfig: func() kubeschedulerconfig.KubeSchedulerConfiguration {
+					cfg, _ := newDefaultComponentConfig()
+					cfg.ClientConnection.Kubeconfig = flagKubeconfig
+					return *cfg
+				}(),
+				Deprecated: &DeprecatedOptions{
+					HardPodAffinitySymmetricWeight: 5,
+				},
+			},
+			expectedUsername: "flag",
+			expectedConfig: kubeschedulerconfig.KubeSchedulerConfiguration{
+				SchedulerName:   "default-scheduler",
+				AlgorithmSource: kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &defaultSource},
+				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
+					EnableProfiling:           true,
+					EnableContentionProfiling: true,
+				},
+				LeaderElection: kubeschedulerconfig.KubeSchedulerLeaderElectionConfiguration{
+					LeaderElectionConfiguration: componentbaseconfig.LeaderElectionConfiguration{
+						LeaderElect:       true,
+						LeaseDuration:     metav1.Duration{Duration: 15 * time.Second},
+						RenewDeadline:     metav1.Duration{Duration: 10 * time.Second},
+						RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
+						ResourceLock:      "endpointsleases",
+						ResourceNamespace: "kube-system",
+						ResourceName:      "kube-scheduler",
+					},
+				},
+				ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
+					Kubeconfig:  flagKubeconfig,
+					QPS:         50,
+					Burst:       100,
+					ContentType: "application/vnd.kubernetes.protobuf",
+				},
+				PercentageOfNodesToScore: defaultPercentageOfNodesToScore,
+				BindTimeoutSeconds:       defaultBindTimeoutSeconds,
+				PodInitialBackoffSeconds: defaultPodInitialBackoffSeconds,
+				PodMaxBackoffSeconds:     defaultPodMaxBackoffSeconds,
+				PluginConfig: []kubeschedulerconfig.PluginConfig{
+					{
+						Name: "InterPodAffinity",
+						Args: runtime.Unknown{
+							Raw: []byte(`{"hardPodAffinityWeight":5}`),
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "v1alpha1 config with HardPodAffinitySymmetricWeight",
+			options: &Options{
+				ConfigFile: v1alpha1Config,
+			},
+			expectedUsername: "config",
+			expectedConfig: kubeschedulerconfig.KubeSchedulerConfiguration{
+				SchedulerName:      "default-scheduler",
+				AlgorithmSource:    kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &defaultSource},
+				HealthzBindAddress: "0.0.0.0:10251",
+				MetricsBindAddress: "0.0.0.0:10251",
+				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
+					EnableProfiling:           true,
+					EnableContentionProfiling: true,
+				},
+				LeaderElection: kubeschedulerconfig.KubeSchedulerLeaderElectionConfiguration{
+					LeaderElectionConfiguration: componentbaseconfig.LeaderElectionConfiguration{
+						LeaderElect:       true,
+						LeaseDuration:     metav1.Duration{Duration: 15 * time.Second},
+						RenewDeadline:     metav1.Duration{Duration: 10 * time.Second},
+						RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
+						ResourceLock:      "endpointsleases",
+						ResourceNamespace: "kube-system",
+						ResourceName:      "kube-scheduler",
+					},
+				},
+				ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
+					Kubeconfig:  configKubeconfig,
+					QPS:         50,
+					Burst:       100,
+					ContentType: "application/vnd.kubernetes.protobuf",
+				},
+				PercentageOfNodesToScore: defaultPercentageOfNodesToScore,
+				BindTimeoutSeconds:       defaultBindTimeoutSeconds,
+				PodInitialBackoffSeconds: defaultPodInitialBackoffSeconds,
+				PodMaxBackoffSeconds:     defaultPodMaxBackoffSeconds,
+				PluginConfig: []kubeschedulerconfig.PluginConfig{
+					{
+						Name: "InterPodAffinity",
+						Args: runtime.Unknown{
+							Raw: []byte(`{"hardPodAffinityWeight":3}`),
+						},
+					},
+				},
+			},
+		},
+		{
 			name: "unknown field lenient (v1alpha1)",
 			options: &Options{
 				ConfigFile: unknownFieldConfigLenient,
 			},
-			// TODO (obitech): Remove this comment and add a new test for v1alpha2, when it's available, as this should fail then.
-			// expectedError: "found unknown field: foo",
-			// checkErrFn:    runtime.IsStrictDecodingError,
 			expectedUsername: "config",
 			expectedConfig: kubeschedulerconfig.KubeSchedulerConfiguration{
-				SchedulerName:                  "default-scheduler",
-				AlgorithmSource:                kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &defaultSource},
-				HardPodAffinitySymmetricWeight: 1,
-				HealthzBindAddress:             "0.0.0.0:10251",
-				MetricsBindAddress:             "0.0.0.0:10251",
+				SchedulerName:      "default-scheduler",
+				AlgorithmSource:    kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &defaultSource},
+				HealthzBindAddress: "0.0.0.0:10251",
+				MetricsBindAddress: "0.0.0.0:10251",
 				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
 					EnableProfiling:           true,
 					EnableContentionProfiling: true,
@@ -688,16 +788,12 @@ plugins:
 			options: &Options{
 				ConfigFile: duplicateFieldConfigLenient,
 			},
-			// TODO (obitech): Remove this comment and add a new test for v1alpha2, when it's available, as this should fail then.
-			// expectedError: `key "leaderElect" already set`,
-			// checkErrFn:    runtime.IsStrictDecodingError,
 			expectedUsername: "config",
 			expectedConfig: kubeschedulerconfig.KubeSchedulerConfiguration{
-				SchedulerName:                  "default-scheduler",
-				AlgorithmSource:                kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &defaultSource},
-				HardPodAffinitySymmetricWeight: 1,
-				HealthzBindAddress:             "0.0.0.0:10251",
-				MetricsBindAddress:             "0.0.0.0:10251",
+				SchedulerName:      "default-scheduler",
+				AlgorithmSource:    kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &defaultSource},
+				HealthzBindAddress: "0.0.0.0:10251",
+				MetricsBindAddress: "0.0.0.0:10251",
 				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
 					EnableProfiling:           true,
 					EnableContentionProfiling: true,

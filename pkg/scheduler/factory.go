@@ -26,7 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -78,11 +77,6 @@ type Configurator struct {
 	StopEverything <-chan struct{}
 
 	schedulerCache internalcache.Cache
-
-	// RequiredDuringScheduling affinity is not symmetric, but there is an implicit PreferredDuringScheduling affinity rule
-	// corresponding to every RequiredDuringScheduling affinity rule.
-	// HardPodAffinitySymmetricWeight represents the weight of implicit PreferredDuringScheduling affinity rule, in the range [0-100].
-	hardPodAffinitySymmetricWeight int32
 
 	// Handles volume binding decisions
 	volumeBinder *volumebinder.VolumeBinder
@@ -180,10 +174,6 @@ func (c *Configurator) createFromProvider(providerName string) (*Scheduler, erro
 	// Combine the provided plugins with the ones from component config.
 	defaultPlugins.Apply(c.plugins)
 	c.plugins = defaultPlugins
-
-	pluginConfig := []schedulerapi.PluginConfig{c.interPodAffinityPluginConfig()}
-	pluginConfig = append(pluginConfig, c.pluginConfig...)
-	c.pluginConfig = pluginConfig
 
 	return c.create([]core.SchedulerExtender{})
 }
@@ -304,15 +294,6 @@ func (c *Configurator) createFromConfig(policy schedulerapi.Policy) (*Scheduler,
 	c.pluginConfig = pluginConfig
 
 	return c.create(extenders)
-}
-
-func (c *Configurator) interPodAffinityPluginConfig() schedulerapi.PluginConfig {
-	return schedulerapi.PluginConfig{
-		Name: interpodaffinity.Name,
-		Args: runtime.Unknown{
-			Raw: []byte(fmt.Sprintf(`{"hardPodAffinityWeight":%d}`, c.hardPodAffinitySymmetricWeight)),
-		},
-	}
 }
 
 // getPriorityConfigs returns priorities configuration: ones that will run as priorities and ones that will run
