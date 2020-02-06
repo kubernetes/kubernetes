@@ -51,7 +51,8 @@ func (r *LogREST) New() runtime.Object {
 	return &api.Pod{}
 }
 
-// ProducesMIMETypes is LogREST's implementation of the StorageMetadata interface
+// ProducesMIMETypes returns a list of the MIME types the specified HTTP verb (GET, POST, DELETE,
+// PATCH) can respond with.
 func (r *LogREST) ProducesMIMETypes(verb string) []string {
 	// Since the default list does not include "plain/text", we need to
 	// explicitly override ProducesMIMETypes, so that it gets added to
@@ -61,7 +62,8 @@ func (r *LogREST) ProducesMIMETypes(verb string) []string {
 	}
 }
 
-// ProducesObject is LogREST's implementation of the StorageMetadata interface
+// ProducesObject returns an object the specified HTTP verb respond with. It will overwrite storage object if
+// it is not nil. Only the type of the return object matters, the value will be ignored.
 func (r *LogREST) ProducesObject(verb string) interface{} {
 	return ""
 }
