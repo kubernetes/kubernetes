@@ -454,7 +454,7 @@ func TestCheckLogLocation(t *testing.T) {
 				InsecureSkipTLSVerifyTransport: fakeInsecureRoundTripper,
 			}}
 
-			_, actualTransport, err := LogLocation(getter, connectionGetter, ctx, fakePodName, tc.opts)
+			_, actualTransport, err := LogLocation(ctx, getter, connectionGetter, fakePodName, tc.opts)
 			if !reflect.DeepEqual(err, tc.expectedErr) {
 				t.Errorf("expected %v, got %v", tc.expectedErr, err)
 			}
@@ -469,7 +469,7 @@ func TestSelectableFieldLabelConversions(t *testing.T) {
 	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
 		"v1",
 		"Pod",
-		PodToSelectableFields(&api.Pod{}),
+		ToSelectableFields(&api.Pod{}),
 		nil,
 	)
 }
@@ -530,7 +530,7 @@ func TestPortForwardLocation(t *testing.T) {
 	for _, tc := range tcs {
 		getter := &mockPodGetter{tc.in}
 		connectionGetter := &mockConnectionInfoGetter{tc.info}
-		loc, _, err := PortForwardLocation(getter, connectionGetter, ctx, "test", tc.opts)
+		loc, _, err := PortForwardLocation(ctx, getter, connectionGetter, "test", tc.opts)
 		if !reflect.DeepEqual(err, tc.expectedErr) {
 			t.Errorf("expected %v, got %v", tc.expectedErr, err)
 		}
