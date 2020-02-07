@@ -26,6 +26,7 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal"
 	openapiproto "k8s.io/kube-openapi/pkg/util/proto"
 	"sigs.k8s.io/structured-merge-diff/v3/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v3/typed"
 )
 
 // DefaultMaxUpdateManagers defines the default maximum retained number of managedFields entries from updates
@@ -44,6 +45,16 @@ type Managed interface {
 
 	// Times gets the timestamps associated with each operation.
 	Times() map[string]*metav1.Time
+}
+
+// TypeConverter allows you to convert from runtime.Object to
+// typed.TypedValue and the other way around.
+type TypeConverter interface {
+	// ObjectToTyped converts an object into a TypedValue
+	ObjectToTyped(runtime.Object) (*typed.TypedValue, error)
+
+	// TypedToObject transforms the typed value into a runtime.Object
+	TypedToObject(*typed.TypedValue) (runtime.Object, error)
 }
 
 // Manager updates the managed fields and merges applied configurations.
@@ -81,10 +92,10 @@ func NewDefaultFieldManager(models openapiproto.Models, objectConverter runtime.
 }
 
 // NewDefaultCRDFieldManager creates a new FieldManager specifically for
-// CRDs. This allows for the possibility of fields which are not defined
-// in models, as well as having no models defined at all.
-func NewDefaultCRDFieldManager(models openapiproto.Models, objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, objectCreater runtime.ObjectCreater, kind schema.GroupVersionKind, hub schema.GroupVersion, preserveUnknownFields bool) (_ *FieldManager, err error) {
-	f, err := NewCRDStructuredMergeManager(models, objectConverter, objectDefaulter, kind.GroupVersion(), hub, preserveUnknownFields)
+// CRDs. This fieldmanager takes a custom typeConverter as an argument,
+// and uses a default deduced type converter if none is provided.
+func NewDefaultCRDFieldManager(typeConverter TypeConverter, objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, objectCreater runtime.ObjectCreater, kind schema.GroupVersionKind, hub schema.GroupVersion) (_ *FieldManager, err error) {
+	f, err := NewCRDStructuredMergeManager(typeConverter, objectConverter, objectDefaulter, kind.GroupVersion(), hub)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create field manager: %v", err)
 	}

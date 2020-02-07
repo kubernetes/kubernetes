@@ -37,12 +37,12 @@ import (
 	structuraldefaulting "k8s.io/apiextensions-apiserver/pkg/apiserver/schema/defaulting"
 	schemaobjectmeta "k8s.io/apiextensions-apiserver/pkg/apiserver/schema/objectmeta"
 	structuralpruning "k8s.io/apiextensions-apiserver/pkg/apiserver/schema/pruning"
+	structuralsmd "k8s.io/apiextensions-apiserver/pkg/apiserver/schema/smd"
 	apiservervalidation "k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
 	informers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions/v1"
 	listers "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/controller/establish"
 	"k8s.io/apiextensions-apiserver/pkg/controller/finalizer"
-	"k8s.io/apiextensions-apiserver/pkg/controller/openapi/builder"
 	"k8s.io/apiextensions-apiserver/pkg/crdserverscheme"
 	"k8s.io/apiextensions-apiserver/pkg/registry/customresource"
 	"k8s.io/apiextensions-apiserver/pkg/registry/customresource/tableconvertor"
@@ -82,7 +82,7 @@ import (
 	"k8s.io/client-go/scale/scheme/autoscalingv1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog"
-	"k8s.io/kube-openapi/pkg/util/proto"
+	"k8s.io/kube-openapi/pkg/schemaconv"
 )
 
 // crdHandler serves the `/apis` endpoint.
@@ -647,10 +647,10 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 		structuralSchemas[v.Name] = s
 	}
 
-	openAPIModels, err := buildOpenAPIModelsForApply(r.staticOpenAPISpec, crd)
+	typeConverter, err := buildTypeConverterForApply(crd.Spec.Versions, structuralSchemas, r.staticOpenAPISpec, crd.Spec.PreserveUnknownFields)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("error building openapi models for %s: %v", crd.Name, err))
-		openAPIModels = nil
+		utilruntime.HandleError(fmt.Errorf("failed to building typeConverter for apply: %s: %v", crd.Name, err))
+		return nil, fmt.Errorf("the server could not properly serve the CR schema") // validation should avoid this
 	}
 
 	safeConverter, unsafeConverter, err := r.converterFactory.NewConverter(crd)
@@ -826,13 +826,12 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 		if utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
 			reqScope := *requestScopes[v.Name]
 			reqScope.FieldManager, err = fieldmanager.NewDefaultCRDFieldManager(
-				openAPIModels,
+				typeConverter,
 				reqScope.Convertor,
 				reqScope.Defaulter,
 				reqScope.Creater,
 				reqScope.Kind,
 				reqScope.HubGroupVersion,
-				crd.Spec.PreserveUnknownFields,
 			)
 			if err != nil {
 				return nil, err
@@ -1234,34 +1233,37 @@ func serverStartingError() error {
 	return err
 }
 
-// buildOpenAPIModelsForApply constructs openapi models from any validation schemas specified in the custom resource,
+// buildTypeConverterForApply constructs TypeConverter from any validation schemas specified in the custom resource,
 // and merges it with the models defined in the static OpenAPI spec.
-// Returns nil models if the ServerSideApply feature is disabled, or the static spec is nil, or an error is encountered.
-func buildOpenAPIModelsForApply(staticOpenAPISpec *spec.Swagger, crd *apiextensionsv1.CustomResourceDefinition) (proto.Models, error) {
+// Returns nil if the ServerSideApply feature is disabled, or the static spec is nil, or an error is encountered.
+func buildTypeConverterForApply(versions []apiextensionsv1.CustomResourceDefinitionVersion, structuralSchemas map[string]*structuralschema.Structural, staticOpenAPISpec *spec.Swagger, preserveUnknown bool) (fieldmanager.TypeConverter, error) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
 		return nil, nil
 	}
 	if staticOpenAPISpec == nil {
 		return nil, nil
 	}
-
-	specs := []*spec.Swagger{}
-	for _, v := range crd.Spec.Versions {
-		s, err := builder.BuildSwagger(crd, v.Name, builder.Options{V2: false, StripDefaults: true, StripValueValidation: true, StripNullable: true, AllowNonStructural: true})
+	models, err := utilopenapi.ToProtoModels(staticOpenAPISpec)
+	if err != nil {
+		return nil, err
+	}
+	baseSchema, err := schemaconv.ToSchemaWithPreserveUnknownFields(models, preserveUnknown)
+	if err != nil {
+		return nil, err
+	}
+	builder := structuralsmd.NewTypeConverterBuilder(baseSchema, preserveUnknown)
+	for _, version := range versions {
+		v := version.Name
+		s := &structuralschema.Structural{}
+		if structuralSchema, ok := structuralSchemas[v]; ok {
+			if len(structuralschema.ValidateStructural(nil, structuralSchema)) == 0 {
+				s = structuralSchema
+			}
+		}
+		err = builder.AddStructural(v, s)
 		if err != nil {
 			return nil, err
 		}
-		specs = append(specs, s)
 	}
-
-	mergedOpenAPI, err := builder.MergeSpecs(staticOpenAPISpec, specs...)
-	if err != nil {
-		return nil, err
-	}
-
-	models, err := utilopenapi.ToProtoModels(mergedOpenAPI)
-	if err != nil {
-		return nil, err
-	}
-	return models, nil
+	return builder.Build(), nil
 }

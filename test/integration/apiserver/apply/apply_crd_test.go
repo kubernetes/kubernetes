@@ -59,6 +59,8 @@ func TestApplyCRDNoSchema(t *testing.T) {
 	}
 
 	noxuDefinition := fixtures.NewMultipleVersionNoxuCRD(apiextensionsv1beta1.ClusterScoped)
+	noxuDefinition.ObjectMeta.Name = "noxunoschemas.mygroup.example.com"
+	noxuDefinition.Spec.Names.Plural = "noxunoschemas"
 
 	noxuDefinition, err = fixtures.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 	if err != nil {
@@ -153,6 +155,8 @@ func TestApplyCRDStructuralSchema(t *testing.T) {
 	}
 
 	noxuDefinition := fixtures.NewMultipleVersionNoxuCRD(apiextensionsv1beta1.ClusterScoped)
+	noxuDefinition.ObjectMeta.Name = "noxustructuralschemas.mygroup.example.com"
+	noxuDefinition.Spec.Names.Plural = "noxustructuralschemas"
 
 	var c apiextensionsv1beta1.CustomResourceValidation
 	err = json.Unmarshal([]byte(`{
@@ -394,6 +398,8 @@ func TestApplyCRDNonStructuralSchema(t *testing.T) {
 	}
 
 	noxuDefinition := fixtures.NewNoxuCustomResourceDefinition(apiextensionsv1beta1.ClusterScoped)
+	noxuDefinition.ObjectMeta.Name = "noxunonstructuralschemas.mygroup.example.com"
+	noxuDefinition.Spec.Names.Plural = "noxunonstructuralschemas"
 
 	var c apiextensionsv1beta1.CustomResourceValidation
 	err = json.Unmarshal([]byte(`{
@@ -632,6 +638,8 @@ func TestApplyCRDUnhandledSchema(t *testing.T) {
 	}
 
 	noxuDefinition := fixtures.NewNoxuCustomResourceDefinition(apiextensionsv1beta1.ClusterScoped)
+	noxuDefinition.ObjectMeta.Name = "noxuunhandledchemas.mygroup.example.com"
+	noxuDefinition.Spec.Names.Plural = "noxuunhandledchemas"
 
 	// This is a schema that kube-openapi ToProtoModels does not handle correctly.
 	// https://github.com/kubernetes/kubernetes/blob/38752f7f99869ed65fb44378360a517649dc2f83/vendor/k8s.io/kube-openapi/pkg/util/proto/document.go#L184

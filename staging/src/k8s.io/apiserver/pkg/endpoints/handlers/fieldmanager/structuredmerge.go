@@ -64,15 +64,11 @@ func NewStructuredMergeManager(models openapiproto.Models, objectConverter runti
 }
 
 // NewCRDStructuredMergeManager creates a new Manager specifically for
-// CRDs. This allows for the possibility of fields which are not defined
-// in models, as well as having no models defined at all.
-func NewCRDStructuredMergeManager(models openapiproto.Models, objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, gv schema.GroupVersion, hub schema.GroupVersion, preserveUnknownFields bool) (_ Manager, err error) {
-	var typeConverter internal.TypeConverter = internal.DeducedTypeConverter{}
-	if models != nil {
-		typeConverter, err = internal.NewTypeConverter(models, preserveUnknownFields)
-		if err != nil {
-			return nil, err
-		}
+// CRDs. This fieldmanager takes a custom typeConverter as an argument,
+// and uses a default deduced type converter if none is provided.
+func NewCRDStructuredMergeManager(typeConverter TypeConverter, objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, gv schema.GroupVersion, hub schema.GroupVersion) (_ Manager, err error) {
+	if typeConverter == nil {
+		typeConverter = internal.DeducedTypeConverter{}
 	}
 	return &structuredMergeManager{
 		typeConverter:   typeConverter,
