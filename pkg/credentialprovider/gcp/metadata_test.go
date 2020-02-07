@@ -323,50 +323,6 @@ func TestContainerRegistryNoServiceAccount(t *testing.T) {
 	}
 }
 
-func TestContainerRegistryNoStorageScope(t *testing.T) {
-	const (
-		serviceAccountsEndpoint = "/computeMetadata/v1/instance/service-accounts/"
-		defaultEndpoint         = "/computeMetadata/v1/instance/service-accounts/default/"
-		scopeEndpoint           = defaultEndpoint + "scopes"
-	)
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Only serve the URL key and the value endpoint
-		if scopeEndpoint == r.URL.Path {
-			w.WriteHeader(http.StatusOK)
-			w.Header().Set("Content-Type", "application/json")
-			fmt.Fprint(w, `["https://www.googleapis.com/auth/compute.read_write"]`)
-		} else if serviceAccountsEndpoint == r.URL.Path {
-			w.WriteHeader(http.StatusOK)
-			fmt.Fprintln(w, "default/\ncustom")
-		} else {
-			http.Error(w, "", http.StatusNotFound)
-		}
-	}))
-	defer server.Close()
-
-	var err error
-	gceProductNameFile, err = createProductNameFile()
-	if err != nil {
-		t.Errorf("failed to create gce product name file: %v", err)
-	}
-	defer os.Remove(gceProductNameFile)
-
-	// Make a transport that reroutes all traffic to the example server
-	transport := utilnet.SetTransportDefaults(&http.Transport{
-		Proxy: func(req *http.Request) (*url.URL, error) {
-			return url.Parse(server.URL + req.URL.Path)
-		},
-	})
-
-	provider := &containerRegistryProvider{
-		metadataProvider{Client: &http.Client{Transport: transport}},
-	}
-
-	if provider.Enabled() {
-		t.Errorf("Provider is unexpectedly enabled")
-	}
-}
-
 func TestComputePlatformScopeSubstitutesStorageScope(t *testing.T) {
 	const (
 		serviceAccountsEndpoint = "/computeMetadata/v1/instance/service-accounts/"

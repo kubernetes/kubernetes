@@ -235,27 +235,8 @@ func (g *containerRegistryProvider) Enabled() bool {
 		klog.V(2).Infof("'default' service account does not exist. Found following service accounts: %q", string(value))
 		return false
 	}
-	url := metadataScopes + "?alt=json"
-	value = runWithBackoff(func() ([]byte, error) {
-		value, err := credentialprovider.ReadUrl(url, g.Client, metadataHeader)
-		if err != nil {
-			klog.V(2).Infof("Failed to Get scopes in default service account from gce metadata server: %v", err)
-		}
-		return value, err
-	})
-	var scopes []string
-	if err := json.Unmarshal(value, &scopes); err != nil {
-		klog.Errorf("Failed to unmarshal scopes: %v", err)
-		return false
-	}
-	for _, v := range scopes {
-		// cloudPlatformScope implies storage scope.
-		if strings.HasPrefix(v, storageScopePrefix) || strings.HasPrefix(v, cloudPlatformScopePrefix) {
-			return true
-		}
-	}
-	klog.Warningf("Google container registry is disabled, no storage scope is available: %s", value)
-	return false
+
+	return true
 }
 
 // tokenBlob is used to decode the JSON blob containing an access token
