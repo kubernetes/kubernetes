@@ -2668,8 +2668,6 @@ EOF
       cni_template_path=""
     fi
   fi
-  # Reuse docker group for containerd.
-  local containerd_gid="$(cat /etc/group | grep ^docker: | cut -d: -f 3)"
   cat > "${config_path}" <<EOF
 # Kubernetes doesn't use containerd restart manager.
 disabled_plugins = ["restart"]
@@ -2677,9 +2675,6 @@ oom_score = -999
 
 [debug]
   level = "${CONTAINERD_LOG_LEVEL:-"info"}"
-
-[grpc]
-  gid = ${containerd_gid}
 
 [plugins.cri]
   stream_server_address = "127.0.0.1"
@@ -2691,6 +2686,16 @@ oom_score = -999
 [plugins.cri.registry.mirrors."docker.io"]
   endpoint = ["https://mirror.gcr.io","https://registry-1.docker.io"]
 EOF
+
+  # Reuse docker group for containerd.
+  local containerd_gid="$(cat /etc/group | grep ^docker: | cut -d: -f 3)"
+  if [[ ! -z "${containerd_gid:-}" ]]; then
+    cat >> "${config_path}" <<EOF
+# reuse id of the docker group
+[grpc]
+  gid = ${containerd_gid}
+EOF
+  fi
   chmod 644 "${config_path}"
 
   echo "Restart containerd to load the config change"
