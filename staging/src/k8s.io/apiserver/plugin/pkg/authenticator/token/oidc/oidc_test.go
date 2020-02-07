@@ -37,8 +37,6 @@ import (
 
 	oidc "github.com/coreos/go-oidc"
 	jose "gopkg.in/square/go-jose.v2"
-
-	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/klog"
 )
@@ -142,7 +140,6 @@ type claimsTest struct {
 	wantInitErr        bool
 	claimToResponseMap map[string]string
 	openIDConfig       string
-	reqAudiences       authenticator.Audiences
 }
 
 // Replace formats the contents of v into the provided template.
@@ -299,12 +296,7 @@ func (c *claimsTest) run(t *testing.T) {
 		t.Fatalf("serialize token: %v", err)
 	}
 
-	ctx := context.Background()
-	if c.reqAudiences != nil {
-		ctx = authenticator.WithAudiences(ctx, c.reqAudiences)
-	}
-
-	got, ok, err := a.AuthenticateToken(ctx, token)
+	got, ok, err := a.AuthenticateToken(context.Background(), token)
 
 	if err != nil {
 		if !c.wantErr {
@@ -1397,11 +1389,10 @@ func TestToken(t *testing.T) {
 			},
 		},
 		{
-			name: "good token with api req audience",
+			name: "good token with bad client id",
 			options: Options{
 				IssuerURL:     "https://auth.example.com",
 				ClientID:      "my-client",
-				APIAudiences:  authenticator.Audiences{"api"},
 				UsernameClaim: "username",
 				now:           func() time.Time { return now },
 			},
@@ -1411,132 +1402,11 @@ func TestToken(t *testing.T) {
 			},
 			claims: fmt.Sprintf(`{
 				"iss": "https://auth.example.com",
-				"aud": "my-client",
+				"aud": "my-wrong-client",
 				"username": "jane",
 				"exp": %d
 			}`, valid.Unix()),
-			reqAudiences: authenticator.Audiences{"api"},
-			want: &user.DefaultInfo{
-				Name: "jane",
-			},
-		},
-		{
-			name: "good token with multiple api req audience",
-			options: Options{
-				IssuerURL:     "https://auth.example.com",
-				ClientID:      "my-client",
-				APIAudiences:  authenticator.Audiences{"api", "other"},
-				UsernameClaim: "username",
-				now:           func() time.Time { return now },
-			},
-			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
-			pubKeys: []*jose.JSONWebKey{
-				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
-			},
-			claims: fmt.Sprintf(`{
-				"iss": "https://auth.example.com",
-				"aud": "my-client",
-				"username": "jane",
-				"exp": %d
-			}`, valid.Unix()),
-			reqAudiences: authenticator.Audiences{"api"},
-			want: &user.DefaultInfo{
-				Name: "jane",
-			},
-		},
-		{
-			name: "good token with client_id req audience",
-			options: Options{
-				IssuerURL:     "https://auth.example.com",
-				ClientID:      "my-client",
-				APIAudiences:  authenticator.Audiences{"api"},
-				UsernameClaim: "username",
-				now:           func() time.Time { return now },
-			},
-			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
-			pubKeys: []*jose.JSONWebKey{
-				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
-			},
-			claims: fmt.Sprintf(`{
-				"iss": "https://auth.example.com",
-				"aud": "my-client",
-				"username": "jane",
-				"exp": %d
-			}`, valid.Unix()),
-			reqAudiences: authenticator.Audiences{"my-client"},
-			want: &user.DefaultInfo{
-				Name: "jane",
-			},
-		},
-		{
-			name: "good token with client_id and api req audience",
-			options: Options{
-				IssuerURL:     "https://auth.example.com",
-				ClientID:      "my-client",
-				APIAudiences:  authenticator.Audiences{"api"},
-				UsernameClaim: "username",
-				now:           func() time.Time { return now },
-			},
-			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
-			pubKeys: []*jose.JSONWebKey{
-				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
-			},
-			claims: fmt.Sprintf(`{
-				"iss": "https://auth.example.com",
-				"aud": "my-client",
-				"username": "jane",
-				"exp": %d
-			}`, valid.Unix()),
-			reqAudiences: authenticator.Audiences{"my-client", "api"},
-			want: &user.DefaultInfo{
-				Name: "jane",
-			},
-		},
-		{
-			name: "good token with client_id and api req audience",
-			options: Options{
-				IssuerURL:     "https://auth.example.com",
-				ClientID:      "my-client",
-				APIAudiences:  authenticator.Audiences{"api"},
-				UsernameClaim: "username",
-				now:           func() time.Time { return now },
-			},
-			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
-			pubKeys: []*jose.JSONWebKey{
-				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
-			},
-			claims: fmt.Sprintf(`{
-				"iss": "https://auth.example.com",
-				"aud": "my-client",
-				"username": "jane",
-				"exp": %d
-			}`, valid.Unix()),
-			reqAudiences: authenticator.Audiences{"my-client", "api"},
-			want: &user.DefaultInfo{
-				Name: "jane",
-			},
-		},
-		{
-			name: "good token with client_id and bad req audience",
-			options: Options{
-				IssuerURL:     "https://auth.example.com",
-				ClientID:      "my-client",
-				APIAudiences:  authenticator.Audiences{"api"},
-				UsernameClaim: "username",
-				now:           func() time.Time { return now },
-			},
-			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
-			pubKeys: []*jose.JSONWebKey{
-				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
-			},
-			claims: fmt.Sprintf(`{
-				"iss": "https://auth.example.com",
-				"aud": "my-client",
-				"username": "jane",
-				"exp": %d
-			}`, valid.Unix()),
-			reqAudiences: authenticator.Audiences{"other"},
-			wantSkip:     true,
+			wantErr: true,
 		},
 	}
 	for _, test := range tests {
