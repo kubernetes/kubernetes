@@ -624,4 +624,5 @@ else
 bazel-release:
 	bazel build //build/release-tars
 	bazel shutdown
+	pkill ^bazel || true
 endif
