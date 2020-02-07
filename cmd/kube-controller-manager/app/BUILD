@@ -84,7 +84,6 @@ go_library(
         "//pkg/quota/v1/install:go_default_library",
         "//pkg/serviceaccount:go_default_library",
         "//pkg/volume:go_default_library",
-        "//pkg/volume/awsebs:go_default_library",
         "//pkg/volume/azure_file:go_default_library",
         "//pkg/volume/azuredd:go_default_library",
         "//pkg/volume/cinder:go_default_library",

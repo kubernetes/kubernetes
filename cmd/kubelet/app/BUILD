@@ -50,7 +50,6 @@ go_library(
         "//pkg/util/oom:go_default_library",
         "//pkg/util/rlimit:go_default_library",
         "//pkg/volume:go_default_library",
-        "//pkg/volume/awsebs:go_default_library",
         "//pkg/volume/azure_file:go_default_library",
         "//pkg/volume/azuredd:go_default_library",
         "//pkg/volume/cephfs:go_default_library",

@@ -38,7 +38,6 @@ var testDrivers = []func() testsuites.TestDriver{
 	drivers.InitWindowsGcePdDriver,
 	drivers.InitVSphereDriver,
 	drivers.InitAzureDiskDriver,
-	drivers.InitAwsDriver,
 	drivers.InitLocalDriverWithVolumeType(utils.LocalVolumeDirectory),
 	drivers.InitLocalDriverWithVolumeType(utils.LocalVolumeDirectoryLink),
 	drivers.InitLocalDriverWithVolumeType(utils.LocalVolumeDirectoryBindMounted),
