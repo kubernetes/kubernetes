@@ -34,7 +34,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/errors"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
-	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 )
 
@@ -43,6 +42,13 @@ const (
 
 	// Various default sandbox resources requests/limits.
 	defaultSandboxCPUshares int64 = 2
+
+	// defaultSandboxOOMAdj is the oom score adjustment for the docker
+	// sandbox container. Using this OOM adj makes it very unlikely, but not
+	// impossible, that the defaultSandox will experience an oom kill. -998
+	// is chosen to signify sandbox should be OOM killed before other more
+	// vital processes like the docker daemon, the kubelet, etc...
+	defaultSandboxOOMAdj int = -998
 
 	// Name of the underlying container runtime
 	runtimeName = "docker"
@@ -643,8 +649,7 @@ func (ds *dockerService) makeSandboxDockerConfig(c *runtimeapi.PodSandboxConfig,
 	createConfig.Config.ExposedPorts = exposedPorts
 	hc.PortBindings = portBindings
 
-	// TODO: Get rid of the dependency on kubelet internal package.
-	hc.OomScoreAdj = qos.PodInfraOOMAdj
+	hc.OomScoreAdj = defaultSandboxOOMAdj
 
 	// Apply resource options.
 	if err := ds.applySandboxResources(hc, c.GetLinux()); err != nil {

@@ -51,7 +51,6 @@ go_library(
         "//pkg/kubelet/dockershim/network/kubenet:go_default_library",
         "//pkg/kubelet/kuberuntime:go_default_library",
         "//pkg/kubelet/leaky:go_default_library",
-        "//pkg/kubelet/qos:go_default_library",
         "//pkg/kubelet/server/streaming:go_default_library",
         "//pkg/kubelet/types:go_default_library",
         "//pkg/kubelet/util/cache:go_default_library",
