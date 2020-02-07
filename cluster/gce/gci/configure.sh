@@ -436,6 +436,39 @@ function install-docker {
   rm -rf /var/lib/apt/lists/*
 }
 
+# If we are on ubuntu we can try to install containerd
+function install-containerd {
+  # bailout if we are not on ubuntu
+  if ! command -v apt-get >/dev/null 2>&1; then
+    echo "Unable to install automatically install docker. Bailing out..."
+    return
+  fi
+  # Install dependencies, some of these are already installed in the image but
+  # that's fine since they won't re-install and we can reuse the code below
+  # for another image someday.
+  apt-get update
+  apt-get install -y --no-install-recommends \
+    apt-transport-https \
+    ca-certificates \
+    socat \
+    curl \
+    gnupg2 \
+    software-properties-common \
+    lsb-release
+
+  # Add the Docker apt-repository (as we install containerd from there)
+  curl -fsSL https://download.docker.com/linux/$(. /etc/os-release; echo "$ID")/gpg \
+    | apt-key add -
+  add-apt-repository \
+    "deb [arch=amd64] https://download.docker.com/linux/$(. /etc/os-release; echo "$ID") \
+    $(lsb_release -cs) stable"
+
+  # Install containerd from Docker repo
+  apt-get update && \
+    apt-get install -y --no-install-recommends containerd
+  rm -rf /var/lib/apt/lists/*
+}
+
 function ensure-container-runtime {
   container_runtime="${CONTAINER_RUNTIME:-docker}"
   if [[ "${container_runtime}" == "docker" ]]; then
@@ -448,11 +481,17 @@ function ensure-container-runtime {
     fi
     docker version
   elif [[ "${container_runtime}" == "containerd" ]]; then
+    set -x
     if ! command -v ctr >/dev/null 2>&1; then
-      echo "ERROR ctr not found. Aborting."
-      exit 2
+      install-containerd
+      if ! command -v containerd >/dev/null 2>&1; then
+        echo "ERROR containerd not found. Aborting."
+        exit 2
+      fi
     fi
-    ctr version
+    ctr --version
+    containerd --version
+    runc --version
   fi
 }
 
