@@ -1550,6 +1550,58 @@ func TestCRIHandler(t *testing.T) {
 	assert.Equal(t, query, fw.criHandler.RequestReceived.URL.RawQuery)
 }
 
+func TestMetricBuckets(t *testing.T) {
+	tests := map[string]struct {
+		url    string
+		bucket string
+	}{
+		"healthz endpoint":                {url: "/healthz", bucket: "healthz"},
+		"attach":                          {url: "/attach/podNamespace/podID/containerName", bucket: "attach"},
+		"attach with uid":                 {url: "/attach/podNamespace/podID/uid/containerName", bucket: "attach"},
+		"configz":                         {url: "/configz", bucket: "configz"},
+		"containerLogs":                   {url: "/containerLogs/podNamespace/podID/containerName", bucket: "containerLogs"},
+		"cri":                             {url: "/cri/", bucket: "cri"},
+		"cri with sub":                    {url: "/cri/foo", bucket: "cri"},
+		"debug v flags":                   {url: "/debug/flags/v", bucket: "debug"},
+		"pprof with sub":                  {url: "/debug/pprof/subpath", bucket: "debug"},
+		"exec":                            {url: "/exec/podNamespace/podID/containerName", bucket: "exec"},
+		"exec with uid":                   {url: "/exec/podNamespace/podID/uid/containerName", bucket: "exec"},
+		"healthz":                         {url: "/healthz/", bucket: "healthz"},
+		"healthz log sub":                 {url: "/healthz/log", bucket: "healthz"},
+		"healthz ping":                    {url: "/healthz/ping", bucket: "healthz"},
+		"healthz sync loop":               {url: "/healthz/syncloop", bucket: "healthz"},
+		"logs":                            {url: "/logs/", bucket: "logs"},
+		"logs with path":                  {url: "/logs/logpath", bucket: "logs"},
+		"metrics":                         {url: "/metrics", bucket: "metrics"},
+		"metrics cadvisor sub":            {url: "/metrics/cadvisor", bucket: "metrics/cadvisor"},
+		"metrics probes sub":              {url: "/metrics/probes", bucket: "metrics/probes"},
+		"metrics resource v1alpha1":       {url: "/metrics/resource/v1alpha1", bucket: "metrics/resource"},
+		"metrics resource sub":            {url: "/metrics/resource", bucket: "metrics/resource"},
+		"pods":                            {url: "/pods/", bucket: "pods"},
+		"portForward":                     {url: "/portForward/podNamespace/podID", bucket: "portForward"},
+		"portForward with uid":            {url: "/portForward/podNamespace/podID/uid", bucket: "portForward"},
+		"run":                             {url: "/run/podNamespace/podID/containerName", bucket: "run"},
+		"run with uid":                    {url: "/run/podNamespace/podID/uid/containerName", bucket: "run"},
+		"runningpods":                     {url: "/runningpods/", bucket: "runningpods"},
+		"spec":                            {url: "/spec/", bucket: "spec"},
+		"stats":                           {url: "/stats/", bucket: "stats"},
+		"stats container sub":             {url: "/stats/container", bucket: "stats"},
+		"stats summary sub":               {url: "/stats/summary", bucket: "stats"},
+		"stats containerName with uid":    {url: "/stats/namespace/podName/uid/containerName", bucket: "stats"},
+		"stats containerName":             {url: "/stats/podName/containerName", bucket: "stats"},
+		"invalid path":                    {url: "/junk", bucket: "Invalid path"},
+		"invalid path starting with good": {url: "/healthzjunk", bucket: "Invalid path"},
+	}
+	fw := newServerTest()
+	defer fw.testHTTPServer.Close()
+
+	for _, test := range tests {
+		path := test.url
+		bucket := test.bucket
+		require.Equal(t, fw.serverUnderTest.getMetricBucket(path), bucket)
+	}
+}
+
 func TestDebuggingDisabledHandlers(t *testing.T) {
 	fw := newServerTestWithDebug(false, false, nil)
 	defer fw.testHTTPServer.Close()
@@ -1623,6 +1675,6 @@ func TestTrimURLPath(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		assert.Equal(t, test.expected, trimURLPath(test.path), fmt.Sprintf("path is: %s", test.path))
+		assert.Equal(t, test.expected, getURLRootPath(test.path), fmt.Sprintf("path is: %s", test.path))
 	}
 }
