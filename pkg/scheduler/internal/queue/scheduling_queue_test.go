@@ -165,13 +165,12 @@ func TestPriorityQueue_Add(t *testing.T) {
 }
 
 func newDefaultFramework() framework.Framework {
-	defaultCfg := algorithmprovider.NewRegistry(1)[schedulerapi.SchedulerDefaultProviderName]
-	pl, pls := defaultCfg.FrameworkPlugins, defaultCfg.FrameworkPluginConfig
+	plugins := algorithmprovider.NewRegistry()[schedulerapi.SchedulerDefaultProviderName]
 	fakeClient := fake.NewSimpleClientset()
 	fwk, err := framework.NewFramework(
 		frameworkplugins.NewInTreeRegistry(),
-		pl,
-		pls,
+		plugins,
+		nil,
 		framework.WithClientSet(fakeClient),
 		framework.WithInformerFactory(informers.NewSharedInformerFactory(fakeClient, 0)),
 		framework.WithSnapshotSharedLister(cache.NewEmptySnapshot()),

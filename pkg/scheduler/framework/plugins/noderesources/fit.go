@@ -52,7 +52,7 @@ type Fit struct {
 type FitArgs struct {
 	// IgnoredResources is the list of resources that NodeResources fit filter
 	// should ignore.
-	IgnoredResources []string `json:"IgnoredResources,omitempty"`
+	IgnoredResources []string `json:"ignoredResources,omitempty"`
 }
 
 // preFilterState computed at PreFilter and used at Filter.

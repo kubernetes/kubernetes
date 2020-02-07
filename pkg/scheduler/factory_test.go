@@ -42,7 +42,9 @@ import (
 	extenderv1 "k8s.io/kubernetes/pkg/scheduler/apis/extender/v1"
 	frameworkplugins "k8s.io/kubernetes/pkg/scheduler/framework/plugins"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodelabel"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/serviceaffinity"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
@@ -190,17 +192,29 @@ func TestCreateFromConfigWithHardPodAffinitySymmetricWeight(t *testing.T) {
 		"priorities" : [
 			{"name" : "RackSpread", "weight" : 3, "argument" : {"serviceAntiAffinity" : {"label" : "rack"}}},
 			{"name" : "NodeAffinityPriority", "weight" : 2},
-			{"name" : "ImageLocalityPriority", "weight" : 1}
+			{"name" : "ImageLocalityPriority", "weight" : 1},
+			{"name" : "InterPodAffinityPriority", "weight" : 1}
 		],
 		"hardPodAffinitySymmetricWeight" : 10
 	}`)
 	if err := runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), configData, &policy); err != nil {
-		t.Errorf("Invalid configuration: %v", err)
+		t.Fatalf("Invalid configuration: %v", err)
 	}
 	factory.createFromConfig(policy)
-	hpa := factory.hardPodAffinitySymmetricWeight
-	if hpa != 10 {
-		t.Errorf("Wrong hardPodAffinitySymmetricWeight, ecpected: %d, got: %d", 10, hpa)
+	// TODO(#87703): Verify that the entire pluginConfig is correct.
+	foundAffinityCfg := false
+	for _, cfg := range factory.pluginConfig {
+		if cfg.Name == interpodaffinity.Name {
+			foundAffinityCfg = true
+			wantArgs := runtime.Unknown{Raw: []byte(`{"hardPodAffinityWeight":10}`)}
+
+			if diff := cmp.Diff(wantArgs, cfg.Args); diff != "" {
+				t.Errorf("wrong InterPodAffinity args (-want, +got): %s", diff)
+			}
+		}
+	}
+	if !foundAffinityCfg {
+		t.Errorf("args for InterPodAffinity were not found")
 	}
 }
 
@@ -219,6 +233,19 @@ func TestCreateFromEmptyConfig(t *testing.T) {
 	}
 
 	factory.createFromConfig(policy)
+	wantConfig := []schedulerapi.PluginConfig{
+		{
+			Name: noderesources.FitName,
+			Args: runtime.Unknown{Raw: []byte(`null`)},
+		},
+		{
+			Name: interpodaffinity.Name,
+			Args: runtime.Unknown{Raw: []byte(`{"hardPodAffinityWeight":1}`)},
+		},
+	}
+	if diff := cmp.Diff(wantConfig, factory.pluginConfig); diff != "" {
+		t.Errorf("wrong plugin config (-want, +got): %s", diff)
+	}
 }
 
 // Test configures a scheduler from a policy that does not specify any
