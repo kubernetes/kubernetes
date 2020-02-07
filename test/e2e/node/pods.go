@@ -48,7 +48,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 		/*
 			Release : v1.15
 			Testname: Pods, delete grace period
-			Description: Create a pod, make sure it is running. Using the http client send a ‘delete’ with gracePeriodSeconds=30. Pod SHOULD get deleted within 30 seconds.
+			Description: Create a pod, make sure it is running. Using the http client send a 'delete' with gracePeriodSeconds=30. Pod SHOULD get deleted within 30 seconds.
 		*/
 		ginkgo.It("should be submitted and removed [Flaky]", func() {
 			ginkgo.By("creating the pod")
