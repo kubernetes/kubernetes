@@ -105,6 +105,10 @@ type ManagerImpl struct {
 
 	// Store of Topology Affinties that the Device Manager can query.
 	topologyAffinityStore topologymanager.Store
+
+	// devicesToReuse contains devices that can be reused as they have been allocated to
+	// init containers.
+	devicesToReuse PodReusableDevices
 }
 
 type endpointInfo struct {
@@ -113,6 +117,9 @@ type endpointInfo struct {
 }
 
 type sourcesReadyStub struct{}
+
+// PodReusableDevices is a map by pod name of devices to reuse.
+type PodReusableDevices map[string]map[string]sets.String
 
 func (s *sourcesReadyStub) AddSource(source string) {}
 func (s *sourcesReadyStub) AllReady() bool          { return true }
@@ -147,6 +154,7 @@ func newManagerImpl(socketPath string, numaNodeInfo cputopology.NUMANodeInfo, to
 		podDevices:            make(podDevices),
 		numaNodes:             numaNodes,
 		topologyAffinityStore: topologyAffinityStore,
+		devicesToReuse:        make(PodReusableDevices),
 	}
 	manager.callback = manager.genericDeviceUpdateCallback
 
@@ -350,54 +358,39 @@ func (m *ManagerImpl) isVersionCompatibleWithPlugin(versions []string) bool {
 	return false
 }
 
-func (m *ManagerImpl) allocatePodResources(pod *v1.Pod) error {
-	devicesToReuse := make(map[string]sets.String)
-	for _, container := range pod.Spec.InitContainers {
-		if err := m.allocateContainerResources(pod, &container, devicesToReuse); err != nil {
-			return err
-		}
-		m.podDevices.addContainerAllocatedResources(string(pod.UID), container.Name, devicesToReuse)
-	}
-	for _, container := range pod.Spec.Containers {
-		if err := m.allocateContainerResources(pod, &container, devicesToReuse); err != nil {
-			return err
-		}
-		m.podDevices.removeContainerAllocatedResources(string(pod.UID), container.Name, devicesToReuse)
-	}
-	return nil
-}
-
 // Allocate is the call that you can use to allocate a set of devices
 // from the registered device plugins.
 func (m *ManagerImpl) Allocate(pod *v1.Pod, container *v1.Container) error {
-	// TODO: This function does not yet do what it is supposed to. The call to
-	// allocatePodResources() below is still allocating devices to a pod all at
-	// once. We need to unroll this logic to allow it to allocate devices on a
-	// container-by-container basis instead. The main challenge will be
-	// ensuring that we "reuse" devices from init containers when allocating
-	// devices to app containers (just as the logic inside
-	// allocatePodResources() currently does). The hard part being that we will
-	// need to maintain the 'devicesToReuse' present in allocatePodResources()
-	// across invocations of Allocate().
-	//
-	// My initial inclination to solve this with the least coode churn is:
-	//   1) Create a new type called PodReusableDevices, defined as:
-	//			type PodReusableDevices map[string]map[string]sets.String
-	//   2) Instantiate a PodReusableDevices map as a new field of the
-	//      devicemanager called devicesToReuse (similar to the local
-	//      devicesToReuse variable currently in allocatePodResources)
-	//   3) Use devicesToReuse[string(pod.UID) just as devicesToReuse is used
-	//      today, being careful to create / destroy the nested maps where
-	//      appropriate.
-
-	err := m.allocatePodResources(pod)
-	if err != nil {
-		klog.Errorf("Failed to allocate device plugin resource for pod %s, container %s: %v", string(pod.UID), container.Name, err)
+	if _, ok := m.devicesToReuse[string(pod.UID)]; !ok {
+		m.devicesToReuse[string(pod.UID)] = make(map[string]sets.String)
+	}
+	// If pod entries to m.devicesToReuse other than the current pod exist, delete them.
+	for podUID := range m.devicesToReuse {
+		if podUID != string(pod.UID) {
+			delete(m.devicesToReuse, podUID)
+		}
+	}
+	// Allocate resources for init containers first as we know the caller always loops
+	// through init containers before looping through app containers. Should the caller
+	// ever change those semantics, this logic will need to be amended.
+	for _, initContainer := range pod.Spec.InitContainers {
+		if container.Name == initContainer.Name {
+			if err := m.allocateContainerResources(pod, container, m.devicesToReuse[string(pod.UID)]); err != nil {
+				return err
+			}
+			m.podDevices.addContainerAllocatedResources(string(pod.UID), container.Name, m.devicesToReuse[string(pod.UID)])
+			return nil
+		}
+	}
+	if err := m.allocateContainerResources(pod, container, m.devicesToReuse[string(pod.UID)]); err != nil {
 		return err
 	}
+	m.podDevices.removeContainerAllocatedResources(string(pod.UID), container.Name, m.devicesToReuse[string(pod.UID)])
 	return nil
+
 }
 
+// UpdatePluginResources updates node resources based on devices already allocated to pods.
 func (m *ManagerImpl) UpdatePluginResources(node *schedulernodeinfo.NodeInfo, attrs *lifecycle.PodAdmitAttributes) error {
 	pod := attrs.Pod
 
