@@ -48,10 +48,6 @@ dependencies:
     refPaths:
     - path: build/debian-hyperkube-base/Makefile
       match: CNI_VERSION=
-    - path: build/rpms/kubeadm.spec
-      match: kubernetes-cni
-    - path: build/rpms/kubelet.spec
-      match: kubernetes-cni
     - path: build/workspace.bzl
       match: CNI_VERSION =
     - path: cluster/gce/gci/configure.sh

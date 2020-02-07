@@ -25,7 +25,6 @@ filegroup(
         for_client = ["//build:client-targets-and-hashes"],
         for_node = [
             "//build:node-targets-and-hashes",
-            "//build/debs:debs-and-hashes",
         ],
         for_server = [
             "//build:docker-artifacts-and-hashes",
