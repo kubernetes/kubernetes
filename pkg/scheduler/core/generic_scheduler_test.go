@@ -611,7 +611,7 @@ func TestGenericScheduler(t *testing.T) {
 			wErr:  fmt.Errorf("error while running score plugin for pod \"2\": %+v", errPrioritize),
 		},
 		{
-			name: "test even pods spread predicate - 2 nodes with maxskew=1",
+			name: "test podtopologyspread plugin - 2 nodes with maxskew=1",
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 				st.RegisterPluginAsExtensions(
@@ -659,7 +659,7 @@ func TestGenericScheduler(t *testing.T) {
 			wErr:          nil,
 		},
 		{
-			name: "test even pods spread predicate - 3 nodes with maxskew=2",
+			name: "test podtopologyspread plugin - 3 nodes with maxskew=2",
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 				st.RegisterPluginAsExtensions(
@@ -854,7 +854,6 @@ func makeScheduler(nodes []*v1.Node, fns ...st.RegisterPluginFunc) *genericSched
 		schedulerapi.DefaultPercentageOfNodesToScore, false)
 	cache.UpdateSnapshot(s.(*genericScheduler).nodeInfoSnapshot)
 	return s.(*genericScheduler)
-
 }
 
 func TestFindFitAllError(t *testing.T) {

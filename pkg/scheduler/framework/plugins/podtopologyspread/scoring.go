@@ -135,6 +135,10 @@ func (pl *PodTopologySpread) PostFilter(
 			// <matchSum> indicates how many pods (on current node) match the <constraint>.
 			matchSum := int64(0)
 			for _, existingPod := range nodeInfo.Pods() {
+				// Bypass terminating Pod (see #87621).
+				if existingPod.DeletionTimestamp != nil || existingPod.Namespace != pod.Namespace {
+					continue
+				}
 				if c.selector.Matches(labels.Set(existingPod.Labels)) {
 					matchSum++
 				}

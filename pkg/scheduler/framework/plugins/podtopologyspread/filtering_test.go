@@ -491,7 +491,7 @@ func TestPreFilterStateAddPod(t *testing.T) {
 			},
 		},
 		{
-			name: "add a pod with mis-matched namespace doesn't change topologyKeyToMinPodsMap",
+			name: "add a pod in a different namespace doesn't change topologyKeyToMinPodsMap",
 			preemptor: st.MakePod().Name("p").Label("foo", "").
 				SpreadConstraint(1, "node", hardSpread, st.MakeLabelSelector().Exists("foo").Obj()).
 				Obj(),
@@ -1036,7 +1036,7 @@ func TestSingleConstraint(t *testing.T) {
 			},
 		},
 		{
-			name: "existing pods with mis-matched namespace doesn't count",
+			name: "existing pods in a different namespace do not count",
 			pod: st.MakePod().Name("p").Label("foo", "").SpreadConstraint(
 				1, "zone", hardSpread, st.MakeLabelSelector().Exists("foo").Obj(),
 			).Obj(),
@@ -1223,6 +1223,24 @@ func TestSingleConstraint(t *testing.T) {
 				"node-b": true, // in real case, it's false
 				"node-x": true, // in real case, it's false
 				"node-y": false,
+			},
+		},
+		{
+			name: "terminating Pods should be excluded",
+			pod: st.MakePod().Name("p").Label("foo", "").SpreadConstraint(
+				1, "node", hardSpread, st.MakeLabelSelector().Exists("foo").Obj(),
+			).Obj(),
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-a").Label("node", "node-a").Obj(),
+				st.MakeNode().Name("node-b").Label("node", "node-b").Obj(),
+			},
+			existingPods: []*v1.Pod{
+				st.MakePod().Name("p-a").Node("node-a").Label("foo", "").Terminating().Obj(),
+				st.MakePod().Name("p-b").Node("node-b").Label("foo", "").Obj(),
+			},
+			fits: map[string]bool{
+				"node-a": true,
+				"node-b": false,
 			},
 		},
 	}
