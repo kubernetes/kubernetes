@@ -146,12 +146,6 @@ type SchedulerPolicyConfigMapSource struct {
 // to include scheduler specific configuration.
 type KubeSchedulerLeaderElectionConfiguration struct {
 	componentbaseconfigv1alpha1.LeaderElectionConfiguration `json:",inline"`
-	// LockObjectNamespace defines the namespace of the lock object
-	// DEPRECATED: will be removed in favor of resourceNamespace
-	LockObjectNamespace string `json:"lockObjectNamespace"`
-	// LockObjectName defines the lock object name
-	// DEPRECATED: will be removed in favor of resourceName
-	LockObjectName string `json:"lockObjectName"`
 }
 
 // Plugins include multiple extension points. When specified, the list of plugins for
