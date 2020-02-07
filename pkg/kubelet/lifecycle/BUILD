@@ -49,7 +49,6 @@ go_test(
         "//pkg/kubelet/util/format:go_default_library",
         "//pkg/scheduler/framework/plugins/nodename:go_default_library",
         "//pkg/scheduler/framework/plugins/nodeports:go_default_library",
-        "//pkg/scheduler/framework/plugins/noderesources:go_default_library",
         "//pkg/scheduler/nodeinfo:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
