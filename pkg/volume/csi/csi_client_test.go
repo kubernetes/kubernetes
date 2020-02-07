@@ -26,6 +26,7 @@ import (
 	csipbv1 "github.com/container-storage-interface/spec/lib/go/csi"
 	api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csi/fake"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
@@ -313,6 +314,7 @@ func TestClientNodeGetInfo(t *testing.T) {
 		expectedMaxVolumePerNode   int64
 		expectedAccessibleTopology map[string]string
 		mustFail                   bool
+		mustTimeout                bool
 		err                        error
 	}{
 		{
@@ -325,6 +327,13 @@ func TestClientNodeGetInfo(t *testing.T) {
 			name:     "grpc error",
 			mustFail: true,
 			err:      errors.New("grpc error"),
+		},
+		{
+			name:                       "test empty nodeId",
+			mustTimeout:                true,
+			expectedNodeID:             "",
+			expectedMaxVolumePerNode:   16,
+			expectedAccessibleTopology: map[string]string{"com.example.csi-topology/zone": "zone1"},
 		},
 	}
 
@@ -349,7 +358,13 @@ func TestClientNodeGetInfo(t *testing.T) {
 		}
 
 		nodeID, maxVolumePerNode, accessibleTopology, err := client.NodeGetInfo(context.Background())
-		checkErr(t, tc.mustFail, err)
+		if tc.mustTimeout {
+			if wait.ErrWaitTimeout.Error() != err.Error() {
+				t.Errorf("should have timed out : %s", tc.name)
+			}
+		} else {
+			checkErr(t, tc.mustFail, err)
+		}
 
 		if nodeID != tc.expectedNodeID {
 			t.Errorf("expected nodeID: %v; got: %v", tc.expectedNodeID, nodeID)

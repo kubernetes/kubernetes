@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"strings"
 	"sync"
 	"time"
 
@@ -161,9 +160,8 @@ func (c *csiDriverClient) NodeGetInfo(ctx context.Context) (
 		if nodeID != "" {
 			return true, nil
 		}
-		// kubelet plugin registration service not implemented is a terminal error, no need to retry
-		if strings.Contains(getNodeInfoError.Error(), "no handler registered for plugin type") {
-			return false, getNodeInfoError
+		if getNodeInfoError != nil {
+			klog.Warningf("Error calling CSI NodeGetInfo(): %v", getNodeInfoError.Error())
 		}
 		// Continue with exponential backoff
 		return false, nil
