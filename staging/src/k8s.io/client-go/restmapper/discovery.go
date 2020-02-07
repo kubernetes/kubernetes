@@ -211,7 +211,7 @@ func (d *DeferredDiscoveryRESTMapper) getDelegate() (meta.RESTMapper, error) {
 // Reset resets the internally cached Discovery information and will
 // cause the next mapping request to re-discover.
 func (d *DeferredDiscoveryRESTMapper) Reset() {
-	klog.V(5).Info("Invalidating discovery information")
+	klog.V(4).Info("Invalidating discovery information")
 
 	d.initMu.Lock()
 	defer d.initMu.Unlock()

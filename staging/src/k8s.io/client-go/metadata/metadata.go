@@ -173,7 +173,7 @@ func (c *client) Get(name string, opts metav1.GetOptions, subresources ...string
 	}
 	obj, err := result.Get()
 	if runtime.IsNotRegisteredError(err) {
-		klog.V(5).Infof("Unable to retrieve PartialObjectMetadata: %#v", err)
+		klog.V(4).Infof("Unable to retrieve PartialObjectMetadata: %#v", err)
 		rawBytes, err := result.Raw()
 		if err != nil {
 			return nil, err
@@ -209,7 +209,7 @@ func (c *client) List(opts metav1.ListOptions) (*metav1.PartialObjectMetadataLis
 	}
 	obj, err := result.Get()
 	if runtime.IsNotRegisteredError(err) {
-		klog.V(5).Infof("Unable to retrieve PartialObjectMetadataList: %#v", err)
+		klog.V(4).Infof("Unable to retrieve PartialObjectMetadataList: %#v", err)
 		rawBytes, err := result.Raw()
 		if err != nil {
 			return nil, err

@@ -233,7 +233,7 @@ func recordEvent(sink EventSink, event *v1beta1.Event) (*v1beta1.Event, bool) {
 		return nil, false
 	case *errors.StatusError:
 		if errors.IsAlreadyExists(err) {
-			klog.V(5).Infof("Server rejected event '%#v': '%v' (will not retry!)", event, err)
+			klog.V(4).Infof("Server rejected event '%#v': '%v' (will not retry!)", event, err)
 		} else {
 			klog.Errorf("Server rejected event '%#v': '%v' (will not retry!)", event, err)
 		}

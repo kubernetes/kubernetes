@@ -121,7 +121,7 @@ func (rw *RetryWatcher) doReceive() (bool, time.Duration) {
 	default:
 		msg := "Watch failed: %v"
 		if net.IsProbableEOF(err) {
-			klog.V(5).Infof(msg, err)
+			klog.V(4).Infof(msg, err)
 			// Retry
 			return false, 0
 		}
@@ -217,7 +217,7 @@ func (rw *RetryWatcher) doReceive() (bool, time.Duration) {
 
 					// Log here so we have a record of hitting the unexpected error
 					// and we can whitelist some error codes if we missed any that are expected.
-					klog.V(5).Info(spew.Sprintf("Retrying after unexpected error: %#+v", event.Object))
+					klog.V(4).Info(spew.Sprintf("Retrying after unexpected error: %#+v", event.Object))
 
 					// Retry
 					return false, statusDelay
