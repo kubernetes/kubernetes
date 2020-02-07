@@ -1305,7 +1305,18 @@ func TestBackoffLifecycle(t *testing.T) {
 
 	// Test backoff recovery and increase.  This correlates to the constants
 	// which are used in the server implementation returning StatusOK above.
-	seconds := []int{0, 1, 2, 4, 8, 0, 1, 2, 4, 0}
+	wait := []time.Duration{
+		0,
+		time.Second,
+		time.Duration(1821921541),
+		time.Duration(3829704523),
+		time.Duration(7420502481),
+		0,
+		time.Second,
+		time.Duration(1821921541),
+		time.Duration(3829704523),
+		0,
+	}
 	request := c.Verb("POST").Prefix("backofftest").Suffix("abc")
 	clock := clock.FakeClock{}
 	request.backoff = &URLBackoff{
@@ -1316,11 +1327,12 @@ func TestBackoffLifecycle(t *testing.T) {
 			&clock,
 		)}
 
-	for _, sec := range seconds {
+	for _, w := range wait {
 		thisBackoff := request.backoff.CalculateBackoff(request.URL())
 		t.Logf("Current backoff %v", thisBackoff)
-		if thisBackoff != time.Duration(sec)*time.Second {
-			t.Errorf("Backoff is %v instead of %v", thisBackoff, sec)
+
+		if thisBackoff != w {
+			t.Errorf("Backoff is %v, expected %v", thisBackoff, w)
 		}
 		now := clock.Now()
 		request.DoRaw(context.Background())

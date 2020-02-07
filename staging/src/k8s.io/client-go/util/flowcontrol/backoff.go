@@ -17,6 +17,7 @@ limitations under the License.
 package flowcontrol
 
 import (
+	"math/rand"
 	"sync"
 	"time"
 
@@ -24,17 +25,30 @@ import (
 	"k8s.io/utils/integer"
 )
 
+// TODO(vllry) consider allowing this to be customized in NewBackOff.
+const DefaultJitterRatio float64 = 0.20 // 20%
+
 type backoffEntry struct {
 	backoff    time.Duration
 	lastUpdate time.Time
+	randomness *rand.Rand // Make random seed be per item, to avoid the same client line up the jitter.
+}
+
+// jitter takes a duration, and decreases or increases it within the jitterRatio.
+// EG jitterRatio = 0.2 implies a result between 0.9*duration, and 1.1*duration
+func (b *backoffEntry) jitter(duration time.Duration, jitterRatio float64) time.Duration {
+	jitter := (0.5 - b.randomness.Float64()) * (float64(duration) * jitterRatio) // Centre jitter.
+	duration += time.Duration(jitter)
+	return duration
 }
 
 type Backoff struct {
 	sync.RWMutex
-	Clock           clock.Clock
-	defaultDuration time.Duration
-	maxDuration     time.Duration
-	perItemBackoff  map[string]*backoffEntry
+	Clock            clock.Clock
+	defaultDuration  time.Duration
+	maxDuration      time.Duration
+	perItemBackoff   map[string]*backoffEntry
+	randomSeedSource func() int64 // Allow a different random source for real and fake Backoff.
 }
 
 func NewFakeBackOff(initial, max time.Duration, tc *clock.FakeClock) *Backoff {
@@ -43,6 +57,9 @@ func NewFakeBackOff(initial, max time.Duration, tc *clock.FakeClock) *Backoff {
 		Clock:           tc,
 		defaultDuration: initial,
 		maxDuration:     max,
+		randomSeedSource: func() int64 { // Fixed seed.
+			return 0
+		},
 	}
 }
 
@@ -52,6 +69,9 @@ func NewBackOff(initial, max time.Duration) *Backoff {
 		Clock:           clock.RealClock{},
 		defaultDuration: initial,
 		maxDuration:     max,
+		randomSeedSource: func() int64 {
+			return time.Now().UTC().UnixNano()
+		},
 	}
 }
 
@@ -75,8 +95,9 @@ func (p *Backoff) Next(id string, eventTime time.Time) {
 	if !ok || hasExpired(eventTime, entry.lastUpdate, p.maxDuration) {
 		entry = p.initEntryUnsafe(id)
 	} else {
-		delay := entry.backoff * 2 // exponential
-		entry.backoff = time.Duration(integer.Int64Min(int64(delay), int64(p.maxDuration)))
+		// Exponential backoff, with a cap. Includes jitter from previous iterations.
+		baseDelay := time.Duration(integer.Int64Min(int64(entry.backoff*2), int64(p.maxDuration)))
+		entry.backoff = entry.jitter(baseDelay, DefaultJitterRatio)
 	}
 	entry.lastUpdate = p.Clock.Now()
 }
@@ -138,7 +159,10 @@ func (p *Backoff) DeleteEntry(id string) {
 
 // Take a lock on *Backoff, before calling initEntryUnsafe
 func (p *Backoff) initEntryUnsafe(id string) *backoffEntry {
-	entry := &backoffEntry{backoff: p.defaultDuration}
+	entry := &backoffEntry{
+		backoff:    p.defaultDuration,
+		randomness: rand.New(rand.NewSource(p.randomSeedSource())), // Create a per-item seed.
+	}
 	p.perItemBackoff[id] = entry
 	return entry
 }

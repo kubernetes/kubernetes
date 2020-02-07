@@ -66,8 +66,13 @@ func TestURLBackoffFunctionality(t *testing.T) {
 	}
 
 	for i, sec := range seconds {
+		expectBaseSeconds := time.Duration(sec) * time.Second
 		backoffSec := myBackoff.CalculateBackoff(parse("http://1.2.3.4:100"))
-		if backoffSec < time.Duration(sec)*time.Second || backoffSec > time.Duration(sec+5)*time.Second {
+		minimumPossibleBackOff := time.Duration(time.Duration(float64(expectBaseSeconds) * (1 - (flowcontrol.DefaultJitterRatio / 2))))
+
+		// TODO(vllry) check upper bound
+		// Why is sec+5 significant?
+		if backoffSec < minimumPossibleBackOff || backoffSec > time.Duration(sec+5)*time.Second {
 			t.Errorf("Backoff out of range %v: %v %v", i, sec, backoffSec)
 		}
 		myBackoff.UpdateBackoff(parse("http://1.2.3.4:100/responseCodeForFuncTest"), nil, returnCodes[i])
