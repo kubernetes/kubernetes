@@ -160,6 +160,9 @@ func (h *hostExecutor) exec(cmd string, node *v1.Node) (Result, error) {
 // the command exits non-zero.
 func (h *hostExecutor) IssueCommandWithResult(cmd string, node *v1.Node) (string, error) {
 	result, err := h.exec(cmd, node)
+	if err != nil {
+		LogResult(result)
+	}
 	return result.Stdout, err
 }
 
