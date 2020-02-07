@@ -276,7 +276,7 @@ func (p *staticPolicy) guaranteedCPUs(pod *v1.Pod, container *v1.Container) int 
 	return int(cpuQuantity.Value())
 }
 
-func (p *staticPolicy) GetTopologyHints(s state.State, pod v1.Pod, container v1.Container) map[string][]topologymanager.TopologyHint {
+func (p *staticPolicy) GetTopologyHints(s state.State, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
 	// If there are no CPU resources requested for this container, we do not
 	// generate any topology hints.
 	if _, ok := container.Resources.Requests[v1.ResourceCPU]; !ok {
@@ -284,7 +284,7 @@ func (p *staticPolicy) GetTopologyHints(s state.State, pod v1.Pod, container v1.
 	}
 
 	// Get a count of how many guaranteed CPUs have been requested.
-	requested := p.guaranteedCPUs(&pod, &container)
+	requested := p.guaranteedCPUs(pod, container)
 
 	// If there are no guaranteed CPUs being requested, we do not generate
 	// any topology hints. This can happen, for example, because init
