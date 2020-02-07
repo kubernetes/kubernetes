@@ -33,6 +33,13 @@ DEFAULT_CRICTL_SHA1="5c18f4e52ab524d429063b78d086dd18b894aae7"
 DEFAULT_MOUNTER_TAR_SHA="8003b798cf33c7f91320cd6ee5cec4fa22244571"
 ###
 
+# Ability to inject custom versions (Ubuntu OS images ONLY)
+# if KUBE_UBUNTU_INSTALL_CONTAINERD_VERSION or KUBE_UBUNTU_INSTALL_RUNC_VERSION
+# is set to empty then we do not override the version(s) and just
+# use whatever is in the default installation of containerd package
+UBUNTU_INSTALL_CONTAINERD_VERSION=${KUBE_UBUNTU_INSTALL_CONTAINERD_VERSION:-}
+UBUNTU_INSTALL_RUNC_VERSION=${KUBE_UBUNTU_INSTALL_RUNC_VERSION:-}
+
 # Use --retry-connrefused opt only if it's supported by curl.
 CURL_RETRY_CONNREFUSED=""
 if curl --help | grep -q -- '--retry-connrefused'; then
@@ -407,7 +414,7 @@ function load-docker-images {
 function install-docker {
   # bailout if we are not on ubuntu
   if ! command -v apt-get >/dev/null 2>&1; then
-    echo "Unable to install automatically install docker. Bailing out..."
+    echo "Unable to automatically install docker. Bailing out..."
     return
   fi
   # Install Docker deps, some of these are already installed in the image but
@@ -437,12 +444,18 @@ function install-docker {
 }
 
 # If we are on ubuntu we can try to install containerd
-function install-containerd {
+function install-containerd-ubuntu {
   # bailout if we are not on ubuntu
-  if ! command -v apt-get >/dev/null 2>&1; then
-    echo "Unable to install automatically install docker. Bailing out..."
-    return
+  if [[ $(lsb_release -si) != "Ubuntu" ]]; then
+    echo "Unable to automatically install containerd in non-ubuntu image. Bailing out..."
+    exit 2
   fi
+
+  if [[ $(dpkg --print-architecture) != "amd64" ]]; then
+    echo "Unable to automatically install containerd in non-amd64 image. Bailing out..."
+    exit 2
+  fi
+
   # Install dependencies, some of these are already installed in the image but
   # that's fine since they won't re-install and we can reuse the code below
   # for another image someday.
@@ -467,6 +480,17 @@ function install-containerd {
   apt-get update && \
     apt-get install -y --no-install-recommends containerd
   rm -rf /var/lib/apt/lists/*
+
+
+  # Override to latest versions of containerd and runc
+  systemctl stop containerd
+  if [[ ! -z "${UBUNTU_INSTALL_CONTAINERD_VERSION:-}" ]]; then
+    curl -fsSL "https://github.com/containerd/containerd/releases/download/${UBUNTU_INSTALL_CONTAINERD_VERSION}/containerd-${UBUNTU_INSTALL_CONTAINERD_VERSION:1}.linux-amd64.tar.gz" | tar --overwrite -xzv -C /usr/
+  fi
+  if [[ ! -z "${UBUNTU_INSTALL_RUNC_VERSION:-}" ]]; then
+    curl -fsSL "https://github.com/opencontainers/runc/releases/download/${UBUNTU_INSTALL_RUNC_VERSION}/runc.amd64" --output /usr/sbin/runc && chmod 755 /usr/sbin/runc
+  fi
+  sudo systemctl start containerd
 }
 
 function ensure-container-runtime {
@@ -481,16 +505,27 @@ function ensure-container-runtime {
     fi
     docker version
   elif [[ "${container_runtime}" == "containerd" ]]; then
-    set -x
+    # Install containerd/runc if requested
+    if [[ ! -z "${UBUNTU_INSTALL_CONTAINERD_VERSION:-}" || ! -z "${UBUNTU_INSTALL_RUNC_VERSION}" ]]; then
+      install-containerd-ubuntu
+    fi
+    # Verify presence and print versions of ctr, containerd, runc
     if ! command -v ctr >/dev/null 2>&1; then
-      install-containerd
-      if ! command -v containerd >/dev/null 2>&1; then
-        echo "ERROR containerd not found. Aborting."
-        exit 2
-      fi
+      echo "ERROR ctr not found. Aborting."
+      exit 2
     fi
     ctr --version
+
+    if ! command -v containerd >/dev/null 2>&1; then
+      echo "ERROR containerd not found. Aborting."
+      exit 2
+    fi
     containerd --version
+
+    if ! command -v runc >/dev/null 2>&1; then
+      echo "ERROR runc not found. Aborting."
+      exit 2
+    fi
     runc --version
   fi
 }
