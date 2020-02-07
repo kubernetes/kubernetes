@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package manifest
+package ingress
 
 import (
 	"io/ioutil"
@@ -36,11 +36,11 @@ func TestIngressToManifest(t *testing.T) {
 	ingPath := filepath.Join(tmpDir, "ing.yaml")
 
 	// Write the ingress to a file and ensure that there is no error.
-	if err := IngressToManifest(ing, ingPath); err != nil {
+	if err := ingressToManifest(ing, ingPath); err != nil {
 		t.Fatalf("Error in creating file: %s", err)
 	}
 	// Writing it again should not return an error.
-	if err := IngressToManifest(ing, ingPath); err != nil {
+	if err := ingressToManifest(ing, ingPath); err != nil {
 		t.Fatalf("Error in creating file: %s", err)
 	}
 }
