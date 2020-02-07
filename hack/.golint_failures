@@ -154,8 +154,6 @@ pkg/registry/core/namespace/storage
 pkg/registry/core/node
 pkg/registry/core/persistentvolume
 pkg/registry/core/persistentvolumeclaim
-pkg/registry/core/pod
-pkg/registry/core/pod/rest
 pkg/registry/core/replicationcontroller
 pkg/registry/core/replicationcontroller/storage
 pkg/registry/core/rest
