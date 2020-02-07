@@ -130,21 +130,6 @@ type driverDefinition struct {
 	ClientNodeName string
 }
 
-// List of testSuites to be executed for each external driver.
-var csiTestSuites = []func() testsuites.TestSuite{
-	testsuites.InitEphemeralTestSuite,
-	testsuites.InitMultiVolumeTestSuite,
-	testsuites.InitProvisioningTestSuite,
-	testsuites.InitSnapshottableTestSuite,
-	testsuites.InitSubPathTestSuite,
-	testsuites.InitVolumeIOTestSuite,
-	testsuites.InitVolumeModeTestSuite,
-	testsuites.InitVolumesTestSuite,
-	testsuites.InitVolumeExpandTestSuite,
-	testsuites.InitDisruptiveTestSuite,
-	testsuites.InitVolumeLimitsTestSuite,
-}
-
 func init() {
 	e2econfig.Flags.Var(testDriverParameter{}, "storage.testdriver", "name of a .yaml or .json file that defines a driver for storage testing, can be used more than once")
 }
@@ -182,7 +167,7 @@ func AddDriverDefinition(filename string) error {
 
 	description := "External Storage " + testsuites.GetDriverNameWithFeatureTags(driver)
 	ginkgo.Describe(description, func() {
-		testsuites.DefineTestSuite(driver, csiTestSuites)
+		testsuites.DefineTestSuite(driver, testsuites.CSISuites)
 	})
 
 	return nil
