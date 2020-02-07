@@ -121,8 +121,7 @@ func (w *waitingPod) GetPendingPlugins() []string {
 // Allow declares the waiting pod is allowed to be scheduled by plugin pluginName.
 // If this is the last remaining plugin to allow, then a success signal is delivered
 // to unblock the pod.
-// Returns true if the allow signal was successfully dealt with, false otherwise.
-func (w *waitingPod) Allow(pluginName string) bool {
+func (w *waitingPod) Allow(pluginName string) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	if timer, exist := w.pendingPlugins[pluginName]; exist {
@@ -132,30 +131,29 @@ func (w *waitingPod) Allow(pluginName string) bool {
 
 	// Only signal success status after all plugins have allowed
 	if len(w.pendingPlugins) != 0 {
-		return true
+		return
 	}
 
+	// The select clause works as a non-blocking send.
+	// If there is no receiver, it's a no-op (default case).
 	select {
 	case w.s <- NewStatus(Success, ""):
-		return true
 	default:
-		return false
 	}
 }
 
-// Reject declares the waiting pod unschedulable. Returns true if the reject signal
-// was successfully delivered, false otherwise.
-func (w *waitingPod) Reject(msg string) bool {
+// Reject declares the waiting pod unschedulable.
+func (w *waitingPod) Reject(msg string) {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
 	for _, timer := range w.pendingPlugins {
 		timer.Stop()
 	}
 
+	// The select clause works as a non-blocking send.
+	// If there is no receiver, it's a no-op (default case).
 	select {
 	case w.s <- NewStatus(Unschedulable, msg):
-		return true
 	default:
-		return false
 	}
 }
