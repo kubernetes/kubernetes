@@ -1738,7 +1738,7 @@ function prepare-mounter-rootfs {
 # Updates node labels used by addons.
 function update-legacy-addon-node-labels() {
   # need kube-apiserver to be ready
-  until kubectl get nodes; do
+  until ${KUBECTL} get nodes; do
     sleep 5
   done
   update-node-label "beta.kubernetes.io/metadata-proxy-ready=true,cloud.google.com/metadata-proxy-ready!=true" "cloud.google.com/metadata-proxy-ready=true"
@@ -1757,7 +1757,7 @@ function update-node-label() {
   local label="$2"
   local retries=5
   until (( retries == 0 )); do
-    if kubectl label --overwrite nodes -l "${selector}" "${label}"; then
+    if ${KUBECTL} label --overwrite nodes -l "${selector}" "${label}"; then
       break
     fi
     (( retries-- ))
@@ -2048,14 +2048,14 @@ function wait-for-apiserver-and-update-fluentd {
   fi
 
   # Wait until ScalingPolicy CRD is in place.
-  until kubectl get scalingpolicies.scalingpolicy.kope.io
+  until ${KUBECTL} get scalingpolicies.scalingpolicy.kope.io
   do
     sleep 10
   done
 
   # Single-shot, not managed by addon manager. Can be later modified or removed
   # at will.
-  cat <<EOF | kubectl apply -f -
+  cat <<EOF | ${KUBECTL} apply -f -
 apiVersion: scalingpolicy.kope.io/v1alpha1
 kind: ScalingPolicy
 metadata:
@@ -2610,7 +2610,7 @@ EOF
 }
 
 function wait-till-apiserver-ready() {
-  until kubectl get nodes; do
+  until ${KUBECTL} get nodes; do
     sleep 5
   done
 }
@@ -2713,6 +2713,7 @@ function main() {
 
   KUBE_HOME="/home/kubernetes"
   KUBE_BIN=${KUBE_HOME}/bin
+	KUBECTL="/home/kubernetes/bin/kubectl"
   CONTAINERIZED_MOUNTER_HOME="${KUBE_HOME}/containerized_mounter"
   PV_RECYCLER_OVERRIDE_TEMPLATE="${KUBE_HOME}/kube-manifests/kubernetes/pv-recycler-template.yaml"
 
