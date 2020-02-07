@@ -2563,6 +2563,11 @@ EOF
 function override-kubectl {
     echo "overriding kubectl"
     echo "export PATH=${KUBE_HOME}/bin:\$PATH" > /etc/profile.d/kube_env.sh
+
+    # source the file explicitly otherwise we have
+    # issues on a ubuntu OS image finding the kubectl
+    source /etc/profile.d/kube_env.sh
+
     # Add ${KUBE_HOME}/bin into sudoer secure path.
     local sudo_path
     sudo_path=$(sudo env | grep "^PATH=")
