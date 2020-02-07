@@ -556,7 +556,7 @@ func (g *Cloud) ensureInternalInstanceGroup(name, zone string, nodes []string) (
 	}
 
 	gceNodes := sets.NewString(nodes...)
-	groupNodes := sets.NewString()
+	igNodes := sets.NewString()
 	if ig == nil {
 		klog.V(2).Infof("ensureInternalInstanceGroup(%v, %v): creating instance group", name, zone)
 		newIG := &compute.InstanceGroup{Name: name}
@@ -576,12 +576,12 @@ func (g *Cloud) ensureInternalInstanceGroup(name, zone string, nodes []string) (
 
 		for _, ins := range instances {
 			parts := strings.Split(ins.Instance, "/")
-			groupNodes.Insert(parts[len(parts)-1])
+			igNodes.Insert(parts[len(parts)-1])
 		}
 	}
 
-	removeNodes := groupNodes.Difference(gceNodes).List()
-	addNodes := gceNodes.Difference(groupNodes).List()
+	removeNodes := igNodes.Difference(gceNodes).List()
+	addNodes := gceNodes.Difference(igNodes).List()
 
 	if len(removeNodes) != 0 {
 		klog.V(2).Infof("ensureInternalInstanceGroup(%v, %v): removing nodes: %v", name, zone, removeNodes)
@@ -611,16 +611,13 @@ func (g *Cloud) ensureInternalInstanceGroups(name string, nodes []*v1.Node) ([]s
 
 	var igLinks []string
 	gceZonedNodes := map[string][]string{}
-	for zone, zNodes := range zonedNodes {
-		hosts, err := g.getFoundInstanceByNames(nodeNames(zNodes))
+	for zone, nodes := range zonedNodes {
+		instances, err := g.getFoundInstanceByNames(nodeNames(nodes))
 		if err != nil {
 			return nil, err
 		}
-		names := sets.NewString()
-		for _, h := range hosts {
-			names.Insert(h.Name)
-		}
-		skip := sets.NewString()
+		instancesToInclude := sets.NewString(gceInstanceNames(instances)...)
+		instancesToSkip := sets.NewString()
 
 		igs, err := g.candidateExternalInstanceGroups(zone)
 		if err != nil {
@@ -630,21 +627,16 @@ func (g *Cloud) ensureInternalInstanceGroups(name string, nodes []*v1.Node) ([]s
 			if strings.EqualFold(ig.Name, name) {
 				continue
 			}
-			instances, err := g.ListInstancesInInstanceGroup(ig.Name, zone, allInstances)
+			shouldUse, igInstances, err := g.reuseInstanceGroupForInternalLoadbalancer(ig, instancesToInclude)
 			if err != nil {
 				return nil, err
 			}
-			groupInstances := sets.NewString()
-			for _, ins := range instances {
-				parts := strings.Split(ins.Instance, "/")
-				groupInstances.Insert(parts[len(parts)-1])
-			}
-			if names.HasAll(groupInstances.UnsortedList()...) {
+			if shouldUse {
 				igLinks = append(igLinks, ig.SelfLink)
-				skip.Insert(groupInstances.UnsortedList()...)
+				instancesToSkip.Insert(igInstances...)
 			}
 		}
-		if remaining := names.Difference(skip).UnsortedList(); len(remaining) > 0 {
+		if remaining := instancesToInclude.Difference(instancesToSkip).UnsortedList(); len(remaining) > 0 {
 			gceZonedNodes[zone] = remaining
 		}
 	}
@@ -657,6 +649,31 @@ func (g *Cloud) ensureInternalInstanceGroups(name string, nodes []*v1.Node) ([]s
 	}
 
 	return igLinks, nil
+}
+
+func gceInstanceNames(instances []*gceInstance) []string {
+	ret := make([]string, len(instances))
+	for i, instance := range instances {
+		ret[i] = instance.Name
+	}
+	return ret
+}
+
+// reuseInstanceGroup returns true if all the instances in the ig are part of the instancesToInclude and list of instances in the ig.
+func (g *Cloud) reuseInstanceGroupForInternalLoadbalancer(ig *compute.InstanceGroup, instancesToInclude sets.String) (bool, []string, error) {
+	igInstances, err := g.ListInstancesInInstanceGroup(ig.Name, ig.Zone, allInstances)
+	if err != nil {
+		return false, nil, err
+	}
+	igInstanceNames := make([]string, len(igInstances))
+	for idx, ins := range igInstances {
+		parts := strings.Split(ins.Instance, "/")
+		igInstanceNames[idx] = parts[len(parts)-1]
+	}
+	if instancesToInclude.HasAll(igInstanceNames...) {
+		return true, igInstanceNames, nil
+	}
+	return false, igInstanceNames, nil
 }
 
 func (g *Cloud) candidateExternalInstanceGroups(zone string) ([]*compute.InstanceGroup, error) {
