@@ -248,6 +248,21 @@ func (g *Graph) deleteEdges_locked(fromType, toType vertexType, toNamespace, toN
 	}
 }
 
+// A fastpath for recomputeDestinationIndex_locked for "adding edge case".
+func (g *Graph) addEdgeToDestinationIndex_locked(e graph.Edge) {
+	n := e.From()
+	index := g.destinationEdgeIndex[n.ID()]
+	if index == nil {
+		// There is no index, use the full index computation method
+		g.recomputeDestinationIndex_locked(n)
+		return
+	}
+	// fast-add the new edge to an existing index
+	if destinationEdge, ok := e.(*destinationEdge); ok {
+		index.mark(destinationEdge.DestinationID())
+	}
+}
+
 // must be called under write lock
 // removeVertex_locked removes the specified vertex from the graph and from the maintained indices.
 // It does nothing to indexes of neighbor vertices.
@@ -327,29 +342,33 @@ func (g *Graph) AddPod(pod *corev1.Pod) {
 	// ref https://github.com/kubernetes/kubernetes/issues/58790
 	if len(pod.Spec.ServiceAccountName) > 0 {
 		serviceAccountVertex := g.getOrCreateVertex_locked(serviceAccountVertexType, pod.Namespace, pod.Spec.ServiceAccountName)
-		g.graph.SetEdge(newDestinationEdge(serviceAccountVertex, podVertex, nodeVertex))
-		g.recomputeDestinationIndex_locked(serviceAccountVertex)
+		e := newDestinationEdge(serviceAccountVertex, podVertex, nodeVertex)
+		g.graph.SetEdge(e)
+		g.addEdgeToDestinationIndex_locked(e)
 	}
 
 	podutil.VisitPodSecretNames(pod, func(secret string) bool {
 		secretVertex := g.getOrCreateVertex_locked(secretVertexType, pod.Namespace, secret)
-		g.graph.SetEdge(newDestinationEdge(secretVertex, podVertex, nodeVertex))
-		g.recomputeDestinationIndex_locked(secretVertex)
+		e := newDestinationEdge(secretVertex, podVertex, nodeVertex)
+		g.graph.SetEdge(e)
+		g.addEdgeToDestinationIndex_locked(e)
 		return true
 	})
 
 	podutil.VisitPodConfigmapNames(pod, func(configmap string) bool {
 		configmapVertex := g.getOrCreateVertex_locked(configMapVertexType, pod.Namespace, configmap)
-		g.graph.SetEdge(newDestinationEdge(configmapVertex, podVertex, nodeVertex))
-		g.recomputeDestinationIndex_locked(configmapVertex)
+		e := newDestinationEdge(configmapVertex, podVertex, nodeVertex)
+		g.graph.SetEdge(e)
+		g.addEdgeToDestinationIndex_locked(e)
 		return true
 	})
 
 	for _, v := range pod.Spec.Volumes {
 		if v.PersistentVolumeClaim != nil {
 			pvcVertex := g.getOrCreateVertex_locked(pvcVertexType, pod.Namespace, v.PersistentVolumeClaim.ClaimName)
-			g.graph.SetEdge(newDestinationEdge(pvcVertex, podVertex, nodeVertex))
-			g.recomputeDestinationIndex_locked(pvcVertex)
+			e := newDestinationEdge(pvcVertex, podVertex, nodeVertex)
+			g.graph.SetEdge(e)
+			g.addEdgeToDestinationIndex_locked(e)
 		}
 	}
 }
