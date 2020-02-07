@@ -193,7 +193,7 @@ func TestDockerKeyringForGlob(t *testing.T) {
 	for i, test := range tests {
 		email := "foo@bar.baz"
 		username := "foo"
-		password := "bar"
+		password := "bar" // Fake value for testing.
 		auth := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", username, password)))
 		sampleDockerConfig := fmt.Sprintf(`{
    "%s": {
@@ -261,7 +261,7 @@ func TestKeyringMiss(t *testing.T) {
 	for _, test := range tests {
 		email := "foo@bar.baz"
 		username := "foo"
-		password := "bar"
+		password := "bar" // Fake value for testing.
 		auth := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", username, password)))
 		sampleDockerConfig := fmt.Sprintf(`{
    "%s": {
@@ -289,7 +289,7 @@ func TestKeyringMissWithDockerHubCredentials(t *testing.T) {
 	url := defaultRegistryKey
 	email := "foo@bar.baz"
 	username := "foo"
-	password := "bar"
+	password := "bar" // Fake value for testing.
 	auth := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", username, password)))
 	sampleDockerConfig := fmt.Sprintf(`{
    "https://%s": {
@@ -315,7 +315,7 @@ func TestKeyringHitWithUnqualifiedDockerHub(t *testing.T) {
 	url := defaultRegistryKey
 	email := "foo@bar.baz"
 	username := "foo"
-	password := "bar"
+	password := "bar" // Fake value for testing.
 	auth := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", username, password)))
 	sampleDockerConfig := fmt.Sprintf(`{
    "https://%s": {
@@ -356,7 +356,7 @@ func TestKeyringHitWithUnqualifiedLibraryDockerHub(t *testing.T) {
 	url := defaultRegistryKey
 	email := "foo@bar.baz"
 	username := "foo"
-	password := "bar"
+	password := "bar" // Fake value for testing.
 	auth := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", username, password)))
 	sampleDockerConfig := fmt.Sprintf(`{
    "https://%s": {
@@ -397,7 +397,7 @@ func TestKeyringHitWithQualifiedDockerHub(t *testing.T) {
 	url := defaultRegistryKey
 	email := "foo@bar.baz"
 	username := "foo"
-	password := "bar"
+	password := "bar" // Fake value for testing.
 	auth := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", username, password)))
 	sampleDockerConfig := fmt.Sprintf(`{
    "https://%s": {
@@ -499,13 +499,13 @@ func TestProvidersDockerKeyring(t *testing.T) {
 func TestDockerKeyringLookup(t *testing.T) {
 	ada := AuthConfig{
 		Username: "ada",
-		Password: "smash",
+		Password: "smash", // Fake value for testing.
 		Email:    "ada@example.com",
 	}
 
 	grace := AuthConfig{
 		Username: "grace",
-		Password: "squash",
+		Password: "squash", // Fake value for testing.
 		Email:    "grace@example.com",
 	}
 
@@ -566,7 +566,7 @@ func TestDockerKeyringLookup(t *testing.T) {
 func TestIssue3797(t *testing.T) {
 	rex := AuthConfig{
 		Username: "rex",
-		Password: "tiny arms",
+		Password: "tiny arms", // Fake value for testing.
 		Email:    "rex@example.com",
 	}
 

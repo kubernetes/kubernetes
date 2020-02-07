@@ -46,7 +46,7 @@ import (
 
 const (
 	secretKey                = "api_key"
-	secretVal                = "086a7ffc-0225-11e8-ba89-0ed5f89f718b"
+	secretVal                = "086a7ffc-0225-11e8-ba89-0ed5f89f718b" // Fake value for testing.
 	encryptionConfigFileName = "encryption.conf"
 	testNamespace            = "secret-encryption-test"
 	testSecret               = "test-secret"

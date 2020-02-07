@@ -54,6 +54,7 @@ import (
 )
 
 const (
+	// Fake values for testing.
 	AliceToken string = "abc123" // username: alice.  Present in token file.
 	BobToken   string = "xyz987" // username: bob.  Present in token file.
 )

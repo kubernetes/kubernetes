@@ -1484,6 +1484,7 @@ func TestProtocolTranslationUDP(t *testing.T) {
 
 // Test Configuration deserialization (json)
 func TestNewCloudFromJSON(t *testing.T) {
+	// Fake values for testing.
 	config := `{
 		"tenantId": "--tenant-id--",
 		"subscriptionId": "--subscription-id--",
