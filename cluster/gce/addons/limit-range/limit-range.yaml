@@ -3,6 +3,8 @@ kind: "LimitRange"
 metadata:
   name: "limits"
   namespace: default
+  labels:
+    addonmanager.kubernetes.io/mode: EnsureExists
 spec:
   limits:
     - type: "Container"
