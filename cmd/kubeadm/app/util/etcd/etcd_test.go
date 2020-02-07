@@ -312,7 +312,7 @@ func TestGetRawEtcdEndpointsFromPodAnnotationWithoutRetry(t *testing.T) {
 			if rt.clientSetup != nil {
 				rt.clientSetup(client)
 			}
-			endpoints, err := getRawEtcdEndpointsFromPodAnnotationWithoutRetry(client)
+			endpoints, _, err := getRawEtcdEndpointsFromPodAnnotationWithoutRetry(client)
 			if err != nil && !rt.expectedErr {
 				t.Errorf("got error %v, but wasn't expecting any error", err)
 				return

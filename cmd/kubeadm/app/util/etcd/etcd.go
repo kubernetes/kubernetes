@@ -147,12 +147,20 @@ func getRawEtcdEndpointsFromPodAnnotation(client clientset.Interface, backoff wa
 	// Let's tolerate some unexpected transient failures from the API server or load balancers. Also, if
 	// static pods were not yet mirrored into the API server we want to wait for this propagation.
 	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
-		if etcdEndpoints, lastErr = getRawEtcdEndpointsFromPodAnnotationWithoutRetry(client); lastErr != nil {
+		var overallEtcdPodCount int
+		if etcdEndpoints, overallEtcdPodCount, lastErr = getRawEtcdEndpointsFromPodAnnotationWithoutRetry(client); lastErr != nil {
 			return false, nil
 		}
-		// If the list of etcd endpoints is empty we want to retry: this can happen if joining a secondary
-		// control plane while the primary control plane didn't mirror its static pods yet.
-		return len(etcdEndpoints) > 0, nil
+		// TODO (ereslibre): this logic will need tweaking once that we get rid of the ClusterStatus, since we won't have
+		// the ClusterStatus safety net we will have to retry in both cases.
+		if len(etcdEndpoints) == 0 {
+			if overallEtcdPodCount == 0 {
+				return false, nil
+			}
+			// Fail fast scenario, to be removed once we get rid of the ClusterStatus
+			return true, errors.New("etcd Pods exist, but no etcd endpoint annotations were found")
+		}
+		return true, nil
 	})
 	if err != nil {
 		if lastErr != nil {
@@ -163,7 +171,10 @@ func getRawEtcdEndpointsFromPodAnnotation(client clientset.Interface, backoff wa
 	return etcdEndpoints, nil
 }
 
-func getRawEtcdEndpointsFromPodAnnotationWithoutRetry(client clientset.Interface) ([]string, error) {
+// getRawEtcdEndpointsFromPodAnnotationWithoutRetry returns the list of etcd endpoints as reported by etcd Pod annotations,
+// along with the number of global etcd pods. This allows for callers to tell the difference between "no endpoints found",
+// and "no endpoints found and pods were listed", so they can skip retrying.
+func getRawEtcdEndpointsFromPodAnnotationWithoutRetry(client clientset.Interface) ([]string, int, error) {
 	klog.V(3).Infof("retrieving etcd endpoints from %q annotation in etcd Pods", constants.EtcdAdvertiseClientUrlsAnnotationKey)
 	podList, err := client.CoreV1().Pods(metav1.NamespaceSystem).List(
 		context.TODO(),
@@ -172,17 +183,18 @@ func getRawEtcdEndpointsFromPodAnnotationWithoutRetry(client clientset.Interface
 		},
 	)
 	if err != nil {
-		return []string{}, err
+		return []string{}, 0, err
 	}
 	etcdEndpoints := []string{}
 	for _, pod := range podList.Items {
 		etcdEndpoint, ok := pod.ObjectMeta.Annotations[constants.EtcdAdvertiseClientUrlsAnnotationKey]
 		if !ok {
-			return []string{}, errors.Errorf("etcd Pod %q is missing the %q annotation; cannot infer etcd advertise client URL", pod.ObjectMeta.Name, constants.EtcdAdvertiseClientUrlsAnnotationKey)
+			klog.V(3).Infof("etcd Pod %q is missing the %q annotation; cannot infer etcd advertise client URL using the Pod annotation", pod.ObjectMeta.Name, constants.EtcdAdvertiseClientUrlsAnnotationKey)
+			continue
 		}
 		etcdEndpoints = append(etcdEndpoints, etcdEndpoint)
 	}
-	return etcdEndpoints, nil
+	return etcdEndpoints, len(podList.Items), nil
 }
 
 // TODO: remove after 1.20, when the ClusterStatus struct is removed from the kubeadm-config ConfigMap.

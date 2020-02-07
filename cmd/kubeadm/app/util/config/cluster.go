@@ -41,6 +41,25 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 )
 
+// unretriableError is an error used temporarily while we are migrating from the
+// ClusterStatus struct to an annotation Pod based information. When performing
+// the upgrade of all control plane nodes with `kubeadm upgrade apply` and
+// `kubeadm upgrade node` we don't want to retry as if we were hitting connectivity
+// issues when the pod annotation is missing on the API server pods. This error will
+// be used in such scenario, for failing fast, and falling back to the ClusterStatus
+// retrieval in those cases.
+type unretriableError struct {
+	err error
+}
+
+func newUnretriableError(err error) *unretriableError {
+	return &unretriableError{err: err}
+}
+
+func (ue *unretriableError) Error() string {
+	return fmt.Sprintf("unretriable error: %s", ue.err.Error())
+}
+
 // FetchInitConfigurationFromCluster fetches configuration from a ConfigMap in the cluster
 func FetchInitConfigurationFromCluster(client clientset.Interface, w io.Writer, logPrefix string, newControlPlane bool) (*kubeadmapi.InitConfiguration, error) {
 	fmt.Fprintf(w, "[%s] Reading configuration from the cluster...\n", logPrefix)
@@ -216,6 +235,13 @@ func getAPIEndpointFromPodAnnotation(client clientset.Interface, nodeName string
 	// static pods were not yet mirrored into the API server we want to wait for this propagation.
 	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
 		rawAPIEndpoint, lastErr = getRawAPIEndpointFromPodAnnotationWithoutRetry(client, nodeName)
+		// TODO (ereslibre): this logic will need tweaking once that we get rid of the ClusterStatus, since we won't have
+		// the ClusterStatus safety net, we will want to remove the UnretriableError and not make the distinction here
+		// anymore.
+		if _, ok := lastErr.(*unretriableError); ok {
+			// Fail fast scenario, to be removed once we get rid of the ClusterStatus
+			return true, errors.Wrapf(lastErr, "API server Pods exist, but no API endpoint annotations were found")
+		}
 		return lastErr == nil, nil
 	})
 	if err != nil {
@@ -246,7 +272,7 @@ func getRawAPIEndpointFromPodAnnotationWithoutRetry(client clientset.Interface, 
 	if apiServerEndpoint, ok := podList.Items[0].Annotations[constants.KubeAPIServerAdvertiseAddressEndpointAnnotationKey]; ok {
 		return apiServerEndpoint, nil
 	}
-	return "", errors.Errorf("API server pod for node name %q hasn't got a %q annotation, cannot retrieve API endpoint", nodeName, constants.KubeAPIServerAdvertiseAddressEndpointAnnotationKey)
+	return "", newUnretriableError(errors.Errorf("API server pod for node name %q hasn't got a %q annotation, cannot retrieve API endpoint", nodeName, constants.KubeAPIServerAdvertiseAddressEndpointAnnotationKey))
 }
 
 // TODO: remove after 1.20, when the ClusterStatus struct is removed from the kubeadm-config ConfigMap.
