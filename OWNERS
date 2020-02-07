@@ -5,7 +5,6 @@ filters:
     reviewers:
       - brendandburns
       - dchen1107
-      - jbeda
       - lavalamp
       - smarterclayton
       - thockin
@@ -14,13 +13,13 @@ filters:
       - bgrant0607
       - brendandburns
       - dchen1107
-      - jbeda
-      - monopole # To move code per kubernetes/community#598
       - lavalamp
       - smarterclayton
       - thockin
       - wojtek-t
       - liggitt
+    emeritus_approvers:
+      - jbeda
 
   # Bazel build infrastructure changes often touch files throughout the tree
   "\\.bzl$":
