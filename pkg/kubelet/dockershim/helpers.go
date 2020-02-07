@@ -17,10 +17,13 @@ limitations under the License.
 package dockershim
 
 import (
+	"errors"
 	"fmt"
+	"io"
 	"regexp"
 	"strconv"
 	"strings"
+	"sync/atomic"
 
 	dockertypes "github.com/docker/docker/api/types"
 	dockercontainer "github.com/docker/docker/api/types/container"
@@ -393,3 +396,48 @@ type dockerOpt struct {
 func (d dockerOpt) GetKV() (string, string) {
 	return d.key, d.value
 }
+
+// writeLimiter limits the total output written across one or more streams.
+type writeLimiter struct {
+	delegate io.Writer
+	limit    *int64
+}
+
+func (w writeLimiter) Write(p []byte) (int, error) {
+	if len(p) == 0 {
+		return 0, nil
+	}
+	limit := atomic.LoadInt64(w.limit)
+	if limit <= 0 {
+		return 0, errMaximumWrite
+	}
+	var truncated bool
+	if limit < int64(len(p)) {
+		p = p[0:limit]
+		truncated = true
+	}
+	n, err := w.delegate.Write(p)
+	if n > 0 {
+		newLimit := limit - int64(n)
+		for !atomic.CompareAndSwapInt64(w.limit, limit, newLimit) {
+			limit = atomic.LoadInt64(w.limit)
+			newLimit = limit - int64(n)
+		}
+	}
+	if err == nil && truncated {
+		err = errMaximumWrite
+	}
+	return n, err
+}
+
+func limitedWriter(w io.Writer, limit *int64) io.Writer {
+	if w == nil {
+		return nil
+	}
+	return &writeLimiter{
+		delegate: w,
+		limit:    limit,
+	}
+}
+
+var errMaximumWrite = errors.New("maximum write")
