@@ -568,7 +568,7 @@ func validateDNSResults(f *framework.Framework, pod *v1.Pod, fileNames []string)
 		framework.Failf("ginkgo.Failed to create pod %s/%s: %v", pod.Namespace, pod.Name, err)
 	}
 
-	framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
+	framework.ExpectNoError(f.WaitForPodRunningSlow(pod.Name))
 
 	ginkgo.By("retrieving the pod")
 	pod, err := podClient.Get(pod.Name, metav1.GetOptions{})
@@ -596,7 +596,7 @@ func validateTargetedProbeOutput(f *framework.Framework, pod *v1.Pod, fileNames 
 		framework.Failf("ginkgo.Failed to create pod %s/%s: %v", pod.Namespace, pod.Name, err)
 	}
 
-	framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
+	framework.ExpectNoError(f.WaitForPodRunningSlow(pod.Name))
 
 	ginkgo.By("retrieving the pod")
 	pod, err := podClient.Get(pod.Name, metav1.GetOptions{})
