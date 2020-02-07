@@ -74,7 +74,7 @@ func enforceRequirements(flags *applyPlanFlags, args []string, dryRun bool, upgr
 			newK8sVersion = cfg.KubernetesVersion
 		}
 	} else {
-		cfg, err = configutil.FetchInitConfigurationFromCluster(client, os.Stdout, "upgrade/config", false)
+		cfg, err = configutil.FetchInitConfigurationFromCluster(client, os.Stdout, "upgrade/config", false, !upgradeApply)
 	}
 
 	if err != nil {
