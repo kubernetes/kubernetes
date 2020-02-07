@@ -638,7 +638,7 @@ func (r *Request) Watch(ctx context.Context) (watch.Interface, error) {
 	contentType := resp.Header.Get("Content-Type")
 	mediaType, params, err := mime.ParseMediaType(contentType)
 	if err != nil {
-		klog.V(4).Infof("Unexpected content type from the server: %q: %v", contentType, err)
+		klog.V(2).Infof("Unexpected content type from the server: %q: %v", contentType, err)
 	}
 	objectDecoder, streamingSerializer, framer, err := r.c.content.Negotiator.StreamDecoder(mediaType, params)
 	if err != nil {
@@ -771,7 +771,7 @@ func (r *Request) request(ctx context.Context, fn func(*http.Request, *http.Resp
 	}()
 
 	if r.err != nil {
-		klog.V(4).Infof("Error in request: %v", r.err)
+		klog.V(2).Infof("Error in request: %v", r.err)
 		return r.err
 	}
 
@@ -1007,11 +1007,11 @@ func (r *Request) transformResponse(resp *http.Response, req *http.Request) Resu
 func truncateBody(body string) string {
 	max := 0
 	switch {
-	case bool(klog.V(10)):
+	case bool(klog.V(5)):
 		return body
-	case bool(klog.V(9)):
+	case bool(klog.V(4)):
 		max = 10240
-	case bool(klog.V(8)):
+	case bool(klog.V(3)):
 		max = 1024
 	}
 
@@ -1026,7 +1026,7 @@ func truncateBody(body string) string {
 // allocating a new string for the body output unless necessary. Uses a simple heuristic to determine
 // whether the body is printable.
 func glogBody(prefix string, body []byte) {
-	if klog.V(8) {
+	if klog.V(3) {
 		if bytes.IndexFunc(body, func(r rune) bool {
 			return r < 0x0a
 		}) != -1 {
@@ -1235,7 +1235,7 @@ func (r Result) Error() error {
 	// to be backwards compatible with old servers that do not return a version, default to "v1"
 	out, _, err := r.decoder.Decode(r.body, &schema.GroupVersionKind{Version: "v1"}, nil)
 	if err != nil {
-		klog.V(5).Infof("body was not decodable (unable to check for Status): %v", err)
+		klog.V(3).Infof("body was not decodable (unable to check for Status): %v", err)
 		return r.err
 	}
 	switch t := out.(type) {

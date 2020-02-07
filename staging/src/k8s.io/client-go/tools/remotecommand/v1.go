@@ -22,7 +22,7 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/klog"
 )
@@ -53,8 +53,8 @@ func (p *streamProtocolV1) stream(conn streamCreator) error {
 	errorChan := make(chan error)
 
 	cp := func(s string, dst io.Writer, src io.Reader) {
-		klog.V(6).Infof("Copying %s", s)
-		defer klog.V(6).Infof("Done copying %s", s)
+		klog.V(4).Infof("Copying %s", s)
+		defer klog.V(4).Infof("Done copying %s", s)
 		if _, err := io.Copy(dst, src); err != nil && err != io.EOF {
 			klog.Errorf("Error copying %s: %v", s, err)
 		}

@@ -67,13 +67,13 @@ func HTTPWrappersForConfig(config *Config, rt http.RoundTripper) (http.RoundTrip
 // DebugWrappers wraps a round tripper and logs based on the current log level.
 func DebugWrappers(rt http.RoundTripper) http.RoundTripper {
 	switch {
-	case bool(klog.V(9)):
+	case bool(klog.V(5)):
 		rt = newDebuggingRoundTripper(rt, debugCurlCommand, debugURLTiming, debugResponseHeaders)
-	case bool(klog.V(8)):
+	case bool(klog.V(4)):
 		rt = newDebuggingRoundTripper(rt, debugJustURL, debugRequestHeaders, debugResponseStatus, debugResponseHeaders)
-	case bool(klog.V(7)):
+	case bool(klog.V(3)):
 		rt = newDebuggingRoundTripper(rt, debugJustURL, debugRequestHeaders, debugResponseStatus)
-	case bool(klog.V(6)):
+	case bool(klog.V(2)):
 		rt = newDebuggingRoundTripper(rt, debugURLTiming)
 	}
 
