@@ -27,7 +27,6 @@ Repositories currently staged here:
 - [`k8s.io/kubelet`](https://github.com/kubernetes/kubelet)
 - [`k8s.io/legacy-cloud-providers`](https://github.com/kubernetes/legacy-cloud-providers)
 - [`k8s.io/metrics`](https://github.com/kubernetes/metrics)
-- [`k8s.io/node-api`](https://github.com/kubernetes/node-api)
 - [`k8s.io/sample-apiserver`](https://github.com/kubernetes/sample-apiserver)
 - [`k8s.io/sample-cli-plugin`](https://github.com/kubernetes/sample-cli-plugin)
 - [`k8s.io/sample-controller`](https://github.com/kubernetes/sample-controller)
