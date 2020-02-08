@@ -37,8 +37,7 @@ var (
 	kubeletConfigLongDesc = cmdutil.LongDesc(`
 		Download the kubelet configuration from a ConfigMap of the form "kubelet-config-1.X" in the cluster,
 		where X is the minor version of the kubelet. kubeadm uses the KuberneteVersion field in the kubeadm-config
-		ConfigMap to determine what the _desired_ kubelet version is, but the user can override this by using the
-		--kubelet-version parameter.
+		ConfigMap to determine what the _desired_ kubelet version is.
 		`)
 )
 
