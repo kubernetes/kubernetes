@@ -17,6 +17,7 @@ limitations under the License.
 package storage
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"time"
@@ -302,7 +303,7 @@ func initTestCase(f *framework.Framework, c clientset.Interface, pvConfig e2epv.
 	pod := e2epod.MakePod(ns, nil, []*v1.PersistentVolumeClaim{pvc}, true, "")
 	pod.Spec.NodeName = nodeName
 	framework.Logf("Creating NFS client pod.")
-	pod, err = c.CoreV1().Pods(ns).Create(pod)
+	pod, err = c.CoreV1().Pods(ns).Create(context.TODO(), pod)
 	framework.Logf("NFS client Pod %q created on Node %q", pod.Name, nodeName)
 	framework.ExpectNoError(err)
 	defer func() {
@@ -313,11 +314,11 @@ func initTestCase(f *framework.Framework, c clientset.Interface, pvConfig e2epv.
 	err = e2epod.WaitForPodRunningInNamespace(c, pod)
 	framework.ExpectNoError(err, fmt.Sprintf("Pod %q timed out waiting for phase: Running", pod.Name))
 	// Return created api objects
-	pod, err = c.CoreV1().Pods(ns).Get(pod.Name, metav1.GetOptions{})
+	pod, err = c.CoreV1().Pods(ns).Get(context.TODO(), pod.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err)
-	pvc, err = c.CoreV1().PersistentVolumeClaims(ns).Get(pvc.Name, metav1.GetOptions{})
+	pvc, err = c.CoreV1().PersistentVolumeClaims(ns).Get(context.TODO(), pvc.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err)
-	pv, err = c.CoreV1().PersistentVolumes().Get(pv.Name, metav1.GetOptions{})
+	pv, err = c.CoreV1().PersistentVolumes().Get(context.TODO(), pv.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err)
 	return pod, pv, pvc
 }

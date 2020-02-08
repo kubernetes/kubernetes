@@ -17,6 +17,7 @@ limitations under the License.
 package storage
 
 import (
+	"context"
 	"github.com/onsi/ginkgo"
 
 	v1 "k8s.io/api/core/v1"
@@ -96,7 +97,7 @@ func createPodPVCFromSC(f *framework.Framework, c clientset.Interface, ns string
 		ClaimSize:  test.ClaimSize,
 		VolumeMode: &test.VolumeMode,
 	}, ns)
-	pvc, err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(pvc)
+	pvc, err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(context.TODO(), pvc)
 	framework.ExpectNoError(err, "Error creating pvc")
 	pvcClaims := []*v1.PersistentVolumeClaim{pvc}
 	pvs, err := e2epv.WaitForPVClaimBoundPhase(c, pvcClaims, framework.ClaimProvisionTimeout)

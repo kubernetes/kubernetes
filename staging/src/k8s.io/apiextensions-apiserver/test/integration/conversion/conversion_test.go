@@ -17,6 +17,7 @@ limitations under the License.
 package conversion
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -904,7 +905,7 @@ func newConversionTestContext(t *testing.T, apiExtensionsClient clientset.Interf
 	if err != nil {
 		t.Fatal(err)
 	}
-	crd, err := apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(v1CRD.Name, metav1.GetOptions{})
+	crd, err := apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(context.TODO(), v1CRD.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -943,7 +944,7 @@ func (c *conversionTestContext) versionedClients(ns string) map[string]dynamic.R
 }
 
 func (c *conversionTestContext) setConversionWebhook(t *testing.T, webhookClientConfig *apiextensionsv1beta1.WebhookClientConfig, reviewVersions []string) {
-	crd, err := c.apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(c.crd.Name, metav1.GetOptions{})
+	crd, err := c.apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(context.TODO(), c.crd.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -952,7 +953,7 @@ func (c *conversionTestContext) setConversionWebhook(t *testing.T, webhookClient
 		WebhookClientConfig:      webhookClientConfig,
 		ConversionReviewVersions: reviewVersions,
 	}
-	crd, err = c.apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(crd)
+	crd, err = c.apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(context.TODO(), crd)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -961,7 +962,7 @@ func (c *conversionTestContext) setConversionWebhook(t *testing.T, webhookClient
 }
 
 func (c *conversionTestContext) removeConversionWebhook(t *testing.T) {
-	crd, err := c.apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(c.crd.Name, metav1.GetOptions{})
+	crd, err := c.apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(context.TODO(), c.crd.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -969,7 +970,7 @@ func (c *conversionTestContext) removeConversionWebhook(t *testing.T) {
 		Strategy: apiextensionsv1beta1.NoneConverter,
 	}
 
-	crd, err = c.apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(crd)
+	crd, err = c.apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(context.TODO(), crd)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -997,14 +998,14 @@ func (c *conversionTestContext) setAndWaitStorageVersion(t *testing.T, version s
 }
 
 func (c *conversionTestContext) setStorageVersion(t *testing.T, version string) {
-	crd, err := c.apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(c.crd.Name, metav1.GetOptions{})
+	crd, err := c.apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(context.TODO(), c.crd.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	for i, v := range crd.Spec.Versions {
 		crd.Spec.Versions[i].Storage = v.Name == version
 	}
-	crd, err = c.apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(crd)
+	crd, err = c.apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(context.TODO(), crd)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1026,7 +1027,7 @@ func (c *conversionTestContext) waitForStorageVersion(t *testing.T, version stri
 }
 
 func (c *conversionTestContext) setServed(t *testing.T, version string, served bool) {
-	crd, err := c.apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(c.crd.Name, metav1.GetOptions{})
+	crd, err := c.apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(context.TODO(), c.crd.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1035,7 +1036,7 @@ func (c *conversionTestContext) setServed(t *testing.T, version string, served b
 			crd.Spec.Versions[i].Served = served
 		}
 	}
-	crd, err = c.apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(crd)
+	crd, err = c.apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(context.TODO(), crd)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -17,6 +17,7 @@ limitations under the License.
 package kubeadm
 
 import (
+	"context"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -61,7 +62,7 @@ var _ = Describe("control-plane node", func() {
 func getControlPlaneNodes(c clientset.Interface) *corev1.NodeList {
 	selector := labels.Set{controlPlaneTaint: ""}.AsSelector()
 	masters, err := c.CoreV1().Nodes().
-		List(metav1.ListOptions{LabelSelector: selector.String()})
+		List(context.TODO(), metav1.ListOptions{LabelSelector: selector.String()})
 	framework.ExpectNoError(err, "error reading control-plane nodes")
 
 	return masters

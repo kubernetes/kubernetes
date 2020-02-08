@@ -17,6 +17,7 @@ limitations under the License.
 package autoscale
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/spf13/cobra"
@@ -262,7 +263,7 @@ func (o *AutoscaleOptions) Run() error {
 			return err
 		}
 
-		actualHPA, err := o.HPAClient.HorizontalPodAutoscalers(o.namespace).Create(hpa)
+		actualHPA, err := o.HPAClient.HorizontalPodAutoscalers(o.namespace).Create(context.TODO(), hpa)
 		if err != nil {
 			return err
 		}

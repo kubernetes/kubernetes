@@ -231,7 +231,7 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 		default:
 		}
 
-		if _, err := client.CoreV1().Namespaces().Get("default", metav1.GetOptions{}); err != nil {
+		if _, err := client.CoreV1().Namespaces().Get(context.TODO(), "default", metav1.GetOptions{}); err != nil {
 			if !errors.IsNotFound(err) {
 				t.Logf("Unable to get default namespace: %v", err)
 			}

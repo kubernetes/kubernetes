@@ -17,6 +17,7 @@ limitations under the License.
 package node
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -119,12 +120,12 @@ func updateJobWithRetries(c clientset.Interface, namespace, name string, applyUp
 	jobs := c.BatchV1().Jobs(namespace)
 	var updateErr error
 	pollErr := wait.PollImmediate(framework.Poll, JobTimeout, func() (bool, error) {
-		if job, err = jobs.Get(name, metav1.GetOptions{}); err != nil {
+		if job, err = jobs.Get(context.TODO(), name, metav1.GetOptions{}); err != nil {
 			return false, err
 		}
 		// Apply the update, then attempt to push it to the apiserver.
 		applyUpdate(job)
-		if job, err = jobs.Update(job); err == nil {
+		if job, err = jobs.Update(context.TODO(), job); err == nil {
 			framework.Logf("Updating job %s", name)
 			return true, nil
 		}
@@ -141,7 +142,7 @@ func updateJobWithRetries(c clientset.Interface, namespace, name string, applyUp
 // a non-nil deletionTimestamp (i.e. being deleted).
 func waitForJobDeleting(c clientset.Interface, ns, jobName string) error {
 	return wait.PollImmediate(framework.Poll, JobTimeout, func() (bool, error) {
-		curr, err := c.BatchV1().Jobs(ns).Get(jobName, metav1.GetOptions{})
+		curr, err := c.BatchV1().Jobs(ns).Get(context.TODO(), jobName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}

@@ -76,7 +76,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 			ginkgo.By("setting up selector")
 			selector := labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
 			options := metav1.ListOptions{LabelSelector: selector.String()}
-			pods, err := podClient.List(options)
+			pods, err := podClient.List(context.TODO(), options)
 			framework.ExpectNoError(err, "failed to query for pod")
 			framework.ExpectEqual(len(pods.Items), 0)
 			options = metav1.ListOptions{
@@ -90,7 +90,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 			ginkgo.By("verifying the pod is in kubernetes")
 			selector = labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
 			options = metav1.ListOptions{LabelSelector: selector.String()}
-			pods, err = podClient.List(options)
+			pods, err = podClient.List(context.TODO(), options)
 			framework.ExpectNoError(err, "failed to query for pod")
 			framework.ExpectEqual(len(pods.Items), 1)
 
@@ -98,7 +98,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 			// may be carried out immediately rather than gracefully.
 			framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
 			// save the running pod
-			pod, err = podClient.Get(pod.Name, metav1.GetOptions{})
+			pod, err = podClient.Get(context.TODO(), pod.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err, "failed to GET scheduled pod")
 
 			ginkgo.By("deleting the pod gracefully")
@@ -139,7 +139,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 
 			selector = labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
 			options = metav1.ListOptions{LabelSelector: selector.String()}
-			pods, err = podClient.List(options)
+			pods, err = podClient.List(context.TODO(), options)
 			framework.ExpectNoError(err, "failed to query for pods")
 			framework.ExpectEqual(len(pods.Items), 0)
 
@@ -192,7 +192,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 			podClient.Create(pod)
 
 			ginkgo.By("verifying QOS class is set on the pod")
-			pod, err := podClient.Get(name, metav1.GetOptions{})
+			pod, err := podClient.Get(context.TODO(), name, metav1.GetOptions{})
 			framework.ExpectNoError(err, "failed to query for pod")
 			framework.ExpectEqual(pod.Status.QOSClass, v1.PodQOSGuaranteed)
 		})

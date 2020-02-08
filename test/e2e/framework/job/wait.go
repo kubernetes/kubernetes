@@ -17,6 +17,7 @@ limitations under the License.
 package job
 
 import (
+	"context"
 	"time"
 
 	"k8s.io/api/core/v1"
@@ -49,7 +50,7 @@ func WaitForAllJobPodsRunning(c clientset.Interface, ns, jobName string, paralle
 // WaitForJobComplete uses c to wait for completions to complete for the Job jobName in namespace ns.
 func WaitForJobComplete(c clientset.Interface, ns, jobName string, completions int32) error {
 	return wait.Poll(framework.Poll, JobTimeout, func() (bool, error) {
-		curr, err := c.BatchV1().Jobs(ns).Get(jobName, metav1.GetOptions{})
+		curr, err := c.BatchV1().Jobs(ns).Get(context.TODO(), jobName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -60,7 +61,7 @@ func WaitForJobComplete(c clientset.Interface, ns, jobName string, completions i
 // WaitForJobFinish uses c to wait for the Job jobName in namespace ns to finish (either Failed or Complete).
 func WaitForJobFinish(c clientset.Interface, ns, jobName string) error {
 	return wait.PollImmediate(framework.Poll, JobTimeout, func() (bool, error) {
-		curr, err := c.BatchV1().Jobs(ns).Get(jobName, metav1.GetOptions{})
+		curr, err := c.BatchV1().Jobs(ns).Get(context.TODO(), jobName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -71,7 +72,7 @@ func WaitForJobFinish(c clientset.Interface, ns, jobName string) error {
 // WaitForJobGone uses c to wait for up to timeout for the Job named jobName in namespace ns to be removed.
 func WaitForJobGone(c clientset.Interface, ns, jobName string, timeout time.Duration) error {
 	return wait.Poll(framework.Poll, timeout, func() (bool, error) {
-		_, err := c.BatchV1().Jobs(ns).Get(jobName, metav1.GetOptions{})
+		_, err := c.BatchV1().Jobs(ns).Get(context.TODO(), jobName, metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
 			return true, nil
 		}

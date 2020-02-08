@@ -69,7 +69,7 @@ func checkConnectivityToHost(f *framework.Framework, nodeName, podName, host str
 		},
 	}
 	podClient := f.ClientSet.CoreV1().Pods(f.Namespace.Name)
-	_, err := podClient.Create(pod)
+	_, err := podClient.Create(context.TODO(), pod)
 	if err != nil {
 		return err
 	}

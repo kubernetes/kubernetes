@@ -17,6 +17,7 @@ limitations under the License.
 package service
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 
@@ -37,7 +38,7 @@ func patch(c v1core.CoreV1Interface, oldSvc *v1.Service, newSvc *v1.Service) (*v
 		return nil, err
 	}
 
-	return c.Services(oldSvc.Namespace).Patch(oldSvc.Name, types.StrategicMergePatchType, patchBytes, "status")
+	return c.Services(oldSvc.Namespace).Patch(context.TODO(), oldSvc.Name, types.StrategicMergePatchType, patchBytes, "status")
 }
 
 func getPatchBytes(oldSvc *v1.Service, newSvc *v1.Service) ([]byte, error) {

@@ -17,6 +17,7 @@ limitations under the License.
 package testsuites
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"strings"
@@ -257,7 +258,7 @@ func (t EphemeralTest) TestEphemeral() {
 		StopPod(client, pod)
 	}()
 	framework.ExpectNoError(e2epod.WaitForPodRunningInNamespaceSlow(client, pod.Name, pod.Namespace), "waiting for pod with inline volume")
-	runningPod, err := client.CoreV1().Pods(pod.Namespace).Get(pod.Name, metav1.GetOptions{})
+	runningPod, err := client.CoreV1().Pods(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err, "get pod")
 	actualNodeName := runningPod.Spec.NodeName
 
@@ -321,7 +322,7 @@ func StartInPodWithInlineVolume(c clientset.Interface, ns, podName, command stri
 			})
 	}
 
-	pod, err := c.CoreV1().Pods(ns).Create(pod)
+	pod, err := c.CoreV1().Pods(ns).Create(context.TODO(), pod)
 	framework.ExpectNoError(err, "failed to create pod")
 	return pod
 }
@@ -364,7 +365,7 @@ func CSIInlineVolumesEnabled(c clientset.Interface, ns string) (bool, error) {
 		},
 	}
 
-	pod, err := c.CoreV1().Pods(ns).Create(pod)
+	pod, err := c.CoreV1().Pods(ns).Create(context.TODO(), pod)
 
 	switch {
 	case err == nil:

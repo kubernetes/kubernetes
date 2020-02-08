@@ -22,6 +22,7 @@ limitations under the License.
 package replication
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -215,7 +216,7 @@ func (c conversionClient) UpdateStatus(rs *apps.ReplicaSet) (*apps.ReplicaSet, e
 }
 
 func (c conversionClient) Get(name string, options metav1.GetOptions) (*apps.ReplicaSet, error) {
-	rc, err := c.ReplicationControllerInterface.Get(name, options)
+	rc, err := c.ReplicationControllerInterface.Get(context.TODO(), name, options)
 	if err != nil {
 		return nil, err
 	}
@@ -223,7 +224,7 @@ func (c conversionClient) Get(name string, options metav1.GetOptions) (*apps.Rep
 }
 
 func (c conversionClient) List(opts metav1.ListOptions) (*apps.ReplicaSetList, error) {
-	rcList, err := c.ReplicationControllerInterface.List(opts)
+	rcList, err := c.ReplicationControllerInterface.List(context.TODO(), opts)
 	if err != nil {
 		return nil, err
 	}

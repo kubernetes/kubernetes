@@ -17,6 +17,7 @@ limitations under the License.
 package exec
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/url"
@@ -285,7 +286,7 @@ func (p *ExecOptions) Run() error {
 	// since there are any other command run this function by providing Podname with PodsGetter
 	// and without resource builder, eg: `kubectl cp`.
 	if len(p.PodName) != 0 {
-		p.Pod, err = p.PodClient.Pods(p.Namespace).Get(p.PodName, metav1.GetOptions{})
+		p.Pod, err = p.PodClient.Pods(p.Namespace).Get(context.TODO(), p.PodName, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}

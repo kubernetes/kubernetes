@@ -17,6 +17,7 @@ limitations under the License.
 package apps
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -260,7 +261,7 @@ var _ = SIGDescribe("Job", func() {
 // waitForJobFailure uses c to wait for up to timeout for the Job named jobName in namespace ns to fail.
 func waitForJobFailure(c clientset.Interface, ns, jobName string, timeout time.Duration, reason string) error {
 	return wait.Poll(framework.Poll, timeout, func() (bool, error) {
-		curr, err := c.BatchV1().Jobs(ns).Get(jobName, metav1.GetOptions{})
+		curr, err := c.BatchV1().Jobs(ns).Get(context.TODO(), jobName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}

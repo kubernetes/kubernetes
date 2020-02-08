@@ -17,6 +17,7 @@ limitations under the License.
 package csi
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"os"
@@ -212,7 +213,7 @@ func MounterSetUpTests(t *testing.T, podInfoEnabled bool) {
 					DetachError: nil,
 				},
 			}
-			_, err = csiMounter.k8s.StorageV1().VolumeAttachments().Create(attachment)
+			_, err = csiMounter.k8s.StorageV1().VolumeAttachments().Create(context.TODO(), attachment)
 			if err != nil {
 				t.Fatalf("failed to setup VolumeAttachment: %v", err)
 			}
@@ -355,7 +356,7 @@ func TestMounterSetUpSimple(t *testing.T) {
 
 			attachID := getAttachmentName(csiMounter.volumeID, string(csiMounter.driverName), string(plug.host.GetNodeName()))
 			attachment := makeTestAttachment(attachID, "test-node", csiMounter.spec.Name())
-			_, err = csiMounter.k8s.StorageV1().VolumeAttachments().Create(attachment)
+			_, err = csiMounter.k8s.StorageV1().VolumeAttachments().Create(context.TODO(), attachment)
 			if err != nil {
 				t.Fatalf("failed to setup VolumeAttachment: %v", err)
 			}
@@ -483,7 +484,7 @@ func TestMounterSetupWithStatusTracking(t *testing.T) {
 			if tc.createAttachment {
 				attachID := getAttachmentName(csiMounter.volumeID, string(csiMounter.driverName), string(plug.host.GetNodeName()))
 				attachment := makeTestAttachment(attachID, "test-node", csiMounter.spec.Name())
-				_, err = csiMounter.k8s.StorageV1().VolumeAttachments().Create(attachment)
+				_, err = csiMounter.k8s.StorageV1().VolumeAttachments().Create(context.TODO(), attachment)
 				if err != nil {
 					t.Fatalf("failed to setup VolumeAttachment: %v", err)
 				}
@@ -597,7 +598,7 @@ func TestMounterSetUpWithInline(t *testing.T) {
 			if csiMounter.volumeLifecycleMode == storagev1beta1.VolumeLifecyclePersistent {
 				attachID := getAttachmentName(csiMounter.volumeID, string(csiMounter.driverName), string(plug.host.GetNodeName()))
 				attachment := makeTestAttachment(attachID, "test-node", csiMounter.spec.Name())
-				_, err = csiMounter.k8s.StorageV1().VolumeAttachments().Create(attachment)
+				_, err = csiMounter.k8s.StorageV1().VolumeAttachments().Create(context.TODO(), attachment)
 				if err != nil {
 					t.Fatalf("failed to setup VolumeAttachment: %v", err)
 				}
@@ -743,7 +744,7 @@ func TestMounterSetUpWithFSGroup(t *testing.T) {
 		attachID := getAttachmentName(csiMounter.volumeID, string(csiMounter.driverName), string(plug.host.GetNodeName()))
 		attachment := makeTestAttachment(attachID, "test-node", pvName)
 
-		_, err = csiMounter.k8s.StorageV1().VolumeAttachments().Create(attachment)
+		_, err = csiMounter.k8s.StorageV1().VolumeAttachments().Create(context.TODO(), attachment)
 		if err != nil {
 			t.Errorf("failed to setup VolumeAttachment: %v", err)
 			continue

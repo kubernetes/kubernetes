@@ -17,6 +17,7 @@ limitations under the License.
 package common
 
 import (
+	"context"
 	"encoding/json"
 
 	v1 "k8s.io/api/core/v1"
@@ -36,14 +37,14 @@ var _ = ginkgo.Describe("[sig-architecture] PodTemplates", func() {
 		podTemplateName := "nginx-pod-template-" + string(uuid.NewUUID())
 
 		// get a list of PodTemplates (in all namespaces to hit endpoint)
-		podTemplateList, err := f.ClientSet.CoreV1().PodTemplates("").List(metav1.ListOptions{
+		podTemplateList, err := f.ClientSet.CoreV1().PodTemplates("").List(context.TODO(), metav1.ListOptions{
 			LabelSelector: "podtemplate-static=true",
 		})
 		framework.ExpectNoError(err, "failed to list all PodTemplates")
 		framework.ExpectEqual(len(podTemplateList.Items), 0, "unable to find templates")
 
 		// create a PodTemplate
-		_, err = f.ClientSet.CoreV1().PodTemplates(testNamespaceName).Create(&v1.PodTemplate{
+		_, err = f.ClientSet.CoreV1().PodTemplates(testNamespaceName).Create(context.TODO(), &v1.PodTemplate{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: podTemplateName,
 				Labels: map[string]string{
@@ -61,7 +62,7 @@ var _ = ginkgo.Describe("[sig-architecture] PodTemplates", func() {
 		framework.ExpectNoError(err, "failed to create PodTemplate")
 
 		// get template
-		podTemplateRead, err := f.ClientSet.CoreV1().PodTemplates(testNamespaceName).Get(podTemplateName, metav1.GetOptions{})
+		podTemplateRead, err := f.ClientSet.CoreV1().PodTemplates(testNamespaceName).Get(context.TODO(), podTemplateName, metav1.GetOptions{})
 		framework.ExpectNoError(err, "failed to get created PodTemplate")
 		framework.ExpectEqual(podTemplateRead.ObjectMeta.Name, podTemplateName)
 
@@ -74,20 +75,20 @@ var _ = ginkgo.Describe("[sig-architecture] PodTemplates", func() {
 			},
 		})
 		framework.ExpectNoError(err, "failed to marshal patch data")
-		_, err = f.ClientSet.CoreV1().PodTemplates(testNamespaceName).Patch(podTemplateName, types.StrategicMergePatchType, []byte(podTemplatePatch))
+		_, err = f.ClientSet.CoreV1().PodTemplates(testNamespaceName).Patch(context.TODO(), podTemplateName, types.StrategicMergePatchType, []byte(podTemplatePatch))
 		framework.ExpectNoError(err, "failed to patch PodTemplate")
 
 		// get template (ensure label is there)
-		podTemplateRead, err = f.ClientSet.CoreV1().PodTemplates(testNamespaceName).Get(podTemplateName, metav1.GetOptions{})
+		podTemplateRead, err = f.ClientSet.CoreV1().PodTemplates(testNamespaceName).Get(context.TODO(), podTemplateName, metav1.GetOptions{})
 		framework.ExpectNoError(err, "failed to get PodTemplate")
 		framework.ExpectEqual(podTemplateRead.ObjectMeta.Labels["podtemplate"], "patched", "failed to patch template, new label not found")
 
 		// delete the PodTemplate
-		err = f.ClientSet.CoreV1().PodTemplates(testNamespaceName).Delete(podTemplateName, &metav1.DeleteOptions{})
+		err = f.ClientSet.CoreV1().PodTemplates(testNamespaceName).Delete(context.TODO(), podTemplateName, &metav1.DeleteOptions{})
 		framework.ExpectNoError(err, "failed to delete PodTemplate")
 
 		// list the PodTemplates
-		podTemplateList, err = f.ClientSet.CoreV1().PodTemplates("").List(metav1.ListOptions{
+		podTemplateList, err = f.ClientSet.CoreV1().PodTemplates("").List(context.TODO(), metav1.ListOptions{
 			LabelSelector: "podtemplate-static=true",
 		})
 		framework.ExpectNoError(err, "failed to list PodTemplate")

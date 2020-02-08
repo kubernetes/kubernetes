@@ -459,7 +459,7 @@ func testWebhookAdmission(t *testing.T, watchCache bool) {
 	// create CRDs
 	etcd.CreateTestCRDs(t, apiextensionsclientset.NewForConfigOrDie(server.ClientConfig), false, etcd.GetCustomResourceDefinitionData()...)
 
-	if _, err := client.CoreV1().Namespaces().Create(&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}}); err != nil {
+	if _, err := client.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1048,7 +1048,7 @@ func testPodBindingEviction(c *testContext) {
 	zero := int64(0)
 	forceDelete := &metav1.DeleteOptions{GracePeriodSeconds: &zero, PropagationPolicy: &background}
 	defer func() {
-		err := c.clientset.CoreV1().Pods(pod.GetNamespace()).Delete(pod.GetName(), forceDelete)
+		err := c.clientset.CoreV1().Pods(pod.GetNamespace()).Delete(context.TODO(), pod.GetName(), forceDelete)
 		if err != nil && !apierrors.IsNotFound(err) {
 			c.t.Error(err)
 			return
@@ -1450,7 +1450,7 @@ func createV1beta1ValidationWebhook(client clientset.Interface, endpoint, conver
 	fail := admissionv1beta1.Fail
 	equivalent := admissionv1beta1.Equivalent
 	// Attaching Admission webhook to API server
-	_, err := client.AdmissionregistrationV1beta1().ValidatingWebhookConfigurations().Create(&admissionv1beta1.ValidatingWebhookConfiguration{
+	_, err := client.AdmissionregistrationV1beta1().ValidatingWebhookConfigurations().Create(context.TODO(), &admissionv1beta1.ValidatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{Name: "admission.integration.test"},
 		Webhooks: []admissionv1beta1.ValidatingWebhook{
 			{
@@ -1486,7 +1486,7 @@ func createV1beta1MutationWebhook(client clientset.Interface, endpoint, converte
 	fail := admissionv1beta1.Fail
 	equivalent := admissionv1beta1.Equivalent
 	// Attaching Mutation webhook to API server
-	_, err := client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Create(&admissionv1beta1.MutatingWebhookConfiguration{
+	_, err := client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Create(context.TODO(), &admissionv1beta1.MutatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{Name: "mutation.integration.test"},
 		Webhooks: []admissionv1beta1.MutatingWebhook{
 			{
@@ -1523,7 +1523,7 @@ func createV1ValidationWebhook(client clientset.Interface, endpoint, convertedEn
 	equivalent := admissionv1.Equivalent
 	none := admissionv1.SideEffectClassNone
 	// Attaching Admission webhook to API server
-	_, err := client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Create(&admissionv1.ValidatingWebhookConfiguration{
+	_, err := client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Create(context.TODO(), &admissionv1.ValidatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{Name: "admissionv1.integration.test"},
 		Webhooks: []admissionv1.ValidatingWebhook{
 			{
@@ -1562,7 +1562,7 @@ func createV1MutationWebhook(client clientset.Interface, endpoint, convertedEndp
 	equivalent := admissionv1.Equivalent
 	none := admissionv1.SideEffectClassNone
 	// Attaching Mutation webhook to API server
-	_, err := client.AdmissionregistrationV1().MutatingWebhookConfigurations().Create(&admissionv1.MutatingWebhookConfiguration{
+	_, err := client.AdmissionregistrationV1().MutatingWebhookConfigurations().Create(context.TODO(), &admissionv1.MutatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{Name: "mutationv1.integration.test"},
 		Webhooks: []admissionv1.MutatingWebhook{
 			{

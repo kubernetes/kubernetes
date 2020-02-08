@@ -17,6 +17,7 @@ limitations under the License.
 package auth
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -222,7 +223,7 @@ func (o *CanIOptions) RunAccessList() error {
 			Namespace: o.Namespace,
 		},
 	}
-	response, err := o.AuthClient.SelfSubjectRulesReviews().Create(sar)
+	response, err := o.AuthClient.SelfSubjectRulesReviews().Create(context.TODO(), sar)
 	if err != nil {
 		return err
 	}
@@ -257,7 +258,7 @@ func (o *CanIOptions) RunAccessCheck() (bool, error) {
 		}
 	}
 
-	response, err := o.AuthClient.SelfSubjectAccessReviews().Create(sar)
+	response, err := o.AuthClient.SelfSubjectAccessReviews().Create(context.TODO(), sar)
 	if err != nil {
 		return false, err
 	}

@@ -19,6 +19,7 @@ limitations under the License.
 package v1
 
 import (
+	"context"
 	time "time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -60,13 +61,13 @@ func NewFilteredClusterTestTypeInformer(client versioned.Interface, resyncPeriod
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.ExampleGroupV1().ClusterTestTypes().List(options)
+				return client.ExampleGroupV1().ClusterTestTypes().List(context.TODO(), options)
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.ExampleGroupV1().ClusterTestTypes().Watch(options)
+				return client.ExampleGroupV1().ClusterTestTypes().Watch(context.TODO(), options)
 			},
 		},
 		&examplev1.ClusterTestType{},

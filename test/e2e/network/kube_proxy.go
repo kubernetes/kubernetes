@@ -17,6 +17,7 @@ limitations under the License.
 package network
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -267,7 +268,7 @@ var _ = SIGDescribe("Network", func() {
 				},
 			},
 		}
-		_, err := fr.ClientSet.CoreV1().Pods(fr.Namespace.Name).Create(serverPod)
+		_, err := fr.ClientSet.CoreV1().Pods(fr.Namespace.Name).Create(context.TODO(), serverPod)
 		framework.ExpectNoError(err)
 
 		err = e2epod.WaitForPodsRunningReady(fr.ClientSet, fr.Namespace.Name, 1, 0, framework.PodReadyBeforeTimeout, map[string]string{})
@@ -289,7 +290,7 @@ var _ = SIGDescribe("Network", func() {
 				},
 			},
 		}
-		_, err = fr.ClientSet.CoreV1().Services(fr.Namespace.Name).Create(svc)
+		_, err = fr.ClientSet.CoreV1().Services(fr.Namespace.Name).Create(context.TODO(), svc)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Server service created")
@@ -324,14 +325,14 @@ var _ = SIGDescribe("Network", func() {
 				RestartPolicy: v1.RestartPolicyNever,
 			},
 		}
-		_, err = fr.ClientSet.CoreV1().Pods(fr.Namespace.Name).Create(pod)
+		_, err = fr.ClientSet.CoreV1().Pods(fr.Namespace.Name).Create(context.TODO(), pod)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Client pod created")
 
 		for i := 0; i < 20; i++ {
 			time.Sleep(3 * time.Second)
-			resultPod, err := fr.ClientSet.CoreV1().Pods(fr.Namespace.Name).Get(serverPod.Name, metav1.GetOptions{})
+			resultPod, err := fr.ClientSet.CoreV1().Pods(fr.Namespace.Name).Get(context.TODO(), serverPod.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 			gomega.Expect(resultPod.Status.ContainerStatuses[0].LastTerminationState.Terminated).Should(gomega.BeNil())
 		}

@@ -223,7 +223,7 @@ func (p *Plugin) ValidateInitialization() error {
 }
 
 func (p *Plugin) defaultGetNamespace(name string) (*corev1.Namespace, error) {
-	namespace, err := p.client.CoreV1().Namespaces().Get(name, metav1.GetOptions{})
+	namespace, err := p.client.CoreV1().Namespaces().Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("namespace %s does not exist", name)
 	}

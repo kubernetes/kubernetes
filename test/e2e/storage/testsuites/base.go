@@ -227,7 +227,7 @@ func CreateVolumeResource(driver TestDriver, config *PerTestConfig, pattern test
 
 			ginkgo.By("creating a StorageClass " + r.Sc.Name)
 
-			r.Sc, err = cs.StorageV1().StorageClasses().Create(r.Sc)
+			r.Sc, err = cs.StorageV1().StorageClasses().Create(context.TODO(), r.Sc)
 			framework.ExpectNoError(err)
 
 			if r.Sc != nil {
@@ -387,12 +387,12 @@ func createPVCPVFromDynamicProvisionSC(
 		framework.ExpectNoError(err)
 	}
 
-	pvc, err = cs.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(pvc.Name, metav1.GetOptions{})
+	pvc, err = cs.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(context.TODO(), pvc.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err)
 
 	var pv *v1.PersistentVolume
 	if !isDelayedBinding(sc) {
-		pv, err = cs.CoreV1().PersistentVolumes().Get(pvc.Spec.VolumeName, metav1.GetOptions{})
+		pv, err = cs.CoreV1().PersistentVolumes().Get(context.TODO(), pvc.Spec.VolumeName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 	}
 
@@ -408,7 +408,7 @@ func isDelayedBinding(sc *storagev1.StorageClass) bool {
 
 // deleteStorageClass deletes the passed in StorageClass and catches errors other than "Not Found"
 func deleteStorageClass(cs clientset.Interface, className string) error {
-	err := cs.StorageV1().StorageClasses().Delete(className, nil)
+	err := cs.StorageV1().StorageClasses().Delete(context.TODO(), className, nil)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
@@ -592,7 +592,7 @@ func getVolumeOpCounts(c clientset.Interface, pluginName string) opCounts {
 	totOps := getVolumeOpsFromMetricsForPlugin(testutil.Metrics(controllerMetrics), pluginName)
 
 	framework.Logf("Node name not specified for getVolumeOpCounts, falling back to listing nodes from API Server")
-	nodes, err := c.CoreV1().Nodes().List(metav1.ListOptions{})
+	nodes, err := c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 	framework.ExpectNoError(err, "Error listing nodes: %v", err)
 	if len(nodes.Items) <= nodeLimit {
 		// For large clusters with > nodeLimit nodes it is too time consuming to

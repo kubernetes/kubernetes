@@ -17,6 +17,7 @@ limitations under the License.
 package helpers
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -136,7 +137,7 @@ func PatchService(c corev1.CoreV1Interface, oldSvc, newSvc *v1.Service) (*v1.Ser
 		return nil, err
 	}
 
-	return c.Services(oldSvc.Namespace).Patch(oldSvc.Name, types.StrategicMergePatchType, patchBytes, "status")
+	return c.Services(oldSvc.Namespace).Patch(context.TODO(), oldSvc.Name, types.StrategicMergePatchType, patchBytes, "status")
 
 }
 

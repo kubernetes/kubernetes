@@ -17,6 +17,7 @@ limitations under the License.
 package integration
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"strings"
@@ -206,12 +207,12 @@ func testDefaulting(t *testing.T, watchCache bool) {
 		var err error
 		for retry := 0; retry < 10; retry++ {
 			var obj *apiextensionsv1.CustomResourceDefinition
-			obj, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(crd.Name, metav1.GetOptions{})
+			obj, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.TODO(), crd.Name, metav1.GetOptions{})
 			if err != nil {
 				t.Fatal(err)
 			}
 			update(obj)
-			obj, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Update(obj)
+			obj, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Update(context.TODO(), obj)
 			if err != nil && apierrors.IsConflict(err) {
 				continue
 			} else if err != nil {

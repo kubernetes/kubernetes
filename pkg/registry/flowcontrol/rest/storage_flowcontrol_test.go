@@ -17,6 +17,7 @@ limitations under the License.
 package rest
 
 import (
+	"context"
 	"github.com/stretchr/testify/require"
 	"testing"
 
@@ -49,7 +50,7 @@ func TestShouldEnsurePredefinedSettings(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			c := fake.NewSimpleClientset()
 			if testCase.existingPriorityLevel != nil {
-				c.FlowcontrolV1alpha1().PriorityLevelConfigurations().Create(testCase.existingPriorityLevel)
+				c.FlowcontrolV1alpha1().PriorityLevelConfigurations().Create(context.TODO(), testCase.existingPriorityLevel)
 			}
 			should, err := lastMandatoryExists(c.FlowcontrolV1alpha1())
 			assert.NoError(t, err)

@@ -82,7 +82,7 @@ var _ = SIGDescribe("[Feature:PerformanceDNS][Serial]", func() {
 				continue
 			}
 			s := services[i]
-			svc, err := f.ClientSet.CoreV1().Services(s.Namespace).Get(s.Name, metav1.GetOptions{})
+			svc, err := f.ClientSet.CoreV1().Services(s.Namespace).Get(context.TODO(), s.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 			qname := fmt.Sprintf("%v.%v.svc.%v", s.Name, s.Namespace, framework.TestContext.ClusterDNSDomain)
 			framework.Logf("Querying %v expecting %v", qname, svc.Spec.ClusterIP)

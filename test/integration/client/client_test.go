@@ -59,7 +59,7 @@ func TestClient(t *testing.T) {
 		t.Errorf("expected %#v, got %#v", e, a)
 	}
 
-	pods, err := client.CoreV1().Pods("default").List(metav1.ListOptions{})
+	pods, err := client.CoreV1().Pods("default").List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -82,14 +82,14 @@ func TestClient(t *testing.T) {
 		},
 	}
 
-	got, err := client.CoreV1().Pods("default").Create(pod)
+	got, err := client.CoreV1().Pods("default").Create(context.TODO(), pod)
 	if err == nil {
 		t.Fatalf("unexpected non-error: %v", got)
 	}
 
 	// get a created pod
 	pod.Spec.Containers[0].Image = "an-image"
-	got, err = client.CoreV1().Pods("default").Create(pod)
+	got, err = client.CoreV1().Pods("default").Create(context.TODO(), pod)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -98,7 +98,7 @@ func TestClient(t *testing.T) {
 	}
 
 	// pod is shown, but not scheduled
-	pods, err = client.CoreV1().Pods("default").List(metav1.ListOptions{})
+	pods, err = client.CoreV1().Pods("default").List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -151,7 +151,7 @@ func TestAtomicPut(t *testing.T) {
 		},
 	}
 	rcs := c.CoreV1().ReplicationControllers("default")
-	rc, err := rcs.Create(&rcBody)
+	rc, err := rcs.Create(context.TODO(), &rcBody)
 	if err != nil {
 		t.Fatalf("Failed creating atomicRC: %v", err)
 	}
@@ -168,7 +168,7 @@ func TestAtomicPut(t *testing.T) {
 		go func(l, v string) {
 			defer wg.Done()
 			for {
-				tmpRC, err := rcs.Get(rc.Name, metav1.GetOptions{})
+				tmpRC, err := rcs.Get(context.TODO(), rc.Name, metav1.GetOptions{})
 				if err != nil {
 					t.Errorf("Error getting atomicRC: %v", err)
 					continue
@@ -180,7 +180,7 @@ func TestAtomicPut(t *testing.T) {
 					tmpRC.Spec.Selector[l] = v
 					tmpRC.Spec.Template.Labels[l] = v
 				}
-				_, err = rcs.Update(tmpRC)
+				_, err = rcs.Update(context.TODO(), tmpRC)
 				if err != nil {
 					if apierrors.IsConflict(err) {
 						// This is what we expect.
@@ -194,7 +194,7 @@ func TestAtomicPut(t *testing.T) {
 		}(label, value)
 	}
 	wg.Wait()
-	rc, err = rcs.Get(rc.Name, metav1.GetOptions{})
+	rc, err = rcs.Get(context.TODO(), rc.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Failed getting atomicRC after writers are complete: %v", err)
 	}
@@ -227,7 +227,7 @@ func TestPatch(t *testing.T) {
 		},
 	}
 	pods := c.CoreV1().Pods("default")
-	_, err := pods.Create(&podBody)
+	_, err := pods.Create(context.TODO(), &podBody)
 	if err != nil {
 		t.Fatalf("Failed creating patchpods: %v", err)
 	}
@@ -286,7 +286,7 @@ func TestPatch(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed updating patchpod with patch type %s: %v", k, err)
 		}
-		pod, err := pods.Get(name, metav1.GetOptions{})
+		pod, err := pods.Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			t.Fatalf("Failed getting patchpod: %v", err)
 		}
@@ -299,7 +299,7 @@ func TestPatch(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed updating patchpod with patch type %s: %v", k, err)
 		}
-		pod, err = pods.Get(name, metav1.GetOptions{})
+		pod, err = pods.Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			t.Fatalf("Failed getting patchpod: %v", err)
 		}
@@ -312,7 +312,7 @@ func TestPatch(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed updating patchpod with patch type %s: %v", k, err)
 		}
-		pod, err = pods.Get(name, metav1.GetOptions{})
+		pod, err = pods.Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			t.Fatalf("Failed getting patchpod: %v", err)
 		}
@@ -357,7 +357,7 @@ func TestPatchWithCreateOnUpdate(t *testing.T) {
 	}
 
 	// Create the endpoint (endpoints set AllowCreateOnUpdate=true) to get a UID and resource version
-	createdEndpoint, err := c.CoreV1().Endpoints("default").Update(endpointTemplate)
+	createdEndpoint, err := c.CoreV1().Endpoints("default").Update(context.TODO(), endpointTemplate)
 	if err != nil {
 		t.Fatalf("Failed creating endpoint: %v", err)
 	}
@@ -476,7 +476,7 @@ func TestSingleWatch(t *testing.T) {
 	rv1 := ""
 	for i := 0; i < 10; i++ {
 		event := mkEvent(i)
-		got, err := client.CoreV1().Events("default").Create(event)
+		got, err := client.CoreV1().Events("default").Create(context.TODO(), event)
 		if err != nil {
 			t.Fatalf("Failed creating event %#q: %v", event, err)
 		}
@@ -569,7 +569,7 @@ func TestMultiWatch(t *testing.T) {
 	for i := 0; i < watcherCount; i++ {
 		watchesStarted.Add(1)
 		name := fmt.Sprintf("multi-watch-%v", i)
-		got, err := client.CoreV1().Pods("default").Create(&v1.Pod{
+		got, err := client.CoreV1().Pods("default").Create(context.TODO(), &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   name,
 				Labels: labels.Set{"watchlabel": name},
@@ -590,7 +590,7 @@ func TestMultiWatch(t *testing.T) {
 				LabelSelector:   labels.Set{"watchlabel": name}.AsSelector().String(),
 				ResourceVersion: rv,
 			}
-			w, err := client.CoreV1().Pods("default").Watch(options)
+			w, err := client.CoreV1().Pods("default").Watch(context.TODO(), options)
 			if err != nil {
 				panic(fmt.Sprintf("watch error for %v: %v", name, err))
 			}
@@ -639,7 +639,7 @@ func TestMultiWatch(t *testing.T) {
 					if !ok {
 						return
 					}
-					if _, err := client.CoreV1().Events("default").Create(dummyEvent(i)); err != nil {
+					if _, err := client.CoreV1().Events("default").Create(context.TODO(), dummyEvent(i)); err != nil {
 						panic(fmt.Sprintf("couldn't make an event: %v", err))
 					}
 					changeMade <- i
@@ -676,7 +676,7 @@ func TestMultiWatch(t *testing.T) {
 						return
 					}
 					name := fmt.Sprintf("unrelated-%v", i)
-					_, err := client.CoreV1().Pods("default").Create(&v1.Pod{
+					_, err := client.CoreV1().Pods("default").Create(context.TODO(), &v1.Pod{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: name,
 						},
@@ -710,13 +710,13 @@ func TestMultiWatch(t *testing.T) {
 	for i := 0; i < watcherCount; i++ {
 		go func(i int) {
 			name := fmt.Sprintf("multi-watch-%v", i)
-			pod, err := client.CoreV1().Pods("default").Get(name, metav1.GetOptions{})
+			pod, err := client.CoreV1().Pods("default").Get(context.TODO(), name, metav1.GetOptions{})
 			if err != nil {
 				panic(fmt.Sprintf("Couldn't get %v: %v", name, err))
 			}
 			pod.Spec.Containers[0].Image = imageutils.GetPauseImageName()
 			sentTimes <- timePair{time.Now(), name}
-			if _, err := client.CoreV1().Pods("default").Update(pod); err != nil {
+			if _, err := client.CoreV1().Pods("default").Update(context.TODO(), pod); err != nil {
 				panic(fmt.Sprintf("Couldn't make %v: %v", name, err))
 			}
 		}(i)
@@ -754,7 +754,7 @@ func runSelfLinkTestOnNamespace(t *testing.T, c clientset.Interface, namespace s
 			},
 		},
 	}
-	pod, err := c.CoreV1().Pods(namespace).Create(&podBody)
+	pod, err := c.CoreV1().Pods(namespace).Create(context.TODO(), &podBody)
 	if err != nil {
 		t.Fatalf("Failed creating selflinktest pod: %v", err)
 	}
@@ -762,7 +762,7 @@ func runSelfLinkTestOnNamespace(t *testing.T, c clientset.Interface, namespace s
 		t.Errorf("Failed listing pod with supplied self link '%v': %v", pod.SelfLink, err)
 	}
 
-	podList, err := c.CoreV1().Pods(namespace).List(metav1.ListOptions{})
+	podList, err := c.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		t.Errorf("Failed listing pods: %v", err)
 	}

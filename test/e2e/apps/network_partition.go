@@ -17,6 +17,7 @@ limitations under the License.
 package apps
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -100,7 +101,7 @@ func podOnNode(podName, nodeName string, image string) *v1.Pod {
 }
 
 func newPodOnNode(c clientset.Interface, namespace, podName, nodeName string) error {
-	pod, err := c.CoreV1().Pods(namespace).Create(podOnNode(podName, nodeName, framework.ServeHostnameImage))
+	pod, err := c.CoreV1().Pods(namespace).Create(context.TODO(), podOnNode(podName, nodeName, framework.ServeHostnameImage))
 	if err == nil {
 		framework.Logf("Created pod %s on node %s", pod.ObjectMeta.Name, nodeName)
 	} else {
@@ -145,14 +146,14 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 				ginkgo.By("choose a node - we will block all network traffic on this node")
 				var podOpts metav1.ListOptions
 				nodeOpts := metav1.ListOptions{}
-				nodes, err := c.CoreV1().Nodes().List(nodeOpts)
+				nodes, err := c.CoreV1().Nodes().List(context.TODO(), nodeOpts)
 				framework.ExpectNoError(err)
 				e2enode.Filter(nodes, func(node v1.Node) bool {
 					if !e2enode.IsConditionSetAsExpected(&node, v1.NodeReady, true) {
 						return false
 					}
 					podOpts = metav1.ListOptions{FieldSelector: fields.OneTermEqualSelector(api.PodHostField, node.Name).String()}
-					pods, err := c.CoreV1().Pods(metav1.NamespaceAll).List(podOpts)
+					pods, err := c.CoreV1().Pods(metav1.NamespaceAll).List(context.TODO(), podOpts)
 					if err != nil || len(pods.Items) <= 0 {
 						return false
 					}
@@ -176,12 +177,12 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 					&cache.ListWatch{
 						ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 							options.FieldSelector = nodeSelector.String()
-							obj, err := f.ClientSet.CoreV1().Nodes().List(options)
+							obj, err := f.ClientSet.CoreV1().Nodes().List(context.TODO(), options)
 							return runtime.Object(obj), err
 						},
 						WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 							options.FieldSelector = nodeSelector.String()
-							return f.ClientSet.CoreV1().Nodes().Watch(options)
+							return f.ClientSet.CoreV1().Nodes().Watch(context.TODO(), options)
 						},
 					},
 					&v1.Node{},
@@ -256,11 +257,11 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 			ginkgo.By("choose a node with at least one pod - we will block some network traffic on this node")
 			label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
 			options := metav1.ListOptions{LabelSelector: label.String()}
-			pods, err := c.CoreV1().Pods(ns).List(options) // list pods after all have been scheduled
+			pods, err := c.CoreV1().Pods(ns).List(context.TODO(), options) // list pods after all have been scheduled
 			framework.ExpectNoError(err)
 			nodeName := pods.Items[0].Spec.NodeName
 
-			node, err := c.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+			node, err := c.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 
 			// This creates a temporary network partition, verifies that 'podNameToDisappear',
@@ -298,7 +299,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 
 			// verify that it is really on the requested node
 			{
-				pod, err := c.CoreV1().Pods(ns).Get(additionalPod, metav1.GetOptions{})
+				pod, err := c.CoreV1().Pods(ns).Get(context.TODO(), additionalPod, metav1.GetOptions{})
 				framework.ExpectNoError(err)
 				if pod.Spec.NodeName != node.Name {
 					framework.Logf("Pod %s found on invalid node: %s instead of %s", pod.Name, pod.Spec.NodeName, node.Name)
@@ -325,11 +326,11 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 			ginkgo.By("choose a node with at least one pod - we will block some network traffic on this node")
 			label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
 			options := metav1.ListOptions{LabelSelector: label.String()}
-			pods, err := c.CoreV1().Pods(ns).List(options) // list pods after all have been scheduled
+			pods, err := c.CoreV1().Pods(ns).List(context.TODO(), options) // list pods after all have been scheduled
 			framework.ExpectNoError(err)
 			nodeName := pods.Items[0].Spec.NodeName
 
-			node, err := c.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+			node, err := c.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 
 			// This creates a temporary network partition, verifies that 'podNameToDisappear',
@@ -367,7 +368,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 			e2eskipper.SkipUnlessProviderIs("gke")
 			ginkgo.By("creating service " + headlessSvcName + " in namespace " + f.Namespace.Name)
 			headlessService := e2eservice.CreateServiceSpec(headlessSvcName, "", true, labels)
-			_, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(headlessService)
+			_, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(context.TODO(), headlessService)
 			framework.ExpectNoError(err)
 			c = f.ClientSet
 			ns = f.Namespace.Name
@@ -385,7 +386,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 			petMounts := []v1.VolumeMount{{Name: "datadir", MountPath: "/data/"}}
 			podMounts := []v1.VolumeMount{{Name: "home", MountPath: "/home"}}
 			ps := e2esset.NewStatefulSet(psName, ns, headlessSvcName, 3, petMounts, podMounts, labels)
-			_, err := c.AppsV1().StatefulSets(ns).Create(ps)
+			_, err := c.AppsV1().StatefulSets(ns).Create(context.TODO(), ps)
 			framework.ExpectNoError(err)
 
 			nn, err := e2enode.TotalRegistered(f.ClientSet)
@@ -402,13 +403,13 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 			e2eskipper.SkipUnlessSSHKeyPresent()
 
 			ps := e2esset.NewStatefulSet(psName, ns, headlessSvcName, 3, []v1.VolumeMount{}, []v1.VolumeMount{}, labels)
-			_, err := c.AppsV1().StatefulSets(ns).Create(ps)
+			_, err := c.AppsV1().StatefulSets(ns).Create(context.TODO(), ps)
 			framework.ExpectNoError(err)
 
 			e2esset.WaitForRunningAndReady(c, *ps.Spec.Replicas, ps)
 
 			pod := e2esset.GetPodList(c, ps).Items[0]
-			node, err := c.CoreV1().Nodes().Get(pod.Spec.NodeName, metav1.GetOptions{})
+			node, err := c.CoreV1().Nodes().Get(context.TODO(), pod.Spec.NodeName, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 
 			// Blocks outgoing network traffic on 'node'. Then verifies that 'podNameToDisappear',
@@ -450,11 +451,11 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 
 			ginkgo.By("choose a node with at least one pod - we will block some network traffic on this node")
 			options := metav1.ListOptions{LabelSelector: label.String()}
-			pods, err := c.CoreV1().Pods(ns).List(options) // list pods after all have been scheduled
+			pods, err := c.CoreV1().Pods(ns).List(context.TODO(), options) // list pods after all have been scheduled
 			framework.ExpectNoError(err)
 			nodeName := pods.Items[0].Spec.NodeName
 
-			node, err := c.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+			node, err := c.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 
 			// This creates a temporary network partition, verifies that the job has 'parallelism' number of
@@ -501,7 +502,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 						return false
 					}
 					podOpts = metav1.ListOptions{FieldSelector: fields.OneTermEqualSelector(api.PodHostField, node.Name).String()}
-					pods, err := c.CoreV1().Pods(metav1.NamespaceAll).List(podOpts)
+					pods, err := c.CoreV1().Pods(metav1.NamespaceAll).List(context.TODO(), podOpts)
 					if err != nil || len(pods.Items) <= 0 {
 						return false
 					}
@@ -515,7 +516,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 				if err := e2epod.WaitForMatchPodsCondition(c, podOpts, "Running and Ready", podReadyTimeout, testutils.PodRunningReadyOrSucceeded); err != nil {
 					framework.Failf("Pods on node %s are not ready and running within %v: %v", node.Name, podReadyTimeout, err)
 				}
-				pods, err := c.CoreV1().Pods(metav1.NamespaceAll).List(podOpts)
+				pods, err := c.CoreV1().Pods(metav1.NamespaceAll).List(context.TODO(), podOpts)
 				framework.ExpectNoError(err)
 				podTolerationTimes := map[string]time.Duration{}
 				// This test doesn't add tolerations by itself, but because they may be present in the cluster
@@ -564,12 +565,12 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 					&cache.ListWatch{
 						ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 							options.FieldSelector = nodeSelector.String()
-							obj, err := f.ClientSet.CoreV1().Nodes().List(options)
+							obj, err := f.ClientSet.CoreV1().Nodes().List(context.TODO(), options)
 							return runtime.Object(obj), err
 						},
 						WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 							options.FieldSelector = nodeSelector.String()
-							return f.ClientSet.CoreV1().Nodes().Watch(options)
+							return f.ClientSet.CoreV1().Nodes().Watch(context.TODO(), options)
 						},
 					},
 					&v1.Node{},
@@ -625,7 +626,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 				sleepTime := maxTolerationTime + 20*time.Second
 				ginkgo.By(fmt.Sprintf("Sleeping for %v and checking if all Pods were evicted", sleepTime))
 				time.Sleep(sleepTime)
-				pods, err = c.CoreV1().Pods(v1.NamespaceAll).List(podOpts)
+				pods, err = c.CoreV1().Pods(v1.NamespaceAll).List(context.TODO(), podOpts)
 				framework.ExpectNoError(err)
 				seenRunning := []string{}
 				for _, pod := range pods.Items {

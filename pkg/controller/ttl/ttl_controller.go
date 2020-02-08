@@ -27,6 +27,7 @@ limitations under the License.
 package ttl
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"strconv"
@@ -263,7 +264,7 @@ func (ttlc *TTLController) patchNodeWithAnnotation(node *v1.Node, annotationKey 
 	if err != nil {
 		return err
 	}
-	_, err = ttlc.kubeClient.CoreV1().Nodes().Patch(node.Name, types.StrategicMergePatchType, patchBytes)
+	_, err = ttlc.kubeClient.CoreV1().Nodes().Patch(context.TODO(), node.Name, types.StrategicMergePatchType, patchBytes)
 	if err != nil {
 		klog.V(2).Infof("Failed to change ttl annotation for node %s: %v", node.Name, err)
 		return err

@@ -17,6 +17,7 @@ limitations under the License.
 package iscsi
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -590,7 +591,7 @@ func createSecretMap(spec *volume.Spec, plugin *iscsiPlugin, namespace string) (
 			if kubeClient == nil {
 				return nil, fmt.Errorf("Cannot get kube client")
 			}
-			secretObj, err := kubeClient.CoreV1().Secrets(secretNamespace).Get(secretName, metav1.GetOptions{})
+			secretObj, err := kubeClient.CoreV1().Secrets(secretNamespace).Get(context.TODO(), secretName, metav1.GetOptions{})
 			if err != nil {
 				err = fmt.Errorf("Couldn't get secret %v/%v error: %v", secretNamespace, secretName, err)
 				return nil, err

@@ -17,6 +17,7 @@ limitations under the License.
 package resourcelock
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -39,7 +40,7 @@ type EndpointsLock struct {
 func (el *EndpointsLock) Get() (*LeaderElectionRecord, []byte, error) {
 	var record LeaderElectionRecord
 	var err error
-	el.e, err = el.Client.Endpoints(el.EndpointsMeta.Namespace).Get(el.EndpointsMeta.Name, metav1.GetOptions{})
+	el.e, err = el.Client.Endpoints(el.EndpointsMeta.Namespace).Get(context.TODO(), el.EndpointsMeta.Name, metav1.GetOptions{})
 	if err != nil {
 		return nil, nil, err
 	}
@@ -61,7 +62,7 @@ func (el *EndpointsLock) Create(ler LeaderElectionRecord) error {
 	if err != nil {
 		return err
 	}
-	el.e, err = el.Client.Endpoints(el.EndpointsMeta.Namespace).Create(&v1.Endpoints{
+	el.e, err = el.Client.Endpoints(el.EndpointsMeta.Namespace).Create(context.TODO(), &v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      el.EndpointsMeta.Name,
 			Namespace: el.EndpointsMeta.Namespace,
@@ -86,7 +87,7 @@ func (el *EndpointsLock) Update(ler LeaderElectionRecord) error {
 		el.e.Annotations = make(map[string]string)
 	}
 	el.e.Annotations[LeaderElectionRecordAnnotationKey] = string(recordBytes)
-	el.e, err = el.Client.Endpoints(el.EndpointsMeta.Namespace).Update(el.e)
+	el.e, err = el.Client.Endpoints(el.EndpointsMeta.Namespace).Update(context.TODO(), el.e)
 	return err
 }
 

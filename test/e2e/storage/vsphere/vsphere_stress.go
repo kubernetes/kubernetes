@@ -17,6 +17,7 @@ limitations under the License.
 package vsphere
 
 import (
+	"context"
 	"fmt"
 	"sync"
 
@@ -88,27 +89,27 @@ var _ = utils.SIGDescribe("vsphere cloud provider stress [Feature:vsphere]", fun
 			var err error
 			switch scname {
 			case storageclass1:
-				sc, err = client.StorageV1().StorageClasses().Create(getVSphereStorageClassSpec(storageclass1, nil, nil, ""))
+				sc, err = client.StorageV1().StorageClasses().Create(context.TODO(), getVSphereStorageClassSpec(storageclass1, nil, nil, ""))
 			case storageclass2:
 				var scVSanParameters map[string]string
 				scVSanParameters = make(map[string]string)
 				scVSanParameters[PolicyHostFailuresToTolerate] = "1"
-				sc, err = client.StorageV1().StorageClasses().Create(getVSphereStorageClassSpec(storageclass2, scVSanParameters, nil, ""))
+				sc, err = client.StorageV1().StorageClasses().Create(context.TODO(), getVSphereStorageClassSpec(storageclass2, scVSanParameters, nil, ""))
 			case storageclass3:
 				var scSPBMPolicyParameters map[string]string
 				scSPBMPolicyParameters = make(map[string]string)
 				scSPBMPolicyParameters[SpbmStoragePolicy] = policyName
-				sc, err = client.StorageV1().StorageClasses().Create(getVSphereStorageClassSpec(storageclass3, scSPBMPolicyParameters, nil, ""))
+				sc, err = client.StorageV1().StorageClasses().Create(context.TODO(), getVSphereStorageClassSpec(storageclass3, scSPBMPolicyParameters, nil, ""))
 			case storageclass4:
 				var scWithDSParameters map[string]string
 				scWithDSParameters = make(map[string]string)
 				scWithDSParameters[Datastore] = datastoreName
 				scWithDatastoreSpec := getVSphereStorageClassSpec(storageclass4, scWithDSParameters, nil, "")
-				sc, err = client.StorageV1().StorageClasses().Create(scWithDatastoreSpec)
+				sc, err = client.StorageV1().StorageClasses().Create(context.TODO(), scWithDatastoreSpec)
 			}
 			gomega.Expect(sc).NotTo(gomega.BeNil())
 			framework.ExpectNoError(err)
-			defer client.StorageV1().StorageClasses().Delete(scname, nil)
+			defer client.StorageV1().StorageClasses().Delete(context.TODO(), scname, nil)
 			scArrays[index] = sc
 		}
 
@@ -152,7 +153,7 @@ func PerformVolumeLifeCycleInParallel(f *framework.Framework, client clientset.I
 		framework.ExpectNoError(err)
 
 		// Get the copy of the Pod to know the assigned node name.
-		pod, err = client.CoreV1().Pods(namespace).Get(pod.Name, metav1.GetOptions{})
+		pod, err = client.CoreV1().Pods(namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 
 		ginkgo.By(fmt.Sprintf("%v Verifing the volume: %v is attached to the node VM: %v", logPrefix, persistentvolumes[0].Spec.VsphereVolume.VolumePath, pod.Spec.NodeName))

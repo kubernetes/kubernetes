@@ -17,6 +17,7 @@ limitations under the License.
 package apimachinery
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 
@@ -49,11 +50,11 @@ var _ = SIGDescribe("client-go should negotiate", func() {
 			cfg.AcceptContentTypes = accept
 
 			c := kubernetes.NewForConfigOrDie(cfg)
-			svcs, err := c.CoreV1().Services("default").Get("kubernetes", metav1.GetOptions{})
+			svcs, err := c.CoreV1().Services("default").Get(context.TODO(), "kubernetes", metav1.GetOptions{})
 			framework.ExpectNoError(err)
 			rv, err := strconv.Atoi(svcs.ResourceVersion)
 			framework.ExpectNoError(err)
-			w, err := c.CoreV1().Services("default").Watch(metav1.ListOptions{ResourceVersion: strconv.Itoa(rv - 1)})
+			w, err := c.CoreV1().Services("default").Watch(context.TODO(), metav1.ListOptions{ResourceVersion: strconv.Itoa(rv - 1)})
 			framework.ExpectNoError(err)
 			defer w.Stop()
 

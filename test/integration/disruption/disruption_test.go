@@ -17,6 +17,7 @@ limitations under the License.
 package disruption
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -156,13 +157,13 @@ func TestPDBWithScaleSubresource(t *testing.T) {
 			},
 		},
 	}
-	if _, err := clientSet.PolicyV1beta1().PodDisruptionBudgets(nsName).Create(pdb); err != nil {
+	if _, err := clientSet.PolicyV1beta1().PodDisruptionBudgets(nsName).Create(context.TODO(), pdb); err != nil {
 		t.Errorf("Error creating PodDisruptionBudget: %v", err)
 	}
 
 	waitPDBStable(t, clientSet, 4, nsName, pdb.Name)
 
-	newPdb, err := clientSet.PolicyV1beta1().PodDisruptionBudgets(nsName).Get(pdb.Name, metav1.GetOptions{})
+	newPdb, err := clientSet.PolicyV1beta1().PodDisruptionBudgets(nsName).Get(context.TODO(), pdb.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Errorf("Error getting PodDisruptionBudget: %v", err)
 	}
@@ -197,18 +198,18 @@ func createPod(t *testing.T, name, namespace, labelValue string, clientSet clien
 			},
 		},
 	}
-	_, err := clientSet.CoreV1().Pods(namespace).Create(pod)
+	_, err := clientSet.CoreV1().Pods(namespace).Create(context.TODO(), pod)
 	if err != nil {
 		t.Error(err)
 	}
 	addPodConditionReady(pod)
-	if _, err := clientSet.CoreV1().Pods(namespace).UpdateStatus(pod); err != nil {
+	if _, err := clientSet.CoreV1().Pods(namespace).UpdateStatus(context.TODO(), pod); err != nil {
 		t.Error(err)
 	}
 }
 
 func createNs(t *testing.T, name string, clientSet clientset.Interface) {
-	_, err := clientSet.CoreV1().Namespaces().Create(&v1.Namespace{
+	_, err := clientSet.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
@@ -255,7 +256,7 @@ func newCustomResourceDefinition() *apiextensionsv1beta1.CustomResourceDefinitio
 
 func waitPDBStable(t *testing.T, clientSet clientset.Interface, podNum int32, ns, pdbName string) {
 	if err := wait.PollImmediate(2*time.Second, 60*time.Second, func() (bool, error) {
-		pdb, err := clientSet.PolicyV1beta1().PodDisruptionBudgets(ns).Get(pdbName, metav1.GetOptions{})
+		pdb, err := clientSet.PolicyV1beta1().PodDisruptionBudgets(ns).Get(context.TODO(), pdbName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}

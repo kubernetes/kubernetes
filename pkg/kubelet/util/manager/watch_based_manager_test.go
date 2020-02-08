@@ -17,6 +17,7 @@ limitations under the License.
 package manager
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"testing"
@@ -40,13 +41,13 @@ import (
 
 func listSecret(fakeClient clientset.Interface) listObjectFunc {
 	return func(namespace string, opts metav1.ListOptions) (runtime.Object, error) {
-		return fakeClient.CoreV1().Secrets(namespace).List(opts)
+		return fakeClient.CoreV1().Secrets(namespace).List(context.TODO(), opts)
 	}
 }
 
 func watchSecret(fakeClient clientset.Interface) watchObjectFunc {
 	return func(namespace string, opts metav1.ListOptions) (watch.Interface, error) {
-		return fakeClient.CoreV1().Secrets(namespace).Watch(opts)
+		return fakeClient.CoreV1().Secrets(namespace).Watch(context.TODO(), opts)
 	}
 }
 
