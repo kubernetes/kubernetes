@@ -47,8 +47,7 @@ c1vuFqTnJBPcb7W//R/GI2Paicm1cmns9NLnPR35exHxFTy+D1yxmGokpoPMdife
 aH+sfuxT8xeTPb3kjzF9eJTlnEquUDLM
 -----END CERTIFICATE-----`
 
-// expectedHash can be verified using the openssl CLI:
-// openssl x509 -pubkey -in test.crt openssl rsa -pubin -outform der 2>&/dev/null | openssl dgst -sha256 -hex
+// expectedHash can be verified using the openssl CLI.
 const expectedHash = `sha256:345959acb2c3b2feb87d281961c893f62a314207ef02599f1cc4a5fb255480b3`
 
 // testCert2PEM is a second test cert generated the same way as testCertPEM
