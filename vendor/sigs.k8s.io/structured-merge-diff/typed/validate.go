@@ -207,7 +207,11 @@ func (v *validatingObjectWalker) visitMapItems(t schema.Map, m *value.Map) (errs
 		} else {
 			v2 := v.prepareDescent(pe, t.ElementType)
 			v2.value = item.Value
-			errs = append(errs, v2.validate()...)
+			if (t.ElementType == schema.TypeRef{}) {
+				errs = append(errs, v2.errorf("field not declared in schema")...)
+			} else {
+				errs = append(errs, v2.validate()...)
+			}
 			v2.doNode()
 			v.finishDescent(v2)
 		}
