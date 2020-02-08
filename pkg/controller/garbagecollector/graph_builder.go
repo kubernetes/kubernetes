@@ -136,6 +136,17 @@ func (gb *GraphBuilder) controllerFor(resource schema.GroupVersionResource, kind
 			gb.graphChanges.Add(event)
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
+			accessor, err := meta.Accessor(newObj)
+			if err != nil {
+				utilruntime.HandleError(fmt.Errorf("cannot access newObj: %v", err))
+			}
+			oldAccessor, err := meta.Accessor(oldObj)
+			if err != nil {
+				utilruntime.HandleError(fmt.Errorf("cannot access oldObj: %v", err))
+			}
+			if accessor.GetResourceVersion() == oldAccessor.GetResourceVersion() {
+				return
+			}
 			// TODO: check if there are differences in the ownerRefs,
 			// finalizers, and DeletionTimestamp; if not, ignore the update.
 			event := &event{
