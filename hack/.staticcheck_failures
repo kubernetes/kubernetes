@@ -20,11 +20,9 @@ pkg/volume
 pkg/volume/azure_dd
 pkg/volume/azure_file
 pkg/volume/csi
-pkg/volume/fc
 pkg/volume/flexvolume
 pkg/volume/iscsi
 pkg/volume/local
-pkg/volume/portworx
 pkg/volume/quobyte
 pkg/volume/rbd
 pkg/volume/storageos
@@ -33,7 +31,6 @@ pkg/volume/util/fsquota
 pkg/volume/util/fsquota/common
 pkg/volume/util/operationexecutor
 pkg/volume/util/subpath
-pkg/volume/vsphere_volume
 test/e2e/apps
 test/e2e/autoscaling
 test/integration/deployment
