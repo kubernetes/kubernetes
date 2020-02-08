@@ -18,7 +18,6 @@ package scheduling
 
 import (
 	"fmt"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -28,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	clientset "k8s.io/client-go/kubernetes"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eevents "k8s.io/kubernetes/test/e2e/framework/events"
 	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
@@ -116,7 +116,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 
 	})
 
-	// This test verifies we don't allow scheduling of pods in a way that sum of local ephemeral storage limits of pods is greater than machines capacity.
+	// This test verifies we don't allow scheduling of pods in a way that sum of local ephemeral storage resource requests of pods is greater than machines capacity.
 	// It assumes that cluster add-on pods stay stable and cannot be run in parallel with any other test that touches Nodes or Pods.
 	// It is so because we need to have precise control on what's running in the cluster.
 	ginkgo.It("validates local ephemeral storage resource limits of pods that are allowed to run [Feature:LocalStorageCapacityIsolation]", func() {
@@ -186,6 +186,9 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 				Limits: v1.ResourceList{
 					v1.ResourceEphemeralStorage: *resource.NewQuantity(ephemeralStoragePerPod, "DecimalSI"),
 				},
+				Requests: v1.ResourceList{
+					v1.ResourceEphemeralStorage: *resource.NewQuantity(ephemeralStoragePerPod, "DecimalSI"),
+				},
 			},
 		}
 		WaitForSchedulerAfterAction(f, createPausePodAction(f, conf), ns, podName, false)
@@ -193,7 +196,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 	})
 
 	// This test verifies we don't allow scheduling of pods in a way that sum of
-	// limits of pods is greater than machines capacity.
+	// resource requests of pods is greater than machines capacity.
 	// It assumes that cluster add-on pods stay stable and cannot be run in parallel
 	// with any other test that touches Nodes or Pods.
 	// It is so because we need to have precise control on what's running in the cluster.
@@ -206,7 +209,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 	/*
 		Release : v1.9
 		Testname: Scheduler, resource limits
-		Description: Scheduling Pods MUST fail if the resource limits exceed Machine capacity.
+		Description: Scheduling Pods MUST fail if the resource requests exceed Machine capacity.
 	*/
 	framework.ConformanceIt("validates resource limits of pods that are allowed to run ", func() {
 		WaitForStableCluster(cs, masterNodes)
@@ -300,6 +303,9 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 			Labels: map[string]string{"name": "additional"},
 			Resources: &v1.ResourceRequirements{
 				Limits: v1.ResourceList{
+					v1.ResourceCPU: *resource.NewMilliQuantity(nodeMaxAllocatable*5/10, "DecimalSI"),
+				},
+				Requests: v1.ResourceList{
 					v1.ResourceCPU: *resource.NewMilliQuantity(nodeMaxAllocatable*5/10, "DecimalSI"),
 				},
 			},
