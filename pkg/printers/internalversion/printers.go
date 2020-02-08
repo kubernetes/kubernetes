@@ -34,6 +34,7 @@ import (
 	apiv1 "k8s.io/api/core/v1"
 	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
+	flowcontrolv1alpha1 "k8s.io/api/flowcontrol/v1alpha1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
@@ -54,6 +55,8 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	"k8s.io/kubernetes/pkg/apis/discovery"
+	"k8s.io/kubernetes/pkg/apis/flowcontrol"
+	apihelpers "k8s.io/kubernetes/pkg/apis/flowcontrol/util"
 	"k8s.io/kubernetes/pkg/apis/networking"
 	nodeapi "k8s.io/kubernetes/pkg/apis/node"
 	"k8s.io/kubernetes/pkg/apis/policy"
@@ -517,6 +520,29 @@ func AddHandlers(h printers.PrintHandler) {
 	}
 	h.TableHandler(validatingWebhookColumnDefinitions, printValidatingWebhook)
 	h.TableHandler(validatingWebhookColumnDefinitions, printValidatingWebhookList)
+
+	flowSchemaColumnDefinitions := []metav1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "PriorityLevel", Type: "string", Description: flowcontrolv1alpha1.PriorityLevelConfigurationReference{}.SwaggerDoc()["name"]},
+		{Name: "MatchingPrecedence", Type: "string", Description: flowcontrolv1alpha1.FlowSchemaSpec{}.SwaggerDoc()["matchingPrecedence"]},
+		{Name: "DistinguisherMethod", Type: "string", Description: flowcontrolv1alpha1.FlowSchemaSpec{}.SwaggerDoc()["distinguisherMethod"]},
+		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+		{Name: "MissingPL", Type: "string", Description: "references a broken or non-existent PriorityLevelConfiguration"},
+	}
+	h.TableHandler(flowSchemaColumnDefinitions, printFlowSchema)
+	h.TableHandler(flowSchemaColumnDefinitions, printFlowSchemaList)
+
+	priorityLevelColumnDefinitions := []metav1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "Type", Type: "string", Description: flowcontrolv1alpha1.PriorityLevelConfigurationSpec{}.SwaggerDoc()["type"]},
+		{Name: "AssuredConcurrencyShares", Type: "string", Description: flowcontrolv1alpha1.LimitedPriorityLevelConfiguration{}.SwaggerDoc()["assuredConcurrencyShares"]},
+		{Name: "Queues", Type: "string", Description: flowcontrolv1alpha1.QueuingConfiguration{}.SwaggerDoc()["queues"]},
+		{Name: "HandSize", Type: "string", Description: flowcontrolv1alpha1.QueuingConfiguration{}.SwaggerDoc()["handSize"]},
+		{Name: "QueueLengthLimit", Type: "string", Description: flowcontrolv1alpha1.QueuingConfiguration{}.SwaggerDoc()["queueLengthLimit"]},
+		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+	}
+	h.TableHandler(priorityLevelColumnDefinitions, printPriorityLevelConfiguration)
+	h.TableHandler(priorityLevelColumnDefinitions, printPriorityLevelConfigurationList)
 }
 
 // Pass ports=nil for all ports.
@@ -2237,6 +2263,80 @@ func printVolumeAttachmentList(list *storage.VolumeAttachmentList, options print
 	rows := make([]metav1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printVolumeAttachment(&list.Items[i], options)
+		if err != nil {
+			return nil, err
+		}
+		rows = append(rows, r...)
+	}
+	return rows, nil
+}
+
+func printFlowSchema(obj *flowcontrol.FlowSchema, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	row := metav1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
+	}
+
+	name := obj.Name
+	plName := obj.Spec.PriorityLevelConfiguration.Name
+	distinguisherMethod := "<none>"
+	if obj.Spec.DistinguisherMethod != nil {
+		distinguisherMethod = string(obj.Spec.DistinguisherMethod.Type)
+	}
+	badPLRef := "?"
+	for _, cond := range obj.Status.Conditions {
+		if cond.Type == flowcontrol.FlowSchemaConditionDangling {
+			badPLRef = string(cond.Status)
+			break
+		}
+	}
+	row.Cells = append(row.Cells, name, plName, obj.Spec.MatchingPrecedence, distinguisherMethod, translateTimestampSince(obj.CreationTimestamp), badPLRef)
+
+	return []metav1.TableRow{row}, nil
+}
+
+func printFlowSchemaList(list *flowcontrol.FlowSchemaList, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	rows := make([]metav1.TableRow, 0, len(list.Items))
+	fsSeq := make(apihelpers.FlowSchemaSequence, len(list.Items))
+	for i := range list.Items {
+		fsSeq[i] = &list.Items[i]
+	}
+	sort.Sort(fsSeq)
+	for i := range fsSeq {
+		r, err := printFlowSchema(fsSeq[i], options)
+		if err != nil {
+			return nil, err
+		}
+		rows = append(rows, r...)
+	}
+	return rows, nil
+}
+
+func printPriorityLevelConfiguration(obj *flowcontrol.PriorityLevelConfiguration, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	row := metav1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
+	}
+	name := obj.Name
+	acs := interface{}("<none>")
+	queues := interface{}("<none>")
+	handSize := interface{}("<none>")
+	queueLengthLimit := interface{}("<none>")
+	if obj.Spec.Limited != nil {
+		acs = obj.Spec.Limited.AssuredConcurrencyShares
+		if qc := obj.Spec.Limited.LimitResponse.Queuing; qc != nil {
+			queues = qc.Queues
+			handSize = qc.HandSize
+			queueLengthLimit = qc.QueueLengthLimit
+		}
+	}
+	row.Cells = append(row.Cells, name, string(obj.Spec.Type), acs, queues, handSize, queueLengthLimit, translateTimestampSince(obj.CreationTimestamp))
+
+	return []metav1.TableRow{row}, nil
+}
+
+func printPriorityLevelConfigurationList(list *flowcontrol.PriorityLevelConfigurationList, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	rows := make([]metav1.TableRow, 0, len(list.Items))
+	for i := range list.Items {
+		r, err := printPriorityLevelConfiguration(&list.Items[i], options)
 		if err != nil {
 			return nil, err
 		}
