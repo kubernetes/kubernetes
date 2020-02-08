@@ -710,7 +710,7 @@ var _ = SIGDescribe("Services", func() {
 	/*
 		Release : v1.9
 		Testname: Kubernetes Service
-		Description: By default when a kubernetes cluster is running there MUST be a ‘kubernetes’ service running in the cluster.
+		Description: By default when a kubernetes cluster is running there MUST be a 'kubernetes' service running in the cluster.
 	*/
 	framework.ConformanceIt("should provide secure master service ", func() {
 		_, err := cs.CoreV1().Services(metav1.NamespaceDefault).Get("kubernetes", metav1.GetOptions{})
