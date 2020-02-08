@@ -17,6 +17,7 @@ limitations under the License.
 package internalversion
 
 import (
+	"math"
 	"reflect"
 	"testing"
 	"time"
@@ -33,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/coordination"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/discovery"
+	"k8s.io/kubernetes/pkg/apis/flowcontrol"
 	"k8s.io/kubernetes/pkg/apis/networking"
 	nodeapi "k8s.io/kubernetes/pkg/apis/node"
 	"k8s.io/kubernetes/pkg/apis/policy"
@@ -4820,6 +4822,231 @@ func TestPrintEndpointSlice(t *testing.T) {
 
 	for i, test := range tests {
 		rows, err := printEndpointSlice(&test.endpointSlice, printers.GenerateOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for i := range rows {
+			rows[i].Object.Object = nil
+		}
+		if !reflect.DeepEqual(test.expected, rows) {
+			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
+		}
+	}
+}
+
+func TestPrintFlowSchema(t *testing.T) {
+	all := []string{"*"}
+
+	tests := []struct {
+		fs       flowcontrol.FlowSchema
+		expected []metav1.TableRow
+	}{
+		{
+			fs: flowcontrol.FlowSchema{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "all-matcher",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec: flowcontrol.FlowSchemaSpec{
+					PriorityLevelConfiguration: flowcontrol.PriorityLevelConfigurationReference{Name: "allee"},
+					MatchingPrecedence:         math.MaxInt32,
+					DistinguisherMethod:        &flowcontrol.FlowDistinguisherMethod{Type: flowcontrol.FlowDistinguisherMethodByUserType},
+					Rules: []flowcontrol.PolicyRulesWithSubjects{{
+						Subjects: []flowcontrol.Subject{{
+							Kind:  flowcontrol.SubjectKindGroup,
+							Group: &flowcontrol.GroupSubject{Name: "system:authenticated"},
+						}},
+						ResourceRules: []flowcontrol.ResourcePolicyRule{{
+							Verbs:        all,
+							APIGroups:    all,
+							Resources:    all,
+							ClusterScope: true,
+							Namespaces:   all,
+						}},
+					}, {
+						Subjects: []flowcontrol.Subject{{
+							Kind:  flowcontrol.SubjectKindGroup,
+							Group: &flowcontrol.GroupSubject{Name: "system:unauthenticated"},
+						}},
+						ResourceRules: []flowcontrol.ResourcePolicyRule{{
+							Verbs:        all,
+							APIGroups:    all,
+							Resources:    all,
+							ClusterScope: true,
+							Namespaces:   all,
+						}},
+					}, {
+						Subjects: []flowcontrol.Subject{{
+							Kind:  flowcontrol.SubjectKindGroup,
+							Group: &flowcontrol.GroupSubject{Name: "system:authenticated"},
+						}, {
+							Kind:  flowcontrol.SubjectKindGroup,
+							Group: &flowcontrol.GroupSubject{Name: "system:unauthenticated"},
+						}},
+						NonResourceRules: []flowcontrol.NonResourcePolicyRule{{
+							Verbs:           all,
+							NonResourceURLs: all,
+						}},
+					}},
+				},
+			},
+			// Columns: Name, PriorityLevelName, MatchingPrecedence, DistinguisherMethod, Age, MissingPL
+			expected: []metav1.TableRow{{Cells: []interface{}{"all-matcher", "allee", int32(math.MaxInt32), "ByUser", "0s", "?"}}},
+		}, {
+			fs: flowcontrol.FlowSchema{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "some-matcher",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(-3e11)},
+				},
+				Spec: flowcontrol.FlowSchemaSpec{
+					PriorityLevelConfiguration: flowcontrol.PriorityLevelConfigurationReference{Name: "allee"},
+					MatchingPrecedence:         0,
+					DistinguisherMethod:        &flowcontrol.FlowDistinguisherMethod{Type: flowcontrol.FlowDistinguisherMethodByNamespaceType},
+					Rules: []flowcontrol.PolicyRulesWithSubjects{{
+						Subjects: []flowcontrol.Subject{{
+							Kind:  flowcontrol.SubjectKindGroup,
+							Group: &flowcontrol.GroupSubject{Name: "system:unauthenticated"},
+						}},
+						ResourceRules: []flowcontrol.ResourcePolicyRule{{
+							Verbs:        all,
+							APIGroups:    all,
+							Resources:    all,
+							ClusterScope: true,
+							Namespaces:   all,
+						}},
+					}, {
+						Subjects: []flowcontrol.Subject{{
+							Kind:  flowcontrol.SubjectKindGroup,
+							Group: &flowcontrol.GroupSubject{Name: "system:authenticated"},
+						}, {
+							Kind:  flowcontrol.SubjectKindGroup,
+							Group: &flowcontrol.GroupSubject{Name: "system:unauthenticated"},
+						}},
+						NonResourceRules: []flowcontrol.NonResourcePolicyRule{{
+							Verbs:           all,
+							NonResourceURLs: all,
+						}},
+					}},
+				},
+				Status: flowcontrol.FlowSchemaStatus{
+					Conditions: []flowcontrol.FlowSchemaCondition{{
+						Type:               flowcontrol.FlowSchemaConditionDangling,
+						Status:             "True",
+						LastTransitionTime: metav1.Time{Time: time.Now().Add(-time.Hour)},
+					}},
+				},
+			},
+			// Columns: Name, PriorityLevelName, MatchingPrecedence, DistinguisherMethod, Age, MissingPL
+			expected: []metav1.TableRow{{Cells: []interface{}{"some-matcher", "allee", int32(0), "ByNamespace", "5m", "True"}}},
+		}, {
+			fs: flowcontrol.FlowSchema{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "exempt",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(-3e11)},
+				},
+				Spec: flowcontrol.FlowSchemaSpec{
+					PriorityLevelConfiguration: flowcontrol.PriorityLevelConfigurationReference{Name: "allee"},
+					MatchingPrecedence:         0,
+					DistinguisherMethod:        nil,
+					Rules: []flowcontrol.PolicyRulesWithSubjects{{
+						Subjects: []flowcontrol.Subject{{
+							Kind:  flowcontrol.SubjectKindGroup,
+							Group: &flowcontrol.GroupSubject{Name: "system:masters"},
+						}},
+						ResourceRules: []flowcontrol.ResourcePolicyRule{{
+							Verbs:        all,
+							APIGroups:    all,
+							Resources:    all,
+							ClusterScope: true,
+							Namespaces:   all,
+						}},
+					}},
+				},
+			},
+			// Columns: Name, PriorityLevelName, MatchingPrecedence, DistinguisherMethod, Age, MissingPL
+			expected: []metav1.TableRow{{Cells: []interface{}{"exempt", "allee", int32(0), "<none>", "5m", "?"}}},
+		},
+	}
+
+	for i, test := range tests {
+		rows, err := printFlowSchema(&test.fs, printers.GenerateOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for i := range rows {
+			rows[i].Object.Object = nil
+		}
+		if !reflect.DeepEqual(test.expected, rows) {
+			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
+		}
+	}
+}
+
+func TestPrintPriorityLevelConfiguration(t *testing.T) {
+	tests := []struct {
+		pl       flowcontrol.PriorityLevelConfiguration
+		expected []metav1.TableRow
+	}{
+		{
+			pl: flowcontrol.PriorityLevelConfiguration{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "unlimited",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec: flowcontrol.PriorityLevelConfigurationSpec{
+					Type: flowcontrol.PriorityLevelEnablementExempt,
+				},
+			},
+			// Columns: Name, Type, AssuredConcurrencyShares, Queues, HandSize, QueueLengthLimit, Age
+			expected: []metav1.TableRow{{Cells: []interface{}{"unlimited", "Exempt", "<none>", "<none>", "<none>", "<none>", "0s"}}},
+		},
+		{
+			pl: flowcontrol.PriorityLevelConfiguration{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "unqueued",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec: flowcontrol.PriorityLevelConfigurationSpec{
+					Type: flowcontrol.PriorityLevelEnablementLimited,
+					Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
+						AssuredConcurrencyShares: 47,
+						LimitResponse: flowcontrol.LimitResponse{
+							Type: flowcontrol.LimitResponseTypeReject,
+						},
+					},
+				},
+			},
+			// Columns: Name, Type, AssuredConcurrencyShares, Queues, HandSize, QueueLengthLimit, Age
+			expected: []metav1.TableRow{{Cells: []interface{}{"unqueued", "Limited", int32(47), "<none>", "<none>", "<none>", "0s"}}},
+		},
+		{
+			pl: flowcontrol.PriorityLevelConfiguration{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "queued",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec: flowcontrol.PriorityLevelConfigurationSpec{
+					Type: flowcontrol.PriorityLevelEnablementLimited,
+					Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
+						AssuredConcurrencyShares: 42,
+						LimitResponse: flowcontrol.LimitResponse{
+							Type: flowcontrol.LimitResponseTypeQueue,
+							Queuing: &flowcontrol.QueuingConfiguration{
+								Queues:           8,
+								HandSize:         3,
+								QueueLengthLimit: 4,
+							},
+						},
+					},
+				},
+			},
+			// Columns: Name, Type, AssuredConcurrencyShares, Queues, HandSize, QueueLengthLimit, Age
+			expected: []metav1.TableRow{{Cells: []interface{}{"queued", "Limited", int32(42), int32(8), int32(3), int32(4), "0s"}}},
+		},
+	}
+
+	for i, test := range tests {
+		rows, err := printPriorityLevelConfiguration(&test.pl, printers.GenerateOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
