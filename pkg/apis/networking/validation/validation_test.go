@@ -715,6 +715,26 @@ func TestValidateNetworkPolicy(t *testing.T) {
 				},
 			},
 		},
+		"except IP is not strictly within CIDR range": {
+			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
+			Spec: networking.NetworkPolicySpec{
+				PodSelector: metav1.LabelSelector{
+					MatchLabels: map[string]string{"a": "b"},
+				},
+				Ingress: []networking.NetworkPolicyIngressRule{
+					{
+						From: []networking.NetworkPolicyPeer{
+							{
+								IPBlock: &networking.IPBlock{
+									CIDR:   "192.168.0.0/24",
+									Except: []string{"192.168.0.0/24"},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
 		"except IPv6 is outside of CIDR range": {
 			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
 			Spec: networking.NetworkPolicySpec{
