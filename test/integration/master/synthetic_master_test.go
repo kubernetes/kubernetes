@@ -342,7 +342,7 @@ func TestObjectSizeResponses(t *testing.T) {
 
 	for _, r := range requests {
 		t.Run(r.size, func(t *testing.T) {
-			_, err := client.AppsV1().Deployments(metav1.NamespaceDefault).Create(context.TODO(), r.deploymentObject)
+			_, err := client.AppsV1().Deployments(metav1.NamespaceDefault).Create(context.TODO(), r.deploymentObject, metav1.CreateOptions{})
 			if err != nil {
 				if !strings.Contains(err.Error(), r.expectedMessage) {
 					t.Errorf("got: %s;want: %s", err.Error(), r.expectedMessage)
@@ -679,13 +679,13 @@ func TestServiceAlloc(t *testing.T) {
 
 	// make 5 more services to take up all IPs
 	for i := 0; i < 5; i++ {
-		if _, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.TODO(), svc(i)); err != nil {
+		if _, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.TODO(), svc(i), metav1.CreateOptions{}); err != nil {
 			t.Error(err)
 		}
 	}
 
 	// Make another service. It will fail because we're out of cluster IPs
-	if _, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.TODO(), svc(8)); err != nil {
+	if _, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.TODO(), svc(8), metav1.CreateOptions{}); err != nil {
 		if !strings.Contains(err.Error(), "range is full") {
 			t.Errorf("unexpected error text: %v", err)
 		}
@@ -707,7 +707,7 @@ func TestServiceAlloc(t *testing.T) {
 	}
 
 	// This time creating the second service should work.
-	if _, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.TODO(), svc(8)); err != nil {
+	if _, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.TODO(), svc(8), metav1.CreateOptions{}); err != nil {
 		t.Fatalf("got unexpected error: %v", err)
 	}
 }
@@ -741,7 +741,7 @@ func TestUpdateNodeObjects(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: fmt.Sprintf("node-%d", i),
 			},
-		})
+		}, metav1.CreateOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -850,7 +850,7 @@ func TestUpdateNodeObjects(t *testing.T) {
 					lastCount = 0
 					n.Status.Conditions = nil
 				}
-				if _, err := c.Nodes().UpdateStatus(context.TODO(), n); err != nil {
+				if _, err := c.Nodes().UpdateStatus(context.TODO(), n, metav1.UpdateOptions{}); err != nil {
 					if !apierrors.IsConflict(err) {
 						fmt.Printf("[%d] error after %d: %v\n", node, i, err)
 						break

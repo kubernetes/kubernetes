@@ -82,7 +82,7 @@ func SpreadServiceOrFail(f *framework.Framework, replicaCount int, image string)
 			}},
 		},
 	}
-	_, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(context.TODO(), serviceSpec)
+	_, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(context.TODO(), serviceSpec, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
 	// Now create some pods behind the service
@@ -207,7 +207,7 @@ func SpreadRCOrFail(f *framework.Framework, replicaCount int32, image string, ar
 				},
 			},
 		},
-	})
+	}, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 	// Cleanup the replication controller when we are done.
 	defer func() {

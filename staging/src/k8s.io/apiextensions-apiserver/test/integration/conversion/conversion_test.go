@@ -953,7 +953,7 @@ func (c *conversionTestContext) setConversionWebhook(t *testing.T, webhookClient
 		WebhookClientConfig:      webhookClientConfig,
 		ConversionReviewVersions: reviewVersions,
 	}
-	crd, err = c.apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(context.TODO(), crd)
+	crd, err = c.apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(context.TODO(), crd, metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -970,7 +970,7 @@ func (c *conversionTestContext) removeConversionWebhook(t *testing.T) {
 		Strategy: apiextensionsv1beta1.NoneConverter,
 	}
 
-	crd, err = c.apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(context.TODO(), crd)
+	crd, err = c.apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(context.TODO(), crd, metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1005,7 +1005,7 @@ func (c *conversionTestContext) setStorageVersion(t *testing.T, version string) 
 	for i, v := range crd.Spec.Versions {
 		crd.Spec.Versions[i].Storage = v.Name == version
 	}
-	crd, err = c.apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(context.TODO(), crd)
+	crd, err = c.apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(context.TODO(), crd, metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1036,7 +1036,7 @@ func (c *conversionTestContext) setServed(t *testing.T, version string, served b
 			crd.Spec.Versions[i].Served = served
 		}
 	}
-	crd, err = c.apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(context.TODO(), crd)
+	crd, err = c.apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(context.TODO(), crd, metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}

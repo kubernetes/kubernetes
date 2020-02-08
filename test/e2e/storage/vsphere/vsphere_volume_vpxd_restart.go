@@ -121,7 +121,7 @@ var _ = utils.SIGDescribe("Verify Volume Attach Through vpxd Restart [Feature:vs
 
 				ginkgo.By(fmt.Sprintf("Creating pod %d on node %v", i, node.name))
 				podspec := getVSpherePodSpecWithVolumePaths([]string{volumePath}, node.kvLabels, nil)
-				pod, err := client.CoreV1().Pods(namespace).Create(context.TODO(), podspec)
+				pod, err := client.CoreV1().Pods(namespace).Create(context.TODO(), podspec, metav1.CreateOptions{})
 				framework.ExpectNoError(err)
 
 				ginkgo.By(fmt.Sprintf("Waiting for pod %d to be ready", i))

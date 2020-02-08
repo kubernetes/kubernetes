@@ -759,7 +759,7 @@ spec:
 
 	// create CRDs
 	t.Logf("Creating CRD %s", crd.Name)
-	if _, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Create(context.TODO(), crd); err != nil {
+	if _, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Create(context.TODO(), crd, metav1.CreateOptions{}); err != nil {
 		t.Fatalf("unexpected create error: %v", err)
 	}
 
@@ -789,7 +789,7 @@ spec:
 			t.Fatalf("unexpected get error: %v", err)
 		}
 		crd.Spec.Validation = nil
-		if _, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(context.TODO(), crd); apierrors.IsConflict(err) {
+		if _, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(context.TODO(), crd, metav1.UpdateOptions{}); apierrors.IsConflict(err) {
 			continue
 		}
 		if err != nil {
@@ -822,7 +822,7 @@ spec:
 			t.Fatalf("unexpected get error: %v", err)
 		}
 		crd.Spec.Validation = &apiextensionsv1beta1.CustomResourceValidation{OpenAPIV3Schema: origSchema}
-		if _, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(context.TODO(), crd); apierrors.IsConflict(err) {
+		if _, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(context.TODO(), crd, metav1.UpdateOptions{}); apierrors.IsConflict(err) {
 			continue
 		}
 		if err != nil {
@@ -1609,7 +1609,7 @@ properties:
 			crd.Name = fmt.Sprintf("foos.%s", crd.Spec.Group)
 
 			// create CRDs
-			crd, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Create(context.TODO(), crd)
+			crd, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Create(context.TODO(), crd, metav1.CreateOptions{})
 			if len(tst.expectedCreateErrors) > 0 && err == nil {
 				t.Fatalf("expected create errors, got none")
 			} else if len(tst.expectedCreateErrors) == 0 && err != nil {

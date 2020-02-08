@@ -1054,14 +1054,14 @@ func TestUpdatePDBStatusRetries(t *testing.T) {
 
 	// Create a PDB and 3 pods that match it.
 	pdb, pdbKey := newMinAvailablePodDisruptionBudget(t, intstr.FromInt(1))
-	pdb, err := dc.coreClient.PolicyV1beta1().PodDisruptionBudgets(pdb.Namespace).Create(context.TODO(), pdb)
+	pdb, err := dc.coreClient.PolicyV1beta1().PodDisruptionBudgets(pdb.Namespace).Create(context.TODO(), pdb, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Failed to create PDB: %v", err)
 	}
 	podNames := []string{"moe", "larry", "curly"}
 	for _, name := range podNames {
 		pod, _ := newPod(t, name)
-		_, err := dc.coreClient.CoreV1().Pods(pod.Namespace).Create(context.TODO(), pod)
+		_, err := dc.coreClient.CoreV1().Pods(pod.Namespace).Create(context.TODO(), pod, metav1.CreateOptions{})
 		if err != nil {
 			t.Fatalf("Failed to create pod: %v", err)
 		}

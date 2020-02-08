@@ -95,7 +95,7 @@ func addOrUpdateLabelsOnNode(kubeClient clientset.Interface, nodeName string, la
 		if err != nil {
 			return fmt.Errorf("failed to create a two-way merge patch: %v", err)
 		}
-		if _, err := kubeClient.CoreV1().Nodes().Patch(context.TODO(), node.Name, types.StrategicMergePatchType, patchBytes); err != nil {
+		if _, err := kubeClient.CoreV1().Nodes().Patch(context.TODO(), node.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}); err != nil {
 			return fmt.Errorf("failed to patch the node: %v", err)
 		}
 		return nil

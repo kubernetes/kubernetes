@@ -61,7 +61,7 @@ func (ll *LeaseLock) Create(ler LeaderElectionRecord) error {
 			Namespace: ll.LeaseMeta.Namespace,
 		},
 		Spec: LeaderElectionRecordToLeaseSpec(&ler),
-	})
+	}, metav1.CreateOptions{})
 	return err
 }
 
@@ -72,7 +72,7 @@ func (ll *LeaseLock) Update(ler LeaderElectionRecord) error {
 	}
 	ll.lease.Spec = LeaderElectionRecordToLeaseSpec(&ler)
 	var err error
-	ll.lease, err = ll.Client.Leases(ll.LeaseMeta.Namespace).Update(context.TODO(), ll.lease)
+	ll.lease, err = ll.Client.Leases(ll.LeaseMeta.Namespace).Update(context.TODO(), ll.lease, metav1.UpdateOptions{})
 	return err
 }
 

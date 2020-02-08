@@ -186,7 +186,7 @@ func (c *Publisher) syncNamespace(ns string) error {
 			Data: map[string]string{
 				"ca.crt": string(c.rootCA),
 			},
-		})
+		}, metav1.CreateOptions{})
 		return err
 	case err != nil:
 		return err
@@ -202,7 +202,7 @@ func (c *Publisher) syncNamespace(ns string) error {
 
 	cm.Data = data
 
-	_, err = c.client.CoreV1().ConfigMaps(ns).Update(context.TODO(), cm)
+	_, err = c.client.CoreV1().ConfigMaps(ns).Update(context.TODO(), cm, metav1.UpdateOptions{})
 	return err
 }
 

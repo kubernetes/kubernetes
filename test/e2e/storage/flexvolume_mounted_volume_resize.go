@@ -91,7 +91,7 @@ var _ = utils.SIGDescribe("Mounted flexvolume expand[Slow]", func() {
 			Provisioner:          "flex-expand",
 		}
 
-		resizableSc, err = c.StorageV1().StorageClasses().Create(context.TODO(), newStorageClass(test, ns, "resizing"))
+		resizableSc, err = c.StorageV1().StorageClasses().Create(context.TODO(), newStorageClass(test, ns, "resizing"), metav1.CreateOptions{})
 		if err != nil {
 			fmt.Printf("storage class creation error: %v\n", err)
 		}
@@ -102,7 +102,7 @@ var _ = utils.SIGDescribe("Mounted flexvolume expand[Slow]", func() {
 			StorageClassName: &(resizableSc.Name),
 			ClaimSize:        "2Gi",
 		}, ns)
-		pvc, err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(context.TODO(), pvc)
+		pvc, err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(context.TODO(), pvc, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "Error creating pvc")
 	})
 

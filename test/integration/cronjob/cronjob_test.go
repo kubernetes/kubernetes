@@ -163,7 +163,7 @@ func TestCronJobLaunchesPodAndCleansUp(t *testing.T) {
 	go cjc.Run(stopCh)
 	go jc.Run(1, stopCh)
 
-	_, err := cjClient.Create(context.TODO(), newCronJob(cronJobName, ns.Name, "* * * * ?"))
+	_, err := cjClient.Create(context.TODO(), newCronJob(cronJobName, ns.Name, "* * * * ?"), metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Failed to create CronJob: %v", err)
 	}

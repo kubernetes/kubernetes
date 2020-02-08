@@ -77,7 +77,7 @@ func TestWebhookLoopback(t *testing.T) {
 			}},
 			FailurePolicy: &fail,
 		}},
-	})
+	}, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,7 +86,7 @@ func TestWebhookLoopback(t *testing.T) {
 		_, err = client.CoreV1().ConfigMaps("default").Create(context.TODO(), &v1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{Name: "webhook-test"},
 			Data:       map[string]string{"invalid key": "value"},
-		})
+		}, metav1.CreateOptions{})
 		if err == nil {
 			t.Fatal("Unexpected success")
 		}

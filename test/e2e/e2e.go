@@ -122,7 +122,7 @@ func runKubernetesServiceTestContainer(c clientset.Interface, ns string) {
 		return
 	}
 	p.Namespace = ns
-	if _, err := c.CoreV1().Pods(ns).Create(context.TODO(), p); err != nil {
+	if _, err := c.CoreV1().Pods(ns).Create(context.TODO(), p, metav1.CreateOptions{}); err != nil {
 		framework.Logf("Failed to create %v: %v", p.Name, err)
 		return
 	}

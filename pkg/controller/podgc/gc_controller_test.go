@@ -346,7 +346,7 @@ func TestGCOrphaned(t *testing.T) {
 
 			// Execute planned nodes changes
 			for _, node := range test.addedClientNodes {
-				client.CoreV1().Nodes().Create(context.TODO(), node)
+				client.CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{})
 			}
 			for _, node := range test.deletedClientNodes {
 				client.CoreV1().Nodes().Delete(context.TODO(), node.Name, &metav1.DeleteOptions{})

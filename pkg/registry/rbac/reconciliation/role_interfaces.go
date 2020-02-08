@@ -93,7 +93,7 @@ func (c RoleModifier) Create(in RuleOwner) (RuleOwner, error) {
 		return nil, err
 	}
 
-	ret, err := c.Client.Roles(in.GetNamespace()).Create(context.TODO(), in.(RoleRuleOwner).Role)
+	ret, err := c.Client.Roles(in.GetNamespace()).Create(context.TODO(), in.(RoleRuleOwner).Role, metav1.CreateOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +101,7 @@ func (c RoleModifier) Create(in RuleOwner) (RuleOwner, error) {
 }
 
 func (c RoleModifier) Update(in RuleOwner) (RuleOwner, error) {
-	ret, err := c.Client.Roles(in.GetNamespace()).Update(context.TODO(), in.(RoleRuleOwner).Role)
+	ret, err := c.Client.Roles(in.GetNamespace()).Update(context.TODO(), in.(RoleRuleOwner).Role, metav1.UpdateOptions{})
 	if err != nil {
 		return nil, err
 	}

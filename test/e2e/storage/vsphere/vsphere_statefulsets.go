@@ -76,7 +76,7 @@ var _ = utils.SIGDescribe("vsphere statefulset", func() {
 		scParameters := make(map[string]string)
 		scParameters["diskformat"] = "thin"
 		scSpec := getVSphereStorageClassSpec(storageclassname, scParameters, nil, "")
-		sc, err := client.StorageV1().StorageClasses().Create(context.TODO(), scSpec)
+		sc, err := client.StorageV1().StorageClasses().Create(context.TODO(), scSpec, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 		defer client.StorageV1().StorageClasses().Delete(context.TODO(), sc.Name, nil)
 

@@ -101,7 +101,7 @@ func podOnNode(podName, nodeName string, image string) *v1.Pod {
 }
 
 func newPodOnNode(c clientset.Interface, namespace, podName, nodeName string) error {
-	pod, err := c.CoreV1().Pods(namespace).Create(context.TODO(), podOnNode(podName, nodeName, framework.ServeHostnameImage))
+	pod, err := c.CoreV1().Pods(namespace).Create(context.TODO(), podOnNode(podName, nodeName, framework.ServeHostnameImage), metav1.CreateOptions{})
 	if err == nil {
 		framework.Logf("Created pod %s on node %s", pod.ObjectMeta.Name, nodeName)
 	} else {
@@ -368,7 +368,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 			e2eskipper.SkipUnlessProviderIs("gke")
 			ginkgo.By("creating service " + headlessSvcName + " in namespace " + f.Namespace.Name)
 			headlessService := e2eservice.CreateServiceSpec(headlessSvcName, "", true, labels)
-			_, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(context.TODO(), headlessService)
+			_, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(context.TODO(), headlessService, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 			c = f.ClientSet
 			ns = f.Namespace.Name
@@ -386,7 +386,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 			petMounts := []v1.VolumeMount{{Name: "datadir", MountPath: "/data/"}}
 			podMounts := []v1.VolumeMount{{Name: "home", MountPath: "/home"}}
 			ps := e2esset.NewStatefulSet(psName, ns, headlessSvcName, 3, petMounts, podMounts, labels)
-			_, err := c.AppsV1().StatefulSets(ns).Create(context.TODO(), ps)
+			_, err := c.AppsV1().StatefulSets(ns).Create(context.TODO(), ps, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 
 			nn, err := e2enode.TotalRegistered(f.ClientSet)
@@ -403,7 +403,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 			e2eskipper.SkipUnlessSSHKeyPresent()
 
 			ps := e2esset.NewStatefulSet(psName, ns, headlessSvcName, 3, []v1.VolumeMount{}, []v1.VolumeMount{}, labels)
-			_, err := c.AppsV1().StatefulSets(ns).Create(context.TODO(), ps)
+			_, err := c.AppsV1().StatefulSets(ns).Create(context.TODO(), ps, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 
 			e2esset.WaitForRunningAndReady(c, *ps.Spec.Replicas, ps)

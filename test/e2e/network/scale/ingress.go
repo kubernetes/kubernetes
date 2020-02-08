@@ -169,7 +169,7 @@ func (f *IngressScaleFramework) RunScaleTest() []error {
 
 	testDeploy := generateScaleTestBackendDeploymentSpec(scaleTestNumBackends)
 	f.Logger.Infof("Creating deployment %s...", testDeploy.Name)
-	testDeploy, err := f.Jig.Client.AppsV1().Deployments(f.Namespace).Create(context.TODO(), testDeploy)
+	testDeploy, err := f.Jig.Client.AppsV1().Deployments(f.Namespace).Create(context.TODO(), testDeploy, metav1.CreateOptions{})
 	if err != nil {
 		errs = append(errs, fmt.Errorf("failed to create deployment %s: %v", testDeploy.Name, err))
 		return errs
@@ -279,7 +279,7 @@ func (f *IngressScaleFramework) RunScaleTest() []error {
 		}
 		addTestPathToIngress(ingToUpdate)
 		start = time.Now()
-		ingToUpdate, err = f.Clientset.NetworkingV1beta1().Ingresses(f.Namespace).Update(context.TODO(), ingToUpdate)
+		ingToUpdate, err = f.Clientset.NetworkingV1beta1().Ingresses(f.Namespace).Update(context.TODO(), ingToUpdate, metav1.UpdateOptions{})
 		if err != nil {
 			errs = append(errs, err)
 			return
@@ -369,11 +369,11 @@ func addTestPathToIngress(ing *networkingv1beta1.Ingress) {
 }
 
 func (f *IngressScaleFramework) createScaleTestServiceIngress(suffix string, enableTLS bool) (*v1.Service, *networkingv1beta1.Ingress, error) {
-	svcCreated, err := f.Clientset.CoreV1().Services(f.Namespace).Create(context.TODO(), generateScaleTestServiceSpec(suffix))
+	svcCreated, err := f.Clientset.CoreV1().Services(f.Namespace).Create(context.TODO(), generateScaleTestServiceSpec(suffix), metav1.CreateOptions{})
 	if err != nil {
 		return nil, nil, err
 	}
-	ingCreated, err := f.Clientset.NetworkingV1beta1().Ingresses(f.Namespace).Create(context.TODO(), generateScaleTestIngressSpec(suffix, enableTLS))
+	ingCreated, err := f.Clientset.NetworkingV1beta1().Ingresses(f.Namespace).Create(context.TODO(), generateScaleTestIngressSpec(suffix, enableTLS), metav1.CreateOptions{})
 	if err != nil {
 		return nil, nil, err
 	}

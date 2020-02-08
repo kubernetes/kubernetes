@@ -60,7 +60,7 @@ func (adapter *EndpointsAdapter) Get(namespace, name string, getOpts metav1.GetO
 // be created or updated. The created Endpoints object or an error will be
 // returned.
 func (adapter *EndpointsAdapter) Create(namespace string, endpoints *corev1.Endpoints) (*corev1.Endpoints, error) {
-	endpoints, err := adapter.endpointClient.Endpoints(namespace).Create(context.TODO(), endpoints)
+	endpoints, err := adapter.endpointClient.Endpoints(namespace).Create(context.TODO(), endpoints, metav1.CreateOptions{})
 	if err == nil {
 		err = adapter.EnsureEndpointSliceFromEndpoints(namespace, endpoints)
 	}
@@ -71,7 +71,7 @@ func (adapter *EndpointsAdapter) Create(namespace string, endpoints *corev1.Endp
 // endpointSliceClient exists, a matching EndpointSlice will also be created or
 // updated. The updated Endpoints object or an error will be returned.
 func (adapter *EndpointsAdapter) Update(namespace string, endpoints *corev1.Endpoints) (*corev1.Endpoints, error) {
-	endpoints, err := adapter.endpointClient.Endpoints(namespace).Update(context.TODO(), endpoints)
+	endpoints, err := adapter.endpointClient.Endpoints(namespace).Update(context.TODO(), endpoints, metav1.UpdateOptions{})
 	if err == nil {
 		err = adapter.EnsureEndpointSliceFromEndpoints(namespace, endpoints)
 	}
@@ -90,7 +90,7 @@ func (adapter *EndpointsAdapter) EnsureEndpointSliceFromEndpoints(namespace stri
 
 	if err != nil {
 		if errors.IsNotFound(err) {
-			if _, err = adapter.endpointSliceClient.EndpointSlices(namespace).Create(context.TODO(), endpointSlice); errors.IsAlreadyExists(err) {
+			if _, err = adapter.endpointSliceClient.EndpointSlices(namespace).Create(context.TODO(), endpointSlice, metav1.CreateOptions{}); errors.IsAlreadyExists(err) {
 				err = nil
 			}
 		}
@@ -103,7 +103,7 @@ func (adapter *EndpointsAdapter) EnsureEndpointSliceFromEndpoints(namespace stri
 		if err != nil {
 			return err
 		}
-		_, err = adapter.endpointSliceClient.EndpointSlices(namespace).Create(context.TODO(), endpointSlice)
+		_, err = adapter.endpointSliceClient.EndpointSlices(namespace).Create(context.TODO(), endpointSlice, metav1.CreateOptions{})
 		return err
 	}
 
@@ -113,7 +113,7 @@ func (adapter *EndpointsAdapter) EnsureEndpointSliceFromEndpoints(namespace stri
 		return nil
 	}
 
-	_, err = adapter.endpointSliceClient.EndpointSlices(namespace).Update(context.TODO(), endpointSlice)
+	_, err = adapter.endpointSliceClient.EndpointSlices(namespace).Update(context.TODO(), endpointSlice, metav1.UpdateOptions{})
 	return err
 }
 

@@ -186,7 +186,7 @@ func (b SAControllerClientBuilder) getAuthenticatedConfig(sa *v1.ServiceAccount,
 
 	// Try token review first
 	tokenReview := &v1authenticationapi.TokenReview{Spec: v1authenticationapi.TokenReviewSpec{Token: token}}
-	if tokenResult, err := b.AuthenticationClient.TokenReviews().Create(context.TODO(), tokenReview); err == nil {
+	if tokenResult, err := b.AuthenticationClient.TokenReviews().Create(context.TODO(), tokenReview, metav1.CreateOptions{}); err == nil {
 		if !tokenResult.Status.Authenticated {
 			klog.Warningf("Token for %s/%s did not authenticate correctly", sa.Namespace, sa.Name)
 			return nil, false, nil

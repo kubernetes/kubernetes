@@ -200,7 +200,7 @@ func StartServeHostnameService(c clientset.Interface, svc *v1.Service, ns string
 	podNames := make([]string, replicas)
 	name := svc.ObjectMeta.Name
 	ginkgo.By("creating service " + name + " in namespace " + ns)
-	_, err := c.CoreV1().Services(ns).Create(context.TODO(), svc)
+	_, err := c.CoreV1().Services(ns).Create(context.TODO(), svc, metav1.CreateOptions{})
 	if err != nil {
 		return podNames, "", err
 	}
@@ -898,7 +898,7 @@ var _ = SIGDescribe("Services", func() {
 		serverPodName := "echo-sourceip"
 		pod := f.NewAgnhostPod(serverPodName, "netexec", "--http-port", strconv.Itoa(servicePort))
 		pod.Labels = jig.Labels
-		_, err = cs.CoreV1().Pods(ns).Create(context.TODO(), pod)
+		_, err = cs.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 		framework.ExpectNoError(f.WaitForPodReady(pod.Name))
 		defer func() {
@@ -956,7 +956,7 @@ var _ = SIGDescribe("Services", func() {
 		serverPodName := "hairpin"
 		podTemplate := f.NewAgnhostPod(serverPodName, "netexec", "--http-port", strconv.Itoa(servicePort))
 		podTemplate.Labels = jig.Labels
-		pod, err := cs.CoreV1().Pods(ns).Create(context.TODO(), podTemplate)
+		pod, err := cs.CoreV1().Pods(ns).Create(context.TODO(), podTemplate, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 		framework.ExpectNoError(f.WaitForPodReady(pod.Name))
 
@@ -3178,7 +3178,7 @@ func createPausePodDeployment(cs clientset.Interface, name, ns string, replicas 
 		},
 	}
 
-	deployment, err := cs.AppsV1().Deployments(ns).Create(context.TODO(), pauseDeployment)
+	deployment, err := cs.AppsV1().Deployments(ns).Create(context.TODO(), pauseDeployment, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "Error in creating deployment for pause pod")
 	return deployment
 }
@@ -3205,7 +3205,7 @@ func createPodOrFail(c clientset.Interface, ns, name string, labels map[string]s
 			},
 		},
 	}
-	_, err := c.CoreV1().Pods(ns).Create(context.TODO(), pod)
+	_, err := c.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "failed to create pod %s in namespace %s", name, ns)
 }
 
@@ -3213,7 +3213,7 @@ func createPodOrFail(c clientset.Interface, ns, name string, labels map[string]s
 // until it's Running
 func launchHostExecPod(client clientset.Interface, ns, name string) *v1.Pod {
 	hostExecPod := e2epod.NewExecPodSpec(ns, name, true)
-	pod, err := client.CoreV1().Pods(ns).Create(context.TODO(), hostExecPod)
+	pod, err := client.CoreV1().Pods(ns).Create(context.TODO(), hostExecPod, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 	err = e2epod.WaitForPodRunningInNamespace(client, pod)
 	framework.ExpectNoError(err)

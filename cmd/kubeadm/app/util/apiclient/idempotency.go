@@ -44,12 +44,12 @@ type ConfigMapMutator func(*v1.ConfigMap) error
 
 // CreateOrUpdateConfigMap creates a ConfigMap if the target resource doesn't exist. If the resource exists already, this function will update the resource instead.
 func CreateOrUpdateConfigMap(client clientset.Interface, cm *v1.ConfigMap) error {
-	if _, err := client.CoreV1().ConfigMaps(cm.ObjectMeta.Namespace).Create(context.TODO(), cm); err != nil {
+	if _, err := client.CoreV1().ConfigMaps(cm.ObjectMeta.Namespace).Create(context.TODO(), cm, metav1.CreateOptions{}); err != nil {
 		if !apierrors.IsAlreadyExists(err) {
 			return errors.Wrap(err, "unable to create ConfigMap")
 		}
 
-		if _, err := client.CoreV1().ConfigMaps(cm.ObjectMeta.Namespace).Update(context.TODO(), cm); err != nil {
+		if _, err := client.CoreV1().ConfigMaps(cm.ObjectMeta.Namespace).Update(context.TODO(), cm, metav1.UpdateOptions{}); err != nil {
 			return errors.Wrap(err, "unable to update ConfigMap")
 		}
 	}
@@ -68,7 +68,7 @@ func CreateOrMutateConfigMap(client clientset.Interface, cm *v1.ConfigMap, mutat
 		Factor:   1.0,
 		Jitter:   0.1,
 	}, func() (bool, error) {
-		if _, err := client.CoreV1().ConfigMaps(cm.ObjectMeta.Namespace).Create(context.TODO(), cm); err != nil {
+		if _, err := client.CoreV1().ConfigMaps(cm.ObjectMeta.Namespace).Create(context.TODO(), cm, metav1.CreateOptions{}); err != nil {
 			lastError = err
 			if apierrors.IsAlreadyExists(err) {
 				lastError = MutateConfigMap(client, metav1.ObjectMeta{Namespace: cm.ObjectMeta.Namespace, Name: cm.ObjectMeta.Name}, mutator)
@@ -102,7 +102,7 @@ func MutateConfigMap(client clientset.Interface, meta metav1.ObjectMeta, mutator
 		if err = mutator(configMap); err != nil {
 			return errors.Wrap(err, "unable to mutate ConfigMap")
 		}
-		_, err = client.CoreV1().ConfigMaps(configMap.ObjectMeta.Namespace).Update(context.TODO(), configMap)
+		_, err = client.CoreV1().ConfigMaps(configMap.ObjectMeta.Namespace).Update(context.TODO(), configMap, metav1.UpdateOptions{})
 		return err
 	})
 }
@@ -113,7 +113,7 @@ func CreateOrRetainConfigMap(client clientset.Interface, cm *v1.ConfigMap, confi
 		if !apierrors.IsNotFound(err) {
 			return nil
 		}
-		if _, err := client.CoreV1().ConfigMaps(cm.ObjectMeta.Namespace).Create(context.TODO(), cm); err != nil {
+		if _, err := client.CoreV1().ConfigMaps(cm.ObjectMeta.Namespace).Create(context.TODO(), cm, metav1.CreateOptions{}); err != nil {
 			if !apierrors.IsAlreadyExists(err) {
 				return errors.Wrap(err, "unable to create ConfigMap")
 			}
@@ -124,12 +124,12 @@ func CreateOrRetainConfigMap(client clientset.Interface, cm *v1.ConfigMap, confi
 
 // CreateOrUpdateSecret creates a Secret if the target resource doesn't exist. If the resource exists already, this function will update the resource instead.
 func CreateOrUpdateSecret(client clientset.Interface, secret *v1.Secret) error {
-	if _, err := client.CoreV1().Secrets(secret.ObjectMeta.Namespace).Create(context.TODO(), secret); err != nil {
+	if _, err := client.CoreV1().Secrets(secret.ObjectMeta.Namespace).Create(context.TODO(), secret, metav1.CreateOptions{}); err != nil {
 		if !apierrors.IsAlreadyExists(err) {
 			return errors.Wrap(err, "unable to create secret")
 		}
 
-		if _, err := client.CoreV1().Secrets(secret.ObjectMeta.Namespace).Update(context.TODO(), secret); err != nil {
+		if _, err := client.CoreV1().Secrets(secret.ObjectMeta.Namespace).Update(context.TODO(), secret, metav1.UpdateOptions{}); err != nil {
 			return errors.Wrap(err, "unable to update secret")
 		}
 	}
@@ -138,7 +138,7 @@ func CreateOrUpdateSecret(client clientset.Interface, secret *v1.Secret) error {
 
 // CreateOrUpdateServiceAccount creates a ServiceAccount if the target resource doesn't exist. If the resource exists already, this function will update the resource instead.
 func CreateOrUpdateServiceAccount(client clientset.Interface, sa *v1.ServiceAccount) error {
-	if _, err := client.CoreV1().ServiceAccounts(sa.ObjectMeta.Namespace).Create(context.TODO(), sa); err != nil {
+	if _, err := client.CoreV1().ServiceAccounts(sa.ObjectMeta.Namespace).Create(context.TODO(), sa, metav1.CreateOptions{}); err != nil {
 		// Note: We don't run .Update here afterwards as that's probably not required
 		// Only thing that could be updated is annotations/labels in .metadata, but we don't use that currently
 		if !apierrors.IsAlreadyExists(err) {
@@ -150,12 +150,12 @@ func CreateOrUpdateServiceAccount(client clientset.Interface, sa *v1.ServiceAcco
 
 // CreateOrUpdateDeployment creates a Deployment if the target resource doesn't exist. If the resource exists already, this function will update the resource instead.
 func CreateOrUpdateDeployment(client clientset.Interface, deploy *apps.Deployment) error {
-	if _, err := client.AppsV1().Deployments(deploy.ObjectMeta.Namespace).Create(context.TODO(), deploy); err != nil {
+	if _, err := client.AppsV1().Deployments(deploy.ObjectMeta.Namespace).Create(context.TODO(), deploy, metav1.CreateOptions{}); err != nil {
 		if !apierrors.IsAlreadyExists(err) {
 			return errors.Wrap(err, "unable to create deployment")
 		}
 
-		if _, err := client.AppsV1().Deployments(deploy.ObjectMeta.Namespace).Update(context.TODO(), deploy); err != nil {
+		if _, err := client.AppsV1().Deployments(deploy.ObjectMeta.Namespace).Update(context.TODO(), deploy, metav1.UpdateOptions{}); err != nil {
 			return errors.Wrap(err, "unable to update deployment")
 		}
 	}
@@ -168,7 +168,7 @@ func CreateOrRetainDeployment(client clientset.Interface, deploy *apps.Deploymen
 		if !apierrors.IsNotFound(err) {
 			return nil
 		}
-		if _, err := client.AppsV1().Deployments(deploy.ObjectMeta.Namespace).Create(context.TODO(), deploy); err != nil {
+		if _, err := client.AppsV1().Deployments(deploy.ObjectMeta.Namespace).Create(context.TODO(), deploy, metav1.CreateOptions{}); err != nil {
 			if !apierrors.IsAlreadyExists(err) {
 				return errors.Wrap(err, "unable to create deployment")
 			}
@@ -179,12 +179,12 @@ func CreateOrRetainDeployment(client clientset.Interface, deploy *apps.Deploymen
 
 // CreateOrUpdateDaemonSet creates a DaemonSet if the target resource doesn't exist. If the resource exists already, this function will update the resource instead.
 func CreateOrUpdateDaemonSet(client clientset.Interface, ds *apps.DaemonSet) error {
-	if _, err := client.AppsV1().DaemonSets(ds.ObjectMeta.Namespace).Create(context.TODO(), ds); err != nil {
+	if _, err := client.AppsV1().DaemonSets(ds.ObjectMeta.Namespace).Create(context.TODO(), ds, metav1.CreateOptions{}); err != nil {
 		if !apierrors.IsAlreadyExists(err) {
 			return errors.Wrap(err, "unable to create daemonset")
 		}
 
-		if _, err := client.AppsV1().DaemonSets(ds.ObjectMeta.Namespace).Update(context.TODO(), ds); err != nil {
+		if _, err := client.AppsV1().DaemonSets(ds.ObjectMeta.Namespace).Update(context.TODO(), ds, metav1.UpdateOptions{}); err != nil {
 			return errors.Wrap(err, "unable to update daemonset")
 		}
 	}
@@ -211,12 +211,12 @@ func DeleteDeploymentForeground(client clientset.Interface, namespace, name stri
 
 // CreateOrUpdateRole creates a Role if the target resource doesn't exist. If the resource exists already, this function will update the resource instead.
 func CreateOrUpdateRole(client clientset.Interface, role *rbac.Role) error {
-	if _, err := client.RbacV1().Roles(role.ObjectMeta.Namespace).Create(context.TODO(), role); err != nil {
+	if _, err := client.RbacV1().Roles(role.ObjectMeta.Namespace).Create(context.TODO(), role, metav1.CreateOptions{}); err != nil {
 		if !apierrors.IsAlreadyExists(err) {
 			return errors.Wrap(err, "unable to create RBAC role")
 		}
 
-		if _, err := client.RbacV1().Roles(role.ObjectMeta.Namespace).Update(context.TODO(), role); err != nil {
+		if _, err := client.RbacV1().Roles(role.ObjectMeta.Namespace).Update(context.TODO(), role, metav1.UpdateOptions{}); err != nil {
 			return errors.Wrap(err, "unable to update RBAC role")
 		}
 	}
@@ -225,12 +225,12 @@ func CreateOrUpdateRole(client clientset.Interface, role *rbac.Role) error {
 
 // CreateOrUpdateRoleBinding creates a RoleBinding if the target resource doesn't exist. If the resource exists already, this function will update the resource instead.
 func CreateOrUpdateRoleBinding(client clientset.Interface, roleBinding *rbac.RoleBinding) error {
-	if _, err := client.RbacV1().RoleBindings(roleBinding.ObjectMeta.Namespace).Create(context.TODO(), roleBinding); err != nil {
+	if _, err := client.RbacV1().RoleBindings(roleBinding.ObjectMeta.Namespace).Create(context.TODO(), roleBinding, metav1.CreateOptions{}); err != nil {
 		if !apierrors.IsAlreadyExists(err) {
 			return errors.Wrap(err, "unable to create RBAC rolebinding")
 		}
 
-		if _, err := client.RbacV1().RoleBindings(roleBinding.ObjectMeta.Namespace).Update(context.TODO(), roleBinding); err != nil {
+		if _, err := client.RbacV1().RoleBindings(roleBinding.ObjectMeta.Namespace).Update(context.TODO(), roleBinding, metav1.UpdateOptions{}); err != nil {
 			return errors.Wrap(err, "unable to update RBAC rolebinding")
 		}
 	}
@@ -239,12 +239,12 @@ func CreateOrUpdateRoleBinding(client clientset.Interface, roleBinding *rbac.Rol
 
 // CreateOrUpdateClusterRole creates a ClusterRole if the target resource doesn't exist. If the resource exists already, this function will update the resource instead.
 func CreateOrUpdateClusterRole(client clientset.Interface, clusterRole *rbac.ClusterRole) error {
-	if _, err := client.RbacV1().ClusterRoles().Create(context.TODO(), clusterRole); err != nil {
+	if _, err := client.RbacV1().ClusterRoles().Create(context.TODO(), clusterRole, metav1.CreateOptions{}); err != nil {
 		if !apierrors.IsAlreadyExists(err) {
 			return errors.Wrap(err, "unable to create RBAC clusterrole")
 		}
 
-		if _, err := client.RbacV1().ClusterRoles().Update(context.TODO(), clusterRole); err != nil {
+		if _, err := client.RbacV1().ClusterRoles().Update(context.TODO(), clusterRole, metav1.UpdateOptions{}); err != nil {
 			return errors.Wrap(err, "unable to update RBAC clusterrole")
 		}
 	}
@@ -253,12 +253,12 @@ func CreateOrUpdateClusterRole(client clientset.Interface, clusterRole *rbac.Clu
 
 // CreateOrUpdateClusterRoleBinding creates a ClusterRoleBinding if the target resource doesn't exist. If the resource exists already, this function will update the resource instead.
 func CreateOrUpdateClusterRoleBinding(client clientset.Interface, clusterRoleBinding *rbac.ClusterRoleBinding) error {
-	if _, err := client.RbacV1().ClusterRoleBindings().Create(context.TODO(), clusterRoleBinding); err != nil {
+	if _, err := client.RbacV1().ClusterRoleBindings().Create(context.TODO(), clusterRoleBinding, metav1.CreateOptions{}); err != nil {
 		if !apierrors.IsAlreadyExists(err) {
 			return errors.Wrap(err, "unable to create RBAC clusterrolebinding")
 		}
 
-		if _, err := client.RbacV1().ClusterRoleBindings().Update(context.TODO(), clusterRoleBinding); err != nil {
+		if _, err := client.RbacV1().ClusterRoleBindings().Update(context.TODO(), clusterRoleBinding, metav1.UpdateOptions{}); err != nil {
 			return errors.Wrap(err, "unable to update RBAC clusterrolebinding")
 		}
 	}
@@ -302,7 +302,7 @@ func PatchNodeOnce(client clientset.Interface, nodeName string, patchFn func(*v1
 			return false, errors.Wrap(err, "failed to create two way merge patch")
 		}
 
-		if _, err := client.CoreV1().Nodes().Patch(context.TODO(), n.Name, types.StrategicMergePatchType, patchBytes); err != nil {
+		if _, err := client.CoreV1().Nodes().Patch(context.TODO(), n.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}); err != nil {
 			// TODO also check for timeouts
 			if apierrors.IsConflict(err) {
 				fmt.Println("Temporarily unable to update node metadata due to conflict (will retry)")

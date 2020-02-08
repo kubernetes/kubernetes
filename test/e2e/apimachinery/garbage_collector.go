@@ -321,7 +321,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		uniqLabels := getUniqLabel("gctest", "delete_pods")
 		rc := newOwnerRC(f, rcName, 2, uniqLabels)
 		ginkgo.By("create the rc")
-		rc, err := rcClient.Create(context.TODO(), rc)
+		rc, err := rcClient.Create(context.TODO(), rc, metav1.CreateOptions{})
 		if err != nil {
 			framework.Failf("Failed to create replication controller: %v", err)
 		}
@@ -379,7 +379,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		uniqLabels := getUniqLabel("gctest", "orphan_pods")
 		rc := newOwnerRC(f, rcName, estimateMaximumPods(clientSet, 10, 100), uniqLabels)
 		ginkgo.By("create the rc")
-		rc, err := rcClient.Create(context.TODO(), rc)
+		rc, err := rcClient.Create(context.TODO(), rc, metav1.CreateOptions{})
 		if err != nil {
 			framework.Failf("Failed to create replication controller: %v", err)
 		}
@@ -445,7 +445,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		uniqLabels := getUniqLabel("gctest", "orphan_pods_nil_option")
 		rc := newOwnerRC(f, rcName, 2, uniqLabels)
 		ginkgo.By("create the rc")
-		rc, err := rcClient.Create(context.TODO(), rc)
+		rc, err := rcClient.Create(context.TODO(), rc, metav1.CreateOptions{})
 		if err != nil {
 			framework.Failf("Failed to create replication controller: %v", err)
 		}
@@ -493,7 +493,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		uniqLabels := getUniqLabel("gctest", "delete_rs")
 		deployment := newOwnerDeployment(f, deploymentName, uniqLabels)
 		ginkgo.By("create the deployment")
-		createdDeployment, err := deployClient.Create(context.TODO(), deployment)
+		createdDeployment, err := deployClient.Create(context.TODO(), deployment, metav1.CreateOptions{})
 		if err != nil {
 			framework.Failf("Failed to create deployment: %v", err)
 		}
@@ -552,7 +552,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		uniqLabels := getUniqLabel("gctest", "orphan_rs")
 		deployment := newOwnerDeployment(f, deploymentName, uniqLabels)
 		ginkgo.By("create the deployment")
-		createdDeployment, err := deployClient.Create(context.TODO(), deployment)
+		createdDeployment, err := deployClient.Create(context.TODO(), deployment, metav1.CreateOptions{})
 		if err != nil {
 			framework.Failf("Failed to create deployment: %v", err)
 		}
@@ -636,7 +636,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		uniqLabels := getUniqLabel("gctest", "delete_pods_foreground")
 		rc := newOwnerRC(f, rcName, estimateMaximumPods(clientSet, 10, 100), uniqLabels)
 		ginkgo.By("create the rc")
-		rc, err := rcClient.Create(context.TODO(), rc)
+		rc, err := rcClient.Create(context.TODO(), rc, metav1.CreateOptions{})
 		if err != nil {
 			framework.Failf("Failed to create replication controller: %v", err)
 		}
@@ -723,7 +723,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		uniqLabelsDeleted := getUniqLabel("gctest_d", "valid_and_pending_owners_d")
 		rc1 := newOwnerRC(f, rc1Name, replicas, uniqLabelsDeleted)
 		ginkgo.By("create the rc1")
-		rc1, err := rcClient.Create(context.TODO(), rc1)
+		rc1, err := rcClient.Create(context.TODO(), rc1, metav1.CreateOptions{})
 		if err != nil {
 			framework.Failf("Failed to create replication controller: %v", err)
 		}
@@ -731,7 +731,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		uniqLabelsStay := getUniqLabel("gctest_s", "valid_and_pending_owners_s")
 		rc2 := newOwnerRC(f, rc2Name, 0, uniqLabelsStay)
 		ginkgo.By("create the rc2")
-		rc2, err = rcClient.Create(context.TODO(), rc2)
+		rc2, err = rcClient.Create(context.TODO(), rc2, metav1.CreateOptions{})
 		if err != nil {
 			framework.Failf("Failed to create replication controller: %v", err)
 		}
@@ -754,7 +754,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		patch := fmt.Sprintf(`{"metadata":{"ownerReferences":[{"apiVersion":"v1","kind":"ReplicationController","name":"%s","uid":"%s"}]}}`, rc2.ObjectMeta.Name, rc2.ObjectMeta.UID)
 		for i := 0; i < halfReplicas; i++ {
 			pod := pods.Items[i]
-			_, err := podClient.Patch(context.TODO(), pod.Name, types.StrategicMergePatchType, []byte(patch))
+			_, err := podClient.Patch(context.TODO(), pod.Name, types.StrategicMergePatchType, []byte(patch), metav1.PatchOptions{})
 			framework.ExpectNoError(err, "failed to apply to pod %s in namespace %s, a strategic merge patch: %s", pod.Name, f.Namespace.Name, patch)
 		}
 
@@ -829,30 +829,30 @@ var _ = SIGDescribe("Garbage collector", func() {
 		podClient := clientSet.CoreV1().Pods(f.Namespace.Name)
 		pod1Name := "pod1"
 		pod1 := newGCPod(pod1Name)
-		pod1, err := podClient.Create(context.TODO(), pod1)
+		pod1, err := podClient.Create(context.TODO(), pod1, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create pod %s in namespace: %s", pod1Name, f.Namespace.Name)
 		pod2Name := "pod2"
 		pod2 := newGCPod(pod2Name)
-		pod2, err = podClient.Create(context.TODO(), pod2)
+		pod2, err = podClient.Create(context.TODO(), pod2, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create pod %s in namespace: %s", pod2Name, f.Namespace.Name)
 		pod3Name := "pod3"
 		pod3 := newGCPod(pod3Name)
-		pod3, err = podClient.Create(context.TODO(), pod3)
+		pod3, err = podClient.Create(context.TODO(), pod3, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create pod %s in namespace: %s", pod3Name, f.Namespace.Name)
 		// create circular dependency
 		addRefPatch := func(name string, uid types.UID) []byte {
 			return []byte(fmt.Sprintf(`{"metadata":{"ownerReferences":[{"apiVersion":"v1","kind":"Pod","name":"%s","uid":"%s","controller":true,"blockOwnerDeletion":true}]}}`, name, uid))
 		}
 		patch1 := addRefPatch(pod3.Name, pod3.UID)
-		pod1, err = podClient.Patch(context.TODO(), pod1.Name, types.StrategicMergePatchType, patch1)
+		pod1, err = podClient.Patch(context.TODO(), pod1.Name, types.StrategicMergePatchType, patch1, metav1.PatchOptions{})
 		framework.ExpectNoError(err, "failed to apply to pod %s in namespace %s, a strategic merge patch: %s", pod1.Name, f.Namespace.Name, patch1)
 		framework.Logf("pod1.ObjectMeta.OwnerReferences=%#v", pod1.ObjectMeta.OwnerReferences)
 		patch2 := addRefPatch(pod1.Name, pod1.UID)
-		pod2, err = podClient.Patch(context.TODO(), pod2.Name, types.StrategicMergePatchType, patch2)
+		pod2, err = podClient.Patch(context.TODO(), pod2.Name, types.StrategicMergePatchType, patch2, metav1.PatchOptions{})
 		framework.ExpectNoError(err, "failed to apply to pod %s in namespace %s, a strategic merge patch: %s", pod2.Name, f.Namespace.Name, patch2)
 		framework.Logf("pod2.ObjectMeta.OwnerReferences=%#v", pod2.ObjectMeta.OwnerReferences)
 		patch3 := addRefPatch(pod2.Name, pod2.UID)
-		pod3, err = podClient.Patch(context.TODO(), pod3.Name, types.StrategicMergePatchType, patch3)
+		pod3, err = podClient.Patch(context.TODO(), pod3.Name, types.StrategicMergePatchType, patch3, metav1.PatchOptions{})
 		framework.ExpectNoError(err, "failed to apply to pod %s in namespace %s, a strategic merge patch: %s", pod3.Name, f.Namespace.Name, patch3)
 		framework.Logf("pod3.ObjectMeta.OwnerReferences=%#v", pod3.ObjectMeta.OwnerReferences)
 		// delete one pod, should result in the deletion of all pods
@@ -1125,7 +1125,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 
 		ginkgo.By("Create the cronjob")
 		cronJob := newCronJob("simple", "*/1 * * * ?")
-		cronJob, err := f.ClientSet.BatchV1beta1().CronJobs(f.Namespace.Name).Create(context.TODO(), cronJob)
+		cronJob, err := f.ClientSet.BatchV1beta1().CronJobs(f.Namespace.Name).Create(context.TODO(), cronJob, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create cronjob: %+v, in namespace: %s", cronJob, f.Namespace.Name)
 
 		ginkgo.By("Wait for the CronJob to create new Job")

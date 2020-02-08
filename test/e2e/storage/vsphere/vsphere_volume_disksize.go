@@ -69,7 +69,7 @@ var _ = utils.SIGDescribe("Volume Disk Size [Feature:vsphere]", func() {
 		expectedDiskSize := "1Mi"
 
 		ginkgo.By("Creating Storage Class")
-		storageclass, err := client.StorageV1().StorageClasses().Create(context.TODO(), getVSphereStorageClassSpec(diskSizeSCName, scParameters, nil, ""))
+		storageclass, err := client.StorageV1().StorageClasses().Create(context.TODO(), getVSphereStorageClassSpec(diskSizeSCName, scParameters, nil, ""), metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 		defer client.StorageV1().StorageClasses().Delete(context.TODO(), storageclass.Name, nil)
 

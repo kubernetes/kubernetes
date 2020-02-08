@@ -227,7 +227,7 @@ func PatchNodeCIDR(c clientset.Interface, node types.NodeName, cidr string) erro
 		return fmt.Errorf("failed to json.Marshal CIDR: %v", err)
 	}
 
-	if _, err := c.CoreV1().Nodes().Patch(context.TODO(), string(node), types.StrategicMergePatchType, patchBytes); err != nil {
+	if _, err := c.CoreV1().Nodes().Patch(context.TODO(), string(node), types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}); err != nil {
 		return fmt.Errorf("failed to patch node CIDR: %v", err)
 	}
 	return nil
@@ -248,7 +248,7 @@ func PatchNodeCIDRs(c clientset.Interface, node types.NodeName, cidrs []string) 
 		return fmt.Errorf("failed to json.Marshal CIDR: %v", err)
 	}
 	klog.V(4).Infof("cidrs patch bytes are:%s", string(patchBytes))
-	if _, err := c.CoreV1().Nodes().Patch(context.TODO(), string(node), types.StrategicMergePatchType, patchBytes); err != nil {
+	if _, err := c.CoreV1().Nodes().Patch(context.TODO(), string(node), types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}); err != nil {
 		return fmt.Errorf("failed to patch node CIDR: %v", err)
 	}
 	return nil
@@ -261,7 +261,7 @@ func PatchNodeStatus(c v1core.CoreV1Interface, nodeName types.NodeName, oldNode 
 		return nil, nil, err
 	}
 
-	updatedNode, err := c.Nodes().Patch(context.TODO(), string(nodeName), types.StrategicMergePatchType, patchBytes, "status")
+	updatedNode, err := c.Nodes().Patch(context.TODO(), string(nodeName), types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}, "status")
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to patch status %q for node %q: %v", patchBytes, nodeName, err)
 	}

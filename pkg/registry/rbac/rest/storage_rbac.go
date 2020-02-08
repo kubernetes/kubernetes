@@ -360,7 +360,7 @@ func primeAggregatedClusterRoles(clusterRolesToAggregate map[string]string, clus
 		klog.V(1).Infof("migrating %v to %v", existingRole.Name, newName)
 		existingRole.Name = newName
 		existingRole.ResourceVersion = "" // clear this so the object can be created.
-		if _, err := clusterRoleClient.ClusterRoles().Create(context.TODO(), existingRole); err != nil && !apierrors.IsAlreadyExists(err) {
+		if _, err := clusterRoleClient.ClusterRoles().Create(context.TODO(), existingRole, metav1.CreateOptions{}); err != nil && !apierrors.IsAlreadyExists(err) {
 			return err
 		}
 	}
@@ -398,7 +398,7 @@ func primeSplitClusterRoleBindings(clusterRoleBindingToSplit map[string]rbacapiv
 		newCRB.Subjects = existingRoleBinding.Subjects
 		newCRB.Labels = existingRoleBinding.Labels
 		newCRB.Annotations = existingRoleBinding.Annotations
-		if _, err := clusterRoleBindingClient.ClusterRoleBindings().Create(context.TODO(), newCRB); err != nil && !apierrors.IsAlreadyExists(err) {
+		if _, err := clusterRoleBindingClient.ClusterRoleBindings().Create(context.TODO(), newCRB, metav1.CreateOptions{}); err != nil && !apierrors.IsAlreadyExists(err) {
 			return err
 		}
 	}

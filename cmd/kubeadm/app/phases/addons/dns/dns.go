@@ -347,7 +347,7 @@ func createDNSService(dnsService *v1.Service, serviceBytes []byte, client client
 	}
 
 	// Can't use a generic apiclient helper func here as we have to tolerate more than AlreadyExists.
-	if _, err := client.CoreV1().Services(metav1.NamespaceSystem).Create(context.TODO(), dnsService); err != nil {
+	if _, err := client.CoreV1().Services(metav1.NamespaceSystem).Create(context.TODO(), dnsService, metav1.CreateOptions{}); err != nil {
 		// Ignore if the Service is invalid with this error message:
 		// 	Service "kube-dns" is invalid: spec.clusterIP: Invalid value: "10.96.0.10": provided IP is already allocated
 
@@ -355,7 +355,7 @@ func createDNSService(dnsService *v1.Service, serviceBytes []byte, client client
 			return errors.Wrap(err, "unable to create a new DNS service")
 		}
 
-		if _, err := client.CoreV1().Services(metav1.NamespaceSystem).Update(context.TODO(), dnsService); err != nil {
+		if _, err := client.CoreV1().Services(metav1.NamespaceSystem).Update(context.TODO(), dnsService, metav1.UpdateOptions{}); err != nil {
 			return errors.Wrap(err, "unable to create/update the DNS service")
 		}
 	}
@@ -383,7 +383,7 @@ func migrateCoreDNSCorefile(client clientset.Interface, cm *v1.ConfigMap, corefi
 			"Corefile":        corefile,
 			"Corefile-backup": corefile,
 		},
-	}); err != nil {
+	}, metav1.UpdateOptions{}); err != nil {
 		return errors.Wrap(err, "unable to update the CoreDNS ConfigMap with backup Corefile")
 	}
 	if err := patchCoreDNSDeployment(client, "Corefile-backup"); err != nil {
@@ -405,7 +405,7 @@ func migrateCoreDNSCorefile(client clientset.Interface, cm *v1.ConfigMap, corefi
 			"Corefile":        updatedCorefile,
 			"Corefile-backup": corefile,
 		},
-	}); err != nil {
+	}, metav1.UpdateOptions{}); err != nil {
 		return errors.Wrap(err, "unable to update the CoreDNS ConfigMap")
 	}
 	fmt.Println("[addons]: Migrating CoreDNS Corefile")
@@ -452,7 +452,7 @@ func patchCoreDNSDeployment(client clientset.Interface, coreDNSCorefileName stri
 	}
 	patch := fmt.Sprintf(`{"spec":{"template":{"spec":{"volumes":[{"name": "config-volume", "configMap":{"name": "coredns", "items":[{"key": "%s", "path": "%s"}]}}]}}}}`, coreDNSCorefileName, coreDNSCorefileName)
 
-	if _, err := client.AppsV1().Deployments(dnsDeployment.ObjectMeta.Namespace).Patch(context.TODO(), dnsDeployment.Name, types.StrategicMergePatchType, []byte(patch)); err != nil {
+	if _, err := client.AppsV1().Deployments(dnsDeployment.ObjectMeta.Namespace).Patch(context.TODO(), dnsDeployment.Name, types.StrategicMergePatchType, []byte(patch), metav1.PatchOptions{}); err != nil {
 		return errors.Wrap(err, "unable to patch the CoreDNS deployment")
 	}
 	return nil

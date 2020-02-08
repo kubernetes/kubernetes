@@ -54,13 +54,13 @@ func TestBrokenWebhook(t *testing.T) {
 	}
 
 	t.Logf("Creating Deployment to ensure apiserver is functional")
-	_, err = client.AppsV1().Deployments("default").Create(context.TODO(), exampleDeployment(generateDeploymentName(0)))
+	_, err = client.AppsV1().Deployments("default").Create(context.TODO(), exampleDeployment(generateDeploymentName(0)), metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Failed to create deployment: %v", err)
 	}
 
 	t.Logf("Creating Broken Webhook that will block all operations on all objects")
-	_, err = client.AdmissionregistrationV1beta1().ValidatingWebhookConfigurations().Create(context.TODO(), brokenWebhookConfig(brokenWebhookName))
+	_, err = client.AdmissionregistrationV1beta1().ValidatingWebhookConfigurations().Create(context.TODO(), brokenWebhookConfig(brokenWebhookName), metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Failed to register broken webhook: %v", err)
 	}
@@ -72,7 +72,7 @@ func TestBrokenWebhook(t *testing.T) {
 
 	// test whether the webhook blocks requests
 	t.Logf("Attempt to create Deployment which should fail due to the webhook")
-	_, err = client.AppsV1().Deployments("default").Create(context.TODO(), exampleDeployment(generateDeploymentName(1)))
+	_, err = client.AppsV1().Deployments("default").Create(context.TODO(), exampleDeployment(generateDeploymentName(1)), metav1.CreateOptions{})
 	if err == nil {
 		t.Fatalf("Expected the broken webhook to cause creating a deployment to fail, but it succeeded.")
 	}
@@ -90,7 +90,7 @@ func TestBrokenWebhook(t *testing.T) {
 
 	// test whether the webhook still blocks requests after restarting
 	t.Logf("Attempt again to create Deployment which should fail due to the webhook")
-	_, err = client.AppsV1().Deployments("default").Create(context.TODO(), exampleDeployment(generateDeploymentName(2)))
+	_, err = client.AppsV1().Deployments("default").Create(context.TODO(), exampleDeployment(generateDeploymentName(2)), metav1.CreateOptions{})
 	if err == nil {
 		t.Fatalf("Expected the broken webhook to cause creating a deployment to fail, but it succeeded.")
 	}
@@ -106,7 +106,7 @@ func TestBrokenWebhook(t *testing.T) {
 
 	// test if the deleted webhook no longer blocks requests
 	t.Logf("Creating Deployment to ensure webhook is deleted")
-	_, err = client.AppsV1().Deployments("default").Create(context.TODO(), exampleDeployment(generateDeploymentName(3)))
+	_, err = client.AppsV1().Deployments("default").Create(context.TODO(), exampleDeployment(generateDeploymentName(3)), metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Failed to create deployment: %v", err)
 	}

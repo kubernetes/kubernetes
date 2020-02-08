@@ -103,7 +103,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 			ginkgo.By("Creating service " + headlessSvcName + " in namespace " + ns)
 			headlessService := e2eservice.CreateServiceSpec(headlessSvcName, "", true, labels)
-			_, err := c.CoreV1().Services(ns).Create(context.TODO(), headlessService)
+			_, err := c.CoreV1().Services(ns).Create(context.TODO(), headlessService, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 		})
 
@@ -123,7 +123,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			*(ss.Spec.Replicas) = 3
 			e2esset.PauseNewPods(ss)
 
-			_, err := c.AppsV1().StatefulSets(ns).Create(context.TODO(), ss)
+			_, err := c.AppsV1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 
 			ginkgo.By("Saturating stateful set " + ss.Name)
@@ -165,7 +165,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			// Replace ss with the one returned from Create() so it has the UID.
 			// Save Kind since it won't be populated in the returned ss.
 			kind := ss.Kind
-			ss, err := c.AppsV1().StatefulSets(ns).Create(context.TODO(), ss)
+			ss, err := c.AppsV1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 			ss.Kind = kind
 
@@ -247,7 +247,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			*(ss.Spec.Replicas) = 2
 			e2esset.PauseNewPods(ss)
 
-			_, err := c.AppsV1().StatefulSets(ns).Create(context.TODO(), ss)
+			_, err := c.AppsV1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 
 			e2esset.WaitForRunning(c, 1, 0, ss)
@@ -314,7 +314,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 						}()}
 				}(),
 			}
-			ss, err := c.AppsV1().StatefulSets(ns).Create(context.TODO(), ss)
+			ss, err := c.AppsV1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 			e2esset.WaitForRunningAndReady(c, *ss.Spec.Replicas, ss)
 			ss = waitForStatus(c, ss)
@@ -499,7 +499,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ss.Spec.UpdateStrategy = appsv1.StatefulSetUpdateStrategy{
 				Type: appsv1.OnDeleteStatefulSetStrategyType,
 			}
-			ss, err := c.AppsV1().StatefulSets(ns).Create(context.TODO(), ss)
+			ss, err := c.AppsV1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 			e2esset.WaitForRunningAndReady(c, *ss.Spec.Replicas, ss)
 			ss = waitForStatus(c, ss)
@@ -581,7 +581,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ginkgo.By("Creating stateful set " + ssName + " in namespace " + ns)
 			ss := e2esset.NewStatefulSet(ssName, ns, headlessSvcName, 1, nil, nil, psLabels)
 			setHTTPProbe(ss)
-			ss, err = c.AppsV1().StatefulSets(ns).Create(context.TODO(), ss)
+			ss, err = c.AppsV1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 
 			ginkgo.By("Waiting until all stateful set " + ssName + " replicas will be running in namespace " + ns)
@@ -661,7 +661,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ss := e2esset.NewStatefulSet(ssName, ns, headlessSvcName, 1, nil, nil, psLabels)
 			ss.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
 			setHTTPProbe(ss)
-			ss, err := c.AppsV1().StatefulSets(ns).Create(context.TODO(), ss)
+			ss, err := c.AppsV1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 
 			ginkgo.By("Waiting until all stateful set " + ssName + " replicas will be running in namespace " + ns)
@@ -720,7 +720,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 					NodeName: node.Name,
 				},
 			}
-			pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod)
+			pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 
 			ginkgo.By("Creating statefulset with conflicting port in namespace " + f.Namespace.Name)
@@ -728,7 +728,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			statefulPodContainer := &ss.Spec.Template.Spec.Containers[0]
 			statefulPodContainer.Ports = append(statefulPodContainer.Ports, conflictingPort)
 			ss.Spec.Template.Spec.NodeName = node.Name
-			_, err = f.ClientSet.AppsV1().StatefulSets(f.Namespace.Name).Create(context.TODO(), ss)
+			_, err = f.ClientSet.AppsV1().StatefulSets(f.Namespace.Name).Create(context.TODO(), ss, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 
 			ginkgo.By("Waiting until pod " + podName + " will start running in namespace " + f.Namespace.Name)
@@ -793,7 +793,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ginkgo.By("Creating statefulset " + ssName + " in namespace " + ns)
 			ss := e2esset.NewStatefulSet(ssName, ns, headlessSvcName, 1, nil, nil, labels)
 			setHTTPProbe(ss)
-			ss, err := c.AppsV1().StatefulSets(ns).Create(context.TODO(), ss)
+			ss, err := c.AppsV1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 			e2esset.WaitForRunningAndReady(c, *ss.Spec.Replicas, ss)
 			ss = waitForStatus(c, ss)
@@ -809,7 +809,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ginkgo.By("updating a scale subresource")
 			scale.ResourceVersion = "" // indicate the scale update should be unconditional
 			scale.Spec.Replicas = 2
-			scaleResult, err := c.AppsV1().StatefulSets(ns).UpdateScale(context.TODO(), ssName, scale)
+			scaleResult, err := c.AppsV1().StatefulSets(ns).UpdateScale(context.TODO(), ssName, scale, metav1.UpdateOptions{})
 			if err != nil {
 				framework.Failf("Failed to put scale subresource: %v", err)
 			}
@@ -1086,7 +1086,7 @@ func pollReadWithTimeout(statefulPod statefulPodTester, statefulPodNumber int, k
 // PVCs and one using no storage.
 func rollbackTest(c clientset.Interface, ns string, ss *appsv1.StatefulSet) {
 	setHTTPProbe(ss)
-	ss, err := c.AppsV1().StatefulSets(ns).Create(context.TODO(), ss)
+	ss, err := c.AppsV1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 	e2esset.WaitForRunningAndReady(c, *ss.Spec.Replicas, ss)
 	ss = waitForStatus(c, ss)
@@ -1292,7 +1292,7 @@ func updateStatefulSetWithRetries(c clientset.Interface, namespace, name string,
 		}
 		// Apply the update, then attempt to push it to the apiserver.
 		applyUpdate(statefulSet)
-		if statefulSet, err = statefulSets.Update(context.TODO(), statefulSet); err == nil {
+		if statefulSet, err = statefulSets.Update(context.TODO(), statefulSet, metav1.UpdateOptions{}); err == nil {
 			framework.Logf("Updating stateful set %s", name)
 			return true, nil
 		}

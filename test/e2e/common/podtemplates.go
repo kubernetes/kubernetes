@@ -58,7 +58,7 @@ var _ = ginkgo.Describe("[sig-architecture] PodTemplates", func() {
 					},
 				},
 			},
-		})
+		}, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create PodTemplate")
 
 		// get template
@@ -75,7 +75,7 @@ var _ = ginkgo.Describe("[sig-architecture] PodTemplates", func() {
 			},
 		})
 		framework.ExpectNoError(err, "failed to marshal patch data")
-		_, err = f.ClientSet.CoreV1().PodTemplates(testNamespaceName).Patch(context.TODO(), podTemplateName, types.StrategicMergePatchType, []byte(podTemplatePatch))
+		_, err = f.ClientSet.CoreV1().PodTemplates(testNamespaceName).Patch(context.TODO(), podTemplateName, types.StrategicMergePatchType, []byte(podTemplatePatch), metav1.PatchOptions{})
 		framework.ExpectNoError(err, "failed to patch PodTemplate")
 
 		// get template (ensure label is there)

@@ -300,7 +300,7 @@ func packDNSScalingConfigMap(params map[string]string) *v1.ConfigMap {
 }
 
 func updateDNSScalingConfigMap(c clientset.Interface, configMap *v1.ConfigMap) error {
-	_, err := c.CoreV1().ConfigMaps(metav1.NamespaceSystem).Update(context.TODO(), configMap)
+	_, err := c.CoreV1().ConfigMaps(metav1.NamespaceSystem).Update(context.TODO(), configMap, metav1.UpdateOptions{})
 	if err != nil {
 		return err
 	}

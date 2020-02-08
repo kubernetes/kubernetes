@@ -227,7 +227,7 @@ func CreateVolumeResource(driver TestDriver, config *PerTestConfig, pattern test
 
 			ginkgo.By("creating a StorageClass " + r.Sc.Name)
 
-			r.Sc, err = cs.StorageV1().StorageClasses().Create(context.TODO(), r.Sc)
+			r.Sc, err = cs.StorageV1().StorageClasses().Create(context.TODO(), r.Sc, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 
 			if r.Sc != nil {

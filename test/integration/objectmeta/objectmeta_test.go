@@ -42,12 +42,12 @@ func TestIgnoreClusterName(t *testing.T) {
 			ClusterName: "cluster-name-to-ignore",
 		},
 	}
-	nsNew, err := client.CoreV1().Namespaces().Create(context.TODO(), &ns)
+	nsNew, err := client.CoreV1().Namespaces().Create(context.TODO(), &ns, metav1.CreateOptions{})
 	assert.Nil(t, err)
 	assert.Equal(t, ns.Name, nsNew.Name)
 	assert.Empty(t, nsNew.ClusterName)
 
-	nsNew, err = client.CoreV1().Namespaces().Update(context.TODO(), &ns)
+	nsNew, err = client.CoreV1().Namespaces().Update(context.TODO(), &ns, metav1.UpdateOptions{})
 	assert.Nil(t, err)
 	assert.Equal(t, ns.Name, nsNew.Name)
 	assert.Empty(t, nsNew.ClusterName)

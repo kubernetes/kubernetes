@@ -663,7 +663,7 @@ func createPausePod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
 	if len(namespace) == 0 {
 		namespace = f.Namespace.Name
 	}
-	pod, err := f.ClientSet.CoreV1().Pods(namespace).Create(context.TODO(), initPausePod(f, conf))
+	pod, err := f.ClientSet.CoreV1().Pods(namespace).Create(context.TODO(), initPausePod(f, conf), metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 	return pod
 }
@@ -718,7 +718,7 @@ func removeTaintFromNodeAction(cs clientset.Interface, nodeName string, testTain
 // createPausePodAction returns a closure that creates a pause pod upon invocation.
 func createPausePodAction(f *framework.Framework, conf pausePodConfig) e2eevents.Action {
 	return func() error {
-		_, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), initPausePod(f, conf))
+		_, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), initPausePod(f, conf), metav1.CreateOptions{})
 		return err
 	}
 }

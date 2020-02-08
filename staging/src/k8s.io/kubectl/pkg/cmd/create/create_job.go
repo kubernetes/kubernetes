@@ -193,7 +193,7 @@ func (o *CreateJobOptions) Run() error {
 	}
 	if !o.DryRun {
 		var err error
-		job, err = o.Client.Jobs(o.Namespace).Create(context.TODO(), job)
+		job, err = o.Client.Jobs(o.Namespace).Create(context.TODO(), job, metav1.CreateOptions{})
 		if err != nil {
 			return fmt.Errorf("failed to create job: %v", err)
 		}

@@ -103,7 +103,7 @@ func (a *adapter) UpdateNodePodCIDR(ctx context.Context, node *v1.Node, cidrRang
 		return err
 	}
 
-	_, err = a.k8s.CoreV1().Nodes().Patch(context.TODO(), node.Name, types.StrategicMergePatchType, bytes)
+	_, err = a.k8s.CoreV1().Nodes().Patch(context.TODO(), node.Name, types.StrategicMergePatchType, bytes, metav1.PatchOptions{})
 	return err
 }
 

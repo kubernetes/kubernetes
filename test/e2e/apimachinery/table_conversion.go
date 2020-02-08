@@ -55,7 +55,7 @@ var _ = SIGDescribe("Servers with support for Table transformation", func() {
 		podName := "pod-1"
 		framework.Logf("Creating pod %s", podName)
 
-		_, err := c.CoreV1().Pods(ns).Create(context.TODO(), newTablePod(podName))
+		_, err := c.CoreV1().Pods(ns).Create(context.TODO(), newTablePod(podName), metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create pod %s in namespace: %s", podName, ns)
 
 		table := &metav1beta1.Table{}
@@ -94,7 +94,7 @@ var _ = SIGDescribe("Servers with support for Table transformation", func() {
 							},
 						},
 					},
-				})
+				}, metav1.CreateOptions{})
 				if err == nil {
 					return
 				}

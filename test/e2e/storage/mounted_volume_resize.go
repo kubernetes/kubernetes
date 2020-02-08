@@ -82,7 +82,7 @@ var _ = utils.SIGDescribe("Mounted volume expand", func() {
 			AllowVolumeExpansion: true,
 			DelayBinding:         true,
 		}
-		resizableSc, err = c.StorageV1().StorageClasses().Create(context.TODO(), newStorageClass(test, ns, "resizing"))
+		resizableSc, err = c.StorageV1().StorageClasses().Create(context.TODO(), newStorageClass(test, ns, "resizing"), metav1.CreateOptions{})
 		framework.ExpectNoError(err, "Error creating resizable storage class")
 		framework.ExpectEqual(*resizableSc.AllowVolumeExpansion, true)
 
@@ -91,7 +91,7 @@ var _ = utils.SIGDescribe("Mounted volume expand", func() {
 			StorageClassName: &(resizableSc.Name),
 			VolumeMode:       &test.VolumeMode,
 		}, ns)
-		pvc, err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(context.TODO(), pvc)
+		pvc, err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(context.TODO(), pvc, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "Error creating pvc")
 	})
 

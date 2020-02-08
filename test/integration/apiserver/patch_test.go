@@ -64,7 +64,7 @@ func TestPatchConflicts(t *testing.T) {
 	}
 
 	// Create the object we're going to conflict on
-	clientSet.CoreV1().Secrets(ns.Name).Create(context.TODO(), secret)
+	clientSet.CoreV1().Secrets(ns.Name).Create(context.TODO(), secret, metav1.CreateOptions{})
 	client := clientSet.CoreV1().RESTClient()
 
 	successes := int32(0)

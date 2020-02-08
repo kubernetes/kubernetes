@@ -79,7 +79,7 @@ func createNodes(apiURL string, config *Config) error {
 	for i := 0; i < config.NumNodes; i++ {
 		var err error
 		for j := 0; j < maxCreateRetries; j++ {
-			if _, err = clientSet.CoreV1().Nodes().Create(context.TODO(), baseNodeTemplate); err != nil && apierrors.IsServerTimeout(err) {
+			if _, err = clientSet.CoreV1().Nodes().Create(context.TODO(), baseNodeTemplate, metav1.CreateOptions{}); err != nil && apierrors.IsServerTimeout(err) {
 				klog.Infof("Server timeout creating nodes, retrying after %v", retryDelay)
 				time.Sleep(retryDelay)
 				continue

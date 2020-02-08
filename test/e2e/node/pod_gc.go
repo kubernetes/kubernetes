@@ -45,7 +45,7 @@ var _ = SIGDescribe("Pod garbage collector [Feature:PodGarbageCollector] [Slow]"
 			}
 			pod.ResourceVersion = ""
 			pod.Status.Phase = v1.PodFailed
-			_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).UpdateStatus(context.TODO(), pod)
+			_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).UpdateStatus(context.TODO(), pod, metav1.UpdateOptions{})
 			if err != nil {
 				framework.Failf("err failing pod: %v", err)
 			}
@@ -100,5 +100,5 @@ func createTerminatingPod(f *framework.Framework) (*v1.Pod, error) {
 			SchedulerName: "please don't schedule my pods",
 		},
 	}
-	return f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod)
+	return f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
 }

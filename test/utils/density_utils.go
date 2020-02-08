@@ -43,7 +43,7 @@ func AddLabelsToNode(c clientset.Interface, nodeName string, labels map[string]s
 	patch := fmt.Sprintf(`{"metadata":{"labels":%v}}`, labelString)
 	var err error
 	for attempt := 0; attempt < retries; attempt++ {
-		_, err = c.CoreV1().Nodes().Patch(context.TODO(), nodeName, types.MergePatchType, []byte(patch))
+		_, err = c.CoreV1().Nodes().Patch(context.TODO(), nodeName, types.MergePatchType, []byte(patch), metav1.PatchOptions{})
 		if err != nil {
 			if !apierrors.IsConflict(err) {
 				return err
@@ -75,7 +75,7 @@ func RemoveLabelOffNode(c clientset.Interface, nodeName string, labelKeys []stri
 			}
 			delete(node.Labels, labelKey)
 		}
-		_, err = c.CoreV1().Nodes().Update(context.TODO(), node)
+		_, err = c.CoreV1().Nodes().Update(context.TODO(), node, metav1.UpdateOptions{})
 		if err != nil {
 			if !apierrors.IsConflict(err) {
 				return err

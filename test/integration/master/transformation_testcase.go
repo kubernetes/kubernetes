@@ -205,7 +205,7 @@ func (e *transformTest) createNamespace(name string) (*corev1.Namespace, error) 
 		},
 	}
 
-	if _, err := e.restClient.CoreV1().Namespaces().Create(context.TODO(), ns); err != nil {
+	if _, err := e.restClient.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{}); err != nil {
 		return nil, fmt.Errorf("unable to create testing namespace %v", err)
 	}
 
@@ -222,7 +222,7 @@ func (e *transformTest) createSecret(name, namespace string) (*corev1.Secret, er
 			secretKey: []byte(secretVal),
 		},
 	}
-	if _, err := e.restClient.CoreV1().Secrets(secret.Namespace).Create(context.TODO(), secret); err != nil {
+	if _, err := e.restClient.CoreV1().Secrets(secret.Namespace).Create(context.TODO(), secret, metav1.CreateOptions{}); err != nil {
 		return nil, fmt.Errorf("error while writing secret: %v", err)
 	}
 

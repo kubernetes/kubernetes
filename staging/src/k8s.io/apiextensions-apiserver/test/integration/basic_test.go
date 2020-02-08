@@ -945,7 +945,7 @@ func TestNameConflict(t *testing.T) {
 	}
 
 	noxu2Definition := fixtures.NewNoxu2CustomResourceDefinition(apiextensionsv1beta1.NamespaceScoped)
-	_, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Create(context.TODO(), noxu2Definition)
+	_, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Create(context.TODO(), noxu2Definition, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1020,7 +1020,7 @@ func TestStatusGetAndPatch(t *testing.T) {
 	// make sure we don't get 405 Method Not Allowed from Patching CRD/status subresource
 	_, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().
 		Patch(context.TODO(), noxuDefinition.Name, types.StrategicMergePatchType,
-			[]byte(fmt.Sprintf(`{"labels":{"test-label":"dummy"}}`)),
+			[]byte(fmt.Sprintf(`{"labels":{"test-label":"dummy"}}`)), metav1.PatchOptions{},
 			"status")
 	if err != nil {
 		t.Fatal(err)

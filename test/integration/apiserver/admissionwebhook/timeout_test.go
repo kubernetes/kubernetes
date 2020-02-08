@@ -175,7 +175,7 @@ func testWebhookTimeout(t *testing.T, watchCache bool) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	_, err = client.CoreV1().Pods("default").Create(context.TODO(), timeoutMarkerFixture)
+	_, err = client.CoreV1().Pods("default").Create(context.TODO(), timeoutMarkerFixture, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -184,7 +184,7 @@ func testWebhookTimeout(t *testing.T, watchCache bool) {
 		t.Run(tt.name, func(t *testing.T) {
 			upCh := recorder.Reset()
 			ns := fmt.Sprintf("reinvoke-%d", i)
-			_, err = client.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ns}})
+			_, err = client.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ns}}, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -212,7 +212,7 @@ func testWebhookTimeout(t *testing.T, watchCache bool) {
 			mutatingCfg, err := client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Create(context.TODO(), &admissionv1beta1.MutatingWebhookConfiguration{
 				ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("admission.integration.test-%d", i)},
 				Webhooks:   mutatingWebhooks,
-			})
+			}, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -246,7 +246,7 @@ func testWebhookTimeout(t *testing.T, watchCache bool) {
 			validatingCfg, err := client.AdmissionregistrationV1beta1().ValidatingWebhookConfigurations().Create(context.TODO(), &admissionv1beta1.ValidatingWebhookConfiguration{
 				ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("admission.integration.test-%d", i)},
 				Webhooks:   validatingWebhooks,
-			})
+			}, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -259,7 +259,7 @@ func testWebhookTimeout(t *testing.T, watchCache bool) {
 
 			// wait until new webhook is called the first time
 			if err := wait.PollImmediate(time.Millisecond*5, wait.ForeverTestTimeout, func() (bool, error) {
-				_, err = client.CoreV1().Pods("default").Patch(context.TODO(), timeoutMarkerFixture.Name, types.JSONPatchType, []byte("[]"))
+				_, err = client.CoreV1().Pods("default").Patch(context.TODO(), timeoutMarkerFixture.Name, types.JSONPatchType, []byte("[]"), metav1.PatchOptions{})
 				select {
 				case <-upCh:
 					return true, nil

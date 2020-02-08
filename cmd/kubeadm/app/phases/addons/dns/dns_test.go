@@ -741,7 +741,7 @@ func createClientAndCoreDNSManifest(t *testing.T, corefile, coreDNSVersion strin
 		Data: map[string]string{
 			"Corefile": corefile,
 		},
-	})
+	}, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("error creating ConfigMap: %v", err)
 	}
@@ -768,7 +768,7 @@ func createClientAndCoreDNSManifest(t *testing.T, corefile, coreDNSVersion strin
 				},
 			},
 		},
-	})
+	}, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("error creating deployment: %v", err)
 	}

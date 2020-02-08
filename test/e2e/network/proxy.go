@@ -116,7 +116,7 @@ var _ = SIGDescribe("Proxy", func() {
 						},
 					},
 				},
-			})
+			}, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 
 			// Make an RC with a single pod. The 'porter' image is

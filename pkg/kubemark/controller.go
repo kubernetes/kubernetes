@@ -227,7 +227,7 @@ func (kubemarkController *KubemarkController) addNodeToNodeGroup(nodeGroup strin
 
 	var err error
 	for i := 0; i < numRetries; i++ {
-		_, err = kubemarkController.externalCluster.client.CoreV1().ReplicationControllers(node.Namespace).Create(context.TODO(), node)
+		_, err = kubemarkController.externalCluster.client.CoreV1().ReplicationControllers(node.Namespace).Create(context.TODO(), node, metav1.CreateOptions{})
 		if err == nil {
 			return nil
 		}

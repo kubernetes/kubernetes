@@ -75,7 +75,7 @@ var _ = SIGDescribe("[Feature:NodeAuthenticator]", func() {
 			},
 			AutomountServiceAccountToken: &trueValue,
 		}
-		_, err := f.ClientSet.CoreV1().ServiceAccounts(ns).Create(context.TODO(), newSA)
+		_, err := f.ClientSet.CoreV1().ServiceAccounts(ns).Create(context.TODO(), newSA, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create service account (%s:%s)", ns, newSA.Name)
 
 		pod := createNodeAuthTestPod(f)

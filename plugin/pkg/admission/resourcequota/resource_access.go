@@ -79,7 +79,7 @@ func newQuotaAccessor() (*quotaAccessor, error) {
 }
 
 func (e *quotaAccessor) UpdateQuotaStatus(newQuota *corev1.ResourceQuota) error {
-	updatedQuota, err := e.client.CoreV1().ResourceQuotas(newQuota.Namespace).UpdateStatus(context.TODO(), newQuota)
+	updatedQuota, err := e.client.CoreV1().ResourceQuotas(newQuota.Namespace).UpdateStatus(context.TODO(), newQuota, metav1.UpdateOptions{})
 	if err != nil {
 		return err
 	}

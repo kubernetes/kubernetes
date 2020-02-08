@@ -82,7 +82,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 		nodeList = &v1.NodeList{}
 		var err error
 		for _, pair := range priorityPairs {
-			_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(context.TODO(), &schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: pair.name}, Value: pair.value})
+			_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(context.TODO(), &schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: pair.name}, Value: pair.value}, metav1.CreateOptions{})
 			framework.ExpectEqual(err == nil || apierrors.IsAlreadyExists(err), true)
 		}
 
@@ -305,7 +305,7 @@ var _ = SIGDescribe("PreemptionExecutionPath", func() {
 			// force it to update
 			nodeCopy.ResourceVersion = "0"
 			delete(nodeCopy.Status.Capacity, fakecpu)
-			_, err := cs.CoreV1().Nodes().UpdateStatus(context.TODO(), nodeCopy)
+			_, err := cs.CoreV1().Nodes().UpdateStatus(context.TODO(), nodeCopy, metav1.UpdateOptions{})
 			framework.ExpectNoError(err)
 		}
 		for _, pair := range priorityPairs {
@@ -339,7 +339,7 @@ var _ = SIGDescribe("PreemptionExecutionPath", func() {
 		// force it to update
 		nodeCopy.ResourceVersion = "0"
 		nodeCopy.Status.Capacity[fakecpu] = resource.MustParse("1000")
-		node, err = cs.CoreV1().Nodes().UpdateStatus(context.TODO(), nodeCopy)
+		node, err = cs.CoreV1().Nodes().UpdateStatus(context.TODO(), nodeCopy, metav1.UpdateOptions{})
 		framework.ExpectNoError(err)
 
 		// create four PriorityClass: p1, p2, p3, p4
@@ -347,7 +347,7 @@ var _ = SIGDescribe("PreemptionExecutionPath", func() {
 			priorityName := fmt.Sprintf("p%d", i)
 			priorityVal := int32(i)
 			priorityPairs = append(priorityPairs, priorityPair{name: priorityName, value: priorityVal})
-			_, err := cs.SchedulingV1().PriorityClasses().Create(context.TODO(), &schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: priorityName}, Value: priorityVal})
+			_, err := cs.SchedulingV1().PriorityClasses().Create(context.TODO(), &schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: priorityName}, Value: priorityVal}, metav1.CreateOptions{})
 			if err != nil {
 				framework.Logf("Failed to create priority '%v/%v': %v", priorityName, priorityVal, err)
 				framework.Logf("Reason: %v. Msg: %v", apierrors.ReasonForError(err), err)
@@ -527,7 +527,7 @@ func createPauseRS(f *framework.Framework, conf pauseRSConfig) *appsv1.ReplicaSe
 	if len(namespace) == 0 {
 		namespace = f.Namespace.Name
 	}
-	rs, err := f.ClientSet.AppsV1().ReplicaSets(namespace).Create(context.TODO(), initPauseRS(f, conf))
+	rs, err := f.ClientSet.AppsV1().ReplicaSets(namespace).Create(context.TODO(), initPauseRS(f, conf), metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 	return rs
 }
@@ -543,7 +543,7 @@ func createPod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
 	if len(namespace) == 0 {
 		namespace = f.Namespace.Name
 	}
-	pod, err := f.ClientSet.CoreV1().Pods(namespace).Create(context.TODO(), initPausePod(f, conf))
+	pod, err := f.ClientSet.CoreV1().Pods(namespace).Create(context.TODO(), initPausePod(f, conf), metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 	return pod
 }

@@ -119,7 +119,7 @@ func TestWatchRestartsIfTimeoutNotReached(t *testing.T) {
 				counter = counter + 1
 
 				patch := fmt.Sprintf(`{"metadata": {"annotations": {"count": "%d"}}}`, counter)
-				_, err := c.CoreV1().Secrets(secret.Namespace).Patch(context.TODO(), secret.Name, types.StrategicMergePatchType, []byte(patch))
+				_, err := c.CoreV1().Secrets(secret.Namespace).Patch(context.TODO(), secret.Name, types.StrategicMergePatchType, []byte(patch), metav1.PatchOptions{})
 				if err != nil {
 					t.Fatalf("Failed to patch secret: %v", err)
 				}
@@ -212,7 +212,7 @@ func TestWatchRestartsIfTimeoutNotReached(t *testing.T) {
 				t.Fatalf("Failed to create clientset: %v", err)
 			}
 
-			secret, err := c.CoreV1().Secrets(tc.secret.Namespace).Create(context.TODO(), tc.secret)
+			secret, err := c.CoreV1().Secrets(tc.secret.Namespace).Create(context.TODO(), tc.secret, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatalf("Failed to create testing secret %s/%s: %v", tc.secret.Namespace, tc.secret.Name, err)
 			}

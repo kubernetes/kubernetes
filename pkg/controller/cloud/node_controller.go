@@ -385,7 +385,7 @@ func (cnc *CloudNodeController) initializeNode(ctx context.Context, node *v1.Nod
 			modify(curNode)
 		}
 
-		_, err = cnc.kubeClient.CoreV1().Nodes().Update(context.TODO(), curNode)
+		_, err = cnc.kubeClient.CoreV1().Nodes().Update(context.TODO(), curNode, metav1.UpdateOptions{})
 		if err != nil {
 			return err
 		}

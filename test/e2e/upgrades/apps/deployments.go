@@ -67,7 +67,7 @@ func (t *DeploymentUpgradeTest) Setup(f *framework.Framework) {
 
 	ginkgo.By(fmt.Sprintf("Creating a deployment %q with 1 replica in namespace %q", deploymentName, ns))
 	d := e2edeploy.NewDeployment(deploymentName, int32(1), map[string]string{"test": "upgrade"}, "nginx", nginxImage, appsv1.RollingUpdateDeploymentStrategyType)
-	deployment, err := deploymentClient.Create(context.TODO(), d)
+	deployment, err := deploymentClient.Create(context.TODO(), d, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
 	ginkgo.By(fmt.Sprintf("Waiting deployment %q to complete", deploymentName))

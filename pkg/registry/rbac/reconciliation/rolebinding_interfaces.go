@@ -95,7 +95,7 @@ func (c RoleBindingClientAdapter) Create(in RoleBinding) (RoleBinding, error) {
 		return nil, err
 	}
 
-	ret, err := c.Client.RoleBindings(in.GetNamespace()).Create(context.TODO(), in.(RoleBindingAdapter).RoleBinding)
+	ret, err := c.Client.RoleBindings(in.GetNamespace()).Create(context.TODO(), in.(RoleBindingAdapter).RoleBinding, metav1.CreateOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -103,7 +103,7 @@ func (c RoleBindingClientAdapter) Create(in RoleBinding) (RoleBinding, error) {
 }
 
 func (c RoleBindingClientAdapter) Update(in RoleBinding) (RoleBinding, error) {
-	ret, err := c.Client.RoleBindings(in.GetNamespace()).Update(context.TODO(), in.(RoleBindingAdapter).RoleBinding)
+	ret, err := c.Client.RoleBindings(in.GetNamespace()).Update(context.TODO(), in.(RoleBindingAdapter).RoleBinding, metav1.UpdateOptions{})
 	if err != nil {
 		return nil, err
 	}

@@ -57,7 +57,7 @@ func DoTestConfigMap(t *testing.T, client clientset.Interface, ns *v1.Namespace)
 		},
 	}
 
-	if _, err := client.CoreV1().ConfigMaps(cfg.Namespace).Create(context.TODO(), &cfg); err != nil {
+	if _, err := client.CoreV1().ConfigMaps(cfg.Namespace).Create(context.TODO(), &cfg, metav1.CreateOptions{}); err != nil {
 		t.Errorf("unable to create test configMap: %v", err)
 	}
 	defer deleteConfigMapOrErrorf(t, client, cfg.Namespace, cfg.Name)
@@ -112,7 +112,7 @@ func DoTestConfigMap(t *testing.T, client clientset.Interface, ns *v1.Namespace)
 	}
 
 	pod.ObjectMeta.Name = "uses-configmap"
-	if _, err := client.CoreV1().Pods(ns.Name).Create(context.TODO(), pod); err != nil {
+	if _, err := client.CoreV1().Pods(ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{}); err != nil {
 		t.Errorf("Failed to create pod: %v", err)
 	}
 	defer integration.DeletePodOrErrorf(t, client, ns.Name, pod.Name)

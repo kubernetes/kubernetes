@@ -370,7 +370,7 @@ func updateAPIServiceStatus(client apiregistrationclient.APIServicesGetter, orig
 		return newAPIService, nil
 	}
 
-	newAPIService, err := client.APIServices().UpdateStatus(context.TODO(), newAPIService)
+	newAPIService, err := client.APIServices().UpdateStatus(context.TODO(), newAPIService, metav1.UpdateOptions{})
 	if err != nil {
 		return nil, err
 	}

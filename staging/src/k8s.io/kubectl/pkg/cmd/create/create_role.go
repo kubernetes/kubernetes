@@ -342,7 +342,7 @@ func (o *CreateRoleOptions) RunCreateRole() error {
 
 	// Create role.
 	if !o.DryRun {
-		role, err = o.Client.Roles(o.Namespace).Create(context.TODO(), role)
+		role, err = o.Client.Roles(o.Namespace).Create(context.TODO(), role, metav1.CreateOptions{})
 		if err != nil {
 			return err
 		}

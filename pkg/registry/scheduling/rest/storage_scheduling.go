@@ -127,7 +127,7 @@ func AddSystemPriorityClasses() genericapiserver.PostStartHookFunc {
 				_, err := schedClientSet.PriorityClasses().Get(context.TODO(), pc.Name, metav1.GetOptions{})
 				if err != nil {
 					if apierrors.IsNotFound(err) {
-						_, err := schedClientSet.PriorityClasses().Create(context.TODO(), pc)
+						_, err := schedClientSet.PriorityClasses().Create(context.TODO(), pc, metav1.CreateOptions{})
 						if err != nil && !apierrors.IsAlreadyExists(err) {
 							return false, err
 						} else {

@@ -63,7 +63,7 @@ var _ = SIGDescribe("[Feature:DynamicAudit]", func() {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "audit",
 			},
-		})
+		}, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create namespace")
 
 		_, err = f.ClientSet.CoreV1().Pods(namespace).Create(context.TODO(), &v1.Pod{
@@ -87,7 +87,7 @@ var _ = SIGDescribe("[Feature:DynamicAudit]", func() {
 					},
 				},
 			},
-		})
+		}, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create proxy pod")
 
 		_, err = f.ClientSet.CoreV1().Services(namespace).Create(context.TODO(), &v1.Service{
@@ -105,7 +105,7 @@ var _ = SIGDescribe("[Feature:DynamicAudit]", func() {
 					"app": "audit",
 				},
 			},
-		})
+		}, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create proxy service")
 
 		var podIP string
@@ -151,7 +151,7 @@ var _ = SIGDescribe("[Feature:DynamicAudit]", func() {
 			},
 		}
 
-		_, err = f.ClientSet.AuditregistrationV1alpha1().AuditSinks().Create(context.TODO(), &sink)
+		_, err = f.ClientSet.AuditregistrationV1alpha1().AuditSinks().Create(context.TODO(), &sink, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create audit sink")
 		framework.Logf("created audit sink")
 
@@ -208,7 +208,7 @@ var _ = SIGDescribe("[Feature:DynamicAudit]", func() {
 					_, err = f.PodClient().List(context.TODO(), metav1.ListOptions{})
 					framework.ExpectNoError(err, "failed to list pods")
 
-					_, err = f.PodClient().Patch(context.TODO(), pod.Name, types.JSONPatchType, patch)
+					_, err = f.PodClient().Patch(context.TODO(), pod.Name, types.JSONPatchType, patch, metav1.PatchOptions{})
 					framework.ExpectNoError(err, "failed to patch pod")
 
 					f.PodClient().DeleteSync(pod.Name, &metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)

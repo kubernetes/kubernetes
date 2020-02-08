@@ -247,7 +247,7 @@ func setNodeConfigSource(f *framework.Framework, source *v1.NodeConfigSource) er
 	node.Spec.ConfigSource = source
 
 	// update to the new source
-	_, err = nodeclient.Update(context.TODO(), node)
+	_, err = nodeclient.Update(context.TODO(), node, metav1.UpdateOptions{})
 	if err != nil {
 		return err
 	}
@@ -316,7 +316,7 @@ func decodeConfigz(resp *http.Response) (*kubeletconfig.KubeletConfiguration, er
 // creates a configmap containing kubeCfg in kube-system namespace
 func createConfigMap(f *framework.Framework, internalKC *kubeletconfig.KubeletConfiguration) (*v1.ConfigMap, error) {
 	cmap := newKubeletConfigMap("testcfg", internalKC)
-	cmap, err := f.ClientSet.CoreV1().ConfigMaps("kube-system").Create(context.TODO(), cmap)
+	cmap, err := f.ClientSet.CoreV1().ConfigMaps("kube-system").Create(context.TODO(), cmap, metav1.CreateOptions{})
 	if err != nil {
 		return nil, err
 	}

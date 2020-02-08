@@ -64,7 +64,7 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 							},
 						},
 					},
-				})
+				}, metav1.CreateOptions{})
 				if err == nil {
 					return
 				}

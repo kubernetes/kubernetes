@@ -388,7 +388,7 @@ func TestColumnsPatch(t *testing.T) {
 	// error about top-level and per-version columns being mutual exclusive.
 	patch := []byte(`{"spec":{"versions":[{"name":"v1beta1","served":true,"storage":true,"additionalPrinterColumns":[{"name":"Age","type":"date","JSONPath":".metadata.creationTimestamp"}]},{"name":"v1","served":true,"storage":false,"additionalPrinterColumns":[{"name":"Age2","type":"date","JSONPath":".metadata.creationTimestamp"}]}]}}`)
 
-	_, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Patch(context.TODO(), crd.Name, types.MergePatchType, patch)
+	_, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Patch(context.TODO(), crd.Name, types.MergePatchType, patch, metav1.PatchOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -434,7 +434,7 @@ func TestPatchCleanTopLevelColumns(t *testing.T) {
 	// the top-level columns.
 	patch := []byte(`{"spec":{"additionalPrinterColumns":null,"versions":[{"name":"v1beta1","served":true,"storage":true,"additionalPrinterColumns":[{"name":"Age","type":"date","JSONPath":".metadata.creationTimestamp"}]},{"name":"v1","served":true,"storage":false,"additionalPrinterColumns":[{"name":"Age2","type":"date","JSONPath":".metadata.creationTimestamp"}]}]}}`)
 
-	_, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Patch(context.TODO(), crd.Name, types.MergePatchType, patch)
+	_, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Patch(context.TODO(), crd.Name, types.MergePatchType, patch, metav1.PatchOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}

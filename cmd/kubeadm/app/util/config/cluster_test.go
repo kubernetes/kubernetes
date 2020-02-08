@@ -343,7 +343,7 @@ func TestGetNodeRegistration(t *testing.T) {
 			client := clientsetfake.NewSimpleClientset()
 
 			if rt.node != nil {
-				_, err := client.CoreV1().Nodes().Create(context.TODO(), rt.node)
+				_, err := client.CoreV1().Nodes().Create(context.TODO(), rt.node, metav1.CreateOptions{})
 				if err != nil {
 					t.Errorf("couldn't create Node")
 					return
@@ -619,7 +619,7 @@ func TestGetInitConfigurationFromCluster(t *testing.T) {
 			client := clientsetfake.NewSimpleClientset()
 
 			if rt.node != nil {
-				_, err := client.CoreV1().Nodes().Create(context.TODO(), rt.node)
+				_, err := client.CoreV1().Nodes().Create(context.TODO(), rt.node, metav1.CreateOptions{})
 				if err != nil {
 					t.Errorf("couldn't create Node")
 					return

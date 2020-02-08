@@ -82,14 +82,14 @@ func TestClient(t *testing.T) {
 		},
 	}
 
-	got, err := client.CoreV1().Pods("default").Create(context.TODO(), pod)
+	got, err := client.CoreV1().Pods("default").Create(context.TODO(), pod, metav1.CreateOptions{})
 	if err == nil {
 		t.Fatalf("unexpected non-error: %v", got)
 	}
 
 	// get a created pod
 	pod.Spec.Containers[0].Image = "an-image"
-	got, err = client.CoreV1().Pods("default").Create(context.TODO(), pod)
+	got, err = client.CoreV1().Pods("default").Create(context.TODO(), pod, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -151,7 +151,7 @@ func TestAtomicPut(t *testing.T) {
 		},
 	}
 	rcs := c.CoreV1().ReplicationControllers("default")
-	rc, err := rcs.Create(context.TODO(), &rcBody)
+	rc, err := rcs.Create(context.TODO(), &rcBody, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Failed creating atomicRC: %v", err)
 	}
@@ -180,7 +180,7 @@ func TestAtomicPut(t *testing.T) {
 					tmpRC.Spec.Selector[l] = v
 					tmpRC.Spec.Template.Labels[l] = v
 				}
-				_, err = rcs.Update(context.TODO(), tmpRC)
+				_, err = rcs.Update(context.TODO(), tmpRC, metav1.UpdateOptions{})
 				if err != nil {
 					if apierrors.IsConflict(err) {
 						// This is what we expect.
@@ -227,7 +227,7 @@ func TestPatch(t *testing.T) {
 		},
 	}
 	pods := c.CoreV1().Pods("default")
-	_, err := pods.Create(context.TODO(), &podBody)
+	_, err := pods.Create(context.TODO(), &podBody, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Failed creating patchpods: %v", err)
 	}
@@ -357,7 +357,7 @@ func TestPatchWithCreateOnUpdate(t *testing.T) {
 	}
 
 	// Create the endpoint (endpoints set AllowCreateOnUpdate=true) to get a UID and resource version
-	createdEndpoint, err := c.CoreV1().Endpoints("default").Update(context.TODO(), endpointTemplate)
+	createdEndpoint, err := c.CoreV1().Endpoints("default").Update(context.TODO(), endpointTemplate, metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatalf("Failed creating endpoint: %v", err)
 	}
@@ -476,7 +476,7 @@ func TestSingleWatch(t *testing.T) {
 	rv1 := ""
 	for i := 0; i < 10; i++ {
 		event := mkEvent(i)
-		got, err := client.CoreV1().Events("default").Create(context.TODO(), event)
+		got, err := client.CoreV1().Events("default").Create(context.TODO(), event, metav1.CreateOptions{})
 		if err != nil {
 			t.Fatalf("Failed creating event %#q: %v", event, err)
 		}
@@ -580,7 +580,7 @@ func TestMultiWatch(t *testing.T) {
 					Image: imageutils.GetPauseImageName(),
 				}},
 			},
-		})
+		}, metav1.CreateOptions{})
 
 		if err != nil {
 			t.Fatalf("Couldn't make %v: %v", name, err)
@@ -639,7 +639,7 @@ func TestMultiWatch(t *testing.T) {
 					if !ok {
 						return
 					}
-					if _, err := client.CoreV1().Events("default").Create(context.TODO(), dummyEvent(i)); err != nil {
+					if _, err := client.CoreV1().Events("default").Create(context.TODO(), dummyEvent(i), metav1.CreateOptions{}); err != nil {
 						panic(fmt.Sprintf("couldn't make an event: %v", err))
 					}
 					changeMade <- i
@@ -686,7 +686,7 @@ func TestMultiWatch(t *testing.T) {
 								Image: imageutils.GetPauseImageName(),
 							}},
 						},
-					})
+					}, metav1.CreateOptions{})
 
 					if err != nil {
 						panic(fmt.Sprintf("couldn't make unrelated pod: %v", err))
@@ -716,7 +716,7 @@ func TestMultiWatch(t *testing.T) {
 			}
 			pod.Spec.Containers[0].Image = imageutils.GetPauseImageName()
 			sentTimes <- timePair{time.Now(), name}
-			if _, err := client.CoreV1().Pods("default").Update(context.TODO(), pod); err != nil {
+			if _, err := client.CoreV1().Pods("default").Update(context.TODO(), pod, metav1.UpdateOptions{}); err != nil {
 				panic(fmt.Sprintf("Couldn't make %v: %v", name, err))
 			}
 		}(i)
@@ -754,7 +754,7 @@ func runSelfLinkTestOnNamespace(t *testing.T, c clientset.Interface, namespace s
 			},
 		},
 	}
-	pod, err := c.CoreV1().Pods(namespace).Create(context.TODO(), &podBody)
+	pod, err := c.CoreV1().Pods(namespace).Create(context.TODO(), &podBody, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Failed creating selflinktest pod: %v", err)
 	}

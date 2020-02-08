@@ -289,5 +289,5 @@ var _ = SIGDescribe("[Feature:PodPreset] PodPreset", func() {
 })
 
 func createPodPreset(c clientset.Interface, ns string, job *settingsv1alpha1.PodPreset) (*settingsv1alpha1.PodPreset, error) {
-	return c.SettingsV1alpha1().PodPresets(ns).Create(context.TODO(), job)
+	return c.SettingsV1alpha1().PodPresets(ns).Create(context.TODO(), job, metav1.CreateOptions{})
 }

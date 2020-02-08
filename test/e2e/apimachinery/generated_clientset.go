@@ -126,7 +126,7 @@ var _ = SIGDescribe("Generated clientset", func() {
 		}
 
 		ginkgo.By("creating the pod")
-		pod, err = podClient.Create(context.TODO(), pod)
+		pod, err = podClient.Create(context.TODO(), pod, metav1.CreateOptions{})
 		if err != nil {
 			framework.Failf("Failed to create pod: %v", err)
 		}
@@ -242,7 +242,7 @@ var _ = SIGDescribe("Generated clientset", func() {
 		}
 
 		ginkgo.By("creating the cronJob")
-		cronJob, err = cronJobClient.Create(context.TODO(), cronJob)
+		cronJob, err = cronJobClient.Create(context.TODO(), cronJob, metav1.CreateOptions{})
 		if err != nil {
 			framework.Failf("Failed to create cronJob: %v", err)
 		}

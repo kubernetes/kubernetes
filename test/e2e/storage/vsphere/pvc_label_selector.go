@@ -22,6 +22,7 @@ import (
 
 	"github.com/onsi/ginkgo"
 	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
@@ -116,21 +117,21 @@ func testSetupVSpherePVClabelselector(c clientset.Interface, nodeInfo *NodeInfo,
 
 	ginkgo.By("creating the pv with label volume-type:ssd")
 	pvSsd = getVSpherePersistentVolumeSpec(volumePath, v1.PersistentVolumeReclaimDelete, ssdlabels)
-	pvSsd, err = c.CoreV1().PersistentVolumes().Create(context.TODO(), pvSsd)
+	pvSsd, err = c.CoreV1().PersistentVolumes().Create(context.TODO(), pvSsd, metav1.CreateOptions{})
 	if err != nil {
 		return
 	}
 
 	ginkgo.By("creating pvc with label selector to match with volume-type:vvol")
 	pvcVvol = getVSpherePersistentVolumeClaimSpec(ns, vvollabels)
-	pvcVvol, err = c.CoreV1().PersistentVolumeClaims(ns).Create(context.TODO(), pvcVvol)
+	pvcVvol, err = c.CoreV1().PersistentVolumeClaims(ns).Create(context.TODO(), pvcVvol, metav1.CreateOptions{})
 	if err != nil {
 		return
 	}
 
 	ginkgo.By("creating pvc with label selector to match with volume-type:ssd")
 	pvcSsd = getVSpherePersistentVolumeClaimSpec(ns, ssdlabels)
-	pvcSsd, err = c.CoreV1().PersistentVolumeClaims(ns).Create(context.TODO(), pvcSsd)
+	pvcSsd, err = c.CoreV1().PersistentVolumeClaims(ns).Create(context.TODO(), pvcSsd, metav1.CreateOptions{})
 	return
 }
 

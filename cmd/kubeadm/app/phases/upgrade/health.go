@@ -157,7 +157,7 @@ func createJob(client clientset.Interface, cfg *kubeadmapi.ClusterConfiguration)
 	// Create the Job, but retry in case it is being currently deleted
 	klog.V(2).Infof("Creating Job %q in the namespace %q", jobName, ns)
 	err := wait.PollImmediate(time.Second*1, timeout, func() (bool, error) {
-		if _, err := client.BatchV1().Jobs(ns).Create(context.TODO(), job); err != nil {
+		if _, err := client.BatchV1().Jobs(ns).Create(context.TODO(), job, metav1.CreateOptions{}); err != nil {
 			klog.V(2).Infof("Could not create Job %q in the namespace %q, retrying: %v", jobName, ns, err)
 			lastError = err
 			return false, nil

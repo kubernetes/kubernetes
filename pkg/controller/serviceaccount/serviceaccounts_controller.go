@@ -213,7 +213,7 @@ func (c *ServiceAccountsController) syncNamespace(key string) error {
 		// TODO eliminate this once the fake client can handle creation without NS
 		sa.Namespace = ns.Name
 
-		if _, err := c.client.CoreV1().ServiceAccounts(ns.Name).Create(context.TODO(), &sa); err != nil && !apierrors.IsAlreadyExists(err) {
+		if _, err := c.client.CoreV1().ServiceAccounts(ns.Name).Create(context.TODO(), &sa, metav1.CreateOptions{}); err != nil && !apierrors.IsAlreadyExists(err) {
 			// we can safely ignore terminating namespace errors
 			if !apierrors.HasStatusCause(err, v1.NamespaceTerminatingCause) {
 				createFailures = append(createFailures, err)

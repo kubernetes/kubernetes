@@ -585,7 +585,7 @@ func (config *NetworkingTestConfig) createTestPods() {
 }
 
 func (config *NetworkingTestConfig) createService(serviceSpec *v1.Service) *v1.Service {
-	_, err := config.getServiceClient().Create(context.TODO(), serviceSpec)
+	_, err := config.getServiceClient().Create(context.TODO(), serviceSpec, metav1.CreateOptions{})
 	framework.ExpectNoError(err, fmt.Sprintf("Failed to create %s service: %v", serviceSpec.Name, err))
 
 	err = framework.WaitForService(config.f.ClientSet, config.Namespace, serviceSpec.Name, true, 5*time.Second, 45*time.Second)

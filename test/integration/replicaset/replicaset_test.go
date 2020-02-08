@@ -174,14 +174,14 @@ func createRSsPods(t *testing.T, clientSet clientset.Interface, rss []*apps.Repl
 	var createdRSs []*apps.ReplicaSet
 	var createdPods []*v1.Pod
 	for _, rs := range rss {
-		createdRS, err := clientSet.AppsV1().ReplicaSets(rs.Namespace).Create(context.TODO(), rs)
+		createdRS, err := clientSet.AppsV1().ReplicaSets(rs.Namespace).Create(context.TODO(), rs, metav1.CreateOptions{})
 		if err != nil {
 			t.Fatalf("Failed to create replica set %s: %v", rs.Name, err)
 		}
 		createdRSs = append(createdRSs, createdRS)
 	}
 	for _, pod := range pods {
-		createdPod, err := clientSet.CoreV1().Pods(pod.Namespace).Create(context.TODO(), pod)
+		createdPod, err := clientSet.CoreV1().Pods(pod.Namespace).Create(context.TODO(), pod, metav1.CreateOptions{})
 		if err != nil {
 			t.Fatalf("Failed to create pod %s: %v", pod.Name, err)
 		}
@@ -215,7 +215,7 @@ func updatePod(t *testing.T, podClient typedv1.PodInterface, podName string, upd
 			return err
 		}
 		updateFunc(newPod)
-		pod, err = podClient.Update(context.TODO(), newPod)
+		pod, err = podClient.Update(context.TODO(), newPod, metav1.UpdateOptions{})
 		return err
 	}); err != nil {
 		t.Fatalf("Failed to update pod %s: %v", podName, err)
@@ -230,7 +230,7 @@ func updatePodStatus(t *testing.T, podClient typedv1.PodInterface, pod *v1.Pod, 
 			return err
 		}
 		updateStatusFunc(newPod)
-		_, err = podClient.UpdateStatus(context.TODO(), newPod)
+		_, err = podClient.UpdateStatus(context.TODO(), newPod, metav1.UpdateOptions{})
 		return err
 	}); err != nil {
 		t.Fatalf("Failed to update status of pod %s: %v", pod.Name, err)
@@ -255,7 +255,7 @@ func updateRS(t *testing.T, rsClient appsclient.ReplicaSetInterface, rsName stri
 			return err
 		}
 		updateFunc(newRS)
-		rs, err = rsClient.Update(context.TODO(), newRS)
+		rs, err = rsClient.Update(context.TODO(), newRS, metav1.UpdateOptions{})
 		return err
 	}); err != nil {
 		t.Fatalf("Failed to update rs %s: %v", rsName, err)
@@ -319,7 +319,7 @@ func setPodsReadyCondition(t *testing.T, clientSet clientset.Interface, pods *v1
 				}
 				pod.Status.Conditions = append(pod.Status.Conditions, *condition)
 			}
-			_, err := clientSet.CoreV1().Pods(pod.Namespace).UpdateStatus(context.TODO(), pod)
+			_, err := clientSet.CoreV1().Pods(pod.Namespace).UpdateStatus(context.TODO(), pod, metav1.UpdateOptions{})
 			if err != nil {
 				// When status fails to be updated, we continue to next pod
 				continue
@@ -354,7 +354,7 @@ func testScalingUsingScaleSubresource(t *testing.T, c clientset.Interface, rs *a
 			return err
 		}
 		scale.Spec.Replicas = replicas
-		_, err = c.AppsV1().ReplicaSets(ns).UpdateScale(context.TODO(), rs.Name, scale)
+		_, err = c.AppsV1().ReplicaSets(ns).UpdateScale(context.TODO(), rs.Name, scale, metav1.UpdateOptions{})
 		return err
 	}); err != nil {
 		t.Fatalf("Failed to set .Spec.Replicas of scale subresource for rs %s: %v", rs.Name, err)
@@ -429,14 +429,14 @@ func TestAdoption(t *testing.T) {
 			rsClient := clientSet.AppsV1().ReplicaSets(ns.Name)
 			podClient := clientSet.CoreV1().Pods(ns.Name)
 			const rsName = "rs"
-			rs, err := rsClient.Create(context.TODO(), newRS(rsName, ns.Name, 1))
+			rs, err := rsClient.Create(context.TODO(), newRS(rsName, ns.Name, 1), metav1.CreateOptions{})
 			if err != nil {
 				t.Fatalf("Failed to create replica set: %v", err)
 			}
 			podName := fmt.Sprintf("pod%d", i)
 			pod := newMatchingPod(podName, ns.Name)
 			pod.OwnerReferences = tc.existingOwnerReferences(rs)
-			_, err = podClient.Create(context.TODO(), pod)
+			_, err = podClient.Create(context.TODO(), pod, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatalf("Failed to create Pod: %v", err)
 			}
@@ -480,7 +480,7 @@ func TestRSSelectorImmutability(t *testing.T) {
 	newSelectorLabels := map[string]string{"changed_name_apps_v1": "changed_test_apps_v1"}
 	rsV1.Spec.Selector.MatchLabels = newSelectorLabels
 	rsV1.Spec.Template.Labels = newSelectorLabels
-	_, err = clientSet.AppsV1().ReplicaSets(ns.Name).Update(context.TODO(), rsV1)
+	_, err = clientSet.AppsV1().ReplicaSets(ns.Name).Update(context.TODO(), rsV1, metav1.UpdateOptions{})
 	if err == nil {
 		t.Fatalf("failed to provide validation error when changing immutable selector when updating apps/v1 replicaset %s", rsV1.Name)
 	}

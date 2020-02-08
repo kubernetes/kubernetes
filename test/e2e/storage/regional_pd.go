@@ -184,7 +184,7 @@ func testZonalFailover(c clientset.Interface, ns string) {
 	statefulSet, service, regionalPDLabels := newStatefulSet(claimTemplate, ns)
 
 	ginkgo.By("creating a StorageClass " + class.Name)
-	_, err := c.StorageV1().StorageClasses().Create(context.TODO(), class)
+	_, err := c.StorageV1().StorageClasses().Create(context.TODO(), class, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 	defer func() {
 		framework.Logf("deleting storage class %s", class.Name)
@@ -193,9 +193,9 @@ func testZonalFailover(c clientset.Interface, ns string) {
 	}()
 
 	ginkgo.By("creating a StatefulSet")
-	_, err = c.CoreV1().Services(ns).Create(context.TODO(), service)
+	_, err = c.CoreV1().Services(ns).Create(context.TODO(), service, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
-	_, err = c.AppsV1().StatefulSets(ns).Create(context.TODO(), statefulSet)
+	_, err = c.AppsV1().StatefulSets(ns).Create(context.TODO(), statefulSet, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
 	defer func() {
@@ -308,13 +308,13 @@ func addTaint(c clientset.Interface, ns string, nodes []v1.Node, podZone string)
 		framework.ExpectNoError(err)
 		reversePatches[node.Name] = reversePatchBytes
 
-		_, err = c.CoreV1().Nodes().Patch(context.TODO(), node.Name, types.StrategicMergePatchType, patchBytes)
+		_, err = c.CoreV1().Nodes().Patch(context.TODO(), node.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
 		framework.ExpectNoError(err)
 	}
 
 	return func() {
 		for nodeName, reversePatch := range reversePatches {
-			_, err := c.CoreV1().Nodes().Patch(context.TODO(), nodeName, types.StrategicMergePatchType, reversePatch)
+			_, err := c.CoreV1().Nodes().Patch(context.TODO(), nodeName, types.StrategicMergePatchType, reversePatch, metav1.PatchOptions{})
 			framework.ExpectNoError(err)
 		}
 	}

@@ -407,7 +407,7 @@ func (e *TokensController) ensureReferencedToken(serviceAccount *v1.ServiceAccou
 	}
 
 	// Save the secret
-	createdToken, err := e.client.CoreV1().Secrets(serviceAccount.Namespace).Create(context.TODO(), secret)
+	createdToken, err := e.client.CoreV1().Secrets(serviceAccount.Namespace).Create(context.TODO(), secret, metav1.CreateOptions{})
 	if err != nil {
 		// if the namespace is being terminated, create will fail no matter what
 		if apierrors.HasStatusCause(err, v1.NamespaceTerminatingCause) {
@@ -449,7 +449,7 @@ func (e *TokensController) ensureReferencedToken(serviceAccount *v1.ServiceAccou
 
 		// Try to add a reference to the token
 		liveServiceAccount.Secrets = append(liveServiceAccount.Secrets, v1.ObjectReference{Name: secret.Name})
-		if _, err := serviceAccounts.Update(context.TODO(), liveServiceAccount); err != nil {
+		if _, err := serviceAccounts.Update(context.TODO(), liveServiceAccount, metav1.UpdateOptions{}); err != nil {
 			return err
 		}
 
@@ -567,7 +567,7 @@ func (e *TokensController) generateTokenIfNeeded(serviceAccount *v1.ServiceAccou
 	liveSecret.Annotations[v1.ServiceAccountUIDKey] = string(serviceAccount.UID)
 
 	// Save the secret
-	_, err = secrets.Update(context.TODO(), liveSecret)
+	_, err = secrets.Update(context.TODO(), liveSecret, metav1.UpdateOptions{})
 	if apierrors.IsConflict(err) || apierrors.IsNotFound(err) {
 		// if we got a Conflict error, the secret was updated by someone else, and we'll get an update notification later
 		// if we got a NotFound error, the secret no longer exists, and we don't need to populate a token
@@ -611,7 +611,7 @@ func (e *TokensController) removeSecretReference(saNamespace string, saName stri
 		}
 	}
 	serviceAccount.Secrets = secrets
-	_, err = serviceAccounts.Update(context.TODO(), serviceAccount)
+	_, err = serviceAccounts.Update(context.TODO(), serviceAccount, metav1.UpdateOptions{})
 	// Ignore NotFound errors when attempting to remove a reference
 	if apierrors.IsNotFound(err) {
 		return nil

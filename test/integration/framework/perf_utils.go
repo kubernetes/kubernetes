@@ -90,7 +90,7 @@ func (p *IntegrationTestNodePreparer) PrepareNodes() error {
 	for i := 0; i < numNodes; i++ {
 		var err error
 		for retry := 0; retry < retries; retry++ {
-			_, err = p.client.CoreV1().Nodes().Create(context.TODO(), baseNode)
+			_, err = p.client.CoreV1().Nodes().Create(context.TODO(), baseNode, metav1.CreateOptions{})
 			if err == nil || !testutils.IsRetryableAPIError(err) {
 				break
 			}

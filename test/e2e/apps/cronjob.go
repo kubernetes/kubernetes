@@ -355,7 +355,7 @@ func newTestCronJob(name, schedule string, concurrencyPolicy batchv1beta1.Concur
 }
 
 func createCronJob(c clientset.Interface, ns string, cronJob *batchv1beta1.CronJob) (*batchv1beta1.CronJob, error) {
-	return c.BatchV1beta1().CronJobs(ns).Create(context.TODO(), cronJob)
+	return c.BatchV1beta1().CronJobs(ns).Create(context.TODO(), cronJob, metav1.CreateOptions{})
 }
 
 func getCronJob(c clientset.Interface, ns, name string) (*batchv1beta1.CronJob, error) {
