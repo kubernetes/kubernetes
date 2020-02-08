@@ -30,6 +30,7 @@ import (
 	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -57,6 +58,9 @@ var (
 		# Replace a pod using the data in pod.json.
 		kubectl replace -f ./pod.json
 
+		# Replace a pod using the data in pod.json if the resource version is equal to one.
+		kubectl replace -f ./pod.json --resource-version=1
+
 		# Replace a pod based on the JSON passed into stdin.
 		cat pod.json | kubectl replace -f -
 
@@ -78,6 +82,7 @@ type ReplaceOptions struct {
 
 	createAnnotation bool
 	validate         bool
+	resourceVersion  string
 
 	Schema      validation.Schema
 	Builder     func() *resource.Builder
@@ -125,6 +130,7 @@ func NewCmdReplace(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	cmdutil.AddApplyAnnotationFlags(cmd)
 
 	cmd.Flags().StringVar(&o.Raw, "raw", o.Raw, "Raw URI to PUT to the server.  Uses the transport specified by the kubeconfig file.")
+	cmd.Flags().StringVar(&o.resourceVersion, "resource-version", o.resourceVersion, i18n.T("If non-empty, the replace will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource."))
 
 	return cmd
 }
@@ -251,9 +257,29 @@ func (o *ReplaceOptions) Run(f cmdutil.Factory) error {
 		return err
 	}
 
+	var singleItemImpliedResource bool
+	r.IntoSingleItemImplied(&singleItemImpliedResource)
+
+	// only apply resource version locking on a single resource.
+	// we must perform this check after o.builder.Do() as
+	// []o.resources can not accurately return the proper number
+	// of resources when they are not passed in "resource/name" format.
+	if !singleItemImpliedResource && len(o.resourceVersion) > 0 {
+		return fmt.Errorf("--resource-version may only be used with a single resource")
+	}
+
 	return r.Visit(func(info *resource.Info, err error) error {
 		if err != nil {
 			return err
+		}
+
+		if len(o.resourceVersion) != 0 {
+			// ensure resourceVersion is always sent in the patch by clearing it from the starting JSON
+			accessor, err := meta.Accessor(info.Object)
+			if err != nil {
+				return err
+			}
+			accessor.SetResourceVersion("")
 		}
 
 		if err := util.CreateOrUpdateAnnotation(o.createAnnotation, info.Object, scheme.DefaultJSONEncoder()); err != nil {
