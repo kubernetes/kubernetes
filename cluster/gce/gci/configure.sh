@@ -33,13 +33,6 @@ DEFAULT_CRICTL_SHA1="5c18f4e52ab524d429063b78d086dd18b894aae7"
 DEFAULT_MOUNTER_TAR_SHA="8003b798cf33c7f91320cd6ee5cec4fa22244571"
 ###
 
-# Ability to inject custom versions (Ubuntu OS images ONLY)
-# if KUBE_UBUNTU_INSTALL_CONTAINERD_VERSION or KUBE_UBUNTU_INSTALL_RUNC_VERSION
-# is set to empty then we do not override the version(s) and just
-# use whatever is in the default installation of containerd package
-UBUNTU_INSTALL_CONTAINERD_VERSION=${KUBE_UBUNTU_INSTALL_CONTAINERD_VERSION:-}
-UBUNTU_INSTALL_RUNC_VERSION=${KUBE_UBUNTU_INSTALL_RUNC_VERSION:-}
-
 # Use --retry-connrefused opt only if it's supported by curl.
 CURL_RETRY_CONNREFUSED=""
 if curl --help | grep -q -- '--retry-connrefused'; then
@@ -446,7 +439,7 @@ function install-docker {
 # If we are on ubuntu we can try to install containerd
 function install-containerd-ubuntu {
   # bailout if we are not on ubuntu
-  if [[ $(lsb_release -si) != "Ubuntu" ]]; then
+  if [[ -z "$(command -v lsb_release)" || $(lsb_release -si) != "Ubuntu" ]]; then
     echo "Unable to automatically install containerd in non-ubuntu image. Bailing out..."
     exit 2
   fi
