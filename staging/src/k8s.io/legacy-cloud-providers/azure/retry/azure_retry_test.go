@@ -75,7 +75,11 @@ func TestStep(t *testing.T) {
 }
 
 func TestDoBackoffRetry(t *testing.T) {
-	backoff := &Backoff{Factor: 1.0, Steps: 3}
+	backoff := &Backoff{
+		Factor:                      1.0,
+		Steps:                       3,
+		NonRetriableHTTPStatusCodes: []int{http.StatusNotFound},
+	}
 	fakeRequest := &http.Request{
 		URL: &url.URL{
 			Host: "localhost",
@@ -122,4 +126,19 @@ func TestDoBackoffRetry(t *testing.T) {
 	assert.Equal(t, 1, client.Attempts())
 	assert.NotNil(t, resp)
 	assert.Equal(t, 429, resp.StatusCode)
+
+	// retry on non retriable error
+	r = mocks.NewResponseWithStatus("404 StatusNotFound", http.StatusNotFound)
+	client = mocks.NewSender()
+	client.AppendAndRepeatResponse(r, 1)
+	expectedErr = &Error{
+		Retriable:      true,
+		HTTPStatusCode: 404,
+		RawError:       fmt.Errorf("HTTP status code (404)"),
+	}
+	resp, err = doBackoffRetry(client, fakeRequest, backoff)
+	assert.NotNil(t, resp)
+	assert.Equal(t, 404, resp.StatusCode)
+	assert.Equal(t, expectedErr.Error(), err)
+	assert.Equal(t, 1, client.Attempts())
 }

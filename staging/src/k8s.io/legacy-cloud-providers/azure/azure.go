@@ -499,21 +499,27 @@ func (az *Cloud) InitializeCloudFromConfig(config *Config, fromSecret bool) erro
 	az.RouteTablesClient = routetableclient.New(azClientConfig.WithRateLimiter(config.RouteTableRateLimit))
 	az.LoadBalancerClient = loadbalancerclient.New(azClientConfig.WithRateLimiter(config.LoadBalancerRateLimit))
 	az.SecurityGroupsClient = securitygroupclient.New(azClientConfig.WithRateLimiter(config.SecurityGroupRateLimit))
-	az.VirtualMachinesClient = vmclient.New(azClientConfig.WithRateLimiter(config.VirtualMachineRateLimit))
 	az.PublicIPAddressesClient = publicipclient.New(azClientConfig.WithRateLimiter(config.PublicIPAddressRateLimit))
 	az.VirtualMachineScaleSetsClient = vmssclient.New(azClientConfig.WithRateLimiter(config.VirtualMachineScaleSetRateLimit))
-	az.DisksClient = diskclient.New(azClientConfig.WithRateLimiter(config.DiskRateLimit))
 	az.VirtualMachineSizesClient = vmsizeclient.New(azClientConfig.WithRateLimiter(config.VirtualMachineSizeRateLimit))
 	az.SnapshotsClient = snapshotclient.New(azClientConfig.WithRateLimiter(config.SnapshotRateLimit))
 	az.StorageAccountClient = storageaccountclient.New(azClientConfig.WithRateLimiter(config.StorageAccountRateLimit))
 
 	// fileClient is not based on armclient, but it's still backoff retried.
-	az.FileClient = newAzureFileClient(env, azClientConfig.Backoff)
+	az.FileClient = newAzureFileClient(env, azClientConfig.Backoff.WithNonRetriableErrors([]string{}, []int{http.StatusNotFound}))
+
+	vmClientConfig := azClientConfig.WithRateLimiter(config.VirtualMachineRateLimit)
+	vmClientConfig.Backoff = vmClientConfig.Backoff.WithNonRetriableErrors([]string{}, []int{http.StatusConflict})
+	az.VirtualMachinesClient = vmclient.New(vmClientConfig)
 
 	// Error "not an active Virtual Machine Scale Set VM" is not retriable for VMSS VM.
 	vmssVMClientConfig := azClientConfig.WithRateLimiter(config.VirtualMachineScaleSetRateLimit)
-	vmssVMClientConfig.Backoff = vmssVMClientConfig.Backoff.WithNonRetriableErrors([]string{vmssVMNotActiveErrorMessage})
+	vmssVMClientConfig.Backoff = vmssVMClientConfig.Backoff.WithNonRetriableErrors([]string{vmssVMNotActiveErrorMessage}, []int{http.StatusConflict})
 	az.VirtualMachineScaleSetVMsClient = vmssvmclient.New(vmssVMClientConfig)
+
+	disksClientConfig := azClientConfig.WithRateLimiter(config.DiskRateLimit)
+	disksClientConfig.Backoff = disksClientConfig.Backoff.WithNonRetriableErrors([]string{}, []int{http.StatusNotFound})
+	az.DisksClient = diskclient.New(disksClientConfig)
 
 	if az.MaximumLoadBalancerRuleCount == 0 {
 		az.MaximumLoadBalancerRuleCount = maximumLoadBalancerRuleCount
