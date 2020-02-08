@@ -193,7 +193,7 @@ var _ = utils.SIGDescribe("EmptyDir wrapper volumes", func() {
 
 	// Slow by design [~150 Seconds].
 	// This test uses deprecated GitRepo VolumeSource so it MUST not be promoted to Conformance.
-	// To provision a container with a git repo, mount an EmptyDir into an InitContainer that clones the repo using git, then mount the EmptyDir into the Pod’s container.
+	// To provision a container with a git repo, mount an EmptyDir into an InitContainer that clones the repo using git, then mount the EmptyDir into the Pod's container.
 	// This projected volume maps approach can also be tested with secrets and downwardapi VolumeSource but are less prone to the race problem.
 	ginkgo.It("should not cause race condition when used for git_repo [Serial] [Slow]", func() {
 		gitURL, gitRepo, cleanup := createGitServer(f)
