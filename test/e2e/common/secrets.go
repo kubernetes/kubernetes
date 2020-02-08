@@ -86,7 +86,7 @@ var _ = ginkgo.Describe("[sig-api-machinery] Secrets", func() {
 	/*
 		Release : v1.9
 		Testname: Secrets, pod environment from source
-		Description: Create a secret. Create a Pod with Container that declares a environment variable using ‘EnvFrom’ which references the secret created to extract a key value from the secret. Pod MUST have the environment variable that contains proper value for the key to the secret.
+		Description: Create a secret. Create a Pod with Container that declares a environment variable using 'EnvFrom' which references the secret created to extract a key value from the secret. Pod MUST have the environment variable that contains proper value for the key to the secret.
 	*/
 	framework.ConformanceIt("should be consumable via the environment [NodeConformance]", func() {
 		name := "secret-test-" + string(uuid.NewUUID())
