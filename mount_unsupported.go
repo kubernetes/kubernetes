@@ -43,6 +43,11 @@ func (mounter *Mounter) Mount(source string, target string, fstype string, optio
 	return errUnsupported
 }
 
+// Mount always returns an error on unsupported platforms
+func (mounter *Mounter) MountSensitive(source string, target string, fstype string, options []string, sensitiveOptions []string) error {
+	return errUnsupported
+}
+
 // Unmount always returns an error on unsupported platforms
 func (mounter *Mounter) Unmount(target string) error {
 	return errUnsupported
@@ -63,7 +68,7 @@ func (mounter *Mounter) GetMountRefs(pathname string) ([]string, error) {
 	return nil, errUnsupported
 }
 
-func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, fstype string, options []string) error {
+func (mounter *SafeFormatAndMount) formatAndMountSensitive(source string, target string, fstype string, options []string, sensitiveOptions []string) error {
 	return mounter.Interface.Mount(source, target, fstype, options)
 }
 

@@ -21,6 +21,7 @@ import (
 	"io/ioutil"
 	"os"
 	"runtime"
+	"strings"
 	"testing"
 
 	"k8s.io/utils/exec"
@@ -34,6 +35,10 @@ type ErrorMounter struct {
 }
 
 func (mounter *ErrorMounter) Mount(source string, target string, fstype string, options []string) error {
+	return mounter.MountSensitive(source, target, fstype, options, nil /* sensitiveOptions */)
+}
+
+func (mounter *ErrorMounter) MountSensitive(source string, target string, fstype string, options []string, sensitiveOptions []string) error {
 	i := mounter.errIndex
 	mounter.errIndex++
 	if mounter.err != nil && mounter.err[i] != nil {
@@ -59,12 +64,13 @@ func TestSafeFormatAndMount(t *testing.T) {
 	}
 	defer os.RemoveAll(mntDir)
 	tests := []struct {
-		description  string
-		fstype       string
-		mountOptions []string
-		execScripts  []ExecArgs
-		mountErrs    []error
-		expErrorType MountErrorType
+		description           string
+		fstype                string
+		mountOptions          []string
+		sensitiveMountOptions []string
+		execScripts           []ExecArgs
+		mountErrs             []error
+		expErrorType          MountErrorType
 	}{
 		{
 			description:  "Test a read only mount of an already formatted device",
@@ -234,6 +240,17 @@ func TestSafeFormatAndMount(t *testing.T) {
 			},
 			expErrorType: HasFilesystemErrors,
 		},
+		{
+			description:           "Test that 'blkid' is called and confirms unformatted disk, format fails with sensitive options",
+			fstype:                "ext4",
+			sensitiveMountOptions: []string{"mySecret"},
+			mountErrs:             []error{fmt.Errorf("unknown filesystem type '(null)'")},
+			execScripts: []ExecArgs{
+				{"blkid", []string{"-p", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", "/dev/foo"}, "", &testingexec.FakeExitError{Status: 2}},
+				{"mkfs.ext4", []string{"-F", "-m0", "/dev/foo"}, "", fmt.Errorf("formatting failed")},
+			},
+			expErrorType: FormatFailed,
+		},
 	}
 
 	for _, test := range tests {
@@ -253,7 +270,12 @@ func TestSafeFormatAndMount(t *testing.T) {
 
 		device := "/dev/foo"
 		dest := mntDir
-		err := mounter.FormatAndMount(device, dest, test.fstype, test.mountOptions)
+		var err error
+		if len(test.sensitiveMountOptions) == 0 {
+			err = mounter.FormatAndMount(device, dest, test.fstype, test.mountOptions)
+		} else {
+			err = mounter.FormatAndMountSensitive(device, dest, test.fstype, test.mountOptions, test.sensitiveMountOptions)
+		}
 		if len(test.expErrorType) == 0 {
 			if err != nil {
 				t.Errorf("test \"%s\" unexpected non-error: %v", test.description, err)
@@ -277,6 +299,20 @@ func TestSafeFormatAndMount(t *testing.T) {
 			}
 			if mntErr.Type != test.expErrorType {
 				t.Errorf("test \"%s\" unexpected error: \n          [%v]. \nExpecting err type[%v]", test.description, err, test.expErrorType)
+			}
+			if len(test.sensitiveMountOptions) == 0 {
+				if strings.Contains(mntErr.Error(), sensitiveOptionsRemoved) {
+					t.Errorf("test \"%s\" returned an error unexpectedly containing the string %q: %v", test.description, sensitiveOptionsRemoved, err)
+				}
+			} else {
+				if !strings.Contains(err.Error(), sensitiveOptionsRemoved) {
+					t.Errorf("test \"%s\" returned an error without the string %q: %v", test.description, sensitiveOptionsRemoved, err)
+				}
+				for _, sensitiveOption := range test.sensitiveMountOptions {
+					if strings.Contains(err.Error(), sensitiveOption) {
+						t.Errorf("test \"%s\" returned an error with a sensitive string (%q): %v", test.description, sensitiveOption, err)
+					}
+				}
 			}
 		}
 	}
