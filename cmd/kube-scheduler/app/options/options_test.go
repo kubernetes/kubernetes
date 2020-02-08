@@ -24,15 +24,14 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"reflect"
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/diff"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	componentbaseconfig "k8s.io/component-base/config"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -73,7 +72,7 @@ func TestSchedulerOptions(t *testing.T) {
 	configFile := filepath.Join(tmpDir, "scheduler.yaml")
 	configKubeconfig := filepath.Join(tmpDir, "config.kubeconfig")
 	if err := ioutil.WriteFile(configFile, []byte(fmt.Sprintf(`
-apiVersion: kubescheduler.config.k8s.io/v1alpha1
+apiVersion: kubescheduler.config.k8s.io/v1alpha2
 kind: KubeSchedulerConfiguration
 clientConnection:
   kubeconfig: "%s"
@@ -103,8 +102,8 @@ users:
 		t.Fatal(err)
 	}
 
-	oldconfigFile := filepath.Join(tmpDir, "scheduler_old.yaml")
-	if err := ioutil.WriteFile(oldconfigFile, []byte(fmt.Sprintf(`
+	oldConfigFile := filepath.Join(tmpDir, "scheduler_old.yaml")
+	if err := ioutil.WriteFile(oldConfigFile, []byte(fmt.Sprintf(`
 apiVersion: componentconfig/v1alpha1
 kind: KubeSchedulerConfiguration
 clientConnection:
@@ -114,9 +113,9 @@ leaderElection:
 		t.Fatal(err)
 	}
 
-	invalidconfigFile := filepath.Join(tmpDir, "scheduler_invalid_wrong_api_version.yaml")
-	if err := ioutil.WriteFile(invalidconfigFile, []byte(fmt.Sprintf(`
-apiVersion: componentconfig/v1alpha2
+	unknownVersionConfig := filepath.Join(tmpDir, "scheduler_invalid_wrong_api_version.yaml")
+	if err := ioutil.WriteFile(unknownVersionConfig, []byte(fmt.Sprintf(`
+apiVersion: kubescheduler.config.k8s.io/unknown
 kind: KubeSchedulerConfiguration
 clientConnection:
   kubeconfig: "%s"
@@ -125,8 +124,18 @@ leaderElection:
 		t.Fatal(err)
 	}
 
-	unknownFieldConfig := filepath.Join(tmpDir, "scheduler_invalid_unknown_field.yaml")
-	if err := ioutil.WriteFile(unknownFieldConfig, []byte(fmt.Sprintf(`
+	noVersionConfig := filepath.Join(tmpDir, "scheduler_invalid_no_version.yaml")
+	if err := ioutil.WriteFile(noVersionConfig, []byte(fmt.Sprintf(`
+kind: KubeSchedulerConfiguration
+clientConnection:
+  kubeconfig: "%s"
+leaderElection:
+  leaderElect: true`, configKubeconfig)), os.FileMode(0600)); err != nil {
+		t.Fatal(err)
+	}
+
+	unknownFieldConfigLenient := filepath.Join(tmpDir, "scheduler_invalid_unknown_field_lenient.yaml")
+	if err := ioutil.WriteFile(unknownFieldConfigLenient, []byte(fmt.Sprintf(`
 apiVersion: kubescheduler.config.k8s.io/v1alpha1
 kind: KubeSchedulerConfiguration
 clientConnection:
@@ -137,9 +146,33 @@ foo: bar`, configKubeconfig)), os.FileMode(0600)); err != nil {
 		t.Fatal(err)
 	}
 
+	unknownFieldConfig := filepath.Join(tmpDir, "scheduler_invalid_unknown_field.yaml")
+	if err := ioutil.WriteFile(unknownFieldConfig, []byte(fmt.Sprintf(`
+apiVersion: kubescheduler.config.k8s.io/v1alpha2
+kind: KubeSchedulerConfiguration
+clientConnection:
+  kubeconfig: "%s"
+leaderElection:
+  leaderElect: true
+foo: bar`, configKubeconfig)), os.FileMode(0600)); err != nil {
+		t.Fatal(err)
+	}
+
+	duplicateFieldConfigLenient := filepath.Join(tmpDir, "scheduler_invalid_duplicate_fields_lenient.yaml")
+	if err := ioutil.WriteFile(duplicateFieldConfigLenient, []byte(fmt.Sprintf(`
+apiVersion: kubescheduler.config.k8s.io/v1alpha1
+kind: KubeSchedulerConfiguration
+clientConnection:
+  kubeconfig: "%s"
+leaderElection:
+  leaderElect: true
+  leaderElect: false`, configKubeconfig)), os.FileMode(0600)); err != nil {
+		t.Fatal(err)
+	}
+
 	duplicateFieldConfig := filepath.Join(tmpDir, "scheduler_invalid_duplicate_fields.yaml")
 	if err := ioutil.WriteFile(duplicateFieldConfig, []byte(fmt.Sprintf(`
-apiVersion: kubescheduler.config.k8s.io/v1alpha1
+apiVersion: kubescheduler.config.k8s.io/v1alpha2
 kind: KubeSchedulerConfiguration
 clientConnection:
   kubeconfig: "%s"
@@ -176,7 +209,7 @@ users:
 	// plugin config
 	pluginconfigFile := filepath.Join(tmpDir, "plugin.yaml")
 	if err := ioutil.WriteFile(pluginconfigFile, []byte(fmt.Sprintf(`
-apiVersion: kubescheduler.config.k8s.io/v1alpha1
+apiVersion: kubescheduler.config.k8s.io/v1alpha2
 kind: KubeSchedulerConfiguration
 clientConnection:
   kubeconfig: "%s"
@@ -293,7 +326,7 @@ pluginConfig:
 		{
 			name: "config file in componentconfig/v1alpha1",
 			options: &Options{
-				ConfigFile: oldconfigFile,
+				ConfigFile: oldConfigFile,
 				ComponentConfig: func() kubeschedulerconfig.KubeSchedulerConfiguration {
 					cfg, err := newDefaultComponentConfig()
 					if err != nil {
@@ -306,9 +339,14 @@ pluginConfig:
 		},
 
 		{
-			name:          "invalid config file in componentconfig/v1alpha2",
-			options:       &Options{ConfigFile: invalidconfigFile},
-			expectedError: "no kind \"KubeSchedulerConfiguration\" is registered for version \"componentconfig/v1alpha2\"",
+			name:          "unknown version kubescheduler.config.k8s.io/unknown",
+			options:       &Options{ConfigFile: unknownVersionConfig},
+			expectedError: "no kind \"KubeSchedulerConfiguration\" is registered for version \"kubescheduler.config.k8s.io/unknown\"",
+		},
+		{
+			name:          "config file with no version",
+			options:       &Options{ConfigFile: noVersionConfig},
+			expectedError: "Object 'apiVersion' is missing",
 		},
 		{
 			name: "kubeconfig flag",
@@ -522,9 +560,9 @@ pluginConfig:
 			expectedError: "no configuration has been provided",
 		},
 		{
-			name: "unknown field",
+			name: "unknown field lenient (v1alpha1)",
 			options: &Options{
-				ConfigFile: unknownFieldConfig,
+				ConfigFile: unknownFieldConfigLenient,
 			},
 			// TODO (obitech): Remove this comment and add a new test for v1alpha2, when it's available, as this should fail then.
 			// expectedError: "found unknown field: foo",
@@ -565,9 +603,17 @@ pluginConfig:
 			},
 		},
 		{
-			name: "duplicate fields",
+			name: "unknown field",
 			options: &Options{
-				ConfigFile: duplicateFieldConfig,
+				ConfigFile: unknownFieldConfig,
+			},
+			expectedError: "found unknown field: foo",
+			checkErrFn:    runtime.IsStrictDecodingError,
+		},
+		{
+			name: "duplicate fields lenient (v1alpha1)",
+			options: &Options{
+				ConfigFile: duplicateFieldConfigLenient,
 			},
 			// TODO (obitech): Remove this comment and add a new test for v1alpha2, when it's available, as this should fail then.
 			// expectedError: `key "leaderElect" already set`,
@@ -607,6 +653,14 @@ pluginConfig:
 				Plugins:                  nil,
 			},
 		},
+		{
+			name: "duplicate fields",
+			options: &Options{
+				ConfigFile: duplicateFieldConfig,
+			},
+			expectedError: `key "leaderElect" already set`,
+			checkErrFn:    runtime.IsStrictDecodingError,
+		},
 	}
 
 	for _, tc := range testcases {
@@ -618,7 +672,7 @@ pluginConfig:
 			if err != nil {
 				if tc.expectedError != "" || tc.checkErrFn != nil {
 					if tc.expectedError != "" {
-						assert.Contains(t, err.Error(), tc.expectedError, tc.name)
+						assert.Contains(t, err.Error(), tc.expectedError)
 					}
 					if tc.checkErrFn != nil {
 						assert.True(t, tc.checkErrFn(err), "got error: %v", err)
@@ -629,8 +683,8 @@ pluginConfig:
 				return
 			}
 
-			if !reflect.DeepEqual(config.ComponentConfig, tc.expectedConfig) {
-				t.Errorf("config.diff:\n%s", diff.ObjectReflectDiff(tc.expectedConfig, config.ComponentConfig))
+			if diff := cmp.Diff(tc.expectedConfig, config.ComponentConfig); diff != "" {
+				t.Errorf("incorrect config (-want, +got):\n%s", diff)
 			}
 
 			// ensure we have a client
