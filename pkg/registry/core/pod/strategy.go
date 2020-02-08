@@ -34,10 +34,12 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -198,6 +200,25 @@ func MatchPod(label labels.Selector, field fields.Selector) storage.SelectionPre
 // NodeNameTriggerFunc returns value spec.nodename of given object.
 func NodeNameTriggerFunc(obj runtime.Object) string {
 	return obj.(*api.Pod).Spec.NodeName
+}
+
+// NodeNameIndexFunc return value spec.nodename of given object.
+func NodeNameIndexFunc(obj interface{}) ([]string, error) {
+	pod, ok := obj.(*api.Pod)
+	if !ok {
+		return nil, fmt.Errorf("not a pod")
+	}
+	return []string{pod.Spec.NodeName}, nil
+}
+
+// Indexers returns the indexers for pod storage.
+func Indexers() *cache.Indexers {
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.SelectorIndex) {
+		return &cache.Indexers{
+			storage.FieldIndex("spec.nodeName"): NodeNameIndexFunc,
+		}
+	}
+	return nil
 }
 
 // ToSelectableFields returns a field set that represents the object
