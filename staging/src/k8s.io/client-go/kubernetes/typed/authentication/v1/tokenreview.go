@@ -33,7 +33,7 @@ type TokenReviewsGetter interface {
 
 // TokenReviewInterface has methods to work with TokenReview resources.
 type TokenReviewInterface interface {
-	Create(*v1.TokenReview) (*v1.TokenReview, error)
+	Create(context.Context, *v1.TokenReview) (*v1.TokenReview, error)
 	TokenReviewExpansion
 }
 
@@ -50,12 +50,12 @@ func newTokenReviews(c *AuthenticationV1Client) *tokenReviews {
 }
 
 // Create takes the representation of a tokenReview and creates it.  Returns the server's representation of the tokenReview, and an error, if there is any.
-func (c *tokenReviews) Create(tokenReview *v1.TokenReview) (result *v1.TokenReview, err error) {
+func (c *tokenReviews) Create(ctx context.Context, tokenReview *v1.TokenReview) (result *v1.TokenReview, err error) {
 	result = &v1.TokenReview{}
 	err = c.client.Post().
 		Resource("tokenreviews").
 		Body(tokenReview).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }

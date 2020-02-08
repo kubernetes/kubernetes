@@ -246,25 +246,25 @@ func (t StorageClassTest) TestDynamicProvisioning() *v1.PersistentVolume {
 	if class != nil {
 		framework.ExpectEqual(*claim.Spec.StorageClassName, class.Name)
 		ginkgo.By("creating a StorageClass " + class.Name)
-		_, err = client.StorageV1().StorageClasses().Create(class)
+		_, err = client.StorageV1().StorageClasses().Create(context.TODO(), class)
 		// The "should provision storage with snapshot data source" test already has created the class.
 		// TODO: make class creation optional and remove the IsAlreadyExists exception
 		framework.ExpectEqual(err == nil || apierrors.IsAlreadyExists(err), true)
-		class, err = client.StorageV1().StorageClasses().Get(class.Name, metav1.GetOptions{})
+		class, err = client.StorageV1().StorageClasses().Get(context.TODO(), class.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		defer func() {
 			framework.Logf("deleting storage class %s", class.Name)
-			framework.ExpectNoError(client.StorageV1().StorageClasses().Delete(class.Name, nil))
+			framework.ExpectNoError(client.StorageV1().StorageClasses().Delete(context.TODO(), class.Name, nil))
 		}()
 	}
 
 	ginkgo.By("creating a claim")
-	claim, err = client.CoreV1().PersistentVolumeClaims(claim.Namespace).Create(claim)
+	claim, err = client.CoreV1().PersistentVolumeClaims(claim.Namespace).Create(context.TODO(), claim)
 	framework.ExpectNoError(err)
 	defer func() {
 		framework.Logf("deleting claim %q/%q", claim.Namespace, claim.Name)
 		// typically this claim has already been deleted
-		err = client.CoreV1().PersistentVolumeClaims(claim.Namespace).Delete(claim.Name, nil)
+		err = client.CoreV1().PersistentVolumeClaims(claim.Namespace).Delete(context.TODO(), claim.Name, nil)
 		if err != nil && !apierrors.IsNotFound(err) {
 			framework.Failf("Error deleting claim %q. Error: %v", claim.Name, err)
 		}
@@ -278,7 +278,7 @@ func (t StorageClassTest) TestDynamicProvisioning() *v1.PersistentVolume {
 	pv := t.checkProvisioning(client, claim, class)
 
 	ginkgo.By(fmt.Sprintf("deleting claim %q/%q", claim.Namespace, claim.Name))
-	framework.ExpectNoError(client.CoreV1().PersistentVolumeClaims(claim.Namespace).Delete(claim.Name, nil))
+	framework.ExpectNoError(client.CoreV1().PersistentVolumeClaims(claim.Namespace).Delete(context.TODO(), claim.Name, nil))
 
 	// Wait for the PV to get deleted if reclaim policy is Delete. (If it's
 	// Retain, there's no use waiting because the PV won't be auto-deleted and
@@ -298,13 +298,13 @@ func (t StorageClassTest) TestDynamicProvisioning() *v1.PersistentVolume {
 // getBoundPV returns a PV details.
 func getBoundPV(client clientset.Interface, pvc *v1.PersistentVolumeClaim) (*v1.PersistentVolume, error) {
 	// Get new copy of the claim
-	claim, err := client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(pvc.Name, metav1.GetOptions{})
+	claim, err := client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(context.TODO(), pvc.Name, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
 
 	// Get the bound PV
-	pv, err := client.CoreV1().PersistentVolumes().Get(claim.Spec.VolumeName, metav1.GetOptions{})
+	pv, err := client.CoreV1().PersistentVolumes().Get(context.TODO(), claim.Spec.VolumeName, metav1.GetOptions{})
 	return pv, err
 }
 
@@ -380,7 +380,7 @@ func PVWriteReadSingleNodeCheck(client clientset.Interface, claim *v1.Persistent
 		StopPod(client, pod)
 	}()
 	framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespaceSlow(client, pod.Name, pod.Namespace))
-	runningPod, err := client.CoreV1().Pods(pod.Namespace).Get(pod.Name, metav1.GetOptions{})
+	runningPod, err := client.CoreV1().Pods(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err, "get pod")
 	actualNodeName := runningPod.Spec.NodeName
 	StopPod(client, pod)
@@ -436,7 +436,7 @@ func PVMultiNodeCheck(client clientset.Interface, claim *v1.PersistentVolumeClai
 	command := "echo 'hello world' > /mnt/test/data"
 	pod = StartInPodWithVolume(client, claim.Namespace, claim.Name, "pvc-writer-node1", command, node)
 	framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespaceSlow(client, pod.Name, pod.Namespace))
-	runningPod, err := client.CoreV1().Pods(pod.Namespace).Get(pod.Name, metav1.GetOptions{})
+	runningPod, err := client.CoreV1().Pods(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err, "get pod")
 	actualNodeName := runningPod.Spec.NodeName
 	StopPod(client, pod)
@@ -452,7 +452,7 @@ func PVMultiNodeCheck(client clientset.Interface, claim *v1.PersistentVolumeClai
 	}
 	pod = StartInPodWithVolume(client, claim.Namespace, claim.Name, "pvc-reader-node2", command, secondNode)
 	framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespaceSlow(client, pod.Name, pod.Namespace))
-	runningPod, err = client.CoreV1().Pods(pod.Namespace).Get(pod.Name, metav1.GetOptions{})
+	runningPod, err = client.CoreV1().Pods(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err, "get pod")
 	framework.ExpectNotEqual(runningPod.Spec.NodeName, actualNodeName, "second pod should have run on a different node")
 	StopPod(client, pod)
@@ -466,7 +466,7 @@ func (t StorageClassTest) TestBindingWaitForFirstConsumerMultiPVC(claims []*v1.P
 	namespace := claims[0].Namespace
 
 	ginkgo.By("creating a storage class " + t.Class.Name)
-	class, err := t.Client.StorageV1().StorageClasses().Create(t.Class)
+	class, err := t.Client.StorageV1().StorageClasses().Create(context.TODO(), t.Class)
 	framework.ExpectNoError(err)
 	defer func() {
 		err = deleteStorageClass(t.Client, class.Name)
@@ -477,7 +477,7 @@ func (t StorageClassTest) TestBindingWaitForFirstConsumerMultiPVC(claims []*v1.P
 	var claimNames []string
 	var createdClaims []*v1.PersistentVolumeClaim
 	for _, claim := range claims {
-		c, err := t.Client.CoreV1().PersistentVolumeClaims(claim.Namespace).Create(claim)
+		c, err := t.Client.CoreV1().PersistentVolumeClaims(claim.Namespace).Create(context.TODO(), claim)
 		claimNames = append(claimNames, c.Name)
 		createdClaims = append(createdClaims, c)
 		framework.ExpectNoError(err)
@@ -523,20 +523,20 @@ func (t StorageClassTest) TestBindingWaitForFirstConsumerMultiPVC(claims []*v1.P
 	}
 
 	// collect node details
-	node, err := t.Client.CoreV1().Nodes().Get(pod.Spec.NodeName, metav1.GetOptions{})
+	node, err := t.Client.CoreV1().Nodes().Get(context.TODO(), pod.Spec.NodeName, metav1.GetOptions{})
 	framework.ExpectNoError(err)
 
 	ginkgo.By("re-checking the claims to see they bound")
 	var pvs []*v1.PersistentVolume
 	for _, claim := range createdClaims {
 		// Get new copy of the claim
-		claim, err = t.Client.CoreV1().PersistentVolumeClaims(claim.Namespace).Get(claim.Name, metav1.GetOptions{})
+		claim, err = t.Client.CoreV1().PersistentVolumeClaims(claim.Namespace).Get(context.TODO(), claim.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		// make sure claim did bind
 		err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, t.Client, claim.Namespace, claim.Name, framework.Poll, framework.ClaimProvisionTimeout)
 		framework.ExpectNoError(err)
 
-		pv, err := t.Client.CoreV1().PersistentVolumes().Get(claim.Spec.VolumeName, metav1.GetOptions{})
+		pv, err := t.Client.CoreV1().PersistentVolumes().Get(context.TODO(), claim.Spec.VolumeName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		pvs = append(pvs, pv)
 	}
@@ -598,7 +598,7 @@ func StartInPodWithVolume(c clientset.Interface, ns, claimName, podName, command
 		},
 	}
 
-	pod, err := c.CoreV1().Pods(ns).Create(pod)
+	pod, err := c.CoreV1().Pods(ns).Create(context.TODO(), pod)
 	framework.ExpectNoError(err, "Failed to create pod: %v", err)
 	return pod
 }
@@ -622,7 +622,7 @@ func StopPod(c clientset.Interface, pod *v1.Pod) {
 func verifyPVCsPending(client clientset.Interface, pvcs []*v1.PersistentVolumeClaim) {
 	for _, claim := range pvcs {
 		// Get new copy of the claim
-		claim, err := client.CoreV1().PersistentVolumeClaims(claim.Namespace).Get(claim.Name, metav1.GetOptions{})
+		claim, err := client.CoreV1().PersistentVolumeClaims(claim.Namespace).Get(context.TODO(), claim.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		framework.ExpectEqual(claim.Status.Phase, v1.ClaimPending)
 	}
@@ -639,12 +639,12 @@ func prepareSnapshotDataSourceForProvisioning(
 	var err error
 	if class != nil {
 		ginkgo.By("[Initialize dataSource]creating a StorageClass " + class.Name)
-		_, err = client.StorageV1().StorageClasses().Create(class)
+		_, err = client.StorageV1().StorageClasses().Create(context.TODO(), class)
 		framework.ExpectNoError(err)
 	}
 
 	ginkgo.By("[Initialize dataSource]creating a initClaim")
-	updatedClaim, err := client.CoreV1().PersistentVolumeClaims(initClaim.Namespace).Create(initClaim)
+	updatedClaim, err := client.CoreV1().PersistentVolumeClaims(initClaim.Namespace).Create(context.TODO(), initClaim)
 	framework.ExpectNoError(err)
 
 	// write namespace to the /mnt/test (= the volume).
@@ -657,7 +657,7 @@ func prepareSnapshotDataSourceForProvisioning(
 
 	ginkgo.By("[Initialize dataSource]checking the initClaim")
 	// Get new copy of the initClaim
-	_, err = client.CoreV1().PersistentVolumeClaims(updatedClaim.Namespace).Get(updatedClaim.Name, metav1.GetOptions{})
+	_, err = client.CoreV1().PersistentVolumeClaims(updatedClaim.Namespace).Get(context.TODO(), updatedClaim.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err)
 
 	ginkgo.By("[Initialize dataSource]creating a SnapshotClass")
@@ -690,7 +690,7 @@ func prepareSnapshotDataSourceForProvisioning(
 		}
 
 		framework.Logf("deleting initClaim %q/%q", updatedClaim.Namespace, updatedClaim.Name)
-		err = client.CoreV1().PersistentVolumeClaims(updatedClaim.Namespace).Delete(updatedClaim.Name, nil)
+		err = client.CoreV1().PersistentVolumeClaims(updatedClaim.Namespace).Delete(context.TODO(), updatedClaim.Name, nil)
 		if err != nil && !apierrors.IsNotFound(err) {
 			framework.Failf("Error deleting initClaim %q. Error: %v", updatedClaim.Name, err)
 		}
@@ -712,12 +712,12 @@ func preparePVCDataSourceForProvisioning(
 	var err error
 	if class != nil {
 		ginkgo.By("[Initialize dataSource]creating a StorageClass " + class.Name)
-		_, err = client.StorageV1().StorageClasses().Create(class)
+		_, err = client.StorageV1().StorageClasses().Create(context.TODO(), class)
 		framework.ExpectNoError(err)
 	}
 
 	ginkgo.By("[Initialize dataSource]creating a source PVC")
-	sourcePVC, err := client.CoreV1().PersistentVolumeClaims(source.Namespace).Create(source)
+	sourcePVC, err := client.CoreV1().PersistentVolumeClaims(source.Namespace).Create(context.TODO(), source)
 	framework.ExpectNoError(err)
 
 	// write namespace to the /mnt/test (= the volume).
@@ -732,7 +732,7 @@ func preparePVCDataSourceForProvisioning(
 
 	cleanupFunc := func() {
 		framework.Logf("deleting source PVC %q/%q", sourcePVC.Namespace, sourcePVC.Name)
-		err = client.CoreV1().PersistentVolumeClaims(sourcePVC.Namespace).Delete(sourcePVC.Name, nil)
+		err = client.CoreV1().PersistentVolumeClaims(sourcePVC.Namespace).Delete(context.TODO(), sourcePVC.Name, nil)
 		if err != nil && !apierrors.IsNotFound(err) {
 			framework.Failf("Error deleting source PVC %q. Error: %v", sourcePVC.Name, err)
 		}

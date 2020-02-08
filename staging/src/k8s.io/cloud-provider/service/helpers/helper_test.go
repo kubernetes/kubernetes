@@ -17,6 +17,7 @@ limitations under the License.
 package helpers
 
 import (
+	"context"
 	"reflect"
 	"strings"
 	"testing"
@@ -287,7 +288,7 @@ func TestPatchService(t *testing.T) {
 	// Issue a separate update and verify patch doesn't fail after this.
 	svcToUpdate := svcOrigin.DeepCopy()
 	addAnnotations(svcToUpdate)
-	if _, err := fakeCs.CoreV1().Services(svcOrigin.Namespace).Update(svcToUpdate); err != nil {
+	if _, err := fakeCs.CoreV1().Services(svcOrigin.Namespace).Update(context.TODO(), svcToUpdate); err != nil {
 		t.Fatalf("Failed to update service: %v", err)
 	}
 

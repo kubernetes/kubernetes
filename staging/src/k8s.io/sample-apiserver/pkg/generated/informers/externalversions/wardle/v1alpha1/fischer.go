@@ -19,6 +19,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"context"
 	time "time"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -60,13 +61,13 @@ func NewFilteredFischerInformer(client versioned.Interface, resyncPeriod time.Du
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.WardleV1alpha1().Fischers().List(options)
+				return client.WardleV1alpha1().Fischers().List(context.TODO(), options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.WardleV1alpha1().Fischers().Watch(options)
+				return client.WardleV1alpha1().Fischers().Watch(context.TODO(), options)
 			},
 		},
 		&wardlev1alpha1.Fischer{},

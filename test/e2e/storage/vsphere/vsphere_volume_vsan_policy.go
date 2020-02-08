@@ -17,6 +17,7 @@ limitations under the License.
 package vsphere
 
 import (
+	"context"
 	"fmt"
 	"hash/fnv"
 	"time"
@@ -258,9 +259,9 @@ var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsp
 
 func invokeValidPolicyTest(f *framework.Framework, client clientset.Interface, namespace string, scParameters map[string]string) {
 	ginkgo.By("Creating Storage Class With storage policy params")
-	storageclass, err := client.StorageV1().StorageClasses().Create(getVSphereStorageClassSpec("storagepolicysc", scParameters, nil, ""))
+	storageclass, err := client.StorageV1().StorageClasses().Create(context.TODO(), getVSphereStorageClassSpec("storagepolicysc", scParameters, nil, ""))
 	framework.ExpectNoError(err, fmt.Sprintf("Failed to create storage class with err: %v", err))
-	defer client.StorageV1().StorageClasses().Delete(storageclass.Name, nil)
+	defer client.StorageV1().StorageClasses().Delete(context.TODO(), storageclass.Name, nil)
 
 	ginkgo.By("Creating PVC using the Storage Class")
 	pvclaim, err := e2epv.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClass(namespace, "2Gi", storageclass))
@@ -290,9 +291,9 @@ func invokeValidPolicyTest(f *framework.Framework, client clientset.Interface, n
 
 func invokeInvalidPolicyTestNeg(client clientset.Interface, namespace string, scParameters map[string]string) error {
 	ginkgo.By("Creating Storage Class With storage policy params")
-	storageclass, err := client.StorageV1().StorageClasses().Create(getVSphereStorageClassSpec("storagepolicysc", scParameters, nil, ""))
+	storageclass, err := client.StorageV1().StorageClasses().Create(context.TODO(), getVSphereStorageClassSpec("storagepolicysc", scParameters, nil, ""))
 	framework.ExpectNoError(err, fmt.Sprintf("Failed to create storage class with err: %v", err))
-	defer client.StorageV1().StorageClasses().Delete(storageclass.Name, nil)
+	defer client.StorageV1().StorageClasses().Delete(context.TODO(), storageclass.Name, nil)
 
 	ginkgo.By("Creating PVC using the Storage Class")
 	pvclaim, err := e2epv.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClass(namespace, "2Gi", storageclass))
@@ -303,16 +304,16 @@ func invokeInvalidPolicyTestNeg(client clientset.Interface, namespace string, sc
 	err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, pvclaim.Namespace, pvclaim.Name, framework.Poll, 2*time.Minute)
 	framework.ExpectError(err)
 
-	eventList, err := client.CoreV1().Events(pvclaim.Namespace).List(metav1.ListOptions{})
+	eventList, err := client.CoreV1().Events(pvclaim.Namespace).List(context.TODO(), metav1.ListOptions{})
 	framework.ExpectNoError(err)
 	return fmt.Errorf("Failure message: %+q", eventList.Items[0].Message)
 }
 
 func invokeStaleDummyVMTestWithStoragePolicy(client clientset.Interface, masterNode string, namespace string, clusterName string, scParameters map[string]string) {
 	ginkgo.By("Creating Storage Class With storage policy params")
-	storageclass, err := client.StorageV1().StorageClasses().Create(getVSphereStorageClassSpec("storagepolicysc", scParameters, nil, ""))
+	storageclass, err := client.StorageV1().StorageClasses().Create(context.TODO(), getVSphereStorageClassSpec("storagepolicysc", scParameters, nil, ""))
 	framework.ExpectNoError(err, fmt.Sprintf("Failed to create storage class with err: %v", err))
-	defer client.StorageV1().StorageClasses().Delete(storageclass.Name, nil)
+	defer client.StorageV1().StorageClasses().Delete(context.TODO(), storageclass.Name, nil)
 
 	ginkgo.By("Creating PVC using the Storage Class")
 	pvclaim, err := e2epv.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClass(namespace, "2Gi", storageclass))
@@ -324,7 +325,7 @@ func invokeStaleDummyVMTestWithStoragePolicy(client clientset.Interface, masterN
 	_, err = e2epv.WaitForPVClaimBoundPhase(client, pvclaims, 2*time.Minute)
 	framework.ExpectError(err)
 
-	updatedClaim, err := client.CoreV1().PersistentVolumeClaims(namespace).Get(pvclaim.Name, metav1.GetOptions{})
+	updatedClaim, err := client.CoreV1().PersistentVolumeClaims(namespace).Get(context.TODO(), pvclaim.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err)
 	vmName := clusterName + "-dynamic-pvc-" + string(updatedClaim.UID)
 	e2epv.DeletePersistentVolumeClaim(client, pvclaim.Name, namespace)

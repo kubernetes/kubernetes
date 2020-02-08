@@ -17,6 +17,7 @@ limitations under the License.
 package common
 
 import (
+	"context"
 	"fmt"
 	"path"
 
@@ -286,7 +287,7 @@ var _ = ginkgo.Describe("[sig-storage] EmptyDir volumes", func() {
 		framework.ExpectNoError(err, "failed to deploy pod %s", pod.Name)
 
 		ginkgo.By("Geting the pod")
-		pod, err = f.PodClient().Get(pod.Name, metav1.GetOptions{})
+		pod, err = f.PodClient().Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "failed to get pod %s", pod.Name)
 
 		ginkgo.By("Reading file content from the nginx-container")

@@ -17,6 +17,7 @@ limitations under the License.
 package e2enode
 
 import (
+	"context"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -142,7 +143,7 @@ var _ = framework.KubeDescribe("ContainerLogPath [NodeConformance]", func() {
 				logDir := kubelet.ContainerLogsDir
 
 				// get containerID from created Pod
-				createdLogPod, err := podClient.Get(logPodName, metav1.GetOptions{})
+				createdLogPod, err := podClient.Get(context.TODO(), logPodName, metav1.GetOptions{})
 				logContainerID := kubecontainer.ParseContainerID(createdLogPod.Status.ContainerStatuses[0].ContainerID)
 				framework.ExpectNoError(err, "Failed to get pod: %s", logPodName)
 
@@ -159,7 +160,7 @@ var _ = framework.KubeDescribe("ContainerLogPath [NodeConformance]", func() {
 				logCRIDir := "/var/log/pods"
 
 				// get podID from created Pod
-				createdLogPod, err := podClient.Get(logPodName, metav1.GetOptions{})
+				createdLogPod, err := podClient.Get(context.TODO(), logPodName, metav1.GetOptions{})
 				framework.ExpectNoError(err, "Failed to get pod: %s", logPodName)
 				podNs := createdLogPod.Namespace
 				podName := createdLogPod.Name

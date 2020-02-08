@@ -17,6 +17,7 @@ limitations under the License.
 package apimachinery
 
 import (
+	"context"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -115,7 +116,7 @@ func checkExistingRCRecovers(f *framework.Framework) {
 	ginkgo.By("deleting pods from existing replication controller")
 	framework.ExpectNoError(wait.Poll(time.Millisecond*500, time.Second*60, func() (bool, error) {
 		options := metav1.ListOptions{LabelSelector: rcSelector.String()}
-		pods, err := podClient.List(options)
+		pods, err := podClient.List(context.TODO(), options)
 		if err != nil {
 			framework.Logf("apiserver returned error, as expected before recovery: %v", err)
 			return false, nil
@@ -124,7 +125,7 @@ func checkExistingRCRecovers(f *framework.Framework) {
 			return false, nil
 		}
 		for _, pod := range pods.Items {
-			err = podClient.Delete(pod.Name, metav1.NewDeleteOptions(0))
+			err = podClient.Delete(context.TODO(), pod.Name, metav1.NewDeleteOptions(0))
 			framework.ExpectNoError(err, "failed to delete pod %s in namespace: %s", pod.Name, f.Namespace.Name)
 		}
 		framework.Logf("apiserver has recovered")
@@ -134,7 +135,7 @@ func checkExistingRCRecovers(f *framework.Framework) {
 	ginkgo.By("waiting for replication controller to recover")
 	framework.ExpectNoError(wait.Poll(time.Millisecond*500, time.Second*60, func() (bool, error) {
 		options := metav1.ListOptions{LabelSelector: rcSelector.String()}
-		pods, err := podClient.List(options)
+		pods, err := podClient.List(context.TODO(), options)
 		framework.ExpectNoError(err, "failed to list pods in namespace: %s, that match label selector: %s", f.Namespace.Name, rcSelector.String())
 		for _, pod := range pods.Items {
 			if pod.DeletionTimestamp == nil && podutil.IsPodReady(&pod) {

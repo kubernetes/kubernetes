@@ -17,6 +17,7 @@ limitations under the License.
 package autoscaling
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -71,7 +72,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaler scalability [Slow]", fun
 		e2eskipper.SkipUnlessProviderIs("gce", "gke", "kubemark")
 
 		// Check if Cloud Autoscaler is enabled by trying to get its ConfigMap.
-		_, err := f.ClientSet.CoreV1().ConfigMaps("kube-system").Get("cluster-autoscaler-status", metav1.GetOptions{})
+		_, err := f.ClientSet.CoreV1().ConfigMaps("kube-system").Get(context.TODO(), "cluster-autoscaler-status", metav1.GetOptions{})
 		if err != nil {
 			e2eskipper.Skipf("test expects Cluster Autoscaler to be enabled")
 		}
@@ -115,7 +116,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaler scalability [Slow]", fun
 		ginkgo.By(fmt.Sprintf("Restoring initial size of the cluster"))
 		setMigSizes(originalSizes)
 		framework.ExpectNoError(e2enode.WaitForReadyNodes(c, nodeCount, scaleDownTimeout))
-		nodes, err := c.CoreV1().Nodes().List(metav1.ListOptions{})
+		nodes, err := c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 		framework.ExpectNoError(err)
 		s := time.Now()
 	makeSchedulableLoop:
@@ -255,7 +256,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaler scalability [Slow]", fun
 		// annotate all nodes with no-scale-down
 		ScaleDownDisabledKey := "cluster-autoscaler.kubernetes.io/scale-down-disabled"
 
-		nodes, err := f.ClientSet.CoreV1().Nodes().List(metav1.ListOptions{
+		nodes, err := f.ClientSet.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{
 			FieldSelector: fields.Set{
 				"spec.unschedulable": "false",
 			}.AsSelector().String(),
@@ -456,7 +457,7 @@ func addAnnotation(f *framework.Framework, nodes []v1.Node, key, value string) e
 			return err
 		}
 
-		_, err = f.ClientSet.CoreV1().Nodes().Patch(string(node.Name), types.StrategicMergePatchType, patchBytes)
+		_, err = f.ClientSet.CoreV1().Nodes().Patch(context.TODO(), string(node.Name), types.StrategicMergePatchType, patchBytes)
 		if err != nil {
 			return err
 		}

@@ -38,14 +38,14 @@ type ExamplesGetter interface {
 
 // ExampleInterface has methods to work with Example resources.
 type ExampleInterface interface {
-	Create(*v1.Example) (*v1.Example, error)
-	Update(*v1.Example) (*v1.Example, error)
-	Delete(name string, options *metav1.DeleteOptions) error
-	DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error
-	Get(name string, options metav1.GetOptions) (*v1.Example, error)
-	List(opts metav1.ListOptions) (*v1.ExampleList, error)
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Example, err error)
+	Create(context.Context, *v1.Example) (*v1.Example, error)
+	Update(context.Context, *v1.Example) (*v1.Example, error)
+	Delete(ctx context.Context, name string, options *metav1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, options *metav1.DeleteOptions, listOptions metav1.ListOptions) error
+	Get(ctx context.Context, name string, options metav1.GetOptions) (*v1.Example, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*v1.ExampleList, error)
+	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Example, err error)
 	ExampleExpansion
 }
 
@@ -64,20 +64,20 @@ func newExamples(c *CrV1Client, namespace string) *examples {
 }
 
 // Get takes name of the example, and returns the corresponding example object, and an error if there is any.
-func (c *examples) Get(name string, options metav1.GetOptions) (result *v1.Example, err error) {
+func (c *examples) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.Example, err error) {
 	result = &v1.Example{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("examples").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of Examples that match those selectors.
-func (c *examples) List(opts metav1.ListOptions) (result *v1.ExampleList, err error) {
+func (c *examples) List(ctx context.Context, opts metav1.ListOptions) (result *v1.ExampleList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -88,13 +88,13 @@ func (c *examples) List(opts metav1.ListOptions) (result *v1.ExampleList, err er
 		Resource("examples").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Watch returns a watch.Interface that watches the requested examples.
-func (c *examples) Watch(opts metav1.ListOptions) (watch.Interface, error) {
+func (c *examples) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -105,47 +105,47 @@ func (c *examples) Watch(opts metav1.ListOptions) (watch.Interface, error) {
 		Resource("examples").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch(context.TODO())
+		Watch(ctx)
 }
 
 // Create takes the representation of a example and creates it.  Returns the server's representation of the example, and an error, if there is any.
-func (c *examples) Create(example *v1.Example) (result *v1.Example, err error) {
+func (c *examples) Create(ctx context.Context, example *v1.Example) (result *v1.Example, err error) {
 	result = &v1.Example{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("examples").
 		Body(example).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Update takes the representation of a example and updates it. Returns the server's representation of the example, and an error, if there is any.
-func (c *examples) Update(example *v1.Example) (result *v1.Example, err error) {
+func (c *examples) Update(ctx context.Context, example *v1.Example) (result *v1.Example, err error) {
 	result = &v1.Example{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("examples").
 		Name(example.Name).
 		Body(example).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Delete takes name of the example and deletes it. Returns an error if one occurs.
-func (c *examples) Delete(name string, options *metav1.DeleteOptions) error {
+func (c *examples) Delete(ctx context.Context, name string, options *metav1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("examples").
 		Name(name).
 		Body(options).
-		Do(context.TODO()).
+		Do(ctx).
 		Error()
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *examples) DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error {
+func (c *examples) DeleteCollection(ctx context.Context, options *metav1.DeleteOptions, listOptions metav1.ListOptions) error {
 	var timeout time.Duration
 	if listOptions.TimeoutSeconds != nil {
 		timeout = time.Duration(*listOptions.TimeoutSeconds) * time.Second
@@ -156,12 +156,12 @@ func (c *examples) DeleteCollection(options *metav1.DeleteOptions, listOptions m
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Timeout(timeout).
 		Body(options).
-		Do(context.TODO()).
+		Do(ctx).
 		Error()
 }
 
 // Patch applies the patch and returns the patched example.
-func (c *examples) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Example, err error) {
+func (c *examples) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Example, err error) {
 	result = &v1.Example{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
@@ -169,7 +169,7 @@ func (c *examples) Patch(name string, pt types.PatchType, data []byte, subresour
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }

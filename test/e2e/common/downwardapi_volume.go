@@ -17,6 +17,7 @@ limitations under the License.
 package common
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -166,7 +167,7 @@ var _ = ginkgo.Describe("[sig-storage] Downward API volume", func() {
 		ginkgo.By("Creating the pod")
 		podClient.CreateSync(pod)
 
-		pod, err := podClient.Get(pod.Name, metav1.GetOptions{})
+		pod, err := podClient.Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "Failed to get pod %q", pod.Name)
 
 		gomega.Eventually(func() (string, error) {

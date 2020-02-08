@@ -17,6 +17,7 @@ limitations under the License.
 package apps
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -126,7 +127,7 @@ func TestReplicationControllerServeImageOrFail(f *framework.Framework, test stri
 	ginkgo.By(fmt.Sprintf("Creating replication controller %s", name))
 	newRC := newRC(name, replicas, map[string]string{"name": name}, name, image, []string{"serve-hostname"})
 	newRC.Spec.Template.Spec.Containers[0].Ports = []v1.ContainerPort{{ContainerPort: 9376}}
-	_, err := f.ClientSet.CoreV1().ReplicationControllers(f.Namespace.Name).Create(newRC)
+	_, err := f.ClientSet.CoreV1().ReplicationControllers(f.Namespace.Name).Create(context.TODO(), newRC)
 	framework.ExpectNoError(err)
 
 	// Check that pods for the new RC were created.
@@ -144,7 +145,7 @@ func TestReplicationControllerServeImageOrFail(f *framework.Framework, test stri
 		}
 		err = f.WaitForPodRunning(pod.Name)
 		if err != nil {
-			updatePod, getErr := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(pod.Name, metav1.GetOptions{})
+			updatePod, getErr := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(context.TODO(), pod.Name, metav1.GetOptions{})
 			if getErr == nil {
 				err = fmt.Errorf("Pod %q never run (phase: %s, conditions: %+v): %v", updatePod.Name, updatePod.Status.Phase, updatePod.Status.Conditions, err)
 			} else {
@@ -183,11 +184,11 @@ func testReplicationControllerConditionCheck(f *framework.Framework) {
 
 	framework.Logf("Creating quota %q that allows only two pods to run in the current namespace", name)
 	quota := newPodQuota(name, "2")
-	_, err := c.CoreV1().ResourceQuotas(namespace).Create(quota)
+	_, err := c.CoreV1().ResourceQuotas(namespace).Create(context.TODO(), quota)
 	framework.ExpectNoError(err)
 
 	err = wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
-		quota, err = c.CoreV1().ResourceQuotas(namespace).Get(name, metav1.GetOptions{})
+		quota, err = c.CoreV1().ResourceQuotas(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -202,14 +203,14 @@ func testReplicationControllerConditionCheck(f *framework.Framework) {
 
 	ginkgo.By(fmt.Sprintf("Creating rc %q that asks for more than the allowed pod quota", name))
 	rc := newRC(name, 3, map[string]string{"name": name}, WebserverImageName, WebserverImage, nil)
-	rc, err = c.CoreV1().ReplicationControllers(namespace).Create(rc)
+	rc, err = c.CoreV1().ReplicationControllers(namespace).Create(context.TODO(), rc)
 	framework.ExpectNoError(err)
 
 	ginkgo.By(fmt.Sprintf("Checking rc %q has the desired failure condition set", name))
 	generation := rc.Generation
 	conditions := rc.Status.Conditions
 	err = wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
-		rc, err = c.CoreV1().ReplicationControllers(namespace).Get(name, metav1.GetOptions{})
+		rc, err = c.CoreV1().ReplicationControllers(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -238,7 +239,7 @@ func testReplicationControllerConditionCheck(f *framework.Framework) {
 	generation = rc.Generation
 	conditions = rc.Status.Conditions
 	err = wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
-		rc, err = c.CoreV1().ReplicationControllers(namespace).Get(name, metav1.GetOptions{})
+		rc, err = c.CoreV1().ReplicationControllers(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -281,12 +282,12 @@ func testRCAdoptMatchingOrphans(f *framework.Framework) {
 	replicas := int32(1)
 	rcSt := newRC(name, replicas, map[string]string{"name": name}, name, WebserverImage, nil)
 	rcSt.Spec.Selector = map[string]string{"name": name}
-	rc, err := f.ClientSet.CoreV1().ReplicationControllers(f.Namespace.Name).Create(rcSt)
+	rc, err := f.ClientSet.CoreV1().ReplicationControllers(f.Namespace.Name).Create(context.TODO(), rcSt)
 	framework.ExpectNoError(err)
 
 	ginkgo.By("Then the orphan pod is adopted")
 	err = wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
-		p2, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(p.Name, metav1.GetOptions{})
+		p2, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(context.TODO(), p.Name, metav1.GetOptions{})
 		// The Pod p should either be adopted or deleted by the RC
 		if apierrors.IsNotFound(err) {
 			return true, nil
@@ -310,7 +311,7 @@ func testRCReleaseControlledNotMatching(f *framework.Framework) {
 	replicas := int32(1)
 	rcSt := newRC(name, replicas, map[string]string{"name": name}, name, WebserverImage, nil)
 	rcSt.Spec.Selector = map[string]string{"name": name}
-	rc, err := f.ClientSet.CoreV1().ReplicationControllers(f.Namespace.Name).Create(rcSt)
+	rc, err := f.ClientSet.CoreV1().ReplicationControllers(f.Namespace.Name).Create(context.TODO(), rcSt)
 	framework.ExpectNoError(err)
 
 	ginkgo.By("When the matched label of one of its pods change")
@@ -319,11 +320,11 @@ func testRCReleaseControlledNotMatching(f *framework.Framework) {
 
 	p := pods.Items[0]
 	err = wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
-		pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(p.Name, metav1.GetOptions{})
+		pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(context.TODO(), p.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 
 		pod.Labels = map[string]string{"name": "not-matching-name"}
-		_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Update(pod)
+		_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Update(context.TODO(), pod)
 		if err != nil && apierrors.IsConflict(err) {
 			return false, nil
 		}
@@ -336,7 +337,7 @@ func testRCReleaseControlledNotMatching(f *framework.Framework) {
 
 	ginkgo.By("Then the pod is released")
 	err = wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
-		p2, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(p.Name, metav1.GetOptions{})
+		p2, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(context.TODO(), p.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		for _, owner := range p2.OwnerReferences {
 			if *owner.Controller && owner.UID == rc.UID {
@@ -361,12 +362,12 @@ func updateReplicationControllerWithRetries(c clientset.Interface, namespace, na
 	var updateErr error
 	pollErr := wait.PollImmediate(10*time.Millisecond, 1*time.Minute, func() (bool, error) {
 		var err error
-		if rc, err = c.CoreV1().ReplicationControllers(namespace).Get(name, metav1.GetOptions{}); err != nil {
+		if rc, err = c.CoreV1().ReplicationControllers(namespace).Get(context.TODO(), name, metav1.GetOptions{}); err != nil {
 			return false, err
 		}
 		// Apply the update, then attempt to push it to the apiserver.
 		applyUpdate(rc)
-		if rc, err = c.CoreV1().ReplicationControllers(namespace).Update(rc); err == nil {
+		if rc, err = c.CoreV1().ReplicationControllers(namespace).Update(context.TODO(), rc); err == nil {
 			framework.Logf("Updating replication controller %q", name)
 			return true, nil
 		}

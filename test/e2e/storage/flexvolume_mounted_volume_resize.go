@@ -17,6 +17,7 @@ limitations under the License.
 package storage
 
 import (
+	"context"
 	"fmt"
 	"path"
 	"time"
@@ -90,7 +91,7 @@ var _ = utils.SIGDescribe("Mounted flexvolume expand[Slow]", func() {
 			Provisioner:          "flex-expand",
 		}
 
-		resizableSc, err = c.StorageV1().StorageClasses().Create(newStorageClass(test, ns, "resizing"))
+		resizableSc, err = c.StorageV1().StorageClasses().Create(context.TODO(), newStorageClass(test, ns, "resizing"))
 		if err != nil {
 			fmt.Printf("storage class creation error: %v\n", err)
 		}
@@ -101,7 +102,7 @@ var _ = utils.SIGDescribe("Mounted flexvolume expand[Slow]", func() {
 			StorageClassName: &(resizableSc.Name),
 			ClaimSize:        "2Gi",
 		}, ns)
-		pvc, err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(pvc)
+		pvc, err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(context.TODO(), pvc)
 		framework.ExpectNoError(err, "Error creating pvc")
 	})
 
@@ -154,7 +155,7 @@ var _ = utils.SIGDescribe("Mounted flexvolume expand[Slow]", func() {
 		ginkgo.By("Creating a deployment with the provisioned volume")
 		deployment, err := e2edeploy.CreateDeployment(c, int32(1), map[string]string{"test": "app"}, nodeKeyValueLabel, ns, pvcClaims, "")
 		framework.ExpectNoError(err, "Failed creating deployment %v", err)
-		defer c.AppsV1().Deployments(ns).Delete(deployment.Name, &metav1.DeleteOptions{})
+		defer c.AppsV1().Deployments(ns).Delete(context.TODO(), deployment.Name, &metav1.DeleteOptions{})
 
 		ginkgo.By("Expanding current pvc")
 		newSize := resource.MustParse("6Gi")

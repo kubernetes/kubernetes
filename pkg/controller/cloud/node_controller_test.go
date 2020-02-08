@@ -773,7 +773,7 @@ func Test_reconcileNodeLabels(t *testing.T) {
 				t.Errorf("unexpected error")
 			}
 
-			actualNode, err := clientset.CoreV1().Nodes().Get("node01", metav1.GetOptions{})
+			actualNode, err := clientset.CoreV1().Nodes().Get(context.TODO(), "node01", metav1.GetOptions{})
 			if err != nil {
 				t.Fatalf("error getting updated node: %v", err)
 			}

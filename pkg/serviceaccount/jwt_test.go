@@ -306,13 +306,13 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 		getter := serviceaccountcontroller.NewGetterFromClient(
 			tc.Client,
 			v1listers.NewSecretLister(newIndexer(func(namespace, name string) (interface{}, error) {
-				return tc.Client.CoreV1().Secrets(namespace).Get(name, metav1.GetOptions{})
+				return tc.Client.CoreV1().Secrets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 			})),
 			v1listers.NewServiceAccountLister(newIndexer(func(namespace, name string) (interface{}, error) {
-				return tc.Client.CoreV1().ServiceAccounts(namespace).Get(name, metav1.GetOptions{})
+				return tc.Client.CoreV1().ServiceAccounts(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 			})),
 			v1listers.NewPodLister(newIndexer(func(namespace, name string) (interface{}, error) {
-				return tc.Client.CoreV1().Pods(namespace).Get(name, metav1.GetOptions{})
+				return tc.Client.CoreV1().Pods(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 			})),
 		)
 		authn := serviceaccount.JWTTokenAuthenticator(serviceaccount.LegacyIssuer, tc.Keys, auds, serviceaccount.NewLegacyValidator(tc.Client != nil, getter))

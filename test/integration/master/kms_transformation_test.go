@@ -176,7 +176,7 @@ resources:
 	}
 
 	// Secrets should be un-enveloped on direct reads from Kube API Server.
-	s, err := test.restClient.CoreV1().Secrets(testNamespace).Get(testSecret, metav1.GetOptions{})
+	s, err := test.restClient.CoreV1().Secrets(testNamespace).Get(context.TODO(), testSecret, metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("failed to get Secret from %s, err: %v", testNamespace, err)
 	}

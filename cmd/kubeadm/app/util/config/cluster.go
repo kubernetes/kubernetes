@@ -17,6 +17,7 @@ limitations under the License.
 package config
 
 import (
+	"context"
 	"crypto/x509"
 	"fmt"
 	"io"
@@ -115,7 +116,7 @@ func getNodeRegistration(kubeconfigDir string, client clientset.Interface, nodeR
 	}
 
 	// gets the corresponding node and retrieves attributes stored there.
-	node, err := client.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+	node, err := client.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 	if err != nil {
 		return errors.Wrap(err, "failed to get corresponding node")
 	}

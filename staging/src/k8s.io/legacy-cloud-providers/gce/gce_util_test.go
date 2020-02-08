@@ -19,6 +19,7 @@ limitations under the License.
 package gce
 
 import (
+	"context"
 	"net"
 	"reflect"
 	"testing"
@@ -127,7 +128,7 @@ func TestAddRemoveFinalizer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to get GCE client, err %v", err)
 	}
-	svc, err = gce.client.CoreV1().Services(svc.Namespace).Create(svc)
+	svc, err = gce.client.CoreV1().Services(svc.Namespace).Create(context.TODO(), svc)
 	if err != nil {
 		t.Errorf("Failed to create service %s, err %v", svc.Name, err)
 	}
@@ -136,7 +137,7 @@ func TestAddRemoveFinalizer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to add finalizer, err %v", err)
 	}
-	svc, err = gce.client.CoreV1().Services(svc.Namespace).Get(svc.Name, metav1.GetOptions{})
+	svc, err = gce.client.CoreV1().Services(svc.Namespace).Get(context.TODO(), svc.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Errorf("Failed to get service, err %v", err)
 	}
@@ -147,7 +148,7 @@ func TestAddRemoveFinalizer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to remove finalizer, err %v", err)
 	}
-	svc, err = gce.client.CoreV1().Services(svc.Namespace).Get(svc.Name, metav1.GetOptions{})
+	svc, err = gce.client.CoreV1().Services(svc.Namespace).Get(context.TODO(), svc.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Errorf("Failed to get service, err %v", err)
 	}

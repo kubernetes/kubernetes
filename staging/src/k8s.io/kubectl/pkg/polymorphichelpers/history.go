@@ -18,6 +18,7 @@ package polymorphichelpers
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"text/tabwriter"
@@ -101,7 +102,7 @@ type DeploymentHistoryViewer struct {
 // TODO: this should be a describer
 func (h *DeploymentHistoryViewer) ViewHistory(namespace, name string, revision int64) (string, error) {
 	versionedAppsClient := h.c.AppsV1()
-	deployment, err := versionedAppsClient.Deployments(namespace).Get(name, metav1.GetOptions{})
+	deployment, err := versionedAppsClient.Deployments(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", fmt.Errorf("failed to retrieve deployment %s: %v", name, err)
 	}
@@ -265,7 +266,7 @@ func controlledHistoryV1(
 	selector labels.Selector,
 	accessor metav1.Object) ([]*appsv1.ControllerRevision, error) {
 	var result []*appsv1.ControllerRevision
-	historyList, err := apps.ControllerRevisions(namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
+	historyList, err := apps.ControllerRevisions(namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: selector.String()})
 	if err != nil {
 		return nil, err
 	}
@@ -286,7 +287,7 @@ func controlledHistory(
 	selector labels.Selector,
 	accessor metav1.Object) ([]*appsv1.ControllerRevision, error) {
 	var result []*appsv1.ControllerRevision
-	historyList, err := apps.ControllerRevisions(namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
+	historyList, err := apps.ControllerRevisions(namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: selector.String()})
 	if err != nil {
 		return nil, err
 	}
@@ -304,7 +305,7 @@ func controlledHistory(
 func daemonSetHistory(
 	apps clientappsv1.AppsV1Interface,
 	namespace, name string) (*appsv1.DaemonSet, []*appsv1.ControllerRevision, error) {
-	ds, err := apps.DaemonSets(namespace).Get(name, metav1.GetOptions{})
+	ds, err := apps.DaemonSets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to retrieve DaemonSet %s: %v", name, err)
 	}
@@ -327,7 +328,7 @@ func daemonSetHistory(
 func statefulSetHistory(
 	apps clientappsv1.AppsV1Interface,
 	namespace, name string) (*appsv1.StatefulSet, []*appsv1.ControllerRevision, error) {
-	sts, err := apps.StatefulSets(namespace).Get(name, metav1.GetOptions{})
+	sts, err := apps.StatefulSets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to retrieve Statefulset %s: %s", name, err.Error())
 	}

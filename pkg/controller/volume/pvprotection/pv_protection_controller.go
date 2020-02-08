@@ -17,6 +17,7 @@ limitations under the License.
 package pvprotection
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -161,7 +162,7 @@ func (c *Controller) addFinalizer(pv *v1.PersistentVolume) error {
 	}
 	pvClone := pv.DeepCopy()
 	pvClone.ObjectMeta.Finalizers = append(pvClone.ObjectMeta.Finalizers, volumeutil.PVProtectionFinalizer)
-	_, err := c.client.CoreV1().PersistentVolumes().Update(pvClone)
+	_, err := c.client.CoreV1().PersistentVolumes().Update(context.TODO(), pvClone)
 	if err != nil {
 		klog.V(3).Infof("Error adding protection finalizer to PV %s: %v", pv.Name, err)
 		return err
@@ -173,7 +174,7 @@ func (c *Controller) addFinalizer(pv *v1.PersistentVolume) error {
 func (c *Controller) removeFinalizer(pv *v1.PersistentVolume) error {
 	pvClone := pv.DeepCopy()
 	pvClone.ObjectMeta.Finalizers = slice.RemoveString(pvClone.ObjectMeta.Finalizers, volumeutil.PVProtectionFinalizer, nil)
-	_, err := c.client.CoreV1().PersistentVolumes().Update(pvClone)
+	_, err := c.client.CoreV1().PersistentVolumes().Update(context.TODO(), pvClone)
 	if err != nil {
 		klog.V(3).Infof("Error removing protection finalizer from PV %s: %v", pv.Name, err)
 		return err

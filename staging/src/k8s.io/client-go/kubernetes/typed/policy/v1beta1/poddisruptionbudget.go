@@ -38,15 +38,15 @@ type PodDisruptionBudgetsGetter interface {
 
 // PodDisruptionBudgetInterface has methods to work with PodDisruptionBudget resources.
 type PodDisruptionBudgetInterface interface {
-	Create(*v1beta1.PodDisruptionBudget) (*v1beta1.PodDisruptionBudget, error)
-	Update(*v1beta1.PodDisruptionBudget) (*v1beta1.PodDisruptionBudget, error)
-	UpdateStatus(*v1beta1.PodDisruptionBudget) (*v1beta1.PodDisruptionBudget, error)
-	Delete(name string, options *v1.DeleteOptions) error
-	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string, options v1.GetOptions) (*v1beta1.PodDisruptionBudget, error)
-	List(opts v1.ListOptions) (*v1beta1.PodDisruptionBudgetList, error)
-	Watch(opts v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.PodDisruptionBudget, err error)
+	Create(context.Context, *v1beta1.PodDisruptionBudget) (*v1beta1.PodDisruptionBudget, error)
+	Update(context.Context, *v1beta1.PodDisruptionBudget) (*v1beta1.PodDisruptionBudget, error)
+	UpdateStatus(context.Context, *v1beta1.PodDisruptionBudget) (*v1beta1.PodDisruptionBudget, error)
+	Delete(ctx context.Context, name string, options *v1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error
+	Get(ctx context.Context, name string, options v1.GetOptions) (*v1beta1.PodDisruptionBudget, error)
+	List(ctx context.Context, opts v1.ListOptions) (*v1beta1.PodDisruptionBudgetList, error)
+	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.PodDisruptionBudget, err error)
 	PodDisruptionBudgetExpansion
 }
 
@@ -65,20 +65,20 @@ func newPodDisruptionBudgets(c *PolicyV1beta1Client, namespace string) *podDisru
 }
 
 // Get takes name of the podDisruptionBudget, and returns the corresponding podDisruptionBudget object, and an error if there is any.
-func (c *podDisruptionBudgets) Get(name string, options v1.GetOptions) (result *v1beta1.PodDisruptionBudget, err error) {
+func (c *podDisruptionBudgets) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.PodDisruptionBudget, err error) {
 	result = &v1beta1.PodDisruptionBudget{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("poddisruptionbudgets").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of PodDisruptionBudgets that match those selectors.
-func (c *podDisruptionBudgets) List(opts v1.ListOptions) (result *v1beta1.PodDisruptionBudgetList, err error) {
+func (c *podDisruptionBudgets) List(ctx context.Context, opts v1.ListOptions) (result *v1beta1.PodDisruptionBudgetList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -89,13 +89,13 @@ func (c *podDisruptionBudgets) List(opts v1.ListOptions) (result *v1beta1.PodDis
 		Resource("poddisruptionbudgets").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Watch returns a watch.Interface that watches the requested podDisruptionBudgets.
-func (c *podDisruptionBudgets) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *podDisruptionBudgets) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -106,30 +106,30 @@ func (c *podDisruptionBudgets) Watch(opts v1.ListOptions) (watch.Interface, erro
 		Resource("poddisruptionbudgets").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch(context.TODO())
+		Watch(ctx)
 }
 
 // Create takes the representation of a podDisruptionBudget and creates it.  Returns the server's representation of the podDisruptionBudget, and an error, if there is any.
-func (c *podDisruptionBudgets) Create(podDisruptionBudget *v1beta1.PodDisruptionBudget) (result *v1beta1.PodDisruptionBudget, err error) {
+func (c *podDisruptionBudgets) Create(ctx context.Context, podDisruptionBudget *v1beta1.PodDisruptionBudget) (result *v1beta1.PodDisruptionBudget, err error) {
 	result = &v1beta1.PodDisruptionBudget{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("poddisruptionbudgets").
 		Body(podDisruptionBudget).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Update takes the representation of a podDisruptionBudget and updates it. Returns the server's representation of the podDisruptionBudget, and an error, if there is any.
-func (c *podDisruptionBudgets) Update(podDisruptionBudget *v1beta1.PodDisruptionBudget) (result *v1beta1.PodDisruptionBudget, err error) {
+func (c *podDisruptionBudgets) Update(ctx context.Context, podDisruptionBudget *v1beta1.PodDisruptionBudget) (result *v1beta1.PodDisruptionBudget, err error) {
 	result = &v1beta1.PodDisruptionBudget{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("poddisruptionbudgets").
 		Name(podDisruptionBudget.Name).
 		Body(podDisruptionBudget).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }
@@ -137,7 +137,7 @@ func (c *podDisruptionBudgets) Update(podDisruptionBudget *v1beta1.PodDisruption
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 
-func (c *podDisruptionBudgets) UpdateStatus(podDisruptionBudget *v1beta1.PodDisruptionBudget) (result *v1beta1.PodDisruptionBudget, err error) {
+func (c *podDisruptionBudgets) UpdateStatus(ctx context.Context, podDisruptionBudget *v1beta1.PodDisruptionBudget) (result *v1beta1.PodDisruptionBudget, err error) {
 	result = &v1beta1.PodDisruptionBudget{}
 	err = c.client.Put().
 		Namespace(c.ns).
@@ -145,24 +145,24 @@ func (c *podDisruptionBudgets) UpdateStatus(podDisruptionBudget *v1beta1.PodDisr
 		Name(podDisruptionBudget.Name).
 		SubResource("status").
 		Body(podDisruptionBudget).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Delete takes name of the podDisruptionBudget and deletes it. Returns an error if one occurs.
-func (c *podDisruptionBudgets) Delete(name string, options *v1.DeleteOptions) error {
+func (c *podDisruptionBudgets) Delete(ctx context.Context, name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("poddisruptionbudgets").
 		Name(name).
 		Body(options).
-		Do(context.TODO()).
+		Do(ctx).
 		Error()
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *podDisruptionBudgets) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *podDisruptionBudgets) DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	var timeout time.Duration
 	if listOptions.TimeoutSeconds != nil {
 		timeout = time.Duration(*listOptions.TimeoutSeconds) * time.Second
@@ -173,12 +173,12 @@ func (c *podDisruptionBudgets) DeleteCollection(options *v1.DeleteOptions, listO
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Timeout(timeout).
 		Body(options).
-		Do(context.TODO()).
+		Do(ctx).
 		Error()
 }
 
 // Patch applies the patch and returns the patched podDisruptionBudget.
-func (c *podDisruptionBudgets) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.PodDisruptionBudget, err error) {
+func (c *podDisruptionBudgets) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.PodDisruptionBudget, err error) {
 	result = &v1beta1.PodDisruptionBudget{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
@@ -186,7 +186,7 @@ func (c *podDisruptionBudgets) Patch(name string, pt types.PatchType, data []byt
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }

@@ -17,6 +17,7 @@ limitations under the License.
 package podgc
 
 import (
+	"context"
 	"sync"
 	"testing"
 	"time"
@@ -345,10 +346,10 @@ func TestGCOrphaned(t *testing.T) {
 
 			// Execute planned nodes changes
 			for _, node := range test.addedClientNodes {
-				client.CoreV1().Nodes().Create(node)
+				client.CoreV1().Nodes().Create(context.TODO(), node)
 			}
 			for _, node := range test.deletedClientNodes {
-				client.CoreV1().Nodes().Delete(node.Name, &metav1.DeleteOptions{})
+				client.CoreV1().Nodes().Delete(context.TODO(), node.Name, &metav1.DeleteOptions{})
 			}
 			for _, node := range test.addedInformerNodes {
 				nodeInformer.Informer().GetStore().Add(node)

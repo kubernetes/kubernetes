@@ -38,15 +38,15 @@ type TestTypesGetter interface {
 
 // TestTypeInterface has methods to work with TestType resources.
 type TestTypeInterface interface {
-	Create(*example2.TestType) (*example2.TestType, error)
-	Update(*example2.TestType) (*example2.TestType, error)
-	UpdateStatus(*example2.TestType) (*example2.TestType, error)
-	Delete(name string, options *v1.DeleteOptions) error
-	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string, options v1.GetOptions) (*example2.TestType, error)
-	List(opts v1.ListOptions) (*example2.TestTypeList, error)
-	Watch(opts v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *example2.TestType, err error)
+	Create(context.Context, *example2.TestType) (*example2.TestType, error)
+	Update(context.Context, *example2.TestType) (*example2.TestType, error)
+	UpdateStatus(context.Context, *example2.TestType) (*example2.TestType, error)
+	Delete(ctx context.Context, name string, options *v1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error
+	Get(ctx context.Context, name string, options v1.GetOptions) (*example2.TestType, error)
+	List(ctx context.Context, opts v1.ListOptions) (*example2.TestTypeList, error)
+	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *example2.TestType, err error)
 	TestTypeExpansion
 }
 
@@ -63,19 +63,19 @@ func newTestTypes(c *SecondExampleClient) *testTypes {
 }
 
 // Get takes name of the testType, and returns the corresponding testType object, and an error if there is any.
-func (c *testTypes) Get(name string, options v1.GetOptions) (result *example2.TestType, err error) {
+func (c *testTypes) Get(ctx context.Context, name string, options v1.GetOptions) (result *example2.TestType, err error) {
 	result = &example2.TestType{}
 	err = c.client.Get().
 		Resource("testtypes").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of TestTypes that match those selectors.
-func (c *testTypes) List(opts v1.ListOptions) (result *example2.TestTypeList, err error) {
+func (c *testTypes) List(ctx context.Context, opts v1.ListOptions) (result *example2.TestTypeList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -85,13 +85,13 @@ func (c *testTypes) List(opts v1.ListOptions) (result *example2.TestTypeList, er
 		Resource("testtypes").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Watch returns a watch.Interface that watches the requested testTypes.
-func (c *testTypes) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *testTypes) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -101,28 +101,28 @@ func (c *testTypes) Watch(opts v1.ListOptions) (watch.Interface, error) {
 		Resource("testtypes").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch(context.TODO())
+		Watch(ctx)
 }
 
 // Create takes the representation of a testType and creates it.  Returns the server's representation of the testType, and an error, if there is any.
-func (c *testTypes) Create(testType *example2.TestType) (result *example2.TestType, err error) {
+func (c *testTypes) Create(ctx context.Context, testType *example2.TestType) (result *example2.TestType, err error) {
 	result = &example2.TestType{}
 	err = c.client.Post().
 		Resource("testtypes").
 		Body(testType).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Update takes the representation of a testType and updates it. Returns the server's representation of the testType, and an error, if there is any.
-func (c *testTypes) Update(testType *example2.TestType) (result *example2.TestType, err error) {
+func (c *testTypes) Update(ctx context.Context, testType *example2.TestType) (result *example2.TestType, err error) {
 	result = &example2.TestType{}
 	err = c.client.Put().
 		Resource("testtypes").
 		Name(testType.Name).
 		Body(testType).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }
@@ -130,30 +130,30 @@ func (c *testTypes) Update(testType *example2.TestType) (result *example2.TestTy
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 
-func (c *testTypes) UpdateStatus(testType *example2.TestType) (result *example2.TestType, err error) {
+func (c *testTypes) UpdateStatus(ctx context.Context, testType *example2.TestType) (result *example2.TestType, err error) {
 	result = &example2.TestType{}
 	err = c.client.Put().
 		Resource("testtypes").
 		Name(testType.Name).
 		SubResource("status").
 		Body(testType).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Delete takes name of the testType and deletes it. Returns an error if one occurs.
-func (c *testTypes) Delete(name string, options *v1.DeleteOptions) error {
+func (c *testTypes) Delete(ctx context.Context, name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
 		Resource("testtypes").
 		Name(name).
 		Body(options).
-		Do(context.TODO()).
+		Do(ctx).
 		Error()
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *testTypes) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *testTypes) DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	var timeout time.Duration
 	if listOptions.TimeoutSeconds != nil {
 		timeout = time.Duration(*listOptions.TimeoutSeconds) * time.Second
@@ -163,19 +163,19 @@ func (c *testTypes) DeleteCollection(options *v1.DeleteOptions, listOptions v1.L
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Timeout(timeout).
 		Body(options).
-		Do(context.TODO()).
+		Do(ctx).
 		Error()
 }
 
 // Patch applies the patch and returns the patched testType.
-func (c *testTypes) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *example2.TestType, err error) {
+func (c *testTypes) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *example2.TestType, err error) {
 	result = &example2.TestType{}
 	err = c.client.Patch(pt).
 		Resource("testtypes").
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }

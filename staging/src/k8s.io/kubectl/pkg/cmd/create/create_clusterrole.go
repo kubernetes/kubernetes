@@ -17,6 +17,7 @@ limitations under the License.
 package create
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -200,7 +201,7 @@ func (c *CreateClusterRoleOptions) RunCreateRole() error {
 
 	// Create ClusterRole.
 	if !c.DryRun {
-		clusterRole, err = c.Client.ClusterRoles().Create(clusterRole)
+		clusterRole, err = c.Client.ClusterRoles().Create(context.TODO(), clusterRole)
 		if err != nil {
 			return err
 		}

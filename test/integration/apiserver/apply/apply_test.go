@@ -753,7 +753,7 @@ func TestApplyRemoveContainerPort(t *testing.T) {
 		t.Fatalf("Failed to remove container port using Apply patch: %v", err)
 	}
 
-	deployment, err := client.AppsV1().Deployments("default").Get("deployment", metav1.GetOptions{})
+	deployment, err := client.AppsV1().Deployments("default").Get(context.TODO(), "deployment", metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Failed to retrieve object: %v", err)
 	}
@@ -961,7 +961,7 @@ func TestApplyConvertsManagedFieldsVersion(t *testing.T) {
 		t.Fatalf("Failed to apply object: %v", err)
 	}
 
-	object, err := client.AppsV1().Deployments("default").Get("deployment", metav1.GetOptions{})
+	object, err := client.AppsV1().Deployments("default").Get(context.TODO(), "deployment", metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Failed to retrieve object: %v", err)
 	}

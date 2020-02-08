@@ -17,6 +17,7 @@ limitations under the License.
 package etcd
 
 import (
+	"context"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -85,7 +86,7 @@ func TestOverlappingCustomResourceAPIService(t *testing.T) {
 	}
 
 	// Verify APIServices can be listed
-	apiServices, err := apiServiceClient.APIServices().List(metav1.ListOptions{})
+	apiServices, err := apiServiceClient.APIServices().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -98,7 +99,7 @@ func TestOverlappingCustomResourceAPIService(t *testing.T) {
 	}
 
 	// Create a CRD defining an overlapping apiregistration.k8s.io apiservices resource with an incompatible schema
-	crdCRD, err := crdClient.CustomResourceDefinitions().Create(&apiextensionsv1.CustomResourceDefinition{
+	crdCRD, err := crdClient.CustomResourceDefinitions().Create(context.TODO(), &apiextensionsv1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        "apiservices.apiregistration.k8s.io",
 			Annotations: map[string]string{"api-approved.kubernetes.io": "unapproved, testing only"},
@@ -132,7 +133,7 @@ func TestOverlappingCustomResourceAPIService(t *testing.T) {
 
 	// Wait until it is established
 	if err := wait.PollImmediate(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
-		crd, err := crdClient.CustomResourceDefinitions().Get(crdCRD.Name, metav1.GetOptions{})
+		crd, err := crdClient.CustomResourceDefinitions().Get(context.TODO(), crdCRD.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -161,7 +162,7 @@ func TestOverlappingCustomResourceAPIService(t *testing.T) {
 	}
 
 	// Creating v1 succeeds (built-in validation, not CR validation)
-	testAPIService, err := apiServiceClient.APIServices().Create(&apiregistrationv1.APIService{
+	testAPIService, err := apiServiceClient.APIServices().Create(context.TODO(), &apiregistrationv1.APIService{
 		ObjectMeta: metav1.ObjectMeta{Name: "v1.example.com"},
 		Spec: apiregistrationv1.APIServiceSpec{
 			Group:                "example.com",
@@ -173,7 +174,7 @@ func TestOverlappingCustomResourceAPIService(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = apiServiceClient.APIServices().Delete(testAPIService.Name, &metav1.DeleteOptions{})
+	err = apiServiceClient.APIServices().Delete(context.TODO(), testAPIService.Name, &metav1.DeleteOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -196,14 +197,14 @@ func TestOverlappingCustomResourceAPIService(t *testing.T) {
 	}
 
 	// Delete the overlapping CRD
-	err = crdClient.CustomResourceDefinitions().Delete(crdCRD.Name, &metav1.DeleteOptions{})
+	err = crdClient.CustomResourceDefinitions().Delete(context.TODO(), crdCRD.Name, &metav1.DeleteOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Make sure the CRD deletion succeeds
 	if err := wait.PollImmediate(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
-		crd, err := crdClient.CustomResourceDefinitions().Get(crdCRD.Name, metav1.GetOptions{})
+		crd, err := crdClient.CustomResourceDefinitions().Get(context.TODO(), crdCRD.Name, metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
 			return true, nil
 		}
@@ -219,7 +220,7 @@ func TestOverlappingCustomResourceAPIService(t *testing.T) {
 
 	// Make sure APIService objects are not removed
 	time.Sleep(5 * time.Second)
-	finalAPIServices, err := apiServiceClient.APIServices().List(metav1.ListOptions{})
+	finalAPIServices, err := apiServiceClient.APIServices().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -243,7 +244,7 @@ func TestOverlappingCustomResourceCustomResourceDefinition(t *testing.T) {
 	}
 
 	// Verify CustomResourceDefinitions can be listed
-	crds, err := crdClient.CustomResourceDefinitions().List(metav1.ListOptions{})
+	crds, err := crdClient.CustomResourceDefinitions().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -256,7 +257,7 @@ func TestOverlappingCustomResourceCustomResourceDefinition(t *testing.T) {
 	}
 
 	// Create a CRD defining an overlapping apiregistration.k8s.io apiservices resource with an incompatible schema
-	crdCRD, err := crdClient.CustomResourceDefinitions().Create(&apiextensionsv1.CustomResourceDefinition{
+	crdCRD, err := crdClient.CustomResourceDefinitions().Create(context.TODO(), &apiextensionsv1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        "customresourcedefinitions.apiextensions.k8s.io",
 			Annotations: map[string]string{"api-approved.kubernetes.io": "unapproved, testing only"},
@@ -295,7 +296,7 @@ func TestOverlappingCustomResourceCustomResourceDefinition(t *testing.T) {
 
 	// Wait until it is established
 	if err := wait.PollImmediate(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
-		crd, err := crdClient.CustomResourceDefinitions().Get(crdCRD.Name, metav1.GetOptions{})
+		crd, err := crdClient.CustomResourceDefinitions().Get(context.TODO(), crdCRD.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -324,7 +325,7 @@ func TestOverlappingCustomResourceCustomResourceDefinition(t *testing.T) {
 	}
 
 	// Updating v1 succeeds (built-in validation, not CR validation)
-	_, err = crdClient.CustomResourceDefinitions().Patch(crdCRD.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"updated"}}}`))
+	_, err = crdClient.CustomResourceDefinitions().Patch(context.TODO(), crdCRD.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"updated"}}}`))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -347,14 +348,14 @@ func TestOverlappingCustomResourceCustomResourceDefinition(t *testing.T) {
 	}
 
 	// Delete the overlapping CRD
-	err = crdClient.CustomResourceDefinitions().Delete(crdCRD.Name, &metav1.DeleteOptions{})
+	err = crdClient.CustomResourceDefinitions().Delete(context.TODO(), crdCRD.Name, &metav1.DeleteOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Make sure the CRD deletion succeeds
 	if err := wait.PollImmediate(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
-		crd, err := crdClient.CustomResourceDefinitions().Get(crdCRD.Name, metav1.GetOptions{})
+		crd, err := crdClient.CustomResourceDefinitions().Get(context.TODO(), crdCRD.Name, metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
 			return true, nil
 		}
@@ -370,7 +371,7 @@ func TestOverlappingCustomResourceCustomResourceDefinition(t *testing.T) {
 
 	// Make sure other CustomResourceDefinition objects are not removed
 	time.Sleep(5 * time.Second)
-	finalCRDs, err := crdClient.CustomResourceDefinitions().List(metav1.ListOptions{})
+	finalCRDs, err := crdClient.CustomResourceDefinitions().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -17,6 +17,7 @@ limitations under the License.
 package vsphere
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -375,9 +376,9 @@ var _ = utils.SIGDescribe("Zone Support", func() {
 })
 
 func verifyPVCAndPodCreationSucceeds(client clientset.Interface, namespace string, scParameters map[string]string, zones []string, volumeBindingMode storagev1.VolumeBindingMode) {
-	storageclass, err := client.StorageV1().StorageClasses().Create(getVSphereStorageClassSpec("zone-sc", scParameters, zones, volumeBindingMode))
+	storageclass, err := client.StorageV1().StorageClasses().Create(context.TODO(), getVSphereStorageClassSpec("zone-sc", scParameters, zones, volumeBindingMode))
 	framework.ExpectNoError(err, fmt.Sprintf("Failed to create storage class with err: %v", err))
-	defer client.StorageV1().StorageClasses().Delete(storageclass.Name, nil)
+	defer client.StorageV1().StorageClasses().Delete(context.TODO(), storageclass.Name, nil)
 
 	ginkgo.By("Creating PVC using the Storage Class")
 	pvclaim, err := e2epv.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClass(namespace, "2Gi", storageclass))
@@ -417,9 +418,9 @@ func verifyPVCAndPodCreationSucceeds(client clientset.Interface, namespace strin
 }
 
 func verifyPodAndPvcCreationFailureOnWaitForFirstConsumerMode(client clientset.Interface, namespace string, scParameters map[string]string, zones []string) error {
-	storageclass, err := client.StorageV1().StorageClasses().Create(getVSphereStorageClassSpec("zone-sc", scParameters, zones, storagev1.VolumeBindingWaitForFirstConsumer))
+	storageclass, err := client.StorageV1().StorageClasses().Create(context.TODO(), getVSphereStorageClassSpec("zone-sc", scParameters, zones, storagev1.VolumeBindingWaitForFirstConsumer))
 	framework.ExpectNoError(err, fmt.Sprintf("Failed to create storage class with err: %v", err))
-	defer client.StorageV1().StorageClasses().Delete(storageclass.Name, nil)
+	defer client.StorageV1().StorageClasses().Delete(context.TODO(), storageclass.Name, nil)
 
 	ginkgo.By("Creating PVC using the Storage Class")
 	pvclaim, err := e2epv.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClass(namespace, "2Gi", storageclass))
@@ -431,7 +432,7 @@ func verifyPodAndPvcCreationFailureOnWaitForFirstConsumerMode(client clientset.I
 
 	ginkgo.By("Creating a pod")
 	pod := e2epod.MakePod(namespace, nil, pvclaims, false, "")
-	pod, err = client.CoreV1().Pods(namespace).Create(pod)
+	pod, err = client.CoreV1().Pods(namespace).Create(context.TODO(), pod)
 	framework.ExpectNoError(err)
 	defer e2epod.DeletePodWithWait(client, pod)
 
@@ -439,7 +440,7 @@ func verifyPodAndPvcCreationFailureOnWaitForFirstConsumerMode(client clientset.I
 	err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, pvclaim.Namespace, pvclaim.Name, framework.Poll, 2*time.Minute)
 	framework.ExpectError(err)
 
-	eventList, err := client.CoreV1().Events(pvclaim.Namespace).List(metav1.ListOptions{})
+	eventList, err := client.CoreV1().Events(pvclaim.Namespace).List(context.TODO(), metav1.ListOptions{})
 	framework.ExpectNoError(err)
 
 	// Look for PVC ProvisioningFailed event and return the message.
@@ -459,9 +460,9 @@ func waitForPVClaimBoundPhase(client clientset.Interface, pvclaims []*v1.Persist
 }
 
 func verifyPodSchedulingFails(client clientset.Interface, namespace string, nodeSelector map[string]string, scParameters map[string]string, zones []string, volumeBindingMode storagev1.VolumeBindingMode) {
-	storageclass, err := client.StorageV1().StorageClasses().Create(getVSphereStorageClassSpec("zone-sc", scParameters, zones, volumeBindingMode))
+	storageclass, err := client.StorageV1().StorageClasses().Create(context.TODO(), getVSphereStorageClassSpec("zone-sc", scParameters, zones, volumeBindingMode))
 	framework.ExpectNoError(err, fmt.Sprintf("Failed to create storage class with err: %v", err))
-	defer client.StorageV1().StorageClasses().Delete(storageclass.Name, nil)
+	defer client.StorageV1().StorageClasses().Delete(context.TODO(), storageclass.Name, nil)
 
 	ginkgo.By("Creating PVC using the Storage Class")
 	pvclaim, err := e2epv.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClass(namespace, "2Gi", storageclass))
@@ -478,9 +479,9 @@ func verifyPodSchedulingFails(client clientset.Interface, namespace string, node
 }
 
 func verifyPVCCreationFails(client clientset.Interface, namespace string, scParameters map[string]string, zones []string, volumeBindingMode storagev1.VolumeBindingMode) error {
-	storageclass, err := client.StorageV1().StorageClasses().Create(getVSphereStorageClassSpec("zone-sc", scParameters, zones, volumeBindingMode))
+	storageclass, err := client.StorageV1().StorageClasses().Create(context.TODO(), getVSphereStorageClassSpec("zone-sc", scParameters, zones, volumeBindingMode))
 	framework.ExpectNoError(err, fmt.Sprintf("Failed to create storage class with err: %v", err))
-	defer client.StorageV1().StorageClasses().Delete(storageclass.Name, nil)
+	defer client.StorageV1().StorageClasses().Delete(context.TODO(), storageclass.Name, nil)
 
 	ginkgo.By("Creating PVC using the Storage Class")
 	pvclaim, err := e2epv.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClass(namespace, "2Gi", storageclass))
@@ -491,7 +492,7 @@ func verifyPVCCreationFails(client clientset.Interface, namespace string, scPara
 	err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, pvclaim.Namespace, pvclaim.Name, framework.Poll, 2*time.Minute)
 	framework.ExpectError(err)
 
-	eventList, err := client.CoreV1().Events(pvclaim.Namespace).List(metav1.ListOptions{})
+	eventList, err := client.CoreV1().Events(pvclaim.Namespace).List(context.TODO(), metav1.ListOptions{})
 	framework.ExpectNoError(err)
 
 	framework.Logf("Failure message : %+q", eventList.Items[0].Message)
@@ -499,9 +500,9 @@ func verifyPVCCreationFails(client clientset.Interface, namespace string, scPara
 }
 
 func verifyPVZoneLabels(client clientset.Interface, namespace string, scParameters map[string]string, zones []string) {
-	storageclass, err := client.StorageV1().StorageClasses().Create(getVSphereStorageClassSpec("zone-sc", nil, zones, ""))
+	storageclass, err := client.StorageV1().StorageClasses().Create(context.TODO(), getVSphereStorageClassSpec("zone-sc", nil, zones, ""))
 	framework.ExpectNoError(err, fmt.Sprintf("Failed to create storage class with err: %v", err))
-	defer client.StorageV1().StorageClasses().Delete(storageclass.Name, nil)
+	defer client.StorageV1().StorageClasses().Delete(context.TODO(), storageclass.Name, nil)
 
 	ginkgo.By("Creating PVC using the storage class")
 	pvclaim, err := e2epv.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClass(namespace, "2Gi", storageclass))

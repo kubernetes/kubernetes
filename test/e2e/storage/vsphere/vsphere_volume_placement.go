@@ -17,6 +17,7 @@ limitations under the License.
 package vsphere
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"time"
@@ -361,7 +362,7 @@ func createPodWithVolumeAndNodeSelector(client clientset.Interface, namespace st
 	ginkgo.By(fmt.Sprintf("Creating pod on the node: %v", nodeName))
 	podspec := getVSpherePodSpecWithVolumePaths(volumePaths, nodeKeyValueLabel, nil)
 
-	pod, err = client.CoreV1().Pods(namespace).Create(podspec)
+	pod, err = client.CoreV1().Pods(namespace).Create(context.TODO(), podspec)
 	framework.ExpectNoError(err)
 	ginkgo.By("Waiting for pod to be ready")
 	gomega.Expect(e2epod.WaitForPodNameRunningInNamespace(client, pod.Name, namespace)).To(gomega.Succeed())

@@ -17,6 +17,7 @@ limitations under the License.
 package events
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"sync"
@@ -50,14 +51,14 @@ func ObserveNodeUpdateAfterAction(c clientset.Interface, nodeName string, nodePr
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				options.FieldSelector = nodeSelector.String()
-				ls, err := c.CoreV1().Nodes().List(options)
+				ls, err := c.CoreV1().Nodes().List(context.TODO(), options)
 				return ls, err
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				// Signal parent goroutine that watching has begun.
 				defer informerStartedGuard.Do(func() { close(informerStartedChan) })
 				options.FieldSelector = nodeSelector.String()
-				w, err := c.CoreV1().Nodes().Watch(options)
+				w, err := c.CoreV1().Nodes().Watch(context.TODO(), options)
 				return w, err
 			},
 		},
@@ -107,13 +108,13 @@ func ObserveEventAfterAction(c clientset.Interface, ns string, eventPredicate fu
 	_, controller := cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-				ls, err := c.CoreV1().Events(ns).List(options)
+				ls, err := c.CoreV1().Events(ns).List(context.TODO(), options)
 				return ls, err
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				// Signal parent goroutine that watching has begun.
 				defer informerStartedGuard.Do(func() { close(informerStartedChan) })
-				w, err := c.CoreV1().Events(ns).Watch(options)
+				w, err := c.CoreV1().Events(ns).Watch(context.TODO(), options)
 				return w, err
 			},
 		},
@@ -162,7 +163,7 @@ func WaitTimeoutForEvent(c clientset.Interface, namespace, eventSelector, msg st
 func eventOccurred(c clientset.Interface, namespace, eventSelector, msg string) wait.ConditionFunc {
 	options := metav1.ListOptions{FieldSelector: eventSelector}
 	return func() (bool, error) {
-		events, err := c.CoreV1().Events(namespace).List(options)
+		events, err := c.CoreV1().Events(namespace).List(context.TODO(), options)
 		if err != nil {
 			return false, fmt.Errorf("got error while getting events: %v", err)
 		}

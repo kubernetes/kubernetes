@@ -190,7 +190,7 @@ func (c *CloudNodeLifecycleController) MonitorNodes() {
 			fmt.Sprintf("Deleting node %v because it does not exist in the cloud provider", node.Name),
 			"Node %s event: %s", node.Name, deleteNodeEvent)
 
-		if err := c.kubeClient.CoreV1().Nodes().Delete(node.Name, nil); err != nil {
+		if err := c.kubeClient.CoreV1().Nodes().Delete(context.TODO(), node.Name, nil); err != nil {
 			klog.Errorf("unable to delete node %q: %v", node.Name, err)
 		}
 	}

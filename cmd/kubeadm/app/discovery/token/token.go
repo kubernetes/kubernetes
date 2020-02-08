@@ -210,7 +210,7 @@ func getClusterInfo(client clientset.Interface, kubeconfig *clientcmdapi.Config,
 	defer cancel()
 
 	wait.JitterUntil(func() {
-		cm, err = client.CoreV1().ConfigMaps(metav1.NamespacePublic).Get(bootstrapapi.ConfigMapClusterInfo, metav1.GetOptions{})
+		cm, err = client.CoreV1().ConfigMaps(metav1.NamespacePublic).Get(context.TODO(), bootstrapapi.ConfigMapClusterInfo, metav1.GetOptions{})
 		if err != nil {
 			klog.V(1).Infof("[discovery] Failed to request cluster-info, will try again: %v", err)
 			return

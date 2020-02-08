@@ -17,6 +17,7 @@ limitations under the License.
 package e2enode
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"strconv"
@@ -302,11 +303,11 @@ var _ = framework.KubeDescribe("PriorityMemoryEvictionOrdering [Slow] [Serial] [
 			initialConfig.EvictionMinimumReclaim = map[string]string{}
 		})
 		ginkgo.BeforeEach(func() {
-			_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(&schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: highPriorityClassName}, Value: highPriority})
+			_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(context.TODO(), &schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: highPriorityClassName}, Value: highPriority})
 			framework.ExpectEqual(err == nil || apierrors.IsAlreadyExists(err), true)
 		})
 		ginkgo.AfterEach(func() {
-			err := f.ClientSet.SchedulingV1().PriorityClasses().Delete(highPriorityClassName, &metav1.DeleteOptions{})
+			err := f.ClientSet.SchedulingV1().PriorityClasses().Delete(context.TODO(), highPriorityClassName, &metav1.DeleteOptions{})
 			framework.ExpectNoError(err)
 		})
 		specs := []podEvictSpec{
@@ -359,11 +360,11 @@ var _ = framework.KubeDescribe("PriorityLocalStorageEvictionOrdering [Slow] [Ser
 			initialConfig.EvictionMinimumReclaim = map[string]string{}
 		})
 		ginkgo.BeforeEach(func() {
-			_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(&schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: highPriorityClassName}, Value: highPriority})
+			_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(context.TODO(), &schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: highPriorityClassName}, Value: highPriority})
 			framework.ExpectEqual(err == nil || apierrors.IsAlreadyExists(err), true)
 		})
 		ginkgo.AfterEach(func() {
-			err := f.ClientSet.SchedulingV1().PriorityClasses().Delete(highPriorityClassName, &metav1.DeleteOptions{})
+			err := f.ClientSet.SchedulingV1().PriorityClasses().Delete(context.TODO(), highPriorityClassName, &metav1.DeleteOptions{})
 			framework.ExpectNoError(err)
 		})
 		specs := []podEvictSpec{
@@ -412,11 +413,11 @@ var _ = framework.KubeDescribe("PriorityPidEvictionOrdering [Slow] [Serial] [Dis
 			initialConfig.EvictionMinimumReclaim = map[string]string{}
 		})
 		ginkgo.BeforeEach(func() {
-			_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(&schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: highPriorityClassName}, Value: highPriority})
+			_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(context.TODO(), &schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: highPriorityClassName}, Value: highPriority})
 			framework.ExpectEqual(err == nil || apierrors.IsAlreadyExists(err), true)
 		})
 		ginkgo.AfterEach(func() {
-			err := f.ClientSet.SchedulingV1().PriorityClasses().Delete(highPriorityClassName, &metav1.DeleteOptions{})
+			err := f.ClientSet.SchedulingV1().PriorityClasses().Delete(context.TODO(), highPriorityClassName, &metav1.DeleteOptions{})
 			framework.ExpectNoError(err)
 		})
 		specs := []podEvictSpec{
@@ -582,7 +583,7 @@ func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expe
 // This function panics (via Expect) if eviction ordering is violated, or if a priority-zero pod fails.
 func verifyEvictionOrdering(f *framework.Framework, testSpecs []podEvictSpec) error {
 	// Gather current information
-	updatedPodList, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).List(metav1.ListOptions{})
+	updatedPodList, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -654,7 +655,7 @@ func verifyEvictionEvents(f *framework.Framework, testSpecs []podEvictSpec, expe
 				"involvedObject.namespace": f.Namespace.Name,
 				"reason":                   eviction.Reason,
 			}.AsSelector().String()
-			podEvictEvents, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).List(metav1.ListOptions{FieldSelector: selector})
+			podEvictEvents, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{FieldSelector: selector})
 			gomega.Expect(err).To(gomega.BeNil(), "Unexpected error getting events during eviction test: %v", err)
 			framework.ExpectEqual(len(podEvictEvents.Items), 1, "Expected to find 1 eviction event for pod %s, got %d", pod.Name, len(podEvictEvents.Items))
 			event := podEvictEvents.Items[0]

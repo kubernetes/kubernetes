@@ -153,7 +153,7 @@ func cleanupTest(t *testing.T, testCtx *testContext) {
 	// Kill the scheduler.
 	testCtx.cancelFn()
 	// Cleanup nodes.
-	testCtx.clientSet.CoreV1().Nodes().DeleteCollection(nil, metav1.ListOptions{})
+	testCtx.clientSet.CoreV1().Nodes().DeleteCollection(context.TODO(), nil, metav1.ListOptions{})
 	framework.DeleteTestingNamespace(testCtx.ns, testCtx.httpServer, t)
 	testCtx.closeFn()
 }
@@ -185,7 +185,7 @@ func waitForPodUnschedulable(cs clientset.Interface, pod *v1.Pod) error {
 // podScheduled returns true if a node is assigned to the given pod.
 func podScheduled(c clientset.Interface, podNamespace, podName string) wait.ConditionFunc {
 	return func() (bool, error) {
-		pod, err := c.CoreV1().Pods(podNamespace).Get(podName, metav1.GetOptions{})
+		pod, err := c.CoreV1().Pods(podNamespace).Get(context.TODO(), podName, metav1.GetOptions{})
 		if err != nil {
 			// This could be a connection error so we want to retry.
 			return false, nil
@@ -201,7 +201,7 @@ func podScheduled(c clientset.Interface, podNamespace, podName string) wait.Cond
 // gets unschedulable status.
 func podUnschedulable(c clientset.Interface, podNamespace, podName string) wait.ConditionFunc {
 	return func() (bool, error) {
-		pod, err := c.CoreV1().Pods(podNamespace).Get(podName, metav1.GetOptions{})
+		pod, err := c.CoreV1().Pods(podNamespace).Get(context.TODO(), podName, metav1.GetOptions{})
 		if err != nil {
 			// This could be a connection error so we want to retry.
 			return false, nil

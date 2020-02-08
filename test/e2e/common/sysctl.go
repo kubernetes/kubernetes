@@ -17,6 +17,7 @@ limitations under the License.
 package common
 
 import (
+	"context"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -90,7 +91,7 @@ var _ = framework.KubeDescribe("Sysctls [LinuxOnly] [NodeFeature:Sysctls]", func
 		ginkgo.By("Waiting for pod completion")
 		err = f.WaitForPodNoLongerRunning(pod.Name)
 		framework.ExpectNoError(err)
-		pod, err = podClient.Get(pod.Name, metav1.GetOptions{})
+		pod, err = podClient.Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Checking that the pod succeeded")
@@ -130,7 +131,7 @@ var _ = framework.KubeDescribe("Sysctls [LinuxOnly] [NodeFeature:Sysctls]", func
 		ginkgo.By("Waiting for pod completion")
 		err = f.WaitForPodNoLongerRunning(pod.Name)
 		framework.ExpectNoError(err)
-		pod, err = podClient.Get(pod.Name, metav1.GetOptions{})
+		pod, err = podClient.Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Checking that the pod succeeded")
@@ -170,7 +171,7 @@ var _ = framework.KubeDescribe("Sysctls [LinuxOnly] [NodeFeature:Sysctls]", func
 
 		ginkgo.By("Creating a pod with one valid and two invalid sysctls")
 		client := f.ClientSet.CoreV1().Pods(f.Namespace.Name)
-		_, err := client.Create(pod)
+		_, err := client.Create(context.TODO(), pod)
 
 		gomega.Expect(err).NotTo(gomega.BeNil())
 		gomega.Expect(err.Error()).To(gomega.ContainSubstring(`Invalid value: "foo-"`))

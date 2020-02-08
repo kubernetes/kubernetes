@@ -413,7 +413,7 @@ func patchService(c v1core.CoreV1Interface, oldSvc *v1.Service, newSvc *v1.Servi
 		return nil, err
 	}
 
-	return c.Services(oldSvc.Namespace).Patch(oldSvc.Name, types.StrategicMergePatchType, patchBytes, "status")
+	return c.Services(oldSvc.Namespace).Patch(context.TODO(), oldSvc.Name, types.StrategicMergePatchType, patchBytes, "status")
 }
 
 func getPatchBytes(oldSvc *v1.Service, newSvc *v1.Service) ([]byte, error) {

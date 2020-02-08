@@ -17,6 +17,7 @@ limitations under the License.
 package events
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -69,7 +70,7 @@ func TestEventCompatibility(t *testing.T) {
 	newBroadcaster.StartRecordingToSink(stopCh)
 	newRecorder.Eventf(regarding, related, v1.EventTypeNormal, "memoryPressure", "killed", "memory pressure")
 	err = wait.PollImmediate(100*time.Millisecond, 20*time.Second, func() (done bool, err error) {
-		v1beta1Events, err := client.EventsV1beta1().Events("").List(metav1.ListOptions{})
+		v1beta1Events, err := client.EventsV1beta1().Events("").List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -78,7 +79,7 @@ func TestEventCompatibility(t *testing.T) {
 			return false, nil
 		}
 
-		events, err := client.CoreV1().Events("").List(metav1.ListOptions{})
+		events, err := client.CoreV1().Events("").List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			return false, err
 		}

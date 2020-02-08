@@ -38,15 +38,15 @@ type FoosGetter interface {
 
 // FooInterface has methods to work with Foo resources.
 type FooInterface interface {
-	Create(*v1alpha1.Foo) (*v1alpha1.Foo, error)
-	Update(*v1alpha1.Foo) (*v1alpha1.Foo, error)
-	UpdateStatus(*v1alpha1.Foo) (*v1alpha1.Foo, error)
-	Delete(name string, options *v1.DeleteOptions) error
-	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string, options v1.GetOptions) (*v1alpha1.Foo, error)
-	List(opts v1.ListOptions) (*v1alpha1.FooList, error)
-	Watch(opts v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.Foo, err error)
+	Create(context.Context, *v1alpha1.Foo) (*v1alpha1.Foo, error)
+	Update(context.Context, *v1alpha1.Foo) (*v1alpha1.Foo, error)
+	UpdateStatus(context.Context, *v1alpha1.Foo) (*v1alpha1.Foo, error)
+	Delete(ctx context.Context, name string, options *v1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error
+	Get(ctx context.Context, name string, options v1.GetOptions) (*v1alpha1.Foo, error)
+	List(ctx context.Context, opts v1.ListOptions) (*v1alpha1.FooList, error)
+	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.Foo, err error)
 	FooExpansion
 }
 
@@ -65,20 +65,20 @@ func newFoos(c *SamplecontrollerV1alpha1Client, namespace string) *foos {
 }
 
 // Get takes name of the foo, and returns the corresponding foo object, and an error if there is any.
-func (c *foos) Get(name string, options v1.GetOptions) (result *v1alpha1.Foo, err error) {
+func (c *foos) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.Foo, err error) {
 	result = &v1alpha1.Foo{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("foos").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of Foos that match those selectors.
-func (c *foos) List(opts v1.ListOptions) (result *v1alpha1.FooList, err error) {
+func (c *foos) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.FooList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -89,13 +89,13 @@ func (c *foos) List(opts v1.ListOptions) (result *v1alpha1.FooList, err error) {
 		Resource("foos").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Watch returns a watch.Interface that watches the requested foos.
-func (c *foos) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *foos) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -106,30 +106,30 @@ func (c *foos) Watch(opts v1.ListOptions) (watch.Interface, error) {
 		Resource("foos").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch(context.TODO())
+		Watch(ctx)
 }
 
 // Create takes the representation of a foo and creates it.  Returns the server's representation of the foo, and an error, if there is any.
-func (c *foos) Create(foo *v1alpha1.Foo) (result *v1alpha1.Foo, err error) {
+func (c *foos) Create(ctx context.Context, foo *v1alpha1.Foo) (result *v1alpha1.Foo, err error) {
 	result = &v1alpha1.Foo{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("foos").
 		Body(foo).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Update takes the representation of a foo and updates it. Returns the server's representation of the foo, and an error, if there is any.
-func (c *foos) Update(foo *v1alpha1.Foo) (result *v1alpha1.Foo, err error) {
+func (c *foos) Update(ctx context.Context, foo *v1alpha1.Foo) (result *v1alpha1.Foo, err error) {
 	result = &v1alpha1.Foo{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("foos").
 		Name(foo.Name).
 		Body(foo).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }
@@ -137,7 +137,7 @@ func (c *foos) Update(foo *v1alpha1.Foo) (result *v1alpha1.Foo, err error) {
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 
-func (c *foos) UpdateStatus(foo *v1alpha1.Foo) (result *v1alpha1.Foo, err error) {
+func (c *foos) UpdateStatus(ctx context.Context, foo *v1alpha1.Foo) (result *v1alpha1.Foo, err error) {
 	result = &v1alpha1.Foo{}
 	err = c.client.Put().
 		Namespace(c.ns).
@@ -145,24 +145,24 @@ func (c *foos) UpdateStatus(foo *v1alpha1.Foo) (result *v1alpha1.Foo, err error)
 		Name(foo.Name).
 		SubResource("status").
 		Body(foo).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Delete takes name of the foo and deletes it. Returns an error if one occurs.
-func (c *foos) Delete(name string, options *v1.DeleteOptions) error {
+func (c *foos) Delete(ctx context.Context, name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("foos").
 		Name(name).
 		Body(options).
-		Do(context.TODO()).
+		Do(ctx).
 		Error()
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *foos) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *foos) DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	var timeout time.Duration
 	if listOptions.TimeoutSeconds != nil {
 		timeout = time.Duration(*listOptions.TimeoutSeconds) * time.Second
@@ -173,12 +173,12 @@ func (c *foos) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOp
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Timeout(timeout).
 		Body(options).
-		Do(context.TODO()).
+		Do(ctx).
 		Error()
 }
 
 // Patch applies the patch and returns the patched foo.
-func (c *foos) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.Foo, err error) {
+func (c *foos) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.Foo, err error) {
 	result = &v1alpha1.Foo{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
@@ -186,7 +186,7 @@ func (c *foos) Patch(name string, pt types.PatchType, data []byte, subresources 
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }

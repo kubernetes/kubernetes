@@ -205,7 +205,7 @@ func (p *Plugin) getNamespace(nsName string) (*corev1.Namespace, error) {
 	namespace, err := p.namespaceLister.Get(nsName)
 	if errors.IsNotFound(err) {
 		// in case of latency in our caches, make a call direct to storage to verify that it truly exists or not
-		namespace, err = p.client.CoreV1().Namespaces().Get(nsName, metav1.GetOptions{})
+		namespace, err = p.client.CoreV1().Namespaces().Get(context.TODO(), nsName, metav1.GetOptions{})
 		if err != nil {
 			if errors.IsNotFound(err) {
 				return nil, err

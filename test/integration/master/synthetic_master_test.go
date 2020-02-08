@@ -103,7 +103,7 @@ func TestKubernetesService(t *testing.T) {
 	defer closeFn()
 	coreClient := clientset.NewForConfigOrDie(config.GenericConfig.LoopbackClientConfig)
 	err := wait.PollImmediate(time.Millisecond*100, wait.ForeverTestTimeout, func() (bool, error) {
-		if _, err := coreClient.CoreV1().Services(metav1.NamespaceDefault).Get("kubernetes", metav1.GetOptions{}); err != nil && apierrors.IsNotFound(err) {
+		if _, err := coreClient.CoreV1().Services(metav1.NamespaceDefault).Get(context.TODO(), "kubernetes", metav1.GetOptions{}); err != nil && apierrors.IsNotFound(err) {
 			return false, nil
 		} else if err != nil {
 			return false, err
@@ -342,7 +342,7 @@ func TestObjectSizeResponses(t *testing.T) {
 
 	for _, r := range requests {
 		t.Run(r.size, func(t *testing.T) {
-			_, err := client.AppsV1().Deployments(metav1.NamespaceDefault).Create(r.deploymentObject)
+			_, err := client.AppsV1().Deployments(metav1.NamespaceDefault).Create(context.TODO(), r.deploymentObject)
 			if err != nil {
 				if !strings.Contains(err.Error(), r.expectedMessage) {
 					t.Errorf("got: %s;want: %s", err.Error(), r.expectedMessage)
@@ -611,7 +611,7 @@ func TestMasterService(t *testing.T) {
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL})
 
 	err := wait.Poll(time.Second, time.Minute, func() (bool, error) {
-		svcList, err := client.CoreV1().Services(metav1.NamespaceDefault).List(metav1.ListOptions{})
+		svcList, err := client.CoreV1().Services(metav1.NamespaceDefault).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 			return false, nil
@@ -624,7 +624,7 @@ func TestMasterService(t *testing.T) {
 			}
 		}
 		if found {
-			ep, err := client.CoreV1().Endpoints(metav1.NamespaceDefault).Get("kubernetes", metav1.GetOptions{})
+			ep, err := client.CoreV1().Endpoints(metav1.NamespaceDefault).Get(context.TODO(), "kubernetes", metav1.GetOptions{})
 			if err != nil {
 				return false, nil
 			}
@@ -668,7 +668,7 @@ func TestServiceAlloc(t *testing.T) {
 
 	// Wait until the default "kubernetes" service is created.
 	if err = wait.Poll(250*time.Millisecond, time.Minute, func() (bool, error) {
-		_, err := client.CoreV1().Services(metav1.NamespaceDefault).Get("kubernetes", metav1.GetOptions{})
+		_, err := client.CoreV1().Services(metav1.NamespaceDefault).Get(context.TODO(), "kubernetes", metav1.GetOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
 			return false, err
 		}
@@ -679,18 +679,18 @@ func TestServiceAlloc(t *testing.T) {
 
 	// make 5 more services to take up all IPs
 	for i := 0; i < 5; i++ {
-		if _, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc(i)); err != nil {
+		if _, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.TODO(), svc(i)); err != nil {
 			t.Error(err)
 		}
 	}
 
 	// Make another service. It will fail because we're out of cluster IPs
-	if _, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc(8)); err != nil {
+	if _, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.TODO(), svc(8)); err != nil {
 		if !strings.Contains(err.Error(), "range is full") {
 			t.Errorf("unexpected error text: %v", err)
 		}
 	} else {
-		svcs, err := client.CoreV1().Services(metav1.NamespaceAll).List(metav1.ListOptions{})
+		svcs, err := client.CoreV1().Services(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			t.Fatalf("unexpected success, and error getting the services: %v", err)
 		}
@@ -702,12 +702,12 @@ func TestServiceAlloc(t *testing.T) {
 	}
 
 	// Delete the first service.
-	if err := client.CoreV1().Services(metav1.NamespaceDefault).Delete(svc(1).ObjectMeta.Name, nil); err != nil {
+	if err := client.CoreV1().Services(metav1.NamespaceDefault).Delete(context.TODO(), svc(1).ObjectMeta.Name, nil); err != nil {
 		t.Fatalf("got unexpected error: %v", err)
 	}
 
 	// This time creating the second service should work.
-	if _, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc(8)); err != nil {
+	if _, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.TODO(), svc(8)); err != nil {
 		t.Fatalf("got unexpected error: %v", err)
 	}
 }
@@ -736,8 +736,8 @@ func TestUpdateNodeObjects(t *testing.T) {
 	iterations := 10000
 
 	for i := 0; i < nodes*6; i++ {
-		c.Nodes().Delete(fmt.Sprintf("node-%d", i), nil)
-		_, err := c.Nodes().Create(&corev1.Node{
+		c.Nodes().Delete(context.TODO(), fmt.Sprintf("node-%d", i), nil)
+		_, err := c.Nodes().Create(context.TODO(), &corev1.Node{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: fmt.Sprintf("node-%d", i),
 			},
@@ -750,7 +750,7 @@ func TestUpdateNodeObjects(t *testing.T) {
 	for k := 0; k < listers; k++ {
 		go func(lister int) {
 			for i := 0; i < iterations; i++ {
-				_, err := c.Nodes().List(metav1.ListOptions{})
+				_, err := c.Nodes().List(context.TODO(), metav1.ListOptions{})
 				if err != nil {
 					fmt.Printf("[list:%d] error after %d: %v\n", lister, i, err)
 					break
@@ -762,7 +762,7 @@ func TestUpdateNodeObjects(t *testing.T) {
 
 	for k := 0; k < watchers; k++ {
 		go func(lister int) {
-			w, err := c.Nodes().Watch(metav1.ListOptions{})
+			w, err := c.Nodes().Watch(context.TODO(), metav1.ListOptions{})
 			if err != nil {
 				fmt.Printf("[watch:%d] error: %v", lister, err)
 				return
@@ -792,14 +792,14 @@ func TestUpdateNodeObjects(t *testing.T) {
 					fmt.Printf("[%d] iteration %d ...\n", node, i)
 				}
 				if i%20 == 0 {
-					_, err := c.Nodes().List(metav1.ListOptions{})
+					_, err := c.Nodes().List(context.TODO(), metav1.ListOptions{})
 					if err != nil {
 						fmt.Printf("[%d] error after %d: %v\n", node, i, err)
 						break
 					}
 				}
 
-				r, err := c.Nodes().List(metav1.ListOptions{
+				r, err := c.Nodes().List(context.TODO(), metav1.ListOptions{
 					FieldSelector:   fmt.Sprintf("metadata.name=node-%d", node),
 					ResourceVersion: "0",
 				})
@@ -812,7 +812,7 @@ func TestUpdateNodeObjects(t *testing.T) {
 					break
 				}
 
-				n, err := c.Nodes().Get(fmt.Sprintf("node-%d", node), metav1.GetOptions{})
+				n, err := c.Nodes().Get(context.TODO(), fmt.Sprintf("node-%d", node), metav1.GetOptions{})
 				if err != nil {
 					fmt.Printf("[%d] error after %d: %v\n", node, i, err)
 					break
@@ -850,7 +850,7 @@ func TestUpdateNodeObjects(t *testing.T) {
 					lastCount = 0
 					n.Status.Conditions = nil
 				}
-				if _, err := c.Nodes().UpdateStatus(n); err != nil {
+				if _, err := c.Nodes().UpdateStatus(context.TODO(), n); err != nil {
 					if !apierrors.IsConflict(err) {
 						fmt.Printf("[%d] error after %d: %v\n", node, i, err)
 						break

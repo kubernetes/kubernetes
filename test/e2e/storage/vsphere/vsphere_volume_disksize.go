@@ -17,6 +17,7 @@ limitations under the License.
 package vsphere
 
 import (
+	"context"
 	"time"
 
 	"github.com/onsi/ginkgo"
@@ -68,9 +69,9 @@ var _ = utils.SIGDescribe("Volume Disk Size [Feature:vsphere]", func() {
 		expectedDiskSize := "1Mi"
 
 		ginkgo.By("Creating Storage Class")
-		storageclass, err := client.StorageV1().StorageClasses().Create(getVSphereStorageClassSpec(diskSizeSCName, scParameters, nil, ""))
+		storageclass, err := client.StorageV1().StorageClasses().Create(context.TODO(), getVSphereStorageClassSpec(diskSizeSCName, scParameters, nil, ""))
 		framework.ExpectNoError(err)
-		defer client.StorageV1().StorageClasses().Delete(storageclass.Name, nil)
+		defer client.StorageV1().StorageClasses().Delete(context.TODO(), storageclass.Name, nil)
 
 		ginkgo.By("Creating PVC using the Storage Class")
 		pvclaim, err := e2epv.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClass(namespace, diskSize, storageclass))
@@ -82,11 +83,11 @@ var _ = utils.SIGDescribe("Volume Disk Size [Feature:vsphere]", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Getting new copy of PVC")
-		pvclaim, err = client.CoreV1().PersistentVolumeClaims(pvclaim.Namespace).Get(pvclaim.Name, metav1.GetOptions{})
+		pvclaim, err = client.CoreV1().PersistentVolumeClaims(pvclaim.Namespace).Get(context.TODO(), pvclaim.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Getting PV created")
-		pv, err := client.CoreV1().PersistentVolumes().Get(pvclaim.Spec.VolumeName, metav1.GetOptions{})
+		pv, err := client.CoreV1().PersistentVolumes().Get(context.TODO(), pvclaim.Spec.VolumeName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Verifying if provisioned PV has the correct size")

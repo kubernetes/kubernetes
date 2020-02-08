@@ -17,6 +17,7 @@ limitations under the License.
 package testutil
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -37,7 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/clock"
 	ref "k8s.io/client-go/tools/reference"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/fake"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
@@ -110,7 +111,7 @@ func (m *FakeLegacyHandler) Nodes() v1core.NodeInterface {
 }
 
 // Create adds a new Node to the fake store.
-func (m *FakeNodeHandler) Create(node *v1.Node) (*v1.Node, error) {
+func (m *FakeNodeHandler) Create(_ context.Context, node *v1.Node) (*v1.Node, error) {
 	m.lock.Lock()
 	defer func() {
 		m.RequestCount++
@@ -130,7 +131,7 @@ func (m *FakeNodeHandler) Create(node *v1.Node) (*v1.Node, error) {
 }
 
 // Get returns a Node from the fake store.
-func (m *FakeNodeHandler) Get(name string, opts metav1.GetOptions) (*v1.Node, error) {
+func (m *FakeNodeHandler) Get(_ context.Context, name string, opts metav1.GetOptions) (*v1.Node, error) {
 	m.lock.Lock()
 	defer func() {
 		m.RequestCount++
@@ -152,7 +153,7 @@ func (m *FakeNodeHandler) Get(name string, opts metav1.GetOptions) (*v1.Node, er
 }
 
 // List returns a list of Nodes from the fake store.
-func (m *FakeNodeHandler) List(opts metav1.ListOptions) (*v1.NodeList, error) {
+func (m *FakeNodeHandler) List(_ context.Context, opts metav1.ListOptions) (*v1.NodeList, error) {
 	m.lock.Lock()
 	defer func() {
 		m.RequestCount++
@@ -182,7 +183,7 @@ func (m *FakeNodeHandler) List(opts metav1.ListOptions) (*v1.NodeList, error) {
 }
 
 // Delete deletes a Node from the fake store.
-func (m *FakeNodeHandler) Delete(id string, opt *metav1.DeleteOptions) error {
+func (m *FakeNodeHandler) Delete(_ context.Context, id string, opt *metav1.DeleteOptions) error {
 	m.lock.Lock()
 	defer func() {
 		m.RequestCount++
@@ -196,12 +197,12 @@ func (m *FakeNodeHandler) Delete(id string, opt *metav1.DeleteOptions) error {
 }
 
 // DeleteCollection deletes a collection of Nodes from the fake store.
-func (m *FakeNodeHandler) DeleteCollection(opt *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+func (m *FakeNodeHandler) DeleteCollection(_ context.Context, opt *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	return nil
 }
 
 // Update updates a Node in the fake store.
-func (m *FakeNodeHandler) Update(node *v1.Node) (*v1.Node, error) {
+func (m *FakeNodeHandler) Update(_ context.Context, node *v1.Node) (*v1.Node, error) {
 	m.lock.Lock()
 	defer func() {
 		m.RequestCount++
@@ -220,7 +221,7 @@ func (m *FakeNodeHandler) Update(node *v1.Node) (*v1.Node, error) {
 }
 
 // UpdateStatus updates a status of a Node in the fake store.
-func (m *FakeNodeHandler) UpdateStatus(node *v1.Node) (*v1.Node, error) {
+func (m *FakeNodeHandler) UpdateStatus(_ context.Context, node *v1.Node) (*v1.Node, error) {
 	m.lock.Lock()
 	defer func() {
 		m.RequestCount++
@@ -263,18 +264,18 @@ func (m *FakeNodeHandler) UpdateStatus(node *v1.Node) (*v1.Node, error) {
 }
 
 // PatchStatus patches a status of a Node in the fake store.
-func (m *FakeNodeHandler) PatchStatus(nodeName string, data []byte) (*v1.Node, error) {
+func (m *FakeNodeHandler) PatchStatus(ctx context.Context, nodeName string, data []byte) (*v1.Node, error) {
 	m.RequestCount++
-	return m.Patch(nodeName, types.StrategicMergePatchType, data, "status")
+	return m.Patch(ctx, nodeName, types.StrategicMergePatchType, data, "status")
 }
 
 // Watch watches Nodes in a fake store.
-func (m *FakeNodeHandler) Watch(opts metav1.ListOptions) (watch.Interface, error) {
+func (m *FakeNodeHandler) Watch(_ context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return watch.NewFake(), nil
 }
 
 // Patch patches a Node in the fake store.
-func (m *FakeNodeHandler) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (*v1.Node, error) {
+func (m *FakeNodeHandler) Patch(_ context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (*v1.Node, error) {
 	m.lock.Lock()
 	defer func() {
 		m.RequestCount++
@@ -476,7 +477,7 @@ func contains(node *v1.Node, nodes []*v1.Node) bool {
 
 // GetZones returns list of zones for all Nodes stored in FakeNodeHandler
 func GetZones(nodeHandler *FakeNodeHandler) []string {
-	nodes, _ := nodeHandler.List(metav1.ListOptions{})
+	nodes, _ := nodeHandler.List(context.TODO(), metav1.ListOptions{})
 	zones := sets.NewString()
 	for _, node := range nodes.Items {
 		zones.Insert(utilnode.GetZoneKey(&node))

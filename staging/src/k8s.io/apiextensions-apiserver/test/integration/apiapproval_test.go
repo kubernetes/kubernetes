@@ -17,6 +17,7 @@ limitations under the License.
 package integration
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -65,7 +66,7 @@ func TestAPIApproval(t *testing.T) {
 		t.Fatal(err)
 	}
 	err = wait.PollImmediate(100*time.Millisecond, 30*time.Second, func() (bool, error) {
-		approvedKubeAPI, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(approvedKubeAPI.Name, metav1.GetOptions{})
+		approvedKubeAPI, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(context.TODO(), approvedKubeAPI.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}

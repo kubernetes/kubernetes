@@ -38,14 +38,14 @@ type ControllerRevisionsGetter interface {
 
 // ControllerRevisionInterface has methods to work with ControllerRevision resources.
 type ControllerRevisionInterface interface {
-	Create(*v1.ControllerRevision) (*v1.ControllerRevision, error)
-	Update(*v1.ControllerRevision) (*v1.ControllerRevision, error)
-	Delete(name string, options *metav1.DeleteOptions) error
-	DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error
-	Get(name string, options metav1.GetOptions) (*v1.ControllerRevision, error)
-	List(opts metav1.ListOptions) (*v1.ControllerRevisionList, error)
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.ControllerRevision, err error)
+	Create(context.Context, *v1.ControllerRevision) (*v1.ControllerRevision, error)
+	Update(context.Context, *v1.ControllerRevision) (*v1.ControllerRevision, error)
+	Delete(ctx context.Context, name string, options *metav1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, options *metav1.DeleteOptions, listOptions metav1.ListOptions) error
+	Get(ctx context.Context, name string, options metav1.GetOptions) (*v1.ControllerRevision, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*v1.ControllerRevisionList, error)
+	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.ControllerRevision, err error)
 	ControllerRevisionExpansion
 }
 
@@ -64,20 +64,20 @@ func newControllerRevisions(c *AppsV1Client, namespace string) *controllerRevisi
 }
 
 // Get takes name of the controllerRevision, and returns the corresponding controllerRevision object, and an error if there is any.
-func (c *controllerRevisions) Get(name string, options metav1.GetOptions) (result *v1.ControllerRevision, err error) {
+func (c *controllerRevisions) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.ControllerRevision, err error) {
 	result = &v1.ControllerRevision{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("controllerrevisions").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of ControllerRevisions that match those selectors.
-func (c *controllerRevisions) List(opts metav1.ListOptions) (result *v1.ControllerRevisionList, err error) {
+func (c *controllerRevisions) List(ctx context.Context, opts metav1.ListOptions) (result *v1.ControllerRevisionList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -88,13 +88,13 @@ func (c *controllerRevisions) List(opts metav1.ListOptions) (result *v1.Controll
 		Resource("controllerrevisions").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Watch returns a watch.Interface that watches the requested controllerRevisions.
-func (c *controllerRevisions) Watch(opts metav1.ListOptions) (watch.Interface, error) {
+func (c *controllerRevisions) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -105,47 +105,47 @@ func (c *controllerRevisions) Watch(opts metav1.ListOptions) (watch.Interface, e
 		Resource("controllerrevisions").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch(context.TODO())
+		Watch(ctx)
 }
 
 // Create takes the representation of a controllerRevision and creates it.  Returns the server's representation of the controllerRevision, and an error, if there is any.
-func (c *controllerRevisions) Create(controllerRevision *v1.ControllerRevision) (result *v1.ControllerRevision, err error) {
+func (c *controllerRevisions) Create(ctx context.Context, controllerRevision *v1.ControllerRevision) (result *v1.ControllerRevision, err error) {
 	result = &v1.ControllerRevision{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("controllerrevisions").
 		Body(controllerRevision).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Update takes the representation of a controllerRevision and updates it. Returns the server's representation of the controllerRevision, and an error, if there is any.
-func (c *controllerRevisions) Update(controllerRevision *v1.ControllerRevision) (result *v1.ControllerRevision, err error) {
+func (c *controllerRevisions) Update(ctx context.Context, controllerRevision *v1.ControllerRevision) (result *v1.ControllerRevision, err error) {
 	result = &v1.ControllerRevision{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("controllerrevisions").
 		Name(controllerRevision.Name).
 		Body(controllerRevision).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Delete takes name of the controllerRevision and deletes it. Returns an error if one occurs.
-func (c *controllerRevisions) Delete(name string, options *metav1.DeleteOptions) error {
+func (c *controllerRevisions) Delete(ctx context.Context, name string, options *metav1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("controllerrevisions").
 		Name(name).
 		Body(options).
-		Do(context.TODO()).
+		Do(ctx).
 		Error()
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *controllerRevisions) DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error {
+func (c *controllerRevisions) DeleteCollection(ctx context.Context, options *metav1.DeleteOptions, listOptions metav1.ListOptions) error {
 	var timeout time.Duration
 	if listOptions.TimeoutSeconds != nil {
 		timeout = time.Duration(*listOptions.TimeoutSeconds) * time.Second
@@ -156,12 +156,12 @@ func (c *controllerRevisions) DeleteCollection(options *metav1.DeleteOptions, li
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Timeout(timeout).
 		Body(options).
-		Do(context.TODO()).
+		Do(ctx).
 		Error()
 }
 
 // Patch applies the patch and returns the patched controllerRevision.
-func (c *controllerRevisions) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.ControllerRevision, err error) {
+func (c *controllerRevisions) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.ControllerRevision, err error) {
 	result = &v1.ControllerRevision{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
@@ -169,7 +169,7 @@ func (c *controllerRevisions) Patch(name string, pt types.PatchType, data []byte
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }

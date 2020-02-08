@@ -38,14 +38,14 @@ type RolesGetter interface {
 
 // RoleInterface has methods to work with Role resources.
 type RoleInterface interface {
-	Create(*v1.Role) (*v1.Role, error)
-	Update(*v1.Role) (*v1.Role, error)
-	Delete(name string, options *metav1.DeleteOptions) error
-	DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error
-	Get(name string, options metav1.GetOptions) (*v1.Role, error)
-	List(opts metav1.ListOptions) (*v1.RoleList, error)
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Role, err error)
+	Create(context.Context, *v1.Role) (*v1.Role, error)
+	Update(context.Context, *v1.Role) (*v1.Role, error)
+	Delete(ctx context.Context, name string, options *metav1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, options *metav1.DeleteOptions, listOptions metav1.ListOptions) error
+	Get(ctx context.Context, name string, options metav1.GetOptions) (*v1.Role, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*v1.RoleList, error)
+	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Role, err error)
 	RoleExpansion
 }
 
@@ -64,20 +64,20 @@ func newRoles(c *RbacV1Client, namespace string) *roles {
 }
 
 // Get takes name of the role, and returns the corresponding role object, and an error if there is any.
-func (c *roles) Get(name string, options metav1.GetOptions) (result *v1.Role, err error) {
+func (c *roles) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.Role, err error) {
 	result = &v1.Role{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("roles").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of Roles that match those selectors.
-func (c *roles) List(opts metav1.ListOptions) (result *v1.RoleList, err error) {
+func (c *roles) List(ctx context.Context, opts metav1.ListOptions) (result *v1.RoleList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -88,13 +88,13 @@ func (c *roles) List(opts metav1.ListOptions) (result *v1.RoleList, err error) {
 		Resource("roles").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Watch returns a watch.Interface that watches the requested roles.
-func (c *roles) Watch(opts metav1.ListOptions) (watch.Interface, error) {
+func (c *roles) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -105,47 +105,47 @@ func (c *roles) Watch(opts metav1.ListOptions) (watch.Interface, error) {
 		Resource("roles").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch(context.TODO())
+		Watch(ctx)
 }
 
 // Create takes the representation of a role and creates it.  Returns the server's representation of the role, and an error, if there is any.
-func (c *roles) Create(role *v1.Role) (result *v1.Role, err error) {
+func (c *roles) Create(ctx context.Context, role *v1.Role) (result *v1.Role, err error) {
 	result = &v1.Role{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("roles").
 		Body(role).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Update takes the representation of a role and updates it. Returns the server's representation of the role, and an error, if there is any.
-func (c *roles) Update(role *v1.Role) (result *v1.Role, err error) {
+func (c *roles) Update(ctx context.Context, role *v1.Role) (result *v1.Role, err error) {
 	result = &v1.Role{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("roles").
 		Name(role.Name).
 		Body(role).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Delete takes name of the role and deletes it. Returns an error if one occurs.
-func (c *roles) Delete(name string, options *metav1.DeleteOptions) error {
+func (c *roles) Delete(ctx context.Context, name string, options *metav1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("roles").
 		Name(name).
 		Body(options).
-		Do(context.TODO()).
+		Do(ctx).
 		Error()
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *roles) DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error {
+func (c *roles) DeleteCollection(ctx context.Context, options *metav1.DeleteOptions, listOptions metav1.ListOptions) error {
 	var timeout time.Duration
 	if listOptions.TimeoutSeconds != nil {
 		timeout = time.Duration(*listOptions.TimeoutSeconds) * time.Second
@@ -156,12 +156,12 @@ func (c *roles) DeleteCollection(options *metav1.DeleteOptions, listOptions meta
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Timeout(timeout).
 		Body(options).
-		Do(context.TODO()).
+		Do(ctx).
 		Error()
 }
 
 // Patch applies the patch and returns the patched role.
-func (c *roles) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Role, err error) {
+func (c *roles) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Role, err error) {
 	result = &v1.Role{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
@@ -169,7 +169,7 @@ func (c *roles) Patch(name string, pt types.PatchType, data []byte, subresources
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }

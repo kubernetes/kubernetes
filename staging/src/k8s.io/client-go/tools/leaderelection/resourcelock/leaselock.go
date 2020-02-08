@@ -17,6 +17,7 @@ limitations under the License.
 package resourcelock
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -39,7 +40,7 @@ type LeaseLock struct {
 // Get returns the election record from a Lease spec
 func (ll *LeaseLock) Get() (*LeaderElectionRecord, []byte, error) {
 	var err error
-	ll.lease, err = ll.Client.Leases(ll.LeaseMeta.Namespace).Get(ll.LeaseMeta.Name, metav1.GetOptions{})
+	ll.lease, err = ll.Client.Leases(ll.LeaseMeta.Namespace).Get(context.TODO(), ll.LeaseMeta.Name, metav1.GetOptions{})
 	if err != nil {
 		return nil, nil, err
 	}
@@ -54,7 +55,7 @@ func (ll *LeaseLock) Get() (*LeaderElectionRecord, []byte, error) {
 // Create attempts to create a Lease
 func (ll *LeaseLock) Create(ler LeaderElectionRecord) error {
 	var err error
-	ll.lease, err = ll.Client.Leases(ll.LeaseMeta.Namespace).Create(&coordinationv1.Lease{
+	ll.lease, err = ll.Client.Leases(ll.LeaseMeta.Namespace).Create(context.TODO(), &coordinationv1.Lease{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      ll.LeaseMeta.Name,
 			Namespace: ll.LeaseMeta.Namespace,
@@ -71,7 +72,7 @@ func (ll *LeaseLock) Update(ler LeaderElectionRecord) error {
 	}
 	ll.lease.Spec = LeaderElectionRecordToLeaseSpec(&ler)
 	var err error
-	ll.lease, err = ll.Client.Leases(ll.LeaseMeta.Namespace).Update(ll.lease)
+	ll.lease, err = ll.Client.Leases(ll.LeaseMeta.Namespace).Update(context.TODO(), ll.lease)
 	return err
 }
 

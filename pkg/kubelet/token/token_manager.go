@@ -19,6 +19,7 @@ limitations under the License.
 package token
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sync"
@@ -64,7 +65,7 @@ func NewManager(c clientset.Interface) *Manager {
 			if c == nil {
 				return nil, errors.New("cannot use TokenManager when kubelet is in standalone mode")
 			}
-			tokenRequest, err := c.CoreV1().ServiceAccounts(namespace).CreateToken(name, tr)
+			tokenRequest, err := c.CoreV1().ServiceAccounts(namespace).CreateToken(context.TODO(), name, tr)
 			if apierrors.IsNotFound(err) && !tokenRequestsSupported() {
 				return nil, fmt.Errorf("the API server does not have TokenRequest endpoints enabled")
 			}

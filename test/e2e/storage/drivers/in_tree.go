@@ -36,6 +36,7 @@ limitations under the License.
 package drivers
 
 import (
+	"context"
 	"fmt"
 	"os/exec"
 	"strconv"
@@ -182,7 +183,7 @@ func (n *nfsDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConf
 		}, func() {
 			framework.ExpectNoError(e2epod.DeletePodWithWait(cs, n.externalProvisionerPod))
 			clusterRoleBindingName := ns.Name + "--" + "cluster-admin"
-			cs.RbacV1().ClusterRoleBindings().Delete(clusterRoleBindingName, metav1.NewDeleteOptions(0))
+			cs.RbacV1().ClusterRoleBindings().Delete(context.TODO(), clusterRoleBindingName, metav1.NewDeleteOptions(0))
 		}
 }
 
@@ -324,7 +325,7 @@ func (v *glusterVolume) DeleteVolume() {
 	name := v.prefix + "-server"
 
 	framework.Logf("Deleting Gluster endpoints %q...", name)
-	err := cs.CoreV1().Endpoints(ns.Name).Delete(name, nil)
+	err := cs.CoreV1().Endpoints(ns.Name).Delete(context.TODO(), name, nil)
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
 			framework.Failf("Gluster delete endpoints failed: %v", err)
@@ -505,7 +506,7 @@ func newRBDServer(cs clientset.Interface, namespace string) (config volume.TestC
 		Type: "kubernetes.io/rbd",
 	}
 
-	secret, err := cs.CoreV1().Secrets(config.Namespace).Create(secret)
+	secret, err := cs.CoreV1().Secrets(config.Namespace).Create(context.TODO(), secret)
 	if err != nil {
 		framework.Failf("Failed to create secrets for Ceph RBD: %v", err)
 	}
@@ -943,7 +944,7 @@ func (h *hostPathSymlinkDriver) CreateVolume(config *testsuites.PerTestConfig, v
 		},
 	}
 	// h.prepPod will be reused in cleanupDriver.
-	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(prepPod)
+	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), prepPod)
 	framework.ExpectNoError(err, "while creating hostPath init pod")
 
 	err = e2epod.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, pod.Namespace)
@@ -965,7 +966,7 @@ func (v *hostPathSymlinkVolume) DeleteVolume() {
 	cmd := fmt.Sprintf("rm -rf %v&& rm -rf %v", v.targetPath, v.sourcePath)
 	v.prepPod.Spec.Containers[0].Command = []string{"/bin/sh", "-ec", cmd}
 
-	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(v.prepPod)
+	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), v.prepPod)
 	framework.ExpectNoError(err, "while creating hostPath teardown pod")
 
 	err = e2epod.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, pod.Namespace)
@@ -1935,7 +1936,7 @@ func cleanUpVolumeServerWithSecret(f *framework.Framework, serverPod *v1.Pod, se
 
 	if secret != nil {
 		framework.Logf("Deleting server secret %q...", secret.Name)
-		err := cs.CoreV1().Secrets(ns.Name).Delete(secret.Name, &metav1.DeleteOptions{})
+		err := cs.CoreV1().Secrets(ns.Name).Delete(context.TODO(), secret.Name, &metav1.DeleteOptions{})
 		if err != nil {
 			framework.Logf("Delete secret failed: %v", err)
 		}

@@ -17,6 +17,7 @@ limitations under the License.
 package portworx
 
 import (
+	"context"
 	"fmt"
 
 	osdapi "github.com/libopenstorage/openstorage/api"
@@ -358,7 +359,7 @@ func getPortworxService(host volume.VolumeHost) (*v1.Service, error) {
 	}
 
 	opts := metav1.GetOptions{}
-	svc, err := kubeClient.CoreV1().Services(api.NamespaceSystem).Get(pxServiceName, opts)
+	svc, err := kubeClient.CoreV1().Services(api.NamespaceSystem).Get(context.TODO(), pxServiceName, opts)
 	if err != nil {
 		klog.Errorf("Failed to get service. Err: %v", err)
 		return nil, err

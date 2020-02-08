@@ -17,6 +17,7 @@ limitations under the License.
 package controller
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"sync"
@@ -174,7 +175,7 @@ func (ts *tokenSourceImpl) Token() (*oauth2.Token, error) {
 			return false, nil
 		}
 
-		tr, inErr := ts.coreClient.ServiceAccounts(ts.namespace).CreateToken(ts.serviceAccountName, &v1authenticationapi.TokenRequest{
+		tr, inErr := ts.coreClient.ServiceAccounts(ts.namespace).CreateToken(context.TODO(), ts.serviceAccountName, &v1authenticationapi.TokenRequest{
 			Spec: v1authenticationapi.TokenRequestSpec{
 				ExpirationSeconds: utilpointer.Int64Ptr(ts.expirationSeconds),
 			},

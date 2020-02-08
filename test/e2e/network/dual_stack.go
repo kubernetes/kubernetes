@@ -17,6 +17,7 @@ limitations under the License.
 package network
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"time"
@@ -100,7 +101,7 @@ var _ = SIGDescribe("[Feature:IPv6DualStackAlphaFeature] [LinuxOnly]", func() {
 		podClient.CreateSync(pod)
 		framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
 
-		p, err := podClient.Get(pod.Name, metav1.GetOptions{})
+		p, err := podClient.Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "Failed to get pod %q", pod.Name)
 
 		gomega.Expect(p.Status.PodIP).ShouldNot(gomega.BeEquivalentTo(""))
@@ -114,7 +115,7 @@ var _ = SIGDescribe("[Feature:IPv6DualStackAlphaFeature] [LinuxOnly]", func() {
 		framework.ExpectEqual(isIPv4(p.Status.PodIPs[0].IP) != isIPv4(p.Status.PodIPs[1].IP), true)
 
 		ginkgo.By("deleting the pod")
-		err = podClient.Delete(pod.Name, metav1.NewDeleteOptions(30))
+		err = podClient.Delete(context.TODO(), pod.Name, metav1.NewDeleteOptions(30))
 		framework.ExpectNoError(err, "failed to delete pod")
 	})
 
@@ -189,10 +190,10 @@ var _ = SIGDescribe("[Feature:IPv6DualStackAlphaFeature] [LinuxOnly]", func() {
 			},
 		}
 
-		serverDeployment, err := cs.AppsV1().Deployments(f.Namespace.Name).Create(serverDeploymentSpec)
+		serverDeployment, err := cs.AppsV1().Deployments(f.Namespace.Name).Create(context.TODO(), serverDeploymentSpec)
 		framework.ExpectNoError(err)
 
-		clientDeployment, err := cs.AppsV1().Deployments(f.Namespace.Name).Create(clientDeploymentSpec)
+		clientDeployment, err := cs.AppsV1().Deployments(f.Namespace.Name).Create(context.TODO(), clientDeploymentSpec)
 		framework.ExpectNoError(err)
 
 		err = e2edeploy.WaitForDeploymentComplete(cs, serverDeployment)
@@ -243,7 +244,7 @@ var _ = SIGDescribe("[Feature:IPv6DualStackAlphaFeature] [LinuxOnly]", func() {
 
 		// ensure endpoint belong to same ipfamily as service
 		if err := wait.PollImmediate(500*time.Millisecond, 10*time.Second, func() (bool, error) {
-			endpoint, err := cs.CoreV1().Endpoints(svc.Namespace).Get(svc.Name, metav1.GetOptions{})
+			endpoint, err := cs.CoreV1().Endpoints(svc.Namespace).Get(context.TODO(), svc.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, nil
 			}
@@ -285,7 +286,7 @@ var _ = SIGDescribe("[Feature:IPv6DualStackAlphaFeature] [LinuxOnly]", func() {
 
 		// ensure endpoints belong to same ipfamily as service
 		if err := wait.PollImmediate(500*time.Millisecond, 10*time.Second, func() (bool, error) {
-			endpoint, err := cs.CoreV1().Endpoints(svc.Namespace).Get(svc.Name, metav1.GetOptions{})
+			endpoint, err := cs.CoreV1().Endpoints(svc.Namespace).Get(context.TODO(), svc.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, nil
 			}
@@ -327,7 +328,7 @@ var _ = SIGDescribe("[Feature:IPv6DualStackAlphaFeature] [LinuxOnly]", func() {
 
 		// ensure endpoints belong to same ipfamily as service
 		if err := wait.PollImmediate(500*time.Millisecond, 10*time.Second, func() (bool, error) {
-			endpoint, err := cs.CoreV1().Endpoints(svc.Namespace).Get(svc.Name, metav1.GetOptions{})
+			endpoint, err := cs.CoreV1().Endpoints(svc.Namespace).Get(context.TODO(), svc.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, nil
 			}

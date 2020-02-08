@@ -17,6 +17,7 @@ limitations under the License.
 package external
 
 import (
+	"context"
 	"flag"
 	"io/ioutil"
 
@@ -273,7 +274,7 @@ func (d *driverDefinition) GetDynamicProvisionStorageClass(config *testsuites.Pe
 	case d.StorageClass.FromName:
 		sc = &storagev1.StorageClass{Provisioner: d.DriverInfo.Name}
 	case d.StorageClass.FromExistingClassName != "":
-		sc, err = f.ClientSet.StorageV1().StorageClasses().Get(d.StorageClass.FromExistingClassName, metav1.GetOptions{})
+		sc, err = f.ClientSet.StorageV1().StorageClasses().Get(context.TODO(), d.StorageClass.FromExistingClassName, metav1.GetOptions{})
 		framework.ExpectNoError(err, "getting storage class %s", d.StorageClass.FromExistingClassName)
 	case d.StorageClass.FromFile != "":
 		var ok bool

@@ -17,6 +17,7 @@ limitations under the License.
 package storage
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -66,7 +67,7 @@ func completeMultiTest(f *framework.Framework, c clientset.Interface, ns string,
 	// 1. verify each PV permits write access to a client pod
 	ginkgo.By("Checking pod has write access to PersistentVolumes")
 	for pvcKey := range claims {
-		pvc, err := c.CoreV1().PersistentVolumeClaims(pvcKey.Namespace).Get(pvcKey.Name, metav1.GetOptions{})
+		pvc, err := c.CoreV1().PersistentVolumeClaims(pvcKey.Namespace).Get(context.TODO(), pvcKey.Name, metav1.GetOptions{})
 		if err != nil {
 			return fmt.Errorf("error getting pvc %q: %v", pvcKey.Name, err)
 		}
@@ -282,7 +283,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 			ginkgo.It("should test that a PV becomes Available and is clean after the PVC is deleted.", func() {
 				ginkgo.By("Writing to the volume.")
 				pod := e2epod.MakePod(ns, nil, []*v1.PersistentVolumeClaim{pvc}, true, "touch /mnt/volume1/SUCCESS && (id -G | grep -E '\\b777\\b')")
-				pod, err = c.CoreV1().Pods(ns).Create(pod)
+				pod, err = c.CoreV1().Pods(ns).Create(context.TODO(), pod)
 				framework.ExpectNoError(err)
 				framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespace(c, pod.Name, ns))
 
@@ -300,7 +301,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 				ginkgo.By("Verifying the mount has been cleaned.")
 				mount := pod.Spec.Containers[0].VolumeMounts[0].MountPath
 				pod = e2epod.MakePod(ns, nil, []*v1.PersistentVolumeClaim{pvc}, true, fmt.Sprintf("[ $(ls -A %s | wc -l) -eq 0 ] && exit 0 || exit 1", mount))
-				pod, err = c.CoreV1().Pods(ns).Create(pod)
+				pod, err = c.CoreV1().Pods(ns).Create(context.TODO(), pod)
 				framework.ExpectNoError(err)
 				framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespace(c, pod.Name, ns))
 
@@ -352,7 +353,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 				}
 
 				spec := makeStatefulSetWithPVCs(ns, writeCmd, mounts, claims, probe)
-				ss, err := c.AppsV1().StatefulSets(ns).Create(spec)
+				ss, err := c.AppsV1().StatefulSets(ns).Create(context.TODO(), spec)
 				framework.ExpectNoError(err)
 				e2esset.WaitForRunningAndReady(c, 1, ss)
 
@@ -361,7 +362,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 				ss, err = e2esset.Scale(c, ss, 0)
 				framework.ExpectNoError(err)
 				e2esset.WaitForStatusReplicas(c, ss, 0)
-				err = c.AppsV1().StatefulSets(ns).Delete(ss.Name, &metav1.DeleteOptions{})
+				err = c.AppsV1().StatefulSets(ns).Delete(context.TODO(), ss.Name, &metav1.DeleteOptions{})
 				framework.ExpectNoError(err)
 
 				ginkgo.By("Creating a new Statefulset and validating the data")
@@ -372,7 +373,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 				validateCmd += "&& sleep 10000"
 
 				spec = makeStatefulSetWithPVCs(ns, validateCmd, mounts, claims, probe)
-				ss, err = c.AppsV1().StatefulSets(ns).Create(spec)
+				ss, err = c.AppsV1().StatefulSets(ns).Create(context.TODO(), spec)
 				framework.ExpectNoError(err)
 				e2esset.WaitForRunningAndReady(c, 1, ss)
 			})
@@ -434,7 +435,7 @@ func makeStatefulSetWithPVCs(ns, cmd string, mounts []v1.VolumeMount, claims []v
 func createWaitAndDeletePod(c clientset.Interface, ns string, pvc *v1.PersistentVolumeClaim, command string) (err error) {
 	framework.Logf("Creating nfs test pod")
 	pod := e2epod.MakePod(ns, nil, []*v1.PersistentVolumeClaim{pvc}, true, command)
-	runPod, err := c.CoreV1().Pods(ns).Create(pod)
+	runPod, err := c.CoreV1().Pods(ns).Create(context.TODO(), pod)
 	if err != nil {
 		return fmt.Errorf("pod Create API error: %v", err)
 	}

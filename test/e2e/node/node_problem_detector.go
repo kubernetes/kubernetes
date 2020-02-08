@@ -17,6 +17,7 @@ limitations under the License.
 package node
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"sort"
@@ -193,7 +194,7 @@ var _ = SIGDescribe("NodeProblemDetector [DisabledForLargeClusters]", func() {
 })
 
 func verifyEvents(f *framework.Framework, options metav1.ListOptions, num int, reason, nodeName string) error {
-	events, err := f.ClientSet.CoreV1().Events(metav1.NamespaceDefault).List(options)
+	events, err := f.ClientSet.CoreV1().Events(metav1.NamespaceDefault).List(context.TODO(), options)
 	if err != nil {
 		return err
 	}
@@ -211,7 +212,7 @@ func verifyEvents(f *framework.Framework, options metav1.ListOptions, num int, r
 }
 
 func verifyEventExists(f *framework.Framework, options metav1.ListOptions, reason, nodeName string) error {
-	events, err := f.ClientSet.CoreV1().Events(metav1.NamespaceDefault).List(options)
+	events, err := f.ClientSet.CoreV1().Events(metav1.NamespaceDefault).List(context.TODO(), options)
 	if err != nil {
 		return err
 	}
@@ -224,7 +225,7 @@ func verifyEventExists(f *framework.Framework, options metav1.ListOptions, reaso
 }
 
 func verifyNodeCondition(f *framework.Framework, condition v1.NodeConditionType, status v1.ConditionStatus, reason, nodeName string) error {
-	node, err := f.ClientSet.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+	node, err := f.ClientSet.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}

@@ -17,6 +17,7 @@ limitations under the License.
 package finalizer
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"time"
@@ -127,7 +128,7 @@ func (c *CRDFinalizer) sync(key string) error {
 		Reason:  "InstanceDeletionInProgress",
 		Message: "CustomResource deletion is in progress",
 	})
-	crd, err = c.crdClient.CustomResourceDefinitions().UpdateStatus(crd)
+	crd, err = c.crdClient.CustomResourceDefinitions().UpdateStatus(context.TODO(), crd)
 	if apierrors.IsNotFound(err) || apierrors.IsConflict(err) {
 		// deleted or changed in the meantime, we'll get called again
 		return nil
@@ -150,7 +151,7 @@ func (c *CRDFinalizer) sync(key string) error {
 		cond, deleteErr := c.deleteInstances(crd)
 		apiextensionshelpers.SetCRDCondition(crd, cond)
 		if deleteErr != nil {
-			if _, err = c.crdClient.CustomResourceDefinitions().UpdateStatus(crd); err != nil {
+			if _, err = c.crdClient.CustomResourceDefinitions().UpdateStatus(context.TODO(), crd); err != nil {
 				utilruntime.HandleError(err)
 			}
 			return deleteErr
@@ -165,7 +166,7 @@ func (c *CRDFinalizer) sync(key string) error {
 	}
 
 	apiextensionshelpers.CRDRemoveFinalizer(crd, apiextensionsv1.CustomResourceCleanupFinalizer)
-	_, err = c.crdClient.CustomResourceDefinitions().UpdateStatus(crd)
+	_, err = c.crdClient.CustomResourceDefinitions().UpdateStatus(context.TODO(), crd)
 	if apierrors.IsNotFound(err) || apierrors.IsConflict(err) {
 		// deleted or changed in the meantime, we'll get called again
 		return nil

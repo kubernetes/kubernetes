@@ -18,6 +18,7 @@ limitations under the License.
 package signer
 
 import (
+	"context"
 	"encoding/pem"
 	"fmt"
 	"time"
@@ -94,7 +95,7 @@ func (s *signer) handle(csr *capi.CertificateSigningRequest) error {
 	if err != nil {
 		return fmt.Errorf("error auto signing csr: %v", err)
 	}
-	_, err = s.client.CertificatesV1beta1().CertificateSigningRequests().UpdateStatus(csr)
+	_, err = s.client.CertificatesV1beta1().CertificateSigningRequests().UpdateStatus(context.TODO(), csr)
 	if err != nil {
 		return fmt.Errorf("error updating signature for csr: %v", err)
 	}

@@ -17,6 +17,7 @@ limitations under the License.
 package nodeinfomanager
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -985,7 +986,7 @@ func TestInstallCSIDriverExistingAnnotation(t *testing.T) {
 		}
 
 		// Assert
-		nodeInfo, err := client.StorageV1().CSINodes().Get(nodeName, metav1.GetOptions{})
+		nodeInfo, err := client.StorageV1().CSINodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 		if err != nil {
 			t.Errorf("error getting CSINode: %v", err)
 			continue
@@ -1058,7 +1059,7 @@ func test(t *testing.T, addNodeInfo bool, csiNodeInfoEnabled bool, testcases []t
 			node, err = applyNodeStatusPatch(tc.existingNode, action.(clienttesting.PatchActionImpl).GetPatch())
 			assert.NoError(t, err)
 		} else {
-			node, err = client.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+			node, err = client.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 			assert.NoError(t, err)
 		}
 
@@ -1073,7 +1074,7 @@ func test(t *testing.T, addNodeInfo bool, csiNodeInfoEnabled bool, testcases []t
 
 		if csiNodeInfoEnabled {
 			// CSINode validation
-			nodeInfo, err := client.StorageV1().CSINodes().Get(nodeName, metav1.GetOptions{})
+			nodeInfo, err := client.StorageV1().CSINodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 			if err != nil {
 				if !errors.IsNotFound(err) {
 					t.Errorf("error getting CSINode: %v", err)

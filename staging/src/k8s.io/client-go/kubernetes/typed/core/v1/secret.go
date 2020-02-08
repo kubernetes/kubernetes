@@ -38,14 +38,14 @@ type SecretsGetter interface {
 
 // SecretInterface has methods to work with Secret resources.
 type SecretInterface interface {
-	Create(*v1.Secret) (*v1.Secret, error)
-	Update(*v1.Secret) (*v1.Secret, error)
-	Delete(name string, options *metav1.DeleteOptions) error
-	DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error
-	Get(name string, options metav1.GetOptions) (*v1.Secret, error)
-	List(opts metav1.ListOptions) (*v1.SecretList, error)
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Secret, err error)
+	Create(context.Context, *v1.Secret) (*v1.Secret, error)
+	Update(context.Context, *v1.Secret) (*v1.Secret, error)
+	Delete(ctx context.Context, name string, options *metav1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, options *metav1.DeleteOptions, listOptions metav1.ListOptions) error
+	Get(ctx context.Context, name string, options metav1.GetOptions) (*v1.Secret, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*v1.SecretList, error)
+	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Secret, err error)
 	SecretExpansion
 }
 
@@ -64,20 +64,20 @@ func newSecrets(c *CoreV1Client, namespace string) *secrets {
 }
 
 // Get takes name of the secret, and returns the corresponding secret object, and an error if there is any.
-func (c *secrets) Get(name string, options metav1.GetOptions) (result *v1.Secret, err error) {
+func (c *secrets) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.Secret, err error) {
 	result = &v1.Secret{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("secrets").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of Secrets that match those selectors.
-func (c *secrets) List(opts metav1.ListOptions) (result *v1.SecretList, err error) {
+func (c *secrets) List(ctx context.Context, opts metav1.ListOptions) (result *v1.SecretList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -88,13 +88,13 @@ func (c *secrets) List(opts metav1.ListOptions) (result *v1.SecretList, err erro
 		Resource("secrets").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Watch returns a watch.Interface that watches the requested secrets.
-func (c *secrets) Watch(opts metav1.ListOptions) (watch.Interface, error) {
+func (c *secrets) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -105,47 +105,47 @@ func (c *secrets) Watch(opts metav1.ListOptions) (watch.Interface, error) {
 		Resource("secrets").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch(context.TODO())
+		Watch(ctx)
 }
 
 // Create takes the representation of a secret and creates it.  Returns the server's representation of the secret, and an error, if there is any.
-func (c *secrets) Create(secret *v1.Secret) (result *v1.Secret, err error) {
+func (c *secrets) Create(ctx context.Context, secret *v1.Secret) (result *v1.Secret, err error) {
 	result = &v1.Secret{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("secrets").
 		Body(secret).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Update takes the representation of a secret and updates it. Returns the server's representation of the secret, and an error, if there is any.
-func (c *secrets) Update(secret *v1.Secret) (result *v1.Secret, err error) {
+func (c *secrets) Update(ctx context.Context, secret *v1.Secret) (result *v1.Secret, err error) {
 	result = &v1.Secret{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("secrets").
 		Name(secret.Name).
 		Body(secret).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Delete takes name of the secret and deletes it. Returns an error if one occurs.
-func (c *secrets) Delete(name string, options *metav1.DeleteOptions) error {
+func (c *secrets) Delete(ctx context.Context, name string, options *metav1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("secrets").
 		Name(name).
 		Body(options).
-		Do(context.TODO()).
+		Do(ctx).
 		Error()
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *secrets) DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error {
+func (c *secrets) DeleteCollection(ctx context.Context, options *metav1.DeleteOptions, listOptions metav1.ListOptions) error {
 	var timeout time.Duration
 	if listOptions.TimeoutSeconds != nil {
 		timeout = time.Duration(*listOptions.TimeoutSeconds) * time.Second
@@ -156,12 +156,12 @@ func (c *secrets) DeleteCollection(options *metav1.DeleteOptions, listOptions me
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Timeout(timeout).
 		Body(options).
-		Do(context.TODO()).
+		Do(ctx).
 		Error()
 }
 
 // Patch applies the patch and returns the patched secret.
-func (c *secrets) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Secret, err error) {
+func (c *secrets) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Secret, err error) {
 	result = &v1.Secret{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
@@ -169,7 +169,7 @@ func (c *secrets) Patch(name string, pt types.PatchType, data []byte, subresourc
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(result)
 	return
 }

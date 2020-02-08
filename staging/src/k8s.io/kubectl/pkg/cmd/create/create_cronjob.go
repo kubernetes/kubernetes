@@ -17,6 +17,7 @@ limitations under the License.
 package create
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/spf13/cobra"
@@ -164,7 +165,7 @@ func (o *CreateCronJobOptions) Run() error {
 
 	if !o.DryRun {
 		var err error
-		cronjob, err = o.Client.CronJobs(o.Namespace).Create(cronjob)
+		cronjob, err = o.Client.CronJobs(o.Namespace).Create(context.TODO(), cronjob)
 		if err != nil {
 			return fmt.Errorf("failed to create cronjob: %v", err)
 		}

@@ -58,7 +58,7 @@ func TestMaxResourceSize(t *testing.T) {
 			Name: "test",
 		},
 	}
-	_, err := clientSet.CoreV1().Secrets("default").Create(secret)
+	_, err := clientSet.CoreV1().Secrets("default").Create(context.TODO(), secret)
 	if err != nil {
 		t.Fatal(err)
 	}

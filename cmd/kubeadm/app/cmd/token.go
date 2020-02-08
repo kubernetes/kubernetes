@@ -17,6 +17,7 @@ limitations under the License.
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -380,7 +381,7 @@ func RunListTokens(out io.Writer, errW io.Writer, client clientset.Interface, pr
 	}
 
 	klog.V(1).Info("[token] retrieving list of bootstrap tokens")
-	secrets, err := client.CoreV1().Secrets(metav1.NamespaceSystem).List(listOptions)
+	secrets, err := client.CoreV1().Secrets(metav1.NamespaceSystem).List(context.TODO(), listOptions)
 	if err != nil {
 		return errors.Wrap(err, "failed to list bootstrap tokens")
 	}
@@ -430,7 +431,7 @@ func RunDeleteTokens(out io.Writer, client clientset.Interface, tokenIDsOrTokens
 
 		tokenSecretName := bootstraputil.BootstrapTokenSecretName(tokenID)
 		klog.V(1).Infof("[token] deleting token %q", tokenID)
-		if err := client.CoreV1().Secrets(metav1.NamespaceSystem).Delete(tokenSecretName, nil); err != nil {
+		if err := client.CoreV1().Secrets(metav1.NamespaceSystem).Delete(context.TODO(), tokenSecretName, nil); err != nil {
 			return errors.Wrapf(err, "failed to delete bootstrap token %q", tokenID)
 		}
 		fmt.Fprintf(out, "bootstrap token %q deleted\n", tokenID)

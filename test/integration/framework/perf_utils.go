@@ -17,6 +17,7 @@ limitations under the License.
 package framework
 
 import (
+	"context"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -89,7 +90,7 @@ func (p *IntegrationTestNodePreparer) PrepareNodes() error {
 	for i := 0; i < numNodes; i++ {
 		var err error
 		for retry := 0; retry < retries; retry++ {
-			_, err = p.client.CoreV1().Nodes().Create(baseNode)
+			_, err = p.client.CoreV1().Nodes().Create(context.TODO(), baseNode)
 			if err == nil || !testutils.IsRetryableAPIError(err) {
 				break
 			}
@@ -124,7 +125,7 @@ func (p *IntegrationTestNodePreparer) CleanupNodes() error {
 		klog.Fatalf("Error listing nodes: %v", err)
 	}
 	for i := range nodes.Items {
-		if err := p.client.CoreV1().Nodes().Delete(nodes.Items[i].Name, &metav1.DeleteOptions{}); err != nil {
+		if err := p.client.CoreV1().Nodes().Delete(context.TODO(), nodes.Items[i].Name, &metav1.DeleteOptions{}); err != nil {
 			klog.Errorf("Error while deleting Node: %v", err)
 		}
 	}

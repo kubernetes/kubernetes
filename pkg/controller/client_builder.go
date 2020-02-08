@@ -120,11 +120,11 @@ func (b SAControllerClientBuilder) Config(name string) (*restclient.Config, erro
 	lw := &cache.ListWatch{
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 			options.FieldSelector = fieldSelector
-			return b.CoreClient.Secrets(b.Namespace).List(options)
+			return b.CoreClient.Secrets(b.Namespace).List(context.TODO(), options)
 		},
 		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 			options.FieldSelector = fieldSelector
-			return b.CoreClient.Secrets(b.Namespace).Watch(options)
+			return b.CoreClient.Secrets(b.Namespace).Watch(context.TODO(), options)
 		},
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -157,7 +157,7 @@ func (b SAControllerClientBuilder) Config(name string) (*restclient.Config, erro
 				if !valid {
 					klog.Warningf("secret %s contained an invalid API token for %s/%s", secret.Name, sa.Namespace, sa.Name)
 					// try to delete the secret containing the invalid token
-					if err := b.CoreClient.Secrets(secret.Namespace).Delete(secret.Name, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+					if err := b.CoreClient.Secrets(secret.Namespace).Delete(context.TODO(), secret.Name, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
 						klog.Warningf("error deleting secret %s containing invalid API token for %s/%s: %v", secret.Name, sa.Namespace, sa.Name, err)
 					}
 					// continue watching for good tokens
@@ -186,7 +186,7 @@ func (b SAControllerClientBuilder) getAuthenticatedConfig(sa *v1.ServiceAccount,
 
 	// Try token review first
 	tokenReview := &v1authenticationapi.TokenReview{Spec: v1authenticationapi.TokenReviewSpec{Token: token}}
-	if tokenResult, err := b.AuthenticationClient.TokenReviews().Create(tokenReview); err == nil {
+	if tokenResult, err := b.AuthenticationClient.TokenReviews().Create(context.TODO(), tokenReview); err == nil {
 		if !tokenResult.Status.Authenticated {
 			klog.Warningf("Token for %s/%s did not authenticate correctly", sa.Namespace, sa.Name)
 			return nil, false, nil

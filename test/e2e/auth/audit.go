@@ -84,19 +84,19 @@ var _ = SIGDescribe("Advanced Audit [DisabledForLargeClusters][Flaky]", func() {
 
 		f.PodClient().CreateSync(pod)
 
-		_, err := f.PodClient().Get(pod.Name, metav1.GetOptions{})
+		_, err := f.PodClient().Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "failed to get audit-pod")
 
-		podChan, err := f.PodClient().Watch(watchOptions)
+		podChan, err := f.PodClient().Watch(context.TODO(), watchOptions)
 		framework.ExpectNoError(err, "failed to create watch for pods")
 		podChan.Stop()
 
 		f.PodClient().Update(pod.Name, updatePod)
 
-		_, err = f.PodClient().List(metav1.ListOptions{})
+		_, err = f.PodClient().List(context.TODO(), metav1.ListOptions{})
 		framework.ExpectNoError(err, "failed to list pods")
 
-		_, err = f.PodClient().Patch(pod.Name, types.JSONPatchType, patch)
+		_, err = f.PodClient().Patch(context.TODO(), pod.Name, types.JSONPatchType, patch)
 		framework.ExpectNoError(err, "failed to patch pod")
 
 		f.PodClient().DeleteSync(pod.Name, &metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
@@ -206,26 +206,26 @@ var _ = SIGDescribe("Advanced Audit [DisabledForLargeClusters][Flaky]", func() {
 		podLabels := map[string]string{"name": "audit-deployment-pod"}
 		d := e2edeploy.NewDeployment("audit-deployment", int32(1), podLabels, "agnhost", imageutils.GetE2EImage(imageutils.Agnhost), appsv1.RecreateDeploymentStrategyType)
 
-		_, err := f.ClientSet.AppsV1().Deployments(namespace).Create(d)
+		_, err := f.ClientSet.AppsV1().Deployments(namespace).Create(context.TODO(), d)
 		framework.ExpectNoError(err, "failed to create audit-deployment")
 
-		_, err = f.ClientSet.AppsV1().Deployments(namespace).Get(d.Name, metav1.GetOptions{})
+		_, err = f.ClientSet.AppsV1().Deployments(namespace).Get(context.TODO(), d.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "failed to get audit-deployment")
 
-		deploymentChan, err := f.ClientSet.AppsV1().Deployments(namespace).Watch(watchOptions)
+		deploymentChan, err := f.ClientSet.AppsV1().Deployments(namespace).Watch(context.TODO(), watchOptions)
 		framework.ExpectNoError(err, "failed to create watch for deployments")
 		deploymentChan.Stop()
 
-		_, err = f.ClientSet.AppsV1().Deployments(namespace).Update(d)
+		_, err = f.ClientSet.AppsV1().Deployments(namespace).Update(context.TODO(), d)
 		framework.ExpectNoError(err, "failed to update audit-deployment")
 
-		_, err = f.ClientSet.AppsV1().Deployments(namespace).Patch(d.Name, types.JSONPatchType, patch)
+		_, err = f.ClientSet.AppsV1().Deployments(namespace).Patch(context.TODO(), d.Name, types.JSONPatchType, patch)
 		framework.ExpectNoError(err, "failed to patch deployment")
 
-		_, err = f.ClientSet.AppsV1().Deployments(namespace).List(metav1.ListOptions{})
+		_, err = f.ClientSet.AppsV1().Deployments(namespace).List(context.TODO(), metav1.ListOptions{})
 		framework.ExpectNoError(err, "failed to create list deployments")
 
-		err = f.ClientSet.AppsV1().Deployments(namespace).Delete("audit-deployment", &metav1.DeleteOptions{})
+		err = f.ClientSet.AppsV1().Deployments(namespace).Delete(context.TODO(), "audit-deployment", &metav1.DeleteOptions{})
 		framework.ExpectNoError(err, "failed to delete deployments")
 
 		expectEvents(f, []utils.AuditEvent{
@@ -339,26 +339,26 @@ var _ = SIGDescribe("Advanced Audit [DisabledForLargeClusters][Flaky]", func() {
 			},
 		}
 
-		_, err := f.ClientSet.CoreV1().ConfigMaps(namespace).Create(configMap)
+		_, err := f.ClientSet.CoreV1().ConfigMaps(namespace).Create(context.TODO(), configMap)
 		framework.ExpectNoError(err, "failed to create audit-configmap")
 
-		_, err = f.ClientSet.CoreV1().ConfigMaps(namespace).Get(configMap.Name, metav1.GetOptions{})
+		_, err = f.ClientSet.CoreV1().ConfigMaps(namespace).Get(context.TODO(), configMap.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "failed to get audit-configmap")
 
-		configMapChan, err := f.ClientSet.CoreV1().ConfigMaps(namespace).Watch(watchOptions)
+		configMapChan, err := f.ClientSet.CoreV1().ConfigMaps(namespace).Watch(context.TODO(), watchOptions)
 		framework.ExpectNoError(err, "failed to create watch for config maps")
 		configMapChan.Stop()
 
-		_, err = f.ClientSet.CoreV1().ConfigMaps(namespace).Update(configMap)
+		_, err = f.ClientSet.CoreV1().ConfigMaps(namespace).Update(context.TODO(), configMap)
 		framework.ExpectNoError(err, "failed to update audit-configmap")
 
-		_, err = f.ClientSet.CoreV1().ConfigMaps(namespace).Patch(configMap.Name, types.JSONPatchType, patch)
+		_, err = f.ClientSet.CoreV1().ConfigMaps(namespace).Patch(context.TODO(), configMap.Name, types.JSONPatchType, patch)
 		framework.ExpectNoError(err, "failed to patch configmap")
 
-		_, err = f.ClientSet.CoreV1().ConfigMaps(namespace).List(metav1.ListOptions{})
+		_, err = f.ClientSet.CoreV1().ConfigMaps(namespace).List(context.TODO(), metav1.ListOptions{})
 		framework.ExpectNoError(err, "failed to list config maps")
 
-		err = f.ClientSet.CoreV1().ConfigMaps(namespace).Delete(configMap.Name, &metav1.DeleteOptions{})
+		err = f.ClientSet.CoreV1().ConfigMaps(namespace).Delete(context.TODO(), configMap.Name, &metav1.DeleteOptions{})
 		framework.ExpectNoError(err, "failed to delete audit-configmap")
 
 		expectEvents(f, []utils.AuditEvent{
@@ -471,26 +471,26 @@ var _ = SIGDescribe("Advanced Audit [DisabledForLargeClusters][Flaky]", func() {
 				"top-secret": []byte("foo-bar"),
 			},
 		}
-		_, err := f.ClientSet.CoreV1().Secrets(namespace).Create(secret)
+		_, err := f.ClientSet.CoreV1().Secrets(namespace).Create(context.TODO(), secret)
 		framework.ExpectNoError(err, "failed to create audit-secret")
 
-		_, err = f.ClientSet.CoreV1().Secrets(namespace).Get(secret.Name, metav1.GetOptions{})
+		_, err = f.ClientSet.CoreV1().Secrets(namespace).Get(context.TODO(), secret.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "failed to get audit-secret")
 
-		secretChan, err := f.ClientSet.CoreV1().Secrets(namespace).Watch(watchOptions)
+		secretChan, err := f.ClientSet.CoreV1().Secrets(namespace).Watch(context.TODO(), watchOptions)
 		framework.ExpectNoError(err, "failed to create watch for secrets")
 		secretChan.Stop()
 
-		_, err = f.ClientSet.CoreV1().Secrets(namespace).Update(secret)
+		_, err = f.ClientSet.CoreV1().Secrets(namespace).Update(context.TODO(), secret)
 		framework.ExpectNoError(err, "failed to update audit-secret")
 
-		_, err = f.ClientSet.CoreV1().Secrets(namespace).Patch(secret.Name, types.JSONPatchType, patch)
+		_, err = f.ClientSet.CoreV1().Secrets(namespace).Patch(context.TODO(), secret.Name, types.JSONPatchType, patch)
 		framework.ExpectNoError(err, "failed to patch secret")
 
-		_, err = f.ClientSet.CoreV1().Secrets(namespace).List(metav1.ListOptions{})
+		_, err = f.ClientSet.CoreV1().Secrets(namespace).List(context.TODO(), metav1.ListOptions{})
 		framework.ExpectNoError(err, "failed to list secrets")
 
-		err = f.ClientSet.CoreV1().Secrets(namespace).Delete(secret.Name, &metav1.DeleteOptions{})
+		err = f.ClientSet.CoreV1().Secrets(namespace).Delete(context.TODO(), secret.Name, &metav1.DeleteOptions{})
 		framework.ExpectNoError(err, "failed to delete audit-secret")
 
 		expectEvents(f, []utils.AuditEvent{
@@ -670,7 +670,7 @@ var _ = SIGDescribe("Advanced Audit [DisabledForLargeClusters][Flaky]", func() {
 		anonymousClient, err := clientset.NewForConfig(config)
 		framework.ExpectNoError(err)
 
-		_, err = anonymousClient.CoreV1().Pods(namespace).Get("another-audit-pod", metav1.GetOptions{})
+		_, err = anonymousClient.CoreV1().Pods(namespace).Get(context.TODO(), "another-audit-pod", metav1.GetOptions{})
 		expectForbidden(err)
 
 		expectEvents(f, []utils.AuditEvent{
@@ -703,7 +703,7 @@ var _ = SIGDescribe("Advanced Audit [DisabledForLargeClusters][Flaky]", func() {
 		impersonatedClient, err := clientset.NewForConfig(config)
 		framework.ExpectNoError(err)
 
-		_, err = impersonatedClient.CoreV1().Pods(namespace).List(metav1.ListOptions{})
+		_, err = impersonatedClient.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{})
 		framework.ExpectNoError(err, "failed to list pods")
 
 		expectEvents(f, []utils.AuditEvent{

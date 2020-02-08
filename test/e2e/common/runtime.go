@@ -17,6 +17,7 @@ limitations under the License.
 package common
 
 import (
+	"context"
 	"fmt"
 	"path"
 	"time"
@@ -299,9 +300,9 @@ while true; do sleep 1; done
 					}
 					secret.Name = "image-pull-secret-" + string(uuid.NewUUID())
 					ginkgo.By("create image pull secret")
-					_, err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(secret)
+					_, err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(context.TODO(), secret)
 					framework.ExpectNoError(err)
-					defer f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Delete(secret.Name, nil)
+					defer f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Delete(context.TODO(), secret.Name, nil)
 					container.ImagePullSecrets = []string{secret.Name}
 				}
 				// checkContainerStatus checks whether the container status matches expectation.

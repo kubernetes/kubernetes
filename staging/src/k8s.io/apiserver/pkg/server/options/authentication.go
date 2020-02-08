@@ -17,6 +17,7 @@ limitations under the License.
 package options
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -339,7 +340,7 @@ func (s *DelegatingAuthenticationOptions) createRequestHeaderConfig(client kuber
 		return nil, fmt.Errorf("unable to create request header authentication config: %v", err)
 	}
 
-	authConfigMap, err := client.CoreV1().ConfigMaps(authenticationConfigMapNamespace).Get(authenticationConfigMapName, metav1.GetOptions{})
+	authConfigMap, err := client.CoreV1().ConfigMaps(authenticationConfigMapNamespace).Get(context.TODO(), authenticationConfigMapName, metav1.GetOptions{})
 	switch {
 	case errors.IsNotFound(err):
 		// ignore, authConfigMap is nil now

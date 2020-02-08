@@ -19,6 +19,7 @@ limitations under the License.
 package v1beta2
 
 import (
+	"context"
 	time "time"
 
 	appsv1beta2 "k8s.io/api/apps/v1beta2"
@@ -61,13 +62,13 @@ func NewFilteredDaemonSetInformer(client kubernetes.Interface, namespace string,
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.AppsV1beta2().DaemonSets(namespace).List(options)
+				return client.AppsV1beta2().DaemonSets(namespace).List(context.TODO(), options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.AppsV1beta2().DaemonSets(namespace).Watch(options)
+				return client.AppsV1beta2().DaemonSets(namespace).Watch(context.TODO(), options)
 			},
 		},
 		&appsv1beta2.DaemonSet{},

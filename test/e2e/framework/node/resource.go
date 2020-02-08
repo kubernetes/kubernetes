@@ -17,6 +17,7 @@ limitations under the License.
 package node
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"strings"
@@ -336,7 +337,7 @@ func GetReadyNodesIncludingTainted(c clientset.Interface) (nodes *v1.NodeList, e
 func GetMasterAndWorkerNodes(c clientset.Interface) (sets.String, *v1.NodeList, error) {
 	nodes := &v1.NodeList{}
 	masters := sets.NewString()
-	all, err := c.CoreV1().Nodes().List(metav1.ListOptions{})
+	all, err := c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return nil, nil, fmt.Errorf("get nodes error: %s", err)
 	}
@@ -460,7 +461,7 @@ func hasNonblockingTaint(node *v1.Node, nonblockingTaints string) bool {
 func PodNodePairs(c clientset.Interface, ns string) ([]PodNode, error) {
 	var result []PodNode
 
-	podList, err := c.CoreV1().Pods(ns).List(metav1.ListOptions{})
+	podList, err := c.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return result, err
 	}

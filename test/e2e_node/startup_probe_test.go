@@ -17,6 +17,7 @@ limitations under the License.
 package e2enode
 
 import (
+	"context"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -168,12 +169,12 @@ var _ = framework.KubeDescribe("StartupProbe [Serial] [Disruptive]", func() {
 			}
 			p := podClient.Create(startupPodSpec(startupProbe, readinessProbe, nil, cmd))
 
-			p, err := podClient.Get(p.Name, metav1.GetOptions{})
+			p, err := podClient.Get(context.TODO(), p.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 
 			f.WaitForPodReady(p.Name)
 
-			p, err = podClient.Get(p.Name, metav1.GetOptions{})
+			p, err = podClient.Get(context.TODO(), p.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 
 			isReady, err := testutils.PodRunningReady(p)

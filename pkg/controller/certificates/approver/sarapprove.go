@@ -18,6 +18,7 @@ limitations under the License.
 package approver
 
 import (
+	"context"
 	"crypto/x509"
 	"fmt"
 	"reflect"
@@ -129,7 +130,7 @@ func (a *sarApprover) authorize(csr *capi.CertificateSigningRequest, rattrs auth
 			ResourceAttributes: &rattrs,
 		},
 	}
-	sar, err := a.client.AuthorizationV1().SubjectAccessReviews().Create(sar)
+	sar, err := a.client.AuthorizationV1().SubjectAccessReviews().Create(context.TODO(), sar)
 	if err != nil {
 		return false, err
 	}

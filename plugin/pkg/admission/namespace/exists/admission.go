@@ -76,7 +76,7 @@ func (e *Exists) Validate(ctx context.Context, a admission.Attributes, o admissi
 	}
 
 	// in case of latency in our caches, make a call direct to storage to verify that it truly exists or not
-	_, err = e.client.CoreV1().Namespaces().Get(a.GetNamespace(), metav1.GetOptions{})
+	_, err = e.client.CoreV1().Namespaces().Get(context.TODO(), a.GetNamespace(), metav1.GetOptions{})
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return err

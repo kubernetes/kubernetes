@@ -17,6 +17,7 @@ limitations under the License.
 package pod
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -33,7 +34,7 @@ func TestPatchPodStatus(t *testing.T) {
 	name := "name"
 	uid := types.UID("myuid")
 	client := &fake.Clientset{}
-	client.CoreV1().Pods(ns).Create(&v1.Pod{
+	client.CoreV1().Pods(ns).Create(context.TODO(), &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: ns,
 			Name:      name,

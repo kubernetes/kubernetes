@@ -19,6 +19,7 @@ package scheduler
 // This file tests the Taint feature.
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"testing"
@@ -530,11 +531,11 @@ func TestTaintNodeByCondition(t *testing.T) {
 				},
 			}
 
-			if _, err := cs.CoreV1().Nodes().Create(node); err != nil {
+			if _, err := cs.CoreV1().Nodes().Create(context.TODO(), node); err != nil {
 				t.Errorf("Failed to create node, err: %v", err)
 			}
 			if err := waitForNodeTaints(cs, node, test.expectedTaints); err != nil {
-				node, err = cs.CoreV1().Nodes().Get(node.Name, metav1.GetOptions{})
+				node, err = cs.CoreV1().Nodes().Get(context.TODO(), node.Name, metav1.GetOptions{})
 				if err != nil {
 					t.Errorf("Failed to get node <%s>", node.Name)
 				}
@@ -548,7 +549,7 @@ func TestTaintNodeByCondition(t *testing.T) {
 				pod.Name = fmt.Sprintf("%s-%d", pod.Name, i)
 				pod.Spec.Tolerations = p.tolerations
 
-				createdPod, err := cs.CoreV1().Pods(pod.Namespace).Create(pod)
+				createdPod, err := cs.CoreV1().Pods(pod.Namespace).Create(context.TODO(), pod)
 				if err != nil {
 					t.Fatalf("Failed to create pod %s/%s, error: %v",
 						pod.Namespace, pod.Name, err)
@@ -668,7 +669,7 @@ func TestTaintBasedEvictions(t *testing.T) {
 			defer cleanupTest(t, testCtx)
 			cs := testCtx.clientSet
 			informers := testCtx.informerFactory
-			_, err := cs.CoreV1().Namespaces().Create(testCtx.ns)
+			_, err := cs.CoreV1().Namespaces().Create(context.TODO(), testCtx.ns)
 			if err != nil {
 				t.Errorf("Failed to create namespace %+v", err)
 			}
@@ -730,7 +731,7 @@ func TestTaintBasedEvictions(t *testing.T) {
 						},
 					},
 				})
-				if _, err := cs.CoreV1().Nodes().Create(nodes[i]); err != nil {
+				if _, err := cs.CoreV1().Nodes().Create(context.TODO(), nodes[i]); err != nil {
 					t.Errorf("Failed to create node, err: %v", err)
 				}
 			}
@@ -742,7 +743,7 @@ func TestTaintBasedEvictions(t *testing.T) {
 					test.pod.Spec.Tolerations[0].TolerationSeconds = &tolerationSeconds[i]
 				}
 
-				test.pod, err = cs.CoreV1().Pods(testCtx.ns.Name).Create(test.pod)
+				test.pod, err = cs.CoreV1().Pods(testCtx.ns.Name).Create(context.TODO(), test.pod)
 				if err != nil {
 					t.Fatalf("Test Failed: error: %v, while creating pod", err)
 				}
@@ -751,11 +752,11 @@ func TestTaintBasedEvictions(t *testing.T) {
 					t.Errorf("Failed to schedule pod %s/%s on the node, err: %v",
 						test.pod.Namespace, test.pod.Name, err)
 				}
-				test.pod, err = cs.CoreV1().Pods(testCtx.ns.Name).Get(test.pod.Name, metav1.GetOptions{})
+				test.pod, err = cs.CoreV1().Pods(testCtx.ns.Name).Get(context.TODO(), test.pod.Name, metav1.GetOptions{})
 				if err != nil {
 					t.Fatalf("Test Failed: error: %v, while creating pod", err)
 				}
-				neededNode, err = cs.CoreV1().Nodes().Get(test.pod.Spec.NodeName, metav1.GetOptions{})
+				neededNode, err = cs.CoreV1().Nodes().Get(context.TODO(), test.pod.Spec.NodeName, metav1.GetOptions{})
 				if err != nil {
 					t.Fatalf("Error while getting node associated with pod %v with err %v", test.pod.Name, err)
 				}
@@ -827,7 +828,7 @@ func TestTaintBasedEvictions(t *testing.T) {
 					return false, nil
 				})
 				if err != nil {
-					pod, _ := cs.CoreV1().Pods(testCtx.ns.Name).Get(test.pod.Name, metav1.GetOptions{})
+					pod, _ := cs.CoreV1().Pods(testCtx.ns.Name).Get(context.TODO(), test.pod.Name, metav1.GetOptions{})
 					t.Fatalf("Error: %v, Expected test pod to be %s but it's %v", err, test.waitForPodCondition, pod)
 				}
 				cleanupPods(cs, t, []*v1.Pod{test.pod})

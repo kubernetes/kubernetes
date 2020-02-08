@@ -17,6 +17,7 @@ limitations under the License.
 package rootcacertpublisher
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"time"
@@ -178,7 +179,7 @@ func (c *Publisher) syncNamespace(ns string) error {
 	cm, err := c.cmLister.ConfigMaps(ns).Get(RootCACertConfigMapName)
 	switch {
 	case apierrors.IsNotFound(err):
-		_, err := c.client.CoreV1().ConfigMaps(ns).Create(&v1.ConfigMap{
+		_, err := c.client.CoreV1().ConfigMaps(ns).Create(context.TODO(), &v1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: RootCACertConfigMapName,
 			},
@@ -201,7 +202,7 @@ func (c *Publisher) syncNamespace(ns string) error {
 
 	cm.Data = data
 
-	_, err = c.client.CoreV1().ConfigMaps(ns).Update(cm)
+	_, err = c.client.CoreV1().ConfigMaps(ns).Update(context.TODO(), cm)
 	return err
 }
 

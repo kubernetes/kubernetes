@@ -17,6 +17,7 @@ limitations under the License.
 package scheduling
 
 import (
+	"context"
 	"fmt"
 	"math"
 
@@ -81,7 +82,7 @@ func SpreadServiceOrFail(f *framework.Framework, replicaCount int, image string)
 			}},
 		},
 	}
-	_, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(serviceSpec)
+	_, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(context.TODO(), serviceSpec)
 	framework.ExpectNoError(err)
 
 	// Now create some pods behind the service
@@ -140,7 +141,7 @@ func getZoneCount(c clientset.Interface) (int, error) {
 // Find the name of the zone in which the pod is scheduled
 func getZoneNameForPod(c clientset.Interface, pod v1.Pod) (string, error) {
 	ginkgo.By(fmt.Sprintf("Getting zone name for pod %s, on node %s", pod.Name, pod.Spec.NodeName))
-	node, err := c.CoreV1().Nodes().Get(pod.Spec.NodeName, metav1.GetOptions{})
+	node, err := c.CoreV1().Nodes().Get(context.TODO(), pod.Spec.NodeName, metav1.GetOptions{})
 	framework.ExpectNoError(err)
 	return getZoneNameForNode(*node)
 }
@@ -180,7 +181,7 @@ func checkZoneSpreading(c clientset.Interface, pods *v1.PodList, zoneNames []str
 func SpreadRCOrFail(f *framework.Framework, replicaCount int32, image string, args []string) {
 	name := "ubelite-spread-rc-" + string(uuid.NewUUID())
 	ginkgo.By(fmt.Sprintf("Creating replication controller %s", name))
-	controller, err := f.ClientSet.CoreV1().ReplicationControllers(f.Namespace.Name).Create(&v1.ReplicationController{
+	controller, err := f.ClientSet.CoreV1().ReplicationControllers(f.Namespace.Name).Create(context.TODO(), &v1.ReplicationController{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: f.Namespace.Name,
 			Name:      name,

@@ -17,6 +17,7 @@ limitations under the License.
 package upgrade
 
 import (
+	"context"
 	"os"
 
 	"github.com/pkg/errors"
@@ -120,7 +121,7 @@ func removeOldDNSDeploymentIfAnotherDNSIsUsed(cfg *kubeadmapi.ClusterConfigurati
 
 		// If we're dry-running, we don't need to wait for the new DNS addon to become ready
 		if !dryRun {
-			dnsDeployment, err := client.AppsV1().Deployments(metav1.NamespaceSystem).Get(installedDeploymentName, metav1.GetOptions{})
+			dnsDeployment, err := client.AppsV1().Deployments(metav1.NamespaceSystem).Get(context.TODO(), installedDeploymentName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}

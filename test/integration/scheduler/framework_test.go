@@ -951,7 +951,7 @@ func TestBindPlugin(t *testing.T) {
 				t.Errorf("test #%v: Expected the pod to be scheduled. error: %v", i, err)
 				continue
 			}
-			pod, err = testCtx.clientSet.CoreV1().Pods(pod.Namespace).Get(pod.Name, metav1.GetOptions{})
+			pod, err = testCtx.clientSet.CoreV1().Pods(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
 			if err != nil {
 				t.Errorf("can't get pod: %v", err)
 			}

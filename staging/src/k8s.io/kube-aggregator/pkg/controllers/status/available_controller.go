@@ -17,6 +17,7 @@ limitations under the License.
 package apiserver
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -369,7 +370,7 @@ func updateAPIServiceStatus(client apiregistrationclient.APIServicesGetter, orig
 		return newAPIService, nil
 	}
 
-	newAPIService, err := client.APIServices().UpdateStatus(newAPIService)
+	newAPIService, err := client.APIServices().UpdateStatus(context.TODO(), newAPIService)
 	if err != nil {
 		return nil, err
 	}

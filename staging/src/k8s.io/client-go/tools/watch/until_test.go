@@ -237,10 +237,10 @@ func TestUntilWithSync(t *testing.T) {
 
 				return &cache.ListWatch{
 					ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-						return fakeclient.CoreV1().Secrets("").List(options)
+						return fakeclient.CoreV1().Secrets("").List(context.TODO(), options)
 					},
 					WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-						return fakeclient.CoreV1().Secrets("").Watch(options)
+						return fakeclient.CoreV1().Secrets("").Watch(context.TODO(), options)
 					},
 				}
 			}(),
@@ -267,10 +267,10 @@ func TestUntilWithSync(t *testing.T) {
 
 				return &cache.ListWatch{
 					ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-						return fakeclient.CoreV1().Secrets("").List(options)
+						return fakeclient.CoreV1().Secrets("").List(context.TODO(), options)
 					},
 					WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-						return fakeclient.CoreV1().Secrets("").Watch(options)
+						return fakeclient.CoreV1().Secrets("").Watch(context.TODO(), options)
 					},
 				}
 			}(),
