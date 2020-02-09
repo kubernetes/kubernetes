@@ -241,7 +241,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 		// This can't be Conformance yet because it depends on a default
 		// StorageClass and a dynamic provisioner.
-		ginkgo.It("should not deadlock when a pod's predecessor fails", func() {
+		ginkgo.It("[Serial] should not deadlock when a pod's predecessor fails", func() {
 			ginkgo.By("Creating statefulset " + ssName + " in namespace " + ns)
 			e2epv.SkipIfNoDefaultStorageClass(c)
 			*(ss.Spec.Replicas) = 2
