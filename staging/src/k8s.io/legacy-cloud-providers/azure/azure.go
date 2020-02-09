@@ -518,7 +518,7 @@ func (az *Cloud) InitializeCloudFromConfig(config *Config, fromSecret bool) erro
 	az.VirtualMachineScaleSetVMsClient = vmssvmclient.New(vmssVMClientConfig)
 
 	disksClientConfig := azClientConfig.WithRateLimiter(config.DiskRateLimit)
-	disksClientConfig.Backoff = disksClientConfig.Backoff.WithNonRetriableErrors([]string{}, []int{http.StatusNotFound})
+	disksClientConfig.Backoff = disksClientConfig.Backoff.WithNonRetriableErrors([]string{}, []int{http.StatusNotFound, http.StatusConflict})
 	az.DisksClient = diskclient.New(disksClientConfig)
 
 	if az.MaximumLoadBalancerRuleCount == 0 {
