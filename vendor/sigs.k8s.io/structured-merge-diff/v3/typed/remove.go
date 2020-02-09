@@ -20,17 +20,19 @@ import (
 )
 
 type removingWalker struct {
-	value    value.Value
-	out      interface{}
-	schema   *schema.Schema
-	toRemove *fieldpath.Set
+	value     value.Value
+	out       interface{}
+	schema    *schema.Schema
+	toRemove  *fieldpath.Set
+	allocator value.Allocator
 }
 
 func removeItemsWithSchema(val value.Value, toRemove *fieldpath.Set, schema *schema.Schema, typeRef schema.TypeRef) value.Value {
 	w := &removingWalker{
-		value:    val,
-		schema:   schema,
-		toRemove: toRemove,
+		value:     val,
+		schema:    schema,
+		toRemove:  toRemove,
+		allocator: value.NewFreelistAllocator(),
 	}
 	resolveSchema(schema, typeRef, val, w)
 	return value.NewValueInterface(w.out)
@@ -42,18 +44,20 @@ func (w *removingWalker) doScalar(t *schema.Scalar) ValidationErrors {
 }
 
 func (w *removingWalker) doList(t *schema.List) (errs ValidationErrors) {
-	l := w.value.AsList()
-
+	l := w.value.AsListUsing(w.allocator)
+	defer w.allocator.Free(l)
 	// If list is null, empty, or atomic just return
 	if l == nil || l.Length() == 0 || t.ElementRelationship == schema.Atomic {
 		return nil
 	}
 
 	var newItems []interface{}
-	for i := 0; i < l.Length(); i++ {
-		item := l.At(i)
+	iter := l.RangeUsing(w.allocator)
+	defer w.allocator.Free(iter)
+	for iter.Next() {
+		i, item := iter.Item()
 		// Ignore error because we have already validated this list
-		pe, _ := listItemToPathElement(t, i, item)
+		pe, _ := listItemToPathElement(w.allocator, t, i, item)
 		path, _ := fieldpath.MakePath(pe)
 		if w.toRemove.Has(path) {
 			continue
@@ -70,10 +74,12 @@ func (w *removingWalker) doList(t *schema.List) (errs ValidationErrors) {
 }
 
 func (w *removingWalker) doMap(t *schema.Map) ValidationErrors {
-	m := w.value.AsMap()
-
+	m := w.value.AsMapUsing(w.allocator)
+	if m != nil {
+		defer w.allocator.Free(m)
+	}
 	// If map is null, empty, or atomic just return
-	if m == nil || m.Length() == 0 || t.ElementRelationship == schema.Atomic {
+	if m == nil || m.Empty() || t.ElementRelationship == schema.Atomic {
 		return nil
 	}
 

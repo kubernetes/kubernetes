@@ -55,9 +55,15 @@ type Value interface {
 	// AsMap converts the Value into a Map (or panic if the type
 	// doesn't allow it).
 	AsMap() Map
+	// AsMapUsing uses the provided allocator and converts the Value
+	// into a Map (or panic if the type doesn't allow it).
+	AsMapUsing(Allocator) Map
 	// AsList converts the Value into a List (or panic if the type
 	// doesn't allow it).
 	AsList() List
+	// AsListUsing uses the provided allocator and converts the Value
+	// into a List (or panic if the type doesn't allow it).
+	AsListUsing(Allocator) List
 	// AsBool converts the Value into a bool (or panic if the type
 	// doesn't allow it).
 	AsBool() bool
@@ -70,10 +76,6 @@ type Value interface {
 	// AsString converts the Value into a string (or panic if the type
 	// doesn't allow it).
 	AsString() string
-
-	// Recycle returns a value of this type that is no longer needed. The
-	// value shouldn't be used after this call.
-	Recycle()
 
 	// Unstructured converts the Value into an Unstructured interface{}.
 	Unstructured() interface{}
@@ -128,6 +130,11 @@ func ToYAML(v Value) ([]byte, error) {
 
 // Equals returns true iff the two values are equal.
 func Equals(lhs, rhs Value) bool {
+	return EqualsUsing(HeapAllocator, lhs, rhs)
+}
+
+// EqualsUsing uses the provided allocator and returns true iff the two values are equal.
+func EqualsUsing(a Allocator, lhs, rhs Value) bool {
 	if lhs.IsFloat() || rhs.IsFloat() {
 		var lf float64
 		if lhs.IsFloat() {
@@ -173,7 +180,11 @@ func Equals(lhs, rhs Value) bool {
 	}
 	if lhs.IsList() {
 		if rhs.IsList() {
-			return ListEquals(lhs.AsList(), rhs.AsList())
+			lhsList := lhs.AsListUsing(a)
+			defer a.Free(lhsList)
+			rhsList := rhs.AsListUsing(a)
+			defer a.Free(rhsList)
+			return lhsList.EqualsUsing(a, rhsList)
 		}
 		return false
 	} else if rhs.IsList() {
@@ -181,7 +192,11 @@ func Equals(lhs, rhs Value) bool {
 	}
 	if lhs.IsMap() {
 		if rhs.IsMap() {
-			return lhs.AsMap().Equals(rhs.AsMap())
+			lhsList := lhs.AsMapUsing(a)
+			defer a.Free(lhsList)
+			rhsList := rhs.AsMapUsing(a)
+			defer a.Free(rhsList)
+			return lhsList.EqualsUsing(a, rhsList)
 		}
 		return false
 	} else if rhs.IsMap() {
@@ -215,8 +230,9 @@ func ToString(v Value) string {
 		return fmt.Sprintf("%v", v.AsBool())
 	case v.IsList():
 		strs := []string{}
-		for i := 0; i < v.AsList().Length(); i++ {
-			strs = append(strs, ToString(v.AsList().At(i)))
+		list := v.AsList()
+		for i := 0; i < list.Length(); i++ {
+			strs = append(strs, ToString(list.At(i)))
 		}
 		return "[" + strings.Join(strs, ",") + "]"
 	case v.IsMap():
@@ -241,6 +257,14 @@ func Less(lhs, rhs Value) bool {
 // sorted, even if they are of different types). The result will be 0 if
 // v==rhs, -1 if v < rhs, and +1 if v > rhs.
 func Compare(lhs, rhs Value) int {
+	return CompareUsing(HeapAllocator, lhs, rhs)
+}
+
+// CompareUsing uses the provided allocator and provides a total
+// ordering for Value (so that they can be sorted, even if they
+// are of different types). The result will be 0 if v==rhs, -1
+// if v < rhs, and +1 if v > rhs.
+func CompareUsing(a Allocator, lhs, rhs Value) int {
 	if lhs.IsFloat() {
 		if !rhs.IsFloat() {
 			// Extra: compare floats and ints numerically.
@@ -289,7 +313,11 @@ func Compare(lhs, rhs Value) int {
 		if !rhs.IsList() {
 			return -1
 		}
-		return ListCompare(lhs.AsList(), rhs.AsList())
+		lhsList := lhs.AsListUsing(a)
+		defer a.Free(lhsList)
+		rhsList := rhs.AsListUsing(a)
+		defer a.Free(rhsList)
+		return ListCompareUsing(a, lhsList, rhsList)
 	} else if rhs.IsList() {
 		return 1
 	}
@@ -297,7 +325,11 @@ func Compare(lhs, rhs Value) int {
 		if !rhs.IsMap() {
 			return -1
 		}
-		return MapCompare(lhs.AsMap(), rhs.AsMap())
+		lhsMap := lhs.AsMapUsing(a)
+		defer a.Free(lhsMap)
+		rhsMap := rhs.AsMapUsing(a)
+		defer a.Free(rhsMap)
+		return MapCompareUsing(a, lhsMap, rhsMap)
 	} else if rhs.IsMap() {
 		return 1
 	}

@@ -18,27 +18,24 @@ package value
 
 import (
 	"fmt"
-	"sync"
 )
-
-var viPool = sync.Pool{
-	New: func() interface{} {
-		return &valueUnstructured{}
-	},
-}
 
 // NewValueInterface creates a Value backed by an "interface{}" type,
 // typically an unstructured object in Kubernetes world.
 // interface{} must be one of: map[string]interface{}, map[interface{}]interface{}, []interface{}, int types, float types,
 // string or boolean. Nested interface{} must also be one of these types.
 func NewValueInterface(v interface{}) Value {
-	vi := viPool.Get().(*valueUnstructured)
-	vi.Value = v
-	return Value(vi)
+	return Value(HeapAllocator.allocValueUnstructured().reuse(v))
 }
 
 type valueUnstructured struct {
 	Value interface{}
+}
+
+// reuse replaces the value of the valueUnstructured.
+func (vi *valueUnstructured) reuse(value interface{}) Value {
+	vi.Value = value
+	return vi
 }
 
 func (v valueUnstructured) IsMap() bool {
@@ -52,6 +49,10 @@ func (v valueUnstructured) IsMap() bool {
 }
 
 func (v valueUnstructured) AsMap() Map {
+	return v.AsMapUsing(HeapAllocator)
+}
+
+func (v valueUnstructured) AsMapUsing(_ Allocator) Map {
 	if v.Value == nil {
 		panic("invalid nil")
 	}
@@ -73,6 +74,10 @@ func (v valueUnstructured) IsList() bool {
 }
 
 func (v valueUnstructured) AsList() List {
+	return v.AsListUsing(HeapAllocator)
+}
+
+func (v valueUnstructured) AsListUsing(_ Allocator) List {
 	return listUnstructured(v.Value.([]interface{}))
 }
 
@@ -166,10 +171,6 @@ func (v valueUnstructured) AsBool() bool {
 
 func (v valueUnstructured) IsNull() bool {
 	return v.Value == nil
-}
-
-func (v *valueUnstructured) Recycle() {
-	viPool.Put(v)
 }
 
 func (v valueUnstructured) Unstructured() interface{} {
