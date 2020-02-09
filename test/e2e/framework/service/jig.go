@@ -106,7 +106,7 @@ func (j *TestJig) CreateTCPServiceWithPort(tweak func(svc *v1.Service), port int
 	if tweak != nil {
 		tweak(svc)
 	}
-	result, err := j.Client.CoreV1().Services(j.Namespace).Create(context.TODO(), svc)
+	result, err := j.Client.CoreV1().Services(j.Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create TCP Service %q: %v", svc.Name, err)
 	}
@@ -121,7 +121,7 @@ func (j *TestJig) CreateTCPService(tweak func(svc *v1.Service)) (*v1.Service, er
 	if tweak != nil {
 		tweak(svc)
 	}
-	result, err := j.Client.CoreV1().Services(j.Namespace).Create(context.TODO(), svc)
+	result, err := j.Client.CoreV1().Services(j.Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create TCP Service %q: %v", svc.Name, err)
 	}
@@ -136,7 +136,7 @@ func (j *TestJig) CreateUDPService(tweak func(svc *v1.Service)) (*v1.Service, er
 	if tweak != nil {
 		tweak(svc)
 	}
-	result, err := j.Client.CoreV1().Services(j.Namespace).Create(context.TODO(), svc)
+	result, err := j.Client.CoreV1().Services(j.Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create UDP Service %q: %v", svc.Name, err)
 	}
@@ -161,7 +161,7 @@ func (j *TestJig) CreateExternalNameService(tweak func(svc *v1.Service)) (*v1.Se
 	if tweak != nil {
 		tweak(svc)
 	}
-	result, err := j.Client.CoreV1().Services(j.Namespace).Create(context.TODO(), svc)
+	result, err := j.Client.CoreV1().Services(j.Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create ExternalName Service %q: %v", svc.Name, err)
 	}
@@ -253,7 +253,7 @@ func (j *TestJig) CreateLoadBalancerService(timeout time.Duration, tweak func(sv
 	if tweak != nil {
 		tweak(svc)
 	}
-	_, err := j.Client.CoreV1().Services(j.Namespace).Create(context.TODO(), svc)
+	_, err := j.Client.CoreV1().Services(j.Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create LoadBalancer Service %q: %v", svc.Name, err)
 	}
@@ -443,7 +443,7 @@ func (j *TestJig) UpdateService(update func(*v1.Service)) (*v1.Service, error) {
 			return nil, fmt.Errorf("failed to get Service %q: %v", j.Name, err)
 		}
 		update(service)
-		result, err := j.Client.CoreV1().Services(j.Namespace).Update(context.TODO(), service)
+		result, err := j.Client.CoreV1().Services(j.Namespace).Update(context.TODO(), service, metav1.UpdateOptions{})
 		if err == nil {
 			return j.sanityCheckService(result, service.Spec.Type)
 		}
@@ -619,7 +619,7 @@ func (j *TestJig) AddRCAntiAffinity(rc *v1.ReplicationController) {
 // CreatePDB returns a PodDisruptionBudget for the given ReplicationController, or returns an error if a PodDisruptionBudget isn't ready
 func (j *TestJig) CreatePDB(rc *v1.ReplicationController) (*policyv1beta1.PodDisruptionBudget, error) {
 	pdb := j.newPDBTemplate(rc)
-	newPdb, err := j.Client.PolicyV1beta1().PodDisruptionBudgets(j.Namespace).Create(context.TODO(), pdb)
+	newPdb, err := j.Client.PolicyV1beta1().PodDisruptionBudgets(j.Namespace).Create(context.TODO(), pdb, metav1.CreateOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create PDB %q %v", pdb.Name, err)
 	}
@@ -659,7 +659,7 @@ func (j *TestJig) Run(tweak func(rc *v1.ReplicationController)) (*v1.Replication
 	if tweak != nil {
 		tweak(rc)
 	}
-	result, err := j.Client.CoreV1().ReplicationControllers(j.Namespace).Create(context.TODO(), rc)
+	result, err := j.Client.CoreV1().ReplicationControllers(j.Namespace).Create(context.TODO(), rc, metav1.CreateOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create RC %q: %v", rc.Name, err)
 	}
@@ -683,7 +683,7 @@ func (j *TestJig) Scale(replicas int) error {
 
 	scale.ResourceVersion = "" // indicate the scale update should be unconditional
 	scale.Spec.Replicas = int32(replicas)
-	_, err = j.Client.CoreV1().ReplicationControllers(j.Namespace).UpdateScale(context.TODO(), rc, scale)
+	_, err = j.Client.CoreV1().ReplicationControllers(j.Namespace).UpdateScale(context.TODO(), rc, scale, metav1.UpdateOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to scale RC %q: %v", rc, err)
 	}

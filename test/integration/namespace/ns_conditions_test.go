@@ -47,7 +47,7 @@ func TestNamespaceCondition(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: nsName,
 		},
-	})
+	}, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}

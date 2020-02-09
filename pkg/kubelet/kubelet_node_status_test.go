@@ -2264,7 +2264,7 @@ func TestUpdateNodeAddresses(t *testing.T) {
 				},
 			}
 
-			_, err := kubeClient.CoreV1().Nodes().Update(context.TODO(), oldNode)
+			_, err := kubeClient.CoreV1().Nodes().Update(context.TODO(), oldNode, metav1.UpdateOptions{})
 			assert.NoError(t, err)
 			kubelet.setNodeStatusFuncs = []func(*v1.Node) error{
 				func(node *v1.Node) error {

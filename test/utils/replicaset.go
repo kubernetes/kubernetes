@@ -40,7 +40,7 @@ func UpdateReplicaSetWithRetries(c clientset.Interface, namespace, name string, 
 		}
 		// Apply the update, then attempt to push it to the apiserver.
 		applyUpdate(rs)
-		if rs, err = c.AppsV1().ReplicaSets(namespace).Update(context.TODO(), rs); err == nil {
+		if rs, err = c.AppsV1().ReplicaSets(namespace).Update(context.TODO(), rs, metav1.UpdateOptions{}); err == nil {
 			logf("Updating replica set %q", name)
 			return true, nil
 		}
@@ -78,7 +78,7 @@ func UpdateReplicaSetStatusWithRetries(c clientset.Interface, namespace, name st
 		}
 		// Apply the update, then attempt to push it to the apiserver.
 		applyUpdate(rs)
-		if rs, err = c.AppsV1().ReplicaSets(namespace).UpdateStatus(context.TODO(), rs); err == nil {
+		if rs, err = c.AppsV1().ReplicaSets(namespace).UpdateStatus(context.TODO(), rs, metav1.UpdateOptions{}); err == nil {
 			logf("Updating replica set %q", name)
 			return true, nil
 		}

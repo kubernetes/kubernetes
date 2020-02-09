@@ -23,6 +23,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	flowcontrolv1alpha1 "k8s.io/api/flowcontrol/v1alpha1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap"
 	"k8s.io/client-go/kubernetes/fake"
 	flowcontrolapisv1alpha1 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1alpha1"
@@ -50,7 +51,7 @@ func TestShouldEnsurePredefinedSettings(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			c := fake.NewSimpleClientset()
 			if testCase.existingPriorityLevel != nil {
-				c.FlowcontrolV1alpha1().PriorityLevelConfigurations().Create(context.TODO(), testCase.existingPriorityLevel)
+				c.FlowcontrolV1alpha1().PriorityLevelConfigurations().Create(context.TODO(), testCase.existingPriorityLevel, metav1.CreateOptions{})
 			}
 			should, err := lastMandatoryExists(c.FlowcontrolV1alpha1())
 			assert.NoError(t, err)

@@ -207,7 +207,7 @@ func testPodSELinuxLabeling(f *framework.Framework, hostIPC bool, hostPID bool) 
 	pod.Spec.Containers[0].Command = []string{"sleep", "6000"}
 
 	client := f.ClientSet.CoreV1().Pods(f.Namespace.Name)
-	pod, err := client.Create(context.TODO(), pod)
+	pod, err := client.Create(context.TODO(), pod, metav1.CreateOptions{})
 
 	framework.ExpectNoError(err, "Error creating pod %v", pod)
 	framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(f.ClientSet, pod))
@@ -263,7 +263,7 @@ func testPodSELinuxLabeling(f *framework.Framework, hostIPC bool, hostPID bool) 
 	pod.Spec.SecurityContext.SELinuxOptions = &v1.SELinuxOptions{
 		Level: "s0:c2,c3",
 	}
-	_, err = client.Create(context.TODO(), pod)
+	_, err = client.Create(context.TODO(), pod, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "Error creating pod %v", pod)
 
 	err = f.WaitForPodRunning(pod.Name)

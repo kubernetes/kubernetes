@@ -483,7 +483,7 @@ func (r *RollingUpdater) getOrCreateTargetControllerWithClient(controller *corev
 		controller.Annotations[desiredReplicasAnnotation] = fmt.Sprintf("%d", valOrZero(controller.Spec.Replicas))
 		controller.Annotations[sourceIDAnnotation] = sourceID
 		controller.Spec.Replicas = utilpointer.Int32Ptr(0)
-		newRc, err := r.rcClient.ReplicationControllers(r.ns).Create(context.TODO(), controller)
+		newRc, err := r.rcClient.ReplicationControllers(r.ns).Create(context.TODO(), controller, metav1.CreateOptions{})
 		return newRc, false, err
 	}
 	// Validate and use the existing controller.
@@ -576,7 +576,7 @@ func Rename(c corev1client.ReplicationControllersGetter, rc *corev1.ReplicationC
 		return err
 	}
 	// Then create the same RC with the new name.
-	_, err = c.ReplicationControllers(rc.Namespace).Create(context.TODO(), rc)
+	_, err = c.ReplicationControllers(rc.Namespace).Create(context.TODO(), rc, metav1.CreateOptions{})
 	return err
 }
 
@@ -783,7 +783,7 @@ func updateRcWithRetries(rcClient corev1client.ReplicationControllersGetter, nam
 	err := retry.RetryOnConflict(retry.DefaultBackoff, func() (e error) {
 		// Apply the update, then attempt to push it to the apiserver.
 		applyUpdate(rc)
-		if rc, e = rcClient.ReplicationControllers(namespace).Update(context.TODO(), rc); e == nil {
+		if rc, e = rcClient.ReplicationControllers(namespace).Update(context.TODO(), rc, metav1.UpdateOptions{}); e == nil {
 			// rc contains the latest controller post update
 			return
 		}
@@ -814,7 +814,7 @@ func updatePodWithRetries(podClient corev1client.PodsGetter, namespace string, p
 	err := retry.RetryOnConflict(retry.DefaultBackoff, func() (e error) {
 		// Apply the update, then attempt to push it to the apiserver.
 		applyUpdate(pod)
-		if pod, e = podClient.Pods(namespace).Update(context.TODO(), pod); e == nil {
+		if pod, e = podClient.Pods(namespace).Update(context.TODO(), pod, metav1.UpdateOptions{}); e == nil {
 			return
 		}
 		updateErr := e

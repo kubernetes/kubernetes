@@ -75,7 +75,7 @@ func (cml *ConfigMapLock) Create(ler LeaderElectionRecord) error {
 				LeaderElectionRecordAnnotationKey: string(recordBytes),
 			},
 		},
-	})
+	}, metav1.CreateOptions{})
 	return err
 }
 
@@ -89,7 +89,7 @@ func (cml *ConfigMapLock) Update(ler LeaderElectionRecord) error {
 		return err
 	}
 	cml.cm.Annotations[LeaderElectionRecordAnnotationKey] = string(recordBytes)
-	cml.cm, err = cml.Client.ConfigMaps(cml.ConfigMapMeta.Namespace).Update(context.TODO(), cml.cm)
+	cml.cm, err = cml.Client.ConfigMaps(cml.ConfigMapMeta.Namespace).Update(context.TODO(), cml.cm, metav1.UpdateOptions{})
 	return err
 }
 

@@ -82,7 +82,7 @@ var _ = framework.KubeDescribe("Lease", func() {
 			},
 		}
 
-		createdLease, err := leaseClient.Create(context.TODO(), lease)
+		createdLease, err := leaseClient.Create(context.TODO(), lease, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "creating Lease failed")
 
 		readLease, err := leaseClient.Get(context.TODO(), name, metav1.GetOptions{})
@@ -97,7 +97,7 @@ var _ = framework.KubeDescribe("Lease", func() {
 			LeaseTransitions:     pointer.Int32Ptr(1),
 		}
 
-		_, err = leaseClient.Update(context.TODO(), createdLease)
+		_, err = leaseClient.Update(context.TODO(), createdLease, metav1.UpdateOptions{})
 		framework.ExpectNoError(err, "updating Lease failed")
 
 		readLease, err = leaseClient.Get(context.TODO(), name, metav1.GetOptions{})
@@ -115,7 +115,7 @@ var _ = framework.KubeDescribe("Lease", func() {
 		patchBytes, err := getPatchBytes(readLease, patchedLease)
 		framework.ExpectNoError(err, "creating patch failed")
 
-		_, err = leaseClient.Patch(context.TODO(), name, types.StrategicMergePatchType, patchBytes)
+		_, err = leaseClient.Patch(context.TODO(), name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
 		framework.ExpectNoError(err, "patching Lease failed")
 
 		readLease, err = leaseClient.Get(context.TODO(), name, metav1.GetOptions{})
@@ -136,7 +136,7 @@ var _ = framework.KubeDescribe("Lease", func() {
 				LeaseTransitions:     pointer.Int32Ptr(0),
 			},
 		}
-		_, err = leaseClient.Create(context.TODO(), lease2)
+		_, err = leaseClient.Create(context.TODO(), lease2, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "creating Lease failed")
 
 		leases, err := leaseClient.List(context.TODO(), metav1.ListOptions{})

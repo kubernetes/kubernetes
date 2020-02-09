@@ -157,7 +157,7 @@ func TestEnsureInternalLoadBalancer(t *testing.T) {
 	gce, err := fakeGCECloud(vals)
 	require.NoError(t, err)
 	svc := fakeLoadbalancerService(string(LBTypeInternal))
-	svc, err = gce.client.CoreV1().Services(svc.Namespace).Create(context.TODO(), svc)
+	svc, err = gce.client.CoreV1().Services(svc.Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
 	require.NoError(t, err)
 	status, err := createInternalLoadBalancer(gce, svc, nil, nodeNames, vals.ClusterName, vals.ClusterID, vals.ZoneName)
 	assert.NoError(t, err)
@@ -182,7 +182,7 @@ func TestEnsureInternalLoadBalancerDeprecatedAnnotation(t *testing.T) {
 	}
 
 	svc := fakeLoadBalancerServiceDeprecatedAnnotation(string(LBTypeInternal))
-	svc, err = gce.client.CoreV1().Services(svc.Namespace).Create(context.TODO(), svc)
+	svc, err = gce.client.CoreV1().Services(svc.Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
 	if err != nil {
 		t.Errorf("Failed to create service %s, err %v", svc.Name, err)
 	}
@@ -220,7 +220,7 @@ func TestEnsureInternalLoadBalancerWithExistingResources(t *testing.T) {
 	gce, err := fakeGCECloud(vals)
 	require.NoError(t, err)
 	svc := fakeLoadbalancerService(string(LBTypeInternal))
-	svc, err = gce.client.CoreV1().Services(svc.Namespace).Create(context.TODO(), svc)
+	svc, err = gce.client.CoreV1().Services(svc.Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
 	require.NoError(t, err)
 	// Create the expected resources necessary for an Internal Load Balancer
 	nm := types.NamespacedName{Name: svc.Name, Namespace: svc.Namespace}
@@ -257,7 +257,7 @@ func TestEnsureInternalLoadBalancerClearPreviousResources(t *testing.T) {
 	require.NoError(t, err)
 
 	svc := fakeLoadbalancerService(string(LBTypeInternal))
-	svc, err = gce.client.CoreV1().Services(svc.Namespace).Create(context.TODO(), svc)
+	svc, err = gce.client.CoreV1().Services(svc.Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
 	require.NoError(t, err)
 	lbName := gce.GetLoadBalancerName(context.TODO(), "", svc)
 
@@ -336,7 +336,7 @@ func TestEnsureInternalLoadBalancerHealthCheckConfigurable(t *testing.T) {
 	require.NoError(t, err)
 
 	svc := fakeLoadbalancerService(string(LBTypeInternal))
-	svc, err = gce.client.CoreV1().Services(svc.Namespace).Create(context.TODO(), svc)
+	svc, err = gce.client.CoreV1().Services(svc.Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
 	require.NoError(t, err)
 	lbName := gce.GetLoadBalancerName(context.TODO(), "", svc)
 
@@ -368,7 +368,7 @@ func TestUpdateInternalLoadBalancerBackendServices(t *testing.T) {
 	require.NoError(t, err)
 
 	svc := fakeLoadbalancerService(string(LBTypeInternal))
-	svc, err = gce.client.CoreV1().Services(svc.Namespace).Create(context.TODO(), svc)
+	svc, err = gce.client.CoreV1().Services(svc.Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
 	require.NoError(t, err)
 	_, err = createInternalLoadBalancer(gce, svc, nil, []string{"test-node-1"}, vals.ClusterName, vals.ClusterID, vals.ZoneName)
 	assert.NoError(t, err)
@@ -424,7 +424,7 @@ func TestUpdateInternalLoadBalancerNodes(t *testing.T) {
 	node1Name := []string{"test-node-1"}
 
 	svc := fakeLoadbalancerService(string(LBTypeInternal))
-	svc, err = gce.client.CoreV1().Services(svc.Namespace).Create(context.TODO(), svc)
+	svc, err = gce.client.CoreV1().Services(svc.Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
 	require.NoError(t, err)
 	nodes, err := createAndInsertNodes(gce, node1Name, vals.ZoneName)
 	require.NoError(t, err)
@@ -491,7 +491,7 @@ func TestEnsureInternalLoadBalancerDeleted(t *testing.T) {
 	require.NoError(t, err)
 
 	svc := fakeLoadbalancerService(string(LBTypeInternal))
-	svc, err = gce.client.CoreV1().Services(svc.Namespace).Create(context.TODO(), svc)
+	svc, err = gce.client.CoreV1().Services(svc.Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
 	require.NoError(t, err)
 	_, err = createInternalLoadBalancer(gce, svc, nil, []string{"test-node-1"}, vals.ClusterName, vals.ClusterID, vals.ZoneName)
 	assert.NoError(t, err)
@@ -509,7 +509,7 @@ func TestEnsureInternalLoadBalancerDeletedTwiceDoesNotError(t *testing.T) {
 	gce, err := fakeGCECloud(vals)
 	require.NoError(t, err)
 	svc := fakeLoadbalancerService(string(LBTypeInternal))
-	svc, err = gce.client.CoreV1().Services(svc.Namespace).Create(context.TODO(), svc)
+	svc, err = gce.client.CoreV1().Services(svc.Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
 	require.NoError(t, err)
 
 	_, err = createInternalLoadBalancer(gce, svc, nil, []string{"test-node-1"}, vals.ClusterName, vals.ClusterID, vals.ZoneName)
@@ -535,7 +535,7 @@ func TestEnsureInternalLoadBalancerWithSpecialHealthCheck(t *testing.T) {
 	svc.Spec.HealthCheckNodePort = healthCheckNodePort
 	svc.Spec.Type = v1.ServiceTypeLoadBalancer
 	svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
-	svc, err = gce.client.CoreV1().Services(svc.Namespace).Create(context.TODO(), svc)
+	svc, err = gce.client.CoreV1().Services(svc.Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
 	require.NoError(t, err)
 	status, err := createInternalLoadBalancer(gce, svc, nil, []string{nodeName}, vals.ClusterName, vals.ClusterID, vals.ZoneName)
 	assert.NoError(t, err)
@@ -554,7 +554,7 @@ func TestClearPreviousInternalResources(t *testing.T) {
 	svc := fakeLoadbalancerService(string(LBTypeInternal))
 	gce, err := fakeGCECloud(vals)
 	require.NoError(t, err)
-	svc, err = gce.client.CoreV1().Services(svc.Namespace).Create(context.TODO(), svc)
+	svc, err = gce.client.CoreV1().Services(svc.Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
 	require.NoError(t, err)
 	loadBalancerName := gce.GetLoadBalancerName(context.TODO(), "", svc)
 	nm := types.NamespacedName{Name: svc.Name, Namespace: svc.Namespace}
@@ -619,7 +619,7 @@ func TestEnsureInternalFirewallDeletesLegacyFirewall(t *testing.T) {
 	require.NoError(t, err)
 	vals := DefaultTestClusterValues()
 	svc := fakeLoadbalancerService(string(LBTypeInternal))
-	svc, err = gce.client.CoreV1().Services(svc.Namespace).Create(context.TODO(), svc)
+	svc, err = gce.client.CoreV1().Services(svc.Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
 	require.NoError(t, err)
 	lbName := gce.GetLoadBalancerName(context.TODO(), "", svc)
 	fwName := MakeFirewallName(lbName)
@@ -695,7 +695,7 @@ func TestEnsureInternalFirewallSucceedsOnXPN(t *testing.T) {
 	require.NoError(t, err)
 	vals := DefaultTestClusterValues()
 	svc := fakeLoadbalancerService(string(LBTypeInternal))
-	svc, err = gce.client.CoreV1().Services(svc.Namespace).Create(context.TODO(), svc)
+	svc, err = gce.client.CoreV1().Services(svc.Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
 	require.NoError(t, err)
 	lbName := gce.GetLoadBalancerName(context.TODO(), "", svc)
 	fwName := MakeFirewallName(lbName)
@@ -772,7 +772,7 @@ func TestEnsureLoadBalancerDeletedSucceedsOnXPN(t *testing.T) {
 	require.NoError(t, err)
 
 	svc := fakeLoadbalancerService(string(LBTypeInternal))
-	svc, err = gce.client.CoreV1().Services(svc.Namespace).Create(context.TODO(), svc)
+	svc, err = gce.client.CoreV1().Services(svc.Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
 	require.NoError(t, err)
 	_, err = createInternalLoadBalancer(gce, svc, nil, []string{"test-node-1"}, vals.ClusterName, vals.ClusterID, vals.ZoneName)
 	assert.NoError(t, err)
@@ -796,7 +796,7 @@ func TestEnsureInternalInstanceGroupsDeleted(t *testing.T) {
 	igName := makeInstanceGroupName(vals.ClusterID)
 
 	svc := fakeLoadbalancerService(string(LBTypeInternal))
-	svc, err = gce.client.CoreV1().Services(svc.Namespace).Create(context.TODO(), svc)
+	svc, err = gce.client.CoreV1().Services(svc.Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
 	require.NoError(t, err)
 	_, err = createInternalLoadBalancer(gce, svc, nil, []string{"test-node-1"}, vals.ClusterName, vals.ClusterID, vals.ZoneName)
 	assert.NoError(t, err)
@@ -916,7 +916,7 @@ func TestEnsureInternalLoadBalancerErrors(t *testing.T) {
 			if tc.injectMock != nil {
 				tc.injectMock(gce.c.(*cloud.MockGCE))
 			}
-			_, err = gce.client.CoreV1().Services(params.service.Namespace).Create(context.TODO(), params.service)
+			_, err = gce.client.CoreV1().Services(params.service.Namespace).Create(context.TODO(), params.service, metav1.CreateOptions{})
 			require.NoError(t, err)
 			status, err := gce.ensureInternalLoadBalancer(
 				params.clusterName,
@@ -1029,7 +1029,7 @@ func TestEnsureInternalLoadBalancerSubsetting(t *testing.T) {
 	require.NoError(t, err)
 
 	svc := fakeLoadbalancerService(string(LBTypeInternal))
-	svc, err = gce.client.CoreV1().Services(svc.Namespace).Create(context.TODO(), svc)
+	svc, err = gce.client.CoreV1().Services(svc.Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
 	require.NoError(t, err)
 	status, err := createInternalLoadBalancer(gce, svc, nil, nodeNames, vals.ClusterName, vals.ClusterID, vals.ZoneName)
 	assert.EqualError(t, err, cloudprovider.ImplementedElsewhere.Error())
@@ -1064,7 +1064,7 @@ func TestEnsureInternalLoadBalancerDeletedSubsetting(t *testing.T) {
 	nodes, err := createAndInsertNodes(gce, nodeNames, vals.ZoneName)
 	require.NoError(t, err)
 	svc := fakeLoadbalancerService(string(LBTypeInternal))
-	svc, err = gce.client.CoreV1().Services(svc.Namespace).Create(context.TODO(), svc)
+	svc, err = gce.client.CoreV1().Services(svc.Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
 	require.NoError(t, err)
 	status, err := createInternalLoadBalancer(gce, svc, nil, nodeNames, vals.ClusterName, vals.ClusterID, vals.ZoneName)
 
@@ -1095,7 +1095,7 @@ func TestEnsureInternalLoadBalancerGlobalAccess(t *testing.T) {
 	nodes, err := createAndInsertNodes(gce, nodeNames, vals.ZoneName)
 	require.NoError(t, err)
 	svc := fakeLoadbalancerService(string(LBTypeInternal))
-	svc, err = gce.client.CoreV1().Services(svc.Namespace).Create(context.TODO(), svc)
+	svc, err = gce.client.CoreV1().Services(svc.Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
 	require.NoError(t, err)
 	status, err := createInternalLoadBalancer(gce, svc, nil, nodeNames, vals.ClusterName, vals.ClusterID, vals.ZoneName)
 	lbName := gce.GetLoadBalancerName(context.TODO(), "", svc)
@@ -1160,7 +1160,7 @@ func TestEnsureInternalLoadBalancerDisableGlobalAccess(t *testing.T) {
 	nodes, err := createAndInsertNodes(gce, nodeNames, vals.ZoneName)
 	require.NoError(t, err)
 	svc := fakeLoadbalancerService(string(LBTypeInternal))
-	svc, err = gce.client.CoreV1().Services(svc.Namespace).Create(context.TODO(), svc)
+	svc, err = gce.client.CoreV1().Services(svc.Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
 	require.NoError(t, err)
 	svc.Annotations[ServiceAnnotationILBAllowGlobalAccess] = "true"
 	lbName := gce.GetLoadBalancerName(context.TODO(), "", svc)
@@ -1211,7 +1211,7 @@ func TestGlobalAccessChangeScheme(t *testing.T) {
 	nodes, err := createAndInsertNodes(gce, nodeNames, vals.ZoneName)
 	require.NoError(t, err)
 	svc := fakeLoadbalancerService(string(LBTypeInternal))
-	svc, err = gce.client.CoreV1().Services(svc.Namespace).Create(context.TODO(), svc)
+	svc, err = gce.client.CoreV1().Services(svc.Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
 	require.NoError(t, err)
 	status, err := createInternalLoadBalancer(gce, svc, nil, nodeNames, vals.ClusterName, vals.ClusterID, vals.ZoneName)
 	lbName := gce.GetLoadBalancerName(context.TODO(), "", svc)
@@ -1372,7 +1372,7 @@ func TestEnsureInternalLoadBalancerCustomSubnet(t *testing.T) {
 	nodes, err := createAndInsertNodes(gce, nodeNames, vals.ZoneName)
 	require.NoError(t, err)
 	svc := fakeLoadbalancerService(string(LBTypeInternal))
-	svc, err = gce.client.CoreV1().Services(svc.Namespace).Create(context.TODO(), svc)
+	svc, err = gce.client.CoreV1().Services(svc.Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
 	require.NoError(t, err)
 	status, err := createInternalLoadBalancer(gce, svc, nil, nodeNames, vals.ClusterName, vals.ClusterID, vals.ZoneName)
 	lbName := gce.GetLoadBalancerName(context.TODO(), "", svc)
@@ -1526,7 +1526,7 @@ func TestEnsureInternalLoadBalancerFinalizer(t *testing.T) {
 	require.NoError(t, err)
 
 	svc := fakeLoadbalancerService(string(LBTypeInternal))
-	svc, err = gce.client.CoreV1().Services(svc.Namespace).Create(context.TODO(), svc)
+	svc, err = gce.client.CoreV1().Services(svc.Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
 	require.NoError(t, err)
 	status, err := createInternalLoadBalancer(gce, svc, nil, nodeNames, vals.ClusterName, vals.ClusterID, vals.ZoneName)
 	require.NoError(t, err)
@@ -1564,7 +1564,7 @@ func TestEnsureLoadBalancerSkipped(t *testing.T) {
 	svc := fakeLoadbalancerService(string(LBTypeInternal))
 	// Add the V2 finalizer
 	svc.Finalizers = append(svc.Finalizers, ILBFinalizerV2)
-	svc, err = gce.client.CoreV1().Services(svc.Namespace).Create(context.TODO(), svc)
+	svc, err = gce.client.CoreV1().Services(svc.Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
 	require.NoError(t, err)
 	status, err := createInternalLoadBalancer(gce, svc, nil, nodeNames, vals.ClusterName, vals.ClusterID, vals.ZoneName)
 	assert.EqualError(t, err, cloudprovider.ImplementedElsewhere.Error())

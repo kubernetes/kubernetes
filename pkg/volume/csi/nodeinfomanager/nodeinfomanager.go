@@ -425,7 +425,7 @@ func (nim *nodeInfoManager) tryInitializeCSINodeWithAnnotation(csiKubeClient cli
 	annotationModified := setMigrationAnnotation(nim.migratedPlugins, nodeInfo)
 
 	if annotationModified {
-		_, err := csiKubeClient.StorageV1().CSINodes().Update(context.TODO(), nodeInfo)
+		_, err := csiKubeClient.StorageV1().CSINodes().Update(context.TODO(), nodeInfo, metav1.UpdateOptions{})
 		return err
 	}
 	return nil
@@ -468,7 +468,7 @@ func (nim *nodeInfoManager) CreateCSINode() (*storagev1.CSINode, error) {
 
 	setMigrationAnnotation(nim.migratedPlugins, nodeInfo)
 
-	return csiKubeClient.StorageV1().CSINodes().Create(context.TODO(), nodeInfo)
+	return csiKubeClient.StorageV1().CSINodes().Create(context.TODO(), nodeInfo, metav1.CreateOptions{})
 }
 
 func setMigrationAnnotation(migratedPlugins map[string](func() bool), nodeInfo *storagev1.CSINode) (modified bool) {
@@ -571,7 +571,7 @@ func (nim *nodeInfoManager) installDriverToCSINode(
 	newDriverSpecs = append(newDriverSpecs, driverSpec)
 	nodeInfo.Spec.Drivers = newDriverSpecs
 
-	_, err := csiKubeClient.StorageV1().CSINodes().Update(context.TODO(), nodeInfo)
+	_, err := csiKubeClient.StorageV1().CSINodes().Update(context.TODO(), nodeInfo, metav1.UpdateOptions{})
 	return err
 }
 
@@ -628,7 +628,7 @@ func (nim *nodeInfoManager) tryUninstallDriverFromCSINode(
 	}
 	nodeInfo.Spec.Drivers = drivers
 
-	_, err = nodeInfoClient.Update(context.TODO(), nodeInfo)
+	_, err = nodeInfoClient.Update(context.TODO(), nodeInfo, metav1.UpdateOptions{})
 
 	return err // do not wrap error
 

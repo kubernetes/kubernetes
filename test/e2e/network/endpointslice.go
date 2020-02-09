@@ -428,7 +428,7 @@ func ensurePodTargetRef(pod *v1.Pod, targetRef *v1.ObjectReference) {
 
 // createServiceReportErr creates a Service and reports any associated error.
 func createServiceReportErr(cs clientset.Interface, ns string, service *v1.Service) *v1.Service {
-	svc, err := cs.CoreV1().Services(ns).Create(context.TODO(), service)
+	svc, err := cs.CoreV1().Services(ns).Create(context.TODO(), service, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 	return svc
 }

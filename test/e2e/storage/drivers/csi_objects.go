@@ -93,7 +93,7 @@ func createGCESecrets(client clientset.Interface, ns string) {
 		},
 	}
 
-	_, err = client.CoreV1().Secrets(ns).Create(context.TODO(), s)
+	_, err = client.CoreV1().Secrets(ns).Create(context.TODO(), s, metav1.CreateOptions{})
 	if !apierrors.IsAlreadyExists(err) {
 		framework.ExpectNoError(err, "Failed to create Secret %v", s.GetName())
 	}

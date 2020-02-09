@@ -201,7 +201,7 @@ func (c *CreateClusterRoleOptions) RunCreateRole() error {
 
 	// Create ClusterRole.
 	if !c.DryRun {
-		clusterRole, err = c.Client.ClusterRoles().Create(context.TODO(), clusterRole)
+		clusterRole, err = c.Client.ClusterRoles().Create(context.TODO(), clusterRole, metav1.CreateOptions{})
 		if err != nil {
 			return err
 		}

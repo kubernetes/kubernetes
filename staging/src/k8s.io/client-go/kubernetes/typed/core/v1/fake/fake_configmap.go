@@ -81,7 +81,7 @@ func (c *FakeConfigMaps) Watch(ctx context.Context, opts v1.ListOptions) (watch.
 }
 
 // Create takes the representation of a configMap and creates it.  Returns the server's representation of the configMap, and an error, if there is any.
-func (c *FakeConfigMaps) Create(ctx context.Context, configMap *corev1.ConfigMap) (result *corev1.ConfigMap, err error) {
+func (c *FakeConfigMaps) Create(ctx context.Context, configMap *corev1.ConfigMap, opts v1.CreateOptions) (result *corev1.ConfigMap, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(configmapsResource, c.ns, configMap), &corev1.ConfigMap{})
 
@@ -92,7 +92,7 @@ func (c *FakeConfigMaps) Create(ctx context.Context, configMap *corev1.ConfigMap
 }
 
 // Update takes the representation of a configMap and updates it. Returns the server's representation of the configMap, and an error, if there is any.
-func (c *FakeConfigMaps) Update(ctx context.Context, configMap *corev1.ConfigMap) (result *corev1.ConfigMap, err error) {
+func (c *FakeConfigMaps) Update(ctx context.Context, configMap *corev1.ConfigMap, opts v1.UpdateOptions) (result *corev1.ConfigMap, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(configmapsResource, c.ns, configMap), &corev1.ConfigMap{})
 
@@ -119,7 +119,7 @@ func (c *FakeConfigMaps) DeleteCollection(ctx context.Context, options *v1.Delet
 }
 
 // Patch applies the patch and returns the patched configMap.
-func (c *FakeConfigMaps) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *corev1.ConfigMap, err error) {
+func (c *FakeConfigMaps) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *corev1.ConfigMap, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(configmapsResource, c.ns, name, pt, data, subresources...), &corev1.ConfigMap{})
 

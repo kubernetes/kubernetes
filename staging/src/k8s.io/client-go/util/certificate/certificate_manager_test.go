@@ -1012,7 +1012,7 @@ func (c fakeClient) List(_ context.Context, opts v1.ListOptions) (*certificates.
 	return &csrReply, nil
 }
 
-func (c fakeClient) Create(context.Context, *certificates.CertificateSigningRequest) (*certificates.CertificateSigningRequest, error) {
+func (c fakeClient) Create(context.Context, *certificates.CertificateSigningRequest, v1.CreateOptions) (*certificates.CertificateSigningRequest, error) {
 	if c.failureType == createError {
 		if c.err != nil {
 			return nil, c.err

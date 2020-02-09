@@ -398,7 +398,7 @@ func (*serviceAccountFactory) Create(f *framework.Framework, i interface{}) (fun
 		return nil, errorItemNotSupported
 	}
 	client := f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.GetName())
-	if _, err := client.Create(context.TODO(), item); err != nil {
+	if _, err := client.Create(context.TODO(), item, metav1.CreateOptions{}); err != nil {
 		return nil, errors.Wrap(err, "create ServiceAccount")
 	}
 	return func() error {
@@ -420,7 +420,7 @@ func (*clusterRoleFactory) Create(f *framework.Framework, i interface{}) (func()
 
 	framework.Logf("Define cluster role %v", item.GetName())
 	client := f.ClientSet.RbacV1().ClusterRoles()
-	if _, err := client.Create(context.TODO(), item); err != nil {
+	if _, err := client.Create(context.TODO(), item, metav1.CreateOptions{}); err != nil {
 		return nil, errors.Wrap(err, "create ClusterRole")
 	}
 	return func() error {
@@ -441,7 +441,7 @@ func (*clusterRoleBindingFactory) Create(f *framework.Framework, i interface{}) 
 	}
 
 	client := f.ClientSet.RbacV1().ClusterRoleBindings()
-	if _, err := client.Create(context.TODO(), item); err != nil {
+	if _, err := client.Create(context.TODO(), item, metav1.CreateOptions{}); err != nil {
 		return nil, errors.Wrap(err, "create ClusterRoleBinding")
 	}
 	return func() error {
@@ -462,7 +462,7 @@ func (*roleFactory) Create(f *framework.Framework, i interface{}) (func() error,
 	}
 
 	client := f.ClientSet.RbacV1().Roles(f.Namespace.GetName())
-	if _, err := client.Create(context.TODO(), item); err != nil {
+	if _, err := client.Create(context.TODO(), item, metav1.CreateOptions{}); err != nil {
 		return nil, errors.Wrap(err, "create Role")
 	}
 	return func() error {
@@ -483,7 +483,7 @@ func (*roleBindingFactory) Create(f *framework.Framework, i interface{}) (func()
 	}
 
 	client := f.ClientSet.RbacV1().RoleBindings(f.Namespace.GetName())
-	if _, err := client.Create(context.TODO(), item); err != nil {
+	if _, err := client.Create(context.TODO(), item, metav1.CreateOptions{}); err != nil {
 		return nil, errors.Wrap(err, "create RoleBinding")
 	}
 	return func() error {
@@ -504,7 +504,7 @@ func (*serviceFactory) Create(f *framework.Framework, i interface{}) (func() err
 	}
 
 	client := f.ClientSet.CoreV1().Services(f.Namespace.GetName())
-	if _, err := client.Create(context.TODO(), item); err != nil {
+	if _, err := client.Create(context.TODO(), item, metav1.CreateOptions{}); err != nil {
 		return nil, errors.Wrap(err, "create Service")
 	}
 	return func() error {
@@ -525,7 +525,7 @@ func (*statefulSetFactory) Create(f *framework.Framework, i interface{}) (func()
 	}
 
 	client := f.ClientSet.AppsV1().StatefulSets(f.Namespace.GetName())
-	if _, err := client.Create(context.TODO(), item); err != nil {
+	if _, err := client.Create(context.TODO(), item, metav1.CreateOptions{}); err != nil {
 		return nil, errors.Wrap(err, "create StatefulSet")
 	}
 	return func() error {
@@ -546,7 +546,7 @@ func (*daemonSetFactory) Create(f *framework.Framework, i interface{}) (func() e
 	}
 
 	client := f.ClientSet.AppsV1().DaemonSets(f.Namespace.GetName())
-	if _, err := client.Create(context.TODO(), item); err != nil {
+	if _, err := client.Create(context.TODO(), item, metav1.CreateOptions{}); err != nil {
 		return nil, errors.Wrap(err, "create DaemonSet")
 	}
 	return func() error {
@@ -567,7 +567,7 @@ func (*storageClassFactory) Create(f *framework.Framework, i interface{}) (func(
 	}
 
 	client := f.ClientSet.StorageV1().StorageClasses()
-	if _, err := client.Create(context.TODO(), item); err != nil {
+	if _, err := client.Create(context.TODO(), item, metav1.CreateOptions{}); err != nil {
 		return nil, errors.Wrap(err, "create StorageClass")
 	}
 	return func() error {
@@ -588,7 +588,7 @@ func (*csiDriverFactory) Create(f *framework.Framework, i interface{}) (func() e
 	}
 
 	client := f.ClientSet.StorageV1beta1().CSIDrivers()
-	if _, err := client.Create(context.TODO(), item); err != nil {
+	if _, err := client.Create(context.TODO(), item, metav1.CreateOptions{}); err != nil {
 		return nil, errors.Wrap(err, "create CSIDriver")
 	}
 	return func() error {
@@ -609,7 +609,7 @@ func (*secretFactory) Create(f *framework.Framework, i interface{}) (func() erro
 	}
 
 	client := f.ClientSet.CoreV1().Secrets(f.Namespace.GetName())
-	if _, err := client.Create(context.TODO(), item); err != nil {
+	if _, err := client.Create(context.TODO(), item, metav1.CreateOptions{}); err != nil {
 		return nil, errors.Wrap(err, "create Secret")
 	}
 	return func() error {

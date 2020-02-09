@@ -1149,7 +1149,7 @@ func (nc *Controller) tryUpdateNodeHealth(node *v1.Node) (time.Duration, v1.Node
 		_, currentReadyCondition = nodeutil.GetNodeCondition(&node.Status, v1.NodeReady)
 
 		if !apiequality.Semantic.DeepEqual(currentReadyCondition, &observedReadyCondition) {
-			if _, err := nc.kubeClient.CoreV1().Nodes().UpdateStatus(context.TODO(), node); err != nil {
+			if _, err := nc.kubeClient.CoreV1().Nodes().UpdateStatus(context.TODO(), node, metav1.UpdateOptions{}); err != nil {
 				klog.Errorf("Error updating node %s: %v", node.Name, err)
 				return gracePeriod, observedReadyCondition, currentReadyCondition, err
 			}

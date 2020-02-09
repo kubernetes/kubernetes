@@ -96,20 +96,20 @@ func TestNodeAuthorizer(t *testing.T) {
 	}
 
 	// Create objects
-	if _, err := superuserClient.CoreV1().Namespaces().Create(context.TODO(), &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "ns"}}); err != nil {
+	if _, err := superuserClient.CoreV1().Namespaces().Create(context.TODO(), &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "ns"}}, metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err := superuserClient.CoreV1().Secrets("ns").Create(context.TODO(), &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "mysecret"}}); err != nil {
+	if _, err := superuserClient.CoreV1().Secrets("ns").Create(context.TODO(), &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "mysecret"}}, metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := superuserClient.CoreV1().Secrets("ns").Create(context.TODO(), &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "mypvsecret"}}); err != nil {
+	if _, err := superuserClient.CoreV1().Secrets("ns").Create(context.TODO(), &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "mypvsecret"}}, metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := superuserClient.CoreV1().ConfigMaps("ns").Create(context.TODO(), &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "myconfigmap"}}); err != nil {
+	if _, err := superuserClient.CoreV1().ConfigMaps("ns").Create(context.TODO(), &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "myconfigmap"}}, metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := superuserClient.CoreV1().ConfigMaps("ns").Create(context.TODO(), &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "myconfigmapconfigsource"}}); err != nil {
+	if _, err := superuserClient.CoreV1().ConfigMaps("ns").Create(context.TODO(), &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "myconfigmapconfigsource"}}, metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
 	pvName := "mypv"
@@ -120,7 +120,7 @@ func TestNodeAuthorizer(t *testing.T) {
 			Source:   storagev1.VolumeAttachmentSource{PersistentVolumeName: &pvName},
 			NodeName: "node2",
 		},
-	}); err != nil {
+	}, metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := superuserClient.CoreV1().PersistentVolumeClaims("ns").Create(context.TODO(), &corev1.PersistentVolumeClaim{
@@ -129,7 +129,7 @@ func TestNodeAuthorizer(t *testing.T) {
 			AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadOnlyMany},
 			Resources:   corev1.ResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("1")}},
 		},
-	}); err != nil {
+	}, metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -141,7 +141,7 @@ func TestNodeAuthorizer(t *testing.T) {
 			ClaimRef:               &corev1.ObjectReference{Namespace: "ns", Name: "mypvc"},
 			PersistentVolumeSource: corev1.PersistentVolumeSource{AzureFile: &corev1.AzureFilePersistentVolumeSource{ShareName: "default", SecretName: "mypvsecret"}},
 		},
-	}); err != nil {
+	}, metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -201,7 +201,7 @@ func TestNodeAuthorizer(t *testing.T) {
 						{Name: "pvc", VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: "mypvc"}}},
 					},
 				},
-			})
+			}, metav1.CreateOptions{})
 			return err
 		}
 	}
@@ -211,7 +211,7 @@ func TestNodeAuthorizer(t *testing.T) {
 			_, err := client.CoreV1().Pods("ns").UpdateStatus(context.TODO(), &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "node2normalpod"},
 				Status:     corev1.PodStatus{StartTime: &startTime},
-			})
+			}, metav1.UpdateOptions{})
 			return err
 		}
 	}
@@ -233,7 +233,7 @@ func TestNodeAuthorizer(t *testing.T) {
 					NodeName:   "node2",
 					Containers: []corev1.Container{{Name: "image", Image: "busybox"}},
 				},
-			})
+			}, metav1.CreateOptions{})
 			return err
 		}
 	}
@@ -246,7 +246,7 @@ func TestNodeAuthorizer(t *testing.T) {
 
 	createNode2 := func(client clientset.Interface) func() error {
 		return func() error {
-			_, err := client.CoreV1().Nodes().Create(context.TODO(), &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node2"}})
+			_, err := client.CoreV1().Nodes().Create(context.TODO(), &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node2"}}, metav1.CreateOptions{})
 			return err
 		}
 	}
@@ -263,7 +263,7 @@ func TestNodeAuthorizer(t *testing.T) {
 					KubeletConfigKey: "kubelet",
 				},
 			}
-			_, err = client.CoreV1().Nodes().Update(context.TODO(), node2)
+			_, err = client.CoreV1().Nodes().Update(context.TODO(), node2, metav1.UpdateOptions{})
 			return err
 		}
 	}
@@ -274,7 +274,7 @@ func TestNodeAuthorizer(t *testing.T) {
 				return err
 			}
 			node2.Spec.ConfigSource = nil
-			_, err = client.CoreV1().Nodes().Update(context.TODO(), node2)
+			_, err = client.CoreV1().Nodes().Update(context.TODO(), node2, metav1.UpdateOptions{})
 			return err
 		}
 	}
@@ -283,7 +283,7 @@ func TestNodeAuthorizer(t *testing.T) {
 			_, err := client.CoreV1().Nodes().UpdateStatus(context.TODO(), &corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "node2"},
 				Status:     corev1.NodeStatus{},
-			})
+			}, metav1.UpdateOptions{})
 			return err
 		}
 	}
@@ -331,7 +331,7 @@ func TestNodeAuthorizer(t *testing.T) {
 			capacity++
 			statusString := fmt.Sprintf("{\"status\": {\"capacity\": {\"storage\": \"%dG\"}}}", capacity)
 			patchBytes := []byte(statusString)
-			_, err := client.CoreV1().PersistentVolumeClaims("ns").Patch(context.TODO(), "mypvc", types.StrategicMergePatchType, patchBytes, "status")
+			_, err := client.CoreV1().PersistentVolumeClaims("ns").Patch(context.TODO(), "mypvc", types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}, "status")
 			return err
 		}
 	}
@@ -339,7 +339,7 @@ func TestNodeAuthorizer(t *testing.T) {
 	updatePVCPhase := func(client clientset.Interface) func() error {
 		return func() error {
 			patchBytes := []byte(`{"status":{"phase": "Bound"}}`)
-			_, err := client.CoreV1().PersistentVolumeClaims("ns").Patch(context.TODO(), "mypvc", types.StrategicMergePatchType, patchBytes, "status")
+			_, err := client.CoreV1().PersistentVolumeClaims("ns").Patch(context.TODO(), "mypvc", types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}, "status")
 			return err
 		}
 	}
@@ -363,7 +363,7 @@ func TestNodeAuthorizer(t *testing.T) {
 					RenewTime:            &metav1.MicroTime{Time: time.Now()},
 				},
 			}
-			_, err := client.CoordinationV1().Leases(corev1.NamespaceNodeLease).Create(context.TODO(), lease)
+			_, err := client.CoordinationV1().Leases(corev1.NamespaceNodeLease).Create(context.TODO(), lease, metav1.CreateOptions{})
 			return err
 		}
 	}
@@ -374,7 +374,7 @@ func TestNodeAuthorizer(t *testing.T) {
 				return err
 			}
 			lease.Spec.RenewTime = &metav1.MicroTime{Time: time.Now()}
-			_, err = client.CoordinationV1().Leases(corev1.NamespaceNodeLease).Update(context.TODO(), lease)
+			_, err = client.CoordinationV1().Leases(corev1.NamespaceNodeLease).Update(context.TODO(), lease, metav1.UpdateOptions{})
 			return err
 		}
 	}
@@ -382,7 +382,7 @@ func TestNodeAuthorizer(t *testing.T) {
 		return func() error {
 			node1LeaseDurationSeconds++
 			bs := []byte(fmt.Sprintf(`{"spec": {"leaseDurationSeconds": %d}}`, node1LeaseDurationSeconds))
-			_, err := client.CoordinationV1().Leases(corev1.NamespaceNodeLease).Patch(context.TODO(), "node1", types.StrategicMergePatchType, bs)
+			_, err := client.CoordinationV1().Leases(corev1.NamespaceNodeLease).Patch(context.TODO(), "node1", types.StrategicMergePatchType, bs, metav1.PatchOptions{})
 			return err
 		}
 	}
@@ -414,7 +414,7 @@ func TestNodeAuthorizer(t *testing.T) {
 					},
 				},
 			}
-			_, err := client.StorageV1().CSINodes().Create(context.TODO(), nodeInfo)
+			_, err := client.StorageV1().CSINodes().Create(context.TODO(), nodeInfo, metav1.CreateOptions{})
 			return err
 		}
 	}
@@ -431,7 +431,7 @@ func TestNodeAuthorizer(t *testing.T) {
 					TopologyKeys: []string{"com.example.csi/rack"},
 				},
 			}
-			_, err = client.StorageV1().CSINodes().Update(context.TODO(), nodeInfo)
+			_, err = client.StorageV1().CSINodes().Update(context.TODO(), nodeInfo, metav1.UpdateOptions{})
 			return err
 		}
 	}
@@ -439,7 +439,7 @@ func TestNodeAuthorizer(t *testing.T) {
 		return func() error {
 			bs := []byte(fmt.Sprintf(`{"csiDrivers": [ { "driver": "net.example.storage.driver2", "nodeID": "net.example.storage/node1", "topologyKeys": [ "net.example.storage/region" ] } ] }`))
 			// StrategicMergePatch is unsupported by CRs. Falling back to MergePatch
-			_, err := client.StorageV1().CSINodes().Patch(context.TODO(), "node1", types.MergePatchType, bs)
+			_, err := client.StorageV1().CSINodes().Patch(context.TODO(), "node1", types.MergePatchType, bs, metav1.PatchOptions{})
 			return err
 		}
 	}

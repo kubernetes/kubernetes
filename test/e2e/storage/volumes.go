@@ -65,7 +65,7 @@ var _ = utils.SIGDescribe("Volumes", func() {
 					"third":  "this is the third file",
 				},
 			}
-			if _, err := cs.CoreV1().ConfigMaps(namespace.Name).Create(context.TODO(), configMap); err != nil {
+			if _, err := cs.CoreV1().ConfigMaps(namespace.Name).Create(context.TODO(), configMap, metav1.CreateOptions{}); err != nil {
 				framework.Failf("unable to create test configmap: %v", err)
 			}
 			defer func() {

@@ -146,7 +146,7 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 					// if all test pods are RO then need a RW pod to format pd
 					ginkgo.By("creating RW fmt Pod to ensure PD is formatted")
 					fmtPod = testPDPod([]string{diskName}, host0Name, false, 1)
-					_, err = podClient.Create(context.TODO(), fmtPod)
+					_, err = podClient.Create(context.TODO(), fmtPod, metav1.CreateOptions{})
 					framework.ExpectNoError(err, "Failed to create fmtPod")
 					framework.ExpectNoError(f.WaitForPodRunningSlow(fmtPod.Name))
 
@@ -174,7 +174,7 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 				}()
 
 				ginkgo.By("creating host0Pod on node0")
-				_, err = podClient.Create(context.TODO(), host0Pod)
+				_, err = podClient.Create(context.TODO(), host0Pod, metav1.CreateOptions{})
 				framework.ExpectNoError(err, fmt.Sprintf("Failed to create host0Pod: %v", err))
 				framework.ExpectNoError(f.WaitForPodRunningSlow(host0Pod.Name))
 				framework.Logf("host0Pod: %q, node0: %q", host0Pod.Name, host0Name)
@@ -198,7 +198,7 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 				}
 
 				ginkgo.By("creating host1Pod on node1")
-				_, err = podClient.Create(context.TODO(), host1Pod)
+				_, err = podClient.Create(context.TODO(), host1Pod, metav1.CreateOptions{})
 				framework.ExpectNoError(err, "Failed to create host1Pod")
 				framework.ExpectNoError(f.WaitForPodRunningSlow(host1Pod.Name))
 				framework.Logf("host1Pod: %q, node1: %q", host1Pod.Name, host1Name)
@@ -280,7 +280,7 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 					framework.Logf("PD Read/Writer Iteration #%v", i)
 					ginkgo.By(fmt.Sprintf("creating host0Pod with %d containers on node0", numContainers))
 					host0Pod = testPDPod(diskNames, host0Name, false /* readOnly */, numContainers)
-					_, err = podClient.Create(context.TODO(), host0Pod)
+					_, err = podClient.Create(context.TODO(), host0Pod, metav1.CreateOptions{})
 					framework.ExpectNoError(err, fmt.Sprintf("Failed to create host0Pod: %v", err))
 					framework.ExpectNoError(f.WaitForPodRunningSlow(host0Pod.Name))
 
@@ -368,7 +368,7 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 							targetNode.ObjectMeta.SetResourceVersion("0")
 							// need to set the resource version or else the Create() fails
 							ginkgo.By("defer: re-create host0 node object")
-							_, err := nodeClient.Create(context.TODO(), targetNode)
+							_, err := nodeClient.Create(context.TODO(), targetNode, metav1.CreateOptions{})
 							framework.ExpectNoError(err, fmt.Sprintf("defer: Unable to re-create the deleted node object %q", targetNode.Name))
 						}
 						ginkgo.By("defer: verify the number of ready nodes")
@@ -382,7 +382,7 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 				}()
 
 				ginkgo.By("creating host0Pod on node0")
-				_, err = podClient.Create(context.TODO(), host0Pod)
+				_, err = podClient.Create(context.TODO(), host0Pod, metav1.CreateOptions{})
 				framework.ExpectNoError(err, fmt.Sprintf("Failed to create host0Pod: %v", err))
 				ginkgo.By("waiting for host0Pod to be running")
 				framework.ExpectNoError(f.WaitForPodRunningSlow(host0Pod.Name))

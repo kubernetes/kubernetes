@@ -1172,7 +1172,7 @@ func TestPDBInPreemption(t *testing.T) {
 			}
 			// Add pod condition ready so that PDB is updated.
 			addPodConditionReady(p)
-			if _, err := testCtx.clientSet.CoreV1().Pods(testCtx.ns.Name).UpdateStatus(context.TODO(), p); err != nil {
+			if _, err := testCtx.clientSet.CoreV1().Pods(testCtx.ns.Name).UpdateStatus(context.TODO(), p, metav1.UpdateOptions{}); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -1183,7 +1183,7 @@ func TestPDBInPreemption(t *testing.T) {
 
 		// Create PDBs.
 		for _, pdb := range test.pdbs {
-			_, err := testCtx.clientSet.PolicyV1beta1().PodDisruptionBudgets(testCtx.ns.Name).Create(context.TODO(), pdb)
+			_, err := testCtx.clientSet.PolicyV1beta1().PodDisruptionBudgets(testCtx.ns.Name).Create(context.TODO(), pdb, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatalf("Failed to create PDB: %v", err)
 			}

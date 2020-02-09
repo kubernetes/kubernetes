@@ -383,7 +383,7 @@ func CreateTestingNS(baseName string, c clientset.Interface, labels map[string]s
 	var got *v1.Namespace
 	if err := wait.PollImmediate(Poll, 30*time.Second, func() (bool, error) {
 		var err error
-		got, err = c.CoreV1().Namespaces().Create(context.TODO(), namespaceObj)
+		got, err = c.CoreV1().Namespaces().Create(context.TODO(), namespaceObj, metav1.CreateOptions{})
 		if err != nil {
 			Logf("Unexpected error while creating namespace: %v", err)
 			return false, nil

@@ -2759,7 +2759,7 @@ func TestApplyNoExecuteTaints(t *testing.T) {
 
 	// Make node3 healthy again.
 	node2.Status = healthyNodeNewStatus
-	_, err = fakeNodeHandler.UpdateStatus(context.TODO(), node2)
+	_, err = fakeNodeHandler.UpdateStatus(context.TODO(), node2, metav1.UpdateOptions{})
 	if err != nil {
 		t.Errorf(err.Error())
 		return
@@ -2905,12 +2905,12 @@ func TestSwapUnreachableNotReadyTaints(t *testing.T) {
 
 	node0.Status = newNodeStatus
 	node1.Status = healthyNodeNewStatus
-	_, err = fakeNodeHandler.UpdateStatus(context.TODO(), node0)
+	_, err = fakeNodeHandler.UpdateStatus(context.TODO(), node0, metav1.UpdateOptions{})
 	if err != nil {
 		t.Errorf(err.Error())
 		return
 	}
-	_, err = fakeNodeHandler.UpdateStatus(context.TODO(), node1)
+	_, err = fakeNodeHandler.UpdateStatus(context.TODO(), node1, metav1.UpdateOptions{})
 	if err != nil {
 		t.Errorf(err.Error())
 		return
@@ -3120,7 +3120,7 @@ func TestTaintsNodeByCondition(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		fakeNodeHandler.Update(context.TODO(), test.Node)
+		fakeNodeHandler.Update(context.TODO(), test.Node, metav1.UpdateOptions{})
 		if err := nodeController.syncNodeStore(fakeNodeHandler); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -3331,7 +3331,7 @@ func TestReconcileNodeLabels(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		fakeNodeHandler.Update(context.TODO(), test.Node)
+		fakeNodeHandler.Update(context.TODO(), test.Node, metav1.UpdateOptions{})
 		if err := nodeController.syncNodeStore(fakeNodeHandler); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -3355,7 +3355,6 @@ func TestReconcileNodeLabels(t *testing.T) {
 			if actualValue != expectedValue {
 				t.Errorf("%s: label %q: expected value %q, got value %q", test.Name, key, expectedValue, actualValue)
 			}
-
 		}
 	}
 }

@@ -283,7 +283,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 			ginkgo.It("should test that a PV becomes Available and is clean after the PVC is deleted.", func() {
 				ginkgo.By("Writing to the volume.")
 				pod := e2epod.MakePod(ns, nil, []*v1.PersistentVolumeClaim{pvc}, true, "touch /mnt/volume1/SUCCESS && (id -G | grep -E '\\b777\\b')")
-				pod, err = c.CoreV1().Pods(ns).Create(context.TODO(), pod)
+				pod, err = c.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
 				framework.ExpectNoError(err)
 				framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespace(c, pod.Name, ns))
 
@@ -301,7 +301,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 				ginkgo.By("Verifying the mount has been cleaned.")
 				mount := pod.Spec.Containers[0].VolumeMounts[0].MountPath
 				pod = e2epod.MakePod(ns, nil, []*v1.PersistentVolumeClaim{pvc}, true, fmt.Sprintf("[ $(ls -A %s | wc -l) -eq 0 ] && exit 0 || exit 1", mount))
-				pod, err = c.CoreV1().Pods(ns).Create(context.TODO(), pod)
+				pod, err = c.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
 				framework.ExpectNoError(err)
 				framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespace(c, pod.Name, ns))
 
@@ -353,7 +353,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 				}
 
 				spec := makeStatefulSetWithPVCs(ns, writeCmd, mounts, claims, probe)
-				ss, err := c.AppsV1().StatefulSets(ns).Create(context.TODO(), spec)
+				ss, err := c.AppsV1().StatefulSets(ns).Create(context.TODO(), spec, metav1.CreateOptions{})
 				framework.ExpectNoError(err)
 				e2esset.WaitForRunningAndReady(c, 1, ss)
 
@@ -373,7 +373,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 				validateCmd += "&& sleep 10000"
 
 				spec = makeStatefulSetWithPVCs(ns, validateCmd, mounts, claims, probe)
-				ss, err = c.AppsV1().StatefulSets(ns).Create(context.TODO(), spec)
+				ss, err = c.AppsV1().StatefulSets(ns).Create(context.TODO(), spec, metav1.CreateOptions{})
 				framework.ExpectNoError(err)
 				e2esset.WaitForRunningAndReady(c, 1, ss)
 			})
@@ -435,7 +435,7 @@ func makeStatefulSetWithPVCs(ns, cmd string, mounts []v1.VolumeMount, claims []v
 func createWaitAndDeletePod(c clientset.Interface, ns string, pvc *v1.PersistentVolumeClaim, command string) (err error) {
 	framework.Logf("Creating nfs test pod")
 	pod := e2epod.MakePod(ns, nil, []*v1.PersistentVolumeClaim{pvc}, true, command)
-	runPod, err := c.CoreV1().Pods(ns).Create(context.TODO(), pod)
+	runPod, err := c.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
 	if err != nil {
 		return fmt.Errorf("pod Create API error: %v", err)
 	}

@@ -156,14 +156,14 @@ func createRCsPods(t *testing.T, clientSet clientset.Interface, rcs []*v1.Replic
 	var createdRCs []*v1.ReplicationController
 	var createdPods []*v1.Pod
 	for _, rc := range rcs {
-		createdRC, err := clientSet.CoreV1().ReplicationControllers(rc.Namespace).Create(context.TODO(), rc)
+		createdRC, err := clientSet.CoreV1().ReplicationControllers(rc.Namespace).Create(context.TODO(), rc, metav1.CreateOptions{})
 		if err != nil {
 			t.Fatalf("Failed to create replication controller %s: %v", rc.Name, err)
 		}
 		createdRCs = append(createdRCs, createdRC)
 	}
 	for _, pod := range pods {
-		createdPod, err := clientSet.CoreV1().Pods(pod.Namespace).Create(context.TODO(), pod)
+		createdPod, err := clientSet.CoreV1().Pods(pod.Namespace).Create(context.TODO(), pod, metav1.CreateOptions{})
 		if err != nil {
 			t.Fatalf("Failed to create pod %s: %v", pod.Name, err)
 		}
@@ -204,7 +204,7 @@ func updatePod(t *testing.T, podClient typedv1.PodInterface, podName string, upd
 			return err
 		}
 		updateFunc(newPod)
-		pod, err = podClient.Update(context.TODO(), newPod)
+		pod, err = podClient.Update(context.TODO(), newPod, metav1.UpdateOptions{})
 		return err
 	}); err != nil {
 		t.Fatalf("Failed to update pod %s: %v", podName, err)
@@ -219,7 +219,7 @@ func updatePodStatus(t *testing.T, podClient typedv1.PodInterface, pod *v1.Pod, 
 			return err
 		}
 		updateStatusFunc(newPod)
-		_, err = podClient.UpdateStatus(context.TODO(), newPod)
+		_, err = podClient.UpdateStatus(context.TODO(), newPod, metav1.UpdateOptions{})
 		return err
 	}); err != nil {
 		t.Fatalf("Failed to update status of pod %s: %v", pod.Name, err)
@@ -244,7 +244,7 @@ func updateRC(t *testing.T, rcClient typedv1.ReplicationControllerInterface, rcN
 			return err
 		}
 		updateFunc(newRC)
-		rc, err = rcClient.Update(context.TODO(), newRC)
+		rc, err = rcClient.Update(context.TODO(), newRC, metav1.UpdateOptions{})
 		return err
 	}); err != nil {
 		t.Fatalf("Failed to update rc %s: %v", rcName, err)
@@ -308,7 +308,7 @@ func setPodsReadyCondition(t *testing.T, clientSet clientset.Interface, pods *v1
 				}
 				pod.Status.Conditions = append(pod.Status.Conditions, *condition)
 			}
-			_, err := clientSet.CoreV1().Pods(pod.Namespace).UpdateStatus(context.TODO(), pod)
+			_, err := clientSet.CoreV1().Pods(pod.Namespace).UpdateStatus(context.TODO(), pod, metav1.UpdateOptions{})
 			if err != nil {
 				// When status fails to be updated, we continue to next pod
 				continue
@@ -343,7 +343,7 @@ func testScalingUsingScaleSubresource(t *testing.T, c clientset.Interface, rc *v
 			return err
 		}
 		scale.Spec.Replicas = replicas
-		_, err = c.CoreV1().ReplicationControllers(ns).UpdateScale(context.TODO(), rc.Name, scale)
+		_, err = c.CoreV1().ReplicationControllers(ns).UpdateScale(context.TODO(), rc.Name, scale, metav1.UpdateOptions{})
 		return err
 	}); err != nil {
 		t.Fatalf("Failed to set .Spec.Replicas of scale subresource for rc %s: %v", rc.Name, err)
@@ -418,14 +418,14 @@ func TestAdoption(t *testing.T) {
 			rcClient := clientSet.CoreV1().ReplicationControllers(ns.Name)
 			podClient := clientSet.CoreV1().Pods(ns.Name)
 			const rcName = "rc"
-			rc, err := rcClient.Create(context.TODO(), newRC(rcName, ns.Name, 1))
+			rc, err := rcClient.Create(context.TODO(), newRC(rcName, ns.Name, 1), metav1.CreateOptions{})
 			if err != nil {
 				t.Fatalf("Failed to create replication controllers: %v", err)
 			}
 			podName := fmt.Sprintf("pod%d", i)
 			pod := newMatchingPod(podName, ns.Name)
 			pod.OwnerReferences = tc.existingOwnerReferences(rc)
-			_, err = podClient.Create(context.TODO(), pod)
+			_, err = podClient.Create(context.TODO(), pod, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatalf("Failed to create Pod: %v", err)
 			}

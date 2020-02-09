@@ -322,7 +322,7 @@ func StartInPodWithInlineVolume(c clientset.Interface, ns, podName, command stri
 			})
 	}
 
-	pod, err := c.CoreV1().Pods(ns).Create(context.TODO(), pod)
+	pod, err := c.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "failed to create pod")
 	return pod
 }
@@ -365,7 +365,7 @@ func CSIInlineVolumesEnabled(c clientset.Interface, ns string) (bool, error) {
 		},
 	}
 
-	pod, err := c.CoreV1().Pods(ns).Create(context.TODO(), pod)
+	pod, err := c.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
 
 	switch {
 	case err == nil:

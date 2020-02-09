@@ -154,7 +154,7 @@ func lastMandatoryExists(flowcontrolClientSet flowcontrolclient.FlowcontrolV1alp
 
 func ensure(flowcontrolClientSet flowcontrolclient.FlowcontrolV1alpha1Interface, flowSchemas []*flowcontrolv1alpha1.FlowSchema, priorityLevels []*flowcontrolv1alpha1.PriorityLevelConfiguration) error {
 	for _, flowSchema := range flowSchemas {
-		_, err := flowcontrolClientSet.FlowSchemas().Create(context.TODO(), flowSchema)
+		_, err := flowcontrolClientSet.FlowSchemas().Create(context.TODO(), flowSchema, metav1.CreateOptions{})
 		if apierrors.IsAlreadyExists(err) {
 			klog.V(3).Infof("system preset FlowSchema %s already exists, skipping creating", flowSchema.Name)
 			continue
@@ -165,7 +165,7 @@ func ensure(flowcontrolClientSet flowcontrolclient.FlowcontrolV1alpha1Interface,
 		klog.V(3).Infof("created system preset FlowSchema %s", flowSchema.Name)
 	}
 	for _, priorityLevelConfiguration := range priorityLevels {
-		_, err := flowcontrolClientSet.PriorityLevelConfigurations().Create(context.TODO(), priorityLevelConfiguration)
+		_, err := flowcontrolClientSet.PriorityLevelConfigurations().Create(context.TODO(), priorityLevelConfiguration, metav1.CreateOptions{})
 		if apierrors.IsAlreadyExists(err) {
 			klog.V(3).Infof("system preset PriorityLevelConfiguration %s already exists, skipping creating", priorityLevelConfiguration.Name)
 			continue
@@ -189,7 +189,7 @@ func upgrade(flowcontrolClientSet flowcontrolclient.FlowcontrolV1alpha1Interface
 				return fmt.Errorf("failed checking if mandatory FlowSchema %s is up-to-date due to %v, will retry later", expectedFlowSchema.Name, err)
 			}
 			if !identical {
-				if _, err := flowcontrolClientSet.FlowSchemas().Update(context.TODO(), expectedFlowSchema); err != nil {
+				if _, err := flowcontrolClientSet.FlowSchemas().Update(context.TODO(), expectedFlowSchema, metav1.UpdateOptions{}); err != nil {
 					return fmt.Errorf("failed upgrading mandatory FlowSchema %s due to %v, will retry later", expectedFlowSchema.Name, err)
 				}
 			}
@@ -198,7 +198,7 @@ func upgrade(flowcontrolClientSet flowcontrolclient.FlowcontrolV1alpha1Interface
 		if !apierrors.IsNotFound(err) {
 			return fmt.Errorf("failed getting FlowSchema %s due to %v, will retry later", expectedFlowSchema.Name, err)
 		}
-		_, err = flowcontrolClientSet.FlowSchemas().Create(context.TODO(), expectedFlowSchema)
+		_, err = flowcontrolClientSet.FlowSchemas().Create(context.TODO(), expectedFlowSchema, metav1.CreateOptions{})
 		if apierrors.IsAlreadyExists(err) {
 			klog.V(3).Infof("system preset FlowSchema %s already exists, skipping creating", expectedFlowSchema.Name)
 			continue
@@ -218,7 +218,7 @@ func upgrade(flowcontrolClientSet flowcontrolclient.FlowcontrolV1alpha1Interface
 				return fmt.Errorf("failed checking if mandatory PriorityLevelConfiguration %s is up-to-date due to %v, will retry later", expectedPriorityLevelConfiguration.Name, err)
 			}
 			if !identical {
-				if _, err := flowcontrolClientSet.PriorityLevelConfigurations().Update(context.TODO(), expectedPriorityLevelConfiguration); err != nil {
+				if _, err := flowcontrolClientSet.PriorityLevelConfigurations().Update(context.TODO(), expectedPriorityLevelConfiguration, metav1.UpdateOptions{}); err != nil {
 					return fmt.Errorf("failed upgrading mandatory PriorityLevelConfiguration %s due to %v, will retry later", expectedPriorityLevelConfiguration.Name, err)
 				}
 			}
@@ -227,7 +227,7 @@ func upgrade(flowcontrolClientSet flowcontrolclient.FlowcontrolV1alpha1Interface
 		if !apierrors.IsNotFound(err) {
 			return fmt.Errorf("failed getting PriorityLevelConfiguration %s due to %v, will retry later", expectedPriorityLevelConfiguration.Name, err)
 		}
-		_, err = flowcontrolClientSet.PriorityLevelConfigurations().Create(context.TODO(), expectedPriorityLevelConfiguration)
+		_, err = flowcontrolClientSet.PriorityLevelConfigurations().Create(context.TODO(), expectedPriorityLevelConfiguration, metav1.CreateOptions{})
 		if apierrors.IsAlreadyExists(err) {
 			klog.V(3).Infof("system preset PriorityLevelConfiguration %s already exists, skipping creating", expectedPriorityLevelConfiguration.Name)
 			continue

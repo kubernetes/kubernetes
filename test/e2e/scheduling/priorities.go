@@ -84,7 +84,7 @@ func addOrUpdateAvoidPodOnNode(c clientset.Interface, nodeName string, avoidPods
 			node.Annotations = make(map[string]string)
 		}
 		node.Annotations[v1.PreferAvoidPodsAnnotationKey] = string(taintsData)
-		_, err = c.CoreV1().Nodes().Update(context.TODO(), node)
+		_, err = c.CoreV1().Nodes().Update(context.TODO(), node, metav1.UpdateOptions{})
 		if err != nil {
 			if !apierrors.IsConflict(err) {
 				framework.ExpectNoError(err)
@@ -113,7 +113,7 @@ func removeAvoidPodsOffNode(c clientset.Interface, nodeName string) {
 			return true, nil
 		}
 		delete(node.Annotations, v1.PreferAvoidPodsAnnotationKey)
-		_, err = c.CoreV1().Nodes().Update(context.TODO(), node)
+		_, err = c.CoreV1().Nodes().Update(context.TODO(), node, metav1.UpdateOptions{})
 		if err != nil {
 			if !apierrors.IsConflict(err) {
 				framework.ExpectNoError(err)
@@ -481,7 +481,7 @@ func createRC(ns, rsName string, replicas int32, rcPodLabels map[string]string, 
 			},
 		},
 	}
-	rc, err := f.ClientSet.CoreV1().ReplicationControllers(ns).Create(context.TODO(), rc)
+	rc, err := f.ClientSet.CoreV1().ReplicationControllers(ns).Create(context.TODO(), rc, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 	return rc
 }

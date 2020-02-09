@@ -642,7 +642,7 @@ func startPausePod(cs clientset.Interface, t testsuites.StorageClassTest, node e
 	var err error
 	_, err = cs.StorageV1().StorageClasses().Get(context.TODO(), class.Name, metav1.GetOptions{})
 	if err != nil {
-		class, err = cs.StorageV1().StorageClasses().Create(context.TODO(), class)
+		class, err = cs.StorageV1().StorageClasses().Create(context.TODO(), class, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "Failed to create class : %v", err)
 	}
 
@@ -651,7 +651,7 @@ func startPausePod(cs clientset.Interface, t testsuites.StorageClassTest, node e
 		StorageClassName: &(class.Name),
 		VolumeMode:       &t.VolumeMode,
 	}, ns)
-	claim, err = cs.CoreV1().PersistentVolumeClaims(ns).Create(context.TODO(), claim)
+	claim, err = cs.CoreV1().PersistentVolumeClaims(ns).Create(context.TODO(), claim, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "Failed to create claim: %v", err)
 
 	pvcClaims := []*v1.PersistentVolumeClaim{claim}
@@ -727,7 +727,7 @@ func startPausePodWithVolumeSource(cs clientset.Interface, volumeSource v1.Volum
 		pod.Spec.NodeSelector = node.Selector
 	}
 
-	return cs.CoreV1().Pods(ns).Create(context.TODO(), pod)
+	return cs.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
 }
 
 // checkPodLogs tests that NodePublish was called with expected volume_context and (for ephemeral inline volumes)

@@ -82,7 +82,7 @@ func TestClusterScopedOwners(t *testing.T) {
 			Capacity:               v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Gi")},
 			AccessModes:            []v1.PersistentVolumeAccessMode{v1.ReadWriteMany},
 		},
-	})
+	}, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,7 +91,7 @@ func TestClusterScopedOwners(t *testing.T) {
 			Name:            "cm-valid",
 			OwnerReferences: []metav1.OwnerReference{{Kind: "PersistentVolume", APIVersion: "v1", Name: pv.Name, UID: pv.UID}},
 		},
-	}); err != nil {
+	}, metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -102,7 +102,7 @@ func TestClusterScopedOwners(t *testing.T) {
 			Labels:          map[string]string{"missing": "true"},
 			OwnerReferences: []metav1.OwnerReference{{Kind: "PersistentVolume", APIVersion: "v1", Name: "missing-name", UID: types.UID("missing-uid")}},
 		},
-	}); err != nil {
+	}, metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -112,7 +112,7 @@ func TestClusterScopedOwners(t *testing.T) {
 			Name:            "cm-invalid",
 			OwnerReferences: []metav1.OwnerReference{{Kind: "UnknownType", APIVersion: "unknown.group/v1", Name: "invalid-name", UID: types.UID("invalid-uid")}},
 		},
-	}); err != nil {
+	}, metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
 

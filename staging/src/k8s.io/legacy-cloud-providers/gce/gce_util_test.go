@@ -128,7 +128,7 @@ func TestAddRemoveFinalizer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to get GCE client, err %v", err)
 	}
-	svc, err = gce.client.CoreV1().Services(svc.Namespace).Create(context.TODO(), svc)
+	svc, err = gce.client.CoreV1().Services(svc.Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
 	if err != nil {
 		t.Errorf("Failed to create service %s, err %v", svc.Name, err)
 	}

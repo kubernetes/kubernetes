@@ -241,7 +241,7 @@ func createPDBMinAvailableOrDie(cs kubernetes.Interface, ns string, minAvailable
 			MinAvailable: &minAvailable,
 		},
 	}
-	_, err := cs.PolicyV1beta1().PodDisruptionBudgets(ns).Create(context.TODO(), &pdb)
+	_, err := cs.PolicyV1beta1().PodDisruptionBudgets(ns).Create(context.TODO(), &pdb, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "Waiting for the pdb to be created with minAvailable %d in namespace %s", minAvailable.IntVal, ns)
 	waitForPdbToBeProcessed(cs, ns)
 }
@@ -257,7 +257,7 @@ func createPDBMaxUnavailableOrDie(cs kubernetes.Interface, ns string, maxUnavail
 			MaxUnavailable: &maxUnavailable,
 		},
 	}
-	_, err := cs.PolicyV1beta1().PodDisruptionBudgets(ns).Create(context.TODO(), &pdb)
+	_, err := cs.PolicyV1beta1().PodDisruptionBudgets(ns).Create(context.TODO(), &pdb, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "Waiting for the pdb to be created with maxUnavailable %d in namespace %s", maxUnavailable.IntVal, ns)
 	waitForPdbToBeProcessed(cs, ns)
 }
@@ -269,7 +269,7 @@ func updatePDBMinAvailableOrDie(cs kubernetes.Interface, ns string, minAvailable
 			return err
 		}
 		old.Spec.MinAvailable = &minAvailable
-		if _, err := cs.PolicyV1beta1().PodDisruptionBudgets(ns).Update(context.TODO(), old); err != nil {
+		if _, err := cs.PolicyV1beta1().PodDisruptionBudgets(ns).Update(context.TODO(), old, metav1.UpdateOptions{}); err != nil {
 			return err
 		}
 		return nil
@@ -298,7 +298,7 @@ func createPodsOrDie(cs kubernetes.Interface, ns string, n int) {
 			},
 		}
 
-		_, err := cs.CoreV1().Pods(ns).Create(context.TODO(), pod)
+		_, err := cs.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "Creating pod %q in namespace %q", pod.Name, ns)
 	}
 }
@@ -365,7 +365,7 @@ func createReplicaSetOrDie(cs kubernetes.Interface, ns string, size int32, exclu
 		},
 	}
 
-	_, err := cs.AppsV1().ReplicaSets(ns).Create(context.TODO(), rs)
+	_, err := cs.AppsV1().ReplicaSets(ns).Create(context.TODO(), rs, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "Creating replica set %q in namespace %q", rs.Name, ns)
 }
 

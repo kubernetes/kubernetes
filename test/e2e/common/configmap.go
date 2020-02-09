@@ -44,7 +44,7 @@ var _ = ginkgo.Describe("[sig-node] ConfigMap", func() {
 		configMap := newConfigMap(f, name)
 		ginkgo.By(fmt.Sprintf("Creating configMap %v/%v", f.Namespace.Name, configMap.Name))
 		var err error
-		if configMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(context.TODO(), configMap); err != nil {
+		if configMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(context.TODO(), configMap, metav1.CreateOptions{}); err != nil {
 			framework.Failf("unable to create test configMap %s: %v", configMap.Name, err)
 		}
 
@@ -92,7 +92,7 @@ var _ = ginkgo.Describe("[sig-node] ConfigMap", func() {
 		configMap := newEnvFromConfigMap(f, name)
 		ginkgo.By(fmt.Sprintf("Creating configMap %v/%v", f.Namespace.Name, configMap.Name))
 		var err error
-		if configMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(context.TODO(), configMap); err != nil {
+		if configMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(context.TODO(), configMap, metav1.CreateOptions{}); err != nil {
 			framework.Failf("unable to create test configMap %s: %v", configMap.Name, err)
 		}
 
@@ -141,14 +141,14 @@ var _ = ginkgo.Describe("[sig-node] ConfigMap", func() {
 		name := "configmap-test-" + string(uuid.NewUUID())
 		configMap := newConfigMap(f, name)
 		ginkgo.By(fmt.Sprintf("Creating ConfigMap %v/%v", f.Namespace.Name, configMap.Name))
-		_, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(context.TODO(), configMap)
+		_, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(context.TODO(), configMap, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create ConfigMap")
 
 		configMap.Data = map[string]string{
 			"data": "value",
 		}
 		ginkgo.By(fmt.Sprintf("Updating configMap %v/%v", f.Namespace.Name, configMap.Name))
-		_, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Update(context.TODO(), configMap)
+		_, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Update(context.TODO(), configMap, metav1.UpdateOptions{})
 		framework.ExpectNoError(err, "failed to update ConfigMap")
 
 		configMapFromUpdate, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Get(context.TODO(), name, metav1.GetOptions{})
@@ -171,7 +171,7 @@ var _ = ginkgo.Describe("[sig-node] ConfigMap", func() {
 			Data: map[string]string{
 				"valueName": "value",
 			},
-		})
+		}, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create ConfigMap")
 
 		configMapPatchPayload, err := json.Marshal(v1.ConfigMap{
@@ -186,7 +186,7 @@ var _ = ginkgo.Describe("[sig-node] ConfigMap", func() {
 		})
 		framework.ExpectNoError(err, "failed to marshal patch data")
 
-		_, err = f.ClientSet.CoreV1().ConfigMaps(testNamespaceName).Patch(context.TODO(), testConfigMapName, types.StrategicMergePatchType, []byte(configMapPatchPayload))
+		_, err = f.ClientSet.CoreV1().ConfigMaps(testNamespaceName).Patch(context.TODO(), testConfigMapName, types.StrategicMergePatchType, []byte(configMapPatchPayload), metav1.PatchOptions{})
 		framework.ExpectNoError(err, "failed to patch ConfigMap")
 
 		configMap, err := f.ClientSet.CoreV1().ConfigMaps(testNamespaceName).Get(context.TODO(), testConfigMapName, metav1.GetOptions{})
@@ -246,5 +246,5 @@ func newConfigMapWithEmptyKey(f *framework.Framework) (*v1.ConfigMap, error) {
 	}
 
 	ginkgo.By(fmt.Sprintf("Creating configMap that has name %s", configMap.Name))
-	return f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(context.TODO(), configMap)
+	return f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(context.TODO(), configMap, metav1.CreateOptions{})
 }

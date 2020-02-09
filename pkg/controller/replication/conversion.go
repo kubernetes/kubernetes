@@ -203,16 +203,22 @@ type conversionClient struct {
 	v1client.ReplicationControllerInterface
 }
 
-func (c conversionClient) Create(ctx context.Context, rs *apps.ReplicaSet) (*apps.ReplicaSet, error) {
-	return convertCall(ctx, c.ReplicationControllerInterface.Create, rs)
+func (c conversionClient) Create(ctx context.Context, rs *apps.ReplicaSet, opts metav1.CreateOptions) (*apps.ReplicaSet, error) {
+	return convertCall(func(rc *v1.ReplicationController) (*v1.ReplicationController, error) {
+		return c.ReplicationControllerInterface.Create(ctx, rc, opts)
+	}, rs)
 }
 
-func (c conversionClient) Update(ctx context.Context, rs *apps.ReplicaSet) (*apps.ReplicaSet, error) {
-	return convertCall(ctx, c.ReplicationControllerInterface.Update, rs)
+func (c conversionClient) Update(ctx context.Context, rs *apps.ReplicaSet, opts metav1.UpdateOptions) (*apps.ReplicaSet, error) {
+	return convertCall(func(rc *v1.ReplicationController) (*v1.ReplicationController, error) {
+		return c.ReplicationControllerInterface.Update(ctx, rc, opts)
+	}, rs)
 }
 
-func (c conversionClient) UpdateStatus(ctx context.Context, rs *apps.ReplicaSet) (*apps.ReplicaSet, error) {
-	return convertCall(ctx, c.ReplicationControllerInterface.UpdateStatus, rs)
+func (c conversionClient) UpdateStatus(ctx context.Context, rs *apps.ReplicaSet, opts metav1.UpdateOptions) (*apps.ReplicaSet, error) {
+	return convertCall(func(rc *v1.ReplicationController) (*v1.ReplicationController, error) {
+		return c.ReplicationControllerInterface.UpdateStatus(ctx, rc, opts)
+	}, rs)
 }
 
 func (c conversionClient) Get(ctx context.Context, name string, options metav1.GetOptions) (*apps.ReplicaSet, error) {
@@ -236,7 +242,7 @@ func (c conversionClient) Watch(ctx context.Context, opts metav1.ListOptions) (w
 	return nil, errors.New("Watch() is not implemented for conversionClient")
 }
 
-func (c conversionClient) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *apps.ReplicaSet, err error) {
+func (c conversionClient) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *apps.ReplicaSet, err error) {
 	// This is not used by RSC.
 	return nil, errors.New("Patch() is not implemented for conversionClient")
 }
@@ -246,7 +252,7 @@ func (c conversionClient) GetScale(ctx context.Context, name string, options met
 	return nil, errors.New("GetScale() is not implemented for conversionClient")
 }
 
-func (c conversionClient) UpdateScale(ctx context.Context, name string, scale *autoscalingv1.Scale) (result *autoscalingv1.Scale, err error) {
+func (c conversionClient) UpdateScale(ctx context.Context, name string, scale *autoscalingv1.Scale, opts metav1.UpdateOptions) (result *autoscalingv1.Scale, err error) {
 	// This is not used by RSC.
 	return nil, errors.New("UpdateScale() is not implemented for conversionClient")
 }
@@ -275,12 +281,12 @@ func convertList(rcList *v1.ReplicationControllerList) (*apps.ReplicaSetList, er
 	return rsList, nil
 }
 
-func convertCall(ctx context.Context, fn func(context.Context, *v1.ReplicationController) (*v1.ReplicationController, error), rs *apps.ReplicaSet) (*apps.ReplicaSet, error) {
+func convertCall(fn func(*v1.ReplicationController) (*v1.ReplicationController, error), rs *apps.ReplicaSet) (*apps.ReplicaSet, error) {
 	rc, err := convertRStoRC(rs)
 	if err != nil {
 		return nil, err
 	}
-	result, err := fn(ctx, rc)
+	result, err := fn(rc)
 	if err != nil {
 		return nil, err
 	}

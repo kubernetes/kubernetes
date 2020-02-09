@@ -506,7 +506,7 @@ func newRBDServer(cs clientset.Interface, namespace string) (config volume.TestC
 		Type: "kubernetes.io/rbd",
 	}
 
-	secret, err := cs.CoreV1().Secrets(config.Namespace).Create(context.TODO(), secret)
+	secret, err := cs.CoreV1().Secrets(config.Namespace).Create(context.TODO(), secret, metav1.CreateOptions{})
 	if err != nil {
 		framework.Failf("Failed to create secrets for Ceph RBD: %v", err)
 	}
@@ -944,7 +944,7 @@ func (h *hostPathSymlinkDriver) CreateVolume(config *testsuites.PerTestConfig, v
 		},
 	}
 	// h.prepPod will be reused in cleanupDriver.
-	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), prepPod)
+	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), prepPod, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "while creating hostPath init pod")
 
 	err = e2epod.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, pod.Namespace)
@@ -966,7 +966,7 @@ func (v *hostPathSymlinkVolume) DeleteVolume() {
 	cmd := fmt.Sprintf("rm -rf %v&& rm -rf %v", v.targetPath, v.sourcePath)
 	v.prepPod.Spec.Containers[0].Command = []string{"/bin/sh", "-ec", cmd}
 
-	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), v.prepPod)
+	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), v.prepPod, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "while creating hostPath teardown pod")
 
 	err = e2epod.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, pod.Namespace)

@@ -70,7 +70,7 @@ func (el *EndpointsLock) Create(ler LeaderElectionRecord) error {
 				LeaderElectionRecordAnnotationKey: string(recordBytes),
 			},
 		},
-	})
+	}, metav1.CreateOptions{})
 	return err
 }
 
@@ -87,7 +87,7 @@ func (el *EndpointsLock) Update(ler LeaderElectionRecord) error {
 		el.e.Annotations = make(map[string]string)
 	}
 	el.e.Annotations[LeaderElectionRecordAnnotationKey] = string(recordBytes)
-	el.e, err = el.Client.Endpoints(el.EndpointsMeta.Namespace).Update(context.TODO(), el.e)
+	el.e, err = el.Client.Endpoints(el.EndpointsMeta.Namespace).Update(context.TODO(), el.e, metav1.UpdateOptions{})
 	return err
 }
 

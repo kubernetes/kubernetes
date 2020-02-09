@@ -81,7 +81,7 @@ func (c *FakeExamples) Watch(ctx context.Context, opts v1.ListOptions) (watch.In
 }
 
 // Create takes the representation of a example and creates it.  Returns the server's representation of the example, and an error, if there is any.
-func (c *FakeExamples) Create(ctx context.Context, example *crv1.Example) (result *crv1.Example, err error) {
+func (c *FakeExamples) Create(ctx context.Context, example *crv1.Example, opts v1.CreateOptions) (result *crv1.Example, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(examplesResource, c.ns, example), &crv1.Example{})
 
@@ -92,7 +92,7 @@ func (c *FakeExamples) Create(ctx context.Context, example *crv1.Example) (resul
 }
 
 // Update takes the representation of a example and updates it. Returns the server's representation of the example, and an error, if there is any.
-func (c *FakeExamples) Update(ctx context.Context, example *crv1.Example) (result *crv1.Example, err error) {
+func (c *FakeExamples) Update(ctx context.Context, example *crv1.Example, opts v1.UpdateOptions) (result *crv1.Example, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(examplesResource, c.ns, example), &crv1.Example{})
 
@@ -119,7 +119,7 @@ func (c *FakeExamples) DeleteCollection(ctx context.Context, options *v1.DeleteO
 }
 
 // Patch applies the patch and returns the patched example.
-func (c *FakeExamples) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *crv1.Example, err error) {
+func (c *FakeExamples) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *crv1.Example, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(examplesResource, c.ns, name, pt, data, subresources...), &crv1.Example{})
 

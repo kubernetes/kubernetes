@@ -81,7 +81,7 @@ func (c *FakeLimitRanges) Watch(ctx context.Context, opts v1.ListOptions) (watch
 }
 
 // Create takes the representation of a limitRange and creates it.  Returns the server's representation of the limitRange, and an error, if there is any.
-func (c *FakeLimitRanges) Create(ctx context.Context, limitRange *corev1.LimitRange) (result *corev1.LimitRange, err error) {
+func (c *FakeLimitRanges) Create(ctx context.Context, limitRange *corev1.LimitRange, opts v1.CreateOptions) (result *corev1.LimitRange, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(limitrangesResource, c.ns, limitRange), &corev1.LimitRange{})
 
@@ -92,7 +92,7 @@ func (c *FakeLimitRanges) Create(ctx context.Context, limitRange *corev1.LimitRa
 }
 
 // Update takes the representation of a limitRange and updates it. Returns the server's representation of the limitRange, and an error, if there is any.
-func (c *FakeLimitRanges) Update(ctx context.Context, limitRange *corev1.LimitRange) (result *corev1.LimitRange, err error) {
+func (c *FakeLimitRanges) Update(ctx context.Context, limitRange *corev1.LimitRange, opts v1.UpdateOptions) (result *corev1.LimitRange, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(limitrangesResource, c.ns, limitRange), &corev1.LimitRange{})
 
@@ -119,7 +119,7 @@ func (c *FakeLimitRanges) DeleteCollection(ctx context.Context, options *v1.Dele
 }
 
 // Patch applies the patch and returns the patched limitRange.
-func (c *FakeLimitRanges) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *corev1.LimitRange, err error) {
+func (c *FakeLimitRanges) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *corev1.LimitRange, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(limitrangesResource, c.ns, name, pt, data, subresources...), &corev1.LimitRange{})
 

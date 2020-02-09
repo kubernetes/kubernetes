@@ -38,14 +38,14 @@ type StorageClassesGetter interface {
 
 // StorageClassInterface has methods to work with StorageClass resources.
 type StorageClassInterface interface {
-	Create(context.Context, *v1beta1.StorageClass) (*v1beta1.StorageClass, error)
-	Update(context.Context, *v1beta1.StorageClass) (*v1beta1.StorageClass, error)
-	Delete(ctx context.Context, name string, options *v1.DeleteOptions) error
-	DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(ctx context.Context, name string, options v1.GetOptions) (*v1beta1.StorageClass, error)
+	Create(ctx context.Context, storageClass *v1beta1.StorageClass, opts v1.CreateOptions) (*v1beta1.StorageClass, error)
+	Update(ctx context.Context, storageClass *v1beta1.StorageClass, opts v1.UpdateOptions) (*v1beta1.StorageClass, error)
+	Delete(ctx context.Context, name string, opts *v1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts *v1.DeleteOptions, listOpts v1.ListOptions) error
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1beta1.StorageClass, error)
 	List(ctx context.Context, opts v1.ListOptions) (*v1beta1.StorageClassList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.StorageClass, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.StorageClass, err error)
 	StorageClassExpansion
 }
 
@@ -104,10 +104,11 @@ func (c *storageClasses) Watch(ctx context.Context, opts v1.ListOptions) (watch.
 }
 
 // Create takes the representation of a storageClass and creates it.  Returns the server's representation of the storageClass, and an error, if there is any.
-func (c *storageClasses) Create(ctx context.Context, storageClass *v1beta1.StorageClass) (result *v1beta1.StorageClass, err error) {
+func (c *storageClasses) Create(ctx context.Context, storageClass *v1beta1.StorageClass, opts v1.CreateOptions) (result *v1beta1.StorageClass, err error) {
 	result = &v1beta1.StorageClass{}
 	err = c.client.Post().
 		Resource("storageclasses").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(storageClass).
 		Do(ctx).
 		Into(result)
@@ -115,11 +116,12 @@ func (c *storageClasses) Create(ctx context.Context, storageClass *v1beta1.Stora
 }
 
 // Update takes the representation of a storageClass and updates it. Returns the server's representation of the storageClass, and an error, if there is any.
-func (c *storageClasses) Update(ctx context.Context, storageClass *v1beta1.StorageClass) (result *v1beta1.StorageClass, err error) {
+func (c *storageClasses) Update(ctx context.Context, storageClass *v1beta1.StorageClass, opts v1.UpdateOptions) (result *v1beta1.StorageClass, err error) {
 	result = &v1beta1.StorageClass{}
 	err = c.client.Put().
 		Resource("storageclasses").
 		Name(storageClass.Name).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(storageClass).
 		Do(ctx).
 		Into(result)
@@ -152,12 +154,13 @@ func (c *storageClasses) DeleteCollection(ctx context.Context, options *v1.Delet
 }
 
 // Patch applies the patch and returns the patched storageClass.
-func (c *storageClasses) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.StorageClass, err error) {
+func (c *storageClasses) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.StorageClass, err error) {
 	result = &v1beta1.StorageClass{}
 	err = c.client.Patch(pt).
 		Resource("storageclasses").
-		SubResource(subresources...).
 		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

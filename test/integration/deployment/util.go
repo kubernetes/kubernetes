@@ -211,7 +211,7 @@ func (d *deploymentTester) waitForDeploymentRevisionAndImage(revision, image str
 
 func markPodReady(c clientset.Interface, ns string, pod *v1.Pod) error {
 	addPodConditionReady(pod, metav1.Now())
-	_, err := c.CoreV1().Pods(ns).UpdateStatus(context.TODO(), pod)
+	_, err := c.CoreV1().Pods(ns).UpdateStatus(context.TODO(), pod, metav1.UpdateOptions{})
 	return err
 }
 

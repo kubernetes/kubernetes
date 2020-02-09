@@ -361,7 +361,7 @@ func configMapOperations(t *testing.T, kubeclient kubernetes.Interface) {
 		},
 	}
 
-	_, err := kubeclient.CoreV1().ConfigMaps(namespace).Create(context.TODO(), configMap)
+	_, err := kubeclient.CoreV1().ConfigMaps(namespace).Create(context.TODO(), configMap, metav1.CreateOptions{})
 	expectNoError(t, err, "failed to create audit-configmap")
 
 	_, err = kubeclient.CoreV1().ConfigMaps(namespace).Get(context.TODO(), configMap.Name, metav1.GetOptions{})
@@ -375,10 +375,10 @@ func configMapOperations(t *testing.T, kubeclient kubernetes.Interface) {
 		// event at stage ResponseComplete will not be generated.
 	}
 
-	_, err = kubeclient.CoreV1().ConfigMaps(namespace).Update(context.TODO(), configMap)
+	_, err = kubeclient.CoreV1().ConfigMaps(namespace).Update(context.TODO(), configMap, metav1.UpdateOptions{})
 	expectNoError(t, err, "failed to update audit-configmap")
 
-	_, err = kubeclient.CoreV1().ConfigMaps(namespace).Patch(context.TODO(), configMap.Name, types.JSONPatchType, patch)
+	_, err = kubeclient.CoreV1().ConfigMaps(namespace).Patch(context.TODO(), configMap.Name, types.JSONPatchType, patch, metav1.PatchOptions{})
 	expectNoError(t, err, "failed to patch configmap")
 
 	_, err = kubeclient.CoreV1().ConfigMaps(namespace).List(context.TODO(), metav1.ListOptions{})
@@ -443,6 +443,6 @@ func createV1beta1MutationWebhook(client clientset.Interface, endpoint string) e
 			FailurePolicy:           &fail,
 			AdmissionReviewVersions: []string{"v1beta1"},
 		}},
-	})
+	}, metav1.CreateOptions{})
 	return err
 }

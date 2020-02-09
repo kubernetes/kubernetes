@@ -90,7 +90,7 @@ func TestChangeCRD(t *testing.T) {
 			} else {
 				noxuDefinitionToUpdate.Spec.Versions = noxuDefinitionToUpdate.Spec.Versions[0:1]
 			}
-			if _, err := apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(context.TODO(), noxuDefinitionToUpdate); err != nil && !apierrors.IsConflict(err) {
+			if _, err := apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(context.TODO(), noxuDefinitionToUpdate, metav1.UpdateOptions{}); err != nil && !apierrors.IsConflict(err) {
 				t.Error(err)
 				continue
 			}

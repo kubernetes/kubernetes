@@ -265,7 +265,7 @@ func UpdateDeploymentWithRetries(c clientset.Interface, namespace, name string, 
 		}
 		// Apply the update, then attempt to push it to the apiserver.
 		applyUpdate(deployment)
-		if deployment, err = c.AppsV1().Deployments(namespace).Update(context.TODO(), deployment); err == nil {
+		if deployment, err = c.AppsV1().Deployments(namespace).Update(context.TODO(), deployment, metav1.UpdateOptions{}); err == nil {
 			logf("Updating deployment %s", name)
 			return true, nil
 		}

@@ -38,15 +38,15 @@ type IngressesGetter interface {
 
 // IngressInterface has methods to work with Ingress resources.
 type IngressInterface interface {
-	Create(context.Context, *v1beta1.Ingress) (*v1beta1.Ingress, error)
-	Update(context.Context, *v1beta1.Ingress) (*v1beta1.Ingress, error)
-	UpdateStatus(context.Context, *v1beta1.Ingress) (*v1beta1.Ingress, error)
-	Delete(ctx context.Context, name string, options *v1.DeleteOptions) error
-	DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(ctx context.Context, name string, options v1.GetOptions) (*v1beta1.Ingress, error)
+	Create(ctx context.Context, ingress *v1beta1.Ingress, opts v1.CreateOptions) (*v1beta1.Ingress, error)
+	Update(ctx context.Context, ingress *v1beta1.Ingress, opts v1.UpdateOptions) (*v1beta1.Ingress, error)
+	UpdateStatus(ctx context.Context, ingress *v1beta1.Ingress, opts v1.UpdateOptions) (*v1beta1.Ingress, error)
+	Delete(ctx context.Context, name string, opts *v1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts *v1.DeleteOptions, listOpts v1.ListOptions) error
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1beta1.Ingress, error)
 	List(ctx context.Context, opts v1.ListOptions) (*v1beta1.IngressList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.Ingress, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.Ingress, err error)
 	IngressExpansion
 }
 
@@ -110,11 +110,12 @@ func (c *ingresses) Watch(ctx context.Context, opts v1.ListOptions) (watch.Inter
 }
 
 // Create takes the representation of a ingress and creates it.  Returns the server's representation of the ingress, and an error, if there is any.
-func (c *ingresses) Create(ctx context.Context, ingress *v1beta1.Ingress) (result *v1beta1.Ingress, err error) {
+func (c *ingresses) Create(ctx context.Context, ingress *v1beta1.Ingress, opts v1.CreateOptions) (result *v1beta1.Ingress, err error) {
 	result = &v1beta1.Ingress{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("ingresses").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(ingress).
 		Do(ctx).
 		Into(result)
@@ -122,12 +123,13 @@ func (c *ingresses) Create(ctx context.Context, ingress *v1beta1.Ingress) (resul
 }
 
 // Update takes the representation of a ingress and updates it. Returns the server's representation of the ingress, and an error, if there is any.
-func (c *ingresses) Update(ctx context.Context, ingress *v1beta1.Ingress) (result *v1beta1.Ingress, err error) {
+func (c *ingresses) Update(ctx context.Context, ingress *v1beta1.Ingress, opts v1.UpdateOptions) (result *v1beta1.Ingress, err error) {
 	result = &v1beta1.Ingress{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("ingresses").
 		Name(ingress.Name).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(ingress).
 		Do(ctx).
 		Into(result)
@@ -136,14 +138,14 @@ func (c *ingresses) Update(ctx context.Context, ingress *v1beta1.Ingress) (resul
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-
-func (c *ingresses) UpdateStatus(ctx context.Context, ingress *v1beta1.Ingress) (result *v1beta1.Ingress, err error) {
+func (c *ingresses) UpdateStatus(ctx context.Context, ingress *v1beta1.Ingress, opts v1.UpdateOptions) (result *v1beta1.Ingress, err error) {
 	result = &v1beta1.Ingress{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("ingresses").
 		Name(ingress.Name).
 		SubResource("status").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(ingress).
 		Do(ctx).
 		Into(result)
@@ -178,13 +180,14 @@ func (c *ingresses) DeleteCollection(ctx context.Context, options *v1.DeleteOpti
 }
 
 // Patch applies the patch and returns the patched ingress.
-func (c *ingresses) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.Ingress, err error) {
+func (c *ingresses) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.Ingress, err error) {
 	result = &v1beta1.Ingress{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("ingresses").
-		SubResource(subresources...).
 		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

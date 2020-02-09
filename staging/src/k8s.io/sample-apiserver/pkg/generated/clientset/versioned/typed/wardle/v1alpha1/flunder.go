@@ -38,15 +38,15 @@ type FlundersGetter interface {
 
 // FlunderInterface has methods to work with Flunder resources.
 type FlunderInterface interface {
-	Create(context.Context, *v1alpha1.Flunder) (*v1alpha1.Flunder, error)
-	Update(context.Context, *v1alpha1.Flunder) (*v1alpha1.Flunder, error)
-	UpdateStatus(context.Context, *v1alpha1.Flunder) (*v1alpha1.Flunder, error)
-	Delete(ctx context.Context, name string, options *v1.DeleteOptions) error
-	DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(ctx context.Context, name string, options v1.GetOptions) (*v1alpha1.Flunder, error)
+	Create(ctx context.Context, flunder *v1alpha1.Flunder, opts v1.CreateOptions) (*v1alpha1.Flunder, error)
+	Update(ctx context.Context, flunder *v1alpha1.Flunder, opts v1.UpdateOptions) (*v1alpha1.Flunder, error)
+	UpdateStatus(ctx context.Context, flunder *v1alpha1.Flunder, opts v1.UpdateOptions) (*v1alpha1.Flunder, error)
+	Delete(ctx context.Context, name string, opts *v1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts *v1.DeleteOptions, listOpts v1.ListOptions) error
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1alpha1.Flunder, error)
 	List(ctx context.Context, opts v1.ListOptions) (*v1alpha1.FlunderList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.Flunder, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.Flunder, err error)
 	FlunderExpansion
 }
 
@@ -110,11 +110,12 @@ func (c *flunders) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interf
 }
 
 // Create takes the representation of a flunder and creates it.  Returns the server's representation of the flunder, and an error, if there is any.
-func (c *flunders) Create(ctx context.Context, flunder *v1alpha1.Flunder) (result *v1alpha1.Flunder, err error) {
+func (c *flunders) Create(ctx context.Context, flunder *v1alpha1.Flunder, opts v1.CreateOptions) (result *v1alpha1.Flunder, err error) {
 	result = &v1alpha1.Flunder{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("flunders").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(flunder).
 		Do(ctx).
 		Into(result)
@@ -122,12 +123,13 @@ func (c *flunders) Create(ctx context.Context, flunder *v1alpha1.Flunder) (resul
 }
 
 // Update takes the representation of a flunder and updates it. Returns the server's representation of the flunder, and an error, if there is any.
-func (c *flunders) Update(ctx context.Context, flunder *v1alpha1.Flunder) (result *v1alpha1.Flunder, err error) {
+func (c *flunders) Update(ctx context.Context, flunder *v1alpha1.Flunder, opts v1.UpdateOptions) (result *v1alpha1.Flunder, err error) {
 	result = &v1alpha1.Flunder{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("flunders").
 		Name(flunder.Name).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(flunder).
 		Do(ctx).
 		Into(result)
@@ -136,14 +138,14 @@ func (c *flunders) Update(ctx context.Context, flunder *v1alpha1.Flunder) (resul
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-
-func (c *flunders) UpdateStatus(ctx context.Context, flunder *v1alpha1.Flunder) (result *v1alpha1.Flunder, err error) {
+func (c *flunders) UpdateStatus(ctx context.Context, flunder *v1alpha1.Flunder, opts v1.UpdateOptions) (result *v1alpha1.Flunder, err error) {
 	result = &v1alpha1.Flunder{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("flunders").
 		Name(flunder.Name).
 		SubResource("status").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(flunder).
 		Do(ctx).
 		Into(result)
@@ -178,13 +180,14 @@ func (c *flunders) DeleteCollection(ctx context.Context, options *v1.DeleteOptio
 }
 
 // Patch applies the patch and returns the patched flunder.
-func (c *flunders) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.Flunder, err error) {
+func (c *flunders) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.Flunder, err error) {
 	result = &v1alpha1.Flunder{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("flunders").
-		SubResource(subresources...).
 		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

@@ -38,14 +38,14 @@ type PodSecurityPoliciesGetter interface {
 
 // PodSecurityPolicyInterface has methods to work with PodSecurityPolicy resources.
 type PodSecurityPolicyInterface interface {
-	Create(context.Context, *v1beta1.PodSecurityPolicy) (*v1beta1.PodSecurityPolicy, error)
-	Update(context.Context, *v1beta1.PodSecurityPolicy) (*v1beta1.PodSecurityPolicy, error)
-	Delete(ctx context.Context, name string, options *v1.DeleteOptions) error
-	DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(ctx context.Context, name string, options v1.GetOptions) (*v1beta1.PodSecurityPolicy, error)
+	Create(ctx context.Context, podSecurityPolicy *v1beta1.PodSecurityPolicy, opts v1.CreateOptions) (*v1beta1.PodSecurityPolicy, error)
+	Update(ctx context.Context, podSecurityPolicy *v1beta1.PodSecurityPolicy, opts v1.UpdateOptions) (*v1beta1.PodSecurityPolicy, error)
+	Delete(ctx context.Context, name string, opts *v1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts *v1.DeleteOptions, listOpts v1.ListOptions) error
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1beta1.PodSecurityPolicy, error)
 	List(ctx context.Context, opts v1.ListOptions) (*v1beta1.PodSecurityPolicyList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.PodSecurityPolicy, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.PodSecurityPolicy, err error)
 	PodSecurityPolicyExpansion
 }
 
@@ -104,10 +104,11 @@ func (c *podSecurityPolicies) Watch(ctx context.Context, opts v1.ListOptions) (w
 }
 
 // Create takes the representation of a podSecurityPolicy and creates it.  Returns the server's representation of the podSecurityPolicy, and an error, if there is any.
-func (c *podSecurityPolicies) Create(ctx context.Context, podSecurityPolicy *v1beta1.PodSecurityPolicy) (result *v1beta1.PodSecurityPolicy, err error) {
+func (c *podSecurityPolicies) Create(ctx context.Context, podSecurityPolicy *v1beta1.PodSecurityPolicy, opts v1.CreateOptions) (result *v1beta1.PodSecurityPolicy, err error) {
 	result = &v1beta1.PodSecurityPolicy{}
 	err = c.client.Post().
 		Resource("podsecuritypolicies").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(podSecurityPolicy).
 		Do(ctx).
 		Into(result)
@@ -115,11 +116,12 @@ func (c *podSecurityPolicies) Create(ctx context.Context, podSecurityPolicy *v1b
 }
 
 // Update takes the representation of a podSecurityPolicy and updates it. Returns the server's representation of the podSecurityPolicy, and an error, if there is any.
-func (c *podSecurityPolicies) Update(ctx context.Context, podSecurityPolicy *v1beta1.PodSecurityPolicy) (result *v1beta1.PodSecurityPolicy, err error) {
+func (c *podSecurityPolicies) Update(ctx context.Context, podSecurityPolicy *v1beta1.PodSecurityPolicy, opts v1.UpdateOptions) (result *v1beta1.PodSecurityPolicy, err error) {
 	result = &v1beta1.PodSecurityPolicy{}
 	err = c.client.Put().
 		Resource("podsecuritypolicies").
 		Name(podSecurityPolicy.Name).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(podSecurityPolicy).
 		Do(ctx).
 		Into(result)
@@ -152,12 +154,13 @@ func (c *podSecurityPolicies) DeleteCollection(ctx context.Context, options *v1.
 }
 
 // Patch applies the patch and returns the patched podSecurityPolicy.
-func (c *podSecurityPolicies) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.PodSecurityPolicy, err error) {
+func (c *podSecurityPolicies) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.PodSecurityPolicy, err error) {
 	result = &v1beta1.PodSecurityPolicy{}
 	err = c.client.Patch(pt).
 		Resource("podsecuritypolicies").
-		SubResource(subresources...).
 		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

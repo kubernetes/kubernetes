@@ -116,7 +116,7 @@ func main() {
 	queries := *queriesAverage * len(nodes.Items) * *podsPerNode
 
 	// Create the namespace
-	got, err := client.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{ObjectMeta: metav1.ObjectMeta{GenerateName: "serve-hostnames-"}})
+	got, err := client.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{ObjectMeta: metav1.ObjectMeta{GenerateName: "serve-hostnames-"}}, metav1.CreateOptions{})
 	if err != nil {
 		klog.Fatalf("Failed to create namespace: %v", err)
 	}
@@ -161,7 +161,7 @@ func main() {
 					"name": "serve-hostname",
 				},
 			},
-		})
+		}, metav1.CreateOptions{})
 		klog.V(4).Infof("Service create %s/server-hostnames took %v", ns, time.Since(t))
 		if err == nil {
 			break
@@ -211,7 +211,7 @@ func main() {
 						},
 						NodeName: node.Name,
 					},
-				})
+				}, metav1.CreateOptions{})
 				klog.V(4).Infof("Pod create %s/%s request took %v", ns, podName, time.Since(t))
 				if err == nil {
 					break

@@ -459,7 +459,7 @@ func testWebhookAdmission(t *testing.T, watchCache bool) {
 	// create CRDs
 	etcd.CreateTestCRDs(t, apiextensionsclientset.NewForConfigOrDie(server.ClientConfig), false, etcd.GetCustomResourceDefinitionData()...)
 
-	if _, err := client.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}}); err != nil {
+	if _, err := client.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}}, metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1478,7 +1478,7 @@ func createV1beta1ValidationWebhook(client clientset.Interface, endpoint, conver
 				AdmissionReviewVersions: []string{"v1beta1"},
 			},
 		},
-	})
+	}, metav1.CreateOptions{})
 	return err
 }
 
@@ -1514,7 +1514,7 @@ func createV1beta1MutationWebhook(client clientset.Interface, endpoint, converte
 				AdmissionReviewVersions: []string{"v1beta1"},
 			},
 		},
-	})
+	}, metav1.CreateOptions{})
 	return err
 }
 
@@ -1553,7 +1553,7 @@ func createV1ValidationWebhook(client clientset.Interface, endpoint, convertedEn
 				SideEffects:             &none,
 			},
 		},
-	})
+	}, metav1.CreateOptions{})
 	return err
 }
 
@@ -1592,7 +1592,7 @@ func createV1MutationWebhook(client clientset.Interface, endpoint, convertedEndp
 				SideEffects:             &none,
 			},
 		},
-	})
+	}, metav1.CreateOptions{})
 	return err
 }
 

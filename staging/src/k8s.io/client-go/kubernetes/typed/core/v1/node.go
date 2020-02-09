@@ -38,15 +38,15 @@ type NodesGetter interface {
 
 // NodeInterface has methods to work with Node resources.
 type NodeInterface interface {
-	Create(context.Context, *v1.Node) (*v1.Node, error)
-	Update(context.Context, *v1.Node) (*v1.Node, error)
-	UpdateStatus(context.Context, *v1.Node) (*v1.Node, error)
-	Delete(ctx context.Context, name string, options *metav1.DeleteOptions) error
-	DeleteCollection(ctx context.Context, options *metav1.DeleteOptions, listOptions metav1.ListOptions) error
-	Get(ctx context.Context, name string, options metav1.GetOptions) (*v1.Node, error)
+	Create(ctx context.Context, node *v1.Node, opts metav1.CreateOptions) (*v1.Node, error)
+	Update(ctx context.Context, node *v1.Node, opts metav1.UpdateOptions) (*v1.Node, error)
+	UpdateStatus(ctx context.Context, node *v1.Node, opts metav1.UpdateOptions) (*v1.Node, error)
+	Delete(ctx context.Context, name string, opts *metav1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.Node, error)
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.NodeList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Node, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Node, err error)
 	NodeExpansion
 }
 
@@ -105,10 +105,11 @@ func (c *nodes) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Inter
 }
 
 // Create takes the representation of a node and creates it.  Returns the server's representation of the node, and an error, if there is any.
-func (c *nodes) Create(ctx context.Context, node *v1.Node) (result *v1.Node, err error) {
+func (c *nodes) Create(ctx context.Context, node *v1.Node, opts metav1.CreateOptions) (result *v1.Node, err error) {
 	result = &v1.Node{}
 	err = c.client.Post().
 		Resource("nodes").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(node).
 		Do(ctx).
 		Into(result)
@@ -116,11 +117,12 @@ func (c *nodes) Create(ctx context.Context, node *v1.Node) (result *v1.Node, err
 }
 
 // Update takes the representation of a node and updates it. Returns the server's representation of the node, and an error, if there is any.
-func (c *nodes) Update(ctx context.Context, node *v1.Node) (result *v1.Node, err error) {
+func (c *nodes) Update(ctx context.Context, node *v1.Node, opts metav1.UpdateOptions) (result *v1.Node, err error) {
 	result = &v1.Node{}
 	err = c.client.Put().
 		Resource("nodes").
 		Name(node.Name).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(node).
 		Do(ctx).
 		Into(result)
@@ -129,13 +131,13 @@ func (c *nodes) Update(ctx context.Context, node *v1.Node) (result *v1.Node, err
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-
-func (c *nodes) UpdateStatus(ctx context.Context, node *v1.Node) (result *v1.Node, err error) {
+func (c *nodes) UpdateStatus(ctx context.Context, node *v1.Node, opts metav1.UpdateOptions) (result *v1.Node, err error) {
 	result = &v1.Node{}
 	err = c.client.Put().
 		Resource("nodes").
 		Name(node.Name).
 		SubResource("status").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(node).
 		Do(ctx).
 		Into(result)
@@ -168,12 +170,13 @@ func (c *nodes) DeleteCollection(ctx context.Context, options *metav1.DeleteOpti
 }
 
 // Patch applies the patch and returns the patched node.
-func (c *nodes) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Node, err error) {
+func (c *nodes) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Node, err error) {
 	result = &v1.Node{}
 	err = c.client.Patch(pt).
 		Resource("nodes").
-		SubResource(subresources...).
 		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

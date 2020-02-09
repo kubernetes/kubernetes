@@ -89,7 +89,7 @@ func (c ClusterRoleBindingClientAdapter) Get(namespace, name string) (RoleBindin
 }
 
 func (c ClusterRoleBindingClientAdapter) Create(in RoleBinding) (RoleBinding, error) {
-	ret, err := c.Client.Create(context.TODO(), in.(ClusterRoleBindingAdapter).ClusterRoleBinding)
+	ret, err := c.Client.Create(context.TODO(), in.(ClusterRoleBindingAdapter).ClusterRoleBinding, metav1.CreateOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -97,7 +97,7 @@ func (c ClusterRoleBindingClientAdapter) Create(in RoleBinding) (RoleBinding, er
 }
 
 func (c ClusterRoleBindingClientAdapter) Update(in RoleBinding) (RoleBinding, error) {
-	ret, err := c.Client.Update(context.TODO(), in.(ClusterRoleBindingAdapter).ClusterRoleBinding)
+	ret, err := c.Client.Update(context.TODO(), in.(ClusterRoleBindingAdapter).ClusterRoleBinding, metav1.UpdateOptions{})
 	if err != nil {
 		return nil, err
 	}

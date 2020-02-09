@@ -250,7 +250,7 @@ func TestSyncServiceEndpointSliceLabelSelection(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Expected no error adding EndpointSlice: %v", err)
 		}
-		_, err = client.DiscoveryV1beta1().EndpointSlices(ns).Create(context.TODO(), endpointSlice)
+		_, err = client.DiscoveryV1beta1().EndpointSlices(ns).Create(context.TODO(), endpointSlice, metav1.CreateOptions{})
 		if err != nil {
 			t.Fatalf("Expected no error creating EndpointSlice: %v", err)
 		}
@@ -306,7 +306,7 @@ func TestSyncServiceFull(t *testing.T) {
 		},
 	}
 	esController.serviceStore.Add(service)
-	_, err := esController.client.CoreV1().Services(namespace).Create(context.TODO(), service)
+	_, err := esController.client.CoreV1().Services(namespace).Create(context.TODO(), service, metav1.CreateOptions{})
 	assert.Nil(t, err, "Expected no error creating service")
 
 	// run through full sync service loop
@@ -369,7 +369,7 @@ func createService(t *testing.T, esController *endpointSliceController, namespac
 		},
 	}
 	esController.serviceStore.Add(service)
-	_, err := esController.client.CoreV1().Services(namespace).Create(context.TODO(), service)
+	_, err := esController.client.CoreV1().Services(namespace).Create(context.TODO(), service, metav1.CreateOptions{})
 	assert.Nil(t, err, "Expected no error creating service")
 	return service
 }

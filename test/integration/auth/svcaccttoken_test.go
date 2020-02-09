@@ -162,13 +162,13 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 			},
 		}
 
-		if resp, err := cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(context.TODO(), sa.Name, treq); err == nil {
+		if resp, err := cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(context.TODO(), sa.Name, treq, metav1.CreateOptions{}); err == nil {
 			t.Fatalf("expected err creating token for nonexistant svcacct but got: %#v", resp)
 		}
 		sa, delSvcAcct := createDeleteSvcAcct(t, cs, sa)
 		defer delSvcAcct()
 
-		treq, err = cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(context.TODO(), sa.Name, treq)
+		treq, err = cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(context.TODO(), sa.Name, treq, metav1.CreateOptions{})
 		if err != nil {
 			t.Fatalf("err: %v", err)
 		}
@@ -200,13 +200,13 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 			},
 		}
 
-		if resp, err := cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(context.TODO(), sa.Name, treq); err == nil {
+		if resp, err := cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(context.TODO(), sa.Name, treq, metav1.CreateOptions{}); err == nil {
 			t.Fatalf("expected err creating token for nonexistant svcacct but got: %#v", resp)
 		}
 		sa, del := createDeleteSvcAcct(t, cs, sa)
 		defer del()
 
-		if resp, err := cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(context.TODO(), sa.Name, treq); err == nil {
+		if resp, err := cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(context.TODO(), sa.Name, treq, metav1.CreateOptions{}); err == nil {
 			t.Fatalf("expected err creating token bound to nonexistant pod but got: %#v", resp)
 		}
 		pod, delPod := createDeletePod(t, cs, pod)
@@ -214,17 +214,17 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 
 		// right uid
 		treq.Spec.BoundObjectRef.UID = pod.UID
-		if _, err := cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(context.TODO(), sa.Name, treq); err != nil {
+		if _, err := cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(context.TODO(), sa.Name, treq, metav1.CreateOptions{}); err != nil {
 			t.Fatalf("err: %v", err)
 		}
 		// wrong uid
 		treq.Spec.BoundObjectRef.UID = wrongUID
-		if resp, err := cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(context.TODO(), sa.Name, treq); err == nil {
+		if resp, err := cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(context.TODO(), sa.Name, treq, metav1.CreateOptions{}); err == nil {
 			t.Fatalf("expected err creating token bound to pod with wrong uid but got: %#v", resp)
 		}
 		// no uid
 		treq.Spec.BoundObjectRef.UID = noUID
-		treq, err = cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(context.TODO(), sa.Name, treq)
+		treq, err = cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(context.TODO(), sa.Name, treq, metav1.CreateOptions{})
 		if err != nil {
 			t.Fatalf("err: %v", err)
 		}
@@ -263,13 +263,13 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 			},
 		}
 
-		if resp, err := cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(context.TODO(), sa.Name, treq); err == nil {
+		if resp, err := cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(context.TODO(), sa.Name, treq, metav1.CreateOptions{}); err == nil {
 			t.Fatalf("expected err creating token for nonexistant svcacct but got: %#v", resp)
 		}
 		sa, del := createDeleteSvcAcct(t, cs, sa)
 		defer del()
 
-		if resp, err := cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(context.TODO(), sa.Name, treq); err == nil {
+		if resp, err := cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(context.TODO(), sa.Name, treq, metav1.CreateOptions{}); err == nil {
 			t.Fatalf("expected err creating token bound to nonexistant secret but got: %#v", resp)
 		}
 		secret, delSecret := createDeleteSecret(t, cs, secret)
@@ -277,17 +277,17 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 
 		// right uid
 		treq.Spec.BoundObjectRef.UID = secret.UID
-		if _, err := cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(context.TODO(), sa.Name, treq); err != nil {
+		if _, err := cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(context.TODO(), sa.Name, treq, metav1.CreateOptions{}); err != nil {
 			t.Fatalf("err: %v", err)
 		}
 		// wrong uid
 		treq.Spec.BoundObjectRef.UID = wrongUID
-		if resp, err := cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(context.TODO(), sa.Name, treq); err == nil {
+		if resp, err := cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(context.TODO(), sa.Name, treq, metav1.CreateOptions{}); err == nil {
 			t.Fatalf("expected err creating token bound to secret with wrong uid but got: %#v", resp)
 		}
 		// no uid
 		treq.Spec.BoundObjectRef.UID = noUID
-		treq, err = cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(context.TODO(), sa.Name, treq)
+		treq, err = cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(context.TODO(), sa.Name, treq, metav1.CreateOptions{})
 		if err != nil {
 			t.Fatalf("err: %v", err)
 		}
@@ -321,7 +321,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 		_, del = createDeletePod(t, cs, otherpod)
 		defer del()
 
-		if resp, err := cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(context.TODO(), sa.Name, treq); err == nil {
+		if resp, err := cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(context.TODO(), sa.Name, treq, metav1.CreateOptions{}); err == nil {
 			t.Fatalf("expected err but got: %#v", resp)
 		}
 	})
@@ -336,7 +336,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 		sa, del := createDeleteSvcAcct(t, cs, sa)
 		defer del()
 
-		treq, err = cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(context.TODO(), sa.Name, treq)
+		treq, err = cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(context.TODO(), sa.Name, treq, metav1.CreateOptions{})
 		if err != nil {
 			t.Fatalf("err: %v", err)
 		}
@@ -375,7 +375,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 		sa, del := createDeleteSvcAcct(t, cs, sa)
 		defer del()
 
-		treq, err = cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(context.TODO(), sa.Name, treq)
+		treq, err = cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(context.TODO(), sa.Name, treq, metav1.CreateOptions{})
 		if err != nil {
 			t.Fatalf("err: %v", err)
 		}
@@ -391,7 +391,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 		sa, del := createDeleteSvcAcct(t, cs, sa)
 		defer del()
 
-		treq, err = cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(context.TODO(), sa.Name, treq)
+		treq, err = cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(context.TODO(), sa.Name, treq, metav1.CreateOptions{})
 		if err != nil {
 			t.Fatalf("err: %v", err)
 		}
@@ -419,7 +419,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 		defer originalDelPod()
 
 		treq.Spec.BoundObjectRef.UID = originalPod.UID
-		if treq, err = cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(context.TODO(), sa.Name, treq); err != nil {
+		if treq, err = cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(context.TODO(), sa.Name, treq, metav1.CreateOptions{}); err != nil {
 			t.Fatalf("err: %v", err)
 		}
 
@@ -460,7 +460,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 		defer originalDelSecret()
 
 		treq.Spec.BoundObjectRef.UID = originalSecret.UID
-		if treq, err = cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(context.TODO(), sa.Name, treq); err != nil {
+		if treq, err = cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(context.TODO(), sa.Name, treq, metav1.CreateOptions{}); err != nil {
 			t.Fatalf("err: %v", err)
 		}
 
@@ -503,7 +503,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 		defer originalDelSecret()
 
 		treq.Spec.BoundObjectRef.UID = originalSecret.UID
-		if treq, err = cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(context.TODO(), sa.Name, treq); err != nil {
+		if treq, err = cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(context.TODO(), sa.Name, treq, metav1.CreateOptions{}); err != nil {
 			t.Fatalf("err: %v", err)
 		}
 
@@ -547,7 +547,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 		defer originalDelSecret()
 
 		treq.Spec.BoundObjectRef.UID = originalSecret.UID
-		if treq, err = cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(context.TODO(), sa.Name, treq); err != nil {
+		if treq, err = cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(context.TODO(), sa.Name, treq, metav1.CreateOptions{}); err != nil {
 			t.Fatalf("err: %v", err)
 		}
 
@@ -576,7 +576,7 @@ func doTokenReview(t *testing.T, cs clientset.Interface, treq *authenticationv1.
 		Spec: authenticationv1.TokenReviewSpec{
 			Token: treq.Status.Token,
 		},
-	})
+	}, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -643,7 +643,7 @@ func getPayload(t *testing.T, b string) string {
 
 func createDeleteSvcAcct(t *testing.T, cs clientset.Interface, sa *v1.ServiceAccount) (*v1.ServiceAccount, func()) {
 	t.Helper()
-	sa, err := cs.CoreV1().ServiceAccounts(sa.Namespace).Create(context.TODO(), sa)
+	sa, err := cs.CoreV1().ServiceAccounts(sa.Namespace).Create(context.TODO(), sa, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -662,7 +662,7 @@ func createDeleteSvcAcct(t *testing.T, cs clientset.Interface, sa *v1.ServiceAcc
 
 func createDeletePod(t *testing.T, cs clientset.Interface, pod *v1.Pod) (*v1.Pod, func()) {
 	t.Helper()
-	pod, err := cs.CoreV1().Pods(pod.Namespace).Create(context.TODO(), pod)
+	pod, err := cs.CoreV1().Pods(pod.Namespace).Create(context.TODO(), pod, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -681,7 +681,7 @@ func createDeletePod(t *testing.T, cs clientset.Interface, pod *v1.Pod) (*v1.Pod
 
 func createDeleteSecret(t *testing.T, cs clientset.Interface, sec *v1.Secret) (*v1.Secret, func()) {
 	t.Helper()
-	sec, err := cs.CoreV1().Secrets(sec.Namespace).Create(context.TODO(), sec)
+	sec, err := cs.CoreV1().Secrets(sec.Namespace).Create(context.TODO(), sec, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}

@@ -38,15 +38,15 @@ type PersistentVolumeClaimsGetter interface {
 
 // PersistentVolumeClaimInterface has methods to work with PersistentVolumeClaim resources.
 type PersistentVolumeClaimInterface interface {
-	Create(context.Context, *v1.PersistentVolumeClaim) (*v1.PersistentVolumeClaim, error)
-	Update(context.Context, *v1.PersistentVolumeClaim) (*v1.PersistentVolumeClaim, error)
-	UpdateStatus(context.Context, *v1.PersistentVolumeClaim) (*v1.PersistentVolumeClaim, error)
-	Delete(ctx context.Context, name string, options *metav1.DeleteOptions) error
-	DeleteCollection(ctx context.Context, options *metav1.DeleteOptions, listOptions metav1.ListOptions) error
-	Get(ctx context.Context, name string, options metav1.GetOptions) (*v1.PersistentVolumeClaim, error)
+	Create(ctx context.Context, persistentVolumeClaim *v1.PersistentVolumeClaim, opts metav1.CreateOptions) (*v1.PersistentVolumeClaim, error)
+	Update(ctx context.Context, persistentVolumeClaim *v1.PersistentVolumeClaim, opts metav1.UpdateOptions) (*v1.PersistentVolumeClaim, error)
+	UpdateStatus(ctx context.Context, persistentVolumeClaim *v1.PersistentVolumeClaim, opts metav1.UpdateOptions) (*v1.PersistentVolumeClaim, error)
+	Delete(ctx context.Context, name string, opts *metav1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.PersistentVolumeClaim, error)
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.PersistentVolumeClaimList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.PersistentVolumeClaim, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.PersistentVolumeClaim, err error)
 	PersistentVolumeClaimExpansion
 }
 
@@ -110,11 +110,12 @@ func (c *persistentVolumeClaims) Watch(ctx context.Context, opts metav1.ListOpti
 }
 
 // Create takes the representation of a persistentVolumeClaim and creates it.  Returns the server's representation of the persistentVolumeClaim, and an error, if there is any.
-func (c *persistentVolumeClaims) Create(ctx context.Context, persistentVolumeClaim *v1.PersistentVolumeClaim) (result *v1.PersistentVolumeClaim, err error) {
+func (c *persistentVolumeClaims) Create(ctx context.Context, persistentVolumeClaim *v1.PersistentVolumeClaim, opts metav1.CreateOptions) (result *v1.PersistentVolumeClaim, err error) {
 	result = &v1.PersistentVolumeClaim{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("persistentvolumeclaims").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(persistentVolumeClaim).
 		Do(ctx).
 		Into(result)
@@ -122,12 +123,13 @@ func (c *persistentVolumeClaims) Create(ctx context.Context, persistentVolumeCla
 }
 
 // Update takes the representation of a persistentVolumeClaim and updates it. Returns the server's representation of the persistentVolumeClaim, and an error, if there is any.
-func (c *persistentVolumeClaims) Update(ctx context.Context, persistentVolumeClaim *v1.PersistentVolumeClaim) (result *v1.PersistentVolumeClaim, err error) {
+func (c *persistentVolumeClaims) Update(ctx context.Context, persistentVolumeClaim *v1.PersistentVolumeClaim, opts metav1.UpdateOptions) (result *v1.PersistentVolumeClaim, err error) {
 	result = &v1.PersistentVolumeClaim{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("persistentvolumeclaims").
 		Name(persistentVolumeClaim.Name).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(persistentVolumeClaim).
 		Do(ctx).
 		Into(result)
@@ -136,14 +138,14 @@ func (c *persistentVolumeClaims) Update(ctx context.Context, persistentVolumeCla
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-
-func (c *persistentVolumeClaims) UpdateStatus(ctx context.Context, persistentVolumeClaim *v1.PersistentVolumeClaim) (result *v1.PersistentVolumeClaim, err error) {
+func (c *persistentVolumeClaims) UpdateStatus(ctx context.Context, persistentVolumeClaim *v1.PersistentVolumeClaim, opts metav1.UpdateOptions) (result *v1.PersistentVolumeClaim, err error) {
 	result = &v1.PersistentVolumeClaim{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("persistentvolumeclaims").
 		Name(persistentVolumeClaim.Name).
 		SubResource("status").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(persistentVolumeClaim).
 		Do(ctx).
 		Into(result)
@@ -178,13 +180,14 @@ func (c *persistentVolumeClaims) DeleteCollection(ctx context.Context, options *
 }
 
 // Patch applies the patch and returns the patched persistentVolumeClaim.
-func (c *persistentVolumeClaims) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.PersistentVolumeClaim, err error) {
+func (c *persistentVolumeClaims) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.PersistentVolumeClaim, err error) {
 	result = &v1.PersistentVolumeClaim{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("persistentvolumeclaims").
-		SubResource(subresources...).
 		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

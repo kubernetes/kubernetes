@@ -1032,7 +1032,7 @@ func storeDaemonSetStatus(dsClient unversionedapps.DaemonSetInterface, ds *apps.
 		toUpdate.Status.NumberAvailable = int32(numberAvailable)
 		toUpdate.Status.NumberUnavailable = int32(numberUnavailable)
 
-		if _, updateErr = dsClient.UpdateStatus(context.TODO(), toUpdate); updateErr == nil {
+		if _, updateErr = dsClient.UpdateStatus(context.TODO(), toUpdate, metav1.UpdateOptions{}); updateErr == nil {
 			return nil
 		}
 

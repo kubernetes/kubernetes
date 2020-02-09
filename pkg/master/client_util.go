@@ -35,7 +35,7 @@ func createNamespaceIfNeeded(c corev1client.NamespacesGetter, ns string) error {
 			Namespace: "",
 		},
 	}
-	_, err := c.Namespaces().Create(context.TODO(), newNs)
+	_, err := c.Namespaces().Create(context.TODO(), newNs, metav1.CreateOptions{})
 	if err != nil && errors.IsAlreadyExists(err) {
 		err = nil
 	}

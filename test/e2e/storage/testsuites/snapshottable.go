@@ -131,7 +131,7 @@ func (s *snapshottableTestSuite) DefineTests(driver TestDriver, pattern testpatt
 		framework.Logf("In creating storage class object and pvc object for driver - sc: %v, pvc: %v", class, pvc)
 
 		ginkgo.By("creating a StorageClass " + class.Name)
-		class, err = cs.StorageV1().StorageClasses().Create(context.TODO(), class)
+		class, err = cs.StorageV1().StorageClasses().Create(context.TODO(), class, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 		defer func() {
 			framework.Logf("deleting storage class %s", class.Name)
@@ -139,7 +139,7 @@ func (s *snapshottableTestSuite) DefineTests(driver TestDriver, pattern testpatt
 		}()
 
 		ginkgo.By("creating a claim")
-		pvc, err = cs.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(context.TODO(), pvc)
+		pvc, err = cs.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(context.TODO(), pvc, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 		defer func() {
 			framework.Logf("deleting claim %q/%q", pvc.Namespace, pvc.Name)

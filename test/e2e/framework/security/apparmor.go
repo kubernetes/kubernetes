@@ -156,7 +156,7 @@ profile %s flags=(attach_disconnected) {
 			profileName: profile,
 		},
 	}
-	_, err := clientset.CoreV1().ConfigMaps(nsName).Create(context.TODO(), cm)
+	_, err := clientset.CoreV1().ConfigMaps(nsName).Create(context.TODO(), cm, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "Failed to create apparmor-profiles ConfigMap")
 }
 
@@ -224,7 +224,7 @@ func createAppArmorProfileLoader(nsName string, clientset clientset.Interface) {
 			},
 		},
 	}
-	_, err := clientset.CoreV1().ReplicationControllers(nsName).Create(context.TODO(), loader)
+	_, err := clientset.CoreV1().ReplicationControllers(nsName).Create(context.TODO(), loader, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "Failed to create apparmor-loader ReplicationController")
 
 	// Wait for loader to be ready.

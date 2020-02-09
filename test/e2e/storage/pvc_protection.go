@@ -79,7 +79,7 @@ var _ = utils.SIGDescribe("PVC Protection", func() {
 			ClaimSize:  t.ClaimSize,
 			VolumeMode: &t.VolumeMode,
 		}, nameSpace)
-		pvc, err = client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(context.TODO(), pvc)
+		pvc, err = client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(context.TODO(), pvc, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "Error creating PVC")
 		pvcCreatedAndNotDeleted = true
 

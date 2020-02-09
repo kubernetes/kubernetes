@@ -316,7 +316,7 @@ func createRBACRoleForGmsa(f *framework.Framework) (string, func(), error) {
 		f.ClientSet.RbacV1().ClusterRoles().Delete(context.TODO(), roleName, &metav1.DeleteOptions{})
 	}
 
-	_, err := f.ClientSet.RbacV1().ClusterRoles().Create(context.TODO(), role)
+	_, err := f.ClientSet.RbacV1().ClusterRoles().Create(context.TODO(), role, metav1.CreateOptions{})
 	if err != nil {
 		err = errors.Wrapf(err, "unable to create RBAC cluster role %q", roleName)
 	}
@@ -333,7 +333,7 @@ func createServiceAccount(f *framework.Framework) string {
 			Namespace: f.Namespace.Name,
 		},
 	}
-	if _, err := f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Create(context.TODO(), account); err != nil {
+	if _, err := f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Create(context.TODO(), account, metav1.CreateOptions{}); err != nil {
 		framework.Failf("unable to create service account %q: %v", accountName, err)
 	}
 	return accountName
@@ -359,7 +359,7 @@ func bindRBACRoleToServiceAccount(f *framework.Framework, serviceAccountName, rb
 			Name:     rbacRoleName,
 		},
 	}
-	f.ClientSet.RbacV1().RoleBindings(f.Namespace.Name).Create(context.TODO(), binding)
+	f.ClientSet.RbacV1().RoleBindings(f.Namespace.Name).Create(context.TODO(), binding, metav1.CreateOptions{})
 }
 
 // createPodWithGmsa creates a pod using the test GMSA cred spec, and returns its name.

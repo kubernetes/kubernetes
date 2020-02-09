@@ -165,7 +165,7 @@ func (o *CreateCronJobOptions) Run() error {
 
 	if !o.DryRun {
 		var err error
-		cronjob, err = o.Client.CronJobs(o.Namespace).Create(context.TODO(), cronjob)
+		cronjob, err = o.Client.CronJobs(o.Namespace).Create(context.TODO(), cronjob, metav1.CreateOptions{})
 		if err != nil {
 			return fmt.Errorf("failed to create cronjob: %v", err)
 		}

@@ -212,7 +212,7 @@ func testDefaulting(t *testing.T, watchCache bool) {
 				t.Fatal(err)
 			}
 			update(obj)
-			obj, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Update(context.TODO(), obj)
+			obj, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Update(context.TODO(), obj, metav1.UpdateOptions{})
 			if err != nil && apierrors.IsConflict(err) {
 				continue
 			} else if err != nil {

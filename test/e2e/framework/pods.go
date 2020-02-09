@@ -79,7 +79,7 @@ type PodClient struct {
 // Create creates a new pod according to the framework specifications (don't wait for it to start).
 func (c *PodClient) Create(pod *v1.Pod) *v1.Pod {
 	c.mungeSpec(pod)
-	p, err := c.PodInterface.Create(context.TODO(), pod)
+	p, err := c.PodInterface.Create(context.TODO(), pod, metav1.CreateOptions{})
 	ExpectNoError(err, "Error creating Pod")
 	return p
 }
@@ -121,7 +121,7 @@ func (c *PodClient) Update(name string, updateFn func(pod *v1.Pod)) {
 			return false, fmt.Errorf("failed to get pod %q: %v", name, err)
 		}
 		updateFn(pod)
-		_, err = c.PodInterface.Update(context.TODO(), pod)
+		_, err = c.PodInterface.Update(context.TODO(), pod, metav1.UpdateOptions{})
 		if err == nil {
 			Logf("Successfully updated pod %q", name)
 			return true, nil

@@ -26,6 +26,7 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -128,7 +129,7 @@ func (c *CRDFinalizer) sync(key string) error {
 		Reason:  "InstanceDeletionInProgress",
 		Message: "CustomResource deletion is in progress",
 	})
-	crd, err = c.crdClient.CustomResourceDefinitions().UpdateStatus(context.TODO(), crd)
+	crd, err = c.crdClient.CustomResourceDefinitions().UpdateStatus(context.TODO(), crd, metav1.UpdateOptions{})
 	if apierrors.IsNotFound(err) || apierrors.IsConflict(err) {
 		// deleted or changed in the meantime, we'll get called again
 		return nil
@@ -151,7 +152,7 @@ func (c *CRDFinalizer) sync(key string) error {
 		cond, deleteErr := c.deleteInstances(crd)
 		apiextensionshelpers.SetCRDCondition(crd, cond)
 		if deleteErr != nil {
-			if _, err = c.crdClient.CustomResourceDefinitions().UpdateStatus(context.TODO(), crd); err != nil {
+			if _, err = c.crdClient.CustomResourceDefinitions().UpdateStatus(context.TODO(), crd, metav1.UpdateOptions{}); err != nil {
 				utilruntime.HandleError(err)
 			}
 			return deleteErr
@@ -166,7 +167,7 @@ func (c *CRDFinalizer) sync(key string) error {
 	}
 
 	apiextensionshelpers.CRDRemoveFinalizer(crd, apiextensionsv1.CustomResourceCleanupFinalizer)
-	_, err = c.crdClient.CustomResourceDefinitions().UpdateStatus(context.TODO(), crd)
+	_, err = c.crdClient.CustomResourceDefinitions().UpdateStatus(context.TODO(), crd, metav1.UpdateOptions{})
 	if apierrors.IsNotFound(err) || apierrors.IsConflict(err) {
 		// deleted or changed in the meantime, we'll get called again
 		return nil

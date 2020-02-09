@@ -81,7 +81,7 @@ func (c *FakeTestTypes) Watch(ctx context.Context, opts v1.ListOptions) (watch.I
 }
 
 // Create takes the representation of a testType and creates it.  Returns the server's representation of the testType, and an error, if there is any.
-func (c *FakeTestTypes) Create(ctx context.Context, testType *example2v1.TestType) (result *example2v1.TestType, err error) {
+func (c *FakeTestTypes) Create(ctx context.Context, testType *example2v1.TestType, opts v1.CreateOptions) (result *example2v1.TestType, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(testtypesResource, c.ns, testType), &example2v1.TestType{})
 
@@ -92,7 +92,7 @@ func (c *FakeTestTypes) Create(ctx context.Context, testType *example2v1.TestTyp
 }
 
 // Update takes the representation of a testType and updates it. Returns the server's representation of the testType, and an error, if there is any.
-func (c *FakeTestTypes) Update(ctx context.Context, testType *example2v1.TestType) (result *example2v1.TestType, err error) {
+func (c *FakeTestTypes) Update(ctx context.Context, testType *example2v1.TestType, opts v1.UpdateOptions) (result *example2v1.TestType, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(testtypesResource, c.ns, testType), &example2v1.TestType{})
 
@@ -104,7 +104,7 @@ func (c *FakeTestTypes) Update(ctx context.Context, testType *example2v1.TestTyp
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeTestTypes) UpdateStatus(ctx context.Context, testType *example2v1.TestType) (*example2v1.TestType, error) {
+func (c *FakeTestTypes) UpdateStatus(ctx context.Context, testType *example2v1.TestType, opts v1.UpdateOptions) (*example2v1.TestType, error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateSubresourceAction(testtypesResource, "status", c.ns, testType), &example2v1.TestType{})
 
@@ -131,7 +131,7 @@ func (c *FakeTestTypes) DeleteCollection(ctx context.Context, options *v1.Delete
 }
 
 // Patch applies the patch and returns the patched testType.
-func (c *FakeTestTypes) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *example2v1.TestType, err error) {
+func (c *FakeTestTypes) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *example2v1.TestType, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(testtypesResource, c.ns, name, pt, data, subresources...), &example2v1.TestType{})
 

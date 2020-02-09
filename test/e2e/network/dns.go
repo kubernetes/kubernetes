@@ -138,7 +138,7 @@ var _ = SIGDescribe("DNS", func() {
 			"dns-test": "true",
 		}
 		headlessService := e2eservice.CreateServiceSpec(dnsTestServiceName, "", true, testServiceSelector)
-		_, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(context.TODO(), headlessService)
+		_, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(context.TODO(), headlessService, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create headless service: %s", dnsTestServiceName)
 		defer func() {
 			ginkgo.By("deleting the test headless service")
@@ -148,7 +148,7 @@ var _ = SIGDescribe("DNS", func() {
 
 		regularServiceName := "test-service-2"
 		regularService := e2eservice.CreateServiceSpec(regularServiceName, "", false, testServiceSelector)
-		regularService, err = f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(context.TODO(), regularService)
+		regularService, err = f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(context.TODO(), regularService, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create regular service: %s", regularServiceName)
 
 		defer func() {
@@ -193,7 +193,7 @@ var _ = SIGDescribe("DNS", func() {
 			"dns-test": "true",
 		}
 		headlessService := e2eservice.CreateServiceSpec(dnsTestServiceName, "", true, testServiceSelector)
-		_, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(context.TODO(), headlessService)
+		_, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(context.TODO(), headlessService, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create headless service: %s", dnsTestServiceName)
 		defer func() {
 			ginkgo.By("deleting the test headless service")
@@ -203,7 +203,7 @@ var _ = SIGDescribe("DNS", func() {
 
 		regularServiceName := "test-service-2"
 		regularService := e2eservice.CreateServiceSpec(regularServiceName, "", false, testServiceSelector)
-		regularService, err = f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(context.TODO(), regularService)
+		regularService, err = f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(context.TODO(), regularService, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create regular service: %s", regularServiceName)
 		defer func() {
 			ginkgo.By("deleting the test service")
@@ -250,7 +250,7 @@ var _ = SIGDescribe("DNS", func() {
 		serviceName := "dns-test-service-2"
 		podHostname := "dns-querier-2"
 		headlessService := e2eservice.CreateServiceSpec(serviceName, "", true, testServiceSelector)
-		_, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(context.TODO(), headlessService)
+		_, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(context.TODO(), headlessService, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create headless service: %s", serviceName)
 
 		defer func() {
@@ -292,7 +292,7 @@ var _ = SIGDescribe("DNS", func() {
 		serviceName := "dns-test-service-2"
 		podHostname := "dns-querier-2"
 		headlessService := e2eservice.CreateServiceSpec(serviceName, "", true, testServiceSelector)
-		_, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(context.TODO(), headlessService)
+		_, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(context.TODO(), headlessService, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create headless service: %s", serviceName)
 
 		defer func() {
@@ -331,7 +331,7 @@ var _ = SIGDescribe("DNS", func() {
 		ginkgo.By("Creating a test externalName service")
 		serviceName := "dns-test-service-3"
 		externalNameService := e2eservice.CreateServiceSpec(serviceName, "foo.example.com", false, nil)
-		_, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(context.TODO(), externalNameService)
+		_, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(context.TODO(), externalNameService, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create ExternalName service: %s", serviceName)
 
 		defer func() {
@@ -414,7 +414,7 @@ var _ = SIGDescribe("DNS", func() {
 			Nameservers: []string{testServerIP},
 			Searches:    []string{testSearchPath},
 		}
-		testAgnhostPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), testAgnhostPod)
+		testAgnhostPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), testAgnhostPod, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create pod: %s", testAgnhostPod.Name)
 		framework.Logf("Created pod %v", testAgnhostPod)
 		defer func() {
@@ -463,7 +463,7 @@ var _ = SIGDescribe("DNS", func() {
 		testServerPod := generateDNSServerPod(map[string]string{
 			testDNSNameFull: testInjectedIP,
 		})
-		testServerPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), testServerPod)
+		testServerPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), testServerPod, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create pod: %s", testServerPod.Name)
 		framework.Logf("Created pod %v", testServerPod)
 		defer func() {
@@ -495,7 +495,7 @@ var _ = SIGDescribe("DNS", func() {
 				},
 			},
 		}
-		testUtilsPod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), testUtilsPod)
+		testUtilsPod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), testUtilsPod, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create pod: %s", testUtilsPod.Name)
 		framework.Logf("Created pod %v", testUtilsPod)
 		defer func() {

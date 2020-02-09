@@ -38,15 +38,15 @@ type CustomResourceDefinitionsGetter interface {
 
 // CustomResourceDefinitionInterface has methods to work with CustomResourceDefinition resources.
 type CustomResourceDefinitionInterface interface {
-	Create(context.Context, *v1.CustomResourceDefinition) (*v1.CustomResourceDefinition, error)
-	Update(context.Context, *v1.CustomResourceDefinition) (*v1.CustomResourceDefinition, error)
-	UpdateStatus(context.Context, *v1.CustomResourceDefinition) (*v1.CustomResourceDefinition, error)
-	Delete(ctx context.Context, name string, options *metav1.DeleteOptions) error
-	DeleteCollection(ctx context.Context, options *metav1.DeleteOptions, listOptions metav1.ListOptions) error
-	Get(ctx context.Context, name string, options metav1.GetOptions) (*v1.CustomResourceDefinition, error)
+	Create(ctx context.Context, customResourceDefinition *v1.CustomResourceDefinition, opts metav1.CreateOptions) (*v1.CustomResourceDefinition, error)
+	Update(ctx context.Context, customResourceDefinition *v1.CustomResourceDefinition, opts metav1.UpdateOptions) (*v1.CustomResourceDefinition, error)
+	UpdateStatus(ctx context.Context, customResourceDefinition *v1.CustomResourceDefinition, opts metav1.UpdateOptions) (*v1.CustomResourceDefinition, error)
+	Delete(ctx context.Context, name string, opts *metav1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.CustomResourceDefinition, error)
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.CustomResourceDefinitionList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.CustomResourceDefinition, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.CustomResourceDefinition, err error)
 	CustomResourceDefinitionExpansion
 }
 
@@ -105,10 +105,11 @@ func (c *customResourceDefinitions) Watch(ctx context.Context, opts metav1.ListO
 }
 
 // Create takes the representation of a customResourceDefinition and creates it.  Returns the server's representation of the customResourceDefinition, and an error, if there is any.
-func (c *customResourceDefinitions) Create(ctx context.Context, customResourceDefinition *v1.CustomResourceDefinition) (result *v1.CustomResourceDefinition, err error) {
+func (c *customResourceDefinitions) Create(ctx context.Context, customResourceDefinition *v1.CustomResourceDefinition, opts metav1.CreateOptions) (result *v1.CustomResourceDefinition, err error) {
 	result = &v1.CustomResourceDefinition{}
 	err = c.client.Post().
 		Resource("customresourcedefinitions").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(customResourceDefinition).
 		Do(ctx).
 		Into(result)
@@ -116,11 +117,12 @@ func (c *customResourceDefinitions) Create(ctx context.Context, customResourceDe
 }
 
 // Update takes the representation of a customResourceDefinition and updates it. Returns the server's representation of the customResourceDefinition, and an error, if there is any.
-func (c *customResourceDefinitions) Update(ctx context.Context, customResourceDefinition *v1.CustomResourceDefinition) (result *v1.CustomResourceDefinition, err error) {
+func (c *customResourceDefinitions) Update(ctx context.Context, customResourceDefinition *v1.CustomResourceDefinition, opts metav1.UpdateOptions) (result *v1.CustomResourceDefinition, err error) {
 	result = &v1.CustomResourceDefinition{}
 	err = c.client.Put().
 		Resource("customresourcedefinitions").
 		Name(customResourceDefinition.Name).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(customResourceDefinition).
 		Do(ctx).
 		Into(result)
@@ -129,13 +131,13 @@ func (c *customResourceDefinitions) Update(ctx context.Context, customResourceDe
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-
-func (c *customResourceDefinitions) UpdateStatus(ctx context.Context, customResourceDefinition *v1.CustomResourceDefinition) (result *v1.CustomResourceDefinition, err error) {
+func (c *customResourceDefinitions) UpdateStatus(ctx context.Context, customResourceDefinition *v1.CustomResourceDefinition, opts metav1.UpdateOptions) (result *v1.CustomResourceDefinition, err error) {
 	result = &v1.CustomResourceDefinition{}
 	err = c.client.Put().
 		Resource("customresourcedefinitions").
 		Name(customResourceDefinition.Name).
 		SubResource("status").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(customResourceDefinition).
 		Do(ctx).
 		Into(result)
@@ -168,12 +170,13 @@ func (c *customResourceDefinitions) DeleteCollection(ctx context.Context, option
 }
 
 // Patch applies the patch and returns the patched customResourceDefinition.
-func (c *customResourceDefinitions) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.CustomResourceDefinition, err error) {
+func (c *customResourceDefinitions) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.CustomResourceDefinition, err error) {
 	result = &v1.CustomResourceDefinition{}
 	err = c.client.Patch(pt).
 		Resource("customresourcedefinitions").
-		SubResource(subresources...).
 		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

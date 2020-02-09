@@ -77,7 +77,7 @@ func (c *FakeCSINodes) Watch(ctx context.Context, opts v1.ListOptions) (watch.In
 }
 
 // Create takes the representation of a cSINode and creates it.  Returns the server's representation of the cSINode, and an error, if there is any.
-func (c *FakeCSINodes) Create(ctx context.Context, cSINode *storagev1.CSINode) (result *storagev1.CSINode, err error) {
+func (c *FakeCSINodes) Create(ctx context.Context, cSINode *storagev1.CSINode, opts v1.CreateOptions) (result *storagev1.CSINode, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootCreateAction(csinodesResource, cSINode), &storagev1.CSINode{})
 	if obj == nil {
@@ -87,7 +87,7 @@ func (c *FakeCSINodes) Create(ctx context.Context, cSINode *storagev1.CSINode) (
 }
 
 // Update takes the representation of a cSINode and updates it. Returns the server's representation of the cSINode, and an error, if there is any.
-func (c *FakeCSINodes) Update(ctx context.Context, cSINode *storagev1.CSINode) (result *storagev1.CSINode, err error) {
+func (c *FakeCSINodes) Update(ctx context.Context, cSINode *storagev1.CSINode, opts v1.UpdateOptions) (result *storagev1.CSINode, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootUpdateAction(csinodesResource, cSINode), &storagev1.CSINode{})
 	if obj == nil {
@@ -112,7 +112,7 @@ func (c *FakeCSINodes) DeleteCollection(ctx context.Context, options *v1.DeleteO
 }
 
 // Patch applies the patch and returns the patched cSINode.
-func (c *FakeCSINodes) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *storagev1.CSINode, err error) {
+func (c *FakeCSINodes) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *storagev1.CSINode, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootPatchSubresourceAction(csinodesResource, name, pt, data, subresources...), &storagev1.CSINode{})
 	if obj == nil {

@@ -127,25 +127,25 @@ type bootstrapRoles struct {
 // client should be authenticated as the RBAC super user.
 func (b bootstrapRoles) bootstrap(client clientset.Interface) error {
 	for _, r := range b.clusterRoles {
-		_, err := client.RbacV1().ClusterRoles().Create(context.TODO(), &r)
+		_, err := client.RbacV1().ClusterRoles().Create(context.TODO(), &r, metav1.CreateOptions{})
 		if err != nil {
 			return fmt.Errorf("failed to make request: %v", err)
 		}
 	}
 	for _, r := range b.roles {
-		_, err := client.RbacV1().Roles(r.Namespace).Create(context.TODO(), &r)
+		_, err := client.RbacV1().Roles(r.Namespace).Create(context.TODO(), &r, metav1.CreateOptions{})
 		if err != nil {
 			return fmt.Errorf("failed to make request: %v", err)
 		}
 	}
 	for _, r := range b.clusterRoleBindings {
-		_, err := client.RbacV1().ClusterRoleBindings().Create(context.TODO(), &r)
+		_, err := client.RbacV1().ClusterRoleBindings().Create(context.TODO(), &r, metav1.CreateOptions{})
 		if err != nil {
 			return fmt.Errorf("failed to make request: %v", err)
 		}
 	}
 	for _, r := range b.roleBindings {
-		_, err := client.RbacV1().RoleBindings(r.Namespace).Create(context.TODO(), &r)
+		_, err := client.RbacV1().RoleBindings(r.Namespace).Create(context.TODO(), &r, metav1.CreateOptions{})
 		if err != nil {
 			return fmt.Errorf("failed to make request: %v", err)
 		}
@@ -728,7 +728,7 @@ func TestDiscoveryUpgradeBootstrapping(t *testing.T) {
 			APIGroup: "rbac.authorization.k8s.io",
 		},
 	}
-	if discRoleBinding, err = client.RbacV1().ClusterRoleBindings().Update(context.TODO(), discRoleBinding); err != nil {
+	if discRoleBinding, err = client.RbacV1().ClusterRoleBindings().Update(context.TODO(), discRoleBinding, metav1.UpdateOptions{}); err != nil {
 		t.Fatalf("Failed to update `system:discovery` ClusterRoleBinding: %v", err)
 	}
 	t.Logf("Modifying default `system:basic-user` ClusterRoleBinding")
@@ -738,7 +738,7 @@ func TestDiscoveryUpgradeBootstrapping(t *testing.T) {
 	}
 	basicUserRoleBinding.Annotations["rbac.authorization.kubernetes.io/autoupdate"] = "false"
 	basicUserRoleBinding.Annotations["rbac-discovery-upgrade-test"] = "pass"
-	if basicUserRoleBinding, err = client.RbacV1().ClusterRoleBindings().Update(context.TODO(), basicUserRoleBinding); err != nil {
+	if basicUserRoleBinding, err = client.RbacV1().ClusterRoleBindings().Update(context.TODO(), basicUserRoleBinding, metav1.UpdateOptions{}); err != nil {
 		t.Fatalf("Failed to update `system:basic-user` ClusterRoleBinding: %v", err)
 	}
 	t.Logf("Deleting default `system:public-info-viewer` ClusterRoleBinding")

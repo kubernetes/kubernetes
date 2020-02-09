@@ -62,7 +62,7 @@ func RequestCertificate(client certificatesclient.CertificateSigningRequestInter
 		csr.GenerateName = "csr-"
 	}
 
-	req, err = client.Create(context.TODO(), csr)
+	req, err = client.Create(context.TODO(), csr, metav1.CreateOptions{})
 	switch {
 	case err == nil:
 	case errors.IsAlreadyExists(err) && len(name) > 0:

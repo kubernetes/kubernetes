@@ -81,7 +81,7 @@ func (c *FakePodTemplates) Watch(ctx context.Context, opts v1.ListOptions) (watc
 }
 
 // Create takes the representation of a podTemplate and creates it.  Returns the server's representation of the podTemplate, and an error, if there is any.
-func (c *FakePodTemplates) Create(ctx context.Context, podTemplate *corev1.PodTemplate) (result *corev1.PodTemplate, err error) {
+func (c *FakePodTemplates) Create(ctx context.Context, podTemplate *corev1.PodTemplate, opts v1.CreateOptions) (result *corev1.PodTemplate, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(podtemplatesResource, c.ns, podTemplate), &corev1.PodTemplate{})
 
@@ -92,7 +92,7 @@ func (c *FakePodTemplates) Create(ctx context.Context, podTemplate *corev1.PodTe
 }
 
 // Update takes the representation of a podTemplate and updates it. Returns the server's representation of the podTemplate, and an error, if there is any.
-func (c *FakePodTemplates) Update(ctx context.Context, podTemplate *corev1.PodTemplate) (result *corev1.PodTemplate, err error) {
+func (c *FakePodTemplates) Update(ctx context.Context, podTemplate *corev1.PodTemplate, opts v1.UpdateOptions) (result *corev1.PodTemplate, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(podtemplatesResource, c.ns, podTemplate), &corev1.PodTemplate{})
 
@@ -119,7 +119,7 @@ func (c *FakePodTemplates) DeleteCollection(ctx context.Context, options *v1.Del
 }
 
 // Patch applies the patch and returns the patched podTemplate.
-func (c *FakePodTemplates) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *corev1.PodTemplate, err error) {
+func (c *FakePodTemplates) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *corev1.PodTemplate, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(podtemplatesResource, c.ns, name, pt, data, subresources...), &corev1.PodTemplate{})
 

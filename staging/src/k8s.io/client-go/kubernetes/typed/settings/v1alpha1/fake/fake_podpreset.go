@@ -81,7 +81,7 @@ func (c *FakePodPresets) Watch(ctx context.Context, opts v1.ListOptions) (watch.
 }
 
 // Create takes the representation of a podPreset and creates it.  Returns the server's representation of the podPreset, and an error, if there is any.
-func (c *FakePodPresets) Create(ctx context.Context, podPreset *v1alpha1.PodPreset) (result *v1alpha1.PodPreset, err error) {
+func (c *FakePodPresets) Create(ctx context.Context, podPreset *v1alpha1.PodPreset, opts v1.CreateOptions) (result *v1alpha1.PodPreset, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(podpresetsResource, c.ns, podPreset), &v1alpha1.PodPreset{})
 
@@ -92,7 +92,7 @@ func (c *FakePodPresets) Create(ctx context.Context, podPreset *v1alpha1.PodPres
 }
 
 // Update takes the representation of a podPreset and updates it. Returns the server's representation of the podPreset, and an error, if there is any.
-func (c *FakePodPresets) Update(ctx context.Context, podPreset *v1alpha1.PodPreset) (result *v1alpha1.PodPreset, err error) {
+func (c *FakePodPresets) Update(ctx context.Context, podPreset *v1alpha1.PodPreset, opts v1.UpdateOptions) (result *v1alpha1.PodPreset, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(podpresetsResource, c.ns, podPreset), &v1alpha1.PodPreset{})
 
@@ -119,7 +119,7 @@ func (c *FakePodPresets) DeleteCollection(ctx context.Context, options *v1.Delet
 }
 
 // Patch applies the patch and returns the patched podPreset.
-func (c *FakePodPresets) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.PodPreset, err error) {
+func (c *FakePodPresets) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.PodPreset, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(podpresetsResource, c.ns, name, pt, data, subresources...), &v1alpha1.PodPreset{})
 

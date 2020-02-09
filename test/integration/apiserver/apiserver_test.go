@@ -227,7 +227,7 @@ func Test202StatusCode(t *testing.T) {
 
 	// 1. Create the resource without any finalizer and then delete it without setting DeleteOptions.
 	// Verify that server returns 200 in this case.
-	rs, err := rsClient.Create(context.TODO(), newRS(ns.Name))
+	rs, err := rsClient.Create(context.TODO(), newRS(ns.Name), metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Failed to create rs: %v", err)
 	}
@@ -237,7 +237,7 @@ func Test202StatusCode(t *testing.T) {
 	// Verify that the apiserver still returns 200 since DeleteOptions.OrphanDependents is not set.
 	rs = newRS(ns.Name)
 	rs.ObjectMeta.Finalizers = []string{"kube.io/dummy-finalizer"}
-	rs, err = rsClient.Create(context.TODO(), rs)
+	rs, err = rsClient.Create(context.TODO(), rs, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Failed to create rs: %v", err)
 	}
@@ -246,7 +246,7 @@ func Test202StatusCode(t *testing.T) {
 	// 3. Create the resource and then delete it with DeleteOptions.OrphanDependents=false.
 	// Verify that the server still returns 200 since the resource is immediately deleted.
 	rs = newRS(ns.Name)
-	rs, err = rsClient.Create(context.TODO(), rs)
+	rs, err = rsClient.Create(context.TODO(), rs, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Failed to create rs: %v", err)
 	}
@@ -256,7 +256,7 @@ func Test202StatusCode(t *testing.T) {
 	// Verify that the server returns 202 in this case.
 	rs = newRS(ns.Name)
 	rs.ObjectMeta.Finalizers = []string{"kube.io/dummy-finalizer"}
-	rs, err = rsClient.Create(context.TODO(), rs)
+	rs, err = rsClient.Create(context.TODO(), rs, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Failed to create rs: %v", err)
 	}
@@ -293,7 +293,7 @@ func TestListResourceVersion0(t *testing.T) {
 			for i := 0; i < 10; i++ {
 				rs := newRS(ns.Name)
 				rs.Name = fmt.Sprintf("test-%d", i)
-				if _, err := rsClient.Create(context.TODO(), rs); err != nil {
+				if _, err := rsClient.Create(context.TODO(), rs, metav1.CreateOptions{}); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -332,7 +332,7 @@ func TestAPIListChunking(t *testing.T) {
 	for i := 0; i < 4; i++ {
 		rs := newRS(ns.Name)
 		rs.Name = fmt.Sprintf("test-%d", i)
-		if _, err := rsClient.Create(context.TODO(), rs); err != nil {
+		if _, err := rsClient.Create(context.TODO(), rs, metav1.CreateOptions{}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -353,7 +353,7 @@ func TestAPIListChunking(t *testing.T) {
 			if calls == 2 {
 				rs := newRS(ns.Name)
 				rs.Name = "test-5"
-				if _, err := rsClient.Create(context.TODO(), rs); err != nil {
+				if _, err := rsClient.Create(context.TODO(), rs, metav1.CreateOptions{}); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -407,11 +407,11 @@ func TestNameInFieldSelector(t *testing.T) {
 		ns := framework.CreateTestingNamespace(fmt.Sprintf("ns%d", i), s, t)
 		defer framework.DeleteTestingNamespace(ns, s, t)
 
-		_, err := clientSet.CoreV1().Secrets(ns.Name).Create(context.TODO(), makeSecret("foo"))
+		_, err := clientSet.CoreV1().Secrets(ns.Name).Create(context.TODO(), makeSecret("foo"), metav1.CreateOptions{})
 		if err != nil {
 			t.Errorf("Couldn't create secret: %v", err)
 		}
-		_, err = clientSet.CoreV1().Secrets(ns.Name).Create(context.TODO(), makeSecret("bar"))
+		_, err = clientSet.CoreV1().Secrets(ns.Name).Create(context.TODO(), makeSecret("bar"), metav1.CreateOptions{})
 		if err != nil {
 			t.Errorf("Couldn't create secret: %v", err)
 		}
@@ -534,7 +534,7 @@ func TestMetadataClient(t *testing.T) {
 			name: "list, get, patch, and delete via metadata client",
 			want: func(t *testing.T) {
 				ns := "metadata-builtin"
-				svc, err := clientset.CoreV1().Services(ns).Create(context.TODO(), &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "test-1", Annotations: map[string]string{"foo": "bar"}}, Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{Port: 1000}}}})
+				svc, err := clientset.CoreV1().Services(ns).Create(context.TODO(), &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "test-1", Annotations: map[string]string{"foo": "bar"}}, Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{Port: 1000}}}}, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("unable to create service: %v", err)
 				}
@@ -674,11 +674,11 @@ func TestMetadataClient(t *testing.T) {
 			name: "watch via metadata client",
 			want: func(t *testing.T) {
 				ns := "metadata-watch"
-				svc, err := clientset.CoreV1().Services(ns).Create(context.TODO(), &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "test-2", Annotations: map[string]string{"foo": "bar"}}, Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{Port: 1000}}}})
+				svc, err := clientset.CoreV1().Services(ns).Create(context.TODO(), &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "test-2", Annotations: map[string]string{"foo": "bar"}}, Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{Port: 1000}}}}, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("unable to create service: %v", err)
 				}
-				if _, err := clientset.CoreV1().Services(ns).Patch(context.TODO(), "test-2", types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`)); err != nil {
+				if _, err := clientset.CoreV1().Services(ns).Patch(context.TODO(), "test-2", types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{}); err != nil {
 					t.Fatalf("unable to patch cr: %v", err)
 				}
 
@@ -1136,11 +1136,11 @@ func TestTransform(t *testing.T) {
 			name:   "v1beta1 verify columns on services",
 			accept: "application/json;as=Table;g=meta.k8s.io;v=v1beta1",
 			object: func(t *testing.T) (metav1.Object, string, string) {
-				svc, err := clientset.CoreV1().Services(testNamespace).Create(context.TODO(), &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "test-1"}, Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{Port: 1000}}}})
+				svc, err := clientset.CoreV1().Services(testNamespace).Create(context.TODO(), &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "test-1"}, Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{Port: 1000}}}}, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("unable to create service: %v", err)
 				}
-				if _, err := clientset.CoreV1().Services(testNamespace).Patch(context.TODO(), svc.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`)); err != nil {
+				if _, err := clientset.CoreV1().Services(testNamespace).Patch(context.TODO(), svc.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{}); err != nil {
 					t.Fatalf("unable to update service: %v", err)
 				}
 				return svc, "", "services"
@@ -1154,11 +1154,11 @@ func TestTransform(t *testing.T) {
 			accept:        "application/json;as=Table;g=meta.k8s.io;v=v1beta1",
 			includeObject: metav1.IncludeNone,
 			object: func(t *testing.T) (metav1.Object, string, string) {
-				obj, err := clientset.CoreV1().Services(testNamespace).Create(context.TODO(), &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "test-2"}, Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{Port: 1000}}}})
+				obj, err := clientset.CoreV1().Services(testNamespace).Create(context.TODO(), &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "test-2"}, Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{Port: 1000}}}}, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("unable to create object: %v", err)
 				}
-				if _, err := clientset.CoreV1().Services(testNamespace).Patch(context.TODO(), obj.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`)); err != nil {
+				if _, err := clientset.CoreV1().Services(testNamespace).Patch(context.TODO(), obj.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{}); err != nil {
 					t.Fatalf("unable to update object: %v", err)
 				}
 				return obj, "", "services"
@@ -1172,11 +1172,11 @@ func TestTransform(t *testing.T) {
 			accept:        "application/json;as=Table;g=meta.k8s.io;v=v1beta1",
 			includeObject: metav1.IncludeObject,
 			object: func(t *testing.T) (metav1.Object, string, string) {
-				obj, err := clientset.CoreV1().Services(testNamespace).Create(context.TODO(), &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "test-3"}, Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{Port: 1000}}}})
+				obj, err := clientset.CoreV1().Services(testNamespace).Create(context.TODO(), &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "test-3"}, Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{Port: 1000}}}}, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("unable to create object: %v", err)
 				}
-				if _, err := clientset.CoreV1().Services(testNamespace).Patch(context.TODO(), obj.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`)); err != nil {
+				if _, err := clientset.CoreV1().Services(testNamespace).Patch(context.TODO(), obj.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{}); err != nil {
 					t.Fatalf("unable to update object: %v", err)
 				}
 				return obj, "", "services"
@@ -1196,11 +1196,11 @@ func TestTransform(t *testing.T) {
 			name:   "v1beta1 verify partial metadata object on config maps",
 			accept: "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1",
 			object: func(t *testing.T) (metav1.Object, string, string) {
-				obj, err := clientset.CoreV1().ConfigMaps(testNamespace).Create(context.TODO(), &v1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "test-1", Annotations: map[string]string{"test": "0"}}})
+				obj, err := clientset.CoreV1().ConfigMaps(testNamespace).Create(context.TODO(), &v1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "test-1", Annotations: map[string]string{"test": "0"}}}, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("unable to create object: %v", err)
 				}
-				if _, err := clientset.CoreV1().ConfigMaps(testNamespace).Patch(context.TODO(), obj.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`)); err != nil {
+				if _, err := clientset.CoreV1().ConfigMaps(testNamespace).Patch(context.TODO(), obj.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{}); err != nil {
 					t.Fatalf("unable to update object: %v", err)
 				}
 				return obj, "", "configmaps"
@@ -1213,11 +1213,11 @@ func TestTransform(t *testing.T) {
 			name:   "v1beta1 verify partial metadata object on config maps in protobuf",
 			accept: "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1",
 			object: func(t *testing.T) (metav1.Object, string, string) {
-				obj, err := clientset.CoreV1().ConfigMaps(testNamespace).Create(context.TODO(), &v1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "test-2", Annotations: map[string]string{"test": "0"}}})
+				obj, err := clientset.CoreV1().ConfigMaps(testNamespace).Create(context.TODO(), &v1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "test-2", Annotations: map[string]string{"test": "0"}}}, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("unable to create object: %v", err)
 				}
-				if _, err := clientset.CoreV1().ConfigMaps(testNamespace).Patch(context.TODO(), obj.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`)); err != nil {
+				if _, err := clientset.CoreV1().ConfigMaps(testNamespace).Patch(context.TODO(), obj.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{}); err != nil {
 					t.Fatalf("unable to update object: %v", err)
 				}
 				return obj, "", "configmaps"
@@ -1392,11 +1392,11 @@ func TestTransform(t *testing.T) {
 			name:   "v1 verify columns on services",
 			accept: "application/json;as=Table;g=meta.k8s.io;v=v1",
 			object: func(t *testing.T) (metav1.Object, string, string) {
-				svc, err := clientset.CoreV1().Services(testNamespace).Create(context.TODO(), &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "test-5"}, Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{Port: 1000}}}})
+				svc, err := clientset.CoreV1().Services(testNamespace).Create(context.TODO(), &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "test-5"}, Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{Port: 1000}}}}, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("unable to create service: %v", err)
 				}
-				if _, err := clientset.CoreV1().Services(testNamespace).Patch(context.TODO(), svc.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`)); err != nil {
+				if _, err := clientset.CoreV1().Services(testNamespace).Patch(context.TODO(), svc.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{}); err != nil {
 					t.Fatalf("unable to update service: %v", err)
 				}
 				return svc, "", "services"
@@ -1410,11 +1410,11 @@ func TestTransform(t *testing.T) {
 			accept:        "application/json;as=Table;g=meta.k8s.io;v=v1",
 			includeObject: metav1.IncludeNone,
 			object: func(t *testing.T) (metav1.Object, string, string) {
-				obj, err := clientset.CoreV1().Services(testNamespace).Create(context.TODO(), &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "test-6"}, Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{Port: 1000}}}})
+				obj, err := clientset.CoreV1().Services(testNamespace).Create(context.TODO(), &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "test-6"}, Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{Port: 1000}}}}, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("unable to create object: %v", err)
 				}
-				if _, err := clientset.CoreV1().Services(testNamespace).Patch(context.TODO(), obj.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`)); err != nil {
+				if _, err := clientset.CoreV1().Services(testNamespace).Patch(context.TODO(), obj.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{}); err != nil {
 					t.Fatalf("unable to update object: %v", err)
 				}
 				return obj, "", "services"
@@ -1428,11 +1428,11 @@ func TestTransform(t *testing.T) {
 			accept:        "application/json;as=Table;g=meta.k8s.io;v=v1",
 			includeObject: metav1.IncludeObject,
 			object: func(t *testing.T) (metav1.Object, string, string) {
-				obj, err := clientset.CoreV1().Services(testNamespace).Create(context.TODO(), &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "test-7"}, Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{Port: 1000}}}})
+				obj, err := clientset.CoreV1().Services(testNamespace).Create(context.TODO(), &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "test-7"}, Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{Port: 1000}}}}, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("unable to create object: %v", err)
 				}
-				if _, err := clientset.CoreV1().Services(testNamespace).Patch(context.TODO(), obj.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`)); err != nil {
+				if _, err := clientset.CoreV1().Services(testNamespace).Patch(context.TODO(), obj.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{}); err != nil {
 					t.Fatalf("unable to update object: %v", err)
 				}
 				return obj, "", "services"
@@ -1452,11 +1452,11 @@ func TestTransform(t *testing.T) {
 			name:   "v1 verify partial metadata object on config maps",
 			accept: "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1",
 			object: func(t *testing.T) (metav1.Object, string, string) {
-				obj, err := clientset.CoreV1().ConfigMaps(testNamespace).Create(context.TODO(), &v1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "test-3", Annotations: map[string]string{"test": "0"}}})
+				obj, err := clientset.CoreV1().ConfigMaps(testNamespace).Create(context.TODO(), &v1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "test-3", Annotations: map[string]string{"test": "0"}}}, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("unable to create object: %v", err)
 				}
-				if _, err := clientset.CoreV1().ConfigMaps(testNamespace).Patch(context.TODO(), obj.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`)); err != nil {
+				if _, err := clientset.CoreV1().ConfigMaps(testNamespace).Patch(context.TODO(), obj.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{}); err != nil {
 					t.Fatalf("unable to update object: %v", err)
 				}
 				return obj, "", "configmaps"
@@ -1469,11 +1469,11 @@ func TestTransform(t *testing.T) {
 			name:   "v1 verify partial metadata object on config maps in protobuf",
 			accept: "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1",
 			object: func(t *testing.T) (metav1.Object, string, string) {
-				obj, err := clientset.CoreV1().ConfigMaps(testNamespace).Create(context.TODO(), &v1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "test-4", Annotations: map[string]string{"test": "0"}}})
+				obj, err := clientset.CoreV1().ConfigMaps(testNamespace).Create(context.TODO(), &v1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "test-4", Annotations: map[string]string{"test": "0"}}}, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("unable to create object: %v", err)
 				}
-				if _, err := clientset.CoreV1().ConfigMaps(testNamespace).Patch(context.TODO(), obj.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`)); err != nil {
+				if _, err := clientset.CoreV1().ConfigMaps(testNamespace).Patch(context.TODO(), obj.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{}); err != nil {
 					t.Fatalf("unable to update object: %v", err)
 				}
 				return obj, "", "configmaps"

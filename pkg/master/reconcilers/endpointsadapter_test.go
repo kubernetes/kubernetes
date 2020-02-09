@@ -84,7 +84,7 @@ func TestEndpointsAdapterGet(t *testing.T) {
 			}
 
 			for _, endpoints := range testCase.endpoints {
-				_, err := client.CoreV1().Endpoints(endpoints.Namespace).Create(context.TODO(), endpoints)
+				_, err := client.CoreV1().Endpoints(endpoints.Namespace).Create(context.TODO(), endpoints, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("Error creating Endpoints: %v", err)
 				}
@@ -182,7 +182,7 @@ func TestEndpointsAdapterCreate(t *testing.T) {
 			}
 
 			for _, endpoints := range testCase.endpoints {
-				_, err := client.CoreV1().Endpoints(endpoints.Namespace).Create(context.TODO(), endpoints)
+				_, err := client.CoreV1().Endpoints(endpoints.Namespace).Create(context.TODO(), endpoints, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("Error creating Endpoints: %v", err)
 				}
@@ -293,7 +293,7 @@ func TestEndpointsAdapterUpdate(t *testing.T) {
 			}
 
 			for _, endpoints := range testCase.endpoints {
-				_, err := client.CoreV1().Endpoints(endpoints.Namespace).Create(context.TODO(), endpoints)
+				_, err := client.CoreV1().Endpoints(endpoints.Namespace).Create(context.TODO(), endpoints, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("Error creating Endpoints: %v", err)
 				}
@@ -435,7 +435,7 @@ func TestEndpointsAdapterEnsureEndpointSliceFromEndpoints(t *testing.T) {
 			}
 
 			for _, endpointSlice := range testCase.endpointSlices {
-				_, err := client.DiscoveryV1beta1().EndpointSlices(endpointSlice.Namespace).Create(context.TODO(), endpointSlice)
+				_, err := client.DiscoveryV1beta1().EndpointSlices(endpointSlice.Namespace).Create(context.TODO(), endpointSlice, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("Error creating EndpointSlice: %v", err)
 				}

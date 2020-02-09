@@ -60,7 +60,7 @@ func createNodes(t *testing.T, client *clientset.Clientset, startIndex, endIndex
 					Name: fmt.Sprintf("node-%d", idx),
 				},
 			}
-			if _, err := client.CoreV1().Nodes().Create(context.TODO(), node); err != nil {
+			if _, err := client.CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{}); err != nil {
 				t.Fatalf("Failed to create node: %v", err)
 			}
 		}(i)

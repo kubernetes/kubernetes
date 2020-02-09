@@ -38,14 +38,14 @@ type RolesGetter interface {
 
 // RoleInterface has methods to work with Role resources.
 type RoleInterface interface {
-	Create(context.Context, *v1beta1.Role) (*v1beta1.Role, error)
-	Update(context.Context, *v1beta1.Role) (*v1beta1.Role, error)
-	Delete(ctx context.Context, name string, options *v1.DeleteOptions) error
-	DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(ctx context.Context, name string, options v1.GetOptions) (*v1beta1.Role, error)
+	Create(ctx context.Context, role *v1beta1.Role, opts v1.CreateOptions) (*v1beta1.Role, error)
+	Update(ctx context.Context, role *v1beta1.Role, opts v1.UpdateOptions) (*v1beta1.Role, error)
+	Delete(ctx context.Context, name string, opts *v1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts *v1.DeleteOptions, listOpts v1.ListOptions) error
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1beta1.Role, error)
 	List(ctx context.Context, opts v1.ListOptions) (*v1beta1.RoleList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.Role, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.Role, err error)
 	RoleExpansion
 }
 
@@ -109,11 +109,12 @@ func (c *roles) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface
 }
 
 // Create takes the representation of a role and creates it.  Returns the server's representation of the role, and an error, if there is any.
-func (c *roles) Create(ctx context.Context, role *v1beta1.Role) (result *v1beta1.Role, err error) {
+func (c *roles) Create(ctx context.Context, role *v1beta1.Role, opts v1.CreateOptions) (result *v1beta1.Role, err error) {
 	result = &v1beta1.Role{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("roles").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(role).
 		Do(ctx).
 		Into(result)
@@ -121,12 +122,13 @@ func (c *roles) Create(ctx context.Context, role *v1beta1.Role) (result *v1beta1
 }
 
 // Update takes the representation of a role and updates it. Returns the server's representation of the role, and an error, if there is any.
-func (c *roles) Update(ctx context.Context, role *v1beta1.Role) (result *v1beta1.Role, err error) {
+func (c *roles) Update(ctx context.Context, role *v1beta1.Role, opts v1.UpdateOptions) (result *v1beta1.Role, err error) {
 	result = &v1beta1.Role{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("roles").
 		Name(role.Name).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(role).
 		Do(ctx).
 		Into(result)
@@ -161,13 +163,14 @@ func (c *roles) DeleteCollection(ctx context.Context, options *v1.DeleteOptions,
 }
 
 // Patch applies the patch and returns the patched role.
-func (c *roles) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.Role, err error) {
+func (c *roles) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.Role, err error) {
 	result = &v1beta1.Role{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("roles").
-		SubResource(subresources...).
 		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

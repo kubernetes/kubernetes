@@ -408,10 +408,10 @@ func createTLSSecret(kubeClient clientset.Interface, namespace, secretName strin
 		// TODO: Retry the update. We don't really expect anything to conflict though.
 		framework.Logf("Updating secret %v in ns %v with hosts %v", secret.Name, namespace, host)
 		s.Data = secret.Data
-		_, err = kubeClient.CoreV1().Secrets(namespace).Update(context.TODO(), s)
+		_, err = kubeClient.CoreV1().Secrets(namespace).Update(context.TODO(), s, metav1.UpdateOptions{})
 	} else {
 		framework.Logf("Creating secret %v in ns %v with hosts %v", secret.Name, namespace, host)
-		_, err = kubeClient.CoreV1().Secrets(namespace).Create(context.TODO(), secret)
+		_, err = kubeClient.CoreV1().Secrets(namespace).Create(context.TODO(), secret, metav1.CreateOptions{})
 	}
 	return host, cert, key, err
 }
@@ -467,7 +467,7 @@ func (j *TestJig) CreateIngress(manifestPath, ns string, ingAnnotations map[stri
 		framework.ExpectNoError(err)
 		for _, svc := range svcList.Items {
 			svc.Annotations = svcAnnotations
-			_, err = j.Client.CoreV1().Services(ns).Update(context.TODO(), &svc)
+			_, err = j.Client.CoreV1().Services(ns).Update(context.TODO(), &svc, metav1.UpdateOptions{})
 			framework.ExpectNoError(err)
 		}
 	}
@@ -537,7 +537,7 @@ func ingressToManifest(ing *networkingv1beta1.Ingress, path string) error {
 // runCreate runs the required command to create the given ingress.
 func (j *TestJig) runCreate(ing *networkingv1beta1.Ingress) (*networkingv1beta1.Ingress, error) {
 	if j.Class != MulticlusterIngressClassValue {
-		return j.Client.NetworkingV1beta1().Ingresses(ing.Namespace).Create(context.TODO(), ing)
+		return j.Client.NetworkingV1beta1().Ingresses(ing.Namespace).Create(context.TODO(), ing, metav1.CreateOptions{})
 	}
 	// Use kubemci to create a multicluster ingress.
 	filePath := framework.TestContext.OutputDir + "/mci.yaml"
@@ -551,7 +551,7 @@ func (j *TestJig) runCreate(ing *networkingv1beta1.Ingress) (*networkingv1beta1.
 // runUpdate runs the required command to update the given ingress.
 func (j *TestJig) runUpdate(ing *networkingv1beta1.Ingress) (*networkingv1beta1.Ingress, error) {
 	if j.Class != MulticlusterIngressClassValue {
-		return j.Client.NetworkingV1beta1().Ingresses(ing.Namespace).Update(context.TODO(), ing)
+		return j.Client.NetworkingV1beta1().Ingresses(ing.Namespace).Update(context.TODO(), ing, metav1.UpdateOptions{})
 	}
 	// Use kubemci to update a multicluster ingress.
 	// kubemci does not have an update command. We use "create --force" to update an existing ingress.
@@ -1120,11 +1120,11 @@ func generateBacksideHTTPSDeploymentSpec() *appsv1.Deployment {
 
 // SetUpBacksideHTTPSIngress sets up deployment, service and ingress with backside HTTPS configured.
 func (j *TestJig) SetUpBacksideHTTPSIngress(cs clientset.Interface, namespace string, staticIPName string) (*appsv1.Deployment, *v1.Service, *networkingv1beta1.Ingress, error) {
-	deployCreated, err := cs.AppsV1().Deployments(namespace).Create(context.TODO(), generateBacksideHTTPSDeploymentSpec())
+	deployCreated, err := cs.AppsV1().Deployments(namespace).Create(context.TODO(), generateBacksideHTTPSDeploymentSpec(), metav1.CreateOptions{})
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	svcCreated, err := cs.CoreV1().Services(namespace).Create(context.TODO(), generateBacksideHTTPSServiceSpec())
+	svcCreated, err := cs.CoreV1().Services(namespace).Create(context.TODO(), generateBacksideHTTPSServiceSpec(), metav1.CreateOptions{})
 	if err != nil {
 		return nil, nil, nil, err
 	}

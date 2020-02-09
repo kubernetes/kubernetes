@@ -26,6 +26,7 @@ import (
 	"golang.org/x/oauth2"
 
 	v1authenticationapi "k8s.io/api/authentication/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/wait"
 	apiserverserviceaccount "k8s.io/apiserver/pkg/authentication/serviceaccount"
@@ -179,7 +180,7 @@ func (ts *tokenSourceImpl) Token() (*oauth2.Token, error) {
 			Spec: v1authenticationapi.TokenRequestSpec{
 				ExpirationSeconds: utilpointer.Int64Ptr(ts.expirationSeconds),
 			},
-		})
+		}, metav1.CreateOptions{})
 		if inErr != nil {
 			klog.Warningf("get token failed: %v", inErr)
 			return false, nil

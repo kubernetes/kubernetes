@@ -153,7 +153,7 @@ func (c *controller) ensureLease() (*coordinationv1.Lease, bool, error) {
 			// not create it this time - we will retry in the next iteration.
 			return nil, false, nil
 		}
-		lease, err := c.leaseClient.Create(context.TODO(), leaseToCreate)
+		lease, err := c.leaseClient.Create(context.TODO(), leaseToCreate, metav1.CreateOptions{})
 		if err != nil {
 			return nil, false, err
 		}
@@ -170,7 +170,7 @@ func (c *controller) ensureLease() (*coordinationv1.Lease, bool, error) {
 // call this once you're sure the lease has been created
 func (c *controller) retryUpdateLease(base *coordinationv1.Lease) error {
 	for i := 0; i < maxUpdateRetries; i++ {
-		lease, err := c.leaseClient.Update(context.TODO(), c.newLease(base))
+		lease, err := c.leaseClient.Update(context.TODO(), c.newLease(base), metav1.UpdateOptions{})
 		if err == nil {
 			c.latestLease = lease
 			return nil

@@ -164,7 +164,7 @@ func (t *volumeLimitsTestSuite) DefineTests(driver TestDriver, pattern testpatte
 				ClaimSize:        claimSize,
 				StorageClassName: &l.resource.Sc.Name,
 			}, l.ns.Name)
-			pvc, err = l.cs.CoreV1().PersistentVolumeClaims(l.ns.Name).Create(context.TODO(), pvc)
+			pvc, err = l.cs.CoreV1().PersistentVolumeClaims(l.ns.Name).Create(context.TODO(), pvc, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 			l.pvcs = append(l.pvcs, pvc)
 		}
@@ -175,7 +175,7 @@ func (t *volumeLimitsTestSuite) DefineTests(driver TestDriver, pattern testpatte
 		selection := e2epod.NodeSelection{}
 		e2epod.SetAffinity(&selection, nodeName)
 		pod.Spec.Affinity = selection.Affinity
-		l.runningPod, err = l.cs.CoreV1().Pods(l.ns.Name).Create(context.TODO(), pod)
+		l.runningPod, err = l.cs.CoreV1().Pods(l.ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Waiting for all PVCs to get Bound")
@@ -191,7 +191,7 @@ func (t *volumeLimitsTestSuite) DefineTests(driver TestDriver, pattern testpatte
 		// Use affinity to schedule everything on the right node
 		e2epod.SetAffinity(&selection, nodeName)
 		pod.Spec.Affinity = selection.Affinity
-		l.unschedulablePod, err = l.cs.CoreV1().Pods(l.ns.Name).Create(context.TODO(), pod)
+		l.unschedulablePod, err = l.cs.CoreV1().Pods(l.ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "Failed to create an extra pod with one volume to exceed the limit")
 
 		ginkgo.By("Waiting for the pod to get unschedulable with the right message")

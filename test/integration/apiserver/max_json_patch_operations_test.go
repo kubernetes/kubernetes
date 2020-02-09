@@ -51,7 +51,7 @@ func TestMaxJSONPatchOperations(t *testing.T) {
 			Name: "test",
 		},
 	}
-	_, err := clientSet.CoreV1().Secrets("default").Create(context.TODO(), secret)
+	_, err := clientSet.CoreV1().Secrets("default").Create(context.TODO(), secret, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}

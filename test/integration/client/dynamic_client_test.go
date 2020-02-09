@@ -65,7 +65,7 @@ func TestDynamicClient(t *testing.T) {
 		},
 	}
 
-	actual, err := client.CoreV1().Pods("default").Create(context.TODO(), pod)
+	actual, err := client.CoreV1().Pods("default").Create(context.TODO(), pod, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error when creating pod: %v", err)
 	}
@@ -150,7 +150,7 @@ func TestDynamicClientWatch(t *testing.T) {
 	rv1 := ""
 	for i := 0; i < 10; i++ {
 		event := mkEvent(i)
-		got, err := client.CoreV1().Events("default").Create(context.TODO(), event)
+		got, err := client.CoreV1().Events("default").Create(context.TODO(), event, metav1.CreateOptions{})
 		if err != nil {
 			t.Fatalf("Failed creating event %#q: %v", event, err)
 		}

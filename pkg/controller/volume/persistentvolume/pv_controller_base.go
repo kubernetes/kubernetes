@@ -322,7 +322,7 @@ func (ctrl *PersistentVolumeController) updateClaimMigrationAnnotations(claim *v
 	if !modified {
 		return claimClone, nil
 	}
-	newClaim, err := ctrl.kubeClient.CoreV1().PersistentVolumeClaims(claimClone.Namespace).Update(context.TODO(), claimClone)
+	newClaim, err := ctrl.kubeClient.CoreV1().PersistentVolumeClaims(claimClone.Namespace).Update(context.TODO(), claimClone, metav1.UpdateOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("persistent Volume Controller can't anneal migration annotations: %v", err)
 	}
@@ -339,7 +339,7 @@ func (ctrl *PersistentVolumeController) updateVolumeMigrationAnnotations(volume 
 	if !modified {
 		return volumeClone, nil
 	}
-	newVol, err := ctrl.kubeClient.CoreV1().PersistentVolumes().Update(context.TODO(), volumeClone)
+	newVol, err := ctrl.kubeClient.CoreV1().PersistentVolumes().Update(context.TODO(), volumeClone, metav1.UpdateOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("persistent Volume Controller can't anneal migration annotations: %v", err)
 	}
@@ -546,7 +546,7 @@ func (ctrl *PersistentVolumeController) setClaimProvisioner(claim *v1.Persistent
 	claimClone := claim.DeepCopy()
 	metav1.SetMetaDataAnnotation(&claimClone.ObjectMeta, pvutil.AnnStorageProvisioner, provisionerName)
 	updateMigrationAnnotations(ctrl.csiMigratedPluginManager, ctrl.translator, claimClone.Annotations, pvutil.AnnStorageProvisioner)
-	newClaim, err := ctrl.kubeClient.CoreV1().PersistentVolumeClaims(claim.Namespace).Update(context.TODO(), claimClone)
+	newClaim, err := ctrl.kubeClient.CoreV1().PersistentVolumeClaims(claim.Namespace).Update(context.TODO(), claimClone, metav1.UpdateOptions{})
 	if err != nil {
 		return newClaim, err
 	}

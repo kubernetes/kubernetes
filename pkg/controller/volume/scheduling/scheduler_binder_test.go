@@ -295,7 +295,7 @@ func (env *testEnv) initVolumes(cachedPVs []*v1.PersistentVolume, apiPVs []*v1.P
 
 func (env *testEnv) updateVolumes(t *testing.T, pvs []*v1.PersistentVolume, waitCache bool) {
 	for _, pv := range pvs {
-		if _, err := env.client.CoreV1().PersistentVolumes().Update(context.TODO(), pv); err != nil {
+		if _, err := env.client.CoreV1().PersistentVolumes().Update(context.TODO(), pv, metav1.UpdateOptions{}); err != nil {
 			t.Fatalf("failed to update PV %q", pv.Name)
 		}
 	}
@@ -321,7 +321,7 @@ func (env *testEnv) updateVolumes(t *testing.T, pvs []*v1.PersistentVolume, wait
 
 func (env *testEnv) updateClaims(t *testing.T, pvcs []*v1.PersistentVolumeClaim, waitCache bool) {
 	for _, pvc := range pvcs {
-		if _, err := env.client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Update(context.TODO(), pvc); err != nil {
+		if _, err := env.client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Update(context.TODO(), pvc, metav1.UpdateOptions{}); err != nil {
 			t.Fatalf("failed to update PVC %q", getPVCName(pvc))
 		}
 	}
@@ -1769,7 +1769,7 @@ func TestBindPodVolumes(t *testing.T) {
 				newPVC := pvc.DeepCopy()
 				newPVC.Spec.VolumeName = pv.Name
 				metav1.SetMetaDataAnnotation(&newPVC.ObjectMeta, pvutil.AnnBindCompleted, "yes")
-				if _, err := testEnv.client.CoreV1().PersistentVolumeClaims(newPVC.Namespace).Update(context.TODO(), newPVC); err != nil {
+				if _, err := testEnv.client.CoreV1().PersistentVolumeClaims(newPVC.Namespace).Update(context.TODO(), newPVC, metav1.UpdateOptions{}); err != nil {
 					t.Errorf("failed to update PVC %q: %v", newPVC.Name, err)
 				}
 			},
@@ -1786,14 +1786,14 @@ func TestBindPodVolumes(t *testing.T) {
 					return
 				}
 				dynamicPV := makeTestPV("dynamic-pv", "node1", "1G", "1", newPVC, waitClass)
-				dynamicPV, err = testEnv.client.CoreV1().PersistentVolumes().Create(context.TODO(), dynamicPV)
+				dynamicPV, err = testEnv.client.CoreV1().PersistentVolumes().Create(context.TODO(), dynamicPV, metav1.CreateOptions{})
 				if err != nil {
 					t.Errorf("failed to create PV %q: %v", dynamicPV.Name, err)
 					return
 				}
 				newPVC.Spec.VolumeName = dynamicPV.Name
 				metav1.SetMetaDataAnnotation(&newPVC.ObjectMeta, pvutil.AnnBindCompleted, "yes")
-				if _, err := testEnv.client.CoreV1().PersistentVolumeClaims(newPVC.Namespace).Update(context.TODO(), newPVC); err != nil {
+				if _, err := testEnv.client.CoreV1().PersistentVolumeClaims(newPVC.Namespace).Update(context.TODO(), newPVC, metav1.UpdateOptions{}); err != nil {
 					t.Errorf("failed to update PVC %q: %v", newPVC.Name, err)
 				}
 			},
@@ -1869,7 +1869,7 @@ func TestBindPodVolumes(t *testing.T) {
 				newPVC := pvcs[0].DeepCopy()
 				newPVC.Spec.VolumeName = pvNode2.Name
 				metav1.SetMetaDataAnnotation(&newPVC.ObjectMeta, pvutil.AnnBindCompleted, "yes")
-				if _, err := testEnv.client.CoreV1().PersistentVolumeClaims(newPVC.Namespace).Update(context.TODO(), newPVC); err != nil {
+				if _, err := testEnv.client.CoreV1().PersistentVolumeClaims(newPVC.Namespace).Update(context.TODO(), newPVC, metav1.UpdateOptions{}); err != nil {
 					t.Errorf("failed to update PVC %q: %v", newPVC.Name, err)
 				}
 			},
@@ -1904,13 +1904,13 @@ func TestBindPodVolumes(t *testing.T) {
 
 		// Before Execute
 		if scenario.apiPV != nil {
-			_, err := testEnv.client.CoreV1().PersistentVolumes().Update(context.TODO(), scenario.apiPV)
+			_, err := testEnv.client.CoreV1().PersistentVolumes().Update(context.TODO(), scenario.apiPV, metav1.UpdateOptions{})
 			if err != nil {
 				t.Fatalf("failed to update PV %q", scenario.apiPV.Name)
 			}
 		}
 		if scenario.apiPVC != nil {
-			_, err := testEnv.client.CoreV1().PersistentVolumeClaims(scenario.apiPVC.Namespace).Update(context.TODO(), scenario.apiPVC)
+			_, err := testEnv.client.CoreV1().PersistentVolumeClaims(scenario.apiPVC.Namespace).Update(context.TODO(), scenario.apiPVC, metav1.UpdateOptions{})
 			if err != nil {
 				t.Fatalf("failed to update PVC %q", getPVCName(scenario.apiPVC))
 			}

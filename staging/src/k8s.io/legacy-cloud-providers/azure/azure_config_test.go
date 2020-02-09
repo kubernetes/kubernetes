@@ -154,7 +154,7 @@ func TestGetConfigFromSecret(t *testing.T) {
 						"cloud-config": secretData,
 					}
 				}
-				_, err := az.kubeClient.CoreV1().Secrets(cloudConfigNamespace).Create(context.TODO(), secret)
+				_, err := az.kubeClient.CoreV1().Secrets(cloudConfigNamespace).Create(context.TODO(), secret, metav1.CreateOptions{})
 				assert.NoError(t, err, test.name)
 			}
 

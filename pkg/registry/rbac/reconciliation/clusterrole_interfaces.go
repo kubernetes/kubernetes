@@ -88,7 +88,7 @@ func (c ClusterRoleModifier) Get(namespace, name string) (RuleOwner, error) {
 }
 
 func (c ClusterRoleModifier) Create(in RuleOwner) (RuleOwner, error) {
-	ret, err := c.Client.Create(context.TODO(), in.(ClusterRoleRuleOwner).ClusterRole)
+	ret, err := c.Client.Create(context.TODO(), in.(ClusterRoleRuleOwner).ClusterRole, metav1.CreateOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -96,7 +96,7 @@ func (c ClusterRoleModifier) Create(in RuleOwner) (RuleOwner, error) {
 }
 
 func (c ClusterRoleModifier) Update(in RuleOwner) (RuleOwner, error) {
-	ret, err := c.Client.Update(context.TODO(), in.(ClusterRoleRuleOwner).ClusterRole)
+	ret, err := c.Client.Update(context.TODO(), in.(ClusterRoleRuleOwner).ClusterRole, metav1.UpdateOptions{})
 	if err != nil {
 		return nil, err
 	}

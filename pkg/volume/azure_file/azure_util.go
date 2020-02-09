@@ -90,7 +90,7 @@ func (s *azureSvc) SetAzureCredentials(host volume.VolumeHost, nameSpace, accoun
 		},
 		Type: "Opaque",
 	}
-	_, err := kubeClient.CoreV1().Secrets(nameSpace).Create(context.TODO(), secret)
+	_, err := kubeClient.CoreV1().Secrets(nameSpace).Create(context.TODO(), secret, metav1.CreateOptions{})
 	if errors.IsAlreadyExists(err) {
 		err = nil
 	}

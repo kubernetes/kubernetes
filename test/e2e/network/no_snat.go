@@ -151,7 +151,7 @@ var _ = SIGDescribe("NoSNAT [Feature:NoSNAT] [Slow]", func() {
 
 			// target Pod at Node and feed Pod Node's InternalIP
 			pod := newTestPod(node.Name, inIP)
-			_, err = pc.Create(context.TODO(), pod)
+			_, err = pc.Create(context.TODO(), pod, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 		}
 
@@ -172,7 +172,7 @@ var _ = SIGDescribe("NoSNAT [Feature:NoSNAT] [Slow]", func() {
 		framework.ExpectNoError(err)
 		proxyNodeIP := extIP + ":" + strconv.Itoa(testProxyPort)
 
-		_, err = pc.Create(context.TODO(), newTestProxyPod(node.Name))
+		_, err = pc.Create(context.TODO(), newTestProxyPod(node.Name), metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 
 		ginkgo.By("waiting for all of the no-snat-test pods to be scheduled and running")

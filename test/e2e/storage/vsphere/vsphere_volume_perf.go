@@ -25,6 +25,7 @@ import (
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -134,23 +135,23 @@ func getTestStorageClasses(client clientset.Interface, policyName, datastoreName
 		var err error
 		switch scname {
 		case storageclass1:
-			sc, err = client.StorageV1().StorageClasses().Create(context.TODO(), getVSphereStorageClassSpec(storageclass1, nil, nil, ""))
+			sc, err = client.StorageV1().StorageClasses().Create(context.TODO(), getVSphereStorageClassSpec(storageclass1, nil, nil, ""), metav1.CreateOptions{})
 		case storageclass2:
 			var scVSanParameters map[string]string
 			scVSanParameters = make(map[string]string)
 			scVSanParameters[PolicyHostFailuresToTolerate] = "1"
-			sc, err = client.StorageV1().StorageClasses().Create(context.TODO(), getVSphereStorageClassSpec(storageclass2, scVSanParameters, nil, ""))
+			sc, err = client.StorageV1().StorageClasses().Create(context.TODO(), getVSphereStorageClassSpec(storageclass2, scVSanParameters, nil, ""), metav1.CreateOptions{})
 		case storageclass3:
 			var scSPBMPolicyParameters map[string]string
 			scSPBMPolicyParameters = make(map[string]string)
 			scSPBMPolicyParameters[SpbmStoragePolicy] = policyName
-			sc, err = client.StorageV1().StorageClasses().Create(context.TODO(), getVSphereStorageClassSpec(storageclass3, scSPBMPolicyParameters, nil, ""))
+			sc, err = client.StorageV1().StorageClasses().Create(context.TODO(), getVSphereStorageClassSpec(storageclass3, scSPBMPolicyParameters, nil, ""), metav1.CreateOptions{})
 		case storageclass4:
 			var scWithDSParameters map[string]string
 			scWithDSParameters = make(map[string]string)
 			scWithDSParameters[Datastore] = datastoreName
 			scWithDatastoreSpec := getVSphereStorageClassSpec(storageclass4, scWithDSParameters, nil, "")
-			sc, err = client.StorageV1().StorageClasses().Create(context.TODO(), scWithDatastoreSpec)
+			sc, err = client.StorageV1().StorageClasses().Create(context.TODO(), scWithDatastoreSpec, metav1.CreateOptions{})
 		}
 		gomega.Expect(sc).NotTo(gomega.BeNil())
 		framework.ExpectNoError(err)

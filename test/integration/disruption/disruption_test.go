@@ -157,7 +157,7 @@ func TestPDBWithScaleSubresource(t *testing.T) {
 			},
 		},
 	}
-	if _, err := clientSet.PolicyV1beta1().PodDisruptionBudgets(nsName).Create(context.TODO(), pdb); err != nil {
+	if _, err := clientSet.PolicyV1beta1().PodDisruptionBudgets(nsName).Create(context.TODO(), pdb, metav1.CreateOptions{}); err != nil {
 		t.Errorf("Error creating PodDisruptionBudget: %v", err)
 	}
 
@@ -198,12 +198,12 @@ func createPod(t *testing.T, name, namespace, labelValue string, clientSet clien
 			},
 		},
 	}
-	_, err := clientSet.CoreV1().Pods(namespace).Create(context.TODO(), pod)
+	_, err := clientSet.CoreV1().Pods(namespace).Create(context.TODO(), pod, metav1.CreateOptions{})
 	if err != nil {
 		t.Error(err)
 	}
 	addPodConditionReady(pod)
-	if _, err := clientSet.CoreV1().Pods(namespace).UpdateStatus(context.TODO(), pod); err != nil {
+	if _, err := clientSet.CoreV1().Pods(namespace).UpdateStatus(context.TODO(), pod, metav1.UpdateOptions{}); err != nil {
 		t.Error(err)
 	}
 }
@@ -213,7 +213,7 @@ func createNs(t *testing.T, name string, clientSet clientset.Interface) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
-	})
+	}, metav1.CreateOptions{})
 	if err != nil {
 		t.Errorf("Error creating namespace: %v", err)
 	}

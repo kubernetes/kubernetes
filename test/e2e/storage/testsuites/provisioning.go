@@ -246,7 +246,7 @@ func (t StorageClassTest) TestDynamicProvisioning() *v1.PersistentVolume {
 	if class != nil {
 		framework.ExpectEqual(*claim.Spec.StorageClassName, class.Name)
 		ginkgo.By("creating a StorageClass " + class.Name)
-		_, err = client.StorageV1().StorageClasses().Create(context.TODO(), class)
+		_, err = client.StorageV1().StorageClasses().Create(context.TODO(), class, metav1.CreateOptions{})
 		// The "should provision storage with snapshot data source" test already has created the class.
 		// TODO: make class creation optional and remove the IsAlreadyExists exception
 		framework.ExpectEqual(err == nil || apierrors.IsAlreadyExists(err), true)
@@ -259,7 +259,7 @@ func (t StorageClassTest) TestDynamicProvisioning() *v1.PersistentVolume {
 	}
 
 	ginkgo.By("creating a claim")
-	claim, err = client.CoreV1().PersistentVolumeClaims(claim.Namespace).Create(context.TODO(), claim)
+	claim, err = client.CoreV1().PersistentVolumeClaims(claim.Namespace).Create(context.TODO(), claim, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 	defer func() {
 		framework.Logf("deleting claim %q/%q", claim.Namespace, claim.Name)
@@ -466,7 +466,7 @@ func (t StorageClassTest) TestBindingWaitForFirstConsumerMultiPVC(claims []*v1.P
 	namespace := claims[0].Namespace
 
 	ginkgo.By("creating a storage class " + t.Class.Name)
-	class, err := t.Client.StorageV1().StorageClasses().Create(context.TODO(), t.Class)
+	class, err := t.Client.StorageV1().StorageClasses().Create(context.TODO(), t.Class, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 	defer func() {
 		err = deleteStorageClass(t.Client, class.Name)
@@ -477,7 +477,7 @@ func (t StorageClassTest) TestBindingWaitForFirstConsumerMultiPVC(claims []*v1.P
 	var claimNames []string
 	var createdClaims []*v1.PersistentVolumeClaim
 	for _, claim := range claims {
-		c, err := t.Client.CoreV1().PersistentVolumeClaims(claim.Namespace).Create(context.TODO(), claim)
+		c, err := t.Client.CoreV1().PersistentVolumeClaims(claim.Namespace).Create(context.TODO(), claim, metav1.CreateOptions{})
 		claimNames = append(claimNames, c.Name)
 		createdClaims = append(createdClaims, c)
 		framework.ExpectNoError(err)
@@ -598,7 +598,7 @@ func StartInPodWithVolume(c clientset.Interface, ns, claimName, podName, command
 		},
 	}
 
-	pod, err := c.CoreV1().Pods(ns).Create(context.TODO(), pod)
+	pod, err := c.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "Failed to create pod: %v", err)
 	return pod
 }
@@ -639,12 +639,12 @@ func prepareSnapshotDataSourceForProvisioning(
 	var err error
 	if class != nil {
 		ginkgo.By("[Initialize dataSource]creating a StorageClass " + class.Name)
-		_, err = client.StorageV1().StorageClasses().Create(context.TODO(), class)
+		_, err = client.StorageV1().StorageClasses().Create(context.TODO(), class, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 	}
 
 	ginkgo.By("[Initialize dataSource]creating a initClaim")
-	updatedClaim, err := client.CoreV1().PersistentVolumeClaims(initClaim.Namespace).Create(context.TODO(), initClaim)
+	updatedClaim, err := client.CoreV1().PersistentVolumeClaims(initClaim.Namespace).Create(context.TODO(), initClaim, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
 	// write namespace to the /mnt/test (= the volume).
@@ -712,12 +712,12 @@ func preparePVCDataSourceForProvisioning(
 	var err error
 	if class != nil {
 		ginkgo.By("[Initialize dataSource]creating a StorageClass " + class.Name)
-		_, err = client.StorageV1().StorageClasses().Create(context.TODO(), class)
+		_, err = client.StorageV1().StorageClasses().Create(context.TODO(), class, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 	}
 
 	ginkgo.By("[Initialize dataSource]creating a source PVC")
-	sourcePVC, err := client.CoreV1().PersistentVolumeClaims(source.Namespace).Create(context.TODO(), source)
+	sourcePVC, err := client.CoreV1().PersistentVolumeClaims(source.Namespace).Create(context.TODO(), source, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
 	// write namespace to the /mnt/test (= the volume).

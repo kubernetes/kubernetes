@@ -77,7 +77,7 @@ func (c *FakePersistentVolumes) Watch(ctx context.Context, opts v1.ListOptions) 
 }
 
 // Create takes the representation of a persistentVolume and creates it.  Returns the server's representation of the persistentVolume, and an error, if there is any.
-func (c *FakePersistentVolumes) Create(ctx context.Context, persistentVolume *corev1.PersistentVolume) (result *corev1.PersistentVolume, err error) {
+func (c *FakePersistentVolumes) Create(ctx context.Context, persistentVolume *corev1.PersistentVolume, opts v1.CreateOptions) (result *corev1.PersistentVolume, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootCreateAction(persistentvolumesResource, persistentVolume), &corev1.PersistentVolume{})
 	if obj == nil {
@@ -87,7 +87,7 @@ func (c *FakePersistentVolumes) Create(ctx context.Context, persistentVolume *co
 }
 
 // Update takes the representation of a persistentVolume and updates it. Returns the server's representation of the persistentVolume, and an error, if there is any.
-func (c *FakePersistentVolumes) Update(ctx context.Context, persistentVolume *corev1.PersistentVolume) (result *corev1.PersistentVolume, err error) {
+func (c *FakePersistentVolumes) Update(ctx context.Context, persistentVolume *corev1.PersistentVolume, opts v1.UpdateOptions) (result *corev1.PersistentVolume, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootUpdateAction(persistentvolumesResource, persistentVolume), &corev1.PersistentVolume{})
 	if obj == nil {
@@ -98,7 +98,7 @@ func (c *FakePersistentVolumes) Update(ctx context.Context, persistentVolume *co
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakePersistentVolumes) UpdateStatus(ctx context.Context, persistentVolume *corev1.PersistentVolume) (*corev1.PersistentVolume, error) {
+func (c *FakePersistentVolumes) UpdateStatus(ctx context.Context, persistentVolume *corev1.PersistentVolume, opts v1.UpdateOptions) (*corev1.PersistentVolume, error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootUpdateSubresourceAction(persistentvolumesResource, "status", persistentVolume), &corev1.PersistentVolume{})
 	if obj == nil {
@@ -123,7 +123,7 @@ func (c *FakePersistentVolumes) DeleteCollection(ctx context.Context, options *v
 }
 
 // Patch applies the patch and returns the patched persistentVolume.
-func (c *FakePersistentVolumes) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *corev1.PersistentVolume, err error) {
+func (c *FakePersistentVolumes) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *corev1.PersistentVolume, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootPatchSubresourceAction(persistentvolumesResource, name, pt, data, subresources...), &corev1.PersistentVolume{})
 	if obj == nil {

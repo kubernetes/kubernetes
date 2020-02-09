@@ -83,7 +83,7 @@ func createAlgorithmSourceFromPolicy(policy *schedulerapi.Policy, clientSet clie
 		Data:       map[string]string{schedulerapi.SchedulerPolicyConfigMapKey: policyString},
 	}
 	policyConfigMap.APIVersion = "v1"
-	clientSet.CoreV1().ConfigMaps(metav1.NamespaceSystem).Create(context.TODO(), &policyConfigMap)
+	clientSet.CoreV1().ConfigMaps(metav1.NamespaceSystem).Create(context.TODO(), &policyConfigMap, metav1.CreateOptions{})
 
 	return schedulerapi.SchedulerAlgorithmSource{
 		Policy: &schedulerapi.SchedulerPolicySource{
@@ -344,17 +344,17 @@ func initNode(name string, res *v1.ResourceList, images []v1.ContainerImage) *v1
 
 // createNode creates a node with the given resource list.
 func createNode(cs clientset.Interface, name string, res *v1.ResourceList) (*v1.Node, error) {
-	return cs.CoreV1().Nodes().Create(context.TODO(), initNode(name, res, nil))
+	return cs.CoreV1().Nodes().Create(context.TODO(), initNode(name, res, nil), metav1.CreateOptions{})
 }
 
 // createNodeWithImages creates a node with the given resource list and images.
 func createNodeWithImages(cs clientset.Interface, name string, res *v1.ResourceList, images []v1.ContainerImage) (*v1.Node, error) {
-	return cs.CoreV1().Nodes().Create(context.TODO(), initNode(name, res, images))
+	return cs.CoreV1().Nodes().Create(context.TODO(), initNode(name, res, images), metav1.CreateOptions{})
 }
 
 // updateNodeStatus updates the status of node.
 func updateNodeStatus(cs clientset.Interface, node *v1.Node) error {
-	_, err := cs.CoreV1().Nodes().UpdateStatus(context.TODO(), node)
+	_, err := cs.CoreV1().Nodes().UpdateStatus(context.TODO(), node, metav1.UpdateOptions{})
 	return err
 }
 
@@ -404,7 +404,7 @@ func addTaintToNode(cs clientset.Interface, nodeName string, taint v1.Taint) err
 	}
 	copy := node.DeepCopy()
 	copy.Spec.Taints = append(copy.Spec.Taints, taint)
-	_, err = cs.CoreV1().Nodes().Update(context.TODO(), copy)
+	_, err = cs.CoreV1().Nodes().Update(context.TODO(), copy, metav1.UpdateOptions{})
 	return err
 }
 
@@ -470,7 +470,7 @@ func initPausePod(cs clientset.Interface, conf *pausePodConfig) *v1.Pod {
 // createPausePod creates a pod with "Pause" image and the given config and
 // return its pointer and error status.
 func createPausePod(cs clientset.Interface, p *v1.Pod) (*v1.Pod, error) {
-	return cs.CoreV1().Pods(p.Namespace).Create(context.TODO(), p)
+	return cs.CoreV1().Pods(p.Namespace).Create(context.TODO(), p, metav1.CreateOptions{})
 }
 
 // createPausePodWithResource creates a pod with "Pause" image and the given
@@ -499,7 +499,7 @@ func createPausePodWithResource(cs clientset.Interface, podName string,
 // runPausePod creates a pod with "Pause" image and the given config and waits
 // until it is scheduled. It returns its pointer and error status.
 func runPausePod(cs clientset.Interface, pod *v1.Pod) (*v1.Pod, error) {
-	pod, err := cs.CoreV1().Pods(pod.Namespace).Create(context.TODO(), pod)
+	pod, err := cs.CoreV1().Pods(pod.Namespace).Create(context.TODO(), pod, metav1.CreateOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("Error creating pause pod: %v", err)
 	}
@@ -536,7 +536,7 @@ func initPodWithContainers(cs clientset.Interface, conf *podWithContainersConfig
 // runPodWithContainers creates a pod with given config and containers and waits
 // until it is scheduled. It returns its pointer and error status.
 func runPodWithContainers(cs clientset.Interface, pod *v1.Pod) (*v1.Pod, error) {
-	pod, err := cs.CoreV1().Pods(pod.Namespace).Create(context.TODO(), pod)
+	pod, err := cs.CoreV1().Pods(pod.Namespace).Create(context.TODO(), pod, metav1.CreateOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("Error creating pod-with-containers: %v", err)
 	}

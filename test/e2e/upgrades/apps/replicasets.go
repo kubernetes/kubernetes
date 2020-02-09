@@ -59,7 +59,7 @@ func (r *ReplicaSetUpgradeTest) Setup(f *framework.Framework) {
 
 	ginkgo.By(fmt.Sprintf("Creating replicaset %s in namespace %s", rsName, ns))
 	replicaSet := newReplicaSet(rsName, ns, 1, map[string]string{"test": "upgrade"}, "nginx", nginxImage)
-	rs, err := c.AppsV1().ReplicaSets(ns).Create(context.TODO(), replicaSet)
+	rs, err := c.AppsV1().ReplicaSets(ns).Create(context.TODO(), replicaSet, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
 	ginkgo.By(fmt.Sprintf("Waiting for replicaset %s to have all of its replicas ready", rsName))

@@ -39,7 +39,7 @@ func tryEnsureNamespace(client corev1client.NamespaceInterface, namespace string
 	}
 
 	ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}}
-	_, createErr := client.Create(context.TODO(), ns)
+	_, createErr := client.Create(context.TODO(), ns, metav1.CreateOptions{})
 
 	return utilerrors.FilterOut(createErr, apierrors.IsAlreadyExists, apierrors.IsForbidden)
 }

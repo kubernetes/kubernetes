@@ -38,14 +38,14 @@ type ControllerRevisionsGetter interface {
 
 // ControllerRevisionInterface has methods to work with ControllerRevision resources.
 type ControllerRevisionInterface interface {
-	Create(context.Context, *v1.ControllerRevision) (*v1.ControllerRevision, error)
-	Update(context.Context, *v1.ControllerRevision) (*v1.ControllerRevision, error)
-	Delete(ctx context.Context, name string, options *metav1.DeleteOptions) error
-	DeleteCollection(ctx context.Context, options *metav1.DeleteOptions, listOptions metav1.ListOptions) error
-	Get(ctx context.Context, name string, options metav1.GetOptions) (*v1.ControllerRevision, error)
+	Create(ctx context.Context, controllerRevision *v1.ControllerRevision, opts metav1.CreateOptions) (*v1.ControllerRevision, error)
+	Update(ctx context.Context, controllerRevision *v1.ControllerRevision, opts metav1.UpdateOptions) (*v1.ControllerRevision, error)
+	Delete(ctx context.Context, name string, opts *metav1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.ControllerRevision, error)
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.ControllerRevisionList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.ControllerRevision, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ControllerRevision, err error)
 	ControllerRevisionExpansion
 }
 
@@ -109,11 +109,12 @@ func (c *controllerRevisions) Watch(ctx context.Context, opts metav1.ListOptions
 }
 
 // Create takes the representation of a controllerRevision and creates it.  Returns the server's representation of the controllerRevision, and an error, if there is any.
-func (c *controllerRevisions) Create(ctx context.Context, controllerRevision *v1.ControllerRevision) (result *v1.ControllerRevision, err error) {
+func (c *controllerRevisions) Create(ctx context.Context, controllerRevision *v1.ControllerRevision, opts metav1.CreateOptions) (result *v1.ControllerRevision, err error) {
 	result = &v1.ControllerRevision{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("controllerrevisions").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(controllerRevision).
 		Do(ctx).
 		Into(result)
@@ -121,12 +122,13 @@ func (c *controllerRevisions) Create(ctx context.Context, controllerRevision *v1
 }
 
 // Update takes the representation of a controllerRevision and updates it. Returns the server's representation of the controllerRevision, and an error, if there is any.
-func (c *controllerRevisions) Update(ctx context.Context, controllerRevision *v1.ControllerRevision) (result *v1.ControllerRevision, err error) {
+func (c *controllerRevisions) Update(ctx context.Context, controllerRevision *v1.ControllerRevision, opts metav1.UpdateOptions) (result *v1.ControllerRevision, err error) {
 	result = &v1.ControllerRevision{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("controllerrevisions").
 		Name(controllerRevision.Name).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(controllerRevision).
 		Do(ctx).
 		Into(result)
@@ -161,13 +163,14 @@ func (c *controllerRevisions) DeleteCollection(ctx context.Context, options *met
 }
 
 // Patch applies the patch and returns the patched controllerRevision.
-func (c *controllerRevisions) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.ControllerRevision, err error) {
+func (c *controllerRevisions) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ControllerRevision, err error) {
 	result = &v1.ControllerRevision{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("controllerrevisions").
-		SubResource(subresources...).
 		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

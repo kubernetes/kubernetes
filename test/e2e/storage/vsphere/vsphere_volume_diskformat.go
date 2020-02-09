@@ -110,14 +110,14 @@ func invokeTest(f *framework.Framework, client clientset.Interface, namespace st
 
 	ginkgo.By("Creating Storage Class With DiskFormat")
 	storageClassSpec := getVSphereStorageClassSpec("thinsc", scParameters, nil, "")
-	storageclass, err := client.StorageV1().StorageClasses().Create(context.TODO(), storageClassSpec)
+	storageclass, err := client.StorageV1().StorageClasses().Create(context.TODO(), storageClassSpec, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
 	defer client.StorageV1().StorageClasses().Delete(context.TODO(), storageclass.Name, nil)
 
 	ginkgo.By("Creating PVC using the Storage Class")
 	pvclaimSpec := getVSphereClaimSpecWithStorageClass(namespace, "2Gi", storageclass)
-	pvclaim, err := client.CoreV1().PersistentVolumeClaims(namespace).Create(context.TODO(), pvclaimSpec)
+	pvclaim, err := client.CoreV1().PersistentVolumeClaims(namespace).Create(context.TODO(), pvclaimSpec, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
 	defer func() {
@@ -143,7 +143,7 @@ func invokeTest(f *framework.Framework, client clientset.Interface, namespace st
 	ginkgo.By("Creating pod to attach PV to the node")
 	// Create pod to attach Volume to Node
 	podSpec := getVSpherePodSpecWithClaim(pvclaim.Name, nodeKeyValueLabel, "while true ; do sleep 2 ; done")
-	pod, err := client.CoreV1().Pods(namespace).Create(context.TODO(), podSpec)
+	pod, err := client.CoreV1().Pods(namespace).Create(context.TODO(), podSpec, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
 	ginkgo.By("Waiting for pod to be running")

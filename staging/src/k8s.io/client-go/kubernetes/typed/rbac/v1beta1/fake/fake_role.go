@@ -81,7 +81,7 @@ func (c *FakeRoles) Watch(ctx context.Context, opts v1.ListOptions) (watch.Inter
 }
 
 // Create takes the representation of a role and creates it.  Returns the server's representation of the role, and an error, if there is any.
-func (c *FakeRoles) Create(ctx context.Context, role *v1beta1.Role) (result *v1beta1.Role, err error) {
+func (c *FakeRoles) Create(ctx context.Context, role *v1beta1.Role, opts v1.CreateOptions) (result *v1beta1.Role, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(rolesResource, c.ns, role), &v1beta1.Role{})
 
@@ -92,7 +92,7 @@ func (c *FakeRoles) Create(ctx context.Context, role *v1beta1.Role) (result *v1b
 }
 
 // Update takes the representation of a role and updates it. Returns the server's representation of the role, and an error, if there is any.
-func (c *FakeRoles) Update(ctx context.Context, role *v1beta1.Role) (result *v1beta1.Role, err error) {
+func (c *FakeRoles) Update(ctx context.Context, role *v1beta1.Role, opts v1.UpdateOptions) (result *v1beta1.Role, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(rolesResource, c.ns, role), &v1beta1.Role{})
 
@@ -119,7 +119,7 @@ func (c *FakeRoles) DeleteCollection(ctx context.Context, options *v1.DeleteOpti
 }
 
 // Patch applies the patch and returns the patched role.
-func (c *FakeRoles) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.Role, err error) {
+func (c *FakeRoles) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.Role, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(rolesResource, c.ns, name, pt, data, subresources...), &v1beta1.Role{})
 

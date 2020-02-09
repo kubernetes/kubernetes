@@ -81,7 +81,7 @@ func (c *FakeStatefulSets) Watch(ctx context.Context, opts v1.ListOptions) (watc
 }
 
 // Create takes the representation of a statefulSet and creates it.  Returns the server's representation of the statefulSet, and an error, if there is any.
-func (c *FakeStatefulSets) Create(ctx context.Context, statefulSet *v1beta2.StatefulSet) (result *v1beta2.StatefulSet, err error) {
+func (c *FakeStatefulSets) Create(ctx context.Context, statefulSet *v1beta2.StatefulSet, opts v1.CreateOptions) (result *v1beta2.StatefulSet, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(statefulsetsResource, c.ns, statefulSet), &v1beta2.StatefulSet{})
 
@@ -92,7 +92,7 @@ func (c *FakeStatefulSets) Create(ctx context.Context, statefulSet *v1beta2.Stat
 }
 
 // Update takes the representation of a statefulSet and updates it. Returns the server's representation of the statefulSet, and an error, if there is any.
-func (c *FakeStatefulSets) Update(ctx context.Context, statefulSet *v1beta2.StatefulSet) (result *v1beta2.StatefulSet, err error) {
+func (c *FakeStatefulSets) Update(ctx context.Context, statefulSet *v1beta2.StatefulSet, opts v1.UpdateOptions) (result *v1beta2.StatefulSet, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(statefulsetsResource, c.ns, statefulSet), &v1beta2.StatefulSet{})
 
@@ -104,7 +104,7 @@ func (c *FakeStatefulSets) Update(ctx context.Context, statefulSet *v1beta2.Stat
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeStatefulSets) UpdateStatus(ctx context.Context, statefulSet *v1beta2.StatefulSet) (*v1beta2.StatefulSet, error) {
+func (c *FakeStatefulSets) UpdateStatus(ctx context.Context, statefulSet *v1beta2.StatefulSet, opts v1.UpdateOptions) (*v1beta2.StatefulSet, error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateSubresourceAction(statefulsetsResource, "status", c.ns, statefulSet), &v1beta2.StatefulSet{})
 
@@ -131,7 +131,7 @@ func (c *FakeStatefulSets) DeleteCollection(ctx context.Context, options *v1.Del
 }
 
 // Patch applies the patch and returns the patched statefulSet.
-func (c *FakeStatefulSets) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta2.StatefulSet, err error) {
+func (c *FakeStatefulSets) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta2.StatefulSet, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(statefulsetsResource, c.ns, name, pt, data, subresources...), &v1beta2.StatefulSet{})
 
@@ -153,7 +153,7 @@ func (c *FakeStatefulSets) GetScale(ctx context.Context, statefulSetName string,
 }
 
 // UpdateScale takes the representation of a scale and updates it. Returns the server's representation of the scale, and an error, if there is any.
-func (c *FakeStatefulSets) UpdateScale(ctx context.Context, statefulSetName string, scale *v1beta2.Scale) (result *v1beta2.Scale, err error) {
+func (c *FakeStatefulSets) UpdateScale(ctx context.Context, statefulSetName string, scale *v1beta2.Scale, opts v1.UpdateOptions) (result *v1beta2.Scale, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateSubresourceAction(statefulsetsResource, "scale", c.ns, scale), &v1beta2.Scale{})
 

@@ -199,7 +199,7 @@ func NewGlusterfsServer(cs clientset.Interface, namespace string) (config TestCo
 			},
 		},
 	}
-	_, err := cs.CoreV1().Endpoints(namespace).Create(context.TODO(), endpoints)
+	_, err := cs.CoreV1().Endpoints(namespace).Create(context.TODO(), endpoints, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "failed to create endpoints for Gluster server")
 
 	return config, pod, ip
@@ -303,7 +303,7 @@ func startVolumeServer(client clientset.Interface, config TestConfig) *v1.Pod {
 	}
 
 	var pod *v1.Pod
-	serverPod, err := podClient.Create(context.TODO(), serverPod)
+	serverPod, err := podClient.Create(context.TODO(), serverPod, metav1.CreateOptions{})
 	// ok if the server pod already exists. TODO: make this controllable by callers
 	if err != nil {
 		if apierrors.IsAlreadyExists(err) {
@@ -424,7 +424,7 @@ func runVolumeTesterPod(client clientset.Interface, config TestConfig, podSuffix
 		})
 	}
 	podsNamespacer := client.CoreV1().Pods(config.Namespace)
-	clientPod, err := podsNamespacer.Create(context.TODO(), clientPod)
+	clientPod, err := podsNamespacer.Create(context.TODO(), clientPod, metav1.CreateOptions{})
 	if err != nil {
 		return nil, err
 	}

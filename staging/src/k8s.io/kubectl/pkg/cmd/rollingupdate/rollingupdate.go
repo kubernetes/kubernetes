@@ -432,7 +432,7 @@ func (o *RollingUpdateOptions) Run() error {
 		if err != nil {
 			return err
 		}
-		coreClient.ReplicationControllers(config.NewRc.Namespace).Update(context.TODO(), config.NewRc)
+		coreClient.ReplicationControllers(config.NewRc.Namespace).Update(context.TODO(), config.NewRc, metav1.UpdateOptions{})
 	}
 	err = updater.Update(config)
 	if err != nil {

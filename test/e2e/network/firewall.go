@@ -23,6 +23,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
@@ -151,7 +152,7 @@ var _ = SIGDescribe("Firewall rule", func() {
 			pod.ObjectMeta.Labels = jig.Labels
 			pod.Spec.NodeName = nodeName
 			pod.Spec.HostNetwork = true
-			_, err := cs.CoreV1().Pods(ns).Create(context.TODO(), pod)
+			_, err := cs.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 			framework.ExpectNoError(f.WaitForPodReady(podName))
 			framework.Logf("Netexec pod %q in namespace %q running", podName, ns)

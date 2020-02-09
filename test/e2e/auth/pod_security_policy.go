@@ -79,7 +79,7 @@ var _ = SIGDescribe("PodSecurityPolicy", func() {
 
 	ginkgo.It("should forbid pod creation when no PSP is available", func() {
 		ginkgo.By("Running a restricted pod")
-		_, err := c.CoreV1().Pods(ns).Create(context.TODO(), restrictedPod("restricted"))
+		_, err := c.CoreV1().Pods(ns).Create(context.TODO(), restrictedPod("restricted"), metav1.CreateOptions{})
 		expectForbidden(err)
 	})
 
@@ -89,12 +89,12 @@ var _ = SIGDescribe("PodSecurityPolicy", func() {
 		defer cleanup()
 
 		ginkgo.By("Running a restricted pod")
-		pod, err := c.CoreV1().Pods(ns).Create(context.TODO(), restrictedPod("allowed"))
+		pod, err := c.CoreV1().Pods(ns).Create(context.TODO(), restrictedPod("allowed"), metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(c, pod.Name, pod.Namespace))
 
 		testPrivilegedPods(func(pod *v1.Pod) {
-			_, err := c.CoreV1().Pods(ns).Create(context.TODO(), pod)
+			_, err := c.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
 			expectForbidden(err)
 		})
 	})
@@ -108,7 +108,7 @@ var _ = SIGDescribe("PodSecurityPolicy", func() {
 		defer cleanup()
 
 		testPrivilegedPods(func(pod *v1.Pod) {
-			p, err := c.CoreV1().Pods(ns).Create(context.TODO(), pod)
+			p, err := c.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 			framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(c, p.Name, p.Namespace))
 
@@ -215,7 +215,7 @@ func createAndBindPSP(f *framework.Framework, pspTemplate *policyv1beta1.PodSecu
 	ns := f.Namespace.Name
 	name := fmt.Sprintf("%s-%s", ns, psp.Name)
 	psp.Name = name
-	psp, err := f.ClientSet.PolicyV1beta1().PodSecurityPolicies().Create(context.TODO(), psp)
+	psp, err := f.ClientSet.PolicyV1beta1().PodSecurityPolicies().Create(context.TODO(), psp, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "Failed to create PSP")
 
 	// Create the Role to bind it to the namespace.
@@ -229,7 +229,7 @@ func createAndBindPSP(f *framework.Framework, pspTemplate *policyv1beta1.PodSecu
 			ResourceNames: []string{name},
 			Verbs:         []string{"use"},
 		}},
-	})
+	}, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "Failed to create PSP role")
 
 	// Bind the role to the namespace.

@@ -40,5 +40,5 @@ func GetJobPods(c clientset.Interface, ns, jobName string) (*v1.PodList, error) 
 // CreateJob uses c to create job in namespace ns. If the returned error is nil, the returned Job is valid and has
 // been created.
 func CreateJob(c clientset.Interface, ns string, job *batchv1.Job) (*batchv1.Job, error) {
-	return c.BatchV1().Jobs(ns).Create(context.TODO(), job)
+	return c.BatchV1().Jobs(ns).Create(context.TODO(), job, metav1.CreateOptions{})
 }

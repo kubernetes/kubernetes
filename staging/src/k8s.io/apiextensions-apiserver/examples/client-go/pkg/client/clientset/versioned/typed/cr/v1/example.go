@@ -38,14 +38,14 @@ type ExamplesGetter interface {
 
 // ExampleInterface has methods to work with Example resources.
 type ExampleInterface interface {
-	Create(context.Context, *v1.Example) (*v1.Example, error)
-	Update(context.Context, *v1.Example) (*v1.Example, error)
-	Delete(ctx context.Context, name string, options *metav1.DeleteOptions) error
-	DeleteCollection(ctx context.Context, options *metav1.DeleteOptions, listOptions metav1.ListOptions) error
-	Get(ctx context.Context, name string, options metav1.GetOptions) (*v1.Example, error)
+	Create(ctx context.Context, example *v1.Example, opts metav1.CreateOptions) (*v1.Example, error)
+	Update(ctx context.Context, example *v1.Example, opts metav1.UpdateOptions) (*v1.Example, error)
+	Delete(ctx context.Context, name string, opts *metav1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.Example, error)
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.ExampleList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Example, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Example, err error)
 	ExampleExpansion
 }
 
@@ -109,11 +109,12 @@ func (c *examples) Watch(ctx context.Context, opts metav1.ListOptions) (watch.In
 }
 
 // Create takes the representation of a example and creates it.  Returns the server's representation of the example, and an error, if there is any.
-func (c *examples) Create(ctx context.Context, example *v1.Example) (result *v1.Example, err error) {
+func (c *examples) Create(ctx context.Context, example *v1.Example, opts metav1.CreateOptions) (result *v1.Example, err error) {
 	result = &v1.Example{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("examples").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(example).
 		Do(ctx).
 		Into(result)
@@ -121,12 +122,13 @@ func (c *examples) Create(ctx context.Context, example *v1.Example) (result *v1.
 }
 
 // Update takes the representation of a example and updates it. Returns the server's representation of the example, and an error, if there is any.
-func (c *examples) Update(ctx context.Context, example *v1.Example) (result *v1.Example, err error) {
+func (c *examples) Update(ctx context.Context, example *v1.Example, opts metav1.UpdateOptions) (result *v1.Example, err error) {
 	result = &v1.Example{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("examples").
 		Name(example.Name).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(example).
 		Do(ctx).
 		Into(result)
@@ -161,13 +163,14 @@ func (c *examples) DeleteCollection(ctx context.Context, options *metav1.DeleteO
 }
 
 // Patch applies the patch and returns the patched example.
-func (c *examples) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Example, err error) {
+func (c *examples) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Example, err error) {
 	result = &v1.Example{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("examples").
-		SubResource(subresources...).
 		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

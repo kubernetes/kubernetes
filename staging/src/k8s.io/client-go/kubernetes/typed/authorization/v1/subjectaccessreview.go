@@ -22,6 +22,8 @@ import (
 	"context"
 
 	v1 "k8s.io/api/authorization/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	scheme "k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
 )
 
@@ -33,7 +35,7 @@ type SubjectAccessReviewsGetter interface {
 
 // SubjectAccessReviewInterface has methods to work with SubjectAccessReview resources.
 type SubjectAccessReviewInterface interface {
-	Create(context.Context, *v1.SubjectAccessReview) (*v1.SubjectAccessReview, error)
+	Create(ctx context.Context, subjectAccessReview *v1.SubjectAccessReview, opts metav1.CreateOptions) (*v1.SubjectAccessReview, error)
 	SubjectAccessReviewExpansion
 }
 
@@ -50,10 +52,11 @@ func newSubjectAccessReviews(c *AuthorizationV1Client) *subjectAccessReviews {
 }
 
 // Create takes the representation of a subjectAccessReview and creates it.  Returns the server's representation of the subjectAccessReview, and an error, if there is any.
-func (c *subjectAccessReviews) Create(ctx context.Context, subjectAccessReview *v1.SubjectAccessReview) (result *v1.SubjectAccessReview, err error) {
+func (c *subjectAccessReviews) Create(ctx context.Context, subjectAccessReview *v1.SubjectAccessReview, opts metav1.CreateOptions) (result *v1.SubjectAccessReview, err error) {
 	result = &v1.SubjectAccessReview{}
 	err = c.client.Post().
 		Resource("subjectaccessreviews").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(subjectAccessReview).
 		Do(ctx).
 		Into(result)

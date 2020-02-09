@@ -326,7 +326,7 @@ func existsInDiscoveryV1(crd *apiextensionsv1.CustomResourceDefinition, apiExten
 // the created CR. Please call CreateNewCustomResourceDefinition if you need to
 // watch the CR.
 func CreateNewCustomResourceDefinitionWatchUnsafe(crd *apiextensionsv1beta1.CustomResourceDefinition, apiExtensionsClient clientset.Interface) (*apiextensionsv1beta1.CustomResourceDefinition, error) {
-	crd, err := apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Create(context.TODO(), crd)
+	crd, err := apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Create(context.TODO(), crd, metav1.CreateOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -375,7 +375,7 @@ func CreateNewCustomResourceDefinition(crd *apiextensionsv1beta1.CustomResourceD
 // the created CR. Please call CreateNewV1CustomResourceDefinition if you need to
 // watch the CR.
 func CreateNewV1CustomResourceDefinitionWatchUnsafe(v1CRD *apiextensionsv1.CustomResourceDefinition, apiExtensionsClient clientset.Interface) (*apiextensionsv1.CustomResourceDefinition, error) {
-	v1CRD, err := apiExtensionsClient.ApiextensionsV1().CustomResourceDefinitions().Create(context.TODO(), v1CRD)
+	v1CRD, err := apiExtensionsClient.ApiextensionsV1().CustomResourceDefinitions().Create(context.TODO(), v1CRD, metav1.CreateOptions{})
 	if err != nil {
 		return nil, err
 	}

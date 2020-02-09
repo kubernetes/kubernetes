@@ -185,7 +185,7 @@ func createNamespaceIfNeeded(nsClient corev1client.NamespacesGetter, ns string) 
 			Namespace: "",
 		},
 	}
-	_, err := nsClient.Namespaces().Create(context.TODO(), newNs)
+	_, err := nsClient.Namespaces().Create(context.TODO(), newNs, metav1.CreateOptions{})
 	if err != nil && apierrors.IsAlreadyExists(err) {
 		err = nil
 	}
@@ -193,9 +193,9 @@ func createNamespaceIfNeeded(nsClient corev1client.NamespacesGetter, ns string) 
 }
 
 func writeConfigMap(configMapClient corev1client.ConfigMapsGetter, required *corev1.ConfigMap) error {
-	_, err := configMapClient.ConfigMaps(required.Namespace).Update(context.TODO(), required)
+	_, err := configMapClient.ConfigMaps(required.Namespace).Update(context.TODO(), required, metav1.UpdateOptions{})
 	if apierrors.IsNotFound(err) {
-		_, err := configMapClient.ConfigMaps(required.Namespace).Create(context.TODO(), required)
+		_, err := configMapClient.ConfigMaps(required.Namespace).Create(context.TODO(), required, metav1.CreateOptions{})
 		return err
 	}
 

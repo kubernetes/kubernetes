@@ -81,7 +81,7 @@ func (c *FakeResourceQuotas) Watch(ctx context.Context, opts v1.ListOptions) (wa
 }
 
 // Create takes the representation of a resourceQuota and creates it.  Returns the server's representation of the resourceQuota, and an error, if there is any.
-func (c *FakeResourceQuotas) Create(ctx context.Context, resourceQuota *corev1.ResourceQuota) (result *corev1.ResourceQuota, err error) {
+func (c *FakeResourceQuotas) Create(ctx context.Context, resourceQuota *corev1.ResourceQuota, opts v1.CreateOptions) (result *corev1.ResourceQuota, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(resourcequotasResource, c.ns, resourceQuota), &corev1.ResourceQuota{})
 
@@ -92,7 +92,7 @@ func (c *FakeResourceQuotas) Create(ctx context.Context, resourceQuota *corev1.R
 }
 
 // Update takes the representation of a resourceQuota and updates it. Returns the server's representation of the resourceQuota, and an error, if there is any.
-func (c *FakeResourceQuotas) Update(ctx context.Context, resourceQuota *corev1.ResourceQuota) (result *corev1.ResourceQuota, err error) {
+func (c *FakeResourceQuotas) Update(ctx context.Context, resourceQuota *corev1.ResourceQuota, opts v1.UpdateOptions) (result *corev1.ResourceQuota, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(resourcequotasResource, c.ns, resourceQuota), &corev1.ResourceQuota{})
 
@@ -104,7 +104,7 @@ func (c *FakeResourceQuotas) Update(ctx context.Context, resourceQuota *corev1.R
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeResourceQuotas) UpdateStatus(ctx context.Context, resourceQuota *corev1.ResourceQuota) (*corev1.ResourceQuota, error) {
+func (c *FakeResourceQuotas) UpdateStatus(ctx context.Context, resourceQuota *corev1.ResourceQuota, opts v1.UpdateOptions) (*corev1.ResourceQuota, error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateSubresourceAction(resourcequotasResource, "status", c.ns, resourceQuota), &corev1.ResourceQuota{})
 
@@ -131,7 +131,7 @@ func (c *FakeResourceQuotas) DeleteCollection(ctx context.Context, options *v1.D
 }
 
 // Patch applies the patch and returns the patched resourceQuota.
-func (c *FakeResourceQuotas) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *corev1.ResourceQuota, err error) {
+func (c *FakeResourceQuotas) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *corev1.ResourceQuota, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(resourcequotasResource, c.ns, name, pt, data, subresources...), &corev1.ResourceQuota{})
 

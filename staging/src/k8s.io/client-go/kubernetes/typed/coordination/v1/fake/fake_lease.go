@@ -81,7 +81,7 @@ func (c *FakeLeases) Watch(ctx context.Context, opts v1.ListOptions) (watch.Inte
 }
 
 // Create takes the representation of a lease and creates it.  Returns the server's representation of the lease, and an error, if there is any.
-func (c *FakeLeases) Create(ctx context.Context, lease *coordinationv1.Lease) (result *coordinationv1.Lease, err error) {
+func (c *FakeLeases) Create(ctx context.Context, lease *coordinationv1.Lease, opts v1.CreateOptions) (result *coordinationv1.Lease, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(leasesResource, c.ns, lease), &coordinationv1.Lease{})
 
@@ -92,7 +92,7 @@ func (c *FakeLeases) Create(ctx context.Context, lease *coordinationv1.Lease) (r
 }
 
 // Update takes the representation of a lease and updates it. Returns the server's representation of the lease, and an error, if there is any.
-func (c *FakeLeases) Update(ctx context.Context, lease *coordinationv1.Lease) (result *coordinationv1.Lease, err error) {
+func (c *FakeLeases) Update(ctx context.Context, lease *coordinationv1.Lease, opts v1.UpdateOptions) (result *coordinationv1.Lease, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(leasesResource, c.ns, lease), &coordinationv1.Lease{})
 
@@ -119,7 +119,7 @@ func (c *FakeLeases) DeleteCollection(ctx context.Context, options *v1.DeleteOpt
 }
 
 // Patch applies the patch and returns the patched lease.
-func (c *FakeLeases) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *coordinationv1.Lease, err error) {
+func (c *FakeLeases) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *coordinationv1.Lease, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(leasesResource, c.ns, name, pt, data, subresources...), &coordinationv1.Lease{})
 

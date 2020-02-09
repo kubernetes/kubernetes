@@ -77,7 +77,7 @@ var _ = utils.SIGDescribe("PV Protection", func() {
 		// make the pv definitions
 		pv = e2epv.MakePersistentVolume(pvConfig)
 		// create the PV
-		pv, err = client.CoreV1().PersistentVolumes().Create(context.TODO(), pv)
+		pv, err = client.CoreV1().PersistentVolumes().Create(context.TODO(), pv, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "Error creating PV")
 
 		ginkgo.By("Waiting for PV to enter phase Available")
@@ -106,7 +106,7 @@ var _ = utils.SIGDescribe("PV Protection", func() {
 	ginkgo.It("Verify that PV bound to a PVC is not removed immediately", func() {
 		ginkgo.By("Creating a PVC")
 		pvc = e2epv.MakePersistentVolumeClaim(pvcConfig, nameSpace)
-		pvc, err = client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(context.TODO(), pvc)
+		pvc, err = client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(context.TODO(), pvc, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "Error creating PVC")
 
 		ginkgo.By("Waiting for PVC to become Bound")

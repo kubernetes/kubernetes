@@ -612,7 +612,7 @@ func (f *Framework) CreateServiceForSimpleApp(contPort, svcPort int, appName str
 			Ports:    portsFunc(),
 			Selector: serviceSelector,
 		},
-	})
+	}, metav1.CreateOptions{})
 	ExpectNoError(err)
 	return service
 }
@@ -632,7 +632,7 @@ func (f *Framework) CreatePodsPerNodeForSimpleApp(appName string, podSpec func(n
 				Labels: podLabels,
 			},
 			Spec: podSpec(node),
-		})
+		}, metav1.CreateOptions{})
 		ExpectNoError(err)
 	}
 	return podLabels

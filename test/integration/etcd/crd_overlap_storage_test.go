@@ -126,7 +126,7 @@ func TestOverlappingCustomResourceAPIService(t *testing.T) {
 				},
 			},
 		},
-	})
+	}, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -170,7 +170,7 @@ func TestOverlappingCustomResourceAPIService(t *testing.T) {
 			VersionPriority:      100,
 			GroupPriorityMinimum: 100,
 		},
-	})
+	}, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -289,7 +289,7 @@ func TestOverlappingCustomResourceCustomResourceDefinition(t *testing.T) {
 				},
 			},
 		},
-	})
+	}, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -325,7 +325,7 @@ func TestOverlappingCustomResourceCustomResourceDefinition(t *testing.T) {
 	}
 
 	// Updating v1 succeeds (built-in validation, not CR validation)
-	_, err = crdClient.CustomResourceDefinitions().Patch(context.TODO(), crdCRD.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"updated"}}}`))
+	_, err = crdClient.CustomResourceDefinitions().Patch(context.TODO(), crdCRD.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"updated"}}}`), metav1.PatchOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}

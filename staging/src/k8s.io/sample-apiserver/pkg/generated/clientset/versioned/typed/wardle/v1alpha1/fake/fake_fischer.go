@@ -77,7 +77,7 @@ func (c *FakeFischers) Watch(ctx context.Context, opts v1.ListOptions) (watch.In
 }
 
 // Create takes the representation of a fischer and creates it.  Returns the server's representation of the fischer, and an error, if there is any.
-func (c *FakeFischers) Create(ctx context.Context, fischer *v1alpha1.Fischer) (result *v1alpha1.Fischer, err error) {
+func (c *FakeFischers) Create(ctx context.Context, fischer *v1alpha1.Fischer, opts v1.CreateOptions) (result *v1alpha1.Fischer, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootCreateAction(fischersResource, fischer), &v1alpha1.Fischer{})
 	if obj == nil {
@@ -87,7 +87,7 @@ func (c *FakeFischers) Create(ctx context.Context, fischer *v1alpha1.Fischer) (r
 }
 
 // Update takes the representation of a fischer and updates it. Returns the server's representation of the fischer, and an error, if there is any.
-func (c *FakeFischers) Update(ctx context.Context, fischer *v1alpha1.Fischer) (result *v1alpha1.Fischer, err error) {
+func (c *FakeFischers) Update(ctx context.Context, fischer *v1alpha1.Fischer, opts v1.UpdateOptions) (result *v1alpha1.Fischer, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootUpdateAction(fischersResource, fischer), &v1alpha1.Fischer{})
 	if obj == nil {
@@ -112,7 +112,7 @@ func (c *FakeFischers) DeleteCollection(ctx context.Context, options *v1.DeleteO
 }
 
 // Patch applies the patch and returns the patched fischer.
-func (c *FakeFischers) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.Fischer, err error) {
+func (c *FakeFischers) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.Fischer, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootPatchSubresourceAction(fischersResource, name, pt, data, subresources...), &v1alpha1.Fischer{})
 	if obj == nil {

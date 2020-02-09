@@ -39,7 +39,7 @@ func TestPatchPodStatus(t *testing.T) {
 			Namespace: ns,
 			Name:      name,
 		},
-	})
+	}, metav1.CreateOptions{})
 
 	testCases := []struct {
 		description        string

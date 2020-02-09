@@ -440,7 +440,7 @@ func runServiceAndWorkloadForResourceConsumer(c clientset.Interface, ns, name st
 				"name": name,
 			},
 		},
-	})
+	}, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
 	rcConfig := testutils.RCConfig{
@@ -494,7 +494,7 @@ func runServiceAndWorkloadForResourceConsumer(c clientset.Interface, ns, name st
 				"name": controllerName,
 			},
 		},
-	})
+	}, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
 	dnsClusterFirst := v1.DNSClusterFirst
@@ -534,7 +534,7 @@ func CreateCPUHorizontalPodAutoscaler(rc *ResourceConsumer, cpu, minReplicas, ma
 			TargetCPUUtilizationPercentage: &cpu,
 		},
 	}
-	hpa, errHPA := rc.clientSet.AutoscalingV1().HorizontalPodAutoscalers(rc.nsName).Create(context.TODO(), hpa)
+	hpa, errHPA := rc.clientSet.AutoscalingV1().HorizontalPodAutoscalers(rc.nsName).Create(context.TODO(), hpa, metav1.CreateOptions{})
 	framework.ExpectNoError(errHPA)
 	return hpa
 }

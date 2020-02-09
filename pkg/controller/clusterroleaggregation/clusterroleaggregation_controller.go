@@ -127,7 +127,7 @@ func (c *ClusterRoleAggregationController) syncClusterRole(key string) error {
 	for _, rule := range newPolicyRules {
 		clusterRole.Rules = append(clusterRole.Rules, *rule.DeepCopy())
 	}
-	_, err = c.clusterRoleClient.ClusterRoles().Update(context.TODO(), clusterRole)
+	_, err = c.clusterRoleClient.ClusterRoles().Update(context.TODO(), clusterRole, metav1.UpdateOptions{})
 
 	return err
 }

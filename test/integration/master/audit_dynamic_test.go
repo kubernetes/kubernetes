@@ -71,7 +71,7 @@ func TestDynamicAudit(t *testing.T) {
 
 	// test creates a single audit sink, generates audit events, and ensures they arrive at the server
 	success := t.Run("one sink", func(t *testing.T) {
-		_, err := kubeclient.AuditregistrationV1alpha1().AuditSinks().Create(context.TODO(), sinkConfig1)
+		_, err := kubeclient.AuditregistrationV1alpha1().AuditSinks().Create(context.TODO(), sinkConfig1, metav1.CreateOptions{})
 		require.NoError(t, err, "failed to create audit sink1")
 		t.Log("created audit sink1")
 
@@ -89,7 +89,7 @@ func TestDynamicAudit(t *testing.T) {
 
 	// test creates a second audit sink, generates audit events, and ensures events arrive in both servers
 	success = t.Run("two sink", func(t *testing.T) {
-		_, err := kubeclient.AuditregistrationV1alpha1().AuditSinks().Create(context.TODO(), sinkConfig2)
+		_, err := kubeclient.AuditregistrationV1alpha1().AuditSinks().Create(context.TODO(), sinkConfig2, metav1.CreateOptions{})
 		require.NoError(t, err, "failed to create audit sink2")
 		t.Log("created audit sink2")
 
@@ -169,7 +169,7 @@ func TestDynamicAudit(t *testing.T) {
 
 		// update the url
 		sink1.Spec.Webhook.ClientConfig.URL = &testServer2.Server.URL
-		_, err = kubeclient.AuditregistrationV1alpha1().AuditSinks().Update(context.TODO(), sink1)
+		_, err = kubeclient.AuditregistrationV1alpha1().AuditSinks().Update(context.TODO(), sink1, metav1.UpdateOptions{})
 		require.NoError(t, err, "failed to update audit sink1")
 		t.Log("updated audit sink1 to point to server2")
 

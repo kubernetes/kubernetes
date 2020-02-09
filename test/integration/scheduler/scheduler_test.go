@@ -251,7 +251,7 @@ priorities: []
 		}
 
 		policyConfigMap.APIVersion = "v1"
-		clientSet.CoreV1().ConfigMaps(metav1.NamespaceSystem).Create(context.TODO(), &policyConfigMap)
+		clientSet.CoreV1().ConfigMaps(metav1.NamespaceSystem).Create(context.TODO(), &policyConfigMap, metav1.CreateOptions{})
 
 		eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: clientSet.EventsV1beta1().Events("")})
 		stopCh := make(chan struct{})
@@ -375,7 +375,7 @@ func TestUnschedulableNodes(t *testing.T) {
 		{
 			makeUnSchedulable: func(t *testing.T, n *v1.Node, nodeLister corelisters.NodeLister, c clientset.Interface) {
 				n.Spec.Unschedulable = true
-				if _, err := c.CoreV1().Nodes().Update(context.TODO(), n); err != nil {
+				if _, err := c.CoreV1().Nodes().Update(context.TODO(), n, metav1.UpdateOptions{}); err != nil {
 					t.Fatalf("Failed to update node with unschedulable=true: %v", err)
 				}
 				err = waitForReflection(t, nodeLister, nodeKey, func(node interface{}) bool {
@@ -391,7 +391,7 @@ func TestUnschedulableNodes(t *testing.T) {
 			},
 			makeSchedulable: func(t *testing.T, n *v1.Node, nodeLister corelisters.NodeLister, c clientset.Interface) {
 				n.Spec.Unschedulable = false
-				if _, err := c.CoreV1().Nodes().Update(context.TODO(), n); err != nil {
+				if _, err := c.CoreV1().Nodes().Update(context.TODO(), n, metav1.UpdateOptions{}); err != nil {
 					t.Fatalf("Failed to update node with unschedulable=false: %v", err)
 				}
 				err = waitForReflection(t, nodeLister, nodeKey, func(node interface{}) bool {
@@ -405,7 +405,7 @@ func TestUnschedulableNodes(t *testing.T) {
 	}
 
 	for i, mod := range nodeModifications {
-		unSchedNode, err := testCtx.clientSet.CoreV1().Nodes().Create(context.TODO(), node)
+		unSchedNode, err := testCtx.clientSet.CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{})
 		if err != nil {
 			t.Fatalf("Failed to create node: %v", err)
 		}
@@ -488,7 +488,7 @@ func TestMultiScheduler(t *testing.T) {
 			},
 		},
 	}
-	testCtx.clientSet.CoreV1().Nodes().Create(context.TODO(), node)
+	testCtx.clientSet.CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{})
 
 	// 3. create 3 pods for testing
 	t.Logf("create 3 pods for testing")
@@ -639,7 +639,7 @@ func TestAllocatable(t *testing.T) {
 		},
 	}
 
-	if _, err := testCtx.clientSet.CoreV1().Nodes().UpdateStatus(context.TODO(), allocNode); err != nil {
+	if _, err := testCtx.clientSet.CoreV1().Nodes().UpdateStatus(context.TODO(), allocNode, metav1.UpdateOptions{}); err != nil {
 		t.Fatalf("Failed to update node with Status.Allocatable: %v", err)
 	}
 
