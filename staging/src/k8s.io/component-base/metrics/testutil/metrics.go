@@ -147,3 +147,34 @@ func ComputeHistogramDelta(before, after model.Samples, label model.LabelName) {
 func makeKey(a, b model.LabelValue) string {
 	return string(a) + "___" + string(b)
 }
+
+// GetMetricValuesForLabel returns value of metric for a given dimension
+func GetMetricValuesForLabel(ms Metrics, metricName, label string) map[string]int64 {
+	samples, found := ms[metricName]
+	result := make(map[string]int64, len(samples))
+	if !found {
+		return result
+	}
+	for _, sample := range samples {
+		count := int64(sample.Value)
+		dimensionName := string(sample.Metric[model.LabelName(label)])
+		result[dimensionName] = count
+	}
+	return result
+}
+
+// ValidateMetrics verifies if every sample of metric has all expected labels
+func ValidateMetrics(metrics Metrics, metricName string, expectedLabels ...string) error {
+	samples, ok := metrics[metricName]
+	if !ok {
+		return fmt.Errorf("metric %q was not found in metrics", metricName)
+	}
+	for _, sample := range samples {
+		for _, l := range expectedLabels {
+			if _, ok := sample.Metric[model.LabelName(l)]; !ok {
+				return fmt.Errorf("metric %q is missing label %q, sample: %q", metricName, l, sample.String())
+			}
+		}
+	}
+	return nil
+}
