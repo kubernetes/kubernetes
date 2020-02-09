@@ -121,6 +121,10 @@ func (cm *containerManagerStub) GetTopologyPodAdmitHandler() topologymanager.Man
 	return nil
 }
 
+func (cm *containerManagerStub) UpdateAllocatedDevices() {
+	return
+}
+
 func NewStubContainerManager() ContainerManager {
 	return &containerManagerStub{shouldResetExtendedResourceCapacity: false}
 }
