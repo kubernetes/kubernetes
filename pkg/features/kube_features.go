@@ -429,6 +429,7 @@ const (
 
 	// owner: @adisky
 	// alpha: v1.14
+	// beta: v1.18
 	//
 	// Enables the OpenStack Cinder in-tree driver to OpenStack Cinder CSI Driver migration feature.
 	CSIMigrationOpenStack featuregate.Feature = "CSIMigrationOpenStack"
@@ -583,7 +584,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	CSIMigrationAzureFile:          {Default: false, PreRelease: featuregate.Alpha},
 	CSIMigrationAzureFileComplete:  {Default: false, PreRelease: featuregate.Alpha},
 	RunAsGroup:                     {Default: true, PreRelease: featuregate.Beta},
-	CSIMigrationOpenStack:          {Default: false, PreRelease: featuregate.Alpha},
+	CSIMigrationOpenStack:          {Default: false, PreRelease: featuregate.Beta}, // Off by default (requires OpenStack Cinder CSI driver)
 	CSIMigrationOpenStackComplete:  {Default: false, PreRelease: featuregate.Alpha},
 	VolumeSubpath:                  {Default: true, PreRelease: featuregate.GA},
 	BalanceAttachedNodeVolumes:     {Default: false, PreRelease: featuregate.Alpha},
