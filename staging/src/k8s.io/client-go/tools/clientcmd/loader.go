@@ -372,7 +372,7 @@ func LoadFromFile(filename string) (*clientcmdapi.Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	klog.V(3).Infoln("Config loaded from file: ", filename)
+	klog.V(5).Infoln("Config loaded from file: ", filename)
 
 	// set LocationOfOrigin on every Cluster, User, and Context
 	for key, obj := range config.AuthInfos {
