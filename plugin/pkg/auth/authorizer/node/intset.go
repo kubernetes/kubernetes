@@ -16,47 +16,47 @@ limitations under the License.
 
 package node
 
-// intSet maintains a set of ints, and supports promoting and culling the previous generation.
-// this allows tracking a large, mostly-stable set without constantly reallocating the entire set.
+// intSet maintains a map of id to refcounts
 type intSet struct {
-	currentGeneration byte
-	members           map[int]byte
+	// members is a map of id to refcounts
+	members map[int]int
 }
 
 func newIntSet() *intSet {
-	return &intSet{members: map[int]byte{}}
+	return &intSet{members: map[int]int{}}
 }
 
-// has returns true if the specified int is in the set.
+// has returns true if the specified id has a positive refcount.
 // it is safe to call concurrently, but must not be called concurrently with any of the other methods.
 func (s *intSet) has(i int) bool {
 	if s == nil {
 		return false
 	}
-	_, present := s.members[i]
-	return present
+	return s.members[i] > 0
 }
 
-// startNewGeneration begins a new generation.
-// it must be followed by a call to mark() for every member of the generation,
-// then a call to sweep() to remove members not present in the generation.
+// reset removes all ids, effectively setting their refcounts to 0.
 // it is not thread-safe.
-func (s *intSet) startNewGeneration() {
-	s.currentGeneration++
+func (s *intSet) reset() {
+	for k := range s.members {
+		delete(s.members, k)
+	}
 }
 
-// mark indicates the specified int belongs to the current generation.
+// increment adds one to the refcount of the specified id.
 // it is not thread-safe.
-func (s *intSet) mark(i int) {
-	s.members[i] = s.currentGeneration
+func (s *intSet) increment(i int) {
+	s.members[i]++
 }
 
-// sweep removes items not in the current generation.
+// decrement removes one from the refcount of the specified id,
+// and removes the id if the resulting refcount is <= 0.
+// it will not track refcounts lower than zero.
 // it is not thread-safe.
-func (s *intSet) sweep() {
-	for k, v := range s.members {
-		if v != s.currentGeneration {
-			delete(s.members, k)
-		}
+func (s *intSet) decrement(i int) {
+	if s.members[i] <= 1 {
+		delete(s.members, i)
+	} else {
+		s.members[i]--
 	}
 }
