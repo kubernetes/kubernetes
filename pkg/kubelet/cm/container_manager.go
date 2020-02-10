@@ -110,8 +110,8 @@ type ContainerManager interface {
 	// due to node recreation.
 	ShouldResetExtendedResourceCapacity() bool
 
-	// GetTopologyPodAdmitHandler returns an instance of a PodAdmitHandler responsible for allocating pod resources.
-	GetTopologyPodAdmitHandler() lifecycle.PodAdmitHandler
+	// GetAllocateResourcesPodAdmitHandler returns an instance of a PodAdmitHandler responsible for allocating pod resources.
+	GetAllocateResourcesPodAdmitHandler() lifecycle.PodAdmitHandler
 
 	// UpdateAllocatedDevices frees any Devices that are bound to terminated pods.
 	UpdateAllocatedDevices()

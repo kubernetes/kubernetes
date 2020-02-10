@@ -675,7 +675,7 @@ func (cm *containerManagerImpl) UpdatePluginResources(node *schedulernodeinfo.No
 	return cm.deviceManager.UpdatePluginResources(node, attrs)
 }
 
-func (cm *containerManagerImpl) GetTopologyPodAdmitHandler() lifecycle.PodAdmitHandler {
+func (cm *containerManagerImpl) GetAllocateResourcesPodAdmitHandler() lifecycle.PodAdmitHandler {
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.TopologyManager) {
 		return cm.topologyManager
 	}
