@@ -500,8 +500,6 @@ func runTopologyManagerPolicySuiteTests(f *framework.Framework) {
 }
 
 func runTopologyManagerPositiveTest(f *framework.Framework, numaNodes, numPods int, cpuAmount, sriovResourceName, deviceAmount string) {
-	ginkgo.By(fmt.Sprintf("allocate aligned resources for a %d pod(s): cpuAmount=%s %s=%s", numPods, cpuAmount, sriovResourceName, deviceAmount))
-
 	var pods []*v1.Pod
 
 	for podID := 0; podID < numPods; podID++ {
@@ -538,8 +536,6 @@ func runTopologyManagerPositiveTest(f *framework.Framework, numaNodes, numPods i
 }
 
 func runTopologyManagerNegativeTest(f *framework.Framework, numaNodes, numPods int, cpuAmount, sriovResourceName, deviceAmount string) {
-	ginkgo.By(fmt.Sprintf("allocate aligned resources for a %d pod(s): cpuAmount=%s %s=%s", numPods, cpuAmount, sriovResourceName, deviceAmount))
-
 	ctnAttrs := []tmCtnAttribute{
 		{
 			ctnName:       "gu-container",
@@ -639,28 +635,37 @@ func runTopologyManagerNodeAlignmentSuiteTests(f *framework.Framework, configMap
 	}
 	// could have been a loop, we unroll it to explain the testcases
 
-	// simplest case: one guaranteed core, one device
+	// simplest case
+	ginkgo.By(fmt.Sprintf("Successfully admit one guaranteed pod with 1 core, 1 %s device", sriovResourceName))
 	runTopologyManagerPositiveTest(f, numaNodes, 1, "1000m", sriovResourceName, "1")
 
-	// two guaranteed cores, one device
+	ginkgo.By(fmt.Sprintf("Successfully admit one guaranteed pod with 2 cores, 1 %s device", sriovResourceName))
 	runTopologyManagerPositiveTest(f, numaNodes, 1, "2000m", sriovResourceName, "1")
 
-	// take an entire socket; but for that, we need to have reserved CPUs on another one.
 	if reservedSystemCPUs != "" {
-		runTopologyManagerPositiveTest(f, numaNodes, 1, fmt.Sprintf("%dm", threadsPerCore*coreCount*1000), sriovResourceName, "1")
+		// to avoid false negatives, we have put reserved CPUs in such a way there is at least a NUMA node
+		// with 1+ SRIOV devices and not reserved CPUs.
+		numCores := threadsPerCore * coreCount
+		ginkgo.By(fmt.Sprintf("Successfully admit an entire socket (%d cores), 1 %s device", numCores, sriovResourceName))
+		runTopologyManagerPositiveTest(f, numaNodes, 1, fmt.Sprintf("%dm", numCores*1000), sriovResourceName, "1")
 	}
 
 	if sriovResourceAmount > 1 {
 		// no matter how busses are connected to NUMA nodes and SRIOV devices are installed, this function
 		// preconditions must ensure the following can be fulfilled
+		ginkgo.By(fmt.Sprintf("Successfully admit two guaranteed pods, each with 1 core, 1 %s device", sriovResourceName))
 		runTopologyManagerPositiveTest(f, numaNodes, 2, "1000m", sriovResourceName, "1")
+
+		ginkgo.By(fmt.Sprintf("Successfully admit two guaranteed pods, each with 2 cores, 1 %s device", sriovResourceName))
 		runTopologyManagerPositiveTest(f, numaNodes, 2, "2000m", sriovResourceName, "1")
 
 		// testing more complex conditions require knowledge about the system cpu+bus topology
 	}
 
 	// overflow NUMA node capacity: cores
-	runTopologyManagerNegativeTest(f, numaNodes, 1, fmt.Sprintf("%dm", (1+threadsPerCore)*coreCount*1000), sriovResourceName, "1")
+	numCores := 1 + (threadsPerCore * coreCount)
+	ginkgo.By(fmt.Sprintf("Trying to admit a guaranteed pods, with %d cores, 1 %s device - and it should be rejected", numCores, sriovResourceName))
+	runTopologyManagerNegativeTest(f, numaNodes, 1, fmt.Sprintf("%dm", numCores*1000), sriovResourceName, "1")
 
 	framework.Logf("deleting the SRIOV device plugin pod %s/%s and waiting for container %s removal",
 		dpPod.Namespace, dpPod.Name, dpPod.Spec.Containers[0].Name)
