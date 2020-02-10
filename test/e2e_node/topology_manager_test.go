@@ -47,6 +47,9 @@ import (
 
 const (
 	numalignCmd = `export CPULIST_ALLOWED=$( awk -F":\t*" '/Cpus_allowed_list/ { print $2 }' /proc/self/status); env; sleep 1d`
+
+	minNumaNodes = 2
+	minCoreCount = 4
 )
 
 // Helper for makeTopologyManagerPod().
@@ -707,10 +710,10 @@ func runTopologyManagerTests(f *framework.Framework) {
 		numaNodes := detectNUMANodes()
 		coreCount := detectCoresPerSocket()
 
-		if numaNodes < 2 {
+		if numaNodes < minNumaNodes {
 			e2eskipper.Skipf("this test is meant to run on a multi-node NUMA system")
 		}
-		if coreCount < 4 {
+		if coreCount < minCoreCount {
 			e2eskipper.Skipf("this test is meant to run on a system with at least 4 cores per socket")
 		}
 		if sriovdevCount == 0 {
