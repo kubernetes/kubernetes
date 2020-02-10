@@ -247,8 +247,8 @@ func TestIndex(t *testing.T) {
 		actual := map[string][]string{}
 		for from, to := range g.destinationEdgeIndex {
 			sortedValues := []string{}
-			for member := range to.members {
-				sortedValues = append(sortedValues, toString(member))
+			for member, count := range to.members {
+				sortedValues = append(sortedValues, fmt.Sprintf("%s=%d", toString(member), count))
 			}
 			sort.Strings(sortedValues)
 			actual[toString(from)] = sortedValues
@@ -280,10 +280,10 @@ func TestIndex(t *testing.T) {
 		"serviceAccount:ns/sa1": {"pod:ns/pod1", "pod:ns/pod2", "pod:ns/pod3"},
 	})
 	expectIndex(map[string][]string{
-		"configmap:ns/cm1":      {"node:node1", "node:node2", "node:node3"},
-		"configmap:ns/cm2":      {"node:node1", "node:node2", "node:node3"},
-		"configmap:ns/cm3":      {"node:node1", "node:node2", "node:node3"},
-		"serviceAccount:ns/sa1": {"node:node1", "node:node2", "node:node3"},
+		"configmap:ns/cm1":      {"node:node1=1", "node:node2=1", "node:node3=1"},
+		"configmap:ns/cm2":      {"node:node1=1", "node:node2=1", "node:node3=1"},
+		"configmap:ns/cm3":      {"node:node1=1", "node:node2=1", "node:node3=1"},
+		"serviceAccount:ns/sa1": {"node:node1=1", "node:node2=1", "node:node3=1"},
 	})
 
 	// delete one to drop below the threshold
@@ -317,10 +317,10 @@ func TestIndex(t *testing.T) {
 		"serviceAccount:ns/sa1": {"pod:ns/pod1", "pod:ns/pod2", "pod:ns/pod3", "pod:ns/pod4"},
 	})
 	expectIndex(map[string][]string{
-		"configmap:ns/cm1":      {"node:node1", "node:node2", "node:node3"},
-		"configmap:ns/cm2":      {"node:node1", "node:node2", "node:node3"},
-		"configmap:ns/cm3":      {"node:node1", "node:node2", "node:node3"},
-		"serviceAccount:ns/sa1": {"node:node1", "node:node2", "node:node3"},
+		"configmap:ns/cm1":      {"node:node1=2", "node:node2=1", "node:node3=1"},
+		"configmap:ns/cm2":      {"node:node1=2", "node:node2=1", "node:node3=1"},
+		"configmap:ns/cm3":      {"node:node1=2", "node:node2=1", "node:node3=1"},
+		"serviceAccount:ns/sa1": {"node:node1=2", "node:node2=1", "node:node3=1"},
 	})
 
 	// delete one to remain above the threshold
@@ -338,10 +338,10 @@ func TestIndex(t *testing.T) {
 		"serviceAccount:ns/sa1": {"pod:ns/pod2", "pod:ns/pod3", "pod:ns/pod4"},
 	})
 	expectIndex(map[string][]string{
-		"configmap:ns/cm1":      {"node:node1", "node:node2", "node:node3"},
-		"configmap:ns/cm2":      {"node:node1", "node:node2", "node:node3"},
-		"configmap:ns/cm3":      {"node:node1", "node:node2", "node:node3"},
-		"serviceAccount:ns/sa1": {"node:node1", "node:node2", "node:node3"},
+		"configmap:ns/cm1":      {"node:node1=1", "node:node2=1", "node:node3=1"},
+		"configmap:ns/cm2":      {"node:node1=1", "node:node2=1", "node:node3=1"},
+		"configmap:ns/cm3":      {"node:node1=1", "node:node2=1", "node:node3=1"},
+		"serviceAccount:ns/sa1": {"node:node1=1", "node:node2=1", "node:node3=1"},
 	})
 
 	// Set node->configmap references
@@ -363,10 +363,10 @@ func TestIndex(t *testing.T) {
 		"serviceAccount:ns/sa1": {"pod:ns/pod2", "pod:ns/pod3", "pod:ns/pod4"},
 	})
 	expectIndex(map[string][]string{
-		"configmap:ns/cm1":      {"node:node1", "node:node2", "node:node3", "node:node4"},
-		"configmap:ns/cm2":      {"node:node1", "node:node2", "node:node3"},
-		"configmap:ns/cm3":      {"node:node1", "node:node2", "node:node3"},
-		"serviceAccount:ns/sa1": {"node:node1", "node:node2", "node:node3"},
+		"configmap:ns/cm1":      {"node:node1=2", "node:node2=2", "node:node3=2", "node:node4=1"},
+		"configmap:ns/cm2":      {"node:node1=1", "node:node2=1", "node:node3=1"},
+		"configmap:ns/cm3":      {"node:node1=1", "node:node2=1", "node:node3=1"},
+		"serviceAccount:ns/sa1": {"node:node1=1", "node:node2=1", "node:node3=1"},
 	})
 
 	// Update node->configmap reference
@@ -385,10 +385,10 @@ func TestIndex(t *testing.T) {
 		"serviceAccount:ns/sa1": {"pod:ns/pod2", "pod:ns/pod3", "pod:ns/pod4"},
 	})
 	expectIndex(map[string][]string{
-		"configmap:ns/cm1":      {"node:node1", "node:node2", "node:node3", "node:node4"},
-		"configmap:ns/cm2":      {"node:node1", "node:node2", "node:node3"},
-		"configmap:ns/cm3":      {"node:node1", "node:node2", "node:node3"},
-		"serviceAccount:ns/sa1": {"node:node1", "node:node2", "node:node3"},
+		"configmap:ns/cm1":      {"node:node1=1", "node:node2=2", "node:node3=2", "node:node4=1"},
+		"configmap:ns/cm2":      {"node:node1=2", "node:node2=1", "node:node3=1"},
+		"configmap:ns/cm3":      {"node:node1=1", "node:node2=1", "node:node3=1"},
+		"serviceAccount:ns/sa1": {"node:node1=1", "node:node2=1", "node:node3=1"},
 	})
 
 	// Remove node->configmap reference
@@ -408,9 +408,9 @@ func TestIndex(t *testing.T) {
 		"serviceAccount:ns/sa1": {"pod:ns/pod2", "pod:ns/pod3", "pod:ns/pod4"},
 	})
 	expectIndex(map[string][]string{
-		"configmap:ns/cm1":      {"node:node1", "node:node2", "node:node3"},
-		"configmap:ns/cm2":      {"node:node1", "node:node2", "node:node3"},
-		"configmap:ns/cm3":      {"node:node1", "node:node2", "node:node3"},
-		"serviceAccount:ns/sa1": {"node:node1", "node:node2", "node:node3"},
+		"configmap:ns/cm1":      {"node:node1=1", "node:node2=2", "node:node3=2"},
+		"configmap:ns/cm2":      {"node:node1=1", "node:node2=1", "node:node3=1"},
+		"configmap:ns/cm3":      {"node:node1=1", "node:node2=1", "node:node3=1"},
+		"serviceAccount:ns/sa1": {"node:node1=1", "node:node2=1", "node:node3=1"},
 	})
 }

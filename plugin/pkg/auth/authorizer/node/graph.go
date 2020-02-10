@@ -259,7 +259,7 @@ func (g *Graph) addEdgeToDestinationIndex_locked(e graph.Edge) {
 	}
 	// fast-add the new edge to an existing index
 	if destinationEdge, ok := e.(*destinationEdge); ok {
-		index.mark(destinationEdge.DestinationID())
+		index.increment(destinationEdge.DestinationID())
 	}
 }
 
@@ -290,19 +290,16 @@ func (g *Graph) recomputeDestinationIndex_locked(n graph.Node) {
 	if index == nil {
 		index = newIntSet()
 	} else {
-		index.startNewGeneration()
+		index.reset()
 	}
 
 	// populate the index
 	g.graph.VisitFrom(n, func(dest graph.Node) bool {
 		if destinationEdge, ok := g.graph.EdgeBetween(n, dest).(*destinationEdge); ok {
-			index.mark(destinationEdge.DestinationID())
+			index.increment(destinationEdge.DestinationID())
 		}
 		return true
 	})
-
-	// remove existing items no longer in the list
-	index.sweep()
 
 	if len(index.members) < g.destinationEdgeThreshold {
 		delete(g.destinationEdgeIndex, n.ID())
