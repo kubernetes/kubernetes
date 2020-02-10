@@ -223,10 +223,10 @@ func (p *csiPlugin) Init(host volume.VolumeHost) error {
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) &&
 		utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) {
-		// This function prevents Kubelet from posting Ready status until CSINodeInfo
+		// This function prevents Kubelet from posting Ready status until CSINode
 		// is both installed and initialized
 		if err := initializeCSINode(host); err != nil {
-			return errors.New(log("failed to initialize CSINodeInfo: %v", err))
+			return errors.New(log("failed to initialize CSINode: %v", err))
 		}
 	}
 
@@ -236,20 +236,26 @@ func (p *csiPlugin) Init(host volume.VolumeHost) error {
 func initializeCSINode(host volume.VolumeHost) error {
 	kvh, ok := host.(volume.KubeletVolumeHost)
 	if !ok {
-		klog.V(4).Info("Cast from VolumeHost to KubeletVolumeHost failed. Skipping CSINodeInfo initialization, not running on kubelet")
+		klog.V(4).Info("Cast from VolumeHost to KubeletVolumeHost failed. Skipping CSINode initialization, not running on kubelet")
 		return nil
 	}
 	kubeClient := host.GetKubeClient()
 	if kubeClient == nil {
-		// Kubelet running in standalone mode. Skip CSINodeInfo initialization
-		klog.Warning("Skipping CSINodeInfo initialization, kubelet running in standalone mode")
+		// Kubelet running in standalone mode. Skip CSINode initialization
+		klog.Warning("Skipping CSINode initialization, kubelet running in standalone mode")
 		return nil
 	}
 
-	kvh.SetKubeletError(errors.New("CSINodeInfo is not yet initialized"))
+	kvh.SetKubeletError(errors.New("CSINode is not yet initialized"))
 
 	go func() {
 		defer utilruntime.HandleCrash()
+
+		// First wait indefinitely to talk to Kube APIServer
+		err := waitForAPIServerForever(kubeClient)
+		if err != nil {
+			klog.Fatalf("Failed to initialize CSINode while waiting for API server to report ok: %v", err)
+		}
 
 		// Backoff parameters tuned to retry over 140 seconds. Will fail and restart the Kubelet
 		// after max retry steps.
@@ -259,12 +265,12 @@ func initializeCSINode(host volume.VolumeHost) error {
 			Factor:   6.0,
 			Jitter:   0.1,
 		}
-		err := wait.ExponentialBackoff(initBackoff, func() (bool, error) {
-			klog.V(4).Infof("Initializing migrated drivers on CSINodeInfo")
+		err = wait.ExponentialBackoff(initBackoff, func() (bool, error) {
+			klog.V(4).Infof("Initializing migrated drivers on CSINode")
 			err := nim.InitializeCSINodeWithAnnotation()
 			if err != nil {
-				kvh.SetKubeletError(fmt.Errorf("Failed to initialize CSINodeInfo: %v", err))
-				klog.Errorf("Failed to initialize CSINodeInfo: %v", err)
+				kvh.SetKubeletError(fmt.Errorf("Failed to initialize CSINode: %v", err))
+				klog.Errorf("Failed to initialize CSINode: %v", err)
 				return false, nil
 			}
 
@@ -278,7 +284,7 @@ func initializeCSINode(host volume.VolumeHost) error {
 			// using CSI for all Migrated volume plugins. Then all the CSINode initialization
 			// code can be dropped from Kubelet.
 			// Kill the Kubelet process and allow it to restart to retry initialization
-			klog.Fatalf("Failed to initialize CSINodeInfo after retrying")
+			klog.Fatalf("Failed to initialize CSINode after retrying: %v", err)
 		}
 	}()
 	return nil
@@ -913,4 +919,24 @@ func highestSupportedVersion(versions []string) (*utilversion.Version, error) {
 		return nil, fmt.Errorf("highest supported version reported by driver is %v, must be v1.x", highestSupportedVersion)
 	}
 	return highestSupportedVersion, nil
+}
+
+// waitForAPIServerForever waits forever to get the APIServer Version as a proxy
+// for a healthy APIServer.
+func waitForAPIServerForever(client clientset.Interface) error {
+	var lastErr error
+	err := wait.PollInfinite(time.Second, func() (bool, error) {
+		_, lastErr = client.Discovery().ServerVersion()
+		if lastErr != nil {
+			lastErr = fmt.Errorf("failed to get apiserver version: %v", lastErr)
+			return false, nil
+		}
+
+		return true, nil
+	})
+	if err != nil {
+		return fmt.Errorf("%v: %v", err, lastErr)
+	}
+
+	return nil
 }
