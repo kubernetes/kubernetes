@@ -532,7 +532,7 @@ type ProxyServer struct {
 	UseEndpointSlices      bool
 	OOMScoreAdj            *int32
 	ConfigSyncPeriod       time.Duration
-	HealthzServer          *healthcheck.ProxierHealthServer
+	HealthzServer          healthcheck.ProxierHealthUpdater
 }
 
 // createClients creates a kube client and an event client from the given config and masterOverride.
