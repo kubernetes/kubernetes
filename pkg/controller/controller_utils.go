@@ -202,7 +202,7 @@ func (r *ControllerExpectations) SatisfiedExpectations(controllerKey string) boo
 		//	- In this case it continues without setting expectations till it needs to create/delete controllees.
 		klog.V(4).Infof("Controller %v either never recorded expectations, or the ttl expired.", controllerKey)
 	}
-	// Trigger a sync if we either encountered and error (which shouldn't happen since we're
+	// Trigger a sync if we either encountered an error (which shouldn't happen since we're
 	// getting from local store) or this controller hasn't established expectations.
 	return true
 }
