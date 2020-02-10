@@ -17,6 +17,7 @@ limitations under the License.
 package leaderelection
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"sync"
@@ -296,7 +297,7 @@ func testTryAcquireOrRenew(t *testing.T, objectType string) {
 				observedTime:      test.observedTime,
 				clock:             clock.RealClock{},
 			}
-			if test.expectSuccess != le.tryAcquireOrRenew() {
+			if test.expectSuccess != le.tryAcquireOrRenew(context.Background()) {
 				t.Errorf("unexpected result of tryAcquireOrRenew: [succeeded=%v]", !test.expectSuccess)
 			}
 
@@ -879,7 +880,7 @@ func testTryAcquireOrRenewMultiLock(t *testing.T, objectType string) {
 				observedTime:      test.observedTime,
 				clock:             clock.RealClock{},
 			}
-			if test.expectSuccess != le.tryAcquireOrRenew() {
+			if test.expectSuccess != le.tryAcquireOrRenew(context.Background()) {
 				t.Errorf("unexpected result of tryAcquireOrRenew: [succeeded=%v]", !test.expectSuccess)
 			}
 
