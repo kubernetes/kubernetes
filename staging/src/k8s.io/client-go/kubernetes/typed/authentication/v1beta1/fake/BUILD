@@ -11,7 +11,6 @@ go_library(
         "doc.go",
         "fake_authentication_client.go",
         "fake_tokenreview.go",
-        "fake_tokenreview_expansion.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/kubernetes/typed/authentication/v1beta1/fake",
     importpath = "k8s.io/client-go/kubernetes/typed/authentication/v1beta1/fake",
