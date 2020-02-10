@@ -626,7 +626,7 @@ func runTopologyManagerNodeAlignmentSuiteTests(f *framework.Framework, configMap
 		framework.Logf("Node status: %v", node.Status.Capacity)
 		sriovResourceName, sriovResourceAmount = findSRIOVResource(node)
 		return sriovResourceAmount > 0
-	}, 5*time.Minute, framework.Poll).Should(gomega.BeTrue())
+	}, 2*time.Minute, framework.Poll).Should(gomega.BeTrue())
 	framework.Logf("Successfully created device plugin pod, detected %d SRIOV device %q", sriovResourceAmount, sriovResourceName)
 
 	threadsPerCore := 1
