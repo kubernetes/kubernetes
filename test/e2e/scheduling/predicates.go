@@ -67,6 +67,7 @@ type pausePodConfig struct {
 	OwnerReferences                   []metav1.OwnerReference
 	PriorityClassName                 string
 	DeletionGracePeriodSeconds        *int64
+	TopologySpreadConstraints         []v1.TopologySpreadConstraint
 }
 
 var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
@@ -604,6 +605,84 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		ginkgo.By(fmt.Sprintf("Trying to create another pod(pod5) with hostport %v but hostIP 127.0.0.1 on the node which pod4 resides and expect not scheduled", port))
 		createHostPortPodOnNode(f, "pod5", ns, "127.0.0.1", port, v1.ProtocolTCP, nodeSelector, false)
 	})
+
+	ginkgo.Context("PodTopologySpread Filtering", func() {
+		var nodeNames []string
+		topologyKey := "kubernetes.io/e2e-pts-filter"
+
+		ginkgo.BeforeEach(func() {
+			ginkgo.By("Trying to get 2 available nodes which can run pod")
+			nodeNames = Get2NodesThatCanRunPod(f)
+			ginkgo.By(fmt.Sprintf("Apply dedicated topologyKey %v for this test on the 2 nodes.", topologyKey))
+			for _, nodeName := range nodeNames {
+				framework.AddOrUpdateLabelOnNode(cs, nodeName, topologyKey, nodeName)
+			}
+		})
+		ginkgo.AfterEach(func() {
+			for _, nodeName := range nodeNames {
+				framework.RemoveLabelOffNode(cs, nodeName, topologyKey)
+			}
+		})
+
+		ginkgo.It("validates 4 pods with MaxSkew=1 are evenly distributed into 2 nodes", func() {
+			podLabel := "e2e-pts-filter"
+			replicas := 4
+			rsConfig := pauseRSConfig{
+				Replicas: int32(replicas),
+				PodConfig: pausePodConfig{
+					Name:      podLabel,
+					Namespace: ns,
+					Labels:    map[string]string{podLabel: ""},
+					Affinity: &v1.Affinity{
+						NodeAffinity: &v1.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+								NodeSelectorTerms: []v1.NodeSelectorTerm{
+									{
+										MatchExpressions: []v1.NodeSelectorRequirement{
+											{
+												Key:      topologyKey,
+												Operator: v1.NodeSelectorOpIn,
+												Values:   nodeNames,
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+					TopologySpreadConstraints: []v1.TopologySpreadConstraint{
+						{
+							MaxSkew:           1,
+							TopologyKey:       topologyKey,
+							WhenUnsatisfiable: v1.DoNotSchedule,
+							LabelSelector: &metav1.LabelSelector{
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{
+										Key:      podLabel,
+										Operator: metav1.LabelSelectorOpExists,
+									},
+								},
+							},
+						},
+					},
+				},
+			}
+			runPauseRS(f, rsConfig)
+			podList, err := cs.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{})
+			framework.ExpectNoError(err)
+			numInNode1, numInNode2 := 0, 0
+			for _, pod := range podList.Items {
+				if pod.Spec.NodeName == nodeNames[0] {
+					numInNode1++
+				} else if pod.Spec.NodeName == nodeNames[1] {
+					numInNode2++
+				}
+			}
+			expected := replicas / len(nodeNames)
+			framework.ExpectEqual(numInNode1, expected, fmt.Sprintf("Pods are not distributed as expected on node %q", nodeNames[0]))
+			framework.ExpectEqual(numInNode2, expected, fmt.Sprintf("Pods are not distributed as expected on node %q", nodeNames[1]))
+		})
+	})
 })
 
 // printAllKubeletPods outputs status of all kubelet pods into log.
@@ -633,8 +712,9 @@ func initPausePod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
 			OwnerReferences: conf.OwnerReferences,
 		},
 		Spec: v1.PodSpec{
-			NodeSelector: conf.NodeSelector,
-			Affinity:     conf.Affinity,
+			NodeSelector:              conf.NodeSelector,
+			Affinity:                  conf.Affinity,
+			TopologySpreadConstraints: conf.TopologySpreadConstraints,
 			Containers: []v1.Container{
 				{
 					Name:  conf.Name,
@@ -669,7 +749,7 @@ func createPausePod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
 
 func runPausePod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
 	pod := createPausePod(f, conf)
-	framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(f.ClientSet, pod))
+	framework.ExpectNoError(e2epod.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace, framework.PollShortTimeout))
 	pod, err := f.ClientSet.CoreV1().Pods(pod.Namespace).Get(context.TODO(), conf.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err)
 	return pod
@@ -748,6 +828,30 @@ func verifyResult(c clientset.Interface, expectedScheduled int, expectedNotSched
 func GetNodeThatCanRunPod(f *framework.Framework) string {
 	ginkgo.By("Trying to launch a pod without a label to get a node which can launch it.")
 	return runPodAndGetNodeName(f, pausePodConfig{Name: "without-label"})
+}
+
+// Get2NodesThatCanRunPod return a 2-node slice where can run pod.
+func Get2NodesThatCanRunPod(f *framework.Framework) []string {
+	firstNode := GetNodeThatCanRunPod(f)
+	ginkgo.By("Trying to launch a pod without a label to get a node which can launch it.")
+	pod := pausePodConfig{
+		Name: "without-label",
+		Affinity: &v1.Affinity{
+			NodeAffinity: &v1.NodeAffinity{
+				RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+					NodeSelectorTerms: []v1.NodeSelectorTerm{
+						{
+							MatchFields: []v1.NodeSelectorRequirement{
+								{Key: "metadata.name", Operator: v1.NodeSelectorOpNotIn, Values: []string{firstNode}},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	secondNode := runPodAndGetNodeName(f, pod)
+	return []string{firstNode, secondNode}
 }
 
 func getNodeThatCanRunPodWithoutToleration(f *framework.Framework) string {

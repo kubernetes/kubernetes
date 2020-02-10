@@ -1423,6 +1423,7 @@ func TestAlgorithmProviderCompatibility(t *testing.T) {
 			{Name: "NodeResourcesFit"},
 			{Name: "NodePorts"},
 			{Name: "InterPodAffinity"},
+			{Name: "PodTopologySpread"},
 		},
 		"FilterPlugin": {
 			{Name: "NodeUnschedulable"},
@@ -1439,11 +1440,13 @@ func TestAlgorithmProviderCompatibility(t *testing.T) {
 			{Name: "VolumeBinding"},
 			{Name: "VolumeZone"},
 			{Name: "InterPodAffinity"},
+			{Name: "PodTopologySpread"},
 		},
 		"PreScorePlugin": {
 			{Name: "InterPodAffinity"},
 			{Name: "DefaultPodTopologySpread"},
 			{Name: "TaintToleration"},
+			{Name: "PodTopologySpread"},
 		},
 		"ScorePlugin": {
 			{Name: "NodeResourcesBalancedAllocation", Weight: 1},
@@ -1454,6 +1457,7 @@ func TestAlgorithmProviderCompatibility(t *testing.T) {
 			{Name: "NodePreferAvoidPods", Weight: 10000},
 			{Name: "DefaultPodTopologySpread", Weight: 1},
 			{Name: "TaintToleration", Weight: 1},
+			{Name: "PodTopologySpread", Weight: 1},
 		},
 		"BindPlugin": {{Name: "DefaultBinder"}},
 	}
@@ -1483,6 +1487,7 @@ func TestAlgorithmProviderCompatibility(t *testing.T) {
 					{Name: "NodeResourcesFit"},
 					{Name: "NodePorts"},
 					{Name: "InterPodAffinity"},
+					{Name: "PodTopologySpread"},
 				},
 				"FilterPlugin": {
 					{Name: "NodeUnschedulable"},
@@ -1499,11 +1504,13 @@ func TestAlgorithmProviderCompatibility(t *testing.T) {
 					{Name: "VolumeBinding"},
 					{Name: "VolumeZone"},
 					{Name: "InterPodAffinity"},
+					{Name: "PodTopologySpread"},
 				},
 				"PreScorePlugin": {
 					{Name: "InterPodAffinity"},
 					{Name: "DefaultPodTopologySpread"},
 					{Name: "TaintToleration"},
+					{Name: "PodTopologySpread"},
 				},
 				"ScorePlugin": {
 					{Name: "NodeResourcesBalancedAllocation", Weight: 1},
@@ -1514,6 +1521,7 @@ func TestAlgorithmProviderCompatibility(t *testing.T) {
 					{Name: "NodePreferAvoidPods", Weight: 10000},
 					{Name: "DefaultPodTopologySpread", Weight: 1},
 					{Name: "TaintToleration", Weight: 1},
+					{Name: "PodTopologySpread", Weight: 1},
 				},
 				"BindPlugin": {{Name: "DefaultBinder"}},
 			},

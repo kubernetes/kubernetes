@@ -56,6 +56,7 @@ func TestClusterAutoscalerProvider(t *testing.T) {
 				{Name: noderesources.FitName},
 				{Name: nodeports.Name},
 				{Name: interpodaffinity.Name},
+				{Name: podtopologyspread.Name},
 			},
 		},
 		Filter: &schedulerapi.PluginSet{
@@ -74,6 +75,7 @@ func TestClusterAutoscalerProvider(t *testing.T) {
 				{Name: volumebinding.Name},
 				{Name: volumezone.Name},
 				{Name: interpodaffinity.Name},
+				{Name: podtopologyspread.Name},
 			},
 		},
 		PreScore: &schedulerapi.PluginSet{
@@ -81,6 +83,7 @@ func TestClusterAutoscalerProvider(t *testing.T) {
 				{Name: interpodaffinity.Name},
 				{Name: defaultpodtopologyspread.Name},
 				{Name: tainttoleration.Name},
+				{Name: podtopologyspread.Name},
 			},
 		},
 		Score: &schedulerapi.PluginSet{
@@ -93,6 +96,7 @@ func TestClusterAutoscalerProvider(t *testing.T) {
 				{Name: nodepreferavoidpods.Name, Weight: 10000},
 				{Name: defaultpodtopologyspread.Name, Weight: 1},
 				{Name: tainttoleration.Name, Weight: 1},
+				{Name: podtopologyspread.Name, Weight: 1},
 			},
 		},
 		Bind: &schedulerapi.PluginSet{

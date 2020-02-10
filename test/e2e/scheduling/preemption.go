@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
@@ -270,6 +271,150 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 		}
 
 		framework.ExpectEqual(podPreempted, true)
+	})
+
+	ginkgo.Context("PodTopologySpread Preemption", func() {
+		var nodeNames []string
+		var nodes []*v1.Node
+		topologyKey := "kubernetes.io/e2e-pts-preemption"
+		var fakeRes v1.ResourceName = "example.com/fakePTSRes"
+
+		ginkgo.BeforeEach(func() {
+			ginkgo.By("Trying to get 2 available nodes which can run pod")
+			nodeNames = Get2NodesThatCanRunPod(f)
+			ginkgo.By(fmt.Sprintf("Apply dedicated topologyKey %v for this test on the 2 nodes.", topologyKey))
+			for _, nodeName := range nodeNames {
+				framework.AddOrUpdateLabelOnNode(cs, nodeName, topologyKey, nodeName)
+
+				node, err := cs.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+				framework.ExpectNoError(err)
+				// update Node API object with a fake resource
+				nodeCopy := node.DeepCopy()
+				// force it to update
+				nodeCopy.ResourceVersion = "0"
+				ginkgo.By(fmt.Sprintf("Apply 10 fake resource to node %v.", node.Name))
+				nodeCopy.Status.Capacity[fakeRes] = resource.MustParse("10")
+				node, err = cs.CoreV1().Nodes().UpdateStatus(context.TODO(), nodeCopy, metav1.UpdateOptions{})
+				framework.ExpectNoError(err)
+				nodes = append(nodes, node)
+			}
+		})
+		ginkgo.AfterEach(func() {
+			for _, nodeName := range nodeNames {
+				framework.RemoveLabelOffNode(cs, nodeName, topologyKey)
+			}
+			for _, node := range nodes {
+				nodeCopy := node.DeepCopy()
+				// force it to update
+				nodeCopy.ResourceVersion = "0"
+				delete(nodeCopy.Status.Capacity, fakeRes)
+				_, err := cs.CoreV1().Nodes().UpdateStatus(context.TODO(), nodeCopy, metav1.UpdateOptions{})
+				framework.ExpectNoError(err)
+			}
+		})
+
+		ginkgo.It("validates proper pods are preempted", func() {
+			podLabel := "e2e-pts-preemption"
+			nodeAffinity := &v1.Affinity{
+				NodeAffinity: &v1.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+						NodeSelectorTerms: []v1.NodeSelectorTerm{
+							{
+								MatchExpressions: []v1.NodeSelectorRequirement{
+									{
+										Key:      topologyKey,
+										Operator: v1.NodeSelectorOpIn,
+										Values:   nodeNames,
+									},
+								},
+							},
+						},
+					},
+				},
+			}
+			highPodCfg := pausePodConfig{
+				Name:              "high",
+				Namespace:         ns,
+				Labels:            map[string]string{podLabel: ""},
+				PriorityClassName: highPriorityClassName,
+				Affinity:          nodeAffinity,
+				Resources: &v1.ResourceRequirements{
+					Requests: v1.ResourceList{fakeRes: resource.MustParse("9")},
+					Limits:   v1.ResourceList{fakeRes: resource.MustParse("9")},
+				},
+			}
+			lowPodCfg := pausePodConfig{
+				Namespace:         ns,
+				Labels:            map[string]string{podLabel: ""},
+				PriorityClassName: lowPriorityClassName,
+				Affinity:          nodeAffinity,
+				Resources: &v1.ResourceRequirements{
+					Requests: v1.ResourceList{fakeRes: resource.MustParse("3")},
+					Limits:   v1.ResourceList{fakeRes: resource.MustParse("3")},
+				},
+			}
+
+			ginkgo.By("Create 1 High Pod and 3 Low Pods to occupy 9/10 of fake resources on both nodes.")
+			// Prepare 1 High Pod and 3 Low Pods
+			runPausePod(f, highPodCfg)
+			for i := 1; i <= 3; i++ {
+				lowPodCfg.Name = fmt.Sprintf("low-%v", i)
+				runPausePod(f, lowPodCfg)
+			}
+
+			ginkgo.By("Create 1 Medium Pod with TopologySpreadConstraints")
+			mediumPodCfg := pausePodConfig{
+				Name:              "medium",
+				Namespace:         ns,
+				Labels:            map[string]string{podLabel: ""},
+				PriorityClassName: mediumPriorityClassName,
+				Affinity:          nodeAffinity,
+				Resources: &v1.ResourceRequirements{
+					Requests: v1.ResourceList{fakeRes: resource.MustParse("3")},
+					Limits:   v1.ResourceList{fakeRes: resource.MustParse("3")},
+				},
+				TopologySpreadConstraints: []v1.TopologySpreadConstraint{
+					{
+						MaxSkew:           1,
+						TopologyKey:       topologyKey,
+						WhenUnsatisfiable: v1.DoNotSchedule,
+						LabelSelector: &metav1.LabelSelector{
+							MatchExpressions: []metav1.LabelSelectorRequirement{
+								{
+									Key:      podLabel,
+									Operator: metav1.LabelSelectorOpExists,
+								},
+							},
+						},
+					},
+				},
+			}
+			// To fulfil resource.requests, the medium Pod only needs to preempt one low pod.
+			// However, in that case, the Pods spread becomes [<high>, <medium, low, low>], which doesn't
+			// satisfy the pod topology spread constraints. Hence it needs to preempt another low pod
+			// to make the Pods spread like [<high>, <medium, low>].
+			runPausePod(f, mediumPodCfg)
+			e2epod.WaitForPodNotPending(cs, ns, mediumPodCfg.Name)
+
+			ginkgo.By("Verify there are 3 Pods left in this namespace")
+			wantPods := sets.NewString("high", "medium", "low")
+
+			podList, err := cs.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{})
+			pods := podList.Items
+			framework.ExpectNoError(err)
+			framework.ExpectEqual(len(pods), 3)
+
+			for _, pod := range pods {
+				// Remove the ordinal index for low pod.
+				podName := strings.Split(pod.Name, "-")[0]
+				if wantPods.Has(podName) {
+					ginkgo.By(fmt.Sprintf("Pod %q is as expected to be running.", pod.Name))
+					wantPods.Delete(podName)
+				} else {
+					framework.Failf("Pod %q conflicted with expected PodSet %v", podName, wantPods)
+				}
+			}
+		})
 	})
 })
 
