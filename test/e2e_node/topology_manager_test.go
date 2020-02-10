@@ -598,7 +598,7 @@ func getSRIOVDevicePluginConfigMap(cmFile string) *v1.ConfigMap {
 	return readConfigMapV1OrDie(cmData)
 }
 
-func runTopologyManagerNodeAlignmentSuiteTests(f *framework.Framework, configMap *v1.ConfigMap, reservedSystemCPUs string, numaNodes, coreCount int) {
+func setupSRIOVConfigOrFail(f *framework.Framework, configMap *v1.ConfigMap) (*v1.Pod, string, int64) {
 	var err error
 
 	ginkgo.By(fmt.Sprintf("Creating configMap %v/%v", metav1.NamespaceSystem, configMap.Name))
@@ -632,10 +632,24 @@ func runTopologyManagerNodeAlignmentSuiteTests(f *framework.Framework, configMap
 	}, 2*time.Minute, framework.Poll).Should(gomega.BeTrue())
 	framework.Logf("Successfully created device plugin pod, detected %d SRIOV device %q", sriovResourceAmount, sriovResourceName)
 
+	return dpPod, sriovResourceName, sriovResourceAmount
+}
+
+func teardownSRIOVConfigOrFail(f *framework.Framework, dpPod *v1.Pod) {
+	framework.Logf("deleting the SRIOV device plugin pod %s/%s and waiting for container %s removal",
+		dpPod.Namespace, dpPod.Name, dpPod.Spec.Containers[0].Name)
+	deletePodInNamespace(f, dpPod.Namespace, dpPod.Name)
+	waitForContainerRemoval(dpPod.Spec.Containers[0].Name, dpPod.Name, dpPod.Namespace)
+}
+
+func runTopologyManagerNodeAlignmentSuiteTests(f *framework.Framework, configMap *v1.ConfigMap, reservedSystemCPUs string, numaNodes, coreCount int) {
 	threadsPerCore := 1
 	if isHTEnabled() {
 		threadsPerCore = 2
 	}
+
+	dpPod, sriovResourceName, sriovResourceAmount := setupSRIOVConfigOrFail(f, configMap)
+
 	// could have been a loop, we unroll it to explain the testcases
 
 	// simplest case
@@ -670,10 +684,7 @@ func runTopologyManagerNodeAlignmentSuiteTests(f *framework.Framework, configMap
 	ginkgo.By(fmt.Sprintf("Trying to admit a guaranteed pods, with %d cores, 1 %s device - and it should be rejected", numCores, sriovResourceName))
 	runTopologyManagerNegativeTest(f, numaNodes, 1, fmt.Sprintf("%dm", numCores*1000), sriovResourceName, "1")
 
-	framework.Logf("deleting the SRIOV device plugin pod %s/%s and waiting for container %s removal",
-		dpPod.Namespace, dpPod.Name, dpPod.Spec.Containers[0].Name)
-	deletePodInNamespace(f, dpPod.Namespace, dpPod.Name)
-	waitForContainerRemoval(dpPod.Spec.Containers[0].Name, dpPod.Name, dpPod.Namespace)
+	teardownSRIOVConfigOrFail(f, dpPod)
 }
 
 func runTopologyManagerTests(f *framework.Framework) {
