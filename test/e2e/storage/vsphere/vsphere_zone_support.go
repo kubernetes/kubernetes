@@ -85,7 +85,7 @@ import (
 	5. Tests to verify dynamic pv creation using availability zones work across different datacenters in the same VC.
 */
 
-var _ = utils.SIGDescribe("Zone Support", func() {
+var _ = utils.SIGDescribe("Zone Support [Feature:vsphere]", func() {
 	f := framework.NewDefaultFramework("zone-support")
 	var (
 		client          clientset.Interface
