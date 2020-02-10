@@ -202,11 +202,9 @@ type WaitingPod interface {
 	// Allow declares the waiting pod is allowed to be scheduled by plugin pluginName.
 	// If this is the last remaining plugin to allow, then a success signal is delivered
 	// to unblock the pod.
-	// Returns true if the allow signal was successfully dealt with, false otherwise.
-	Allow(pluginName string) bool
-	// Reject declares the waiting pod unschedulable. Returns true if the reject signal
-	// was successfully delivered, false otherwise.
-	Reject(msg string) bool
+	Allow(pluginName string)
+	// Reject declares the waiting pod unschedulable.
+	Reject(msg string)
 }
 
 // Plugin is the parent type for all the scheduling framework plugins.
