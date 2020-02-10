@@ -1,12 +1,9 @@
 /*
 Copyright 2014 The Kubernetes Authors.
-
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
-
     http://www.apache.org/licenses/LICENSE-2.0
-
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -62,7 +59,6 @@ type PatchOptions struct {
 	enforceNamespace             bool
 	dryRun                       bool
 	outputFormat                 string
-	resourceVersion              string
 	args                         []string
 	builder                      *resource.Builder
 	unstructuredClientForMapping func(mapping *meta.RESTMapping) (resource.RESTClient, error)
@@ -73,28 +69,17 @@ type PatchOptions struct {
 var (
 	patchLong = templates.LongDesc(i18n.T(`
 		Update field(s) of a resource using strategic merge patch, a JSON merge patch, or a JSON patch.
-
-		JSON and YAML formats are accepted.
-
-		If --resource-version is specified and does not match the current resource version on
-		the server the command will fail.`))
+		JSON and YAML formats are accepted.`))
 
 	patchExample = templates.Examples(i18n.T(`
 		# Partially update a node using a strategic merge patch. Specify the patch as JSON.
 		kubectl patch node k8s-node-1 -p '{"spec":{"unschedulable":true}}'
-
 		# Partially update a node using a strategic merge patch. Specify the patch as YAML.
 		kubectl patch node k8s-node-1 -p $'spec:\n unschedulable: true'
-
 		# Partially update a node identified by the type and name specified in "node.json" using strategic merge patch.
 		kubectl patch -f node.json -p '{"spec":{"unschedulable":true}}'
-
-		# Partially update a node identified by the type and name specified in "node.json" using strategic merge patch only when the resource version is equal to 1.
-		kubectl patch -f node.json -p '{"spec":{"unschedulable":true}} --resource-version=1'
-
 		# Update a container's image; spec.containers[*].name is required because it's a merge key.
 		kubectl patch pod valid-pod -p '{"spec":{"containers":[{"name":"kubernetes-serve-hostname","image":"new image"}]}}'
-
 		# Update a container's image using a json patch with positional arrays.
 		kubectl patch pod valid-pod --type='json' -p='[{"op": "replace", "path": "/spec/containers/0/image", "value":"new image"}]'`))
 )
@@ -133,7 +118,6 @@ func NewCmdPatch(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobr
 	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, "identifying the resource to update")
 	cmd.Flags().BoolVar(&o.Local, "local", o.Local, "If true, patch will operate on the content of the file, not the server-side resource.")
-	cmd.Flags().StringVar(&o.resourceVersion, "resource-version", o.resourceVersion, i18n.T("If non-empty, the patch will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource."))
 
 	return cmd
 }
@@ -210,17 +194,6 @@ func (o *PatchOptions) RunPatch() error {
 		return err
 	}
 
-	var singleItemImpliedResource bool
-	r.IntoSingleItemImplied(&singleItemImpliedResource)
-
-	// only apply resource version locking on a single resource.
-	// we must perform this check after o.builder.Do() as
-	// []o.resources can not accurately return the proper number
-	// of resources when they are not passed in "resource/name" format.
-	if !singleItemImpliedResource && len(o.resourceVersion) > 0 {
-		return fmt.Errorf("--resource-version may only be used with a single resource")
-	}
-
 	count := 0
 	err = r.Visit(func(info *resource.Info, err error) error {
 		if err != nil {
@@ -228,15 +201,6 @@ func (o *PatchOptions) RunPatch() error {
 		}
 		count++
 		name, namespace := info.Name, info.Namespace
-
-		if len(o.resourceVersion) != 0 {
-			// ensure resourceVersion is always sent in the patch by clearing it from the starting JSON
-			accessor, err := meta.Accessor(info.Object)
-			if err != nil {
-				return err
-			}
-			accessor.SetResourceVersion("")
-		}
 
 		if !o.Local && !o.dryRun {
 			mapping := info.ResourceMapping()
