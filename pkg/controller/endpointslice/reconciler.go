@@ -205,7 +205,7 @@ func (r *reconciler) finalize(
 
 	for _, endpointSlice := range slicesToCreate {
 		addTriggerTimeAnnotation(endpointSlice, triggerTime)
-		_, err := r.client.DiscoveryV1beta1().EndpointSlices(service.Namespace).Create(endpointSlice)
+		createdSlice, err := r.client.DiscoveryV1beta1().EndpointSlices(service.Namespace).Create(endpointSlice)
 		if err != nil {
 			// If the namespace is terminating, creates will continue to fail. Simply drop the item.
 			if errors.HasStatusCause(err, corev1.NamespaceTerminatingCause) {
@@ -213,18 +213,18 @@ func (r *reconciler) finalize(
 			}
 			errs = append(errs, fmt.Errorf("Error creating EndpointSlice for Service %s/%s: %v", service.Namespace, service.Name, err))
 		} else {
-			r.endpointSliceTracker.Update(endpointSlice)
+			r.endpointSliceTracker.Update(createdSlice)
 			metrics.EndpointSliceChanges.WithLabelValues("create").Inc()
 		}
 	}
 
 	for _, endpointSlice := range slicesToUpdate {
 		addTriggerTimeAnnotation(endpointSlice, triggerTime)
-		_, err := r.client.DiscoveryV1beta1().EndpointSlices(service.Namespace).Update(endpointSlice)
+		updatedSlice, err := r.client.DiscoveryV1beta1().EndpointSlices(service.Namespace).Update(endpointSlice)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("Error updating %s EndpointSlice for Service %s/%s: %v", endpointSlice.Name, service.Namespace, service.Name, err))
 		} else {
-			r.endpointSliceTracker.Update(endpointSlice)
+			r.endpointSliceTracker.Update(updatedSlice)
 			metrics.EndpointSliceChanges.WithLabelValues("update").Inc()
 		}
 	}
