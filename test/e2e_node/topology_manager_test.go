@@ -46,8 +46,7 @@ import (
 )
 
 const (
-	numalignCmd   = `export CPULIST_ALLOWED=$( awk -F":\t*" '/Cpus_allowed_list/ { print $2 }' /proc/self/status); env; sleep 1d`
-	topologyError = "Topology Affinity Error" // XXX do we have a proper constant?
+	numalignCmd = `export CPULIST_ALLOWED=$( awk -F":\t*" '/Cpus_allowed_list/ { print $2 }' /proc/self/status); env; sleep 1d`
 )
 
 // Helper for makeTopologyManagerPod().
@@ -570,11 +569,16 @@ func runTopologyManagerNegativeTest(f *framework.Framework, numaNodes, numPods i
 	if pod.Status.Phase != v1.PodFailed {
 		framework.Failf("pod %s not failed: %v", pod.Name, pod.Status)
 	}
-	if pod.Status.Reason != topologyError {
-		framework.Failf("pod %s failed for wrong reason: %v", pod.Name, pod.Status)
+	if !isTopologyAffinityError(pod) {
+		framework.Failf("pod %s failed for wrong reason: %q", pod.Name, pod.Status.Reason)
 	}
 
 	deletePods(f, []string{pod.Name})
+}
+
+func isTopologyAffinityError(pod *v1.Pod) bool {
+	re := regexp.MustCompile(`Topology.*Affinity.*Error`)
+	return re.MatchString(pod.Status.Reason)
 }
 
 func getSRIOVDevicePluginConfigMap(cmFile string) *v1.ConfigMap {
