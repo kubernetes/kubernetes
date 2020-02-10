@@ -348,20 +348,22 @@ func TestIndex(t *testing.T) {
 	g.SetNodeConfigMap("node1", "cm1", "ns")
 	g.SetNodeConfigMap("node2", "cm1", "ns")
 	g.SetNodeConfigMap("node3", "cm1", "ns")
+	g.SetNodeConfigMap("node4", "cm1", "ns")
 	expectGraph(map[string][]string{
 		"node:node1":            {},
 		"node:node2":            {},
 		"node:node3":            {},
+		"node:node4":            {},
 		"pod:ns/pod2":           {"node:node2"},
 		"pod:ns/pod3":           {"node:node3"},
 		"pod:ns/pod4":           {"node:node1"},
-		"configmap:ns/cm1":      {"node:node1", "node:node2", "node:node3", "pod:ns/pod2", "pod:ns/pod3", "pod:ns/pod4"},
+		"configmap:ns/cm1":      {"node:node1", "node:node2", "node:node3", "node:node4", "pod:ns/pod2", "pod:ns/pod3", "pod:ns/pod4"},
 		"configmap:ns/cm2":      {"pod:ns/pod2", "pod:ns/pod3", "pod:ns/pod4"},
 		"configmap:ns/cm3":      {"pod:ns/pod2", "pod:ns/pod3", "pod:ns/pod4"},
 		"serviceAccount:ns/sa1": {"pod:ns/pod2", "pod:ns/pod3", "pod:ns/pod4"},
 	})
 	expectIndex(map[string][]string{
-		"configmap:ns/cm1":      {"node:node1", "node:node2", "node:node3"},
+		"configmap:ns/cm1":      {"node:node1", "node:node2", "node:node3", "node:node4"},
 		"configmap:ns/cm2":      {"node:node1", "node:node2", "node:node3"},
 		"configmap:ns/cm3":      {"node:node1", "node:node2", "node:node3"},
 		"serviceAccount:ns/sa1": {"node:node1", "node:node2", "node:node3"},
@@ -373,16 +375,17 @@ func TestIndex(t *testing.T) {
 		"node:node1":            {},
 		"node:node2":            {},
 		"node:node3":            {},
+		"node:node4":            {},
 		"pod:ns/pod2":           {"node:node2"},
 		"pod:ns/pod3":           {"node:node3"},
 		"pod:ns/pod4":           {"node:node1"},
-		"configmap:ns/cm1":      {"node:node2", "node:node3", "pod:ns/pod2", "pod:ns/pod3", "pod:ns/pod4"},
+		"configmap:ns/cm1":      {"node:node2", "node:node3", "node:node4", "pod:ns/pod2", "pod:ns/pod3", "pod:ns/pod4"},
 		"configmap:ns/cm2":      {"node:node1", "pod:ns/pod2", "pod:ns/pod3", "pod:ns/pod4"},
 		"configmap:ns/cm3":      {"pod:ns/pod2", "pod:ns/pod3", "pod:ns/pod4"},
 		"serviceAccount:ns/sa1": {"pod:ns/pod2", "pod:ns/pod3", "pod:ns/pod4"},
 	})
 	expectIndex(map[string][]string{
-		"configmap:ns/cm1":      {"node:node1", "node:node2", "node:node3"},
+		"configmap:ns/cm1":      {"node:node1", "node:node2", "node:node3", "node:node4"},
 		"configmap:ns/cm2":      {"node:node1", "node:node2", "node:node3"},
 		"configmap:ns/cm3":      {"node:node1", "node:node2", "node:node3"},
 		"serviceAccount:ns/sa1": {"node:node1", "node:node2", "node:node3"},
@@ -390,10 +393,12 @@ func TestIndex(t *testing.T) {
 
 	// Remove node->configmap reference
 	g.SetNodeConfigMap("node1", "", "")
+	g.SetNodeConfigMap("node4", "", "")
 	expectGraph(map[string][]string{
 		"node:node1":            {},
 		"node:node2":            {},
 		"node:node3":            {},
+		"node:node4":            {},
 		"pod:ns/pod2":           {"node:node2"},
 		"pod:ns/pod3":           {"node:node3"},
 		"pod:ns/pod4":           {"node:node1"},

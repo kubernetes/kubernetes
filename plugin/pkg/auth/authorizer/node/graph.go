@@ -451,7 +451,9 @@ func (g *Graph) SetNodeConfigMap(nodeName, configMapName, configMapNamespace str
 	if len(configMapName) > 0 && len(configMapNamespace) > 0 {
 		configmapVertex := g.getOrCreateVertex_locked(configMapVertexType, configMapNamespace, configMapName)
 		nodeVertex := g.getOrCreateVertex_locked(nodeVertexType, "", nodeName)
-		g.graph.SetEdge(newDestinationEdge(configmapVertex, nodeVertex, nodeVertex))
+		e := newDestinationEdge(configmapVertex, nodeVertex, nodeVertex)
+		g.graph.SetEdge(e)
+		g.addEdgeToDestinationIndex_locked(e)
 	}
 
 }
