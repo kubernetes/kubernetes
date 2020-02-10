@@ -24,7 +24,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/klog"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
@@ -130,10 +129,8 @@ func (f *Fit) PreFilterExtensions() framework.PreFilterExtensions {
 func getPreFilterState(cycleState *framework.CycleState) (*preFilterState, error) {
 	c, err := cycleState.Read(preFilterStateKey)
 	if err != nil {
-		// The preFilterState doesn't exist. We ignore the error for now since
-		// Filter is able to handle that by computing it again.
-		klog.V(5).Infof("Error reading %q from cycleState: %v", preFilterStateKey, err)
-		return nil, nil
+		// The preFilterState doesn't exist.
+		return nil, fmt.Errorf("error reading %q from cycleState: %v", preFilterStateKey, err)
 	}
 
 	s, ok := c.(*preFilterState)
@@ -152,12 +149,7 @@ func (f *Fit) Filter(ctx context.Context, cycleState *framework.CycleState, pod 
 		return framework.NewStatus(framework.Error, err.Error())
 	}
 
-	var insufficientResources []InsufficientResource
-	if s != nil {
-		insufficientResources = fitsRequest(s, nodeInfo, f.ignoredResources)
-	} else {
-		insufficientResources = Fits(pod, nodeInfo, f.ignoredResources)
-	}
+	insufficientResources := fitsRequest(s, nodeInfo, f.ignoredResources)
 
 	if len(insufficientResources) != 0 {
 		// We will keep all failure reasons.

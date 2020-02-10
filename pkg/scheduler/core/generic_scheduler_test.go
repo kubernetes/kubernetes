@@ -1339,7 +1339,7 @@ func TestSelectNodesForPreemption(t *testing.T) {
 			name: "a pod that fits on both machines when lower priority pods are preempted",
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterFilterPlugin(noderesources.FitName, noderesources.NewFit),
+				st.RegisterPluginAsExtensions(noderesources.FitName, 1, noderesources.NewFit, "Filter", "PreFilter"),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
 			nodes: []string{"machine1", "machine2"},
@@ -1354,7 +1354,7 @@ func TestSelectNodesForPreemption(t *testing.T) {
 			name: "a pod that would fit on the machines, but other pods running are higher priority",
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterFilterPlugin(noderesources.FitName, noderesources.NewFit),
+				st.RegisterPluginAsExtensions(noderesources.FitName, 1, noderesources.NewFit, "Filter", "PreFilter"),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
 			nodes: []string{"machine1", "machine2"},
@@ -1369,7 +1369,7 @@ func TestSelectNodesForPreemption(t *testing.T) {
 			name: "medium priority pod is preempted, but lower priority one stays as it is small",
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterFilterPlugin(noderesources.FitName, noderesources.NewFit),
+				st.RegisterPluginAsExtensions(noderesources.FitName, 1, noderesources.NewFit, "Filter", "PreFilter"),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
 			nodes: []string{"machine1", "machine2"},
@@ -1385,7 +1385,7 @@ func TestSelectNodesForPreemption(t *testing.T) {
 			name: "mixed priority pods are preempted",
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterFilterPlugin(noderesources.FitName, noderesources.NewFit),
+				st.RegisterPluginAsExtensions(noderesources.FitName, 1, noderesources.NewFit, "Filter", "PreFilter"),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
 			nodes: []string{"machine1", "machine2"},
@@ -1403,7 +1403,7 @@ func TestSelectNodesForPreemption(t *testing.T) {
 			name: "mixed priority pods are preempted, pick later StartTime one when priorities are equal",
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterFilterPlugin(noderesources.FitName, noderesources.NewFit),
+				st.RegisterPluginAsExtensions(noderesources.FitName, 1, noderesources.NewFit, "Filter", "PreFilter"),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
 			nodes: []string{"machine1", "machine2"},
@@ -1421,8 +1421,8 @@ func TestSelectNodesForPreemption(t *testing.T) {
 			name: "pod with anti-affinity is preempted",
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterFilterPlugin(noderesources.FitName, noderesources.NewFit),
-				st.RegisterFilterPlugin(interpodaffinity.Name, interpodaffinity.New),
+				st.RegisterPluginAsExtensions(noderesources.FitName, 1, noderesources.NewFit, "Filter", "PreFilter"),
+				st.RegisterPluginAsExtensions(interpodaffinity.Name, 1, interpodaffinity.New, "Filter", "PreFilter"),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
 			nodes: []string{"machine1", "machine2"},
@@ -1541,7 +1541,7 @@ func TestSelectNodesForPreemption(t *testing.T) {
 			name: "get Unschedulable in the preemption phase when the filter plugins filtering the nodes",
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterFilterPlugin(noderesources.FitName, noderesources.NewFit),
+				st.RegisterPluginAsExtensions(noderesources.FitName, 1, noderesources.NewFit, "Filter", "PreFilter"),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
 			nodes: []string{"machine1", "machine2"},
@@ -1557,7 +1557,7 @@ func TestSelectNodesForPreemption(t *testing.T) {
 			name: "preemption with violation of same pdb",
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterFilterPlugin(noderesources.FitName, noderesources.NewFit),
+				st.RegisterPluginAsExtensions(noderesources.FitName, 1, noderesources.NewFit, "Filter", "PreFilter"),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
 			nodes: []string{"machine1"},
@@ -1673,7 +1673,7 @@ func TestPickOneNodeForPreemption(t *testing.T) {
 			name: "No node needs preemption",
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterFilterPlugin(noderesources.FitName, noderesources.NewFit),
+				st.RegisterPluginAsExtensions(noderesources.FitName, 1, noderesources.NewFit, "Filter", "PreFilter"),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
 			nodes: []string{"machine1"},
@@ -1686,7 +1686,7 @@ func TestPickOneNodeForPreemption(t *testing.T) {
 			name: "a pod that fits on both machines when lower priority pods are preempted",
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterFilterPlugin(noderesources.FitName, noderesources.NewFit),
+				st.RegisterPluginAsExtensions(noderesources.FitName, 1, noderesources.NewFit, "Filter", "PreFilter"),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
 			nodes: []string{"machine1", "machine2"},
@@ -1701,7 +1701,7 @@ func TestPickOneNodeForPreemption(t *testing.T) {
 			name: "a pod that fits on a machine with no preemption",
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterFilterPlugin(noderesources.FitName, noderesources.NewFit),
+				st.RegisterPluginAsExtensions(noderesources.FitName, 1, noderesources.NewFit, "Filter", "PreFilter"),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
 			nodes: []string{"machine1", "machine2", "machine3"},
@@ -1716,7 +1716,7 @@ func TestPickOneNodeForPreemption(t *testing.T) {
 			name: "machine with min highest priority pod is picked",
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterFilterPlugin(noderesources.FitName, noderesources.NewFit),
+				st.RegisterPluginAsExtensions(noderesources.FitName, 1, noderesources.NewFit, "Filter", "PreFilter"),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
 			nodes: []string{"machine1", "machine2", "machine3"},
@@ -1737,7 +1737,7 @@ func TestPickOneNodeForPreemption(t *testing.T) {
 			name: "when highest priorities are the same, minimum sum of priorities is picked",
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterFilterPlugin(noderesources.FitName, noderesources.NewFit),
+				st.RegisterPluginAsExtensions(noderesources.FitName, 1, noderesources.NewFit, "Filter", "PreFilter"),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
 			nodes: []string{"machine1", "machine2", "machine3"},
@@ -1758,7 +1758,7 @@ func TestPickOneNodeForPreemption(t *testing.T) {
 			name: "when highest priority and sum are the same, minimum number of pods is picked",
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterFilterPlugin(noderesources.FitName, noderesources.NewFit),
+				st.RegisterPluginAsExtensions(noderesources.FitName, 1, noderesources.NewFit, "Filter", "PreFilter"),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
 			nodes: []string{"machine1", "machine2", "machine3"},
@@ -1784,7 +1784,7 @@ func TestPickOneNodeForPreemption(t *testing.T) {
 			name: "sum of adjusted priorities is considered",
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterFilterPlugin(noderesources.FitName, noderesources.NewFit),
+				st.RegisterPluginAsExtensions(noderesources.FitName, 1, noderesources.NewFit, "Filter", "PreFilter"),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
 			nodes: []string{"machine1", "machine2", "machine3"},
@@ -1807,7 +1807,7 @@ func TestPickOneNodeForPreemption(t *testing.T) {
 			name: "non-overlapping lowest high priority, sum priorities, and number of pods",
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterFilterPlugin(noderesources.FitName, noderesources.NewFit),
+				st.RegisterPluginAsExtensions(noderesources.FitName, 1, noderesources.NewFit, "Filter", "PreFilter"),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
 			nodes: []string{"machine1", "machine2", "machine3", "machine4"},
@@ -1835,7 +1835,7 @@ func TestPickOneNodeForPreemption(t *testing.T) {
 			name: "same priority, same number of victims, different start time for each machine's pod",
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterFilterPlugin(noderesources.FitName, noderesources.NewFit),
+				st.RegisterPluginAsExtensions(noderesources.FitName, 1, noderesources.NewFit, "Filter", "PreFilter"),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
 			nodes: []string{"machine1", "machine2", "machine3"},
@@ -1856,7 +1856,7 @@ func TestPickOneNodeForPreemption(t *testing.T) {
 			name: "same priority, same number of victims, different start time for all pods",
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterFilterPlugin(noderesources.FitName, noderesources.NewFit),
+				st.RegisterPluginAsExtensions(noderesources.FitName, 1, noderesources.NewFit, "Filter", "PreFilter"),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
 			nodes: []string{"machine1", "machine2", "machine3"},
@@ -1877,7 +1877,7 @@ func TestPickOneNodeForPreemption(t *testing.T) {
 			name: "different priority, same number of victims, different start time for all pods",
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterFilterPlugin(noderesources.FitName, noderesources.NewFit),
+				st.RegisterPluginAsExtensions(noderesources.FitName, 1, noderesources.NewFit, "Filter", "PreFilter"),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
 			nodes: []string{"machine1", "machine2", "machine3"},
@@ -1918,6 +1918,11 @@ func TestPickOneNodeForPreemption(t *testing.T) {
 				t.Fatal(err)
 			}
 			state := framework.NewCycleState()
+			// Some tests rely on PreFilter plugin to compute its CycleState.
+			preFilterStatus := fwk.RunPreFilterPlugins(context.Background(), state, test.pod)
+			if !preFilterStatus.IsSuccess() {
+				t.Errorf("Unexpected preFilterStatus: %v", preFilterStatus)
+			}
 			candidateNodes, _ := g.selectNodesForPreemption(context.Background(), state, test.pod, nodeInfos, nil)
 			node := pickOneNodeForPreemption(candidateNodes)
 			found := false
@@ -2091,7 +2096,7 @@ func TestPreempt(t *testing.T) {
 			},
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterFilterPlugin(noderesources.FitName, noderesources.NewFit),
+				st.RegisterPluginAsExtensions(noderesources.FitName, 1, noderesources.NewFit, "Filter", "PreFilter"),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
 			expectedNode: "machine1",
@@ -2112,7 +2117,7 @@ func TestPreempt(t *testing.T) {
 			},
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterFilterPlugin(noderesources.FitName, noderesources.NewFit),
+				st.RegisterPluginAsExtensions(noderesources.FitName, 1, noderesources.NewFit, "Filter", "PreFilter"),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
 			expectedNode: "machine3",
@@ -2227,7 +2232,7 @@ func TestPreempt(t *testing.T) {
 			},
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterFilterPlugin(noderesources.FitName, noderesources.NewFit),
+				st.RegisterPluginAsExtensions(noderesources.FitName, 1, noderesources.NewFit, "Filter", "PreFilter"),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
 			expectedNode: "machine1",
@@ -2253,7 +2258,7 @@ func TestPreempt(t *testing.T) {
 			},
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterFilterPlugin(noderesources.FitName, noderesources.NewFit),
+				st.RegisterPluginAsExtensions(noderesources.FitName, 1, noderesources.NewFit, "Filter", "PreFilter"),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
 			expectedNode: "",
@@ -2283,7 +2288,7 @@ func TestPreempt(t *testing.T) {
 			},
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterFilterPlugin(noderesources.FitName, noderesources.NewFit),
+				st.RegisterPluginAsExtensions(noderesources.FitName, 1, noderesources.NewFit, "Filter", "PreFilter"),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
 			expectedNode: "machine1",
@@ -2313,7 +2318,7 @@ func TestPreempt(t *testing.T) {
 			},
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterFilterPlugin(noderesources.FitName, noderesources.NewFit),
+				st.RegisterPluginAsExtensions(noderesources.FitName, 1, noderesources.NewFit, "Filter", "PreFilter"),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
 			expectedNode: "machine3",
@@ -2334,7 +2339,7 @@ func TestPreempt(t *testing.T) {
 			},
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterFilterPlugin(noderesources.FitName, noderesources.NewFit),
+				st.RegisterPluginAsExtensions(noderesources.FitName, 1, noderesources.NewFit, "Filter", "PreFilter"),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
 			expectedNode: "",
@@ -2355,7 +2360,7 @@ func TestPreempt(t *testing.T) {
 			},
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterFilterPlugin(noderesources.FitName, noderesources.NewFit),
+				st.RegisterPluginAsExtensions(noderesources.FitName, 1, noderesources.NewFit, "Filter", "PreFilter"),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
 			expectedNode: "machine1",

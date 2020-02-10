@@ -569,7 +569,7 @@ func TestSchedulerFailedSchedulingReasons(t *testing.T) {
 	fns := []st.RegisterPluginFunc{
 		st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 		st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
-		st.RegisterFilterPlugin("PodFitsResources", noderesources.NewFit),
+		st.RegisterPluginAsExtensions(noderesources.FitName, 1, noderesources.NewFit, "Filter", "PreFilter"),
 	}
 	scheduler, _, errChan := setupTestScheduler(queuedPodStore, scache, informerFactory, nil, nil, fns...)
 

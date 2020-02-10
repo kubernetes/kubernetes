@@ -163,45 +163,6 @@ func TestNodePorts(t *testing.T) {
 	}
 }
 
-func TestPreFilterDisabled(t *testing.T) {
-	tests := []struct {
-		pod        *v1.Pod
-		nodeInfo   *schedulernodeinfo.NodeInfo
-		name       string
-		wantStatus *framework.Status
-	}{
-		{
-			pod:      &v1.Pod{},
-			nodeInfo: schedulernodeinfo.NewNodeInfo(),
-			name:     "nothing running",
-		},
-		{
-			pod: newPod("m1", "UDP/127.0.0.1/8080"),
-			nodeInfo: schedulernodeinfo.NewNodeInfo(
-				newPod("m1", "UDP/127.0.0.1/9090")),
-			name: "other port",
-		},
-		{
-			pod: newPod("m1", "UDP/127.0.0.1/8080"),
-			nodeInfo: schedulernodeinfo.NewNodeInfo(
-				newPod("m1", "UDP/127.0.0.1/8080")),
-			name:       "same udp port",
-			wantStatus: framework.NewStatus(framework.Unschedulable, ErrReason),
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			p, _ := New(nil, nil)
-			cycleState := framework.NewCycleState()
-			gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), cycleState, test.pod, test.nodeInfo)
-			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
-				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
-			}
-		})
-	}
-}
-
 func TestGetContainerPorts(t *testing.T) {
 	tests := []struct {
 		pod1     *v1.Pod
