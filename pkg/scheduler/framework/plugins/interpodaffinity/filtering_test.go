@@ -1635,120 +1635,16 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 }
 
 func TestPreFilterDisabled(t *testing.T) {
-	labelRgChina := map[string]string{
-		"region": "China",
-	}
-	labelRgChinaAzAz1 := map[string]string{
-		"region": "China",
-		"az":     "az1",
-	}
-	labelRgIndia := map[string]string{
-		"region": "India",
-	}
-	labelRgUS := map[string]string{
-		"region": "US",
-	}
-
-	tests := []struct {
-		pod          *v1.Pod
-		pods         []*v1.Pod
-		nodes        []*v1.Node
-		wantStatuses []*framework.Status
-		name         string
-	}{
-		{
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"foo": "123"}},
-				Spec: v1.PodSpec{
-					Affinity: &v1.Affinity{
-						PodAntiAffinity: &v1.PodAntiAffinity{
-							RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
-								{
-									LabelSelector: &metav1.LabelSelector{
-										MatchExpressions: []metav1.LabelSelectorRequirement{
-											{
-												Key:      "foo",
-												Operator: metav1.LabelSelectorOpIn,
-												Values:   []string{"bar"},
-											},
-										},
-									},
-									TopologyKey: "region",
-								},
-							},
-						},
-					},
-				},
-			},
-			pods: []*v1.Pod{
-				{Spec: v1.PodSpec{NodeName: "nodeA"}, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"foo": "bar"}}},
-				{
-					Spec: v1.PodSpec{
-						NodeName: "nodeC",
-						Affinity: &v1.Affinity{
-							PodAntiAffinity: &v1.PodAntiAffinity{
-								RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
-									{
-										LabelSelector: &metav1.LabelSelector{
-											MatchExpressions: []metav1.LabelSelectorRequirement{
-												{
-													Key:      "foo",
-													Operator: metav1.LabelSelectorOpIn,
-													Values:   []string{"123"},
-												},
-											},
-										},
-										TopologyKey: "region",
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			nodes: []*v1.Node{
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: labelRgChina}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: labelRgChinaAzAz1}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeC", Labels: labelRgIndia}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeD", Labels: labelRgUS}},
-			},
-			wantStatuses: []*framework.Status{
-				framework.NewStatus(
-					framework.Unschedulable,
-					ErrReasonAffinityNotMatch,
-					ErrReasonAntiAffinityRulesNotMatch,
-				),
-				framework.NewStatus(
-					framework.Unschedulable,
-					ErrReasonAffinityNotMatch,
-					ErrReasonAntiAffinityRulesNotMatch,
-				),
-				framework.NewStatus(
-					framework.Unschedulable,
-					ErrReasonAffinityNotMatch,
-					ErrReasonExistingAntiAffinityRulesNotMatch,
-				),
-				nil,
-			},
-			name: "NodeA and nodeB have same topologyKey and label value. NodeA has an existing pod that matches the inter pod affinity rule. NodeC has an existing pod that match the inter pod affinity rule. The pod can not be scheduled onto nodeA, nodeB and nodeC but can be schedulerd onto nodeD",
-		},
-	}
-
-	for indexTest, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			snapshot := cache.NewSnapshot(test.pods, test.nodes)
-			for indexNode, node := range test.nodes {
-				p := &InterPodAffinity{
-					sharedLister: snapshot,
-				}
-				state := framework.NewCycleState()
-				nodeInfo := mustGetNodeInfo(t, snapshot, node.Name)
-				gotStatus := p.Filter(context.Background(), state, test.pod, nodeInfo)
-				if !reflect.DeepEqual(gotStatus, test.wantStatuses[indexNode]) {
-					t.Errorf("index: %d status does not match: %v, want: %v", indexTest, gotStatus, test.wantStatuses[indexNode])
-				}
-			}
-		})
+	pod := &v1.Pod{}
+	nodeInfo := nodeinfo.NewNodeInfo()
+	node := v1.Node{}
+	nodeInfo.SetNode(&node)
+	p := &InterPodAffinity{}
+	cycleState := framework.NewCycleState()
+	gotStatus := p.Filter(context.Background(), cycleState, pod, nodeInfo)
+	wantStatus := framework.NewStatus(framework.Error, `error reading "PreFilterInterPodAffinity" from cycleState: not found`)
+	if !reflect.DeepEqual(gotStatus, wantStatus) {
+		t.Errorf("status does not match: %v, want: %v", gotStatus, wantStatus)
 	}
 }
 

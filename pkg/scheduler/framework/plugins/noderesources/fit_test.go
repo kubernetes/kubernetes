@@ -399,60 +399,16 @@ func TestEnoughRequests(t *testing.T) {
 }
 
 func TestPreFilterDisabled(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodOverhead, true)()
-
-	tests := []struct {
-		pod                       *v1.Pod
-		nodeInfo                  *schedulernodeinfo.NodeInfo
-		name                      string
-		ignoredResources          []byte
-		wantInsufficientResources []InsufficientResource
-		wantStatus                *framework.Status
-	}{
-		{
-			pod: &v1.Pod{},
-			nodeInfo: schedulernodeinfo.NewNodeInfo(
-				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 10, Memory: 20})),
-			name:                      "no resources requested always fits",
-			wantInsufficientResources: []InsufficientResource{},
-		},
-		{
-			pod: newResourcePod(schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1}),
-			nodeInfo: schedulernodeinfo.NewNodeInfo(
-				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 10, Memory: 20})),
-			name:                      "too many resources fails",
-			wantStatus:                framework.NewStatus(framework.Unschedulable, getErrReason(v1.ResourceCPU), getErrReason(v1.ResourceMemory)),
-			wantInsufficientResources: []InsufficientResource{{v1.ResourceCPU, getErrReason(v1.ResourceCPU), 1, 10, 10}, {v1.ResourceMemory, getErrReason(v1.ResourceMemory), 1, 20, 20}},
-		},
-		{
-			pod: newResourcePod(
-				schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{extendedResourceB: 1}}),
-			nodeInfo:                  schedulernodeinfo.NewNodeInfo(newResourcePod(schedulernodeinfo.Resource{MilliCPU: 0, Memory: 0})),
-			ignoredResources:          []byte(`{"IgnoredResources" : ["example.com/bbb"]}`),
-			name:                      "skip checking ignored extended resource",
-			wantInsufficientResources: []InsufficientResource{},
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			node := v1.Node{Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 5, 20, 5).Capacity, Allocatable: makeAllocatableResources(10, 20, 32, 5, 20, 5)}}
-			test.nodeInfo.SetNode(&node)
-
-			args := &runtime.Unknown{Raw: test.ignoredResources}
-			p, _ := NewFit(args, nil)
-			cycleState := framework.NewCycleState()
-
-			gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), cycleState, test.pod, test.nodeInfo)
-			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
-				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
-			}
-
-			gotInsufficientResources := Fits(test.pod, test.nodeInfo, p.(*Fit).ignoredResources)
-			if !reflect.DeepEqual(gotInsufficientResources, test.wantInsufficientResources) {
-				t.Errorf("insufficient resources do not match: %v, want: %v", gotInsufficientResources, test.wantInsufficientResources)
-			}
-		})
+	pod := &v1.Pod{}
+	nodeInfo := schedulernodeinfo.NewNodeInfo()
+	node := v1.Node{}
+	nodeInfo.SetNode(&node)
+	p, _ := NewFit(nil, nil)
+	cycleState := framework.NewCycleState()
+	gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), cycleState, pod, nodeInfo)
+	wantStatus := framework.NewStatus(framework.Error, `error reading "PreFilterNodeResourcesFit" from cycleState: not found`)
+	if !reflect.DeepEqual(gotStatus, wantStatus) {
+		t.Errorf("status does not match: %v, want: %v", gotStatus, wantStatus)
 	}
 }
 
