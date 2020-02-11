@@ -486,8 +486,12 @@ func TestVolumeClient(f *framework.Framework, config TestConfig, fsGroup *int64,
 	clientPod, err := runVolumeTesterPod(f.ClientSet, config, "client", false, fsGroup, tests)
 	if err != nil {
 		framework.Failf("Failed to create client pod: %v", err)
-
 	}
+	defer func() {
+		e2epod.DeletePodOrFail(f.ClientSet, clientPod.Namespace, clientPod.Name)
+		e2epod.WaitForPodToDisappear(f.ClientSet, clientPod.Namespace, clientPod.Name, labels.Everything(), framework.Poll, framework.PodDeleteTimeout)
+	}()
+
 	framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(f.ClientSet, clientPod))
 	testVolumeContent(f, clientPod, fsGroup, fsType, tests)
 }
