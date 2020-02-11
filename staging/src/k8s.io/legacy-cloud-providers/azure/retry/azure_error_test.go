@@ -73,7 +73,7 @@ func TestGetError(t *testing.T) {
 			code: http.StatusSeeOther,
 			err:  fmt.Errorf("some error"),
 			expected: &Error{
-				Retriable:      true,
+				Retriable:      false,
 				HTTPStatusCode: http.StatusSeeOther,
 				RawError:       fmt.Errorf("some error"),
 			},
@@ -82,7 +82,7 @@ func TestGetError(t *testing.T) {
 			code:       http.StatusTooManyRequests,
 			retryAfter: 100,
 			expected: &Error{
-				Retriable:      true,
+				Retriable:      false,
 				HTTPStatusCode: http.StatusTooManyRequests,
 				RetryAfter:     now().Add(100 * time.Second),
 				RawError:       fmt.Errorf("some error"),
@@ -156,7 +156,7 @@ func TestGetStatusNotFoundAndForbiddenIgnoredError(t *testing.T) {
 			code: http.StatusSeeOther,
 			err:  fmt.Errorf("some error"),
 			expected: &Error{
-				Retriable:      true,
+				Retriable:      false,
 				HTTPStatusCode: http.StatusSeeOther,
 				RawError:       fmt.Errorf("some error"),
 			},
@@ -165,7 +165,7 @@ func TestGetStatusNotFoundAndForbiddenIgnoredError(t *testing.T) {
 			code:       http.StatusTooManyRequests,
 			retryAfter: 100,
 			expected: &Error{
-				Retriable:      true,
+				Retriable:      false,
 				HTTPStatusCode: http.StatusTooManyRequests,
 				RetryAfter:     now().Add(100 * time.Second),
 				RawError:       fmt.Errorf("some error"),
