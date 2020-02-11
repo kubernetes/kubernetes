@@ -1634,6 +1634,20 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 	}
 }
 
+func TestPreFilterDisabled(t *testing.T) {
+	pod := &v1.Pod{}
+	nodeInfo := nodeinfo.NewNodeInfo()
+	node := v1.Node{}
+	nodeInfo.SetNode(&node)
+	p := &InterPodAffinity{}
+	cycleState := framework.NewCycleState()
+	gotStatus := p.Filter(context.Background(), cycleState, pod, nodeInfo)
+	wantStatus := framework.NewStatus(framework.Error, `error reading "PreFilterInterPodAffinity" from cycleState: not found`)
+	if !reflect.DeepEqual(gotStatus, wantStatus) {
+		t.Errorf("status does not match: %v, want: %v", gotStatus, wantStatus)
+	}
+}
+
 func TestPreFilterStateAddRemovePod(t *testing.T) {
 	var label1 = map[string]string{
 		"region": "r1",

@@ -190,7 +190,7 @@ func (pl *ServiceAffinity) RemovePod(ctx context.Context, cycleState *framework.
 func getPreFilterState(cycleState *framework.CycleState) (*preFilterState, error) {
 	c, err := cycleState.Read(preFilterStateKey)
 	if err != nil {
-		// The metadata wasn't pre-computed in prefilter.
+		// preFilterState doesn't exist, likely PreFilter wasn't invoked.
 		return nil, fmt.Errorf("error reading %q from cycleState: %v", preFilterStateKey, err)
 	}
 

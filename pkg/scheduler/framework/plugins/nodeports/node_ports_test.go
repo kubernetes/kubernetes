@@ -163,6 +163,20 @@ func TestNodePorts(t *testing.T) {
 	}
 }
 
+func TestPreFilterDisabled(t *testing.T) {
+	pod := &v1.Pod{}
+	nodeInfo := schedulernodeinfo.NewNodeInfo()
+	node := v1.Node{}
+	nodeInfo.SetNode(&node)
+	p, _ := New(nil, nil)
+	cycleState := framework.NewCycleState()
+	gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), cycleState, pod, nodeInfo)
+	wantStatus := framework.NewStatus(framework.Error, `error reading "PreFilterNodePorts" from cycleState: not found`)
+	if !reflect.DeepEqual(gotStatus, wantStatus) {
+		t.Errorf("status does not match: %v, want: %v", gotStatus, wantStatus)
+	}
+}
+
 func TestGetContainerPorts(t *testing.T) {
 	tests := []struct {
 		pod1     *v1.Pod

@@ -86,7 +86,7 @@ func (pl *NodePorts) PreFilterExtensions() framework.PreFilterExtensions {
 func getPreFilterState(cycleState *framework.CycleState) (preFilterState, error) {
 	c, err := cycleState.Read(preFilterStateKey)
 	if err != nil {
-		// preFilterState state doesn't exist.
+		// preFilterState doesn't exist, likely PreFilter wasn't invoked.
 		return nil, fmt.Errorf("error reading %q from cycleState: %v", preFilterStateKey, err)
 	}
 
