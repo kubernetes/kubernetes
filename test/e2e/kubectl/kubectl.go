@@ -845,7 +845,7 @@ metadata:
 		/*
 			Release : v1.9
 			Testname: Kubectl, check version v1
-			Description: Run kubectl to get api versions, output MUST contain returned versions with ‘v1’ listed.
+			Description: Run kubectl to get api versions, output MUST contain returned versions with 'v1' listed.
 		*/
 		framework.ConformanceIt("should check if v1 is in available api versions ", func() {
 			ginkgo.By("validating api versions")
@@ -1345,7 +1345,7 @@ metadata:
 		/*
 			Release : v1.9
 			Testname: Kubectl, label update
-			Description: When a Pod is running, update a Label using ‘kubectl label’ command. The label MUST be created in the Pod. A ‘kubectl get pod’ with -l option on the container MUST verify that the label can be read back. Use ‘kubectl label label-’ to remove the label. ‘kubectl get pod’ with -l option SHOULD not list the deleted label as the label is removed.
+			Description: When a Pod is running, update a Label using 'kubectl label' command. The label MUST be created in the Pod. A 'kubectl get pod' with -l option on the container MUST verify that the label can be read back. Use 'kubectl label label-' to remove the label. 'kubectl get pod' with -l option SHOULD not list the deleted label as the label is removed.
 		*/
 		framework.ConformanceIt("should update the label on a resource ", func() {
 			labelName := "testing-label"
@@ -1428,11 +1428,11 @@ metadata:
 			Testname: Kubectl, logs
 			Description: When a Pod is running then it MUST generate logs.
 			Starting a Pod should have a expected log line. Also log command options MUST work as expected and described below.
-				‘kubectl logs -tail=1’ should generate a output of one line, the last line in the log.
-				‘kubectl --limit-bytes=1’ should generate a single byte output.
-				‘kubectl --tail=1 --timestamp should generate one line with timestamp in RFC3339 format
-				‘kubectl --since=1s’ should output logs that are only 1 second older from now
-				‘kubectl --since=24h’ should output logs that are only 1 day older from now
+				'kubectl logs -tail=1' should generate a output of one line, the last line in the log.
+				'kubectl --limit-bytes=1' should generate a single byte output.
+				'kubectl --tail=1 --timestamp should generate one line with timestamp in RFC3339 format
+				'kubectl --since=1s' should output logs that are only 1 second older from now
+				'kubectl --since=24h' should output logs that are only 1 day older from now
 		*/
 		framework.ConformanceIt("should be able to retrieve and filter logs ", func() {
 			// Split("something\n", "\n") returns ["something", ""], so
@@ -1492,7 +1492,7 @@ metadata:
 		/*
 			Release : v1.9
 			Testname: Kubectl, patch to annotate
-			Description: Start running agnhost and a replication controller. When the pod is running, using ‘kubectl patch’ command add annotations. The annotation MUST be added to running pods and SHOULD be able to read added annotations from each of the Pods running under the replication controller.
+			Description: Start running agnhost and a replication controller. When the pod is running, using 'kubectl patch' command add annotations. The annotation MUST be added to running pods and SHOULD be able to read added annotations from each of the Pods running under the replication controller.
 		*/
 		framework.ConformanceIt("should add annotations for pods in rc ", func() {
 			controllerJSON := commonutils.SubstituteImageName(string(readTestFileOrDie(agnhostControllerFilename)))
@@ -1526,7 +1526,7 @@ metadata:
 		/*
 			Release : v1.9
 			Testname: Kubectl, version
-			Description: The command ‘kubectl version’ MUST return the major, minor versions,  GitCommit, etc of the Client and the Server that the kubectl is configured to connect to.
+			Description: The command 'kubectl version' MUST return the major, minor versions,  GitCommit, etc of the Client and the Server that the kubectl is configured to connect to.
 		*/
 		framework.ConformanceIt("should check is all data is printed ", func() {
 			version := framework.RunKubectlOrDie(ns, "version")
@@ -1560,7 +1560,7 @@ metadata:
 		/*
 			Release : v1.9
 			Testname: Kubectl, rolling update
-			Description: Command ‘kubectl rolling-update’ MUST replace the specified replication controller with a new replication controller by updating one pod at a time to use the new Pod spec.
+			Description: Command 'kubectl rolling-update' MUST replace the specified replication controller with a new replication controller by updating one pod at a time to use the new Pod spec.
 		*/
 		framework.ConformanceIt("should support rolling-update to same image ", func() {
 			ginkgo.By("running the image " + httpdImage)
@@ -1591,7 +1591,7 @@ metadata:
 		/*
 			Release : v1.9
 			Testname: Kubectl, run pod
-			Description: Command ‘kubectl run’ MUST create a pod, when a image name is specified in the run command. After the run command there SHOULD be a pod that should exist with one container running the specified image.
+			Description: Command 'kubectl run' MUST create a pod, when a image name is specified in the run command. After the run command there SHOULD be a pod that should exist with one container running the specified image.
 		*/
 		framework.ConformanceIt("should create a pod from an image when restart is Never ", func() {
 			ginkgo.By("running the image " + httpdImage)
@@ -1627,7 +1627,7 @@ metadata:
 		/*
 			Release : v1.9
 			Testname: Kubectl, replace
-			Description: Command ‘kubectl replace’ on a existing Pod with a new spec MUST update the image of the container running in the Pod. A -f option to ‘kubectl replace’ SHOULD force to re-create the resource. The new Pod SHOULD have the container with new change to the image.
+			Description: Command 'kubectl replace' on a existing Pod with a new spec MUST update the image of the container running in the Pod. A -f option to 'kubectl replace' SHOULD force to re-create the resource. The new Pod SHOULD have the container with new change to the image.
 		*/
 		framework.ConformanceIt("should update a single-container pod's image ", func() {
 			ginkgo.By("running the image " + httpdImage)
@@ -1667,7 +1667,7 @@ metadata:
 		/*
 			Release : v1.9
 			Testname: Kubectl, proxy port zero
-			Description: Start a proxy server on port zero by running ‘kubectl proxy’ with --port=0. Call the proxy server by requesting api versions from unix socket. The proxy server MUST provide at least one version string.
+			Description: Start a proxy server on port zero by running 'kubectl proxy' with --port=0. Call the proxy server by requesting api versions from unix socket. The proxy server MUST provide at least one version string.
 		*/
 		framework.ConformanceIt("should support proxy with --port 0 ", func() {
 			ginkgo.By("starting the proxy server")
@@ -1692,7 +1692,7 @@ metadata:
 		/*
 			Release : v1.9
 			Testname: Kubectl, proxy socket
-			Description: Start a proxy server on by running ‘kubectl proxy’ with --unix-socket=<some path>. Call the proxy server by requesting api versions from  http://locahost:0/api. The proxy server MUST provide at least one version string
+			Description: Start a proxy server on by running 'kubectl proxy' with --unix-socket=<some path>. Call the proxy server by requesting api versions from  http://locahost:0/api. The proxy server MUST provide at least one version string
 		*/
 		framework.ConformanceIt("should support --unix-socket=/path ", func() {
 			ginkgo.By("Starting the proxy")
