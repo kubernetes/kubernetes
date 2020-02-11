@@ -168,7 +168,7 @@ func testPrivilegedPods(tester func(pod *v1.Pod)) {
 		tester(hostipc)
 	})
 
-	if isAppArmorSupported() {
+	if isAppArmorSupported() && framework.TestContext.ContainerRuntime == "docker" {
 		ginkgo.By("Running a custom AppArmor profile pod", func() {
 			aa := restrictedPod("apparmor")
 			// Every node is expected to have the docker-default profile.
