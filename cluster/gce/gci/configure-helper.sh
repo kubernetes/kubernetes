@@ -2687,6 +2687,15 @@ oom_score = -999
   endpoint = ["https://mirror.gcr.io","https://registry-1.docker.io"]
 EOF
 
+  if [[ "${CONTAINER_RUNTIME_TEST_HANDLER:-}" == "true" ]]; then
+  cat >> "${config_path}" <<EOF
+# Setup a runtime with the magic name ("test-handler") used for Kubernetes
+# runtime class tests ...
+[plugins.cri.containerd.runtimes.test-handler]
+  runtime_type = "io.containerd.runtime.v1.linux"
+EOF
+  fi
+
   # Reuse docker group for containerd.
   local containerd_gid="$(cat /etc/group | grep ^docker: | cut -d: -f 3)"
   if [[ ! -z "${containerd_gid:-}" ]]; then
