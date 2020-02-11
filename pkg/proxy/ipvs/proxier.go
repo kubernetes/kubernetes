@@ -807,7 +807,7 @@ func CleanupLeftovers(ipvs utilipvs.Interface, ipt utiliptables.Interface, ipset
 
 // Sync is called to synchronize the proxier state to iptables and ipvs as soon as possible.
 func (proxier *Proxier) Sync() {
-	if proxier.healthzServer != nil {
+	if !utilproxy.IsNil(proxier.healthzServer) {
 		proxier.healthzServer.QueuedUpdate()
 	}
 	proxier.syncRunner.Run()
@@ -816,7 +816,7 @@ func (proxier *Proxier) Sync() {
 // SyncLoop runs periodic work.  This is expected to run as a goroutine or as the main loop of the app.  It does not return.
 func (proxier *Proxier) SyncLoop() {
 	// Update healthz timestamp at beginning in case Sync() never succeeds.
-	if proxier.healthzServer != nil {
+	if !utilproxy.IsNil(proxier.healthzServer) {
 		proxier.healthzServer.Updated()
 	}
 	proxier.syncRunner.Loop(wait.NeverStop)
@@ -1611,7 +1611,7 @@ func (proxier *Proxier) syncProxyRules() {
 	}
 	proxier.cleanLegacyService(activeIPVSServices, currentIPVSServices, legacyBindAddrs)
 
-	if proxier.healthzServer != nil {
+	if !utilproxy.IsNil(proxier.healthzServer) {
 		proxier.healthzServer.Updated()
 	}
 	metrics.SyncProxyRulesLastTimestamp.SetToCurrentTime()

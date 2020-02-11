@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"reflect"
 	"strconv"
 
 	v1 "k8s.io/api/core/v1"
@@ -285,4 +286,13 @@ func ShuffleStrings(s []string) []string {
 		shuffled[j] = s[i]
 	}
 	return shuffled
+}
+
+// IsNil check if a interface is really nil
+func IsNil(i interface{}) bool {
+	vi := reflect.ValueOf(i)
+	if vi.Kind() == reflect.Ptr {
+		return vi.IsNil()
+	}
+	return false
 }

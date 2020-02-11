@@ -33,7 +33,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1beta1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -500,7 +500,7 @@ func (proxier *Proxier) probability(n int) string {
 
 // Sync is called to synchronize the proxier state to iptables as soon as possible.
 func (proxier *Proxier) Sync() {
-	if proxier.healthzServer != nil {
+	if !utilproxy.IsNil(proxier.healthzServer) {
 		proxier.healthzServer.QueuedUpdate()
 	}
 	proxier.syncRunner.Run()
@@ -509,7 +509,7 @@ func (proxier *Proxier) Sync() {
 // SyncLoop runs periodic work.  This is expected to run as a goroutine or as the main loop of the app.  It does not return.
 func (proxier *Proxier) SyncLoop() {
 	// Update healthz timestamp at beginning in case Sync() never succeeds.
-	if proxier.healthzServer != nil {
+	if !utilproxy.IsNil(proxier.healthzServer) {
 		proxier.healthzServer.Updated()
 	}
 	proxier.syncRunner.Loop(wait.NeverStop)
@@ -1569,7 +1569,7 @@ func (proxier *Proxier) syncProxyRules() {
 	}
 	proxier.portsMap = replacementPortsMap
 
-	if proxier.healthzServer != nil {
+	if !utilproxy.IsNil(proxier.healthzServer) {
 		proxier.healthzServer.Updated()
 	}
 	metrics.SyncProxyRulesLastTimestamp.SetToCurrentTime()
