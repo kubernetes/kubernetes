@@ -157,6 +157,12 @@ var _ = ginkgo.Describe("[sig-node] ConfigMap", func() {
 		framework.ExpectEqual(configMapFromUpdate.Data, configMap.Data)
 	})
 
+	/*
+	   Release : v1.18
+	   Testname: ConfigMap lifecycle
+	   Description: Attempt to create a ConfigMap. Patch the created ConfigMap. Fetching the ConfigMap MUST reflect changes.
+           By fetching all the ConfigMaps via a Label selector it MUST find the ConfigMap by it's static label and updated value. The ConfigMap must be deleted by Collection.
+	*/
 	ginkgo.It("should run through a ConfigMap lifecycle", func() {
 		testNamespaceName := f.Namespace.Name
 		testConfigMapName := "test-configmap" + string(uuid.NewUUID())
@@ -212,6 +218,7 @@ var _ = ginkgo.Describe("[sig-node] ConfigMap", func() {
 		}
 		framework.ExpectEqual(testConfigMapFound, true, "failed to find ConfigMap in list")
 
+		// hit the endpoint for delete collection
 		err = f.ClientSet.CoreV1().ConfigMaps(testNamespaceName).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{
 			LabelSelector: "test-configmap-static=true",
 		})
