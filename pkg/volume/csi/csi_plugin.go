@@ -216,6 +216,12 @@ func (p *csiPlugin) Init(host volume.VolumeHost) error {
 		csitranslationplugins.CinderInTreePluginName: func() bool {
 			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) && utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationOpenStack)
 		},
+		csitranslationplugins.AzureDiskInTreePluginName: func() bool {
+			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) && utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationAzureDisk)
+		},
+		csitranslationplugins.AzureFileInTreePluginName: func() bool {
+			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) && utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationAzureFile)
+		},
 	}
 
 	// Initializing the label management channels
