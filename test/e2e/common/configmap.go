@@ -163,7 +163,7 @@ var _ = ginkgo.Describe("[sig-node] ConfigMap", func() {
 	   Description: Attempt to create a ConfigMap. Patch the created ConfigMap. Fetching the ConfigMap MUST reflect changes.
            By fetching all the ConfigMaps via a Label selector it MUST find the ConfigMap by it's static label and updated value. The ConfigMap must be deleted by Collection.
 	*/
-	ginkgo.It("should run through a ConfigMap lifecycle", func() {
+	framework.ConformanceIt("should run through a ConfigMap lifecycle", func() {
 		testNamespaceName := f.Namespace.Name
 		testConfigMapName := "test-configmap" + string(uuid.NewUUID())
 
