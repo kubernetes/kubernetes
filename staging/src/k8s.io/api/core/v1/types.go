@@ -5209,8 +5209,7 @@ const (
 // LimitRangeItem defines a min/max usage limit for any resource that matches on kind.
 type LimitRangeItem struct {
 	// Type of resource that this limit applies to.
-	// +optional
-	Type LimitType `json:"type,omitempty" protobuf:"bytes,1,opt,name=type,casttype=LimitType"`
+	Type LimitType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=LimitType"`
 	// Max usage constraints on this kind by resource name.
 	// +optional
 	Max ResourceList `json:"max,omitempty" protobuf:"bytes,2,rep,name=max,casttype=ResourceList,castkey=ResourceName"`
