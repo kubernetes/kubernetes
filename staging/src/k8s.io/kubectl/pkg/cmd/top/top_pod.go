@@ -197,6 +197,13 @@ func (o TopPodOptions) RunTopPod() error {
 		if e != nil {
 			return e
 		}
+
+		// if we had no errors, be sure we output something.
+		if o.AllNamespaces {
+			fmt.Fprintln(o.ErrOut, "No resources found")
+		} else {
+			fmt.Fprintf(o.ErrOut, "No resources found in %s namespace.\n", o.Namespace)
+		}
 	}
 	if err != nil {
 		return err
