@@ -55,7 +55,7 @@ type testRESTMapper struct {
 	meta.RESTMapper
 }
 
-func (_ *testRESTMapper) Reset() {}
+func (*testRESTMapper) Reset() {}
 
 func TestGarbageCollectorConstruction(t *testing.T) {
 	config := &restclient.Config{}
@@ -928,16 +928,16 @@ type fakeServerResources struct {
 	InterfaceUsedCount int
 }
 
-func (_ *fakeServerResources) ServerResourcesForGroupVersion(groupVersion string) (*metav1.APIResourceList, error) {
+func (*fakeServerResources) ServerResourcesForGroupVersion(groupVersion string) (*metav1.APIResourceList, error) {
 	return nil, nil
 }
 
 // Deprecated: use ServerGroupsAndResources instead.
-func (_ *fakeServerResources) ServerResources() ([]*metav1.APIResourceList, error) {
+func (*fakeServerResources) ServerResources() ([]*metav1.APIResourceList, error) {
 	return nil, nil
 }
 
-func (_ *fakeServerResources) ServerGroupsAndResources() ([]*metav1.APIGroup, []*metav1.APIResourceList, error) {
+func (*fakeServerResources) ServerGroupsAndResources() ([]*metav1.APIGroup, []*metav1.APIResourceList, error) {
 	return nil, nil, nil
 }
 
@@ -966,6 +966,6 @@ func (f *fakeServerResources) getInterfaceUsedCount() int {
 	return f.InterfaceUsedCount
 }
 
-func (_ *fakeServerResources) ServerPreferredNamespacedResources() ([]*metav1.APIResourceList, error) {
+func (*fakeServerResources) ServerPreferredNamespacedResources() ([]*metav1.APIResourceList, error) {
 	return nil, nil
 }

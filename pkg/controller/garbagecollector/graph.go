@@ -98,32 +98,32 @@ func (n *node) isDeletingDependents() bool {
 	return n.deletingDependents
 }
 
-func (ownerNode *node) addDependent(dependent *node) {
-	ownerNode.dependentsLock.Lock()
-	defer ownerNode.dependentsLock.Unlock()
-	ownerNode.dependents[dependent] = struct{}{}
+func (n *node) addDependent(dependent *node) {
+	n.dependentsLock.Lock()
+	defer n.dependentsLock.Unlock()
+	n.dependents[dependent] = struct{}{}
 }
 
-func (ownerNode *node) deleteDependent(dependent *node) {
-	ownerNode.dependentsLock.Lock()
-	defer ownerNode.dependentsLock.Unlock()
-	delete(ownerNode.dependents, dependent)
+func (n *node) deleteDependent(dependent *node) {
+	n.dependentsLock.Lock()
+	defer n.dependentsLock.Unlock()
+	delete(n.dependents, dependent)
 }
 
-func (ownerNode *node) dependentsLength() int {
-	ownerNode.dependentsLock.RLock()
-	defer ownerNode.dependentsLock.RUnlock()
-	return len(ownerNode.dependents)
+func (n *node) dependentsLength() int {
+	n.dependentsLock.RLock()
+	defer n.dependentsLock.RUnlock()
+	return len(n.dependents)
 }
 
 // Note that this function does not provide any synchronization guarantees;
 // items could be added to or removed from ownerNode.dependents the moment this
 // function returns.
-func (ownerNode *node) getDependents() []*node {
-	ownerNode.dependentsLock.RLock()
-	defer ownerNode.dependentsLock.RUnlock()
+func (n *node) getDependents() []*node {
+	n.dependentsLock.RLock()
+	defer n.dependentsLock.RUnlock()
 	var ret []*node
-	for dep := range ownerNode.dependents {
+	for dep := range n.dependents {
 		ret = append(ret, dep)
 	}
 	return ret
