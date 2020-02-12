@@ -1319,7 +1319,7 @@ func (g *gcePdDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestCo
 	if framework.NodeOSDistroIs("windows") {
 		config.ClientNodeSelection = e2epod.NodeSelection{
 			Selector: map[string]string{
-				"beta.kubernetes.io/os": "windows",
+				"kubernetes.io/os": "windows",
 			},
 		}
 	}
@@ -1716,7 +1716,7 @@ func (a *awsDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConf
 	if framework.NodeOSDistroIs("windows") {
 		config.ClientNodeSelection = e2epod.NodeSelection{
 			Selector: map[string]string{
-				"beta.kubernetes.io/os": "windows",
+				"kubernetes.io/os": "windows",
 			},
 		}
 	}

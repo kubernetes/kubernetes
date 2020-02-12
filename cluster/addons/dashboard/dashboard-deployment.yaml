@@ -63,7 +63,7 @@ spec:
         emptyDir: {}
       serviceAccountName: kubernetes-dashboard
       nodeSelector:
-        "beta.kubernetes.io/os": linux
+        "kubernetes.io/os": linux
       tolerations:
       - key: "CriticalAddonsOnly"
         operator: "Exists"

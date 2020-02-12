@@ -94,7 +94,7 @@ spec:
       - key: "CriticalAddonsOnly"
         operator: "Exists"
       nodeSelector:
-        beta.kubernetes.io/os: linux
+        kubernetes.io/os: linux
       volumes:
       - name: kube-dns-config
         configMap:

@@ -45,13 +45,13 @@ output_file=/tmp/k8s-smoke-test.out
 
 function check_windows_nodes_are_ready {
   # kubectl filtering is the worst.
-  statuses=$(${kubectl} get nodes -l beta.kubernetes.io/os=windows \
+  statuses=$(${kubectl} get nodes -l kubernetes.io/os=windows \
     -o jsonpath='{.items[*].status.conditions[?(@.type=="Ready")].status}')
   for status in $statuses; do
     if [[ $status == "False" ]]; then
       echo "ERROR: some Windows node has status != Ready"
-      echo "kubectl get nodes -l beta.kubernetes.io/os=windows"
-      ${kubectl} get nodes -l beta.kubernetes.io/os=windows
+      echo "kubectl get nodes -l kubernetes.io/os=windows"
+      ${kubectl} get nodes -l kubernetes.io/os=windows
       exit 1
     fi
   done
@@ -61,7 +61,7 @@ function check_windows_nodes_are_ready {
 function untaint_windows_nodes {
   # Untaint the windows nodes to allow test workloads without tolerations to be
   # scheduled onto them.
-  WINDOWS_NODES=$(${kubectl} get nodes -l beta.kubernetes.io/os=windows -o name)
+  WINDOWS_NODES=$(${kubectl} get nodes -l kubernetes.io/os=windows -o name)
   for node in $WINDOWS_NODES; do
     ${kubectl} taint node "$node" node.kubernetes.io/os:NoSchedule-
   done
@@ -106,7 +106,7 @@ spec:
       - name: nginx
         image: nginx:1.7.9
       nodeSelector:
-        beta.kubernetes.io/os: linux
+        kubernetes.io/os: linux
 EOF
 
   if ! ${kubectl} create -f $linux_webserver_deployment.yaml; then
@@ -183,7 +183,7 @@ spec:
         image: ubuntu
         command: ["sleep", "123456"]
       nodeSelector:
-        beta.kubernetes.io/os: linux
+        kubernetes.io/os: linux
 EOF
 
   if ! ${kubectl} create -f $linux_command_deployment.yaml; then
@@ -280,7 +280,7 @@ spec:
         args:
         - serve-hostname
       nodeSelector:
-        beta.kubernetes.io/os: windows
+        kubernetes.io/os: windows
       tolerations:
       - effect: NoSchedule
         key: node.kubernetes.io/os
@@ -360,7 +360,7 @@ spec:
       - name: pause-win
         image: gcr.io/gke-release/pause-win:1.1.0
       nodeSelector:
-        beta.kubernetes.io/os: windows
+        kubernetes.io/os: windows
       tolerations:
       - effect: NoSchedule
         key: node.kubernetes.io/os
