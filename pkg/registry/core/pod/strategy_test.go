@@ -18,6 +18,7 @@ package pod
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/url"
 	"reflect"
@@ -31,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/client-go/tools/cache"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/kubelet/client"
@@ -629,3 +631,43 @@ var (
 	fakeSecureRoundTripper   = fakeTransport{val: "secure"}
 	fakeInsecureRoundTripper = fakeTransport{val: "insecure"}
 )
+
+func TestPodIndexFunc(t *testing.T) {
+	tcs := []struct {
+		name          string
+		indexFunc     cache.IndexFunc
+		pod           interface{}
+		expectedValue string
+		expectedErr   error
+	}{
+		{
+			name:      "node name index",
+			indexFunc: NodeNameIndexFunc,
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					NodeName: "test-pod",
+				},
+			},
+			expectedValue: "test-pod",
+			expectedErr:   nil,
+		},
+		{
+			name:          "not a pod failed",
+			indexFunc:     NodeNameIndexFunc,
+			pod:           "not a pod object",
+			expectedValue: "test-pod",
+			expectedErr:   fmt.Errorf("not a pod"),
+		},
+	}
+
+	for _, tc := range tcs {
+		indexValues, err := tc.indexFunc(tc.pod)
+		if !reflect.DeepEqual(err, tc.expectedErr) {
+			t.Errorf("name %v, expected %v, got %v", tc.name, tc.expectedErr, err)
+		}
+		if err == nil && len(indexValues) != 1 && indexValues[0] != tc.expectedValue {
+			t.Errorf("name %v, expected %v, got %v", tc.name, tc.expectedValue, indexValues)
+		}
+
+	}
+}
