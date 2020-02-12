@@ -125,6 +125,16 @@ func (info *BaseServiceInfo) TopologyKeys() []string {
 	return info.topologyKeys
 }
 
+// OnlyNodeLocalTopology returns true if node (or hostname) topology
+// is the only requested topology for a Service.
+func (info *BaseServiceInfo) OnlyNodeLocalTopology() bool {
+	if len(info.topologyKeys) != 1 {
+		return false
+	}
+
+	return info.topologyKeys[0] == v1.LabelHostname
+}
+
 func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, service *v1.Service) *BaseServiceInfo {
 	onlyNodeLocalEndpoints := false
 	if apiservice.RequestsOnlyLocalTraffic(service) {

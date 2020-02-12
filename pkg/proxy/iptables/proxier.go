@@ -975,7 +975,7 @@ func (proxier *Proxier) syncProxyRules() {
 		// 2. ServiceTopology is not enabled.
 		// 3. EndpointSlice is not enabled (service topology depends on endpoint slice
 		// to get topology information).
-		if !svcInfo.OnlyNodeLocalEndpoints() && utilfeature.DefaultFeatureGate.Enabled(features.ServiceTopology) && utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceProxying) {
+		if !svcInfo.OnlyNodeLocalEndpoints() && isServiceTopologyEnabled() {
 			allEndpoints = proxy.FilterTopologyEndpoint(proxier.nodeLabels, svcInfo.TopologyKeys(), allEndpoints)
 			hasEndpoints = len(allEndpoints) > 0
 		}
@@ -992,7 +992,7 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 
 		svcXlbChain := svcInfo.serviceLBChainName
-		if svcInfo.OnlyNodeLocalEndpoints() {
+		if svcInfo.OnlyNodeLocalEndpoints() || (isServiceTopologyEnabled() && svcInfo.OnlyNodeLocalTopology()) {
 			// Only for services request OnlyLocal traffic
 			// create the per-service LB chain, retaining counters if possible.
 			if lbChain, ok := existingNATChains[svcXlbChain]; ok {
@@ -1140,7 +1140,7 @@ func (proxier *Proxier) syncProxyRules() {
 					chosenChain := svcXlbChain
 					// If we are proxying globally, we need to masquerade in case we cross nodes.
 					// If we are proxying only locally, we can retain the source IP.
-					if !svcInfo.OnlyNodeLocalEndpoints() {
+					if !svcInfo.OnlyNodeLocalEndpoints() && (!svcInfo.OnlyNodeLocalTopology() || !isServiceTopologyEnabled()) {
 						writeLine(proxier.natRules, append(args, "-j", string(KubeMarkMasqChain))...)
 						chosenChain = svcChain
 					}
@@ -1246,7 +1246,7 @@ func (proxier *Proxier) syncProxyRules() {
 					"-m", protocol, "-p", protocol,
 					"--dport", strconv.Itoa(svcInfo.NodePort()),
 				)
-				if !svcInfo.OnlyNodeLocalEndpoints() {
+				if !svcInfo.OnlyNodeLocalEndpoints() && (!svcInfo.OnlyNodeLocalTopology() || !isServiceTopologyEnabled()) {
 					// Nodeports need SNAT, unless they're local.
 					writeLine(proxier.natRules, append(args, "-j", string(KubeMarkMasqChain))...)
 					// Jump to the service chain.
@@ -1327,7 +1327,7 @@ func (proxier *Proxier) syncProxyRules() {
 		localEndpointChains := make([]utiliptables.Chain, 0)
 		for i, endpointChain := range endpointChains {
 			// Write ingress loadbalancing & DNAT rules only for services that request OnlyLocal traffic.
-			if svcInfo.OnlyNodeLocalEndpoints() && endpoints[i].IsLocal {
+			if (svcInfo.OnlyNodeLocalEndpoints() || (isServiceTopologyEnabled() && svcInfo.OnlyNodeLocalTopology())) && endpoints[i].IsLocal {
 				localEndpointChains = append(localEndpointChains, endpointChains[i])
 			}
 
@@ -1368,7 +1368,7 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 
 		// The logic below this applies only if this service is marked as OnlyLocal
-		if !svcInfo.OnlyNodeLocalEndpoints() {
+		if !svcInfo.OnlyNodeLocalEndpoints() && (!isServiceTopologyEnabled() || !svcInfo.OnlyNodeLocalTopology()) {
 			continue
 		}
 
@@ -1664,4 +1664,10 @@ func openLocalPort(lp *utilproxy.LocalPort, isIPv6 bool) (utilproxy.Closeable, e
 	}
 	klog.V(2).Infof("Opened local port %s", lp.String())
 	return socket, nil
+}
+
+// isServiceTopologyEnabled returns true if all the necessary feature gates for the ServiceTopology feature are enabled. Today they are:
+// ServiceTopology and EndpointSliceProxying
+func isServiceTopologyEnabled() bool {
+	return utilfeature.DefaultFeatureGate.Enabled(features.ServiceTopology) && utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceProxying)
 }
