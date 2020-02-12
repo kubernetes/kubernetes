@@ -20,6 +20,7 @@ limitations under the License.
 package mount
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -74,6 +75,36 @@ type MountPoint struct {
 	Opts   []string
 	Freq   int
 	Pass   int
+}
+
+type MountErrorType string
+
+const (
+	FilesystemMismatch  MountErrorType = "FilesystemMismatch"
+	HasFilesystemErrors MountErrorType = "HasFilesystemErrors"
+	UnformattedReadOnly MountErrorType = "UnformattedReadOnly"
+	FormatFailed        MountErrorType = "FormatFailed"
+)
+
+type MountError struct {
+	Type    MountErrorType
+	Message string
+}
+
+func (mountError *MountError) String() string {
+	return mountError.Message
+}
+
+func (mountError *MountError) Error() string {
+	return mountError.Message
+}
+
+func NewMountError(mountErrorValue MountErrorType, format string, args ...interface{}) error {
+	mountError := &MountError{
+		Type:    mountErrorValue,
+		Message: fmt.Sprintf(format, args...),
+	}
+	return mountError
 }
 
 // SafeFormatAndMount probes a device to see if it is formatted.
