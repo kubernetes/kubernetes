@@ -30,7 +30,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2eevents "k8s.io/kubernetes/test/e2e/framework/events"
 	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -708,7 +707,7 @@ func getRequestedStorageEphemeralStorage(pod v1.Pod) int64 {
 
 // removeTaintFromNodeAction returns a closure that removes the given taint
 // from the given node upon invocation.
-func removeTaintFromNodeAction(cs clientset.Interface, nodeName string, testTaint v1.Taint) e2eevents.Action {
+func removeTaintFromNodeAction(cs clientset.Interface, nodeName string, testTaint v1.Taint) Action {
 	return func() error {
 		framework.RemoveTaintOffNode(cs, nodeName, testTaint)
 		return nil
@@ -716,7 +715,7 @@ func removeTaintFromNodeAction(cs clientset.Interface, nodeName string, testTain
 }
 
 // createPausePodAction returns a closure that creates a pause pod upon invocation.
-func createPausePodAction(f *framework.Framework, conf pausePodConfig) e2eevents.Action {
+func createPausePodAction(f *framework.Framework, conf pausePodConfig) Action {
 	return func() error {
 		_, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), initPausePod(f, conf), metav1.CreateOptions{})
 		return err
@@ -725,12 +724,12 @@ func createPausePodAction(f *framework.Framework, conf pausePodConfig) e2eevents
 
 // WaitForSchedulerAfterAction performs the provided action and then waits for
 // scheduler to act on the given pod.
-func WaitForSchedulerAfterAction(f *framework.Framework, action e2eevents.Action, ns, podName string, expectSuccess bool) {
+func WaitForSchedulerAfterAction(f *framework.Framework, action Action, ns, podName string, expectSuccess bool) {
 	predicate := scheduleFailureEvent(podName)
 	if expectSuccess {
 		predicate = scheduleSuccessEvent(ns, podName, "" /* any node */)
 	}
-	success, err := e2eevents.ObserveEventAfterAction(f.ClientSet, f.Namespace.Name, predicate, action)
+	success, err := observeEventAfterAction(f.ClientSet, f.Namespace.Name, predicate, action)
 	framework.ExpectNoError(err)
 	framework.ExpectEqual(success, true)
 }
