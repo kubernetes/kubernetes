@@ -117,7 +117,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 		m.provisioner = config.GetUniqueDriverName()
 
 		if tp.nodeSelectorKey != "" {
-			framework.AddOrUpdateLabelOnNode(m.cs, m.config.ClientNodeName, tp.nodeSelectorKey, f.Namespace.Name)
+			framework.AddOrUpdateLabelOnNode(m.cs, m.config.ClientNodeSelection.Name, tp.nodeSelectorKey, f.Namespace.Name)
 			m.nodeLabel = map[string]string{
 				tp.nodeSelectorKey: f.Namespace.Name,
 			}
@@ -138,7 +138,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 		if dDriver, ok := m.driver.(testsuites.DynamicPVTestDriver); ok {
 			sc = dDriver.GetDynamicProvisionStorageClass(m.config, "")
 		}
-		nodeName := m.config.ClientNodeName
+		nodeName := m.config.ClientNodeSelection.Name
 		scTest := testsuites.StorageClassTest{
 			Name:         m.driver.GetDriverInfo().Name,
 			Provisioner:  sc.Provisioner,
@@ -184,7 +184,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 	}
 
 	createPodWithPVC := func(pvc *v1.PersistentVolumeClaim) (*v1.Pod, error) {
-		nodeName := m.config.ClientNodeName
+		nodeName := m.config.ClientNodeSelection.Name
 		nodeSelection := e2epod.NodeSelection{
 			Name: nodeName,
 		}
@@ -230,7 +230,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 		}
 
 		if len(m.nodeLabel) > 0 && len(m.tp.nodeSelectorKey) > 0 {
-			framework.RemoveLabelOffNode(m.cs, m.config.ClientNodeName, m.tp.nodeSelectorKey)
+			framework.RemoveLabelOffNode(m.cs, m.config.ClientNodeSelection.Name, m.tp.nodeSelectorKey)
 		}
 
 		err := utilerrors.NewAggregate(errs)
@@ -274,7 +274,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 
 				ginkgo.By("Checking if VolumeAttachment was created for the pod")
 				handle := getVolumeHandle(m.cs, claim)
-				attachmentHash := sha256.Sum256([]byte(fmt.Sprintf("%s%s%s", handle, m.provisioner, m.config.ClientNodeName)))
+				attachmentHash := sha256.Sum256([]byte(fmt.Sprintf("%s%s%s", handle, m.provisioner, m.config.ClientNodeSelection.Name)))
 				attachmentName := fmt.Sprintf("csi-%x", attachmentHash)
 				_, err = m.cs.StorageV1().VolumeAttachments().Get(context.TODO(), attachmentName, metav1.GetOptions{})
 				if err != nil {
@@ -390,7 +390,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 			nodeSelectorKey := fmt.Sprintf("attach-limit-csi-%s", f.Namespace.Name)
 			init(testParameters{nodeSelectorKey: nodeSelectorKey, attachLimit: 2})
 			defer cleanup()
-			nodeName := m.config.ClientNodeName
+			nodeName := m.config.ClientNodeSelection.Name
 			driverName := m.config.GetUniqueDriverName()
 
 			csiNodeAttachLimit, err := checkCSINodeForLimits(nodeName, driverName, m.cs)

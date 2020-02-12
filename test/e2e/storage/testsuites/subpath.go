@@ -149,17 +149,12 @@ func (s *subPathTestSuite) DefineTests(driver TestDriver, pattern testpatterns.T
 			framework.Failf("SubPath test doesn't support: %s", volType)
 		}
 
-		nodeSelection := e2epod.NodeSelection{
-			Name:     l.config.ClientNodeName,
-			Selector: l.config.ClientNodeSelector,
-		}
-
 		subPath := f.Namespace.Name
 		l.pod = SubpathTestPod(f, subPath, string(volType), l.resource.VolSource, true)
-		e2epod.SetNodeSelection(l.pod, nodeSelection)
+		e2epod.SetNodeSelection(l.pod, l.config.ClientNodeSelection)
 
 		l.formatPod = volumeFormatPod(f, l.resource.VolSource)
-		e2epod.SetNodeSelection(l.formatPod, nodeSelection)
+		e2epod.SetNodeSelection(l.formatPod, l.config.ClientNodeSelection)
 
 		l.subPathDir = filepath.Join(volumePath, subPath)
 		l.filePathInSubpath = filepath.Join(volumePath, fileName)

@@ -101,7 +101,7 @@ func (p *ephemeralTestSuite) DefineTests(driver TestDriver, pattern testpatterns
 			Client:     l.config.Framework.ClientSet,
 			Namespace:  f.Namespace.Name,
 			DriverName: eDriver.GetCSIDriverName(l.config),
-			Node:       e2epod.NodeSelection{Name: l.config.ClientNodeName},
+			Node:       l.config.ClientNodeSelection,
 			GetVolume: func(volumeNumber int) (map[string]string, bool, bool) {
 				return eDriver.GetVolume(l.config, volumeNumber)
 			},

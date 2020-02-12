@@ -32,6 +32,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/config"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
@@ -330,10 +331,10 @@ func (d *driverDefinition) GetCSIDriverName(config *testsuites.PerTestConfig) st
 
 func (d *driverDefinition) PrepareTest(f *framework.Framework) (*testsuites.PerTestConfig, func()) {
 	config := &testsuites.PerTestConfig{
-		Driver:         d,
-		Prefix:         "external",
-		Framework:      f,
-		ClientNodeName: d.ClientNodeName,
+		Driver:              d,
+		Prefix:              "external",
+		Framework:           f,
+		ClientNodeSelection: e2epod.NodeSelection{Name: d.ClientNodeName},
 	}
 	return config, func() {}
 }
