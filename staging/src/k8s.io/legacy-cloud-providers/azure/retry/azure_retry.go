@@ -58,8 +58,8 @@ type Backoff struct {
 	Cap time.Duration
 	// The errors indicate that the request shouldn't do more retrying.
 	NonRetriableErrors []string
-	// The HTTPStatusCode indicates that the request shouldn't do more retrying.
-	NonRetriableHTTPStatusCodes []int
+	// The RetriableHTTPStatusCodes indicates that the HTTPStatusCode should do more retrying.
+	RetriableHTTPStatusCodes []int
 }
 
 // NewBackoff creates a new Backoff.
@@ -73,11 +73,17 @@ func NewBackoff(duration time.Duration, factor float64, jitter float64, steps in
 	}
 }
 
-// WithNonRetriableErrors returns a new *Backoff with NonRetriableErrors, NonRetriableHTTPStatusCodes assigned.
-func (b *Backoff) WithNonRetriableErrors(errs []string, httpStatusCodes []int) *Backoff {
+// WithNonRetriableErrors returns a new *Backoff with NonRetriableErrors assigned.
+func (b *Backoff) WithNonRetriableErrors(errs []string) *Backoff {
 	newBackoff := *b
 	newBackoff.NonRetriableErrors = errs
-	newBackoff.NonRetriableHTTPStatusCodes = httpStatusCodes
+	return &newBackoff
+}
+
+// WithRetriableHTTPStatusCodes returns a new *Backoff with RetriableHTTPStatusCode assigned.
+func (b *Backoff) WithRetriableHTTPStatusCodes(httpStatusCodes []int) *Backoff {
+	newBackoff := *b
+	newBackoff.RetriableHTTPStatusCodes = httpStatusCodes
 	return &newBackoff
 }
 
@@ -93,11 +99,6 @@ func (b *Backoff) isNonRetriableError(rerr *Error) bool {
 		}
 	}
 
-	for _, code := range b.NonRetriableHTTPStatusCodes {
-		if rerr.HTTPStatusCode == code {
-			return true
-		}
-	}
 	return false
 }
 
@@ -162,7 +163,7 @@ func doBackoffRetry(s autorest.Sender, r *http.Request, backoff *Backoff) (resp 
 			return
 		}
 		resp, err = s.Do(rr.Request())
-		rerr := GetError(resp, err)
+		rerr := GetErrorWithRetriableHTTPStatusCodes(resp, err, backoff.RetriableHTTPStatusCodes)
 		// Abort retries in the following scenarios:
 		// 1) request succeed
 		// 2) request is not retriable

@@ -801,7 +801,7 @@ func TestReconcileSecurityGroupEtagMismatch(t *testing.T) {
 		HTTPStatusCode: http.StatusPreconditionFailed,
 		RawError:       errPreconditionFailedEtagMismatch,
 	}
-	assert.Equal(t, err, expectedError.Error())
+	assert.Equal(t, expectedError.Error(), err)
 }
 
 func TestReconcilePublicIPWithNewService(t *testing.T) {

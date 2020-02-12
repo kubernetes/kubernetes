@@ -504,22 +504,16 @@ func (az *Cloud) InitializeCloudFromConfig(config *Config, fromSecret bool) erro
 	az.VirtualMachineSizesClient = vmsizeclient.New(azClientConfig.WithRateLimiter(config.VirtualMachineSizeRateLimit))
 	az.SnapshotsClient = snapshotclient.New(azClientConfig.WithRateLimiter(config.SnapshotRateLimit))
 	az.StorageAccountClient = storageaccountclient.New(azClientConfig.WithRateLimiter(config.StorageAccountRateLimit))
-
+	az.VirtualMachinesClient = vmclient.New(azClientConfig.WithRateLimiter(config.VirtualMachineRateLimit))
+	az.DisksClient = diskclient.New(azClientConfig.WithRateLimiter(config.DiskRateLimit))
 	// fileClient is not based on armclient, but it's still backoff retried.
-	az.FileClient = newAzureFileClient(env, azClientConfig.Backoff.WithNonRetriableErrors([]string{}, []int{http.StatusNotFound}))
-
-	vmClientConfig := azClientConfig.WithRateLimiter(config.VirtualMachineRateLimit)
-	vmClientConfig.Backoff = vmClientConfig.Backoff.WithNonRetriableErrors([]string{}, []int{http.StatusConflict})
-	az.VirtualMachinesClient = vmclient.New(vmClientConfig)
+	az.FileClient = newAzureFileClient(env, azClientConfig.Backoff)
 
 	// Error "not an active Virtual Machine Scale Set VM" is not retriable for VMSS VM.
+	// But http.StatusNotFound is retriable because of ARM replication latency.
 	vmssVMClientConfig := azClientConfig.WithRateLimiter(config.VirtualMachineScaleSetRateLimit)
-	vmssVMClientConfig.Backoff = vmssVMClientConfig.Backoff.WithNonRetriableErrors([]string{vmssVMNotActiveErrorMessage}, []int{http.StatusConflict})
+	vmssVMClientConfig.Backoff = vmssVMClientConfig.Backoff.WithNonRetriableErrors([]string{vmssVMNotActiveErrorMessage}).WithRetriableHTTPStatusCodes([]int{http.StatusNotFound})
 	az.VirtualMachineScaleSetVMsClient = vmssvmclient.New(vmssVMClientConfig)
-
-	disksClientConfig := azClientConfig.WithRateLimiter(config.DiskRateLimit)
-	disksClientConfig.Backoff = disksClientConfig.Backoff.WithNonRetriableErrors([]string{}, []int{http.StatusNotFound, http.StatusConflict})
-	az.DisksClient = diskclient.New(disksClientConfig)
 
 	if az.MaximumLoadBalancerRuleCount == 0 {
 		az.MaximumLoadBalancerRuleCount = maximumLoadBalancerRuleCount

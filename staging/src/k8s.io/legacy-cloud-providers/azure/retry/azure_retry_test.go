@@ -75,11 +75,6 @@ func TestStep(t *testing.T) {
 }
 
 func TestDoBackoffRetry(t *testing.T) {
-	backoff := &Backoff{
-		Factor:                      1.0,
-		Steps:                       3,
-		NonRetriableHTTPStatusCodes: []int{http.StatusNotFound},
-	}
 	fakeRequest := &http.Request{
 		URL: &url.URL{
 			Host: "localhost",
@@ -96,7 +91,7 @@ func TestDoBackoffRetry(t *testing.T) {
 		HTTPStatusCode: 500,
 		RawError:       fmt.Errorf("HTTP status code (500)"),
 	}
-	resp, err := doBackoffRetry(client, fakeRequest, backoff)
+	resp, err := doBackoffRetry(client, fakeRequest, &Backoff{Factor: 1.0, Steps: 3})
 	assert.NotNil(t, resp)
 	assert.Equal(t, 500, resp.StatusCode)
 	assert.Equal(t, expectedErr.Error(), err)
@@ -106,7 +101,7 @@ func TestDoBackoffRetry(t *testing.T) {
 	r = mocks.NewResponseWithStatus("200 OK", http.StatusOK)
 	client = mocks.NewSender()
 	client.AppendAndRepeatResponse(r, 1)
-	resp, err = doBackoffRetry(client, fakeRequest, backoff)
+	resp, err = doBackoffRetry(client, fakeRequest, &Backoff{Factor: 1.0, Steps: 3})
 	assert.Nil(t, err)
 	assert.Equal(t, 1, client.Attempts())
 	assert.NotNil(t, resp)
@@ -117,28 +112,47 @@ func TestDoBackoffRetry(t *testing.T) {
 	client = mocks.NewSender()
 	client.AppendAndRepeatResponse(r, 1)
 	expectedErr = &Error{
-		Retriable:      true,
+		Retriable:      false,
 		HTTPStatusCode: 429,
 		RawError:       fmt.Errorf("HTTP status code (429)"),
 	}
-	resp, err = doBackoffRetry(client, fakeRequest, backoff)
+	resp, err = doBackoffRetry(client, fakeRequest, &Backoff{Factor: 1.0, Steps: 3})
 	assert.Equal(t, expectedErr.Error(), err)
 	assert.Equal(t, 1, client.Attempts())
 	assert.NotNil(t, resp)
 	assert.Equal(t, 429, resp.StatusCode)
 
-	// retry on non retriable error
+	// don't retry on non retriable error
 	r = mocks.NewResponseWithStatus("404 StatusNotFound", http.StatusNotFound)
 	client = mocks.NewSender()
 	client.AppendAndRepeatResponse(r, 1)
 	expectedErr = &Error{
-		Retriable:      true,
+		Retriable:      false,
 		HTTPStatusCode: 404,
 		RawError:       fmt.Errorf("HTTP status code (404)"),
 	}
-	resp, err = doBackoffRetry(client, fakeRequest, backoff)
+	resp, err = doBackoffRetry(client, fakeRequest, &Backoff{Factor: 1.0, Steps: 3})
 	assert.NotNil(t, resp)
 	assert.Equal(t, 404, resp.StatusCode)
 	assert.Equal(t, expectedErr.Error(), err)
 	assert.Equal(t, 1, client.Attempts())
+
+	// retry on RetriableHTTPStatusCodes
+	r = mocks.NewResponseWithStatus("102 StatusProcessing", http.StatusProcessing)
+	client = mocks.NewSender()
+	client.AppendAndRepeatResponse(r, 3)
+	expectedErr = &Error{
+		Retriable:      true,
+		HTTPStatusCode: 102,
+		RawError:       fmt.Errorf("HTTP status code (102)"),
+	}
+	resp, err = doBackoffRetry(client, fakeRequest, &Backoff{
+		Factor:                   1.0,
+		Steps:                    3,
+		RetriableHTTPStatusCodes: []int{http.StatusProcessing},
+	})
+	assert.NotNil(t, resp)
+	assert.Equal(t, 102, resp.StatusCode)
+	assert.Equal(t, expectedErr.Error(), err)
+	assert.Equal(t, 3, client.Attempts())
 }
