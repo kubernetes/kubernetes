@@ -18,6 +18,7 @@ package apiserver
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -35,10 +36,10 @@ import (
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	"k8s.io/apiserver/pkg/server/egressselector"
 	v1informers "k8s.io/client-go/informers/core/v1"
 	v1listers "k8s.io/client-go/listers/core/v1"
-	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/transport"
 	"k8s.io/client-go/util/workqueue"
@@ -71,6 +72,7 @@ type AvailableConditionController struct {
 	endpointsSynced cache.InformerSynced
 
 	discoveryClient *http.Client
+
 	serviceResolver ServiceResolver
 
 	// To allow injection for testing.
@@ -89,11 +91,10 @@ func NewAvailableConditionController(
 	serviceInformer v1informers.ServiceInformer,
 	endpointsInformer v1informers.EndpointsInformer,
 	apiServiceClient apiregistrationclient.APIServicesGetter,
-	proxyTransport *http.Transport,
-	proxyClientCert []byte,
-	proxyClientKey []byte,
-	serviceResolver ServiceResolver,
+	certKeyContentProvider dynamiccertificates.CertKeyContentProvider,
 	egressSelector *egressselector.EgressSelector,
+	proxyTransport *http.Transport,
+	serviceResolver ServiceResolver,
 ) (*AvailableConditionController, error) {
 	c := &AvailableConditionController{
 		apiServiceClient: apiServiceClient,
@@ -110,39 +111,6 @@ func NewAvailableConditionController(
 			// the maximum disruption time to a minimum, but it does prevent hot loops.
 			workqueue.NewItemExponentialFailureRateLimiter(5*time.Millisecond, 30*time.Second),
 			"AvailableConditionController"),
-	}
-
-	// if a particular transport was specified, use that otherwise build one
-	// construct an http client that will ignore TLS verification (if someone owns the network and messes with your status
-	// that's not so bad) and sets a very short timeout.  This is a best effort GET that provides no additional information
-	restConfig := &rest.Config{
-		TLSClientConfig: rest.TLSClientConfig{
-			Insecure: true,
-			CertData: proxyClientCert,
-			KeyData:  proxyClientKey,
-		},
-	}
-
-	if egressSelector != nil {
-		networkContext := egressselector.Cluster.AsNetworkContext()
-		var egressDialer utilnet.DialFunc
-		egressDialer, err := egressSelector.Lookup(networkContext)
-		if err != nil {
-			return nil, err
-		}
-		restConfig.Dial = egressDialer
-	} else if proxyTransport != nil && proxyTransport.DialContext != nil {
-		restConfig.Dial = proxyTransport.DialContext
-	}
-
-	transport, err := rest.TransportFor(restConfig)
-	if err != nil {
-		return nil, err
-	}
-	c.discoveryClient = &http.Client{
-		Transport: transport,
-		// the request should happen quickly.
-		Timeout: 5 * time.Second,
 	}
 
 	// resync on this one because it is low cardinality and rechecking the actual discovery
@@ -168,6 +136,39 @@ func NewAvailableConditionController(
 		UpdateFunc: c.updateEndpoints,
 		DeleteFunc: c.deleteEndpoints,
 	})
+
+	transportConfig := &transport.Config{
+		TLS: transport.TLSConfig{
+			Insecure: true,
+			GetCert: func() (*tls.Certificate, error) {
+				cert, key := certKeyContentProvider.CurrentCertKeyContent()
+				crt, err := tls.X509KeyPair(cert, key)
+				return &crt, err
+			},
+		},
+	}
+
+	if egressSelector != nil {
+		networkContext := egressselector.Cluster.AsNetworkContext()
+		var egressDialer utilnet.DialFunc
+		egressDialer, err := egressSelector.Lookup(networkContext)
+		if err != nil {
+			return nil, err
+		}
+		transportConfig.Dial = egressDialer
+	} else if proxyTransport != nil && proxyTransport.DialContext != nil {
+		transportConfig.Dial = proxyTransport.DialContext
+	}
+
+	tr, err := transport.New(transportConfig)
+	if err != nil {
+		return nil, err
+	}
+	c.discoveryClient = &http.Client{
+		Transport: tr,
+		// the request should happen quickly.
+		Timeout: 5 * time.Second,
+	}
 
 	c.syncFn = c.sync
 

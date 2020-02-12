@@ -18,13 +18,14 @@ package apiserver
 
 import (
 	"fmt"
-	"k8s.io/utils/pointer"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
 	"time"
+
+	"k8s.io/utils/pointer"
 
 	"github.com/davecgh/go-spew/spew"
 
@@ -33,6 +34,7 @@ import (
 	v1listers "k8s.io/client-go/listers/core/v1"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/transport"
 	"k8s.io/client-go/util/workqueue"
 	apiregistration "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	"k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/fake"
@@ -120,13 +122,23 @@ func setupAPIServices(apiServices []*apiregistration.APIService) (*AvailableCond
 		apiServiceIndexer.Add(o)
 	}
 
+	tr, _ := transport.New(&transport.Config{
+		TLS: transport.TLSConfig{
+			Insecure:   true,
+			ServerName: "",
+		}})
+
 	c := AvailableConditionController{
 		apiServiceClient: fakeClient.ApiregistrationV1(),
 		apiServiceLister: listers.NewAPIServiceLister(apiServiceIndexer),
 		serviceLister:    v1listers.NewServiceLister(serviceIndexer),
 		endpointsLister:  v1listers.NewEndpointsLister(endpointsIndexer),
-		discoveryClient:  testServer.Client(),
-		serviceResolver:  &fakeServiceResolver{url: testServer.URL},
+		discoveryClient: &http.Client{
+			Transport: tr,
+			// the request should happen quickly.
+			Timeout: 5 * time.Second,
+		},
+		serviceResolver: &fakeServiceResolver{url: testServer.URL},
 		queue: workqueue.NewNamedRateLimitingQueue(
 			// We want a fairly tight requeue time.  The controller listens to the API, but because it relies on the routability of the
 			// service network, it is possible for an external, non-watchable factor to affect availability.  This keeps
@@ -349,13 +361,23 @@ func TestSync(t *testing.T) {
 			}))
 			defer testServer.Close()
 
+			tr, _ := transport.New(&transport.Config{
+				TLS: transport.TLSConfig{
+					Insecure:   true,
+					ServerName: "",
+				}})
+
 			c := AvailableConditionController{
 				apiServiceClient: fakeClient.ApiregistrationV1(),
 				apiServiceLister: listers.NewAPIServiceLister(apiServiceIndexer),
 				serviceLister:    v1listers.NewServiceLister(serviceIndexer),
 				endpointsLister:  v1listers.NewEndpointsLister(endpointsIndexer),
-				discoveryClient:  testServer.Client(),
 				serviceResolver:  &fakeServiceResolver{url: testServer.URL},
+				discoveryClient: &http.Client{
+					Transport: tr,
+					// the request should happen quickly.
+					Timeout: 5 * time.Second,
+				},
 			}
 			c.sync(tc.apiServiceName)
 
