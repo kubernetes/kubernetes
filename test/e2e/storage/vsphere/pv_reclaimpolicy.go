@@ -33,7 +33,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
-var _ = utils.SIGDescribe("PersistentVolumes [Feature:ReclaimPolicy]", func() {
+var _ = utils.SIGDescribe("PersistentVolumes [Feature:vsphere][Feature:ReclaimPolicy]", func() {
 	f := framework.NewDefaultFramework("persistentvolumereclaim")
 	var (
 		c          clientset.Interface
@@ -50,7 +50,7 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:ReclaimPolicy]", func() {
 		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(c, framework.TestContext.NodeSchedulableTimeout))
 	})
 
-	utils.SIGDescribe("persistentvolumereclaim:vsphere", func() {
+	utils.SIGDescribe("persistentvolumereclaim:vsphere [Feature:vsphere]", func() {
 		ginkgo.BeforeEach(func() {
 			e2eskipper.SkipUnlessProviderIs("vsphere")
 			Bootstrap(f)
