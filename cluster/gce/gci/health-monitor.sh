@@ -72,7 +72,7 @@ function kubelet_monitoring {
   local -r max_seconds=10
   local output=""
   while [ 1 ]; do
-    if ! output=$(curl -m "${max_seconds}" -f -s -S http://127.0.0.1:10255/healthz 2>&1); then
+    if ! output=$(curl -m "${max_seconds}" -f -s -S http://127.0.0.1:10248/healthz 2>&1); then
       # Print the response and/or errors.
       echo $output
       echo "Kubelet is unhealthy!"
