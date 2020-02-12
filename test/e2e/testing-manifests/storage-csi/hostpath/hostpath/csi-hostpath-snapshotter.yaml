@@ -28,6 +28,16 @@ spec:
         app: csi-snapshotter
     spec:
       serviceAccount: csi-snapshotter
+      affinity:
+        podAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: app
+                operator: In
+                values:
+                - csi-hostpathplugin
+            topologyKey: kubernetes.io/hostname
       containers:
       - name: csi-snapshotter
         image: quay.io/k8scsi/csi-snapshotter:v2.0.0
