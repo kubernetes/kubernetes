@@ -70,6 +70,9 @@
         { "name": "srvkube",
         "mountPath": "/etc/srv/kubernetes",
         "readOnly": true},
+        { "name": "profiles",
+        "mountPath": "/var/log/profiles",
+        "readOnly": false},
         { "name": "logfile",
         "mountPath": "/var/log/kube-apiserver.log",
         "readOnly": false},
@@ -116,6 +119,11 @@
     "hostPath": {
         "path": "/var/log/kube-apiserver.log",
         "type": "FileOrCreate"}
+  },
+  {"name": "profiles",
+    "hostPath": {
+        "path": "/var/log/profiles",
+        "type": "DirectoryOrCreate"}
   },
   { "name": "auditlogfile",
     "hostPath": {

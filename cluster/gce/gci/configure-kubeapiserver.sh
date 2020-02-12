@@ -62,6 +62,7 @@ function configure-etcd-params {
 #   INSECURE_PORT_MAPPING
 function start-kube-apiserver {
   echo "Start kubernetes api-server"
+  prepare-profile-dir /var/log/profiles
   prepare-log-file "${KUBE_API_SERVER_LOG_PATH:-/var/log/kube-apiserver.log}"
   prepare-log-file "${KUBE_API_SERVER_AUDIT_LOG_PATH:-/var/log/kube-apiserver-audit.log}"
 
@@ -331,7 +332,7 @@ function start-kube-apiserver {
     params+=" --egress-selector-config-file=/etc/srv/kubernetes/egress_selector_configuration.yaml"
   fi
 
-  local container_env=""
+  local container_env="{\"name\": \"PROFILE_DIR\", \"value\": \"/var/log/profiles\"}"
   if [[ -n "${ENABLE_CACHE_MUTATION_DETECTOR:-}" ]]; then
     container_env+="{\"name\": \"KUBE_CACHE_MUTATION_DETECTOR\", \"value\": \"${ENABLE_CACHE_MUTATION_DETECTOR}\"}"
   fi

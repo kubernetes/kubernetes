@@ -20,6 +20,7 @@ go_library(
     importpath = "k8s.io/kubernetes/cmd/kube-apiserver",
     deps = [
         "//cmd/kube-apiserver/app:go_default_library",
+        "//cmd/pprof:go_default_library",
         "//staging/src/k8s.io/component-base/logs:go_default_library",
         "//staging/src/k8s.io/component-base/metrics/prometheus/clientgo:go_default_library",
     ],

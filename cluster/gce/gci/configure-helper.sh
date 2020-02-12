@@ -1453,6 +1453,11 @@ function prepare-log-file {
   chmod 644 $1
   chown "${2:-${LOG_OWNER_USER:-root}}":"${3:-${LOG_OWNER_GROUP:-root}}" $1
 }
+function prepare-profile-dir {
+  mkdir -p $1
+  chmod 755 $1
+  chown "${2:-${LOG_OWNER_USER:-root}}":"${3:-${LOG_OWNER_GROUP:-root}}" $1
+}
 
 # Prepares parameters for kube-proxy manifest.
 # $1 source path of kube-proxy manifest.
@@ -1778,6 +1783,7 @@ function start-kube-controller-manager {
   echo "Start kubernetes controller-manager"
   create-kubeconfig "kube-controller-manager" ${KUBE_CONTROLLER_MANAGER_TOKEN}
   prepare-log-file /var/log/kube-controller-manager.log
+  prepare-profile-dir /var/log/profiles
   # Calculate variables and assemble the command line.
   local params="${CONTROLLER_MANAGER_TEST_LOG_LEVEL:-"--v=2"} ${CONTROLLER_MANAGER_TEST_ARGS:-} ${CLOUD_CONFIG_OPT}"
   params+=" --use-service-account-credentials"
@@ -1842,7 +1848,9 @@ function start-kube-controller-manager {
   local -r kube_rc_docker_tag=$(cat /home/kubernetes/kube-docker-files/kube-controller-manager.docker_tag)
   local container_env=""
   if [[ -n "${ENABLE_CACHE_MUTATION_DETECTOR:-}" ]]; then
-    container_env="\"env\":[{\"name\": \"KUBE_CACHE_MUTATION_DETECTOR\", \"value\": \"${ENABLE_CACHE_MUTATION_DETECTOR}\"}],"
+    container_env="\"env\":[{\"name\": \"PROFILE_DIR\", \"value\": \"/var/log/profiles\"},{\"name\": \"KUBE_CACHE_MUTATION_DETECTOR\", \"value\": \"${ENABLE_CACHE_MUTATION_DETECTOR}\"}],"
+  else
+    container_env="\"env\":[{\"name\": \"PROFILE_DIR\", \"value\": \"/var/log/profiles\"}],"
   fi
 
   local -r src_file="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/kube-controller-manager.manifest"

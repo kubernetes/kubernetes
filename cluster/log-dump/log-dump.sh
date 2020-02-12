@@ -158,6 +158,9 @@ function save-logs() {
 
     if log-dump-ssh "${node_name}" "command -v journalctl" &> /dev/null; then
         if [[ "${on_master}" == "true" ]]; then
+
+          gcloud compute scp --recurse --project "${PROJECT}" --zone "${ZONE}" "${node}:/var/log/profiles" "${dir}/" > /dev/null || true
+
           log-dump-ssh "${node_name}" "sudo journalctl --output=short-precise -u kube-master-installation.service" > "${dir}/kube-master-installation.log" || true
           log-dump-ssh "${node_name}" "sudo journalctl --output=short-precise -u kube-master-configuration.service" > "${dir}/kube-master-configuration.log" || true
         else

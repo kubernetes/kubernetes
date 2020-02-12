@@ -47,6 +47,9 @@
         "mountPath": "/etc/srv/kubernetes",
         "readOnly": true},
         {{flexvolume_hostpath_mount}}
+        { "name": "profiles",
+        "mountPath": "/var/log/profiles",
+        "readOnly": false},
         { "name": "logfile",
         "mountPath": "/var/log/kube-controller-manager.log",
         "readOnly": false},
@@ -77,6 +80,11 @@
         "path": "/etc/srv/kubernetes"}
   },
   {{flexvolume_hostpath}}
+  { "name": "profiles",
+    "hostPath": {
+        "path": "/var/log/profiles",
+        "type": "DirectoryOrCreate"}
+  },
   { "name": "logfile",
     "hostPath": {
         "path": "/var/log/kube-controller-manager.log",
