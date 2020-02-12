@@ -169,16 +169,11 @@ func (h *hostpathCSIDriver) GetSnapshotClass(config *testsuites.PerTestConfig) *
 func (h *hostpathCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConfig, func()) {
 	ginkgo.By(fmt.Sprintf("deploying %s driver", h.driverInfo.Name))
 	cancelLogging := testsuites.StartPodLogs(f)
-	cs := f.ClientSet
 
-	// The hostpath CSI driver only works when everything runs on the same node.
-	node, err := e2enode.GetRandomReadySchedulableNode(cs)
-	framework.ExpectNoError(err)
 	config := &testsuites.PerTestConfig{
-		Driver:         h,
-		Prefix:         "hostpath",
-		Framework:      f,
-		ClientNodeName: node.Name,
+		Driver:    h,
+		Prefix:    "hostpath",
+		Framework: f,
 	}
 
 	o := utils.PatchCSIOptions{
@@ -188,7 +183,6 @@ func (h *hostpathCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.Per
 		DriverContainerArguments: []string{"--drivername=" + config.GetUniqueDriverName()},
 		ProvisionerContainerName: "csi-provisioner",
 		SnapshotterContainerName: "csi-snapshotter",
-		NodeName:                 node.Name,
 	}
 	cleanup, err := utils.CreateFromManifests(config.Framework, func(item interface{}) error {
 		return utils.PatchCSIDeployment(config.Framework, o, item)

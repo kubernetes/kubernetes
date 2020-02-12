@@ -28,6 +28,16 @@ spec:
         app: csi-hostpath-resizer
     spec:
       serviceAccountName: csi-resizer
+      affinity:
+        podAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: app
+                operator: In
+                values:
+                - csi-hostpathplugin
+            topologyKey: kubernetes.io/hostname
       containers:
         - name: csi-resizer
           image: quay.io/k8scsi/csi-resizer:v0.4.0
