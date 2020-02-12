@@ -27,6 +27,8 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 )
 
+// Write and other vars are slices of the allowed verbs.
+// Label and Annotation are default maps of bootstrappolicy.
 var (
 	Write      = []string{"create", "update", "patch", "delete", "deletecollection"}
 	ReadWrite  = []string{"get", "list", "watch", "create", "update", "patch", "delete", "deletecollection"}
@@ -97,6 +99,7 @@ func addClusterRoleBindingLabel(rolebindings []rbacv1.ClusterRoleBinding) {
 	return
 }
 
+// NodeRules returns node policy rules, it is slice of rbacv1.PolicyRule.
 func NodeRules() []rbacv1.PolicyRule {
 	nodePolicyRules := []rbacv1.PolicyRule{
 		// Needed to check API access.  These creates are non-mutating
@@ -539,6 +542,7 @@ func ClusterRoleBindings() []rbacv1.ClusterRoleBinding {
 	return rolebindings
 }
 
+// ClusterRolesToAggregate maps from previous clusterrole name to the new clusterrole name
 func ClusterRolesToAggregate() map[string]string {
 	return map[string]string{
 		"admin": "system:aggregate-to-admin",
