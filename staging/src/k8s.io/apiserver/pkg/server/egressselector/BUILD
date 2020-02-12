@@ -19,7 +19,7 @@ go_library(
         "//vendor/google.golang.org/grpc:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
         "//vendor/k8s.io/utils/path:go_default_library",
-        "//vendor/sigs.k8s.io/apiserver-network-proxy/pkg/agent/client:go_default_library",
+        "//vendor/sigs.k8s.io/apiserver-network-proxy/konnectivity-client/pkg/client:go_default_library",
         "//vendor/sigs.k8s.io/yaml:go_default_library",
     ],
 )

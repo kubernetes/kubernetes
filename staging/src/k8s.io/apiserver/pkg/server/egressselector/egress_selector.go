@@ -30,7 +30,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	client "sigs.k8s.io/apiserver-network-proxy/pkg/agent/client"
+	client "sigs.k8s.io/apiserver-network-proxy/konnectivity-client/pkg/client"
 	"strings"
 )
 
