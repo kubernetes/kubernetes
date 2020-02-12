@@ -25,11 +25,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	genericapiserver "k8s.io/apiserver/pkg/server"
+	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	"k8s.io/apiserver/pkg/server/egressselector"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/client-go/pkg/version"
-	openapicommon "k8s.io/kube-openapi/pkg/common"
-
 	v1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	v1helper "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1/helper"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
@@ -41,6 +40,7 @@ import (
 	openapiaggregator "k8s.io/kube-aggregator/pkg/controllers/openapi/aggregator"
 	statuscontrollers "k8s.io/kube-aggregator/pkg/controllers/status"
 	apiservicerest "k8s.io/kube-aggregator/pkg/registry/apiservice/rest"
+	openapicommon "k8s.io/kube-openapi/pkg/common"
 )
 
 func init() {
@@ -64,8 +64,8 @@ const legacyAPIServiceName = "v1."
 type ExtraConfig struct {
 	// ProxyClientCert/Key are the client cert used to identify this proxy. Backing APIServices use
 	// this to confirm the proxy's identity
-	ProxyClientCert []byte
-	ProxyClientKey  []byte
+	ProxyClientCertFile string
+	ProxyClientKeyFile  string
 
 	// If present, the Dial method will be used for dialing out to delegate
 	// apiservers.
@@ -108,11 +108,10 @@ type APIAggregator struct {
 
 	delegateHandler http.Handler
 
-	// proxyClientCert/Key are the client cert used to identify this proxy. Backing APIServices use
+	// certKeyContentProvider is dynamically reloaded client cert used to identify this proxy. Backing APIServices use
 	// this to confirm the proxy's identity
-	proxyClientCert []byte
-	proxyClientKey  []byte
-	proxyTransport  *http.Transport
+	certKeyContentProvider dynamiccertificates.CertKeyContentProvider
+	proxyTransport         *http.Transport
 
 	// proxyHandlers are the proxy handlers that are currently registered, keyed by apiservice.name
 	proxyHandlers map[string]*proxyHandler
@@ -177,11 +176,21 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		5*time.Minute, // this is effectively used as a refresh interval right now.  Might want to do something nicer later on.
 	)
 
+	var certKeyContentProvider *dynamiccertificates.DynamicCertKeyPairContent
+	if len(c.ExtraConfig.ProxyClientCertFile) > 0 && len(c.ExtraConfig.ProxyClientKeyFile) > 0 {
+		certKeyContentProvider, err = dynamiccertificates.NewDynamicServingContentFromFiles("aggregator-proxy-cert", c.ExtraConfig.ProxyClientCertFile, c.ExtraConfig.ProxyClientKeyFile)
+		if err != nil {
+			return nil, err
+		}
+		if err := certKeyContentProvider.RunOnce(); err != nil {
+			return nil, err
+		}
+	}
+
 	s := &APIAggregator{
 		GenericAPIServer:         genericServer,
 		delegateHandler:          delegationTarget.UnprotectedHandler(),
-		proxyClientCert:          c.ExtraConfig.ProxyClientCert,
-		proxyClientKey:           c.ExtraConfig.ProxyClientKey,
+		certKeyContentProvider:   certKeyContentProvider,
 		proxyTransport:           c.ExtraConfig.ProxyTransport,
 		proxyHandlers:            map[string]*proxyHandler{},
 		handledGroups:            sets.String{},
@@ -214,16 +223,16 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 	s.GenericAPIServer.Handler.NonGoRestfulMux.UnlistedHandle("/apis/", apisHandler)
 
 	apiserviceRegistrationController := NewAPIServiceRegistrationController(informerFactory.Apiregistration().V1().APIServices(), s)
+
 	availableController, err := statuscontrollers.NewAvailableConditionController(
 		informerFactory.Apiregistration().V1().APIServices(),
 		c.GenericConfig.SharedInformerFactory.Core().V1().Services(),
 		c.GenericConfig.SharedInformerFactory.Core().V1().Endpoints(),
 		apiregistrationClient.ApiregistrationV1(),
-		c.ExtraConfig.ProxyTransport,
-		c.ExtraConfig.ProxyClientCert,
-		c.ExtraConfig.ProxyClientKey,
-		s.serviceResolver,
+		certKeyContentProvider,
 		c.GenericConfig.EgressSelector,
+		c.ExtraConfig.ProxyTransport,
+		s.serviceResolver,
 	)
 	if err != nil {
 		return nil, err
@@ -234,6 +243,12 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		c.GenericConfig.SharedInformerFactory.Start(context.StopCh)
 		return nil
 	})
+	if certKeyContentProvider != nil {
+		s.GenericAPIServer.AddPostStartHookOrDie("start-kube-aggregator-dynamic-cert-reload", func(context genericapiserver.PostStartHookContext) error {
+			go certKeyContentProvider.Run(1, context.StopCh)
+			return nil
+		})
+	}
 	s.GenericAPIServer.AddPostStartHookOrDie("apiservice-registration-controller", func(context genericapiserver.PostStartHookContext) error {
 		handlerSyncedCh := make(chan struct{})
 		go apiserviceRegistrationController.Run(context.StopCh, handlerSyncedCh)
@@ -309,12 +324,9 @@ func (s *APIAggregator) AddAPIService(apiService *v1.APIService) error {
 
 	// register the proxy handler
 	proxyHandler := &proxyHandler{
-		localDelegate:   s.delegateHandler,
-		proxyClientCert: s.proxyClientCert,
-		proxyClientKey:  s.proxyClientKey,
-		proxyTransport:  s.proxyTransport,
-		serviceResolver: s.serviceResolver,
-		egressSelector:  s.egressSelector,
+		localDelegate:          s.delegateHandler,
+		certKeyContentProvider: s.certKeyContentProvider,
+		serviceResolver:        s.serviceResolver,
 	}
 	proxyHandler.updateAPIService(apiService)
 	if s.openAPIAggregationController != nil {

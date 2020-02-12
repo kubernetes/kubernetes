@@ -18,6 +18,7 @@ package apiserver
 
 import (
 	"context"
+	"crypto/tls"
 	"net/http"
 	"net/url"
 	"strings"
@@ -33,9 +34,9 @@ import (
 	endpointmetrics "k8s.io/apiserver/pkg/endpoints/metrics"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	genericfeatures "k8s.io/apiserver/pkg/features"
+	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	"k8s.io/apiserver/pkg/server/egressselector"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/transport"
 	"k8s.io/klog/v2"
 	apiregistrationv1api "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
@@ -54,11 +55,10 @@ type proxyHandler struct {
 	// localDelegate is used to satisfy local APIServices
 	localDelegate http.Handler
 
-	// proxyClientCert/Key are the client cert used to identify this proxy. Backing APIServices use
-	// this to confirm the proxy's identity
-	proxyClientCert []byte
-	proxyClientKey  []byte
-	proxyTransport  *http.Transport
+	// certKeyContentProvider provides certificates to confirm the proxy's identity
+	certKeyContentProvider dynamiccertificates.CertKeyContentProvider
+
+	proxyTransport *http.Transport
 
 	// Endpoints based routing to map from cluster IP to routable IP
 	serviceResolver ServiceResolver
@@ -76,13 +76,8 @@ type proxyHandlingInfo struct {
 
 	// name is the name of the APIService
 	name string
-	// restConfig holds the information for building a roundtripper
-	restConfig *restclient.Config
-	// transportBuildingError is an error produced while building the transport.  If this
-	// is non-nil, it will be reported to clients.
-	transportBuildingError error
-	// proxyRoundTripper is the re-useable portion of the transport.  It does not vary with any request.
-	proxyRoundTripper http.RoundTripper
+	// transportConfig holds the information for building a roundtripper
+	transportConfig *transport.Config
 	// serviceName is the name of the service this handler proxies to
 	serviceName string
 	// namespace is the namespace the service lives in
@@ -127,11 +122,6 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if handlingInfo.transportBuildingError != nil {
-		proxyError(w, req, handlingInfo.transportBuildingError.Error(), http.StatusInternalServerError)
-		return
-	}
-
 	user, ok := genericapirequest.UserFrom(req.Context())
 	if !ok {
 		proxyError(w, req, "missing user", http.StatusInternalServerError)
@@ -154,13 +144,19 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	newReq, cancelFn := newRequestForProxy(location, req)
 	defer cancelFn()
 
-	if handlingInfo.proxyRoundTripper == nil {
+	roundTripper, err := transport.New(handlingInfo.transportConfig)
+	if err != nil {
+		klog.Warning(err)
+		proxyError(w, req, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if roundTripper == nil {
 		proxyError(w, req, "", http.StatusNotFound)
 		return
 	}
 
 	// we need to wrap the roundtripper in another roundtripper which will apply the front proxy headers
-	proxyRoundTripper, upgrade, err := maybeWrapForConnectionUpgrades(handlingInfo.restConfig, handlingInfo.proxyRoundTripper, req)
+	proxyRoundTripper, upgrade, err := maybeWrapForConnectionUpgrades(handlingInfo.transportConfig, roundTripper, req)
 	if err != nil {
 		proxyError(w, req, err.Error(), http.StatusInternalServerError)
 		return
@@ -205,19 +201,19 @@ func newRequestForProxy(location *url.URL, req *http.Request) (*http.Request, co
 }
 
 // maybeWrapForConnectionUpgrades wraps the roundtripper for upgrades.  The bool indicates if it was wrapped
-func maybeWrapForConnectionUpgrades(restConfig *restclient.Config, rt http.RoundTripper, req *http.Request) (http.RoundTripper, bool, error) {
+func maybeWrapForConnectionUpgrades(transportConfig *transport.Config, rt http.RoundTripper, req *http.Request) (http.RoundTripper, bool, error) {
 	if !httpstream.IsUpgradeRequest(req) {
 		return rt, false, nil
 	}
 
-	tlsConfig, err := restclient.TLSConfigFor(restConfig)
+	tlsConfig, err := transport.TLSConfigFor(transportConfig)
 	if err != nil {
 		return nil, true, err
 	}
 	followRedirects := utilfeature.DefaultFeatureGate.Enabled(genericfeatures.StreamingProxyRedirects)
 	requireSameHostRedirects := utilfeature.DefaultFeatureGate.Enabled(genericfeatures.ValidateProxyRedirects)
 	upgradeRoundTripper := spdy.NewRoundTripper(tlsConfig, followRedirects, requireSameHostRedirects)
-	wrappedRT, err := restclient.HTTPWrappersForConfig(restConfig, upgradeRoundTripper)
+	wrappedRT, err := transport.HTTPWrappersForConfig(transportConfig, upgradeRoundTripper)
 	if err != nil {
 		return nil, true, err
 	}
@@ -248,37 +244,38 @@ func (r *proxyHandler) updateAPIService(apiService *apiregistrationv1api.APIServ
 		return
 	}
 
-	newInfo := proxyHandlingInfo{
-		name: apiService.Name,
-		restConfig: &restclient.Config{
-			TLSClientConfig: restclient.TLSClientConfig{
-				Insecure:   apiService.Spec.InsecureSkipTLSVerify,
-				ServerName: apiService.Spec.Service.Name + "." + apiService.Spec.Service.Namespace + ".svc",
-				CertData:   r.proxyClientCert,
-				KeyData:    r.proxyClientKey,
-				CAData:     apiService.Spec.CABundle,
+	transportConfig := &transport.Config{
+		TLS: transport.TLSConfig{
+			Insecure: apiService.Spec.InsecureSkipTLSVerify,
+			GetCert: func() (*tls.Certificate, error) {
+				cert, key := r.certKeyContentProvider.CurrentCertKeyContent()
+				crt, err := tls.X509KeyPair(cert, key)
+				return &crt, err
 			},
+			CAData:     apiService.Spec.CABundle,
+			ServerName: apiService.Spec.Service.Name + "." + apiService.Spec.Service.Namespace + ".svc",
 		},
-		serviceName:      apiService.Spec.Service.Name,
-		serviceNamespace: apiService.Spec.Service.Namespace,
-		servicePort:      *apiService.Spec.Service.Port,
-		serviceAvailable: apiregistrationv1apihelper.IsAPIServiceConditionTrue(apiService, apiregistrationv1api.Available),
 	}
+
 	if r.egressSelector != nil {
 		networkContext := egressselector.Cluster.AsNetworkContext()
 		var egressDialer utilnet.DialFunc
 		egressDialer, err := r.egressSelector.Lookup(networkContext)
 		if err != nil {
 			klog.Warning(err.Error())
-		} else {
-			newInfo.restConfig.Dial = egressDialer
 		}
+		transportConfig.Dial = egressDialer
 	} else if r.proxyTransport != nil && r.proxyTransport.DialContext != nil {
-		newInfo.restConfig.Dial = r.proxyTransport.DialContext
+		transportConfig.Dial = r.proxyTransport.DialContext
 	}
-	newInfo.proxyRoundTripper, newInfo.transportBuildingError = restclient.TransportFor(newInfo.restConfig)
-	if newInfo.transportBuildingError != nil {
-		klog.Warning(newInfo.transportBuildingError.Error())
+
+	newInfo := proxyHandlingInfo{
+		name:             apiService.Name,
+		transportConfig:  transportConfig,
+		serviceName:      apiService.Spec.Service.Name,
+		serviceNamespace: apiService.Spec.Service.Namespace,
+		servicePort:      *apiService.Spec.Service.Port,
+		serviceAvailable: apiregistrationv1apihelper.IsAPIServiceConditionTrue(apiService, apiregistrationv1api.Available),
 	}
 	r.handlingInfo.Store(newInfo)
 }
