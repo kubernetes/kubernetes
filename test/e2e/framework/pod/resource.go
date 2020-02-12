@@ -520,7 +520,7 @@ func getPodLogsInternal(c clientset.Interface, namespace, podName, containerName
 	if err != nil {
 		return "", err
 	}
-	if err == nil && strings.Contains(string(logs), "Internal Error") {
+	if strings.Contains(string(logs), "Internal Error") {
 		return "", fmt.Errorf("Fetched log contains \"Internal Error\": %q", string(logs))
 	}
 	return string(logs), err
