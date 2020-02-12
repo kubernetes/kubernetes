@@ -16,9 +16,11 @@
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 
-# This command builds and runs a local kubernetes cluster.
-# You may need to run this as root to allow kubelet to open docker's socket,
-# and to write the test CA in /var/run/kubernetes.
+# This script builds and runs a local kubernetes cluster. You may need to run
+# this as root to allow kubelet to open docker's socket, and to write the test
+# CA in /var/run/kubernetes.
+# Usage: `hack/local-up-cluster.sh`.
+
 DOCKER_OPTS=${DOCKER_OPTS:-""}
 export DOCKER=(docker "${DOCKER_OPTS[@]}")
 DOCKER_ROOT=${DOCKER_ROOT:-""}
