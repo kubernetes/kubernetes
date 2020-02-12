@@ -324,6 +324,16 @@ rules:
   - list
   - update
   - delete
+- apiGroups:
+  - "coordination.k8s.io"
+  resources:
+  - leases
+  verbs:
+  - create
+  - update
+  - get
+  - list
+  - watch
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -338,6 +348,37 @@ roleRef:
 subjects:
 - kind: User
   name: system:vpa-admission-controller
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: system:gke-vpa-status-reader
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+rules:
+- apiGroups:
+  - "coordination.k8s.io"
+  resources:
+  - leases
+  verbs:
+  - get
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: system:gke-vpa-status-reader-binding
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:gke-vpa-status-reader
+subjects:
+- kind: User
+  name: system:vpa-updater
   namespace: kube-system
 ---
 # VPA Recommender is the Kubernetes Unified Autoscaling Adapter
