@@ -65,6 +65,7 @@ var upgradeTests = []upgrades.Test{
 	&apps.DaemonSetUpgradeTest{},
 	&upgrades.AppArmorUpgradeTest{},
 	&storage.VolumeModeDowngradeTest{},
+	&upgrades.TopologyManagerUpgradeTest{},
 }
 
 var gpuUpgradeTests = []upgrades.Test{
