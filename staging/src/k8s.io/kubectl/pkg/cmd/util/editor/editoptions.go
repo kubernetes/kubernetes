@@ -37,7 +37,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/mergepatch"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
@@ -731,10 +730,6 @@ func (h *editHeader) writeTo(w io.Writer, editMode EditMode) error {
 	return nil
 }
 
-func (h *editHeader) flush() {
-	h.reasons = []editReason{}
-}
-
 // editResults capture the result of an update
 type editResults struct {
 	header    editHeader
@@ -742,8 +737,6 @@ type editResults struct {
 	notfound  int
 	edit      []*resource.Info
 	file      string
-
-	version schema.GroupVersion
 }
 
 func (r *editResults) addError(err error, info *resource.Info) string {

@@ -181,7 +181,7 @@ func (o TopNodeOptions) RunTopNode() error {
 
 	metricsAPIAvailable := SupportedMetricsAPIVersionAvailable(apiGroups)
 
-	metrics := &metricsapi.NodeMetricsList{}
+	var metrics *metricsapi.NodeMetricsList
 	if metricsAPIAvailable {
 		metrics, err = getNodeMetricsFromMetricsAPI(o.MetricsClient, o.ResourceName, selector)
 		if err != nil {

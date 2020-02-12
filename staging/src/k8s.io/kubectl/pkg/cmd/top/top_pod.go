@@ -175,7 +175,7 @@ func (o TopPodOptions) RunTopPod() error {
 
 	metricsAPIAvailable := SupportedMetricsAPIVersionAvailable(apiGroups)
 
-	metrics := &metricsapi.PodMetricsList{}
+	var metrics *metricsapi.PodMetricsList
 	if metricsAPIAvailable {
 		metrics, err = getMetricsFromMetricsAPI(o.MetricsClient, o.Namespace, o.ResourceName, o.AllNamespaces, selector)
 		if err != nil {
