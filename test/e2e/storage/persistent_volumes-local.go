@@ -988,7 +988,8 @@ func makeLocalPodWithNodeName(config *localTestConfig, volume *localTestVolume, 
 	if pod == nil {
 		return
 	}
-	pod.Spec.NodeName = nodeName
+
+	e2epod.SetNodeAffinity(pod, nodeName)
 	return
 }
 

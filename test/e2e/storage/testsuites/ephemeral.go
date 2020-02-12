@@ -291,9 +291,6 @@ func StartInPodWithInlineVolume(c clientset.Interface, ns, podName, command stri
 			},
 		},
 		Spec: v1.PodSpec{
-			NodeName:     node.Name,
-			NodeSelector: node.Selector,
-			Affinity:     node.Affinity,
 			Containers: []v1.Container{
 				{
 					Name:    "csi-volume-tester",
@@ -304,6 +301,7 @@ func StartInPodWithInlineVolume(c clientset.Interface, ns, podName, command stri
 			RestartPolicy: v1.RestartPolicyNever,
 		},
 	}
+	e2epod.SetNodeSelection(pod, node)
 
 	for i, csiVolume := range csiVolumes {
 		name := fmt.Sprintf("my-volume-%d", i)
