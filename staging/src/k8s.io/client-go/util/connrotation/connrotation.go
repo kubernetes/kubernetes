@@ -77,11 +77,6 @@ func (d *Dialer) DialContext(ctx context.Context, network, address string) (net.
 
 	closable := &closableConn{Conn: conn}
 
-	// Start tracking the connection
-	d.mu.Lock()
-	d.conns[closable] = struct{}{}
-	d.mu.Unlock()
-
 	// When the connection is closed, remove it from the map. This will
 	// be no-op if the connection isn't in the map, e.g. if CloseAll()
 	// is called.
@@ -90,6 +85,11 @@ func (d *Dialer) DialContext(ctx context.Context, network, address string) (net.
 		delete(d.conns, closable)
 		d.mu.Unlock()
 	}
+
+	// Start tracking the connection
+	d.mu.Lock()
+	d.conns[closable] = struct{}{}
+	d.mu.Unlock()
 
 	return closable, nil
 }
