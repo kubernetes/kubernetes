@@ -442,7 +442,7 @@ func (i *iSCSIDriver) CreateVolume(config *testsuites.PerTestConfig, volType tes
 
 	c, serverPod, serverIP, iqn := newISCSIServer(cs, ns.Name)
 	config.ServerConfig = &c
-	config.ClientNodeSelection = e2epod.NodeSelection{Name: c.ClientNodeName}
+	config.ClientNodeSelection = c.ClientNodeSelection
 	return &iSCSIVolume{
 		serverPod: serverPod,
 		serverIP:  serverIP,
@@ -473,7 +473,7 @@ func newISCSIServer(cs clientset.Interface, namespace string) (config volume.Tes
 	}
 	pod, ip = volume.CreateStorageServer(cs, config)
 	// Make sure the client runs on the same node as server so we don't need to open any firewalls.
-	config.ClientNodeName = pod.Spec.NodeName
+	config.ClientNodeSelection = e2epod.NodeSelection{Name: pod.Spec.NodeName}
 	return config, pod, ip, iqn
 }
 
