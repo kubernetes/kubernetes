@@ -148,6 +148,7 @@ func createConnectTCPDialer(tcpTransport *apiserver.TCPTransport) (utilnet.DialF
 			return nil, fmt.Errorf("failed to append CA cert to the cert pool")
 		}
 	} else {
+		// Use host's root CA set instead of providing our own
 		certPool = nil
 	}
 	contextDialer := func(ctx context.Context, network, addr string) (net.Conn, error) {
@@ -166,13 +167,13 @@ func createConnectTCPDialer(tcpTransport *apiserver.TCPTransport) (utilnet.DialF
 	return contextDialer, nil
 }
 
-func createConnectUDSDialer(udsName string) (utilnet.DialFunc, error) {
+func createConnectUDSDialer(udsConfig *apiserver.UDSTransport) (utilnet.DialFunc, error) {
 	contextDialer := func(ctx context.Context, network, addr string) (net.Conn, error) {
-		proxyConn, err := net.Dial("unix", udsName)
+		proxyConn, err := net.Dial("unix", udsConfig.UDSName)
 		if err != nil {
-			return nil, fmt.Errorf("dialing proxy %q failed: %v", udsName, err)
+			return nil, fmt.Errorf("dialing proxy %q failed: %v", udsConfig.UDSName, err)
 		}
-		return tunnelHTTPConnect(proxyConn, udsName, addr)
+		return tunnelHTTPConnect(proxyConn, udsConfig.UDSName, addr)
 	}
 	return contextDialer, nil
 }
@@ -221,7 +222,7 @@ func NewEgressSelector(config *apiserver.EgressSelectorConfiguration) (*EgressSe
 
 		case apiserver.ProtocolHTTPConnect:
 			if service.Connection.Transport.UDS != nil {
-				contextDialer, err := createConnectUDSDialer(service.Connection.Transport.UDS.UDSName)
+				contextDialer, err := createConnectUDSDialer(service.Connection.Transport.UDS)
 				if err != nil {
 					return nil, fmt.Errorf("failed to create HTTPConnect uds dialer: %v", err)
 				}
@@ -233,7 +234,7 @@ func NewEgressSelector(config *apiserver.EgressSelectorConfiguration) (*EgressSe
 				}
 				cs.egressToDialer[name] = contextDialer
 			} else {
-				return nil, fmt.Errorf("Either TCP or UDP transport must be specified")
+				return nil, fmt.Errorf("Either a TCP or UDS transport must be specified")
 			}
 		case apiserver.ProtocolGRPC:
 			if service.Connection.Transport.UDS != nil {
@@ -244,7 +245,7 @@ func NewEgressSelector(config *apiserver.EgressSelectorConfiguration) (*EgressSe
 				cs.egressToDialer[name] = grpcContextDialer
 
 			} else {
-				return nil, fmt.Errorf("Either TCP or UDP transport must be specified")
+				return nil, fmt.Errorf("UDS transport must be specified for GRPC")
 			}
 		case apiserver.ProtocolDirect:
 			cs.egressToDialer[name] = directDialer

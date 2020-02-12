@@ -74,8 +74,8 @@ type Connection struct {
 	// Protocol is the protocol used to connect from client to the konnectivity server.
 	ProxyProtocol ProtocolType
 
-	// Transport defines the transport configurations we use to dial to the konnectivity server
-	// This is required if ProxyProtocol is HTTPConnect or GRPC
+	// Transport defines the transport configurations we use to dial to the konnectivity server.
+	// This is required if ProxyProtocol is HTTPConnect or GRPC.
 	// +optional
 	Transport *Transport
 }
@@ -96,6 +96,7 @@ const (
 // Transport defines the transport configurations we use to dial to the konnectivity server
 type Transport struct {
 	// TCP is the TCP configuration for communicating with the konnectivity server via TCP
+	// ProxyProtocol of GRPC is not supported with TCP transport at the moment
 	// Requires at least one of TCP or UDS to be set
 	// +optional
 	TCP *TCPTransport
@@ -128,24 +129,20 @@ type UDSTransport struct {
 // Only used with TCPTransport
 type TLSConfig struct {
 	// caBundle is the file location of the CA to be used to determine trust with the konnectivity server.
-	// Must be absent/empty HTTPConnect using the plain http
-	// If absent while using the HTTPConnect protocol with HTTPS
-	// default to system trust roots
-	// Misconfiguration will cause an error
+	// Must be absent/empty if TCPTransport.URL is prefixed with http://
+	// If absent while TCPTransport.URL is prefixed with https://, default to system trust roots.
 	// +optional
 	CABundle string
 
 	// clientKey is the file location of the client key to authenticate with the konnectivity server
-	// Must be absent/empty HTTPConnect using the plain http
-	// Must be configured for HTTPConnect using the https protocol
-	// Misconfiguration will cause an error
+	// Must be absent/empty if TCPTransport.URL is prefixed with http://
+	// Must be configured if TCPTransport.URL is prefixed with https://
 	// +optional
 	ClientKey string
 
 	// clientCert is the file location of the client certificate to authenticate with the konnectivity server
-	// Must be absent/empty HTTPConnect using the plain http
-	// Must be configured for HTTPConnect using the https protocol
-	// Misconfiguration will cause an error
+	// Must be absent/empty if TCPTransport.URL is prefixed with http://
+	// Must be configured if TCPTransport.URL is prefixed with https://
 	// +optional
 	ClientCert string
 }

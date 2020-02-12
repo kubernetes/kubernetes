@@ -78,42 +78,70 @@ func ValidateEgressSelectorConfiguration(config *apiserver.EgressSelectorConfigu
 		return allErrs // Treating a nil configuration as valid
 	}
 	for _, service := range config.EgressSelections {
-		base := field.NewPath("service", "connection")
+		fldPath := field.NewPath("service", "connection")
 		switch service.Connection.ProxyProtocol {
 		case apiserver.ProtocolDirect:
-			allErrs = append(allErrs, validateDirectConnection(service.Connection, base)...)
+			allErrs = append(allErrs, validateDirectConnection(service.Connection, fldPath)...)
 		case apiserver.ProtocolHTTPConnect:
-			if service.Connection.Transport.TCP != nil && service.Connection.Transport.UDS != nil {
-				allErrs = append(allErrs, field.Invalid(
-					base.Child("tcp"),
-					service.Connection.Transport.TCP,
-					"TCP and UDS cannot both be set"))
-			} else if service.Connection.Transport.TCP == nil && service.Connection.Transport.UDS == nil {
-				allErrs = append(allErrs, field.Required(
-					base.Child("tcp"),
-					"One of TCP or UDS must be set"))
-			} else if service.Connection.Transport.TCP != nil {
-				allErrs = append(allErrs, validateTCPConnection(service.Connection, base)...)
-			} else if service.Connection.Transport.UDS != nil {
-				allErrs = append(allErrs, validateUDSConnection(service.Connection, base)...)
-			}
+			allErrs = append(allErrs, validateHTTPConnectTransport(service.Connection.Transport, fldPath)...)
 		case apiserver.ProtocolGRPC:
-			if service.Connection.Transport.UDS != nil {
-				allErrs = append(allErrs, validateUDSConnection(service.Connection, base)...)
-			} else {
-				allErrs = append(allErrs, field.NotSupported(
-					base.Child("protocol"),
-					service.Connection.ProxyProtocol,
-					[]string{"uds"}))
-			}
+			allErrs = append(allErrs, validateGRPCTransport(service.Connection.Transport, fldPath)...)
 		default:
 			allErrs = append(allErrs, field.NotSupported(
-				base.Child("protocol"),
+				fldPath.Child("protocol"),
 				service.Connection.ProxyProtocol,
-				[]string{"direct", "HTTPConnect", "grpc"}))
+				[]string{
+					string(apiserver.ProtocolDirect),
+					string(apiserver.ProtocolHTTPConnect),
+					string(apiserver.ProtocolGRPC),
+				}))
 		}
 	}
+	return allErrs
+}
 
+func validateHTTPConnectTransport(transport *apiserver.Transport, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if transport == nil {
+		allErrs = append(allErrs, field.Required(
+			fldPath.Child("transport"),
+			"transport must be set for HTTPConnect"))
+		return allErrs
+	}
+
+	if transport.TCP != nil && transport.UDS != nil {
+		allErrs = append(allErrs, field.Invalid(
+			fldPath.Child("tcp"),
+			transport.TCP,
+			"TCP and UDS cannot both be set"))
+	} else if transport.TCP == nil && transport.UDS == nil {
+		allErrs = append(allErrs, field.Required(
+			fldPath.Child("tcp"),
+			"One of TCP or UDS must be set"))
+	} else if transport.TCP != nil {
+		allErrs = append(allErrs, validateTCPConnection(transport.TCP, fldPath)...)
+	} else if transport.UDS != nil {
+		allErrs = append(allErrs, validateUDSConnection(transport.UDS, fldPath)...)
+	}
+	return allErrs
+}
+
+func validateGRPCTransport(transport *apiserver.Transport, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if transport == nil {
+		allErrs = append(allErrs, field.Required(
+			fldPath.Child("transport"),
+			"transport must be set for GRPC"))
+		return allErrs
+	}
+
+	if transport.UDS != nil {
+		allErrs = append(allErrs, validateUDSConnection(transport.UDS, fldPath)...)
+	} else {
+		allErrs = append(allErrs, field.Required(
+			fldPath.Child("uds"),
+			"UDS must be set with GRPC"))
+	}
 	return allErrs
 }
 
@@ -129,9 +157,9 @@ func validateDirectConnection(connection apiserver.Connection, fldPath *field.Pa
 	return nil
 }
 
-func validateUDSConnection(connection apiserver.Connection, fldPath *field.Path) field.ErrorList {
+func validateUDSConnection(udsConfig *apiserver.UDSTransport, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if connection.Transport.UDS.UDSName == "" {
+	if udsConfig.UDSName == "" {
 		allErrs = append(allErrs, field.Invalid(
 			fldPath.Child("udsName"),
 			"nil",
@@ -140,68 +168,65 @@ func validateUDSConnection(connection apiserver.Connection, fldPath *field.Path)
 	return allErrs
 }
 
-func validateTCPConnection(connection apiserver.Connection, fldPath *field.Path) field.ErrorList {
+func validateTCPConnection(tcpConfig *apiserver.TCPTransport, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if connection.Transport.TCP.TLSConfig == nil {
-		allErrs = append(allErrs, field.Invalid(
-			fldPath.Child("tlsConfig"),
-			"nil",
-			"TLSConfig config should be present for HTTPConnect via tcp"))
-	} else if strings.HasPrefix(connection.Transport.TCP.URL, "https://") {
-		if connection.Transport.TCP.TLSConfig.CABundle != "" {
-			if exists, err := path.Exists(path.CheckFollowSymlink, connection.Transport.TCP.TLSConfig.CABundle); exists == false || err != nil {
-				allErrs = append(allErrs, field.Invalid(
-					fldPath.Child("tlsConfig", "caBundle"),
-					connection.Transport.TCP.TLSConfig.CABundle,
-					"HTTPConnect ca bundle does not exist"))
-			}
-		}
-		if connection.Transport.TCP.TLSConfig.ClientCert == "" {
+
+	if strings.HasPrefix(tcpConfig.URL, "http://") {
+		if tcpConfig.TLSConfig != nil {
 			allErrs = append(allErrs, field.Invalid(
-				fldPath.Child("tlsConfig", "clientCert"),
+				fldPath.Child("tlsConfig"),
 				"nil",
-				"HTTPConnect via https requires clientCert"))
-		} else if exists, err := path.Exists(path.CheckFollowSymlink, connection.Transport.TCP.TLSConfig.ClientCert); exists == false || err != nil {
-			allErrs = append(allErrs, field.Invalid(
-				fldPath.Child("tlsConfig", "clientCert"),
-				connection.Transport.TCP.TLSConfig.ClientCert,
-				"HTTPConnect client cert does not exist"))
+				"TLSConfig config should not be present when using HTTP"))
 		}
-		if connection.Transport.TCP.TLSConfig.ClientKey == "" {
-			allErrs = append(allErrs, field.Invalid(
-				fldPath.Child("tlsConfig", "clientKey"),
-				"nil",
-				"HTTPConnect via https requires clientKey"))
-		} else if exists, err := path.Exists(path.CheckFollowSymlink, connection.Transport.TCP.TLSConfig.ClientKey); exists == false || err != nil {
-			allErrs = append(allErrs, field.Invalid(
-				fldPath.Child("tlsConfig", "clientKey"),
-				connection.Transport.TCP.TLSConfig.ClientKey,
-				"HTTPConnect client key does not exist"))
-		}
-	} else if strings.HasPrefix(connection.Transport.TCP.URL, "http://") {
-		if connection.Transport.TCP.TLSConfig.CABundle != "" {
-			allErrs = append(allErrs, field.Invalid(
-				fldPath.Child("tlsConfig", "caBundle"),
-				connection.Transport.TCP.TLSConfig.CABundle,
-				"HTTPConnect via http does not support caBundle"))
-		}
-		if connection.Transport.TCP.TLSConfig.ClientCert != "" {
-			allErrs = append(allErrs, field.Invalid(
-				fldPath.Child("tlsConfig", "clientCert"),
-				connection.Transport.TCP.TLSConfig.ClientCert,
-				"HTTPConnect via http does not support clientCert"))
-		}
-		if connection.Transport.TCP.TLSConfig.ClientKey != "" {
-			allErrs = append(allErrs, field.Invalid(
-				fldPath.Child("tlsConfig", "clientKey"),
-				connection.Transport.TCP.TLSConfig.ClientKey,
-				"HTTPConnect via http does not support clientKey"))
-		}
+	} else if strings.HasPrefix(tcpConfig.URL, "https://") {
+		return validateTLSConfig(tcpConfig.TLSConfig, fldPath)
 	} else {
 		allErrs = append(allErrs, field.Invalid(
 			fldPath.Child("url"),
-			connection.Transport.TCP.URL,
+			tcpConfig.URL,
 			"supported connection protocols are http:// and https://"))
+	}
+	return allErrs
+}
+
+func validateTLSConfig(tlsConfig *apiserver.TLSConfig, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if tlsConfig == nil {
+		allErrs = append(allErrs, field.Required(
+			fldPath.Child("tlsConfig"),
+			"TLSConfig must be present when using HTTPS"))
+		return allErrs
+	}
+	if tlsConfig.CABundle != "" {
+		if exists, err := path.Exists(path.CheckFollowSymlink, tlsConfig.CABundle); exists == false || err != nil {
+			allErrs = append(allErrs, field.Invalid(
+				fldPath.Child("tlsConfig", "caBundle"),
+				tlsConfig.CABundle,
+				"TLS config ca bundle does not exist"))
+		}
+	}
+	if tlsConfig.ClientCert == "" {
+		allErrs = append(allErrs, field.Invalid(
+			fldPath.Child("tlsConfig", "clientCert"),
+			"nil",
+			"Using TLS requires clientCert"))
+	} else if exists, err := path.Exists(path.CheckFollowSymlink, tlsConfig.ClientCert); exists == false || err != nil {
+		allErrs = append(allErrs, field.Invalid(
+			fldPath.Child("tlsConfig", "clientCert"),
+			tlsConfig.ClientCert,
+			"TLS client cert does not exist"))
+	}
+	if tlsConfig.ClientKey == "" {
+		allErrs = append(allErrs, field.Invalid(
+			fldPath.Child("tlsConfig", "clientKey"),
+			"nil",
+			"Using TLS requires requires clientKey"))
+	} else if exists, err := path.Exists(path.CheckFollowSymlink, tlsConfig.ClientKey); exists == false || err != nil {
+		allErrs = append(allErrs, field.Invalid(
+			fldPath.Child("tlsConfig", "clientKey"),
+			tlsConfig.ClientKey,
+			"TLS client key does not exist"))
 	}
 	return allErrs
 }

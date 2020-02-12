@@ -223,3 +223,206 @@ spec:
 		})
 	}
 }
+
+func TestValidateEgressSelectorConfiguration(t *testing.T) {
+	testcases := []struct {
+		name        string
+		expectError bool
+		contents    *apiserver.EgressSelectorConfiguration
+	}{
+		{
+			name:        "direct-valid",
+			expectError: false,
+			contents: &apiserver.EgressSelectorConfiguration{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "",
+					APIVersion: "",
+				},
+				EgressSelections: []apiserver.EgressSelection{
+					{
+						Name: "master",
+						Connection: apiserver.Connection{
+							ProxyProtocol: apiserver.ProtocolDirect,
+						},
+					},
+				},
+			},
+		},
+		{
+			name:        "direct-invalid-transport",
+			expectError: true,
+			contents: &apiserver.EgressSelectorConfiguration{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "",
+					APIVersion: "",
+				},
+				EgressSelections: []apiserver.EgressSelection{
+					{
+						Name: "master",
+						Connection: apiserver.Connection{
+							ProxyProtocol: apiserver.ProtocolDirect,
+							Transport:     &apiserver.Transport{},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:        "httpconnect-no-https",
+			expectError: false,
+			contents: &apiserver.EgressSelectorConfiguration{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "",
+					APIVersion: "",
+				},
+				EgressSelections: []apiserver.EgressSelection{
+					{
+						Name: "cluster",
+						Connection: apiserver.Connection{
+							ProxyProtocol: apiserver.ProtocolHTTPConnect,
+							Transport: &apiserver.Transport{
+								TCP: &apiserver.TCPTransport{
+									URL: "http://127.0.0.1:8131",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:        "httpconnect-https-no-cert-error",
+			expectError: true,
+			contents: &apiserver.EgressSelectorConfiguration{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "",
+					APIVersion: "",
+				},
+				EgressSelections: []apiserver.EgressSelection{
+					{
+						Name: "cluster",
+						Connection: apiserver.Connection{
+							ProxyProtocol: apiserver.ProtocolHTTPConnect,
+							Transport: &apiserver.Transport{
+								TCP: &apiserver.TCPTransport{
+									URL: "https://127.0.0.1:8131",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:        "httpconnect-tcp-uds-both-set",
+			expectError: true,
+			contents: &apiserver.EgressSelectorConfiguration{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "",
+					APIVersion: "",
+				},
+				EgressSelections: []apiserver.EgressSelection{
+					{
+						Name: "cluster",
+						Connection: apiserver.Connection{
+							ProxyProtocol: apiserver.ProtocolHTTPConnect,
+							Transport: &apiserver.Transport{
+								TCP: &apiserver.TCPTransport{
+									URL: "http://127.0.0.1:8131",
+								},
+								UDS: &apiserver.UDSTransport{
+									UDSName: "/etc/srv/kubernetes/konnectivity/konnectivity-server.socket",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:        "httpconnect-uds",
+			expectError: false,
+			contents: &apiserver.EgressSelectorConfiguration{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "",
+					APIVersion: "",
+				},
+				EgressSelections: []apiserver.EgressSelection{
+					{
+						Name: "cluster",
+						Connection: apiserver.Connection{
+							ProxyProtocol: apiserver.ProtocolHTTPConnect,
+							Transport: &apiserver.Transport{
+								UDS: &apiserver.UDSTransport{
+									UDSName: "/etc/srv/kubernetes/konnectivity/konnectivity-server.socket",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:        "grpc-https-invalid",
+			expectError: true,
+			contents: &apiserver.EgressSelectorConfiguration{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "",
+					APIVersion: "",
+				},
+				EgressSelections: []apiserver.EgressSelection{
+					{
+						Name: "cluster",
+						Connection: apiserver.Connection{
+							ProxyProtocol: apiserver.ProtocolGRPC,
+							Transport: &apiserver.Transport{
+								TCP: &apiserver.TCPTransport{
+									URL: "http://127.0.0.1:8131",
+									TLSConfig: &apiserver.TLSConfig{
+										CABundle:   "",
+										ClientKey:  "",
+										ClientCert: "",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:        "grpc-uds",
+			expectError: false,
+			contents: &apiserver.EgressSelectorConfiguration{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "",
+					APIVersion: "",
+				},
+				EgressSelections: []apiserver.EgressSelection{
+					{
+						Name: "cluster",
+						Connection: apiserver.Connection{
+							ProxyProtocol: apiserver.ProtocolGRPC,
+							Transport: &apiserver.Transport{
+								UDS: &apiserver.UDSTransport{
+									UDSName: "/etc/srv/kubernetes/konnectivity/konnectivity-server.socket",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			errs := ValidateEgressSelectorConfiguration(tc.contents)
+			if tc.expectError == false && len(errs) != 0 {
+				t.Errorf("Calling ValidateEgressSelectorConfiguration expected no error, got %v", errs)
+			} else if tc.expectError == true && len(errs) == 0 {
+				t.Errorf("Calling ValidateEgressSelectorConfiguration expected error, got no error")
+			}
+		})
+	}
+}
