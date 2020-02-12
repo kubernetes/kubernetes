@@ -86,7 +86,7 @@ bin/$(BIN)-$(ARCH): $(SRCS)
 
 container: .container-$(ARCH)
 .container-$(ARCH): bin/$(BIN)-$(ARCH)
-	docker build --pull -t $(IMAGE_WITH_ARCH):$(TAG) --build-arg ARCH=$(ARCH) .
+	DOCKER_CLI_EXPERIMENTAL=enabled docker buildx build --pull --platform linux/$(ARCH) -t $(IMAGE_WITH_ARCH):$(TAG) --build-arg ARCH=$(ARCH) .
 	touch $@
 
 push: .push-$(ARCH)
