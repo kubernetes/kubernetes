@@ -52,20 +52,17 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
-	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
 	"k8s.io/kubernetes/pkg/controller"
 	commonutils "k8s.io/kubernetes/test/e2e/common"
@@ -113,7 +110,6 @@ const (
 
 var (
 	nautilusImage = imageutils.GetE2EImage(imageutils.Nautilus)
-	kittenImage   = imageutils.GetE2EImage(imageutils.Kitten)
 	httpdImage    = imageutils.GetE2EImage(imageutils.Httpd)
 	busyboxImage  = imageutils.GetE2EImage(imageutils.BusyBox)
 	agnhostImage  = imageutils.GetE2EImage(imageutils.Agnhost)
@@ -277,11 +273,10 @@ var _ = SIGDescribe("Kubectl client", func() {
 	}
 
 	ginkgo.Describe("Update Demo", func() {
-		var nautilus, kitten string
+		var nautilus string
 		ginkgo.BeforeEach(func() {
 			updateDemoRoot := "test/fixtures/doc-yaml/user-guide/update-demo"
 			nautilus = commonutils.SubstituteImageName(string(testfiles.ReadOrDie(filepath.Join(updateDemoRoot, "nautilus-rc.yaml.in"))))
-			kitten = commonutils.SubstituteImageName(string(testfiles.ReadOrDie(filepath.Join(updateDemoRoot, "kitten-rc.yaml.in"))))
 		})
 		/*
 			Release : v1.9
@@ -315,22 +310,6 @@ var _ = SIGDescribe("Kubectl client", func() {
 			debugDiscovery()
 			framework.RunKubectlOrDie(ns, "scale", "rc", "update-demo-nautilus", "--replicas=2", "--timeout=5m", fmt.Sprintf("--namespace=%v", ns))
 			validateController(c, nautilusImage, 2, "update-demo", updateDemoSelector, getUDData("nautilus.jpg", ns), ns)
-		})
-
-		/*
-			Release : v1.9
-			Testname: Kubectl, rolling update replication controller
-			Description: Create a Pod and a container with a given image. Configure replication controller to run 2 replicas. The number of running instances of the Pod MUST equal the number of replicas set on the replication controller which is 2. Run a rolling update to run a different version of the container. All running instances SHOULD now be running the newer version of the container as part of the rolling update.
-		*/
-		framework.ConformanceIt("should do a rolling update of a replication controller ", func() {
-			ginkgo.By("creating the initial replication controller")
-			framework.RunKubectlOrDieInput(ns, string(nautilus[:]), "create", "-f", "-", fmt.Sprintf("--namespace=%v", ns))
-			validateController(c, nautilusImage, 2, "update-demo", updateDemoSelector, getUDData("nautilus.jpg", ns), ns)
-			ginkgo.By("rolling-update to new replication controller")
-			debugDiscovery()
-			framework.RunKubectlOrDieInput(ns, string(kitten[:]), "rolling-update", "update-demo-nautilus", "--update-period=1s", "-f", "-", fmt.Sprintf("--namespace=%v", ns))
-			validateController(c, kittenImage, 2, "update-demo", updateDemoSelector, getUDData("kitten.jpg", ns), ns)
-			// Everything will hopefully be cleaned up when the namespace is deleted.
 		})
 	})
 
@@ -1539,42 +1518,6 @@ metadata:
 		})
 	})
 
-	ginkgo.Describe("Kubectl rolling-update", func() {
-		var nsFlag string
-		var rcName string
-		var httpdRC string
-		var c clientset.Interface
-
-		ginkgo.BeforeEach(func() {
-			c = f.ClientSet
-			nsFlag = fmt.Sprintf("--namespace=%v", ns)
-			rcName = "httpd-rc"
-			httpdRC = commonutils.SubstituteImageName(string(readTestFileOrDie(httpdRCFilename)))
-
-		})
-
-		ginkgo.AfterEach(func() {
-			framework.RunKubectlOrDie(ns, "delete", "rc", rcName, nsFlag)
-		})
-
-		/*
-			Release : v1.9
-			Testname: Kubectl, rolling update
-			Description: Command 'kubectl rolling-update' MUST replace the specified replication controller with a new replication controller by updating one pod at a time to use the new Pod spec.
-		*/
-		framework.ConformanceIt("should support rolling-update to same image ", func() {
-			ginkgo.By("running the image " + httpdImage)
-			framework.RunKubectlOrDieInput(ns, httpdRC, "create", "-f", "-", fmt.Sprintf("--namespace=%v", ns))
-			waitForRCToStabilize(c, ns, rcName, framework.PodStartTimeout)
-
-			ginkgo.By("rolling-update to same image controller")
-
-			debugDiscovery()
-			runKubectlRetryOrDie(ns, "rolling-update", rcName, "--update-period=1s", "--image="+httpdImage, "--image-pull-policy="+string(v1.PullIfNotPresent), nsFlag)
-			validateController(c, httpdImage, 1, rcName, "run="+rcName, noOpValidatorFn, ns)
-		})
-	})
-
 	ginkgo.Describe("Kubectl run pod", func() {
 		var nsFlag string
 		var podName string
@@ -2167,8 +2110,6 @@ func getUDData(jpgExpected string, ns string) func(clientset.Interface, string) 
 	}
 }
 
-func noOpValidatorFn(c clientset.Interface, podID string) error { return nil }
-
 // newBlockingReader returns a reader that allows reading the given string,
 // then blocks until Close() is called on the returned closer.
 //
@@ -2331,36 +2272,4 @@ func createObjValidateOutputAndCleanup(namespace string, client dynamic.Resource
 	for _, defaults := range defaultColumns {
 		framework.ExpectNotEqual(fields, defaults, fmt.Sprintf("expected non-default fields for resource: %s", resource.Name))
 	}
-}
-
-// waitForRCToStabilize waits till the RC has a matching generation/replica count between spec and status.
-func waitForRCToStabilize(c clientset.Interface, ns, name string, timeout time.Duration) error {
-	options := metav1.ListOptions{FieldSelector: fields.Set{
-		"metadata.name":      name,
-		"metadata.namespace": ns,
-	}.AsSelector().String()}
-	w, err := c.CoreV1().ReplicationControllers(ns).Watch(context.TODO(), options)
-	if err != nil {
-		return err
-	}
-	ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), timeout)
-	defer cancel()
-	_, err = watchtools.UntilWithoutRetry(ctx, w, func(event watch.Event) (bool, error) {
-		switch event.Type {
-		case watch.Deleted:
-			return false, apierrors.NewNotFound(schema.GroupResource{Resource: "replicationcontrollers"}, "")
-		}
-		switch rc := event.Object.(type) {
-		case *v1.ReplicationController:
-			if rc.Name == name && rc.Namespace == ns &&
-				rc.Generation <= rc.Status.ObservedGeneration &&
-				*(rc.Spec.Replicas) == rc.Status.Replicas {
-				return true, nil
-			}
-			framework.Logf("Waiting for rc %s to stabilize, generation %v observed generation %v spec.replicas %d status.replicas %d",
-				name, rc.Generation, rc.Status.ObservedGeneration, *(rc.Spec.Replicas), rc.Status.Replicas)
-		}
-		return false, nil
-	})
-	return err
 }

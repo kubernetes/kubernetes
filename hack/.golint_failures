@@ -480,7 +480,6 @@ staging/src/k8s.io/kubectl/pkg/cmd/plugin
 staging/src/k8s.io/kubectl/pkg/cmd/portforward
 staging/src/k8s.io/kubectl/pkg/cmd/proxy
 staging/src/k8s.io/kubectl/pkg/cmd/replace
-staging/src/k8s.io/kubectl/pkg/cmd/rollingupdate
 staging/src/k8s.io/kubectl/pkg/cmd/rollout
 staging/src/k8s.io/kubectl/pkg/cmd/run
 staging/src/k8s.io/kubectl/pkg/cmd/scale

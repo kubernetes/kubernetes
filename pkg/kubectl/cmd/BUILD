@@ -44,7 +44,6 @@ go_library(
         "//staging/src/k8s.io/kubectl/pkg/cmd/portforward:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/cmd/proxy:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/cmd/replace:go_default_library",
-        "//staging/src/k8s.io/kubectl/pkg/cmd/rollingupdate:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/cmd/rollout:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/cmd/run:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/cmd/scale:go_default_library",
