@@ -333,6 +333,12 @@ func doTestMustConnectSendDisconnect(bindAddress string, f *framework.Framework)
 	}
 
 	if e, a := strings.Repeat("x", 100), string(fromServer); e != a {
+		podlogs, err := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, "portforwardtester")
+		if err != nil {
+			framework.Logf("Failed to get logs of portforwardtester pod: %v", err)
+		} else {
+			framework.Logf("Logs of portforwardtester pod: %v", podlogs)
+		}
 		framework.Failf("Expected %q from server, got %q", e, a)
 	}
 
