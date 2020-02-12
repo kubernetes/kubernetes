@@ -116,7 +116,9 @@ func Accessor(obj interface{}) (metav1.Object, error) {
 func AsPartialObjectMetadata(m metav1.Object) *metav1.PartialObjectMetadata {
 	switch t := m.(type) {
 	case *metav1.ObjectMeta:
-		return &metav1.PartialObjectMetadata{ObjectMeta: *t}
+		mo := &metav1.PartialObjectMetadata{ObjectMeta: *t}
+		mo.ManagedFields = nil
+		return mo
 	default:
 		return &metav1.PartialObjectMetadata{
 			ObjectMeta: metav1.ObjectMeta{
@@ -135,7 +137,10 @@ func AsPartialObjectMetadata(m metav1.Object) *metav1.PartialObjectMetadata {
 				OwnerReferences:            m.GetOwnerReferences(),
 				Finalizers:                 m.GetFinalizers(),
 				ClusterName:                m.GetClusterName(),
-				ManagedFields:              m.GetManagedFields(),
+				// Explicitely set ManagedFields to nil
+				// since it's big and not necessary for
+				// metadata-only clients.
+				ManagedFields: nil,
 			},
 		}
 	}

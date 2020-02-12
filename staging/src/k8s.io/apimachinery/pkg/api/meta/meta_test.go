@@ -35,6 +35,10 @@ func TestAsPartialObjectMetadata(t *testing.T) {
 		m := &metav1.ObjectMeta{}
 		f.Fuzz(m)
 		partial := AsPartialObjectMetadata(m)
+		if partial.ManagedFields != nil {
+			t.Fatalf("ManagedFields must be nil")
+		}
+		m.ManagedFields = nil
 		if !reflect.DeepEqual(&partial.ObjectMeta, m) {
 			t.Fatalf("incomplete partial object metadata: %s", diff.ObjectReflectDiff(&partial.ObjectMeta, m))
 		}
@@ -44,6 +48,10 @@ func TestAsPartialObjectMetadata(t *testing.T) {
 		m := &metav1beta1.PartialObjectMetadata{}
 		f.Fuzz(&m.ObjectMeta)
 		partial := AsPartialObjectMetadata(m)
+		if partial.ManagedFields != nil {
+			t.Fatalf("ManagedFields must be nil")
+		}
+		m.ManagedFields = nil
 		if !reflect.DeepEqual(&partial.ObjectMeta, &m.ObjectMeta) {
 			t.Fatalf("incomplete partial object metadata: %s", diff.ObjectReflectDiff(&partial.ObjectMeta, &m.ObjectMeta))
 		}
