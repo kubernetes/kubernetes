@@ -21,7 +21,7 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -47,7 +47,7 @@ import (
    9. delete pvcVvol
 
 */
-var _ = utils.SIGDescribe("PersistentVolumes [Feature:LabelSelector]", func() {
+var _ = utils.SIGDescribe("PersistentVolumes [Feature:vsphere][Feature:LabelSelector]", func() {
 	f := framework.NewDefaultFramework("pvclabelselector")
 	var (
 		c          clientset.Interface
@@ -75,7 +75,7 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:LabelSelector]", func() {
 
 	})
 
-	utils.SIGDescribe("Selector-Label Volume Binding:vsphere", func() {
+	utils.SIGDescribe("Selector-Label Volume Binding:vsphere [Feature:vsphere]", func() {
 		ginkgo.AfterEach(func() {
 			ginkgo.By("Running clean up actions")
 			if framework.ProviderIs("vsphere") {

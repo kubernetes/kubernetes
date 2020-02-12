@@ -24,7 +24,7 @@ import (
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
@@ -35,7 +35,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
-var _ = utils.SIGDescribe("Volume Placement", func() {
+var _ = utils.SIGDescribe("Volume Placement [Feature:vsphere]", func() {
 	f := framework.NewDefaultFramework("volume-placement")
 	const (
 		NodeLabelKey = "vsphere_e2e_label_volume_placement"
