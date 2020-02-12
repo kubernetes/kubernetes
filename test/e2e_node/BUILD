@@ -25,7 +25,6 @@ go_library(
     deps = [
         "//pkg/features:go_default_library",
         "//pkg/kubelet/apis/config:go_default_library",
-        "//pkg/kubelet/apis/config/scheme:go_default_library",
         "//pkg/kubelet/apis/podresources:go_default_library",
         "//pkg/kubelet/apis/podresources/v1alpha1:go_default_library",
         "//pkg/kubelet/apis/stats/v1alpha1:go_default_library",
