@@ -90,11 +90,11 @@ ALLOWED_NOTREADY_NODES="${ALLOWED_NOTREADY_NODES:-$(($(get-num-nodes) / 100))}"
 # you are updating the os image versions, update this variable.
 # Also please update corresponding image for node e2e at:
 # https://github.com/kubernetes/kubernetes/blob/master/test/e2e_node/jenkins/image-config.yaml
-GCI_VERSION=${KUBE_GCI_VERSION:-cos-77-12371-114-0}
+GCI_VERSION=${KUBE_GCI_VERSION:-cos-rc-73-11647-449-0}
 MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-}
-MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-cos-cloud}
+MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-wfender-test}
 NODE_IMAGE=${KUBE_GCE_NODE_IMAGE:-${GCI_VERSION}}
-NODE_IMAGE_PROJECT=${KUBE_GCE_NODE_PROJECT:-cos-cloud}
+NODE_IMAGE_PROJECT=${KUBE_GCE_NODE_PROJECT:-wfender-test}
 NODE_SERVICE_ACCOUNT=${KUBE_GCE_NODE_SERVICE_ACCOUNT:-default}
 
 CONTAINER_RUNTIME=${KUBE_CONTAINER_RUNTIME:-docker}
