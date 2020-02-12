@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -34,9 +35,23 @@ import (
 func ValidateKubeSchedulerConfiguration(cc *config.KubeSchedulerConfiguration) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, componentbasevalidation.ValidateClientConnectionConfiguration(&cc.ClientConnection, field.NewPath("clientConnection"))...)
-	allErrs = append(allErrs, ValidateKubeSchedulerLeaderElectionConfiguration(&cc.LeaderElection, field.NewPath("leaderElection"))...)
-	if len(cc.SchedulerName) == 0 {
-		allErrs = append(allErrs, field.Required(field.NewPath("schedulerName"), ""))
+	allErrs = append(allErrs, validateKubeSchedulerLeaderElectionConfiguration(field.NewPath("leaderElection"), &cc.LeaderElection)...)
+
+	profilesPath := field.NewPath("profiles")
+	if len(cc.Profiles) == 0 {
+		allErrs = append(allErrs, field.Required(profilesPath, ""))
+	} else {
+		existingProfiles := make(map[string]int, len(cc.Profiles))
+		for i := range cc.Profiles {
+			profile := &cc.Profiles[i]
+			path := profilesPath.Index(i)
+			allErrs = append(allErrs, validateKubeSchedulerProfile(path, profile)...)
+			if idx, ok := existingProfiles[profile.SchedulerName]; ok {
+				allErrs = append(allErrs, field.Duplicate(path.Child("schedulerName"), profilesPath.Index(idx).Child("schedulerName")))
+			}
+			existingProfiles[profile.SchedulerName] = i
+		}
+		allErrs = append(allErrs, validateCommonQueueSort(profilesPath, cc.Profiles)...)
 	}
 	for _, msg := range validation.IsValidSocketAddr(cc.HealthzBindAddress) {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("healthzBindAddress"), cc.HealthzBindAddress, msg))
@@ -59,13 +74,39 @@ func ValidateKubeSchedulerConfiguration(cc *config.KubeSchedulerConfiguration) f
 	return allErrs
 }
 
-// ValidateKubeSchedulerLeaderElectionConfiguration ensures validation of the KubeSchedulerLeaderElectionConfiguration struct
-func ValidateKubeSchedulerLeaderElectionConfiguration(cc *config.KubeSchedulerLeaderElectionConfiguration, fldPath *field.Path) field.ErrorList {
+func validateKubeSchedulerProfile(path *field.Path, profile *config.KubeSchedulerProfile) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if len(profile.SchedulerName) == 0 {
+		allErrs = append(allErrs, field.Required(path.Child("schedulerName"), ""))
+	}
+	return allErrs
+}
+
+func validateCommonQueueSort(path *field.Path, profiles []config.KubeSchedulerProfile) field.ErrorList {
+	allErrs := field.ErrorList{}
+	var canon *config.PluginSet
+	if profiles[0].Plugins != nil {
+		canon = profiles[0].Plugins.QueueSort
+	}
+	for i := 1; i < len(profiles); i++ {
+		var curr *config.PluginSet
+		if profiles[i].Plugins != nil {
+			curr = profiles[i].Plugins.QueueSort
+		}
+		if !cmp.Equal(canon, curr) {
+			allErrs = append(allErrs, field.Invalid(path.Index(i).Child("plugins", "queueSort"), curr, "has to match for all profiles"))
+		}
+	}
+	// TODO(#88093): Validate that all plugin configs for the queue sort extension match.
+	return allErrs
+}
+
+func validateKubeSchedulerLeaderElectionConfiguration(fldPath *field.Path, cc *config.KubeSchedulerLeaderElectionConfiguration) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if !cc.LeaderElectionConfiguration.LeaderElect {
 		return allErrs
 	}
-	allErrs = append(allErrs, componentbasevalidation.ValidateLeaderElectionConfiguration(&cc.LeaderElectionConfiguration, field.NewPath("leaderElectionConfiguration"))...)
+	allErrs = append(allErrs, componentbasevalidation.ValidateLeaderElectionConfiguration(&cc.LeaderElectionConfiguration, fldPath)...)
 	return allErrs
 }
 

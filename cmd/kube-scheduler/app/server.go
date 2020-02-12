@@ -19,6 +19,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -171,12 +172,17 @@ func Run(ctx context.Context, cc schedulerserverconfig.CompletedConfig, outOfTre
 		}
 	}
 
+	if len(cc.ComponentConfig.Profiles) != 1 {
+		// TODO(#85737): Support more than one profile.
+		return errors.New("multiple scheduling profiles are unsupported")
+	}
+	profile := cc.ComponentConfig.Profiles[0]
 	// Prepare event clients.
 	if _, err := cc.Client.Discovery().ServerResourcesForGroupVersion(eventsv1beta1.SchemeGroupVersion.String()); err == nil {
 		cc.Broadcaster = events.NewBroadcaster(&events.EventSinkImpl{Interface: cc.EventClient.Events("")})
-		cc.Recorder = cc.Broadcaster.NewRecorder(scheme.Scheme, cc.ComponentConfig.SchedulerName)
+		cc.Recorder = cc.Broadcaster.NewRecorder(scheme.Scheme, profile.SchedulerName)
 	} else {
-		recorder := cc.CoreBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: cc.ComponentConfig.SchedulerName})
+		recorder := cc.CoreBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: profile.SchedulerName})
 		cc.Recorder = record.NewEventRecorderAdapter(recorder)
 	}
 
@@ -186,14 +192,14 @@ func Run(ctx context.Context, cc schedulerserverconfig.CompletedConfig, outOfTre
 		cc.PodInformer,
 		cc.Recorder,
 		ctx.Done(),
-		scheduler.WithName(cc.ComponentConfig.SchedulerName),
+		scheduler.WithName(profile.SchedulerName),
 		scheduler.WithAlgorithmSource(cc.ComponentConfig.AlgorithmSource),
 		scheduler.WithPreemptionDisabled(cc.ComponentConfig.DisablePreemption),
 		scheduler.WithPercentageOfNodesToScore(cc.ComponentConfig.PercentageOfNodesToScore),
 		scheduler.WithBindTimeoutSeconds(cc.ComponentConfig.BindTimeoutSeconds),
 		scheduler.WithFrameworkOutOfTreeRegistry(outOfTreeRegistry),
-		scheduler.WithFrameworkPlugins(cc.ComponentConfig.Plugins),
-		scheduler.WithFrameworkPluginConfig(cc.ComponentConfig.PluginConfig),
+		scheduler.WithFrameworkPlugins(profile.Plugins),
+		scheduler.WithFrameworkPluginConfig(profile.PluginConfig),
 		scheduler.WithPodMaxBackoffSeconds(cc.ComponentConfig.PodMaxBackoffSeconds),
 		scheduler.WithPodInitialBackoffSeconds(cc.ComponentConfig.PodInitialBackoffSeconds),
 	)
