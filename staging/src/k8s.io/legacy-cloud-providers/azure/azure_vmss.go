@@ -26,6 +26,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-07-01/compute"
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2019-06-01/network"
@@ -51,6 +52,13 @@ var (
 	vmssIPConfigurationRE  = regexp.MustCompile(`.*/subscriptions/(?:.*)/resourceGroups/(.+)/providers/Microsoft.Compute/virtualMachineScaleSets/(.+)/virtualMachines/(.+)/networkInterfaces(?:.*)`)
 	vmssPIPConfigurationRE = regexp.MustCompile(`.*/subscriptions/(?:.*)/resourceGroups/(.+)/providers/Microsoft.Compute/virtualMachineScaleSets/(.+)/virtualMachines/(.+)/networkInterfaces/(.+)/ipConfigurations/(.+)/publicIPAddresses/(.+)`)
 	vmssVMProviderIDRE     = regexp.MustCompile(`azure:///subscriptions/(?:.*)/resourceGroups/(.+)/providers/Microsoft.Compute/virtualMachineScaleSets/(.+)/virtualMachines/(?:\d+)`)
+)
+
+const (
+	// vmssVMInstanceUpdateDelay is used when updating multiple vm instances in parallel
+	// the optimum value is 3s to prevent any conflicts that result in concurrent vmss vm
+	// instances update
+	vmssVMInstanceUpdateDelay = 3 * time.Second
 )
 
 // scaleSet implements VMSet interface for Azure scale set.
@@ -1097,7 +1105,7 @@ func (ss *scaleSet) EnsureHostsInPool(service *v1.Service, nodes []*v1.Node, bac
 		hostUpdates = append(hostUpdates, f)
 	}
 
-	errs := utilerrors.AggregateGoroutines(hostUpdates...)
+	errs := aggregateGoroutinesWithDelay(vmssVMInstanceUpdateDelay, hostUpdates...)
 	if errs != nil {
 		return utilerrors.Flatten(errs)
 	}
@@ -1389,7 +1397,7 @@ func (ss *scaleSet) EnsureBackendPoolDeleted(service *v1.Service, backendPoolID,
 		hostUpdates = append(hostUpdates, f)
 	}
 
-	errs := utilerrors.AggregateGoroutines(hostUpdates...)
+	errs := aggregateGoroutinesWithDelay(vmssVMInstanceUpdateDelay, hostUpdates...)
 	if errs != nil {
 		return utilerrors.Flatten(errs)
 	}
