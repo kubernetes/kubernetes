@@ -121,7 +121,6 @@ aliases:
     - justaugustus # SIG Chair
     - tpepper # SIG Chair / Patch Release Team
   release-engineering-reviewers:
-    - aleksandra-malinowska # Patch Release Team
     - calebamiles # SIG Chair
     - cpanato # Branch Manager
     - feiskyer # Patch Release Team
