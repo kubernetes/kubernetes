@@ -185,7 +185,7 @@ func (w *resourceGatherWorker) singleProbe() {
 	data := make(ResourceUsagePerContainer)
 	if w.inKubemark {
 		kubemarkData := getKubemarkMasterComponentsResourceUsage()
-		if data == nil {
+		if kubemarkData == nil {
 			return
 		}
 		for k, v := range kubemarkData {
