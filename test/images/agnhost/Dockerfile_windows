@@ -13,6 +13,8 @@
 # limitations under the License.
 
 ARG BASEIMAGE
+ARG REGISTRY
+FROM $REGISTRY/windows-image-builder-helper:1.0 as helper
 FROM $BASEIMAGE
 
 # from dnsutils image
@@ -24,18 +26,17 @@ FROM $BASEIMAGE
 # - curl, nc: used by a lot of e2e tests (inherited from BASEIMAGE)
 # from iperf image
 # install necessary packages: iperf
-ENV chocolateyUseWindowsCompression false
+COPY --from=helper /dig /dig
+COPY --from=helper /Windows/System32/netapi32.dll /Windows/System32/netapi32.dll
+
+RUN setx /M PATH "C:\dig\;%PATH%
 RUN powershell -Command "\
-    iex ((new-object net.webclient).DownloadString('https://chocolatey.org/install.ps1')); \
-    choco feature disable --name showDownloadProgress; \
-    choco install bind-toolsonly --version 9.10.3 -y
-RUN powershell -Command "\
-    wget -uri 'https://github.com/coredns/coredns/releases/download/v1.5.0/coredns_1.5.0_windows_amd64.tgz' -OutFile C:\coredns.tgz;\
-    tar -xzvf C:\coredns.tgz;\
+    curl.exe -L 'https://github.com/coredns/coredns/releases/download/v1.5.0/coredns_1.5.0_windows_amd64.tgz' -o C:\coredns.tgz;\
+    tar.exe -xzvf C:\coredns.tgz;\
     Remove-Item C:\coredns.tgz"
 
 RUN powershell -Command "\
-    wget -uri 'https://iperf.fr/download/windows/iperf-2.0.9-win64.zip' -OutFile C:\iperf.zip;\
+    curl.exe -L 'https://iperf.fr/download/windows/iperf-2.0.9-win64.zip' -o C:\iperf.zip;\
     Expand-Archive -Path C:\iperf.zip -DestinationPath C:\ -Force;\
     Rename-Item C:\iperf-2.0.9-win64 C:\iperf;\
     Remove-Item C:\iperf.zip"
@@ -52,6 +53,9 @@ RUN mkdir C:\uploads
 # from porter
 ADD porter/localhost.crt localhost.crt
 ADD porter/localhost.key localhost.key
+
+# from mounttest
+ADD mounttest/filePermissions.ps1 filePermissions.ps1
 
 ADD agnhost agnhost
 
