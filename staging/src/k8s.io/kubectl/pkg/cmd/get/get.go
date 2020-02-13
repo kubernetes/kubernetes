@@ -529,6 +529,7 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 	separatorWriter := &separatorWriterWrapper{Delegate: trackingWriter}
 
 	w := printers.GetNewTabWriter(separatorWriter)
+	allResourcesNamespaced := !o.AllNamespaces
 	for ix := range objs {
 		var mapping *meta.RESTMapping
 		var info *resource.Info
@@ -540,6 +541,7 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 			mapping = info.Mapping
 		}
 
+		allResourcesNamespaced = allResourcesNamespaced && info.Namespaced()
 		printWithNamespace := o.AllNamespaces
 
 		if mapping != nil && mapping.Scope.Name() == meta.RESTScopeNameRoot {
@@ -583,7 +585,7 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 	w.Flush()
 	if trackingWriter.Written == 0 && !o.IgnoreNotFound && len(allErrs) == 0 {
 		// if we wrote no output, and had no errors, and are not ignoring NotFound, be sure we output something
-		if !o.AllNamespaces {
+		if allResourcesNamespaced {
 			fmt.Fprintln(o.ErrOut, fmt.Sprintf("No resources found in %s namespace.", o.Namespace))
 		} else {
 			fmt.Fprintln(o.ErrOut, fmt.Sprintf("No resources found"))
