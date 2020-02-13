@@ -38,6 +38,15 @@ var (
 		[]string{"verb", "url"},
 	)
 
+	rateLimiterLatency = k8smetrics.NewHistogramVec(
+		&k8smetrics.HistogramOpts{
+			Name:    "rest_client_rate_limiter_duration_seconds",
+			Help:    "Client side rate limiter latency in seconds. Broken down by verb and URL.",
+			Buckets: k8smetrics.ExponentialBuckets(0.001, 2, 10),
+		},
+		[]string{"verb", "url"},
+	)
+
 	requestResult = k8smetrics.NewCounterVec(
 		&k8smetrics.CounterOpts{
 			Name: "rest_client_requests_total",
@@ -106,6 +115,7 @@ func init() {
 		ClientCertExpiry:      execPluginCertTTLAdapter,
 		ClientCertRotationAge: &rotationAdapter{m: execPluginCertRotation},
 		RequestLatency:        &latencyAdapter{m: requestLatency},
+		RateLimiterLatency:    &latencyAdapter{m: rateLimiterLatency},
 		RequestResult:         &resultAdapter{requestResult},
 	})
 }
