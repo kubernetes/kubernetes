@@ -33,7 +33,7 @@ func TestSetupOutputWriterNoOp(t *testing.T) {
 		f := cmdtesting.NewTestFactory()
 		defer f.Cleanup()
 
-		writer := setupOutputWriter(test, buf, "/some/file/that/should/be/ignored")
+		writer := setupOutputWriter(test, buf, "/some/file/that/should/be/ignored", "")
 		if writer != buf {
 			t.Errorf("expected: %v, saw: %v", buf, writer)
 		}
@@ -41,19 +41,20 @@ func TestSetupOutputWriterNoOp(t *testing.T) {
 }
 
 func TestSetupOutputWriterFile(t *testing.T) {
-	file := "output.json"
+	file := "output"
+	extension := ".json"
 	dir, err := ioutil.TempDir(os.TempDir(), "out")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	fullPath := path.Join(dir, file)
+	fullPath := path.Join(dir, file) + extension
 	defer os.RemoveAll(dir)
 
 	_, _, buf, _ := genericclioptions.NewTestIOStreams()
 	f := cmdtesting.NewTestFactory()
 	defer f.Cleanup()
 
-	writer := setupOutputWriter(dir, buf, file)
+	writer := setupOutputWriter(dir, buf, file, extension)
 	if writer == buf {
 		t.Errorf("expected: %v, saw: %v", buf, writer)
 	}
