@@ -54,9 +54,9 @@ go_library(
     srcs = ["util.go"],
     importpath = "k8s.io/kubernetes/test/integration/volumescheduling",
     deps = [
-        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/api/v1/pod:go_default_library",
         "//pkg/scheduler:go_default_library",
+        "//pkg/scheduler/profile:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
@@ -64,7 +64,6 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/admission:go_default_library",
         "//staging/src/k8s.io/client-go/informers:go_default_library",
-        "//staging/src/k8s.io/client-go/informers/core/v1:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/client-go/rest:go_default_library",
         "//staging/src/k8s.io/client-go/tools/events:go_default_library",

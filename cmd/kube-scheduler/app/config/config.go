@@ -53,7 +53,6 @@ type Config struct {
 	CoreBroadcaster record.EventBroadcaster
 
 	EventClient v1beta1.EventsGetter
-	Recorder    events.EventRecorder
 	Broadcaster events.EventBroadcaster
 
 	// LeaderElection is optional.
