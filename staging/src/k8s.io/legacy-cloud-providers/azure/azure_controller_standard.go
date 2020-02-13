@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-07-01/compute"
+	"github.com/Azure/go-autorest/autorest/to"
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog"
@@ -29,7 +30,7 @@ import (
 
 // AttachDisk attaches a vhd to vm
 // the vhd must exist, can be identified by diskName, diskURI, and lun.
-func (as *availabilitySet) AttachDisk(isManagedDisk bool, diskName, diskURI string, nodeName types.NodeName, lun int32, cachingMode compute.CachingTypes, diskEncryptionSetID string) error {
+func (as *availabilitySet) AttachDisk(isManagedDisk bool, diskName, diskURI string, nodeName types.NodeName, lun int32, cachingMode compute.CachingTypes, diskEncryptionSetID string, writeAcceleratorEnabled bool) error {
 	vm, err := as.getVirtualMachine(nodeName, cacheReadTypeDefault)
 	if err != nil {
 		return err
@@ -59,11 +60,12 @@ func (as *availabilitySet) AttachDisk(isManagedDisk bool, diskName, diskURI stri
 		}
 		disks = append(disks,
 			compute.DataDisk{
-				Name:         &diskName,
-				Lun:          &lun,
-				Caching:      cachingMode,
-				CreateOption: "attach",
-				ManagedDisk:  managedDisk,
+				Name:                    &diskName,
+				Lun:                     &lun,
+				Caching:                 cachingMode,
+				CreateOption:            "attach",
+				ManagedDisk:             managedDisk,
+				WriteAcceleratorEnabled: to.BoolPtr(writeAcceleratorEnabled),
 			})
 	} else {
 		disks = append(disks,

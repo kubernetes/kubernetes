@@ -51,6 +51,10 @@ const (
 	sourceSnapshot       = "snapshot"
 	sourceVolume         = "volume"
 
+	// WriteAcceleratorEnabled support for Azure Write Accelerator on Azure Disks
+	// https://docs.microsoft.com/azure/virtual-machines/windows/how-to-enable-write-accelerator
+	WriteAcceleratorEnabled = "writeacceleratorenabled"
+
 	// see https://docs.microsoft.com/en-us/rest/api/compute/disks/createorupdate#create-a-managed-disk-by-copying-a-snapshot.
 	diskSnapshotPath = "/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/snapshots/%s"
 
@@ -113,6 +117,8 @@ func (c *controllerCommon) getNodeVMSet(nodeName types.NodeName, crt cacheReadTy
 // return (lun, error)
 func (c *controllerCommon) AttachDisk(isManagedDisk bool, diskName, diskURI string, nodeName types.NodeName, cachingMode compute.CachingTypes) (int32, error) {
 	diskEncryptionSetID := ""
+	writeAcceleratorEnabled := false
+
 	if isManagedDisk {
 		diskName := path.Base(diskURI)
 		resourceGroup, err := getResourceGroupFromDiskURI(diskURI)
@@ -142,6 +148,11 @@ func (c *controllerCommon) AttachDisk(isManagedDisk bool, diskName, diskURI stri
 			disk.DiskProperties.Encryption.DiskEncryptionSetID != nil {
 			diskEncryptionSetID = *disk.DiskProperties.Encryption.DiskEncryptionSetID
 		}
+		if v, ok := disk.Tags[WriteAcceleratorEnabled]; ok {
+			if v != nil && strings.EqualFold(*v, "true") {
+				writeAcceleratorEnabled = true
+			}
+		}
 	}
 
 	vmset, err := c.getNodeVMSet(nodeName, cacheReadTypeUnsafe)
@@ -167,7 +178,7 @@ func (c *controllerCommon) AttachDisk(isManagedDisk bool, diskName, diskURI stri
 	klog.V(2).Infof("Trying to attach volume %q lun %d to node %q.", diskURI, lun, nodeName)
 	c.diskAttachDetachMap.Store(strings.ToLower(diskURI), "attaching")
 	defer c.diskAttachDetachMap.Delete(strings.ToLower(diskURI))
-	return lun, vmset.AttachDisk(isManagedDisk, diskName, diskURI, nodeName, lun, cachingMode, diskEncryptionSetID)
+	return lun, vmset.AttachDisk(isManagedDisk, diskName, diskURI, nodeName, lun, cachingMode, diskEncryptionSetID, writeAcceleratorEnabled)
 }
 
 // DetachDisk detaches a disk from host. The vhd can be identified by diskName or diskURI.
