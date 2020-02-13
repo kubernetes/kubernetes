@@ -61,7 +61,6 @@ const (
 
 	// singleCallTimeout is how long to try single API calls (like 'get' or 'list'). Used to prevent
 	// transient failures from failing tests.
-	// TODO: client should not apply this timeout to Watch calls. Increased from 30s until that is fixed.
 	singleCallTimeout = 5 * time.Minute
 
 	// Some pods can take much longer to get ready due to volume attach/detach latency.

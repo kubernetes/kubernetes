@@ -216,7 +216,7 @@ func getNodeRuntimeOperationErrorRate(c clientset.Interface, node string) (NodeR
 
 // GetStatsSummary contacts kubelet for the container information.
 func GetStatsSummary(c clientset.Interface, nodeName string) (*kubeletstatsv1alpha1.Summary, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), e2emetrics.SingleCallTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), framework.SingleCallTimeout)
 	defer cancel()
 
 	data, err := c.CoreV1().RESTClient().Get().
