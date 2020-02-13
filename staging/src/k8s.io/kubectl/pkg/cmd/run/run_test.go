@@ -390,7 +390,7 @@ func TestGenerateService(t *testing.T) {
 			addRunFlags(cmd, opts)
 
 			if !test.expectPOST {
-				opts.DryRun = true
+				opts.DryRunStrategy = cmdutil.DryRunClient
 			}
 
 			if len(test.port) > 0 {
@@ -464,7 +464,7 @@ func TestRunValidations(t *testing.T) {
 			flags: map[string]string{
 				"image":   "busybox",
 				"attach":  "true",
-				"dry-run": "true",
+				"dry-run": "client",
 			},
 			expectedErr: "can't be used with attached containers options",
 		},
@@ -474,7 +474,7 @@ func TestRunValidations(t *testing.T) {
 			flags: map[string]string{
 				"image":   "busybox",
 				"stdin":   "true",
-				"dry-run": "true",
+				"dry-run": "client",
 			},
 			expectedErr: "can't be used with attached containers options",
 		},
@@ -485,7 +485,7 @@ func TestRunValidations(t *testing.T) {
 				"image":   "busybox",
 				"tty":     "true",
 				"stdin":   "true",
-				"dry-run": "true",
+				"dry-run": "client",
 			},
 			expectedErr: "can't be used with attached containers options",
 		},

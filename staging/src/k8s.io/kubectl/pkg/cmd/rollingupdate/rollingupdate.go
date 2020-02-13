@@ -196,7 +196,7 @@ func (o *RollingUpdateOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, a
 	if len(args) > 0 {
 		o.OldName = args[0]
 	}
-	o.DryRun = cmdutil.GetClientSideDryRun(cmd)
+	o.DryRun = getClientSideDryRun(cmd)
 	o.OutputFormat = cmdutil.GetFlagString(cmd, "output")
 	o.KeepOldName = len(args) == 1
 	o.ShouldValidate = cmdutil.GetFlagBool(cmd, "validate")
@@ -466,4 +466,15 @@ func findNewName(args []string, oldRc *corev1.ReplicationController) string {
 		return newName
 	}
 	return ""
+}
+
+func getClientSideDryRun(cmd *cobra.Command) bool {
+	dryRunStrategy, err := cmdutil.GetDryRunStrategy(cmd)
+	if err != nil {
+		klog.Fatalf("error accessing --dry-run flag for command %s: %v", cmd.Name(), err)
+	}
+	if dryRunStrategy == cmdutil.DryRunServer {
+		klog.Fatalf("--dry-run=server for command %s is not supported yet", cmd.Name())
+	}
+	return dryRunStrategy == cmdutil.DryRunClient
 }

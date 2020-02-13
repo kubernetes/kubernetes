@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/kubectl/pkg/apps"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
 	deploymentutil "k8s.io/kubectl/pkg/util/deployment"
 )
@@ -45,7 +46,7 @@ const (
 
 // Rollbacker provides an interface for resources that can be rolled back.
 type Rollbacker interface {
-	Rollback(obj runtime.Object, updatedAnnotations map[string]string, toRevision int64, dryRun bool) (string, error)
+	Rollback(obj runtime.Object, updatedAnnotations map[string]string, toRevision int64, dryRunStrategy cmdutil.DryRunStrategy) (string, error)
 }
 
 type RollbackVisitor struct {
@@ -95,7 +96,7 @@ type DeploymentRollbacker struct {
 	c kubernetes.Interface
 }
 
-func (r *DeploymentRollbacker) Rollback(obj runtime.Object, updatedAnnotations map[string]string, toRevision int64, dryRun bool) (string, error) {
+func (r *DeploymentRollbacker) Rollback(obj runtime.Object, updatedAnnotations map[string]string, toRevision int64, dryRunStrategy cmdutil.DryRunStrategy) (string, error) {
 	if toRevision < 0 {
 		return "", revisionNotFoundErr(toRevision)
 	}
@@ -119,7 +120,7 @@ func (r *DeploymentRollbacker) Rollback(obj runtime.Object, updatedAnnotations m
 	if err != nil {
 		return "", err
 	}
-	if dryRun {
+	if dryRunStrategy == cmdutil.DryRunClient {
 		return printTemplate(&rsForRevision.Spec.Template)
 	}
 	if deployment.Spec.Paused {
@@ -153,8 +154,12 @@ func (r *DeploymentRollbacker) Rollback(obj runtime.Object, updatedAnnotations m
 		return "", fmt.Errorf("failed restoring revision %d: %v", toRevision, err)
 	}
 
+	patchOptions := metav1.PatchOptions{}
+	if dryRunStrategy == cmdutil.DryRunServer {
+		patchOptions.DryRun = []string{metav1.DryRunAll}
+	}
 	// Restore revision
-	if _, err = r.c.AppsV1().Deployments(namespace).Patch(context.TODO(), name, patchType, patch, metav1.PatchOptions{}); err != nil {
+	if _, err = r.c.AppsV1().Deployments(namespace).Patch(context.TODO(), name, patchType, patch, patchOptions); err != nil {
 		return "", fmt.Errorf("failed restoring revision %d: %v", toRevision, err)
 	}
 	return rollbackSuccess, nil
@@ -255,7 +260,7 @@ type DaemonSetRollbacker struct {
 	c kubernetes.Interface
 }
 
-func (r *DaemonSetRollbacker) Rollback(obj runtime.Object, updatedAnnotations map[string]string, toRevision int64, dryRun bool) (string, error) {
+func (r *DaemonSetRollbacker) Rollback(obj runtime.Object, updatedAnnotations map[string]string, toRevision int64, dryRunStrategy cmdutil.DryRunStrategy) (string, error) {
 	if toRevision < 0 {
 		return "", revisionNotFoundErr(toRevision)
 	}
@@ -276,7 +281,7 @@ func (r *DaemonSetRollbacker) Rollback(obj runtime.Object, updatedAnnotations ma
 		return "", revisionNotFoundErr(toRevision)
 	}
 
-	if dryRun {
+	if dryRunStrategy == cmdutil.DryRunClient {
 		appliedDS, err := applyDaemonSetHistory(ds, toHistory)
 		if err != nil {
 			return "", err
@@ -293,8 +298,12 @@ func (r *DaemonSetRollbacker) Rollback(obj runtime.Object, updatedAnnotations ma
 		return fmt.Sprintf("%s (current template already matches revision %d)", rollbackSkipped, toRevision), nil
 	}
 
+	patchOptions := metav1.PatchOptions{}
+	if dryRunStrategy == cmdutil.DryRunServer {
+		patchOptions.DryRun = []string{metav1.DryRunAll}
+	}
 	// Restore revision
-	if _, err = r.c.AppsV1().DaemonSets(accessor.GetNamespace()).Patch(context.TODO(), accessor.GetName(), types.StrategicMergePatchType, toHistory.Data.Raw, metav1.PatchOptions{}); err != nil {
+	if _, err = r.c.AppsV1().DaemonSets(accessor.GetNamespace()).Patch(context.TODO(), accessor.GetName(), types.StrategicMergePatchType, toHistory.Data.Raw, patchOptions); err != nil {
 		return "", fmt.Errorf("failed restoring revision %d: %v", toRevision, err)
 	}
 
@@ -342,7 +351,7 @@ type StatefulSetRollbacker struct {
 }
 
 // toRevision is a non-negative integer, with 0 being reserved to indicate rolling back to previous configuration
-func (r *StatefulSetRollbacker) Rollback(obj runtime.Object, updatedAnnotations map[string]string, toRevision int64, dryRun bool) (string, error) {
+func (r *StatefulSetRollbacker) Rollback(obj runtime.Object, updatedAnnotations map[string]string, toRevision int64, dryRunStrategy cmdutil.DryRunStrategy) (string, error) {
 	if toRevision < 0 {
 		return "", revisionNotFoundErr(toRevision)
 	}
@@ -363,7 +372,7 @@ func (r *StatefulSetRollbacker) Rollback(obj runtime.Object, updatedAnnotations 
 		return "", revisionNotFoundErr(toRevision)
 	}
 
-	if dryRun {
+	if dryRunStrategy == cmdutil.DryRunClient {
 		appliedSS, err := applyRevision(sts, toHistory)
 		if err != nil {
 			return "", err
@@ -380,8 +389,12 @@ func (r *StatefulSetRollbacker) Rollback(obj runtime.Object, updatedAnnotations 
 		return fmt.Sprintf("%s (current template already matches revision %d)", rollbackSkipped, toRevision), nil
 	}
 
+	patchOptions := metav1.PatchOptions{}
+	if dryRunStrategy == cmdutil.DryRunServer {
+		patchOptions.DryRun = []string{metav1.DryRunAll}
+	}
 	// Restore revision
-	if _, err = r.c.AppsV1().StatefulSets(sts.Namespace).Patch(context.TODO(), sts.Name, types.StrategicMergePatchType, toHistory.Data.Raw, metav1.PatchOptions{}); err != nil {
+	if _, err = r.c.AppsV1().StatefulSets(sts.Namespace).Patch(context.TODO(), sts.Name, types.StrategicMergePatchType, toHistory.Data.Raw, patchOptions); err != nil {
 		return "", fmt.Errorf("failed restoring revision %d: %v", toRevision, err)
 	}
 

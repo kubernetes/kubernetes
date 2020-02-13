@@ -22,6 +22,7 @@ run_cluster_management_tests() {
   set -o nounset
   set -o errexit
 
+  create_and_use_new_namespace
   kube::log::status "Testing cluster-management commands"
 
   kube::test::get_object_assert nodes "{{range.items}}{{${id_field:?}}}:{{end}}" '127.0.0.1:'
@@ -90,13 +91,15 @@ __EOF__
   ### kubectl cordon update with --dry-run does not mark node unschedulable
   # Pre-condition: node is schedulable
   kube::test::get_object_assert "nodes 127.0.0.1" "{{.spec.unschedulable}}" '<no value>'
-  kubectl cordon "127.0.0.1" --dry-run
+  kubectl cordon "127.0.0.1" --dry-run=client
+  kubectl cordon "127.0.0.1" --dry-run=server
   kube::test::get_object_assert "nodes 127.0.0.1" "{{.spec.unschedulable}}" '<no value>'
 
   ### kubectl drain update with --dry-run does not mark node unschedulable
   # Pre-condition: node is schedulable
   kube::test::get_object_assert "nodes 127.0.0.1" "{{.spec.unschedulable}}" '<no value>'
-  kubectl drain "127.0.0.1" --dry-run
+  kubectl drain "127.0.0.1" --dry-run=client
+  kubectl drain "127.0.0.1" --dry-run=server
   # Post-condition: node still exists, node is still schedulable
   kube::test::get_object_assert nodes "{{range.items}}{{$id_field}}:{{end}}" '127.0.0.1:'
   kube::test::get_object_assert "nodes 127.0.0.1" "{{.spec.unschedulable}}" '<no value>'
@@ -106,6 +109,11 @@ __EOF__
   kube::test::get_object_assert "nodes 127.0.0.1" "{{.spec.unschedulable}}" '<no value>'
   # Pre-condition: test-pod-1 and test-pod-2 exist
   kube::test::get_object_assert "pods" "{{range .items}}{{.metadata.name}},{{end}}" 'test-pod-1,test-pod-2,'
+  # dry-run command
+  kubectl drain "127.0.0.1" --pod-selector 'e in (f)' --dry-run=client
+  kubectl drain "127.0.0.1" --pod-selector 'e in (f)' --dry-run=server
+  kube::test::get_object_assert "pods" "{{range .items}}{{.metadata.name}},{{end}}" 'test-pod-1,test-pod-2,'
+  # command
   kubectl drain "127.0.0.1" --pod-selector 'e in (f)'
   # only "test-pod-1" should have been matched and deleted - test-pod-2 should still exist
   kube::test::get_object_assert "pods/test-pod-2" "{{.metadata.name}}" 'test-pod-2'
@@ -118,7 +126,9 @@ __EOF__
   ### kubectl uncordon update with --dry-run is a no-op
   # Pre-condition: node is already schedulable
   kube::test::get_object_assert "nodes 127.0.0.1" "{{.spec.unschedulable}}" '<no value>'
-  response=$(kubectl uncordon "127.0.0.1" --dry-run)
+  response=$(kubectl uncordon "127.0.0.1" --dry-run=client)
+  kube::test::if_has_string "${response}" 'already uncordoned'
+  response=$(kubectl uncordon "127.0.0.1" --dry-run=server)
   kube::test::if_has_string "${response}" 'already uncordoned'
   # Post-condition: node is still schedulable
   kube::test::get_object_assert "nodes 127.0.0.1" "{{.spec.unschedulable}}" '<no value>'

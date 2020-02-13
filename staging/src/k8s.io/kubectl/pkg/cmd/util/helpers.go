@@ -524,19 +524,6 @@ const (
 	DryRunServer
 )
 
-// TODO(julianvmodesto): remove GetClientSideDryRun once we support
-// server-side dry-run in all commands
-func GetClientSideDryRun(cmd *cobra.Command) bool {
-	dryRunStrategy, err := GetDryRunStrategy(cmd)
-	if err != nil {
-		klog.Fatalf("error accessing --dry-run flag for command %s: %v", cmd.Name(), err)
-	}
-	if dryRunStrategy == DryRunServer {
-		klog.Fatalf("--dry-run=server for command %s is not supported yet", cmd.Name())
-	}
-	return dryRunStrategy == DryRunClient
-}
-
 func GetDryRunStrategy(cmd *cobra.Command) (DryRunStrategy, error) {
 	var dryRunFlag = GetFlagString(cmd, "dry-run")
 	b, err := strconv.ParseBool(dryRunFlag)
