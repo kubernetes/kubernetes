@@ -18,9 +18,7 @@ package options
 
 import (
 	"fmt"
-	"math/rand"
 	"net"
-	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -208,7 +206,7 @@ func (o *CloudControllerManagerOptions) ApplyTo(c *cloudcontrollerconfig.Config,
 		c.ClientBuilder = rootClientBuilder
 	}
 	c.VersionedClient = rootClientBuilder.ClientOrDie("shared-informers")
-	c.SharedInformers = informers.NewSharedInformerFactory(c.VersionedClient, resyncPeriod(c)())
+	c.SharedInformers = informers.NewSharedInformerFactory(c.VersionedClient, controller.DynamicResyncPeriodFunc(c.ComponentConfig.Generic.MinResyncPeriod.Duration)())
 
 	// sync back to component config
 	// TODO: find more elegant way than syncing back the values.
@@ -237,14 +235,6 @@ func (o *CloudControllerManagerOptions) Validate(allControllers, disabledByDefau
 	}
 
 	return utilerrors.NewAggregate(errors)
-}
-
-// resyncPeriod computes the time interval a shared informer waits before resyncing with the api server
-func resyncPeriod(c *cloudcontrollerconfig.Config) func() time.Duration {
-	return func() time.Duration {
-		factor := rand.Float64() + 1
-		return time.Duration(float64(c.ComponentConfig.Generic.MinResyncPeriod.Nanoseconds()) * factor)
-	}
 }
 
 // Config return a cloud controller manager config objective

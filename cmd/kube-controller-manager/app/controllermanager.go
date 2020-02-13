@@ -24,7 +24,6 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
-	"math/rand"
 	"net/http"
 	"os"
 	"time"
@@ -143,16 +142,6 @@ controller, and serviceaccounts controller.`,
 	})
 
 	return cmd
-}
-
-// ResyncPeriod returns a function which generates a duration each time it is
-// invoked; this is so that multiple controllers don't get into lock-step and all
-// hammer the apiserver with list requests simultaneously.
-func ResyncPeriod(c *config.CompletedConfig) func() time.Duration {
-	return func() time.Duration {
-		factor := rand.Float64() + 1
-		return time.Duration(float64(c.ComponentConfig.Generic.MinResyncPeriod.Nanoseconds()) * factor)
-	}
 }
 
 // Run runs the KubeControllerManagerOptions.  This should never exit.
@@ -447,10 +436,10 @@ func GetAvailableResources(clientBuilder controller.ControllerClientBuilder) (ma
 // the shared-informers client and token controller.
 func CreateControllerContext(s *config.CompletedConfig, rootClientBuilder, clientBuilder controller.ControllerClientBuilder, stop <-chan struct{}) (ControllerContext, error) {
 	versionedClient := rootClientBuilder.ClientOrDie("shared-informers")
-	sharedInformers := informers.NewSharedInformerFactory(versionedClient, ResyncPeriod(s)())
+	sharedInformers := informers.NewSharedInformerFactory(versionedClient, controller.DynamicResyncPeriodFunc(s.ComponentConfig.Generic.MinResyncPeriod.Duration)())
 
 	metadataClient := metadata.NewForConfigOrDie(rootClientBuilder.ConfigOrDie("metadata-informers"))
-	metadataInformers := metadatainformer.NewSharedInformerFactory(metadataClient, ResyncPeriod(s)())
+	metadataInformers := metadatainformer.NewSharedInformerFactory(metadataClient, controller.DynamicResyncPeriodFunc(s.ComponentConfig.Generic.MinResyncPeriod.Duration)())
 
 	// If apiserver is not running we should wait for some time and fail only then. This is particularly
 	// important when we start apiserver and controller manager at the same time.
@@ -488,7 +477,7 @@ func CreateControllerContext(s *config.CompletedConfig, rootClientBuilder, clien
 		LoopMode:                        loopMode,
 		Stop:                            stop,
 		InformersStarted:                make(chan struct{}),
-		ResyncPeriod:                    ResyncPeriod(s),
+		ResyncPeriod:                    controller.DynamicResyncPeriodFunc(s.ComponentConfig.Generic.MinResyncPeriod.Duration),
 	}
 	return ctx, nil
 }

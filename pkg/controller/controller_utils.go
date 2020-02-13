@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"hash/fnv"
+	"math/rand"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -35,7 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
-	"k8s.io/apimachinery/pkg/util/rand"
+	randutil "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -111,6 +112,17 @@ func NoResyncPeriodFunc() time.Duration {
 func StaticResyncPeriodFunc(resyncPeriod time.Duration) ResyncPeriodFunc {
 	return func() time.Duration {
 		return resyncPeriod
+	}
+}
+
+// DynamicResyncPeriodFunc returns a function which generates a duration each time it is
+// invoked; this is so that multiple controllers don't get into lock-step and all
+// hammer the apiserver with list requests simultaneously.
+// The duration will be random between resyncPeriod and 2*resyncPeriod.
+func DynamicResyncPeriodFunc(resyncPeriod time.Duration) ResyncPeriodFunc {
+	return func() time.Duration {
+		factor := rand.Float64() + 1
+		return time.Duration(float64(resyncPeriod.Nanoseconds()) * factor)
 	}
 }
 
@@ -1137,7 +1149,7 @@ func ComputeHash(template *v1.PodTemplateSpec, collisionCount *int32) string {
 		podTemplateSpecHasher.Write(collisionCountBytes)
 	}
 
-	return rand.SafeEncodeString(fmt.Sprint(podTemplateSpecHasher.Sum32()))
+	return randutil.SafeEncodeString(fmt.Sprint(podTemplateSpecHasher.Sum32()))
 }
 
 func AddOrUpdateLabelsOnNode(kubeClient clientset.Interface, nodeName string, labelsToUpdate map[string]string) error {
