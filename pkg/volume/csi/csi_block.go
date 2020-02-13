@@ -72,9 +72,11 @@ import (
 	"os"
 	"path/filepath"
 
+	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
+
 	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -299,6 +301,13 @@ func (m *csiBlockMapper) SetUpDevice() error {
 	// Call NodeStageVolume
 	_, err = m.stageVolumeForBlock(ctx, csiClient, accessMode, csiSource, attachment)
 	if err != nil {
+		if volumetypes.IsOperationFinishedError(err) {
+			cleanupErr := m.cleanupOrphanDeviceFiles()
+			if cleanupErr != nil {
+				// V(4) for not so serious error
+				klog.V(4).Infof("Failed to clean up block volume directory %s", cleanupErr)
+			}
+		}
 		return err
 	}
 
@@ -434,6 +443,57 @@ func (m *csiBlockMapper) TearDownDevice(globalMapPath, devicePath string) error 
 		if err != nil {
 			return err
 		}
+	}
+	if err = m.cleanupOrphanDeviceFiles(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Clean up any orphan files / directories when a block volume is being unstaged.
+// At this point we can be sure that there is no pod using the volume and all
+// files are indeed orphaned.
+func (m *csiBlockMapper) cleanupOrphanDeviceFiles() error {
+	// Remove artifacts of NodePublish.
+	// publishPath: xxx/plugins/kubernetes.io/csi/volumeDevices/publish/<volume name>/<pod UUID>
+	// publishPath was removed by the driver. We need to remove the <volume name>/ dir.
+	publishPath := m.getPublishPath()
+	publishDir := filepath.Dir(publishPath)
+	if m.podUID == "" {
+		// Pod UID is not known during device teardown ("NodeUnstage").
+		// getPublishPath() squashed "<volume name>/<pod UUID>" into "<volume name>/".
+		publishDir = publishPath
+	}
+	if err := os.Remove(publishDir); err != nil && !os.IsNotExist(err) {
+		return errors.New(log("failed to publish directory [%s]: %v", publishDir, err))
+	}
+
+	// Remove artifacts of NodeStage.
+	// stagingPath: xxx/plugins/kubernetes.io/csi/volumeDevices/staging/<volume name>
+	stagingPath := m.getStagingPath()
+	if err := os.Remove(stagingPath); err != nil && !os.IsNotExist(err) {
+		return errors.New(log("failed to delete volume staging path [%s]: %v", stagingPath, err))
+	}
+
+	// Remove everything under xxx/plugins/kubernetes.io/csi/volumeDevices/<volume name>.
+	// At this point it contains only "data/vol_data.json" and empty "dev/".
+	dataDir := getVolumeDeviceDataDir(m.specName, m.plugin.host)
+	dataFile := filepath.Join(dataDir, volDataFileName)
+	if err := os.Remove(dataFile); err != nil && !os.IsNotExist(err) {
+		return errors.New(log("failed to delete volume data file [%s]: %v", dataFile, err))
+	}
+	if err := os.Remove(dataDir); err != nil && !os.IsNotExist(err) {
+		return errors.New(log("failed to delete volume data directory [%s]: %v", dataDir, err))
+	}
+
+	volumeDir := filepath.Dir(dataDir)
+	deviceDir := filepath.Join(volumeDir, "dev")
+	if err := os.Remove(deviceDir); err != nil && !os.IsNotExist(err) {
+		return errors.New(log("failed to delete volume directory [%s]: %v", deviceDir, err))
+	}
+	if err := os.Remove(volumeDir); err != nil && !os.IsNotExist(err) {
+		return errors.New(log("failed to delete volume directory [%s]: %v", volumeDir, err))
 	}
 
 	return nil
