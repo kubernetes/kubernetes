@@ -181,7 +181,7 @@ func (p *provisioningTestSuite) DefineTests(driver TestDriver, pattern testpatte
 
 		l.testCase.Class.MountOptions = dInfo.SupportedMountOption.Union(dInfo.RequiredMountOption).List()
 		l.testCase.PvCheck = func(claim *v1.PersistentVolumeClaim) {
-			PVWriteReadSingleNodeCheck(l.cs, claim, e2epod.NodeSelection{Name: l.config.ClientNodeName})
+			PVWriteReadSingleNodeCheck(l.cs, claim, l.config.ClientNodeSelection)
 		}
 		l.testCase.TestDynamicProvisioning()
 	})
@@ -201,14 +201,14 @@ func (p *provisioningTestSuite) DefineTests(driver TestDriver, pattern testpatte
 
 		dc := l.config.Framework.DynamicClient
 		vsc := sDriver.GetSnapshotClass(l.config)
-		dataSource, cleanupFunc := prepareSnapshotDataSourceForProvisioning(e2epod.NodeSelection{Name: l.config.ClientNodeName}, l.cs, dc, l.pvc, l.sc, vsc)
+		dataSource, cleanupFunc := prepareSnapshotDataSourceForProvisioning(l.config.ClientNodeSelection, l.cs, dc, l.pvc, l.sc, vsc)
 		defer cleanupFunc()
 
 		l.pvc.Spec.DataSource = dataSource
 		l.testCase.PvCheck = func(claim *v1.PersistentVolumeClaim) {
 			ginkgo.By("checking whether the created volume has the pre-populated data")
 			command := fmt.Sprintf("grep '%s' /mnt/test/initialData", claim.Namespace)
-			RunInPodWithVolume(l.cs, claim.Namespace, claim.Name, "pvc-snapshot-tester", command, e2epod.NodeSelection{Name: l.config.ClientNodeName})
+			RunInPodWithVolume(l.cs, claim.Namespace, claim.Name, "pvc-snapshot-tester", command, l.config.ClientNodeSelection)
 		}
 		l.testCase.TestDynamicProvisioning()
 	})
@@ -221,14 +221,14 @@ func (p *provisioningTestSuite) DefineTests(driver TestDriver, pattern testpatte
 		defer cleanup()
 
 		dc := l.config.Framework.DynamicClient
-		dataSource, dataSourceCleanup := preparePVCDataSourceForProvisioning(e2epod.NodeSelection{Name: l.config.ClientNodeName}, l.cs, dc, l.sourcePVC, l.sc)
+		dataSource, dataSourceCleanup := preparePVCDataSourceForProvisioning(l.config.ClientNodeSelection, l.cs, dc, l.sourcePVC, l.sc)
 		defer dataSourceCleanup()
 
 		l.pvc.Spec.DataSource = dataSource
 		l.testCase.PvCheck = func(claim *v1.PersistentVolumeClaim) {
 			ginkgo.By("checking whether the created volume has the pre-populated data")
 			command := fmt.Sprintf("grep '%s' /mnt/test/initialData", claim.Namespace)
-			RunInPodWithVolume(l.cs, claim.Namespace, claim.Name, "pvc-datasource-tester", command, e2epod.NodeSelection{Name: l.config.ClientNodeName})
+			RunInPodWithVolume(l.cs, claim.Namespace, claim.Name, "pvc-datasource-tester", command, l.config.ClientNodeSelection)
 		}
 		l.testCase.TestDynamicProvisioning()
 	})
@@ -567,9 +567,6 @@ func StartInPodWithVolume(c clientset.Interface, ns, claimName, podName, command
 			},
 		},
 		Spec: v1.PodSpec{
-			NodeName:     node.Name,
-			NodeSelector: node.Selector,
-			Affinity:     node.Affinity,
 			Containers: []v1.Container{
 				{
 					Name:    "volume-tester",
@@ -598,6 +595,7 @@ func StartInPodWithVolume(c clientset.Interface, ns, claimName, podName, command
 		},
 	}
 
+	e2epod.SetNodeSelection(pod, node)
 	pod, err := c.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "Failed to create pod: %v", err)
 	return pod

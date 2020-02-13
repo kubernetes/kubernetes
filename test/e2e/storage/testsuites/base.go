@@ -429,10 +429,9 @@ func convertTestConfig(in *PerTestConfig) volume.TestConfig {
 	}
 
 	return volume.TestConfig{
-		Namespace:      in.Framework.Namespace.Name,
-		Prefix:         in.Prefix,
-		ClientNodeName: in.ClientNodeName,
-		NodeSelector:   in.ClientNodeSelector,
+		Namespace:           in.Framework.Namespace.Name,
+		Prefix:              in.Prefix,
+		ClientNodeSelection: in.ClientNodeSelection,
 	}
 }
 

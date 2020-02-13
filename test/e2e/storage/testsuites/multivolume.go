@@ -150,7 +150,7 @@ func (t *multiVolumeTestSuite) DefineTests(driver TestDriver, pattern testpatter
 		}
 
 		TestAccessMultipleVolumesAcrossPodRecreation(l.config.Framework, l.cs, l.ns.Name,
-			e2epod.NodeSelection{Name: l.config.ClientNodeName}, pvcs, true /* sameNode */)
+			l.config.ClientNodeSelection, pvcs, true /* sameNode */)
 	})
 
 	// This tests below configuration:
@@ -178,14 +178,13 @@ func (t *multiVolumeTestSuite) DefineTests(driver TestDriver, pattern testpatter
 		if len(nodes.Items) < 2 {
 			e2eskipper.Skipf("Number of available nodes is less than 2 - skipping")
 		}
-		if l.config.ClientNodeName != "" {
+		if l.config.ClientNodeSelection.Name != "" {
 			e2eskipper.Skipf("Driver %q requires to deploy on a specific node - skipping", l.driver.GetDriverInfo().Name)
 		}
 		// For multi-node tests there must be enough nodes with the same toopology to schedule the pods
-		nodeSelection := e2epod.NodeSelection{Name: l.config.ClientNodeName}
 		topologyKeys := dInfo.TopologyKeys
 		if len(topologyKeys) != 0 {
-			if err = ensureTopologyRequirements(&nodeSelection, nodes, l.cs, topologyKeys, 2); err != nil {
+			if err = ensureTopologyRequirements(&l.config.ClientNodeSelection, nodes, l.cs, topologyKeys, 2); err != nil {
 				framework.Failf("Error setting topology requirements: %v", err)
 			}
 		}
@@ -201,7 +200,7 @@ func (t *multiVolumeTestSuite) DefineTests(driver TestDriver, pattern testpatter
 		}
 
 		TestAccessMultipleVolumesAcrossPodRecreation(l.config.Framework, l.cs, l.ns.Name,
-			nodeSelection, pvcs, false /* sameNode */)
+			l.config.ClientNodeSelection, pvcs, false /* sameNode */)
 	})
 
 	// This tests below configuration (only <block, filesystem> pattern is tested):
@@ -240,7 +239,7 @@ func (t *multiVolumeTestSuite) DefineTests(driver TestDriver, pattern testpatter
 		}
 
 		TestAccessMultipleVolumesAcrossPodRecreation(l.config.Framework, l.cs, l.ns.Name,
-			e2epod.NodeSelection{Name: l.config.ClientNodeName}, pvcs, true /* sameNode */)
+			l.config.ClientNodeSelection, pvcs, true /* sameNode */)
 	})
 
 	// This tests below configuration (only <block, filesystem> pattern is tested):
@@ -272,14 +271,13 @@ func (t *multiVolumeTestSuite) DefineTests(driver TestDriver, pattern testpatter
 		if len(nodes.Items) < 2 {
 			e2eskipper.Skipf("Number of available nodes is less than 2 - skipping")
 		}
-		if l.config.ClientNodeName != "" {
+		if l.config.ClientNodeSelection.Name != "" {
 			e2eskipper.Skipf("Driver %q requires to deploy on a specific node - skipping", l.driver.GetDriverInfo().Name)
 		}
 		// For multi-node tests there must be enough nodes with the same toopology to schedule the pods
-		nodeSelection := e2epod.NodeSelection{Name: l.config.ClientNodeName}
 		topologyKeys := dInfo.TopologyKeys
 		if len(topologyKeys) != 0 {
-			if err = ensureTopologyRequirements(&nodeSelection, nodes, l.cs, topologyKeys, 2); err != nil {
+			if err = ensureTopologyRequirements(&l.config.ClientNodeSelection, nodes, l.cs, topologyKeys, 2); err != nil {
 				framework.Failf("Error setting topology requirements: %v", err)
 			}
 		}
@@ -300,7 +298,7 @@ func (t *multiVolumeTestSuite) DefineTests(driver TestDriver, pattern testpatter
 		}
 
 		TestAccessMultipleVolumesAcrossPodRecreation(l.config.Framework, l.cs, l.ns.Name,
-			nodeSelection, pvcs, false /* sameNode */)
+			l.config.ClientNodeSelection, pvcs, false /* sameNode */)
 	})
 
 	// This tests below configuration:
@@ -325,7 +323,7 @@ func (t *multiVolumeTestSuite) DefineTests(driver TestDriver, pattern testpatter
 
 		// Test access to the volume from pods on different node
 		TestConcurrentAccessToSingleVolume(l.config.Framework, l.cs, l.ns.Name,
-			e2epod.NodeSelection{Name: l.config.ClientNodeName}, resource.Pvc, numPods, true /* sameNode */)
+			l.config.ClientNodeSelection, resource.Pvc, numPods, true /* sameNode */)
 	})
 
 	// This tests below configuration:
@@ -349,14 +347,13 @@ func (t *multiVolumeTestSuite) DefineTests(driver TestDriver, pattern testpatter
 		if len(nodes.Items) < numPods {
 			e2eskipper.Skipf(fmt.Sprintf("Number of available nodes is less than %d - skipping", numPods))
 		}
-		if l.config.ClientNodeName != "" {
+		if l.config.ClientNodeSelection.Name != "" {
 			e2eskipper.Skipf("Driver %q requires to deploy on a specific node - skipping", l.driver.GetDriverInfo().Name)
 		}
 		// For multi-node tests there must be enough nodes with the same toopology to schedule the pods
-		nodeSelection := e2epod.NodeSelection{Name: l.config.ClientNodeName}
 		topologyKeys := dInfo.TopologyKeys
 		if len(topologyKeys) != 0 {
-			if err = ensureTopologyRequirements(&nodeSelection, nodes, l.cs, topologyKeys, 2); err != nil {
+			if err = ensureTopologyRequirements(&l.config.ClientNodeSelection, nodes, l.cs, topologyKeys, 2); err != nil {
 				framework.Failf("Error setting topology requirements: %v", err)
 			}
 		}
@@ -368,7 +365,7 @@ func (t *multiVolumeTestSuite) DefineTests(driver TestDriver, pattern testpatter
 
 		// Test access to the volume from pods on different node
 		TestConcurrentAccessToSingleVolume(l.config.Framework, l.cs, l.ns.Name,
-			nodeSelection, resource.Pvc, numPods, false /* sameNode */)
+			l.config.ClientNodeSelection, resource.Pvc, numPods, false /* sameNode */)
 	})
 }
 

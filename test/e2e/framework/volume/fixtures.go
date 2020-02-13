@@ -128,12 +128,8 @@ type TestConfig struct {
 	// Wait for the pod to terminate successfully
 	// False indicates that the pod is long running
 	WaitForCompletion bool
-	// ServerNodeName is the spec.nodeName to run server pod on.  Default is any node.
-	ServerNodeName string
-	// ClientNodeName is the spec.nodeName to run client pod on.  Default is any node.
-	ClientNodeName string
-	// NodeSelector to use in pod spec (server, client and injector pods).
-	NodeSelector map[string]string
+	// ClientNodeSelection restricts where the client pod runs on.  Default is any node.
+	ClientNodeSelection e2epod.NodeSelection
 }
 
 // Test contains a volume to mount into a client pod and its
@@ -297,8 +293,6 @@ func startVolumeServer(client clientset.Interface, config TestConfig) *v1.Pod {
 			},
 			Volumes:       volumes,
 			RestartPolicy: restartPolicy,
-			NodeName:      config.ServerNodeName,
-			NodeSelector:  config.NodeSelector,
 		},
 	}
 
@@ -389,10 +383,9 @@ func runVolumeTesterPod(client clientset.Interface, config TestConfig, podSuffix
 			TerminationGracePeriodSeconds: &gracePeriod,
 			SecurityContext:               GeneratePodSecurityContext(fsGroup, seLinuxOptions),
 			Volumes:                       []v1.Volume{},
-			NodeName:                      config.ClientNodeName,
-			NodeSelector:                  config.NodeSelector,
 		},
 	}
+	e2epod.SetNodeSelection(clientPod, config.ClientNodeSelection)
 
 	for i, test := range tests {
 		volumeName := fmt.Sprintf("%s-%s-%d", config.Prefix, "volume", i)

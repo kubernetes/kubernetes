@@ -128,7 +128,7 @@ func (t *volumeLimitsTestSuite) DefineTests(driver TestDriver, pattern testpatte
 		ginkgo.By("Picking a node")
 		// Some CSI drivers are deployed to a single node (e.g csi-hostpath),
 		// so we use that node instead of picking a random one.
-		nodeName := l.config.ClientNodeName
+		nodeName := l.config.ClientNodeSelection.Name
 		if nodeName == "" {
 			node, err := e2enode.GetRandomReadySchedulableNode(f.ClientSet)
 			framework.ExpectNoError(err)
