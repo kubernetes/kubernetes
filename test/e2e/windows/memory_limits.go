@@ -168,7 +168,7 @@ func newMemLimitTestPods(numPods int, imageName, podType string, memoryLimit str
 					},
 				},
 				NodeSelector: map[string]string{
-					"beta.kubernetes.io/os": "windows",
+					"kubernetes.io/os": "windows",
 				},
 			},
 		}
@@ -181,7 +181,7 @@ func newMemLimitTestPods(numPods int, imageName, podType string, memoryLimit str
 
 // getNodeMemory populates a nodeMemory struct with information from the first
 func getNodeMemory(f *framework.Framework) nodeMemory {
-	selector := labels.Set{"beta.kubernetes.io/os": "windows"}.AsSelector()
+	selector := labels.Set{"kubernetes.io/os": "windows"}.AsSelector()
 	nodeList, err := f.ClientSet.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{
 		LabelSelector: selector.String(),
 	})
@@ -232,7 +232,7 @@ func getNodeMemory(f *framework.Framework) nodeMemory {
 
 // getTotalAllocatableMemory gets the sum of all agent node's allocatable memory
 func getTotalAllocatableMemory(f *framework.Framework) *resource.Quantity {
-	selector := labels.Set{"beta.kubernetes.io/os": "windows"}.AsSelector()
+	selector := labels.Set{"kubernetes.io/os": "windows"}.AsSelector()
 	nodeList, err := f.ClientSet.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{
 		LabelSelector: selector.String(),
 	})

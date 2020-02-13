@@ -115,7 +115,7 @@ spec:
         - key: "CriticalAddonsOnly"
           operator: "Exists"
       nodeSelector:
-        beta.kubernetes.io/os: linux
+        kubernetes.io/os: linux
       containers:
       - name: coredns
         image: k8s.gcr.io/coredns:1.6.5

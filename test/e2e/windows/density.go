@@ -236,7 +236,7 @@ func newDensityTestPods(numPods int, volume bool, imageName, podType string) []*
 					},
 				},
 				NodeSelector: map[string]string{
-					"beta.kubernetes.io/os": "windows",
+					"kubernetes.io/os": "windows",
 				},
 			},
 		}

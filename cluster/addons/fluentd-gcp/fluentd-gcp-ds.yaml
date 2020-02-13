@@ -98,7 +98,7 @@ spec:
                 fieldPath: metadata.namespace
       # END_PROMETHEUS_TO_SD
       nodeSelector:
-        beta.kubernetes.io/os: linux
+        kubernetes.io/os: linux
       terminationGracePeriodSeconds: 60
       tolerations:
       - operator: "Exists"
