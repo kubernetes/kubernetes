@@ -304,7 +304,7 @@ func TestBlockMapperSetupDeviceError(t *testing.T) {
 	attachID := getAttachmentName(csiMapper.volumeID, string(csiMapper.driverName), string(nodeName))
 	attachment := makeTestAttachment(attachID, nodeName, pvName)
 	attachment.Status.Attached = true
-	_, err = csiMapper.k8s.StorageV1().VolumeAttachments().Create(context.TODO(), attachment, metav1.CreateOptions{})
+	_, err = csiMapper.k8s.StorageV1().VolumeAttachments().Create(context.Background(), attachment, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("failed to setup VolumeAttachment: %v", err)
 	}
@@ -347,10 +347,10 @@ func TestBlockMapperMapPodDevice(t *testing.T) {
 
 	csiMapper.csiClient = setupClient(t, true)
 
-	attachID := getAttachmentName(csiMapper.volumeID, string(csiMapper.driverName), string(nodeName))
+	attachID := getAttachmentName(csiMapper.volumeID, string(csiMapper.driverName), nodeName)
 	attachment := makeTestAttachment(attachID, nodeName, pvName)
 	attachment.Status.Attached = true
-	_, err = csiMapper.k8s.StorageV1().VolumeAttachments().Create(context.TODO(), attachment, metav1.CreateOptions{})
+	_, err = csiMapper.k8s.StorageV1().VolumeAttachments().Create(context.Background(), attachment, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("failed to setup VolumeAttachment: %v", err)
 	}
@@ -483,6 +483,9 @@ func TestBlockMapperTearDownDevice(t *testing.T) {
 func TestVolumeSetupTeardown(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIBlockVolume, true)()
 
+	// Follow volume setup + teardown sequences at top of cs_block.go and set up / clean up one CSI block device.
+	// Focus on testing that there were no leftover files present after the cleanup.
+
 	plug, tmpDir := newTestPlugin(t, nil)
 	defer os.RemoveAll(tmpDir)
 
@@ -505,7 +508,6 @@ func TestVolumeSetupTeardown(t *testing.T) {
 	}
 	t.Log("created attachement ", attachID)
 
-	// SetupDevice
 	err = csiMapper.SetUpDevice()
 	if err != nil {
 		t.Fatalf("mapper failed to SetupDevice: %v", err)
@@ -521,7 +523,6 @@ func TestVolumeSetupTeardown(t *testing.T) {
 		t.Errorf("csi server expected device path %s, got %s", stagingPath, svol.Path)
 	}
 
-	// MapPodDevice
 	path, err := csiMapper.MapPodDevice()
 	if err != nil {
 		t.Fatalf("mapper failed to GetGlobalMapPath: %v", err)
@@ -552,7 +553,6 @@ func TestVolumeSetupTeardown(t *testing.T) {
 		t.Fatalf("unmapper failed to GetGlobalMapPath: %v", err)
 	}
 
-	// UnmapDevice
 	err = csiUnmapper.UnmapPodDevice()
 	if err != nil {
 		t.Errorf("unmapper failed to call UnmapPodDevice: %v", err)
@@ -566,7 +566,6 @@ func TestVolumeSetupTeardown(t *testing.T) {
 	csiUnmapper = unmapper.(*csiBlockMapper)
 	csiUnmapper.csiClient = csiMapper.csiClient
 
-	// TearDownDevice
 	err = csiUnmapper.TearDownDevice(globalMapPath, "/dev/test")
 	if err != nil {
 		t.Fatal(err)

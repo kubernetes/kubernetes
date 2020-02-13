@@ -192,9 +192,9 @@ func (f *NodeClient) NodePublishVolume(ctx context.Context, req *csipb.NodePubli
 		Path:            req.GetTargetPath(),
 		DeviceMountPath: req.GetStagingTargetPath(),
 		VolumeContext:   req.GetVolumeContext(),
-		FSType:          req.GetVolumeCapability().GetMount().GetFsType(),
 	}
 	if req.GetVolumeCapability().GetMount() != nil {
+		publishedVolume.FSType = req.GetVolumeCapability().GetMount().FsType
 		publishedVolume.MountFlags = req.GetVolumeCapability().GetMount().MountFlags
 	}
 	f.nodePublishedVolumes[req.GetVolumeId()] = publishedVolume

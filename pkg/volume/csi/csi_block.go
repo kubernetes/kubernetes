@@ -466,7 +466,7 @@ func (m *csiBlockMapper) cleanupOrphanDeviceFiles() error {
 		publishDir = publishPath
 	}
 	if err := os.Remove(publishDir); err != nil && !os.IsNotExist(err) {
-		return errors.New(log("failed to publish directory [%s]: %v", publishDir, err))
+		return errors.New(log("failed to remove publish directory [%s]: %v", publishDir, err))
 	}
 
 	// Remove artifacts of NodeStage.
