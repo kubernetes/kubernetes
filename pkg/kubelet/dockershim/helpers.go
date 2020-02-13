@@ -397,13 +397,13 @@ func (d dockerOpt) GetKV() (string, string) {
 	return d.key, d.value
 }
 
-// writeLimiter limits the total output written across one or more streams.
-type writeLimiter struct {
+// sharedWriteLimiter limits the total output written across one or more streams.
+type sharedWriteLimiter struct {
 	delegate io.Writer
 	limit    *int64
 }
 
-func (w writeLimiter) Write(p []byte) (int, error) {
+func (w sharedWriteLimiter) Write(p []byte) (int, error) {
 	if len(p) == 0 {
 		return 0, nil
 	}
@@ -418,11 +418,7 @@ func (w writeLimiter) Write(p []byte) (int, error) {
 	}
 	n, err := w.delegate.Write(p)
 	if n > 0 {
-		newLimit := limit - int64(n)
-		for !atomic.CompareAndSwapInt64(w.limit, limit, newLimit) {
-			limit = atomic.LoadInt64(w.limit)
-			newLimit = limit - int64(n)
-		}
+		atomic.AddInt64(w.limit, -1*int64(n))
 	}
 	if err == nil && truncated {
 		err = errMaximumWrite
@@ -434,7 +430,7 @@ func limitedWriter(w io.Writer, limit *int64) io.Writer {
 	if w == nil {
 		return nil
 	}
-	return &writeLimiter{
+	return &sharedWriteLimiter{
 		delegate: w,
 		limit:    limit,
 	}
