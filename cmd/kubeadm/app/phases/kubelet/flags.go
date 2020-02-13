@@ -27,7 +27,6 @@ import (
 	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/initsystem"
@@ -36,7 +35,6 @@ import (
 
 type kubeletFlagsOpts struct {
 	nodeRegOpts              *kubeadmapi.NodeRegistrationOptions
-	featureGates             map[string]bool
 	pauseImage               string
 	registerTaintsUsingFlags bool
 	execer                   utilsexec.Interface
@@ -66,7 +64,6 @@ func GetNodeNameAndHostname(cfg *kubeadmapi.NodeRegistrationOptions) (string, st
 func WriteKubeletDynamicEnvFile(cfg *kubeadmapi.ClusterConfiguration, nodeReg *kubeadmapi.NodeRegistrationOptions, registerTaintsUsingFlags bool, kubeletDir string) error {
 	flagOpts := kubeletFlagsOpts{
 		nodeRegOpts:              nodeReg,
-		featureGates:             cfg.FeatureGates,
 		pauseImage:               images.GetPauseImage(cfg),
 		registerTaintsUsingFlags: registerTaintsUsingFlags,
 		execer:                   utilsexec.New(),
@@ -93,12 +90,6 @@ func buildKubeletArgMap(opts kubeletFlagsOpts) map[string]string {
 	if opts.nodeRegOpts.CRISocket == constants.DefaultDockerCRISocket {
 		// These flags should only be set when running docker
 		kubeletFlags["network-plugin"] = "cni"
-		driver, err := kubeadmutil.GetCgroupDriverDocker(opts.execer)
-		if err != nil {
-			klog.Warningf("cannot automatically assign a '--cgroup-driver' value when starting the Kubelet: %v\n", err)
-		} else {
-			kubeletFlags["cgroup-driver"] = driver
-		}
 		if opts.pauseImage != "" {
 			kubeletFlags["pod-infra-container-image"] = opts.pauseImage
 		}
@@ -116,14 +107,6 @@ func buildKubeletArgMap(opts kubeletFlagsOpts) map[string]string {
 		kubeletFlags["register-with-taints"] = strings.Join(taintStrs, ",")
 	}
 
-	ok, err := opts.isServiceActiveFunc("systemd-resolved")
-	if err != nil {
-		klog.Warningf("cannot determine if systemd-resolved is active: %v\n", err)
-	}
-	if ok {
-		kubeletFlags["resolv-conf"] = "/run/systemd/resolve/resolv.conf"
-	}
-
 	// Pass the "--hostname-override" flag to the kubelet only if it's different from the hostname
 	nodeName, hostname, err := GetNodeNameAndHostname(opts.nodeRegOpts)
 	if err != nil {
@@ -138,9 +121,6 @@ func buildKubeletArgMap(opts kubeletFlagsOpts) map[string]string {
 
 	// TODO: The following code should be removed after dual-stack is GA.
 	// Note: The user still retains the ability to explicitly set feature-gates and that value will overwrite this base value.
-	if enabled, present := opts.featureGates[features.IPv6DualStack]; present {
-		kubeletFlags["feature-gates"] = fmt.Sprintf("%s=%t", features.IPv6DualStack, enabled)
-	}
 
 	return kubeletFlags
 }

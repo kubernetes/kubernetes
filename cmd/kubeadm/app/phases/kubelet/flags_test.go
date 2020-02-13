@@ -165,7 +165,6 @@ func TestBuildKubeletArgMap(t *testing.T) {
 			},
 			expected: map[string]string{
 				"network-plugin": "cni",
-				"cgroup-driver":  "systemd",
 			},
 		},
 		{
@@ -179,7 +178,6 @@ func TestBuildKubeletArgMap(t *testing.T) {
 			},
 			expected: map[string]string{
 				"network-plugin": "cni",
-				"cgroup-driver":  "cgroupfs",
 			},
 		},
 		{
@@ -236,7 +234,6 @@ func TestBuildKubeletArgMap(t *testing.T) {
 			expected: map[string]string{
 				"container-runtime":          "remote",
 				"container-runtime-endpoint": "/var/run/containerd.sock",
-				"resolv-conf":                "/run/systemd/resolve/resolv.conf",
 			},
 		},
 		{
@@ -251,7 +248,6 @@ func TestBuildKubeletArgMap(t *testing.T) {
 			},
 			expected: map[string]string{
 				"network-plugin":            "cni",
-				"cgroup-driver":             "cgroupfs",
 				"pod-infra-container-image": "gcr.io/pause:3.1",
 			},
 		},
