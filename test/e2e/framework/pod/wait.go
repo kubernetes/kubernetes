@@ -31,13 +31,11 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
-	e2eresource "k8s.io/kubernetes/test/e2e/framework/resource"
 	testutils "k8s.io/kubernetes/test/utils"
 )
 
@@ -426,40 +424,6 @@ func PodsResponding(c clientset.Interface, ns, name string, wantName bool, pods 
 	ginkgo.By("trying to dial each unique pod")
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
 	return wait.PollImmediate(poll, podRespondingTimeout, NewProxyResponseChecker(c, ns, label, name, wantName, pods).CheckAllResponses)
-}
-
-// WaitForControlledPodsRunning waits up to 10 minutes for pods to become Running.
-func WaitForControlledPodsRunning(c clientset.Interface, ns, name string, kind schema.GroupKind) error {
-	rtObject, err := e2eresource.GetRuntimeObjectForKind(c, kind, ns, name)
-	if err != nil {
-		return err
-	}
-	selector, err := e2eresource.GetSelectorFromRuntimeObject(rtObject)
-	if err != nil {
-		return err
-	}
-	replicas, err := e2eresource.GetReplicasFromRuntimeObject(rtObject)
-	if err != nil {
-		return err
-	}
-	err = testutils.WaitForEnoughPodsWithLabelRunning(c, ns, selector, int(replicas))
-	if err != nil {
-		return fmt.Errorf("Error while waiting for replication controller %s pods to be running: %v", name, err)
-	}
-	return nil
-}
-
-// WaitForControlledPods waits up to podListTimeout for getting pods of the specified controller name and return them.
-func WaitForControlledPods(c clientset.Interface, ns, name string, kind schema.GroupKind) (pods *v1.PodList, err error) {
-	rtObject, err := e2eresource.GetRuntimeObjectForKind(c, kind, ns, name)
-	if err != nil {
-		return nil, err
-	}
-	selector, err := e2eresource.GetSelectorFromRuntimeObject(rtObject)
-	if err != nil {
-		return nil, err
-	}
-	return WaitForPodsWithLabel(c, ns, selector)
 }
 
 // WaitForPodsWithLabelScheduled waits for all matching pods to become scheduled and at least one

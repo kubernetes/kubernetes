@@ -44,6 +44,7 @@ import (
 	e2edeploy "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/framework/replicaset"
+	e2eresource "k8s.io/kubernetes/test/e2e/framework/resource"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	testutil "k8s.io/kubernetes/test/utils"
@@ -193,7 +194,7 @@ func stopDeployment(c clientset.Interface, ns, deploymentName string) {
 	framework.ExpectNoError(err)
 
 	framework.Logf("Deleting deployment %s", deploymentName)
-	err = framework.DeleteResourceAndWaitForGC(c, appsinternal.Kind("Deployment"), ns, deployment.Name)
+	err = e2eresource.DeleteResourceAndWaitForGC(c, appsinternal.Kind("Deployment"), ns, deployment.Name)
 	framework.ExpectNoError(err)
 
 	framework.Logf("Ensuring deployment %s was deleted", deploymentName)
