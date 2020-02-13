@@ -21,6 +21,7 @@ import (
 	"net/url"
 	"strings"
 	"time"
+	"os"
 
 	"github.com/spf13/cobra"
 	"k8s.io/klog"
@@ -124,6 +125,27 @@ type DeleteOptions struct {
 	genericclioptions.IOStreams
 }
 
+func printOnly(msg string, code int) {
+	if klog.V(2) {
+		klog.FatalDepth(2, msg)
+	}
+	if len(msg) > 0 {
+		// add newline if needed
+		if !strings.HasSuffix(msg, "\n") {
+			msg += "\n"
+		}
+		fmt.Fprint(os.Stderr, msg)
+	}
+}
+
+func exitOnly(msg string, code int) {
+	os.Exit(code)
+}
+
+var printOnlyHandler = printOnly
+
+var exitOnlyHandler = exitOnly
+
 func NewCmdDelete(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	deleteFlags := NewDeleteCommandFlags("containing the resource to delete.")
 
@@ -137,7 +159,13 @@ func NewCmdDelete(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 			o := deleteFlags.ToOptions(nil, streams)
 			cmdutil.CheckErr(o.Complete(f, args, cmd))
 			cmdutil.CheckErr(o.Validate())
-			cmdutil.CheckErr(o.RunDelete(f))
+
+			err := o.RunDelete(f)
+
+			// Err is output from within the function, we only need to exit
+			cmdutil.BehaviorOnFatal(exitOnlyHandler)
+			defer cmdutil.DefaultBehaviorOnFatal()
+			cmdutil.CheckErr(err)
 		},
 		SuggestFor: []string{"rm"},
 	}
@@ -249,20 +277,36 @@ func (o *DeleteOptions) Validate() error {
 }
 
 func (o *DeleteOptions) RunDelete(f cmdutil.Factory) error {
+	// We only need to print when CheckErr is run within this method
+	cmdutil.BehaviorOnFatal(printOnlyHandler)
+	defer cmdutil.DefaultBehaviorOnFatal()
+
+	var err error
+
 	if len(o.Raw) > 0 {
 		restClient, err := f.RESTClient()
-		if err != nil {
+		cmdutil.CheckErr(err)
+		if len(o.Filenames) == 0 {
+			err = rawhttp.RawDelete(restClient, o.IOStreams, o.Raw, "")
+			cmdutil.CheckErr(err)
 			return err
 		}
-		if len(o.Filenames) == 0 {
-			return rawhttp.RawDelete(restClient, o.IOStreams, o.Raw, "")
-		}
-		return rawhttp.RawDelete(restClient, o.IOStreams, o.Raw, o.Filenames[0])
+		err = rawhttp.RawDelete(restClient, o.IOStreams, o.Raw, o.Filenames[0])
+		cmdutil.CheckErr(err)
+		return err
 	}
-	return o.DeleteResult(o.Result)
+
+	// This method will output error from within, we need to only handle exit code silently
+	err = o.DeleteResult(o.Result)
+	cmdutil.DefaultBehaviorOnFatal()
+	return err
 }
 
 func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
+	// We only need to print when CheckErr is run within this method
+	cmdutil.BehaviorOnFatal(printOnlyHandler)
+	defer cmdutil.DefaultBehaviorOnFatal()
+
 	found := 0
 	if o.IgnoreNotFound {
 		r = r.IgnoreErrors(errors.IsNotFound)
@@ -314,20 +358,24 @@ func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
 
 		return nil
 	})
+	var returnErr error
+
 	if err != nil {
-		return err
+		// If there is an error, we want to output it, in case we have to wait later
+		cmdutil.CheckErr(err)
+		returnErr = err
 	}
 	if found == 0 {
 		fmt.Fprintf(o.Out, "No resources found\n")
 		return nil
 	}
 	if !o.WaitForDeletion {
-		return nil
+		return returnErr
 	}
 	// if we don't have a dynamic client, we don't want to wait.  Eventually when delete is cleaned up, this will likely
 	// drop out.
 	if o.DynamicClient == nil {
-		return nil
+		return returnErr
 	}
 
 	effectiveTimeout := o.Timeout
@@ -346,12 +394,19 @@ func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
 		IOStreams:   o.IOStreams,
 	}
 	err = waitOptions.RunWait()
+
+	if returnErr != nil {
+		return returnErr
+	}
+
 	if errors.IsForbidden(err) || errors.IsMethodNotSupported(err) {
 		// if we're forbidden from waiting, we shouldn't fail.
 		// if the resource doesn't support a verb we need, we shouldn't fail.
 		klog.V(1).Info(err)
 		return nil
 	}
+	// In case there is an error, we should output it
+	cmdutil.CheckErr(err)
 	return err
 }
 
