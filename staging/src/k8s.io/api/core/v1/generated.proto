@@ -1921,7 +1921,6 @@ message LimitRange {
 // LimitRangeItem defines a min/max usage limit for any resource that matches on kind.
 message LimitRangeItem {
   // Type of resource that this limit applies to.
-  // +optional
   optional string type = 1;
 
   // Max usage constraints on this kind by resource name.
