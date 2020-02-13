@@ -13,6 +13,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/version:go_default_library",
         "//staging/src/k8s.io/component-base/metrics:go_default_library",
         "//vendor/github.com/prometheus/client_golang/prometheus/testutil:go_default_library",
+        "//vendor/github.com/prometheus/client_model/go:go_default_library",
         "//vendor/github.com/prometheus/common/expfmt:go_default_library",
         "//vendor/github.com/prometheus/common/model:go_default_library",
     ],
@@ -34,7 +35,14 @@ filegroup(
 
 go_test(
     name = "go_default_test",
-    srcs = ["testutil_test.go"],
+    srcs = [
+        "metrics_test.go",
+        "testutil_test.go",
+    ],
     embed = [":go_default_library"],
-    deps = ["//staging/src/k8s.io/component-base/metrics:go_default_library"],
+    deps = [
+        "//staging/src/k8s.io/component-base/metrics:go_default_library",
+        "//vendor/github.com/prometheus/client_model/go:go_default_library",
+        "//vendor/k8s.io/utils/pointer:go_default_library",
+    ],
 )
