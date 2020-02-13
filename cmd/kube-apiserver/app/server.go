@@ -381,6 +381,22 @@ func CreateKubeAPIServerConfig(
 		config.ExtraConfig.KubeletClientConfig.Lookup = config.GenericConfig.EgressSelector.Lookup
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountIssuerDiscovery) {
+		// Load the public keys.
+		var pubKeys []interface{}
+		for _, f := range s.Authentication.ServiceAccounts.KeyFiles {
+			keys, err := keyutil.PublicKeysFromFile(f)
+			if err != nil {
+				return nil, nil, nil, nil, fmt.Errorf("failed to parse key file %q: %v", f, err)
+			}
+			pubKeys = append(pubKeys, keys...)
+		}
+		// Plumb the required metadata through ExtraConfig.
+		config.ExtraConfig.ServiceAccountIssuerURL = s.Authentication.ServiceAccounts.Issuer
+		config.ExtraConfig.ServiceAccountJWKSURI = s.Authentication.ServiceAccounts.JWKSURI
+		config.ExtraConfig.ServiceAccountPublicKeys = pubKeys
+	}
+
 	return config, insecureServingInfo, serviceResolver, pluginInitializers, nil
 }
 

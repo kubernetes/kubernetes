@@ -17,16 +17,21 @@ limitations under the License.
 package auth
 
 import (
+	"bytes"
 	"context"
 	"crypto/ecdsa"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"net/http"
+	"net/url"
 	"reflect"
 	"strings"
 	"testing"
 	"time"
 
+	jose "gopkg.in/square/go-jose.v2"
 	"gopkg.in/square/go-jose.v2/jwt"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
@@ -40,6 +45,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	v1listers "k8s.io/client-go/listers/core/v1"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/keyutil"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -58,12 +64,14 @@ AwEHoUQDQgAEH6cuzP8XuD5wal6wf9M6xDljTOPLX2i8uIp/C/ASqiIGUeeKQtX0
 
 func TestServiceAccountTokenCreate(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TokenRequest, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceAccountIssuerDiscovery, true)()
 
 	// Build client config, clientset, and informers
 	sk, err := keyutil.ParsePrivateKeyPEM([]byte(ecdsaPrivateKey))
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
+
 	pk := sk.(*ecdsa.PrivateKey).PublicKey
 
 	const iss = "https://foo.bar.example.com"
@@ -100,6 +108,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 			)),
 		),
 	)
+
 	tokenGenerator, err := serviceaccount.JWTTokenGenerator(iss, sk)
 	if err != nil {
 		t.Fatalf("err: %v", err)
@@ -107,6 +116,10 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 	masterConfig.ExtraConfig.ServiceAccountIssuer = tokenGenerator
 	masterConfig.ExtraConfig.ServiceAccountMaxExpiration = maxExpirationDuration
 	masterConfig.GenericConfig.Authentication.APIAudiences = aud
+
+	masterConfig.ExtraConfig.ServiceAccountIssuerURL = iss
+	masterConfig.ExtraConfig.ServiceAccountJWKSURI = ""
+	masterConfig.ExtraConfig.ServiceAccountPublicKeys = []interface{}{&pk}
 
 	master, _, closeFn := framework.RunAMaster(masterConfig)
 	defer closeFn()
@@ -116,6 +129,11 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 		t.Fatalf("err: %v", err)
 	}
 	*gcs = *cs
+
+	rc, err := rest.UnversionedRESTClientFor(master.GenericAPIServer.LoopbackClientConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	var (
 		sa = &v1.ServiceAccount{
@@ -567,6 +585,137 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 		defer recreateDelSecret()
 
 		doTokenReview(t, cs, treq, true)
+	})
+
+	t.Run("a token is valid against the HTTP-provided service account issuer metadata", func(t *testing.T) {
+		sa, del := createDeleteSvcAcct(t, cs, sa)
+		defer del()
+
+		t.Log("get token")
+		tokenRequest, err := cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(
+			context.TODO(),
+			sa.Name,
+			&authenticationv1.TokenRequest{
+				Spec: authenticationv1.TokenRequestSpec{
+					Audiences: []string{"api"},
+				},
+			}, metav1.CreateOptions{})
+		if err != nil {
+			t.Fatalf("unexpected error creating token: %v", err)
+		}
+		token := tokenRequest.Status.Token
+		if token == "" {
+			t.Fatal("no token")
+		}
+
+		t.Log("get discovery doc")
+		discoveryDoc := struct {
+			Issuer string `json:"issuer"`
+			JWKS   string `json:"jwks_uri"`
+		}{}
+
+		// A little convoluted, but the base path is hidden inside the RESTClient.
+		// We can't just use the RESTClient, because it throws away the headers
+		// before returning a result, and we need to check the headers.
+		discoveryURL := rc.Get().AbsPath("/.well-known/openid-configuration").URL().String()
+		resp, err := rc.Client.Get(discoveryURL)
+		if err != nil {
+			t.Fatalf("error getting metadata: %v", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("got status: %v, want: %v", resp.StatusCode, http.StatusOK)
+		}
+		if got, want := resp.Header.Get("Content-Type"), "application/json"; got != want {
+			t.Errorf("got Content-Type: %v, want: %v", got, want)
+		}
+		if got, want := resp.Header.Get("Cache-Control"), "public, max-age=3600"; got != want {
+			t.Errorf("got Cache-Control: %v, want: %v", got, want)
+		}
+
+		b, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		md := bytes.NewBuffer(b)
+		t.Logf("raw discovery doc response:\n---%s\n---", md.String())
+		if md.Len() == 0 {
+			t.Fatal("empty response for discovery doc")
+		}
+
+		if err := json.NewDecoder(md).Decode(&discoveryDoc); err != nil {
+			t.Fatalf("could not decode metadata: %v", err)
+		}
+		if discoveryDoc.Issuer != iss {
+			t.Fatalf("invalid issuer in discovery doc: got %s, want %s",
+				discoveryDoc.Issuer, iss)
+		}
+		// Parse the JWKSURI see if the path is what we expect. Since the
+		// integration test framework hardcodes 192.168.10.4 as the PublicAddress,
+		// which results in the same for ExternalAddress, we expect the JWKS URI
+		// to be 192.168.10.4:443, even if that's not necessarily the external
+		// IP of the test machine.
+		expectJWKSURI := (&url.URL{
+			Scheme: "https",
+			Host:   "192.168.10.4:443",
+			Path:   serviceaccount.JWKSPath,
+		}).String()
+		if discoveryDoc.JWKS != expectJWKSURI {
+			t.Fatalf("unexpected jwks_uri in discovery doc: got %s, want %s",
+				discoveryDoc.JWKS, expectJWKSURI)
+		}
+
+		// Since the test framework hardcodes the host, we combine our client's
+		// scheme and host with serviceaccount.JWKSPath. We know that this is what was
+		// in the discovery doc because we checked that it matched above.
+		jwksURI := rc.Get().AbsPath(serviceaccount.JWKSPath).URL().String()
+		t.Log("get jwks from", jwksURI)
+		resp, err = rc.Client.Get(jwksURI)
+		if err != nil {
+			t.Fatalf("error getting jwks: %v", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("got status: %v, want: %v", resp.StatusCode, http.StatusOK)
+		}
+		if got, want := resp.Header.Get("Content-Type"), "application/jwk-set+json"; got != want {
+			t.Errorf("got Content-Type: %v, want: %v", got, want)
+		}
+		if got, want := resp.Header.Get("Cache-Control"), "public, max-age=3600"; got != want {
+			t.Errorf("got Cache-Control: %v, want: %v", got, want)
+		}
+
+		b, err = ioutil.ReadAll(resp.Body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ks := bytes.NewBuffer(b)
+		if ks.Len() == 0 {
+			t.Fatal("empty jwks")
+		}
+		t.Logf("raw JWKS: \n---\n%s\n---", ks.String())
+
+		jwks := jose.JSONWebKeySet{}
+		if err := json.NewDecoder(ks).Decode(&jwks); err != nil {
+			t.Fatalf("could not decode JWKS: %v", err)
+		}
+		if len(jwks.Keys) != 1 {
+			t.Fatalf("len(jwks.Keys) = %d, want 1", len(jwks.Keys))
+		}
+		key := jwks.Keys[0]
+		tok, err := jwt.ParseSigned(token)
+		if err != nil {
+			t.Fatalf("could not parse token %q: %v", token, err)
+		}
+		var claims jwt.Claims
+		if err := tok.Claims(key, &claims); err != nil {
+			t.Fatalf("could not validate claims on token: %v", err)
+		}
+		if err := claims.Validate(jwt.Expected{Issuer: discoveryDoc.Issuer}); err != nil {
+			t.Fatalf("invalid claims: %v", err)
+		}
 	})
 }
 

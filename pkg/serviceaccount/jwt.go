@@ -114,6 +114,10 @@ func signerFromRSAPrivateKey(keyPair *rsa.PrivateKey) (jose.Signer, error) {
 		return nil, fmt.Errorf("failed to derive keyID: %v", err)
 	}
 
+	// IMPORTANT: If this function is updated to support additional key sizes,
+	// algorithmForPublicKey in serviceaccount/openidmetadata.go must also be
+	// updated to support the same key sizes. Today we only support RS256.
+
 	// Wrap the RSA keypair in a JOSE JWK with the designated key ID.
 	privateJWK := &jose.JSONWebKey{
 		Algorithm: string(jose.RS256),

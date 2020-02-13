@@ -180,7 +180,7 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"Memory limit for apiserver in MB (used to configure sizes of caches, etc.)")
 
 	fs.StringVar(&s.ExternalHost, "external-hostname", s.ExternalHost,
-		"The hostname to use when generating externalized URLs for this master (e.g. Swagger API Docs).")
+		"The hostname to use when generating externalized URLs for this master (e.g. Swagger API Docs or OpenID Discovery).")
 
 	deprecatedMasterServiceNamespace := metav1.NamespaceDefault
 	fs.StringVar(&deprecatedMasterServiceNamespace, "master-service-namespace", deprecatedMasterServiceNamespace, ""+
