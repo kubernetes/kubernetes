@@ -102,7 +102,7 @@ func TestRegisterConfigProducers(t *testing.T) {
 				{Name: testFilterName2},
 			},
 		},
-		PostFilter: &config.PluginSet{},
+		PreScore: &config.PluginSet{},
 		Score: &config.PluginSet{
 			Enabled: []config.Plugin{
 				{Name: testScoreName1, Weight: 1},

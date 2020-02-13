@@ -302,17 +302,17 @@ type FilterPlugin interface {
 	Filter(ctx context.Context, state *CycleState, pod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *Status
 }
 
-// PostFilterPlugin is an interface for Post-filter plugin. Post-filter is an
+// PreScorePlugin is an interface for Pre-score plugin. Pre-score is an
 // informational extension point. Plugins will be called with a list of nodes
 // that passed the filtering phase. A plugin may use this data to update internal
 // state or to generate logs/metrics.
-type PostFilterPlugin interface {
+type PreScorePlugin interface {
 	Plugin
-	// PostFilter is called by the scheduling framework after a list of nodes
-	// passed the filtering phase. All postfilter plugins must return success or
+	// PreScore is called by the scheduling framework after a list of nodes
+	// passed the filtering phase. All prescore plugins must return success or
 	// the pod will be rejected. The filteredNodesStatuses is the set of filtered nodes
 	// and their filter status.
-	PostFilter(ctx context.Context, state *CycleState, pod *v1.Pod, nodes []*v1.Node, filteredNodesStatuses NodeToStatusMap) *Status
+	PreScore(ctx context.Context, state *CycleState, pod *v1.Pod, nodes []*v1.Node, filteredNodesStatuses NodeToStatusMap) *Status
 }
 
 // ScoreExtensions is an interface for Score extended functionality.
@@ -438,10 +438,10 @@ type Framework interface {
 	// status other than Success.
 	RunPreFilterExtensionRemovePod(ctx context.Context, state *CycleState, podToSchedule *v1.Pod, podToAdd *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *Status
 
-	// RunPostFilterPlugins runs the set of configured post-filter plugins. If any
-	// of these plugins returns any status other than "Success", the given node is
+	// RunPreScorePlugins runs the set of configured pre-score plugins. If any
+	// of these plugins returns any status other than "Success", the given pod is
 	// rejected. The filteredNodeStatuses is the set of filtered nodes and their statuses.
-	RunPostFilterPlugins(ctx context.Context, state *CycleState, pod *v1.Pod, nodes []*v1.Node, filteredNodesStatuses NodeToStatusMap) *Status
+	RunPreScorePlugins(ctx context.Context, state *CycleState, pod *v1.Pod, nodes []*v1.Node, filteredNodesStatuses NodeToStatusMap) *Status
 
 	// RunScorePlugins runs the set of configured scoring plugins. It returns a map that
 	// stores for each scoring plugin name the corresponding NodeScoreList(s).

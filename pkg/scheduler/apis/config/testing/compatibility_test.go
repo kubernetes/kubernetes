@@ -135,7 +135,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "NodeLabel"},
 					{Name: "ServiceAffinity"},
 				},
-				"PostFilterPlugin": {{Name: "DefaultPodTopologySpread"}},
+				"PreScorePlugin": {{Name: "DefaultPodTopologySpread"}},
 				"ScorePlugin": {
 					{Name: "NodeResourcesLeastAllocated", Weight: 1},
 					{Name: "NodeLabel", Weight: 4},
@@ -190,7 +190,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "NodeLabel"},
 					{Name: "ServiceAffinity"},
 				},
-				"PostFilterPlugin": {{Name: "DefaultPodTopologySpread"}},
+				"PreScorePlugin": {{Name: "DefaultPodTopologySpread"}},
 				"ScorePlugin": {
 					{Name: "NodeResourcesBalancedAllocation", Weight: 2},
 					{Name: "NodeResourcesLeastAllocated", Weight: 2},
@@ -253,7 +253,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "AzureDiskLimits"},
 					{Name: "VolumeZone"},
 				},
-				"PostFilterPlugin": {{Name: "DefaultPodTopologySpread"}},
+				"PreScorePlugin": {{Name: "DefaultPodTopologySpread"}},
 				"ScorePlugin": {
 					{Name: "NodeResourcesBalancedAllocation", Weight: 2},
 					{Name: "ImageLocality", Weight: 2},
@@ -323,7 +323,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "VolumeZone"},
 					{Name: "InterPodAffinity"},
 				},
-				"PostFilterPlugin": {
+				"PreScorePlugin": {
 					{Name: "InterPodAffinity"},
 					{Name: "DefaultPodTopologySpread"},
 					{Name: "TaintToleration"},
@@ -399,7 +399,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "VolumeZone"},
 					{Name: "InterPodAffinity"},
 				},
-				"PostFilterPlugin": {
+				"PreScorePlugin": {
 					{Name: "InterPodAffinity"},
 					{Name: "DefaultPodTopologySpread"},
 					{Name: "TaintToleration"},
@@ -486,7 +486,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "VolumeZone"},
 					{Name: "InterPodAffinity"},
 				},
-				"PostFilterPlugin": {
+				"PreScorePlugin": {
 					{Name: "InterPodAffinity"},
 					{Name: "DefaultPodTopologySpread"},
 					{Name: "TaintToleration"},
@@ -584,7 +584,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "VolumeZone"},
 					{Name: "InterPodAffinity"},
 				},
-				"PostFilterPlugin": {
+				"PreScorePlugin": {
 					{Name: "InterPodAffinity"},
 					{Name: "DefaultPodTopologySpread"},
 					{Name: "TaintToleration"},
@@ -684,7 +684,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "VolumeZone"},
 					{Name: "InterPodAffinity"},
 				},
-				"PostFilterPlugin": {
+				"PreScorePlugin": {
 					{Name: "InterPodAffinity"},
 					{Name: "DefaultPodTopologySpread"},
 					{Name: "TaintToleration"},
@@ -787,7 +787,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "VolumeZone"},
 					{Name: "InterPodAffinity"},
 				},
-				"PostFilterPlugin": {
+				"PreScorePlugin": {
 					{Name: "InterPodAffinity"},
 					{Name: "DefaultPodTopologySpread"},
 					{Name: "TaintToleration"},
@@ -902,7 +902,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "VolumeZone"},
 					{Name: "InterPodAffinity"},
 				},
-				"PostFilterPlugin": {
+				"PreScorePlugin": {
 					{Name: "InterPodAffinity"},
 					{Name: "DefaultPodTopologySpread"},
 					{Name: "TaintToleration"},
@@ -1020,7 +1020,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "VolumeZone"},
 					{Name: "InterPodAffinity"},
 				},
-				"PostFilterPlugin": {
+				"PreScorePlugin": {
 					{Name: "InterPodAffinity"},
 					{Name: "DefaultPodTopologySpread"},
 					{Name: "TaintToleration"},
@@ -1138,7 +1138,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "VolumeZone"},
 					{Name: "InterPodAffinity"},
 				},
-				"PostFilterPlugin": {
+				"PreScorePlugin": {
 					{Name: "InterPodAffinity"},
 					{Name: "DefaultPodTopologySpread"},
 					{Name: "TaintToleration"},
@@ -1260,7 +1260,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "VolumeZone"},
 					{Name: "InterPodAffinity"},
 				},
-				"PostFilterPlugin": {
+				"PreScorePlugin": {
 					{Name: "InterPodAffinity"},
 					{Name: "DefaultPodTopologySpread"},
 					{Name: "TaintToleration"},
@@ -1318,7 +1318,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "TaintToleration"},
 					{Name: "PodTopologySpread"},
 				},
-				"PostFilterPlugin": {
+				"PreScorePlugin": {
 					{Name: "PodTopologySpread"},
 				},
 				"ScorePlugin": {
@@ -1342,7 +1342,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			},
 			wantPlugins: map[string][]config.Plugin{
 				"QueueSortPlugin": {{Name: "PrioritySort"}},
-				"PostFilterPlugin": {
+				"PreScorePlugin": {
 					{Name: "NodeResourceLimits"},
 				},
 				"FilterPlugin": {
@@ -1440,7 +1440,7 @@ func TestAlgorithmProviderCompatibility(t *testing.T) {
 			{Name: "VolumeZone"},
 			{Name: "InterPodAffinity"},
 		},
-		"PostFilterPlugin": {
+		"PreScorePlugin": {
 			{Name: "InterPodAffinity"},
 			{Name: "DefaultPodTopologySpread"},
 			{Name: "TaintToleration"},
@@ -1500,7 +1500,7 @@ func TestAlgorithmProviderCompatibility(t *testing.T) {
 					{Name: "VolumeZone"},
 					{Name: "InterPodAffinity"},
 				},
-				"PostFilterPlugin": {
+				"PreScorePlugin": {
 					{Name: "InterPodAffinity"},
 					{Name: "DefaultPodTopologySpread"},
 					{Name: "TaintToleration"},
@@ -1550,5 +1550,4 @@ func TestAlgorithmProviderCompatibility(t *testing.T) {
 			}
 		})
 	}
-
 }

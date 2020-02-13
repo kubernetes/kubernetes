@@ -106,7 +106,7 @@ func getDefaultConfig() *schedulerapi.Plugins {
 				{Name: interpodaffinity.Name},
 			},
 		},
-		PostFilter: &schedulerapi.PluginSet{
+		PreScore: &schedulerapi.PluginSet{
 			Enabled: []schedulerapi.Plugin{
 				{Name: interpodaffinity.Name},
 				{Name: defaultpodtopologyspread.Name},
@@ -151,7 +151,7 @@ func applyFeatureGates(config *schedulerapi.Plugins) {
 		f := schedulerapi.Plugin{Name: podtopologyspread.Name}
 		config.PreFilter.Enabled = append(config.PreFilter.Enabled, f)
 		config.Filter.Enabled = append(config.Filter.Enabled, f)
-		config.PostFilter.Enabled = append(config.PostFilter.Enabled, f)
+		config.PreScore.Enabled = append(config.PreScore.Enabled, f)
 		s := schedulerapi.Plugin{Name: podtopologyspread.Name, Weight: 1}
 		config.Score.Enabled = append(config.Score.Enabled, s)
 	}
@@ -160,7 +160,7 @@ func applyFeatureGates(config *schedulerapi.Plugins) {
 	if utilfeature.DefaultFeatureGate.Enabled(features.ResourceLimitsPriorityFunction) {
 		klog.Infof("Registering resourcelimits priority function")
 		s := schedulerapi.Plugin{Name: noderesources.ResourceLimitsName}
-		config.PostFilter.Enabled = append(config.PostFilter.Enabled, s)
+		config.PreScore.Enabled = append(config.PreScore.Enabled, s)
 		s = schedulerapi.Plugin{Name: noderesources.ResourceLimitsName, Weight: 1}
 		config.Score.Enabled = append(config.Score.Enabled, s)
 	}

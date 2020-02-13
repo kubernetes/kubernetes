@@ -28,7 +28,7 @@ import (
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
-func TestPostFilterStateInitialize(t *testing.T) {
+func TestPreScoreStateInitialize(t *testing.T) {
 	tests := []struct {
 		name                string
 		pod                 *v1.Pod
@@ -77,7 +77,7 @@ func TestPostFilterStateInitialize(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := &postFilterState{
+			s := &preScoreState{
 				nodeNameSet:             sets.String{},
 				topologyPairToPodCounts: make(map[topologyPair]*int64),
 			}
@@ -476,7 +476,7 @@ func TestPodTopologySpreadScore(t *testing.T) {
 			snapshot := cache.NewSnapshot(tt.existingPods, allNodes)
 			p := &PodTopologySpread{sharedLister: snapshot}
 
-			status := p.PostFilter(context.Background(), state, tt.pod, tt.nodes, nil)
+			status := p.PreScore(context.Background(), state, tt.pod, tt.nodes, nil)
 			if !status.IsSuccess() {
 				t.Errorf("unexpected error: %v", status)
 			}
@@ -546,7 +546,7 @@ func BenchmarkTestPodTopologySpreadScore(b *testing.B) {
 			snapshot := cache.NewSnapshot(existingPods, allNodes)
 			p := &PodTopologySpread{sharedLister: snapshot}
 
-			status := p.PostFilter(context.Background(), state, tt.pod, filteredNodes, nil)
+			status := p.PreScore(context.Background(), state, tt.pod, filteredNodes, nil)
 			if !status.IsSuccess() {
 				b.Fatalf("unexpected error: %v", status)
 			}
@@ -605,7 +605,7 @@ func BenchmarkTestDefaultEvenPodsSpreadPriority(b *testing.B) {
 			snapshot := cache.NewSnapshot(existingPods, allNodes)
 			p := &PodTopologySpread{sharedLister: snapshot}
 
-			status := p.PostFilter(context.Background(), state, pod, filteredNodes, nil)
+			status := p.PreScore(context.Background(), state, pod, filteredNodes, nil)
 			if !status.IsSuccess() {
 				b.Fatalf("unexpected error: %v", status)
 			}

@@ -163,8 +163,8 @@ type Plugins struct {
 	// Filter is a list of plugins that should be invoked when filtering out nodes that cannot run the Pod.
 	Filter *PluginSet `json:"filter,omitempty"`
 
-	// PostFilter is a list of plugins that are invoked after filtering out infeasible nodes.
-	PostFilter *PluginSet `json:"postFilter,omitempty"`
+	// PreScore is a list of plugins that are invoked before scoring.
+	PreScore *PluginSet `json:"preScore,omitempty"`
 
 	// Score is a list of plugins that should be invoked when ranking nodes that have passed the filtering phase.
 	Score *PluginSet `json:"score,omitempty"`

@@ -194,12 +194,6 @@ func (g *genericScheduler) Schedule(ctx context.Context, state *framework.CycleS
 	}
 	trace.Step("Computing predicates done")
 
-	// Run "postfilter" plugins.
-	postfilterStatus := g.framework.RunPostFilterPlugins(ctx, state, pod, filteredNodes, filteredNodesStatuses)
-	if !postfilterStatus.IsSuccess() {
-		return result, postfilterStatus.AsError()
-	}
-
 	if len(filteredNodes) == 0 {
 		return result, &FitError{
 			Pod:                   pod,
@@ -207,7 +201,14 @@ func (g *genericScheduler) Schedule(ctx context.Context, state *framework.CycleS
 			FilteredNodesStatuses: filteredNodesStatuses,
 		}
 	}
-	trace.Step("Running postfilter plugins done")
+
+	// Run "prescore" plugins.
+	prescoreStatus := g.framework.RunPreScorePlugins(ctx, state, pod, filteredNodes, filteredNodesStatuses)
+	if !prescoreStatus.IsSuccess() {
+		return result, prescoreStatus.AsError()
+	}
+	trace.Step("Running prescore plugins done")
+
 	metrics.DeprecatedSchedulingAlgorithmPredicateEvaluationSecondsDuration.Observe(metrics.SinceInSeconds(startPredicateEvalTime))
 	metrics.DeprecatedSchedulingDuration.WithLabelValues(metrics.PredicateEvaluation).Observe(metrics.SinceInSeconds(startPredicateEvalTime))
 

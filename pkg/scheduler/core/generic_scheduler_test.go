@@ -1115,7 +1115,7 @@ func TestZeroRequest(t *testing.T) {
 				st.RegisterScorePlugin(noderesources.LeastAllocatedName, noderesources.NewLeastAllocated, 1),
 				st.RegisterScorePlugin(noderesources.BalancedAllocationName, noderesources.NewBalancedAllocation, 1),
 				st.RegisterScorePlugin(defaultpodtopologyspread.Name, defaultpodtopologyspread.New, 1),
-				st.RegisterPostFilterPlugin(defaultpodtopologyspread.Name, defaultpodtopologyspread.New),
+				st.RegisterPreScorePlugin(defaultpodtopologyspread.Name, defaultpodtopologyspread.New),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			}
 			fwk, err := st.NewFramework(
@@ -1148,7 +1148,7 @@ func TestZeroRequest(t *testing.T) {
 			if err != nil {
 				t.Fatalf("error filtering nodes: %+v", err)
 			}
-			scheduler.framework.RunPostFilterPlugins(ctx, state, test.pod, test.nodes, filteredNodesStatuses)
+			scheduler.framework.RunPreScorePlugins(ctx, state, test.pod, test.nodes, filteredNodesStatuses)
 			list, err := scheduler.prioritizeNodes(
 				ctx,
 				state,

@@ -37,9 +37,12 @@ go_test(
         "//pkg/scheduler/apis/config:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/conversion:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
         "//staging/src/k8s.io/component-base/config:go_default_library",
         "//staging/src/k8s.io/component-base/config/v1alpha1:go_default_library",
         "//staging/src/k8s.io/kube-scheduler/config/v1alpha1:go_default_library",
+        "//vendor/github.com/google/go-cmp/cmp:go_default_library",
         "//vendor/k8s.io/utils/pointer:go_default_library",
     ],
 )
