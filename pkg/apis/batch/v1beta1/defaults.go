@@ -18,6 +18,7 @@ package v1beta1
 
 import (
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -26,6 +27,17 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 }
 
 func SetDefaults_CronJob(obj *batchv1beta1.CronJob) {
+	labels := obj.Spec.JobTemplate.Spec.Template.Labels
+	if labels != nil {
+		if obj.Spec.JobTemplate.Spec.Selector == nil {
+			obj.Spec.JobTemplate.Spec.Selector = &metav1.LabelSelector{
+				MatchLabels: labels,
+			}
+		}
+		if len(obj.Labels) == 0 {
+			obj.Labels = labels
+		}
+	}
 	if obj.Spec.ConcurrencyPolicy == "" {
 		obj.Spec.ConcurrencyPolicy = batchv1beta1.AllowConcurrent
 	}
