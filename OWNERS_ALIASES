@@ -456,7 +456,7 @@ aliases:
     - andrewsykim     # Cloud Provider
     - bgrant0607      # Architecture
     - brancz          # Instrumentation
-    - bsalamat        # Scheduling
+    - ahg-g           # Scheduling
     - calebamiles     # Release
     - caseydavenport  # Network
     - countspongebob  # Scalability
