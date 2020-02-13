@@ -14,8 +14,6 @@
 
 .PHONY: all push container clean orphan all-push push-manifest
 
-include ../../hack/make-rules/Makefile.manifest
-
 REGISTRY ?= staging-k8s.gcr.io
 IMAGE = $(REGISTRY)/pause
 IMAGE_WITH_ARCH = $(IMAGE)-$(ARCH)
@@ -60,8 +58,10 @@ all: all-container
 
 all-push: all-push-images push-manifest
 
-push-manifest: manifest-tool
-	manifest-tool push from-args --platforms $(call join_platforms,$(ALL_ARCH)) --template $(IMAGE)-ARCH:$(TAG) --target $(IMAGE):$(TAG)
+push-manifest:
+	docker manifest create --amend $(IMAGE):$(TAG) $(shell echo $(ALL_ARCH) | sed -e "s~[^ ]*~$(IMAGE)\-&:$(TAG)~g")
+	set -x; for arch in $(ALL_ARCH); do docker manifest annotate --arch $${arch} ${IMAGE}:${TAG} ${IMAGE}-$${arch}:${TAG}; done
+	docker manifest push --purge ${IMAGE}:${TAG}
 
 sub-container-%:
 	$(MAKE) ARCH=$* container
