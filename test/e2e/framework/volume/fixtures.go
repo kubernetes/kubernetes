@@ -334,21 +334,17 @@ func startVolumeServer(client clientset.Interface, config TestConfig) *v1.Pod {
 	return pod
 }
 
-// TestCleanup cleans both server and client pods.
-func TestCleanup(f *framework.Framework, config TestConfig) {
+// TestServerCleanup cleans server pod.
+func TestServerCleanup(f *framework.Framework, config TestConfig) {
 	ginkgo.By(fmt.Sprint("cleaning the environment after ", config.Prefix))
-
 	defer ginkgo.GinkgoRecover()
 
-	cs := f.ClientSet
-
-	err := e2epod.DeletePodWithWaitByName(cs, config.Prefix+"-client", config.Namespace)
-	gomega.Expect(err).To(gomega.BeNil(), "Failed to delete pod %v in namespace %v", config.Prefix+"-client", config.Namespace)
-
-	if config.ServerImage != "" {
-		err := e2epod.DeletePodWithWaitByName(cs, config.Prefix+"-server", config.Namespace)
-		gomega.Expect(err).To(gomega.BeNil(), "Failed to delete pod %v in namespace %v", config.Prefix+"-server", config.Namespace)
+	if config.ServerImage == "" {
+		return
 	}
+
+	err := e2epod.DeletePodWithWaitByName(f.ClientSet, config.Prefix+"-server", config.Namespace)
+	gomega.Expect(err).To(gomega.BeNil(), "Failed to delete pod %v in namespace %v", config.Prefix+"-server", config.Namespace)
 }
 
 func runVolumeTesterPod(client clientset.Interface, config TestConfig, podSuffix string, privileged bool, fsGroup *int64, tests []Test) (*v1.Pod, error) {

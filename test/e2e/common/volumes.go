@@ -44,7 +44,8 @@ package common
 
 import (
 	"context"
-	"k8s.io/api/core/v1"
+
+	v1 "k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -76,7 +77,7 @@ var _ = ginkgo.Describe("[sig-storage] GCP Volumes", func() {
 	ginkgo.Describe("NFSv4", func() {
 		ginkgo.It("should be mountable for NFSv4", func() {
 			config, _, serverIP := volume.NewNFSServer(c, namespace.Name, []string{})
-			defer volume.TestCleanup(f, config)
+			defer volume.TestServerCleanup(f, config)
 
 			tests := []volume.Test{
 				{
@@ -100,7 +101,7 @@ var _ = ginkgo.Describe("[sig-storage] GCP Volumes", func() {
 	ginkgo.Describe("NFSv3", func() {
 		ginkgo.It("should be mountable for NFSv3", func() {
 			config, _, serverIP := volume.NewNFSServer(c, namespace.Name, []string{})
-			defer volume.TestCleanup(f, config)
+			defer volume.TestServerCleanup(f, config)
 
 			tests := []volume.Test{
 				{
@@ -129,7 +130,7 @@ var _ = ginkgo.Describe("[sig-storage] GCP Volumes", func() {
 			config, _, _ := volume.NewGlusterfsServer(c, namespace.Name)
 			name := config.Prefix + "-server"
 			defer func() {
-				volume.TestCleanup(f, config)
+				volume.TestServerCleanup(f, config)
 				err := c.CoreV1().Endpoints(namespace.Name).Delete(context.TODO(), name, nil)
 				framework.ExpectNoError(err, "defer: Gluster delete endpoints failed")
 			}()

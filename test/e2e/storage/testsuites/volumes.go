@@ -156,7 +156,7 @@ func (t *volumesTestSuite) DefineTests(driver TestDriver, pattern testpatterns.T
 
 		init()
 		defer func() {
-			volume.TestCleanup(f, convertTestConfig(l.config))
+			volume.TestServerCleanup(f, convertTestConfig(l.config))
 			cleanup()
 		}()
 
