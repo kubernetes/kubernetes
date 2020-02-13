@@ -1290,7 +1290,7 @@ func (proxier *Proxier) syncProxyRules() {
 				}
 				proxier.ipsetList[kubeLoadBalancerSet].activeEntries.Insert(entry.String())
 				// insert loadbalancer entry to lbIngressLocalSet if service externaltrafficpolicy=local
-				if svcInfo.OnlyNodeLocalEndpoints() {
+				if svcInfo.OnlyNodeLocalEndpoints() || (isServiceTopologyEnabled() && svcInfo.OnlyNodeLocalTopology()) {
 					if valid := proxier.ipsetList[kubeLoadBalancerLocalSet].validateEntry(entry); !valid {
 						klog.Errorf("%s", fmt.Sprintf(EntryInvalidErr, entry, proxier.ipsetList[kubeLoadBalancerLocalSet].Name))
 						continue
@@ -1473,8 +1473,8 @@ func (proxier *Proxier) syncProxyRules() {
 				}
 			}
 
-			// Add externaltrafficpolicy=local type nodeport entry
-			if svcInfo.OnlyNodeLocalEndpoints() {
+			// Add externaltrafficpolicy=local or topologyKeys=[kubernetes.io/hostname] for nodeport entries
+			if svcInfo.OnlyNodeLocalEndpoints() || (isServiceTopologyEnabled() && svcInfo.OnlyNodeLocalTopology()) {
 				var nodePortLocalSet *IPSet
 				switch protocol {
 				case "tcp":
@@ -1950,6 +1950,7 @@ func (proxier *Proxier) syncEndpoint(svcPortName proxy.ServicePortName, onlyNode
 		if onlyNodeLocalEndpoints && !epInfo.GetIsLocal() {
 			continue
 		}
+
 		newEndpoints.Insert(epInfo.String())
 	}
 
@@ -2077,6 +2078,12 @@ func (proxier *Proxier) getLegacyBindAddr(activeBindAddrs map[string]bool, curre
 		}
 	}
 	return legacyAddrs
+}
+
+// isServiceTopologyEnabled returns true if all the necessary feature gates for the ServiceTopology feature are enabled. Today they are:
+// ServiceTopology and EndpointSliceProxying
+func isServiceTopologyEnabled() bool {
+	return utilfeature.DefaultFeatureGate.Enabled(features.ServiceTopology) && utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceProxying)
 }
 
 // Join all words with spaces, terminate with newline and write to buff.
