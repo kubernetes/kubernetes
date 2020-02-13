@@ -1,8 +1,7 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-- dchen1107
-- sig-network-approvers
+- sig-network-driver-approvers
 emeritus_approvers:
 - matchstick
 reviewers:

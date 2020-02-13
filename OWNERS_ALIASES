@@ -219,6 +219,11 @@ aliases:
     - krmayankk
     - mattjmcnaughton
     - matthyx
+
+  sig-network-driver-approvers:
+    - dcbw
+    - freehan
+
   sig-network-approvers:
     - andrewsykim
     - bowei
