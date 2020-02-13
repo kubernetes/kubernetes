@@ -98,6 +98,16 @@ var (
 	zero       = int64(0)
 	lablecount = int64(0)
 
+	// The GC controller periodically rediscovers available APIs and syncs running informers for those resources.
+	// If previously available APIs are removed during that resync process, the sync process can fail and need to be retried.
+	//
+	// During e2e runs, parallel tests add/remove API resources (by creating/deleting CRDs and aggregated APIs),
+	// which makes it likely GC will need to retry informer resync at some point during an e2e run.
+	//
+	// This timeout covers two resync/retry periods, and should be added to wait timeouts to account for delays
+	// to the GC controller caused by API changes in other tests.
+	gcInformerResyncRetryTimeout = time.Minute
+
 	// CronJobGroupVersionResource unambiguously identifies a CronJob resource.
 	CronJobGroupVersionResource = schema.GroupVersionResource{Group: batchv1beta1.GroupName, Version: "v1beta1", Resource: "cronjobs"}
 )
@@ -351,7 +361,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		}
 		ginkgo.By("wait for all pods to be garbage collected")
 		// wait for the RCs and Pods to reach the expected numbers.
-		if err := wait.Poll(5*time.Second, 60*time.Second, func() (bool, error) {
+		if err := wait.Poll(5*time.Second, (60*time.Second)+gcInformerResyncRetryTimeout, func() (bool, error) {
 			objects := map[string]int{"ReplicationControllers": 0, "Pods": 0}
 			return verifyRemainingObjects(f, objects)
 		}); err != nil {
@@ -411,7 +421,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		// actual qps is less than 5. Also, the e2e tests are running in
 		// parallel, the GC controller might get distracted by other tests.
 		// According to the test logs, 120s is enough time.
-		if err := wait.Poll(5*time.Second, 120*time.Second, func() (bool, error) {
+		if err := wait.Poll(5*time.Second, 120*time.Second+gcInformerResyncRetryTimeout, func() (bool, error) {
 			rcs, err := rcClient.List(context.TODO(), metav1.ListOptions{})
 			if err != nil {
 				return false, fmt.Errorf("failed to list rcs: %v", err)
@@ -518,7 +528,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 			framework.Failf("failed to delete the deployment: %v", err)
 		}
 		ginkgo.By("wait for all rs to be garbage collected")
-		err = wait.PollImmediate(500*time.Millisecond, 1*time.Minute, func() (bool, error) {
+		err = wait.PollImmediate(500*time.Millisecond, 1*time.Minute+gcInformerResyncRetryTimeout, func() (bool, error) {
 			objects := map[string]int{"Deployments": 0, "ReplicaSets": 0, "Pods": 0}
 			return verifyRemainingObjects(f, objects)
 		})
@@ -577,7 +587,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 			framework.Failf("failed to delete the deployment: %v", err)
 		}
 		ginkgo.By("wait for deployment deletion to see if the garbage collector mistakenly deletes the rs")
-		err = wait.PollImmediate(500*time.Millisecond, 1*time.Minute, func() (bool, error) {
+		err = wait.PollImmediate(500*time.Millisecond, 1*time.Minute+gcInformerResyncRetryTimeout, func() (bool, error) {
 			dList, err := deployClient.List(context.TODO(), metav1.ListOptions{})
 			if err != nil {
 				return false, fmt.Errorf("failed to list deployments: %v", err)
@@ -665,7 +675,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		// owner deletion, but in practice there can be a long delay between owner
 		// deletion and dependent deletion processing. For now, increase the timeout
 		// and investigate the processing delay.
-		if err := wait.Poll(1*time.Second, 60*time.Second, func() (bool, error) {
+		if err := wait.Poll(1*time.Second, 30*time.Second+gcInformerResyncRetryTimeout, func() (bool, error) {
 			_, err := rcClient.Get(context.TODO(), rc.Name, metav1.GetOptions{})
 			if err == nil {
 				pods, _ := podClient.List(context.TODO(), metav1.ListOptions{})
@@ -864,7 +874,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		var err2 error
 		// TODO: shorten the timeout when we make GC's periodic API rediscovery more efficient.
 		// Tracked at https://github.com/kubernetes/kubernetes/issues/50046.
-		if err := wait.Poll(5*time.Second, 90*time.Second, func() (bool, error) {
+		if err := wait.Poll(5*time.Second, 90*time.Second+gcInformerResyncRetryTimeout, func() (bool, error) {
 			pods, err2 = podClient.List(context.TODO(), metav1.ListOptions{})
 			if err2 != nil {
 				return false, fmt.Errorf("failed to list pods: %v", err)
