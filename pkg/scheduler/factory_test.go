@@ -44,7 +44,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodelabel"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/serviceaffinity"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
@@ -65,7 +64,7 @@ func TestCreate(t *testing.T) {
 	client := fake.NewSimpleClientset()
 	stopCh := make(chan struct{})
 	defer close(stopCh)
-	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight, stopCh)
+	factory := newConfigFactory(client, stopCh)
 	factory.createFromProvider(schedulerapi.SchedulerDefaultProviderName)
 }
 
@@ -78,7 +77,7 @@ func TestCreateFromConfig(t *testing.T) {
 	client := fake.NewSimpleClientset()
 	stopCh := make(chan struct{})
 	defer close(stopCh)
-	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight, stopCh)
+	factory := newConfigFactory(client, stopCh)
 
 	configData = []byte(`{
 		"kind" : "Policy",
@@ -107,10 +106,6 @@ func TestCreateFromConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("createFromConfig failed: %v", err)
 	}
-	hpa := factory.hardPodAffinitySymmetricWeight
-	if hpa != v1.DefaultHardPodAffinitySymmetricWeight {
-		t.Errorf("Wrong hardPodAffinitySymmetricWeight, ecpected: %d, got: %d", v1.DefaultHardPodAffinitySymmetricWeight, hpa)
-	}
 	queueSortPls := sched.Framework.ListPlugins()["QueueSortPlugin"]
 	wantQueuePls := []schedulerapi.Plugin{{Name: queuesort.Name}}
 	if diff := cmp.Diff(wantQueuePls, queueSortPls); diff != "" {
@@ -128,6 +123,7 @@ func TestCreateFromConfig(t *testing.T) {
 	// Verify that service affinity custom predicate/priority is converted to framework plugin.
 	wantArgs = `{"Name":"ServiceAffinity","Args":{"labels":["zone","foo"],"antiAffinityLabelsPreference":["rack","zone"]}}`
 	verifyPluginConvertion(t, serviceaffinity.Name, []string{"FilterPlugin", "ScorePlugin"}, sched, factory, 6, wantArgs)
+	// TODO(#87703): Verify all plugin configs.
 }
 
 func verifyPluginConvertion(t *testing.T, name string, extentionPoints []string, sched *Scheduler, configurator *Configurator, wantWeight int32, wantArgs string) {
@@ -178,7 +174,7 @@ func TestCreateFromConfigWithHardPodAffinitySymmetricWeight(t *testing.T) {
 	client := fake.NewSimpleClientset()
 	stopCh := make(chan struct{})
 	defer close(stopCh)
-	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight, stopCh)
+	factory := newConfigFactory(client, stopCh)
 
 	configData = []byte(`{
 		"kind" : "Policy",
@@ -225,7 +221,7 @@ func TestCreateFromEmptyConfig(t *testing.T) {
 	client := fake.NewSimpleClientset()
 	stopCh := make(chan struct{})
 	defer close(stopCh)
-	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight, stopCh)
+	factory := newConfigFactory(client, stopCh)
 
 	configData = []byte(`{}`)
 	if err := runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), configData, &policy); err != nil {
@@ -233,18 +229,8 @@ func TestCreateFromEmptyConfig(t *testing.T) {
 	}
 
 	factory.createFromConfig(policy)
-	wantConfig := []schedulerapi.PluginConfig{
-		{
-			Name: noderesources.FitName,
-			Args: runtime.Unknown{Raw: []byte(`null`)},
-		},
-		{
-			Name: interpodaffinity.Name,
-			Args: runtime.Unknown{Raw: []byte(`{"hardPodAffinityWeight":1}`)},
-		},
-	}
-	if diff := cmp.Diff(wantConfig, factory.pluginConfig); diff != "" {
-		t.Errorf("wrong plugin config (-want, +got): %s", diff)
+	if len(factory.pluginConfig) != 0 {
+		t.Errorf("got plugin config %s, want none", factory.pluginConfig)
 	}
 }
 
@@ -255,7 +241,7 @@ func TestCreateFromConfigWithUnspecifiedPredicatesOrPriorities(t *testing.T) {
 	client := fake.NewSimpleClientset()
 	stopCh := make(chan struct{})
 	defer close(stopCh)
-	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight, stopCh)
+	factory := newConfigFactory(client, stopCh)
 
 	configData := []byte(`{
 		"kind" : "Policy",
@@ -406,32 +392,30 @@ func testClientGetPodRequest(client *fake.Clientset, t *testing.T, podNs string,
 }
 
 func newConfigFactoryWithFrameworkRegistry(
-	client clientset.Interface, hardPodAffinitySymmetricWeight int32, stopCh <-chan struct{},
+	client clientset.Interface, stopCh <-chan struct{},
 	registry framework.Registry) *Configurator {
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
 	snapshot := internalcache.NewEmptySnapshot()
 	return &Configurator{
-		client:                         client,
-		informerFactory:                informerFactory,
-		podInformer:                    informerFactory.Core().V1().Pods(),
-		hardPodAffinitySymmetricWeight: hardPodAffinitySymmetricWeight,
-		disablePreemption:              disablePodPreemption,
-		percentageOfNodesToScore:       schedulerapi.DefaultPercentageOfNodesToScore,
-		bindTimeoutSeconds:             bindTimeoutSeconds,
-		podInitialBackoffSeconds:       podInitialBackoffDurationSeconds,
-		podMaxBackoffSeconds:           podMaxBackoffDurationSeconds,
-		StopEverything:                 stopCh,
-		enableNonPreempting:            utilfeature.DefaultFeatureGate.Enabled(kubefeatures.NonPreemptingPriority),
-		registry:                       registry,
-		plugins:                        nil,
-		pluginConfig:                   []schedulerapi.PluginConfig{},
-		nodeInfoSnapshot:               snapshot,
+		client:                   client,
+		informerFactory:          informerFactory,
+		podInformer:              informerFactory.Core().V1().Pods(),
+		disablePreemption:        disablePodPreemption,
+		percentageOfNodesToScore: schedulerapi.DefaultPercentageOfNodesToScore,
+		bindTimeoutSeconds:       bindTimeoutSeconds,
+		podInitialBackoffSeconds: podInitialBackoffDurationSeconds,
+		podMaxBackoffSeconds:     podMaxBackoffDurationSeconds,
+		StopEverything:           stopCh,
+		enableNonPreempting:      utilfeature.DefaultFeatureGate.Enabled(kubefeatures.NonPreemptingPriority),
+		registry:                 registry,
+		plugins:                  nil,
+		pluginConfig:             []schedulerapi.PluginConfig{},
+		nodeInfoSnapshot:         snapshot,
 	}
 }
 
-func newConfigFactory(
-	client clientset.Interface, hardPodAffinitySymmetricWeight int32, stopCh <-chan struct{}) *Configurator {
-	return newConfigFactoryWithFrameworkRegistry(client, hardPodAffinitySymmetricWeight, stopCh,
+func newConfigFactory(client clientset.Interface, stopCh <-chan struct{}) *Configurator {
+	return newConfigFactoryWithFrameworkRegistry(client, stopCh,
 		frameworkplugins.NewInTreeRegistry())
 }
 

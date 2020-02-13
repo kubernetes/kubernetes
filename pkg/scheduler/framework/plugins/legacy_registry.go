@@ -18,7 +18,6 @@ package plugins
 
 import (
 	"encoding/json"
-	"fmt"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -226,7 +225,9 @@ func NewLegacyRegistry() *LegacyRegistry {
 			// GeneralPredicate is a combination of predicates.
 			plugins.Filter = appendToPluginSet(plugins.Filter, noderesources.FitName, nil)
 			plugins.PreFilter = appendToPluginSet(plugins.PreFilter, noderesources.FitName, nil)
-			pluginConfig = append(pluginConfig, makePluginConfig(noderesources.FitName, args.NodeResourcesFitArgs))
+			if args.NodeResourcesFitArgs != nil {
+				pluginConfig = append(pluginConfig, NewPluginConfig(noderesources.FitName, args.NodeResourcesFitArgs))
+			}
 			plugins.Filter = appendToPluginSet(plugins.Filter, nodename.Name, nil)
 			plugins.Filter = appendToPluginSet(plugins.Filter, nodeports.Name, nil)
 			plugins.PreFilter = appendToPluginSet(plugins.PreFilter, nodeports.Name, nil)
@@ -242,7 +243,9 @@ func NewLegacyRegistry() *LegacyRegistry {
 		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			plugins.Filter = appendToPluginSet(plugins.Filter, noderesources.FitName, nil)
 			plugins.PreFilter = appendToPluginSet(plugins.PreFilter, noderesources.FitName, nil)
-			pluginConfig = append(pluginConfig, makePluginConfig(noderesources.FitName, args.NodeResourcesFitArgs))
+			if args.NodeResourcesFitArgs != nil {
+				pluginConfig = append(pluginConfig, NewPluginConfig(noderesources.FitName, args.NodeResourcesFitArgs))
+			}
 			return
 		})
 	registry.registerPredicateConfigProducer(HostNamePred,
@@ -315,13 +318,17 @@ func NewLegacyRegistry() *LegacyRegistry {
 	registry.registerPredicateConfigProducer(CheckNodeLabelPresencePred,
 		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			plugins.Filter = appendToPluginSet(plugins.Filter, nodelabel.Name, nil)
-			pluginConfig = append(pluginConfig, makePluginConfig(nodelabel.Name, args.NodeLabelArgs))
+			if args.NodeLabelArgs != nil {
+				pluginConfig = append(pluginConfig, NewPluginConfig(nodelabel.Name, args.NodeLabelArgs))
+			}
 			return
 		})
 	registry.registerPredicateConfigProducer(CheckServiceAffinityPred,
 		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			plugins.Filter = appendToPluginSet(plugins.Filter, serviceaffinity.Name, nil)
-			pluginConfig = append(pluginConfig, makePluginConfig(serviceaffinity.Name, args.ServiceAffinityArgs))
+			if args.ServiceAffinityArgs != nil {
+				pluginConfig = append(pluginConfig, NewPluginConfig(serviceaffinity.Name, args.ServiceAffinityArgs))
+			}
 			plugins.PreFilter = appendToPluginSet(plugins.PreFilter, serviceaffinity.Name, nil)
 			return
 		})
@@ -353,7 +360,9 @@ func NewLegacyRegistry() *LegacyRegistry {
 		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			plugins.PreScore = appendToPluginSet(plugins.PreScore, interpodaffinity.Name, nil)
 			plugins.Score = appendToPluginSet(plugins.Score, interpodaffinity.Name, &args.Weight)
-			pluginConfig = append(pluginConfig, makePluginConfig(interpodaffinity.Name, args.InterPodAffinityArgs))
+			if args.InterPodAffinityArgs != nil {
+				pluginConfig = append(pluginConfig, NewPluginConfig(interpodaffinity.Name, args.InterPodAffinityArgs))
+			}
 			return
 		})
 	registry.registerPriorityConfigProducer(NodePreferAvoidPodsPriority,
@@ -379,7 +388,9 @@ func NewLegacyRegistry() *LegacyRegistry {
 	registry.registerPriorityConfigProducer(noderesources.RequestedToCapacityRatioName,
 		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			plugins.Score = appendToPluginSet(plugins.Score, noderesources.RequestedToCapacityRatioName, &args.Weight)
-			pluginConfig = append(pluginConfig, makePluginConfig(noderesources.RequestedToCapacityRatioName, args.RequestedToCapacityRatioArgs))
+			if args.RequestedToCapacityRatioArgs != nil {
+				pluginConfig = append(pluginConfig, NewPluginConfig(noderesources.RequestedToCapacityRatioName, args.RequestedToCapacityRatioArgs))
+			}
 			return
 		})
 
@@ -390,7 +401,9 @@ func NewLegacyRegistry() *LegacyRegistry {
 			// priorities specified in Policy have the same weight).
 			weight := args.Weight * int32(len(args.NodeLabelArgs.PresentLabelsPreference)+len(args.NodeLabelArgs.AbsentLabelsPreference))
 			plugins.Score = appendToPluginSet(plugins.Score, nodelabel.Name, &weight)
-			pluginConfig = append(pluginConfig, makePluginConfig(nodelabel.Name, args.NodeLabelArgs))
+			if args.NodeLabelArgs != nil {
+				pluginConfig = append(pluginConfig, NewPluginConfig(nodelabel.Name, args.NodeLabelArgs))
+			}
 			return
 		})
 	registry.registerPriorityConfigProducer(serviceaffinity.Name,
@@ -400,7 +413,9 @@ func NewLegacyRegistry() *LegacyRegistry {
 			// priorities specified in Policy have the same weight).
 			weight := args.Weight * int32(len(args.ServiceAffinityArgs.AntiAffinityLabelsPreference))
 			plugins.Score = appendToPluginSet(plugins.Score, serviceaffinity.Name, &weight)
-			pluginConfig = append(pluginConfig, makePluginConfig(serviceaffinity.Name, args.ServiceAffinityArgs))
+			if args.ServiceAffinityArgs != nil {
+				pluginConfig = append(pluginConfig, NewPluginConfig(serviceaffinity.Name, args.ServiceAffinityArgs))
+			}
 			return
 		})
 
@@ -471,17 +486,17 @@ func appendToPluginSet(set *config.PluginSet, name string, weight *int32) *confi
 	return set
 }
 
-func makePluginConfig(pluginName string, args interface{}) config.PluginConfig {
+// NewPluginConfig builds a PluginConfig with the struct of args marshaled.
+// It panics if it fails to marshal.
+func NewPluginConfig(pluginName string, args interface{}) config.PluginConfig {
 	encoding, err := json.Marshal(args)
 	if err != nil {
-		klog.Fatal(fmt.Errorf("failed to marshal %+v: %v", args, err))
-		return config.PluginConfig{}
+		klog.Fatalf("failed to marshal %+v: %v", args, err)
 	}
-	config := config.PluginConfig{
+	return config.PluginConfig{
 		Name: pluginName,
 		Args: runtime.Unknown{Raw: encoding},
 	}
-	return config
 }
 
 // ProcessPredicatePolicy given a PredicatePolicy, return the plugin name implementing the predicate and update

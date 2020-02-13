@@ -273,7 +273,6 @@ priorities: []
 					},
 				},
 			}),
-			scheduler.WithHardPodAffinitySymmetricWeight(v1.DefaultHardPodAffinitySymmetricWeight),
 			scheduler.WithBindTimeoutSeconds(defaultBindTimeout),
 		)
 		if err != nil {
@@ -321,7 +320,6 @@ func TestSchedulerCreationFromNonExistentConfigMap(t *testing.T) {
 				},
 			},
 		}),
-		scheduler.WithHardPodAffinitySymmetricWeight(v1.DefaultHardPodAffinitySymmetricWeight),
 		scheduler.WithBindTimeoutSeconds(defaultBindTimeout))
 
 	if err == nil {

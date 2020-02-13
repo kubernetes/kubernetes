@@ -21,14 +21,85 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	conversion "k8s.io/apimachinery/pkg/conversion"
+	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	componentbaseconfig "k8s.io/component-base/config"
 	componentbaseconfigv1alpha1 "k8s.io/component-base/config/v1alpha1"
-	v1alpha1 "k8s.io/kube-scheduler/config/v1alpha1"
-	config "k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kube-scheduler/config/v1alpha1"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/utils/pointer"
 )
+
+func TestConvertHardPodAffinitySymmetricWeight(t *testing.T) {
+	cases := []struct {
+		name string
+		cfg  v1alpha1.KubeSchedulerConfiguration
+		want config.KubeSchedulerConfiguration
+	}{
+		{
+			name: "no weight",
+		},
+		{
+			name: "custom weight",
+			cfg: v1alpha1.KubeSchedulerConfiguration{
+				HardPodAffinitySymmetricWeight: pointer.Int32Ptr(3),
+			},
+			want: config.KubeSchedulerConfiguration{
+				PluginConfig: []config.PluginConfig{
+					{
+						Name: "InterPodAffinity",
+						Args: runtime.Unknown{
+							Raw: []byte(`{"hardPodAffinityWeight":3}`),
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "custom weight and existing PluginConfig",
+			cfg: v1alpha1.KubeSchedulerConfiguration{
+				HardPodAffinitySymmetricWeight: pointer.Int32Ptr(3),
+				PluginConfig: []v1alpha1.PluginConfig{
+					{
+						Name: "InterPodAffinity",
+						Args: runtime.Unknown{
+							Raw: []byte(`{"hardPodAffinityWeight":5}`),
+						},
+					},
+				},
+			},
+			want: config.KubeSchedulerConfiguration{
+				PluginConfig: []config.PluginConfig{
+					{
+						Name: "InterPodAffinity",
+						Args: runtime.Unknown{
+							Raw: []byte(`{"hardPodAffinityWeight":5}`),
+						},
+					},
+					{
+						Name: "InterPodAffinity",
+						Args: runtime.Unknown{
+							Raw: []byte(`{"hardPodAffinityWeight":3}`),
+						},
+					},
+				},
+			},
+		},
+	}
+	scheme := getScheme(t)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var out config.KubeSchedulerConfiguration
+			err := scheme.Convert(&tc.cfg, &out, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if diff := cmp.Diff(tc.want, out); diff != "" {
+				t.Errorf("unexpected conversion (-want, +got):\n%s", diff)
+			}
+		})
+	}
+}
 
 func TestV1alpha1ToConfigKubeSchedulerLeaderElectionConfiguration(t *testing.T) {
 	configuration := &v1alpha1.KubeSchedulerLeaderElectionConfiguration{
@@ -384,8 +455,7 @@ func TestConvertBetweenV1Alpha1PluginsAndConfigPlugins(t *testing.T) {
 	}
 	convertedConfigPlugins := config.Plugins{}
 	convertedV1Alpha1Plugins := v1alpha1.Plugins{}
-	scheme := runtime.NewScheme()
-	utilruntime.Must(AddToScheme(scheme))
+	scheme := getScheme(t)
 	if err := scheme.Convert(&v1alpha1Plugins, &convertedConfigPlugins, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -398,4 +468,12 @@ func TestConvertBetweenV1Alpha1PluginsAndConfigPlugins(t *testing.T) {
 	if diff := cmp.Diff(v1alpha1Plugins, convertedV1Alpha1Plugins); diff != "" {
 		t.Errorf("unexpected plugins diff (-want, +got): %s", diff)
 	}
+}
+
+func getScheme(t *testing.T) *runtime.Scheme {
+	scheme := runtime.NewScheme()
+	if err := AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	return scheme
 }

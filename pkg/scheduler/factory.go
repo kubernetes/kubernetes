@@ -26,7 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -78,11 +77,6 @@ type Configurator struct {
 	StopEverything <-chan struct{}
 
 	schedulerCache internalcache.Cache
-
-	// RequiredDuringScheduling affinity is not symmetric, but there is an implicit PreferredDuringScheduling affinity rule
-	// corresponding to every RequiredDuringScheduling affinity rule.
-	// HardPodAffinitySymmetricWeight represents the weight of implicit PreferredDuringScheduling affinity rule, in the range [0-100].
-	hardPodAffinitySymmetricWeight int32
 
 	// Handles volume binding decisions
 	volumeBinder *volumebinder.VolumeBinder
@@ -181,10 +175,6 @@ func (c *Configurator) createFromProvider(providerName string) (*Scheduler, erro
 	defaultPlugins.Apply(c.plugins)
 	c.plugins = defaultPlugins
 
-	pluginConfig := []schedulerapi.PluginConfig{c.interPodAffinityPluginConfig()}
-	pluginConfig = append(pluginConfig, c.pluginConfig...)
-	c.pluginConfig = pluginConfig
-
 	return c.create([]core.SchedulerExtender{})
 }
 
@@ -253,10 +243,13 @@ func (c *Configurator) createFromConfig(policy schedulerapi.Policy) (*Scheduler,
 		// place ignorable extenders to the tail of extenders
 		extenders = append(extenders, ignorableExtenders...)
 	}
-	// Providing HardPodAffinitySymmetricWeight in the policy config is the new and preferred way of providing the value.
-	// Give it higher precedence than scheduler CLI configuration when it is provided.
+	// HardPodAffinitySymmetricWeight in the policy config takes precedence over
+	// CLI configuration.
 	if policy.HardPodAffinitySymmetricWeight != 0 {
-		c.hardPodAffinitySymmetricWeight = policy.HardPodAffinitySymmetricWeight
+		v := policy.HardPodAffinitySymmetricWeight
+		args.InterPodAffinityArgs = &interpodaffinity.Args{
+			HardPodAffinityWeight: &v,
+		}
 	}
 
 	// When AlwaysCheckAllPredicates is set to true, scheduler checks all the configured
@@ -266,10 +259,6 @@ func (c *Configurator) createFromConfig(policy schedulerapi.Policy) (*Scheduler,
 	}
 
 	klog.V(2).Infof("Creating scheduler with fit predicates '%v' and priority functions '%v'", predicateKeys, priorityKeys)
-
-	args.InterPodAffinityArgs = &interpodaffinity.Args{
-		HardPodAffinityWeight: &c.hardPodAffinitySymmetricWeight,
-	}
 
 	pluginsForPredicates, pluginConfigForPredicates, err := getPredicateConfigs(predicateKeys, lr, args)
 	if err != nil {
@@ -305,15 +294,6 @@ func (c *Configurator) createFromConfig(policy schedulerapi.Policy) (*Scheduler,
 	c.pluginConfig = pluginConfig
 
 	return c.create(extenders)
-}
-
-func (c *Configurator) interPodAffinityPluginConfig() schedulerapi.PluginConfig {
-	return schedulerapi.PluginConfig{
-		Name: interpodaffinity.Name,
-		Args: runtime.Unknown{
-			Raw: []byte(fmt.Sprintf(`{"hardPodAffinityWeight":%d}`, c.hardPodAffinitySymmetricWeight)),
-		},
-	}
 }
 
 // getPriorityConfigs returns priorities configuration: ones that will run as priorities and ones that will run

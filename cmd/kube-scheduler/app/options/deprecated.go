@@ -20,10 +20,11 @@ import (
 	"fmt"
 
 	"github.com/spf13/pflag"
-
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
 )
 
 // DeprecatedOptions contains deprecated options and their flags.
@@ -31,11 +32,12 @@ import (
 type DeprecatedOptions struct {
 	// The fields below here are placeholders for flags that can't be directly
 	// mapped into componentconfig.KubeSchedulerConfiguration.
-	PolicyConfigFile         string
-	PolicyConfigMapName      string
-	PolicyConfigMapNamespace string
-	UseLegacyPolicyConfig    bool
-	AlgorithmProvider        string
+	PolicyConfigFile               string
+	PolicyConfigMapName            string
+	PolicyConfigMapNamespace       string
+	UseLegacyPolicyConfig          bool
+	AlgorithmProvider              string
+	HardPodAffinitySymmetricWeight int32
 }
 
 // AddFlags adds flags for the deprecated options.
@@ -61,7 +63,7 @@ func (o *DeprecatedOptions) AddFlags(fs *pflag.FlagSet, cfg *kubeschedulerconfig
 	fs.StringVar(&cfg.LeaderElection.ResourceNamespace, "lock-object-namespace", cfg.LeaderElection.ResourceNamespace, "DEPRECATED: define the namespace of the lock object. Will be removed in favor of leader-elect-resource-namespace.")
 	fs.StringVar(&cfg.LeaderElection.ResourceName, "lock-object-name", cfg.LeaderElection.ResourceName, "DEPRECATED: define the name of the lock object. Will be removed in favor of leader-elect-resource-name")
 
-	fs.Int32Var(&cfg.HardPodAffinitySymmetricWeight, "hard-pod-affinity-symmetric-weight", cfg.HardPodAffinitySymmetricWeight,
+	fs.Int32Var(&o.HardPodAffinitySymmetricWeight, "hard-pod-affinity-symmetric-weight", interpodaffinity.DefaultHardPodAffinityWeight,
 		"DEPRECATED: RequiredDuringScheduling affinity is not symmetric, but there is an implicit PreferredDuringScheduling affinity rule corresponding "+
 			"to every RequiredDuringScheduling affinity rule. --hard-pod-affinity-symmetric-weight represents the weight of implicit PreferredDuringScheduling affinity rule. Must be in the range 0-100."+
 			"This option was moved to the policy configuration file")
@@ -76,6 +78,11 @@ func (o *DeprecatedOptions) Validate() []error {
 	if o.UseLegacyPolicyConfig && len(o.PolicyConfigFile) == 0 {
 		errs = append(errs, field.Required(field.NewPath("policyConfigFile"), "required when --use-legacy-policy-config is true"))
 	}
+
+	if err := interpodaffinity.ValidateHardPodAffinityWeight(field.NewPath("hardPodAffinitySymmetricWeight"), o.HardPodAffinitySymmetricWeight); err != nil {
+		errs = append(errs, err)
+	}
+
 	return errs
 }
 
@@ -111,6 +118,13 @@ func (o *DeprecatedOptions) ApplyTo(cfg *kubeschedulerconfig.KubeSchedulerConfig
 		cfg.AlgorithmSource = kubeschedulerconfig.SchedulerAlgorithmSource{
 			Provider: &o.AlgorithmProvider,
 		}
+	}
+
+	if o.HardPodAffinitySymmetricWeight != interpodaffinity.DefaultHardPodAffinityWeight {
+		args := interpodaffinity.Args{
+			HardPodAffinityWeight: &o.HardPodAffinitySymmetricWeight,
+		}
+		cfg.PluginConfig = append(cfg.PluginConfig, plugins.NewPluginConfig(interpodaffinity.Name, args))
 	}
 
 	return nil
