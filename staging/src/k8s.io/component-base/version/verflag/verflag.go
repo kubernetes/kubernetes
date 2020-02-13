@@ -19,6 +19,7 @@ limitations under the License.
 package verflag
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"strconv"
@@ -26,17 +27,25 @@ import (
 	flag "github.com/spf13/pflag"
 
 	"k8s.io/component-base/version"
+	"sigs.k8s.io/yaml"
 )
 
 type versionValue int
 
 const (
-	VersionFalse versionValue = 0
-	VersionTrue  versionValue = 1
-	VersionRaw   versionValue = 2
+	VersionFalse versionValue = iota
+	VersionTrue
+	VersionRaw
+	VersionJson
+	VersionYaml
 )
 
-const strRawVersion string = "raw"
+const (
+	strTrueVersion string = "true"
+	strRawVersion  string = "raw"
+	strJsonVersion string = "json"
+	strYamlVersion string = "yaml"
+)
 
 func (v *versionValue) IsBoolFlag() bool {
 	return true
@@ -47,24 +56,37 @@ func (v *versionValue) Get() interface{} {
 }
 
 func (v *versionValue) Set(s string) error {
-	if s == strRawVersion {
+	switch s {
+	case strRawVersion:
 		*v = VersionRaw
-		return nil
+	case strJsonVersion:
+		*v = VersionJson
+	case strYamlVersion:
+		*v = VersionYaml
+	default:
+		boolVal, err := strconv.ParseBool(s)
+		if boolVal {
+			*v = VersionTrue
+		} else {
+			*v = VersionFalse
+		}
+		return err
 	}
-	boolVal, err := strconv.ParseBool(s)
-	if boolVal {
-		*v = VersionTrue
-	} else {
-		*v = VersionFalse
-	}
-	return err
+	return nil
 }
 
 func (v *versionValue) String() string {
-	if *v == VersionRaw {
+	switch *v {
+	case VersionTrue:
+		return strTrueVersion
+	case VersionRaw:
 		return strRawVersion
+	case VersionJson:
+		return strJsonVersion
+	case VersionYaml:
+		return strYamlVersion
 	}
-	return fmt.Sprintf("%v", bool(*v == VersionTrue))
+	return "false"
 }
 
 // The type of the flag as required by the pflag.Value interface
@@ -76,7 +98,7 @@ func VersionVar(p *versionValue, name string, value versionValue, usage string) 
 	*p = value
 	flag.Var(p, name, usage)
 	// "--version" will be treated as "--version=true"
-	flag.Lookup(name).NoOptDefVal = "true"
+	flag.Lookup(name).NoOptDefVal = strTrueVersion
 }
 
 func Version(name string, value versionValue, usage string) *versionValue {
@@ -88,7 +110,8 @@ func Version(name string, value versionValue, usage string) *versionValue {
 const versionFlagName = "version"
 
 var (
-	versionFlag = Version(versionFlagName, VersionFalse, "Print version information and quit")
+	versionFlag = Version(versionFlagName, VersionFalse,
+		fmt.Sprintf("Print version information and quit. Can be set to %q, %q, %q or %q", strTrueVersion, strRawVersion, strJsonVersion, strYamlVersion))
 )
 
 // AddFlags registers this package's flags on arbitrary FlagSets, such that they point to the
@@ -100,11 +123,32 @@ func AddFlags(fs *flag.FlagSet) {
 // PrintAndExitIfRequested will check if the -version flag was passed
 // and, if so, print the version and exit.
 func PrintAndExitIfRequested() {
-	if *versionFlag == VersionRaw {
-		fmt.Printf("%#v\n", version.Get())
-		os.Exit(0)
-	} else if *versionFlag == VersionTrue {
-		fmt.Printf("Kubernetes %s\n", version.Get())
+	ver := version.Get()
+	verStr := ""
+
+	switch *versionFlag {
+	case VersionTrue:
+		verStr = fmt.Sprintf("Kubernetes %s", ver)
+	case VersionRaw:
+		verStr = fmt.Sprintf("%#v", ver)
+	case VersionJson:
+		bytes, err := json.MarshalIndent(&ver, "", "  ")
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "failed to marshal version data: %v\n", err)
+			os.Exit(1)
+		}
+		verStr = string(bytes)
+	case VersionYaml:
+		bytes, err := yaml.Marshal(&ver)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "failed to marshal version data: %v\n", err)
+			os.Exit(1)
+		}
+		verStr = string(bytes)
+	}
+
+	if verStr != "" {
+		fmt.Println(verStr)
 		os.Exit(0)
 	}
 }

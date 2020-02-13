@@ -14,6 +14,7 @@ go_library(
     deps = [
         "//staging/src/k8s.io/component-base/version:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
+        "//vendor/sigs.k8s.io/yaml:go_default_library",
     ],
 )
 
