@@ -23,7 +23,7 @@ import (
 	"time"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -289,9 +289,14 @@ func (ssc *StatefulSetController) getPodsForStatefulSet(set *apps.StatefulSet, s
 		return isMemberOf(set, pod)
 	}
 
-	// If any adoptions are attempted, we should first recheck for deletion with
-	// an uncached quorum read sometime after listing Pods (see #42639).
-	canAdoptFunc := controller.RecheckDeletionTimestamp(func() (metav1.Object, error) {
+	cm := controller.NewPodControllerRefManager(ssc.podControl, set, selector, controllerKind, ssc.canAdoptFunc(set))
+	return cm.ClaimPods(pods, filter)
+}
+
+// If any adoptions are attempted, we should first recheck for deletion with
+// an uncached quorum read sometime after listing Pods/ControllerRevisions (see #42639).
+func (ssc *StatefulSetController) canAdoptFunc(set *apps.StatefulSet) func() error {
+	return controller.RecheckDeletionTimestamp(func() (metav1.Object, error) {
 		fresh, err := ssc.kubeClient.AppsV1().StatefulSets(set.Namespace).Get(context.TODO(), set.Name, metav1.GetOptions{})
 		if err != nil {
 			return nil, err
@@ -301,9 +306,6 @@ func (ssc *StatefulSetController) getPodsForStatefulSet(set *apps.StatefulSet, s
 		}
 		return fresh, nil
 	})
-
-	cm := controller.NewPodControllerRefManager(ssc.podControl, set, selector, controllerKind, canAdoptFunc)
-	return cm.ClaimPods(pods, filter)
 }
 
 // adoptOrphanRevisions adopts any orphaned ControllerRevisions matched by set's Selector.
@@ -319,12 +321,9 @@ func (ssc *StatefulSetController) adoptOrphanRevisions(set *apps.StatefulSet) er
 		}
 	}
 	if len(orphanRevisions) > 0 {
-		fresh, err := ssc.kubeClient.AppsV1().StatefulSets(set.Namespace).Get(context.TODO(), set.Name, metav1.GetOptions{})
-		if err != nil {
-			return err
-		}
-		if fresh.UID != set.UID {
-			return fmt.Errorf("original StatefulSet %v/%v is gone: got uid %v, wanted %v", set.Namespace, set.Name, fresh.UID, set.UID)
+		canAdoptErr := ssc.canAdoptFunc(set)()
+		if canAdoptErr != nil {
+			return fmt.Errorf("can't adopt ControllerRevisions: %v", canAdoptErr)
 		}
 		return ssc.control.AdoptOrphanRevisions(set, orphanRevisions)
 	}
