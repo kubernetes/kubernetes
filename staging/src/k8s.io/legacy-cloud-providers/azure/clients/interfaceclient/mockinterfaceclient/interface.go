@@ -93,3 +93,17 @@ func (mr *MockInterfaceMockRecorder) CreateOrUpdate(ctx, resourceGroupName, netw
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateOrUpdate", reflect.TypeOf((*MockInterface)(nil).CreateOrUpdate), ctx, resourceGroupName, networkInterfaceName, parameters)
 }
+
+// Delete mocks base method
+func (m *MockInterface) Delete(ctx context.Context, resourceGroupName, networkInterfaceName string) *retry.Error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Delete", ctx, resourceGroupName, networkInterfaceName)
+	ret0, _ := ret[0].(*retry.Error)
+	return ret0
+}
+
+// Delete indicates an expected call of Delete
+func (mr *MockInterfaceMockRecorder) Delete(ctx, resourceGroupName, networkInterfaceName interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Delete", reflect.TypeOf((*MockInterface)(nil).Delete), ctx, resourceGroupName, networkInterfaceName)
+}

@@ -292,6 +292,10 @@ func (fIC *fakeAzureInterfacesClient) GetVirtualMachineScaleSetNetworkInterface(
 		errors.New("Not such Interface"))
 }
 
+func (fIC *fakeAzureInterfacesClient) Delete(ctx context.Context, resourceGroupName string, networkInterfaceName string) *retry.Error {
+	return nil
+}
+
 func (fIC *fakeAzureInterfacesClient) setFakeStore(store map[string]map[string]network.Interface) {
 	fIC.mutex.Lock()
 	defer fIC.mutex.Unlock()
@@ -361,6 +365,10 @@ func (fVMC *fakeAzureVirtualMachinesClient) List(ctx context.Context, resourceGr
 	}
 
 	return result, nil
+}
+
+func (fVMC *fakeAzureVirtualMachinesClient) Delete(ctx context.Context, resourceGroupName string, VMName string) *retry.Error {
+	return nil
 }
 
 func (fVMC *fakeAzureVirtualMachinesClient) setFakeStore(store map[string]map[string]compute.VirtualMachine) {
@@ -658,6 +666,10 @@ func (fVMSSC *fakeVirtualMachineScaleSetsClient) List(ctx context.Context, resou
 }
 
 func (fVMSSC *fakeVirtualMachineScaleSetsClient) UpdateInstances(ctx context.Context, resourceGroupName string, VMScaleSetName string, VMInstanceIDs compute.VirtualMachineScaleSetVMInstanceRequiredIDs) *retry.Error {
+	return nil
+}
+
+func (fVMSSC *fakeVirtualMachineScaleSetsClient) DeleteInstances(ctx context.Context, resourceGroupName string, vmScaleSetName string, vmInstanceIDs compute.VirtualMachineScaleSetVMInstanceRequiredIDs) *retry.Error {
 	return nil
 }
 
