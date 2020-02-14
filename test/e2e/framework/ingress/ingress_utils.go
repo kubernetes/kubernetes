@@ -54,7 +54,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 	clientset "k8s.io/client-go/kubernetes"
-	scheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
@@ -113,11 +113,6 @@ const (
 
 	// poll is how often to Poll pods, nodes and claims.
 	poll = 2 * time.Second
-
-	// singleCallTimeout is how long to try single API calls (like 'get' or 'list'). Used to prevent
-	// transient failures from failing tests.
-	// TODO: client should not apply this timeout to Watch calls. Increased from 30s until that is fixed.
-	singleCallTimeout = 5 * time.Minute
 )
 
 // TestLogger is an interface for log.
@@ -876,7 +871,7 @@ func getPortURL(client clientset.Interface, ns, name string, svcPort int) (strin
 	// unschedulable, since the master doesn't run kube-proxy. Without
 	// kube-proxy NodePorts won't work.
 	var nodes *v1.NodeList
-	if wait.PollImmediate(poll, singleCallTimeout, func() (bool, error) {
+	if wait.PollImmediate(poll, framework.SingleCallTimeout, func() (bool, error) {
 		nodes, err = client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{FieldSelector: fields.Set{
 			"spec.unschedulable": "false",
 		}.AsSelector().String()})
