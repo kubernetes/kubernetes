@@ -487,6 +487,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 		if getPodRevision(condemned[target]) == updateRevision.Name {
 			status.UpdatedReplicas--
 		}
+		status.Replicas--
 		if monotonic {
 			return &status, nil
 		}
@@ -513,6 +514,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 				replicas[target].Name)
 			err := ssc.podControl.DeleteStatefulPod(set, replicas[target])
 			status.CurrentReplicas--
+			status.Replicas--
 			return &status, err
 		}
 
