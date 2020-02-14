@@ -1882,7 +1882,6 @@ func DumpDebugInfo(c clientset.Interface, ns string) {
 
 // DsFromManifest reads a .json/yaml file and returns the daemonset in it.
 func DsFromManifest(url string) (*appsv1.DaemonSet, error) {
-	var ds appsv1.DaemonSet
 	Logf("Parsing ds from %v", url)
 
 	var response *http.Response
@@ -1908,7 +1907,12 @@ func DsFromManifest(url string) (*appsv1.DaemonSet, error) {
 	if err != nil {
 		return nil, fmt.Errorf("Failed to read html response body: %v", err)
 	}
+	return DsFromData(data)
+}
 
+// DsFromData reads a byte slice and returns the daemonset in it.
+func DsFromData(data []byte) (*appsv1.DaemonSet, error) {
+	var ds appsv1.DaemonSet
 	dataJSON, err := utilyaml.ToJSON(data)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to parse data to json: %v", err)
