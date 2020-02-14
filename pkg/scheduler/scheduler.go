@@ -262,6 +262,7 @@ func New(client clientset.Interface,
 		informerFactory.Core().V1().PersistentVolumes(),
 		informerFactory.Storage().V1().StorageClasses(),
 		time.Duration(options.bindTimeoutSeconds)*time.Second,
+		recorder,
 	)
 
 	registry := frameworkplugins.NewInTreeRegistry()

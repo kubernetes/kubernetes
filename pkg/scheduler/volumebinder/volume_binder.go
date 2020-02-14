@@ -23,6 +23,7 @@ import (
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	storageinformers "k8s.io/client-go/informers/storage/v1"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/events"
 	volumescheduling "k8s.io/kubernetes/pkg/controller/volume/scheduling"
 )
 
@@ -39,10 +40,11 @@ func NewVolumeBinder(
 	pvcInformer coreinformers.PersistentVolumeClaimInformer,
 	pvInformer coreinformers.PersistentVolumeInformer,
 	storageClassInformer storageinformers.StorageClassInformer,
-	bindTimeout time.Duration) *VolumeBinder {
+	bindTimeout time.Duration,
+	recorder events.EventRecorder) *VolumeBinder {
 
 	return &VolumeBinder{
-		Binder: volumescheduling.NewVolumeBinder(client, nodeInformer, csiNodeInformer, pvcInformer, pvInformer, storageClassInformer, bindTimeout),
+		Binder: volumescheduling.NewVolumeBinder(client, nodeInformer, csiNodeInformer, pvcInformer, pvInformer, storageClassInformer, bindTimeout, recorder),
 	}
 }
 

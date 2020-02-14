@@ -35,6 +35,7 @@ import (
 	storageinformers "k8s.io/client-go/informers/storage/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
+	"k8s.io/client-go/tools/events"
 	csitrans "k8s.io/csi-translation-lib"
 	csiplugins "k8s.io/csi-translation-lib/plugins"
 	"k8s.io/klog"
@@ -132,6 +133,7 @@ type volumeBinder struct {
 	bindTimeout time.Duration
 
 	translator InTreeToCSITranslator
+	recorder   events.EventRecorder
 }
 
 // NewVolumeBinder sets up all the caches needed for the scheduler to make volume binding decisions.
@@ -142,7 +144,8 @@ func NewVolumeBinder(
 	pvcInformer coreinformers.PersistentVolumeClaimInformer,
 	pvInformer coreinformers.PersistentVolumeInformer,
 	storageClassInformer storageinformers.StorageClassInformer,
-	bindTimeout time.Duration) SchedulerVolumeBinder {
+	bindTimeout time.Duration,
+	recorder events.EventRecorder) SchedulerVolumeBinder {
 
 	b := &volumeBinder{
 		kubeClient:      kubeClient,
@@ -154,6 +157,7 @@ func NewVolumeBinder(
 		podBindingCache: NewPodBindingCache(),
 		bindTimeout:     bindTimeout,
 		translator:      csitrans.New(),
+		recorder:        recorder,
 	}
 
 	return b
@@ -758,27 +762,37 @@ func (b *volumeBinder) findMatchingVolumes(pod *v1.Pod, claimsToBind []*v1.Persi
 func (b *volumeBinder) checkVolumeProvisions(pod *v1.Pod, claimsToProvision []*v1.PersistentVolumeClaim, node *v1.Node) (provisionSatisfied bool, provisionedClaims []*v1.PersistentVolumeClaim, err error) {
 	podName := getPodName(pod)
 	provisionedClaims = []*v1.PersistentVolumeClaim{}
-
 	for _, claim := range claimsToProvision {
 		pvcName := getPVCName(claim)
 		className := v1helper.GetPersistentVolumeClaimClass(claim)
 		if className == "" {
+			// Returning err below adds event to the *pod*. Add similar event to the claim.
+			b.recorder.Eventf(claim, pod, v1.EventTypeWarning, "FailedScheduling", "Provisioning", "didn't find available persistent volumes and no storage class is set")
 			return false, nil, fmt.Errorf("no class for claim %q", pvcName)
 		}
 
 		class, err := b.classLister.Get(className)
 		if err != nil {
+			// Returning err below adds event to the *pod*. Add similar event to the claim.
+			msg := fmt.Sprintf("didn't find available persistent volumes and failed to get storage class %q", className)
+			b.recorder.Eventf(claim, pod, v1.EventTypeWarning, "FailedScheduling", "Provisioning", msg)
 			return false, nil, fmt.Errorf("failed to find storage class %q", className)
 		}
 		provisioner := class.Provisioner
 		if provisioner == "" || provisioner == pvutil.NotSupportedProvisioner {
 			klog.V(4).Infof("storage class %q of claim %q does not support dynamic provisioning", className, pvcName)
+			// Returning false below adds event to the *pod*. Add similar event to the claim.
+			msg := fmt.Sprintf("didn't find available persistent volumes and dynamic provisioning is disabled for storage class %q", className)
+			b.recorder.Eventf(claim, pod, v1.EventTypeWarning, "FailedScheduling", "Provisioning", msg)
 			return false, nil, nil
 		}
 
 		// Check if the node can satisfy the topology requirement in the class
 		if !v1helper.MatchTopologySelectorTerms(class.AllowedTopologies, labels.Set(node.Labels)) {
 			klog.V(4).Infof("Node %q cannot satisfy provisioning topology requirements of claim %q", node.Name, pvcName)
+			// Returning false below adds event to the *pod*. Add similar event to the claim.
+			msg := fmt.Sprintf("Node %q cannot satisfy provisioning topology requirements of required storage class", node.Name)
+			b.recorder.Eventf(claim, pod, v1.EventTypeWarning, "FailedScheduling", "Provisioning", msg)
 			return false, nil, nil
 		}
 
@@ -789,7 +803,6 @@ func (b *volumeBinder) checkVolumeProvisions(pod *v1.Pod, claimsToProvision []*v
 
 	}
 	klog.V(4).Infof("Provisioning for claims of pod %q that has no matching volumes on node %q ...", podName, node.Name)
-
 	return true, provisionedClaims, nil
 }
 

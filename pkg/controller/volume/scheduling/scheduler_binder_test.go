@@ -37,7 +37,9 @@ import (
 	storageinformers "k8s.io/client-go/informers/storage/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
+	clientScheme "k8s.io/client-go/kubernetes/scheme"
 	k8stesting "k8s.io/client-go/testing"
+	"k8s.io/client-go/tools/events"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/controller"
@@ -147,6 +149,8 @@ func newTestBinder(t *testing.T, stopCh <-chan struct{}) *testEnv {
 	csiNodeInformer := informerFactory.Storage().V1().CSINodes()
 	pvcInformer := informerFactory.Core().V1().PersistentVolumeClaims()
 	classInformer := informerFactory.Storage().V1().StorageClasses()
+	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1beta1().Events("")})
+	recorder := eventBroadcaster.NewRecorder(clientScheme.Scheme, "scheduler")
 	binder := NewVolumeBinder(
 		client,
 		nodeInformer,
@@ -154,7 +158,8 @@ func newTestBinder(t *testing.T, stopCh <-chan struct{}) *testEnv {
 		pvcInformer,
 		informerFactory.Core().V1().PersistentVolumes(),
 		classInformer,
-		10*time.Second)
+		10*time.Second,
+		recorder)
 
 	// Wait for informers cache sync
 	informerFactory.Start(stopCh)
