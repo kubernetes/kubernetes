@@ -50,6 +50,8 @@ const (
 	ErrReasonBindConflict = "node(s) didn't find available persistent volumes to bind"
 	// ErrReasonNodeConflict is used for VolumeNodeAffinityConflict predicate error.
 	ErrReasonNodeConflict = "node(s) had volume node affinity conflict"
+
+	csiDriverUnavailable = "CSI driver not running"
 )
 
 // InTreeToCSITranslator contains methods required to check migratable status
@@ -215,9 +217,20 @@ func (b *volumeBinder) FindPodVolumes(pod *v1.Pod, node *v1.Node) (reasons []str
 
 	// The pod's volumes need to be processed in one call to avoid the race condition where
 	// volumes can get bound/provisioned in between calls.
-	boundClaims, claimsToBind, unboundClaimsImmediate, err := b.getPodVolumes(pod)
+	boundClaims, claimsToBind, unboundClaimsImmediate, inlineVolumes, err := b.getPodVolumes(pod)
 	if err != nil {
 		return nil, err
+	}
+
+	// For CSI ephemeral inline volumes, the CSI driver must be running on the node.
+	driversAvailable, err := b.checkInlineVolumes(node.Name, inlineVolumes)
+	if err != nil {
+		return nil, err
+	}
+	if !driversAvailable {
+		// Fast path: give up on node immediately, kubelet wouldn't be able to
+		// publish the CSI volume because the driver isn't running on the node.
+		return []string{csiDriverUnavailable}, nil
 	}
 
 	// Immediate claims should be bound
@@ -469,6 +482,35 @@ var (
 	versioner = etcd3.APIObjectVersioner{}
 )
 
+// checkInlineVolumes ensures that the CSI driver required by each volume
+// is really running on the node.
+func (b *volumeBinder) checkInlineVolumes(nodeName string, inlineVolumes []*v1.CSIVolumeSource) (bool, error) {
+	if len(inlineVolumes) == 0 {
+		return true, nil
+	}
+
+	csiNode, err := b.csiNodeInformer.Lister().Get(nodeName)
+	if err != nil {
+		return false, fmt.Errorf("failed to get CSI node %q: %v", nodeName, err)
+	}
+
+	for _, inlineVolume := range inlineVolumes {
+		if !hasDriver(csiNode.Spec.Drivers, inlineVolume.Driver) {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
+func hasDriver(drivers []storagev1.CSINodeDriver, driverName string) bool {
+	for _, driver := range drivers {
+		if driver.Name == driverName {
+			return true
+		}
+	}
+	return false
+}
+
 // checkBindings runs through all the PVCs in the Pod and checks:
 // * if the PVC is fully bound
 // * if there are any conditions that require binding to fail and be retried
@@ -657,17 +699,18 @@ func (b *volumeBinder) arePodVolumesBound(pod *v1.Pod) bool {
 	return true
 }
 
-// getPodVolumes returns a pod's PVCs separated into bound, unbound with delayed binding (including provisioning)
-// and unbound with immediate binding (including prebound)
-func (b *volumeBinder) getPodVolumes(pod *v1.Pod) (boundClaims []*v1.PersistentVolumeClaim, unboundClaimsDelayBinding []*v1.PersistentVolumeClaim, unboundClaimsImmediate []*v1.PersistentVolumeClaim, err error) {
-	boundClaims = []*v1.PersistentVolumeClaim{}
-	unboundClaimsImmediate = []*v1.PersistentVolumeClaim{}
-	unboundClaimsDelayBinding = []*v1.PersistentVolumeClaim{}
-
+// getPodVolumes returns a pod's PVCs separated into bound, unbound with delayed binding (including provisioning),
+// unbound with immediate binding (including prebound), and CSI ephemeral inline volumes.
+func (b *volumeBinder) getPodVolumes(pod *v1.Pod) (boundClaims []*v1.PersistentVolumeClaim, unboundClaimsDelayBinding []*v1.PersistentVolumeClaim, unboundClaimsImmediate []*v1.PersistentVolumeClaim, inlineVolumes []*v1.CSIVolumeSource, err error) {
 	for _, vol := range pod.Spec.Volumes {
+		if vol.CSI != nil {
+			inlineVolumes = append(inlineVolumes, vol.CSI)
+			continue
+		}
+
 		volumeBound, pvc, err := b.isVolumeBound(pod.Namespace, &vol)
 		if err != nil {
-			return nil, nil, nil, err
+			return nil, nil, nil, nil, err
 		}
 		if pvc == nil {
 			continue
@@ -677,7 +720,7 @@ func (b *volumeBinder) getPodVolumes(pod *v1.Pod) (boundClaims []*v1.PersistentV
 		} else {
 			delayBindingMode, err := pvutil.IsDelayBindingMode(pvc, b.classLister)
 			if err != nil {
-				return nil, nil, nil, err
+				return nil, nil, nil, nil, err
 			}
 			// Prebound PVCs are treated as unbound immediate binding
 			if delayBindingMode && pvc.Spec.VolumeName == "" {
@@ -690,7 +733,7 @@ func (b *volumeBinder) getPodVolumes(pod *v1.Pod) (boundClaims []*v1.PersistentV
 			}
 		}
 	}
-	return boundClaims, unboundClaimsDelayBinding, unboundClaimsImmediate, nil
+	return
 }
 
 func (b *volumeBinder) checkBoundClaims(claims []*v1.PersistentVolumeClaim, node *v1.Node, podName string) (bool, error) {
