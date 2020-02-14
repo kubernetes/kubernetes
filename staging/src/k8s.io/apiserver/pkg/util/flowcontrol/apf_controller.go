@@ -556,7 +556,7 @@ func qscOfPL(qsf fq.QueueSetFactory, queues fq.QueueSet, pl *fctypesv1a1.Priorit
 		qsc, err = qsf.BeginConstruction(qcQS)
 	}
 	if err != nil {
-		err = errors.Wrap(err, fmt.Sprintf("priority level %q has QueuingConfiguration %#+v, which is invalid", pl.Name, *qcAPI))
+		err = errors.Wrap(err, fmt.Sprintf("priority level %q has QueuingConfiguration %#+v, which is invalid", pl.Name, qcAPI))
 	}
 	return qsc, err
 }
