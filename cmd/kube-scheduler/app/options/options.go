@@ -40,7 +40,7 @@ import (
 	cliflag "k8s.io/component-base/cli/flag"
 	componentbaseconfig "k8s.io/component-base/config"
 	"k8s.io/klog"
-	kubeschedulerconfigv1alpha1 "k8s.io/kube-scheduler/config/v1alpha1"
+	kubeschedulerconfigv1alpha2 "k8s.io/kube-scheduler/config/v1alpha2"
 	schedulerappconfig "k8s.io/kubernetes/cmd/kube-scheduler/app/config"
 	"k8s.io/kubernetes/pkg/client/leaderelectionconfig"
 	"k8s.io/kubernetes/pkg/master/ports"
@@ -129,10 +129,10 @@ func splitHostIntPort(s string) (string, int, error) {
 }
 
 func newDefaultComponentConfig() (*kubeschedulerconfig.KubeSchedulerConfiguration, error) {
-	cfgv1alpha1 := kubeschedulerconfigv1alpha1.KubeSchedulerConfiguration{}
-	kubeschedulerscheme.Scheme.Default(&cfgv1alpha1)
+	versionedCfg := kubeschedulerconfigv1alpha2.KubeSchedulerConfiguration{}
+	kubeschedulerscheme.Scheme.Default(&versionedCfg)
 	cfg := kubeschedulerconfig.KubeSchedulerConfiguration{}
-	if err := kubeschedulerscheme.Scheme.Convert(&cfgv1alpha1, &cfg, nil); err != nil {
+	if err := kubeschedulerscheme.Scheme.Convert(&versionedCfg, &cfg, nil); err != nil {
 		return nil, err
 	}
 	return &cfg, nil

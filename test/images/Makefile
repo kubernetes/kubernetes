@@ -12,12 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-include  ../../hack/make-rules/Makefile.manifest
-
 REGISTRY ?= gcr.io/kubernetes-e2e-test-images
 GOARM ?= 7
 QEMUVERSION=v2.9.1
-GOLANG_VERSION=1.13.5
+GOLANG_VERSION=1.13.6
 export
 
 ifndef WHAT

@@ -66,21 +66,26 @@ func exerciseQueueSetUniformScenario(t *testing.T, name string, qs fq.QueueSet, 
 			go func(i, j int, uc uniformClient, igr test.Integrator) {
 				for k := 0; k < uc.nCalls; k++ {
 					ClockWait(clk, counter, uc.thinkDuration)
-					for {
-						tryAnother, execute, afterExecute := qs.Wait(context.Background(), uc.hash, name, []int{i, j, k})
-						t.Logf("%s: %d, %d, %d got a=%v, e=%v", clk.Now().Format(nsTimeFmt), i, j, k, tryAnother, execute)
-						if tryAnother {
-							continue
-						}
-						if !execute {
-							atomic.AddUint64(&failedCount, 1)
-							break
-						}
+					req, idle := qs.StartRequest(context.Background(), uc.hash, name, []int{i, j, k})
+					t.Logf("%s: %d, %d, %d got req=%p, idle=%v", clk.Now().Format(nsTimeFmt), i, j, k, req, idle)
+					if req == nil {
+						atomic.AddUint64(&failedCount, 1)
+						break
+					}
+					if idle {
+						t.Error("got request but QueueSet reported idle")
+					}
+					var executed bool
+					idle2 := req.Finish(func() {
+						executed = true
+						t.Logf("%s: %d, %d, %d executing", clk.Now().Format(nsTimeFmt), i, j, k)
 						igr.Add(1)
 						ClockWait(clk, counter, uc.execDuration)
-						afterExecute()
 						igr.Add(-1)
-						break
+					})
+					t.Logf("%s: %d, %d, %d got executed=%v, idle2=%v", clk.Now().Format(nsTimeFmt), i, j, k, executed, idle2)
+					if !executed {
+						atomic.AddUint64(&failedCount, 1)
 					}
 				}
 				counter.Add(-1)
@@ -141,12 +146,11 @@ func init() {
 func TestNoRestraint(t *testing.T) {
 	now := time.Now()
 	clk, counter := clock.NewFakeEventClock(now, 0, nil)
-	nrf := test.NewNoRestraintFactory()
-	config := fq.QueueSetConfig{}
-	nr, err := nrf.NewQueueSet(config)
+	nrc, err := test.NewNoRestraintFactory().BeginConstruction(fq.QueuingConfig{})
 	if err != nil {
-		t.Fatalf("QueueSet creation failed with %v", err)
+		t.Fatal(err)
 	}
+	nr := nrc.Complete(fq.DispatchingConfig{})
 	exerciseQueueSetUniformScenario(t, "NoRestraint", nr, []uniformClient{
 		{1001001001, 5, 10, time.Second, time.Second},
 		{2002002002, 2, 10, time.Second, time.Second / 2},
@@ -158,18 +162,18 @@ func TestUniformFlows(t *testing.T) {
 
 	clk, counter := clock.NewFakeEventClock(now, 0, nil)
 	qsf := NewQueueSetFactory(clk, counter)
-	config := fq.QueueSetConfig{
+	qCfg := fq.QueuingConfig{
 		Name:             "TestUniformFlows",
-		ConcurrencyLimit: 4,
 		DesiredNumQueues: 8,
 		QueueLengthLimit: 6,
 		HandSize:         3,
 		RequestWaitLimit: 10 * time.Minute,
 	}
-	qs, err := qsf.NewQueueSet(config)
+	qsc, err := qsf.BeginConstruction(qCfg)
 	if err != nil {
-		t.Fatalf("QueueSet creation failed with %v", err)
+		t.Fatal(err)
 	}
+	qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: 4})
 
 	exerciseQueueSetUniformScenario(t, "UniformFlows", qs, []uniformClient{
 		{1001001001, 5, 10, time.Second, time.Second},
@@ -182,18 +186,18 @@ func TestDifferentFlows(t *testing.T) {
 
 	clk, counter := clock.NewFakeEventClock(now, 0, nil)
 	qsf := NewQueueSetFactory(clk, counter)
-	config := fq.QueueSetConfig{
+	qCfg := fq.QueuingConfig{
 		Name:             "TestDifferentFlows",
-		ConcurrencyLimit: 4,
 		DesiredNumQueues: 8,
 		QueueLengthLimit: 6,
 		HandSize:         3,
 		RequestWaitLimit: 10 * time.Minute,
 	}
-	qs, err := qsf.NewQueueSet(config)
+	qsc, err := qsf.BeginConstruction(qCfg)
 	if err != nil {
-		t.Fatalf("QueueSet creation failed with %v", err)
+		t.Fatal(err)
 	}
+	qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: 4})
 
 	exerciseQueueSetUniformScenario(t, "DifferentFlows", qs, []uniformClient{
 		{1001001001, 6, 10, time.Second, time.Second},
@@ -206,18 +210,15 @@ func TestDifferentFlowsWithoutQueuing(t *testing.T) {
 
 	clk, counter := clock.NewFakeEventClock(now, 0, nil)
 	qsf := NewQueueSetFactory(clk, counter)
-	config := fq.QueueSetConfig{
+	qCfg := fq.QueuingConfig{
 		Name:             "TestDifferentFlowsWithoutQueuing",
-		ConcurrencyLimit: 4,
 		DesiredNumQueues: 0,
-		QueueLengthLimit: 6,
-		HandSize:         3,
-		RequestWaitLimit: 10 * time.Minute,
 	}
-	qs, err := qsf.NewQueueSet(config)
+	qsc, err := qsf.BeginConstruction(qCfg)
 	if err != nil {
-		t.Fatalf("QueueSet creation failed with %v", err)
+		t.Fatal(err)
 	}
+	qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: 4})
 
 	exerciseQueueSetUniformScenario(t, "DifferentFlowsWithoutQueuing", qs, []uniformClient{
 		{1001001001, 6, 10, time.Second, 57 * time.Millisecond},
@@ -230,20 +231,80 @@ func TestTimeout(t *testing.T) {
 
 	clk, counter := clock.NewFakeEventClock(now, 0, nil)
 	qsf := NewQueueSetFactory(clk, counter)
-	config := fq.QueueSetConfig{
+	qCfg := fq.QueuingConfig{
 		Name:             "TestTimeout",
-		ConcurrencyLimit: 1,
 		DesiredNumQueues: 128,
 		QueueLengthLimit: 128,
 		HandSize:         1,
 		RequestWaitLimit: 0,
 	}
-	qs, err := qsf.NewQueueSet(config)
+	qsc, err := qsf.BeginConstruction(qCfg)
 	if err != nil {
-		t.Fatalf("QueueSet creation failed with %v", err)
+		t.Fatal(err)
 	}
+	qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: 1})
 
 	exerciseQueueSetUniformScenario(t, "Timeout", qs, []uniformClient{
 		{1001001001, 5, 100, time.Second, time.Second},
 	}, time.Second*10, true, false, clk, counter)
+}
+
+func TestContextCancel(t *testing.T) {
+	now := time.Now()
+	clk, counter := clock.NewFakeEventClock(now, 0, nil)
+	qsf := NewQueueSetFactory(clk, counter)
+	qCfg := fq.QueuingConfig{
+		Name:             "TestTimeout",
+		DesiredNumQueues: 11,
+		QueueLengthLimit: 11,
+		HandSize:         1,
+		RequestWaitLimit: 15 * time.Second,
+	}
+	qsc, err := qsf.BeginConstruction(qCfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: 1})
+	counter.Add(1) // account for the goroutine running this test
+	ctx1 := context.Background()
+	req1, _ := qs.StartRequest(ctx1, 1, "test", "one")
+	if req1 == nil {
+		t.Error("Request rejected")
+		return
+	}
+	var executed1 bool
+	idle1 := req1.Finish(func() {
+		executed1 = true
+		ctx2, cancel2 := context.WithCancel(context.Background())
+		tBefore := time.Now()
+		go func() {
+			time.Sleep(time.Second)
+			// account for unblocking the goroutine that waits on cancelation
+			counter.Add(1)
+			cancel2()
+		}()
+		req2, idle2a := qs.StartRequest(ctx2, 2, "test", "two")
+		if idle2a {
+			t.Error("2nd StartRequest returned idle")
+		}
+		if req2 != nil {
+			idle2b := req2.Finish(func() {
+				t.Error("Executing req2")
+			})
+			if idle2b {
+				t.Error("2nd Finish returned idle")
+			}
+		}
+		tAfter := time.Now()
+		dt := tAfter.Sub(tBefore)
+		if dt < time.Second || dt > 2*time.Second {
+			t.Errorf("Unexpected: dt=%d", dt)
+		}
+	})
+	if !executed1 {
+		t.Errorf("Unexpected: executed1=%v", executed1)
+	}
+	if !idle1 {
+		t.Error("Not idle at the end")
+	}
 }

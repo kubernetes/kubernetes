@@ -17,6 +17,7 @@ limitations under the License.
 package node
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -47,7 +48,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 		/*
 			Release : v1.15
 			Testname: Pods, delete grace period
-			Description: Create a pod, make sure it is running. Using the http client send a ‘delete’ with gracePeriodSeconds=30. Pod SHOULD get deleted within 30 seconds.
+			Description: Create a pod, make sure it is running. Using the http client send a 'delete' with gracePeriodSeconds=30. Pod SHOULD get deleted within 30 seconds.
 		*/
 		ginkgo.It("should be submitted and removed [Flaky]", func() {
 			ginkgo.By("creating the pod")
@@ -75,7 +76,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 			ginkgo.By("setting up selector")
 			selector := labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
 			options := metav1.ListOptions{LabelSelector: selector.String()}
-			pods, err := podClient.List(options)
+			pods, err := podClient.List(context.TODO(), options)
 			framework.ExpectNoError(err, "failed to query for pod")
 			framework.ExpectEqual(len(pods.Items), 0)
 			options = metav1.ListOptions{
@@ -89,7 +90,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 			ginkgo.By("verifying the pod is in kubernetes")
 			selector = labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
 			options = metav1.ListOptions{LabelSelector: selector.String()}
-			pods, err = podClient.List(options)
+			pods, err = podClient.List(context.TODO(), options)
 			framework.ExpectNoError(err, "failed to query for pod")
 			framework.ExpectEqual(len(pods.Items), 1)
 
@@ -97,13 +98,13 @@ var _ = SIGDescribe("Pods Extended", func() {
 			// may be carried out immediately rather than gracefully.
 			framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
 			// save the running pod
-			pod, err = podClient.Get(pod.Name, metav1.GetOptions{})
+			pod, err = podClient.Get(context.TODO(), pod.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err, "failed to GET scheduled pod")
 
 			ginkgo.By("deleting the pod gracefully")
 			var lastPod v1.Pod
 			var statusCode int
-			err = f.ClientSet.CoreV1().RESTClient().Delete().AbsPath("/api/v1/namespaces", pod.Namespace, "pods", pod.Name).Param("gracePeriodSeconds", "30").Do().StatusCode(&statusCode).Into(&lastPod)
+			err = f.ClientSet.CoreV1().RESTClient().Delete().AbsPath("/api/v1/namespaces", pod.Namespace, "pods", pod.Name).Param("gracePeriodSeconds", "30").Do(context.TODO()).StatusCode(&statusCode).Into(&lastPod)
 			framework.ExpectNoError(err, "failed to use http client to send delete")
 			framework.ExpectEqual(statusCode, http.StatusOK, "failed to delete gracefully by client request")
 
@@ -138,7 +139,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 
 			selector = labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
 			options = metav1.ListOptions{LabelSelector: selector.String()}
-			pods, err = podClient.List(options)
+			pods, err = podClient.List(context.TODO(), options)
 			framework.ExpectNoError(err, "failed to query for pods")
 			framework.ExpectEqual(len(pods.Items), 0)
 
@@ -191,7 +192,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 			podClient.Create(pod)
 
 			ginkgo.By("verifying QOS class is set on the pod")
-			pod, err := podClient.Get(name, metav1.GetOptions{})
+			pod, err := podClient.Get(context.TODO(), name, metav1.GetOptions{})
 			framework.ExpectNoError(err, "failed to query for pod")
 			framework.ExpectEqual(pod.Status.QOSClass, v1.PodQOSGuaranteed)
 		})

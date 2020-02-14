@@ -19,6 +19,7 @@ limitations under the License.
 package gce
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net"
@@ -32,12 +33,18 @@ import (
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/meta"
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/mock"
 	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
+
+	"encoding/json"
 
 	"cloud.google.com/go/compute/metadata"
 	compute "google.golang.org/api/compute/v1"
 	"google.golang.org/api/googleapi"
+	"k8s.io/client-go/kubernetes/fake"
+	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 )
 
 func fakeGCECloud(vals TestClusterValues) (*Cloud, error) {
@@ -45,6 +52,7 @@ func fakeGCECloud(vals TestClusterValues) (*Cloud, error) {
 
 	gce.AlphaFeatureGate = NewAlphaFeatureGate([]string{})
 	gce.nodeInformerSynced = func() bool { return true }
+	gce.client = fake.NewSimpleClientset()
 
 	mockGCE := gce.c.(*cloud.MockGCE)
 	mockGCE.MockTargetPools.AddInstanceHook = mock.AddInstanceHook
@@ -73,6 +81,34 @@ func fakeGCECloud(vals TestClusterValues) (*Cloud, error) {
 	}
 
 	return gce, nil
+}
+
+func registerTargetPoolAddInstanceHook(gce *Cloud, callback func(*compute.TargetPoolsAddInstanceRequest)) error {
+	mockGCE, ok := gce.c.(*cloud.MockGCE)
+	if !ok {
+		return fmt.Errorf("couldn't cast cloud to mockGCE: %#v", gce)
+	}
+	existingHandler := mockGCE.MockTargetPools.AddInstanceHook
+	hook := func(ctx context.Context, key *meta.Key, req *compute.TargetPoolsAddInstanceRequest, m *cloud.MockTargetPools) error {
+		callback(req)
+		return existingHandler(ctx, key, req, m)
+	}
+	mockGCE.MockTargetPools.AddInstanceHook = hook
+	return nil
+}
+
+func registerTargetPoolRemoveInstanceHook(gce *Cloud, callback func(*compute.TargetPoolsRemoveInstanceRequest)) error {
+	mockGCE, ok := gce.c.(*cloud.MockGCE)
+	if !ok {
+		return fmt.Errorf("couldn't cast cloud to mockGCE: %#v", gce)
+	}
+	existingHandler := mockGCE.MockTargetPools.RemoveInstanceHook
+	hook := func(ctx context.Context, key *meta.Key, req *compute.TargetPoolsRemoveInstanceRequest, m *cloud.MockTargetPools) error {
+		callback(req)
+		return existingHandler(ctx, key, req, m)
+	}
+	mockGCE.MockTargetPools.RemoveInstanceHook = hook
+	return nil
 }
 
 type gceInstance struct {
@@ -315,4 +351,86 @@ func typeOfNetwork(network *compute.Network) netType {
 
 func getLocationName(project, zoneOrRegion string) string {
 	return fmt.Sprintf("projects/%s/locations/%s", project, zoneOrRegion)
+}
+
+func addFinalizer(service *v1.Service, kubeClient v1core.CoreV1Interface, key string) error {
+	if hasFinalizer(service, key) {
+		return nil
+	}
+
+	// Make a copy so we don't mutate the shared informer cache.
+	updated := service.DeepCopy()
+	updated.ObjectMeta.Finalizers = append(updated.ObjectMeta.Finalizers, key)
+
+	// TODO(87447) use PatchService from k8s.io/cloud-provider/service/helpers
+	_, err := patchService(kubeClient, service, updated)
+	return err
+}
+
+// removeFinalizer patches the service to remove finalizer.
+func removeFinalizer(service *v1.Service, kubeClient v1core.CoreV1Interface, key string) error {
+	if !hasFinalizer(service, key) {
+		return nil
+	}
+
+	// Make a copy so we don't mutate the shared informer cache.
+	updated := service.DeepCopy()
+	updated.ObjectMeta.Finalizers = removeString(updated.ObjectMeta.Finalizers, key)
+
+	_, err := patchService(kubeClient, service, updated)
+	return err
+}
+
+//hasFinalizer returns if the given service has the specified key in its list of finalizers.
+func hasFinalizer(service *v1.Service, key string) bool {
+	for _, finalizer := range service.ObjectMeta.Finalizers {
+		if finalizer == key {
+			return true
+		}
+	}
+	return false
+}
+
+// removeString returns a newly created []string that contains all items from slice that
+// are not equal to s.
+func removeString(slice []string, s string) []string {
+	var newSlice []string
+	for _, item := range slice {
+		if item != s {
+			newSlice = append(newSlice, item)
+		}
+	}
+	return newSlice
+}
+
+// patchService patches service's Status or ObjectMeta given the origin and
+// updated ones. Change to spec will be ignored.
+func patchService(c v1core.CoreV1Interface, oldSvc *v1.Service, newSvc *v1.Service) (*v1.Service, error) {
+	// Reset spec to make sure only patch for Status or ObjectMeta.
+	newSvc.Spec = oldSvc.Spec
+
+	patchBytes, err := getPatchBytes(oldSvc, newSvc)
+	if err != nil {
+		return nil, err
+	}
+
+	return c.Services(oldSvc.Namespace).Patch(context.TODO(), oldSvc.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}, "status")
+}
+
+func getPatchBytes(oldSvc *v1.Service, newSvc *v1.Service) ([]byte, error) {
+	oldData, err := json.Marshal(oldSvc)
+	if err != nil {
+		return nil, fmt.Errorf("failed to Marshal oldData for svc %s/%s: %v", oldSvc.Namespace, oldSvc.Name, err)
+	}
+
+	newData, err := json.Marshal(newSvc)
+	if err != nil {
+		return nil, fmt.Errorf("failed to Marshal newData for svc %s/%s: %v", newSvc.Namespace, newSvc.Name, err)
+	}
+
+	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, v1.Service{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to CreateTwoWayMergePatch for svc %s/%s: %v", oldSvc.Namespace, oldSvc.Name, err)
+	}
+	return patchBytes, nil
 }

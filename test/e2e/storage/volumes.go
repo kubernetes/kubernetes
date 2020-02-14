@@ -19,6 +19,7 @@ limitations under the License.
 package storage
 
 import (
+	"context"
 	"github.com/onsi/ginkgo"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -64,11 +65,11 @@ var _ = utils.SIGDescribe("Volumes", func() {
 					"third":  "this is the third file",
 				},
 			}
-			if _, err := cs.CoreV1().ConfigMaps(namespace.Name).Create(configMap); err != nil {
+			if _, err := cs.CoreV1().ConfigMaps(namespace.Name).Create(context.TODO(), configMap, metav1.CreateOptions{}); err != nil {
 				framework.Failf("unable to create test configmap: %v", err)
 			}
 			defer func() {
-				_ = cs.CoreV1().ConfigMaps(namespace.Name).Delete(configMap.Name, nil)
+				_ = cs.CoreV1().ConfigMaps(namespace.Name).Delete(context.TODO(), configMap.Name, nil)
 			}()
 
 			// Test one ConfigMap mounted several times to test #28502

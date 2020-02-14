@@ -23,9 +23,13 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"reflect"
+	"strings"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apiserver/pkg/endpoints/metrics"
+	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/metrics/testutil"
 )
 
 func TestInstallHandler(t *testing.T) {
@@ -229,6 +233,35 @@ func TestGetExcludedChecks(t *testing.T) {
 				t.Errorf("getExcludedChecks() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestMetrics(t *testing.T) {
+	mux := http.NewServeMux()
+	InstallHandler(mux)
+	InstallLivezHandler(mux)
+	InstallReadyzHandler(mux)
+	metrics.Register()
+	metrics.Reset()
+
+	paths := []string{"/healthz", "/livez", "/readyz"}
+	for _, path := range paths {
+		req, err := http.NewRequest("GET", fmt.Sprintf("http://example.com%s", path), nil)
+		if err != nil {
+			t.Errorf("%v", err)
+		}
+		mux.ServeHTTP(httptest.NewRecorder(), req)
+	}
+
+	expected := strings.NewReader(`
+        # HELP apiserver_request_total [ALPHA] Counter of apiserver requests broken out for each verb, dry run value, group, version, resource, scope, component, and HTTP response contentType and code.
+        # TYPE apiserver_request_total counter
+        apiserver_request_total{code="200",component="",contentType="text/plain; charset=utf-8",dry_run="",group="",resource="",scope="",subresource="/healthz",verb="GET",version=""} 1
+        apiserver_request_total{code="200",component="",contentType="text/plain; charset=utf-8",dry_run="",group="",resource="",scope="",subresource="/livez",verb="GET",version=""} 1
+        apiserver_request_total{code="200",component="",contentType="text/plain; charset=utf-8",dry_run="",group="",resource="",scope="",subresource="/readyz",verb="GET",version=""} 1
+`)
+	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, expected, "apiserver_request_total"); err != nil {
+		t.Error(err)
 	}
 }
 

@@ -17,12 +17,13 @@ limitations under the License.
 package cloud
 
 import (
+	"context"
 	"errors"
 	"reflect"
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/informers"
@@ -448,7 +449,7 @@ func Test_NodesShutdown(t *testing.T) {
 }
 
 func syncNodeStore(nodeinformer coreinformers.NodeInformer, f *testutil.FakeNodeHandler) error {
-	nodes, err := f.List(metav1.ListOptions{})
+	nodes, err := f.List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return err
 	}

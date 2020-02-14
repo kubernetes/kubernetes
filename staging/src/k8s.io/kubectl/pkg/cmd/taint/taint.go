@@ -129,7 +129,7 @@ func (o *TaintOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 	taintArgs := []string{}
 	metTaintArg := false
 	for _, s := range args {
-		isTaint := strings.Contains(s, "=") || strings.HasSuffix(s, "-")
+		isTaint := strings.Contains(s, "=") || strings.Contains(s, ":") || strings.HasSuffix(s, "-")
 		switch {
 		case !metTaintArg && isTaint:
 			metTaintArg = true

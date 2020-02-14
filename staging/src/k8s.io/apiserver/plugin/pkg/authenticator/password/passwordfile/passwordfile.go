@@ -31,6 +31,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 )
 
+// PasswordAuthenticator authenticates users by password
 type PasswordAuthenticator struct {
 	users map[string]*userPasswordInfo
 }
@@ -81,6 +82,7 @@ func NewCSV(path string) (*PasswordAuthenticator, error) {
 	return &PasswordAuthenticator{users}, nil
 }
 
+// AuthenticatePassword returns user info if authentication is successful, nil otherwise
 func (a *PasswordAuthenticator) AuthenticatePassword(ctx context.Context, username, password string) (*authenticator.Response, bool, error) {
 	user, ok := a.users[username]
 	if !ok {

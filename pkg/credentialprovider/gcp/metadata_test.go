@@ -45,7 +45,7 @@ func TestDockerKeyringFromGoogleDockerConfigMetadata(t *testing.T) {
 	registryURL := "hello.kubernetes.io"
 	email := "foo@bar.baz"
 	username := "foo"
-	password := "bar"
+	password := "bar" // Fake value for testing.
 	auth := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", username, password)))
 	sampleDockerConfig := fmt.Sprintf(`{
    "https://%s": {
@@ -118,7 +118,7 @@ func TestDockerKeyringFromGoogleDockerConfigMetadataUrl(t *testing.T) {
 	registryURL := "hello.kubernetes.io"
 	email := "foo@bar.baz"
 	username := "foo"
-	password := "bar"
+	password := "bar" // Fake value for testing.
 	auth := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", username, password)))
 	sampleDockerConfig := fmt.Sprintf(`{
    "https://%s": {
@@ -193,86 +193,90 @@ func TestDockerKeyringFromGoogleDockerConfigMetadataUrl(t *testing.T) {
 }
 
 func TestContainerRegistryBasics(t *testing.T) {
-	registryURL := "container.cloud.google.com"
-	email := "1234@project.gserviceaccount.com"
-	token := &tokenBlob{AccessToken: "ya26.lots-of-indiscernible-garbage"}
+	registryURLs := []string{"container.cloud.google.com", "eu.gcr.io", "us-west2-docker.pkg.dev"}
+	for _, registryURL := range registryURLs {
+		t.Run(registryURL, func(t *testing.T) {
+			email := "1234@project.gserviceaccount.com"
+			token := &tokenBlob{AccessToken: "ya26.lots-of-indiscernible-garbage"} // Fake value for testing.
 
-	const (
-		serviceAccountsEndpoint = "/computeMetadata/v1/instance/service-accounts/"
-		defaultEndpoint         = "/computeMetadata/v1/instance/service-accounts/default/"
-		scopeEndpoint           = defaultEndpoint + "scopes"
-		emailEndpoint           = defaultEndpoint + "email"
-		tokenEndpoint           = defaultEndpoint + "token"
-	)
-	var err error
-	gceProductNameFile, err = createProductNameFile()
-	if err != nil {
-		t.Errorf("failed to create gce product name file: %v", err)
-	}
-	defer os.Remove(gceProductNameFile)
-
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Only serve the URL key and the value endpoint
-		if scopeEndpoint == r.URL.Path {
-			w.WriteHeader(http.StatusOK)
-			w.Header().Set("Content-Type", "application/json")
-			fmt.Fprintf(w, `["%s.read_write"]`, storageScopePrefix)
-		} else if emailEndpoint == r.URL.Path {
-			w.WriteHeader(http.StatusOK)
-			fmt.Fprint(w, email)
-		} else if tokenEndpoint == r.URL.Path {
-			w.WriteHeader(http.StatusOK)
-			w.Header().Set("Content-Type", "application/json")
-			bytes, err := json.Marshal(token)
+			const (
+				serviceAccountsEndpoint = "/computeMetadata/v1/instance/service-accounts/"
+				defaultEndpoint         = "/computeMetadata/v1/instance/service-accounts/default/"
+				scopeEndpoint           = defaultEndpoint + "scopes"
+				emailEndpoint           = defaultEndpoint + "email"
+				tokenEndpoint           = defaultEndpoint + "token"
+			)
+			var err error
+			gceProductNameFile, err = createProductNameFile()
 			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
+				t.Errorf("failed to create gce product name file: %v", err)
 			}
-			fmt.Fprintln(w, string(bytes))
-		} else if serviceAccountsEndpoint == r.URL.Path {
-			w.WriteHeader(http.StatusOK)
-			fmt.Fprintln(w, "default/\ncustom")
-		} else {
-			http.Error(w, "", http.StatusNotFound)
-		}
-	}))
-	defer server.Close()
+			defer os.Remove(gceProductNameFile)
 
-	// Make a transport that reroutes all traffic to the example server
-	transport := utilnet.SetTransportDefaults(&http.Transport{
-		Proxy: func(req *http.Request) (*url.URL, error) {
-			return url.Parse(server.URL + req.URL.Path)
-		},
-	})
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				// Only serve the URL key and the value endpoint
+				if scopeEndpoint == r.URL.Path {
+					w.WriteHeader(http.StatusOK)
+					w.Header().Set("Content-Type", "application/json")
+					fmt.Fprintf(w, `["%s.read_write"]`, storageScopePrefix)
+				} else if emailEndpoint == r.URL.Path {
+					w.WriteHeader(http.StatusOK)
+					fmt.Fprint(w, email)
+				} else if tokenEndpoint == r.URL.Path {
+					w.WriteHeader(http.StatusOK)
+					w.Header().Set("Content-Type", "application/json")
+					bytes, err := json.Marshal(token)
+					if err != nil {
+						t.Fatalf("unexpected error: %v", err)
+					}
+					fmt.Fprintln(w, string(bytes))
+				} else if serviceAccountsEndpoint == r.URL.Path {
+					w.WriteHeader(http.StatusOK)
+					fmt.Fprintln(w, "default/\ncustom")
+				} else {
+					http.Error(w, "", http.StatusNotFound)
+				}
+			}))
+			defer server.Close()
 
-	keyring := &credentialprovider.BasicDockerKeyring{}
-	provider := &containerRegistryProvider{
-		metadataProvider{Client: &http.Client{Transport: transport}},
-	}
+			// Make a transport that reroutes all traffic to the example server
+			transport := utilnet.SetTransportDefaults(&http.Transport{
+				Proxy: func(req *http.Request) (*url.URL, error) {
+					return url.Parse(server.URL + req.URL.Path)
+				},
+			})
 
-	if !provider.Enabled() {
-		t.Errorf("Provider is unexpectedly disabled")
-	}
+			keyring := &credentialprovider.BasicDockerKeyring{}
+			provider := &containerRegistryProvider{
+				metadataProvider{Client: &http.Client{Transport: transport}},
+			}
 
-	keyring.Add(provider.Provide(""))
+			if !provider.Enabled() {
+				t.Errorf("Provider is unexpectedly disabled")
+			}
 
-	creds, ok := keyring.Lookup(registryURL)
-	if !ok {
-		t.Errorf("Didn't find expected URL: %s", registryURL)
-		return
-	}
-	if len(creds) > 1 {
-		t.Errorf("Got more hits than expected: %s", creds)
-	}
-	val := creds[0]
+			keyring.Add(provider.Provide(""))
 
-	if val.Username != "_token" {
-		t.Errorf("Unexpected username value, want: %s, got: %s", "_token", val.Username)
-	}
-	if token.AccessToken != val.Password {
-		t.Errorf("Unexpected password value, want: %s, got: %s", token.AccessToken, val.Password)
-	}
-	if email != val.Email {
-		t.Errorf("Unexpected email value, want: %s, got: %s", email, val.Email)
+			creds, ok := keyring.Lookup(registryURL)
+			if !ok {
+				t.Errorf("Didn't find expected URL: %s", registryURL)
+				return
+			}
+			if len(creds) > 1 {
+				t.Errorf("Got more hits than expected: %s", creds)
+			}
+			val := creds[0]
+
+			if val.Username != "_token" {
+				t.Errorf("Unexpected username value, want: %s, got: %s", "_token", val.Username)
+			}
+			if token.AccessToken != val.Password {
+				t.Errorf("Unexpected password value, want: %s, got: %s", token.AccessToken, val.Password)
+			}
+			if email != val.Email {
+				t.Errorf("Unexpected email value, want: %s, got: %s", email, val.Email)
+			}
+		})
 	}
 }
 

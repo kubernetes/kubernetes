@@ -17,11 +17,15 @@ limitations under the License.
 package phases
 
 import (
+	"context"
 	"fmt"
 	"os"
 
 	"github.com/lithammer/dedent"
 	"github.com/pkg/errors"
+	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -126,6 +130,28 @@ func runKubeletStartJoinPhase(c workflow.RunData) (returnErr error) {
 	bootstrapClient, err := kubeconfigutil.ClientSetFromFile(bootstrapKubeConfigFile)
 	if err != nil {
 		return errors.Errorf("couldn't create client from kubeconfig file %q", bootstrapKubeConfigFile)
+	}
+
+	// Obtain the name of this Node.
+	nodeName, _, err := kubeletphase.GetNodeNameAndHostname(&cfg.NodeRegistration)
+	if err != nil {
+		klog.Warning(err)
+	}
+
+	// Make sure to exit before TLS bootstrap if a Node with the same name exist in the cluster
+	// and it has the "Ready" status.
+	// A new Node with the same name as an existing control-plane Node can cause undefined
+	// behavior and ultimately control-plane failure.
+	klog.V(1).Infof("[kubelet-start] Checking for an existing Node in the cluster with name %q and status %q", nodeName, v1.NodeReady)
+	node, err := bootstrapClient.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+	if err != nil && !apierrors.IsNotFound(err) {
+		return errors.Wrapf(err, "cannot get Node %q", nodeName)
+	}
+	for _, cond := range node.Status.Conditions {
+		if cond.Type == v1.NodeReady {
+			return errors.Errorf("a Node with name %q and status %q already exists in the cluster. "+
+				"You must delete the existing Node or change the name of this new joining Node", nodeName, v1.NodeReady)
+		}
 	}
 
 	// Configure the kubelet. In this short timeframe, kubeadm is trying to stop/restart the kubelet

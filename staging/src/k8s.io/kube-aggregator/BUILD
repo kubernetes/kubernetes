@@ -47,6 +47,7 @@ filegroup(
         "//staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration:all-srcs",
         "//staging/src/k8s.io/kube-aggregator/pkg/apiserver:all-srcs",
         "//staging/src/k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset:all-srcs",
+        "//staging/src/k8s.io/kube-aggregator/pkg/client/clientset_generated/deprecated:all-srcs",
         "//staging/src/k8s.io/kube-aggregator/pkg/client/informers/externalversions:all-srcs",
         "//staging/src/k8s.io/kube-aggregator/pkg/client/listers/apiregistration/v1:all-srcs",
         "//staging/src/k8s.io/kube-aggregator/pkg/client/listers/apiregistration/v1beta1:all-srcs",

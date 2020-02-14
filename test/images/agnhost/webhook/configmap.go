@@ -97,8 +97,10 @@ func mutateConfigmaps(ar v1.AdmissionReview) *v1.AdmissionResponse {
 		reviewResponse.Patch = []byte(configMapPatch2)
 	}
 
-	pt := v1.PatchTypeJSONPatch
-	reviewResponse.PatchType = &pt
+	if len(reviewResponse.Patch) != 0 {
+		pt := v1.PatchTypeJSONPatch
+		reviewResponse.PatchType = &pt
+	}
 
 	return &reviewResponse
 }

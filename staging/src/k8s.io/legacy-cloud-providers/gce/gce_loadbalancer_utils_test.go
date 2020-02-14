@@ -46,6 +46,7 @@ const (
 	errPrefixGetTargetPool  = "error getting load balancer's target pool:"
 	wrongTier               = "SupremeLuxury"
 	errStrUnsupportedTier   = "unsupported network tier: \"" + wrongTier + "\""
+	fakeSvcName             = "fakesvc"
 )
 
 func fakeLoadbalancerService(lbType string) *v1.Service {
@@ -59,7 +60,7 @@ func fakeLoadBalancerServiceDeprecatedAnnotation(lbType string) *v1.Service {
 func fakeLoadbalancerServiceHelper(lbType string, annotationKey string) *v1.Service {
 	return &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        "",
+			Name:        fakeSvcName,
 			Annotations: map[string]string{annotationKey: lbType},
 		},
 		Spec: v1.ServiceSpec{

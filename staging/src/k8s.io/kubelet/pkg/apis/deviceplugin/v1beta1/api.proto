@@ -62,7 +62,7 @@ service DevicePlugin {
 
         // PreStartContainer is called, if indicated by Device Plugin during registeration phase,
         // before each container start. Device plugin can run device specific operations
-        // such as reseting the device before making devices available to the container
+        // such as resetting the device before making devices available to the container
 	rpc PreStartContainer(PreStartContainerRequest) returns (PreStartContainerResponse) {}
 }
 

@@ -18,6 +18,7 @@ package logs
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -667,12 +668,12 @@ type responseWrapperMock struct {
 	err  error
 }
 
-func (r *responseWrapperMock) DoRaw() ([]byte, error) {
+func (r *responseWrapperMock) DoRaw(context.Context) ([]byte, error) {
 	data, _ := ioutil.ReadAll(r.data)
 	return data, r.err
 }
 
-func (r *responseWrapperMock) Stream() (io.ReadCloser, error) {
+func (r *responseWrapperMock) Stream(context.Context) (io.ReadCloser, error) {
 	return ioutil.NopCloser(r.data), r.err
 }
 
@@ -687,7 +688,7 @@ type logTestMock struct {
 }
 
 func (l *logTestMock) mockConsumeRequest(request restclient.ResponseWrapper, out io.Writer) error {
-	readCloser, err := request.Stream()
+	readCloser, err := request.Stream(context.Background())
 	if err != nil {
 		return err
 	}

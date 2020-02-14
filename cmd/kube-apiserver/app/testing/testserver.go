@@ -17,6 +17,7 @@ limitations under the License.
 package testing
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -210,7 +211,7 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 		default:
 		}
 
-		result := client.CoreV1().RESTClient().Get().AbsPath("/healthz").Do()
+		result := client.CoreV1().RESTClient().Get().AbsPath("/healthz").Do(context.TODO())
 		status := 0
 		result.StatusCode(&status)
 		if status == 200 {
@@ -230,7 +231,7 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 		default:
 		}
 
-		if _, err := client.CoreV1().Namespaces().Get("default", metav1.GetOptions{}); err != nil {
+		if _, err := client.CoreV1().Namespaces().Get(context.TODO(), "default", metav1.GetOptions{}); err != nil {
 			if !errors.IsNotFound(err) {
 				t.Logf("Unable to get default namespace: %v", err)
 			}

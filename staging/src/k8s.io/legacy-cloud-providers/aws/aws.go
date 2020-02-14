@@ -2084,7 +2084,7 @@ func (d *awsDisk) modifyVolume(requestGiB int64) (int64, error) {
 // applyUnSchedulableTaint applies a unschedulable taint to a node after verifying
 // if node has become unusable because of volumes getting stuck in attaching state.
 func (c *Cloud) applyUnSchedulableTaint(nodeName types.NodeName, reason string) {
-	node, fetchErr := c.kubeClient.CoreV1().Nodes().Get(string(nodeName), metav1.GetOptions{})
+	node, fetchErr := c.kubeClient.CoreV1().Nodes().Get(context.TODO(), string(nodeName), metav1.GetOptions{})
 	if fetchErr != nil {
 		klog.Errorf("Error fetching node %s with %v", nodeName, fetchErr)
 		return

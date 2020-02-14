@@ -291,12 +291,17 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 
 	var versionedDeleteOptions runtime.Object
 	var versionedDeleterObject interface{}
+	deleteReturnsDeletedObject := false
 	if isGracefulDeleter {
 		versionedDeleteOptions, err = a.group.Creater.New(optionsExternalVersion.WithKind("DeleteOptions"))
 		if err != nil {
 			return nil, err
 		}
 		versionedDeleterObject = indirectArbitraryPointer(versionedDeleteOptions)
+
+		if mayReturnFullObjectDeleter, ok := storage.(rest.MayReturnFullObjectDeleter); ok {
+			deleteReturnsDeletedObject = mayReturnFullObjectDeleter.DeleteReturnsDeletedObject()
+		}
 	}
 
 	versionedStatusPtr, err := a.group.Creater.New(optionsExternalVersion.WithKind("Status"))
@@ -769,15 +774,19 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			if isSubresource {
 				doc = "delete " + subresource + " of" + article + kind
 			}
+			deleteReturnType := versionedStatus
+			if deleteReturnsDeletedObject {
+				deleteReturnType = producedObject
+			}
 			handler := metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, restfulDeleteResource(gracefulDeleter, isGracefulDeleter, reqScope, admit))
 			route := ws.DELETE(action.Path).To(handler).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Operation("delete"+namespaced+kind+strings.Title(subresource)+operationSuffix).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), mediaTypes...)...).
-				Writes(versionedStatus).
-				Returns(http.StatusOK, "OK", versionedStatus).
-				Returns(http.StatusAccepted, "Accepted", versionedStatus)
+				Writes(deleteReturnType).
+				Returns(http.StatusOK, "OK", deleteReturnType).
+				Returns(http.StatusAccepted, "Accepted", deleteReturnType)
 			if isGracefulDeleter {
 				route.Reads(versionedDeleterObject)
 				route.ParameterNamed("body").Required(false)

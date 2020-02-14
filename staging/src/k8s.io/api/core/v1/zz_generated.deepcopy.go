@@ -519,6 +519,11 @@ func (in *ConfigMap) DeepCopyInto(out *ConfigMap) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
 	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	if in.Immutable != nil {
+		in, out := &in.Immutable, &out.Immutable
+		*out = new(bool)
+		**out = **in
+	}
 	if in.Data != nil {
 		in, out := &in.Data, &out.Data
 		*out = make(map[string]string, len(*in))
@@ -4663,6 +4668,11 @@ func (in *Secret) DeepCopyInto(out *Secret) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
 	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	if in.Immutable != nil {
+		in, out := &in.Immutable, &out.Immutable
+		*out = new(bool)
+		**out = **in
+	}
 	if in.Data != nil {
 		in, out := &in.Data, &out.Data
 		*out = make(map[string][]byte, len(*in))

@@ -200,6 +200,10 @@ func (o ProxyOptions) Validate() error {
 func (o ProxyOptions) RunProxy() error {
 	server, err := proxy.NewServer(o.staticDir, o.apiPrefix, o.staticPrefix, o.filter, o.clientConfig, o.keepalive)
 
+	if err != nil {
+		return err
+	}
+
 	// Separate listening from serving so we can report the bound port
 	// when it is chosen by os (eg: port == 0)
 	var l net.Listener
@@ -209,9 +213,8 @@ func (o ProxyOptions) RunProxy() error {
 		l, err = server.ListenUnix(o.unixSocket)
 	}
 	if err != nil {
-		klog.Fatal(err)
+		return err
 	}
 	fmt.Fprintf(o.IOStreams.Out, "Starting to serve on %s\n", l.Addr().String())
-	klog.Fatal(server.ServeOnListener(l))
-	return nil
+	return server.ServeOnListener(l)
 }

@@ -65,7 +65,8 @@ type SubjectOptions struct {
 	ContainerSelector string
 	Output            string
 	All               bool
-	DryRun            bool
+	DryRunStrategy    cmdutil.DryRunStrategy
+	DryRunVerifier    *resource.DryRunVerifier
 	Local             bool
 
 	Users           []string
@@ -120,11 +121,22 @@ func NewCmdSubject(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 // Complete completes all required options
 func (o *SubjectOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	o.Output = cmdutil.GetFlagString(cmd, "output")
-	o.DryRun = cmdutil.GetDryRunFlag(cmd)
-
-	if o.DryRun {
-		o.PrintFlags.Complete("%s (dry run)")
+	var err error
+	o.DryRunStrategy, err = cmdutil.GetDryRunStrategy(cmd)
+	if err != nil {
+		return err
 	}
+	dynamicClient, err := f.DynamicClient()
+	if err != nil {
+		return err
+	}
+	discoveryClient, err := f.ToDiscoveryClient()
+	if err != nil {
+		return err
+	}
+	o.DryRunVerifier = resource.NewDryRunVerifier(dynamicClient, discoveryClient)
+
+	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.DryRunStrategy)
 	printer, err := o.PrintFlags.ToPrinter()
 	if err != nil {
 		return err
@@ -250,14 +262,23 @@ func (o *SubjectOptions) Run(fn updateSubjects) error {
 			continue
 		}
 
-		if o.Local || o.DryRun {
+		if o.Local || o.DryRunStrategy == cmdutil.DryRunClient {
 			if err := o.PrintObj(info.Object, o.Out); err != nil {
 				allErrs = append(allErrs, err)
 			}
 			continue
 		}
 
-		actual, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch, nil)
+		if o.DryRunStrategy == cmdutil.DryRunServer {
+			if err := o.DryRunVerifier.HasSupport(info.Mapping.GroupVersionKind); err != nil {
+				allErrs = append(allErrs, err)
+				continue
+			}
+		}
+		actual, err := resource.
+			NewHelper(info.Client, info.Mapping).
+			DryRun(o.DryRunStrategy == cmdutil.DryRunServer).
+			Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch, nil)
 		if err != nil {
 			allErrs = append(allErrs, fmt.Errorf("failed to patch subjects to rolebinding: %v", err))
 			continue

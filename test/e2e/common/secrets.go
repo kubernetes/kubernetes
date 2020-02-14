@@ -17,6 +17,7 @@ limitations under the License.
 package common
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 
@@ -45,7 +46,7 @@ var _ = ginkgo.Describe("[sig-api-machinery] Secrets", func() {
 
 		ginkgo.By(fmt.Sprintf("Creating secret with name %s", secret.Name))
 		var err error
-		if secret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(secret); err != nil {
+		if secret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(context.TODO(), secret, metav1.CreateOptions{}); err != nil {
 			framework.Failf("unable to create test secret %s: %v", secret.Name, err)
 		}
 
@@ -86,14 +87,14 @@ var _ = ginkgo.Describe("[sig-api-machinery] Secrets", func() {
 	/*
 		Release : v1.9
 		Testname: Secrets, pod environment from source
-		Description: Create a secret. Create a Pod with Container that declares a environment variable using ‘EnvFrom’ which references the secret created to extract a key value from the secret. Pod MUST have the environment variable that contains proper value for the key to the secret.
+		Description: Create a secret. Create a Pod with Container that declares a environment variable using 'EnvFrom' which references the secret created to extract a key value from the secret. Pod MUST have the environment variable that contains proper value for the key to the secret.
 	*/
 	framework.ConformanceIt("should be consumable via the environment [NodeConformance]", func() {
 		name := "secret-test-" + string(uuid.NewUUID())
 		secret := newEnvFromSecret(f.Namespace.Name, name)
 		ginkgo.By(fmt.Sprintf("creating secret %v/%v", f.Namespace.Name, secret.Name))
 		var err error
-		if secret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(secret); err != nil {
+		if secret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(context.TODO(), secret, metav1.CreateOptions{}); err != nil {
 			framework.Failf("unable to create test secret %s: %v", secret.Name, err)
 		}
 
@@ -138,13 +139,22 @@ var _ = ginkgo.Describe("[sig-api-machinery] Secrets", func() {
 		framework.ExpectError(err, "created secret %q with empty key in namespace %q", secret.Name, f.Namespace.Name)
 	})
 
-	ginkgo.It("should patch a secret", func() {
+	/*
+			   Release : v1.18
+			   Testname: Secret patching
+			   Description: A Secret is created.
+		           Listing all Secrets MUST return an empty list.
+		           Given the patching and fetching of the Secret, the fields MUST equal the new values.
+		           The Secret is deleted by it's static Label.
+		           Secrets are listed finally, the list MUST NOT include the originally created Secret.
+	*/
+	framework.ConformanceIt("should patch a secret", func() {
 		ginkgo.By("creating a secret")
 
 		secretTestName := "test-secret-" + string(uuid.NewUUID())
 
 		// create a secret in the test namespace
-		_, err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(&v1.Secret{
+		_, err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(context.TODO(), &v1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: secretTestName,
 				Labels: map[string]string{
@@ -155,12 +165,12 @@ var _ = ginkgo.Describe("[sig-api-machinery] Secrets", func() {
 				"key": []byte("value"),
 			},
 			Type: "Opaque",
-		})
+		}, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create secret")
 
 		ginkgo.By("listing secrets in all namespaces to ensure that there are more than zero")
 		// list all secrets in all namespaces to ensure endpoint coverage
-		secretsList, err := f.ClientSet.CoreV1().Secrets("").List(metav1.ListOptions{
+		secretsList, err := f.ClientSet.CoreV1().Secrets("").List(context.TODO(), metav1.ListOptions{
 			LabelSelector: "testsecret-constant=true",
 		})
 		framework.ExpectNoError(err, "failed to list secrets")
@@ -187,10 +197,10 @@ var _ = ginkgo.Describe("[sig-api-machinery] Secrets", func() {
 			"data": map[string][]byte{"key": []byte(secretPatchNewData)},
 		})
 		framework.ExpectNoError(err, "failed to marshal JSON")
-		_, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Patch(secretCreatedName, types.StrategicMergePatchType, []byte(secretPatch))
+		_, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Patch(context.TODO(), secretCreatedName, types.StrategicMergePatchType, []byte(secretPatch), metav1.PatchOptions{})
 		framework.ExpectNoError(err, "failed to patch secret")
 
-		secret, err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Get(secretCreatedName, metav1.GetOptions{})
+		secret, err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Get(context.TODO(), secretCreatedName, metav1.GetOptions{})
 		framework.ExpectNoError(err, "failed to get secret")
 
 		secretDecodedstring, err := base64.StdEncoding.DecodeString(string(secret.Data["key"]))
@@ -199,14 +209,14 @@ var _ = ginkgo.Describe("[sig-api-machinery] Secrets", func() {
 		framework.ExpectEqual(string(secretDecodedstring), "value1", "found secret, but the data wasn't updated from the patch")
 
 		ginkgo.By("deleting the secret using a LabelSelector")
-		err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).DeleteCollection(&metav1.DeleteOptions{}, metav1.ListOptions{
+		err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).DeleteCollection(context.TODO(), &metav1.DeleteOptions{}, metav1.ListOptions{
 			LabelSelector: "testsecret=true",
 		})
 		framework.ExpectNoError(err, "failed to delete patched secret")
 
 		ginkgo.By("listing secrets in all namespaces, searching for label name and value in patch")
 		// list all secrets in all namespaces
-		secretsList, err = f.ClientSet.CoreV1().Secrets("").List(metav1.ListOptions{
+		secretsList, err = f.ClientSet.CoreV1().Secrets("").List(context.TODO(), metav1.ListOptions{
 			LabelSelector: "testsecret-constant=true",
 		})
 		framework.ExpectNoError(err, "failed to list secrets")
@@ -248,5 +258,5 @@ func createEmptyKeySecretForTest(f *framework.Framework) (*v1.Secret, error) {
 		},
 	}
 	ginkgo.By(fmt.Sprintf("Creating projection with secret that has name %s", secret.Name))
-	return f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(secret)
+	return f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(context.TODO(), secret, metav1.CreateOptions{})
 }

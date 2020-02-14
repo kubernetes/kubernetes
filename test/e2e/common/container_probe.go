@@ -17,6 +17,7 @@ limitations under the License.
 package common
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 	"time"
@@ -31,6 +32,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eevents "k8s.io/kubernetes/test/e2e/framework/events"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	testutils "k8s.io/kubernetes/test/utils"
 
 	"github.com/onsi/ginkgo"
@@ -63,7 +65,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 		p := podClient.Create(testWebServerPodSpec(probe.withInitialDelay().build(), nil, containerName, 80))
 		f.WaitForPodReady(p.Name)
 
-		p, err := podClient.Get(p.Name, metav1.GetOptions{})
+		p, err := podClient.Get(context.TODO(), p.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		isReady, err := testutils.PodRunningReady(p)
 		framework.ExpectNoError(err)
@@ -95,14 +97,14 @@ var _ = framework.KubeDescribe("Probing container", func() {
 	framework.ConformanceIt("with readiness probe that fails should never be ready and never restart [NodeConformance]", func() {
 		p := podClient.Create(testWebServerPodSpec(probe.withFailing().build(), nil, "test-webserver", 80))
 		gomega.Consistently(func() (bool, error) {
-			p, err := podClient.Get(p.Name, metav1.GetOptions{})
+			p, err := podClient.Get(context.TODO(), p.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, err
 			}
 			return podutil.IsPodReady(p), nil
 		}, 1*time.Minute, 1*time.Second).ShouldNot(gomega.BeTrue(), "pod should not be ready")
 
-		p, err := podClient.Get(p.Name, metav1.GetOptions{})
+		p, err := podClient.Get(context.TODO(), p.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 
 		isReady, _ := testutils.PodRunningReady(p)
@@ -131,7 +133,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 	/*
 		Release : v1.9
 		Testname: Pod liveness probe, using local file, no restart
-		Description:  Pod is created with liveness probe that uses ‘exec’ command to cat /temp/health file. Liveness probe MUST not fail to check health and the restart count should remain 0.
+		Description:  Pod is created with liveness probe that uses 'exec' command to cat /temp/health file. Liveness probe MUST not fail to check health and the restart count should remain 0.
 	*/
 	framework.ConformanceIt("should *not* be restarted with a exec \"cat /tmp/health\" liveness probe [NodeConformance]", func() {
 		cmd := []string{"/bin/sh", "-c", "echo ok >/tmp/health; sleep 600"}
@@ -160,11 +162,11 @@ var _ = framework.KubeDescribe("Probing container", func() {
 	})
 
 	/*
-		Release : v1.15
+		Release : v1.18
 		Testname: Pod liveness probe, using tcp socket, no restart
-		Description: A Pod is created with liveness probe on tcp socket 8080. The http handler on port 8080 will return http errors after 10 seconds, but socket will remain open. Liveness probe MUST not fail to check health and the restart count should remain 0.
+		Description: A Pod is created with liveness probe on tcp socket 8080. The http handler on port 8080 will return http errors after 10 seconds, but the socket will remain open. Liveness probe MUST not fail to check health and the restart count should remain 0.
 	*/
-	ginkgo.It("should *not* be restarted with a tcp:8080 liveness probe [NodeConformance]", func() {
+	framework.ConformanceIt("should *not* be restarted with a tcp:8080 liveness probe [NodeConformance]", func() {
 		livenessProbe := &v1.Probe{
 			Handler:             tcpSocketHandler(8080),
 			InitialDelaySeconds: 15,
@@ -192,7 +194,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 	/*
 		Release : v1.9
 		Testname: Pod liveness probe, using http endpoint, failure
-		Description: A Pod is created with liveness probe on http endpoint ‘/’. Liveness probe on this endpoint will not fail. When liveness probe does not fail then the restart count MUST remain zero.
+		Description: A Pod is created with liveness probe on http endpoint '/'. Liveness probe on this endpoint will not fail. When liveness probe does not fail then the restart count MUST remain zero.
 	*/
 	framework.ConformanceIt("should *not* be restarted with a /healthz http liveness probe [NodeConformance]", func() {
 		livenessProbe := &v1.Probe{
@@ -212,7 +214,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 	*/
 	ginkgo.It("should be restarted with a docker exec liveness probe with timeout ", func() {
 		// TODO: enable this test once the default exec handler supports timeout.
-		framework.Skipf("The default exec handler, dockertools.NativeExecHandler, does not support timeouts due to a limitation in the Docker Remote API")
+		e2eskipper.Skipf("The default exec handler, dockertools.NativeExecHandler, does not support timeouts due to a limitation in the Docker Remote API")
 		cmd := []string{"/bin/sh", "-c", "sleep 600"}
 		livenessProbe := &v1.Probe{
 			Handler:             execHandler([]string{"/bin/sh", "-c", "sleep 10"}),
@@ -412,7 +414,7 @@ func RunLivenessTest(f *framework.Framework, pod *v1.Pod, expectNumRestarts int,
 	// At the end of the test, clean up by removing the pod.
 	defer func() {
 		ginkgo.By("deleting the pod")
-		podClient.Delete(pod.Name, metav1.NewDeleteOptions(0))
+		podClient.Delete(context.TODO(), pod.Name, metav1.NewDeleteOptions(0))
 	}()
 	ginkgo.By(fmt.Sprintf("Creating pod %s in namespace %s", pod.Name, ns))
 	podClient.Create(pod)
@@ -426,7 +428,7 @@ func RunLivenessTest(f *framework.Framework, pod *v1.Pod, expectNumRestarts int,
 
 	// Check the pod's current state and verify that restartCount is present.
 	ginkgo.By("checking the pod's current state and verifying that restartCount is present")
-	pod, err := podClient.Get(pod.Name, metav1.GetOptions{})
+	pod, err := podClient.Get(context.TODO(), pod.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err, fmt.Sprintf("getting pod %s in namespace %s", pod.Name, ns))
 	initialRestartCount := podutil.GetExistingContainerStatus(pod.Status.ContainerStatuses, containerName).RestartCount
 	framework.Logf("Initial restart count of pod %s is %d", pod.Name, initialRestartCount)
@@ -436,7 +438,7 @@ func RunLivenessTest(f *framework.Framework, pod *v1.Pod, expectNumRestarts int,
 	lastRestartCount := initialRestartCount
 	observedRestarts := int32(0)
 	for start := time.Now(); time.Now().Before(deadline); time.Sleep(2 * time.Second) {
-		pod, err = podClient.Get(pod.Name, metav1.GetOptions{})
+		pod, err = podClient.Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err, fmt.Sprintf("getting pod %s", pod.Name))
 		restartCount := podutil.GetExistingContainerStatus(pod.Status.ContainerStatuses, containerName).RestartCount
 		if restartCount != lastRestartCount {

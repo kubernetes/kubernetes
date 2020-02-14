@@ -17,6 +17,7 @@ limitations under the License.
 package e2enode
 
 import (
+	"context"
 	"strings"
 
 	"k8s.io/api/core/v1"
@@ -202,7 +203,7 @@ var _ = framework.KubeDescribe("Kubelet Cgroup Manager", func() {
 				})
 				ginkgo.By("Checking if the pod cgroup was deleted", func() {
 					gp := int64(1)
-					err := f.PodClient().Delete(guaranteedPod.Name, &metav1.DeleteOptions{GracePeriodSeconds: &gp})
+					err := f.PodClient().Delete(context.TODO(), guaranteedPod.Name, &metav1.DeleteOptions{GracePeriodSeconds: &gp})
 					framework.ExpectNoError(err)
 					pod := makePodToVerifyCgroupRemoved("pod" + podUID)
 					f.PodClient().Create(pod)
@@ -247,7 +248,7 @@ var _ = framework.KubeDescribe("Kubelet Cgroup Manager", func() {
 				})
 				ginkgo.By("Checking if the pod cgroup was deleted", func() {
 					gp := int64(1)
-					err := f.PodClient().Delete(bestEffortPod.Name, &metav1.DeleteOptions{GracePeriodSeconds: &gp})
+					err := f.PodClient().Delete(context.TODO(), bestEffortPod.Name, &metav1.DeleteOptions{GracePeriodSeconds: &gp})
 					framework.ExpectNoError(err)
 					pod := makePodToVerifyCgroupRemoved("besteffort/pod" + podUID)
 					f.PodClient().Create(pod)
@@ -292,7 +293,7 @@ var _ = framework.KubeDescribe("Kubelet Cgroup Manager", func() {
 				})
 				ginkgo.By("Checking if the pod cgroup was deleted", func() {
 					gp := int64(1)
-					err := f.PodClient().Delete(burstablePod.Name, &metav1.DeleteOptions{GracePeriodSeconds: &gp})
+					err := f.PodClient().Delete(context.TODO(), burstablePod.Name, &metav1.DeleteOptions{GracePeriodSeconds: &gp})
 					framework.ExpectNoError(err)
 					pod := makePodToVerifyCgroupRemoved("burstable/pod" + podUID)
 					f.PodClient().Create(pod)

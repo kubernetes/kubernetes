@@ -4,7 +4,8 @@ go_library(
     name = "go_default_library",
     srcs = [
         "credentials.go",
-        "tls13.go",
+        "go12.go",
+        "tls.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/google.golang.org/grpc/credentials",
     importpath = "google.golang.org/grpc/credentials",
@@ -12,6 +13,7 @@ go_library(
     deps = [
         "//vendor/github.com/golang/protobuf/proto:go_default_library",
         "//vendor/google.golang.org/grpc/credentials/internal:go_default_library",
+        "//vendor/google.golang.org/grpc/internal:go_default_library",
     ],
 )
 

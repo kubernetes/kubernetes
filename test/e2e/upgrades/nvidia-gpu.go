@@ -18,7 +18,7 @@ package upgrades
 
 import (
 	"k8s.io/kubernetes/test/e2e/framework"
-	jobutil "k8s.io/kubernetes/test/e2e/framework/job"
+	e2ejob "k8s.io/kubernetes/test/e2e/framework/job"
 	"k8s.io/kubernetes/test/e2e/scheduling"
 
 	"github.com/onsi/ginkgo"
@@ -51,7 +51,7 @@ func (t *NvidiaGPUUpgradeTest) Test(f *framework.Framework, done <-chan struct{}
 	scheduling.VerifyJobNCompletions(f, completions)
 	if upgrade == MasterUpgrade || upgrade == ClusterUpgrade {
 		// MasterUpgrade should be totally hitless.
-		job, err := jobutil.GetJob(f.ClientSet, f.Namespace.Name, "cuda-add")
+		job, err := e2ejob.GetJob(f.ClientSet, f.Namespace.Name, "cuda-add")
 		framework.ExpectNoError(err)
 		framework.ExpectEqual(job.Status.Failed, 0, "Job pods failed during master upgrade: %v", job.Status.Failed)
 	}

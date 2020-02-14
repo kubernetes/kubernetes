@@ -891,8 +891,32 @@ func TestGetContainerUsageNanoCores(t *testing.T) {
 			},
 			expected: &value2,
 		},
+		{
+			desc: "should return nil if cpuacct is reset to 0 in a live container",
+			stats: &runtimeapi.ContainerStats{
+				Attributes: &runtimeapi.ContainerAttributes{
+					Id: "1",
+				},
+				Cpu: &runtimeapi.CpuUsage{
+					Timestamp: 2,
+					UsageCoreNanoSeconds: &runtimeapi.UInt64Value{
+						Value: 0,
+					},
+				},
+			},
+			cpuUsageCache: map[string]*cpuUsageRecord{
+				"1": {
+					stats: &runtimeapi.CpuUsage{
+						Timestamp: 1,
+						UsageCoreNanoSeconds: &runtimeapi.UInt64Value{
+							Value: 10000000000,
+						},
+					},
+				},
+			},
+			expected: nil,
+		},
 	}
-
 	for _, test := range tests {
 		provider := &criStatsProvider{cpuUsageCache: test.cpuUsageCache}
 		// Before the update, the cached value should be nil

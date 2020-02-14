@@ -48,6 +48,7 @@ func (l *lister) Get(name string) (*corev1.Secret, error) {
 }
 
 const (
+	// Fake values for testing.
 	tokenID     = "foobar"           // 6 letters
 	tokenSecret = "circumnavigation" // 16 letters
 )

@@ -17,6 +17,7 @@ limitations under the License.
 package integration
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"strings"
@@ -32,14 +33,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
-	utilfeaturetesting "k8s.io/component-base/featuregate/testing"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	serveroptions "k8s.io/apiextensions-apiserver/pkg/cmd/server/options"
-	"k8s.io/apiextensions-apiserver/pkg/features"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 	"k8s.io/apiextensions-apiserver/test/integration/storage"
 )
@@ -167,8 +165,6 @@ func TestCustomResourceDefaultingWithoutWatchCache(t *testing.T) {
 }
 
 func testDefaulting(t *testing.T, watchCache bool) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CustomResourceDefaulting, true)()
-
 	tearDownFn, apiExtensionClient, dynamicClient, err := fixtures.StartDefaultServerWithClients(t, fmt.Sprintf("--watch-cache=%v", watchCache))
 	if err != nil {
 		t.Fatal(err)
@@ -211,12 +207,12 @@ func testDefaulting(t *testing.T, watchCache bool) {
 		var err error
 		for retry := 0; retry < 10; retry++ {
 			var obj *apiextensionsv1.CustomResourceDefinition
-			obj, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(crd.Name, metav1.GetOptions{})
+			obj, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.TODO(), crd.Name, metav1.GetOptions{})
 			if err != nil {
 				t.Fatal(err)
 			}
 			update(obj)
-			obj, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Update(obj)
+			obj, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Update(context.TODO(), obj, metav1.UpdateOptions{})
 			if err != nil && apierrors.IsConflict(err) {
 				continue
 			} else if err != nil {
@@ -572,8 +568,6 @@ metadata:
 `
 
 func TestCustomResourceDefaultingOfMetaFields(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CustomResourceDefaulting, true)()
-
 	tearDown, config, options, err := fixtures.StartDefaultServer(t)
 	if err != nil {
 		t.Fatal(err)

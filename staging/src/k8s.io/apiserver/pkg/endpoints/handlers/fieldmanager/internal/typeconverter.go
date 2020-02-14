@@ -23,8 +23,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kube-openapi/pkg/util/proto"
-	"sigs.k8s.io/structured-merge-diff/typed"
-	"sigs.k8s.io/structured-merge-diff/value"
+	"sigs.k8s.io/structured-merge-diff/v3/typed"
+	"sigs.k8s.io/structured-merge-diff/v3/value"
 )
 
 // TypeConverter allows you to convert from runtime.Object to
@@ -49,11 +49,12 @@ var _ TypeConverter = DeducedTypeConverter{}
 
 // ObjectToTyped converts an object into a TypedValue with a "deduced type".
 func (DeducedTypeConverter) ObjectToTyped(obj runtime.Object) (*typed.TypedValue, error) {
-	u, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
-	if err != nil {
-		return nil, err
+	switch o := obj.(type) {
+	case *unstructured.Unstructured:
+		return typed.DeducedParseableType.FromUnstructured(o.UnstructuredContent())
+	default:
+		return typed.DeducedParseableType.FromStructured(obj)
 	}
-	return typed.DeducedParseableType.FromUnstructured(u)
 }
 
 // TypedToObject transforms the typed value into a runtime.Object. That
@@ -80,29 +81,31 @@ func NewTypeConverter(models proto.Models, preserveUnknownFields bool) (TypeConv
 }
 
 func (c *typeConverter) ObjectToTyped(obj runtime.Object) (*typed.TypedValue, error) {
-	u, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
-	if err != nil {
-		return nil, err
-	}
 	gvk := obj.GetObjectKind().GroupVersionKind()
 	t := c.parser.Type(gvk)
 	if t == nil {
 		return nil, newNoCorrespondingTypeError(gvk)
 	}
-	return t.FromUnstructured(u)
+	switch o := obj.(type) {
+	case *unstructured.Unstructured:
+		return t.FromUnstructured(o.UnstructuredContent())
+	default:
+		return t.FromStructured(obj)
+	}
 }
 
 func (c *typeConverter) TypedToObject(value *typed.TypedValue) (runtime.Object, error) {
 	return valueToObject(value.AsValue())
 }
 
-func valueToObject(value *value.Value) (runtime.Object, error) {
-	vu := value.ToUnstructured(false)
-	u, ok := vu.(map[string]interface{})
-	if !ok {
-		return nil, fmt.Errorf("failed to convert typed to unstructured: want map, got %T", vu)
+func valueToObject(val value.Value) (runtime.Object, error) {
+	vu := val.Unstructured()
+	switch o := vu.(type) {
+	case map[string]interface{}:
+		return &unstructured.Unstructured{Object: o}, nil
+	default:
+		return nil, fmt.Errorf("failed to convert value to unstructured for type %T", vu)
 	}
-	return &unstructured.Unstructured{Object: u}, nil
 }
 
 type noCorrespondingTypeErr struct {

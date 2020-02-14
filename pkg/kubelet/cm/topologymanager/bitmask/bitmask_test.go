@@ -28,7 +28,7 @@ func TestNewEmptyiBitMask(t *testing.T) {
 	}{
 		{
 			name:         "New empty BitMask",
-			expectedMask: "0000000000000000000000000000000000000000000000000000000000000000",
+			expectedMask: "00",
 		},
 	}
 	for _, tc := range tcases {
@@ -48,17 +48,17 @@ func TestNewBitMask(t *testing.T) {
 		{
 			name:         "New BitMask with bit 0 set",
 			bits:         []int{0},
-			expectedMask: "0000000000000000000000000000000000000000000000000000000000000001",
+			expectedMask: "01",
 		},
 		{
 			name:         "New BitMask with bit 1 set",
 			bits:         []int{1},
-			expectedMask: "0000000000000000000000000000000000000000000000000000000000000010",
+			expectedMask: "10",
 		},
 		{
 			name:         "New BitMask with bit 0 and bit 1 set",
 			bits:         []int{0, 1},
-			expectedMask: "0000000000000000000000000000000000000000000000000000000000000011",
+			expectedMask: "11",
 		},
 	}
 	for _, tc := range tcases {
@@ -78,22 +78,22 @@ func TestAdd(t *testing.T) {
 		{
 			name:         "Add BitMask with bit 0 set",
 			bits:         []int{0},
-			expectedMask: "0000000000000000000000000000000000000000000000000000000000000001",
+			expectedMask: "01",
 		},
 		{
 			name:         "Add BitMask with bit 1 set",
 			bits:         []int{1},
-			expectedMask: "0000000000000000000000000000000000000000000000000000000000000010",
+			expectedMask: "10",
 		},
 		{
 			name:         "Add BitMask with bits 0 and 1 set",
 			bits:         []int{0, 1},
-			expectedMask: "0000000000000000000000000000000000000000000000000000000000000011",
+			expectedMask: "11",
 		},
 		{
 			name:         "Add BitMask with bits outside range 0-63",
 			bits:         []int{-1, 64},
-			expectedMask: "0000000000000000000000000000000000000000000000000000000000000000",
+			expectedMask: "00",
 		},
 	}
 	for _, tc := range tcases {
@@ -116,25 +116,25 @@ func TestRemove(t *testing.T) {
 			name:         "Set bit 0. Remove bit 0",
 			bitsSet:      []int{0},
 			bitsRemove:   []int{0},
-			expectedMask: "0000000000000000000000000000000000000000000000000000000000000000",
+			expectedMask: "00",
 		},
 		{
 			name:         "Set bits 0 and 1. Remove bit 1",
 			bitsSet:      []int{0, 1},
 			bitsRemove:   []int{1},
-			expectedMask: "0000000000000000000000000000000000000000000000000000000000000001",
+			expectedMask: "01",
 		},
 		{
 			name:         "Set bits 0 and 1. Remove bits 0 and 1",
 			bitsSet:      []int{0, 1},
 			bitsRemove:   []int{0, 1},
-			expectedMask: "0000000000000000000000000000000000000000000000000000000000000000",
+			expectedMask: "00",
 		},
 		{
 			name:         "Set bit 0. Attempt to remove bits outside range 0-63",
 			bitsSet:      []int{0},
 			bitsRemove:   []int{-1, 64},
-			expectedMask: "0000000000000000000000000000000000000000000000000000000000000001",
+			expectedMask: "01",
 		},
 	}
 	for _, tc := range tcases {
@@ -155,32 +155,32 @@ func TestAnd(t *testing.T) {
 		{
 			name:    "Mask 11 AND mask 11",
 			masks:   [][]int{{0, 1}, {0, 1}},
-			andMask: "0000000000000000000000000000000000000000000000000000000000000011",
+			andMask: "11",
 		},
 		{
 			name:    "Mask 11 AND mask 10",
 			masks:   [][]int{{0, 1}, {1}},
-			andMask: "0000000000000000000000000000000000000000000000000000000000000010",
+			andMask: "10",
 		},
 		{
 			name:    "Mask 01 AND mask 11",
 			masks:   [][]int{{0}, {0, 1}},
-			andMask: "0000000000000000000000000000000000000000000000000000000000000001",
+			andMask: "01",
 		},
 		{
 			name:    "Mask 11 AND mask 11 AND mask 10",
 			masks:   [][]int{{0, 1}, {0, 1}, {1}},
-			andMask: "0000000000000000000000000000000000000000000000000000000000000010",
+			andMask: "10",
 		},
 		{
 			name:    "Mask 01 AND mask 01 AND mask 10 AND mask 11",
 			masks:   [][]int{{0}, {0}, {1}, {0, 1}},
-			andMask: "0000000000000000000000000000000000000000000000000000000000000000",
+			andMask: "00",
 		},
 		{
 			name:    "Mask 1111 AND mask 1110 AND mask 1100 AND mask 1000",
 			masks:   [][]int{{0, 1, 2, 3}, {1, 2, 3}, {2, 3}, {3}},
-			andMask: "0000000000000000000000000000000000000000000000000000000000001000",
+			andMask: "1000",
 		},
 	}
 	for _, tc := range tcases {
@@ -206,32 +206,32 @@ func TestOr(t *testing.T) {
 		{
 			name:   "Mask 01 OR mask 00",
 			masks:  [][]int{{0}, {}},
-			orMask: "0000000000000000000000000000000000000000000000000000000000000001",
+			orMask: "01",
 		},
 		{
 			name:   "Mask 10 OR mask 10",
 			masks:  [][]int{{1}, {1}},
-			orMask: "0000000000000000000000000000000000000000000000000000000000000010",
+			orMask: "10",
 		},
 		{
 			name:   "Mask 01 OR mask 10",
 			masks:  [][]int{{0}, {1}},
-			orMask: "0000000000000000000000000000000000000000000000000000000000000011",
+			orMask: "11",
 		},
 		{
 			name:   "Mask 11 OR mask 11",
 			masks:  [][]int{{0, 1}, {0, 1}},
-			orMask: "0000000000000000000000000000000000000000000000000000000000000011",
+			orMask: "11",
 		},
 		{
 			name:   "Mask 01 OR mask 10 OR mask 11",
 			masks:  [][]int{{0}, {1}, {0, 1}},
-			orMask: "0000000000000000000000000000000000000000000000000000000000000011",
+			orMask: "11",
 		},
 		{
 			name:   "Mask 1000 OR mask 0100 OR mask 0010 OR mask 0001",
 			masks:  [][]int{{3}, {2}, {1}, {0}},
-			orMask: "0000000000000000000000000000000000000000000000000000000000001111",
+			orMask: "1111",
 		},
 	}
 	for _, tc := range tcases {
@@ -256,17 +256,17 @@ func TestClear(t *testing.T) {
 		{
 			name:        "Clear mask 01",
 			mask:        []int{0},
-			clearedMask: "0000000000000000000000000000000000000000000000000000000000000000",
+			clearedMask: "00",
 		},
 		{
 			name:        "Clear mask 10",
 			mask:        []int{1},
-			clearedMask: "0000000000000000000000000000000000000000000000000000000000000000",
+			clearedMask: "00",
 		},
 		{
 			name:        "Clear mask 11",
 			mask:        []int{0, 1},
-			clearedMask: "0000000000000000000000000000000000000000000000000000000000000000",
+			clearedMask: "00",
 		},
 	}
 	for _, tc := range tcases {

@@ -18,6 +18,7 @@ package common
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"text/template"
 	"time"
@@ -140,7 +141,7 @@ func svcByName(name string, port int) *v1.Service {
 // NewSVCByName creates a service by name.
 func NewSVCByName(c clientset.Interface, ns, name string) error {
 	const testPort = 9376
-	_, err := c.CoreV1().Services(ns).Create(svcByName(name, testPort))
+	_, err := c.CoreV1().Services(ns).Create(context.TODO(), svcByName(name, testPort), metav1.CreateOptions{})
 	return err
 }
 
@@ -152,8 +153,8 @@ func NewRCByName(c clientset.Interface, ns, name string, replicas int32, gracePe
 		containerArgs = []string{"serve-hostname"}
 	}
 
-	return c.CoreV1().ReplicationControllers(ns).Create(rcByNamePort(
-		name, replicas, framework.ServeHostnameImage, containerArgs, 9376, v1.ProtocolTCP, map[string]string{}, gracePeriod))
+	return c.CoreV1().ReplicationControllers(ns).Create(context.TODO(), rcByNamePort(
+		name, replicas, framework.ServeHostnameImage, containerArgs, 9376, v1.ProtocolTCP, map[string]string{}, gracePeriod), metav1.CreateOptions{})
 }
 
 // RestartNodes restarts specific nodes.
@@ -189,7 +190,7 @@ func RestartNodes(c clientset.Interface, nodes []v1.Node) error {
 	for i := range nodes {
 		node := &nodes[i]
 		if err := wait.Poll(30*time.Second, framework.RestartNodeReadyAgainTimeout, func() (bool, error) {
-			newNode, err := c.CoreV1().Nodes().Get(node.Name, metav1.GetOptions{})
+			newNode, err := c.CoreV1().Nodes().Get(context.TODO(), node.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, fmt.Errorf("error getting node info after reboot: %s", err)
 			}
@@ -205,7 +206,7 @@ func RestartNodes(c clientset.Interface, nodes []v1.Node) error {
 func rcByNamePort(name string, replicas int32, image string, containerArgs []string, port int, protocol v1.Protocol,
 	labels map[string]string, gracePeriod *int64) *v1.ReplicationController {
 
-	return e2erc.ByNameContainer(name, replicas, image, labels, v1.Container{
+	return e2erc.ByNameContainer(name, replicas, labels, v1.Container{
 		Name:  name,
 		Image: image,
 		Args:  containerArgs,

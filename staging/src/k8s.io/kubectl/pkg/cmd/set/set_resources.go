@@ -22,7 +22,7 @@ import (
 	"github.com/spf13/cobra"
 	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -74,7 +74,7 @@ type SetResourcesOptions struct {
 	All               bool
 	Local             bool
 
-	DryRun bool
+	DryRunStrategy cmdutil.DryRunStrategy
 
 	PrintObj printers.ResourcePrinterFunc
 	Recorder genericclioptions.Recorder
@@ -85,6 +85,7 @@ type SetResourcesOptions struct {
 
 	UpdatePodSpecForObject polymorphichelpers.UpdatePodSpecForObjectFunc
 	Resources              []string
+	DryRunVerifier         *resource.DryRunVerifier
 
 	genericclioptions.IOStreams
 }
@@ -150,11 +151,21 @@ func (o *SetResourcesOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, ar
 
 	o.UpdatePodSpecForObject = polymorphichelpers.UpdatePodSpecForObjectFn
 	o.Output = cmdutil.GetFlagString(cmd, "output")
-	o.DryRun = cmdutil.GetDryRunFlag(cmd)
-
-	if o.DryRun {
-		o.PrintFlags.Complete("%s (dry run)")
+	o.DryRunStrategy, err = cmdutil.GetDryRunStrategy(cmd)
+	if err != nil {
+		return err
 	}
+	dynamicClient, err := f.DynamicClient()
+	if err != nil {
+		return err
+	}
+	discoveryClient, err := f.ToDiscoveryClient()
+	if err != nil {
+		return err
+	}
+	o.DryRunVerifier = resource.NewDryRunVerifier(dynamicClient, discoveryClient)
+
+	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.DryRunStrategy)
 	printer, err := o.PrintFlags.ToPrinter()
 	if err != nil {
 		return err
@@ -270,16 +281,26 @@ func (o *SetResourcesOptions) Run() error {
 			continue
 		}
 
-		if o.Local || o.DryRun {
+		if o.Local || o.DryRunStrategy == cmdutil.DryRunClient {
 			if err := o.PrintObj(info.Object, o.Out); err != nil {
 				allErrs = append(allErrs, err)
 			}
 			continue
 		}
 
-		actual, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch, nil)
+		if o.DryRunStrategy == cmdutil.DryRunServer {
+			if err := o.DryRunVerifier.HasSupport(info.Mapping.GroupVersionKind); err != nil {
+				allErrs = append(allErrs, fmt.Errorf("failed to patch resources update to pod template %v", err))
+				continue
+			}
+		}
+
+		actual, err := resource.
+			NewHelper(info.Client, info.Mapping).
+			DryRun(o.DryRunStrategy == cmdutil.DryRunServer).
+			Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch, nil)
 		if err != nil {
-			allErrs = append(allErrs, fmt.Errorf("failed to patch limit update to pod template %v", err))
+			allErrs = append(allErrs, fmt.Errorf("failed to patch resources update to pod template %v", err))
 			continue
 		}
 

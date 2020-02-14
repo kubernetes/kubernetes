@@ -17,6 +17,7 @@ limitations under the License.
 package cronjob
 
 import (
+	"context"
 	"fmt"
 	"sync"
 
@@ -44,7 +45,7 @@ type realSJControl struct {
 var _ sjControlInterface = &realSJControl{}
 
 func (c *realSJControl) UpdateStatus(sj *batchv1beta1.CronJob) (*batchv1beta1.CronJob, error) {
-	return c.KubeClient.BatchV1beta1().CronJobs(sj.Namespace).UpdateStatus(sj)
+	return c.KubeClient.BatchV1beta1().CronJobs(sj.Namespace).UpdateStatus(context.TODO(), sj, metav1.UpdateOptions{})
 }
 
 // fakeSJControl is the default implementation of sjControlInterface.
@@ -102,24 +103,24 @@ func copyAnnotations(template *batchv1beta1.JobTemplateSpec) labels.Set {
 }
 
 func (r realJobControl) GetJob(namespace, name string) (*batchv1.Job, error) {
-	return r.KubeClient.BatchV1().Jobs(namespace).Get(name, metav1.GetOptions{})
+	return r.KubeClient.BatchV1().Jobs(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 }
 
 func (r realJobControl) UpdateJob(namespace string, job *batchv1.Job) (*batchv1.Job, error) {
-	return r.KubeClient.BatchV1().Jobs(namespace).Update(job)
+	return r.KubeClient.BatchV1().Jobs(namespace).Update(context.TODO(), job, metav1.UpdateOptions{})
 }
 
 func (r realJobControl) PatchJob(namespace string, name string, pt types.PatchType, data []byte, subresources ...string) (*batchv1.Job, error) {
-	return r.KubeClient.BatchV1().Jobs(namespace).Patch(name, pt, data, subresources...)
+	return r.KubeClient.BatchV1().Jobs(namespace).Patch(context.TODO(), name, pt, data, metav1.PatchOptions{}, subresources...)
 }
 
 func (r realJobControl) CreateJob(namespace string, job *batchv1.Job) (*batchv1.Job, error) {
-	return r.KubeClient.BatchV1().Jobs(namespace).Create(job)
+	return r.KubeClient.BatchV1().Jobs(namespace).Create(context.TODO(), job, metav1.CreateOptions{})
 }
 
 func (r realJobControl) DeleteJob(namespace string, name string) error {
 	background := metav1.DeletePropagationBackground
-	return r.KubeClient.BatchV1().Jobs(namespace).Delete(name, &metav1.DeleteOptions{PropagationPolicy: &background})
+	return r.KubeClient.BatchV1().Jobs(namespace).Delete(context.TODO(), name, &metav1.DeleteOptions{PropagationPolicy: &background})
 }
 
 type fakeJobControl struct {
@@ -217,11 +218,11 @@ type realPodControl struct {
 var _ podControlInterface = &realPodControl{}
 
 func (r realPodControl) ListPods(namespace string, opts metav1.ListOptions) (*v1.PodList, error) {
-	return r.KubeClient.CoreV1().Pods(namespace).List(opts)
+	return r.KubeClient.CoreV1().Pods(namespace).List(context.TODO(), opts)
 }
 
 func (r realPodControl) DeletePod(namespace string, name string) error {
-	return r.KubeClient.CoreV1().Pods(namespace).Delete(name, nil)
+	return r.KubeClient.CoreV1().Pods(namespace).Delete(context.TODO(), name, nil)
 }
 
 type fakePodControl struct {

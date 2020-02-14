@@ -44,7 +44,8 @@ type SetSelectorOptions struct {
 	ResourceBuilderFlags *genericclioptions.ResourceBuilderFlags
 	PrintFlags           *genericclioptions.PrintFlags
 	RecordFlags          *genericclioptions.RecordFlags
-	dryrun               bool
+	dryRunStrategy       cmdutil.DryRunStrategy
+	dryRunVerifier       *resource.DryRunVerifier
 
 	// set by args
 	resources       []string
@@ -129,7 +130,19 @@ func (o *SetSelectorOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, arg
 		return err
 	}
 
-	o.dryrun = cmdutil.GetDryRunFlag(cmd)
+	o.dryRunStrategy, err = cmdutil.GetDryRunStrategy(cmd)
+	if err != nil {
+		return err
+	}
+	dynamicClient, err := f.DynamicClient()
+	if err != nil {
+		return err
+	}
+	discoveryClient, err := f.ToDiscoveryClient()
+	if err != nil {
+		return err
+	}
+	o.dryRunVerifier = resource.NewDryRunVerifier(dynamicClient, discoveryClient)
 
 	o.resources, o.selector, err = getResourcesAndSelector(args)
 	if err != nil {
@@ -137,11 +150,9 @@ func (o *SetSelectorOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, arg
 	}
 
 	o.ResourceFinder = o.ResourceBuilderFlags.ToBuilder(f, o.resources)
-	o.WriteToServer = !(*o.ResourceBuilderFlags.Local || o.dryrun)
+	o.WriteToServer = !(*o.ResourceBuilderFlags.Local || o.dryRunStrategy == cmdutil.DryRunClient)
 
-	if o.dryrun {
-		o.PrintFlags.Complete("%s (dry run)")
-	}
+	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.dryRunStrategy)
 	printer, err := o.PrintFlags.ToPrinter()
 	if err != nil {
 		return err
@@ -204,8 +215,16 @@ func (o *SetSelectorOptions) RunSelector() error {
 		if !o.WriteToServer {
 			return o.PrintObj(info.Object, o.Out)
 		}
+		if o.dryRunStrategy == cmdutil.DryRunServer {
+			if err := o.dryRunVerifier.HasSupport(info.Mapping.GroupVersionKind); err != nil {
+				return err
+			}
+		}
 
-		actual, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch, nil)
+		actual, err := resource.
+			NewHelper(info.Client, info.Mapping).
+			DryRun(o.dryRunStrategy == cmdutil.DryRunServer).
+			Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch, nil)
 		if err != nil {
 			return err
 		}

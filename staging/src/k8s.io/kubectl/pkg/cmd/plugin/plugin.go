@@ -113,10 +113,14 @@ func (o *PluginListOptions) Run() error {
 	pluginWarnings := 0
 
 	for _, dir := range uniquePathsList(o.PluginPaths) {
+		if len(strings.TrimSpace(dir)) == 0 {
+			continue
+		}
+
 		files, err := ioutil.ReadDir(dir)
 		if err != nil {
 			if _, ok := err.(*os.PathError); ok {
-				fmt.Fprintf(o.ErrOut, "Unable read directory %q from your PATH: %v. Skipping...", dir, err)
+				fmt.Fprintf(o.ErrOut, "Unable read directory %q from your PATH: %v. Skipping...\n", dir, err)
 				continue
 			}
 
@@ -133,7 +137,7 @@ func (o *PluginListOptions) Run() error {
 			}
 
 			if isFirstFile {
-				fmt.Fprintf(o.ErrOut, "The following compatible plugins are available:\n\n")
+				fmt.Fprintf(o.Out, "The following compatible plugins are available:\n\n")
 				pluginsFound = true
 				isFirstFile = false
 			}
@@ -165,7 +169,6 @@ func (o *PluginListOptions) Run() error {
 		}
 	}
 	if len(pluginErrors) > 0 {
-		fmt.Fprintln(o.ErrOut)
 		errs := bytes.NewBuffer(nil)
 		for _, e := range pluginErrors {
 			fmt.Fprintln(errs, e)

@@ -18,6 +18,7 @@ package podlogs
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io/ioutil"
 	"path"
@@ -145,7 +146,7 @@ MnVCuBwfwDXCAiEAw/1TA+CjPq9JC5ek1ifR0FybTURjeQqYkKpve1dveps=
 
 func waitForConfigMapCAContent(t *testing.T, kubeClient kubernetes.Interface, key, content string, count int) func() (bool, error) {
 	return func() (bool, error) {
-		clusterAuthInfo, err := kubeClient.CoreV1().ConfigMaps("kube-system").Get("extension-apiserver-authentication", metav1.GetOptions{})
+		clusterAuthInfo, err := kubeClient.CoreV1().ConfigMaps("kube-system").Get(context.TODO(), "extension-apiserver-authentication", metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
 			return false, nil
 		}

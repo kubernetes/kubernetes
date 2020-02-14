@@ -279,6 +279,9 @@ func (kr *kubeRegistry) enableHiddenStableCollectors() {
 	kr.CustomMustRegister(cs...)
 }
 
+// BuildVersion is a helper function that can be easily mocked.
+var BuildVersion = version.Get
+
 func newKubeRegistry(v apimachineryversion.Info) *kubeRegistry {
 	r := &kubeRegistry{
 		PromRegistry:     prometheus.NewRegistry(),
@@ -296,7 +299,7 @@ func newKubeRegistry(v apimachineryversion.Info) *kubeRegistry {
 // NewKubeRegistry creates a new vanilla Registry without any Collectors
 // pre-registered.
 func NewKubeRegistry() KubeRegistry {
-	r := newKubeRegistry(version.Get())
+	r := newKubeRegistry(BuildVersion())
 
 	return r
 }

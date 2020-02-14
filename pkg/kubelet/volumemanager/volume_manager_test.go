@@ -17,6 +17,7 @@ limitations under the License.
 package volumemanager
 
 import (
+	"context"
 	"os"
 	"reflect"
 	"strconv"
@@ -425,11 +426,11 @@ func delayClaimBecomesBound(
 ) {
 	time.Sleep(500 * time.Millisecond)
 	volumeClaim, _ :=
-		kubeClient.CoreV1().PersistentVolumeClaims(namespace).Get(claimName, metav1.GetOptions{})
+		kubeClient.CoreV1().PersistentVolumeClaims(namespace).Get(context.TODO(), claimName, metav1.GetOptions{})
 	volumeClaim.Status = v1.PersistentVolumeClaimStatus{
 		Phase: v1.ClaimBound,
 	}
-	kubeClient.CoreV1().PersistentVolumeClaims(namespace).Update(volumeClaim)
+	kubeClient.CoreV1().PersistentVolumeClaims(namespace).Update(context.TODO(), volumeClaim, metav1.UpdateOptions{})
 }
 
 func runVolumeManager(manager VolumeManager) chan struct{} {

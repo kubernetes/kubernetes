@@ -17,6 +17,7 @@ limitations under the License.
 package upgrades
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/onsi/ginkgo"
@@ -28,7 +29,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/sysctl"
 
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -54,13 +54,13 @@ func (t *SysctlUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, u
 	switch upgrade {
 	case MasterUpgrade, ClusterUpgrade:
 		ginkgo.By("Checking the safe sysctl pod keeps running on master upgrade")
-		pod, err := f.ClientSet.CoreV1().Pods(t.validPod.Namespace).Get(t.validPod.Name, metav1.GetOptions{})
+		pod, err := f.ClientSet.CoreV1().Pods(t.validPod.Namespace).Get(context.TODO(), t.validPod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		framework.ExpectEqual(pod.Status.Phase, v1.PodRunning)
 	}
 
 	ginkgo.By("Checking the old unsafe sysctl pod was not suddenly started during an upgrade")
-	pod, err := f.ClientSet.CoreV1().Pods(t.invalidPod.Namespace).Get(t.invalidPod.Name, metav1.GetOptions{})
+	pod, err := f.ClientSet.CoreV1().Pods(t.invalidPod.Namespace).Get(context.TODO(), t.invalidPod.Name, metav1.GetOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
 		framework.ExpectNoError(err)
 	}
@@ -85,11 +85,8 @@ func (t *SysctlUpgradeTest) verifySafeSysctlWork(f *framework.Framework) *v1.Pod
 	validPod := f.PodClient().Create(t.validPod)
 
 	ginkgo.By("Making sure the valid pod launches")
-	ev, err := f.PodClient().WaitForErrorEventOrSuccess(t.validPod)
+	_, err := f.PodClient().WaitForErrorEventOrSuccess(t.validPod)
 	framework.ExpectNoError(err)
-	if ev != nil && ev.Reason == sysctl.UnsupportedReason {
-		e2eskipper.Skipf("No sysctl support in Docker <1.12")
-	}
 	f.TestContainerOutput("pod with safe sysctl launched", t.validPod, 0, []string{fmt.Sprintf("%s = %s", safeSysctl, safeSysctlValue)})
 
 	return validPod
@@ -105,9 +102,6 @@ func (t *SysctlUpgradeTest) verifyUnsafeSysctlsAreRejected(f *framework.Framewor
 	ginkgo.By("Making sure the invalid pod failed")
 	ev, err := f.PodClient().WaitForErrorEventOrSuccess(invalidPod)
 	framework.ExpectNoError(err)
-	if ev != nil && ev.Reason == sysctl.UnsupportedReason {
-		e2eskipper.Skipf("No sysctl support in Docker <1.12")
-	}
 	framework.ExpectEqual(ev.Reason, sysctl.ForbiddenReason)
 
 	return invalidPod

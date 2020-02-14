@@ -18,6 +18,7 @@ package pod
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"sync"
@@ -53,14 +54,10 @@ const (
 	podScheduledBeforeTimeout = podListTimeout + (20 * time.Second)
 
 	// podStartTimeout is how long to wait for the pod to be started.
-	// Initial pod start can be delayed O(minutes) by slow docker pulls.
-	// TODO: Make this 30 seconds once #4566 is resolved.
 	podStartTimeout = 5 * time.Minute
 
 	// poll is how often to poll pods, nodes and claims.
-	poll             = 2 * time.Second
-	pollShortTimeout = 1 * time.Minute
-	pollLongTimeout  = 5 * time.Minute
+	poll = 2 * time.Second
 
 	// singleCallTimeout is how long to try single API calls (like 'get' or 'list'). Used to prevent
 	// transient failures from failing tests.
@@ -125,7 +122,7 @@ func WaitForPodsRunningReady(c clientset.Interface, ns string, minPods, allowedN
 		// checked.
 		replicas, replicaOk := int32(0), int32(0)
 
-		rcList, err := c.CoreV1().ReplicationControllers(ns).List(metav1.ListOptions{})
+		rcList, err := c.CoreV1().ReplicationControllers(ns).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			e2elog.Logf("Error getting replication controllers in namespace '%s': %v", ns, err)
 			if testutils.IsRetryableAPIError(err) {
@@ -138,7 +135,7 @@ func WaitForPodsRunningReady(c clientset.Interface, ns string, minPods, allowedN
 			replicaOk += rc.Status.ReadyReplicas
 		}
 
-		rsList, err := c.AppsV1().ReplicaSets(ns).List(metav1.ListOptions{})
+		rsList, err := c.AppsV1().ReplicaSets(ns).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			e2elog.Logf("Error getting replication sets in namespace %q: %v", ns, err)
 			if testutils.IsRetryableAPIError(err) {
@@ -151,7 +148,7 @@ func WaitForPodsRunningReady(c clientset.Interface, ns string, minPods, allowedN
 			replicaOk += rs.Status.ReadyReplicas
 		}
 
-		podList, err := c.CoreV1().Pods(ns).List(metav1.ListOptions{})
+		podList, err := c.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			e2elog.Logf("Error getting pods in namespace '%s': %v", ns, err)
 			if testutils.IsRetryableAPIError(err) {
@@ -211,7 +208,7 @@ func WaitForPodsRunningReady(c clientset.Interface, ns string, minPods, allowedN
 func WaitForPodCondition(c clientset.Interface, ns, podName, desc string, timeout time.Duration, condition podCondition) error {
 	e2elog.Logf("Waiting up to %v for pod %q in namespace %q to be %q", timeout, podName, ns, desc)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(poll) {
-		pod, err := c.CoreV1().Pods(ns).Get(podName, metav1.GetOptions{})
+		pod, err := c.CoreV1().Pods(ns).Get(context.TODO(), podName, metav1.GetOptions{})
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				e2elog.Logf("Pod %q in namespace %q not found. Error: %v", podName, ns, err)
@@ -253,8 +250,8 @@ func WaitForPodTerminatedInNamespace(c clientset.Interface, podName, reason, nam
 }
 
 // waitForPodSuccessInNamespaceTimeout returns nil if the pod reached state success, or an error if it reached failure or ran too long.
-func waitForPodSuccessInNamespaceTimeout(c clientset.Interface, podName string, namespace string, timeout time.Duration) error {
-	return WaitForPodCondition(c, namespace, podName, "success or failure", timeout, func(pod *v1.Pod) (bool, error) {
+func waitForPodSuccessInNamespaceTimeout(c clientset.Interface, podName, namespace string, timeout time.Duration) error {
+	return WaitForPodCondition(c, namespace, podName, fmt.Sprintf("%s or %s", v1.PodSucceeded, v1.PodFailed), timeout, func(pod *v1.Pod) (bool, error) {
 		if pod.Spec.RestartPolicy == v1.RestartPolicyAlways {
 			return true, fmt.Errorf("pod %q will never terminate with a succeeded state since its restart policy is Always", podName)
 		}
@@ -275,12 +272,12 @@ func waitForPodSuccessInNamespaceTimeout(c clientset.Interface, podName string, 
 // if the pod Get api returns an error (IsNotFound or other), or if the pod failed with an unexpected reason.
 // Typically called to test that the passed-in pod is Pending and Unschedulable.
 func WaitForPodNameUnschedulableInNamespace(c clientset.Interface, podName, namespace string) error {
-	return WaitForPodCondition(c, namespace, podName, "Unschedulable", podStartTimeout, func(pod *v1.Pod) (bool, error) {
+	return WaitForPodCondition(c, namespace, podName, v1.PodReasonUnschedulable, podStartTimeout, func(pod *v1.Pod) (bool, error) {
 		// Only consider Failed pods. Successful pods will be deleted and detected in
 		// waitForPodCondition's Get call returning `IsNotFound`
 		if pod.Status.Phase == v1.PodPending {
 			for _, cond := range pod.Status.Conditions {
-				if cond.Type == v1.PodScheduled && cond.Status == v1.ConditionFalse && cond.Reason == "Unschedulable" {
+				if cond.Type == v1.PodScheduled && cond.Status == v1.ConditionFalse && cond.Reason == v1.PodReasonUnschedulable {
 					return true, nil
 				}
 			}
@@ -297,7 +294,7 @@ func WaitForPodNameUnschedulableInNamespace(c clientset.Interface, podName, name
 func WaitForMatchPodsCondition(c clientset.Interface, opts metav1.ListOptions, desc string, timeout time.Duration, condition podCondition) error {
 	e2elog.Logf("Waiting up to %v for matching pods' status to be %s", timeout, desc)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(poll) {
-		pods, err := c.CoreV1().Pods(metav1.NamespaceAll).List(opts)
+		pods, err := c.CoreV1().Pods(metav1.NamespaceAll).List(context.TODO(), opts)
 		if err != nil {
 			return err
 		}
@@ -386,7 +383,7 @@ func WaitForPodSuccessInNamespaceSlow(c clientset.Interface, podName string, nam
 // than "not found" then that error is returned and the wait stops.
 func WaitForPodNotFoundInNamespace(c clientset.Interface, podName, ns string, timeout time.Duration) error {
 	return wait.PollImmediate(poll, timeout, func() (bool, error) {
-		_, err := c.CoreV1().Pods(ns).Get(podName, metav1.GetOptions{})
+		_, err := c.CoreV1().Pods(ns).Get(context.TODO(), podName, metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
 			return true, nil // done
 		}
@@ -402,7 +399,7 @@ func WaitForPodToDisappear(c clientset.Interface, ns, podName string, label labe
 	return wait.PollImmediate(interval, timeout, func() (bool, error) {
 		e2elog.Logf("Waiting for pod %s to disappear", podName)
 		options := metav1.ListOptions{LabelSelector: label.String()}
-		pods, err := c.CoreV1().Pods(ns).List(options)
+		pods, err := c.CoreV1().Pods(ns).List(context.TODO(), options)
 		if err != nil {
 			if testutils.IsRetryableAPIError(err) {
 				return false, nil
@@ -489,7 +486,7 @@ func WaitForPodsWithLabelScheduled(c clientset.Interface, ns string, label label
 func WaitForPodsWithLabel(c clientset.Interface, ns string, label labels.Selector) (pods *v1.PodList, err error) {
 	for t := time.Now(); time.Since(t) < podListTimeout; time.Sleep(poll) {
 		options := metav1.ListOptions{LabelSelector: label.String()}
-		pods, err = c.CoreV1().Pods(ns).List(options)
+		pods, err = c.CoreV1().Pods(ns).List(context.TODO(), options)
 		if err != nil {
 			if testutils.IsRetryableAPIError(err) {
 				continue
@@ -540,7 +537,7 @@ func WaitForPodsReady(c clientset.Interface, ns, name string, minReadySeconds in
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
 	options := metav1.ListOptions{LabelSelector: label.String()}
 	return wait.Poll(poll, 5*time.Minute, func() (bool, error) {
-		pods, err := c.CoreV1().Pods(ns).List(options)
+		pods, err := c.CoreV1().Pods(ns).List(context.TODO(), options)
 		if err != nil {
 			return false, nil
 		}

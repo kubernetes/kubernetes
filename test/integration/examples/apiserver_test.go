@@ -17,6 +17,7 @@ limitations under the License.
 package apiserver
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -110,7 +111,7 @@ func TestAggregatedAPIServer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = aggregatorClient.ApiregistrationV1beta1().APIServices().Create(&apiregistrationv1beta1.APIService{
+	_, err = aggregatorClient.ApiregistrationV1beta1().APIServices().Create(context.TODO(), &apiregistrationv1beta1.APIService{
 		ObjectMeta: metav1.ObjectMeta{Name: "v1alpha1.wardle.example.com"},
 		Spec: apiregistrationv1beta1.APIServiceSpec{
 			Service: &apiregistrationv1beta1.ServiceReference{
@@ -123,7 +124,7 @@ func TestAggregatedAPIServer(t *testing.T) {
 			GroupPriorityMinimum: 200,
 			VersionPriority:      200,
 		},
-	})
+	}, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -228,7 +229,7 @@ func waitForWardleRunning(t *testing.T, wardleToKASKubeConfig *rest.Config, ward
 			return false, nil
 		}
 		healthStatus := 0
-		result := wardleClient.Discovery().RESTClient().Get().AbsPath("/healthz").Do().StatusCode(&healthStatus)
+		result := wardleClient.Discovery().RESTClient().Get().AbsPath("/healthz").Do(context.TODO()).StatusCode(&healthStatus)
 		lastHealthContent, lastHealthErr = result.Raw()
 		if healthStatus != http.StatusOK {
 			return false, nil
@@ -345,7 +346,7 @@ func createKubeConfig(clientCfg *rest.Config) *clientcmdapi.Config {
 }
 
 func readResponse(client rest.Interface, location string) ([]byte, error) {
-	return client.Get().AbsPath(location).DoRaw()
+	return client.Get().AbsPath(location).DoRaw(context.TODO())
 }
 
 func testAPIGroupList(t *testing.T, client rest.Interface) {

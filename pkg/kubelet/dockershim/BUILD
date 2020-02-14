@@ -51,7 +51,6 @@ go_library(
         "//pkg/kubelet/dockershim/network/kubenet:go_default_library",
         "//pkg/kubelet/kuberuntime:go_default_library",
         "//pkg/kubelet/leaky:go_default_library",
-        "//pkg/kubelet/qos:go_default_library",
         "//pkg/kubelet/server/streaming:go_default_library",
         "//pkg/kubelet/types:go_default_library",
         "//pkg/kubelet/util/cache:go_default_library",
@@ -78,6 +77,7 @@ go_library(
         "@io_bazel_rules_go//go/platform:windows": [
             "//pkg/kubelet/apis:go_default_library",
             "//pkg/kubelet/winstats:go_default_library",
+            "//vendor/github.com/Microsoft/hcsshim:go_default_library",
             "//vendor/golang.org/x/sys/windows/registry:go_default_library",
         ],
         "//conditions:default": [],

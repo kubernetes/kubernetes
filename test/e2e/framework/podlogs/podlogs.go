@@ -36,7 +36,7 @@ import (
 
 	"github.com/pkg/errors"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 )
@@ -47,8 +47,7 @@ import (
 //    rpc error: code = Unknown desc = Error: No such container: 41a...
 // when the pod gets deleted while streaming.
 func LogsForPod(ctx context.Context, cs clientset.Interface, ns, pod string, opts *v1.PodLogOptions) (io.ReadCloser, error) {
-	req := cs.CoreV1().Pods(ns).GetLogs(pod, opts)
-	return req.Context(ctx).Stream()
+	return cs.CoreV1().Pods(ns).GetLogs(pod, opts).Stream(ctx)
 }
 
 // LogOutput determines where output from CopyAllLogs goes.
@@ -79,7 +78,7 @@ var expectedErrors = regexp.MustCompile(`container .* in pod .* is (terminated|w
 // running pods, but that then would have the disadvantage that
 // already deleted pods aren't covered.
 func CopyAllLogs(ctx context.Context, cs clientset.Interface, ns string, to LogOutput) error {
-	watcher, err := cs.CoreV1().Pods(ns).Watch(meta.ListOptions{})
+	watcher, err := cs.CoreV1().Pods(ns).Watch(context.TODO(), meta.ListOptions{})
 	if err != nil {
 		return errors.Wrap(err, "cannot create Pod event watcher")
 	}
@@ -91,7 +90,7 @@ func CopyAllLogs(ctx context.Context, cs clientset.Interface, ns string, to LogO
 			m.Lock()
 			defer m.Unlock()
 
-			pods, err := cs.CoreV1().Pods(ns).List(meta.ListOptions{})
+			pods, err := cs.CoreV1().Pods(ns).List(context.TODO(), meta.ListOptions{})
 			if err != nil {
 				if to.StatusWriter != nil {
 					fmt.Fprintf(to.StatusWriter, "ERROR: get pod list in %s: %s\n", ns, err)
@@ -214,7 +213,7 @@ func CopyAllLogs(ctx context.Context, cs clientset.Interface, ns string, to LogO
 // WatchPods prints pod status events for a certain namespace or all namespaces
 // when namespace name is empty.
 func WatchPods(ctx context.Context, cs clientset.Interface, ns string, to io.Writer) error {
-	watcher, err := cs.CoreV1().Pods(ns).Watch(meta.ListOptions{})
+	watcher, err := cs.CoreV1().Pods(ns).Watch(context.TODO(), meta.ListOptions{})
 	if err != nil {
 		return errors.Wrap(err, "cannot create Pod event watcher")
 	}

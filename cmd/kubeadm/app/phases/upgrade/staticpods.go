@@ -591,8 +591,8 @@ func renewCertsByComponent(cfg *kubeadmapi.InitConfiguration, component string, 
 
 // GetPathManagerForUpgrade returns a path manager properly configured for the given InitConfiguration.
 func GetPathManagerForUpgrade(kubernetesDir, kustomizeDir string, internalcfg *kubeadmapi.InitConfiguration, etcdUpgrade bool) (StaticPodPathManager, error) {
-	isHAEtcd := etcdutil.CheckConfigurationIsHA(&internalcfg.Etcd)
-	return NewKubeStaticPodPathManagerUsingTempDirs(kubernetesDir, kustomizeDir, true, etcdUpgrade && !isHAEtcd)
+	isExternalEtcd := internalcfg.Etcd.External != nil
+	return NewKubeStaticPodPathManagerUsingTempDirs(kubernetesDir, kustomizeDir, true, etcdUpgrade && !isExternalEtcd)
 }
 
 // PerformStaticPodUpgrade performs the upgrade of the control plane components for a static pod hosted cluster

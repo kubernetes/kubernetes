@@ -18,6 +18,7 @@ package rollingupdate
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"time"
 
@@ -195,7 +196,7 @@ func (o *RollingUpdateOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, a
 	if len(args) > 0 {
 		o.OldName = args[0]
 	}
-	o.DryRun = cmdutil.GetDryRunFlag(cmd)
+	o.DryRun = getClientSideDryRun(cmd)
 	o.OutputFormat = cmdutil.GetFlagString(cmd, "output")
 	o.KeepOldName = len(args) == 1
 	o.ShouldValidate = cmdutil.GetFlagBool(cmd, "validate")
@@ -248,7 +249,7 @@ func (o *RollingUpdateOptions) Run() error {
 
 	var newRc *corev1.ReplicationController
 	// fetch rc
-	oldRc, err := coreClient.ReplicationControllers(o.Namespace).Get(o.OldName, metav1.GetOptions{})
+	oldRc, err := coreClient.ReplicationControllers(o.Namespace).Get(context.TODO(), o.OldName, metav1.GetOptions{})
 	if err != nil {
 		if !errors.IsNotFound(err) || len(o.Image) == 0 || !o.KeepOldName {
 			return err
@@ -431,7 +432,7 @@ func (o *RollingUpdateOptions) Run() error {
 		if err != nil {
 			return err
 		}
-		coreClient.ReplicationControllers(config.NewRc.Namespace).Update(config.NewRc)
+		coreClient.ReplicationControllers(config.NewRc.Namespace).Update(context.TODO(), config.NewRc, metav1.UpdateOptions{})
 	}
 	err = updater.Update(config)
 	if err != nil {
@@ -444,7 +445,7 @@ func (o *RollingUpdateOptions) Run() error {
 	} else {
 		message = fmt.Sprintf("rolling updated to %q", newRc.Name)
 	}
-	newRc, err = coreClient.ReplicationControllers(o.Namespace).Get(newRc.Name, metav1.GetOptions{})
+	newRc, err = coreClient.ReplicationControllers(o.Namespace).Get(context.TODO(), newRc.Name, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -465,4 +466,15 @@ func findNewName(args []string, oldRc *corev1.ReplicationController) string {
 		return newName
 	}
 	return ""
+}
+
+func getClientSideDryRun(cmd *cobra.Command) bool {
+	dryRunStrategy, err := cmdutil.GetDryRunStrategy(cmd)
+	if err != nil {
+		klog.Fatalf("error accessing --dry-run flag for command %s: %v", cmd.Name(), err)
+	}
+	if dryRunStrategy == cmdutil.DryRunServer {
+		klog.Fatalf("--dry-run=server for command %s is not supported yet", cmd.Name())
+	}
+	return dryRunStrategy == cmdutil.DryRunClient
 }

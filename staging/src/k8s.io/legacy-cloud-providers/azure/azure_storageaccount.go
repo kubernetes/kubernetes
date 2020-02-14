@@ -40,12 +40,9 @@ func (az *Cloud) getStorageAccounts(matchingAccountType, matchingAccountKind, re
 	if rerr != nil {
 		return nil, rerr.Error()
 	}
-	if result.Value == nil {
-		return nil, fmt.Errorf("unexpected error when listing storage accounts from resource group %s", resourceGroup)
-	}
 
 	accounts := []accountWithLocation{}
-	for _, acct := range *result.Value {
+	for _, acct := range result {
 		if acct.Name != nil && acct.Location != nil && acct.Sku != nil {
 			storageType := string((*acct.Sku).Name)
 			if matchingAccountType != "" && !strings.EqualFold(matchingAccountType, storageType) {

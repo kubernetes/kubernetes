@@ -9,6 +9,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//staging/src/k8s.io/client-go/deprecated:all-srcs",
         "//staging/src/k8s.io/client-go/discovery:all-srcs",
         "//staging/src/k8s.io/client-go/dynamic:all-srcs",
         "//staging/src/k8s.io/client-go/examples/create-update-delete-deployment:all-srcs",

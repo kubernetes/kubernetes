@@ -17,6 +17,7 @@ limitations under the License.
 package upgrades
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -26,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	jobutil "k8s.io/kubernetes/test/e2e/framework/job"
+	e2ejob "k8s.io/kubernetes/test/e2e/framework/job"
 	"k8s.io/kubernetes/test/e2e/upgrades"
 
 	"github.com/onsi/ginkgo"
@@ -46,13 +47,13 @@ func (t *JobUpgradeTest) Setup(f *framework.Framework) {
 	t.namespace = f.Namespace.Name
 
 	ginkgo.By("Creating a job")
-	t.job = jobutil.NewTestJob("notTerminate", "foo", v1.RestartPolicyOnFailure, 2, 2, nil, 6)
-	job, err := jobutil.CreateJob(f.ClientSet, t.namespace, t.job)
+	t.job = e2ejob.NewTestJob("notTerminate", "foo", v1.RestartPolicyOnFailure, 2, 2, nil, 6)
+	job, err := e2ejob.CreateJob(f.ClientSet, t.namespace, t.job)
 	t.job = job
 	framework.ExpectNoError(err)
 
 	ginkgo.By("Ensuring active pods == parallelism")
-	err = jobutil.WaitForAllJobPodsRunning(f.ClientSet, t.namespace, job.Name, 2)
+	err = e2ejob.WaitForAllJobPodsRunning(f.ClientSet, t.namespace, job.Name, 2)
 	framework.ExpectNoError(err)
 }
 
@@ -73,9 +74,9 @@ func (t *JobUpgradeTest) Teardown(f *framework.Framework) {
 // is running, returning an error if the expected parallelism is not
 // satisfied.
 func ensureAllJobPodsRunning(c clientset.Interface, ns, jobName string, parallelism int32) error {
-	label := labels.SelectorFromSet(labels.Set(map[string]string{jobutil.JobSelectorKey: jobName}))
+	label := labels.SelectorFromSet(labels.Set(map[string]string{e2ejob.JobSelectorKey: jobName}))
 	options := metav1.ListOptions{LabelSelector: label.String()}
-	pods, err := c.CoreV1().Pods(ns).List(options)
+	pods, err := c.CoreV1().Pods(ns).List(context.TODO(), options)
 	if err != nil {
 		return err
 	}

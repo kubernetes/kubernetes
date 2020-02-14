@@ -17,6 +17,7 @@ limitations under the License.
 package upgrades
 
 import (
+	"context"
 	"fmt"
 
 	"k8s.io/api/core/v1"
@@ -57,7 +58,7 @@ func (t *ConfigMapUpgradeTest) Setup(f *framework.Framework) {
 
 	ginkgo.By("Creating a ConfigMap")
 	var err error
-	if t.configMap, err = f.ClientSet.CoreV1().ConfigMaps(ns.Name).Create(t.configMap); err != nil {
+	if t.configMap, err = f.ClientSet.CoreV1().ConfigMaps(ns.Name).Create(context.TODO(), t.configMap, metav1.CreateOptions{}); err != nil {
 		framework.Failf("unable to create test ConfigMap %s: %v", t.configMap.Name, err)
 	}
 

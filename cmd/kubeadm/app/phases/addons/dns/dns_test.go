@@ -17,6 +17,7 @@ limitations under the License.
 package dns
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -722,7 +723,7 @@ func TestCreateCoreDNSConfigMap(t *testing.T) {
 			if err != nil {
 				t.Fatalf("error creating the CoreDNS ConfigMap: %v", err)
 			}
-			migratedConfigMap, _ := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(kubeadmconstants.CoreDNSConfigMap, metav1.GetOptions{})
+			migratedConfigMap, _ := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(context.TODO(), kubeadmconstants.CoreDNSConfigMap, metav1.GetOptions{})
 			if !strings.EqualFold(migratedConfigMap.Data["Corefile"], tc.expectedCorefileData) {
 				t.Fatalf("expected to get %v, but got %v", tc.expectedCorefileData, migratedConfigMap.Data["Corefile"])
 			}
@@ -732,7 +733,7 @@ func TestCreateCoreDNSConfigMap(t *testing.T) {
 
 func createClientAndCoreDNSManifest(t *testing.T, corefile, coreDNSVersion string) *clientsetfake.Clientset {
 	client := clientsetfake.NewSimpleClientset()
-	_, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Create(&v1.ConfigMap{
+	_, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Create(context.TODO(), &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      kubeadmconstants.CoreDNSConfigMap,
 			Namespace: metav1.NamespaceSystem,
@@ -740,11 +741,11 @@ func createClientAndCoreDNSManifest(t *testing.T, corefile, coreDNSVersion strin
 		Data: map[string]string{
 			"Corefile": corefile,
 		},
-	})
+	}, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("error creating ConfigMap: %v", err)
 	}
-	_, err = client.AppsV1().Deployments(metav1.NamespaceSystem).Create(&apps.Deployment{
+	_, err = client.AppsV1().Deployments(metav1.NamespaceSystem).Create(context.TODO(), &apps.Deployment{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Deployment",
 			APIVersion: "apps/v1",
@@ -767,7 +768,7 @@ func createClientAndCoreDNSManifest(t *testing.T, corefile, coreDNSVersion strin
 				},
 			},
 		},
-	})
+	}, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("error creating deployment: %v", err)
 	}

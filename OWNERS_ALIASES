@@ -130,7 +130,6 @@ aliases:
 
   sig-storage-reviewers:
     - saad-ali
-    - childsb
 
   sig-scheduling-maintainers:
     - alculquicondor
@@ -152,6 +151,7 @@ aliases:
     - hex108
     - alculquicondor
     - liu-cong
+    - damemi
 
   sig-cli-maintainers:
     - adohe
@@ -218,7 +218,14 @@ aliases:
     - yujuhong
     - krmayankk
     - mattjmcnaughton
+    - matthyx
+
+  sig-network-driver-approvers:
+    - dcbw
+    - freehan
+
   sig-network-approvers:
+    - andrewsykim
     - bowei
     - caseydavenport
     - danwinship
@@ -229,19 +236,20 @@ aliases:
     - nicksardo
     - thockin
   sig-network-reviewers:
+    - andrewsykim
+    - aojea
     - bowei
     - caseydavenport
+    - cmluciano
     - danwinship
     - dcbw
     - freehan
     - johnbelamaric
+    - m1093782566
     - mrhohn
     - nicksardo
-    - thockin
     - rramkumar1
-    - cmluciano
-    - m1093782566
-    - andrewsykim
+    - thockin
   sig-apps-approvers:
     - kow3ns
     - janetkuo
@@ -268,6 +276,7 @@ aliases:
   sig-instrumentation-approvers:
     - piosz
     - brancz
+    - serathius
   sig-instrumentation-reviewers:
     - kawych
     - s-urbaniak
@@ -452,10 +461,9 @@ aliases:
     - andrewsykim     # Cloud Provider
     - bgrant0607      # Architecture
     - brancz          # Instrumentation
-    - bsalamat        # Scheduling
+    - ahg-g           # Scheduling
     - calebamiles     # Release
     - caseydavenport  # Network
-    - childsb         # Storage
     - countspongebob  # Scalability
     - csbell          # Multicluster
     - dcbw            # Network

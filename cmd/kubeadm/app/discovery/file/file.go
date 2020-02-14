@@ -17,6 +17,7 @@ limitations under the License.
 package file
 
 import (
+	"context"
 	"time"
 
 	"github.com/pkg/errors"
@@ -100,7 +101,7 @@ func ValidateConfigInfo(config *clientcmdapi.Config, clustername string, discove
 
 	err = wait.Poll(constants.DiscoveryRetryInterval, discoveryTimeout, func() (bool, error) {
 		var err error
-		clusterinfoCM, err = client.CoreV1().ConfigMaps(metav1.NamespacePublic).Get(bootstrapapi.ConfigMapClusterInfo, metav1.GetOptions{})
+		clusterinfoCM, err = client.CoreV1().ConfigMaps(metav1.NamespacePublic).Get(context.TODO(), bootstrapapi.ConfigMapClusterInfo, metav1.GetOptions{})
 		if err != nil {
 			if apierrors.IsForbidden(err) {
 				// If the request is unauthorized, the cluster admin has not granted access to the cluster info configmap for unauthenticated users

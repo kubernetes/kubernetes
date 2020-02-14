@@ -28,8 +28,8 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal"
 	"k8s.io/klog"
 	openapiproto "k8s.io/kube-openapi/pkg/util/proto"
-	"sigs.k8s.io/structured-merge-diff/fieldpath"
-	"sigs.k8s.io/structured-merge-diff/merge"
+	"sigs.k8s.io/structured-merge-diff/v3/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v3/merge"
 )
 
 type structuredMergeManager struct {
@@ -99,13 +99,13 @@ func (f *structuredMergeManager) Update(liveObj, newObj runtime.Object, managed 
 	newObjTyped, err := f.typeConverter.ObjectToTyped(newObjVersioned)
 	if err != nil {
 		// Return newObj and just by-pass fields update. This really shouldn't happen.
-		klog.Errorf("[SHOULD NOT HAPPEN] failed to create typed new object: %v", err)
+		klog.Errorf("[SHOULD NOT HAPPEN] failed to create typed new object of type %v: %v", newObjVersioned.GetObjectKind().GroupVersionKind(), err)
 		return newObj, managed, nil
 	}
 	liveObjTyped, err := f.typeConverter.ObjectToTyped(liveObjVersioned)
 	if err != nil {
 		// Return newObj and just by-pass fields update. This really shouldn't happen.
-		klog.Errorf("[SHOULD NOT HAPPEN] failed to create typed live object: %v", err)
+		klog.Errorf("[SHOULD NOT HAPPEN] failed to create typed live object of type %v: %v", liveObjVersioned.GetObjectKind().GroupVersionKind(), err)
 		return newObj, managed, nil
 	}
 	apiVersion := fieldpath.APIVersion(f.groupVersion.String())

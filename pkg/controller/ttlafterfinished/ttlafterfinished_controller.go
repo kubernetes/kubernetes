@@ -17,6 +17,7 @@ limitations under the License.
 package ttlafterfinished
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -214,7 +215,7 @@ func (tc *Controller) processJob(key string) error {
 	// Before deleting the Job, do a final sanity check.
 	// If TTL is modified before we do this check, we cannot be sure if the TTL truly expires.
 	// The latest Job may have a different UID, but it's fine because the checks will be run again.
-	fresh, err := tc.client.BatchV1().Jobs(namespace).Get(name, metav1.GetOptions{})
+	fresh, err := tc.client.BatchV1().Jobs(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
 		return nil
 	}
@@ -234,7 +235,7 @@ func (tc *Controller) processJob(key string) error {
 		Preconditions:     &metav1.Preconditions{UID: &fresh.UID},
 	}
 	klog.V(4).Infof("Cleaning up Job %s/%s", namespace, name)
-	return tc.client.BatchV1().Jobs(fresh.Namespace).Delete(fresh.Name, options)
+	return tc.client.BatchV1().Jobs(fresh.Namespace).Delete(context.TODO(), fresh.Name, options)
 }
 
 // processTTL checks whether a given Job's TTL has expired, and add it to the queue after the TTL is expected to expire

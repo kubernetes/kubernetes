@@ -17,6 +17,7 @@ limitations under the License.
 package testsuites
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -165,7 +166,7 @@ func (v *volumeExpandTestSuite) DefineTests(driver TestDriver, pattern testpatte
 
 			var err error
 			ginkgo.By("Creating a pod with dynamically provisioned volume")
-			l.pod, err = e2epod.CreateSecPodWithNodeSelection(f.ClientSet, f.Namespace.Name, []*v1.PersistentVolumeClaim{l.resource.Pvc}, nil, false, "", false, false, e2epv.SELinuxLabel, nil, e2epod.NodeSelection{Name: l.config.ClientNodeName}, framework.PodStartTimeout)
+			l.pod, err = e2epod.CreateSecPodWithNodeSelection(f.ClientSet, f.Namespace.Name, []*v1.PersistentVolumeClaim{l.resource.Pvc}, nil, false, "", false, false, e2epv.SELinuxLabel, nil, l.config.ClientNodeSelection, framework.PodStartTimeout)
 			defer func() {
 				err = e2epod.DeletePodWithWait(f.ClientSet, l.pod)
 				framework.ExpectNoError(err, "while cleaning up pod already deleted in resize test")
@@ -202,7 +203,7 @@ func (v *volumeExpandTestSuite) DefineTests(driver TestDriver, pattern testpatte
 			l.resource.Pvc = npvc
 
 			ginkgo.By("Creating a new pod with same volume")
-			l.pod2, err = e2epod.CreateSecPodWithNodeSelection(f.ClientSet, f.Namespace.Name, []*v1.PersistentVolumeClaim{l.resource.Pvc}, nil, false, "", false, false, e2epv.SELinuxLabel, nil, e2epod.NodeSelection{Name: l.config.ClientNodeName}, framework.PodStartTimeout)
+			l.pod2, err = e2epod.CreateSecPodWithNodeSelection(f.ClientSet, f.Namespace.Name, []*v1.PersistentVolumeClaim{l.resource.Pvc}, nil, false, "", false, false, e2epv.SELinuxLabel, nil, l.config.ClientNodeSelection, framework.PodStartTimeout)
 			defer func() {
 				err = e2epod.DeletePodWithWait(f.ClientSet, l.pod2)
 				framework.ExpectNoError(err, "while cleaning up pod before exiting resizing test")
@@ -223,7 +224,7 @@ func (v *volumeExpandTestSuite) DefineTests(driver TestDriver, pattern testpatte
 
 			var err error
 			ginkgo.By("Creating a pod with dynamically provisioned volume")
-			l.pod, err = e2epod.CreateSecPodWithNodeSelection(f.ClientSet, f.Namespace.Name, []*v1.PersistentVolumeClaim{l.resource.Pvc}, nil, false, "", false, false, e2epv.SELinuxLabel, nil, e2epod.NodeSelection{Name: l.config.ClientNodeName}, framework.PodStartTimeout)
+			l.pod, err = e2epod.CreateSecPodWithNodeSelection(f.ClientSet, f.Namespace.Name, []*v1.PersistentVolumeClaim{l.resource.Pvc}, nil, false, "", false, false, e2epv.SELinuxLabel, nil, l.config.ClientNodeSelection, framework.PodStartTimeout)
 			defer func() {
 				err = e2epod.DeletePodWithWait(f.ClientSet, l.pod)
 				framework.ExpectNoError(err, "while cleaning up pod already deleted in resize test")
@@ -271,13 +272,13 @@ func ExpandPVCSize(origPVC *v1.PersistentVolumeClaim, size resource.Quantity, c 
 	var lastUpdateError error
 	waitErr := wait.PollImmediate(resizePollInterval, 30*time.Second, func() (bool, error) {
 		var err error
-		updatedPVC, err = c.CoreV1().PersistentVolumeClaims(origPVC.Namespace).Get(pvcName, metav1.GetOptions{})
+		updatedPVC, err = c.CoreV1().PersistentVolumeClaims(origPVC.Namespace).Get(context.TODO(), pvcName, metav1.GetOptions{})
 		if err != nil {
 			return false, fmt.Errorf("error fetching pvc %q for resizing: %v", pvcName, err)
 		}
 
 		updatedPVC.Spec.Resources.Requests[v1.ResourceStorage] = size
-		updatedPVC, err = c.CoreV1().PersistentVolumeClaims(origPVC.Namespace).Update(updatedPVC)
+		updatedPVC, err = c.CoreV1().PersistentVolumeClaims(origPVC.Namespace).Update(context.TODO(), updatedPVC, metav1.UpdateOptions{})
 		if err != nil {
 			framework.Logf("Error updating pvc %s: %v", pvcName, err)
 			lastUpdateError = err
@@ -298,7 +299,7 @@ func ExpandPVCSize(origPVC *v1.PersistentVolumeClaim, size resource.Quantity, c 
 func WaitForResizingCondition(pvc *v1.PersistentVolumeClaim, c clientset.Interface, duration time.Duration) error {
 	waitErr := wait.PollImmediate(resizePollInterval, duration, func() (bool, error) {
 		var err error
-		updatedPVC, err := c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(pvc.Name, metav1.GetOptions{})
+		updatedPVC, err := c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(context.TODO(), pvc.Name, metav1.GetOptions{})
 
 		if err != nil {
 			return false, fmt.Errorf("error fetching pvc %q for checking for resize status: %v", pvc.Name, err)
@@ -324,7 +325,7 @@ func WaitForControllerVolumeResize(pvc *v1.PersistentVolumeClaim, c clientset.In
 	waitErr := wait.PollImmediate(resizePollInterval, duration, func() (bool, error) {
 		pvcSize := pvc.Spec.Resources.Requests[v1.ResourceStorage]
 
-		pv, err := c.CoreV1().PersistentVolumes().Get(pvName, metav1.GetOptions{})
+		pv, err := c.CoreV1().PersistentVolumes().Get(context.TODO(), pvName, metav1.GetOptions{})
 		if err != nil {
 			return false, fmt.Errorf("error fetching pv %q for resizing %v", pvName, err)
 		}
@@ -348,7 +349,7 @@ func WaitForPendingFSResizeCondition(pvc *v1.PersistentVolumeClaim, c clientset.
 	var updatedPVC *v1.PersistentVolumeClaim
 	waitErr := wait.PollImmediate(resizePollInterval, pvcConditionSyncPeriod, func() (bool, error) {
 		var err error
-		updatedPVC, err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(pvc.Name, metav1.GetOptions{})
+		updatedPVC, err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(context.TODO(), pvc.Name, metav1.GetOptions{})
 
 		if err != nil {
 			return false, fmt.Errorf("error fetching pvc %q for checking for resize status : %v", pvc.Name, err)
@@ -376,7 +377,7 @@ func WaitForFSResize(pvc *v1.PersistentVolumeClaim, c clientset.Interface) (*v1.
 	var updatedPVC *v1.PersistentVolumeClaim
 	waitErr := wait.PollImmediate(resizePollInterval, totalResizeWaitPeriod, func() (bool, error) {
 		var err error
-		updatedPVC, err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(pvc.Name, metav1.GetOptions{})
+		updatedPVC, err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(context.TODO(), pvc.Name, metav1.GetOptions{})
 
 		if err != nil {
 			return false, fmt.Errorf("error fetching pvc %q for checking for resize status : %v", pvc.Name, err)

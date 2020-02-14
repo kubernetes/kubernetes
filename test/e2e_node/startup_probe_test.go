@@ -17,6 +17,7 @@ limitations under the License.
 package e2enode
 
 import (
+	"context"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -116,7 +117,7 @@ var _ = framework.KubeDescribe("StartupProbe [Serial] [Disruptive]", func() {
 		/*
 			Release : v1.16
 			Testname: Pod liveness probe fails after startup success
-			Description: A Pod is created with failing liveness probe and delayed startup probe that uses ‘exec’ command to cat /temp/health file. The Container is started by creating /tmp/startup after 10 seconds, triggering liveness probe to fail. The Pod MUST now be killed and restarted incrementing restart count to 1.
+			Description: A Pod is created with failing liveness probe and delayed startup probe that uses 'exec' command to cat /temp/health file. The Container is started by creating /tmp/startup after 10 seconds, triggering liveness probe to fail. The Pod MUST now be killed and restarted incrementing restart count to 1.
 		*/
 		ginkgo.It("should be restarted by liveness probe after startup probe enables it", func() {
 			cmd := []string{"/bin/sh", "-c", "sleep 10; echo ok >/tmp/startup; sleep 600"}
@@ -168,12 +169,12 @@ var _ = framework.KubeDescribe("StartupProbe [Serial] [Disruptive]", func() {
 			}
 			p := podClient.Create(startupPodSpec(startupProbe, readinessProbe, nil, cmd))
 
-			p, err := podClient.Get(p.Name, metav1.GetOptions{})
+			p, err := podClient.Get(context.TODO(), p.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 
 			f.WaitForPodReady(p.Name)
 
-			p, err = podClient.Get(p.Name, metav1.GetOptions{})
+			p, err = podClient.Get(context.TODO(), p.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 
 			isReady, err := testutils.PodRunningReady(p)

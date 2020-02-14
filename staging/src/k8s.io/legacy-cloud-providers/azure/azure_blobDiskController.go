@@ -443,16 +443,13 @@ func (c *BlobDiskController) getDiskCount(SAName string) (int, error) {
 func (c *BlobDiskController) getAllStorageAccounts() (map[string]*storageAccountState, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
-	accountListResult, rerr := c.common.cloud.StorageAccountClient.ListByResourceGroup(ctx, c.common.resourceGroup)
+	accountList, rerr := c.common.cloud.StorageAccountClient.ListByResourceGroup(ctx, c.common.resourceGroup)
 	if rerr != nil {
 		return nil, rerr.Error()
 	}
-	if accountListResult.Value == nil {
-		return nil, fmt.Errorf("azureDisk - empty accountListResult")
-	}
 
 	accounts := make(map[string]*storageAccountState)
-	for _, v := range *accountListResult.Value {
+	for _, v := range accountList {
 		if v.Name == nil || v.Sku == nil {
 			klog.Info("azureDisk - accountListResult Name or Sku is nil")
 			continue

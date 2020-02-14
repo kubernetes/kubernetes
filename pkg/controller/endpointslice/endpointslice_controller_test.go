@@ -17,6 +17,7 @@ limitations under the License.
 package endpointslice
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"testing"
@@ -106,7 +107,7 @@ func TestSyncServiceWithSelector(t *testing.T) {
 	standardSyncService(t, esController, ns, serviceName, "true")
 	expectActions(t, client.Actions(), 1, "create", "endpointslices")
 
-	sliceList, err := client.DiscoveryV1beta1().EndpointSlices(ns).List(metav1.ListOptions{})
+	sliceList, err := client.DiscoveryV1beta1().EndpointSlices(ns).List(context.TODO(), metav1.ListOptions{})
 	assert.Nil(t, err, "Expected no error fetching endpoint slices")
 	assert.Len(t, sliceList.Items, 1, "Expected 1 endpoint slices")
 	slice := sliceList.Items[0]
@@ -173,7 +174,7 @@ func TestSyncServicePodSelection(t *testing.T) {
 	expectActions(t, client.Actions(), 1, "create", "endpointslices")
 
 	// an endpoint slice should be created, it should only reference pod1 (not pod2)
-	slices, err := client.DiscoveryV1beta1().EndpointSlices(ns).List(metav1.ListOptions{})
+	slices, err := client.DiscoveryV1beta1().EndpointSlices(ns).List(context.TODO(), metav1.ListOptions{})
 	assert.Nil(t, err, "Expected no error fetching endpoint slices")
 	assert.Len(t, slices.Items, 1, "Expected 1 endpoint slices")
 	slice := slices.Items[0]
@@ -249,7 +250,7 @@ func TestSyncServiceEndpointSliceLabelSelection(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Expected no error adding EndpointSlice: %v", err)
 		}
-		_, err = client.DiscoveryV1beta1().EndpointSlices(ns).Create(endpointSlice)
+		_, err = client.DiscoveryV1beta1().EndpointSlices(ns).Create(context.TODO(), endpointSlice, metav1.CreateOptions{})
 		if err != nil {
 			t.Fatalf("Expected no error creating EndpointSlice: %v", err)
 		}
@@ -305,7 +306,7 @@ func TestSyncServiceFull(t *testing.T) {
 		},
 	}
 	esController.serviceStore.Add(service)
-	_, err := esController.client.CoreV1().Services(namespace).Create(service)
+	_, err := esController.client.CoreV1().Services(namespace).Create(context.TODO(), service, metav1.CreateOptions{})
 	assert.Nil(t, err, "Expected no error creating service")
 
 	// run through full sync service loop
@@ -314,7 +315,7 @@ func TestSyncServiceFull(t *testing.T) {
 
 	// last action should be to create endpoint slice
 	expectActions(t, client.Actions(), 1, "create", "endpointslices")
-	sliceList, err := client.DiscoveryV1beta1().EndpointSlices(namespace).List(metav1.ListOptions{})
+	sliceList, err := client.DiscoveryV1beta1().EndpointSlices(namespace).List(context.TODO(), metav1.ListOptions{})
 	assert.Nil(t, err, "Expected no error fetching endpoint slices")
 	assert.Len(t, sliceList.Items, 1, "Expected 1 endpoint slices")
 
@@ -368,7 +369,7 @@ func createService(t *testing.T, esController *endpointSliceController, namespac
 		},
 	}
 	esController.serviceStore.Add(service)
-	_, err := esController.client.CoreV1().Services(namespace).Create(service)
+	_, err := esController.client.CoreV1().Services(namespace).Create(context.TODO(), service, metav1.CreateOptions{})
 	assert.Nil(t, err, "Expected no error creating service")
 	return service
 }

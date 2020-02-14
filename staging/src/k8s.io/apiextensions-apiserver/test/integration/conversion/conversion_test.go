@@ -17,6 +17,7 @@ limitations under the License.
 package conversion
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -38,15 +39,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	etcd3watcher "k8s.io/apiserver/pkg/storage/etcd3"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	serveroptions "k8s.io/apiextensions-apiserver/pkg/cmd/server/options"
-	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 	"k8s.io/apiextensions-apiserver/test/integration/storage"
 )
@@ -58,17 +56,13 @@ func checks(checkers ...Checker) []Checker {
 }
 
 func TestWebhookConverterWithWatchCache(t *testing.T) {
-	testWebhookConverter(t, false, true)
+	testWebhookConverter(t, true)
 }
 func TestWebhookConverterWithoutWatchCache(t *testing.T) {
-	testWebhookConverter(t, false, false)
+	testWebhookConverter(t, false)
 }
 
-func TestWebhookConverterWithDefaulting(t *testing.T) {
-	testWebhookConverter(t, true, true)
-}
-
-func testWebhookConverter(t *testing.T, defaulting, watchCache bool) {
+func testWebhookConverter(t *testing.T, watchCache bool) {
 	tests := []struct {
 		group          string
 		handler        http.Handler
@@ -167,11 +161,6 @@ func testWebhookConverter(t *testing.T, defaulting, watchCache bool) {
 	etcd3watcher.TestOnlySetFatalOnDecodeError(false)
 	defer etcd3watcher.TestOnlySetFatalOnDecodeError(true)
 
-	// enable necessary features
-	if defaulting {
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CustomResourceDefaulting, true)()
-	}
-
 	tearDown, config, options, err := fixtures.StartDefaultServer(t, fmt.Sprintf("--watch-cache=%v", watchCache))
 	if err != nil {
 		t.Fatal(err)
@@ -191,12 +180,6 @@ func testWebhookConverter(t *testing.T, defaulting, watchCache bool) {
 	defer tearDown()
 
 	crd := multiVersionFixture.DeepCopy()
-
-	if !defaulting {
-		for i := range crd.Spec.Versions {
-			delete(crd.Spec.Versions[i].Schema.OpenAPIV3Schema.Properties, "defaults")
-		}
-	}
 
 	RESTOptionsGetter := serveroptions.NewCRDRESTOptionsGetter(*options.RecommendedOptions.Etcd)
 	restOptions, err := RESTOptionsGetter.GetRESTOptions(schema.GroupResource{Group: crd.Spec.Group, Resource: crd.Spec.Names.Plural})
@@ -922,7 +905,7 @@ func newConversionTestContext(t *testing.T, apiExtensionsClient clientset.Interf
 	if err != nil {
 		t.Fatal(err)
 	}
-	crd, err := apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(v1CRD.Name, metav1.GetOptions{})
+	crd, err := apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(context.TODO(), v1CRD.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -961,7 +944,7 @@ func (c *conversionTestContext) versionedClients(ns string) map[string]dynamic.R
 }
 
 func (c *conversionTestContext) setConversionWebhook(t *testing.T, webhookClientConfig *apiextensionsv1beta1.WebhookClientConfig, reviewVersions []string) {
-	crd, err := c.apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(c.crd.Name, metav1.GetOptions{})
+	crd, err := c.apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(context.TODO(), c.crd.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -970,7 +953,7 @@ func (c *conversionTestContext) setConversionWebhook(t *testing.T, webhookClient
 		WebhookClientConfig:      webhookClientConfig,
 		ConversionReviewVersions: reviewVersions,
 	}
-	crd, err = c.apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(crd)
+	crd, err = c.apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(context.TODO(), crd, metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -979,7 +962,7 @@ func (c *conversionTestContext) setConversionWebhook(t *testing.T, webhookClient
 }
 
 func (c *conversionTestContext) removeConversionWebhook(t *testing.T) {
-	crd, err := c.apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(c.crd.Name, metav1.GetOptions{})
+	crd, err := c.apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(context.TODO(), c.crd.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -987,7 +970,7 @@ func (c *conversionTestContext) removeConversionWebhook(t *testing.T) {
 		Strategy: apiextensionsv1beta1.NoneConverter,
 	}
 
-	crd, err = c.apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(crd)
+	crd, err = c.apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(context.TODO(), crd, metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1015,14 +998,14 @@ func (c *conversionTestContext) setAndWaitStorageVersion(t *testing.T, version s
 }
 
 func (c *conversionTestContext) setStorageVersion(t *testing.T, version string) {
-	crd, err := c.apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(c.crd.Name, metav1.GetOptions{})
+	crd, err := c.apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(context.TODO(), c.crd.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	for i, v := range crd.Spec.Versions {
 		crd.Spec.Versions[i].Storage = v.Name == version
 	}
-	crd, err = c.apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(crd)
+	crd, err = c.apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(context.TODO(), crd, metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1044,7 +1027,7 @@ func (c *conversionTestContext) waitForStorageVersion(t *testing.T, version stri
 }
 
 func (c *conversionTestContext) setServed(t *testing.T, version string, served bool) {
-	crd, err := c.apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(c.crd.Name, metav1.GetOptions{})
+	crd, err := c.apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(context.TODO(), c.crd.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1053,7 +1036,7 @@ func (c *conversionTestContext) setServed(t *testing.T, version string, served b
 			crd.Spec.Versions[i].Served = served
 		}
 	}
-	crd, err = c.apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(crd)
+	crd, err = c.apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(context.TODO(), crd, metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}

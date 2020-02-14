@@ -60,7 +60,8 @@ type PatchOptions struct {
 
 	namespace                    string
 	enforceNamespace             bool
-	dryRun                       bool
+	dryRunStrategy               cmdutil.DryRunStrategy
+	dryRunVerifier               *resource.DryRunVerifier
 	outputFormat                 string
 	args                         []string
 	builder                      *resource.Builder
@@ -139,13 +140,14 @@ func (o *PatchOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 	}
 
 	o.outputFormat = cmdutil.GetFlagString(cmd, "output")
-	o.dryRun = cmdutil.GetFlagBool(cmd, "dry-run")
+	o.dryRunStrategy, err = cmdutil.GetDryRunStrategy(cmd)
+	if err != nil {
+		return err
+	}
 
+	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.dryRunStrategy)
 	o.ToPrinter = func(operation string) (printers.ResourcePrinter, error) {
 		o.PrintFlags.NamePrintFlags.Operation = operation
-		if o.dryRun {
-			o.PrintFlags.Complete("%s (dry run)")
-		}
 
 		return o.PrintFlags.ToPrinter()
 	}
@@ -157,6 +159,15 @@ func (o *PatchOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 	o.args = args
 	o.builder = f.NewBuilder()
 	o.unstructuredClientForMapping = f.UnstructuredClientForMapping
+	dynamicClient, err := f.DynamicClient()
+	if err != nil {
+		return err
+	}
+	discoveryClient, err := f.ToDiscoveryClient()
+	if err != nil {
+		return err
+	}
+	o.dryRunVerifier = resource.NewDryRunVerifier(dynamicClient, discoveryClient)
 
 	return nil
 }
@@ -210,14 +221,21 @@ func (o *PatchOptions) RunPatch() error {
 		count++
 		name, namespace := info.Name, info.Namespace
 
-		if !o.Local && !o.dryRun {
+		if !o.Local && o.dryRunStrategy != cmdutil.DryRunClient {
 			mapping := info.ResourceMapping()
+			if o.dryRunStrategy == cmdutil.DryRunServer {
+				if err := o.dryRunVerifier.HasSupport(mapping.GroupVersionKind); err != nil {
+					return err
+				}
+			}
 			client, err := o.unstructuredClientForMapping(mapping)
 			if err != nil {
 				return err
 			}
 
-			helper := resource.NewHelper(client, mapping)
+			helper := resource.
+				NewHelper(client, mapping).
+				DryRun(o.dryRunStrategy == cmdutil.DryRunServer)
 			patchedObj, err := helper.Patch(namespace, name, patchType, patchBytes, nil)
 			if err != nil {
 				return err

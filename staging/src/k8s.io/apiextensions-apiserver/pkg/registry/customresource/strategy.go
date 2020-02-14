@@ -32,12 +32,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	apiserverstorage "k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	schemaobjectmeta "k8s.io/apiextensions-apiserver/pkg/apiserver/schema/objectmeta"
-	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 )
 
 // customResourceStrategy implements behavior for CustomResources.
@@ -75,7 +73,7 @@ func (a customResourceStrategy) NamespaceScoped() bool {
 
 // PrepareForCreate clears the status of a CustomResource before creation.
 func (a customResourceStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
-	if utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceSubresources) && a.status != nil {
+	if a.status != nil {
 		customResourceObject := obj.(*unstructured.Unstructured)
 		customResource := customResourceObject.UnstructuredContent()
 
@@ -98,7 +96,7 @@ func (a customResourceStrategy) PrepareForUpdate(ctx context.Context, obj, old r
 	oldCustomResource := oldCustomResourceObject.UnstructuredContent()
 
 	// If the /status subresource endpoint is installed, update is not allowed to set status.
-	if utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceSubresources) && a.status != nil {
+	if a.status != nil {
 		_, ok1 := newCustomResource["status"]
 		_, ok2 := oldCustomResource["status"]
 		switch {

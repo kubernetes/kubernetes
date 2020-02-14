@@ -17,6 +17,7 @@ limitations under the License.
 package vsphere
 
 import (
+	"context"
 	"time"
 
 	"github.com/onsi/ginkgo"
@@ -32,7 +33,7 @@ import (
 )
 
 // Testing configurations of single a PV/PVC pair attached to a vSphere Disk
-var _ = utils.SIGDescribe("PersistentVolumes:vsphere", func() {
+var _ = utils.SIGDescribe("PersistentVolumes:vsphere [Feature:vsphere]", func() {
 	var (
 		c          clientset.Interface
 		ns         string
@@ -206,7 +207,7 @@ var _ = utils.SIGDescribe("PersistentVolumes:vsphere", func() {
 	*/
 	ginkgo.It("should test that deleting the Namespace of a PVC and Pod causes the successful detach of vsphere volume", func() {
 		ginkgo.By("Deleting the Namespace")
-		err := c.CoreV1().Namespaces().Delete(ns, nil)
+		err := c.CoreV1().Namespaces().Delete(context.TODO(), ns, nil)
 		framework.ExpectNoError(err)
 
 		err = framework.WaitForNamespacesDeleted(c, []string{ns}, 3*time.Minute)

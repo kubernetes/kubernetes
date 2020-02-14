@@ -17,6 +17,7 @@ limitations under the License.
 package framework
 
 import (
+	"context"
 	"fmt"
 	"regexp"
 	"sync"
@@ -78,7 +79,7 @@ type PodClient struct {
 // Create creates a new pod according to the framework specifications (don't wait for it to start).
 func (c *PodClient) Create(pod *v1.Pod) *v1.Pod {
 	c.mungeSpec(pod)
-	p, err := c.PodInterface.Create(pod)
+	p, err := c.PodInterface.Create(context.TODO(), pod, metav1.CreateOptions{})
 	ExpectNoError(err, "Error creating Pod")
 	return p
 }
@@ -89,7 +90,7 @@ func (c *PodClient) CreateSync(pod *v1.Pod) *v1.Pod {
 	p := c.Create(pod)
 	ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(c.f.ClientSet, p.Name, namespace))
 	// Get the newest pod after it becomes running, some status may change after pod created, such as pod ip.
-	p, err := c.Get(p.Name, metav1.GetOptions{})
+	p, err := c.Get(context.TODO(), p.Name, metav1.GetOptions{})
 	ExpectNoError(err)
 	return p
 }
@@ -115,12 +116,12 @@ func (c *PodClient) CreateBatch(pods []*v1.Pod) []*v1.Pod {
 // pod object.
 func (c *PodClient) Update(name string, updateFn func(pod *v1.Pod)) {
 	ExpectNoError(wait.Poll(time.Millisecond*500, time.Second*30, func() (bool, error) {
-		pod, err := c.PodInterface.Get(name, metav1.GetOptions{})
+		pod, err := c.PodInterface.Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			return false, fmt.Errorf("failed to get pod %q: %v", name, err)
 		}
 		updateFn(pod)
-		_, err = c.PodInterface.Update(pod)
+		_, err = c.PodInterface.Update(context.TODO(), pod, metav1.UpdateOptions{})
 		if err == nil {
 			Logf("Successfully updated pod %q", name)
 			return true, nil
@@ -137,7 +138,7 @@ func (c *PodClient) Update(name string, updateFn func(pod *v1.Pod)) {
 // disappear before the timeout, it will fail the test.
 func (c *PodClient) DeleteSync(name string, options *metav1.DeleteOptions, timeout time.Duration) {
 	namespace := c.f.Namespace.Name
-	err := c.Delete(name, options)
+	err := c.Delete(context.TODO(), name, options)
 	if err != nil && !apierrors.IsNotFound(err) {
 		Failf("Failed to delete pod %q: %v", name, err)
 	}
@@ -185,7 +186,7 @@ func (c *PodClient) mungeSpec(pod *v1.Pod) {
 // TODO(random-liu): Move pod wait function into this file
 func (c *PodClient) WaitForSuccess(name string, timeout time.Duration) {
 	f := c.f
-	gomega.Expect(e2epod.WaitForPodCondition(f.ClientSet, f.Namespace.Name, name, "success or failure", timeout,
+	gomega.Expect(e2epod.WaitForPodCondition(f.ClientSet, f.Namespace.Name, name, fmt.Sprintf("%s or %s", v1.PodSucceeded, v1.PodFailed), timeout,
 		func(pod *v1.Pod) (bool, error) {
 			switch pod.Status.Phase {
 			case v1.PodFailed:
@@ -202,7 +203,7 @@ func (c *PodClient) WaitForSuccess(name string, timeout time.Duration) {
 // WaitForFinish waits for pod to finish running, regardless of success or failure.
 func (c *PodClient) WaitForFinish(name string, timeout time.Duration) {
 	f := c.f
-	gomega.Expect(e2epod.WaitForPodCondition(f.ClientSet, f.Namespace.Name, name, "success or failure", timeout,
+	gomega.Expect(e2epod.WaitForPodCondition(f.ClientSet, f.Namespace.Name, name, fmt.Sprintf("%s or %s", v1.PodSucceeded, v1.PodFailed), timeout,
 		func(pod *v1.Pod) (bool, error) {
 			switch pod.Status.Phase {
 			case v1.PodFailed:
@@ -226,7 +227,7 @@ func (c *PodClient) WaitForErrorEventOrSuccess(pod *v1.Pod) (*v1.Event, error) {
 		}
 		for _, e := range evnts.Items {
 			switch e.Reason {
-			case events.KillingContainer, events.FailedToCreateContainer, sysctl.UnsupportedReason, sysctl.ForbiddenReason:
+			case events.KillingContainer, events.FailedToCreateContainer, sysctl.ForbiddenReason:
 				ev = &e
 				return true, nil
 			case events.StartedContainer:
@@ -259,7 +260,7 @@ func (c *PodClient) MatchContainerOutput(name string, containerName string, expe
 
 // PodIsReady returns true if the specified pod is ready. Otherwise false.
 func (c *PodClient) PodIsReady(name string) bool {
-	pod, err := c.Get(name, metav1.GetOptions{})
+	pod, err := c.Get(context.TODO(), name, metav1.GetOptions{})
 	ExpectNoError(err)
 	return podutil.IsPodReady(pod)
 }

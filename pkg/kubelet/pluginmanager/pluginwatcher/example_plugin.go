@@ -17,6 +17,7 @@ limitations under the License.
 package pluginwatcher
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net"
@@ -24,7 +25,6 @@ import (
 	"sync"
 	"time"
 
-	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"k8s.io/klog"
 

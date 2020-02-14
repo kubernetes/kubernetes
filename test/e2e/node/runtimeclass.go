@@ -17,6 +17,7 @@ limitations under the License.
 package node
 
 import (
+	"context"
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
@@ -46,14 +47,14 @@ var _ = ginkgo.Describe("[sig-node] RuntimeClass", func() {
 
 		runtimeClass := newRuntimeClass(f.Namespace.Name, "conflict-runtimeclass")
 		runtimeClass.Scheduling = scheduling
-		rc, err := f.ClientSet.NodeV1beta1().RuntimeClasses().Create(runtimeClass)
+		rc, err := f.ClientSet.NodeV1beta1().RuntimeClasses().Create(context.TODO(), runtimeClass, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create RuntimeClass resource")
 
 		pod := newRuntimeClassPod(rc.GetName())
 		pod.Spec.NodeSelector = map[string]string{
 			"foo": "bar",
 		}
-		_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
+		_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
 		framework.ExpectError(err, "should be forbidden")
 		framework.ExpectEqual(apierrors.IsForbidden(err), true, "should be forbidden error")
 	})
@@ -97,7 +98,7 @@ var _ = ginkgo.Describe("[sig-node] RuntimeClass", func() {
 		ginkgo.By("Trying to create runtimeclass and pod")
 		runtimeClass := newRuntimeClass(f.Namespace.Name, "non-conflict-runtimeclass")
 		runtimeClass.Scheduling = scheduling
-		rc, err := f.ClientSet.NodeV1beta1().RuntimeClasses().Create(runtimeClass)
+		rc, err := f.ClientSet.NodeV1beta1().RuntimeClasses().Create(context.TODO(), runtimeClass, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create RuntimeClass resource")
 
 		pod := newRuntimeClassPod(rc.GetName())
@@ -109,7 +110,7 @@ var _ = ginkgo.Describe("[sig-node] RuntimeClass", func() {
 		framework.ExpectNoError(e2epod.WaitForPodNotPending(f.ClientSet, f.Namespace.Name, pod.Name))
 
 		// check that pod got scheduled on specified node.
-		scheduledPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(pod.Name, metav1.GetOptions{})
+		scheduledPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		framework.ExpectEqual(nodeName, scheduledPod.Spec.NodeName)
 		framework.ExpectEqual(nodeSelector, pod.Spec.NodeSelector)

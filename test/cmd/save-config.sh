@@ -63,21 +63,21 @@ run_save_config_tests() {
   # Clean up
   kubectl delete -f hack/testdata/pod.yaml "${kube_flags[@]}"
   ## 4. kubectl run --save-config should generate configuration annotation
-  # Pre-Condition: no RC exists
-  kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" ''
-  # Command: create the rc "nginx" with image nginx
-  kubectl run nginx "--image=$IMAGE_NGINX" --save-config --generator=run/v1 "${kube_flags[@]}"
-  # Post-Condition: rc "nginx" has configuration annotation
-  grep -q "kubectl.kubernetes.io/last-applied-configuration" <<< "$(kubectl get rc nginx -o yaml "${kube_flags[@]}")"
+  # Pre-Condition: no pods exists
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command: create the pod "nginx" with image nginx
+  kubectl run nginx "--image=$IMAGE_NGINX" --save-config "${kube_flags[@]}"
+  # Post-Condition: pod "nginx" has configuration annotation
+  grep -q "kubectl.kubernetes.io/last-applied-configuration" <<< "$(kubectl get pod nginx -o yaml "${kube_flags[@]}")"
   ## 5. kubectl expose --save-config should generate configuration annotation
   # Pre-Condition: no service exists
   kube::test::get_object_assert svc "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command: expose the rc "nginx"
-  kubectl expose rc nginx --save-config --port=80 --target-port=8000 "${kube_flags[@]}"
+  kubectl expose pod nginx --save-config --port=80 --target-port=8000 "${kube_flags[@]}"
   # Post-Condition: service "nginx" has configuration annotation
   grep -q "kubectl.kubernetes.io/last-applied-configuration" <<< "$(kubectl get svc nginx -o yaml "${kube_flags[@]}")"
   # Clean up
-  kubectl delete rc,svc nginx
+  kubectl delete pod,svc nginx
   ## 6. kubectl autoscale --save-config should generate configuration annotation
   # Pre-Condition: no RC exists, then create the rc "frontend", which shouldn't have configuration annotation
   kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" ''

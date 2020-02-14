@@ -6,7 +6,7 @@ go 1.13
 
 require (
 	github.com/go-openapi/spec v0.19.3
-	github.com/google/gofuzz v1.0.0
+	github.com/google/gofuzz v1.1.0
 	github.com/spf13/cobra v0.0.5
 	k8s.io/apimachinery v0.0.0
 	k8s.io/apiserver v0.0.0
@@ -14,7 +14,7 @@ require (
 	k8s.io/code-generator v0.0.0
 	k8s.io/component-base v0.0.0
 	k8s.io/klog v1.0.0
-	k8s.io/kube-openapi v0.0.0-20191107075043-30be4d16710a
+	k8s.io/kube-openapi v0.0.0-20200121204235-bf4fb3bd569c
 )
 
 replace (

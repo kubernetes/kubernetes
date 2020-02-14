@@ -291,7 +291,7 @@ func waitForServer(cfg restclient.Config, deadline time.Duration) error {
 
 	var connected bool
 	wait.JitterUntil(func() {
-		if _, err := cli.Get().AbsPath("/healthz").Do().Raw(); err != nil {
+		if _, err := cli.Get().AbsPath("/healthz").Do(context.TODO()).Raw(); err != nil {
 			klog.Infof("Failed to connect to apiserver: %v", err)
 			return
 		}
@@ -352,6 +352,7 @@ func requestNodeCertificate(client certificatesv1beta1.CertificateSigningRequest
 	ctx, cancel := context.WithTimeout(context.Background(), 3600*time.Second)
 	defer cancel()
 
+	klog.V(2).Infof("Waiting for client certificate to be issued")
 	return csr.WaitForCertificate(ctx, client, req)
 }
 

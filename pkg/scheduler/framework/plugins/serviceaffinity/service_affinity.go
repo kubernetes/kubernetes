@@ -24,7 +24,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	corelisters "k8s.io/client-go/listers/core/v1"
-	"k8s.io/klog"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
 	"k8s.io/kubernetes/pkg/scheduler/nodeinfo"
@@ -154,7 +153,7 @@ func (pl *ServiceAffinity) AddPod(ctx context.Context, cycleState *framework.Cyc
 
 	// If addedPod is in the same namespace as the pod, update the list
 	// of matching pods if applicable.
-	if s == nil || podToAdd.Namespace != podToSchedule.Namespace {
+	if podToAdd.Namespace != podToSchedule.Namespace {
 		return nil
 	}
 
@@ -173,8 +172,7 @@ func (pl *ServiceAffinity) RemovePod(ctx context.Context, cycleState *framework.
 		return framework.NewStatus(framework.Error, err.Error())
 	}
 
-	if s == nil ||
-		len(s.matchingPodList) == 0 ||
+	if len(s.matchingPodList) == 0 ||
 		podToRemove.Namespace != s.matchingPodList[0].Namespace {
 		return nil
 	}
@@ -192,10 +190,8 @@ func (pl *ServiceAffinity) RemovePod(ctx context.Context, cycleState *framework.
 func getPreFilterState(cycleState *framework.CycleState) (*preFilterState, error) {
 	c, err := cycleState.Read(preFilterStateKey)
 	if err != nil {
-		// The metadata wasn't pre-computed in prefilter. We ignore the error for now since
-		// Filter is able to handle that by computing it again.
-		klog.V(5).Infof(fmt.Sprintf("reading %q from cycleState: %v", preFilterStateKey, err))
-		return nil, nil
+		// preFilterState doesn't exist, likely PreFilter wasn't invoked.
+		return nil, fmt.Errorf("error reading %q from cycleState: %v", preFilterStateKey, err)
 	}
 
 	if c == nil {
@@ -246,14 +242,6 @@ func (pl *ServiceAffinity) Filter(ctx context.Context, cycleState *framework.Cyc
 	s, err := getPreFilterState(cycleState)
 	if err != nil {
 		return framework.NewStatus(framework.Error, err.Error())
-	}
-	if s == nil {
-		// Make the filter resilient in case preFilterState is missing.
-		s, err = pl.createPreFilterState(pod)
-		if err != nil {
-			return framework.NewStatus(framework.Error, fmt.Sprintf("could not create preFilterState: %v", err))
-
-		}
 	}
 
 	pods, services := s.matchingPodList, s.matchingPodServices

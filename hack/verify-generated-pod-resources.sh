@@ -14,6 +14,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This script checks whether updating of Pod resources API is needed or not. We
+# should run `hack/update-generated-pod-resources.sh` if Pod resources API is
+# out of date.
+# Usage: `hack/verify-generated-pod-resources.sh`.
+
 set -o errexit
 set -o nounset
 set -o pipefail

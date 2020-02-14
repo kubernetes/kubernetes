@@ -24,11 +24,11 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
-	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
+	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
-func TestPostFilterStateInitialize(t *testing.T) {
+func TestPreScoreStateInitialize(t *testing.T) {
 	tests := []struct {
 		name                string
 		pod                 *v1.Pod
@@ -77,7 +77,7 @@ func TestPostFilterStateInitialize(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := &postFilterState{
+			s := &preScoreState{
 				nodeNameSet:             sets.String{},
 				topologyPairToPodCounts: make(map[topologyPair]*int64),
 			}
@@ -429,16 +429,54 @@ func TestPodTopologySpreadScore(t *testing.T) {
 				{Name: "node-x", Score: 100},
 			},
 		},
+		{
+			name: "existing pods in a different namespace do not count",
+			pod: st.MakePod().Name("p").Label("foo", "").
+				SpreadConstraint(1, "node", softSpread, st.MakeLabelSelector().Exists("foo").Obj()).
+				Obj(),
+			existingPods: []*v1.Pod{
+				st.MakePod().Name("p-a1").Namespace("ns1").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-a2").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-b1").Node("node-b").Label("foo", "").Obj(),
+				st.MakePod().Name("p-b2").Node("node-b").Label("foo", "").Obj(),
+			},
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-a").Label("node", "node-a").Obj(),
+				st.MakeNode().Name("node-b").Label("node", "node-b").Obj(),
+			},
+			want: []framework.NodeScore{
+				{Name: "node-a", Score: 100},
+				{Name: "node-b", Score: 50},
+			},
+		},
+		{
+			name: "terminating Pods should be excluded",
+			pod: st.MakePod().Name("p").Label("foo", "").SpreadConstraint(
+				1, "node", softSpread, st.MakeLabelSelector().Exists("foo").Obj(),
+			).Obj(),
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-a").Label("node", "node-a").Obj(),
+				st.MakeNode().Name("node-b").Label("node", "node-b").Obj(),
+			},
+			existingPods: []*v1.Pod{
+				st.MakePod().Name("p-a").Node("node-a").Label("foo", "").Terminating().Obj(),
+				st.MakePod().Name("p-b").Node("node-b").Label("foo", "").Obj(),
+			},
+			want: []framework.NodeScore{
+				{Name: "node-a", Score: 100},
+				{Name: "node-b", Score: 0},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			allNodes := append([]*v1.Node{}, tt.nodes...)
 			allNodes = append(allNodes, tt.failedNodes...)
 			state := framework.NewCycleState()
-			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(tt.existingPods, allNodes))
+			snapshot := cache.NewSnapshot(tt.existingPods, allNodes)
 			p := &PodTopologySpread{sharedLister: snapshot}
 
-			status := p.PostFilter(context.Background(), state, tt.pod, tt.nodes, nil)
+			status := p.PreScore(context.Background(), state, tt.pod, tt.nodes, nil)
 			if !status.IsSuccess() {
 				t.Errorf("unexpected error: %v", status)
 			}
@@ -505,10 +543,10 @@ func BenchmarkTestPodTopologySpreadScore(b *testing.B) {
 		b.Run(tt.name, func(b *testing.B) {
 			existingPods, allNodes, filteredNodes := st.MakeNodesAndPodsForEvenPodsSpread(tt.pod.Labels, tt.existingPodsNum, tt.allNodesNum, tt.filteredNodesNum)
 			state := framework.NewCycleState()
-			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(existingPods, allNodes))
+			snapshot := cache.NewSnapshot(existingPods, allNodes)
 			p := &PodTopologySpread{sharedLister: snapshot}
 
-			status := p.PostFilter(context.Background(), state, tt.pod, filteredNodes, nil)
+			status := p.PreScore(context.Background(), state, tt.pod, filteredNodes, nil)
 			if !status.IsSuccess() {
 				b.Fatalf("unexpected error: %v", status)
 			}
@@ -564,10 +602,10 @@ func BenchmarkTestDefaultEvenPodsSpreadPriority(b *testing.B) {
 				SpreadConstraint(1, v1.LabelZoneFailureDomain, softSpread, st.MakeLabelSelector().Exists("foo").Obj()).Obj()
 			existingPods, allNodes, filteredNodes := st.MakeNodesAndPodsForEvenPodsSpread(pod.Labels, tt.existingPodsNum, tt.allNodesNum, tt.allNodesNum)
 			state := framework.NewCycleState()
-			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(existingPods, allNodes))
+			snapshot := cache.NewSnapshot(existingPods, allNodes)
 			p := &PodTopologySpread{sharedLister: snapshot}
 
-			status := p.PostFilter(context.Background(), state, pod, filteredNodes, nil)
+			status := p.PreScore(context.Background(), state, pod, filteredNodes, nil)
 			if !status.IsSuccess() {
 				b.Fatalf("unexpected error: %v", status)
 			}

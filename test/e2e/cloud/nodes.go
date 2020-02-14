@@ -17,6 +17,7 @@ limitations under the License.
 package cloud
 
 import (
+	"context"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -25,6 +26,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 
 	"github.com/onsi/ginkgo"
 )
@@ -36,7 +38,7 @@ var _ = SIGDescribe("[Feature:CloudProvider][Disruptive] Nodes", func() {
 	ginkgo.BeforeEach(func() {
 		// Only supported in AWS/GCE because those are the only cloud providers
 		// where E2E test are currently running.
-		framework.SkipUnlessProviderIs("aws", "gce", "gke")
+		e2eskipper.SkipUnlessProviderIs("aws", "gce", "gke")
 		c = f.ClientSet
 	})
 
@@ -64,7 +66,7 @@ var _ = SIGDescribe("[Feature:CloudProvider][Disruptive] Nodes", func() {
 		framework.ExpectNoError(err)
 		framework.ExpectEqual(len(newNodes), len(origNodes.Items)-1)
 
-		_, err = c.CoreV1().Nodes().Get(nodeToDelete.Name, metav1.GetOptions{})
+		_, err = c.CoreV1().Nodes().Get(context.TODO(), nodeToDelete.Name, metav1.GetOptions{})
 		if err == nil {
 			framework.Failf("node %q still exists when it should be deleted", nodeToDelete.Name)
 		} else if !apierrors.IsNotFound(err) {

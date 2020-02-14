@@ -40,6 +40,7 @@ limitations under the License.
 package volume
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"strconv"
@@ -127,12 +128,8 @@ type TestConfig struct {
 	// Wait for the pod to terminate successfully
 	// False indicates that the pod is long running
 	WaitForCompletion bool
-	// ServerNodeName is the spec.nodeName to run server pod on.  Default is any node.
-	ServerNodeName string
-	// ClientNodeName is the spec.nodeName to run client pod on.  Default is any node.
-	ClientNodeName string
-	// NodeSelector to use in pod spec (server, client and injector pods).
-	NodeSelector map[string]string
+	// ClientNodeSelection restricts where the client pod runs on.  Default is any node.
+	ClientNodeSelection e2epod.NodeSelection
 }
 
 // Test contains a volume to mount into a client pod and its
@@ -198,7 +195,7 @@ func NewGlusterfsServer(cs clientset.Interface, namespace string) (config TestCo
 			},
 		},
 	}
-	_, err := cs.CoreV1().Endpoints(namespace).Create(endpoints)
+	_, err := cs.CoreV1().Endpoints(namespace).Create(context.TODO(), endpoints, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "failed to create endpoints for Gluster server")
 
 	return config, pod, ip
@@ -296,19 +293,17 @@ func startVolumeServer(client clientset.Interface, config TestConfig) *v1.Pod {
 			},
 			Volumes:       volumes,
 			RestartPolicy: restartPolicy,
-			NodeName:      config.ServerNodeName,
-			NodeSelector:  config.NodeSelector,
 		},
 	}
 
 	var pod *v1.Pod
-	serverPod, err := podClient.Create(serverPod)
+	serverPod, err := podClient.Create(context.TODO(), serverPod, metav1.CreateOptions{})
 	// ok if the server pod already exists. TODO: make this controllable by callers
 	if err != nil {
 		if apierrors.IsAlreadyExists(err) {
 			framework.Logf("Ignore \"already-exists\" error, re-get pod...")
 			ginkgo.By(fmt.Sprintf("re-getting the %q server pod", serverPodName))
-			serverPod, err = podClient.Get(serverPodName, metav1.GetOptions{})
+			serverPod, err = podClient.Get(context.TODO(), serverPodName, metav1.GetOptions{})
 			framework.ExpectNoError(err, "Cannot re-get the server pod %q: %v", serverPodName, err)
 			pod = serverPod
 		} else {
@@ -317,12 +312,12 @@ func startVolumeServer(client clientset.Interface, config TestConfig) *v1.Pod {
 	}
 	if config.WaitForCompletion {
 		framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespace(client, serverPod.Name, serverPod.Namespace))
-		framework.ExpectNoError(podClient.Delete(serverPod.Name, nil))
+		framework.ExpectNoError(podClient.Delete(context.TODO(), serverPod.Name, nil))
 	} else {
 		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(client, serverPod))
 		if pod == nil {
 			ginkgo.By(fmt.Sprintf("locating the %q server pod", serverPodName))
-			pod, err = podClient.Get(serverPodName, metav1.GetOptions{})
+			pod, err = podClient.Get(context.TODO(), serverPodName, metav1.GetOptions{})
 			framework.ExpectNoError(err, "Cannot locate the server pod %q: %v", serverPodName, err)
 		}
 	}
@@ -388,10 +383,9 @@ func runVolumeTesterPod(client clientset.Interface, config TestConfig, podSuffix
 			TerminationGracePeriodSeconds: &gracePeriod,
 			SecurityContext:               GeneratePodSecurityContext(fsGroup, seLinuxOptions),
 			Volumes:                       []v1.Volume{},
-			NodeName:                      config.ClientNodeName,
-			NodeSelector:                  config.NodeSelector,
 		},
 	}
+	e2epod.SetNodeSelection(clientPod, config.ClientNodeSelection)
 
 	for i, test := range tests {
 		volumeName := fmt.Sprintf("%s-%s-%d", config.Prefix, "volume", i)
@@ -423,7 +417,7 @@ func runVolumeTesterPod(client clientset.Interface, config TestConfig, podSuffix
 		})
 	}
 	podsNamespacer := client.CoreV1().Pods(config.Namespace)
-	clientPod, err := podsNamespacer.Create(clientPod)
+	clientPod, err := podsNamespacer.Create(context.TODO(), clientPod, metav1.CreateOptions{})
 	if err != nil {
 		return nil, err
 	}

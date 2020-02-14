@@ -91,7 +91,7 @@ func (r *APIRenewer) Renew(cfg *certutil.Config) (*x509.Certificate, crypto.Sign
 		},
 	}
 
-	req, err := r.client.CertificateSigningRequests().Create(k8sCSR)
+	req, err := r.client.CertificateSigningRequests().Create(context.TODO(), k8sCSR, metav1.CreateOptions{})
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't create certificate signing request")
 	}

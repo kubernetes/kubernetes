@@ -17,6 +17,7 @@ limitations under the License.
 package create
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -199,8 +200,15 @@ func (c *CreateClusterRoleOptions) RunCreateRole() error {
 	}
 
 	// Create ClusterRole.
-	if !c.DryRun {
-		clusterRole, err = c.Client.ClusterRoles().Create(clusterRole)
+	if c.DryRunStrategy != cmdutil.DryRunClient {
+		createOptions := metav1.CreateOptions{}
+		if c.DryRunStrategy == cmdutil.DryRunServer {
+			if err := c.DryRunVerifier.HasSupport(clusterRole.GroupVersionKind()); err != nil {
+				return err
+			}
+			createOptions.DryRun = []string{metav1.DryRunAll}
+		}
+		clusterRole, err = c.Client.ClusterRoles().Create(context.TODO(), clusterRole, createOptions)
 		if err != nil {
 			return err
 		}

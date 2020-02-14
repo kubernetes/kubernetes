@@ -17,6 +17,7 @@ limitations under the License.
 package scheduler
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -40,10 +41,10 @@ const pollInterval = 100 * time.Millisecond
 // TestInterPodAffinity verifies that scheduler's inter pod affinity and
 // anti-affinity predicate functions works correctly.
 func TestInterPodAffinity(t *testing.T) {
-	context := initTest(t, "inter-pod-affinity")
-	defer cleanupTest(t, context)
+	testCtx := initTest(t, "inter-pod-affinity")
+	defer cleanupTest(t, testCtx)
 	// Add a few nodes.
-	nodes, err := createNodes(context.clientSet, "testnode", nil, 2)
+	nodes, err := createNodes(testCtx.clientSet, "testnode", nil, 2)
 	if err != nil {
 		t.Fatalf("Cannot create nodes: %v", err)
 	}
@@ -53,15 +54,15 @@ func TestInterPodAffinity(t *testing.T) {
 		"zone":   "z11",
 	}
 	for _, node := range nodes {
-		if err = testutils.AddLabelsToNode(context.clientSet, node.Name, labels1); err != nil {
+		if err = testutils.AddLabelsToNode(testCtx.clientSet, node.Name, labels1); err != nil {
 			t.Fatalf("Cannot add labels to node: %v", err)
 		}
-		if err = waitForNodeLabels(context.clientSet, node.Name, labels1); err != nil {
+		if err = waitForNodeLabels(testCtx.clientSet, node.Name, labels1); err != nil {
 			t.Fatalf("Adding labels to node didn't succeed: %v", err)
 		}
 	}
 
-	cs := context.clientSet
+	cs := testCtx.clientSet
 	podLabel := map[string]string{"service": "securityscan"}
 	podLabel2 := map[string]string{"security": "S1"}
 
@@ -821,9 +822,9 @@ func TestInterPodAffinity(t *testing.T) {
 			if pod.Namespace != "" {
 				nsName = pod.Namespace
 			} else {
-				nsName = context.ns.Name
+				nsName = testCtx.ns.Name
 			}
-			createdPod, err := cs.CoreV1().Pods(nsName).Create(pod)
+			createdPod, err := cs.CoreV1().Pods(nsName).Create(context.TODO(), pod, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatalf("Test Failed: error, %v, while creating pod during test: %v", err, test.test)
 			}
@@ -832,7 +833,7 @@ func TestInterPodAffinity(t *testing.T) {
 				t.Errorf("Test Failed: error, %v, while waiting for pod during test, %v", err, test)
 			}
 		}
-		testPod, err := cs.CoreV1().Pods(context.ns.Name).Create(test.pod)
+		testPod, err := cs.CoreV1().Pods(testCtx.ns.Name).Create(context.TODO(), test.pod, metav1.CreateOptions{})
 		if err != nil {
 			if !(test.errorType == "invalidPod" && apierrors.IsInvalid(err)) {
 				t.Fatalf("Test Failed: error, %v, while creating pod during test: %v", err, test.test)
@@ -848,11 +849,11 @@ func TestInterPodAffinity(t *testing.T) {
 			t.Errorf("Test Failed: %v, err %v, test.fits %v", test.test, err, test.fits)
 		}
 
-		err = cs.CoreV1().Pods(context.ns.Name).Delete(test.pod.Name, metav1.NewDeleteOptions(0))
+		err = cs.CoreV1().Pods(testCtx.ns.Name).Delete(context.TODO(), test.pod.Name, metav1.NewDeleteOptions(0))
 		if err != nil {
 			t.Errorf("Test Failed: error, %v, while deleting pod during test: %v", err, test.test)
 		}
-		err = wait.Poll(pollInterval, wait.ForeverTestTimeout, podDeleted(cs, context.ns.Name, test.pod.Name))
+		err = wait.Poll(pollInterval, wait.ForeverTestTimeout, podDeleted(cs, testCtx.ns.Name, test.pod.Name))
 		if err != nil {
 			t.Errorf("Test Failed: error, %v, while waiting for pod to get deleted, %v", err, test.test)
 		}
@@ -861,9 +862,9 @@ func TestInterPodAffinity(t *testing.T) {
 			if pod.Namespace != "" {
 				nsName = pod.Namespace
 			} else {
-				nsName = context.ns.Name
+				nsName = testCtx.ns.Name
 			}
-			err = cs.CoreV1().Pods(nsName).Delete(pod.Name, metav1.NewDeleteOptions(0))
+			err = cs.CoreV1().Pods(nsName).Delete(context.TODO(), pod.Name, metav1.NewDeleteOptions(0))
 			if err != nil {
 				t.Errorf("Test Failed: error, %v, while deleting pod during test: %v", err, test.test)
 			}
@@ -879,10 +880,10 @@ func TestInterPodAffinity(t *testing.T) {
 func TestEvenPodsSpreadPredicate(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EvenPodsSpread, true)()
 
-	context := initTest(t, "eps-predicate")
-	cs := context.clientSet
-	ns := context.ns.Name
-	defer cleanupTest(t, context)
+	testCtx := initTest(t, "eps-predicate")
+	cs := testCtx.clientSet
+	ns := testCtx.ns.Name
+	defer cleanupTest(t, testCtx)
 	// Add 4 nodes.
 	nodes, err := createNodes(cs, "node", nil, 4)
 	if err != nil {
@@ -1004,7 +1005,7 @@ func TestEvenPodsSpreadPredicate(t *testing.T) {
 			allPods := append(tt.existingPods, tt.incomingPod)
 			defer cleanupPods(cs, t, allPods)
 			for _, pod := range tt.existingPods {
-				createdPod, err := cs.CoreV1().Pods(pod.Namespace).Create(pod)
+				createdPod, err := cs.CoreV1().Pods(pod.Namespace).Create(context.TODO(), pod, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("Test Failed: error while creating pod during test: %v", err)
 				}
@@ -1013,7 +1014,7 @@ func TestEvenPodsSpreadPredicate(t *testing.T) {
 					t.Errorf("Test Failed: error while waiting for pod during test: %v", err)
 				}
 			}
-			testPod, err := cs.CoreV1().Pods(tt.incomingPod.Namespace).Create(tt.incomingPod)
+			testPod, err := cs.CoreV1().Pods(tt.incomingPod.Namespace).Create(context.TODO(), tt.incomingPod, metav1.CreateOptions{})
 			if err != nil && !apierrors.IsInvalid(err) {
 				t.Fatalf("Test Failed: error while creating pod during test: %v", err)
 			}

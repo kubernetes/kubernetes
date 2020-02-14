@@ -16,10 +16,6 @@ limitations under the License.
 
 package topologymanager
 
-import (
-	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
-)
-
 type restrictedPolicy struct {
 	bestEffortPolicy
 }
@@ -38,21 +34,16 @@ func (p *restrictedPolicy) Name() string {
 	return PolicyRestricted
 }
 
-func (p *restrictedPolicy) canAdmitPodResult(hint *TopologyHint) lifecycle.PodAdmitResult {
+func (p *restrictedPolicy) canAdmitPodResult(hint *TopologyHint) bool {
 	if !hint.Preferred {
-		return lifecycle.PodAdmitResult{
-			Admit:   false,
-			Reason:  "Topology Affinity Error",
-			Message: "Resources cannot be allocated with Topology Locality",
-		}
+		return false
 	}
-	return lifecycle.PodAdmitResult{
-		Admit: true,
-	}
+	return true
 }
 
-func (p *restrictedPolicy) Merge(providersHints []map[string][]TopologyHint) (TopologyHint, lifecycle.PodAdmitResult) {
-	hint := mergeProvidersHints(p, p.numaNodes, providersHints)
+func (p *restrictedPolicy) Merge(providersHints []map[string][]TopologyHint) (TopologyHint, bool) {
+	filteredHints := filterProvidersHints(providersHints)
+	hint := mergeFilteredHints(p.numaNodes, filteredHints)
 	admit := p.canAdmitPodResult(&hint)
 	return hint, admit
 }

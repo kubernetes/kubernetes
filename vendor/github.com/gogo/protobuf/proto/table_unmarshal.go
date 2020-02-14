@@ -371,15 +371,18 @@ func (u *unmarshalInfo) computeUnmarshalInfo() {
 	}
 
 	// Find any types associated with oneof fields.
-	// TODO: XXX_OneofFuncs returns more info than we need.  Get rid of some of it?
-	fn := reflect.Zero(reflect.PtrTo(t)).MethodByName("XXX_OneofFuncs")
 	// gogo: len(oneofFields) > 0 is needed for embedded oneof messages, without a marshaler and unmarshaler
-	if fn.IsValid() && len(oneofFields) > 0 {
-		res := fn.Call(nil)[3] // last return value from XXX_OneofFuncs: []interface{}
-		for i := res.Len() - 1; i >= 0; i-- {
-			v := res.Index(i)                             // interface{}
-			tptr := reflect.ValueOf(v.Interface()).Type() // *Msg_X
-			typ := tptr.Elem()                            // Msg_X
+	if len(oneofFields) > 0 {
+		var oneofImplementers []interface{}
+		switch m := reflect.Zero(reflect.PtrTo(t)).Interface().(type) {
+		case oneofFuncsIface:
+			_, _, _, oneofImplementers = m.XXX_OneofFuncs()
+		case oneofWrappersIface:
+			oneofImplementers = m.XXX_OneofWrappers()
+		}
+		for _, v := range oneofImplementers {
+			tptr := reflect.TypeOf(v) // *Msg_X
+			typ := tptr.Elem()        // Msg_X
 
 			f := typ.Field(0) // oneof implementers have one field
 			baseUnmarshal := fieldUnmarshaler(&f)
@@ -407,11 +410,12 @@ func (u *unmarshalInfo) computeUnmarshalInfo() {
 					u.setTag(fieldNum, of.field, unmarshal, 0, name)
 				}
 			}
+
 		}
 	}
 
 	// Get extension ranges, if any.
-	fn = reflect.Zero(reflect.PtrTo(t)).MethodByName("ExtensionRangeArray")
+	fn := reflect.Zero(reflect.PtrTo(t)).MethodByName("ExtensionRangeArray")
 	if fn.IsValid() {
 		if !u.extensions.IsValid() && !u.oldExtensions.IsValid() && !u.bytesExtensions.IsValid() {
 			panic("a message with extensions, but no extensions field in " + t.Name())

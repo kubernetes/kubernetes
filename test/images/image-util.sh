@@ -22,6 +22,7 @@ TASK=$1
 WHAT=$2
 
 KUBE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
+source "${KUBE_ROOT}/hack/lib/logging.sh"
 source "${KUBE_ROOT}/hack/lib/util.sh"
 
 # Mapping of go ARCH to actual architectures shipped part of multiarch/qemu-user-static project
@@ -132,6 +133,8 @@ push() {
 
   # The manifest command is still experimental as of Docker 18.09.2
   export DOCKER_CLI_EXPERIMENTAL="enabled"
+  # reset manifest list; needed in case multiple images are being built / pushed.
+  manifest=()
   # Make archs list into image manifest. Eg: 'amd64 ppc64le' to '${REGISTRY}/${image}-amd64:${TAG} ${REGISTRY}/${image}-ppc64le:${TAG}'
   while IFS='' read -r line; do manifest+=("$line"); done < <(echo "$archs" | ${SED} -e "s~[^ ]*~$REGISTRY\/$image\-&:$TAG~g")
   docker manifest create --amend "${REGISTRY}/${image}:${TAG}" "${manifest[@]}"
@@ -149,7 +152,7 @@ bin() {
   fi
   for SRC in "$@";
   do
-  docker run --rm -it -v "${TARGET}:${TARGET}:Z" -v "${KUBE_ROOT}":/go/src/k8s.io/kubernetes:Z \
+  docker run --rm -v "${TARGET}:${TARGET}:Z" -v "${KUBE_ROOT}":/go/src/k8s.io/kubernetes:Z \
         golang:"${GOLANG_VERSION}" \
         /bin/bash -c "\
                 cd /go/src/k8s.io/kubernetes/test/images/${SRC_DIR} && \
@@ -166,8 +169,7 @@ if [[ "${WHAT}" == "all-conformance" ]]; then
   # Discussed during Conformance Office Hours Meeting (2019.12.17):
   # https://docs.google.com/document/d/1W31nXh9RYAb_VaYkwuPLd1hFxuRX3iU0DmaQ4lkCsX8/edit#heading=h.l87lu17xm9bh
   # echoserver image not included: https://github.com/kubernetes/kubernetes/issues/84158
-  conformance_images=("agnhost" "dnsutils" "jessie-dnsutils" "kitten" "mounttest" "mounttest-user"\
-    "nautilus" "nonewprivs" "resource-consumer" "resource-consumer-controller" "sample-apiserver" "test-webserver")
+  conformance_images=("agnhost" "jessie-dnsutils" "kitten" "nautilus" "nonewprivs" "resource-consumer" "sample-apiserver")
   for image in "${conformance_images[@]}"; do
     eval "${TASK}" "${image}"
   done

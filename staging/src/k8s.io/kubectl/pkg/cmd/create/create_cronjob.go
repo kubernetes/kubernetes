@@ -17,6 +17,7 @@ limitations under the License.
 package create
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/spf13/cobra"
@@ -40,10 +41,10 @@ var (
 
 	cronjobExample = templates.Examples(`
 		# Create a cronjob
-		kubectl create cronjob my-job --image=busybox 
+		kubectl create cronjob my-job --image=busybox
 
 		# Create a cronjob with command
-		kubectl create cronjob my-job --image=busybox -- date 
+		kubectl create cronjob my-job --image=busybox -- date
 
 		# Create a cronjob with schedule
 		kubectl create cronjob test-job --image=busybox --schedule="*/1 * * * *"`)
@@ -60,11 +61,12 @@ type CreateCronJobOptions struct {
 	Command  []string
 	Restart  string
 
-	Namespace string
-	Client    batchv1beta1client.BatchV1beta1Interface
-	DryRun    bool
-	Builder   *resource.Builder
-	Cmd       *cobra.Command
+	Namespace      string
+	Client         batchv1beta1client.BatchV1beta1Interface
+	DryRunStrategy cmdutil.DryRunStrategy
+	DryRunVerifier *resource.DryRunVerifier
+	Builder        *resource.Builder
+	Cmd            *cobra.Command
 
 	genericclioptions.IOStreams
 }
@@ -133,10 +135,20 @@ func (o *CreateCronJobOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, a
 	o.Builder = f.NewBuilder()
 	o.Cmd = cmd
 
-	o.DryRun = cmdutil.GetDryRunFlag(cmd)
-	if o.DryRun {
-		o.PrintFlags.Complete("%s (dry run)")
+	o.DryRunStrategy, err = cmdutil.GetDryRunStrategy(cmd)
+	if err != nil {
+		return err
 	}
+	dynamicClient, err := f.DynamicClient()
+	if err != nil {
+		return err
+	}
+	discoveryClient, err := f.ToDiscoveryClient()
+	if err != nil {
+		return err
+	}
+	o.DryRunVerifier = resource.NewDryRunVerifier(dynamicClient, discoveryClient)
+	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.DryRunStrategy)
 	printer, err := o.PrintFlags.ToPrinter()
 	if err != nil {
 		return err
@@ -162,9 +174,16 @@ func (o *CreateCronJobOptions) Run() error {
 	var cronjob *batchv1beta1.CronJob
 	cronjob = o.createCronJob()
 
-	if !o.DryRun {
+	if o.DryRunStrategy != cmdutil.DryRunClient {
+		createOptions := metav1.CreateOptions{}
+		if o.DryRunStrategy == cmdutil.DryRunServer {
+			if err := o.DryRunVerifier.HasSupport(cronjob.GroupVersionKind()); err != nil {
+				return err
+			}
+			createOptions.DryRun = []string{metav1.DryRunAll}
+		}
 		var err error
-		cronjob, err = o.Client.CronJobs(o.Namespace).Create(cronjob)
+		cronjob, err = o.Client.CronJobs(o.Namespace).Create(context.TODO(), cronjob, createOptions)
 		if err != nil {
 			return fmt.Errorf("failed to create cronjob: %v", err)
 		}

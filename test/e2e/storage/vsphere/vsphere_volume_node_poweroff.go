@@ -80,9 +80,9 @@ var _ = utils.SIGDescribe("Node Poweroff [Feature:vsphere] [Slow] [Disruptive]",
 	ginkgo.It("verify volume status after node power off", func() {
 		ginkgo.By("Creating a Storage Class")
 		storageClassSpec := getVSphereStorageClassSpec("test-sc", nil, nil, "")
-		storageclass, err := client.StorageV1().StorageClasses().Create(storageClassSpec)
+		storageclass, err := client.StorageV1().StorageClasses().Create(context.TODO(), storageClassSpec, metav1.CreateOptions{})
 		framework.ExpectNoError(err, fmt.Sprintf("Failed to create storage class with err: %v", err))
-		defer client.StorageV1().StorageClasses().Delete(storageclass.Name, nil)
+		defer client.StorageV1().StorageClasses().Delete(context.TODO(), storageclass.Name, nil)
 
 		ginkgo.By("Creating PVC using the Storage Class")
 		pvclaimSpec := getVSphereClaimSpecWithStorageClass(namespace, "1Gi", storageclass)
@@ -99,7 +99,7 @@ var _ = utils.SIGDescribe("Node Poweroff [Feature:vsphere] [Slow] [Disruptive]",
 		ginkgo.By("Creating a Deployment")
 		deployment, err := e2edeploy.CreateDeployment(client, int32(1), map[string]string{"test": "app"}, nil, namespace, pvclaims, "")
 		framework.ExpectNoError(err, fmt.Sprintf("Failed to create Deployment with err: %v", err))
-		defer client.AppsV1().Deployments(namespace).Delete(deployment.Name, &metav1.DeleteOptions{})
+		defer client.AppsV1().Deployments(namespace).Delete(context.TODO(), deployment.Name, &metav1.DeleteOptions{})
 
 		ginkgo.By("Get pod from the deployment")
 		podList, err := e2edeploy.GetPodsForDeployment(client, deployment)

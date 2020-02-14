@@ -17,6 +17,7 @@ limitations under the License.
 package utils
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
@@ -118,7 +119,7 @@ func isSudoPresent(nodeIP string, provider string) bool {
 // address. Returns an error if the node the pod is on doesn't have an
 // address.
 func getHostAddress(client clientset.Interface, p *v1.Pod) (string, error) {
-	node, err := client.CoreV1().Nodes().Get(p.Spec.NodeName, metav1.GetOptions{})
+	node, err := client.CoreV1().Nodes().Get(context.TODO(), p.Spec.NodeName, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -298,9 +299,9 @@ func TestVolumeUnmountsFromDeletedPodWithForceOption(c clientset.Interface, f *f
 
 	ginkgo.By(fmt.Sprintf("Deleting Pod %q", clientPod.Name))
 	if forceDelete {
-		err = c.CoreV1().Pods(clientPod.Namespace).Delete(clientPod.Name, metav1.NewDeleteOptions(0))
+		err = c.CoreV1().Pods(clientPod.Namespace).Delete(context.TODO(), clientPod.Name, metav1.NewDeleteOptions(0))
 	} else {
-		err = c.CoreV1().Pods(clientPod.Namespace).Delete(clientPod.Name, &metav1.DeleteOptions{})
+		err = c.CoreV1().Pods(clientPod.Namespace).Delete(context.TODO(), clientPod.Name, &metav1.DeleteOptions{})
 	}
 	framework.ExpectNoError(err)
 
@@ -384,9 +385,9 @@ func TestVolumeUnmapsFromDeletedPodWithForceOption(c clientset.Interface, f *fra
 
 	ginkgo.By(fmt.Sprintf("Deleting Pod %q", clientPod.Name))
 	if forceDelete {
-		err = c.CoreV1().Pods(clientPod.Namespace).Delete(clientPod.Name, metav1.NewDeleteOptions(0))
+		err = c.CoreV1().Pods(clientPod.Namespace).Delete(context.TODO(), clientPod.Name, metav1.NewDeleteOptions(0))
 	} else {
-		err = c.CoreV1().Pods(clientPod.Namespace).Delete(clientPod.Name, &metav1.DeleteOptions{})
+		err = c.CoreV1().Pods(clientPod.Namespace).Delete(context.TODO(), clientPod.Name, &metav1.DeleteOptions{})
 	}
 	framework.ExpectNoError(err, "Failed to delete pod.")
 
@@ -465,7 +466,7 @@ func RunInPodWithVolume(c clientset.Interface, ns, claimName, command string) {
 			},
 		},
 	}
-	pod, err := c.CoreV1().Pods(ns).Create(pod)
+	pod, err := c.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "Failed to create pod: %v", err)
 	defer func() {
 		e2epod.DeletePodOrFail(c, ns, pod.Name)
@@ -535,13 +536,13 @@ func StartExternalProvisioner(c clientset.Interface, ns string, externalPluginNa
 			},
 		},
 	}
-	provisionerPod, err := podClient.Create(provisionerPod)
+	provisionerPod, err := podClient.Create(context.TODO(), provisionerPod, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "Failed to create %s pod: %v", provisionerPod.Name, err)
 
 	framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(c, provisionerPod))
 
 	ginkgo.By("locating the provisioner pod")
-	pod, err := podClient.Get(provisionerPod.Name, metav1.GetOptions{})
+	pod, err := podClient.Get(context.TODO(), provisionerPod.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err, "Cannot locate the provisioner pod %v: %v", provisionerPod.Name, err)
 
 	return pod
@@ -578,9 +579,9 @@ func PrivilegedTestPSPClusterRoleBinding(client clientset.Interface,
 			},
 		}
 
-		roleBindingClient.Delete(binding.GetName(), &metav1.DeleteOptions{})
+		roleBindingClient.Delete(context.TODO(), binding.GetName(), &metav1.DeleteOptions{})
 		err := wait.Poll(2*time.Second, 2*time.Minute, func() (bool, error) {
-			_, err := roleBindingClient.Get(binding.GetName(), metav1.GetOptions{})
+			_, err := roleBindingClient.Get(context.TODO(), binding.GetName(), metav1.GetOptions{})
 			return apierrors.IsNotFound(err), nil
 		})
 		framework.ExpectNoError(err, "Timed out waiting for RBAC binding %s deletion: %v", binding.GetName(), err)
@@ -589,7 +590,7 @@ func PrivilegedTestPSPClusterRoleBinding(client clientset.Interface,
 			continue
 		}
 
-		_, err = roleBindingClient.Create(binding)
+		_, err = roleBindingClient.Create(context.TODO(), binding, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "Failed to create %s role binding: %v", binding.GetName(), err)
 
 	}

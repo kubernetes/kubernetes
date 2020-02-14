@@ -17,8 +17,8 @@ limitations under the License.
 package scheduling
 
 import (
+	"context"
 	"fmt"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -28,8 +28,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	clientset "k8s.io/client-go/kubernetes"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2eevents "k8s.io/kubernetes/test/e2e/framework/events"
 	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -77,7 +77,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 	f := framework.NewDefaultFramework("sched-pred")
 
 	ginkgo.AfterEach(func() {
-		rc, err := cs.CoreV1().ReplicationControllers(ns).Get(RCName, metav1.GetOptions{})
+		rc, err := cs.CoreV1().ReplicationControllers(ns).Get(context.TODO(), RCName, metav1.GetOptions{})
 		if err == nil && *(rc.Spec.Replicas) != 0 {
 			ginkgo.By("Cleaning up the replication controller")
 			err := e2erc.DeleteRCAndWaitForGC(f.ClientSet, ns, RCName)
@@ -116,7 +116,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 
 	})
 
-	// This test verifies we don't allow scheduling of pods in a way that sum of local ephemeral storage limits of pods is greater than machines capacity.
+	// This test verifies we don't allow scheduling of pods in a way that sum of local ephemeral storage resource requests of pods is greater than machines capacity.
 	// It assumes that cluster add-on pods stay stable and cannot be run in parallel with any other test that touches Nodes or Pods.
 	// It is so because we need to have precise control on what's running in the cluster.
 	ginkgo.It("validates local ephemeral storage resource limits of pods that are allowed to run [Feature:LocalStorageCapacityIsolation]", func() {
@@ -136,7 +136,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		}
 		WaitForStableCluster(cs, masterNodes)
 
-		pods, err := cs.CoreV1().Pods(metav1.NamespaceAll).List(metav1.ListOptions{})
+		pods, err := cs.CoreV1().Pods(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{})
 		framework.ExpectNoError(err)
 		for _, pod := range pods.Items {
 			_, found := nodeToAllocatableMap[pod.Spec.NodeName]
@@ -186,6 +186,9 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 				Limits: v1.ResourceList{
 					v1.ResourceEphemeralStorage: *resource.NewQuantity(ephemeralStoragePerPod, "DecimalSI"),
 				},
+				Requests: v1.ResourceList{
+					v1.ResourceEphemeralStorage: *resource.NewQuantity(ephemeralStoragePerPod, "DecimalSI"),
+				},
 			},
 		}
 		WaitForSchedulerAfterAction(f, createPausePodAction(f, conf), ns, podName, false)
@@ -193,7 +196,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 	})
 
 	// This test verifies we don't allow scheduling of pods in a way that sum of
-	// limits of pods is greater than machines capacity.
+	// resource requests of pods is greater than machines capacity.
 	// It assumes that cluster add-on pods stay stable and cannot be run in parallel
 	// with any other test that touches Nodes or Pods.
 	// It is so because we need to have precise control on what's running in the cluster.
@@ -206,7 +209,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 	/*
 		Release : v1.9
 		Testname: Scheduler, resource limits
-		Description: Scheduling Pods MUST fail if the resource limits exceed Machine capacity.
+		Description: Scheduling Pods MUST fail if the resource requests exceed Machine capacity.
 	*/
 	framework.ConformanceIt("validates resource limits of pods that are allowed to run ", func() {
 		WaitForStableCluster(cs, masterNodes)
@@ -241,7 +244,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 			}
 		}()
 
-		pods, err := cs.CoreV1().Pods(metav1.NamespaceAll).List(metav1.ListOptions{})
+		pods, err := cs.CoreV1().Pods(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{})
 		framework.ExpectNoError(err)
 		for _, pod := range pods.Items {
 			_, found := nodeToAllocatableMap[pod.Spec.NodeName]
@@ -300,6 +303,9 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 			Labels: map[string]string{"name": "additional"},
 			Resources: &v1.ResourceRequirements{
 				Limits: v1.ResourceList{
+					v1.ResourceCPU: *resource.NewMilliQuantity(nodeMaxAllocatable*5/10, "DecimalSI"),
+				},
+				Requests: v1.ResourceList{
 					v1.ResourceCPU: *resource.NewMilliQuantity(nodeMaxAllocatable*5/10, "DecimalSI"),
 				},
 			},
@@ -363,7 +369,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		// already when the kubelet does not know about its new label yet. The
 		// kubelet will then refuse to launch the pod.
 		framework.ExpectNoError(e2epod.WaitForPodNotPending(cs, ns, labelPodName))
-		labelPod, err := cs.CoreV1().Pods(ns).Get(labelPodName, metav1.GetOptions{})
+		labelPod, err := cs.CoreV1().Pods(ns).Get(context.TODO(), labelPodName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		framework.ExpectEqual(labelPod.Spec.NodeName, nodeName)
 	})
@@ -450,7 +456,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		// already when the kubelet does not know about its new label yet. The
 		// kubelet will then refuse to launch the pod.
 		framework.ExpectNoError(e2epod.WaitForPodNotPending(cs, ns, labelPodName))
-		labelPod, err := cs.CoreV1().Pods(ns).Get(labelPodName, metav1.GetOptions{})
+		labelPod, err := cs.CoreV1().Pods(ns).Get(context.TODO(), labelPodName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		framework.ExpectEqual(labelPod.Spec.NodeName, nodeName)
 	})
@@ -493,7 +499,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		// already when the kubelet does not know about its new taint yet. The
 		// kubelet will then refuse to launch the pod.
 		framework.ExpectNoError(e2epod.WaitForPodNotPending(cs, ns, tolerationPodName))
-		deployedPod, err := cs.CoreV1().Pods(ns).Get(tolerationPodName, metav1.GetOptions{})
+		deployedPod, err := cs.CoreV1().Pods(ns).Get(context.TODO(), tolerationPodName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		framework.ExpectEqual(deployedPod.Spec.NodeName, nodeName)
 	})
@@ -656,7 +662,7 @@ func createPausePod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
 	if len(namespace) == 0 {
 		namespace = f.Namespace.Name
 	}
-	pod, err := f.ClientSet.CoreV1().Pods(namespace).Create(initPausePod(f, conf))
+	pod, err := f.ClientSet.CoreV1().Pods(namespace).Create(context.TODO(), initPausePod(f, conf), metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 	return pod
 }
@@ -664,7 +670,7 @@ func createPausePod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
 func runPausePod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
 	pod := createPausePod(f, conf)
 	framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(f.ClientSet, pod))
-	pod, err := f.ClientSet.CoreV1().Pods(pod.Namespace).Get(conf.Name, metav1.GetOptions{})
+	pod, err := f.ClientSet.CoreV1().Pods(pod.Namespace).Get(context.TODO(), conf.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err)
 	return pod
 }
@@ -677,7 +683,7 @@ func runPodAndGetNodeName(f *framework.Framework, conf pausePodConfig) string {
 	pod := runPausePod(f, conf)
 
 	ginkgo.By("Explicitly delete pod here to free the resource it takes.")
-	err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(pod.Name, metav1.NewDeleteOptions(0))
+	err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), pod.Name, metav1.NewDeleteOptions(0))
 	framework.ExpectNoError(err)
 
 	return pod.Spec.NodeName
@@ -701,7 +707,7 @@ func getRequestedStorageEphemeralStorage(pod v1.Pod) int64 {
 
 // removeTaintFromNodeAction returns a closure that removes the given taint
 // from the given node upon invocation.
-func removeTaintFromNodeAction(cs clientset.Interface, nodeName string, testTaint v1.Taint) e2eevents.Action {
+func removeTaintFromNodeAction(cs clientset.Interface, nodeName string, testTaint v1.Taint) Action {
 	return func() error {
 		framework.RemoveTaintOffNode(cs, nodeName, testTaint)
 		return nil
@@ -709,28 +715,28 @@ func removeTaintFromNodeAction(cs clientset.Interface, nodeName string, testTain
 }
 
 // createPausePodAction returns a closure that creates a pause pod upon invocation.
-func createPausePodAction(f *framework.Framework, conf pausePodConfig) e2eevents.Action {
+func createPausePodAction(f *framework.Framework, conf pausePodConfig) Action {
 	return func() error {
-		_, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(initPausePod(f, conf))
+		_, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), initPausePod(f, conf), metav1.CreateOptions{})
 		return err
 	}
 }
 
 // WaitForSchedulerAfterAction performs the provided action and then waits for
 // scheduler to act on the given pod.
-func WaitForSchedulerAfterAction(f *framework.Framework, action e2eevents.Action, ns, podName string, expectSuccess bool) {
+func WaitForSchedulerAfterAction(f *framework.Framework, action Action, ns, podName string, expectSuccess bool) {
 	predicate := scheduleFailureEvent(podName)
 	if expectSuccess {
 		predicate = scheduleSuccessEvent(ns, podName, "" /* any node */)
 	}
-	success, err := e2eevents.ObserveEventAfterAction(f.ClientSet, f.Namespace.Name, predicate, action)
+	success, err := observeEventAfterAction(f.ClientSet, f.Namespace.Name, predicate, action)
 	framework.ExpectNoError(err)
 	framework.ExpectEqual(success, true)
 }
 
 // TODO: upgrade calls in PodAffinity tests when we're able to run them
 func verifyResult(c clientset.Interface, expectedScheduled int, expectedNotScheduled int, ns string) {
-	allPods, err := c.CoreV1().Pods(ns).List(metav1.ListOptions{})
+	allPods, err := c.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{})
 	framework.ExpectNoError(err)
 	scheduledPods, notScheduledPods := GetPodsScheduled(masterNodes, allPods)
 

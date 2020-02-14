@@ -20,7 +20,7 @@ import (
 	"reflect"
 	"testing"
 
-	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -28,7 +28,7 @@ func TestClusterRoleBindingGenerate(t *testing.T) {
 	tests := []struct {
 		name      string
 		params    map[string]interface{}
-		expected  *rbacv1beta1.ClusterRoleBinding
+		expected  *rbacv1.ClusterRoleBinding
 		expectErr bool
 	}{
 		{
@@ -40,28 +40,28 @@ func TestClusterRoleBindingGenerate(t *testing.T) {
 				"group":          []string{"group"},
 				"serviceaccount": []string{"ns1:name1"},
 			},
-			expected: &rbacv1beta1.ClusterRoleBinding{
+			expected: &rbacv1.ClusterRoleBinding{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
-				RoleRef: rbacv1beta1.RoleRef{
-					APIGroup: rbacv1beta1.GroupName,
+				RoleRef: rbacv1.RoleRef{
+					APIGroup: rbacv1.GroupName,
 					Kind:     "ClusterRole",
 					Name:     "admin",
 				},
-				Subjects: []rbacv1beta1.Subject{
+				Subjects: []rbacv1.Subject{
 					{
-						APIGroup: rbacv1beta1.GroupName,
-						Kind:     rbacv1beta1.UserKind,
+						APIGroup: rbacv1.GroupName,
+						Kind:     rbacv1.UserKind,
 						Name:     "user",
 					},
 					{
-						APIGroup: rbacv1beta1.GroupName,
-						Kind:     rbacv1beta1.GroupKind,
+						APIGroup: rbacv1.GroupName,
+						Kind:     rbacv1.GroupKind,
 						Name:     "group",
 					},
 					{
-						Kind:      rbacv1beta1.ServiceAccountKind,
+						Kind:      rbacv1.ServiceAccountKind,
 						APIGroup:  "",
 						Namespace: "ns1",
 						Name:      "name1",
@@ -79,44 +79,44 @@ func TestClusterRoleBindingGenerate(t *testing.T) {
 				"group":          []string{"group1", "group2"},
 				"serviceaccount": []string{"ns1:name1", "ns2:name2"},
 			},
-			expected: &rbacv1beta1.ClusterRoleBinding{
+			expected: &rbacv1.ClusterRoleBinding{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
-				RoleRef: rbacv1beta1.RoleRef{
-					APIGroup: rbacv1beta1.GroupName,
+				RoleRef: rbacv1.RoleRef{
+					APIGroup: rbacv1.GroupName,
 					Kind:     "ClusterRole",
 					Name:     "admin",
 				},
-				Subjects: []rbacv1beta1.Subject{
+				Subjects: []rbacv1.Subject{
 					{
-						APIGroup: rbacv1beta1.GroupName,
-						Kind:     rbacv1beta1.UserKind,
+						APIGroup: rbacv1.GroupName,
+						Kind:     rbacv1.UserKind,
 						Name:     "user1",
 					},
 					{
-						APIGroup: rbacv1beta1.GroupName,
-						Kind:     rbacv1beta1.UserKind,
+						APIGroup: rbacv1.GroupName,
+						Kind:     rbacv1.UserKind,
 						Name:     "user2",
 					},
 					{
-						APIGroup: rbacv1beta1.GroupName,
-						Kind:     rbacv1beta1.GroupKind,
+						APIGroup: rbacv1.GroupName,
+						Kind:     rbacv1.GroupKind,
 						Name:     "group1",
 					},
 					{
-						APIGroup: rbacv1beta1.GroupName,
-						Kind:     rbacv1beta1.GroupKind,
+						APIGroup: rbacv1.GroupName,
+						Kind:     rbacv1.GroupKind,
 						Name:     "group2",
 					},
 					{
-						Kind:      rbacv1beta1.ServiceAccountKind,
+						Kind:      rbacv1.ServiceAccountKind,
 						APIGroup:  "",
 						Namespace: "ns1",
 						Name:      "name1",
 					},
 					{
-						Kind:      rbacv1beta1.ServiceAccountKind,
+						Kind:      rbacv1.ServiceAccountKind,
 						APIGroup:  "",
 						Namespace: "ns2",
 						Name:      "name2",
@@ -131,12 +131,12 @@ func TestClusterRoleBindingGenerate(t *testing.T) {
 				"name":        "foo",
 				"clusterrole": "admin",
 			},
-			expected: &rbacv1beta1.ClusterRoleBinding{
+			expected: &rbacv1.ClusterRoleBinding{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
-				RoleRef: rbacv1beta1.RoleRef{
-					APIGroup: rbacv1beta1.GroupName,
+				RoleRef: rbacv1.RoleRef{
+					APIGroup: rbacv1.GroupName,
 					Kind:     "ClusterRole",
 					Name:     "admin",
 				},
@@ -223,8 +223,8 @@ func TestClusterRoleBindingGenerate(t *testing.T) {
 			if tt.expectErr && err == nil {
 				t.Errorf("[%s] expect error, got nil", tt.name)
 			}
-			if !reflect.DeepEqual(obj.(*rbacv1beta1.ClusterRoleBinding), tt.expected) {
-				t.Errorf("\n[%s] want:\n%#v\ngot:\n%#v", tt.name, tt.expected, obj.(*rbacv1beta1.ClusterRoleBinding))
+			if !reflect.DeepEqual(obj.(*rbacv1.ClusterRoleBinding), tt.expected) {
+				t.Errorf("\n[%s] want:\n%#v\ngot:\n%#v", tt.name, tt.expected, obj.(*rbacv1.ClusterRoleBinding))
 			}
 		})
 	}

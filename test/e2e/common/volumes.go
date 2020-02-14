@@ -43,9 +43,11 @@ limitations under the License.
 package common
 
 import (
+	"context"
 	"k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
 
 	"github.com/onsi/ginkgo"
@@ -62,7 +64,7 @@ var _ = ginkgo.Describe("[sig-storage] GCP Volumes", func() {
 	var c clientset.Interface
 
 	ginkgo.BeforeEach(func() {
-		framework.SkipUnlessNodeOSDistroIs("gci", "ubuntu", "custom")
+		e2eskipper.SkipUnlessNodeOSDistroIs("gci", "ubuntu", "custom")
 
 		namespace = f.Namespace
 		c = f.ClientSet
@@ -128,7 +130,7 @@ var _ = ginkgo.Describe("[sig-storage] GCP Volumes", func() {
 			name := config.Prefix + "-server"
 			defer func() {
 				volume.TestCleanup(f, config)
-				err := c.CoreV1().Endpoints(namespace.Name).Delete(name, nil)
+				err := c.CoreV1().Endpoints(namespace.Name).Delete(context.TODO(), name, nil)
 				framework.ExpectNoError(err, "defer: Gluster delete endpoints failed")
 			}()
 

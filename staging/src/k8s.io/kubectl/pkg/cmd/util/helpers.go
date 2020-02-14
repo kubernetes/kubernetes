@@ -23,6 +23,7 @@ import (
 	"io"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -112,6 +113,18 @@ var ErrExit = fmt.Errorf("exit")
 // commands.
 func CheckErr(err error) {
 	checkErr(err, fatalErrHandler)
+}
+
+// CheckDiffErr prints a user friendly error to STDERR and exits with a
+// non-zero and non-one exit code. Unrecognized errors will be printed
+// with an "error: " prefix.
+//
+// This method is meant specifically for `kubectl diff` and may be used
+// by other commands.
+func CheckDiffErr(err error) {
+	checkErr(err, func(msg string, code int) {
+		fatalErrHandler(msg, code+1)
+	})
 }
 
 // checkErr formats a given error as a string and calls the passed handleErr
@@ -409,7 +422,12 @@ func AddKustomizeFlag(flags *pflag.FlagSet, value *string) {
 
 // AddDryRunFlag adds dry-run flag to a command. Usually used by mutations.
 func AddDryRunFlag(cmd *cobra.Command) {
-	cmd.Flags().Bool("dry-run", false, "If true, only print the object that would be sent, without sending it.")
+	cmd.Flags().String(
+		"dry-run",
+		"none",
+		`Must be "none", "server", or "client". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource.`,
+	)
+	cmd.Flags().Lookup("dry-run").NoOptDefVal = "unchanged"
 }
 
 func AddServerSideApplyFlags(cmd *cobra.Command) {
@@ -498,8 +516,56 @@ func GetFieldManagerFlag(cmd *cobra.Command) string {
 	return GetFlagString(cmd, "field-manager")
 }
 
-func GetDryRunFlag(cmd *cobra.Command) bool {
-	return GetFlagBool(cmd, "dry-run")
+type DryRunStrategy int
+
+const (
+	DryRunNone DryRunStrategy = iota
+	DryRunClient
+	DryRunServer
+)
+
+func GetDryRunStrategy(cmd *cobra.Command) (DryRunStrategy, error) {
+	var dryRunFlag = GetFlagString(cmd, "dry-run")
+	b, err := strconv.ParseBool(dryRunFlag)
+	// The flag is not a boolean
+	if err != nil {
+		switch dryRunFlag {
+		case cmd.Flag("dry-run").NoOptDefVal:
+			klog.Warning(`--dry-run is deprecated and can be replaced with --dry-run=client.`)
+			return DryRunClient, nil
+		case "client":
+			return DryRunClient, nil
+		case "server":
+			return DryRunServer, nil
+		case "none":
+			return DryRunNone, nil
+		default:
+			return DryRunNone, fmt.Errorf(`Invalid dry-run value (%v). Must be "none", "server", or "client".`, dryRunFlag)
+		}
+	}
+	// The flag was a boolean
+	if b {
+		klog.Warningf(`--dry-run=%v is deprecated (boolean value) and can be replaced with --dry-run=%s.`, dryRunFlag, "client")
+		return DryRunClient, nil
+	}
+	klog.Warningf(`--dry-run=%v is deprecated (boolean value) and can be replaced with --dry-run=%s.`, dryRunFlag, "none")
+	return DryRunNone, nil
+}
+
+// PrintFlagsWithDryRunStrategy sets a success message at print time for the dry run strategy
+//
+// TODO(juanvallejo): This can be cleaned up even further by creating
+// a PrintFlags struct that binds the --dry-run flag, and whose
+// ToPrinter method returns a printer that understands how to print
+// this success message.
+func PrintFlagsWithDryRunStrategy(printFlags *genericclioptions.PrintFlags, dryRunStrategy DryRunStrategy) *genericclioptions.PrintFlags {
+	switch dryRunStrategy {
+	case DryRunClient:
+		printFlags.Complete("%s (dry run)")
+	case DryRunServer:
+		printFlags.Complete("%s (server dry run)")
+	}
+	return printFlags
 }
 
 // GetResourcesAndPairs retrieves resources and "KEY=VALUE or KEY-" pair args from given args

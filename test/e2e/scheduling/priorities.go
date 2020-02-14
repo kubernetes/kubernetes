@@ -17,6 +17,7 @@ limitations under the License.
 package scheduling
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -37,7 +38,6 @@ import (
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2eevents "k8s.io/kubernetes/test/e2e/framework/events"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
@@ -68,7 +68,7 @@ var podRequestedResource = &v1.ResourceRequirements{
 // addOrUpdateAvoidPodOnNode adds avoidPods annotations to node, will override if it exists
 func addOrUpdateAvoidPodOnNode(c clientset.Interface, nodeName string, avoidPods v1.AvoidPods) {
 	err := wait.PollImmediate(framework.Poll, framework.SingleCallTimeout, func() (bool, error) {
-		node, err := c.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+		node, err := c.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 		if err != nil {
 			if testutils.IsRetryableAPIError(err) {
 				return false, nil
@@ -83,7 +83,7 @@ func addOrUpdateAvoidPodOnNode(c clientset.Interface, nodeName string, avoidPods
 			node.Annotations = make(map[string]string)
 		}
 		node.Annotations[v1.PreferAvoidPodsAnnotationKey] = string(taintsData)
-		_, err = c.CoreV1().Nodes().Update(node)
+		_, err = c.CoreV1().Nodes().Update(context.TODO(), node, metav1.UpdateOptions{})
 		if err != nil {
 			if !apierrors.IsConflict(err) {
 				framework.ExpectNoError(err)
@@ -100,7 +100,7 @@ func addOrUpdateAvoidPodOnNode(c clientset.Interface, nodeName string, avoidPods
 // removeAvoidPodsOffNode removes AvoidPods annotations from the node. It does not fail if no such annotation exists.
 func removeAvoidPodsOffNode(c clientset.Interface, nodeName string) {
 	err := wait.PollImmediate(framework.Poll, framework.SingleCallTimeout, func() (bool, error) {
-		node, err := c.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+		node, err := c.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 		if err != nil {
 			if testutils.IsRetryableAPIError(err) {
 				return false, nil
@@ -112,7 +112,7 @@ func removeAvoidPodsOffNode(c clientset.Interface, nodeName string) {
 			return true, nil
 		}
 		delete(node.Annotations, v1.PreferAvoidPodsAnnotationKey)
-		_, err = c.CoreV1().Nodes().Update(node)
+		_, err = c.CoreV1().Nodes().Update(context.TODO(), node, metav1.UpdateOptions{})
 		if err != nil {
 			if !apierrors.IsConflict(err) {
 				framework.ExpectNoError(err)
@@ -170,7 +170,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 
 		k := v1.LabelHostname
 		ginkgo.By("Verifying the node has a label " + k)
-		node, err := cs.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+		node, err := cs.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		if _, hasLabel := node.Labels[k]; !hasLabel {
 			// If the label is not exists, label all nodes for testing.
@@ -234,7 +234,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 		})
 		ginkgo.By("Wait the pod becomes running")
 		framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
-		labelPod, err := cs.CoreV1().Pods(ns).Get(labelPodName, metav1.GetOptions{})
+		labelPod, err := cs.CoreV1().Pods(ns).Get(context.TODO(), labelPodName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		ginkgo.By("Verify the pod was scheduled to the expected node.")
 		framework.ExpectNotEqual(labelPod.Spec.NodeName, nodeName)
@@ -284,7 +284,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 			}
 			return node.Annotations[v1.PreferAvoidPodsAnnotationKey] == string(val)
 		}
-		success, err := e2eevents.ObserveNodeUpdateAfterAction(f.ClientSet, nodeName, predicate, action)
+		success, err := observeNodeUpdateAfterAction(f.ClientSet, nodeName, predicate, action)
 		framework.ExpectNoError(err)
 		framework.ExpectEqual(success, true)
 
@@ -293,7 +293,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 		ginkgo.By(fmt.Sprintf("Scale the RC: %s to len(nodeList.Item)-1 : %v.", rc.Name, len(nodeList.Items)-1))
 
 		e2erc.ScaleRC(f.ClientSet, f.ScalesGetter, ns, rc.Name, uint(len(nodeList.Items)-1), true)
-		testPods, err := cs.CoreV1().Pods(ns).List(metav1.ListOptions{
+		testPods, err := cs.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{
 			LabelSelector: "name=scheduler-priority-avoid-pod",
 		})
 		framework.ExpectNoError(err)
@@ -335,7 +335,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 		framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
 
 		ginkgo.By("Pod should prefer scheduled to the node that pod can tolerate.")
-		tolePod, err := cs.CoreV1().Pods(ns).Get(tolerationPodName, metav1.GetOptions{})
+		tolePod, err := cs.CoreV1().Pods(ns).Get(context.TODO(), tolerationPodName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		framework.ExpectEqual(tolePod.Spec.NodeName, nodeName)
 	})
@@ -404,7 +404,7 @@ func computeCPUMemFraction(cs clientset.Interface, node v1.Node, resource *v1.Re
 	framework.Logf("ComputeCPUMemFraction for node: %v", node.Name)
 	totalRequestedCPUResource := resource.Requests.Cpu().MilliValue()
 	totalRequestedMemResource := resource.Requests.Memory().Value()
-	allpods, err := cs.CoreV1().Pods(metav1.NamespaceAll).List(metav1.ListOptions{})
+	allpods, err := cs.CoreV1().Pods(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		framework.Failf("Expect error of invalid, got : %v", err)
 	}
@@ -480,7 +480,7 @@ func createRC(ns, rsName string, replicas int32, rcPodLabels map[string]string, 
 			},
 		},
 	}
-	rc, err := f.ClientSet.CoreV1().ReplicationControllers(ns).Create(rc)
+	rc, err := f.ClientSet.CoreV1().ReplicationControllers(ns).Create(context.TODO(), rc, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 	return rc
 }

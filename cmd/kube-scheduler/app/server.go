@@ -188,7 +188,6 @@ func Run(ctx context.Context, cc schedulerserverconfig.CompletedConfig, outOfTre
 		ctx.Done(),
 		scheduler.WithName(cc.ComponentConfig.SchedulerName),
 		scheduler.WithAlgorithmSource(cc.ComponentConfig.AlgorithmSource),
-		scheduler.WithHardPodAffinitySymmetricWeight(cc.ComponentConfig.HardPodAffinitySymmetricWeight),
 		scheduler.WithPreemptionDisabled(cc.ComponentConfig.DisablePreemption),
 		scheduler.WithPercentageOfNodesToScore(cc.ComponentConfig.PercentageOfNodesToScore),
 		scheduler.WithBindTimeoutSeconds(cc.ComponentConfig.BindTimeoutSeconds),

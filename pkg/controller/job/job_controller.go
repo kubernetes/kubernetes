@@ -17,6 +17,7 @@ limitations under the License.
 package job
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"reflect"
@@ -417,7 +418,7 @@ func (jm *JobController) getPodsForJob(j *batch.Job) ([]*v1.Pod, error) {
 	// If any adoptions are attempted, we should first recheck for deletion
 	// with an uncached quorum read sometime after listing Pods (see #42639).
 	canAdoptFunc := controller.RecheckDeletionTimestamp(func() (metav1.Object, error) {
-		fresh, err := jm.kubeClient.BatchV1().Jobs(j.Namespace).Get(j.Name, metav1.GetOptions{})
+		fresh, err := jm.kubeClient.BatchV1().Jobs(j.Namespace).Get(context.TODO(), j.Name, metav1.GetOptions{})
 		if err != nil {
 			return nil, err
 		}
@@ -485,7 +486,7 @@ func (jm *JobController) syncJob(key string) (bool, error) {
 		job.Status.StartTime = &now
 		// enqueue a sync to check if job past ActiveDeadlineSeconds
 		if job.Spec.ActiveDeadlineSeconds != nil {
-			klog.V(4).Infof("Job %s have ActiveDeadlineSeconds will sync after %d seconds",
+			klog.V(4).Infof("Job %s has ActiveDeadlineSeconds will sync after %d seconds",
 				key, *job.Spec.ActiveDeadlineSeconds)
 			jm.queue.AddAfter(key, time.Duration(*job.Spec.ActiveDeadlineSeconds)*time.Second)
 		}
@@ -826,12 +827,12 @@ func (jm *JobController) updateJobStatus(job *batch.Job) error {
 	var err error
 	for i := 0; i <= statusUpdateRetries; i = i + 1 {
 		var newJob *batch.Job
-		newJob, err = jobClient.Get(job.Name, metav1.GetOptions{})
+		newJob, err = jobClient.Get(context.TODO(), job.Name, metav1.GetOptions{})
 		if err != nil {
 			break
 		}
 		newJob.Status = job.Status
-		if _, err = jobClient.UpdateStatus(newJob); err == nil {
+		if _, err = jobClient.UpdateStatus(context.TODO(), newJob, metav1.UpdateOptions{}); err == nil {
 			break
 		}
 	}

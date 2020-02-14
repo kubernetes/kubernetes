@@ -27,6 +27,7 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-07-01/compute"
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2019-06-01/network"
+	"github.com/Azure/go-autorest/autorest/to"
 
 	"k8s.io/apimachinery/pkg/types"
 	cloudprovider "k8s.io/cloud-provider"
@@ -190,6 +191,12 @@ func (az *Cloud) newVMCache() (*timedCache, error) {
 
 		if !exists {
 			klog.V(2).Infof("Virtual machine %q not found", key)
+			return nil, nil
+		}
+
+		if vm.VirtualMachineProperties != nil &&
+			strings.EqualFold(to.String(vm.VirtualMachineProperties.ProvisioningState), string(compute.ProvisioningStateDeleting)) {
+			klog.V(2).Infof("Virtual machine %q is under deleting", key)
 			return nil, nil
 		}
 

@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
-	"path"
 	"path/filepath"
 	"testing"
 	"time"
@@ -422,14 +421,14 @@ func TestCSI_VolumeAll(t *testing.T) {
 			}
 			t.Log("csiTest.VolumeAll mounter.Setup(fsGroup) done OK")
 
-			dataFile := filepath.Join(path.Dir(mounter.GetPath()), volDataFileName)
+			dataFile := filepath.Join(filepath.Dir(mounter.GetPath()), volDataFileName)
 			if _, err := os.Stat(dataFile); err != nil {
 				t.Fatalf("csiTest.VolumeAll meatadata JSON file not found: %s", dataFile)
 			}
 			t.Log("csiTest.VolumeAll JSON datafile generated OK:", dataFile)
 
 			// ******** Volume Reconstruction ************* //
-			volPath := path.Dir(csiMounter.GetPath())
+			volPath := filepath.Dir(csiMounter.GetPath())
 			t.Log("csiTest.VolumeAll entering plugin.ConstructVolumeSpec for path", volPath)
 			spec, err := volPlug.ConstructVolumeSpec(test.volName, volPath)
 			if err != nil {

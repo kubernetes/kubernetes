@@ -17,6 +17,7 @@ limitations under the License.
 package node
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -168,13 +169,13 @@ func createPodUsingNfs(f *framework.Framework, c clientset.Interface, ns, nfsIP,
 			},
 		},
 	}
-	rtnPod, err := c.CoreV1().Pods(ns).Create(pod)
+	rtnPod, err := c.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
 	err = f.WaitForPodReady(rtnPod.Name) // running & ready
 	framework.ExpectNoError(err)
 
-	rtnPod, err = c.CoreV1().Pods(ns).Get(rtnPod.Name, metav1.GetOptions{}) // return fresh pod
+	rtnPod, err = c.CoreV1().Pods(ns).Get(context.TODO(), rtnPod.Name, metav1.GetOptions{}) // return fresh pod
 	framework.ExpectNoError(err)
 	return rtnPod
 }
@@ -183,7 +184,7 @@ func createPodUsingNfs(f *framework.Framework, c clientset.Interface, ns, nfsIP,
 // address. Returns an error if the node the pod is on doesn't have an External
 // address.
 func getHostExternalAddress(client clientset.Interface, p *v1.Pod) (externalAddress string, err error) {
-	node, err := client.CoreV1().Nodes().Get(p.Spec.NodeName, metav1.GetOptions{})
+	node, err := client.CoreV1().Nodes().Get(context.TODO(), p.Spec.NodeName, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}

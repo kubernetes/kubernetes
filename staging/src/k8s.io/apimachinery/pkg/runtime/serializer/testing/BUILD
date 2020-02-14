@@ -8,6 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "conversion.go",
         "doc.go",
         "types.go",
         "zz_generated.deepcopy.go",
@@ -15,6 +16,7 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/runtime/serializer/testing",
     importpath = "k8s.io/apimachinery/pkg/runtime/serializer/testing",
     deps = [
+        "//staging/src/k8s.io/apimachinery/pkg/conversion:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
     ],

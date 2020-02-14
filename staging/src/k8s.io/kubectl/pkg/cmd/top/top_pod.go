@@ -17,6 +17,7 @@ limitations under the License.
 package top
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -174,7 +175,7 @@ func (o TopPodOptions) RunTopPod() error {
 
 	metricsAPIAvailable := SupportedMetricsAPIVersionAvailable(apiGroups)
 
-	metrics := &metricsapi.PodMetricsList{}
+	var metrics *metricsapi.PodMetricsList
 	if metricsAPIAvailable {
 		metrics, err = getMetricsFromMetricsAPI(o.MetricsClient, o.Namespace, o.ResourceName, o.AllNamespaces, selector)
 		if err != nil {
@@ -196,6 +197,13 @@ func (o TopPodOptions) RunTopPod() error {
 		if e != nil {
 			return e
 		}
+
+		// if we had no errors, be sure we output something.
+		if o.AllNamespaces {
+			fmt.Fprintln(o.ErrOut, "No resources found")
+		} else {
+			fmt.Fprintf(o.ErrOut, "No resources found in %s namespace.\n", o.Namespace)
+		}
 	}
 	if err != nil {
 		return err
@@ -212,13 +220,13 @@ func getMetricsFromMetricsAPI(metricsClient metricsclientset.Interface, namespac
 	}
 	versionedMetrics := &metricsv1beta1api.PodMetricsList{}
 	if resourceName != "" {
-		m, err := metricsClient.MetricsV1beta1().PodMetricses(ns).Get(resourceName, metav1.GetOptions{})
+		m, err := metricsClient.MetricsV1beta1().PodMetricses(ns).Get(context.TODO(), resourceName, metav1.GetOptions{})
 		if err != nil {
 			return nil, err
 		}
 		versionedMetrics.Items = []metricsv1beta1api.PodMetrics{*m}
 	} else {
-		versionedMetrics, err = metricsClient.MetricsV1beta1().PodMetricses(ns).List(metav1.ListOptions{LabelSelector: selector.String()})
+		versionedMetrics, err = metricsClient.MetricsV1beta1().PodMetricses(ns).List(context.TODO(), metav1.ListOptions{LabelSelector: selector.String()})
 		if err != nil {
 			return nil, err
 		}
@@ -233,7 +241,7 @@ func getMetricsFromMetricsAPI(metricsClient metricsclientset.Interface, namespac
 
 func verifyEmptyMetrics(o TopPodOptions, selector labels.Selector) error {
 	if len(o.ResourceName) > 0 {
-		pod, err := o.PodClient.Pods(o.Namespace).Get(o.ResourceName, metav1.GetOptions{})
+		pod, err := o.PodClient.Pods(o.Namespace).Get(context.TODO(), o.ResourceName, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -241,7 +249,7 @@ func verifyEmptyMetrics(o TopPodOptions, selector labels.Selector) error {
 			return err
 		}
 	} else {
-		pods, err := o.PodClient.Pods(o.Namespace).List(metav1.ListOptions{
+		pods, err := o.PodClient.Pods(o.Namespace).List(context.TODO(), metav1.ListOptions{
 			LabelSelector: selector.String(),
 		})
 		if err != nil {

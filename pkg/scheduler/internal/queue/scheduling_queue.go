@@ -36,7 +36,6 @@ import (
 	ktypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/kubernetes/pkg/api/v1/pod"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/internal/heap"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
@@ -196,17 +195,6 @@ func newPodInfoNoTimestamp(pod *v1.Pod) *framework.PodInfo {
 	}
 }
 
-// activeQComp is the function used by the activeQ heap algorithm to sort pods.
-// It sorts pods based on their priority. When priorities are equal, it uses
-// PodInfo.timestamp.
-func activeQComp(podInfo1, podInfo2 interface{}) bool {
-	pInfo1 := podInfo1.(*framework.PodInfo)
-	pInfo2 := podInfo2.(*framework.PodInfo)
-	prio1 := pod.GetPodPriority(pInfo1.Pod)
-	prio2 := pod.GetPodPriority(pInfo2.Pod)
-	return (prio1 > prio2) || (prio1 == prio2 && pInfo1.Timestamp.Before(pInfo2.Timestamp))
-}
-
 // NewPriorityQueue creates a PriorityQueue object.
 func NewPriorityQueue(
 	fwk framework.Framework,
@@ -217,22 +205,16 @@ func NewPriorityQueue(
 		opt(&options)
 	}
 
-	comp := activeQComp
-	if fwk != nil {
-		if queueSortFunc := fwk.QueueSortFunc(); queueSortFunc != nil {
-			comp = func(podInfo1, podInfo2 interface{}) bool {
-				pInfo1 := podInfo1.(*framework.PodInfo)
-				pInfo2 := podInfo2.(*framework.PodInfo)
-
-				return queueSortFunc(pInfo1, pInfo2)
-			}
-		}
+	comp := func(podInfo1, podInfo2 interface{}) bool {
+		pInfo1 := podInfo1.(*framework.PodInfo)
+		pInfo2 := podInfo2.(*framework.PodInfo)
+		return fwk.QueueSortFunc()(pInfo1, pInfo2)
 	}
 
 	pq := &PriorityQueue{
 		clock:            options.clock,
 		stop:             make(chan struct{}),
-		podBackoff:       NewPodBackoffMap(options.podInitialBackoffDuration, options.podMaxBackoffDuration),
+		podBackoff:       NewPodBackoffMap(options.podInitialBackoffDuration, options.podMaxBackoffDuration, options.clock),
 		activeQ:          heap.NewWithRecorder(podInfoKeyFunc, comp, metrics.NewActivePodsRecorder()),
 		unschedulableQ:   newUnschedulablePodsMap(metrics.NewUnschedulablePodsRecorder()),
 		nominatedPods:    newNominatedPodMap(),

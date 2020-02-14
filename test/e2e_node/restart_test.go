@@ -19,6 +19,7 @@ limitations under the License.
 package e2enode
 
 import (
+	"context"
 	"fmt"
 	"os/exec"
 	"time"
@@ -37,7 +38,7 @@ import (
 // If the timeout is hit, it returns the list of currently running pods.
 func waitForPods(f *framework.Framework, podCount int, timeout time.Duration) (runningPods []*v1.Pod) {
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(10 * time.Second) {
-		podList, err := f.PodClient().List(metav1.ListOptions{})
+		podList, err := f.PodClient().List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			framework.Logf("Failed to list pods on node: %v", err)
 			continue

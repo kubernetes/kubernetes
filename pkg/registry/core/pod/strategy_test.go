@@ -18,6 +18,7 @@ package pod
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/url"
 	"reflect"
@@ -31,8 +32,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/tools/cache"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/client"
 
 	// ensure types are installed
@@ -319,6 +324,7 @@ func (g mockPodGetter) Get(context.Context, string, *metav1.GetOptions) (runtime
 }
 
 func TestCheckLogLocation(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
 	ctx := genericapirequest.NewDefaultContext()
 	fakePodName := "test"
 	tcs := []struct {
@@ -405,7 +411,28 @@ func TestCheckLogLocation(t *testing.T) {
 				Status: api.PodStatus{},
 			},
 			opts:              &api.PodLogOptions{},
-			expectedErr:       errors.NewBadRequest("a container name must be specified for pod test, choose one of: [container1 container2] or one of the init containers: [initcontainer1]"),
+			expectedErr:       errors.NewBadRequest("a container name must be specified for pod test, choose one of: [initcontainer1 container1 container2]"),
+			expectedTransport: nil,
+		},
+		{
+			in: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: fakePodName},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{Name: "container1"},
+						{Name: "container2"},
+					},
+					InitContainers: []api.Container{
+						{Name: "initcontainer1"},
+					},
+					EphemeralContainers: []api.EphemeralContainer{
+						{EphemeralContainerCommon: api.EphemeralContainerCommon{Name: "debugger"}},
+					},
+				},
+				Status: api.PodStatus{},
+			},
+			opts:              &api.PodLogOptions{},
+			expectedErr:       errors.NewBadRequest("a container name must be specified for pod test, choose one of: [initcontainer1 container1 container2 debugger]"),
 			expectedTransport: nil,
 		},
 		{
@@ -454,12 +481,12 @@ func TestCheckLogLocation(t *testing.T) {
 				InsecureSkipTLSVerifyTransport: fakeInsecureRoundTripper,
 			}}
 
-			_, actualTransport, err := LogLocation(getter, connectionGetter, ctx, fakePodName, tc.opts)
+			_, actualTransport, err := LogLocation(ctx, getter, connectionGetter, fakePodName, tc.opts)
 			if !reflect.DeepEqual(err, tc.expectedErr) {
-				t.Errorf("expected %v, got %v", tc.expectedErr, err)
+				t.Errorf("expected %q, got %q", tc.expectedErr, err)
 			}
 			if actualTransport != tc.expectedTransport {
-				t.Errorf("expected %v, got %v", tc.expectedTransport, actualTransport)
+				t.Errorf("expected %q, got %q", tc.expectedTransport, actualTransport)
 			}
 		})
 	}
@@ -469,7 +496,7 @@ func TestSelectableFieldLabelConversions(t *testing.T) {
 	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
 		"v1",
 		"Pod",
-		PodToSelectableFields(&api.Pod{}),
+		ToSelectableFields(&api.Pod{}),
 		nil,
 	)
 }
@@ -530,7 +557,7 @@ func TestPortForwardLocation(t *testing.T) {
 	for _, tc := range tcs {
 		getter := &mockPodGetter{tc.in}
 		connectionGetter := &mockConnectionInfoGetter{tc.info}
-		loc, _, err := PortForwardLocation(getter, connectionGetter, ctx, "test", tc.opts)
+		loc, _, err := PortForwardLocation(ctx, getter, connectionGetter, "test", tc.opts)
 		if !reflect.DeepEqual(err, tc.expectedErr) {
 			t.Errorf("expected %v, got %v", tc.expectedErr, err)
 		}
@@ -629,3 +656,43 @@ var (
 	fakeSecureRoundTripper   = fakeTransport{val: "secure"}
 	fakeInsecureRoundTripper = fakeTransport{val: "insecure"}
 )
+
+func TestPodIndexFunc(t *testing.T) {
+	tcs := []struct {
+		name          string
+		indexFunc     cache.IndexFunc
+		pod           interface{}
+		expectedValue string
+		expectedErr   error
+	}{
+		{
+			name:      "node name index",
+			indexFunc: NodeNameIndexFunc,
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					NodeName: "test-pod",
+				},
+			},
+			expectedValue: "test-pod",
+			expectedErr:   nil,
+		},
+		{
+			name:          "not a pod failed",
+			indexFunc:     NodeNameIndexFunc,
+			pod:           "not a pod object",
+			expectedValue: "test-pod",
+			expectedErr:   fmt.Errorf("not a pod"),
+		},
+	}
+
+	for _, tc := range tcs {
+		indexValues, err := tc.indexFunc(tc.pod)
+		if !reflect.DeepEqual(err, tc.expectedErr) {
+			t.Errorf("name %v, expected %v, got %v", tc.name, tc.expectedErr, err)
+		}
+		if err == nil && len(indexValues) != 1 && indexValues[0] != tc.expectedValue {
+			t.Errorf("name %v, expected %v, got %v", tc.name, tc.expectedValue, indexValues)
+		}
+
+	}
+}

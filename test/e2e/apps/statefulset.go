@@ -103,7 +103,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 			ginkgo.By("Creating service " + headlessSvcName + " in namespace " + ns)
 			headlessService := e2eservice.CreateServiceSpec(headlessSvcName, "", true, labels)
-			_, err := c.CoreV1().Services(ns).Create(headlessService)
+			_, err := c.CoreV1().Services(ns).Create(context.TODO(), headlessService, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 		})
 
@@ -123,7 +123,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			*(ss.Spec.Replicas) = 3
 			e2esset.PauseNewPods(ss)
 
-			_, err := c.AppsV1().StatefulSets(ns).Create(ss)
+			_, err := c.AppsV1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 
 			ginkgo.By("Saturating stateful set " + ss.Name)
@@ -165,7 +165,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			// Replace ss with the one returned from Create() so it has the UID.
 			// Save Kind since it won't be populated in the returned ss.
 			kind := ss.Kind
-			ss, err := c.AppsV1().StatefulSets(ns).Create(ss)
+			ss, err := c.AppsV1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 			ss.Kind = kind
 
@@ -247,7 +247,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			*(ss.Spec.Replicas) = 2
 			e2esset.PauseNewPods(ss)
 
-			_, err := c.AppsV1().StatefulSets(ns).Create(ss)
+			_, err := c.AppsV1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 
 			e2esset.WaitForRunning(c, 1, 0, ss)
@@ -314,7 +314,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 						}()}
 				}(),
 			}
-			ss, err := c.AppsV1().StatefulSets(ns).Create(ss)
+			ss, err := c.AppsV1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 			e2esset.WaitForRunningAndReady(c, *ss.Spec.Replicas, ss)
 			ss = waitForStatus(c, ss)
@@ -499,7 +499,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ss.Spec.UpdateStrategy = appsv1.StatefulSetUpdateStrategy{
 				Type: appsv1.OnDeleteStatefulSetStrategyType,
 			}
-			ss, err := c.AppsV1().StatefulSets(ns).Create(ss)
+			ss, err := c.AppsV1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 			e2esset.WaitForRunningAndReady(c, *ss.Spec.Replicas, ss)
 			ss = waitForStatus(c, ss)
@@ -573,7 +573,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		framework.ConformanceIt("Scaling should happen in predictable order and halt if any stateful pod is unhealthy [Slow]", func() {
 			psLabels := klabels.Set(labels)
 			ginkgo.By("Initializing watcher for selector " + psLabels.String())
-			watcher, err := f.ClientSet.CoreV1().Pods(ns).Watch(metav1.ListOptions{
+			watcher, err := f.ClientSet.CoreV1().Pods(ns).Watch(context.TODO(), metav1.ListOptions{
 				LabelSelector: psLabels.AsSelector().String(),
 			})
 			framework.ExpectNoError(err)
@@ -581,7 +581,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ginkgo.By("Creating stateful set " + ssName + " in namespace " + ns)
 			ss := e2esset.NewStatefulSet(ssName, ns, headlessSvcName, 1, nil, nil, psLabels)
 			setHTTPProbe(ss)
-			ss, err = c.AppsV1().StatefulSets(ns).Create(ss)
+			ss, err = c.AppsV1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 
 			ginkgo.By("Waiting until all stateful set " + ssName + " replicas will be running in namespace " + ns)
@@ -616,7 +616,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			framework.ExpectNoError(err)
 
 			ginkgo.By("Scale down will halt with unhealthy stateful pod")
-			watcher, err = f.ClientSet.CoreV1().Pods(ns).Watch(metav1.ListOptions{
+			watcher, err = f.ClientSet.CoreV1().Pods(ns).Watch(context.TODO(), metav1.ListOptions{
 				LabelSelector: psLabels.AsSelector().String(),
 			})
 			framework.ExpectNoError(err)
@@ -661,7 +661,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ss := e2esset.NewStatefulSet(ssName, ns, headlessSvcName, 1, nil, nil, psLabels)
 			ss.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
 			setHTTPProbe(ss)
-			ss, err := c.AppsV1().StatefulSets(ns).Create(ss)
+			ss, err := c.AppsV1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 
 			ginkgo.By("Waiting until all stateful set " + ssName + " replicas will be running in namespace " + ns)
@@ -720,7 +720,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 					NodeName: node.Name,
 				},
 			}
-			pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
+			pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 
 			ginkgo.By("Creating statefulset with conflicting port in namespace " + f.Namespace.Name)
@@ -728,7 +728,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			statefulPodContainer := &ss.Spec.Template.Spec.Containers[0]
 			statefulPodContainer.Ports = append(statefulPodContainer.Ports, conflictingPort)
 			ss.Spec.Template.Spec.NodeName = node.Name
-			_, err = f.ClientSet.AppsV1().StatefulSets(f.Namespace.Name).Create(ss)
+			_, err = f.ClientSet.AppsV1().StatefulSets(f.Namespace.Name).Create(context.TODO(), ss, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 
 			ginkgo.By("Waiting until pod " + podName + " will start running in namespace " + f.Namespace.Name)
@@ -738,7 +738,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 			var initialStatefulPodUID types.UID
 			ginkgo.By("Waiting until stateful pod " + statefulPodName + " will be recreated and deleted at least once in namespace " + f.Namespace.Name)
-			w, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Watch(metav1.SingleObject(metav1.ObjectMeta{Name: statefulPodName}))
+			w, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Watch(context.TODO(), metav1.SingleObject(metav1.ObjectMeta{Name: statefulPodName}))
 			framework.ExpectNoError(err)
 			ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), statefulPodTimeout)
 			defer cancel()
@@ -763,13 +763,13 @@ var _ = SIGDescribe("StatefulSet", func() {
 			}
 
 			ginkgo.By("Removing pod with conflicting port in namespace " + f.Namespace.Name)
-			err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(pod.Name, metav1.NewDeleteOptions(0))
+			err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), pod.Name, metav1.NewDeleteOptions(0))
 			framework.ExpectNoError(err)
 
 			ginkgo.By("Waiting when stateful pod " + statefulPodName + " will be recreated in namespace " + f.Namespace.Name + " and will be in running state")
 			// we may catch delete event, that's why we are waiting for running phase like this, and not with watchtools.UntilWithoutRetry
 			gomega.Eventually(func() error {
-				statefulPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(statefulPodName, metav1.GetOptions{})
+				statefulPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(context.TODO(), statefulPodName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -793,13 +793,13 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ginkgo.By("Creating statefulset " + ssName + " in namespace " + ns)
 			ss := e2esset.NewStatefulSet(ssName, ns, headlessSvcName, 1, nil, nil, labels)
 			setHTTPProbe(ss)
-			ss, err := c.AppsV1().StatefulSets(ns).Create(ss)
+			ss, err := c.AppsV1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 			e2esset.WaitForRunningAndReady(c, *ss.Spec.Replicas, ss)
 			ss = waitForStatus(c, ss)
 
 			ginkgo.By("getting scale subresource")
-			scale, err := c.AppsV1().StatefulSets(ns).GetScale(ssName, metav1.GetOptions{})
+			scale, err := c.AppsV1().StatefulSets(ns).GetScale(context.TODO(), ssName, metav1.GetOptions{})
 			if err != nil {
 				framework.Failf("Failed to get scale subresource: %v", err)
 			}
@@ -809,14 +809,14 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ginkgo.By("updating a scale subresource")
 			scale.ResourceVersion = "" // indicate the scale update should be unconditional
 			scale.Spec.Replicas = 2
-			scaleResult, err := c.AppsV1().StatefulSets(ns).UpdateScale(ssName, scale)
+			scaleResult, err := c.AppsV1().StatefulSets(ns).UpdateScale(context.TODO(), ssName, scale, metav1.UpdateOptions{})
 			if err != nil {
 				framework.Failf("Failed to put scale subresource: %v", err)
 			}
 			framework.ExpectEqual(scaleResult.Spec.Replicas, int32(2))
 
 			ginkgo.By("verifying the statefulset Spec.Replicas was modified")
-			ss, err = c.AppsV1().StatefulSets(ns).Get(ssName, metav1.GetOptions{})
+			ss, err = c.AppsV1().StatefulSets(ns).Get(context.TODO(), ssName, metav1.GetOptions{})
 			if err != nil {
 				framework.Failf("Failed to get statefulset resource: %v", err)
 			}
@@ -1086,7 +1086,7 @@ func pollReadWithTimeout(statefulPod statefulPodTester, statefulPodNumber int, k
 // PVCs and one using no storage.
 func rollbackTest(c clientset.Interface, ns string, ss *appsv1.StatefulSet) {
 	setHTTPProbe(ss)
-	ss, err := c.AppsV1().StatefulSets(ns).Create(ss)
+	ss, err := c.AppsV1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 	e2esset.WaitForRunningAndReady(c, *ss.Spec.Replicas, ss)
 	ss = waitForStatus(c, ss)
@@ -1268,7 +1268,7 @@ func restorePodHTTPProbe(ss *appsv1.StatefulSet, pod *v1.Pod) error {
 func deleteStatefulPodAtIndex(c clientset.Interface, index int, ss *appsv1.StatefulSet) {
 	name := getStatefulSetPodNameAtIndex(index, ss)
 	noGrace := int64(0)
-	if err := c.CoreV1().Pods(ss.Namespace).Delete(name, &metav1.DeleteOptions{GracePeriodSeconds: &noGrace}); err != nil {
+	if err := c.CoreV1().Pods(ss.Namespace).Delete(context.TODO(), name, &metav1.DeleteOptions{GracePeriodSeconds: &noGrace}); err != nil {
 		framework.Failf("Failed to delete stateful pod %v for StatefulSet %v/%v: %v", name, ss.Namespace, ss.Name, err)
 	}
 }
@@ -1287,12 +1287,12 @@ func updateStatefulSetWithRetries(c clientset.Interface, namespace, name string,
 	statefulSets := c.AppsV1().StatefulSets(namespace)
 	var updateErr error
 	pollErr := wait.Poll(10*time.Millisecond, 1*time.Minute, func() (bool, error) {
-		if statefulSet, err = statefulSets.Get(name, metav1.GetOptions{}); err != nil {
+		if statefulSet, err = statefulSets.Get(context.TODO(), name, metav1.GetOptions{}); err != nil {
 			return false, err
 		}
 		// Apply the update, then attempt to push it to the apiserver.
 		applyUpdate(statefulSet)
-		if statefulSet, err = statefulSets.Update(statefulSet); err == nil {
+		if statefulSet, err = statefulSets.Update(context.TODO(), statefulSet, metav1.UpdateOptions{}); err == nil {
 			framework.Logf("Updating stateful set %s", name)
 			return true, nil
 		}
@@ -1307,7 +1307,7 @@ func updateStatefulSetWithRetries(c clientset.Interface, namespace, name string,
 
 // getStatefulSet gets the StatefulSet named name in namespace.
 func getStatefulSet(c clientset.Interface, namespace, name string) *appsv1.StatefulSet {
-	ss, err := c.AppsV1().StatefulSets(namespace).Get(name, metav1.GetOptions{})
+	ss, err := c.AppsV1().StatefulSets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		framework.Failf("Failed to get StatefulSet %s/%s: %v", namespace, name, err)
 	}

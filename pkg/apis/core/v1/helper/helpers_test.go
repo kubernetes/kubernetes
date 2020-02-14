@@ -21,7 +21,7 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1395,6 +1395,50 @@ func TestNodeSelectorRequirementKeyExistsInNodeSelectorTerms(t *testing.T) {
 		keyExists := NodeSelectorRequirementKeysExistInNodeSelectorTerms(test.reqs, test.terms)
 		if test.exists != keyExists {
 			t.Errorf("test %s failed. Expected %v but got %v", test.name, test.exists, keyExists)
+		}
+	}
+}
+
+func TestHugePageUnitSizeFromByteSize(t *testing.T) {
+	tests := []struct {
+		size     int64
+		expected string
+		wantErr  bool
+	}{
+		{
+			size:     1024,
+			expected: "1KB",
+			wantErr:  false,
+		},
+		{
+			size:     33554432,
+			expected: "32MB",
+			wantErr:  false,
+		},
+		{
+			size:     3221225472,
+			expected: "3GB",
+			wantErr:  false,
+		},
+		{
+			size:     1024 * 1024 * 1023 * 3,
+			expected: "3069MB",
+			wantErr:  true,
+		},
+	}
+	for _, test := range tests {
+		size := test.size
+		result, err := HugePageUnitSizeFromByteSize(size)
+		if err != nil {
+			if test.wantErr {
+				t.Logf("HugePageUnitSizeFromByteSize() expected error = %v", err)
+			} else {
+				t.Errorf("HugePageUnitSizeFromByteSize() error = %v, wantErr %v", err, test.wantErr)
+			}
+			continue
+		}
+		if test.expected != result {
+			t.Errorf("HugePageUnitSizeFromByteSize() expected %v but got %v", test.expected, result)
 		}
 	}
 }

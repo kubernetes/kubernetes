@@ -211,7 +211,19 @@ func (o *DrainCmdOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 		return cmdutil.UsageErrorf(cmd, "error: cannot specify both a node name and a --selector option")
 	}
 
-	o.drainer.DryRun = cmdutil.GetDryRunFlag(cmd)
+	o.drainer.DryRunStrategy, err = cmdutil.GetDryRunStrategy(cmd)
+	if err != nil {
+		return err
+	}
+	dynamicClient, err := f.DynamicClient()
+	if err != nil {
+		return err
+	}
+	discoveryClient, err := f.ToDiscoveryClient()
+	if err != nil {
+		return err
+	}
+	o.drainer.DryRunVerifier = resource.NewDryRunVerifier(dynamicClient, discoveryClient)
 
 	if o.drainer.Client, err = f.KubernetesClientSet(); err != nil {
 		return err
@@ -232,9 +244,7 @@ func (o *DrainCmdOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 
 	o.ToPrinter = func(operation string) (printers.ResourcePrinterFunc, error) {
 		o.PrintFlags.NamePrintFlags.Operation = operation
-		if o.drainer.DryRun {
-			o.PrintFlags.Complete("%s (dry run)")
-		}
+		cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.drainer.DryRunStrategy)
 
 		printer, err := o.PrintFlags.ToPrinter()
 		if err != nil {
@@ -325,7 +335,7 @@ func (o *DrainCmdOptions) deleteOrEvictPodsSimple(nodeInfo *resource.Info) error
 	if warnings := list.Warnings(); warnings != "" {
 		fmt.Fprintf(o.ErrOut, "WARNING: %s\n", warnings)
 	}
-	if o.drainer.DryRun {
+	if o.drainer.DryRunStrategy == cmdutil.DryRunClient {
 		for _, pod := range list.Pods() {
 			fmt.Fprintf(o.Out, "evicting pod %s/%s (dry run)\n", pod.Namespace, pod.Name)
 		}
@@ -381,8 +391,14 @@ func (o *DrainCmdOptions) RunCordonOrUncordon(desired bool) error {
 				}
 				printObj(nodeInfo.Object, o.Out)
 			} else {
-				if !o.drainer.DryRun {
-					err, patchErr := c.PatchOrReplace(o.drainer.Client)
+				if o.drainer.DryRunStrategy != cmdutil.DryRunClient {
+					if o.drainer.DryRunStrategy == cmdutil.DryRunServer {
+						if err := o.drainer.DryRunVerifier.HasSupport(gvk); err != nil {
+							printError(err)
+							continue
+						}
+					}
+					err, patchErr := c.PatchOrReplace(o.drainer.Client, o.drainer.DryRunStrategy == cmdutil.DryRunServer)
 					if patchErr != nil {
 						printError(patchErr)
 					}

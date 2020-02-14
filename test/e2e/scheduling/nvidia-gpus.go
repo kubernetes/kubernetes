@@ -17,6 +17,7 @@ limitations under the License.
 package scheduling
 
 import (
+	"context"
 	"os"
 	"regexp"
 	"time"
@@ -28,7 +29,7 @@ import (
 	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/gpu"
-	jobutil "k8s.io/kubernetes/test/e2e/framework/job"
+	e2ejob "k8s.io/kubernetes/test/e2e/framework/job"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
@@ -84,7 +85,7 @@ func makeCudaAdditionDevicePluginTestPod() *v1.Pod {
 }
 
 func logOSImages(f *framework.Framework) {
-	nodeList, err := f.ClientSet.CoreV1().Nodes().List(metav1.ListOptions{})
+	nodeList, err := f.ClientSet.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 	framework.ExpectNoError(err, "getting node list")
 	for _, node := range nodeList.Items {
 		framework.Logf("Nodename: %v, OS Image: %v", node.Name, node.Status.NodeInfo.OSImage)
@@ -93,7 +94,7 @@ func logOSImages(f *framework.Framework) {
 
 func areGPUsAvailableOnAllSchedulableNodes(f *framework.Framework) bool {
 	framework.Logf("Getting list of Nodes from API server")
-	nodeList, err := f.ClientSet.CoreV1().Nodes().List(metav1.ListOptions{})
+	nodeList, err := f.ClientSet.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 	framework.ExpectNoError(err, "getting node list")
 	for _, node := range nodeList.Items {
 		if node.Spec.Unschedulable {
@@ -110,7 +111,7 @@ func areGPUsAvailableOnAllSchedulableNodes(f *framework.Framework) bool {
 }
 
 func getGPUsAvailable(f *framework.Framework) int64 {
-	nodeList, err := f.ClientSet.CoreV1().Nodes().List(metav1.ListOptions{})
+	nodeList, err := f.ClientSet.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 	framework.ExpectNoError(err, "getting node list")
 	var gpusAvailable int64
 	for _, node := range nodeList.Items {
@@ -138,7 +139,7 @@ func SetupNVIDIAGPUNode(f *framework.Framework, setupResourceGatherer bool) *fra
 	ds, err := framework.DsFromManifest(dsYamlURL)
 	framework.ExpectNoError(err)
 	ds.Namespace = f.Namespace.Name
-	_, err = f.ClientSet.AppsV1().DaemonSets(f.Namespace.Name).Create(ds)
+	_, err = f.ClientSet.AppsV1().DaemonSets(f.Namespace.Name).Create(context.TODO(), ds, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "failed to create nvidia-driver-installer daemonset")
 	framework.Logf("Successfully created daemonset to install Nvidia drivers.")
 
@@ -224,11 +225,11 @@ func testNvidiaGPUsJob(f *framework.Framework) {
 	ginkgo.By("Starting GPU job")
 	StartJob(f, completions)
 
-	job, err := jobutil.GetJob(f.ClientSet, f.Namespace.Name, "cuda-add")
+	job, err := e2ejob.GetJob(f.ClientSet, f.Namespace.Name, "cuda-add")
 	framework.ExpectNoError(err)
 
 	// make sure job is running by waiting for its first pod to start running
-	err = jobutil.WaitForAllJobPodsRunning(f.ClientSet, f.Namespace.Name, job.Name, 1)
+	err = e2ejob.WaitForAllJobPodsRunning(f.ClientSet, f.Namespace.Name, job.Name, 1)
 	framework.ExpectNoError(err)
 
 	numNodes, err := e2enode.TotalRegistered(f.ClientSet)
@@ -242,7 +243,7 @@ func testNvidiaGPUsJob(f *framework.Framework) {
 	ginkgo.By("Done recreating nodes")
 
 	ginkgo.By("Waiting for gpu job to finish")
-	err = jobutil.WaitForJobFinish(f.ClientSet, f.Namespace.Name, job.Name)
+	err = e2ejob.WaitForJobFinish(f.ClientSet, f.Namespace.Name, job.Name)
 	framework.ExpectNoError(err)
 	ginkgo.By("Done with gpu job")
 
@@ -254,7 +255,7 @@ func testNvidiaGPUsJob(f *framework.Framework) {
 // StartJob starts a simple CUDA job that requests gpu and the specified number of completions
 func StartJob(f *framework.Framework, completions int32) {
 	var activeSeconds int64 = 3600
-	testJob := jobutil.NewTestJob("succeed", "cuda-add", v1.RestartPolicyAlways, 1, completions, &activeSeconds, 6)
+	testJob := e2ejob.NewTestJob("succeed", "cuda-add", v1.RestartPolicyAlways, 1, completions, &activeSeconds, 6)
 	testJob.Spec.Template.Spec = v1.PodSpec{
 		RestartPolicy: v1.RestartPolicyOnFailure,
 		Containers: []v1.Container{
@@ -271,7 +272,7 @@ func StartJob(f *framework.Framework, completions int32) {
 		},
 	}
 	ns := f.Namespace.Name
-	_, err := jobutil.CreateJob(f.ClientSet, ns, testJob)
+	_, err := e2ejob.CreateJob(f.ClientSet, ns, testJob)
 	framework.ExpectNoError(err)
 	framework.Logf("Created job %v", testJob)
 }
@@ -279,7 +280,7 @@ func StartJob(f *framework.Framework, completions int32) {
 // VerifyJobNCompletions verifies that the job has completions number of successful pods
 func VerifyJobNCompletions(f *framework.Framework, completions int32) {
 	ns := f.Namespace.Name
-	pods, err := jobutil.GetJobPods(f.ClientSet, f.Namespace.Name, "cuda-add")
+	pods, err := e2ejob.GetJobPods(f.ClientSet, f.Namespace.Name, "cuda-add")
 	framework.ExpectNoError(err)
 	createdPods := pods.Items
 	createdPodNames := podNames(createdPods)

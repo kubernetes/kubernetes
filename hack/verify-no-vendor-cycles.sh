@@ -14,6 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This script checks whether packages under `vendor` directory have cyclic
+# dependencies on `main` or `staging` repositories.
+# Usage: `hack/verify-no-vendor-cycles.sh`.
+
 set -o errexit
 set -o nounset
 set -o pipefail

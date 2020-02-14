@@ -21,13 +21,14 @@ import (
 	"strconv"
 
 	appsv1beta2 "k8s.io/api/apps/v1beta2"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	autoscaling "k8s.io/kubernetes/pkg/apis/autoscaling"
-	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
+	"k8s.io/kubernetes/pkg/apis/core"
 )
 
 func addConversionFuncs(scheme *runtime.Scheme) error {
@@ -84,52 +85,17 @@ func Convert_v1beta2_ScaleStatus_To_autoscaling_ScaleStatus(in *appsv1beta2.Scal
 	return nil
 }
 
-func Convert_v1beta2_DeploymentSpec_To_apps_DeploymentSpec(in *appsv1beta2.DeploymentSpec, out *apps.DeploymentSpec, s conversion.Scope) error {
-	if in.Replicas != nil {
-		out.Replicas = *in.Replicas
-	}
-	out.Selector = in.Selector
-	if err := k8s_api_v1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
-		return err
-	}
-	if err := Convert_v1beta2_DeploymentStrategy_To_apps_DeploymentStrategy(&in.Strategy, &out.Strategy, s); err != nil {
-		return err
-	}
-	out.RevisionHistoryLimit = in.RevisionHistoryLimit
-	out.MinReadySeconds = in.MinReadySeconds
-	out.Paused = in.Paused
-	if in.ProgressDeadlineSeconds != nil {
-		out.ProgressDeadlineSeconds = new(int32)
-		*out.ProgressDeadlineSeconds = *in.ProgressDeadlineSeconds
-	}
-	return nil
-}
-
+// Convert_apps_DeploymentSpec_To_v1beta2_DeploymentSpec is defined here, because public
+// conversion is not auto-generated due to existing warnings.
 func Convert_apps_DeploymentSpec_To_v1beta2_DeploymentSpec(in *apps.DeploymentSpec, out *appsv1beta2.DeploymentSpec, s conversion.Scope) error {
-	out.Replicas = &in.Replicas
-	out.Selector = in.Selector
-	if err := k8s_api_v1.Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+	if err := autoConvert_apps_DeploymentSpec_To_v1beta2_DeploymentSpec(in, out, s); err != nil {
 		return err
-	}
-	if err := Convert_apps_DeploymentStrategy_To_v1beta2_DeploymentStrategy(&in.Strategy, &out.Strategy, s); err != nil {
-		return err
-	}
-	if in.RevisionHistoryLimit != nil {
-		out.RevisionHistoryLimit = new(int32)
-		*out.RevisionHistoryLimit = int32(*in.RevisionHistoryLimit)
-	}
-	out.MinReadySeconds = int32(in.MinReadySeconds)
-	out.Paused = in.Paused
-	if in.ProgressDeadlineSeconds != nil {
-		out.ProgressDeadlineSeconds = new(int32)
-		*out.ProgressDeadlineSeconds = *in.ProgressDeadlineSeconds
 	}
 	return nil
 }
 
 func Convert_v1beta2_Deployment_To_apps_Deployment(in *appsv1beta2.Deployment, out *apps.Deployment, s conversion.Scope) error {
-	out.ObjectMeta = in.ObjectMeta
-	if err := Convert_v1beta2_DeploymentSpec_To_apps_DeploymentSpec(&in.Spec, &out.Spec, s); err != nil {
+	if err := autoConvert_v1beta2_Deployment_To_apps_Deployment(in, out, s); err != nil {
 		return err
 	}
 
@@ -148,20 +114,15 @@ func Convert_v1beta2_Deployment_To_apps_Deployment(in *appsv1beta2.Deployment, o
 		out.Spec.RollbackTo = nil
 	}
 
-	if err := Convert_v1beta2_DeploymentStatus_To_apps_DeploymentStatus(&in.Status, &out.Status, s); err != nil {
-		return err
-	}
 	return nil
 }
 
 func Convert_apps_Deployment_To_v1beta2_Deployment(in *apps.Deployment, out *appsv1beta2.Deployment, s conversion.Scope) error {
-	out.ObjectMeta = in.ObjectMeta
-	out.Annotations = deepCopyStringMap(out.Annotations) // deep copy because we modify annotations below
-
-	if err := Convert_apps_DeploymentSpec_To_v1beta2_DeploymentSpec(&in.Spec, &out.Spec, s); err != nil {
+	if err := autoConvert_apps_Deployment_To_v1beta2_Deployment(in, out, s); err != nil {
 		return err
 	}
 
+	out.Annotations = deepCopyStringMap(out.Annotations) // deep copy because we modify annotations below
 	// Copy deprecated rollbackTo field to annotation for roundtrip
 	// TODO: remove this conversion after we delete extensions/v1beta1 and apps/v1beta1 Deployment
 	if in.Spec.RollbackTo != nil {
@@ -173,48 +134,33 @@ func Convert_apps_Deployment_To_v1beta2_Deployment(in *apps.Deployment, out *app
 		delete(out.Annotations, appsv1beta2.DeprecatedRollbackTo)
 	}
 
-	if err := Convert_apps_DeploymentStatus_To_v1beta2_DeploymentStatus(&in.Status, &out.Status, s); err != nil {
-		return err
-	}
 	return nil
 }
 
 func Convert_apps_DaemonSet_To_v1beta2_DaemonSet(in *apps.DaemonSet, out *appsv1beta2.DaemonSet, s conversion.Scope) error {
-	out.ObjectMeta = in.ObjectMeta
+	if err := autoConvert_apps_DaemonSet_To_v1beta2_DaemonSet(in, out, s); err != nil {
+		return err
+	}
+
 	out.Annotations = deepCopyStringMap(out.Annotations)
 	out.Annotations[appsv1beta2.DeprecatedTemplateGeneration] = strconv.FormatInt(in.Spec.TemplateGeneration, 10)
-	if err := Convert_apps_DaemonSetSpec_To_v1beta2_DaemonSetSpec(&in.Spec, &out.Spec, s); err != nil {
-		return err
-	}
-	if err := s.Convert(&in.Status, &out.Status, 0); err != nil {
-		return err
-	}
 	return nil
 }
 
+// Convert_apps_DaemonSetSpec_To_v1beta2_DaemonSetSpec is defined here, because public
+// conversion is not auto-generated due to existing warnings.
 func Convert_apps_DaemonSetSpec_To_v1beta2_DaemonSetSpec(in *apps.DaemonSetSpec, out *appsv1beta2.DaemonSetSpec, s conversion.Scope) error {
-	out.Selector = in.Selector
-	if err := k8s_api_v1.Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+	if err := autoConvert_apps_DaemonSetSpec_To_v1beta2_DaemonSetSpec(in, out, s); err != nil {
 		return err
-	}
-	if err := Convert_apps_DaemonSetUpdateStrategy_To_v1beta2_DaemonSetUpdateStrategy(&in.UpdateStrategy, &out.UpdateStrategy, s); err != nil {
-		return err
-	}
-	out.MinReadySeconds = int32(in.MinReadySeconds)
-	if in.RevisionHistoryLimit != nil {
-		out.RevisionHistoryLimit = new(int32)
-		*out.RevisionHistoryLimit = *in.RevisionHistoryLimit
-	} else {
-		out.RevisionHistoryLimit = nil
 	}
 	return nil
 }
 
 func Convert_v1beta2_DaemonSet_To_apps_DaemonSet(in *appsv1beta2.DaemonSet, out *apps.DaemonSet, s conversion.Scope) error {
-	out.ObjectMeta = in.ObjectMeta
-	if err := Convert_v1beta2_DaemonSetSpec_To_apps_DaemonSetSpec(&in.Spec, &out.Spec, s); err != nil {
+	if err := autoConvert_v1beta2_DaemonSet_To_apps_DaemonSet(in, out, s); err != nil {
 		return err
 	}
+
 	if value, ok := in.Annotations[appsv1beta2.DeprecatedTemplateGeneration]; ok {
 		if value64, err := strconv.ParseInt(value, 10, 64); err != nil {
 			return err
@@ -224,27 +170,7 @@ func Convert_v1beta2_DaemonSet_To_apps_DaemonSet(in *appsv1beta2.DaemonSet, out 
 			delete(out.Annotations, appsv1beta2.DeprecatedTemplateGeneration)
 		}
 	}
-	if err := s.Convert(&in.Status, &out.Status, 0); err != nil {
-		return err
-	}
-	return nil
-}
 
-func Convert_v1beta2_DaemonSetSpec_To_apps_DaemonSetSpec(in *appsv1beta2.DaemonSetSpec, out *apps.DaemonSetSpec, s conversion.Scope) error {
-	out.Selector = in.Selector
-	if err := k8s_api_v1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
-		return err
-	}
-	if err := Convert_v1beta2_DaemonSetUpdateStrategy_To_apps_DaemonSetUpdateStrategy(&in.UpdateStrategy, &out.UpdateStrategy, s); err != nil {
-		return err
-	}
-	if in.RevisionHistoryLimit != nil {
-		out.RevisionHistoryLimit = new(int32)
-		*out.RevisionHistoryLimit = *in.RevisionHistoryLimit
-	} else {
-		out.RevisionHistoryLimit = nil
-	}
-	out.MinReadySeconds = in.MinReadySeconds
 	return nil
 }
 
@@ -254,4 +180,46 @@ func deepCopyStringMap(m map[string]string) map[string]string {
 		ret[k] = v
 	}
 	return ret
+}
+
+// Convert_v1beta2_StatefulSetSpec_To_apps_StatefulSetSpec augments auto-conversion to preserve < 1.17 behavior
+// setting apiVersion/kind in nested persistent volume claim objects.
+func Convert_v1beta2_StatefulSetSpec_To_apps_StatefulSetSpec(in *appsv1beta2.StatefulSetSpec, out *apps.StatefulSetSpec, s conversion.Scope) error {
+	if err := autoConvert_v1beta2_StatefulSetSpec_To_apps_StatefulSetSpec(in, out, s); err != nil {
+		return err
+	}
+	// set APIVersion/Kind to behave the same as reflective conversion < 1.17.
+	// see http://issue.k8s.io/87583
+	if out.VolumeClaimTemplates != nil {
+		// copy so we don't modify the input
+		templatesCopy := make([]core.PersistentVolumeClaim, len(out.VolumeClaimTemplates))
+		copy(templatesCopy, out.VolumeClaimTemplates)
+		out.VolumeClaimTemplates = templatesCopy
+		for i := range out.VolumeClaimTemplates {
+			out.VolumeClaimTemplates[i].APIVersion = ""
+			out.VolumeClaimTemplates[i].Kind = ""
+		}
+	}
+	return nil
+}
+
+// Convert_apps_StatefulSetSpec_To_v1beta2_StatefulSetSpec augments auto-conversion to preserve < 1.17 behavior
+// setting apiVersion/kind in nested persistent volume claim objects.
+func Convert_apps_StatefulSetSpec_To_v1beta2_StatefulSetSpec(in *apps.StatefulSetSpec, out *appsv1beta2.StatefulSetSpec, s conversion.Scope) error {
+	if err := autoConvert_apps_StatefulSetSpec_To_v1beta2_StatefulSetSpec(in, out, s); err != nil {
+		return err
+	}
+	// set APIVersion/Kind to behave the same as reflective conversion < 1.17.
+	// see http://issue.k8s.io/87583
+	if out.VolumeClaimTemplates != nil {
+		// copy so we don't modify the input
+		templatesCopy := make([]corev1.PersistentVolumeClaim, len(out.VolumeClaimTemplates))
+		copy(templatesCopy, out.VolumeClaimTemplates)
+		out.VolumeClaimTemplates = templatesCopy
+		for i := range out.VolumeClaimTemplates {
+			out.VolumeClaimTemplates[i].APIVersion = "v1"
+			out.VolumeClaimTemplates[i].Kind = "PersistentVolumeClaim"
+		}
+	}
+	return nil
 }

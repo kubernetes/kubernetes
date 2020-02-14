@@ -30,8 +30,9 @@ type fakeManager struct {
 	state state.State
 }
 
-func (m *fakeManager) Start(activePods ActivePodsFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService, initialContainers containermap.ContainerMap) {
+func (m *fakeManager) Start(activePods ActivePodsFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService, initialContainers containermap.ContainerMap) error {
 	klog.Info("[fake cpumanager] Start()")
+	return nil
 }
 
 func (m *fakeManager) Policy() Policy {
@@ -49,7 +50,7 @@ func (m *fakeManager) RemoveContainer(containerID string) error {
 	return nil
 }
 
-func (m *fakeManager) GetTopologyHints(pod v1.Pod, container v1.Container) map[string][]topologymanager.TopologyHint {
+func (m *fakeManager) GetTopologyHints(pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
 	klog.Infof("[fake cpumanager] Get Topology Hints")
 	return map[string][]topologymanager.TopologyHint{}
 }

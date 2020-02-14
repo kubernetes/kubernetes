@@ -31,10 +31,10 @@ import (
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
 
-const postFilterStateKey = "PostFilter" + Name
+const preScoreStateKey = "PreScore" + Name
 
-// postFilterState computed at PostFilter and used at Score.
-type postFilterState struct {
+// preScoreState computed at PreScore and used at Score.
+type preScoreState struct {
 	constraints []topologySpreadConstraint
 	// nodeNameSet is a string set holding all node names which have all constraints[*].topologyKey present.
 	nodeNameSet sets.String
@@ -44,7 +44,7 @@ type postFilterState struct {
 
 // Clone implements the mandatory Clone interface. We don't really copy the data since
 // there is no need for that.
-func (s *postFilterState) Clone() framework.StateData {
+func (s *preScoreState) Clone() framework.StateData {
 	return s
 }
 
@@ -52,7 +52,7 @@ func (s *postFilterState) Clone() framework.StateData {
 // and initialize two maps:
 // 1) s.topologyPairToPodCounts: keyed with both eligible topology pair and node names.
 // 2) s.nodeNameSet: keyed with node name, and valued with a *int64 pointer for eligible node only.
-func (s *postFilterState) initialize(pod *v1.Pod, filteredNodes []*v1.Node) error {
+func (s *preScoreState) initialize(pod *v1.Pod, filteredNodes []*v1.Node) error {
 	constraints, err := filterTopologySpreadConstraints(pod.Spec.TopologySpreadConstraints, v1.ScheduleAnyway)
 	if err != nil {
 		return err
@@ -78,8 +78,8 @@ func (s *postFilterState) initialize(pod *v1.Pod, filteredNodes []*v1.Node) erro
 	return nil
 }
 
-// PostFilter builds and writes cycle state used by Score and NormalizeScore.
-func (pl *PodTopologySpread) PostFilter(
+// PreScore builds and writes cycle state used by Score and NormalizeScore.
+func (pl *PodTopologySpread) PreScore(
 	ctx context.Context,
 	cycleState *framework.CycleState,
 	pod *v1.Pod,
@@ -96,18 +96,18 @@ func (pl *PodTopologySpread) PostFilter(
 		return nil
 	}
 
-	state := &postFilterState{
+	state := &preScoreState{
 		nodeNameSet:             sets.String{},
 		topologyPairToPodCounts: make(map[topologyPair]*int64),
 	}
 	err = state.initialize(pod, filteredNodes)
 	if err != nil {
-		return framework.NewStatus(framework.Error, fmt.Sprintf("error when calculating postFilterState: %v", err))
+		return framework.NewStatus(framework.Error, fmt.Sprintf("error when calculating preScoreState: %v", err))
 	}
 
 	// return if incoming pod doesn't have soft topology spread constraints.
 	if state.constraints == nil {
-		cycleState.Write(postFilterStateKey, state)
+		cycleState.Write(preScoreStateKey, state)
 		return nil
 	}
 
@@ -135,6 +135,10 @@ func (pl *PodTopologySpread) PostFilter(
 			// <matchSum> indicates how many pods (on current node) match the <constraint>.
 			matchSum := int64(0)
 			for _, existingPod := range nodeInfo.Pods() {
+				// Bypass terminating Pod (see #87621).
+				if existingPod.DeletionTimestamp != nil || existingPod.Namespace != pod.Namespace {
+					continue
+				}
 				if c.selector.Matches(labels.Set(existingPod.Labels)) {
 					matchSum++
 				}
@@ -144,7 +148,7 @@ func (pl *PodTopologySpread) PostFilter(
 	}
 	workqueue.ParallelizeUntil(ctx, 16, len(allNodes), processAllNode)
 
-	cycleState.Write(postFilterStateKey, state)
+	cycleState.Write(preScoreStateKey, state)
 	return nil
 }
 
@@ -158,7 +162,7 @@ func (pl *PodTopologySpread) Score(ctx context.Context, cycleState *framework.Cy
 	}
 
 	node := nodeInfo.Node()
-	s, err := getPostFilterState(cycleState)
+	s, err := getPreScoreState(cycleState)
 	if err != nil {
 		return 0, framework.NewStatus(framework.Error, err.Error())
 	}
@@ -183,7 +187,7 @@ func (pl *PodTopologySpread) Score(ctx context.Context, cycleState *framework.Cy
 
 // NormalizeScore invoked after scoring all nodes.
 func (pl *PodTopologySpread) NormalizeScore(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, scores framework.NodeScoreList) *framework.Status {
-	s, err := getPostFilterState(cycleState)
+	s, err := getPreScoreState(cycleState)
 	if err != nil {
 		return framework.NewStatus(framework.Error, err.Error())
 	}
@@ -242,15 +246,15 @@ func (pl *PodTopologySpread) ScoreExtensions() framework.ScoreExtensions {
 	return pl
 }
 
-func getPostFilterState(cycleState *framework.CycleState) (*postFilterState, error) {
-	c, err := cycleState.Read(postFilterStateKey)
+func getPreScoreState(cycleState *framework.CycleState) (*preScoreState, error) {
+	c, err := cycleState.Read(preScoreStateKey)
 	if err != nil {
-		return nil, fmt.Errorf("error reading %q from cycleState: %v", postFilterStateKey, err)
+		return nil, fmt.Errorf("error reading %q from cycleState: %v", preScoreStateKey, err)
 	}
 
-	s, ok := c.(*postFilterState)
+	s, ok := c.(*preScoreState)
 	if !ok {
-		return nil, fmt.Errorf("%+v  convert to podtopologyspread.postFilterState error", c)
+		return nil, fmt.Errorf("%+v  convert to podtopologyspread.preScoreState error", c)
 	}
 	return s, nil
 }

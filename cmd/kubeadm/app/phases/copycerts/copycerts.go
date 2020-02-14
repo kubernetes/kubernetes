@@ -17,6 +17,7 @@ limitations under the License.
 package copycerts
 
 import (
+	"context"
 	"encoding/hex"
 	"fmt"
 	"io/ioutil"
@@ -159,7 +160,7 @@ func createRBAC(client clientset.Interface) error {
 
 func getSecretOwnerRef(client clientset.Interface, tokenID string) ([]metav1.OwnerReference, error) {
 	secretName := bootstraputil.BootstrapTokenSecretName(tokenID)
-	secret, err := client.CoreV1().Secrets(metav1.NamespaceSystem).Get(secretName, metav1.GetOptions{})
+	secret, err := client.CoreV1().Secrets(metav1.NamespaceSystem).Get(context.TODO(), secretName, metav1.GetOptions{})
 	if err != nil {
 		return nil, errors.Wrap(err, "error to get token reference")
 	}
@@ -259,7 +260,7 @@ func writeCertOrKey(certOrKeyPath string, certOrKeyData []byte) error {
 }
 
 func getSecret(client clientset.Interface) (*v1.Secret, error) {
-	secret, err := client.CoreV1().Secrets(metav1.NamespaceSystem).Get(kubeadmconstants.KubeadmCertsSecret, metav1.GetOptions{})
+	secret, err := client.CoreV1().Secrets(metav1.NamespaceSystem).Get(context.TODO(), kubeadmconstants.KubeadmCertsSecret, metav1.GetOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			return nil, errors.Errorf("Secret %q was not found in the %q Namespace. This Secret might have expired. Please, run `kubeadm init phase upload-certs --upload-certs` on a control plane to generate a new one", kubeadmconstants.KubeadmCertsSecret, metav1.NamespaceSystem)

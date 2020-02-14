@@ -17,6 +17,7 @@ limitations under the License.
 package testsuites
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -28,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
@@ -130,20 +130,20 @@ func (s *snapshottableTestSuite) DefineTests(driver TestDriver, pattern testpatt
 		framework.Logf("In creating storage class object and pvc object for driver - sc: %v, pvc: %v", class, pvc)
 
 		ginkgo.By("creating a StorageClass " + class.Name)
-		class, err = cs.StorageV1().StorageClasses().Create(class)
+		class, err = cs.StorageV1().StorageClasses().Create(context.TODO(), class, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 		defer func() {
 			framework.Logf("deleting storage class %s", class.Name)
-			framework.ExpectNoError(cs.StorageV1().StorageClasses().Delete(class.Name, nil))
+			framework.ExpectNoError(cs.StorageV1().StorageClasses().Delete(context.TODO(), class.Name, nil))
 		}()
 
 		ginkgo.By("creating a claim")
-		pvc, err = cs.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(pvc)
+		pvc, err = cs.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(context.TODO(), pvc, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 		defer func() {
 			framework.Logf("deleting claim %q/%q", pvc.Namespace, pvc.Name)
 			// typically this claim has already been deleted
-			err = cs.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(pvc.Name, nil)
+			err = cs.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(context.TODO(), pvc.Name, nil)
 			if err != nil && !apierrors.IsNotFound(err) {
 				framework.Failf("Error deleting claim %q. Error: %v", pvc.Name, err)
 			}
@@ -151,7 +151,7 @@ func (s *snapshottableTestSuite) DefineTests(driver TestDriver, pattern testpatt
 
 		ginkgo.By("starting a pod to use the claim")
 		command := "echo 'hello world' > /mnt/test/data"
-		pod := StartInPodWithVolume(cs, pvc.Namespace, pvc.Name, "pvc-snapshottable-tester", command, e2epod.NodeSelection{Name: config.ClientNodeName})
+		pod := StartInPodWithVolume(cs, pvc.Namespace, pvc.Name, "pvc-snapshottable-tester", command, config.ClientNodeSelection)
 		defer StopPod(cs, pod)
 
 		err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, cs, pvc.Namespace, pvc.Name, framework.Poll, framework.ClaimProvisionTimeout)
@@ -159,11 +159,11 @@ func (s *snapshottableTestSuite) DefineTests(driver TestDriver, pattern testpatt
 
 		ginkgo.By("checking the claim")
 		// Get new copy of the claim
-		pvc, err = cs.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(pvc.Name, metav1.GetOptions{})
+		pvc, err = cs.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(context.TODO(), pvc.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 
 		// Get the bound PV
-		_, err = cs.CoreV1().PersistentVolumes().Get(pvc.Spec.VolumeName, metav1.GetOptions{})
+		_, err = cs.CoreV1().PersistentVolumes().Get(context.TODO(), pvc.Spec.VolumeName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 
 		ginkgo.By("creating a SnapshotClass")

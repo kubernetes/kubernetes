@@ -491,9 +491,6 @@ API rule violation: list_type_missing,k8s.io/kube-scheduler/config/v1,Policy,Pri
 API rule violation: list_type_missing,k8s.io/kube-scheduler/config/v1,RequestedToCapacityRatioArguments,Resources
 API rule violation: list_type_missing,k8s.io/kube-scheduler/config/v1,RequestedToCapacityRatioArguments,Shape
 API rule violation: list_type_missing,k8s.io/kube-scheduler/config/v1,ServiceAffinity,Labels
-API rule violation: list_type_missing,k8s.io/kube-scheduler/config/v1alpha1,KubeSchedulerConfiguration,PluginConfig
-API rule violation: list_type_missing,k8s.io/kube-scheduler/config/v1alpha1,PluginSet,Disabled
-API rule violation: list_type_missing,k8s.io/kube-scheduler/config/v1alpha1,PluginSet,Enabled
 API rule violation: list_type_missing,k8s.io/kubelet/config/v1beta1,KubeletConfiguration,AllowedUnsafeSysctls
 API rule violation: list_type_missing,k8s.io/kubelet/config/v1beta1,KubeletConfiguration,ClusterDNS
 API rule violation: list_type_missing,k8s.io/kubelet/config/v1beta1,KubeletConfiguration,EnforceNodeAllocatable
@@ -507,7 +504,6 @@ API rule violation: list_type_missing,k8s.io/metrics/pkg/apis/metrics/v1alpha1,P
 API rule violation: list_type_missing,k8s.io/metrics/pkg/apis/metrics/v1beta1,NodeMetricsList,Items
 API rule violation: list_type_missing,k8s.io/metrics/pkg/apis/metrics/v1beta1,PodMetrics,Containers
 API rule violation: list_type_missing,k8s.io/metrics/pkg/apis/metrics/v1beta1,PodMetricsList,Items
-API rule violation: list_type_missing,k8s.io/node-api/pkg/apis/node/v1alpha1,RuntimeClassList,Items
 API rule violation: names_match,k8s.io/api/authorization/v1beta1,SubjectAccessReviewSpec,Groups
 API rule violation: names_match,k8s.io/api/core/v1,AzureDiskVolumeSource,DataDiskURI
 API rule violation: names_match,k8s.io/api/core/v1,ContainerStatus,LastTerminationState

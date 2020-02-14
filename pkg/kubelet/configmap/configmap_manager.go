@@ -17,6 +17,7 @@ limitations under the License.
 package configmap
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -61,7 +62,7 @@ func NewSimpleConfigMapManager(kubeClient clientset.Interface) Manager {
 }
 
 func (s *simpleConfigMapManager) GetConfigMap(namespace, name string) (*v1.ConfigMap, error) {
-	return s.kubeClient.CoreV1().ConfigMaps(namespace).Get(name, metav1.GetOptions{})
+	return s.kubeClient.CoreV1().ConfigMaps(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 }
 
 func (s *simpleConfigMapManager) RegisterPod(pod *v1.Pod) {
@@ -120,7 +121,7 @@ const (
 //   value in cache; otherwise it is just fetched from cache
 func NewCachingConfigMapManager(kubeClient clientset.Interface, getTTL manager.GetObjectTTLFunc) Manager {
 	getConfigMap := func(namespace, name string, opts metav1.GetOptions) (runtime.Object, error) {
-		return kubeClient.CoreV1().ConfigMaps(namespace).Get(name, opts)
+		return kubeClient.CoreV1().ConfigMaps(namespace).Get(context.TODO(), name, opts)
 	}
 	configMapStore := manager.NewObjectStore(getConfigMap, clock.RealClock{}, getTTL, defaultTTL)
 	return &configMapManager{
@@ -136,16 +137,22 @@ func NewCachingConfigMapManager(kubeClient clientset.Interface, getTTL manager.G
 // - every GetObject() returns a value from local cache propagated via watches
 func NewWatchingConfigMapManager(kubeClient clientset.Interface) Manager {
 	listConfigMap := func(namespace string, opts metav1.ListOptions) (runtime.Object, error) {
-		return kubeClient.CoreV1().ConfigMaps(namespace).List(opts)
+		return kubeClient.CoreV1().ConfigMaps(namespace).List(context.TODO(), opts)
 	}
 	watchConfigMap := func(namespace string, opts metav1.ListOptions) (watch.Interface, error) {
-		return kubeClient.CoreV1().ConfigMaps(namespace).Watch(opts)
+		return kubeClient.CoreV1().ConfigMaps(namespace).Watch(context.TODO(), opts)
 	}
 	newConfigMap := func() runtime.Object {
 		return &v1.ConfigMap{}
 	}
+	isImmutable := func(object runtime.Object) bool {
+		if configMap, ok := object.(*v1.ConfigMap); ok {
+			return configMap.Immutable != nil && *configMap.Immutable
+		}
+		return false
+	}
 	gr := corev1.Resource("configmap")
 	return &configMapManager{
-		manager: manager.NewWatchBasedManager(listConfigMap, watchConfigMap, newConfigMap, gr, getConfigMapNames),
+		manager: manager.NewWatchBasedManager(listConfigMap, watchConfigMap, newConfigMap, isImmutable, gr, getConfigMapNames),
 	}
 }

@@ -17,6 +17,7 @@ limitations under the License.
 package resource
 
 import (
+	"context"
 	"fmt"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -39,15 +40,15 @@ import (
 func GetRuntimeObjectForKind(c clientset.Interface, kind schema.GroupKind, ns, name string) (runtime.Object, error) {
 	switch kind {
 	case api.Kind("ReplicationController"):
-		return c.CoreV1().ReplicationControllers(ns).Get(name, metav1.GetOptions{})
+		return c.CoreV1().ReplicationControllers(ns).Get(context.TODO(), name, metav1.GetOptions{})
 	case extensionsinternal.Kind("ReplicaSet"), appsinternal.Kind("ReplicaSet"):
-		return c.AppsV1().ReplicaSets(ns).Get(name, metav1.GetOptions{})
+		return c.AppsV1().ReplicaSets(ns).Get(context.TODO(), name, metav1.GetOptions{})
 	case extensionsinternal.Kind("Deployment"), appsinternal.Kind("Deployment"):
-		return c.AppsV1().Deployments(ns).Get(name, metav1.GetOptions{})
+		return c.AppsV1().Deployments(ns).Get(context.TODO(), name, metav1.GetOptions{})
 	case extensionsinternal.Kind("DaemonSet"):
-		return c.AppsV1().DaemonSets(ns).Get(name, metav1.GetOptions{})
+		return c.AppsV1().DaemonSets(ns).Get(context.TODO(), name, metav1.GetOptions{})
 	case batchinternal.Kind("Job"):
-		return c.BatchV1().Jobs(ns).Get(name, metav1.GetOptions{})
+		return c.BatchV1().Jobs(ns).Get(context.TODO(), name, metav1.GetOptions{})
 	default:
 		return nil, fmt.Errorf("Unsupported kind when getting runtime object: %v", kind)
 	}

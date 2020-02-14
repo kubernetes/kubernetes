@@ -276,7 +276,7 @@ func (m *csiBlockMapper) SetUpDevice() error {
 		// Search for attachment by VolumeAttachment.Spec.Source.PersistentVolumeName
 		nodeName := string(m.plugin.host.GetNodeName())
 		attachID := getAttachmentName(csiSource.VolumeHandle, csiSource.Driver, nodeName)
-		attachment, err = m.k8s.StorageV1().VolumeAttachments().Get(attachID, meta.GetOptions{})
+		attachment, err = m.k8s.StorageV1().VolumeAttachments().Get(context.TODO(), attachID, meta.GetOptions{})
 		if err != nil {
 			return errors.New(log("blockMapper.SetupDevice failed to get volume attachment [id=%v]: %v", attachID, err))
 		}
@@ -332,7 +332,7 @@ func (m *csiBlockMapper) MapPodDevice() (string, error) {
 		// Search for attachment by VolumeAttachment.Spec.Source.PersistentVolumeName
 		nodeName := string(m.plugin.host.GetNodeName())
 		attachID := getAttachmentName(csiSource.VolumeHandle, csiSource.Driver, nodeName)
-		attachment, err = m.k8s.StorageV1().VolumeAttachments().Get(attachID, meta.GetOptions{})
+		attachment, err = m.k8s.StorageV1().VolumeAttachments().Get(context.TODO(), attachID, meta.GetOptions{})
 		if err != nil {
 			return "", errors.New(log("blockMapper.MapPodDevice failed to get volume attachment [id=%v]: %v", attachID, err))
 		}

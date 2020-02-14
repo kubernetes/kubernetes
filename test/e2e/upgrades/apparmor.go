@@ -17,11 +17,13 @@ limitations under the License.
 package upgrades
 
 import (
+	"context"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2esecurity "k8s.io/kubernetes/test/e2e/framework/security"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -39,7 +41,7 @@ func (AppArmorUpgradeTest) Name() string { return "apparmor-upgrade" }
 // Skip returns true when this test can be skipped.
 func (AppArmorUpgradeTest) Skip(upgCtx UpgradeContext) bool {
 	supportedImages := make(map[string]bool)
-	for _, d := range framework.AppArmorDistros {
+	for _, d := range e2eskipper.AppArmorDistros {
 		supportedImages[d] = true
 	}
 
@@ -85,7 +87,7 @@ func (t *AppArmorUpgradeTest) Teardown(f *framework.Framework) {
 
 func (t *AppArmorUpgradeTest) verifyPodStillUp(f *framework.Framework) {
 	ginkgo.By("Verifying an AppArmor profile is continuously enforced for a pod")
-	pod, err := f.PodClient().Get(t.pod.Name, metav1.GetOptions{})
+	pod, err := f.PodClient().Get(context.TODO(), t.pod.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err, "Should be able to get pod")
 	framework.ExpectEqual(pod.Status.Phase, v1.PodRunning, "Pod should stay running")
 	gomega.Expect(pod.Status.ContainerStatuses[0].State.Running).NotTo(gomega.BeNil(), "Container should be running")
@@ -99,7 +101,7 @@ func (t *AppArmorUpgradeTest) verifyNewPodSucceeds(f *framework.Framework) {
 
 func (t *AppArmorUpgradeTest) verifyNodesAppArmorEnabled(f *framework.Framework) {
 	ginkgo.By("Verifying nodes are AppArmor enabled")
-	nodes, err := f.ClientSet.CoreV1().Nodes().List(metav1.ListOptions{})
+	nodes, err := f.ClientSet.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 	framework.ExpectNoError(err, "Failed to list nodes")
 	for _, node := range nodes.Items {
 		gomega.Expect(node.Status.Conditions).To(gstruct.MatchElements(conditionType, gstruct.IgnoreExtras, gstruct.Elements{

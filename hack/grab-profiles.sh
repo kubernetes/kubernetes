@@ -14,6 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This script grabs profiles from running components.
+# Usage: `hack/grab-profiles.sh`.
+
 set -o errexit
 set -o nounset
 set -o pipefail

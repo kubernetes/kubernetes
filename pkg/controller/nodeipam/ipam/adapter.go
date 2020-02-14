@@ -88,7 +88,7 @@ func (a *adapter) AddAlias(ctx context.Context, nodeName string, cidrRange *net.
 }
 
 func (a *adapter) Node(ctx context.Context, name string) (*v1.Node, error) {
-	return a.k8s.CoreV1().Nodes().Get(name, metav1.GetOptions{})
+	return a.k8s.CoreV1().Nodes().Get(context.TODO(), name, metav1.GetOptions{})
 }
 
 func (a *adapter) UpdateNodePodCIDR(ctx context.Context, node *v1.Node, cidrRange *net.IPNet) error {
@@ -103,7 +103,7 @@ func (a *adapter) UpdateNodePodCIDR(ctx context.Context, node *v1.Node, cidrRang
 		return err
 	}
 
-	_, err = a.k8s.CoreV1().Nodes().Patch(node.Name, types.StrategicMergePatchType, bytes)
+	_, err = a.k8s.CoreV1().Nodes().Patch(context.TODO(), node.Name, types.StrategicMergePatchType, bytes, metav1.PatchOptions{})
 	return err
 }
 

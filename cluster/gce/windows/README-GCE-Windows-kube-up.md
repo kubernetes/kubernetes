@@ -57,7 +57,7 @@ make quick-release
 ### 2. Create a Kubernetes cluster
 
 You can create a regular Kubernetes cluster or an end-to-end test cluster.<br />
-Only end-to-end test clusters support running the Kubernetes e2e tests (as both [e2e cluster creation](https://github.com/kubernetes/kubernetes/blob/b632eaddbaad9dc1430d214d506b72750bbb9f69/hack/e2e-internal/e2e-up.sh#L24) and [e2e test scripts](https://github.com/kubernetes/kubernetes/blob/b632eaddbaad9dc1430d214d506b72750bbb9f69/hack/ginkgo-e2e.sh#L42) are setup based on `cluster/gce/config-test.sh`), also enables some debugging features such as SSH access on the Windows nodes. 
+Only end-to-end test clusters support running the Kubernetes e2e tests (as both [e2e cluster creation](https://github.com/kubernetes/kubernetes/blob/b632eaddbaad9dc1430d214d506b72750bbb9f69/hack/e2e-internal/e2e-up.sh#L24) and [e2e test scripts](https://github.com/kubernetes/kubernetes/blob/b632eaddbaad9dc1430d214d506b72750bbb9f69/hack/ginkgo-e2e.sh#L42) are setup based on `cluster/gce/config-test.sh`), also enables some debugging features such as SSH access on the Windows nodes.
 
 Please make sure you set the environment variables properly following the
 instructions in the previous section.
@@ -84,31 +84,37 @@ Now bring up a cluster using one of the following two methods:
 ```
 # Invoke kube-up.sh with these environment variables:
 #   PROJECT: text name of your GCP project.
-#   KUBERNETES_SKIP_CONFIRM: skips any kube-up prompts.
-PROJECT=${CLOUDSDK_CORE_PROJECT} KUBERNETES_SKIP_CONFIRM=y ./cluster/kube-up.sh
+#   WINDOWS_NODE_OS_DISTRIBUTION: the Windows version you want your nodes to
+#     run, e.g. win2019 or win1909.
+#   KUBE_UP_AUTOMATIC_CLEANUP (optional): cleans up existing cluster without
+#     prompting.
+PROJECT=${CLOUDSDK_CORE_PROJECT} WINDOWS_NODE_OS_DISTRIBUTION=win2019 \
+  KUBE_UP_AUTOMATIC_CLEANUP=true ./cluster/kube-up.sh
 ```
 
 To teardown the cluster run:
 
 ```
-PROJECT=${CLOUDSDK_CORE_PROJECT} KUBERNETES_SKIP_CONFIRM=y ./cluster/kube-down.sh
+PROJECT=${CLOUDSDK_CORE_PROJECT} ./cluster/kube-down.sh
 ```
 
-#### 2b. Create a Kubernetes end-to-end (E2E) test cluster	
-If you have built your own release binaries following step 1, run the following	
-command:	
-```	
-PROJECT=${CLOUDSDK_CORE_PROJECT} ./hack/e2e-internal/e2e-up.sh	
-```	
+#### 2b. Create a Kubernetes end-to-end (E2E) test cluster
+If you have built your own release binaries following step 1, run the following
+command:
+```
+PROJECT=${CLOUDSDK_CORE_PROJECT} WINDOWS_NODE_OS_DISTRIBUTION=win2019 \
+  ./hack/e2e-internal/e2e-up.sh
+```
 
-If any e2e cluster exists already, this command will prompt you whether tears down and creates a new	one. To teardown existing e2e cluster only, run the command:
-```	
-PROJECT=${CLOUDSDK_CORE_PROJECT} ./hack/e2e-internal/e2e-down.sh	
-```	
+If any e2e cluster exists already, this command will prompt you to tear down and
+create a new one. To teardown existing e2e cluster only, run the command:
+```
+PROJECT=${CLOUDSDK_CORE_PROJECT} ./hack/e2e-internal/e2e-down.sh
+```
 
-No matter what type of cluster you chose to create, the result should be a	
-Kubernetes cluster with one Linux master node, `NUM_NODES` Linux worker nodes	
-and `NUM_WINDOWS_NODES` Windows worker nodes.	
+No matter what type of cluster you chose to create, the result should be a
+Kubernetes cluster with one Linux master node, `NUM_NODES` Linux worker nodes
+and `NUM_WINDOWS_NODES` Windows worker nodes.
 
 ## Validating the cluster
 

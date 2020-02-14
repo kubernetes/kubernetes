@@ -17,6 +17,7 @@ limitations under the License.
 package controller
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -733,11 +734,11 @@ func TestRemoveTaintOffNode(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		node, _ := test.nodeHandler.Get(test.nodeName, metav1.GetOptions{})
+		node, _ := test.nodeHandler.Get(context.TODO(), test.nodeName, metav1.GetOptions{})
 		err := RemoveTaintOffNode(test.nodeHandler, test.nodeName, node, test.taintsToRemove...)
 		assert.NoError(t, err, "%s: RemoveTaintOffNode() error = %v", test.name, err)
 
-		node, _ = test.nodeHandler.Get(test.nodeName, metav1.GetOptions{})
+		node, _ = test.nodeHandler.Get(context.TODO(), test.nodeName, metav1.GetOptions{})
 		assert.EqualValues(t, test.expectedTaints, node.Spec.Taints,
 			"%s: failed to remove taint off node: expected %+v, got %+v",
 			test.name, test.expectedTaints, node.Spec.Taints)
@@ -912,7 +913,7 @@ func TestAddOrUpdateTaintOnNode(t *testing.T) {
 		err := AddOrUpdateTaintOnNode(test.nodeHandler, test.nodeName, test.taintsToAdd...)
 		assert.NoError(t, err, "%s: AddOrUpdateTaintOnNode() error = %v", test.name, err)
 
-		node, _ := test.nodeHandler.Get(test.nodeName, metav1.GetOptions{})
+		node, _ := test.nodeHandler.Get(context.TODO(), test.nodeName, metav1.GetOptions{})
 		assert.EqualValues(t, test.expectedTaints, node.Spec.Taints,
 			"%s: failed to add taint to node: expected %+v, got %+v",
 			test.name, test.expectedTaints, node.Spec.Taints)

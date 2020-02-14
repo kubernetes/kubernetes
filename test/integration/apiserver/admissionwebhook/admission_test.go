@@ -17,6 +17,7 @@ limitations under the License.
 package admissionwebhook
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
@@ -458,7 +459,7 @@ func testWebhookAdmission(t *testing.T, watchCache bool) {
 	// create CRDs
 	etcd.CreateTestCRDs(t, apiextensionsclientset.NewForConfigOrDie(server.ClientConfig), false, etcd.GetCustomResourceDefinitionData()...)
 
-	if _, err := client.CoreV1().Namespaces().Create(&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}}); err != nil {
+	if _, err := client.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}}, metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1016,11 +1017,11 @@ func testPodConnectSubresource(c *testContext) {
 		var err error
 		switch c.gvr {
 		case gvr("", "v1", "pods/exec"):
-			err = c.clientset.CoreV1().RESTClient().Verb(httpMethod).Namespace(pod.GetNamespace()).Resource("pods").Name(pod.GetName()).SubResource("exec").Do().Error()
+			err = c.clientset.CoreV1().RESTClient().Verb(httpMethod).Namespace(pod.GetNamespace()).Resource("pods").Name(pod.GetName()).SubResource("exec").Do(context.TODO()).Error()
 		case gvr("", "v1", "pods/attach"):
-			err = c.clientset.CoreV1().RESTClient().Verb(httpMethod).Namespace(pod.GetNamespace()).Resource("pods").Name(pod.GetName()).SubResource("attach").Do().Error()
+			err = c.clientset.CoreV1().RESTClient().Verb(httpMethod).Namespace(pod.GetNamespace()).Resource("pods").Name(pod.GetName()).SubResource("attach").Do(context.TODO()).Error()
 		case gvr("", "v1", "pods/portforward"):
-			err = c.clientset.CoreV1().RESTClient().Verb(httpMethod).Namespace(pod.GetNamespace()).Resource("pods").Name(pod.GetName()).SubResource("portforward").Do().Error()
+			err = c.clientset.CoreV1().RESTClient().Verb(httpMethod).Namespace(pod.GetNamespace()).Resource("pods").Name(pod.GetName()).SubResource("portforward").Do(context.TODO()).Error()
 		default:
 			c.t.Errorf("unknown subresource %#v", c.gvr)
 			return
@@ -1047,7 +1048,7 @@ func testPodBindingEviction(c *testContext) {
 	zero := int64(0)
 	forceDelete := &metav1.DeleteOptions{GracePeriodSeconds: &zero, PropagationPolicy: &background}
 	defer func() {
-		err := c.clientset.CoreV1().Pods(pod.GetNamespace()).Delete(pod.GetName(), forceDelete)
+		err := c.clientset.CoreV1().Pods(pod.GetNamespace()).Delete(context.TODO(), pod.GetName(), forceDelete)
 		if err != nil && !apierrors.IsNotFound(err) {
 			c.t.Error(err)
 			return
@@ -1061,19 +1062,19 @@ func testPodBindingEviction(c *testContext) {
 		err = c.clientset.CoreV1().RESTClient().Post().Namespace(pod.GetNamespace()).Resource("bindings").Body(&corev1.Binding{
 			ObjectMeta: metav1.ObjectMeta{Name: pod.GetName()},
 			Target:     corev1.ObjectReference{Name: "foo", Kind: "Node", APIVersion: "v1"},
-		}).Do().Error()
+		}).Do(context.TODO()).Error()
 
 	case gvr("", "v1", "pods/binding"):
 		err = c.clientset.CoreV1().RESTClient().Post().Namespace(pod.GetNamespace()).Resource("pods").Name(pod.GetName()).SubResource("binding").Body(&corev1.Binding{
 			ObjectMeta: metav1.ObjectMeta{Name: pod.GetName()},
 			Target:     corev1.ObjectReference{Name: "foo", Kind: "Node", APIVersion: "v1"},
-		}).Do().Error()
+		}).Do(context.TODO()).Error()
 
 	case gvr("", "v1", "pods/eviction"):
 		err = c.clientset.CoreV1().RESTClient().Post().Namespace(pod.GetNamespace()).Resource("pods").Name(pod.GetName()).SubResource("eviction").Body(&policyv1beta1.Eviction{
 			ObjectMeta:    metav1.ObjectMeta{Name: pod.GetName()},
 			DeleteOptions: forceDelete,
-		}).Do().Error()
+		}).Do(context.TODO()).Error()
 
 	default:
 		c.t.Errorf("unhandled resource %#v", c.gvr)
@@ -1124,7 +1125,7 @@ func testSubresourceProxy(c *testContext) {
 		// set expectations
 		c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), schema.GroupVersionKind{}, v1beta1.Connect, obj.GetName(), obj.GetNamespace(), true, false, false)
 		// run the request. we don't actually care if the request is successful, just that admission gets called as expected
-		err = request.Resource(gvrWithoutSubresources.Resource).Name(obj.GetName()).SubResource(subresources...).Do().Error()
+		err = request.Resource(gvrWithoutSubresources.Resource).Name(obj.GetName()).SubResource(subresources...).Do(context.TODO()).Error()
 		if err != nil {
 			c.t.Logf("debug: result of subresource proxy (error expected): %v", err)
 		}
@@ -1449,7 +1450,7 @@ func createV1beta1ValidationWebhook(client clientset.Interface, endpoint, conver
 	fail := admissionv1beta1.Fail
 	equivalent := admissionv1beta1.Equivalent
 	// Attaching Admission webhook to API server
-	_, err := client.AdmissionregistrationV1beta1().ValidatingWebhookConfigurations().Create(&admissionv1beta1.ValidatingWebhookConfiguration{
+	_, err := client.AdmissionregistrationV1beta1().ValidatingWebhookConfigurations().Create(context.TODO(), &admissionv1beta1.ValidatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{Name: "admission.integration.test"},
 		Webhooks: []admissionv1beta1.ValidatingWebhook{
 			{
@@ -1477,7 +1478,7 @@ func createV1beta1ValidationWebhook(client clientset.Interface, endpoint, conver
 				AdmissionReviewVersions: []string{"v1beta1"},
 			},
 		},
-	})
+	}, metav1.CreateOptions{})
 	return err
 }
 
@@ -1485,7 +1486,7 @@ func createV1beta1MutationWebhook(client clientset.Interface, endpoint, converte
 	fail := admissionv1beta1.Fail
 	equivalent := admissionv1beta1.Equivalent
 	// Attaching Mutation webhook to API server
-	_, err := client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Create(&admissionv1beta1.MutatingWebhookConfiguration{
+	_, err := client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Create(context.TODO(), &admissionv1beta1.MutatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{Name: "mutation.integration.test"},
 		Webhooks: []admissionv1beta1.MutatingWebhook{
 			{
@@ -1513,7 +1514,7 @@ func createV1beta1MutationWebhook(client clientset.Interface, endpoint, converte
 				AdmissionReviewVersions: []string{"v1beta1"},
 			},
 		},
-	})
+	}, metav1.CreateOptions{})
 	return err
 }
 
@@ -1522,7 +1523,7 @@ func createV1ValidationWebhook(client clientset.Interface, endpoint, convertedEn
 	equivalent := admissionv1.Equivalent
 	none := admissionv1.SideEffectClassNone
 	// Attaching Admission webhook to API server
-	_, err := client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Create(&admissionv1.ValidatingWebhookConfiguration{
+	_, err := client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Create(context.TODO(), &admissionv1.ValidatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{Name: "admissionv1.integration.test"},
 		Webhooks: []admissionv1.ValidatingWebhook{
 			{
@@ -1552,7 +1553,7 @@ func createV1ValidationWebhook(client clientset.Interface, endpoint, convertedEn
 				SideEffects:             &none,
 			},
 		},
-	})
+	}, metav1.CreateOptions{})
 	return err
 }
 
@@ -1561,7 +1562,7 @@ func createV1MutationWebhook(client clientset.Interface, endpoint, convertedEndp
 	equivalent := admissionv1.Equivalent
 	none := admissionv1.SideEffectClassNone
 	// Attaching Mutation webhook to API server
-	_, err := client.AdmissionregistrationV1().MutatingWebhookConfigurations().Create(&admissionv1.MutatingWebhookConfiguration{
+	_, err := client.AdmissionregistrationV1().MutatingWebhookConfigurations().Create(context.TODO(), &admissionv1.MutatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{Name: "mutationv1.integration.test"},
 		Webhooks: []admissionv1.MutatingWebhook{
 			{
@@ -1591,7 +1592,7 @@ func createV1MutationWebhook(client clientset.Interface, endpoint, convertedEndp
 				SideEffects:             &none,
 			},
 		},
-	})
+	}, metav1.CreateOptions{})
 	return err
 }
 

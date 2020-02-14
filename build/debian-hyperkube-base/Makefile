@@ -19,16 +19,16 @@
 
 REGISTRY?=staging-k8s.gcr.io
 IMAGE?=$(REGISTRY)/debian-hyperkube-base
-TAG=0.12.1
+TAG=0.12.2
 ARCH?=amd64
 ALL_ARCH = amd64 arm arm64 ppc64le s390x
 CACHEBUST?=1
 
 BASEIMAGE=k8s.gcr.io/debian-base-$(ARCH):0.4.1
-CNI_VERSION=v0.7.5
+CNI_VERSION=v0.8.5
 
 TEMP_DIR:=$(shell mktemp -d)
-CNI_TARBALL=cni-plugins-$(ARCH)-$(CNI_VERSION).tgz
+CNI_TARBALL=cni-plugins-linux-$(ARCH)-$(CNI_VERSION).tgz
 
 # This option is for running docker manifest command
 export DOCKER_CLI_EXPERIMENTAL := enabled
@@ -58,7 +58,7 @@ push-manifest:
 
 cni-tars/$(CNI_TARBALL):
 	mkdir -p cni-tars/
-	cd cni-tars/ && curl -sSLO --retry 5 https://storage.googleapis.com/kubernetes-release/network-plugins/${CNI_TARBALL}
+	cd cni-tars/ && curl -sSLO --retry 5 https://storage.googleapis.com/k8s-artifacts-cni/release/${CNI_VERSION}/${CNI_TARBALL}
 
 clean:
 	rm -rf cni-tars/

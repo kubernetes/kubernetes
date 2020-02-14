@@ -78,7 +78,7 @@ func TestReplicationControllerScaleRetry(t *testing.T) {
 	}
 	preconditions := ScalePrecondition{3, ""}
 	scaleFunc = ScaleCondition(scaler, &preconditions, namespace, name, count, nil, rcgvr)
-	pass, err = scaleFunc()
+	_, err = scaleFunc()
 	if err == nil {
 		t.Errorf("Expected error on precondition failure")
 	}
@@ -188,7 +188,7 @@ func TestDeploymentScaleRetry(t *testing.T) {
 	}
 	preconditions := &ScalePrecondition{3, ""}
 	scaleFunc = ScaleCondition(scaler, preconditions, namespace, name, count, nil, deploygvr)
-	pass, err = scaleFunc()
+	_, err = scaleFunc()
 	if err == nil {
 		t.Error("Expected error on precondition failure")
 	}
@@ -318,7 +318,7 @@ func TestStatefulSetScaleRetry(t *testing.T) {
 	}
 	preconditions := &ScalePrecondition{3, ""}
 	scaleFunc = ScaleCondition(scaler, preconditions, namespace, name, count, nil, stsgvr)
-	pass, err = scaleFunc()
+	_, err = scaleFunc()
 	if err == nil {
 		t.Error("Expected error on precondition failure")
 	}
@@ -427,7 +427,7 @@ func TestReplicaSetScaleRetry(t *testing.T) {
 	}
 	preconditions := &ScalePrecondition{3, ""}
 	scaleFunc = ScaleCondition(scaler, preconditions, namespace, name, count, nil, rsgvr)
-	pass, err = scaleFunc()
+	_, err = scaleFunc()
 	if err == nil {
 		t.Error("Expected error on precondition failure")
 	}

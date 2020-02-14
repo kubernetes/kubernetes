@@ -17,6 +17,7 @@ limitations under the License.
 package reconcilers
 
 import (
+	"context"
 	corev1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -51,7 +52,7 @@ func NewEndpointsAdapter(endpointClient corev1client.EndpointsGetter, endpointSl
 // Get takes the name and namespace of the Endpoints resource, and returns a
 // corresponding Endpoints object if it exists, and an error if there is any.
 func (adapter *EndpointsAdapter) Get(namespace, name string, getOpts metav1.GetOptions) (*corev1.Endpoints, error) {
-	return adapter.endpointClient.Endpoints(namespace).Get(name, getOpts)
+	return adapter.endpointClient.Endpoints(namespace).Get(context.TODO(), name, getOpts)
 }
 
 // Create accepts a namespace and Endpoints object and creates the Endpoints
@@ -59,7 +60,7 @@ func (adapter *EndpointsAdapter) Get(namespace, name string, getOpts metav1.GetO
 // be created or updated. The created Endpoints object or an error will be
 // returned.
 func (adapter *EndpointsAdapter) Create(namespace string, endpoints *corev1.Endpoints) (*corev1.Endpoints, error) {
-	endpoints, err := adapter.endpointClient.Endpoints(namespace).Create(endpoints)
+	endpoints, err := adapter.endpointClient.Endpoints(namespace).Create(context.TODO(), endpoints, metav1.CreateOptions{})
 	if err == nil {
 		err = adapter.EnsureEndpointSliceFromEndpoints(namespace, endpoints)
 	}
@@ -70,7 +71,7 @@ func (adapter *EndpointsAdapter) Create(namespace string, endpoints *corev1.Endp
 // endpointSliceClient exists, a matching EndpointSlice will also be created or
 // updated. The updated Endpoints object or an error will be returned.
 func (adapter *EndpointsAdapter) Update(namespace string, endpoints *corev1.Endpoints) (*corev1.Endpoints, error) {
-	endpoints, err := adapter.endpointClient.Endpoints(namespace).Update(endpoints)
+	endpoints, err := adapter.endpointClient.Endpoints(namespace).Update(context.TODO(), endpoints, metav1.UpdateOptions{})
 	if err == nil {
 		err = adapter.EnsureEndpointSliceFromEndpoints(namespace, endpoints)
 	}
@@ -85,11 +86,11 @@ func (adapter *EndpointsAdapter) EnsureEndpointSliceFromEndpoints(namespace stri
 		return nil
 	}
 	endpointSlice := endpointSliceFromEndpoints(endpoints)
-	currentEndpointSlice, err := adapter.endpointSliceClient.EndpointSlices(namespace).Get(endpointSlice.Name, metav1.GetOptions{})
+	currentEndpointSlice, err := adapter.endpointSliceClient.EndpointSlices(namespace).Get(context.TODO(), endpointSlice.Name, metav1.GetOptions{})
 
 	if err != nil {
 		if errors.IsNotFound(err) {
-			if _, err = adapter.endpointSliceClient.EndpointSlices(namespace).Create(endpointSlice); errors.IsAlreadyExists(err) {
+			if _, err = adapter.endpointSliceClient.EndpointSlices(namespace).Create(context.TODO(), endpointSlice, metav1.CreateOptions{}); errors.IsAlreadyExists(err) {
 				err = nil
 			}
 		}
@@ -98,11 +99,11 @@ func (adapter *EndpointsAdapter) EnsureEndpointSliceFromEndpoints(namespace stri
 
 	// required for transition from IP to IPv4 address type.
 	if currentEndpointSlice.AddressType != endpointSlice.AddressType {
-		err = adapter.endpointSliceClient.EndpointSlices(namespace).Delete(endpointSlice.Name, &metav1.DeleteOptions{})
+		err = adapter.endpointSliceClient.EndpointSlices(namespace).Delete(context.TODO(), endpointSlice.Name, &metav1.DeleteOptions{})
 		if err != nil {
 			return err
 		}
-		_, err = adapter.endpointSliceClient.EndpointSlices(namespace).Create(endpointSlice)
+		_, err = adapter.endpointSliceClient.EndpointSlices(namespace).Create(context.TODO(), endpointSlice, metav1.CreateOptions{})
 		return err
 	}
 
@@ -112,7 +113,7 @@ func (adapter *EndpointsAdapter) EnsureEndpointSliceFromEndpoints(namespace stri
 		return nil
 	}
 
-	_, err = adapter.endpointSliceClient.EndpointSlices(namespace).Update(endpointSlice)
+	_, err = adapter.endpointSliceClient.EndpointSlices(namespace).Update(context.TODO(), endpointSlice, metav1.UpdateOptions{})
 	return err
 }
 

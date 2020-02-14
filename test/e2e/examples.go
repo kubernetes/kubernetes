@@ -17,6 +17,7 @@ limitations under the License.
 package e2e
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"sync"
@@ -79,7 +80,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 				err := e2epod.WaitForPodNameRunningInNamespace(c, podName, ns)
 				framework.ExpectNoError(err)
 				for t := time.Now(); time.Since(t) < timeout; time.Sleep(framework.Poll) {
-					pod, err := c.CoreV1().Pods(ns).Get(podName, metav1.GetOptions{})
+					pod, err := c.CoreV1().Pods(ns).Get(context.TODO(), podName, metav1.GetOptions{})
 					framework.ExpectNoError(err, fmt.Sprintf("getting pod %s", podName))
 					stat := podutil.GetExistingContainerStatus(pod.Status.ContainerStatuses, podName)
 					framework.Logf("Pod: %s, restart count:%d", stat.Name, stat.RestartCount)

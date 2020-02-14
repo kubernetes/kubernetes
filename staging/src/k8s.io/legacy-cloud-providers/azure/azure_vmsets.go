@@ -64,7 +64,7 @@ type VMSet interface {
 	EnsureBackendPoolDeleted(service *v1.Service, backendPoolID, vmSetName string, backendAddressPools *[]network.BackendAddressPool) error
 
 	// AttachDisk attaches a vhd to vm. The vhd must exist, can be identified by diskName, diskURI, and lun.
-	AttachDisk(isManagedDisk bool, diskName, diskURI string, nodeName types.NodeName, lun int32, cachingMode compute.CachingTypes, diskEncryptionSetID string) error
+	AttachDisk(isManagedDisk bool, diskName, diskURI string, nodeName types.NodeName, lun int32, cachingMode compute.CachingTypes, diskEncryptionSetID string, writeAcceleratorEnabled bool) error
 	// DetachDisk detaches a vhd from host. The vhd can be identified by diskName or diskURI.
 	DetachDisk(diskName, diskURI string, nodeName types.NodeName) error
 	// GetDataDisks gets a list of data disks attached to the node.

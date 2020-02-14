@@ -17,6 +17,7 @@ limitations under the License.
 package queueset
 
 import (
+	"context"
 	"time"
 
 	"k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/promise"
@@ -25,23 +26,32 @@ import (
 // request is a temporary container for "requests" with additional
 // tracking fields required for the functionality FQScheduler
 type request struct {
+	qs  *queueSet
+	ctx context.Context
+
+	// The relevant queue.  Is nil if this request did not go through
+	// a queue.
 	queue *queue
 
 	// startTime is the real time when the request began executing
 	startTime time.Time
 
-	// decision gets set to the decision about what to do with this request
-	decision promise.LockingMutable
+	// decision gets set to a `requestDecision` indicating what to do
+	// with this request.  It gets set exactly once, when the request
+	// is removed from its queue.  The value will be decisionReject,
+	// decisionCancel, or decisionExecute; decisionTryAnother never
+	// appears here.
+	decision promise.LockingWriteOnce
 
 	// arrivalTime is the real time when the request entered this system
 	arrivalTime time.Time
 
-	// isWaiting indicates whether the request is presently waiting in a queue
-	isWaiting bool
-
 	// descr1 and descr2 are not used in any logic but they appear in
 	// log messages
 	descr1, descr2 interface{}
+
+	// Indicates whether client has called Request::Wait()
+	waitStarted bool
 }
 
 // queue is an array of requests with additional metadata required for
@@ -60,7 +70,6 @@ type queue struct {
 
 // Enqueue enqueues a request into the queue
 func (q *queue) Enqueue(request *request) {
-	request.isWaiting = true
 	q.requests = append(q.requests, request)
 }
 
@@ -71,8 +80,6 @@ func (q *queue) Dequeue() (*request, bool) {
 	}
 	request := q.requests[0]
 	q.requests = q.requests[1:]
-
-	request.isWaiting = false
 	return request, true
 }
 

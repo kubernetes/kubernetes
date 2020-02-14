@@ -17,6 +17,7 @@ limitations under the License.
 package gce
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
@@ -126,7 +127,7 @@ func (cont *IngressController) CleanupIngressControllerWithTimeout(timeout time.
 
 func (cont *IngressController) getL7AddonUID() (string, error) {
 	framework.Logf("Retrieving UID from config map: %v/%v", metav1.NamespaceSystem, uidConfigMap)
-	cm, err := cont.Client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(uidConfigMap, metav1.GetOptions{})
+	cm, err := cont.Client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(context.TODO(), uidConfigMap, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}

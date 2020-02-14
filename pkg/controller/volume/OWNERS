@@ -1,12 +1,10 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-- childsb
 - jsafrane
 - saad-ali
 - msau42
 reviewers:
-- childsb
 - saad-ali
 - jsafrane
 - jingxu97

@@ -17,6 +17,7 @@ limitations under the License.
 package testing
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"os"
@@ -249,7 +250,7 @@ func (f *fakeVolumeHost) GetNodeAllocatable() (v1.ResourceList, error) {
 
 func (f *fakeVolumeHost) GetSecretFunc() func(namespace, name string) (*v1.Secret, error) {
 	return func(namespace, name string) (*v1.Secret, error) {
-		return f.kubeClient.CoreV1().Secrets(namespace).Get(name, metav1.GetOptions{})
+		return f.kubeClient.CoreV1().Secrets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	}
 }
 
@@ -259,13 +260,13 @@ func (f *fakeVolumeHost) GetExec(pluginName string) exec.Interface {
 
 func (f *fakeVolumeHost) GetConfigMapFunc() func(namespace, name string) (*v1.ConfigMap, error) {
 	return func(namespace, name string) (*v1.ConfigMap, error) {
-		return f.kubeClient.CoreV1().ConfigMaps(namespace).Get(name, metav1.GetOptions{})
+		return f.kubeClient.CoreV1().ConfigMaps(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	}
 }
 
 func (f *fakeVolumeHost) GetServiceAccountTokenFunc() func(string, string, *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error) {
 	return func(namespace, name string, tr *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error) {
-		return f.kubeClient.CoreV1().ServiceAccounts(namespace).CreateToken(name, tr)
+		return f.kubeClient.CoreV1().ServiceAccounts(namespace).CreateToken(context.TODO(), name, tr, metav1.CreateOptions{})
 	}
 }
 

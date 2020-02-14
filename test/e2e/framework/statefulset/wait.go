@@ -17,6 +17,7 @@ limitations under the License.
 package statefulset
 
 import (
+	"context"
 	"fmt"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -62,7 +63,7 @@ func WaitForRunning(c clientset.Interface, numPodsRunning, numPodsReady int32, s
 func WaitForState(c clientset.Interface, ss *appsv1.StatefulSet, until func(*appsv1.StatefulSet, *v1.PodList) (bool, error)) {
 	pollErr := wait.PollImmediate(StatefulSetPoll, StatefulSetTimeout,
 		func() (bool, error) {
-			ssGet, err := c.AppsV1().StatefulSets(ss.Namespace).Get(ss.Name, metav1.GetOptions{})
+			ssGet, err := c.AppsV1().StatefulSets(ss.Namespace).Get(context.TODO(), ss.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, err
 			}
@@ -102,7 +103,7 @@ func WaitForStatusReadyReplicas(c clientset.Interface, ss *appsv1.StatefulSet, e
 	ns, name := ss.Namespace, ss.Name
 	pollErr := wait.PollImmediate(StatefulSetPoll, StatefulSetTimeout,
 		func() (bool, error) {
-			ssGet, err := c.AppsV1().StatefulSets(ns).Get(name, metav1.GetOptions{})
+			ssGet, err := c.AppsV1().StatefulSets(ns).Get(context.TODO(), name, metav1.GetOptions{})
 			if err != nil {
 				return false, err
 			}
@@ -127,7 +128,7 @@ func WaitForStatusReplicas(c clientset.Interface, ss *appsv1.StatefulSet, expect
 	ns, name := ss.Namespace, ss.Name
 	pollErr := wait.PollImmediate(StatefulSetPoll, StatefulSetTimeout,
 		func() (bool, error) {
-			ssGet, err := c.AppsV1().StatefulSets(ns).Get(name, metav1.GetOptions{})
+			ssGet, err := c.AppsV1().StatefulSets(ns).Get(context.TODO(), name, metav1.GetOptions{})
 			if err != nil {
 				return false, err
 			}

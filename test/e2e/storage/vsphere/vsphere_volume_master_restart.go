@@ -17,6 +17,7 @@ limitations under the License.
 package vsphere
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"time"
@@ -114,14 +115,14 @@ var _ = utils.SIGDescribe("Volume Attach Verify [Feature:vsphere][Serial][Disrup
 
 			ginkgo.By(fmt.Sprintf("Creating pod %d on node %v", i, nodeNameList[i]))
 			podspec := getVSpherePodSpecWithVolumePaths([]string{volumePath}, nodeKeyValueLabelList[i], nil)
-			pod, err := client.CoreV1().Pods(namespace).Create(podspec)
+			pod, err := client.CoreV1().Pods(namespace).Create(context.TODO(), podspec, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 			defer e2epod.DeletePodWithWait(client, pod)
 
 			ginkgo.By("Waiting for pod to be ready")
 			gomega.Expect(e2epod.WaitForPodNameRunningInNamespace(client, pod.Name, namespace)).To(gomega.Succeed())
 
-			pod, err = client.CoreV1().Pods(namespace).Get(pod.Name, metav1.GetOptions{})
+			pod, err = client.CoreV1().Pods(namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 
 			pods = append(pods, pod)

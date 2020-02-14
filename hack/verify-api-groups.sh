@@ -14,8 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# locate all API groups by their packages and versions
-
+# This scripts locates all API groups by their packages and versions
+# Usage: `hack/verify-api-groups.sh`.
 
 set -o errexit
 set -o nounset
@@ -44,7 +44,7 @@ for register_file in "${register_files[@]}"; do
 	group_dirname="${group_dirname%%"/*"}"
 	group_name=""
 	if grep -q 'GroupName = "' "${register_file}"; then
-		group_name=$(grep -q 'GroupName = "' "${register_file}" | cut -d\" -f2 -)
+		group_name=$(grep 'GroupName = "' "${register_file}" | cut -d\" -f2 -)
 	else
 		echo "${register_file} is missing \"const GroupName =\""
 		exit 1

@@ -17,6 +17,7 @@ limitations under the License.
 package pod
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -125,7 +126,7 @@ func TestCreateMirrorPod(t *testing.T) {
 				return
 			}
 
-			createdPod, err := clientset.CoreV1().Pods(testPodNS).Get(testPodName, metav1.GetOptions{})
+			createdPod, err := clientset.CoreV1().Pods(testPodNS).Get(context.TODO(), testPodName, metav1.GetOptions{})
 			require.NoError(t, err)
 
 			// Validate created pod

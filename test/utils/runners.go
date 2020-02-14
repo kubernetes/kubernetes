@@ -66,7 +66,7 @@ func removePtr(replicas *int32) int32 {
 
 func WaitUntilPodIsScheduled(c clientset.Interface, name, namespace string, timeout time.Duration) (*v1.Pod, error) {
 	// Wait until it's scheduled
-	p, err := c.CoreV1().Pods(namespace).Get(name, metav1.GetOptions{ResourceVersion: "0"})
+	p, err := c.CoreV1().Pods(namespace).Get(context.TODO(), name, metav1.GetOptions{ResourceVersion: "0"})
 	if err == nil && p.Spec.NodeName != "" {
 		return p, nil
 	}
@@ -74,7 +74,7 @@ func WaitUntilPodIsScheduled(c clientset.Interface, name, namespace string, time
 	startTime := time.Now()
 	for startTime.Add(timeout).After(time.Now()) {
 		time.Sleep(pollingPeriod)
-		p, err := c.CoreV1().Pods(namespace).Get(name, metav1.GetOptions{ResourceVersion: "0"})
+		p, err := c.CoreV1().Pods(namespace).Get(context.TODO(), name, metav1.GetOptions{ResourceVersion: "0"})
 		if err == nil && p.Spec.NodeName != "" {
 			return p, nil
 		}
@@ -852,7 +852,7 @@ func (config *RCConfig) start() error {
 	if oldRunning != config.Replicas {
 		// List only pods from a given replication controller.
 		options := metav1.ListOptions{LabelSelector: label.String()}
-		if pods, err := config.Client.CoreV1().Pods(config.Namespace).List(options); err == nil {
+		if pods, err := config.Client.CoreV1().Pods(config.Namespace).List(context.TODO(), options); err == nil {
 			for _, pod := range pods.Items {
 				config.RCConfigLog("Pod %s\t%s\t%s\t%s", pod.Name, pod.Spec.NodeName, pod.Status.Phase, pod.DeletionTimestamp)
 			}
@@ -1088,7 +1088,7 @@ func (s *NodeAllocatableStrategy) createCSINode(nodeName string, client clientse
 		csiNode.Spec.Drivers = append(csiNode.Spec.Drivers, d)
 	}
 
-	_, err := client.StorageV1beta1().CSINodes().Create(csiNode)
+	_, err := client.StorageV1beta1().CSINodes().Create(context.TODO(), csiNode, metav1.CreateOptions{})
 	if apierrors.IsAlreadyExists(err) {
 		// Something created CSINode instance after we checked it did not exist.
 		// Make the caller to re-try PrepareDependentObjects by returning Conflict error
@@ -1118,12 +1118,12 @@ func (s *NodeAllocatableStrategy) updateCSINode(csiNode *storagev1beta1.CSINode,
 	}
 	csiNode.Annotations[v1.MigratedPluginsAnnotationKey] = strings.Join(s.MigratedPlugins, ",")
 
-	_, err := client.StorageV1beta1().CSINodes().Update(csiNode)
+	_, err := client.StorageV1beta1().CSINodes().Update(context.TODO(), csiNode, metav1.UpdateOptions{})
 	return err
 }
 
 func (s *NodeAllocatableStrategy) PrepareDependentObjects(node *v1.Node, client clientset.Interface) error {
-	csiNode, err := client.StorageV1beta1().CSINodes().Get(node.Name, metav1.GetOptions{})
+	csiNode, err := client.StorageV1beta1().CSINodes().Get(context.TODO(), node.Name, metav1.GetOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			return s.createCSINode(node.Name, client)
@@ -1134,7 +1134,7 @@ func (s *NodeAllocatableStrategy) PrepareDependentObjects(node *v1.Node, client 
 }
 
 func (s *NodeAllocatableStrategy) CleanupDependentObjects(nodeName string, client clientset.Interface) error {
-	csiNode, err := client.StorageV1beta1().CSINodes().Get(nodeName, metav1.GetOptions{})
+	csiNode, err := client.StorageV1beta1().CSINodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			return nil
@@ -1194,7 +1194,7 @@ func DoPrepareNode(client clientset.Interface, node *v1.Node, strategy PrepareNo
 		return nil
 	}
 	for attempt := 0; attempt < retries; attempt++ {
-		if _, err = client.CoreV1().Nodes().Patch(node.Name, types.MergePatchType, []byte(patch)); err == nil {
+		if _, err = client.CoreV1().Nodes().Patch(context.TODO(), node.Name, types.MergePatchType, []byte(patch), metav1.PatchOptions{}); err == nil {
 			break
 		}
 		if !apierrors.IsConflict(err) {
@@ -1224,7 +1224,7 @@ func DoPrepareNode(client clientset.Interface, node *v1.Node, strategy PrepareNo
 func DoCleanupNode(client clientset.Interface, nodeName string, strategy PrepareNodeStrategy) error {
 	var err error
 	for attempt := 0; attempt < retries; attempt++ {
-		node, err := client.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+		node, err := client.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 		if err != nil {
 			return fmt.Errorf("Skipping cleanup of Node: failed to get Node %v: %v", nodeName, err)
 		}
@@ -1232,7 +1232,7 @@ func DoCleanupNode(client clientset.Interface, nodeName string, strategy Prepare
 		if apiequality.Semantic.DeepEqual(node, updatedNode) {
 			return nil
 		}
-		if _, err = client.CoreV1().Nodes().Update(updatedNode); err == nil {
+		if _, err = client.CoreV1().Nodes().Update(context.TODO(), updatedNode, metav1.UpdateOptions{}); err == nil {
 			break
 		}
 		if !apierrors.IsConflict(err) {
@@ -1698,7 +1698,7 @@ func (config *DaemonConfig) Run() error {
 	var err error
 	for i := 0; i < retries; i++ {
 		// Wait for all daemons to be running
-		nodes, err = config.Client.CoreV1().Nodes().List(metav1.ListOptions{ResourceVersion: "0"})
+		nodes, err = config.Client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{ResourceVersion: "0"})
 		if err == nil {
 			break
 		} else if i+1 == retries {

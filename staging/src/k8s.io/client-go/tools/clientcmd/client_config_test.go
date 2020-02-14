@@ -296,7 +296,7 @@ func TestCertificateData(t *testing.T) {
 
 func TestBasicAuthData(t *testing.T) {
 	username := "myuser"
-	password := "mypass"
+	password := "mypass" // Fake value for testing.
 
 	config := clientcmdapi.NewConfig()
 	config.Clusters["clean"] = &clientcmdapi.Cluster{

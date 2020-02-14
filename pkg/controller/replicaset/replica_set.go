@@ -28,6 +28,7 @@ limitations under the License.
 package replicaset
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"sort"
@@ -714,7 +715,7 @@ func (rsc *ReplicaSetController) claimPods(rs *apps.ReplicaSet, selector labels.
 	// If any adoptions are attempted, we should first recheck for deletion with
 	// an uncached quorum read sometime after listing Pods (see #42639).
 	canAdoptFunc := controller.RecheckDeletionTimestamp(func() (metav1.Object, error) {
-		fresh, err := rsc.kubeClient.AppsV1().ReplicaSets(rs.Namespace).Get(rs.Name, metav1.GetOptions{})
+		fresh, err := rsc.kubeClient.AppsV1().ReplicaSets(rs.Namespace).Get(context.TODO(), rs.Name, metav1.GetOptions{})
 		if err != nil {
 			return nil, err
 		}

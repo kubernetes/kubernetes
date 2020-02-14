@@ -20,6 +20,7 @@ import (
 	"context"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
@@ -97,9 +98,9 @@ func (pl *VolumeBinding) Filter(ctx context.Context, cs *framework.CycleState, p
 	return nil
 }
 
-// NewFromVolumeBinder initializes a new plugin with volume binder and returns it.
-func NewFromVolumeBinder(volumeBinder *volumebinder.VolumeBinder) framework.Plugin {
+// New initializes a new plugin with volume binder and returns it.
+func New(_ *runtime.Unknown, fh framework.FrameworkHandle) (framework.Plugin, error) {
 	return &VolumeBinding{
-		binder: volumeBinder,
-	}
+		binder: fh.VolumeBinder(),
+	}, nil
 }

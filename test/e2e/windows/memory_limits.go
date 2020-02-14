@@ -17,6 +17,7 @@ limitations under the License.
 package windows
 
 import (
+	"context"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
@@ -122,7 +123,7 @@ func overrideAllocatableMemoryTest(f *framework.Framework, allocatablePods int) 
 	f.PodClient().Create(failurePods[0])
 
 	gomega.Eventually(func() bool {
-		eventList, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).List(metav1.ListOptions{})
+		eventList, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{})
 		framework.ExpectNoError(err)
 		for _, e := range eventList.Items {
 			// Look for an event that shows FailedScheduling
@@ -167,7 +168,7 @@ func newMemLimitTestPods(numPods int, imageName, podType string, memoryLimit str
 					},
 				},
 				NodeSelector: map[string]string{
-					"beta.kubernetes.io/os": "windows",
+					"kubernetes.io/os": "windows",
 				},
 			},
 		}
@@ -180,8 +181,8 @@ func newMemLimitTestPods(numPods int, imageName, podType string, memoryLimit str
 
 // getNodeMemory populates a nodeMemory struct with information from the first
 func getNodeMemory(f *framework.Framework) nodeMemory {
-	selector := labels.Set{"beta.kubernetes.io/os": "windows"}.AsSelector()
-	nodeList, err := f.ClientSet.CoreV1().Nodes().List(metav1.ListOptions{
+	selector := labels.Set{"kubernetes.io/os": "windows"}.AsSelector()
+	nodeList, err := f.ClientSet.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{
 		LabelSelector: selector.String(),
 	})
 	framework.ExpectNoError(err)
@@ -231,8 +232,8 @@ func getNodeMemory(f *framework.Framework) nodeMemory {
 
 // getTotalAllocatableMemory gets the sum of all agent node's allocatable memory
 func getTotalAllocatableMemory(f *framework.Framework) *resource.Quantity {
-	selector := labels.Set{"beta.kubernetes.io/os": "windows"}.AsSelector()
-	nodeList, err := f.ClientSet.CoreV1().Nodes().List(metav1.ListOptions{
+	selector := labels.Set{"kubernetes.io/os": "windows"}.AsSelector()
+	nodeList, err := f.ClientSet.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{
 		LabelSelector: selector.String(),
 	})
 	framework.ExpectNoError(err)

@@ -3569,7 +3569,7 @@ func TestDescribeNode(t *testing.T) {
 }
 
 func TestDescribeStatefulSet(t *testing.T) {
-	var partition int32 = 2
+	var partition int32 = 2672
 	var replicas int32 = 1
 	fake := fake.NewSimpleClientset(&appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
@@ -3600,7 +3600,7 @@ func TestDescribeStatefulSet(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	expectedOutputs := []string{
-		"bar", "foo", "Containers:", "mytest-image:latest", "Update Strategy", "RollingUpdate", "Partition",
+		"bar", "foo", "Containers:", "mytest-image:latest", "Update Strategy", "RollingUpdate", "Partition", "2672",
 	}
 	for _, o := range expectedOutputs {
 		if !strings.Contains(out, o) {
@@ -3684,12 +3684,6 @@ Events:         <none>` + "\n"
 		t.Logf(out)
 		t.Errorf("expected : %q\n but got output:\n %q", expectedOut, out)
 	}
-}
-
-// boolPtr returns a pointer to a bool
-func boolPtr(b bool) *bool {
-	o := b
-	return &o
 }
 
 func TestControllerRef(t *testing.T) {

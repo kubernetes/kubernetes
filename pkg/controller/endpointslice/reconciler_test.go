@@ -17,6 +17,7 @@ limitations under the License.
 package endpointslice
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"strings"
@@ -203,7 +204,7 @@ func TestReconcile1EndpointSlice(t *testing.T) {
 	svc, endpointMeta := newServiceAndEndpointMeta("foo", namespace)
 	endpointSlice1 := newEmptyEndpointSlice(1, namespace, endpointMeta, svc)
 
-	_, createErr := client.DiscoveryV1beta1().EndpointSlices(namespace).Create(endpointSlice1)
+	_, createErr := client.DiscoveryV1beta1().EndpointSlices(namespace).Create(context.TODO(), endpointSlice1, metav1.CreateOptions{})
 	assert.Nil(t, createErr, "Expected no error creating endpoint slice")
 
 	numActionsBefore := len(client.Actions())
@@ -827,7 +828,7 @@ func portsAndAddressTypeEqual(slice1, slice2 discovery.EndpointSlice) bool {
 func createEndpointSlices(t *testing.T, client *fake.Clientset, namespace string, endpointSlices []*discovery.EndpointSlice) {
 	t.Helper()
 	for _, endpointSlice := range endpointSlices {
-		_, err := client.DiscoveryV1beta1().EndpointSlices(namespace).Create(endpointSlice)
+		_, err := client.DiscoveryV1beta1().EndpointSlices(namespace).Create(context.TODO(), endpointSlice, metav1.CreateOptions{})
 		if err != nil {
 			t.Fatalf("Expected no error creating Endpoint Slice, got: %v", err)
 		}
@@ -836,7 +837,7 @@ func createEndpointSlices(t *testing.T, client *fake.Clientset, namespace string
 
 func fetchEndpointSlices(t *testing.T, client *fake.Clientset, namespace string) []discovery.EndpointSlice {
 	t.Helper()
-	fetchedSlices, err := client.DiscoveryV1beta1().EndpointSlices(namespace).List(metav1.ListOptions{})
+	fetchedSlices, err := client.DiscoveryV1beta1().EndpointSlices(namespace).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		t.Fatalf("Expected no error fetching Endpoint Slices, got: %v", err)
 		return []discovery.EndpointSlice{}

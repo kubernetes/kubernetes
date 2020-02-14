@@ -56,8 +56,10 @@ func mutateCustomResource(ar v1.AdmissionReview) *v1.AdmissionResponse {
 	if cr.Data["mutation-stage-1"] == "yes" {
 		reviewResponse.Patch = []byte(customResourcePatch2)
 	}
-	pt := v1.PatchTypeJSONPatch
-	reviewResponse.PatchType = &pt
+	if len(reviewResponse.Patch) != 0 {
+		pt := v1.PatchTypeJSONPatch
+		reviewResponse.PatchType = &pt
+	}
 	return &reviewResponse
 }
 

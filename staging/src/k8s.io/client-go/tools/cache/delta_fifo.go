@@ -29,7 +29,8 @@ import (
 // NewDeltaFIFO returns a Queue which can be used to process changes to items.
 //
 // keyFunc is used to figure out what key an object should have. (It is
-// exposed in the returned DeltaFIFO's KeyOf() method, with bonus features.)
+// exposed in the returned DeltaFIFO's KeyOf() method, with additional handling
+// around deleted objects and queue state).
 //
 // 'knownObjects' may be supplied to modify the behavior of Delete,
 // Replace, and Resync.  It may be nil if you do not need those
@@ -56,12 +57,62 @@ import (
 //       and internal tests.
 //
 // Also see the comment on DeltaFIFO.
+//
+// Warning: This constructs a DeltaFIFO that does not differentiate between
+// events caused by a call to Replace (e.g., from a relist, which may
+// contain object updates), and synthetic events caused by a periodic resync
+// (which just emit the existing object). See https://issue.k8s.io/86015 for details.
+//
+// Use `NewDeltaFIFOWithOptions(DeltaFIFOOptions{..., EmitDeltaTypeReplaced: true})`
+// instead to receive a `Replaced` event depending on the type.
+//
+// Deprecated: Equivalent to NewDeltaFIFOWithOptions(DeltaFIFOOptions{KeyFunction: keyFunc, KnownObjects: knownObjects})
 func NewDeltaFIFO(keyFunc KeyFunc, knownObjects KeyListerGetter) *DeltaFIFO {
+	return NewDeltaFIFOWithOptions(DeltaFIFOOptions{
+		KeyFunction:  keyFunc,
+		KnownObjects: knownObjects,
+	})
+}
+
+// DeltaFIFOOptions is the configuration parameters for DeltaFIFO. All are
+// optional.
+type DeltaFIFOOptions struct {
+
+	// KeyFunction is used to figure out what key an object should have. (It's
+	// exposed in the returned DeltaFIFO's KeyOf() method, with additional
+	// handling around deleted objects and queue state).
+	// Optional, the default is MetaNamespaceKeyFunc.
+	KeyFunction KeyFunc
+
+	// KnownObjects is expected to return a list of keys that the consumer of
+	// this queue "knows about". It is used to decide which items are missing
+	// when Replace() is called; 'Deleted' deltas are produced for the missing items.
+	// KnownObjects may be nil if you can tolerate missing deletions on Replace().
+	KnownObjects KeyListerGetter
+
+	// EmitDeltaTypeReplaced indicates that the queue consumer
+	// understands the Replaced DeltaType. Before the `Replaced` event type was
+	// added, calls to Replace() were handled the same as Sync(). For
+	// backwards-compatibility purposes, this is false by default.
+	// When true, `Replaced` events will be sent for items passed to a Replace() call.
+	// When false, `Sync` events will be sent instead.
+	EmitDeltaTypeReplaced bool
+}
+
+// NewDeltaFIFOWithOptions returns a Store which can be used process changes to
+// items. See also the comment on DeltaFIFO.
+func NewDeltaFIFOWithOptions(opts DeltaFIFOOptions) *DeltaFIFO {
+	if opts.KeyFunction == nil {
+		opts.KeyFunction = MetaNamespaceKeyFunc
+	}
+
 	f := &DeltaFIFO{
 		items:        map[string]Deltas{},
 		queue:        []string{},
-		keyFunc:      keyFunc,
-		knownObjects: knownObjects,
+		keyFunc:      opts.KeyFunction,
+		knownObjects: opts.KnownObjects,
+
+		emitDeltaTypeReplaced: opts.EmitDeltaTypeReplaced,
 	}
 	f.cond.L = &f.lock
 	return f
@@ -134,6 +185,10 @@ type DeltaFIFO struct {
 	// Currently, not used to gate any of CRED operations.
 	closed     bool
 	closedLock sync.Mutex
+
+	// emitDeltaTypeReplaced is whether to emit the Replaced or Sync
+	// DeltaType when Replace() is called (to preserve backwards compat).
+	emitDeltaTypeReplaced bool
 }
 
 var (
@@ -446,7 +501,7 @@ func (f *DeltaFIFO) Pop(process PopProcessFunc) (interface{}, error) {
 }
 
 // Replace atomically does two things: (1) it adds the given objects
-// using the Sync type of Delta and then (2) it does some deletions.
+// using the Sync or Replace DeltaType and then (2) it does some deletions.
 // In particular: for every pre-existing key K that is not the key of
 // an object in `list` there is the effect of
 // `Delete(DeletedFinalStateUnknown{K, O})` where O is current object
@@ -460,13 +515,19 @@ func (f *DeltaFIFO) Replace(list []interface{}, resourceVersion string) error {
 	defer f.lock.Unlock()
 	keys := make(sets.String, len(list))
 
+	// keep backwards compat for old clients
+	action := Sync
+	if f.emitDeltaTypeReplaced {
+		action = Replaced
+	}
+
 	for _, item := range list {
 		key, err := f.KeyOf(item)
 		if err != nil {
 			return KeyError{item, err}
 		}
 		keys.Insert(key)
-		if err := f.queueActionLocked(Sync, item); err != nil {
+		if err := f.queueActionLocked(action, item); err != nil {
 			return fmt.Errorf("couldn't enqueue object: %v", err)
 		}
 	}
@@ -600,10 +661,14 @@ const (
 	Added   DeltaType = "Added"
 	Updated DeltaType = "Updated"
 	Deleted DeltaType = "Deleted"
-	// The other types are obvious. You'll get Sync deltas when:
-	//  * A watch expires/errors out and a new list/watch cycle is started.
-	//  * You've turned on periodic syncs.
-	// (Anything that trigger's DeltaFIFO's Replace() method.)
+	// Replaced is emitted when we encountered watch errors and had to do a
+	// relist. We don't know if the replaced object has changed.
+	//
+	// NOTE: Previous versions of DeltaFIFO would use Sync for Replace events
+	// as well. Hence, Replaced is only emitted when the option
+	// EmitDeltaTypeReplaced is true.
+	Replaced DeltaType = "Replaced"
+	// Sync is for synthetic events during a periodic resync.
 	Sync DeltaType = "Sync"
 )
 

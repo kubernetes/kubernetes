@@ -449,6 +449,108 @@ func TestTopPodWithMetricsServer(t *testing.T) {
 	}
 }
 
+func TestTopPodNoResourcesFound(t *testing.T) {
+	testNS := "testns"
+	testCases := []struct {
+		name           string
+		options        *TopPodOptions
+		namespace      string
+		expectedOutput string
+		expectedErr    string
+		expectedPath   string
+	}{
+		{
+			name:           "all namespaces",
+			options:        &TopPodOptions{AllNamespaces: true},
+			expectedOutput: "",
+			expectedErr:    "No resources found\n",
+			expectedPath:   topMetricsAPIPathPrefix + "/pods",
+		},
+		{
+			name:           "all in namespace",
+			namespace:      testNS,
+			expectedOutput: "",
+			expectedErr:    "No resources found in " + testNS + " namespace.\n",
+			expectedPath:   topMetricsAPIPathPrefix + "/namespaces/" + testNS + "/pods",
+		},
+	}
+	cmdtesting.InitTestErrorHandler(t)
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			fakemetricsClientset := &metricsfake.Clientset{}
+			fakemetricsClientset.AddReactor("list", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+				res := &metricsv1beta1api.PodMetricsList{
+					ListMeta: metav1.ListMeta{
+						ResourceVersion: "2",
+					},
+					Items: nil, // No metrics found
+				}
+				return true, res, nil
+			})
+
+			tf := cmdtesting.NewTestFactory().WithNamespace(testNS)
+			defer tf.Cleanup()
+
+			ns := scheme.Codecs.WithoutConversion()
+
+			tf.Client = &fake.RESTClient{
+				NegotiatedSerializer: ns,
+				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+					switch p := req.URL.Path; {
+					case p == "/api":
+						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte(apibody)))}, nil
+					case p == "/apis":
+						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte(apisbodyWithMetrics)))}, nil
+					case p == "/api/v1/namespaces/"+testNS+"/pods":
+						// Top Pod calls this endpoint to check if there are pods whenever it gets no metrics,
+						// so we need to return no pods for this test scenario
+						body, _ := marshallBody(metricsv1alpha1api.PodMetricsList{
+							ListMeta: metav1.ListMeta{
+								ResourceVersion: "2",
+							},
+							Items: nil, // No pods found
+						})
+						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: body}, nil
+					default:
+						t.Fatalf("%s: unexpected request: %#v\nGot URL: %#v",
+							testCase.name, req, req.URL)
+						return nil, nil
+					}
+				}),
+			}
+			tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
+			streams, _, buf, errbuf := genericclioptions.NewTestIOStreams()
+
+			cmd := NewCmdTopPod(tf, nil, streams)
+			var cmdOptions *TopPodOptions
+			if testCase.options != nil {
+				cmdOptions = testCase.options
+			} else {
+				cmdOptions = &TopPodOptions{}
+			}
+			cmdOptions.IOStreams = streams
+
+			if err := cmdOptions.Complete(tf, cmd, nil); err != nil {
+				t.Fatal(err)
+			}
+			cmdOptions.MetricsClient = fakemetricsClientset
+			if err := cmdOptions.Validate(); err != nil {
+				t.Fatal(err)
+			}
+			if err := cmdOptions.RunTopPod(); err != nil {
+				t.Fatal(err)
+			}
+
+			if e, a := testCase.expectedOutput, buf.String(); e != a {
+				t.Errorf("Unexpected output:\nExpected:\n%v\nActual:\n%v", e, a)
+			}
+			if e, a := testCase.expectedErr, errbuf.String(); e != a {
+				t.Errorf("Unexpected error:\nExpected:\n%v\nActual:\n%v", e, a)
+			}
+		})
+	}
+}
+
 type fakeDiscovery struct{}
 
 // ServerGroups returns the supported groups, with information like supported versions and the

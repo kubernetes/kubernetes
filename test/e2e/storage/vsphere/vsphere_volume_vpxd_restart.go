@@ -17,6 +17,7 @@ limitations under the License.
 package vsphere
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"time"
@@ -120,13 +121,13 @@ var _ = utils.SIGDescribe("Verify Volume Attach Through vpxd Restart [Feature:vs
 
 				ginkgo.By(fmt.Sprintf("Creating pod %d on node %v", i, node.name))
 				podspec := getVSpherePodSpecWithVolumePaths([]string{volumePath}, node.kvLabels, nil)
-				pod, err := client.CoreV1().Pods(namespace).Create(podspec)
+				pod, err := client.CoreV1().Pods(namespace).Create(context.TODO(), podspec, metav1.CreateOptions{})
 				framework.ExpectNoError(err)
 
 				ginkgo.By(fmt.Sprintf("Waiting for pod %d to be ready", i))
 				gomega.Expect(e2epod.WaitForPodNameRunningInNamespace(client, pod.Name, namespace)).To(gomega.Succeed())
 
-				pod, err = client.CoreV1().Pods(namespace).Get(pod.Name, metav1.GetOptions{})
+				pod, err = client.CoreV1().Pods(namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
 				framework.ExpectNoError(err)
 				pods = append(pods, pod)
 

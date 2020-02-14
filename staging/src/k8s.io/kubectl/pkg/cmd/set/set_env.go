@@ -119,7 +119,8 @@ type EnvOptions struct {
 	envArgs                []string
 	resources              []string
 	output                 string
-	dryRun                 bool
+	dryRunStrategy         cmdutil.DryRunStrategy
+	dryRunVerifier         *resource.DryRunVerifier
 	builder                func() *resource.Builder
 	updatePodSpecForObject polymorphichelpers.UpdatePodSpecForObjectFunc
 	namespace              string
@@ -216,15 +217,22 @@ func (o *EnvOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 
 	o.updatePodSpecForObject = polymorphichelpers.UpdatePodSpecForObjectFn
 	o.output = cmdutil.GetFlagString(cmd, "output")
-	o.dryRun = cmdutil.GetDryRunFlag(cmd)
-
-	if o.dryRun {
-		// TODO(juanvallejo): This can be cleaned up even further by creating
-		// a PrintFlags struct that binds the --dry-run flag, and whose
-		// ToPrinter method returns a printer that understands how to print
-		// this success message.
-		o.PrintFlags.Complete("%s (dry run)")
+	var err error
+	o.dryRunStrategy, err = cmdutil.GetDryRunStrategy(cmd)
+	if err != nil {
+		return err
 	}
+	dynamicClient, err := f.DynamicClient()
+	if err != nil {
+		return err
+	}
+	discoveryClient, err := f.ToDiscoveryClient()
+	if err != nil {
+		return err
+	}
+	o.dryRunVerifier = resource.NewDryRunVerifier(dynamicClient, discoveryClient)
+
+	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.dryRunStrategy)
 	printer, err := o.PrintFlags.ToPrinter()
 	if err != nil {
 		return err
@@ -484,14 +492,24 @@ func (o *EnvOptions) RunEnv() error {
 			continue
 		}
 
-		if o.Local || o.dryRun {
+		if o.Local || o.dryRunStrategy == cmdutil.DryRunClient {
 			if err := o.PrintObj(info.Object, o.Out); err != nil {
 				allErrs = append(allErrs, err)
 			}
 			continue
 		}
 
-		actual, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch, nil)
+		if o.dryRunStrategy == cmdutil.DryRunServer {
+			if err := o.dryRunVerifier.HasSupport(info.Mapping.GroupVersionKind); err != nil {
+				allErrs = append(allErrs, err)
+				continue
+			}
+		}
+
+		actual, err := resource.
+			NewHelper(info.Client, info.Mapping).
+			DryRun(o.dryRunStrategy == cmdutil.DryRunServer).
+			Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch, nil)
 		if err != nil {
 			allErrs = append(allErrs, fmt.Errorf("failed to patch env update to pod template: %v", err))
 			continue

@@ -8,6 +8,7 @@ go_library(
         "dep_service_ids.go",
         "doc.go",
         "endpoints.go",
+        "legacy_regions.go",
         "v3model.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/github.com/aws/aws-sdk-go/aws/endpoints",

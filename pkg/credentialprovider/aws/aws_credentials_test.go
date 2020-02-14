@@ -32,7 +32,7 @@ import (
 )
 
 const user = "foo"
-const password = "1234567890abcdef"
+const password = "1234567890abcdef" // Fake value for testing.
 const email = "not@val.id"
 
 // Mock implementation

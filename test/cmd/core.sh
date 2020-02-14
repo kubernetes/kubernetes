@@ -40,7 +40,10 @@ run_configmap_tests() {
   # Pre-condition: configmap test-configmap and test-binary-configmap does not exist
   kube::test::get_object_assert 'configmaps' "{{range.items}}{{ if eq $id_field \\\"test-configmap\\\" }}found{{end}}{{end}}:" ':'
   kube::test::get_object_assert 'configmaps' "{{range.items}}{{ if eq $id_field \\\"test-binary-configmap\\\" }}found{{end}}{{end}}:" ':'
-
+  # Dry-run command
+  kubectl create configmap test-configmap --dry-run=client --from-literal=key1=value1 --namespace=test-configmaps
+  kubectl create configmap test-configmap --dry-run=server --from-literal=key1=value1 --namespace=test-configmaps
+  kube::test::get_object_assert 'configmaps' "{{range.items}}{{ if eq $id_field \\\"test-configmap\\\" }}found{{end}}{{end}}:" ':'
   # Command
   kubectl create configmap test-configmap --from-literal=key1=value1 --namespace=test-configmaps
   kubectl create configmap test-binary-configmap --from-file <( head -c 256 /dev/urandom ) --namespace=test-configmaps
@@ -217,6 +220,10 @@ run_pod_tests() {
   ### Create a generic secret
   # Pre-condition: no SECRET exists
   kube::test::get_object_assert 'secrets --namespace=test-kubectl-describe-pod' "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Dry-run command
+  kubectl create secret generic test-secret --dry-run=client --from-literal=key-1=value1 --type=test-type --namespace=test-kubectl-describe-pod
+  kubectl create secret generic test-secret --dry-run=server --from-literal=key-1=value1 --type=test-type --namespace=test-kubectl-describe-pod
+  kube::test::get_object_assert 'secrets --namespace=test-kubectl-describe-pod' "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
   kubectl create secret generic test-secret --from-literal=key-1=value1 --type=test-type --namespace=test-kubectl-describe-pod
   # Post-condition: secret exists and has expected values
@@ -235,6 +242,12 @@ run_pod_tests() {
   kube::test::get_object_assert 'configmap/test-configmap --namespace=test-kubectl-describe-pod' "{{$id_field}}" 'test-configmap'
 
   ### Create a pod disruption budget with minAvailable
+  # Pre-condition: pdb does not exist
+  kube::test::get_object_assert 'pdb --namespace=test-kubectl-describe-pod' "{{range.items}}{{ if eq $id_field \\\"test-pdb-1\\\" }}found{{end}}{{end}}:" ':'
+  # Dry-run command
+  kubectl create pdb test-pdb-1 --dry-run=client --selector=app=rails --min-available=2 --namespace=test-kubectl-describe-pod
+  kubectl create pdb test-pdb-1 --dry-run=server --selector=app=rails --min-available=2 --namespace=test-kubectl-describe-pod
+  kube::test::get_object_assert 'pdb --namespace=test-kubectl-describe-pod' "{{range.items}}{{ if eq $id_field \\\"test-pdb-1\\\" }}found{{end}}{{end}}:" ':'
   # Command
   kubectl create pdb test-pdb-1 --selector=app=rails --min-available=2 --namespace=test-kubectl-describe-pod
   # Post-condition: pdb exists and has expected values
@@ -272,6 +285,17 @@ run_pod_tests() {
   kubectl delete pdb/test-pdb-1 pdb/test-pdb-2 pdb/test-pdb-3 pdb/test-pdb-4 --namespace=test-kubectl-describe-pod
   kubectl delete namespace test-kubectl-describe-pod
 
+  ### Priority Class
+  kube::test::get_object_assert 'priorityclasses' "{{range.items}}{{ if eq $id_field \\\"test-priorityclass\\\" }}found{{end}}{{end}}:" ':'
+  # Dry-run command
+  kubectl create priorityclass test-priorityclass --dry-run=client
+  kubectl create priorityclass test-priorityclass --dry-run=server
+  kube::test::get_object_assert 'priorityclasses' "{{range.items}}{{ if eq $id_field \\\"test-priorityclass\\\" }}found{{end}}{{end}}:" ':'
+  # Command
+  kubectl create priorityclass test-priorityclass
+  kube::test::get_object_assert 'priorityclasses' "{{range.items}}{{ if eq $id_field \\\"test-priorityclass\\\" }}found{{end}}{{end}}:" 'found:'
+  kubectl delete priorityclass test-priorityclass
+
   ### Create two PODs
   # Pre-condition: no POD exists
   create_and_use_new_namespace
@@ -299,6 +323,15 @@ run_pod_tests() {
   # Post-condition: valid-pod POD is created
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'valid-pod:'
 
+  ### Dry-run label the valid-pod POD
+  # Pre-condition: valid-pod is not labelled
+  kube::test::get_object_assert 'pod valid-pod' "{{range${labels_field:?}}}{{.}}:{{end}}" 'valid-pod:'
+  # Command
+  kubectl label pods valid-pod new-name=new-valid-pod --dry-run=client "${kube_flags[@]}"
+  kubectl label pods valid-pod new-name=new-valid-pod --dry-run=server "${kube_flags[@]}"
+  # Post-condition: valid-pod is not labelled
+  kube::test::get_object_assert 'pod valid-pod' "{{range${labels_field:?}}}{{.}}:{{end}}" 'valid-pod:'
+
   ### Label the valid-pod POD
   # Pre-condition: valid-pod is not labelled
   kube::test::get_object_assert 'pod valid-pod' "{{range${labels_field:?}}}{{.}}:{{end}}" 'valid-pod:'
@@ -314,6 +347,15 @@ run_pod_tests() {
   kubectl label pods valid-pod emptylabel="" "${kube_flags[@]}"
   # Post-condition: valid pod contains "emptylabel" with no value
   kube::test::get_object_assert 'pod valid-pod' "{{${labels_field}.emptylabel}}" ''
+
+  ### Dry-run annotate the valid-pod POD with empty annotation value
+  # Pre-condition: valid-pod does not have annotation "emptyannotation"
+  kube::test::get_object_assert 'pod valid-pod' "{{${annotations_field:?}.emptyannotation}}" '<no value>'
+  # Command
+  kubectl annotate pods valid-pod emptyannotation="" --dry-run=client "${kube_flags[@]}"
+  kubectl annotate pods valid-pod emptyannotation="" --dry-run=server "${kube_flags[@]}"
+  # Post-condition: valid-pod does not have annotation "emptyannotation"
+  kube::test::get_object_assert 'pod valid-pod' "{{${annotations_field:?}.emptyannotation}}" '<no value>'
 
   ### Annotate the valid-pod POD with empty annotation value
   # Pre-condition: valid-pod does not have annotation "emptyannotation"
@@ -461,6 +503,11 @@ run_pod_tests() {
   kube::test::get_object_assert pods "{{range.items}}{{$image_field}}:{{end}}" 'nginx2:'
   # prove that patch can use different types
   kubectl patch "${kube_flags[@]}" pod valid-pod --type="json" -p='[{"op": "replace", "path": "/spec/containers/0/image", "value":"nginx"}]'
+  # Post-condition: valid-pod POD has image nginx
+  kube::test::get_object_assert pods "{{range.items}}{{$image_field}}:{{end}}" 'nginx:'
+  # Dry-run change image
+  kubectl patch "${kube_flags[@]}" pod valid-pod --record --dry-run=client -p='{"spec":{"containers":[{"name": "kubernetes-serve-hostname", "image": "not-nginx"}]}}'
+  kubectl patch "${kube_flags[@]}" pod valid-pod --record --dry-run=server -p='{"spec":{"containers":[{"name": "kubernetes-serve-hostname", "image": "not-nginx"}]}}'
   # Post-condition: valid-pod POD has image nginx
   kube::test::get_object_assert pods "{{range.items}}{{$image_field}}:{{end}}" 'nginx:'
   # prove that yaml input works too
@@ -689,7 +736,7 @@ run_create_secret_tests() {
 
 
     # check to make sure that replace correctly PUTs to a URL
-    kubectl create configmap tester-update-cm -o json --dry-run | kubectl create "${kube_flags[@]}" --raw /api/v1/namespaces/default/configmaps -f -
+    kubectl create configmap tester-update-cm -o json --dry-run=client | kubectl create "${kube_flags[@]}" --raw /api/v1/namespaces/default/configmaps -f -
     output_message=$(kubectl create configmap tester-update-cm --from-literal=key1=config1 -o json --dry-run | kubectl replace "${kube_flags[@]}" --raw /api/v1/namespaces/default/configmaps/tester-update-cm -f -)
     # the message should show the body returned which will include a UID not present in the input
     kube::test::if_has_string "${output_message}" 'uid'
@@ -832,6 +879,12 @@ run_service_accounts_tests() {
   kube::test::get_object_assert 'namespaces/test-service-accounts' "{{$id_field}}" 'test-service-accounts'
 
   ### Create a service account in a specific namespace
+  # Pre-condition: service account does not exist
+  kube::test::get_object_assert 'serviceaccount --namespace=test-service-accounts' "{{range.items}}{{ if eq $id_field \\\"test-service-account\\\" }}found{{end}}{{end}}:" ':'
+  # Dry-run command
+  kubectl create serviceaccount test-service-account --dry-run=client --namespace=test-service-accounts
+  kubectl create serviceaccount test-service-account --dry-run=server --namespace=test-service-accounts
+  kube::test::get_object_assert 'serviceaccount --namespace=test-service-accounts' "{{range.items}}{{ if eq $id_field \\\"test-service-account\\\" }}found{{end}}{{end}}:" ':'
   # Command
   kubectl create serviceaccount test-service-account --namespace=test-service-accounts
   # Post-condition: secret exists and has expected values
@@ -893,7 +946,8 @@ run_service_tests() {
   # prove role=master
   kube::test::get_object_assert 'services redis-master' "{{range$service_selector_field}}{{.}}:{{end}}" "redis:master:backend:"
   # Show dry-run works on running selector
-  kubectl set selector services redis-master role=padawan --dry-run -o yaml "${kube_flags[@]}"
+  kubectl set selector services redis-master role=padawan --dry-run=client -o yaml "${kube_flags[@]}"
+  kubectl set selector services redis-master role=padawan --dry-run=server -o yaml "${kube_flags[@]}"
   ! kubectl set selector services redis-master role=padawan --local -o yaml "${kube_flags[@]}" || exit 1
   kube::test::get_object_assert 'services redis-master' "{{range$service_selector_field}}{{.}}:{{end}}" "redis:master:backend:"
   # --resource-version=<current-resource-version> succeeds
@@ -994,6 +1048,10 @@ __EOF__
   ### Create an ExternalName service
   # Pre-condition: Only the default kubernetes service exist
   kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:'
+  # Dry-run command
+  kubectl create service externalname beep-boop --dry-run=client --external-name bar.com
+  kubectl create service externalname beep-boop --dry-run=server --external-name bar.com
+  kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:'
   # Command
   kubectl create service externalname beep-boop --external-name bar.com
   # Post-condition: beep-boop service is created
@@ -1010,18 +1068,25 @@ __EOF__
   # Post-condition: Only the default kubernetes services exist
   kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:'
 
-  ### Create deployent and service
-  # Pre-condition: no deployment exists
-  kube::test::wait_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" ''
+  ### Create pod and service
+  # Pre-condition: no pod exists
+  kube::test::wait_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Pre-condition: Only the default kubernetes services exist
+  kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:'
+  # Dry-run command
+  kubectl run testmetadata --image=nginx --port=80 --expose --dry-run=client --service-overrides='{ "metadata": { "annotations": { "zone-context": "home" } } } '
+  kubectl run testmetadata --image=nginx --port=80 --expose --dry-run=server --service-overrides='{ "metadata": { "annotations": { "zone-context": "home" } } } '
+  # Check only the default kubernetes services exist
+  kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:'
   # Command
-  kubectl run testmetadata --image=nginx --replicas=2 --port=80 --expose --service-overrides='{ "metadata": { "annotations": { "zone-context": "home" } } } '
+  kubectl run testmetadata --image=nginx --port=80 --expose --service-overrides='{ "metadata": { "annotations": { "zone-context": "home" } } } '
   # Check result
-  kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" 'testmetadata:'
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'testmetadata:'
   kube::test::get_object_assert 'service testmetadata' "{{.metadata.annotations}}" "map\[zone-context:home\]"
 
-  ### Expose deployment as a new service
+  ### Expose pod as a new service
   # Command
-  kubectl expose deployment testmetadata  --port=1000 --target-port=80 --type=NodePort --name=exposemetadata --overrides='{ "metadata": { "annotations": { "zone-context": "work" } } } '
+  kubectl expose pod testmetadata  --port=1000 --target-port=80 --type=NodePort --name=exposemetadata --overrides='{ "metadata": { "annotations": { "zone-context": "work" } } } '
   # Check result
   kube::test::get_object_assert 'service exposemetadata' "{{.metadata.annotations}}" "map\[zone-context:work\]"
 
@@ -1031,7 +1096,7 @@ __EOF__
   if [[ "${WAIT_FOR_DELETION:-}" == "true" ]]; then
     kube::test::wait_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:'
   fi
-  kubectl delete deployment testmetadata "${kube_flags[@]}"
+  kubectl delete pod testmetadata "${kube_flags[@]}"
   if [[ "${WAIT_FOR_DELETION:-}" == "true" ]]; then
     kube::test::wait_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" ''
   fi
@@ -1305,9 +1370,14 @@ run_namespace_tests() {
 
   kube::log::status "Testing kubectl(v1:namespaces)"
   ### Create a new namespace
-  # Pre-condition: only the "default" namespace exists
-  # The Pre-condition doesn't hold anymore after we create and switch namespaces before creating pods with same name in the test.
-  # kube::test::get_object_assert namespaces "{{range.items}}{{$id_field}}:{{end}}" 'default:'
+  # Pre-condition: test namespace does not exist
+  output_message=$(! kubectl get ns/my-namespace 2>&1 "${kube_flags[@]}")
+  kube::test::if_has_string "${output_message}" ' not found'
+  # Dry-run command
+  kubectl create namespace my-namespace --dry-run=client
+  kubectl create namespace my-namespace --dry-run=server
+  output_message=$(! kubectl get ns/my-namespace 2>&1 "${kube_flags[@]}")
+  kube::test::if_has_string "${output_message}" ' not found'
   # Command
   kubectl create namespace my-namespace
   # Post-condition: namespace 'my-namespace' is created.
@@ -1324,6 +1394,21 @@ run_namespace_tests() {
   output_message=$(! kubectl delete namespace -n my-namespace --all 2>&1 "${kube_flags[@]}")
   kube::test::if_has_string "${output_message}" 'warning: deleting cluster-scoped resources'
   kube::test::if_has_string "${output_message}" 'namespace "my-namespace" deleted'
+
+  ### Quota
+  kubectl create namespace quotas
+  kube::test::get_object_assert 'namespaces/quotas' "{{$id_field}}" 'quotas'
+  kube::test::get_object_assert 'quota --namespace=quotas' "{{range.items}}{{ if eq $id_field \\\"test-quota\\\" }}found{{end}}{{end}}:" ':'
+  # Dry-run command
+  kubectl create quota test-quota --dry-run=client --namespace=quotas
+  kubectl create quota test-quota --dry-run=server --namespace=quotas
+  kube::test::get_object_assert 'quota --namespace=quotas' "{{range.items}}{{ if eq $id_field \\\"test-quota\\\" }}found{{end}}{{end}}:" ':'
+  # Command
+  kubectl create quota test-quota --namespace=quotas
+  kube::test::get_object_assert 'quota --namespace=quotas' "{{range.items}}{{ if eq $id_field \\\"test-quota\\\" }}found{{end}}{{end}}:" 'found:'
+  # Clean up
+  kubectl delete quota test-quota --namespace=quotas
+  kubectl delete namespace quotas
 
   ######################
   # Pods in Namespaces #

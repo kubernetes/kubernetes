@@ -17,6 +17,7 @@ limitations under the License.
 package gcp
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -27,17 +28,18 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 
 	"github.com/onsi/ginkgo"
 )
 
 func resizeRC(c clientset.Interface, ns, name string, replicas int32) error {
-	rc, err := c.CoreV1().ReplicationControllers(ns).Get(name, metav1.GetOptions{})
+	rc, err := c.CoreV1().ReplicationControllers(ns).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
 	*(rc.Spec.Replicas) = replicas
-	_, err = c.CoreV1().ReplicationControllers(rc.Namespace).Update(rc)
+	_, err = c.CoreV1().ReplicationControllers(rc.Namespace).Update(context.TODO(), rc, metav1.UpdateOptions{})
 	return err
 }
 
@@ -68,8 +70,8 @@ var _ = SIGDescribe("Nodes [Disruptive]", func() {
 
 		ginkgo.BeforeEach(func() {
 			skipped = true
-			framework.SkipUnlessProviderIs("gce", "gke", "aws")
-			framework.SkipUnlessNodeCountIsAtLeast(2)
+			e2eskipper.SkipUnlessProviderIs("gce", "gke", "aws")
+			e2eskipper.SkipUnlessNodeCountIsAtLeast(2)
 			skipped = false
 		})
 

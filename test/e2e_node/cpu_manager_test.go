@@ -23,7 +23,7 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -257,7 +258,7 @@ func runCPUManagerTests(f *framework.Framework) {
 
 		// Skip CPU Manager tests altogether if the CPU capacity < 2.
 		if cpuCap < 2 {
-			framework.Skipf("Skipping CPU Manager tests since the CPU capacity < 2")
+			e2eskipper.Skipf("Skipping CPU Manager tests since the CPU capacity < 2")
 		}
 
 		// Enable CPU Manager in the kubelet.
@@ -359,7 +360,7 @@ func runCPUManagerTests(f *framework.Framework) {
 
 		// Skip rest of the tests if CPU capacity < 3.
 		if cpuCap < 3 {
-			framework.Skipf("Skipping rest of the CPU Manager tests since CPU capacity < 3")
+			e2eskipper.Skipf("Skipping rest of the CPU Manager tests since CPU capacity < 3")
 		}
 
 		ginkgo.By("running a Gu pod requesting multiple CPUs")
@@ -422,7 +423,7 @@ func runCPUManagerTests(f *framework.Framework) {
 		framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
 			pod.Spec.Containers[0].Name, pod.Name)
 
-		err = f.PodClient().MatchContainerOutput(pod.Name, pod.Spec.Containers[0].Name, expAllowedCPUsListRegex)
+		err = f.PodClient().MatchContainerOutput(pod.Name, pod.Spec.Containers[1].Name, expAllowedCPUsListRegex)
 		framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
 			pod.Spec.Containers[1].Name, pod.Name)
 

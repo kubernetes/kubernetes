@@ -19,6 +19,7 @@ limitations under the License.
 package e2enode
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"sort"
@@ -493,12 +494,12 @@ func newInformerWatchPod(f *framework.Framework, mutex *sync.Mutex, watchTimes m
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				options.LabelSelector = labels.SelectorFromSet(labels.Set{"type": podType}).String()
-				obj, err := f.ClientSet.CoreV1().Pods(ns).List(options)
+				obj, err := f.ClientSet.CoreV1().Pods(ns).List(context.TODO(), options)
 				return runtime.Object(obj), err
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				options.LabelSelector = labels.SelectorFromSet(labels.Set{"type": podType}).String()
-				return f.ClientSet.CoreV1().Pods(ns).Watch(options)
+				return f.ClientSet.CoreV1().Pods(ns).Watch(context.TODO(), options)
 			},
 		},
 		&v1.Pod{},

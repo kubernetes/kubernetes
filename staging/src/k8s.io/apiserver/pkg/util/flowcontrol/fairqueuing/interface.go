@@ -21,9 +21,22 @@ import (
 	"time"
 )
 
-// QueueSetFactory is used to create QueueSet objects.
+// QueueSetFactory is used to create QueueSet objects.  Creation, like
+// config update, is done in two phases: the first phase consumes the
+// QueuingConfig and the second consumes the DispatchingConfig.  They
+// are separated so that errors from the first phase can be found
+// before committing to a concurrency allotment for the second.
 type QueueSetFactory interface {
-	NewQueueSet(config QueueSetConfig) (QueueSet, error)
+	// BeginConstruction does the first phase of creating a QueueSet
+	BeginConstruction(QueuingConfig) (QueueSetCompleter, error)
+}
+
+// QueueSetCompleter finishes the two-step process of creating or
+// reconfiguring a QueueSet
+type QueueSetCompleter interface {
+	// Complete returns a QueueSet configured by the given
+	// dispatching configuration.
+	Complete(DispatchingConfig) QueueSet
 }
 
 // QueueSet is the abstraction for the queuing and dispatching
@@ -34,54 +47,74 @@ type QueueSetFactory interface {
 // .  Some day we may have connections between priority levels, but
 // today is not that day.
 type QueueSet interface {
-	// SetConfiguration updates the configuration
-	SetConfiguration(QueueSetConfig) error
+	// BeginConfigChange starts the two-step process of updating the
+	// configuration.  No change is made until Complete is called.  If
+	// `C := X.BeginConstruction(q)` then `C.Complete(d)` returns the
+	// same value `X`.  If the QueuingConfig's DesiredNumQueues field
+	// is zero then the other queuing-specific config parameters are
+	// not changed, so that the queues continue draining as before.
+	// In any case, reconfiguration does not discard any queue unless
+	// and until it is undesired and empty.
+	BeginConfigChange(QueuingConfig) (QueueSetCompleter, error)
 
-	// Quiesce controls whether the QueueSet is operating normally or is quiescing.
-	// A quiescing QueueSet drains as normal but does not admit any
-	// new requests. Passing a non-nil handler means the system should
-	// be quiescing, a nil handler means the system should operate
-	// normally. A call to Wait while the system is quiescing
-	// will be rebuffed by returning tryAnother=true. If all the
-	// queues have no requests waiting nor executing while the system
-	// is quiescing then the handler will eventually be called with no
-	// locks held (even if the system becomes non-quiescing between the
-	// triggering state and the required call).
-	Quiesce(EmptyHandler)
+	// IsIdle returns a bool indicating whether the QueueSet was idle
+	// at the moment of the return.  Idle means the QueueSet has zero
+	// requests queued and zero executing.  This bit can change only
+	// (1) during a call to StartRequest and (2) during a call to
+	// Request::Finish.  In the latter case idleness can only change
+	// from false to true.
+	IsIdle() bool
 
-	// Wait uses the given hashValue as the source of entropy as it
-	// shuffle-shards a request into a queue and waits for a decision
-	// on what to do with that request.  The descr1 and descr2 values
-	// play no role in the logic but appear in log messages.  If
-	// tryAnother==true at return then the QueueSet has become
-	// undesirable and the client should try to find a different
-	// QueueSet to use; execute and afterExecution are irrelevant in
-	// this case.  Otherwise, if execute then the client should start
-	// executing the request and, once the request finishes execution
-	// or is canceled, call afterExecution().  Otherwise the client
-	// should not execute the request and afterExecution is
-	// irrelevant.
-	Wait(ctx context.Context, hashValue uint64, descr1, descr2 interface{}) (tryAnother, execute bool, afterExecution func())
+	// StartRequest begins the process of handling a request.  If the
+	// request gets queued and the number of queues is greater than
+	// 1 then Wait uses the given hashValue as the source of entropy
+	// as it shuffle-shards the request into a queue.  The descr1 and
+	// descr2 values play no role in the logic but appear in log
+	// messages.  This method always returns quickly (without waiting
+	// for the request to be dequeued).  If this method returns a nil
+	// Request value then caller should reject the request and the
+	// returned bool indicates whether the QueueSet was idle at the
+	// moment of the return.  Otherwise idle==false and the client
+	// must call the Wait method of the Request exactly once.
+	StartRequest(ctx context.Context, hashValue uint64, descr1, descr2 interface{}) (req Request, idle bool)
 }
 
-// QueueSetConfig defines the configuration of a QueueSet.
-type QueueSetConfig struct {
+// Request represents the remainder of the handling of one request
+type Request interface {
+	// Finish determines whether to execute or reject the request and
+	// invokes `execute` if the decision is to execute the request.
+	// The returned `idle bool` value indicates whether the QueueSet
+	// was idle when the value was calculated, but might no longer be
+	// accurate by the time the client examines that value.
+	Finish(execute func()) (idle bool)
+}
+
+// QueuingConfig defines the configuration of the queuing aspect of a QueueSet.
+type QueuingConfig struct {
 	// Name is used to identify a queue set, allowing for descriptive information about its intended use
 	Name string
-	// ConcurrencyLimit is the maximum number of requests of this QueueSet that may be executing at a time
-	ConcurrencyLimit int
+
 	// DesiredNumQueues is the number of queues that the API says
 	// should exist now.  This may be zero, in which case
 	// QueueLengthLimit, HandSize, and RequestWaitLimit are ignored.
 	DesiredNumQueues int
+
 	// QueueLengthLimit is the maximum number of requests that may be waiting in a given queue at a time
 	QueueLengthLimit int
+
 	// HandSize is a parameter of shuffle sharding.  Upon arrival of a request, a queue is chosen by randomly
 	// dealing a "hand" of this many queues and then picking one of minimum length.
 	HandSize int
+
 	// RequestWaitLimit is the maximum amount of time that a request may wait in a queue.
 	// If, by the end of that time, the request has not been dispatched then it is rejected.
 	RequestWaitLimit time.Duration
+}
+
+// DispatchingConfig defines the configuration of the dispatching aspect of a QueueSet.
+type DispatchingConfig struct {
+	// ConcurrencyLimit is the maximum number of requests of this QueueSet that may be executing at a time
+	ConcurrencyLimit int
 }
 
 // EmptyHandler is used to notify the callee when all the queues

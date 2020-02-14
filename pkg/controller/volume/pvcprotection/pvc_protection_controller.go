@@ -17,6 +17,7 @@ limitations under the License.
 package pvcprotection
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -188,7 +189,7 @@ func (c *Controller) addFinalizer(pvc *v1.PersistentVolumeClaim) error {
 	}
 	claimClone := pvc.DeepCopy()
 	claimClone.ObjectMeta.Finalizers = append(claimClone.ObjectMeta.Finalizers, volumeutil.PVCProtectionFinalizer)
-	_, err := c.client.CoreV1().PersistentVolumeClaims(claimClone.Namespace).Update(claimClone)
+	_, err := c.client.CoreV1().PersistentVolumeClaims(claimClone.Namespace).Update(context.TODO(), claimClone, metav1.UpdateOptions{})
 	if err != nil {
 		klog.V(3).Infof("Error adding protection finalizer to PVC %s/%s: %v", pvc.Namespace, pvc.Name, err)
 		return err
@@ -200,7 +201,7 @@ func (c *Controller) addFinalizer(pvc *v1.PersistentVolumeClaim) error {
 func (c *Controller) removeFinalizer(pvc *v1.PersistentVolumeClaim) error {
 	claimClone := pvc.DeepCopy()
 	claimClone.ObjectMeta.Finalizers = slice.RemoveString(claimClone.ObjectMeta.Finalizers, volumeutil.PVCProtectionFinalizer, nil)
-	_, err := c.client.CoreV1().PersistentVolumeClaims(claimClone.Namespace).Update(claimClone)
+	_, err := c.client.CoreV1().PersistentVolumeClaims(claimClone.Namespace).Update(context.TODO(), claimClone, metav1.UpdateOptions{})
 	if err != nil {
 		klog.V(3).Infof("Error removing protection finalizer from PVC %s/%s: %v", pvc.Namespace, pvc.Name, err)
 		return err
@@ -248,7 +249,7 @@ func (c *Controller) askInformer(pvc *v1.PersistentVolumeClaim) (bool, error) {
 func (c *Controller) askAPIServer(pvc *v1.PersistentVolumeClaim) (bool, error) {
 	klog.V(4).Infof("Looking for Pods using PVC %s/%s with a live list", pvc.Namespace, pvc.Name)
 
-	podsList, err := c.client.CoreV1().Pods(pvc.Namespace).List(metav1.ListOptions{})
+	podsList, err := c.client.CoreV1().Pods(pvc.Namespace).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return false, fmt.Errorf("live list of pods failed: %s", err.Error())
 	}

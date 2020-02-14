@@ -22,6 +22,7 @@ limitations under the License.
 package framework
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
@@ -110,6 +111,9 @@ type Framework struct {
 	// the various afterEaches
 	afterEaches map[string]AfterEachActionFunc
 
+	// beforeEachStarted indicates that BeforeEach has started
+	beforeEachStarted bool
+
 	// configuration for framework's client
 	Options Options
 
@@ -179,6 +183,8 @@ func NewFramework(baseName string, options Options, client clientset.Interface) 
 
 // BeforeEach gets a client and makes a namespace.
 func (f *Framework) BeforeEach() {
+	f.beforeEachStarted = true
+
 	// The fact that we need this feels like a bug in ginkgo.
 	// https://github.com/onsi/ginkgo/issues/222
 	f.cleanupHandle = AddCleanupAction(f.AfterEach)
@@ -356,7 +362,19 @@ func (f *Framework) AddAfterEach(name string, fn AfterEachActionFunc) {
 
 // AfterEach deletes the namespace, after reading its events.
 func (f *Framework) AfterEach() {
+	// If BeforeEach never started AfterEach should be skipped.
+	// Currently some tests under e2e/storage have this condition.
+	if !f.beforeEachStarted {
+		return
+	}
+
 	RemoveCleanupAction(f.cleanupHandle)
+
+	// This should not happen. Given ClientSet is a public field a test must have updated it!
+	// Error out early before any API calls during cleanup.
+	if f.ClientSet == nil {
+		Failf("The framework ClientSet must not be nil at this point")
+	}
 
 	// DeleteNamespace at the very end in defer, to avoid any
 	// expectation failures preventing deleting the namespace.
@@ -368,7 +386,7 @@ func (f *Framework) AfterEach() {
 		if TestContext.DeleteNamespace && (TestContext.DeleteNamespaceOnFailure || !ginkgo.CurrentGinkgoTestDescription().Failed) {
 			for _, ns := range f.namespacesToDelete {
 				ginkgo.By(fmt.Sprintf("Destroying namespace %q for this suite.", ns.Name))
-				if err := f.ClientSet.CoreV1().Namespaces().Delete(ns.Name, nil); err != nil {
+				if err := f.ClientSet.CoreV1().Namespaces().Delete(context.TODO(), ns.Name, nil); err != nil {
 					if !apierrors.IsNotFound(err) {
 						nsDeletionErrors[ns.Name] = err
 
@@ -583,7 +601,7 @@ func (f *Framework) CreateServiceForSimpleApp(contPort, svcPort int, appName str
 		}}
 	}
 	Logf("Creating a service-for-%v for selecting app=%v-pod", appName, appName)
-	service, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(&v1.Service{
+	service, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(context.TODO(), &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "service-for-" + appName,
 			Labels: map[string]string{
@@ -594,7 +612,7 @@ func (f *Framework) CreateServiceForSimpleApp(contPort, svcPort int, appName str
 			Ports:    portsFunc(),
 			Selector: serviceSelector,
 		},
-	})
+	}, metav1.CreateOptions{})
 	ExpectNoError(err)
 	return service
 }
@@ -608,13 +626,13 @@ func (f *Framework) CreatePodsPerNodeForSimpleApp(appName string, podSpec func(n
 	}
 	for i, node := range nodes.Items {
 		Logf("%v/%v : Creating container with label app=%v-pod", i, maxCount, appName)
-		_, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(&v1.Pod{
+		_, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   fmt.Sprintf(appName+"-pod-%v", i),
 				Labels: podLabels,
 			},
 			Spec: podSpec(node),
-		})
+		}, metav1.CreateOptions{})
 		ExpectNoError(err)
 	}
 	return podLabels
@@ -759,9 +777,9 @@ func filterLabels(selectors map[string]string, cli clientset.Interface, ns strin
 	if len(selectors) > 0 {
 		selector = labels.SelectorFromSet(labels.Set(selectors))
 		options := metav1.ListOptions{LabelSelector: selector.String()}
-		pl, err = cli.CoreV1().Pods(ns).List(options)
+		pl, err = cli.CoreV1().Pods(ns).List(context.TODO(), options)
 	} else {
-		pl, err = cli.CoreV1().Pods(ns).List(metav1.ListOptions{})
+		pl, err = cli.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{})
 	}
 	return pl, err
 }

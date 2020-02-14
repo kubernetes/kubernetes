@@ -17,6 +17,7 @@ limitations under the License.
 package namespace
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
 	"time"
@@ -42,11 +43,11 @@ func TestNamespaceCondition(t *testing.T) {
 	closeFn, nsController, informers, kubeClient, dynamicClient := namespaceLifecycleSetup(t)
 	defer closeFn()
 	nsName := "test-namespace-conditions"
-	_, err := kubeClient.CoreV1().Namespaces().Create(&corev1.Namespace{
+	_, err := kubeClient.CoreV1().Namespaces().Create(context.TODO(), &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: nsName,
 		},
-	})
+	}, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -77,12 +78,12 @@ func TestNamespaceCondition(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err = kubeClient.CoreV1().Namespaces().Delete(nsName, nil); err != nil {
+	if err = kubeClient.CoreV1().Namespaces().Delete(context.TODO(), nsName, nil); err != nil {
 		t.Fatal(err)
 	}
 
 	err = wait.PollImmediate(1*time.Second, 60*time.Second, func() (bool, error) {
-		curr, err := kubeClient.CoreV1().Namespaces().Get(nsName, metav1.GetOptions{})
+		curr, err := kubeClient.CoreV1().Namespaces().Get(context.TODO(), nsName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}

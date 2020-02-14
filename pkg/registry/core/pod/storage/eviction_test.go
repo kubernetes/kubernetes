@@ -17,25 +17,16 @@ limitations under the License.
 package storage
 
 import (
-	"context"
 	"testing"
 
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
-	"k8s.io/apimachinery/pkg/api/apitesting"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
-	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/registry/generic"
-	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
-	"k8s.io/apiserver/pkg/storage"
-	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	"k8s.io/client-go/kubernetes/fake"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/policy"
-	"k8s.io/kubernetes/pkg/registry/registrytest"
 )
 
 func TestEviction(t *testing.T) {
@@ -155,41 +146,6 @@ func TestEviction(t *testing.T) {
 	}
 }
 
-type FailDeleteUpdateStorage struct {
-	storage.Interface
-}
-
-func (f FailDeleteUpdateStorage) Delete(ctx context.Context, key string, out runtime.Object, precondition *storage.Preconditions, validateDeletion storage.ValidateObjectFunc) error {
-	return storage.NewKeyNotFoundError(key, 0)
-}
-
-func (f FailDeleteUpdateStorage) GuaranteedUpdate(ctx context.Context, key string, ptrToType runtime.Object, ignoreNotFound bool,
-	preconditions *storage.Preconditions, tryUpdate storage.UpdateFunc, suggestion ...runtime.Object) error {
-	return storage.NewKeyNotFoundError(key, 0)
-}
-
-var scheme = runtime.NewScheme()
-var codecs = serializer.NewCodecFactory(scheme)
-
-func newFailDeleteUpdateStorage(t *testing.T) (*REST, *etcd3testing.EtcdTestServer) {
-	etcdStorage, server := registrytest.NewEtcdStorage(t, "")
-	restOptions := generic.RESTOptions{
-		StorageConfig:           etcdStorage,
-		Decorator:               generic.UndecoratedStorage,
-		DeleteCollectionWorkers: 3,
-		ResourcePrefix:          "pods",
-	}
-	storage, err := NewStorage(restOptions, nil, nil, nil)
-	if err != nil {
-		t.Fatalf("unexpected error from REST storage: %v", err)
-	}
-	storage.Pod.Store.Storage = genericregistry.DryRunnableStorage{
-		Storage: FailDeleteUpdateStorage{storage.Pod.Store.Storage.Storage},
-		Codec:   apitesting.TestStorageCodec(codecs, examplev1.SchemeGroupVersion),
-	}
-	return storage.Pod, server
-}
-
 func TestEvictionDryRun(t *testing.T) {
 	testcases := []struct {
 		name            string
@@ -227,7 +183,7 @@ func TestEvictionDryRun(t *testing.T) {
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
 			testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), metav1.NamespaceDefault)
-			storage, server := newFailDeleteUpdateStorage(t)
+			storage, _, _, server := newStorage(t)
 			defer server.Terminate(t)
 			defer storage.Store.DestroyFunc()
 

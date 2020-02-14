@@ -5,7 +5,6 @@ package fs
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sync"
@@ -32,14 +31,6 @@ var (
 		&PerfEventGroup{},
 		&FreezerGroup{},
 		&NameGroup{GroupName: "name=systemd", Join: true},
-	}
-	subsystemsUnified = subsystemSet{
-		&CpusetGroupV2{},
-		&FreezerGroupV2{},
-		&CpuGroupV2{},
-		&MemoryGroupV2{},
-		&IOGroupV2{},
-		&PidsGroupV2{},
 	}
 	HugePageSizes, _ = cgroups.GetHugePageSize()
 )
@@ -138,9 +129,6 @@ func isIgnorableError(rootless bool, err error) bool {
 }
 
 func (m *Manager) getSubsystems() subsystemSet {
-	if cgroups.IsCgroup2UnifiedMode() {
-		return subsystemsUnified
-	}
 	return subsystemsLegacy
 }
 
@@ -222,6 +210,10 @@ func (m *Manager) GetPaths() map[string]string {
 	paths := m.Paths
 	m.mu.Unlock()
 	return paths
+}
+
+func (m *Manager) GetUnifiedPath() (string, error) {
+	return "", errors.New("unified path is only supported when running in unified mode")
 }
 
 func (m *Manager) GetStats() (*cgroups.Stats, error) {
@@ -377,23 +369,6 @@ func (raw *cgroupData) join(subsystem string) (string, error) {
 	return path, nil
 }
 
-func writeFile(dir, file, data string) error {
-	// Normally dir should not be empty, one case is that cgroup subsystem
-	// is not mounted, we will get empty dir, and we want it fail here.
-	if dir == "" {
-		return fmt.Errorf("no such directory for %s", file)
-	}
-	if err := ioutil.WriteFile(filepath.Join(dir, file), []byte(data), 0700); err != nil {
-		return fmt.Errorf("failed to write %v to %v: %v", data, file, err)
-	}
-	return nil
-}
-
-func readFile(dir, file string) (string, error) {
-	data, err := ioutil.ReadFile(filepath.Join(dir, file))
-	return string(data), err
-}
-
 func removePath(p string, err error) error {
 	if err != nil {
 		return err
@@ -429,4 +404,8 @@ func CheckCpushares(path string, c uint64) error {
 	}
 
 	return nil
+}
+
+func (m *Manager) GetCgroups() (*configs.Cgroup, error) {
+	return m.Cgroups, nil
 }

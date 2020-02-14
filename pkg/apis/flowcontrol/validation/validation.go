@@ -20,13 +20,14 @@ import (
 	"fmt"
 	"strings"
 
-	"k8s.io/apimachinery/pkg/api/validation"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/util/shufflesharding"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/flowcontrol"
+	"k8s.io/kubernetes/pkg/apis/flowcontrol/internalbootstrap"
 )
 
 // ValidateFlowSchemaName validates name for flow-schema.
@@ -73,7 +74,17 @@ var supportedLimitResponseType = sets.NewString(
 // ValidateFlowSchema validates the content of flow-schema
 func ValidateFlowSchema(fs *flowcontrol.FlowSchema) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMeta(&fs.ObjectMeta, false, ValidateFlowSchemaName, field.NewPath("metadata"))
-	allErrs = append(allErrs, ValidateFlowSchemaSpec(&fs.Spec, field.NewPath("spec"))...)
+	specPath := field.NewPath("spec")
+	allErrs = append(allErrs, ValidateFlowSchemaSpec(fs.Name, &fs.Spec, specPath)...)
+	if mand, ok := internalbootstrap.MandatoryFlowSchemas[fs.Name]; ok {
+		// Check for almost exact equality.  This is a pretty
+		// strict test, and it is OK in this context because both
+		// sides of this comparison are intended to ultimately
+		// come from the same code.
+		if !apiequality.Semantic.DeepEqual(fs.Spec, mand.Spec) {
+			allErrs = append(allErrs, field.Invalid(specPath, fs.Spec, fmt.Sprintf("spec of '%s' must equal the fixed value", fs.Name)))
+		}
+	}
 	allErrs = append(allErrs, ValidateFlowSchemaStatus(&fs.Status, field.NewPath("status"))...)
 	return allErrs
 }
@@ -84,13 +95,16 @@ func ValidateFlowSchemaUpdate(old, fs *flowcontrol.FlowSchema) field.ErrorList {
 }
 
 // ValidateFlowSchemaSpec validates the content of flow-schema's spec
-func ValidateFlowSchemaSpec(spec *flowcontrol.FlowSchemaSpec, fldPath *field.Path) field.ErrorList {
+func ValidateFlowSchemaSpec(fsName string, spec *flowcontrol.FlowSchemaSpec, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	if spec.MatchingPrecedence <= 0 {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("matchingPrecedence"), spec.MatchingPrecedence, "must be a positive value"))
 	}
 	if spec.MatchingPrecedence > flowcontrol.FlowSchemaMaxMatchingPrecedence {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("matchingPrecedence"), spec.MatchingPrecedence, fmt.Sprintf("must not be greater than %v", flowcontrol.FlowSchemaMaxMatchingPrecedence)))
+	}
+	if (spec.MatchingPrecedence == 1) && (fsName != flowcontrol.FlowSchemaNameExempt) {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("matchingPrecedence"), spec.MatchingPrecedence, "only the schema named 'exempt' may have matchingPrecedence 1"))
 	}
 	if spec.DistinguisherMethod != nil {
 		if !supportedDistinguisherMethods.Has(string(spec.DistinguisherMethod.Type)) {
@@ -139,10 +153,28 @@ func ValidateFlowSchemaSubject(subject *flowcontrol.Subject, fldPath *field.Path
 	switch subject.Kind {
 	case flowcontrol.SubjectKindServiceAccount:
 		allErrs = append(allErrs, ValidateServiceAccountSubject(subject.ServiceAccount, fldPath.Child("serviceAccount"))...)
+		if subject.User != nil {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("user"), "user is forbidden when subject kind is not 'User'"))
+		}
+		if subject.Group != nil {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("group"), "group is forbidden when subject kind is not 'Group'"))
+		}
 	case flowcontrol.SubjectKindUser:
 		allErrs = append(allErrs, ValidateUserSubject(subject.User, fldPath.Child("user"))...)
+		if subject.ServiceAccount != nil {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("serviceAccount"), "serviceAccount is forbidden when subject kind is not 'ServiceAccount'"))
+		}
+		if subject.Group != nil {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("group"), "group is forbidden when subject kind is not 'Group'"))
+		}
 	case flowcontrol.SubjectKindGroup:
 		allErrs = append(allErrs, ValidateGroupSubject(subject.Group, fldPath.Child("group"))...)
+		if subject.ServiceAccount != nil {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("serviceAccount"), "serviceAccount is forbidden when subject kind is not 'ServiceAccount'"))
+		}
+		if subject.User != nil {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("user"), "user is forbidden when subject kind is not 'User'"))
+		}
 	default:
 		allErrs = append(allErrs, field.NotSupported(fldPath.Child("kind"), subject.Kind, supportedSubjectKinds.List()))
 	}
@@ -152,10 +184,13 @@ func ValidateFlowSchemaSubject(subject *flowcontrol.Subject, fldPath *field.Path
 // ValidateServiceAccountSubject validates subject of "ServiceAccount" kind
 func ValidateServiceAccountSubject(subject *flowcontrol.ServiceAccountSubject, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
+	if subject == nil {
+		return append(allErrs, field.Required(fldPath, "serviceAccount is required when subject kind is 'ServiceAccount'"))
+	}
 	if len(subject.Name) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
 	} else if subject.Name != flowcontrol.NameAll {
-		for _, msg := range validation.ValidateServiceAccountName(subject.Name, false) {
+		for _, msg := range apimachineryvalidation.ValidateServiceAccountName(subject.Name, false) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), subject.Name, msg))
 		}
 	}
@@ -174,6 +209,9 @@ func ValidateServiceAccountSubject(subject *flowcontrol.ServiceAccountSubject, f
 // ValidateUserSubject validates subject of "User" kind
 func ValidateUserSubject(subject *flowcontrol.UserSubject, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
+	if subject == nil {
+		return append(allErrs, field.Required(fldPath, "user is required when subject kind is 'User'"))
+	}
 	if len(subject.Name) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
 	}
@@ -183,6 +221,9 @@ func ValidateUserSubject(subject *flowcontrol.UserSubject, fldPath *field.Path) 
 // ValidateGroupSubject validates subject of "Group" kind
 func ValidateGroupSubject(subject *flowcontrol.GroupSubject, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
+	if subject == nil {
+		return append(allErrs, field.Required(fldPath, "group is required when subject kind is 'Group'"))
+	}
 	if len(subject.Name) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
 	}
@@ -298,7 +339,17 @@ func ValidateFlowSchemaCondition(condition *flowcontrol.FlowSchemaCondition, fld
 // ValidatePriorityLevelConfiguration validates priority-level-configuration.
 func ValidatePriorityLevelConfiguration(pl *flowcontrol.PriorityLevelConfiguration) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMeta(&pl.ObjectMeta, false, ValidatePriorityLevelConfigurationName, field.NewPath("metadata"))
-	allErrs = append(allErrs, ValidatePriorityLevelConfigurationSpec(&pl.Spec, pl.Name, field.NewPath("spec"))...)
+	specPath := field.NewPath("spec")
+	allErrs = append(allErrs, ValidatePriorityLevelConfigurationSpec(&pl.Spec, pl.Name, specPath)...)
+	if mand, ok := internalbootstrap.MandatoryPriorityLevelConfigurations[pl.Name]; ok {
+		// Check for almost exact equality.  This is a pretty
+		// strict test, and it is OK in this context because both
+		// sides of this comparison are intended to ultimately
+		// come from the same code.
+		if !apiequality.Semantic.DeepEqual(pl.Spec, mand.Spec) {
+			allErrs = append(allErrs, field.Invalid(specPath, pl.Spec, fmt.Sprintf("spec of '%s' must equal the fixed value", pl.Name)))
+		}
+	}
 	allErrs = append(allErrs, ValidatePriorityLevelConfigurationStatus(&pl.Status, field.NewPath("status"))...)
 	return allErrs
 }
@@ -311,6 +362,9 @@ func ValidatePriorityLevelConfigurationUpdate(old, pl *flowcontrol.PriorityLevel
 // ValidatePriorityLevelConfigurationSpec validates priority-level-configuration's spec.
 func ValidatePriorityLevelConfigurationSpec(spec *flowcontrol.PriorityLevelConfigurationSpec, name string, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
+	if (name == flowcontrol.PriorityLevelConfigurationNameExempt) != (spec.Type == flowcontrol.PriorityLevelEnablementExempt) {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("type"), spec.Type, "type must be 'Exempt' if and only if name is 'exempt'"))
+	}
 	switch spec.Type {
 	case flowcontrol.PriorityLevelEnablementExempt:
 		if spec.Limited != nil {
@@ -318,7 +372,7 @@ func ValidatePriorityLevelConfigurationSpec(spec *flowcontrol.PriorityLevelConfi
 		}
 	case flowcontrol.PriorityLevelEnablementLimited:
 		if spec.Limited == nil {
-			allErrs = append(allErrs, field.Required(fldPath.Child("limited"), "must not be empty"))
+			allErrs = append(allErrs, field.Required(fldPath.Child("limited"), "must not be empty when type is Limited"))
 		} else {
 			allErrs = append(allErrs, ValidateLimitedPriorityLevelConfiguration(spec.Limited, fldPath.Child("limited"))...)
 		}
@@ -344,11 +398,11 @@ func ValidateLimitResponse(lr flowcontrol.LimitResponse, fldPath *field.Path) fi
 	switch lr.Type {
 	case flowcontrol.LimitResponseTypeReject:
 		if lr.Queuing != nil {
-			allErrs = append(allErrs, field.Forbidden(fldPath.Child("queuing"), "must be nil if the type is not Limited"))
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("queuing"), "must be nil if limited.limitResponse.type is not Limited"))
 		}
 	case flowcontrol.LimitResponseTypeQueue:
 		if lr.Queuing == nil {
-			allErrs = append(allErrs, field.Required(fldPath.Child("queuing"), "must not be empty"))
+			allErrs = append(allErrs, field.Required(fldPath.Child("queuing"), "must not be empty if limited.limitResponse.type is Limited"))
 		} else {
 			allErrs = append(allErrs, ValidatePriorityLevelQueuingConfiguration(lr.Queuing, fldPath.Child("queuing"))...)
 		}

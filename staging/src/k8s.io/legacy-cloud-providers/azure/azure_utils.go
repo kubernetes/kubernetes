@@ -19,6 +19,7 @@ limitations under the License.
 package azure
 
 import (
+	"context"
 	"sync"
 )
 
@@ -68,4 +69,8 @@ func (lm *lockMap) lockEntry(entry string) {
 
 func (lm *lockMap) unlockEntry(entry string) {
 	lm.mutexMap[entry].Unlock()
+}
+
+func getContextWithCancel() (context.Context, context.CancelFunc) {
+	return context.WithCancel(context.Background())
 }

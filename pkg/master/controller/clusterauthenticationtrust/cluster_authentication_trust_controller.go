@@ -18,6 +18,7 @@ package clusterauthenticationtrust
 
 import (
 	"bytes"
+	"context"
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
@@ -27,7 +28,6 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -109,7 +109,7 @@ func NewClusterAuthenticationTrustController(requiredAuthenticationData ClusterA
 				return cast.Name == configMapName
 			}
 			if tombstone, ok := obj.(cache.DeletedFinalStateUnknown); ok {
-				if cast, ok := tombstone.Obj.(*apiextensions.CustomResourceDefinition); ok {
+				if cast, ok := tombstone.Obj.(*corev1.ConfigMap); ok {
 					return cast.Name == configMapName
 				}
 			}
@@ -175,7 +175,7 @@ func (c *Controller) syncConfigMap() error {
 }
 
 func createNamespaceIfNeeded(nsClient corev1client.NamespacesGetter, ns string) error {
-	if _, err := nsClient.Namespaces().Get(ns, metav1.GetOptions{}); err == nil {
+	if _, err := nsClient.Namespaces().Get(context.TODO(), ns, metav1.GetOptions{}); err == nil {
 		// the namespace already exists
 		return nil
 	}
@@ -185,7 +185,7 @@ func createNamespaceIfNeeded(nsClient corev1client.NamespacesGetter, ns string) 
 			Namespace: "",
 		},
 	}
-	_, err := nsClient.Namespaces().Create(newNs)
+	_, err := nsClient.Namespaces().Create(context.TODO(), newNs, metav1.CreateOptions{})
 	if err != nil && apierrors.IsAlreadyExists(err) {
 		err = nil
 	}
@@ -193,9 +193,9 @@ func createNamespaceIfNeeded(nsClient corev1client.NamespacesGetter, ns string) 
 }
 
 func writeConfigMap(configMapClient corev1client.ConfigMapsGetter, required *corev1.ConfigMap) error {
-	_, err := configMapClient.ConfigMaps(required.Namespace).Update(required)
+	_, err := configMapClient.ConfigMaps(required.Namespace).Update(context.TODO(), required, metav1.UpdateOptions{})
 	if apierrors.IsNotFound(err) {
-		_, err := configMapClient.ConfigMaps(required.Namespace).Create(required)
+		_, err := configMapClient.ConfigMaps(required.Namespace).Create(context.TODO(), required, metav1.CreateOptions{})
 		return err
 	}
 
@@ -205,7 +205,7 @@ func writeConfigMap(configMapClient corev1client.ConfigMapsGetter, required *cor
 	//   1. request is so big the generic request catcher finds it
 	//   2. the content is so large that that the server sends a validation error "Too long: must have at most 1048576 characters"
 	if apierrors.IsRequestEntityTooLargeError(err) || (apierrors.IsInvalid(err) && strings.Contains(err.Error(), "Too long")) {
-		if deleteErr := configMapClient.ConfigMaps(required.Namespace).Delete(required.Name, nil); deleteErr != nil {
+		if deleteErr := configMapClient.ConfigMaps(required.Namespace).Delete(context.TODO(), required.Name, nil); deleteErr != nil {
 			return deleteErr
 		}
 		return err

@@ -20,15 +20,28 @@ package azure
 
 import (
 	"fmt"
+	"net/http"
 
 	azs "github.com/Azure/azure-sdk-for-go/storage"
 	"github.com/Azure/go-autorest/autorest/azure"
 
 	"k8s.io/klog"
+	"k8s.io/legacy-cloud-providers/azure/retry"
 )
 
 const (
 	useHTTPS = true
+)
+
+var (
+	// refer https://github.com/Azure/azure-sdk-for-go/blob/master/storage/client.go#L88.
+	defaultValidStatusCodes = []int{
+		http.StatusRequestTimeout,      // 408
+		http.StatusInternalServerError, // 500
+		http.StatusBadGateway,          // 502
+		http.StatusServiceUnavailable,  // 503
+		http.StatusGatewayTimeout,      // 504
+	}
 )
 
 // FileClient is the interface for creating file shares, interface for test
@@ -53,7 +66,15 @@ func (az *Cloud) resizeFileShare(accountName, accountKey, name string, sizeGiB i
 }
 
 type azureFileClient struct {
-	env azure.Environment
+	env     *azure.Environment
+	backoff *retry.Backoff
+}
+
+func newAzureFileClient(env *azure.Environment, backoff *retry.Backoff) *azureFileClient {
+	return &azureFileClient{
+		env:     env,
+		backoff: backoff,
+	}
 }
 
 func (f *azureFileClient) createFileShare(accountName, accountKey, name string, sizeGiB int) error {
@@ -106,6 +127,15 @@ func (f *azureFileClient) getFileSvcClient(accountName, accountKey string) (*azs
 	if err != nil {
 		return nil, fmt.Errorf("error creating azure client: %v", err)
 	}
+
+	if f.backoff != nil {
+		fileClient.Sender = &azs.DefaultSender{
+			RetryAttempts:    f.backoff.Steps,
+			ValidStatusCodes: defaultValidStatusCodes,
+			RetryDuration:    f.backoff.Duration,
+		}
+	}
+
 	fc := fileClient.GetFileService()
 	return &fc, nil
 }

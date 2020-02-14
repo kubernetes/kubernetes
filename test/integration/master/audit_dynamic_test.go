@@ -17,6 +17,7 @@ limitations under the License.
 package master
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -70,7 +71,7 @@ func TestDynamicAudit(t *testing.T) {
 
 	// test creates a single audit sink, generates audit events, and ensures they arrive at the server
 	success := t.Run("one sink", func(t *testing.T) {
-		_, err := kubeclient.AuditregistrationV1alpha1().AuditSinks().Create(sinkConfig1)
+		_, err := kubeclient.AuditregistrationV1alpha1().AuditSinks().Create(context.TODO(), sinkConfig1, metav1.CreateOptions{})
 		require.NoError(t, err, "failed to create audit sink1")
 		t.Log("created audit sink1")
 
@@ -88,7 +89,7 @@ func TestDynamicAudit(t *testing.T) {
 
 	// test creates a second audit sink, generates audit events, and ensures events arrive in both servers
 	success = t.Run("two sink", func(t *testing.T) {
-		_, err := kubeclient.AuditregistrationV1alpha1().AuditSinks().Create(sinkConfig2)
+		_, err := kubeclient.AuditregistrationV1alpha1().AuditSinks().Create(context.TODO(), sinkConfig2, metav1.CreateOptions{})
 		require.NoError(t, err, "failed to create audit sink2")
 		t.Log("created audit sink2")
 
@@ -108,7 +109,7 @@ func TestDynamicAudit(t *testing.T) {
 
 	// test deletes an audit sink, generates audit events, and ensures they don't arrive in the corresponding server
 	success = t.Run("delete sink", func(t *testing.T) {
-		err := kubeclient.AuditregistrationV1alpha1().AuditSinks().Delete(sinkConfig2.Name, &metav1.DeleteOptions{})
+		err := kubeclient.AuditregistrationV1alpha1().AuditSinks().Delete(context.TODO(), sinkConfig2.Name, &metav1.DeleteOptions{})
 		require.NoError(t, err, "failed to delete audit sink2")
 		t.Log("deleted audit sink2")
 
@@ -144,7 +145,7 @@ func TestDynamicAudit(t *testing.T) {
 	// The test checks that no events are lost or duplicated during the update.
 	t.Run("update sink", func(t *testing.T) {
 		// fetch sink1 config
-		sink1, err := kubeclient.AuditregistrationV1alpha1().AuditSinks().Get(sinkConfig1.Name, metav1.GetOptions{})
+		sink1, err := kubeclient.AuditregistrationV1alpha1().AuditSinks().Get(context.TODO(), sinkConfig1.Name, metav1.GetOptions{})
 		require.NoError(t, err)
 
 		// reset event lists
@@ -168,7 +169,7 @@ func TestDynamicAudit(t *testing.T) {
 
 		// update the url
 		sink1.Spec.Webhook.ClientConfig.URL = &testServer2.Server.URL
-		_, err = kubeclient.AuditregistrationV1alpha1().AuditSinks().Update(sink1)
+		_, err = kubeclient.AuditregistrationV1alpha1().AuditSinks().Update(context.TODO(), sink1, metav1.UpdateOptions{})
 		require.NoError(t, err, "failed to update audit sink1")
 		t.Log("updated audit sink1 to point to server2")
 
@@ -230,7 +231,7 @@ func sinkHealth(t *testing.T, kubeclient kubernetes.Interface, servers ...*utils
 // simpleOp is a function that simply tries to get a configmap with the given name and returns the
 // corresponding expected audit event
 func simpleOp(name string, kubeclient kubernetes.Interface) ([]utils.AuditEvent, error) {
-	_, err := kubeclient.CoreV1().ConfigMaps(namespace).Get(name, metav1.GetOptions{})
+	_, err := kubeclient.CoreV1().ConfigMaps(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
 		return nil, err
 	}

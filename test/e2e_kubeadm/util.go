@@ -17,6 +17,7 @@ limitations under the License.
 package kubeadm
 
 import (
+	"context"
 	appsv1 "k8s.io/api/apps/v1"
 	authv1 "k8s.io/api/authorization/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -35,7 +36,7 @@ import (
 func ExpectServiceAccount(c clientset.Interface, namespace, name string) {
 	_, err := c.CoreV1().
 		ServiceAccounts(namespace).
-		Get(name, metav1.GetOptions{})
+		Get(context.TODO(), name, metav1.GetOptions{})
 	framework.ExpectNoError(err, "error getting ServiceAccount %q from namespace %q", name, namespace)
 }
 
@@ -45,7 +46,7 @@ func ExpectServiceAccount(c clientset.Interface, namespace, name string) {
 func GetSecret(c clientset.Interface, namespace, name string) *corev1.Secret {
 	r, err := c.CoreV1().
 		Secrets(namespace).
-		Get(name, metav1.GetOptions{})
+		Get(context.TODO(), name, metav1.GetOptions{})
 	framework.ExpectNoError(err, "error getting Secret %q from namespace %q", name, namespace)
 	return r
 }
@@ -56,7 +57,7 @@ func GetSecret(c clientset.Interface, namespace, name string) *corev1.Secret {
 func GetConfigMap(c clientset.Interface, namespace, name string) *corev1.ConfigMap {
 	r, err := c.CoreV1().
 		ConfigMaps(namespace).
-		Get(name, metav1.GetOptions{})
+		Get(context.TODO(), name, metav1.GetOptions{})
 	framework.ExpectNoError(err, "error getting ConfigMap %q from namespace %q", name, namespace)
 	return r
 }
@@ -67,7 +68,7 @@ func GetConfigMap(c clientset.Interface, namespace, name string) *corev1.ConfigM
 func ExpectService(c clientset.Interface, namespace, name string) {
 	_, err := c.CoreV1().
 		Services(namespace).
-		Get(name, metav1.GetOptions{})
+		Get(context.TODO(), name, metav1.GetOptions{})
 	framework.ExpectNoError(err, "error getting Service %q from namespace %q", name, namespace)
 }
 
@@ -77,7 +78,7 @@ func ExpectService(c clientset.Interface, namespace, name string) {
 func GetDeployment(c clientset.Interface, namespace, name string) *appsv1.Deployment {
 	r, err := c.AppsV1().
 		Deployments(namespace).
-		Get(name, metav1.GetOptions{})
+		Get(context.TODO(), name, metav1.GetOptions{})
 	framework.ExpectNoError(err, "error getting Deployment %q from namespace %q", name, namespace)
 	return r
 }
@@ -88,7 +89,7 @@ func GetDeployment(c clientset.Interface, namespace, name string) *appsv1.Deploy
 func GetDaemonSet(c clientset.Interface, namespace, name string) *appsv1.DaemonSet {
 	r, err := c.AppsV1().
 		DaemonSets(namespace).
-		Get(name, metav1.GetOptions{})
+		Get(context.TODO(), name, metav1.GetOptions{})
 	framework.ExpectNoError(err, "error getting DaemonSet %q from namespace %q", name, namespace)
 	return r
 }
@@ -99,7 +100,7 @@ func GetDaemonSet(c clientset.Interface, namespace, name string) *appsv1.DaemonS
 func ExpectRole(c clientset.Interface, namespace, name string) {
 	_, err := c.RbacV1().
 		Roles(namespace).
-		Get(name, metav1.GetOptions{})
+		Get(context.TODO(), name, metav1.GetOptions{})
 	framework.ExpectNoError(err, "error getting Role %q from namespace %q", name, namespace)
 }
 
@@ -107,7 +108,7 @@ func ExpectRole(c clientset.Interface, namespace, name string) {
 func ExpectRoleBinding(c clientset.Interface, namespace, name string) {
 	_, err := c.RbacV1().
 		RoleBindings(namespace).
-		Get(name, metav1.GetOptions{})
+		Get(context.TODO(), name, metav1.GetOptions{})
 	framework.ExpectNoError(err, "error getting RoleBinding %q from namespace %q", name, namespace)
 }
 
@@ -115,7 +116,7 @@ func ExpectRoleBinding(c clientset.Interface, namespace, name string) {
 func ExpectClusterRole(c clientset.Interface, name string) {
 	_, err := c.RbacV1().
 		ClusterRoles().
-		Get(name, metav1.GetOptions{})
+		Get(context.TODO(), name, metav1.GetOptions{})
 	framework.ExpectNoError(err, "error getting ClusterRole %q", name)
 }
 
@@ -123,7 +124,7 @@ func ExpectClusterRole(c clientset.Interface, name string) {
 func ExpectClusterRoleBinding(c clientset.Interface, name string) {
 	_, err := c.RbacV1().
 		ClusterRoleBindings().
-		Get(name, metav1.GetOptions{})
+		Get(context.TODO(), name, metav1.GetOptions{})
 	framework.ExpectNoError(err, "error getting ClusterRoleBindings %q", name)
 }
 
@@ -131,7 +132,7 @@ func ExpectClusterRoleBinding(c clientset.Interface, name string) {
 func ExpectClusterRoleBindingWithSubjectAndRole(c clientset.Interface, name, subjectKind, subject, role string) {
 	binding, err := c.RbacV1().
 		ClusterRoleBindings().
-		Get(name, metav1.GetOptions{})
+		Get(context.TODO(), name, metav1.GetOptions{})
 	framework.ExpectNoError(err, "error getting ClusterRoleBindings %q", name)
 	gomega.Expect(binding.Subjects).To(
 		gomega.ContainElement(subjectMatcher(
@@ -170,7 +171,7 @@ func ExpectSubjectHasAccessToResource(c clientset.Interface, subjectKind, subjec
 		framework.Failf("invalid subjectKind %s", subjectKind)
 	}
 
-	s, err := c.AuthorizationV1().SubjectAccessReviews().Create(sar)
+	s, err := c.AuthorizationV1().SubjectAccessReviews().Create(context.TODO(), sar, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "error getting SubjectAccessReview for %s %s to resource %+v", subjectKind, subject, *sar.Spec.ResourceAttributes)
 
 	gomega.Expect(s.Status.Allowed).Should(gomega.BeTrue(), "%s %s has no access to resource %+v", subjectKind, subject, *sar.Spec.ResourceAttributes)

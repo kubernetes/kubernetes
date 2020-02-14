@@ -16,7 +16,7 @@
 
 # This script checks coding style for go language files in each
 # Kubernetes package by golint.
-# Usage: hack/verify-golint.sh
+# Usage: `hack/verify-golint.sh`.
 
 set -o errexit
 set -o nounset

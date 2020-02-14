@@ -17,6 +17,7 @@ limitations under the License.
 package csi
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -25,6 +26,7 @@ import (
 	api "k8s.io/api/core/v1"
 	"k8s.io/api/storage/v1beta1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -257,7 +259,7 @@ func TestBlockMapperSetupDevice(t *testing.T) {
 	attachID := getAttachmentName(csiMapper.volumeID, string(csiMapper.driverName), string(nodeName))
 	attachment := makeTestAttachment(attachID, nodeName, pvName)
 	attachment.Status.Attached = true
-	_, err = csiMapper.k8s.StorageV1().VolumeAttachments().Create(attachment)
+	_, err = csiMapper.k8s.StorageV1().VolumeAttachments().Create(context.TODO(), attachment, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("failed to setup VolumeAttachment: %v", err)
 	}
@@ -299,7 +301,7 @@ func TestBlockMapperMapPodDevice(t *testing.T) {
 	attachID := getAttachmentName(csiMapper.volumeID, string(csiMapper.driverName), string(nodeName))
 	attachment := makeTestAttachment(attachID, nodeName, pvName)
 	attachment.Status.Attached = true
-	_, err = csiMapper.k8s.StorageV1().VolumeAttachments().Create(attachment)
+	_, err = csiMapper.k8s.StorageV1().VolumeAttachments().Create(context.TODO(), attachment, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("failed to setup VolumeAttachment: %v", err)
 	}
@@ -341,7 +343,7 @@ func TestBlockMapperMapPodDeviceNotSupportAttach(t *testing.T) {
 			AttachRequired: &attachRequired,
 		},
 	}
-	_, err := fakeClient.StorageV1beta1().CSIDrivers().Create(fakeDriver)
+	_, err := fakeClient.StorageV1beta1().CSIDrivers().Create(context.TODO(), fakeDriver, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Failed to create a fakeDriver: %v", err)
 	}

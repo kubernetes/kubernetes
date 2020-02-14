@@ -22,13 +22,14 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 )
 
 // TestDriver represents an interface for a driver to be tested in TestSuite.
 // Except for GetDriverInfo, all methods will be called at test runtime and thus
-// can use framework.Skipf, framework.Fatal, Gomega assertions, etc.
+// can use e2eskipper.Skipf, framework.Fatal, Gomega assertions, etc.
 type TestDriver interface {
 	// GetDriverInfo returns DriverInfo for the TestDriver. This must be static
 	// information.
@@ -205,16 +206,10 @@ type PerTestConfig struct {
 	// The framework instance allocated for the current test.
 	Framework *framework.Framework
 
-	// If non-empty, then pods using a volume will be scheduled
-	// onto the node with this name. Otherwise Kubernetes will
+	// If non-empty, Pods using a volume will be scheduled
+	// according to the NodeSelection. Otherwise Kubernetes will
 	// pick a node.
-	ClientNodeName string
-
-	// Some tests also support scheduling pods onto nodes with
-	// these label/value pairs. As not all tests use this field,
-	// a driver that absolutely needs the pods on a specific
-	// node must use ClientNodeName.
-	ClientNodeSelector map[string]string
+	ClientNodeSelection e2epod.NodeSelection
 
 	// Some test drivers initialize a storage server. This is
 	// the configuration that then has to be used to run tests.

@@ -1527,7 +1527,7 @@ function start-kube-proxy {
 # $5: pod name, which should be either etcd or etcd-events
 function prepare-etcd-manifest {
   local host_name=${ETCD_HOSTNAME:-$(hostname -s)}
-  local host_ip=$(python -c "import socket;print(socket.gethostbyname(\"${host_name}\"))")
+  local host_ip=$(${PYTHON} -c "import socket;print(socket.gethostbyname(\"${host_name}\"))")
   local etcd_cluster=""
   local cluster_state="new"
   local etcd_protocol="http"
@@ -2563,6 +2563,11 @@ EOF
 function override-kubectl {
     echo "overriding kubectl"
     echo "export PATH=${KUBE_HOME}/bin:\$PATH" > /etc/profile.d/kube_env.sh
+
+    # source the file explicitly otherwise we have
+    # issues on a ubuntu OS image finding the kubectl
+    source /etc/profile.d/kube_env.sh
+
     # Add ${KUBE_HOME}/bin into sudoer secure path.
     local sudo_path
     sudo_path=$(sudo env | grep "^PATH=")
@@ -2663,8 +2668,6 @@ EOF
       cni_template_path=""
     fi
   fi
-  # Reuse docker group for containerd.
-  local containerd_gid="$(cat /etc/group | grep ^docker: | cut -d: -f 3)"
   cat > "${config_path}" <<EOF
 # Kubernetes doesn't use containerd restart manager.
 disabled_plugins = ["restart"]
@@ -2672,9 +2675,6 @@ oom_score = -999
 
 [debug]
   level = "${CONTAINERD_LOG_LEVEL:-"info"}"
-
-[grpc]
-  gid = ${containerd_gid}
 
 [plugins.cri]
   stream_server_address = "127.0.0.1"
@@ -2686,6 +2686,25 @@ oom_score = -999
 [plugins.cri.registry.mirrors."docker.io"]
   endpoint = ["https://mirror.gcr.io","https://registry-1.docker.io"]
 EOF
+
+  if [[ "${CONTAINER_RUNTIME_TEST_HANDLER:-}" == "true" ]]; then
+  cat >> "${config_path}" <<EOF
+# Setup a runtime with the magic name ("test-handler") used for Kubernetes
+# runtime class tests ...
+[plugins.cri.containerd.runtimes.test-handler]
+  runtime_type = "io.containerd.runtime.v1.linux"
+EOF
+  fi
+
+  # Reuse docker group for containerd.
+  local containerd_gid="$(cat /etc/group | grep ^docker: | cut -d: -f 3)"
+  if [[ ! -z "${containerd_gid:-}" ]]; then
+    cat >> "${config_path}" <<EOF
+# reuse id of the docker group
+[grpc]
+  gid = ${containerd_gid}
+EOF
+  fi
   chmod 644 "${config_path}"
 
   echo "Restart containerd to load the config change"
@@ -2716,13 +2735,28 @@ function main() {
   CONTAINERIZED_MOUNTER_HOME="${KUBE_HOME}/containerized_mounter"
   PV_RECYCLER_OVERRIDE_TEMPLATE="${KUBE_HOME}/kube-manifests/kubernetes/pv-recycler-template.yaml"
 
+  if [[ "$(python -V 2>&1)" =~ "Python 2" ]]; then
+    # found python2, just use that
+    PYTHON="python"
+  elif [[ -f "/usr/bin/python2.7" ]]; then
+    # System python not defaulted to python 2 but using 2.7 during migration
+    PYTHON="/usr/bin/python2.7"
+  else
+    # No python2 either by default, let's see if we can find python3
+    PYTHON="python3"
+    if ! command -v ${PYTHON} >/dev/null 2>&1; then
+      echo "ERROR Python not found. Aborting."
+      exit 2
+    fi
+  fi
+  echo "Version : " $(${PYTHON} -V 2>&1)
+
   if [[ ! -e "${KUBE_HOME}/kube-env" ]]; then
     echo "The ${KUBE_HOME}/kube-env file does not exist!! Terminate cluster initialization."
     exit 1
   fi
 
   source "${KUBE_HOME}/kube-env"
-
 
   if [[ -f "${KUBE_HOME}/kubelet-config.yaml" ]]; then
     echo "Found Kubelet config file at ${KUBE_HOME}/kubelet-config.yaml"

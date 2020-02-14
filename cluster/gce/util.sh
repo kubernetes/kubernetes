@@ -83,14 +83,16 @@ function set-linux-node-image() {
 # Requires:
 #   WINDOWS_NODE_OS_DISTRIBUTION
 # Sets:
-#   WINDOWS_NODE_IMAGE_FAMILY
 #   WINDOWS_NODE_IMAGE_PROJECT
+#   WINDOWS_NODE_IMAGE
 function set-windows-node-image() {
   WINDOWS_NODE_IMAGE_PROJECT="windows-cloud"
   if [[ "${WINDOWS_NODE_OS_DISTRIBUTION}" == "win2019" ]]; then
-    WINDOWS_NODE_IMAGE_FAMILY="windows-2019-core-for-containers"
+    WINDOWS_NODE_IMAGE="windows-server-2019-dc-core-for-containers-v20200114"
+  elif [[ "${WINDOWS_NODE_OS_DISTRIBUTION}" == "win1909" ]]; then
+    WINDOWS_NODE_IMAGE="windows-server-1909-dc-core-for-containers-v20200114"
   elif [[ "${WINDOWS_NODE_OS_DISTRIBUTION}" == "win1809" ]]; then
-    WINDOWS_NODE_IMAGE_FAMILY="windows-1809-core-for-containers"
+    WINDOWS_NODE_IMAGE="windows-server-1809-dc-core-for-containers-v20200114"
   else
     echo "Unknown WINDOWS_NODE_OS_DISTRIBUTION ${WINDOWS_NODE_OS_DISTRIBUTION}" >&2
     exit 1
@@ -763,12 +765,22 @@ function construct-linux-kubelet-flags {
       flags+=" --kubeconfig=/var/lib/kubelet/bootstrap-kubeconfig"
       flags+=" --register-schedulable=false"
     fi
+    if [[ "${MASTER_OS_DISTRIBUTION}" == "ubuntu" ]]; then
+      # Configure the file path for host dns configuration
+      # as ubuntu uses systemd-resolved
+      flags+=" --resolv-conf=/run/systemd/resolve/resolv.conf"
+    fi
   else # For nodes
     flags+=" ${NODE_KUBELET_TEST_ARGS:-}"
     flags+=" --bootstrap-kubeconfig=/var/lib/kubelet/bootstrap-kubeconfig"
     flags+=" --kubeconfig=/var/lib/kubelet/kubeconfig"
     if [[ "${node_type}" == "heapster" ]]; then
         flags+=" ${HEAPSTER_KUBELET_TEST_ARGS:-}"
+    fi
+    if [[ "${NODE_OS_DISTRIBUTION}" == "ubuntu" ]]; then
+      # Configure the file path for host dns configuration
+      # as ubuntu uses systemd-resolved
+      flags+=" --resolv-conf=/run/systemd/resolve/resolv.conf"
     fi
   fi
   # Network plugin
@@ -1142,7 +1154,8 @@ NODE_PROBLEM_DETECTOR_VERSION: $(yaml-quote ${NODE_PROBLEM_DETECTOR_VERSION:-})
 NODE_PROBLEM_DETECTOR_TAR_HASH: $(yaml-quote ${NODE_PROBLEM_DETECTOR_TAR_HASH:-})
 NODE_PROBLEM_DETECTOR_RELEASE_PATH: $(yaml-quote ${NODE_PROBLEM_DETECTOR_RELEASE_PATH:-})
 NODE_PROBLEM_DETECTOR_CUSTOM_FLAGS: $(yaml-quote ${NODE_PROBLEM_DETECTOR_CUSTOM_FLAGS:-})
-CNI_STORAGE_PATH: $(yaml-quote ${CNI_STORAGE_PATH:-})
+CNI_STORAGE_URL_BASE: $(yaml-quote ${CNI_STORAGE_URL_BASE:-})
+CNI_TAR_PREFIX: $(yaml-quote ${CNI_TAR_PREFIX:-})
 CNI_VERSION: $(yaml-quote ${CNI_VERSION:-})
 CNI_SHA1: $(yaml-quote ${CNI_SHA1:-})
 ENABLE_NODE_LOGGING: $(yaml-quote ${ENABLE_NODE_LOGGING:-false})
@@ -1211,6 +1224,9 @@ DISABLE_PROMETHEUS_TO_SD_IN_DS: $(yaml-quote ${DISABLE_PROMETHEUS_TO_SD_IN_DS:-f
 CONTAINER_RUNTIME: $(yaml-quote ${CONTAINER_RUNTIME:-})
 CONTAINER_RUNTIME_ENDPOINT: $(yaml-quote ${CONTAINER_RUNTIME_ENDPOINT:-})
 CONTAINER_RUNTIME_NAME: $(yaml-quote ${CONTAINER_RUNTIME_NAME:-})
+CONTAINER_RUNTIME_TEST_HANDLER: $(yaml-quote ${CONTAINER_RUNTIME_TEST_HANDLER:-})
+UBUNTU_INSTALL_CONTAINERD_VERSION: $(yaml-quote ${UBUNTU_INSTALL_CONTAINERD_VERSION:-})
+UBUNTU_INSTALL_RUNC_VERSION: $(yaml-quote ${UBUNTU_INSTALL_RUNC_VERSION:-})
 NODE_LOCAL_SSDS_EXT: $(yaml-quote ${NODE_LOCAL_SSDS_EXT:-})
 LOAD_IMAGE_COMMAND: $(yaml-quote ${LOAD_IMAGE_COMMAND:-})
 ZONE: $(yaml-quote ${ZONE})
@@ -1525,6 +1541,8 @@ NODE_DIR: $(yaml-quote ${WINDOWS_NODE_DIR})
 LOGS_DIR: $(yaml-quote ${WINDOWS_LOGS_DIR})
 CNI_DIR: $(yaml-quote ${WINDOWS_CNI_DIR})
 CNI_CONFIG_DIR: $(yaml-quote ${WINDOWS_CNI_CONFIG_DIR})
+WINDOWS_CNI_STORAGE_PATH: $(yaml-quote ${WINDOWS_CNI_STORAGE_PATH})
+WINDOWS_CNI_VERSION: $(yaml-quote ${WINDOWS_CNI_VERSION})
 MANIFESTS_DIR: $(yaml-quote ${WINDOWS_MANIFESTS_DIR})
 PKI_DIR: $(yaml-quote ${WINDOWS_PKI_DIR})
 CA_FILE_PATH: $(yaml-quote ${WINDOWS_CA_FILE})
@@ -2205,9 +2223,7 @@ function create-node-template() {
   if [[ "${os}" == 'linux' ]]; then
       node_image_flags="--image-project ${NODE_IMAGE_PROJECT} --image ${NODE_IMAGE}"
   elif [[ "${os}" == 'windows' ]]; then
-      # TODO(pjh): revert back to using WINDOWS_NODE_IMAGE_FAMILY instead of
-      # pinning to the v20190312 image once #76666 is resolved.
-      node_image_flags="--image-project ${WINDOWS_NODE_IMAGE_PROJECT} --image=windows-server-1809-dc-core-for-containers-v20190709"
+      node_image_flags="--image-project ${WINDOWS_NODE_IMAGE_PROJECT} --image ${WINDOWS_NODE_IMAGE}"
   else
       echo "Unknown OS ${os}" >&2
       exit 1
@@ -2924,7 +2940,7 @@ function attach-internal-master-ip() {
   echo "Setting ${name}'s aliases to '${aliases}' (added ${ip})"
   # Attach ${ip} to ${name}
   gcloud compute instances network-interfaces update "${name}" --project "${PROJECT}" --zone "${zone}" --aliases="${aliases}"
-  run-gcloud-command "${name}" "${zone}" "sudo ip route add to local ${ip}/32 dev eth0"
+  run-gcloud-command "${name}" "${zone}" 'sudo ip route add to local '${ip}'/32 dev $(ip route | grep default | awk '\''{print $5}'\'')' || true
   return $?
 }
 
@@ -2942,7 +2958,7 @@ function detach-internal-master-ip() {
   echo "Setting ${name}'s aliases to '${aliases}' (removed ${ip})"
   # Detach ${MASTER_NAME}-internal-ip from ${name}
   gcloud compute instances network-interfaces update "${name}" --project "${PROJECT}" --zone "${zone}" --aliases="${aliases}"
-  run-gcloud-command "${name}" "${zone}" "sudo ip route del to local ${ip}/32 dev eth0"
+  run-gcloud-command "${name}" "${zone}" 'sudo ip route del to local '${ip}'/32 dev $(ip route | grep default | awk '\''{print $5}'\'')' || true
   return $?
 }
 

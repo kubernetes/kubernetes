@@ -271,7 +271,7 @@ func (c *webhookConverter) Convert(in runtime.Object, toGV schema.GroupVersion) 
 
 	// TODO: Figure out if adding one second timeout make sense here.
 	ctx := context.TODO()
-	r := c.restClient.Post().Context(ctx).Body(request).Do()
+	r := c.restClient.Post().Body(request).Do(ctx)
 	if err := r.Into(response); err != nil {
 		// TODO: Return a webhook specific error to be able to convert it to meta.Status
 		return nil, fmt.Errorf("conversion webhook for %v failed: %v", in.GetObjectKind().GroupVersionKind(), err)

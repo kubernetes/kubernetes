@@ -17,6 +17,7 @@ limitations under the License.
 package fixtures
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -325,7 +326,7 @@ func existsInDiscoveryV1(crd *apiextensionsv1.CustomResourceDefinition, apiExten
 // the created CR. Please call CreateNewCustomResourceDefinition if you need to
 // watch the CR.
 func CreateNewCustomResourceDefinitionWatchUnsafe(crd *apiextensionsv1beta1.CustomResourceDefinition, apiExtensionsClient clientset.Interface) (*apiextensionsv1beta1.CustomResourceDefinition, error) {
-	crd, err := apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Create(crd)
+	crd, err := apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Create(context.TODO(), crd, metav1.CreateOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -374,11 +375,11 @@ func CreateNewCustomResourceDefinition(crd *apiextensionsv1beta1.CustomResourceD
 // the created CR. Please call CreateNewV1CustomResourceDefinition if you need to
 // watch the CR.
 func CreateNewV1CustomResourceDefinitionWatchUnsafe(v1CRD *apiextensionsv1.CustomResourceDefinition, apiExtensionsClient clientset.Interface) (*apiextensionsv1.CustomResourceDefinition, error) {
-	v1CRD, err := apiExtensionsClient.ApiextensionsV1().CustomResourceDefinitions().Create(v1CRD)
+	v1CRD, err := apiExtensionsClient.ApiextensionsV1().CustomResourceDefinitions().Create(context.TODO(), v1CRD, metav1.CreateOptions{})
 	if err != nil {
 		return nil, err
 	}
-	crd, err := apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(v1CRD.Name, metav1.GetOptions{})
+	crd, err := apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(context.TODO(), v1CRD.Name, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -402,7 +403,7 @@ func CreateNewV1CustomResourceDefinition(v1CRD *apiextensionsv1.CustomResourceDe
 	if err != nil {
 		return nil, err
 	}
-	crd, err := apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(v1CRD.Name, metav1.GetOptions{})
+	crd, err := apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(context.TODO(), v1CRD.Name, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -506,7 +507,7 @@ func isWatchCachePrimed(crd *apiextensionsv1beta1.CustomResourceDefinition, dyna
 
 // DeleteCustomResourceDefinition deletes a CRD and waits until it disappears from discovery.
 func DeleteCustomResourceDefinition(crd *apiextensionsv1beta1.CustomResourceDefinition, apiExtensionsClient clientset.Interface) error {
-	if err := apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Delete(crd.Name, nil); err != nil {
+	if err := apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Delete(context.TODO(), crd.Name, nil); err != nil {
 		return err
 	}
 	for _, version := range servedVersions(crd) {
@@ -523,7 +524,7 @@ func DeleteCustomResourceDefinition(crd *apiextensionsv1beta1.CustomResourceDefi
 
 // DeleteV1CustomResourceDefinition deletes a CRD and waits until it disappears from discovery.
 func DeleteV1CustomResourceDefinition(crd *apiextensionsv1.CustomResourceDefinition, apiExtensionsClient clientset.Interface) error {
-	if err := apiExtensionsClient.ApiextensionsV1().CustomResourceDefinitions().Delete(crd.Name, nil); err != nil {
+	if err := apiExtensionsClient.ApiextensionsV1().CustomResourceDefinitions().Delete(context.TODO(), crd.Name, nil); err != nil {
 		return err
 	}
 	for _, version := range servedV1Versions(crd) {
@@ -540,11 +541,11 @@ func DeleteV1CustomResourceDefinition(crd *apiextensionsv1.CustomResourceDefinit
 
 // DeleteCustomResourceDefinitions deletes all CRD matching the provided deleteListOpts and waits until all the CRDs disappear from discovery.
 func DeleteCustomResourceDefinitions(deleteListOpts metav1.ListOptions, apiExtensionsClient clientset.Interface) error {
-	list, err := apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().List(deleteListOpts)
+	list, err := apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().List(context.TODO(), deleteListOpts)
 	if err != nil {
 		return err
 	}
-	if err = apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().DeleteCollection(nil, deleteListOpts); err != nil {
+	if err = apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().DeleteCollection(context.TODO(), nil, deleteListOpts); err != nil {
 		return err
 	}
 	for _, crd := range list.Items {
@@ -563,11 +564,11 @@ func DeleteCustomResourceDefinitions(deleteListOpts metav1.ListOptions, apiExten
 
 // DeleteV1CustomResourceDefinitions deletes all CRD matching the provided deleteListOpts and waits until all the CRDs disappear from discovery.
 func DeleteV1CustomResourceDefinitions(deleteListOpts metav1.ListOptions, apiExtensionsClient clientset.Interface) error {
-	list, err := apiExtensionsClient.ApiextensionsV1().CustomResourceDefinitions().List(deleteListOpts)
+	list, err := apiExtensionsClient.ApiextensionsV1().CustomResourceDefinitions().List(context.TODO(), deleteListOpts)
 	if err != nil {
 		return err
 	}
-	if err = apiExtensionsClient.ApiextensionsV1().CustomResourceDefinitions().DeleteCollection(nil, deleteListOpts); err != nil {
+	if err = apiExtensionsClient.ApiextensionsV1().CustomResourceDefinitions().DeleteCollection(context.TODO(), nil, deleteListOpts); err != nil {
 		return err
 	}
 	for _, crd := range list.Items {

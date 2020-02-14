@@ -15,7 +15,7 @@
 
 # This script checks commonly misspelled English words in all files in the
 # working directory by client9/misspell package.
-# Usage: hack/verify-spelling.sh
+# Usage: `hack/verify-spelling.sh`.
 
 set -o errexit
 set -o nounset

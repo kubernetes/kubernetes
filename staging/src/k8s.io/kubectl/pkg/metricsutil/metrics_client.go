@@ -17,6 +17,7 @@ limitations under the License.
 package metricsutil
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -166,5 +167,5 @@ func (cli *HeapsterMetricsClient) GetPodMetrics(namespace string, podName string
 func GetHeapsterMetrics(cli *HeapsterMetricsClient, path string, params map[string]string) ([]byte, error) {
 	return cli.SVCClient.Services(cli.HeapsterNamespace).
 		ProxyGet(cli.HeapsterScheme, cli.HeapsterService, cli.HeapsterPort, path, params).
-		DoRaw()
+		DoRaw(context.TODO())
 }

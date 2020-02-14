@@ -43,8 +43,8 @@ var _ framework.ScorePlugin = &DefaultPodTopologySpread{}
 const (
 	// Name is the name of the plugin used in the plugin registry and configurations.
 	Name = "DefaultPodTopologySpread"
-	// postFilterStateKey is the key in CycleState to DefaultPodTopologySpread pre-computed data for Scoring.
-	postFilterStateKey = "PostFilter" + Name
+	// preScoreStateKey is the key in CycleState to DefaultPodTopologySpread pre-computed data for Scoring.
+	preScoreStateKey = "PreScore" + Name
 
 	// When zone information is present, give 2/3 of the weighting to zone spreading, 1/3 to node spreading
 	// TODO: Any way to justify this weighting?
@@ -56,29 +56,38 @@ func (pl *DefaultPodTopologySpread) Name() string {
 	return Name
 }
 
-// postFilterState computed at PostFilter and used at Score.
-type postFilterState struct {
+// preScoreState computed at PreScore and used at Score.
+type preScoreState struct {
 	selector labels.Selector
 }
 
 // Clone implements the mandatory Clone interface. We don't really copy the data since
 // there is no need for that.
-func (s *postFilterState) Clone() framework.StateData {
+func (s *preScoreState) Clone() framework.StateData {
 	return s
+}
+
+// skipDefaultPodTopologySpread returns true if the pod's TopologySpreadConstraints are specified.
+func skipDefaultPodTopologySpread(pod *v1.Pod) bool {
+	return len(pod.Spec.TopologySpreadConstraints) != 0
 }
 
 // Score invoked at the Score extension point.
 // The "score" returned in this function is the matching number of pods on the `nodeName`,
 // it is normalized later.
 func (pl *DefaultPodTopologySpread) Score(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) (int64, *framework.Status) {
-	c, err := state.Read(postFilterStateKey)
-	if err != nil {
-		return 0, framework.NewStatus(framework.Error, fmt.Sprintf("Error reading %q from cycleState: %v", postFilterStateKey, err))
+	if skipDefaultPodTopologySpread(pod) {
+		return 0, nil
 	}
 
-	s, ok := c.(*postFilterState)
+	c, err := state.Read(preScoreStateKey)
+	if err != nil {
+		return 0, framework.NewStatus(framework.Error, fmt.Sprintf("Error reading %q from cycleState: %v", preScoreStateKey, err))
+	}
+
+	s, ok := c.(*preScoreState)
 	if !ok {
-		return 0, framework.NewStatus(framework.Error, fmt.Sprintf("%+v convert to tainttoleration.postFilterState error", c))
+		return 0, framework.NewStatus(framework.Error, fmt.Sprintf("%+v convert to tainttoleration.preScoreState error", c))
 	}
 
 	nodeInfo, err := pl.handle.SnapshotSharedLister().NodeInfos().Get(nodeName)
@@ -96,6 +105,10 @@ func (pl *DefaultPodTopologySpread) Score(ctx context.Context, state *framework.
 // where zone information is included on the nodes, it favors nodes
 // in zones with fewer existing matching pods.
 func (pl *DefaultPodTopologySpread) NormalizeScore(ctx context.Context, state *framework.CycleState, pod *v1.Pod, scores framework.NodeScoreList) *framework.Status {
+	if skipDefaultPodTopologySpread(pod) {
+		return nil
+	}
+
 	countsByZone := make(map[string]int64, 10)
 	maxCountByZone := int64(0)
 	maxCountByNodeName := int64(0)
@@ -164,8 +177,8 @@ func (pl *DefaultPodTopologySpread) ScoreExtensions() framework.ScoreExtensions 
 	return pl
 }
 
-// PostFilter builds and writes cycle state used by Score and NormalizeScore.
-func (pl *DefaultPodTopologySpread) PostFilter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodes []*v1.Node, _ framework.NodeToStatusMap) *framework.Status {
+// PreScore builds and writes cycle state used by Score and NormalizeScore.
+func (pl *DefaultPodTopologySpread) PreScore(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodes []*v1.Node, _ framework.NodeToStatusMap) *framework.Status {
 	var selector labels.Selector
 	informerFactory := pl.handle.SharedInformerFactory()
 	selector = getSelector(
@@ -175,10 +188,10 @@ func (pl *DefaultPodTopologySpread) PostFilter(ctx context.Context, cycleState *
 		informerFactory.Apps().V1().ReplicaSets().Lister(),
 		informerFactory.Apps().V1().StatefulSets().Lister(),
 	)
-	state := &postFilterState{
+	state := &preScoreState{
 		selector: selector,
 	}
-	cycleState.Write(postFilterStateKey, state)
+	cycleState.Write(preScoreStateKey, state)
 	return nil
 }
 

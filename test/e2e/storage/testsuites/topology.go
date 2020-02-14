@@ -19,6 +19,7 @@ limitations under the License.
 package testsuites
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 
@@ -179,10 +180,10 @@ func (t *topologyTestSuite) DefineTests(driver TestDriver, pattern testpatterns.
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Verifying pod scheduled to correct node")
-		pod, err := cs.CoreV1().Pods(l.pod.Namespace).Get(l.pod.Name, metav1.GetOptions{})
+		pod, err := cs.CoreV1().Pods(l.pod.Namespace).Get(context.TODO(), l.pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 
-		node, err := cs.CoreV1().Nodes().Get(pod.Spec.NodeName, metav1.GetOptions{})
+		node, err := cs.CoreV1().Nodes().Get(context.TODO(), pod.Spec.NodeName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 
 		t.verifyNodeTopology(node, allowedTopologies)
@@ -324,11 +325,11 @@ func (t *topologyTestSuite) createResources(cs clientset.Interface, l *topologyT
 	framework.Logf("Creating storage class object and pvc object for driver - sc: %v, pvc: %v", l.resource.Sc, l.resource.Pvc)
 
 	ginkgo.By("Creating sc")
-	l.resource.Sc, err = cs.StorageV1().StorageClasses().Create(l.resource.Sc)
+	l.resource.Sc, err = cs.StorageV1().StorageClasses().Create(context.TODO(), l.resource.Sc, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
 	ginkgo.By("Creating pvc")
-	l.resource.Pvc, err = cs.CoreV1().PersistentVolumeClaims(l.resource.Pvc.Namespace).Create(l.resource.Pvc)
+	l.resource.Pvc, err = cs.CoreV1().PersistentVolumeClaims(l.resource.Pvc.Namespace).Create(context.TODO(), l.resource.Pvc, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
 	ginkgo.By("Creating pod")
@@ -342,7 +343,7 @@ func (t *topologyTestSuite) createResources(cs clientset.Interface, l *topologyT
 		e2epv.SELinuxLabel,
 		nil)
 	l.pod.Spec.Affinity = affinity
-	l.pod, err = cs.CoreV1().Pods(l.pod.Namespace).Create(l.pod)
+	l.pod, err = cs.CoreV1().Pods(l.pod.Namespace).Create(context.TODO(), l.pod, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 }
 

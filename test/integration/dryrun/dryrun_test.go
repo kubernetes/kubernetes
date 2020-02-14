@@ -17,6 +17,7 @@ limitations under the License.
 package dryrun
 
 import (
+	"context"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
@@ -232,7 +233,7 @@ func TestDryRun(t *testing.T) {
 	// create CRDs so we can make sure that custom resources do not get lost
 	etcd.CreateTestCRDs(t, apiextensionsclientset.NewForConfigOrDie(s.ClientConfig), false, etcd.GetCustomResourceDefinitionData()...)
 
-	if _, err := client.CoreV1().Namespaces().Create(&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}}); err != nil {
+	if _, err := client.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}}, metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
 

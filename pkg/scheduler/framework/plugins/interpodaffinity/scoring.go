@@ -29,11 +29,11 @@ import (
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
-// postFilterStateKey is the key in CycleState to InterPodAffinity pre-computed data for Scoring.
-const postFilterStateKey = "PostFilter" + Name
+// preScoreStateKey is the key in CycleState to InterPodAffinity pre-computed data for Scoring.
+const preScoreStateKey = "PreScore" + Name
 
-// postFilterState computed at PostFilter and used at Score.
-type postFilterState struct {
+// preScoreState computed at PreScore and used at Score.
+type preScoreState struct {
 	topologyScore     map[string]map[string]int64
 	affinityTerms     []*weightedAffinityTerm
 	antiAffinityTerms []*weightedAffinityTerm
@@ -41,7 +41,7 @@ type postFilterState struct {
 
 // Clone implements the mandatory Clone interface. We don't really copy the data since
 // there is no need for that.
-func (s *postFilterState) Clone() framework.StateData {
+func (s *preScoreState) Clone() framework.StateData {
 	return s
 }
 
@@ -77,7 +77,7 @@ func getWeightedAffinityTerms(pod *v1.Pod, v1Terms []v1.WeightedPodAffinityTerm)
 }
 
 func (pl *InterPodAffinity) processTerm(
-	state *postFilterState,
+	state *preScoreState,
 	term *weightedAffinityTerm,
 	podToCheck *v1.Pod,
 	fixedNode *v1.Node,
@@ -100,14 +100,14 @@ func (pl *InterPodAffinity) processTerm(
 	return
 }
 
-func (pl *InterPodAffinity) processTerms(state *postFilterState, terms []*weightedAffinityTerm, podToCheck *v1.Pod, fixedNode *v1.Node, multiplier int) error {
+func (pl *InterPodAffinity) processTerms(state *preScoreState, terms []*weightedAffinityTerm, podToCheck *v1.Pod, fixedNode *v1.Node, multiplier int) error {
 	for _, term := range terms {
 		pl.processTerm(state, term, podToCheck, fixedNode, multiplier)
 	}
 	return nil
 }
 
-func (pl *InterPodAffinity) processExistingPod(state *postFilterState, existingPod *v1.Pod, existingPodNodeInfo *nodeinfo.NodeInfo, incomingPod *v1.Pod) error {
+func (pl *InterPodAffinity) processExistingPod(state *preScoreState, existingPod *v1.Pod, existingPodNodeInfo *nodeinfo.NodeInfo, incomingPod *v1.Pod) error {
 	existingPodAffinity := existingPod.Spec.Affinity
 	existingHasAffinityConstraints := existingPodAffinity != nil && existingPodAffinity.PodAffinity != nil
 	existingHasAntiAffinityConstraints := existingPodAffinity != nil && existingPodAffinity.PodAntiAffinity != nil
@@ -166,8 +166,8 @@ func (pl *InterPodAffinity) processExistingPod(state *postFilterState, existingP
 	return nil
 }
 
-// PostFilter builds and writes cycle state used by Score and NormalizeScore.
-func (pl *InterPodAffinity) PostFilter(
+// PreScore builds and writes cycle state used by Score and NormalizeScore.
+func (pl *InterPodAffinity) PreScore(
 	pCtx context.Context,
 	cycleState *framework.CycleState,
 	pod *v1.Pod,
@@ -215,7 +215,7 @@ func (pl *InterPodAffinity) PostFilter(
 		}
 	}
 
-	state := &postFilterState{
+	state := &preScoreState{
 		topologyScore:     make(map[string]map[string]int64),
 		affinityTerms:     affinityTerms,
 		antiAffinityTerms: antiAffinityTerms,
@@ -248,19 +248,19 @@ func (pl *InterPodAffinity) PostFilter(
 		return framework.NewStatus(framework.Error, err.Error())
 	}
 
-	cycleState.Write(postFilterStateKey, state)
+	cycleState.Write(preScoreStateKey, state)
 	return nil
 }
 
-func getPostFilterState(cycleState *framework.CycleState) (*postFilterState, error) {
-	c, err := cycleState.Read(postFilterStateKey)
+func getPreScoreState(cycleState *framework.CycleState) (*preScoreState, error) {
+	c, err := cycleState.Read(preScoreStateKey)
 	if err != nil {
-		return nil, fmt.Errorf("Error reading %q from cycleState: %v", postFilterStateKey, err)
+		return nil, fmt.Errorf("Error reading %q from cycleState: %v", preScoreStateKey, err)
 	}
 
-	s, ok := c.(*postFilterState)
+	s, ok := c.(*preScoreState)
 	if !ok {
-		return nil, fmt.Errorf("%+v  convert to interpodaffinity.postFilterState error", c)
+		return nil, fmt.Errorf("%+v  convert to interpodaffinity.preScoreState error", c)
 	}
 	return s, nil
 }
@@ -275,7 +275,7 @@ func (pl *InterPodAffinity) Score(ctx context.Context, cycleState *framework.Cyc
 	}
 	node := nodeInfo.Node()
 
-	s, err := getPostFilterState(cycleState)
+	s, err := getPreScoreState(cycleState)
 	if err != nil {
 		return 0, framework.NewStatus(framework.Error, err.Error())
 	}
@@ -293,7 +293,7 @@ func (pl *InterPodAffinity) Score(ctx context.Context, cycleState *framework.Cyc
 // The basic rule is: the bigger the score(matching number of pods) is, the smaller the
 // final normalized score will be.
 func (pl *InterPodAffinity) NormalizeScore(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, scores framework.NodeScoreList) *framework.Status {
-	s, err := getPostFilterState(cycleState)
+	s, err := getPreScoreState(cycleState)
 	if err != nil {
 		return framework.NewStatus(framework.Error, err.Error())
 	}

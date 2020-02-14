@@ -110,18 +110,18 @@ func invokeTest(f *framework.Framework, client clientset.Interface, namespace st
 
 	ginkgo.By("Creating Storage Class With DiskFormat")
 	storageClassSpec := getVSphereStorageClassSpec("thinsc", scParameters, nil, "")
-	storageclass, err := client.StorageV1().StorageClasses().Create(storageClassSpec)
+	storageclass, err := client.StorageV1().StorageClasses().Create(context.TODO(), storageClassSpec, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
-	defer client.StorageV1().StorageClasses().Delete(storageclass.Name, nil)
+	defer client.StorageV1().StorageClasses().Delete(context.TODO(), storageclass.Name, nil)
 
 	ginkgo.By("Creating PVC using the Storage Class")
 	pvclaimSpec := getVSphereClaimSpecWithStorageClass(namespace, "2Gi", storageclass)
-	pvclaim, err := client.CoreV1().PersistentVolumeClaims(namespace).Create(pvclaimSpec)
+	pvclaim, err := client.CoreV1().PersistentVolumeClaims(namespace).Create(context.TODO(), pvclaimSpec, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
 	defer func() {
-		client.CoreV1().PersistentVolumeClaims(namespace).Delete(pvclaimSpec.Name, nil)
+		client.CoreV1().PersistentVolumeClaims(namespace).Delete(context.TODO(), pvclaimSpec.Name, nil)
 	}()
 
 	ginkgo.By("Waiting for claim to be in bound phase")
@@ -129,11 +129,11 @@ func invokeTest(f *framework.Framework, client clientset.Interface, namespace st
 	framework.ExpectNoError(err)
 
 	// Get new copy of the claim
-	pvclaim, err = client.CoreV1().PersistentVolumeClaims(pvclaim.Namespace).Get(pvclaim.Name, metav1.GetOptions{})
+	pvclaim, err = client.CoreV1().PersistentVolumeClaims(pvclaim.Namespace).Get(context.TODO(), pvclaim.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err)
 
 	// Get the bound PV
-	pv, err := client.CoreV1().PersistentVolumes().Get(pvclaim.Spec.VolumeName, metav1.GetOptions{})
+	pv, err := client.CoreV1().PersistentVolumes().Get(context.TODO(), pvclaim.Spec.VolumeName, metav1.GetOptions{})
 	framework.ExpectNoError(err)
 
 	/*
@@ -143,7 +143,7 @@ func invokeTest(f *framework.Framework, client clientset.Interface, namespace st
 	ginkgo.By("Creating pod to attach PV to the node")
 	// Create pod to attach Volume to Node
 	podSpec := getVSpherePodSpecWithClaim(pvclaim.Name, nodeKeyValueLabel, "while true ; do sleep 2 ; done")
-	pod, err := client.CoreV1().Pods(namespace).Create(podSpec)
+	pod, err := client.CoreV1().Pods(namespace).Create(context.TODO(), podSpec, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
 	ginkgo.By("Waiting for pod to be running")

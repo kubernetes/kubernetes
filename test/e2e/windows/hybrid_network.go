@@ -117,7 +117,7 @@ func createTestPod(f *framework.Framework, image string, os string) *v1.Pod {
 				},
 			},
 			NodeSelector: map[string]string{
-				"beta.kubernetes.io/os": os,
+				"kubernetes.io/os": os,
 			},
 		},
 	}

@@ -43,6 +43,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	openapinamer "k8s.io/apiserver/pkg/endpoints/openapi"
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/filters"
 	serveroptions "k8s.io/apiserver/pkg/server/options"
@@ -50,6 +51,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/etcd3/preflight"
 	"k8s.io/apiserver/pkg/util/feature"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 	"k8s.io/apiserver/pkg/util/term"
 	"k8s.io/apiserver/pkg/util/webhook"
 	clientgoinformers "k8s.io/client-go/informers"
@@ -381,6 +383,22 @@ func CreateKubeAPIServerConfig(
 		config.ExtraConfig.KubeletClientConfig.Lookup = config.GenericConfig.EgressSelector.Lookup
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountIssuerDiscovery) {
+		// Load the public keys.
+		var pubKeys []interface{}
+		for _, f := range s.Authentication.ServiceAccounts.KeyFiles {
+			keys, err := keyutil.PublicKeysFromFile(f)
+			if err != nil {
+				return nil, nil, nil, nil, fmt.Errorf("failed to parse key file %q: %v", f, err)
+			}
+			pubKeys = append(pubKeys, keys...)
+		}
+		// Plumb the required metadata through ExtraConfig.
+		config.ExtraConfig.ServiceAccountIssuerURL = s.Authentication.ServiceAccounts.Issuer
+		config.ExtraConfig.ServiceAccountJWKSURI = s.Authentication.ServiceAccounts.JWKSURI
+		config.ExtraConfig.ServiceAccountPublicKeys = pubKeys
+	}
+
 	return config, insecureServingInfo, serviceResolver, pluginInitializers, nil
 }
 
@@ -523,6 +541,10 @@ func buildGenericConfig(
 		lastErr = fmt.Errorf("failed to initialize admission: %v", err)
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIPriorityAndFairness) && s.GenericServerRunOptions.EnableInflightQuotaHandler {
+		genericConfig.FlowControl = BuildPriorityAndFairness(s, clientgoExternalClient, versionedInformers)
+	}
+
 	return
 }
 
@@ -551,6 +573,16 @@ func BuildAuthenticator(s *options.ServerRunOptions, extclient clientgoclientset
 func BuildAuthorizer(s *options.ServerRunOptions, versionedInformers clientgoinformers.SharedInformerFactory) (authorizer.Authorizer, authorizer.RuleResolver, error) {
 	authorizationConfig := s.Authorization.ToAuthorizationConfig(versionedInformers)
 	return authorizationConfig.New()
+}
+
+// BuildPriorityAndFairness constructs the guts of the API Priority and Fairness filter
+func BuildPriorityAndFairness(s *options.ServerRunOptions, extclient clientgoclientset.Interface, versionedInformer clientgoinformers.SharedInformerFactory) utilflowcontrol.Interface {
+	return utilflowcontrol.New(
+		versionedInformer,
+		extclient.FlowcontrolV1alpha1(),
+		s.GenericServerRunOptions.MaxRequestsInFlight+s.GenericServerRunOptions.MaxMutatingRequestsInFlight,
+		s.GenericServerRunOptions.RequestTimeout/4,
+	)
 }
 
 // completedServerRunOptions is a private wrapper that enforces a call of Complete() before Run can be invoked.

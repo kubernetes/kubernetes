@@ -37,7 +37,10 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//vendor/github.com/opencontainers/runc/libcontainer/cgroups/ebpf:all-srcs",
         "//vendor/github.com/opencontainers/runc/libcontainer/cgroups/fs:all-srcs",
+        "//vendor/github.com/opencontainers/runc/libcontainer/cgroups/fs2:all-srcs",
+        "//vendor/github.com/opencontainers/runc/libcontainer/cgroups/fscommon:all-srcs",
         "//vendor/github.com/opencontainers/runc/libcontainer/cgroups/systemd:all-srcs",
     ],
     tags = ["automanaged"],

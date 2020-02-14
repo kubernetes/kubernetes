@@ -19,6 +19,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"context"
 	"time"
 
 	v1alpha1 "k8s.io/api/flowcontrol/v1alpha1"
@@ -37,15 +38,15 @@ type PriorityLevelConfigurationsGetter interface {
 
 // PriorityLevelConfigurationInterface has methods to work with PriorityLevelConfiguration resources.
 type PriorityLevelConfigurationInterface interface {
-	Create(*v1alpha1.PriorityLevelConfiguration) (*v1alpha1.PriorityLevelConfiguration, error)
-	Update(*v1alpha1.PriorityLevelConfiguration) (*v1alpha1.PriorityLevelConfiguration, error)
-	UpdateStatus(*v1alpha1.PriorityLevelConfiguration) (*v1alpha1.PriorityLevelConfiguration, error)
-	Delete(name string, options *v1.DeleteOptions) error
-	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string, options v1.GetOptions) (*v1alpha1.PriorityLevelConfiguration, error)
-	List(opts v1.ListOptions) (*v1alpha1.PriorityLevelConfigurationList, error)
-	Watch(opts v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.PriorityLevelConfiguration, err error)
+	Create(ctx context.Context, priorityLevelConfiguration *v1alpha1.PriorityLevelConfiguration, opts v1.CreateOptions) (*v1alpha1.PriorityLevelConfiguration, error)
+	Update(ctx context.Context, priorityLevelConfiguration *v1alpha1.PriorityLevelConfiguration, opts v1.UpdateOptions) (*v1alpha1.PriorityLevelConfiguration, error)
+	UpdateStatus(ctx context.Context, priorityLevelConfiguration *v1alpha1.PriorityLevelConfiguration, opts v1.UpdateOptions) (*v1alpha1.PriorityLevelConfiguration, error)
+	Delete(ctx context.Context, name string, opts *v1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts *v1.DeleteOptions, listOpts v1.ListOptions) error
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1alpha1.PriorityLevelConfiguration, error)
+	List(ctx context.Context, opts v1.ListOptions) (*v1alpha1.PriorityLevelConfigurationList, error)
+	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.PriorityLevelConfiguration, err error)
 	PriorityLevelConfigurationExpansion
 }
 
@@ -62,19 +63,19 @@ func newPriorityLevelConfigurations(c *FlowcontrolV1alpha1Client) *priorityLevel
 }
 
 // Get takes name of the priorityLevelConfiguration, and returns the corresponding priorityLevelConfiguration object, and an error if there is any.
-func (c *priorityLevelConfigurations) Get(name string, options v1.GetOptions) (result *v1alpha1.PriorityLevelConfiguration, err error) {
+func (c *priorityLevelConfigurations) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.PriorityLevelConfiguration, err error) {
 	result = &v1alpha1.PriorityLevelConfiguration{}
 	err = c.client.Get().
 		Resource("prioritylevelconfigurations").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of PriorityLevelConfigurations that match those selectors.
-func (c *priorityLevelConfigurations) List(opts v1.ListOptions) (result *v1alpha1.PriorityLevelConfigurationList, err error) {
+func (c *priorityLevelConfigurations) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.PriorityLevelConfigurationList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -84,13 +85,13 @@ func (c *priorityLevelConfigurations) List(opts v1.ListOptions) (result *v1alpha
 		Resource("prioritylevelconfigurations").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Watch returns a watch.Interface that watches the requested priorityLevelConfigurations.
-func (c *priorityLevelConfigurations) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *priorityLevelConfigurations) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -100,59 +101,61 @@ func (c *priorityLevelConfigurations) Watch(opts v1.ListOptions) (watch.Interfac
 		Resource("prioritylevelconfigurations").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch()
+		Watch(ctx)
 }
 
 // Create takes the representation of a priorityLevelConfiguration and creates it.  Returns the server's representation of the priorityLevelConfiguration, and an error, if there is any.
-func (c *priorityLevelConfigurations) Create(priorityLevelConfiguration *v1alpha1.PriorityLevelConfiguration) (result *v1alpha1.PriorityLevelConfiguration, err error) {
+func (c *priorityLevelConfigurations) Create(ctx context.Context, priorityLevelConfiguration *v1alpha1.PriorityLevelConfiguration, opts v1.CreateOptions) (result *v1alpha1.PriorityLevelConfiguration, err error) {
 	result = &v1alpha1.PriorityLevelConfiguration{}
 	err = c.client.Post().
 		Resource("prioritylevelconfigurations").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(priorityLevelConfiguration).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Update takes the representation of a priorityLevelConfiguration and updates it. Returns the server's representation of the priorityLevelConfiguration, and an error, if there is any.
-func (c *priorityLevelConfigurations) Update(priorityLevelConfiguration *v1alpha1.PriorityLevelConfiguration) (result *v1alpha1.PriorityLevelConfiguration, err error) {
+func (c *priorityLevelConfigurations) Update(ctx context.Context, priorityLevelConfiguration *v1alpha1.PriorityLevelConfiguration, opts v1.UpdateOptions) (result *v1alpha1.PriorityLevelConfiguration, err error) {
 	result = &v1alpha1.PriorityLevelConfiguration{}
 	err = c.client.Put().
 		Resource("prioritylevelconfigurations").
 		Name(priorityLevelConfiguration.Name).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(priorityLevelConfiguration).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-
-func (c *priorityLevelConfigurations) UpdateStatus(priorityLevelConfiguration *v1alpha1.PriorityLevelConfiguration) (result *v1alpha1.PriorityLevelConfiguration, err error) {
+func (c *priorityLevelConfigurations) UpdateStatus(ctx context.Context, priorityLevelConfiguration *v1alpha1.PriorityLevelConfiguration, opts v1.UpdateOptions) (result *v1alpha1.PriorityLevelConfiguration, err error) {
 	result = &v1alpha1.PriorityLevelConfiguration{}
 	err = c.client.Put().
 		Resource("prioritylevelconfigurations").
 		Name(priorityLevelConfiguration.Name).
 		SubResource("status").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(priorityLevelConfiguration).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Delete takes name of the priorityLevelConfiguration and deletes it. Returns an error if one occurs.
-func (c *priorityLevelConfigurations) Delete(name string, options *v1.DeleteOptions) error {
+func (c *priorityLevelConfigurations) Delete(ctx context.Context, name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
 		Resource("prioritylevelconfigurations").
 		Name(name).
 		Body(options).
-		Do().
+		Do(ctx).
 		Error()
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *priorityLevelConfigurations) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *priorityLevelConfigurations) DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	var timeout time.Duration
 	if listOptions.TimeoutSeconds != nil {
 		timeout = time.Duration(*listOptions.TimeoutSeconds) * time.Second
@@ -162,19 +165,20 @@ func (c *priorityLevelConfigurations) DeleteCollection(options *v1.DeleteOptions
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Timeout(timeout).
 		Body(options).
-		Do().
+		Do(ctx).
 		Error()
 }
 
 // Patch applies the patch and returns the patched priorityLevelConfiguration.
-func (c *priorityLevelConfigurations) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.PriorityLevelConfiguration, err error) {
+func (c *priorityLevelConfigurations) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.PriorityLevelConfiguration, err error) {
 	result = &v1alpha1.PriorityLevelConfiguration{}
 	err = c.client.Patch(pt).
 		Resource("prioritylevelconfigurations").
-		SubResource(subresources...).
 		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(data).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }

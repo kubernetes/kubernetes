@@ -86,9 +86,8 @@ func (pl *NodePorts) PreFilterExtensions() framework.PreFilterExtensions {
 func getPreFilterState(cycleState *framework.CycleState) (preFilterState, error) {
 	c, err := cycleState.Read(preFilterStateKey)
 	if err != nil {
-		// preFilterState state doesn't exist. We ignore the error for now since
-		// Filter is able to handle that by computing it again.
-		return nil, nil
+		// preFilterState doesn't exist, likely PreFilter wasn't invoked.
+		return nil, fmt.Errorf("error reading %q from cycleState: %v", preFilterStateKey, err)
 	}
 
 	s, ok := c.(preFilterState)
@@ -105,12 +104,7 @@ func (pl *NodePorts) Filter(ctx context.Context, cycleState *framework.CycleStat
 		return framework.NewStatus(framework.Error, err.Error())
 	}
 
-	var fits bool
-	if wantPorts != nil {
-		fits = fitsPorts(wantPorts, nodeInfo)
-	} else {
-		fits = Fits(pod, nodeInfo)
-	}
+	fits := fitsPorts(wantPorts, nodeInfo)
 	if !fits {
 		return framework.NewStatus(framework.Unschedulable, ErrReason)
 	}

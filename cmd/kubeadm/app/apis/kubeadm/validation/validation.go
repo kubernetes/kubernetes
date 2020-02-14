@@ -372,33 +372,32 @@ func ValidateHostPort(endpoint string, fldPath *field.Path) field.ErrorList {
 // ValidateIPNetFromString validates network portion of ip address
 func ValidateIPNetFromString(subnetStr string, minAddrs int64, isDualStack bool, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if isDualStack {
-		subnets, err := utilnet.ParseCIDRs(strings.Split(subnetStr, ","))
+	subnets, err := utilnet.ParseCIDRs(strings.Split(subnetStr, ","))
+	if err != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath, subnetStr, "couldn't parse subnet"))
+		return allErrs
+	}
+	switch {
+	// if DualStack only 2 CIDRs allowed
+	case isDualStack && len(subnets) > 2:
+		allErrs = append(allErrs, field.Invalid(fldPath, subnetStr, "expected one (IPv4 or IPv6) CIDR or two CIDRs from each family for dual-stack networking"))
+	// if DualStack and there are 2 CIDRs validate if there is at least one of each IP family
+	case isDualStack && len(subnets) == 2:
+		areDualStackCIDRs, err := utilnet.IsDualStackCIDRs(subnets)
 		if err != nil {
 			allErrs = append(allErrs, field.Invalid(fldPath, subnetStr, err.Error()))
-		} else {
-			areDualStackCIDRs, err := utilnet.IsDualStackCIDRs(subnets)
-			if err != nil {
-				allErrs = append(allErrs, field.Invalid(fldPath, subnets, err.Error()))
-			} else if !areDualStackCIDRs {
-				allErrs = append(allErrs, field.Invalid(fldPath, subnetStr, "expected at least one IP from each family (v4 or v6) for dual-stack networking"))
-			}
-			for _, s := range subnets {
-				numAddresses := utilnet.RangeSize(s)
-				if numAddresses < minAddrs {
-					allErrs = append(allErrs, field.Invalid(fldPath, s, "subnet is too small"))
-				}
-			}
+		} else if !areDualStackCIDRs {
+			allErrs = append(allErrs, field.Invalid(fldPath, subnetStr, "expected one (IPv4 or IPv6) CIDR or two CIDRs from each family for dual-stack networking"))
 		}
-	} else {
-		_, svcSubnet, err := net.ParseCIDR(subnetStr)
-		if err != nil {
-			allErrs = append(allErrs, field.Invalid(fldPath, subnetStr, "couldn't parse subnet"))
-			return allErrs
-		}
-		numAddresses := utilnet.RangeSize(svcSubnet)
+	// if not DualStack only one CIDR allowed
+	case !isDualStack && len(subnets) > 1:
+		allErrs = append(allErrs, field.Invalid(fldPath, subnetStr, "only one CIDR allowed for single-stack networking"))
+	}
+	// validate the subnet/s
+	for _, s := range subnets {
+		numAddresses := utilnet.RangeSize(s)
 		if numAddresses < minAddrs {
-			allErrs = append(allErrs, field.Invalid(fldPath, subnetStr, "subnet is too small"))
+			allErrs = append(allErrs, field.Invalid(fldPath, s, "subnet is too small"))
 		}
 	}
 	return allErrs
