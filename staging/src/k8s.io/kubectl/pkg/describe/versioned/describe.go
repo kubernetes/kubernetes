@@ -4831,4 +4831,3 @@ func loadBalancerStatusStringer(s corev1.LoadBalancerStatus, wide bool) string {
 	}
 	return r
 }
-
