@@ -25,7 +25,7 @@ package node
 import (
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -249,10 +249,11 @@ func testPodSELinuxLabeling(f *framework.Framework, hostIPC bool, hostPID bool) 
 	pod.Spec.SecurityContext.SELinuxOptions = &v1.SELinuxOptions{
 		Level: "s0:c0,c1",
 	}
-
 	f.TestContainerOutput("Pod with same MCS label reading test file", pod, 0, []string{testContent})
+
 	// Confirm that the same pod with a different MCS
 	// label cannot access the volume
+	ginkgo.By("confirming a container with a different MCS label is unable to read the file")
 	pod = scTestPod(hostIPC, hostPID)
 	pod.Spec.Volumes = volumes
 	pod.Spec.Containers[0].VolumeMounts = volumeMounts
@@ -266,7 +267,10 @@ func testPodSELinuxLabeling(f *framework.Framework, hostIPC bool, hostPID bool) 
 	err = f.WaitForPodRunning(pod.Name)
 	framework.ExpectNoError(err, "Error waiting for pod to run %v", pod)
 
-	content, err = f.ReadFileViaContainer(pod.Name, "test-container", testFilePath)
-	framework.ExpectNoError(err, "Error reading file via container")
-	gomega.Expect(content).NotTo(gomega.ContainSubstring(testContent))
+	// for this to work, SELinux should be in enforcing mode, so let's check that
+	isEnforced, err := tk.ReadFileViaContainer(pod.Name, "test-container", "/sys/fs/selinux/enforce")
+	if err == nil && isEnforced == "1" {
+		_, err = tk.ReadFileViaContainer(pod.Name, "test-container", testFilePath)
+		framework.ExpectError(err, "expecting SELinux to not let the container with different MCS label to read the file")
+	}
 }
