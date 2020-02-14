@@ -517,9 +517,9 @@ run_pod_tests() {
   kube::test::get_object_assert pods "{{range.items}}{{$image_field}}:{{end}}" 'changed-with-yaml:'
   ## Patch pod from JSON can change image
   # Command
-  kubectl patch "${kube_flags[@]}" -f test/fixtures/doc-yaml/admin/limitrange/valid-pod.yaml -p='{"spec":{"containers":[{"name": "kubernetes-serve-hostname", "image": "k8s.gcr.io/pause:3.1"}]}}'
+  kubectl patch "${kube_flags[@]}" -f test/fixtures/doc-yaml/admin/limitrange/valid-pod.yaml -p='{"spec":{"containers":[{"name": "kubernetes-serve-hostname", "image": "k8s.gcr.io/pause:3.2"}]}}'
   # Post-condition: valid-pod POD has expected image
-  kube::test::get_object_assert pods "{{range.items}}{{$image_field}}:{{end}}" 'k8s.gcr.io/pause:3.1:'
+  kube::test::get_object_assert pods "{{range.items}}{{$image_field}}:{{end}}" 'k8s.gcr.io/pause:3.2:'
 
   ## If resourceVersion is specified in the patch, it will be treated as a precondition, i.e., if the resourceVersion is different from that is stored in the server, the Patch should be rejected
   ERROR_FILE="${KUBE_TEMP}/conflict-error"

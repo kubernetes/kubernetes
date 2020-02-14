@@ -236,7 +236,7 @@ func initImageConfigs() map[int]Config {
 	configs[Nonewprivs] = Config{e2eRegistry, "nonewprivs", "1.0"}
 	configs[NonRoot] = Config{e2eRegistry, "nonroot", "1.0"}
 	// Pause - when these values are updated, also update cmd/kubelet/app/options/container_runtime.go
-	configs[Pause] = Config{gcRegistry, "pause", "3.1"}
+	configs[Pause] = Config{gcRegistry, "pause", "3.2"}
 	configs[Perl] = Config{dockerLibraryRegistry, "perl", "5.26"}
 	configs[PrometheusDummyExporter] = Config{gcRegistry, "prometheus-dummy-exporter", "v0.1.0"}
 	configs[PrometheusToSd] = Config{gcRegistry, "prometheus-to-sd", "v0.5.0"}
