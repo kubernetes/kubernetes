@@ -26,7 +26,7 @@ import (
 	"context"
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -270,6 +270,6 @@ func testPodSELinuxLabeling(f *framework.Framework, hostIPC bool, hostPID bool) 
 	framework.ExpectNoError(err, "Error waiting for pod to run %v", pod)
 
 	content, err = tk.ReadFileViaContainer(pod.Name, "test-container", testFilePath)
-	framework.ExpectNoError(err, "Error reading file via container")
+	framework.ExpectError(err)
 	gomega.Expect(content).NotTo(gomega.ContainSubstring(testContent))
 }
