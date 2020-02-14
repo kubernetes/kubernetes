@@ -351,7 +351,7 @@ func (gb *GraphBuilder) addDependentToOwners(n *node, owners []metav1.OwnerRefer
 				dependents: make(map[*node]struct{}),
 				virtual:    true,
 			}
-			klog.V(5).Infof("add virtual node.identity: %s\n\n", ownerNode.identity)
+			klog.V(2).Infof("add virtual node.identity: %s\n\n", ownerNode.identity)
 			gb.uidToNode.Write(ownerNode)
 		}
 		ownerNode.addDependent(n)
@@ -480,7 +480,7 @@ func (gb *GraphBuilder) addUnblockedOwnersToDeleteQueue(removed []metav1.OwnerRe
 		if ref.BlockOwnerDeletion != nil && *ref.BlockOwnerDeletion {
 			node, found := gb.uidToNode.Read(ref.UID)
 			if !found {
-				klog.V(5).Infof("cannot find %s in uidToNode", ref.UID)
+				klog.V(2).Infof("cannot find %s in uidToNode", ref.UID)
 				continue
 			}
 			gb.attemptToDelete.Add(node)
@@ -492,7 +492,7 @@ func (gb *GraphBuilder) addUnblockedOwnersToDeleteQueue(removed []metav1.OwnerRe
 		if wasBlocked && isUnblocked {
 			node, found := gb.uidToNode.Read(c.newRef.UID)
 			if !found {
-				klog.V(5).Infof("cannot find %s in uidToNode", c.newRef.UID)
+				klog.V(2).Infof("cannot find %s in uidToNode", c.newRef.UID)
 				continue
 			}
 			gb.attemptToDelete.Add(node)
@@ -502,7 +502,7 @@ func (gb *GraphBuilder) addUnblockedOwnersToDeleteQueue(removed []metav1.OwnerRe
 
 func (gb *GraphBuilder) processTransitions(oldObj interface{}, newAccessor metav1.Object, n *node) {
 	if startsWaitingForDependentsOrphaned(oldObj, newAccessor) {
-		klog.V(5).Infof("add %s to the attemptToOrphan", n.identity)
+		klog.V(2).Infof("add %s to the attemptToOrphan", n.identity)
 		gb.attemptToOrphan.Add(n)
 		return
 	}
@@ -540,7 +540,7 @@ func (gb *GraphBuilder) processGraphChanges() bool {
 		utilruntime.HandleError(fmt.Errorf("cannot access obj: %v", err))
 		return true
 	}
-	klog.V(5).Infof("GraphBuilder process object: %s/%s, namespace %s, name %s, uid %s, event type %v", event.gvk.GroupVersion().String(), event.gvk.Kind, accessor.GetNamespace(), accessor.GetName(), string(accessor.GetUID()), event.eventType)
+	klog.V(2).Infof("GraphBuilder process object: %s/%s, namespace %s, name %s, uid %s, event type %v", event.gvk.GroupVersion().String(), event.gvk.Kind, accessor.GetNamespace(), accessor.GetName(), string(accessor.GetUID()), event.eventType)
 	// Check if the node already exists
 	existingNode, found := gb.uidToNode.Read(accessor.GetUID())
 	if found {
@@ -592,7 +592,7 @@ func (gb *GraphBuilder) processGraphChanges() bool {
 		gb.processTransitions(event.oldObj, accessor, existingNode)
 	case event.eventType == deleteEvent:
 		if !found {
-			klog.V(5).Infof("%v doesn't exist in the graph, this shouldn't happen", accessor.GetUID())
+			klog.V(2).Infof("%v doesn't exist in the graph, this shouldn't happen", accessor.GetUID())
 			return true
 		}
 		// removeNode updates the graph

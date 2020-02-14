@@ -99,7 +99,7 @@ func (gc *GarbageCollector) removeFinalizer(owner *node, targetFinalizer string)
 			newFinalizers = append(newFinalizers, f)
 		}
 		if !found {
-			klog.V(5).Infof("the %s finalizer is already removed from object %s", targetFinalizer, owner.identity)
+			klog.V(2).Infof("the %s finalizer is already removed from object %s", targetFinalizer, owner.identity)
 			return nil
 		}
 
