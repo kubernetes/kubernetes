@@ -853,18 +853,56 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 			defer cleanupNetworkPolicy(f, policy)
 
 			ginkgo.By(fmt.Sprintf("Creating client pod %s that should not be able to connect to %s.", "client-a", service.Name))
-			podClient := createNetworkClientPod(f, f.Namespace, "client-a", service, allowedPort)
+			// Specify RestartPolicy to OnFailure so we can check the client pod fails in the beginning and succeeds
+			// after updating its label, otherwise it would not restart after the first failure.
+			podClient := createNetworkClientPodWithRestartPolicy(f, f.Namespace, "client-a", service, allowedPort, v1.RestartPolicyOnFailure)
 			defer func() {
 				ginkgo.By(fmt.Sprintf("Cleaning up the pod %s", podClient.Name))
 				if err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), podClient.Name, nil); err != nil {
 					framework.Failf("unable to cleanup pod %v: %v", podClient.Name, err)
 				}
 			}()
-			checkNoConnectivity(f, f.Namespace, podClient, service)
+			// Check Container exit code as restartable Pod's Phase will be Running even when container fails.
+			checkNoConnectivityByExitCode(f, f.Namespace, podClient, service)
 
 			ginkgo.By(fmt.Sprintf("Updating client pod %s that should successfully connect to %s.", podClient.Name, service.Name))
-			podClient = updateNetworkClientPodLabel(f, f.Namespace, podClient.Name, "replace", "/metadata/labels", map[string]string{})
+			podClient = updatePodLabel(f, f.Namespace, podClient.Name, "replace", "/metadata/labels", map[string]string{})
 			checkConnectivity(f, f.Namespace, podClient, service)
+		})
+
+		ginkgo.It("should deny ingress access to updated pod [Feature:NetworkPolicy]", func() {
+			const allowedPort = 80
+			ginkgo.By("Creating a network policy for the server which denies all traffic.")
+			policy := &networkingv1.NetworkPolicy{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "deny-ingress-via-isolated-label-selector",
+				},
+				Spec: networkingv1.NetworkPolicySpec{
+					PodSelector: metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"pod-name": podServerLabelSelector,
+						},
+						MatchExpressions: []metav1.LabelSelectorRequirement{{
+							Key:      "isolated",
+							Operator: metav1.LabelSelectorOpExists,
+						}},
+					},
+					PolicyTypes: []networkingv1.PolicyType{networkingv1.PolicyTypeIngress},
+					Ingress:     []networkingv1.NetworkPolicyIngressRule{},
+				},
+			}
+
+			policy, err := f.ClientSet.NetworkingV1().NetworkPolicies(f.Namespace.Name).Create(context.TODO(), policy, metav1.CreateOptions{})
+			framework.ExpectNoError(err, "Error creating Network Policy %v: %v", policy.ObjectMeta.Name, err)
+			defer cleanupNetworkPolicy(f, policy)
+
+			// Client can connect to service when the network policy doesn't apply to the server pod.
+			testCanConnect(f, f.Namespace, "client-a", service, allowedPort)
+
+			// Client cannot connect to service after updating the server pod's labels to match the network policy's selector.
+			ginkgo.By(fmt.Sprintf("Updating server pod %s to be selected by network policy %s.", podServer.Name, policy.Name))
+			updatePodLabel(f, f.Namespace, podServer.Name, "add", "/metadata/labels/isolated", nil)
+			testCannotConnect(f, f.Namespace, "client-a", service, allowedPort)
 		})
 
 		ginkgo.It("should enforce egress policy allowing traffic to a server in a different namespace based on PodSelector and NamespaceSelector [Feature:NetworkPolicy]", func() {
@@ -1416,29 +1454,7 @@ func checkConnectivity(f *framework.Framework, ns *v1.Namespace, podClient *v1.P
 	framework.Logf("Waiting for %s to complete.", podClient.Name)
 	err = e2epod.WaitForPodSuccessInNamespace(f.ClientSet, podClient.Name, ns.Name)
 	if err != nil {
-		// Collect pod logs when we see a failure.
-		logs, logErr := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, podClient.Name, "client")
-		if logErr != nil {
-			framework.Failf("Error getting container logs: %s", logErr)
-		}
-
-		// Collect current NetworkPolicies applied in the test namespace.
-		policies, err := f.ClientSet.NetworkingV1().NetworkPolicies(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{})
-		if err != nil {
-			framework.Logf("error getting current NetworkPolicies for %s namespace: %s", f.Namespace.Name, err)
-		}
-
-		// Collect the list of pods running in the test namespace.
-		podsInNS, err := e2epod.GetPodsInNamespace(f.ClientSet, f.Namespace.Name, map[string]string{})
-		if err != nil {
-			framework.Logf("error getting pods for %s namespace: %s", f.Namespace.Name, err)
-		}
-
-		pods := []string{}
-		for _, p := range podsInNS {
-			pods = append(pods, fmt.Sprintf("Pod: %s, Status: %s\n", p.Name, p.Status.String()))
-		}
-
+		pods, policies, logs := collectPodsAndNetworkPolicies(f, podClient)
 		framework.Failf("Pod %s should be able to connect to service %s, but was not able to connect.\nPod logs:\n%s\n\n Current NetworkPolicies:\n\t%v\n\n Pods:\n\t%v\n\n", podClient.Name, service.Name, logs, policies.Items, pods)
 
 		// Dump debug information for the test namespace.
@@ -1453,34 +1469,57 @@ func checkNoConnectivity(f *framework.Framework, ns *v1.Namespace, podClient *v1
 	// We expect an error here since it's a cannot connect test.
 	// Dump debug information if the error was nil.
 	if err == nil {
-		// Collect pod logs when we see a failure.
-		logs, logErr := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, podClient.Name, "client")
-		if logErr != nil {
-			framework.Failf("Error getting container logs: %s", logErr)
-		}
-
-		// Collect current NetworkPolicies applied in the test namespace.
-		policies, err := f.ClientSet.NetworkingV1().NetworkPolicies(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{})
-		if err != nil {
-			framework.Logf("error getting current NetworkPolicies for %s namespace: %s", f.Namespace.Name, err)
-		}
-
-		// Collect the list of pods running in the test namespace.
-		podsInNS, err := e2epod.GetPodsInNamespace(f.ClientSet, f.Namespace.Name, map[string]string{})
-		if err != nil {
-			framework.Logf("error getting pods for %s namespace: %s", f.Namespace.Name, err)
-		}
-
-		pods := []string{}
-		for _, p := range podsInNS {
-			pods = append(pods, fmt.Sprintf("Pod: %s, Status: %s\n", p.Name, p.Status.String()))
-		}
-
+		pods, policies, logs := collectPodsAndNetworkPolicies(f, podClient)
 		framework.Failf("Pod %s should not be able to connect to service %s, but was able to connect.\nPod logs:\n%s\n\n Current NetworkPolicies:\n\t%v\n\n Pods:\n\t %v\n\n", podClient.Name, service.Name, logs, policies.Items, pods)
 
 		// Dump debug information for the test namespace.
 		framework.DumpDebugInfo(f.ClientSet, f.Namespace.Name)
 	}
+}
+
+func checkNoConnectivityByExitCode(f *framework.Framework, ns *v1.Namespace, podClient *v1.Pod, service *v1.Service) {
+	err := e2epod.WaitForPodCondition(f.ClientSet, ns.Name, podClient.Name, "terminated", framework.PodStartTimeout, func(pod *v1.Pod) (bool, error) {
+		statuses := pod.Status.ContainerStatuses
+		if len(statuses) == 0 || statuses[0].State.Terminated == nil {
+			return false, nil
+		}
+		if statuses[0].State.Terminated.ExitCode != 0 {
+			return true, fmt.Errorf("pod %q container exited with code: %d", podClient.Name, statuses[0].State.Terminated.ExitCode)
+		}
+		return true, nil
+	})
+	// We expect an error here since it's a cannot connect test.
+	// Dump debug information if the error was nil.
+	if err == nil {
+		pods, policies, logs := collectPodsAndNetworkPolicies(f, podClient)
+		framework.Failf("Pod %s should not be able to connect to service %s, but was able to connect.\nPod logs:\n%s\n\n Current NetworkPolicies:\n\t%v\n\n Pods:\n\t%v\n\n", podClient.Name, service.Name, logs, policies.Items, pods)
+
+		// Dump debug information for the test namespace.
+		framework.DumpDebugInfo(f.ClientSet, f.Namespace.Name)
+	}
+}
+
+func collectPodsAndNetworkPolicies(f *framework.Framework, podClient *v1.Pod) ([]string, *networkingv1.NetworkPolicyList, string) {
+	// Collect pod logs when we see a failure.
+	logs, logErr := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, podClient.Name, "client")
+	if logErr != nil {
+		framework.Failf("Error getting container logs: %s", logErr)
+	}
+	// Collect current NetworkPolicies applied in the test namespace.
+	policies, err := f.ClientSet.NetworkingV1().NetworkPolicies(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		framework.Logf("error getting current NetworkPolicies for %s namespace: %s", f.Namespace.Name, err)
+	}
+	// Collect the list of pods running in the test namespace.
+	podsInNS, err := e2epod.GetPodsInNamespace(f.ClientSet, f.Namespace.Name, map[string]string{})
+	if err != nil {
+		framework.Logf("error getting pods for %s namespace: %s", f.Namespace.Name, err)
+	}
+	pods := []string{}
+	for _, p := range podsInNS {
+		pods = append(pods, fmt.Sprintf("Pod: %s, Status: %s\n", p.Name, p.Status.String()))
+	}
+	return pods, policies, logs
 }
 
 // Create a server pod with a listening container for each port in ports[].
@@ -1580,6 +1619,12 @@ func cleanupServerPodAndService(f *framework.Framework, pod *v1.Pod, service *v1
 // This client will attempt a one-shot connection, then die, without restarting the pod.
 // Test can then be asserted based on whether the pod quit with an error or not.
 func createNetworkClientPod(f *framework.Framework, namespace *v1.Namespace, podName string, targetService *v1.Service, targetPort int) *v1.Pod {
+	return createNetworkClientPodWithRestartPolicy(f, namespace, podName, targetService, targetPort, v1.RestartPolicyNever)
+}
+
+// Create a client pod which will attempt a netcat to the provided service, on the specified port.
+// It is similar to createNetworkClientPod but supports specifying RestartPolicy.
+func createNetworkClientPodWithRestartPolicy(f *framework.Framework, namespace *v1.Namespace, podName string, targetService *v1.Service, targetPort int, restartPolicy v1.RestartPolicy) *v1.Pod {
 	pod, err := f.ClientSet.CoreV1().Pods(namespace.Name).Create(context.TODO(), &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: podName + "-",
@@ -1588,7 +1633,7 @@ func createNetworkClientPod(f *framework.Framework, namespace *v1.Namespace, pod
 			},
 		},
 		Spec: v1.PodSpec{
-			RestartPolicy: v1.RestartPolicyNever,
+			RestartPolicy: restartPolicy,
 			Containers: []v1.Container{
 				{
 					Name:  "client",
@@ -1608,8 +1653,8 @@ func createNetworkClientPod(f *framework.Framework, namespace *v1.Namespace, pod
 	return pod
 }
 
-// Patch client pod with a map value
-func updateNetworkClientPodLabel(f *framework.Framework, namespace *v1.Namespace, podName string, patchOperation string, patchPath string, patchValue map[string]string) *v1.Pod {
+// Patch pod with a map value
+func updatePodLabel(f *framework.Framework, namespace *v1.Namespace, podName string, patchOperation string, patchPath string, patchValue map[string]string) *v1.Pod {
 	type patchMapValue struct {
 		Op    string            `json:"op"`
 		Path  string            `json:"path"`
