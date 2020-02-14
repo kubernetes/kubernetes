@@ -33,19 +33,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/uuid"
-
 	"k8s.io/client-go/kubernetes/scheme"
-
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
-
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
-
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
@@ -100,8 +95,6 @@ func (t *TopologyManagerUpgradeTest) Test(f *framework.Framework, done <-chan st
 	ginkgo.By("Verifying it is still possible to create a Pod with aligned resources")
 	node := getTopologyManagerSingleNumaNodePolicyEnabledNode(f)
 	if node == nil {
-		// XXX: but what if the topology manager WAS enabled before the upgrade?
-		// If somehow got disabled during the upgrade, should we raise an error?
 		framework.Logf("No suitable node configured with Topology Manager before upgrade")
 		return
 	}
@@ -229,6 +222,7 @@ func pollConfigz(timeout time.Duration, pollInterval time.Duration, nodeName, na
 	framework.ExpectEqual(len(match), 2)
 	port, err := strconv.Atoi(match[1])
 	framework.ExpectNoError(err)
+
 	ginkgo.By("http requesting node kubelet /configz")
 	endpoint := fmt.Sprintf("http://127.0.0.1:%d/api/v1/nodes/%s/proxy/configz", port, nodeName)
 	tr := &http.Transport{
