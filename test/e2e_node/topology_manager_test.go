@@ -83,7 +83,7 @@ func detectCoresPerSocket() int {
 }
 
 func detectSRIOVDevices() int {
-	outData, err := exec.Command("/bin/sh", "-c", "ls /sys/bus/pci/devices/*/sriov_totalvfs | wc -w").Output()
+	outData, err := exec.Command("/bin/sh", "-c", "ls /sys/bus/pci/devices/*/physfn | wc -w").Output()
 	framework.ExpectNoError(err)
 
 	devCount, err := strconv.Atoi(strings.TrimSpace(string(outData)))
@@ -728,7 +728,7 @@ func runTopologyManagerTests(f *framework.Framework) {
 			e2eskipper.Skipf("this test is meant to run on a system with at least 4 cores per socket")
 		}
 		if sriovdevCount == 0 {
-			e2eskipper.Skipf("this test is meant to run on a system with at least one SRIOV device")
+			e2eskipper.Skipf("this test is meant to run on a system with at least one configured VF from SRIOV device")
 		}
 
 		configMap := getSRIOVDevicePluginConfigMap(framework.TestContext.SriovdpConfigMapFile)
