@@ -89,7 +89,7 @@ func getCPUsPerNUMANode(nodeNum int) ([]int, error) {
 	return cpus.ToSlice(), nil
 }
 
-func getCPUToNUMANodeMapFromEnv(f *framework.Framework, pod *v1.Pod, environ map[string]string, numaNodes int) (map[int]int, error) {
+func getCPUToNUMANodeMapFromEnv(f *framework.Framework, pod *v1.Pod, cnt *v1.Container, environ map[string]string, numaNodes int) (map[int]int, error) {
 	var cpuIDs []int
 	cpuListAllowedEnvVar := "CPULIST_ALLOWED"
 
@@ -103,12 +103,12 @@ func getCPUToNUMANodeMapFromEnv(f *framework.Framework, pod *v1.Pod, environ map
 		}
 	}
 	if len(cpuIDs) == 0 {
-		return nil, fmt.Errorf("variable %q found in environ", cpuListAllowedEnvVar)
+		return nil, fmt.Errorf("variable %q not found in environ", cpuListAllowedEnvVar)
 	}
 
 	cpusPerNUMA := make(map[int][]int)
 	for numaNode := 0; numaNode < numaNodes; numaNode++ {
-		nodeCPUList := f.ExecCommandInContainer(pod.Name, pod.Spec.Containers[0].Name,
+		nodeCPUList := f.ExecCommandInContainer(pod.Name, cnt.Name,
 			"/bin/cat", fmt.Sprintf("/sys/devices/system/node/node%d/cpulist", numaNode))
 
 		cpus, err := cpuset.Parse(nodeCPUList)
@@ -138,7 +138,7 @@ func getCPUToNUMANodeMapFromEnv(f *framework.Framework, pod *v1.Pod, environ map
 	return CPUMap, nil
 }
 
-func getPCIDeviceToNumaNodeMapFromEnv(f *framework.Framework, pod *v1.Pod, environ map[string]string) (map[string]int, error) {
+func getPCIDeviceToNumaNodeMapFromEnv(f *framework.Framework, pod *v1.Pod, cnt *v1.Container, environ map[string]string) (map[string]int, error) {
 	pciDevPrefix := "PCIDEVICE_"
 	// at this point we don't care which plugin selected the device,
 	// we only need to know which devices were assigned to the POD.
@@ -153,13 +153,10 @@ func getPCIDeviceToNumaNodeMapFromEnv(f *framework.Framework, pod *v1.Pod, envir
 		// a single plugin can allocate more than a single device
 		pciDevs := strings.Split(value, ",")
 		for _, pciDev := range pciDevs {
-			pciDevNUMANode := f.ExecCommandInContainer(pod.Name, pod.Spec.Containers[0].Name,
+			pciDevNUMANode := f.ExecCommandInContainer(pod.Name, cnt.Name,
 				"/bin/cat", fmt.Sprintf("/sys/bus/pci/devices/%s/numa_node", pciDev))
 			NUMAPerDev[pciDev] = numaNodeFromSysFsEntry(pciDevNUMANode)
 		}
-	}
-	if len(NUMAPerDev) == 0 {
-		return nil, fmt.Errorf("no PCI devices found in environ")
 	}
 	return NUMAPerDev, nil
 }
@@ -180,22 +177,30 @@ func makeEnvMap(logs string) (map[string]string, error) {
 	return envMap, nil
 }
 
-func checkNUMAAlignment(f *framework.Framework, pod *v1.Pod, logs string, numaNodes int) (numaPodResources, error) {
+func containerWantsDevices(cnt *v1.Container, hwinfo testEnvHWInfo) bool {
+	_, found := cnt.Resources.Requests[v1.ResourceName(hwinfo.sriovResourceName)]
+	return found
+}
+
+func checkNUMAAlignment(f *framework.Framework, pod *v1.Pod, cnt *v1.Container, logs string, hwinfo testEnvHWInfo) (numaPodResources, error) {
 	podEnv, err := makeEnvMap(logs)
 	if err != nil {
 		return numaPodResources{}, err
 	}
 
-	CPUToNUMANode, err := getCPUToNUMANodeMapFromEnv(f, pod, podEnv, numaNodes)
+	CPUToNUMANode, err := getCPUToNUMANodeMapFromEnv(f, pod, cnt, podEnv, hwinfo.numaNodes)
 	if err != nil {
 		return numaPodResources{}, err
 	}
 
-	PCIDevsToNUMANode, err := getPCIDeviceToNumaNodeMapFromEnv(f, pod, podEnv)
+	PCIDevsToNUMANode, err := getPCIDeviceToNumaNodeMapFromEnv(f, pod, cnt, podEnv)
 	if err != nil {
 		return numaPodResources{}, err
 	}
 
+	if containerWantsDevices(cnt, hwinfo) && len(PCIDevsToNUMANode) == 0 {
+		return numaPodResources{}, fmt.Errorf("no PCI devices found in environ")
+	}
 	numaRes := numaPodResources{
 		CPUToNUMANode:     CPUToNUMANode,
 		PCIDevsToNUMANode: PCIDevsToNUMANode,
