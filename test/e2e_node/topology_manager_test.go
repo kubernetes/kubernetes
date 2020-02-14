@@ -134,7 +134,7 @@ func makeTopologyManagerTestPod(podName, podCmd string, tmCtnAttributes []tmCtnA
 	}
 }
 
-func findNUMANodeWithoutSRIOVDevices(configMap *v1.ConfigMap, numaNodes int) (int, bool) {
+func findNUMANodeWithoutSRIOVDevicesFromConfigMap(configMap *v1.ConfigMap, numaNodes int) (int, bool) {
 	for nodeNum := 0; nodeNum < numaNodes; nodeNum++ {
 		value, ok := configMap.Annotations[fmt.Sprintf("pcidevice_node%d", nodeNum)]
 		if !ok {
@@ -152,6 +152,46 @@ func findNUMANodeWithoutSRIOVDevices(configMap *v1.ConfigMap, numaNodes int) (in
 		framework.Logf("NUMA node %d has %d SRIOV devices attached", nodeNum, v)
 	}
 	return -1, false
+}
+
+func findNUMANodeWithoutSRIOVDevicesFromSysfs(numaNodes int) (int, bool) {
+	pciDevs, err := getPCIDeviceInfo("/sys/bus/pci/devices")
+	if err != nil {
+		framework.Failf("error detecting the PCI device NUMA node: %v", err)
+	}
+
+	pciPerNuma := make(map[int]int)
+	for _, pciDev := range pciDevs {
+		if pciDev.IsVFn {
+			pciPerNuma[pciDev.NUMANode]++
+		}
+	}
+
+	if len(pciPerNuma) == 0 {
+		// if we got this far we already passed a rough check that SRIOV devices
+		// are available in the box, so something is seriously wrong
+		framework.Failf("failed to find any VF devices from %v", pciDevs)
+	}
+
+	for nodeNum := 0; nodeNum < numaNodes; nodeNum++ {
+		v := pciPerNuma[nodeNum]
+		if v == 0 {
+			framework.Logf("NUMA node %d has no SRIOV devices attached", nodeNum)
+			return nodeNum, true
+		}
+		framework.Logf("NUMA node %d has %d SRIOV devices attached", nodeNum, v)
+	}
+	return -1, false
+}
+
+func findNUMANodeWithoutSRIOVDevices(configMap *v1.ConfigMap, numaNodes int) (int, bool) {
+	// if someone annotated the configMap, let's use this information
+	if nodeNum, found := findNUMANodeWithoutSRIOVDevicesFromConfigMap(configMap, numaNodes); found {
+		return nodeNum, found
+	}
+	// no annotations, try to autodetect
+	// NOTE: this assumes all the VFs in the box can be used for the tests.
+	return findNUMANodeWithoutSRIOVDevicesFromSysfs(numaNodes)
 }
 
 func configureTopologyManagerInKubelet(f *framework.Framework, oldCfg *kubeletconfig.KubeletConfiguration, policy string, configMap *v1.ConfigMap, numaNodes int) string {

@@ -19,6 +19,8 @@ package e2enode
 import (
 	"fmt"
 	"io/ioutil"
+	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -153,12 +155,7 @@ func getPCIDeviceToNumaNodeMapFromEnv(f *framework.Framework, pod *v1.Pod, envir
 		for _, pciDev := range pciDevs {
 			pciDevNUMANode := f.ExecCommandInContainer(pod.Name, pod.Spec.Containers[0].Name,
 				"/bin/cat", fmt.Sprintf("/sys/bus/pci/devices/%s/numa_node", pciDev))
-
-			nodeNum, err := strconv.Atoi(pciDevNUMANode)
-			if err != nil {
-				return nil, err
-			}
-			NUMAPerDev[pciDev] = nodeNum
+			NUMAPerDev[pciDev] = numaNodeFromSysFsEntry(pciDevNUMANode)
 		}
 	}
 	if len(NUMAPerDev) == 0 {
@@ -208,4 +205,57 @@ func checkNUMAAlignment(f *framework.Framework, pod *v1.Pod, logs string, numaNo
 		return numaRes, fmt.Errorf("NUMA resources not aligned")
 	}
 	return numaRes, nil
+}
+
+type pciDeviceInfo struct {
+	Address  string
+	NUMANode int
+	IsPhysFn bool
+	IsVFn    bool
+}
+
+func getPCIDeviceInfo(sysPCIDir string) ([]pciDeviceInfo, error) {
+	var pciDevs []pciDeviceInfo
+
+	entries, err := ioutil.ReadDir(sysPCIDir)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, entry := range entries {
+		isPhysFn := false
+		isVFn := false
+		if _, err := os.Stat(filepath.Join(sysPCIDir, entry.Name(), "sriov_numvfs")); err == nil {
+			isPhysFn = true
+		} else if !os.IsNotExist(err) {
+			// unexpected error. Bail out
+			return nil, err
+		}
+		if _, err := os.Stat(filepath.Join(sysPCIDir, entry.Name(), "physfn")); err == nil {
+			isVFn = true
+		} else if !os.IsNotExist(err) {
+			// unexpected error. Bail out
+			return nil, err
+		}
+
+		content, err := ioutil.ReadFile(filepath.Join(sysPCIDir, entry.Name(), "numa_node"))
+		if err != nil {
+			return nil, err
+		}
+
+		pciDevs = append(pciDevs, pciDeviceInfo{
+			Address:  entry.Name(),
+			NUMANode: numaNodeFromSysFsEntry(string(content)),
+			IsPhysFn: isPhysFn,
+			IsVFn:    isVFn,
+		})
+	}
+
+	return pciDevs, nil
+}
+
+func numaNodeFromSysFsEntry(content string) int {
+	nodeNum, err := strconv.Atoi(strings.TrimSpace(content))
+	framework.ExpectNoError(err, "error detecting the device numa_node from sysfs: %v", err)
+	return nodeNum
 }
