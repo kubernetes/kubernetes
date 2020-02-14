@@ -1885,12 +1885,12 @@ func TestValidateNodeIPParam(t *testing.T) {
 		},
 		{
 			nodeIP:   "0.0.0.0",
-			success:  false,
+			success:  true,
 			testName: "Unspecified IPv4 address",
 		},
 		{
 			nodeIP:   "::",
-			success:  false,
+			success:  true,
 			testName: "Unspecified IPv6 address",
 		},
 		{

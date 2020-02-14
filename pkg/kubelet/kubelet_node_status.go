@@ -589,7 +589,9 @@ func validateNodeIP(nodeIP net.IP) error {
 		return fmt.Errorf("nodeIP can't be a link-local unicast address")
 	}
 	if nodeIP.IsUnspecified() {
-		return fmt.Errorf("nodeIP can't be an all zeros address")
+		// Unspecified addresses are used to autodetect the node IP address
+		// https://github.com/kubernetes/kubernetes/pull/85850
+		return nil
 	}
 
 	addrs, err := net.InterfaceAddrs()
