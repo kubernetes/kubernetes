@@ -1536,7 +1536,11 @@ func headersForConfig(c *restclient.Config, url *url.URL) (http.Header, error) {
 	if err != nil {
 		return nil, err
 	}
-	if _, err := rt.RoundTrip(&http.Request{Header: make(http.Header), URL: url}); err != nil {
+	request, err := http.NewRequest("GET", url.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := rt.RoundTrip(request); err != nil {
 		return nil, err
 	}
 	return extract.Header, nil
