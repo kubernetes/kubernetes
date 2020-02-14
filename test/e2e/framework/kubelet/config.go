@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package framework
+package kubelet
 
 import (
 	"crypto/tls"
@@ -31,6 +31,7 @@ import (
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 
+	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 )
 
@@ -52,47 +53,47 @@ func pollConfigz(timeout time.Duration, pollInterval time.Duration, nodeName, na
 	endpoint := ""
 	if useProxy {
 		// start local proxy, so we can send graceful deletion over query string, rather than body parameter
-		Logf("Opening proxy to cluster")
-		tk := e2ekubectl.NewTestKubeconfig(TestContext.CertDir, TestContext.Host, TestContext.KubeConfig, TestContext.KubeContext, TestContext.KubectlPath, namespace)
+		framework.Logf("Opening proxy to cluster")
+		tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, namespace)
 		cmd := tk.KubectlCmd("proxy", "-p", "0")
-		stdout, stderr, err := StartCmdAndStreamOutput(cmd)
-		ExpectNoError(err)
+		stdout, stderr, err := framework.StartCmdAndStreamOutput(cmd)
+		framework.ExpectNoError(err)
 		defer stdout.Close()
 		defer stderr.Close()
-		defer TryKill(cmd)
+		defer framework.TryKill(cmd)
 
 		buf := make([]byte, 128)
 		var n int
 		n, err = stdout.Read(buf)
-		ExpectNoError(err)
+		framework.ExpectNoError(err)
 		output := string(buf[:n])
 		proxyRegexp := regexp.MustCompile("Starting to serve on 127.0.0.1:([0-9]+)")
 		match := proxyRegexp.FindStringSubmatch(output)
-		ExpectEqual(len(match), 2)
+		framework.ExpectEqual(len(match), 2)
 		port, err := strconv.Atoi(match[1])
-		ExpectNoError(err)
-		Logf("http requesting node kubelet /configz")
+		framework.ExpectNoError(err)
+		framework.Logf("http requesting node kubelet /configz")
 		endpoint = fmt.Sprintf("http://127.0.0.1:%d/api/v1/nodes/%s/proxy/configz", port, nodeName)
 	} else {
-		endpoint = fmt.Sprintf("http://127.0.0.1:8080/api/v1/nodes/%s/proxy/configz", TestContext.NodeName)
+		endpoint = fmt.Sprintf("http://127.0.0.1:8080/api/v1/nodes/%s/proxy/configz", framework.TestContext.NodeName)
 	}
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
 	client := &http.Client{Transport: tr}
 	req, err := http.NewRequest("GET", endpoint, nil)
-	ExpectNoError(err)
+	framework.ExpectNoError(err)
 	req.Header.Add("Accept", "application/json")
 
 	var resp *http.Response
 	wait.PollImmediate(pollInterval, timeout, func() (bool, error) {
 		resp, err = client.Do(req)
 		if err != nil {
-			Logf("Failed to get /configz, retrying. Error: %v", err)
+			framework.Logf("Failed to get /configz, retrying. Error: %v", err)
 			return false, nil
 		}
 		if resp.StatusCode != 200 {
-			Logf("/configz response status not 200, retrying. Response was: %+v", resp)
+			framework.Logf("/configz response status not 200, retrying. Response was: %+v", resp)
 			return false, nil
 		}
 
