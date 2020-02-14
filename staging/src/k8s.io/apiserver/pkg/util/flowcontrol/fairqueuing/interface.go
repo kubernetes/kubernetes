@@ -47,47 +47,46 @@ type QueueSetCompleter interface {
 // .  Some day we may have connections between priority levels, but
 // today is not that day.
 type QueueSet interface {
-	// BeginConfigChange starts the two-step process of updating
-	// the configuration.  No change is made until Complete is
-	// called.  If `C := X.BeginConstruction(q)` then
-	// `C.Complete(d)` returns the same value `X`.  If the
-	// QueuingConfig's DesiredNumQueues field is zero then the other
-	// queuing-specific config parameters are not changed, so that the
-	// queues continue draining as before.
+	// BeginConfigChange starts the two-step process of updating the
+	// configuration.  No change is made until Complete is called.  If
+	// `C := X.BeginConstruction(q)` then `C.Complete(d)` returns the
+	// same value `X`.  If the QueuingConfig's DesiredNumQueues field
+	// is zero then the other queuing-specific config parameters are
+	// not changed, so that the queues continue draining as before.
+	// In any case, reconfiguration does not discard any queue unless
+	// and until it is undesired and empty.
 	BeginConfigChange(QueuingConfig) (QueueSetCompleter, error)
 
-	// Quiesce controls whether the QueueSet is operating normally or
-	// is quiescing.  A quiescing QueueSet drains as normal but does
-	// not admit any new requests. Passing a non-nil handler means the
-	// system should be quiescing, a nil handler means the system
-	// should operate normally. A call to Wait while the system is
-	// quiescing will be rebuffed by returning tryAnother=true. If all
-	// the queues have no requests waiting nor executing while the
-	// system is quiescing then the handler will eventually be called
-	// with no locks held (even if the system becomes non-quiescing
-	// between the triggering state and the required call).  In Go
-	// Memory Model terms, the triggering state happens before the
-	// call to the EmptyHandler.
-	Quiesce(EmptyHandler)
+	// IsIdle returns a bool indicating whether the QueueSet was idle
+	// at the moment of the return.  Idle means the QueueSet has zero
+	// requests queued and zero executing.  This bit can change only
+	// (1) during a call to StartRequest and (2) during a call to
+	// Request::Finish.  In the latter case idleness can only change
+	// from false to true.
+	IsIdle() bool
 
-	// Wait uses the given hashValue as the source of entropy as it
-	// shuffle-shards a request into a queue and waits for a decision
-	// on what to do with that request.  The descr1 and descr2 values
-	// play no role in the logic but appear in log messages.  If
-	// tryAnother==true at return then the QueueSet has become
-	// undesirable and the client should try to find a different
-	// QueueSet to use; execute and afterExecution are irrelevant in
-	// this case.  In the terms of the Go Memory Model, there was a
-	// call to Quiesce with a non-nil handler that happened before
-	// this return from Wait.  Otherwise, if execute then the client
-	// should start executing the request and, once the request
-	// finishes execution or is canceled, call afterExecution().
-	// Otherwise the client should not execute the request and
-	// afterExecution is irrelevant.  Canceling the context while the
-	// request is waiting in its queue will cut short that wait and
-	// cause a return with tryAnother and execute both false; later
-	// cancellations are the caller's problem.
-	Wait(ctx context.Context, hashValue uint64, descr1, descr2 interface{}) (tryAnother, execute bool, afterExecution func())
+	// StartRequest begins the process of handling a request.  If the
+	// request gets queued and the number of queues is greater than
+	// 1 then Wait uses the given hashValue as the source of entropy
+	// as it shuffle-shards the request into a queue.  The descr1 and
+	// descr2 values play no role in the logic but appear in log
+	// messages.  This method always returns quickly (without waiting
+	// for the request to be dequeued).  If this method returns a nil
+	// Request value then caller should reject the request and the
+	// returned bool indicates whether the QueueSet was idle at the
+	// moment of the return.  Otherwise idle==false and the client
+	// must call the Wait method of the Request exactly once.
+	StartRequest(ctx context.Context, hashValue uint64, descr1, descr2 interface{}) (req Request, idle bool)
+}
+
+// Request represents the remainder of the handling of one request
+type Request interface {
+	// Finish determines whether to execute or reject the request and
+	// invokes `execute` if the decision is to execute the request.
+	// The returned `idle bool` value indicates whether the QueueSet
+	// was idle when the value was calculated, but might no longer be
+	// accurate by the time the client examines that value.
+	Finish(execute func()) (idle bool)
 }
 
 // QueuingConfig defines the configuration of the queuing aspect of a QueueSet.
