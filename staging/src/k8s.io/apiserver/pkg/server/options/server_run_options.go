@@ -26,9 +26,6 @@ import (
 	"k8s.io/apiserver/pkg/server"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 
-	// add the generic feature gates
-	"k8s.io/apiserver/pkg/features"
-
 	"github.com/spf13/pflag"
 )
 
@@ -67,6 +64,7 @@ func NewServerRunOptions() *ServerRunOptions {
 		ShutdownDelayDuration:       defaults.ShutdownDelayDuration,
 		JSONPatchMaxCopyBytes:       defaults.JSONPatchMaxCopyBytes,
 		MaxRequestBodyBytes:         defaults.MaxRequestBodyBytes,
+		EnableInflightQuotaHandler:  true,
 	}
 }
 
@@ -116,26 +114,11 @@ func (s *ServerRunOptions) Validate() []error {
 		errors = append(errors, fmt.Errorf("--livez-grace-period can not be a negative value"))
 	}
 
-	if s.EnableInflightQuotaHandler {
-		if !utilfeature.DefaultFeatureGate.Enabled(features.APIPriorityAndFairness) {
-			errors = append(errors, fmt.Errorf("--enable-inflight-quota-handler can not be set if feature "+
-				"gate APIPriorityAndFairness is disabled"))
-		}
-		if s.MaxMutatingRequestsInFlight != 0 {
-			errors = append(errors, fmt.Errorf("--max-mutating-requests-inflight=%v "+
-				"can not be set if enabled inflight quota handler", s.MaxMutatingRequestsInFlight))
-		}
-		if s.MaxRequestsInFlight != 0 {
-			errors = append(errors, fmt.Errorf("--max-requests-inflight=%v "+
-				"can not be set if enabled inflight quota handler", s.MaxRequestsInFlight))
-		}
-	} else {
-		if s.MaxRequestsInFlight < 0 {
-			errors = append(errors, fmt.Errorf("--max-requests-inflight can not be negative value"))
-		}
-		if s.MaxMutatingRequestsInFlight < 0 {
-			errors = append(errors, fmt.Errorf("--max-mutating-requests-inflight can not be negative value"))
-		}
+	if s.MaxRequestsInFlight < 0 {
+		errors = append(errors, fmt.Errorf("--max-requests-inflight can not be negative value"))
+	}
+	if s.MaxMutatingRequestsInFlight < 0 {
+		errors = append(errors, fmt.Errorf("--max-mutating-requests-inflight can not be negative value"))
 	}
 
 	if s.RequestTimeout.Nanoseconds() < 0 {
@@ -211,7 +194,7 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"to spread out load.")
 
 	fs.BoolVar(&s.EnableInflightQuotaHandler, "enable-inflight-quota-handler", s.EnableInflightQuotaHandler, ""+
-		"If true, replace the max-in-flight handler with an enhanced one that queues and dispatches with priority and fairness")
+		"If true and the APIPriorityAndFairness feature gate is enabled, replace the max-in-flight handler with an enhanced one that queues and dispatches with priority and fairness")
 
 	fs.DurationVar(&s.ShutdownDelayDuration, "shutdown-delay-duration", s.ShutdownDelayDuration, ""+
 		"Time to delay the termination. During that time the server keeps serving requests normally and /healthz "+
