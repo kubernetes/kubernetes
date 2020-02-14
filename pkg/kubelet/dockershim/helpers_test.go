@@ -389,7 +389,7 @@ func TestLimitedWriter(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			limit := tc.limit
-			w := limitedWriter(&tc.w, &limit)
+			w := sharedLimitWriter(&tc.w, &limit)
 			n, err := w.Write([]byte(tc.toWrite))
 			if int64(n) > max(0, tc.limit) {
 				t.Fatalf("bytes written (%d) exceeds limit (%d)", n, tc.limit)
@@ -421,8 +421,8 @@ func TestLimitedWriter(t *testing.T) {
 		var (
 			b1, b2 bytes.Buffer
 			limit  = int64(10)
-			w1     = limitedWriter(&b1, &limit)
-			w2     = limitedWriter(&b2, &limit)
+			w1     = sharedLimitWriter(&b1, &limit)
+			w2     = sharedLimitWriter(&b2, &limit)
 			ch     = make(chan struct{})
 			wg     sync.WaitGroup
 		)

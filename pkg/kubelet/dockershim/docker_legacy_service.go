@@ -81,8 +81,8 @@ func (d *dockerService) GetContainerLogs(_ context.Context, pod *v1.Pod, contain
 	if logOptions.LimitBytes != nil {
 		// stdout and stderr share the total write limit
 		max := *logOptions.LimitBytes
-		stderr = limitedWriter(stderr, &max)
-		stdout = limitedWriter(stdout, &max)
+		stderr = sharedLimitWriter(stderr, &max)
+		stdout = sharedLimitWriter(stdout, &max)
 	}
 	sopts := libdocker.StreamOptions{
 		OutputStream: stdout,
