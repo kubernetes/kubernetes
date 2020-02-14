@@ -245,14 +245,14 @@ func TestBuildKubeletArgMap(t *testing.T) {
 				nodeRegOpts: &kubeadmapi.NodeRegistrationOptions{
 					CRISocket: "/var/run/dockershim.sock",
 				},
-				pauseImage:          "gcr.io/pause:3.1",
+				pauseImage:          "gcr.io/pause:3.2",
 				execer:              cgroupfsCgroupExecer,
 				isServiceActiveFunc: serviceIsNotActiveFunc,
 			},
 			expected: map[string]string{
 				"network-plugin":            "cni",
 				"cgroup-driver":             "cgroupfs",
-				"pod-infra-container-image": "gcr.io/pause:3.1",
+				"pod-infra-container-image": "gcr.io/pause:3.2",
 			},
 		},
 	}
