@@ -45,6 +45,13 @@ import (
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
+const (
+	// ErrReasonBindConflict is used for VolumeBindingNoMatch predicate error.
+	ErrReasonBindConflict = "node(s) didn't find available persistent volumes to bind"
+	// ErrReasonNodeConflict is used for VolumeNodeAffinityConflict predicate error.
+	ErrReasonNodeConflict = "node(s) had volume node affinity conflict"
+)
+
 // InTreeToCSITranslator contains methods required to check migratable status
 // and perform translations from InTree PV's to CSI
 type InTreeToCSITranslator interface {
@@ -78,16 +85,16 @@ type InTreeToCSITranslator interface {
 // 2. Once all the assume operations are done in d), the scheduler processes the next Pod in the scheduler queue
 //    while the actual binding operation occurs in the background.
 type SchedulerVolumeBinder interface {
-	// FindPodVolumes checks if all of a Pod's PVCs can be satisfied by the node.
+	// FindPodVolumes checks if all of a Pod's volumes can be satisfied by the node.
 	//
 	// If a PVC is bound, it checks if the PV's NodeAffinity matches the Node.
 	// Otherwise, it tries to find an available PV to bind to the PVC.
 	//
-	// It returns true if all of the Pod's PVCs have matching PVs or can be dynamic provisioned,
-	// and returns true if bound volumes satisfy the PV NodeAffinity.
+	// It returns an error when something went wrong or a list or reasons why the node is
+	// (currently) not usable for the pod.
 	//
 	// This function is called by the volume binding scheduler predicate and can be called in parallel
-	FindPodVolumes(pod *v1.Pod, node *v1.Node) (unboundVolumesSatisified, boundVolumesSatisfied bool, err error)
+	FindPodVolumes(pod *v1.Pod, node *v1.Node) (reasons []string, err error)
 
 	// AssumePodVolumes will:
 	// 1. Take the PV matches for unbound PVCs and update the PV cache assuming
@@ -166,15 +173,15 @@ func (b *volumeBinder) GetBindingsCache() PodBindingCache {
 // FindPodVolumes caches the matching PVs and PVCs to provision per node in podBindingCache.
 // This method intentionally takes in a *v1.Node object instead of using volumebinder.nodeInformer.
 // That's necessary because some operations will need to pass in to the predicate fake node objects.
-func (b *volumeBinder) FindPodVolumes(pod *v1.Pod, node *v1.Node) (unboundVolumesSatisfied, boundVolumesSatisfied bool, err error) {
+func (b *volumeBinder) FindPodVolumes(pod *v1.Pod, node *v1.Node) (reasons []string, err error) {
 	podName := getPodName(pod)
 
 	// Warning: Below log needs high verbosity as it can be printed several times (#60933).
 	klog.V(5).Infof("FindPodVolumes for pod %q, node %q", podName, node.Name)
 
 	// Initialize to true for pods that don't have volumes
-	unboundVolumesSatisfied = true
-	boundVolumesSatisfied = true
+	unboundVolumesSatisfied := true
+	boundVolumesSatisfied := true
 	start := time.Now()
 	defer func() {
 		metrics.VolumeSchedulingStageLatency.WithLabelValues("predicate").Observe(time.Since(start).Seconds())
@@ -210,19 +217,19 @@ func (b *volumeBinder) FindPodVolumes(pod *v1.Pod, node *v1.Node) (unboundVolume
 	// volumes can get bound/provisioned in between calls.
 	boundClaims, claimsToBind, unboundClaimsImmediate, err := b.getPodVolumes(pod)
 	if err != nil {
-		return false, false, err
+		return nil, err
 	}
 
 	// Immediate claims should be bound
 	if len(unboundClaimsImmediate) > 0 {
-		return false, false, fmt.Errorf("pod has unbound immediate PersistentVolumeClaims")
+		return nil, fmt.Errorf("pod has unbound immediate PersistentVolumeClaims")
 	}
 
 	// Check PV node affinity on bound volumes
 	if len(boundClaims) > 0 {
 		boundVolumesSatisfied, err = b.checkBoundClaims(boundClaims, node, podName)
 		if err != nil {
-			return false, false, err
+			return nil, err
 		}
 	}
 
@@ -238,7 +245,7 @@ func (b *volumeBinder) FindPodVolumes(pod *v1.Pod, node *v1.Node) (unboundVolume
 			if selectedNode, ok := claim.Annotations[pvutil.AnnSelectedNode]; ok {
 				if selectedNode != node.Name {
 					// Fast path, skip unmatched node
-					return false, boundVolumesSatisfied, nil
+					return []string{ErrReasonBindConflict}, nil
 				}
 				claimsToProvision = append(claimsToProvision, claim)
 			} else {
@@ -251,7 +258,7 @@ func (b *volumeBinder) FindPodVolumes(pod *v1.Pod, node *v1.Node) (unboundVolume
 			var unboundClaims []*v1.PersistentVolumeClaim
 			unboundVolumesSatisfied, matchedBindings, unboundClaims, err = b.findMatchingVolumes(pod, claimsToFindMatching, node)
 			if err != nil {
-				return false, false, err
+				return nil, err
 			}
 			claimsToProvision = append(claimsToProvision, unboundClaims...)
 		}
@@ -260,12 +267,19 @@ func (b *volumeBinder) FindPodVolumes(pod *v1.Pod, node *v1.Node) (unboundVolume
 		if len(claimsToProvision) > 0 {
 			unboundVolumesSatisfied, provisionedClaims, err = b.checkVolumeProvisions(pod, claimsToProvision, node)
 			if err != nil {
-				return false, false, err
+				return nil, err
 			}
 		}
 	}
 
-	return unboundVolumesSatisfied, boundVolumesSatisfied, nil
+	if !boundVolumesSatisfied {
+		reasons = append(reasons, ErrReasonNodeConflict)
+	}
+	if !unboundVolumesSatisfied {
+		reasons = append(reasons, ErrReasonBindConflict)
+	}
+
+	return reasons, nil
 }
 
 // AssumePodVolumes will take the cached matching PVs and PVCs to provision

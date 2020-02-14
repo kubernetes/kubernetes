@@ -711,9 +711,7 @@ func TestSchedulerWithVolumeBinding(t *testing.T) {
 		{
 			name: "all bound",
 			volumeBinderConfig: &volumescheduling.FakeVolumeBinderConfig{
-				AllBound:             true,
-				FindUnboundSatsified: true,
-				FindBoundSatsified:   true,
+				AllBound: true,
 			},
 			expectAssumeCalled: true,
 			expectPodBind:      &v1.Binding{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "foo-ns", UID: types.UID("foo")}, Target: v1.ObjectReference{Kind: "Node", Name: "machine1"}},
@@ -722,9 +720,8 @@ func TestSchedulerWithVolumeBinding(t *testing.T) {
 		{
 			name: "bound/invalid pv affinity",
 			volumeBinderConfig: &volumescheduling.FakeVolumeBinderConfig{
-				AllBound:             true,
-				FindUnboundSatsified: true,
-				FindBoundSatsified:   false,
+				AllBound:    true,
+				FindReasons: []string{volumescheduling.ErrReasonNodeConflict},
 			},
 			eventReason: "FailedScheduling",
 			expectError: makePredicateError("1 node(s) had volume node affinity conflict"),
@@ -732,8 +729,7 @@ func TestSchedulerWithVolumeBinding(t *testing.T) {
 		{
 			name: "unbound/no matches",
 			volumeBinderConfig: &volumescheduling.FakeVolumeBinderConfig{
-				FindUnboundSatsified: false,
-				FindBoundSatsified:   true,
+				FindReasons: []string{volumescheduling.ErrReasonBindConflict},
 			},
 			eventReason: "FailedScheduling",
 			expectError: makePredicateError("1 node(s) didn't find available persistent volumes to bind"),
@@ -741,18 +737,14 @@ func TestSchedulerWithVolumeBinding(t *testing.T) {
 		{
 			name: "bound and unbound unsatisfied",
 			volumeBinderConfig: &volumescheduling.FakeVolumeBinderConfig{
-				FindUnboundSatsified: false,
-				FindBoundSatsified:   false,
+				FindReasons: []string{volumescheduling.ErrReasonBindConflict, volumescheduling.ErrReasonNodeConflict},
 			},
 			eventReason: "FailedScheduling",
 			expectError: makePredicateError("1 node(s) didn't find available persistent volumes to bind, 1 node(s) had volume node affinity conflict"),
 		},
 		{
-			name: "unbound/found matches/bind succeeds",
-			volumeBinderConfig: &volumescheduling.FakeVolumeBinderConfig{
-				FindUnboundSatsified: true,
-				FindBoundSatsified:   true,
-			},
+			name:               "unbound/found matches/bind succeeds",
+			volumeBinderConfig: &volumescheduling.FakeVolumeBinderConfig{},
 			expectAssumeCalled: true,
 			expectBindCalled:   true,
 			expectPodBind:      &v1.Binding{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "foo-ns", UID: types.UID("foo")}, Target: v1.ObjectReference{Kind: "Node", Name: "machine1"}},
@@ -769,9 +761,7 @@ func TestSchedulerWithVolumeBinding(t *testing.T) {
 		{
 			name: "assume error",
 			volumeBinderConfig: &volumescheduling.FakeVolumeBinderConfig{
-				FindUnboundSatsified: true,
-				FindBoundSatsified:   true,
-				AssumeErr:            assumeErr,
+				AssumeErr: assumeErr,
 			},
 			expectAssumeCalled: true,
 			eventReason:        "FailedScheduling",
@@ -780,9 +770,7 @@ func TestSchedulerWithVolumeBinding(t *testing.T) {
 		{
 			name: "bind error",
 			volumeBinderConfig: &volumescheduling.FakeVolumeBinderConfig{
-				FindUnboundSatsified: true,
-				FindBoundSatsified:   true,
-				BindErr:              bindErr,
+				BindErr: bindErr,
 			},
 			expectAssumeCalled: true,
 			expectBindCalled:   true,
