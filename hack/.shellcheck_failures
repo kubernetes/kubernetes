@@ -1,4 +1,3 @@
 ./cluster/gce/gci/configure.sh
 ./cluster/gce/gci/master-helper.sh
 ./cluster/gce/util.sh
-./cluster/log-dump/log-dump.sh
