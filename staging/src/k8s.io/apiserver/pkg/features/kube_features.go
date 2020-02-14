@@ -169,7 +169,9 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	WinOverlay:              {Default: false, PreRelease: featuregate.Alpha},
 	WinDSR:                  {Default: false, PreRelease: featuregate.Alpha},
 	WatchBookmark:           {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
-	APIPriorityAndFairness:  {Default: false, PreRelease: featuregate.Alpha},
-	RemoveSelfLink:          {Default: false, PreRelease: featuregate.Alpha},
-	SelectorIndex:           {Default: false, PreRelease: featuregate.Alpha},
+
+	// DO NOT MERGE; setting to true to try out the e2e with this feature on.
+	APIPriorityAndFairness: {Default: true, PreRelease: featuregate.Alpha},
+	RemoveSelfLink:         {Default: false, PreRelease: featuregate.Alpha},
+	SelectorIndex:          {Default: false, PreRelease: featuregate.Alpha},
 }
