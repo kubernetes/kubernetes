@@ -101,7 +101,6 @@ func (p *ephemeralTestSuite) DefineTests(driver TestDriver, pattern testpatterns
 			Client:     l.config.Framework.ClientSet,
 			Namespace:  f.Namespace.Name,
 			DriverName: eDriver.GetCSIDriverName(l.config),
-			Node:       l.config.ClientNodeSelection,
 			GetVolume: func(volumeNumber int) (map[string]string, bool, bool) {
 				return eDriver.GetVolume(l.config, volumeNumber)
 			},
@@ -150,8 +149,7 @@ func (p *ephemeralTestSuite) DefineTests(driver TestDriver, pattern testpatterns
 			// Create another pod with the same inline volume attributes.
 			pod2 := StartInPodWithInlineVolume(f.ClientSet, f.Namespace.Name, "inline-volume-tester2", "sleep 100000",
 				[]v1.CSIVolumeSource{*pod.Spec.Volumes[0].CSI},
-				readOnly,
-				l.testCase.Node)
+				readOnly)
 			framework.ExpectNoError(e2epod.WaitForPodRunningInNamespaceSlow(f.ClientSet, pod2.Name, pod2.Namespace), "waiting for second pod with inline volume")
 
 			// If (and only if) we were able to mount
@@ -191,7 +189,6 @@ type EphemeralTest struct {
 	Client     clientset.Interface
 	Namespace  string
 	DriverName string
-	Node       e2epod.NodeSelection
 
 	// GetVolume returns the volume attributes for a
 	// certain inline ephemeral volume, enumerated starting with
@@ -234,7 +231,7 @@ func (t EphemeralTest) TestEphemeral() {
 	gomega.Expect(t.GetVolume).NotTo(gomega.BeNil(), "EphemeralTest.GetVolume is required")
 	gomega.Expect(t.DriverName).NotTo(gomega.BeEmpty(), "EphemeralTest.DriverName is required")
 
-	ginkgo.By(fmt.Sprintf("checking the requested inline volume exists in the pod running on node %+v", t.Node))
+	ginkgo.By(fmt.Sprintf("checking the requested inline volume exists"))
 	command := "mount | grep /mnt/test && sleep 10000"
 	var csiVolumes []v1.CSIVolumeSource
 	numVolumes := t.NumInlineVolumes
@@ -252,7 +249,7 @@ func (t EphemeralTest) TestEphemeral() {
 		}
 		csiVolumes = append(csiVolumes, csi)
 	}
-	pod := StartInPodWithInlineVolume(client, t.Namespace, "inline-volume-tester", command, csiVolumes, t.ReadOnly, t.Node)
+	pod := StartInPodWithInlineVolume(client, t.Namespace, "inline-volume-tester", command, csiVolumes, t.ReadOnly)
 	defer func() {
 		// pod might be nil now.
 		StopPod(client, pod)
@@ -278,7 +275,7 @@ func (t EphemeralTest) TestEphemeral() {
 
 // StartInPodWithInlineVolume starts a command in a pod with given volume(s) mounted to /mnt/test-<number> directory.
 // The caller is responsible for checking the pod and deleting it.
-func StartInPodWithInlineVolume(c clientset.Interface, ns, podName, command string, csiVolumes []v1.CSIVolumeSource, readOnly bool, node e2epod.NodeSelection) *v1.Pod {
+func StartInPodWithInlineVolume(c clientset.Interface, ns, podName, command string, csiVolumes []v1.CSIVolumeSource, readOnly bool) *v1.Pod {
 	pod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
@@ -301,7 +298,6 @@ func StartInPodWithInlineVolume(c clientset.Interface, ns, podName, command stri
 			RestartPolicy: v1.RestartPolicyNever,
 		},
 	}
-	e2epod.SetNodeSelection(pod, node)
 
 	for i, csiVolume := range csiVolumes {
 		name := fmt.Sprintf("my-volume-%d", i)
