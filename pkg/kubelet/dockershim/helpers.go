@@ -426,7 +426,7 @@ func (w sharedWriteLimiter) Write(p []byte) (int, error) {
 	return n, err
 }
 
-func limitedWriter(w io.Writer, limit *int64) io.Writer {
+func sharedLimitWriter(w io.Writer, limit *int64) io.Writer {
 	if w == nil {
 		return nil
 	}
