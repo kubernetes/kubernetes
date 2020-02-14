@@ -4,7 +4,6 @@ go_library(
     name = "go_default_library",
     srcs = [
         "events.go",
-        "pod_backoff.go",
         "scheduling_queue.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/scheduler/internal/queue",
@@ -25,10 +24,7 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = [
-        "pod_backoff_test.go",
-        "scheduling_queue_test.go",
-    ],
+    srcs = ["scheduling_queue_test.go"],
     embed = [":go_default_library"],
     deps = [
         "//pkg/api/v1/pod:go_default_library",
