@@ -251,12 +251,11 @@ func createAndBindPSP(f *framework.Framework, pspTemplate *policyv1beta1.PodSecu
 }
 
 func restrictedPod(name string) *v1.Pod {
-	return &v1.Pod{
+	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 			Annotations: map[string]string{
-				v1.SeccompPodAnnotationKey:                      v1.SeccompProfileRuntimeDefault,
-				apparmor.ContainerAnnotationKeyPrefix + "pause": apparmor.ProfileRuntimeDefault,
+				v1.SeccompPodAnnotationKey: v1.SeccompProfileRuntimeDefault,
 			},
 		},
 		Spec: v1.PodSpec{
@@ -271,6 +270,10 @@ func restrictedPod(name string) *v1.Pod {
 			}},
 		},
 	}
+	if isAppArmorSupported() {
+		pod.Annotations[apparmor.ContainerAnnotationKeyPrefix+"pause"] = apparmor.ProfileRuntimeDefault
+	}
+	return pod
 }
 
 // privilegedPSPInPolicy creates a PodSecurityPolicy (in the "policy" API Group) that allows everything.
@@ -311,14 +314,12 @@ func privilegedPSP(name string) *policyv1beta1.PodSecurityPolicy {
 
 // restrictedPSPInPolicy creates a PodSecurityPolicy (in the "policy" API Group) that is most strict.
 func restrictedPSP(name string) *policyv1beta1.PodSecurityPolicy {
-	return &policyv1beta1.PodSecurityPolicy{
+	psp := &policyv1beta1.PodSecurityPolicy{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 			Annotations: map[string]string{
-				seccomp.AllowedProfilesAnnotationKey:  v1.SeccompProfileRuntimeDefault,
-				seccomp.DefaultProfileAnnotationKey:   v1.SeccompProfileRuntimeDefault,
-				apparmor.AllowedProfilesAnnotationKey: apparmor.ProfileRuntimeDefault,
-				apparmor.DefaultProfileAnnotationKey:  apparmor.ProfileRuntimeDefault,
+				seccomp.AllowedProfilesAnnotationKey: v1.SeccompProfileRuntimeDefault,
+				seccomp.DefaultProfileAnnotationKey:  v1.SeccompProfileRuntimeDefault,
 			},
 		},
 		Spec: policyv1beta1.PodSecurityPolicySpec{
@@ -367,6 +368,11 @@ func restrictedPSP(name string) *policyv1beta1.PodSecurityPolicy {
 			ReadOnlyRootFilesystem: false,
 		},
 	}
+	if isAppArmorSupported() {
+		psp.Annotations[apparmor.AllowedProfilesAnnotationKey] = apparmor.ProfileRuntimeDefault
+		psp.Annotations[apparmor.DefaultProfileAnnotationKey] = apparmor.ProfileRuntimeDefault
+	}
+	return psp
 }
 
 func boolPtr(b bool) *bool {
