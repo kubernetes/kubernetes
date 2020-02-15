@@ -203,7 +203,7 @@ func (g *genericScheduler) Schedule(ctx context.Context, state *framework.CycleS
 	}
 
 	// Run "prescore" plugins.
-	prescoreStatus := g.framework.RunPreScorePlugins(ctx, state, pod, filteredNodes, filteredNodesStatuses)
+	prescoreStatus := g.framework.RunPreScorePlugins(ctx, state, pod, filteredNodes)
 	if !prescoreStatus.IsSuccess() {
 		return result, prescoreStatus.AsError()
 	}

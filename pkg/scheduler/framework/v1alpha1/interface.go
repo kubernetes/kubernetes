@@ -310,9 +310,8 @@ type PreScorePlugin interface {
 	Plugin
 	// PreScore is called by the scheduling framework after a list of nodes
 	// passed the filtering phase. All prescore plugins must return success or
-	// the pod will be rejected. The filteredNodesStatuses is the set of filtered nodes
-	// and their filter status.
-	PreScore(ctx context.Context, state *CycleState, pod *v1.Pod, nodes []*v1.Node, filteredNodesStatuses NodeToStatusMap) *Status
+	// the pod will be rejected
+	PreScore(ctx context.Context, state *CycleState, pod *v1.Pod, nodes []*v1.Node) *Status
 }
 
 // ScoreExtensions is an interface for Score extended functionality.
@@ -439,9 +438,8 @@ type Framework interface {
 	RunPreFilterExtensionRemovePod(ctx context.Context, state *CycleState, podToSchedule *v1.Pod, podToAdd *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *Status
 
 	// RunPreScorePlugins runs the set of configured pre-score plugins. If any
-	// of these plugins returns any status other than "Success", the given pod is
-	// rejected. The filteredNodeStatuses is the set of filtered nodes and their statuses.
-	RunPreScorePlugins(ctx context.Context, state *CycleState, pod *v1.Pod, nodes []*v1.Node, filteredNodesStatuses NodeToStatusMap) *Status
+	// of these plugins returns any status other than "Success", the given pod is rejected.
+	RunPreScorePlugins(ctx context.Context, state *CycleState, pod *v1.Pod, nodes []*v1.Node) *Status
 
 	// RunScorePlugins runs the set of configured scoring plugins. It returns a map that
 	// stores for each scoring plugin name the corresponding NodeScoreList(s).

@@ -65,7 +65,6 @@ func (rl *ResourceLimits) PreScore(
 	cycleState *framework.CycleState,
 	pod *v1.Pod,
 	nodes []*v1.Node,
-	_ framework.NodeToStatusMap,
 ) *framework.Status {
 	if len(nodes) == 0 {
 		// No nodes to score.

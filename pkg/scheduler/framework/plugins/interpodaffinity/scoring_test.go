@@ -523,7 +523,7 @@ func TestPreferredAffinity(t *testing.T) {
 				hardPodAffinityWeight: 1,
 			}
 
-			status := p.PreScore(context.Background(), state, test.pod, test.nodes, nil)
+			status := p.PreScore(context.Background(), state, test.pod, test.nodes)
 			if !status.IsSuccess() {
 				t.Errorf("unexpected error: %v", status)
 			}
@@ -631,7 +631,7 @@ func TestPreferredAffinityWithHardPodAffinitySymmetricWeight(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			status := p.(framework.PreScorePlugin).PreScore(context.Background(), state, test.pod, test.nodes, nil)
+			status := p.(framework.PreScorePlugin).PreScore(context.Background(), state, test.pod, test.nodes)
 			if !status.IsSuccess() {
 				t.Errorf("unexpected error: %v", status)
 			}

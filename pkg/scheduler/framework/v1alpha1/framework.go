@@ -22,7 +22,7 @@ import (
 	"reflect"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -462,21 +462,19 @@ func (f *framework) runFilterPlugin(ctx context.Context, pl FilterPlugin, state 
 }
 
 // RunPreScorePlugins runs the set of configured pre-score plugins. If any
-// of these plugins returns any status other than "Success", the given pod is
-// rejected. The filteredNodeStatuses is the set of filtered nodes and their statuses.
+// of these plugins returns any status other than "Success", the given pod is rejected.
 func (f *framework) RunPreScorePlugins(
 	ctx context.Context,
 	state *CycleState,
 	pod *v1.Pod,
 	nodes []*v1.Node,
-	filteredNodesStatuses NodeToStatusMap,
 ) (status *Status) {
 	startTime := time.Now()
 	defer func() {
 		metrics.FrameworkExtensionPointDuration.WithLabelValues(preScore, status.Code().String()).Observe(metrics.SinceInSeconds(startTime))
 	}()
 	for _, pl := range f.preScorePlugins {
-		status = f.runPreScorePlugin(ctx, pl, state, pod, nodes, filteredNodesStatuses)
+		status = f.runPreScorePlugin(ctx, pl, state, pod, nodes)
 		if !status.IsSuccess() {
 			msg := fmt.Sprintf("error while running %q prescore plugin for pod %q: %v", pl.Name(), pod.Name, status.Message())
 			klog.Error(msg)
@@ -487,12 +485,12 @@ func (f *framework) RunPreScorePlugins(
 	return nil
 }
 
-func (f *framework) runPreScorePlugin(ctx context.Context, pl PreScorePlugin, state *CycleState, pod *v1.Pod, nodes []*v1.Node, filteredNodesStatuses NodeToStatusMap) *Status {
+func (f *framework) runPreScorePlugin(ctx context.Context, pl PreScorePlugin, state *CycleState, pod *v1.Pod, nodes []*v1.Node) *Status {
 	if !state.ShouldRecordPluginMetrics() {
-		return pl.PreScore(ctx, state, pod, nodes, filteredNodesStatuses)
+		return pl.PreScore(ctx, state, pod, nodes)
 	}
 	startTime := time.Now()
-	status := pl.PreScore(ctx, state, pod, nodes, filteredNodesStatuses)
+	status := pl.PreScore(ctx, state, pod, nodes)
 	f.metricsRecorder.observePluginDurationAsync(preScore, pl.Name(), status, metrics.SinceInSeconds(startTime))
 	return status
 }

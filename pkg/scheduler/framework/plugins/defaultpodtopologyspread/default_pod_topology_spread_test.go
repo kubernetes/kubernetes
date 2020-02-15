@@ -386,7 +386,7 @@ func TestDefaultPodTopologySpreadScore(t *testing.T) {
 				handle: fh,
 			}
 
-			status := plugin.PreScore(ctx, state, test.pod, nodes, nil)
+			status := plugin.PreScore(ctx, state, test.pod, nodes)
 			if !status.IsSuccess() {
 				t.Fatalf("unexpected error: %v", status)
 			}
@@ -638,7 +638,7 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 			}
 
 			state := framework.NewCycleState()
-			status := plugin.PreScore(ctx, state, test.pod, nodes, nil)
+			status := plugin.PreScore(ctx, state, test.pod, nodes)
 			if !status.IsSuccess() {
 				t.Fatalf("unexpected error: %v", status)
 			}
