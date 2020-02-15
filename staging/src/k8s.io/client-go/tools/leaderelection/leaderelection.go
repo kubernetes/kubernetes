@@ -290,7 +290,8 @@ func (le *LeaderElector) release() bool {
 		return true
 	}
 	leaderElectionRecord := rl.LeaderElectionRecord{
-		LeaderTransitions: le.observedRecord.LeaderTransitions,
+		LeaseDurationSeconds: le.observedRecord.LeaseDurationSeconds,
+		LeaderTransitions:    le.observedRecord.LeaderTransitions,
 	}
 	if err := le.config.Lock.Update(context.TODO(), leaderElectionRecord); err != nil {
 		klog.Errorf("Failed to release lock: %v", err)
