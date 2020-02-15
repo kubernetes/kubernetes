@@ -19,6 +19,7 @@ package defaultpodtopologyspread
 import (
 	"context"
 	"fmt"
+
 	"k8s.io/klog"
 
 	v1 "k8s.io/api/core/v1"
@@ -178,7 +179,7 @@ func (pl *DefaultPodTopologySpread) ScoreExtensions() framework.ScoreExtensions 
 }
 
 // PreScore builds and writes cycle state used by Score and NormalizeScore.
-func (pl *DefaultPodTopologySpread) PreScore(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodes []*v1.Node, _ framework.NodeToStatusMap) *framework.Status {
+func (pl *DefaultPodTopologySpread) PreScore(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodes []*v1.Node) *framework.Status {
 	var selector labels.Selector
 	informerFactory := pl.handle.SharedInformerFactory()
 	selector = getSelector(

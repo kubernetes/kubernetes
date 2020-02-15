@@ -476,7 +476,7 @@ func TestPodTopologySpreadScore(t *testing.T) {
 			snapshot := cache.NewSnapshot(tt.existingPods, allNodes)
 			p := &PodTopologySpread{sharedLister: snapshot}
 
-			status := p.PreScore(context.Background(), state, tt.pod, tt.nodes, nil)
+			status := p.PreScore(context.Background(), state, tt.pod, tt.nodes)
 			if !status.IsSuccess() {
 				t.Errorf("unexpected error: %v", status)
 			}
@@ -546,7 +546,7 @@ func BenchmarkTestPodTopologySpreadScore(b *testing.B) {
 			snapshot := cache.NewSnapshot(existingPods, allNodes)
 			p := &PodTopologySpread{sharedLister: snapshot}
 
-			status := p.PreScore(context.Background(), state, tt.pod, filteredNodes, nil)
+			status := p.PreScore(context.Background(), state, tt.pod, filteredNodes)
 			if !status.IsSuccess() {
 				b.Fatalf("unexpected error: %v", status)
 			}
@@ -605,7 +605,7 @@ func BenchmarkTestDefaultEvenPodsSpreadPriority(b *testing.B) {
 			snapshot := cache.NewSnapshot(existingPods, allNodes)
 			p := &PodTopologySpread{sharedLister: snapshot}
 
-			status := p.PreScore(context.Background(), state, pod, filteredNodes, nil)
+			status := p.PreScore(context.Background(), state, pod, filteredNodes)
 			if !status.IsSuccess() {
 				b.Fatalf("unexpected error: %v", status)
 			}

@@ -84,7 +84,6 @@ func (pl *PodTopologySpread) PreScore(
 	cycleState *framework.CycleState,
 	pod *v1.Pod,
 	filteredNodes []*v1.Node,
-	_ framework.NodeToStatusMap,
 ) *framework.Status {
 	allNodes, err := pl.sharedLister.NodeInfos().List()
 	if err != nil {

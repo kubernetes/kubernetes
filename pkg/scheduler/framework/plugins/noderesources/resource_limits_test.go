@@ -152,7 +152,7 @@ func TestResourceLimits(t *testing.T) {
 			for i := range test.nodes {
 				state := framework.NewCycleState()
 				if !test.skipPreScore {
-					status := p.PreScore(context.Background(), state, test.pod, test.nodes, nil)
+					status := p.PreScore(context.Background(), state, test.pod, test.nodes)
 					if !status.IsSuccess() {
 						t.Errorf("unexpected error: %v", status)
 					}

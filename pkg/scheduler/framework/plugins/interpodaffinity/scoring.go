@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog"
@@ -172,7 +172,6 @@ func (pl *InterPodAffinity) PreScore(
 	cycleState *framework.CycleState,
 	pod *v1.Pod,
 	nodes []*v1.Node,
-	_ framework.NodeToStatusMap,
 ) *framework.Status {
 	if len(nodes) == 0 {
 		// No nodes to score.

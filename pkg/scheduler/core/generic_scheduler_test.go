@@ -1144,11 +1144,11 @@ func TestZeroRequest(t *testing.T) {
 
 			ctx := context.Background()
 			state := framework.NewCycleState()
-			_, filteredNodesStatuses, err := scheduler.findNodesThatFitPod(ctx, state, test.pod)
+			_, _, err = scheduler.findNodesThatFitPod(ctx, state, test.pod)
 			if err != nil {
 				t.Fatalf("error filtering nodes: %+v", err)
 			}
-			scheduler.framework.RunPreScorePlugins(ctx, state, test.pod, test.nodes, filteredNodesStatuses)
+			scheduler.framework.RunPreScorePlugins(ctx, state, test.pod, test.nodes)
 			list, err := scheduler.prioritizeNodes(
 				ctx,
 				state,

@@ -169,7 +169,7 @@ func (pl *TestPlugin) Filter(ctx context.Context, state *CycleState, pod *v1.Pod
 	return NewStatus(Code(pl.inj.FilterStatus), "injected filter status")
 }
 
-func (pl *TestPlugin) PreScore(ctx context.Context, state *CycleState, pod *v1.Pod, nodes []*v1.Node, filteredNodesStatuses NodeToStatusMap) *Status {
+func (pl *TestPlugin) PreScore(ctx context.Context, state *CycleState, pod *v1.Pod, nodes []*v1.Node) *Status {
 	return NewStatus(Code(pl.inj.PreScoreStatus), "injected status")
 }
 
@@ -1329,7 +1329,7 @@ func TestRecordingMetrics(t *testing.T) {
 		},
 		{
 			name:               "PreScore - Success",
-			action:             func(f Framework) { f.RunPreScorePlugins(context.Background(), state, pod, nil, nil) },
+			action:             func(f Framework) { f.RunPreScorePlugins(context.Background(), state, pod, nil) },
 			wantExtensionPoint: "PreScore",
 			wantStatus:         Success,
 		},
@@ -1385,7 +1385,7 @@ func TestRecordingMetrics(t *testing.T) {
 		},
 		{
 			name:               "PreScore - Error",
-			action:             func(f Framework) { f.RunPreScorePlugins(context.Background(), state, pod, nil, nil) },
+			action:             func(f Framework) { f.RunPreScorePlugins(context.Background(), state, pod, nil) },
 			inject:             injectedResult{PreScoreStatus: int(Error)},
 			wantExtensionPoint: "PreScore",
 			wantStatus:         Error,
