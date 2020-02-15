@@ -464,7 +464,7 @@ function append_or_replace_prefixed_line {
   local -r tmpfile="$(mktemp -t filtered.XXXX --tmpdir=${dirname})"
 
   touch "${file}"
-  awk "substr(\$0,0,length(\"${prefix}\")) != \"${prefix}\" { print }" "${file}" > "${tmpfile}"
+  awk -v pfx="${prefix}" 'substr($0,1,length(pfx)) != pfx { print }' "${file}" > "${tmpfile}"
   echo "${prefix}${suffix}" >> "${tmpfile}"
   mv "${tmpfile}" "${file}"
 }
