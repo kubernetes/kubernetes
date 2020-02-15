@@ -210,6 +210,9 @@ func (o *SetResourcesOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, ar
 // Validate makes sure that provided values in ResourcesOptions are valid
 func (o *SetResourcesOptions) Validate() error {
 	var err error
+	if o.Local && o.DryRunStrategy == cmdutil.DryRunServer {
+		return fmt.Errorf("cannot specify --local and --dry-run=server - did you mean --dry-run=client?")
+	}
 	if o.All && len(o.Selector) > 0 {
 		return fmt.Errorf("cannot set --all and --selector at the same time")
 	}

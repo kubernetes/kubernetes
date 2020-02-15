@@ -133,6 +133,9 @@ func (o *SetServiceAccountOptions) Complete(f cmdutil.Factory, cmd *cobra.Comman
 	if err != nil {
 		return err
 	}
+	if o.local && o.dryRunStrategy == cmdutil.DryRunServer {
+		return fmt.Errorf("cannot specify --local and --dry-run=server - did you mean --dry-run=client?")
+	}
 	dynamicClient, err := f.DynamicClient()
 	if err != nil {
 		return err

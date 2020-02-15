@@ -223,6 +223,9 @@ func (o AnnotateOptions) Validate() error {
 			return fmt.Errorf("one or more resources must be specified as <resource> <name> or <resource>/<name>")
 		}
 	} else {
+		if o.dryRunStrategy == cmdutil.DryRunServer {
+			return fmt.Errorf("cannot specify --local and --dry-run=server - did you mean --dry-run=client?")
+		}
 		if len(o.resources) > 0 {
 			return fmt.Errorf("can only use local files by -f rsrc.yaml or --filename=rsrc.json when --local=true is set")
 		}

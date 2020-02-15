@@ -254,6 +254,9 @@ func (o *EnvOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 
 // Validate makes sure provided values for EnvOptions are valid
 func (o *EnvOptions) Validate() error {
+	if o.Local && o.dryRunStrategy == cmdutil.DryRunServer {
+		return fmt.Errorf("cannot specify --local and --dry-run=server - did you mean --dry-run=client?")
+	}
 	if len(o.Filenames) == 0 && len(o.resources) < 1 {
 		return fmt.Errorf("one or more resources must be specified as <resource> <name> or <resource>/<name>")
 	}

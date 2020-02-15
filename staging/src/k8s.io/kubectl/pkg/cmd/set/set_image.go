@@ -216,6 +216,9 @@ func (o *SetImageOptions) Validate() error {
 	} else if len(o.ContainerImages) > 1 && hasWildcardKey(o.ContainerImages) {
 		errors = append(errors, fmt.Errorf("all containers are already specified by *, but saw more than one container_name=container_image pairs"))
 	}
+	if o.Local && o.DryRunStrategy == cmdutil.DryRunServer {
+		errors = append(errors, fmt.Errorf("cannot specify --local and --dry-run=server - did you mean --dry-run=client?"))
+	}
 	return utilerrors.NewAggregate(errors)
 }
 

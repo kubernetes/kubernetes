@@ -176,6 +176,9 @@ func (o *PatchOptions) Validate() error {
 	if o.Local && len(o.args) != 0 {
 		return fmt.Errorf("cannot specify --local and server resources")
 	}
+	if o.Local && o.dryRunStrategy == cmdutil.DryRunServer {
+		return fmt.Errorf("cannot specify --local and --dry-run=server - did you mean --dry-run=client?")
+	}
 	if len(o.Patch) == 0 {
 		return fmt.Errorf("must specify -p to patch")
 	}
