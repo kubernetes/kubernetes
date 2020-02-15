@@ -82,6 +82,7 @@ go_library(
         "//test/e2e/framework/skipper:go_default_library",
         "//test/e2e/framework/ssh:go_default_library",
         "//test/e2e/network/scale:go_default_library",
+        "//test/e2e/storage/utils:go_default_library",
         "//test/utils:go_default_library",
         "//test/utils/image:go_default_library",
         "//vendor/github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud:go_default_library",
