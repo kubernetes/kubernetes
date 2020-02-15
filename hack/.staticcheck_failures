@@ -18,7 +18,6 @@ pkg/registry/core/service/storage
 pkg/util/coverage
 pkg/volume
 pkg/volume/azure_dd
-pkg/volume/azure_file
 pkg/volume/csi
 pkg/volume/flexvolume
 pkg/volume/iscsi
@@ -29,7 +28,6 @@ pkg/volume/storageos
 pkg/volume/util
 pkg/volume/util/fsquota
 pkg/volume/util/fsquota/common
-pkg/volume/util/operationexecutor
 pkg/volume/util/subpath
 test/e2e/apps
 test/e2e/autoscaling

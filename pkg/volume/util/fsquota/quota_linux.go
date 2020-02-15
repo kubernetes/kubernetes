@@ -226,6 +226,11 @@ func clearQuotaOnDir(m mount.Interface, path string) error {
 	// we explicitly have to check in this case.
 	klog.V(4).Infof("clearQuotaOnDir %s", path)
 	supportsQuotas, err := SupportsQuotas(m, path)
+	if err != nil {
+		// Log-and-continue instead of returning an error for now
+		// due to unspecified backwards compatibility concerns (a subject to revise)
+		klog.V(3).Infof("Attempt to check for quota support failed: %v", err)
+	}
 	if !supportsQuotas {
 		return nil
 	}
@@ -409,8 +414,12 @@ func ClearQuota(m mount.Interface, path string) error {
 	if !ok {
 		return fmt.Errorf("ClearQuota: No quota available for %s", path)
 	}
-	var err error
 	projid, err := getQuotaOnDir(m, path)
+	if err != nil {
+		// Log-and-continue instead of returning an error for now
+		// due to unspecified backwards compatibility concerns (a subject to revise)
+		klog.V(3).Infof("Attempt to check quota ID %v on dir %s failed: %v", dirQuotaMap[path], path, err)
+	}
 	if projid != dirQuotaMap[path] {
 		return fmt.Errorf("Expected quota ID %v on dir %s does not match actual %v", dirQuotaMap[path], path, projid)
 	}
