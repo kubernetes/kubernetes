@@ -153,7 +153,7 @@ func lastMandatoryExists(flowcontrolClientSet flowcontrolclient.FlowcontrolV1alp
 	return false, nil
 }
 
-const thisFieldManager = "api-priority-and-fairness-config-producer"
+const thisFieldManager = "api-priority-and-fairness-config-producer-v1"
 
 func ensure(flowcontrolClientSet flowcontrolclient.FlowcontrolV1alpha1Interface, flowSchemas []*flowcontrolv1alpha1.FlowSchema, priorityLevels []*flowcontrolv1alpha1.PriorityLevelConfiguration) error {
 	for _, flowSchema := range flowSchemas {
