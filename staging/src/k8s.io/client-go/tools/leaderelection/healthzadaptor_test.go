@@ -17,6 +17,7 @@ limitations under the License.
 package leaderelection
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -32,17 +33,17 @@ type fakeLock struct {
 }
 
 // Get is a dummy to allow us to have a fakeLock for testing.
-func (fl *fakeLock) Get() (ler *rl.LeaderElectionRecord, rawRecord []byte, err error) {
+func (fl *fakeLock) Get(ctx context.Context) (ler *rl.LeaderElectionRecord, rawRecord []byte, err error) {
 	return nil, nil, nil
 }
 
 // Create is a dummy to allow us to have a fakeLock for testing.
-func (fl *fakeLock) Create(ler rl.LeaderElectionRecord) error {
+func (fl *fakeLock) Create(ctx context.Context, ler rl.LeaderElectionRecord) error {
 	return nil
 }
 
 // Update is a dummy to allow us to have a fakeLock for testing.
-func (fl *fakeLock) Update(ler rl.LeaderElectionRecord) error {
+func (fl *fakeLock) Update(ctx context.Context, ler rl.LeaderElectionRecord) error {
 	return nil
 }
 

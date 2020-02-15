@@ -42,10 +42,10 @@ type ConfigMapLock struct {
 }
 
 // Get returns the election record from a ConfigMap Annotation
-func (cml *ConfigMapLock) Get() (*LeaderElectionRecord, []byte, error) {
+func (cml *ConfigMapLock) Get(ctx context.Context) (*LeaderElectionRecord, []byte, error) {
 	var record LeaderElectionRecord
 	var err error
-	cml.cm, err = cml.Client.ConfigMaps(cml.ConfigMapMeta.Namespace).Get(context.TODO(), cml.ConfigMapMeta.Name, metav1.GetOptions{})
+	cml.cm, err = cml.Client.ConfigMaps(cml.ConfigMapMeta.Namespace).Get(ctx, cml.ConfigMapMeta.Name, metav1.GetOptions{})
 	if err != nil {
 		return nil, nil, err
 	}
@@ -62,12 +62,12 @@ func (cml *ConfigMapLock) Get() (*LeaderElectionRecord, []byte, error) {
 }
 
 // Create attempts to create a LeaderElectionRecord annotation
-func (cml *ConfigMapLock) Create(ler LeaderElectionRecord) error {
+func (cml *ConfigMapLock) Create(ctx context.Context, ler LeaderElectionRecord) error {
 	recordBytes, err := json.Marshal(ler)
 	if err != nil {
 		return err
 	}
-	cml.cm, err = cml.Client.ConfigMaps(cml.ConfigMapMeta.Namespace).Create(context.TODO(), &v1.ConfigMap{
+	cml.cm, err = cml.Client.ConfigMaps(cml.ConfigMapMeta.Namespace).Create(ctx, &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cml.ConfigMapMeta.Name,
 			Namespace: cml.ConfigMapMeta.Namespace,
@@ -80,7 +80,7 @@ func (cml *ConfigMapLock) Create(ler LeaderElectionRecord) error {
 }
 
 // Update will update an existing annotation on a given resource.
-func (cml *ConfigMapLock) Update(ler LeaderElectionRecord) error {
+func (cml *ConfigMapLock) Update(ctx context.Context, ler LeaderElectionRecord) error {
 	if cml.cm == nil {
 		return errors.New("configmap not initialized, call get or create first")
 	}
@@ -89,7 +89,7 @@ func (cml *ConfigMapLock) Update(ler LeaderElectionRecord) error {
 		return err
 	}
 	cml.cm.Annotations[LeaderElectionRecordAnnotationKey] = string(recordBytes)
-	cml.cm, err = cml.Client.ConfigMaps(cml.ConfigMapMeta.Namespace).Update(context.TODO(), cml.cm, metav1.UpdateOptions{})
+	cml.cm, err = cml.Client.ConfigMaps(cml.ConfigMapMeta.Namespace).Update(ctx, cml.cm, metav1.UpdateOptions{})
 	return err
 }
 
