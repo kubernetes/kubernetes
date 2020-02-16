@@ -53,11 +53,16 @@ import (
 const testHostname = "test-hostname"
 
 type fakeIPGetter struct {
-	nodeIPs []net.IP
+	nodeIPs   []net.IP
+	bindedIPs sets.String
 }
 
 func (f *fakeIPGetter) NodeIPs() ([]net.IP, error) {
 	return f.nodeIPs, nil
+}
+
+func (f *fakeIPGetter) BindedIPs() (sets.String, error) {
+	return f.bindedIPs, nil
 }
 
 // fakePortOpener implements portOpener.
@@ -3120,7 +3125,7 @@ func Test_syncService(t *testing.T) {
 				t.Errorf("Case [%d], unexpected add IPVS virtual server error: %v", i, err)
 			}
 		}
-		if err := proxier.syncService(testCases[i].svcName, testCases[i].newVirtualServer, testCases[i].bindAddr); err != nil {
+		if err := proxier.syncService(testCases[i].svcName, testCases[i].newVirtualServer, testCases[i].bindAddr, sets.NewString()); err != nil {
 			t.Errorf("Case [%d], unexpected sync IPVS virtual server error: %v", i, err)
 		}
 		// check
