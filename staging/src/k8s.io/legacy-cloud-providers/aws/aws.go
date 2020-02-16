@@ -3874,9 +3874,9 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 					tcpHealthCheckPort = int32(*listener.InstancePort)
 					break
 				}
-				if tcpHealthCheckPort == 0 {
-					return nil, fmt.Errorf("Failed to assign SSL heath check port for load balancer %v, no secure endpoint available", loadBalancerName)
-				}
+			}
+			if tcpHealthCheckPort == 0 {
+				return nil, fmt.Errorf("Failed to assign SSL heath check port for load balancer %v, no secure endpoint available", loadBalancerName)
 			}
 		} else {
 			hcProtocol = "TCP"
