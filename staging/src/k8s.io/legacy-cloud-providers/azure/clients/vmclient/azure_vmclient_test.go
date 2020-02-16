@@ -139,6 +139,19 @@ func TestCreateOrUpdate(t *testing.T) {
 	assert.Nil(t, rerr)
 }
 
+func TestDelete(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	r := getTestVM("vm1")
+	armClient := mockarmclient.NewMockInterface(ctrl)
+	armClient.EXPECT().DeleteResource(gomock.Any(), to.String(r.ID), "").Return(nil).Times(1)
+
+	client := getTestVMClient(armClient)
+	rerr := client.Delete(context.TODO(), "rg", "vm1")
+	assert.Nil(t, rerr)
+}
+
 func getTestVM(vmName string) compute.VirtualMachine {
 	resourceID := fmt.Sprintf("/subscriptions/subscriptionID/resourceGroups/rg/providers/Microsoft.Compute/virtualMachines/%s", vmName)
 	return compute.VirtualMachine{

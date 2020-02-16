@@ -45,4 +45,7 @@ type Interface interface {
 
 	// Update updates a VirtualMachine.
 	Update(ctx context.Context, resourceGroupName string, VMName string, parameters compute.VirtualMachineUpdate, source string) *retry.Error
+
+	// Delete deletes a VirtualMachine.
+	Delete(ctx context.Context, resourceGroupName string, VMName string) *retry.Error
 }
