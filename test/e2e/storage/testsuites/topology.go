@@ -333,16 +333,14 @@ func (t *topologyTestSuite) createResources(cs clientset.Interface, l *topologyT
 	framework.ExpectNoError(err)
 
 	ginkgo.By("Creating pod")
-	l.pod = e2epod.MakeSecPod(l.config.Framework.Namespace.Name,
-		[]*v1.PersistentVolumeClaim{l.resource.Pvc},
-		nil,
-		false,
-		"",
-		false,
-		false,
-		e2epv.SELinuxLabel,
-		nil)
-	l.pod.Spec.Affinity = affinity
+	podConfig := e2epod.Config{
+		NS:            l.config.Framework.Namespace.Name,
+		PVCs:          []*v1.PersistentVolumeClaim{l.resource.Pvc},
+		SeLinuxLabel:  e2epv.SELinuxLabel,
+		NodeSelection: e2epod.NodeSelection{Affinity: affinity},
+	}
+	l.pod, err = e2epod.MakeSecPod(&podConfig)
+	framework.ExpectNoError(err)
 	l.pod, err = cs.CoreV1().Pods(l.pod.Namespace).Create(context.TODO(), l.pod, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 }

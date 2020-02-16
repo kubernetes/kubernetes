@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -95,7 +95,12 @@ func (t *VolumeModeDowngradeTest) Setup(f *framework.Framework) {
 	framework.ExpectNoError(err)
 
 	ginkgo.By("Consuming the PVC before downgrade")
-	t.pod, err = e2epod.CreateSecPod(cs, ns, []*v1.PersistentVolumeClaim{t.pvc}, nil, false, "", false, false, e2epv.SELinuxLabel, nil, framework.PodStartTimeout)
+	podConfig := e2epod.Config{
+		NS:           ns,
+		PVCs:         []*v1.PersistentVolumeClaim{t.pvc},
+		SeLinuxLabel: e2epv.SELinuxLabel,
+	}
+	t.pod, err = e2epod.CreateSecPod(cs, &podConfig, framework.PodStartTimeout)
 	framework.ExpectNoError(err)
 
 	ginkgo.By("Checking if PV exists as expected volume mode")

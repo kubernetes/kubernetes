@@ -213,9 +213,15 @@ func (t *volumeModeTestSuite) DefineTests(driver TestDriver, pattern testpattern
 				framework.ExpectNoError(e2epv.WaitOnPVandPVC(l.cs, l.ns.Name, l.Pv, l.Pvc), "Failed to bind pv and pvc")
 
 				ginkgo.By("Creating pod")
-				pod := e2epod.MakeSecPod(l.ns.Name, []*v1.PersistentVolumeClaim{l.Pvc}, nil, false, "", false, false, e2epv.SELinuxLabel, nil)
-				// Setting node
-				e2epod.SetNodeSelection(&pod.Spec, l.config.ClientNodeSelection)
+				podConfig := e2epod.Config{
+					NS:            l.ns.Name,
+					PVCs:          []*v1.PersistentVolumeClaim{l.Pvc},
+					SeLinuxLabel:  e2epv.SELinuxLabel,
+					NodeSelection: l.config.ClientNodeSelection,
+				}
+				pod, err := e2epod.MakeSecPod(&podConfig)
+				framework.ExpectNoError(err, "Failed to create pod")
+
 				pod, err = l.cs.CoreV1().Pods(l.ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
 				framework.ExpectNoError(err, "Failed to create pod")
 				defer func() {
@@ -292,7 +298,14 @@ func (t *volumeModeTestSuite) DefineTests(driver TestDriver, pattern testpattern
 
 		ginkgo.By("Creating pod")
 		var err error
-		pod := e2epod.MakeSecPod(l.ns.Name, []*v1.PersistentVolumeClaim{l.Pvc}, nil, false, "", false, false, e2epv.SELinuxLabel, nil)
+		podConfig := e2epod.Config{
+			NS:           l.ns.Name,
+			PVCs:         []*v1.PersistentVolumeClaim{l.Pvc},
+			SeLinuxLabel: e2epv.SELinuxLabel,
+		}
+		pod, err := e2epod.MakeSecPod(&podConfig)
+		framework.ExpectNoError(err)
+
 		// Change volumeMounts to volumeDevices and the other way around
 		pod = swapVolumeMode(pod)
 
@@ -341,7 +354,14 @@ func (t *volumeModeTestSuite) DefineTests(driver TestDriver, pattern testpattern
 
 		ginkgo.By("Creating pod")
 		var err error
-		pod := e2epod.MakeSecPod(l.ns.Name, []*v1.PersistentVolumeClaim{l.Pvc}, nil, false, "", false, false, e2epv.SELinuxLabel, nil)
+		podConfig := e2epod.Config{
+			NS:           l.ns.Name,
+			PVCs:         []*v1.PersistentVolumeClaim{l.Pvc},
+			SeLinuxLabel: e2epv.SELinuxLabel,
+		}
+		pod, err := e2epod.MakeSecPod(&podConfig)
+		framework.ExpectNoError(err)
+
 		for i := range pod.Spec.Containers {
 			pod.Spec.Containers[i].VolumeDevices = nil
 			pod.Spec.Containers[i].VolumeMounts = nil
