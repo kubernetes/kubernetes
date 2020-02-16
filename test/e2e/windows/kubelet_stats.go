@@ -34,7 +34,7 @@ import (
 	"github.com/onsi/ginkgo"
 )
 
-var _ = SIGDescribe("[Feature:Windows] Kubelet-Stats", func() {
+var _ = SIGDescribe("[Feature:Windows] Kubelet-Stats [Serial]", func() {
 	f := framework.NewDefaultFramework("kubelet-stats-test-windows")
 
 	ginkgo.Describe("Kubelet stats collection for Windows nodes", func() {
