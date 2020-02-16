@@ -639,6 +639,27 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 		fwk.RunUnreservePlugins(schedulingCycleCtx, state, assumedPod, scheduleResult.SuggestedHost)
 		return
 	}
+
+	// Run "permit" plugins.
+	runPermitStatus := fwk.RunPermitPlugins(schedulingCycleCtx, state, assumedPod, scheduleResult.SuggestedHost)
+	if runPermitStatus.Code() != framework.Wait && !runPermitStatus.IsSuccess() {
+		var reason string
+		if runPermitStatus.IsUnschedulable() {
+			metrics.PodScheduleFailures.Inc()
+			reason = v1.PodReasonUnschedulable
+		} else {
+			metrics.PodScheduleErrors.Inc()
+			reason = SchedulerError
+		}
+		if forgetErr := sched.Cache().ForgetPod(assumedPod); forgetErr != nil {
+			klog.Errorf("scheduler cache ForgetPod failed: %v", forgetErr)
+		}
+		// One of the plugins returned status different than success or wait.
+		fwk.RunUnreservePlugins(schedulingCycleCtx, state, assumedPod, scheduleResult.SuggestedHost)
+		sched.recordSchedulingFailure(assumedPodInfo, runPermitStatus.AsError(), reason, runPermitStatus.Message())
+		return
+	}
+
 	// bind the pod to its host asynchronously (we can do this b/c of the assumption step above).
 	go func() {
 		bindingCycleCtx, cancel := context.WithCancel(ctx)
@@ -646,11 +667,10 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 		metrics.SchedulerGoroutines.WithLabelValues("binding").Inc()
 		defer metrics.SchedulerGoroutines.WithLabelValues("binding").Dec()
 
-		// Run "permit" plugins.
-		permitStatus := fwk.RunPermitPlugins(bindingCycleCtx, state, assumedPod, scheduleResult.SuggestedHost)
-		if !permitStatus.IsSuccess() {
+		waitOnPermitStatus := fwk.WaitOnPermit(bindingCycleCtx, assumedPod)
+		if !waitOnPermitStatus.IsSuccess() {
 			var reason string
-			if permitStatus.IsUnschedulable() {
+			if waitOnPermitStatus.IsUnschedulable() {
 				metrics.PodScheduleFailures.Inc()
 				reason = v1.PodReasonUnschedulable
 			} else {
@@ -662,7 +682,7 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 			}
 			// trigger un-reserve plugins to clean up state associated with the reserved Pod
 			fwk.RunUnreservePlugins(bindingCycleCtx, state, assumedPod, scheduleResult.SuggestedHost)
-			sched.recordSchedulingFailure(assumedPodInfo, permitStatus.AsError(), reason, permitStatus.Message())
+			sched.recordSchedulingFailure(assumedPodInfo, waitOnPermitStatus.AsError(), reason, waitOnPermitStatus.Message())
 			return
 		}
 
