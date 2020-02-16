@@ -229,6 +229,7 @@ type Cloud struct {
 	kubeClient       clientset.Interface
 	eventBroadcaster record.EventBroadcaster
 	eventRecorder    record.EventRecorder
+	routeUpdater     *delayedRouteUpdater
 
 	vmCache  *timedCache
 	lbCache  *timedCache
@@ -508,6 +509,10 @@ func (az *Cloud) InitializeCloudFromConfig(config *Config, fromSecret bool) erro
 	if err := initDiskControllers(az); err != nil {
 		return err
 	}
+
+	// start delayed route updater.
+	az.routeUpdater = newDelayedRouteUpdater(az, routeUpdateInterval)
+	go az.routeUpdater.run()
 
 	return nil
 }
