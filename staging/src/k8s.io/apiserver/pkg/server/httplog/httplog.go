@@ -19,6 +19,7 @@ package httplog
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -85,7 +86,11 @@ func WithLogging(handler http.Handler, pred StacktracePred) http.Handler {
 		rl := newLogged(req, w).StacktraceWhen(pred)
 		req = req.WithContext(context.WithValue(ctx, respLoggerContextKey, rl))
 
-		defer rl.Log()
+		defer func() {
+			if !errors.Is(req.Context().Err(), context.Canceled) {
+				rl.Log()
+			}
+		}()
 		handler.ServeHTTP(rl, req)
 	})
 }
