@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"net"
 	"runtime"
-	"strconv"
 	"strings"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
@@ -232,10 +231,8 @@ func validateHostPort(input string, fldPath *field.Path) field.ErrorList {
 		allErrs = append(allErrs, field.Invalid(fldPath, hostIP, "must be a valid IP"))
 	}
 
-	if p, err := strconv.Atoi(port); err != nil {
-		allErrs = append(allErrs, field.Invalid(fldPath, port, "must be a valid port"))
-	} else if p < 1 || p > 65535 {
-		allErrs = append(allErrs, field.Invalid(fldPath, port, "must be a valid port"))
+	if _, err := netutils.ParsePort(port, false); err != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath, port, fmt.Sprintf("must be a valid port: %v", err)))
 	}
 
 	return allErrs

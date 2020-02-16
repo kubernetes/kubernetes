@@ -36,6 +36,7 @@
   - k8s.io/apimachinery
   - k8s.io/kube-openapi
   - k8s.io/klog
+  - k8s.io/utils/net
 
 - baseImportPath: "./vendor/k8s.io/api/"
   allowedImports:

@@ -43,6 +43,7 @@ import (
 	"k8s.io/kubectl/pkg/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
+	netutils "k8s.io/utils/net"
 )
 
 // PortForwardOptions contains all the options for running the port-forward cli command.
@@ -168,7 +169,7 @@ func translateServicePortToTargetPort(ports []string, svc corev1.Service, pod co
 	for _, port := range ports {
 		localPort, remotePort := splitPort(port)
 
-		portnum, err := strconv.Atoi(remotePort)
+		portnum, err := netutils.ParsePort(remotePort, false)
 		if err != nil {
 			svcPort, err := util.LookupServicePortNumberByName(svc, remotePort)
 			if err != nil {
@@ -206,7 +207,7 @@ func convertPodNamedPortToNumber(ports []string, pod corev1.Pod) ([]string, erro
 		localPort, remotePort := splitPort(port)
 
 		containerPortStr := remotePort
-		_, err := strconv.Atoi(remotePort)
+		_, err := netutils.ParsePort(remotePort, false)
 		if err != nil {
 			containerPort, err := util.LookupContainerPortNumberByName(pod, remotePort)
 			if err != nil {

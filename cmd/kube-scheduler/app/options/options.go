@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"strconv"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -50,6 +49,7 @@ import (
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	kubeschedulerscheme "k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
+	utilnet "k8s.io/utils/net"
 )
 
 // Options has all the params needed to run a Scheduler
@@ -129,7 +129,7 @@ func splitHostIntPort(s string) (string, int, error) {
 	if err != nil {
 		return "", 0, err
 	}
-	portInt, err := strconv.Atoi(port)
+	portInt, err := utilnet.ParsePort(port, true)
 	if err != nil {
 		return "", 0, err
 	}
