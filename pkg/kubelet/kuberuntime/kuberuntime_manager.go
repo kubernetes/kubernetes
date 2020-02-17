@@ -477,11 +477,11 @@ func containerSucceeded(c *v1.Container, podStatus *kubecontainer.PodStatus) boo
 	return cStatus.ExitCode == 0
 }
 
-func getSidecarIDs(pod *v1.Pod) []int {
+func getSidecarIndexes(pod *v1.Pod) []int {
 	var sidecars []int
 
 	for idx, container := range pod.Spec.Containers {
-		if lifecycleSidecar(container) {
+		if lifecycleSidecar(&container) {
 			sidecars = append(sidecars, idx)
 		}
 	}
@@ -494,7 +494,7 @@ func onlySidecars(pod *v1.Pod, podStatus *kubecontainer.PodStatus) bool {
 
 	//Check if there are any non sidecars running or in need of a restart
 	for _, container := range pod.Spec.Containers {
-		if !lifecycleSidecar(container) {
+		if !lifecycleSidecar(&container) {
 			containerStatus := podStatus.FindContainerStatusByName(container.Name)
 			if kubecontainer.ShouldContainerBeRestarted(&container, pod, podStatus) || containerStatus.State != kubecontainer.ContainerStateExited {
 				onlySidecars = false
@@ -566,7 +566,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 
 		if utilfeature.DefaultFeatureGate.Enabled(features.SidecarLifecycle) {
 			// If pod has sidecars, start them before non sidecars
-			sidecarContainerIDs := getSidecarIDs(pod)
+			sidecarContainerIDs := getSidecarIndexes(pod)
 			if len(sidecarContainerIDs) != 0 {
 				for _, containerID := range sidecarContainerIDs {
 					changes.ContainersToStart = append(changes.ContainersToStart, containerID)
@@ -625,10 +625,11 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 	for idx, container := range pod.Spec.Containers {
 
 		if utilfeature.DefaultFeatureGate.Enabled(features.SidecarLifecycle) {
-			//if the sidecars are still becoming ready during the startup of the pod, skip any non-sidecars
+			//while the sidecars are still becoming ready during the startup of the pod, skip any non-sidecars. This is to ensure that the sidecars are running and ready before we start the non sidecars
+			//this is only true during startup, once the non sidecars have been started for the first time NonSidecarContainersWaiting will be false.
 			if sidecarStatus.SidecarsPresent {
-				if sidecarStatus.ContainersWaiting && !sidecarStatus.SidecarsReady {
-					if !lifecycleSidecar(container) {
+				if sidecarStatus.NonSidecarContainersWaiting && !sidecarStatus.SidecarsReady {
+					if !lifecycleSidecar(&container) {
 						continue
 					}
 				}
@@ -715,12 +716,11 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 
 			//only sidecars are left so terminate them all
 			if onlySidecars {
-				changes.KillPod = true
 				for idx, container := range pod.Spec.Containers {
 					containerStatus := podStatus.FindContainerStatusByName(container.Name)
 					// we don't need to terminate non sidecars or exited sidecars
-					if lifecycleSidecar(container) && containerStatus.State != kubecontainer.ContainerStateExited {
-						message := " All containers have permanently exited, sidecar container will be killed"
+					if lifecycleSidecar(&container) && containerStatus.State != kubecontainer.ContainerStateExited {
+						message := fmt.Sprintf(" All containers have permanently exited, sidecar container %s will be killed", container.Name)
 						changes.ContainersToKill[containerStatus.ID] = containerToKillInfo{
 							name:      containerStatus.Name,
 							container: &pod.Spec.Containers[idx],
@@ -735,6 +735,9 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 						}
 					}
 				}
+				if len(changes.ContainersToKill) == 0 {
+					changes.KillPod = true
+				}
 			}
 		}
 	}
@@ -742,7 +745,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 	return changes
 }
 
-func lifecycleSidecar(c v1.Container) bool {
+func lifecycleSidecar(c *v1.Container) bool {
 	if c.Lifecycle != nil && c.Lifecycle.Type != nil {
 		return *c.Lifecycle.Type == v1.LifecycleTypeSidecar
 	}

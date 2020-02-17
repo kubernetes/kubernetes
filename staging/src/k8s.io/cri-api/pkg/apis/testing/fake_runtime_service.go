@@ -60,8 +60,9 @@ type FakeContainer struct {
 type FakeRuntimeService struct {
 	sync.Mutex
 
-	Called []string
-	Errors map[string][]error
+	Called           []string
+	Errors           map[string][]error
+	ContainersKilled []string
 
 	FakeStatus         *runtimeapi.RuntimeStatus
 	Containers         map[string]*FakeContainer
@@ -416,6 +417,7 @@ func (r *FakeRuntimeService) StopContainer(containerID string, timeout int64) er
 	// Set container to exited state.
 	finishedAt := time.Now().UnixNano()
 	exitedState := runtimeapi.ContainerState_CONTAINER_EXITED
+	r.ContainersKilled = append(r.ContainersKilled, containerID)
 	c.State = exitedState
 	c.FinishedAt = finishedAt
 

@@ -647,7 +647,7 @@ func (m *kubeGenericRuntimeManager) killContainer(pod *v1.Pod, containerID kubec
 
 func isSidecar(containers []v1.Container, name string) bool {
 	for _, container := range containers {
-		if container.Name == name && lifecycleSidecar(container) {
+		if container.Name == name && lifecycleSidecar(&container) {
 			return true
 		}
 	}
@@ -691,11 +691,6 @@ func (m *kubeGenericRuntimeManager) killContainersWithSyncResult(pod *v1.Pod, ru
 				}
 			}
 			containers = nonSidecars
-		}
-		if len(sidecars) != 0 {
-			timePreStopStarted := time.Now()
-			m.preStopContainers(pod, sidecars)
-			gracePeriodOverride = gracePeriodRemaining(pod, gracePeriodOverride, timePreStopStarted)
 		}
 	} else {
 		containers = runningPod.Containers
