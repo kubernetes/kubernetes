@@ -400,7 +400,6 @@ func createTLSSecret(kubeClient clientset.Interface, namespace, secretName strin
 	}
 	var s *v1.Secret
 	if s, err = kubeClient.CoreV1().Secrets(namespace).Get(context.TODO(), secretName, metav1.GetOptions{}); err == nil {
-		// TODO: Retry the update. We don't really expect anything to conflict though.
 		framework.Logf("Updating secret %v in ns %v with hosts %v", secret.Name, namespace, host)
 		s.Data = secret.Data
 		_, err = kubeClient.CoreV1().Secrets(namespace).Update(context.TODO(), s, metav1.UpdateOptions{})
