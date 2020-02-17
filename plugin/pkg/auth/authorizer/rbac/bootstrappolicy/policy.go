@@ -40,23 +40,24 @@ var (
 )
 
 const (
-	legacyGroup         = ""
-	appsGroup           = "apps"
-	authenticationGroup = "authentication.k8s.io"
-	authorizationGroup  = "authorization.k8s.io"
-	autoscalingGroup    = "autoscaling"
-	batchGroup          = "batch"
-	certificatesGroup   = "certificates.k8s.io"
-	coordinationGroup   = "coordination.k8s.io"
-	discoveryGroup      = "discovery.k8s.io"
-	extensionsGroup     = "extensions"
-	policyGroup         = "policy"
-	rbacGroup           = "rbac.authorization.k8s.io"
-	storageGroup        = "storage.k8s.io"
-	resMetricsGroup     = "metrics.k8s.io"
-	customMetricsGroup  = "custom.metrics.k8s.io"
-	networkingGroup     = "networking.k8s.io"
-	eventsGroup         = "events.k8s.io"
+	legacyGroup            = ""
+	appsGroup              = "apps"
+	authenticationGroup    = "authentication.k8s.io"
+	authorizationGroup     = "authorization.k8s.io"
+	autoscalingGroup       = "autoscaling"
+	batchGroup             = "batch"
+	certificatesGroup      = "certificates.k8s.io"
+	coordinationGroup      = "coordination.k8s.io"
+	discoveryGroup         = "discovery.k8s.io"
+	extensionsGroup        = "extensions"
+	policyGroup            = "policy"
+	rbacGroup              = "rbac.authorization.k8s.io"
+	storageGroup           = "storage.k8s.io"
+	resMetricsGroup        = "metrics.k8s.io"
+	customMetricsGroup     = "custom.metrics.k8s.io"
+	networkingGroup        = "networking.k8s.io"
+	eventsGroup            = "events.k8s.io"
+	apiserverinternalGroup = "internal.apiserver.k8s.io"
 )
 
 func addDefaultMetadata(obj runtime.Object) {
@@ -388,6 +389,13 @@ func ClusterRoles() []rbacv1.ClusterRole {
 			Rules: []rbacv1.PolicyRule{
 				// it needs to see all services so that it knows whether the ones it points to exist or not
 				rbacv1helpers.NewRule(Read...).Groups(legacyGroup).Resources("services", "endpoints").RuleOrDie(),
+			},
+		},
+		{
+			// a role to use for storageVersion registration
+			ObjectMeta: metav1.ObjectMeta{Name: "system:kube-apiserver"},
+			Rules: []rbacv1.PolicyRule{
+				rbacv1helpers.NewRule(ReadWrite...).Groups(apiserverinternalGroup).Resources("storageversions").RuleOrDie(),
 			},
 		},
 		{
