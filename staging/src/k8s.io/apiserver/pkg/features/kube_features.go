@@ -108,6 +108,13 @@ const (
 	// document.
 	StorageVersionHash featuregate.Feature = "StorageVersionHash"
 
+	// owner: @caesarxuchao
+	// alpha: v1.18
+	// beta: v1.19
+	//
+	// Enable the storage version API.
+	StorageVersionAPI featuregate.Feature = "StorageVersionAPI"
+
 	// owner: @ksubrmnn
 	// alpha: v1.14
 	//
@@ -166,6 +173,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	RemainingItemCount:      {Default: true, PreRelease: featuregate.Beta},
 	ServerSideApply:         {Default: true, PreRelease: featuregate.Beta},
 	StorageVersionHash:      {Default: true, PreRelease: featuregate.Beta},
+	StorageVersionAPI:       {Default: false, PreRelease: featuregate.Alpha},
 	WinOverlay:              {Default: false, PreRelease: featuregate.Alpha},
 	WinDSR:                  {Default: false, PreRelease: featuregate.Alpha},
 	WatchBookmark:           {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
