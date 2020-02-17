@@ -60,6 +60,14 @@ import (
 	_ "k8s.io/kubernetes/test/e2e/framework/providers/vsphere"
 )
 
+const (
+	// namespaceCleanupTimeout is how long to wait for the namespace to be deleted.
+	// If there are any orphaned namespaces to clean up, this test is running
+	// on a long lived cluster. A long wait here is preferably to spurious test
+	// failures caused by leaked resources from a previous test run.
+	namespaceCleanupTimeout = 15 * time.Minute
+)
+
 var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// Reference common test to make the import valid.
 	commontest.CurrentSuite = commontest.E2E
@@ -232,7 +240,7 @@ func setupSuite() {
 			framework.Failf("Error deleting orphaned namespaces: %v", err)
 		}
 		klog.Infof("Waiting for deletion of the following namespaces: %v", deleted)
-		if err := framework.WaitForNamespacesDeleted(c, deleted, framework.NamespaceCleanupTimeout); err != nil {
+		if err := framework.WaitForNamespacesDeleted(c, deleted, namespaceCleanupTimeout); err != nil {
 			framework.Failf("Failed to delete orphaned namespaces %v: %v", deleted, err)
 		}
 	}
