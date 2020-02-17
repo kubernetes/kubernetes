@@ -133,7 +133,11 @@ func CopyAllLogs(ctx context.Context, cs clientset.Interface, ns string, to LogO
 					var prefix string
 					if to.LogWriter != nil {
 						out = to.LogWriter
-						prefix = name + ": "
+						nodeName := pod.Spec.NodeName
+						if len(nodeName) > 10 {
+							nodeName = nodeName[0:4] + ".." + nodeName[len(nodeName)-4:]
+						}
+						prefix = name + "@" + nodeName + ": "
 					} else {
 						var err error
 						filename := to.LogPathPrefix + pod.ObjectMeta.Name + "-" + c.Name + ".log"
