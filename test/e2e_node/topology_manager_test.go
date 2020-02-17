@@ -778,6 +778,69 @@ func runTopologyManagerNodeAlignmentSuiteTests(f *framework.Framework, configMap
 		// testing more complex conditions require knowledge about the system cpu+bus topology
 	}
 
+	// multi-container tests
+	if sriovResourceAmount >= 4 {
+		ginkgo.By(fmt.Sprintf("Successfully admit one guaranteed pods, each with two containers, each with 2 cores, 1 %s device", sriovResourceName))
+		ctnAttrs = []tmCtnAttribute{
+			{
+				ctnName:       "gu-container-0",
+				cpuRequest:    "2000m",
+				cpuLimit:      "2000m",
+				deviceName:    sriovResourceName,
+				deviceRequest: "1",
+				deviceLimit:   "1",
+			},
+			{
+				ctnName:       "gu-container-1",
+				cpuRequest:    "2000m",
+				cpuLimit:      "2000m",
+				deviceName:    sriovResourceName,
+				deviceRequest: "1",
+				deviceLimit:   "1",
+			},
+		}
+		runTopologyManagerPositiveTest(f, 1, ctnAttrs, hwinfo)
+
+		ginkgo.By(fmt.Sprintf("Successfully admit two guaranteed pods, each with two containers, each with 1 core, 1 %s device", sriovResourceName))
+		ctnAttrs = []tmCtnAttribute{
+			{
+				ctnName:       "gu-container-0",
+				cpuRequest:    "1000m",
+				cpuLimit:      "1000m",
+				deviceName:    sriovResourceName,
+				deviceRequest: "1",
+				deviceLimit:   "1",
+			},
+			{
+				ctnName:       "gu-container-1",
+				cpuRequest:    "1000m",
+				cpuLimit:      "1000m",
+				deviceName:    sriovResourceName,
+				deviceRequest: "1",
+				deviceLimit:   "1",
+			},
+		}
+		runTopologyManagerPositiveTest(f, 2, ctnAttrs, hwinfo)
+
+		ginkgo.By(fmt.Sprintf("Successfully admit two guaranteed pods, each with two containers, both with with 2 cores, one with 1 %s device", sriovResourceName))
+		ctnAttrs = []tmCtnAttribute{
+			{
+				ctnName:       "gu-container-dev",
+				cpuRequest:    "2000m",
+				cpuLimit:      "2000m",
+				deviceName:    sriovResourceName,
+				deviceRequest: "1",
+				deviceLimit:   "1",
+			},
+			{
+				ctnName:    "gu-container-nodev",
+				cpuRequest: "2000m",
+				cpuLimit:   "2000m",
+			},
+		}
+		runTopologyManagerPositiveTest(f, 2, ctnAttrs, hwinfo)
+	}
+
 	// overflow NUMA node capacity: cores
 	numCores := 1 + (threadsPerCore * coreCount)
 	excessCoresReq := fmt.Sprintf("%dm", numCores*1000)
