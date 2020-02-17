@@ -87,6 +87,9 @@ type DefaultStorageFactory struct {
 
 	// newStorageCodecFn exists to be overwritten for unit testing.
 	newStorageCodecFn func(opts StorageCodecConfig) (codec runtime.Codec, encodeVersioner runtime.GroupVersioner, err error)
+
+	// IncludeGroupInResourcePrefix decides if the group name should be included in the resource prefix. Default to false.
+	IncludeGroupInResourcePrefix bool
 }
 
 type groupResourceOverrides struct {
@@ -164,13 +167,14 @@ func NewDefaultStorageFactory(
 		defaultMediaType = runtime.ContentTypeJSON
 	}
 	return &DefaultStorageFactory{
-		StorageConfig:           config,
-		Overrides:               map[schema.GroupResource]groupResourceOverrides{},
-		DefaultMediaType:        defaultMediaType,
-		DefaultSerializer:       defaultSerializer,
-		ResourceEncodingConfig:  resourceEncodingConfig,
-		APIResourceConfigSource: resourceConfig,
-		DefaultResourcePrefixes: specialDefaultResourcePrefixes,
+		StorageConfig:                config,
+		Overrides:                    map[schema.GroupResource]groupResourceOverrides{},
+		DefaultMediaType:             defaultMediaType,
+		DefaultSerializer:            defaultSerializer,
+		ResourceEncodingConfig:       resourceEncodingConfig,
+		APIResourceConfigSource:      resourceConfig,
+		DefaultResourcePrefixes:      specialDefaultResourcePrefixes,
+		IncludeGroupInResourcePrefix: false,
 
 		newStorageCodecFn: NewStorageCodec,
 	}
@@ -343,7 +347,11 @@ func (s *DefaultStorageFactory) ResourcePrefix(groupResource schema.GroupResourc
 		etcdResourcePrefix = exactResourceOverride.etcdResourcePrefix
 	}
 	if len(etcdResourcePrefix) == 0 {
-		etcdResourcePrefix = strings.ToLower(chosenStorageResource.Resource)
+		if s.IncludeGroupInResourcePrefix {
+			etcdResourcePrefix = strings.ToLower(chosenStorageResource.Group) + "/" + strings.ToLower(chosenStorageResource.Resource)
+		} else {
+			etcdResourcePrefix = strings.ToLower(chosenStorageResource.Resource)
+		}
 	}
 
 	return etcdResourcePrefix
