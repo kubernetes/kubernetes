@@ -105,6 +105,7 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 				"PreFilterPlugin": {
 					{Name: "NodeResourcesFit"},
 					{Name: "NodePorts"},
+					{Name: "PodTopologySpread"},
 					{Name: "InterPodAffinity"},
 				},
 				"FilterPlugin": {
@@ -121,15 +122,18 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 					{Name: "AzureDiskLimits"},
 					{Name: "VolumeBinding"},
 					{Name: "VolumeZone"},
+					{Name: "PodTopologySpread"},
 					{Name: "InterPodAffinity"},
 				},
 				"PreScorePlugin": {
+					{Name: "PodTopologySpread"},
 					{Name: "InterPodAffinity"},
 					{Name: "DefaultPodTopologySpread"},
 					{Name: "TaintToleration"},
 				},
 				"ScorePlugin": {
 					{Name: "NodeResourcesBalancedAllocation", Weight: 1},
+					{Name: "PodTopologySpread", Weight: 1},
 					{Name: "ImageLocality", Weight: 1},
 					{Name: "InterPodAffinity", Weight: 1},
 					{Name: "NodeResourcesLeastAllocated", Weight: 1},
@@ -191,6 +195,7 @@ kind: Policy
 				"PreFilterPlugin": {
 					{Name: "NodeResourcesFit"},
 					{Name: "NodePorts"},
+					{Name: "PodTopologySpread"},
 					{Name: "InterPodAffinity"},
 				},
 				"FilterPlugin": {
@@ -207,15 +212,18 @@ kind: Policy
 					{Name: "AzureDiskLimits"},
 					{Name: "VolumeBinding"},
 					{Name: "VolumeZone"},
+					{Name: "PodTopologySpread"},
 					{Name: "InterPodAffinity"},
 				},
 				"PreScorePlugin": {
+					{Name: "PodTopologySpread"},
 					{Name: "InterPodAffinity"},
 					{Name: "DefaultPodTopologySpread"},
 					{Name: "TaintToleration"},
 				},
 				"ScorePlugin": {
 					{Name: "NodeResourcesBalancedAllocation", Weight: 1},
+					{Name: "PodTopologySpread", Weight: 1},
 					{Name: "ImageLocality", Weight: 1},
 					{Name: "InterPodAffinity", Weight: 1},
 					{Name: "NodeResourcesLeastAllocated", Weight: 1},
