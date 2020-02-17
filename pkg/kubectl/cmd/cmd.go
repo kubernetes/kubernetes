@@ -466,9 +466,9 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 	kubeConfigFlags := genericclioptions.NewConfigFlags(true).WithDeprecatedPasswordFlag()
 	kubeConfigFlags.AddFlags(flags)
 	matchVersionKubeConfigFlags := cmdutil.NewMatchVersionFlags(kubeConfigFlags)
-	matchVersionKubeConfigFlags.AddFlags(cmds.PersistentFlags())
+	matchVersionKubeConfigFlags.AddFlags(flags)
 
-	cmds.PersistentFlags().AddGoFlagSet(flag.CommandLine)
+	flags.AddGoFlagSet(flag.CommandLine)
 
 	f := cmdutil.NewFactory(matchVersionKubeConfigFlags)
 
