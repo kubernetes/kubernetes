@@ -44,8 +44,7 @@ func (R *numaPodResources) CheckAlignment() bool {
 		}
 	}
 	for _, devNode := range R.PCIDevsToNUMANode {
-		// TODO: explain -1
-		if devNode != -1 && nodeNum != devNode {
+		if nodeNum != devNode {
 			return false
 		}
 	}
