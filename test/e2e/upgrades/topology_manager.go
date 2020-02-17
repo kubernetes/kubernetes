@@ -51,7 +51,7 @@ const testCmd string = `
 NCPU=$( getconf _NPROCESSORS_ONLN );
 MAXCPU=$( expr $NCPU - 1 );
 echo ALLOWED=$(grep Cpus_allowed_list /proc/self/status | cut -f2);
-for N in $( seq 0 ${MAXCPU} ); do echo "SIBILING$N=$( cat /sys/devices/system/cpu/cpu${N}/topology/core_siblings_list )"; done;
+for N in $( seq 0 ${MAXCPU} ); do echo "SIBLING$N=$( cat /sys/devices/system/cpu/cpu${N}/topology/core_siblings_list )"; done;
 sleep 12h
 `
 
@@ -145,19 +145,23 @@ func validatePodOutput(output string) error {
 
 	for i := 1; i < len(allowed); i++ {
 		cpuNumPrev := allowed[i-1]
-		sibilingsPrev, ok := cpuMap[fmt.Sprintf("SIBILING%d", cpuNumPrev)]
+		siblingsPrev, ok := cpuMap[fmt.Sprintf("SIBLING%d", cpuNumPrev)]
 		if !ok {
-			return fmt.Errorf("Unknown sibilings for cpu %d", cpuNumPrev)
+			return fmt.Errorf("Unknown siblings for cpu %d", cpuNumPrev)
 		}
 
 		cpuNum := allowed[i]
-		sibilings, ok := cpuMap[fmt.Sprintf("SIBILING%d", cpuNum)]
+		siblings, ok := cpuMap[fmt.Sprintf("SIBLING%d", cpuNum)]
 		if !ok {
-			return fmt.Errorf("Unknown sibilings for cpu %d", cpuNum)
+			return fmt.Errorf("Unknown siblings for cpu %d", cpuNum)
 		}
 
-		if !reflect.DeepEqual(sibilingsPrev, sibilings) {
-			return fmt.Errorf("disaligned cpus %d and %d (%v and %v)", cpuNumPrev, cpuNum, sibilingsPrev, sibilings)
+		// per https://www.kernel.org/doc/Documentation/cputopology.txt , cpu_siblings_list is
+		// "(the) human-readable list of cpuX's hardware threads within the same physical_package_id."
+		// hence, if two entries have the same ordered list of siblings, they are on the same
+		// physical package, thus in the same NUMA node.
+		if !reflect.DeepEqual(siblingsPrev, siblings) {
+			return fmt.Errorf("disaligned cpus %d and %d (%v and %v)", cpuNumPrev, cpuNum, siblingsPrev, siblings)
 		}
 	}
 	return nil
