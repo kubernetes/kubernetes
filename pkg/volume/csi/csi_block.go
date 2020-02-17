@@ -72,16 +72,15 @@ import (
 	"os"
 	"path/filepath"
 
-	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
-
-	"k8s.io/klog"
-
 	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/klog"
+	"k8s.io/kubernetes/pkg/util/removeall"
 	"k8s.io/kubernetes/pkg/volume"
+	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 	utilstrings "k8s.io/utils/strings"
 )
 
@@ -115,10 +114,16 @@ func (m *csiBlockMapper) getStagingPath() string {
 	return filepath.Join(m.plugin.host.GetVolumeDevicePluginDir(CSIPluginName), "staging", m.specName)
 }
 
+// getPublishDir returns path to a directory, where the volume is published to each pod.
+// Example: plugins/kubernetes.io/csi/volumeDevices/publish/{specName}
+func (m *csiBlockMapper) getPublishDir() string {
+	return filepath.Join(m.plugin.host.GetVolumeDevicePluginDir(CSIPluginName), "publish", m.specName)
+}
+
 // getPublishPath returns a publish path for a file (on the node) that should be used on NodePublishVolume/NodeUnpublishVolume
 // Example: plugins/kubernetes.io/csi/volumeDevices/publish/{specName}/{podUID}
 func (m *csiBlockMapper) getPublishPath() string {
-	return filepath.Join(m.plugin.host.GetVolumeDevicePluginDir(CSIPluginName), "publish", m.specName, string(m.podUID))
+	return filepath.Join(m.getPublishDir(), string(m.podUID))
 }
 
 // GetPodDeviceMapPath returns pod's device file which will be mapped to a volume
@@ -445,7 +450,8 @@ func (m *csiBlockMapper) TearDownDevice(globalMapPath, devicePath string) error 
 		}
 	}
 	if err = m.cleanupOrphanDeviceFiles(); err != nil {
-		return err
+		// V(4) for not so serious error
+		klog.V(4).Infof("Failed to clean up block volume directory %s", err)
 	}
 
 	return nil
@@ -456,15 +462,10 @@ func (m *csiBlockMapper) TearDownDevice(globalMapPath, devicePath string) error 
 // files are indeed orphaned.
 func (m *csiBlockMapper) cleanupOrphanDeviceFiles() error {
 	// Remove artifacts of NodePublish.
-	// publishPath: xxx/plugins/kubernetes.io/csi/volumeDevices/publish/<volume name>/<pod UUID>
-	// publishPath was removed by the driver. We need to remove the <volume name>/ dir.
-	publishPath := m.getPublishPath()
-	publishDir := filepath.Dir(publishPath)
-	if m.podUID == "" {
-		// Pod UID is not known during device teardown ("NodeUnstage").
-		// getPublishPath() squashed "<volume name>/<pod UUID>" into "<volume name>/".
-		publishDir = publishPath
-	}
+	// publishDir: xxx/plugins/kubernetes.io/csi/volumeDevices/publish/<volume name>
+	// Each PublishVolume() created a subdirectory there. Since everything should be
+	// already unpublished at this point, the directory should be empty by now.
+	publishDir := m.getPublishDir()
 	if err := os.Remove(publishDir); err != nil && !os.IsNotExist(err) {
 		return errors.New(log("failed to remove publish directory [%s]: %v", publishDir, err))
 	}
@@ -478,22 +479,10 @@ func (m *csiBlockMapper) cleanupOrphanDeviceFiles() error {
 
 	// Remove everything under xxx/plugins/kubernetes.io/csi/volumeDevices/<volume name>.
 	// At this point it contains only "data/vol_data.json" and empty "dev/".
-	dataDir := getVolumeDeviceDataDir(m.specName, m.plugin.host)
-	dataFile := filepath.Join(dataDir, volDataFileName)
-	if err := os.Remove(dataFile); err != nil && !os.IsNotExist(err) {
-		return errors.New(log("failed to delete volume data file [%s]: %v", dataFile, err))
-	}
-	if err := os.Remove(dataDir); err != nil && !os.IsNotExist(err) {
-		return errors.New(log("failed to delete volume data directory [%s]: %v", dataDir, err))
-	}
-
-	volumeDir := filepath.Dir(dataDir)
-	deviceDir := filepath.Join(volumeDir, "dev")
-	if err := os.Remove(deviceDir); err != nil && !os.IsNotExist(err) {
-		return errors.New(log("failed to delete volume directory [%s]: %v", deviceDir, err))
-	}
-	if err := os.Remove(volumeDir); err != nil && !os.IsNotExist(err) {
-		return errors.New(log("failed to delete volume directory [%s]: %v", volumeDir, err))
+	volumeDir := getVolumePluginDir(m.specName, m.plugin.host)
+	mounter := m.plugin.host.GetMounter(m.plugin.GetPluginName())
+	if err := removeall.RemoveAllOneFilesystem(mounter, volumeDir); err != nil {
+		return err
 	}
 
 	return nil
