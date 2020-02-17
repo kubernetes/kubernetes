@@ -25,18 +25,16 @@ import (
 
 	flag "github.com/spf13/pflag"
 
-	"k8s.io/component-base/version"
+	k8sversion "k8s.io/component-base/version"
 )
 
-type versionValue int
+type versionValue string
 
 const (
-	VersionFalse versionValue = 0
-	VersionTrue  versionValue = 1
-	VersionRaw   versionValue = 2
+	versionFalse versionValue = "false"
+	versionTrue  versionValue = "true"
+	versionRaw   versionValue = "raw"
 )
-
-const strRawVersion string = "raw"
 
 func (v *versionValue) IsBoolFlag() bool {
 	return true
@@ -47,24 +45,21 @@ func (v *versionValue) Get() interface{} {
 }
 
 func (v *versionValue) Set(s string) error {
-	if s == strRawVersion {
-		*v = VersionRaw
+	if s == string(versionRaw) {
+		*v = versionRaw
 		return nil
 	}
 	boolVal, err := strconv.ParseBool(s)
 	if boolVal {
-		*v = VersionTrue
+		*v = versionTrue
 	} else {
-		*v = VersionFalse
+		*v = versionFalse
 	}
 	return err
 }
 
 func (v *versionValue) String() string {
-	if *v == VersionRaw {
-		return strRawVersion
-	}
-	return fmt.Sprintf("%v", bool(*v == VersionTrue))
+	return string(*v)
 }
 
 // The type of the flag as required by the pflag.Value interface
@@ -72,23 +67,23 @@ func (v *versionValue) Type() string {
 	return "version"
 }
 
-func VersionVar(p *versionValue, name string, value versionValue, usage string) {
+func versionVar(p *versionValue, name string, value versionValue, usage string) {
 	*p = value
 	flag.Var(p, name, usage)
 	// "--version" will be treated as "--version=true"
 	flag.Lookup(name).NoOptDefVal = "true"
 }
 
-func Version(name string, value versionValue, usage string) *versionValue {
+func version(name string, value versionValue, usage string) *versionValue {
 	p := new(versionValue)
-	VersionVar(p, name, value, usage)
+	versionVar(p, name, value, usage)
 	return p
 }
 
 const versionFlagName = "version"
 
 var (
-	versionFlag = Version(versionFlagName, VersionFalse, "Print version information and quit")
+	versionFlag = version(versionFlagName, versionFalse, "Print version information and quit")
 )
 
 // AddFlags registers this package's flags on arbitrary FlagSets, such that they point to the
@@ -100,11 +95,12 @@ func AddFlags(fs *flag.FlagSet) {
 // PrintAndExitIfRequested will check if the -version flag was passed
 // and, if so, print the version and exit.
 func PrintAndExitIfRequested() {
-	if *versionFlag == VersionRaw {
-		fmt.Printf("%#v\n", version.Get())
+	switch *versionFlag {
+	case versionRaw:
+		fmt.Printf("%#v\n", k8sversion.Get())
 		os.Exit(0)
-	} else if *versionFlag == VersionTrue {
-		fmt.Printf("Kubernetes %s\n", version.Get())
+	case versionTrue:
+		fmt.Printf("Kubernetes %s\n", k8sversion.Get())
 		os.Exit(0)
 	}
 }
