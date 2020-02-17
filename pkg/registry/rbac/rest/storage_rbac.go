@@ -26,6 +26,7 @@ import (
 	rbacapiv1 "k8s.io/api/rbac/v1"
 	rbacapiv1alpha1 "k8s.io/api/rbac/v1alpha1"
 	rbacapiv1beta1 "k8s.io/api/rbac/v1beta1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -160,6 +161,15 @@ type PolicyData struct {
 	ClusterRoleBindingsToSplit map[string]rbacapiv1.ClusterRoleBinding
 }
 
+func isConflictOrServiceUnavailable(err error) bool {
+	return errors.IsConflict(err) || errors.IsServiceUnavailable(err)
+
+}
+
+func retryOnConflictOrServiceUnavailable(backoff wait.Backoff, fn func() error) error {
+	return retry.OnError(backoff, isConflictOrServiceUnavailable, fn)
+}
+
 func (p *PolicyData) EnsureRBACPolicy() genericapiserver.PostStartHookFunc {
 	return func(hookContext genericapiserver.PostStartHookContext) error {
 		// initializing roles is really important.  On some e2e runs, we've seen cases where etcd is down when the server
@@ -206,7 +216,7 @@ func (p *PolicyData) EnsureRBACPolicy() genericapiserver.PostStartHookFunc {
 					Client:  reconciliation.ClusterRoleModifier{Client: clientset.ClusterRoles()},
 					Confirm: true,
 				}
-				err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+				err := retryOnConflictOrServiceUnavailable(retry.DefaultBackoff, func() error {
 					result, err := opts.Run()
 					if err != nil {
 						return err
@@ -234,7 +244,7 @@ func (p *PolicyData) EnsureRBACPolicy() genericapiserver.PostStartHookFunc {
 					Client:      reconciliation.ClusterRoleBindingClientAdapter{Client: clientset.ClusterRoleBindings()},
 					Confirm:     true,
 				}
-				err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+				err := retryOnConflictOrServiceUnavailable(retry.DefaultBackoff, func() error {
 					result, err := opts.Run()
 					if err != nil {
 						return err
@@ -265,7 +275,7 @@ func (p *PolicyData) EnsureRBACPolicy() genericapiserver.PostStartHookFunc {
 						Client:  reconciliation.RoleModifier{Client: clientset, NamespaceClient: coreclientset.Namespaces()},
 						Confirm: true,
 					}
-					err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+					err := retryOnConflictOrServiceUnavailable(retry.DefaultBackoff, func() error {
 						result, err := opts.Run()
 						if err != nil {
 							return err
@@ -295,7 +305,7 @@ func (p *PolicyData) EnsureRBACPolicy() genericapiserver.PostStartHookFunc {
 						Client:      reconciliation.RoleBindingClientAdapter{Client: clientset, NamespaceClient: coreclientset.Namespaces()},
 						Confirm:     true,
 					}
-					err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+					err := retryOnConflictOrServiceUnavailable(retry.DefaultBackoff, func() error {
 						result, err := opts.Run()
 						if err != nil {
 							return err
