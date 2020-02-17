@@ -25,7 +25,7 @@ import (
 	"k8s.io/utils/mount"
 	utilstrings "k8s.io/utils/strings"
 
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -160,7 +160,7 @@ type mountDetector interface {
 	// returns (v1.StorageMediumMemory, false, nil), the caller knows that the path is
 	// on a memory FS (tmpfs on Linux) but is not the root mountpoint of
 	// that tmpfs.
-	GetMountMedium(path string) (v1.StorageMedium, bool, error)
+	GetMountMedium(path string, requestedMedium v1.StorageMedium) (v1.StorageMedium, bool, *resource.Quantity, error)
 }
 
 // EmptyDir volumes are temporary directories exposed to the pod.
@@ -261,7 +261,7 @@ func (ed *emptyDir) setupTmpfs(dir string) error {
 		return err
 	}
 	// Make SetUp idempotent.
-	medium, isMnt, err := ed.mountDetector.GetMountMedium(dir)
+	medium, isMnt, _, err := ed.mountDetector.GetMountMedium(dir, ed.medium)
 	if err != nil {
 		return err
 	}
@@ -284,13 +284,30 @@ func (ed *emptyDir) setupHugepages(dir string) error {
 		return err
 	}
 	// Make SetUp idempotent.
-	medium, isMnt, err := ed.mountDetector.GetMountMedium(dir)
+	medium, isMnt, mountPageSize, err := ed.mountDetector.GetMountMedium(dir, ed.medium)
+	klog.V(3).Infof("pod %v: setupHugepages: medium: %s, isMnt: %v, dir: %s, err: %v", ed.pod.UID, medium, isMnt, dir, err)
 	if err != nil {
 		return err
 	}
-	// If the directory is a mountpoint with medium hugepages, there is no
-	// work to do since we are already in the desired state.
+	// If the directory is a mountpoint with medium hugepages of the same page size,
+	// there is no work to do since we are already in the desired state.
 	if isMnt && v1helper.IsHugePageMedium(medium) {
+		// Medium is: Hugepages
+		if ed.medium == v1.StorageMediumHugePages {
+			return nil
+		}
+		if mountPageSize == nil {
+			return fmt.Errorf("pod %v: mounted dir %s pagesize is not determined", ed.pod.UID, dir)
+		}
+		// Medium is: Hugepages-<size>
+		// Mounted page size and medium size must be equal
+		mediumSize, err := v1helper.HugePageSizeFromMedium(ed.medium)
+		if err != nil {
+			return err
+		}
+		if mountPageSize == nil || mediumSize.Cmp(*mountPageSize) != 0 {
+			return fmt.Errorf("pod %v: mounted dir %s pagesize '%s' and requested medium size '%s' differ", ed.pod.UID, dir, mountPageSize.String(), mediumSize.String())
+		}
 		return nil
 	}
 
@@ -412,7 +429,7 @@ func (ed *emptyDir) TearDownAt(dir string) error {
 	}
 
 	// Figure out the medium.
-	medium, isMnt, err := ed.mountDetector.GetMountMedium(dir)
+	medium, isMnt, _, err := ed.mountDetector.GetMountMedium(dir, ed.medium)
 	if err != nil {
 		return err
 	}
