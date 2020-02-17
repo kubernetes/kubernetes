@@ -114,6 +114,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/util/net:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/endpoints:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/endpoints/discovery:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/registry/generic:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server:go_default_library",

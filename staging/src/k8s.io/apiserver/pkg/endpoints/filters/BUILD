@@ -49,6 +49,7 @@ go_library(
         "doc.go",
         "impersonation.go",
         "requestinfo.go",
+        "storageversion.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/endpoints/filters",
     importpath = "k8s.io/apiserver/pkg/endpoints/filters",

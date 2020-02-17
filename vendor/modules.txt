@@ -1291,6 +1291,10 @@ k8s.io/apiserver/pkg/apis/apiserver
 k8s.io/apiserver/pkg/apis/apiserver/install
 k8s.io/apiserver/pkg/apis/apiserver/v1
 k8s.io/apiserver/pkg/apis/apiserver/v1alpha1
+k8s.io/apiserver/pkg/apis/apiserverinternal
+k8s.io/apiserver/pkg/apis/apiserverinternal/install
+k8s.io/apiserver/pkg/apis/apiserverinternal/v1alpha1
+k8s.io/apiserver/pkg/apis/apiserverinternal/validation
 k8s.io/apiserver/pkg/apis/audit
 k8s.io/apiserver/pkg/apis/audit/install
 k8s.io/apiserver/pkg/apis/audit/v1
@@ -1324,6 +1328,9 @@ k8s.io/apiserver/pkg/authorization/authorizer
 k8s.io/apiserver/pkg/authorization/authorizerfactory
 k8s.io/apiserver/pkg/authorization/path
 k8s.io/apiserver/pkg/authorization/union
+k8s.io/apiserver/pkg/client/clientset_generated/clientset
+k8s.io/apiserver/pkg/client/clientset_generated/clientset/scheme
+k8s.io/apiserver/pkg/client/clientset_generated/clientset/typed/apiserverinternal/v1alpha1
 k8s.io/apiserver/pkg/endpoints
 k8s.io/apiserver/pkg/endpoints/discovery
 k8s.io/apiserver/pkg/endpoints/filters
@@ -1373,6 +1380,7 @@ k8s.io/apiserver/pkg/storage/value/encrypt/envelope/testing
 k8s.io/apiserver/pkg/storage/value/encrypt/envelope/v1beta1
 k8s.io/apiserver/pkg/storage/value/encrypt/identity
 k8s.io/apiserver/pkg/storage/value/encrypt/secretbox
+k8s.io/apiserver/pkg/storageversion
 k8s.io/apiserver/pkg/util/apihelpers
 k8s.io/apiserver/pkg/util/dryrun
 k8s.io/apiserver/pkg/util/feature
@@ -1748,6 +1756,9 @@ k8s.io/kube-aggregator/pkg/controllers/autoregister
 k8s.io/kube-aggregator/pkg/controllers/openapi
 k8s.io/kube-aggregator/pkg/controllers/openapi/aggregator
 k8s.io/kube-aggregator/pkg/controllers/status
+k8s.io/kube-aggregator/pkg/registry/apiserverinternal/rest
+k8s.io/kube-aggregator/pkg/registry/apiserverinternal/storageversion
+k8s.io/kube-aggregator/pkg/registry/apiserverinternal/storageversion/storage
 k8s.io/kube-aggregator/pkg/registry/apiservice
 k8s.io/kube-aggregator/pkg/registry/apiservice/etcd
 k8s.io/kube-aggregator/pkg/registry/apiservice/rest
