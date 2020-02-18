@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-07-01/compute"
+	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 
 	"k8s.io/apimachinery/pkg/types"
@@ -31,6 +32,9 @@ import (
 )
 
 func TestCommonAttachDisk(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	testCases := []struct {
 		desc            string
 		vmList          map[string]string
@@ -63,7 +67,7 @@ func TestCommonAttachDisk(t *testing.T) {
 	}
 
 	for i, test := range testCases {
-		testCloud := GetTestCloud()
+		testCloud := GetTestCloud(ctrl)
 		common := &controllerCommon{
 			location:              testCloud.Location,
 			storageEndpointSuffix: testCloud.Environment.StorageEndpointSuffix,
@@ -83,6 +87,9 @@ func TestCommonAttachDisk(t *testing.T) {
 }
 
 func TestCommonDetachDisk(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	testCases := []struct {
 		desc        string
 		vmList      map[string]string
@@ -112,7 +119,7 @@ func TestCommonDetachDisk(t *testing.T) {
 	}
 
 	for i, test := range testCases {
-		testCloud := GetTestCloud()
+		testCloud := GetTestCloud(ctrl)
 		common := &controllerCommon{
 			location:              testCloud.Location,
 			storageEndpointSuffix: testCloud.Environment.StorageEndpointSuffix,
@@ -131,6 +138,9 @@ func TestCommonDetachDisk(t *testing.T) {
 }
 
 func TestGetDiskLun(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	testCases := []struct {
 		desc        string
 		diskName    string
@@ -153,7 +163,7 @@ func TestGetDiskLun(t *testing.T) {
 	}
 
 	for i, test := range testCases {
-		testCloud := GetTestCloud()
+		testCloud := GetTestCloud(ctrl)
 		common := &controllerCommon{
 			location:              testCloud.Location,
 			storageEndpointSuffix: testCloud.Environment.StorageEndpointSuffix,
@@ -171,6 +181,9 @@ func TestGetDiskLun(t *testing.T) {
 }
 
 func TestGetNextDiskLun(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	testCases := []struct {
 		desc            string
 		isDataDisksFull bool
@@ -192,7 +205,7 @@ func TestGetNextDiskLun(t *testing.T) {
 	}
 
 	for i, test := range testCases {
-		testCloud := GetTestCloud()
+		testCloud := GetTestCloud(ctrl)
 		common := &controllerCommon{
 			location:              testCloud.Location,
 			storageEndpointSuffix: testCloud.Environment.StorageEndpointSuffix,
@@ -210,6 +223,9 @@ func TestGetNextDiskLun(t *testing.T) {
 }
 
 func TestDisksAreAttached(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	testCases := []struct {
 		desc             string
 		diskNames        []string
@@ -234,7 +250,7 @@ func TestDisksAreAttached(t *testing.T) {
 	}
 
 	for i, test := range testCases {
-		testCloud := GetTestCloud()
+		testCloud := GetTestCloud(ctrl)
 		common := &controllerCommon{
 			location:              testCloud.Location,
 			storageEndpointSuffix: testCloud.Environment.StorageEndpointSuffix,

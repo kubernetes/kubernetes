@@ -22,6 +22,7 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 
 	v1 "k8s.io/api/core/v1"
@@ -127,7 +128,9 @@ func TestGenerateStorageAccountName(t *testing.T) {
 }
 
 func TestMapLoadBalancerNameToVMSet(t *testing.T) {
-	az := GetTestCloud()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	az := GetTestCloud(ctrl)
 	az.PrimaryAvailabilitySetName = "primary"
 
 	cases := []struct {
@@ -175,7 +178,9 @@ func TestMapLoadBalancerNameToVMSet(t *testing.T) {
 }
 
 func TestGetAzureLoadBalancerName(t *testing.T) {
-	az := GetTestCloud()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	az := GetTestCloud(ctrl)
 	az.PrimaryAvailabilitySetName = "primary"
 
 	cases := []struct {
@@ -256,7 +261,9 @@ func TestGetAzureLoadBalancerName(t *testing.T) {
 }
 
 func TestGetLoadBalancingRuleName(t *testing.T) {
-	az := GetTestCloud()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	az := GetTestCloud(ctrl)
 	az.PrimaryAvailabilitySetName = "primary"
 
 	svc := &v1.Service{
@@ -337,7 +344,9 @@ func TestGetLoadBalancingRuleName(t *testing.T) {
 }
 
 func TestGetFrontendIPConfigName(t *testing.T) {
-	az := GetTestCloud()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	az := GetTestCloud(ctrl)
 	az.PrimaryAvailabilitySetName = "primary"
 
 	svc := &v1.Service{
