@@ -112,7 +112,22 @@ var _ = SIGDescribe("Reboot [Disruptive] [Feature:Reboot]", func() {
 	ginkgo.It("each node by switching off the network interface and ensure they function upon switch on", func() {
 		// switch the network interface off for a while to simulate a network outage
 		// We sleep 10 seconds to give some time for ssh command to cleanly finish before network is down.
-		testReboot(f.ClientSet, "nohup sh -c 'sleep 10 && sudo ip link set eth0 down && sleep 120 && sudo ip link set eth0 up && (sudo dhclient || true)' >/dev/null 2>&1 &", nil)
+		cmd := "nohup sh -c '" +
+			"sleep 10; " +
+			"echo Shutting down eth0 | sudo tee /dev/kmsg; " +
+			"sudo ip link set eth0 down | sudo tee /dev/kmsg; " +
+			"sleep 120; " +
+			"echo Starting up eth0 | sudo tee /dev/kmsg; " +
+			"sudo ip link set eth0 up | sudo tee /dev/kmsg; " +
+			"sleep 10; " +
+			"echo Retrying starting up eth0 | sudo tee /dev/kmsg; " +
+			"sudo ip link set eth0 up | sudo tee /dev/kmsg; " +
+			"echo Running dhclient | sudo tee /dev/kmsg; " +
+			"sudo dhclient | sudo tee /dev/kmsg; " +
+			"echo Starting systemd-networkd | sudo tee /dev/kmsg; " +
+			"sudo systemctl restart systemd-networkd | sudo tee /dev/kmsg" +
+			"' >/dev/null 2>&1 &"
+		testReboot(f.ClientSet, cmd, nil)
 	})
 
 	ginkgo.It("each node by dropping all inbound packets for a while and ensure they function afterwards", func() {
