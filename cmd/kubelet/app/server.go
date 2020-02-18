@@ -745,6 +745,8 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, featureGate f
 			devicePluginEnabled,
 			kubeDeps.Recorder)
 
+		klog.Info("kublet run... ExperimentalTopologyManagerPolicy: %s", s.TopologyManagerPolicy)
+
 		if err != nil {
 			return err
 		}

@@ -175,6 +175,7 @@ func run(config *hollowNodeConfig) {
 
 	if config.Morph == "kubelet" {
 		f, c := kubemark.GetHollowKubeletConfig(config.createHollowKubeletOptions())
+		klog.Info("Hollow Node Kubelet Config: Topology Manager policy is %s",c.TopologyManagerPolicy)
 
 		heartbeatClientConfig := *clientConfig
 		heartbeatClientConfig.Timeout = c.NodeStatusUpdateFrequency.Duration

@@ -188,11 +188,13 @@ function wait-for-hollow-nodes-to-run-or-timeout {
     echo -n "."
     sleep 1
     now=$(date +%s)
-    # Fail it if it already took more than 30 minutes.
-    if [ $((now - start)) -gt 1800 ]; then
+    # Fail it if it already took more than 5 minutes.
+    if [ $((now - start)) -gt 300 ]; then
       echo ""
       # shellcheck disable=SC2154 # Color defined in sourced script
       echo -e "${color_red} Timeout waiting for all hollow-nodes to become Running. ${color_norm}"
+      echo -e "${color_red} Dumping hollow-nodes ${color_norm}"
+     "${KUBECTL}" --kubeconfig="${LOCAL_KUBECONFIG}" describe node
       # Try listing nodes again - if it fails it means that API server is not responding
       if "${KUBECTL}" --kubeconfig="${LOCAL_KUBECONFIG}" get node &> /dev/null; then
         echo "Found only ${ready} ready hollow-nodes while waiting for ${NUM_NODES}."
