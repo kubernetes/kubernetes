@@ -190,7 +190,6 @@ func (im *realImageGCManager) Start() {
 	}, 5*time.Minute, wait.NeverStop)
 
 	// Start a goroutine periodically updates image cache.
-	// TODO(random-liu): Merge this with the previous loop.
 	go wait.Until(func() {
 		images, err := im.runtime.ListImages()
 		if err != nil {
