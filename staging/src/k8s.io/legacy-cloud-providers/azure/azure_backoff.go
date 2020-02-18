@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog"
+	azcache "k8s.io/legacy-cloud-providers/azure/cache"
 	"k8s.io/legacy-cloud-providers/azure/retry"
 )
 
@@ -65,7 +66,7 @@ func (az *Cloud) Event(obj runtime.Object, eventtype, reason, message string) {
 }
 
 // GetVirtualMachineWithRetry invokes az.getVirtualMachine with exponential backoff retry
-func (az *Cloud) GetVirtualMachineWithRetry(name types.NodeName, crt cacheReadType) (compute.VirtualMachine, error) {
+func (az *Cloud) GetVirtualMachineWithRetry(name types.NodeName, crt azcache.AzureCacheReadType) (compute.VirtualMachine, error) {
 	var machine compute.VirtualMachine
 	var retryErr error
 	err := wait.ExponentialBackoff(az.RequestBackoff(), func() (bool, error) {

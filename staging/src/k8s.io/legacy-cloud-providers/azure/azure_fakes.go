@@ -35,6 +35,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	cloudprovider "k8s.io/cloud-provider"
+	azcache "k8s.io/legacy-cloud-providers/azure/cache"
 	"k8s.io/legacy-cloud-providers/azure/retry"
 )
 
@@ -983,7 +984,7 @@ func (f *fakeVMSet) DetachDisk(diskName, diskURI string, nodeName types.NodeName
 	return fmt.Errorf("unimplemented")
 }
 
-func (f *fakeVMSet) GetDataDisks(nodeName types.NodeName, crt cacheReadType) ([]compute.DataDisk, error) {
+func (f *fakeVMSet) GetDataDisks(nodeName types.NodeName, crt azcache.AzureCacheReadType) ([]compute.DataDisk, error) {
 	return nil, fmt.Errorf("unimplemented")
 }
 

@@ -27,6 +27,7 @@ import (
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/stretchr/testify/assert"
 	cloudprovider "k8s.io/cloud-provider"
+	azcache "k8s.io/legacy-cloud-providers/azure/cache"
 )
 
 func TestExtractVmssVMName(t *testing.T) {
@@ -87,7 +88,7 @@ func TestVMSSVMCache(t *testing.T) {
 	for i := range virtualMachines {
 		vm := virtualMachines[i]
 		vmName := to.String(vm.OsProfile.ComputerName)
-		ssName, instanceID, realVM, err := ss.getVmssVM(vmName, cacheReadTypeDefault)
+		ssName, instanceID, realVM, err := ss.getVmssVM(vmName, azcache.CacheReadTypeDefault)
 		assert.Nil(t, err)
 		assert.Equal(t, "vmss", ssName)
 		assert.Equal(t, to.String(vm.InstanceID), instanceID)
@@ -101,14 +102,14 @@ func TestVMSSVMCache(t *testing.T) {
 	assert.NoError(t, err)
 
 	// the VM should be removed from cache after deleteCacheForNode().
-	cached, err := ss.vmssVMCache.Get(vmssVirtualMachinesKey, cacheReadTypeDefault)
+	cached, err := ss.vmssVMCache.Get(vmssVirtualMachinesKey, azcache.CacheReadTypeDefault)
 	assert.NoError(t, err)
 	cachedVirtualMachines := cached.(*sync.Map)
 	_, ok := cachedVirtualMachines.Load(vmName)
 	assert.Equal(t, false, ok)
 
 	// the VM should be get back after another cache refresh.
-	ssName, instanceID, realVM, err := ss.getVmssVM(vmName, cacheReadTypeDefault)
+	ssName, instanceID, realVM, err := ss.getVmssVM(vmName, azcache.CacheReadTypeDefault)
 	assert.NoError(t, err)
 	assert.Equal(t, "vmss", ssName)
 	assert.Equal(t, to.String(vm.InstanceID), instanceID)
@@ -130,7 +131,7 @@ func TestVMSSVMCacheWithDeletingNodes(t *testing.T) {
 		vmName := to.String(vm.OsProfile.ComputerName)
 		assert.Equal(t, vm.ProvisioningState, to.StringPtr(string(compute.ProvisioningStateDeleting)))
 
-		ssName, instanceID, realVM, err := ss.getVmssVM(vmName, cacheReadTypeDefault)
+		ssName, instanceID, realVM, err := ss.getVmssVM(vmName, azcache.CacheReadTypeDefault)
 		assert.Nil(t, realVM)
 		assert.Equal(t, "", ssName)
 		assert.Equal(t, instanceID, ssName)

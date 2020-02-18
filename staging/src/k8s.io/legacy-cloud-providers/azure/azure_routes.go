@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog"
+	azcache "k8s.io/legacy-cloud-providers/azure/cache"
 	utilnet "k8s.io/utils/net"
 )
 
@@ -117,7 +118,7 @@ func (d *delayedRouteUpdater) updateRoutes() {
 
 	var routeTable network.RouteTable
 	var existsRouteTable bool
-	routeTable, existsRouteTable, err = d.az.getRouteTable(cacheReadTypeDefault)
+	routeTable, existsRouteTable, err = d.az.getRouteTable(azcache.CacheReadTypeDefault)
 	if err != nil {
 		klog.Errorf("getRouteTable() failed with error: %v", err)
 		return
@@ -131,7 +132,7 @@ func (d *delayedRouteUpdater) updateRoutes() {
 			return
 		}
 
-		routeTable, _, err = d.az.getRouteTable(cacheReadTypeDefault)
+		routeTable, _, err = d.az.getRouteTable(azcache.CacheReadTypeDefault)
 		if err != nil {
 			klog.Errorf("getRouteTable() failed with error: %v", err)
 			return
@@ -200,7 +201,7 @@ func (d *delayedRouteUpdater) addRouteOperation(operation routeOperation, route 
 // ListRoutes lists all managed routes that belong to the specified clusterName
 func (az *Cloud) ListRoutes(ctx context.Context, clusterName string) ([]*cloudprovider.Route, error) {
 	klog.V(10).Infof("ListRoutes: START clusterName=%q", clusterName)
-	routeTable, existsRouteTable, err := az.getRouteTable(cacheReadTypeDefault)
+	routeTable, existsRouteTable, err := az.getRouteTable(azcache.CacheReadTypeDefault)
 	routes, err := processRoutes(az.ipv6DualStackEnabled, routeTable, existsRouteTable, err)
 	if err != nil {
 		return nil, err

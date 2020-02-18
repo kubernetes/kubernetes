@@ -26,12 +26,13 @@ import (
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog"
+	azcache "k8s.io/legacy-cloud-providers/azure/cache"
 )
 
 // AttachDisk attaches a vhd to vm
 // the vhd must exist, can be identified by diskName, diskURI, and lun.
 func (as *availabilitySet) AttachDisk(isManagedDisk bool, diskName, diskURI string, nodeName types.NodeName, lun int32, cachingMode compute.CachingTypes, diskEncryptionSetID string, writeAcceleratorEnabled bool) error {
-	vm, err := as.getVirtualMachine(nodeName, cacheReadTypeDefault)
+	vm, err := as.getVirtualMachine(nodeName, azcache.CacheReadTypeDefault)
 	if err != nil {
 		return err
 	}
@@ -115,7 +116,7 @@ func (as *availabilitySet) AttachDisk(isManagedDisk bool, diskName, diskURI stri
 // DetachDisk detaches a disk from host
 // the vhd can be identified by diskName or diskURI
 func (as *availabilitySet) DetachDisk(diskName, diskURI string, nodeName types.NodeName) error {
-	vm, err := as.getVirtualMachine(nodeName, cacheReadTypeDefault)
+	vm, err := as.getVirtualMachine(nodeName, azcache.CacheReadTypeDefault)
 	if err != nil {
 		// if host doesn't exist, no need to detach
 		klog.Warningf("azureDisk - cannot find node %s, skip detaching disk(%s, %s)", nodeName, diskName, diskURI)
@@ -172,7 +173,7 @@ func (as *availabilitySet) DetachDisk(diskName, diskURI string, nodeName types.N
 }
 
 // GetDataDisks gets a list of data disks attached to the node.
-func (as *availabilitySet) GetDataDisks(nodeName types.NodeName, crt cacheReadType) ([]compute.DataDisk, error) {
+func (as *availabilitySet) GetDataDisks(nodeName types.NodeName, crt azcache.AzureCacheReadType) ([]compute.DataDisk, error) {
 	vm, err := as.getVirtualMachine(nodeName, crt)
 	if err != nil {
 		return nil, err

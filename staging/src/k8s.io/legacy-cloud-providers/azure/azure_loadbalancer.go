@@ -35,6 +35,7 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	servicehelpers "k8s.io/cloud-provider/service/helpers"
 	"k8s.io/klog"
+	azcache "k8s.io/legacy-cloud-providers/azure/cache"
 	utilnet "k8s.io/utils/net"
 )
 
@@ -961,7 +962,7 @@ func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, 
 
 			if isInternal {
 				// Refresh updated lb which will be used later in other places.
-				newLB, exist, err := az.getAzureLoadBalancer(lbName, cacheReadTypeDefault)
+				newLB, exist, err := az.getAzureLoadBalancer(lbName, azcache.CacheReadTypeDefault)
 				if err != nil {
 					klog.V(2).Infof("reconcileLoadBalancer for service(%s): getAzureLoadBalancer(%s) failed: %v", serviceName, lbName, err)
 					return nil, err
@@ -1125,7 +1126,7 @@ func (az *Cloud) reconcileSecurityGroup(clusterName string, service *v1.Service,
 		ports = []v1.ServicePort{}
 	}
 
-	sg, err := az.getSecurityGroup(cacheReadTypeDefault)
+	sg, err := az.getSecurityGroup(azcache.CacheReadTypeDefault)
 	if err != nil {
 		return nil, err
 	}
@@ -1466,7 +1467,7 @@ func (az *Cloud) reconcilePublicIP(clusterName string, service *v1.Service, lbNa
 	}
 
 	if lbName != "" {
-		loadBalancer, _, err := az.getAzureLoadBalancer(lbName, cacheReadTypeDefault)
+		loadBalancer, _, err := az.getAzureLoadBalancer(lbName, azcache.CacheReadTypeDefault)
 		if err != nil {
 			return nil, err
 		}
