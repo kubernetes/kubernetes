@@ -21,8 +21,11 @@ package fs
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"os/exec"
-	"strings"
+	"path/filepath"
+	"strconv"
+	"syscall"
 
 	"golang.org/x/sys/unix"
 
@@ -55,28 +58,78 @@ func FsInfo(path string) (int64, int64, int64, int64, int64, int64, error) {
 	return available, capacity, usage, inodes, inodesFree, inodesUsed, nil
 }
 
+const (
+	// The block size in bytes.
+	statBlockSize uint64 = 512
+)
+
 // DiskUsage gets disk usage of specified path.
-func DiskUsage(path string) (*resource.Quantity, error) {
-	// First check whether the quota system knows about this directory
-	// A nil quantity with no error means that the path does not support quotas
-	// and we should use other mechanisms.
-	data, err := fsquota.GetConsumption(path)
-	if data != nil {
-		return data, nil
-	} else if err != nil {
-		return nil, fmt.Errorf("unable to retrieve disk consumption via quota for %s: %v", path, err)
+func DiskUsage(dir string) (*resource.Quantity, error) {
+	var bytes uint64
+
+	if dir == "" {
+		return nil, fmt.Errorf("invalid directory")
 	}
-	// Uses the same niceness level as cadvisor.fs does when running du
-	// Uses -B 1 to always scale to a blocksize of 1 byte
-	out, err := exec.Command("nice", "-n", "19", "du", "-x", "-s", "-B", "1", path).CombinedOutput()
+
+	rootInfo, err := os.Stat(dir)
 	if err != nil {
-		return nil, fmt.Errorf("failed command 'du' ($ nice -n 19 du -x -s -B 1) on path %s with error %v", path, err)
+		return nil, fmt.Errorf("could not stat %q to get inode usage: %v", dir, err)
 	}
-	used, err := resource.ParseQuantity(strings.Fields(string(out))[0])
+
+	rootStat, ok := rootInfo.Sys().(*syscall.Stat_t)
+	if !ok {
+		return nil, fmt.Errorf("unsuported fileinfo for getting inode usage of %q", dir)
+	}
+
+	rootDevId := rootStat.Dev
+
+	// dedupedInode stores inodes that could be duplicates (nlink > 1)
+	dedupedInodes := make(map[uint64]struct{})
+
+	err = filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		if os.IsNotExist(err) {
+			// expected if files appear/vanish
+			return nil
+		}
+		if err != nil {
+			return fmt.Errorf("unable to count inodes for part of dir %s: %s", dir, err)
+		}
+
+		// according to the docs, Sys can be nil
+		if info.Sys() == nil {
+			return fmt.Errorf("fileinfo Sys is nil")
+		}
+
+		s, ok := info.Sys().(*syscall.Stat_t)
+		if !ok {
+			return fmt.Errorf("unsupported fileinfo; could not convert to stat_t")
+		}
+
+		if s.Dev != rootDevId {
+			// don't descend into directories on other devices
+			return filepath.SkipDir
+		}
+		if s.Nlink > 1 {
+			if _, ok := dedupedInodes[s.Ino]; !ok {
+				// Dedupe things that could be hardlinks
+				dedupedInodes[s.Ino] = struct{}{}
+
+				bytes += uint64(s.Blocks) * statBlockSize
+			}
+		} else {
+			bytes += uint64(s.Blocks) * statBlockSize
+		}
+		return nil
+	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse 'du' output %s due to error %v", out, err)
+		return nil, fmt.Errorf("failed to get disk usage due to error %v", err)
+	}
+	used, err := resource.ParseQuantity(strconv.FormatInt(int64(bytes), 10))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get disk usage due to error %v", err)
 	}
 	used.Format = resource.BinarySI
+
 	return &used, nil
 }
 
