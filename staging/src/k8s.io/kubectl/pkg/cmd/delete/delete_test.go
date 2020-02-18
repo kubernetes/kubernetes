@@ -33,6 +33,7 @@ import (
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
 )
 
@@ -42,6 +43,7 @@ func fakecmd() *cobra.Command {
 		DisableFlagsInUseLine: true,
 		Run:                   func(cmd *cobra.Command, args []string) {},
 	}
+	cmdutil.AddDryRunFlag(cmd)
 	return cmd
 }
 
