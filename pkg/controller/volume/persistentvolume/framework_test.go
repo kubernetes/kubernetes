@@ -348,6 +348,17 @@ func newVolumeArray(name, capacity, boundToClaimUID, boundToClaimName string, ph
 	}
 }
 
+func withVolumeDeletionTimestamp(pvs []*v1.PersistentVolume) []*v1.PersistentVolume {
+	result := []*v1.PersistentVolume{}
+	for _, pv := range pvs {
+		// Using time.Now() here will cause mismatching deletion timestamps in tests
+		deleteTime := metav1.Date(2020, time.February, 18, 10, 30, 30, 10, time.UTC)
+		pv.SetDeletionTimestamp(&deleteTime)
+		result = append(result, pv)
+	}
+	return result
+}
+
 // newClaim returns a new claim with given attributes
 func newClaim(name, claimUID, capacity, boundToVolume string, phase v1.PersistentVolumeClaimPhase, class *string, annotations ...string) *v1.PersistentVolumeClaim {
 	fs := v1.PersistentVolumeFilesystem

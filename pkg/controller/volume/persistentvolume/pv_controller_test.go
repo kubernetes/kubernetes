@@ -233,6 +233,21 @@ func TestControllerSync(t *testing.T) {
 				return nil
 			},
 		},
+		{
+			// delete success(?) - volume has deletion timestamp before doDelete() starts
+			"8-13 - volume is has deletion timestamp and is not processed",
+			withVolumeDeletionTimestamp(newVolumeArray("volume8-13", "1Gi", "uid8-13", "claim8-13", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classEmpty)),
+			withVolumeDeletionTimestamp(newVolumeArray("volume8-13", "1Gi", "uid8-13", "claim8-13", v1.VolumeReleased, v1.PersistentVolumeReclaimDelete, classEmpty)),
+			noclaims,
+			noclaims,
+			noevents, noerrors,
+			// We don't need to do anything in test function because deletion will be noticed automatically and synced.
+			// Attempting to use testSyncVolume here will cause an error because of race condition between manually
+			// calling testSyncVolume and volume loop running.
+			func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
+				return nil
+			},
+		},
 	}
 
 	for _, test := range tests {
