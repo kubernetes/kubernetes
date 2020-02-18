@@ -39,7 +39,7 @@ const (
 	StreamingProxyRedirects featuregate.Feature = "StreamingProxyRedirects"
 
 	// owner: @tallclair
-	// alpha: v1.10
+	// alpha: v1.12
 	// beta: v1.14
 	//
 	// ValidateProxyRedirects controls whether the apiserver should validate that redirects are only
