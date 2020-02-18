@@ -18,12 +18,8 @@ package kubelet
 
 import (
 	"fmt"
-	"io/ioutil"
-	"os"
-	"path/filepath"
-	"strings"
-
 	"github.com/pkg/errors"
+	"io/ioutil"
 	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -32,6 +28,9 @@ import (
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/initsystem"
 	utilsexec "k8s.io/utils/exec"
+	"os"
+	"path/filepath"
+	"strings"
 )
 
 type kubeletFlagsOpts struct {
@@ -85,20 +84,14 @@ func WriteKubeletDynamicEnvFile(cfg *kubeadmapi.ClusterConfiguration, nodeReg *k
 	return writeKubeletFlagBytesToDisk([]byte(envFileContent), kubeletDir)
 }
 
-// buildKubeletArgMap takes a kubeletFlagsOpts object and builds based on that a string-string map with flags
-// that should be given to the local kubelet daemon.
-func buildKubeletArgMap(opts kubeletFlagsOpts) map[string]string {
+//buildKubeletArgMapCommon takes a kubeletFlagsOpts object and builds based on that a string-string map with flags
+//that are common to both Linux and Windows
+func buildKubeletArgMapCommon(opts kubeletFlagsOpts) map[string]string {
 	kubeletFlags := map[string]string{}
 
 	if opts.nodeRegOpts.CRISocket == constants.DefaultDockerCRISocket {
 		// These flags should only be set when running docker
 		kubeletFlags["network-plugin"] = "cni"
-		driver, err := kubeadmutil.GetCgroupDriverDocker(opts.execer)
-		if err != nil {
-			klog.Warningf("cannot automatically assign a '--cgroup-driver' value when starting the Kubelet: %v\n", err)
-		} else {
-			kubeletFlags["cgroup-driver"] = driver
-		}
 		if opts.pauseImage != "" {
 			kubeletFlags["pod-infra-container-image"] = opts.pauseImage
 		}
@@ -116,14 +109,6 @@ func buildKubeletArgMap(opts kubeletFlagsOpts) map[string]string {
 		kubeletFlags["register-with-taints"] = strings.Join(taintStrs, ",")
 	}
 
-	ok, err := opts.isServiceActiveFunc("systemd-resolved")
-	if err != nil {
-		klog.Warningf("cannot determine if systemd-resolved is active: %v\n", err)
-	}
-	if ok {
-		kubeletFlags["resolv-conf"] = "/run/systemd/resolve/resolv.conf"
-	}
-
 	// Pass the "--hostname-override" flag to the kubelet only if it's different from the hostname
 	nodeName, hostname, err := GetNodeNameAndHostname(opts.nodeRegOpts)
 	if err != nil {
@@ -133,8 +118,6 @@ func buildKubeletArgMap(opts kubeletFlagsOpts) map[string]string {
 		klog.V(1).Infof("setting kubelet hostname-override to %q", nodeName)
 		kubeletFlags["hostname-override"] = nodeName
 	}
-
-	// TODO: Conditionally set `--cgroup-driver` to either `systemd` or `cgroupfs` for CRI other than Docker
 
 	// TODO: The following code should be removed after dual-stack is GA.
 	// Note: The user still retains the ability to explicitly set feature-gates and that value will overwrite this base value.

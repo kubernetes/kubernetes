@@ -1,7 +1,7 @@
-// +build windows
+// +build !windows
 
 /*
-Copyright 2019 The Kubernetes Authors.
+Copyright 2020 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,12 +16,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package constants
+package images
 
-const (
-	// DefaultDockerCRISocket defines the default Docker CRI socket
-	DefaultDockerCRISocket = "npipe:////./pipe/docker_engine"
-
-	// PauseVersion indicates the default pause image version for kubeadm
-	PauseVersion = "1.3.0"
+import (
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
+
+// GetPauseImage returns the image for the "pause" container
+func GetPauseImage(cfg *kubeadmapi.ClusterConfiguration) string {
+	return GetGenericImage(cfg.ImageRepository, "pause", constants.PauseVersion)
+}
