@@ -180,6 +180,7 @@ func makeEnvMap(logs string) (map[string]string, error) {
 type testEnvInfo struct {
 	numaNodes         int
 	sriovResourceName string
+	policy            string
 }
 
 func containerWantsDevices(cnt *v1.Container, envInfo *testEnvInfo) bool {

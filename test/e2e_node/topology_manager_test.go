@@ -568,8 +568,12 @@ func runTopologyManagerPositiveTest(f *framework.Framework, numPods int, ctnAttr
 		pods = append(pods, pod)
 	}
 
-	for podID := 0; podID < numPods; podID++ {
-		validatePodAlignment(f, pods[podID], envInfo)
+	// per https://github.com/kubernetes/enhancements/blob/master/keps/sig-node/0035-20190130-topology-manager.md#multi-numa-systems-tests
+	// we can do a menaingful validation only when using the single-numa node policy
+	if envInfo.policy == topologymanager.PolicySingleNumaNode {
+		for podID := 0; podID < numPods; podID++ {
+			validatePodAlignment(f, pods[podID], envInfo)
+		}
 	}
 
 	for podID := 0; podID < numPods; podID++ {
@@ -703,7 +707,7 @@ func teardownSRIOVConfigOrFail(f *framework.Framework, sd *sriovData) {
 	framework.ExpectNoError(err)
 }
 
-func runTopologyManagerNodeAlignmentSuiteTests(f *framework.Framework, configMap *v1.ConfigMap, reservedSystemCPUs string, numaNodes, coreCount int) {
+func runTopologyManagerNodeAlignmentSuiteTests(f *framework.Framework, configMap *v1.ConfigMap, reservedSystemCPUs string, numaNodes, coreCount int, policy string) {
 	threadsPerCore := 1
 	if isHTEnabled() {
 		threadsPerCore = 2
@@ -713,6 +717,7 @@ func runTopologyManagerNodeAlignmentSuiteTests(f *framework.Framework, configMap
 	envInfo := &testEnvInfo{
 		numaNodes:         numaNodes,
 		sriovResourceName: sd.resourceName,
+		policy:            policy,
 	}
 
 	// could have been a loop, we unroll it to explain the testcases
@@ -859,22 +864,24 @@ func runTopologyManagerNodeAlignmentSuiteTests(f *framework.Framework, configMap
 		runTopologyManagerPositiveTest(f, 2, ctnAttrs, envInfo)
 	}
 
-	// overflow NUMA node capacity: cores
-	numCores := 1 + (threadsPerCore * coreCount)
-	excessCoresReq := fmt.Sprintf("%dm", numCores*1000)
-	ginkgo.By(fmt.Sprintf("Trying to admit a guaranteed pods, with %d cores, 1 %s device - and it should be rejected", numCores, sd.resourceName))
-	ctnAttrs = []tmCtnAttribute{
-		{
-			ctnName:       "gu-container",
-			cpuRequest:    excessCoresReq,
-			cpuLimit:      excessCoresReq,
-			deviceName:    sd.resourceName,
-			deviceRequest: "1",
-			deviceLimit:   "1",
-		},
+	// this is the only policy that can guarantee reliable rejects
+	if policy == topologymanager.PolicySingleNumaNode {
+		// overflow NUMA node capacity: cores
+		numCores := 1 + (threadsPerCore * coreCount)
+		excessCoresReq := fmt.Sprintf("%dm", numCores*1000)
+		ginkgo.By(fmt.Sprintf("Trying to admit a guaranteed pods, with %d cores, 1 %s device - and it should be rejected", numCores, sd.resourceName))
+		ctnAttrs = []tmCtnAttribute{
+			{
+				ctnName:       "gu-container",
+				cpuRequest:    excessCoresReq,
+				cpuLimit:      excessCoresReq,
+				deviceName:    sd.resourceName,
+				deviceRequest: "1",
+				deviceLimit:   "1",
+			},
+		}
+		runTopologyManagerNegativeTest(f, 1, ctnAttrs, envInfo)
 	}
-	runTopologyManagerNegativeTest(f, 1, ctnAttrs, envInfo)
-
 	teardownSRIOVConfigOrFail(f, sd)
 }
 
@@ -927,15 +934,18 @@ func runTopologyManagerTests(f *framework.Framework) {
 		oldCfg, err = getCurrentKubeletConfig()
 		framework.ExpectNoError(err)
 
-		policy := topologymanager.PolicySingleNumaNode
+		var policies = []string{topologymanager.PolicySingleNumaNode, topologymanager.PolicyRestricted,
+			topologymanager.PolicyBestEffort, topologymanager.PolicyNone}
 
-		// Configure Topology Manager
-		ginkgo.By(fmt.Sprintf("by configuring Topology Manager policy to %s", policy))
-		framework.Logf("Configuring topology Manager policy to %s", policy)
+		for _, policy := range policies {
+			// Configure Topology Manager
+			ginkgo.By(fmt.Sprintf("by configuring Topology Manager policy to %s", policy))
+			framework.Logf("Configuring topology Manager policy to %s", policy)
 
-		reservedSystemCPUs := configureTopologyManagerInKubelet(f, oldCfg, policy, configMap, numaNodes)
+			reservedSystemCPUs := configureTopologyManagerInKubelet(f, oldCfg, policy, configMap, numaNodes)
 
-		runTopologyManagerNodeAlignmentSuiteTests(f, configMap, reservedSystemCPUs, numaNodes, coreCount)
+			runTopologyManagerNodeAlignmentSuiteTests(f, configMap, reservedSystemCPUs, numaNodes, coreCount, policy)
+		}
 
 		// restore kubelet config
 		setOldKubeletConfig(f, oldCfg)
