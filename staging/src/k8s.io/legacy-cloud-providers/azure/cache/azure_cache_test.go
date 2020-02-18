@@ -16,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package azure
+package cache
 
 import (
 	"fmt"
@@ -59,12 +59,12 @@ func (fake *fakeDataSource) set(data map[string]*fakeDataObj) {
 	fake.called = 0
 }
 
-func newFakeCache(t *testing.T) (*fakeDataSource, *timedCache) {
+func newFakeCache(t *testing.T) (*fakeDataSource, *TimedCache) {
 	dataSource := &fakeDataSource{
 		data: make(map[string]*fakeDataObj),
 	}
 	getter := dataSource.get
-	cache, err := newTimedcache(fakeCacheTTL, getter)
+	cache, err := NewTimedcache(fakeCacheTTL, getter)
 	assert.NoError(t, err)
 	return dataSource, cache
 }
@@ -99,7 +99,7 @@ func TestCacheGet(t *testing.T) {
 	for _, c := range cases {
 		dataSource, cache := newFakeCache(t)
 		dataSource.set(c.data)
-		val, err := cache.Get(c.key, cacheReadTypeDefault)
+		val, err := cache.Get(c.key, CacheReadTypeDefault)
 		assert.NoError(t, err, c.name)
 		assert.Equal(t, c.expected, val, c.name)
 	}
@@ -110,10 +110,10 @@ func TestCacheGetError(t *testing.T) {
 	getter := func(key string) (interface{}, error) {
 		return nil, getError
 	}
-	cache, err := newTimedcache(fakeCacheTTL, getter)
+	cache, err := NewTimedcache(fakeCacheTTL, getter)
 	assert.NoError(t, err)
 
-	val, err := cache.Get("key", cacheReadTypeDefault)
+	val, err := cache.Get("key", CacheReadTypeDefault)
 	assert.Error(t, err)
 	assert.Equal(t, getError, err)
 	assert.Nil(t, val)
@@ -128,13 +128,13 @@ func TestCacheDelete(t *testing.T) {
 	dataSource, cache := newFakeCache(t)
 	dataSource.set(data)
 
-	v, err := cache.Get(key, cacheReadTypeDefault)
+	v, err := cache.Get(key, CacheReadTypeDefault)
 	assert.NoError(t, err)
 	assert.Equal(t, val, v, "cache should get correct data")
 
 	dataSource.set(nil)
 	cache.Delete(key)
-	v, err = cache.Get(key, cacheReadTypeDefault)
+	v, err = cache.Get(key, CacheReadTypeDefault)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, dataSource.called)
 	assert.Equal(t, nil, v, "cache should get nil after data is removed")
@@ -149,13 +149,13 @@ func TestCacheExpired(t *testing.T) {
 	dataSource, cache := newFakeCache(t)
 	dataSource.set(data)
 
-	v, err := cache.Get(key, cacheReadTypeDefault)
+	v, err := cache.Get(key, CacheReadTypeDefault)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, dataSource.called)
 	assert.Equal(t, val, v, "cache should get correct data")
 
 	time.Sleep(fakeCacheTTL)
-	v, err = cache.Get(key, cacheReadTypeDefault)
+	v, err = cache.Get(key, CacheReadTypeDefault)
 	assert.NoError(t, err)
 	assert.Equal(t, 2, dataSource.called)
 	assert.Equal(t, val, v, "cache should get correct data even after expired")
@@ -170,13 +170,13 @@ func TestCacheAllowUnsafeRead(t *testing.T) {
 	dataSource, cache := newFakeCache(t)
 	dataSource.set(data)
 
-	v, err := cache.Get(key, cacheReadTypeDefault)
+	v, err := cache.Get(key, CacheReadTypeDefault)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, dataSource.called)
 	assert.Equal(t, val, v, "cache should get correct data")
 
 	time.Sleep(fakeCacheTTL)
-	v, err = cache.Get(key, cacheReadTypeUnsafe)
+	v, err = cache.Get(key, CacheReadTypeUnsafe)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, dataSource.called)
 	assert.Equal(t, val, v, "cache should return expired as allow unsafe read is allowed")
@@ -195,10 +195,10 @@ func TestCacheNoConcurrentGet(t *testing.T) {
 	var wg sync.WaitGroup
 	for i := 0; i < 5; i++ {
 		wg.Add(1)
-		go cache.Get(key, cacheReadTypeDefault)
+		go cache.Get(key, CacheReadTypeDefault)
 		wg.Done()
 	}
-	v, err := cache.Get(key, cacheReadTypeDefault)
+	v, err := cache.Get(key, CacheReadTypeDefault)
 	wg.Wait()
 	assert.NoError(t, err)
 	assert.Equal(t, 1, dataSource.called)
@@ -214,12 +214,12 @@ func TestCacheForceRefresh(t *testing.T) {
 	dataSource, cache := newFakeCache(t)
 	dataSource.set(data)
 
-	v, err := cache.Get(key, cacheReadTypeDefault)
+	v, err := cache.Get(key, CacheReadTypeDefault)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, dataSource.called)
 	assert.Equal(t, val, v, "cache should get correct data")
 
-	v, err = cache.Get(key, cacheReadTypeForceRefresh)
+	v, err = cache.Get(key, CacheReadTypeForceRefresh)
 	assert.NoError(t, err)
 	assert.Equal(t, 2, dataSource.called)
 	assert.Equal(t, val, v, "should refetch unexpired data as forced refresh")

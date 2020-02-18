@@ -12,7 +12,6 @@ go_library(
         "azure.go",
         "azure_backoff.go",
         "azure_blobDiskController.go",
-        "azure_cache.go",
         "azure_config.go",
         "azure_controller_common.go",
         "azure_controller_standard.go",
@@ -62,6 +61,7 @@ go_library(
         "//staging/src/k8s.io/cloud-provider/volume/helpers:go_default_library",
         "//staging/src/k8s.io/component-base/featuregate:go_default_library",
         "//staging/src/k8s.io/legacy-cloud-providers/azure/auth:go_default_library",
+        "//staging/src/k8s.io/legacy-cloud-providers/azure/cache:go_default_library",
         "//staging/src/k8s.io/legacy-cloud-providers/azure/clients:go_default_library",
         "//staging/src/k8s.io/legacy-cloud-providers/azure/clients/diskclient:go_default_library",
         "//staging/src/k8s.io/legacy-cloud-providers/azure/clients/interfaceclient:go_default_library",
@@ -95,7 +95,6 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
-        "azure_cache_test.go",
         "azure_config_test.go",
         "azure_controller_common_test.go",
         "azure_controller_standard_test.go",
@@ -125,6 +124,7 @@ go_test(
         "//staging/src/k8s.io/cloud-provider:go_default_library",
         "//staging/src/k8s.io/cloud-provider/service/helpers:go_default_library",
         "//staging/src/k8s.io/legacy-cloud-providers/azure/auth:go_default_library",
+        "//staging/src/k8s.io/legacy-cloud-providers/azure/cache:go_default_library",
         "//staging/src/k8s.io/legacy-cloud-providers/azure/clients:go_default_library",
         "//staging/src/k8s.io/legacy-cloud-providers/azure/retry:go_default_library",
         "//vendor/github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-07-01/compute:go_default_library",
@@ -149,6 +149,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//staging/src/k8s.io/legacy-cloud-providers/azure/auth:all-srcs",
+        "//staging/src/k8s.io/legacy-cloud-providers/azure/cache:all-srcs",
         "//staging/src/k8s.io/legacy-cloud-providers/azure/clients:all-srcs",
         "//staging/src/k8s.io/legacy-cloud-providers/azure/metrics:all-srcs",
         "//staging/src/k8s.io/legacy-cloud-providers/azure/retry:all-srcs",
