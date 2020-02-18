@@ -218,7 +218,7 @@ var (
 		&metrics.HistogramOpts{
 			Subsystem:      SchedulerSubsystem,
 			Name:           "permit_wait_duration_seconds",
-			Help:           "Duration of waiting in RunPermitPlugins.",
+			Help:           "Duration of waiting on permit.",
 			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
 			StabilityLevel: metrics.ALPHA,
 		},
