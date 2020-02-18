@@ -1862,6 +1862,7 @@ k8s.io/kubelet/pkg/apis/pluginregistration/v1
 k8s.io/legacy-cloud-providers/aws
 k8s.io/legacy-cloud-providers/azure
 k8s.io/legacy-cloud-providers/azure/auth
+k8s.io/legacy-cloud-providers/azure/cache
 k8s.io/legacy-cloud-providers/azure/clients
 k8s.io/legacy-cloud-providers/azure/clients/armclient
 k8s.io/legacy-cloud-providers/azure/clients/diskclient
