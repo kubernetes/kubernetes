@@ -3155,7 +3155,7 @@ function create-linux-nodes() {
           --base-instance-name "${extra_group_name}" \
           --size "${num_additional}" \
           --template "${extra_template_name}" || true;
-      gcloud compute instance-groups managed wait-until-stable \
+      gcloud compute instance-groups managed wait-until --stable \
           "${extra_group_name}" \
           --zone "${ZONE}" \
           --project "${PROJECT}" \
@@ -3186,7 +3186,7 @@ function create-linux-nodes() {
           --base-instance-name "${group_name}" \
           --size "${this_mig_size}" \
           --template "${template_name}" || true;
-      gcloud compute instance-groups managed wait-until-stable \
+      gcloud compute instance-groups managed wait-until --stable \
           "${group_name}" \
           --zone "${ZONE}" \
           --project "${PROJECT}" \
@@ -3226,7 +3226,7 @@ function create-windows-nodes() {
         --base-instance-name "${group_name}" \
         --size "${this_mig_size}" \
         --template "${template_name}" || true;
-    gcloud compute instance-groups managed wait-until-stable \
+    gcloud compute instance-groups managed wait-until --stable \
         "${group_name}" \
         --zone "${ZONE}" \
         --project "${PROJECT}" \
