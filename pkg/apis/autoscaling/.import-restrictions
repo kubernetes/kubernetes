@@ -1,0 +1,4 @@
+inverseRules:
+  - selectorRegexp: k8s[.]io/code-generator/_examples
+    allowedPrefixes:
+      - ''
