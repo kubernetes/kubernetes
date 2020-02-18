@@ -21,8 +21,10 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
+	"os/exec"
 	"reflect"
 	"regexp"
 	"strconv"
@@ -72,16 +74,8 @@ func (TopologyManagerUpgradeTest) Skip(upgCtx UpgradeContext) bool {
 
 // Setup creates a pod requesting aligned resources.
 func (t *TopologyManagerUpgradeTest) Setup(f *framework.Framework) {
-	ginkgo.By("Creating a Pod with aligned resources")
-	node := getTopologyManagerSingleNumaNodePolicyEnabledNode(f)
-	if node == nil {
-		framework.Logf("No suitable node configured with Topology Manager before upgrade")
-		return
-	}
-
-	name := "pod-before-" + string(uuid.NewUUID())
-	err := runAndValidate(f, name, node)
-	framework.ExpectNoError(err)
+	podName := "pod-before-" + string(uuid.NewUUID())
+	runTopologyManagerTest(f, podName, "before upgrade")
 }
 
 // Test waits for the upgrade to complete, and then verifies that it is possible to run
@@ -89,19 +83,12 @@ func (t *TopologyManagerUpgradeTest) Setup(f *framework.Framework) {
 func (t *TopologyManagerUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upgrade UpgradeType) {
 	<-done
 	if !isRelevantUpgrade(upgrade) {
+		framework.Logf("upgrade %v not relevant for topology manager", upgrade)
 		return
 	}
 
-	ginkgo.By("Verifying it is still possible to create a Pod with aligned resources")
-	node := getTopologyManagerSingleNumaNodePolicyEnabledNode(f)
-	if node == nil {
-		framework.Logf("No suitable node configured with Topology Manager before upgrade")
-		return
-	}
-
-	name := "pod-after-" + string(uuid.NewUUID())
-	err := runAndValidate(f, name, node)
-	framework.ExpectNoError(err)
+	podName := "pod-after-" + string(uuid.NewUUID())
+	runTopologyManagerTest(f, podName, "after upgrade")
 }
 
 // Teardown cleans up any remaining resources.
@@ -109,14 +96,35 @@ func (t *TopologyManagerUpgradeTest) Teardown(f *framework.Framework) {
 	// rely on the namespace deletion to clean up everything
 }
 
-func runAndValidate(f *framework.Framework, name string, node *v1.Node) error {
+func isRelevantUpgrade(upgrade UpgradeType) bool {
+	return upgrade == NodeUpgrade || upgrade == ClusterUpgrade
+}
+
+func runTopologyManagerTest(f *framework.Framework, podName, stage string) {
+	ginkgo.By(fmt.Sprintf("Creating a Pod with aligned resources - %s", stage))
+	node, policy := getTopologyManagerEnabledNode(f)
+	if node == nil {
+		framework.Logf("No suitable node configured with Topology Manager - %s", stage)
+		return
+	}
+
+	err := runAndValidate(f, podName, node, policy)
+	framework.ExpectNoError(err)
+}
+
+func runAndValidate(f *framework.Framework, name string, node *v1.Node, policy string) error {
 	pod := makePod(node.ObjectMeta.Name, f.Namespace.Name, name, testCmd)
 	pod = f.PodClient().CreateSync(pod)
 
 	output, err := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, pod.Spec.Containers[0].Name)
 	framework.ExpectNoError(err, fmt.Sprintf("Failed to get pod %q output", name))
 
-	return validatePodOutput(output)
+	// this is the only policy that can guarantee reliable rejects
+	if policy == topologymanager.PolicySingleNumaNode {
+		return validatePodOutput(output)
+	}
+	// else it is enough the pod created succesfully. We cannot really test much more.
+	return nil
 }
 
 func validatePodOutput(output string) error {
@@ -167,11 +175,21 @@ func validatePodOutput(output string) error {
 	return nil
 }
 
-func isRelevantUpgrade(upgrade UpgradeType) bool {
-	return upgrade == NodeUpgrade || upgrade == ClusterUpgrade
+func nodeSeemsMaster(node *v1.Node) bool {
+	for _, taint := range node.Spec.Taints {
+		if taint.Key == "node-role.kubernetes.io/master" {
+			return true
+		}
+	}
+	return false
 }
 
-func getTopologyManagerSingleNumaNodePolicyEnabledNode(f *framework.Framework) *v1.Node {
+func getTopologyManagerEnabledNode(f *framework.Framework) (*v1.Node, string) {
+	// start local proxy, so we can send graceful deletion over query string, rather than body parameter
+	ginkgo.By("Opening proxy to cluster")
+	cp := setupClusterProxy(f.Namespace.Name)
+	defer cp.teardown()
+
 	selector := labels.Set{"node-role.kubernetes.io/worker=": ""}.AsSelector()
 	nodeList, err := f.ClientSet.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{
 		LabelSelector: selector.String(),
@@ -181,23 +199,97 @@ func getTopologyManagerSingleNumaNodePolicyEnabledNode(f *framework.Framework) *
 	ginkgo.By("Finding a worker node with Topology Manager configured")
 
 	for _, node := range nodeList.Items {
-		kubeletConfig, err := getCurrentKubeletConfig(node.ObjectMeta.Name, f.Namespace.Name)
+		if node.Spec.Unschedulable || nodeSeemsMaster(&node) {
+			framework.Logf("node %q skipped, seems master or unschedulable", node.ObjectMeta.Name)
+			continue
+		}
+
+		kubeletConfig, err := getCurrentKubeletConfig(cp, node.ObjectMeta.Name)
 		framework.ExpectNoError(err)
 
 		framework.Logf("node %q TopologyManagerPolicy %q", node.ObjectMeta.Name, kubeletConfig.TopologyManagerPolicy)
-		if kubeletConfig.TopologyManagerPolicy == topologymanager.PolicySingleNumaNode {
-			return &node
+		if kubeletConfig.TopologyManagerPolicy != "" && kubeletConfig.TopologyManagerPolicy != topologymanager.PolicyNone {
+			return &node, kubeletConfig.TopologyManagerPolicy
 		}
 	}
 
-	return nil
+	return nil, ""
 }
 
-// TODO: this dupes test/e2e/windows/memory_limits.go. How can we factor this code out?
-// getCurrentKubeletConfig modified from test/e2e_node/util.go
-func getCurrentKubeletConfig(nodeName, namespace string) (*kubeletconfig.KubeletConfiguration, error) {
+func makePod(nodeName, namespace, podName, cmd string) *v1.Pod {
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+			Name:      podName,
+		},
+		Spec: v1.PodSpec{
+			RestartPolicy: v1.RestartPolicyNever,
+			Containers: []v1.Container{
+				{
+					Name:  podName,
+					Image: imageutils.GetE2EImage(imageutils.BusyBox),
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceName(v1.ResourceCPU):    resource.MustParse("2000m"),
+							v1.ResourceName(v1.ResourceMemory): resource.MustParse("100Mi"),
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceName(v1.ResourceCPU):    resource.MustParse("2000m"),
+							v1.ResourceName(v1.ResourceMemory): resource.MustParse("100Mi"),
+						},
+					},
+					Command: []string{"sh", "-c", cmd},
+				},
+			},
+			NodeName: nodeName,
+		},
+	}
+}
 
-	resp := pollConfigz(5*time.Minute, 5*time.Second, nodeName, namespace)
+// TODO: push these helpers in test/e2e/framework/kubelet/config.go
+
+type clusterProxy struct {
+	tk     *e2ekubectl.TestKubeconfig
+	cmd    *exec.Cmd
+	stdout io.ReadCloser
+	stderr io.ReadCloser
+	port   int
+}
+
+func setupClusterProxy(namespace string) *clusterProxy {
+	var err error
+	var cp clusterProxy
+
+	cp.tk = e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, namespace)
+	cp.cmd = cp.tk.KubectlCmd("proxy", "-p", "0")
+	cp.stdout, cp.stderr, err = framework.StartCmdAndStreamOutput(cp.cmd)
+	framework.ExpectNoError(err)
+
+	buf := make([]byte, 128)
+	var n int
+	n, err = cp.stdout.Read(buf)
+	framework.ExpectNoError(err)
+	output := string(buf[:n])
+	proxyRegexp := regexp.MustCompile("Starting to serve on 127.0.0.1:([0-9]+)")
+	match := proxyRegexp.FindStringSubmatch(output)
+	framework.ExpectEqual(len(match), 2)
+	cp.port, err = strconv.Atoi(match[1])
+	framework.ExpectNoError(err)
+	return &cp
+}
+
+func (cp *clusterProxy) getURLForAPI() string {
+	return fmt.Sprintf("http://127.0.0.1:%d/api/v1", cp.port)
+}
+
+func (cp *clusterProxy) teardown() {
+	cp.stdout.Close()
+	cp.stderr.Close()
+	framework.TryKill(cp.cmd)
+}
+
+func getCurrentKubeletConfig(cp *clusterProxy, nodeName string) (*kubeletconfig.KubeletConfiguration, error) {
+	resp := pollConfigz(cp, 5*time.Minute, 5*time.Second, nodeName)
 	kubeCfg, err := decodeConfigz(resp)
 	if err != nil {
 		return nil, err
@@ -206,29 +298,9 @@ func getCurrentKubeletConfig(nodeName, namespace string) (*kubeletconfig.Kubelet
 }
 
 // Causes the test to fail, or returns a status 200 response from the /configz endpoint
-func pollConfigz(timeout time.Duration, pollInterval time.Duration, nodeName, namespace string) *http.Response {
-	// start local proxy, so we can send graceful deletion over query string, rather than body parameter
-	ginkgo.By("Opening proxy to cluster")
-	tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, namespace)
-	cmd := tk.KubectlCmd("proxy", "-p", "0")
-	stdout, stderr, err := framework.StartCmdAndStreamOutput(cmd)
-	framework.ExpectNoError(err)
-	defer stdout.Close()
-	defer stderr.Close()
-	defer framework.TryKill(cmd)
-	buf := make([]byte, 128)
-	var n int
-	n, err = stdout.Read(buf)
-	framework.ExpectNoError(err)
-	output := string(buf[:n])
-	proxyRegexp := regexp.MustCompile("Starting to serve on 127.0.0.1:([0-9]+)")
-	match := proxyRegexp.FindStringSubmatch(output)
-	framework.ExpectEqual(len(match), 2)
-	port, err := strconv.Atoi(match[1])
-	framework.ExpectNoError(err)
-
+func pollConfigz(cp *clusterProxy, timeout time.Duration, pollInterval time.Duration, nodeName string) *http.Response {
 	ginkgo.By("http requesting node kubelet /configz")
-	endpoint := fmt.Sprintf("http://127.0.0.1:%d/api/v1/nodes/%s/proxy/configz", port, nodeName)
+	endpoint := fmt.Sprintf("%s/nodes/%s/proxy/configz", cp.getURLForAPI(), nodeName)
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
@@ -281,35 +353,4 @@ func decodeConfigz(resp *http.Response) (*kubeletconfig.KubeletConfiguration, er
 	}
 
 	return &kubeCfg, nil
-}
-
-// cpusetCmd := fmt.Sprintf("grep Cpus_allowed_list /proc/self/status | cut -f2 && sleep 1d")
-func makePod(nodeName, namespace, podName, cmd string) *v1.Pod {
-	return &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: namespace,
-			Name:      podName,
-		},
-		Spec: v1.PodSpec{
-			RestartPolicy: v1.RestartPolicyNever,
-			Containers: []v1.Container{
-				{
-					Name:  podName,
-					Image: imageutils.GetE2EImage(imageutils.BusyBox),
-					Resources: v1.ResourceRequirements{
-						Requests: v1.ResourceList{
-							v1.ResourceName(v1.ResourceCPU):    resource.MustParse("2000m"),
-							v1.ResourceName(v1.ResourceMemory): resource.MustParse("100Mi"),
-						},
-						Limits: v1.ResourceList{
-							v1.ResourceName(v1.ResourceCPU):    resource.MustParse("2000m"),
-							v1.ResourceName(v1.ResourceMemory): resource.MustParse("100Mi"),
-						},
-					},
-					Command: []string{"sh", "-c", cmd},
-				},
-			},
-			NodeName: nodeName,
-		},
-	}
 }
