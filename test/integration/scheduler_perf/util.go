@@ -118,20 +118,42 @@ func dataItems2JSONFile(dataItems DataItems, namePrefix string) error {
 	return ioutil.WriteFile(destFile, b, 0644)
 }
 
+// metricsCollectorConfig is the config to be marshalled to YAML config file.
+type metricsCollectorConfig struct {
+	Metrics []string
+}
+
 // metricsCollector collects metrics from legacyregistry.DefaultGatherer.Gather() endpoint.
 // Currently only Histrogram metrics are supported.
 type metricsCollector struct {
-	metric string
+	metricsCollectorConfig
+	labels map[string]string
 }
 
-func newMetricsCollector(metric string) *metricsCollector {
+func newMetricsCollector(config metricsCollectorConfig, labels map[string]string) *metricsCollector {
 	return &metricsCollector{
-		metric: metric,
+		metricsCollectorConfig: config,
+		labels:                 labels,
 	}
 }
 
-func (pc *metricsCollector) collect() *DataItem {
-	hist, err := testutil.GetHistogramFromGatherer(legacyregistry.DefaultGatherer, pc.metric)
+func (*metricsCollector) run(stopCh chan struct{}) {
+	// metricCollector doesn't need to start before the tests, so nothing to do here.
+}
+
+func (pc *metricsCollector) collect() []DataItem {
+	var dataItems []DataItem
+	for _, metric := range pc.Metrics {
+		dataItem := collectHistogram(metric, pc.labels)
+		if dataItem != nil {
+			dataItems = append(dataItems, *dataItem)
+		}
+	}
+	return dataItems
+}
+
+func collectHistogram(metric string, labels map[string]string) *DataItem {
+	hist, err := testutil.GetHistogramFromGatherer(legacyregistry.DefaultGatherer, metric)
 	if err != nil {
 		klog.Error(err)
 		return nil
@@ -153,10 +175,13 @@ func (pc *metricsCollector) collect() *DataItem {
 
 	msFactor := float64(time.Second) / float64(time.Millisecond)
 
+	// Copy labels and add "Metric" label for this metric.
+	labelMap := map[string]string{"Metric": metric}
+	for k, v := range labels {
+		labelMap[k] = v
+	}
 	return &DataItem{
-		Labels: map[string]string{
-			"Metric": pc.metric,
-		},
+		Labels: labelMap,
 		Data: map[string]float64{
 			"Perc50":  q50 * msFactor,
 			"Perc90":  q90 * msFactor,
@@ -170,11 +195,13 @@ func (pc *metricsCollector) collect() *DataItem {
 type throughputCollector struct {
 	podInformer           coreinformers.PodInformer
 	schedulingThroughputs []float64
+	labels                map[string]string
 }
 
-func newThroughputCollector(podInformer coreinformers.PodInformer) *throughputCollector {
+func newThroughputCollector(podInformer coreinformers.PodInformer, labels map[string]string) *throughputCollector {
 	return &throughputCollector{
 		podInformer: podInformer,
+		labels:      labels,
 	}
 }
 
@@ -205,8 +232,8 @@ func (tc *throughputCollector) run(stopCh chan struct{}) {
 	}
 }
 
-func (tc *throughputCollector) collect() *DataItem {
-	throughputSummary := &DataItem{}
+func (tc *throughputCollector) collect() []DataItem {
+	throughputSummary := DataItem{Labels: tc.labels}
 	if length := len(tc.schedulingThroughputs); length > 0 {
 		sort.Float64s(tc.schedulingThroughputs)
 		sum := 0.0
@@ -225,5 +252,6 @@ func (tc *throughputCollector) collect() *DataItem {
 		}
 		throughputSummary.Unit = "pods/s"
 	}
-	return throughputSummary
+
+	return []DataItem{throughputSummary}
 }
