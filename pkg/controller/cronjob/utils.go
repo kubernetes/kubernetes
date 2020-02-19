@@ -90,7 +90,7 @@ func groupJobsByParent(js []batchv1.Job) map[types.UID][]batchv1.Job {
 // If there are too many (>100) unstarted times, just give up and return an empty slice.
 // If there were missed times prior to the last known start time, then those are not returned.
 func getRecentUnmetScheduleTimes(sj batchv1beta1.CronJob, now time.Time) ([]time.Time, error) {
-	starts := []time.Time{}
+	starts := make([]time.Time, 0)
 	sched, err := cron.ParseStandard(sj.Spec.Schedule)
 	if err != nil {
 		return starts, fmt.Errorf("unparseable schedule: %s : %s", sj.Spec.Schedule, err)
@@ -120,31 +120,85 @@ func getRecentUnmetScheduleTimes(sj batchv1beta1.CronJob, now time.Time) ([]time
 		return []time.Time{}, nil
 	}
 
-	for t := sched.Next(earliestTime); !t.After(now); t = sched.Next(t) {
-		starts = append(starts, t)
-		// An object might miss several starts. For example, if
-		// controller gets wedged on friday at 5:01pm when everyone has
-		// gone home, and someone comes in on tuesday AM and discovers
-		// the problem and restarts the controller, then all the hourly
-		// jobs, more than 80 of them for one hourly scheduledJob, should
-		// all start running with no further intervention (if the scheduledJob
-		// allows concurrency and late starts).
-		//
-		// However, if there is a bug somewhere, or incorrect clock
-		// on controller's server or apiservers (for setting creationTimestamp)
-		// then there could be so many missed start times (it could be off
-		// by decades or more), that it would eat up all the CPU and memory
-		// of this controller. In that case, we want to not try to list
-		// all the missed start times.
-		//
-		// I've somewhat arbitrarily picked 100, as more than 80,
-		// but less than "lots".
-		if len(starts) > 100 {
-			// We can't get the most recent times so just return an empty slice
-			return []time.Time{}, fmt.Errorf("too many missed start time (> 100). Set or decrease .spec.startingDeadlineSeconds or check clock skew")
+	// For the sake of easy patching, try to "hide" getLatestMissedSchedule
+	latestTime, missedTimes := getLatestMissedSchedule(earliestTime, now, sched)
+	for i := 0; i < missedTimes; i++ {
+		starts = append(starts, latestTime) // This technically breaks the function signature, but the actual consumer only cares about starts[0] and len(starts).
+	}
+
+	return starts, nil
+}
+
+// getLatestMissedSchedule returns the latest start time in the time window (inclusive), and the number of schedules in the time window (capped at 2).
+// The number of missed start times conveys "none, one, multiple".
+func getLatestMissedSchedule(startWindow time.Time, endWindow time.Time, schedule cron.Schedule) (time.Time, int) {
+	nextSchedule := schedule.Next(startWindow)
+
+	// If no schedules in window, return.
+	if nextSchedule.After(endWindow) {
+		return time.Time{}, 0
+
+		// There is (at least one) schedule in the window. See if there are more later ones.
+	} else {
+		latestSchedule, found := getLatestMissedScheduleBinarySearch(nextSchedule, endWindow, schedule)
+		if found && latestSchedule != nextSchedule {
+			return latestSchedule, 2 // We missed at least 2 schedules. Return the latest.
+		} else {
+			return nextSchedule, 1
 		}
 	}
-	return starts, nil
+}
+
+// LatestScheduleTime, foundSchedule
+// getLatestMissedSchedule returns the latest start time in the specified time window (inclusive). It also returns true if a start time was found, false otherwise
+// It uses a binary search with the cron.Next function, to avoid stepping through every cron schedule.
+// This is less efficient than if cron.Previous existed, but is arguably simpler to review and test than a custom Previous function.
+func getLatestMissedScheduleBinarySearch(startWindow time.Time, endWindow time.Time, schedule cron.Schedule) (time.Time, bool) {
+	// Crons can't schedule in lower granularity than a minute.
+	// If we are looking at a time window less than a minute, there is "room" for at most 1 schedule, and we can skip the binary search.
+	minimumTimeUnit := time.Minute
+	if endWindow.Sub(startWindow) < minimumTimeUnit {
+		nextStart := schedule.Next(startWindow)
+		if !nextStart.After(endWindow) {
+			return nextStart, true
+		} else {
+			return time.Time{}, false
+		}
+	}
+
+	// Break the window into 2 halves for a binary search.
+	midway := startWindow.Add(endWindow.Sub(startWindow) / 2)
+
+	// Check the second half of the window for a start time.
+	// If there is a start time within this window, we can safely ignore the first half of the window.
+	nextScheduleAfterMidway := schedule.Next(midway)
+	if !nextScheduleAfterMidway.After(endWindow) {
+		latestFound, found := getLatestMissedScheduleBinarySearch(nextScheduleAfterMidway, endWindow, schedule) // Check a sub-window between the found schedule and the end of the window.
+		if found {
+			return latestFound, true
+		} else {
+			return nextScheduleAfterMidway, true
+		}
+
+		// If there was no start time in the second half of the window, we need to check the first half of the window.
+	} else {
+
+		nextScheduleInWindow := schedule.Next(startWindow)
+		if !nextScheduleInWindow.After(midway) { // Latest start time is in first half. There's no start time in the second half.
+			latestFound, found := getLatestMissedScheduleBinarySearch(nextScheduleInWindow, midway, schedule) // Check the first half.
+			if found {
+				return latestFound, true
+			} else {
+				return nextScheduleInWindow, true
+			}
+
+			// If there was no schedule time in the first half of the window either,
+			// then there is no missed schedule.
+		} else {
+			return time.Time{}, false
+		}
+
+	}
 }
 
 // getJobFromTemplate makes a Job from a CronJob
