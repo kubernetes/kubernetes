@@ -22,12 +22,15 @@ import (
 	"net/http/httptest"
 
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/events"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
 	"k8s.io/kubernetes/pkg/scheduler"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -85,6 +88,48 @@ func StartScheduler(clientSet clientset.Interface) (*scheduler.Scheduler, corein
 		klog.Infof("destroyed scheduler")
 	}
 	return sched, podInformer, shutdownFunc
+}
+
+// StartFakePVController is a simplified pv controller logic that sets PVC VolumeName and annotation for each PV binding.
+// TODO(mborsz): Use a real PV controller here.
+func StartFakePVController(clientSet clientset.Interface) ShutdownFunc {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	informerFactory := informers.NewSharedInformerFactory(clientSet, 0)
+	pvInformer := informerFactory.Core().V1().PersistentVolumes()
+
+	syncPV := func(obj *v1.PersistentVolume) {
+		if obj.Spec.ClaimRef != nil {
+			claimRef := obj.Spec.ClaimRef
+			pvc, err := clientSet.CoreV1().PersistentVolumeClaims(claimRef.Namespace).Get(ctx, claimRef.Name, metav1.GetOptions{})
+			if err != nil {
+				klog.Errorf("error while getting %v/%v: %v", claimRef.Namespace, claimRef.Name, err)
+				return
+			}
+
+			if pvc.Spec.VolumeName == "" {
+				pvc.Spec.VolumeName = obj.Name
+				metav1.SetMetaDataAnnotation(&pvc.ObjectMeta, pvutil.AnnBindCompleted, "yes")
+				_, err := clientSet.CoreV1().PersistentVolumeClaims(claimRef.Namespace).Update(ctx, pvc, metav1.UpdateOptions{})
+				if err != nil {
+					klog.Errorf("error while getting %v/%v: %v", claimRef.Namespace, claimRef.Name, err)
+					return
+				}
+			}
+		}
+	}
+
+	pvInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: func(obj interface{}) {
+			syncPV(obj.(*v1.PersistentVolume))
+		},
+		UpdateFunc: func(_, obj interface{}) {
+			syncPV(obj.(*v1.PersistentVolume))
+		},
+	})
+
+	informerFactory.Start(ctx.Done())
+	return ShutdownFunc(cancel)
 }
 
 // createScheduler create a scheduler with given informer factory and default name.
