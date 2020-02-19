@@ -24,6 +24,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//test/conformance/behaviors:all-srcs",
         "//test/conformance/kubetestgen:all-srcs",
     ],
     tags = ["automanaged"],

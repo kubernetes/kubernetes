@@ -1217,7 +1217,7 @@ func TestPermitPlugins(t *testing.T) {
 					inj:  injectedResult{PermitStatus: int(Unschedulable)},
 				},
 			},
-			want: NewStatus(Unschedulable, `rejected by "TestPlugin" at permit: injected status`),
+			want: NewStatus(Unschedulable, `rejected pod "" by permit plugin "TestPlugin": injected status`),
 		},
 		{
 			name: "ErrorPermitPlugin",
@@ -1237,7 +1237,7 @@ func TestPermitPlugins(t *testing.T) {
 					inj:  injectedResult{PermitStatus: int(UnschedulableAndUnresolvable)},
 				},
 			},
-			want: NewStatus(UnschedulableAndUnresolvable, `rejected by "TestPlugin" at permit: injected status`),
+			want: NewStatus(UnschedulableAndUnresolvable, `rejected pod "" by permit plugin "TestPlugin": injected status`),
 		},
 		{
 			name: "WaitPermitPlugin",
@@ -1247,7 +1247,7 @@ func TestPermitPlugins(t *testing.T) {
 					inj:  injectedResult{PermitStatus: int(Wait)},
 				},
 			},
-			want: NewStatus(Unschedulable, `pod "" rejected while waiting at permit: rejected due to timeout after waiting 0s at plugin TestPlugin`),
+			want: NewStatus(Wait, `one or more plugins asked to wait and no plugin rejected pod ""`),
 		},
 		{
 			name: "SuccessSuccessPermitPlugin",
@@ -1425,6 +1425,13 @@ func TestRecordingMetrics(t *testing.T) {
 			wantExtensionPoint: "Permit",
 			wantStatus:         Error,
 		},
+		{
+			name:               "Permit - Wait",
+			action:             func(f Framework) { f.RunPermitPlugins(context.Background(), state, pod, "") },
+			inject:             injectedResult{PermitStatus: int(Wait)},
+			wantExtensionPoint: "Permit",
+			wantStatus:         Wait,
+		},
 	}
 
 	for _, tt := range tests {
@@ -1578,17 +1585,17 @@ func TestRunBindPlugins(t *testing.T) {
 	}
 }
 
-func TestPermitWaitingMetric(t *testing.T) {
+func TestPermitWaitDurationMetric(t *testing.T) {
 	tests := []struct {
 		name    string
 		inject  injectedResult
 		wantRes string
 	}{
 		{
-			name: "Permit - Success",
+			name: "WaitOnPermit - No Wait",
 		},
 		{
-			name:    "Permit - Wait Timeout",
+			name:    "WaitOnPermit - Wait Timeout",
 			inject:  injectedResult{PermitStatus: int(Wait)},
 			wantRes: "Unschedulable",
 		},
@@ -1617,13 +1624,14 @@ func TestPermitWaitingMetric(t *testing.T) {
 			}
 
 			f.RunPermitPlugins(context.TODO(), nil, pod, "")
+			f.WaitOnPermit(context.TODO(), pod)
 
 			collectAndComparePermitWaitDuration(t, tt.wantRes)
 		})
 	}
 }
 
-func TestRejectWaitingPod(t *testing.T) {
+func TestWaitOnPermit(t *testing.T) {
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "pod",
@@ -1631,33 +1639,65 @@ func TestRejectWaitingPod(t *testing.T) {
 		},
 	}
 
-	testPermitPlugin := &TestPermitPlugin{}
-	r := make(Registry)
-	r.Register(permitPlugin,
-		func(_ *runtime.Unknown, fh FrameworkHandle) (Plugin, error) {
-			return testPermitPlugin, nil
-		})
-	plugins := &config.Plugins{
-		Permit: &config.PluginSet{Enabled: []config.Plugin{{Name: permitPlugin, Weight: 1}}},
+	tests := []struct {
+		name        string
+		action      func(f Framework)
+		wantStatus  Code
+		wantMessage string
+	}{
+		{
+			name: "Reject Waiting Pod",
+			action: func(f Framework) {
+				f.GetWaitingPod(pod.UID).Reject("reject message")
+			},
+			wantStatus:  Unschedulable,
+			wantMessage: "pod \"pod\" rejected while waiting on permit: reject message",
+		},
+		{
+			name: "Allow Waiting Pod",
+			action: func(f Framework) {
+				f.GetWaitingPod(pod.UID).Allow(permitPlugin)
+			},
+			wantStatus:  Success,
+			wantMessage: "",
+		},
 	}
 
-	f, err := newFrameworkWithQueueSortAndBind(r, plugins, emptyArgs)
-	if err != nil {
-		t.Fatalf("Failed to create framework for testing: %v", err)
-	}
-
-	go func() {
-		for {
-			waitingPod := f.GetWaitingPod(pod.UID)
-			if waitingPod != nil {
-				break
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			testPermitPlugin := &TestPermitPlugin{}
+			r := make(Registry)
+			r.Register(permitPlugin,
+				func(_ *runtime.Unknown, fh FrameworkHandle) (Plugin, error) {
+					return testPermitPlugin, nil
+				})
+			plugins := &config.Plugins{
+				Permit: &config.PluginSet{Enabled: []config.Plugin{{Name: permitPlugin, Weight: 1}}},
 			}
-		}
-		f.RejectWaitingPod(pod.UID)
-	}()
-	permitStatus := f.RunPermitPlugins(context.Background(), nil, pod, "")
-	if permitStatus.Message() != "pod \"pod\" rejected while waiting at permit: removed" {
-		t.Fatalf("RejectWaitingPod failed, permitStatus: %v", permitStatus)
+
+			f, err := newFrameworkWithQueueSortAndBind(r, plugins, emptyArgs)
+			if err != nil {
+				t.Fatalf("Failed to create framework for testing: %v", err)
+			}
+
+			runPermitPluginsStatus := f.RunPermitPlugins(context.Background(), nil, pod, "")
+			if runPermitPluginsStatus.Code() != Wait {
+				t.Fatalf("Expected RunPermitPlugins to return status %v, but got %v",
+					Wait, runPermitPluginsStatus.Code())
+			}
+
+			go tt.action(f)
+
+			waitOnPermitStatus := f.WaitOnPermit(context.Background(), pod)
+			if waitOnPermitStatus.Code() != tt.wantStatus {
+				t.Fatalf("Expected WaitOnPermit to return status %v, but got %v",
+					tt.wantStatus, waitOnPermitStatus.Code())
+			}
+			if waitOnPermitStatus.Message() != tt.wantMessage {
+				t.Fatalf("Expected WaitOnPermit to return status with message %q, but got %q",
+					tt.wantMessage, waitOnPermitStatus.Message())
+			}
+		})
 	}
 }
 

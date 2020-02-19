@@ -20,6 +20,7 @@ package storage
 
 import (
 	"context"
+
 	"github.com/onsi/ginkgo"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -49,8 +50,6 @@ var _ = utils.SIGDescribe("Volumes", func() {
 				Namespace: namespace.Name,
 				Prefix:    "configmap",
 			}
-
-			defer volume.TestCleanup(f, config)
 			configMap := &v1.ConfigMap{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       "ConfigMap",

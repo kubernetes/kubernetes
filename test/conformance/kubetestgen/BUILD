@@ -2,13 +2,11 @@ load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
 
 go_library(
     name = "go_default_library",
-    srcs = [
-        "kubetestgen.go",
-        "types.go",
-    ],
+    srcs = ["kubetestgen.go"],
     importpath = "k8s.io/kubernetes/test/conformance/kubetestgen",
     visibility = ["//visibility:private"],
     deps = [
+        "//test/conformance/behaviors:go_default_library",
         "//vendor/github.com/go-openapi/analysis:go_default_library",
         "//vendor/github.com/go-openapi/loads:go_default_library",
         "//vendor/github.com/go-openapi/spec:go_default_library",

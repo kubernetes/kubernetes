@@ -62,6 +62,7 @@ func TestReconcileEmpty(t *testing.T) {
 	assert.Equal(t, svc.Name, slices[0].Labels[discovery.LabelServiceName])
 	assert.EqualValues(t, []discovery.EndpointPort{}, slices[0].Ports)
 	assert.EqualValues(t, []discovery.Endpoint{}, slices[0].Endpoints)
+	expectTrackedResourceVersion(t, r.endpointSliceTracker, &slices[0], "100")
 	expectMetrics(t, expectedMetrics{desiredSlices: 1, actualSlices: 1, desiredEndpoints: 0, addedPerSync: 0, removedPerSync: 0, numCreated: 1, numUpdated: 0, numDeleted: 0})
 }
 
@@ -190,6 +191,8 @@ func TestReconcile1Pod(t *testing.T) {
 				t.Errorf("Expected endpoint: %+v, got: %+v", testCase.expectedEndpoint, endpoint)
 			}
 
+			expectTrackedResourceVersion(t, r.endpointSliceTracker, &slice, "100")
+
 			expectMetrics(t, expectedMetrics{desiredSlices: 1, actualSlices: 1, desiredEndpoints: 1, addedPerSync: 1, removedPerSync: 0, numCreated: 1, numUpdated: 0, numDeleted: 0})
 		})
 	}
@@ -221,6 +224,7 @@ func TestReconcile1EndpointSlice(t *testing.T) {
 	assert.Equal(t, svc.Name, slices[0].Labels[discovery.LabelServiceName])
 	assert.EqualValues(t, []discovery.EndpointPort{}, slices[0].Ports)
 	assert.EqualValues(t, []discovery.Endpoint{}, slices[0].Endpoints)
+	expectTrackedResourceVersion(t, r.endpointSliceTracker, &slices[0], "200")
 	expectMetrics(t, expectedMetrics{desiredSlices: 1, actualSlices: 1, desiredEndpoints: 0, addedPerSync: 0, removedPerSync: 0, numCreated: 0, numUpdated: 1, numDeleted: 0})
 }
 
@@ -818,6 +822,17 @@ func expectActions(t *testing.T, actions []k8stesting.Action, num int, verb, res
 		relativePos := len(actions) - i - 1
 		assert.Equal(t, verb, actions[relativePos].GetVerb(), "Expected action -%d verb to be %s", i, verb)
 		assert.Equal(t, resource, actions[relativePos].GetResource().Resource, "Expected action -%d resource to be %s", i, resource)
+	}
+}
+
+func expectTrackedResourceVersion(t *testing.T, tracker *endpointSliceTracker, slice *discovery.EndpointSlice, expectedRV string) {
+	rrv := tracker.relatedResourceVersions(slice)
+	rv, tracked := rrv[slice.Name]
+	if !tracked {
+		t.Fatalf("Expected EndpointSlice %s to be tracked", slice.Name)
+	}
+	if rv != expectedRV {
+		t.Errorf("Expected ResourceVersion of %s to be %s, got %s", slice.Name, expectedRV, rv)
 	}
 }
 

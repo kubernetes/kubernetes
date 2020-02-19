@@ -65,8 +65,6 @@ func testFlexVolume(driver string, config volume.TestConfig, f *framework.Framew
 		},
 	}
 	volume.TestVolumeClient(f, config, nil, "" /* fsType */, tests)
-
-	volume.TestCleanup(f, config)
 }
 
 // installFlex installs the driver found at filePath on the node, and restarts

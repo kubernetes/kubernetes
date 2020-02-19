@@ -27,19 +27,19 @@ import (
 
 // waitingPodsMap a thread-safe map used to maintain pods waiting in the permit phase.
 type waitingPodsMap struct {
-	pods map[types.UID]WaitingPod
+	pods map[types.UID]*waitingPod
 	mu   sync.RWMutex
 }
 
 // newWaitingPodsMap returns a new waitingPodsMap.
 func newWaitingPodsMap() *waitingPodsMap {
 	return &waitingPodsMap{
-		pods: make(map[types.UID]WaitingPod),
+		pods: make(map[types.UID]*waitingPod),
 	}
 }
 
 // add a new WaitingPod to the map.
-func (m *waitingPodsMap) add(wp WaitingPod) {
+func (m *waitingPodsMap) add(wp *waitingPod) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.pods[wp.GetPod().UID] = wp
@@ -53,11 +53,10 @@ func (m *waitingPodsMap) remove(uid types.UID) {
 }
 
 // get a WaitingPod from the map.
-func (m *waitingPodsMap) get(uid types.UID) WaitingPod {
+func (m *waitingPodsMap) get(uid types.UID) *waitingPod {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return m.pods[uid]
-
 }
 
 // iterate acquires a read lock and iterates over the WaitingPods map.
@@ -77,11 +76,17 @@ type waitingPod struct {
 	mu             sync.RWMutex
 }
 
+var _ WaitingPod = &waitingPod{}
+
 // newWaitingPod returns a new waitingPod instance.
 func newWaitingPod(pod *v1.Pod, pluginsMaxWaitTime map[string]time.Duration) *waitingPod {
 	wp := &waitingPod{
 		pod: pod,
-		s:   make(chan *Status),
+		// Allow() and Reject() calls are non-blocking. This property is guaranteed
+		// by using non-blocking send to this channel. This channel has a buffer of size 1
+		// to ensure that non-blocking send will not be ignored - possible situation when
+		// receiving from this channel happens after non-blocking send.
+		s: make(chan *Status, 1),
 	}
 
 	wp.pendingPlugins = make(map[string]*time.Timer, len(pluginsMaxWaitTime))
