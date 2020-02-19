@@ -385,6 +385,8 @@ func TestPriorityQueue_MoveAllToActiveOrBackoffQueue(t *testing.T) {
 	q.AddUnschedulableIfNotPresent(q.newPodInfo(&unschedulablePod), q.SchedulingCycle())
 	q.AddUnschedulableIfNotPresent(q.newPodInfo(&highPriorityPod), q.SchedulingCycle())
 	q.MoveAllToActiveOrBackoffQueue("test")
+	q.lock.Lock()
+	defer q.lock.Unlock()
 	if q.activeQ.Len() != 1 {
 		t.Error("Expected 1 item to be in activeQ")
 	}
