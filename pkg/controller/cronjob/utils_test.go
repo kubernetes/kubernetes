@@ -23,6 +23,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/robfig/cron"
+
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	"k8s.io/api/core/v1"
@@ -329,7 +331,7 @@ func TestGetRecentUnmetScheduleTimes(t *testing.T) {
 		if len(times) != 1 {
 			t.Errorf("expected 1 start times, got: %v", times)
 		} else if !times[0].Equal(T2) {
-			t.Errorf("expected: %v, got: %v", T1, times[0])
+			t.Errorf("expected: %v, got: %v", T2, times[0])
 		}
 	}
 	{
@@ -345,11 +347,8 @@ func TestGetRecentUnmetScheduleTimes(t *testing.T) {
 		if len(times) != 2 {
 			t.Errorf("expected 2 start times, got: %v", times)
 		} else {
-			if !times[0].Equal(T1) {
-				t.Errorf("expected: %v, got: %v", T1, times[0])
-			}
-			if !times[1].Equal(T2) {
-				t.Errorf("expected: %v, got: %v", T2, times[1])
+			if !times[len(times)-1].Equal(T2) {
+				t.Errorf("expected: %v, got: %v", T2, times[len(times)-1])
 			}
 		}
 	}
@@ -358,9 +357,16 @@ func TestGetRecentUnmetScheduleTimes(t *testing.T) {
 		sj.ObjectMeta.CreationTimestamp = metav1.Time{Time: T1.Add(-2 * time.Hour)}
 		sj.Status.LastScheduleTime = &metav1.Time{Time: T1.Add(-1 * time.Hour)}
 		now := T2.Add(10 * 24 * time.Hour)
-		_, err := getRecentUnmetScheduleTimes(sj, now)
-		if err == nil {
-			t.Errorf("expected an error")
+		times, err := getRecentUnmetScheduleTimes(sj, now)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if len(times) != 2 {
+			t.Errorf("expected 2 start times, got: %v", times)
+		} else {
+			if !times[len(times)-1].Equal(now) {
+				t.Errorf("expected: %v, got: %v", now, times[len(times)-1])
+			}
 		}
 	}
 	{
@@ -437,6 +443,160 @@ func TestByJobStartTime(t *testing.T) {
 		sort.Sort(byJobStartTime(testCase.input))
 		if !reflect.DeepEqual(testCase.input, testCase.expected) {
 			t.Errorf("case: '%s', jobs not sorted as expected", testCase.name)
+		}
+	}
+}
+
+func Test_getLatestMissedSchedule(t *testing.T) {
+	startTime, err := time.Parse(time.RFC3339, "2016-05-19T10:00:00Z")
+	if err != nil {
+		panic("test setup error")
+	}
+
+	hourly, err := cron.ParseStandard("0 * * * *")
+	if err != nil {
+		t.Errorf("couldn't parse schedule")
+	}
+	minutely, err := cron.ParseStandard("* * * * *")
+	if err != nil {
+		t.Errorf("couldn't parse schedule")
+	}
+
+	cases := []struct {
+		desc        string
+		end         time.Time
+		schedule    cron.Schedule
+		expectFound bool
+		expect      time.Time
+	}{
+		{
+			desc:        "basic case",
+			end:         weekAfterTheHour(),
+			schedule:    hourly,
+			expectFound: true,
+			expect:      weekAfterTheHour(),
+		},
+		{
+			desc:        "no time",
+			end:         startTime,
+			schedule:    minutely,
+			expectFound: false,
+		},
+		{
+			desc:        "not enough time",
+			end:         startTime.Add(time.Second * 59),
+			schedule:    minutely,
+			expectFound: false,
+		},
+		{
+			desc:        "just enough time",
+			end:         startTime.Add(time.Minute),
+			schedule:    minutely,
+			expectFound: true,
+			expect:      startTime.Add(time.Minute),
+		},
+	}
+
+	for _, c := range cases {
+		actual, numberMissed := getLatestMissedSchedule(startTime, c.end, c.schedule)
+		if (numberMissed > 0) != c.expectFound {
+			t.Errorf("For case '%s' at %v, expected %v, got %v", c.schedule, c.end, c.expect, actual)
+		}
+		if actual != c.expect {
+			t.Errorf("%v", actual)
+		}
+	}
+}
+
+func Test_getLatestMissedScheduleBinarySearch(t *testing.T) {
+	startTime, err := time.Parse(time.RFC3339, "2016-05-19T10:00:00Z")
+	if err != nil {
+		panic("test setup error")
+	}
+
+	elevenOnTheHour, err := cron.ParseStandard("0 10,11 * * *")
+	if err != nil {
+		t.Errorf("couldn't parse schedule")
+	}
+	hourly, err := cron.ParseStandard("0 * * * *")
+	if err != nil {
+		t.Errorf("couldn't parse schedule")
+	}
+	minutely, err := cron.ParseStandard("* * * * *")
+	if err != nil {
+		t.Errorf("couldn't parse schedule")
+	}
+
+	cases := []struct {
+		desc        string
+		end         time.Time
+		schedule    cron.Schedule
+		expectFound bool
+		expect      time.Time
+	}{
+		{
+			desc:        "basic case",
+			end:         weekAfterTheHour(),
+			schedule:    hourly,
+			expectFound: true,
+			expect:      weekAfterTheHour(),
+		},
+		{
+			desc:        "long case",
+			end:         startTime.Add(time.Hour*24*500 - time.Second), // 500 days later, minus 1 second.
+			schedule:    minutely,
+			expectFound: true,
+			expect:      startTime.Add(time.Hour*24*500 - time.Minute), // 500 days later, minus 1 minute.
+		},
+		{
+			desc:        "no time",
+			end:         startTime,
+			schedule:    minutely,
+			expectFound: false,
+		},
+		{
+			desc:        "not enough time",
+			end:         startTime.Add(time.Second * 59),
+			schedule:    minutely,
+			expectFound: false,
+		},
+		{
+			desc:        "just enough time",
+			end:         startTime.Add(time.Minute),
+			schedule:    minutely,
+			expectFound: true,
+			expect:      startTime.Add(time.Minute),
+		},
+		{
+			desc:        "bounds check on midway",
+			end:         startTime.Add(time.Hour*2),
+			schedule:    elevenOnTheHour,
+			expectFound: true,
+			expect:      startTime.Add(time.Hour),
+		},
+		{
+			desc:        "result just before midway",
+			end:         startTime.Add(time.Hour*2 + time.Minute), // Midway is 30s after the schedule time.
+			schedule:    elevenOnTheHour,
+			expectFound: true,
+			expect:      startTime.Add(time.Hour),
+		},
+		{
+			desc:        "result just after midway",
+			end:         startTime.Add(time.Hour*2 - time.Minute), // Midway is 30s before the schedule time.
+			schedule:    elevenOnTheHour,
+			expectFound: true,
+			expect:      startTime.Add(time.Hour),
+		},
+	}
+
+	for _, c := range cases {
+		actual, found := getLatestMissedScheduleBinarySearch(startTime, c.end, c.schedule)
+		if found != c.expectFound {
+			t.Errorf("For case '%s' at %v, expected %v, got %v", c.schedule, c.end, c.expect, actual)
+		}
+		if actual != c.expect {
+			t.Errorf("%v", actual)
 		}
 	}
 }
