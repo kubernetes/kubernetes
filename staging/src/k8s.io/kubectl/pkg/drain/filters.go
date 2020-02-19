@@ -29,12 +29,13 @@ import (
 )
 
 const (
-	daemonSetFatal      = "DaemonSet-managed Pods (use --ignore-daemonsets to ignore)"
-	daemonSetWarning    = "ignoring DaemonSet-managed Pods"
-	localStorageFatal   = "Pods with local storage (use --delete-local-data to override)"
-	localStorageWarning = "deleting Pods with local storage"
-	unmanagedFatal      = "Pods not managed by ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet (use --force to override)"
-	unmanagedWarning    = "deleting Pods not managed by ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet"
+	daemonSetFatal        = "DaemonSet-managed Pods (use --ignore-daemonsets to ignore)"
+	daemonSetConflictOpts = "Invalid Options Specified: DeleteDaemonSets and IgnoreAllDaemonSets cannot be set together"
+	daemonSetWarning      = "ignoring DaemonSet-managed Pods"
+	localStorageFatal     = "Pods with local storage (use --delete-local-data to override)"
+	localStorageWarning   = "deleting Pods with local storage"
+	unmanagedFatal        = "Pods not managed by ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet (use --force to override)"
+	unmanagedWarning      = "deleting Pods not managed by ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet"
 )
 
 type podDelete struct {
@@ -159,13 +160,21 @@ func hasLocalStorage(pod corev1.Pod) bool {
 
 func (d *Helper) daemonSetFilter(pod corev1.Pod) podDeleteStatus {
 	// Note that we return false in cases where the pod is DaemonSet managed,
-	// regardless of flags.
+	// unless DeleteDaemonSets is specified.
 	//
 	// The exception is for pods that are orphaned (the referencing
 	// management resource - including DaemonSet - is not found).
 	// Such pods will be deleted if --force is used.
+
+	// Specifying ignore and delete daemonsets is invalid. We check this here
+	// because there's no single public-method entry point to validate options
+	// when used as a library.
+	if d.DeleteDaemonSets && d.IgnoreAllDaemonSets {
+		return makePodDeleteStatusWithError(daemonSetConflictOpts)
+	}
+
 	controllerRef := metav1.GetControllerOf(&pod)
-	if controllerRef == nil || controllerRef.Kind != appsv1.SchemeGroupVersion.WithKind("DaemonSet").Kind {
+	if controllerRef == nil || controllerRef.Kind != appsv1.SchemeGroupVersion.WithKind("DaemonSet").Kind || d.DeleteDaemonSets {
 		return makePodDeleteStatusOkay()
 	}
 	// Any finished pod can be removed.

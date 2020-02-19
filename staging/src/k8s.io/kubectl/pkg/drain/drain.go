@@ -51,6 +51,7 @@ type Helper struct {
 	Force               bool
 	GracePeriodSeconds  int
 	IgnoreAllDaemonSets bool
+	DeleteDaemonSets    bool
 	Timeout             time.Duration
 	DeleteLocalData     bool
 	Selector            string

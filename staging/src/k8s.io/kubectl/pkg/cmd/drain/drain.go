@@ -116,9 +116,10 @@ var (
 		DELETE to delete the pods.
 		The 'drain' evicts or deletes all pods except mirror pods (which cannot be deleted through
 		the API server).  If there are DaemonSet-managed pods, drain will not proceed
-		without --ignore-daemonsets, and regardless it will not delete any
-		DaemonSet-managed pods, because those pods would be immediately replaced by the
-		DaemonSet controller, which ignores unschedulable markings.  If there are any
+		without --ignore-daemonsets or --delete-daemonsets (but not both).  Any deleted
+		DaemonSet-managed pods will be immediately replaced by the
+		DaemonSet controller, which ignores unschedulable markings, so --delete-daemonsets
+		is only useful to trigger an OnDelete update strategy.  If there are any
 		pods that are neither mirror pods nor managed by ReplicationController,
 		ReplicaSet, DaemonSet, StatefulSet or Job, then drain will not delete any pods unless you
 		use --force.  --force will also allow deletion to proceed if the managing resource of one
@@ -186,7 +187,8 @@ func NewCmdDrain(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobr
 		},
 	}
 	cmd.Flags().BoolVar(&o.drainer.Force, "force", o.drainer.Force, "Continue even if there are pods not managed by a ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet.")
-	cmd.Flags().BoolVar(&o.drainer.IgnoreAllDaemonSets, "ignore-daemonsets", o.drainer.IgnoreAllDaemonSets, "Ignore DaemonSet-managed pods.")
+	cmd.Flags().BoolVar(&o.drainer.IgnoreAllDaemonSets, "ignore-daemonsets", o.drainer.IgnoreAllDaemonSets, "Ignore DaemonSet-managed pods. Cannot be used with --delete-daemonsets")
+	cmd.Flags().BoolVar(&o.drainer.DeleteDaemonSets, "delete-daemonsets", o.drainer.DeleteDaemonSets, "Delete DaemonSet-managed pods. Cannot be used with --ignore-daemonsets. Deleted pods will be immediately rescheduled regardless of node schedulability.")
 	cmd.Flags().BoolVar(&o.drainer.DeleteLocalData, "delete-local-data", o.drainer.DeleteLocalData, "Continue even if there are pods using emptyDir (local data that will be deleted when the node is drained).")
 	cmd.Flags().IntVar(&o.drainer.GracePeriodSeconds, "grace-period", o.drainer.GracePeriodSeconds, "Period of time in seconds given to each pod to terminate gracefully. If negative, the default value specified in the pod will be used.")
 	cmd.Flags().DurationVar(&o.drainer.Timeout, "timeout", o.drainer.Timeout, "The length of time to wait before giving up, zero means infinite")
@@ -209,6 +211,10 @@ func (o *DrainCmdOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 	}
 	if len(args) > 0 && len(o.drainer.Selector) > 0 {
 		return cmdutil.UsageErrorf(cmd, "error: cannot specify both a node name and a --selector option")
+	}
+
+	if o.drainer.IgnoreAllDaemonSets && o.drainer.DeleteDaemonSets {
+		return cmdutil.UsageErrorf(cmd, "error: cannot specify both --ignore-daemonsets and --delete-daemonsets options")
 	}
 
 	o.drainer.DryRunStrategy, err = cmdutil.GetDryRunStrategy(cmd)
