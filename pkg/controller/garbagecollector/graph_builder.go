@@ -200,7 +200,7 @@ func (gb *GraphBuilder) syncMonitors(resources map[schema.GroupVersionResource]s
 			kept++
 			continue
 		}
-		klog.V(4).Infof("synced monitors: start KindFor %v", resource)
+		klog.V(4).Infof("synced monitors: start KindFor %v (%T)", resource, gb.restMapper)
 		kind, err := gb.restMapper.KindFor(resource)
 		klog.V(4).Infof("synced monitors: done KindFor %v", resource)
 		if err != nil {

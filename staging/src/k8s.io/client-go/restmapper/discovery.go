@@ -223,14 +223,19 @@ func (d *DeferredDiscoveryRESTMapper) Reset() {
 // KindFor takes a partial resource and returns back the single match.
 // It returns an error if there are multiple matches.
 func (d *DeferredDiscoveryRESTMapper) KindFor(resource schema.GroupVersionResource) (gvk schema.GroupVersionKind, err error) {
+	klog.Infof("DeferredDiscoveryRESTMapper.KindFor")
 	del, err := d.getDelegate()
+	klog.Infof("DeferredDiscoveryRESTMapper.KindFor: got delegate")
 	if err != nil {
 		return schema.GroupVersionKind{}, err
 	}
 	gvk, err = del.KindFor(resource)
+	klog.Infof("DeferredDiscoveryRESTMapper.KindFor: del.KindFor")
 	if err != nil && !d.cl.Fresh() {
 		d.Reset()
+		klog.Infof("DeferredDiscoveryRESTMapper.KindFor: KindFor(recursive) >")
 		gvk, err = d.KindFor(resource)
+		klog.Infof("DeferredDiscoveryRESTMapper.KindFor: KindFor(recursive) <")
 	}
 	return
 }
