@@ -1946,9 +1946,6 @@ var _ = SIGDescribe("Services", func() {
 			}
 		}()
 
-		testAgnhostPod := f.NewAgnhostPod(ns, "pause")
-		testAgnhostPod, err := f.ClientSet.CoreV1().Pods(ns).Create(testAgnhostPod)
-
 		t.Name = "slow-terminating-unready-pod"
 		t.Image = imageutils.GetE2EImage(imageutils.Agnhost)
 		port := 80
@@ -1981,11 +1978,18 @@ var _ = SIGDescribe("Services", func() {
 					},
 				},
 			},
+			Lifecycle: &v1.Lifecycle{
+				PreStop: &v1.Handler{
+					Exec: &v1.ExecAction{
+						Command: []string{"/bin/sleep", fmt.Sprintf("%d", terminateSeconds)},
+					},
+				},
+			},
 		}, nil)
 		rcSpec.Spec.Template.Spec.TerminationGracePeriodSeconds = &terminateSeconds
 
 		ginkgo.By(fmt.Sprintf("creating RC %v with selectors %v", rcSpec.Name, rcSpec.Spec.Selector))
-		_, err = t.CreateRC(rcSpec)
+		_, err := t.CreateRC(rcSpec)
 		framework.ExpectNoError(err)
 
 		ginkgo.By(fmt.Sprintf("creating Service %v with selectors %v", service.Name, service.Spec.Selector))
@@ -1998,7 +2002,21 @@ var _ = SIGDescribe("Services", func() {
 		svcName := fmt.Sprintf("%v.%v.svc.%v", serviceName, f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
 		ginkgo.By("Waiting for endpoints of Service with DNS name " + svcName)
 
-		_ = f.ExecCommandInContainer(testAgnhostPod.Name, "agnhost", "/agnhost", "--timeout", "10s", "connect", fmt.Sprintln("%s:%d", svcName, port))
+		execPod := e2epod.CreateExecPodOrFail(f.ClientSet, f.Namespace.Name, "execpod-", nil)
+		execPodName := execPod.Name
+		cmd := fmt.Sprintf("curl -q -s --connect-timeout 2 http://%s:%d/", svcName, port)
+		var stdout string
+		if pollErr := wait.PollImmediate(framework.Poll, e2eservice.KubeProxyLagTimeout, func() (bool, error) {
+			var err error
+			stdout, err = framework.RunHostCmd(f.Namespace.Name, execPodName, cmd)
+			if err != nil {
+				framework.Logf("expected un-ready endpoint for Service %v, stdout: %v, err %v", t.Name, stdout, err)
+				return false, nil
+			}
+			return true, nil
+		}); pollErr != nil {
+			framework.Failf("expected un-ready endpoint for Service %v within %v, stdout: %v", t.Name, e2eservice.KubeProxyLagTimeout, stdout)
+		}
 
 		ginkgo.By("Scaling down replication controller to zero")
 		e2erc.ScaleRC(f.ClientSet, f.ScalesGetter, t.Namespace, rcSpec.Name, 0, false)
@@ -2010,7 +2028,18 @@ var _ = SIGDescribe("Services", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Check if pod is unreachable")
-		_ = f.ExecCommandInContainer(testAgnhostPod.Name, "agnhost", "/agnhost", "--timeout", "10s", "connect", fmt.Sprintln("%s:%d", svcName, port))
+		cmd = fmt.Sprintf("curl -q -s --connect-timeout 2 http://%s:%d/; test \"$?\" -ne \"0\"", svcName, port)
+		if pollErr := wait.PollImmediate(framework.Poll, e2eservice.KubeProxyLagTimeout, func() (bool, error) {
+			var err error
+			stdout, err = framework.RunHostCmd(f.Namespace.Name, execPodName, cmd)
+			if err != nil {
+				framework.Logf("expected un-ready endpoint for Service %v, stdout: %v, err %v", t.Name, stdout, err)
+				return false, nil
+			}
+			return true, nil
+		}); pollErr != nil {
+			framework.Failf("expected un-ready endpoint for Service %v within %v, stdout: %v", t.Name, e2eservice.KubeProxyLagTimeout, stdout)
+		}
 
 		ginkgo.By("Update service to tolerate unready services again")
 		_, err = e2eservice.UpdateService(f.ClientSet, t.Namespace, t.ServiceName, func(s *v1.Service) {
@@ -2019,7 +2048,18 @@ var _ = SIGDescribe("Services", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Check if terminating pod is available through service")
-		_ = f.ExecCommandInContainer(testAgnhostPod.Name, "agnhost", "/agnhost", "--timeout", "10s", "connect", fmt.Sprintln("%s:%d", svcName, port))
+		cmd = fmt.Sprintf("curl -q -s --connect-timeout 2 http://%s:%d/", svcName, port)
+		if pollErr := wait.PollImmediate(framework.Poll, e2eservice.KubeProxyLagTimeout, func() (bool, error) {
+			var err error
+			stdout, err = framework.RunHostCmd(f.Namespace.Name, execPodName, cmd)
+			if err != nil {
+				framework.Logf("expected un-ready endpoint for Service %v, stdout: %v, err %v", t.Name, stdout, err)
+				return false, nil
+			}
+			return true, nil
+		}); pollErr != nil {
+			framework.Failf("expected un-ready endpoint for Service %v within %v, stdout: %v", t.Name, e2eservice.KubeProxyLagTimeout, stdout)
+		}
 
 		ginkgo.By("Remove pods immediately")
 		label := labels.SelectorFromSet(labels.Set(t.Labels))
