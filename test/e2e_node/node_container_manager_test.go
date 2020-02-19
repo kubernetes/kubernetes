@@ -162,7 +162,10 @@ func runTest(f *framework.Framework) error {
 	}
 
 	// Create a cgroup manager object for manipulating cgroups.
-	cgroupManager := cm.NewCgroupManager(subsystems, oldCfg.CgroupDriver)
+	cgroupManager, err := cm.NewCgroupManager(subsystems, oldCfg.CgroupDriver)
+	if err != nil {
+		return fmt.Errorf("error when creating cgroup manager: %+v", err)
+	}
 
 	defer destroyTemporaryCgroupsForReservation(cgroupManager)
 	defer func() {

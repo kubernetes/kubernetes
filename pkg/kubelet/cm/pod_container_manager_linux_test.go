@@ -19,6 +19,7 @@ limitations under the License.
 package cm
 
 import (
+	cgroupsystemd "github.com/opencontainers/runc/libcontainer/cgroups/systemd"
 	"strings"
 	"testing"
 
@@ -100,8 +101,16 @@ func TestIsCgroupPod(t *testing.T) {
 		},
 	}
 	for _, cgroupDriver := range []string{"cgroupfs", "systemd"} {
+		if cgroupDriver == "systemd" && !cgroupsystemd.UseSystemd() {
+			t.Skip("systemd not supported")
+		}
+
+		cgroupManager, err := NewCgroupManager(nil, cgroupDriver)
+		if err != nil {
+			t.Fatalf("unexpected error when creating cgroup manager: %v", err)
+		}
 		pcm := &podContainerManagerImpl{
-			cgroupManager:     NewCgroupManager(nil, cgroupDriver),
+			cgroupManager:     cgroupManager,
 			enforceCPULimits:  true,
 			qosContainersInfo: qosContainersInfo,
 		}

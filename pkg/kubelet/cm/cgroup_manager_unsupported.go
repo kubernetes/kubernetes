@@ -30,8 +30,8 @@ type CgroupSubsystems struct {
 	MountPoints map[string]string
 }
 
-func NewCgroupManager(_ interface{}) CgroupManager {
-	return &unsupportedCgroupManager{}
+func NewCgroupManager(_ interface{}) (CgroupManager, error) {
+	return &unsupportedCgroupManager{}, nil
 }
 
 func (m *unsupportedCgroupManager) Name(_ CgroupName) string {

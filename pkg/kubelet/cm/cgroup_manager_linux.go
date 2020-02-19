@@ -18,6 +18,9 @@ package cm
 
 import (
 	"fmt"
+	systemddbus "github.com/coreos/go-systemd/dbus"
+	"github.com/godbus/dbus"
+	"math"
 	"os"
 	"path"
 	"path/filepath"
@@ -182,21 +185,30 @@ type cgroupManagerImpl struct {
 	subsystems *CgroupSubsystems
 	// simplifies interaction with libcontainer and its cgroup managers
 	adapter *libcontainerAdapter
+	// dbus connection to systemd for altering slice properties
+	dbusConnection *systemddbus.Conn
 }
 
 // Make sure that cgroupManagerImpl implements the CgroupManager interface
 var _ CgroupManager = &cgroupManagerImpl{}
 
 // NewCgroupManager is a factory method that returns a CgroupManager
-func NewCgroupManager(cs *CgroupSubsystems, cgroupDriver string) CgroupManager {
+func NewCgroupManager(cs *CgroupSubsystems, cgroupDriver string) (CgroupManager, error) {
 	managerType := libcontainerCgroupfs
+	var dbusConnection *systemddbus.Conn
 	if cgroupDriver == string(libcontainerSystemd) {
 		managerType = libcontainerSystemd
+		var err error
+		dbusConnection, err = systemddbus.New()
+		if err != nil {
+			return nil, fmt.Errorf("failed to start dbus connection to systemd: %+v", err)
+		}
 	}
 	return &cgroupManagerImpl{
-		subsystems: cs,
-		adapter:    newLibcontainerAdapter(managerType),
-	}
+		subsystems:     cs,
+		adapter:        newLibcontainerAdapter(managerType),
+		dbusConnection: dbusConnection,
+	}, nil
 }
 
 // Name converts the cgroup to the driver specific value in cgroupfs form.
@@ -440,10 +452,74 @@ func (m *cgroupManagerImpl) Update(cgroupConfig *CgroupConfig) error {
 		libcontainerCgroupConfig.PidsLimit = *cgroupConfig.ResourceParameters.PidsLimit
 	}
 
+	if m.adapter.cgroupManagerType == libcontainerSystemd {
+		if err := m.updateSliceProperties(libcontainerCgroupConfig); err != nil {
+			return fmt.Errorf("failed to slice properties for unit %v: %v", cgroupConfig.Name, err)
+		}
+	}
 	if err := setSupportedSubsystems(libcontainerCgroupConfig); err != nil {
 		return fmt.Errorf("failed to set supported cgroup subsystems for cgroup %v: %v", cgroupConfig.Name, err)
 	}
 	return nil
+}
+
+func (m *cgroupManagerImpl) updateSliceProperties(c *libcontainerconfigs.Cgroup) error {
+	var (
+		unitName   = c.Name
+		properties []systemddbus.Property
+	)
+
+	if c.Resources.Memory != 0 {
+		properties = append(properties,
+			newProp("MemoryLimit", uint64(c.Resources.Memory)))
+	}
+
+	if c.Resources.CpuShares != 0 {
+		properties = append(properties,
+			newProp("CPUShares", c.Resources.CpuShares))
+	}
+
+	// cpu.cfs_quota_us and cpu.cfs_period_us are controlled by systemd.
+	if c.Resources.CpuQuota != 0 && c.Resources.CpuPeriod != 0 {
+		// corresponds to USEC_INFINITY in systemd
+		// if USEC_INFINITY is provided, CPUQuota is left unbound by systemd
+		// always setting a property value ensures we can apply a quota and remove it later
+		cpuQuotaPerSecUSec := uint64(math.MaxUint64)
+		if c.Resources.CpuQuota > 0 {
+			// systemd converts CPUQuotaPerSecUSec (microseconds per CPU second) to CPUQuota
+			// (integer percentage of CPU) internally.  This means that if a fractional percent of
+			// CPU is indicated by Resources.CpuQuota, we need to round up to the nearest
+			// 10ms (1% of a second) such that child cgroups can set the cpu.cfs_quota_us they expect.
+			cpuQuotaPerSecUSec = uint64(c.Resources.CpuQuota*1000000) / c.Resources.CpuPeriod
+			if cpuQuotaPerSecUSec%10000 != 0 {
+				cpuQuotaPerSecUSec = ((cpuQuotaPerSecUSec / 10000) + 1) * 10000
+			}
+		}
+		properties = append(properties,
+			newProp("CPUQuotaPerSecUSec", cpuQuotaPerSecUSec))
+	}
+
+	if c.Resources.BlkioWeight != 0 {
+		properties = append(properties,
+			newProp("BlockIOWeight", uint64(c.Resources.BlkioWeight)))
+	}
+
+	if c.Resources.PidsLimit > 0 {
+		properties = append(properties,
+			newProp("TasksAccounting", true),
+			newProp("TasksMax", uint64(c.Resources.PidsLimit)))
+	}
+
+	if err := m.dbusConnection.SetUnitProperties(unitName, true, properties...); err != nil {
+		return fmt.Errorf("failed to update properties for systemd slice %q: %+v", unitName, err)
+	}
+	return nil
+}
+func newProp(name string, units interface{}) systemddbus.Property {
+	return systemddbus.Property{
+		Name:  name,
+		Value: dbus.MakeVariant(units),
+	}
 }
 
 // Create creates the specified cgroup
