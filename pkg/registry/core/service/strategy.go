@@ -65,7 +65,7 @@ func (svcStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 // Validate validates a new service.
 func (svcStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	service := obj.(*api.Service)
-	allErrs := validation.ValidateService(service)
+	allErrs := validation.ValidateServiceCreate(service)
 	allErrs = append(allErrs, validation.ValidateConditionalService(service, nil)...)
 	return allErrs
 }

@@ -534,6 +534,12 @@ const (
 	// Enables topology aware service routing
 	ServiceTopology featuregate.Feature = "ServiceTopology"
 
+	// owner: @robscott
+	// alpha: v1.18
+	//
+	// Enables AppProtocol field for Services and Endpoints.
+	ServiceAppProtocol featuregate.Feature = "ServiceAppProtocol"
+
 	// owner: @wojtek-t
 	// alpha: v1.18
 	//
@@ -623,6 +629,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	AllowInsecureBackendProxy:                      {Default: true, PreRelease: featuregate.Beta},
 	PodDisruptionBudget:                            {Default: true, PreRelease: featuregate.Beta},
 	ServiceTopology:                                {Default: false, PreRelease: featuregate.Alpha},
+	ServiceAppProtocol:                             {Default: false, PreRelease: featuregate.Alpha},
 	ImmutableEphemeralVolumes:                      {Default: false, PreRelease: featuregate.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
