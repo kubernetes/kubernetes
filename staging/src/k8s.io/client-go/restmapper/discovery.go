@@ -192,8 +192,10 @@ func NewDeferredDiscoveryRESTMapper(cl discovery.CachedDiscoveryInterface) *Defe
 }
 
 func (d *DeferredDiscoveryRESTMapper) getDelegate() (meta.RESTMapper, error) {
+	klog.Infof("DeferredDiscoveryRESTMapper: getDelegate")
 	d.initMu.Lock()
 	defer d.initMu.Unlock()
+	klog.Infof("DeferredDiscoveryRESTMapper: getDelegate: acquired lock")
 
 	if d.delegate != nil {
 		return d.delegate, nil
@@ -203,8 +205,10 @@ func (d *DeferredDiscoveryRESTMapper) getDelegate() (meta.RESTMapper, error) {
 	if err != nil {
 		return nil, err
 	}
+	klog.Infof("DeferredDiscoveryRESTMapper: getDelegate: GetAPIGroupResources done")
 
 	d.delegate = NewDiscoveryRESTMapper(groupResources)
+	klog.Infof("DeferredDiscoveryRESTMapper: getDelegate: NewDiscoveryRESTMapper done")
 	return d.delegate, err
 }
 
