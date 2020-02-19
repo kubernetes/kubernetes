@@ -1102,6 +1102,18 @@ func TestComputePodActionsWithInitContainers(t *testing.T) {
 				ContainersToKill:         getKillMapWithInitContainers(basePod, baseStatus, []int{}),
 			},
 		},
+		"Kill the pod sandbox if init container spec has been changed for pod if RestartPolicy == Always": {
+			mutatePodFn: func(pod *v1.Pod) {
+				pod.Spec.RestartPolicy = v1.RestartPolicyAlways
+				pod.Spec.InitContainers[0].Image = "foo-image"
+			},
+			actions: podActions{
+				KillPod:           true,
+				SandboxID:         baseStatus.SandboxStatuses[0].Id,
+				ContainersToStart: []int{},
+				ContainersToKill:  getKillMapWithInitContainers(basePod, baseStatus, []int{}),
+			},
+		},
 	} {
 		pod, status := makeBasePodAndStatusWithInitContainers()
 		if test.mutatePodFn != nil {
@@ -1142,12 +1154,12 @@ func makeBasePodAndStatusWithInitContainers() (*v1.Pod, *kubecontainer.PodStatus
 		{
 			ID:   kubecontainer.ContainerID{ID: "initid2"},
 			Name: "init2", State: kubecontainer.ContainerStateExited,
-			Hash: kubecontainer.HashContainer(&pod.Spec.InitContainers[0]),
+			Hash: kubecontainer.HashContainer(&pod.Spec.InitContainers[1]),
 		},
 		{
 			ID:   kubecontainer.ContainerID{ID: "initid3"},
 			Name: "init3", State: kubecontainer.ContainerStateExited,
-			Hash: kubecontainer.HashContainer(&pod.Spec.InitContainers[0]),
+			Hash: kubecontainer.HashContainer(&pod.Spec.InitContainers[2]),
 		},
 	}
 	return pod, status

@@ -699,6 +699,20 @@ func (m *kubeGenericRuntimeManager) purgeInitContainers(pod *v1.Pod, podStatus *
 	}
 }
 
+func initContainerChanged(pod *v1.Pod, podStatus *kubecontainer.PodStatus) bool {
+	for i := len(pod.Spec.InitContainers) - 1; i >= 0; i-- {
+		container := &pod.Spec.InitContainers[i]
+		status := podStatus.FindContainerStatusByName(container.Name)
+		if status != nil {
+			if expectedHash, actualHash, changed := containerChanged(container, status); changed {
+				klog.V(4).Infof("Init container spec hash changed (%d vs %d).", actualHash, expectedHash)
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // findNextInitContainerToRun returns the status of the last failed container, the
 // index of next init container to start, or done if there are no further init containers.
 // Status is only returned if an init container is failed, in which case next will

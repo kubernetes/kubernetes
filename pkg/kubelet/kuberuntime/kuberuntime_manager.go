@@ -517,6 +517,11 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 		}
 	}
 
+	changed := initContainerChanged(pod, podStatus)
+	if changed && pod.Spec.RestartPolicy == v1.RestartPolicyAlways {
+		changes.KillPod = true
+		return changes
+	}
 	// Check initialization progress.
 	initLastStatus, next, done := findNextInitContainerToRun(pod, podStatus)
 	if !done {
