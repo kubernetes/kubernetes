@@ -25,10 +25,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	"k8s.io/kubernetes/pkg/features"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
@@ -94,8 +91,6 @@ func getErrReason(rn v1.ResourceName) string {
 }
 
 func TestEnoughRequests(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodOverhead, true)()
-
 	enoughPodsTests := []struct {
 		pod                       *v1.Pod
 		nodeInfo                  *schedulernodeinfo.NodeInfo
@@ -413,7 +408,6 @@ func TestPreFilterDisabled(t *testing.T) {
 }
 
 func TestNotEnoughRequests(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodOverhead, true)()
 	notEnoughPodsTests := []struct {
 		pod        *v1.Pod
 		nodeInfo   *schedulernodeinfo.NodeInfo
@@ -468,8 +462,6 @@ func TestNotEnoughRequests(t *testing.T) {
 }
 
 func TestStorageRequests(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodOverhead, true)()
-
 	storagePodsTests := []struct {
 		pod        *v1.Pod
 		nodeInfo   *schedulernodeinfo.NodeInfo
