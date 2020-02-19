@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"path"
 	"reflect"
+	"strconv"
 	"strings"
 	"time"
 
@@ -427,6 +428,31 @@ func (s *store) Count(key string) (int64, error) {
 		return 0, err
 	}
 	return getResp.Count, nil
+}
+
+func (s *store) GetLastRevision(ctx context.Context, key string) (string, error) {
+	if s.pathPrefix != "" {
+		key = path.Join(s.pathPrefix, key)
+	}
+
+	if !strings.HasSuffix(key, "/") {
+		key += "/"
+	}
+
+	options := make([]clientv3.OpOption, 0, 4)
+	options = append(options, clientv3.WithPrefix())
+	options = append(options, clientv3.WithLastRev()...)
+	options = append(options, clientv3.WithKeysOnly())
+
+	resp, err := s.client.KV.Get(ctx, key, options...)
+	if err != nil {
+		return "", err
+	}
+	if len(resp.Kvs) == 0 {
+		return "", errors.New("failed to get last resource version from backend storage")
+	}
+	kv := resp.Kvs[0]
+	return strconv.FormatInt(kv.ModRevision, 10), nil
 }
 
 // continueToken is a simple structured object for encoding the state of a continue token.

@@ -328,6 +328,9 @@ func (d *dummyStorage) GuaranteedUpdate(_ context.Context, _ string, _ runtime.O
 func (d *dummyStorage) Count(_ string) (int64, error) {
 	return 0, fmt.Errorf("unimplemented")
 }
+func (d *dummyStorage) GetLastRevision(_ context.Context, key string) (string, error) {
+	return "", fmt.Errorf("unimplemented")
+}
 
 func TestListWithLimitAndRV0(t *testing.T) {
 	backingStorage := &dummyStorage{}

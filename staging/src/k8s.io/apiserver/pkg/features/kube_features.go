@@ -146,6 +146,12 @@ const (
 	//
 	// Allows label and field based indexes in apiserver watch cache to accelerate list operations.
 	SelectorIndex featuregate.Feature = "SelectorIndex"
+
+	// owner: @jpbetz @jfbai
+	// alpha: v1.18
+	//
+	// Enables consistent reads from watch cache
+	WatchCacheConsistentReads featuregate.Feature = "WatchCacheConsistentReads"
 )
 
 func init() {
@@ -156,20 +162,21 @@ func init() {
 // To add a new feature, define a key for it above and add it here. The features will be
 // available throughout Kubernetes binaries.
 var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
-	StreamingProxyRedirects: {Default: true, PreRelease: featuregate.Beta},
-	ValidateProxyRedirects:  {Default: true, PreRelease: featuregate.Beta},
-	AdvancedAuditing:        {Default: true, PreRelease: featuregate.GA},
-	DynamicAuditing:         {Default: false, PreRelease: featuregate.Alpha},
-	APIResponseCompression:  {Default: true, PreRelease: featuregate.Beta},
-	APIListChunking:         {Default: true, PreRelease: featuregate.Beta},
-	DryRun:                  {Default: true, PreRelease: featuregate.Beta},
-	RemainingItemCount:      {Default: true, PreRelease: featuregate.Beta},
-	ServerSideApply:         {Default: true, PreRelease: featuregate.Beta},
-	StorageVersionHash:      {Default: true, PreRelease: featuregate.Beta},
-	WinOverlay:              {Default: false, PreRelease: featuregate.Alpha},
-	WinDSR:                  {Default: false, PreRelease: featuregate.Alpha},
-	WatchBookmark:           {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
-	APIPriorityAndFairness:  {Default: false, PreRelease: featuregate.Alpha},
-	RemoveSelfLink:          {Default: false, PreRelease: featuregate.Alpha},
-	SelectorIndex:           {Default: false, PreRelease: featuregate.Alpha},
+	StreamingProxyRedirects:   {Default: true, PreRelease: featuregate.Beta},
+	ValidateProxyRedirects:    {Default: true, PreRelease: featuregate.Beta},
+	AdvancedAuditing:          {Default: true, PreRelease: featuregate.GA},
+	DynamicAuditing:           {Default: false, PreRelease: featuregate.Alpha},
+	APIResponseCompression:    {Default: true, PreRelease: featuregate.Beta},
+	APIListChunking:           {Default: true, PreRelease: featuregate.Beta},
+	DryRun:                    {Default: true, PreRelease: featuregate.Beta},
+	RemainingItemCount:        {Default: true, PreRelease: featuregate.Beta},
+	ServerSideApply:           {Default: true, PreRelease: featuregate.Beta},
+	StorageVersionHash:        {Default: true, PreRelease: featuregate.Beta},
+	WinOverlay:                {Default: false, PreRelease: featuregate.Alpha},
+	WinDSR:                    {Default: false, PreRelease: featuregate.Alpha},
+	WatchBookmark:             {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+	APIPriorityAndFairness:    {Default: false, PreRelease: featuregate.Alpha},
+	RemoveSelfLink:            {Default: false, PreRelease: featuregate.Alpha},
+	SelectorIndex:             {Default: false, PreRelease: featuregate.Alpha},
+	WatchCacheConsistentReads: {Default: false, PreRelease: featuregate.Alpha},
 }

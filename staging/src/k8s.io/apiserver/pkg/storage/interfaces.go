@@ -242,4 +242,7 @@ type Interface interface {
 
 	// Count returns number of different entries under the key (generally being path prefix).
 	Count(key string) (int64, error)
+
+	// GetLastRevision returns the key-value store revision when the request was applied.
+	GetLastRevision(ctx context.Context, key string) (string, error)
 }
