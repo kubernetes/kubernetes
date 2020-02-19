@@ -595,7 +595,7 @@ func StartInPodWithVolume(c clientset.Interface, ns, claimName, podName, command
 		},
 	}
 
-	e2epod.SetNodeSelection(pod, node)
+	e2epod.SetNodeSelection(&pod.Spec, node)
 	pod, err := c.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "Failed to create pod: %v", err)
 	return pod

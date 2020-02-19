@@ -381,7 +381,7 @@ func runVolumeTesterPod(client clientset.Interface, config TestConfig, podSuffix
 			Volumes:                       []v1.Volume{},
 		},
 	}
-	e2epod.SetNodeSelection(clientPod, config.ClientNodeSelection)
+	e2epod.SetNodeSelection(&clientPod.Spec, config.ClientNodeSelection)
 
 	for i, test := range tests {
 		volumeName := fmt.Sprintf("%s-%s-%d", config.Prefix, "volume", i)

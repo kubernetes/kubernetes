@@ -25,6 +25,7 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 )
 
 // PatchCSIDeployment modifies the CSI driver deployment:
@@ -98,7 +99,7 @@ func PatchCSIDeployment(f *framework.Framework, o PatchCSIOptions, object interf
 		patchContainers(spec.Containers)
 		patchVolumes(spec.Volumes)
 		if o.NodeName != "" {
-			spec.NodeName = o.NodeName
+			e2epod.SetNodeSelection(spec, e2epod.NodeSelection{Name: o.NodeName})
 		}
 	}
 

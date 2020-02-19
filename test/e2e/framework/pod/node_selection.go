@@ -82,17 +82,17 @@ func SetAntiAffinity(nodeSelection *NodeSelection, nodeName string) {
 
 // SetNodeAffinity modifies the given pod object with
 // NodeAffinity to the given node name.
-func SetNodeAffinity(pod *v1.Pod, nodeName string) {
+func SetNodeAffinity(podSpec *v1.PodSpec, nodeName string) {
 	nodeSelection := &NodeSelection{}
 	SetAffinity(nodeSelection, nodeName)
-	pod.Spec.Affinity = nodeSelection.Affinity
+	podSpec.Affinity = nodeSelection.Affinity
 }
 
 // SetNodeSelection modifies the given pod object with
 // the specified NodeSelection
-func SetNodeSelection(pod *v1.Pod, nodeSelection NodeSelection) {
-	pod.Spec.NodeSelector = nodeSelection.Selector
-	pod.Spec.Affinity = nodeSelection.Affinity
+func SetNodeSelection(podSpec *v1.PodSpec, nodeSelection NodeSelection) {
+	podSpec.NodeSelector = nodeSelection.Selector
+	podSpec.Affinity = nodeSelection.Affinity
 	// pod.Spec.NodeName should not be set directly because
 	// it will bypass the scheduler, potentially causing
 	// kubelet to Fail the pod immediately if it's out of
@@ -100,6 +100,6 @@ func SetNodeSelection(pod *v1.Pod, nodeSelection NodeSelection) {
 	// pending in the scheduler until the node has resources
 	// freed up.
 	if nodeSelection.Name != "" {
-		SetNodeAffinity(pod, nodeSelection.Name)
+		SetNodeAffinity(podSpec, nodeSelection.Name)
 	}
 }

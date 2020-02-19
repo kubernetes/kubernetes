@@ -80,7 +80,7 @@ func (h *hostExecutor) launchNodeExecPod(node string) *v1.Pod {
 	// be immediately Failed by kubelet if it's out of space. Instead
 	// Pods will be pending in the scheduler until there is space freed
 	// up.
-	e2epod.SetNodeAffinity(hostExecPod, node)
+	e2epod.SetNodeAffinity(&hostExecPod.Spec, node)
 	hostExecPod.Spec.Volumes = []v1.Volume{
 		{
 			// Required to enter into host mount namespace via nsenter.

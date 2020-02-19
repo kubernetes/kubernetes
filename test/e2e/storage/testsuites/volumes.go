@@ -247,7 +247,7 @@ func testScriptInPod(
 			RestartPolicy: v1.RestartPolicyNever,
 		},
 	}
-	e2epod.SetNodeSelection(pod, config.ClientNodeSelection)
+	e2epod.SetNodeSelection(&pod.Spec, config.ClientNodeSelection)
 	ginkgo.By(fmt.Sprintf("Creating pod %s", pod.Name))
 	f.TestContainerOutput("exec-volume-test", pod, 0, []string{fileName})
 
