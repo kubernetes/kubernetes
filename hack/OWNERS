@@ -16,6 +16,7 @@ reviewers:
   - xichengliudui
   - zmerlynn
   - mikedanese
+  - oomichi
 approvers:
   - bentheelder
   - cblecker
@@ -34,5 +35,6 @@ approvers:
   - vishh
   - zmerlynn
   - mikedanese
+  - oomichi
 emeritus_approvers:
   - jbeda
