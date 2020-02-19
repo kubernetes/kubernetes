@@ -22,7 +22,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	discoveryv1alpha1 "k8s.io/api/discovery/v1alpha1"
+	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -192,7 +192,7 @@ var _ = SIGDescribe("EndpointSlice [Feature:EndpointSlice]", func() {
 // and takes some shortcuts with the assumption that those test cases will be
 // the only caller of this function.
 func expectEndpointsAndSlices(cs clientset.Interface, ns string, svc *v1.Service, pods []*v1.Pod, numSubsets, numSlices int, namedPort bool) {
-	endpointSlices := []discoveryv1alpha1.EndpointSlice{}
+	endpointSlices := []discoveryv1beta1.EndpointSlice{}
 	endpoints := &v1.Endpoints{}
 
 	err := wait.Poll(5*time.Second, 1*time.Minute, func() (bool, error) {
@@ -353,18 +353,18 @@ func expectEndpointsAndSlices(cs clientset.Interface, ns string, svc *v1.Service
 // hasMatchingEndpointSlices returns any EndpointSlices that match the
 // conditions along with a boolean indicating if all the conditions have been
 // met.
-func hasMatchingEndpointSlices(cs clientset.Interface, ns, svcName string, numEndpoints, numSlices int) ([]discoveryv1alpha1.EndpointSlice, bool) {
-	listOptions := metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", discoveryv1alpha1.LabelServiceName, svcName)}
-	esList, err := cs.DiscoveryV1alpha1().EndpointSlices(ns).List(context.TODO(), listOptions)
+func hasMatchingEndpointSlices(cs clientset.Interface, ns, svcName string, numEndpoints, numSlices int) ([]discoveryv1beta1.EndpointSlice, bool) {
+	listOptions := metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", discoveryv1beta1.LabelServiceName, svcName)}
+	esList, err := cs.DiscoveryV1beta1().EndpointSlices(ns).List(context.TODO(), listOptions)
 	framework.ExpectNoError(err, "Error fetching EndpointSlice for %s/%s Service", ns, svcName)
 
 	if len(esList.Items) == 0 {
 		framework.Logf("EndpointSlice for %s/%s Service not found", ns, svcName)
-		return []discoveryv1alpha1.EndpointSlice{}, false
+		return []discoveryv1beta1.EndpointSlice{}, false
 	}
 	if len(esList.Items) != numSlices {
 		framework.Logf("Expected %d EndpointSlices for %s/%s Service, got %d", numSlices, ns, svcName, len(esList.Items))
-		return []discoveryv1alpha1.EndpointSlice{}, false
+		return []discoveryv1beta1.EndpointSlice{}, false
 	}
 
 	actualNumEndpoints := 0
@@ -373,7 +373,7 @@ func hasMatchingEndpointSlices(cs clientset.Interface, ns, svcName string, numEn
 	}
 	if actualNumEndpoints != numEndpoints {
 		framework.Logf("EndpointSlices for %s/%s Service have %d/%d endpoints", ns, svcName, actualNumEndpoints, numEndpoints)
-		return []discoveryv1alpha1.EndpointSlice{}, false
+		return []discoveryv1beta1.EndpointSlice{}, false
 	}
 
 	return esList.Items, true
