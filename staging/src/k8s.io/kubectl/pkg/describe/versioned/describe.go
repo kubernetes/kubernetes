@@ -2350,9 +2350,12 @@ func (i *IngressDescriber) Describe(namespace, name string, describerSettings de
 }
 
 func (i *IngressDescriber) describeBackend(ns string, backend *networkingv1beta1.IngressBackend) string {
-	endpoints, errEndpoints := i.CoreV1().Endpoints(ns).Get(context.TODO(), backend.ServiceName, metav1.GetOptions{})
-	service, errService := i.CoreV1().Services(ns).Get(context.TODO(), backend.ServiceName, metav1.GetOptions{})
-	if errEndpoints != nil || errService != nil {
+	endpoints, err := i.CoreV1().Endpoints(ns).Get(context.TODO(), backend.ServiceName, metav1.GetOptions{})
+	if err != nil {
+		return "<none>"
+	}
+	service, err := i.CoreV1().Services(ns).Get(context.TODO(), backend.ServiceName, metav1.GetOptions{})
+	if err != nil {
 		return "<none>"
 	}
 	spName := ""
@@ -2414,7 +2417,6 @@ func (i *IngressDescriber) describeIngress(ing *networkingv1beta1.Ingress, descr
 			w.Write(LEVEL_1, "%s\t%s \t%s (%s)\n", "*", "*", backendStringer(def), i.describeBackend(ns, def))
 		}
 
-		// TODO: Move from annotations into Ingress status.
 		printAnnotationsMultiline(w, "Annotations", ing.Annotations)
 
 		if describerSettings.ShowEvents {
