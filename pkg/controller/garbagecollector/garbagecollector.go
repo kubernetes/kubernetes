@@ -33,6 +33,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/metadata"
 	"k8s.io/client-go/tools/cache"
@@ -180,6 +181,8 @@ func (gc *GarbageCollector) Sync(discoveryClient discovery.ServerResourcesInterf
 
 		// Ensure workers are paused to avoid processing events before informers
 		// have resynced.
+		// TODO(jpbetz): Looks like this an be moved after the GetDeletableResources for reattempts and still be correct?
+		// This would avoid holding the lock during expensive discovery requests for reattempts like we already do for the first attempt.
 		gc.workerLock.Lock()
 		defer gc.workerLock.Unlock()
 
@@ -282,9 +285,12 @@ func (gc *GarbageCollector) runAttemptToDeleteWorker() {
 }
 
 func (gc *GarbageCollector) attemptToDeleteWorker() bool {
+	klog.V(4).Infof("attemptToDeleteWorker")
 	item, quit := gc.attemptToDelete.Get()
+	klog.V(4).Infof("attemptToDeleteWorker: got item")
 	gc.workerLock.RLock()
 	defer gc.workerLock.RUnlock()
+	klog.V(4).Infof("attemptToDeleteWorker: acquired lock")
 	if quit {
 		return false
 	}
@@ -304,17 +310,19 @@ func (gc *GarbageCollector) attemptToDeleteWorker() bool {
 			//    have a way to distinguish this from a valid type we will recognize
 			//    after the next discovery sync.
 			// For now, record the error and retry.
-			klog.V(5).Infof("error syncing item %s: %v", n, err)
+			klog.V(4).Infof("error syncing item %s: %v", n, err)
 		} else {
 			utilruntime.HandleError(fmt.Errorf("error syncing item %s: %v", n, err))
 		}
 		// retry if garbage collection of an object failed.
+		klog.V(4).Infof("attemptToDeleteWorker: retrying rate limited")
 		gc.attemptToDelete.AddRateLimited(item)
 	} else if !n.isObserved() {
 		// requeue if item hasn't been observed via an informer event yet.
 		// otherwise a virtual node for an item added AND removed during watch reestablishment can get stuck in the graph and never removed.
 		// see https://issue.k8s.io/56121
-		klog.V(5).Infof("item %s hasn't been observed via informer yet", n.identity)
+		klog.V(4).Infof("item %s hasn't been observed via informer yet", n.identity)
+		klog.V(4).Infof("attemptToDeleteWorker: retrying rate limited")
 		gc.attemptToDelete.AddRateLimited(item)
 	}
 	return true
@@ -401,10 +409,11 @@ func ownerRefsToUIDs(refs []metav1.OwnerReference) []types.UID {
 }
 
 func (gc *GarbageCollector) attemptToDeleteItem(item *node) error {
-	klog.V(2).Infof("processing item %s", item.identity)
+	attemptId := string(uuid.NewUUID())
+	klog.V(2).Infof("%s: processing item %s", attemptId, item.identity)
 	// "being deleted" is an one-way trip to the final deletion. We'll just wait for the final deletion, and then process the object's dependents.
 	if item.isBeingDeleted() && !item.isDeletingDependents() {
-		klog.V(5).Infof("processing item %s returned at once, because its DeletionTimestamp is non-nil", item.identity)
+		klog.V(5).Infof("%s: processing item %s returned at once, because its DeletionTimestamp is non-nil", attemptId, item.identity)
 		return nil
 	}
 	// TODO: It's only necessary to talk to the API server if this is a
@@ -416,7 +425,7 @@ func (gc *GarbageCollector) attemptToDeleteItem(item *node) error {
 		// the GraphBuilder can add "virtual" node for an owner that doesn't
 		// exist yet, so we need to enqueue a virtual Delete event to remove
 		// the virtual node from GraphBuilder.uidToNode.
-		klog.V(5).Infof("item %v not found, generating a virtual delete event", item.identity)
+		klog.V(4).Infof("%s: item %v not found, generating a virtual delete event", attemptId, item.identity)
 		gc.dependencyGraphBuilder.enqueueVirtualDeleteEvent(item.identity)
 		// since we're manually inserting a delete event to remove this node,
 		// we don't need to keep tracking it as a virtual node and requeueing in attemptToDelete
@@ -427,7 +436,7 @@ func (gc *GarbageCollector) attemptToDeleteItem(item *node) error {
 	}
 
 	if latest.GetUID() != item.identity.UID {
-		klog.V(5).Infof("UID doesn't match, item %v not found, generating a virtual delete event", item.identity)
+		klog.V(4).Infof("%s: UID doesn't match, item %v not found, generating a virtual delete event", attemptId, item.identity)
 		gc.dependencyGraphBuilder.enqueueVirtualDeleteEvent(item.identity)
 		// since we're manually inserting a delete event to remove this node,
 		// we don't need to keep tracking it as a virtual node and requeueing in attemptToDelete
@@ -444,7 +453,7 @@ func (gc *GarbageCollector) attemptToDeleteItem(item *node) error {
 	// compute if we should delete the item
 	ownerReferences := latest.GetOwnerReferences()
 	if len(ownerReferences) == 0 {
-		klog.V(2).Infof("object %s's doesn't have an owner, continue on next item", item.identity)
+		klog.V(2).Infof("%s: object %s's doesn't have an owner, continue on next item", attemptId, item.identity)
 		return nil
 	}
 
@@ -452,22 +461,22 @@ func (gc *GarbageCollector) attemptToDeleteItem(item *node) error {
 	if err != nil {
 		return err
 	}
-	klog.V(5).Infof("classify references of %s.\nsolid: %#v\ndangling: %#v\nwaitingForDependentsDeletion: %#v\n", item.identity, solid, dangling, waitingForDependentsDeletion)
+	klog.V(4).Infof("%s: classify references of %s.\nsolid: %#v\ndangling: %#v\nwaitingForDependentsDeletion: %#v\n", attemptId, item.identity, solid, dangling, waitingForDependentsDeletion)
 
 	switch {
 	case len(solid) != 0:
-		klog.V(2).Infof("object %#v has at least one existing owner: %#v, will not garbage collect", item.identity, solid)
+		klog.V(2).Infof("%s: object %#v has at least one existing owner: %#v, will not garbage collect", attemptId, item.identity, solid)
 		if len(dangling) == 0 && len(waitingForDependentsDeletion) == 0 {
 			return nil
 		}
-		klog.V(2).Infof("remove dangling references %#v and waiting references %#v for object %s", dangling, waitingForDependentsDeletion, item.identity)
+		klog.V(2).Infof("%s: remove dangling references %#v and waiting references %#v for object %s", attemptId, dangling, waitingForDependentsDeletion, item.identity)
 		// waitingForDependentsDeletion needs to be deleted from the
 		// ownerReferences, otherwise the referenced objects will be stuck with
 		// the FinalizerDeletingDependents and never get deleted.
 		ownerUIDs := append(ownerRefsToUIDs(dangling), ownerRefsToUIDs(waitingForDependentsDeletion)...)
 		patch := deleteOwnerRefStrategicMergePatch(item.identity.UID, ownerUIDs...)
 		_, err = gc.patch(item, patch, func(n *node) ([]byte, error) {
-			return gc.deleteOwnerRefJSONMergePatch(n, ownerUIDs...)
+			return gc.deleteOwnerRefJSONMergePatch(n, ownerUIDs...) // holds gb.monitorLock via gc.getMetadata
 		})
 		return err
 	case len(waitingForDependentsDeletion) != 0 && item.dependentsLength() != 0:
@@ -479,18 +488,18 @@ func (gc *GarbageCollector) attemptToDeleteItem(item *node) error {
 				// problem.
 				// there are multiple workers run attemptToDeleteItem in
 				// parallel, the circle detection can fail in a race condition.
-				klog.V(2).Infof("processing object %s, some of its owners and its dependent [%s] have FinalizerDeletingDependents, to prevent potential cycle, its ownerReferences are going to be modified to be non-blocking, then the object is going to be deleted with Foreground", item.identity, dep.identity)
+				klog.V(2).Infof("%s: processing object %s, some of its owners and its dependent [%s] have FinalizerDeletingDependents, to prevent potential cycle, its ownerReferences are going to be modified to be non-blocking, then the object is going to be deleted with Foreground", attemptId, item.identity, dep.identity)
 				patch, err := item.unblockOwnerReferencesStrategicMergePatch()
 				if err != nil {
 					return err
 				}
-				if _, err := gc.patch(item, patch, gc.unblockOwnerReferencesJSONMergePatch); err != nil {
+				if _, err := gc.patch(item, patch, gc.unblockOwnerReferencesJSONMergePatch); err != nil { // holds gb.monitorLock via gc.getMetadata
 					return err
 				}
 				break
 			}
 		}
-		klog.V(2).Infof("at least one owner of object %s has FinalizerDeletingDependents, and the object itself has dependents, so it is going to be deleted in Foreground", item.identity)
+		klog.V(2).Infof("%s: at least one owner of object %s has FinalizerDeletingDependents, and the object itself has dependents, so it is going to be deleted in Foreground", attemptId, item.identity)
 		// the deletion event will be observed by the graphBuilder, so the item
 		// will be processed again in processDeletingDependentsItem. If it
 		// doesn't have dependents, the function will remove the
@@ -514,7 +523,7 @@ func (gc *GarbageCollector) attemptToDeleteItem(item *node) error {
 			// otherwise, default to background.
 			policy = metav1.DeletePropagationBackground
 		}
-		klog.V(2).Infof("delete object %s with propagation policy %s", item.identity, policy)
+		klog.V(2).Infof("%s: delete object %s with propagation policy %s", attemptId, item.identity, policy)
 		return gc.deleteObject(item.identity, &policy)
 	}
 }

@@ -20,6 +20,8 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"k8s.io/klog"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -58,12 +60,15 @@ func deleteOwnerRefStrategicMergePatch(dependentUID types.UID, ownerUIDs ...type
 // getMetadata tries getting object metadata from local cache, and sends GET request to apiserver when
 // local cache is not available or not latest.
 func (gc *GarbageCollector) getMetadata(apiVersion, kind, namespace, name string) (metav1.Object, error) {
+	klog.V(4).Infof("gc.getMetadata")
 	apiResource, _, err := gc.apiResource(apiVersion, kind)
 	if err != nil {
 		return nil, err
 	}
 	gc.dependencyGraphBuilder.monitorLock.RLock()
 	defer gc.dependencyGraphBuilder.monitorLock.RUnlock()
+	klog.V(4).Infof("gc.getMetadata: acquired lock")
+
 	m, ok := gc.dependencyGraphBuilder.monitors[apiResource]
 	if !ok || m == nil {
 		// If local cache doesn't exist for mapping.Resource, send a GET request to API server

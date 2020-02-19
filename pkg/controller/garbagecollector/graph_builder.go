@@ -177,8 +177,10 @@ func (gb *GraphBuilder) controllerFor(resource schema.GroupVersionResource, kind
 // Run. Monitors are NOT started as part of the sync. To ensure all existing
 // monitors are started, call startMonitors.
 func (gb *GraphBuilder) syncMonitors(resources map[schema.GroupVersionResource]struct{}) error {
+	klog.V(4).Infof("syncMonitors")
 	gb.monitorLock.Lock()
 	defer gb.monitorLock.Unlock()
+	klog.V(4).Infof("syncMonitors: acquired lock")
 
 	toRemove := gb.monitors
 	if toRemove == nil {
@@ -198,12 +200,16 @@ func (gb *GraphBuilder) syncMonitors(resources map[schema.GroupVersionResource]s
 			kept++
 			continue
 		}
+		klog.V(4).Infof("synced monitors: start KindFor %v", resource)
 		kind, err := gb.restMapper.KindFor(resource)
+		klog.V(4).Infof("synced monitors: done KindFor %v", resource)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("couldn't look up resource %q: %v", resource, err))
 			continue
 		}
+		klog.V(4).Infof("synced monitors: start controllerFor %v, %v", resource, kind)
 		c, s, err := gb.controllerFor(resource, kind)
+		klog.V(4).Infof("synced monitors: done controllerFor %v, %v", resource, kind)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("couldn't start monitor for resource %q: %v", resource, err))
 			continue
@@ -230,8 +236,10 @@ func (gb *GraphBuilder) syncMonitors(resources map[schema.GroupVersionResource]s
 // If called before Run, startMonitors does nothing (as there is no stop channel
 // to support monitor/informer execution).
 func (gb *GraphBuilder) startMonitors() {
+	klog.V(4).Infof("startMonitors")
 	gb.monitorLock.Lock()
 	defer gb.monitorLock.Unlock()
+	klog.V(4).Infof("startMonitors: acquired lock")
 
 	if !gb.running {
 		return
@@ -259,8 +267,10 @@ func (gb *GraphBuilder) startMonitors() {
 // true at one time, and then later return false if all monitors were
 // reconstructed.
 func (gb *GraphBuilder) IsSynced() bool {
+	klog.V(4).Info("IsSynced")
 	gb.monitorLock.Lock()
 	defer gb.monitorLock.Unlock()
+	klog.V(4).Info("IsSynced: lock acquired")
 
 	if len(gb.monitors) == 0 {
 		klog.V(4).Info("garbage controller monitor not synced: no monitors")
@@ -287,6 +297,7 @@ func (gb *GraphBuilder) Run(stopCh <-chan struct{}) {
 	gb.stopCh = stopCh
 	gb.running = true
 	gb.monitorLock.Unlock()
+	klog.V(4).Info("GraphBuilder.Run: lock acquired")
 
 	// Start monitors and begin change processing until the stop channel is
 	// closed.
@@ -294,8 +305,10 @@ func (gb *GraphBuilder) Run(stopCh <-chan struct{}) {
 	wait.Until(gb.runProcessGraphChanges, 1*time.Second, stopCh)
 
 	// Stop any running monitors.
+	klog.V(4).Info("GraphBuilder.Run: stop monitors")
 	gb.monitorLock.Lock()
 	defer gb.monitorLock.Unlock()
+	klog.V(4).Info("GraphBuilder.Run: stop monitors: lock acquired")
 	monitors := gb.monitors
 	stopped := 0
 	for _, monitor := range monitors {
