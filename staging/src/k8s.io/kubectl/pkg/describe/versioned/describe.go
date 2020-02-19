@@ -2352,11 +2352,11 @@ func (i *IngressDescriber) Describe(namespace, name string, describerSettings de
 func (i *IngressDescriber) describeBackend(ns string, backend *networkingv1beta1.IngressBackend) string {
 	endpoints, err := i.CoreV1().Endpoints(ns).Get(context.TODO(), backend.ServiceName, metav1.GetOptions{})
 	if err != nil {
-		return "<none>"
+		return fmt.Sprintf("<none> (failed to fetch endpoints: %v)", err)
 	}
 	service, err := i.CoreV1().Services(ns).Get(context.TODO(), backend.ServiceName, metav1.GetOptions{})
 	if err != nil {
-		return "<none>"
+		return fmt.Sprintf("<none> (failed to fetch services: %v)", err)
 	}
 	spName := ""
 	for i := range service.Spec.Ports {
