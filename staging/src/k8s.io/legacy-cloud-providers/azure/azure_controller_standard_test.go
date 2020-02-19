@@ -53,7 +53,7 @@ func TestStandardAttachDisk(t *testing.T) {
 	}
 
 	for i, test := range testCases {
-		testCloud := getTestCloud()
+		testCloud := GetTestCloud()
 		vmSet := testCloud.vmSet
 		setTestVirtualMachines(testCloud, map[string]string{"vm1": "PowerState/Running"}, false)
 
@@ -90,7 +90,7 @@ func TestStandardDetachDisk(t *testing.T) {
 	}
 
 	for i, test := range testCases {
-		testCloud := getTestCloud()
+		testCloud := GetTestCloud()
 		vmSet := testCloud.vmSet
 		setTestVirtualMachines(testCloud, map[string]string{"vm1": "PowerState/Running"}, false)
 
@@ -140,7 +140,7 @@ func TestGetDataDisks(t *testing.T) {
 		},
 	}
 	for i, test := range testCases {
-		testCloud := getTestCloud()
+		testCloud := GetTestCloud()
 		vmSet := testCloud.vmSet
 		setTestVirtualMachines(testCloud, map[string]string{"vm1": "PowerState/Running"}, false)
 

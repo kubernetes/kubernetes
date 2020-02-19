@@ -89,7 +89,7 @@ func TestIsNodeUnmanaged(t *testing.T) {
 		},
 	}
 
-	az := getTestCloud()
+	az := GetTestCloud()
 	for _, test := range tests {
 		az.unmanagedNodes = test.unmanagedNodes
 		if test.expectErr {
@@ -137,7 +137,7 @@ func TestIsNodeUnmanagedByProviderID(t *testing.T) {
 		},
 	}
 
-	az := getTestCloud()
+	az := GetTestCloud()
 	for _, test := range tests {
 		isUnmanagedNode := az.IsNodeUnmanagedByProviderID(test.providerID)
 		assert.Equal(t, test.expected, isUnmanagedNode, test.providerID)

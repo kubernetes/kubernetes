@@ -127,7 +127,7 @@ func TestGenerateStorageAccountName(t *testing.T) {
 }
 
 func TestMapLoadBalancerNameToVMSet(t *testing.T) {
-	az := getTestCloud()
+	az := GetTestCloud()
 	az.PrimaryAvailabilitySetName = "primary"
 
 	cases := []struct {
@@ -175,7 +175,7 @@ func TestMapLoadBalancerNameToVMSet(t *testing.T) {
 }
 
 func TestGetAzureLoadBalancerName(t *testing.T) {
-	az := getTestCloud()
+	az := GetTestCloud()
 	az.PrimaryAvailabilitySetName = "primary"
 
 	cases := []struct {
@@ -256,7 +256,7 @@ func TestGetAzureLoadBalancerName(t *testing.T) {
 }
 
 func TestGetLoadBalancingRuleName(t *testing.T) {
-	az := getTestCloud()
+	az := GetTestCloud()
 	az.PrimaryAvailabilitySetName = "primary"
 
 	svc := &v1.Service{
@@ -337,7 +337,7 @@ func TestGetLoadBalancingRuleName(t *testing.T) {
 }
 
 func TestGetFrontendIPConfigName(t *testing.T) {
-	az := getTestCloud()
+	az := GetTestCloud()
 	az.PrimaryAvailabilitySetName = "primary"
 
 	svc := &v1.Service{
