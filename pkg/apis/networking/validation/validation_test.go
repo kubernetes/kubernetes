@@ -980,6 +980,12 @@ func TestValidateIngress(t *testing.T) {
 	badWildcardErr := fmt.Sprintf("spec.rules[0].host: Invalid value: '%v'", wildcardHost)
 	errorCases[badWildcardErr] = badWildcard
 
+	// Test that single wildcard characher hosts are not allowed
+	singleWildcardHost := "*"
+	singleWildcard := newValid()
+	singleWildcard.Spec.Rules[0].Host = singleWildcardHost
+	errorCases[fmt.Sprintf("spec.rules[0].host: Invalid value: '%v'", singleWildcardHost)] = singleWildcard
+
 	for k, v := range errorCases {
 		errs := ValidateIngress(&v, networkingv1beta1.SchemeGroupVersion)
 		if len(errs) == 0 {
@@ -990,6 +996,19 @@ func TestValidateIngress(t *testing.T) {
 			if err.Field != s[0] || !strings.Contains(err.Error(), s[1]) {
 				t.Errorf("unexpected error: %q, expected: %q", err, k)
 			}
+		}
+	}
+
+	// Validate that a single wildcard label is allowed
+	wildHost := newValid()
+	wildHost.Spec.Rules[0].Host = "*.bar.com"
+	validCases := map[string]networking.Ingress{
+		"spec.rules[0].host: Regex value": wildHost,
+	}
+	for k, v := range validCases {
+		errs := ValidateIngress(&v, networkingv1beta1.SchemeGroupVersion)
+		if len(errs) != 0 {
+			t.Errorf("expected success for %q", k)
 		}
 	}
 }
@@ -1225,6 +1244,24 @@ func TestValidateIngressTLS(t *testing.T) {
 			if err.Field != s[0] || !strings.Contains(err.Error(), s[1]) {
 				t.Errorf("unexpected error: %q, expected: %q", err, k)
 			}
+		}
+	}
+
+	// Test for wildcard host and wildcard TLS
+	validCases := map[string]networking.Ingress{}
+	wildHost := "*.bar.com"
+	goodWildcardTLS := newValid()
+	goodWildcardTLS.Spec.Rules[0].Host = "*.bar.com"
+	goodWildcardTLS.Spec.TLS = []networking.IngressTLS{
+		{
+			Hosts: []string{wildHost},
+		},
+	}
+	validCases[fmt.Sprintf("spec.tls[0].hosts: Valid value: '%v'", wildHost)] = goodWildcardTLS
+	for k, v := range validCases {
+		errs := ValidateIngress(&v, networkingv1beta1.SchemeGroupVersion)
+		if len(errs) != 0 {
+			t.Errorf("expected success for %q", k)
 		}
 	}
 }
