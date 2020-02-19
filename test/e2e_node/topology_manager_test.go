@@ -297,16 +297,7 @@ func findSRIOVResource(node *v1.Node) (string, int64) {
 	return "", 0
 }
 
-func deletePodInNamespace(f *framework.Framework, namespace, name string) {
-	gp := int64(0)
-	deleteOptions := metav1.DeleteOptions{
-		GracePeriodSeconds: &gp,
-	}
-	err := f.ClientSet.CoreV1().Pods(namespace).Delete(context.TODO(), name, &deleteOptions)
-	framework.ExpectNoError(err)
-}
-
-func validatePodAlignment(f *framework.Framework, pod *v1.Pod, hwinfo testEnvHWInfo) {
+func validatePodAlignment(f *framework.Framework, pod *v1.Pod, envInfo testEnvInfo) {
 	for _, cnt := range pod.Spec.Containers {
 		ginkgo.By(fmt.Sprintf("validating the container %s on Gu pod %s", cnt.Name, pod.Name))
 
@@ -314,7 +305,7 @@ func validatePodAlignment(f *framework.Framework, pod *v1.Pod, hwinfo testEnvHWI
 		framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]", cnt.Name, pod.Name)
 
 		framework.Logf("got pod logs: %v", logs)
-		numaRes, err := checkNUMAAlignment(f, pod, &cnt, logs, hwinfo)
+		numaRes, err := checkNUMAAlignment(f, pod, &cnt, logs, envInfo)
 		framework.ExpectNoError(err, "NUMA Alignment check failed for [%s] of pod [%s]: %s", cnt.Name, pod.Name, numaRes.String())
 	}
 }
@@ -562,7 +553,7 @@ func waitForAllContainerRemoval(podName, podNS string) {
 	}, 2*time.Minute, 1*time.Second).Should(gomega.BeTrue())
 }
 
-func runTopologyManagerPositiveTest(f *framework.Framework, numPods int, ctnAttrs []tmCtnAttribute, hwinfo testEnvHWInfo) {
+func runTopologyManagerPositiveTest(f *framework.Framework, numPods int, ctnAttrs []tmCtnAttribute, envInfo testEnvInfo) {
 	var pods []*v1.Pod
 
 	for podID := 0; podID < numPods; podID++ {
@@ -575,7 +566,7 @@ func runTopologyManagerPositiveTest(f *framework.Framework, numPods int, ctnAttr
 	}
 
 	for podID := 0; podID < numPods; podID++ {
-		validatePodAlignment(f, pods[podID], hwinfo)
+		validatePodAlignment(f, pods[podID], envInfo)
 	}
 
 	for podID := 0; podID < numPods; podID++ {
@@ -587,7 +578,7 @@ func runTopologyManagerPositiveTest(f *framework.Framework, numPods int, ctnAttr
 	}
 }
 
-func runTopologyManagerNegativeTest(f *framework.Framework, numPods int, ctnAttrs []tmCtnAttribute, hwinfo testEnvHWInfo) {
+func runTopologyManagerNegativeTest(f *framework.Framework, numPods int, ctnAttrs []tmCtnAttribute, envInfo testEnvInfo) {
 	podName := "gu-pod"
 	framework.Logf("creating pod %s attrs %v", podName, ctnAttrs)
 	pod := makeTopologyManagerTestPod(podName, numalignCmd, ctnAttrs)
@@ -636,7 +627,16 @@ func getSRIOVDevicePluginConfigMap(cmFile string) *v1.ConfigMap {
 	return readConfigMapV1OrDie(cmData)
 }
 
-func setupSRIOVConfigOrFail(f *framework.Framework, configMap *v1.ConfigMap) (*v1.Pod, string, int64) {
+type sriovData struct {
+	configMap      *v1.ConfigMap
+	serviceAccount *v1.ServiceAccount
+	pod            *v1.Pod
+
+	resourceName   string
+	resourceAmount int64
+}
+
+func setupSRIOVConfigOrFail(f *framework.Framework, configMap *v1.ConfigMap) sriovData {
 	var err error
 
 	ginkgo.By(fmt.Sprintf("Creating configMap %v/%v", metav1.NamespaceSystem, configMap.Name))
@@ -670,19 +670,34 @@ func setupSRIOVConfigOrFail(f *framework.Framework, configMap *v1.ConfigMap) (*v
 	}, 2*time.Minute, framework.Poll).Should(gomega.BeTrue())
 	framework.Logf("Successfully created device plugin pod, detected %d SRIOV device %q", sriovResourceAmount, sriovResourceName)
 
-	return dpPod, sriovResourceName, sriovResourceAmount
+	return sriovData{
+		configMap:      configMap,
+		serviceAccount: serviceAccount,
+		pod:            dpPod,
+		resourceName:   sriovResourceName,
+		resourceAmount: sriovResourceAmount,
+	}
 }
 
-func teardownSRIOVConfigOrFail(f *framework.Framework, dpPod *v1.Pod) {
-	framework.Logf("deleting the SRIOV device plugin pod %s/%s and waiting for container %s removal",
-		dpPod.Namespace, dpPod.Name, dpPod.Spec.Containers[0].Name)
-	deletePodInNamespace(f, dpPod.Namespace, dpPod.Name)
-	waitForContainerRemoval(dpPod.Spec.Containers[0].Name, dpPod.Name, dpPod.Namespace)
-}
+func teardownSRIOVConfigOrFail(f *framework.Framework, sd sriovData) {
+	var err error
+	gp := int64(0)
+	deleteOptions := metav1.DeleteOptions{
+		GracePeriodSeconds: &gp,
+	}
 
-type testEnvHWInfo struct {
-	numaNodes         int
-	sriovResourceName string
+	ginkgo.By("Delete SRIOV device plugin pod %s/%s")
+	err = f.ClientSet.CoreV1().Pods(sd.pod.Namespace).Delete(context.TODO(), sd.pod.Name, &deleteOptions)
+	framework.ExpectNoError(err)
+	waitForContainerRemoval(sd.pod.Spec.Containers[0].Name, sd.pod.Name, sd.pod.Namespace)
+
+	ginkgo.By(fmt.Sprintf("Deleting configMap %v/%v", metav1.NamespaceSystem, sd.configMap.Name))
+	err = f.ClientSet.CoreV1().ConfigMaps(metav1.NamespaceSystem).Delete(context.TODO(), sd.configMap.Name, &deleteOptions)
+	framework.ExpectNoError(err)
+
+	ginkgo.By(fmt.Sprintf("Deleting serviceAccount %v/%v", metav1.NamespaceSystem, sd.serviceAccount.Name))
+	err = f.ClientSet.CoreV1().ServiceAccounts(metav1.NamespaceSystem).Delete(context.TODO(), sd.serviceAccount.Name, &deleteOptions)
+	framework.ExpectNoError(err)
 }
 
 func runTopologyManagerNodeAlignmentSuiteTests(f *framework.Framework, configMap *v1.ConfigMap, reservedSystemCPUs string, numaNodes, coreCount int) {
@@ -691,102 +706,102 @@ func runTopologyManagerNodeAlignmentSuiteTests(f *framework.Framework, configMap
 		threadsPerCore = 2
 	}
 
-	dpPod, sriovResourceName, sriovResourceAmount := setupSRIOVConfigOrFail(f, configMap)
-	hwinfo := testEnvHWInfo{
+	sd := setupSRIOVConfigOrFail(f, configMap)
+	envInfo := testEnvInfo{
 		numaNodes:         numaNodes,
-		sriovResourceName: sriovResourceName,
+		sriovResourceName: sd.resourceName,
 	}
 
 	// could have been a loop, we unroll it to explain the testcases
 	var ctnAttrs []tmCtnAttribute
 
 	// simplest case
-	ginkgo.By(fmt.Sprintf("Successfully admit one guaranteed pod with 1 core, 1 %s device", sriovResourceName))
+	ginkgo.By(fmt.Sprintf("Successfully admit one guaranteed pod with 1 core, 1 %s device", sd.resourceName))
 	ctnAttrs = []tmCtnAttribute{
 		{
 			ctnName:       "gu-container",
 			cpuRequest:    "1000m",
 			cpuLimit:      "1000m",
-			deviceName:    sriovResourceName,
+			deviceName:    sd.resourceName,
 			deviceRequest: "1",
 			deviceLimit:   "1",
 		},
 	}
-	runTopologyManagerPositiveTest(f, 1, ctnAttrs, hwinfo)
+	runTopologyManagerPositiveTest(f, 1, ctnAttrs, envInfo)
 
-	ginkgo.By(fmt.Sprintf("Successfully admit one guaranteed pod with 2 cores, 1 %s device", sriovResourceName))
+	ginkgo.By(fmt.Sprintf("Successfully admit one guaranteed pod with 2 cores, 1 %s device", sd.resourceName))
 	ctnAttrs = []tmCtnAttribute{
 		{
 			ctnName:       "gu-container",
 			cpuRequest:    "2000m",
 			cpuLimit:      "2000m",
-			deviceName:    sriovResourceName,
+			deviceName:    sd.resourceName,
 			deviceRequest: "1",
 			deviceLimit:   "1",
 		},
 	}
-	runTopologyManagerPositiveTest(f, 1, ctnAttrs, hwinfo)
+	runTopologyManagerPositiveTest(f, 1, ctnAttrs, envInfo)
 
 	if reservedSystemCPUs != "" {
 		// to avoid false negatives, we have put reserved CPUs in such a way there is at least a NUMA node
 		// with 1+ SRIOV devices and not reserved CPUs.
 		numCores := threadsPerCore * coreCount
 		allCoresReq := fmt.Sprintf("%dm", numCores*1000)
-		ginkgo.By(fmt.Sprintf("Successfully admit an entire socket (%d cores), 1 %s device", numCores, sriovResourceName))
+		ginkgo.By(fmt.Sprintf("Successfully admit an entire socket (%d cores), 1 %s device", numCores, sd.resourceName))
 		ctnAttrs = []tmCtnAttribute{
 			{
 				ctnName:       "gu-container",
 				cpuRequest:    allCoresReq,
 				cpuLimit:      allCoresReq,
-				deviceName:    sriovResourceName,
+				deviceName:    sd.resourceName,
 				deviceRequest: "1",
 				deviceLimit:   "1",
 			},
 		}
-		runTopologyManagerPositiveTest(f, 1, ctnAttrs, hwinfo)
+		runTopologyManagerPositiveTest(f, 1, ctnAttrs, envInfo)
 	}
 
-	if sriovResourceAmount > 1 {
+	if sd.resourceAmount > 1 {
 		// no matter how busses are connected to NUMA nodes and SRIOV devices are installed, this function
 		// preconditions must ensure the following can be fulfilled
-		ginkgo.By(fmt.Sprintf("Successfully admit two guaranteed pods, each with 1 core, 1 %s device", sriovResourceName))
+		ginkgo.By(fmt.Sprintf("Successfully admit two guaranteed pods, each with 1 core, 1 %s device", sd.resourceName))
 		ctnAttrs = []tmCtnAttribute{
 			{
 				ctnName:       "gu-container",
 				cpuRequest:    "1000m",
 				cpuLimit:      "1000m",
-				deviceName:    sriovResourceName,
+				deviceName:    sd.resourceName,
 				deviceRequest: "1",
 				deviceLimit:   "1",
 			},
 		}
-		runTopologyManagerPositiveTest(f, 2, ctnAttrs, hwinfo)
+		runTopologyManagerPositiveTest(f, 2, ctnAttrs, envInfo)
 
-		ginkgo.By(fmt.Sprintf("Successfully admit two guaranteed pods, each with 2 cores, 1 %s device", sriovResourceName))
+		ginkgo.By(fmt.Sprintf("Successfully admit two guaranteed pods, each with 2 cores, 1 %s device", sd.resourceName))
 		ctnAttrs = []tmCtnAttribute{
 			{
 				ctnName:       "gu-container",
 				cpuRequest:    "2000m",
 				cpuLimit:      "2000m",
-				deviceName:    sriovResourceName,
+				deviceName:    sd.resourceName,
 				deviceRequest: "1",
 				deviceLimit:   "1",
 			},
 		}
-		runTopologyManagerPositiveTest(f, 2, ctnAttrs, hwinfo)
+		runTopologyManagerPositiveTest(f, 2, ctnAttrs, envInfo)
 
 		// testing more complex conditions require knowledge about the system cpu+bus topology
 	}
 
 	// multi-container tests
-	if sriovResourceAmount >= 4 {
-		ginkgo.By(fmt.Sprintf("Successfully admit one guaranteed pods, each with two containers, each with 2 cores, 1 %s device", sriovResourceName))
+	if sd.resourceAmount >= 4 {
+		ginkgo.By(fmt.Sprintf("Successfully admit one guaranteed pods, each with two containers, each with 2 cores, 1 %s device", sd.resourceName))
 		ctnAttrs = []tmCtnAttribute{
 			{
 				ctnName:       "gu-container-0",
 				cpuRequest:    "2000m",
 				cpuLimit:      "2000m",
-				deviceName:    sriovResourceName,
+				deviceName:    sd.resourceName,
 				deviceRequest: "1",
 				deviceLimit:   "1",
 			},
@@ -794,20 +809,20 @@ func runTopologyManagerNodeAlignmentSuiteTests(f *framework.Framework, configMap
 				ctnName:       "gu-container-1",
 				cpuRequest:    "2000m",
 				cpuLimit:      "2000m",
-				deviceName:    sriovResourceName,
+				deviceName:    sd.resourceName,
 				deviceRequest: "1",
 				deviceLimit:   "1",
 			},
 		}
-		runTopologyManagerPositiveTest(f, 1, ctnAttrs, hwinfo)
+		runTopologyManagerPositiveTest(f, 1, ctnAttrs, envInfo)
 
-		ginkgo.By(fmt.Sprintf("Successfully admit two guaranteed pods, each with two containers, each with 1 core, 1 %s device", sriovResourceName))
+		ginkgo.By(fmt.Sprintf("Successfully admit two guaranteed pods, each with two containers, each with 1 core, 1 %s device", sd.resourceName))
 		ctnAttrs = []tmCtnAttribute{
 			{
 				ctnName:       "gu-container-0",
 				cpuRequest:    "1000m",
 				cpuLimit:      "1000m",
-				deviceName:    sriovResourceName,
+				deviceName:    sd.resourceName,
 				deviceRequest: "1",
 				deviceLimit:   "1",
 			},
@@ -815,20 +830,20 @@ func runTopologyManagerNodeAlignmentSuiteTests(f *framework.Framework, configMap
 				ctnName:       "gu-container-1",
 				cpuRequest:    "1000m",
 				cpuLimit:      "1000m",
-				deviceName:    sriovResourceName,
+				deviceName:    sd.resourceName,
 				deviceRequest: "1",
 				deviceLimit:   "1",
 			},
 		}
-		runTopologyManagerPositiveTest(f, 2, ctnAttrs, hwinfo)
+		runTopologyManagerPositiveTest(f, 2, ctnAttrs, envInfo)
 
-		ginkgo.By(fmt.Sprintf("Successfully admit two guaranteed pods, each with two containers, both with with 2 cores, one with 1 %s device", sriovResourceName))
+		ginkgo.By(fmt.Sprintf("Successfully admit two guaranteed pods, each with two containers, both with with 2 cores, one with 1 %s device", sd.resourceName))
 		ctnAttrs = []tmCtnAttribute{
 			{
 				ctnName:       "gu-container-dev",
 				cpuRequest:    "2000m",
 				cpuLimit:      "2000m",
-				deviceName:    sriovResourceName,
+				deviceName:    sd.resourceName,
 				deviceRequest: "1",
 				deviceLimit:   "1",
 			},
@@ -838,26 +853,26 @@ func runTopologyManagerNodeAlignmentSuiteTests(f *framework.Framework, configMap
 				cpuLimit:   "2000m",
 			},
 		}
-		runTopologyManagerPositiveTest(f, 2, ctnAttrs, hwinfo)
+		runTopologyManagerPositiveTest(f, 2, ctnAttrs, envInfo)
 	}
 
 	// overflow NUMA node capacity: cores
 	numCores := 1 + (threadsPerCore * coreCount)
 	excessCoresReq := fmt.Sprintf("%dm", numCores*1000)
-	ginkgo.By(fmt.Sprintf("Trying to admit a guaranteed pods, with %d cores, 1 %s device - and it should be rejected", numCores, sriovResourceName))
+	ginkgo.By(fmt.Sprintf("Trying to admit a guaranteed pods, with %d cores, 1 %s device - and it should be rejected", numCores, sd.resourceName))
 	ctnAttrs = []tmCtnAttribute{
 		{
 			ctnName:       "gu-container",
 			cpuRequest:    excessCoresReq,
 			cpuLimit:      excessCoresReq,
-			deviceName:    sriovResourceName,
+			deviceName:    sd.resourceName,
 			deviceRequest: "1",
 			deviceLimit:   "1",
 		},
 	}
-	runTopologyManagerNegativeTest(f, 1, ctnAttrs, hwinfo)
+	runTopologyManagerNegativeTest(f, 1, ctnAttrs, envInfo)
 
-	teardownSRIOVConfigOrFail(f, dpPod)
+	teardownSRIOVConfigOrFail(f, sd)
 }
 
 func runTopologyManagerTests(f *framework.Framework) {

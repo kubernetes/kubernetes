@@ -177,18 +177,23 @@ func makeEnvMap(logs string) (map[string]string, error) {
 	return envMap, nil
 }
 
-func containerWantsDevices(cnt *v1.Container, hwinfo testEnvHWInfo) bool {
-	_, found := cnt.Resources.Requests[v1.ResourceName(hwinfo.sriovResourceName)]
+type testEnvInfo struct {
+	numaNodes         int
+	sriovResourceName string
+}
+
+func containerWantsDevices(cnt *v1.Container, envInfo testEnvInfo) bool {
+	_, found := cnt.Resources.Requests[v1.ResourceName(envInfo.sriovResourceName)]
 	return found
 }
 
-func checkNUMAAlignment(f *framework.Framework, pod *v1.Pod, cnt *v1.Container, logs string, hwinfo testEnvHWInfo) (numaPodResources, error) {
+func checkNUMAAlignment(f *framework.Framework, pod *v1.Pod, cnt *v1.Container, logs string, envInfo testEnvInfo) (numaPodResources, error) {
 	podEnv, err := makeEnvMap(logs)
 	if err != nil {
 		return numaPodResources{}, err
 	}
 
-	CPUToNUMANode, err := getCPUToNUMANodeMapFromEnv(f, pod, cnt, podEnv, hwinfo.numaNodes)
+	CPUToNUMANode, err := getCPUToNUMANodeMapFromEnv(f, pod, cnt, podEnv, envInfo.numaNodes)
 	if err != nil {
 		return numaPodResources{}, err
 	}
@@ -198,7 +203,7 @@ func checkNUMAAlignment(f *framework.Framework, pod *v1.Pod, cnt *v1.Container, 
 		return numaPodResources{}, err
 	}
 
-	if containerWantsDevices(cnt, hwinfo) && len(PCIDevsToNUMANode) == 0 {
+	if containerWantsDevices(cnt, envInfo) && len(PCIDevsToNUMANode) == 0 {
 		return numaPodResources{}, fmt.Errorf("no PCI devices found in environ")
 	}
 	numaRes := numaPodResources{
