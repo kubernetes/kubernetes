@@ -226,6 +226,9 @@ type PodInfo struct {
 	// It shouldn't be updated once initialized. It's used to record the e2e scheduling
 	// latency for a pod.
 	InitialAttemptTimestamp time.Time
+	// The dynamic priority of pod.
+	// It's used to store de-prioritized value when pod is unschedulable.
+	DynamicPriority int32
 }
 
 // DeepCopy returns a deep copy of the PodInfo object.
@@ -235,6 +238,7 @@ func (podInfo *PodInfo) DeepCopy() *PodInfo {
 		Timestamp:               podInfo.Timestamp,
 		Attempts:                podInfo.Attempts,
 		InitialAttemptTimestamp: podInfo.InitialAttemptTimestamp,
+		DynamicPriority:         podInfo.DynamicPriority,
 	}
 }
 
@@ -248,6 +252,8 @@ type QueueSortPlugin interface {
 	Plugin
 	// Less are used to sort pods in the scheduling queue.
 	Less(*PodInfo, *PodInfo) bool
+	// DynamicLess are used to sort pods with dynamic priority in the scheduling queue.
+	DynamicLess(*PodInfo, *PodInfo) bool
 }
 
 // PreFilterExtensions is an interface that is included in plugins that allow specifying
@@ -411,6 +417,10 @@ type Framework interface {
 	FrameworkHandle
 	// QueueSortFunc returns the function to sort pods in scheduling queue
 	QueueSortFunc() LessFunc
+
+	// DynamicQueueSortFunc returns the function to sort pods with dynamic priority
+	// in scheduling queue
+	DynamicQueueSortFunc() LessFunc
 
 	// RunPreFilterPlugins runs the set of configured prefilter plugins. It returns
 	// *Status and its code is set to non-success if any of the plugins returns

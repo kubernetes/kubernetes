@@ -36,6 +36,7 @@ import (
 	ktypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/internal/heap"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
@@ -96,6 +97,7 @@ type SchedulingQueue interface {
 	NumUnschedulablePods() int
 	// Run starts the goroutines managing the queue.
 	Run()
+	RestorePodPriorities()
 }
 
 // NewSchedulingQueue initializes a priority queue as a new scheduling queue.
@@ -127,6 +129,7 @@ type PriorityQueue struct {
 	lock sync.RWMutex
 	cond sync.Cond
 
+	deprioritizedPods *PodDynamicPrioritiesMap
 	// activeQ is heap structure that scheduler actively looks at to find pods to
 	// schedule. Head of heap is the highest priority pod.
 	activeQ *heap.Heap
@@ -198,6 +201,140 @@ func newPodInfoNoTimestamp(pod *v1.Pod) *framework.PodInfo {
 	}
 }
 
+// PodDynamicPrioritiesMap holds pods' dynamic priorities information.
+// When pod fails to be scheduled, it will be moved to unschedulableQ,
+// calculate dynamic priority for this pod, dynamic-priority=dynamic-priority/(2^N)
+// and store this dynamic priority to map podDynamicPriorities.
+// Meanwhile, update the dynamic priority in PodInfo.
+type PodDynamicPrioritiesMap struct {
+	lock sync.RWMutex
+
+	// maximum count to de-prioritize pod priority.
+	// over maxRetry, dynamic priority will be fixed to (-1-priority).
+	maxRetry int
+	// maximum duration to cleanup outdated priorities.
+	maxCleanupDuration time.Duration
+	// all the pod/dpriority in podDynamicPriorities
+	// store the dynamic priority of pod in activeQ heap.
+	podDynamicPriorities map[ktypes.NamespacedName]int32
+	// podLastUpdateTime stores the start time to calculate the expire time.
+	// when pod is removed from activeQ, set this timestamp to now().
+	// after maxCleanupDuration, if this timestamp is still not reset,
+	// that is to say, this pod has been scheduled successfully,
+	// then the dynamic priority of this pod can be removed from map podDynamicPriorities.
+	podLastUpdateTime map[ktypes.NamespacedName]time.Time
+
+	keyFunc func(*v1.Pod) ktypes.NamespacedName
+}
+
+func newPodDynamicPrioritiesMap() *PodDynamicPrioritiesMap {
+	dpm := &PodDynamicPrioritiesMap{
+		maxRetry:             3,
+		maxCleanupDuration:   10 * time.Minute,
+		podDynamicPriorities: make(map[ktypes.NamespacedName]int32),
+		podLastUpdateTime:    make(map[ktypes.NamespacedName]time.Time),
+		keyFunc:              nsNameForPod,
+	}
+	return dpm
+}
+
+func (m *PodDynamicPrioritiesMap) cleanupOutdatedPriority() {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	for p, _ := range m.podDynamicPriorities {
+		if t, ok := m.podLastUpdateTime[p]; !ok || time.Since(t) <= m.maxCleanupDuration {
+			continue
+		}
+		delete(m.podDynamicPriorities, p)
+		delete(m.podLastUpdateTime, p)
+	}
+}
+
+func (m *PodDynamicPrioritiesMap) UpdatePodDynamicPriority(pInfo *framework.PodInfo) {
+	var prio int32
+	var ok bool
+	key := m.keyFunc(pInfo.Pod)
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	if prio, ok = m.podDynamicPriorities[key]; !ok {
+		prio = podutil.GetPodPriority(pInfo.Pod)
+		if prio < 0 {
+			return
+		}
+	}
+	if prio >= 0 {
+		c := pInfo.Attempts
+		if c >= m.maxRetry {
+			o := podutil.GetPodPriority(pInfo.Pod)
+			prio = -1 - o
+		} else {
+			reduce := 1 << (uint32(c) + 1)
+			prio = prio / int32(reduce)
+			if prio == 0 {
+				o := podutil.GetPodPriority(pInfo.Pod)
+				prio = -1 - o
+			}
+		}
+	}
+	m.podDynamicPriorities[key] = prio
+	delete(m.podLastUpdateTime, key)
+	pInfo.DynamicPriority = prio
+}
+
+func (m *PodDynamicPrioritiesMap) updateTimestamp(pInfo *framework.PodInfo) {
+	key := m.keyFunc(pInfo.Pod)
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	if _, ok := m.podDynamicPriorities[key]; ok {
+		m.podLastUpdateTime[key] = time.Now()
+	}
+}
+
+func (m *PodDynamicPrioritiesMap) GetDeprioritizedPods() []ktypes.NamespacedName {
+	pods := []ktypes.NamespacedName{}
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+	for p, _ := range m.podDynamicPriorities {
+		pods = append(pods, p)
+	}
+	return pods
+}
+
+func (m *PodDynamicPrioritiesMap) ResetPodDynamicPriorities() {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	m.podDynamicPriorities = make(map[ktypes.NamespacedName]int32)
+	m.podLastUpdateTime = make(map[ktypes.NamespacedName]time.Time)
+}
+
+func (p *PriorityQueue) RestorePodPriorities() {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	ps := p.deprioritizedPods.GetDeprioritizedPods()
+	p.deprioritizedPods.ResetPodDynamicPriorities()
+	for _, deprioPod := range ps {
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      deprioPod.Name,
+				Namespace: deprioPod.Namespace,
+			},
+		}
+		podInfo, exist, err := p.activeQ.Get(newPodInfoNoTimestamp(pod))
+		if err != nil || !exist {
+			continue
+		}
+		pInfo := podInfo.(*framework.PodInfo)
+		pInfo.DynamicPriority = podutil.GetPodPriority(pInfo.Pod)
+		err = p.activeQ.Fix(pInfo)
+		if err != nil {
+			klog.Errorf("failed to fix pod %s to restore priority", deprioPod)
+		}
+	}
+}
+
 // NewPriorityQueue creates a PriorityQueue object.
 func NewPriorityQueue(
 	lessFn framework.LessFunc,
@@ -219,6 +356,7 @@ func NewPriorityQueue(
 		stop:                      make(chan struct{}),
 		podInitialBackoffDuration: options.podInitialBackoffDuration,
 		podMaxBackoffDuration:     options.podMaxBackoffDuration,
+		deprioritizedPods:         newPodDynamicPrioritiesMap(),
 		activeQ:                   heap.NewWithRecorder(podInfoKeyFunc, comp, metrics.NewActivePodsRecorder()),
 		unschedulableQ:            newUnschedulablePodsMap(metrics.NewUnschedulablePodsRecorder()),
 		nominatedPods:             newNominatedPodMap(),
@@ -234,6 +372,7 @@ func NewPriorityQueue(
 func (p *PriorityQueue) Run() {
 	go wait.Until(p.flushBackoffQCompleted, 1.0*time.Second, p.stop)
 	go wait.Until(p.flushUnschedulableQLeftover, 30*time.Second, p.stop)
+	go wait.Until(p.deprioritizedPods.cleanupOutdatedPriority, p.deprioritizedPods.maxCleanupDuration, p.stop)
 }
 
 // Add adds a pod to the active queue. It should be called only when a new pod
@@ -283,6 +422,12 @@ func (p *PriorityQueue) SchedulingCycle() int64 {
 	return p.schedulingCycle
 }
 
+func isPodUnschedulable(pod *v1.Pod) bool {
+	_, cond := podutil.GetPodCondition(&pod.Status, v1.PodScheduled)
+	klog.V(4).Infof("pod(%s/%s). condition: %v\n", pod.Namespace, pod.Name, cond)
+	return cond != nil && cond.Status == v1.ConditionFalse && cond.Reason == v1.PodReasonUnschedulable
+}
+
 // AddUnschedulableIfNotPresent inserts a pod that cannot be scheduled into
 // the queue, unless it is already in the queue. Normally, PriorityQueue puts
 // unschedulable pods in `unschedulableQ`. But if there has been a recent move
@@ -291,6 +436,9 @@ func (p *PriorityQueue) AddUnschedulableIfNotPresent(pInfo *framework.PodInfo, p
 	p.lock.Lock()
 	defer p.lock.Unlock()
 	pod := pInfo.Pod
+	if isPodUnschedulable(pod) {
+		p.deprioritizedPods.UpdatePodDynamicPriority(pInfo)
+	}
 	if p.unschedulableQ.get(pod) != nil {
 		return fmt.Errorf("pod: %v is already present in unschedulable queue", nsNameForPod(pod))
 	}
@@ -386,6 +534,7 @@ func (p *PriorityQueue) Pop() (*framework.PodInfo, error) {
 		return nil, err
 	}
 	pInfo := obj.(*framework.PodInfo)
+	p.deprioritizedPods.updateTimestamp(pInfo)
 	pInfo.Attempts++
 	p.schedulingCycle++
 	return pInfo, err
@@ -468,6 +617,7 @@ func (p *PriorityQueue) Delete(pod *v1.Pod) error {
 		p.podBackoffQ.Delete(newPodInfoNoTimestamp(pod))
 		p.unschedulableQ.delete(pod)
 	}
+	p.deprioritizedPods.updateTimestamp(newPodInfoNoTimestamp(pod))
 	return nil
 }
 
@@ -628,6 +778,7 @@ func (p *PriorityQueue) newPodInfo(pod *v1.Pod) *framework.PodInfo {
 		Pod:                     pod,
 		Timestamp:               now,
 		InitialAttemptTimestamp: now,
+		DynamicPriority:         podutil.GetPodPriority(pod),
 	}
 }
 

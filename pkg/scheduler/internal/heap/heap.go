@@ -152,6 +152,18 @@ func (h *Heap) Add(obj interface{}) error {
 	return nil
 }
 
+func (h *Heap) Fix(obj interface{}) error {
+	key, err := h.data.keyFunc(obj)
+	if err != nil {
+		return cache.KeyError{Obj: obj, Err: err}
+	}
+	if _, exists := h.data.items[key]; exists {
+		h.data.items[key].obj = obj
+		heap.Fix(h.data, h.data.items[key].index)
+	}
+	return nil
+}
+
 // AddIfNotPresent inserts an item, and puts it in the queue. If an item with
 // the key is present in the map, no changes is made to the item.
 func (h *Heap) AddIfNotPresent(obj interface{}) error {

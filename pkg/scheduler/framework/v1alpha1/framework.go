@@ -309,6 +309,20 @@ func (f *framework) QueueSortFunc() LessFunc {
 	return f.queueSortPlugins[0].Less
 }
 
+func (f *framework) DynamicQueueSortFunc() LessFunc {
+	if f == nil {
+		// If framework is nil, simply keep their order unchanged.
+		// NOTE: this is primarily for tests.
+		return func(_, _ *PodInfo) bool { return false }
+	}
+
+	if len(f.queueSortPlugins) == 0 {
+		panic("No QueueSort plugin is registered in the framework.")
+	}
+
+	return f.queueSortPlugins[0].DynamicLess
+}
+
 // RunPreFilterPlugins runs the set of configured PreFilter plugins. It returns
 // *Status and its code is set to non-success if any of the plugins returns
 // anything but Success. If a non-success status is returned, then the scheduling

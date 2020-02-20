@@ -102,6 +102,7 @@ func (sched *Scheduler) addNodeToCache(obj interface{}) {
 	}
 
 	klog.V(3).Infof("add event for node %q", node.Name)
+	sched.SchedulingQueue.RestorePodPriorities()
 	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(queue.NodeAdd)
 }
 
@@ -129,6 +130,7 @@ func (sched *Scheduler) updateNodeInCache(oldObj, newObj interface{}) {
 	if sched.SchedulingQueue.NumUnschedulablePods() == 0 {
 		sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(queue.Unknown)
 	} else if event := nodeSchedulingPropertiesChange(newNode, oldNode); event != "" {
+		sched.SchedulingQueue.RestorePodPriorities()
 		sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(event)
 	}
 }
@@ -285,6 +287,7 @@ func (sched *Scheduler) deletePodFromCache(obj interface{}) {
 		klog.Errorf("scheduler cache RemovePod failed: %v", err)
 	}
 
+	sched.SchedulingQueue.RestorePodPriorities()
 	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(queue.AssignedPodDelete)
 }
 

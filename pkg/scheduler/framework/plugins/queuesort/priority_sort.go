@@ -44,6 +44,18 @@ func (pl *PrioritySort) Less(pInfo1, pInfo2 *framework.PodInfo) bool {
 	return (p1 > p2) || (p1 == p2 && pInfo1.Timestamp.Before(pInfo2.Timestamp))
 }
 
+// DynamicLess is the function used by the activeQ heap algorithm with de-prioritize
+// unschedulable pods feature to sort pods. It sorts pods based on their dynamic priority.
+// When dynamic priorities are equal, it uses PodInfo.timestamp
+func (pl *PrioritySort) DynamicLess(pInfo1, pInfo2 *framework.PodInfo) bool {
+	p1 := pInfo1.DynamicPriority
+	p2 := pInfo2.DynamicPriority
+	if p1 < 0 && p2 < 0 {
+		return (p1 < p2) || (p1 == p2 && pInfo1.Timestamp.Before(pInfo2.Timestamp))
+	}
+	return (p1 > p2) || (p1 == p2 && pInfo1.Timestamp.Before(pInfo2.Timestamp))
+}
+
 // New initializes a new plugin and returns it.
 func New(plArgs *runtime.Unknown, handle framework.FrameworkHandle) (framework.Plugin, error) {
 	return &PrioritySort{}, nil

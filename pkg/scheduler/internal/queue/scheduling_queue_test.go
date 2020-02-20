@@ -155,7 +155,7 @@ func TestPriorityQueue_Add(t *testing.T) {
 
 func newDefaultQueueSort() framework.LessFunc {
 	sort := &queuesort.PrioritySort{}
-	return sort.Less
+	return sort.DynamicLess
 }
 
 func TestPriorityQueue_AddWithReversePriorityLessFunc(t *testing.T) {
@@ -1608,4 +1608,184 @@ func makePodInfos(num int, timestamp time.Time) []*framework.PodInfo {
 		pInfos = append(pInfos, p)
 	}
 	return pInfos
+}
+
+// TestHighPriorityPodDeprioritized tests
+// that a high priority pod determined as unschedulable multiple times doesn't block
+// newer low priority pod. This behavior ensures that an unschedulable high priority pod
+// does not block head of the queue when there are frequent events that move pods to
+// the active queue.
+func TestHighPriorityPodDeprioritized(t *testing.T) {
+	c := clock.NewFakeClock(time.Now())
+	q := createAndRunPriorityQueue(newDefaultQueueSort(), WithClock(c))
+
+	// Add an unschedulable pod to a priority queue.
+	// This makes a situation that the pod was tried to schedule
+	// and had been determined unschedulable so far
+	unschedulablePod := v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-pod-unscheduled",
+			Namespace: "ns1",
+			UID:       "tp001",
+		},
+		Spec: v1.PodSpec{
+			Priority: &highPriority,
+		},
+		Status: v1.PodStatus{
+			NominatedNodeName: "node1",
+		},
+	}
+
+	// Update pod condition to unschedulable.
+	podutil.UpdatePodCondition(&unschedulablePod.Status, &v1.PodCondition{
+		Type:    v1.PodScheduled,
+		Status:  v1.ConditionFalse,
+		Reason:  v1.PodReasonUnschedulable,
+		Message: "fake scheduling failure",
+	})
+
+	q.Add(&unschedulablePod)
+	unschedulablePodInfo, err := q.Pop()
+
+	for i := 0; i < 3; i++ {
+		// Put in the unschedulable queue
+		q.AddUnschedulableIfNotPresent(unschedulablePodInfo, q.SchedulingCycle())
+		// Move clock to make the unschedulable pods complete backoff.
+		c.Step(DefaultPodMaxBackoffDuration + time.Second)
+		// Move all unschedulable pods to the active queue.
+		q.MoveAllToActiveOrBackoffQueue("test")
+
+		// Simulate a pod being popped by the scheduler,
+		// At this time, unschedulable pod should be popped.
+		unschedulablePodInfo, err = q.Pop()
+		if err != nil {
+			t.Errorf("Error while popping the head of the queue: %v", err)
+		}
+		if unschedulablePodInfo.Pod != &unschedulablePod {
+			t.Errorf("Expected that test-pod-unscheduled was popped, got %v", unschedulablePodInfo.Pod.Name)
+		}
+	}
+	// Put in the unschedulable queue
+	q.AddUnschedulableIfNotPresent(unschedulablePodInfo, q.SchedulingCycle())
+	// Move clock to make the unschedulable pods complete backoff.
+	c.Step(DefaultPodMaxBackoffDuration + time.Second)
+	// Move all unschedulable pods to the active queue.
+	q.MoveAllToActiveOrBackoffQueue("test")
+	// Assume newer pod was added just after unschedulable pod
+	// being popped and before being pushed back to the queue.
+	newerPod := v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "test-newer-pod",
+			Namespace:         "ns1",
+			UID:               "tp002",
+			CreationTimestamp: metav1.Now(),
+		},
+		Spec: v1.PodSpec{
+			Priority: &lowPriority,
+		},
+		Status: v1.PodStatus{
+			NominatedNodeName: "node1",
+		},
+	}
+	q.Add(&newerPod)
+
+	// At this time, newerPod should be popped
+	// because unschedulable pod are deprioritized to negative value.
+	p2, err2 := q.Pop()
+	if err2 != nil {
+		t.Errorf("Error while popping the head of the queue: %v", err2)
+	}
+	if p2.Pod != &newerPod {
+		t.Errorf("Expected that test-newer-pod was popped, got %v", p2.Pod.Name)
+	}
+}
+
+// TestRestorePodPriority tests that a high priority pod determined as unschedulable
+// multiple times will be scheduled before other low priority pod when pod priority
+// restored. This behavior ensures that an unschedulable high priority pod can be
+// scheduled firstly when capacity adding or preemting pods to make room.
+func TestRestorePodPriority(t *testing.T) {
+	c := clock.NewFakeClock(time.Now())
+	q := createAndRunPriorityQueue(newDefaultQueueSort(), WithClock(c))
+	// Add an unschedulable pod to a priority queue.
+	// This makes a situation that the pod was tried to schedule
+	// and had been determined unschedulable so far
+	unschedulablePod := v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-pod-unscheduled",
+			Namespace: "ns1",
+			UID:       "tp001",
+		},
+		Spec: v1.PodSpec{
+			Priority: &highPriority,
+		},
+		Status: v1.PodStatus{
+			NominatedNodeName: "node1",
+		},
+	}
+
+	// Update pod condition to unschedulable.
+	podutil.UpdatePodCondition(&unschedulablePod.Status, &v1.PodCondition{
+		Type:    v1.PodScheduled,
+		Status:  v1.ConditionFalse,
+		Reason:  v1.PodReasonUnschedulable,
+		Message: "fake scheduling failure",
+	})
+
+	q.Add(&unschedulablePod)
+	unschedulablePodInfo, err := q.Pop()
+
+	for i := 0; i < 3; i++ {
+		// Put in the unschedulable queue
+		q.AddUnschedulableIfNotPresent(unschedulablePodInfo, q.SchedulingCycle())
+		// Move clock to make the unschedulable pods complete backoff.
+		c.Step(DefaultPodMaxBackoffDuration + time.Second)
+		// Move all unschedulable pods to the active queue.
+		q.MoveAllToActiveOrBackoffQueue("test")
+
+		// Simulate a pod being popped by the scheduler,
+		// At this time, unschedulable pod should be popped.
+		unschedulablePodInfo, err = q.Pop()
+		if err != nil {
+			t.Errorf("Error while popping the head of the queue: %v", err)
+		}
+		if unschedulablePodInfo.Pod != &unschedulablePod {
+			t.Errorf("Expected that test-pod-unscheduled was popped, got %v", unschedulablePodInfo.Pod.Name)
+		}
+	}
+	// Put in the unschedulable queue
+	q.AddUnschedulableIfNotPresent(unschedulablePodInfo, q.SchedulingCycle())
+	// Move clock to make the unschedulable pods complete backoff.
+	c.Step(DefaultPodMaxBackoffDuration + time.Second)
+	// Move all unschedulable pods to the active queue.
+	q.MoveAllToActiveOrBackoffQueue("test")
+	// Assume newer pod was added just after unschedulable pod
+	// being popped and before being pushed back to the queue.
+	newerPod := v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "test-newer-pod",
+			Namespace:         "ns1",
+			UID:               "tp002",
+			CreationTimestamp: metav1.Now(),
+		},
+		Spec: v1.PodSpec{
+			Priority: &lowPriority,
+		},
+		Status: v1.PodStatus{
+			NominatedNodeName: "node1",
+		},
+	}
+	q.Add(&newerPod)
+
+	q.RestorePodPriorities()
+
+	// At this time, newerPod should be popped
+	// because unschedulable pod are deprioritized to negative value.
+	p2, err2 := q.Pop()
+	if err2 != nil {
+		t.Errorf("Error while popping the head of the queue: %v", err2)
+	}
+	if p2.Pod != &unschedulablePod {
+		t.Errorf("Expected that test-pod-unscheduled was popped, got %v", p2.Pod.Name)
+	}
 }
