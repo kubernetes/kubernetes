@@ -63,7 +63,7 @@ func TestCommonAttachDisk(t *testing.T) {
 	}
 
 	for i, test := range testCases {
-		testCloud := getTestCloud()
+		testCloud := GetTestCloud()
 		common := &controllerCommon{
 			location:              testCloud.Location,
 			storageEndpointSuffix: testCloud.Environment.StorageEndpointSuffix,
@@ -112,7 +112,7 @@ func TestCommonDetachDisk(t *testing.T) {
 	}
 
 	for i, test := range testCases {
-		testCloud := getTestCloud()
+		testCloud := GetTestCloud()
 		common := &controllerCommon{
 			location:              testCloud.Location,
 			storageEndpointSuffix: testCloud.Environment.StorageEndpointSuffix,
@@ -153,7 +153,7 @@ func TestGetDiskLun(t *testing.T) {
 	}
 
 	for i, test := range testCases {
-		testCloud := getTestCloud()
+		testCloud := GetTestCloud()
 		common := &controllerCommon{
 			location:              testCloud.Location,
 			storageEndpointSuffix: testCloud.Environment.StorageEndpointSuffix,
@@ -192,7 +192,7 @@ func TestGetNextDiskLun(t *testing.T) {
 	}
 
 	for i, test := range testCases {
-		testCloud := getTestCloud()
+		testCloud := GetTestCloud()
 		common := &controllerCommon{
 			location:              testCloud.Location,
 			storageEndpointSuffix: testCloud.Environment.StorageEndpointSuffix,
@@ -234,7 +234,7 @@ func TestDisksAreAttached(t *testing.T) {
 	}
 
 	for i, test := range testCases {
-		testCloud := getTestCloud()
+		testCloud := GetTestCloud()
 		common := &controllerCommon{
 			location:              testCloud.Location,
 			storageEndpointSuffix: testCloud.Environment.StorageEndpointSuffix,

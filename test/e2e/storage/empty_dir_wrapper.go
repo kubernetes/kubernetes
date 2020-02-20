@@ -127,7 +127,8 @@ var _ = utils.SIGDescribe("EmptyDir wrapper volumes", func() {
 				Containers: []v1.Container{
 					{
 						Name:  "secret-test",
-						Image: imageutils.GetE2EImage(imageutils.TestWebserver),
+						Image: imageutils.GetE2EImage(imageutils.Agnhost),
+						Args:  []string{"test-webserver"},
 						VolumeMounts: []v1.VolumeMount{
 							{
 								Name:      volumeName,

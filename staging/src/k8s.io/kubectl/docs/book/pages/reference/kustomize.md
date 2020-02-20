@@ -564,7 +564,7 @@ Meta Options control how Kustomize generates and transforms Resource Config.
 ### configurations
 
 `configurations` is used to configure the built-in Kustomize Transformers to work with CRDs.  The built-in
-Kustomize configurations can be found [here](https://github.com/kubernetes-sigs/kustomize/tree/master/pkg/transformers/config/defaultconfig)
+Kustomize configurations can be found [here](https://github.com/kubernetes-sigs/kustomize/blob/master/api/konfig/builtinpluginconsts)
 
 Examples:
 
@@ -605,7 +605,7 @@ to find additional annotation fields on CRDs.
 | **path**      | string    | Path to annotation field.   |
 | **version**   | string    | API Version of the object to add the annotation to.  If unset, applies to all Versions. |
 
-[Built-in examples](https://github.com/kubernetes-sigs/kustomize/blob/master/pkg/transformers/config/defaultconfig/commonannotations.go)
+[Built-in examples](https://github.com/kubernetes-sigs/kustomize/blob/master/api/konfig/builtinpluginconsts/commonannotations.go)
 
 {% sample lang="yaml" %}
 
@@ -640,7 +640,7 @@ additional labels and selector fields on CRDs.
 | **path**      | string    | Path to label field.   |
 | **version**   | string    | API Version of the object to add the label to.  If unset, applies to all Versions. |
 
-[Built-in examples](https://github.com/kubernetes-sigs/kustomize/blob/master/pkg/transformers/config/defaultconfig/commonlabels.go)
+[Built-in examples](https://github.com/kubernetes-sigs/kustomize/blob/master/api/konfig/builtinpluginconsts/commonlabels.go)
 
 {% sample lang="yaml" %}
 
@@ -737,7 +737,7 @@ names are modified - e.g. `namePrefix`, `secretGenerator`.
 | **path**      | string    | Path to the name field that is a reference.   |
 | **version**   | string    | API Version of the object *that contains a reference**.  If unset, applies to all Versions. |
 
-[Built-In Examples](https://github.com/kubernetes-sigs/kustomize/blob/master/pkg/transformers/config/defaultconfig/namereference.go)
+[Built-In Examples](https://github.com/kubernetes-sigs/kustomize/blob/master/api/konfig/builtinpluginconsts/namereference.go)
 
 {% sample lang="yaml" %}
 

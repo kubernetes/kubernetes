@@ -52,7 +52,7 @@ var (
 		prometheus.CounterOpts{
 			Namespace: namespace,
 			Subsystem: subsystem,
-			Name:      "rejectedRequests",
+			Name:      "rejected_requests",
 			Help:      "Number of rejected requests by api priority and fairness system",
 		},
 		[]string{priorityLevel, "reason"},
@@ -61,7 +61,7 @@ var (
 		prometheus.GaugeOpts{
 			Namespace: namespace,
 			Subsystem: subsystem,
-			Name:      "currentInqueueRequests",
+			Name:      "current_inqueue_requests",
 			Help:      "Number of requests currently pending in the queue by the api priority and fairness system",
 		},
 		[]string{priorityLevel},
@@ -70,7 +70,7 @@ var (
 		prometheus.HistogramOpts{
 			Namespace: namespace,
 			Subsystem: subsystem,
-			Name:      "requestQueueLength",
+			Name:      "request_queue_length",
 			Help:      "Length of queue in the api priority and fairness system",
 			Buckets:   queueLengthBuckets,
 		},
@@ -80,7 +80,7 @@ var (
 		prometheus.GaugeOpts{
 			Namespace: namespace,
 			Subsystem: subsystem,
-			Name:      "requestConcurrencyLimit",
+			Name:      "request_concurrency_limit",
 			Help:      "Shared concurrency limit in the api priority and fairness system",
 		},
 		[]string{priorityLevel},
@@ -89,7 +89,7 @@ var (
 		prometheus.GaugeOpts{
 			Namespace: namespace,
 			Subsystem: subsystem,
-			Name:      "currentExecutingRequests",
+			Name:      "current_executing_requests",
 			Help:      "Number of requests currently executing in the api priority and fairness system",
 		},
 		[]string{priorityLevel},
@@ -98,7 +98,7 @@ var (
 		prometheus.HistogramOpts{
 			Namespace: namespace,
 			Subsystem: subsystem,
-			Name:      "request_wait_durationSeconds",
+			Name:      "request_wait_duration_seconds",
 			Help:      "Length of time a request spent waiting in its queue",
 			Buckets:   requestDurationSecondsBuckets,
 		},
@@ -108,7 +108,7 @@ var (
 		prometheus.HistogramOpts{
 			Namespace: namespace,
 			Subsystem: subsystem,
-			Name:      "requestExecutionSeconds",
+			Name:      "request_execution_seconds",
 			Help:      "Time of request executing in the api priority and fairness system",
 			Buckets:   requestDurationSecondsBuckets,
 		},

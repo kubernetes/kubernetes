@@ -34,7 +34,10 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/tools/record"
 	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/legacy-cloud-providers/azure/auth"
 	azcache "k8s.io/legacy-cloud-providers/azure/cache"
 	"k8s.io/legacy-cloud-providers/azure/retry"
 )
@@ -875,6 +878,10 @@ func (fDC *fakeDisksClient) CreateOrUpdate(ctx context.Context, resourceGroupNam
 	fDC.mutex.Lock()
 	defer fDC.mutex.Unlock()
 
+	provisioningStateSucceeded := string(compute.ProvisioningStateSucceeded)
+	diskParameter.DiskProperties = &compute.DiskProperties{ProvisioningState: &provisioningStateSucceeded}
+	diskParameter.ID = &diskName
+
 	if _, ok := fDC.FakeStore[resourceGroupName]; !ok {
 		fDC.FakeStore[resourceGroupName] = make(map[string]compute.Disk)
 	}
@@ -990,4 +997,56 @@ func (f *fakeVMSet) GetDataDisks(nodeName types.NodeName, crt azcache.AzureCache
 
 func (f *fakeVMSet) GetPowerStatusByNodeName(name string) (string, error) {
 	return "", fmt.Errorf("unimplemented")
+}
+
+// GetTestCloud returns a fake azure cloud for unit tests in Azure related CSI drivers
+func GetTestCloud() (az *Cloud) {
+	az = &Cloud{
+		Config: Config{
+			AzureAuthConfig: auth.AzureAuthConfig{
+				TenantID:       "tenant",
+				SubscriptionID: "subscription",
+			},
+			ResourceGroup:                "rg",
+			VnetResourceGroup:            "rg",
+			RouteTableResourceGroup:      "rg",
+			SecurityGroupResourceGroup:   "rg",
+			Location:                     "westus",
+			VnetName:                     "vnet",
+			SubnetName:                   "subnet",
+			SecurityGroupName:            "nsg",
+			RouteTableName:               "rt",
+			PrimaryAvailabilitySetName:   "as",
+			MaximumLoadBalancerRuleCount: 250,
+			VMType:                       vmTypeStandard,
+		},
+		nodeZones:          map[string]sets.String{},
+		nodeInformerSynced: func() bool { return true },
+		nodeResourceGroups: map[string]string{},
+		unmanagedNodes:     sets.NewString(),
+		routeCIDRs:         map[string]string{},
+		eventRecorder:      &record.FakeRecorder{},
+	}
+	az.DisksClient = newFakeDisksClient()
+	az.InterfacesClient = newFakeAzureInterfacesClient()
+	az.LoadBalancerClient = newFakeAzureLBClient()
+	az.PublicIPAddressesClient = newFakeAzurePIPClient(az.Config.SubscriptionID)
+	az.RoutesClient = newFakeRoutesClient()
+	az.RouteTablesClient = newFakeRouteTablesClient()
+	az.SecurityGroupsClient = newFakeAzureNSGClient()
+	az.SubnetsClient = newFakeAzureSubnetsClient()
+	az.VirtualMachineScaleSetsClient = newFakeVirtualMachineScaleSetsClient()
+	az.VirtualMachineScaleSetVMsClient = newFakeVirtualMachineScaleSetVMsClient()
+	az.VirtualMachinesClient = newFakeAzureVirtualMachinesClient()
+	az.vmSet = newAvailabilitySet(az)
+	az.vmCache, _ = az.newVMCache()
+	az.lbCache, _ = az.newLBCache()
+	az.nsgCache, _ = az.newNSGCache()
+	az.rtCache, _ = az.newRouteTableCache()
+
+	common := &controllerCommon{cloud: az}
+	az.controllerCommon = common
+	az.ManagedDiskController = &ManagedDiskController{common: common}
+
+	return az
 }

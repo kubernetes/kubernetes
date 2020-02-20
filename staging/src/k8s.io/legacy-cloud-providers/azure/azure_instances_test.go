@@ -82,7 +82,7 @@ func setTestVirtualMachines(c *Cloud, vmList map[string]string, isDataDisksFull 
 }
 
 func TestInstanceID(t *testing.T) {
-	cloud := getTestCloud()
+	cloud := GetTestCloud()
 	cloud.Config.UseInstanceMetadata = true
 
 	testcases := []struct {
@@ -215,7 +215,7 @@ func TestInstanceShutdownByProviderID(t *testing.T) {
 	}
 
 	for _, test := range testcases {
-		cloud := getTestCloud()
+		cloud := GetTestCloud()
 		setTestVirtualMachines(cloud, test.vmList, false)
 		providerID := "azure://" + cloud.getStandardMachineID("subscription", "rg", test.nodeName)
 		hasShutdown, err := cloud.InstanceShutdownByProviderID(context.Background(), providerID)
@@ -236,7 +236,7 @@ func TestInstanceShutdownByProviderID(t *testing.T) {
 }
 
 func TestNodeAddresses(t *testing.T) {
-	cloud := getTestCloud()
+	cloud := GetTestCloud()
 	cloud.Config.UseInstanceMetadata = true
 	metadataTemplate := `{"compute":{"name":"%s"},"network":{"interface":[{"ipv4":{"ipAddress":[{"privateIpAddress":"%s","publicIpAddress":"%s"}]},"ipv6":{"ipAddress":[{"privateIpAddress":"%s","publicIpAddress":"%s"}]}}]}}`
 

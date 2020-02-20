@@ -216,6 +216,13 @@ enum NamespaceMode {
     // For example, a container with a PID namespace of NODE expects to view
     // all of the processes on the host running the kubelet.
     NODE      = 2;
+    // TARGET targets the namespace of another container. When this is specified,
+    // a target_id must be specified in NamespaceOption and refer to a container
+    // previously created with NamespaceMode CONTAINER. This containers namespace
+    // will be made to match that of container target_id.
+    // For example, a container with a PID namespace of TARGET expects to view
+    // all of the processes that container target_id can view.
+    TARGET    = 3;
 }
 
 // NamespaceOption provides options for Linux namespaces.
@@ -227,12 +234,16 @@ message NamespaceOption {
     // PID namespace for this container/sandbox.
     // Note: The CRI default is POD, but the v1.PodSpec default is CONTAINER.
     // The kubelet's runtime manager will set this to CONTAINER explicitly for v1 pods.
-    // Namespaces currently set by the kubelet: POD, CONTAINER, NODE
+    // Namespaces currently set by the kubelet: POD, CONTAINER, NODE, TARGET
     NamespaceMode pid = 2;
     // IPC namespace for this container/sandbox.
     // Note: There is currently no way to set CONTAINER scoped IPC in the Kubernetes API.
     // Namespaces currently set by the kubelet: POD, NODE
     NamespaceMode ipc = 3;
+    // Target Container ID for NamespaceMode of TARGET. This container must have been
+    // previously created in the same pod. It is not possible to specify different targets
+    // for each namespace.
+    string target_id = 4;
 }
 
 // Int64Value is the wrapper of int64.
