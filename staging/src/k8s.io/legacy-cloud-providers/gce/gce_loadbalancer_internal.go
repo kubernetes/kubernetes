@@ -28,7 +28,6 @@ import (
 
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/meta"
-	computebeta "google.golang.org/api/compute/v0.beta"
 	compute "google.golang.org/api/compute/v1"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -169,24 +168,28 @@ func (g *Cloud) ensureInternalLoadBalancer(clusterName, clusterID string, svc *v
 		return nil, err
 	}
 
-	newFRC := &forwardingRuleComposite{
-		name:           loadBalancerName,
-		description:    &forwardingRuleDescription{ServiceName: nm.String()},
-		ipAddress:      ipToUse,
-		backendService: backendServiceLink,
-		ports:          ports,
-		ipProtocol:     string(protocol),
-		lbScheme:       string(scheme),
+	fwdRuleDescription := &forwardingRuleDescription{ServiceName: nm.String()}
+	fwdRuleDescriptionString, err := fwdRuleDescription.marshal()
+	if err != nil {
+		return nil, err
+	}
+	newFwdRule := &compute.ForwardingRule{
+		Name:                loadBalancerName,
+		Description:         fwdRuleDescriptionString,
+		IPAddress:           ipToUse,
+		BackendService:      backendServiceLink,
+		Ports:               ports,
+		IPProtocol:          string(protocol),
+		LoadBalancingScheme: string(scheme),
 		// Given that CreateGCECloud will attempt to determine the subnet based off the network,
 		// the subnetwork should rarely be unknown.
-		subnetwork: subnetworkURL,
-		network:    g.networkURL,
+		Subnetwork: subnetworkURL,
+		Network:    g.networkURL,
 	}
 	if options.AllowGlobalAccess {
-		newFRC.allowGlobalAccess = options.AllowGlobalAccess
-		newFRC.description.APIVersion = meta.VersionBeta
+		newFwdRule.AllowGlobalAccess = options.AllowGlobalAccess
 	}
-	if err := g.ensureInternalForwardingRule(existingFwdRule, newFRC); err != nil {
+	if err := g.ensureInternalForwardingRule(existingFwdRule, newFwdRule); err != nil {
 		return nil, err
 	}
 
@@ -878,116 +881,6 @@ func getILBOptions(svc *v1.Service) ILBOptions {
 	}
 }
 
-// forwardingRuleComposite is a composite type encapsulating both the GA and Beta ForwardingRules.
-// It exposes methods to compute the ForwardingRule object based on the given parameters and to compare 2 composite types
-// based on the version string.
-type forwardingRuleComposite struct {
-	allowGlobalAccess bool
-	name              string
-	description       *forwardingRuleDescription
-	ipAddress         string
-	backendService    string
-	ports             []string
-	ipProtocol        string
-	lbScheme          string
-	subnetwork        string
-	network           string
-}
-
-func (f *forwardingRuleComposite) Version() meta.Version {
-	return f.description.APIVersion
-}
-
-func (f *forwardingRuleComposite) Equal(other *forwardingRuleComposite) bool {
-	return (f.ipAddress == "" || other.ipAddress == "" || f.ipAddress == other.ipAddress) &&
-		f.ipProtocol == other.ipProtocol &&
-		f.lbScheme == other.lbScheme &&
-		equalStringSets(f.ports, other.ports) &&
-		f.backendService == other.backendService &&
-		f.allowGlobalAccess == other.allowGlobalAccess &&
-		f.subnetwork == other.subnetwork
-}
-
-// toForwardingRuleComposite converts a compute beta or GA ForwardingRule into the composite type
-func toForwardingRuleComposite(rule interface{}) (frc *forwardingRuleComposite, err error) {
-	switch fr := rule.(type) {
-	case *compute.ForwardingRule:
-		frc = &forwardingRuleComposite{
-			name:           fr.Name,
-			ipAddress:      fr.IPAddress,
-			description:    &forwardingRuleDescription{APIVersion: meta.VersionGA},
-			backendService: fr.BackendService,
-			ports:          fr.Ports,
-			ipProtocol:     fr.IPProtocol,
-			lbScheme:       fr.LoadBalancingScheme,
-			subnetwork:     fr.Subnetwork,
-			network:        fr.Network,
-		}
-		if fr.Description != "" {
-			err = frc.description.unmarshal(fr.Description)
-		}
-		return frc, err
-	case *computebeta.ForwardingRule:
-		frc = &forwardingRuleComposite{
-			name:              fr.Name,
-			ipAddress:         fr.IPAddress,
-			description:       &forwardingRuleDescription{APIVersion: meta.VersionBeta},
-			backendService:    fr.BackendService,
-			ports:             fr.Ports,
-			ipProtocol:        fr.IPProtocol,
-			lbScheme:          fr.LoadBalancingScheme,
-			subnetwork:        fr.Subnetwork,
-			network:           fr.Network,
-			allowGlobalAccess: fr.AllowGlobalAccess,
-		}
-		if fr.Description != "" {
-			err = frc.description.unmarshal(fr.Description)
-		}
-		return frc, err
-	default:
-		return nil, fmt.Errorf("Invalid object type %T to compute ForwardingRuleComposite from", fr)
-	}
-}
-
-// ToBeta returns a Beta ForwardingRule from the composite type.
-func (f *forwardingRuleComposite) ToBeta() (*computebeta.ForwardingRule, error) {
-	descStr, err := f.description.marshal()
-	if err != nil {
-		return nil, fmt.Errorf("Failed to compute description for beta forwarding rule %s, err: %v", f.name, err)
-	}
-	return &computebeta.ForwardingRule{
-		Name:                f.name,
-		Description:         descStr,
-		IPAddress:           f.ipAddress,
-		BackendService:      f.backendService,
-		Ports:               f.ports,
-		IPProtocol:          f.ipProtocol,
-		LoadBalancingScheme: f.lbScheme,
-		Subnetwork:          f.subnetwork,
-		Network:             f.network,
-		AllowGlobalAccess:   f.allowGlobalAccess,
-	}, nil
-}
-
-// ToGA returns a GA ForwardingRule from the composite type.
-func (f *forwardingRuleComposite) ToGA() (*compute.ForwardingRule, error) {
-	descStr, err := f.description.marshal()
-	if err != nil {
-		return nil, fmt.Errorf("Failed to compute description for GA forwarding rule %s, err: %v", f.name, err)
-	}
-	return &compute.ForwardingRule{
-		Name:                f.name,
-		Description:         descStr,
-		IPAddress:           f.ipAddress,
-		BackendService:      f.backendService,
-		Ports:               f.ports,
-		IPProtocol:          f.ipProtocol,
-		LoadBalancingScheme: f.lbScheme,
-		Subnetwork:          f.subnetwork,
-		Network:             f.network,
-	}, nil
-}
-
 type forwardingRuleDescription struct {
 	ServiceName string       `json:"kubernetes.io/service-name"`
 	APIVersion  meta.Version `json:"kubernetes.io/api-version,omitempty"`
@@ -1021,32 +914,10 @@ func getFwdRuleAPIVersion(rule *compute.ForwardingRule) (meta.Version, error) {
 	return d.APIVersion, nil
 }
 
-func (g *Cloud) ensureInternalForwardingRule(existingFwdRule *compute.ForwardingRule, newFRC *forwardingRuleComposite) (err error) {
+func (g *Cloud) ensureInternalForwardingRule(existingFwdRule, newFwdRule *compute.ForwardingRule) (err error) {
 	if existingFwdRule != nil {
-		version, err := getFwdRuleAPIVersion(existingFwdRule)
-		if err != nil {
-			return err
-		}
-		var oldFRC *forwardingRuleComposite
-		switch version {
-		case meta.VersionBeta:
-			var betaRule *computebeta.ForwardingRule
-			betaRule, err = g.GetBetaRegionForwardingRule(existingFwdRule.Name, g.region)
-			if err != nil {
-				return err
-			}
-			oldFRC, err = toForwardingRuleComposite(betaRule)
-		case meta.VersionGA:
-			oldFRC, err = toForwardingRuleComposite(existingFwdRule)
-		default:
-			klog.Errorf("invalid version string for %s, assuming GA", existingFwdRule.Name)
-			oldFRC, err = toForwardingRuleComposite(existingFwdRule)
-		}
-		if err != nil {
-			return err
-		}
-		if oldFRC.Equal(newFRC) {
-			klog.V(4).Infof("oldFRC == newFRC, no updates needed (oldFRC == %+v)", oldFRC)
+		if forwardingRulesEqual(existingFwdRule, newFwdRule) {
+			klog.V(4).Infof("existingFwdRule == newFwdRule, no updates needed (existingFwdRule == %+v)", existingFwdRule)
 			return nil
 		}
 		klog.V(2).Infof("ensureInternalLoadBalancer(%v): deleting existing forwarding rule with IP address %v", existingFwdRule.Name, existingFwdRule.IPAddress)
@@ -1056,23 +927,20 @@ func (g *Cloud) ensureInternalForwardingRule(existingFwdRule *compute.Forwarding
 	}
 	// At this point, the existing rule has been deleted if required.
 	// Create the rule based on the api version determined
-	if newFRC.Version() == meta.VersionBeta {
-		klog.V(2).Infof("ensureInternalLoadBalancer(%v): creating beta forwarding rule", newFRC.name)
-		var betaRule *computebeta.ForwardingRule
-		betaRule, err = newFRC.ToBeta()
-		if err != nil {
-			return err
-		}
-		err = g.CreateBetaRegionForwardingRule(betaRule, g.region)
-	} else {
-		var gaRule *compute.ForwardingRule
-		klog.V(2).Infof("ensureInternalLoadBalancer(%v): creating ga forwarding rule", newFRC.name)
-		gaRule, err = newFRC.ToGA()
-		if err != nil {
-			return err
-		}
-		err = g.CreateRegionForwardingRule(gaRule, g.region)
+	klog.V(2).Infof("ensureInternalLoadBalancer(%v): creating forwarding rule", newFwdRule.Name)
+	if err = g.CreateRegionForwardingRule(newFwdRule, g.region); err != nil {
+		return err
 	}
-	klog.V(2).Infof("ensureInternalLoadBalancer(%v): created forwarding rule, err : %s", newFRC.name, err)
-	return err
+	klog.V(2).Infof("ensureInternalLoadBalancer(%v): created forwarding rule", newFwdRule.Name)
+	return nil
+}
+
+func forwardingRulesEqual(old, new *compute.ForwardingRule) bool {
+	return (old.IPAddress == "" || new.IPAddress == "" || old.IPAddress == new.IPAddress) &&
+		old.IPProtocol == new.IPProtocol &&
+		old.LoadBalancingScheme == new.LoadBalancingScheme &&
+		equalStringSets(old.Ports, new.Ports) &&
+		old.BackendService == new.BackendService &&
+		old.AllowGlobalAccess == new.AllowGlobalAccess &&
+		old.Subnetwork == new.Subnetwork
 }
