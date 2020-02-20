@@ -189,6 +189,15 @@ func (c *ManagedDiskController) DeleteManagedDisk(diskURI string) error {
 		return fmt.Errorf("failed to delete disk(%s) since it's in attaching or detaching state", diskURI)
 	}
 
+	disk, err := c.common.cloud.DisksClient.Get(ctx, resourceGroup, diskName)
+	if err != nil {
+		return err
+	}
+
+	if disk.ManagedBy != nil {
+		return fmt.Errorf("disk(%s) already attached to node(%s), could not be deleted", diskURI, *disk.ManagedBy)
+	}
+
 	_, err = c.common.cloud.DisksClient.Delete(ctx, resourceGroup, diskName)
 	if err != nil {
 		return err
