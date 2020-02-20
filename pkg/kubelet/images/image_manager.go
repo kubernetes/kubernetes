@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	dockerref "github.com/docker/distribution/reference"
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/klog/v2"
@@ -28,6 +28,7 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 
 // imageManager provides the functionalities for image pulling.
@@ -122,6 +123,8 @@ func (m *imageManager) EnsureImageExists(pod *v1.Pod, container *v1.Container, p
 	present := imageRef != ""
 	if !shouldPullImage(container, present) {
 		if present {
+			// attempt to pull image and there is a cache hit
+			metrics.RuntimeImagePullCount.WithLabelValues(metrics.LabelValueImagePullCacheHit).Inc()
 			msg := fmt.Sprintf("Container image %q already present on machine", container.Image)
 			m.logIt(ref, v1.EventTypeNormal, events.PulledImage, logPrefix, msg, klog.Info)
 			return imageRef, "", nil
@@ -137,6 +140,8 @@ func (m *imageManager) EnsureImageExists(pod *v1.Pod, container *v1.Container, p
 		m.logIt(ref, v1.EventTypeNormal, events.BackOffPullImage, logPrefix, msg, klog.Info)
 		return "", msg, ErrImagePullBackOff
 	}
+	// attempt to pull image and we should pull
+	metrics.RuntimeImagePullCount.WithLabelValues(metrics.LabelValueImagePullCacheMiss).Inc()
 	m.logIt(ref, v1.EventTypeNormal, events.PullingImage, logPrefix, fmt.Sprintf("Pulling image %q", container.Image), klog.Info)
 	pullChan := make(chan pullResult)
 	m.puller.pullImage(spec, pullSecrets, pullChan, podSandboxConfig)

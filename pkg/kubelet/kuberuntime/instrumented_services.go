@@ -282,7 +282,11 @@ func (in instrumentedImageManagerService) ImageStatus(image *runtimeapi.ImageSpe
 
 func (in instrumentedImageManagerService) PullImage(image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
 	const operation = "pull_image"
-	defer recordOperation(operation, time.Now())
+	start := time.Now()
+	defer func() {
+		recordOperation(operation, start)
+		metrics.RuntimeImagePullDuration.Observe(metrics.SinceInSeconds(start))
+	}()
 
 	imageRef, err := in.service.PullImage(image, auth, podSandboxConfig)
 	recordError(operation, err)

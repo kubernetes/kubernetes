@@ -76,9 +76,18 @@ const (
 	// Metrics keys for RuntimeClass
 	RunPodSandboxDurationKey = "run_podsandbox_duration_seconds"
 	RunPodSandboxErrorsKey   = "run_podsandbox_errors_total"
+	ImagePullDurationKey     = "image_pull_duration_seconds_key"
+	ImageEnsureCountKey      = "image_ensure_count_key"
+
+	LabelValueImagePullCacheHit  = "true"
+	LabelValueImagePullCacheMiss = "false"
 )
 
 var (
+	// podLatencyBuckets is a default bucket for pod related observations that can vary from seconds to minutes level,
+	// such as pod startup, image pulling, etc
+	podLatencyBuckets = []float64{1.0, 2.5, 5.0, 10.0, 20.0, 30.0, 60.0, 90.0, 120.0, 150.0, 180.0}
+
 	// NodeName is a Gauge that tracks the ode's name. The count is always 1.
 	NodeName = metrics.NewGaugeVec(
 		&metrics.GaugeOpts{
@@ -95,7 +104,7 @@ var (
 			Subsystem:      KubeletSubsystem,
 			Name:           "containers_per_pod_count",
 			Help:           "The number of containers per pod.",
-			Buckets:        metrics.DefBuckets,
+			Buckets:        metrics.LinearBuckets(1, 1, 10),
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
@@ -106,7 +115,7 @@ var (
 			Subsystem:      KubeletSubsystem,
 			Name:           PodWorkerDurationKey,
 			Help:           "Duration in seconds to sync a single pod. Broken down by operation type: create, update, or sync",
-			Buckets:        metrics.DefBuckets,
+			Buckets:        podLatencyBuckets,
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"operation_type"},
@@ -117,10 +126,11 @@ var (
 			Subsystem:      KubeletSubsystem,
 			Name:           PodStartDurationKey,
 			Help:           "Duration in seconds for a single pod to go from pending to running.",
-			Buckets:        metrics.DefBuckets,
+			Buckets:        podLatencyBuckets,
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
+
 	// CgroupManagerDuration is a Histogram that tracks the duration (in seconds) it takes for cgroup manager operations to complete.
 	// Broken down by method.
 	CgroupManagerDuration = metrics.NewHistogramVec(
@@ -219,6 +229,31 @@ var (
 		},
 		[]string{"operation_type"},
 	)
+
+	// RuntimeImagePullDuration is a Histogram that tracks the duration (in seconds) for image pull
+	RuntimeImagePullDuration = metrics.NewHistogram(
+		&metrics.HistogramOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           ImagePullDurationKey,
+			Help:           "Duration of image pull in seconds, broken down by heuristics buckets",
+			Buckets:        podLatencyBuckets,
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+
+	// RuntimeImagePullCount is a Counter that tracks kubelet's attempt to ensure image.
+	// Two cases are excluded: 1) image not present AND image pull policy is NEVER;
+	// 2) image shall be pulled but should backoff
+	RuntimeImagePullCount = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           ImageEnsureCountKey,
+			Help:           "Count of the number of time kubelet tries to ensure image, labeled by cache hit, except: 1) image not present AND image pull policy is NEVER; 2) image shall be pulled but should backoff",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"cache_hit"},
+	)
+
 	// Evictions is a Counter that tracks the cumulative number of pod evictions initiated by the kubelet.
 	// Broken down by eviction signal.
 	Evictions = metrics.NewCounterVec(
@@ -385,6 +420,8 @@ func Register(containerCache kubecontainer.RuntimeCache, collectors ...metrics.S
 		legacyregistry.MustRegister(RuntimeOperations)
 		legacyregistry.MustRegister(RuntimeOperationsDuration)
 		legacyregistry.MustRegister(RuntimeOperationsErrors)
+		legacyregistry.MustRegister(RuntimeImagePullDuration)
+		legacyregistry.MustRegister(RuntimeImagePullCount)
 		legacyregistry.MustRegister(Evictions)
 		legacyregistry.MustRegister(EvictionStatsAge)
 		legacyregistry.MustRegister(Preemptions)
