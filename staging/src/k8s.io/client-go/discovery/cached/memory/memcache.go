@@ -23,8 +23,10 @@ import (
 	"net/url"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/googleapis/gnostic/OpenAPIv2"
+	utiltrace "k8s.io/utils/trace"
 
 	errorsutil "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -129,12 +131,18 @@ func (d *memCacheClient) ServerGroupsAndResources() ([]*metav1.APIGroup, []*meta
 }
 
 func (d *memCacheClient) ServerGroups() (*metav1.APIGroupList, error) {
+	trace := utiltrace.New("memCacheClient.ServerGroups")
+	defer func() {
+		trace.LogIfLong(2 * time.Second)
+	}()
 	d.lock.Lock()
+	trace.Step("lock acquired")
 	defer d.lock.Unlock()
 	if !d.cacheValid {
 		if err := d.refreshLocked(); err != nil {
 			return nil, err
 		}
+		trace.Step("done refresh locked")
 	}
 	return d.groupList, nil
 }
@@ -181,10 +189,15 @@ func (d *memCacheClient) Invalidate() {
 // refreshLocked refreshes the state of cache. The caller must hold d.lock for
 // writing.
 func (d *memCacheClient) refreshLocked() error {
+	trace := utiltrace.New("memCacheClient.refreshLocked")
+	defer func() {
+		trace.LogIfLong(2 * time.Second)
+	}()
 	// TODO: Could this multiplicative set of calls be replaced by a single call
 	// to ServerResources? If it's possible for more than one resulting
 	// APIResourceList to have the same GroupVersion, the lists would need merged.
 	gl, err := d.delegate.ServerGroups()
+	trace.Step("got ServerGroups from delegate")
 	if err != nil || len(gl.Groups) == 0 {
 		utilruntime.HandleError(fmt.Errorf("couldn't get current server API group list: %v", err))
 		return err
@@ -200,6 +213,7 @@ func (d *memCacheClient) refreshLocked() error {
 			}
 		}
 	}
+	trace.Step("got server resources for all group versions")
 
 	d.groupToServerResources, d.groupList = rl, gl
 	d.cacheValid = true
