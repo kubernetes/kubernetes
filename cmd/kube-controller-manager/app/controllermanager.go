@@ -32,11 +32,15 @@ import (
 	"github.com/spf13/cobra"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/apis/apiserver"
+	"k8s.io/apiserver/pkg/apis/apiserver/install"
+	"k8s.io/apiserver/pkg/apis/apiserver/v1alpha1"
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/mux"
@@ -69,13 +73,22 @@ import (
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	"k8s.io/kubernetes/pkg/util/configz"
 	utilflag "k8s.io/kubernetes/pkg/util/flag"
+	"sigs.k8s.io/yaml"
 )
+
+var cfgScheme = runtime.NewScheme()
+
+func init() {
+	install.Install(cfgScheme)
+}
 
 const (
 	// ControllerStartJitter is the Jitter used when starting controller managers
 	ControllerStartJitter = 1.0
 	// ConfigzName is the name used for register kube-controller manager /configz, same with GroupName.
 	ConfigzName = "kubecontrollermanager.config.k8s.io"
+	// ComponentName is the name used to indicate the current running component
+	ComponentName = "kube-controller-manager"
 )
 
 // ControllerLoopMode is the kube-controller-manager's mode of running controller loops that are cloud provider dependent
@@ -166,6 +179,15 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 		klog.Errorf("unable to register configz: %v", err)
 	}
 
+	var controllerMigrationEnabled bool
+	migratorConfig, err := readLeaderMigratorConfiguration(c.ComponentConfig.Generic.ControllerMigrationConfig)
+	if err != nil {
+		klog.Errorf("Error reading controller migration config: %v", err)
+	} else if migratorConfig != nil {
+		klog.Infof("Found a configuration for controller migration with resource lock name %s", migratorConfig.LeaderResourceName)
+		controllerMigrationEnabled = true
+	}
+
 	// Setup any healthz checks we will want to use.
 	var checks []healthz.HealthChecker
 	var electionChecker *leaderelection.HealthzAdaptor
@@ -229,10 +251,91 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 		if err != nil {
 			klog.Fatalf("error building controller context: %v", err)
 		}
+
+		primaryControllers := NewControllerInitializers(IncludeCloudLoops)
+		migratingControllers := make(map[string]InitFunc, 0)
+
+		if controllerMigrationEnabled {
+			for controllerName, controllerFunc := range primaryControllers {
+				if shouldControllerRunWithMigration(migratorConfig, controllerName) {
+					migratingControllers[controllerName] = controllerFunc
+				}
+			}
+
+			// if a controller was marked for "migration", remove it from list of primary controllers
+			for controllerName := range migratingControllers {
+				delete(primaryControllers, controllerName)
+			}
+		}
+
 		saTokenControllerInitFunc := serviceAccountTokenControllerStarter{rootClientBuilder: rootClientBuilder}.startServiceAccountTokenController
 
-		if err := StartControllers(controllerContext, saTokenControllerInitFunc, NewControllerInitializers(controllerContext.LoopMode), unsecuredMux); err != nil {
+		// Always start the SA token controller first using a full-power client, since it needs to mint tokens for the rest
+		// If this fails, just return here and fail since other controllers won't be able to get credentials.
+		if _, _, err := saTokenControllerInitFunc(controllerContext); err != nil {
+			klog.Fatalf("error startin SA controller: %v", err)
+		}
+
+		// Initialize the cloud provider with a reference to the clientBuilder only after token controller
+		// has started in case the cloud provider uses the client builder.
+		if controllerContext.Cloud != nil {
+			controllerContext.Cloud.Initialize(controllerContext.ClientBuilder, controllerContext.Stop)
+		}
+
+		if err := StartControllers(controllerContext, primaryControllers, unsecuredMux); err != nil {
 			klog.Fatalf("error starting controllers: %v", err)
+		}
+
+		if controllerMigrationEnabled && !c.ComponentConfig.Generic.LeaderElection.LeaderElect {
+			klog.Fatalf("leader election must be enabled if controller migration is enabled")
+		}
+
+		if controllerMigrationEnabled && c.ComponentConfig.Generic.LeaderElection.LeaderElect {
+			migratingRunFunc := func(ctx context.Context) {
+				if err := StartControllers(controllerContext, migratingControllers, unsecuredMux); err != nil {
+					klog.Fatalf("error starting controllers: %v", err)
+				}
+
+			}
+
+			// Identity used to distinguish between multiple cloud controller manager instances
+			id, err := os.Hostname()
+			if err != nil {
+				klog.Fatalf("error getting hostname: %v", err)
+			}
+			// add a uniquifier so that two processes on the same host don't accidentally both become active
+			id = id + "_" + string(uuid.NewUUID())
+
+			// Lock required for leader election
+			rl, err := resourcelock.New(c.ComponentConfig.Generic.LeaderElection.ResourceLock,
+				c.ComponentConfig.Generic.LeaderElection.ResourceNamespace,
+				migratorConfig.LeaderResourceName,
+				c.LeaderElectionClient.CoreV1(),
+				c.LeaderElectionClient.CoordinationV1(),
+				resourcelock.ResourceLockConfig{
+					Identity:      id,
+					EventRecorder: c.EventRecorder,
+				})
+			if err != nil {
+				klog.Fatalf("error creating lock: %v", err)
+			}
+
+			// Try and become the leader and start cloud controller manager loops
+			go leaderelection.RunOrDie(context.TODO(), leaderelection.LeaderElectionConfig{
+				Lock:          rl,
+				LeaseDuration: c.ComponentConfig.Generic.LeaderElection.LeaseDuration.Duration,
+				RenewDeadline: c.ComponentConfig.Generic.LeaderElection.RenewDeadline.Duration,
+				RetryPeriod:   c.ComponentConfig.Generic.LeaderElection.RetryPeriod.Duration,
+				Callbacks: leaderelection.LeaderCallbacks{
+					OnStartedLeading: migratingRunFunc,
+					OnStoppedLeading: func() {
+						klog.Fatalf("leaderelection lost")
+					},
+				},
+				WatchDog: electionChecker,
+				Name:     migratorConfig.LeaderResourceName,
+			})
+
 		}
 
 		controllerContext.InformerFactory.Start(controllerContext.Stop)
@@ -283,6 +386,43 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 		Name:     "kube-controller-manager",
 	})
 	panic("unreachable")
+}
+
+func shouldControllerRunWithMigration(l *apiserver.LeaderMigratorConfiguration, controllerName string) bool {
+	for _, controller := range l.MigratingControllers {
+		if controller.Name == controllerName && controller.Manager == ComponentName {
+			return true
+		}
+	}
+
+	return false
+}
+
+func readLeaderMigratorConfiguration(configFilePath string) (*apiserver.LeaderMigratorConfiguration, error) {
+	if configFilePath == "" {
+		return nil, nil
+	}
+	// a file was provided, so we just read it.
+	data, err := ioutil.ReadFile(configFilePath)
+	if err != nil {
+		return nil, fmt.Errorf("unable to read leader migrator configuration from %q [%v]", configFilePath, err)
+	}
+	var decodedConfig v1alpha1.LeaderMigratorConfiguration
+	err = yaml.Unmarshal(data, &decodedConfig)
+	if err != nil {
+		// we got an error where the decode wasn't related to a missing type
+		return nil, err
+	}
+	if decodedConfig.Kind != "LeaderMigratorConfiguration" {
+		return nil, fmt.Errorf("invalid migrator configuration object %q", decodedConfig.Kind)
+	}
+
+	internalConfig := &apiserver.LeaderMigratorConfiguration{}
+	if err := cfgScheme.Convert(&decodedConfig, internalConfig, nil); err != nil {
+		return nil, err
+	}
+
+	return internalConfig, nil
 }
 
 // ControllerContext defines the context object for controller
@@ -494,19 +634,7 @@ func CreateControllerContext(s *config.CompletedConfig, rootClientBuilder, clien
 }
 
 // StartControllers starts a set of controllers with a specified ControllerContext
-func StartControllers(ctx ControllerContext, startSATokenController InitFunc, controllers map[string]InitFunc, unsecuredMux *mux.PathRecorderMux) error {
-	// Always start the SA token controller first using a full-power client, since it needs to mint tokens for the rest
-	// If this fails, just return here and fail since other controllers won't be able to get credentials.
-	if _, _, err := startSATokenController(ctx); err != nil {
-		return err
-	}
-
-	// Initialize the cloud provider with a reference to the clientBuilder only after token controller
-	// has started in case the cloud provider uses the client builder.
-	if ctx.Cloud != nil {
-		ctx.Cloud.Initialize(ctx.ClientBuilder, ctx.Stop)
-	}
-
+func StartControllers(ctx ControllerContext, controllers map[string]InitFunc, unsecuredMux *mux.PathRecorderMux) error {
 	for controllerName, initFn := range controllers {
 		if !ctx.IsControllerEnabled(controllerName) {
 			klog.Warningf("%q is disabled", controllerName)

@@ -1,0 +1,34 @@
+# three node (two workers) cluster config
+kind: Cluster
+apiVersion: kind.sigs.k8s.io/v1alpha3
+nodes:
+- role: control-plane
+- role: worker
+- role: worker
+- role: worker
+kubeadmConfigPatches:
+- |
+  apiVersion: kubeadm.k8s.io/v1beta2
+  kind: ClusterConfiguration
+  metadata:
+    name: config
+  apiServer:
+    extraArgs:
+      "feature-gates": "EndpointSlice=true,EndpointSliceProxying=true,ServiceTopology=true"
+  scheduler:
+    extraArgs:
+      "feature-gates": "EndpointSlice=true,EndpointSliceProxying=true,ServiceTopology=true"
+  controllerManager:
+    extraArgs:
+      "feature-gates": "EndpointSlice=true,EndpointSliceProxying=true,ServiceTopology=true"
+- |
+  apiVersion: kubeadm.k8s.io/v1beta2
+  kind: InitConfiguration
+  metadata:
+    name: config
+  nodeRegistration:
+    kubeletExtraArgs:
+      "feature-gates": "EndpointSlice=true,EndpointSliceProxying=true,ServiceTopology=true"
+# 1 control plane node and 3 workers
+
+

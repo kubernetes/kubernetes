@@ -112,11 +112,15 @@ go_library(
         "//pkg/volume/vsphere_volume:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/api/discovery/v1beta1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/uuid:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/apis/apiserver:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/apis/apiserver/install:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/apis/apiserver/v1alpha1:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server/healthz:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server/mux:go_default_library",
@@ -155,6 +159,7 @@ go_library(
         "//vendor/k8s.io/klog:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
         "//vendor/k8s.io/utils/net:go_default_library",
+        "//vendor/sigs.k8s.io/yaml:go_default_library",
     ],
 )
 
