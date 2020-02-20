@@ -27,6 +27,7 @@ import (
 
 	openapi_v2 "github.com/googleapis/gnostic/OpenAPIv2"
 	"k8s.io/klog"
+	utiltrace "k8s.io/utils/trace"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -105,8 +106,13 @@ func (d *CachedDiscoveryClient) ServerGroupsAndResources() ([]*metav1.APIGroup, 
 // ServerGroups returns the supported groups, with information like supported versions and the
 // preferred version.
 func (d *CachedDiscoveryClient) ServerGroups() (*metav1.APIGroupList, error) {
+	trace := utiltrace.New("CachedDiscoveryClient.ServerGroups")
+	defer func() {
+		trace.LogIfLong(2 * time.Second)
+	}()
 	filename := filepath.Join(d.cacheDirectory, "servergroups.json")
 	cachedBytes, err := d.getCachedFile(filename)
+	trace.Step("got cached file")
 	// don't fail on errors, we either don't have a file or won't be able to run the cached check. Either way we can fallback.
 	if err == nil {
 		cachedGroups := &metav1.APIGroupList{}
@@ -116,11 +122,13 @@ func (d *CachedDiscoveryClient) ServerGroups() (*metav1.APIGroupList, error) {
 		}
 	}
 
+	trace.Step("decoded")
 	liveGroups, err := d.delegate.ServerGroups()
 	if err != nil {
 		klog.V(3).Infof("skipped caching discovery info due to %v", err)
 		return liveGroups, err
 	}
+	trace.Step("got server groups from delegate")
 	if liveGroups == nil || len(liveGroups.Groups) == 0 {
 		klog.V(3).Infof("skipped caching discovery info, no groups found")
 		return liveGroups, err
@@ -129,6 +137,7 @@ func (d *CachedDiscoveryClient) ServerGroups() (*metav1.APIGroupList, error) {
 	if err := d.writeCachedFile(filename, liveGroups); err != nil {
 		klog.V(1).Infof("failed to write cache to %v due to %v", filename, err)
 	}
+	trace.Step("wrote cache file")
 
 	return liveGroups, nil
 }

@@ -148,7 +148,12 @@ func NewDiscoveryRESTMapper(groupResources []*APIGroupResources) meta.RESTMapper
 // GetAPIGroupResources uses the provided discovery client to gather
 // discovery information and populate a slice of APIGroupResources.
 func GetAPIGroupResources(cl discovery.DiscoveryInterface) ([]*APIGroupResources, error) {
+	trace := utiltrace.New("GetAPIGroupResources")
+	defer func() {
+		trace.LogIfLong(2 * time.Second)
+	}()
 	gs, rs, err := cl.ServerGroupsAndResources()
+	trace.Step("got servergroups and resources")
 	if rs == nil || gs == nil {
 		return nil, err
 		// TODO track the errors and update callers to handle partial errors.

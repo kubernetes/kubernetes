@@ -21,6 +21,7 @@ go_library(
         "//vendor/github.com/gregjones/httpcache/diskcache:go_default_library",
         "//vendor/github.com/peterbourgon/diskv:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/utils/trace:go_default_library",
     ],
 )
 

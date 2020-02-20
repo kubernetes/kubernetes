@@ -28,6 +28,7 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	openapi_v2 "github.com/googleapis/gnostic/OpenAPIv2"
+	utiltrace "k8s.io/utils/trace"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -154,6 +155,10 @@ func apiVersionsToAPIGroup(apiVersions *metav1.APIVersions) (apiGroup metav1.API
 // ServerGroups returns the supported groups, with information like supported versions and the
 // preferred version.
 func (d *DiscoveryClient) ServerGroups() (apiGroupList *metav1.APIGroupList, err error) {
+	trace := utiltrace.New("DiscoveryClient.ServerGroups")
+	defer func() {
+		trace.LogIfLong(2 * time.Second)
+	}()
 	// Get the groupVersions exposed at /api
 	v := &metav1.APIVersions{}
 	err = d.restClient.Get().AbsPath(d.LegacyPrefix).Do(context.TODO()).Into(v)
@@ -165,6 +170,7 @@ func (d *DiscoveryClient) ServerGroups() (apiGroupList *metav1.APIGroupList, err
 		return nil, err
 	}
 
+	trace.Step("got legacy apis")
 	// Get the groupVersions exposed at /apis
 	apiGroupList = &metav1.APIGroupList{}
 	err = d.restClient.Get().AbsPath("/apis").Do(context.TODO()).Into(apiGroupList)
@@ -175,6 +181,8 @@ func (d *DiscoveryClient) ServerGroups() (apiGroupList *metav1.APIGroupList, err
 	if err != nil && (errors.IsNotFound(err) || errors.IsForbidden(err)) {
 		apiGroupList = &metav1.APIGroupList{}
 	}
+
+	trace.Step("got apis")
 
 	// prepend the group retrieved from /api to the list if not empty
 	if len(v.Versions) != 0 {
@@ -253,7 +261,13 @@ func ServerResources(d DiscoveryInterface) ([]*metav1.APIResourceList, error) {
 }
 
 func ServerGroupsAndResources(d DiscoveryInterface) ([]*metav1.APIGroup, []*metav1.APIResourceList, error) {
+	trace := utiltrace.New("ServerGroupsAndResources")
+	defer func() {
+		trace.LogIfLong(5 * time.Second)
+	}()
+
 	sgs, err := d.ServerGroups()
+	trace.Step("got server groups")
 	if sgs == nil {
 		return nil, nil, err
 	}
@@ -263,6 +277,7 @@ func ServerGroupsAndResources(d DiscoveryInterface) ([]*metav1.APIGroup, []*meta
 	}
 
 	groupVersionResources, failedGroups := fetchGroupVersionResources(d, sgs)
+	trace.Step("fetched group version resources")
 
 	// order results by group/version discovery order
 	result := []*metav1.APIResourceList{}
@@ -345,6 +360,10 @@ func ServerPreferredResources(d DiscoveryInterface) ([]*metav1.APIResourceList, 
 
 // fetchServerResourcesForGroupVersions uses the discovery client to fetch the resources for the specified groups in parallel.
 func fetchGroupVersionResources(d DiscoveryInterface, apiGroups *metav1.APIGroupList) (map[schema.GroupVersion]*metav1.APIResourceList, map[schema.GroupVersion]error) {
+	trace := utiltrace.New("fetchGroupVersionResources")
+	defer func() {
+		trace.LogIfLong(2 * time.Second)
+	}()
 	groupVersionResources := make(map[schema.GroupVersion]*metav1.APIResourceList)
 	failedGroups := make(map[schema.GroupVersion]error)
 
@@ -375,7 +394,9 @@ func fetchGroupVersionResources(d DiscoveryInterface, apiGroups *metav1.APIGroup
 			}()
 		}
 	}
+	trace.Step("requests sent")
 	wg.Wait()
+	trace.Step("requests gathered")
 
 	return groupVersionResources, failedGroups
 }
