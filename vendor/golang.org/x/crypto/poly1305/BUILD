@@ -3,12 +3,12 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = [
+        "bits_compat.go",
+        "bits_go1.13.go",
         "mac_noasm.go",
         "poly1305.go",
         "sum_amd64.go",
         "sum_amd64.s",
-        "sum_arm.go",
-        "sum_arm.s",
         "sum_generic.go",
         "sum_noasm.go",
         "sum_ppc64le.go",
