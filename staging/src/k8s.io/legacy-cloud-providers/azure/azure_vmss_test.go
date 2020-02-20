@@ -38,7 +38,7 @@ func newTestScaleSet(scaleSetName, zone string, faultDomain int32, vmList []stri
 }
 
 func newTestScaleSetWithState(scaleSetName, zone string, faultDomain int32, vmList []string, state string) (*scaleSet, error) {
-	cloud := getTestCloud()
+	cloud := GetTestCloud()
 	setTestVirtualMachineCloud(cloud, scaleSetName, zone, faultDomain, vmList, state)
 	ss, err := newScaleSet(cloud)
 	if err != nil {
