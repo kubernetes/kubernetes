@@ -918,22 +918,21 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 
 			// Creating pods and services in namespace-b
 			nsBpodServerA, nsBserviceA = createServerPodAndService(f, nsB, "ns-b-server-a", []int{80})
+			defer cleanupServerPodAndService(f, nsBpodServerA, nsBserviceA)
 			nsBpodServerB, nsBserviceB = createServerPodAndService(f, nsB, "ns-b-server-b", []int{80})
+			defer cleanupServerPodAndService(f, nsBpodServerB, nsBserviceB)
 
 			// Wait for Server with Service in NS-A to be ready
-			framework.Logf("Waiting for servers to come up.")
-			err = e2epod.WaitForPodRunningInNamespace(f.ClientSet, podServer)
-			framework.ExpectNoError(err, "Error occurred while waiting for pod status in namespace: Running.")
+			framework.Logf("Waiting for servers to be ready.")
+			err = e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, podServer.Name, podServer.Namespace, framework.PodStartTimeout)
+			framework.ExpectNoError(err, "Error occurred while waiting for pod status in namespace: Ready.")
 
 			// Wait for Servers with Services in NS-B to be ready
-			err = e2epod.WaitForPodRunningInNamespace(f.ClientSet, nsBpodServerA)
-			framework.ExpectNoError(err, "Error occurred while waiting for pod status in namespace: Running.")
+			err = e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, nsBpodServerA.Name, nsBpodServerA.Namespace, framework.PodStartTimeout)
+			framework.ExpectNoError(err, "Error occurred while waiting for pod status in namespace: Ready.")
 
-			err = e2epod.WaitForPodRunningInNamespace(f.ClientSet, nsBpodServerB)
-			framework.ExpectNoError(err, "Error occurred while waiting for pod status in namespace: Running.")
-
-			defer cleanupServerPodAndService(f, nsBpodServerA, nsBserviceA)
-			defer cleanupServerPodAndService(f, nsBpodServerB, nsBserviceB)
+			err = e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, nsBpodServerB.Name, nsBpodServerB.Namespace, framework.PodStartTimeout)
+			framework.ExpectNoError(err, "Error occurred while waiting for pod status in namespace: Ready.")
 
 			ginkgo.By("Creating a network policy for the server which allows traffic only to a server in different namespace.")
 			protocolUDP := v1.ProtocolUDP
