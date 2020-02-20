@@ -64,6 +64,7 @@ func (o *GenericControllerManagerConfigurationOptions) AddFlags(fss *cliflag.Nam
 		"A list of controllers to enable. '*' enables all on-by-default controllers, 'foo' enables the controller "+
 		"named 'foo', '-foo' disables the controller named 'foo'.\nAll controllers: %s\nDisabled-by-default controllers: %s",
 		strings.Join(allControllers, ", "), strings.Join(disabledByDefaultControllers, ", ")))
+	genericfs.StringVar(&o.ControllerMigrationConfig, "controller-migration-config", o.ControllerMigrationConfig, "The path to the controller migration configuration file")
 
 	leaderelectionconfig.BindFlags(&o.LeaderElection, genericfs)
 }
@@ -85,6 +86,7 @@ func (o *GenericControllerManagerConfigurationOptions) ApplyTo(cfg *kubectrlmgrc
 	cfg.ControllerStartInterval = o.ControllerStartInterval
 	cfg.LeaderElection = o.LeaderElection
 	cfg.Controllers = o.Controllers
+	cfg.ControllerMigrationConfig = o.ControllerMigrationConfig
 
 	return nil
 }

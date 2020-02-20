@@ -198,6 +198,7 @@ func autoConvert_config_GenericControllerManagerConfiguration_To_v1alpha1_Generi
 		return err
 	}
 	out.Controllers = *(*[]string)(unsafe.Pointer(&in.Controllers))
+	// WARNING: in.ControllerMigrationConfig requires manual conversion: does not exist in peer-type
 	if err := componentbaseconfigv1alpha1.Convert_config_DebuggingConfiguration_To_v1alpha1_DebuggingConfiguration(&in.Debugging, &out.Debugging, s); err != nil {
 		return err
 	}

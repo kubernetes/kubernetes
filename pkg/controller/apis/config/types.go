@@ -141,6 +141,8 @@ type GenericControllerManagerConfiguration struct {
 	// '-foo' means "disable 'foo'"
 	// first item for a particular name wins
 	Controllers []string
+	// ControllerMigrationConfig is the path to the controller migration config file
+	ControllerMigrationConfig string
 	// DebuggingConfiguration holds configuration for Debugging related features.
 	Debugging componentbaseconfig.DebuggingConfiguration
 }
