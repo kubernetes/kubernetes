@@ -297,7 +297,7 @@ func findSRIOVResource(node *v1.Node) (string, int64) {
 	return "", 0
 }
 
-func validatePodAlignment(f *framework.Framework, pod *v1.Pod, envInfo testEnvInfo) {
+func validatePodAlignment(f *framework.Framework, pod *v1.Pod, envInfo *testEnvInfo) {
 	for _, cnt := range pod.Spec.Containers {
 		ginkgo.By(fmt.Sprintf("validating the container %s on Gu pod %s", cnt.Name, pod.Name))
 
@@ -306,7 +306,10 @@ func validatePodAlignment(f *framework.Framework, pod *v1.Pod, envInfo testEnvIn
 
 		framework.Logf("got pod logs: %v", logs)
 		numaRes, err := checkNUMAAlignment(f, pod, &cnt, logs, envInfo)
-		framework.ExpectNoError(err, "NUMA Alignment check failed for [%s] of pod [%s]: %s", cnt.Name, pod.Name, numaRes.String())
+		framework.ExpectNoError(err, "NUMA Alignment check failed for [%s] of pod [%s]", cnt.Name, pod.Name)
+		if numaRes != nil {
+			framework.Logf("NUMA resources for %s/%s: %s", pod.Name, cnt.Name, numaRes.String())
+		}
 	}
 }
 
@@ -553,7 +556,7 @@ func waitForAllContainerRemoval(podName, podNS string) {
 	}, 2*time.Minute, 1*time.Second).Should(gomega.BeTrue())
 }
 
-func runTopologyManagerPositiveTest(f *framework.Framework, numPods int, ctnAttrs []tmCtnAttribute, envInfo testEnvInfo) {
+func runTopologyManagerPositiveTest(f *framework.Framework, numPods int, ctnAttrs []tmCtnAttribute, envInfo *testEnvInfo) {
 	var pods []*v1.Pod
 
 	for podID := 0; podID < numPods; podID++ {
@@ -578,7 +581,7 @@ func runTopologyManagerPositiveTest(f *framework.Framework, numPods int, ctnAttr
 	}
 }
 
-func runTopologyManagerNegativeTest(f *framework.Framework, numPods int, ctnAttrs []tmCtnAttribute, envInfo testEnvInfo) {
+func runTopologyManagerNegativeTest(f *framework.Framework, numPods int, ctnAttrs []tmCtnAttribute, envInfo *testEnvInfo) {
 	podName := "gu-pod"
 	framework.Logf("creating pod %s attrs %v", podName, ctnAttrs)
 	pod := makeTopologyManagerTestPod(podName, numalignCmd, ctnAttrs)
@@ -636,7 +639,7 @@ type sriovData struct {
 	resourceAmount int64
 }
 
-func setupSRIOVConfigOrFail(f *framework.Framework, configMap *v1.ConfigMap) sriovData {
+func setupSRIOVConfigOrFail(f *framework.Framework, configMap *v1.ConfigMap) *sriovData {
 	var err error
 
 	ginkgo.By(fmt.Sprintf("Creating configMap %v/%v", metav1.NamespaceSystem, configMap.Name))
@@ -670,7 +673,7 @@ func setupSRIOVConfigOrFail(f *framework.Framework, configMap *v1.ConfigMap) sri
 	}, 2*time.Minute, framework.Poll).Should(gomega.BeTrue())
 	framework.Logf("Successfully created device plugin pod, detected %d SRIOV device %q", sriovResourceAmount, sriovResourceName)
 
-	return sriovData{
+	return &sriovData{
 		configMap:      configMap,
 		serviceAccount: serviceAccount,
 		pod:            dpPod,
@@ -679,7 +682,7 @@ func setupSRIOVConfigOrFail(f *framework.Framework, configMap *v1.ConfigMap) sri
 	}
 }
 
-func teardownSRIOVConfigOrFail(f *framework.Framework, sd sriovData) {
+func teardownSRIOVConfigOrFail(f *framework.Framework, sd *sriovData) {
 	var err error
 	gp := int64(0)
 	deleteOptions := metav1.DeleteOptions{
@@ -707,7 +710,7 @@ func runTopologyManagerNodeAlignmentSuiteTests(f *framework.Framework, configMap
 	}
 
 	sd := setupSRIOVConfigOrFail(f, configMap)
-	envInfo := testEnvInfo{
+	envInfo := &testEnvInfo{
 		numaNodes:         numaNodes,
 		sriovResourceName: sd.resourceName,
 	}
