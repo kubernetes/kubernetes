@@ -37,10 +37,12 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/informers"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
 	clienttesting "k8s.io/client-go/testing"
+	ktesting "k8s.io/client-go/testing"
 	clientcache "k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/events"
 	volumescheduling "k8s.io/kubernetes/pkg/controller/volume/scheduling"
@@ -1029,4 +1031,147 @@ func TestSchedulerBinding(t *testing.T) {
 
 		})
 	}
+}
+
+type fakeBinder struct {
+	watcher   *watch.FakeWatcher
+	podsBound chan<- *v1.Pod
+}
+
+// Name returns the name of the plugin.
+func (b fakeBinder) Name() string {
+	return "fakeBinder"
+}
+
+// Bind binds pods to nodes using a fake <watcher>, and notify the consumers through chan <podsBound>.
+func (b fakeBinder) Bind(_ context.Context, _ *framework.CycleState, p *v1.Pod, nodeName string) *framework.Status {
+	pCopy := p.DeepCopy()
+	pCopy.Spec.NodeName = nodeName
+	b.watcher.Modify(pCopy)
+	b.podsBound <- pCopy
+	return nil
+}
+
+func newFakeBinder(watcher *watch.FakeWatcher, podsBound chan<- *v1.Pod) *fakeBinder {
+	return &fakeBinder{
+		watcher:   watcher,
+		podsBound: podsBound,
+	}
+}
+
+func TestSchedulerCacheRacingWithQueue(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	cache := internalcache.New(time.Duration(0), ctx.Done())
+	nodes := []*v1.Node{
+		st.MakeNode().Name("node-a").Label("node", "node-a").Obj(),
+		st.MakeNode().Name("node-b").Label("node", "node-b").Obj(),
+	}
+	var objects []runtime.Object
+	for _, node := range nodes {
+		objects = append(objects, node)
+	}
+	client := clientsetfake.NewSimpleClientset(objects...)
+	informerFactory := informers.NewSharedInformerFactory(client, 0)
+	fakeWatch := watch.NewFake()
+	client.PrependWatchReactor("pods", ktesting.DefaultWatchReactor(fakeWatch, nil))
+	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1beta1().Events("")})
+
+	podsBound := make(chan *v1.Pod)
+	defer close(podsBound)
+
+	fns := []st.RegisterPluginFunc{
+		st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+		st.RegisterBindPlugin("fakeBinder", func(_ *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
+			return newFakeBinder(fakeWatch, podsBound), nil
+		}),
+	}
+	emptySnapshot := internalcache.NewEmptySnapshot()
+	fwk, _ := st.NewFramework(
+		fns,
+		framework.WithClientSet(client),
+		framework.WithSnapshotSharedLister(emptySnapshot),
+	)
+	podQueue := internalqueue.NewSchedulingQueue(fwk)
+	algo := core.NewGenericScheduler(
+		cache,
+		podQueue,
+		emptySnapshot,
+		fwk,
+		[]core.SchedulerExtender{},
+		nil,
+		informerFactory.Core().V1().PersistentVolumeClaims().Lister(),
+		informerFactory.Policy().V1beta1().PodDisruptionBudgets().Lister(),
+		false,
+		schedulerapi.DefaultPercentageOfNodesToScore,
+		false,
+	)
+	sched := &Scheduler{
+		SchedulerCache:  cache,
+		Algorithm:       algo,
+		Framework:       fwk,
+		NextPod:         internalqueue.MakeNextPodFunc(podQueue),
+		Error:           MakeDefaultErrorFunc(client, podQueue, cache),
+		VolumeBinder:    volumebinder.NewFakeVolumeBinder(&volumescheduling.FakeVolumeBinderConfig{AllBound: true}),
+		Recorder:        eventBroadcaster.NewRecorder(scheme.Scheme, "scheduler"),
+		StopEverything:  ctx.Done(),
+		SchedulingQueue: podQueue,
+	}
+	podInformer := informerFactory.Core().V1().Pods()
+	AddAllEventHandlers(sched, "", informerFactory, podInformer)
+	informerFactory.Start(ctx.Done())
+	informerFactory.WaitForCacheSync(ctx.Done())
+
+	// Start the main scheduler goroutine.
+	go wait.UntilWithContext(ctx, sched.scheduleOne, 0)
+
+	p1 := st.MakePod().Name("p1").UID("p1").Label("foo", "").Obj()
+	fakeWatch.Add(p1)
+	// Wait for the scheduling cycle to finish.
+	select {
+	case p := <-podsBound:
+		if p.Name == p1.Name {
+			p1 = p
+		} else {
+			t.Fatalf("unexpected pod %q gets bound.", p.Name)
+		}
+	case <-time.After(time.Second * 2):
+		t.Fatalf("timeout waiting for p1 to be scheduled.")
+	}
+
+	// Spawn event1: assignedPod updated (label "foo" changed to "bar").
+	p1Update := p1.DeepCopy()
+	p1Update.SetLabels(map[string]string{"bar": ""})
+	fakeWatch.Modify(p1Update)
+	// Spawn event2: unassignedPod added. The new pod should go to schedulingQ and then get
+	// popped out. Finally the main scheduling cycle invokes snapshot() to sync with cache.
+	p2 := st.MakePod().Name("p2").UID("p2").Label("baz", "").Obj()
+	fakeWatch.Add(p2)
+	select {
+	case p := <-podsBound:
+		if p.Name == p2.Name {
+			p2 = p
+		} else {
+			t.Fatalf("unexpected pod %q gets bound.", p.Name)
+		}
+	case <-time.After(time.Second * 2):
+		t.Fatalf("timeout waiting for p1 to be scheduled.")
+	}
+
+	// Our goal is to ensure the scheduling of p2 is based on the the snapshot
+	// that p1.label has been updated (to "bar").
+	// cache.UpdateSnapshot(emptySnapshot)
+	pods, err := emptySnapshot.Pods().List(labels.NewSelector())
+	if err != nil {
+		t.Fatalf("cannot get pods from snapshot: %v", err)
+	}
+	if len(pods) != 1 {
+		t.Fatalf("expect only one pod from snapshot, but got %v", len(pods))
+	}
+	// TODO: uncomment the following section and ensure the test always passes, i.e. run
+	// go test k8s.io/kubernetes/pkg/scheduler/ -run ^TestSchedulerCacheRacingWithQueue$ -count=20
+	// if _, ok := pods[0].Labels["bar"]; !ok {
+	// 	t.Errorf("expect label 'bar' to be present in pod %q in the snapshot, but got %v", pods[0].Name, pods[0].Labels)
+	// }
 }

@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 var zero int64
@@ -153,6 +154,12 @@ func (p *PodWrapper) Name(s string) *PodWrapper {
 // Namespace sets `s` as the namespace of the inner pod.
 func (p *PodWrapper) Namespace(s string) *PodWrapper {
 	p.SetNamespace(s)
+	return p
+}
+
+// UID sets `s` as the UID of the inner pod.
+func (p *PodWrapper) UID(s types.UID) *PodWrapper {
+	p.SetUID(s)
 	return p
 }
 
