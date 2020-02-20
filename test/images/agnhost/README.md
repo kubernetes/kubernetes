@@ -40,7 +40,7 @@ For example, let's consider the following `pod.yaml` file:
       containers:
       - args:
         - dns-suffix
-        image: gcr.io/kubernetes-e2e-test-images/agnhost:2.10
+        image: us.gcr.io/k8s-artifacts-prod/e2e-test-images/agnhost:2.10
         name: agnhost
       dnsConfig:
         nameservers:
@@ -207,7 +207,7 @@ Usage:
 
 ```console
 guestbook="test/e2e/testing-manifests/guestbook"
-sed_expr="s|{{.AgnhostImage}}|gcr.io/kubernetes-e2e-test-images/agnhost:2.8|"
+sed_expr="s|{{.AgnhostImage}}|us.gcr.io/k8s-artifacts-prod/e2e-test-images/agnhost:2.10|"
 
 # create the services.
 kubectl create -f ${guestbook}/frontend-service.yaml
@@ -290,14 +290,14 @@ Examples:
 
 ```console
 docker run -i \
-  gcr.io/kubernetes-e2e-test-images/agnhost:2.10 \
+  us.gcr.io/k8s-artifacts-prod/e2e-test-images/agnhost:2.10 \
   logs-generator --log-lines-total 10 --run-duration 1s
 ```
 
 ```console
 kubectl run logs-generator \
   --generator=run-pod/v1 \
-  --image=gcr.io/kubernetes-e2e-test-images/agnhost:2.10 \
+  --image=us.gcr.io/k8s-artifacts-prod/e2e-test-images/agnhost:2.10 \
   --restart=Never \
   -- logs-generator -t 10 -d 1s
 ```
@@ -455,7 +455,7 @@ Usage:
 ```console
     kubectl run test-agnhost \
       --generator=run-pod/v1 \
-      --image=gcr.io/kubernetes-e2e-test-images/agnhost:2.10 \
+      --image=us.gcr.io/k8s-artifacts-prod/e2e-test-images/agnhost:2.10 \
       --restart=Never \
       --env "POD_IP=<POD_IP>" \
       --env "NODE_IP=<NODE_IP>" \
@@ -510,7 +510,7 @@ Usage:
 ```console
     kubectl run test-agnhost \
       --generator=run-pod/v1 \
-      --image=gcr.io/kubernetes-e2e-test-images/agnhost:2.10 \
+      --image=us.gcr.io/k8s-artifacts-prod/e2e-test-images/agnhost:2.10 \
       --restart=Never \
       --env "BIND_ADDRESS=localhost" \
       --env "BIND_PORT=8080" \
@@ -631,6 +631,6 @@ The image contains `iperf`, `curl`, `dns-tools` (including `dig`), CoreDNS.
 
 ## Image
 
-The image can be found at `gcr.io/kubernetes-e2e-test-images/agnhost:2.10` for Linux
-containers, and `e2eteam/agnhost:2.8` for Windows containers. In the future, the same
+The image can be found at `us.gcr.io/k8s-artifacts-prod/e2e-test-images/agnhost:2.10` for Linux
+containers, and `e2eteam/agnhost:2.10` for Windows containers. In the future, the same
 repository can be used for both OSes.

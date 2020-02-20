@@ -60,7 +60,7 @@ func NewServerTest(client clientset.Interface, namespace string, serviceName str
 	t.services = make(map[string]bool)
 
 	t.Name = "webserver"
-	t.Image = imageutils.GetE2EImage(imageutils.TestWebserver)
+	t.Image = imageutils.GetE2EImage(imageutils.Agnhost)
 
 	return t
 }

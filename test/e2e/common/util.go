@@ -68,7 +68,6 @@ var CommonImageWhiteList = sets.NewString(
 	imageutils.GetE2EImage(imageutils.MounttestUser),
 	imageutils.GetE2EImage(imageutils.Nginx),
 	imageutils.GetE2EImage(imageutils.Httpd),
-	imageutils.GetE2EImage(imageutils.TestWebserver),
 	imageutils.GetE2EImage(imageutils.VolumeNFSServer),
 	imageutils.GetE2EImage(imageutils.VolumeGlusterServer),
 	imageutils.GetE2EImage(imageutils.NonRoot),

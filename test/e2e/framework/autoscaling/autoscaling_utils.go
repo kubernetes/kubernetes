@@ -64,8 +64,7 @@ const (
 )
 
 var (
-	resourceConsumerImage           = imageutils.GetE2EImage(imageutils.ResourceConsumer)
-	resourceConsumerControllerImage = imageutils.GetE2EImage(imageutils.ResourceController)
+	resourceConsumerImage = imageutils.GetE2EImage(imageutils.ResourceConsumer)
 )
 
 var (
@@ -500,12 +499,12 @@ func runServiceAndWorkloadForResourceConsumer(c clientset.Interface, ns, name st
 	dnsClusterFirst := v1.DNSClusterFirst
 	controllerRcConfig := testutils.RCConfig{
 		Client:    c,
-		Image:     resourceConsumerControllerImage,
+		Image:     imageutils.GetE2EImage(imageutils.Agnhost),
 		Name:      controllerName,
 		Namespace: ns,
 		Timeout:   timeoutRC,
 		Replicas:  1,
-		Command:   []string{"/controller", "--consumer-service-name=" + name, "--consumer-service-namespace=" + ns, "--consumer-port=80"},
+		Command:   []string{"/agnhost", "resource-consumer-controller", "--consumer-service-name=" + name, "--consumer-service-namespace=" + ns, "--consumer-port=80"},
 		DNSPolicy: &dnsClusterFirst,
 	}
 	framework.ExpectNoError(e2erc.RunRC(controllerRcConfig))
