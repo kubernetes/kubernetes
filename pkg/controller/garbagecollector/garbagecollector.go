@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"k8s.io/klog"
+	utiltrace "k8s.io/utils/trace"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -401,6 +402,10 @@ func ownerRefsToUIDs(refs []metav1.OwnerReference) []types.UID {
 }
 
 func (gc *GarbageCollector) attemptToDeleteItem(item *node) error {
+	trace := utiltrace.New("attemptToDeleteItem", utiltrace.Field{Key: "item", Value: item})
+	defer func() {
+		trace.LogIfLong(2 * time.Second)
+	}()
 	klog.V(2).Infof("processing item %s", item.identity)
 	// "being deleted" is an one-way trip to the final deletion. We'll just wait for the final deletion, and then process the object's dependents.
 	if item.isBeingDeleted() && !item.isDeletingDependents() {
