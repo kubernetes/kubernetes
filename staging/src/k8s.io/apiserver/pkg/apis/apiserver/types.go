@@ -146,3 +146,25 @@ type TLSConfig struct {
 	// +optional
 	ClientCert string
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// LeaderMigratorConfiguration provides versioned configuration for all migrating leader locks.
+type LeaderMigratorConfiguration struct {
+	metav1.TypeMeta
+
+	// LeaderResourceName is the name of the resource under which the controllers should be run.
+	LeaderResourceName string
+
+	// Controllers contains a list of migrating leader lock configurations
+	MigratingControllers []MigratingControllerConfiguration
+}
+
+// ControllerLeaderConfiguration provides the configuration for a migrating leader lock.
+type MigratingControllerConfiguration struct {
+	// Name is the name of the controller being migrated
+	Name string
+
+	// Manager is the name of the controller manager in which the controller should be running
+	// e.g. cloud-controller-manager, kube-controller-manager, etc
+	Manager string
+}

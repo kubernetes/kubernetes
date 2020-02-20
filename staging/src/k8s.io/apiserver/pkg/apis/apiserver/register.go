@@ -40,10 +40,12 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(LegacySchemeGroupVersion,
 		&AdmissionConfiguration{},
 		&EgressSelectorConfiguration{},
+		&LeaderMigratorConfiguration{},
 	)
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&AdmissionConfiguration{},
 		&EgressSelectorConfiguration{},
+		&LeaderMigratorConfiguration{},
 	)
 	return nil
 }
