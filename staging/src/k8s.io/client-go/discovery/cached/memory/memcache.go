@@ -30,6 +30,7 @@ import (
 
 	errorsutil "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/client-go/discovery"
@@ -203,17 +204,31 @@ func (d *memCacheClient) refreshLocked() error {
 		return err
 	}
 
+	wg := &sync.WaitGroup{}
+	resultLock := &sync.Mutex{}
 	rl := map[string]*cacheEntry{}
 	for _, g := range gl.Groups {
 		for _, v := range g.Versions {
-			r, err := d.serverResourcesForGroupVersion(v.GroupVersion)
-			rl[v.GroupVersion] = &cacheEntry{r, err}
-			if err != nil {
-				utilruntime.HandleError(fmt.Errorf("couldn't get resource list for %v: %v", v.GroupVersion, err))
-			}
+			groupVersion := schema.GroupVersion{Group: g.Name, Version: v.Version}
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				defer utilruntime.HandleCrash()
+
+				r, err := d.serverResourcesForGroupVersion(groupVersion.String())
+				if err != nil {
+					utilruntime.HandleError(fmt.Errorf("couldn't get resource list for %v: %v", groupVersion, err))
+				}
+
+				resultLock.Lock()
+				defer resultLock.Unlock()
+				rl[groupVersion.String()] = &cacheEntry{r, err}
+			}()
 		}
 	}
-	trace.Step("got server resources for all group versions")
+	trace.Step("requested server resources for all group versions")
+	wg.Wait()
+	trace.Step("got server resources for all group versions", utiltrace.Field{Key: "groupVersionCount", Value: len(rl)})
 
 	d.groupToServerResources, d.groupList = rl, gl
 	d.cacheValid = true
