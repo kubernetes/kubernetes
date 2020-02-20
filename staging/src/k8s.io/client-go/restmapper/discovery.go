@@ -20,6 +20,9 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
+
+	utiltrace "k8s.io/utils/trace"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -192,10 +195,13 @@ func NewDeferredDiscoveryRESTMapper(cl discovery.CachedDiscoveryInterface) *Defe
 }
 
 func (d *DeferredDiscoveryRESTMapper) getDelegate() (meta.RESTMapper, error) {
-	klog.Infof("DeferredDiscoveryRESTMapper: getDelegate")
+	trace := utiltrace.New("DeferredDiscoveryRESTMapper.getDelegate")
+	defer func() {
+		trace.LogIfLong(2 * time.Second)
+	}()
 	d.initMu.Lock()
 	defer d.initMu.Unlock()
-	klog.Infof("DeferredDiscoveryRESTMapper: getDelegate: acquired lock")
+	trace.Step("acquired lock")
 
 	if d.delegate != nil {
 		return d.delegate, nil
@@ -205,10 +211,9 @@ func (d *DeferredDiscoveryRESTMapper) getDelegate() (meta.RESTMapper, error) {
 	if err != nil {
 		return nil, err
 	}
-	klog.Infof("DeferredDiscoveryRESTMapper: getDelegate: GetAPIGroupResources done")
+	trace.Step("got api group resources")
 
 	d.delegate = NewDiscoveryRESTMapper(groupResources)
-	klog.Infof("DeferredDiscoveryRESTMapper: getDelegate: NewDiscoveryRESTMapper done")
 	return d.delegate, err
 }
 
@@ -292,13 +297,21 @@ func (d *DeferredDiscoveryRESTMapper) ResourcesFor(input schema.GroupVersionReso
 // RESTMapping identifies a preferred resource mapping for the
 // provided group kind.
 func (d *DeferredDiscoveryRESTMapper) RESTMapping(gk schema.GroupKind, versions ...string) (m *meta.RESTMapping, err error) {
+	trace := utiltrace.New("DeferredDiscoveryRESTMapper.RESTMapping", utiltrace.Field{Key: "gk", Value: gk}, utiltrace.Field{Key: "versions", Value: strings.Join(versions, ",")})
+	defer func() {
+		trace.LogIfLong(5 * time.Second)
+	}()
+
 	del, err := d.getDelegate()
 	if err != nil {
 		return nil, err
 	}
+	trace.Step("got delegate")
 	m, err = del.RESTMapping(gk, versions...)
 	if err != nil && !d.cl.Fresh() {
+		trace.Step("resetting")
 		d.Reset()
+		trace.Step("retrying")
 		m, err = d.RESTMapping(gk, versions...)
 	}
 	return

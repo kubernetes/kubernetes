@@ -19,6 +19,7 @@ package garbagecollector
 import (
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -27,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog"
+	utiltrace "k8s.io/utils/trace"
 )
 
 // cluster scoped resources don't have namespaces.  Default to the item's namespace, but clear it for cluster scoped resources
@@ -40,7 +42,12 @@ func resourceDefaultNamespace(namespaced bool, defaultNamespace string) string {
 // apiResource consults the REST mapper to translate an <apiVersion, kind,
 // namespace> tuple to a unversioned.APIResource struct.
 func (gc *GarbageCollector) apiResource(apiVersion, kind string) (schema.GroupVersionResource, bool, error) {
+	trace := utiltrace.New("apiResource", utiltrace.Field{Key: "apiVersion", Value: apiVersion}, utiltrace.Field{Key: "kind", Value: kind})
+	defer func() {
+		trace.LogIfLong(5 * time.Second)
+	}()
 	fqKind := schema.FromAPIVersionAndKind(apiVersion, kind)
+	trace.Step("restMapper.RESTMapping")
 	mapping, err := gc.restMapper.RESTMapping(fqKind.GroupKind(), fqKind.Version)
 	if err != nil {
 		return schema.GroupVersionResource{}, false, newRESTMappingError(kind, apiVersion)
@@ -60,10 +67,15 @@ func (gc *GarbageCollector) deleteObject(item objectReference, policy *metav1.De
 }
 
 func (gc *GarbageCollector) getObject(item objectReference) (*metav1.PartialObjectMetadata, error) {
+	trace := utiltrace.New("getObject", utiltrace.Field{Key: "item", Value: item})
+	defer func() {
+		trace.LogIfLong(5 * time.Second)
+	}()
 	resource, namespaced, err := gc.apiResource(item.APIVersion, item.Kind)
 	if err != nil {
 		return nil, err
 	}
+	trace.Step("metadata client get")
 	return gc.metadataClient.Resource(resource).Namespace(resourceDefaultNamespace(namespaced, item.Namespace)).Get(item.Name, metav1.GetOptions{})
 }
 
