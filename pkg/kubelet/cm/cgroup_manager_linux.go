@@ -153,6 +153,7 @@ func (l *libcontainerAdapter) newManager(cgroups *libcontainerconfigs.Cgroup, pa
 		}, nil
 	case libcontainerSystemd:
 		// this means you asked systemd to manage cgroups, but systemd was not on the host, so all you can do is panic...
+		// IMPORTANT: This call to "UseSystemd" will setup the internal dbus connection to systemd inside runc, so do not replace it!
 		if !cgroupsystemd.UseSystemd() {
 			panic("systemd cgroup manager not available")
 		}
