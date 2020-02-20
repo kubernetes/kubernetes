@@ -45,6 +45,7 @@ import (
 	openapinamer "k8s.io/apiserver/pkg/endpoints/openapi"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	genericapiserver "k8s.io/apiserver/pkg/server"
+	"k8s.io/apiserver/pkg/server/egressselector"
 	"k8s.io/apiserver/pkg/server/filters"
 	serveroptions "k8s.io/apiserver/pkg/server/options"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
@@ -381,6 +382,16 @@ func CreateKubeAPIServerConfig(
 	if config.GenericConfig.EgressSelector != nil {
 		// Use the config.GenericConfig.EgressSelector lookup to find the dialer to connect to the kubelet
 		config.ExtraConfig.KubeletClientConfig.Lookup = config.GenericConfig.EgressSelector.Lookup
+
+		// Use the config.GenericConfig.EgressSelector lookup as the transport used by the "proxy" subresources.
+		networkContext := egressselector.Cluster.AsNetworkContext()
+		dialer, err := config.GenericConfig.EgressSelector.Lookup(networkContext)
+		if err != nil {
+			return nil, nil, nil, nil, err
+		}
+		c := proxyTransport.Clone()
+		c.DialContext = dialer
+		config.ExtraConfig.ProxyTransport = c
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountIssuerDiscovery) {
