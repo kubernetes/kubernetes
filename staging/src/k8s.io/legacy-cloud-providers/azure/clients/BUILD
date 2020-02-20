@@ -12,7 +12,7 @@ go_library(
     deps = [
         "//staging/src/k8s.io/client-go/util/flowcontrol:go_default_library",
         "//staging/src/k8s.io/legacy-cloud-providers/azure/retry:go_default_library",
-        "//vendor/github.com/Azure/go-autorest/autorest/adal:go_default_library",
+        "//vendor/github.com/Azure/go-autorest/autorest:go_default_library",
     ],
 )
 
