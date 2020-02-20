@@ -63,7 +63,7 @@ func (ns *noopSink) Close() error                 { return nil }
 
 // newWriterSink creates a binary log sink with the given writer.
 //
-// Write() marshalls the proto message and writes it to the given writer. Each
+// Write() marshals the proto message and writes it to the given writer. Each
 // message is prefixed with a 4 byte big endian unsigned integer as the length.
 //
 // No buffer is done, Close() doesn't try to close the writer.

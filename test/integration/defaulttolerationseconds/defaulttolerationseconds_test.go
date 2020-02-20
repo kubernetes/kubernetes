@@ -17,6 +17,7 @@ limitations under the License.
 package defaulttolerationseconds
 
 import (
+	"context"
 	"testing"
 
 	"k8s.io/api/core/v1"
@@ -56,7 +57,7 @@ func TestAdmission(t *testing.T) {
 		},
 	}
 
-	updatedPod, err := client.CoreV1().Pods(pod.Namespace).Create(&pod)
+	updatedPod, err := client.CoreV1().Pods(pod.Namespace).Create(context.TODO(), &pod, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("error creating pod: %v", err)
 	}

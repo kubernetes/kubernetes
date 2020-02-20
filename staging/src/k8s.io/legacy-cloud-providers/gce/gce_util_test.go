@@ -19,11 +19,13 @@ limitations under the License.
 package gce
 
 import (
+	"context"
 	"net"
 	"reflect"
 	"testing"
 
 	compute "google.golang.org/api/compute/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestLastIPInRange(t *testing.T) {
@@ -116,5 +118,41 @@ func TestFirewallToGcloudArgs(t *testing.T) {
 	var e = `--description "Last Line of Defense" --allow sctp:123,sctp:123-456,sctp:321,tcp:123,tcp:123-456,tcp:321,udp:123,udp:123-456,udp:321 --source-ranges 1.1.1.1/20,2.2.2.2/20,3.3.3.3/20 --target-tags band-nodes,jock-nodes --project my-project`
 	if got != e {
 		t.Errorf("%q does not equal %q", got, e)
+	}
+}
+
+// TestAddRemoveFinalizer tests the add/remove and hasFinalizer methods.
+func TestAddRemoveFinalizer(t *testing.T) {
+	svc := fakeLoadbalancerService(string(LBTypeInternal))
+	gce, err := fakeGCECloud(vals)
+	if err != nil {
+		t.Fatalf("Failed to get GCE client, err %v", err)
+	}
+	svc, err = gce.client.CoreV1().Services(svc.Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
+	if err != nil {
+		t.Errorf("Failed to create service %s, err %v", svc.Name, err)
+	}
+
+	err = addFinalizer(svc, gce.client.CoreV1(), ILBFinalizerV1)
+	if err != nil {
+		t.Fatalf("Failed to add finalizer, err %v", err)
+	}
+	svc, err = gce.client.CoreV1().Services(svc.Namespace).Get(context.TODO(), svc.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Errorf("Failed to get service, err %v", err)
+	}
+	if !hasFinalizer(svc, ILBFinalizerV1) {
+		t.Errorf("Unable to find finalizer '%s' in service %s", ILBFinalizerV1, svc.Name)
+	}
+	err = removeFinalizer(svc, gce.client.CoreV1(), ILBFinalizerV1)
+	if err != nil {
+		t.Fatalf("Failed to remove finalizer, err %v", err)
+	}
+	svc, err = gce.client.CoreV1().Services(svc.Namespace).Get(context.TODO(), svc.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Errorf("Failed to get service, err %v", err)
+	}
+	if hasFinalizer(svc, ILBFinalizerV1) {
+		t.Errorf("Failed to remove finalizer '%s' in service %s", ILBFinalizerV1, svc.Name)
 	}
 }

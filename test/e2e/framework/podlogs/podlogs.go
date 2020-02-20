@@ -36,20 +36,10 @@ import (
 
 	"github.com/pkg/errors"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 )
-
-// LogsForPod starts reading the logs for a certain pod. If the pod has more than one
-// container, opts.Container must be set. Reading stops when the context is done.
-// The stream includes formatted error messages and ends with
-//    rpc error: code = Unknown desc = Error: No such container: 41a...
-// when the pod gets deleted while streaming.
-func LogsForPod(ctx context.Context, cs clientset.Interface, ns, pod string, opts *v1.PodLogOptions) (io.ReadCloser, error) {
-	req := cs.CoreV1().Pods(ns).GetLogs(pod, opts)
-	return req.Context(ctx).Stream()
-}
 
 // LogOutput determines where output from CopyAllLogs goes.
 type LogOutput struct {
@@ -79,7 +69,7 @@ var expectedErrors = regexp.MustCompile(`container .* in pod .* is (terminated|w
 // running pods, but that then would have the disadvantage that
 // already deleted pods aren't covered.
 func CopyAllLogs(ctx context.Context, cs clientset.Interface, ns string, to LogOutput) error {
-	watcher, err := cs.CoreV1().Pods(ns).Watch(meta.ListOptions{})
+	watcher, err := cs.CoreV1().Pods(ns).Watch(context.TODO(), meta.ListOptions{})
 	if err != nil {
 		return errors.Wrap(err, "cannot create Pod event watcher")
 	}
@@ -91,7 +81,7 @@ func CopyAllLogs(ctx context.Context, cs clientset.Interface, ns string, to LogO
 			m.Lock()
 			defer m.Unlock()
 
-			pods, err := cs.CoreV1().Pods(ns).List(meta.ListOptions{})
+			pods, err := cs.CoreV1().Pods(ns).List(context.TODO(), meta.ListOptions{})
 			if err != nil {
 				if to.StatusWriter != nil {
 					fmt.Fprintf(to.StatusWriter, "ERROR: get pod list in %s: %s\n", ns, err)
@@ -111,7 +101,7 @@ func CopyAllLogs(ctx context.Context, cs clientset.Interface, ns string, to LogO
 							pod.Status.ContainerStatuses[i].State.Terminated == nil) {
 						continue
 					}
-					readCloser, err := LogsForPod(ctx, cs, ns, pod.ObjectMeta.Name,
+					readCloser, err := logsForPod(ctx, cs, ns, pod.ObjectMeta.Name,
 						&v1.PodLogOptions{
 							Container: c.Name,
 							Follow:    true,
@@ -134,7 +124,11 @@ func CopyAllLogs(ctx context.Context, cs clientset.Interface, ns string, to LogO
 					var prefix string
 					if to.LogWriter != nil {
 						out = to.LogWriter
-						prefix = name + ": "
+						nodeName := pod.Spec.NodeName
+						if len(nodeName) > 10 {
+							nodeName = nodeName[0:4] + ".." + nodeName[len(nodeName)-4:]
+						}
+						prefix = name + "@" + nodeName + ": "
 					} else {
 						var err error
 						filename := to.LogPathPrefix + pod.ObjectMeta.Name + "-" + c.Name + ".log"
@@ -211,10 +205,19 @@ func CopyAllLogs(ctx context.Context, cs clientset.Interface, ns string, to LogO
 	return nil
 }
 
+// logsForPod starts reading the logs for a certain pod. If the pod has more than one
+// container, opts.Container must be set. Reading stops when the context is done.
+// The stream includes formatted error messages and ends with
+//    rpc error: code = Unknown desc = Error: No such container: 41a...
+// when the pod gets deleted while streaming.
+func logsForPod(ctx context.Context, cs clientset.Interface, ns, pod string, opts *v1.PodLogOptions) (io.ReadCloser, error) {
+	return cs.CoreV1().Pods(ns).GetLogs(pod, opts).Stream(ctx)
+}
+
 // WatchPods prints pod status events for a certain namespace or all namespaces
 // when namespace name is empty.
 func WatchPods(ctx context.Context, cs clientset.Interface, ns string, to io.Writer) error {
-	watcher, err := cs.CoreV1().Pods(ns).Watch(meta.ListOptions{})
+	watcher, err := cs.CoreV1().Pods(ns).Watch(context.TODO(), meta.ListOptions{})
 	if err != nil {
 		return errors.Wrap(err, "cannot create Pod event watcher")
 	}

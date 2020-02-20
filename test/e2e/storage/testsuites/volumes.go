@@ -156,7 +156,7 @@ func (t *volumesTestSuite) DefineTests(driver TestDriver, pattern testpatterns.T
 
 		init()
 		defer func() {
-			volume.TestCleanup(f, convertTestConfig(l.config))
+			volume.TestServerCleanup(f, convertTestConfig(l.config))
 			cleanup()
 		}()
 
@@ -245,10 +245,9 @@ func testScriptInPod(
 				},
 			},
 			RestartPolicy: v1.RestartPolicyNever,
-			NodeSelector:  config.ClientNodeSelector,
-			NodeName:      config.ClientNodeName,
 		},
 	}
+	e2epod.SetNodeSelection(pod, config.ClientNodeSelection)
 	ginkgo.By(fmt.Sprintf("Creating pod %s", pod.Name))
 	f.TestContainerOutput("exec-volume-test", pod, 0, []string{fileName})
 

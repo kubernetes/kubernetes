@@ -38,6 +38,7 @@ import (
 
 	"github.com/onsi/ginkgo"
 	"golang.org/x/oauth2/google"
+	"google.golang.org/api/option"
 )
 
 const (
@@ -99,8 +100,9 @@ func testCustomMetrics(f *framework.Framework, kubeClient clientset.Interface, c
 
 	ctx := context.Background()
 	client, err := google.DefaultClient(ctx, gcm.CloudPlatformScope)
+	framework.ExpectNoError(err)
 
-	gcmService, err := gcm.New(client)
+	gcmService, err := gcm.NewService(ctx, option.WithHTTPClient(client))
 	if err != nil {
 		framework.Failf("Failed to create gcm service, %v", err)
 	}
@@ -118,11 +120,11 @@ func testCustomMetrics(f *framework.Framework, kubeClient clientset.Interface, c
 	}
 	defer CleanupAdapter(f.Namespace.Name, adapterDeployment)
 
-	_, err = kubeClient.RbacV1().ClusterRoleBindings().Create(HPAPermissions)
+	_, err = kubeClient.RbacV1().ClusterRoleBindings().Create(context.TODO(), HPAPermissions, metav1.CreateOptions{})
 	if err != nil {
 		framework.Failf("Failed to create ClusterRoleBindings: %v", err)
 	}
-	defer kubeClient.RbacV1().ClusterRoleBindings().Delete(HPAPermissions.Name, &metav1.DeleteOptions{})
+	defer kubeClient.RbacV1().ClusterRoleBindings().Delete(context.TODO(), HPAPermissions.Name, &metav1.DeleteOptions{})
 
 	// Run application that exports the metric
 	_, err = createSDExporterPods(f, kubeClient)
@@ -145,8 +147,9 @@ func testExternalMetrics(f *framework.Framework, kubeClient clientset.Interface,
 
 	ctx := context.Background()
 	client, err := google.DefaultClient(ctx, gcm.CloudPlatformScope)
+	framework.ExpectNoError(err)
 
-	gcmService, err := gcm.New(client)
+	gcmService, err := gcm.NewService(ctx, option.WithHTTPClient(client))
 	if err != nil {
 		framework.Failf("Failed to create gcm service, %v", err)
 	}
@@ -165,11 +168,11 @@ func testExternalMetrics(f *framework.Framework, kubeClient clientset.Interface,
 	}
 	defer CleanupAdapter(f.Namespace.Name, AdapterForOldResourceModel)
 
-	_, err = kubeClient.RbacV1().ClusterRoleBindings().Create(HPAPermissions)
+	_, err = kubeClient.RbacV1().ClusterRoleBindings().Create(context.TODO(), HPAPermissions, metav1.CreateOptions{})
 	if err != nil {
 		framework.Failf("Failed to create ClusterRoleBindings: %v", err)
 	}
-	defer kubeClient.RbacV1().ClusterRoleBindings().Delete(HPAPermissions.Name, &metav1.DeleteOptions{})
+	defer kubeClient.RbacV1().ClusterRoleBindings().Delete(context.TODO(), HPAPermissions.Name, &metav1.DeleteOptions{})
 
 	// Run application that exports the metric
 	pod, err := createSDExporterPods(f, kubeClient)
@@ -255,21 +258,21 @@ func verifyResponseFromExternalMetricsAPI(f *framework.Framework, externalMetric
 }
 
 func cleanupSDExporterPod(f *framework.Framework, cs clientset.Interface) {
-	err := cs.CoreV1().Pods(f.Namespace.Name).Delete(stackdriverExporterPod1, &metav1.DeleteOptions{})
+	err := cs.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), stackdriverExporterPod1, &metav1.DeleteOptions{})
 	if err != nil {
 		framework.Logf("Failed to delete %s pod: %v", stackdriverExporterPod1, err)
 	}
-	err = cs.CoreV1().Pods(f.Namespace.Name).Delete(stackdriverExporterPod2, &metav1.DeleteOptions{})
+	err = cs.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), stackdriverExporterPod2, &metav1.DeleteOptions{})
 	if err != nil {
 		framework.Logf("Failed to delete %s pod: %v", stackdriverExporterPod2, err)
 	}
 }
 
 func createSDExporterPods(f *framework.Framework, cs clientset.Interface) (*v1.Pod, error) {
-	pod, err := cs.CoreV1().Pods(f.Namespace.Name).Create(StackdriverExporterPod(stackdriverExporterPod1, f.Namespace.Name, stackdriverExporterLabel, CustomMetricName, CustomMetricValue))
+	pod, err := cs.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), StackdriverExporterPod(stackdriverExporterPod1, f.Namespace.Name, stackdriverExporterLabel, CustomMetricName, CustomMetricValue), metav1.CreateOptions{})
 	if err != nil {
 		return nil, err
 	}
-	_, err = cs.CoreV1().Pods(f.Namespace.Name).Create(StackdriverExporterPod(stackdriverExporterPod2, f.Namespace.Name, stackdriverExporterLabel, UnusedMetricName, UnusedMetricValue))
+	_, err = cs.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), StackdriverExporterPod(stackdriverExporterPod2, f.Namespace.Name, stackdriverExporterLabel, UnusedMetricName, UnusedMetricValue), metav1.CreateOptions{})
 	return pod, err
 }

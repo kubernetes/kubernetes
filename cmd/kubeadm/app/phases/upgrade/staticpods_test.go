@@ -900,7 +900,7 @@ func getEmbeddedCerts(tmpDir, kubeConfig string) ([]*x509.Certificate, error) {
 
 func TestGetPathManagerForUpgrade(t *testing.T) {
 
-	haEtcd := &kubeadmapi.InitConfiguration{
+	externalEtcd := &kubeadmapi.InitConfiguration{
 		ClusterConfiguration: kubeadmapi.ClusterConfiguration{
 			Etcd: kubeadmapi.Etcd{
 				External: &kubeadmapi.ExternalEtcd{
@@ -910,7 +910,7 @@ func TestGetPathManagerForUpgrade(t *testing.T) {
 		},
 	}
 
-	noHAEtcd := &kubeadmapi.InitConfiguration{}
+	stackedEtcd := &kubeadmapi.InitConfiguration{}
 
 	tests := []struct {
 		name             string
@@ -919,22 +919,28 @@ func TestGetPathManagerForUpgrade(t *testing.T) {
 		shouldDeleteEtcd bool
 	}{
 		{
-			name:             "ha etcd but no etcd upgrade",
-			cfg:              haEtcd,
+			name:             "external etcd but no etcd upgrade",
+			cfg:              externalEtcd,
 			etcdUpgrade:      false,
 			shouldDeleteEtcd: true,
 		},
 		{
-			name:             "non-ha etcd with etcd upgrade",
-			cfg:              noHAEtcd,
-			etcdUpgrade:      true,
-			shouldDeleteEtcd: false,
-		},
-		{
-			name:             "ha etcd and etcd upgrade",
-			cfg:              haEtcd,
+			name:             "external etcd with etcd upgrade",
+			cfg:              externalEtcd,
 			etcdUpgrade:      true,
 			shouldDeleteEtcd: true,
+		},
+		{
+			name:             "stacked etcd but no etcd upgrade",
+			cfg:              stackedEtcd,
+			etcdUpgrade:      false,
+			shouldDeleteEtcd: true,
+		},
+		{
+			name:             "stacked etcd with etcd upgrade",
+			cfg:              stackedEtcd,
+			etcdUpgrade:      true,
+			shouldDeleteEtcd: false,
 		},
 	}
 

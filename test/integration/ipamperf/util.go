@@ -17,6 +17,7 @@ limitations under the License.
 package ipamperf
 
 import (
+	"context"
 	"time"
 
 	"k8s.io/api/core/v1"
@@ -62,7 +63,7 @@ func deleteNodes(apiURL string, config *Config) {
 		Burst:         config.CreateQPS,
 	})
 	noGrace := int64(0)
-	if err := clientSet.CoreV1().Nodes().DeleteCollection(&metav1.DeleteOptions{GracePeriodSeconds: &noGrace}, metav1.ListOptions{}); err != nil {
+	if err := clientSet.CoreV1().Nodes().DeleteCollection(context.TODO(), &metav1.DeleteOptions{GracePeriodSeconds: &noGrace}, metav1.ListOptions{}); err != nil {
 		klog.Errorf("Error deleting node: %v", err)
 	}
 }
@@ -78,7 +79,7 @@ func createNodes(apiURL string, config *Config) error {
 	for i := 0; i < config.NumNodes; i++ {
 		var err error
 		for j := 0; j < maxCreateRetries; j++ {
-			if _, err = clientSet.CoreV1().Nodes().Create(baseNodeTemplate); err != nil && apierrors.IsServerTimeout(err) {
+			if _, err = clientSet.CoreV1().Nodes().Create(context.TODO(), baseNodeTemplate, metav1.CreateOptions{}); err != nil && apierrors.IsServerTimeout(err) {
 				klog.Infof("Server timeout creating nodes, retrying after %v", retryDelay)
 				time.Sleep(retryDelay)
 				continue

@@ -29,6 +29,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//pkg/apis/flowcontrol/install:all-srcs",
+        "//pkg/apis/flowcontrol/internalbootstrap:all-srcs",
         "//pkg/apis/flowcontrol/util:all-srcs",
         "//pkg/apis/flowcontrol/v1alpha1:all-srcs",
         "//pkg/apis/flowcontrol/validation:all-srcs",

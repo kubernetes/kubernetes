@@ -17,6 +17,7 @@ limitations under the License.
 package cephfs
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -104,7 +105,7 @@ func (plugin *cephfsPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.
 		if kubeClient == nil {
 			return nil, fmt.Errorf("Cannot get kube client")
 		}
-		secrets, err := kubeClient.CoreV1().Secrets(secretNs).Get(secretName, metav1.GetOptions{})
+		secrets, err := kubeClient.CoreV1().Secrets(secretNs).Get(context.TODO(), secretName, metav1.GetOptions{})
 		if err != nil {
 			err = fmt.Errorf("Couldn't get secret %v/%v err: %v", secretNs, secretName, err)
 			return nil, err

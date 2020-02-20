@@ -353,10 +353,6 @@ func TestCmdInitFeatureGates(t *testing.T) {
 			args: "",
 		},
 		{
-			name: "feature gate CoreDNS=true",
-			args: "--feature-gates=CoreDNS=true",
-		},
-		{
 			name: "feature gate IPv6DualStack=true",
 			args: "--feature-gates=IPv6DualStack=true",
 		},

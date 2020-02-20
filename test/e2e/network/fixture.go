@@ -17,6 +17,7 @@ limitations under the License.
 package network
 
 import (
+	"context"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -84,7 +85,7 @@ func (t *TestFixture) BuildServiceSpec() *v1.Service {
 
 // CreateRC creates a replication controller and records it for cleanup.
 func (t *TestFixture) CreateRC(rc *v1.ReplicationController) (*v1.ReplicationController, error) {
-	rc, err := t.Client.CoreV1().ReplicationControllers(t.Namespace).Create(rc)
+	rc, err := t.Client.CoreV1().ReplicationControllers(t.Namespace).Create(context.TODO(), rc, metav1.CreateOptions{})
 	if err == nil {
 		t.rcs[rc.Name] = true
 	}
@@ -93,7 +94,7 @@ func (t *TestFixture) CreateRC(rc *v1.ReplicationController) (*v1.ReplicationCon
 
 // CreateService creates a service, and record it for cleanup
 func (t *TestFixture) CreateService(service *v1.Service) (*v1.Service, error) {
-	result, err := t.Client.CoreV1().Services(t.Namespace).Create(service)
+	result, err := t.Client.CoreV1().Services(t.Namespace).Create(context.TODO(), service, metav1.CreateOptions{})
 	if err == nil {
 		t.services[service.Name] = true
 	}
@@ -102,7 +103,7 @@ func (t *TestFixture) CreateService(service *v1.Service) (*v1.Service, error) {
 
 // DeleteService deletes a service, and remove it from the cleanup list
 func (t *TestFixture) DeleteService(serviceName string) error {
-	err := t.Client.CoreV1().Services(t.Namespace).Delete(serviceName, nil)
+	err := t.Client.CoreV1().Services(t.Namespace).Delete(context.TODO(), serviceName, nil)
 	if err == nil {
 		delete(t.services, serviceName)
 	}
@@ -116,7 +117,7 @@ func (t *TestFixture) Cleanup() []error {
 		ginkgo.By("stopping RC " + rcName + " in namespace " + t.Namespace)
 		err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 			// First, resize the RC to 0.
-			old, err := t.Client.CoreV1().ReplicationControllers(t.Namespace).Get(rcName, metav1.GetOptions{})
+			old, err := t.Client.CoreV1().ReplicationControllers(t.Namespace).Get(context.TODO(), rcName, metav1.GetOptions{})
 			if err != nil {
 				if apierrors.IsNotFound(err) {
 					return nil
@@ -125,7 +126,7 @@ func (t *TestFixture) Cleanup() []error {
 			}
 			x := int32(0)
 			old.Spec.Replicas = &x
-			if _, err := t.Client.CoreV1().ReplicationControllers(t.Namespace).Update(old); err != nil {
+			if _, err := t.Client.CoreV1().ReplicationControllers(t.Namespace).Update(context.TODO(), old, metav1.UpdateOptions{}); err != nil {
 				if apierrors.IsNotFound(err) {
 					return nil
 				}
@@ -138,7 +139,7 @@ func (t *TestFixture) Cleanup() []error {
 		}
 		// TODO(mikedanese): Wait.
 		// Then, delete the RC altogether.
-		if err := t.Client.CoreV1().ReplicationControllers(t.Namespace).Delete(rcName, nil); err != nil {
+		if err := t.Client.CoreV1().ReplicationControllers(t.Namespace).Delete(context.TODO(), rcName, nil); err != nil {
 			if !apierrors.IsNotFound(err) {
 				errs = append(errs, err)
 			}
@@ -147,7 +148,7 @@ func (t *TestFixture) Cleanup() []error {
 
 	for serviceName := range t.services {
 		ginkgo.By("deleting service " + serviceName + " in namespace " + t.Namespace)
-		err := t.Client.CoreV1().Services(t.Namespace).Delete(serviceName, nil)
+		err := t.Client.CoreV1().Services(t.Namespace).Delete(context.TODO(), serviceName, nil)
 		if err != nil {
 			if !apierrors.IsNotFound(err) {
 				errs = append(errs, err)

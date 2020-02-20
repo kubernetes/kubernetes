@@ -65,7 +65,7 @@ func (h *ManagerStub) GetWatcherHandler() cache.PluginHandler {
 }
 
 // GetTopologyHints returns an empty TopologyHint map
-func (h *ManagerStub) GetTopologyHints(pod v1.Pod, container v1.Container) map[string][]topologymanager.TopologyHint {
+func (h *ManagerStub) GetTopologyHints(pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
 	return map[string][]topologymanager.TopologyHint{}
 }
 
@@ -77,4 +77,9 @@ func (h *ManagerStub) GetDevices(_, _ string) []*podresourcesapi.ContainerDevice
 // ShouldResetExtendedResourceCapacity returns false
 func (h *ManagerStub) ShouldResetExtendedResourceCapacity() bool {
 	return false
+}
+
+// UpdateAllocatedDevices returns nothing
+func (h *ManagerStub) UpdateAllocatedDevices() {
+	return
 }

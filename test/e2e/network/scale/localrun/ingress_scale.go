@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -135,7 +136,7 @@ func main() {
 		},
 	}
 	klog.Infof("Creating namespace %s...", ns.Name)
-	if _, err := cs.CoreV1().Namespaces().Create(ns); err != nil {
+	if _, err := cs.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{}); err != nil {
 		klog.Errorf("Failed to create namespace %s: %v", ns.Name, err)
 		testSuccessFlag = false
 		return
@@ -143,7 +144,7 @@ func main() {
 	if cleanup {
 		defer func() {
 			klog.Infof("Deleting namespace %s...", ns.Name)
-			if err := cs.CoreV1().Namespaces().Delete(ns.Name, nil); err != nil {
+			if err := cs.CoreV1().Namespaces().Delete(context.TODO(), ns.Name, nil); err != nil {
 				klog.Errorf("Failed to delete namespace %s: %v", ns.Name, err)
 				testSuccessFlag = false
 			}

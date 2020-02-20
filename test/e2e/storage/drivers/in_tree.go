@@ -36,6 +36,7 @@ limitations under the License.
 package drivers
 
 import (
+	"context"
 	"fmt"
 	"os/exec"
 	"strconv"
@@ -182,7 +183,7 @@ func (n *nfsDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConf
 		}, func() {
 			framework.ExpectNoError(e2epod.DeletePodWithWait(cs, n.externalProvisionerPod))
 			clusterRoleBindingName := ns.Name + "--" + "cluster-admin"
-			cs.RbacV1().ClusterRoleBindings().Delete(clusterRoleBindingName, metav1.NewDeleteOptions(0))
+			cs.RbacV1().ClusterRoleBindings().Delete(context.TODO(), clusterRoleBindingName, metav1.NewDeleteOptions(0))
 		}
 }
 
@@ -324,7 +325,7 @@ func (v *glusterVolume) DeleteVolume() {
 	name := v.prefix + "-server"
 
 	framework.Logf("Deleting Gluster endpoints %q...", name)
-	err := cs.CoreV1().Endpoints(ns.Name).Delete(name, nil)
+	err := cs.CoreV1().Endpoints(ns.Name).Delete(context.TODO(), name, nil)
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
 			framework.Failf("Gluster delete endpoints failed: %v", err)
@@ -370,12 +371,14 @@ func InitISCSIDriver() testsuites.TestDriver {
 				//"ext3",
 				"ext4",
 			),
+			TopologyKeys: []string{v1.LabelHostname},
 			Capabilities: map[testsuites.Capability]bool{
 				testsuites.CapPersistence: true,
 				testsuites.CapFsGroup:     true,
 				testsuites.CapBlock:       true,
 				testsuites.CapExec:        true,
 				testsuites.CapMultiPODs:   true,
+				testsuites.CapTopology:    true,
 			},
 		},
 	}
@@ -439,7 +442,7 @@ func (i *iSCSIDriver) CreateVolume(config *testsuites.PerTestConfig, volType tes
 
 	c, serverPod, serverIP, iqn := newISCSIServer(cs, ns.Name)
 	config.ServerConfig = &c
-	config.ClientNodeName = c.ClientNodeName
+	config.ClientNodeSelection = c.ClientNodeSelection
 	return &iSCSIVolume{
 		serverPod: serverPod,
 		serverIP:  serverIP,
@@ -470,7 +473,7 @@ func newISCSIServer(cs clientset.Interface, namespace string) (config volume.Tes
 	}
 	pod, ip = volume.CreateStorageServer(cs, config)
 	// Make sure the client runs on the same node as server so we don't need to open any firewalls.
-	config.ClientNodeName = pod.Spec.NodeName
+	config.ClientNodeSelection = e2epod.NodeSelection{Name: pod.Spec.NodeName}
 	return config, pod, ip, iqn
 }
 
@@ -503,7 +506,7 @@ func newRBDServer(cs clientset.Interface, namespace string) (config volume.TestC
 		Type: "kubernetes.io/rbd",
 	}
 
-	secret, err := cs.CoreV1().Secrets(config.Namespace).Create(secret)
+	secret, err := cs.CoreV1().Secrets(config.Namespace).Create(context.TODO(), secret, metav1.CreateOptions{})
 	if err != nil {
 		framework.Failf("Failed to create secrets for Ceph RBD: %v", err)
 	}
@@ -772,10 +775,12 @@ func InitHostPathDriver() testsuites.TestDriver {
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 			),
+			TopologyKeys: []string{v1.LabelHostname},
 			Capabilities: map[testsuites.Capability]bool{
 				testsuites.CapPersistence:      true,
 				testsuites.CapMultiPODs:        true,
 				testsuites.CapSingleNodeVolume: true,
+				testsuites.CapTopology:         true,
 			},
 		},
 	}
@@ -815,7 +820,7 @@ func (h *hostPathDriver) CreateVolume(config *testsuites.PerTestConfig, volType 
 	// pods should be scheduled on the node
 	node, err := e2enode.GetRandomReadySchedulableNode(cs)
 	framework.ExpectNoError(err)
-	config.ClientNodeName = node.Name
+	config.ClientNodeSelection = e2epod.NodeSelection{Name: node.Name}
 	return nil
 }
 
@@ -845,10 +850,12 @@ func InitHostPathSymlinkDriver() testsuites.TestDriver {
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 			),
+			TopologyKeys: []string{v1.LabelHostname},
 			Capabilities: map[testsuites.Capability]bool{
 				testsuites.CapPersistence:      true,
 				testsuites.CapMultiPODs:        true,
 				testsuites.CapSingleNodeVolume: true,
+				testsuites.CapTopology:         true,
 			},
 		},
 	}
@@ -895,7 +902,7 @@ func (h *hostPathSymlinkDriver) CreateVolume(config *testsuites.PerTestConfig, v
 	// pods should be scheduled on the node
 	node, err := e2enode.GetRandomReadySchedulableNode(cs)
 	framework.ExpectNoError(err)
-	config.ClientNodeName = node.Name
+	config.ClientNodeSelection = e2epod.NodeSelection{Name: node.Name}
 
 	cmd := fmt.Sprintf("mkdir %v -m 777 && ln -s %v %v", sourcePath, sourcePath, targetPath)
 	privileged := true
@@ -937,7 +944,7 @@ func (h *hostPathSymlinkDriver) CreateVolume(config *testsuites.PerTestConfig, v
 		},
 	}
 	// h.prepPod will be reused in cleanupDriver.
-	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(prepPod)
+	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), prepPod, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "while creating hostPath init pod")
 
 	err = e2epod.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, pod.Namespace)
@@ -959,7 +966,7 @@ func (v *hostPathSymlinkVolume) DeleteVolume() {
 	cmd := fmt.Sprintf("rm -rf %v&& rm -rf %v", v.targetPath, v.sourcePath)
 	v.prepPod.Spec.Containers[0].Command = []string{"/bin/sh", "-ec", cmd}
 
-	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(v.prepPod)
+	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), v.prepPod, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "while creating hostPath teardown pod")
 
 	err = e2epod.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, pod.Namespace)
@@ -1059,6 +1066,7 @@ func InitCinderDriver() testsuites.TestDriver {
 				"", // Default fsType
 				"ext3",
 			),
+			TopologyKeys: []string{v1.LabelZoneFailureDomain},
 			Capabilities: map[testsuites.Capability]bool{
 				testsuites.CapPersistence: true,
 				testsuites.CapFsGroup:     true,
@@ -1067,6 +1075,7 @@ func InitCinderDriver() testsuites.TestDriver {
 				// Cinder supports volume limits, but the test creates large
 				// number of volumes and times out test suites.
 				testsuites.CapVolumeLimits: false,
+				testsuites.CapTopology:     true,
 			},
 		},
 	}
@@ -1308,8 +1317,10 @@ func (g *gcePdDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestCo
 		Framework: f,
 	}
 	if framework.NodeOSDistroIs("windows") {
-		config.ClientNodeSelector = map[string]string{
-			"beta.kubernetes.io/os": "windows",
+		config.ClientNodeSelection = e2epod.NodeSelection{
+			Selector: map[string]string{
+				"kubernetes.io/os": "windows",
+			},
 		}
 	}
 	return config, func() {}
@@ -1320,8 +1331,10 @@ func (g *gcePdDriver) CreateVolume(config *testsuites.PerTestConfig, volType tes
 	if volType == testpatterns.InlineVolume {
 		// PD will be created in framework.TestContext.CloudConfig.Zone zone,
 		// so pods should be also scheduled there.
-		config.ClientNodeSelector = map[string]string{
-			v1.LabelZoneFailureDomain: framework.TestContext.CloudConfig.Zone,
+		config.ClientNodeSelection = e2epod.NodeSelection{
+			Selector: map[string]string{
+				v1.LabelZoneFailureDomain: framework.TestContext.CloudConfig.Zone,
+			},
 		}
 	}
 	ginkgo.By("creating a test gce pd volume")
@@ -1366,11 +1379,13 @@ func InitVSphereDriver() testsuites.TestDriver {
 				"", // Default fsType
 				"ext4",
 			),
+			TopologyKeys: []string{v1.LabelZoneFailureDomain},
 			Capabilities: map[testsuites.Capability]bool{
 				testsuites.CapPersistence: true,
 				testsuites.CapFsGroup:     true,
 				testsuites.CapExec:        true,
 				testsuites.CapMultiPODs:   true,
+				testsuites.CapTopology:    true,
 			},
 		},
 	}
@@ -1490,6 +1505,7 @@ func InitAzureDiskDriver() testsuites.TestDriver {
 				"ext4",
 				"xfs",
 			),
+			TopologyKeys: []string{v1.LabelZoneFailureDomain},
 			Capabilities: map[testsuites.Capability]bool{
 				testsuites.CapPersistence: true,
 				testsuites.CapFsGroup:     true,
@@ -1499,6 +1515,7 @@ func InitAzureDiskDriver() testsuites.TestDriver {
 				// Azure supports volume limits, but the test creates large
 				// number of volumes and times out test suites.
 				testsuites.CapVolumeLimits: false,
+				testsuites.CapTopology:     true,
 			},
 		},
 	}
@@ -1621,6 +1638,7 @@ func InitAwsDriver() testsuites.TestDriver {
 				"ntfs",
 			),
 			SupportedMountOption: sets.NewString("debug", "nouid32"),
+			TopologyKeys:         []string{v1.LabelZoneFailureDomain},
 			Capabilities: map[testsuites.Capability]bool{
 				testsuites.CapPersistence:         true,
 				testsuites.CapFsGroup:             true,
@@ -1632,6 +1650,7 @@ func InitAwsDriver() testsuites.TestDriver {
 				// AWS supports volume limits, but the test creates large
 				// number of volumes and times out test suites.
 				testsuites.CapVolumeLimits: false,
+				testsuites.CapTopology:     true,
 			},
 		},
 	}
@@ -1695,8 +1714,10 @@ func (a *awsDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConf
 		Framework: f,
 	}
 	if framework.NodeOSDistroIs("windows") {
-		config.ClientNodeSelector = map[string]string{
-			"beta.kubernetes.io/os": "windows",
+		config.ClientNodeSelection = e2epod.NodeSelection{
+			Selector: map[string]string{
+				"kubernetes.io/os": "windows",
+			},
 		}
 	}
 	return config, func() {}
@@ -1706,8 +1727,10 @@ func (a *awsDriver) CreateVolume(config *testsuites.PerTestConfig, volType testp
 	if volType == testpatterns.InlineVolume {
 		// PD will be created in framework.TestContext.CloudConfig.Zone zone,
 		// so pods should be also scheduled there.
-		config.ClientNodeSelector = map[string]string{
-			v1.LabelZoneFailureDomain: framework.TestContext.CloudConfig.Zone,
+		config.ClientNodeSelection = e2epod.NodeSelection{
+			Selector: map[string]string{
+				v1.LabelZoneFailureDomain: framework.TestContext.CloudConfig.Zone,
+			},
 		}
 	}
 	ginkgo.By("creating a test aws volume")
@@ -1843,10 +1866,10 @@ func (l *localDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestCo
 	}
 
 	return &testsuites.PerTestConfig{
-			Driver:         l,
-			Prefix:         "local",
-			Framework:      f,
-			ClientNodeName: l.node.Name,
+			Driver:              l,
+			Prefix:              "local",
+			Framework:           f,
+			ClientNodeSelection: e2epod.NodeSelection{Name: l.node.Name},
 		}, func() {
 			l.hostExec.Cleanup()
 		}
@@ -1857,7 +1880,7 @@ func (l *localDriver) CreateVolume(config *testsuites.PerTestConfig, volType tes
 	case testpatterns.PreprovisionedPV:
 		node := l.node
 		// assign this to schedule pod on this node
-		config.ClientNodeName = node.Name
+		config.ClientNodeSelection = e2epod.NodeSelection{Name: node.Name}
 		return &localVolume{
 			ltrMgr: l.ltrMgr,
 			ltr:    l.ltrMgr.Create(node, l.volumeType, nil),
@@ -1921,7 +1944,7 @@ func cleanUpVolumeServerWithSecret(f *framework.Framework, serverPod *v1.Pod, se
 
 	if secret != nil {
 		framework.Logf("Deleting server secret %q...", secret.Name)
-		err := cs.CoreV1().Secrets(ns.Name).Delete(secret.Name, &metav1.DeleteOptions{})
+		err := cs.CoreV1().Secrets(ns.Name).Delete(context.TODO(), secret.Name, &metav1.DeleteOptions{})
 		if err != nil {
 			framework.Logf("Delete secret failed: %v", err)
 		}

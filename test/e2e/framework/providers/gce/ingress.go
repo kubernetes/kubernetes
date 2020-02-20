@@ -17,6 +17,7 @@ limitations under the License.
 package gce
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
@@ -126,7 +127,7 @@ func (cont *IngressController) CleanupIngressControllerWithTimeout(timeout time.
 
 func (cont *IngressController) getL7AddonUID() (string, error) {
 	framework.Logf("Retrieving UID from config map: %v/%v", metav1.NamespaceSystem, uidConfigMap)
-	cm, err := cont.Client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(uidConfigMap, metav1.GetOptions{})
+	cm, err := cont.Client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(context.TODO(), uidConfigMap, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -571,19 +572,8 @@ func (cont *IngressController) GetFirewallRuleName() string {
 }
 
 // GetFirewallRule returns the firewall used by the IngressController.
-// Causes a fatal error incase of an error.
-// TODO: Rename this to GetFirewallRuleOrDie and similarly rename all other
-// methods here to be consistent with rest of the code in this repo.
-func (cont *IngressController) GetFirewallRule() *compute.Firewall {
-	fw, err := cont.GetFirewallRuleOrError()
-	framework.ExpectNoError(err)
-	return fw
-}
-
-// GetFirewallRuleOrError returns the firewall used by the IngressController.
 // Returns an error if that fails.
-// TODO: Rename this to GetFirewallRule when the above method with that name is renamed.
-func (cont *IngressController) GetFirewallRuleOrError() (*compute.Firewall, error) {
+func (cont *IngressController) GetFirewallRule() (*compute.Firewall, error) {
 	gceCloud := cont.Cloud.Provider.(*Provider).gceCloud
 	fwName := cont.GetFirewallRuleName()
 	return gceCloud.GetFirewall(fwName)

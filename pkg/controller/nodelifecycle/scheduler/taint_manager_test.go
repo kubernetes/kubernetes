@@ -17,6 +17,7 @@ limitations under the License.
 package scheduler
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"sync"
@@ -37,14 +38,14 @@ var timeForControllerToProgress = 500 * time.Millisecond
 
 func getPodFromClientset(clientset *fake.Clientset) GetPodFunc {
 	return func(name, namespace string) (*v1.Pod, error) {
-		return clientset.CoreV1().Pods(namespace).Get(name, metav1.GetOptions{})
+		return clientset.CoreV1().Pods(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	}
 }
 
 func getPodsAssignedToNode(c *fake.Clientset) GetPodsByNodeNameFunc {
 	return func(nodeName string) ([]*v1.Pod, error) {
 		selector := fields.SelectorFromSet(fields.Set{"spec.nodeName": nodeName})
-		pods, err := c.CoreV1().Pods(v1.NamespaceAll).List(metav1.ListOptions{
+		pods, err := c.CoreV1().Pods(v1.NamespaceAll).List(context.TODO(), metav1.ListOptions{
 			FieldSelector: selector.String(),
 			LabelSelector: labels.Everything().String(),
 		})
@@ -61,7 +62,7 @@ func getPodsAssignedToNode(c *fake.Clientset) GetPodsByNodeNameFunc {
 
 func getNodeFromClientset(clientset *fake.Clientset) GetNodeFunc {
 	return func(name string) (*v1.Node, error) {
-		return clientset.CoreV1().Nodes().Get(name, metav1.GetOptions{})
+		return clientset.CoreV1().Nodes().Get(context.TODO(), name, metav1.GetOptions{})
 	}
 }
 

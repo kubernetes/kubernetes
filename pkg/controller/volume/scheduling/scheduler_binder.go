@@ -17,6 +17,7 @@ limitations under the License.
 package scheduling
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"strings"
@@ -423,7 +424,7 @@ func (b *volumeBinder) bindAPIUpdate(podName string, bindings []*bindingInfo, cl
 		// TODO: does it hurt if we make an api call and nothing needs to be updated?
 		claimKey := claimToClaimKey(binding.pvc)
 		klog.V(2).Infof("claim %q bound to volume %q", claimKey, binding.pv.Name)
-		newPV, err := b.kubeClient.CoreV1().PersistentVolumes().Update(binding.pv)
+		newPV, err := b.kubeClient.CoreV1().PersistentVolumes().Update(context.TODO(), binding.pv, metav1.UpdateOptions{})
 		if err != nil {
 			klog.V(4).Infof("updating PersistentVolume[%s]: binding to %q failed: %v", binding.pv.Name, claimKey, err)
 			return err
@@ -438,7 +439,7 @@ func (b *volumeBinder) bindAPIUpdate(podName string, bindings []*bindingInfo, cl
 	// PV controller is expect to signal back by removing related annotations if actual provisioning fails
 	for i, claim = range claimsToProvision {
 		klog.V(5).Infof("bindAPIUpdate: Pod %q, PVC %q", podName, getPVCName(claim))
-		newClaim, err := b.kubeClient.CoreV1().PersistentVolumeClaims(claim.Namespace).Update(claim)
+		newClaim, err := b.kubeClient.CoreV1().PersistentVolumeClaims(claim.Namespace).Update(context.TODO(), claim, metav1.UpdateOptions{})
 		if err != nil {
 			return err
 		}

@@ -27,13 +27,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
-	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/klog"
 	"k8s.io/kubectl/pkg/cmd/delete"
@@ -61,8 +59,8 @@ type ApplyOptions struct {
 	ForceConflicts  bool
 	FieldManager    string
 	Selector        string
-	DryRun          bool
-	ServerDryRun    bool
+	DryRunStrategy  cmdutil.DryRunStrategy
+	DryRunVerifier  *resource.DryRunVerifier
 	Prune           bool
 	PruneResources  []pruneResource
 	cmdBaseName     string
@@ -71,12 +69,11 @@ type ApplyOptions struct {
 	OpenAPIPatch    bool
 	PruneWhitelist  []string
 
-	Validator       validation.Schema
-	Builder         *resource.Builder
-	Mapper          meta.RESTMapper
-	DynamicClient   dynamic.Interface
-	DiscoveryClient discovery.DiscoveryInterface
-	OpenAPISchema   openapi.Resources
+	Validator     validation.Schema
+	Builder       *resource.Builder
+	Mapper        meta.RESTMapper
+	DynamicClient dynamic.Interface
+	OpenAPISchema openapi.Resources
 
 	Namespace        string
 	EnforceNamespace bool
@@ -193,8 +190,9 @@ func NewCmdApply(baseName string, f cmdutil.Factory, ioStreams genericclioptions
 	cmd.Flags().BoolVar(&o.All, "all", o.All, "Select all resources in the namespace of the specified resource types.")
 	cmd.Flags().StringArrayVar(&o.PruneWhitelist, "prune-whitelist", o.PruneWhitelist, "Overwrite the default whitelist with <group/version/kind> for --prune")
 	cmd.Flags().BoolVar(&o.OpenAPIPatch, "openapi-patch", o.OpenAPIPatch, "If true, use openapi to calculate diff when the openapi presents and the resource can be found in the openapi spec. Otherwise, fall back to use baked-in types.")
-	cmd.Flags().BoolVar(&o.ServerDryRun, "server-dry-run", o.ServerDryRun, "If true, request will be sent to server with dry-run flag, which means the modifications won't be persisted. This is an alpha feature and flag.")
-	cmd.Flags().Bool("dry-run", false, "If true, only print the object that would be sent, without sending it. Warning: --dry-run cannot accurately output the result of merging the local manifest and the server-side data. Use --server-dry-run to get the merged result instead.")
+	cmd.Flags().Bool("server-dry-run", false, "If true, request will be sent to server with dry-run flag, which means the modifications won't be persisted.")
+	cmd.Flags().MarkDeprecated("server-dry-run", "--server-dry-run is deprecated and can be replaced with --dry-run=server.")
+	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddServerSideApplyFlags(cmd)
 
 	// apply subcommands
@@ -207,52 +205,55 @@ func NewCmdApply(baseName string, f cmdutil.Factory, ioStreams genericclioptions
 
 // Complete verifies if ApplyOptions are valid and without conflicts.
 func (o *ApplyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
+	var err error
 	o.ServerSideApply = cmdutil.GetServerSideApplyFlag(cmd)
 	o.ForceConflicts = cmdutil.GetForceConflictsFlag(cmd)
+	o.DryRunStrategy, err = cmdutil.GetDryRunStrategy(cmd)
+	if err != nil {
+		return err
+	}
+	o.DynamicClient, err = f.DynamicClient()
+	if err != nil {
+		return err
+	}
+	discoveryClient, err := f.ToDiscoveryClient()
+	if err != nil {
+		return err
+	}
+	o.DryRunVerifier = resource.NewDryRunVerifier(o.DynamicClient, discoveryClient)
 	o.FieldManager = cmdutil.GetFieldManagerFlag(cmd)
-	o.DryRun = cmdutil.GetDryRunFlag(cmd)
 
 	if o.ForceConflicts && !o.ServerSideApply {
 		return fmt.Errorf("--force-conflicts only works with --server-side")
 	}
 
-	if o.DryRun && o.ServerSideApply {
-		return fmt.Errorf("--dry-run doesn't work with --server-side (did you mean --server-dry-run instead?)")
+	if o.DryRunStrategy == cmdutil.DryRunClient && o.ServerSideApply {
+		return fmt.Errorf("--dry-run=client doesn't work with --server-side (did you mean --dry-run=server instead?)")
 	}
 
-	if o.DryRun && o.ServerDryRun {
-		return fmt.Errorf("--dry-run and --server-dry-run can't be used together")
+	var deprecatedServerDryRunFlag = cmdutil.GetFlagBool(cmd, "server-dry-run")
+	if o.DryRunStrategy == cmdutil.DryRunClient && deprecatedServerDryRunFlag {
+		return fmt.Errorf("--dry-run=client and --server-dry-run can't be used together (did you mean --dry-run=server instead?)")
+	}
+
+	if o.DryRunStrategy == cmdutil.DryRunNone && deprecatedServerDryRunFlag {
+		o.DryRunStrategy = cmdutil.DryRunServer
 	}
 
 	// allow for a success message operation to be specified at print time
 	o.ToPrinter = func(operation string) (printers.ResourcePrinter, error) {
 		o.PrintFlags.NamePrintFlags.Operation = operation
-		if o.DryRun {
-			o.PrintFlags.Complete("%s (dry run)")
-		}
-		if o.ServerDryRun {
-			o.PrintFlags.Complete("%s (server dry run)")
-		}
+		cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.DryRunStrategy)
 		return o.PrintFlags.ToPrinter()
 	}
 
-	var err error
 	o.RecordFlags.Complete(cmd)
 	o.Recorder, err = o.RecordFlags.ToRecorder()
 	if err != nil {
 		return err
 	}
 
-	o.DiscoveryClient, err = f.ToDiscoveryClient()
-	if err != nil {
-		return err
-	}
-
-	dynamicClient, err := f.DynamicClient()
-	if err != nil {
-		return err
-	}
-	o.DeleteOptions = o.DeleteFlags.ToOptions(dynamicClient, o.IOStreams)
+	o.DeleteOptions = o.DeleteFlags.ToOptions(o.DynamicClient, o.IOStreams)
 	err = o.DeleteOptions.FilenameOptions.RequireFilenameOrKustomize()
 	if err != nil {
 		return err
@@ -265,11 +266,6 @@ func (o *ApplyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	}
 	o.Builder = f.NewBuilder()
 	o.Mapper, err = f.ToRESTMapper()
-	if err != nil {
-		return err
-	}
-
-	o.DynamicClient, err = f.DynamicClient()
 	if err != nil {
 		return err
 	}
@@ -360,16 +356,16 @@ func (o *ApplyOptions) SetObjects(infos []*resource.Info) {
 // Run executes the `apply` command.
 func (o *ApplyOptions) Run() error {
 
-	dryRunVerifier := &DryRunVerifier{
-		Finder:        cmdutil.NewCRDFinder(cmdutil.CRDFromDynamic(o.DynamicClient)),
-		OpenAPIGetter: o.DiscoveryClient,
-	}
-
 	if o.PreProcessorFn != nil {
 		klog.V(4).Infof("Running apply pre-processor function")
 		if err := o.PreProcessorFn(); err != nil {
 			return err
 		}
+	}
+
+	// Enforce CLI specified namespace on server request.
+	if o.EnforceNamespace {
+		o.VisitedNamespaces.Insert(o.Namespace)
 	}
 
 	// Generates the objects using the resource builder if they have not
@@ -382,13 +378,6 @@ func (o *ApplyOptions) Run() error {
 		return fmt.Errorf("no objects passed to apply")
 	}
 	for _, info := range infos {
-
-		// If server-dry-run is requested but the type doesn't support it, fail right away.
-		if o.ServerDryRun {
-			if err := dryRunVerifier.HasSupport(info.Mapping.GroupVersionKind); err != nil {
-				return err
-			}
-		}
 
 		o.MarkNamespaceVisited(info)
 
@@ -407,11 +396,15 @@ func (o *ApplyOptions) Run() error {
 				Force:        &o.ForceConflicts,
 				FieldManager: o.FieldManager,
 			}
-			if o.ServerDryRun {
-				options.DryRun = []string{metav1.DryRunAll}
-			}
 
-			obj, err := resource.NewHelper(info.Client, info.Mapping).Patch(
+			helper := resource.NewHelper(info.Client, info.Mapping)
+			if o.DryRunStrategy == cmdutil.DryRunServer {
+				if err := o.DryRunVerifier.HasSupport(info.Mapping.GroupVersionKind); err != nil {
+					return err
+				}
+				helper.DryRun(true)
+			}
+			obj, err := helper.Patch(
 				info.Namespace,
 				info.Name,
 				types.ApplyPatchType,
@@ -424,7 +417,6 @@ func (o *ApplyOptions) Run() error {
 				}
 				if errors.IsConflict(err) {
 					err = fmt.Errorf(`%v
-
 Please review the fields above--they currently have other managers. Here
 are the ways you can resolve this warning:
 * If you intend to manage all of these fields, please re-run the apply
@@ -435,7 +427,6 @@ are the ways you can resolve this warning:
 * You may co-own fields by updating your manifest to match the existing
   value; in this case, you'll become the manager if the other manager(s)
   stop managing the field (remove it from their configuration).
-
 See http://k8s.io/docs/reference/using-api/api-concepts/#conflicts`, err)
 				}
 				return err
@@ -481,13 +472,16 @@ See http://k8s.io/docs/reference/using-api/api-concepts/#conflicts`, err)
 				return cmdutil.AddSourceToErr("creating", info.Source, err)
 			}
 
-			if !o.DryRun {
+			if o.DryRunStrategy != cmdutil.DryRunClient {
 				// Then create the resource and skip the three-way merge
-				options := metav1.CreateOptions{}
-				if o.ServerDryRun {
-					options.DryRun = []string{metav1.DryRunAll}
+				helper := resource.NewHelper(info.Client, info.Mapping)
+				if o.DryRunStrategy == cmdutil.DryRunServer {
+					if err := o.DryRunVerifier.HasSupport(info.Mapping.GroupVersionKind); err != nil {
+						return cmdutil.AddSourceToErr("creating", info.Source, err)
+					}
+					helper.DryRun(true)
 				}
-				obj, err := resource.NewHelper(info.Client, info.Mapping).Create(info.Namespace, true, info.Object, &options)
+				obj, err := helper.Create(info.Namespace, true, info.Object)
 				if err != nil {
 					return cmdutil.AddSourceToErr("creating", info.Source, err)
 				}
@@ -516,14 +510,17 @@ See http://k8s.io/docs/reference/using-api/api-concepts/#conflicts`, err)
 			return err
 		}
 
-		if !o.DryRun {
+		if o.DryRunStrategy != cmdutil.DryRunClient {
 			metadata, _ := meta.Accessor(info.Object)
 			annotationMap := metadata.GetAnnotations()
 			if _, ok := annotationMap[corev1.LastAppliedConfigAnnotation]; !ok {
 				fmt.Fprintf(o.ErrOut, warningNoLastAppliedConfigAnnotation, o.cmdBaseName)
 			}
 
-			patcher := newPatcher(o, info)
+			patcher, err := newPatcher(o, info)
+			if err != nil {
+				return err
+			}
 			patchBytes, patchedObject, err := patcher.Patch(info.Object, modified, info.Source, info.Namespace, info.Name, o.ErrOut)
 			if err != nil {
 				return cmdutil.AddSourceToErr(fmt.Sprintf("applying patch:\n%s\nto:\n%v\nfor:", patchBytes, info), info.Source, err)
@@ -659,43 +656,4 @@ func (o *ApplyOptions) PrintAndPrunePostProcessor() func() error {
 
 		return nil
 	}
-}
-
-// DryRunVerifier verifies if a given group-version-kind supports DryRun
-// against the current server. Sending dryRun requests to apiserver that
-// don't support it will result in objects being unwillingly persisted.
-//
-// It reads the OpenAPI to see if the given GVK supports dryRun. If the
-// GVK can not be found, we assume that CRDs will have the same level of
-// support as "namespaces", and non-CRDs will not be supported. We
-// delay the check for CRDs as much as possible though, since it
-// requires an extra round-trip to the server.
-type DryRunVerifier struct {
-	Finder        cmdutil.CRDFinder
-	OpenAPIGetter discovery.OpenAPISchemaInterface
-}
-
-// HasSupport verifies if the given gvk supports DryRun. An error is
-// returned if it doesn't.
-func (v *DryRunVerifier) HasSupport(gvk schema.GroupVersionKind) error {
-	oapi, err := v.OpenAPIGetter.OpenAPISchema()
-	if err != nil {
-		return fmt.Errorf("failed to download openapi: %v", err)
-	}
-	supports, err := openapi.SupportsDryRun(oapi, gvk)
-	if err != nil {
-		// We assume that we couldn't find the type, then check for namespace:
-		supports, _ = openapi.SupportsDryRun(oapi, schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Namespace"})
-		// If namespace supports dryRun, then we will support dryRun for CRDs only.
-		if supports {
-			supports, err = v.Finder.HasCRD(gvk.GroupKind())
-			if err != nil {
-				return fmt.Errorf("failed to check CRD: %v", err)
-			}
-		}
-	}
-	if !supports {
-		return fmt.Errorf("%v doesn't support dry-run", gvk)
-	}
-	return nil
 }

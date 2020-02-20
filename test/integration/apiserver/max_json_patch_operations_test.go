@@ -17,11 +17,12 @@ limitations under the License.
 package apiserver
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -50,13 +51,13 @@ func TestMaxJSONPatchOperations(t *testing.T) {
 			Name: "test",
 		},
 	}
-	_, err := clientSet.CoreV1().Secrets("default").Create(secret)
+	_, err := clientSet.CoreV1().Secrets("default").Create(context.TODO(), secret, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	err = c.Patch(types.JSONPatchType).AbsPath(fmt.Sprintf("/api/v1/namespaces/default/secrets/test")).
-		Body(hugePatch).Do().Error()
+		Body(hugePatch).Do(context.TODO()).Error()
 	if err == nil {
 		t.Fatalf("unexpected no error")
 	}

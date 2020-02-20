@@ -64,6 +64,7 @@ func (n *NodeMetricsSorter) Len() int {
 
 func (n *NodeMetricsSorter) Swap(i, j int) {
 	n.metrics[i], n.metrics[j] = n.metrics[j], n.metrics[i]
+	n.usages[i], n.usages[j] = n.usages[j], n.usages[i]
 }
 
 func (n *NodeMetricsSorter) Less(i, j int) bool {
@@ -71,7 +72,7 @@ func (n *NodeMetricsSorter) Less(i, j int) bool {
 	case "cpu":
 		qi := n.usages[i][v1.ResourceCPU]
 		qj := n.usages[j][v1.ResourceCPU]
-		return qi.Value() > qj.Value()
+		return qi.MilliValue() > qj.MilliValue()
 	case "memory":
 		qi := n.usages[i][v1.ResourceMemory]
 		qj := n.usages[j][v1.ResourceMemory]
@@ -109,6 +110,7 @@ func (p *PodMetricsSorter) Len() int {
 
 func (p *PodMetricsSorter) Swap(i, j int) {
 	p.metrics[i], p.metrics[j] = p.metrics[j], p.metrics[i]
+	p.podMetrics[i], p.podMetrics[j] = p.podMetrics[j], p.podMetrics[i]
 }
 
 func (p *PodMetricsSorter) Less(i, j int) bool {
@@ -116,7 +118,7 @@ func (p *PodMetricsSorter) Less(i, j int) bool {
 	case "cpu":
 		qi := p.podMetrics[i][v1.ResourceCPU]
 		qj := p.podMetrics[j][v1.ResourceCPU]
-		return qi.Value() > qj.Value()
+		return qi.MilliValue() > qj.MilliValue()
 	case "memory":
 		qi := p.podMetrics[i][v1.ResourceMemory]
 		qj := p.podMetrics[j][v1.ResourceMemory]

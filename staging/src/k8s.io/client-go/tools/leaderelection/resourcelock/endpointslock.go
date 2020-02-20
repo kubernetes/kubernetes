@@ -17,6 +17,7 @@ limitations under the License.
 package resourcelock
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -36,10 +37,10 @@ type EndpointsLock struct {
 }
 
 // Get returns the election record from a Endpoints Annotation
-func (el *EndpointsLock) Get() (*LeaderElectionRecord, []byte, error) {
+func (el *EndpointsLock) Get(ctx context.Context) (*LeaderElectionRecord, []byte, error) {
 	var record LeaderElectionRecord
 	var err error
-	el.e, err = el.Client.Endpoints(el.EndpointsMeta.Namespace).Get(el.EndpointsMeta.Name, metav1.GetOptions{})
+	el.e, err = el.Client.Endpoints(el.EndpointsMeta.Namespace).Get(ctx, el.EndpointsMeta.Name, metav1.GetOptions{})
 	if err != nil {
 		return nil, nil, err
 	}
@@ -56,12 +57,12 @@ func (el *EndpointsLock) Get() (*LeaderElectionRecord, []byte, error) {
 }
 
 // Create attempts to create a LeaderElectionRecord annotation
-func (el *EndpointsLock) Create(ler LeaderElectionRecord) error {
+func (el *EndpointsLock) Create(ctx context.Context, ler LeaderElectionRecord) error {
 	recordBytes, err := json.Marshal(ler)
 	if err != nil {
 		return err
 	}
-	el.e, err = el.Client.Endpoints(el.EndpointsMeta.Namespace).Create(&v1.Endpoints{
+	el.e, err = el.Client.Endpoints(el.EndpointsMeta.Namespace).Create(ctx, &v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      el.EndpointsMeta.Name,
 			Namespace: el.EndpointsMeta.Namespace,
@@ -69,12 +70,12 @@ func (el *EndpointsLock) Create(ler LeaderElectionRecord) error {
 				LeaderElectionRecordAnnotationKey: string(recordBytes),
 			},
 		},
-	})
+	}, metav1.CreateOptions{})
 	return err
 }
 
 // Update will update and existing annotation on a given resource.
-func (el *EndpointsLock) Update(ler LeaderElectionRecord) error {
+func (el *EndpointsLock) Update(ctx context.Context, ler LeaderElectionRecord) error {
 	if el.e == nil {
 		return errors.New("endpoint not initialized, call get or create first")
 	}
@@ -86,7 +87,7 @@ func (el *EndpointsLock) Update(ler LeaderElectionRecord) error {
 		el.e.Annotations = make(map[string]string)
 	}
 	el.e.Annotations[LeaderElectionRecordAnnotationKey] = string(recordBytes)
-	el.e, err = el.Client.Endpoints(el.EndpointsMeta.Namespace).Update(el.e)
+	el.e, err = el.Client.Endpoints(el.EndpointsMeta.Namespace).Update(ctx, el.e, metav1.UpdateOptions{})
 	return err
 }
 

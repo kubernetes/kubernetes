@@ -44,7 +44,7 @@ func TestCrossGroupStorage(t *testing.T) {
 
 	crossGroupResources := map[schema.GroupVersionKind][]Resource{}
 
-	master.Client.CoreV1().Namespaces().Create(&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}})
+	master.Client.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}}, metav1.CreateOptions{})
 
 	// Group by persisted GVK
 	for _, resourceToPersist := range master.Resources {

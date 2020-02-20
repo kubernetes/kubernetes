@@ -1,10 +1,7 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-- thockin
-- dchen1107
-- freehan
-- dcbw
+- sig-network-driver-approvers
 emeritus_approvers:
 - matchstick
 reviewers:

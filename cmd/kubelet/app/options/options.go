@@ -219,7 +219,7 @@ func NewKubeletFlags() *KubeletFlags {
 		SeccompProfileRoot:                  filepath.Join(defaultRootDir, "seccomp"),
 		// prior to the introduction of this flag, there was a hardcoded cap of 50 images
 		NodeStatusMaxImages:         50,
-		EnableCAdvisorJSONEndpoints: true,
+		EnableCAdvisorJSONEndpoints: false,
 	}
 }
 

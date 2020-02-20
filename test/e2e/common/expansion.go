@@ -17,6 +17,7 @@ limitations under the License.
 package common
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -184,7 +185,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 								SubPathExpr: "$(POD_NAME)",
 							},
 							{
-								Name:      "workdir2",
+								Name:      "workdir1",
 								MountPath: "/testcontainer",
 							},
 						},
@@ -195,13 +196,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 					{
 						Name: "workdir1",
 						VolumeSource: v1.VolumeSource{
-							HostPath: &v1.HostPathVolumeSource{Path: "/tmp"},
-						},
-					},
-					{
-						Name: "workdir2",
-						VolumeSource: v1.VolumeSource{
-							HostPath: &v1.HostPathVolumeSource{Path: "/tmp"},
+							EmptyDir: &v1.EmptyDirVolumeSource{},
 						},
 					},
 				},
@@ -353,7 +348,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 								SubPathExpr: "$(ANNOTATION)/$(POD_NAME)",
 							},
 							{
-								Name:      "workdir2",
+								Name:      "workdir1",
 								MountPath: "/volume_mount",
 							},
 						},
@@ -363,13 +358,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 					{
 						Name: "workdir1",
 						VolumeSource: v1.VolumeSource{
-							HostPath: &v1.HostPathVolumeSource{Path: "/tmp"},
-						},
-					},
-					{
-						Name: "workdir2",
-						VolumeSource: v1.VolumeSource{
-							HostPath: &v1.HostPathVolumeSource{Path: "/tmp"},
+							EmptyDir: &v1.EmptyDirVolumeSource{},
 						},
 					},
 				},
@@ -443,7 +432,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 								SubPathExpr: "$(ANNOTATION)/$(POD_NAME)",
 							},
 							{
-								Name:      "workdir2",
+								Name:      "workdir1",
 								MountPath: "/volume_mount",
 							},
 						},
@@ -454,13 +443,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 					{
 						Name: "workdir1",
 						VolumeSource: v1.VolumeSource{
-							HostPath: &v1.HostPathVolumeSource{Path: "/tmp"},
-						},
-					},
-					{
-						Name: "workdir2",
-						VolumeSource: v1.VolumeSource{
-							HostPath: &v1.HostPathVolumeSource{Path: "/tmp"},
+							EmptyDir: &v1.EmptyDirVolumeSource{},
 						},
 					},
 				},
@@ -536,7 +519,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 								MountPath: "/subpath_mount",
 							},
 							{
-								Name:      "workdir2",
+								Name:      "workdir1",
 								MountPath: "/volume_mount",
 							},
 						},
@@ -566,7 +549,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 								SubPathExpr: "$(POD_NAME)",
 							},
 							{
-								Name:      "workdir2",
+								Name:      "workdir1",
 								MountPath: "/volume_mount",
 							},
 						},
@@ -577,13 +560,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 					{
 						Name: "workdir1",
 						VolumeSource: v1.VolumeSource{
-							HostPath: &v1.HostPathVolumeSource{Path: "/tmp"},
-						},
-					},
-					{
-						Name: "workdir2",
-						VolumeSource: v1.VolumeSource{
-							HostPath: &v1.HostPathVolumeSource{Path: "/tmp"},
+							EmptyDir: &v1.EmptyDirVolumeSource{},
 						},
 					},
 				},
@@ -661,7 +638,7 @@ func waitForPodContainerRestart(f *framework.Framework, pod *v1.Pod, volumeMount
 	ginkgo.By("Waiting for container to restart")
 	restarts := int32(0)
 	err = wait.PollImmediate(10*time.Second, 2*time.Minute, func() (bool, error) {
-		pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(pod.Name, metav1.GetOptions{})
+		pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -690,7 +667,7 @@ func waitForPodContainerRestart(f *framework.Framework, pod *v1.Pod, volumeMount
 	stableCount := int(0)
 	stableThreshold := int(time.Minute / framework.Poll)
 	err = wait.PollImmediate(framework.Poll, 2*time.Minute, func() (bool, error) {
-		pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(pod.Name, metav1.GetOptions{})
+		pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}

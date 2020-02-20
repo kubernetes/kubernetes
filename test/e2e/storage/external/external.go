@@ -17,20 +17,22 @@ limitations under the License.
 package external
 
 import (
+	"context"
 	"flag"
 	"io/ioutil"
 
 	"github.com/pkg/errors"
 
 	storagev1 "k8s.io/api/storage/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/config"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
@@ -69,6 +71,10 @@ type driverDefinition struct {
 		// This can be used when the storage class is meant to have
 		// additional parameters.
 		FromFile string
+
+		// FromExistingClassName specifies the name of a pre-installed
+		// StorageClass that will be copied and used for the tests.
+		FromExistingClassName string
 	}
 
 	// SnapshotClass must be set to enable snapshotting tests.
@@ -233,7 +239,7 @@ func (d *driverDefinition) SkipUnsupportedTest(pattern testpatterns.TestPattern)
 	case "":
 		supported = true
 	case testpatterns.DynamicPV:
-		if d.StorageClass.FromName || d.StorageClass.FromFile != "" {
+		if d.StorageClass.FromName || d.StorageClass.FromFile != "" || d.StorageClass.FromExistingClassName != "" {
 			supported = true
 		}
 	case testpatterns.CSIInlineVolume:
@@ -258,39 +264,44 @@ func (d *driverDefinition) SkipUnsupportedTest(pattern testpatterns.TestPattern)
 }
 
 func (d *driverDefinition) GetDynamicProvisionStorageClass(config *testsuites.PerTestConfig, fsType string) *storagev1.StorageClass {
+	var (
+		sc  *storagev1.StorageClass
+		err error
+	)
+
 	f := config.Framework
 
-	if d.StorageClass.FromName {
-		provisioner := d.DriverInfo.Name
-		parameters := map[string]string{}
-		ns := f.Namespace.Name
-		suffix := provisioner + "-sc"
-		if fsType != "" {
-			parameters["csi.storage.k8s.io/fstype"] = fsType
-		}
+	switch {
+	case d.StorageClass.FromName:
+		sc = &storagev1.StorageClass{Provisioner: d.DriverInfo.Name}
+	case d.StorageClass.FromExistingClassName != "":
+		sc, err = f.ClientSet.StorageV1().StorageClasses().Get(context.TODO(), d.StorageClass.FromExistingClassName, metav1.GetOptions{})
+		framework.ExpectNoError(err, "getting storage class %s", d.StorageClass.FromExistingClassName)
+	case d.StorageClass.FromFile != "":
+		var ok bool
 
-		return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
+		items, err := utils.LoadFromManifests(d.StorageClass.FromFile)
+		framework.ExpectNoError(err, "load storage class from %s", d.StorageClass.FromFile)
+		framework.ExpectEqual(len(items), 1, "exactly one item from %s", d.StorageClass.FromFile)
+
+		err = utils.PatchItems(f, items...)
+		framework.ExpectNoError(err, "patch items")
+
+		sc, ok = items[0].(*storagev1.StorageClass)
+		framework.ExpectEqual(ok, true, "storage class from %s", d.StorageClass.FromFile)
 	}
 
-	items, err := utils.LoadFromManifests(d.StorageClass.FromFile)
-	framework.ExpectNoError(err, "load storage class from %s", d.StorageClass.FromFile)
-	framework.ExpectEqual(len(items), 1, "exactly one item from %s", d.StorageClass.FromFile)
+	framework.ExpectNotEqual(sc, nil, "storage class is unexpectantly nil")
 
-	err = utils.PatchItems(f, items...)
-	framework.ExpectNoError(err, "patch items")
-
-	sc, ok := items[0].(*storagev1.StorageClass)
-	framework.ExpectEqual(ok, true, "storage class from %s", d.StorageClass.FromFile)
-	// Ensure that we can load more than once as required for
-	// GetDynamicProvisionStorageClass by adding a random suffix.
-	sc.Name = names.SimpleNameGenerator.GenerateName(sc.Name + "-")
 	if fsType != "" {
 		if sc.Parameters == nil {
 			sc.Parameters = map[string]string{}
 		}
+		// This limits the external storage test suite to only CSI drivers, which may need to be
+		// reconsidered if we eventually need to move in-tree storage tests out.
 		sc.Parameters["csi.storage.k8s.io/fstype"] = fsType
 	}
-	return sc
+	return testsuites.GetStorageClass(sc.Provisioner, sc.Parameters, sc.VolumeBindingMode, f.Namespace.Name, "e2e-sc")
 }
 
 func (d *driverDefinition) GetSnapshotClass(config *testsuites.PerTestConfig) *unstructured.Unstructured {
@@ -320,10 +331,10 @@ func (d *driverDefinition) GetCSIDriverName(config *testsuites.PerTestConfig) st
 
 func (d *driverDefinition) PrepareTest(f *framework.Framework) (*testsuites.PerTestConfig, func()) {
 	config := &testsuites.PerTestConfig{
-		Driver:         d,
-		Prefix:         "external",
-		Framework:      f,
-		ClientNodeName: d.ClientNodeName,
+		Driver:              d,
+		Prefix:              "external",
+		Framework:           f,
+		ClientNodeSelection: e2epod.NodeSelection{Name: d.ClientNodeName},
 	}
 	return config, func() {}
 }

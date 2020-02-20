@@ -31,7 +31,9 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/kubernetes"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 
 const (
@@ -66,8 +68,8 @@ type Helper struct {
 	Out    io.Writer
 	ErrOut io.Writer
 
-	// TODO(justinsb): unnecessary?
-	DryRun bool
+	DryRunStrategy cmdutil.DryRunStrategy
+	DryRunVerifier *resource.DryRunVerifier
 
 	// OnPodDeletedOrEvicted is called when a pod is evicted/deleted; for printing progress output
 	OnPodDeletedOrEvicted func(pod *corev1.Pod, usingEviction bool)
@@ -125,16 +127,29 @@ func (d *Helper) makeDeleteOptions() *metav1.DeleteOptions {
 		gracePeriodSeconds := int64(d.GracePeriodSeconds)
 		deleteOptions.GracePeriodSeconds = &gracePeriodSeconds
 	}
+	if d.DryRunStrategy == cmdutil.DryRunServer {
+		deleteOptions.DryRun = []string{metav1.DryRunAll}
+	}
 	return deleteOptions
 }
 
 // DeletePod will delete the given pod, or return an error if it couldn't
 func (d *Helper) DeletePod(pod corev1.Pod) error {
-	return d.Client.CoreV1().Pods(pod.Namespace).Delete(pod.Name, d.makeDeleteOptions())
+	if d.DryRunStrategy == cmdutil.DryRunServer {
+		if err := d.DryRunVerifier.HasSupport(pod.GroupVersionKind()); err != nil {
+			return err
+		}
+	}
+	return d.Client.CoreV1().Pods(pod.Namespace).Delete(context.TODO(), pod.Name, d.makeDeleteOptions())
 }
 
 // EvictPod will evict the give pod, or return an error if it couldn't
 func (d *Helper) EvictPod(pod corev1.Pod, policyGroupVersion string) error {
+	if d.DryRunStrategy == cmdutil.DryRunServer {
+		if err := d.DryRunVerifier.HasSupport(pod.GroupVersionKind()); err != nil {
+			return err
+		}
+	}
 	eviction := &policyv1beta1.Eviction{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: policyGroupVersion,
@@ -160,7 +175,7 @@ func (d *Helper) GetPodsForDeletion(nodeName string) (*podDeleteList, []error) {
 		return nil, []error{err}
 	}
 
-	podList, err := d.Client.CoreV1().Pods(metav1.NamespaceAll).List(metav1.ListOptions{
+	podList, err := d.Client.CoreV1().Pods(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{
 		LabelSelector: labelSelector.String(),
 		FieldSelector: fields.SelectorFromSet(fields.Set{"spec.nodeName": nodeName}).String()})
 	if err != nil {
@@ -180,12 +195,13 @@ func (d *Helper) GetPodsForDeletion(nodeName string) (*podDeleteList, []error) {
 				break
 			}
 		}
-		if status.delete {
-			pods = append(pods, podDelete{
-				pod:    pod,
-				status: status,
-			})
-		}
+		// Add the pod to podDeleteList no matter what podDeleteStatus is,
+		// those pods whose podDeleteStatus is false like DaemonSet will
+		// be catched by list.errors()
+		pods = append(pods, podDelete{
+			pod:    pod,
+			status: status,
+		})
 	}
 
 	list := &podDeleteList{items: pods}
@@ -205,7 +221,7 @@ func (d *Helper) DeleteOrEvictPods(pods []corev1.Pod) error {
 
 	// TODO(justinsb): unnecessary?
 	getPodFn := func(namespace, name string) (*corev1.Pod, error) {
-		return d.Client.CoreV1().Pods(namespace).Get(name, metav1.GetOptions{})
+		return d.Client.CoreV1().Pods(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	}
 
 	if !d.DisableEviction {
@@ -236,7 +252,12 @@ func (d *Helper) evictPods(pods []corev1.Pod, policyGroupVersion string, getPodF
 	for _, pod := range pods {
 		go func(pod corev1.Pod, returnCh chan error) {
 			for {
-				fmt.Fprintf(d.Out, "evicting pod %s/%s\n", pod.Namespace, pod.Name)
+				switch d.DryRunStrategy {
+				case cmdutil.DryRunServer:
+					fmt.Fprintf(d.Out, "evicting pod %s/%s (server dry run)\n", pod.Namespace, pod.Name)
+				default:
+					fmt.Fprintf(d.Out, "evicting pod %s/%s\n", pod.Namespace, pod.Name)
+				}
 				select {
 				case <-ctx.Done():
 					// return here or we'll leak a goroutine.
@@ -257,6 +278,10 @@ func (d *Helper) evictPods(pods []corev1.Pod, policyGroupVersion string, getPodF
 					returnCh <- fmt.Errorf("error when evicting pod %q: %v", pod.Name, err)
 					return
 				}
+			}
+			if d.DryRunStrategy == cmdutil.DryRunServer {
+				returnCh <- nil
+				return
 			}
 			params := waitForDeleteParams{
 				ctx:                             ctx,

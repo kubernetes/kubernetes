@@ -27,11 +27,13 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/registry/core/pod"
+
+	// ensure types are installed
+	_ "k8s.io/kubernetes/pkg/apis/core/install"
 )
 
 // LogREST implements the log endpoint for a Pod
@@ -49,7 +51,8 @@ func (r *LogREST) New() runtime.Object {
 	return &api.Pod{}
 }
 
-// LogREST implements StorageMetadata
+// ProducesMIMETypes returns a list of the MIME types the specified HTTP verb (GET, POST, DELETE,
+// PATCH) can respond with.
 func (r *LogREST) ProducesMIMETypes(verb string) []string {
 	// Since the default list does not include "plain/text", we need to
 	// explicitly override ProducesMIMETypes, so that it gets added to
@@ -59,7 +62,8 @@ func (r *LogREST) ProducesMIMETypes(verb string) []string {
 	}
 }
 
-// LogREST implements StorageMetadata, return string as the generating object
+// ProducesObject returns an object the specified HTTP verb respond with. It will overwrite storage object if
+// it is not nil. Only the type of the return object matters, the value will be ignored.
 func (r *LogREST) ProducesObject(verb string) interface{} {
 	return ""
 }
@@ -77,7 +81,7 @@ func (r *LogREST) Get(ctx context.Context, name string, opts runtime.Object) (ru
 	if errs := validation.ValidatePodLogOptions(logOpts); len(errs) > 0 {
 		return nil, errors.NewInvalid(api.Kind("PodLogOptions"), name, errs)
 	}
-	location, transport, err := pod.LogLocation(r.Store, r.KubeletConn, ctx, name, logOpts)
+	location, transport, err := pod.LogLocation(ctx, r.Store, r.KubeletConn, name, logOpts)
 	if err != nil {
 		return nil, err
 	}

@@ -130,6 +130,7 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 		availabilityZone         string
 		availabilityZones        sets.String
 		selectedAvailabilityZone string
+		writeAcceleratorEnabled  string
 
 		diskIopsReadWrite   string
 		diskMbpsReadWrite   string
@@ -178,6 +179,8 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 			diskMbpsReadWrite = v
 		case "diskencryptionsetid":
 			diskEncryptionSetID = v
+		case azure.WriteAcceleratorEnabled:
+			writeAcceleratorEnabled = v
 		default:
 			return nil, fmt.Errorf("AzureDisk - invalid option %s in storage class", k)
 		}
@@ -244,6 +247,9 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 		tags := make(map[string]string)
 		if p.options.CloudTags != nil {
 			tags = *(p.options.CloudTags)
+		}
+		if strings.EqualFold(writeAcceleratorEnabled, "true") {
+			tags[azure.WriteAcceleratorEnabled] = "true"
 		}
 
 		volumeOptions := &azure.ManagedDiskOptions{

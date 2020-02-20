@@ -88,6 +88,7 @@ go_test(
         "//test/e2e/lifecycle/bootstrap:go_default_library",
         "//test/integration:go_default_library",
         "//test/integration/framework:go_default_library",
+        "//vendor/gopkg.in/square/go-jose.v2:go_default_library",
         "//vendor/gopkg.in/square/go-jose.v2/jwt:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
         "//vendor/k8s.io/utils/pointer:go_default_library",

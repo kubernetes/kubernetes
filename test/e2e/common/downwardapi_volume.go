@@ -17,6 +17,7 @@ limitations under the License.
 package common
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -26,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
@@ -89,7 +91,7 @@ var _ = ginkgo.Describe("[sig-storage] Downward API volume", func() {
 
 	ginkgo.It("should provide podname as non-root with fsgroup [LinuxOnly] [NodeFeature:FSGroup]", func() {
 		// Windows does not support RunAsUser / FSGroup SecurityContext options.
-		framework.SkipIfNodeOSDistroIs("windows")
+		e2eskipper.SkipIfNodeOSDistroIs("windows")
 		podName := "metadata-volume-" + string(uuid.NewUUID())
 		gid := int64(1234)
 		pod := downwardAPIVolumePodForSimpleTest(podName, "/etc/podinfo/podname")
@@ -104,7 +106,7 @@ var _ = ginkgo.Describe("[sig-storage] Downward API volume", func() {
 
 	ginkgo.It("should provide podname as non-root with fsgroup and defaultMode [LinuxOnly] [NodeFeature:FSGroup]", func() {
 		// Windows does not support RunAsUser / FSGroup SecurityContext options, and it does not support setting file permissions.
-		framework.SkipIfNodeOSDistroIs("windows")
+		e2eskipper.SkipIfNodeOSDistroIs("windows")
 		podName := "metadata-volume-" + string(uuid.NewUUID())
 		gid := int64(1234)
 		mode := int32(0440) /* setting fsGroup sets mode to at least 440 */
@@ -165,7 +167,7 @@ var _ = ginkgo.Describe("[sig-storage] Downward API volume", func() {
 		ginkgo.By("Creating the pod")
 		podClient.CreateSync(pod)
 
-		pod, err := podClient.Get(pod.Name, metav1.GetOptions{})
+		pod, err := podClient.Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "Failed to get pod %q", pod.Name)
 
 		gomega.Eventually(func() (string, error) {

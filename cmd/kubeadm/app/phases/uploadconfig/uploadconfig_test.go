@@ -17,6 +17,7 @@ limitations under the License.
 package uploadconfig
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
@@ -120,7 +121,7 @@ func TestUploadConfiguration(t *testing.T) {
 				}
 			}
 			if tt.verifyResult {
-				controlPlaneCfg, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(kubeadmconstants.KubeadmConfigConfigMap, metav1.GetOptions{})
+				controlPlaneCfg, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(context.TODO(), kubeadmconstants.KubeadmConfigConfigMap, metav1.GetOptions{})
 				if err != nil {
 					t2.Fatalf("Fail to query ConfigMap error = %v", err)
 				}

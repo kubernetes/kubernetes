@@ -28,9 +28,11 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/meta/testrestmapper"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/discovery"
@@ -128,6 +130,34 @@ func NewInternalType(kind, apiversion, name string) *InternalType {
 	return &item
 }
 
+func convertInternalTypeToExternalType(in *InternalType, out *ExternalType, s conversion.Scope) error {
+	out.Kind = in.Kind
+	out.APIVersion = in.APIVersion
+	out.Name = in.Name
+	return nil
+}
+
+func convertInternalTypeToExternalType2(in *InternalType, out *ExternalType2, s conversion.Scope) error {
+	out.Kind = in.Kind
+	out.APIVersion = in.APIVersion
+	out.Name = in.Name
+	return nil
+}
+
+func convertExternalTypeToInternalType(in *ExternalType, out *InternalType, s conversion.Scope) error {
+	out.Kind = in.Kind
+	out.APIVersion = in.APIVersion
+	out.Name = in.Name
+	return nil
+}
+
+func convertExternalType2ToInternalType(in *ExternalType2, out *InternalType, s conversion.Scope) error {
+	out.Kind = in.Kind
+	out.APIVersion = in.APIVersion
+	out.Name = in.Name
+	return nil
+}
+
 // InternalNamespacedType schema for internal namespaced types
 // +k8s:deepcopy-gen=true
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -209,6 +239,38 @@ func NewInternalNamespacedType(kind, apiversion, name, namespace string) *Intern
 	return &item
 }
 
+func convertInternalNamespacedTypeToExternalNamespacedType(in *InternalNamespacedType, out *ExternalNamespacedType, s conversion.Scope) error {
+	out.Kind = in.Kind
+	out.APIVersion = in.APIVersion
+	out.Name = in.Name
+	out.Namespace = in.Namespace
+	return nil
+}
+
+func convertInternalNamespacedTypeToExternalNamespacedType2(in *InternalNamespacedType, out *ExternalNamespacedType2, s conversion.Scope) error {
+	out.Kind = in.Kind
+	out.APIVersion = in.APIVersion
+	out.Name = in.Name
+	out.Namespace = in.Namespace
+	return nil
+}
+
+func convertExternalNamespacedTypeToInternalNamespacedType(in *ExternalNamespacedType, out *InternalNamespacedType, s conversion.Scope) error {
+	out.Kind = in.Kind
+	out.APIVersion = in.APIVersion
+	out.Name = in.Name
+	out.Namespace = in.Namespace
+	return nil
+}
+
+func convertExternalNamespacedType2ToInternalNamespacedType(in *ExternalNamespacedType2, out *InternalNamespacedType, s conversion.Scope) error {
+	out.Kind = in.Kind
+	out.APIVersion = in.APIVersion
+	out.Name = in.Name
+	out.Namespace = in.Namespace
+	return nil
+}
+
 var errInvalidVersion = errors.New("not a version")
 
 // ValidVersion of API
@@ -230,17 +292,63 @@ func NewExternalScheme() (*runtime.Scheme, meta.RESTMapper, runtime.Codec) {
 	return scheme, mapper, codec
 }
 
+func registerConversions(s *runtime.Scheme) error {
+	if err := s.AddConversionFunc((*InternalType)(nil), (*ExternalType)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return convertInternalTypeToExternalType(a.(*InternalType), b.(*ExternalType), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*InternalType)(nil), (*ExternalType2)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return convertInternalTypeToExternalType2(a.(*InternalType), b.(*ExternalType2), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*ExternalType)(nil), (*InternalType)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return convertExternalTypeToInternalType(a.(*ExternalType), b.(*InternalType), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*ExternalType2)(nil), (*InternalType)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return convertExternalType2ToInternalType(a.(*ExternalType2), b.(*InternalType), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*InternalNamespacedType)(nil), (*ExternalNamespacedType)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return convertInternalNamespacedTypeToExternalNamespacedType(a.(*InternalNamespacedType), b.(*ExternalNamespacedType), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*InternalNamespacedType)(nil), (*ExternalNamespacedType2)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return convertInternalNamespacedTypeToExternalNamespacedType2(a.(*InternalNamespacedType), b.(*ExternalNamespacedType2), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*ExternalNamespacedType)(nil), (*InternalNamespacedType)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return convertExternalNamespacedTypeToInternalNamespacedType(a.(*ExternalNamespacedType), b.(*InternalNamespacedType), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*ExternalNamespacedType2)(nil), (*InternalNamespacedType)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return convertExternalNamespacedType2ToInternalNamespacedType(a.(*ExternalNamespacedType2), b.(*InternalNamespacedType), scope)
+	}); err != nil {
+		return err
+	}
+	return nil
+}
+
 // AddToScheme adds required objects into scheme
 func AddToScheme(scheme *runtime.Scheme) (meta.RESTMapper, runtime.Codec) {
 	scheme.AddKnownTypeWithName(InternalGV.WithKind("Type"), &InternalType{})
 	scheme.AddKnownTypeWithName(UnlikelyGV.WithKind("Type"), &ExternalType{})
-	//This tests that kubectl will not confuse the external scheme with the internal scheme, even when they accidentally have versions of the same name.
+	// This tests that kubectl will not confuse the external scheme with the internal scheme, even when they accidentally have versions of the same name.
 	scheme.AddKnownTypeWithName(ValidVersionGV.WithKind("Type"), &ExternalType2{})
 
 	scheme.AddKnownTypeWithName(InternalGV.WithKind("NamespacedType"), &InternalNamespacedType{})
 	scheme.AddKnownTypeWithName(UnlikelyGV.WithKind("NamespacedType"), &ExternalNamespacedType{})
-	//This tests that kubectl will not confuse the external scheme with the internal scheme, even when they accidentally have versions of the same name.
+	// This tests that kubectl will not confuse the external scheme with the internal scheme, even when they accidentally have versions of the same name.
 	scheme.AddKnownTypeWithName(ValidVersionGV.WithKind("NamespacedType"), &ExternalNamespacedType2{})
+
+	utilruntime.Must(registerConversions(scheme))
 
 	codecs := serializer.NewCodecFactory(scheme)
 	codec := codecs.LegacyCodec(UnlikelyGV)

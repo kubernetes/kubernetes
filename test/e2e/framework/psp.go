@@ -17,6 +17,7 @@ limitations under the License.
 package framework
 
 import (
+	"context"
 	"fmt"
 	"sync"
 
@@ -83,7 +84,7 @@ func privilegedPSP(name string) *policyv1beta1.PodSecurityPolicy {
 // IsPodSecurityPolicyEnabled returns true if PodSecurityPolicy is enabled. Otherwise false.
 func IsPodSecurityPolicyEnabled(kubeClient clientset.Interface) bool {
 	isPSPEnabledOnce.Do(func() {
-		psps, err := kubeClient.PolicyV1beta1().PodSecurityPolicies().List(metav1.ListOptions{})
+		psps, err := kubeClient.PolicyV1beta1().PodSecurityPolicies().List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			Logf("Error listing PodSecurityPolicies; assuming PodSecurityPolicy is disabled: %v", err)
 			isPSPEnabled = false
@@ -109,8 +110,7 @@ func CreatePrivilegedPSPBinding(kubeClient clientset.Interface, namespace string
 	}
 	// Create the privileged PSP & role
 	privilegedPSPOnce.Do(func() {
-		_, err := kubeClient.PolicyV1beta1().PodSecurityPolicies().Get(
-			podSecurityPolicyPrivileged, metav1.GetOptions{})
+		_, err := kubeClient.PolicyV1beta1().PodSecurityPolicies().Get(context.TODO(), podSecurityPolicyPrivileged, metav1.GetOptions{})
 		if !apierrors.IsNotFound(err) {
 			// Privileged PSP was already created.
 			ExpectNoError(err, "Failed to get PodSecurityPolicy %s", podSecurityPolicyPrivileged)
@@ -118,14 +118,14 @@ func CreatePrivilegedPSPBinding(kubeClient clientset.Interface, namespace string
 		}
 
 		psp := privilegedPSP(podSecurityPolicyPrivileged)
-		_, err = kubeClient.PolicyV1beta1().PodSecurityPolicies().Create(psp)
+		_, err = kubeClient.PolicyV1beta1().PodSecurityPolicies().Create(context.TODO(), psp, metav1.CreateOptions{})
 		if !apierrors.IsAlreadyExists(err) {
 			ExpectNoError(err, "Failed to create PSP %s", podSecurityPolicyPrivileged)
 		}
 
 		if auth.IsRBACEnabled(kubeClient.RbacV1()) {
 			// Create the Role to bind it to the namespace.
-			_, err = kubeClient.RbacV1().ClusterRoles().Create(&rbacv1.ClusterRole{
+			_, err = kubeClient.RbacV1().ClusterRoles().Create(context.TODO(), &rbacv1.ClusterRole{
 				ObjectMeta: metav1.ObjectMeta{Name: podSecurityPolicyPrivileged},
 				Rules: []rbacv1.PolicyRule{{
 					APIGroups:     []string{"extensions"},
@@ -133,7 +133,7 @@ func CreatePrivilegedPSPBinding(kubeClient clientset.Interface, namespace string
 					ResourceNames: []string{podSecurityPolicyPrivileged},
 					Verbs:         []string{"use"},
 				}},
-			})
+			}, metav1.CreateOptions{})
 			if !apierrors.IsAlreadyExists(err) {
 				ExpectNoError(err, "Failed to create PSP role")
 			}

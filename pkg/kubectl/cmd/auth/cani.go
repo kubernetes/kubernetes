@@ -17,6 +17,7 @@ limitations under the License.
 package auth
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -30,6 +31,7 @@ import (
 	authorizationv1 "k8s.io/api/authorization/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -222,7 +224,7 @@ func (o *CanIOptions) RunAccessList() error {
 			Namespace: o.Namespace,
 		},
 	}
-	response, err := o.AuthClient.SelfSubjectRulesReviews().Create(sar)
+	response, err := o.AuthClient.SelfSubjectRulesReviews().Create(context.TODO(), sar, metav1.CreateOptions{})
 	if err != nil {
 		return err
 	}
@@ -257,7 +259,7 @@ func (o *CanIOptions) RunAccessCheck() (bool, error) {
 		}
 	}
 
-	response, err := o.AuthClient.SelfSubjectAccessReviews().Create(sar)
+	response, err := o.AuthClient.SelfSubjectAccessReviews().Create(context.TODO(), sar, metav1.CreateOptions{})
 	if err != nil {
 		return false, err
 	}

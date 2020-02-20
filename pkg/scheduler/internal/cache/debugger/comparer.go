@@ -52,15 +52,15 @@ func (c *CacheComparer) Compare() error {
 		return err
 	}
 
-	snapshot := c.Cache.Snapshot()
+	dump := c.Cache.Dump()
 
 	pendingPods := c.PodQueue.PendingPods()
 
-	if missed, redundant := c.CompareNodes(nodes, snapshot.Nodes); len(missed)+len(redundant) != 0 {
+	if missed, redundant := c.CompareNodes(nodes, dump.Nodes); len(missed)+len(redundant) != 0 {
 		klog.Warningf("cache mismatch: missed nodes: %s; redundant nodes: %s", missed, redundant)
 	}
 
-	if missed, redundant := c.ComparePods(pods, pendingPods, snapshot.Nodes); len(missed)+len(redundant) != 0 {
+	if missed, redundant := c.ComparePods(pods, pendingPods, dump.Nodes); len(missed)+len(redundant) != 0 {
 		klog.Warningf("cache mismatch: missed pods: %s; redundant pods: %s", missed, redundant)
 	}
 

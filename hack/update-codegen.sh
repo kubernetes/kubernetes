@@ -14,6 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Please do not add any logic to this shell script. Add logic to the go code
+# that generates the set-gen program.
+
 set -o errexit
 set -o nounset
 set -o pipefail
@@ -33,10 +36,6 @@ make -C "${KUBE_ROOT}" WHAT="${BUILD_TARGETS[*]}"
 clientgen=$(kube::util::find-binary "client-gen")
 listergen=$(kube::util::find-binary "lister-gen")
 informergen=$(kube::util::find-binary "informer-gen")
-
-# Please do not add any logic to this shell script. Add logic to the go code
-# that generates the set-gen program.
-#
 
 IFS=" " read -r -a GROUP_VERSIONS <<< "${KUBE_AVAILABLE_GROUP_VERSIONS}"
 GV_DIRS=()
@@ -98,4 +97,3 @@ CODEGEN_PKG=./vendor/k8s.io/code-generator vendor/k8s.io/sample-controller/hack/
 CODEGEN_PKG=./vendor/k8s.io/code-generator vendor/k8s.io/apiextensions-apiserver/hack/update-codegen.sh
 CODEGEN_PKG=./vendor/k8s.io/code-generator vendor/k8s.io/metrics/hack/update-codegen.sh
 CODEGEN_PKG=./vendor/k8s.io/code-generator vendor/k8s.io/apiextensions-apiserver/examples/client-go/hack/update-codegen.sh
-CODEGEN_PKG=./vendor/k8s.io/code-generator vendor/k8s.io/node-api/hack/update-codegen.sh

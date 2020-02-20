@@ -17,6 +17,7 @@ limitations under the License.
 package deployment
 
 import (
+	"context"
 	"fmt"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -71,7 +72,7 @@ func NewDeployment(deploymentName string, replicas int32, podLabels map[string]s
 // CreateDeployment creates a deployment.
 func CreateDeployment(client clientset.Interface, replicas int32, podLabels map[string]string, nodeSelector map[string]string, namespace string, pvclaims []*v1.PersistentVolumeClaim, command string) (*appsv1.Deployment, error) {
 	deploymentSpec := testDeployment(replicas, podLabels, nodeSelector, namespace, pvclaims, false, command)
-	deployment, err := client.AppsV1().Deployments(namespace).Create(deploymentSpec)
+	deployment, err := client.AppsV1().Deployments(namespace).Create(context.TODO(), deploymentSpec, metav1.CreateOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("deployment %q Create API error: %v", deploymentSpec.Name, err)
 	}
@@ -93,7 +94,7 @@ func GetPodsForDeployment(client clientset.Interface, deployment *appsv1.Deploym
 		return nil, fmt.Errorf("expected a new replica set for deployment %q, found none", deployment.Name)
 	}
 	podListFunc := func(namespace string, options metav1.ListOptions) (*v1.PodList, error) {
-		return client.CoreV1().Pods(namespace).List(options)
+		return client.CoreV1().Pods(namespace).List(context.TODO(), options)
 	}
 	rsList := []*appsv1.ReplicaSet{replicaSet}
 	podList, err := deploymentutil.ListPods(deployment, rsList, podListFunc)

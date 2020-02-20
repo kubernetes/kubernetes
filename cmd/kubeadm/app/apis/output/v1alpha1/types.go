@@ -31,3 +31,12 @@ type BootstrapToken struct {
 
 	kubeadmapiv1beta2.BootstrapToken
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// Images represents information for the output produced by 'kubeadm config images list'
+type Images struct {
+	metav1.TypeMeta `json:",inline"`
+
+	Images []string `json:"images"`
+}

@@ -31,9 +31,11 @@ import (
 	"github.com/lithammer/dedent"
 	"github.com/spf13/cobra"
 	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
+	outputapischeme "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/scheme"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 	utilruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
 	"k8s.io/utils/exec"
 	fakeexec "k8s.io/utils/exec/testing"
@@ -94,6 +96,12 @@ func TestImagesListRunWithCustomConfigPath(t *testing.T) {
 		},
 	}
 
+	outputFlags := output.NewOutputFlags(&imageTextPrintFlags{}).WithTypeSetter(outputapischeme.Scheme).WithDefaultOutput(output.TextOutput)
+	printer, err := outputFlags.ToPrinter()
+	if err != nil {
+		t.Fatalf("can't create printer for the output format %s: %+v", output.TextOutput, err)
+	}
+
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
 			tmpDir, err := ioutil.TempDir("", "kubeadm-images-test")
@@ -114,7 +122,7 @@ func TestImagesListRunWithCustomConfigPath(t *testing.T) {
 				t.Fatalf("Failed getting the kubeadm images command: %v", err)
 			}
 			var output bytes.Buffer
-			if i.Run(&output) != nil {
+			if err = i.Run(&output, printer); err != nil {
 				t.Fatalf("Error from running the images command: %v", err)
 			}
 			actual := strings.Split(output.String(), "\n")
@@ -175,6 +183,11 @@ func TestConfigImagesListRunWithoutPath(t *testing.T) {
 		},
 	}
 
+	outputFlags := output.NewOutputFlags(&imageTextPrintFlags{}).WithTypeSetter(outputapischeme.Scheme).WithDefaultOutput(output.TextOutput)
+	printer, err := outputFlags.ToPrinter()
+	if err != nil {
+		t.Fatalf("can't create printer for the output format %s: %+v", output.TextOutput, err)
+	}
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
 			i, err := NewImagesList("", &tc.cfg)
@@ -183,13 +196,127 @@ func TestConfigImagesListRunWithoutPath(t *testing.T) {
 			}
 
 			var output bytes.Buffer
-			if i.Run(&output) != nil {
+
+			if err = i.Run(&output, printer); err != nil {
 				t.Fatalf("did not expect an error running the Images command: %v", err)
 			}
 
 			actual := strings.Split(output.String(), "\n")
 			if len(actual) != tc.expectedImages {
 				t.Fatalf("expected %v images but got %v", tc.expectedImages, actual)
+			}
+		})
+	}
+}
+
+func TestConfigImagesListOutput(t *testing.T) {
+	testcases := []struct {
+		name           string
+		cfg            kubeadmapiv1beta2.ClusterConfiguration
+		outputFormat   string
+		expectedOutput string
+	}{
+		{
+			name: "text output",
+			cfg: kubeadmapiv1beta2.ClusterConfiguration{
+				KubernetesVersion: dummyKubernetesVersion,
+			},
+			outputFormat: "text",
+			expectedOutput: `k8s.gcr.io/kube-apiserver:v1.16.0
+k8s.gcr.io/kube-controller-manager:v1.16.0
+k8s.gcr.io/kube-scheduler:v1.16.0
+k8s.gcr.io/kube-proxy:v1.16.0
+k8s.gcr.io/pause:3.2
+k8s.gcr.io/etcd:3.3.17-0
+k8s.gcr.io/coredns:1.6.5
+`,
+		},
+		{
+			name: "JSON output",
+			cfg: kubeadmapiv1beta2.ClusterConfiguration{
+				KubernetesVersion: dummyKubernetesVersion,
+			},
+			outputFormat: "json",
+			expectedOutput: `{
+    "kind": "Images",
+    "apiVersion": "output.kubeadm.k8s.io/v1alpha1",
+    "images": [
+        "k8s.gcr.io/kube-apiserver:v1.16.0",
+        "k8s.gcr.io/kube-controller-manager:v1.16.0",
+        "k8s.gcr.io/kube-scheduler:v1.16.0",
+        "k8s.gcr.io/kube-proxy:v1.16.0",
+        "k8s.gcr.io/pause:3.2",
+        "k8s.gcr.io/etcd:3.3.17-0",
+        "k8s.gcr.io/coredns:1.6.5"
+    ]
+}
+`,
+		},
+		{
+			name: "YAML output",
+			cfg: kubeadmapiv1beta2.ClusterConfiguration{
+				KubernetesVersion: dummyKubernetesVersion,
+			},
+			outputFormat: "yaml",
+			expectedOutput: `apiVersion: output.kubeadm.k8s.io/v1alpha1
+images:
+- k8s.gcr.io/kube-apiserver:v1.16.0
+- k8s.gcr.io/kube-controller-manager:v1.16.0
+- k8s.gcr.io/kube-scheduler:v1.16.0
+- k8s.gcr.io/kube-proxy:v1.16.0
+- k8s.gcr.io/pause:3.2
+- k8s.gcr.io/etcd:3.3.17-0
+- k8s.gcr.io/coredns:1.6.5
+kind: Images
+`,
+		},
+		{
+			name: "go-template output",
+			cfg: kubeadmapiv1beta2.ClusterConfiguration{
+				KubernetesVersion: dummyKubernetesVersion,
+			},
+			outputFormat: `go-template={{range .images}}{{.}}{{"\n"}}{{end}}`,
+			expectedOutput: `k8s.gcr.io/kube-apiserver:v1.16.0
+k8s.gcr.io/kube-controller-manager:v1.16.0
+k8s.gcr.io/kube-scheduler:v1.16.0
+k8s.gcr.io/kube-proxy:v1.16.0
+k8s.gcr.io/pause:3.2
+k8s.gcr.io/etcd:3.3.17-0
+k8s.gcr.io/coredns:1.6.5
+`,
+		},
+		{
+			name: "JSONPATH output",
+			cfg: kubeadmapiv1beta2.ClusterConfiguration{
+				KubernetesVersion: dummyKubernetesVersion,
+			},
+			outputFormat: `jsonpath={range.images[*]}{@} {end}`,
+			expectedOutput: "k8s.gcr.io/kube-apiserver:v1.16.0 k8s.gcr.io/kube-controller-manager:v1.16.0 k8s.gcr.io/kube-scheduler:v1.16.0 " +
+				"k8s.gcr.io/kube-proxy:v1.16.0 k8s.gcr.io/pause:3.2 k8s.gcr.io/etcd:3.3.17-0 k8s.gcr.io/coredns:1.6.5 ",
+		},
+	}
+
+	for _, tc := range testcases {
+		outputFlags := output.NewOutputFlags(&imageTextPrintFlags{}).WithTypeSetter(outputapischeme.Scheme).WithDefaultOutput(tc.outputFormat)
+		printer, err := outputFlags.ToPrinter()
+		if err != nil {
+			t.Fatalf("can't create printer for the output format %s: %+v", tc.outputFormat, err)
+		}
+
+		t.Run(tc.name, func(t *testing.T) {
+			i, err := NewImagesList("", &tc.cfg)
+			if err != nil {
+				t.Fatalf("did not expect an error while creating the Images command: %v", err)
+			}
+
+			var output bytes.Buffer
+
+			if err = i.Run(&output, printer); err != nil {
+				t.Fatalf("did not expect an error running the Images command: %v", err)
+			}
+
+			if output.String() != tc.expectedOutput {
+				t.Fatalf("unexpected output:\n|%s|\nexpected:\n|%s|\n", output.String(), tc.expectedOutput)
 			}
 		})
 	}

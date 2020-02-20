@@ -45,6 +45,7 @@ import (
 	storeerr "k8s.io/apiserver/pkg/storage/errors"
 	"k8s.io/apiserver/pkg/storage/etcd3/metrics"
 	"k8s.io/apiserver/pkg/util/dryrun"
+	"k8s.io/client-go/tools/cache"
 
 	"k8s.io/klog"
 )
@@ -975,6 +976,11 @@ func (e *Store) Delete(ctx context.Context, name string, deleteValidation rest.V
 	return out, true, err
 }
 
+// DeleteReturnsDeletedObject implements the rest.MayReturnFullObjectDeleter interface
+func (e *Store) DeleteReturnsDeletedObject() bool {
+	return e.ReturnDeletedObject
+}
+
 // DeleteCollection removes all items returned by List with a given ListOptions from storage.
 //
 // DeleteCollection is currently NOT atomic. It can happen that only subset of objects
@@ -1247,6 +1253,11 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 		}
 	}
 
+	err := validateIndexers(options.Indexers)
+	if err != nil {
+		return err
+	}
+
 	opts, err := options.RESTOptions.GetRESTOptions(e.DefaultQualifiedResource)
 	if err != nil {
 		return err
@@ -1322,6 +1333,7 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 			e.NewListFunc,
 			attrFunc,
 			options.TriggerFunc,
+			options.Indexers,
 		)
 		if err != nil {
 			return err
@@ -1370,4 +1382,17 @@ func (e *Store) ConvertToTable(ctx context.Context, object runtime.Object, table
 
 func (e *Store) StorageVersion() runtime.GroupVersioner {
 	return e.StorageVersioner
+}
+
+// validateIndexers will check the prefix of indexers.
+func validateIndexers(indexers *cache.Indexers) error {
+	if indexers == nil {
+		return nil
+	}
+	for indexName := range *indexers {
+		if len(indexName) <= 2 || (indexName[:2] != "l:" && indexName[:2] != "f:") {
+			return fmt.Errorf("index must prefix with \"l:\" or \"f:\"")
+		}
+	}
+	return nil
 }

@@ -24,7 +24,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/klog"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
@@ -52,7 +51,7 @@ type Fit struct {
 type FitArgs struct {
 	// IgnoredResources is the list of resources that NodeResources fit filter
 	// should ignore.
-	IgnoredResources []string `json:"IgnoredResources,omitempty"`
+	IgnoredResources []string `json:"ignoredResources,omitempty"`
 }
 
 // preFilterState computed at PreFilter and used at Filter.
@@ -130,10 +129,8 @@ func (f *Fit) PreFilterExtensions() framework.PreFilterExtensions {
 func getPreFilterState(cycleState *framework.CycleState) (*preFilterState, error) {
 	c, err := cycleState.Read(preFilterStateKey)
 	if err != nil {
-		// The preFilterState doesn't exist. We ignore the error for now since
-		// Filter is able to handle that by computing it again.
-		klog.V(5).Infof("Error reading %q from cycleState: %v", preFilterStateKey, err)
-		return nil, nil
+		// preFilterState doesn't exist, likely PreFilter wasn't invoked.
+		return nil, fmt.Errorf("error reading %q from cycleState: %v", preFilterStateKey, err)
 	}
 
 	s, ok := c.(*preFilterState)
@@ -152,35 +149,28 @@ func (f *Fit) Filter(ctx context.Context, cycleState *framework.CycleState, pod 
 		return framework.NewStatus(framework.Error, err.Error())
 	}
 
-	var insufficientResources []InsufficientResource
-	if s != nil {
-		insufficientResources = fitsRequest(s, nodeInfo, f.ignoredResources)
-	} else {
-		insufficientResources = Fits(pod, nodeInfo, f.ignoredResources)
-	}
-
-	// We will keep all failure reasons.
-	var failureReasons []string
-	for _, r := range insufficientResources {
-		failureReasons = append(failureReasons, getErrReason(r.ResourceName))
-	}
+	insufficientResources := fitsRequest(s, nodeInfo, f.ignoredResources)
 
 	if len(insufficientResources) != 0 {
+		// We will keep all failure reasons.
+		failureReasons := make([]string, 0, len(insufficientResources))
+		for _, r := range insufficientResources {
+			failureReasons = append(failureReasons, r.Reason)
+		}
 		return framework.NewStatus(framework.Unschedulable, failureReasons...)
 	}
 	return nil
 }
 
-func getErrReason(rn v1.ResourceName) string {
-	return fmt.Sprintf("Insufficient %v", rn)
-}
-
 // InsufficientResource describes what kind of resource limit is hit and caused the pod to not fit the node.
 type InsufficientResource struct {
 	ResourceName v1.ResourceName
-	Requested    int64
-	Used         int64
-	Capacity     int64
+	// We explicitly have a parameter for reason to avoid formatting a message on the fly
+	// for common resources, which is expensive for cluster autoscaler simulations.
+	Reason    string
+	Requested int64
+	Used      int64
+	Capacity  int64
 }
 
 // Fits checks if node have enough resources to host the pod.
@@ -189,12 +179,13 @@ func Fits(pod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo, ignoredExtendedReso
 }
 
 func fitsRequest(podRequest *preFilterState, nodeInfo *schedulernodeinfo.NodeInfo, ignoredExtendedResources sets.String) []InsufficientResource {
-	var insufficientResources []InsufficientResource
+	insufficientResources := make([]InsufficientResource, 0, 4)
 
 	allowedPodNumber := nodeInfo.AllowedPodNumber()
 	if len(nodeInfo.Pods())+1 > allowedPodNumber {
 		insufficientResources = append(insufficientResources, InsufficientResource{
 			v1.ResourcePods,
+			"Too many pods",
 			1,
 			int64(len(nodeInfo.Pods())),
 			int64(allowedPodNumber),
@@ -216,6 +207,7 @@ func fitsRequest(podRequest *preFilterState, nodeInfo *schedulernodeinfo.NodeInf
 	if allocatable.MilliCPU < podRequest.MilliCPU+nodeInfo.RequestedResource().MilliCPU {
 		insufficientResources = append(insufficientResources, InsufficientResource{
 			v1.ResourceCPU,
+			"Insufficient cpu",
 			podRequest.MilliCPU,
 			nodeInfo.RequestedResource().MilliCPU,
 			allocatable.MilliCPU,
@@ -224,6 +216,7 @@ func fitsRequest(podRequest *preFilterState, nodeInfo *schedulernodeinfo.NodeInf
 	if allocatable.Memory < podRequest.Memory+nodeInfo.RequestedResource().Memory {
 		insufficientResources = append(insufficientResources, InsufficientResource{
 			v1.ResourceMemory,
+			"Insufficient memory",
 			podRequest.Memory,
 			nodeInfo.RequestedResource().Memory,
 			allocatable.Memory,
@@ -232,6 +225,7 @@ func fitsRequest(podRequest *preFilterState, nodeInfo *schedulernodeinfo.NodeInf
 	if allocatable.EphemeralStorage < podRequest.EphemeralStorage+nodeInfo.RequestedResource().EphemeralStorage {
 		insufficientResources = append(insufficientResources, InsufficientResource{
 			v1.ResourceEphemeralStorage,
+			"Insufficient ephemeral-storage",
 			podRequest.EphemeralStorage,
 			nodeInfo.RequestedResource().EphemeralStorage,
 			allocatable.EphemeralStorage,
@@ -249,6 +243,7 @@ func fitsRequest(podRequest *preFilterState, nodeInfo *schedulernodeinfo.NodeInf
 		if allocatable.ScalarResources[rName] < rQuant+nodeInfo.RequestedResource().ScalarResources[rName] {
 			insufficientResources = append(insufficientResources, InsufficientResource{
 				rName,
+				fmt.Sprintf("Insufficient %v", rName),
 				podRequest.ScalarResources[rName],
 				nodeInfo.RequestedResource().ScalarResources[rName],
 				allocatable.ScalarResources[rName],

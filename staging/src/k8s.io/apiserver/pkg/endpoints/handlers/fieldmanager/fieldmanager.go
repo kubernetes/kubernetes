@@ -25,7 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal"
 	openapiproto "k8s.io/kube-openapi/pkg/util/proto"
-	"sigs.k8s.io/structured-merge-diff/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v3/fieldpath"
 )
 
 // DefaultMaxUpdateManagers defines the default maximum retained number of managedFields entries from updates
@@ -35,7 +35,7 @@ const DefaultMaxUpdateManagers int = 10
 
 // DefaultTrackOnCreateProbability defines the default probability that the field management of an object
 // starts being tracked from the object's creation, instead of from the first time the object is applied to.
-const DefaultTrackOnCreateProbability float32 = 0.0
+const DefaultTrackOnCreateProbability float32 = 0.1
 
 // Managed groups a fieldpath.ManagedFields together with the timestamps associated with each operation.
 type Managed interface {

@@ -48,6 +48,28 @@ func setNodeAffinityRequirement(nodeSelection *NodeSelection, operator v1.NodeSe
 		})
 }
 
+// SetNodeAffinityTopologyRequirement sets node affinity to a specified topology
+func SetNodeAffinityTopologyRequirement(nodeSelection *NodeSelection, topology map[string]string) {
+	if nodeSelection.Affinity == nil {
+		nodeSelection.Affinity = &v1.Affinity{}
+	}
+	if nodeSelection.Affinity.NodeAffinity == nil {
+		nodeSelection.Affinity.NodeAffinity = &v1.NodeAffinity{}
+	}
+	if nodeSelection.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution == nil {
+		nodeSelection.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution = &v1.NodeSelector{}
+	}
+	for k, v := range topology {
+		nodeSelection.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms = append(nodeSelection.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms,
+			v1.NodeSelectorTerm{
+				MatchExpressions: []v1.NodeSelectorRequirement{
+					{Key: k, Operator: v1.NodeSelectorOpIn, Values: []string{v}},
+				},
+			})
+
+	}
+}
+
 // SetAffinity sets affinity to nodeName to nodeSelection
 func SetAffinity(nodeSelection *NodeSelection, nodeName string) {
 	setNodeAffinityRequirement(nodeSelection, v1.NodeSelectorOpIn, nodeName)
@@ -56,4 +78,28 @@ func SetAffinity(nodeSelection *NodeSelection, nodeName string) {
 // SetAntiAffinity sets anti-affinity to nodeName to nodeSelection
 func SetAntiAffinity(nodeSelection *NodeSelection, nodeName string) {
 	setNodeAffinityRequirement(nodeSelection, v1.NodeSelectorOpNotIn, nodeName)
+}
+
+// SetNodeAffinity modifies the given pod object with
+// NodeAffinity to the given node name.
+func SetNodeAffinity(pod *v1.Pod, nodeName string) {
+	nodeSelection := &NodeSelection{}
+	SetAffinity(nodeSelection, nodeName)
+	pod.Spec.Affinity = nodeSelection.Affinity
+}
+
+// SetNodeSelection modifies the given pod object with
+// the specified NodeSelection
+func SetNodeSelection(pod *v1.Pod, nodeSelection NodeSelection) {
+	pod.Spec.NodeSelector = nodeSelection.Selector
+	pod.Spec.Affinity = nodeSelection.Affinity
+	// pod.Spec.NodeName should not be set directly because
+	// it will bypass the scheduler, potentially causing
+	// kubelet to Fail the pod immediately if it's out of
+	// resources. Instead, we want the pod to remain
+	// pending in the scheduler until the node has resources
+	// freed up.
+	if nodeSelection.Name != "" {
+		SetNodeAffinity(pod, nodeSelection.Name)
+	}
 }

@@ -82,6 +82,35 @@ func storeElementKey(obj interface{}) (string, error) {
 	return elem.Key, nil
 }
 
+func storeElementObject(obj interface{}) (runtime.Object, error) {
+	elem, ok := obj.(*storeElement)
+	if !ok {
+		return nil, fmt.Errorf("not a storeElement: %v", obj)
+	}
+	return elem.Object, nil
+}
+
+func storeElementIndexFunc(objIndexFunc cache.IndexFunc) cache.IndexFunc {
+	return func(obj interface{}) (strings []string, e error) {
+		seo, err := storeElementObject(obj)
+		if err != nil {
+			return nil, err
+		}
+		return objIndexFunc(seo)
+	}
+}
+
+func storeElementIndexers(indexers *cache.Indexers) cache.Indexers {
+	if indexers == nil {
+		return cache.Indexers{}
+	}
+	ret := cache.Indexers{}
+	for indexName, indexFunc := range *indexers {
+		ret[indexName] = storeElementIndexFunc(indexFunc)
+	}
+	return ret
+}
+
 // watchCache implements a Store interface.
 // However, it depends on the elements implementing runtime.Object interface.
 //
@@ -116,7 +145,7 @@ type watchCache struct {
 	// history" i.e. from the moment just after the newest cached watched event.
 	// It is necessary to effectively allow clients to start watching at now.
 	// NOTE: We assume that <store> is thread-safe.
-	store cache.Store
+	store cache.Indexer
 
 	// ResourceVersion up to which the watchCache is propagated.
 	resourceVersion uint64
@@ -143,7 +172,8 @@ func newWatchCache(
 	keyFunc func(runtime.Object) (string, error),
 	eventHandler func(*watchCacheEvent),
 	getAttrsFunc func(runtime.Object) (labels.Set, fields.Set, error),
-	versioner storage.Versioner) *watchCache {
+	versioner storage.Versioner,
+	indexers *cache.Indexers) *watchCache {
 	wc := &watchCache{
 		capacity:            capacity,
 		keyFunc:             keyFunc,
@@ -151,7 +181,7 @@ func newWatchCache(
 		cache:               make([]*watchCacheEvent, capacity),
 		startIndex:          0,
 		endIndex:            0,
-		store:               cache.NewStore(storeElementKey),
+		store:               cache.NewIndexer(storeElementKey, storeElementIndexers(indexers)),
 		resourceVersion:     0,
 		listResourceVersion: 0,
 		eventHandler:        eventHandler,
@@ -319,11 +349,21 @@ func (w *watchCache) waitUntilFreshAndBlock(resourceVersion uint64, trace *utilt
 }
 
 // WaitUntilFreshAndList returns list of pointers to <storeElement> objects.
-func (w *watchCache) WaitUntilFreshAndList(resourceVersion uint64, trace *utiltrace.Trace) ([]interface{}, uint64, error) {
+func (w *watchCache) WaitUntilFreshAndList(resourceVersion uint64, matchValues []storage.MatchValue, trace *utiltrace.Trace) ([]interface{}, uint64, error) {
 	err := w.waitUntilFreshAndBlock(resourceVersion, trace)
 	defer w.RUnlock()
 	if err != nil {
 		return nil, 0, err
+	}
+
+	// This isn't the place where we do "final filtering" - only some "prefiltering" is happening here. So the only
+	// requirement here is to NOT miss anything that should be returned. We can return as many non-matching items as we
+	// want - they will be filtered out later. The fact that we return less things is only further performance improvement.
+	// TODO: if multiple indexes match, return the one with the fewest items, so as to do as much filtering as possible.
+	for _, matchValue := range matchValues {
+		if result, err := w.store.ByIndex(matchValue.IndexName, matchValue.Value); err == nil {
+			return result, w.resourceVersion, nil
+		}
 	}
 	return w.store.List(), w.resourceVersion, nil
 }

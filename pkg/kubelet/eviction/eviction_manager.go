@@ -47,6 +47,15 @@ const (
 	podCleanupPollFreq = time.Second
 )
 
+const (
+	// signalEphemeralContainerFsLimit is amount of storage available on filesystem requested by the container
+	signalEphemeralContainerFsLimit string = "ephemeralcontainerfs.limit"
+	// signalEphemeralPodFsLimit is amount of storage available on filesystem requested by the pod
+	signalEphemeralPodFsLimit string = "ephemeralpodfs.limit"
+	// signalEmptyDirFsLimit is amount of storage available on filesystem requested by an emptyDir
+	signalEmptyDirFsLimit string = "emptydirfs.limit"
+)
+
 // managerImpl implements Manager
 type managerImpl struct {
 	//  used to track time
@@ -480,7 +489,11 @@ func (m *managerImpl) emptyDirLimitEviction(podStats statsapi.PodStats, pod *v1.
 			used := podVolumeUsed[pod.Spec.Volumes[i].Name]
 			if used != nil && size != nil && size.Sign() == 1 && used.Cmp(*size) > 0 {
 				// the emptyDir usage exceeds the size limit, evict the pod
-				return m.evictPod(pod, 0, fmt.Sprintf(emptyDirMessageFmt, pod.Spec.Volumes[i].Name, size.String()), nil)
+				if m.evictPod(pod, 0, fmt.Sprintf(emptyDirMessageFmt, pod.Spec.Volumes[i].Name, size.String()), nil) {
+					metrics.Evictions.WithLabelValues(signalEmptyDirFsLimit).Inc()
+					return true
+				}
+				return false
 			}
 		}
 	}
@@ -512,7 +525,11 @@ func (m *managerImpl) podEphemeralStorageLimitEviction(podStats statsapi.PodStat
 	podEphemeralStorageLimit := podLimits[v1.ResourceEphemeralStorage]
 	if podEphemeralStorageTotalUsage.Cmp(podEphemeralStorageLimit) > 0 {
 		// the total usage of pod exceeds the total size limit of containers, evict the pod
-		return m.evictPod(pod, 0, fmt.Sprintf(podEphemeralStorageMessageFmt, podEphemeralStorageLimit.String()), nil)
+		if m.evictPod(pod, 0, fmt.Sprintf(podEphemeralStorageMessageFmt, podEphemeralStorageLimit.String()), nil) {
+			metrics.Evictions.WithLabelValues(signalEphemeralPodFsLimit).Inc()
+			return true
+		}
+		return false
 	}
 	return false
 }
@@ -534,8 +551,11 @@ func (m *managerImpl) containerEphemeralStorageLimitEviction(podStats statsapi.P
 
 		if ephemeralStorageThreshold, ok := thresholdsMap[containerStat.Name]; ok {
 			if ephemeralStorageThreshold.Cmp(*containerUsed) < 0 {
-				return m.evictPod(pod, 0, fmt.Sprintf(containerEphemeralStorageMessageFmt, containerStat.Name, ephemeralStorageThreshold.String()), nil)
-
+				if m.evictPod(pod, 0, fmt.Sprintf(containerEphemeralStorageMessageFmt, containerStat.Name, ephemeralStorageThreshold.String()), nil) {
+					metrics.Evictions.WithLabelValues(signalEphemeralContainerFsLimit).Inc()
+					return true
+				}
+				return false
 			}
 		}
 	}

@@ -17,6 +17,7 @@ limitations under the License.
 package apiapproval
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"time"
@@ -27,6 +28,7 @@ import (
 	informers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions/v1"
 	listers "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
@@ -158,7 +160,7 @@ func (c *KubernetesAPIApprovalPolicyConformantConditionController) sync(key stri
 	crd := inCustomResourceDefinition.DeepCopy()
 	apihelpers.SetCRDCondition(crd, *cond)
 
-	_, err = c.crdClient.CustomResourceDefinitions().UpdateStatus(crd)
+	_, err = c.crdClient.CustomResourceDefinitions().UpdateStatus(context.TODO(), crd, metav1.UpdateOptions{})
 	if apierrors.IsNotFound(err) || apierrors.IsConflict(err) {
 		// deleted or changed in the meantime, we'll get called again
 		return nil

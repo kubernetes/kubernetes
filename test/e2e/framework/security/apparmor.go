@@ -17,6 +17,7 @@ limitations under the License.
 package security
 
 import (
+	"context"
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
@@ -119,7 +120,7 @@ done`, testCmd)
 		framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespace(
 			clientset, pod.Name, nsName))
 		var err error
-		pod, err = podClient.Get(pod.Name, metav1.GetOptions{})
+		pod, err = podClient.Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 	} else {
 		pod = podClient.CreateSync(pod)
@@ -155,7 +156,7 @@ profile %s flags=(attach_disconnected) {
 			profileName: profile,
 		},
 	}
-	_, err := clientset.CoreV1().ConfigMaps(nsName).Create(cm)
+	_, err := clientset.CoreV1().ConfigMaps(nsName).Create(context.TODO(), cm, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "Failed to create apparmor-profiles ConfigMap")
 }
 
@@ -223,7 +224,7 @@ func createAppArmorProfileLoader(nsName string, clientset clientset.Interface) {
 			},
 		},
 	}
-	_, err := clientset.CoreV1().ReplicationControllers(nsName).Create(loader)
+	_, err := clientset.CoreV1().ReplicationControllers(nsName).Create(context.TODO(), loader, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "Failed to create apparmor-loader ReplicationController")
 
 	// Wait for loader to be ready.

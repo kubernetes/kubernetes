@@ -17,6 +17,7 @@ limitations under the License.
 package gcp
 
 import (
+	"context"
 	"fmt"
 	"os/exec"
 	"path"
@@ -33,6 +34,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 )
 
 func addMasterReplica(zone string) error {
@@ -123,7 +125,7 @@ func generateMasterRegexp(prefix string) string {
 // waitForMasters waits until the cluster has the desired number of ready masters in it.
 func waitForMasters(masterPrefix string, c clientset.Interface, size int, timeout time.Duration) error {
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(20 * time.Second) {
-		nodes, err := c.CoreV1().Nodes().List(metav1.ListOptions{})
+		nodes, err := c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			framework.Logf("Failed to list nodes: %v", err)
 			continue
@@ -166,7 +168,7 @@ var _ = SIGDescribe("HA-master [Feature:HAMaster]", func() {
 	var existingRCs []string
 
 	ginkgo.BeforeEach(func() {
-		framework.SkipUnlessProviderIs("gce")
+		e2eskipper.SkipUnlessProviderIs("gce")
 		c = f.ClientSet
 		ns = f.Namespace.Name
 		framework.ExpectNoError(waitForMasters(framework.TestContext.CloudConfig.MasterName, c, 1, 10*time.Minute))

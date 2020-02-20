@@ -14,6 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This script checks version dependencies of modules. It checks whether all
+# pinned versions of checked dependencies match their preferred version or not.
+# Usage: `hack/lint-dependencies.sh`.
+
 set -o errexit
 set -o nounset
 set -o pipefail

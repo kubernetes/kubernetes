@@ -17,6 +17,7 @@ limitations under the License.
 package gcp
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -27,6 +28,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -57,8 +59,8 @@ var _ = SIGDescribe("[Disruptive]NodeLease", func() {
 
 		ginkgo.BeforeEach(func() {
 			skipped = true
-			framework.SkipUnlessProviderIs("gce", "gke", "aws")
-			framework.SkipUnlessNodeCountIsAtLeast(2)
+			e2eskipper.SkipUnlessProviderIs("gce", "gke", "aws")
+			e2eskipper.SkipUnlessNodeCountIsAtLeast(2)
 			skipped = false
 		})
 
@@ -110,7 +112,7 @@ var _ = SIGDescribe("[Disruptive]NodeLease", func() {
 			gomega.Eventually(func() error {
 				pass := true
 				for _, node := range originalNodes.Items {
-					if _, err := leaseClient.Get(node.ObjectMeta.Name, metav1.GetOptions{}); err != nil {
+					if _, err := leaseClient.Get(context.TODO(), node.ObjectMeta.Name, metav1.GetOptions{}); err != nil {
 						framework.Logf("Try to get lease of node %s, but got error: %v", node.ObjectMeta.Name, err)
 						pass = false
 					}
@@ -147,7 +149,7 @@ var _ = SIGDescribe("[Disruptive]NodeLease", func() {
 			}
 			framework.ExpectNotEqual(deletedNodeName, "")
 			gomega.Eventually(func() error {
-				if _, err := leaseClient.Get(deletedNodeName, metav1.GetOptions{}); err == nil {
+				if _, err := leaseClient.Get(context.TODO(), deletedNodeName, metav1.GetOptions{}); err == nil {
 					return fmt.Errorf("node lease is not deleted yet for node %q", deletedNodeName)
 				}
 				return nil
@@ -156,7 +158,7 @@ var _ = SIGDescribe("[Disruptive]NodeLease", func() {
 			ginkgo.By("verify node leases still exist for remaining nodes")
 			gomega.Eventually(func() error {
 				for _, node := range targetNodes.Items {
-					if _, err := leaseClient.Get(node.ObjectMeta.Name, metav1.GetOptions{}); err != nil {
+					if _, err := leaseClient.Get(context.TODO(), node.ObjectMeta.Name, metav1.GetOptions{}); err != nil {
 						return err
 					}
 				}

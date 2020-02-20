@@ -182,17 +182,11 @@ type vsphereVolume struct {
 	podUID  types.UID
 	// Unique identifier of the volume, used to find the disk resource in the provider.
 	volPath string
-	// Filesystem type, optional.
-	fsType string
-	//diskID for detach disk
-	diskID string
 	// Utility interface that provides API calls to the provider to attach/detach disks.
 	manager vdManager
 	// Mounter interface that provides system calls to mount the global path to the pod local path.
 	mounter mount.Interface
-	// diskMounter provides the interface that is used to mount the actual block device.
-	diskMounter mount.Interface
-	plugin      *vsphereVolumePlugin
+	plugin  *vsphereVolumePlugin
 	volume.MetricsProvider
 }
 

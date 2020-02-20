@@ -488,12 +488,6 @@ func (elb *FakeELB) ModifyLoadBalancerAttributes(*elb.ModifyLoadBalancerAttribut
 	panic("Not implemented")
 }
 
-// expectDescribeLoadBalancers is not implemented but is required for interface
-// conformance
-func (elb *FakeELB) expectDescribeLoadBalancers(loadBalancerName string) {
-	panic("Not implemented")
-}
-
 // FakeELBV2 is a fake ELBV2 client used for testing
 type FakeELBV2 struct {
 	aws *FakeAWSServices

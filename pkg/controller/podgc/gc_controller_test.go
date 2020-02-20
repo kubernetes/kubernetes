@@ -17,6 +17,7 @@ limitations under the License.
 package podgc
 
 import (
+	"context"
 	"sync"
 	"testing"
 	"time"
@@ -35,18 +36,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/testutil"
 )
-
-type FakeController struct{}
-
-func (*FakeController) Run(<-chan struct{}) {}
-
-func (*FakeController) HasSynced() bool {
-	return true
-}
-
-func (*FakeController) LastSyncResourceVersion() string {
-	return ""
-}
 
 func alwaysReady() bool { return true }
 
@@ -357,10 +346,10 @@ func TestGCOrphaned(t *testing.T) {
 
 			// Execute planned nodes changes
 			for _, node := range test.addedClientNodes {
-				client.CoreV1().Nodes().Create(node)
+				client.CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{})
 			}
 			for _, node := range test.deletedClientNodes {
-				client.CoreV1().Nodes().Delete(node.Name, &metav1.DeleteOptions{})
+				client.CoreV1().Nodes().Delete(context.TODO(), node.Name, &metav1.DeleteOptions{})
 			}
 			for _, node := range test.addedInformerNodes {
 				nodeInformer.Informer().GetStore().Add(node)

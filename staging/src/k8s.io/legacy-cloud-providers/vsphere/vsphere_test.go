@@ -75,6 +75,7 @@ W6CzB7pZ9Nj1YLpgzc1r6oONHLokMJJIz/IvkQ==
 -----END CERTIFICATE-----`
 
 // localhostKey is the private key for localhostCert.
+// Fake value for testing.
 var localhostKey = `-----BEGIN RSA PRIVATE KEY-----
 MIIEowIBAAKCAQEA1Z5/aTwqY706M34tn60l8ZHkanWDl8mM1pYf4Q7qg3zA9XqW
 LX6S4rTYDYCb4stEasC72lQnbEWHbthiQE76zubP8WOFHdvGR3mjAvHWz4FxvLOT
@@ -206,6 +207,7 @@ func TestReadConfig(t *testing.T) {
 		t.Errorf("Should fail when no config is provided: %s", err)
 	}
 
+	// Fake values for testing.
 	cfg, err := readConfig(strings.NewReader(`
 [Global]
 server = 0.0.0.0
@@ -823,7 +825,7 @@ func TestSecretVSphereConfig(t *testing.T) {
 	var vs *VSphere
 	var (
 		username = "user"
-		password = "password"
+		password = "password" // Fake value for testing.
 	)
 	var testcases = []struct {
 		testName                 string

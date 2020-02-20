@@ -109,7 +109,6 @@ func TestBuildKubeletArgMap(t *testing.T) {
 			opts: kubeletFlagsOpts{
 				nodeRegOpts: &kubeadmapi.NodeRegistrationOptions{
 					CRISocket: "/var/run/dockershim.sock",
-					Name:      "foo",
 					Taints: []v1.Taint{ // This should be ignored as registerTaintsUsingFlags is false
 						{
 							Key:    "foo",
@@ -120,14 +119,13 @@ func TestBuildKubeletArgMap(t *testing.T) {
 				},
 				execer:              errCgroupExecer,
 				isServiceActiveFunc: serviceIsNotActiveFunc,
-				defaultHostname:     "foo",
 			},
 			expected: map[string]string{
 				"network-plugin": "cni",
 			},
 		},
 		{
-			name: "nodeRegOpts.Name != default hostname",
+			name: "hostname override from NodeRegistrationOptions.Name",
 			opts: kubeletFlagsOpts{
 				nodeRegOpts: &kubeadmapi.NodeRegistrationOptions{
 					CRISocket: "/var/run/dockershim.sock",
@@ -135,7 +133,21 @@ func TestBuildKubeletArgMap(t *testing.T) {
 				},
 				execer:              errCgroupExecer,
 				isServiceActiveFunc: serviceIsNotActiveFunc,
-				defaultHostname:     "default",
+			},
+			expected: map[string]string{
+				"network-plugin":    "cni",
+				"hostname-override": "override-name",
+			},
+		},
+		{
+			name: "hostname override from NodeRegistrationOptions.KubeletExtraArgs",
+			opts: kubeletFlagsOpts{
+				nodeRegOpts: &kubeadmapi.NodeRegistrationOptions{
+					CRISocket:        "/var/run/dockershim.sock",
+					KubeletExtraArgs: map[string]string{"hostname-override": "override-name"},
+				},
+				execer:              errCgroupExecer,
+				isServiceActiveFunc: serviceIsNotActiveFunc,
 			},
 			expected: map[string]string{
 				"network-plugin":    "cni",
@@ -147,11 +159,9 @@ func TestBuildKubeletArgMap(t *testing.T) {
 			opts: kubeletFlagsOpts{
 				nodeRegOpts: &kubeadmapi.NodeRegistrationOptions{
 					CRISocket: "/var/run/dockershim.sock",
-					Name:      "foo",
 				},
 				execer:              systemdCgroupExecer,
 				isServiceActiveFunc: serviceIsNotActiveFunc,
-				defaultHostname:     "foo",
 			},
 			expected: map[string]string{
 				"network-plugin": "cni",
@@ -163,11 +173,9 @@ func TestBuildKubeletArgMap(t *testing.T) {
 			opts: kubeletFlagsOpts{
 				nodeRegOpts: &kubeadmapi.NodeRegistrationOptions{
 					CRISocket: "/var/run/dockershim.sock",
-					Name:      "foo",
 				},
 				execer:              cgroupfsCgroupExecer,
 				isServiceActiveFunc: serviceIsNotActiveFunc,
-				defaultHostname:     "foo",
 			},
 			expected: map[string]string{
 				"network-plugin": "cni",
@@ -179,11 +187,9 @@ func TestBuildKubeletArgMap(t *testing.T) {
 			opts: kubeletFlagsOpts{
 				nodeRegOpts: &kubeadmapi.NodeRegistrationOptions{
 					CRISocket: "/var/run/containerd.sock",
-					Name:      "foo",
 				},
 				execer:              cgroupfsCgroupExecer,
 				isServiceActiveFunc: serviceIsNotActiveFunc,
-				defaultHostname:     "foo",
 			},
 			expected: map[string]string{
 				"container-runtime":          "remote",
@@ -195,7 +201,6 @@ func TestBuildKubeletArgMap(t *testing.T) {
 			opts: kubeletFlagsOpts{
 				nodeRegOpts: &kubeadmapi.NodeRegistrationOptions{
 					CRISocket: "/var/run/containerd.sock",
-					Name:      "foo",
 					Taints: []v1.Taint{
 						{
 							Key:    "foo",
@@ -212,7 +217,6 @@ func TestBuildKubeletArgMap(t *testing.T) {
 				registerTaintsUsingFlags: true,
 				execer:                   cgroupfsCgroupExecer,
 				isServiceActiveFunc:      serviceIsNotActiveFunc,
-				defaultHostname:          "foo",
 			},
 			expected: map[string]string{
 				"container-runtime":          "remote",
@@ -225,11 +229,9 @@ func TestBuildKubeletArgMap(t *testing.T) {
 			opts: kubeletFlagsOpts{
 				nodeRegOpts: &kubeadmapi.NodeRegistrationOptions{
 					CRISocket: "/var/run/containerd.sock",
-					Name:      "foo",
 				},
 				execer:              cgroupfsCgroupExecer,
 				isServiceActiveFunc: serviceIsActiveFunc,
-				defaultHostname:     "foo",
 			},
 			expected: map[string]string{
 				"container-runtime":          "remote",
@@ -242,17 +244,15 @@ func TestBuildKubeletArgMap(t *testing.T) {
 			opts: kubeletFlagsOpts{
 				nodeRegOpts: &kubeadmapi.NodeRegistrationOptions{
 					CRISocket: "/var/run/dockershim.sock",
-					Name:      "foo",
 				},
-				pauseImage:          "gcr.io/pause:3.1",
+				pauseImage:          "gcr.io/pause:3.2",
 				execer:              cgroupfsCgroupExecer,
 				isServiceActiveFunc: serviceIsNotActiveFunc,
-				defaultHostname:     "foo",
 			},
 			expected: map[string]string{
 				"network-plugin":            "cni",
 				"cgroup-driver":             "cgroupfs",
-				"pod-infra-container-image": "gcr.io/pause:3.1",
+				"pod-infra-container-image": "gcr.io/pause:3.2",
 			},
 		},
 	}

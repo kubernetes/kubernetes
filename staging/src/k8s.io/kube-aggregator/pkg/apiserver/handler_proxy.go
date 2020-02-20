@@ -33,6 +33,7 @@ import (
 	endpointmetrics "k8s.io/apiserver/pkg/endpoints/metrics"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	genericfeatures "k8s.io/apiserver/pkg/features"
+	"k8s.io/apiserver/pkg/server/egressselector"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/transport"
@@ -63,6 +64,10 @@ type proxyHandler struct {
 	serviceResolver ServiceResolver
 
 	handlingInfo atomic.Value
+
+	// egressSelector selects the proper egress dialer to communicate with the custom apiserver
+	// overwrites proxyTransport dialer if not nil
+	egressSelector *egressselector.EgressSelector
 }
 
 type proxyHandlingInfo struct {
@@ -259,7 +264,16 @@ func (r *proxyHandler) updateAPIService(apiService *apiregistrationv1api.APIServ
 		servicePort:      *apiService.Spec.Service.Port,
 		serviceAvailable: apiregistrationv1apihelper.IsAPIServiceConditionTrue(apiService, apiregistrationv1api.Available),
 	}
-	if r.proxyTransport != nil && r.proxyTransport.DialContext != nil {
+	if r.egressSelector != nil {
+		networkContext := egressselector.Cluster.AsNetworkContext()
+		var egressDialer utilnet.DialFunc
+		egressDialer, err := r.egressSelector.Lookup(networkContext)
+		if err != nil {
+			klog.Warning(err.Error())
+		} else {
+			newInfo.restConfig.Dial = egressDialer
+		}
+	} else if r.proxyTransport != nil && r.proxyTransport.DialContext != nil {
 		newInfo.restConfig.Dial = r.proxyTransport.DialContext
 	}
 	newInfo.proxyRoundTripper, newInfo.transportBuildingError = restclient.TransportFor(newInfo.restConfig)

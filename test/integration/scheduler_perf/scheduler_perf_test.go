@@ -19,13 +19,13 @@ package benchmark
 import (
 	"fmt"
 	"io/ioutil"
-	"sync/atomic"
 	"testing"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/client-go/tools/cache"
+	coreinformers "k8s.io/client-go/informers/core/v1"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog"
@@ -38,13 +38,24 @@ const (
 	configFile = "config/performance-config.yaml"
 )
 
+var (
+	defaultMetricsCollectorConfig = metricsCollectorConfig{
+		Metrics: []string{
+			"scheduler_scheduling_algorithm_predicate_evaluation_seconds",
+			"scheduler_scheduling_algorithm_priority_evaluation_seconds",
+			"scheduler_binding_duration_seconds",
+			"scheduler_e2e_scheduling_duration_seconds",
+		},
+	}
+)
+
 // testCase configures a test case to run the scheduler performance test. Users should be able to
 // provide this via a YAML file.
 //
 // It specifies nodes and pods in the cluster before running the test. It also specifies the pods to
 // schedule during the test. The config can be as simple as just specify number of nodes/pods, where
-// default spec will be applied. It also allows the user to specify a pod spec template for more compicated
-// test cases.
+// default spec will be applied. It also allows the user to specify a pod spec template for more
+// complicated test cases.
 //
 // It also specifies the metrics to be collected after the test. If nothing is specified, default metrics
 // such as scheduling throughput and latencies will be collected.
@@ -59,6 +70,8 @@ type testCase struct {
 	PodsToSchedule podCase
 	// optional, feature gates to set before running the test
 	FeatureGates map[featuregate.Feature]bool
+	// optional, replaces default defaultMetricsCollectorConfig if supplied.
+	MetricsCollectorConfig *metricsCollectorConfig
 }
 
 type nodeCase struct {
@@ -91,7 +104,13 @@ type testParams struct {
 	NumPodsToSchedule int
 }
 
+type testDataCollector interface {
+	run(stopCh chan struct{})
+	collect() []DataItem
+}
+
 func BenchmarkPerfScheduling(b *testing.B) {
+	dataItems := DataItems{Version: "v1"}
 	tests := getSimpleTestCases(configFile)
 
 	for _, test := range tests {
@@ -100,95 +119,106 @@ func BenchmarkPerfScheduling(b *testing.B) {
 			for feature, flag := range test.FeatureGates {
 				defer featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, feature, flag)()
 			}
-			perfScheduling(test, b)
+			dataItems.DataItems = append(dataItems.DataItems, perfScheduling(test, b)...)
 		})
+	}
+	if err := dataItems2JSONFile(dataItems, b.Name()); err != nil {
+		klog.Fatalf("%v: unable to write measured data: %v", b.Name(), err)
 	}
 }
 
-func perfScheduling(test testCase, b *testing.B) {
-	var nodeStrategy testutils.PrepareNodeStrategy = &testutils.TrivialNodePrepareStrategy{}
-	if test.Nodes.NodeAllocatableStrategy != nil {
-		nodeStrategy = test.Nodes.NodeAllocatableStrategy
-	} else if test.Nodes.LabelNodePrepareStrategy != nil {
-		nodeStrategy = test.Nodes.LabelNodePrepareStrategy
-	} else if test.Nodes.UniqueNodeLabelStrategy != nil {
-		nodeStrategy = test.Nodes.UniqueNodeLabelStrategy
-	}
-
-	setupPodStrategy := getPodStrategy(test.InitPods)
-	testPodStrategy := getPodStrategy(test.PodsToSchedule)
-
-	var nodeSpec *v1.Node
-	if test.Nodes.NodeTemplatePath != nil {
-		nodeSpec = getNodeSpecFromFile(test.Nodes.NodeTemplatePath)
-	}
-
+func perfScheduling(test testCase, b *testing.B) []DataItem {
 	finalFunc, podInformer, clientset := mustSetupScheduler()
 	defer finalFunc()
 
-	var nodePreparer testutils.TestNodePreparer
-	if nodeSpec != nil {
-		nodePreparer = framework.NewIntegrationTestNodePreparerWithNodeSpec(
-			clientset,
-			[]testutils.CountToStrategy{{Count: test.Nodes.Num, Strategy: nodeStrategy}},
-			nodeSpec,
-		)
-	} else {
-		nodePreparer = framework.NewIntegrationTestNodePreparer(
-			clientset,
-			[]testutils.CountToStrategy{{Count: test.Nodes.Num, Strategy: nodeStrategy}},
-			"scheduler-perf-",
-		)
-	}
-
+	nodePreparer := getNodePreparer(test.Nodes, clientset)
 	if err := nodePreparer.PrepareNodes(); err != nil {
 		klog.Fatalf("%v", err)
 	}
 	defer nodePreparer.CleanupNodes()
 
-	config := testutils.NewTestPodCreatorConfig()
-	config.AddStrategy(setupNamespace, test.InitPods.Num, setupPodStrategy)
-	podCreator := testutils.NewTestPodCreator(clientset, config)
-	podCreator.CreatePods()
+	createPods(setupNamespace, test.InitPods, clientset)
+	waitNumPodsScheduled(test.InitPods.Num, podInformer)
 
+	// start benchmark
+	b.ResetTimer()
+
+	// Start test data collectors.
+	stopCh := make(chan struct{})
+	collectors := getTestDataCollectors(test, podInformer, b)
+	for _, collector := range collectors {
+		go collector.run(stopCh)
+	}
+
+	// Schedule the main workload
+	createPods(testNamespace, test.PodsToSchedule, clientset)
+	waitNumPodsScheduled(test.InitPods.Num+test.PodsToSchedule.Num, podInformer)
+
+	close(stopCh)
+	// Note: without this line we're taking the overhead of defer() into account.
+	b.StopTimer()
+
+	var dataItems []DataItem
+	for _, collector := range collectors {
+		dataItems = append(dataItems, collector.collect()...)
+	}
+	return dataItems
+}
+
+func waitNumPodsScheduled(num int, podInformer coreinformers.PodInformer) {
 	for {
 		scheduled, err := getScheduledPods(podInformer)
 		if err != nil {
 			klog.Fatalf("%v", err)
 		}
-		if len(scheduled) >= test.InitPods.Num {
+		if len(scheduled) >= num {
 			break
 		}
-		klog.Infof("got %d existing pods, required: %d", len(scheduled), test.InitPods.Num)
+		klog.Infof("got %d existing pods, required: %d", len(scheduled), num)
 		time.Sleep(1 * time.Second)
 	}
+}
 
-	scheduled := int32(0)
-	completedCh := make(chan struct{})
-	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		UpdateFunc: func(old, cur interface{}) {
-			curPod := cur.(*v1.Pod)
-			oldPod := old.(*v1.Pod)
+func getTestDataCollectors(tc testCase, podInformer coreinformers.PodInformer, b *testing.B) []testDataCollector {
+	collectors := []testDataCollector{newThroughputCollector(podInformer, map[string]string{"Name": b.Name()})}
+	metricsCollectorConfig := defaultMetricsCollectorConfig
+	if tc.MetricsCollectorConfig != nil {
+		metricsCollectorConfig = *tc.MetricsCollectorConfig
+	}
+	collectors = append(collectors, newMetricsCollector(metricsCollectorConfig, map[string]string{"Name": b.Name()}))
+	return collectors
+}
 
-			if len(oldPod.Spec.NodeName) == 0 && len(curPod.Spec.NodeName) > 0 {
-				if atomic.AddInt32(&scheduled, 1) >= int32(test.PodsToSchedule.Num) {
-					completedCh <- struct{}{}
-				}
-			}
-		},
-	})
+func getNodePreparer(nc nodeCase, clientset clientset.Interface) testutils.TestNodePreparer {
+	var nodeStrategy testutils.PrepareNodeStrategy = &testutils.TrivialNodePrepareStrategy{}
+	if nc.NodeAllocatableStrategy != nil {
+		nodeStrategy = nc.NodeAllocatableStrategy
+	} else if nc.LabelNodePrepareStrategy != nil {
+		nodeStrategy = nc.LabelNodePrepareStrategy
+	} else if nc.UniqueNodeLabelStrategy != nil {
+		nodeStrategy = nc.UniqueNodeLabelStrategy
+	}
 
-	// start benchmark
-	b.ResetTimer()
-	config = testutils.NewTestPodCreatorConfig()
-	config.AddStrategy(testNamespace, test.PodsToSchedule.Num, testPodStrategy)
-	podCreator = testutils.NewTestPodCreator(clientset, config)
+	if nc.NodeTemplatePath != nil {
+		return framework.NewIntegrationTestNodePreparerWithNodeSpec(
+			clientset,
+			[]testutils.CountToStrategy{{Count: nc.Num, Strategy: nodeStrategy}},
+			getNodeSpecFromFile(nc.NodeTemplatePath),
+		)
+	}
+	return framework.NewIntegrationTestNodePreparer(
+		clientset,
+		[]testutils.CountToStrategy{{Count: nc.Num, Strategy: nodeStrategy}},
+		"scheduler-perf-",
+	)
+}
+
+func createPods(ns string, pc podCase, clientset clientset.Interface) {
+	strategy := getPodStrategy(pc)
+	config := testutils.NewTestPodCreatorConfig()
+	config.AddStrategy(ns, pc.Num, strategy)
+	podCreator := testutils.NewTestPodCreator(clientset, config)
 	podCreator.CreatePods()
-
-	<-completedCh
-
-	// Note: without this line we're taking the overhead of defer() into account.
-	b.StopTimer()
 }
 
 func getPodStrategy(pc podCase) testutils.TestPodCreateStrategy {

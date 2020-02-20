@@ -80,9 +80,9 @@ var _ = utils.SIGDescribe("Node Poweroff [Feature:vsphere] [Slow] [Disruptive]",
 	ginkgo.It("verify volume status after node power off", func() {
 		ginkgo.By("Creating a Storage Class")
 		storageClassSpec := getVSphereStorageClassSpec("test-sc", nil, nil, "")
-		storageclass, err := client.StorageV1().StorageClasses().Create(storageClassSpec)
+		storageclass, err := client.StorageV1().StorageClasses().Create(context.TODO(), storageClassSpec, metav1.CreateOptions{})
 		framework.ExpectNoError(err, fmt.Sprintf("Failed to create storage class with err: %v", err))
-		defer client.StorageV1().StorageClasses().Delete(storageclass.Name, nil)
+		defer client.StorageV1().StorageClasses().Delete(context.TODO(), storageclass.Name, nil)
 
 		ginkgo.By("Creating PVC using the Storage Class")
 		pvclaimSpec := getVSphereClaimSpecWithStorageClass(namespace, "1Gi", storageclass)
@@ -99,7 +99,7 @@ var _ = utils.SIGDescribe("Node Poweroff [Feature:vsphere] [Slow] [Disruptive]",
 		ginkgo.By("Creating a Deployment")
 		deployment, err := e2edeploy.CreateDeployment(client, int32(1), map[string]string{"test": "app"}, nil, namespace, pvclaims, "")
 		framework.ExpectNoError(err, fmt.Sprintf("Failed to create Deployment with err: %v", err))
-		defer client.AppsV1().Deployments(namespace).Delete(deployment.Name, &metav1.DeleteOptions{})
+		defer client.AppsV1().Deployments(namespace).Delete(context.TODO(), deployment.Name, &metav1.DeleteOptions{})
 
 		ginkgo.By("Get pod from the deployment")
 		podList, err := e2edeploy.GetPodsForDeployment(client, deployment)
@@ -148,20 +148,18 @@ var _ = utils.SIGDescribe("Node Poweroff [Feature:vsphere] [Slow] [Disruptive]",
 // Wait until the pod failed over to a different node, or time out after 3 minutes
 func waitForPodToFailover(client clientset.Interface, deployment *appsv1.Deployment, oldNode string) (string, error) {
 	var (
-		err      error
-		newNode  string
 		timeout  = 3 * time.Minute
 		pollTime = 10 * time.Second
 	)
 
-	err = wait.Poll(pollTime, timeout, func() (bool, error) {
-		newNode, err = getNodeForDeployment(client, deployment)
+	waitErr := wait.Poll(pollTime, timeout, func() (bool, error) {
+		currentNode, err := getNodeForDeployment(client, deployment)
 		if err != nil {
 			return true, err
 		}
 
-		if newNode != oldNode {
-			framework.Logf("The pod has been failed over from %q to %q", oldNode, newNode)
+		if currentNode != oldNode {
+			framework.Logf("The pod has been failed over from %q to %q", oldNode, currentNode)
 			return true, nil
 		}
 
@@ -169,12 +167,11 @@ func waitForPodToFailover(client clientset.Interface, deployment *appsv1.Deploym
 		return false, nil
 	})
 
-	if err != nil {
-		if err == wait.ErrWaitTimeout {
-			framework.Logf("Time out after waiting for %v", timeout)
+	if waitErr != nil {
+		if waitErr == wait.ErrWaitTimeout {
+			return "", fmt.Errorf("pod has not failed over after %v: %v", timeout, waitErr)
 		}
-		framework.Logf("Pod did not fail over from %q with error: %v", oldNode, err)
-		return "", err
+		return "", fmt.Errorf("pod did not fail over from %q: %v", oldNode, waitErr)
 	}
 
 	return getNodeForDeployment(client, deployment)

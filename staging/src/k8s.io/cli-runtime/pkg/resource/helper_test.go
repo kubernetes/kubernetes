@@ -120,7 +120,7 @@ func TestHelperDelete(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			client := &fake.RESTClient{
-				NegotiatedSerializer: scheme.Codecs,
+				NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
 				Resp:                 tt.Resp,
 				Err:                  tt.HttpErr,
 			}
@@ -227,7 +227,7 @@ func TestHelperCreate(t *testing.T) {
 				RESTClient:      client,
 				NamespaceScoped: true,
 			}
-			_, err := modifier.Create("bar", tt.Modify, tt.Object, nil)
+			_, err := modifier.Create("bar", tt.Modify, tt.Object)
 			if (err != nil) != tt.Err {
 				t.Errorf("%d: unexpected error: %t %v", i, tt.Err, err)
 			}

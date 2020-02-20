@@ -17,6 +17,7 @@ limitations under the License.
 package disruption
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -791,6 +792,6 @@ func (dc *DisruptionController) updatePdbStatus(pdb *policy.PodDisruptionBudget,
 func (dc *DisruptionController) writePdbStatus(pdb *policy.PodDisruptionBudget) error {
 	// If this update fails, don't retry it. Allow the failure to get handled &
 	// retried in `processNextWorkItem()`.
-	_, err := dc.kubeClient.PolicyV1beta1().PodDisruptionBudgets(pdb.Namespace).UpdateStatus(pdb)
+	_, err := dc.kubeClient.PolicyV1beta1().PodDisruptionBudgets(pdb.Namespace).UpdateStatus(context.TODO(), pdb, metav1.UpdateOptions{})
 	return err
 }

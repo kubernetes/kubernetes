@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/conntrack"
 	"k8s.io/kubernetes/pkg/util/iptables"
 	utilexec "k8s.io/utils/exec"
+	netutils "k8s.io/utils/net"
 )
 
 type portal struct {
@@ -127,6 +128,7 @@ type Proxier struct {
 	listenIP        net.IP
 	iptables        iptables.Interface
 	hostIP          net.IP
+	localAddrs      netutils.IPSet
 	proxyPorts      PortAllocator
 	makeProxySocket ProxySocketFunc
 	exec            utilexec.Interface
@@ -370,6 +372,17 @@ func (proxier *Proxier) syncProxyRules() {
 		existingPorts := proxier.mergeService(change.current)
 		proxier.unmergeService(change.previous, existingPorts)
 	}
+
+	localAddrs, err := utilproxy.GetLocalAddrs()
+	if err != nil {
+		klog.Errorf("Failed to get local addresses during proxy sync: %s, assuming IPs are not local", err)
+	} else if len(localAddrs) == 0 {
+		klog.Warning("No local addresses were found, assuming all external IPs are not local")
+	}
+
+	localAddrSet := netutils.IPSet{}
+	localAddrSet.Insert(localAddrs...)
+	proxier.localAddrs = localAddrSet
 
 	proxier.ensurePortals()
 	proxier.cleanupStaleStickySessions()
@@ -725,9 +738,7 @@ func (proxier *Proxier) openPortal(service proxy.ServicePortName, info *ServiceI
 }
 
 func (proxier *Proxier) openOnePortal(portal portal, protocol v1.Protocol, proxyIP net.IP, proxyPort int, name proxy.ServicePortName) error {
-	if local, err := utilproxy.IsLocalIP(portal.ip.String()); err != nil {
-		return fmt.Errorf("can't determine if IP %s is local, assuming not: %v", portal.ip, err)
-	} else if local {
+	if proxier.localAddrs.Len() > 0 && proxier.localAddrs.Has(portal.ip) {
 		err := proxier.claimNodePort(portal.ip, portal.port, protocol, name)
 		if err != nil {
 			return err
@@ -903,10 +914,7 @@ func (proxier *Proxier) closePortal(service proxy.ServicePortName, info *Service
 
 func (proxier *Proxier) closeOnePortal(portal portal, protocol v1.Protocol, proxyIP net.IP, proxyPort int, name proxy.ServicePortName) []error {
 	el := []error{}
-
-	if local, err := utilproxy.IsLocalIP(portal.ip.String()); err != nil {
-		el = append(el, fmt.Errorf("can't determine if IP %s is local, assuming not: %v", portal.ip, err))
-	} else if local {
+	if proxier.localAddrs.Len() > 0 && proxier.localAddrs.Has(portal.ip) {
 		if err := proxier.releaseNodePort(portal.ip, portal.port, protocol, name); err != nil {
 			el = append(el, err)
 		}

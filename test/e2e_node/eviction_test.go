@@ -17,6 +17,7 @@ limitations under the License.
 package e2enode
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"strconv"
@@ -36,6 +37,7 @@ import (
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -76,7 +78,7 @@ var _ = framework.KubeDescribe("InodeEviction [Slow] [Serial] [Disruptive][NodeF
 			summary := eventuallyGetSummary()
 			inodesFree := *summary.Node.Fs.InodesFree
 			if inodesFree <= inodesConsumed {
-				framework.Skipf("Too few inodes free on the host for the InodeEviction test to run")
+				e2eskipper.Skipf("Too few inodes free on the host for the InodeEviction test to run")
 			}
 			initialConfig.EvictionHard = map[string]string{string(evictionapi.SignalNodeFsInodesFree): fmt.Sprintf("%d", inodesFree-inodesConsumed)}
 			initialConfig.EvictionMinimumReclaim = map[string]string{}
@@ -112,7 +114,7 @@ var _ = framework.KubeDescribe("ImageGCNoEviction [Slow] [Serial] [Disruptive][N
 			summary := eventuallyGetSummary()
 			inodesFree := *summary.Node.Fs.InodesFree
 			if inodesFree <= inodesConsumed {
-				framework.Skipf("Too few inodes free on the host for the InodeEviction test to run")
+				e2eskipper.Skipf("Too few inodes free on the host for the InodeEviction test to run")
 			}
 			initialConfig.EvictionHard = map[string]string{string(evictionapi.SignalNodeFsInodesFree): fmt.Sprintf("%d", inodesFree-inodesConsumed)}
 			initialConfig.EvictionMinimumReclaim = map[string]string{}
@@ -203,7 +205,7 @@ var _ = framework.KubeDescribe("LocalStorageSoftEviction [Slow] [Serial] [Disrup
 			summary := eventuallyGetSummary()
 			availableBytes := *(summary.Node.Fs.AvailableBytes)
 			if availableBytes <= uint64(diskConsumed.Value()) {
-				framework.Skipf("Too little disk free on the host for the LocalStorageSoftEviction test to run")
+				e2eskipper.Skipf("Too little disk free on the host for the LocalStorageSoftEviction test to run")
 			}
 			initialConfig.EvictionSoft = map[string]string{string(evictionapi.SignalNodeFsAvailable): fmt.Sprintf("%d", availableBytes-uint64(diskConsumed.Value()))}
 			initialConfig.EvictionSoftGracePeriod = map[string]string{string(evictionapi.SignalNodeFsAvailable): "1m"}
@@ -295,17 +297,17 @@ var _ = framework.KubeDescribe("PriorityMemoryEvictionOrdering [Slow] [Serial] [
 			summary := eventuallyGetSummary()
 			availableBytes := *(summary.Node.Memory.AvailableBytes)
 			if availableBytes <= uint64(memoryConsumed.Value()) {
-				framework.Skipf("Too little memory free on the host for the PriorityMemoryEvictionOrdering test to run")
+				e2eskipper.Skipf("Too little memory free on the host for the PriorityMemoryEvictionOrdering test to run")
 			}
 			initialConfig.EvictionHard = map[string]string{string(evictionapi.SignalMemoryAvailable): fmt.Sprintf("%d", availableBytes-uint64(memoryConsumed.Value()))}
 			initialConfig.EvictionMinimumReclaim = map[string]string{}
 		})
 		ginkgo.BeforeEach(func() {
-			_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(&schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: highPriorityClassName}, Value: highPriority})
+			_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(context.TODO(), &schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: highPriorityClassName}, Value: highPriority}, metav1.CreateOptions{})
 			framework.ExpectEqual(err == nil || apierrors.IsAlreadyExists(err), true)
 		})
 		ginkgo.AfterEach(func() {
-			err := f.ClientSet.SchedulingV1().PriorityClasses().Delete(highPriorityClassName, &metav1.DeleteOptions{})
+			err := f.ClientSet.SchedulingV1().PriorityClasses().Delete(context.TODO(), highPriorityClassName, &metav1.DeleteOptions{})
 			framework.ExpectNoError(err)
 		})
 		specs := []podEvictSpec{
@@ -352,17 +354,17 @@ var _ = framework.KubeDescribe("PriorityLocalStorageEvictionOrdering [Slow] [Ser
 			summary := eventuallyGetSummary()
 			availableBytes := *(summary.Node.Fs.AvailableBytes)
 			if availableBytes <= uint64(diskConsumed.Value()) {
-				framework.Skipf("Too little disk free on the host for the PriorityLocalStorageEvictionOrdering test to run")
+				e2eskipper.Skipf("Too little disk free on the host for the PriorityLocalStorageEvictionOrdering test to run")
 			}
 			initialConfig.EvictionHard = map[string]string{string(evictionapi.SignalNodeFsAvailable): fmt.Sprintf("%d", availableBytes-uint64(diskConsumed.Value()))}
 			initialConfig.EvictionMinimumReclaim = map[string]string{}
 		})
 		ginkgo.BeforeEach(func() {
-			_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(&schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: highPriorityClassName}, Value: highPriority})
+			_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(context.TODO(), &schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: highPriorityClassName}, Value: highPriority}, metav1.CreateOptions{})
 			framework.ExpectEqual(err == nil || apierrors.IsAlreadyExists(err), true)
 		})
 		ginkgo.AfterEach(func() {
-			err := f.ClientSet.SchedulingV1().PriorityClasses().Delete(highPriorityClassName, &metav1.DeleteOptions{})
+			err := f.ClientSet.SchedulingV1().PriorityClasses().Delete(context.TODO(), highPriorityClassName, &metav1.DeleteOptions{})
 			framework.ExpectNoError(err)
 		})
 		specs := []podEvictSpec{
@@ -411,11 +413,11 @@ var _ = framework.KubeDescribe("PriorityPidEvictionOrdering [Slow] [Serial] [Dis
 			initialConfig.EvictionMinimumReclaim = map[string]string{}
 		})
 		ginkgo.BeforeEach(func() {
-			_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(&schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: highPriorityClassName}, Value: highPriority})
+			_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(context.TODO(), &schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: highPriorityClassName}, Value: highPriority}, metav1.CreateOptions{})
 			framework.ExpectEqual(err == nil || apierrors.IsAlreadyExists(err), true)
 		})
 		ginkgo.AfterEach(func() {
-			err := f.ClientSet.SchedulingV1().PriorityClasses().Delete(highPriorityClassName, &metav1.DeleteOptions{})
+			err := f.ClientSet.SchedulingV1().PriorityClasses().Delete(context.TODO(), highPriorityClassName, &metav1.DeleteOptions{})
 			framework.ExpectNoError(err)
 		})
 		specs := []podEvictSpec{
@@ -581,7 +583,7 @@ func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expe
 // This function panics (via Expect) if eviction ordering is violated, or if a priority-zero pod fails.
 func verifyEvictionOrdering(f *framework.Framework, testSpecs []podEvictSpec) error {
 	// Gather current information
-	updatedPodList, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).List(metav1.ListOptions{})
+	updatedPodList, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -653,7 +655,7 @@ func verifyEvictionEvents(f *framework.Framework, testSpecs []podEvictSpec, expe
 				"involvedObject.namespace": f.Namespace.Name,
 				"reason":                   eviction.Reason,
 			}.AsSelector().String()
-			podEvictEvents, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).List(metav1.ListOptions{FieldSelector: selector})
+			podEvictEvents, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{FieldSelector: selector})
 			gomega.Expect(err).To(gomega.BeNil(), "Unexpected error getting events during eviction test: %v", err)
 			framework.ExpectEqual(len(podEvictEvents.Items), 1, "Expected to find 1 eviction event for pod %s, got %d", pod.Name, len(podEvictEvents.Items))
 			event := podEvictEvents.Items[0]

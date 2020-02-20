@@ -17,6 +17,7 @@ limitations under the License.
 package admissionwebhook
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
@@ -174,7 +175,7 @@ func testWebhookTimeout(t *testing.T, watchCache bool) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	_, err = client.CoreV1().Pods("default").Create(timeoutMarkerFixture)
+	_, err = client.CoreV1().Pods("default").Create(context.TODO(), timeoutMarkerFixture, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -183,7 +184,7 @@ func testWebhookTimeout(t *testing.T, watchCache bool) {
 		t.Run(tt.name, func(t *testing.T) {
 			upCh := recorder.Reset()
 			ns := fmt.Sprintf("reinvoke-%d", i)
-			_, err = client.CoreV1().Namespaces().Create(&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ns}})
+			_, err = client.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ns}}, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -208,15 +209,15 @@ func testWebhookTimeout(t *testing.T, watchCache bool) {
 					AdmissionReviewVersions: []string{"v1beta1"},
 				})
 			}
-			mutatingCfg, err := client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Create(&admissionv1beta1.MutatingWebhookConfiguration{
+			mutatingCfg, err := client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Create(context.TODO(), &admissionv1beta1.MutatingWebhookConfiguration{
 				ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("admission.integration.test-%d", i)},
 				Webhooks:   mutatingWebhooks,
-			})
+			}, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatal(err)
 			}
 			defer func() {
-				err := client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Delete(mutatingCfg.GetName(), &metav1.DeleteOptions{})
+				err := client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Delete(context.TODO(), mutatingCfg.GetName(), &metav1.DeleteOptions{})
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -242,15 +243,15 @@ func testWebhookTimeout(t *testing.T, watchCache bool) {
 					AdmissionReviewVersions: []string{"v1beta1"},
 				})
 			}
-			validatingCfg, err := client.AdmissionregistrationV1beta1().ValidatingWebhookConfigurations().Create(&admissionv1beta1.ValidatingWebhookConfiguration{
+			validatingCfg, err := client.AdmissionregistrationV1beta1().ValidatingWebhookConfigurations().Create(context.TODO(), &admissionv1beta1.ValidatingWebhookConfiguration{
 				ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("admission.integration.test-%d", i)},
 				Webhooks:   validatingWebhooks,
-			})
+			}, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatal(err)
 			}
 			defer func() {
-				err := client.AdmissionregistrationV1beta1().ValidatingWebhookConfigurations().Delete(validatingCfg.GetName(), &metav1.DeleteOptions{})
+				err := client.AdmissionregistrationV1beta1().ValidatingWebhookConfigurations().Delete(context.TODO(), validatingCfg.GetName(), &metav1.DeleteOptions{})
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -258,7 +259,7 @@ func testWebhookTimeout(t *testing.T, watchCache bool) {
 
 			// wait until new webhook is called the first time
 			if err := wait.PollImmediate(time.Millisecond*5, wait.ForeverTestTimeout, func() (bool, error) {
-				_, err = client.CoreV1().Pods("default").Patch(timeoutMarkerFixture.Name, types.JSONPatchType, []byte("[]"))
+				_, err = client.CoreV1().Pods("default").Patch(context.TODO(), timeoutMarkerFixture.Name, types.JSONPatchType, []byte("[]"), metav1.PatchOptions{})
 				select {
 				case <-upCh:
 					return true, nil
@@ -291,7 +292,7 @@ func testWebhookTimeout(t *testing.T, watchCache bool) {
 			}
 
 			// set the timeout parameter manually so we don't actually cut off the request client-side, and wait for the server response
-			err = client.CoreV1().RESTClient().Post().Resource("pods").Namespace(ns).Body(body).Param("timeout", fmt.Sprintf("%ds", tt.timeoutSeconds)).Do().Error()
+			err = client.CoreV1().RESTClient().Post().Resource("pods").Namespace(ns).Body(body).Param("timeout", fmt.Sprintf("%ds", tt.timeoutSeconds)).Do(context.TODO()).Error()
 			// _, err = testClient.CoreV1().Pods(ns).Create(pod)
 
 			if tt.expectError {

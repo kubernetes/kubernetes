@@ -114,6 +114,11 @@ func (plugin *azureFilePlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod
 		return nil, err
 	}
 	secretName, secretNamespace, err := getSecretNameAndNamespace(spec, pod.Namespace)
+	if err != nil {
+		// Log-and-continue instead of returning an error for now
+		// due to unspecified backwards compatibility concerns (a subject to revise)
+		klog.Errorf("get secret name and namespace from pod(%s) return with error: %v", pod.Name, err)
+	}
 	return &azureFileMounter{
 		azureFile: &azureFile{
 			volName:         spec.Name(),
@@ -257,7 +262,6 @@ func (b *azureFileMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) e
 			klog.Errorf("azureFile - Unmount directory %s failed with %v", dir, err)
 			return err
 		}
-		notMnt = true
 	}
 
 	var accountKey, accountName string
@@ -265,7 +269,7 @@ func (b *azureFileMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) e
 		return err
 	}
 
-	mountOptions := []string{}
+	var mountOptions []string
 	source := ""
 	osSeparator := string(os.PathSeparator)
 	source = fmt.Sprintf("%s%s%s.file.%s%s%s", osSeparator, osSeparator, accountName, getStorageEndpointSuffix(b.plugin.host.GetCloudProvider()), osSeparator, b.shareName)

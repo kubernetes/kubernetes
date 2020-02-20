@@ -27,6 +27,7 @@ limitations under the License.
 package ttl
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"strconv"
@@ -35,6 +36,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/json"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -263,7 +265,7 @@ func (ttlc *TTLController) patchNodeWithAnnotation(node *v1.Node, annotationKey 
 	if err != nil {
 		return err
 	}
-	_, err = ttlc.kubeClient.CoreV1().Nodes().Patch(node.Name, types.StrategicMergePatchType, patchBytes)
+	_, err = ttlc.kubeClient.CoreV1().Nodes().Patch(context.TODO(), node.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
 	if err != nil {
 		klog.V(2).Infof("Failed to change ttl annotation for node %s: %v", node.Name, err)
 		return err

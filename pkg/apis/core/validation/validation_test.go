@@ -10812,6 +10812,9 @@ func TestValidateReplicationController(t *testing.T) {
 }
 
 func TestValidateNode(t *testing.T) {
+	opts := NodeValidationOptions{
+		ValidateSingleHugePageResource: true,
+	}
 	validSelector := map[string]string{"a": "b"}
 	invalidSelector := map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}
 	successCases := []core.Node{
@@ -10918,7 +10921,7 @@ func TestValidateNode(t *testing.T) {
 		},
 	}
 	for _, successCase := range successCases {
-		if errs := ValidateNode(&successCase); len(errs) != 0 {
+		if errs := ValidateNode(&successCase, opts); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
 	}
@@ -11142,7 +11145,7 @@ func TestValidateNode(t *testing.T) {
 		},
 	}
 	for k, v := range errorCases {
-		errs := ValidateNode(&v)
+		errs := ValidateNode(&v, opts)
 		if len(errs) == 0 {
 			t.Errorf("expected failure for %s", k)
 		}
@@ -11169,7 +11172,134 @@ func TestValidateNode(t *testing.T) {
 	}
 }
 
+func TestNodeValidationOptions(t *testing.T) {
+	updateTests := []struct {
+		oldNode core.Node
+		node    core.Node
+		opts    NodeValidationOptions
+		valid   bool
+	}{
+		{core.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "validate-single-hugepages",
+			},
+			Status: core.NodeStatus{
+				Capacity: core.ResourceList{
+					core.ResourceName("hugepages-2Mi"): resource.MustParse("1Gi"),
+					core.ResourceName("hugepages-1Gi"): resource.MustParse("0"),
+				},
+			},
+		}, core.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "validate-single-hugepages",
+			},
+			Status: core.NodeStatus{
+				Capacity: core.ResourceList{
+					core.ResourceName("hugepages-2Mi"): resource.MustParse("1Gi"),
+					core.ResourceName("hugepages-1Gi"): resource.MustParse("2Gi"),
+				},
+			},
+		}, NodeValidationOptions{ValidateSingleHugePageResource: true}, false},
+		{core.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "validate-single-hugepages",
+			},
+			Status: core.NodeStatus{
+				Capacity: core.ResourceList{
+					core.ResourceName("hugepages-2Mi"): resource.MustParse("1Gi"),
+					core.ResourceName("hugepages-1Gi"): resource.MustParse("1Gi"),
+				},
+			},
+		}, core.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "validate-single-hugepages",
+			},
+			Status: core.NodeStatus{
+				Capacity: core.ResourceList{
+					core.ResourceName("hugepages-2Mi"): resource.MustParse("1Gi"),
+					core.ResourceName("hugepages-1Gi"): resource.MustParse("1Gi"),
+				},
+			},
+		}, NodeValidationOptions{ValidateSingleHugePageResource: true}, false},
+		{core.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "not-validate-single-hugepages",
+			},
+			Status: core.NodeStatus{
+				Capacity: core.ResourceList{
+					core.ResourceName("hugepages-2Mi"): resource.MustParse("1Gi"),
+					core.ResourceName("hugepages-1Gi"): resource.MustParse("0"),
+				},
+			},
+		}, core.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "not-validate-single-hugepages",
+			},
+			Status: core.NodeStatus{
+				Capacity: core.ResourceList{
+					core.ResourceName("hugepages-2Mi"): resource.MustParse("1Gi"),
+					core.ResourceName("hugepages-1Gi"): resource.MustParse("2Gi"),
+				},
+			},
+		}, NodeValidationOptions{ValidateSingleHugePageResource: false}, true},
+	}
+	for i, test := range updateTests {
+		test.oldNode.ObjectMeta.ResourceVersion = "1"
+		test.node.ObjectMeta.ResourceVersion = "1"
+		errs := ValidateNodeUpdate(&test.node, &test.oldNode, test.opts)
+		if test.valid && len(errs) > 0 {
+			t.Errorf("%d: Unexpected error: %v", i, errs)
+			t.Logf("%#v vs %#v", test.oldNode.ObjectMeta, test.node.ObjectMeta)
+		}
+		if !test.valid && len(errs) == 0 {
+			t.Errorf("%d: Unexpected non-error", i)
+			t.Logf("%#v vs %#v", test.oldNode.ObjectMeta, test.node.ObjectMeta)
+		}
+	}
+	nodeTests := []struct {
+		node  core.Node
+		opts  NodeValidationOptions
+		valid bool
+	}{
+		{core.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "validate-single-hugepages",
+			},
+			Status: core.NodeStatus{
+				Capacity: core.ResourceList{
+					core.ResourceName("hugepages-2Mi"): resource.MustParse("1Gi"),
+					core.ResourceName("hugepages-1Gi"): resource.MustParse("2Gi"),
+				},
+			},
+		}, NodeValidationOptions{ValidateSingleHugePageResource: true}, false},
+		{core.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "not-validate-single-hugepages",
+			},
+			Status: core.NodeStatus{
+				Capacity: core.ResourceList{
+					core.ResourceName("hugepages-2Mi"):  resource.MustParse("1Gi"),
+					core.ResourceName("hugepages-1Gi"):  resource.MustParse("2Gi"),
+					core.ResourceName("hugepages-64Ki"): resource.MustParse("2Gi"),
+				},
+			},
+		}, NodeValidationOptions{ValidateSingleHugePageResource: false}, true},
+	}
+	for i, test := range nodeTests {
+		test.node.ObjectMeta.ResourceVersion = "1"
+		errs := ValidateNode(&test.node, test.opts)
+		if test.valid && len(errs) > 0 {
+			t.Errorf("%d: Unexpected error: %v", i, errs)
+		}
+		if !test.valid && len(errs) == 0 {
+			t.Errorf("%d: Unexpected non-error", i)
+		}
+	}
+}
 func TestValidateNodeUpdate(t *testing.T) {
+	opts := NodeValidationOptions{
+		ValidateSingleHugePageResource: true,
+	}
 	tests := []struct {
 		oldNode core.Node
 		node    core.Node
@@ -11593,7 +11723,7 @@ func TestValidateNodeUpdate(t *testing.T) {
 	for i, test := range tests {
 		test.oldNode.ObjectMeta.ResourceVersion = "1"
 		test.node.ObjectMeta.ResourceVersion = "1"
-		errs := ValidateNodeUpdate(&test.node, &test.oldNode)
+		errs := ValidateNodeUpdate(&test.node, &test.oldNode, opts)
 		if test.valid && len(errs) > 0 {
 			t.Errorf("%d: Unexpected error: %v", i, errs)
 			t.Logf("%#v vs %#v", test.oldNode.ObjectMeta, test.node.ObjectMeta)
@@ -13117,6 +13247,104 @@ func TestValidateSecret(t *testing.T) {
 	}
 }
 
+func TestValidateSecretUpdate(t *testing.T) {
+	validSecret := func() core.Secret {
+		return core.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            "foo",
+				Namespace:       "bar",
+				ResourceVersion: "20",
+			},
+			Data: map[string][]byte{
+				"data-1": []byte("bar"),
+			},
+		}
+	}
+
+	falseVal := false
+	trueVal := true
+
+	secret := validSecret()
+	immutableSecret := validSecret()
+	immutableSecret.Immutable = &trueVal
+	mutableSecret := validSecret()
+	mutableSecret.Immutable = &falseVal
+
+	secretWithData := validSecret()
+	secretWithData.Data["data-2"] = []byte("baz")
+	immutableSecretWithData := validSecret()
+	immutableSecretWithData.Immutable = &trueVal
+	immutableSecretWithData.Data["data-2"] = []byte("baz")
+
+	secretWithChangedData := validSecret()
+	secretWithChangedData.Data["data-1"] = []byte("foo")
+	immutableSecretWithChangedData := validSecret()
+	immutableSecretWithChangedData.Immutable = &trueVal
+	immutableSecretWithChangedData.Data["data-1"] = []byte("foo")
+
+	tests := []struct {
+		name      string
+		oldSecret core.Secret
+		newSecret core.Secret
+		valid     bool
+	}{
+		{
+			name:      "mark secret immutable",
+			oldSecret: secret,
+			newSecret: immutableSecret,
+			valid:     true,
+		},
+		{
+			name:      "revert immutable secret",
+			oldSecret: immutableSecret,
+			newSecret: secret,
+			valid:     false,
+		},
+		{
+			name:      "makr immutable secret mutable",
+			oldSecret: immutableSecret,
+			newSecret: mutableSecret,
+			valid:     false,
+		},
+		{
+			name:      "add data in secret",
+			oldSecret: secret,
+			newSecret: secretWithData,
+			valid:     true,
+		},
+		{
+			name:      "add data in immutable secret",
+			oldSecret: immutableSecret,
+			newSecret: immutableSecretWithData,
+			valid:     false,
+		},
+		{
+			name:      "change data in secret",
+			oldSecret: secret,
+			newSecret: secretWithChangedData,
+			valid:     true,
+		},
+		{
+			name:      "change data in immutable secret",
+			oldSecret: immutableSecret,
+			newSecret: immutableSecretWithChangedData,
+			valid:     false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			errs := ValidateSecretUpdate(&tc.newSecret, &tc.oldSecret)
+			if tc.valid && len(errs) > 0 {
+				t.Errorf("Unexpected error: %v", errs)
+			}
+			if !tc.valid && len(errs) == 0 {
+				t.Errorf("Unexpected lack of error")
+			}
+		})
+	}
+}
+
 func TestValidateDockerConfigSecret(t *testing.T) {
 	validDockerSecret := func() core.Secret {
 		return core.Secret{
@@ -13731,40 +13959,105 @@ func TestValidateConfigMapUpdate(t *testing.T) {
 			Data: data,
 		}
 	}
+	validConfigMap := func() core.ConfigMap {
+		return newConfigMap("1", "validname", "validdns", map[string]string{"key": "value"})
+	}
 
-	var (
-		validConfigMap = newConfigMap("1", "validname", "validns", map[string]string{"key": "value"})
-		noVersion      = newConfigMap("", "validname", "validns", map[string]string{"key": "value"})
-	)
+	falseVal := false
+	trueVal := true
+
+	configMap := validConfigMap()
+	immutableConfigMap := validConfigMap()
+	immutableConfigMap.Immutable = &trueVal
+	mutableConfigMap := validConfigMap()
+	mutableConfigMap.Immutable = &falseVal
+
+	configMapWithData := validConfigMap()
+	configMapWithData.Data["key-2"] = "value-2"
+	immutableConfigMapWithData := validConfigMap()
+	immutableConfigMapWithData.Immutable = &trueVal
+	immutableConfigMapWithData.Data["key-2"] = "value-2"
+
+	configMapWithChangedData := validConfigMap()
+	configMapWithChangedData.Data["key"] = "foo"
+	immutableConfigMapWithChangedData := validConfigMap()
+	immutableConfigMapWithChangedData.Immutable = &trueVal
+	immutableConfigMapWithChangedData.Data["key"] = "foo"
+
+	noVersion := newConfigMap("", "validname", "validns", map[string]string{"key": "value"})
 
 	cases := []struct {
-		name    string
-		newCfg  core.ConfigMap
-		oldCfg  core.ConfigMap
-		isValid bool
+		name   string
+		newCfg core.ConfigMap
+		oldCfg core.ConfigMap
+		valid  bool
 	}{
 		{
-			name:    "valid",
-			newCfg:  validConfigMap,
-			oldCfg:  validConfigMap,
-			isValid: true,
+			name:   "valid",
+			newCfg: configMap,
+			oldCfg: configMap,
+			valid:  true,
 		},
 		{
-			name:    "invalid",
-			newCfg:  noVersion,
-			oldCfg:  validConfigMap,
-			isValid: false,
+			name:   "invalid",
+			newCfg: noVersion,
+			oldCfg: configMap,
+			valid:  false,
+		},
+		{
+			name:   "mark configmap immutable",
+			oldCfg: configMap,
+			newCfg: immutableConfigMap,
+			valid:  true,
+		},
+		{
+			name:   "revert immutable configmap",
+			oldCfg: immutableConfigMap,
+			newCfg: configMap,
+			valid:  false,
+		},
+		{
+			name:   "mark immutable configmap mutable",
+			oldCfg: immutableConfigMap,
+			newCfg: mutableConfigMap,
+			valid:  false,
+		},
+		{
+			name:   "add data in configmap",
+			oldCfg: configMap,
+			newCfg: configMapWithData,
+			valid:  true,
+		},
+		{
+			name:   "add data in immutable configmap",
+			oldCfg: immutableConfigMap,
+			newCfg: immutableConfigMapWithData,
+			valid:  false,
+		},
+		{
+			name:   "change data in configmap",
+			oldCfg: configMap,
+			newCfg: configMapWithChangedData,
+			valid:  true,
+		},
+		{
+			name:   "change data in immutable configmap",
+			oldCfg: immutableConfigMap,
+			newCfg: immutableConfigMapWithChangedData,
+			valid:  false,
 		},
 	}
 
 	for _, tc := range cases {
-		errs := ValidateConfigMapUpdate(&tc.newCfg, &tc.oldCfg)
-		if tc.isValid && len(errs) > 0 {
-			t.Errorf("%v: unexpected error: %v", tc.name, errs)
-		}
-		if !tc.isValid && len(errs) == 0 {
-			t.Errorf("%v: unexpected non-error", tc.name)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			errs := ValidateConfigMapUpdate(&tc.newCfg, &tc.oldCfg)
+			if tc.valid && len(errs) > 0 {
+				t.Errorf("Unexpected error: %v", errs)
+			}
+			if !tc.valid && len(errs) == 0 {
+				t.Errorf("Unexpected lack of error")
+			}
+		})
 	}
 }
 
@@ -14616,6 +14909,9 @@ func makeNode(nodeName string, podCIDRs []string) core.Node {
 	}
 }
 func TestValidateNodeCIDRs(t *testing.T) {
+	opts := NodeValidationOptions{
+		ValidateSingleHugePageResource: true,
+	}
 	testCases := []struct {
 		expectError bool
 		node        core.Node
@@ -14676,7 +14972,7 @@ func TestValidateNodeCIDRs(t *testing.T) {
 		},
 	}
 	for _, testCase := range testCases {
-		errs := ValidateNode(&testCase.node)
+		errs := ValidateNode(&testCase.node, opts)
 		if len(errs) == 0 && testCase.expectError {
 			t.Errorf("expected failure for %s, but there were none", testCase.node.Name)
 			return

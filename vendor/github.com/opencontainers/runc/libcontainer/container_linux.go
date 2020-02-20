@@ -265,22 +265,24 @@ func (c *linuxContainer) Exec() error {
 
 func (c *linuxContainer) exec() error {
 	path := filepath.Join(c.root, execFifoFilename)
+	pid := c.initProcess.pid()
+	blockingFifoOpenCh := awaitFifoOpen(path)
+	for {
+		select {
+		case result := <-blockingFifoOpenCh:
+			return handleFifoResult(result)
 
-	fifoOpen := make(chan struct{})
-	select {
-	case <-awaitProcessExit(c.initProcess.pid(), fifoOpen):
-		return errors.New("container process is already dead")
-	case result := <-awaitFifoOpen(path):
-		close(fifoOpen)
-		if result.err != nil {
-			return result.err
+		case <-time.After(time.Millisecond * 100):
+			stat, err := system.Stat(pid)
+			if err != nil || stat.State == system.Zombie {
+				// could be because process started, ran, and completed between our 100ms timeout and our system.Stat() check.
+				// see if the fifo exists and has data (with a non-blocking open, which will succeed if the writing process is complete).
+				if err := handleFifoResult(fifoOpen(path, false)); err != nil {
+					return errors.New("container process is already dead")
+				}
+				return nil
+			}
 		}
-		f := result.file
-		defer f.Close()
-		if err := readFromExecFifo(f); err != nil {
-			return err
-		}
-		return os.Remove(path)
 	}
 }
 
@@ -295,36 +297,37 @@ func readFromExecFifo(execFifo io.Reader) error {
 	return nil
 }
 
-func awaitProcessExit(pid int, exit <-chan struct{}) <-chan struct{} {
-	isDead := make(chan struct{})
-	go func() {
-		for {
-			select {
-			case <-exit:
-				return
-			case <-time.After(time.Millisecond * 100):
-				stat, err := system.Stat(pid)
-				if err != nil || stat.State == system.Zombie {
-					close(isDead)
-					return
-				}
-			}
-		}
-	}()
-	return isDead
-}
-
 func awaitFifoOpen(path string) <-chan openResult {
 	fifoOpened := make(chan openResult)
 	go func() {
-		f, err := os.OpenFile(path, os.O_RDONLY, 0)
-		if err != nil {
-			fifoOpened <- openResult{err: newSystemErrorWithCause(err, "open exec fifo for reading")}
-			return
-		}
-		fifoOpened <- openResult{file: f}
+		result := fifoOpen(path, true)
+		fifoOpened <- result
 	}()
 	return fifoOpened
+}
+
+func fifoOpen(path string, block bool) openResult {
+	flags := os.O_RDONLY
+	if !block {
+		flags |= syscall.O_NONBLOCK
+	}
+	f, err := os.OpenFile(path, flags, 0)
+	if err != nil {
+		return openResult{err: newSystemErrorWithCause(err, "open exec fifo for reading")}
+	}
+	return openResult{file: f}
+}
+
+func handleFifoResult(result openResult) error {
+	if result.err != nil {
+		return result.err
+	}
+	f := result.file
+	defer f.Close()
+	if err := readFromExecFifo(f); err != nil {
+		return err
+	}
+	return os.Remove(f.Name())
 }
 
 type openResult struct {
@@ -940,7 +943,7 @@ func (c *linuxContainer) Checkpoint(criuOpts *CriuOpts) error {
 
 	// Since a container can be C/R'ed multiple times,
 	// the checkpoint directory may already exist.
-	if err := os.Mkdir(criuOpts.ImagesDirectory, 0755); err != nil && !os.IsExist(err) {
+	if err := os.Mkdir(criuOpts.ImagesDirectory, 0700); err != nil && !os.IsExist(err) {
 		return err
 	}
 
@@ -948,7 +951,7 @@ func (c *linuxContainer) Checkpoint(criuOpts *CriuOpts) error {
 		criuOpts.WorkDirectory = filepath.Join(c.root, "criu.work")
 	}
 
-	if err := os.Mkdir(criuOpts.WorkDirectory, 0755); err != nil && !os.IsExist(err) {
+	if err := os.Mkdir(criuOpts.WorkDirectory, 0700); err != nil && !os.IsExist(err) {
 		return err
 	}
 
@@ -1111,7 +1114,7 @@ func (c *linuxContainer) Checkpoint(criuOpts *CriuOpts) error {
 			return err
 		}
 
-		err = ioutil.WriteFile(filepath.Join(criuOpts.ImagesDirectory, descriptorsFilename), fdsJSON, 0655)
+		err = ioutil.WriteFile(filepath.Join(criuOpts.ImagesDirectory, descriptorsFilename), fdsJSON, 0600)
 		if err != nil {
 			return err
 		}
@@ -1246,7 +1249,7 @@ func (c *linuxContainer) Restore(process *Process, criuOpts *CriuOpts) error {
 	}
 	// Since a container can be C/R'ed multiple times,
 	// the work directory may already exist.
-	if err := os.Mkdir(criuOpts.WorkDirectory, 0655); err != nil && !os.IsExist(err) {
+	if err := os.Mkdir(criuOpts.WorkDirectory, 0700); err != nil && !os.IsExist(err) {
 		return err
 	}
 	workDir, err := os.Open(criuOpts.WorkDirectory)
@@ -1824,7 +1827,7 @@ func (c *linuxContainer) isPaused() (bool, error) {
 	data, err := ioutil.ReadFile(filepath.Join(fcg, filename))
 	if err != nil {
 		// If freezer cgroup is not mounted, the container would just be not paused.
-		if os.IsNotExist(err) {
+		if os.IsNotExist(err) || err == syscall.ENODEV {
 			return false, nil
 		}
 		return false, newSystemErrorWithCause(err, "checking if container is paused")

@@ -40,6 +40,7 @@ limitations under the License.
 package volume
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"strconv"
@@ -127,12 +128,8 @@ type TestConfig struct {
 	// Wait for the pod to terminate successfully
 	// False indicates that the pod is long running
 	WaitForCompletion bool
-	// ServerNodeName is the spec.nodeName to run server pod on.  Default is any node.
-	ServerNodeName string
-	// ClientNodeName is the spec.nodeName to run client pod on.  Default is any node.
-	ClientNodeName string
-	// NodeSelector to use in pod spec (server, client and injector pods).
-	NodeSelector map[string]string
+	// ClientNodeSelection restricts where the client pod runs on.  Default is any node.
+	ClientNodeSelection e2epod.NodeSelection
 }
 
 // Test contains a volume to mount into a client pod and its
@@ -198,7 +195,7 @@ func NewGlusterfsServer(cs clientset.Interface, namespace string) (config TestCo
 			},
 		},
 	}
-	_, err := cs.CoreV1().Endpoints(namespace).Create(endpoints)
+	_, err := cs.CoreV1().Endpoints(namespace).Create(context.TODO(), endpoints, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "failed to create endpoints for Gluster server")
 
 	return config, pod, ip
@@ -296,19 +293,17 @@ func startVolumeServer(client clientset.Interface, config TestConfig) *v1.Pod {
 			},
 			Volumes:       volumes,
 			RestartPolicy: restartPolicy,
-			NodeName:      config.ServerNodeName,
-			NodeSelector:  config.NodeSelector,
 		},
 	}
 
 	var pod *v1.Pod
-	serverPod, err := podClient.Create(serverPod)
+	serverPod, err := podClient.Create(context.TODO(), serverPod, metav1.CreateOptions{})
 	// ok if the server pod already exists. TODO: make this controllable by callers
 	if err != nil {
 		if apierrors.IsAlreadyExists(err) {
 			framework.Logf("Ignore \"already-exists\" error, re-get pod...")
 			ginkgo.By(fmt.Sprintf("re-getting the %q server pod", serverPodName))
-			serverPod, err = podClient.Get(serverPodName, metav1.GetOptions{})
+			serverPod, err = podClient.Get(context.TODO(), serverPodName, metav1.GetOptions{})
 			framework.ExpectNoError(err, "Cannot re-get the server pod %q: %v", serverPodName, err)
 			pod = serverPod
 		} else {
@@ -317,12 +312,12 @@ func startVolumeServer(client clientset.Interface, config TestConfig) *v1.Pod {
 	}
 	if config.WaitForCompletion {
 		framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespace(client, serverPod.Name, serverPod.Namespace))
-		framework.ExpectNoError(podClient.Delete(serverPod.Name, nil))
+		framework.ExpectNoError(podClient.Delete(context.TODO(), serverPod.Name, nil))
 	} else {
 		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(client, serverPod))
 		if pod == nil {
 			ginkgo.By(fmt.Sprintf("locating the %q server pod", serverPodName))
-			pod, err = podClient.Get(serverPodName, metav1.GetOptions{})
+			pod, err = podClient.Get(context.TODO(), serverPodName, metav1.GetOptions{})
 			framework.ExpectNoError(err, "Cannot locate the server pod %q: %v", serverPodName, err)
 		}
 	}
@@ -333,21 +328,17 @@ func startVolumeServer(client clientset.Interface, config TestConfig) *v1.Pod {
 	return pod
 }
 
-// TestCleanup cleans both server and client pods.
-func TestCleanup(f *framework.Framework, config TestConfig) {
+// TestServerCleanup cleans server pod.
+func TestServerCleanup(f *framework.Framework, config TestConfig) {
 	ginkgo.By(fmt.Sprint("cleaning the environment after ", config.Prefix))
-
 	defer ginkgo.GinkgoRecover()
 
-	cs := f.ClientSet
-
-	err := e2epod.DeletePodWithWaitByName(cs, config.Prefix+"-client", config.Namespace)
-	gomega.Expect(err).To(gomega.BeNil(), "Failed to delete pod %v in namespace %v", config.Prefix+"-client", config.Namespace)
-
-	if config.ServerImage != "" {
-		err := e2epod.DeletePodWithWaitByName(cs, config.Prefix+"-server", config.Namespace)
-		gomega.Expect(err).To(gomega.BeNil(), "Failed to delete pod %v in namespace %v", config.Prefix+"-server", config.Namespace)
+	if config.ServerImage == "" {
+		return
 	}
+
+	err := e2epod.DeletePodWithWaitByName(f.ClientSet, config.Prefix+"-server", config.Namespace)
+	gomega.Expect(err).To(gomega.BeNil(), "Failed to delete pod %v in namespace %v", config.Prefix+"-server", config.Namespace)
 }
 
 func runVolumeTesterPod(client clientset.Interface, config TestConfig, podSuffix string, privileged bool, fsGroup *int64, tests []Test) (*v1.Pod, error) {
@@ -388,10 +379,9 @@ func runVolumeTesterPod(client clientset.Interface, config TestConfig, podSuffix
 			TerminationGracePeriodSeconds: &gracePeriod,
 			SecurityContext:               GeneratePodSecurityContext(fsGroup, seLinuxOptions),
 			Volumes:                       []v1.Volume{},
-			NodeName:                      config.ClientNodeName,
-			NodeSelector:                  config.NodeSelector,
 		},
 	}
+	e2epod.SetNodeSelection(clientPod, config.ClientNodeSelection)
 
 	for i, test := range tests {
 		volumeName := fmt.Sprintf("%s-%s-%d", config.Prefix, "volume", i)
@@ -423,7 +413,7 @@ func runVolumeTesterPod(client clientset.Interface, config TestConfig, podSuffix
 		})
 	}
 	podsNamespacer := client.CoreV1().Pods(config.Namespace)
-	clientPod, err := podsNamespacer.Create(clientPod)
+	clientPod, err := podsNamespacer.Create(context.TODO(), clientPod, metav1.CreateOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -485,8 +475,12 @@ func TestVolumeClient(f *framework.Framework, config TestConfig, fsGroup *int64,
 	clientPod, err := runVolumeTesterPod(f.ClientSet, config, "client", false, fsGroup, tests)
 	if err != nil {
 		framework.Failf("Failed to create client pod: %v", err)
-
 	}
+	defer func() {
+		e2epod.DeletePodOrFail(f.ClientSet, clientPod.Namespace, clientPod.Name)
+		e2epod.WaitForPodToDisappear(f.ClientSet, clientPod.Namespace, clientPod.Name, labels.Everything(), framework.Poll, framework.PodDeleteTimeout)
+	}()
+
 	framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(f.ClientSet, clientPod))
 	testVolumeContent(f, clientPod, fsGroup, fsType, tests)
 }
@@ -543,38 +537,13 @@ func GenerateScriptCmd(command string) []string {
 	return commands
 }
 
-// generateWriteBlockCmd generates the corresponding command lines to write to a block device the given content.
-// Depending on the Node OS is Windows or linux, the command will use powershell or /bin/sh
-func generateWriteBlockCmd(content, fullPath string) []string {
+// generateWriteCmd is used by generateWriteBlockCmd and generateWriteFileCmd
+func generateWriteCmd(content, path string) []string {
 	var commands []string
 	if !framework.NodeOSDistroIs("windows") {
-		commands = []string{"/bin/sh", "-c", "echo '" + content + "' > " + fullPath}
+		commands = []string{"/bin/sh", "-c", "echo '" + content + "' > " + path}
 	} else {
-		commands = []string{"powershell", "/c", "echo '" + content + "' > " + fullPath}
-	}
-	return commands
-}
-
-// generateWriteFileCmd generates the corresponding command lines to write a file with the given content and file path.
-// Depending on the Node OS is Windows or linux, the command will use powershell or /bin/sh
-func generateWriteFileCmd(content, fullPath string) []string {
-	var commands []string
-	if !framework.NodeOSDistroIs("windows") {
-		commands = []string{"/bin/sh", "-c", "echo '" + content + "' > " + fullPath}
-	} else {
-		commands = []string{"powershell", "/c", "echo '" + content + "' > " + fullPath}
-	}
-	return commands
-}
-
-// generateReadFileCmd generates the corresponding command lines to read from a file with the given file path.
-// Depending on the Node OS is Windows or linux, the command will use powershell or /bin/sh
-func generateReadFileCmd(fullPath string) []string {
-	var commands []string
-	if !framework.NodeOSDistroIs("windows") {
-		commands = []string{"cat", fullPath}
-	} else {
-		commands = []string{"powershell", "/c", "type " + fullPath}
+		commands = []string{"powershell", "/c", "echo '" + content + "' > " + path}
 	}
 	return commands
 }
@@ -590,6 +559,30 @@ func generateReadBlockCmd(fullPath string, numberOfCharacters int) []string {
 		commands = []string{"powershell", "/c", "type " + fullPath}
 	}
 	return commands
+}
+
+// generateWriteBlockCmd generates the corresponding command lines to write to a block device the given content.
+// Depending on the Node OS is Windows or linux, the command will use powershell or /bin/sh
+func generateWriteBlockCmd(content, fullPath string) []string {
+	return generateWriteCmd(content, fullPath)
+}
+
+// generateReadFileCmd generates the corresponding command lines to read from a file with the given file path.
+// Depending on the Node OS is Windows or linux, the command will use powershell or /bin/sh
+func generateReadFileCmd(fullPath string) []string {
+	var commands []string
+	if !framework.NodeOSDistroIs("windows") {
+		commands = []string{"cat", fullPath}
+	} else {
+		commands = []string{"powershell", "/c", "type " + fullPath}
+	}
+	return commands
+}
+
+// generateWriteFileCmd generates the corresponding command lines to write a file with the given content and file path.
+// Depending on the Node OS is Windows or linux, the command will use powershell or /bin/sh
+func generateWriteFileCmd(content, fullPath string) []string {
+	return generateWriteCmd(content, fullPath)
 }
 
 // GenerateSecurityContext generates the corresponding container security context with the given inputs

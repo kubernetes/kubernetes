@@ -21,7 +21,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
-	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
 )
 
 // Cache is used for testing
@@ -75,8 +74,8 @@ func (c *Cache) UpdateNode(oldNode, newNode *v1.Node) error { return nil }
 // RemoveNode is a fake method for testing.
 func (c *Cache) RemoveNode(node *v1.Node) error { return nil }
 
-// UpdateNodeInfoSnapshot is a fake method for testing.
-func (c *Cache) UpdateNodeInfoSnapshot(nodeSnapshot *nodeinfosnapshot.Snapshot) error {
+// UpdateSnapshot is a fake method for testing.
+func (c *Cache) UpdateSnapshot(snapshot *internalcache.Snapshot) error {
 	return nil
 }
 
@@ -88,9 +87,9 @@ func (c *Cache) FilteredList(filter schedulerlisters.PodFilter, selector labels.
 	return nil, nil
 }
 
-// Snapshot is a fake method for testing
-func (c *Cache) Snapshot() *internalcache.Snapshot {
-	return &internalcache.Snapshot{}
+// Dump is a fake method for testing.
+func (c *Cache) Dump() *internalcache.Dump {
+	return &internalcache.Dump{}
 }
 
 // GetNodeInfo is a fake method for testing.

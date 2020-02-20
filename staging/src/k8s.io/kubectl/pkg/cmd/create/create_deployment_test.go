@@ -28,6 +28,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	generateversioned "k8s.io/kubectl/pkg/generate/versioned"
 	"k8s.io/kubectl/pkg/scheme"
 )
@@ -139,9 +140,9 @@ func TestCreateDeploymentNoImage(t *testing.T) {
 	cmd.Flags().Set("output", "name")
 	options := &DeploymentOpts{
 		CreateSubcommandOptions: &CreateSubcommandOptions{
-			PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
-			DryRun:     true,
-			IOStreams:  ioStreams,
+			PrintFlags:     genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
+			DryRunStrategy: cmdutil.DryRunClient,
+			IOStreams:      ioStreams,
 		},
 	}
 

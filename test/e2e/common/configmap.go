@@ -17,10 +17,13 @@ limitations under the License.
 package common
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -41,7 +44,7 @@ var _ = ginkgo.Describe("[sig-node] ConfigMap", func() {
 		configMap := newConfigMap(f, name)
 		ginkgo.By(fmt.Sprintf("Creating configMap %v/%v", f.Namespace.Name, configMap.Name))
 		var err error
-		if configMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(configMap); err != nil {
+		if configMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(context.TODO(), configMap, metav1.CreateOptions{}); err != nil {
 			framework.Failf("unable to create test configMap %s: %v", configMap.Name, err)
 		}
 
@@ -89,7 +92,7 @@ var _ = ginkgo.Describe("[sig-node] ConfigMap", func() {
 		configMap := newEnvFromConfigMap(f, name)
 		ginkgo.By(fmt.Sprintf("Creating configMap %v/%v", f.Namespace.Name, configMap.Name))
 		var err error
-		if configMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(configMap); err != nil {
+		if configMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(context.TODO(), configMap, metav1.CreateOptions{}); err != nil {
 			framework.Failf("unable to create test configMap %s: %v", configMap.Name, err)
 		}
 
@@ -138,20 +141,81 @@ var _ = ginkgo.Describe("[sig-node] ConfigMap", func() {
 		name := "configmap-test-" + string(uuid.NewUUID())
 		configMap := newConfigMap(f, name)
 		ginkgo.By(fmt.Sprintf("Creating ConfigMap %v/%v", f.Namespace.Name, configMap.Name))
-		_, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(configMap)
+		_, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(context.TODO(), configMap, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create ConfigMap")
 
 		configMap.Data = map[string]string{
 			"data": "value",
 		}
 		ginkgo.By(fmt.Sprintf("Updating configMap %v/%v", f.Namespace.Name, configMap.Name))
-		_, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Update(configMap)
+		_, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Update(context.TODO(), configMap, metav1.UpdateOptions{})
 		framework.ExpectNoError(err, "failed to update ConfigMap")
 
-		configMapFromUpdate, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Get(name, metav1.GetOptions{})
+		configMapFromUpdate, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Get(context.TODO(), name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "failed to get ConfigMap")
 		ginkgo.By(fmt.Sprintf("Verifying update of ConfigMap %v/%v", f.Namespace.Name, configMap.Name))
 		framework.ExpectEqual(configMapFromUpdate.Data, configMap.Data)
+	})
+
+	ginkgo.It("should run through a ConfigMap lifecycle", func() {
+		testNamespaceName := f.Namespace.Name
+		testConfigMapName := "test-configmap" + string(uuid.NewUUID())
+
+		_, err := f.ClientSet.CoreV1().ConfigMaps(testNamespaceName).Create(context.TODO(), &v1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: testConfigMapName,
+				Labels: map[string]string{
+					"test-configmap-static": "true",
+				},
+			},
+			Data: map[string]string{
+				"valueName": "value",
+			},
+		}, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "failed to create ConfigMap")
+
+		configMapPatchPayload, err := json.Marshal(v1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{
+					"test-configmap": "patched",
+				},
+			},
+			Data: map[string]string{
+				"valueName": "value1",
+			},
+		})
+		framework.ExpectNoError(err, "failed to marshal patch data")
+
+		_, err = f.ClientSet.CoreV1().ConfigMaps(testNamespaceName).Patch(context.TODO(), testConfigMapName, types.StrategicMergePatchType, []byte(configMapPatchPayload), metav1.PatchOptions{})
+		framework.ExpectNoError(err, "failed to patch ConfigMap")
+
+		configMap, err := f.ClientSet.CoreV1().ConfigMaps(testNamespaceName).Get(context.TODO(), testConfigMapName, metav1.GetOptions{})
+		framework.ExpectNoError(err, "failed to get ConfigMap")
+		framework.ExpectEqual(configMap.Data["valueName"], "value1", "failed to patch ConfigMap")
+		framework.ExpectEqual(configMap.Labels["test-configmap"], "patched", "failed to patch ConfigMap")
+
+		// listing in all namespaces to hit the endpoint
+		configMapList, err := f.ClientSet.CoreV1().ConfigMaps("").List(context.TODO(), metav1.ListOptions{
+			LabelSelector: "test-configmap-static=true",
+		})
+		framework.ExpectNoError(err, "failed to list ConfigMaps with LabelSelector")
+		framework.ExpectNotEqual(len(configMapList.Items), 0, "no ConfigMaps found in ConfigMap list")
+		testConfigMapFound := false
+		for _, cm := range configMapList.Items {
+			if cm.ObjectMeta.Name == testConfigMapName &&
+				cm.ObjectMeta.Namespace == testNamespaceName &&
+				cm.ObjectMeta.Labels["test-configmap-static"] == "true" &&
+				cm.Data["valueName"] == "value1" {
+				testConfigMapFound = true
+				break
+			}
+		}
+		framework.ExpectEqual(testConfigMapFound, true, "failed to find ConfigMap in list")
+
+		err = f.ClientSet.CoreV1().ConfigMaps(testNamespaceName).DeleteCollection(context.TODO(), &metav1.DeleteOptions{}, metav1.ListOptions{
+			LabelSelector: "test-configmap-static=true",
+		})
+		framework.ExpectNoError(err, "failed to delete ConfigMap collection with LabelSelector")
 	})
 })
 
@@ -182,5 +246,5 @@ func newConfigMapWithEmptyKey(f *framework.Framework) (*v1.ConfigMap, error) {
 	}
 
 	ginkgo.By(fmt.Sprintf("Creating configMap that has name %s", configMap.Name))
-	return f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(configMap)
+	return f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(context.TODO(), configMap, metav1.CreateOptions{})
 }

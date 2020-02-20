@@ -9,7 +9,6 @@ go_library(
     name = "go_default_library",
     srcs = [
         "accelerator.go",
-        "cadvisor.go",
         "custom_metrics_deployments.go",
         "custom_metrics_stackdriver.go",
         "metrics_grabber.go",
@@ -35,7 +34,6 @@ go_library(
         "//staging/src/k8s.io/metrics/pkg/client/external_metrics:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//test/e2e/framework/autoscaling:go_default_library",
-        "//test/e2e/framework/config:go_default_library",
         "//test/e2e/framework/gpu:go_default_library",
         "//test/e2e/framework/metrics:go_default_library",
         "//test/e2e/framework/node:go_default_library",
@@ -48,6 +46,7 @@ go_library(
         "//vendor/github.com/onsi/gomega:go_default_library",
         "//vendor/golang.org/x/oauth2/google:go_default_library",
         "//vendor/google.golang.org/api/monitoring/v3:go_default_library",
+        "//vendor/google.golang.org/api/option:go_default_library",
     ],
 )
 

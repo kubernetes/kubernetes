@@ -144,6 +144,17 @@ const (
 	// a statically assigned hash table by their source IP
 	// addresses.
 	SourceHashing = "sh"
+
+	// WeightedRoundRobin assigns jobs to real servers proportionally
+	// to there real servers' weight. Servers with higher weights
+	// receive new jobs first and get more jobs than servers
+	// with lower weights. Servers with equal weights get
+	// an equal distribution of new jobs
+	WeightedRoundRobin = "wrr"
+
+	// WeightedLeastConnection assigns more jobs to servers
+	// with fewer jobs and relative to the real servers' weight
+	WeightedLeastConnection = "wlc"
 )
 
 const (

@@ -85,6 +85,24 @@ func HugePageSizeFromResourceName(name v1.ResourceName) (resource.Quantity, erro
 	return resource.ParseQuantity(pageSize)
 }
 
+// HugePageUnitSizeFromByteSize returns hugepage size has the format.
+// `size` must be guaranteed to divisible into the largest units that can be expressed.
+// <size><unit-prefix>B (1024 = "1KB", 1048576 = "1MB", etc).
+func HugePageUnitSizeFromByteSize(size int64) (string, error) {
+	// hugePageSizeUnitList is borrowed from opencontainers/runc/libcontainer/cgroups/utils.go
+	var hugePageSizeUnitList = []string{"B", "KB", "MB", "GB", "TB", "PB"}
+	idx := 0
+	len := len(hugePageSizeUnitList) - 1
+	for size%1024 == 0 && idx < len {
+		size /= 1024
+		idx++
+	}
+	if size > 1024 && idx < len {
+		return "", fmt.Errorf("size: %d%s must be guaranteed to divisible into the largest units", size, hugePageSizeUnitList[idx])
+	}
+	return fmt.Sprintf("%d%s", size, hugePageSizeUnitList[idx]), nil
+}
+
 // IsOvercommitAllowed returns true if the resource is in the default
 // namespace and is not hugepages.
 func IsOvercommitAllowed(name v1.ResourceName) bool {
@@ -395,22 +413,37 @@ type taintsFilterFunc func(*v1.Taint) bool
 
 // TolerationsTolerateTaintsWithFilter checks if given tolerations tolerates
 // all the taints that apply to the filter in given taint list.
+// DEPRECATED: Please use FindMatchingUntoleratedTaint instead.
 func TolerationsTolerateTaintsWithFilter(tolerations []v1.Toleration, taints []v1.Taint, applyFilter taintsFilterFunc) bool {
-	if len(taints) == 0 {
-		return true
-	}
+	_, isUntolerated := FindMatchingUntoleratedTaint(taints, tolerations, applyFilter)
+	return !isUntolerated
+}
 
-	for i := range taints {
-		if applyFilter != nil && !applyFilter(&taints[i]) {
+// FindMatchingUntoleratedTaint checks if the given tolerations tolerates
+// all the filtered taints, and returns the first taint without a toleration
+func FindMatchingUntoleratedTaint(taints []v1.Taint, tolerations []v1.Toleration, inclusionFilter taintsFilterFunc) (v1.Taint, bool) {
+	filteredTaints := getFilteredTaints(taints, inclusionFilter)
+	for _, taint := range filteredTaints {
+		if !TolerationsTolerateTaint(tolerations, &taint) {
+			return taint, true
+		}
+	}
+	return v1.Taint{}, false
+}
+
+// getFilteredTaints returns a list of taints satisfying the filter predicate
+func getFilteredTaints(taints []v1.Taint, inclusionFilter taintsFilterFunc) []v1.Taint {
+	if inclusionFilter == nil {
+		return taints
+	}
+	filteredTaints := []v1.Taint{}
+	for _, taint := range taints {
+		if !inclusionFilter(&taint) {
 			continue
 		}
-
-		if !TolerationsTolerateTaint(tolerations, &taints[i]) {
-			return false
-		}
+		filteredTaints = append(filteredTaints, taint)
 	}
-
-	return true
+	return filteredTaints
 }
 
 // Returns true and list of Tolerations matching all Taints if all are tolerated, or false otherwise.

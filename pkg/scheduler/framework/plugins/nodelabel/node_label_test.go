@@ -24,8 +24,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
-	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
 )
 
 func TestValidateNodeLabelArgs(t *testing.T) {
@@ -227,7 +227,7 @@ func TestNodeLabelScore(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			state := framework.NewCycleState()
 			node := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "machine1", Labels: map[string]string{"foo": "", "bar": ""}}}
-			fh, _ := framework.NewFramework(nil, nil, nil, framework.WithSnapshotSharedLister(nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(nil, []*v1.Node{node}))))
+			fh, _ := framework.NewFramework(nil, nil, nil, framework.WithSnapshotSharedLister(cache.NewSnapshot(nil, []*v1.Node{node})))
 			args := &runtime.Unknown{Raw: []byte(test.rawArgs)}
 			p, err := New(args, fh)
 			if err != nil {
@@ -262,7 +262,7 @@ func TestNodeLabelFilterWithoutNode(t *testing.T) {
 
 func TestNodeLabelScoreWithoutNode(t *testing.T) {
 	t.Run("node does not exist", func(t *testing.T) {
-		fh, _ := framework.NewFramework(nil, nil, nil, framework.WithSnapshotSharedLister(nodeinfosnapshot.NewEmptySnapshot()))
+		fh, _ := framework.NewFramework(nil, nil, nil, framework.WithSnapshotSharedLister(cache.NewEmptySnapshot()))
 		p, err := New(nil, fh)
 		if err != nil {
 			t.Fatalf("Failed to create plugin: %+v", err)

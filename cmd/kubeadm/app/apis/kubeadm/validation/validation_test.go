@@ -197,18 +197,21 @@ func TestValidateIPNetFromString(t *testing.T) {
 		expected       bool
 	}{
 		{"invalid missing CIDR", "", 0, false, false},
+		{"invalid  CIDR", "a", 0, false, false},
 		{"invalid CIDR missing decimal points in IPv4 address and / mask", "1234", 0, false, false},
 		{"invalid CIDR use of letters instead of numbers and / mask", "abc", 0, false, false},
 		{"invalid IPv4 address provided instead of CIDR representation", "1.2.3.4", 0, false, false},
 		{"invalid IPv6 address provided instead of CIDR representation", "2001:db8::1", 0, false, false},
+		{"invalid multiple CIDR provided in a single stack cluster", "2001:db8::1/64,1.2.3.4/24", 0, false, false},
+		{"invalid multiple CIDR provided in a single stack cluster and one invalid subnet", "2001:db8::1/64,a", 0, false, false},
 		{"valid, but IPv4 CIDR too small. At least 10 addresses needed", "10.0.0.16/29", 10, false, false},
 		{"valid, but IPv6 CIDR too small. At least 10 addresses needed", "2001:db8::/125", 10, false, false},
 		{"valid IPv4 CIDR", "10.0.0.16/12", 10, false, true},
 		{"valid IPv6 CIDR", "2001:db8::/98", 10, false, true},
 		// dual-stack:
 		{"invalid missing CIDR", "", 0, true, false},
-		{"invalid only an IPv4 CIDR specified", "10.0.0.16/12", 10, true, false},
-		{"invalid only an IPv6 CIDR specified", "2001:db8::/98", 10, true, false},
+		{"valid dual-stack enabled but only an IPv4 CIDR specified", "10.0.0.16/12", 10, true, true},
+		{"valid dual-stack enabled but only an IPv6 CIDR specified", "2001:db8::/98", 10, true, true},
 		{"invalid IPv4 address provided instead of CIDR representation", "1.2.3.4,2001:db8::/98", 0, true, false},
 		{"invalid IPv6 address provided instead of CIDR representation", "2001:db8::1,10.0.0.16/12", 0, true, false},
 		{"valid, but IPv4 CIDR too small. At least 10 addresses needed", "10.0.0.16/29,2001:db8::/98", 10, true, false},
@@ -217,6 +220,8 @@ func TestValidateIPNetFromString(t *testing.T) {
 		{"valid, but only IPv6 family addresses specified. IPv4 CIDR is necessary.", "2001:db8::/98,2005:db8::/98", 10, true, false},
 		{"valid IPv4 and IPv6 CIDR", "10.0.0.16/12,2001:db8::/98", 10, true, true},
 		{"valid IPv6 and IPv4 CIDR", "10.0.0.16/12,2001:db8::/98", 10, true, true},
+		{"invalid IPv6 and IPv4 CIDR with more than 2 subnets", "10.0.0.16/12,2001:db8::/98,192.168.0.0/16", 10, true, false},
+		{"invalid IPv6 and IPv4 CIDR with more than 2 subnets", "10.0.0.16/12,2001:db8::/98,192.168.0.0/16,a.b.c.d/24", 10, true, false},
 	}
 	for _, rt := range tests {
 		actual := ValidateIPNetFromString(rt.subnet, rt.minaddrs, rt.checkDualStack, nil)

@@ -87,6 +87,7 @@ func NewStorage(optsGetter generic.RESTOptionsGetter, k client.ConnectionInfoGet
 		RESTOptions: optsGetter,
 		AttrFunc:    registrypod.GetAttrs,
 		TriggerFunc: map[string]storage.IndexerFunc{"spec.nodeName": registrypod.NodeNameTriggerFunc},
+		Indexers:    registrypod.Indexers(),
 	}
 	if err := store.CompleteWithOptions(options); err != nil {
 		return PodStorage{}, err
@@ -118,7 +119,7 @@ var _ = rest.Redirector(&REST{})
 
 // ResourceLocation returns a pods location from its HostIP
 func (r *REST) ResourceLocation(ctx context.Context, name string) (*url.URL, http.RoundTripper, error) {
-	return registrypod.ResourceLocation(r, r.proxyTransport, ctx, name)
+	return registrypod.ResourceLocation(ctx, r, r.proxyTransport, name)
 }
 
 // Implement ShortNamesProvider

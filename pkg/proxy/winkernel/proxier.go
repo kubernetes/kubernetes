@@ -36,6 +36,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	genericfeatures "k8s.io/apiserver/pkg/features"
@@ -234,14 +235,18 @@ func newServiceInfo(svcPortName proxy.ServicePortName, port *v1.ServicePort, ser
 	if err != nil {
 		preserveDIP = false
 	}
+	// targetPort is zero if it is specified as a name in port.TargetPort.
+	// Its real value would be got later from endpoints.
+	targetPort := 0
+	if port.TargetPort.Type == intstr.Int {
+		targetPort = port.TargetPort.IntValue()
+	}
 	info := &serviceInfo{
-		clusterIP: net.ParseIP(service.Spec.ClusterIP),
-		port:      int(port.Port),
-		protocol:  port.Protocol,
-		nodePort:  int(port.NodePort),
-		// targetPort is zero if it is specified as a name in port.TargetPort.
-		// Its real value would be got later from endpoints.
-		targetPort: port.TargetPort.IntValue(),
+		clusterIP:  net.ParseIP(service.Spec.ClusterIP),
+		port:       int(port.Port),
+		protocol:   port.Protocol,
+		nodePort:   int(port.NodePort),
+		targetPort: targetPort,
 		// Deep-copy in case the service instance changes
 		loadBalancerStatus:       *service.Status.LoadBalancer.DeepCopy(),
 		sessionAffinityType:      service.Spec.SessionAffinity,

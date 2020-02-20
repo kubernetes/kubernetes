@@ -17,6 +17,7 @@ limitations under the License.
 package e2enode
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -26,8 +27,6 @@ import (
 	"regexp"
 	"strings"
 	"time"
-
-	"golang.org/x/net/context"
 
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -239,7 +238,7 @@ func setNodeConfigSource(f *framework.Framework, source *v1.NodeConfigSource) er
 	nodeclient := f.ClientSet.CoreV1().Nodes()
 
 	// get the node
-	node, err := nodeclient.Get(framework.TestContext.NodeName, metav1.GetOptions{})
+	node, err := nodeclient.Get(context.TODO(), framework.TestContext.NodeName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -248,7 +247,7 @@ func setNodeConfigSource(f *framework.Framework, source *v1.NodeConfigSource) er
 	node.Spec.ConfigSource = source
 
 	// update to the new source
-	_, err = nodeclient.Update(node)
+	_, err = nodeclient.Update(context.TODO(), node, metav1.UpdateOptions{})
 	if err != nil {
 		return err
 	}
@@ -317,7 +316,7 @@ func decodeConfigz(resp *http.Response) (*kubeletconfig.KubeletConfiguration, er
 // creates a configmap containing kubeCfg in kube-system namespace
 func createConfigMap(f *framework.Framework, internalKC *kubeletconfig.KubeletConfiguration) (*v1.ConfigMap, error) {
 	cmap := newKubeletConfigMap("testcfg", internalKC)
-	cmap, err := f.ClientSet.CoreV1().ConfigMaps("kube-system").Create(cmap)
+	cmap, err := f.ClientSet.CoreV1().ConfigMaps("kube-system").Create(context.TODO(), cmap, metav1.CreateOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -340,7 +339,7 @@ func newKubeletConfigMap(name string, internalKC *kubeletconfig.KubeletConfigura
 
 // listNamespaceEvents lists the events in the given namespace.
 func listNamespaceEvents(c clientset.Interface, ns string) error {
-	ls, err := c.CoreV1().Events(ns).List(metav1.ListOptions{})
+	ls, err := c.CoreV1().Events(ns).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return err
 	}

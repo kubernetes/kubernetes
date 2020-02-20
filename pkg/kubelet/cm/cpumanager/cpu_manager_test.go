@@ -100,7 +100,8 @@ func (p *mockPolicy) Name() string {
 	return "mock"
 }
 
-func (p *mockPolicy) Start(s state.State) {
+func (p *mockPolicy) Start(s state.State) error {
+	return p.err
 }
 
 func (p *mockPolicy) AddContainer(s state.State, pod *v1.Pod, container *v1.Container) error {
@@ -111,7 +112,7 @@ func (p *mockPolicy) RemoveContainer(s state.State, podUID string, containerName
 	return p.err
 }
 
-func (p *mockPolicy) GetTopologyHints(s state.State, pod v1.Pod, container v1.Container) map[string][]topologymanager.TopologyHint {
+func (p *mockPolicy) GetTopologyHints(s state.State, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
 	return nil
 }
 
@@ -206,7 +207,7 @@ func makeMultiContainerPod(initCPUs, appCPUs []struct{ request, limit string }) 
 }
 
 func TestCPUManagerAdd(t *testing.T) {
-	testPolicy := NewStaticPolicy(
+	testPolicy, _ := NewStaticPolicy(
 		&topology.CPUTopology{
 			NumCPUs:    4,
 			NumSockets: 1,
@@ -464,7 +465,7 @@ func TestCPUManagerAddWithInitContainers(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		policy := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs, cpuset.NewCPUSet(), topologymanager.NewFakeManager())
+		policy, _ := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs, cpuset.NewCPUSet(), topologymanager.NewFakeManager())
 
 		state := &mockState{
 			assignments:   testCase.stAssignments,
@@ -701,6 +702,9 @@ func TestReconcileState(t *testing.T) {
 					{
 						Name:        "fakeContainerName",
 						ContainerID: "docker://fakeContainerID",
+						State: v1.ContainerState{
+							Running: &v1.ContainerStateRunning{},
+						},
 					},
 				},
 			},
@@ -737,6 +741,9 @@ func TestReconcileState(t *testing.T) {
 					{
 						Name:        "fakeContainerName",
 						ContainerID: "docker://fakeContainerID",
+						State: v1.ContainerState{
+							Running: &v1.ContainerStateRunning{},
+						},
 					},
 				},
 			},
@@ -752,7 +759,7 @@ func TestReconcileState(t *testing.T) {
 			expectFailedContainerName:    "",
 		},
 		{
-			description: "cpu manager reconclie - pod status not found",
+			description: "cpu manager reconcile - pod status not found",
 			activePods: []*v1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{
@@ -774,10 +781,10 @@ func TestReconcileState(t *testing.T) {
 			stDefaultCPUSet:              cpuset.NewCPUSet(),
 			updateErr:                    nil,
 			expectSucceededContainerName: "",
-			expectFailedContainerName:    "fakeContainerName",
+			expectFailedContainerName:    "",
 		},
 		{
-			description: "cpu manager reconclie - container id not found",
+			description: "cpu manager reconcile - container state not found",
 			activePods: []*v1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{
@@ -830,6 +837,9 @@ func TestReconcileState(t *testing.T) {
 					{
 						Name:        "fakeContainerName",
 						ContainerID: "docker://fakeContainerID",
+						State: v1.ContainerState{
+							Running: &v1.ContainerStateRunning{},
+						},
 					},
 				},
 			},
@@ -866,6 +876,9 @@ func TestReconcileState(t *testing.T) {
 					{
 						Name:        "fakeContainerName",
 						ContainerID: "docker://fakeContainerID",
+						State: v1.ContainerState{
+							Running: &v1.ContainerStateRunning{},
+						},
 					},
 				},
 			},
@@ -941,7 +954,7 @@ func TestReconcileState(t *testing.T) {
 // above test cases are without kubelet --reserved-cpus cmd option
 // the following tests are with --reserved-cpus configured
 func TestCPUManagerAddWithResvList(t *testing.T) {
-	testPolicy := NewStaticPolicy(
+	testPolicy, _ := NewStaticPolicy(
 		&topology.CPUTopology{
 			NumCPUs:    4,
 			NumSockets: 1,

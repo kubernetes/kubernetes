@@ -17,6 +17,7 @@ limitations under the License.
 package storage
 
 import (
+	"context"
 	"github.com/onsi/ginkgo"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -153,7 +154,7 @@ var _ = utils.SIGDescribe("PersistentVolumes GCEPD", func() {
 	ginkgo.It("should test that deleting the Namespace of a PVC and Pod causes the successful detach of Persistent Disk [Flaky]", func() {
 
 		ginkgo.By("Deleting the Namespace")
-		err := c.CoreV1().Namespaces().Delete(ns, nil)
+		err := c.CoreV1().Namespaces().Delete(context.TODO(), ns, nil)
 		framework.ExpectNoError(err)
 
 		err = framework.WaitForNamespacesDeleted(c, []string{ns}, framework.DefaultNamespaceDeletionTimeout)

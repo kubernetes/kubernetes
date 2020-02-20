@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
-	"path"
 	"path/filepath"
 	"testing"
 
@@ -376,7 +375,7 @@ func TestPluginConstructVolumeSpec(t *testing.T) {
 			csiMounter := mounter.(*csiMountMgr)
 
 			// rebuild spec
-			spec, err := plug.ConstructVolumeSpec("test-pv", path.Dir(csiMounter.GetPath()))
+			spec, err := plug.ConstructVolumeSpec("test-pv", filepath.Dir(csiMounter.GetPath()))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -508,7 +507,7 @@ func TestPluginConstructVolumeSpecWithInline(t *testing.T) {
 			csiMounter := mounter.(*csiMountMgr)
 
 			// rebuild spec
-			spec, err := plug.ConstructVolumeSpec("test-pv", path.Dir(csiMounter.GetPath()))
+			spec, err := plug.ConstructVolumeSpec("test-pv", filepath.Dir(csiMounter.GetPath()))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -636,7 +635,7 @@ func TestPluginNewMounter(t *testing.T) {
 			}
 
 			// ensure data file is created
-			dataDir := path.Dir(mounter.GetPath())
+			dataDir := filepath.Dir(mounter.GetPath())
 			dataFile := filepath.Join(dataDir, volDataFileName)
 			if _, err := os.Stat(dataFile); err != nil {
 				if os.IsNotExist(err) {
@@ -775,7 +774,7 @@ func TestPluginNewMounterWithInline(t *testing.T) {
 				}
 
 				// ensure data file is created
-				dataDir := path.Dir(mounter.GetPath())
+				dataDir := filepath.Dir(mounter.GetPath())
 				dataFile := filepath.Join(dataDir, volDataFileName)
 				if _, err := os.Stat(dataFile); err != nil {
 					if os.IsNotExist(err) {
@@ -834,7 +833,7 @@ func TestPluginNewUnmounter(t *testing.T) {
 	}
 
 	if err := saveVolumeData(
-		path.Dir(dir),
+		filepath.Dir(dir),
 		volDataFileName,
 		map[string]string{
 			volDataKey.specVolID:  pv.ObjectMeta.Name,

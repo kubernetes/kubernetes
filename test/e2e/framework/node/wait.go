@@ -17,6 +17,7 @@ limitations under the License.
 package node
 
 import (
+	"context"
 	"fmt"
 	"regexp"
 	"time"
@@ -56,7 +57,7 @@ func WaitForTotalHealthy(c clientset.Interface, timeout time.Duration) error {
 	err := wait.PollImmediate(poll, timeout, func() (bool, error) {
 		notReady = nil
 		// It should be OK to list unschedulable Nodes here.
-		nodes, err := c.CoreV1().Nodes().List(metav1.ListOptions{ResourceVersion: "0"})
+		nodes, err := c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{ResourceVersion: "0"})
 		if err != nil {
 			if testutils.IsRetryableAPIError(err) {
 				return false, nil
@@ -68,7 +69,7 @@ func WaitForTotalHealthy(c clientset.Interface, timeout time.Duration) error {
 				notReady = append(notReady, node)
 			}
 		}
-		pods, err := c.CoreV1().Pods(metav1.NamespaceAll).List(metav1.ListOptions{ResourceVersion: "0"})
+		pods, err := c.CoreV1().Pods(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{ResourceVersion: "0"})
 		if err != nil {
 			return false, err
 		}
@@ -122,7 +123,7 @@ func WaitForTotalHealthy(c clientset.Interface, timeout time.Duration) error {
 func WaitConditionToBe(c clientset.Interface, name string, conditionType v1.NodeConditionType, wantTrue bool, timeout time.Duration) bool {
 	e2elog.Logf("Waiting up to %v for node %s condition %s to be %t", timeout, name, conditionType, wantTrue)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(poll) {
-		node, err := c.CoreV1().Nodes().Get(name, metav1.GetOptions{})
+		node, err := c.CoreV1().Nodes().Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			e2elog.Logf("Couldn't get node %s", name)
 			continue
@@ -182,7 +183,7 @@ func waitListSchedulableNodes(c clientset.Interface) (*v1.NodeList, error) {
 	var nodes *v1.NodeList
 	var err error
 	if wait.PollImmediate(poll, singleCallTimeout, func() (bool, error) {
-		nodes, err = c.CoreV1().Nodes().List(metav1.ListOptions{FieldSelector: fields.Set{
+		nodes, err = c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{FieldSelector: fields.Set{
 			"spec.unschedulable": "false",
 		}.AsSelector().String()})
 		if err != nil {
@@ -219,7 +220,7 @@ func CheckReadyForTests(c clientset.Interface, nonblockingTaints string, allowed
 			ResourceVersion: "0",
 			FieldSelector:   fields.Set{"spec.unschedulable": "false"}.AsSelector().String(),
 		}
-		nodes, err := c.CoreV1().Nodes().List(opts)
+		nodes, err := c.CoreV1().Nodes().List(context.TODO(), opts)
 		if err != nil {
 			e2elog.Logf("Unexpected error listing nodes: %v", err)
 			if testutils.IsRetryableAPIError(err) {

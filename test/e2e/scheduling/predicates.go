@@ -17,8 +17,8 @@ limitations under the License.
 package scheduling
 
 import (
+	"context"
 	"fmt"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -28,8 +28,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	clientset "k8s.io/client-go/kubernetes"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2eevents "k8s.io/kubernetes/test/e2e/framework/events"
 	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -67,6 +67,7 @@ type pausePodConfig struct {
 	OwnerReferences                   []metav1.OwnerReference
 	PriorityClassName                 string
 	DeletionGracePeriodSeconds        *int64
+	TopologySpreadConstraints         []v1.TopologySpreadConstraint
 }
 
 var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
@@ -77,7 +78,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 	f := framework.NewDefaultFramework("sched-pred")
 
 	ginkgo.AfterEach(func() {
-		rc, err := cs.CoreV1().ReplicationControllers(ns).Get(RCName, metav1.GetOptions{})
+		rc, err := cs.CoreV1().ReplicationControllers(ns).Get(context.TODO(), RCName, metav1.GetOptions{})
 		if err == nil && *(rc.Spec.Replicas) != 0 {
 			ginkgo.By("Cleaning up the replication controller")
 			err := e2erc.DeleteRCAndWaitForGC(f.ClientSet, ns, RCName)
@@ -116,7 +117,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 
 	})
 
-	// This test verifies we don't allow scheduling of pods in a way that sum of local ephemeral storage limits of pods is greater than machines capacity.
+	// This test verifies we don't allow scheduling of pods in a way that sum of local ephemeral storage resource requests of pods is greater than machines capacity.
 	// It assumes that cluster add-on pods stay stable and cannot be run in parallel with any other test that touches Nodes or Pods.
 	// It is so because we need to have precise control on what's running in the cluster.
 	ginkgo.It("validates local ephemeral storage resource limits of pods that are allowed to run [Feature:LocalStorageCapacityIsolation]", func() {
@@ -136,7 +137,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		}
 		WaitForStableCluster(cs, masterNodes)
 
-		pods, err := cs.CoreV1().Pods(metav1.NamespaceAll).List(metav1.ListOptions{})
+		pods, err := cs.CoreV1().Pods(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{})
 		framework.ExpectNoError(err)
 		for _, pod := range pods.Items {
 			_, found := nodeToAllocatableMap[pod.Spec.NodeName]
@@ -186,6 +187,9 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 				Limits: v1.ResourceList{
 					v1.ResourceEphemeralStorage: *resource.NewQuantity(ephemeralStoragePerPod, "DecimalSI"),
 				},
+				Requests: v1.ResourceList{
+					v1.ResourceEphemeralStorage: *resource.NewQuantity(ephemeralStoragePerPod, "DecimalSI"),
+				},
 			},
 		}
 		WaitForSchedulerAfterAction(f, createPausePodAction(f, conf), ns, podName, false)
@@ -193,7 +197,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 	})
 
 	// This test verifies we don't allow scheduling of pods in a way that sum of
-	// limits of pods is greater than machines capacity.
+	// resource requests of pods is greater than machines capacity.
 	// It assumes that cluster add-on pods stay stable and cannot be run in parallel
 	// with any other test that touches Nodes or Pods.
 	// It is so because we need to have precise control on what's running in the cluster.
@@ -206,7 +210,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 	/*
 		Release : v1.9
 		Testname: Scheduler, resource limits
-		Description: Scheduling Pods MUST fail if the resource limits exceed Machine capacity.
+		Description: Scheduling Pods MUST fail if the resource requests exceed Machine capacity.
 	*/
 	framework.ConformanceIt("validates resource limits of pods that are allowed to run ", func() {
 		WaitForStableCluster(cs, masterNodes)
@@ -241,7 +245,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 			}
 		}()
 
-		pods, err := cs.CoreV1().Pods(metav1.NamespaceAll).List(metav1.ListOptions{})
+		pods, err := cs.CoreV1().Pods(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{})
 		framework.ExpectNoError(err)
 		for _, pod := range pods.Items {
 			_, found := nodeToAllocatableMap[pod.Spec.NodeName]
@@ -300,6 +304,9 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 			Labels: map[string]string{"name": "additional"},
 			Resources: &v1.ResourceRequirements{
 				Limits: v1.ResourceList{
+					v1.ResourceCPU: *resource.NewMilliQuantity(nodeMaxAllocatable*5/10, "DecimalSI"),
+				},
+				Requests: v1.ResourceList{
 					v1.ResourceCPU: *resource.NewMilliQuantity(nodeMaxAllocatable*5/10, "DecimalSI"),
 				},
 			},
@@ -363,7 +370,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		// already when the kubelet does not know about its new label yet. The
 		// kubelet will then refuse to launch the pod.
 		framework.ExpectNoError(e2epod.WaitForPodNotPending(cs, ns, labelPodName))
-		labelPod, err := cs.CoreV1().Pods(ns).Get(labelPodName, metav1.GetOptions{})
+		labelPod, err := cs.CoreV1().Pods(ns).Get(context.TODO(), labelPodName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		framework.ExpectEqual(labelPod.Spec.NodeName, nodeName)
 	})
@@ -450,7 +457,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		// already when the kubelet does not know about its new label yet. The
 		// kubelet will then refuse to launch the pod.
 		framework.ExpectNoError(e2epod.WaitForPodNotPending(cs, ns, labelPodName))
-		labelPod, err := cs.CoreV1().Pods(ns).Get(labelPodName, metav1.GetOptions{})
+		labelPod, err := cs.CoreV1().Pods(ns).Get(context.TODO(), labelPodName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		framework.ExpectEqual(labelPod.Spec.NodeName, nodeName)
 	})
@@ -493,7 +500,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		// already when the kubelet does not know about its new taint yet. The
 		// kubelet will then refuse to launch the pod.
 		framework.ExpectNoError(e2epod.WaitForPodNotPending(cs, ns, tolerationPodName))
-		deployedPod, err := cs.CoreV1().Pods(ns).Get(tolerationPodName, metav1.GetOptions{})
+		deployedPod, err := cs.CoreV1().Pods(ns).Get(context.TODO(), tolerationPodName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		framework.ExpectEqual(deployedPod.Spec.NodeName, nodeName)
 	})
@@ -598,6 +605,84 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		ginkgo.By(fmt.Sprintf("Trying to create another pod(pod5) with hostport %v but hostIP 127.0.0.1 on the node which pod4 resides and expect not scheduled", port))
 		createHostPortPodOnNode(f, "pod5", ns, "127.0.0.1", port, v1.ProtocolTCP, nodeSelector, false)
 	})
+
+	ginkgo.Context("PodTopologySpread Filtering", func() {
+		var nodeNames []string
+		topologyKey := "kubernetes.io/e2e-pts-filter"
+
+		ginkgo.BeforeEach(func() {
+			ginkgo.By("Trying to get 2 available nodes which can run pod")
+			nodeNames = Get2NodesThatCanRunPod(f)
+			ginkgo.By(fmt.Sprintf("Apply dedicated topologyKey %v for this test on the 2 nodes.", topologyKey))
+			for _, nodeName := range nodeNames {
+				framework.AddOrUpdateLabelOnNode(cs, nodeName, topologyKey, nodeName)
+			}
+		})
+		ginkgo.AfterEach(func() {
+			for _, nodeName := range nodeNames {
+				framework.RemoveLabelOffNode(cs, nodeName, topologyKey)
+			}
+		})
+
+		ginkgo.It("validates 4 pods with MaxSkew=1 are evenly distributed into 2 nodes", func() {
+			podLabel := "e2e-pts-filter"
+			replicas := 4
+			rsConfig := pauseRSConfig{
+				Replicas: int32(replicas),
+				PodConfig: pausePodConfig{
+					Name:      podLabel,
+					Namespace: ns,
+					Labels:    map[string]string{podLabel: ""},
+					Affinity: &v1.Affinity{
+						NodeAffinity: &v1.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+								NodeSelectorTerms: []v1.NodeSelectorTerm{
+									{
+										MatchExpressions: []v1.NodeSelectorRequirement{
+											{
+												Key:      topologyKey,
+												Operator: v1.NodeSelectorOpIn,
+												Values:   nodeNames,
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+					TopologySpreadConstraints: []v1.TopologySpreadConstraint{
+						{
+							MaxSkew:           1,
+							TopologyKey:       topologyKey,
+							WhenUnsatisfiable: v1.DoNotSchedule,
+							LabelSelector: &metav1.LabelSelector{
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{
+										Key:      podLabel,
+										Operator: metav1.LabelSelectorOpExists,
+									},
+								},
+							},
+						},
+					},
+				},
+			}
+			runPauseRS(f, rsConfig)
+			podList, err := cs.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{})
+			framework.ExpectNoError(err)
+			numInNode1, numInNode2 := 0, 0
+			for _, pod := range podList.Items {
+				if pod.Spec.NodeName == nodeNames[0] {
+					numInNode1++
+				} else if pod.Spec.NodeName == nodeNames[1] {
+					numInNode2++
+				}
+			}
+			expected := replicas / len(nodeNames)
+			framework.ExpectEqual(numInNode1, expected, fmt.Sprintf("Pods are not distributed as expected on node %q", nodeNames[0]))
+			framework.ExpectEqual(numInNode2, expected, fmt.Sprintf("Pods are not distributed as expected on node %q", nodeNames[1]))
+		})
+	})
 })
 
 // printAllKubeletPods outputs status of all kubelet pods into log.
@@ -627,8 +712,9 @@ func initPausePod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
 			OwnerReferences: conf.OwnerReferences,
 		},
 		Spec: v1.PodSpec{
-			NodeSelector: conf.NodeSelector,
-			Affinity:     conf.Affinity,
+			NodeSelector:              conf.NodeSelector,
+			Affinity:                  conf.Affinity,
+			TopologySpreadConstraints: conf.TopologySpreadConstraints,
 			Containers: []v1.Container{
 				{
 					Name:  conf.Name,
@@ -656,15 +742,15 @@ func createPausePod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
 	if len(namespace) == 0 {
 		namespace = f.Namespace.Name
 	}
-	pod, err := f.ClientSet.CoreV1().Pods(namespace).Create(initPausePod(f, conf))
+	pod, err := f.ClientSet.CoreV1().Pods(namespace).Create(context.TODO(), initPausePod(f, conf), metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 	return pod
 }
 
 func runPausePod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
 	pod := createPausePod(f, conf)
-	framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(f.ClientSet, pod))
-	pod, err := f.ClientSet.CoreV1().Pods(pod.Namespace).Get(conf.Name, metav1.GetOptions{})
+	framework.ExpectNoError(e2epod.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace, framework.PollShortTimeout))
+	pod, err := f.ClientSet.CoreV1().Pods(pod.Namespace).Get(context.TODO(), conf.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err)
 	return pod
 }
@@ -677,7 +763,7 @@ func runPodAndGetNodeName(f *framework.Framework, conf pausePodConfig) string {
 	pod := runPausePod(f, conf)
 
 	ginkgo.By("Explicitly delete pod here to free the resource it takes.")
-	err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(pod.Name, metav1.NewDeleteOptions(0))
+	err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), pod.Name, metav1.NewDeleteOptions(0))
 	framework.ExpectNoError(err)
 
 	return pod.Spec.NodeName
@@ -701,7 +787,7 @@ func getRequestedStorageEphemeralStorage(pod v1.Pod) int64 {
 
 // removeTaintFromNodeAction returns a closure that removes the given taint
 // from the given node upon invocation.
-func removeTaintFromNodeAction(cs clientset.Interface, nodeName string, testTaint v1.Taint) e2eevents.Action {
+func removeTaintFromNodeAction(cs clientset.Interface, nodeName string, testTaint v1.Taint) Action {
 	return func() error {
 		framework.RemoveTaintOffNode(cs, nodeName, testTaint)
 		return nil
@@ -709,28 +795,28 @@ func removeTaintFromNodeAction(cs clientset.Interface, nodeName string, testTain
 }
 
 // createPausePodAction returns a closure that creates a pause pod upon invocation.
-func createPausePodAction(f *framework.Framework, conf pausePodConfig) e2eevents.Action {
+func createPausePodAction(f *framework.Framework, conf pausePodConfig) Action {
 	return func() error {
-		_, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(initPausePod(f, conf))
+		_, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), initPausePod(f, conf), metav1.CreateOptions{})
 		return err
 	}
 }
 
 // WaitForSchedulerAfterAction performs the provided action and then waits for
 // scheduler to act on the given pod.
-func WaitForSchedulerAfterAction(f *framework.Framework, action e2eevents.Action, ns, podName string, expectSuccess bool) {
+func WaitForSchedulerAfterAction(f *framework.Framework, action Action, ns, podName string, expectSuccess bool) {
 	predicate := scheduleFailureEvent(podName)
 	if expectSuccess {
 		predicate = scheduleSuccessEvent(ns, podName, "" /* any node */)
 	}
-	success, err := e2eevents.ObserveEventAfterAction(f.ClientSet, f.Namespace.Name, predicate, action)
+	success, err := observeEventAfterAction(f.ClientSet, f.Namespace.Name, predicate, action)
 	framework.ExpectNoError(err)
 	framework.ExpectEqual(success, true)
 }
 
 // TODO: upgrade calls in PodAffinity tests when we're able to run them
 func verifyResult(c clientset.Interface, expectedScheduled int, expectedNotScheduled int, ns string) {
-	allPods, err := c.CoreV1().Pods(ns).List(metav1.ListOptions{})
+	allPods, err := c.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{})
 	framework.ExpectNoError(err)
 	scheduledPods, notScheduledPods := GetPodsScheduled(masterNodes, allPods)
 
@@ -742,6 +828,30 @@ func verifyResult(c clientset.Interface, expectedScheduled int, expectedNotSched
 func GetNodeThatCanRunPod(f *framework.Framework) string {
 	ginkgo.By("Trying to launch a pod without a label to get a node which can launch it.")
 	return runPodAndGetNodeName(f, pausePodConfig{Name: "without-label"})
+}
+
+// Get2NodesThatCanRunPod return a 2-node slice where can run pod.
+func Get2NodesThatCanRunPod(f *framework.Framework) []string {
+	firstNode := GetNodeThatCanRunPod(f)
+	ginkgo.By("Trying to launch a pod without a label to get a node which can launch it.")
+	pod := pausePodConfig{
+		Name: "without-label",
+		Affinity: &v1.Affinity{
+			NodeAffinity: &v1.NodeAffinity{
+				RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+					NodeSelectorTerms: []v1.NodeSelectorTerm{
+						{
+							MatchFields: []v1.NodeSelectorRequirement{
+								{Key: "metadata.name", Operator: v1.NodeSelectorOpNotIn, Values: []string{firstNode}},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	secondNode := runPodAndGetNodeName(f, pod)
+	return []string{firstNode, secondNode}
 }
 
 func getNodeThatCanRunPodWithoutToleration(f *framework.Framework) string {

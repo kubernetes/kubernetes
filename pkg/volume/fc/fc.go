@@ -93,7 +93,7 @@ func (plugin *fcPlugin) RequiresRemount() bool {
 }
 
 func (plugin *fcPlugin) SupportsMountOption() bool {
-	return false
+	return true
 }
 
 func (plugin *fcPlugin) SupportsBulkVolumeVerification() bool {
@@ -148,7 +148,7 @@ func (plugin *fcPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID, 
 			readOnly:     readOnly,
 			mounter:      &mount.SafeFormatAndMount{Interface: mounter, Exec: exec},
 			deviceUtil:   util.NewDeviceHandler(util.NewIOHandler()),
-			mountOptions: []string{},
+			mountOptions: util.MountOptionFromSpec(spec),
 		}, nil
 	}
 	return &fcDiskMounter{
@@ -312,7 +312,6 @@ func (plugin *fcPlugin) ConstructBlockVolumeSpec(podUID types.UID, volumeName, m
 type fcDisk struct {
 	volName string
 	podUID  types.UID
-	portal  string
 	wwns    []string
 	lun     string
 	wwids   []string

@@ -25,7 +25,6 @@ import (
 	"github.com/jonboulle/clockwork"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -75,13 +74,19 @@ type Patcher struct {
 	OpenapiSchema openapi.Resources
 }
 
-func newPatcher(o *ApplyOptions, info *resource.Info) *Patcher {
+func newPatcher(o *ApplyOptions, info *resource.Info) (*Patcher, error) {
 	var openapiSchema openapi.Resources
 	if o.OpenAPIPatch {
 		openapiSchema = o.OpenAPISchema
 	}
 
 	helper := resource.NewHelper(info.Client, info.Mapping)
+	if o.DryRunStrategy == cmdutil.DryRunServer {
+		if err := o.DryRunVerifier.HasSupport(info.Mapping.GroupVersionKind); err != nil {
+			return nil, err
+		}
+		helper.DryRun(true)
+	}
 	return &Patcher{
 		Mapping:       info.Mapping,
 		Helper:        helper,
@@ -92,10 +97,10 @@ func newPatcher(o *ApplyOptions, info *resource.Info) *Patcher {
 		Cascade:       o.DeleteOptions.Cascade,
 		Timeout:       o.DeleteOptions.Timeout,
 		GracePeriod:   o.DeleteOptions.GracePeriod,
-		ServerDryRun:  o.ServerDryRun,
+		ServerDryRun:  o.DryRunStrategy == cmdutil.DryRunServer,
 		OpenapiSchema: openapiSchema,
 		Retries:       maxPatchRetry,
-	}
+	}, nil
 }
 
 func (p *Patcher) delete(namespace, name string) error {
@@ -180,12 +185,7 @@ func (p *Patcher) patchSimple(obj runtime.Object, modified []byte, source, names
 		}
 	}
 
-	options := metav1.PatchOptions{}
-	if p.ServerDryRun {
-		options.DryRun = []string{metav1.DryRunAll}
-	}
-
-	patchedObj, err := p.Helper.Patch(namespace, name, patchType, patch, &options)
+	patchedObj, err := p.Helper.Patch(namespace, name, patchType, patch, nil)
 	return patch, patchedObj, err
 }
 
@@ -230,15 +230,11 @@ func (p *Patcher) deleteAndCreate(original runtime.Object, modified []byte, name
 	if err != nil {
 		return modified, nil, err
 	}
-	options := metav1.CreateOptions{}
-	if p.ServerDryRun {
-		options.DryRun = []string{metav1.DryRunAll}
-	}
-	createdObject, err := p.Helper.Create(namespace, true, versionedObject, &options)
+	createdObject, err := p.Helper.Create(namespace, true, versionedObject)
 	if err != nil {
 		// restore the original object if we fail to create the new one
 		// but still propagate and advertise error to user
-		recreated, recreateErr := p.Helper.Create(namespace, true, original, &options)
+		recreated, recreateErr := p.Helper.Create(namespace, true, original)
 		if recreateErr != nil {
 			err = fmt.Errorf("An error occurred force-replacing the existing object with the newly provided one:\n\n%v.\n\nAdditionally, an error occurred attempting to restore the original object:\n\n%v", err, recreateErr)
 		} else {

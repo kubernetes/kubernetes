@@ -103,6 +103,8 @@ type KubeSchedulerConfiguration struct {
 
 	// PluginConfig is an optional set of custom plugin arguments for each plugin.
 	// Omitting config args for a plugin is equivalent to using the default config for that plugin.
+	// +listType=map
+	// +listMapKey=name
 	PluginConfig []PluginConfig `json:"pluginConfig,omitempty"`
 }
 
@@ -198,9 +200,12 @@ type Plugins struct {
 type PluginSet struct {
 	// Enabled specifies plugins that should be enabled in addition to default plugins.
 	// These are called after default plugins and in the same order specified here.
+	// +listType=atomic
 	Enabled []Plugin `json:"enabled,omitempty"`
 	// Disabled specifies default plugins that should be disabled.
 	// When all default plugins need to be disabled, an array containing only one "*" should be provided.
+	// +listType=map
+	// +listMapKey=name
 	Disabled []Plugin `json:"disabled,omitempty"`
 }
 

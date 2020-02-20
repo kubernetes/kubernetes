@@ -17,6 +17,7 @@ limitations under the License.
 package e2enode
 
 import (
+	"context"
 	"os/exec"
 	"strconv"
 	"time"
@@ -76,7 +77,7 @@ var _ = framework.KubeDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugi
 			}
 
 			ginkgo.By("Creating the Google Device Plugin pod for NVIDIA GPU in GKE")
-			devicePluginPod, err = f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Create(NVIDIADevicePlugin())
+			devicePluginPod, err = f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Create(context.TODO(), NVIDIADevicePlugin(), metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 
 			ginkgo.By("Waiting for GPUs to become available on the local node")
@@ -90,7 +91,7 @@ var _ = framework.KubeDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugi
 		})
 
 		ginkgo.AfterEach(func() {
-			l, err := f.PodClient().List(metav1.ListOptions{})
+			l, err := f.PodClient().List(context.TODO(), metav1.ListOptions{})
 			framework.ExpectNoError(err)
 
 			for _, p := range l.Items {
@@ -98,7 +99,7 @@ var _ = framework.KubeDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugi
 					continue
 				}
 
-				f.PodClient().Delete(p.Name, &metav1.DeleteOptions{})
+				f.PodClient().Delete(context.TODO(), p.Name, &metav1.DeleteOptions{})
 			}
 		})
 
@@ -109,7 +110,7 @@ var _ = framework.KubeDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugi
 
 			deviceIDRE := "gpu devices: (nvidia[0-9]+)"
 			devID1 := parseLog(f, p1.Name, p1.Name, deviceIDRE)
-			p1, err := f.PodClient().Get(p1.Name, metav1.GetOptions{})
+			p1, err := f.PodClient().Get(context.TODO(), p1.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 
 			ginkgo.By("Restarting Kubelet and waiting for the current running pod to restart")
@@ -134,10 +135,10 @@ var _ = framework.KubeDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugi
 			framework.ExpectEqual(devID1, devID2)
 
 			ginkgo.By("Deleting device plugin.")
-			f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Delete(devicePluginPod.Name, &metav1.DeleteOptions{})
+			f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Delete(context.TODO(), devicePluginPod.Name, &metav1.DeleteOptions{})
 			ginkgo.By("Waiting for GPUs to become unavailable on the local node")
 			gomega.Eventually(func() bool {
-				node, err := f.ClientSet.CoreV1().Nodes().Get(framework.TestContext.NodeName, metav1.GetOptions{})
+				node, err := f.ClientSet.CoreV1().Nodes().Get(context.TODO(), framework.TestContext.NodeName, metav1.GetOptions{})
 				framework.ExpectNoError(err)
 				return numberOfNVIDIAGPUs(node) <= 0
 			}, 10*time.Minute, framework.Poll).Should(gomega.BeTrue())

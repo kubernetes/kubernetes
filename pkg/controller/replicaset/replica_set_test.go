@@ -17,6 +17,7 @@ limitations under the License.
 package replicaset
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -1158,7 +1159,7 @@ func TestExpectationsOnRecreate(t *testing.T) {
 	}
 
 	oldRS := newReplicaSet(1, map[string]string{"foo": "bar"})
-	oldRS, err := client.AppsV1().ReplicaSets(oldRS.Namespace).Create(oldRS)
+	oldRS, err := client.AppsV1().ReplicaSets(oldRS.Namespace).Create(context.TODO(), oldRS, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1202,7 +1203,7 @@ func TestExpectationsOnRecreate(t *testing.T) {
 		t.Fatal("Unexpected item in the queue")
 	}
 
-	err = client.AppsV1().ReplicaSets(oldRS.Namespace).Delete(oldRS.Name, &metav1.DeleteOptions{})
+	err = client.AppsV1().ReplicaSets(oldRS.Namespace).Delete(context.TODO(), oldRS.Name, &metav1.DeleteOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1239,7 +1240,7 @@ func TestExpectationsOnRecreate(t *testing.T) {
 
 	newRS := oldRS.DeepCopy()
 	newRS.UID = uuid.NewUUID()
-	newRS, err = client.AppsV1().ReplicaSets(newRS.Namespace).Create(newRS)
+	newRS, err = client.AppsV1().ReplicaSets(newRS.Namespace).Create(context.TODO(), newRS, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}

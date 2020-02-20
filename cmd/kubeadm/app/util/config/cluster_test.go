@@ -17,6 +17,7 @@ limitations under the License.
 package config
 
 import (
+	"context"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -342,7 +343,7 @@ func TestGetNodeRegistration(t *testing.T) {
 			client := clientsetfake.NewSimpleClientset()
 
 			if rt.node != nil {
-				_, err := client.CoreV1().Nodes().Create(rt.node)
+				_, err := client.CoreV1().Nodes().Create(context.TODO(), rt.node, metav1.CreateOptions{})
 				if err != nil {
 					t.Errorf("couldn't create Node")
 					return
@@ -618,7 +619,7 @@ func TestGetInitConfigurationFromCluster(t *testing.T) {
 			client := clientsetfake.NewSimpleClientset()
 
 			if rt.node != nil {
-				_, err := client.CoreV1().Nodes().Create(rt.node)
+				_, err := client.CoreV1().Nodes().Create(context.TODO(), rt.node, metav1.CreateOptions{})
 				if err != nil {
 					t.Errorf("couldn't create Node")
 					return

@@ -85,7 +85,7 @@ var _ Policy = &staticPolicy{}
 // NewStaticPolicy returns a CPU manager policy that does not change CPU
 // assignments for exclusively pinned guaranteed containers after the main
 // container process starts.
-func NewStaticPolicy(topology *topology.CPUTopology, numReservedCPUs int, reservedCPUs cpuset.CPUSet, affinity topologymanager.Store) Policy {
+func NewStaticPolicy(topology *topology.CPUTopology, numReservedCPUs int, reservedCPUs cpuset.CPUSet, affinity topologymanager.Store) (Policy, error) {
 	allCPUs := topology.CPUDetails.CPUs()
 	var reserved cpuset.CPUSet
 	if reservedCPUs.Size() > 0 {
@@ -100,7 +100,8 @@ func NewStaticPolicy(topology *topology.CPUTopology, numReservedCPUs int, reserv
 	}
 
 	if reserved.Size() != numReservedCPUs {
-		panic(fmt.Sprintf("[cpumanager] unable to reserve the required amount of CPUs (size of %s did not equal %d)", reserved, numReservedCPUs))
+		err := fmt.Errorf("[cpumanager] unable to reserve the required amount of CPUs (size of %s did not equal %d)", reserved, numReservedCPUs)
+		return nil, err
 	}
 
 	klog.Infof("[cpumanager] reserved %d CPUs (\"%s\") not available for exclusive assignment", reserved.Size(), reserved)
@@ -109,18 +110,19 @@ func NewStaticPolicy(topology *topology.CPUTopology, numReservedCPUs int, reserv
 		topology: topology,
 		reserved: reserved,
 		affinity: affinity,
-	}
+	}, nil
 }
 
 func (p *staticPolicy) Name() string {
 	return string(PolicyStatic)
 }
 
-func (p *staticPolicy) Start(s state.State) {
+func (p *staticPolicy) Start(s state.State) error {
 	if err := p.validateState(s); err != nil {
-		klog.Errorf("[cpumanager] static policy invalid state: %s\n", err.Error())
-		panic("[cpumanager] - please drain node and remove policy state file")
+		klog.Errorf("[cpumanager] static policy invalid state: %v, please drain node and remove policy state file", err)
+		return err
 	}
+	return nil
 }
 
 func (p *staticPolicy) validateState(s state.State) error {
@@ -274,7 +276,7 @@ func (p *staticPolicy) guaranteedCPUs(pod *v1.Pod, container *v1.Container) int 
 	return int(cpuQuantity.Value())
 }
 
-func (p *staticPolicy) GetTopologyHints(s state.State, pod v1.Pod, container v1.Container) map[string][]topologymanager.TopologyHint {
+func (p *staticPolicy) GetTopologyHints(s state.State, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
 	// If there are no CPU resources requested for this container, we do not
 	// generate any topology hints.
 	if _, ok := container.Resources.Requests[v1.ResourceCPU]; !ok {
@@ -282,7 +284,7 @@ func (p *staticPolicy) GetTopologyHints(s state.State, pod v1.Pod, container v1.
 	}
 
 	// Get a count of how many guaranteed CPUs have been requested.
-	requested := p.guaranteedCPUs(&pod, &container)
+	requested := p.guaranteedCPUs(pod, container)
 
 	// If there are no guaranteed CPUs being requested, we do not generate
 	// any topology hints. This can happen, for example, because init

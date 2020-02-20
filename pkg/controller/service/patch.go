@@ -17,10 +17,12 @@ limitations under the License.
 package service
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -37,7 +39,7 @@ func patch(c v1core.CoreV1Interface, oldSvc *v1.Service, newSvc *v1.Service) (*v
 		return nil, err
 	}
 
-	return c.Services(oldSvc.Namespace).Patch(oldSvc.Name, types.StrategicMergePatchType, patchBytes, "status")
+	return c.Services(oldSvc.Namespace).Patch(context.TODO(), oldSvc.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}, "status")
 }
 
 func getPatchBytes(oldSvc *v1.Service, newSvc *v1.Service) ([]byte, error) {

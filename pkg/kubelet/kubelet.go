@@ -850,12 +850,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	klet.admitHandlers.AddPodAdmitHandler(evictionAdmitHandler)
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.Sysctls) {
-		// add sysctl admission
-		runtimeSupport, err := sysctl.NewRuntimeAdmitHandler(klet.containerRuntime)
-		if err != nil {
-			return nil, err
-		}
-
 		// Safe, whitelisted sysctls can always be used as unsafe sysctls in the spec.
 		// Hence, we concatenate those two lists.
 		safeAndUnsafeSysctls := append(sysctlwhitelist.SafeSysctlWhitelist(), allowedUnsafeSysctls...)
@@ -863,7 +857,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		if err != nil {
 			return nil, err
 		}
-		klet.admitHandlers.AddPodAdmitHandler(runtimeSupport)
 		klet.admitHandlers.AddPodAdmitHandler(sysctlsWhitelist)
 	}
 

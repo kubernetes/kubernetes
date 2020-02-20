@@ -9,6 +9,7 @@ go_library(
     deps = [
         "//vendor/github.com/aws/aws-sdk-go/aws/awserr:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/aws/credentials:go_default_library",
+        "//vendor/github.com/aws/aws-sdk-go/internal/sdkio:go_default_library",
     ],
 )
 

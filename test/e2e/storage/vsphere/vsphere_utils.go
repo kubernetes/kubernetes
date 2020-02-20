@@ -54,8 +54,8 @@ const (
 	storageclass2  = "sc-vsan"
 	storageclass3  = "sc-spbm"
 	storageclass4  = "sc-user-specified-ds"
-	DummyDiskName  = "kube-dummyDisk.vmdk"
-	ProviderPrefix = "vsphere://"
+	dummyDiskName  = "kube-dummyDisk.vmdk"
+	providerPrefix = "vsphere://"
 )
 
 // volumeState represents the state of a volume.
@@ -69,12 +69,10 @@ const (
 // Wait until vsphere volumes are detached from the list of nodes or time out after 5 minutes
 func waitForVSphereDisksToDetach(nodeVolumes map[string][]string) error {
 	var (
-		err            error
-		disksAttached  = true
 		detachTimeout  = 5 * time.Minute
 		detachPollTime = 10 * time.Second
 	)
-	err = wait.Poll(detachPollTime, detachTimeout, func() (bool, error) {
+	waitErr := wait.Poll(detachPollTime, detachTimeout, func() (bool, error) {
 		attachedResult, err := disksAreAttached(nodeVolumes)
 		if err != nil {
 			return false, err
@@ -82,20 +80,19 @@ func waitForVSphereDisksToDetach(nodeVolumes map[string][]string) error {
 		for nodeName, nodeVolumes := range attachedResult {
 			for volumePath, attached := range nodeVolumes {
 				if attached {
-					framework.Logf("Waiting for volumes %q to detach from %q.", volumePath, string(nodeName))
+					framework.Logf("Volume %q is still attached to %q.", volumePath, string(nodeName))
 					return false, nil
 				}
 			}
 		}
-		disksAttached = false
 		framework.Logf("Volume are successfully detached from all the nodes: %+v", nodeVolumes)
 		return true, nil
 	})
-	if err != nil {
-		return err
-	}
-	if disksAttached {
-		return fmt.Errorf("Gave up waiting for volumes to detach after %v", detachTimeout)
+	if waitErr != nil {
+		if waitErr == wait.ErrWaitTimeout {
+			return fmt.Errorf("volumes have not detached after %v: %v", detachTimeout, waitErr)
+		}
+		return fmt.Errorf("error waiting for volumes to detach: %v", waitErr)
 	}
 	return nil
 }
@@ -103,8 +100,6 @@ func waitForVSphereDisksToDetach(nodeVolumes map[string][]string) error {
 // Wait until vsphere vmdk moves to expected state on the given node, or time out after 6 minutes
 func waitForVSphereDiskStatus(volumePath string, nodeName string, expectedState volumeState) error {
 	var (
-		err          error
-		diskAttached bool
 		currentState volumeState
 		timeout      = 6 * time.Minute
 		pollTime     = 10 * time.Second
@@ -120,8 +115,8 @@ func waitForVSphereDiskStatus(volumePath string, nodeName string, expectedState 
 		volumeStateDetached: "detached from",
 	}
 
-	err = wait.Poll(pollTime, timeout, func() (bool, error) {
-		diskAttached, err = diskIsAttached(volumePath, nodeName)
+	waitErr := wait.Poll(pollTime, timeout, func() (bool, error) {
+		diskAttached, err := diskIsAttached(volumePath, nodeName)
 		if err != nil {
 			return true, err
 		}
@@ -134,14 +129,13 @@ func waitForVSphereDiskStatus(volumePath string, nodeName string, expectedState 
 		framework.Logf("Waiting for Volume %q to be %s %q.", volumePath, attachedStateMsg[expectedState], nodeName)
 		return false, nil
 	})
-	if err != nil {
-		return err
+	if waitErr != nil {
+		if waitErr == wait.ErrWaitTimeout {
+			return fmt.Errorf("volume %q is not %s %q after %v: %v", volumePath, attachedStateMsg[expectedState], nodeName, timeout, waitErr)
+		}
+		return fmt.Errorf("error waiting for volume %q to be %s %q: %v", volumePath, attachedStateMsg[expectedState], nodeName, waitErr)
 	}
-
-	if currentState != expectedState {
-		err = fmt.Errorf("Gave up waiting for Volume %q to be %s %q after %v", volumePath, attachedStateMsg[expectedState], nodeName, timeout)
-	}
-	return err
+	return nil
 }
 
 // Wait until vsphere vmdk is attached from the given node or time out after 6 minutes
@@ -427,9 +421,9 @@ func verifyVolumeCreationOnRightZone(persistentvolumes []*v1.PersistentVolume, n
 
 // Get vSphere Volume Path from PVC
 func getvSphereVolumePathFromClaim(client clientset.Interface, namespace string, claimName string) string {
-	pvclaim, err := client.CoreV1().PersistentVolumeClaims(namespace).Get(claimName, metav1.GetOptions{})
+	pvclaim, err := client.CoreV1().PersistentVolumeClaims(namespace).Get(context.TODO(), claimName, metav1.GetOptions{})
 	framework.ExpectNoError(err)
-	pv, err := client.CoreV1().PersistentVolumes().Get(pvclaim.Spec.VolumeName, metav1.GetOptions{})
+	pv, err := client.CoreV1().PersistentVolumes().Get(context.TODO(), pvclaim.Spec.VolumeName, metav1.GetOptions{})
 	framework.ExpectNoError(err)
 	return pv.Spec.VsphereVolume.VolumePath
 }
@@ -452,7 +446,7 @@ func getCanonicalVolumePath(ctx context.Context, dc *object.Datacenter, volumePa
 	dsFolder := dsPath[0]
 	// Get the datastore folder ID if datastore or folder doesn't exist in datastoreFolderIDMap
 	if !isValidUUID(dsFolder) {
-		dummyDiskVolPath := "[" + datastore + "] " + dsFolder + "/" + DummyDiskName
+		dummyDiskVolPath := "[" + datastore + "] " + dsFolder + "/" + dummyDiskName
 		// Querying a non-existent dummy disk on the datastore folder.
 		// It would fail and return an folder ID in the error message.
 		_, err := getVirtualDiskPage83Data(ctx, dc, dummyDiskVolPath)
@@ -552,9 +546,8 @@ func getVirtualDeviceByPath(ctx context.Context, vm *object.VirtualMachine, disk
 				if matchVirtualDiskAndVolPath(backing.FileName, diskPath) {
 					framework.Logf("Found VirtualDisk backing with filename %q for diskPath %q", backing.FileName, diskPath)
 					return device, nil
-				} else {
-					framework.Logf("VirtualDisk backing filename %q does not match with diskPath %q", backing.FileName, diskPath)
 				}
+				framework.Logf("VirtualDisk backing filename %q does not match with diskPath %q", backing.FileName, diskPath)
 			}
 		}
 	}
@@ -751,10 +744,10 @@ func diskIsAttached(volPath string, nodeName string) (bool, error) {
 // getUUIDFromProviderID strips ProviderPrefix - "vsphere://" from the providerID
 // this gives the VM UUID which can be used to find Node VM from vCenter
 func getUUIDFromProviderID(providerID string) string {
-	return strings.TrimPrefix(providerID, ProviderPrefix)
+	return strings.TrimPrefix(providerID, providerPrefix)
 }
 
-// GetAllReadySchedulableNodeInfos returns NodeInfo objects for all nodes with Ready and schedulable state
+// GetReadySchedulableNodeInfos returns NodeInfo objects for all nodes with Ready and schedulable state
 func GetReadySchedulableNodeInfos() []*NodeInfo {
 	nodeList, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
 	framework.ExpectNoError(err)

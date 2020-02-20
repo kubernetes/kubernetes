@@ -13,6 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This script checks whether e2e test code which contains `Expect()` but not use
+# the e2e framework exists or not.
+# Usage: `hack/verify-test-code.sh`.
+
 set -o errexit
 set -o nounset
 set -o pipefail

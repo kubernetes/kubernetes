@@ -22,7 +22,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 	"strconv"
 
@@ -432,7 +431,7 @@ func removeMountDir(plug *csiPlugin, mountPath string) error {
 			return errors.New(log("failed to remove dir [%s]: %v", mountPath, err))
 		}
 		// remove volume data file as well
-		volPath := path.Dir(mountPath)
+		volPath := filepath.Dir(mountPath)
 		dataFile := filepath.Join(volPath, volDataFileName)
 		klog.V(4).Info(log("also deleting volume info data file [%s]", dataFile))
 		if err := os.Remove(dataFile); err != nil && !os.IsNotExist(err) {

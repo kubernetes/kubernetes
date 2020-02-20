@@ -17,6 +17,7 @@ limitations under the License.
 package e2enode
 
 import (
+	"context"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -52,7 +53,7 @@ var _ = framework.KubeDescribe("ImageID [NodeFeature: ImageID]", func() {
 
 		framework.ExpectNoError(e2epod.WaitTimeoutForPodNoLongerRunningInNamespace(
 			f.ClientSet, pod.Name, f.Namespace.Name, framework.PodStartTimeout))
-		runningPod, err := f.PodClient().Get(pod.Name, metav1.GetOptions{})
+		runningPod, err := f.PodClient().Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 
 		status := runningPod.Status

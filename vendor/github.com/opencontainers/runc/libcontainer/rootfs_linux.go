@@ -279,8 +279,14 @@ func mountCgroupV2(m *configs.Mount, rootfs, mountLabel string, enableCgroupns b
 	if err := os.MkdirAll(cgroupPath, 0755); err != nil {
 		return err
 	}
-
-	return unix.Mount(m.Source, cgroupPath, "cgroup2", uintptr(m.Flags), m.Data)
+	if err := unix.Mount(m.Source, cgroupPath, "cgroup2", uintptr(m.Flags), m.Data); err != nil {
+		// when we are in UserNS but CgroupNS is not unshared, we cannot mount cgroup2 (#2158)
+		if err == unix.EPERM || err == unix.EBUSY {
+			return unix.Mount("/sys/fs/cgroup", cgroupPath, "", uintptr(m.Flags)|unix.MS_BIND, "")
+		}
+		return err
+	}
+	return nil
 }
 
 func mountToRootfs(m *configs.Mount, rootfs, mountLabel string, enableCgroupns bool) error {
@@ -293,6 +299,18 @@ func mountToRootfs(m *configs.Mount, rootfs, mountLabel string, enableCgroupns b
 
 	switch m.Device {
 	case "proc", "sysfs":
+		// If the destination already exists and is not a directory, we bail
+		// out This is to avoid mounting through a symlink or similar -- which
+		// has been a "fun" attack scenario in the past.
+		// TODO: This won't be necessary once we switch to libpathrs and we can
+		//       stop all of these symlink-exchange attacks.
+		if fi, err := os.Lstat(dest); err != nil {
+			if !os.IsNotExist(err) {
+				return err
+			}
+		} else if fi.Mode()&os.ModeDir == 0 {
+			return fmt.Errorf("filesystem %q must be mounted on ordinary directory", m.Device)
+		}
 		if err := os.MkdirAll(dest, 0755); err != nil {
 			return err
 		}

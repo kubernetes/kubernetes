@@ -26,13 +26,18 @@ go_test(
 
 go_library(
     name = "go_default_library",
-    srcs = ["signer.go"],
+    srcs = [
+        "ca_provider.go",
+        "signer.go",
+    ],
     importpath = "k8s.io/kubernetes/pkg/controller/certificates/signer",
     deps = [
         "//pkg/apis/certificates/v1beta1:go_default_library",
         "//pkg/controller/certificates:go_default_library",
         "//pkg/controller/certificates/authority:go_default_library",
         "//staging/src/k8s.io/api/certificates/v1beta1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/server/dynamiccertificates:go_default_library",
         "//staging/src/k8s.io/client-go/informers/certificates/v1beta1:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/client-go/util/cert:go_default_library",

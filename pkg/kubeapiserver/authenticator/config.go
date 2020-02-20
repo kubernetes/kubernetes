@@ -165,7 +165,6 @@ func (config Config) New() (authenticator.Request, *spec.SecurityDefinitions, er
 		oidcAuth, err := newAuthenticatorFromOIDCIssuerURL(oidc.Options{
 			IssuerURL:            config.OIDCIssuerURL,
 			ClientID:             config.OIDCClientID,
-			APIAudiences:         config.APIAudiences,
 			CAFile:               config.OIDCCAFile,
 			UsernameClaim:        config.OIDCUsernameClaim,
 			UsernamePrefix:       config.OIDCUsernamePrefix,
@@ -177,7 +176,7 @@ func (config Config) New() (authenticator.Request, *spec.SecurityDefinitions, er
 		if err != nil {
 			return nil, nil, err
 		}
-		tokenAuthenticators = append(tokenAuthenticators, oidcAuth)
+		tokenAuthenticators = append(tokenAuthenticators, authenticator.WrapAudienceAgnosticToken(config.APIAudiences, oidcAuth))
 	}
 	if len(config.WebhookTokenAuthnConfigFile) > 0 {
 		webhookTokenAuth, err := newWebhookTokenAuthenticator(config.WebhookTokenAuthnConfigFile, config.WebhookTokenAuthnVersion, config.WebhookTokenAuthnCacheTTL, config.APIAudiences)

@@ -51,13 +51,15 @@
 #  - Document functions using proper syntax:
 #    https://technet.microsoft.com/en-us/library/hh847834(v=wps.620).aspx
 
-$INFRA_CONTAINER = 'gcr.io/gke-release/pause-win:1.0.0'
+$INFRA_CONTAINER = 'gcr.io/gke-release/pause-win:1.1.0'
 $GCE_METADATA_SERVER = "169.254.169.254"
 # The "management" interface is used by the kubelet and by Windows pods to talk
 # to the rest of the Kubernetes cluster *without NAT*. This interface does not
 # exist until an initial HNS network has been created on the Windows node - see
 # Add_InitialHnsNetwork().
 $MGMT_ADAPTER_NAME = "vEthernet (Ethernet*"
+$CRICTL_VERSION = 'v1.17.0'
+$CRICTL_SHA256 = '781fd3bd15146a924c6fc2428b11d8a0f20fa04a0c8e00a9a5808f2cc37e0569'
 
 Import-Module -Force C:\common.psm1
 
@@ -151,7 +153,7 @@ function Dump-DebugInfoToConsole {
 #
 # Returns: a PowerShell Hashtable object containing the key-value pairs from
 #   kube-env.
-function ConvertFrom-Yaml-KubeEnv {
+function ConvertFrom_Yaml_KubeEnv {
   param (
     [parameter(Mandatory=$true)] [string]$kube_env_str
   )
@@ -194,13 +196,13 @@ function Fetch-KubeEnv {
   #   ${kube_env} = Get-InstanceMetadataAttribute 'kube-env'
   # or:
   #   ${kube_env} = [IO.File]::ReadAllText(".\kubeEnv.txt")
-  # ${kube_env_table} = ConvertFrom-Yaml-KubeEnv ${kube_env}
+  # ${kube_env_table} = ConvertFrom_Yaml_KubeEnv ${kube_env}
   # ${kube_env_table}
   # ${kube_env_table}.GetType()
 
   # The type of kube_env is a powershell String.
   $kube_env = Get-InstanceMetadataAttribute 'kube-env'
-  $kube_env_table = ConvertFrom-Yaml-KubeEnv ${kube_env}
+  $kube_env_table = ConvertFrom_Yaml_KubeEnv ${kube_env}
   return ${kube_env_table}
 }
 
@@ -233,9 +235,12 @@ function Set-EnvironmentVars {
   # ${kube_env}['K8S_DIR'] cannot be afaik).
   $env_vars = @{
     "K8S_DIR" = ${kube_env}['K8S_DIR']
+    # Typically 'C:\etc\kubernetes\node\bin' (not just 'C:\etc\kubernetes\node')
     "NODE_DIR" = ${kube_env}['NODE_DIR']
     "CNI_DIR" = ${kube_env}['CNI_DIR']
     "CNI_CONFIG_DIR" = ${kube_env}['CNI_CONFIG_DIR']
+    "WINDOWS_CNI_STORAGE_PATH" = ${kube_env}['WINDOWS_CNI_STORAGE_PATH']
+    "WINDOWS_CNI_VERSION" = ${kube_env}['WINDOWS_CNI_VERSION']
     "PKI_DIR" = ${kube_env}['PKI_DIR']
     "CA_FILE_PATH" = ${kube_env}['CA_FILE_PATH']
     "KUBELET_CONFIG" = ${kube_env}['KUBELET_CONFIG_FILE']
@@ -271,8 +276,8 @@ function Set-EnvironmentVars {
 function Set-PrerequisiteOptions {
   # Windows updates cause the node to reboot at arbitrary times.
   Log-Output "Disabling Windows Update service"
-  sc.exe config wuauserv start=disabled
-  sc.exe stop wuauserv
+  & sc.exe config wuauserv start=disabled
+  & sc.exe stop wuauserv
 
   # Use TLS 1.2: needed for Invoke-WebRequest downloads from github.com.
   [Net.ServicePointManager]::SecurityProtocol = `
@@ -296,29 +301,11 @@ function Create-Directories {
 # Downloads some external helper scripts needed by other functions in this
 # module.
 function Download-HelperScripts {
-  if (-not (ShouldWrite-File ${env:K8S_DIR}\hns.psm1)) {
-    return
+  if (ShouldWrite-File ${env:K8S_DIR}\hns.psm1) {
+    MustDownload-File `
+        -OutFile ${env:K8S_DIR}\hns.psm1 `
+        -URLs 'https://storage.googleapis.com/gke-release/winnode/config/sdn/master/hns.psm1'
   }
-  MustDownload-File -OutFile ${env:K8S_DIR}\hns.psm1 `
-    -URLs "https://www.googleapis.com/storage/v1/b/gke-release/o/winnode%2fconfig%2fsdn%2fmaster%2fhns.psm1?alt=media"
-}
-
-# Takes the Windows version string from the cluster bash scripts (e.g.
-# 'win1809') and returns the correct label to use for containers on this
-# version of Windows. Returns $null if $WinVersion is unknown.
-function Get_ContainerVersionLabel {
-  param (
-    [parameter(Mandatory=$true)] [string]$WinVersion
-  )
-  # -match does regular expression matching.
-  if ($WinVersion -match '1809') {
-    return '1809'
-  }
-  elseif ($WinVersion -match '2019') {
-    return 'ltsc2019'
-  }
-  Throw ("Unknown Windows version $WinVersion, don't know its container " +
-         "version label")
 }
 
 # Downloads the gke-exec-auth-plugin for TPM-based authentication to the
@@ -375,13 +362,12 @@ function DownloadAndInstall-KubernetesBinaries {
   if ($kube_env.ContainsKey('NODE_BINARY_TAR_HASH')) {
     $hash = ${kube_env}['NODE_BINARY_TAR_HASH']
   }
-  MustDownload-File -Hash $hash -OutFile ${tmp_dir}\${filename} -URLs $urls
+  MustDownload-File -Hash $hash -OutFile $tmp_dir\$filename -URLs $urls
 
-  # Change the directory to the parent directory of ${env:K8S_DIR} and untar.
-  # This (over-)writes ${dest_dir}/kubernetes/node/bin/*.exe files.
-  # TODO(pjh): clean this up, files not guaranteed to end up in NODE_DIR
-  $dest_dir = (Get-Item ${env:K8S_DIR}).Parent.Fullname
-  tar xzf ${tmp_dir}\${filename} -C ${dest_dir}
+  tar xzvf $tmp_dir\$filename -C $tmp_dir
+  Move-Item -Force $tmp_dir\kubernetes\node\bin\* ${env:NODE_DIR}\
+  Move-Item -Force `
+      $tmp_dir\kubernetes\LICENSES ${env:LICENSE_DIR}\LICENSES_kubernetes
 
   # Clean up the temporary directory
   Remove-Item -Force -Recurse $tmp_dir
@@ -916,30 +902,65 @@ function Configure-HostNetworkingService {
 function Configure-GcePdTools {
   if (ShouldWrite-File ${env:K8S_DIR}\GetGcePdName.dll) {
     MustDownload-File -OutFile ${env:K8S_DIR}\GetGcePdName.dll `
-      -URLs "https://www.googleapis.com/storage/v1/b/gke-release/o/winnode%2fconfig%2fgce-tools%2fmaster%2fGetGcePdName%2fGetGcePdName.dll?alt=media"
+      -URLs "https://storage.googleapis.com/gke-release/winnode/config/gce-tools/master/GetGcePdName/GetGcePdName.dll"
   }
   if (-not (Test-Path $PsHome\profile.ps1)) {
     New-Item -path $PsHome\profile.ps1 -type file
   }
 
-    Add-Content $PsHome\profile.ps1 `
+  Add-Content $PsHome\profile.ps1 `
 '$modulePath = "K8S_DIR\GetGcePdName.dll"
 Unblock-File $modulePath
 Import-Module -Name $modulePath'.replace('K8S_DIR', ${env:K8S_DIR})
 }
 
-# Setup cni network. This function supports both Docker
-# and containerd.
-function Configure-CniNetworking {
+# Setup cni network. This function supports both Docker and containerd.
+function Prepare-CniNetworking {
   if (${env:CONTAINER_RUNTIME} -eq "containerd") {
+    # For containerd the CNI binaries have already been installed along with
+    # the runtime.
     Configure_Containerd_CniNetworking
   } else {
+    Install_Cni_Binaries
     Configure_Dockerd_CniNetworking
   }
 }
 
-# Downloads the Windows CNI binaries and writes a CNI config file under
-# $env:CNI_CONFIG_DIR.
+# Downloads the Windows CNI binaries and puts them in $env:CNI_DIR.
+function Install_Cni_Binaries {
+  if (-not (ShouldWrite-File ${env:CNI_DIR}\win-bridge.exe) -and
+      -not (ShouldWrite-File ${env:CNI_DIR}\host-local.exe)) {
+    return
+  }
+
+  $tmp_dir = 'C:\cni_tmp'
+  New-Item $tmp_dir -ItemType 'directory' -Force | Out-Null
+
+  $release_url = "${env:WINDOWS_CNI_STORAGE_PATH}/${env:WINDOWS_CNI_VERSION}/"
+  $tgz_url = ($release_url +
+              "cni-plugins-windows-amd64-${env:WINDOWS_CNI_VERSION}.tgz")
+  $sha_url = ($tgz_url + ".sha1")
+  MustDownload-File -URLs $sha_url -OutFile $tmp_dir\cni-plugins.sha1
+  $sha1_val = ($(Get-Content $tmp_dir\cni-plugins.sha1) -split ' ',2)[0]
+  MustDownload-File `
+      -URLs $tgz_url `
+      -OutFile $tmp_dir\cni-plugins.tgz `
+      -Hash $sha1_val
+
+  tar xzvf $tmp_dir\cni-plugins.tgz -C $tmp_dir
+  Move-Item -Force $tmp_dir\host-local.exe ${env:CNI_DIR}\
+  Move-Item -Force $tmp_dir\win-bridge.exe ${env:CNI_DIR}\
+  Remove-Item -Force -Recurse $tmp_dir
+
+  if (-not ((Test-Path ${env:CNI_DIR}\win-bridge.exe) -and `
+            (Test-Path ${env:CNI_DIR}\host-local.exe))) {
+    Log-Output `
+        "win-bridge.exe and host-local.exe not found in ${env:CNI_DIR}" `
+        -Fatal
+  }
+}
+
+# Writes a CNI config file under $env:CNI_CONFIG_DIR.
 #
 # Prerequisites:
 #   $env:POD_CIDR is set (by Set-PodCidr).
@@ -953,40 +974,6 @@ function Configure-CniNetworking {
 #   CLUSTER_IP_RANGE
 #   SERVICE_CLUSTER_IP_RANGE
 function Configure_Dockerd_CniNetworking {
-  $CNI_RELEASE_VERSION = 'v0.8.2-gke.0'
-  if ((ShouldWrite-File ${env:CNI_DIR}\win-bridge.exe) -or
-      (ShouldWrite-File ${env:CNI_DIR}\host-local.exe)) {
-    $tmp_dir = 'C:\cni_tmp'
-    New-Item $tmp_dir -ItemType 'directory' -Force | Out-Null
-
-    $release_url = ('https://www.googleapis.com/storage/v1/b/gke-release/o/cni-plugins%2f' +
-        $CNI_RELEASE_VERSION + '%2f')
-    $sha_url = ($release_url +
-        "cni-plugins-windows-amd64-$CNI_RELEASE_VERSION.tgz.sha1?alt=media")
-    $tgz_url = ($release_url +
-        "cni-plugins-windows-amd64-$CNI_RELEASE_VERSION.tgz?alt=media")
-    MustDownload-File -URLs $sha_url -OutFile $tmp_dir\cni-plugins.sha1
-    $sha1_val = ($(Get-Content $tmp_dir\cni-plugins.sha1) -split ' ',2)[0]
-    MustDownload-File `
-        -URLs $tgz_url `
-        -OutFile $tmp_dir\cni-plugins.tgz `
-        -Hash $sha1_val
-
-    Push-Location $tmp_dir
-    # tar can only extract in the current directory.
-    tar -xvf $tmp_dir\cni-plugins.tgz
-    Move-Item -Force host-local.exe ${env:CNI_DIR}\
-    Move-Item -Force win-bridge.exe ${env:CNI_DIR}\
-    Pop-Location
-    Remove-Item -Force -Recurse $tmp_dir
-  }
-  if (-not ((Test-Path ${env:CNI_DIR}\win-bridge.exe) -and `
-            (Test-Path ${env:CNI_DIR}\host-local.exe))) {
-    Log-Output `
-        "win-bridge.exe and host-local.exe not found in ${env:CNI_DIR}" `
-        -Fatal
-  }
-
   $l2bridge_conf = "${env:CNI_CONFIG_DIR}\l2bridge.conf"
   if (-not (ShouldWrite-File ${l2bridge_conf})) {
     return
@@ -1089,7 +1076,7 @@ function Configure-HostDnsConf {
   $search_list = (Get-DnsClient).ConnectionSpecificSuffixSearchList
   $conf = ""
   ForEach ($ip in $server_ips)  {
-	$conf = $conf + "nameserver $ip`r`n"
+    $conf = $conf + "nameserver $ip`r`n"
   }
   $conf = $conf + "search $search_list"
   # Do not put hostdns.conf into the CNI config directory so as to
@@ -1183,10 +1170,10 @@ function Start-WorkerServices {
         "A kubelet process is already running, don't know what to do"
   }
   Log-Output "Creating kubelet service"
-  sc.exe create kubelet binPath= "${env:NODE_DIR}\kubelet.exe ${kubelet_args}" start= demand
-  sc.exe failure kubelet reset= 0 actions= restart/10000
+  & sc.exe create kubelet binPath= "${env:NODE_DIR}\kubelet.exe ${kubelet_args}" start= demand
+  & sc.exe failure kubelet reset= 0 actions= restart/10000
   Log-Output "Starting kubelet service"
-  sc.exe start kubelet
+  & sc.exe start kubelet
 
   Log-Output "Waiting 10 seconds for kubelet to stabilize"
   Start-Sleep 10
@@ -1196,10 +1183,10 @@ function Start-WorkerServices {
         "A kube-proxy process is already running, don't know what to do"
   }
   Log-Output "Creating kube-proxy service"
-  sc.exe create kube-proxy binPath= "${env:NODE_DIR}\kube-proxy.exe ${kubeproxy_args}" start= demand
-  sc.exe failure kube-proxy reset= 0 actions= restart/10000
+  & sc.exe create kube-proxy binPath= "${env:NODE_DIR}\kube-proxy.exe ${kubeproxy_args}" start= demand
+  & sc.exe failure kube-proxy reset= 0 actions= restart/10000
   Log-Output "Starting kube-proxy service"
-  sc.exe start kube-proxy
+  & sc.exe start kube-proxy
 
   # F1020 23:08:52.000083    9136 server.go:361] unable to load in-cluster
   # configuration, KUBERNETES_SERVICE_HOST and KUBERNETES_SERVICE_PORT must be
@@ -1212,7 +1199,7 @@ function Start-WorkerServices {
   Log-Output "Kubernetes components started successfully"
 }
 
-# Wait for kubelet & kube-proxy to be ready within 10s.
+# Wait for kubelet and kube-proxy to be ready within 10s.
 function WaitFor_KubeletAndKubeProxyReady {
   $waited = 0
   $timeout = 10
@@ -1224,7 +1211,7 @@ function WaitFor_KubeletAndKubeProxyReady {
   # Timeout occurred
   if ($waited -ge $timeout) {
     Log-Output "$(Get-Service kube* | Out-String)"
-    Throw ("Timeout while waiting ${timeout} seconds for kubelet & kube-proxy services to start")
+    Throw ("Timeout while waiting ${timeout} seconds for kubelet and kube-proxy services to start")
   }
 }
 
@@ -1232,38 +1219,31 @@ function WaitFor_KubeletAndKubeProxyReady {
 # TODO(pjh): run more verification commands.
 function Verify-WorkerServices {
   Log-Output ("kubectl get nodes:`n" +
-              "$(& ${env:NODE_DIR}\kubectl.exe get nodes | Out-String)")
+              $(& "${env:NODE_DIR}\kubectl.exe" get nodes | Out-String))
   Verify_GceMetadataServerRouteIsPresent
   Log_Todo "run more verification commands."
 }
 
+# Downloads crictl.exe and installs it in $env:NODE_DIR.
 function DownloadAndInstall-Crictl {
-  $CRICTL_VERSION = "v1.16.1"
-  $CRICTL_SHA256 = "69a53602f9a8469d4a86284e318fe19b33e97577f7836f48e6f4fb2ed1822baa"
-
-  # Assume that presence of crictl.exe indicates that the crictl binaries
-  # were already previously downloaded to this node.
   if (-not (ShouldWrite-File ${env:NODE_DIR}\crictl.exe)) {
     return
   }
-  $tmp_dir = 'C:\crictl_tmp'
-  New-Item $tmp_dir -ItemType 'directory' -Force | Out-Null
-
   $url = ('https://storage.googleapis.com/kubernetes-release/crictl/' +
       'crictl-' + $CRICTL_VERSION + '-windows-amd64.exe')
   MustDownload-File `
       -URLs $url `
-      -OutFile $tmp_dir\crictl.exe `
+      -OutFile ${env:NODE_DIR}\crictl.exe `
       -Hash $CRICTL_SHA256 `
       -Algorithm SHA256
+}
 
-  Push-Location $tmp_dir
-  Move-Item -Force crictl.exe ${env:NODE_DIR}\
+# Sets crictl configuration values.
+function Configure-Crictl {
   if (${env:CONTAINER_RUNTIME_ENDPOINT}) {
-    crictl.exe config runtime-endpoint ${env:CONTAINER_RUNTIME_ENDPOINT}
+    & "${env:NODE_DIR}\crictl.exe" config runtime-endpoint `
+        ${env:CONTAINER_RUNTIME_ENDPOINT}
   }
-  Pop-Location
-  Remove-Item -Force -Recurse $tmp_dir
 }
 
 # Pulls the infra/pause container image onto the node so that it will be
@@ -1289,6 +1269,7 @@ function Pull-InfraContainer {
 function Setup-ContainerRuntime {
   if (${env:CONTAINER_RUNTIME} -eq "containerd") {
     Install_Containerd
+    Configure_Containerd
     Start_Containerd
   } else {
     Create_DockerRegistryKey
@@ -1404,7 +1385,7 @@ function Configure_Containerd_CniNetworking {
       "Name":  "EndpointPolicy",
       "Value":  {
         "Type":  "OutBoundNAT",
-	"Settings": {
+        "Settings": {
           "Exceptions":  [
             "CLUSTER_CIDR",
             "SERVICE_CIDR",
@@ -1417,20 +1398,20 @@ function Configure_Containerd_CniNetworking {
       "Name":  "EndpointPolicy",
       "Value":  {
         "Type":  "SDNRoute",
-	"Settings": {
+        "Settings": {
           "DestinationPrefix":  "SERVICE_CIDR",
           "NeedEncap":  true
-	}
+        }
       }
     },
     {
       "Name":  "EndpointPolicy",
       "Value":  {
         "Type":  "SDNRoute",
-	"Settings": {
+        "Settings": {
           "DestinationPrefix":  "MGMT_IP/32",
           "NeedEncap":  true
-	}
+        }
       }
     }
   ]
@@ -1443,18 +1424,17 @@ function Configure_Containerd_CniNetworking {
   replace('SERVICE_CIDR', ${kube_env}['SERVICE_CLUSTER_IP_RANGE']).`
   replace('MGMT_SUBNET', ${mgmt_subnet})
 
-  Log-Output "CNI config:`n$(Get-Content -Raw ${l2bridge_conf})"
+  Log-Output "containerd CNI config:`n$(Get-Content -Raw ${l2bridge_conf})"
 }
 
-# Download and install containerd and CNI binaries.
+# Download and install containerd and CNI binaries into $env:NODE_DIR.
 function Install_Containerd {
-  # Assume that presence of containerd.exe indicates that all containerd binaries
-  # were already previously downloaded to this node.
+  # Assume that presence of containerd.exe indicates that all containerd
+  # binaries were already previously downloaded to this node.
   if (-not (ShouldWrite-File ${env:NODE_DIR}\containerd.exe)) {
     return
   }
 
-  # https://storage.googleapis.com/cri-containerd-staging/cri-containerd-9f79be1b.windows-amd64.tar.gz
   # TODO(random-liu): Change this to official release path after testing.
   $CONTAINERD_GCS_BUCKET = "cri-containerd-staging/windows"
 
@@ -1465,7 +1445,8 @@ function Install_Containerd {
   MustDownload-File -URLs $version_url -OutFile $tmp_dir\version
   $version = $(Get-Content $tmp_dir\version)
 
-  $tar_url = "https://storage.googleapis.com/$CONTAINERD_GCS_BUCKET/cri-containerd-cni-$version.windows-amd64.tar.gz"
+  $tar_url = ("https://storage.googleapis.com/$CONTAINERD_GCS_BUCKET/" +
+              "cri-containerd-cni-$version.windows-amd64.tar.gz")
   $sha_url = $tar_url + ".sha256"
   MustDownload-File -URLs $sha_url -OutFile $tmp_dir\sha256
   $sha = $(Get-Content $tmp_dir\sha256)
@@ -1476,15 +1457,14 @@ function Install_Containerd {
       -Hash $sha `
       -Algorithm SHA256
 
-  Push-Location $tmp_dir
-  # tar can only extract in the current directory.
-  tar -xvf $tmp_dir\containerd.tar.gz
-  Move-Item -Force cni\*.exe ${env:CNI_DIR}\
-  Move-Item -Force *.exe ${env:NODE_DIR}\
-  Pop-Location
+  tar xzvf $tmp_dir\containerd.tar.gz -C $tmp_dir
+  Move-Item -Force $tmp_dir\cni\*.exe ${env:CNI_DIR}\
+  Move-Item -Force $tmp_dir\*.exe ${env:NODE_DIR}\
   Remove-Item -Force -Recurse $tmp_dir
+}
 
-  # Generate containerd config
+# Generates the containerd config.toml file.
+function Configure_Containerd {
   $config_dir = 'C:\Program Files\containerd'
   New-Item $config_dir -ItemType 'directory' -Force | Out-Null
   Set-Content "$config_dir\config.toml" @"
@@ -1501,7 +1481,7 @@ function Install_Containerd {
 # Register and start containerd service.
 function Start_Containerd {
   Log-Output "Creating containerd service"
-  containerd.exe --register-service --log-file ${env:LOGS_DIR}/containerd.log
+  & containerd.exe --register-service --log-file ${env:LOGS_DIR}/containerd.log
   Log-Output "Starting containerd service"
   Start-Service containerd
 }
@@ -1511,7 +1491,6 @@ function Start_Containerd {
 # the K8s release machinery.
 $STACKDRIVER_VERSION = 'v1-9'
 $STACKDRIVER_ROOT = 'C:\Program Files (x86)\Stackdriver'
-
 
 # Restarts the Stackdriver logging agent, or starts it if it is not currently
 # running. A standard `Restart-Service StackdriverLogging` may fail because
@@ -1551,7 +1530,7 @@ function Restart-LoggingAgent {
       Throw ("Timeout while waiting for StackdriverLogging service to stop")
     }
   }
-  
+
   Start-Service StackdriverLogging
 }
 
@@ -1583,8 +1562,8 @@ function Install-LoggingAgent {
     return
   }
 
-  $url = ("https://www.googleapis.com/storage/v1/b/gke-release/o/winnode%2fstackdriver%2f" +
-          "StackdriverLogging-${STACKDRIVER_VERSION}.exe?alt=media")
+  $url = ("https://storage.googleapis.com/gke-release/winnode/stackdriver/" +
+          "StackdriverLogging-${STACKDRIVER_VERSION}.exe")
   $tmp_dir = 'C:\stackdriver_tmp'
   New-Item $tmp_dir -ItemType 'directory' -Force | Out-Null
   $installer_file = "${tmp_dir}\StackdriverLogging-${STACKDRIVER_VERSION}.exe"
@@ -1613,12 +1592,12 @@ function Install-LoggingAgent {
 function Configure-LoggingAgent {
   $fluentd_config_dir = "$STACKDRIVER_ROOT\LoggingAgent\config.d"
   $fluentd_config_file = "$fluentd_config_dir\k8s_containers.conf"
-  
+
   # Create a configuration file for kubernetes containers.
   # The config.d directory should have already been created automatically, but
   # try creating again just in case.
   New-Item $fluentd_config_dir -ItemType 'directory' -Force | Out-Null
-  
+
   $config = $FLUENTD_CONFIG.replace('NODE_NAME', (hostname))
   $config | Out-File -FilePath $fluentd_config_file -Encoding ASCII
   Log-Output "Wrote fluentd logging config to $fluentd_config_file"

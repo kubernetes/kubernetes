@@ -127,25 +127,25 @@ type bootstrapRoles struct {
 // client should be authenticated as the RBAC super user.
 func (b bootstrapRoles) bootstrap(client clientset.Interface) error {
 	for _, r := range b.clusterRoles {
-		_, err := client.RbacV1().ClusterRoles().Create(&r)
+		_, err := client.RbacV1().ClusterRoles().Create(context.TODO(), &r, metav1.CreateOptions{})
 		if err != nil {
 			return fmt.Errorf("failed to make request: %v", err)
 		}
 	}
 	for _, r := range b.roles {
-		_, err := client.RbacV1().Roles(r.Namespace).Create(&r)
+		_, err := client.RbacV1().Roles(r.Namespace).Create(context.TODO(), &r, metav1.CreateOptions{})
 		if err != nil {
 			return fmt.Errorf("failed to make request: %v", err)
 		}
 	}
 	for _, r := range b.clusterRoleBindings {
-		_, err := client.RbacV1().ClusterRoleBindings().Create(&r)
+		_, err := client.RbacV1().ClusterRoleBindings().Create(context.TODO(), &r, metav1.CreateOptions{})
 		if err != nil {
 			return fmt.Errorf("failed to make request: %v", err)
 		}
 	}
 	for _, r := range b.roleBindings {
-		_, err := client.RbacV1().RoleBindings(r.Namespace).Create(&r)
+		_, err := client.RbacV1().RoleBindings(r.Namespace).Create(context.TODO(), &r, metav1.CreateOptions{})
 		if err != nil {
 			return fmt.Errorf("failed to make request: %v", err)
 		}
@@ -652,7 +652,7 @@ func TestBootstrapping(t *testing.T) {
 
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{BearerToken: superUser, Host: s.URL})
 
-	watcher, err := clientset.RbacV1().ClusterRoles().Watch(metav1.ListOptions{ResourceVersion: "0"})
+	watcher, err := clientset.RbacV1().ClusterRoles().Watch(context.TODO(), metav1.ListOptions{ResourceVersion: "0"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -668,7 +668,7 @@ func TestBootstrapping(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	clusterRoles, err := clientset.RbacV1().ClusterRoles().List(metav1.ListOptions{})
+	clusterRoles, err := clientset.RbacV1().ClusterRoles().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -684,7 +684,7 @@ func TestBootstrapping(t *testing.T) {
 
 	t.Errorf("missing cluster-admin: %v", clusterRoles)
 
-	healthBytes, err := clientset.Discovery().RESTClient().Get().AbsPath("/healthz/poststarthook/rbac/bootstrap-roles").DoRaw()
+	healthBytes, err := clientset.Discovery().RESTClient().Get().AbsPath("/healthz/poststarthook/rbac/bootstrap-roles").DoRaw(context.TODO())
 	if err != nil {
 		t.Error(err)
 	}
@@ -715,7 +715,7 @@ func TestDiscoveryUpgradeBootstrapping(t *testing.T) {
 	// Modify the default RBAC discovery ClusterRoleBidnings to look more like the defaults that
 	// existed prior to v1.14, but with user modifications.
 	t.Logf("Modifying default `system:discovery` ClusterRoleBinding")
-	discRoleBinding, err := client.RbacV1().ClusterRoleBindings().Get("system:discovery", metav1.GetOptions{})
+	discRoleBinding, err := client.RbacV1().ClusterRoleBindings().Get(context.TODO(), "system:discovery", metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Failed to get `system:discovery` ClusterRoleBinding: %v", err)
 	}
@@ -728,21 +728,21 @@ func TestDiscoveryUpgradeBootstrapping(t *testing.T) {
 			APIGroup: "rbac.authorization.k8s.io",
 		},
 	}
-	if discRoleBinding, err = client.RbacV1().ClusterRoleBindings().Update(discRoleBinding); err != nil {
+	if discRoleBinding, err = client.RbacV1().ClusterRoleBindings().Update(context.TODO(), discRoleBinding, metav1.UpdateOptions{}); err != nil {
 		t.Fatalf("Failed to update `system:discovery` ClusterRoleBinding: %v", err)
 	}
 	t.Logf("Modifying default `system:basic-user` ClusterRoleBinding")
-	basicUserRoleBinding, err := client.RbacV1().ClusterRoleBindings().Get("system:basic-user", metav1.GetOptions{})
+	basicUserRoleBinding, err := client.RbacV1().ClusterRoleBindings().Get(context.TODO(), "system:basic-user", metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Failed to get `system:basic-user` ClusterRoleBinding: %v", err)
 	}
 	basicUserRoleBinding.Annotations["rbac.authorization.kubernetes.io/autoupdate"] = "false"
 	basicUserRoleBinding.Annotations["rbac-discovery-upgrade-test"] = "pass"
-	if basicUserRoleBinding, err = client.RbacV1().ClusterRoleBindings().Update(basicUserRoleBinding); err != nil {
+	if basicUserRoleBinding, err = client.RbacV1().ClusterRoleBindings().Update(context.TODO(), basicUserRoleBinding, metav1.UpdateOptions{}); err != nil {
 		t.Fatalf("Failed to update `system:basic-user` ClusterRoleBinding: %v", err)
 	}
 	t.Logf("Deleting default `system:public-info-viewer` ClusterRoleBinding")
-	if err = client.RbacV1().ClusterRoleBindings().Delete("system:public-info-viewer", &metav1.DeleteOptions{}); err != nil {
+	if err = client.RbacV1().ClusterRoleBindings().Delete(context.TODO(), "system:public-info-viewer", &metav1.DeleteOptions{}); err != nil {
 		t.Fatalf("Failed to delete `system:public-info-viewer` ClusterRoleBinding: %v", err)
 	}
 
@@ -756,21 +756,21 @@ func TestDiscoveryUpgradeBootstrapping(t *testing.T) {
 
 	client = clientset.NewForConfigOrDie(&restclient.Config{BearerToken: superUser, Host: s.URL})
 
-	newDiscRoleBinding, err := client.RbacV1().ClusterRoleBindings().Get("system:discovery", metav1.GetOptions{})
+	newDiscRoleBinding, err := client.RbacV1().ClusterRoleBindings().Get(context.TODO(), "system:discovery", metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Failed to get `system:discovery` ClusterRoleBinding: %v", err)
 	}
 	if !reflect.DeepEqual(newDiscRoleBinding, discRoleBinding) {
 		t.Errorf("`system:discovery` should have been unmodified. Wanted: %v, got %v", discRoleBinding, newDiscRoleBinding)
 	}
-	newBasicUserRoleBinding, err := client.RbacV1().ClusterRoleBindings().Get("system:basic-user", metav1.GetOptions{})
+	newBasicUserRoleBinding, err := client.RbacV1().ClusterRoleBindings().Get(context.TODO(), "system:basic-user", metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Failed to get `system:basic-user` ClusterRoleBinding: %v", err)
 	}
 	if !reflect.DeepEqual(newBasicUserRoleBinding, basicUserRoleBinding) {
 		t.Errorf("`system:basic-user` should have been unmodified. Wanted: %v, got %v", basicUserRoleBinding, newBasicUserRoleBinding)
 	}
-	publicInfoViewerRoleBinding, err := client.RbacV1().ClusterRoleBindings().Get("system:public-info-viewer", metav1.GetOptions{})
+	publicInfoViewerRoleBinding, err := client.RbacV1().ClusterRoleBindings().Get(context.TODO(), "system:public-info-viewer", metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Failed to get `system:public-info-viewer` ClusterRoleBinding: %v", err)
 	}

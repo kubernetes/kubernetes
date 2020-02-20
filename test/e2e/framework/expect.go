@@ -45,3 +45,18 @@ func ExpectNoError(err error, explain ...interface{}) {
 func ExpectNoErrorWithOffset(offset int, err error, explain ...interface{}) {
 	gomega.ExpectWithOffset(1+offset, err).NotTo(gomega.HaveOccurred(), explain...)
 }
+
+// ExpectConsistOf expects actual contains precisely the extra elements.  The ordering of the elements does not matter.
+func ExpectConsistOf(actual interface{}, extra interface{}, explain ...interface{}) {
+	gomega.ExpectWithOffset(1, actual).To(gomega.ConsistOf(extra), explain...)
+}
+
+// ExpectHaveKey expects the actual map has the key in the keyset
+func ExpectHaveKey(actual interface{}, key interface{}, explain ...interface{}) {
+	gomega.ExpectWithOffset(1, actual).To(gomega.HaveKey(key), explain...)
+}
+
+// ExpectEmpty expects actual is empty
+func ExpectEmpty(actual interface{}, explain ...interface{}) {
+	gomega.ExpectWithOffset(1, actual).To(gomega.BeEmpty(), explain...)
+}

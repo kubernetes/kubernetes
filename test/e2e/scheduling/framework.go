@@ -17,6 +17,7 @@ limitations under the License.
 package scheduling
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -79,7 +80,7 @@ func WaitForPodsToBeDeleted(c clientset.Interface) {
 
 // getScheduledAndUnscheduledPods lists scheduled and not scheduled pods in the given namespace, with succeeded and failed pods filtered out.
 func getScheduledAndUnscheduledPods(c clientset.Interface, masterNodes sets.String, ns string) (scheduledPods, notScheduledPods []v1.Pod) {
-	pods, err := c.CoreV1().Pods(ns).List(metav1.ListOptions{})
+	pods, err := c.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{})
 	framework.ExpectNoError(err, fmt.Sprintf("listing all pods in namespace %q while waiting for stable cluster", ns))
 	// API server returns also Pods that succeeded. We need to filter them out.
 	filteredPods := make([]v1.Pod, 0, len(pods.Items))
@@ -94,7 +95,7 @@ func getScheduledAndUnscheduledPods(c clientset.Interface, masterNodes sets.Stri
 
 // getDeletingPods returns whether there are any pods marked for deletion.
 func getDeletingPods(c clientset.Interface, ns string) []v1.Pod {
-	pods, err := c.CoreV1().Pods(ns).List(metav1.ListOptions{})
+	pods, err := c.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{})
 	framework.ExpectNoError(err, fmt.Sprintf("listing all pods in namespace %q while waiting for pods to terminate", ns))
 	var deleting []v1.Pod
 	for _, p := range pods.Items {

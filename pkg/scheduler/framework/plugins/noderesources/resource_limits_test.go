@@ -23,7 +23,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
-	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
+	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
 )
 
 func TestResourceLimits(t *testing.T) {
@@ -99,11 +99,11 @@ func TestResourceLimits(t *testing.T) {
 
 	tests := []struct {
 		// input pod
-		pod            *v1.Pod
-		nodes          []*v1.Node
-		expectedList   framework.NodeScoreList
-		name           string
-		skipPostFilter bool
+		pod          *v1.Pod
+		nodes        []*v1.Node
+		expectedList framework.NodeScoreList
+		name         string
+		skipPreScore bool
 	}{
 		{
 			pod:          &v1.Pod{Spec: noResources},
@@ -136,30 +136,30 @@ func TestResourceLimits(t *testing.T) {
 			name:         "node does not advertise its allocatables",
 		},
 		{
-			pod:            &v1.Pod{Spec: cpuAndMemory},
-			nodes:          []*v1.Node{makeNode("machine1", 0, 0)},
-			expectedList:   []framework.NodeScore{{Name: "machine1", Score: 0}},
-			skipPostFilter: true,
-			name:           "postFilter skipped",
+			pod:          &v1.Pod{Spec: cpuAndMemory},
+			nodes:        []*v1.Node{makeNode("machine1", 0, 0)},
+			expectedList: []framework.NodeScore{{Name: "machine1", Score: 0}},
+			skipPreScore: true,
+			name:         "preScore skipped",
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(nil, test.nodes))
+			snapshot := cache.NewSnapshot(nil, test.nodes)
 			fh, _ := framework.NewFramework(nil, nil, nil, framework.WithSnapshotSharedLister(snapshot))
 			p := &ResourceLimits{handle: fh}
 			for i := range test.nodes {
 				state := framework.NewCycleState()
-				if !test.skipPostFilter {
-					status := p.PostFilter(context.Background(), state, test.pod, test.nodes, nil)
+				if !test.skipPreScore {
+					status := p.PreScore(context.Background(), state, test.pod, test.nodes)
 					if !status.IsSuccess() {
 						t.Errorf("unexpected error: %v", status)
 					}
 				}
 
 				gotScore, err := p.Score(context.Background(), state, test.pod, test.nodes[i].Name)
-				if test.skipPostFilter {
+				if test.skipPreScore {
 					if err == nil {
 						t.Errorf("expected error")
 					}

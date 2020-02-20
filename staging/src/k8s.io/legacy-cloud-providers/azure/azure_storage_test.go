@@ -44,7 +44,7 @@ func TestCreateFileShare(t *testing.T) {
 		acctKind string
 		loc      string
 		gb       int
-		accounts storage.AccountListResult
+		accounts []storage.Account
 		keys     storage.AccountListKeysResult
 		err      error
 
@@ -77,10 +77,8 @@ func TestCreateFileShare(t *testing.T) {
 			acctKind: kind,
 			loc:      location,
 			gb:       10,
-			accounts: storage.AccountListResult{
-				Value: &[]storage.Account{
-					{Name: &name, Sku: &storage.Sku{Name: storage.SkuName(sku)}, Kind: storage.Kind(kind), Location: &location},
-				},
+			accounts: []storage.Account{
+				{Name: &name, Sku: &storage.Sku{Name: storage.SkuName(sku)}, Kind: storage.Kind(kind), Location: &location},
 			},
 			keys: storage.AccountListKeysResult{
 				Keys: &[]storage.AccountKey{
@@ -97,10 +95,8 @@ func TestCreateFileShare(t *testing.T) {
 			acctKind: kind,
 			loc:      location,
 			gb:       10,
-			accounts: storage.AccountListResult{
-				Value: &[]storage.Account{
-					{Name: &bogus, Sku: &storage.Sku{Name: storage.SkuName(sku)}, Location: &location},
-				},
+			accounts: []storage.Account{
+				{Name: &bogus, Sku: &storage.Sku{Name: storage.SkuName(sku)}, Location: &location},
 			},
 			expectErr: true,
 		},
@@ -111,10 +107,8 @@ func TestCreateFileShare(t *testing.T) {
 			acctKind: kind,
 			loc:      location,
 			gb:       10,
-			accounts: storage.AccountListResult{
-				Value: &[]storage.Account{
-					{Name: &name, Sku: &storage.Sku{Name: storage.SkuName(sku)}, Location: &bogus},
-				},
+			accounts: []storage.Account{
+				{Name: &name, Sku: &storage.Sku{Name: storage.SkuName(sku)}, Location: &bogus},
 			},
 			expectErr: true,
 		},

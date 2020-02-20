@@ -17,6 +17,7 @@ limitations under the License.
 package apiserver
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -129,8 +130,6 @@ var missingHanlders = sets.NewString(
 	"PriorityClass",
 	"PodPreset",
 	"AuditSink",
-	"FlowSchema",                 // TODO(yue9944882): remove this comment by merging print-handler for flow-control API
-	"PriorityLevelConfiguration", // TODO(yue9944882): remove this comment by merging print-handler for flow-control API
 )
 
 // known types that are no longer served we should tolerate restmapper errors for
@@ -238,7 +237,7 @@ func TestServerSidePrint(t *testing.T) {
 		if mapping.Scope.Name() == meta.RESTScopeNameNamespace {
 			req = req.Namespace(ns.Name)
 		}
-		body, err := req.Resource(mapping.Resource.Resource).SetHeader("Accept", tableParam).Do().Raw()
+		body, err := req.Resource(mapping.Resource.Resource).SetHeader("Accept", tableParam).Do(context.TODO()).Raw()
 		if err != nil {
 			t.Errorf("unexpected error getting %s: %v", gvk, err)
 			continue

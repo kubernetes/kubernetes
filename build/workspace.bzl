@@ -17,25 +17,25 @@ load("//build:workspace_mirror.bzl", "mirror")
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_file")
 load("@io_bazel_rules_docker//container:container.bzl", "container_pull")
 
-CNI_VERSION = "0.7.5"
+CNI_VERSION = "0.8.5"
 _CNI_TARBALL_ARCH_SHA256 = {
-    "amd64": "3ca15c0a18ee830520cf3a95408be826cbd255a1535a38e0be9608b25ad8bf64",
-    "arm": "0eb4a528b5b2e4ce23ebc96e41b2f5280d5a64d41eec8dd8b16c3d66aaa0f6b8",
-    "arm64": "7fec91af78e9548df306f0ec43bea527c8c10cc3a9682c33e971c8522a7fcded",
-    "ppc64le": "9164a26ed8dd398b2fe3b15d9d456271dfa59aa537528d10572ea9fa2cef7679",
-    "s390x": "415cdcf02c65c22f5b7e55b0ab61208a10f2b95a0c8310176c771d07a9f448cf",
+    "amd64": "bd682ffcf701e8f83283cdff7281aad0c83b02a56084d6e601216210732833f9",
+    "arm": "86a868234045837cb3f5d58a0a4468ff42845d50b5e87bd128f050ef393d7495",
+    "arm64": "a7881ec37e592c897bdfd2a225b4ed74caa981e3c4cdcf8f45574f8d2f111bce",
+    "ppc64le": "a26cc3734f7cb980ab8fb3aaa64ccf2d67291478130009fa9542355fbdd94aa5",
+    "s390x": "033ea910a83144609083d5c3fb62bf4a379b0b17729a1a9e829feed9fa7a9d97",
 }
 
-CRI_TOOLS_VERSION = "1.16.1"
+CRI_TOOLS_VERSION = "1.17.0"
 _CRI_TARBALL_ARCH_SHA256 = {
-    "linux-386": "35b721a7a90a12cf9689fb1f4fe5b50f73520200130a52b552234bd798d2ae9f",
-    "linux-amd64": "19fed421710fccfe58f5573383bb137c19438a9056355556f1a15da8d23b3ad1",
-    "linux-arm": "367826f3eb06c4d923f3174d23141ddacef9ffcb0c902502bd922dbad86d08dd",
-    "linux-arm64": "62b60ab7046b788df892a1b746bd602c520a59c38232febc0580692c9805f641",
-    "linux-ppc64le": "d6464188a5011242b8dad22cb1e55d8cb29d6873f3d1f3f3c32bb236d3fca64e",
-    "linux-s390x": "f3d5e707810d7985f6a470ea439ca5989c0ee218a824795ed1726f4958281a2d",
-    "windows-386": "b7564675f69aa2a01b092874c9c9aeda084204384d711a6fb85c6d2328ca5c7d",
-    "windows-amd64": "7d092dcb3b1af2edf75477d5d049a70e8c0d1ac8242b1dff2de7e6aa084e3615",
+    "linux-386": "cffa443cf76ab4b760a68d4db555d1854cb692e8b20b3360cf23221815ca151e",
+    "linux-amd64": "7b72073797f638f099ed19550d52e9b9067672523fc51b746e65d7aa0bafa414",
+    "linux-arm": "9700957218e8e7bdc02cbc8fda4c189f5b6223a93ba89d876bdfd77b6117e9b7",
+    "linux-arm64": "d89afd89c2852509fafeaff6534d456272360fcee732a8d0cb89476377387e12",
+    "linux-ppc64le": "a61c52b9ac5bffe94ae4c09763083c60f3eccd30eb351017b310f32d1cafb855",
+    "linux-s390x": "0db445f0b74ecb51708b710480a462b728174155c5f2709a39d1cc2dc975e350",
+    "windows-386": "2e285250d36b5cb3e8c047b191c0c0af606fed7c0034bb140ba95cc1498f4996",
+    "windows-amd64": "e18150d5546d3ddf6b165bd9aec0f65c18aacf75b94fb28bb26bfc0238f07b28",
 }
 
 ETCD_VERSION = "3.4.3"
@@ -59,7 +59,7 @@ def cni_tarballs():
             name = "kubernetes_cni_%s" % arch,
             downloaded_file_path = "kubernetes_cni.tgz",
             sha256 = sha,
-            urls = mirror("https://storage.googleapis.com/kubernetes-release/network-plugins/cni-plugins-%s-v%s.tgz" % (arch, CNI_VERSION)),
+            urls = ["https://storage.googleapis.com/k8s-artifacts-cni/release/v%s/cni-plugins-linux-%s-v%s.tgz" % (CNI_VERSION, arch, CNI_VERSION)],
         )
 
 def cri_tarballs():

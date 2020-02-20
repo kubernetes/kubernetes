@@ -17,6 +17,7 @@ limitations under the License.
 package inclusterclient
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/base64"
 	"flag"
@@ -77,7 +78,7 @@ func main(cmd *cobra.Command, args []string) {
 	for {
 		<-t
 		klog.Infof("calling /healthz")
-		b, err := c.Get().AbsPath("/healthz").Do().Raw()
+		b, err := c.Get().AbsPath("/healthz").Do(context.TODO()).Raw()
 		if err != nil {
 			klog.Errorf("status=failed")
 			klog.Errorf("error checking /healthz: %v\n%s\n", err, string(b))

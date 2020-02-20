@@ -355,7 +355,7 @@ func (util *RBDUtil) rbdUnlock(b rbdMounter) error {
 	if len(locker) > 0 {
 		args := []string{"lock", "remove", b.Image, lock_id, locker, "--pool", b.Pool, "--id", b.Id, "-m", mon}
 		args = append(args, secret_opt...)
-		cmd, err = b.exec.Command("rbd", args...).CombinedOutput()
+		_, err = b.exec.Command("rbd", args...).CombinedOutput()
 		if err == nil {
 			klog.V(4).Infof("rbd: successfully remove lock (locker_id: %s) on image: %s/%s with id %s mon %s", lock_id, b.Pool, b.Image, b.Id, mon)
 		} else {
@@ -487,7 +487,7 @@ func (util *RBDUtil) DetachDisk(plugin *rbdPlugin, deviceMountPath string, devic
 	// rbd unmap
 	output, err := exec.Command(rbdCmd, "unmap", device).CombinedOutput()
 	if err != nil {
-		return rbdErrors(err, fmt.Errorf("rbd: failed to unmap device %s, error %v, rbd output: %v", device, err, output))
+		return rbdErrors(err, fmt.Errorf("rbd: failed to unmap device %s, error %v, rbd output: %s", device, err, string(output)))
 	}
 	klog.V(3).Infof("rbd: successfully unmap device %s", device)
 

@@ -17,6 +17,7 @@ limitations under the License.
 package storageos
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -173,7 +174,7 @@ func TestPlugin(t *testing.T) {
 
 	client := fake.NewSimpleClientset()
 
-	client.CoreV1().Secrets("default").Create(&v1.Secret{
+	client.CoreV1().Secrets("default").Create(context.TODO(), &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      secretName,
 			Namespace: "default",
@@ -183,7 +184,7 @@ func TestPlugin(t *testing.T) {
 			"apiUsername": []byte("storageos"),
 			"apiPassword": []byte("storageos"),
 			"apiAddr":     []byte("tcp://localhost:5705"),
-		}})
+		}}, metav1.CreateOptions{})
 
 	plug.(*storageosPlugin).host = volumetest.NewFakeVolumeHost(t, tmpDir, client, nil)
 

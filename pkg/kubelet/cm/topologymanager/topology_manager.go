@@ -76,7 +76,7 @@ type HintProvider interface {
 	// this function for each hint provider, and merges the hints to produce
 	// a consensus "best" hint. The hint providers may subsequently query the
 	// topology manager to influence actual resource assignment.
-	GetTopologyHints(pod v1.Pod, container v1.Container) map[string][]TopologyHint
+	GetTopologyHints(pod *v1.Pod, container *v1.Container) map[string][]TopologyHint
 }
 
 //Store interface is to allow Hint Providers to retrieve pod affinity
@@ -124,7 +124,7 @@ func NewManager(numaNodeInfo cputopology.NUMANodeInfo, topologyPolicyName string
 		numaNodes = append(numaNodes, node)
 	}
 
-	if len(numaNodes) > maxAllowableNUMANodes {
+	if topologyPolicyName != PolicyNone && len(numaNodes) > maxAllowableNUMANodes {
 		return nil, fmt.Errorf("unsupported on machines with more than %v NUMA Nodes", maxAllowableNUMANodes)
 	}
 
@@ -164,7 +164,7 @@ func (m *manager) GetAffinity(podUID string, containerName string) TopologyHint 
 	return m.podTopologyHints[podUID][containerName]
 }
 
-func (m *manager) accumulateProvidersHints(pod v1.Pod, container v1.Container) (providersHints []map[string][]TopologyHint) {
+func (m *manager) accumulateProvidersHints(pod *v1.Pod, container *v1.Container) (providersHints []map[string][]TopologyHint) {
 	// Loop through all hint providers and save an accumulated list of the
 	// hints returned by each hint provider.
 	for _, provider := range m.hintProviders {
@@ -177,7 +177,7 @@ func (m *manager) accumulateProvidersHints(pod v1.Pod, container v1.Container) (
 }
 
 // Collect Hints from hint providers and pass to policy to retrieve the best one.
-func (m *manager) calculateAffinity(pod v1.Pod, container v1.Container) (TopologyHint, lifecycle.PodAdmitResult) {
+func (m *manager) calculateAffinity(pod *v1.Pod, container *v1.Container) (TopologyHint, bool) {
 	providersHints := m.accumulateProvidersHints(pod, container)
 	bestHint, admit := m.policy.Merge(providersHints)
 	klog.Infof("[topologymanager] ContainerTopologyHint: %v", bestHint)
@@ -194,35 +194,44 @@ func (m *manager) AddContainer(pod *v1.Pod, containerID string) error {
 }
 
 func (m *manager) RemoveContainer(containerID string) error {
+	klog.Infof("[topologymanager] RemoveContainer - Container ID: %v", containerID)
+
 	podUIDString := m.podMap[containerID]
-	delete(m.podTopologyHints, podUIDString)
 	delete(m.podMap, containerID)
-	klog.Infof("[topologymanager] RemoveContainer - Container ID: %v podTopologyHints: %v", containerID, m.podTopologyHints)
+	if _, exists := m.podTopologyHints[podUIDString]; exists {
+		delete(m.podTopologyHints[podUIDString], containerID)
+		if len(m.podTopologyHints[podUIDString]) == 0 {
+			delete(m.podTopologyHints, podUIDString)
+		}
+	}
+
 	return nil
 }
 
 func (m *manager) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
-	klog.Infof("[topologymanager] Topology Admit Handler")
-	if m.policy.Name() == "none" {
-		klog.Infof("[topologymanager] Skipping calculate topology affinity as policy: none")
-		return lifecycle.PodAdmitResult{
-			Admit: true,
-		}
+	// Unconditionally admit the pod if we are running with the 'none' policy.
+	if m.policy.Name() == PolicyNone {
+		return lifecycle.PodAdmitResult{Admit: true}
 	}
+
+	klog.Infof("[topologymanager] Topology Admit Handler")
 	pod := attrs.Pod
-	c := make(map[string]TopologyHint)
+	hints := make(map[string]TopologyHint)
 
 	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
-		result, admitPod := m.calculateAffinity(*pod, container)
-		if !admitPod.Admit {
-			return admitPod
+		result, admit := m.calculateAffinity(pod, &container)
+		if !admit {
+			return lifecycle.PodAdmitResult{
+				Message: "Resources cannot be allocated with Topology locality",
+				Reason:  "TopologyAffinityError",
+				Admit:   false,
+			}
 		}
-		c[container.Name] = result
+		hints[container.Name] = result
 	}
-	m.podTopologyHints[string(pod.UID)] = c
+
+	m.podTopologyHints[string(pod.UID)] = hints
 	klog.Infof("[topologymanager] Topology Affinity for Pod: %v are %v", pod.UID, m.podTopologyHints[string(pod.UID)])
 
-	return lifecycle.PodAdmitResult{
-		Admit: true,
-	}
+	return lifecycle.PodAdmitResult{Admit: true}
 }

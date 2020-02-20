@@ -17,6 +17,7 @@ limitations under the License.
 package autoscaling
 
 import (
+	"context"
 	"strings"
 	"time"
 
@@ -25,6 +26,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eautoscaling "k8s.io/kubernetes/test/e2e/framework/autoscaling"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 
 	"github.com/onsi/ginkgo"
 )
@@ -35,9 +37,9 @@ var _ = SIGDescribe("[Feature:ClusterSizeAutoscalingScaleUp] [Slow] Autoscaling"
 	SIGDescribe("Autoscaling a service", func() {
 		ginkgo.BeforeEach(func() {
 			// Check if Cloud Autoscaler is enabled by trying to get its ConfigMap.
-			_, err := f.ClientSet.CoreV1().ConfigMaps("kube-system").Get("cluster-autoscaler-status", metav1.GetOptions{})
+			_, err := f.ClientSet.CoreV1().ConfigMaps("kube-system").Get(context.TODO(), "cluster-autoscaler-status", metav1.GetOptions{})
 			if err != nil {
-				framework.Skipf("test expects Cluster Autoscaler to be enabled")
+				e2eskipper.Skipf("test expects Cluster Autoscaler to be enabled")
 			}
 		})
 
@@ -50,7 +52,7 @@ var _ = SIGDescribe("[Feature:ClusterSizeAutoscalingScaleUp] [Slow] Autoscaling"
 				// Make sure there is only 1 node group, otherwise this test becomes useless.
 				nodeGroups := strings.Split(framework.TestContext.CloudConfig.NodeInstanceGroup, ",")
 				if len(nodeGroups) != 1 {
-					framework.Skipf("test expects 1 node group, found %d", len(nodeGroups))
+					e2eskipper.Skipf("test expects 1 node group, found %d", len(nodeGroups))
 				}
 				nodeGroupName = nodeGroups[0]
 
@@ -58,7 +60,7 @@ var _ = SIGDescribe("[Feature:ClusterSizeAutoscalingScaleUp] [Slow] Autoscaling"
 				nodeGroupSize, err := framework.GroupSize(nodeGroupName)
 				framework.ExpectNoError(err)
 				if nodeGroupSize != nodesNum {
-					framework.Skipf("test expects %d nodes, found %d", nodesNum, nodeGroupSize)
+					e2eskipper.Skipf("test expects %d nodes, found %d", nodesNum, nodeGroupSize)
 				}
 
 				// Make sure all nodes are schedulable, otherwise we are in some kind of a problem state.

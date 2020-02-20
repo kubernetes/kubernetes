@@ -17,6 +17,7 @@ limitations under the License.
 package scale
 
 import (
+	"context"
 	"encoding/json"
 	"path"
 	"strings"
@@ -120,16 +121,16 @@ func TestScaleSubresources(t *testing.T) {
 	}
 
 	// Create objects required to exercise scale subresources
-	if _, err := clientSet.CoreV1().ReplicationControllers("default").Create(rcStub); err != nil {
+	if _, err := clientSet.CoreV1().ReplicationControllers("default").Create(context.TODO(), rcStub, metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := clientSet.AppsV1().ReplicaSets("default").Create(rsStub); err != nil {
+	if _, err := clientSet.AppsV1().ReplicaSets("default").Create(context.TODO(), rsStub, metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := clientSet.AppsV1().Deployments("default").Create(deploymentStub); err != nil {
+	if _, err := clientSet.AppsV1().Deployments("default").Create(context.TODO(), deploymentStub, metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := clientSet.AppsV1().StatefulSets("default").Create(ssStub); err != nil {
+	if _, err := clientSet.AppsV1().StatefulSets("default").Create(context.TODO(), ssStub, metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -145,7 +146,7 @@ func TestScaleSubresources(t *testing.T) {
 		urlPath := path.Join(prefix, gvr.Group, gvr.Version, "namespaces", "default", resourceParts[0], "test", resourceParts[1])
 		obj := &unstructured.Unstructured{}
 
-		getData, err := clientSet.CoreV1().RESTClient().Get().AbsPath(urlPath).DoRaw()
+		getData, err := clientSet.CoreV1().RESTClient().Get().AbsPath(urlPath).DoRaw(context.TODO())
 		if err != nil {
 			t.Errorf("error fetching %s: %v", urlPath, err)
 			continue
@@ -162,7 +163,7 @@ func TestScaleSubresources(t *testing.T) {
 			continue
 		}
 
-		updateData, err := clientSet.CoreV1().RESTClient().Put().AbsPath(urlPath).Body(getData).DoRaw()
+		updateData, err := clientSet.CoreV1().RESTClient().Put().AbsPath(urlPath).Body(getData).DoRaw(context.TODO())
 		if err != nil {
 			t.Errorf("error putting to %s: %v", urlPath, err)
 			t.Log(string(getData))

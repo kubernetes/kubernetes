@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubectl/pkg/cmd/delete"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	generateversioned "k8s.io/kubectl/pkg/generate/versioned"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util/i18n"
 )
@@ -174,7 +175,7 @@ func TestRunArgsFollowDashRules(t *testing.T) {
 				GroupVersion:         corev1.SchemeGroupVersion,
 				NegotiatedSerializer: ns,
 				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-					if req.URL.Path == "/namespaces/test/replicationcontrollers" {
+					if req.URL.Path == "/namespaces/test/pods" {
 						return &http.Response{StatusCode: http.StatusCreated, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, rc)}, nil
 					}
 					return &http.Response{
@@ -188,7 +189,6 @@ func TestRunArgsFollowDashRules(t *testing.T) {
 
 			cmd := NewCmdRun(tf, genericclioptions.NewTestIOStreamsDiscard())
 			cmd.Flags().Set("image", "nginx")
-			cmd.Flags().Set("generator", "run/v1")
 
 			printFlags := genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme)
 			printer, err := printFlags.ToPrinter()
@@ -205,7 +205,7 @@ func TestRunArgsFollowDashRules(t *testing.T) {
 				IOStreams: genericclioptions.NewTestIOStreamsDiscard(),
 
 				Image:     "nginx",
-				Generator: "run/v1",
+				Generator: generateversioned.RunPodV1GeneratorName,
 
 				PrintObj: func(obj runtime.Object) error {
 					return printer.PrintObj(obj, os.Stdout)
@@ -390,7 +390,7 @@ func TestGenerateService(t *testing.T) {
 			addRunFlags(cmd, opts)
 
 			if !test.expectPOST {
-				opts.DryRun = true
+				opts.DryRunStrategy = cmdutil.DryRunClient
 			}
 
 			if len(test.port) > 0 {
@@ -464,7 +464,7 @@ func TestRunValidations(t *testing.T) {
 			flags: map[string]string{
 				"image":   "busybox",
 				"attach":  "true",
-				"dry-run": "true",
+				"dry-run": "client",
 			},
 			expectedErr: "can't be used with attached containers options",
 		},
@@ -474,7 +474,7 @@ func TestRunValidations(t *testing.T) {
 			flags: map[string]string{
 				"image":   "busybox",
 				"stdin":   "true",
-				"dry-run": "true",
+				"dry-run": "client",
 			},
 			expectedErr: "can't be used with attached containers options",
 		},
@@ -485,7 +485,7 @@ func TestRunValidations(t *testing.T) {
 				"image":   "busybox",
 				"tty":     "true",
 				"stdin":   "true",
-				"dry-run": "true",
+				"dry-run": "client",
 			},
 			expectedErr: "can't be used with attached containers options",
 		},

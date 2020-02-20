@@ -19,6 +19,7 @@ limitations under the License.
 package v1beta1
 
 import (
+	"context"
 	time "time"
 
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
@@ -61,13 +62,13 @@ func NewFilteredRoleBindingInformer(client kubernetes.Interface, namespace strin
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.RbacV1beta1().RoleBindings(namespace).List(options)
+				return client.RbacV1beta1().RoleBindings(namespace).List(context.TODO(), options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.RbacV1beta1().RoleBindings(namespace).Watch(options)
+				return client.RbacV1beta1().RoleBindings(namespace).Watch(context.TODO(), options)
 			},
 		},
 		&rbacv1beta1.RoleBinding{},

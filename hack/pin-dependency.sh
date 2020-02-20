@@ -14,18 +14,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This script switches to the preferred version for specified module.
+# Usage: `hack/pin-dependency.sh $MODULE $SHA-OR-TAG`.
+# Example: `hack/pin-dependency.sh github.com/docker/docker 501cb131a7b7`.
+
 set -o errexit
 set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
-
-# Usage:
-#   hack/pin-dependency.sh $MODULE $SHA-OR-TAG
-#
-# Example:
-#   hack/pin-dependency.sh github.com/docker/docker 501cb131a7b7
 
 # Explicitly opt into go modules, even though we're inside a GOPATH directory
 export GO111MODULE=on

@@ -17,13 +17,15 @@ limitations under the License.
 package vsphere
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"time"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -33,7 +35,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
-var _ = utils.SIGDescribe("Volume Placement", func() {
+var _ = utils.SIGDescribe("Volume Placement [Feature:vsphere]", func() {
 	f := framework.NewDefaultFramework("volume-placement")
 	const (
 		NodeLabelKey = "vsphere_e2e_label_volume_placement"
@@ -361,7 +363,7 @@ func createPodWithVolumeAndNodeSelector(client clientset.Interface, namespace st
 	ginkgo.By(fmt.Sprintf("Creating pod on the node: %v", nodeName))
 	podspec := getVSpherePodSpecWithVolumePaths(volumePaths, nodeKeyValueLabel, nil)
 
-	pod, err = client.CoreV1().Pods(namespace).Create(podspec)
+	pod, err = client.CoreV1().Pods(namespace).Create(context.TODO(), podspec, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 	ginkgo.By("Waiting for pod to be ready")
 	gomega.Expect(e2epod.WaitForPodNameRunningInNamespace(client, pod.Name, namespace)).To(gomega.Succeed())

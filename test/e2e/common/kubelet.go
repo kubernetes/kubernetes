@@ -18,11 +18,12 @@ package common
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"strings"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -64,7 +65,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 			})
 			gomega.Eventually(func() string {
 				sinceTime := metav1.NewTime(time.Now().Add(time.Duration(-1 * time.Hour)))
-				rc, err := podClient.GetLogs(podName, &v1.PodLogOptions{SinceTime: &sinceTime}).Stream()
+				rc, err := podClient.GetLogs(podName, &v1.PodLogOptions{SinceTime: &sinceTime}).Stream(context.TODO())
 				if err != nil {
 					return ""
 				}
@@ -105,7 +106,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 		*/
 		framework.ConformanceIt("should have an terminated reason [NodeConformance]", func() {
 			gomega.Eventually(func() error {
-				podData, err := podClient.Get(podName, metav1.GetOptions{})
+				podData, err := podClient.Get(context.TODO(), podName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -120,7 +121,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 					return fmt.Errorf("expected non-zero exitCode and non-empty terminated state reason. Got exitCode: %+v and terminated state reason: %+v", contTerminatedState.ExitCode, contTerminatedState.Reason)
 				}
 				return nil
-			}, time.Minute, time.Second*4).Should(gomega.BeNil())
+			}, framework.PodStartTimeout, time.Second*4).Should(gomega.BeNil())
 		})
 
 		/*
@@ -129,7 +130,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 			Description: Create a Pod with terminated state. This terminated pod MUST be able to be deleted.
 		*/
 		framework.ConformanceIt("should be possible to delete [NodeConformance]", func() {
-			err := podClient.Delete(podName, &metav1.DeleteOptions{})
+			err := podClient.Delete(context.TODO(), podName, &metav1.DeleteOptions{})
 			gomega.Expect(err).To(gomega.BeNil(), fmt.Sprintf("Error deleting Pod %v", err))
 		})
 	})
@@ -167,7 +168,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 			})
 
 			gomega.Eventually(func() error {
-				rc, err := podClient.GetLogs(podName, &v1.PodLogOptions{}).Stream()
+				rc, err := podClient.GetLogs(podName, &v1.PodLogOptions{}).Stream(context.TODO())
 				if err != nil {
 					return err
 				}
@@ -215,7 +216,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 				},
 			})
 			gomega.Eventually(func() string {
-				rc, err := podClient.GetLogs(podName, &v1.PodLogOptions{}).Stream()
+				rc, err := podClient.GetLogs(podName, &v1.PodLogOptions{}).Stream(context.TODO())
 				if err != nil {
 					return ""
 				}

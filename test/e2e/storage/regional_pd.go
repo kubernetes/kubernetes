@@ -17,6 +17,7 @@ limitations under the License.
 package storage
 
 import (
+	"context"
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 
@@ -183,29 +184,29 @@ func testZonalFailover(c clientset.Interface, ns string) {
 	statefulSet, service, regionalPDLabels := newStatefulSet(claimTemplate, ns)
 
 	ginkgo.By("creating a StorageClass " + class.Name)
-	_, err := c.StorageV1().StorageClasses().Create(class)
+	_, err := c.StorageV1().StorageClasses().Create(context.TODO(), class, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 	defer func() {
 		framework.Logf("deleting storage class %s", class.Name)
-		framework.ExpectNoError(c.StorageV1().StorageClasses().Delete(class.Name, nil),
+		framework.ExpectNoError(c.StorageV1().StorageClasses().Delete(context.TODO(), class.Name, nil),
 			"Error deleting StorageClass %s", class.Name)
 	}()
 
 	ginkgo.By("creating a StatefulSet")
-	_, err = c.CoreV1().Services(ns).Create(service)
+	_, err = c.CoreV1().Services(ns).Create(context.TODO(), service, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
-	_, err = c.AppsV1().StatefulSets(ns).Create(statefulSet)
+	_, err = c.AppsV1().StatefulSets(ns).Create(context.TODO(), statefulSet, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
 	defer func() {
 		framework.Logf("deleting statefulset%q/%q", statefulSet.Namespace, statefulSet.Name)
 		// typically this claim has already been deleted
-		framework.ExpectNoError(c.AppsV1().StatefulSets(ns).Delete(statefulSet.Name, nil /* options */),
+		framework.ExpectNoError(c.AppsV1().StatefulSets(ns).Delete(context.TODO(), statefulSet.Name, nil),
 			"Error deleting StatefulSet %s", statefulSet.Name)
 
 		framework.Logf("deleting claims in namespace %s", ns)
 		pvc := getPVC(c, ns, regionalPDLabels)
-		framework.ExpectNoError(c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(pvc.Name, nil),
+		framework.ExpectNoError(c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(context.TODO(), pvc.Name, nil),
 			"Error deleting claim %s.", pvc.Name)
 		if pvc.Spec.VolumeName != "" {
 			err = framework.WaitForPersistentVolumeDeleted(c, pvc.Spec.VolumeName, framework.Poll, pvDeletionTimeout)
@@ -227,13 +228,13 @@ func testZonalFailover(c clientset.Interface, ns string) {
 	ginkgo.By("getting zone information from pod")
 	pod := getPod(c, ns, regionalPDLabels)
 	nodeName := pod.Spec.NodeName
-	node, err := c.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+	node, err := c.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 	framework.ExpectNoError(err)
 	podZone := node.Labels[v1.LabelZoneFailureDomain]
 
 	ginkgo.By("tainting nodes in the zone the pod is scheduled in")
 	selector := labels.SelectorFromSet(labels.Set(map[string]string{v1.LabelZoneFailureDomain: podZone}))
-	nodesInZone, err := c.CoreV1().Nodes().List(metav1.ListOptions{LabelSelector: selector.String()})
+	nodesInZone, err := c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{LabelSelector: selector.String()})
 	framework.ExpectNoError(err)
 	removeTaintFunc := addTaint(c, ns, nodesInZone.Items, podZone)
 
@@ -243,7 +244,7 @@ func testZonalFailover(c clientset.Interface, ns string) {
 	}()
 
 	ginkgo.By("deleting StatefulSet pod")
-	err = c.CoreV1().Pods(ns).Delete(pod.Name, &metav1.DeleteOptions{})
+	err = c.CoreV1().Pods(ns).Delete(context.TODO(), pod.Name, &metav1.DeleteOptions{})
 
 	// Verify the pod is scheduled in the other zone.
 	ginkgo.By("verifying the pod is scheduled in a different zone.")
@@ -253,18 +254,17 @@ func testZonalFailover(c clientset.Interface, ns string) {
 	} else {
 		otherZone = cloudZones[0]
 	}
-	err = wait.PollImmediate(framework.Poll, statefulSetReadyTimeout, func() (bool, error) {
-		framework.Logf("checking whether new pod is scheduled in zone %q", otherZone)
-		pod = getPod(c, ns, regionalPDLabels)
-		nodeName = pod.Spec.NodeName
-		node, err = c.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+	waitErr := wait.PollImmediate(framework.Poll, statefulSetReadyTimeout, func() (bool, error) {
+		framework.Logf("Checking whether new pod is scheduled in zone %q", otherZone)
+		pod := getPod(c, ns, regionalPDLabels)
+		node, err := c.CoreV1().Nodes().Get(context.TODO(), pod.Spec.NodeName, metav1.GetOptions{})
 		if err != nil {
 			return false, nil
 		}
 		newPodZone := node.Labels[v1.LabelZoneFailureDomain]
 		return newPodZone == otherZone, nil
 	})
-	framework.ExpectNoError(err, "Error waiting for pod to be scheduled in a different zone (%q): %v", otherZone, err)
+	framework.ExpectNoError(waitErr, "Error waiting for pod to be scheduled in a different zone (%q): %v", otherZone, err)
 
 	err = waitForStatefulSetReplicasReady(statefulSet.Name, ns, c, 3*time.Second, framework.RestartPodReadyAgainTimeout)
 	if err != nil {
@@ -308,13 +308,13 @@ func addTaint(c clientset.Interface, ns string, nodes []v1.Node, podZone string)
 		framework.ExpectNoError(err)
 		reversePatches[node.Name] = reversePatchBytes
 
-		_, err = c.CoreV1().Nodes().Patch(node.Name, types.StrategicMergePatchType, patchBytes)
+		_, err = c.CoreV1().Nodes().Patch(context.TODO(), node.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
 		framework.ExpectNoError(err)
 	}
 
 	return func() {
 		for nodeName, reversePatch := range reversePatches {
-			_, err := c.CoreV1().Nodes().Patch(nodeName, types.StrategicMergePatchType, reversePatch)
+			_, err := c.CoreV1().Nodes().Patch(context.TODO(), nodeName, types.StrategicMergePatchType, reversePatch, metav1.PatchOptions{})
 			framework.ExpectNoError(err)
 		}
 	}
@@ -437,7 +437,7 @@ func testRegionalAllowedTopologiesWithDelayedBinding(c clientset.Interface, ns s
 func getPVC(c clientset.Interface, ns string, pvcLabels map[string]string) *v1.PersistentVolumeClaim {
 	selector := labels.Set(pvcLabels).AsSelector()
 	options := metav1.ListOptions{LabelSelector: selector.String()}
-	pvcList, err := c.CoreV1().PersistentVolumeClaims(ns).List(options)
+	pvcList, err := c.CoreV1().PersistentVolumeClaims(ns).List(context.TODO(), options)
 	framework.ExpectNoError(err)
 	framework.ExpectEqual(len(pvcList.Items), 1, "There should be exactly 1 PVC matched.")
 
@@ -447,7 +447,7 @@ func getPVC(c clientset.Interface, ns string, pvcLabels map[string]string) *v1.P
 func getPod(c clientset.Interface, ns string, podLabels map[string]string) *v1.Pod {
 	selector := labels.Set(podLabels).AsSelector()
 	options := metav1.ListOptions{LabelSelector: selector.String()}
-	podList, err := c.CoreV1().Pods(ns).List(options)
+	podList, err := c.CoreV1().Pods(ns).List(context.TODO(), options)
 	framework.ExpectNoError(err)
 	framework.ExpectEqual(len(podList.Items), 1, "There should be exactly 1 pod matched.")
 
@@ -633,7 +633,7 @@ func checkZonesFromLabelAndAffinity(pv *v1.PersistentVolume, zones sets.String, 
 func waitForStatefulSetReplicasReady(statefulSetName, ns string, c clientset.Interface, Poll, timeout time.Duration) error {
 	framework.Logf("Waiting up to %v for StatefulSet %s to have all replicas ready", timeout, statefulSetName)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(Poll) {
-		sts, err := c.AppsV1().StatefulSets(ns).Get(statefulSetName, metav1.GetOptions{})
+		sts, err := c.AppsV1().StatefulSets(ns).Get(context.TODO(), statefulSetName, metav1.GetOptions{})
 		if err != nil {
 			framework.Logf("Get StatefulSet %s failed, ignoring for %v: %v", statefulSetName, Poll, err)
 			continue

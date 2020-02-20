@@ -129,7 +129,7 @@ func (o *TaintOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 	taintArgs := []string{}
 	metTaintArg := false
 	for _, s := range args {
-		isTaint := strings.Contains(s, "=") || strings.HasSuffix(s, "-")
+		isTaint := strings.Contains(s, "=") || strings.Contains(s, ":") || strings.HasSuffix(s, "-")
 		switch {
 		case !metTaintArg && isTaint:
 			metTaintArg = true
@@ -183,7 +183,7 @@ func (o *TaintOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 func (o TaintOptions) validateFlags() error {
 	// Cannot have a non-empty selector and all flag set. They are mutually exclusive.
 	if o.all && o.selector != "" {
-		return fmt.Errorf("setting 'all' parameter with a non empty selector is prohibited.")
+		return fmt.Errorf("setting 'all' parameter with a non empty selector is prohibited")
 	}
 	// If both selector and all are not set.
 	if !o.all && o.selector == "" {
@@ -294,7 +294,7 @@ func (o TaintOptions) updateTaints(obj runtime.Object) (string, error) {
 	}
 	if !o.overwrite {
 		if exists := checkIfTaintsAlreadyExists(node.Spec.Taints, o.taintsToAdd); len(exists) != 0 {
-			return "", fmt.Errorf("Node %s already has %v taint(s) with same effect(s) and --overwrite is false", node.Name, exists)
+			return "", fmt.Errorf("node %s already has %v taint(s) with same effect(s) and --overwrite is false", node.Name, exists)
 		}
 	}
 	operation, newTaints, err := reorganizeTaints(node, o.overwrite, o.taintsToAdd, o.taintsToRemove)

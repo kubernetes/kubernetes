@@ -17,6 +17,7 @@ limitations under the License.
 package checkpoint
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"time"
@@ -191,7 +192,7 @@ func (r *remoteConfigMap) Download(client clientset.Interface, store cache.Store
 	// if we didn't find the ConfigMap in the in-memory store, download it from the API server
 	if cm == nil {
 		utillog.Infof("attempting to download %s", r.APIPath())
-		cm, err = client.CoreV1().ConfigMaps(r.source.ConfigMap.Namespace).Get(r.source.ConfigMap.Name, metav1.GetOptions{})
+		cm, err = client.CoreV1().ConfigMaps(r.source.ConfigMap.Namespace).Get(context.TODO(), r.source.ConfigMap.Name, metav1.GetOptions{})
 		if err != nil {
 			return nil, status.DownloadError, fmt.Errorf("%s, error: %v", status.DownloadError, err)
 		}

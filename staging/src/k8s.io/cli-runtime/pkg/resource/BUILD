@@ -5,7 +5,9 @@ go_library(
     srcs = [
         "builder.go",
         "client.go",
+        "crd_finder.go",
         "doc.go",
+        "dry_run_verifier.go",
         "fake.go",
         "helper.go",
         "interfaces.go",
@@ -39,11 +41,14 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/watch:go_default_library",
         "//staging/src/k8s.io/cli-runtime/pkg/kustomize:go_default_library",
         "//staging/src/k8s.io/client-go/discovery:go_default_library",
+        "//staging/src/k8s.io/client-go/dynamic:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/scheme:go_default_library",
         "//staging/src/k8s.io/client-go/rest:go_default_library",
         "//staging/src/k8s.io/client-go/restmapper:go_default_library",
+        "//vendor/github.com/googleapis/gnostic/OpenAPIv2:go_default_library",
         "//vendor/golang.org/x/text/encoding/unicode:go_default_library",
         "//vendor/golang.org/x/text/transform:go_default_library",
+        "//vendor/gopkg.in/yaml.v2:go_default_library",
         "//vendor/sigs.k8s.io/kustomize/pkg/fs:go_default_library",
     ],
 )
@@ -52,6 +57,8 @@ go_test(
     name = "go_default_test",
     srcs = [
         "builder_test.go",
+        "crd_finder_test.go",
+        "dry_run_verifier_test.go",
         "helper_test.go",
         "scheme_test.go",
         "visitor_test.go",
@@ -81,7 +88,9 @@ go_test(
         "//staging/src/k8s.io/client-go/restmapper:go_default_library",
         "//staging/src/k8s.io/client-go/util/testing:go_default_library",
         "//vendor/github.com/davecgh/go-spew/spew:go_default_library",
+        "//vendor/github.com/googleapis/gnostic/OpenAPIv2:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
+        "//vendor/k8s.io/kube-openapi/pkg/util/proto/testing:go_default_library",
         "//vendor/sigs.k8s.io/yaml:go_default_library",
     ],
 )

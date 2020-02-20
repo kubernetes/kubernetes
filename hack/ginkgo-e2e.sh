@@ -14,6 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This script runs e2e tests on Google Cloud Platform.
+# Usage: `hack/ginkgo-e2e.sh`.
+
 set -o errexit
 set -o nounset
 set -o pipefail

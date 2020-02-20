@@ -17,6 +17,7 @@ limitations under the License.
 package windows
 
 import (
+	"context"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -48,7 +49,7 @@ var _ = SIGDescribe("[Feature:Windows] SecurityContext RunAsUserName", func() {
 		framework.Logf("Waiting for pod %s to enter the error state.", podInvalid.Name)
 		framework.ExpectNoError(f.WaitForPodTerminated(podInvalid.Name, ""))
 
-		podInvalid, _ = f.PodClient().Get(podInvalid.Name, metav1.GetOptions{})
+		podInvalid, _ = f.PodClient().Get(context.TODO(), podInvalid.Name, metav1.GetOptions{})
 		podTerminatedReason := testutils.TerminatedContainers(podInvalid)[runAsUserNameContainerName]
 		if podTerminatedReason != "ContainerCannotRun" && podTerminatedReason != "StartError" {
 			framework.Failf("The container terminated reason was supposed to be: 'ContainerCannotRun' or 'StartError', not: '%q'", podTerminatedReason)

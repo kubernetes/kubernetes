@@ -236,13 +236,6 @@
   - k8s.io/component-base/metrics
   - k8s.io/component-base/metrics/legacyregistry
 
-- baseImportPath: "./vendor/k8s.io/node-api/"
-  allowedImports:
-  - k8s.io/apimachinery
-  - k8s.io/client-go
-  - k8s.io/code-generator
-  - k8s.io/node-api
-
 - baseImportPath: "./vendor/k8s.io/csi-translation-lib/"
   allowedImports:
   - k8s.io/api

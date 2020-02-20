@@ -106,5 +106,5 @@ spec:
       - key: "CriticalAddonsOnly"
         operator: "Exists"
       nodeSelector:
-        beta.kubernetes.io/os: linux
+        kubernetes.io/os: linux
       serviceAccountName: kube-dns-autoscaler

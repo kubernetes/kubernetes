@@ -56,7 +56,7 @@ type LabelOptions struct {
 	overwrite       bool
 	list            bool
 	local           bool
-	dryrun          bool
+	dryRunStrategy  cmdutil.DryRunStrategy
 	all             bool
 	resourceVersion string
 	selector        string
@@ -74,6 +74,7 @@ type LabelOptions struct {
 	enforceNamespace             bool
 	builder                      *resource.Builder
 	unstructuredClientForMapping func(mapping *meta.RESTMapping) (resource.RESTClient, error)
+	dryRunVerifier               *resource.DryRunVerifier
 
 	// Common shared fields
 	genericclioptions.IOStreams
@@ -164,14 +165,23 @@ func (o *LabelOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 	}
 
 	o.outputFormat = cmdutil.GetFlagString(cmd, "output")
-	o.dryrun = cmdutil.GetDryRunFlag(cmd)
+	o.dryRunStrategy, err = cmdutil.GetDryRunStrategy(cmd)
+	if err != nil {
+		return err
+	}
+	dynamicClient, err := f.DynamicClient()
+	if err != nil {
+		return err
+	}
+	discoveryClient, err := f.ToDiscoveryClient()
+	if err != nil {
+		return err
+	}
+	o.dryRunVerifier = resource.NewDryRunVerifier(dynamicClient, discoveryClient)
 
+	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.dryRunStrategy)
 	o.ToPrinter = func(operation string) (printers.ResourcePrinter, error) {
 		o.PrintFlags.NamePrintFlags.Operation = operation
-		if o.dryrun {
-			o.PrintFlags.Complete("%s (dry run)")
-		}
-
 		return o.PrintFlags.ToPrinter()
 	}
 
@@ -201,6 +211,9 @@ func (o *LabelOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 
 // Validate checks to the LabelOptions to see if there is sufficient information run the command.
 func (o *LabelOptions) Validate() error {
+	if o.local && o.dryRunStrategy == cmdutil.DryRunServer {
+		return fmt.Errorf("cannot specify --local and --dry-run=server - did you mean --dry-run=client?")
+	}
 	if o.all && len(o.selector) > 0 {
 		return fmt.Errorf("cannot set --all and --selector at the same time")
 	}
@@ -267,7 +280,7 @@ func (o *LabelOptions) RunLabel() error {
 		if err != nil {
 			return err
 		}
-		if o.dryrun || o.local || o.list {
+		if o.dryRunStrategy == cmdutil.DryRunClient || o.local || o.list {
 			err = labelFunc(obj, o.overwrite, o.resourceVersion, o.newLabels, o.removeLabels)
 			if err != nil {
 				return err
@@ -311,11 +324,17 @@ func (o *LabelOptions) RunLabel() error {
 			}
 
 			mapping := info.ResourceMapping()
+			if o.dryRunStrategy == cmdutil.DryRunServer {
+				if err := o.dryRunVerifier.HasSupport(mapping.GroupVersionKind); err != nil {
+					return err
+				}
+			}
 			client, err := o.unstructuredClientForMapping(mapping)
 			if err != nil {
 				return err
 			}
-			helper := resource.NewHelper(client, mapping)
+			helper := resource.NewHelper(client, mapping).
+				DryRun(o.dryRunStrategy == cmdutil.DryRunServer)
 
 			if createdPatch {
 				outputObj, err = helper.Patch(namespace, name, types.MergePatchType, patchBytes, nil)

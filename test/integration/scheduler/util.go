@@ -83,7 +83,7 @@ func createAlgorithmSourceFromPolicy(policy *schedulerapi.Policy, clientSet clie
 		Data:       map[string]string{schedulerapi.SchedulerPolicyConfigMapKey: policyString},
 	}
 	policyConfigMap.APIVersion = "v1"
-	clientSet.CoreV1().ConfigMaps(metav1.NamespaceSystem).Create(&policyConfigMap)
+	clientSet.CoreV1().ConfigMaps(metav1.NamespaceSystem).Create(context.TODO(), &policyConfigMap, metav1.CreateOptions{})
 
 	return schedulerapi.SchedulerAlgorithmSource{
 		Policy: &schedulerapi.SchedulerPolicySource{
@@ -99,7 +99,7 @@ func createAlgorithmSourceFromPolicy(policy *schedulerapi.Policy, clientSet clie
 // configuration.
 func initTestMaster(t *testing.T, nsPrefix string, admission admission.Interface) *testContext {
 	ctx, cancelFunc := context.WithCancel(context.Background())
-	context := testContext{
+	testCtx := testContext{
 		ctx:      ctx,
 		cancelFn: cancelFunc,
 	}
@@ -117,16 +117,16 @@ func initTestMaster(t *testing.T, nsPrefix string, admission admission.Interface
 		masterConfig.GenericConfig.AdmissionControl = admission
 	}
 
-	_, context.httpServer, context.closeFn = framework.RunAMasterUsingServer(masterConfig, s, h)
+	_, testCtx.httpServer, testCtx.closeFn = framework.RunAMasterUsingServer(masterConfig, s, h)
 
 	if nsPrefix != "default" {
-		context.ns = framework.CreateTestingNamespace(nsPrefix+string(uuid.NewUUID()), s, t)
+		testCtx.ns = framework.CreateTestingNamespace(nsPrefix+string(uuid.NewUUID()), s, t)
 	} else {
-		context.ns = framework.CreateTestingNamespace("default", s, t)
+		testCtx.ns = framework.CreateTestingNamespace("default", s, t)
 	}
 
 	// 2. Create kubeclient
-	context.clientSet = clientset.NewForConfigOrDie(
+	testCtx.clientSet = clientset.NewForConfigOrDie(
 		&restclient.Config{
 			QPS: -1, Host: s.URL,
 			ContentConfig: restclient.ContentConfig{
@@ -134,60 +134,60 @@ func initTestMaster(t *testing.T, nsPrefix string, admission admission.Interface
 			},
 		},
 	)
-	return &context
+	return &testCtx
 }
 
 // initTestScheduler initializes a test environment and creates a scheduler with default
 // configuration.
 func initTestScheduler(
 	t *testing.T,
-	context *testContext,
+	testCtx *testContext,
 	setPodInformer bool,
 	policy *schedulerapi.Policy,
 ) *testContext {
 	// Pod preemption is enabled by default scheduler configuration.
-	return initTestSchedulerWithOptions(t, context, setPodInformer, policy, time.Second)
+	return initTestSchedulerWithOptions(t, testCtx, setPodInformer, policy, time.Second)
 }
 
 // initTestSchedulerWithOptions initializes a test environment and creates a scheduler with default
 // configuration and other options.
 func initTestSchedulerWithOptions(
 	t *testing.T,
-	context *testContext,
+	testCtx *testContext,
 	setPodInformer bool,
 	policy *schedulerapi.Policy,
 	resyncPeriod time.Duration,
 	opts ...scheduler.Option,
 ) *testContext {
 	// 1. Create scheduler
-	context.informerFactory = informers.NewSharedInformerFactory(context.clientSet, resyncPeriod)
+	testCtx.informerFactory = informers.NewSharedInformerFactory(testCtx.clientSet, resyncPeriod)
 
 	var podInformer coreinformers.PodInformer
 
 	// create independent pod informer if required
 	if setPodInformer {
-		podInformer = scheduler.NewPodInformer(context.clientSet, 12*time.Hour)
+		podInformer = scheduler.NewPodInformer(testCtx.clientSet, 12*time.Hour)
 	} else {
-		podInformer = context.informerFactory.Core().V1().Pods()
+		podInformer = testCtx.informerFactory.Core().V1().Pods()
 	}
 	var err error
 	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{
-		Interface: context.clientSet.EventsV1beta1().Events(""),
+		Interface: testCtx.clientSet.EventsV1beta1().Events(""),
 	})
 	recorder := eventBroadcaster.NewRecorder(
 		legacyscheme.Scheme,
 		v1.DefaultSchedulerName,
 	)
 	if policy != nil {
-		opts = append(opts, scheduler.WithAlgorithmSource(createAlgorithmSourceFromPolicy(policy, context.clientSet)))
+		opts = append(opts, scheduler.WithAlgorithmSource(createAlgorithmSourceFromPolicy(policy, testCtx.clientSet)))
 	}
 	opts = append([]scheduler.Option{scheduler.WithBindTimeoutSeconds(600)}, opts...)
-	context.scheduler, err = scheduler.New(
-		context.clientSet,
-		context.informerFactory,
+	testCtx.scheduler, err = scheduler.New(
+		testCtx.clientSet,
+		testCtx.informerFactory,
 		podInformer,
 		recorder,
-		context.ctx.Done(),
+		testCtx.ctx.Done(),
 		opts...,
 	)
 
@@ -197,31 +197,31 @@ func initTestSchedulerWithOptions(
 
 	// set setPodInformer if provided.
 	if setPodInformer {
-		go podInformer.Informer().Run(context.scheduler.StopEverything)
-		cache.WaitForNamedCacheSync("scheduler", context.scheduler.StopEverything, podInformer.Informer().HasSynced)
+		go podInformer.Informer().Run(testCtx.scheduler.StopEverything)
+		cache.WaitForNamedCacheSync("scheduler", testCtx.scheduler.StopEverything, podInformer.Informer().HasSynced)
 	}
 
 	stopCh := make(chan struct{})
 	eventBroadcaster.StartRecordingToSink(stopCh)
 
-	context.informerFactory.Start(context.scheduler.StopEverything)
-	context.informerFactory.WaitForCacheSync(context.scheduler.StopEverything)
+	testCtx.informerFactory.Start(testCtx.scheduler.StopEverything)
+	testCtx.informerFactory.WaitForCacheSync(testCtx.scheduler.StopEverything)
 
-	go context.scheduler.Run(context.ctx)
+	go testCtx.scheduler.Run(testCtx.ctx)
 
-	return context
+	return testCtx
 }
 
 // initDisruptionController initializes and runs a Disruption Controller to properly
 // update PodDisuptionBudget objects.
-func initDisruptionController(t *testing.T, context *testContext) *disruption.DisruptionController {
-	informers := informers.NewSharedInformerFactory(context.clientSet, 12*time.Hour)
+func initDisruptionController(t *testing.T, testCtx *testContext) *disruption.DisruptionController {
+	informers := informers.NewSharedInformerFactory(testCtx.clientSet, 12*time.Hour)
 
-	discoveryClient := cacheddiscovery.NewMemCacheClient(context.clientSet.Discovery())
+	discoveryClient := cacheddiscovery.NewMemCacheClient(testCtx.clientSet.Discovery())
 	mapper := restmapper.NewDeferredDiscoveryRESTMapper(discoveryClient)
 
-	config := restclient.Config{Host: context.httpServer.URL}
-	scaleKindResolver := scale.NewDiscoveryScaleKindResolver(context.clientSet.Discovery())
+	config := restclient.Config{Host: testCtx.httpServer.URL}
+	scaleKindResolver := scale.NewDiscoveryScaleKindResolver(testCtx.clientSet.Discovery())
 	scaleClient, err := scale.NewForConfig(&config, mapper, dynamic.LegacyAPIPathResolverFunc, scaleKindResolver)
 	if err != nil {
 		t.Fatalf("Error in create scaleClient: %v", err)
@@ -234,13 +234,13 @@ func initDisruptionController(t *testing.T, context *testContext) *disruption.Di
 		informers.Apps().V1().ReplicaSets(),
 		informers.Apps().V1().Deployments(),
 		informers.Apps().V1().StatefulSets(),
-		context.clientSet,
+		testCtx.clientSet,
 		mapper,
 		scaleClient)
 
-	informers.Start(context.scheduler.StopEverything)
-	informers.WaitForCacheSync(context.scheduler.StopEverything)
-	go dc.Run(context.scheduler.StopEverything)
+	informers.Start(testCtx.scheduler.StopEverything)
+	informers.WaitForCacheSync(testCtx.scheduler.StopEverything)
+	go dc.Run(testCtx.scheduler.StopEverything)
 	return dc
 }
 
@@ -260,13 +260,13 @@ func initTestDisablePreemption(t *testing.T, nsPrefix string) *testContext {
 
 // cleanupTest deletes the scheduler and the test namespace. It should be called
 // at the end of a test.
-func cleanupTest(t *testing.T, context *testContext) {
+func cleanupTest(t *testing.T, testCtx *testContext) {
 	// Kill the scheduler.
-	context.cancelFn()
+	testCtx.cancelFn()
 	// Cleanup nodes.
-	context.clientSet.CoreV1().Nodes().DeleteCollection(nil, metav1.ListOptions{})
-	framework.DeleteTestingNamespace(context.ns, context.httpServer, t)
-	context.closeFn()
+	testCtx.clientSet.CoreV1().Nodes().DeleteCollection(context.TODO(), nil, metav1.ListOptions{})
+	framework.DeleteTestingNamespace(testCtx.ns, testCtx.httpServer, t)
+	testCtx.closeFn()
 }
 
 // waitForReflection waits till the passFunc confirms that the object it expects
@@ -302,7 +302,7 @@ func waitForReflection(t *testing.T, nodeLister corelisters.NodeLister, key stri
 // nodeHasLabels returns a function that checks if a node has all the given labels.
 func nodeHasLabels(cs clientset.Interface, nodeName string, labels map[string]string) wait.ConditionFunc {
 	return func() (bool, error) {
-		node, err := cs.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+		node, err := cs.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 		if err != nil {
 			// This could be a connection error so we want to retry.
 			return false, nil
@@ -344,17 +344,17 @@ func initNode(name string, res *v1.ResourceList, images []v1.ContainerImage) *v1
 
 // createNode creates a node with the given resource list.
 func createNode(cs clientset.Interface, name string, res *v1.ResourceList) (*v1.Node, error) {
-	return cs.CoreV1().Nodes().Create(initNode(name, res, nil))
+	return cs.CoreV1().Nodes().Create(context.TODO(), initNode(name, res, nil), metav1.CreateOptions{})
 }
 
 // createNodeWithImages creates a node with the given resource list and images.
 func createNodeWithImages(cs clientset.Interface, name string, res *v1.ResourceList, images []v1.ContainerImage) (*v1.Node, error) {
-	return cs.CoreV1().Nodes().Create(initNode(name, res, images))
+	return cs.CoreV1().Nodes().Create(context.TODO(), initNode(name, res, images), metav1.CreateOptions{})
 }
 
 // updateNodeStatus updates the status of node.
 func updateNodeStatus(cs clientset.Interface, node *v1.Node) error {
-	_, err := cs.CoreV1().Nodes().UpdateStatus(node)
+	_, err := cs.CoreV1().Nodes().UpdateStatus(context.TODO(), node, metav1.UpdateOptions{})
 	return err
 }
 
@@ -377,7 +377,7 @@ func createNodes(cs clientset.Interface, prefix string, res *v1.ResourceList, nu
 // the taints.
 func nodeTainted(cs clientset.Interface, nodeName string, taints []v1.Taint) wait.ConditionFunc {
 	return func() (bool, error) {
-		node, err := cs.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+		node, err := cs.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -398,13 +398,13 @@ func nodeTainted(cs clientset.Interface, nodeName string, taints []v1.Taint) wai
 }
 
 func addTaintToNode(cs clientset.Interface, nodeName string, taint v1.Taint) error {
-	node, err := cs.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+	node, err := cs.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
 	copy := node.DeepCopy()
 	copy.Spec.Taints = append(copy.Spec.Taints, taint)
-	_, err = cs.CoreV1().Nodes().Update(copy)
+	_, err = cs.CoreV1().Nodes().Update(context.TODO(), copy, metav1.UpdateOptions{})
 	return err
 }
 
@@ -416,8 +416,7 @@ func waitForNodeTaints(cs clientset.Interface, node *v1.Node, taints []v1.Taint)
 
 // cleanupNodes deletes all nodes.
 func cleanupNodes(cs clientset.Interface, t *testing.T) {
-	err := cs.CoreV1().Nodes().DeleteCollection(
-		metav1.NewDeleteOptions(0), metav1.ListOptions{})
+	err := cs.CoreV1().Nodes().DeleteCollection(context.TODO(), metav1.NewDeleteOptions(0), metav1.ListOptions{})
 	if err != nil {
 		t.Errorf("error while deleting all nodes: %v", err)
 	}
@@ -471,7 +470,7 @@ func initPausePod(cs clientset.Interface, conf *pausePodConfig) *v1.Pod {
 // createPausePod creates a pod with "Pause" image and the given config and
 // return its pointer and error status.
 func createPausePod(cs clientset.Interface, p *v1.Pod) (*v1.Pod, error) {
-	return cs.CoreV1().Pods(p.Namespace).Create(p)
+	return cs.CoreV1().Pods(p.Namespace).Create(context.TODO(), p, metav1.CreateOptions{})
 }
 
 // createPausePodWithResource creates a pod with "Pause" image and the given
@@ -500,14 +499,14 @@ func createPausePodWithResource(cs clientset.Interface, podName string,
 // runPausePod creates a pod with "Pause" image and the given config and waits
 // until it is scheduled. It returns its pointer and error status.
 func runPausePod(cs clientset.Interface, pod *v1.Pod) (*v1.Pod, error) {
-	pod, err := cs.CoreV1().Pods(pod.Namespace).Create(pod)
+	pod, err := cs.CoreV1().Pods(pod.Namespace).Create(context.TODO(), pod, metav1.CreateOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("Error creating pause pod: %v", err)
 	}
 	if err = waitForPodToSchedule(cs, pod); err != nil {
 		return pod, fmt.Errorf("Pod %v/%v didn't schedule successfully. Error: %v", pod.Namespace, pod.Name, err)
 	}
-	if pod, err = cs.CoreV1().Pods(pod.Namespace).Get(pod.Name, metav1.GetOptions{}); err != nil {
+	if pod, err = cs.CoreV1().Pods(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{}); err != nil {
 		return pod, fmt.Errorf("Error getting pod %v/%v info: %v", pod.Namespace, pod.Name, err)
 	}
 	return pod, nil
@@ -537,14 +536,14 @@ func initPodWithContainers(cs clientset.Interface, conf *podWithContainersConfig
 // runPodWithContainers creates a pod with given config and containers and waits
 // until it is scheduled. It returns its pointer and error status.
 func runPodWithContainers(cs clientset.Interface, pod *v1.Pod) (*v1.Pod, error) {
-	pod, err := cs.CoreV1().Pods(pod.Namespace).Create(pod)
+	pod, err := cs.CoreV1().Pods(pod.Namespace).Create(context.TODO(), pod, metav1.CreateOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("Error creating pod-with-containers: %v", err)
 	}
 	if err = waitForPodToSchedule(cs, pod); err != nil {
 		return pod, fmt.Errorf("Pod %v didn't schedule successfully. Error: %v", pod.Name, err)
 	}
-	if pod, err = cs.CoreV1().Pods(pod.Namespace).Get(pod.Name, metav1.GetOptions{}); err != nil {
+	if pod, err = cs.CoreV1().Pods(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{}); err != nil {
 		return pod, fmt.Errorf("Error getting pod %v info: %v", pod.Name, err)
 	}
 	return pod, nil
@@ -553,7 +552,7 @@ func runPodWithContainers(cs clientset.Interface, pod *v1.Pod) (*v1.Pod, error) 
 // podDeleted returns true if a pod is not found in the given namespace.
 func podDeleted(c clientset.Interface, podNamespace, podName string) wait.ConditionFunc {
 	return func() (bool, error) {
-		pod, err := c.CoreV1().Pods(podNamespace).Get(podName, metav1.GetOptions{})
+		pod, err := c.CoreV1().Pods(podNamespace).Get(context.TODO(), podName, metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
 			return true, nil
 		}
@@ -567,7 +566,7 @@ func podDeleted(c clientset.Interface, podNamespace, podName string) wait.Condit
 // podIsGettingEvicted returns true if the pod's deletion timestamp is set.
 func podIsGettingEvicted(c clientset.Interface, podNamespace, podName string) wait.ConditionFunc {
 	return func() (bool, error) {
-		pod, err := c.CoreV1().Pods(podNamespace).Get(podName, metav1.GetOptions{})
+		pod, err := c.CoreV1().Pods(podNamespace).Get(context.TODO(), podName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -581,7 +580,7 @@ func podIsGettingEvicted(c clientset.Interface, podNamespace, podName string) wa
 // podScheduled returns true if a node is assigned to the given pod.
 func podScheduled(c clientset.Interface, podNamespace, podName string) wait.ConditionFunc {
 	return func() (bool, error) {
-		pod, err := c.CoreV1().Pods(podNamespace).Get(podName, metav1.GetOptions{})
+		pod, err := c.CoreV1().Pods(podNamespace).Get(context.TODO(), podName, metav1.GetOptions{})
 		if err != nil {
 			// This could be a connection error so we want to retry.
 			return false, nil
@@ -596,7 +595,7 @@ func podScheduled(c clientset.Interface, podNamespace, podName string) wait.Cond
 // podScheduledIn returns true if a given pod is placed onto one of the expected nodes.
 func podScheduledIn(c clientset.Interface, podNamespace, podName string, nodeNames []string) wait.ConditionFunc {
 	return func() (bool, error) {
-		pod, err := c.CoreV1().Pods(podNamespace).Get(podName, metav1.GetOptions{})
+		pod, err := c.CoreV1().Pods(podNamespace).Get(context.TODO(), podName, metav1.GetOptions{})
 		if err != nil {
 			// This could be a connection error so we want to retry.
 			return false, nil
@@ -617,7 +616,7 @@ func podScheduledIn(c clientset.Interface, podNamespace, podName string, nodeNam
 // gets unschedulable status.
 func podUnschedulable(c clientset.Interface, podNamespace, podName string) wait.ConditionFunc {
 	return func() (bool, error) {
-		pod, err := c.CoreV1().Pods(podNamespace).Get(podName, metav1.GetOptions{})
+		pod, err := c.CoreV1().Pods(podNamespace).Get(context.TODO(), podName, metav1.GetOptions{})
 		if err != nil {
 			// This could be a connection error so we want to retry.
 			return false, nil
@@ -633,7 +632,7 @@ func podUnschedulable(c clientset.Interface, podNamespace, podName string) wait.
 // records such reasons in case of error.
 func podSchedulingError(c clientset.Interface, podNamespace, podName string) wait.ConditionFunc {
 	return func() (bool, error) {
-		pod, err := c.CoreV1().Pods(podNamespace).Get(podName, metav1.GetOptions{})
+		pod, err := c.CoreV1().Pods(podNamespace).Get(context.TODO(), podName, metav1.GetOptions{})
 		if err != nil {
 			// This could be a connection error so we want to retry.
 			return false, nil
@@ -670,9 +669,9 @@ func waitForPodUnschedulable(cs clientset.Interface, pod *v1.Pod) error {
 
 // waitForPDBsStable waits for PDBs to have "CurrentHealthy" status equal to
 // the expected values.
-func waitForPDBsStable(context *testContext, pdbs []*policy.PodDisruptionBudget, pdbPodNum []int32) error {
+func waitForPDBsStable(testCtx *testContext, pdbs []*policy.PodDisruptionBudget, pdbPodNum []int32) error {
 	return wait.Poll(time.Second, 60*time.Second, func() (bool, error) {
-		pdbList, err := context.clientSet.PolicyV1beta1().PodDisruptionBudgets(context.ns.Name).List(metav1.ListOptions{})
+		pdbList, err := testCtx.clientSet.PolicyV1beta1().PodDisruptionBudgets(testCtx.ns.Name).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -698,9 +697,9 @@ func waitForPDBsStable(context *testContext, pdbs []*policy.PodDisruptionBudget,
 }
 
 // waitCachedPodsStable waits until scheduler cache has the given pods.
-func waitCachedPodsStable(context *testContext, pods []*v1.Pod) error {
+func waitCachedPodsStable(testCtx *testContext, pods []*v1.Pod) error {
 	return wait.Poll(time.Second, 30*time.Second, func() (bool, error) {
-		cachedPods, err := context.scheduler.SchedulerCache.List(labels.Everything())
+		cachedPods, err := testCtx.scheduler.SchedulerCache.List(labels.Everything())
 		if err != nil {
 			return false, err
 		}
@@ -708,11 +707,11 @@ func waitCachedPodsStable(context *testContext, pods []*v1.Pod) error {
 			return false, nil
 		}
 		for _, p := range pods {
-			actualPod, err1 := context.clientSet.CoreV1().Pods(p.Namespace).Get(p.Name, metav1.GetOptions{})
+			actualPod, err1 := testCtx.clientSet.CoreV1().Pods(p.Namespace).Get(context.TODO(), p.Name, metav1.GetOptions{})
 			if err1 != nil {
 				return false, err1
 			}
-			cachedPod, err2 := context.scheduler.SchedulerCache.GetPod(actualPod)
+			cachedPod, err2 := testCtx.scheduler.SchedulerCache.GetPod(actualPod)
 			if err2 != nil || cachedPod == nil {
 				return false, err2
 			}
@@ -723,17 +722,17 @@ func waitCachedPodsStable(context *testContext, pods []*v1.Pod) error {
 
 // deletePod deletes the given pod in the given namespace.
 func deletePod(cs clientset.Interface, podName string, nsName string) error {
-	return cs.CoreV1().Pods(nsName).Delete(podName, metav1.NewDeleteOptions(0))
+	return cs.CoreV1().Pods(nsName).Delete(context.TODO(), podName, metav1.NewDeleteOptions(0))
 }
 
 func getPod(cs clientset.Interface, podName string, podNamespace string) (*v1.Pod, error) {
-	return cs.CoreV1().Pods(podNamespace).Get(podName, metav1.GetOptions{})
+	return cs.CoreV1().Pods(podNamespace).Get(context.TODO(), podName, metav1.GetOptions{})
 }
 
 // cleanupPods deletes the given pods and waits for them to be actually deleted.
 func cleanupPods(cs clientset.Interface, t *testing.T, pods []*v1.Pod) {
 	for _, p := range pods {
-		err := cs.CoreV1().Pods(p.Namespace).Delete(p.Name, metav1.NewDeleteOptions(0))
+		err := cs.CoreV1().Pods(p.Namespace).Delete(context.TODO(), p.Name, metav1.NewDeleteOptions(0))
 		if err != nil && !apierrors.IsNotFound(err) {
 			t.Errorf("error while deleting pod %v/%v: %v", p.Namespace, p.Name, err)
 		}
@@ -749,7 +748,7 @@ func cleanupPods(cs clientset.Interface, t *testing.T, pods []*v1.Pod) {
 // noPodsInNamespace returns true if no pods in the given namespace.
 func noPodsInNamespace(c clientset.Interface, podNamespace string) wait.ConditionFunc {
 	return func() (bool, error) {
-		pods, err := c.CoreV1().Pods(podNamespace).List(metav1.ListOptions{})
+		pods, err := c.CoreV1().Pods(podNamespace).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -761,7 +760,7 @@ func noPodsInNamespace(c clientset.Interface, podNamespace string) wait.Conditio
 // cleanupPodsInNamespace deletes the pods in the given namespace and waits for them to
 // be actually deleted.
 func cleanupPodsInNamespace(cs clientset.Interface, t *testing.T, ns string) {
-	if err := cs.CoreV1().Pods(ns).DeleteCollection(nil, metav1.ListOptions{}); err != nil {
+	if err := cs.CoreV1().Pods(ns).DeleteCollection(context.TODO(), nil, metav1.ListOptions{}); err != nil {
 		t.Errorf("error while listing pod in namespace %v: %v", ns, err)
 		return
 	}
@@ -774,9 +773,9 @@ func cleanupPodsInNamespace(cs clientset.Interface, t *testing.T, ns string) {
 
 func waitForSchedulerCacheCleanup(sched *scheduler.Scheduler, t *testing.T) {
 	schedulerCacheIsEmpty := func() (bool, error) {
-		snapshot := sched.Cache().Snapshot()
+		dump := sched.Cache().Dump()
 
-		return len(snapshot.Nodes) == 0 && len(snapshot.AssumedPods) == 0, nil
+		return len(dump.Nodes) == 0 && len(dump.AssumedPods) == 0, nil
 	}
 
 	if err := wait.Poll(time.Second, wait.ForeverTestTimeout, schedulerCacheIsEmpty); err != nil {

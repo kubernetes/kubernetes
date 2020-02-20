@@ -17,6 +17,7 @@ limitations under the License.
 package apimachinery
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -114,7 +115,7 @@ var alternativeAPIVersions = []apiextensionsv1.CustomResourceDefinitionVersion{
 }
 
 var _ = SIGDescribe("CustomResourceConversionWebhook [Privileged:ClusterAdmin]", func() {
-	var context *certContext
+	var certCtx *certContext
 	f := framework.NewDefaultFramework("crd-webhook")
 	servicePort := int32(9443)
 	containerPort := int32(9444)
@@ -127,10 +128,10 @@ var _ = SIGDescribe("CustomResourceConversionWebhook [Privileged:ClusterAdmin]",
 		namespaceName = f.Namespace.Name
 
 		ginkgo.By("Setting up server cert")
-		context = setupServerCert(f.Namespace.Name, serviceCRDName)
+		certCtx = setupServerCert(f.Namespace.Name, serviceCRDName)
 		createAuthReaderRoleBindingForCRDConversion(f, f.Namespace.Name)
 
-		deployCustomResourceWebhookAndService(f, imageutils.GetE2EImage(imageutils.Agnhost), context, servicePort, containerPort)
+		deployCustomResourceWebhookAndService(f, imageutils.GetE2EImage(imageutils.Agnhost), certCtx, servicePort, containerPort)
 	})
 
 	ginkgo.AfterEach(func() {
@@ -150,7 +151,7 @@ var _ = SIGDescribe("CustomResourceConversionWebhook [Privileged:ClusterAdmin]",
 				Strategy: apiextensionsv1.WebhookConverter,
 				Webhook: &apiextensionsv1.WebhookConversion{
 					ClientConfig: &apiextensionsv1.WebhookClientConfig{
-						CABundle: context.signingCert,
+						CABundle: certCtx.signingCert,
 						Service: &apiextensionsv1.ServiceReference{
 							Namespace: f.Namespace.Name,
 							Name:      serviceCRDName,
@@ -185,7 +186,7 @@ var _ = SIGDescribe("CustomResourceConversionWebhook [Privileged:ClusterAdmin]",
 				Strategy: apiextensionsv1.WebhookConverter,
 				Webhook: &apiextensionsv1.WebhookConversion{
 					ClientConfig: &apiextensionsv1.WebhookClientConfig{
-						CABundle: context.signingCert,
+						CABundle: certCtx.signingCert,
 						Service: &apiextensionsv1.ServiceReference{
 							Namespace: f.Namespace.Name,
 							Name:      serviceCRDName,
@@ -208,17 +209,17 @@ var _ = SIGDescribe("CustomResourceConversionWebhook [Privileged:ClusterAdmin]",
 })
 
 func cleanCRDWebhookTest(client clientset.Interface, namespaceName string) {
-	_ = client.CoreV1().Services(namespaceName).Delete(serviceCRDName, nil)
-	_ = client.AppsV1().Deployments(namespaceName).Delete(deploymentCRDName, nil)
-	_ = client.CoreV1().Secrets(namespaceName).Delete(secretCRDName, nil)
-	_ = client.RbacV1().RoleBindings("kube-system").Delete(roleBindingCRDName, nil)
+	_ = client.CoreV1().Services(namespaceName).Delete(context.TODO(), serviceCRDName, nil)
+	_ = client.AppsV1().Deployments(namespaceName).Delete(context.TODO(), deploymentCRDName, nil)
+	_ = client.CoreV1().Secrets(namespaceName).Delete(context.TODO(), secretCRDName, nil)
+	_ = client.RbacV1().RoleBindings("kube-system").Delete(context.TODO(), roleBindingCRDName, nil)
 }
 
 func createAuthReaderRoleBindingForCRDConversion(f *framework.Framework, namespace string) {
 	ginkgo.By("Create role binding to let cr conversion webhook read extension-apiserver-authentication")
 	client := f.ClientSet
 	// Create the role binding to allow the webhook read the extension-apiserver-authentication configmap
-	_, err := client.RbacV1().RoleBindings("kube-system").Create(&rbacv1.RoleBinding{
+	_, err := client.RbacV1().RoleBindings("kube-system").Create(context.TODO(), &rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: roleBindingCRDName,
 		},
@@ -227,7 +228,7 @@ func createAuthReaderRoleBindingForCRDConversion(f *framework.Framework, namespa
 			Kind:     "Role",
 			Name:     "extension-apiserver-authentication-reader",
 		},
-		// Webhook uses the default service account.
+
 		Subjects: []rbacv1.Subject{
 			{
 				Kind:      "ServiceAccount",
@@ -235,7 +236,7 @@ func createAuthReaderRoleBindingForCRDConversion(f *framework.Framework, namespa
 				Namespace: namespace,
 			},
 		},
-	})
+	}, metav1.CreateOptions{})
 	if err != nil && apierrors.IsAlreadyExists(err) {
 		framework.Logf("role binding %s already exists", roleBindingCRDName)
 	} else {
@@ -243,7 +244,7 @@ func createAuthReaderRoleBindingForCRDConversion(f *framework.Framework, namespa
 	}
 }
 
-func deployCustomResourceWebhookAndService(f *framework.Framework, image string, context *certContext, servicePort int32, containerPort int32) {
+func deployCustomResourceWebhookAndService(f *framework.Framework, image string, certCtx *certContext, servicePort int32, containerPort int32) {
 	ginkgo.By("Deploying the custom resource conversion webhook pod")
 	client := f.ClientSet
 
@@ -254,12 +255,12 @@ func deployCustomResourceWebhookAndService(f *framework.Framework, image string,
 		},
 		Type: v1.SecretTypeOpaque,
 		Data: map[string][]byte{
-			"tls.crt": context.cert,
-			"tls.key": context.key,
+			"tls.crt": certCtx.cert,
+			"tls.key": certCtx.key,
 		},
 	}
 	namespace := f.Namespace.Name
-	_, err := client.CoreV1().Secrets(namespace).Create(secret)
+	_, err := client.CoreV1().Secrets(namespace).Create(context.TODO(), secret, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "creating secret %q in namespace %q", secretName, namespace)
 
 	// Create the deployment of the webhook
@@ -335,7 +336,7 @@ func deployCustomResourceWebhookAndService(f *framework.Framework, image string,
 			},
 		},
 	}
-	deployment, err := client.AppsV1().Deployments(namespace).Create(d)
+	deployment, err := client.AppsV1().Deployments(namespace).Create(context.TODO(), d, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "creating deployment %s in namespace %s", deploymentCRDName, namespace)
 	ginkgo.By("Wait for the deployment to be ready")
 	err = e2edeploy.WaitForDeploymentRevisionAndImage(client, namespace, deploymentCRDName, "1", image)
@@ -363,7 +364,7 @@ func deployCustomResourceWebhookAndService(f *framework.Framework, image string,
 			},
 		},
 	}
-	_, err = client.CoreV1().Services(namespace).Create(service)
+	_, err = client.CoreV1().Services(namespace).Create(context.TODO(), service, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "creating service %s in namespace %s", serviceCRDName, namespace)
 
 	ginkgo.By("Verifying the service has paired with the endpoint")

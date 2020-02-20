@@ -21,9 +21,9 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -52,7 +52,7 @@ var (
 	kubectl set serviceaccount deployment nginx-deployment serviceaccount1
 
 	# Print the result (in yaml format) of updated nginx deployment with serviceaccount from local file, without hitting apiserver
-	kubectl set sa -f nginx-deployment.yaml serviceaccount1 --local --dry-run -o yaml
+	kubectl set sa -f nginx-deployment.yaml serviceaccount1 --local --dry-run=client -o yaml
 	`))
 )
 
@@ -62,7 +62,8 @@ type SetServiceAccountOptions struct {
 	RecordFlags *genericclioptions.RecordFlags
 
 	fileNameOptions        resource.FilenameOptions
-	dryRun                 bool
+	dryRunStrategy         cmdutil.DryRunStrategy
+	dryRunVerifier         *resource.DryRunVerifier
 	shortOutput            bool
 	all                    bool
 	output                 string
@@ -128,13 +129,26 @@ func (o *SetServiceAccountOptions) Complete(f cmdutil.Factory, cmd *cobra.Comman
 	}
 
 	o.shortOutput = cmdutil.GetFlagString(cmd, "output") == "name"
-	o.dryRun = cmdutil.GetDryRunFlag(cmd)
+	o.dryRunStrategy, err = cmdutil.GetDryRunStrategy(cmd)
+	if err != nil {
+		return err
+	}
+	if o.local && o.dryRunStrategy == cmdutil.DryRunServer {
+		return fmt.Errorf("cannot specify --local and --dry-run=server - did you mean --dry-run=client?")
+	}
+	dynamicClient, err := f.DynamicClient()
+	if err != nil {
+		return err
+	}
+	discoveryClient, err := f.ToDiscoveryClient()
+	if err != nil {
+		return err
+	}
+	o.dryRunVerifier = resource.NewDryRunVerifier(dynamicClient, discoveryClient)
 	o.output = cmdutil.GetFlagString(cmd, "output")
 	o.updatePodSpecForObject = polymorphichelpers.UpdatePodSpecForObjectFn
 
-	if o.dryRun {
-		o.PrintFlags.Complete("%s (dry run)")
-	}
+	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.dryRunStrategy)
 	printer, err := o.PrintFlags.ToPrinter()
 	if err != nil {
 		return err
@@ -195,13 +209,22 @@ func (o *SetServiceAccountOptions) Run() error {
 			patchErrs = append(patchErrs, fmt.Errorf("error: %s %v\n", name, patch.Err))
 			continue
 		}
-		if o.local || o.dryRun {
+		if o.local || o.dryRunStrategy == cmdutil.DryRunClient {
 			if err := o.PrintObj(info.Object, o.Out); err != nil {
 				patchErrs = append(patchErrs, err)
 			}
 			continue
 		}
-		actual, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch, nil)
+		if o.dryRunStrategy == cmdutil.DryRunServer {
+			if err := o.dryRunVerifier.HasSupport(info.Mapping.GroupVersionKind); err != nil {
+				patchErrs = append(patchErrs, err)
+				continue
+			}
+		}
+		actual, err := resource.
+			NewHelper(info.Client, info.Mapping).
+			DryRun(o.dryRunStrategy == cmdutil.DryRunServer).
+			Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch, nil)
 		if err != nil {
 			patchErrs = append(patchErrs, fmt.Errorf("failed to patch ServiceAccountName %v", err))
 			continue

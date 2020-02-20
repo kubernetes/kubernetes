@@ -17,6 +17,7 @@ limitations under the License.
 package bootstrap
 
 import (
+	"context"
 	"strings"
 	"time"
 
@@ -26,6 +27,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -242,7 +244,7 @@ func (e *Signer) signConfigMap() {
 }
 
 func (e *Signer) updateConfigMap(cm *v1.ConfigMap) {
-	_, err := e.client.CoreV1().ConfigMaps(cm.Namespace).Update(cm)
+	_, err := e.client.CoreV1().ConfigMaps(cm.Namespace).Update(context.TODO(), cm, metav1.UpdateOptions{})
 	if err != nil && !apierrors.IsConflict(err) && !apierrors.IsNotFound(err) {
 		klog.V(3).Infof("Error updating ConfigMap: %v", err)
 	}

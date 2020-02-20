@@ -35,6 +35,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	cloudprovider "k8s.io/cloud-provider"
+	azcache "k8s.io/legacy-cloud-providers/azure/cache"
 	"k8s.io/legacy-cloud-providers/azure/retry"
 )
 
@@ -292,6 +293,10 @@ func (fIC *fakeAzureInterfacesClient) GetVirtualMachineScaleSetNetworkInterface(
 		errors.New("Not such Interface"))
 }
 
+func (fIC *fakeAzureInterfacesClient) Delete(ctx context.Context, resourceGroupName string, networkInterfaceName string) *retry.Error {
+	return nil
+}
+
 func (fIC *fakeAzureInterfacesClient) setFakeStore(store map[string]map[string]network.Interface) {
 	fIC.mutex.Lock()
 	defer fIC.mutex.Unlock()
@@ -361,6 +366,10 @@ func (fVMC *fakeAzureVirtualMachinesClient) List(ctx context.Context, resourceGr
 	}
 
 	return result, nil
+}
+
+func (fVMC *fakeAzureVirtualMachinesClient) Delete(ctx context.Context, resourceGroupName string, VMName string) *retry.Error {
+	return nil
 }
 
 func (fVMC *fakeAzureVirtualMachinesClient) setFakeStore(store map[string]map[string]compute.VirtualMachine) {
@@ -661,6 +670,10 @@ func (fVMSSC *fakeVirtualMachineScaleSetsClient) UpdateInstances(ctx context.Con
 	return nil
 }
 
+func (fVMSSC *fakeVirtualMachineScaleSetsClient) DeleteInstances(ctx context.Context, resourceGroupName string, vmScaleSetName string, vmInstanceIDs compute.VirtualMachineScaleSetVMInstanceRequiredIDs) *retry.Error {
+	return nil
+}
+
 type fakeRoutesClient struct {
 	mutex     *sync.Mutex
 	FakeStore map[string]map[string]network.Route
@@ -772,7 +785,7 @@ type fakeStorageAccountClient struct {
 	mutex     *sync.Mutex
 	FakeStore map[string]map[string]storage.Account
 	Keys      storage.AccountListKeysResult
-	Accounts  storage.AccountListResult
+	Accounts  []storage.Account
 	Err       error
 }
 
@@ -825,7 +838,7 @@ func (fSAC *fakeStorageAccountClient) ListKeys(ctx context.Context, resourceGrou
 	return fSAC.Keys, nil
 }
 
-func (fSAC *fakeStorageAccountClient) ListByResourceGroup(ctx context.Context, resourceGroupName string) (result storage.AccountListResult, err *retry.Error) {
+func (fSAC *fakeStorageAccountClient) ListByResourceGroup(ctx context.Context, resourceGroupName string) (result []storage.Account, err *retry.Error) {
 	return fSAC.Accounts, nil
 }
 
@@ -963,7 +976,7 @@ func (f *fakeVMSet) EnsureBackendPoolDeleted(service *v1.Service, backendPoolID,
 	return fmt.Errorf("unimplemented")
 }
 
-func (f *fakeVMSet) AttachDisk(isManagedDisk bool, diskName, diskURI string, nodeName types.NodeName, lun int32, cachingMode compute.CachingTypes, diskEncryptionSetID string) error {
+func (f *fakeVMSet) AttachDisk(isManagedDisk bool, diskName, diskURI string, nodeName types.NodeName, lun int32, cachingMode compute.CachingTypes, diskEncryptionSetID string, writeAcceleratorEnabled bool) error {
 	return fmt.Errorf("unimplemented")
 }
 
@@ -971,7 +984,7 @@ func (f *fakeVMSet) DetachDisk(diskName, diskURI string, nodeName types.NodeName
 	return fmt.Errorf("unimplemented")
 }
 
-func (f *fakeVMSet) GetDataDisks(nodeName types.NodeName, crt cacheReadType) ([]compute.DataDisk, error) {
+func (f *fakeVMSet) GetDataDisks(nodeName types.NodeName, crt azcache.AzureCacheReadType) ([]compute.DataDisk, error) {
 	return nil, fmt.Errorf("unimplemented")
 }
 

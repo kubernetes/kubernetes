@@ -39,8 +39,9 @@ func (p *nonePolicy) Name() string {
 	return string(PolicyNone)
 }
 
-func (p *nonePolicy) Start(s state.State) {
+func (p *nonePolicy) Start(s state.State) error {
 	klog.Info("[cpumanager] none policy: Start")
+	return nil
 }
 
 func (p *nonePolicy) AddContainer(s state.State, pod *v1.Pod, container *v1.Container) error {
@@ -51,6 +52,6 @@ func (p *nonePolicy) RemoveContainer(s state.State, podUID string, containerName
 	return nil
 }
 
-func (p *nonePolicy) GetTopologyHints(s state.State, pod v1.Pod, container v1.Container) map[string][]topologymanager.TopologyHint {
+func (p *nonePolicy) GetTopologyHints(s state.State, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
 	return nil
 }

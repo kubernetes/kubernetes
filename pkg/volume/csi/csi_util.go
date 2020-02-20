@@ -17,6 +17,7 @@ limitations under the License.
 package csi
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -43,7 +44,7 @@ const (
 
 func getCredentialsFromSecret(k8s kubernetes.Interface, secretRef *api.SecretReference) (map[string]string, error) {
 	credentials := map[string]string{}
-	secret, err := k8s.CoreV1().Secrets(secretRef.Namespace).Get(secretRef.Name, meta.GetOptions{})
+	secret, err := k8s.CoreV1().Secrets(secretRef.Namespace).Get(context.TODO(), secretRef.Name, meta.GetOptions{})
 	if err != nil {
 		return credentials, errors.New(log("failed to find the secret %s in the namespace %s with error: %v", secretRef.Name, secretRef.Namespace, err))
 	}
@@ -107,20 +108,24 @@ func log(msg string, parts ...interface{}) string {
 	return fmt.Sprintf(fmt.Sprintf("%s: %s", CSIPluginName, msg), parts...)
 }
 
+// getVolumePluginDir returns the path where CSI plugin keeps metadata for given volume
+func getVolumePluginDir(specVolID string, host volume.VolumeHost) string {
+	sanitizedSpecVolID := utilstrings.EscapeQualifiedName(specVolID)
+	return filepath.Join(host.GetVolumeDevicePluginDir(CSIPluginName), sanitizedSpecVolID)
+}
+
 // getVolumeDevicePluginDir returns the path where the CSI plugin keeps the
 // symlink for a block device associated with a given specVolumeID.
 // path: plugins/kubernetes.io/csi/volumeDevices/{specVolumeID}/dev
 func getVolumeDevicePluginDir(specVolID string, host volume.VolumeHost) string {
-	sanitizedSpecVolID := utilstrings.EscapeQualifiedName(specVolID)
-	return filepath.Join(host.GetVolumeDevicePluginDir(CSIPluginName), sanitizedSpecVolID, "dev")
+	return filepath.Join(getVolumePluginDir(specVolID, host), "dev")
 }
 
 // getVolumeDeviceDataDir returns the path where the CSI plugin keeps the
 // volume data for a block device associated with a given specVolumeID.
 // path: plugins/kubernetes.io/csi/volumeDevices/{specVolumeID}/data
 func getVolumeDeviceDataDir(specVolID string, host volume.VolumeHost) string {
-	sanitizedSpecVolID := utilstrings.EscapeQualifiedName(specVolID)
-	return filepath.Join(host.GetVolumeDevicePluginDir(CSIPluginName), sanitizedSpecVolID, "data")
+	return filepath.Join(getVolumePluginDir(specVolID, host), "data")
 }
 
 // hasReadWriteOnce returns true if modes contains v1.ReadWriteOnce

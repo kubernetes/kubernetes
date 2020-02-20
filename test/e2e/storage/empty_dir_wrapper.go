@@ -17,6 +17,7 @@ limitations under the License.
 package storage
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 
@@ -77,7 +78,7 @@ var _ = utils.SIGDescribe("EmptyDir wrapper volumes", func() {
 		}
 
 		var err error
-		if secret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(secret); err != nil {
+		if secret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(context.TODO(), secret, metav1.CreateOptions{}); err != nil {
 			framework.Failf("unable to create test secret %s: %v", secret.Name, err)
 		}
 
@@ -94,7 +95,7 @@ var _ = utils.SIGDescribe("EmptyDir wrapper volumes", func() {
 			},
 		}
 
-		if configMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(configMap); err != nil {
+		if configMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(context.TODO(), configMap, metav1.CreateOptions{}); err != nil {
 			framework.Failf("unable to create test configMap %s: %v", configMap.Name, err)
 		}
 
@@ -146,15 +147,15 @@ var _ = utils.SIGDescribe("EmptyDir wrapper volumes", func() {
 
 		defer func() {
 			ginkgo.By("Cleaning up the secret")
-			if err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Delete(secret.Name, nil); err != nil {
+			if err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Delete(context.TODO(), secret.Name, nil); err != nil {
 				framework.Failf("unable to delete secret %v: %v", secret.Name, err)
 			}
 			ginkgo.By("Cleaning up the configmap")
-			if err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Delete(configMap.Name, nil); err != nil {
+			if err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Delete(context.TODO(), configMap.Name, nil); err != nil {
 				framework.Failf("unable to delete configmap %v: %v", configMap.Name, err)
 			}
 			ginkgo.By("Cleaning up the pod")
-			if err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(pod.Name, metav1.NewDeleteOptions(0)); err != nil {
+			if err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), pod.Name, metav1.NewDeleteOptions(0)); err != nil {
 				framework.Failf("unable to delete pod %v: %v", pod.Name, err)
 			}
 		}()
@@ -193,7 +194,7 @@ var _ = utils.SIGDescribe("EmptyDir wrapper volumes", func() {
 
 	// Slow by design [~150 Seconds].
 	// This test uses deprecated GitRepo VolumeSource so it MUST not be promoted to Conformance.
-	// To provision a container with a git repo, mount an EmptyDir into an InitContainer that clones the repo using git, then mount the EmptyDir into the Pod’s container.
+	// To provision a container with a git repo, mount an EmptyDir into an InitContainer that clones the repo using git, then mount the EmptyDir into the Pod's container.
 	// This projected volume maps approach can also be tested with secrets and downwardapi VolumeSource but are less prone to the race problem.
 	ginkgo.It("should not cause race condition when used for git_repo [Serial] [Slow]", func() {
 		gitURL, gitRepo, cleanup := createGitServer(f)
@@ -252,17 +253,17 @@ func createGitServer(f *framework.Framework) (gitURL string, gitRepo string, cle
 		},
 	}
 
-	if gitServerSvc, err = f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(gitServerSvc); err != nil {
+	if gitServerSvc, err = f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(context.TODO(), gitServerSvc, metav1.CreateOptions{}); err != nil {
 		framework.Failf("unable to create test git server service %s: %v", gitServerSvc.Name, err)
 	}
 
 	return "http://" + gitServerSvc.Spec.ClusterIP + ":" + strconv.Itoa(httpPort), "test", func() {
 		ginkgo.By("Cleaning up the git server pod")
-		if err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(gitServerPod.Name, metav1.NewDeleteOptions(0)); err != nil {
+		if err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), gitServerPod.Name, metav1.NewDeleteOptions(0)); err != nil {
 			framework.Failf("unable to delete git server pod %v: %v", gitServerPod.Name, err)
 		}
 		ginkgo.By("Cleaning up the git server svc")
-		if err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Delete(gitServerSvc.Name, nil); err != nil {
+		if err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Delete(context.TODO(), gitServerSvc.Name, nil); err != nil {
 			framework.Failf("unable to delete git server svc %v: %v", gitServerSvc.Name, err)
 		}
 	}
@@ -302,7 +303,7 @@ func createConfigmapsForRace(f *framework.Framework) (configMapNames []string) {
 				"data-1": "value-1",
 			},
 		}
-		_, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(configMap)
+		_, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(context.TODO(), configMap, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 	}
 	return
@@ -311,7 +312,7 @@ func createConfigmapsForRace(f *framework.Framework) (configMapNames []string) {
 func deleteConfigMaps(f *framework.Framework, configMapNames []string) {
 	ginkgo.By("Cleaning up the configMaps")
 	for _, configMapName := range configMapNames {
-		err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Delete(configMapName, nil)
+		err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Delete(context.TODO(), configMapName, nil)
 		framework.ExpectNoError(err, "unable to delete configMap %v", configMapName)
 	}
 }
@@ -397,7 +398,7 @@ func testNoWrappedVolumeRace(f *framework.Framework, volumes []v1.Volume, volume
 			},
 		},
 	}
-	_, err = f.ClientSet.CoreV1().ReplicationControllers(f.Namespace.Name).Create(rc)
+	_, err = f.ClientSet.CoreV1().ReplicationControllers(f.Namespace.Name).Create(context.TODO(), rc, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "error creating replication controller")
 
 	defer func() {

@@ -19,19 +19,12 @@ limitations under the License.
 package azure
 
 import (
-	"context"
 	"net/http"
 	"reflect"
 	"testing"
 
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-07-01/compute"
-	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/stretchr/testify/assert"
-
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/client-go/tools/record"
-	"k8s.io/legacy-cloud-providers/azure/auth"
 	"k8s.io/legacy-cloud-providers/azure/retry"
 )
 
@@ -288,66 +281,4 @@ func TestIsBackendPoolOnSameLB(t *testing.T) {
 		assert.Equal(t, test.expected, isSameLB)
 		assert.Equal(t, test.expectedLBName, lbName)
 	}
-}
-
-func TestVMCache(t *testing.T) {
-	vmList := []string{"vm000000", "vm000001", "vm000002"}
-	az := getTestCloudForVMCache(vmList)
-
-	// validate getting VM via cache.
-	virtualMachines, err := az.VirtualMachinesClient.List(
-		context.Background(), "rg")
-	assert.Nil(t, err)
-	assert.Equal(t, 3, len(virtualMachines))
-	for i := range virtualMachines {
-		vm := virtualMachines[i]
-		vmName := to.String(vm.Name)
-		realVM, err := az.getVirtualMachine(types.NodeName(vmName), cacheReadTypeDefault)
-		assert.NoError(t, err)
-		assert.Equal(t, vm, realVM)
-	}
-}
-
-func getTestCloudForVMCache(vmList []string) (az *Cloud) {
-	az = &Cloud{
-		Config: Config{
-			AzureAuthConfig: auth.AzureAuthConfig{
-				TenantID:       "tenant",
-				SubscriptionID: "subscription",
-			},
-			ResourceGroup:                "rg",
-			VnetResourceGroup:            "rg",
-			RouteTableResourceGroup:      "rg",
-			SecurityGroupResourceGroup:   "rg",
-			Location:                     "westus",
-			VnetName:                     "vnet",
-			SubnetName:                   "subnet",
-			SecurityGroupName:            "nsg",
-			RouteTableName:               "rt",
-			PrimaryAvailabilitySetName:   "as",
-			MaximumLoadBalancerRuleCount: 250,
-			VMType:                       vmTypeStandard,
-		},
-		nodeZones:          map[string]sets.String{},
-		nodeResourceGroups: map[string]string{},
-		unmanagedNodes:     sets.NewString(),
-		routeCIDRs:         map[string]string{},
-		eventRecorder:      &record.FakeRecorder{},
-	}
-	virtualMachinesClient := newFakeAzureVirtualMachinesClient()
-
-	store := make(map[string]map[string]compute.VirtualMachine)
-	store["rg"] = map[string]compute.VirtualMachine{}
-	for _, vm := range vmList {
-		store["rg"][vm] = compute.VirtualMachine{
-			Name: &vm,
-		}
-	}
-
-	virtualMachinesClient.setFakeStore(store)
-	az.VirtualMachinesClient = virtualMachinesClient
-	az.vmCache, _ = az.newVMCache()
-	az.controllerCommon = &controllerCommon{cloud: az}
-
-	return az
 }

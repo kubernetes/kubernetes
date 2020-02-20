@@ -38,6 +38,15 @@ const (
 var (
 	// The function to get current time.
 	now = time.Now
+
+	// StatusCodesForRetry are a defined group of status code for which the client will retry.
+	StatusCodesForRetry = []int{
+		http.StatusRequestTimeout,      // 408
+		http.StatusInternalServerError, // 500
+		http.StatusBadGateway,          // 502
+		http.StatusServiceUnavailable,  // 503
+		http.StatusGatewayTimeout,      // 504
+	}
 )
 
 // Error indicates an error returned by Azure APIs.
@@ -184,18 +193,21 @@ func getHTTPStatusCode(resp *http.Response) int {
 // shouldRetryHTTPRequest determines if the request is retriable.
 func shouldRetryHTTPRequest(resp *http.Response, err error) bool {
 	if resp != nil {
-		// HTTP 412 (StatusPreconditionFailed) means etag mismatch
-		// HTTP 400 (BadRequest) means the request cannot be accepted, hence we shouldn't retry.
-		if resp.StatusCode == http.StatusPreconditionFailed || resp.StatusCode == http.StatusBadRequest {
-			return false
+		for _, code := range StatusCodesForRetry {
+			if resp.StatusCode == code {
+				return true
+			}
 		}
 
-		// HTTP 4xx (except 412) or 5xx suggests we should retry.
-		if 399 < resp.StatusCode && resp.StatusCode < 600 {
+		// should retry on <200, error>.
+		if isSuccessHTTPResponse(resp) && err != nil {
 			return true
 		}
+
+		return false
 	}
 
+	// should retry when error is not nil and no http.Response.
 	if err != nil {
 		return true
 	}
@@ -222,6 +234,24 @@ func getRetryAfter(resp *http.Response) time.Duration {
 		dur = t.Sub(now())
 	}
 	return dur
+}
+
+// GetErrorWithRetriableHTTPStatusCodes gets an error with RetriableHTTPStatusCodes.
+// It is used to retry on some HTTPStatusCodes.
+func GetErrorWithRetriableHTTPStatusCodes(resp *http.Response, err error, retriableHTTPStatusCodes []int) *Error {
+	rerr := GetError(resp, err)
+	if rerr == nil {
+		return nil
+	}
+
+	for _, code := range retriableHTTPStatusCodes {
+		if rerr.HTTPStatusCode == code {
+			rerr.Retriable = true
+			break
+		}
+	}
+
+	return rerr
 }
 
 // GetStatusNotFoundAndForbiddenIgnoredError gets an error with StatusNotFound and StatusForbidden ignored.

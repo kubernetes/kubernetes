@@ -288,6 +288,24 @@ func TestDeltaFIFO_ResyncNonExisting(t *testing.T) {
 	}
 }
 
+func TestDeltaFIFO_Resync(t *testing.T) {
+	f := NewDeltaFIFO(
+		testFifoObjectKeyFunc,
+		literalListerGetter(func() []testFifoObject {
+			return []testFifoObject{mkFifoObj("foo", 5)}
+		}),
+	)
+	f.Resync()
+
+	deltas := f.items["foo"]
+	if len(deltas) != 1 {
+		t.Fatalf("unexpected deltas length: %v", deltas)
+	}
+	if deltas[0].Type != Sync {
+		t.Errorf("unexpected delta: %v", deltas[0])
+	}
+}
+
 func TestDeltaFIFO_DeleteExistingNonPropagated(t *testing.T) {
 	f := NewDeltaFIFO(
 		testFifoObjectKeyFunc,
@@ -374,6 +392,60 @@ func TestDeltaFIFO_ReplaceMakesDeletions(t *testing.T) {
 		{{Added, mkFifoObj("baz", 10)},
 			{Deleted, DeletedFinalStateUnknown{Key: "baz", Obj: mkFifoObj("baz", 10)}}},
 		{{Sync, mkFifoObj("foo", 5)}},
+	}
+
+	for _, expected := range expectedList {
+		cur := Pop(f).(Deltas)
+		if e, a := expected, cur; !reflect.DeepEqual(e, a) {
+			t.Errorf("Expected %#v, got %#v", e, a)
+		}
+	}
+}
+
+// TestDeltaFIFO_ReplaceMakesDeletionsReplaced is the same as the above test, but
+// ensures that a Replaced DeltaType is emitted.
+func TestDeltaFIFO_ReplaceMakesDeletionsReplaced(t *testing.T) {
+	f := NewDeltaFIFOWithOptions(DeltaFIFOOptions{
+		KeyFunction: testFifoObjectKeyFunc,
+		KnownObjects: literalListerGetter(func() []testFifoObject {
+			return []testFifoObject{mkFifoObj("foo", 5), mkFifoObj("bar", 6), mkFifoObj("baz", 7)}
+		}),
+		EmitDeltaTypeReplaced: true,
+	})
+
+	f.Delete(mkFifoObj("baz", 10))
+	f.Replace([]interface{}{mkFifoObj("foo", 6)}, "0")
+
+	expectedList := []Deltas{
+		{{Deleted, mkFifoObj("baz", 10)}},
+		{{Replaced, mkFifoObj("foo", 6)}},
+		// Since "bar" didn't have a delete event and wasn't in the Replace list
+		// it should get a tombstone key with the right Obj.
+		{{Deleted, DeletedFinalStateUnknown{Key: "bar", Obj: mkFifoObj("bar", 6)}}},
+	}
+
+	for _, expected := range expectedList {
+		cur := Pop(f).(Deltas)
+		if e, a := expected, cur; !reflect.DeepEqual(e, a) {
+			t.Errorf("Expected %#v, got %#v", e, a)
+		}
+	}
+}
+
+// TestDeltaFIFO_ReplaceDeltaType checks that passing EmitDeltaTypeReplaced
+// means that Replaced is correctly emitted.
+func TestDeltaFIFO_ReplaceDeltaType(t *testing.T) {
+	f := NewDeltaFIFOWithOptions(DeltaFIFOOptions{
+		KeyFunction: testFifoObjectKeyFunc,
+		KnownObjects: literalListerGetter(func() []testFifoObject {
+			return []testFifoObject{mkFifoObj("foo", 5)}
+		}),
+		EmitDeltaTypeReplaced: true,
+	})
+	f.Replace([]interface{}{mkFifoObj("foo", 5)}, "0")
+
+	expectedList := []Deltas{
+		{{Replaced, mkFifoObj("foo", 5)}},
 	}
 
 	for _, expected := range expectedList {

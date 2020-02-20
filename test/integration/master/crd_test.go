@@ -17,6 +17,7 @@ limitations under the License.
 package master
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -49,7 +50,7 @@ func TestCRDShadowGroup(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	if _, err := kubeclient.CoreV1().Namespaces().Create((&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}})); err != nil {
+	if _, err := kubeclient.CoreV1().Namespaces().Create(context.TODO(), (&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}}), metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -59,13 +60,13 @@ func TestCRDShadowGroup(t *testing.T) {
 	}
 
 	t.Logf("Creating a NetworkPolicy")
-	nwPolicy, err := kubeclient.NetworkingV1().NetworkPolicies(testNamespace).Create(&networkingv1.NetworkPolicy{
+	nwPolicy, err := kubeclient.NetworkingV1().NetworkPolicies(testNamespace).Create(context.TODO(), &networkingv1.NetworkPolicy{
 		ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: testNamespace},
 		Spec: networkingv1.NetworkPolicySpec{
 			PodSelector: metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 			Ingress:     []networkingv1.NetworkPolicyIngressRule{},
 		},
-	})
+	}, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Failed to create NetworkPolicy: %v", err)
 	}
@@ -91,7 +92,7 @@ func TestCRDShadowGroup(t *testing.T) {
 	time.Sleep(2 * time.Second)
 
 	t.Logf("Checking that we still see the NetworkPolicy")
-	_, err = kubeclient.NetworkingV1().NetworkPolicies(nwPolicy.Namespace).Get(nwPolicy.Name, metav1.GetOptions{})
+	_, err = kubeclient.NetworkingV1().NetworkPolicies(nwPolicy.Namespace).Get(context.TODO(), nwPolicy.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Errorf("Failed to get NetworkPolocy: %v", err)
 	}
@@ -111,7 +112,7 @@ func TestCRD(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	if _, err := kubeclient.CoreV1().Namespaces().Create((&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}})); err != nil {
+	if _, err := kubeclient.CoreV1().Namespaces().Create(context.TODO(), (&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}}), metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -211,7 +212,7 @@ func TestCRDOpenAPI(t *testing.T) {
 	etcd.CreateTestCRDs(t, apiextensionsclient, false, structuralCRD)
 
 	getPublishedSchema := func(defName string) (*spec.Schema, error) {
-		bs, err := kubeclient.RESTClient().Get().AbsPath("openapi", "v2").DoRaw()
+		bs, err := kubeclient.RESTClient().Get().AbsPath("openapi", "v2").DoRaw(context.TODO())
 		if err != nil {
 			return nil, err
 		}
@@ -261,14 +262,14 @@ func TestCRDOpenAPI(t *testing.T) {
 
 	t.Logf("Check that structural schema is published")
 	waitForSpec(structuralCRD, "string")
-	structuralCRD, err = apiextensionsclient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(structuralCRD.Name, metav1.GetOptions{})
+	structuralCRD, err = apiextensionsclient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(context.TODO(), structuralCRD.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	prop := structuralCRD.Spec.Validation.OpenAPIV3Schema.Properties["foo"]
 	prop.Type = "boolean"
 	structuralCRD.Spec.Validation.OpenAPIV3Schema.Properties["foo"] = prop
-	if _, err = apiextensionsclient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(structuralCRD); err != nil {
+	if _, err = apiextensionsclient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(context.TODO(), structuralCRD, metav1.UpdateOptions{}); err != nil {
 		t.Fatal(err)
 	}
 	waitForSpec(structuralCRD, "boolean")

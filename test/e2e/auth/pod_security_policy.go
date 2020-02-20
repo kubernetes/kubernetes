@@ -17,6 +17,7 @@ limitations under the License.
 package auth
 
 import (
+	"context"
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
@@ -34,6 +35,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/auth"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	utilpointer "k8s.io/utils/pointer"
 
@@ -52,10 +54,10 @@ var _ = SIGDescribe("PodSecurityPolicy", func() {
 	var ns string // Test namespace, for convenience
 	ginkgo.BeforeEach(func() {
 		if !framework.IsPodSecurityPolicyEnabled(f.ClientSet) {
-			framework.Skipf("PodSecurityPolicy not enabled")
+			e2eskipper.Skipf("PodSecurityPolicy not enabled")
 		}
 		if !auth.IsRBACEnabled(f.ClientSet.RbacV1()) {
-			framework.Skipf("RBAC not enabled")
+			e2eskipper.Skipf("RBAC not enabled")
 		}
 		ns = f.Namespace.Name
 
@@ -77,7 +79,7 @@ var _ = SIGDescribe("PodSecurityPolicy", func() {
 
 	ginkgo.It("should forbid pod creation when no PSP is available", func() {
 		ginkgo.By("Running a restricted pod")
-		_, err := c.CoreV1().Pods(ns).Create(restrictedPod("restricted"))
+		_, err := c.CoreV1().Pods(ns).Create(context.TODO(), restrictedPod("restricted"), metav1.CreateOptions{})
 		expectForbidden(err)
 	})
 
@@ -87,12 +89,12 @@ var _ = SIGDescribe("PodSecurityPolicy", func() {
 		defer cleanup()
 
 		ginkgo.By("Running a restricted pod")
-		pod, err := c.CoreV1().Pods(ns).Create(restrictedPod("allowed"))
+		pod, err := c.CoreV1().Pods(ns).Create(context.TODO(), restrictedPod("allowed"), metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(c, pod.Name, pod.Namespace))
 
 		testPrivilegedPods(func(pod *v1.Pod) {
-			_, err := c.CoreV1().Pods(ns).Create(pod)
+			_, err := c.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
 			expectForbidden(err)
 		})
 	})
@@ -106,12 +108,12 @@ var _ = SIGDescribe("PodSecurityPolicy", func() {
 		defer cleanup()
 
 		testPrivilegedPods(func(pod *v1.Pod) {
-			p, err := c.CoreV1().Pods(ns).Create(pod)
+			p, err := c.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 			framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(c, p.Name, p.Namespace))
 
 			// Verify expected PSP was used.
-			p, err = c.CoreV1().Pods(ns).Get(p.Name, metav1.GetOptions{})
+			p, err = c.CoreV1().Pods(ns).Get(context.TODO(), p.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 			validated, found := p.Annotations[psputil.ValidatedPSPAnnotation]
 			framework.ExpectEqual(found, true, "PSP annotation not found")
@@ -166,7 +168,7 @@ func testPrivilegedPods(tester func(pod *v1.Pod)) {
 		tester(hostipc)
 	})
 
-	if isAppArmorSupported() {
+	if isAppArmorSupported() && framework.TestContext.ContainerRuntime == "docker" {
 		ginkgo.By("Running a custom AppArmor profile pod", func() {
 			aa := restrictedPod("apparmor")
 			// Every node is expected to have the docker-default profile.
@@ -213,11 +215,11 @@ func createAndBindPSP(f *framework.Framework, pspTemplate *policyv1beta1.PodSecu
 	ns := f.Namespace.Name
 	name := fmt.Sprintf("%s-%s", ns, psp.Name)
 	psp.Name = name
-	psp, err := f.ClientSet.PolicyV1beta1().PodSecurityPolicies().Create(psp)
+	psp, err := f.ClientSet.PolicyV1beta1().PodSecurityPolicies().Create(context.TODO(), psp, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "Failed to create PSP")
 
 	// Create the Role to bind it to the namespace.
-	_, err = f.ClientSet.RbacV1().Roles(ns).Create(&rbacv1.Role{
+	_, err = f.ClientSet.RbacV1().Roles(ns).Create(context.TODO(), &rbacv1.Role{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
@@ -227,7 +229,7 @@ func createAndBindPSP(f *framework.Framework, pspTemplate *policyv1beta1.PodSecu
 			ResourceNames: []string{name},
 			Verbs:         []string{"use"},
 		}},
-	})
+	}, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "Failed to create PSP role")
 
 	// Bind the role to the namespace.
@@ -244,7 +246,7 @@ func createAndBindPSP(f *framework.Framework, pspTemplate *policyv1beta1.PodSecu
 
 	return psp, func() {
 		// Cleanup non-namespaced PSP object.
-		f.ClientSet.PolicyV1beta1().PodSecurityPolicies().Delete(name, &metav1.DeleteOptions{})
+		f.ClientSet.PolicyV1beta1().PodSecurityPolicies().Delete(context.TODO(), name, &metav1.DeleteOptions{})
 	}
 }
 
@@ -373,5 +375,5 @@ func boolPtr(b bool) *bool {
 
 // isAppArmorSupported checks whether the AppArmor is supported by the node OS distro.
 func isAppArmorSupported() bool {
-	return framework.NodeOSDistroIs(framework.AppArmorDistros...)
+	return framework.NodeOSDistroIs(e2eskipper.AppArmorDistros...)
 }

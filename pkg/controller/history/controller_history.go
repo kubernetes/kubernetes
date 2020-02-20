@@ -18,6 +18,7 @@ package history
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"hash/fnv"
@@ -248,9 +249,9 @@ func (rh *realHistory) CreateControllerRevision(parent metav1.Object, revision *
 		// Update the revisions name
 		clone.Name = ControllerRevisionName(parent.GetName(), hash)
 		ns := parent.GetNamespace()
-		created, err := rh.client.AppsV1().ControllerRevisions(ns).Create(clone)
+		created, err := rh.client.AppsV1().ControllerRevisions(ns).Create(context.TODO(), clone, metav1.CreateOptions{})
 		if errors.IsAlreadyExists(err) {
-			exists, err := rh.client.AppsV1().ControllerRevisions(ns).Get(clone.Name, metav1.GetOptions{})
+			exists, err := rh.client.AppsV1().ControllerRevisions(ns).Get(context.TODO(), clone.Name, metav1.GetOptions{})
 			if err != nil {
 				return nil, err
 			}
@@ -271,7 +272,7 @@ func (rh *realHistory) UpdateControllerRevision(revision *apps.ControllerRevisio
 			return nil
 		}
 		clone.Revision = newRevision
-		updated, updateErr := rh.client.AppsV1().ControllerRevisions(clone.Namespace).Update(clone)
+		updated, updateErr := rh.client.AppsV1().ControllerRevisions(clone.Namespace).Update(context.TODO(), clone, metav1.UpdateOptions{})
 		if updateErr == nil {
 			return nil
 		}
@@ -288,7 +289,7 @@ func (rh *realHistory) UpdateControllerRevision(revision *apps.ControllerRevisio
 }
 
 func (rh *realHistory) DeleteControllerRevision(revision *apps.ControllerRevision) error {
-	return rh.client.AppsV1().ControllerRevisions(revision.Namespace).Delete(revision.Name, nil)
+	return rh.client.AppsV1().ControllerRevisions(revision.Namespace).Delete(context.TODO(), revision.Name, nil)
 }
 
 type objectForPatch struct {
@@ -304,7 +305,7 @@ type objectMetaForPatch struct {
 func (rh *realHistory) AdoptControllerRevision(parent metav1.Object, parentKind schema.GroupVersionKind, revision *apps.ControllerRevision) (*apps.ControllerRevision, error) {
 	blockOwnerDeletion := true
 	isController := true
-	// Return an error if the parent does not own the revision
+	// Return an error if the revision is not orphan
 	if owner := metav1.GetControllerOfNoCopy(revision); owner != nil {
 		return nil, fmt.Errorf("attempt to adopt revision owned by %v", owner)
 	}
@@ -326,15 +327,15 @@ func (rh *realHistory) AdoptControllerRevision(parent metav1.Object, parentKind 
 		return nil, err
 	}
 	// Use strategic merge patch to add an owner reference indicating a controller ref
-	return rh.client.AppsV1().ControllerRevisions(parent.GetNamespace()).Patch(revision.GetName(),
-		types.StrategicMergePatchType, patchBytes)
+	return rh.client.AppsV1().ControllerRevisions(parent.GetNamespace()).Patch(context.TODO(), revision.GetName(),
+		types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
 }
 
 func (rh *realHistory) ReleaseControllerRevision(parent metav1.Object, revision *apps.ControllerRevision) (*apps.ControllerRevision, error) {
 	// Use strategic merge patch to add an owner reference indicating a controller ref
-	released, err := rh.client.AppsV1().ControllerRevisions(revision.GetNamespace()).Patch(revision.GetName(),
+	released, err := rh.client.AppsV1().ControllerRevisions(revision.GetNamespace()).Patch(context.TODO(), revision.GetName(),
 		types.StrategicMergePatchType,
-		[]byte(fmt.Sprintf(`{"metadata":{"ownerReferences":[{"$patch":"delete","uid":"%s"}],"uid":"%s"}}`, parent.GetUID(), revision.UID)))
+		[]byte(fmt.Sprintf(`{"metadata":{"ownerReferences":[{"$patch":"delete","uid":"%s"}],"uid":"%s"}}`, parent.GetUID(), revision.UID)), metav1.PatchOptions{})
 
 	if err != nil {
 		if errors.IsNotFound(err) {

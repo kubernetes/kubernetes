@@ -21,59 +21,35 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/scheduler/apis/config"
-	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
 )
 
 func TestDecodeInto(t *testing.T) {
 	type PluginFooConfig struct {
-		FooTest string `json:"foo_test,omitempty"`
+		FooTest string `json:"fooTest,omitempty"`
 	}
 	tests := []struct {
-		name            string
-		schedulerConfig string
-		expected        PluginFooConfig
+		name     string
+		args     *runtime.Unknown
+		expected PluginFooConfig
 	}{
 		{
 			name: "test decode for JSON config",
-			schedulerConfig: `{
-				"kind": "KubeSchedulerConfiguration",
-				"apiVersion": "kubescheduler.config.k8s.io/v1alpha1",
-				"plugins": {
-				"permit": {
-						"enabled": [
-							{
-								"name": "foo"
-							}
-						]
-					}
-				},
-				"pluginConfig": [
-					{
-						"name": "foo",
-						"args": {
-							"foo_test": "test decode"
-						}
-					}
-				]
-			}`,
+			args: &runtime.Unknown{
+				ContentType: runtime.ContentTypeJSON,
+				Raw: []byte(`{
+					"fooTest": "test decode"
+				}`),
+			},
 			expected: PluginFooConfig{
 				FooTest: "test decode",
 			},
 		},
 		{
 			name: "test decode for YAML config",
-			schedulerConfig: `
-apiVersion: kubescheduler.config.k8s.io/v1alpha1
-kind: KubeSchedulerConfiguration
-plugins:
-  permit:
-    enabled:
-      - name: foo
-pluginConfig:
-  - name: foo
-    args:
-      foo_test: "test decode"`,
+			args: &runtime.Unknown{
+				ContentType: runtime.ContentTypeYAML,
+				Raw:         []byte(`fooTest: "test decode"`),
+			},
 			expected: PluginFooConfig{
 				FooTest: "test decode",
 			},
@@ -82,14 +58,9 @@ pluginConfig:
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			schedulerConf, err := loadConfig([]byte(test.schedulerConfig))
-			if err != nil {
-				t.Errorf("loadConfig(): failed to load scheduler config: %v", err)
-			}
 			var pluginFooConf PluginFooConfig
-			if err := DecodeInto(&schedulerConf.PluginConfig[0].Args, &pluginFooConf); err != nil {
-				t.Errorf("DecodeInto(): failed to decode args %+v: %v",
-					schedulerConf.PluginConfig[0].Args, err)
+			if err := DecodeInto(test.args, &pluginFooConf); err != nil {
+				t.Errorf("DecodeInto(): failed to decode args %+v: %v", test.args, err)
 			}
 			if !reflect.DeepEqual(test.expected, pluginFooConf) {
 				t.Errorf("DecodeInto(): failed to decode plugin config, expected: %+v, got: %+v",
@@ -97,15 +68,6 @@ pluginConfig:
 			}
 		})
 	}
-}
-
-func loadConfig(data []byte) (*config.KubeSchedulerConfiguration, error) {
-	configObj := &config.KubeSchedulerConfiguration{}
-	if err := runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), data, configObj); err != nil {
-		return nil, err
-	}
-
-	return configObj, nil
 }
 
 // isRegistryEqual compares two registries for equality. This function is used in place of

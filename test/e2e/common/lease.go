@@ -17,6 +17,7 @@ limitations under the License.
 package common
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -81,10 +82,10 @@ var _ = framework.KubeDescribe("Lease", func() {
 			},
 		}
 
-		createdLease, err := leaseClient.Create(lease)
+		createdLease, err := leaseClient.Create(context.TODO(), lease, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "creating Lease failed")
 
-		readLease, err := leaseClient.Get(name, metav1.GetOptions{})
+		readLease, err := leaseClient.Get(context.TODO(), name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "couldn't read Lease")
 		framework.ExpectEqual(apiequality.Semantic.DeepEqual(lease.Spec, readLease.Spec), true)
 
@@ -96,10 +97,10 @@ var _ = framework.KubeDescribe("Lease", func() {
 			LeaseTransitions:     pointer.Int32Ptr(1),
 		}
 
-		_, err = leaseClient.Update(createdLease)
+		_, err = leaseClient.Update(context.TODO(), createdLease, metav1.UpdateOptions{})
 		framework.ExpectNoError(err, "updating Lease failed")
 
-		readLease, err = leaseClient.Get(name, metav1.GetOptions{})
+		readLease, err = leaseClient.Get(context.TODO(), name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "couldn't read Lease")
 		framework.ExpectEqual(apiequality.Semantic.DeepEqual(createdLease.Spec, readLease.Spec), true)
 
@@ -114,10 +115,10 @@ var _ = framework.KubeDescribe("Lease", func() {
 		patchBytes, err := getPatchBytes(readLease, patchedLease)
 		framework.ExpectNoError(err, "creating patch failed")
 
-		_, err = leaseClient.Patch(name, types.StrategicMergePatchType, patchBytes)
+		_, err = leaseClient.Patch(context.TODO(), name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
 		framework.ExpectNoError(err, "patching Lease failed")
 
-		readLease, err = leaseClient.Get(name, metav1.GetOptions{})
+		readLease, err = leaseClient.Get(context.TODO(), name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "couldn't read Lease")
 		framework.ExpectEqual(apiequality.Semantic.DeepEqual(patchedLease.Spec, readLease.Spec), true)
 
@@ -135,25 +136,25 @@ var _ = framework.KubeDescribe("Lease", func() {
 				LeaseTransitions:     pointer.Int32Ptr(0),
 			},
 		}
-		_, err = leaseClient.Create(lease2)
+		_, err = leaseClient.Create(context.TODO(), lease2, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "creating Lease failed")
 
-		leases, err := leaseClient.List(metav1.ListOptions{})
+		leases, err := leaseClient.List(context.TODO(), metav1.ListOptions{})
 		framework.ExpectNoError(err, "couldn't list Leases")
 		framework.ExpectEqual(len(leases.Items), 2)
 
 		selector := labels.Set(map[string]string{"deletecollection": "true"}).AsSelector()
-		err = leaseClient.DeleteCollection(&metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: selector.String()})
+		err = leaseClient.DeleteCollection(context.TODO(), &metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: selector.String()})
 		framework.ExpectNoError(err, "couldn't delete collection")
 
-		leases, err = leaseClient.List(metav1.ListOptions{})
+		leases, err = leaseClient.List(context.TODO(), metav1.ListOptions{})
 		framework.ExpectNoError(err, "couldn't list Leases")
 		framework.ExpectEqual(len(leases.Items), 1)
 
-		err = leaseClient.Delete(name, &metav1.DeleteOptions{})
+		err = leaseClient.Delete(context.TODO(), name, &metav1.DeleteOptions{})
 		framework.ExpectNoError(err, "deleting Lease failed")
 
-		_, err = leaseClient.Get(name, metav1.GetOptions{})
+		_, err = leaseClient.Get(context.TODO(), name, metav1.GetOptions{})
 		framework.ExpectEqual(apierrors.IsNotFound(err), true)
 	})
 })

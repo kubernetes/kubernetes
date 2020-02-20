@@ -132,6 +132,7 @@ try {
   Download-HelperScripts
 
   DownloadAndInstall-Crictl
+  Configure-Crictl
   Setup-ContainerRuntime
   DownloadAndInstall-AuthPlugin
   DownloadAndInstall-KubernetesBinaries
@@ -140,7 +141,7 @@ try {
   Create-KubeproxyKubeconfig
   Set-PodCidr
   Configure-HostNetworkingService
-  Configure-CniNetworking
+  Prepare-CniNetworking
   Configure-HostDnsConf
   Configure-GcePdTools
   Configure-Kubelet

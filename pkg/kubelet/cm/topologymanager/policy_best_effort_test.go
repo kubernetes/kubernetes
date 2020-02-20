@@ -43,13 +43,13 @@ func TestPolicyBestEffortCanAdmitPodResult(t *testing.T) {
 		policy := NewBestEffortPolicy(numaNodes)
 		result := policy.(*bestEffortPolicy).canAdmitPodResult(&tc.hint)
 
-		if result.Admit != tc.expected {
-			t.Errorf("Expected Admit field in result to be %t, got %t", tc.expected, result.Admit)
+		if result != tc.expected {
+			t.Errorf("Expected result to be %t, got %t", tc.expected, result)
 		}
 	}
 }
 
-func TestBestEffortPolicyMerge(t *testing.T) {
+func TestPolicyBestEffortMerge(t *testing.T) {
 	numaNodes := []int{0, 1}
 	policy := NewBestEffortPolicy(numaNodes)
 

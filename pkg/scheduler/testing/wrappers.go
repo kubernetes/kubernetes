@@ -171,6 +171,13 @@ func (p *PodWrapper) Priority(val int32) *PodWrapper {
 	return p
 }
 
+// Terminating sets the inner pod's deletionTimestamp to current timestamp.
+func (p *PodWrapper) Terminating() *PodWrapper {
+	now := metav1.Now()
+	p.DeletionTimestamp = &now
+	return p
+}
+
 // ZeroTerminationGracePeriod sets the TerminationGracePeriodSeconds of the inner pod to zero.
 func (p *PodWrapper) ZeroTerminationGracePeriod() *PodWrapper {
 	p.Spec.TerminationGracePeriodSeconds = &zero

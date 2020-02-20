@@ -17,6 +17,7 @@ limitations under the License.
 package upgrades
 
 import (
+	"context"
 	"github.com/onsi/ginkgo"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -79,7 +80,7 @@ func (t *DaemonSetUpgradeTest) Setup(f *framework.Framework) {
 
 	ginkgo.By("Creating a DaemonSet")
 	var err error
-	if t.daemonSet, err = f.ClientSet.AppsV1().DaemonSets(ns.Name).Create(t.daemonSet); err != nil {
+	if t.daemonSet, err = f.ClientSet.AppsV1().DaemonSets(ns.Name).Create(context.TODO(), t.daemonSet, metav1.CreateOptions{}); err != nil {
 		framework.Failf("unable to create test DaemonSet %s: %v", t.daemonSet.Name, err)
 	}
 
@@ -126,7 +127,7 @@ func (t *DaemonSetUpgradeTest) validateRunningDaemonSet(f *framework.Framework) 
 }
 
 func checkRunningOnAllNodes(f *framework.Framework, namespace string, selector map[string]string) (bool, error) {
-	nodeList, err := f.ClientSet.CoreV1().Nodes().List(metav1.ListOptions{})
+	nodeList, err := f.ClientSet.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return false, err
 	}
@@ -146,7 +147,7 @@ func checkRunningOnAllNodes(f *framework.Framework, namespace string, selector m
 func checkDaemonPodOnNodes(f *framework.Framework, namespace string, labelSet map[string]string, nodeNames []string) (bool, error) {
 	selector := labels.Set(labelSet).AsSelector()
 	options := metav1.ListOptions{LabelSelector: selector.String()}
-	podList, err := f.ClientSet.CoreV1().Pods(namespace).List(options)
+	podList, err := f.ClientSet.CoreV1().Pods(namespace).List(context.TODO(), options)
 	if err != nil {
 		return false, err
 	}
@@ -175,7 +176,7 @@ func checkDaemonPodOnNodes(f *framework.Framework, namespace string, labelSet ma
 }
 
 func checkDaemonStatus(f *framework.Framework, namespace string, dsName string) (bool, error) {
-	ds, err := f.ClientSet.AppsV1().DaemonSets(namespace).Get(dsName, metav1.GetOptions{})
+	ds, err := f.ClientSet.AppsV1().DaemonSets(namespace).Get(context.TODO(), dsName, metav1.GetOptions{})
 	if err != nil {
 		return false, err
 	}

@@ -45,13 +45,13 @@ output_file=/tmp/k8s-smoke-test.out
 
 function check_windows_nodes_are_ready {
   # kubectl filtering is the worst.
-  statuses=$(${kubectl} get nodes -l beta.kubernetes.io/os=windows \
+  statuses=$(${kubectl} get nodes -l kubernetes.io/os=windows \
     -o jsonpath='{.items[*].status.conditions[?(@.type=="Ready")].status}')
   for status in $statuses; do
     if [[ $status == "False" ]]; then
       echo "ERROR: some Windows node has status != Ready"
-      echo "kubectl get nodes -l beta.kubernetes.io/os=windows"
-      ${kubectl} get nodes -l beta.kubernetes.io/os=windows
+      echo "kubectl get nodes -l kubernetes.io/os=windows"
+      ${kubectl} get nodes -l kubernetes.io/os=windows
       exit 1
     fi
   done
@@ -61,7 +61,7 @@ function check_windows_nodes_are_ready {
 function untaint_windows_nodes {
   # Untaint the windows nodes to allow test workloads without tolerations to be
   # scheduled onto them.
-  WINDOWS_NODES=$(${kubectl} get nodes -l beta.kubernetes.io/os=windows -o name)
+  WINDOWS_NODES=$(${kubectl} get nodes -l kubernetes.io/os=windows -o name)
   for node in $WINDOWS_NODES; do
     ${kubectl} taint node "$node" node.kubernetes.io/os:NoSchedule-
   done
@@ -106,7 +106,7 @@ spec:
       - name: nginx
         image: nginx:1.7.9
       nodeSelector:
-        beta.kubernetes.io/os: linux
+        kubernetes.io/os: linux
 EOF
 
   if ! ${kubectl} create -f $linux_webserver_deployment.yaml; then
@@ -183,7 +183,7 @@ spec:
         image: ubuntu
         command: ["sleep", "123456"]
       nodeSelector:
-        beta.kubernetes.io/os: linux
+        kubernetes.io/os: linux
 EOF
 
   if ! ${kubectl} create -f $linux_command_deployment.yaml; then
@@ -245,17 +245,19 @@ function undeploy_linux_command_pod {
   ${kubectl} delete deployment $linux_command_deployment
 }
 
-windows_webserver_deployment=windows-nettest
-windows_webserver_pod_label=nettest
+windows_webserver_deployment=windows-agnhost
+windows_webserver_pod_label=agnhost
+# The default port for 'agnhost serve-hostname'. The documentation says that
+# this can be changed but the --port arg does not seem to work.
+windows_webserver_port=9376
 windows_webserver_replicas=1
 
 function deploy_windows_webserver_pod {
   echo "Writing example deployment to $windows_webserver_deployment.yaml"
   cat <<EOF > $windows_webserver_deployment.yaml
-# You can run a pod with the e2eteam/nettest:1.0 image (which should listen on
-# <podIP>:8080) and create another pod on a different node (linux would be
-# easier) to curl the http server:
-#   curl http://<pod_ip>:8080/read
+# A multi-arch Windows container that runs an HTTP server on port
+# $windows_webserver_port that serves the container's hostname.
+#   curl -s http://<pod_ip>:$windows_webserver_port
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -273,10 +275,12 @@ spec:
         app: $windows_webserver_pod_label
     spec:
       containers:
-      - name: nettest
-        image: e2eteam/nettest:1.0
+      - name: agnhost
+        image: e2eteam/agnhost:2.8
+        args:
+        - serve-hostname
       nodeSelector:
-        beta.kubernetes.io/os: windows
+        kubernetes.io/os: windows
       tolerations:
       - effect: NoSchedule
         key: node.kubernetes.io/os
@@ -332,6 +336,7 @@ windows_command_deployment=windows-powershell
 windows_command_pod_label=powershell
 windows_command_replicas=1
 
+# Deploys a multi-arch Windows pod capable of running PowerShell.
 function deploy_windows_command_pod {
   echo "Writing example deployment to $windows_command_deployment.yaml"
   cat <<EOF > $windows_command_deployment.yaml
@@ -352,10 +357,10 @@ spec:
         app: $windows_command_pod_label
     spec:
       containers:
-      - name: nettest
-        image: e2eteam/nettest:1.0
+      - name: pause-win
+        image: gcr.io/gke-release/pause-win:1.1.0
       nodeSelector:
-        beta.kubernetes.io/os: windows
+        kubernetes.io/os: windows
       tolerations:
       - effect: NoSchedule
         key: node.kubernetes.io/os
@@ -422,7 +427,7 @@ function test_linux_pod_to_linux_pod {
   local linux_webserver_pod_ip
   linux_webserver_pod_ip="$(get_linux_webserver_pod_ip)"
 
-  if ! $kubectl exec "$linux_command_pod" -- curl -m 20 \
+  if ! $kubectl exec "$linux_command_pod" -- curl -s -m 20 \
       "http://$linux_webserver_pod_ip" &> $output_file; then
     cleanup_deployments
     echo "Failing output: $(cat $output_file)"
@@ -444,8 +449,8 @@ function test_linux_pod_to_windows_pod {
   local windows_webserver_pod_ip
   windows_webserver_pod_ip="$(get_windows_webserver_pod_ip)"
 
-  if ! $kubectl exec "$linux_command_pod" -- curl -m 20 \
-      "http://$windows_webserver_pod_ip:8080/read" &> $output_file; then
+  if ! $kubectl exec "$linux_command_pod" -- curl -s -m 20 \
+      "http://$windows_webserver_pod_ip:$windows_webserver_port" &> $output_file; then
     cleanup_deployments
     echo "Failing output: $(cat $output_file)"
     echo "FAILED: ${FUNCNAME[0]}"
@@ -461,7 +466,7 @@ function test_linux_pod_to_internet {
   # A stable (hopefully) HTTP server provided by Cloudflare.
   local internet_ip="1.1.1.1"
 
-  if ! $kubectl exec "$linux_command_pod" -- curl -m 20 \
+  if ! $kubectl exec "$linux_command_pod" -- curl -s -m 20 \
       "http://$internet_ip" > $output_file; then
     cleanup_deployments
     echo "Failing output: $(cat $output_file)"
@@ -486,7 +491,7 @@ function test_linux_pod_to_k8s_service {
   # curl-ing the metrics-server service downloads 14 bytes of unprintable binary
   # data and sets a return code of success (0).
   if ! $kubectl exec "$linux_command_pod" -- \
-      curl -m 20 "http://$service_ip:$service_port" &> $output_file; then
+      curl -s -m 20 "http://$service_ip:$service_port" &> $output_file; then
     cleanup_deployments
     echo "Failing output: $(cat $output_file)"
     echo "FAILED: ${FUNCNAME[0]}"
@@ -534,7 +539,7 @@ function test_windows_pod_to_windows_pod {
   windows_webserver_pod_ip="$(get_windows_webserver_pod_ip)"
 
   if ! $kubectl exec "$windows_command_pod" -- powershell.exe \
-      "curl -UseBasicParsing http://$windows_webserver_pod_ip:8080/read" \
+      "curl -UseBasicParsing http://$windows_webserver_pod_ip:$windows_webserver_port" \
       > $output_file; then
     cleanup_deployments
     echo "Failing output: $(cat $output_file)"

@@ -481,7 +481,7 @@ func TestV1beta1WebhookTokenAuthenticator(t *testing.T) {
 			expectedAuthenticated: false,
 		},
 	}
-	token := "my-s3cr3t-t0ken"
+	token := "my-s3cr3t-t0ken" // Fake token for testing.
 	for _, tt := range tests {
 		t.Run(tt.description, func(t *testing.T) {
 			wh, err := newV1beta1TokenAuthenticator(s.URL, clientCert, clientKey, caCert, 0, tt.implicitAuds)

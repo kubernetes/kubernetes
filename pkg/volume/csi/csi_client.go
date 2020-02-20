@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"strings"
 	"sync"
 	"time"
 
@@ -32,7 +31,6 @@ import (
 	"google.golang.org/grpc/status"
 	api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
@@ -153,23 +151,12 @@ func (c *csiDriverClient) NodeGetInfo(ctx context.Context) (
 	err error) {
 	klog.V(4).Info(log("calling NodeGetInfo rpc"))
 
-	// TODO retries should happen at a lower layer (issue #73371)
-	backoff := wait.Backoff{Duration: initialDuration, Factor: factor, Steps: steps}
-	err = wait.ExponentialBackoff(backoff, func() (bool, error) {
-		var getNodeInfoError error
-		nodeID, maxVolumePerNode, accessibleTopology, getNodeInfoError = c.nodeGetInfoV1(ctx)
-		if nodeID != "" {
-			return true, nil
-		}
-		// kubelet plugin registration service not implemented is a terminal error, no need to retry
-		if strings.Contains(getNodeInfoError.Error(), "no handler registered for plugin type") {
-			return false, getNodeInfoError
-		}
-		// Continue with exponential backoff
-		return false, nil
-	})
-
-	return nodeID, maxVolumePerNode, accessibleTopology, err
+	var getNodeInfoError error
+	nodeID, maxVolumePerNode, accessibleTopology, getNodeInfoError = c.nodeGetInfoV1(ctx)
+	if getNodeInfoError != nil {
+		klog.Warningf("Error calling CSI NodeGetInfo(): %v", getNodeInfoError.Error())
+	}
+	return nodeID, maxVolumePerNode, accessibleTopology, getNodeInfoError
 }
 
 func (c *csiDriverClient) nodeGetInfoV1(ctx context.Context) (

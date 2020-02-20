@@ -26,7 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
-	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
+	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
 )
 
 func TestRequestedToCapacityRatio(t *testing.T) {
@@ -65,7 +65,7 @@ func TestRequestedToCapacityRatio(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			state := framework.NewCycleState()
-			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(test.scheduledPods, test.nodes))
+			snapshot := cache.NewSnapshot(test.scheduledPods, test.nodes)
 			fh, _ := framework.NewFramework(nil, nil, nil, framework.WithSnapshotSharedLister(snapshot))
 			args := &runtime.Unknown{Raw: []byte(`{"shape" : [{"utilization" : 0, "score" : 10}, {"utilization" : 100, "score" : 0}], "resources" : [{"name" : "memory", "weight" : 1}, {"name" : "cpu", "weight" : 1}]}`)}
 			p, err := NewRequestedToCapacityRatio(args, fh)
@@ -349,7 +349,7 @@ func TestResourceBinPackingSingleExtended(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			state := framework.NewCycleState()
-			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(test.pods, test.nodes))
+			snapshot := cache.NewSnapshot(test.pods, test.nodes)
 			fh, _ := framework.NewFramework(nil, nil, nil, framework.WithSnapshotSharedLister(snapshot))
 			args := &runtime.Unknown{Raw: []byte(`{"shape" : [{"utilization" : 0, "score" : 0}, {"utilization" : 100, "score" : 1}], "resources" : [{"name" : "intel.com/foo", "weight" : 1}]}`)}
 			p, err := NewRequestedToCapacityRatio(args, fh)
@@ -584,7 +584,7 @@ func TestResourceBinPackingMultipleExtended(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			state := framework.NewCycleState()
-			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(test.pods, test.nodes))
+			snapshot := cache.NewSnapshot(test.pods, test.nodes)
 			fh, _ := framework.NewFramework(nil, nil, nil, framework.WithSnapshotSharedLister(snapshot))
 			args := &runtime.Unknown{Raw: []byte(`{"shape" : [{"utilization" : 0, "score" : 0}, {"utilization" : 100, "score" : 1}], "resources" : [{"name" : "intel.com/foo", "weight" : 3}, {"name" : "intel.com/bar", "weight": 5}]}`)}
 			p, err := NewRequestedToCapacityRatio(args, fh)

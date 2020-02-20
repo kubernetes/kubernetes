@@ -17,6 +17,7 @@ limitations under the License.
 package service
 
 import (
+	"context"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -64,14 +65,14 @@ func UpdateService(c clientset.Interface, namespace, serviceName string, update 
 	var service *v1.Service
 	var err error
 	for i := 0; i < 3; i++ {
-		service, err = c.CoreV1().Services(namespace).Get(serviceName, metav1.GetOptions{})
+		service, err = c.CoreV1().Services(namespace).Get(context.TODO(), serviceName, metav1.GetOptions{})
 		if err != nil {
 			return service, err
 		}
 
 		update(service)
 
-		service, err = c.CoreV1().Services(namespace).Update(service)
+		service, err = c.CoreV1().Services(namespace).Update(context.TODO(), service, metav1.UpdateOptions{})
 
 		if !apierrors.IsConflict(err) && !apierrors.IsServerTimeout(err) {
 			return service, err

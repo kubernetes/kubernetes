@@ -22,6 +22,7 @@ https://github.com/openshift/origin/blob/bb340c5dd5ff72718be86fb194dedc0faed7f4c
 */
 
 import (
+	"context"
 	"net"
 	"reflect"
 	"testing"
@@ -420,7 +421,7 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 		clientset := fake.NewSimpleClientset()
 		if test.endpoints != nil {
 			for _, ep := range test.endpoints.Items {
-				if _, err := clientset.CoreV1().Endpoints(ep.Namespace).Create(&ep); err != nil {
+				if _, err := clientset.CoreV1().Endpoints(ep.Namespace).Create(context.TODO(), &ep, metav1.CreateOptions{}); err != nil {
 					t.Errorf("case %q: unexpected error: %v", test.testName, err)
 					continue
 				}
@@ -433,7 +434,7 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 		if err != nil {
 			t.Errorf("case %q: unexpected error: %v", test.testName, err)
 		}
-		actualEndpoints, err := clientset.CoreV1().Endpoints(corev1.NamespaceDefault).Get(test.serviceName, metav1.GetOptions{})
+		actualEndpoints, err := clientset.CoreV1().Endpoints(corev1.NamespaceDefault).Get(context.TODO(), test.serviceName, metav1.GetOptions{})
 		if err != nil {
 			t.Errorf("case %q: unexpected error: %v", test.testName, err)
 		}
@@ -522,7 +523,7 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 			clientset := fake.NewSimpleClientset()
 			if test.endpoints != nil {
 				for _, ep := range test.endpoints.Items {
-					if _, err := clientset.CoreV1().Endpoints(ep.Namespace).Create(&ep); err != nil {
+					if _, err := clientset.CoreV1().Endpoints(ep.Namespace).Create(context.TODO(), &ep, metav1.CreateOptions{}); err != nil {
 						t.Errorf("case %q: unexpected error: %v", test.testName, err)
 						continue
 					}
@@ -534,7 +535,7 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 			if err != nil {
 				t.Errorf("case %q: unexpected error: %v", test.testName, err)
 			}
-			actualEndpoints, err := clientset.CoreV1().Endpoints(corev1.NamespaceDefault).Get(test.serviceName, metav1.GetOptions{})
+			actualEndpoints, err := clientset.CoreV1().Endpoints(corev1.NamespaceDefault).Get(context.TODO(), test.serviceName, metav1.GetOptions{})
 			if err != nil {
 				t.Errorf("case %q: unexpected error: %v", test.testName, err)
 			}
@@ -637,7 +638,7 @@ func TestLeaseRemoveEndpoints(t *testing.T) {
 			fakeLeases.SetKeys(test.endpointKeys)
 			clientset := fake.NewSimpleClientset()
 			for _, ep := range test.endpoints.Items {
-				if _, err := clientset.CoreV1().Endpoints(ep.Namespace).Create(&ep); err != nil {
+				if _, err := clientset.CoreV1().Endpoints(ep.Namespace).Create(context.TODO(), &ep, metav1.CreateOptions{}); err != nil {
 					t.Errorf("case %q: unexpected error: %v", test.testName, err)
 					continue
 				}
@@ -648,7 +649,7 @@ func TestLeaseRemoveEndpoints(t *testing.T) {
 			if err != nil {
 				t.Errorf("case %q: unexpected error: %v", test.testName, err)
 			}
-			actualEndpoints, err := clientset.CoreV1().Endpoints(corev1.NamespaceDefault).Get(test.serviceName, metav1.GetOptions{})
+			actualEndpoints, err := clientset.CoreV1().Endpoints(corev1.NamespaceDefault).Get(context.TODO(), test.serviceName, metav1.GetOptions{})
 			if err != nil {
 				t.Errorf("case %q: unexpected error: %v", test.testName, err)
 			}

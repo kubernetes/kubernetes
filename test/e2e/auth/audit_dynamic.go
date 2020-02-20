@@ -17,6 +17,7 @@ limitations under the License.
 package auth
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -58,14 +59,14 @@ var _ = SIGDescribe("[Feature:DynamicAudit]", func() {
 		anonymousClient, err := clientset.NewForConfig(config)
 		framework.ExpectNoError(err, "failed to create the anonymous client")
 
-		_, err = f.ClientSet.CoreV1().Namespaces().Create(&v1.Namespace{
+		_, err = f.ClientSet.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "audit",
 			},
-		})
+		}, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create namespace")
 
-		_, err = f.ClientSet.CoreV1().Pods(namespace).Create(&v1.Pod{
+		_, err = f.ClientSet.CoreV1().Pods(namespace).Create(context.TODO(), &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "audit-proxy",
 				Labels: map[string]string{
@@ -86,10 +87,10 @@ var _ = SIGDescribe("[Feature:DynamicAudit]", func() {
 					},
 				},
 			},
-		})
+		}, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create proxy pod")
 
-		_, err = f.ClientSet.CoreV1().Services(namespace).Create(&v1.Service{
+		_, err = f.ClientSet.CoreV1().Services(namespace).Create(context.TODO(), &v1.Service{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "audit",
 			},
@@ -104,13 +105,13 @@ var _ = SIGDescribe("[Feature:DynamicAudit]", func() {
 					"app": "audit",
 				},
 			},
-		})
+		}, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create proxy service")
 
 		var podIP string
 		// get pod ip
 		err = wait.Poll(100*time.Millisecond, 10*time.Second, func() (done bool, err error) {
-			p, err := f.ClientSet.CoreV1().Pods(namespace).Get("audit-proxy", metav1.GetOptions{})
+			p, err := f.ClientSet.CoreV1().Pods(namespace).Get(context.TODO(), "audit-proxy", metav1.GetOptions{})
 			if apierrors.IsNotFound(err) {
 				framework.Logf("waiting for audit-proxy pod to be present")
 				return false, nil
@@ -150,7 +151,7 @@ var _ = SIGDescribe("[Feature:DynamicAudit]", func() {
 			},
 		}
 
-		_, err = f.ClientSet.AuditregistrationV1alpha1().AuditSinks().Create(&sink)
+		_, err = f.ClientSet.AuditregistrationV1alpha1().AuditSinks().Create(context.TODO(), &sink, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create audit sink")
 		framework.Logf("created audit sink")
 
@@ -194,20 +195,20 @@ var _ = SIGDescribe("[Feature:DynamicAudit]", func() {
 
 					f.PodClient().CreateSync(pod)
 
-					_, err := f.PodClient().Get(pod.Name, metav1.GetOptions{})
+					_, err := f.PodClient().Get(context.TODO(), pod.Name, metav1.GetOptions{})
 					framework.ExpectNoError(err, "failed to get audit-pod")
 
-					podChan, err := f.PodClient().Watch(watchOptions)
+					podChan, err := f.PodClient().Watch(context.TODO(), watchOptions)
 					framework.ExpectNoError(err, "failed to create watch for pods")
 					for range podChan.ResultChan() {
 					}
 
 					f.PodClient().Update(pod.Name, updatePod)
 
-					_, err = f.PodClient().List(metav1.ListOptions{})
+					_, err = f.PodClient().List(context.TODO(), metav1.ListOptions{})
 					framework.ExpectNoError(err, "failed to list pods")
 
-					_, err = f.PodClient().Patch(pod.Name, types.JSONPatchType, patch)
+					_, err = f.PodClient().Patch(context.TODO(), pod.Name, types.JSONPatchType, patch, metav1.PatchOptions{})
 					framework.ExpectNoError(err, "failed to patch pod")
 
 					f.PodClient().DeleteSync(pod.Name, &metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
@@ -323,7 +324,7 @@ var _ = SIGDescribe("[Feature:DynamicAudit]", func() {
 			// get a pod with unauthorized user
 			{
 				func() {
-					_, err := anonymousClient.CoreV1().Pods(namespace).Get("another-audit-pod", metav1.GetOptions{})
+					_, err := anonymousClient.CoreV1().Pods(namespace).Get(context.TODO(), "another-audit-pod", metav1.GetOptions{})
 					expectForbidden(err)
 				},
 				[]utils.AuditEvent{
@@ -375,7 +376,7 @@ var _ = SIGDescribe("[Feature:DynamicAudit]", func() {
 			return len(missingReport.MissingEvents) == 0, nil
 		})
 		framework.ExpectNoError(err, "after %v failed to observe audit events", pollingTimeout)
-		err = f.ClientSet.AuditregistrationV1alpha1().AuditSinks().Delete("test", &metav1.DeleteOptions{})
+		err = f.ClientSet.AuditregistrationV1alpha1().AuditSinks().Delete(context.TODO(), "test", &metav1.DeleteOptions{})
 		framework.ExpectNoError(err, "could not delete audit configuration")
 	})
 })

@@ -130,7 +130,7 @@ func newProxyServer(
 		Namespace: "",
 	}
 
-	var healthzServer *healthcheck.ProxierHealthServer
+	var healthzServer healthcheck.ProxierHealthUpdater
 	if len(config.HealthzBindAddress) > 0 {
 		healthzServer = healthcheck.NewProxierHealthServer(config.HealthzBindAddress, 2*config.IPTables.SyncPeriod.Duration, recorder, nodeRef)
 	}
@@ -313,7 +313,7 @@ func newProxyServer(
 		OOMScoreAdj:            config.OOMScoreAdj,
 		ConfigSyncPeriod:       config.ConfigSyncPeriod.Duration,
 		HealthzServer:          healthzServer,
-		UseEndpointSlices:      utilfeature.DefaultFeatureGate.Enabled(features.EndpointSlice),
+		UseEndpointSlices:      utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceProxying),
 	}, nil
 }
 

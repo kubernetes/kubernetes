@@ -17,6 +17,7 @@ limitations under the License.
 package network
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -40,6 +41,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -551,7 +553,7 @@ func (config *NetworkingTestConfig) createSessionAffinityService(selector map[st
 
 // DeleteNodePortService deletes NodePort service.
 func (config *NetworkingTestConfig) DeleteNodePortService() {
-	err := config.getServiceClient().Delete(config.NodePortService.Name, nil)
+	err := config.getServiceClient().Delete(context.TODO(), config.NodePortService.Name, nil)
 	framework.ExpectNoError(err, "error while deleting NodePortService. err:%v)", err)
 	time.Sleep(15 * time.Second) // wait for kube-proxy to catch up with the service being deleted.
 }
@@ -568,14 +570,14 @@ func (config *NetworkingTestConfig) createTestPods() {
 	framework.ExpectNoError(config.f.WaitForPodRunning(testContainerPod.Name))
 
 	var err error
-	config.TestContainerPod, err = config.getPodClient().Get(testContainerPod.Name, metav1.GetOptions{})
+	config.TestContainerPod, err = config.getPodClient().Get(context.TODO(), testContainerPod.Name, metav1.GetOptions{})
 	if err != nil {
 		framework.Failf("Failed to retrieve %s pod: %v", testContainerPod.Name, err)
 	}
 
 	if config.HostNetwork {
 		framework.ExpectNoError(config.f.WaitForPodRunning(hostTestContainerPod.Name))
-		config.HostTestContainerPod, err = config.getPodClient().Get(hostTestContainerPod.Name, metav1.GetOptions{})
+		config.HostTestContainerPod, err = config.getPodClient().Get(context.TODO(), hostTestContainerPod.Name, metav1.GetOptions{})
 		if err != nil {
 			framework.Failf("Failed to retrieve %s pod: %v", hostTestContainerPod.Name, err)
 		}
@@ -583,13 +585,13 @@ func (config *NetworkingTestConfig) createTestPods() {
 }
 
 func (config *NetworkingTestConfig) createService(serviceSpec *v1.Service) *v1.Service {
-	_, err := config.getServiceClient().Create(serviceSpec)
+	_, err := config.getServiceClient().Create(context.TODO(), serviceSpec, metav1.CreateOptions{})
 	framework.ExpectNoError(err, fmt.Sprintf("Failed to create %s service: %v", serviceSpec.Name, err))
 
 	err = framework.WaitForService(config.f.ClientSet, config.Namespace, serviceSpec.Name, true, 5*time.Second, 45*time.Second)
 	framework.ExpectNoError(err, fmt.Sprintf("error while waiting for service:%s err: %v", serviceSpec.Name, err))
 
-	createdService, err := config.getServiceClient().Get(serviceSpec.Name, metav1.GetOptions{})
+	createdService, err := config.getServiceClient().Get(context.TODO(), serviceSpec.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err, fmt.Sprintf("Failed to create %s service: %v", serviceSpec.Name, err))
 
 	return createdService
@@ -619,7 +621,7 @@ func (config *NetworkingTestConfig) setup(selector map[string]string) {
 	framework.ExpectNoError(err)
 	config.ExternalAddr = e2enode.FirstAddress(nodeList, v1.NodeExternalIP)
 
-	framework.SkipUnlessNodeCountIsAtLeast(2)
+	e2eskipper.SkipUnlessNodeCountIsAtLeast(2)
 	config.Nodes = nodeList.Items
 
 	ginkgo.By("Creating the service on top of the pods in kubernetes")
@@ -665,7 +667,7 @@ func (config *NetworkingTestConfig) createNetProxyPods(podName string, selector 
 	runningPods := make([]*v1.Pod, 0, len(nodes))
 	for _, p := range createdPods {
 		framework.ExpectNoError(config.f.WaitForPodReady(p.Name))
-		rp, err := config.getPodClient().Get(p.Name, metav1.GetOptions{})
+		rp, err := config.getPodClient().Get(context.TODO(), p.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		runningPods = append(runningPods, rp)
 	}
@@ -676,7 +678,7 @@ func (config *NetworkingTestConfig) createNetProxyPods(podName string, selector 
 // DeleteNetProxyPod deletes the first endpoint pod and waits for it being removed.
 func (config *NetworkingTestConfig) DeleteNetProxyPod() {
 	pod := config.EndpointPods[0]
-	config.getPodClient().Delete(pod.Name, metav1.NewDeleteOptions(0))
+	config.getPodClient().Delete(context.TODO(), pod.Name, metav1.NewDeleteOptions(0))
 	config.EndpointPods = config.EndpointPods[1:]
 	// wait for pod being deleted.
 	err := e2epod.WaitForPodToDisappear(config.f.ClientSet, config.Namespace, pod.Name, labels.Everything(), time.Second, wait.ForeverTestTimeout)

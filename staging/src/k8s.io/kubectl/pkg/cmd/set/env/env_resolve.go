@@ -17,6 +17,7 @@ limitations under the License.
 package env
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"strconv"
@@ -51,7 +52,7 @@ func getSecretRefValue(client kubernetes.Interface, namespace string, store *Res
 	secret, ok := store.SecretStore[secretSelector.Name]
 	if !ok {
 		var err error
-		secret, err = client.CoreV1().Secrets(namespace).Get(secretSelector.Name, metav1.GetOptions{})
+		secret, err = client.CoreV1().Secrets(namespace).Get(context.TODO(), secretSelector.Name, metav1.GetOptions{})
 		if err != nil {
 			return "", err
 		}
@@ -69,7 +70,7 @@ func getConfigMapRefValue(client kubernetes.Interface, namespace string, store *
 	configMap, ok := store.ConfigMapStore[configMapSelector.Name]
 	if !ok {
 		var err error
-		configMap, err = client.CoreV1().ConfigMaps(namespace).Get(configMapSelector.Name, metav1.GetOptions{})
+		configMap, err = client.CoreV1().ConfigMaps(namespace).Get(context.TODO(), configMapSelector.Name, metav1.GetOptions{})
 		if err != nil {
 			return "", err
 		}

@@ -17,6 +17,7 @@ limitations under the License.
 package integration
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"reflect"
@@ -210,7 +211,7 @@ func testStoragedVersionInCRDStatus(t *testing.T, ns string, noxuDefinition *api
 	}
 
 	// The storage version list should be initilized to storage version
-	crd, err := apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(noxuDefinition.Name, metav1.GetOptions{})
+	crd, err := apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(context.TODO(), noxuDefinition.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -220,11 +221,11 @@ func testStoragedVersionInCRDStatus(t *testing.T, ns string, noxuDefinition *api
 
 	// Changing CRD storage version should be reflected immediately
 	crd.Spec.Versions = versionsV1Beta2Storage
-	_, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(crd)
+	_, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(context.TODO(), crd, metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	crd, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(noxuDefinition.Name, metav1.GetOptions{})
+	crd, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(context.TODO(), noxuDefinition.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}

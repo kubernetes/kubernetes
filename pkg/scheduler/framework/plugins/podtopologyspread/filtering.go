@@ -194,10 +194,8 @@ func (pl *PodTopologySpread) RemovePod(ctx context.Context, cycleState *framewor
 func getPreFilterState(cycleState *framework.CycleState) (*preFilterState, error) {
 	c, err := cycleState.Read(preFilterStateKey)
 	if err != nil {
-		// The preFilterState wasn't pre-computed in prefilter. We ignore the error for now since
-		// we are able to handle that by computing it again (e.g. in Filter()).
-		klog.V(5).Infof("Error reading %q from cycleState: %v", preFilterStateKey, err)
-		return nil, nil
+		// preFilterState doesn't exist, likely PreFilter wasn't invoked.
+		return nil, fmt.Errorf("error reading %q from cycleState: %v", preFilterStateKey, err)
 	}
 
 	s, ok := c.(*preFilterState)
@@ -255,7 +253,8 @@ func calPreFilterState(pod *v1.Pod, allNodes []*schedulernodeinfo.NodeInfo) (*pr
 			matchTotal := int32(0)
 			// nodeInfo.Pods() can be empty; or all pods don't fit
 			for _, existingPod := range nodeInfo.Pods() {
-				if existingPod.Namespace != pod.Namespace {
+				// Bypass terminating Pod (see #87621).
+				if existingPod.DeletionTimestamp != nil || existingPod.Namespace != pod.Namespace {
 					continue
 				}
 				if constraint.selector.Matches(labels.Set(existingPod.Labels)) {
@@ -290,11 +289,6 @@ func (pl *PodTopologySpread) Filter(ctx context.Context, cycleState *framework.C
 	s, err := getPreFilterState(cycleState)
 	if err != nil {
 		return framework.NewStatus(framework.Error, err.Error())
-	}
-	// nil preFilterState is illegal.
-	if s == nil {
-		// TODO(autoscaler): get it implemented.
-		return framework.NewStatus(framework.Error, "preFilterState not pre-computed for PodTopologySpread Plugin")
 	}
 
 	// However, "empty" preFilterState is legit which tolerates every toSchedule Pod.

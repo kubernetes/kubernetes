@@ -73,10 +73,14 @@ go_library(
         "//vendor/k8s.io/klog:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:android": [
+            "//pkg/apis/core/v1/helper:go_default_library",
             "//pkg/kubelet/qos:go_default_library",
+            "//vendor/github.com/opencontainers/runc/libcontainer/cgroups/fs:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:linux": [
+            "//pkg/apis/core/v1/helper:go_default_library",
             "//pkg/kubelet/qos:go_default_library",
+            "//vendor/github.com/opencontainers/runc/libcontainer/cgroups/fs:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:windows": [
             "//pkg/kubelet/apis:go_default_library",
@@ -130,7 +134,17 @@ go_test(
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/github.com/stretchr/testify/require:go_default_library",
         "//vendor/k8s.io/utils/pointer:go_default_library",
-    ],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:android": [
+            "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
+            "//vendor/github.com/opencontainers/runc/libcontainer/cgroups/fs:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:linux": [
+            "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
+            "//vendor/github.com/opencontainers/runc/libcontainer/cgroups/fs:go_default_library",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 filegroup(
