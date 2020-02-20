@@ -27,6 +27,7 @@ import (
 	"sort"
 	"strings"
 	"testing"
+	"text/template"
 
 	"github.com/lithammer/dedent"
 	"github.com/spf13/cobra"
@@ -45,13 +46,16 @@ const (
 	defaultNumberOfImages = 8
 )
 
-// dummyKubernetesVersion is just used for unit testing, in order to not make
-// kubeadm lookup dl.k8s.io to resolve what the latest stable release is
-var dummyKubernetesVersion = constants.MinimumControlPlaneVersion.String()
+var (
+	// dummyKubernetesVersion and dummyKubernetesVersionStr are just used for unit testing, in order to not make
+	// kubeadm lookup dl.k8s.io to resolve what the latest stable release is
+	dummyKubernetesVersion    = constants.MinimumControlPlaneVersion
+	dummyKubernetesVersionStr = dummyKubernetesVersion.String()
+)
 
 func TestNewCmdConfigImagesList(t *testing.T) {
 	var output bytes.Buffer
-	mockK8sVersion := dummyKubernetesVersion
+	mockK8sVersion := dummyKubernetesVersionStr
 	images := NewCmdConfigImagesList(&output, &mockK8sVersion)
 	if err := images.RunE(nil, nil); err != nil {
 		t.Fatalf("Error from running the images command: %v", err)
@@ -116,7 +120,7 @@ func TestImagesListRunWithCustomConfigPath(t *testing.T) {
 			}
 
 			i, err := NewImagesList(configFilePath, &kubeadmapiv1beta2.ClusterConfiguration{
-				KubernetesVersion: dummyKubernetesVersion,
+				KubernetesVersion: dummyKubernetesVersionStr,
 			})
 			if err != nil {
 				t.Fatalf("Failed getting the kubeadm images command: %v", err)
@@ -149,7 +153,7 @@ func TestConfigImagesListRunWithoutPath(t *testing.T) {
 			name:           "empty config",
 			expectedImages: defaultNumberOfImages,
 			cfg: kubeadmapiv1beta2.ClusterConfiguration{
-				KubernetesVersion: dummyKubernetesVersion,
+				KubernetesVersion: dummyKubernetesVersionStr,
 			},
 		},
 		{
@@ -160,21 +164,21 @@ func TestConfigImagesListRunWithoutPath(t *testing.T) {
 						Endpoints: []string{"https://some.etcd.com:2379"},
 					},
 				},
-				KubernetesVersion: dummyKubernetesVersion,
+				KubernetesVersion: dummyKubernetesVersionStr,
 			},
 			expectedImages: defaultNumberOfImages - 1,
 		},
 		{
 			name: "coredns enabled",
 			cfg: kubeadmapiv1beta2.ClusterConfiguration{
-				KubernetesVersion: dummyKubernetesVersion,
+				KubernetesVersion: dummyKubernetesVersionStr,
 			},
 			expectedImages: defaultNumberOfImages,
 		},
 		{
 			name: "kube-dns enabled",
 			cfg: kubeadmapiv1beta2.ClusterConfiguration{
-				KubernetesVersion: dummyKubernetesVersion,
+				KubernetesVersion: dummyKubernetesVersionStr,
 				DNS: kubeadmapiv1beta2.DNS{
 					Type: kubeadmapiv1beta2.KubeDNS,
 				},
@@ -210,6 +214,23 @@ func TestConfigImagesListRunWithoutPath(t *testing.T) {
 }
 
 func TestConfigImagesListOutput(t *testing.T) {
+
+	etcdVersion, ok := constants.SupportedEtcdVersion[uint8(dummyKubernetesVersion.Minor())]
+	if !ok {
+		t.Fatalf("cannot determine etcd version for Kubernetes version %s", dummyKubernetesVersionStr)
+	}
+	versionMapping := struct {
+		EtcdVersion    string
+		KubeVersion    string
+		PauseVersion   string
+		CoreDNSVersion string
+	}{
+		EtcdVersion:    etcdVersion,
+		KubeVersion:    "v" + dummyKubernetesVersionStr,
+		PauseVersion:   constants.PauseVersion,
+		CoreDNSVersion: constants.CoreDNSVersion,
+	}
+
 	testcases := []struct {
 		name           string
 		cfg            kubeadmapiv1beta2.ClusterConfiguration
@@ -219,35 +240,35 @@ func TestConfigImagesListOutput(t *testing.T) {
 		{
 			name: "text output",
 			cfg: kubeadmapiv1beta2.ClusterConfiguration{
-				KubernetesVersion: dummyKubernetesVersion,
+				KubernetesVersion: dummyKubernetesVersionStr,
 			},
 			outputFormat: "text",
-			expectedOutput: `k8s.gcr.io/kube-apiserver:v1.16.0
-k8s.gcr.io/kube-controller-manager:v1.16.0
-k8s.gcr.io/kube-scheduler:v1.16.0
-k8s.gcr.io/kube-proxy:v1.16.0
-k8s.gcr.io/pause:3.2
-k8s.gcr.io/etcd:3.3.17-0
-k8s.gcr.io/coredns:1.6.5
+			expectedOutput: `k8s.gcr.io/kube-apiserver:{{.KubeVersion}}
+k8s.gcr.io/kube-controller-manager:{{.KubeVersion}}
+k8s.gcr.io/kube-scheduler:{{.KubeVersion}}
+k8s.gcr.io/kube-proxy:{{.KubeVersion}}
+k8s.gcr.io/pause:{{.PauseVersion}}
+k8s.gcr.io/etcd:{{.EtcdVersion}}
+k8s.gcr.io/coredns:{{.CoreDNSVersion}}
 `,
 		},
 		{
 			name: "JSON output",
 			cfg: kubeadmapiv1beta2.ClusterConfiguration{
-				KubernetesVersion: dummyKubernetesVersion,
+				KubernetesVersion: dummyKubernetesVersionStr,
 			},
 			outputFormat: "json",
 			expectedOutput: `{
     "kind": "Images",
     "apiVersion": "output.kubeadm.k8s.io/v1alpha1",
     "images": [
-        "k8s.gcr.io/kube-apiserver:v1.16.0",
-        "k8s.gcr.io/kube-controller-manager:v1.16.0",
-        "k8s.gcr.io/kube-scheduler:v1.16.0",
-        "k8s.gcr.io/kube-proxy:v1.16.0",
-        "k8s.gcr.io/pause:3.2",
-        "k8s.gcr.io/etcd:3.3.17-0",
-        "k8s.gcr.io/coredns:1.6.5"
+        "k8s.gcr.io/kube-apiserver:{{.KubeVersion}}",
+        "k8s.gcr.io/kube-controller-manager:{{.KubeVersion}}",
+        "k8s.gcr.io/kube-scheduler:{{.KubeVersion}}",
+        "k8s.gcr.io/kube-proxy:{{.KubeVersion}}",
+        "k8s.gcr.io/pause:{{.PauseVersion}}",
+        "k8s.gcr.io/etcd:{{.EtcdVersion}}",
+        "k8s.gcr.io/coredns:{{.CoreDNSVersion}}"
     ]
 }
 `,
@@ -255,44 +276,44 @@ k8s.gcr.io/coredns:1.6.5
 		{
 			name: "YAML output",
 			cfg: kubeadmapiv1beta2.ClusterConfiguration{
-				KubernetesVersion: dummyKubernetesVersion,
+				KubernetesVersion: dummyKubernetesVersionStr,
 			},
 			outputFormat: "yaml",
 			expectedOutput: `apiVersion: output.kubeadm.k8s.io/v1alpha1
 images:
-- k8s.gcr.io/kube-apiserver:v1.16.0
-- k8s.gcr.io/kube-controller-manager:v1.16.0
-- k8s.gcr.io/kube-scheduler:v1.16.0
-- k8s.gcr.io/kube-proxy:v1.16.0
-- k8s.gcr.io/pause:3.2
-- k8s.gcr.io/etcd:3.3.17-0
-- k8s.gcr.io/coredns:1.6.5
+- k8s.gcr.io/kube-apiserver:{{.KubeVersion}}
+- k8s.gcr.io/kube-controller-manager:{{.KubeVersion}}
+- k8s.gcr.io/kube-scheduler:{{.KubeVersion}}
+- k8s.gcr.io/kube-proxy:{{.KubeVersion}}
+- k8s.gcr.io/pause:{{.PauseVersion}}
+- k8s.gcr.io/etcd:{{.EtcdVersion}}
+- k8s.gcr.io/coredns:{{.CoreDNSVersion}}
 kind: Images
 `,
 		},
 		{
 			name: "go-template output",
 			cfg: kubeadmapiv1beta2.ClusterConfiguration{
-				KubernetesVersion: dummyKubernetesVersion,
+				KubernetesVersion: dummyKubernetesVersionStr,
 			},
 			outputFormat: `go-template={{range .images}}{{.}}{{"\n"}}{{end}}`,
-			expectedOutput: `k8s.gcr.io/kube-apiserver:v1.16.0
-k8s.gcr.io/kube-controller-manager:v1.16.0
-k8s.gcr.io/kube-scheduler:v1.16.0
-k8s.gcr.io/kube-proxy:v1.16.0
-k8s.gcr.io/pause:3.2
-k8s.gcr.io/etcd:3.3.17-0
-k8s.gcr.io/coredns:1.6.5
+			expectedOutput: `k8s.gcr.io/kube-apiserver:{{.KubeVersion}}
+k8s.gcr.io/kube-controller-manager:{{.KubeVersion}}
+k8s.gcr.io/kube-scheduler:{{.KubeVersion}}
+k8s.gcr.io/kube-proxy:{{.KubeVersion}}
+k8s.gcr.io/pause:{{.PauseVersion}}
+k8s.gcr.io/etcd:{{.EtcdVersion}}
+k8s.gcr.io/coredns:{{.CoreDNSVersion}}
 `,
 		},
 		{
 			name: "JSONPATH output",
 			cfg: kubeadmapiv1beta2.ClusterConfiguration{
-				KubernetesVersion: dummyKubernetesVersion,
+				KubernetesVersion: dummyKubernetesVersionStr,
 			},
 			outputFormat: `jsonpath={range.images[*]}{@} {end}`,
-			expectedOutput: "k8s.gcr.io/kube-apiserver:v1.16.0 k8s.gcr.io/kube-controller-manager:v1.16.0 k8s.gcr.io/kube-scheduler:v1.16.0 " +
-				"k8s.gcr.io/kube-proxy:v1.16.0 k8s.gcr.io/pause:3.2 k8s.gcr.io/etcd:3.3.17-0 k8s.gcr.io/coredns:1.6.5 ",
+			expectedOutput: "k8s.gcr.io/kube-apiserver:{{.KubeVersion}} k8s.gcr.io/kube-controller-manager:{{.KubeVersion}} k8s.gcr.io/kube-scheduler:{{.KubeVersion}} " +
+				"k8s.gcr.io/kube-proxy:{{.KubeVersion}} k8s.gcr.io/pause:{{.PauseVersion}} k8s.gcr.io/etcd:{{.EtcdVersion}} k8s.gcr.io/coredns:{{.CoreDNSVersion}} ",
 		},
 	}
 
@@ -309,13 +330,21 @@ k8s.gcr.io/coredns:1.6.5
 				t.Fatalf("did not expect an error while creating the Images command: %v", err)
 			}
 
-			var output bytes.Buffer
+			var output, expectedOutput bytes.Buffer
 
 			if err = i.Run(&output, printer); err != nil {
 				t.Fatalf("did not expect an error running the Images command: %v", err)
 			}
 
-			if output.String() != tc.expectedOutput {
+			tmpl, err := template.New("test").Parse(tc.expectedOutput)
+			if err != nil {
+				t.Fatalf("could not create template: %v", err)
+			}
+			if err = tmpl.Execute(&expectedOutput, versionMapping); err != nil {
+				t.Fatalf("could not execute template: %v", err)
+			}
+
+			if output.String() != expectedOutput.String() {
 				t.Fatalf("unexpected output:\n|%s|\nexpected:\n|%s|\n", output.String(), tc.expectedOutput)
 			}
 		})
