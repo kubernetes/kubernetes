@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2019-06-01/network"
 	"github.com/Azure/go-autorest/autorest/to"
@@ -34,10 +35,10 @@ import (
 )
 
 func TestDeleteRoute(t *testing.T) {
-	fakeRoutes := newFakeRoutesClient()
+	fakeTable := newFakeRouteTablesClient()
 
 	cloud := &Cloud{
-		RoutesClient: fakeRoutes,
+		RouteTablesClient: fakeTable,
 		Config: Config{
 			RouteTableResourceGroup: "foo",
 			RouteTableName:          "bar",
@@ -46,13 +47,30 @@ func TestDeleteRoute(t *testing.T) {
 		unmanagedNodes:     sets.NewString(),
 		nodeInformerSynced: func() bool { return true },
 	}
-	route := cloudprovider.Route{TargetNode: "node", DestinationCIDR: "1.2.3.4/24"}
-	routeName := mapNodeNameToRouteName(route.TargetNode, route.DestinationCIDR)
 
-	fakeRoutes.FakeStore = map[string]map[string]network.Route{
-		cloud.RouteTableName: {
-			routeName: {},
+	cache, _ := cloud.newRouteTableCache()
+	cloud.rtCache = cache
+	cloud.routeUpdater = newDelayedRouteUpdater(cloud, 100*time.Millisecond)
+	go cloud.routeUpdater.run()
+	route := cloudprovider.Route{
+		TargetNode:      "node",
+		DestinationCIDR: "1.2.3.4/24",
+	}
+	routeName := mapNodeNameToRouteName(route.TargetNode, route.DestinationCIDR)
+	routeTables := network.RouteTable{
+		Name:     &cloud.RouteTableName,
+		Location: &cloud.Location,
+		RouteTablePropertiesFormat: &network.RouteTablePropertiesFormat{
+			Routes: &[]network.Route{
+				{
+					Name: &routeName,
+				},
+			},
 		},
+	}
+	fakeTable.FakeStore = map[string]map[string]network.RouteTable{}
+	fakeTable.FakeStore[cloud.RouteTableResourceGroup] = map[string]network.RouteTable{
+		cloud.RouteTableName: routeTables,
 	}
 
 	err := cloud.DeleteRoute(context.TODO(), "cluster", &route)
@@ -61,15 +79,17 @@ func TestDeleteRoute(t *testing.T) {
 		t.FailNow()
 	}
 
-	mp, found := fakeRoutes.FakeStore[cloud.RouteTableName]
+	rt, found := fakeTable.FakeStore[cloud.RouteTableResourceGroup][cloud.RouteTableName]
 	if !found {
-		t.Errorf("unexpected missing item for %s", cloud.RouteTableName)
+		t.Errorf("unexpected missing routetable for %s", cloud.RouteTableName)
 		t.FailNow()
 	}
-	ob, found := mp[routeName]
-	if found {
-		t.Errorf("unexpectedly found: %v that should have been deleted.", ob)
-		t.FailNow()
+
+	for _, r := range *rt.Routes {
+		if to.String(r.Name) == routeName {
+			t.Errorf("unexpectedly found: %v that should have been deleted.", routeName)
+			t.FailNow()
+		}
 	}
 
 	// test delete route for unmanaged nodes.
@@ -97,11 +117,9 @@ func TestDeleteRoute(t *testing.T) {
 func TestCreateRoute(t *testing.T) {
 	fakeTable := newFakeRouteTablesClient()
 	fakeVM := &fakeVMSet{}
-	fakeRoutes := newFakeRoutesClient()
 
 	cloud := &Cloud{
 		RouteTablesClient: fakeTable,
-		RoutesClient:      fakeRoutes,
 		vmSet:             fakeVM,
 		Config: Config{
 			RouteTableResourceGroup: "foo",
@@ -113,10 +131,13 @@ func TestCreateRoute(t *testing.T) {
 	}
 	cache, _ := cloud.newRouteTableCache()
 	cloud.rtCache = cache
+	cloud.routeUpdater = newDelayedRouteUpdater(cloud, 100*time.Millisecond)
+	go cloud.routeUpdater.run()
 
 	expectedTable := network.RouteTable{
-		Name:     &cloud.RouteTableName,
-		Location: &cloud.Location,
+		Name:                       &cloud.RouteTableName,
+		Location:                   &cloud.Location,
+		RouteTablePropertiesFormat: &network.RouteTablePropertiesFormat{},
 	}
 	fakeTable.FakeStore = map[string]map[string]network.RouteTable{}
 	fakeTable.FakeStore[cloud.RouteTableResourceGroup] = map[string]network.RouteTable{
@@ -134,24 +155,47 @@ func TestCreateRoute(t *testing.T) {
 		t.Errorf("unexpected error create if not exists route table: %v", err)
 		t.FailNow()
 	}
-	if len(fakeTable.Calls) != 1 || fakeTable.Calls[0] != "Get" {
+	if len(fakeTable.Calls) != 2 {
 		t.Errorf("unexpected calls create if not exists, exists: %v", fakeTable.Calls)
 	}
 
 	routeName := mapNodeNameToRouteName(route.TargetNode, string(route.DestinationCIDR))
-	routeInfo, found := fakeRoutes.FakeStore[cloud.RouteTableName][routeName]
+	rt, found := fakeTable.FakeStore[cloud.RouteTableResourceGroup][cloud.RouteTableName]
 	if !found {
-		t.Errorf("could not find route: %v in %v", routeName, fakeRoutes.FakeStore)
+		t.Errorf("unexpected missing routetable for %s", cloud.RouteTableName)
 		t.FailNow()
 	}
-	if *routeInfo.AddressPrefix != route.DestinationCIDR {
-		t.Errorf("Expected cidr: %s, saw %s", *routeInfo.AddressPrefix, route.DestinationCIDR)
+
+	foundRoute := false
+	for _, r := range *rt.Routes {
+		if to.String(r.Name) == routeName {
+			foundRoute = true
+			if *r.AddressPrefix != route.DestinationCIDR {
+				t.Errorf("Expected cidr: %s, saw %s", *r.AddressPrefix, route.DestinationCIDR)
+			}
+			if r.NextHopType != network.RouteNextHopTypeVirtualAppliance {
+				t.Errorf("Expected next hop: %v, saw %v", network.RouteNextHopTypeVirtualAppliance, r.NextHopType)
+			}
+			if *r.NextHopIPAddress != nodeIP {
+				t.Errorf("Expected IP address: %s, saw %s", nodeIP, *r.NextHopIPAddress)
+			}
+
+		}
 	}
-	if routeInfo.NextHopType != network.RouteNextHopTypeVirtualAppliance {
-		t.Errorf("Expected next hop: %v, saw %v", network.RouteNextHopTypeVirtualAppliance, routeInfo.NextHopType)
+	if !foundRoute {
+		t.Errorf("could not find route: %v in %v", routeName, fakeTable.FakeStore)
+		t.FailNow()
 	}
-	if *routeInfo.NextHopIPAddress != nodeIP {
-		t.Errorf("Expected IP address: %s, saw %s", nodeIP, *routeInfo.NextHopIPAddress)
+
+	// test create again without real creation, clean fakeTable calls
+	fakeTable.Calls = []string{}
+	err = cloud.CreateRoute(context.TODO(), "cluster", "unused", &route)
+	if err != nil {
+		t.Errorf("unexpected error creating route: %v", err)
+		t.FailNow()
+	}
+	if len(fakeTable.Calls) != 1 || fakeTable.Calls[0] != "Get" {
+		t.Errorf("unexpected route calls create if not exists, exists: %v", fakeTable.Calls)
 	}
 
 	// test create route for unmanaged nodes.
@@ -175,73 +219,6 @@ func TestCreateRoute(t *testing.T) {
 	}
 	if cidr != nodeCIDR {
 		t.Errorf("unexpected cidr %s, saw %s", nodeCIDR, cidr)
-	}
-}
-
-func TestCreateRouteTableIfNotExists_Exists(t *testing.T) {
-	fake := newFakeRouteTablesClient()
-	cloud := &Cloud{
-		RouteTablesClient: fake,
-		Config: Config{
-			RouteTableResourceGroup: "foo",
-			RouteTableName:          "bar",
-			Location:                "location",
-		},
-	}
-	cache, _ := cloud.newRouteTableCache()
-	cloud.rtCache = cache
-
-	expectedTable := network.RouteTable{
-		Name:     &cloud.RouteTableName,
-		Location: &cloud.Location,
-	}
-	fake.FakeStore = map[string]map[string]network.RouteTable{}
-	fake.FakeStore[cloud.RouteTableResourceGroup] = map[string]network.RouteTable{
-		cloud.RouteTableName: expectedTable,
-	}
-	err := cloud.createRouteTableIfNotExists("clusterName", &cloudprovider.Route{TargetNode: "node", DestinationCIDR: "1.2.3.4/16"})
-	if err != nil {
-		t.Errorf("unexpected error create if not exists route table: %v", err)
-		t.FailNow()
-	}
-	if len(fake.Calls) != 1 || fake.Calls[0] != "Get" {
-		t.Errorf("unexpected calls create if not exists, exists: %v", fake.Calls)
-	}
-}
-
-func TestCreateRouteTableIfNotExists_NotExists(t *testing.T) {
-	fake := newFakeRouteTablesClient()
-	cloud := &Cloud{
-		RouteTablesClient: fake,
-		Config: Config{
-			RouteTableResourceGroup: "foo",
-			RouteTableName:          "bar",
-			Location:                "location",
-		},
-	}
-	cache, _ := cloud.newRouteTableCache()
-	cloud.rtCache = cache
-
-	expectedTable := network.RouteTable{
-		Name:     &cloud.RouteTableName,
-		Location: &cloud.Location,
-	}
-
-	err := cloud.createRouteTableIfNotExists("clusterName", &cloudprovider.Route{TargetNode: "node", DestinationCIDR: "1.2.3.4/16"})
-	if err != nil {
-		t.Errorf("unexpected error create if not exists route table: %v", err)
-		t.FailNow()
-	}
-
-	table := fake.FakeStore[cloud.RouteTableResourceGroup][cloud.RouteTableName]
-	if *table.Location != *expectedTable.Location {
-		t.Errorf("mismatch: %s vs %s", *table.Location, *expectedTable.Location)
-	}
-	if *table.Name != *expectedTable.Name {
-		t.Errorf("mismatch: %s vs %s", *table.Name, *expectedTable.Name)
-	}
-	if len(fake.Calls) != 2 || fake.Calls[0] != "Get" || fake.Calls[1] != "CreateOrUpdate" {
-		t.Errorf("unexpected calls create if not exists, exists: %v", fake.Calls)
 	}
 }
 
