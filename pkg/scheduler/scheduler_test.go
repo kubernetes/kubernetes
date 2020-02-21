@@ -1161,7 +1161,6 @@ func TestSchedulerCacheRacingWithQueue(t *testing.T) {
 
 	// Our goal is to ensure the scheduling of p2 is based on the the snapshot
 	// that p1.label has been updated (to "bar").
-	// cache.UpdateSnapshot(emptySnapshot)
 	pods, err := emptySnapshot.Pods().List(labels.NewSelector())
 	if err != nil {
 		t.Fatalf("cannot get pods from snapshot: %v", err)
@@ -1171,7 +1170,7 @@ func TestSchedulerCacheRacingWithQueue(t *testing.T) {
 	}
 	// TODO: uncomment the following section and ensure the test always passes, i.e. run
 	// go test k8s.io/kubernetes/pkg/scheduler/ -run ^TestSchedulerCacheRacingWithQueue$ -count=20
-	// if _, ok := pods[0].Labels["bar"]; !ok {
-	// 	t.Errorf("expect label 'bar' to be present in pod %q in the snapshot, but got %v", pods[0].Name, pods[0].Labels)
-	// }
+	if _, ok := pods[0].Labels["bar"]; !ok {
+		t.Errorf("expect label 'bar' to be present in pod %q in the snapshot, but got %v", pods[0].Name, pods[0].Labels)
+	}
 }

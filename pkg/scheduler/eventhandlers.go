@@ -33,6 +33,67 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/internal/queue"
 )
 
+func parse(obj interface{}) *v1.Pod {
+	switch t := obj.(type) {
+	case *v1.Pod:
+		return t
+	case cache.DeletedFinalStateUnknown:
+		if pod, ok := t.Obj.(*v1.Pod); ok {
+			return pod
+		}
+		utilruntime.HandleError(fmt.Errorf("unable to convert object %T to *v1.Pod", obj))
+	default:
+		utilruntime.HandleError(fmt.Errorf("unable to handle object %T", obj))
+	}
+	return nil
+}
+
+func (sched *Scheduler) onPodAdd(obj interface{}) {
+	pod := parse(obj)
+	if pod == nil {
+		return
+	}
+	// TODO(Huang-Wei): take responsibleForPod() into consideration
+	if assignedPod(pod) {
+		sched.addPodToCache(obj)
+	} else {
+		sched.addPodToSchedulingQueue(obj)
+	}
+}
+
+func (sched *Scheduler) onPodUpdate(old, new interface{}) {
+	oldPod, newPod := parse(old), parse(new)
+	if oldPod == nil || newPod == nil {
+		return
+	}
+	// TODO(Huang-Wei): take responsibleForPod() into consideration
+	oldAssigned, newAssigned := assignedPod(oldPod), assignedPod(newPod)
+	if oldAssigned && newAssigned {
+		sched.updatePodInCache(oldPod, newPod)
+	} else if !oldAssigned && !newAssigned {
+		sched.updatePodInSchedulingQueue(oldPod, newPod)
+	} else if oldAssigned && !newAssigned {
+		sched.deletePodFromCache(oldPod)
+		sched.addPodToSchedulingQueue(newPod)
+	} else if !oldAssigned && newAssigned {
+		sched.deletePodFromSchedulingQueue(oldPod)
+		sched.addPodToCache(newPod)
+	}
+}
+
+func (sched *Scheduler) onPodDelete(obj interface{}) {
+	pod := parse(obj)
+	if pod == nil {
+		return
+	}
+	// TODO(Huang-Wei): take responsibleForPod() into consideration
+	if assignedPod(pod) {
+		sched.deletePodFromCache(pod)
+	} else {
+		sched.deletePodFromSchedulingQueue(pod)
+	}
+}
+
 func (sched *Scheduler) onPvAdd(obj interface{}) {
 	// Pods created when there are no PVs available will be stuck in
 	// unschedulable queue. But unbound PVs created for static provisioning and
@@ -345,54 +406,12 @@ func AddAllEventHandlers(
 	informerFactory informers.SharedInformerFactory,
 	podInformer coreinformers.PodInformer,
 ) {
-	// scheduled pod cache
+	// Use one event handler dealing with Pod events no matter they're assigned or not.
 	podInformer.Informer().AddEventHandler(
-		cache.FilteringResourceEventHandler{
-			FilterFunc: func(obj interface{}) bool {
-				switch t := obj.(type) {
-				case *v1.Pod:
-					return assignedPod(t)
-				case cache.DeletedFinalStateUnknown:
-					if pod, ok := t.Obj.(*v1.Pod); ok {
-						return assignedPod(pod)
-					}
-					utilruntime.HandleError(fmt.Errorf("unable to convert object %T to *v1.Pod in %T", obj, sched))
-					return false
-				default:
-					utilruntime.HandleError(fmt.Errorf("unable to handle object in %T: %T", sched, obj))
-					return false
-				}
-			},
-			Handler: cache.ResourceEventHandlerFuncs{
-				AddFunc:    sched.addPodToCache,
-				UpdateFunc: sched.updatePodInCache,
-				DeleteFunc: sched.deletePodFromCache,
-			},
-		},
-	)
-	// unscheduled pod queue
-	podInformer.Informer().AddEventHandler(
-		cache.FilteringResourceEventHandler{
-			FilterFunc: func(obj interface{}) bool {
-				switch t := obj.(type) {
-				case *v1.Pod:
-					return !assignedPod(t) && responsibleForPod(t, schedulerName)
-				case cache.DeletedFinalStateUnknown:
-					if pod, ok := t.Obj.(*v1.Pod); ok {
-						return !assignedPod(pod) && responsibleForPod(pod, schedulerName)
-					}
-					utilruntime.HandleError(fmt.Errorf("unable to convert object %T to *v1.Pod in %T", obj, sched))
-					return false
-				default:
-					utilruntime.HandleError(fmt.Errorf("unable to handle object in %T: %T", sched, obj))
-					return false
-				}
-			},
-			Handler: cache.ResourceEventHandlerFuncs{
-				AddFunc:    sched.addPodToSchedulingQueue,
-				UpdateFunc: sched.updatePodInSchedulingQueue,
-				DeleteFunc: sched.deletePodFromSchedulingQueue,
-			},
+		cache.ResourceEventHandlerFuncs{
+			AddFunc:    sched.onPodAdd,
+			UpdateFunc: sched.onPodUpdate,
+			DeleteFunc: sched.onPodDelete,
 		},
 	)
 
