@@ -454,7 +454,7 @@ func (m *cgroupManagerImpl) Update(cgroupConfig *CgroupConfig) error {
 	}
 
 	if m.adapter.cgroupManagerType == libcontainerSystemd {
-		if err := m.updateSliceProperties(libcontainerCgroupConfig); err != nil {
+		if err := m.updateSlicePropertiesSystemd(libcontainerCgroupConfig); err != nil {
 			return fmt.Errorf("failed to slice properties for unit %v: %v", cgroupConfig.Name, err)
 		}
 	}
@@ -464,7 +464,12 @@ func (m *cgroupManagerImpl) Update(cgroupConfig *CgroupConfig) error {
 	return nil
 }
 
-func (m *cgroupManagerImpl) updateSliceProperties(c *libcontainerconfigs.Cgroup) error {
+// Since libcontainer doesn't support updating slice properties, and only sets resources params during
+// creating of slice, we have to update them manually.
+//
+// The code is adapted from:
+// https://github.com/opencontainers/runc/blob/v1.0.0-rc10/libcontainer/cgroups/systemd/apply_systemd.go#L138
+func (m *cgroupManagerImpl) updateSlicePropertiesSystemd(c *libcontainerconfigs.Cgroup) error {
 	var (
 		unitName   = c.Name
 		properties []systemddbus.Property
