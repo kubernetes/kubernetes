@@ -18,6 +18,7 @@ package persistentvolume
 
 import (
 	"errors"
+	"reflect"
 	"testing"
 	"time"
 
@@ -25,16 +26,21 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/component-base/featuregate"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/controller"
 	pvtesting "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/testing"
 	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
+	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/volume/csimigration"
 )
 
 var (
@@ -459,5 +465,112 @@ func TestDelayBindingMode(t *testing.T) {
 		if shouldDelay != test.shouldDelay {
 			t.Errorf("Test %q returned unexpected %v", name, test.shouldDelay)
 		}
+	}
+}
+
+func TestAnnealMigrationAnnotations(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigration, true)()
+
+	const testPlugin = "non-migrated-plugin"
+	const gcePlugin = "kubernetes.io/gce-pd"
+	const gceDriver = "pd.csi.storage.gke.io"
+	tests := []struct {
+		name                 string
+		volumeAnnotations    map[string]string
+		expVolumeAnnotations map[string]string
+		claimAnnotations     map[string]string
+		expClaimAnnotations  map[string]string
+		migratedDriverGates  []featuregate.Feature
+	}{
+		{
+			name:                 "migration on for GCE",
+			volumeAnnotations:    map[string]string{pvutil.AnnDynamicallyProvisioned: gcePlugin},
+			expVolumeAnnotations: map[string]string{pvutil.AnnDynamicallyProvisioned: gcePlugin, pvutil.AnnMigratedTo: gceDriver},
+			claimAnnotations:     map[string]string{pvutil.AnnStorageProvisioner: gcePlugin},
+			expClaimAnnotations:  map[string]string{pvutil.AnnStorageProvisioner: gcePlugin, pvutil.AnnMigratedTo: gceDriver},
+			migratedDriverGates:  []featuregate.Feature{features.CSIMigrationGCE},
+		},
+		{
+			name:                 "migration off for GCE",
+			volumeAnnotations:    map[string]string{pvutil.AnnDynamicallyProvisioned: gcePlugin},
+			expVolumeAnnotations: map[string]string{pvutil.AnnDynamicallyProvisioned: gcePlugin},
+			claimAnnotations:     map[string]string{pvutil.AnnStorageProvisioner: gcePlugin},
+			expClaimAnnotations:  map[string]string{pvutil.AnnStorageProvisioner: gcePlugin},
+			migratedDriverGates:  []featuregate.Feature{},
+		},
+		{
+			name:                 "migration off for GCE removes migrated to (rollback)",
+			volumeAnnotations:    map[string]string{pvutil.AnnDynamicallyProvisioned: gcePlugin, pvutil.AnnMigratedTo: gceDriver},
+			expVolumeAnnotations: map[string]string{pvutil.AnnDynamicallyProvisioned: gcePlugin},
+			claimAnnotations:     map[string]string{pvutil.AnnStorageProvisioner: gcePlugin, pvutil.AnnMigratedTo: gceDriver},
+			expClaimAnnotations:  map[string]string{pvutil.AnnStorageProvisioner: gcePlugin},
+			migratedDriverGates:  []featuregate.Feature{},
+		},
+		{
+			name:                 "migration on for GCE other plugin not affected",
+			volumeAnnotations:    map[string]string{pvutil.AnnDynamicallyProvisioned: testPlugin},
+			expVolumeAnnotations: map[string]string{pvutil.AnnDynamicallyProvisioned: testPlugin},
+			claimAnnotations:     map[string]string{pvutil.AnnStorageProvisioner: testPlugin},
+			expClaimAnnotations:  map[string]string{pvutil.AnnStorageProvisioner: testPlugin},
+			migratedDriverGates:  []featuregate.Feature{features.CSIMigrationGCE},
+		},
+		{
+			name:                 "not dynamically provisioned migration off for GCE",
+			volumeAnnotations:    map[string]string{},
+			expVolumeAnnotations: map[string]string{},
+			claimAnnotations:     map[string]string{},
+			expClaimAnnotations:  map[string]string{},
+			migratedDriverGates:  []featuregate.Feature{},
+		},
+		{
+			name:                 "not dynamically provisioned migration on for GCE",
+			volumeAnnotations:    map[string]string{},
+			expVolumeAnnotations: map[string]string{},
+			claimAnnotations:     map[string]string{},
+			expClaimAnnotations:  map[string]string{},
+			migratedDriverGates:  []featuregate.Feature{features.CSIMigrationGCE},
+		},
+		{
+			name:                 "nil annotations migration off for GCE",
+			volumeAnnotations:    nil,
+			expVolumeAnnotations: nil,
+			claimAnnotations:     nil,
+			expClaimAnnotations:  nil,
+			migratedDriverGates:  []featuregate.Feature{},
+		},
+		{
+			name:                 "nil annotations migration on for GCE",
+			volumeAnnotations:    nil,
+			expVolumeAnnotations: nil,
+			claimAnnotations:     nil,
+			expClaimAnnotations:  nil,
+			migratedDriverGates:  []featuregate.Feature{features.CSIMigrationGCE},
+		},
+	}
+
+	translator := csitrans.New()
+	cmpm := csimigration.NewPluginManager(translator)
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, f := range tc.migratedDriverGates {
+				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, f, true)()
+			}
+			if tc.volumeAnnotations != nil {
+				ann := tc.volumeAnnotations
+				updateMigrationAnnotations(cmpm, translator, ann, pvutil.AnnDynamicallyProvisioned)
+				if !reflect.DeepEqual(tc.expVolumeAnnotations, ann) {
+					t.Errorf("got volume annoations: %v, but expected: %v", ann, tc.expVolumeAnnotations)
+				}
+			}
+			if tc.claimAnnotations != nil {
+				ann := tc.claimAnnotations
+				updateMigrationAnnotations(cmpm, translator, ann, pvutil.AnnStorageProvisioner)
+				if !reflect.DeepEqual(tc.expClaimAnnotations, ann) {
+					t.Errorf("got volume annoations: %v, but expected: %v", ann, tc.expVolumeAnnotations)
+				}
+			}
+
+		})
 	}
 }

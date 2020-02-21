@@ -408,8 +408,12 @@ func newClaimArray(name, claimUID, capacity, boundToVolume string, phase v1.Pers
 	}
 }
 
-// claimWithAnnotation saves given annotation into given claims.
-// Meant to be used to compose claims specified inline in a test.
+// claimWithAnnotation saves given annotation into given claims. Meant to be
+// used to compose claims specified inline in a test.
+// TODO(refactor): This helper function (and other helpers related to claim
+// arrays) could use some cleaning up (most assume an array size of one)-
+// replace with annotateClaim at all callsites. The tests require claimArrays
+// but mostly operate on single claims
 func claimWithAnnotation(name, value string, claims []*v1.PersistentVolumeClaim) []*v1.PersistentVolumeClaim {
 	if claims[0].Annotations == nil {
 		claims[0].Annotations = map[string]string{name: value}
@@ -417,6 +421,16 @@ func claimWithAnnotation(name, value string, claims []*v1.PersistentVolumeClaim)
 		claims[0].Annotations[name] = value
 	}
 	return claims
+}
+
+func annotateClaim(claim *v1.PersistentVolumeClaim, ann map[string]string) *v1.PersistentVolumeClaim {
+	if claim.Annotations == nil {
+		claim.Annotations = map[string]string{}
+	}
+	for key, val := range ann {
+		claim.Annotations[key] = val
+	}
+	return claim
 }
 
 // volumeWithAnnotation saves given annotation into given volume.
@@ -524,7 +538,7 @@ func wrapTestWithProvisionCalls(expectedProvisionCalls []provisionCall, toWrap t
 type fakeCSINameTranslator struct{}
 
 func (t fakeCSINameTranslator) GetCSINameFromInTreeName(pluginName string) (string, error) {
-	return "vendor.com/MockCSIPlugin", nil
+	return "vendor.com/MockCSIDriver", nil
 }
 
 type fakeCSIMigratedPluginManager struct{}
