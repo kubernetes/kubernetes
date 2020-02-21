@@ -45,13 +45,20 @@ kube::etcd::validate() {
     exit 1
   fi
 
+  # need set the env of "ETCD_UNSUPPORTED_ARCH" on unstable arch.
+  arch=$(uname -m)
+  if [[ $arch =~ aarch* ]]; then
+	  export ETCD_UNSUPPORTED_ARCH=arm64
+  elif [[ $arch =~ arm* ]]; then
+	  export ETCD_UNSUPPORTED_ARCH=arm
+  fi
   # validate installed version is at least equal to minimum
-  version=$(etcd --version | grep Version | tail -n +1 | head -n 1 | cut -d " " -f 3)
+  version=$(etcd --version | grep Version | head -n 1 | cut -d " " -f 3)
   if [[ $(kube::etcd::version "${ETCD_VERSION}") -gt $(kube::etcd::version "${version}") ]]; then
    export PATH=${KUBE_ROOT}/third_party/etcd:${PATH}
    hash etcd
    echo "${PATH}"
-   version=$(etcd --version | head -n 1 | cut -d " " -f 3)
+   version=$(etcd --version | grep Version | head -n 1 | cut -d " " -f 3)
    if [[ $(kube::etcd::version "${ETCD_VERSION}") -gt $(kube::etcd::version "${version}") ]]; then
     kube::log::usage "etcd version ${ETCD_VERSION} or greater required."
     kube::log::info "You can use 'hack/install-etcd.sh' to install a copy in third_party/."
