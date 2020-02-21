@@ -21,9 +21,11 @@ import (
 	"strings"
 	"testing"
 
+	networkingv1 "k8s.io/api/networking/v1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -899,117 +901,183 @@ func TestValidateIngress(t *testing.T) {
 		ServicePort: intstr.FromInt(80),
 	}
 	pathTypePrefix := networking.PathTypePrefix
+	pathTypeImplementationSpecific := networking.PathTypeImplementationSpecific
 	pathTypeFoo := networking.PathType("foo")
 
-	newValid := func() networking.Ingress {
-		return networking.Ingress{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "foo",
-				Namespace: metav1.NamespaceDefault,
+	baseIngress := networking.Ingress{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "foo",
+			Namespace: metav1.NamespaceDefault,
+		},
+		Spec: networking.IngressSpec{
+			DefaultBackend: &networking.IngressBackend{
+				ServiceName: "default-backend",
+				ServicePort: intstr.FromInt(80),
 			},
-			Spec: networking.IngressSpec{
-				DefaultBackend: &networking.IngressBackend{
-					ServiceName: "default-backend",
-					ServicePort: intstr.FromInt(80),
-				},
-				Rules: []networking.IngressRule{
-					{
-						Host: "foo.bar.com",
-						IngressRuleValue: networking.IngressRuleValue{
-							HTTP: &networking.HTTPIngressRuleValue{
-								Paths: []networking.HTTPIngressPath{
-									{
-										Path:     "/foo",
-										PathType: &pathTypePrefix,
-										Backend:  defaultBackend,
-									},
+			Rules: []networking.IngressRule{
+				{
+					Host: "foo.bar.com",
+					IngressRuleValue: networking.IngressRuleValue{
+						HTTP: &networking.HTTPIngressRuleValue{
+							Paths: []networking.HTTPIngressPath{
+								{
+									Path:     "/foo",
+									PathType: &pathTypeImplementationSpecific,
+									Backend:  defaultBackend,
 								},
 							},
 						},
 					},
 				},
 			},
-			Status: networking.IngressStatus{
-				LoadBalancer: api.LoadBalancerStatus{
-					Ingress: []api.LoadBalancerIngress{
-						{IP: "127.0.0.1"},
-					},
+		},
+		Status: networking.IngressStatus{
+			LoadBalancer: api.LoadBalancerStatus{
+				Ingress: []api.LoadBalancerIngress{
+					{IP: "127.0.0.1"},
 				},
 			},
-		}
-	}
-	servicelessBackend := newValid()
-	servicelessBackend.Spec.DefaultBackend.ServiceName = ""
-	invalidNameBackend := newValid()
-	invalidNameBackend.Spec.DefaultBackend.ServiceName = "defaultBackend"
-	noPortBackend := newValid()
-	noPortBackend.Spec.DefaultBackend = &networking.IngressBackend{ServiceName: defaultBackend.ServiceName}
-	noForwardSlashPath := newValid()
-	noForwardSlashPath.Spec.Rules[0].IngressRuleValue.HTTP.Paths = []networking.HTTPIngressPath{
-		{
-			Path:    "invalid",
-			Backend: defaultBackend,
 		},
 	}
-	badPathType := newValid()
-	badPathType.Spec.Rules[0].IngressRuleValue.HTTP.Paths[0].PathType = &pathTypeFoo
 
-	noPaths := newValid()
-	noPaths.Spec.Rules[0].IngressRuleValue.HTTP.Paths = []networking.HTTPIngressPath{}
-	badHost := newValid()
-	badHost.Spec.Rules[0].Host = "foobar:80"
-	hostIP := "127.0.0.1"
-	badHostIP := newValid()
-	badHostIP.Spec.Rules[0].Host = hostIP
-	badHostIPErr := fmt.Sprintf("spec.rules[0].host: Invalid value: '%v'", hostIP)
+	testCases := map[string]struct {
+		groupVersion       *schema.GroupVersion
+		tweakIngress       func(ing *networking.Ingress)
+		expectErrsOnFields []string
+	}{
+		// valid use cases
+		"wildcard host": {
+			tweakIngress: func(ing *networking.Ingress) {
+				ing.Spec.Rules[0].Host = "*.bar.com"
+			},
+			expectErrsOnFields: []string{},
+		},
+		"empty path (implementation specific)": {
+			tweakIngress: func(ing *networking.Ingress) {
+				ing.Spec.Rules[0].IngressRuleValue.HTTP.Paths[0].Path = ""
+			},
+			expectErrsOnFields: []string{},
+		},
 
-	errorCases := map[string]networking.Ingress{
-		"spec.defaultBackend.serviceName: Required value": servicelessBackend,
-		"spec.defaultBackend.serviceName: Invalid value":  invalidNameBackend,
-		"spec.defaultBackend.servicePort: Invalid value":  noPortBackend,
-		"spec.rules[0].host: Invalid value":               badHost,
-		"spec.rules[0].http.paths: Required value":        noPaths,
-		"spec.rules[0].http.paths[0].path: Invalid value": noForwardSlashPath,
-		"spec.rules[0].http.paths[0].pathType: Unsupported value: \"foo\": supported values: \"ImplementationSpecific\", \"Prefix\", \"exact\"": badPathType,
+		// invalid use cases
+		"backend (v1beta1) with no service": {
+			groupVersion: &networkingv1beta1.SchemeGroupVersion,
+			tweakIngress: func(ing *networking.Ingress) {
+				ing.Spec.DefaultBackend.ServiceName = ""
+			},
+			expectErrsOnFields: []string{
+				"spec.backend.serviceName",
+			},
+		},
+		"defaultBackend (v1) with no service": {
+			tweakIngress: func(ing *networking.Ingress) {
+				ing.Spec.DefaultBackend.ServiceName = ""
+			},
+			expectErrsOnFields: []string{
+				"spec.defaultBackend.serviceName",
+			},
+		},
+		"defaultBackend (v1) with invalid service name": {
+			tweakIngress: func(ing *networking.Ingress) {
+				ing.Spec.DefaultBackend.ServiceName = "invalidName"
+			},
+			expectErrsOnFields: []string{
+				"spec.defaultBackend.serviceName",
+			},
+		},
+		"defaultBackend (v1) with no port": {
+			tweakIngress: func(ing *networking.Ingress) {
+				ing.Spec.DefaultBackend = &networking.IngressBackend{ServiceName: defaultBackend.ServiceName}
+			},
+			expectErrsOnFields: []string{
+				"spec.defaultBackend.servicePort",
+			},
+		},
+		"invalid path type": {
+			tweakIngress: func(ing *networking.Ingress) {
+				ing.Spec.Rules[0].IngressRuleValue.HTTP.Paths[0].PathType = &pathTypeFoo
+			},
+			expectErrsOnFields: []string{
+				"spec.rules[0].http.paths[0].pathType",
+			},
+		},
+		"invalid path (no leading slash)": {
+			tweakIngress: func(ing *networking.Ingress) {
+				ing.Spec.Rules[0].IngressRuleValue.HTTP.Paths[0].Path = "invalid"
+			},
+			expectErrsOnFields: []string{
+				"spec.rules[0].http.paths[0].path",
+			},
+		},
+		"empty path (prefix)": {
+			tweakIngress: func(ing *networking.Ingress) {
+				ing.Spec.Rules[0].IngressRuleValue.HTTP.Paths[0].Path = ""
+				ing.Spec.Rules[0].IngressRuleValue.HTTP.Paths[0].PathType = &pathTypePrefix
+			},
+			expectErrsOnFields: []string{
+				"spec.rules[0].http.paths[0].path",
+			},
+		},
+		"no paths": {
+			tweakIngress: func(ing *networking.Ingress) {
+				ing.Spec.Rules[0].IngressRuleValue.HTTP.Paths = []networking.HTTPIngressPath{}
+			},
+			expectErrsOnFields: []string{
+				"spec.rules[0].http.paths",
+			},
+		},
+		"invalid host (foobar:80)": {
+			tweakIngress: func(ing *networking.Ingress) {
+				ing.Spec.Rules[0].Host = "foobar:80"
+			},
+			expectErrsOnFields: []string{
+				"spec.rules[0].host",
+			},
+		},
+		"invalid host (127.0.0.1)": {
+			tweakIngress: func(ing *networking.Ingress) {
+				ing.Spec.Rules[0].Host = "127.0.0.1"
+			},
+			expectErrsOnFields: []string{
+				"spec.rules[0].host",
+			},
+		},
+		"invalid host (foo.*.bar.com)": {
+			tweakIngress: func(ing *networking.Ingress) {
+				ing.Spec.Rules[0].Host = "foo.*.bar.com"
+			},
+			expectErrsOnFields: []string{
+				"spec.rules[0].host",
+			},
+		},
+		"invalid host (*)": {
+			tweakIngress: func(ing *networking.Ingress) {
+				ing.Spec.Rules[0].Host = "*"
+			},
+			expectErrsOnFields: []string{
+				"spec.rules[0].host",
+			},
+		},
 	}
-	errorCases[badHostIPErr] = badHostIP
 
-	wildcardHost := "foo.*.bar.com"
-	badWildcard := newValid()
-	badWildcard.Spec.Rules[0].Host = wildcardHost
-	badWildcardErr := fmt.Sprintf("spec.rules[0].host: Invalid value: '%v'", wildcardHost)
-	errorCases[badWildcardErr] = badWildcard
-
-	// Test that single wildcard characher hosts are not allowed
-	singleWildcardHost := "*"
-	singleWildcard := newValid()
-	singleWildcard.Spec.Rules[0].Host = singleWildcardHost
-	errorCases[fmt.Sprintf("spec.rules[0].host: Invalid value: '%v'", singleWildcardHost)] = singleWildcard
-
-	for k, v := range errorCases {
-		errs := ValidateIngress(&v, networkingv1beta1.SchemeGroupVersion)
-		if len(errs) == 0 {
-			t.Errorf("expected failure for %q", k)
-		} else {
-			s := strings.Split(k, ":")
-			err := errs[0]
-			if err.Field != s[0] || !strings.Contains(err.Error(), s[1]) {
-				t.Errorf("unexpected error: %q, expected: %q", err, k)
+	for name, testCase := range testCases {
+		t.Run(name, func(t *testing.T) {
+			ingress := baseIngress.DeepCopy()
+			testCase.tweakIngress(ingress)
+			gv := testCase.groupVersion
+			if gv == nil {
+				gv = &networkingv1.SchemeGroupVersion
 			}
-		}
-	}
-
-	// Validate that a single wildcard label is allowed
-	wildHost := newValid()
-	wildHost.Spec.Rules[0].Host = "*.bar.com"
-	validCases := map[string]networking.Ingress{
-		"spec.rules[0].host: Regex value": wildHost,
-	}
-	for k, v := range validCases {
-		errs := ValidateIngress(&v, networkingv1beta1.SchemeGroupVersion)
-		if len(errs) != 0 {
-			t.Errorf("expected success for %q", k)
-		}
+			errs := ValidateIngress(ingress, *gv)
+			if len(testCase.expectErrsOnFields) != len(errs) {
+				t.Fatalf("Expected %d errors, got %d errors: %v", len(testCase.expectErrsOnFields), len(errs), errs)
+			}
+			for i, err := range errs {
+				if err.Field != testCase.expectErrsOnFields[i] {
+					t.Errorf("Expected error on field: %s, got: %s", testCase.expectErrsOnFields[i], err.Error())
+				}
+			}
+		})
 	}
 }
 

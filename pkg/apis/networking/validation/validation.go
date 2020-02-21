@@ -17,6 +17,7 @@ limitations under the License.
 package validation
 
 import (
+	"fmt"
 	"net"
 	"strings"
 
@@ -242,15 +243,11 @@ func validateIngressTLS(spec *networking.IngressSpec, fldPath *field.Path) field
 func ValidateIngressSpec(spec *networking.IngressSpec, fldPath *field.Path, requestGV schema.GroupVersion) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if len(spec.Rules) == 0 && spec.DefaultBackend == nil {
-		switch requestGV {
-		case networkingv1beta1.SchemeGroupVersion, extensionsv1beta1.SchemeGroupVersion:
-			allErrs = append(allErrs, field.Invalid(fldPath, spec.Rules, "either `backend` or `rules` must be specified"))
-		default:
-			allErrs = append(allErrs, field.Invalid(fldPath, spec.Rules, "either `defaultBackend` or `rules` must be specified"))
-		}
+		errMsg := fmt.Sprintf("either `%s` or `rules` must be specified", defaultBackendFieldName(requestGV))
+		allErrs = append(allErrs, field.Invalid(fldPath, spec.Rules, errMsg))
 	}
 	if spec.DefaultBackend != nil {
-		allErrs = append(allErrs, validateIngressBackend(spec.DefaultBackend, fldPath.Child("defaultBackend"))...)
+		allErrs = append(allErrs, validateIngressBackend(spec.DefaultBackend, fldPath.Child(defaultBackendFieldName(requestGV)))...)
 	}
 	if len(spec.Rules) > 0 {
 		allErrs = append(allErrs, validateIngressRules(spec.Rules, fldPath.Child("rules"))...)
@@ -321,9 +318,6 @@ func validateHTTPIngressRuleValue(httpIngressRuleValue *networking.HTTPIngressRu
 
 func validateHTTPIngressPath(path *networking.HTTPIngressPath, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if !strings.HasPrefix(path.Path, "/") {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("path"), path.Path, "must be an absolute path"))
-	}
 
 	if path.PathType != nil {
 		if !supportedPathTypes.Has(string(*path.PathType)) {
@@ -332,11 +326,16 @@ func validateHTTPIngressPath(path *networking.HTTPIngressPath, fldPath *field.Pa
 
 		switch *path.PathType {
 		case networking.PathTypeExact, networking.PathTypePrefix:
+			if !strings.HasPrefix(path.Path, "/") {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("path"), path.Path, "must be an absolute path"))
+			}
 			if len(path.Path) > 0 && strings.Contains(path.Path, "//") {
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("path"), path.Path, "must not contain repeating '/' characters"))
 			}
-		default:
-			// ImplementationSpecific - no additional validation
+		default: // ImplementationSpecific
+			if len(path.Path) > 0 && !strings.HasPrefix(path.Path, "/") {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("path"), path.Path, "must be an absolute path"))
+			}
 		}
 	}
 	allErrs = append(allErrs, validateIngressBackend(&path.Backend, fldPath.Child("backend"))...)
@@ -393,4 +392,15 @@ func ValidateIngressClassSpec(spec *networking.IngressClassSpec, fldPath *field.
 // valid.
 func ValidateIngressClassSpecUpdate(newSpec, oldSpec *networking.IngressClassSpec, fldPath *field.Path) field.ErrorList {
 	return apivalidation.ValidateImmutableField(newSpec.Controller, oldSpec.Controller, fldPath.Child("controller"))
+}
+
+// defaultBackendFieldName returns the name of the field used for defaultBackend
+// in the provided GroupVersion.
+func defaultBackendFieldName(gv schema.GroupVersion) string {
+	switch gv {
+	case networkingv1beta1.SchemeGroupVersion, extensionsv1beta1.SchemeGroupVersion:
+		return "backend"
+	default:
+		return "defaultBackend"
+	}
 }
