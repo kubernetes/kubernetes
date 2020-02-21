@@ -80,6 +80,9 @@ func newAnalyzer(platform string) *analyzer {
 	ctx.GOOS, ctx.GOARCH = platSplit[0], platSplit[1]
 	ctx.CgoEnabled = true
 
+	// add selinux tag explicitly
+	ctx.BuildTags = append(ctx.BuildTags, "selinux")
+
 	a := &analyzer{
 		platform:  platform,
 		fset:      token.NewFileSet(),
