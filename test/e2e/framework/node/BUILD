@@ -4,6 +4,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "resource.go",
+        "runtimeclass.go",
         "wait.go",
     ],
     importpath = "k8s.io/kubernetes/test/e2e/framework/node",
@@ -22,6 +23,8 @@ go_library(
         "//test/e2e/framework/log:go_default_library",
         "//test/e2e/system:go_default_library",
         "//test/utils:go_default_library",
+        "//test/utils/image:go_default_library",
+        "//vendor/k8s.io/utils/pointer:go_default_library",
     ],
 )
 
