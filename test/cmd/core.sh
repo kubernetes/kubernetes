@@ -583,6 +583,34 @@ run_pod_tests() {
   }
 }
 __EOF__
+  kube::test::get_object_assert "node node-v1-test" "{{range.items}}{{if .metadata.annotations.a}}found{{end}}{{end}}:" ':'
+
+  # Dry-run command
+  kubectl replace --dry-run=server -f - "${kube_flags[@]}" << __EOF__
+{
+  "kind": "Node",
+  "apiVersion": "v1",
+  "metadata": {
+    "name": "node-v1-test",
+    "annotations": {"a":"b"},
+    "resourceVersion": "0"
+  }
+}
+__EOF__
+  kubectl replace --dry-run=client -f - "${kube_flags[@]}" << __EOF__
+{
+  "kind": "Node",
+  "apiVersion": "v1",
+  "metadata": {
+    "name": "node-v1-test",
+    "annotations": {"a":"b"},
+    "resourceVersion": "0"
+  }
+}
+__EOF__
+  kube::test::get_object_assert "node node-v1-test" "{{range.items}}{{if .metadata.annotations.a}}found{{end}}{{end}}:" ':'
+
+  # Command
   kubectl replace -f - "${kube_flags[@]}" << __EOF__
 {
   "kind": "Node",

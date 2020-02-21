@@ -145,8 +145,24 @@ func isHTEnabled() bool {
 	return threadsPerCore > 1
 }
 
+func isMultiNUMA() bool {
+	outData, err := exec.Command("/bin/sh", "-c", "lscpu | grep \"NUMA node(s):\" | cut -d \":\" -f 2").Output()
+	framework.ExpectNoError(err)
+
+	numaNodes, err := strconv.Atoi(strings.TrimSpace(string(outData)))
+	framework.ExpectNoError(err)
+
+	return numaNodes > 1
+}
+
 func getCPUSiblingList(cpuRes int64) string {
 	out, err := exec.Command("/bin/sh", "-c", fmt.Sprintf("cat /sys/devices/system/cpu/cpu%d/topology/thread_siblings_list | tr -d \"\n\r\"", cpuRes)).Output()
+	framework.ExpectNoError(err)
+	return string(out)
+}
+
+func getCoreSiblingList(cpuRes int64) string {
+	out, err := exec.Command("/bin/sh", "-c", fmt.Sprintf("cat /sys/devices/system/cpu/cpu%d/topology/core_siblings_list | tr -d \"\n\r\"", cpuRes)).Output()
 	framework.ExpectNoError(err)
 	return string(out)
 }
@@ -301,6 +317,9 @@ func runCPUManagerTests(f *framework.Framework) {
 		if isHTEnabled() {
 			cpuList = cpuset.MustParse(getCPUSiblingList(0)).ToSlice()
 			cpu1 = cpuList[1]
+		} else if isMultiNUMA() {
+			cpuList = cpuset.MustParse(getCoreSiblingList(0)).ToSlice()
+			cpu1 = cpuList[1]
 		}
 		expAllowedCPUsListRegex = fmt.Sprintf("^%d\n$", cpu1)
 		err = f.PodClient().MatchContainerOutput(pod.Name, pod.Spec.Containers[0].Name, expAllowedCPUsListRegex)
@@ -336,6 +355,9 @@ func runCPUManagerTests(f *framework.Framework) {
 		cpu1 = 1
 		if isHTEnabled() {
 			cpuList = cpuset.MustParse(getCPUSiblingList(0)).ToSlice()
+			cpu1 = cpuList[1]
+		} else if isMultiNUMA() {
+			cpuList = cpuset.MustParse(getCoreSiblingList(0)).ToSlice()
 			cpu1 = cpuList[1]
 		}
 		expAllowedCPUsListRegex = fmt.Sprintf("^%d\n$", cpu1)
@@ -376,7 +398,15 @@ func runCPUManagerTests(f *framework.Framework) {
 
 		ginkgo.By("checking if the expected cpuset was assigned")
 		cpuListString = "1-2"
-		if isHTEnabled() {
+		if isMultiNUMA() {
+			cpuList = cpuset.MustParse(getCoreSiblingList(0)).ToSlice()
+			if !isHTEnabled() {
+				cset = cpuset.MustParse(fmt.Sprintf("%d,%d", cpuList[1], cpuList[2]))
+			} else {
+				cset = cpuset.MustParse(getCPUSiblingList(int64(cpuList[1])))
+			}
+			cpuListString = fmt.Sprintf("%s", cset)
+		} else if isHTEnabled() {
 			cpuListString = "2-3"
 			cpuList = cpuset.MustParse(getCPUSiblingList(0)).ToSlice()
 			if cpuList[1] != 1 {
@@ -416,8 +446,14 @@ func runCPUManagerTests(f *framework.Framework) {
 			if cpuList[1] != 1 {
 				cpu1, cpu2 = cpuList[1], 1
 			}
+			if isMultiNUMA() {
+				cpuList = cpuset.MustParse(getCoreSiblingList(0)).ToSlice()
+				cpu2 = cpuList[1]
+			}
+		} else if isMultiNUMA() {
+			cpuList = cpuset.MustParse(getCoreSiblingList(0)).ToSlice()
+			cpu1, cpu2 = cpuList[1], cpuList[2]
 		}
-
 		expAllowedCPUsListRegex = fmt.Sprintf("^%d|%d\n$", cpu1, cpu2)
 		err = f.PodClient().MatchContainerOutput(pod.Name, pod.Spec.Containers[0].Name, expAllowedCPUsListRegex)
 		framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
@@ -460,8 +496,14 @@ func runCPUManagerTests(f *framework.Framework) {
 			if cpuList[1] != 1 {
 				cpu1, cpu2 = cpuList[1], 1
 			}
+			if isMultiNUMA() {
+				cpuList = cpuset.MustParse(getCoreSiblingList(0)).ToSlice()
+				cpu2 = cpuList[1]
+			}
+		} else if isMultiNUMA() {
+			cpuList = cpuset.MustParse(getCoreSiblingList(0)).ToSlice()
+			cpu1, cpu2 = cpuList[1], cpuList[2]
 		}
-
 		expAllowedCPUsListRegex = fmt.Sprintf("^%d\n$", cpu1)
 		err = f.PodClient().MatchContainerOutput(pod1.Name, pod1.Spec.Containers[0].Name, expAllowedCPUsListRegex)
 		framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
@@ -499,6 +541,9 @@ func runCPUManagerTests(f *framework.Framework) {
 		cpu1 = 1
 		if isHTEnabled() {
 			cpuList = cpuset.MustParse(getCPUSiblingList(0)).ToSlice()
+			cpu1 = cpuList[1]
+		} else if isMultiNUMA() {
+			cpuList = cpuset.MustParse(getCoreSiblingList(0)).ToSlice()
 			cpu1 = cpuList[1]
 		}
 		expAllowedCPUsListRegex = fmt.Sprintf("^%d\n$", cpu1)

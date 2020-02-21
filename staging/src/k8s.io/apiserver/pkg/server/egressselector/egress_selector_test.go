@@ -53,37 +53,19 @@ func TestEgressSelector(t *testing.T) {
 					{
 						Name: "cluster",
 						Connection: apiserver.Connection{
-							Type: "direct",
-							HTTPConnect: &apiserver.HTTPConnectConfig{
-								URL:        "",
-								CABundle:   "",
-								ClientKey:  "",
-								ClientCert: "",
-							},
+							ProxyProtocol: apiserver.ProtocolDirect,
 						},
 					},
 					{
 						Name: "master",
 						Connection: apiserver.Connection{
-							Type: "direct",
-							HTTPConnect: &apiserver.HTTPConnectConfig{
-								URL:        "",
-								CABundle:   "",
-								ClientKey:  "",
-								ClientCert: "",
-							},
+							ProxyProtocol: apiserver.ProtocolDirect,
 						},
 					},
 					{
 						Name: "etcd",
 						Connection: apiserver.Connection{
-							Type: "direct",
-							HTTPConnect: &apiserver.HTTPConnectConfig{
-								URL:        "",
-								CABundle:   "",
-								ClientKey:  "",
-								ClientCert: "",
-							},
+							ProxyProtocol: apiserver.ProtocolDirect,
 						},
 					},
 				},

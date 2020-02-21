@@ -11,7 +11,7 @@ spec:
   hostNetwork: true
   containers:
   - name: konnectivity-server-container
-    image: gcr.io/google-containers/proxy-server:v0.0.3
+    image: us.gcr.io/k8s-artifacts-prod/kas-network-proxy/proxy-server:v0.0.4
     resources:
       requests:
         cpu: 25m
@@ -25,9 +25,6 @@ spec:
       initialDelaySeconds: {{ liveness_probe_initial_delay }}
       timeoutSeconds: 60
     ports:
-    - name: serverport
-      containerPort: {{ server_port }}
-      hostPort: {{ server_port }}
     - name: agentport
       containerPort: {{ agent_port }}
       hostPort: {{ agent_port }}
@@ -38,21 +35,21 @@ spec:
     - name: varlogkonnectivityserver
       mountPath: /var/log/konnectivity-server.log
       readOnly: false
-    - name: pkiserver
-      mountPath: /etc/srv/kubernetes/pki/konnectivity-server
+    - name: pki
+      mountPath: /etc/srv/kubernetes/pki
       readOnly: true
-    - name: pkiagent
-      mountPath: /etc/srv/kubernetes/pki/konnectivity-agent
-      readOnly: true
+    - name: konnectivity-uds
+      mountPath: /etc/srv/kubernetes/konnectivity
+      readOnly: false
   volumes:
   - name: varlogkonnectivityserver
     hostPath:
       path: /var/log/konnectivity-server.log
       type: FileOrCreate
-  - name: pkiserver
+  - name: pki
     hostPath:
-      path: /etc/srv/kubernetes/pki/konnectivity-server
-  - name: pkiagent
+      path: /etc/srv/kubernetes/pki
+  - name: konnectivity-uds
     hostPath:
-      path: /etc/srv/kubernetes/pki/konnectivity-agent
-
+      path: /etc/srv/kubernetes/konnectivity
+      type: DirectoryOrCreate

@@ -115,6 +115,9 @@ type DeleteOptions struct {
 	GracePeriod int
 	Timeout     time.Duration
 
+	DryRunStrategy cmdutil.DryRunStrategy
+	DryRunVerifier *resource.DryRunVerifier
+
 	Output string
 
 	DynamicClient dynamic.Interface
@@ -143,6 +146,7 @@ func NewCmdDelete(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	}
 
 	deleteFlags.AddFlags(cmd)
+	cmdutil.AddDryRunFlag(cmd)
 
 	return cmd
 }
@@ -172,6 +176,20 @@ func (o *DeleteOptions) Complete(f cmdutil.Factory, args []string, cmd *cobra.Co
 		// into --grace-period=1. Users may provide --force to bypass this conversion.
 		o.GracePeriod = 1
 	}
+
+	o.DryRunStrategy, err = cmdutil.GetDryRunStrategy(cmd)
+	if err != nil {
+		return err
+	}
+	dynamicClient, err := f.DynamicClient()
+	if err != nil {
+		return err
+	}
+	discoveryClient, err := f.ToDiscoveryClient()
+	if err != nil {
+		return err
+	}
+	o.DryRunVerifier = resource.NewDryRunVerifier(dynamicClient, discoveryClient)
 
 	if len(o.Raw) == 0 {
 		r := f.NewBuilder().
@@ -291,6 +309,18 @@ func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
 			fmt.Fprintf(o.ErrOut, "warning: deleting cluster-scoped resources, not scoped to the provided namespace\n")
 			warnClusterScope = false
 		}
+
+		if o.DryRunStrategy == cmdutil.DryRunClient {
+			if !o.Quiet {
+				o.PrintObj(info)
+			}
+			return nil
+		}
+		if o.DryRunStrategy == cmdutil.DryRunServer {
+			if err := o.DryRunVerifier.HasSupport(info.Mapping.GroupVersionKind); err != nil {
+				return err
+			}
+		}
 		response, err := o.deleteResource(info, options)
 		if err != nil {
 			return err
@@ -330,6 +360,11 @@ func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
 		return nil
 	}
 
+	// If we are dry-running, then we don't want to wait
+	if o.DryRunStrategy != cmdutil.DryRunNone {
+		return nil
+	}
+
 	effectiveTimeout := o.Timeout
 	if effectiveTimeout == 0 {
 		// if we requested to wait forever, set it to a week.
@@ -356,7 +391,10 @@ func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
 }
 
 func (o *DeleteOptions) deleteResource(info *resource.Info, deleteOptions *metav1.DeleteOptions) (runtime.Object, error) {
-	deleteResponse, err := resource.NewHelper(info.Client, info.Mapping).DeleteWithOptions(info.Namespace, info.Name, deleteOptions)
+	deleteResponse, err := resource.
+		NewHelper(info.Client, info.Mapping).
+		DryRun(o.DryRunStrategy == cmdutil.DryRunServer).
+		DeleteWithOptions(info.Namespace, info.Name, deleteOptions)
 	if err != nil {
 		return nil, cmdutil.AddSourceToErr("deleting", info.Source, err)
 	}
@@ -379,6 +417,13 @@ func (o *DeleteOptions) PrintObj(info *resource.Info) {
 
 	if o.GracePeriod == 0 {
 		operation = "force deleted"
+	}
+
+	switch o.DryRunStrategy {
+	case cmdutil.DryRunClient:
+		operation = fmt.Sprintf("%s (dry run)", operation)
+	case cmdutil.DryRunServer:
+		operation = fmt.Sprintf("%s (server dry run)", operation)
 	}
 
 	if o.Output == "name" {

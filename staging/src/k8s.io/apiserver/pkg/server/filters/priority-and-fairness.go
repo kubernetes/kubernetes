@@ -37,6 +37,11 @@ type priorityAndFairnessKeyType int
 
 const priorityAndFairnessKey priorityAndFairnessKeyType = iota
 
+const (
+	responseHeaderMatchedPriorityLevelConfigurationUID = "X-Kubernetes-PF-PriorityLevelUID"
+	responseHeaderMatchedFlowSchemaUID                 = "X-Kubernetes-PF-FlowSchemaUID"
+)
+
 // PriorityAndFairnessClassification identifies the results of
 // classification for API Priority and Fairness
 type PriorityAndFairnessClassification struct {
@@ -97,6 +102,8 @@ func WithPriorityAndFairness(
 			served = true
 			innerCtx := context.WithValue(ctx, priorityAndFairnessKey, classification)
 			innerReq := r.Clone(innerCtx)
+			w.Header().Set(responseHeaderMatchedPriorityLevelConfigurationUID, string(classification.PriorityLevelUID))
+			w.Header().Set(responseHeaderMatchedFlowSchemaUID, string(classification.FlowSchemaUID))
 			handler.ServeHTTP(w, innerReq)
 		}
 		digest := utilflowcontrol.RequestDigest{requestInfo, user}

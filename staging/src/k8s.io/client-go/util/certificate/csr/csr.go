@@ -115,8 +115,12 @@ func WaitForCertificate(ctx context.Context, client certificatesclient.Certifica
 				if c.Type == certificates.CertificateDenied {
 					return false, fmt.Errorf("certificate signing request is not approved, reason: %v, message: %v", c.Reason, c.Message)
 				}
-				if c.Type == certificates.CertificateApproved && csr.Status.Certificate != nil {
-					return true, nil
+				if c.Type == certificates.CertificateApproved {
+					if csr.Status.Certificate != nil {
+						klog.V(2).Infof("certificate signing request %s is issued", csr.Name)
+						return true, nil
+					}
+					klog.V(2).Infof("certificate signing request %s is approved, waiting to be issued", csr.Name)
 				}
 			}
 			return false, nil
