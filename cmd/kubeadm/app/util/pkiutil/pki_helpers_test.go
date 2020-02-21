@@ -33,7 +33,9 @@ import (
 )
 
 func TestNewCertificateAuthority(t *testing.T) {
-	cert, key, err := NewCertificateAuthority(&certutil.Config{CommonName: "kubernetes"})
+	cert, key, err := NewCertificateAuthority(&CertConfig{
+		Config: certutil.Config{CommonName: "kubernetes"},
+	})
 
 	if cert == nil {
 		t.Error("failed NewCertificateAuthority, cert == nil")
@@ -86,10 +88,12 @@ func TestNewCertAndKey(t *testing.T) {
 				t.Fatalf("Couldn't create Private Key")
 			}
 			caCert := &x509.Certificate{}
-			config := &certutil.Config{
-				CommonName:   "test",
-				Organization: []string{"test"},
-				Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+			config := &CertConfig{
+				Config: certutil.Config{
+					CommonName:   "test",
+					Organization: []string{"test"},
+					Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+				},
 			}
 			_, _, actual := NewCertAndKey(caCert, caKey, config)
 			if (actual == nil) != rt.expected {
@@ -104,26 +108,41 @@ func TestNewCertAndKey(t *testing.T) {
 }
 
 func TestHasServerAuth(t *testing.T) {
-	caCert, caKey, _ := NewCertificateAuthority(&certutil.Config{CommonName: "kubernetes"})
+	caCert, caKey, _ := NewCertificateAuthority(&CertConfig{Config: certutil.Config{CommonName: "kubernetes"}})
 
 	var tests = []struct {
 		name     string
-		config   certutil.Config
+		config   CertConfig
 		expected bool
 	}{
 		{
 			name: "has ServerAuth",
-			config: certutil.Config{
-				CommonName: "test",
-				Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+			config: CertConfig{
+				Config: certutil.Config{
+					CommonName: "test",
+					Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "has ServerAuth ECDSA",
+			config: CertConfig{
+				Config: certutil.Config{
+					CommonName: "test",
+					Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+				},
+				PublicKeyAlgorithm: x509.ECDSA,
 			},
 			expected: true,
 		},
 		{
 			name: "doesn't have ServerAuth",
-			config: certutil.Config{
-				CommonName: "test",
-				Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+			config: CertConfig{
+				Config: certutil.Config{
+					CommonName: "test",
+					Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+				},
 			},
 			expected: false,
 		},
@@ -285,7 +304,9 @@ func TestTryLoadCertAndKeyFromDisk(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpdir)
 
-	caCert, caKey, err := NewCertificateAuthority(&certutil.Config{CommonName: "kubernetes"})
+	caCert, caKey, err := NewCertificateAuthority(&CertConfig{
+		Config: certutil.Config{CommonName: "kubernetes"},
+	})
 	if err != nil {
 		t.Errorf(
 			"failed to create cert and key with an error: %v",
@@ -340,7 +361,9 @@ func TestTryLoadCertFromDisk(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpdir)
 
-	caCert, _, err := NewCertificateAuthority(&certutil.Config{CommonName: "kubernetes"})
+	caCert, _, err := NewCertificateAuthority(&CertConfig{
+		Config: certutil.Config{CommonName: "kubernetes"},
+	})
 	if err != nil {
 		t.Errorf(
 			"failed to create cert and key with an error: %v",

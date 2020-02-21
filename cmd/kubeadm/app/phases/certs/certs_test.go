@@ -42,8 +42,10 @@ import (
 
 func createTestCSR(t *testing.T) (*x509.CertificateRequest, crypto.Signer) {
 	csr, key, err := pkiutil.NewCSRAndKey(
-		&certutil.Config{
-			CommonName: "testCert",
+		&pkiutil.CertConfig{
+			Config: certutil.Config{
+				CommonName: "testCert",
+			},
 		})
 	if err != nil {
 		t.Fatalf("couldn't create test cert: %v", err)
@@ -344,7 +346,7 @@ func TestCreateServiceAccountKeyAndPublicKeyFiles(t *testing.T) {
 				}
 			}
 
-			err := CreateServiceAccountKeyAndPublicKeyFiles(dir)
+			err := CreateServiceAccountKeyAndPublicKeyFiles(dir, x509.RSA)
 			if (err != nil) != tt.expectedErr {
 				t.Fatalf("expected error: %v, got: %v, error: %v", tt.expectedErr, err != nil, err)
 			} else if tt.expectedErr {
