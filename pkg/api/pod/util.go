@@ -387,6 +387,8 @@ func dropDisabledFields(
 
 	dropDisabledRunAsGroupField(podSpec, oldPodSpec)
 
+	dropDisabledFSGroupFields(podSpec, oldPodSpec)
+
 	if !utilfeature.DefaultFeatureGate.Enabled(features.RuntimeClass) && !runtimeClassInUse(oldPodSpec) {
 		// Set RuntimeClassName to nil only if feature is disabled and it is not used
 		podSpec.RuntimeClassName = nil
@@ -447,6 +449,16 @@ func dropDisabledProcMountField(podSpec, oldPodSpec *api.PodSpec) {
 	}
 }
 
+func dropDisabledFSGroupFields(podSpec, oldPodSpec *api.PodSpec) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ConfigurableFSGroupPolicy) && !fsGroupPolicyInUse(oldPodSpec) {
+		// if oldPodSpec had no FSGroupChangePolicy set then we should prevent new pod from having this field
+		// if ConfigurableFSGroupPolicy feature is disabled
+		if podSpec.SecurityContext != nil {
+			podSpec.SecurityContext.FSGroupChangePolicy = nil
+		}
+	}
+}
+
 // dropDisabledCSIVolumeSourceAlphaFields removes disabled alpha fields from []CSIVolumeSource.
 // This should be called from PrepareForCreate/PrepareForUpdate for all pod specs resources containing a CSIVolumeSource
 func dropDisabledCSIVolumeSourceAlphaFields(podSpec, oldPodSpec *api.PodSpec) {
@@ -462,6 +474,17 @@ func ephemeralContainersInUse(podSpec *api.PodSpec) bool {
 		return false
 	}
 	return len(podSpec.EphemeralContainers) > 0
+}
+
+func fsGroupPolicyInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+	securityContext := podSpec.SecurityContext
+	if securityContext != nil && securityContext.FSGroupChangePolicy != nil {
+		return true
+	}
+	return false
 }
 
 // subpathInUse returns true if the pod spec is non-nil and has a volume mount that makes use of the subPath feature
