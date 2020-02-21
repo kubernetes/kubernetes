@@ -1645,11 +1645,11 @@ func TestTranslateTimestampUntil(t *testing.T) {
 }
 
 func TestPrintDeployment(t *testing.T) {
-
 	testDeployment := apps.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "test1",
 			CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+			Generation:        1,
 		},
 		Spec: apps.DeploymentSpec{
 			Replicas: 5,
@@ -1674,46 +1674,61 @@ func TestPrintDeployment(t *testing.T) {
 			UpdatedReplicas:     2,
 			AvailableReplicas:   1,
 			UnavailableReplicas: 4,
+			ObservedGeneration:  1,
 		},
 	}
 
 	tests := []struct {
+		name       string
 		deployment apps.Deployment
 		options    printers.GenerateOptions
 		expected   []metav1.TableRow
 	}{
-		// Test Deployment with no generate options.
 		{
+			name:       "No generate options",
 			deployment: testDeployment,
 			options:    printers.GenerateOptions{},
-			// Columns: Name, ReadyReplicas, UpdatedReplicas, AvailableReplicas, Age
-			expected: []metav1.TableRow{{Cells: []interface{}{"test1", "0/5", int64(2), int64(1), "0s"}}},
+			// Columns: Name, ReadyReplicas, UpdatedReplicas, AvailableReplicas, Age, Stale
+			expected: []metav1.TableRow{{Cells: []interface{}{"test1", "0/5", int64(2), int64(1), "0s", false}}},
 		},
-		// Test generate options: Wide.
 		{
+			name:       "Generate options Wide",
 			deployment: testDeployment,
 			options:    printers.GenerateOptions{Wide: true},
-			// Columns: Name, ReadyReplicas, UpdatedReplicas, AvailableReplicas, Age, Containers, Images, Selectors
-			expected: []metav1.TableRow{{Cells: []interface{}{"test1", "0/5", int64(2), int64(1), "0s", "fake-container1,fake-container2", "fake-image1,fake-image2", "foo=bar"}}},
+			// Columns: Name, ReadyReplicas, UpdatedReplicas, AvailableReplicas, Age, Stale, Containers, Images, Selectors
+			expected: []metav1.TableRow{{Cells: []interface{}{"test1", "0/5", int64(2), int64(1), "0s", false, "fake-container1,fake-container2", "fake-image1,fake-image2", "foo=bar"}}},
+		},
+		{
+			name: "Stale status (observedGeneration <= generation)",
+			deployment: func() apps.Deployment {
+				r := testDeployment.DeepCopy()
+				r.Generation = 2
+				r.Status.ObservedGeneration = 1
+				return *r
+			}(),
+			options: printers.GenerateOptions{},
+			// Columns: Name, ReadyReplicas, UpdatedReplicas, AvailableReplicas, Age, Stale
+			expected: []metav1.TableRow{{Cells: []interface{}{"test1", "0/5", int64(2), int64(1), "0s", true}}},
 		},
 	}
 
-	for i, test := range tests {
-		rows, err := printDeployment(&test.deployment, test.options)
-		if err != nil {
-			t.Fatal(err)
-		}
-		for i := range rows {
-			rows[i].Object.Object = nil
-		}
-		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
-		}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			rows, err := printDeployment(&test.deployment, test.options)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for i := range rows {
+				rows[i].Object.Object = nil
+			}
+			if !reflect.DeepEqual(test.expected, rows) {
+				t.Errorf("mismatch: %s", diff.ObjectReflectDiff(test.expected, rows))
+			}
+		})
 	}
 }
 
 func TestPrintDaemonSet(t *testing.T) {
-
 	testDaemonSet := apps.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "test1",
@@ -1746,42 +1761,56 @@ func TestPrintDaemonSet(t *testing.T) {
 	}
 
 	tests := []struct {
+		name      string
 		daemonSet apps.DaemonSet
 		options   printers.GenerateOptions
 		expected  []metav1.TableRow
 	}{
-		// Test generate daemon set with no generate options.
 		{
+			name:      "Test generate daemon set with no generate options",
 			daemonSet: testDaemonSet,
 			options:   printers.GenerateOptions{},
-			// Columns: Name, Num Desired, Num Current, Num Ready, Num Updated, Num Available, Selectors, Age
-			expected: []metav1.TableRow{{Cells: []interface{}{"test1", int64(3), int64(2), int64(1), int64(2), int64(0), "<none>", "0s"}}},
+			// Columns: Name, Num Desired, Num Current, Num Ready, Num Updated, Num Available, Selectors, Age, Stale
+			expected: []metav1.TableRow{{Cells: []interface{}{"test1", int64(3), int64(2), int64(1), int64(2), int64(0), "<none>", "0s", false}}},
 		},
-		// Test generate daemon set with "Wide" generate options.
 		{
+			name:      "Test generate daemon set with Wide generate options",
 			daemonSet: testDaemonSet,
 			options:   printers.GenerateOptions{Wide: true},
-			// Columns: Name, Num Desired, Num Current, Num Ready, Num Updated, Num Available, Node Selectors, Age, Containers, Images, Labels
-			expected: []metav1.TableRow{{Cells: []interface{}{"test1", int64(3), int64(2), int64(1), int64(2), int64(0), "<none>", "0s", "fake-container1,fake-container2", "fake-image1,fake-image2", "foo=bar"}}},
+			// Columns: Name, Num Desired, Num Current, Num Ready, Num Updated, Num Available, Node Selectors, Age, Stale, Containers, Images, Labels
+			expected: []metav1.TableRow{{Cells: []interface{}{"test1", int64(3), int64(2), int64(1), int64(2), int64(0), "<none>", "0s", false, "fake-container1,fake-container2", "fake-image1,fake-image2", "foo=bar"}}},
+		},
+		{
+			name: "Stale status (observedGeneration <= generation)",
+			daemonSet: func() apps.DaemonSet {
+				r := testDaemonSet.DeepCopy()
+				r.Generation = 2
+				r.Status.ObservedGeneration = 1
+				return *r
+			}(),
+			options: printers.GenerateOptions{},
+			// Columns: Name, Num Desired, Num Current, Num Ready, Num Updated, Num Available, Selectors, Age, Stale
+			expected: []metav1.TableRow{{Cells: []interface{}{"test1", int64(3), int64(2), int64(1), int64(2), int64(0), "<none>", "0s", true}}},
 		},
 	}
 
-	for i, test := range tests {
-		rows, err := printDaemonSet(&test.daemonSet, test.options)
-		if err != nil {
-			t.Fatal(err)
-		}
-		for i := range rows {
-			rows[i].Object.Object = nil
-		}
-		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
-		}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			rows, err := printDaemonSet(&test.daemonSet, test.options)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for i := range rows {
+				rows[i].Object.Object = nil
+			}
+			if !reflect.DeepEqual(test.expected, rows) {
+				t.Errorf("mismatch: %s", diff.ObjectReflectDiff(test.expected, rows))
+			}
+		})
 	}
 }
 
 func TestPrintDaemonSetList(t *testing.T) {
-
 	daemonSetList := apps.DaemonSetList{
 		Items: []apps.DaemonSet{
 			{
@@ -1817,6 +1846,7 @@ func TestPrintDaemonSetList(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "daemonset2",
 					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+					Generation:        2,
 				},
 				Spec: apps.DaemonSetSpec{
 					Template: api.PodTemplateSpec{},
@@ -1828,15 +1858,16 @@ func TestPrintDaemonSetList(t *testing.T) {
 					NumberReady:            9,
 					UpdatedNumberScheduled: 3,
 					NumberAvailable:        3,
+					ObservedGeneration:     1,
 				},
 			},
 		},
 	}
 
-	// Columns: Name, Num Desired, Num Current, Num Ready, Num Updated, Num Available, Selectors, Age
+	// Columns: Name, Num Desired, Num Current, Num Ready, Num Updated, Num Available, Selectors, Age, Stale
 	expectedRows := []metav1.TableRow{
-		{Cells: []interface{}{"daemonset1", int64(3), int64(2), int64(1), int64(2), int64(0), "<none>", "0s"}},
-		{Cells: []interface{}{"daemonset2", int64(2), int64(4), int64(9), int64(3), int64(3), "<none>", "0s"}},
+		{Cells: []interface{}{"daemonset1", int64(3), int64(2), int64(1), int64(2), int64(0), "<none>", "0s", false}},
+		{Cells: []interface{}{"daemonset2", int64(2), int64(4), int64(9), int64(3), int64(3), "<none>", "0s", true}},
 	}
 
 	rows, err := printDaemonSetList(&daemonSetList, printers.GenerateOptions{})
@@ -3501,12 +3532,13 @@ func TestPrintCertificateSigningRequest(t *testing.T) {
 
 func TestPrintReplicationController(t *testing.T) {
 	tests := []struct {
+		name     string
 		rc       api.ReplicationController
 		options  printers.GenerateOptions
 		expected []metav1.TableRow
 	}{
-		// Basic print replication controller without replicas or status.
 		{
+			name: "Basic print replication controller without replicas or status.",
 			rc: api.ReplicationController{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "rc1",
@@ -3534,11 +3566,11 @@ func TestPrintReplicationController(t *testing.T) {
 				},
 			},
 			options: printers.GenerateOptions{},
-			// Columns: Name, Desired, Current, Ready, Age
-			expected: []metav1.TableRow{{Cells: []interface{}{"rc1", int64(0), int64(0), int64(0), "<unknown>"}}},
+			// Columns: Name, Desired, Current, Ready, Age, Stale
+			expected: []metav1.TableRow{{Cells: []interface{}{"rc1", int64(0), int64(0), int64(0), "<unknown>", false}}},
 		},
-		// Basic print replication controller with replicas; does not print containers or labels
 		{
+			name: "Basic print replication controller with replicas; does not print containers or labels",
 			rc: api.ReplicationController{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "rc1",
@@ -3571,11 +3603,11 @@ func TestPrintReplicationController(t *testing.T) {
 				},
 			},
 			options: printers.GenerateOptions{},
-			// Columns: Name, Desired, Current, Ready, Age
-			expected: []metav1.TableRow{{Cells: []interface{}{"rc1", int64(5), int64(3), int64(1), "<unknown>"}}},
+			// Columns: Name, Desired, Current, Ready, Age, Stale
+			expected: []metav1.TableRow{{Cells: []interface{}{"rc1", int64(5), int64(3), int64(1), "<unknown>", false}}},
 		},
-		// Generate options: Wide; print containers and labels.
 		{
+			name: "Generate options: Wide; print containers and labels.",
 			rc: api.ReplicationController{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "rc1",
@@ -3608,32 +3640,56 @@ func TestPrintReplicationController(t *testing.T) {
 			},
 			options: printers.GenerateOptions{Wide: true},
 			// Columns: Name, Desired, Current, Ready, Age, Containers, Images, Selector
-			expected: []metav1.TableRow{{Cells: []interface{}{"rc1", int64(5), int64(3), int64(1), "<unknown>", "test", "test_image", "a=b"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"rc1", int64(5), int64(3), int64(1), "<unknown>", false, "test", "test_image", "a=b"}}},
+		},
+		{
+			name: "Stale status (observedGeneration <= generation)",
+			rc: api.ReplicationController{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "rc1",
+					Namespace:  "test-namespace",
+					Generation: 2,
+				},
+				Spec: api.ReplicationControllerSpec{
+					Replicas: 5,
+				},
+				Status: api.ReplicationControllerStatus{
+					Replicas:           4,
+					ReadyReplicas:      3,
+					ObservedGeneration: 1,
+				},
+			},
+			options: printers.GenerateOptions{},
+			// Columns: Name, Desired, Current, Ready, Age, Stale
+			expected: []metav1.TableRow{{Cells: []interface{}{"rc1", int64(5), int64(4), int64(3), "<unknown>", true}}},
 		},
 	}
 
-	for i, test := range tests {
-		rows, err := printReplicationController(&test.rc, test.options)
-		if err != nil {
-			t.Fatal(err)
-		}
-		for i := range rows {
-			rows[i].Object.Object = nil
-		}
-		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
-		}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			rows, err := printReplicationController(&test.rc, test.options)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for i := range rows {
+				rows[i].Object.Object = nil
+			}
+			if !reflect.DeepEqual(test.expected, rows) {
+				t.Errorf("mismatch: %s", diff.ObjectReflectDiff(test.expected, rows))
+			}
+		})
 	}
 }
 
 func TestPrintReplicaSet(t *testing.T) {
 	tests := []struct {
+		name       string
 		replicaSet apps.ReplicaSet
 		options    printers.GenerateOptions
 		expected   []metav1.TableRow
 	}{
-		// Generate options empty
 		{
+			name: "Generate options empty",
 			replicaSet: apps.ReplicaSet{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "test1",
@@ -3663,11 +3719,11 @@ func TestPrintReplicaSet(t *testing.T) {
 				},
 			},
 			options: printers.GenerateOptions{},
-			// Columns: Name, Desired, Current, Ready, Age
-			expected: []metav1.TableRow{{Cells: []interface{}{"test1", int64(5), int64(5), int64(2), "0s"}}},
+			// Columns: Name, Desired, Current, Ready, Age, Stale
+			expected: []metav1.TableRow{{Cells: []interface{}{"test1", int64(5), int64(5), int64(2), "0s", false}}},
 		},
-		// Generate options "Wide"
 		{
+			name: "Generate options Wide",
 			replicaSet: apps.ReplicaSet{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "test1",
@@ -3697,27 +3753,49 @@ func TestPrintReplicaSet(t *testing.T) {
 				},
 			},
 			options: printers.GenerateOptions{Wide: true},
-			// Columns: Name, Desired, Current, Ready, Age, Containers, Images, Selector
-			expected: []metav1.TableRow{{Cells: []interface{}{"test1", int64(5), int64(5), int64(2), "0s", "fake-container1,fake-container2", "fake-image1,fake-image2", "foo=bar"}}},
+			// Columns: Name, Desired, Current, Ready, Age, Stale, Containers, Images, Selector
+			expected: []metav1.TableRow{{Cells: []interface{}{"test1", int64(5), int64(5), int64(2), "0s", false, "fake-container1,fake-container2", "fake-image1,fake-image2", "foo=bar"}}},
+		},
+		{
+			name: "Stale status (observedGeneration <= generation)",
+			replicaSet: apps.ReplicaSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "rc1",
+					Namespace:  "test-namespace",
+					Generation: 2,
+				},
+				Spec: apps.ReplicaSetSpec{
+					Replicas: 5,
+				},
+				Status: apps.ReplicaSetStatus{
+					Replicas:           4,
+					ReadyReplicas:      3,
+					ObservedGeneration: 1,
+				},
+			},
+			options: printers.GenerateOptions{},
+			// Columns: Name, Desired, Current, Ready, Age, Stale
+			expected: []metav1.TableRow{{Cells: []interface{}{"rc1", int64(5), int64(4), int64(3), "<unknown>", true}}},
 		},
 	}
 
-	for i, test := range tests {
-		rows, err := printReplicaSet(&test.replicaSet, test.options)
-		if err != nil {
-			t.Fatal(err)
-		}
-		for i := range rows {
-			rows[i].Object.Object = nil
-		}
-		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
-		}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			rows, err := printReplicaSet(&test.replicaSet, test.options)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for i := range rows {
+				rows[i].Object.Object = nil
+			}
+			if !reflect.DeepEqual(test.expected, rows) {
+				t.Errorf("mismatch: %s", diff.ObjectReflectDiff(test.expected, rows))
+			}
+		})
 	}
 }
 
 func TestPrintReplicaSetList(t *testing.T) {
-
 	replicaSetList := apps.ReplicaSetList{
 		Items: []apps.ReplicaSet{
 			{
@@ -3751,6 +3829,7 @@ func TestPrintReplicaSetList(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "replicaset2",
 					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+					Generation:        2,
 				},
 				Spec: apps.ReplicaSetSpec{
 					Replicas: 4,
@@ -3758,8 +3837,9 @@ func TestPrintReplicaSetList(t *testing.T) {
 					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 				},
 				Status: apps.ReplicaSetStatus{
-					Replicas:      3,
-					ReadyReplicas: 1,
+					Replicas:           3,
+					ReadyReplicas:      1,
+					ObservedGeneration: 1,
 				},
 			},
 		},
@@ -3767,8 +3847,8 @@ func TestPrintReplicaSetList(t *testing.T) {
 
 	// Columns: Name, Desired, Current, Ready, Age
 	expectedRows := []metav1.TableRow{
-		{Cells: []interface{}{"replicaset1", int64(5), int64(5), int64(2), "0s"}},
-		{Cells: []interface{}{"replicaset2", int64(4), int64(3), int64(1), "0s"}},
+		{Cells: []interface{}{"replicaset1", int64(5), int64(5), int64(2), "0s", false}},
+		{Cells: []interface{}{"replicaset2", int64(4), int64(3), int64(1), "0s", true}},
 	}
 
 	rows, err := printReplicaSetList(&replicaSetList, printers.GenerateOptions{})
@@ -3783,18 +3863,22 @@ func TestPrintReplicaSetList(t *testing.T) {
 	}
 }
 
+func int64Ptr(i int64) *int64 { return &i }
+
 func TestPrintStatefulSet(t *testing.T) {
 	tests := []struct {
+		name        string
 		statefulSet apps.StatefulSet
 		options     printers.GenerateOptions
 		expected    []metav1.TableRow
 	}{
-		// Basic stateful set; no generate options.
 		{
+			name: "Basic stateful set; no generate options",
 			statefulSet: apps.StatefulSet{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "test1",
 					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+					Generation:        1,
 				},
 				Spec: apps.StatefulSetSpec{
 					Replicas: 5,
@@ -3814,20 +3898,22 @@ func TestPrintStatefulSet(t *testing.T) {
 					},
 				},
 				Status: apps.StatefulSetStatus{
-					Replicas:      5,
-					ReadyReplicas: 2,
+					Replicas:           5,
+					ReadyReplicas:      2,
+					ObservedGeneration: int64Ptr(1),
 				},
 			},
 			options: printers.GenerateOptions{},
 			// Columns: Name, Ready, Age
-			expected: []metav1.TableRow{{Cells: []interface{}{"test1", "2/5", "0s"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"test1", "2/5", "0s", false}}},
 		},
-		// Generate options "Wide"; includes containers and images.
 		{
+			name: "Stale status (observedGeneration <= generation)",
 			statefulSet: apps.StatefulSet{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "test1",
 					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+					Generation:        2,
 				},
 				Spec: apps.StatefulSetSpec{
 					Replicas: 5,
@@ -3847,27 +3933,98 @@ func TestPrintStatefulSet(t *testing.T) {
 					},
 				},
 				Status: apps.StatefulSetStatus{
-					Replicas:      5,
-					ReadyReplicas: 2,
+					Replicas:           5,
+					ReadyReplicas:      2,
+					ObservedGeneration: int64Ptr(1),
+				},
+			},
+			options: printers.GenerateOptions{},
+			// Columns: Name, Ready, Age
+			expected: []metav1.TableRow{{Cells: []interface{}{"test1", "2/5", "0s", true}}},
+		},
+		{
+			name: "Stale status (observedGeneration is nil)",
+			statefulSet: apps.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "test1",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+					Generation:        1,
+				},
+				Spec: apps.StatefulSetSpec{
+					Replicas: 5,
+					Template: api.PodTemplateSpec{
+						Spec: api.PodSpec{
+							Containers: []api.Container{
+								{
+									Name:  "fake-container1",
+									Image: "fake-image1",
+								},
+								{
+									Name:  "fake-container2",
+									Image: "fake-image2",
+								},
+							},
+						},
+					},
+				},
+				Status: apps.StatefulSetStatus{
+					ObservedGeneration: nil,
+				},
+			},
+			options: printers.GenerateOptions{},
+			// Columns: Name, Ready, Age, Stale
+			expected: []metav1.TableRow{{Cells: []interface{}{"test1", "0/5", "0s", true}}},
+		},
+		{
+			name: "Generate options Wide; includes containers and images",
+			statefulSet: apps.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "test1",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+					Generation:        1,
+				},
+				Spec: apps.StatefulSetSpec{
+					Replicas: 5,
+					Template: api.PodTemplateSpec{
+						Spec: api.PodSpec{
+							Containers: []api.Container{
+								{
+									Name:  "fake-container1",
+									Image: "fake-image1",
+								},
+								{
+									Name:  "fake-container2",
+									Image: "fake-image2",
+								},
+							},
+						},
+					},
+				},
+				Status: apps.StatefulSetStatus{
+					Replicas:           5,
+					ReadyReplicas:      2,
+					ObservedGeneration: int64Ptr(1),
 				},
 			},
 			options: printers.GenerateOptions{Wide: true},
-			// Columns: Name, Ready, Age, Containers, Images
-			expected: []metav1.TableRow{{Cells: []interface{}{"test1", "2/5", "0s", "fake-container1,fake-container2", "fake-image1,fake-image2"}}},
+			// Columns: Name, Ready, Age, Stale, Containers, Images
+			expected: []metav1.TableRow{{Cells: []interface{}{"test1", "2/5", "0s", false, "fake-container1,fake-container2", "fake-image1,fake-image2"}}},
 		},
 	}
 
-	for i, test := range tests {
-		rows, err := printStatefulSet(&test.statefulSet, test.options)
-		if err != nil {
-			t.Fatal(err)
-		}
-		for i := range rows {
-			rows[i].Object.Object = nil
-		}
-		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
-		}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			rows, err := printStatefulSet(&test.statefulSet, test.options)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for i := range rows {
+				rows[i].Object.Object = nil
+			}
+			if !reflect.DeepEqual(test.expected, rows) {
+				t.Errorf("mismatch: %s", diff.ObjectReflectDiff(test.expected, rows))
+			}
+		})
 	}
 }
 
