@@ -1329,10 +1329,12 @@ func mergeMap(original, patch map[string]interface{}, schema LookupPatchMeta, me
 			}
 		}
 
-		_, ok := original[k]
-		if !ok {
-			// If it's not in the original document, just take the patch value.
-			original[k] = patchV
+		val, ok := original[k]
+		if !ok || val == nil {
+			if !isDeleteList {
+				// If it's not in the original document, just take the patch value.
+				original[k] = patchV
+			}
 			continue
 		}
 

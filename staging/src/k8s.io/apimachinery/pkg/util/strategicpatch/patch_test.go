@@ -6761,3 +6761,90 @@ func TestUnknownField(t *testing.T) {
 		}
 	}
 }
+
+func TestDeletionOnPrimitiveList(t *testing.T) {
+	testcases := map[string]struct {
+		Original string
+		Patch    string
+		Expected string
+	}{
+		// Deletion cases
+		"null array": {
+			Original: `{"mergingIntList":null}`,
+			Patch:    `{"$deleteFromPrimitiveList/mergingIntList":[1]}`,
+			Expected: `{"mergingIntList":null}`,
+		},
+		"no field": {
+			Original: `{}`,
+			Patch:    `{"$deleteFromPrimitiveList/mergingIntList":[1]}`,
+			Expected: `{}`,
+		},
+		"empty array": {
+			Original: `{"mergingIntList":[]}`,
+			Patch:    `{"$deleteFromPrimitiveList/mergingIntList":[1]}`,
+			Expected: `{"mergingIntList":[]}`,
+		},
+		"valid array": {
+			Original: `{"mergingIntList":[1]}`,
+			Patch:    `{"$deleteFromPrimitiveList/mergingIntList":[1]}`,
+			Expected: `{"mergingIntList":[]}`,
+		},
+
+		// Normal cases
+		"set null array": {
+			Original: `{"mergingIntList":null}`,
+			Patch:    `{"mergingIntList":[1]}`,
+			Expected: `{"mergingIntList":[1]}`,
+		},
+		"set field": {
+			Original: `{}`,
+			Patch:    `{"mergingIntList":[1]}`,
+			Expected: `{"mergingIntList":[1]}`,
+		},
+		"append to empty array": {
+			Original: `{"mergingIntList":[]}`,
+			Patch:    `{"mergingIntList":[1]}`,
+			Expected: `{"mergingIntList":[1]}`,
+		},
+		"append to valid array": {
+			Original: `{"mergingIntList":[1]}`,
+			Patch:    `{"mergingIntList":[2]}`,
+			Expected: `{"mergingIntList":[2,1]}`,
+		},
+		"set a null struct array": {
+			Original: `{"mergingList":null}`,
+			Patch:    `{"mergingList":[{"name":"a"}]}`,
+			Expected: `{"mergingList":[{"name":"a"}]}`,
+		},
+		"set a struct array": {
+			Original: `{}`,
+			Patch:    `{"mergingList":[{"name":"a"}]}`,
+			Expected: `{"mergingList":[{"name":"a"}]}`,
+		},
+		"append to a empty struct array": {
+			Original: `{"mergingList":[]}`,
+			Patch:    `{"mergingList":[{"name":"a"}]}`,
+			Expected: `{"mergingList":[{"name":"a"}]}`,
+		},
+		"append to a valid struct array": {
+			Original: `{"mergingList":[{"name":"a"}]}`,
+			Patch:    `{"mergingList":[{"name":"b"}]}`,
+			Expected: `{"mergingList":[{"name":"b"},{"name":"a"}]}`,
+		},
+	}
+
+	scheme := mergeItemStructSchema
+	for _, k := range sets.StringKeySet(testcases).List() {
+		tc := testcases[k]
+		result, err := StrategicMergePatchUsingLookupPatchMeta([]byte(tc.Original), []byte(tc.Patch), scheme)
+		if err != nil {
+			t.Errorf("testcase %s: expected no error but got: %s", k, err.Error())
+			continue
+		}
+		if string(result) != tc.Expected {
+			t.Errorf("testcase %s: expected result:\n\t%s\ngot:\n\t%s", k, tc.Expected, result)
+			continue
+		}
+	}
+
+}
