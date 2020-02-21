@@ -20,6 +20,9 @@ package azure
 
 import (
 	"sync"
+	"time"
+
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 )
 
 // lockMap used to lock on entries
@@ -68,4 +71,22 @@ func (lm *lockMap) lockEntry(entry string) {
 
 func (lm *lockMap) unlockEntry(entry string) {
 	lm.mutexMap[entry].Unlock()
+}
+
+// aggregateGoroutinesWithDelay aggregates goroutines and runs them
+// in parallel with delay before starting each goroutine
+func aggregateGoroutinesWithDelay(delay time.Duration, funcs ...func() error) utilerrors.Aggregate {
+	errChan := make(chan error, len(funcs))
+
+	for _, f := range funcs {
+		go func(f func() error) { errChan <- f() }(f)
+		time.Sleep(delay)
+	}
+	errs := make([]error, 0)
+	for i := 0; i < cap(errChan); i++ {
+		if err := <-errChan; err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return utilerrors.NewAggregate(errs)
 }
