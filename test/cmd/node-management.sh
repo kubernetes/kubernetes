@@ -75,6 +75,10 @@ __EOF__
   # taint/untaint
   # Pre-condition: node doesn't have dedicated=foo:PreferNoSchedule taint
   kube::test::get_object_assert "nodes 127.0.0.1" '{{range .spec.taints}}{{if eq .key \"dedicated\"}}{{.key}}={{.value}}:{{.effect}}{{end}}{{end}}' "" # expect no output
+  # Dry-run
+  kubectl taint node 127.0.0.1 --dry-run=client dedicated=foo:PreferNoSchedule
+  kubectl taint node 127.0.0.1 --dry-run=server dedicated=foo:PreferNoSchedule
+  kube::test::get_object_assert "nodes 127.0.0.1" '{{range .spec.taints}}{{if eq .key \"dedicated\"}}{{.key}}={{.value}}:{{.effect}}{{end}}{{end}}' "" # expect no output
   # taint can add a taint (<key>=<value>:<effect>)
   kubectl taint node 127.0.0.1 dedicated=foo:PreferNoSchedule
   kube::test::get_object_assert "nodes 127.0.0.1" '{{range .spec.taints}}{{if eq .key \"dedicated\"}}{{.key}}={{.value}}:{{.effect}}{{end}}{{end}}' "dedicated=foo:PreferNoSchedule"
@@ -82,6 +86,10 @@ __EOF__
   kubectl taint node 127.0.0.1 dedicated-
   # taint can add a taint (<key>:<effect>)
   kubectl taint node 127.0.0.1 dedicated:PreferNoSchedule
+  kube::test::get_object_assert "nodes 127.0.0.1" '{{range .spec.taints}}{{if eq .key \"dedicated\"}}{{.key}}={{.value}}:{{.effect}}{{end}}{{end}}' "dedicated=<no value>:PreferNoSchedule"
+  # Dry-run remove a taint
+  kubectl taint node 127.0.0.1 --dry-run=client dedicated-
+  kubectl taint node 127.0.0.1 --dry-run=server dedicated-
   kube::test::get_object_assert "nodes 127.0.0.1" '{{range .spec.taints}}{{if eq .key \"dedicated\"}}{{.key}}={{.value}}:{{.effect}}{{end}}{{end}}' "dedicated=<no value>:PreferNoSchedule"
   # taint can remove a taint
   kubectl taint node 127.0.0.1 dedicated-
