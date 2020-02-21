@@ -404,7 +404,7 @@ func ownerRefsToUIDs(refs []metav1.OwnerReference) []types.UID {
 func (gc *GarbageCollector) attemptToDeleteItem(item *node) error {
 	trace := utiltrace.New("attemptToDeleteItem", utiltrace.Field{Key: "item", Value: item})
 	defer func() {
-		trace.LogIfLong(2 * time.Second)
+		trace.LogIfLong(200 * time.Millisecond)
 	}()
 	klog.V(2).Infof("processing item %s", item.identity)
 	// "being deleted" is an one-way trip to the final deletion. We'll just wait for the final deletion, and then process the object's dependents.
