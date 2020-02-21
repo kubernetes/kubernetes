@@ -22,6 +22,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	"google.golang.org/grpc"
 	"io/ioutil"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apiserver/pkg/apis/apiserver"
@@ -29,6 +30,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	client "sigs.k8s.io/apiserver-network-proxy/konnectivity-client/pkg/client"
 	"strings"
 )
 
@@ -94,13 +96,40 @@ func lookupServiceName(name string) (EgressType, error) {
 	return -1, fmt.Errorf("unrecognized service name %s", name)
 }
 
-func createConnectDialer(connectConfig *apiserver.HTTPConnectConfig) (utilnet.DialFunc, error) {
-	clientCert := connectConfig.ClientCert
-	clientKey := connectConfig.ClientKey
-	caCert := connectConfig.CABundle
-	proxyURL, err := url.Parse(connectConfig.URL)
+func tunnelHTTPConnect(proxyConn net.Conn, proxyAddress, addr string) (net.Conn, error) {
+	fmt.Fprintf(proxyConn, "CONNECT %s HTTP/1.1\r\nHost: %s\r\n\r\n", addr, "127.0.0.1")
+	br := bufio.NewReader(proxyConn)
+	res, err := http.ReadResponse(br, nil)
 	if err != nil {
-		return nil, fmt.Errorf("invalid proxy server url %q: %v", connectConfig.URL, err)
+		proxyConn.Close()
+		return nil, fmt.Errorf("reading HTTP response from CONNECT to %s via proxy %s failed: %v",
+			addr, proxyAddress, err)
+	}
+	if res.StatusCode != 200 {
+		proxyConn.Close()
+		return nil, fmt.Errorf("proxy error from %s while dialing %s, code %d: %v",
+			proxyAddress, addr, res.StatusCode, res.Status)
+	}
+
+	// It's safe to discard the bufio.Reader here and return the
+	// original TCP conn directly because we only use this for
+	// TLS, and in TLS the client speaks first, so we know there's
+	// no unbuffered data. But we can double-check.
+	if br.Buffered() > 0 {
+		proxyConn.Close()
+		return nil, fmt.Errorf("unexpected %d bytes of buffered data from CONNECT proxy %q",
+			br.Buffered(), proxyAddress)
+	}
+	return proxyConn, nil
+}
+
+func createConnectTCPDialer(tcpTransport *apiserver.TCPTransport) (utilnet.DialFunc, error) {
+	clientCert := tcpTransport.TLSConfig.ClientCert
+	clientKey := tcpTransport.TLSConfig.ClientKey
+	caCert := tcpTransport.TLSConfig.CABundle
+	proxyURL, err := url.Parse(tcpTransport.URL)
+	if err != nil {
+		return nil, fmt.Errorf("invalid proxy server url %q: %v", tcpTransport.URL, err)
 	}
 	proxyAddress := proxyURL.Host
 
@@ -109,13 +138,18 @@ func createConnectDialer(connectConfig *apiserver.HTTPConnectConfig) (utilnet.Di
 		return nil, fmt.Errorf("failed to read key pair %s & %s, got %v", clientCert, clientKey, err)
 	}
 	certPool := x509.NewCertPool()
-	certBytes, err := ioutil.ReadFile(caCert)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read cert file %s, got %v", caCert, err)
-	}
-	ok := certPool.AppendCertsFromPEM(certBytes)
-	if !ok {
-		return nil, fmt.Errorf("failed to append CA cert to the cert pool")
+	if caCert != "" {
+		certBytes, err := ioutil.ReadFile(caCert)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read cert file %s, got %v", caCert, err)
+		}
+		ok := certPool.AppendCertsFromPEM(certBytes)
+		if !ok {
+			return nil, fmt.Errorf("failed to append CA cert to the cert pool")
+		}
+	} else {
+		// Use host's root CA set instead of providing our own
+		certPool = nil
 	}
 	contextDialer := func(ctx context.Context, network, addr string) (net.Conn, error) {
 		klog.V(4).Infof("Sending request to %q.", addr)
@@ -128,30 +162,42 @@ func createConnectDialer(connectConfig *apiserver.HTTPConnectConfig) (utilnet.Di
 		if err != nil {
 			return nil, fmt.Errorf("dialing proxy %q failed: %v", proxyAddress, err)
 		}
-		fmt.Fprintf(proxyConn, "CONNECT %s HTTP/1.1\r\nHost: %s\r\n\r\n", addr, "127.0.0.1")
-		br := bufio.NewReader(proxyConn)
-		res, err := http.ReadResponse(br, nil)
+		return tunnelHTTPConnect(proxyConn, proxyAddress, addr)
+	}
+	return contextDialer, nil
+}
+
+func createConnectUDSDialer(udsConfig *apiserver.UDSTransport) (utilnet.DialFunc, error) {
+	contextDialer := func(ctx context.Context, network, addr string) (net.Conn, error) {
+		proxyConn, err := net.Dial("unix", udsConfig.UDSName)
 		if err != nil {
-			proxyConn.Close()
-			return nil, fmt.Errorf("reading HTTP response from CONNECT to %s via proxy %s failed: %v",
-				addr, proxyAddress, err)
+			return nil, fmt.Errorf("dialing proxy %q failed: %v", udsConfig.UDSName, err)
 		}
-		if res.StatusCode != 200 {
-			proxyConn.Close()
-			return nil, fmt.Errorf("proxy error from %s while dialing %s, code %d: %v",
-				proxyAddress, addr, res.StatusCode, res.Status)
+		return tunnelHTTPConnect(proxyConn, udsConfig.UDSName, addr)
+	}
+	return contextDialer, nil
+}
+
+func createGRPCUDSDialer(udsName string) (utilnet.DialFunc, error) {
+	contextDialer := func(ctx context.Context, network, addr string) (net.Conn, error) {
+
+		dialOption := grpc.WithContextDialer(func(context.Context, string) (net.Conn, error) {
+			c, err := net.Dial("unix", udsName)
+			if err != nil {
+				klog.Errorf("failed to create connection to uds name %s, error: %v", udsName, err)
+			}
+			return c, err
+		})
+
+		tunnel, err := client.CreateGrpcTunnel(udsName, dialOption, grpc.WithInsecure())
+		if err != nil {
+			return nil, err
 		}
 
-		// It's safe to discard the bufio.Reader here and return the
-		// original TCP conn directly because we only use this for
-		// TLS, and in TLS the client speaks first, so we know there's
-		// no unbuffered data. But we can double-check.
-		if br.Buffered() > 0 {
-			proxyConn.Close()
-			return nil, fmt.Errorf("unexpected %d bytes of buffered data from CONNECT proxy %q",
-				br.Buffered(), proxyAddress)
+		proxyConn, err := tunnel.Dial("tcp", addr)
+		if err != nil {
+			return nil, err
 		}
-		klog.V(4).Infof("About to proxy request to %s over %s.", addr, proxyAddress)
 		return proxyConn, nil
 	}
 	return contextDialer, nil
@@ -172,17 +218,39 @@ func NewEgressSelector(config *apiserver.EgressSelectorConfiguration) (*EgressSe
 		if err != nil {
 			return nil, err
 		}
-		switch service.Connection.Type {
-		case "http-connect":
-			contextDialer, err := createConnectDialer(service.Connection.HTTPConnect)
-			if err != nil {
-				return nil, fmt.Errorf("failed to create http-connect dialer: %v", err)
+		switch service.Connection.ProxyProtocol {
+
+		case apiserver.ProtocolHTTPConnect:
+			if service.Connection.Transport.UDS != nil {
+				contextDialer, err := createConnectUDSDialer(service.Connection.Transport.UDS)
+				if err != nil {
+					return nil, fmt.Errorf("failed to create HTTPConnect uds dialer: %v", err)
+				}
+				cs.egressToDialer[name] = contextDialer
+			} else if service.Connection.Transport.TCP != nil {
+				contextDialer, err := createConnectTCPDialer(service.Connection.Transport.TCP)
+				if err != nil {
+					return nil, fmt.Errorf("failed to create HTTPConnect dialer: %v", err)
+				}
+				cs.egressToDialer[name] = contextDialer
+			} else {
+				return nil, fmt.Errorf("Either a TCP or UDS transport must be specified")
 			}
-			cs.egressToDialer[name] = contextDialer
-		case "direct":
+		case apiserver.ProtocolGRPC:
+			if service.Connection.Transport.UDS != nil {
+				grpcContextDialer, err := createGRPCUDSDialer(service.Connection.Transport.UDS.UDSName)
+				if err != nil {
+					return nil, fmt.Errorf("failed to create grpc dialer: %v", err)
+				}
+				cs.egressToDialer[name] = grpcContextDialer
+
+			} else {
+				return nil, fmt.Errorf("UDS transport must be specified for GRPC")
+			}
+		case apiserver.ProtocolDirect:
 			cs.egressToDialer[name] = directDialer
 		default:
-			return nil, fmt.Errorf("unrecognized service connection type %q", service.Connection.Type)
+			return nil, fmt.Errorf("unrecognized service connection protocol %q", service.Connection.ProxyProtocol)
 		}
 	}
 	return cs, nil
