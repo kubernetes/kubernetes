@@ -608,7 +608,7 @@ func TestSetDefaultReplicationControllerInitContainers(t *testing.T) {
 
 	assertImagePullPolicy := func(got, expected *v1.Container) error {
 		if got.ImagePullPolicy != expected.ImagePullPolicy {
-			return fmt.Errorf("different image pull poicy: got <%v>, expected <%v>", got.ImagePullPolicy, expected.ImagePullPolicy)
+			return fmt.Errorf("different image pull policy: got <%v>, expected <%v>", got.ImagePullPolicy, expected.ImagePullPolicy)
 		}
 		return nil
 	}
