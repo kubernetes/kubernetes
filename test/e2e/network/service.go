@@ -114,20 +114,26 @@ type portsByPodName map[string][]int
 // return false only in case of unexpected errors.
 func checkAffinity(execPod *v1.Pod, serviceIP string, servicePort int, shouldHold bool) bool {
 	serviceIPPort := net.JoinHostPort(serviceIP, strconv.Itoa(servicePort))
-	cmd := fmt.Sprintf(`curl -q -s --connect-timeout 2 http://%s/`, serviceIPPort)
+	curl := fmt.Sprintf(`curl -q -s --connect-timeout 2 http://%s/`, serviceIPPort)
+	cmd := fmt.Sprintf("for i in $(seq 0 %d); do echo; %s ; done", AffinityConfirmCount, curl)
 	timeout := AffinityTimeout
 	if execPod == nil {
 		timeout = LoadBalancerPollTimeout
 	}
 	var tracker affinityTracker
-	if pollErr := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
+	// interval considering a maximum of 2 seconds per connection
+	interval := 2 * AffinityConfirmCount * time.Second
+	if pollErr := wait.PollImmediate(interval, timeout, func() (bool, error) {
 		if execPod != nil {
 			stdout, err := framework.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
 			if err != nil {
 				framework.Logf("Failed to get response from %s. Retry until timeout", serviceIPPort)
 				return false, nil
 			}
-			tracker.recordHost(stdout)
+			hosts := strings.Split(stdout, "\n")
+			for _, host := range hosts {
+				tracker.recordHost(strings.TrimSpace(host))
+			}
 		} else {
 			rawResponse := GetHTTPContent(serviceIP, servicePort, timeout, "")
 			tracker.recordHost(rawResponse.String())
