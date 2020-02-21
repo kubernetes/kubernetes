@@ -44,6 +44,7 @@ go_library(
         "//vendor/gonum.org/v1/gonum/graph/encoding/dot:go_default_library",
         "//vendor/gonum.org/v1/gonum/graph/simple:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/utils/trace:go_default_library",
     ],
 )
 

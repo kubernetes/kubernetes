@@ -23,11 +23,14 @@ import (
 	"net/url"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/googleapis/gnostic/OpenAPIv2"
+	utiltrace "k8s.io/utils/trace"
 
 	errorsutil "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/client-go/discovery"
@@ -129,12 +132,18 @@ func (d *memCacheClient) ServerGroupsAndResources() ([]*metav1.APIGroup, []*meta
 }
 
 func (d *memCacheClient) ServerGroups() (*metav1.APIGroupList, error) {
+	trace := utiltrace.New("memCacheClient.ServerGroups")
+	defer func() {
+		trace.LogIfLong(2 * time.Second)
+	}()
 	d.lock.Lock()
+	trace.Step("lock acquired")
 	defer d.lock.Unlock()
 	if !d.cacheValid {
 		if err := d.refreshLocked(); err != nil {
 			return nil, err
 		}
+		trace.Step("done refresh locked")
 	}
 	return d.groupList, nil
 }
@@ -190,16 +199,29 @@ func (d *memCacheClient) refreshLocked() error {
 		return err
 	}
 
+	wg := &sync.WaitGroup{}
+	resultLock := &sync.Mutex{}
 	rl := map[string]*cacheEntry{}
 	for _, g := range gl.Groups {
 		for _, v := range g.Versions {
-			r, err := d.serverResourcesForGroupVersion(v.GroupVersion)
-			rl[v.GroupVersion] = &cacheEntry{r, err}
-			if err != nil {
-				utilruntime.HandleError(fmt.Errorf("couldn't get resource list for %v: %v", v.GroupVersion, err))
-			}
+			groupVersion := schema.GroupVersion{Group: g.Name, Version: v.Version}
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				defer utilruntime.HandleCrash()
+
+				r, err := d.serverResourcesForGroupVersion(groupVersion.String())
+				if err != nil {
+					utilruntime.HandleError(fmt.Errorf("couldn't get resource list for %v: %v", groupVersion, err))
+				}
+
+				resultLock.Lock()
+				defer resultLock.Unlock()
+				rl[groupVersion.String()] = &cacheEntry{r, err}
+			}()
 		}
 	}
+	wg.Wait()
 
 	d.groupToServerResources, d.groupList = rl, gl
 	d.cacheValid = true
