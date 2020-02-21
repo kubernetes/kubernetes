@@ -2363,28 +2363,28 @@ var _ = SIGDescribe("Services", func() {
 	})
 
 	// [LinuxOnly]: Windows does not support session affinity.
-	ginkgo.It("should have session affinity work for service with type clusterIP [LinuxOnly] [Flaky]", func() {
+	ginkgo.It("should have session affinity work for service with type clusterIP [LinuxOnly]", func() {
 		svc := getServeHostnameService("affinity-clusterip")
 		svc.Spec.Type = v1.ServiceTypeClusterIP
 		execAffinityTestForNonLBService(f, cs, svc)
 	})
 
 	// [LinuxOnly]: Windows does not support session affinity.
-	ginkgo.It("should be able to switch session affinity for service with type clusterIP [LinuxOnly] [Flaky]", func() {
+	ginkgo.It("should be able to switch session affinity for service with type clusterIP [LinuxOnly]", func() {
 		svc := getServeHostnameService("affinity-clusterip-transition")
 		svc.Spec.Type = v1.ServiceTypeClusterIP
 		execAffinityTestForNonLBServiceWithTransition(f, cs, svc)
 	})
 
 	// [LinuxOnly]: Windows does not support session affinity.
-	ginkgo.It("should have session affinity work for NodePort service [LinuxOnly] [Flaky]", func() {
+	ginkgo.It("should have session affinity work for NodePort service [LinuxOnly]", func() {
 		svc := getServeHostnameService("affinity-nodeport")
 		svc.Spec.Type = v1.ServiceTypeNodePort
 		execAffinityTestForNonLBService(f, cs, svc)
 	})
 
 	// [LinuxOnly]: Windows does not support session affinity.
-	ginkgo.It("should be able to switch session affinity for NodePort service [LinuxOnly] [Flaky]", func() {
+	ginkgo.It("should be able to switch session affinity for NodePort service [LinuxOnly]", func() {
 		svc := getServeHostnameService("affinity-nodeport-transition")
 		svc.Spec.Type = v1.ServiceTypeNodePort
 		execAffinityTestForNonLBServiceWithTransition(f, cs, svc)
