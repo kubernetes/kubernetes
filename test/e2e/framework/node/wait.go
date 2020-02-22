@@ -164,7 +164,7 @@ func CheckReady(c clientset.Interface, size int, timeout time.Duration) ([]v1.No
 		// Filter out not-ready nodes.
 		Filter(nodes, func(node v1.Node) bool {
 			nodeReady := IsConditionSetAsExpected(&node, v1.NodeReady, true)
-			networkReady := IsConditionUnset(&node, v1.NodeNetworkUnavailable) || IsConditionSetAsExpected(&node, v1.NodeNetworkUnavailable, false)
+			networkReady := isConditionUnset(&node, v1.NodeNetworkUnavailable) || IsConditionSetAsExpected(&node, v1.NodeNetworkUnavailable, false)
 			return nodeReady && networkReady
 		})
 		numReady := len(nodes.Items)
@@ -274,7 +274,7 @@ func readyForTests(node *v1.Node, nonblockingTaints string) bool {
 			return false
 		}
 	} else {
-		if !IsNodeSchedulable(node) || !IsNodeUntainted(node) {
+		if !IsNodeSchedulable(node) || !isNodeUntainted(node) {
 			return false
 		}
 	}

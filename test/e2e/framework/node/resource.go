@@ -67,7 +67,6 @@ func FirstAddress(nodelist *v1.NodeList, addrType v1.NodeAddressType) string {
 	return ""
 }
 
-// TODO: better to change to a easy read name
 func isNodeConditionSetAsExpected(node *v1.Node, conditionType v1.NodeConditionType, wantTrue, silent bool) bool {
 	// Check the node readiness condition (logging all).
 	for _, cond := range node.Status.Conditions {
@@ -138,8 +137,8 @@ func IsConditionSetAsExpectedSilent(node *v1.Node, conditionType v1.NodeConditio
 	return isNodeConditionSetAsExpected(node, conditionType, wantTrue, true)
 }
 
-// IsConditionUnset returns true if conditions of the given node do not have a match to the given conditionType, otherwise false.
-func IsConditionUnset(node *v1.Node, conditionType v1.NodeConditionType) bool {
+// isConditionUnset returns true if conditions of the given node do not have a match to the given conditionType, otherwise false.
+func isConditionUnset(node *v1.Node, conditionType v1.NodeConditionType) bool {
 	for _, cond := range node.Status.Conditions {
 		if cond.Type == conditionType {
 			return false
@@ -207,11 +206,9 @@ func GetExternalIP(node *v1.Node) (string, error) {
 func GetInternalIP(node *v1.Node) (string, error) {
 	host := ""
 	for _, address := range node.Status.Addresses {
-		if address.Type == v1.NodeInternalIP {
-			if address.Address != "" {
-				host = net.JoinHostPort(address.Address, sshPort)
-				break
-			}
+		if address.Type == v1.NodeInternalIP && address.Address != "" {
+			host = net.JoinHostPort(address.Address, sshPort)
+			break
 		}
 	}
 	if host == "" {
@@ -278,7 +275,7 @@ func GetReadySchedulableNodes(c clientset.Interface) (nodes *v1.NodeList, err er
 		return nil, fmt.Errorf("listing schedulable nodes error: %s", err)
 	}
 	Filter(nodes, func(node v1.Node) bool {
-		return IsNodeSchedulable(&node) && IsNodeUntainted(&node)
+		return IsNodeSchedulable(&node) && isNodeUntainted(&node)
 	})
 	if len(nodes.Items) == 0 {
 		return nil, fmt.Errorf("there are currently no ready, schedulable nodes in the cluster")
@@ -343,16 +340,16 @@ func GetMasterAndWorkerNodes(c clientset.Interface) (sets.String, *v1.NodeList, 
 	for _, n := range all.Items {
 		if system.DeprecatedMightBeMasterNode(n.Name) {
 			masters.Insert(n.Name)
-		} else if IsNodeSchedulable(&n) && IsNodeUntainted(&n) {
+		} else if IsNodeSchedulable(&n) && isNodeUntainted(&n) {
 			nodes.Items = append(nodes.Items, n)
 		}
 	}
 	return masters, nodes, nil
 }
 
-// IsNodeUntainted tests whether a fake pod can be scheduled on "node", given its current taints.
+// isNodeUntainted tests whether a fake pod can be scheduled on "node", given its current taints.
 // TODO: need to discuss wether to return bool and error type
-func IsNodeUntainted(node *v1.Node) bool {
+func isNodeUntainted(node *v1.Node) bool {
 	return isNodeUntaintedWithNonblocking(node, "")
 }
 
@@ -427,7 +424,7 @@ func IsNodeSchedulable(node *v1.Node) bool {
 // 2) doesn't have NetworkUnavailable condition set to true
 func IsNodeReady(node *v1.Node) bool {
 	nodeReady := IsConditionSetAsExpected(node, v1.NodeReady, true)
-	networkReady := IsConditionUnset(node, v1.NodeNetworkUnavailable) ||
+	networkReady := isConditionUnset(node, v1.NodeNetworkUnavailable) ||
 		IsConditionSetAsExpectedSilent(node, v1.NodeNetworkUnavailable, false)
 	return nodeReady && networkReady
 }
