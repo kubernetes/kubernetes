@@ -262,7 +262,7 @@ func (o *ClusterInfoDumpOptions) Run() error {
 			return err
 		}
 
-		printContainer := func(writer io.Writer, container corev1.Container, pod *corev1.Pod) {
+		printContainer := func(writer io.Writer, container *corev1.Container, pod *corev1.Pod) {
 			writer.Write([]byte(fmt.Sprintf("==== START logs for container %s of pod %s/%s ====\n", container.Name, pod.Namespace, pod.Name)))
 			defer writer.Write([]byte(fmt.Sprintf("==== END logs for container %s of pod %s/%s ====\n", container.Name, pod.Namespace, pod.Name)))
 
@@ -288,13 +288,17 @@ func (o *ClusterInfoDumpOptions) Run() error {
 			pod := &pods.Items[ix]
 			initcontainers := pod.Spec.InitContainers
 			containers := pod.Spec.Containers
+			ephemeralContainers := pod.Spec.EphemeralContainers
 			writer := setupOutputWriter(o.OutputDir, o.Out, path.Join(namespace, pod.Name, "logs"), ".txt")
 
 			for i := range initcontainers {
-				printContainer(writer, initcontainers[i], pod)
+				printContainer(writer, &initcontainers[i], pod)
 			}
 			for i := range containers {
-				printContainer(writer, containers[i], pod)
+				printContainer(writer, &containers[i], pod)
+			}
+			for i := range ephemeralContainers {
+				printContainer(writer, (*corev1.Container)(&ephemeralContainers[i].EphemeralContainerCommon), pod)
 			}
 		}
 	}
