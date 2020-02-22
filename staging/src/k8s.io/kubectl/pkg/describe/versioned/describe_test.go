@@ -3503,9 +3503,38 @@ Events:              <none>` + "\n"
 	}
 
 }
+func getHugePageResourceList(pageSize, value string) corev1.ResourceList {
+	res := corev1.ResourceList{}
+	if pageSize != "" && value != "" {
+		res[corev1.ResourceName(corev1.ResourceHugePagesPrefix+pageSize)] = resource.MustParse(value)
+	}
+	return res
+}
+
+// mergeResourceLists will merge resoure lists. When two lists have the same resourece, the value from
+// the last list will be present in the result
+func mergeResourceLists(resourceLists ...corev1.ResourceList) corev1.ResourceList {
+	result := corev1.ResourceList{}
+	for _, rl := range resourceLists {
+		for resource, quantity := range rl {
+			result[resource] = quantity
+		}
+	}
+	return result
+}
 
 func TestDescribeNode(t *testing.T) {
 	holderIdentity := "holder"
+	nodeCapacity := mergeResourceLists(
+		getHugePageResourceList("2Mi", "4Gi"),
+		getResourceList("8", "24Gi"),
+		getHugePageResourceList("1Gi", "0"),
+	)
+	nodeAllocatable := mergeResourceLists(
+		getHugePageResourceList("2Mi", "2Gi"),
+		getResourceList("4", "12Gi"),
+		getHugePageResourceList("1Gi", "0"),
+	)
 
 	fake := fake.NewSimpleClientset(
 		&corev1.Node{
@@ -3514,6 +3543,10 @@ func TestDescribeNode(t *testing.T) {
 			},
 			Spec: corev1.NodeSpec{
 				Unschedulable: true,
+			},
+			Status: corev1.NodeStatus{
+				Capacity:    nodeCapacity,
+				Allocatable: nodeAllocatable,
 			},
 		},
 		&coordinationv1.Lease{
@@ -3527,6 +3560,38 @@ func TestDescribeNode(t *testing.T) {
 				RenewTime:      &metav1.MicroTime{Time: time.Now()},
 			},
 		},
+		&corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "pod-with-resources",
+				Namespace: "foo",
+			},
+			TypeMeta: metav1.TypeMeta{
+				Kind: "Pod",
+			},
+			Spec: corev1.PodSpec{
+				Containers: []corev1.Container{
+					{
+						Name:  "cpu-mem",
+						Image: "image:latest",
+						Resources: corev1.ResourceRequirements{
+							Requests: getResourceList("1", "1Gi"),
+							Limits:   getResourceList("2", "2Gi"),
+						},
+					},
+					{
+						Name:  "hugepages",
+						Image: "image:latest",
+						Resources: corev1.ResourceRequirements{
+							Requests: getHugePageResourceList("2Mi", "512Mi"),
+							Limits:   getHugePageResourceList("2Mi", "512Mi"),
+						},
+					},
+				},
+			},
+			Status: corev1.PodStatus{
+				Phase: corev1.PodRunning,
+			},
+		},
 	)
 	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
 	d := NodeDescriber{c}
@@ -3535,7 +3600,16 @@ func TestDescribeNode(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	expectedOut := []string{"Unschedulable", "true", "holder"}
+	expectedOut := []string{"Unschedulable", "true", "holder",
+		`Allocated resources:
+  (Total limits may be over 100 percent, i.e., overcommitted.)
+  Resource           Requests     Limits
+  --------           --------     ------
+  cpu                1 (25%)      2 (50%)
+  memory             1Gi (8%)     2Gi (16%)
+  ephemeral-storage  0 (0%)       0 (0%)
+  hugepages-1Gi      0 (0%)       0 (0%)
+  hugepages-2Mi      512Mi (25%)  512Mi (25%)`}
 	for _, expected := range expectedOut {
 		if !strings.Contains(out, expected) {
 			t.Errorf("expected to find %q in output: %q", expected, out)

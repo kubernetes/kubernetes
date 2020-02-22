@@ -3530,13 +3530,32 @@ func describeNodeResource(nodeNonTerminatedPodsList *corev1.PodList, node *corev
 		corev1.ResourceMemory, memoryReqs.String(), int64(fractionMemoryReqs), memoryLimits.String(), int64(fractionMemoryLimits))
 	w.Write(LEVEL_1, "%s\t%s (%d%%)\t%s (%d%%)\n",
 		corev1.ResourceEphemeralStorage, ephemeralstorageReqs.String(), int64(fractionEphemeralStorageReqs), ephemeralstorageLimits.String(), int64(fractionEphemeralStorageLimits))
+
 	extResources := make([]string, 0, len(allocatable))
+	hugePageResources := make([]string, 0, len(allocatable))
 	for resource := range allocatable {
-		if !resourcehelper.IsStandardContainerResourceName(string(resource)) && resource != corev1.ResourcePods {
+		if resourcehelper.IsHugePageResourceName(resource) {
+			hugePageResources = append(hugePageResources, string(resource))
+		} else if !resourcehelper.IsStandardContainerResourceName(string(resource)) && resource != corev1.ResourcePods {
 			extResources = append(extResources, string(resource))
 		}
 	}
+
 	sort.Strings(extResources)
+	sort.Strings(hugePageResources)
+
+	for _, resource := range hugePageResources {
+		hugePageSizeRequests, hugePageSizeLimits, hugePageSizeAllocable := reqs[corev1.ResourceName(resource)], limits[corev1.ResourceName(resource)], allocatable[corev1.ResourceName(resource)]
+		fractionHugePageSizeRequests := float64(0)
+		fractionHugePageSizeLimits := float64(0)
+		if hugePageSizeAllocable.Value() != 0 {
+			fractionHugePageSizeRequests = float64(hugePageSizeRequests.Value()) / float64(hugePageSizeAllocable.Value()) * 100
+			fractionHugePageSizeLimits = float64(hugePageSizeLimits.Value()) / float64(hugePageSizeAllocable.Value()) * 100
+		}
+		w.Write(LEVEL_1, "%s\t%s (%d%%)\t%s (%d%%)\n",
+			resource, hugePageSizeRequests.String(), int64(fractionHugePageSizeRequests), hugePageSizeLimits.String(), int64(fractionHugePageSizeLimits))
+	}
+
 	for _, ext := range extResources {
 		extRequests, extLimits := reqs[corev1.ResourceName(ext)], limits[corev1.ResourceName(ext)]
 		w.Write(LEVEL_1, "%s\t%s\t%s\n", ext, extRequests.String(), extLimits.String())
