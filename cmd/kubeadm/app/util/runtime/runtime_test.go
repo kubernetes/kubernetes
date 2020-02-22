@@ -219,7 +219,7 @@ func TestRemoveContainers(t *testing.T) {
 				t.Errorf("unexpected RemoveContainers errors: %v, criSocket: %s, containers: %v", err, tc.criSocket, tc.containers)
 			}
 			if tc.isError && err == nil {
-				t.Errorf("unexpected RemoveContnainers success, criSocket: %s, containers: %v", tc.criSocket, tc.containers)
+				t.Errorf("unexpected RemoveContainers success, criSocket: %s, containers: %v", tc.criSocket, tc.containers)
 			}
 		})
 	}
