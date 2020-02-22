@@ -122,6 +122,7 @@ namespace=%v
 	}
 }
 
+// NewGonumVertex creates a new gonumVertex.
 func NewGonumVertex(node *node, nodeID int64) *gonumVertex {
 	gv, err := schema.ParseGroupVersion(node.identity.APIVersion)
 	if err != nil {
@@ -140,6 +141,7 @@ func NewGonumVertex(node *node, nodeID int64) *gonumVertex {
 	}
 }
 
+// NewMissingGonumVertex creates a new gonumVertex.
 func NewMissingGonumVertex(ownerRef metav1.OwnerReference, nodeID int64) *gonumVertex {
 	gv, err := schema.ParseGroupVersion(ownerRef.APIVersion)
 	if err != nil {
@@ -242,6 +244,7 @@ func toGonumGraphForObj(uidToNode map[types.UID]*node, uids ...types.UID) graph.
 	return toGonumGraph(interestingNodes)
 }
 
+// NewDebugHandler creates a new debugHTTPHandler.
 func NewDebugHandler(controller *GarbageCollector) http.Handler {
 	return &debugHTTPHandler{controller: controller}
 }
