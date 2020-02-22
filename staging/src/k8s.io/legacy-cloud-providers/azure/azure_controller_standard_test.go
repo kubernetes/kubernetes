@@ -24,6 +24,7 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-07-01/compute"
 	"github.com/Azure/go-autorest/autorest/to"
+	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 
 	"k8s.io/apimachinery/pkg/types"
@@ -35,6 +36,9 @@ var (
 )
 
 func TestStandardAttachDisk(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	testCases := []struct {
 		desc        string
 		nodeName    types.NodeName
@@ -53,7 +57,7 @@ func TestStandardAttachDisk(t *testing.T) {
 	}
 
 	for i, test := range testCases {
-		testCloud := GetTestCloud()
+		testCloud := GetTestCloud(ctrl)
 		vmSet := testCloud.vmSet
 		setTestVirtualMachines(testCloud, map[string]string{"vm1": "PowerState/Running"}, false)
 
@@ -64,6 +68,9 @@ func TestStandardAttachDisk(t *testing.T) {
 }
 
 func TestStandardDetachDisk(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	testCases := []struct {
 		desc          string
 		nodeName      types.NodeName
@@ -90,7 +97,7 @@ func TestStandardDetachDisk(t *testing.T) {
 	}
 
 	for i, test := range testCases {
-		testCloud := GetTestCloud()
+		testCloud := GetTestCloud(ctrl)
 		vmSet := testCloud.vmSet
 		setTestVirtualMachines(testCloud, map[string]string{"vm1": "PowerState/Running"}, false)
 
@@ -100,6 +107,9 @@ func TestStandardDetachDisk(t *testing.T) {
 }
 
 func TestGetDataDisks(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	var testCases = []struct {
 		desc              string
 		nodeName          types.NodeName
@@ -140,7 +150,7 @@ func TestGetDataDisks(t *testing.T) {
 		},
 	}
 	for i, test := range testCases {
-		testCloud := GetTestCloud()
+		testCloud := GetTestCloud(ctrl)
 		vmSet := testCloud.vmSet
 		setTestVirtualMachines(testCloud, map[string]string{"vm1": "PowerState/Running"}, false)
 

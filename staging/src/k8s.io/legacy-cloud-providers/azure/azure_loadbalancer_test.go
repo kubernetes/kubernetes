@@ -29,10 +29,12 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2019-06-01/network"
 	"github.com/Azure/go-autorest/autorest/to"
+	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/legacy-cloud-providers/azure/clients/subnetclient/mocksubnetclient"
 )
 
 func TestFindProbe(t *testing.T) {
@@ -378,12 +380,14 @@ func TestEnsureLoadBalancerDeleted(t *testing.T) {
 		},
 	}
 
-	az := GetTestCloud()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	az := GetTestCloud(ctrl)
 	for i, c := range tests {
 		clusterResources := getClusterResources(az, vmCount, availabilitySetCount)
 		getTestSecurityGroup(az)
 		if c.service.Annotations[ServiceAnnotationLoadBalancerInternal] == "true" {
-			addTestSubnet(t, az, &c.service)
+			validateTestSubnet(t, az, &c.service)
 		}
 
 		// create the service first.
@@ -488,7 +492,9 @@ func TestServiceOwnsPublicIP(t *testing.T) {
 }
 
 func TestGetPublicIPAddressResourceGroup(t *testing.T) {
-	az := GetTestCloud()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	az := GetTestCloud(ctrl)
 
 	for i, c := range []struct {
 		desc        string
@@ -692,8 +698,10 @@ func TestGetServiceLoadBalancer(t *testing.T) {
 		},
 	}
 
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 	for i, test := range testCases {
-		az := GetTestCloud()
+		az := GetTestCloud(ctrl)
 		clusterResources := getClusterResources(az, 3, 3)
 
 		for _, existingLB := range test.existingLBs {
@@ -714,6 +722,9 @@ func TestGetServiceLoadBalancer(t *testing.T) {
 }
 
 func TestIsFrontendIPChanged(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	testCases := []struct {
 		desc                   string
 		config                 network.FrontendIPConfiguration
@@ -903,7 +914,10 @@ func TestIsFrontendIPChanged(t *testing.T) {
 	}
 
 	for i, test := range testCases {
-		az := GetTestCloud()
+		az := GetTestCloud(ctrl)
+		mockSubnetsClient := az.SubnetsClient.(*mocksubnetclient.MockInterface)
+		mockSubnetsClient.EXPECT().Get(gomock.Any(), "rg", "vnet", "testSubnet", "").Return(test.exsistingSubnet, nil).AnyTimes()
+		mockSubnetsClient.EXPECT().CreateOrUpdate(gomock.Any(), "rg", "vnet", "testSubnet", test.exsistingSubnet).Return(nil)
 		err := az.SubnetsClient.CreateOrUpdate(context.TODO(), "rg", "vnet", "testSubnet", test.exsistingSubnet)
 		if err != nil {
 			t.Fatalf("TestCase[%d] meets unexpected error: %v", i, err)
@@ -924,6 +938,9 @@ func TestIsFrontendIPChanged(t *testing.T) {
 }
 
 func TestDeterminePublicIPName(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	testCases := []struct {
 		desc           string
 		loadBalancerIP string
@@ -960,7 +977,7 @@ func TestDeterminePublicIPName(t *testing.T) {
 		},
 	}
 	for i, test := range testCases {
-		az := GetTestCloud()
+		az := GetTestCloud(ctrl)
 		service := getTestService("test1", v1.ProtocolTCP, nil, 80)
 		service.Spec.LoadBalancerIP = test.loadBalancerIP
 		for _, existingPIP := range test.exsistingPIPs {
@@ -976,6 +993,9 @@ func TestDeterminePublicIPName(t *testing.T) {
 }
 
 func TestReconcileLoadBalancerRule(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	testCases := []struct {
 		desc            string
 		service         v1.Service
@@ -1117,7 +1137,7 @@ func TestReconcileLoadBalancerRule(t *testing.T) {
 		},
 	}
 	for i, test := range testCases {
-		az := GetTestCloud()
+		az := GetTestCloud(ctrl)
 		az.Config.LoadBalancerSku = test.loadBalancerSku
 		probe, lbrule, err := az.reconcileLoadBalancerRule(&test.service, test.wantLb,
 			"frontendIPConfigID", "backendPoolID", "lbname", to.Int32Ptr(0))
@@ -1191,6 +1211,9 @@ func getTestLoadBalancer(name, rgName, clusterName, identifier *string, service 
 }
 
 func TestReconcileLoadBalancer(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	service1 := getTestService("test1", v1.ProtocolTCP, nil, 80)
 	basicLb1 := getTestLoadBalancer(to.StringPtr("lb1"), to.StringPtr("rg"), to.StringPtr("testCluster"), to.StringPtr("atest1"), service1, "Basic")
 
@@ -1547,7 +1570,7 @@ func TestReconcileLoadBalancer(t *testing.T) {
 	}
 
 	for i, test := range testCases {
-		az := GetTestCloud()
+		az := GetTestCloud(ctrl)
 		az.Config.LoadBalancerSku = test.loadBalancerSku
 		az.DisableOutboundSNAT = test.disableOutboundSnat
 		if test.preConfigLBType != "" {
@@ -1583,7 +1606,10 @@ func TestReconcileLoadBalancer(t *testing.T) {
 }
 
 func TestGetServiceLoadBalancerStatus(t *testing.T) {
-	az := GetTestCloud()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	az := GetTestCloud(ctrl)
 	service := getTestService("test1", v1.ProtocolTCP, nil, 80)
 	internalService := getInternalTestService("test1", 80)
 
@@ -1721,6 +1747,9 @@ func TestGetServiceLoadBalancerStatus(t *testing.T) {
 }
 
 func TestReconcileSecurityGroup(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	testCases := []struct {
 		desc          string
 		service       v1.Service
@@ -1804,7 +1833,7 @@ func TestReconcileSecurityGroup(t *testing.T) {
 	}
 
 	for i, test := range testCases {
-		az := GetTestCloud()
+		az := GetTestCloud(ctrl)
 		for name, sg := range test.existingSgs {
 			err := az.SecurityGroupsClient.CreateOrUpdate(context.TODO(), "rg", name, sg, "")
 			if err != nil {
@@ -1818,6 +1847,9 @@ func TestReconcileSecurityGroup(t *testing.T) {
 }
 
 func TestSafeDeletePublicIP(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	testCases := []struct {
 		desc          string
 		pip           *network.PublicIPAddress
@@ -1852,7 +1884,7 @@ func TestSafeDeletePublicIP(t *testing.T) {
 	}
 
 	for i, test := range testCases {
-		az := GetTestCloud()
+		az := GetTestCloud(ctrl)
 		err := az.PublicIPAddressesClient.CreateOrUpdate(context.TODO(), "rg", "pip1", network.PublicIPAddress{
 			Name: to.StringPtr("pip1"),
 			PublicIPAddressPropertiesFormat: &network.PublicIPAddressPropertiesFormat{
@@ -1873,6 +1905,9 @@ func TestSafeDeletePublicIP(t *testing.T) {
 }
 
 func TestReconcilePublicIP(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	testCases := []struct {
 		desc          string
 		wantLb        bool
@@ -1971,7 +2006,7 @@ func TestReconcilePublicIP(t *testing.T) {
 	}
 
 	for i, test := range testCases {
-		az := GetTestCloud()
+		az := GetTestCloud(ctrl)
 		service := getTestService("test1", v1.ProtocolTCP, nil, 80)
 		service.Annotations = test.annotations
 		for _, pip := range test.existingPIPs {
@@ -1991,6 +2026,9 @@ func TestReconcilePublicIP(t *testing.T) {
 }
 
 func TestEnsurePublicIPExists(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	testCases := []struct {
 		desc                    string
 		existingPIPs            []network.PublicIPAddress
@@ -2082,7 +2120,7 @@ func TestEnsurePublicIPExists(t *testing.T) {
 	}
 
 	for i, test := range testCases {
-		az := GetTestCloud()
+		az := GetTestCloud(ctrl)
 		service := getTestService("test1", v1.ProtocolTCP, nil, 80)
 		for _, pip := range test.existingPIPs {
 			err := az.PublicIPAddressesClient.CreateOrUpdate(context.TODO(), "rg", to.String(pip.Name), pip)
@@ -2101,6 +2139,9 @@ func TestEnsurePublicIPExists(t *testing.T) {
 }
 
 func TestShouldUpdateLoadBalancer(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	testCases := []struct {
 		desc                   string
 		lbHasDeletionTimestamp bool
@@ -2134,7 +2175,7 @@ func TestShouldUpdateLoadBalancer(t *testing.T) {
 	}
 
 	for i, test := range testCases {
-		az := GetTestCloud()
+		az := GetTestCloud(ctrl)
 		service := getTestService("test1", v1.ProtocolTCP, nil, 80)
 		if test.lbHasDeletionTimestamp {
 			service.ObjectMeta.DeletionTimestamp = &metav1.Time{Time: time.Now()}
@@ -2164,6 +2205,9 @@ func TestShouldUpdateLoadBalancer(t *testing.T) {
 }
 
 func TestIsBackendPoolPreConfigured(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	testCases := []struct {
 		desc                                      string
 		preConfiguredBackendPoolLoadBalancerTypes string
@@ -2221,7 +2265,7 @@ func TestIsBackendPoolPreConfigured(t *testing.T) {
 	}
 
 	for i, test := range testCases {
-		az := GetTestCloud()
+		az := GetTestCloud(ctrl)
 		az.Config.PreConfiguredBackendPoolLoadBalancerTypes = test.preConfiguredBackendPoolLoadBalancerTypes
 		var service v1.Service
 		if test.isInternalService {

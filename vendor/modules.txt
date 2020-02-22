@@ -1870,11 +1870,14 @@ k8s.io/legacy-cloud-providers/azure/clients/interfaceclient
 k8s.io/legacy-cloud-providers/azure/clients/loadbalancerclient
 k8s.io/legacy-cloud-providers/azure/clients/publicipclient
 k8s.io/legacy-cloud-providers/azure/clients/routeclient
+k8s.io/legacy-cloud-providers/azure/clients/routeclient/mockrouteclient
 k8s.io/legacy-cloud-providers/azure/clients/routetableclient
+k8s.io/legacy-cloud-providers/azure/clients/routetableclient/mockroutetableclient
 k8s.io/legacy-cloud-providers/azure/clients/securitygroupclient
 k8s.io/legacy-cloud-providers/azure/clients/snapshotclient
 k8s.io/legacy-cloud-providers/azure/clients/storageaccountclient
 k8s.io/legacy-cloud-providers/azure/clients/subnetclient
+k8s.io/legacy-cloud-providers/azure/clients/subnetclient/mocksubnetclient
 k8s.io/legacy-cloud-providers/azure/clients/vmclient
 k8s.io/legacy-cloud-providers/azure/clients/vmsizeclient
 k8s.io/legacy-cloud-providers/azure/clients/vmssclient
