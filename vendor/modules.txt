@@ -1806,7 +1806,6 @@ k8s.io/kubectl/pkg/cmd/plugin
 k8s.io/kubectl/pkg/cmd/portforward
 k8s.io/kubectl/pkg/cmd/proxy
 k8s.io/kubectl/pkg/cmd/replace
-k8s.io/kubectl/pkg/cmd/rollingupdate
 k8s.io/kubectl/pkg/cmd/rollout
 k8s.io/kubectl/pkg/cmd/run
 k8s.io/kubectl/pkg/cmd/scale
