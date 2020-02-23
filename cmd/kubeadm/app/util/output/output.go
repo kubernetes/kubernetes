@@ -30,7 +30,7 @@ import (
 // TextOutput describes the plain text output
 const TextOutput = "text"
 
-// TextPrintFlags is an iterface to handle custom text output
+// TextPrintFlags is an interface to handle custom text output
 type TextPrintFlags interface {
 	ToPrinter(outputFormat string) (Printer, error)
 }
