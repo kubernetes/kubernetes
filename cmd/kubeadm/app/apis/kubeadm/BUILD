@@ -9,6 +9,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "apiendpoint.go",
         "bootstraptokenhelpers.go",
         "bootstraptokenstring.go",
         "doc.go",
@@ -52,6 +53,7 @@ filegroup(
 go_test(
     name = "go_default_test",
     srcs = [
+        "apiendpoint_test.go",
         "bootstraptokenhelpers_test.go",
         "bootstraptokenstring_test.go",
     ],
