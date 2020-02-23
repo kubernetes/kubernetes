@@ -50,7 +50,7 @@ msgstr "Wyświetl bieżący kontekst"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/config.go#L39
 msgid "Modify kubeconfig files"
-msgstr "MZmodyfikuj pliki kubeconfig"
+msgstr "Zmodyfikuj pliki kubeconfig"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/create_cluster.go#L67
 msgid "Sets a cluster entry in kubeconfig"
