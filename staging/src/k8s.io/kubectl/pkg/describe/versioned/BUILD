@@ -68,6 +68,7 @@ go_test(
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/api/discovery/v1beta1:go_default_library",
         "//staging/src/k8s.io/api/networking/v1:go_default_library",
+        "//staging/src/k8s.io/api/networking/v1beta1:go_default_library",
         "//staging/src/k8s.io/api/policy/v1beta1:go_default_library",
         "//staging/src/k8s.io/api/storage/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/equality:go_default_library",

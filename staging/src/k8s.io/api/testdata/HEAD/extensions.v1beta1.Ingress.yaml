@@ -31,20 +31,22 @@ metadata:
   uid: "7"
 spec:
   backend:
-    serviceName: "19"
-    servicePort: "20"
+    serviceName: "20"
+    servicePort: "21"
+  ingressClassName: "19"
   rules:
-  - host: "23"
+  - host: "24"
     http:
       paths:
       - backend:
-          serviceName: "25"
-          servicePort: "26"
-        path: "24"
+          serviceName: "26"
+          servicePort: -783752440
+        path: "25"
+        pathType: ""
   tls:
   - hosts:
-    - "21"
-    secretName: "22"
+    - "22"
+    secretName: "23"
 status:
   loadBalancer:
     ingress:

@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/admission/extendedresourcetoleration"
 	"k8s.io/kubernetes/plugin/pkg/admission/gc"
 	"k8s.io/kubernetes/plugin/pkg/admission/imagepolicy"
+	"k8s.io/kubernetes/plugin/pkg/admission/ingressclass"
 	"k8s.io/kubernetes/plugin/pkg/admission/limitranger"
 	"k8s.io/kubernetes/plugin/pkg/admission/namespace/autoprovision"
 	"k8s.io/kubernetes/plugin/pkg/admission/namespace/exists"
@@ -90,6 +91,7 @@ var AllOrderedPlugins = []string{
 	validatingwebhook.PluginName,            // ValidatingAdmissionWebhook
 	runtimeclass.PluginName,                 //RuntimeClass
 	resourcequota.PluginName,                // ResourceQuota
+	ingressclass.PluginName,                 // IngressClass
 	deny.PluginName,                         // AlwaysDeny
 }
 
@@ -106,6 +108,7 @@ func RegisterAllAdmissionPlugins(plugins *admission.Plugins) {
 	extendedresourcetoleration.Register(plugins)
 	gc.Register(plugins)
 	imagepolicy.Register(plugins)
+	ingressclass.Register(plugins)
 	limitranger.Register(plugins)
 	autoprovision.Register(plugins)
 	exists.Register(plugins)
@@ -142,6 +145,7 @@ func DefaultOffAdmissionPlugins() sets.String {
 		podpriority.PluginName,                  //PodPriority
 		nodetaint.PluginName,                    //TaintNodesByCondition
 		runtimeclass.PluginName,                 //RuntimeClass, gates internally on the feature
+		ingressclass.PluginName,                 //IngressClass
 	)
 
 	return sets.NewString(AllOrderedPlugins...).Difference(defaultOnPlugins)

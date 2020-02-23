@@ -26,6 +26,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
+var defaultPathType = extensionsv1beta1.PathTypeImplementationSpecific
+
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	return RegisterDefaults(scheme)
 }
@@ -163,5 +165,11 @@ func SetDefaults_NetworkPolicy(obj *extensionsv1beta1.NetworkPolicy) {
 		if len(obj.Spec.Egress) != 0 {
 			obj.Spec.PolicyTypes = append(obj.Spec.PolicyTypes, extensionsv1beta1.PolicyTypeEgress)
 		}
+	}
+}
+
+func SetDefaults_HTTPIngressPath(obj *extensionsv1beta1.HTTPIngressPath) {
+	if obj.PathType == nil {
+		obj.PathType = &defaultPathType
 	}
 }

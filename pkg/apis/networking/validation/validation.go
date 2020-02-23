@@ -17,12 +17,16 @@ limitations under the License.
 package validation
 
 import (
+	"fmt"
 	"net"
 	"regexp"
 	"strings"
 
+	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
+	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
@@ -30,6 +34,17 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/networking"
+)
+
+var supportedPathTypes = sets.NewString(
+	string(networking.PathTypeExact),
+	string(networking.PathTypePrefix),
+	string(networking.PathTypeImplementationSpecific),
+)
+
+const (
+	annotationIngressClass       = "kubernetes.io/ingress.class"
+	maxLenIngressClassController = 250
 )
 
 // ValidateNetworkPolicyName can be used to check whether the given networkpolicy
@@ -174,15 +189,35 @@ func ValidateIPBlock(ipb *networking.IPBlock, fldPath *field.Path) field.ErrorLi
 	return allErrs
 }
 
-// ValidateIngress tests if required fields in the Ingress are set.
-func ValidateIngress(ingress *networking.Ingress) field.ErrorList {
+// ValidateIngressName validates that the given name can be used as an Ingress
+// name.
+var ValidateIngressName = apimachineryvalidation.NameIsDNSSubdomain
+
+// ValidateIngress validates Ingresses on create and update.
+func ValidateIngress(ingress *networking.Ingress, requestGV schema.GroupVersion) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMeta(&ingress.ObjectMeta, true, ValidateIngressName, field.NewPath("metadata"))
-	allErrs = append(allErrs, ValidateIngressSpec(&ingress.Spec, field.NewPath("spec"))...)
+	annotationVal, annotationIsSet := ingress.Annotations[annotationIngressClass]
+	if annotationIsSet && ingress.Spec.IngressClassName != nil {
+		annotationPath := field.NewPath("annotations").Child(annotationIngressClass)
+		allErrs = append(allErrs, field.Invalid(annotationPath, annotationVal, "can not be set when the class field is also set"))
+	}
+	allErrs = append(allErrs, ValidateIngressSpec(&ingress.Spec, field.NewPath("spec"), requestGV)...)
 	return allErrs
 }
 
-// ValidateIngressName validates that the given name can be used as an Ingress name.
-var ValidateIngressName = apimachineryvalidation.NameIsDNSSubdomain
+// ValidateIngressCreate validates Ingresses on create.
+func ValidateIngressCreate(ingress *networking.Ingress, requestGV schema.GroupVersion) field.ErrorList {
+	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, ValidateIngress(ingress, requestGV)...)
+	return allErrs
+}
+
+// ValidateIngressUpdate validates ingresses on update.
+func ValidateIngressUpdate(ingress, oldIngress *networking.Ingress, requestGV schema.GroupVersion) field.ErrorList {
+	allErrs := apivalidation.ValidateObjectMetaUpdate(&ingress.ObjectMeta, &oldIngress.ObjectMeta, field.NewPath("metadata"))
+	allErrs = append(allErrs, ValidateIngress(ingress, requestGV)...)
+	return allErrs
+}
 
 func validateIngressTLS(spec *networking.IngressSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -206,13 +241,14 @@ func validateIngressTLS(spec *networking.IngressSpec, fldPath *field.Path) field
 }
 
 // ValidateIngressSpec tests if required fields in the IngressSpec are set.
-func ValidateIngressSpec(spec *networking.IngressSpec, fldPath *field.Path) field.ErrorList {
+func ValidateIngressSpec(spec *networking.IngressSpec, fldPath *field.Path, requestGV schema.GroupVersion) field.ErrorList {
 	allErrs := field.ErrorList{}
-	// TODO: Is a default backend mandatory?
+	if len(spec.Rules) == 0 && spec.Backend == nil {
+		errMsg := fmt.Sprintf("either `%s` or `rules` must be specified", defaultBackendFieldName(requestGV))
+		allErrs = append(allErrs, field.Invalid(fldPath, spec.Rules, errMsg))
+	}
 	if spec.Backend != nil {
-		allErrs = append(allErrs, validateIngressBackend(spec.Backend, fldPath.Child("backend"))...)
-	} else if len(spec.Rules) == 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath, spec.Rules, "either `backend` or `rules` must be specified"))
+		allErrs = append(allErrs, validateIngressBackend(spec.Backend, fldPath.Child(defaultBackendFieldName(requestGV)))...)
 	}
 	if len(spec.Rules) > 0 {
 		allErrs = append(allErrs, validateIngressRules(spec.Rules, fldPath.Child("rules"))...)
@@ -220,13 +256,11 @@ func ValidateIngressSpec(spec *networking.IngressSpec, fldPath *field.Path) fiel
 	if len(spec.TLS) > 0 {
 		allErrs = append(allErrs, validateIngressTLS(spec, fldPath.Child("tls"))...)
 	}
-	return allErrs
-}
-
-// ValidateIngressUpdate tests if required fields in the Ingress are set.
-func ValidateIngressUpdate(ingress, oldIngress *networking.Ingress) field.ErrorList {
-	allErrs := apivalidation.ValidateObjectMetaUpdate(&ingress.ObjectMeta, &oldIngress.ObjectMeta, field.NewPath("metadata"))
-	allErrs = append(allErrs, ValidateIngressSpec(&ingress.Spec, field.NewPath("spec"))...)
+	if spec.IngressClassName != nil {
+		for _, msg := range ValidateIngressClassName(*spec.IngressClassName, false) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("ingressClassName"), *spec.IngressClassName, msg))
+		}
+	}
 	return allErrs
 }
 
@@ -277,27 +311,53 @@ func validateHTTPIngressRuleValue(httpIngressRuleValue *networking.HTTPIngressRu
 	if len(httpIngressRuleValue.Paths) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("paths"), ""))
 	}
-	for i, rule := range httpIngressRuleValue.Paths {
-		if len(rule.Path) > 0 {
-			if !strings.HasPrefix(rule.Path, "/") {
-				allErrs = append(allErrs, field.Invalid(fldPath.Child("paths").Index(i).Child("path"), rule.Path, "must be an absolute path"))
+	for i, path := range httpIngressRuleValue.Paths {
+		allErrs = append(allErrs, validateHTTPIngressPath(&path, fldPath.Child("paths").Index(i))...)
+	}
+	return allErrs
+}
+
+func validateHTTPIngressPath(path *networking.HTTPIngressPath, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if path.PathType != nil {
+		if !supportedPathTypes.Has(string(*path.PathType)) {
+			allErrs = append(allErrs, field.NotSupported(fldPath.Child("pathType"), path.PathType, supportedPathTypes.List()))
+		}
+
+		switch *path.PathType {
+		case networking.PathTypeExact, networking.PathTypePrefix:
+			if !strings.HasPrefix(path.Path, "/") {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("path"), path.Path, "must be an absolute path"))
 			}
-			// TODO: More draconian path regex validation.
-			// Path must be a valid regex. This is the basic requirement.
-			// In addition to this any characters not allowed in a path per
-			// RFC 3986 section-3.3 cannot appear as a literal in the regex.
-			// Consider the example: http://host/valid?#bar, everything after
-			// the last '/' is a valid regex that matches valid#bar, which
-			// isn't a valid path, because the path terminates at the first ?
-			// or #. A more sophisticated form of validation would detect that
-			// the user is confusing url regexes with path regexes.
-			_, err := regexp.CompilePOSIX(rule.Path)
-			if err != nil {
-				allErrs = append(allErrs, field.Invalid(fldPath.Child("paths").Index(i).Child("path"), rule.Path, "must be a valid regex"))
+			if len(path.Path) > 0 && strings.Contains(path.Path, "//") {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("path"), path.Path, "must not contain repeating '/' characters"))
 			}
 		}
-		allErrs = append(allErrs, validateIngressBackend(&rule.Backend, fldPath.Child("backend"))...)
 	}
+
+	if path.PathType == nil || *path.PathType == networking.PathTypeImplementationSpecific {
+		if len(path.Path) > 0 {
+			if !strings.HasPrefix(path.Path, "/") {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("path"), path.Path, "must be an absolute path"))
+			}
+			// TODO: More draconian path regex validation. Path must be a
+			// valid regex. This is the basic requirement. In addition to
+			// this any characters not allowed in a path per RFC 3986
+			// section-3.3 cannot appear as a literal in the regex. Consider
+			// the example: http://host/valid?#bar, everything after the
+			// last '/' is a valid regex that matches valid#bar, which isn't
+			// a valid path, because the path terminates at the first ? or
+			// #. A more sophisticated form of validation would detect that
+			// the user is confusing url regexes with path regexes.
+			_, err := regexp.CompilePOSIX(path.Path)
+			if err != nil {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("path"), path.Path, "must be a valid regex"))
+			}
+		}
+	}
+
+	allErrs = append(allErrs, validateIngressBackend(&path.Backend, fldPath.Child("backend"))...)
 	return allErrs
 }
 
@@ -314,4 +374,52 @@ func validateIngressBackend(backend *networking.IngressBackend, fldPath *field.P
 	}
 	allErrs = append(allErrs, apivalidation.ValidatePortNumOrName(backend.ServicePort, fldPath.Child("servicePort"))...)
 	return allErrs
+}
+
+// ValidateIngressClassName validates that the given name can be used as an
+// IngressClass name.
+var ValidateIngressClassName = apimachineryvalidation.NameIsDNSSubdomain
+
+// ValidateIngressClass ensures that IngressClass resources are valid.
+func ValidateIngressClass(ingressClass *networking.IngressClass) field.ErrorList {
+	allErrs := apivalidation.ValidateObjectMeta(&ingressClass.ObjectMeta, false, ValidateIngressClassName, field.NewPath("metadata"))
+	allErrs = append(allErrs, ValidateIngressClassSpec(&ingressClass.Spec, field.NewPath("spec"))...)
+	return allErrs
+}
+
+// ValidateIngressClassUpdate ensures that IngressClass updates are valid.
+func ValidateIngressClassUpdate(newIngressClass, oldIngressClass *networking.IngressClass) field.ErrorList {
+	allErrs := apivalidation.ValidateObjectMetaUpdate(&newIngressClass.ObjectMeta, &oldIngressClass.ObjectMeta, field.NewPath("metadata"))
+	allErrs = append(allErrs, ValidateIngressClassSpecUpdate(&newIngressClass.Spec, &oldIngressClass.Spec, field.NewPath("spec"))...)
+	allErrs = append(allErrs, ValidateIngressClass(newIngressClass)...)
+	return allErrs
+}
+
+// ValidateIngressClassSpec ensures that IngressClassSpec fields are valid.
+func ValidateIngressClassSpec(spec *networking.IngressClassSpec, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if len(spec.Controller) > maxLenIngressClassController {
+		allErrs = append(allErrs, field.TooLong(fldPath.Child("controller"), spec.Controller, maxLenIngressClassController))
+	}
+
+	allErrs = append(allErrs, validation.IsDomainPrefixedPath(fldPath.Child("controller"), spec.Controller)...)
+
+	return allErrs
+}
+
+// ValidateIngressClassSpecUpdate ensures that IngressClassSpec updates are
+// valid.
+func ValidateIngressClassSpecUpdate(newSpec, oldSpec *networking.IngressClassSpec, fldPath *field.Path) field.ErrorList {
+	return apivalidation.ValidateImmutableField(newSpec.Controller, oldSpec.Controller, fldPath.Child("controller"))
+}
+
+// defaultBackendFieldName returns the name of the field used for defaultBackend
+// in the provided GroupVersion.
+func defaultBackendFieldName(gv schema.GroupVersion) string {
+	switch gv {
+	case networkingv1beta1.SchemeGroupVersion, extensionsv1beta1.SchemeGroupVersion:
+		return "backend"
+	default:
+		return "defaultBackend"
+	}
 }

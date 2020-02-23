@@ -69,6 +69,11 @@ func newIngress() networking.Ingress {
 
 func TestIngressStrategy(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
+	apiRequest := genericapirequest.RequestInfo{APIGroup: "networking.k8s.io",
+		APIVersion: "v1beta1",
+		Resource:   "ingress",
+	}
+	ctx = genericapirequest.WithRequestInfo(ctx, &apiRequest)
 	if !Strategy.NamespaceScoped() {
 		t.Errorf("Ingress must be namespace scoped")
 	}
