@@ -35,7 +35,7 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 }
 
 func SetObjectDefaults_PriorityClass(in *v1beta1.PriorityClass) {
-	SetDefaults_PriorityClass(in)
+	SetDefaultsPriorityClass(in)
 }
 
 func SetObjectDefaults_PriorityClassList(in *v1beta1.PriorityClassList) {

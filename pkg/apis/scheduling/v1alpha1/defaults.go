@@ -28,9 +28,9 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	return RegisterDefaults(scheme)
 }
 
-// SetDefaults_PriorityClass sets additional defaults compared to its counterpart
+// SetDefaultsPriorityClass sets additional defaults compared to its counterpart
 // in extensions.
-func SetDefaults_PriorityClass(obj *v1alpha1.PriorityClass) {
+func SetDefaultsPriorityClass(obj *v1alpha1.PriorityClass) {
 	if utilfeature.DefaultFeatureGate.Enabled(features.NonPreemptingPriority) && obj.PreemptionPolicy == nil {
 		preemptLowerPriority := apiv1.PreemptLowerPriority
 		obj.PreemptionPolicy = &preemptLowerPriority
