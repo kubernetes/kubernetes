@@ -41,6 +41,7 @@ var knownTranslations = map[string][]string{
 		"it_IT",
 		"de_DE",
 		"ko_KR",
+		"pl_PL",
 	},
 	// only used for unit tests.
 	"test": {
