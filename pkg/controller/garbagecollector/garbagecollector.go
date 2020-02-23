@@ -43,6 +43,7 @@ import (
 	_ "k8s.io/client-go/kubernetes"
 )
 
+// ResourceResyncTime defines the resync period of the garbage collector's informers.
 const ResourceResyncTime time.Duration = 0
 
 // GarbageCollector runs reflectors to watch for changes of managed API
@@ -70,6 +71,7 @@ type GarbageCollector struct {
 	workerLock sync.RWMutex
 }
 
+// NewGarbageCollector creates a new GarbageCollector.
 func NewGarbageCollector(
 	metadataClient metadata.Interface,
 	mapper resettableRESTMapper,
@@ -120,6 +122,7 @@ func (gc *GarbageCollector) resyncMonitors(deletableResources map[schema.GroupVe
 	return nil
 }
 
+// Run starts garbage collector workers.
 func (gc *GarbageCollector) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer gc.attemptToDelete.ShutDown()
@@ -272,6 +275,7 @@ func waitForStopOrTimeout(stopCh <-chan struct{}, timeout time.Duration) <-chan 
 	return stopChWithTimeout
 }
 
+// IsSynced returns true if dependencyGraphBuilder is synced.
 func (gc *GarbageCollector) IsSynced() bool {
 	return gc.dependencyGraphBuilder.IsSynced()
 }

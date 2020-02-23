@@ -877,18 +877,3 @@ func (cl *ClusterVerification) ForEach(podFunc func(v1.Pod)) error {
 
 	return err
 }
-
-const (
-	// preconfiguredRuntimeHandler is the name of the runtime handler that is expected to be
-	// preconfigured in the test environment.
-	preconfiguredRuntimeHandler = "test-handler"
-)
-
-// PreconfiguredRuntimeClassHandler returns configured runtime handler.
-func PreconfiguredRuntimeClassHandler() string {
-	if TestContext.ContainerRuntime == "docker" {
-		return TestContext.ContainerRuntime
-	}
-
-	return preconfiguredRuntimeHandler
-}

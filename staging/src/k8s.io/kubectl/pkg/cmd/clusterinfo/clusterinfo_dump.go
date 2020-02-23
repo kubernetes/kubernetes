@@ -286,9 +286,13 @@ func (o *ClusterInfoDumpOptions) Run() error {
 
 		for ix := range pods.Items {
 			pod := &pods.Items[ix]
+			initcontainers := pod.Spec.InitContainers
 			containers := pod.Spec.Containers
 			writer := setupOutputWriter(o.OutputDir, o.Out, path.Join(namespace, pod.Name, "logs"), ".txt")
 
+			for i := range initcontainers {
+				printContainer(writer, initcontainers[i], pod)
+			}
 			for i := range containers {
 				printContainer(writer, containers[i], pod)
 			}

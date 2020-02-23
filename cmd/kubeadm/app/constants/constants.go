@@ -29,6 +29,7 @@ import (
 	"github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/apimachinery/pkg/util/wait"
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	utilnet "k8s.io/utils/net"
@@ -370,6 +371,16 @@ const (
 	// May be overridden by a flag at startup.
 	KubeControllerManagerPort = 10257
 
+	// EtcdAdvertiseClientUrlsAnnotationKey is the annotation key on every etcd pod, describing the
+	// advertise client URLs
+	EtcdAdvertiseClientUrlsAnnotationKey = "kubeadm.kubernetes.io/etcd.advertise-client-urls"
+	// KubeAPIServerAdvertiseAddressEndpointAnnotationKey is the annotation key on every apiserver pod,
+	// describing the API endpoint (advertise address and bind port of the api server)
+	KubeAPIServerAdvertiseAddressEndpointAnnotationKey = "kubeadm.kubernetes.io/kube-apiserver.advertise-address.endpoint"
+
+	// ControlPlaneTier is the value used in the tier label to identify control plane components
+	ControlPlaneTier = "control-plane"
+
 	// Mode* constants were copied from pkg/kubeapiserver/authorizer/modes
 	// to avoid kubeadm dependency on the internal module
 	// TODO: share Mode* constants in component config
@@ -433,6 +444,15 @@ var (
 	// KubeadmCertsClusterRoleName sets the name for the ClusterRole that allows
 	// the bootstrap tokens to access the kubeadm-certs Secret during the join of a new control-plane
 	KubeadmCertsClusterRoleName = fmt.Sprintf("kubeadm:%s", KubeadmCertsSecret)
+
+	// StaticPodMirroringDefaultRetry is used a backoff strategy for
+	// waiting for static pods to be mirrored to the apiserver.
+	StaticPodMirroringDefaultRetry = wait.Backoff{
+		Steps:    30,
+		Duration: 1 * time.Second,
+		Factor:   1.0,
+		Jitter:   0.1,
+	}
 )
 
 // EtcdSupportedVersion returns officially supported version of etcd for a specific Kubernetes release

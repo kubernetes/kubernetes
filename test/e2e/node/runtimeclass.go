@@ -26,10 +26,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeclasstest "k8s.io/kubernetes/pkg/kubelet/runtimeclass/testing"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/scheduling"
-	imageutils "k8s.io/kubernetes/test/utils/image"
-	utilpointer "k8s.io/utils/pointer"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -45,12 +44,12 @@ var _ = ginkgo.Describe("[sig-node] RuntimeClass", func() {
 			},
 		}
 
-		runtimeClass := newRuntimeClass(f.Namespace.Name, "conflict-runtimeclass")
+		runtimeClass := newRuntimeClass(f.Namespace.Name, "conflict-runtimeclass", framework.TestContext.ContainerRuntime)
 		runtimeClass.Scheduling = scheduling
 		rc, err := f.ClientSet.NodeV1beta1().RuntimeClasses().Create(context.TODO(), runtimeClass, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create RuntimeClass resource")
 
-		pod := newRuntimeClassPod(rc.GetName())
+		pod := e2enode.NewRuntimeClassPod(rc.GetName())
 		pod.Spec.NodeSelector = map[string]string{
 			"foo": "bar",
 		}
@@ -96,12 +95,12 @@ var _ = ginkgo.Describe("[sig-node] RuntimeClass", func() {
 		defer framework.RemoveTaintOffNode(f.ClientSet, nodeName, taint)
 
 		ginkgo.By("Trying to create runtimeclass and pod")
-		runtimeClass := newRuntimeClass(f.Namespace.Name, "non-conflict-runtimeclass")
+		runtimeClass := newRuntimeClass(f.Namespace.Name, "non-conflict-runtimeclass", framework.TestContext.ContainerRuntime)
 		runtimeClass.Scheduling = scheduling
 		rc, err := f.ClientSet.NodeV1beta1().RuntimeClasses().Create(context.TODO(), runtimeClass, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create RuntimeClass resource")
 
-		pod := newRuntimeClassPod(rc.GetName())
+		pod := e2enode.NewRuntimeClassPod(rc.GetName())
 		pod.Spec.NodeSelector = map[string]string{
 			"foo": "bar",
 		}
@@ -119,26 +118,7 @@ var _ = ginkgo.Describe("[sig-node] RuntimeClass", func() {
 })
 
 // newRuntimeClass returns a test runtime class.
-func newRuntimeClass(namespace, name string) *nodev1beta1.RuntimeClass {
+func newRuntimeClass(namespace, name, handler string) *nodev1beta1.RuntimeClass {
 	uniqueName := fmt.Sprintf("%s-%s", namespace, name)
-	return runtimeclasstest.NewRuntimeClass(uniqueName, framework.PreconfiguredRuntimeClassHandler())
-}
-
-// newRuntimeClassPod returns a test pod with the given runtimeClassName.
-func newRuntimeClassPod(runtimeClassName string) *v1.Pod {
-	return &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: fmt.Sprintf("test-runtimeclass-%s-", runtimeClassName),
-		},
-		Spec: v1.PodSpec{
-			RuntimeClassName: &runtimeClassName,
-			Containers: []v1.Container{{
-				Name:    "test",
-				Image:   imageutils.GetE2EImage(imageutils.BusyBox),
-				Command: []string{"true"},
-			}},
-			RestartPolicy:                v1.RestartPolicyNever,
-			AutomountServiceAccountToken: utilpointer.BoolPtr(false),
-		},
-	}
+	return runtimeclasstest.NewRuntimeClass(uniqueName, e2enode.PreconfiguredRuntimeClassHandler(handler))
 }
