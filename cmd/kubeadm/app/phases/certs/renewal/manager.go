@@ -154,7 +154,8 @@ func NewManager(cfg *kubeadmapi.ClusterConfiguration, kubernetesDir string) (*Ma
 	// create a CertificateRenewHandler for each kubeConfig file
 	for _, kubeConfig := range kubeConfigs {
 		// create a ReadWriter for certificates embedded in kubeConfig files
-		kubeConfigReadWriter := newKubeconfigReadWriter(kubernetesDir, kubeConfig.fileName)
+		kubeConfigReadWriter := newKubeconfigReadWriter(kubernetesDir, kubeConfig.fileName,
+			rm.cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName)
 
 		// adds the certificateRenewHandler.
 		// Certificates embedded kubeConfig files in are indexed by fileName, that is a well know constant defined

@@ -27,6 +27,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/keyutil"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	pkiutil "k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
@@ -79,15 +80,27 @@ func TestPKICertificateReadWriter(t *testing.T) {
 }
 
 func TestKubeconfigReadWriter(t *testing.T) {
-	// creates a tmp folder
-	dir := testutil.SetupTempDir(t)
-	defer os.RemoveAll(dir)
+	// creates tmp folders
+	dirKubernetes := testutil.SetupTempDir(t)
+	defer os.RemoveAll(dirKubernetes)
+	dirPKI := testutil.SetupTempDir(t)
+	defer os.RemoveAll(dirPKI)
+
+	// write the CA cert and key to the temporary PKI dir
+	caName := kubeadmconstants.CACertAndKeyBaseName
+	if err := pkiutil.WriteCertAndKey(
+		dirPKI,
+		caName,
+		testCACert,
+		testCAKey); err != nil {
+		t.Fatalf("couldn't write out certificate %s to %s", caName, dirPKI)
+	}
 
 	// creates a certificate and then embeds it into a kubeconfig file
-	cert := writeTestKubeconfig(t, dir, "test", testCACert, testCAKey)
+	cert := writeTestKubeconfig(t, dirKubernetes, "test", testCACert, testCAKey)
 
 	// Creates a KubeconfigReadWriter
-	kubeconfigReadWriter := newKubeconfigReadWriter(dir, "test")
+	kubeconfigReadWriter := newKubeconfigReadWriter(dirKubernetes, "test", dirPKI, caName)
 
 	// Reads the certificate embedded in a kubeconfig
 	readCert, err := kubeconfigReadWriter.Read()
