@@ -62,6 +62,7 @@ import (
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/routes"
 	serverstore "k8s.io/apiserver/pkg/server/storage"
+	"k8s.io/apiserver/pkg/storageversion"
 	"k8s.io/apiserver/pkg/util/feature"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 	"k8s.io/client-go/informers"
@@ -227,6 +228,9 @@ type Config struct {
 
 	// APIServerID is the ID of this API server
 	APIServerID string
+
+	// StorageVersionManager holds the storage versions of the API resources installed by this server.
+	StorageVersionManager storageversion.Manager
 }
 
 type RecommendedConfig struct {
@@ -331,8 +335,9 @@ func NewConfig(codecs serializer.CodecFactory) *Config {
 
 		// Default to treating watch as a long-running operation
 		// Generic API servers have no inherent long-running subresources
-		LongRunningFunc: genericfilters.BasicLongRunningRequestCheck(sets.NewString("watch"), sets.NewString()),
-		APIServerID:     id,
+		LongRunningFunc:       genericfilters.BasicLongRunningRequestCheck(sets.NewString("watch"), sets.NewString()),
+		APIServerID:           id,
+		StorageVersionManager: storageversion.NewDefaultManager(),
 	}
 }
 
@@ -582,7 +587,9 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 
 		maxRequestBodyBytes: c.MaxRequestBodyBytes,
 		livezClock:          clock.RealClock{},
-		APIServerID:         c.APIServerID,
+
+		APIServerID:           c.APIServerID,
+		StorageVersionManager: c.StorageVersionManager,
 	}
 
 	for {
@@ -701,6 +708,12 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 	}
 
 	return s, nil
+}
+
+func BuildHandlerChainWithStorageVersionPrecondition(apiHandler http.Handler, c *Config) http.Handler {
+	// WithStorageVersionPrecondition needs the WithRequestInfo to run first
+	handler := genericapifilters.WithStorageVersionPrecondition(apiHandler, c.StorageVersionManager)
+	return DefaultBuildHandlerChain(handler, c)
 }
 
 func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
