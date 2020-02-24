@@ -53,11 +53,11 @@ func NewInTreeRegistry() framework.Registry {
 		nodeaffinity.Name:                          nodeaffinity.New,
 		podtopologyspread.Name:                     podtopologyspread.New,
 		nodeunschedulable.Name:                     nodeunschedulable.New,
-		noderesources.FitName:                      noderesources.NewFit,
+		noderesources.FitName:                      noderesources.NewFit, //
 		noderesources.BalancedAllocationName:       noderesources.NewBalancedAllocation,
 		noderesources.MostAllocatedName:            noderesources.NewMostAllocated,
 		noderesources.LeastAllocatedName:           noderesources.NewLeastAllocated,
-		noderesources.RequestedToCapacityRatioName: noderesources.NewRequestedToCapacityRatio,
+		noderesources.RequestedToCapacityRatioName: noderesources.NewRequestedToCapacityRatio, //
 		noderesources.ResourceLimitsName:           noderesources.NewResourceLimits,
 		volumebinding.Name:                         volumebinding.New,
 		volumerestrictions.Name:                    volumerestrictions.New,
@@ -67,9 +67,9 @@ func NewInTreeRegistry() framework.Registry {
 		nodevolumelimits.GCEPDName:                 nodevolumelimits.NewGCEPD,
 		nodevolumelimits.AzureDiskName:             nodevolumelimits.NewAzureDisk,
 		nodevolumelimits.CinderName:                nodevolumelimits.NewCinder,
-		interpodaffinity.Name:                      interpodaffinity.New,
-		nodelabel.Name:                             nodelabel.New,
-		serviceaffinity.Name:                       serviceaffinity.New,
+		interpodaffinity.Name:                      interpodaffinity.New, //
+		nodelabel.Name:                             nodelabel.New,        //
+		serviceaffinity.Name:                       serviceaffinity.New,  //
 		queuesort.Name:                             queuesort.New,
 		defaultbinder.Name:                         defaultbinder.New,
 	}

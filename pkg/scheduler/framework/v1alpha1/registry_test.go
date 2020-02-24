@@ -101,6 +101,11 @@ func (p *mockNoopPlugin) Name() string {
 	return "MockNoop"
 }
 
+// BuildArgs returns the args that were used to build the plugin.
+func (*mockNoopPlugin) BuildArgs() interface{} {
+	return nil
+}
+
 func NewMockNoopPluginFactory() PluginFactory {
 	return func(_ *runtime.Unknown, _ FrameworkHandle) (Plugin, error) {
 		return &mockNoopPlugin{}, nil

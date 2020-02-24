@@ -41,6 +41,11 @@ func (la *LeastAllocated) Name() string {
 	return LeastAllocatedName
 }
 
+// BuildArgs returns the args that were used to build the plugin.
+func (*LeastAllocated) BuildArgs() interface{} {
+	return nil
+}
+
 // Score invoked at the score extension point.
 func (la *LeastAllocated) Score(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) (int64, *framework.Status) {
 	nodeInfo, err := la.handle.SnapshotSharedLister().NodeInfos().Get(nodeName)

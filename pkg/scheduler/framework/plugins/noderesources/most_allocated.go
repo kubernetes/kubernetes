@@ -41,6 +41,11 @@ func (ma *MostAllocated) Name() string {
 	return MostAllocatedName
 }
 
+// BuildArgs returns the args that were used to build the plugin.
+func (*MostAllocated) BuildArgs() interface{} {
+	return nil
+}
+
 // Score invoked at the Score extension point.
 func (ma *MostAllocated) Score(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) (int64, *framework.Status) {
 	nodeInfo, err := ma.handle.SnapshotSharedLister().NodeInfos().Get(nodeName)

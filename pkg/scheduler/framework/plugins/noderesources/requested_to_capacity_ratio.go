@@ -53,13 +53,13 @@ type functionShapePoint struct {
 
 // NewRequestedToCapacityRatio initializes a new plugin and returns it.
 func NewRequestedToCapacityRatio(plArgs *runtime.Unknown, handle framework.FrameworkHandle) (framework.Plugin, error) {
-	args := &config.RequestedToCapacityRatioArguments{}
-	if err := framework.DecodeInto(plArgs, args); err != nil {
+	pl := &RequestedToCapacityRatio{handle: handle}
+	if err := framework.DecodeInto(plArgs, &pl.RequestedToCapacityRatioArguments); err != nil {
 		return nil, err
 	}
 
-	shape := make([]functionShapePoint, 0, len(args.Shape))
-	for _, point := range args.Shape {
+	shape := make([]functionShapePoint, 0, len(pl.Shape))
+	for _, point := range pl.Shape {
 		shape = append(shape, functionShapePoint{
 			utilization: int64(point.Utilization),
 			// MaxCustomPriorityScore may diverge from the max score used in the scheduler and defined by MaxNodeScore,
@@ -74,31 +74,36 @@ func NewRequestedToCapacityRatio(plArgs *runtime.Unknown, handle framework.Frame
 	}
 
 	resourceToWeightMap := make(resourceToWeightMap)
-	for _, resource := range args.Resources {
+	for _, resource := range pl.Resources {
 		resourceToWeightMap[v1.ResourceName(resource.Name)] = resource.Weight
 		if resource.Weight == 0 {
 			// Apply the default weight.
 			resourceToWeightMap[v1.ResourceName(resource.Name)] = 1
 		}
 	}
-	if len(args.Resources) == 0 {
+	if len(pl.Resources) == 0 {
 		// If no resources specified, used the default set.
 		resourceToWeightMap = defaultRequestedRatioResources
 	}
 
-	return &RequestedToCapacityRatio{
-		handle: handle,
-		resourceAllocationScorer: resourceAllocationScorer{
-			RequestedToCapacityRatioName,
-			buildRequestedToCapacityRatioScorerFunction(shape, resourceToWeightMap),
-			resourceToWeightMap,
-		},
-	}, nil
+	pl.resourceAllocationScorer = resourceAllocationScorer{
+		RequestedToCapacityRatioName,
+		buildRequestedToCapacityRatioScorerFunction(shape, resourceToWeightMap),
+		resourceToWeightMap,
+	}
+
+	return pl, nil
+}
+
+// BuildArgs returns the args that were used to build the plugin.
+func (pl *RequestedToCapacityRatio) BuildArgs() interface{} {
+	return pl.RequestedToCapacityRatioArguments
 }
 
 // RequestedToCapacityRatio is a score plugin that allow users to apply bin packing
 // on core resources like CPU, Memory as well as extended resources like accelerators.
 type RequestedToCapacityRatio struct {
+	config.RequestedToCapacityRatioArguments
 	handle framework.FrameworkHandle
 	resourceAllocationScorer
 }

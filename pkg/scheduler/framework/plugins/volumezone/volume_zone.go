@@ -54,6 +54,11 @@ func (pl *VolumeZone) Name() string {
 	return Name
 }
 
+// BuildArgs returns the args that were used to build the plugin.
+func (*VolumeZone) BuildArgs() interface{} {
+	return nil
+}
+
 // Filter invoked at the filter extension point.
 //
 // It evaluates if a pod can fit due to the volumes it requests, given

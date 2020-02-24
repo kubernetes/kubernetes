@@ -144,6 +144,11 @@ func (sp *ScorePlugin) Name() string {
 	return scorePluginName
 }
 
+// BuildArgs returns the args that were used to build the plugin.
+func (*ScorePlugin) BuildArgs() interface{} {
+	return nil
+}
+
 // reset returns name of the score plugin.
 func (sp *ScorePlugin) reset() {
 	sp.failScore = false
@@ -176,6 +181,11 @@ func (sp *ScoreWithNormalizePlugin) Name() string {
 	return scoreWithNormalizePluginName
 }
 
+// BuildArgs returns the args that were used to build the plugin.
+func (*ScoreWithNormalizePlugin) BuildArgs() interface{} {
+	return nil
+}
+
 // reset returns name of the score plugin.
 func (sp *ScoreWithNormalizePlugin) reset() {
 	sp.numScoreCalled = 0
@@ -203,6 +213,11 @@ func (fp *FilterPlugin) Name() string {
 	return filterPluginName
 }
 
+// BuildArgs returns the args that were used to build the plugin.
+func (*FilterPlugin) BuildArgs() interface{} {
+	return nil
+}
+
 // reset is used to reset filter plugin.
 func (fp *FilterPlugin) reset() {
 	fp.numFilterCalled = 0
@@ -226,6 +241,11 @@ func (rp *ReservePlugin) Name() string {
 	return reservePluginName
 }
 
+// BuildArgs returns the args that were used to build the plugin.
+func (*ReservePlugin) BuildArgs() interface{} {
+	return nil
+}
+
 // Reserve is a test function that returns an error or nil, depending on the
 // value of "failReserve".
 func (rp *ReservePlugin) Reserve(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
@@ -244,6 +264,11 @@ func (rp *ReservePlugin) reset() {
 // Name returns name of the plugin.
 func (*PreScorePlugin) Name() string {
 	return preScorePluginName
+}
+
+// BuildArgs returns the args that were used to build the plugin.
+func (*PreScorePlugin) BuildArgs() interface{} {
+	return nil
 }
 
 // PreScore is a test function.
@@ -265,6 +290,11 @@ func (pfp *PreScorePlugin) reset() {
 // Name returns name of the plugin.
 func (pp *PreBindPlugin) Name() string {
 	return preBindPluginName
+}
+
+// BuildArgs returns the args that were used to build the plugin.
+func (*PreBindPlugin) BuildArgs() interface{} {
+	return nil
 }
 
 // PreBind is a test function that returns (true, nil) or errors for testing.
@@ -290,6 +320,11 @@ const bindPluginAnnotation = "bindPluginName"
 
 func (bp *BindPlugin) Name() string {
 	return bp.PluginName
+}
+
+// BuildArgs returns the args that were used to build the plugin.
+func (*BindPlugin) BuildArgs() interface{} {
+	return nil
 }
 
 func (bp *BindPlugin) Bind(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodeName string) *framework.Status {
@@ -321,6 +356,11 @@ func (pp *PostBindPlugin) Name() string {
 	return pp.name
 }
 
+// BuildArgs returns the args that were used to build the plugin.
+func (*PostBindPlugin) BuildArgs() interface{} {
+	return nil
+}
+
 // PostBind is a test function, which counts the number of times called.
 func (pp *PostBindPlugin) PostBind(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) {
 	pp.numPostBindCalled++
@@ -337,6 +377,11 @@ func (pp *PostBindPlugin) reset() {
 // Name returns name of the plugin.
 func (pp *PreFilterPlugin) Name() string {
 	return prefilterPluginName
+}
+
+// BuildArgs returns the args that were used to build the plugin.
+func (*PreFilterPlugin) BuildArgs() interface{} {
+	return nil
 }
 
 // Extensions returns the PreFilterExtensions interface.
@@ -368,6 +413,11 @@ func (up *UnreservePlugin) Name() string {
 	return up.name
 }
 
+// BuildArgs returns the args that were used to build the plugin.
+func (*UnreservePlugin) BuildArgs() interface{} {
+	return nil
+}
+
 // Unreserve is a test function that returns an error or nil, depending on the
 // value of "failUnreserve".
 func (up *UnreservePlugin) Unreserve(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) {
@@ -385,6 +435,11 @@ func (up *UnreservePlugin) reset() {
 // Name returns name of the plugin.
 func (pp *PermitPlugin) Name() string {
 	return pp.name
+}
+
+// BuildArgs returns the args that were used to build the plugin.
+func (*PermitPlugin) BuildArgs() interface{} {
+	return nil
 }
 
 // Permit implements the permit test plugin.

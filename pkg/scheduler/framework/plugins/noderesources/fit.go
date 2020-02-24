@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -44,6 +44,7 @@ const (
 
 // Fit is a plugin that checks if a node has sufficient resources.
 type Fit struct {
+	FitArgs
 	ignoredResources sets.String
 }
 
@@ -254,14 +255,18 @@ func fitsRequest(podRequest *preFilterState, nodeInfo *schedulernodeinfo.NodeInf
 	return insufficientResources
 }
 
+// BuildArgs returns the args that were used to build the plugin.
+func (fit *Fit) BuildArgs() interface{} {
+	return fit.FitArgs
+}
+
 // NewFit initializes a new plugin and returns it.
 func NewFit(plArgs *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
-	args := &FitArgs{}
-	if err := framework.DecodeInto(plArgs, args); err != nil {
+	fit := &Fit{}
+	if err := framework.DecodeInto(plArgs, &fit.FitArgs); err != nil {
 		return nil, err
 	}
 
-	fit := &Fit{}
-	fit.ignoredResources = sets.NewString(args.IgnoredResources...)
+	fit.ignoredResources = sets.NewString(fit.FitArgs.IgnoredResources...)
 	return fit, nil
 }

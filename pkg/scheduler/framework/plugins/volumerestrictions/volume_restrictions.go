@@ -43,6 +43,11 @@ func (pl *VolumeRestrictions) Name() string {
 	return Name
 }
 
+// BuildArgs returns the args that were used to build the plugin.
+func (*VolumeRestrictions) BuildArgs() interface{} {
+	return nil
+}
+
 func isVolumeConflict(volume v1.Volume, pod *v1.Pod) bool {
 	// fast path if there is no conflict checking targets.
 	if volume.GCEPersistentDisk == nil && volume.AWSElasticBlockStore == nil && volume.RBD == nil && volume.ISCSI == nil {

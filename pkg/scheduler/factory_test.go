@@ -484,6 +484,11 @@ func (t *TestPlugin) Name() string {
 	return t.name
 }
 
+// BuildArgs returns the args that were used to build the plugin.
+func (*TestPlugin) BuildArgs() interface{} {
+	return nil
+}
+
 func (t *TestPlugin) Score(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodeName string) (int64, *framework.Status) {
 	return 1, nil
 }

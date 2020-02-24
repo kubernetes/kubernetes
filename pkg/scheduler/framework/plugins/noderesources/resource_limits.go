@@ -59,6 +59,11 @@ func (rl *ResourceLimits) Name() string {
 	return ResourceLimitsName
 }
 
+// BuildArgs returns the args that were used to build the plugin.
+func (*ResourceLimits) BuildArgs() interface{} {
+	return nil
+}
+
 // PreScore builds and writes cycle state used by Score and NormalizeScore.
 func (rl *ResourceLimits) PreScore(
 	pCtx context.Context,

@@ -46,6 +46,11 @@ func (b DefaultBinder) Name() string {
 	return Name
 }
 
+// BuildArgs returns the args that were used to build the plugin.
+func (DefaultBinder) BuildArgs() interface{} {
+	return nil
+}
+
 // Bind binds pods to nodes using the k8s client.
 func (b DefaultBinder) Bind(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodeName string) *framework.Status {
 	klog.V(3).Infof("Attempting to bind %v/%v to %v", p.Namespace, p.Name, nodeName)

@@ -61,22 +61,24 @@ func validateNoConflict(presentLabels []string, absentLabels []string) error {
 	return nil
 }
 
+// BuildArgs returns the args that were used to build the plugin.
+func (pl *NodeLabel) BuildArgs() interface{} {
+	return pl.Args
+}
+
 // New initializes a new plugin and returns it.
 func New(plArgs *runtime.Unknown, handle framework.FrameworkHandle) (framework.Plugin, error) {
-	args := Args{}
-	if err := framework.DecodeInto(plArgs, &args); err != nil {
+	pl := &NodeLabel{handle: handle}
+	if err := framework.DecodeInto(plArgs, &pl.Args); err != nil {
 		return nil, err
 	}
-	if err := validateNoConflict(args.PresentLabels, args.AbsentLabels); err != nil {
+	if err := validateNoConflict(pl.PresentLabels, pl.AbsentLabels); err != nil {
 		return nil, err
 	}
-	if err := validateNoConflict(args.PresentLabelsPreference, args.AbsentLabelsPreference); err != nil {
+	if err := validateNoConflict(pl.PresentLabelsPreference, pl.AbsentLabelsPreference); err != nil {
 		return nil, err
 	}
-	return &NodeLabel{
-		handle: handle,
-		Args:   args,
-	}, nil
+	return pl, nil
 }
 
 // NodeLabel checks whether a pod can fit based on the node labels which match a filter that it requests.

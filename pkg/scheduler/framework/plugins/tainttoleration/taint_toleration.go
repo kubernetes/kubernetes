@@ -51,6 +51,11 @@ func (pl *TaintToleration) Name() string {
 	return Name
 }
 
+// BuildArgs returns the args that were used to build the plugin.
+func (*TaintToleration) BuildArgs() interface{} {
+	return nil
+}
+
 // Filter invoked at the filter extension point.
 func (pl *TaintToleration) Filter(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeInfo *nodeinfo.NodeInfo) *framework.Status {
 	if nodeInfo == nil || nodeInfo.Node() == nil {

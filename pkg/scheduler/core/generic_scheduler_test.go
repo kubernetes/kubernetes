@@ -76,6 +76,11 @@ func (pl *trueFilterPlugin) Name() string {
 	return "TrueFilter"
 }
 
+// BuildArgs returns the args that were used to build the plugin.
+func (*trueFilterPlugin) BuildArgs() interface{} {
+	return nil
+}
+
 // Filter invoked at the filter extension point.
 func (pl *trueFilterPlugin) Filter(_ context.Context, _ *framework.CycleState, pod *v1.Pod, nodeInfo *nodeinfo.NodeInfo) *framework.Status {
 	return nil
@@ -93,6 +98,11 @@ func (pl *falseFilterPlugin) Name() string {
 	return "FalseFilter"
 }
 
+// BuildArgs returns the args that were used to build the plugin.
+func (*falseFilterPlugin) BuildArgs() interface{} {
+	return nil
+}
+
 // Filter invoked at the filter extension point.
 func (pl *falseFilterPlugin) Filter(_ context.Context, _ *framework.CycleState, pod *v1.Pod, nodeInfo *nodeinfo.NodeInfo) *framework.Status {
 	return framework.NewStatus(framework.Unschedulable, ErrReasonFake)
@@ -108,6 +118,11 @@ type matchFilterPlugin struct{}
 // Name returns name of the plugin.
 func (pl *matchFilterPlugin) Name() string {
 	return "MatchFilter"
+}
+
+// BuildArgs returns the args that were used to build the plugin.
+func (*matchFilterPlugin) BuildArgs() interface{} {
+	return nil
 }
 
 // Filter invoked at the filter extension point.
@@ -134,6 +149,11 @@ func (pl *noPodsFilterPlugin) Name() string {
 	return "NoPodsFilter"
 }
 
+// BuildArgs returns the args that were used to build the plugin.
+func (*noPodsFilterPlugin) BuildArgs() interface{} {
+	return nil
+}
+
 // Filter invoked at the filter extension point.
 func (pl *noPodsFilterPlugin) Filter(_ context.Context, _ *framework.CycleState, pod *v1.Pod, nodeInfo *nodeinfo.NodeInfo) *framework.Status {
 	if len(nodeInfo.Pods()) == 0 {
@@ -157,6 +177,11 @@ type fakeFilterPlugin struct {
 // Name returns name of the plugin.
 func (pl *fakeFilterPlugin) Name() string {
 	return "FakeFilter"
+}
+
+// BuildArgs returns the args that were used to build the plugin.
+func (*fakeFilterPlugin) BuildArgs() interface{} {
+	return nil
 }
 
 // Filter invoked at the filter extension point.
@@ -191,6 +216,11 @@ func (pl *numericMapPlugin) Name() string {
 	return "NumericMap"
 }
 
+// BuildArgs returns the args that were used to build the plugin.
+func (*numericMapPlugin) BuildArgs() interface{} {
+	return nil
+}
+
 func (pl *numericMapPlugin) Score(_ context.Context, _ *framework.CycleState, _ *v1.Pod, nodeName string) (int64, *framework.Status) {
 	score, err := strconv.Atoi(nodeName)
 	if err != nil {
@@ -213,6 +243,11 @@ func newReverseNumericMapPlugin() framework.PluginFactory {
 
 func (pl *reverseNumericMapPlugin) Name() string {
 	return "ReverseNumericMap"
+}
+
+// BuildArgs returns the args that were used to build the plugin.
+func (*reverseNumericMapPlugin) BuildArgs() interface{} {
+	return nil
 }
 
 func (pl *reverseNumericMapPlugin) Score(_ context.Context, _ *framework.CycleState, _ *v1.Pod, nodeName string) (int64, *framework.Status) {
@@ -256,6 +291,11 @@ func (pl *trueMapPlugin) Name() string {
 	return "TrueMap"
 }
 
+// BuildArgs returns the args that were used to build the plugin.
+func (*trueMapPlugin) BuildArgs() interface{} {
+	return nil
+}
+
 func (pl *trueMapPlugin) Score(_ context.Context, _ *framework.CycleState, _ *v1.Pod, _ string) (int64, *framework.Status) {
 	return 1, nil
 }
@@ -283,6 +323,11 @@ func newFalseMapPlugin() framework.PluginFactory {
 
 func (pl *falseMapPlugin) Name() string {
 	return "FalseMap"
+}
+
+// BuildArgsreturns the args that were used to build the plugin.
+func (*falseMapPlugin) BuildArgs() interface{} {
+	return nil
 }
 
 func (pl *falseMapPlugin) Score(_ context.Context, _ *framework.CycleState, _ *v1.Pod, _ string) (int64, *framework.Status) {

@@ -50,6 +50,11 @@ func (pl *NodeAffinity) Name() string {
 	return Name
 }
 
+// BuildArgs returns the args that were used to build the plugin.
+func (*NodeAffinity) BuildArgs() interface{} {
+	return nil
+}
+
 // Filter invoked at the filter extension point.
 func (pl *NodeAffinity) Filter(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeInfo *nodeinfo.NodeInfo) *framework.Status {
 	node := nodeInfo.Node()

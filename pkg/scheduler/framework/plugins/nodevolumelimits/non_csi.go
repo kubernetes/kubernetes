@@ -195,6 +195,11 @@ func (pl *nonCSILimits) Name() string {
 	return pl.name
 }
 
+// BuildArgs returns the args that were used to build the plugin.
+func (*nonCSILimits) BuildArgs() interface{} {
+	return nil
+}
+
 // Filter invoked at the filter extension point.
 func (pl *nonCSILimits) Filter(ctx context.Context, _ *framework.CycleState, pod *v1.Pod, nodeInfo *nodeinfo.NodeInfo) *framework.Status {
 	// If a pod doesn't have any volume attached to it, the predicate will always be true.

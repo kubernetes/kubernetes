@@ -56,6 +56,11 @@ func (pl *NodePorts) Name() string {
 	return Name
 }
 
+// BuildArgs returns the args that were used to build the plugin.
+func (*NodePorts) BuildArgs() interface{} {
+	return nil
+}
+
 // getContainerPorts returns the used host ports of Pods: if 'port' was used, a 'port:true' pair
 // will be in the result; but it does not resolve port conflict.
 func getContainerPorts(pods ...*v1.Pod) []*v1.ContainerPort {

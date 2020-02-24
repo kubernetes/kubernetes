@@ -209,6 +209,7 @@ type WaitingPod interface {
 
 // Plugin is the parent type for all the scheduling framework plugins.
 type Plugin interface {
+	BuildArgs() interface{}
 	Name() string
 }
 
@@ -491,6 +492,9 @@ type Framework interface {
 
 	// ListPlugins returns a map of extension point name to list of configured Plugins.
 	ListPlugins() map[string][]config.Plugin
+
+	// ListPluginArgs returns a map of extension point name to list of user defined plugin config args.
+	ListPluginArgs() map[string]interface{}
 }
 
 // FrameworkHandle provides data and some tools that plugins can use. It is

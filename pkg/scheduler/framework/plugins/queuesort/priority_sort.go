@@ -35,6 +35,11 @@ func (pl *PrioritySort) Name() string {
 	return Name
 }
 
+// BuildArgs returns the args that were used to build the plugin.
+func (*PrioritySort) BuildArgs() interface{} {
+	return nil
+}
+
 // Less is the function used by the activeQ heap algorithm to sort pods.
 // It sorts pods based on their priority. When priorities are equal, it uses
 // PodInfo.timestamp.
@@ -45,6 +50,6 @@ func (pl *PrioritySort) Less(pInfo1, pInfo2 *framework.PodInfo) bool {
 }
 
 // New initializes a new plugin and returns it.
-func New(plArgs *runtime.Unknown, handle framework.FrameworkHandle) (framework.Plugin, error) {
+func New(_ *runtime.Unknown, handle framework.FrameworkHandle) (framework.Plugin, error) {
 	return &PrioritySort{}, nil
 }

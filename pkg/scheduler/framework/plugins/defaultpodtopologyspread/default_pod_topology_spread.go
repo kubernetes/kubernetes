@@ -57,6 +57,11 @@ func (pl *DefaultPodTopologySpread) Name() string {
 	return Name
 }
 
+// BuildArgs returns the args that were used to build the plugin.
+func (*DefaultPodTopologySpread) BuildArgs() interface{} {
+	return nil
+}
+
 // preScoreState computed at PreScore and used at Score.
 type preScoreState struct {
 	selector labels.Selector

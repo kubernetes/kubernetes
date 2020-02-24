@@ -43,6 +43,11 @@ func (pl *NodePreferAvoidPods) Name() string {
 	return Name
 }
 
+// BuildArgs returns the args that were used to build the plugin.
+func (*NodePreferAvoidPods) BuildArgs() interface{} {
+	return nil
+}
+
 // Score invoked at the score extension point.
 func (pl *NodePreferAvoidPods) Score(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) (int64, *framework.Status) {
 	nodeInfo, err := pl.handle.SnapshotSharedLister().NodeInfos().Get(nodeName)

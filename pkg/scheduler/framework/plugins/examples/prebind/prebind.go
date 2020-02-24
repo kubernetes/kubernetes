@@ -39,6 +39,11 @@ func (sr StatelessPreBindExample) Name() string {
 	return Name
 }
 
+// BuildArgs returns the args that were used to build the plugin.
+func (StatelessPreBindExample) BuildArgs() interface{} {
+	return nil
+}
+
 // PreBind is the functions invoked by the framework at "prebind" extension point.
 func (sr StatelessPreBindExample) PreBind(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
 	if pod == nil {

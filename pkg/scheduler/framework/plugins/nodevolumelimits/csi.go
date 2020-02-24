@@ -68,6 +68,11 @@ func (pl *CSILimits) Name() string {
 	return CSIName
 }
 
+// BuildArgs returns the args that were used to build the plugin.
+func (*CSILimits) BuildArgs() interface{} {
+	return nil
+}
+
 // Filter invoked at the filter extension point.
 func (pl *CSILimits) Filter(ctx context.Context, _ *framework.CycleState, pod *v1.Pod, nodeInfo *nodeinfo.NodeInfo) *framework.Status {
 	// If the new pod doesn't have any volume attached to it, the predicate will always be true

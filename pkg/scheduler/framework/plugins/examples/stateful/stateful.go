@@ -47,6 +47,11 @@ func (mp *MultipointExample) Name() string {
 	return Name
 }
 
+// BuildArgs returns the args that were used to build the plugin.
+func (*MultipointExample) BuildArgs() interface{} {
+	return nil
+}
+
 // Reserve is the functions invoked by the framework at "reserve" extension point.
 func (mp *MultipointExample) Reserve(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
 	// Reserve is not called concurrently, and so we don't need to lock.

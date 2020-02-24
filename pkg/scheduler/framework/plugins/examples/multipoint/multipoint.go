@@ -39,6 +39,11 @@ func (mc CommunicatingPlugin) Name() string {
 	return Name
 }
 
+// BuildArgs returns the args that were used to build the plugin.
+func (CommunicatingPlugin) BuildArgs() interface{} {
+	return nil
+}
+
 type stateData struct {
 	data string
 }

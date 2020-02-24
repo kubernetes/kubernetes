@@ -91,6 +91,11 @@ func (pl *TestScoreWithNormalizePlugin) Name() string {
 	return pl.name
 }
 
+// BuildArgs returns the args that were used to build the plugin.
+func (*TestScoreWithNormalizePlugin) BuildArgs() interface{} {
+	return nil
+}
+
 func (pl *TestScoreWithNormalizePlugin) NormalizeScore(ctx context.Context, state *CycleState, pod *v1.Pod, scores NodeScoreList) *Status {
 	return injectNormalizeRes(pl.inj, scores)
 }
@@ -113,6 +118,11 @@ func (pl *TestScorePlugin) Name() string {
 	return pl.name
 }
 
+// BuildArgs returns the args that were used to build the plugin.
+func (*TestScorePlugin) BuildArgs() interface{} {
+	return nil
+}
+
 func (pl *TestScorePlugin) Score(ctx context.Context, state *CycleState, p *v1.Pod, nodeName string) (int64, *Status) {
 	return setScoreRes(pl.inj)
 }
@@ -126,6 +136,11 @@ type PluginNotImplementingScore struct{}
 
 func (pl *PluginNotImplementingScore) Name() string {
 	return pluginNotImplementingScore
+}
+
+// BuildArgs returns the args that were used to build the plugin.
+func (*PluginNotImplementingScore) BuildArgs() interface{} {
+	return nil
 }
 
 // TestPlugin implements all Plugin interfaces.
@@ -147,6 +162,11 @@ func (e *TestPluginPreFilterExtension) RemovePod(ctx context.Context, state *Cyc
 
 func (pl *TestPlugin) Name() string {
 	return pl.name
+}
+
+// BuildArgs returns the args that were used to build the plugin.
+func (*TestPlugin) BuildArgs() interface{} {
+	return nil
 }
 
 func (pl *TestPlugin) Score(ctx context.Context, state *CycleState, p *v1.Pod, nodeName string) (int64, *Status) {
@@ -202,6 +222,11 @@ func (pl *TestPreFilterPlugin) Name() string {
 	return preFilterPluginName
 }
 
+// BuildArgs returns the args that were used to build the plugin.
+func (*TestPreFilterPlugin) BuildArgs() interface{} {
+	return nil
+}
+
 func (pl *TestPreFilterPlugin) PreFilter(ctx context.Context, state *CycleState, p *v1.Pod) *Status {
 	pl.PreFilterCalled++
 	return nil
@@ -220,6 +245,11 @@ type TestPreFilterWithExtensionsPlugin struct {
 
 func (pl *TestPreFilterWithExtensionsPlugin) Name() string {
 	return preFilterWithExtensionsPluginName
+}
+
+// BuildArgs returns the args that were used to build the plugin.
+func (*TestPreFilterWithExtensionsPlugin) BuildArgs() interface{} {
+	return nil
 }
 
 func (pl *TestPreFilterWithExtensionsPlugin) PreFilter(ctx context.Context, state *CycleState, p *v1.Pod) *Status {
@@ -250,6 +280,11 @@ func (dp *TestDuplicatePlugin) Name() string {
 	return duplicatePluginName
 }
 
+// BuildArgs returns the args that were used to build the plugin.
+func (*TestDuplicatePlugin) BuildArgs() interface{} {
+	return nil
+}
+
 func (dp *TestDuplicatePlugin) PreFilter(ctx context.Context, state *CycleState, p *v1.Pod) *Status {
 	return nil
 }
@@ -272,6 +307,12 @@ type TestPermitPlugin struct {
 func (pp *TestPermitPlugin) Name() string {
 	return permitPlugin
 }
+
+// BuildArgs returns the args that were used to build the plugin.
+func (*TestPermitPlugin) BuildArgs() interface{} {
+	return nil
+}
+
 func (pp *TestPermitPlugin) Permit(ctx context.Context, state *CycleState, p *v1.Pod, nodeName string) (*Status, time.Duration) {
 	return NewStatus(Wait, ""), time.Duration(10 * time.Second)
 }
@@ -289,6 +330,11 @@ func (pl *TestQueueSortPlugin) Name() string {
 	return queueSortPlugin
 }
 
+// BuildArgs returns the args that were used to build the plugin.
+func (*TestQueueSortPlugin) BuildArgs() interface{} {
+	return nil
+}
+
 func (pl *TestQueueSortPlugin) Less(_, _ *PodInfo) bool {
 	return false
 }
@@ -304,6 +350,11 @@ type TestBindPlugin struct{}
 
 func (t TestBindPlugin) Name() string {
 	return bindPlugin
+}
+
+// BuildArgs returns the args that were used to build the plugin.
+func (TestBindPlugin) BuildArgs() interface{} {
+	return nil
 }
 
 func (t TestBindPlugin) Bind(ctx context.Context, state *CycleState, p *v1.Pod, nodeName string) *Status {

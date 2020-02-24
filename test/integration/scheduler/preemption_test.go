@@ -82,6 +82,11 @@ func (fp *tokenFilter) Name() string {
 	return tokenFilterName
 }
 
+// BuildArgs returns the args that were used to build the plugin.
+func (*tokenFilter) BuildArgs() interface{} {
+	return nil
+}
+
 func (fp *tokenFilter) Filter(ctx context.Context, state *framework.CycleState, pod *v1.Pod,
 	nodeInfo *schedulernodeinfo.NodeInfo) *framework.Status {
 	if fp.Tokens > 0 {

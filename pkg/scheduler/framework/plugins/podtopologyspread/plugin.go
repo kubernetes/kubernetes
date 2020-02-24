@@ -49,6 +49,11 @@ func (pl *PodTopologySpread) Name() string {
 	return Name
 }
 
+// BuildArgs returns the args that were used to build the plugin.
+func (*PodTopologySpread) BuildArgs() interface{} {
+	return nil
+}
+
 // New initializes a new plugin and returns it.
 func New(_ *runtime.Unknown, h framework.FrameworkHandle) (framework.Plugin, error) {
 	if h.SnapshotSharedLister() == nil {

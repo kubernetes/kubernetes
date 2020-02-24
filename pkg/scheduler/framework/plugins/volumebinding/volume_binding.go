@@ -48,6 +48,11 @@ func (pl *VolumeBinding) Name() string {
 	return Name
 }
 
+// BuildArgs returns the args that were used to build the plugin.
+func (*VolumeBinding) BuildArgs() interface{} {
+	return nil
+}
+
 func podHasPVCs(pod *v1.Pod) bool {
 	for _, vol := range pod.Spec.Volumes {
 		if vol.PersistentVolumeClaim != nil {

@@ -120,6 +120,11 @@ func (pl *machine2PrioritizerPlugin) Name() string {
 	return "Machine2Prioritizer"
 }
 
+// BuildArgs returns the args that were used to build the plugin.
+func (pl *machine2PrioritizerPlugin) BuildArgs() interface{} {
+	return nil
+}
+
 func (pl *machine2PrioritizerPlugin) Score(_ context.Context, _ *framework.CycleState, _ *v1.Pod, nodeName string) (int64, *framework.Status) {
 	score := 10
 	if nodeName == "machine2" {
@@ -147,6 +152,11 @@ type FakeExtender struct {
 
 func (f *FakeExtender) Name() string {
 	return "FakeExtender"
+}
+
+// BuildArgs returns the args that were used to build the plugin.
+func (*FakeExtender) BuildArgs() interface{} {
+	return nil
 }
 
 func (f *FakeExtender) IsIgnorable() bool {

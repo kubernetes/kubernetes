@@ -880,6 +880,22 @@ func (f *framework) ListPlugins() map[string][]config.Plugin {
 	return nil
 }
 
+func (f *framework) ListPluginArgs() map[string]interface{} {
+	m := make(map[string]interface{})
+	for _, e := range f.getExtensionPoints(&config.Plugins{}) {
+		plugins := reflect.ValueOf(e.slicePtr).Elem()
+		for i := 0; i < plugins.Len(); i++ {
+			name := plugins.Index(i).Interface().(Plugin).Name()
+			args := plugins.Index(i).Interface().(Plugin).BuildArgs()
+			m[name] = args
+		}
+	}
+	if len(m) > 0 {
+		return m
+	}
+	return nil
+}
+
 // ClientSet returns a kubernetes clientset.
 func (f *framework) ClientSet() clientset.Interface {
 	return f.clientSet

@@ -72,6 +72,11 @@ func (s *preFilterState) Clone() framework.StateData {
 	return &copy
 }
 
+// BuildArgs returns the args that were used to build the plugin.
+func (pl *ServiceAffinity) BuildArgs() interface{} {
+	return pl.args
+}
+
 // New initializes a new plugin and returns it.
 func New(plArgs *runtime.Unknown, handle framework.FrameworkHandle) (framework.Plugin, error) {
 	args := Args{}
