@@ -45,6 +45,5 @@ go_test(
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/version:go_default_library",
-        "//vendor/github.com/pkg/errors:go_default_library",
     ],
 )

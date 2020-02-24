@@ -22,6 +22,7 @@ import (
 
 	versionutil "k8s.io/apimachinery/pkg/util/version"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
@@ -300,10 +301,13 @@ func minorUpgradePossibleWithPatchRelease(stableVersion, patchVersion *versionut
 }
 
 func getSuggestedEtcdVersion(kubernetesVersion string) string {
-	etcdVersion, err := kubeadmconstants.EtcdSupportedVersion(kubernetesVersion)
+	etcdVersion, warning, err := kubeadmconstants.EtcdSupportedVersion(kubeadmconstants.SupportedEtcdVersion, kubernetesVersion)
 	if err != nil {
-		fmt.Printf("[upgrade/versions] WARNING: No recommended etcd for requested Kubernetes version (%s)\n", kubernetesVersion)
+		klog.Warningf("[upgrade/versions] could not retrieve an etcd version for the target Kubernetes version: %v", err)
 		return "N/A"
+	}
+	if warning != nil {
+		klog.Warningf("[upgrade/versions] %v", warning)
 	}
 	return etcdVersion.String()
 }
