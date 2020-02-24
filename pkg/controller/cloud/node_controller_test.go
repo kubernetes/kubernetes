@@ -688,9 +688,9 @@ func Test_reconcileNodeLabels(t *testing.T) {
 		{
 			name: "requires reconcile",
 			labels: map[string]string{
-				v1.LabelZoneFailureDomain: "foo",
-				v1.LabelZoneRegion:        "bar",
-				v1.LabelInstanceType:      "the-best-type",
+				v1.LabelZoneFailureDomainStable: "foo",
+				v1.LabelZoneRegionStable:        "bar",
+				v1.LabelInstanceTypeStable:      "the-best-type",
 			},
 			expectedLabels: map[string]string{
 				v1.LabelZoneFailureDomain:       "foo",
@@ -725,12 +725,12 @@ func Test_reconcileNodeLabels(t *testing.T) {
 		{
 			name: "require reconcile -- secondary labels are different from primary",
 			labels: map[string]string{
-				v1.LabelZoneFailureDomain:       "foo",
-				v1.LabelZoneRegion:              "bar",
-				v1.LabelZoneFailureDomainStable: "wrongfoo",
-				v1.LabelZoneRegionStable:        "wrongbar",
-				v1.LabelInstanceType:            "the-best-type",
-				v1.LabelInstanceTypeStable:      "the-wrong-type",
+				v1.LabelZoneFailureDomain:       "wrongfoo",
+				v1.LabelZoneRegion:              "wrongbar",
+				v1.LabelZoneFailureDomainStable: "foo",
+				v1.LabelZoneRegionStable:        "bar",
+				v1.LabelInstanceType:            "the-wrong-type",
+				v1.LabelInstanceTypeStable:      "the-best-type",
 			},
 			expectedLabels: map[string]string{
 				v1.LabelZoneFailureDomain:       "foo",

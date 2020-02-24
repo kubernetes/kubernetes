@@ -55,27 +55,27 @@ var labelReconcileInfo = []struct {
 	ensureSecondaryExists bool
 }{
 	{
-		// Reconcile the beta and the GA zone label using the beta label as
+		// Reconcile the beta and the GA zone label using the GA label as
 		// the source of truth
-		// TODO: switch the primary key to GA labels in v1.21
-		primaryKey:            v1.LabelZoneFailureDomain,
-		secondaryKey:          v1.LabelZoneFailureDomainStable,
+		// TODO: remove support for secondary key in v1.21
+		primaryKey:            v1.LabelZoneFailureDomainStable,
+		secondaryKey:          v1.LabelZoneFailureDomain,
 		ensureSecondaryExists: true,
 	},
 	{
-		// Reconcile the beta and the stable region label using the beta label as
+		// Reconcile the beta and the stable region label using the GA label as
 		// the source of truth
-		// TODO: switch the primary key to GA labels in v1.21
-		primaryKey:            v1.LabelZoneRegion,
-		secondaryKey:          v1.LabelZoneRegionStable,
+		// TODO: remove support for secondary key in v1.21
+		primaryKey:            v1.LabelZoneRegionStable,
+		secondaryKey:          v1.LabelZoneRegion,
 		ensureSecondaryExists: true,
 	},
 	{
-		// Reconcile the beta and the stable instance-type label using the beta label as
+		// Reconcile the beta and the stable instance-type label using the GA label as
 		// the source of truth
-		// TODO: switch the primary key to GA labels in v1.21
-		primaryKey:            v1.LabelInstanceType,
-		secondaryKey:          v1.LabelInstanceTypeStable,
+		// TODO: remove support for secondary key in v1.21
+		primaryKey:            v1.LabelInstanceTypeStable,
+		secondaryKey:          v1.LabelInstanceType,
 		ensureSecondaryExists: true,
 	},
 }
