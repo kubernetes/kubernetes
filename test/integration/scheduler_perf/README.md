@@ -31,14 +31,42 @@ Currently the test suite has the following:
 
 How To Run
 ------
+
+## Density tests
+
 ```shell
 # In Kubernetes root path
-make generated_files
-
-cd test/integration/scheduler_perf
-./test-performance.sh
+make test-integration WHAT=./test/integration/scheduler_perf KUBE_TEST_VMODULE="''" KUBE_TEST_ARGS="-alsologtostderr=true -logtostderr=true -run=." KUBE_TIMEOUT="--timeout=60m" SHORT="--short=false"
 ```
 
+## Benchmark tests
+
+```shell
+# In Kubernetes root path
+make test-integration WHAT=./test/integration/scheduler_perf KUBE_TEST_VMODULE="''" KUBE_TEST_ARGS="-alsologtostderr=false -logtostderr=false -run=^$$ -benchtime=1ns -bench=BenchmarkPerfScheduling"
+```
+
+The benchmark suite runs all the tests specified under config/performance-config.yaml.
+
+Once the benchmark is finished, JSON file with metrics is available in the current directory (test/integration/scheduler_perf). Look for `BenchmarkPerfScheduling_YYYY-MM-DDTHH:MM:SSZ.json`.
+You can use `-data-items-dir` to generate the metrics file elsewhere.
+
+In case you want to run a specific test in the suite, you can specify the test through `-bench` flag:
+
+Also, bench time is explicitly set to 1ns (`-benchtime=1ns` flag) so each test is run only once.
+Otherwise, the golang benchmark framework will try to run a test more than once in case it ran for less than 1s.
+
+```shell
+# In Kubernetes root path
+make test-integration WHAT=./test/integration/scheduler_perf KUBE_TEST_VMODULE="''" KUBE_TEST_ARGS="-alsologtostderr=false -logtostderr=false -run=^$$ -benchtime=1ns -bench=BenchmarkPerfScheduling/SchedulingBasic/5000Nodes/5000InitPods/1000PodsToSchedule"
+```
+
+To produce a cpu profile:
+
+```shell
+# In Kubernetes root path
+make test-integration WHAT=./test/integration/scheduler_perf KUBE_TIMEOUT="-timeout=3600s" KUBE_TEST_VMODULE="''" KUBE_TEST_ARGS="-alsologtostderr=false -logtostderr=false -run=^$$ -benchtime=1ns -bench=BenchmarkPerfScheduling -cpuprofile ~/cpu-profile.out"
+```
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/test/component/scheduler/perf/README.md?pixel)]()
