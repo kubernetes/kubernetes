@@ -66,10 +66,13 @@ func TestDetachDisk(t *testing.T) {
 }
 
 func TestCheckDiskExists(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	ctx, cancel := getContextWithCancel()
 	defer cancel()
 
-	testCloud := GetTestCloud()
+	testCloud := GetTestCloud(ctrl)
 	common := &controllerCommon{
 		location:              testCloud.Location,
 		storageEndpointSuffix: testCloud.Environment.StorageEndpointSuffix,
@@ -117,10 +120,13 @@ func TestCheckDiskExists(t *testing.T) {
 }
 
 func TestFilterNonExistingDisks(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	ctx, cancel := getContextWithCancel()
 	defer cancel()
 
-	testCloud := GetTestCloud()
+	testCloud := GetTestCloud(ctrl)
 	common := &controllerCommon{
 		location:              testCloud.Location,
 		storageEndpointSuffix: testCloud.Environment.StorageEndpointSuffix,
