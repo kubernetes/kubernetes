@@ -231,11 +231,6 @@ func (in *HPAControllerConfiguration) DeepCopyInto(out *HPAControllerConfigurati
 	out.HorizontalPodAutoscalerUpscaleForbiddenWindow = in.HorizontalPodAutoscalerUpscaleForbiddenWindow
 	out.HorizontalPodAutoscalerDownscaleStabilizationWindow = in.HorizontalPodAutoscalerDownscaleStabilizationWindow
 	out.HorizontalPodAutoscalerDownscaleForbiddenWindow = in.HorizontalPodAutoscalerDownscaleForbiddenWindow
-	if in.HorizontalPodAutoscalerUseRESTClients != nil {
-		in, out := &in.HorizontalPodAutoscalerUseRESTClients, &out.HorizontalPodAutoscalerUseRESTClients
-		*out = new(bool)
-		**out = **in
-	}
 	out.HorizontalPodAutoscalerCPUInitializationPeriod = in.HorizontalPodAutoscalerCPUInitializationPeriod
 	out.HorizontalPodAutoscalerInitialReadinessDelay = in.HorizontalPodAutoscalerInitialReadinessDelay
 	return
@@ -307,7 +302,7 @@ func (in *KubeControllerManagerConfiguration) DeepCopyInto(out *KubeControllerMa
 	out.EndpointController = in.EndpointController
 	out.EndpointSliceController = in.EndpointSliceController
 	in.GarbageCollectorController.DeepCopyInto(&out.GarbageCollectorController)
-	in.HPAController.DeepCopyInto(&out.HPAController)
+	out.HPAController = in.HPAController
 	out.JobController = in.JobController
 	out.NamespaceController = in.NamespaceController
 	out.NodeIPAMController = in.NodeIPAMController
