@@ -32,7 +32,6 @@ func TestValidateKubeSchedulerConfiguration(t *testing.T) {
 	podInitialBackoffSeconds := int64(1)
 	podMaxBackoffSeconds := int64(1)
 	validConfig := &config.KubeSchedulerConfiguration{
-		SchedulerName:      "me",
 		HealthzBindAddress: "0.0.0.0:10254",
 		MetricsBindAddress: "0.0.0.0:10254",
 		ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
@@ -64,6 +63,30 @@ func TestValidateKubeSchedulerConfiguration(t *testing.T) {
 		PodMaxBackoffSeconds:     podMaxBackoffSeconds,
 		BindTimeoutSeconds:       testTimeout,
 		PercentageOfNodesToScore: 35,
+		Profiles: []config.KubeSchedulerProfile{
+			{
+				SchedulerName: "me",
+				Plugins: &config.Plugins{
+					QueueSort: &config.PluginSet{
+						Enabled: []config.Plugin{{Name: "CustomSort"}},
+					},
+					Score: &config.PluginSet{
+						Disabled: []config.Plugin{{Name: "*"}},
+					},
+				},
+			},
+			{
+				SchedulerName: "other",
+				Plugins: &config.Plugins{
+					QueueSort: &config.PluginSet{
+						Enabled: []config.Plugin{{Name: "CustomSort"}},
+					},
+					Bind: &config.PluginSet{
+						Enabled: []config.Plugin{{Name: "CustomBind"}},
+					},
+				},
+			},
+		},
 	}
 
 	resourceNameNotSet := validConfig.DeepCopy()
@@ -90,6 +113,18 @@ func TestValidateKubeSchedulerConfiguration(t *testing.T) {
 
 	percentageOfNodesToScore101 := validConfig.DeepCopy()
 	percentageOfNodesToScore101.PercentageOfNodesToScore = int32(101)
+
+	schedulerNameNotSet := validConfig.DeepCopy()
+	schedulerNameNotSet.Profiles[1].SchedulerName = ""
+
+	repeatedSchedulerName := validConfig.DeepCopy()
+	repeatedSchedulerName.Profiles[0].SchedulerName = "other"
+
+	differentQueueSort := validConfig.DeepCopy()
+	differentQueueSort.Profiles[1].Plugins.QueueSort.Enabled[0].Name = "AnotherSort"
+
+	oneEmptyQueueSort := validConfig.DeepCopy()
+	oneEmptyQueueSort.Profiles[0].Plugins = nil
 
 	scenarios := map[string]struct {
 		expectedToFail bool
@@ -127,16 +162,34 @@ func TestValidateKubeSchedulerConfiguration(t *testing.T) {
 			expectedToFail: true,
 			config:         percentageOfNodesToScore101,
 		},
+		"scheduler-name-not-set": {
+			expectedToFail: true,
+			config:         schedulerNameNotSet,
+		},
+		"repeated-scheduler-name": {
+			expectedToFail: true,
+			config:         repeatedSchedulerName,
+		},
+		"different-queue-sort": {
+			expectedToFail: true,
+			config:         differentQueueSort,
+		},
+		"one-empty-queue-sort": {
+			expectedToFail: true,
+			config:         oneEmptyQueueSort,
+		},
 	}
 
 	for name, scenario := range scenarios {
-		errs := ValidateKubeSchedulerConfiguration(scenario.config)
-		if len(errs) == 0 && scenario.expectedToFail {
-			t.Errorf("Unexpected success for scenario: %s", name)
-		}
-		if len(errs) > 0 && !scenario.expectedToFail {
-			t.Errorf("Unexpected failure for scenario: %s - %+v", name, errs)
-		}
+		t.Run(name, func(t *testing.T) {
+			errs := ValidateKubeSchedulerConfiguration(scenario.config)
+			if len(errs) == 0 && scenario.expectedToFail {
+				t.Error("Unexpected success")
+			}
+			if len(errs) > 0 && !scenario.expectedToFail {
+				t.Errorf("Unexpected failure: %+v", errs)
+			}
+		})
 	}
 }
 
