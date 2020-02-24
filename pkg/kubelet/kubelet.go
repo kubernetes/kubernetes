@@ -1486,6 +1486,9 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 	podStatus := o.podStatus
 	updateType := o.updateType
 
+	klog.Infof("DEBUG: syncPod %q", format.Pod(pod))
+	defer klog.Infof("DEBUG: syncPod %q complete", format.Pod(pod))
+
 	// if we want to kill a pod, do it now!
 	if updateType == kubetypes.SyncPodKill {
 		killPodOptions := o.killPodOptions
@@ -1688,6 +1691,10 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 
 	// Call the container runtime's SyncPod callback
 	result := kl.containerRuntime.SyncPod(pod, podStatus, pullSecrets, kl.backOff)
+	klog.Infof("DEBUG: kl.reasonCache.Update for pod %q: %v", format.Pod(pod), result.SyncError)
+	for _, r := range result.SyncResults {
+		klog.Infof("DEBUG: - %q: %#v", format.Pod(pod), r)
+	}
 	kl.reasonCache.Update(pod.UID, result)
 	if err := result.Error(); err != nil {
 		// Do not return error if the only failures were pods in backoff
@@ -1953,8 +1960,10 @@ func (kl *Kubelet) syncLoopIteration(configCh <-chan kubetypes.PodUpdate, handle
 				handler.HandlePodSyncs([]*v1.Pod{pod})
 			} else {
 				// If the pod no longer exists, ignore the event.
-				klog.V(4).Infof("SyncLoop (PLEG): ignore irrelevant event: %#v", e)
+				klog.V(2).Infof("SyncLoop (PLEG): ignore irrelevant event: %#v", e)
 			}
+		} else {
+			klog.Infof("DEBUG: sync ignored %#v", e)
 		}
 
 		if e.Type == pleg.ContainerDied {
@@ -2249,7 +2258,9 @@ func (kl *Kubelet) cleanUpContainersInPod(podID types.UID, exitedContainerID str
 			apiPodStatus := kl.generateAPIPodStatus(syncedPod, podStatus)
 			// When an evicted or deleted pod has already synced, all containers can be removed.
 			removeAll = eviction.PodIsEvicted(syncedPod.Status) || (syncedPod.DeletionTimestamp != nil && notRunning(apiPodStatus.ContainerStatuses))
+			klog.Infof("DEBUG: cleanUpContainersInPod %q %q isEvicted=%t notRunning=%t", podStatus.Name, exitedContainerID, eviction.PodIsEvicted(syncedPod.Status), (syncedPod.DeletionTimestamp != nil && notRunning(apiPodStatus.ContainerStatuses)))
 		}
+		klog.Infof("DEBUG: cleanUpContainersInPod %q %q num=%d removeall=%t", podStatus.Name, exitedContainerID, len(podStatus.ContainerStatuses), removeAll)
 		kl.containerDeletor.deleteContainersInPod(exitedContainerID, podStatus, removeAll)
 	}
 }

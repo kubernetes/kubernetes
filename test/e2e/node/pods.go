@@ -221,7 +221,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 
 			const delay = 2000
 			const workers = 3
-			const pods = 15
+			const pods = 30
 			var min, max time.Duration
 			for i := 0; i < workers; i++ {
 				wg.Add(1)

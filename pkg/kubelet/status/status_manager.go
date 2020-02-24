@@ -163,16 +163,19 @@ func (m *manager) Start() {
 		for {
 			select {
 			case syncRequest := <-m.podStatusChannel:
-				klog.V(5).Infof("Status Manager: syncing pod: %q, with status: (%d, %v) from podStatusChannel",
+				klog.V(4).Infof("Status Manager: syncing pod: %q, with status: (%d, %v) from podStatusChannel",
 					syncRequest.podUID, syncRequest.status.version, syncRequest.status.status)
 				m.syncPod(syncRequest.podUID, syncRequest.status)
 			case <-syncTicker:
-				klog.V(5).Infof("Status Manager: syncing batch")
+				klog.V(4).Infof("Status Manager: syncing batch")
+				start := time.Now()
 				// remove any entries in the status channel since the batch will handle them
 				for i := len(m.podStatusChannel); i > 0; i-- {
 					<-m.podStatusChannel
 				}
 				m.syncBatch()
+				end := time.Now()
+				klog.V(4).Infof("Status Manager: syncing batch finished in %s", end.Sub(start))
 			}
 		}
 	}, 0)
@@ -446,7 +449,7 @@ func (m *manager) updateStatusInternal(pod *v1.Pod, status v1.PodStatus, forceUp
 
 	select {
 	case m.podStatusChannel <- podStatusSyncRequest{pod.UID, newStatus}:
-		klog.V(5).Infof("Status Manager: adding pod: %q, with status: (%d, %v) to podStatusChannel",
+		klog.V(4).Infof("Status Manager: adding pod: %q, with status: (%d, %v) to podStatusChannel",
 			pod.UID, newStatus.version, newStatus.status)
 		return true
 	default:
@@ -532,7 +535,7 @@ func (m *manager) syncBatch() {
 	}()
 
 	for _, update := range updatedStatuses {
-		klog.V(5).Infof("Status Manager: syncPod in syncbatch. pod UID: %q", update.podUID)
+		klog.V(4).Infof("Status Manager: syncPod in syncbatch. pod UID: %q", update.podUID)
 		m.syncPod(update.podUID, update.status)
 	}
 }
@@ -575,7 +578,7 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 	if unchanged {
 		klog.V(3).Infof("Status for pod %q is up-to-date: (%d)", format.Pod(pod), status.version)
 	} else {
-		klog.V(3).Infof("Status for pod %q updated successfully: (%d, %+v)", format.Pod(pod), status.version, status.status)
+		klog.V(3).Infof("Status for pod %q updated successfully: (%d, %#v)", format.Pod(pod), status.version, status.status)
 		pod = newPod
 	}
 
@@ -586,13 +589,16 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 		deleteOptions := metav1.NewDeleteOptions(0)
 		// Use the pod UID as the precondition for deletion to prevent deleting a newly created pod with the same name and namespace.
 		deleteOptions.Preconditions = metav1.NewUIDPreconditions(string(pod.UID))
+		klog.V(3).Infof("DEBUG: Pod %q (%d) about to terminate from version", format.Pod(pod), status.version)
 		err = m.kubeClient.CoreV1().Pods(pod.Namespace).Delete(context.TODO(), pod.Name, deleteOptions)
 		if err != nil {
 			klog.Warningf("Failed to delete status for pod %q: %v", format.Pod(pod), err)
 			return
 		}
-		klog.V(3).Infof("Pod %q fully terminated and removed from etcd", format.Pod(pod))
+		klog.V(3).Infof("Pod %q (%d) fully terminated and removed from etcd", format.Pod(pod), status.version)
 		m.deletePodStatus(uid)
+	} else {
+		klog.V(3).Infof("DEBUG: Pod %q (%d) not deletable: terminated=%t", format.Pod(pod), status.version, pod.DeletionTimestamp != nil)
 	}
 }
 
