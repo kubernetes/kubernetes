@@ -17,10 +17,14 @@ limitations under the License.
 package node
 
 import (
+	"context"
+	"reflect"
 	"testing"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes/fake"
 )
 
 func TestGetPreferredAddress(t *testing.T) {
@@ -197,6 +201,269 @@ func Test_GetZoneKey(t *testing.T) {
 				t.Logf("actual zone key: %q", zone)
 				t.Logf("expected zone key: %q", test.zone)
 				t.Errorf("unexpected zone key")
+			}
+		})
+	}
+}
+
+func Test_PatchNodeStatus(t *testing.T) {
+	tests := []struct {
+		name               string
+		oldNode            *v1.Node
+		newNode            *v1.Node
+		expectedNode       *v1.Node
+		expectedPatchBytes []byte
+		expectedErr        error
+	}{
+		{
+			name: "spec ignored in patch bytes",
+			oldNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-node",
+				},
+				Spec: v1.NodeSpec{
+					PodCIDR: "172.17.0.1/24",
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:   v1.NodeReady,
+							Status: v1.ConditionFalse,
+							Reason: "KubeletNotReady",
+						},
+					},
+				},
+			},
+			newNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-node",
+				},
+				Spec: v1.NodeSpec{
+					PodCIDR: "172.17.0.2/24",
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:   v1.NodeReady,
+							Status: v1.ConditionTrue,
+							Reason: "KubeletReady",
+						},
+					},
+				},
+			},
+			expectedNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-node",
+				},
+				Spec: v1.NodeSpec{
+					PodCIDR: "172.17.0.1/24",
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:   v1.NodeReady,
+							Status: v1.ConditionTrue,
+							Reason: "KubeletReady",
+						},
+					},
+				},
+			},
+			expectedPatchBytes: []byte(`{"status":{"$setElementOrder/conditions":[{"type":"Ready"}],"conditions":[{"reason":"KubeletReady","status":"True","type":"Ready"}]}}`),
+			expectedErr:        nil,
+		},
+		{
+			name: "patch without node addresses",
+			oldNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-node",
+				},
+				Spec: v1.NodeSpec{
+					PodCIDR: "172.17.0.1/24",
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:   v1.NodeReady,
+							Status: v1.ConditionTrue,
+							Reason: "KubeletReady",
+						},
+					},
+					Images: []v1.ContainerImage{
+						{
+							Names: []string{"foobar:latest"},
+						},
+					},
+				},
+			},
+			newNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-node",
+				},
+				Spec: v1.NodeSpec{
+					PodCIDR: "172.17.0.2/24",
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:   v1.NodeReady,
+							Status: v1.ConditionTrue,
+							Reason: "KubeletReady",
+						},
+						{
+							Type:   v1.NodeMemoryPressure,
+							Status: v1.ConditionTrue,
+							Reason: "KubeletHasSufficientMemory",
+						},
+					},
+					Images: []v1.ContainerImage{
+						{
+							Names: []string{"foobar:v1"},
+						},
+					},
+				},
+			},
+			expectedNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-node",
+				},
+				Spec: v1.NodeSpec{
+					PodCIDR: "172.17.0.1/24",
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:   v1.NodeReady,
+							Status: v1.ConditionTrue,
+							Reason: "KubeletReady",
+						},
+						{
+							Type:   v1.NodeMemoryPressure,
+							Status: v1.ConditionTrue,
+							Reason: "KubeletHasSufficientMemory",
+						},
+					},
+					Images: []v1.ContainerImage{
+						{
+							Names: []string{"foobar:v1"},
+						},
+					},
+				},
+			},
+			expectedPatchBytes: []byte(`{"status":{"$setElementOrder/conditions":[{"type":"Ready"},{"type":"MemoryPressure"}],"conditions":[{"lastHeartbeatTime":null,"lastTransitionTime":null,"reason":"KubeletHasSufficientMemory","status":"True","type":"MemoryPressure"}],"images":[{"names":["foobar:v1"]}]}}`),
+			expectedErr:        nil,
+		},
+		{
+			name: "patch with node addresses using replace strategy instead of merge",
+			oldNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-node",
+				},
+				Spec: v1.NodeSpec{
+					PodCIDR: "172.17.0.1/24",
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:   v1.NodeReady,
+							Status: v1.ConditionTrue,
+							Reason: "KubeletReady",
+						},
+					},
+					Addresses: []v1.NodeAddress{
+						{
+							Type:    v1.NodeInternalIP,
+							Address: "10.0.0.1",
+						},
+						{
+							Type:    v1.NodeExternalIP,
+							Address: "1.1.1.1",
+						},
+					},
+				},
+			},
+			newNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-node",
+				},
+				Spec: v1.NodeSpec{
+					PodCIDR: "172.17.0.2/24",
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:   v1.NodeReady,
+							Status: v1.ConditionTrue,
+							Reason: "KubeletReady",
+						},
+					},
+					Addresses: []v1.NodeAddress{
+						{
+							Type:    v1.NodeInternalIP,
+							Address: "10.0.0.1",
+						},
+						{
+							Type:    v1.NodeInternalIP,
+							Address: "10.0.0.2",
+						},
+					},
+				},
+			},
+			expectedNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-node",
+				},
+				Spec: v1.NodeSpec{
+					PodCIDR: "172.17.0.1/24",
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:   v1.NodeReady,
+							Status: v1.ConditionTrue,
+							Reason: "KubeletReady",
+						},
+					},
+					Addresses: []v1.NodeAddress{
+						{
+							Type:    v1.NodeInternalIP,
+							Address: "10.0.0.1",
+						},
+						{
+							Type:    v1.NodeInternalIP,
+							Address: "10.0.0.2",
+						},
+					},
+				},
+			},
+			expectedPatchBytes: []byte(`{"status":{"addresses":[{"address":"10.0.0.1","type":"InternalIP"},{"address":"10.0.0.2","type":"InternalIP"},{"$patch":"replace"}]}}`),
+			expectedErr:        nil,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			clientset := fake.NewSimpleClientset()
+			_, err := clientset.CoreV1().Nodes().Create(context.TODO(), test.oldNode, metav1.CreateOptions{})
+			if err != nil {
+				t.Fatalf("failed to create initial node: %v", err)
+			}
+			node, patchBytes, err := PatchNodeStatus(clientset.CoreV1(), types.NodeName(test.oldNode.Name), test.oldNode, test.newNode)
+			if !reflect.DeepEqual(node, test.expectedNode) {
+				t.Logf("actual patched node: %v", node)
+				t.Logf("expected patched node: %v", test.expectedNode)
+				t.Error("unexpectd node")
+			}
+
+			if !reflect.DeepEqual(patchBytes, test.expectedPatchBytes) {
+				t.Logf("actual patch bytes: %v", string(patchBytes))
+				t.Logf("expected patch bytes: %v", string(test.expectedPatchBytes))
+				t.Error("unexpected patch bytes")
+			}
+
+			if err != test.expectedErr {
+				t.Logf("actual err: %v", err)
+				t.Logf("expected err: %v", test.expectedErr)
+				t.Error("unexpected err")
 			}
 		})
 	}
