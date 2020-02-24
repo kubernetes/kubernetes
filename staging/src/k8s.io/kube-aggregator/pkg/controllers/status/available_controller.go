@@ -123,17 +123,11 @@ func NewAvailableConditionController(
 		},
 	}
 
-	if egressSelector != nil {
-		networkContext := egressselector.Cluster.AsNetworkContext()
-		var egressDialer utilnet.DialFunc
-		egressDialer, err := egressSelector.Lookup(networkContext)
-		if err != nil {
-			return nil, err
-		}
-		restConfig.Dial = egressDialer
-	} else if proxyTransport != nil && proxyTransport.DialContext != nil {
+	if proxyTransport != nil && proxyTransport.DialContext != nil {
 		restConfig.Dial = proxyTransport.DialContext
 	}
+
+	restConfig.Dial = egressSelector.GenerateDialer(restConfig.Dial, egressselector.Cluster.AsNetworkContext())
 
 	transport, err := rest.TransportFor(restConfig)
 	if err != nil {

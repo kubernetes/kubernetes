@@ -39,6 +39,7 @@ var directDialer utilnet.DialFunc = http.DefaultTransport.(*http.Transport).Dial
 // EgressSelector is the map of network context type to context dialer, for network egress.
 type EgressSelector struct {
 	egressToDialer map[EgressType]utilnet.DialFunc
+	enabled        bool
 }
 
 // EgressType is an indicator of which egress selection should be used for sending traffic.
@@ -77,6 +78,14 @@ func (s EgressType) String() string {
 	default:
 		return "invalid"
 	}
+}
+
+type EgressInfo struct {
+	// EgressSelector is the egress selector
+	EgressSelector *EgressSelector
+
+	// Network context for egress selection
+	NetworkContext NetworkContext
 }
 
 // AsNetworkContext is a helper function to make it easy to get the basic NetworkContext objects.
@@ -212,6 +221,7 @@ func NewEgressSelector(config *apiserver.EgressSelectorConfiguration) (*EgressSe
 	}
 	cs := &EgressSelector{
 		egressToDialer: make(map[EgressType]utilnet.DialFunc),
+		enabled:        true,
 	}
 	for _, service := range config.EgressSelections {
 		name, err := lookupServiceName(service.Name)
@@ -264,4 +274,26 @@ func (cs *EgressSelector) Lookup(networkContext NetworkContext) (utilnet.DialFun
 		return nil, nil
 	}
 	return cs.egressToDialer[networkContext.EgressSelectionName], nil
+}
+
+func CreateEmptyEgressSelector() *EgressSelector {
+	return &EgressSelector{
+		egressToDialer: make(map[EgressType]utilnet.DialFunc),
+		enabled:        false,
+	}
+}
+
+// kenerateDialer generates the Dialer based on the network context
+// If EgressSelector is turned off, this function is a no op that just returns the passed in Dialer
+func (cs *EgressSelector) GenerateDialer(existingDialer utilnet.DialFunc, networkContext NetworkContext) utilnet.DialFunc {
+	if !cs.enabled {
+		return existingDialer
+	} else {
+		dialer, err := cs.Lookup(networkContext)
+		if err != nil {
+			// Print Error Message
+			return existingDialer
+		}
+		return dialer
+	}
 }

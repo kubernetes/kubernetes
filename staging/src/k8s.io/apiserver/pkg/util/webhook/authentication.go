@@ -26,7 +26,6 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	utilnet "k8s.io/apimachinery/pkg/util/net"
 	egressselector "k8s.io/apiserver/pkg/server/egressselector"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -54,17 +53,8 @@ func NewDefaultAuthenticationInfoResolverWrapper(
 					return nil, err
 				}
 
-				if egressSelector != nil {
-					networkContext := egressselector.Master.AsNetworkContext()
-					var egressDialer utilnet.DialFunc
-					egressDialer, err = egressSelector.Lookup(networkContext)
+				ret.Dial = egressSelector.GenerateDialer(ret.Dial, egressselector.Master.AsNetworkContext())
 
-					if err != nil {
-						return nil, err
-					}
-
-					ret.Dial = egressDialer
-				}
 				return ret, nil
 			},
 			ClientConfigForServiceFunc: func(serviceName, serviceNamespace string, servicePort int) (*rest.Config, error) {
@@ -76,18 +66,13 @@ func NewDefaultAuthenticationInfoResolverWrapper(
 					return nil, err
 				}
 
-				if egressSelector != nil {
-					networkContext := egressselector.Cluster.AsNetworkContext()
-					var egressDialer utilnet.DialFunc
-					egressDialer, err = egressSelector.Lookup(networkContext)
-					if err != nil {
-						return nil, err
-					}
-
-					ret.Dial = egressDialer
-				} else if proxyTransport != nil && proxyTransport.DialContext != nil {
+				if proxyTransport != nil && proxyTransport.DialContext != nil {
 					ret.Dial = proxyTransport.DialContext
 				}
+
+				// Use the dialer provided by egressselector. This overwrites the proxyTransport dialer defined
+				// above if egressselector is enabled
+				ret.Dial = egressSelector.GenerateDialer(ret.Dial, egressselector.Cluster.AsNetworkContext())
 				return ret, nil
 			},
 		}

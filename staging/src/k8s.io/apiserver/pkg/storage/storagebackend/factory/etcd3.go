@@ -31,7 +31,6 @@ import (
 	"go.etcd.io/etcd/pkg/transport"
 	"google.golang.org/grpc"
 
-	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/server/egressselector"
 	"k8s.io/apiserver/pkg/storage"
@@ -110,19 +109,15 @@ func newETCD3Client(c storagebackend.TransportConfig) (*clientv3.Client, error) 
 	if len(c.CertFile) == 0 && len(c.KeyFile) == 0 && len(c.TrustedCAFile) == 0 {
 		tlsConfig = nil
 	}
-	networkContext := egressselector.Etcd.AsNetworkContext()
-	var egressDialer utilnet.DialFunc
-	if c.EgressLookup != nil {
-		egressDialer, err = c.EgressLookup(networkContext)
-		if err != nil {
-			return nil, err
-		}
-	}
+
 	dialOptions := []grpc.DialOption{
 		grpc.WithBlock(), // block until the underlying connection is up
 		grpc.WithUnaryInterceptor(grpcprom.UnaryClientInterceptor),
 		grpc.WithStreamInterceptor(grpcprom.StreamClientInterceptor),
 	}
+
+	egressDialer := c.EgressSelector.GenerateDialer(nil, egressselector.Etcd.AsNetworkContext())
+
 	if egressDialer != nil {
 		dialer := func(ctx context.Context, addr string) (net.Conn, error) {
 			u, err := url.Parse(addr)

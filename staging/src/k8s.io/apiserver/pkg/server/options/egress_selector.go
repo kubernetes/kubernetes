@@ -56,6 +56,7 @@ func (o *EgressSelectorOptions) AddFlags(fs *pflag.FlagSet) {
 // they will be prepared from the recommended/default/no-op values.
 func (o *EgressSelectorOptions) ApplyTo(c *server.Config) error {
 	if o == nil {
+		c.EgressSelector = egressselector.CreateEmptyEgressSelector()
 		return nil
 	}
 

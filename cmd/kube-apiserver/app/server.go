@@ -379,20 +379,12 @@ func CreateKubeAPIServerConfig(
 		// Use the nodeTunneler's dialer to connect to the kubelet
 		config.ExtraConfig.KubeletClientConfig.Dial = nodeTunneler.Dial
 	}
-	if config.GenericConfig.EgressSelector != nil {
-		// Use the config.GenericConfig.EgressSelector lookup to find the dialer to connect to the kubelet
-		config.ExtraConfig.KubeletClientConfig.Lookup = config.GenericConfig.EgressSelector.Lookup
 
-		// Use the config.GenericConfig.EgressSelector lookup as the transport used by the "proxy" subresources.
-		networkContext := egressselector.Cluster.AsNetworkContext()
-		dialer, err := config.GenericConfig.EgressSelector.Lookup(networkContext)
-		if err != nil {
-			return nil, nil, nil, nil, err
-		}
-		c := proxyTransport.Clone()
-		c.DialContext = dialer
-		config.ExtraConfig.ProxyTransport = c
-	}
+	// Use the config.GenericConfig.EgressSelector lookup to find the dialer to connect to the kubelet
+	config.ExtraConfig.KubeletClientConfig.EgressSelector = config.GenericConfig.EgressSelector
+
+	// Use the config.GenericConfig.EgressSelector lookup as the transport used by the "proxy" subresources.
+	config.ExtraConfig.ProxyTransport.DialContext = config.GenericConfig.EgressSelector.GenerateDialer(config.ExtraConfig.ProxyTransport.DialContext, egressselector.Cluster.AsNetworkContext())
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountIssuerDiscovery) {
 		// Load the public keys.
@@ -474,9 +466,8 @@ func buildGenericConfig(
 	if lastErr != nil {
 		return
 	}
-	if genericConfig.EgressSelector != nil {
-		storageFactory.StorageConfig.Transport.EgressLookup = genericConfig.EgressSelector.Lookup
-	}
+	storageFactory.StorageConfig.Transport.EgressSelector = genericConfig.EgressSelector
+
 	if lastErr = s.Etcd.ApplyWithStorageFactoryTo(storageFactory, genericConfig); lastErr != nil {
 		return
 	}
@@ -498,13 +489,14 @@ func buildGenericConfig(
 	}
 	versionedInformers = clientgoinformers.NewSharedInformerFactory(clientgoExternalClient, 10*time.Minute)
 
-	genericConfig.Authentication.Authenticator, genericConfig.OpenAPIConfig.SecurityDefinitions, err = BuildAuthenticator(s, genericConfig.EgressSelector, clientgoExternalClient, versionedInformers)
+	masterEgressInfo := egressselector.EgressInfo{genericConfig.EgressSelector, egressselector.Master.AsNetworkContext()}
+	genericConfig.Authentication.Authenticator, genericConfig.OpenAPIConfig.SecurityDefinitions, err = BuildAuthenticator(s, masterEgressInfo, clientgoExternalClient, versionedInformers)
 	if err != nil {
 		lastErr = fmt.Errorf("invalid authentication config: %v", err)
 		return
 	}
 
-	genericConfig.Authorization.Authorizer, genericConfig.RuleResolver, err = BuildAuthorizer(s, genericConfig.EgressSelector, versionedInformers)
+	genericConfig.Authorization.Authorizer, genericConfig.RuleResolver, err = BuildAuthorizer(s, masterEgressInfo, versionedInformers)
 	if err != nil {
 		lastErr = fmt.Errorf("invalid authorization config: %v", err)
 		return
@@ -560,7 +552,7 @@ func buildGenericConfig(
 }
 
 // BuildAuthenticator constructs the authenticator
-func BuildAuthenticator(s *options.ServerRunOptions, EgressSelector *egressselector.EgressSelector, extclient clientgoclientset.Interface, versionedInformer clientgoinformers.SharedInformerFactory) (authenticator.Request, *spec.SecurityDefinitions, error) {
+func BuildAuthenticator(s *options.ServerRunOptions, EgressInfo egressselector.EgressInfo, extclient clientgoclientset.Interface, versionedInformer clientgoinformers.SharedInformerFactory) (authenticator.Request, *spec.SecurityDefinitions, error) {
 	authenticatorConfig, err := s.Authentication.ToAuthenticationConfig()
 	if err != nil {
 		return nil, nil, err
@@ -577,28 +569,15 @@ func BuildAuthenticator(s *options.ServerRunOptions, EgressSelector *egressselec
 		versionedInformer.Core().V1().Secrets().Lister().Secrets(v1.NamespaceSystem),
 	)
 
-	if EgressSelector != nil {
-		egressDialer, err := EgressSelector.Lookup(egressselector.Master.AsNetworkContext())
-		if err != nil {
-			return nil, nil, err
-		}
-		authenticatorConfig.CustomDial = egressDialer
-	}
+	authenticatorConfig.EgressInfo = EgressInfo
 
 	return authenticatorConfig.New()
 }
 
 // BuildAuthorizer constructs the authorizer
-func BuildAuthorizer(s *options.ServerRunOptions, EgressSelector *egressselector.EgressSelector, versionedInformers clientgoinformers.SharedInformerFactory) (authorizer.Authorizer, authorizer.RuleResolver, error) {
+func BuildAuthorizer(s *options.ServerRunOptions, EgressInfo egressselector.EgressInfo, versionedInformers clientgoinformers.SharedInformerFactory) (authorizer.Authorizer, authorizer.RuleResolver, error) {
 	authorizationConfig := s.Authorization.ToAuthorizationConfig(versionedInformers)
-
-	if EgressSelector != nil {
-		egressDialer, err := EgressSelector.Lookup(egressselector.Master.AsNetworkContext())
-		if err != nil {
-			return nil, nil, err
-		}
-		authorizationConfig.CustomDial = egressDialer
-	}
+	authorizationConfig.EgressInfo = EgressInfo
 
 	return authorizationConfig.New()
 }

@@ -59,8 +59,8 @@ type KubeletClientConfig struct {
 	// Dial is a custom dialer used for the client
 	Dial utilnet.DialFunc
 
-	// Lookup will give us a dialer if the egress selector is configured for it
-	Lookup egressselector.Lookup
+	// EgressSelector provides a function to look up a generated dialer if it is configured for it
+	EgressSelector egressselector.EgressSelector
 }
 
 // ConnectionInfo provides the information needed to connect to a kubelet
@@ -105,15 +105,11 @@ func makeTransport(config *KubeletClientConfig, insecureSkipTLSVerify bool) (htt
 
 	rt := http.DefaultTransport
 	dialer := config.Dial
-	if dialer == nil && config.Lookup != nil {
-		// Assuming EgressSelector if SSHTunnel is not turned on.
-		// We will not get a dialer if egress selector is disabled.
-		networkContext := egressselector.Cluster.AsNetworkContext()
-		dialer, err = config.Lookup(networkContext)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get context dialer for 'cluster': got %v", err)
-		}
-	}
+
+	// Assuming EgressSelector if SSHTunnel is not turned on.
+	// We will not get a dialer if egress selector is disabled.
+	dialer = config.EgressSelector.GenerateDialer(dialer, egressselector.Cluster.AsNetworkContext())
+
 	if dialer != nil || tlsConfig != nil {
 		// If SSH Tunnel is turned on
 		rt = utilnet.SetOldTransportDefaults(&http.Transport{

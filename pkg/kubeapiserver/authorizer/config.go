@@ -24,6 +24,7 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 	"k8s.io/apiserver/pkg/authorization/union"
+	"k8s.io/apiserver/pkg/server/egressselector"
 	"k8s.io/apiserver/plugin/pkg/authorizer/webhook"
 	versionedinformers "k8s.io/client-go/informers"
 	"k8s.io/kubernetes/pkg/auth/authorizer/abac"
@@ -56,8 +57,8 @@ type Config struct {
 
 	VersionedInformerFactory versionedinformers.SharedInformerFactory
 
-	// Optional field, custom dial function used to connect to webhook
-	CustomDial utilnet.DialFunc
+	// Egress information on how to Dial to authenticator
+	EgressInfo egressselector.EgressInfo
 }
 
 // New returns the right sort of union of multiple authorizer.Authorizer objects
@@ -107,7 +108,7 @@ func (config Config) New() (authorizer.Authorizer, authorizer.RuleResolver, erro
 				config.WebhookVersion,
 				config.WebhookCacheAuthorizedTTL,
 				config.WebhookCacheUnauthorizedTTL,
-				config.CustomDial)
+				config.EgressInfo)
 			if err != nil {
 				return nil, nil, err
 			}

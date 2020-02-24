@@ -264,18 +264,13 @@ func (r *proxyHandler) updateAPIService(apiService *apiregistrationv1api.APIServ
 		servicePort:      *apiService.Spec.Service.Port,
 		serviceAvailable: apiregistrationv1apihelper.IsAPIServiceConditionTrue(apiService, apiregistrationv1api.Available),
 	}
-	if r.egressSelector != nil {
-		networkContext := egressselector.Cluster.AsNetworkContext()
-		var egressDialer utilnet.DialFunc
-		egressDialer, err := r.egressSelector.Lookup(networkContext)
-		if err != nil {
-			klog.Warning(err.Error())
-		} else {
-			newInfo.restConfig.Dial = egressDialer
-		}
-	} else if r.proxyTransport != nil && r.proxyTransport.DialContext != nil {
+
+	if r.proxyTransport != nil && r.proxyTransport.DialContext != nil {
 		newInfo.restConfig.Dial = r.proxyTransport.DialContext
 	}
+
+	newInfo.restConfig.Dial = r.egressSelector.GenerateDialer(newInfo.restConfig.Dial, egressselector.Cluster.AsNetworkContext())
+
 	newInfo.proxyRoundTripper, newInfo.transportBuildingError = restclient.TransportFor(newInfo.restConfig)
 	if newInfo.transportBuildingError != nil {
 		klog.Warning(newInfo.transportBuildingError.Error())
