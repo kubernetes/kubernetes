@@ -60,6 +60,7 @@ import (
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/routes"
 	serverstore "k8s.io/apiserver/pkg/server/storage"
+	"k8s.io/apiserver/pkg/storageversion"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 	"k8s.io/client-go/informers"
 	restclient "k8s.io/client-go/rest"
@@ -143,6 +144,8 @@ type Config struct {
 	// DiscoveryAddresses is used to build the IPs pass to discovery. If nil, the ExternalAddress is
 	// always reported
 	DiscoveryAddresses discovery.Addresses
+	// APIServerID is the ID of this API server
+	APIServerID string
 	// The default set of healthz checks. There might be more added via AddHealthChecks dynamically.
 	HealthzChecks []healthz.HealthChecker
 	// The default set of livez checks. There might be more added via AddHealthChecks dynamically.
@@ -214,6 +217,9 @@ type Config struct {
 	// EquivalentResourceRegistry provides information about resources equivalent to a given resource,
 	// and the kind associated with a given resource. As resources are installed, they are registered here.
 	EquivalentResourceRegistry runtime.EquivalentResourceRegistry
+
+	// StorageVersion holds the storage versions of the API resources installed by this server.
+	StorageVersion storageversion.Manager
 }
 
 type RecommendedConfig struct {
@@ -319,6 +325,7 @@ func NewConfig(codecs serializer.CodecFactory) *Config {
 		// Default to treating watch as a long-running operation
 		// Generic API servers have no inherent long-running subresources
 		LongRunningFunc: genericfilters.BasicLongRunningRequestCheck(sets.NewString("watch"), sets.NewString()),
+		StorageVersion:  storageversion.NewDefaultManager(),
 	}
 }
 
@@ -481,6 +488,9 @@ func (c *Config) Complete(informers informers.SharedInformerFactory) CompletedCo
 		c.DiscoveryAddresses = discovery.DefaultAddresses{DefaultAddress: c.ExternalAddress}
 	}
 
+	// TODO: make a flag to allow configuring APIServer ID separately.
+	c.APIServerID = c.PublicAddress.String()
+
 	AuthorizeClientBearerToken(c.LoopbackClientConfig, &c.Authentication, &c.Authorization)
 
 	if c.RequestInfoResolver == nil {
@@ -532,6 +542,7 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 
 	s := &GenericAPIServer{
 		discoveryAddresses:         c.DiscoveryAddresses,
+		APIServerID:                c.APIServerID,
 		LoopbackClientConfig:       c.LoopbackClientConfig,
 		legacyAPIGroupPrefixes:     c.LegacyAPIGroupPrefixes,
 		admissionControl:           c.AdmissionControl,
@@ -568,6 +579,8 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 
 		maxRequestBodyBytes: c.MaxRequestBodyBytes,
 		livezClock:          clock.RealClock{},
+
+		StorageVersion: c.StorageVersion,
 	}
 
 	for {
@@ -653,6 +666,12 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 	}
 
 	return s, nil
+}
+
+func BuildHandlerChainWithStorageVersionPrecondition(apiHandler http.Handler, c *Config) http.Handler {
+	// WithStorageVersionPrecondition needs the WithRequestInfo to run first
+	handler := genericapifilters.WithStorageVersionPrecondition(apiHandler, c.StorageVersion)
+	return DefaultBuildHandlerChain(handler, c)
 }
 
 func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {

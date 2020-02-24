@@ -76,3 +76,10 @@ func InternalError(w http.ResponseWriter, req *http.Request, err error) {
 		http.StatusInternalServerError)
 	utilruntime.HandleError(err)
 }
+
+// ServiceUnavailabeError renders a simple internal error
+func ServiceUnavailabeError(w http.ResponseWriter, req *http.Request, err error) {
+	http.Error(w, sanitizer.Replace(fmt.Sprintf("Service Unavailable: %q: %v", req.RequestURI, err)),
+		http.StatusServiceUnavailable)
+	utilruntime.HandleError(err)
+}
