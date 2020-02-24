@@ -104,10 +104,6 @@ func (az *Cloud) ListVirtualMachines(resourceGroup string) ([]compute.VirtualMac
 // getPrivateIPsForMachine is wrapper for optional backoff getting private ips
 // list of a node by name
 func (az *Cloud) getPrivateIPsForMachine(nodeName types.NodeName) ([]string, error) {
-	if az.Config.shouldOmitCloudProviderBackoff() {
-		return az.vmSet.GetPrivateIPsByNodeName(string(nodeName))
-	}
-
 	return az.getPrivateIPsForMachineWithRetry(nodeName)
 }
 
@@ -131,10 +127,6 @@ func (az *Cloud) getPrivateIPsForMachineWithRetry(nodeName types.NodeName) ([]st
 }
 
 func (az *Cloud) getIPForMachine(nodeName types.NodeName) (string, string, error) {
-	if az.Config.shouldOmitCloudProviderBackoff() {
-		return az.vmSet.GetIPByNodeName(string(nodeName))
-	}
-
 	return az.GetIPForMachineWithRetry(nodeName)
 }
 
@@ -398,8 +390,4 @@ func (az *Cloud) CreateOrUpdateVMSS(resourceGroupName string, VMScaleSetName str
 	}
 
 	return nil
-}
-
-func (cfg *Config) shouldOmitCloudProviderBackoff() bool {
-	return cfg.CloudProviderBackoffMode == backoffModeV2
 }

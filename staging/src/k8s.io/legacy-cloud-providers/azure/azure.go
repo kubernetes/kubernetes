@@ -79,9 +79,6 @@ const (
 	vmTypeVMSS     = "vmss"
 	vmTypeStandard = "standard"
 
-	backoffModeDefault = "default"
-	backoffModeV2      = "v2"
-
 	loadBalancerSkuBasic    = "basic"
 	loadBalancerSkuStandard = "standard"
 
@@ -161,12 +158,6 @@ type Config struct {
 	CloudProviderBackoffDuration int `json:"cloudProviderBackoffDuration,omitempty" yaml:"cloudProviderBackoffDuration,omitempty"`
 	// Backoff jitter
 	CloudProviderBackoffJitter float64 `json:"cloudProviderBackoffJitter,omitempty" yaml:"cloudProviderBackoffJitter,omitempty"`
-	// Backoff mode, options are v2 and default.
-	// * default means two-layer backoff retrying, one in the cloud provider and the other in the Azure SDK.
-	// * v2 means only backoff in the Azure SDK is used. In such mode, CloudProviderBackoffDuration and
-	//   CloudProviderBackoffJitter are omitted.
-	// "default" will be used if not specified.
-	CloudProviderBackoffMode string `json:"cloudProviderBackoffMode,omitempty" yaml:"cloudProviderBackoffMode,omitempty"`
 	// Use instance metadata service where possible
 	UseInstanceMetadata bool `json:"useInstanceMetadata,omitempty" yaml:"useInstanceMetadata,omitempty"`
 
@@ -419,22 +410,17 @@ func (az *Cloud) InitializeCloudFromConfig(config *Config, fromSecret bool) erro
 		}
 		if config.CloudProviderBackoffExponent == 0 {
 			config.CloudProviderBackoffExponent = backoffExponentDefault
-		} else if config.shouldOmitCloudProviderBackoff() {
-			klog.Warning("Azure cloud provider config 'cloudProviderBackoffExponent' has been deprecated for 'v2' backoff mode. 2 is always used as the backoff exponent.")
-		}
-		if config.CloudProviderBackoffJitter == 0 {
-			config.CloudProviderBackoffJitter = backoffJitterDefault
-		} else if config.shouldOmitCloudProviderBackoff() {
-			klog.Warning("Azure cloud provider config 'cloudProviderBackoffJitter' has been deprecated for 'v2' backoff mode.")
 		}
 
-		if !config.shouldOmitCloudProviderBackoff() {
-			resourceRequestBackoff = wait.Backoff{
-				Steps:    config.CloudProviderBackoffRetries,
-				Factor:   config.CloudProviderBackoffExponent,
-				Duration: time.Duration(config.CloudProviderBackoffDuration) * time.Second,
-				Jitter:   config.CloudProviderBackoffJitter,
-			}
+		if config.CloudProviderBackoffJitter == 0 {
+			config.CloudProviderBackoffJitter = backoffJitterDefault
+		}
+
+		resourceRequestBackoff = wait.Backoff{
+			Steps:    config.CloudProviderBackoffRetries,
+			Factor:   config.CloudProviderBackoffExponent,
+			Duration: time.Duration(config.CloudProviderBackoffDuration) * time.Second,
+			Jitter:   config.CloudProviderBackoffJitter,
 		}
 		klog.V(2).Infof("Azure cloudprovider using try backoff: retries=%d, exponent=%f, duration=%d, jitter=%f",
 			config.CloudProviderBackoffRetries,
@@ -602,14 +588,11 @@ func (az *Cloud) configAzureClients(
 
 func (az *Cloud) getAzureClientConfig(servicePrincipalToken *adal.ServicePrincipalToken) *azclients.ClientConfig {
 	azClientConfig := &azclients.ClientConfig{
-		Location:                       az.Config.Location,
-		SubscriptionID:                 az.Config.SubscriptionID,
-		ResourceManagerEndpoint:        az.Environment.ResourceManagerEndpoint,
-		CloudProviderBackoffRetries:    az.Config.CloudProviderBackoffRetries,
-		CloudProviderBackoffDuration:   az.Config.CloudProviderBackoffDuration,
-		ShouldOmitCloudProviderBackoff: az.Config.shouldOmitCloudProviderBackoff(),
-		Authorizer:                     autorest.NewBearerAuthorizer(servicePrincipalToken),
-		Backoff:                        &retry.Backoff{Steps: 1},
+		Location:                az.Config.Location,
+		SubscriptionID:          az.Config.SubscriptionID,
+		ResourceManagerEndpoint: az.Environment.ResourceManagerEndpoint,
+		Authorizer:              autorest.NewBearerAuthorizer(servicePrincipalToken),
+		Backoff:                 &retry.Backoff{Steps: 1},
 	}
 
 	if az.Config.CloudProviderBackoff {
