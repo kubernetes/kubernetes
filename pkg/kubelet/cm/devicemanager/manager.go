@@ -121,8 +121,9 @@ type sourcesReadyStub struct{}
 // PodReusableDevices is a map by pod name of devices to reuse.
 type PodReusableDevices map[string]map[string]sets.String
 
-func (s *sourcesReadyStub) AddSource(source string) {}
-func (s *sourcesReadyStub) AllReady() bool          { return true }
+func (s *sourcesReadyStub) AddSource(source string)       {}
+func (s *sourcesReadyStub) AllReady() bool                { return true }
+func (s *sourcesReadyStub) SeenSource(source string) bool { return true }
 
 // NewManagerImpl creates a new manager.
 func NewManagerImpl(numaNodeInfo cputopology.NUMANodeInfo, topologyAffinityStore topologymanager.Store) (*ManagerImpl, error) {

@@ -32,6 +32,8 @@ type SourcesReady interface {
 	AddSource(source string)
 	// AllReady returns true if the currently configured sources have all been seen.
 	AllReady() bool
+	// SeenSource returns true if the given source is ready.
+	SeenSource(source string) bool
 }
 
 // NewSourcesReady returns a SourcesReady with the specified function.
@@ -64,4 +66,11 @@ func (s *sourcesImpl) AllReady() bool {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 	return s.sourcesReadyFn(s.sourcesSeen)
+}
+
+// SeenSource returns true if the given source is ready.
+func (s *sourcesImpl) SeenSource(source string) bool {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+	return s.sourcesSeen.Has(source)
 }

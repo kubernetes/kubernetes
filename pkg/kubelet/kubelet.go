@@ -1736,16 +1736,11 @@ func (kl *Kubelet) getPodsToSync() []*v1.Pod {
 // 1.  stopping the associated pod worker asynchronously
 // 2.  signaling to kill the pod by sending on the podKillingCh channel
 //
-// deletePod returns an error if not all sources are ready or the pod is not
+// deletePod returns an error if the pod is not
 // found in the runtime cache.
 func (kl *Kubelet) deletePod(pod *v1.Pod) error {
 	if pod == nil {
 		return fmt.Errorf("deletePod does not allow nil pod")
-	}
-	if !kl.sourcesReady.AllReady() {
-		// If the sources aren't ready, skip deletion, as we may accidentally delete pods
-		// for sources that haven't reported yet.
-		return fmt.Errorf("skipping delete because sources aren't ready yet")
 	}
 	kl.podWorkers.ForgetWorker(pod.UID)
 
@@ -1915,7 +1910,13 @@ func (kl *Kubelet) syncLoopIteration(configCh <-chan kubetypes.PodUpdate, handle
 			handler.HandlePodUpdates(u.Pods)
 		case kubetypes.REMOVE:
 			klog.V(2).Infof("SyncLoop (REMOVE, %q): %q", u.Source, format.Pods(u.Pods))
-			handler.HandlePodRemoves(u.Pods)
+			if kl.sourcesReady.SeenSource(u.Source) {
+				handler.HandlePodRemoves(u.Pods)
+			} else {
+				// If the source is not ready, skip deletion, as we may accidentally delete pods
+				// for sources that haven't reported yet.
+				klog.V(2).Infof("skipping delete because source %s is not ready yet", u.Source)
+			}
 		case kubetypes.RECONCILE:
 			klog.V(4).Infof("SyncLoop (RECONCILE, %q): %q", u.Source, format.Pods(u.Pods))
 			handler.HandlePodReconcile(u.Pods)

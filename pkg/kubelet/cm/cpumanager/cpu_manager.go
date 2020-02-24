@@ -122,8 +122,9 @@ var _ Manager = &manager{}
 
 type sourcesReadyStub struct{}
 
-func (s *sourcesReadyStub) AddSource(source string) {}
-func (s *sourcesReadyStub) AllReady() bool          { return true }
+func (s *sourcesReadyStub) AddSource(source string)       {}
+func (s *sourcesReadyStub) AllReady() bool                { return true }
+func (s *sourcesReadyStub) SeenSource(source string) bool { return true }
 
 // NewManager creates new cpu manager based on provided policy
 func NewManager(cpuPolicyName string, reconcilePeriod time.Duration, machineInfo *cadvisorapi.MachineInfo, numaNodeInfo topology.NUMANodeInfo, specificCPUs cpuset.CPUSet, nodeAllocatableReservation v1.ResourceList, stateFileDirectory string, affinity topologymanager.Store) (Manager, error) {
