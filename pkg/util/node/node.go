@@ -143,24 +143,22 @@ func GetNodeIP(client clientset.Interface, hostname string) net.IP {
 // Since there are currently two separate zone keys:
 //   * "failure-domain.beta.kubernetes.io/zone"
 //   * "topology.kubernetes.io/zone"
-// GetZoneKey will first check failure-domain.beta.kubernetes.io/zone and if not exists, will then check
-// topology.kubernetes.io/zone
+// GetZoneKey will first check topology.kubernetes.io/zone and if not exists, will then check
+// failure-domain.beta.kubernetes.io/zone (deprecated and to be removed in v1.21)
 func GetZoneKey(node *v1.Node) string {
 	labels := node.Labels
 	if labels == nil {
 		return ""
 	}
 
-	// TODO: prefer stable labels for zone in v1.18
-	zone, ok := labels[v1.LabelZoneFailureDomain]
+	zone, ok := labels[v1.LabelZoneFailureDomainStable]
 	if !ok {
-		zone, _ = labels[v1.LabelZoneFailureDomainStable]
+		zone, _ = labels[v1.LabelZoneFailureDomain]
 	}
 
-	// TODO: prefer stable labels for region in v1.18
-	region, ok := labels[v1.LabelZoneRegion]
+	region, ok := labels[v1.LabelZoneRegionStable]
 	if !ok {
-		region, _ = labels[v1.LabelZoneRegionStable]
+		region, _ = labels[v1.LabelZoneRegion]
 	}
 
 	if region == "" && zone == "" {

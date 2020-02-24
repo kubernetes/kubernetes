@@ -186,7 +186,7 @@ func Test_GetZoneKey(t *testing.T) {
 					},
 				},
 			},
-			zone: "region2:\x00:zone2",
+			zone: "region1:\x00:zone1",
 		},
 	}
 
