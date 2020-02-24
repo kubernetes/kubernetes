@@ -103,7 +103,7 @@ type ManagerImpl struct {
 	// List of NUMA Nodes available on the underlying machine
 	numaNodes []int
 
-	// Store of Topology Affinties that the Device Manager can query.
+	// Store of Topology Affinities that the Device Manager can query.
 	topologyAffinityStore topologymanager.Store
 }
 

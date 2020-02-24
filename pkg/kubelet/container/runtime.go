@@ -83,7 +83,7 @@ type Runtime interface {
 	GetPods(all bool) ([]*Pod, error)
 	// GarbageCollect removes dead containers using the specified container gc policy
 	// If allSourcesReady is not true, it means that kubelet doesn't have the
-	// complete list of pods from all avialble sources (e.g., apiserver, http,
+	// complete list of pods from all available sources (e.g., apiserver, http,
 	// file). In this case, garbage collector should refrain itself from aggressive
 	// behavior such as removing all containers of unrecognized pods (yet).
 	// If evictNonDeletedPods is set to true, containers and sandboxes belonging to pods
@@ -163,7 +163,7 @@ type Pod struct {
 	// running containers, or mixed with dead ones (when GetPods(true)).
 	Containers []*Container
 	// List of sandboxes associated with this pod. The sandboxes are converted
-	// to Container temporariliy to avoid substantial changes to other
+	// to Container temporarily to avoid substantial changes to other
 	// components. This is only populated by kuberuntime.
 	// TODO: use the runtimeApi.PodSandbox type directly.
 	Sandboxes []*Container

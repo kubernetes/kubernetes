@@ -184,7 +184,7 @@ func TestGetSeccompProfileFromAnnotations(t *testing.T) {
 			expectedProfile: "",
 		},
 		{
-			description:     "no seccomp with containerName should return exmpty string",
+			description:     "no seccomp with containerName should return empty string",
 			containerName:   "container1",
 			expectedProfile: "",
 		},

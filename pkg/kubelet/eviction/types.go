@@ -143,7 +143,7 @@ type CgroupNotifier interface {
 	Stop()
 }
 
-// NotifierFactory creates CgroupNotifer
+// NotifierFactory creates CgroupNotifier
 type NotifierFactory interface {
 	// NewCgroupNotifier creates a CgroupNotifier that creates events when the threshold
 	// on the attribute in the cgroup specified by the path is crossed.

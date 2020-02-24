@@ -54,7 +54,7 @@ var (
 		metrics.ALPHA,
 		"")
 
-	resouceScrapeResultDesc = metrics.NewDesc("scrape_error",
+	resourceScrapeResultDesc = metrics.NewDesc("scrape_error",
 		"1 if there was an error while getting container metrics, 0 otherwise",
 		nil,
 		nil,
@@ -84,7 +84,7 @@ func (rc *resourceMetricsCollector) DescribeWithStability(ch chan<- *metrics.Des
 	ch <- nodeMemoryUsageDesc
 	ch <- containerCPUUsageDesc
 	ch <- containerMemoryUsageDesc
-	ch <- resouceScrapeResultDesc
+	ch <- resourceScrapeResultDesc
 }
 
 // CollectWithStability implements metrics.StableCollector
@@ -94,7 +94,7 @@ func (rc *resourceMetricsCollector) DescribeWithStability(ch chan<- *metrics.Des
 func (rc *resourceMetricsCollector) CollectWithStability(ch chan<- metrics.Metric) {
 	var errorCount float64
 	defer func() {
-		ch <- metrics.NewLazyConstMetric(resouceScrapeResultDesc, metrics.GaugeValue, errorCount)
+		ch <- metrics.NewLazyConstMetric(resourceScrapeResultDesc, metrics.GaugeValue, errorCount)
 	}()
 	statsSummary, err := rc.provider.GetCPUAndMemoryStats()
 	if err != nil {

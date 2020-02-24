@@ -681,7 +681,7 @@ func TestReconcileState(t *testing.T) {
 		expectFailedContainerName    string
 	}{
 		{
-			description: "cpu manager reconclie - no error",
+			description: "cpu manager reconcile - no error",
 			activePods: []*v1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{
@@ -816,7 +816,7 @@ func TestReconcileState(t *testing.T) {
 			expectFailedContainerName:    "fakeContainerName",
 		},
 		{
-			description: "cpu manager reconclie - cpuset is empty",
+			description: "cpu manager reconcile - cpuset is empty",
 			activePods: []*v1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{
@@ -855,7 +855,7 @@ func TestReconcileState(t *testing.T) {
 			expectFailedContainerName:    "fakeContainerName",
 		},
 		{
-			description: "cpu manager reconclie - container update error",
+			description: "cpu manager reconcile - container update error",
 			activePods: []*v1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{

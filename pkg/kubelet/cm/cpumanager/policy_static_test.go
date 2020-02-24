@@ -377,7 +377,7 @@ func TestStaticPolicyAdd(t *testing.T) {
 				},
 			},
 			stDefaultCPUSet: cpuset.NewCPUSet(1, 25, 13, 38, 2, 9, 11, 35, 23, 48, 12, 51, 53, 173, 113, 233, 54, 61),
-			pod:             makePod("fakePod", "fakeCcontainer5", "12000m", "12000m"),
+			pod:             makePod("fakePod", "fakeContainer5", "12000m", "12000m"),
 			expErr:          nil,
 			expCPUAlloc:     true,
 			expCSet:         cpuset.NewCPUSet(1, 25, 13, 38, 11, 35, 23, 48, 53, 173, 113, 233),
@@ -463,7 +463,7 @@ func TestStaticPolicyAdd(t *testing.T) {
 			}
 
 			if !cset.Intersection(st.defaultCPUSet).IsEmpty() {
-				t.Errorf("StaticPolicy AddContainer() error (%v). expected cpuset %v to be disoint from the shared cpuset %v",
+				t.Errorf("StaticPolicy AddContainer() error (%v). expected cpuset %v to be disjoint from the shared cpuset %v",
 					testCase.description, cset, st.defaultCPUSet)
 			}
 		}
@@ -805,7 +805,7 @@ func TestStaticPolicyAddWithResvList(t *testing.T) {
 			}
 
 			if !cset.Intersection(st.defaultCPUSet).IsEmpty() {
-				t.Errorf("StaticPolicy AddContainer() error (%v). expected cpuset %v to be disoint from the shared cpuset %v",
+				t.Errorf("StaticPolicy AddContainer() error (%v). expected cpuset %v to be disjoint from the shared cpuset %v",
 					testCase.description, cset, st.defaultCPUSet)
 			}
 		}

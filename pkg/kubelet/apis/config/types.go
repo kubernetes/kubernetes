@@ -347,7 +347,7 @@ const (
 	KubeletAuthorizationModeWebhook KubeletAuthorizationMode = "Webhook"
 )
 
-// KubeletAuthorization holds the state related to the authorization in the kublet.
+// KubeletAuthorization holds the state related to the authorization in the kubelet.
 type KubeletAuthorization struct {
 	// mode is the authorization mode to apply to requests to the kubelet server.
 	// Valid values are AlwaysAllow and Webhook.
@@ -367,7 +367,7 @@ type KubeletWebhookAuthorization struct {
 	CacheUnauthorizedTTL metav1.Duration
 }
 
-// KubeletAuthentication holds the Kubetlet Authentication setttings.
+// KubeletAuthentication holds the Kubelet Authentication setttings.
 type KubeletAuthentication struct {
 	// x509 contains settings related to x509 client certificate authentication
 	X509 KubeletX509Authentication
@@ -393,7 +393,7 @@ type KubeletWebhookAuthentication struct {
 	CacheTTL metav1.Duration
 }
 
-// KubeletAnonymousAuthentication enables anonymous requests to the kubetlet server.
+// KubeletAnonymousAuthentication enables anonymous requests to the kubelet server.
 type KubeletAnonymousAuthentication struct {
 	// enabled allows anonymous requests to the kubelet server.
 	// Requests that are not rejected by another authentication method are treated as anonymous requests.

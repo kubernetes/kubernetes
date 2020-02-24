@@ -160,7 +160,7 @@ func (m *podContainerManagerImpl) tryKillingCgroupProcesses(podCgroup CgroupName
 	removed := map[int]bool{}
 	for i := 0; i < 5; i++ {
 		if i != 0 {
-			klog.V(3).Infof("Attempt %v failed to kill all unwanted process from cgroup: %v. Retyring", i, podCgroup)
+			klog.V(3).Infof("Attempt %v failed to kill all unwanted processes from cgroup: %v. Retrying", i, podCgroup)
 		}
 		errlist = []error{}
 		for _, pid := range pidsToKill {

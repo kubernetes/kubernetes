@@ -48,7 +48,7 @@ const maxProbeRetries = 3
 type prober struct {
 	exec execprobe.Prober
 	// probe types needs different httprobe instances so they don't
-	// share a connection pool which can cause collsions to the
+	// share a connection pool which can cause collisions to the
 	// same host:port and transient failures. See #49740.
 	readinessHTTP httpprobe.Prober
 	livenessHTTP  httpprobe.Prober

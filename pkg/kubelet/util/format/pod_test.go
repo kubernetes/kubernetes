@@ -68,7 +68,7 @@ func TestPodAndPodDesc(t *testing.T) {
 	testCases := []struct {
 		caseName      string
 		podName       string
-		podNamesapce  string
+		podNamespace  string
 		podUID        types.UID
 		expectedValue string
 	}{
@@ -77,7 +77,7 @@ func TestPodAndPodDesc(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		realPodDesc := PodDesc(testCase.podName, testCase.podNamesapce, testCase.podUID)
+		realPodDesc := PodDesc(testCase.podName, testCase.podNamespace, testCase.podUID)
 		assert.Equalf(t, testCase.expectedValue, realPodDesc, "Failed to test: %s", testCase.caseName)
 	}
 }
