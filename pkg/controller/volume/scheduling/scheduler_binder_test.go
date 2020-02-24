@@ -912,10 +912,10 @@ func TestFindPodVolumesWithoutProvisioning(t *testing.T) {
 			t.Error("returned success but expected error")
 		}
 		if boundSatisfied != scenario.expectedBound {
-			t.Errorf("expected boundSatsified %v, got %v", scenario.expectedBound, boundSatisfied)
+			t.Errorf("expected boundSatisfied %v, got %v", scenario.expectedBound, boundSatisfied)
 		}
 		if unboundSatisfied != scenario.expectedUnbound {
-			t.Errorf("expected unboundSatsified %v, got %v", scenario.expectedUnbound, unboundSatisfied)
+			t.Errorf("expected unboundSatisfied %v, got %v", scenario.expectedUnbound, unboundSatisfied)
 		}
 		testEnv.validatePodCache(t, testNode.Name, scenario.pod, scenario.expectedBindings, nil)
 	}
@@ -1037,10 +1037,10 @@ func TestFindPodVolumesWithProvisioning(t *testing.T) {
 			t.Error("returned success but expected error")
 		}
 		if boundSatisfied != scenario.expectedBound {
-			t.Errorf("expected boundSatsified %v, got %v", scenario.expectedBound, boundSatisfied)
+			t.Errorf("expected boundSatisfied %v, got %v", scenario.expectedBound, boundSatisfied)
 		}
 		if unboundSatisfied != scenario.expectedUnbound {
-			t.Errorf("expected unboundSatsified %v, got %v", scenario.expectedUnbound, unboundSatisfied)
+			t.Errorf("expected unboundSatisfied %v, got %v", scenario.expectedUnbound, unboundSatisfied)
 		}
 		testEnv.validatePodCache(t, testNode.Name, scenario.pod, scenario.expectedBindings, scenario.expectedProvisions)
 	}
@@ -1150,10 +1150,10 @@ func TestFindPodVolumesWithCSIMigration(t *testing.T) {
 			t.Error("returned success but expected error")
 		}
 		if boundSatisfied != scenario.expectedBound {
-			t.Errorf("expected boundSatsified %v, got %v", scenario.expectedBound, boundSatisfied)
+			t.Errorf("expected boundSatisfied %v, got %v", scenario.expectedBound, boundSatisfied)
 		}
 		if unboundSatisfied != scenario.expectedUnbound {
-			t.Errorf("expected unboundSatsified %v, got %v", scenario.expectedUnbound, unboundSatisfied)
+			t.Errorf("expected unboundSatisfied %v, got %v", scenario.expectedUnbound, unboundSatisfied)
 		}
 	}
 

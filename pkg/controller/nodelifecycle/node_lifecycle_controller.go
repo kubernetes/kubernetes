@@ -129,7 +129,7 @@ const (
 	retrySleepTime   = 20 * time.Millisecond
 	nodeNameKeyIndex = "spec.nodeName"
 	// podUpdateWorkerSizes assumes that in most cases pod will be handled by monitorNodeHealth pass.
-	// Pod update workes will only handle lagging cache pods. 4 workes should be enough.
+	// Pod update workers will only handle lagging cache pods. 4 workers should be enough.
 	podUpdateWorkerSize = 4
 )
 

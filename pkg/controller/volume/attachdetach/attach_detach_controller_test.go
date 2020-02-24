@@ -199,7 +199,7 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 		t.Fatalf("Error waiting for the informer caches to sync")
 	}
 
-	// Make sure the nodes and pods are in the inforer cache
+	// Make sure the nodes and pods are in the informer cache
 	i = 0
 	nodeList, err := informerFactory.Core().V1().Nodes().Lister().List(labels.Everything())
 	for len(nodeList) < nodesNum {

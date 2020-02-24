@@ -137,7 +137,7 @@ func (q *TimedWorkerQueue) CancelWork(key string) bool {
 }
 
 // GetWorkerUnsafe returns a TimedWorker corresponding to the given key.
-// Unsafe method - workers have attached goroutines which can fire afater this function is called.
+// Unsafe method - workers have attached goroutines which can fire after this function is called.
 func (q *TimedWorkerQueue) GetWorkerUnsafe(key string) *TimedWorker {
 	q.Lock()
 	defer q.Unlock()
