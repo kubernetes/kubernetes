@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
+	"k8s.io/apiserver/pkg/storageversion"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/util/cert"
@@ -48,9 +49,12 @@ type TearDownFunc func()
 type TestServerInstanceOptions struct {
 	// DisableStorageCleanup Disable the automatic storage cleanup
 	DisableStorageCleanup bool
-
 	// Enable cert-auth for the kube-apiserver
 	EnableCertAuth bool
+	// Skip healthz check and default namespace creation check
+	SkipPostStartChecks bool
+	// Wrap the storage version interface of the created server's generic server.
+	StorageVersionWrapFunc func(storageversion.Manager) storageversion.Manager
 }
 
 // TestServer return values supplied by kube-test-ApiServer
@@ -73,6 +77,7 @@ func NewDefaultTestServerOptions() *TestServerInstanceOptions {
 	return &TestServerInstanceOptions{
 		DisableStorageCleanup: false,
 		EnableCertAuth:        true,
+		SkipPostStartChecks:   false,
 	}
 }
 
@@ -95,7 +100,12 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 	}
 
 	stopCh := make(chan struct{})
+	// This gives the post start hooks some time to run even if the actual
+	// tests run too fast. Otherwise post start hooks like
+	// crd-informer-synced may panic due to timeout.
+	minRunTime := time.After(10 * time.Second)
 	tearDown := func() {
+		<-minRunTime
 		if !instanceOptions.DisableStorageCleanup {
 			registry.CleanupStorage()
 		}
@@ -182,6 +192,9 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 	t.Logf("runtime-config=%v", completedOptions.APIEnablement.RuntimeConfig)
 	t.Logf("Starting kube-apiserver on port %d...", s.SecureServing.BindPort)
 	server, err := app.CreateServerChain(completedOptions, stopCh)
+	if instanceOptions.StorageVersionWrapFunc != nil {
+		server.GenericAPIServer.StorageVersion = instanceOptions.StorageVersionWrapFunc(server.GenericAPIServer.StorageVersion)
+	}
 	if err != nil {
 		return result, fmt.Errorf("failed to create server chain: %v", err)
 	}
@@ -195,6 +208,16 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 			errCh <- err
 		}
 	}(stopCh)
+
+	if instanceOptions.SkipPostStartChecks {
+		// from here the caller must call tearDown
+		result.ClientConfig = server.GenericAPIServer.LoopbackClientConfig
+		result.ClientConfig.QPS = 1000
+		result.ClientConfig.Burst = 10000
+		result.ServerOpts = s
+		result.TearDownFn = tearDown
+		return result, nil
+	}
 
 	t.Logf("Waiting for /healthz to be ok...")
 
