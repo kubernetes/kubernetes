@@ -17,6 +17,8 @@ limitations under the License.
 package windows
 
 import (
+	"context"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -48,14 +50,18 @@ var _ = SIGDescribe("[Feature:Windows] Cpu Resources", func() {
 			ginkgo.By("Ensuring pods are still running")
 			var allPods [](*v1.Pod)
 			for _, p := range podsDecimal {
-				pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(p.Name,
+				pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(
+					context.TODO(),
+					p.Name,
 					metav1.GetOptions{})
 				framework.ExpectNoError(err, "Error retrieving pod")
 				framework.ExpectEqual(pod.Status.Phase, v1.PodRunning)
 				allPods = append(allPods, pod)
 			}
 			for _, p := range podsMilli {
-				pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(p.Name,
+				pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(
+					context.TODO(),
+					p.Name,
 					metav1.GetOptions{})
 				framework.ExpectNoError(err, "Error retrieving pod")
 				framework.ExpectEqual(pod.Status.Phase, v1.PodRunning)
