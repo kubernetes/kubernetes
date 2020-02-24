@@ -18,6 +18,7 @@ package storageversion
 
 import (
 	"fmt"
+	"sort"
 	"sync"
 	"sync/atomic"
 
@@ -98,7 +99,10 @@ func (s *defaultManager) AddResourceInfo(resources ...*ResourceInfo) {
 func (s *defaultManager) addPendingManagedStatusLocked(r *ResourceInfo) {
 	gvrs := r.EquivalentResourceMapper.EquivalentResourcesFor(r.GroupResource.WithVersion(""), "")
 	for _, gvr := range gvrs {
-		s.managedStatus[gvr.GroupResource()] = &updateStatus{}
+		gr := gvr.GroupResource()
+		if _, ok := s.managedStatus[gr]; !ok {
+			s.managedStatus[gr] = &updateStatus{}
+		}
 	}
 }
 
@@ -112,22 +116,37 @@ func (s *defaultManager) UpdateStorageVersions(kubeAPIServerClientConfig *rest.C
 	sc := clientset.InternalV1alpha1().StorageVersions()
 
 	s.mu.RLock()
-	resources := []*ResourceInfo{}
+	resources := []ResourceInfo{}
 	for resource := range s.managedResourceInfos {
-		resources = append(resources, resource)
+		resources = append(resources, *resource)
 	}
 	s.mu.RUnlock()
 	hasFailure := false
-	for _, r := range resources {
+	// Sorting the list to make sure we have a consistent dedup result, and
+	// therefore avoid creating unnecessarily duplicated StorageVersion objects.
+	// For example, extensions.ingresses and networking.k8s.io.ingresses share
+	// the same underlying storage. Without sorting, in an HA cluster, one
+	// apiserver may dedup and update StorageVersion for extensions.ingresses,
+	// while another apiserver may dedup and update StorageVersion for
+	// networking.k8s.io.ingresses. The storage migrator (which migrates objects
+	// per GroupResource) will migrate these resources twice, since both
+	// StorageVersion objects have CommonEncodingVersion (each with one server registered).
+	sortResourceInfosByGroupResource(resources)
+	for _, r := range dedupResourceInfos(resources) {
 		dv := decodableVersions(r.EquivalentResourceMapper, r.GroupResource)
-		if err := updateStorageVersionFor(sc, serverID, r.GroupResource, r.EncodingVersion, dv); err != nil {
+		gr := r.GroupResource
+		// Group must be a valid subdomain in DNS (RFC 1123)
+		if len(gr.Group) == 0 {
+			gr.Group = "core"
+		}
+		if err := updateStorageVersionFor(sc, serverID, gr, r.EncodingVersion, dv); err != nil {
 			utilruntime.HandleError(fmt.Errorf("failed to update storage version for %v: %v", r.GroupResource, err))
-			s.recordStatusFailure(r, err)
+			s.recordStatusFailure(&r, err)
 			hasFailure = true
 			continue
 		}
 		klog.V(2).Infof("successfully updated storage version for %v", r.GroupResource)
-		s.recordStatusSuccess(r)
+		s.recordStatusSuccess(&r)
 	}
 	if hasFailure {
 		return
@@ -135,6 +154,45 @@ func (s *defaultManager) UpdateStorageVersions(kubeAPIServerClientConfig *rest.C
 	klog.V(2).Infof("storage version updates complete")
 	s.setComplete()
 }
+
+// dedupResourceInfos dedups ResourceInfos with the same underlying storage.
+// ResourceInfos from the same Group with different Versions share the same underlying storage.
+// ResourceInfos from different Groups may share the same underlying storage, e.g.
+// networking.k8s.io ingresses and extensions ingresses. The StorageVersion manager
+// only needs to update one StorageVersion for the equivalent Groups.
+func dedupResourceInfos(infos []ResourceInfo) []ResourceInfo {
+	var ret []ResourceInfo
+	seen := make(map[schema.GroupResource]struct{})
+	for _, info := range infos {
+		gr := info.GroupResource
+		if _, ok := seen[gr]; ok {
+			continue
+		}
+		gvrs := info.EquivalentResourceMapper.EquivalentResourcesFor(gr.WithVersion(""), "")
+		for _, gvr := range gvrs {
+			seen[gvr.GroupResource()] = struct{}{}
+		}
+		ret = append(ret, info)
+	}
+	return ret
+}
+
+func sortResourceInfosByGroupResource(infos []ResourceInfo) {
+	sort.Sort(byGroupResource(infos))
+}
+
+type byGroupResource []ResourceInfo
+
+func (s byGroupResource) Len() int { return len(s) }
+
+func (s byGroupResource) Less(i, j int) bool {
+	if s[i].GroupResource.Group == s[j].GroupResource.Group {
+		return s[i].GroupResource.Resource < s[j].GroupResource.Resource
+	}
+	return s[i].GroupResource.Group < s[j].GroupResource.Group
+}
+
+func (s byGroupResource) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
 
 // recordStatusSuccess marks updated ResourceInfo as completed.
 func (s *defaultManager) recordStatusSuccess(r *ResourceInfo) {
