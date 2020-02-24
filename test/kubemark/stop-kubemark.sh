@@ -41,6 +41,6 @@ detect-project &> /dev/null
 
 rm -rf "${RESOURCE_DIRECTORY}/addons" \
 	"${RESOURCE_DIRECTORY}/kubeconfig.kubemark" \
-	"${RESOURCE_DIRECTORY}/hollow-node.yaml"  &> /dev/null || true
+	"${RESOURCE_DIRECTORY}/hollow-node.yaml" &> /dev/null || true
 
 delete-kubemark-master
