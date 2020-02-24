@@ -3972,7 +3972,7 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 		}
 	}
 
-	err = c.updateInstanceSecurityGroupsForLoadBalancer(loadBalancer, instances)
+	err = c.updateInstanceSecurityGroupsForLoadBalancer(loadBalancer, instances, apiService)
 	if err != nil {
 		klog.Warningf("Error opening ingress rules for the load balancer to the instances: %q", err)
 		return nil, err
@@ -4130,17 +4130,23 @@ func (c *Cloud) getTaggedSecurityGroups() (map[string]*ec2.SecurityGroup, error)
 
 // Open security group ingress rules on the instances so that the load balancer can talk to them
 // Will also remove any security groups ingress rules for the load balancer that are _not_ needed for allInstances
-func (c *Cloud) updateInstanceSecurityGroupsForLoadBalancer(lb *elb.LoadBalancerDescription, instances map[InstanceID]*ec2.Instance) error {
+func (c *Cloud) updateInstanceSecurityGroupsForLoadBalancer(lb *elb.LoadBalancerDescription, instances map[InstanceID]*ec2.Instance, service *v1.Service) error {
 	if c.cfg.Global.DisableSecurityGroupIngress {
 		return nil
 	}
 
 	// Determine the load balancer security group id
 	loadBalancerSecurityGroupID := ""
+
 	for _, securityGroup := range lb.SecurityGroups {
 		if aws.StringValue(securityGroup) == "" {
 			continue
 		}
+
+		if c.checkSecurityGroupMatchesServiceExtraSg(service, securityGroup) {
+			continue
+		}
+
 		if loadBalancerSecurityGroupID != "" {
 			// We create LBs with one SG
 			klog.Warningf("Multiple security groups for load balancer: %q", aws.StringValue(lb.LoadBalancerName))
@@ -4260,6 +4266,31 @@ func (c *Cloud) updateInstanceSecurityGroupsForLoadBalancer(lb *elb.LoadBalancer
 	return nil
 }
 
+// Returns a list of all the extra security groups as annotated in the service definition
+func (c* Cloud) collectExtraSecurityGroupsForService(service *v1.Service) []string {
+	extraSgList := []string{}
+
+	for _, extraSG := range strings.Split(service.ObjectMeta.Annotations[ServiceAnnotationLoadBalancerExtraSecurityGroups], ",") {
+		extraSG = strings.TrimSpace(extraSG)
+		if len(extraSG) > 0 {
+			extraSgList = append(extraSgList, extraSG)
+		}
+	}
+
+	return extraSgList
+}
+
+// Checks whether a given security group is inside the extra security group annotation of a service definition
+func (c* Cloud) checkSecurityGroupMatchesServiceExtraSg(service *v1.Service, securityGroup *string) bool {
+	for _, extraSg := range c.collectExtraSecurityGroupsForService(service) {
+		if extraSg == *securityGroup {
+			return true
+		}
+	}
+
+	return false
+}
+
 // EnsureLoadBalancerDeleted implements LoadBalancer.EnsureLoadBalancerDeleted.
 func (c *Cloud) EnsureLoadBalancerDeleted(ctx context.Context, clusterName string, service *v1.Service) error {
 	loadBalancerName := c.GetLoadBalancerName(ctx, clusterName, service)
@@ -4325,7 +4356,7 @@ func (c *Cloud) EnsureLoadBalancerDeleted(ctx context.Context, clusterName strin
 
 	{
 		// De-authorize the load balancer security group from the instances security group
-		err = c.updateInstanceSecurityGroupsForLoadBalancer(lb, nil)
+		err = c.updateInstanceSecurityGroupsForLoadBalancer(lb, nil, service)
 		if err != nil {
 			klog.Errorf("Error deregistering load balancer from instance security groups: %q", err)
 			return err
@@ -4361,6 +4392,10 @@ func (c *Cloud) EnsureLoadBalancerDeleted(ctx context.Context, clusterName strin
 			return fmt.Errorf("error querying security groups for ELB: %q", err)
 		}
 
+		if len(response) == 0 {
+			return nil
+		}
+
 		// Collect the security groups to delete
 		securityGroupIDs := map[string]struct{}{}
 		annotatedSgSet := map[string]bool{}
@@ -4381,6 +4416,10 @@ func (c *Cloud) EnsureLoadBalancerDeleted(ctx context.Context, clusterName strin
 			}
 			if sgID == "" {
 				klog.Warningf("Ignoring empty security group in %s", service.Name)
+				continue
+			}
+
+			if c.checkSecurityGroupMatchesServiceExtraSg(service, sg.GroupId) {
 				continue
 			}
 
@@ -4490,7 +4529,7 @@ func (c *Cloud) UpdateLoadBalancer(ctx context.Context, clusterName string, serv
 		return nil
 	}
 
-	err = c.updateInstanceSecurityGroupsForLoadBalancer(lb, instances)
+	err = c.updateInstanceSecurityGroupsForLoadBalancer(lb, instances, service)
 	if err != nil {
 		return err
 	}
