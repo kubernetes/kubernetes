@@ -27,7 +27,6 @@ pkg/apis/core/helper/qos
 pkg/apis/core/v1
 pkg/apis/core/v1/helper
 pkg/apis/core/v1/helper/qos
-pkg/apis/core/v1/validation
 pkg/apis/core/validation
 pkg/apis/discovery/v1alpha1
 pkg/apis/discovery/v1beta1
