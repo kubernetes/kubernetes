@@ -25,6 +25,7 @@ import (
 	"strings"
 	"time"
 
+	apiserverinternalv1alpha1 "k8s.io/api/apiserverinternal/v1alpha1"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	autoscalingv2beta1 "k8s.io/api/autoscaling/v2beta1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -48,6 +49,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
+	"k8s.io/kubernetes/pkg/apis/apiserverinternal"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
@@ -571,6 +573,15 @@ func AddHandlers(h printers.PrintHandler) {
 	}
 	h.TableHandler(priorityLevelColumnDefinitions, printPriorityLevelConfiguration)
 	h.TableHandler(priorityLevelColumnDefinitions, printPriorityLevelConfigurationList)
+
+	storageVersionColumnDefinitions := []metav1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "CommonEncodingVersion", Type: "string", Description: apiserverinternalv1alpha1.StorageVersionStatus{}.SwaggerDoc()["commonEncodingVersion"]},
+		{Name: "StorageVersions", Type: "string", Description: apiserverinternalv1alpha1.StorageVersionStatus{}.SwaggerDoc()["storageVersions"]},
+		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+	}
+	h.TableHandler(storageVersionColumnDefinitions, printStorageVersion)
+	h.TableHandler(storageVersionColumnDefinitions, printStorageVersionList)
 }
 
 // Pass ports=nil for all ports.
@@ -2469,6 +2480,46 @@ func printFlowSchemaList(list *flowcontrol.FlowSchemaList, options printers.Gene
 	sort.Sort(fsSeq)
 	for i := range fsSeq {
 		r, err := printFlowSchema(fsSeq[i], options)
+		if err != nil {
+			return nil, err
+		}
+		rows = append(rows, r...)
+	}
+	return rows, nil
+}
+
+func printStorageVersion(obj *apiserverinternal.StorageVersion, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	row := metav1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
+	}
+	commonEncodingVersion := "<unset>"
+	if obj.Status.CommonEncodingVersion != nil {
+		commonEncodingVersion = *obj.Status.CommonEncodingVersion
+	}
+	row.Cells = append(row.Cells, obj.Name, commonEncodingVersion, formatStorageVersions(obj.Status.StorageVersions), translateTimestampSince(obj.CreationTimestamp))
+	return []metav1.TableRow{row}, nil
+}
+
+func formatStorageVersions(storageVersions []apiserverinternal.ServerStorageVersion) string {
+	list := []string{}
+	max := 3
+	more := false
+	count := 0
+	for _, sv := range storageVersions {
+		if len(list) < max {
+			list = append(list, fmt.Sprintf("%s=%s", sv.APIServerID, sv.EncodingVersion))
+		} else if len(list) == max {
+			more = true
+		}
+		count++
+	}
+	return listWithMoreString(list, more, count, max)
+}
+
+func printStorageVersionList(list *apiserverinternal.StorageVersionList, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	rows := make([]metav1.TableRow, 0, len(list.Items))
+	for i := range list.Items {
+		r, err := printStorageVersion(&list.Items[i], options)
 		if err != nil {
 			return nil, err
 		}

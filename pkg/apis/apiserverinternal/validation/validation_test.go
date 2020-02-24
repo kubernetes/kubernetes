@@ -284,3 +284,66 @@ func TestValidateStorageVersionCondition(t *testing.T) {
 		}
 	}
 }
+
+func TestValidateStorageVersionName(t *testing.T) {
+	cases := []struct {
+		name        string
+		expectedErr string
+	}{
+		{
+			name:        "",
+			expectedErr: `name must be in the form of <group>.<resource>`,
+		},
+		{
+			name:        "pods",
+			expectedErr: `name must be in the form of <group>.<resource>`,
+		},
+		{
+			name:        "core.pods",
+			expectedErr: "",
+		},
+		{
+			name:        "authentication.k8s.io.tokenreviews",
+			expectedErr: "",
+		},
+		{
+			name:        strings.Repeat("x", 253) + ".tokenreviews",
+			expectedErr: "",
+		},
+		{
+			name:        strings.Repeat("x", 254) + ".tokenreviews",
+			expectedErr: `the group segment must be no more than 253 characters`,
+		},
+		{
+			name:        "authentication.k8s.io." + strings.Repeat("x", 63),
+			expectedErr: "",
+		},
+		{
+			name:        "authentication.k8s.io." + strings.Repeat("x", 64),
+			expectedErr: `the resource segment must be no more than 63 characters`,
+		},
+	}
+	for _, tc := range cases {
+		errs := ValidateStorageVersionName(tc.name, false)
+		if errs == nil && len(tc.expectedErr) == 0 {
+			continue
+		}
+		if errs != nil && len(tc.expectedErr) == 0 {
+			t.Errorf("unexpected error %v", errs)
+			continue
+		}
+		if errs == nil && len(tc.expectedErr) != 0 {
+			t.Errorf("unexpected empty error")
+			continue
+		}
+		found := false
+		for _, msg := range errs {
+			if msg == tc.expectedErr {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("expected error to contain %s, got %v", tc.expectedErr, errs)
+		}
+	}
+}

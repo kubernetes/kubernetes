@@ -47,7 +47,7 @@ type StorageVersionStatus struct {
 	// The reported versions per API server instance.
 	// +optional
 	// +listType=map
-	// +listMapKey=apiserverID
+	// +listMapKey=apiServerID
 	StorageVersions []ServerStorageVersion `json:"storageVersions,omitempty" protobuf:"bytes,1,opt,name=storageVersions"`
 	// If all API server instances agree on the same encoding storage version,
 	// then this field is set to that version. Otherwise this field is left empty.

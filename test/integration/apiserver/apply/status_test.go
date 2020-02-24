@@ -57,6 +57,7 @@ var statusData = map[schema.GroupVersionResource]string{
 	gvr("policy", "v1beta1", "poddisruptionbudgets"):                    `{"status": {"currentHealthy": 5}}`,
 	gvr("certificates.k8s.io", "v1beta1", "certificatesigningrequests"): `{"status": {"conditions": [{"type": "MyStatus"}]}}`,
 	gvr("certificates.k8s.io", "v1", "certificatesigningrequests"):      `{"status": {"conditions": [{"type": "MyStatus", "status": "True"}]}}`,
+	gvr("internal.apiserver.k8s.io", "v1alpha1", "storageversions"):     `{"status": {"commonEncodingVersion":"v1","storageVersions":[{"apiServerID":"1","decodableVersions":["v1","v2"],"encodingVersion":"v1"}],"conditions":[{"type":"AllEncodingVersionsEqual","status":"True","lastTransitionTime":"2020-01-01T00:00:00Z","reason":"allEncodingVersionsEqual","message":"all encoding versions are set to v1"}]}}`,
 }
 
 const statusDefault = `{"status": {"conditions": [{"type": "MyStatus", "status":"true"}]}}`
@@ -67,6 +68,12 @@ var ignoreList = map[schema.GroupVersionResource]struct{}{
 	// TODO(#89264): apiservices doesn't work because the openapi is not routed properly.
 	gvr("apiregistration.k8s.io", "v1beta1", "apiservices"): {},
 	gvr("apiregistration.k8s.io", "v1", "apiservices"):      {},
+}
+
+// Some status-only APIs have empty object on creation. Therefore we don't expect create_test
+// managedFields for these APIs
+var ignoreCreateManagementList = map[schema.GroupVersionResource]struct{}{
+	gvr("internal.apiserver.k8s.io", "v1alpha1", "storageversions"): {},
 }
 
 func gvr(g, v, r string) schema.GroupVersionResource {
@@ -200,7 +207,11 @@ func TestApplyStatus(t *testing.T) {
 					t.Fatalf("Couldn't find apply_status_test: %v", managedFields)
 				}
 				if !findManager(managedFields, "create_test") {
-					t.Fatalf("Couldn't find create_test: %v", managedFields)
+					if _, ok := ignoreCreateManagementList[mapping.Resource]; !ok {
+						t.Fatalf("Couldn't find create_test: %v", managedFields)
+					}
+				} else if _, ok := ignoreCreateManagementList[mapping.Resource]; ok {
+					t.Fatalf("found create_test in ignoreCreateManagementList resource: %v", managedFields)
 				}
 
 				if err := rsc.Delete(context.TODO(), name, *metav1.NewDeleteOptions(0)); err != nil {
