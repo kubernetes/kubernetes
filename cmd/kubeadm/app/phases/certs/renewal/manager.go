@@ -224,7 +224,10 @@ func (rm *Manager) RenewUsingLocalCA(name string) (bool, error) {
 	}
 
 	// extract the certificate config
-	cfg := certToConfig(cert)
+	cfg := &pkiutil.CertConfig{
+		Config:             certToConfig(cert),
+		PublicKeyAlgorithm: rm.cfg.PublicKeyAlgorithm(),
+	}
 
 	// reads the CA
 	caCert, caKey, err := certsphase.LoadCertificateAuthority(rm.cfg.CertificatesDir, handler.CABaseName)
@@ -264,7 +267,10 @@ func (rm *Manager) RenewUsingCSRAPI(name string, client clientset.Interface) err
 	}
 
 	// extract the certificate config
-	cfg := certToConfig(cert)
+	cfg := &pkiutil.CertConfig{
+		Config:             certToConfig(cert),
+		PublicKeyAlgorithm: rm.cfg.PublicKeyAlgorithm(),
+	}
 
 	// create a new certificate with the same config
 	newCert, newKey, err := NewAPIRenewer(client).Renew(cfg)
@@ -298,7 +304,10 @@ func (rm *Manager) CreateRenewCSR(name, outdir string) error {
 	}
 
 	// extracts the certificate config
-	cfg := certToConfig(cert)
+	cfg := &pkiutil.CertConfig{
+		Config:             certToConfig(cert),
+		PublicKeyAlgorithm: rm.cfg.PublicKeyAlgorithm(),
+	}
 
 	// generates the CSR request and save it
 	csr, key, err := pkiutil.NewCSRAndKey(cfg)
@@ -407,8 +416,8 @@ func (rm *Manager) IsExternallyManaged(caBaseName string) (bool, error) {
 	}
 }
 
-func certToConfig(cert *x509.Certificate) *certutil.Config {
-	return &certutil.Config{
+func certToConfig(cert *x509.Certificate) certutil.Config {
+	return certutil.Config{
 		CommonName:   cert.Subject.CommonName,
 		Organization: cert.Subject.Organization,
 		AltNames: certutil.AltNames{

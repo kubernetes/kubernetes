@@ -19,6 +19,7 @@ package pkiutil
 import (
 	"crypto"
 	"crypto/ecdsa"
+	"crypto/elliptic"
 	cryptorand "crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
@@ -56,14 +57,20 @@ const (
 	rsaKeySize             = 2048
 )
 
+// CertConfig is a wrapper around certutil.Config extending it with PublicKeyAlgorithm.
+type CertConfig struct {
+	certutil.Config
+	PublicKeyAlgorithm x509.PublicKeyAlgorithm
+}
+
 // NewCertificateAuthority creates new certificate and private key for the certificate authority
-func NewCertificateAuthority(config *certutil.Config) (*x509.Certificate, crypto.Signer, error) {
-	key, err := NewPrivateKey()
+func NewCertificateAuthority(config *CertConfig) (*x509.Certificate, crypto.Signer, error) {
+	key, err := NewPrivateKey(config.PublicKeyAlgorithm)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "unable to create private key while generating CA certificate")
 	}
 
-	cert, err := certutil.NewSelfSignedCACert(*config, key)
+	cert, err := certutil.NewSelfSignedCACert(config.Config, key)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "unable to create self-signed CA certificate")
 	}
@@ -72,8 +79,8 @@ func NewCertificateAuthority(config *certutil.Config) (*x509.Certificate, crypto
 }
 
 // NewCertAndKey creates new certificate and key by passing the certificate authority certificate and key
-func NewCertAndKey(caCert *x509.Certificate, caKey crypto.Signer, config *certutil.Config) (*x509.Certificate, crypto.Signer, error) {
-	key, err := NewPrivateKey()
+func NewCertAndKey(caCert *x509.Certificate, caKey crypto.Signer, config *CertConfig) (*x509.Certificate, crypto.Signer, error) {
+	key, err := NewPrivateKey(config.PublicKeyAlgorithm)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "unable to create private key")
 	}
@@ -87,8 +94,8 @@ func NewCertAndKey(caCert *x509.Certificate, caKey crypto.Signer, config *certut
 }
 
 // NewCSRAndKey generates a new key and CSR and that could be signed to create the given certificate
-func NewCSRAndKey(config *certutil.Config) (*x509.CertificateRequest, crypto.Signer, error) {
-	key, err := NewPrivateKey()
+func NewCSRAndKey(config *CertConfig) (*x509.CertificateRequest, crypto.Signer, error) {
+	key, err := NewPrivateKey(config.PublicKeyAlgorithm)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "unable to create private key")
 	}
@@ -496,7 +503,7 @@ func CertificateRequestFromFile(file string) (*x509.CertificateRequest, error) {
 }
 
 // NewCSR creates a new CSR
-func NewCSR(cfg certutil.Config, key crypto.Signer) (*x509.CertificateRequest, error) {
+func NewCSR(cfg CertConfig, key crypto.Signer) (*x509.CertificateRequest, error) {
 	template := &x509.CertificateRequest{
 		Subject: pkix.Name{
 			CommonName:   cfg.CommonName,
@@ -538,12 +545,16 @@ func EncodePublicKeyPEM(key crypto.PublicKey) ([]byte, error) {
 }
 
 // NewPrivateKey creates an RSA private key
-func NewPrivateKey() (crypto.Signer, error) {
+func NewPrivateKey(keyType x509.PublicKeyAlgorithm) (crypto.Signer, error) {
+	if keyType == x509.ECDSA {
+		return ecdsa.GenerateKey(elliptic.P256(), cryptorand.Reader)
+	}
+
 	return rsa.GenerateKey(cryptorand.Reader, rsaKeySize)
 }
 
 // NewSignedCert creates a signed certificate using the given CA certificate and key
-func NewSignedCert(cfg *certutil.Config, key crypto.Signer, caCert *x509.Certificate, caKey crypto.Signer) (*x509.Certificate, error) {
+func NewSignedCert(cfg *CertConfig, key crypto.Signer, caCert *x509.Certificate, caKey crypto.Signer) (*x509.Certificate, error) {
 	serial, err := cryptorand.Int(cryptorand.Reader, new(big.Int).SetInt64(math.MaxInt64))
 	if err != nil {
 		return nil, err

@@ -24,7 +24,6 @@ import (
 	"path/filepath"
 
 	"github.com/pkg/errors"
-	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/keyutil"
 	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -61,12 +60,12 @@ func CreatePKIAssets(cfg *kubeadmapi.InitConfiguration) error {
 	fmt.Printf("[certs] Valid certificates and keys now exist in %q\n", cfg.CertificatesDir)
 
 	// Service accounts are not x509 certs, so handled separately
-	return CreateServiceAccountKeyAndPublicKeyFiles(cfg.CertificatesDir)
+	return CreateServiceAccountKeyAndPublicKeyFiles(cfg.CertificatesDir, cfg.ClusterConfiguration.PublicKeyAlgorithm())
 }
 
 // CreateServiceAccountKeyAndPublicKeyFiles creates new public/private key files for signing service account users.
 // If the sa public/private key files already exist in the target folder, they are used only if evaluated equals; otherwise an error is returned.
-func CreateServiceAccountKeyAndPublicKeyFiles(certsDir string) error {
+func CreateServiceAccountKeyAndPublicKeyFiles(certsDir string, keyType x509.PublicKeyAlgorithm) error {
 	klog.V(1).Infoln("creating new public/private key files for signing service account users")
 	_, err := keyutil.PrivateKeyFromFile(filepath.Join(certsDir, kubeadmconstants.ServiceAccountPrivateKeyName))
 	if err == nil {
@@ -80,7 +79,7 @@ func CreateServiceAccountKeyAndPublicKeyFiles(certsDir string) error {
 	}
 
 	// The key does NOT exist, let's generate it now
-	key, err := pkiutil.NewPrivateKey()
+	key, err := pkiutil.NewPrivateKey(keyType)
 	if err != nil {
 		return err
 	}
@@ -215,7 +214,7 @@ func writeCertificateAuthorityFilesIfNotExist(pkiDir string, baseName string, ca
 // If there already is a certificate file at the given path; kubeadm tries to load it and check if the values in the
 // existing and the expected certificate equals. If they do; kubeadm will just skip writing the file as it's up-to-date,
 // otherwise this function returns an error.
-func writeCertificateFilesIfNotExist(pkiDir string, baseName string, signingCert *x509.Certificate, cert *x509.Certificate, key crypto.Signer, cfg *certutil.Config) error {
+func writeCertificateFilesIfNotExist(pkiDir string, baseName string, signingCert *x509.Certificate, cert *x509.Certificate, key crypto.Signer, cfg *pkiutil.CertConfig) error {
 
 	// Checks if the signed certificate exists in the PKI directory
 	if pkiutil.CertOrKeyExist(pkiDir, baseName) {
@@ -426,7 +425,7 @@ func validatePrivatePublicKey(l certKeyLocation) error {
 
 // validateCertificateWithConfig makes sure that a given certificate is valid at
 // least for the SANs defined in the configuration.
-func validateCertificateWithConfig(cert *x509.Certificate, baseName string, cfg *certutil.Config) error {
+func validateCertificateWithConfig(cert *x509.Certificate, baseName string, cfg *pkiutil.CertConfig) error {
 	for _, dnsName := range cfg.AltNames.DNSNames {
 		if err := cert.VerifyHostname(dnsName); err != nil {
 			return errors.Wrapf(err, "certificate %s is invalid", baseName)

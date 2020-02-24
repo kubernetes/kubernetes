@@ -33,7 +33,9 @@ import (
 )
 
 func TestAPIRenewer(t *testing.T) {
-	caCertCfg := &certutil.Config{CommonName: "kubernetes"}
+	caCertCfg := &pkiutil.CertConfig{
+		Config: certutil.Config{CommonName: "kubernetes"},
+	}
 	caCert, caKey, err := pkiutil.NewCertificateAuthority(caCertCfg)
 	if err != nil {
 		t.Fatalf("couldn't create CA: %v", err)
@@ -55,12 +57,14 @@ func TestAPIRenewer(t *testing.T) {
 	// override the timeout so tests are faster
 	watchTimeout = time.Second
 
-	certCfg := &certutil.Config{
-		CommonName: "test-certs",
-		AltNames: certutil.AltNames{
-			DNSNames: []string{"test-domain.space"},
+	certCfg := &pkiutil.CertConfig{
+		Config: certutil.Config{
+			CommonName: "test-certs",
+			AltNames: certutil.AltNames{
+				DNSNames: []string{"test-domain.space"},
+			},
+			Usages: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
 		},
-		Usages: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
 	}
 
 	renewer := &APIRenewer{
@@ -92,12 +96,14 @@ func defaultReactionFunc(obj runtime.Object) k8stesting.ReactionFunc {
 }
 
 func getCertReq(t *testing.T, caCert *x509.Certificate, caKey crypto.Signer) *certsapi.CertificateSigningRequest {
-	cert, _, err := pkiutil.NewCertAndKey(caCert, caKey, &certutil.Config{
-		CommonName: "testcert",
-		AltNames: certutil.AltNames{
-			DNSNames: []string{"test-domain.space"},
+	cert, _, err := pkiutil.NewCertAndKey(caCert, caKey, &pkiutil.CertConfig{
+		Config: certutil.Config{
+			CommonName: "testcert",
+			AltNames: certutil.AltNames{
+				DNSNames: []string{"test-domain.space"},
+			},
+			Usages: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
 		},
-		Usages: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
 	})
 	if err != nil {
 		t.Fatalf("couldn't generate cert: %v", err)

@@ -154,13 +154,15 @@ func writeTestCertificate(t *testing.T, dir, name string, caCert *x509.Certifica
 // writeTestKubeconfig is a utility for creating a test kubeconfig with an embedded certificate
 func writeTestKubeconfig(t *testing.T, dir, name string, caCert *x509.Certificate, caKey crypto.Signer) *x509.Certificate {
 
-	cfg := &certutil.Config{
-		CommonName:   "test-common-name",
-		Organization: []string{"sig-cluster-lifecycle"},
-		Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
-		AltNames: certutil.AltNames{
-			IPs:      []net.IP{net.ParseIP("10.100.0.1")},
-			DNSNames: []string{"test-domain.space"},
+	cfg := &pkiutil.CertConfig{
+		Config: certutil.Config{
+			CommonName:   "test-common-name",
+			Organization: []string{"sig-cluster-lifecycle"},
+			Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+			AltNames: certutil.AltNames{
+				IPs:      []net.IP{net.ParseIP("10.100.0.1")},
+				DNSNames: []string{"test-domain.space"},
+			},
 		},
 	}
 	cert, key, err := pkiutil.NewCertAndKey(caCert, caKey, cfg)
