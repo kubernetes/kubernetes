@@ -31,6 +31,7 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
 	"k8s.io/apiserver/pkg/registry/rest"
+	"k8s.io/apiserver/pkg/storageversion"
 	openapiproto "k8s.io/kube-openapi/pkg/util/proto"
 )
 
@@ -89,12 +90,14 @@ type APIGroupVersion struct {
 	// The limit on the request body size that would be accepted and decoded in a write request.
 	// 0 means no limit.
 	MaxRequestBodyBytes int64
+
+	DecodableVersions []string
 }
 
 // InstallREST registers the REST handlers (storage, watch, proxy and redirect) into a restful Container.
 // It is expected that the provided path root prefix will serve all operations. Root MUST NOT end
 // in a slash.
-func (g *APIGroupVersion) InstallREST(container *restful.Container) error {
+func (g *APIGroupVersion) InstallREST(container *restful.Container) ([]*storageversion.ResourceInfo, error) {
 	prefix := path.Join(g.Root, g.GroupVersion.Group, g.GroupVersion.Version)
 	installer := &APIInstaller{
 		group:             g,
@@ -103,10 +106,21 @@ func (g *APIGroupVersion) InstallREST(container *restful.Container) error {
 	}
 
 	apiResources, ws, registrationErrors := installer.Install()
-	versionDiscoveryHandler := discovery.NewAPIVersionHandler(g.Serializer, g.GroupVersion, staticLister{apiResources})
+	var resources []metav1.APIResource
+	var filteredResourceInfo []*storageversion.ResourceInfo
+	for _, r := range apiResources {
+		resources = append(resources, r.Resource)
+		// if EncodingVersion is empty, then the apiserver does not
+		// need to register this resource via the storage version API,
+		// thus we can remove it.
+		if r.EncodingVersion != "" {
+			filteredResourceInfo = append(filteredResourceInfo, r)
+		}
+	}
+	versionDiscoveryHandler := discovery.NewAPIVersionHandler(g.Serializer, g.GroupVersion, staticLister{resources})
 	versionDiscoveryHandler.AddToWebService(ws)
 	container.Add(ws)
-	return utilerrors.NewAggregate(registrationErrors)
+	return filteredResourceInfo, utilerrors.NewAggregate(registrationErrors)
 }
 
 // staticLister implements the APIResourceLister interface

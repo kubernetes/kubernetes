@@ -40,6 +40,7 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/rest"
+	"k8s.io/apiserver/pkg/storageversion"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
 
@@ -89,9 +90,23 @@ var toDiscoveryKubeVerb = map[string]string{
 	"WATCHLIST":        "watch",
 }
 
+func dedupResourceInfo(infos []*storageversion.ResourceInfo) []*storageversion.ResourceInfo {
+	var ret []*storageversion.ResourceInfo
+	seen := make(map[string]struct{})
+	for _, info := range infos {
+		if _, ok := seen[info.Group+info.Resource.Name]; ok {
+			continue
+
+		}
+		seen[info.Group+info.Resource.Name] = struct{}{}
+		ret = append(ret, info)
+	}
+	return ret
+}
+
 // Install handlers for API resources.
-func (a *APIInstaller) Install() ([]metav1.APIResource, *restful.WebService, []error) {
-	var apiResources []metav1.APIResource
+func (a *APIInstaller) Install() ([]*storageversion.ResourceInfo, *restful.WebService, []error) {
+	var resources []*storageversion.ResourceInfo
 	var errors []error
 	ws := a.newWebService()
 
@@ -104,15 +119,14 @@ func (a *APIInstaller) Install() ([]metav1.APIResource, *restful.WebService, []e
 	}
 	sort.Strings(paths)
 	for _, path := range paths {
-		apiResource, err := a.registerResourceHandlers(path, a.group.Storage[path], ws)
+		resource, err := a.registerResourceHandlers(path, a.group.Storage[path], ws)
 		if err != nil {
 			errors = append(errors, fmt.Errorf("error in registering resource: %s, %v", path, err))
+			continue
 		}
-		if apiResource != nil {
-			apiResources = append(apiResources, *apiResource)
-		}
+		resources = append(resources, resource)
 	}
-	return apiResources, ws, errors
+	return dedupResourceInfo(resources), ws, errors
 }
 
 // newWebService creates a new restful webservice with the api installer's prefix and version.
@@ -178,7 +192,8 @@ func GetResourceKind(groupVersion schema.GroupVersion, storage rest.Storage, typ
 	return fqKindToRegister, nil
 }
 
-func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storage, ws *restful.WebService) (*metav1.APIResource, error) {
+func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storage, ws *restful.WebService) (*storageversion.ResourceInfo, error) {
+	resourceInfo := storageversion.ResourceInfo{}
 	admit := a.group.Admit
 
 	optionsExternalVersion := a.group.GroupVersion
@@ -393,6 +408,21 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			return nil, err
 		}
 		apiResource.StorageVersionHash = discovery.StorageVersionHash(gvk.Group, gvk.Version, gvk.Kind)
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.StorageVersionAPI) &&
+		isStorageVersionProvider &&
+		storageVersionProvider.StorageVersion() != nil &&
+		!isSubresource && // TODO: is this right?
+		resource != "storageversions" {
+		versioner := storageVersionProvider.StorageVersion()
+		encodingGVK, err := getStorageVersionKind(versioner, storage, a.group.Typer)
+		if err != nil {
+			return nil, err
+		}
+		resourceInfo.Group = a.group.GroupVersion.Group
+		resourceInfo.EncodingVersion = encodingGVK.GroupVersion().String()
+		resourceInfo.EquivalentResourceMapper = a.group.EquivalentResourceRegistry
 	}
 
 	// Get the list of actions for the given scope.
@@ -931,7 +961,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	// Record the existence of the GVR and the corresponding GVK
 	a.group.EquivalentResourceRegistry.RegisterKindFor(reqScope.Resource, reqScope.Subresource, fqKindToRegister)
 
-	return &apiResource, nil
+	resourceInfo.Resource = apiResource
+	return &resourceInfo, nil
 }
 
 // indirectArbitraryPointer returns *ptrToObject for an arbitrary pointer

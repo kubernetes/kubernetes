@@ -43,6 +43,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/routes"
+	"k8s.io/apiserver/pkg/storageversion"
 	utilopenapi "k8s.io/apiserver/pkg/util/openapi"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/klog"
@@ -87,6 +88,9 @@ type APIGroupInfo struct {
 type GenericAPIServer struct {
 	// discoveryAddresses is used to build cluster IPs for discovery.
 	discoveryAddresses discovery.Addresses
+
+	// APIServerID is the ID of this API server
+	APIServerID string
 
 	// LoopbackClientConfig is a config for a privileged loopback connection to the API server
 	LoopbackClientConfig *restclient.Config
@@ -197,6 +201,9 @@ type GenericAPIServer struct {
 	// The limit on the request body size that would be accepted and decoded in a write request.
 	// 0 means no limit.
 	maxRequestBodyBytes int64
+
+	// StorageVersion holds the storage versions of the API resources installed by this server.
+	StorageVersion storageversion.Manager
 }
 
 // DelegationTarget is an interface which allows for composition of API servers with top level handling that works
@@ -399,6 +406,7 @@ func (s preparedGenericAPIServer) NonBlockingRun(stopCh <-chan struct{}) error {
 
 // installAPIResources is a private method for installing the REST storage backing each api groupversionresource
 func (s *GenericAPIServer) installAPIResources(apiPrefix string, apiGroupInfo *APIGroupInfo, openAPIModels openapiproto.Models) error {
+	var resources []*storageversion.ResourceInfo
 	for _, groupVersion := range apiGroupInfo.PrioritizedVersions {
 		if len(apiGroupInfo.VersionedResourcesStorageMap[groupVersion.Version]) == 0 {
 			klog.Warningf("Skipping API %v because it has no resources.", groupVersion)
@@ -412,10 +420,14 @@ func (s *GenericAPIServer) installAPIResources(apiPrefix string, apiGroupInfo *A
 		apiGroupVersion.OpenAPIModels = openAPIModels
 		apiGroupVersion.MaxRequestBodyBytes = s.maxRequestBodyBytes
 
-		if err := apiGroupVersion.InstallREST(s.Handler.GoRestfulContainer); err != nil {
+		r, err := apiGroupVersion.InstallREST(s.Handler.GoRestfulContainer)
+		if err != nil {
 			return fmt.Errorf("unable to setup API %v: %v", apiGroupInfo, err)
 		}
+		resources = append(resources, r...)
 	}
+
+	s.StorageVersion.AddResourceInfo(resources...)
 
 	return nil
 }
