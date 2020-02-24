@@ -99,6 +99,11 @@ func CreateStaticPodFiles(manifestDir, kustomizeDir string, cfg *kubeadmapi.Clus
 			return errors.Errorf("couldn't retrieve StaticPodSpec for %q", componentName)
 		}
 
+		// print all volumes that are mounted
+		for _, v := range spec.Spec.Volumes {
+			klog.V(2).Infof("[control-plane] adding volume %q for component %q", v.Name, componentName)
+		}
+
 		// if kustomizeDir is defined, customize the static pod manifest
 		if kustomizeDir != "" {
 			kustomizedSpec, err := staticpodutil.KustomizeStaticPod(&spec, kustomizeDir)
