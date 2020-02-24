@@ -88,6 +88,14 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(pod *v1.Pod, attemp
 		Annotations: newPodAnnotations(pod),
 	}
 
+	if pod.Spec.TerminationGracePeriodSeconds != nil {
+		gracePeriod := int64(minimumGracePeriodInSeconds)
+		podSandboxConfig.TerminationGracePeriod = *pod.Spec.TerminationGracePeriodSeconds
+		if podSandboxConfig.TerminationGracePeriod < gracePeriod {
+			podSandboxConfig.TerminationGracePeriod = gracePeriod
+		}
+	}
+
 	dnsConfig, err := m.runtimeHelper.GetPodDNS(pod)
 	if err != nil {
 		return nil, err

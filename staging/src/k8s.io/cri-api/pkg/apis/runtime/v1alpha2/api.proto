@@ -368,6 +368,9 @@ message PodSandboxConfig {
     map<string, string> annotations = 7;
     // Optional configurations specific to Linux hosts.
     LinuxPodSandboxConfig linux = 8;
+    // Grace period in seconds to wait for the containers in a pod to stop before
+    // forcibly terminating them.
+    int64 termination_grace_period = 9;
 }
 
 message RunPodSandboxRequest {
