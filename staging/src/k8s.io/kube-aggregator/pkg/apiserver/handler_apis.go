@@ -25,9 +25,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/sets"
+	apiserverinternalv1alpha1 "k8s.io/apiserver/pkg/apis/apiserverinternal/v1alpha1"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
-
+	"k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	apiregistrationv1api "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	apiregistrationv1apihelper "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1/helper"
 	apiregistrationv1beta1api "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
@@ -67,11 +69,28 @@ func discoveryGroup(enabledVersions sets.String) metav1.APIGroup {
 	return retval
 }
 
+var apiserverinternalGroup = metav1.APIGroup{
+	Name: apiserverinternalv1alpha1.GroupName,
+	Versions: []metav1.GroupVersionForDiscovery{
+		{
+			GroupVersion: apiserverinternalv1alpha1.SchemeGroupVersion.String(),
+			Version:      apiserverinternalv1alpha1.SchemeGroupVersion.Version,
+		},
+	},
+	PreferredVersion: metav1.GroupVersionForDiscovery{
+		GroupVersion: apiserverinternalv1alpha1.SchemeGroupVersion.String(),
+		Version:      apiserverinternalv1alpha1.SchemeGroupVersion.Version,
+	},
+}
+
 func (r *apisHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	discoveryGroupList := &metav1.APIGroupList{
 		// always add OUR api group to the list first.  Since we'll never have a registered APIService for it
 		// and since this is the crux of the API, having this first will give our names priority.  It's good to be king.
 		Groups: []metav1.APIGroup{r.discoveryGroup},
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.StorageVersionAPI) {
+		discoveryGroupList.Groups = append(discoveryGroupList.Groups, apiserverinternalGroup)
 	}
 
 	apiServices, err := r.lister.List(labels.Everything())

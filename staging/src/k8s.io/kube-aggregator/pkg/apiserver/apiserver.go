@@ -40,6 +40,7 @@ import (
 	openapicontroller "k8s.io/kube-aggregator/pkg/controllers/openapi"
 	openapiaggregator "k8s.io/kube-aggregator/pkg/controllers/openapi/aggregator"
 	statuscontrollers "k8s.io/kube-aggregator/pkg/controllers/status"
+	apiserverinternalrest "k8s.io/kube-aggregator/pkg/registry/apiserverinternal/rest"
 	apiservicerest "k8s.io/kube-aggregator/pkg/registry/apiservice/rest"
 )
 
@@ -192,8 +193,19 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		egressSelector:           c.GenericConfig.EgressSelector,
 	}
 
-	apiGroupInfo := apiservicerest.NewRESTStorage(c.GenericConfig.MergedResourceConfig, c.GenericConfig.RESTOptionsGetter)
-	if err := s.GenericAPIServer.InstallAPIGroup(&apiGroupInfo); err != nil {
+	rp := apiserverinternalrest.StorageProvider{}
+	apiGroupInfo, err := rp.NewRESTStorage(c.GenericConfig.MergedResourceConfig, c.GenericConfig.RESTOptionsGetter)
+	if err != nil {
+		return nil, err
+	}
+	err = s.GenericAPIServer.InstallAPIGroup(&apiGroupInfo)
+	if err != nil {
+		return nil, err
+	}
+
+	apiGroupInfo = apiservicerest.NewRESTStorage(c.GenericConfig.MergedResourceConfig, c.GenericConfig.RESTOptionsGetter)
+	err = s.GenericAPIServer.InstallAPIGroup(&apiGroupInfo)
+	if err != nil {
 		return nil, err
 	}
 

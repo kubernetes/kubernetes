@@ -21,9 +21,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 
+	apiserverinternalinstall "k8s.io/apiserver/pkg/apis/apiserverinternal/install"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration/install"
-	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
+	v1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
 )
 
@@ -38,6 +39,7 @@ var (
 func init() {
 	AddToScheme(Scheme)
 	install.Install(Scheme)
+	apiserverinternalinstall.Install(Scheme)
 }
 
 // AddToScheme adds the types of this group into the given scheme.
