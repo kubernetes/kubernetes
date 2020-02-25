@@ -228,7 +228,7 @@ func ToSelectableFields(pod *api.Pod) fields.Set {
 	// amount of allocations needed to create the fields.Set. If you add any
 	// field here or the number of object-meta related fields changes, this should
 	// be adjusted.
-	podSpecificFieldsSet := make(fields.Set, 9)
+	podSpecificFieldsSet := make(fields.Set, 10)
 	podSpecificFieldsSet["spec.nodeName"] = pod.Spec.NodeName
 	podSpecificFieldsSet["spec.restartPolicy"] = string(pod.Spec.RestartPolicy)
 	podSpecificFieldsSet["spec.schedulerName"] = string(pod.Spec.SchedulerName)
@@ -240,6 +240,7 @@ func ToSelectableFields(pod *api.Pod) fields.Set {
 		podIP = string(pod.Status.PodIPs[0].IP)
 	}
 	podSpecificFieldsSet["status.podIP"] = podIP
+	podSpecificFieldsSet["status.hostIP"] = string(pod.Status.HostIP)
 	podSpecificFieldsSet["status.nominatedNodeName"] = string(pod.Status.NominatedNodeName)
 	return generic.AddObjectMetaFieldsSet(podSpecificFieldsSet, &pod.ObjectMeta, true)
 }

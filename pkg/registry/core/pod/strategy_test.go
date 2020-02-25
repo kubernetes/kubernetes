@@ -144,6 +144,20 @@ func TestMatchPod(t *testing.T) {
 		},
 		{
 			in: &api.Pod{
+				Status: api.PodStatus{HostIP: "1.2.3.4"},
+			},
+			fieldSelector: fields.ParseSelectorOrDie("status.hostIP=1.2.3.4"),
+			expectMatch:   true,
+		},
+		{
+			in: &api.Pod{
+				Status: api.PodStatus{HostIP: "1.2.3.4"},
+			},
+			fieldSelector: fields.ParseSelectorOrDie("status.hostIP=4.3.2.1"),
+			expectMatch:   false,
+		},
+		{
+			in: &api.Pod{
 				Status: api.PodStatus{NominatedNodeName: "node1"},
 			},
 			fieldSelector: fields.ParseSelectorOrDie("status.nominatedNodeName=node1"),

@@ -44,6 +44,7 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 				"status.phase",
 				"status.podIP",
 				"status.podIPs",
+				"status.hostIP",
 				"status.nominatedNodeName":
 				return label, value, nil
 			// This is for backwards compatibility with old v1 clients which send spec.host
