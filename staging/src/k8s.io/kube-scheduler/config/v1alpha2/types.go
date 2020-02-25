@@ -39,9 +39,6 @@ const (
 type KubeSchedulerConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 
-	// SchedulerName is name of the scheduler, used to select which pods
-	// will be processed by this scheduler, based on pod's "spec.SchedulerName".
-	SchedulerName *string `json:"schedulerName,omitempty"`
 	// AlgorithmSource specifies the scheduler algorithm source.
 	AlgorithmSource SchedulerAlgorithmSource `json:"algorithmSource"`
 
@@ -90,15 +87,35 @@ type KubeSchedulerConfiguration struct {
 	// the default value (10s) will be used.
 	PodMaxBackoffSeconds *int64 `json:"podMaxBackoffSeconds"`
 
-	// Plugins specify the set of plugins that should be enabled or disabled. Enabled plugins are the
-	// ones that should be enabled in addition to the default plugins. Disabled plugins are any of the
-	// default plugins that should be disabled.
-	// When no enabled or disabled plugin is specified for an extension point, default plugins for
-	// that extension point will be used if there is any.
+	// Profiles are scheduling profiles that kube-scheduler supports. Pods can
+	// choose to be scheduled under a particular profile by setting its associated
+	// scheduler name. Pods that don't specify any scheduler name are scheduled
+	// with the "default-scheduler" profile, if present here.
+	// +listType=map
+	// +listMapKey=schedulerName
+	Profiles []KubeSchedulerProfile `json:"profiles"`
+}
+
+// KubeSchedulerProfile is a scheduling profile.
+type KubeSchedulerProfile struct {
+	// SchedulerName is the name of the scheduler associated to this profile.
+	// If SchedulerName matches with the pod's "spec.schedulerName", then the pod
+	// is scheduled with this profile.
+	SchedulerName *string `json:"schedulerName,omitempty"`
+
+	// Plugins specify the set of plugins that should be enabled or disabled.
+	// Enabled plugins are the ones that should be enabled in addition to the
+	// default plugins. Disabled plugins are any of the default plugins that
+	// should be disabled.
+	// When no enabled or disabled plugin is specified for an extension point,
+	// default plugins for that extension point will be used if there is any.
+	// If a QueueSort plugin is specified, the same QueueSort Plugin and
+	// PluginConfig must be specified for all profiles.
 	Plugins *Plugins `json:"plugins,omitempty"`
 
 	// PluginConfig is an optional set of custom plugin arguments for each plugin.
-	// Omitting config args for a plugin is equivalent to using the default config for that plugin.
+	// Omitting config args for a plugin is equivalent to using the default config
+	// for that plugin.
 	// +listType=map
 	// +listMapKey=name
 	PluginConfig []PluginConfig `json:"pluginConfig,omitempty"`

@@ -19,6 +19,7 @@ package v1alpha1
 import (
 	"fmt"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/kube-scheduler/config/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -31,12 +32,38 @@ func Convert_v1alpha1_KubeSchedulerConfiguration_To_config_KubeSchedulerConfigur
 	if err := autoConvert_v1alpha1_KubeSchedulerConfiguration_To_config_KubeSchedulerConfiguration(in, out, s); err != nil {
 		return err
 	}
+	var profile config.KubeSchedulerProfile
+	if err := metav1.Convert_Pointer_string_To_string(&in.SchedulerName, &profile.SchedulerName, s); err != nil {
+		return err
+	}
+	if in.Plugins != nil {
+		profile.Plugins = &config.Plugins{}
+		if err := Convert_v1alpha1_Plugins_To_config_Plugins(in.Plugins, profile.Plugins, s); err != nil {
+			return err
+		}
+	} else {
+		profile.Plugins = nil
+	}
+	if in.PluginConfig != nil {
+		profile.PluginConfig = make([]config.PluginConfig, len(in.PluginConfig))
+		for i := range in.PluginConfig {
+			if err := Convert_v1alpha1_PluginConfig_To_config_PluginConfig(&in.PluginConfig[i], &profile.PluginConfig[i], s); err != nil {
+				return err
+			}
+		}
+	}
 	if in.HardPodAffinitySymmetricWeight != nil {
 		args := interpodaffinity.Args{HardPodAffinityWeight: in.HardPodAffinitySymmetricWeight}
 		plCfg := plugins.NewPluginConfig(interpodaffinity.Name, args)
-		out.PluginConfig = append(out.PluginConfig, plCfg)
+		profile.PluginConfig = append(profile.PluginConfig, plCfg)
 	}
+	out.Profiles = []config.KubeSchedulerProfile{profile}
 	return nil
+}
+
+func Convert_config_KubeSchedulerConfiguration_To_v1alpha1_KubeSchedulerConfiguration(in *config.KubeSchedulerConfiguration, out *v1alpha1.KubeSchedulerConfiguration, s conversion.Scope) error {
+	// Conversion from internal to v1alpha1 is not relevant for kube-scheduler.
+	return autoConvert_config_KubeSchedulerConfiguration_To_v1alpha1_KubeSchedulerConfiguration(in, out, s)
 }
 
 // Convert_v1alpha1_KubeSchedulerLeaderElectionConfiguration_To_config_KubeSchedulerLeaderElectionConfiguration handles deprecated parameters for leader election.

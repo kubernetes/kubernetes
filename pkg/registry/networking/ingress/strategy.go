@@ -28,7 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/networking/validation"
 )
 
-// ingressStrategy implements verification logic for Replication Ingresss.
+// ingressStrategy implements verification logic for Replication Ingress.
 type ingressStrategy struct {
 	runtime.ObjectTyper
 	names.NameGenerator

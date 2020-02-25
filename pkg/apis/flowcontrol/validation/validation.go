@@ -382,7 +382,7 @@ func ValidatePriorityLevelConfigurationSpec(spec *flowcontrol.PriorityLevelConfi
 	return allErrs
 }
 
-// ValidateLimitedPriorityLevelConfiguration validates the configuration for an exeuction-limited priority level
+// ValidateLimitedPriorityLevelConfiguration validates the configuration for an execution-limited priority level
 func ValidateLimitedPriorityLevelConfiguration(lplc *flowcontrol.LimitedPriorityLevelConfiguration, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	if lplc.AssuredConcurrencyShares <= 0 {

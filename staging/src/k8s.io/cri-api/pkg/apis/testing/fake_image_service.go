@@ -65,6 +65,7 @@ func (r *FakeImageService) SetFakeFilesystemUsage(usage []*runtimeapi.Filesystem
 func NewFakeImageService() *FakeImageService {
 	return &FakeImageService{
 		Called: make([]string, 0),
+		Errors: make(map[string][]error),
 		Images: make(map[string]*runtimeapi.Image),
 	}
 }

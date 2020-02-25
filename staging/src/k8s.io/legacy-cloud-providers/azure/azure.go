@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/Azure/go-autorest/autorest"
+	"github.com/Azure/go-autorest/autorest/adal"
 	"github.com/Azure/go-autorest/autorest/azure"
 
 	v1 "k8s.io/api/core/v1"
@@ -476,46 +477,21 @@ func (az *Cloud) InitializeCloudFromConfig(config *Config, fromSecret bool) erro
 		return nil
 	}
 
-	// Initialize Azure clients.
-	azClientConfig := &azclients.ClientConfig{
-		Location:                       config.Location,
-		SubscriptionID:                 config.SubscriptionID,
-		ResourceManagerEndpoint:        env.ResourceManagerEndpoint,
-		ServicePrincipalToken:          servicePrincipalToken,
-		CloudProviderBackoffRetries:    config.CloudProviderBackoffRetries,
-		CloudProviderBackoffDuration:   config.CloudProviderBackoffDuration,
-		ShouldOmitCloudProviderBackoff: config.shouldOmitCloudProviderBackoff(),
-		Backoff:                        &retry.Backoff{Steps: 1},
-	}
-	if config.CloudProviderBackoff {
-		azClientConfig.Backoff = &retry.Backoff{
-			Steps:    config.CloudProviderBackoffRetries,
-			Factor:   config.CloudProviderBackoffExponent,
-			Duration: time.Duration(config.CloudProviderBackoffDuration) * time.Second,
-			Jitter:   config.CloudProviderBackoffJitter,
+	// If uses network resources in different AAD Tenant, then prepare corresponding Service Principal Token for VM/VMSS client and network resources client
+	var multiTenantServicePrincipalToken *adal.MultiTenantServicePrincipalToken
+	var networkResourceServicePrincipalToken *adal.ServicePrincipalToken
+	if az.Config.UsesNetworkResourceInDifferentTenant() {
+		multiTenantServicePrincipalToken, err = auth.GetMultiTenantServicePrincipalToken(&az.Config.AzureAuthConfig, &az.Environment)
+		if err != nil {
+			return err
+		}
+		networkResourceServicePrincipalToken, err = auth.GetNetworkResourceServicePrincipalToken(&az.Config.AzureAuthConfig, &az.Environment)
+		if err != nil {
+			return err
 		}
 	}
-	az.RoutesClient = routeclient.New(azClientConfig.WithRateLimiter(config.RouteRateLimit))
-	az.SubnetsClient = subnetclient.New(azClientConfig.WithRateLimiter(config.SubnetsRateLimit))
-	az.InterfacesClient = interfaceclient.New(azClientConfig.WithRateLimiter(config.InterfaceRateLimit))
-	az.RouteTablesClient = routetableclient.New(azClientConfig.WithRateLimiter(config.RouteTableRateLimit))
-	az.LoadBalancerClient = loadbalancerclient.New(azClientConfig.WithRateLimiter(config.LoadBalancerRateLimit))
-	az.SecurityGroupsClient = securitygroupclient.New(azClientConfig.WithRateLimiter(config.SecurityGroupRateLimit))
-	az.PublicIPAddressesClient = publicipclient.New(azClientConfig.WithRateLimiter(config.PublicIPAddressRateLimit))
-	az.VirtualMachineScaleSetsClient = vmssclient.New(azClientConfig.WithRateLimiter(config.VirtualMachineScaleSetRateLimit))
-	az.VirtualMachineSizesClient = vmsizeclient.New(azClientConfig.WithRateLimiter(config.VirtualMachineSizeRateLimit))
-	az.SnapshotsClient = snapshotclient.New(azClientConfig.WithRateLimiter(config.SnapshotRateLimit))
-	az.StorageAccountClient = storageaccountclient.New(azClientConfig.WithRateLimiter(config.StorageAccountRateLimit))
-	az.VirtualMachinesClient = vmclient.New(azClientConfig.WithRateLimiter(config.VirtualMachineRateLimit))
-	az.DisksClient = diskclient.New(azClientConfig.WithRateLimiter(config.DiskRateLimit))
-	// fileClient is not based on armclient, but it's still backoff retried.
-	az.FileClient = newAzureFileClient(env, azClientConfig.Backoff)
 
-	// Error "not an active Virtual Machine Scale Set VM" is not retriable for VMSS VM.
-	// But http.StatusNotFound is retriable because of ARM replication latency.
-	vmssVMClientConfig := azClientConfig.WithRateLimiter(config.VirtualMachineScaleSetRateLimit)
-	vmssVMClientConfig.Backoff = vmssVMClientConfig.Backoff.WithNonRetriableErrors([]string{vmssVMNotActiveErrorMessage}).WithRetriableHTTPStatusCodes([]int{http.StatusNotFound})
-	az.VirtualMachineScaleSetVMsClient = vmssvmclient.New(vmssVMClientConfig)
+	az.configAzureClients(servicePrincipalToken, multiTenantServicePrincipalToken, networkResourceServicePrincipalToken)
 
 	if az.MaximumLoadBalancerRuleCount == 0 {
 		az.MaximumLoadBalancerRuleCount = maximumLoadBalancerRuleCount
@@ -559,6 +535,93 @@ func (az *Cloud) InitializeCloudFromConfig(config *Config, fromSecret bool) erro
 	go az.routeUpdater.run()
 
 	return nil
+}
+
+func (az *Cloud) configAzureClients(
+	servicePrincipalToken *adal.ServicePrincipalToken,
+	multiTenantServicePrincipalToken *adal.MultiTenantServicePrincipalToken,
+	networkResourceServicePrincipalToken *adal.ServicePrincipalToken) {
+	azClientConfig := az.getAzureClientConfig(servicePrincipalToken)
+
+	// Prepare AzureClientConfig for all azure clients
+	interfaceClientConfig := azClientConfig.WithRateLimiter(az.Config.InterfaceRateLimit)
+	vmSizeClientConfig := azClientConfig.WithRateLimiter(az.Config.VirtualMachineSizeRateLimit)
+	snapshotClientConfig := azClientConfig.WithRateLimiter(az.Config.SnapshotRateLimit)
+	storageAccountClientConfig := azClientConfig.WithRateLimiter(az.Config.StorageAccountRateLimit)
+	diskClientConfig := azClientConfig.WithRateLimiter(az.Config.DiskRateLimit)
+	vmClientConfig := azClientConfig.WithRateLimiter(az.Config.VirtualMachineRateLimit)
+	vmssClientConfig := azClientConfig.WithRateLimiter(az.Config.VirtualMachineScaleSetRateLimit)
+	// Error "not an active Virtual Machine Scale Set VM" is not retriable for VMSS VM.
+	// But http.StatusNotFound is retriable because of ARM replication latency.
+	vmssVMClientConfig := azClientConfig.WithRateLimiter(az.Config.VirtualMachineScaleSetRateLimit)
+	vmssVMClientConfig.Backoff = vmssVMClientConfig.Backoff.WithNonRetriableErrors([]string{vmssVMNotActiveErrorMessage}).WithRetriableHTTPStatusCodes([]int{http.StatusNotFound})
+	routeClientConfig := azClientConfig.WithRateLimiter(az.Config.RouteRateLimit)
+	subnetClientConfig := azClientConfig.WithRateLimiter(az.Config.SubnetsRateLimit)
+	routeTableClientConfig := azClientConfig.WithRateLimiter(az.Config.RouteTableRateLimit)
+	loadBalancerClientConfig := azClientConfig.WithRateLimiter(az.Config.LoadBalancerRateLimit)
+	securityGroupClientConfig := azClientConfig.WithRateLimiter(az.Config.SecurityGroupRateLimit)
+	publicIPClientConfig := azClientConfig.WithRateLimiter(az.Config.PublicIPAddressRateLimit)
+
+	// If uses network resources in different AAD Tenant, update Authorizer for VM/VMSS client config
+	if multiTenantServicePrincipalToken != nil {
+		multiTenantServicePrincipalTokenAuthorizer := autorest.NewMultiTenantServicePrincipalTokenAuthorizer(multiTenantServicePrincipalToken)
+		vmClientConfig.Authorizer = multiTenantServicePrincipalTokenAuthorizer
+		vmssClientConfig.Authorizer = multiTenantServicePrincipalTokenAuthorizer
+		vmssVMClientConfig.Authorizer = multiTenantServicePrincipalTokenAuthorizer
+	}
+
+	// If uses network resources in different AAD Tenant, update Authorizer for network resources client config
+	if networkResourceServicePrincipalToken != nil {
+		networkResourceServicePrincipalTokenAuthorizer := autorest.NewBearerAuthorizer(networkResourceServicePrincipalToken)
+		routeClientConfig.Authorizer = networkResourceServicePrincipalTokenAuthorizer
+		subnetClientConfig.Authorizer = networkResourceServicePrincipalTokenAuthorizer
+		routeTableClientConfig.Authorizer = networkResourceServicePrincipalTokenAuthorizer
+		loadBalancerClientConfig.Authorizer = networkResourceServicePrincipalTokenAuthorizer
+		securityGroupClientConfig.Authorizer = networkResourceServicePrincipalTokenAuthorizer
+		publicIPClientConfig.Authorizer = networkResourceServicePrincipalTokenAuthorizer
+	}
+
+	// Initialize all azure clients based on client config
+	az.InterfacesClient = interfaceclient.New(interfaceClientConfig)
+	az.VirtualMachineSizesClient = vmsizeclient.New(vmSizeClientConfig)
+	az.SnapshotsClient = snapshotclient.New(snapshotClientConfig)
+	az.StorageAccountClient = storageaccountclient.New(storageAccountClientConfig)
+	az.DisksClient = diskclient.New(diskClientConfig)
+	az.VirtualMachinesClient = vmclient.New(vmClientConfig)
+	az.VirtualMachineScaleSetsClient = vmssclient.New(vmssClientConfig)
+	az.VirtualMachineScaleSetVMsClient = vmssvmclient.New(vmssVMClientConfig)
+	az.RoutesClient = routeclient.New(routeClientConfig)
+	az.SubnetsClient = subnetclient.New(subnetClientConfig)
+	az.RouteTablesClient = routetableclient.New(routeTableClientConfig)
+	az.LoadBalancerClient = loadbalancerclient.New(loadBalancerClientConfig)
+	az.SecurityGroupsClient = securitygroupclient.New(securityGroupClientConfig)
+	az.PublicIPAddressesClient = publicipclient.New(publicIPClientConfig)
+	// fileClient is not based on armclient, but it's still backoff retried.
+	az.FileClient = newAzureFileClient(&az.Environment, azClientConfig.Backoff)
+}
+
+func (az *Cloud) getAzureClientConfig(servicePrincipalToken *adal.ServicePrincipalToken) *azclients.ClientConfig {
+	azClientConfig := &azclients.ClientConfig{
+		Location:                       az.Config.Location,
+		SubscriptionID:                 az.Config.SubscriptionID,
+		ResourceManagerEndpoint:        az.Environment.ResourceManagerEndpoint,
+		CloudProviderBackoffRetries:    az.Config.CloudProviderBackoffRetries,
+		CloudProviderBackoffDuration:   az.Config.CloudProviderBackoffDuration,
+		ShouldOmitCloudProviderBackoff: az.Config.shouldOmitCloudProviderBackoff(),
+		Authorizer:                     autorest.NewBearerAuthorizer(servicePrincipalToken),
+		Backoff:                        &retry.Backoff{Steps: 1},
+	}
+
+	if az.Config.CloudProviderBackoff {
+		azClientConfig.Backoff = &retry.Backoff{
+			Steps:    az.Config.CloudProviderBackoffRetries,
+			Factor:   az.Config.CloudProviderBackoffExponent,
+			Duration: time.Duration(az.Config.CloudProviderBackoffDuration) * time.Second,
+			Jitter:   az.Config.CloudProviderBackoffJitter,
+		}
+	}
+
+	return azClientConfig
 }
 
 // parseConfig returns a parsed configuration for an Azure cloudprovider config file

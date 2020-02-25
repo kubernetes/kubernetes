@@ -80,13 +80,13 @@ func newStrategicMergeSliceFromBytes(in []byte) (strategicMergeSlice, error) {
 						return err
 					}
 
-					// Get the stategicMergeSlice for the item
+					// Get the strategicMergeSlice for the item
 					itemU, err := newStrategicMergeSliceFromBytes(itemJSON)
 					if err != nil {
 						return err
 					}
 
-					// append the stategicMergeSlice for the item to the stategicMergeSlice
+					// append the strategicMergeSlice for the item to the strategicMergeSlice
 					result = append(result, itemU...)
 
 					return nil

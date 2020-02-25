@@ -19,6 +19,7 @@ limitations under the License.
 package azure
 
 import (
+	"net/http"
 	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-07-01/compute"
@@ -98,18 +99,18 @@ func (as *availabilitySet) AttachDisk(isManagedDisk bool, diskName, diskURI stri
 
 	rerr := as.VirtualMachinesClient.Update(ctx, nodeResourceGroup, vmName, newVM, "attach_disk")
 	if rerr != nil {
-		klog.Errorf("azureDisk - attach disk(%s, %s) failed, err: %v", diskName, diskURI, rerr)
-		detail := rerr.Error().Error()
-		if strings.Contains(detail, errLeaseFailed) || strings.Contains(detail, errDiskBlobNotFound) {
-			// if lease cannot be acquired or disk not found, immediately detach the disk and return the original error
-			klog.V(2).Infof("azureDisk - err %v, try detach disk(%s, %s)", rerr, diskName, diskURI)
-			as.DetachDisk(diskName, diskURI, nodeName)
+		klog.Errorf("azureDisk - attach disk(%s, %s) on rg(%s) vm(%s) failed, err: %v", diskName, diskURI, nodeResourceGroup, vmName, rerr)
+		if rerr.HTTPStatusCode == http.StatusNotFound {
+			klog.Errorf("azureDisk - begin to filterNonExistingDisks(%s, %s) on rg(%s) vm(%s)", diskName, diskURI, nodeResourceGroup, vmName)
+			disks := as.filterNonExistingDisks(ctx, *newVM.VirtualMachineProperties.StorageProfile.DataDisks)
+			newVM.VirtualMachineProperties.StorageProfile.DataDisks = &disks
+			if rerr = as.VirtualMachinesClient.Update(ctx, nodeResourceGroup, vmName, newVM, "attach_disk"); rerr != nil {
+				return rerr.Error()
+			}
 		}
-
-		return rerr.Error()
 	}
 
-	klog.V(2).Infof("azureDisk - attach disk(%s, %s) succeeded", diskName, diskURI)
+	klog.V(2).Infof("azureDisk - update(%s): vm(%s) - attach disk(%s, %s) succeeded", nodeResourceGroup, vmName, diskName, diskURI)
 	return nil
 }
 
@@ -166,9 +167,18 @@ func (as *availabilitySet) DetachDisk(diskName, diskURI string, nodeName types.N
 
 	rerr := as.VirtualMachinesClient.Update(ctx, nodeResourceGroup, vmName, newVM, "detach_disk")
 	if rerr != nil {
-		return rerr.Error()
+		klog.Errorf("azureDisk - detach disk(%s, %s) on rg(%s) vm(%s) failed, err: %v", diskName, diskURI, nodeResourceGroup, vmName, rerr)
+		if rerr.HTTPStatusCode == http.StatusNotFound {
+			klog.Errorf("azureDisk - begin to filterNonExistingDisks(%s, %s) on rg(%s) vm(%s)", diskName, diskURI, nodeResourceGroup, vmName)
+			disks := as.filterNonExistingDisks(ctx, *vm.StorageProfile.DataDisks)
+			newVM.VirtualMachineProperties.StorageProfile.DataDisks = &disks
+			if rerr = as.VirtualMachinesClient.Update(ctx, nodeResourceGroup, vmName, newVM, "detach_disk"); rerr != nil {
+				return rerr.Error()
+			}
+		}
 	}
 
+	klog.V(2).Infof("azureDisk - update(%s): vm(%s) - detach disk(%s, %s) succeeded", nodeResourceGroup, vmName, diskName, diskURI)
 	return nil
 }
 

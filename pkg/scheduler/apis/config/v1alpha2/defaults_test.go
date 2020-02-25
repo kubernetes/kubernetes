@@ -17,10 +17,10 @@ limitations under the License.
 package v1alpha2
 
 import (
-	"reflect"
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	componentbaseconfig "k8s.io/component-base/config/v1alpha1"
 	"k8s.io/kube-scheduler/config/v1alpha2"
@@ -38,7 +38,6 @@ func TestSchedulerDefaults(t *testing.T) {
 			name:   "empty config",
 			config: &v1alpha2.KubeSchedulerConfiguration{},
 			expected: &v1alpha2.KubeSchedulerConfiguration{
-				SchedulerName:      pointer.StringPtr("default-scheduler"),
 				AlgorithmSource:    v1alpha2.SchedulerAlgorithmSource{Provider: pointer.StringPtr("DefaultProvider")},
 				HealthzBindAddress: pointer.StringPtr("0.0.0.0:10251"),
 				MetricsBindAddress: pointer.StringPtr("0.0.0.0:10251"),
@@ -67,7 +66,128 @@ func TestSchedulerDefaults(t *testing.T) {
 				BindTimeoutSeconds:       pointer.Int64Ptr(600),
 				PodInitialBackoffSeconds: pointer.Int64Ptr(1),
 				PodMaxBackoffSeconds:     pointer.Int64Ptr(10),
-				Plugins:                  nil,
+				Profiles: []v1alpha2.KubeSchedulerProfile{
+					{SchedulerName: pointer.StringPtr("default-scheduler")},
+				},
+			},
+		},
+		{
+			name: "no scheduler name",
+			config: &v1alpha2.KubeSchedulerConfiguration{
+				Profiles: []v1alpha2.KubeSchedulerProfile{
+					{
+						PluginConfig: []v1alpha2.PluginConfig{
+							{Name: "FooPlugin"},
+						},
+					},
+				},
+			},
+			expected: &v1alpha2.KubeSchedulerConfiguration{
+				AlgorithmSource:    v1alpha2.SchedulerAlgorithmSource{Provider: pointer.StringPtr("DefaultProvider")},
+				HealthzBindAddress: pointer.StringPtr("0.0.0.0:10251"),
+				MetricsBindAddress: pointer.StringPtr("0.0.0.0:10251"),
+				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
+					EnableProfiling:           &enable,
+					EnableContentionProfiling: &enable,
+				},
+				LeaderElection: v1alpha2.KubeSchedulerLeaderElectionConfiguration{
+					LeaderElectionConfiguration: componentbaseconfig.LeaderElectionConfiguration{
+						LeaderElect:       pointer.BoolPtr(true),
+						LeaseDuration:     metav1.Duration{Duration: 15 * time.Second},
+						RenewDeadline:     metav1.Duration{Duration: 10 * time.Second},
+						RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
+						ResourceLock:      "endpointsleases",
+						ResourceNamespace: "kube-system",
+						ResourceName:      "kube-scheduler",
+					},
+				},
+				ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
+					QPS:         50,
+					Burst:       100,
+					ContentType: "application/vnd.kubernetes.protobuf",
+				},
+				DisablePreemption:        pointer.BoolPtr(false),
+				PercentageOfNodesToScore: pointer.Int32Ptr(0),
+				BindTimeoutSeconds:       pointer.Int64Ptr(600),
+				PodInitialBackoffSeconds: pointer.Int64Ptr(1),
+				PodMaxBackoffSeconds:     pointer.Int64Ptr(10),
+				Profiles: []v1alpha2.KubeSchedulerProfile{
+					{
+						SchedulerName: pointer.StringPtr("default-scheduler"),
+						PluginConfig: []v1alpha2.PluginConfig{
+							{Name: "FooPlugin"},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "two profiles",
+			config: &v1alpha2.KubeSchedulerConfiguration{
+				Profiles: []v1alpha2.KubeSchedulerProfile{
+					{
+						PluginConfig: []v1alpha2.PluginConfig{
+							{Name: "FooPlugin"},
+						},
+					},
+					{
+						SchedulerName: pointer.StringPtr("custom-scheduler"),
+						Plugins: &v1alpha2.Plugins{
+							Bind: &v1alpha2.PluginSet{
+								Enabled: []v1alpha2.Plugin{
+									{Name: "BarPlugin"},
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: &v1alpha2.KubeSchedulerConfiguration{
+				AlgorithmSource:    v1alpha2.SchedulerAlgorithmSource{Provider: pointer.StringPtr("DefaultProvider")},
+				HealthzBindAddress: pointer.StringPtr("0.0.0.0:10251"),
+				MetricsBindAddress: pointer.StringPtr("0.0.0.0:10251"),
+				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
+					EnableProfiling:           &enable,
+					EnableContentionProfiling: &enable,
+				},
+				LeaderElection: v1alpha2.KubeSchedulerLeaderElectionConfiguration{
+					LeaderElectionConfiguration: componentbaseconfig.LeaderElectionConfiguration{
+						LeaderElect:       pointer.BoolPtr(true),
+						LeaseDuration:     metav1.Duration{Duration: 15 * time.Second},
+						RenewDeadline:     metav1.Duration{Duration: 10 * time.Second},
+						RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
+						ResourceLock:      "endpointsleases",
+						ResourceNamespace: "kube-system",
+						ResourceName:      "kube-scheduler",
+					},
+				},
+				ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
+					QPS:         50,
+					Burst:       100,
+					ContentType: "application/vnd.kubernetes.protobuf",
+				},
+				DisablePreemption:        pointer.BoolPtr(false),
+				PercentageOfNodesToScore: pointer.Int32Ptr(0),
+				BindTimeoutSeconds:       pointer.Int64Ptr(600),
+				PodInitialBackoffSeconds: pointer.Int64Ptr(1),
+				PodMaxBackoffSeconds:     pointer.Int64Ptr(10),
+				Profiles: []v1alpha2.KubeSchedulerProfile{
+					{
+						PluginConfig: []v1alpha2.PluginConfig{
+							{Name: "FooPlugin"},
+						},
+					},
+					{
+						SchedulerName: pointer.StringPtr("custom-scheduler"),
+						Plugins: &v1alpha2.Plugins{
+							Bind: &v1alpha2.PluginSet{
+								Enabled: []v1alpha2.Plugin{
+									{Name: "BarPlugin"},
+								},
+							},
+						},
+					},
+				},
 			},
 		},
 		{
@@ -77,7 +197,6 @@ func TestSchedulerDefaults(t *testing.T) {
 				HealthzBindAddress: pointer.StringPtr("1.2.3.4"),
 			},
 			expected: &v1alpha2.KubeSchedulerConfiguration{
-				SchedulerName:      pointer.StringPtr("default-scheduler"),
 				AlgorithmSource:    v1alpha2.SchedulerAlgorithmSource{Provider: pointer.StringPtr("DefaultProvider")},
 				HealthzBindAddress: pointer.StringPtr("1.2.3.4:10251"),
 				MetricsBindAddress: pointer.StringPtr("1.2.3.4:10251"),
@@ -106,7 +225,9 @@ func TestSchedulerDefaults(t *testing.T) {
 				BindTimeoutSeconds:       pointer.Int64Ptr(600),
 				PodInitialBackoffSeconds: pointer.Int64Ptr(1),
 				PodMaxBackoffSeconds:     pointer.Int64Ptr(10),
-				Plugins:                  nil,
+				Profiles: []v1alpha2.KubeSchedulerProfile{
+					{SchedulerName: pointer.StringPtr("default-scheduler")},
+				},
 			},
 		},
 		{
@@ -116,7 +237,6 @@ func TestSchedulerDefaults(t *testing.T) {
 				HealthzBindAddress: pointer.StringPtr(":12345"),
 			},
 			expected: &v1alpha2.KubeSchedulerConfiguration{
-				SchedulerName:      pointer.StringPtr("default-scheduler"),
 				AlgorithmSource:    v1alpha2.SchedulerAlgorithmSource{Provider: pointer.StringPtr("DefaultProvider")},
 				HealthzBindAddress: pointer.StringPtr("0.0.0.0:12345"),
 				MetricsBindAddress: pointer.StringPtr("0.0.0.0:12345"),
@@ -145,15 +265,17 @@ func TestSchedulerDefaults(t *testing.T) {
 				BindTimeoutSeconds:       pointer.Int64Ptr(600),
 				PodInitialBackoffSeconds: pointer.Int64Ptr(1),
 				PodMaxBackoffSeconds:     pointer.Int64Ptr(10),
-				Plugins:                  nil,
+				Profiles: []v1alpha2.KubeSchedulerProfile{
+					{SchedulerName: pointer.StringPtr("default-scheduler")},
+				},
 			},
 		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			SetDefaults_KubeSchedulerConfiguration(tc.config)
-			if !reflect.DeepEqual(tc.expected, tc.config) {
-				t.Errorf("Expected:\n%#v\n\nGot:\n%#v", tc.expected, tc.config)
+			if diff := cmp.Diff(tc.expected, tc.config); diff != "" {
+				t.Errorf("Got unexpected defaults (-want, +got):\n%s", diff)
 			}
 		})
 	}

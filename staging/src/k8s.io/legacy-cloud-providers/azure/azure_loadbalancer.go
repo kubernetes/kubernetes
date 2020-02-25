@@ -95,6 +95,7 @@ const (
 
 	// ServiceAnnotationLoadBalancerDisableTCPReset is the annotation used on the service
 	// to set enableTcpReset to false in load balancer rule. This only works for Azure standard load balancer backed service.
+	// TODO(feiskyer): disable-tcp-reset annotations has been depracated since v1.18, it would removed on v1.20.
 	ServiceAnnotationLoadBalancerDisableTCPReset = "service.beta.kubernetes.io/azure-load-balancer-disable-tcp-reset"
 
 	// serviceTagKey is the service key applied for public IP tags.
@@ -1009,6 +1010,7 @@ func (az *Cloud) reconcileLoadBalancerRule(
 	if az.useStandardLoadBalancer() {
 		enableTCPReset = to.BoolPtr(true)
 		if v, ok := service.Annotations[ServiceAnnotationLoadBalancerDisableTCPReset]; ok {
+			klog.Warning("annotation service.beta.kubernetes.io/azure-load-balancer-disable-tcp-reset has been depracated, it would be removed in a future release")
 			klog.V(2).Infof("reconcileLoadBalancerRule lb name (%s) flag(%s) is set to %s", lbName, ServiceAnnotationLoadBalancerDisableTCPReset, v)
 			enableTCPReset = to.BoolPtr(!strings.EqualFold(v, "true"))
 		}

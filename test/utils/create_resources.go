@@ -25,6 +25,8 @@ import (
 
 	apps "k8s.io/api/apps/v1"
 	batch "k8s.io/api/batch/v1"
+	storage "k8s.io/api/storage/v1"
+
 	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -207,6 +209,23 @@ func CreateServiceWithRetries(c clientset.Interface, namespace string, obj *v1.S
 	}
 	createFunc := func() (bool, error) {
 		_, err := c.CoreV1().Services(namespace).Create(context.TODO(), obj, metav1.CreateOptions{})
+		if err == nil || apierrors.IsAlreadyExists(err) {
+			return true, nil
+		}
+		if IsRetryableAPIError(err) {
+			return false, nil
+		}
+		return false, fmt.Errorf("Failed to create object with non-retriable error: %v", err)
+	}
+	return RetryWithExponentialBackOff(createFunc)
+}
+
+func CreateStorageClassWithRetries(c clientset.Interface, obj *storage.StorageClass) error {
+	if obj == nil {
+		return fmt.Errorf("Object provided to create is empty")
+	}
+	createFunc := func() (bool, error) {
+		_, err := c.StorageV1().StorageClasses().Create(context.TODO(), obj, metav1.CreateOptions{})
 		if err == nil || apierrors.IsAlreadyExists(err) {
 			return true, nil
 		}

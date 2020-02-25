@@ -40,7 +40,6 @@ import (
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
-	kubeletscheme "k8s.io/kubernetes/pkg/kubelet/apis/config/scheme"
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
 	kubeletpodresourcesv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/podresources/v1alpha1"
 	kubeletstatsv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
@@ -50,6 +49,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/remote"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -123,12 +123,8 @@ func getNodeDevices() (*kubeletpodresourcesv1alpha1.ListPodResourcesResponse, er
 
 // Returns the current KubeletConfiguration
 func getCurrentKubeletConfig() (*kubeletconfig.KubeletConfiguration, error) {
-	resp := pollConfigz(5*time.Minute, 5*time.Second)
-	kubeCfg, err := decodeConfigz(resp)
-	if err != nil {
-		return nil, err
-	}
-	return kubeCfg, nil
+	// namespace only relevant if useProxy==true, so we don't bother
+	return e2ekubelet.GetCurrentKubeletConfig(framework.TestContext.NodeName, "", false)
 }
 
 // Must be called within a Context. Allows the function to modify the KubeletConfiguration during the BeforeEach of the context.
@@ -253,64 +249,6 @@ func setNodeConfigSource(f *framework.Framework, source *v1.NodeConfigSource) er
 	}
 
 	return nil
-}
-
-// Causes the test to fail, or returns a status 200 response from the /configz endpoint
-func pollConfigz(timeout time.Duration, pollInterval time.Duration) *http.Response {
-	endpoint := fmt.Sprintf("http://127.0.0.1:8080/api/v1/nodes/%s/proxy/configz", framework.TestContext.NodeName)
-	client := &http.Client{}
-	req, err := http.NewRequest("GET", endpoint, nil)
-	framework.ExpectNoError(err)
-	req.Header.Add("Accept", "application/json")
-
-	var resp *http.Response
-	gomega.Eventually(func() bool {
-		resp, err = client.Do(req)
-		if err != nil {
-			klog.Errorf("Failed to get /configz, retrying. Error: %v", err)
-			return false
-		}
-		if resp.StatusCode != 200 {
-			klog.Errorf("/configz response status not 200, retrying. Response was: %+v", resp)
-			return false
-		}
-		return true
-	}, timeout, pollInterval).Should(gomega.Equal(true))
-	return resp
-}
-
-// Decodes the http response from /configz and returns a kubeletconfig.KubeletConfiguration (internal type).
-func decodeConfigz(resp *http.Response) (*kubeletconfig.KubeletConfiguration, error) {
-	// This hack because /configz reports the following structure:
-	// {"kubeletconfig": {the JSON representation of kubeletconfigv1beta1.KubeletConfiguration}}
-	type configzWrapper struct {
-		ComponentConfig kubeletconfigv1beta1.KubeletConfiguration `json:"kubeletconfig"`
-	}
-
-	scheme, _, err := kubeletscheme.NewSchemeAndCodecs()
-	if err != nil {
-		return nil, err
-	}
-
-	configz := configzWrapper{}
-	kubeCfg := kubeletconfig.KubeletConfiguration{}
-
-	contentsBytes, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	err = json.Unmarshal(contentsBytes, &configz)
-	if err != nil {
-		return nil, err
-	}
-
-	err = scheme.Convert(&configz.ComponentConfig, &kubeCfg, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return &kubeCfg, nil
 }
 
 // creates a configmap containing kubeCfg in kube-system namespace

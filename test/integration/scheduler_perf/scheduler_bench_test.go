@@ -128,6 +128,25 @@ func BenchmarkSchedulingInTreePVs(b *testing.B) {
 	}
 }
 
+// BenchmarkSchedulingWaitForFirstConsumerPVs benchmarks the scheduling rate
+// of pods with volumes with VolumeBindingMode set to WaitForFirstConsumer.
+func BenchmarkSchedulingWaitForFirstConsumerPVs(b *testing.B) {
+	tests := []struct{ nodes, existingPods, minPods int }{
+		{nodes: 500, existingPods: 500, minPods: 1000},
+		// default 5000 existingPods is a way too much for now
+	}
+	basePod := makeBasePod()
+	testStrategy := testutils.NewCreatePodWithPersistentVolumeWithFirstConsumerStrategy(gceVolumeFactory, basePod)
+	nodeStrategy := testutils.NewLabelNodePrepareStrategy(v1.LabelZoneFailureDomain, "zone1")
+	for _, test := range tests {
+		name := fmt.Sprintf("%vNodes/%vPods", test.nodes, test.existingPods)
+		b.Run(name, func(b *testing.B) {
+			nodeStrategies := []testutils.CountToStrategy{{Count: test.nodes, Strategy: nodeStrategy}}
+			benchmarkScheduling(test.existingPods, test.minPods, nodeStrategies, testStrategy, b)
+		})
+	}
+}
+
 // BenchmarkSchedulingMigratedInTreePVs benchmarks the scheduling rate of pods with
 // in-tree volumes (used via PV/PVC) that are migrated to CSI. CSINode instances exist
 // for all nodes and have proper annotation that AWS is migrated.
@@ -551,6 +570,42 @@ func awsVolumeFactory(id int) *v1.PersistentVolume {
 					// counted as a separate volume in MaxPDVolumeCountChecker
 					// predicate.
 					VolumeID: fmt.Sprintf("vol-%d", id),
+				},
+			},
+		},
+	}
+}
+
+func gceVolumeFactory(id int) *v1.PersistentVolume {
+	return &v1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: fmt.Sprintf("vol-%d", id),
+		},
+		Spec: v1.PersistentVolumeSpec{
+			AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadOnlyMany},
+			Capacity: v1.ResourceList{
+				v1.ResourceName(v1.ResourceStorage): resource.MustParse("1Gi"),
+			},
+			PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimRetain,
+			PersistentVolumeSource: v1.PersistentVolumeSource{
+				GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
+					FSType: "ext4",
+					PDName: fmt.Sprintf("vol-%d-pvc", id),
+				},
+			},
+			NodeAffinity: &v1.VolumeNodeAffinity{
+				Required: &v1.NodeSelector{
+					NodeSelectorTerms: []v1.NodeSelectorTerm{
+						{
+							MatchExpressions: []v1.NodeSelectorRequirement{
+								{
+									Key:      v1.LabelZoneFailureDomain,
+									Operator: v1.NodeSelectorOpIn,
+									Values:   []string{"zone1"},
+								},
+							},
+						},
+					},
 				},
 			},
 		},

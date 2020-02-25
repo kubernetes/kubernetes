@@ -21,6 +21,7 @@ package azure
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"path"
 	"regexp"
 	"strings"
@@ -343,6 +344,48 @@ func filterDetachingDisks(unfilteredDisks []compute.DataDisk) []compute.DataDisk
 		}
 	}
 	return filteredDisks
+}
+
+func (c *controllerCommon) filterNonExistingDisks(ctx context.Context, unfilteredDisks []compute.DataDisk) []compute.DataDisk {
+	filteredDisks := []compute.DataDisk{}
+	for _, disk := range unfilteredDisks {
+		filter := false
+		if disk.ManagedDisk != nil && disk.ManagedDisk.ID != nil {
+			diskURI := *disk.ManagedDisk.ID
+			exist, err := c.cloud.checkDiskExists(ctx, diskURI)
+			if err != nil {
+				klog.Errorf("checkDiskExists(%s) failed with error: %v", diskURI, err)
+			} else {
+				// only filter disk when checkDiskExists returns <false, nil>
+				filter = !exist
+				if filter {
+					klog.Errorf("disk(%s) does not exist, removed from data disk list", diskURI)
+				}
+			}
+		}
+
+		if !filter {
+			filteredDisks = append(filteredDisks, disk)
+		}
+	}
+	return filteredDisks
+}
+
+func (c *controllerCommon) checkDiskExists(ctx context.Context, diskURI string) (bool, error) {
+	diskName := path.Base(diskURI)
+	resourceGroup, err := getResourceGroupFromDiskURI(diskURI)
+	if err != nil {
+		return false, err
+	}
+
+	if _, rerr := c.cloud.DisksClient.Get(ctx, resourceGroup, diskName); rerr != nil {
+		if rerr.HTTPStatusCode == http.StatusNotFound {
+			return false, nil
+		}
+		return false, rerr.Error()
+	}
+
+	return true, nil
 }
 
 func getValidCreationData(subscriptionID, resourceGroup, sourceResourceID, sourceType string) (compute.CreationData, error) {
