@@ -300,11 +300,7 @@ func (expc *expandController) expand(pvc *v1.PersistentVolumeClaim, pv *v1.Persi
 		return err
 	}
 
-	generatedOperations, err := expc.operationGenerator.GenerateExpandVolumeFunc(pvc, pv)
-	if err != nil {
-		klog.Errorf("Error starting ExpandVolume for pvc %s with %v", util.GetPersistentVolumeClaimQualifiedName(pvc), err)
-		return err
-	}
+	generatedOperations := expc.operationGenerator.GenerateExpandVolumeFunc(pvc, pv)
 	klog.V(5).Infof("Starting ExpandVolume for volume %s", util.GetPersistentVolumeClaimQualifiedName(pvc))
 	_, detailedErr := generatedOperations.Run()
 

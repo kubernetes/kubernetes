@@ -17,9 +17,12 @@ limitations under the License.
 package operationexecutor
 
 import (
-	"github.com/prometheus/client_model/go"
+	"os"
+	"testing"
+
+	io_prometheus_client "github.com/prometheus/client_model/go"
 	"github.com/stretchr/testify/assert"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -32,8 +35,6 @@ import (
 	csitesting "k8s.io/kubernetes/pkg/volume/csi/testing"
 	"k8s.io/kubernetes/pkg/volume/gcepd"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
-	"os"
-	"testing"
 )
 
 // this method just tests the volume plugin name that's used in CompleteFunc, the same plugin is also used inside the
@@ -77,10 +78,7 @@ func TestOperationGenerator_GenerateUnmapVolumeFunc_PluginName(t *testing.T) {
 		pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: types.UID(string(uuid.NewUUID()))}}
 		volumeToUnmount := getTestVolumeToUnmount(pod, tc.pvSpec, tc.pluginName)
 
-		unmapVolumeFunc, e := operationGenerator.GenerateUnmapVolumeFunc(volumeToUnmount, nil)
-		if e != nil {
-			t.Fatalf("Error occurred while generating unmapVolumeFunc: %v", e)
-		}
+		unmapVolumeFunc := operationGenerator.GenerateUnmapVolumeFunc(volumeToUnmount, nil)
 
 		metricFamilyName := "storage_operation_status_count"
 		labelFilter := map[string]string{

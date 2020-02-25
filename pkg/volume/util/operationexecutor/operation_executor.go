@@ -668,11 +668,8 @@ func (oe *operationExecutor) DetachVolume(
 	volumeToDetach AttachedVolume,
 	verifySafeToDetach bool,
 	actualStateOfWorld ActualStateOfWorldAttacherUpdater) error {
-	generatedOperations, err :=
+	generatedOperations :=
 		oe.operationGenerator.GenerateDetachVolumeFunc(volumeToDetach, verifySafeToDetach, actualStateOfWorld)
-	if err != nil {
-		return err
-	}
 
 	return oe.pendingOperations.Run(
 		volumeToDetach.VolumeName, "" /* podName */, generatedOperations)
@@ -750,18 +747,15 @@ func (oe *operationExecutor) VerifyVolumesAreAttached(
 	}
 
 	for pluginName, pluginNodeVolumes := range bulkVerifyPluginsByNode {
-		generatedOperations, err := oe.operationGenerator.GenerateBulkVolumeVerifyFunc(
+		generatedOperations := oe.operationGenerator.GenerateBulkVolumeVerifyFunc(
 			pluginNodeVolumes,
 			pluginName,
 			volumeSpecMapByPlugin[pluginName],
 			actualStateOfWorld)
-		if err != nil {
-			klog.Errorf("BulkVerifyVolumes.GenerateBulkVolumeVerifyFunc error bulk verifying volumes for plugin %q with  %v", pluginName, err)
-		}
 
 		// Ugly hack to ensure - we don't do parallel bulk polling of same volume plugin
 		uniquePluginName := v1.UniqueVolumeName(pluginName)
-		err = oe.pendingOperations.Run(uniquePluginName, "" /* Pod Name */, generatedOperations)
+		err := oe.pendingOperations.Run(uniquePluginName, "" /* Pod Name */, generatedOperations)
 		if err != nil {
 			klog.Errorf("BulkVerifyVolumes.Run Error bulk volume verification for plugin %q  with %v", pluginName, err)
 		}
@@ -772,11 +766,8 @@ func (oe *operationExecutor) VerifyVolumesAreAttachedPerNode(
 	attachedVolumes []AttachedVolume,
 	nodeName types.NodeName,
 	actualStateOfWorld ActualStateOfWorldAttacherUpdater) error {
-	generatedOperations, err :=
+	generatedOperations :=
 		oe.operationGenerator.GenerateVolumesAreAttachedFunc(attachedVolumes, nodeName, actualStateOfWorld)
-	if err != nil {
-		return err
-	}
 
 	// Give an empty UniqueVolumeName so that this operation could be executed concurrently.
 	return oe.pendingOperations.Run("" /* volumeName */, "" /* podName */, generatedOperations)
@@ -801,11 +792,8 @@ func (oe *operationExecutor) MountVolume(
 	} else {
 		// Block volume case
 		// Creates a map to device if a volume is attached
-		generatedOperations, err = oe.operationGenerator.GenerateMapVolumeFunc(
+		generatedOperations = oe.operationGenerator.GenerateMapVolumeFunc(
 			waitForAttachTimeout, volumeToMount, actualStateOfWorld)
-	}
-	if err != nil {
-		return err
 	}
 	// Avoid executing mount/map from multiple pods referencing the
 	// same volume in parallel
@@ -835,16 +823,13 @@ func (oe *operationExecutor) UnmountVolume(
 	if fsVolume {
 		// Filesystem volume case
 		// Unmount a volume if a volume is mounted
-		generatedOperations, err = oe.operationGenerator.GenerateUnmountVolumeFunc(
+		generatedOperations = oe.operationGenerator.GenerateUnmountVolumeFunc(
 			volumeToUnmount, actualStateOfWorld, podsDir)
 	} else {
 		// Block volume case
 		// Unmap a volume if a volume is mapped
-		generatedOperations, err = oe.operationGenerator.GenerateUnmapVolumeFunc(
+		generatedOperations = oe.operationGenerator.GenerateUnmapVolumeFunc(
 			volumeToUnmount, actualStateOfWorld)
-	}
-	if err != nil {
-		return err
 	}
 	// All volume plugins can execute unmount/unmap for multiple pods referencing the
 	// same volume in parallel
@@ -866,16 +851,13 @@ func (oe *operationExecutor) UnmountDevice(
 	if fsVolume {
 		// Filesystem volume case
 		// Unmount and detach a device if a volume isn't referenced
-		generatedOperations, err = oe.operationGenerator.GenerateUnmountDeviceFunc(
+		generatedOperations = oe.operationGenerator.GenerateUnmountDeviceFunc(
 			deviceToDetach, actualStateOfWorld, hostutil)
 	} else {
 		// Block volume case
 		// Detach a device and remove loopback if a volume isn't referenced
-		generatedOperations, err = oe.operationGenerator.GenerateUnmapDeviceFunc(
+		generatedOperations = oe.operationGenerator.GenerateUnmapDeviceFunc(
 			deviceToDetach, actualStateOfWorld, hostutil)
-	}
-	if err != nil {
-		return err
 	}
 	// Avoid executing unmount/unmap device from multiple pods referencing
 	// the same volume in parallel
@@ -886,10 +868,7 @@ func (oe *operationExecutor) UnmountDevice(
 }
 
 func (oe *operationExecutor) ExpandInUseVolume(volumeToMount VolumeToMount, actualStateOfWorld ActualStateOfWorldMounterUpdater) error {
-	generatedOperations, err := oe.operationGenerator.GenerateExpandInUseVolumeFunc(volumeToMount, actualStateOfWorld)
-	if err != nil {
-		return err
-	}
+	generatedOperations := oe.operationGenerator.GenerateExpandInUseVolumeFunc(volumeToMount, actualStateOfWorld)
 	return oe.pendingOperations.Run(volumeToMount.VolumeName, "", generatedOperations)
 }
 
@@ -897,12 +876,8 @@ func (oe *operationExecutor) VerifyControllerAttachedVolume(
 	volumeToMount VolumeToMount,
 	nodeName types.NodeName,
 	actualStateOfWorld ActualStateOfWorldAttacherUpdater) error {
-	generatedOperations, err :=
+	generatedOperations :=
 		oe.operationGenerator.GenerateVerifyControllerAttachedVolumeFunc(volumeToMount, nodeName, actualStateOfWorld)
-	if err != nil {
-		return err
-	}
-
 	return oe.pendingOperations.Run(
 		volumeToMount.VolumeName, "" /* podName */, generatedOperations)
 }
