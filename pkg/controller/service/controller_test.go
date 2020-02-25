@@ -648,7 +648,7 @@ func TestProcessServiceCreateOrUpdateK8sError(t *testing.T) {
 				return true, nil, tc.k8sErr
 			})
 
-			if err := controller.processServiceCreateOrUpdate(svc, svcName); !reflect.DeepEqual(err, tc.expectErr) {
+			if err := controller.processServiceCreateOrUpdate(svc, svcName); err.Error() != tc.expectErr.Error() {
 				t.Fatalf("processServiceCreateOrUpdate() = %v, want %v", err, tc.expectErr)
 			}
 			if tc.expectErr == nil {
