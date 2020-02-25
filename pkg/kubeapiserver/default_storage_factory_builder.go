@@ -78,19 +78,19 @@ type StorageFactoryConfig struct {
 }
 
 // Complete completes the StorageFactoryConfig with provided etcdOptions returning completedStorageFactoryConfig.
-func (c *StorageFactoryConfig) Complete(etcdOptions *serveroptions.EtcdOptions) (*kubeapiserver.completedStorageFactoryConfig, error) {
+func (c *StorageFactoryConfig) Complete(etcdOptions *serveroptions.EtcdOptions) (*CompletedStorageFactoryConfig, error) {
 	c.StorageConfig = etcdOptions.StorageConfig
 	c.DefaultStorageMediaType = etcdOptions.DefaultStorageMediaType
 	c.EtcdServersOverrides = etcdOptions.EtcdServersOverrides
 	c.EncryptionProviderConfigFilepath = etcdOptions.EncryptionProviderConfigFilepath
-	return &completedStorageFactoryConfig{c}, nil
+	return &CompletedStorageFactoryConfig{c}, nil
 }
 
-// completedStorageFactoryConfig is a wrapper around StorageFactoryConfig completed with etcd options.
+// CompletedStorageFactoryConfig is a wrapper around StorageFactoryConfig completed with etcd options.
 //
 // Note: this struct is intentionally unexported so that it can only be constructed via a StorageFactoryConfig.Complete
 // call. The implied consequence is that this does not comply with golint.
-type completedStorageFactoryConfig struct {
+type CompletedStorageFactoryConfig struct {
 	*StorageFactoryConfig
 }
 
