@@ -195,11 +195,11 @@ func (kubemarkController *KubemarkController) SetNodeGroupSize(nodeGroup string,
 		}
 	case delta > 0:
 		kubemarkController.nodeGroupQueueSizeLock.Lock()
+		kubemarkController.nodeGroupQueueSize[nodeGroup] += delta
+		kubemarkController.nodeGroupQueueSizeLock.Unlock()
 		for i := 0; i < delta; i++ {
-			kubemarkController.nodeGroupQueueSize[nodeGroup]++
 			kubemarkController.createNodeQueue <- nodeGroup
 		}
-		kubemarkController.nodeGroupQueueSizeLock.Unlock()
 	}
 
 	return nil
