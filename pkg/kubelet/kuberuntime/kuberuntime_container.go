@@ -131,7 +131,7 @@ func (s *startSpec) getTargetID(podStatus *kubecontainer.PodStatus) (*kubecontai
 // * create the container
 // * start the container
 // * run the post start lifecycle hooks (if applicable)
-func (m *kubeGenericRuntimeManager) startContainer(podSandboxID string, podSandboxConfig *runtimeapi.PodSandboxConfig, spec *startSpec, pod *v1.Pod, podStatus *kubecontainer.PodStatus, pullSecrets []v1.Secret, podIP string, podIPs []string) (string, error) {
+func (m *kubeGenericRuntimeManager) startContainer(podSandboxID string, podSandboxConfig *runtimeapi.PodSandboxConfig, spec *startSpec, pod *v1.Pod, podStatus *kubecontainer.PodStatus, pullSecrets []v1.Secret, podIP string, podIPs []string, async bool) (string, error) {
 	container := spec.container
 
 	// Step 1: pull the image.
@@ -228,15 +228,22 @@ func (m *kubeGenericRuntimeManager) startContainer(podSandboxID string, podSandb
 			Type: m.runtimeName,
 			ID:   containerID,
 		}
-		msg, handlerErr := m.runner.Run(kubeContainerID, pod, container, container.Lifecycle.PostStart)
-		if handlerErr != nil {
-			m.recordContainerEvent(pod, container, kubeContainerID.ID, v1.EventTypeWarning, events.FailedPostStartHook, msg)
-			if err := m.killContainer(pod, kubeContainerID, container.Name, "FailedPostStartHook", nil); err != nil {
-				klog.Errorf("Failed to kill container %q(id=%q) in pod %q: %v, %v",
-					container.Name, kubeContainerID.String(), format.Pod(pod), ErrPostStartHook, err)
+		postStart := func(async bool) (string, error) {
+			msg, handlerErr := m.runner.Run(kubeContainerID, pod, container, container.Lifecycle.PostStart)
+			if handlerErr != nil {
+				m.recordContainerEvent(pod, container, kubeContainerID.ID, v1.EventTypeWarning, events.FailedPostStartHook, msg)
+				if err := m.killContainer(pod, kubeContainerID, container.Name, "FailedPostStartHook", nil); err != nil {
+					klog.Errorf("Failed to kill container %q(id=%q) in pod %q: %v, %v",
+						container.Name, kubeContainerID.String(), format.Pod(pod), ErrPostStartHook, err)
+				}
+				if async {
+					klog.Errorf("%s: %v", ErrPostStartHook, handlerErr)
+				}
+				return msg, fmt.Errorf("%s: %v", ErrPostStartHook, handlerErr)
 			}
-			return msg, fmt.Errorf("%s: %v", ErrPostStartHook, handlerErr)
+			return "", nil
 		}
+		go postStart(true)
 	}
 
 	return "", nil
