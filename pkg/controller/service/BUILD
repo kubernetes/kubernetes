@@ -5,7 +5,6 @@ go_library(
     srcs = [
         "controller.go",
         "doc.go",
-        "patch.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/controller/service",
     visibility = ["//visibility:public"],
@@ -39,7 +38,6 @@ go_test(
     name = "go_default_test",
     srcs = [
         "controller_test.go",
-        "patch_test.go",
     ],
     embed = [":go_default_library"],
     deps = [
