@@ -1918,6 +1918,58 @@ func TestGenerateAPIPodStatusInvokesPodSyncHandlers(t *testing.T) {
 	require.Equal(t, "because", apiStatus.Message)
 }
 
+func TestGenerateAPIPodStatusIPs(t *testing.T) {
+	testKubelet := newTestKubelet(t, false)
+	defer testKubelet.Cleanup()
+	kl := testKubelet.kubelet
+	pod := podWithUIDNameNsSpec("12345678", "hostnetwork", "new", v1.PodSpec{})
+
+	testCases := []struct {
+		name        string
+		hostNetwork bool
+		ips         []string
+		expectIP    string
+		expectIPs   []v1.PodIP
+	}{
+		{
+			name:        "host network pod with no ip",
+			hostNetwork: true,
+			expectIP:    "127.0.0.1",
+			expectIPs:   []v1.PodIP{{IP: "127.0.0.1"}},
+		},
+		{
+			name:        "host network pod with ip",
+			hostNetwork: true,
+			ips:         []string{"10.0.0.1"},
+			expectIP:    "10.0.0.1",
+			expectIPs:   []v1.PodIP{{IP: "10.0.0.1"}},
+		},
+		{
+			name:        "pod with one ip",
+			hostNetwork: false,
+			ips:         []string{"10.0.0.1"},
+			expectIP:    "10.0.0.1",
+			expectIPs:   []v1.PodIP{{IP: "10.0.0.1"}},
+		},
+		{
+			name:        "pod with dual stack",
+			hostNetwork: false,
+			ips:         []string{"10.0.0.1", "2000:0:0:0:0:0:0:1"},
+			expectIP:    "10.0.0.1",
+			expectIPs:   []v1.PodIP{{IP: "10.0.0.1"}, {IP: "2000:0:0:0:0:0:0:1"}},
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			pod.Spec.HostNetwork = test.hostNetwork
+			apiStatus := kl.convertStatusToAPIStatus(pod, &kubecontainer.PodStatus{IPs: test.ips})
+			require.Equal(t, apiStatus.PodIP, test.expectIP)
+			require.Equal(t, apiStatus.PodIPs, test.expectIPs)
+		})
+	}
+}
+
 func TestSyncPodKillPod(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()

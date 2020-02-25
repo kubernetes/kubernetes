@@ -1525,17 +1525,6 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 
 	// Generate final API pod status with pod and status manager status
 	apiPodStatus := kl.generateAPIPodStatus(pod, podStatus)
-	// The pod IP may be changed in generateAPIPodStatus if the pod is using host network. (See #24576)
-	// TODO(random-liu): After writing pod spec into container labels, check whether pod is using host network, and
-	// set pod IP to hostIP directly in runtime.GetPodStatus
-	podStatus.IPs = make([]string, 0, len(apiPodStatus.PodIPs))
-	for _, ipInfo := range apiPodStatus.PodIPs {
-		podStatus.IPs = append(podStatus.IPs, ipInfo.IP)
-	}
-
-	if len(podStatus.IPs) == 0 && len(apiPodStatus.PodIP) > 0 {
-		podStatus.IPs = []string{apiPodStatus.PodIP}
-	}
 
 	// Record the time it takes for the pod to become running.
 	existingStatus, ok := kl.statusManager.GetPodStatus(pod.UID)

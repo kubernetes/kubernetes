@@ -1391,19 +1391,6 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 		Status: v1.ConditionTrue,
 	})
 
-	if kl.kubeClient != nil {
-		hostIP, err := kl.getHostIPAnyWay()
-		if err != nil {
-			klog.V(4).Infof("Cannot get host IP: %v", err)
-		} else {
-			s.HostIP = hostIP.String()
-			if kubecontainer.IsHostNetworkPod(pod) && s.PodIP == "" {
-				s.PodIP = hostIP.String()
-				s.PodIPs = []v1.PodIP{{IP: s.PodIP}}
-			}
-		}
-	}
-
 	return *s
 }
 
@@ -1412,6 +1399,21 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 // alter the kubelet state at all.
 func (kl *Kubelet) convertStatusToAPIStatus(pod *v1.Pod, podStatus *kubecontainer.PodStatus) *v1.PodStatus {
 	var apiPodStatus v1.PodStatus
+	// The pod IP may be changed if the pod is using host network. (See #24576)
+	// TODO(random-liu): After writing pod spec into container labels, check whether pod is using host network, and
+	// set pod IP to hostIP directly in runtime.GetPodStatus
+	if kl.kubeClient != nil {
+		hostIP, err := kl.getHostIPAnyWay()
+		if err != nil {
+			klog.V(4).Infof("Cannot get host IP: %v", err)
+		} else {
+			apiPodStatus.HostIP = hostIP.String()
+			if kubecontainer.IsHostNetworkPod(pod) && len(podStatus.IPs) == 0 {
+				podStatus.IPs = append(podStatus.IPs, hostIP.String())
+			}
+		}
+	}
+
 	apiPodStatus.PodIPs = make([]v1.PodIP, 0, len(podStatus.IPs))
 	for _, ip := range podStatus.IPs {
 		apiPodStatus.PodIPs = append(apiPodStatus.PodIPs, v1.PodIP{
