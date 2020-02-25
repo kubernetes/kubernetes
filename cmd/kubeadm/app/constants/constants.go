@@ -338,7 +338,7 @@ const (
 	KubeDNSVersion = "1.14.13"
 
 	// CoreDNSVersion is the version of CoreDNS to be deployed if it is used
-	CoreDNSVersion = "1.6.5"
+	CoreDNSVersion = "1.6.7"
 
 	// ClusterConfigurationKind is the string kind value for the ClusterConfiguration struct
 	ClusterConfigurationKind = "ClusterConfiguration"

@@ -152,7 +152,7 @@ NextPlugin:
 }
 
 func (o *Option) FindMatch(def []*Option) (*Option, bool) {
-NextPlugin:
+NextOption:
 	for _, oDef := range def {
 		if oDef.Name != o.Name {
 			continue
@@ -165,7 +165,7 @@ NextPlugin:
 				return oDef, true
 			}
 			if i >= len(o.Args) || arg != o.Args[i] {
-				continue NextPlugin
+				continue NextOption
 			}
 		}
 		if len(oDef.Args) != len(o.Args) {
