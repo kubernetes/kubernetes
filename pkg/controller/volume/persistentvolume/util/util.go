@@ -211,9 +211,14 @@ func FindMatchingVolume(
 			// Skip volumes in the excluded list
 			continue
 		}
+		if volume.Spec.ClaimRef != nil && !IsVolumeBoundToClaim(volume, claim) {
+			continue
+		}
 
 		volumeQty := volume.Spec.Capacity[v1.ResourceStorage]
-
+		if volumeQty.Cmp(requestedQty) < 0 {
+			continue
+		}
 		// filter out mismatching volumeModes
 		if CheckVolumeModeMismatches(&claim.Spec, &volume.Spec) {
 			continue
@@ -230,6 +235,8 @@ func FindMatchingVolume(
 		if node != nil {
 			// Scheduler path, check that the PV NodeAffinity
 			// is satisfied by the node
+			// volumeutil.CheckNodeAffinity is the most expensive call in this loop.
+			// We should check cheaper conditions first or consider optimizing this function.
 			err := volumeutil.CheckNodeAffinity(volume, node.Labels)
 			if err != nil {
 				nodeAffinityValid = false
@@ -237,13 +244,6 @@ func FindMatchingVolume(
 		}
 
 		if IsVolumeBoundToClaim(volume, claim) {
-			// this claim and volume are pre-bound; return
-			// the volume if the size request is satisfied,
-			// otherwise continue searching for a match
-			if volumeQty.Cmp(requestedQty) < 0 {
-				continue
-			}
-
 			// If PV node affinity is invalid, return no match.
 			// This means the prebound PV (and therefore PVC)
 			// is not suitable for this node.
@@ -263,7 +263,6 @@ func FindMatchingVolume(
 
 		// filter out:
 		// - volumes in non-available phase
-		// - volumes bound to another claim
 		// - volumes whose labels don't match the claim's selector, if specified
 		// - volumes in Class that is not requested
 		// - volumes whose NodeAffinity does not match the node
@@ -272,8 +271,6 @@ func FindMatchingVolume(
 			// satisfies matching criteria will be updated to available, binding
 			// them now has high chance of encountering unnecessary failures
 			// due to API conflicts.
-			continue
-		} else if volume.Spec.ClaimRef != nil {
 			continue
 		} else if selector != nil && !selector.Matches(labels.Set(volume.Labels)) {
 			continue
@@ -293,11 +290,9 @@ func FindMatchingVolume(
 			}
 		}
 
-		if volumeQty.Cmp(requestedQty) >= 0 {
-			if smallestVolume == nil || smallestVolumeQty.Cmp(volumeQty) > 0 {
-				smallestVolume = volume
-				smallestVolumeQty = volumeQty
-			}
+		if smallestVolume == nil || smallestVolumeQty.Cmp(volumeQty) > 0 {
+			smallestVolume = volume
+			smallestVolumeQty = volumeQty
 		}
 	}
 
