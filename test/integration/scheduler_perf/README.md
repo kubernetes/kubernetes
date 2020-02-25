@@ -68,6 +68,26 @@ To produce a cpu profile:
 make test-integration WHAT=./test/integration/scheduler_perf KUBE_TIMEOUT="-timeout=3600s" KUBE_TEST_VMODULE="''" KUBE_TEST_ARGS="-alsologtostderr=false -logtostderr=false -run=^$$ -benchtime=1ns -bench=BenchmarkPerfScheduling -cpuprofile ~/cpu-profile.out"
 ```
 
+### How to configure bechmark tests
+
+Configuration file located under config/performance-config.yaml contains a list of templates.
+Each template allows to set:
+- node manifest
+- manifests for initial and testing pod
+- number of nodes, number of initial and testing pods
+- templates for PVs and PVCs
+- feature gates
+
+See `simpleTestCases` data type implementation for available configuration for each template.
+
+Initial pods create a state of a cluster before the scheduler performance measurement can begin.
+Testing pods are then subject to performance measurement.
+
+The configuration file under config/performance-config.yaml contains a default list of templates to cover
+various scenarios. In case you want to add your own, you can extend the list with new templates.
+It's also possible to extend `simpleTestCases` data type, respectively its underlying data types
+to extend configuration of possible test cases.
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/test/component/scheduler/perf/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
