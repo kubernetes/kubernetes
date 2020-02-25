@@ -61,8 +61,10 @@ func mustSetupScheduler() (util.ShutdownFunc, coreinformers.PodInformer, clients
 		Burst:         5000,
 	})
 	_, podInformer, schedulerShutdown := util.StartScheduler(clientSet)
+	fakePVControllerShutdown := util.StartFakePVController(clientSet)
 
 	shutdownFunc := func() {
+		fakePVControllerShutdown()
 		schedulerShutdown()
 		apiShutdown()
 	}
