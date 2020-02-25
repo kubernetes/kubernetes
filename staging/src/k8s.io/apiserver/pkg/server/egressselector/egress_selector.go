@@ -22,16 +22,20 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"google.golang.org/grpc"
 	"io/ioutil"
-	utilnet "k8s.io/apimachinery/pkg/util/net"
-	"k8s.io/apiserver/pkg/apis/apiserver"
-	"k8s.io/klog"
 	"net"
 	"net/http"
 	"net/url"
-	client "sigs.k8s.io/apiserver-network-proxy/konnectivity-client/pkg/client"
 	"strings"
+	"time"
+
+	"google.golang.org/grpc"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apiserver/pkg/apis/apiserver"
+	egressmetrics "k8s.io/apiserver/pkg/server/egressselector/metrics"
+	"k8s.io/klog"
+	utiltrace "k8s.io/utils/trace"
+	client "sigs.k8s.io/apiserver-network-proxy/konnectivity-client/pkg/client"
 )
 
 var directDialer utilnet.DialFunc = http.DefaultTransport.(*http.Transport).DialContext
@@ -152,7 +156,10 @@ func createConnectTCPDialer(tcpTransport *apiserver.TCPTransport) (utilnet.DialF
 		certPool = nil
 	}
 	contextDialer := func(ctx context.Context, network, addr string) (net.Conn, error) {
+		trace := utiltrace.New("Proxy via HTTP Connect over TCP", utiltrace.Field{Key: "address", Value: addr})
+		defer trace.LogIfLong(500 * time.Millisecond)
 		klog.V(4).Infof("Sending request to %q.", addr)
+		start := time.Now()
 		proxyConn, err := tls.Dial("tcp", proxyAddress,
 			&tls.Config{
 				Certificates: []tls.Certificate{clientCerts},
@@ -160,27 +167,46 @@ func createConnectTCPDialer(tcpTransport *apiserver.TCPTransport) (utilnet.DialF
 			},
 		)
 		if err != nil {
+			egressmetrics.Metrics.ObserveDialFailure(egressmetrics.ProtocolHTTPConnect, egressmetrics.TransportTCP, egressmetrics.StageDial)
 			return nil, fmt.Errorf("dialing proxy %q failed: %v", proxyAddress, err)
 		}
-		return tunnelHTTPConnect(proxyConn, proxyAddress, addr)
+		ret, err := tunnelHTTPConnect(proxyConn, proxyAddress, addr)
+		if err != nil {
+			egressmetrics.Metrics.ObserveDialFailure(egressmetrics.ProtocolHTTPConnect, egressmetrics.TransportTCP, egressmetrics.StageProxy)
+			return nil, err
+		}
+		egressmetrics.Metrics.ObserveDialLatency(time.Since(start), egressmetrics.ProtocolHTTPConnect, egressmetrics.TransportTCP)
+		return ret, nil
 	}
 	return contextDialer, nil
 }
 
 func createConnectUDSDialer(udsConfig *apiserver.UDSTransport) (utilnet.DialFunc, error) {
 	contextDialer := func(ctx context.Context, network, addr string) (net.Conn, error) {
+		trace := utiltrace.New("Proxy via HTTP Connect over UDS", utiltrace.Field{Key: "address", Value: addr})
+		defer trace.LogIfLong(500 * time.Millisecond)
+		start := time.Now()
 		proxyConn, err := net.Dial("unix", udsConfig.UDSName)
 		if err != nil {
+			egressmetrics.Metrics.ObserveDialFailure(egressmetrics.ProtocolHTTPConnect, egressmetrics.TransportUDS, egressmetrics.StageDial)
 			return nil, fmt.Errorf("dialing proxy %q failed: %v", udsConfig.UDSName, err)
 		}
-		return tunnelHTTPConnect(proxyConn, udsConfig.UDSName, addr)
+		ret, err := tunnelHTTPConnect(proxyConn, udsConfig.UDSName, addr)
+		if err != nil {
+			egressmetrics.Metrics.ObserveDialFailure(egressmetrics.ProtocolHTTPConnect, egressmetrics.TransportUDS, egressmetrics.StageProxy)
+			return nil, err
+		}
+		egressmetrics.Metrics.ObserveDialLatency(time.Since(start), egressmetrics.ProtocolHTTPConnect, egressmetrics.TransportUDS)
+		return ret, nil
 	}
 	return contextDialer, nil
 }
 
 func createGRPCUDSDialer(udsName string) (utilnet.DialFunc, error) {
 	contextDialer := func(ctx context.Context, network, addr string) (net.Conn, error) {
-
+		trace := utiltrace.New("Proxy via GRPC over UDS", utiltrace.Field{Key: "address", Value: addr})
+		defer trace.LogIfLong(500 * time.Millisecond)
+		start := time.Now()
 		dialOption := grpc.WithContextDialer(func(context.Context, string) (net.Conn, error) {
 			c, err := net.Dial("unix", udsName)
 			if err != nil {
@@ -191,13 +217,16 @@ func createGRPCUDSDialer(udsName string) (utilnet.DialFunc, error) {
 
 		tunnel, err := client.CreateGrpcTunnel(udsName, dialOption, grpc.WithInsecure())
 		if err != nil {
+			egressmetrics.Metrics.ObserveDialFailure(egressmetrics.ProtocolGRPC, egressmetrics.TransportUDS, egressmetrics.StageDial)
 			return nil, err
 		}
 
 		proxyConn, err := tunnel.Dial("tcp", addr)
 		if err != nil {
+			egressmetrics.Metrics.ObserveDialFailure(egressmetrics.ProtocolGRPC, egressmetrics.TransportUDS, egressmetrics.StageProxy)
 			return nil, err
 		}
+		egressmetrics.Metrics.ObserveDialLatency(time.Since(start), egressmetrics.ProtocolGRPC, egressmetrics.TransportUDS)
 		return proxyConn, nil
 	}
 	return contextDialer, nil
