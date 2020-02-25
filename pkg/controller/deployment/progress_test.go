@@ -165,7 +165,7 @@ func TestRequeueStuckDeployment(t *testing.T) {
 		},
 	}
 
-	dc := &DeploymentController{
+	dc := &Controller{
 		queue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "doesnt_matter"),
 	}
 	dc.enqueueDeployment = dc.enqueue
@@ -322,7 +322,7 @@ func TestSyncRolloutStatus(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			fake := fake.Clientset{}
-			dc := &DeploymentController{
+			dc := &Controller{
 				client: &fake,
 			}
 

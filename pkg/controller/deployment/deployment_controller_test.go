@@ -180,7 +180,7 @@ func newFixture(t testing.TB) *fixture {
 	return f
 }
 
-func (f *fixture) newController() (*DeploymentController, informers.SharedInformerFactory, error) {
+func (f *fixture) newController() (*Controller, informers.SharedInformerFactory, error) {
 	f.client = fake.NewSimpleClientset(f.objects...)
 	informers := informers.NewSharedInformerFactory(f.client, controller.NoResyncPeriodFunc())
 	c, err := NewDeploymentController(informers.Apps().V1().Deployments(), informers.Apps().V1().ReplicaSets(), informers.Core().V1().Pods(), f.client)
@@ -204,14 +204,14 @@ func (f *fixture) newController() (*DeploymentController, informers.SharedInform
 }
 
 func (f *fixture) runExpectError(deploymentName string, startInformers bool) {
-	f.run_(deploymentName, startInformers, true)
+	f.run(deploymentName, startInformers, true)
 }
 
-func (f *fixture) run(deploymentName string) {
-	f.run_(deploymentName, true, false)
+func (f *fixture) runStartInformers(deploymentName string) {
+	f.run(deploymentName, true, false)
 }
 
-func (f *fixture) run_(deploymentName string, startInformers bool, expectError bool) {
+func (f *fixture) run(deploymentName string, startInformers bool, expectError bool) {
 	c, informers, err := f.newController()
 	if err != nil {
 		f.t.Fatalf("error creating Deployment controller: %v", err)
@@ -279,7 +279,7 @@ func TestSyncDeploymentCreatesReplicaSet(t *testing.T) {
 	f.expectUpdateDeploymentStatusAction(d)
 	f.expectUpdateDeploymentStatusAction(d)
 
-	f.run(testutil.GetKey(d, t))
+	f.runStartInformers(testutil.GetKey(d, t))
 }
 
 func TestSyncDeploymentDontDoAnythingDuringDeletion(t *testing.T) {
@@ -292,7 +292,7 @@ func TestSyncDeploymentDontDoAnythingDuringDeletion(t *testing.T) {
 	f.objects = append(f.objects, d)
 
 	f.expectUpdateDeploymentStatusAction(d)
-	f.run(testutil.GetKey(d, t))
+	f.runStartInformers(testutil.GetKey(d, t))
 }
 
 func TestSyncDeploymentDeletionRace(t *testing.T) {
@@ -331,7 +331,7 @@ func TestDontSyncDeploymentsWithEmptyPodSelector(t *testing.T) {
 
 	// Normally there should be a status update to sync observedGeneration but the fake
 	// deployment has no generation set so there is no action happening here.
-	f.run(testutil.GetKey(d, t))
+	f.runStartInformers(testutil.GetKey(d, t))
 }
 
 func TestReentrantRollback(t *testing.T) {
@@ -358,7 +358,7 @@ func TestReentrantRollback(t *testing.T) {
 	// Rollback is done here
 	f.expectUpdateDeploymentAction(d)
 	// Expect no update on replica sets though
-	f.run(testutil.GetKey(d, t))
+	f.runStartInformers(testutil.GetKey(d, t))
 }
 
 // TestPodDeletionEnqueuesRecreateDeployment ensures that the deletion of a pod

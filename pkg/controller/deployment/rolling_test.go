@@ -86,7 +86,7 @@ func TestDeploymentController_reconcileNewReplicaSet(t *testing.T) {
 		maxUnavailable := intstr.FromInt(0)
 		deployment := newDeployment("foo", test.deploymentReplicas, nil, &test.maxSurge, &maxUnavailable, map[string]string{"foo": "bar"})
 		fake := fake.Clientset{}
-		controller := &DeploymentController{
+		controller := &Controller{
 			client:        &fake,
 			eventRecorder: &record.FakeRecorder{},
 		}
@@ -192,7 +192,7 @@ func TestDeploymentController_reconcileOldReplicaSets(t *testing.T) {
 		maxSurge := intstr.FromInt(0)
 		deployment := newDeployment("foo", test.deploymentReplicas, nil, &maxSurge, &test.maxUnavailable, newSelector)
 		fakeClientset := fake.Clientset{}
-		controller := &DeploymentController{
+		controller := &Controller{
 			client:        &fakeClientset,
 			eventRecorder: &record.FakeRecorder{},
 		}
@@ -261,7 +261,7 @@ func TestDeploymentController_cleanupUnhealthyReplicas(t *testing.T) {
 		deployment := newDeployment("foo", 10, nil, &maxSurge, &maxUnavailable, nil)
 		fakeClientset := fake.Clientset{}
 
-		controller := &DeploymentController{
+		controller := &Controller{
 			client:        &fakeClientset,
 			eventRecorder: &record.FakeRecorder{},
 		}
@@ -335,7 +335,7 @@ func TestDeploymentController_scaleDownOldReplicaSetsForRollingUpdate(t *testing
 		maxSurge := intstr.FromInt(0)
 		deployment := newDeployment("foo", test.deploymentReplicas, nil, &maxSurge, &test.maxUnavailable, map[string]string{"foo": "bar"})
 		fakeClientset := fake.Clientset{}
-		controller := &DeploymentController{
+		controller := &Controller{
 			client:        &fakeClientset,
 			eventRecorder: &record.FakeRecorder{},
 		}

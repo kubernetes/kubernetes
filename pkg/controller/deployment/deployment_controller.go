@@ -63,9 +63,9 @@ const (
 // controllerKind contains the schema.GroupVersionKind for this controller type.
 var controllerKind = apps.SchemeGroupVersion.WithKind("Deployment")
 
-// DeploymentController is responsible for synchronizing Deployment objects stored
+// Controller is responsible for synchronizing Deployment objects stored
 // in the system with actual running replica sets and pods.
-type DeploymentController struct {
+type Controller struct {
 	// rsControl is used for adopting/releasing replica sets.
 	rsControl     controller.RSControlInterface
 	client        clientset.Interface
@@ -98,7 +98,7 @@ type DeploymentController struct {
 }
 
 // NewDeploymentController creates a new DeploymentController.
-func NewDeploymentController(dInformer appsinformers.DeploymentInformer, rsInformer appsinformers.ReplicaSetInformer, podInformer coreinformers.PodInformer, client clientset.Interface) (*DeploymentController, error) {
+func NewDeploymentController(dInformer appsinformers.DeploymentInformer, rsInformer appsinformers.ReplicaSetInformer, podInformer coreinformers.PodInformer, client clientset.Interface) (*Controller, error) {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(klog.Infof)
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: client.CoreV1().Events("")})
@@ -108,7 +108,7 @@ func NewDeploymentController(dInformer appsinformers.DeploymentInformer, rsInfor
 			return nil, err
 		}
 	}
-	dc := &DeploymentController{
+	dc := &Controller{
 		client:        client,
 		eventRecorder: eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "deployment-controller"}),
 		queue:         workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "deployment"),
@@ -146,7 +146,7 @@ func NewDeploymentController(dInformer appsinformers.DeploymentInformer, rsInfor
 }
 
 // Run begins watching and syncing.
-func (dc *DeploymentController) Run(workers int, stopCh <-chan struct{}) {
+func (dc *Controller) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer dc.queue.ShutDown()
 
@@ -164,20 +164,20 @@ func (dc *DeploymentController) Run(workers int, stopCh <-chan struct{}) {
 	<-stopCh
 }
 
-func (dc *DeploymentController) addDeployment(obj interface{}) {
+func (dc *Controller) addDeployment(obj interface{}) {
 	d := obj.(*apps.Deployment)
 	klog.V(4).Infof("Adding deployment %s", d.Name)
 	dc.enqueueDeployment(d)
 }
 
-func (dc *DeploymentController) updateDeployment(old, cur interface{}) {
+func (dc *Controller) updateDeployment(old, cur interface{}) {
 	oldD := old.(*apps.Deployment)
 	curD := cur.(*apps.Deployment)
 	klog.V(4).Infof("Updating deployment %s", oldD.Name)
 	dc.enqueueDeployment(curD)
 }
 
-func (dc *DeploymentController) deleteDeployment(obj interface{}) {
+func (dc *Controller) deleteDeployment(obj interface{}) {
 	d, ok := obj.(*apps.Deployment)
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
@@ -196,7 +196,7 @@ func (dc *DeploymentController) deleteDeployment(obj interface{}) {
 }
 
 // addReplicaSet enqueues the deployment that manages a ReplicaSet when the ReplicaSet is created.
-func (dc *DeploymentController) addReplicaSet(obj interface{}) {
+func (dc *Controller) addReplicaSet(obj interface{}) {
 	rs := obj.(*apps.ReplicaSet)
 
 	if rs.DeletionTimestamp != nil {
@@ -231,7 +231,7 @@ func (dc *DeploymentController) addReplicaSet(obj interface{}) {
 
 // getDeploymentsForReplicaSet returns a list of Deployments that potentially
 // match a ReplicaSet.
-func (dc *DeploymentController) getDeploymentsForReplicaSet(rs *apps.ReplicaSet) []*apps.Deployment {
+func (dc *Controller) getDeploymentsForReplicaSet(rs *apps.ReplicaSet) []*apps.Deployment {
 	deployments, err := util.GetDeploymentsForReplicaSet(dc.dLister, rs)
 	if err != nil || len(deployments) == 0 {
 		return nil
@@ -253,7 +253,7 @@ func (dc *DeploymentController) getDeploymentsForReplicaSet(rs *apps.ReplicaSet)
 // is updated and wake them up. If the anything of the ReplicaSets have changed, we need to
 // awaken both the old and new deployments. old and cur must be *apps.ReplicaSet
 // types.
-func (dc *DeploymentController) updateReplicaSet(old, cur interface{}) {
+func (dc *Controller) updateReplicaSet(old, cur interface{}) {
 	curRS := cur.(*apps.ReplicaSet)
 	oldRS := old.(*apps.ReplicaSet)
 	if curRS.ResourceVersion == oldRS.ResourceVersion {
@@ -301,7 +301,7 @@ func (dc *DeploymentController) updateReplicaSet(old, cur interface{}) {
 // deleteReplicaSet enqueues the deployment that manages a ReplicaSet when
 // the ReplicaSet is deleted. obj could be an *apps.ReplicaSet, or
 // a DeletionFinalStateUnknown marker item.
-func (dc *DeploymentController) deleteReplicaSet(obj interface{}) {
+func (dc *Controller) deleteReplicaSet(obj interface{}) {
 	rs, ok := obj.(*apps.ReplicaSet)
 
 	// When a delete is dropped, the relist will notice a pod in the store not
@@ -335,7 +335,7 @@ func (dc *DeploymentController) deleteReplicaSet(obj interface{}) {
 }
 
 // deletePod will enqueue a Recreate Deployment once all of its pods have stopped running.
-func (dc *DeploymentController) deletePod(obj interface{}) {
+func (dc *Controller) deletePod(obj interface{}) {
 	pod, ok := obj.(*v1.Pod)
 
 	// When a delete is dropped, the relist will notice a pod in the store not
@@ -375,7 +375,7 @@ func (dc *DeploymentController) deletePod(obj interface{}) {
 	}
 }
 
-func (dc *DeploymentController) enqueue(deployment *apps.Deployment) {
+func (dc *Controller) enqueue(deployment *apps.Deployment) {
 	key, err := controller.KeyFunc(deployment)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %#v: %v", deployment, err))
@@ -385,7 +385,7 @@ func (dc *DeploymentController) enqueue(deployment *apps.Deployment) {
 	dc.queue.Add(key)
 }
 
-func (dc *DeploymentController) enqueueRateLimited(deployment *apps.Deployment) {
+func (dc *Controller) enqueueRateLimited(deployment *apps.Deployment) {
 	key, err := controller.KeyFunc(deployment)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %#v: %v", deployment, err))
@@ -396,7 +396,7 @@ func (dc *DeploymentController) enqueueRateLimited(deployment *apps.Deployment) 
 }
 
 // enqueueAfter will enqueue a deployment after the provided amount of time.
-func (dc *DeploymentController) enqueueAfter(deployment *apps.Deployment, after time.Duration) {
+func (dc *Controller) enqueueAfter(deployment *apps.Deployment, after time.Duration) {
 	key, err := controller.KeyFunc(deployment)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %#v: %v", deployment, err))
@@ -407,7 +407,7 @@ func (dc *DeploymentController) enqueueAfter(deployment *apps.Deployment, after 
 }
 
 // getDeploymentForPod returns the deployment managing the given Pod.
-func (dc *DeploymentController) getDeploymentForPod(pod *v1.Pod) *apps.Deployment {
+func (dc *Controller) getDeploymentForPod(pod *v1.Pod) *apps.Deployment {
 	// Find the owning replica set
 	var rs *apps.ReplicaSet
 	var err error
@@ -437,7 +437,7 @@ func (dc *DeploymentController) getDeploymentForPod(pod *v1.Pod) *apps.Deploymen
 // resolveControllerRef returns the controller referenced by a ControllerRef,
 // or nil if the ControllerRef could not be resolved to a matching controller
 // of the correct Kind.
-func (dc *DeploymentController) resolveControllerRef(namespace string, controllerRef *metav1.OwnerReference) *apps.Deployment {
+func (dc *Controller) resolveControllerRef(namespace string, controllerRef *metav1.OwnerReference) *apps.Deployment {
 	// We can't look up by UID, so look up by Name and then verify UID.
 	// Don't even try to look up by Name if it's the wrong Kind.
 	if controllerRef.Kind != controllerKind.Kind {
@@ -457,12 +457,12 @@ func (dc *DeploymentController) resolveControllerRef(namespace string, controlle
 
 // worker runs a worker thread that just dequeues items, processes them, and marks them done.
 // It enforces that the syncHandler is never invoked concurrently with the same key.
-func (dc *DeploymentController) worker() {
+func (dc *Controller) worker() {
 	for dc.processNextWorkItem() {
 	}
 }
 
-func (dc *DeploymentController) processNextWorkItem() bool {
+func (dc *Controller) processNextWorkItem() bool {
 	key, quit := dc.queue.Get()
 	if quit {
 		return false
@@ -475,7 +475,7 @@ func (dc *DeploymentController) processNextWorkItem() bool {
 	return true
 }
 
-func (dc *DeploymentController) handleErr(err error, key interface{}) {
+func (dc *Controller) handleErr(err error, key interface{}) {
 	if err == nil || errors.HasStatusCause(err, v1.NamespaceTerminatingCause) {
 		dc.queue.Forget(key)
 		return
@@ -495,7 +495,7 @@ func (dc *DeploymentController) handleErr(err error, key interface{}) {
 // getReplicaSetsForDeployment uses ControllerRefManager to reconcile
 // ControllerRef by adopting and orphaning.
 // It returns the list of ReplicaSets that this Deployment should manage.
-func (dc *DeploymentController) getReplicaSetsForDeployment(d *apps.Deployment) ([]*apps.ReplicaSet, error) {
+func (dc *Controller) getReplicaSetsForDeployment(d *apps.Deployment) ([]*apps.ReplicaSet, error) {
 	// List all ReplicaSets to find those we own but that no longer match our
 	// selector. They will be orphaned by ClaimReplicaSets().
 	rsList, err := dc.rsLister.ReplicaSets(d.Namespace).List(labels.Everything())
@@ -528,7 +528,7 @@ func (dc *DeploymentController) getReplicaSetsForDeployment(d *apps.Deployment) 
 // according to the Pod's ControllerRef.
 // NOTE: The pod pointers returned by this method point the pod objects in the cache and thus
 // shouldn't be modified in any way.
-func (dc *DeploymentController) getPodMapForDeployment(d *apps.Deployment, rsList []*apps.ReplicaSet) (map[types.UID][]*v1.Pod, error) {
+func (dc *Controller) getPodMapForDeployment(d *apps.Deployment, rsList []*apps.ReplicaSet) (map[types.UID][]*v1.Pod, error) {
 	// Get all Pods that potentially belong to this Deployment.
 	selector, err := metav1.LabelSelectorAsSelector(d.Spec.Selector)
 	if err != nil {
@@ -560,7 +560,7 @@ func (dc *DeploymentController) getPodMapForDeployment(d *apps.Deployment, rsLis
 
 // syncDeployment will sync the deployment with the given key.
 // This function is not meant to be invoked concurrently with the same key.
-func (dc *DeploymentController) syncDeployment(key string) error {
+func (dc *Controller) syncDeployment(key string) error {
 	startTime := time.Now()
 	klog.V(4).Infof("Started syncing deployment %q (%v)", key, startTime)
 	defer func() {

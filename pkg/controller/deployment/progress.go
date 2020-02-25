@@ -34,7 +34,7 @@ import (
 // cases this helper will run that cannot be prevented from the scaling detection,
 // for example a resync of the deployment after it was scaled up. In those cases,
 // we shouldn't try to estimate any progress.
-func (dc *DeploymentController) syncRolloutStatus(allRSs []*apps.ReplicaSet, newRS *apps.ReplicaSet, d *apps.Deployment) error {
+func (dc *Controller) syncRolloutStatus(allRSs []*apps.ReplicaSet, newRS *apps.ReplicaSet, d *apps.Deployment) error {
 	newStatus := calculateStatus(allRSs, newRS, d)
 
 	// If there is no progressDeadlineSeconds set, remove any Progressing condition.
@@ -120,7 +120,7 @@ func (dc *DeploymentController) syncRolloutStatus(allRSs []*apps.ReplicaSet, new
 
 // getReplicaFailures will convert replica failure conditions from replica sets
 // to deployment conditions.
-func (dc *DeploymentController) getReplicaFailures(allRSs []*apps.ReplicaSet, newRS *apps.ReplicaSet) []apps.DeploymentCondition {
+func (dc *Controller) getReplicaFailures(allRSs []*apps.ReplicaSet, newRS *apps.ReplicaSet) []apps.DeploymentCondition {
 	var conditions []apps.DeploymentCondition
 	if newRS != nil {
 		for _, c := range newRS.Status.Conditions {
@@ -158,7 +158,7 @@ var nowFn = func() time.Time { return time.Now() }
 // requeueStuckDeployment checks whether the provided deployment needs to be synced for a progress
 // check. It returns the time after the deployment will be requeued for the progress check, 0 if it
 // will be requeued now, or -1 if it does not need to be requeued.
-func (dc *DeploymentController) requeueStuckDeployment(d *apps.Deployment, newStatus apps.DeploymentStatus) time.Duration {
+func (dc *Controller) requeueStuckDeployment(d *apps.Deployment, newStatus apps.DeploymentStatus) time.Duration {
 	currentCond := util.GetDeploymentCondition(d.Status, apps.DeploymentProgressing)
 	// Can't estimate progress if there is no deadline in the spec or progressing condition in the current status.
 	if !util.HasProgressDeadline(d) || currentCond == nil {

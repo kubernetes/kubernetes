@@ -272,7 +272,7 @@ func TestScale(t *testing.T) {
 			_ = olderTimestamp
 			t.Log(test.name)
 			fake := fake.Clientset{}
-			dc := &DeploymentController{
+			dc := &Controller{
 				client:        &fake,
 				eventRecorder: &record.FakeRecorder{},
 			}
