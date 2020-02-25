@@ -72,8 +72,6 @@ const (
 const (
 	// SelectingAllReason is added to an event when a DaemonSet selects all Pods.
 	SelectingAllReason = "SelectingAll"
-	// FailedPlacementReason is added to an event when a DaemonSet can't schedule a Pod to a specified node.
-	FailedPlacementReason = "FailedPlacement"
 	// FailedDaemonPodReason is added to an event when the status of a Pod of a DaemonSet is 'Failed'.
 	FailedDaemonPodReason = "FailedDaemonPod"
 )
