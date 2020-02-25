@@ -19,11 +19,6 @@ limitations under the License.
 package gce
 
 const (
-	// AlphaFeatureNetworkTiers allows Services backed by a GCP load balancer to choose
-	// what network tier to use. Currently supports "Standard" and "Premium" (default).
-	//
-	// alpha: v1.8 (for Services)
-	AlphaFeatureNetworkTiers = "NetworkTiers"
 	// AlphaFeatureILBSubsets allows InternalLoadBalancer services to include a subset
 	// of cluster nodes as backends instead of all nodes.
 	AlphaFeatureILBSubsets = "ILBSubsets"
