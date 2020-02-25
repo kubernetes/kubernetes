@@ -193,7 +193,6 @@ pkg/util/labels # See previous effort in PR #80685
 pkg/util/oom
 pkg/util/procfs
 pkg/util/removeall
-pkg/util/rlimit
 pkg/util/selinux
 pkg/util/taints
 pkg/volume

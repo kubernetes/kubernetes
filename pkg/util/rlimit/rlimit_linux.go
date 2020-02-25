@@ -22,6 +22,7 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-func RlimitNumFiles(maxOpenFiles uint64) error {
+// SetNumFiles sets the linux rlimit for the maximum open files.
+func SetNumFiles(maxOpenFiles uint64) error {
 	return unix.Setrlimit(unix.RLIMIT_NOFILE, &unix.Rlimit{Max: maxOpenFiles, Cur: maxOpenFiles})
 }
