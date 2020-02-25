@@ -59,7 +59,7 @@ cd "${GOPATH}/src/k8s.io/kubernetes"
 ./hack/install-etcd.sh
 
 # Run the benchmark tests and pretty-print the results into a separate file.
-make test-integration WHAT="$*" KUBE_TEST_ARGS="-run='XXX' -bench=${TEST_PREFIX:-.} -benchmem  -alsologtostderr=false -logtostderr=false -data-items-dir=${ARTIFACTS}" \
+make test-integration WHAT="$*" KUBE_TEST_ARGS="-run='XXX' -bench=${TEST_PREFIX:-.} -benchtime=${BENCHTIME:-1s} -benchmem  -alsologtostderr=false -logtostderr=false -data-items-dir=${ARTIFACTS}" \
   | (go run test/integration/benchmark/extractlog/main.go) \
   | tee \
    >(prettybench -no-passthrough > "${ARTIFACTS}/BenchmarkResults.txt") \
