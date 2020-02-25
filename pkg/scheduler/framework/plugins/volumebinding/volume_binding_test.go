@@ -67,18 +67,18 @@ func TestVolumeBinding(t *testing.T) {
 			pod:  &v1.Pod{Spec: volState},
 			node: &v1.Node{},
 			volumeBinderConfig: &volumescheduling.FakeVolumeBinderConfig{
-				FindReasons: []string{volumescheduling.ErrReasonBindConflict},
+				FindReasons: []volumescheduling.ConflictReason{volumescheduling.ErrReasonBindConflict},
 			},
-			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, volumescheduling.ErrReasonBindConflict),
+			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, string(volumescheduling.ErrReasonBindConflict)),
 		},
 		{
 			name: "bound and unbound unsatisfied",
 			pod:  &v1.Pod{Spec: volState},
 			node: &v1.Node{},
 			volumeBinderConfig: &volumescheduling.FakeVolumeBinderConfig{
-				FindReasons: []string{volumescheduling.ErrReasonBindConflict, volumescheduling.ErrReasonNodeConflict},
+				FindReasons: []volumescheduling.ConflictReason{volumescheduling.ErrReasonBindConflict, volumescheduling.ErrReasonNodeConflict},
 			},
-			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, volumescheduling.ErrReasonBindConflict, volumescheduling.ErrReasonNodeConflict),
+			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, string(volumescheduling.ErrReasonBindConflict), string(volumescheduling.ErrReasonNodeConflict)),
 		},
 		{
 			name:               "unbound/found matches/bind succeeds",

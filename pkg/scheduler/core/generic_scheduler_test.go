@@ -1999,8 +1999,8 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 			name: "ErrVolume... errors should not be tried as it indicates that the pod is unschedulable due to no matching volumes for pod on node",
 			nodesStatuses: framework.NodeToStatusMap{
 				"machine1": framework.NewStatus(framework.UnschedulableAndUnresolvable, volumezone.ErrReasonConflict),
-				"machine2": framework.NewStatus(framework.UnschedulableAndUnresolvable, volumescheduling.ErrReasonNodeConflict),
-				"machine3": framework.NewStatus(framework.UnschedulableAndUnresolvable, volumescheduling.ErrReasonBindConflict),
+				"machine2": framework.NewStatus(framework.UnschedulableAndUnresolvable, string(volumescheduling.ErrReasonNodeConflict)),
+				"machine3": framework.NewStatus(framework.UnschedulableAndUnresolvable, string(volumescheduling.ErrReasonBindConflict)),
 			},
 			expected: map[string]bool{"machine4": true},
 		},

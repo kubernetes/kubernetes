@@ -739,7 +739,7 @@ func addProvisionAnn(pvc *v1.PersistentVolumeClaim) *v1.PersistentVolumeClaim {
 // reasonNames pretty-prints a list of reasons with variable names in
 // case of a test failure because that is easier to read than the full
 // strings.
-func reasonNames(reasons []string) string {
+func reasonNames(reasons ConflictReasons) string {
 	var varNames []string
 	for _, reason := range reasons {
 		switch reason {
@@ -748,16 +748,16 @@ func reasonNames(reasons []string) string {
 		case ErrReasonNodeConflict:
 			varNames = append(varNames, "ErrReasonNodeConflict")
 		default:
-			varNames = append(varNames, reason)
+			varNames = append(varNames, string(reason))
 		}
 	}
 	return fmt.Sprintf("%v", varNames)
 }
 
-func checkReasons(t *testing.T, actual, expected []string) {
+func checkReasons(t *testing.T, actual, expected ConflictReasons) {
 	equal := len(actual) == len(expected)
-	sort.Strings(actual)
-	sort.Strings(expected)
+	sort.Sort(actual)
+	sort.Sort(expected)
 	if equal {
 		for i, reason := range actual {
 			if reason != expected[i] {
@@ -785,7 +785,7 @@ func TestFindPodVolumesWithoutProvisioning(t *testing.T) {
 		expectedBindings []*bindingInfo
 
 		// Expected return values
-		reasons    []string
+		reasons    ConflictReasons
 		shouldFail bool
 	}
 	scenarios := map[string]scenarioType{
@@ -821,7 +821,7 @@ func TestFindPodVolumesWithoutProvisioning(t *testing.T) {
 		"unbound-pvc,pv-different-node": {
 			podPVCs: []*v1.PersistentVolumeClaim{unboundPVC},
 			pvs:     []*v1.PersistentVolume{pvNode2},
-			reasons: []string{ErrReasonBindConflict},
+			reasons: ConflictReasons{ErrReasonBindConflict},
 		},
 		"two-unbound-pvcs": {
 			podPVCs:          []*v1.PersistentVolumeClaim{unboundPVC, unboundPVC2},
@@ -837,7 +837,7 @@ func TestFindPodVolumesWithoutProvisioning(t *testing.T) {
 			podPVCs:          []*v1.PersistentVolumeClaim{unboundPVC, unboundPVC2},
 			pvs:              []*v1.PersistentVolume{pvNode1a},
 			expectedBindings: []*bindingInfo{makeBinding(unboundPVC, pvNode1a)},
-			reasons:          []string{ErrReasonBindConflict},
+			reasons:          ConflictReasons{ErrReasonBindConflict},
 		},
 		"one-bound,one-unbound": {
 			podPVCs:          []*v1.PersistentVolumeClaim{unboundPVC, boundPVC},
@@ -847,7 +847,7 @@ func TestFindPodVolumesWithoutProvisioning(t *testing.T) {
 		"one-bound,one-unbound,no-match": {
 			podPVCs: []*v1.PersistentVolumeClaim{unboundPVC, boundPVC},
 			pvs:     []*v1.PersistentVolume{pvBound, pvNode2},
-			reasons: []string{ErrReasonBindConflict},
+			reasons: ConflictReasons{ErrReasonBindConflict},
 		},
 		"one-prebound,one-unbound": {
 			podPVCs:    []*v1.PersistentVolumeClaim{unboundPVC, preboundPVC},
@@ -861,7 +861,7 @@ func TestFindPodVolumesWithoutProvisioning(t *testing.T) {
 		"immediate-bound-pvc-wrong-node": {
 			podPVCs: []*v1.PersistentVolumeClaim{immediateBoundPVC},
 			pvs:     []*v1.PersistentVolume{pvBoundImmediateNode2},
-			reasons: []string{ErrReasonNodeConflict},
+			reasons: ConflictReasons{ErrReasonNodeConflict},
 		},
 		"immediate-unbound-pvc": {
 			podPVCs:    []*v1.PersistentVolumeClaim{immediateUnboundPVC},
@@ -940,7 +940,7 @@ func TestFindPodVolumesWithProvisioning(t *testing.T) {
 		expectedProvisions []*v1.PersistentVolumeClaim
 
 		// Expected return values
-		reasons    []string
+		reasons    ConflictReasons
 		shouldFail bool
 	}
 	scenarios := map[string]scenarioType{
@@ -975,11 +975,11 @@ func TestFindPodVolumesWithProvisioning(t *testing.T) {
 		},
 		"invalid-provisioner": {
 			podPVCs: []*v1.PersistentVolumeClaim{noProvisionerPVC},
-			reasons: []string{ErrReasonBindConflict},
+			reasons: ConflictReasons{ErrReasonBindConflict},
 		},
 		"volume-topology-unsatisfied": {
 			podPVCs: []*v1.PersistentVolumeClaim{topoMismatchPVC},
-			reasons: []string{ErrReasonBindConflict},
+			reasons: ConflictReasons{ErrReasonBindConflict},
 		},
 	}
 
@@ -1047,7 +1047,7 @@ func TestFindPodVolumesWithCSIMigration(t *testing.T) {
 		initCSINodes []*storagev1.CSINode
 
 		// Expected return values
-		reasons    []string
+		reasons    ConflictReasons
 		shouldFail bool
 	}
 	scenarios := map[string]scenarioType{
@@ -1073,7 +1073,7 @@ func TestFindPodVolumesWithCSIMigration(t *testing.T) {
 			pvs:          []*v1.PersistentVolume{migrationPVBound},
 			initNodes:    []*v1.Node{node1Zone2},
 			initCSINodes: []*storagev1.CSINode{csiNode1Migrated},
-			reasons:      []string{ErrReasonNodeConflict},
+			reasons:      ConflictReasons{ErrReasonNodeConflict},
 		},
 	}
 

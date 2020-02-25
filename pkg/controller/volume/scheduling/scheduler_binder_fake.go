@@ -21,7 +21,7 @@ import "k8s.io/api/core/v1"
 // FakeVolumeBinderConfig holds configurations for fake volume binder.
 type FakeVolumeBinderConfig struct {
 	AllBound    bool
-	FindReasons []string
+	FindReasons ConflictReasons
 	FindErr     error
 	AssumeErr   error
 	BindErr     error
@@ -43,7 +43,7 @@ type FakeVolumeBinder struct {
 }
 
 // FindPodVolumes implements SchedulerVolumeBinder.FindPodVolumes.
-func (b *FakeVolumeBinder) FindPodVolumes(pod *v1.Pod, node *v1.Node) (reasons []string, err error) {
+func (b *FakeVolumeBinder) FindPodVolumes(pod *v1.Pod, node *v1.Node) (reasons ConflictReasons, err error) {
 	return b.config.FindReasons, b.config.FindErr
 }
 

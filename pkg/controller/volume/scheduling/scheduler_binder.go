@@ -45,11 +45,22 @@ import (
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
+// ConflictReason is used for the special strings which explain why
+// volume binding is impossible for a node.
+type ConflictReason string
+
+// ConflictReasons contains all reasons that explain why volume binding is impossible for a node.
+type ConflictReasons []ConflictReason
+
+func (reasons ConflictReasons) Len() int           { return len(reasons) }
+func (reasons ConflictReasons) Less(i, j int) bool { return reasons[i] < reasons[j] }
+func (reasons ConflictReasons) Swap(i, j int)      { reasons[i], reasons[j] = reasons[j], reasons[i] }
+
 const (
 	// ErrReasonBindConflict is used for VolumeBindingNoMatch predicate error.
-	ErrReasonBindConflict = "node(s) didn't find available persistent volumes to bind"
+	ErrReasonBindConflict ConflictReason = "node(s) didn't find available persistent volumes to bind"
 	// ErrReasonNodeConflict is used for VolumeNodeAffinityConflict predicate error.
-	ErrReasonNodeConflict = "node(s) had volume node affinity conflict"
+	ErrReasonNodeConflict ConflictReason = "node(s) had volume node affinity conflict"
 )
 
 // InTreeToCSITranslator contains methods required to check migratable status
@@ -94,7 +105,7 @@ type SchedulerVolumeBinder interface {
 	// (currently) not usable for the pod.
 	//
 	// This function is called by the volume binding scheduler predicate and can be called in parallel
-	FindPodVolumes(pod *v1.Pod, node *v1.Node) (reasons []string, err error)
+	FindPodVolumes(pod *v1.Pod, node *v1.Node) (reasons ConflictReasons, err error)
 
 	// AssumePodVolumes will:
 	// 1. Take the PV matches for unbound PVCs and update the PV cache assuming
@@ -173,7 +184,7 @@ func (b *volumeBinder) GetBindingsCache() PodBindingCache {
 // FindPodVolumes caches the matching PVs and PVCs to provision per node in podBindingCache.
 // This method intentionally takes in a *v1.Node object instead of using volumebinder.nodeInformer.
 // That's necessary because some operations will need to pass in to the predicate fake node objects.
-func (b *volumeBinder) FindPodVolumes(pod *v1.Pod, node *v1.Node) (reasons []string, err error) {
+func (b *volumeBinder) FindPodVolumes(pod *v1.Pod, node *v1.Node) (reasons ConflictReasons, err error) {
 	podName := getPodName(pod)
 
 	// Warning: Below log needs high verbosity as it can be printed several times (#60933).
