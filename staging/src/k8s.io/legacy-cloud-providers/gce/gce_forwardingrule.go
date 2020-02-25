@@ -182,14 +182,11 @@ func (g *Cloud) DeleteRegionForwardingRule(name, region string) error {
 	return mc.Observe(g.c.ForwardingRules().Delete(ctx, meta.RegionalKey(name, region)))
 }
 
-// TODO(#51665): retire this function once Network Tiers becomes Beta in GCP.
 func (g *Cloud) getNetworkTierFromForwardingRule(name, region string) (string, error) {
-	if !g.AlphaFeatureGate.Enabled(AlphaFeatureNetworkTiers) {
-		return cloud.NetworkTierDefault.ToGCEValue(), nil
-	}
-	fwdRule, err := g.GetAlphaRegionForwardingRule(name, region)
+	fwdRule, err := g.GetRegionForwardingRule(name, region)
 	if err != nil {
-		return handleAlphaNetworkTierGetError(err)
+		// Can't get the network tier, just return an error.
+		return "", err
 	}
 	return fwdRule.NetworkTier, nil
 }

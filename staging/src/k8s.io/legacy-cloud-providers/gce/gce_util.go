@@ -281,18 +281,6 @@ func makeGoogleAPINotFoundError(message string) error {
 	return &googleapi.Error{Code: http.StatusNotFound, Message: message}
 }
 
-// TODO(#51665): Remove this once Network Tiers becomes Beta in GCP.
-func handleAlphaNetworkTierGetError(err error) (string, error) {
-	if isForbidden(err) {
-		// Network tier is still an Alpha feature in GCP, and not every project
-		// is whitelisted to access the API. If we cannot access the API, just
-		// assume the tier is premium.
-		return cloud.NetworkTierDefault.ToGCEValue(), nil
-	}
-	// Can't get the network tier, just return an error.
-	return "", err
-}
-
 // containsCIDR returns true if outer contains inner.
 func containsCIDR(outer, inner *net.IPNet) bool {
 	return outer.Contains(firstIPInRange(inner)) && outer.Contains(lastIPInRange(inner))
