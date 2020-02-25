@@ -182,6 +182,7 @@ func describerMap(clientConfig *rest.Config) (map[schema.GroupKind]describe.Desc
 		{Group: extensionsv1beta1.GroupName, Kind: "Deployment"}:                  &DeploymentDescriber{c},
 		{Group: extensionsv1beta1.GroupName, Kind: "Ingress"}:                     &IngressDescriber{c},
 		{Group: networkingv1beta1.GroupName, Kind: "Ingress"}:                     &IngressDescriber{c},
+		{Group: networkingv1beta1.GroupName, Kind: "IngressClass"}:                &IngressClassDescriber{c},
 		{Group: batchv1.GroupName, Kind: "Job"}:                                   &JobDescriber{c},
 		{Group: batchv1.GroupName, Kind: "CronJob"}:                               &CronJobDescriber{c},
 		{Group: appsv1.GroupName, Kind: "StatefulSet"}:                            &StatefulSetDescriber{c},
@@ -2431,6 +2432,40 @@ func describeIngressTLS(w PrefixWriter, ingTLS []networkingv1beta1.IngressTLS) {
 			w.Write(LEVEL_1, "%v terminates %v\n", t.SecretName, strings.Join(t.Hosts, ","))
 		}
 	}
+}
+
+type IngressClassDescriber struct {
+	clientset.Interface
+}
+
+func (i *IngressClassDescriber) Describe(namespace, name string, describerSettings describe.DescriberSettings) (string, error) {
+	c := i.NetworkingV1beta1().IngressClasses()
+	ic, err := c.Get(context.TODO(), name, metav1.GetOptions{})
+	if err != nil {
+		return "", err
+	}
+	return i.describeIngressClass(ic, describerSettings)
+}
+
+func (i *IngressClassDescriber) describeIngressClass(ic *networkingv1beta1.IngressClass, describerSettings describe.DescriberSettings) (string, error) {
+	return tabbedString(func(out io.Writer) error {
+		w := NewPrefixWriter(out)
+		w.Write(LEVEL_0, "Name:\t%s\n", ic.Name)
+		printLabelsMultiline(w, "Labels", ic.Labels)
+		printAnnotationsMultiline(w, "Annotations", ic.Annotations)
+		w.Write(LEVEL_0, "Controller:\t%v\n", ic.Spec.Controller)
+
+		if ic.Spec.Parameters != nil {
+			w.Write(LEVEL_0, "Parameters:\n")
+			if ic.Spec.Parameters.APIGroup != nil {
+				w.Write(LEVEL_1, "APIGroup:\t%v\n", *ic.Spec.Parameters.APIGroup)
+			}
+			w.Write(LEVEL_1, "Kind:\t%v\n", ic.Spec.Parameters.Kind)
+			w.Write(LEVEL_1, "Name:\t%v\n", ic.Spec.Parameters.Name)
+		}
+
+		return nil
+	})
 }
 
 // ServiceDescriber generates information about a service.

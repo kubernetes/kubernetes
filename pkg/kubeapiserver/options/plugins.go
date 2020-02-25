@@ -27,6 +27,7 @@ import (
 	certapproval "k8s.io/kubernetes/plugin/pkg/admission/certificates/approval"
 	certsigning "k8s.io/kubernetes/plugin/pkg/admission/certificates/signing"
 	certsubjectrestriction "k8s.io/kubernetes/plugin/pkg/admission/certificates/subjectrestriction"
+	"k8s.io/kubernetes/plugin/pkg/admission/defaultingressclass"
 	"k8s.io/kubernetes/plugin/pkg/admission/defaulttolerationseconds"
 	"k8s.io/kubernetes/plugin/pkg/admission/deny"
 	"k8s.io/kubernetes/plugin/pkg/admission/eventratelimit"
@@ -93,6 +94,7 @@ var AllOrderedPlugins = []string{
 	certapproval.PluginName,                 // CertificateApproval
 	certsigning.PluginName,                  // CertificateSigning
 	certsubjectrestriction.PluginName,       // CertificateSubjectRestriction
+	defaultingressclass.PluginName,          // DefaultIngressClass
 
 	// new admission plugins should generally be inserted above here
 	// webhook, resourcequota, and deny plugins must go at the end
@@ -110,6 +112,7 @@ func RegisterAllAdmissionPlugins(plugins *admission.Plugins) {
 	alwayspullimages.Register(plugins)
 	antiaffinity.Register(plugins)
 	defaulttolerationseconds.Register(plugins)
+	defaultingressclass.Register(plugins)
 	deny.Register(plugins) // DEPRECATED as no real meaning
 	eventratelimit.Register(plugins)
 	exec.Register(plugins)
@@ -158,6 +161,7 @@ func DefaultOffAdmissionPlugins() sets.String {
 		certapproval.PluginName,                 // CertificateApproval
 		certsigning.PluginName,                  // CertificateSigning
 		certsubjectrestriction.PluginName,       // CertificateSubjectRestriction
+		defaultingressclass.PluginName,          //DefaultIngressClass
 	)
 
 	return sets.NewString(AllOrderedPlugins...).Difference(defaultOnPlugins)

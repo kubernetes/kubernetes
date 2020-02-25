@@ -235,10 +235,23 @@ type IngressList struct {
 
 // IngressSpec describes the Ingress the user wishes to exist.
 type IngressSpec struct {
-	// A default backend capable of servicing requests that don't match any
-	// rule. At least one of 'backend' or 'rules' must be specified. This field
-	// is optional to allow the loadbalancer controller or defaulting logic to
-	// specify a global default.
+	// IngressClassName is the name of the IngressClass cluster resource. The
+	// associated IngressClass defines which controller will implement the
+	// resource. This replaces the deprecated `kubernetes.io/ingress.class`
+	// annotation. For backwards compatibility, when that annotation is set, it
+	// must be given precedence over this field. The controller may emit a
+	// warning if the field and annotation have different values.
+	// Implementations of this API should ignore Ingresses without a class
+	// specified. An IngressClass resource may be marked as default, which can
+	// be used to set a default value for this field. For more information,
+	// refer to the IngressClass documentation.
+	// +optional
+	IngressClassName *string
+
+	// Backend is a default backend capable of servicing requests that don't
+	// match any rule. At least one of 'backend' or 'rules' must be specified.
+	// This field is optional to allow the loadbalancer controller or defaulting
+	// logic to specify a global default.
 	// +optional
 	Backend *IngressBackend
 
@@ -257,6 +270,55 @@ type IngressSpec struct {
 	// TODO: Add the ability to specify load-balancer IP through claims
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// IngressClass represents the class of the Ingress, referenced by the Ingress
+// Spec. The `ingressclass.kubernetes.io/is-default-class` annotation can be
+// used to indicate that an IngressClass should be considered default. When a
+// single IngressClass resource has this annotation set to true, new Ingress
+// resources without a class specified will be assigned this default class.
+type IngressClass struct {
+	metav1.TypeMeta
+	metav1.ObjectMeta
+
+	// Spec is the desired state of the IngressClass.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	// +optional
+	Spec IngressClassSpec
+}
+
+// IngressClassSpec provides information about the class of an Ingress.
+type IngressClassSpec struct {
+	// Controller refers to the name of the controller that should handle this
+	// class. This allows for different "flavors" that are controlled by the
+	// same controller. For example, you may have different Parameters for the
+	// same implementing controller. This should be specified as a
+	// domain-prefixed path no more than 250 characters in length, e.g.
+	// "acme.io/ingress-controller". This field is immutable.
+	Controller string
+
+	// Parameters is a link to a resource containing additional configuration
+	// for the controller. This is optional if the controller does not require
+	// extra parameters. Example configuration resources include
+	// `core.ConfigMap` or a controller specific Custom Resource.
+	// +optional
+	Parameters *api.TypedLocalObjectReference
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// IngressClassList is a collection of IngressClasses.
+type IngressClassList struct {
+	metav1.TypeMeta
+	// Standard object's metadata.
+	// +optional
+	metav1.ListMeta
+
+	// Items is the list of IngressClasses.
+	// +listType=set
+	Items []IngressClass
+}
+
 // IngressTLS describes the transport layer security associated with an Ingress.
 type IngressTLS struct {
 	// Hosts are a list of hosts included in the TLS certificate. The values in
@@ -265,11 +327,11 @@ type IngressTLS struct {
 	// Ingress, if left unspecified.
 	// +optional
 	Hosts []string
-	// SecretName is the name of the secret used to terminate SSL traffic on 443.
-	// Field is left optional to allow SSL routing based on SNI hostname alone.
-	// If the SNI host in a listener conflicts with the "Host" header field used
-	// by an IngressRule, the SNI host is used for termination and value of the
-	// Host header is used for routing.
+	// SecretName is the name of the secret used to terminate TLS traffic on
+	// port 443. Field is left optional to allow TLS routing based on SNI
+	// hostname alone. If the SNI host in a listener conflicts with the "Host"
+	// header field used by an IngressRule, the SNI host is used for termination
+	// and value of the Host header is used for routing.
 	// +optional
 	SecretName string
 	// TODO: Consider specifying different modes of termination, protocols etc.

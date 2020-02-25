@@ -32,6 +32,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
 	networkingv1 "k8s.io/api/networking/v1"
+	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	storagev1 "k8s.io/api/storage/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -3006,6 +3007,43 @@ func TestDescribeResourceQuota(t *testing.T) {
 		if !strings.Contains(out, expected) {
 			t.Errorf("expected to find %q in output: %q", expected, out)
 		}
+	}
+}
+
+func TestDescribeIngressClass(t *testing.T) {
+	fake := fake.NewSimpleClientset(&networkingv1beta1.IngressClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "example-class",
+		},
+		Spec: networkingv1beta1.IngressClassSpec{
+			Controller: "example.com/controller",
+			Parameters: &corev1.TypedLocalObjectReference{
+				APIGroup: utilpointer.StringPtr("v1"),
+				Kind:     "ConfigMap",
+				Name:     "example-parameters",
+			},
+		},
+	})
+
+	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
+	d := IngressClassDescriber{c}
+	out, err := d.Describe("", "example-class", describe.DescriberSettings{})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	expectedOut := `Name:         example-class
+Labels:       <none>
+Annotations:  <none>
+Controller:   example.com/controller
+Parameters:
+  APIGroup:  v1
+  Kind:      ConfigMap
+  Name:      example-parameters` + "\n"
+
+	if out != expectedOut {
+		t.Logf(out)
+		t.Errorf("expected : %q\n but got output:\n %q", expectedOut, out)
 	}
 }
 

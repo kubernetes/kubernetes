@@ -41,28 +41,29 @@
     ]
   },
   "spec": {
+    "ingressClassName": "19",
     "backend": {
-      "serviceName": "19",
-      "servicePort": "20"
+      "serviceName": "20",
+      "servicePort": "21"
     },
     "tls": [
       {
         "hosts": [
-          "21"
+          "22"
         ],
-        "secretName": "22"
+        "secretName": "23"
       }
     ],
     "rules": [
       {
-        "host": "23",
+        "host": "24",
         "http": {
           "paths": [
             {
-              "path": "24",
+              "path": "25",
               "backend": {
-                "serviceName": "25",
-                "servicePort": "26"
+                "serviceName": "26",
+                "servicePort": "27"
               }
             }
           ]
@@ -74,8 +75,8 @@
     "loadBalancer": {
       "ingress": [
         {
-          "ip": "27",
-          "hostname": "28"
+          "ip": "28",
+          "hostname": "29"
         }
       ]
     }

@@ -569,6 +569,19 @@ type IngressList struct {
 
 // IngressSpec describes the Ingress the user wishes to exist.
 type IngressSpec struct {
+	// IngressClassName is the name of the IngressClass cluster resource. The
+	// associated IngressClass defines which controller will implement the
+	// resource. This replaces the deprecated `kubernetes.io/ingress.class`
+	// annotation. For backwards compatibility, when that annotation is set, it
+	// must be given precedence over this field. The controller may emit a
+	// warning if the field and annotation have different values.
+	// Implementations of this API should ignore Ingresses without a class
+	// specified. An IngressClass resource may be marked as default, which can
+	// be used to set a default value for this field. For more information,
+	// refer to the IngressClass documentation.
+	// +optional
+	IngressClassName *string `json:"ingressClassName,omitempty" protobuf:"bytes,4,opt,name=ingressClassName"`
+
 	// A default backend capable of servicing requests that don't match any
 	// rule. At least one of 'backend' or 'rules' must be specified. This field
 	// is optional to allow the loadbalancer controller or defaulting logic to
