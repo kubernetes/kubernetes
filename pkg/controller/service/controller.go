@@ -564,26 +564,13 @@ func portSlicesEqualForLB(x, y []*v1.ServicePort) bool {
 
 func portEqualForLB(x, y *v1.ServicePort) bool {
 	// TODO: Should we check name?  (In theory, an LB could expose it)
-	if x.Name != y.Name {
+	if x.Name != y.Name ||
+		x.Protocol != y.Protocol ||
+		x.Port != y.Port ||
+		x.NodePort != y.NodePort ||
+		x.TargetPort != y.TargetPort {
 		return false
 	}
-
-	if x.Protocol != y.Protocol {
-		return false
-	}
-
-	if x.Port != y.Port {
-		return false
-	}
-
-	if x.NodePort != y.NodePort {
-		return false
-	}
-
-	if x.TargetPort != y.TargetPort {
-		return false
-	}
-
 	return true
 }
 
