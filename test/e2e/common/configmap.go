@@ -158,10 +158,10 @@ var _ = ginkgo.Describe("[sig-node] ConfigMap", func() {
 	})
 
 	/*
-		   Release : v1.18
-		   Testname: ConfigMap lifecycle
-		   Description: Attempt to create a ConfigMap. Patch the created ConfigMap. Fetching the ConfigMap MUST reflect changes.
-	           By fetching all the ConfigMaps via a Label selector it MUST find the ConfigMap by it's static label and updated value. The ConfigMap must be deleted by Collection.
+			   Release : v1.18
+			   Testname: ConfigMap lifecycle
+			   Description: Attempt to create a ConfigMap. Patch the created ConfigMap. Fetching the ConfigMap MUST reflect changes.
+		           By fetching all the ConfigMaps via a Label selector it MUST find the ConfigMap by it's static label and updated value. The ConfigMap must be deleted by Collection.
 	*/
 	framework.ConformanceIt("should run through a ConfigMap lifecycle", func() {
 		testNamespaceName := f.Namespace.Name
