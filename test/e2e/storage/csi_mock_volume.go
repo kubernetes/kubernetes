@@ -64,7 +64,6 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 		registerDriver      bool
 		podInfo             *bool
 		scName              string
-		nodeSelectorKey     string
 		enableResizing      bool // enable resizing for both CSI mock driver and storageClass.
 		enableNodeExpansion bool // enable node expansion for CSI mock driver
 		// just disable resizing on driver it overrides enableResizing flag for CSI mock driver
@@ -79,7 +78,6 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 		pvcs         []*v1.PersistentVolumeClaim
 		sc           map[string]*storagev1.StorageClass
 		driver       testsuites.TestDriver
-		nodeLabel    map[string]string
 		provisioner  string
 		tp           testParameters
 	}
@@ -116,13 +114,6 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 		m.config = config
 		m.provisioner = config.GetUniqueDriverName()
 
-		if tp.nodeSelectorKey != "" {
-			framework.AddOrUpdateLabelOnNode(m.cs, m.config.ClientNodeSelection.Name, tp.nodeSelectorKey, f.Namespace.Name)
-			m.nodeLabel = map[string]string{
-				tp.nodeSelectorKey: f.Namespace.Name,
-			}
-		}
-
 		if tp.registerDriver {
 			err = waitForCSIDriver(cs, m.config.GetUniqueDriverName())
 			framework.ExpectNoError(err, "Failed to get CSIDriver : %v", err)
@@ -138,7 +129,6 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 		if dDriver, ok := m.driver.(testsuites.DynamicPVTestDriver); ok {
 			sc = dDriver.GetDynamicProvisionStorageClass(m.config, "")
 		}
-		nodeName := m.config.ClientNodeSelection.Name
 		scTest := testsuites.StorageClassTest{
 			Name:         m.driver.GetDriverInfo().Name,
 			Provisioner:  sc.Provisioner,
@@ -154,15 +144,8 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 			scTest.AllowVolumeExpansion = true
 		}
 
-		nodeSelection := e2epod.NodeSelection{
-			// The mock driver only works when everything runs on a single node.
-			Name: nodeName,
-		}
-		if len(m.nodeLabel) > 0 {
-			nodeSelection = e2epod.NodeSelection{
-				Selector: m.nodeLabel,
-			}
-		}
+		// The mock driver only works when everything runs on a single node.
+		nodeSelection := m.config.ClientNodeSelection
 		if ephemeral {
 			pod = startPausePodInline(f.ClientSet, scTest, nodeSelection, f.Namespace.Name)
 			if pod != nil {
@@ -184,15 +167,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 	}
 
 	createPodWithPVC := func(pvc *v1.PersistentVolumeClaim) (*v1.Pod, error) {
-		nodeName := m.config.ClientNodeSelection.Name
-		nodeSelection := e2epod.NodeSelection{
-			Name: nodeName,
-		}
-		if len(m.nodeLabel) > 0 {
-			nodeSelection = e2epod.NodeSelection{
-				Selector: m.nodeLabel,
-			}
-		}
+		nodeSelection := m.config.ClientNodeSelection
 		pod, err := startPausePodWithClaim(m.cs, pvc, nodeSelection, f.Namespace.Name)
 		if pod != nil {
 			m.pods = append(m.pods, pod)
@@ -227,10 +202,6 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 		ginkgo.By("Cleaning up resources")
 		for _, cleanupFunc := range m.testCleanups {
 			cleanupFunc()
-		}
-
-		if len(m.nodeLabel) > 0 && len(m.tp.nodeSelectorKey) > 0 {
-			framework.RemoveLabelOffNode(m.cs, m.config.ClientNodeSelection.Name, m.tp.nodeSelectorKey)
 		}
 
 		err := utilerrors.NewAggregate(errs)
@@ -387,8 +358,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 			// define volume limit to be 2 for this test
 
 			var err error
-			nodeSelectorKey := fmt.Sprintf("attach-limit-csi-%s", f.Namespace.Name)
-			init(testParameters{nodeSelectorKey: nodeSelectorKey, attachLimit: 2})
+			init(testParameters{attachLimit: 2})
 			defer cleanup()
 			nodeName := m.config.ClientNodeSelection.Name
 			driverName := m.config.GetUniqueDriverName()
@@ -719,14 +689,7 @@ func startPausePodWithVolumeSource(cs clientset.Interface, volumeSource v1.Volum
 			},
 		},
 	}
-
-	if node.Name != "" {
-		pod.Spec.NodeName = node.Name
-	}
-	if len(node.Selector) != 0 {
-		pod.Spec.NodeSelector = node.Selector
-	}
-
+	e2epod.SetNodeSelection(pod, node)
 	return cs.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
 }
 
