@@ -18,40 +18,35 @@ package podtopologyspread
 
 import (
 	"context"
-	"reflect"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes/fake"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	"k8s.io/utils/pointer"
 )
 
-func (s preScoreState) Equal(o preScoreState) bool {
-	type internal preScoreState
-	return cmp.Equal(internal(s), internal(o),
-		cmp.Comparer(func(s1 labels.Selector, s2 labels.Selector) bool {
-			return reflect.DeepEqual(s1, s2)
-		}),
-	)
-}
-
 func TestPreScoreStateEmptyNodes(t *testing.T) {
 	tests := []struct {
-		name  string
-		pod   *v1.Pod
-		nodes []*v1.Node
-		want  *preScoreState
+		name               string
+		pod                *v1.Pod
+		nodes              []*v1.Node
+		objs               []runtime.Object
+		defaultConstraints []v1.TopologySpreadConstraint
+		want               *preScoreState
 	}{
 		{
 			name: "normal case",
 			pod: st.MakePod().Name("p").Label("foo", "").
-				SpreadConstraint(1, "zone", softSpread, st.MakeLabelSelector().Exists("foo").Obj()).
-				SpreadConstraint(1, "node", softSpread, st.MakeLabelSelector().Exists("foo").Obj()).
+				SpreadConstraint(1, "zone", v1.ScheduleAnyway, st.MakeLabelSelector().Exists("foo").Obj()).
+				SpreadConstraint(1, "node", v1.ScheduleAnyway, st.MakeLabelSelector().Exists("foo").Obj()).
 				Obj(),
 			nodes: []*v1.Node{
 				st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node-a").Obj(),
@@ -84,8 +79,8 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 		{
 			name: "node-x doesn't have label zone",
 			pod: st.MakePod().Name("p").Label("foo", "").
-				SpreadConstraint(1, "zone", softSpread, st.MakeLabelSelector().Exists("foo").Obj()).
-				SpreadConstraint(1, "node", softSpread, st.MakeLabelSelector().Exists("bar").Obj()).
+				SpreadConstraint(1, "zone", v1.ScheduleAnyway, st.MakeLabelSelector().Exists("foo").Obj()).
+				SpreadConstraint(1, "node", v1.ScheduleAnyway, st.MakeLabelSelector().Exists("bar").Obj()).
 				Obj(),
 			nodes: []*v1.Node{
 				st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node-a").Obj(),
@@ -113,12 +108,98 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "defaults constraints and a replica set",
+			pod:  st.MakePod().Name("p").Label("foo", "tar").Label("baz", "sup").Obj(),
+			defaultConstraints: []v1.TopologySpreadConstraint{
+				{MaxSkew: 1, TopologyKey: "node", WhenUnsatisfiable: v1.ScheduleAnyway},
+				{MaxSkew: 2, TopologyKey: "rack", WhenUnsatisfiable: v1.DoNotSchedule},
+				{MaxSkew: 2, TopologyKey: "planet", WhenUnsatisfiable: v1.ScheduleAnyway},
+			},
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-a").Label("rack", "rack1").Label("node", "node-a").Label("planet", "mars").Obj(),
+			},
+			objs: []runtime.Object{
+				&appsv1.ReplicaSet{Spec: appsv1.ReplicaSetSpec{Selector: st.MakeLabelSelector().Exists("foo").Obj()}},
+			},
+			want: &preScoreState{
+				Constraints: []topologySpreadConstraint{
+					{
+						MaxSkew:     1,
+						TopologyKey: "node",
+						Selector:    mustConvertLabelSelectorAsSelector(t, st.MakeLabelSelector().Exists("foo").Obj()),
+					},
+					{
+						MaxSkew:     2,
+						TopologyKey: "planet",
+						Selector:    mustConvertLabelSelectorAsSelector(t, st.MakeLabelSelector().Exists("foo").Obj()),
+					},
+				},
+				NodeNameSet: sets.NewString("node-a"),
+				TopologyPairToPodCounts: map[topologyPair]*int64{
+					{key: "node", value: "node-a"}: pointer.Int64Ptr(0),
+					{key: "planet", value: "mars"}: pointer.Int64Ptr(0),
+				},
+			},
+		},
+		{
+			name: "defaults constraints and a replica set that doesn't match",
+			pod:  st.MakePod().Name("p").Label("foo", "bar").Label("baz", "sup").Obj(),
+			defaultConstraints: []v1.TopologySpreadConstraint{
+				{MaxSkew: 2, TopologyKey: "planet", WhenUnsatisfiable: v1.ScheduleAnyway},
+			},
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-a").Label("planet", "mars").Obj(),
+			},
+			objs: []runtime.Object{
+				&appsv1.ReplicaSet{Spec: appsv1.ReplicaSetSpec{Selector: st.MakeLabelSelector().Exists("tar").Obj()}},
+			},
+			want: &preScoreState{
+				TopologyPairToPodCounts: make(map[topologyPair]*int64),
+			},
+		},
+		{
+			name: "defaults constraints and a replica set, but pod has constraints",
+			pod: st.MakePod().Name("p").Label("foo", "bar").Label("baz", "sup").
+				SpreadConstraint(1, "zone", v1.DoNotSchedule, st.MakeLabelSelector().Label("foo", "bar").Obj()).
+				SpreadConstraint(2, "planet", v1.ScheduleAnyway, st.MakeLabelSelector().Label("baz", "sup").Obj()).Obj(),
+			defaultConstraints: []v1.TopologySpreadConstraint{
+				{MaxSkew: 2, TopologyKey: "galaxy", WhenUnsatisfiable: v1.ScheduleAnyway},
+			},
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-a").Label("planet", "mars").Label("galaxy", "andromeda").Obj(),
+			},
+			objs: []runtime.Object{
+				&appsv1.ReplicaSet{Spec: appsv1.ReplicaSetSpec{Selector: st.MakeLabelSelector().Exists("foo").Obj()}},
+			},
+			want: &preScoreState{
+				Constraints: []topologySpreadConstraint{
+					{
+						MaxSkew:     2,
+						TopologyKey: "planet",
+						Selector:    mustConvertLabelSelectorAsSelector(t, st.MakeLabelSelector().Label("baz", "sup").Obj()),
+					},
+				},
+				NodeNameSet: sets.NewString("node-a"),
+				TopologyPairToPodCounts: map[topologyPair]*int64{
+					{"planet", "mars"}: pointer.Int64Ptr(0),
+				},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			informerFactory := informers.NewSharedInformerFactory(fake.NewSimpleClientset(tt.objs...), 0)
 			pl := PodTopologySpread{
 				sharedLister: cache.NewSnapshot(nil, tt.nodes),
+				Args: Args{
+					DefaultConstraints: tt.defaultConstraints,
+				},
 			}
+			pl.setListers(informerFactory)
+			informerFactory.Start(ctx.Done())
+			informerFactory.WaitForCacheSync(ctx.Done())
 			cs := framework.NewCycleState()
 			if s := pl.PreScore(context.Background(), cs, tt.pod, tt.nodes); !s.IsSuccess() {
 				t.Fatal(s.AsError())
@@ -128,7 +209,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if diff := cmp.Diff(tt.want, got); diff != "" {
+			if diff := cmp.Diff(tt.want, got, cmpOpts...); diff != "" {
 				t.Errorf("PodTopologySpread#PreScore() returned (-want, +got):\n%s", diff)
 			}
 		})
@@ -155,7 +236,7 @@ func TestPodTopologySpreadScore(t *testing.T) {
 			// if there is only one candidate node, it should be scored to 10
 			name: "one constraint on node, no existing pods",
 			pod: st.MakePod().Name("p").Label("foo", "").
-				SpreadConstraint(1, "node", softSpread, st.MakeLabelSelector().Exists("foo").Obj()).
+				SpreadConstraint(1, "node", v1.ScheduleAnyway, st.MakeLabelSelector().Exists("foo").Obj()).
 				Obj(),
 			nodes: []*v1.Node{
 				st.MakeNode().Name("node-a").Label("node", "node-a").Obj(),
@@ -170,7 +251,7 @@ func TestPodTopologySpreadScore(t *testing.T) {
 			// if there is only one candidate node, it should be scored to 10
 			name: "one constraint on node, only one node is candidate",
 			pod: st.MakePod().Name("p").Label("foo", "").
-				SpreadConstraint(1, "node", softSpread, st.MakeLabelSelector().Exists("foo").Obj()).
+				SpreadConstraint(1, "node", v1.ScheduleAnyway, st.MakeLabelSelector().Exists("foo").Obj()).
 				Obj(),
 			existingPods: []*v1.Pod{
 				st.MakePod().Name("p-a1").Node("node-a").Label("foo", "").Obj(),
@@ -190,7 +271,7 @@ func TestPodTopologySpreadScore(t *testing.T) {
 		{
 			name: "one constraint on node, all nodes have the same number of matching pods",
 			pod: st.MakePod().Name("p").Label("foo", "").
-				SpreadConstraint(1, "node", softSpread, st.MakeLabelSelector().Exists("foo").Obj()).
+				SpreadConstraint(1, "node", v1.ScheduleAnyway, st.MakeLabelSelector().Exists("foo").Obj()).
 				Obj(),
 			existingPods: []*v1.Pod{
 				st.MakePod().Name("p-a1").Node("node-a").Label("foo", "").Obj(),
@@ -211,7 +292,7 @@ func TestPodTopologySpreadScore(t *testing.T) {
 			// so scores = 400/6, 500/6, 600/6, 300/6
 			name: "one constraint on node, all 4 nodes are candidates",
 			pod: st.MakePod().Name("p").Label("foo", "").
-				SpreadConstraint(1, "node", softSpread, st.MakeLabelSelector().Exists("foo").Obj()).
+				SpreadConstraint(1, "node", v1.ScheduleAnyway, st.MakeLabelSelector().Exists("foo").Obj()).
 				Obj(),
 			existingPods: []*v1.Pod{
 				st.MakePod().Name("p-a1").Node("node-a").Label("foo", "").Obj(),
@@ -241,7 +322,7 @@ func TestPodTopologySpreadScore(t *testing.T) {
 			// so scores = 300/6, 500/6, 600/6
 			name: "one constraint on node, 3 out of 4 nodes are candidates",
 			pod: st.MakePod().Name("p").Label("foo", "").
-				SpreadConstraint(1, "node", softSpread, st.MakeLabelSelector().Exists("foo").Obj()).
+				SpreadConstraint(1, "node", v1.ScheduleAnyway, st.MakeLabelSelector().Exists("foo").Obj()).
 				Obj(),
 			existingPods: []*v1.Pod{
 				st.MakePod().Name("p-a1").Node("node-a").Label("foo", "").Obj(),
@@ -275,7 +356,7 @@ func TestPodTopologySpreadScore(t *testing.T) {
 			// so scores = 100/4, 0, 400/4
 			name: "one constraint on node, 3 out of 4 nodes are candidates",
 			pod: st.MakePod().Name("p").Label("foo", "").
-				SpreadConstraint(1, "node", softSpread, st.MakeLabelSelector().Exists("foo").Obj()).
+				SpreadConstraint(1, "node", v1.ScheduleAnyway, st.MakeLabelSelector().Exists("foo").Obj()).
 				Obj(),
 			existingPods: []*v1.Pod{
 				st.MakePod().Name("p-a1").Node("node-a").Label("foo", "").Obj(),
@@ -309,7 +390,7 @@ func TestPodTopologySpreadScore(t *testing.T) {
 			// so scores = 1000/12, 1000/12, 1200/12
 			name: "one constraint on zone, 3 out of 4 nodes are candidates",
 			pod: st.MakePod().Name("p").Label("foo", "").
-				SpreadConstraint(1, "zone", softSpread, st.MakeLabelSelector().Exists("foo").Obj()).
+				SpreadConstraint(1, "zone", v1.ScheduleAnyway, st.MakeLabelSelector().Exists("foo").Obj()).
 				Obj(),
 			existingPods: []*v1.Pod{
 				st.MakePod().Name("p-a1").Node("node-a").Label("foo", "").Obj(),
@@ -343,8 +424,8 @@ func TestPodTopologySpreadScore(t *testing.T) {
 			// so scores = 800/8, 500/8
 			name: "two Constraints on zone and node, 2 out of 4 nodes are candidates",
 			pod: st.MakePod().Name("p").Label("foo", "").
-				SpreadConstraint(1, "zone", softSpread, st.MakeLabelSelector().Exists("foo").Obj()).
-				SpreadConstraint(1, "node", softSpread, st.MakeLabelSelector().Exists("foo").Obj()).
+				SpreadConstraint(1, "zone", v1.ScheduleAnyway, st.MakeLabelSelector().Exists("foo").Obj()).
+				SpreadConstraint(1, "node", v1.ScheduleAnyway, st.MakeLabelSelector().Exists("foo").Obj()).
 				Obj(),
 			existingPods: []*v1.Pod{
 				st.MakePod().Name("p-a1").Node("node-a").Label("foo", "").Obj(),
@@ -386,8 +467,8 @@ func TestPodTopologySpreadScore(t *testing.T) {
 			// so scores = 600/7, 500/7, 700/7, 600/7
 			name: "two Constraints on zone and node, with different labelSelectors",
 			pod: st.MakePod().Name("p").Label("foo", "").Label("bar", "").
-				SpreadConstraint(1, "zone", softSpread, st.MakeLabelSelector().Exists("foo").Obj()).
-				SpreadConstraint(1, "node", softSpread, st.MakeLabelSelector().Exists("bar").Obj()).
+				SpreadConstraint(1, "zone", v1.ScheduleAnyway, st.MakeLabelSelector().Exists("foo").Obj()).
+				SpreadConstraint(1, "node", v1.ScheduleAnyway, st.MakeLabelSelector().Exists("bar").Obj()).
 				Obj(),
 			existingPods: []*v1.Pod{
 				st.MakePod().Name("p-a1").Node("node-a").Label("foo", "").Obj(),
@@ -417,8 +498,8 @@ func TestPodTopologySpreadScore(t *testing.T) {
 			// so scores = 600/6, 500/6, 400/6, 300/6
 			name: "two Constraints on zone and node, with different labelSelectors, some nodes have 0 pods",
 			pod: st.MakePod().Name("p").Label("foo", "").Label("bar", "").
-				SpreadConstraint(1, "zone", softSpread, st.MakeLabelSelector().Exists("foo").Obj()).
-				SpreadConstraint(1, "node", softSpread, st.MakeLabelSelector().Exists("bar").Obj()).
+				SpreadConstraint(1, "zone", v1.ScheduleAnyway, st.MakeLabelSelector().Exists("foo").Obj()).
+				SpreadConstraint(1, "node", v1.ScheduleAnyway, st.MakeLabelSelector().Exists("bar").Obj()).
 				Obj(),
 			existingPods: []*v1.Pod{
 				st.MakePod().Name("p-b1").Node("node-b").Label("bar", "").Obj(),
@@ -447,8 +528,8 @@ func TestPodTopologySpreadScore(t *testing.T) {
 			// so scores = 400/5, 300/5, 500/5
 			name: "two Constraints on zone and node, with different labelSelectors, 3 out of 4 nodes are candidates",
 			pod: st.MakePod().Name("p").Label("foo", "").Label("bar", "").
-				SpreadConstraint(1, "zone", softSpread, st.MakeLabelSelector().Exists("foo").Obj()).
-				SpreadConstraint(1, "node", softSpread, st.MakeLabelSelector().Exists("bar").Obj()).
+				SpreadConstraint(1, "zone", v1.ScheduleAnyway, st.MakeLabelSelector().Exists("foo").Obj()).
+				SpreadConstraint(1, "node", v1.ScheduleAnyway, st.MakeLabelSelector().Exists("bar").Obj()).
 				Obj(),
 			existingPods: []*v1.Pod{
 				st.MakePod().Name("p-a1").Node("node-a").Label("foo", "").Obj(),
@@ -473,7 +554,7 @@ func TestPodTopologySpreadScore(t *testing.T) {
 		{
 			name: "existing pods in a different namespace do not count",
 			pod: st.MakePod().Name("p").Label("foo", "").
-				SpreadConstraint(1, "node", softSpread, st.MakeLabelSelector().Exists("foo").Obj()).
+				SpreadConstraint(1, "node", v1.ScheduleAnyway, st.MakeLabelSelector().Exists("foo").Obj()).
 				Obj(),
 			existingPods: []*v1.Pod{
 				st.MakePod().Name("p-a1").Namespace("ns1").Node("node-a").Label("foo", "").Obj(),
@@ -493,7 +574,7 @@ func TestPodTopologySpreadScore(t *testing.T) {
 		{
 			name: "terminating Pods should be excluded",
 			pod: st.MakePod().Name("p").Label("foo", "").SpreadConstraint(
-				1, "node", softSpread, st.MakeLabelSelector().Exists("foo").Obj(),
+				1, "node", v1.ScheduleAnyway, st.MakeLabelSelector().Exists("foo").Obj(),
 			).Obj(),
 			nodes: []*v1.Node{
 				st.MakeNode().Name("node-a").Label("node", "node-a").Obj(),
@@ -536,7 +617,7 @@ func TestPodTopologySpreadScore(t *testing.T) {
 			if !status.IsSuccess() {
 				t.Errorf("unexpected error: %v", status)
 			}
-			if diff := cmp.Diff(tt.want, gotList); diff != "" {
+			if diff := cmp.Diff(tt.want, gotList, cmpOpts...); diff != "" {
 				t.Errorf("unexpected scores (-want,+got):\n%s", diff)
 			}
 		})
@@ -554,7 +635,7 @@ func BenchmarkTestPodTopologySpreadScore(b *testing.B) {
 		{
 			name: "1000nodes/single-constraint-zone",
 			pod: st.MakePod().Name("p").Label("foo", "").
-				SpreadConstraint(1, v1.LabelZoneFailureDomain, softSpread, st.MakeLabelSelector().Exists("foo").Obj()).
+				SpreadConstraint(1, v1.LabelZoneFailureDomain, v1.ScheduleAnyway, st.MakeLabelSelector().Exists("foo").Obj()).
 				Obj(),
 			existingPodsNum:  10000,
 			allNodesNum:      1000,
@@ -563,7 +644,7 @@ func BenchmarkTestPodTopologySpreadScore(b *testing.B) {
 		{
 			name: "1000nodes/single-constraint-node",
 			pod: st.MakePod().Name("p").Label("foo", "").
-				SpreadConstraint(1, v1.LabelHostname, softSpread, st.MakeLabelSelector().Exists("foo").Obj()).
+				SpreadConstraint(1, v1.LabelHostname, v1.ScheduleAnyway, st.MakeLabelSelector().Exists("foo").Obj()).
 				Obj(),
 			existingPodsNum:  10000,
 			allNodesNum:      1000,
@@ -572,8 +653,8 @@ func BenchmarkTestPodTopologySpreadScore(b *testing.B) {
 		{
 			name: "1000nodes/two-Constraints-zone-node",
 			pod: st.MakePod().Name("p").Label("foo", "").Label("bar", "").
-				SpreadConstraint(1, v1.LabelZoneFailureDomain, softSpread, st.MakeLabelSelector().Exists("foo").Obj()).
-				SpreadConstraint(1, v1.LabelHostname, softSpread, st.MakeLabelSelector().Exists("bar").Obj()).
+				SpreadConstraint(1, v1.LabelZoneFailureDomain, v1.ScheduleAnyway, st.MakeLabelSelector().Exists("foo").Obj()).
+				SpreadConstraint(1, v1.LabelHostname, v1.ScheduleAnyway, st.MakeLabelSelector().Exists("bar").Obj()).
 				Obj(),
 			existingPodsNum:  10000,
 			allNodesNum:      1000,
@@ -613,8 +694,10 @@ func BenchmarkTestPodTopologySpreadScore(b *testing.B) {
 	}
 }
 
-// The tests in this file compare the performance of SelectorSpreadPriority
-// against EvenPodsSpreadPriority with a similar rule.
+// The following test allows to compare PodTopologySpread.Score with
+// DefaultPodTopologySpread.Score by using a similar rule.
+// See pkg/scheduler/framework/plugins/defaultpodtopologyspread/default_pod_topology_spread_perf_test.go
+// for the equivalent test.
 
 var (
 	tests = []struct {
@@ -638,31 +721,43 @@ var (
 func BenchmarkTestDefaultEvenPodsSpreadPriority(b *testing.B) {
 	for _, tt := range tests {
 		b.Run(tt.name, func(b *testing.B) {
-			pod := st.MakePod().Name("p").Label("foo", "").
-				SpreadConstraint(1, v1.LabelHostname, softSpread, st.MakeLabelSelector().Exists("foo").Obj()).
-				SpreadConstraint(1, v1.LabelZoneFailureDomain, softSpread, st.MakeLabelSelector().Exists("foo").Obj()).Obj()
+			pod := st.MakePod().Name("p").Label("foo", "").Obj()
 			existingPods, allNodes, filteredNodes := st.MakeNodesAndPodsForEvenPodsSpread(pod.Labels, tt.existingPodsNum, tt.allNodesNum, tt.allNodesNum)
 			state := framework.NewCycleState()
 			snapshot := cache.NewSnapshot(existingPods, allNodes)
-			p := &PodTopologySpread{sharedLister: snapshot}
-
-			status := p.PreScore(context.Background(), state, pod, filteredNodes)
-			if !status.IsSuccess() {
-				b.Fatalf("unexpected error: %v", status)
+			p := &PodTopologySpread{
+				sharedLister: snapshot,
+				Args: Args{
+					DefaultConstraints: []v1.TopologySpreadConstraint{
+						{MaxSkew: 1, TopologyKey: v1.LabelHostname, WhenUnsatisfiable: v1.ScheduleAnyway},
+						{MaxSkew: 1, TopologyKey: v1.LabelZoneFailureDomain, WhenUnsatisfiable: v1.ScheduleAnyway},
+					},
+				},
 			}
+			client := fake.NewSimpleClientset(
+				&v1.Service{Spec: v1.ServiceSpec{Selector: map[string]string{"foo": ""}}},
+			)
+			ctx := context.Background()
+			informerFactory := informers.NewSharedInformerFactory(client, 0)
+			p.setListers(informerFactory)
+			informerFactory.Start(ctx.Done())
+			informerFactory.WaitForCacheSync(ctx.Done())
+
 			b.ResetTimer()
 
 			for i := 0; i < b.N; i++ {
 				var gotList framework.NodeScoreList
+				status := p.PreScore(ctx, state, pod, filteredNodes)
+				if !status.IsSuccess() {
+					b.Fatalf("unexpected error: %v", status)
+				}
 				for _, n := range filteredNodes {
-					nodeName := n.Name
-					score, status := p.Score(context.Background(), state, pod, nodeName)
+					score, status := p.Score(context.Background(), state, pod, n.Name)
 					if !status.IsSuccess() {
 						b.Fatalf("unexpected error: %v", status)
 					}
-					gotList = append(gotList, framework.NodeScore{Name: nodeName, Score: score})
+					gotList = append(gotList, framework.NodeScore{Name: n.Name, Score: score})
 				}
-
 				status = p.NormalizeScore(context.Background(), state, pod, gotList)
 				if !status.IsSuccess() {
 					b.Fatal(status)

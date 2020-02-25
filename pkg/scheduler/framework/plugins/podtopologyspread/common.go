@@ -20,6 +20,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 )
 
 type topologyPair struct {
@@ -34,6 +35,24 @@ type topologySpreadConstraint struct {
 	MaxSkew     int32
 	TopologyKey string
 	Selector    labels.Selector
+}
+
+// defaultConstraints builds the constraints for a pod using
+// .DefaultConstraints and the selectors from the services, replication
+// controllers, replica sets and stateful sets that match the pod.
+func (pl *PodTopologySpread) defaultConstraints(p *v1.Pod, action v1.UnsatisfiableConstraintAction) ([]topologySpreadConstraint, error) {
+	constraints, err := filterTopologySpreadConstraints(pl.DefaultConstraints, action)
+	if err != nil || len(constraints) == 0 {
+		return nil, err
+	}
+	selector := helper.DefaultSelector(p, pl.services, pl.replicationCtrls, pl.replicaSets, pl.statefulSets)
+	if selector.Empty() {
+		return nil, nil
+	}
+	for i := range constraints {
+		constraints[i].Selector = selector
+	}
+	return constraints, nil
 }
 
 // nodeLabelsMatchSpreadConstraints checks if ALL topology keys in spread Constraints are present in node labels.

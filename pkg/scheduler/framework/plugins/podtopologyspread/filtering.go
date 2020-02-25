@@ -91,32 +91,32 @@ func newCriticalPaths() *criticalPaths {
 	return &criticalPaths{{MatchNum: math.MaxInt32}, {MatchNum: math.MaxInt32}}
 }
 
-func (paths *criticalPaths) update(tpVal string, num int32) {
+func (p *criticalPaths) update(tpVal string, num int32) {
 	// first verify if `tpVal` exists or not
 	i := -1
-	if tpVal == paths[0].TopologyValue {
+	if tpVal == p[0].TopologyValue {
 		i = 0
-	} else if tpVal == paths[1].TopologyValue {
+	} else if tpVal == p[1].TopologyValue {
 		i = 1
 	}
 
 	if i >= 0 {
 		// `tpVal` exists
-		paths[i].MatchNum = num
-		if paths[0].MatchNum > paths[1].MatchNum {
+		p[i].MatchNum = num
+		if p[0].MatchNum > p[1].MatchNum {
 			// swap paths[0] and paths[1]
-			paths[0], paths[1] = paths[1], paths[0]
+			p[0], p[1] = p[1], p[0]
 		}
 	} else {
 		// `tpVal` doesn't exist
-		if num < paths[0].MatchNum {
+		if num < p[0].MatchNum {
 			// update paths[1] with paths[0]
-			paths[1] = paths[0]
+			p[1] = p[0]
 			// update paths[0]
-			paths[0].TopologyValue, paths[0].MatchNum = tpVal, num
-		} else if num < paths[1].MatchNum {
+			p[0].TopologyValue, p[0].MatchNum = tpVal, num
+		} else if num < p[1].MatchNum {
 			// update paths[1]
-			paths[1].TopologyValue, paths[1].MatchNum = tpVal, num
+			p[1].TopologyValue, p[1].MatchNum = tpVal, num
 		}
 	}
 }
@@ -201,11 +201,19 @@ func (pl *PodTopologySpread) calPreFilterState(pod *v1.Pod) (*preFilterState, er
 	if err != nil {
 		return nil, fmt.Errorf("listing NodeInfos: %v", err)
 	}
-	// We have feature gating in APIServer to strip the spec
-	// so don't need to re-check feature gate, just check length of Constraints.
-	constraints, err := filterTopologySpreadConstraints(pod.Spec.TopologySpreadConstraints, v1.DoNotSchedule)
-	if err != nil {
-		return nil, err
+	var constraints []topologySpreadConstraint
+	if len(pod.Spec.TopologySpreadConstraints) > 0 {
+		// We have feature gating in APIServer to strip the spec
+		// so don't need to re-check feature gate, just check length of Constraints.
+		constraints, err = filterTopologySpreadConstraints(pod.Spec.TopologySpreadConstraints, v1.DoNotSchedule)
+		if err != nil {
+			return nil, fmt.Errorf("obtaining pod's hard topology spread constraints: %v", err)
+		}
+	} else {
+		constraints, err = pl.defaultConstraints(pod, v1.DoNotSchedule)
+		if err != nil {
+			return nil, fmt.Errorf("setting default hard topology spread constraints: %v", err)
+		}
 	}
 	if len(constraints) == 0 {
 		return &preFilterState{}, nil
