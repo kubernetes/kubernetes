@@ -113,6 +113,73 @@ func TestHugePageSizeFromResourceName(t *testing.T) {
 	}
 }
 
+func TestHugePageSizeFromMedium(t *testing.T) {
+	testCases := []struct {
+		description string
+		medium      v1.StorageMedium
+		expectVal   resource.Quantity
+		expectErr   bool
+	}{
+		{
+			description: "Invalid hugepages medium",
+			medium:      "Memory",
+			expectVal:   resource.Quantity{},
+			expectErr:   true,
+		},
+		{
+			description: "Invalid hugepages medium",
+			medium:      "Memory",
+			expectVal:   resource.Quantity{},
+			expectErr:   true,
+		},
+		{
+			description: "Invalid: HugePages without size",
+			medium:      "HugePages",
+			expectVal:   resource.Quantity{},
+			expectErr:   true,
+		},
+		{
+			description: "Invalid: HugePages without size",
+			medium:      "HugePages",
+			expectVal:   resource.Quantity{},
+			expectErr:   true,
+		},
+		{
+			description: "Valid: HugePages-1Gi",
+			medium:      "HugePages-1Gi",
+			expectVal:   resource.MustParse("1Gi"),
+			expectErr:   false,
+		},
+		{
+			description: "Valid: HugePages-2Mi",
+			medium:      "HugePages-2Mi",
+			expectVal:   resource.MustParse("2Mi"),
+			expectErr:   false,
+		},
+		{
+			description: "Valid: HugePages-64Ki",
+			medium:      "HugePages-64Ki",
+			expectVal:   resource.MustParse("64Ki"),
+			expectErr:   false,
+		},
+	}
+	for i, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			t.Parallel()
+			v, err := HugePageSizeFromMedium(tc.medium)
+			if err == nil && tc.expectErr {
+				t.Errorf("[%v]expected error but got none.", i)
+			}
+			if err != nil && !tc.expectErr {
+				t.Errorf("[%v]did not expect error but got: %v", i, err)
+			}
+			if v != tc.expectVal {
+				t.Errorf("Got %v but expected %v", v, tc.expectVal)
+			}
+		})
+	}
+}
+
 func TestIsOvercommitAllowed(t *testing.T) {
 	testCases := []struct {
 		resourceName v1.ResourceName

@@ -88,7 +88,11 @@ func (podStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 // Validate validates a new pod.
 func (podStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	pod := obj.(*api.Pod)
-	allErrs := validation.ValidatePodCreate(pod)
+	opts := validation.PodValidationOptions{
+		// Allow multiple huge pages on pod create if feature is enabled
+		AllowMultipleHugePageResources: utilfeature.DefaultFeatureGate.Enabled(features.HugePageStorageMediumSize),
+	}
+	allErrs := validation.ValidatePodCreate(pod, opts)
 	allErrs = append(allErrs, validation.ValidateConditionalPod(pod, nil, field.NewPath(""))...)
 	return allErrs
 }
@@ -104,8 +108,13 @@ func (podStrategy) AllowCreateOnUpdate() bool {
 
 // ValidateUpdate is the default update validation for an end user.
 func (podStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	errorList := validation.ValidatePod(obj.(*api.Pod))
-	errorList = append(errorList, validation.ValidatePodUpdate(obj.(*api.Pod), old.(*api.Pod))...)
+	oldFailsSingleHugepagesValidation := len(validation.ValidatePodSingleHugePageResources(old.(*api.Pod), field.NewPath("spec"))) > 0
+	opts := validation.PodValidationOptions{
+		// Allow multiple huge pages on pod create if feature is enabled or if the old pod already has multiple hugepages specified
+		AllowMultipleHugePageResources: oldFailsSingleHugepagesValidation || utilfeature.DefaultFeatureGate.Enabled(features.HugePageStorageMediumSize),
+	}
+	errorList := validation.ValidatePod(obj.(*api.Pod), opts)
+	errorList = append(errorList, validation.ValidatePodUpdate(obj.(*api.Pod), old.(*api.Pod), opts)...)
 	errorList = append(errorList, validation.ValidateConditionalPod(obj.(*api.Pod), old.(*api.Pod), field.NewPath(""))...)
 	return errorList
 }
