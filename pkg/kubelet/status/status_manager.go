@@ -184,7 +184,7 @@ func (m *manager) SetPodStatus(pod *v1.Pod, status v1.PodStatus) {
 
 	for _, c := range pod.Status.Conditions {
 		if !kubetypes.PodConditionByKubelet(c.Type) {
-			klog.Errorf("Kubelet is trying to update pod condition %q for pod %q. "+
+			klog.V(4).Infof("Kubelet is trying to update pod condition %q for pod %q. "+
 				"But it is not owned by kubelet.", string(c.Type), format.Pod(pod))
 		}
 	}
