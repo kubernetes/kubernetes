@@ -21,11 +21,32 @@
 #   make REGISTRY=$VAR
 REGISTRY := $(if $(REGISTRY),$(REGISTRY),staging-k8s.gcr.io)
 IMAGE_TAG := $(if $(IMAGE_TAG),$(IMAGE_TAG),latest)
+TEMP_DIR:=$(shell mktemp -d)
+ARCH?=amd64
+
+ifeq ($(ARCH),amd64)
+    BASEIMAGE?=gcr.io/distroless/base@sha256:7fa7445dfbebae4f4b7ab0e6ef99276e96075ae42584af6286ba080750d6dfe5
+endif
+ifeq ($(ARCH),arm)
+    BASEIMAGE?=k8s.gcr.io/debian-base-arm:v1.0.0
+endif
+ifeq ($(ARCH),arm64)
+    BASEIMAGE?=k8s.gcr.io/debian-base-arm64:v1.0.0
+endif
+ifeq ($(ARCH),ppc64le)
+    BASEIMAGE?=k8s.gcr.io/debian-base-ppc64le:v1.0.0
+endif
+ifeq ($(ARCH),s390x)
+    BASEIMAGE?=k8s.gcr.io/debian-base-s390x:v1.0.0
+endif
 
 all: gcloudpush
 
 build:
-	docker build --pull -t $(REGISTRY)/kubemark:$(IMAGE_TAG) .
+	cp -r ./* ${TEMP_DIR}
+	cd ${TEMP_DIR} && sed -i.bak "s|BASEIMAGE|${BASEIMAGE}|g" Dockerfile
+
+	docker build --pull -t $(REGISTRY)/kubemark:$(IMAGE_TAG) $(TEMP_DIR)
 
 gcloudpush: build
 	docker push $(REGISTRY)/kubemark:$(IMAGE_TAG)
