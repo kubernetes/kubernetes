@@ -485,7 +485,6 @@ staging/src/k8s.io/kubectl/pkg/cmd/scale
 staging/src/k8s.io/kubectl/pkg/cmd/set
 staging/src/k8s.io/kubectl/pkg/cmd/taint
 staging/src/k8s.io/kubectl/pkg/cmd/testing
-staging/src/k8s.io/kubectl/pkg/cmd/top
 staging/src/k8s.io/kubectl/pkg/cmd/util
 staging/src/k8s.io/kubectl/pkg/cmd/wait
 staging/src/k8s.io/kubectl/pkg/describe/versioned
