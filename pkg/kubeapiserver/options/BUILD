@@ -89,6 +89,7 @@ go_test(
         "admission_test.go",
         "authentication_test.go",
         "authorization_test.go",
+        "plugins_test.go",
     ],
     data = [
         "testdata/client-expired.pem",

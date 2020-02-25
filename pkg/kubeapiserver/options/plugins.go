@@ -86,11 +86,15 @@ var AllOrderedPlugins = []string{
 	storageobjectinuseprotection.PluginName, // StorageObjectInUseProtection
 	gc.PluginName,                           // OwnerReferencesPermissionEnforcement
 	resize.PluginName,                       // PersistentVolumeClaimResize
-	mutatingwebhook.PluginName,              // MutatingAdmissionWebhook
-	validatingwebhook.PluginName,            // ValidatingAdmissionWebhook
-	runtimeclass.PluginName,                 //RuntimeClass
-	resourcequota.PluginName,                // ResourceQuota
-	deny.PluginName,                         // AlwaysDeny
+	runtimeclass.PluginName,                 // RuntimeClass
+
+	// new admission plugins should generally be inserted above here
+	// webhook, resourcequota, and deny plugins must go at the end
+
+	mutatingwebhook.PluginName,   // MutatingAdmissionWebhook
+	validatingwebhook.PluginName, // ValidatingAdmissionWebhook
+	resourcequota.PluginName,     // ResourceQuota
+	deny.PluginName,              // AlwaysDeny
 }
 
 // RegisterAllAdmissionPlugins registers all admission plugins and
