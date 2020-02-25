@@ -203,6 +203,7 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&o.config.EnableProfiling, "profiling", o.config.EnableProfiling, "If true enables profiling via web interface on /debug/pprof handler.")
 
 	fs.Float32Var(&o.config.ClientConnection.QPS, "kube-api-qps", o.config.ClientConnection.QPS, "QPS to use while talking with kubernetes apiserver")
+	fs.Var(&o.config.DetectLocalMode, "detect-local-mode", "Mode to use to detect local traffic")
 }
 
 // NewOptions returns initialized Options
