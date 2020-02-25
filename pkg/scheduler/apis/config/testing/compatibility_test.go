@@ -1294,41 +1294,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			}},
 		},
 		{
-			name: "enable alpha feature EvenPodsSpread",
-			JSON: `{
-		  "kind": "Policy",
-		  "apiVersion": "v1",
-		  "predicates": [
-			{"name": "EvenPodsSpread"}
-		  ],
-		  "priorities": [
-			{"name": "EvenPodsSpreadPriority",   "weight": 2}
-		  ]
-		}`,
-			featureGates: map[featuregate.Feature]bool{
-				features.EvenPodsSpread: true,
-			},
-			wantPlugins: map[string][]config.Plugin{
-				"QueueSortPlugin": {{Name: "PrioritySort"}},
-				"PreFilterPlugin": {
-					{Name: "PodTopologySpread"},
-				},
-				"FilterPlugin": {
-					{Name: "NodeUnschedulable"},
-					{Name: "TaintToleration"},
-					{Name: "PodTopologySpread"},
-				},
-				"PreScorePlugin": {
-					{Name: "PodTopologySpread"},
-				},
-				"ScorePlugin": {
-					{Name: "PodTopologySpread", Weight: 2},
-				},
-				"BindPlugin": {{Name: "DefaultBinder"}},
-			},
-		},
-		{
-			name: "enable alpha feature ResourceLimitsPriorityFunction",
+			name: "enable alpha feature ResourceLimitsPriorityFunction and disable beta feature EvenPodsSpread",
 			JSON: `{
 		  "kind": "Policy",
 		  "apiVersion": "v1",
@@ -1338,6 +1304,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		  ]
 		}`,
 			featureGates: map[featuregate.Feature]bool{
+				features.EvenPodsSpread:                 false,
 				features.ResourceLimitsPriorityFunction: true,
 			},
 			wantPlugins: map[string][]config.Plugin{
