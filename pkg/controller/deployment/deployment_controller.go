@@ -63,7 +63,7 @@ const (
 // controllerKind contains the schema.GroupVersionKind for this controller type.
 var controllerKind = apps.SchemeGroupVersion.WithKind("Deployment")
 
-// Controller is responsible for synchronizing Deployment objects stored
+// Controller is a controller for Deployments, is responsible for synchronizing Deployment objects stored
 // in the system with actual running replica sets and pods.
 type Controller struct {
 	// rsControl is used for adopting/releasing replica sets.
