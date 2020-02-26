@@ -65,6 +65,13 @@ func (t *gcm) TransformFromStorage(data []byte, context value.Context) ([]byte, 
 	return result, false, err
 }
 
+// TransformFromStorageConcurrencyLevel indication the degree at which a provider (typically KMS)
+// could handle requests concurrently.
+func (t *gcm) TransformFromStorageConcurrencyLevel() int {
+	// TODO(immutableT) Should this be GOMAXPROCS?
+	return 1
+}
+
 func (t *gcm) TransformToStorage(data []byte, context value.Context) ([]byte, error) {
 	aead, err := cipher.NewGCM(t.block)
 	if err != nil {
@@ -131,6 +138,13 @@ func (t *cbc) TransformFromStorage(data []byte, context value.Context) ([]byte, 
 	}
 
 	return result[:size], false, nil
+}
+
+// TransformFromStorageConcurrencyLevel indication the degree at which a provider (typically KMS)
+// could handle requests concurrently.
+func (t *cbc) TransformFromStorageConcurrencyLevel() int {
+	// TODO(immutableT) Should this be GOMAXPROCS?
+	return 1
 }
 
 func (t *cbc) TransformToStorage(data []byte, context value.Context) ([]byte, error) {

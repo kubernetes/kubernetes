@@ -311,6 +311,47 @@ func TestKMSEndpoint(t *testing.T) {
 	}
 }
 
+func TestKMSProviderDecryptionConcurrencyLevel(t *testing.T) {
+	concurrencyField := root.Index(0).Child("kms").Child("decryptionConcurrencyLevel")
+	negative := int32(-1)
+	positive := int32(10)
+	zero := int32(0)
+
+	testCases := []struct {
+		desc string
+		in   *config.KMSConfiguration
+		want field.ErrorList
+	}{
+		{
+			desc: "valid positive concurrency level",
+			in:   &config.KMSConfiguration{DecryptionConcurrencyLevel: positive},
+			want: field.ErrorList{},
+		},
+		{
+			desc: "invalid zero concurrency level",
+			in:   &config.KMSConfiguration{DecryptionConcurrencyLevel: zero},
+			want: field.ErrorList{
+				field.Invalid(concurrencyField, int32(0), fmt.Sprintf(zeroOrNegativeErrFmt, "decryptionConcurrencyLevel")),
+			},
+		},
+		{
+			desc: "invalid negative concurrency level",
+			in:   &config.KMSConfiguration{DecryptionConcurrencyLevel: negative},
+			want: field.ErrorList{
+				field.Invalid(concurrencyField, int32(-1), fmt.Sprintf(zeroOrNegativeErrFmt, "decryptionConcurrencyLevel"))},
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.desc, func(t *testing.T) {
+			got := validateKMSDecryptionConcurrencyLevel(tt.in, concurrencyField)
+			if d := cmp.Diff(tt.want, got); d != "" {
+				t.Fatalf("KMS Provider validation mismatch (-want +got):\n%s", d)
+			}
+		})
+	}
+}
+
 func TestKMSProviderCacheSize(t *testing.T) {
 	cacheField := root.Index(0).Child("kms").Child("cachesize")
 	negativeCacheSize := int32(-1)

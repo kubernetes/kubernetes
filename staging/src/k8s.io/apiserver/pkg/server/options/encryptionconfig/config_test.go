@@ -94,6 +94,8 @@ func TestLegacyConfig(t *testing.T) {
 	legacyV1Config := "testdata/valid-configs/legacy.yaml"
 	legacyConfigObject, err := loadConfig(mustReadConfig(t, legacyV1Config))
 	cacheSize := int32(10)
+	decryptionConcurrencyLevel := int32(1)
+
 	if err != nil {
 		t.Fatalf("error while parsing configuration file: %s.\nThe file was:\n%s", err, legacyV1Config)
 	}
@@ -111,10 +113,11 @@ func TestLegacyConfig(t *testing.T) {
 						},
 					}},
 					{KMS: &apiserverconfig.KMSConfiguration{
-						Name:      "testprovider",
-						Endpoint:  "unix:///tmp/testprovider.sock",
-						CacheSize: &cacheSize,
-						Timeout:   &metav1.Duration{Duration: 3 * time.Second},
+						Name:                       "testprovider",
+						Endpoint:                   "unix:///tmp/testprovider.sock",
+						CacheSize:                  &cacheSize,
+						Timeout:                    &metav1.Duration{Duration: 3 * time.Second},
+						DecryptionConcurrencyLevel: decryptionConcurrencyLevel,
 					}},
 					{AESCBC: &apiserverconfig.AESConfiguration{
 						Keys: []apiserverconfig.Key{

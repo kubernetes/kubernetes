@@ -38,6 +38,10 @@ func (t *testTransformer) TransformFromStorage(from []byte, context Context) (da
 	return t.from, t.stale, t.err
 }
 
+func (t *testTransformer) TransformFromStorageConcurrencyLevel() int {
+	return 1
+}
+
 func (t *testTransformer) TransformToStorage(to []byte, context Context) (data []byte, err error) {
 	t.receivedTo = to
 	return t.to, t.err

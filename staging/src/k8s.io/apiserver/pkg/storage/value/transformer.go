@@ -48,6 +48,9 @@ type Transformer interface {
 	TransformFromStorage(data []byte, context Context) (out []byte, stale bool, err error)
 	// TransformToStorage may transform the provided data into the appropriate form in storage or return an error.
 	TransformToStorage(data []byte, context Context) (out []byte, err error)
+	// TransformFromStorageConcurrencyLevel indication the degree at which a provider (typically KMS)
+	// could handle requests concurrently.
+	TransformFromStorageConcurrencyLevel() int
 }
 
 type identityTransformer struct{}
@@ -58,6 +61,13 @@ var IdentityTransformer Transformer = identityTransformer{}
 func (identityTransformer) TransformFromStorage(b []byte, ctx Context) ([]byte, bool, error) {
 	return b, false, nil
 }
+
+// TransformFromStorageConcurrencyLevel indication the degree at which a provider (typically KMS)
+// could handle requests concurrently.
+func (identityTransformer) TransformFromStorageConcurrencyLevel() int {
+	return 1
+}
+
 func (identityTransformer) TransformToStorage(b []byte, ctx Context) ([]byte, error) {
 	return b, nil
 }
@@ -92,6 +102,13 @@ func (t *MutableTransformer) TransformFromStorage(data []byte, context Context) 
 	t.lock.RUnlock()
 	return transformer.TransformFromStorage(data, context)
 }
+
+// TransformFromStorageConcurrencyLevel indication the degree at which a provider (typically KMS)
+// could handle requests concurrently.
+func (t *MutableTransformer) TransformFromStorageConcurrencyLevel() int {
+	return t.transformer.TransformFromStorageConcurrencyLevel()
+}
+
 func (t *MutableTransformer) TransformToStorage(data []byte, context Context) (out []byte, err error) {
 	t.lock.RLock()
 	transformer := t.transformer
@@ -191,6 +208,19 @@ func (t *prefixTransformers) TransformFromStorage(data []byte, context Context) 
 	}
 	RecordTransformation("from_storage", "unknown", start, t.err)
 	return nil, false, t.err
+}
+
+// TransformFromStorageConcurrencyLevel indication the degree at which a provider (typically KMS)
+// could handle requests concurrently.
+func (t *prefixTransformers) TransformFromStorageConcurrencyLevel() int {
+	concurrencyLevel := 1
+	for _, transformer := range t.transformers {
+		if concurrencyLevel < transformer.Transformer.TransformFromStorageConcurrencyLevel() {
+			concurrencyLevel = transformer.Transformer.TransformFromStorageConcurrencyLevel()
+		}
+	}
+
+	return concurrencyLevel
 }
 
 // TransformToStorage uses the first transformer and adds its prefix to the data.

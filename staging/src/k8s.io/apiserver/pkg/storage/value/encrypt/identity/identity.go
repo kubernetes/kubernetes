@@ -44,6 +44,12 @@ func (identityTransformer) TransformFromStorage(b []byte, context value.Context)
 	return b, false, nil
 }
 
+// TransformFromStorageConcurrencyLevel indication the degree at which a provider (typically KMS)
+// could handle requests concurrently.
+func (t identityTransformer) TransformFromStorageConcurrencyLevel() int {
+	return 1
+}
+
 // TransformToStorage implements the Transformer interface for identityTransformer
 func (identityTransformer) TransformToStorage(b []byte, context value.Context) ([]byte, error) {
 	return b, nil

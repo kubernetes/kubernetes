@@ -179,6 +179,16 @@ func validateKMSConfiguration(c *config.KMSConfiguration, fieldPath *field.Path)
 	allErrs = append(allErrs, validateKMSTimeout(c, fieldPath.Child("timeout"))...)
 	allErrs = append(allErrs, validateKMSEndpoint(c, fieldPath.Child("endpoint"))...)
 	allErrs = append(allErrs, validateKMSCacheSize(c, fieldPath.Child("cachesize"))...)
+	allErrs = append(allErrs, validateKMSDecryptionConcurrencyLevel(c, fieldPath.Child("decryptionConcurrencyLevel"))...)
+	return allErrs
+}
+
+func validateKMSDecryptionConcurrencyLevel(c *config.KMSConfiguration, fieldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if c.DecryptionConcurrencyLevel <= 0 {
+		allErrs = append(allErrs, field.Invalid(fieldPath, c.DecryptionConcurrencyLevel, fmt.Sprintf(zeroOrNegativeErrFmt, "decryptionConcurrencyLevel")))
+	}
+
 	return allErrs
 }
 

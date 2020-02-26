@@ -56,6 +56,13 @@ func (t *secretboxTransformer) TransformFromStorage(data []byte, context value.C
 	return result, false, nil
 }
 
+// TransformFromStorageConcurrencyLevel indication the degree at which a provider (typically KMS)
+// could handle requests concurrently.
+func (t *secretboxTransformer) TransformFromStorageConcurrencyLevel() int {
+	// TODO(immutableT) Should this be GOMAXPROCS?
+	return 1
+}
+
 func (t *secretboxTransformer) TransformToStorage(data []byte, context value.Context) ([]byte, error) {
 	var nonce [nonceSize]byte
 	n, err := rand.Read(nonce[:])

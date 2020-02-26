@@ -53,15 +53,16 @@ type envelopeTransformer struct {
 	// baseTransformerFunc creates a new transformer for encrypting the data with the DEK.
 	baseTransformerFunc func(cipher.Block) value.Transformer
 
-	cacheSize    int
-	cacheEnabled bool
+	cacheSize        int
+	cacheEnabled     bool
+	concurrencyLevel int
 }
 
 // NewEnvelopeTransformer returns a transformer which implements a KEK-DEK based envelope encryption scheme.
 // It uses envelopeService to encrypt and decrypt DEKs. Respective DEKs (in encrypted form) are prepended to
 // the data items they encrypt. A cache (of size cacheSize) is maintained to store the most recently
 // used decrypted DEKs in memory.
-func NewEnvelopeTransformer(envelopeService Service, cacheSize int, baseTransformerFunc func(cipher.Block) value.Transformer) (value.Transformer, error) {
+func NewEnvelopeTransformer(envelopeService Service, cacheSize, concurrencyLevel int, baseTransformerFunc func(cipher.Block) value.Transformer) (value.Transformer, error) {
 	var (
 		cache *lru.Cache
 		err   error
@@ -79,6 +80,7 @@ func NewEnvelopeTransformer(envelopeService Service, cacheSize int, baseTransfor
 		baseTransformerFunc: baseTransformerFunc,
 		cacheEnabled:        cacheSize > 0,
 		cacheSize:           cacheSize,
+		concurrencyLevel:    concurrencyLevel,
 	}, nil
 }
 
@@ -118,6 +120,12 @@ func (t *envelopeTransformer) TransformFromStorage(data []byte, context value.Co
 	}
 
 	return transformer.TransformFromStorage(encData, context)
+}
+
+// TransformFromStorageConcurrencyLevel indication the degree at which a provider (typically KMS)
+// could handle requests concurrently.
+func (t *envelopeTransformer) TransformFromStorageConcurrencyLevel() int {
+	return t.concurrencyLevel
 }
 
 // TransformToStorage encrypts data to be written to disk using envelope encryption.

@@ -97,4 +97,10 @@ type KMSConfiguration struct {
 	// timeout for gRPC calls to kms-plugin (ex. 5s). The default is 3 seconds.
 	// +optional
 	Timeout *metav1.Duration
+	// decryptionConcurrencyLevel provides a hint to kube-apiserver on what level on concurrency does
+	// the KMS support.
+	// The default value is 1, implying that decryption of items during List operations will take
+	// place sequentially.
+	// +optional
+	DecryptionConcurrencyLevel int32
 }

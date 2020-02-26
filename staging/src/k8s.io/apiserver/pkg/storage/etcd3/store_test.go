@@ -30,10 +30,13 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+
 	"github.com/coreos/pkg/capnslog"
 	"go.etcd.io/etcd/clientv3"
 	"go.etcd.io/etcd/integration"
-	apitesting "k8s.io/apimachinery/pkg/api/apitesting"
+	"go.etcd.io/etcd/mvcc/mvccpb"
+	"k8s.io/apimachinery/pkg/api/apitesting"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
@@ -85,6 +88,7 @@ func (p *prefixTransformer) TransformFromStorage(b []byte, ctx value.Context) ([
 	}
 	return bytes.TrimPrefix(b, p.prefix), p.stale, p.err
 }
+
 func (p *prefixTransformer) TransformToStorage(b []byte, ctx value.Context) ([]byte, error) {
 	if ctx == nil {
 		panic("no context provided")
@@ -93,6 +97,10 @@ func (p *prefixTransformer) TransformToStorage(b []byte, ctx value.Context) ([]b
 		return append(append([]byte{}, p.prefix...), b...), p.err
 	}
 	return b, p.err
+}
+
+func (p *prefixTransformer) TransformFromStorageConcurrencyLevel() int {
+	return 4
 }
 
 func (p *prefixTransformer) resetReads() {
@@ -831,6 +839,149 @@ func TestTransformationFailure(t *testing.T) {
 	}
 }
 
+func TestKvsSplit(t *testing.T) {
+	var (
+		kv1 = &mvccpb.KeyValue{Key: []byte("one")}
+		kv2 = &mvccpb.KeyValue{Key: []byte("two")}
+		kv3 = &mvccpb.KeyValue{Key: []byte("three")}
+		kv4 = &mvccpb.KeyValue{Key: []byte("four")}
+		kv5 = &mvccpb.KeyValue{Key: []byte("five")}
+	)
+
+	testCases := []struct {
+		desc           string
+		kvs            []*mvccpb.KeyValue
+		numberOfChunks int
+		want           [][]*mvccpb.KeyValue
+	}{
+		{
+			desc:           "empty input results in nil - can't split an empty slice",
+			kvs:            []*mvccpb.KeyValue{},
+			numberOfChunks: 4,
+			want:           nil,
+		},
+		{
+			desc:           "input slice on len one",
+			kvs:            []*mvccpb.KeyValue{kv1},
+			numberOfChunks: 4,
+			want:           [][]*mvccpb.KeyValue{{kv1}},
+		},
+		{
+			desc:           "input slice of len two",
+			kvs:            []*mvccpb.KeyValue{kv1, kv2},
+			numberOfChunks: 4,
+			want:           [][]*mvccpb.KeyValue{{kv1}, {kv2}},
+		},
+		{
+			desc:           "input slice on len three",
+			kvs:            []*mvccpb.KeyValue{kv1, kv2, kv3},
+			numberOfChunks: 4,
+			want:           [][]*mvccpb.KeyValue{{kv1}, {kv2}, {kv3}},
+		},
+		{
+			desc:           "input slice on len four",
+			kvs:            []*mvccpb.KeyValue{kv1, kv2, kv3, kv4},
+			numberOfChunks: 4,
+			want:           [][]*mvccpb.KeyValue{{kv1}, {kv2}, {kv3}, {kv4}},
+		},
+		{
+			desc:           "input slice on len five",
+			kvs:            []*mvccpb.KeyValue{kv1, kv2, kv3, kv4, kv5},
+			numberOfChunks: 4,
+			want:           [][]*mvccpb.KeyValue{{kv1, kv2}, {kv3}, {kv4}, {kv5}},
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.desc, func(t *testing.T) {
+			got := splitKVsIntoChunks(tt.numberOfChunks, tt.kvs)
+			if diff := cmp.Diff(tt.want, got); diff != "" {
+				t.Errorf("incorrect config (-want, +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestListProgress(t *testing.T) {
+	var testCases = []struct {
+		desc             string
+		progress         *listTransformationProgress
+		currentMatched   map[int]uint64
+		level            int
+		wantIncrement    bool
+		wantLimitReached bool
+		wantMatched      map[int]uint64
+	}{
+		{
+			desc:          "paging disabled",
+			progress:      newListTransformationProgress(0, false),
+			wantIncrement: true,
+			wantMatched:   map[int]uint64{0: 1},
+		},
+		{
+			desc:          "paging enabled limit zero",
+			progress:      newListTransformationProgress(0, true),
+			wantIncrement: true,
+			wantMatched:   map[int]uint64{0: 1},
+		},
+		{
+			desc:             "levels above already reached the limit",
+			progress:         newListTransformationProgress(1, true),
+			currentMatched:   map[int]uint64{0: 1},
+			level:            1,
+			wantIncrement:    false,
+			wantMatched:      map[int]uint64{0: 1},
+			wantLimitReached: true,
+		},
+		{
+			desc:          "levels above have not already reached the limit",
+			progress:      newListTransformationProgress(1, true),
+			level:         1,
+			wantIncrement: true,
+			wantMatched:   map[int]uint64{1: 1},
+		},
+		{
+			desc:             "level has reached the limit",
+			progress:         newListTransformationProgress(1, true),
+			currentMatched:   map[int]uint64{1: 1},
+			level:            1,
+			wantIncrement:    false,
+			wantMatched:      map[int]uint64{1: 1},
+			wantLimitReached: true,
+		},
+		{
+			desc:           "levels below have reached the limit",
+			progress:       newListTransformationProgress(1, true),
+			currentMatched: map[int]uint64{1: 1},
+			level:          0,
+			wantIncrement:  true,
+			wantMatched:    map[int]uint64{0: 1, 1: 1},
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.desc, func(t *testing.T) {
+			if tt.currentMatched != nil {
+				tt.progress.matched = tt.currentMatched
+			}
+
+			gotLimitReached := tt.progress.limitReached(tt.level)
+			if gotLimitReached != tt.wantLimitReached {
+				t.Fatalf("Got %v want %v for limtReahed", gotLimitReached, tt.wantIncrement)
+			}
+
+			gotIncrement := tt.progress.increment(tt.level)
+			if gotIncrement != tt.wantIncrement {
+				t.Fatalf("Got %v want %v for increment", gotIncrement, tt.wantIncrement)
+			}
+
+			if diff := cmp.Diff(tt.wantMatched, tt.progress.matched); diff != "" {
+				t.Errorf("matched: (-want, +got):\n%s", diff)
+			}
+		})
+	}
+}
+
 func TestList(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RemainingItemCount, true)()
 	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
@@ -1178,8 +1329,8 @@ func TestList(t *testing.T) {
 		}
 		for j, wantPod := range tt.expectedOut {
 			getPod := &out.Items[j]
-			if !reflect.DeepEqual(wantPod, getPod) {
-				t.Errorf("(%s): pod want=%#v, got=%#v", tt.name, wantPod, getPod)
+			if diff := cmp.Diff(wantPod, getPod); diff != "" {
+				t.Errorf("(-want, +got):\n%s", diff)
 			}
 		}
 	}
@@ -1330,6 +1481,7 @@ func TestListContinuation(t *testing.T) {
 		t.Errorf("unexpected reads: %d", recorder.reads)
 	}
 	transformer.resetReads()
+	transformer.resetReads()
 	recorder.resetReads()
 }
 
@@ -1415,7 +1567,13 @@ func TestListContinuationWithFilter(t *testing.T) {
 	if len(out.Items) != 2 || !reflect.DeepEqual(&out.Items[0], preset[0].storedObj) || !reflect.DeepEqual(&out.Items[1], preset[2].storedObj) {
 		t.Errorf("Unexpected first page, len=%d: %#v", len(out.Items), out.Items)
 	}
-	if transformer.reads != 3 {
+
+	// If we were transforming serially, only 3 transformations would be needed.
+	// However, when transforming concurrently, we can't know ahead of time that
+	// some results of the transformations could be filtered out by the predicate.
+	// In essence, this is the price of concurrent (speculative) processing - we
+	// may end-up transforming items that could be thrown-out later.
+	if transformer.reads != 4 {
 		t.Errorf("unexpected reads: %d", transformer.reads)
 	}
 	if recorder.reads != 2 {

@@ -364,7 +364,12 @@ func secretboxPrefixTransformer(config *apiserverconfig.SecretboxConfiguration) 
 }
 
 func envelopePrefixTransformer(config *apiserverconfig.KMSConfiguration, envelopeService envelope.Service, prefix string) (value.PrefixTransformer, error) {
-	envelopeTransformer, err := envelope.NewEnvelopeTransformer(envelopeService, int(*config.CacheSize), aestransformer.NewCBCTransformer)
+	envelopeTransformer, err := envelope.NewEnvelopeTransformer(
+		envelopeService,
+		int(*config.CacheSize),
+		int(config.DecryptionConcurrencyLevel),
+		aestransformer.NewCBCTransformer,
+	)
 	if err != nil {
 		return value.PrefixTransformer{}, err
 	}

@@ -31,9 +31,10 @@ import (
 )
 
 const (
-	testText              = "abcdefghijklmnopqrstuvwxyz"
-	testContextText       = "0123456789"
-	testEnvelopeCacheSize = 10
+	testText                                 = "abcdefghijklmnopqrstuvwxyz"
+	testContextText                          = "0123456789"
+	testEnvelopeCacheSize                    = 10
+	testTransformFromStorageConcurrencyLevel = 1
 )
 
 // testEnvelopeService is a mock Envelope service which can be used to simulate remote Envelope services
@@ -97,7 +98,7 @@ func TestEnvelopeCaching(t *testing.T) {
 	for _, tt := range testCases {
 		t.Run(tt.desc, func(t *testing.T) {
 			envelopeService := newTestEnvelopeService()
-			envelopeTransformer, err := NewEnvelopeTransformer(envelopeService, tt.cacheSize, aestransformer.NewCBCTransformer)
+			envelopeTransformer, err := NewEnvelopeTransformer(envelopeService, tt.cacheSize, testTransformFromStorageConcurrencyLevel, aestransformer.NewCBCTransformer)
 			if err != nil {
 				t.Fatalf("failed to initialize envelope transformer: %v", err)
 			}
@@ -131,7 +132,7 @@ func TestEnvelopeCaching(t *testing.T) {
 
 // Makes Envelope transformer hit cache limit, throws error if it misbehaves.
 func TestEnvelopeCacheLimit(t *testing.T) {
-	envelopeTransformer, err := NewEnvelopeTransformer(newTestEnvelopeService(), testEnvelopeCacheSize, aestransformer.NewCBCTransformer)
+	envelopeTransformer, err := NewEnvelopeTransformer(newTestEnvelopeService(), testEnvelopeCacheSize, testTransformFromStorageConcurrencyLevel, aestransformer.NewCBCTransformer)
 	if err != nil {
 		t.Fatalf("failed to initialize envelope transformer: %v", err)
 	}
@@ -166,7 +167,7 @@ func TestEnvelopeCacheLimit(t *testing.T) {
 }
 
 func BenchmarkEnvelopeCBCRead(b *testing.B) {
-	envelopeTransformer, err := NewEnvelopeTransformer(newTestEnvelopeService(), testEnvelopeCacheSize, aestransformer.NewCBCTransformer)
+	envelopeTransformer, err := NewEnvelopeTransformer(newTestEnvelopeService(), testEnvelopeCacheSize, testTransformFromStorageConcurrencyLevel, aestransformer.NewCBCTransformer)
 	if err != nil {
 		b.Fatalf("failed to initialize envelope transformer: %v", err)
 	}
@@ -184,7 +185,7 @@ func BenchmarkAESCBCRead(b *testing.B) {
 }
 
 func BenchmarkEnvelopeGCMRead(b *testing.B) {
-	envelopeTransformer, err := NewEnvelopeTransformer(newTestEnvelopeService(), testEnvelopeCacheSize, aestransformer.NewGCMTransformer)
+	envelopeTransformer, err := NewEnvelopeTransformer(newTestEnvelopeService(), testEnvelopeCacheSize, testTransformFromStorageConcurrencyLevel, aestransformer.NewGCMTransformer)
 	if err != nil {
 		b.Fatalf("failed to initialize envelope transformer: %v", err)
 	}
@@ -226,7 +227,7 @@ func benchmarkRead(b *testing.B, transformer value.Transformer, valueLength int)
 // remove after 1.13
 func TestBackwardsCompatibility(t *testing.T) {
 	envelopeService := newTestEnvelopeService()
-	envelopeTransformerInst, err := NewEnvelopeTransformer(envelopeService, testEnvelopeCacheSize, aestransformer.NewCBCTransformer)
+	envelopeTransformerInst, err := NewEnvelopeTransformer(envelopeService, testEnvelopeCacheSize, testTransformFromStorageConcurrencyLevel, aestransformer.NewCBCTransformer)
 	if err != nil {
 		t.Fatalf("failed to initialize envelope transformer: %v", err)
 	}

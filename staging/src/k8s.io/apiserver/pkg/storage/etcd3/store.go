@@ -26,9 +26,11 @@ import (
 	"path"
 	"reflect"
 	"strings"
+	"sync"
 	"time"
 
 	"go.etcd.io/etcd/clientv3"
+	"go.etcd.io/etcd/mvcc/mvccpb"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -81,6 +83,65 @@ type objState struct {
 	rev   int64
 	data  []byte
 	stale bool
+}
+
+type transformedKVPair struct {
+	etcdKey []byte
+	data    runtime.Object
+	match   bool
+	err     error
+}
+
+type listTransformationProgress struct {
+	matched map[int]uint64
+	mux     sync.Mutex
+	limit   uint64
+	paging  bool
+}
+
+func newListTransformationProgress(limit uint64, paging bool) *listTransformationProgress {
+	return &listTransformationProgress{
+		matched: make(map[int]uint64),
+		mux:     sync.Mutex{},
+		limit:   limit,
+		paging:  paging,
+	}
+}
+
+func (l *listTransformationProgress) limitReached(level int) bool {
+	if l.limit == 0 || !l.paging {
+		return false
+	}
+
+	l.mux.Lock()
+	defer l.mux.Unlock()
+	return l.matchesAbove(level)+l.matched[level] >= l.limit
+}
+
+func (l *listTransformationProgress) increment(level int) bool {
+	l.mux.Lock()
+	defer l.mux.Unlock()
+
+	if l.limit == 0 || !l.paging {
+		l.matched[level]++
+		return true
+	}
+
+	if l.matchesAbove(level) >= l.limit || l.matchesAbove(level)+l.matched[level] >= l.limit {
+		return false
+	}
+
+	l.matched[level]++
+	return true
+}
+
+func (l *listTransformationProgress) matchesAbove(level int) uint64 {
+	var m uint64
+	for i := 0; i < level; i++ {
+		m += l.matched[i]
+	}
+
+	return m
 }
 
 // New returns an etcd3 implementation of storage.Interface.
@@ -594,6 +655,8 @@ func (s *store) List(ctx context.Context, key, resourceVersion string, pred stor
 	var lastKey []byte
 	var hasMore bool
 	var getResp *clientv3.GetResponse
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	for {
 		startTime := time.Now()
 		getResp, err = s.client.KV.Get(ctx, key, options...)
@@ -618,21 +681,31 @@ func (s *store) List(ctx context.Context, key, resourceVersion string, pred stor
 			growSlice(v, 2048, len(getResp.Kvs))
 		}
 
-		// take items from the response until the bucket is full, filtering as we go
-		for _, kv := range getResp.Kvs {
-			if paging && int64(v.Len()) >= pred.Limit {
-				hasMore = true
-				break
-			}
-			lastKey = kv.Key
+		chunks := splitKVsIntoChunks(s.transformer.TransformFromStorageConcurrencyLevel(), getResp.Kvs)
+		progress := newListTransformationProgress(uint64(pred.Limit), paging)
+		fanOutChannels := make([]<-chan *transformedKVPair, len(chunks))
+		for i, c := range chunks {
+			fanOutChannels[i] = s.transformChunk(ctx, i, c, pred, progress, newItemFunc)
+		}
 
-			data, _, err := s.transformer.TransformFromStorage(kv.Value, authenticatedDataString(kv.Key))
-			if err != nil {
-				return storage.NewInternalErrorf("unable to transform key %q: %v", kv.Key, err)
-			}
+		// To preserve the order of items in the response, we iterate over the channels, as opposed to
+		// creating a single multiplexed channel and accepting transformed items as they arrive.
+	ChannelLoop:
+		for _, c := range fanOutChannels {
+			for transformed := range c {
+				if paging && int64(v.Len()) >= pred.Limit {
+					hasMore = true
+					break ChannelLoop
+				}
 
-			if err := appendListItem(v, data, uint64(kv.ModRevision), pred, s.codec, s.versioner, newItemFunc); err != nil {
-				return err
+				lastKey = transformed.etcdKey
+				if transformed.err != nil {
+					return transformed.err
+				}
+
+				if transformed.match {
+					v.Set(reflect.Append(v, reflect.ValueOf(transformed.data).Elem()))
+				}
 			}
 		}
 
@@ -675,6 +748,92 @@ func (s *store) List(ctx context.Context, key, resourceVersion string, pred stor
 
 	// no continuation
 	return s.versioner.UpdateList(listObj, uint64(returnedRV), "", nil)
+}
+
+func splitKVsIntoChunks(concurrencyLevel int, kvs []*mvccpb.KeyValue) [][]*mvccpb.KeyValue {
+	if concurrencyLevel == 0 {
+		return [][]*mvccpb.KeyValue{kvs}
+	}
+
+	if kvs == nil || len(kvs) == 0 {
+		return nil
+	}
+
+	var chunks [][]*mvccpb.KeyValue
+
+	chunkSize := len(kvs) / concurrencyLevel
+	// Number of items to "smear" across first several chunks.
+	rem := len(kvs) % concurrencyLevel
+
+	for i := 0; i < len(kvs); {
+		end := i + chunkSize
+		// If we have more items to "smear":
+		if rem > 0 {
+			// Add one to this chunk.
+			end++
+			rem--
+		}
+		if end > len(kvs) {
+			end = len(kvs)
+		}
+		chunks = append(chunks, kvs[i:end])
+
+		// Adjust i here instead of the loop condition.
+		// Our "step" is not uniform due to smearing.
+		i = end
+	}
+
+	return chunks
+}
+
+func (s *store) transformChunk(
+	ctx context.Context,
+	chunkLevel int,
+	kvPairs []*mvccpb.KeyValue,
+	pred storage.SelectionPredicate,
+	progress *listTransformationProgress,
+	newItemFunc func() runtime.Object) <-chan *transformedKVPair {
+
+	outChan := make(chan *transformedKVPair, len(kvPairs))
+	go func() {
+		defer close(outChan)
+		for _, kv := range kvPairs {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+				if progress.limitReached(chunkLevel) {
+					return
+				}
+
+				data, _, err := s.transformer.TransformFromStorage(kv.Value, authenticatedDataString(kv.Key))
+				if err != nil {
+					outChan <- &transformedKVPair{err: storage.NewInternalErrorf("unable to transform key %q: %v", kv.Key, err)}
+					continue
+				}
+
+				obj, err := toUpdatedRuntimeObject(data, uint64(kv.ModRevision), s.codec, s.versioner, newItemFunc)
+				if err != nil {
+					outChan <- &transformedKVPair{err: storage.NewInternalErrorf("unable to decode value for the key %q: %v", kv.Key, err)}
+					continue
+				}
+
+				out := &transformedKVPair{etcdKey: kv.Key, data: obj}
+				if matched, err := pred.Matches(obj); err == nil && matched {
+					out.match = true
+
+					// The limit was reached by another go-routine.
+					if ok := progress.increment(chunkLevel); !ok {
+						return
+					}
+				}
+
+				outChan <- out
+			}
+		}
+	}()
+
+	return outChan
 }
 
 // growSlice takes a slice value and grows its capacity up
@@ -853,16 +1012,27 @@ func decode(codec runtime.Codec, versioner storage.Versioner, value []byte, objP
 	return nil
 }
 
-// appendListItem decodes and appends the object (if it passes filter) to v, which must be a slice.
-func appendListItem(v reflect.Value, data []byte, rev uint64, pred storage.SelectionPredicate, codec runtime.Codec, versioner storage.Versioner, newItemFunc func() runtime.Object) error {
+// toUpdatedRuntimeObject decodes and sets the version the output of transformation into a runtime.Object.
+func toUpdatedRuntimeObject(data []byte, rev uint64, codec runtime.Codec, versioner storage.Versioner, newItemFunc func() runtime.Object) (runtime.Object, error) {
 	obj, _, err := codec.Decode(data, nil, newItemFunc())
 	if err != nil {
-		return err
+		return nil, err
 	}
 	// being unable to set the version does not prevent the object from being extracted
 	if err := versioner.UpdateObject(obj, rev); err != nil {
 		klog.Errorf("failed to update object version: %v", err)
 	}
+
+	return obj, nil
+}
+
+// appendListItem decodes and appends the object (if it passes filter) to v, which must be a slice.
+func appendListItem(v reflect.Value, data []byte, rev uint64, pred storage.SelectionPredicate, codec runtime.Codec, versioner storage.Versioner, newItemFunc func() runtime.Object) error {
+	obj, err := toUpdatedRuntimeObject(data, rev, codec, versioner, newItemFunc)
+	if err != nil {
+		return err
+	}
+
 	if matched, err := pred.Matches(obj); err == nil && matched {
 		v.Set(reflect.Append(v, reflect.ValueOf(obj).Elem()))
 	}
