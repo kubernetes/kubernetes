@@ -205,3 +205,21 @@ root@nginx-deployment-5c689d88bb-s7xcv:/#
 ```
 
 {% endmethod %}
+
+## Extending kubectl
+
+There is a plugin mechanism to adapt `kubectl` to your particular needs.
+
+{% method %}
+
+Show which plugins are currently available
+
+{% sample lang="yaml" %}
+
+```bash
+kubectl plugin list
+```
+
+{% endmethod %}
+
+The easiest way to discover and install plugins is via the kubernetes sub-project [krew.dev](https://github.com/kubernetes-sigs/krew/#installation).
