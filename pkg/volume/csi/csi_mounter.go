@@ -35,6 +35,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	utilstrings "k8s.io/utils/strings"
 )
@@ -104,12 +105,18 @@ func (c *csiMountMgr) SetUp(mounterArgs volume.MounterArgs) error {
 func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 	klog.V(4).Infof(log("Mounter.SetUpAt(%s)", dir))
 
+	corruptedDir := false
 	mounted, err := isDirMounted(c.plugin, dir)
 	if err != nil {
-		return errors.New(log("mounter.SetUpAt failed while checking mount status for dir [%s]: %v", dir, err))
+		if isCorruptedDir(dir) {
+			corruptedDir = true // leave to CSI driver to handle corrupted mount
+			klog.Warning(log("mounter.SetUpAt detected corrupted mount for dir [%s]", dir))
+		} else {
+			return errors.New(log("mounter.SetUpAt failed while checking mount status for dir [%s]: %v", dir, err))
+		}
 	}
 
-	if mounted {
+	if mounted && !corruptedDir {
 		klog.V(4).Info(log("mounter.SetUpAt skipping mount, dir already mounted [%s]", dir))
 		return nil
 	}
@@ -208,7 +215,7 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 	}
 
 	// create target_dir before call to NodePublish
-	if err := os.MkdirAll(dir, 0750); err != nil {
+	if err := os.MkdirAll(dir, 0750); err != nil && !corruptedDir {
 		return errors.New(log("mounter.SetUpAt failed to create dir %#v:  %v", dir, err))
 	}
 	klog.V(4).Info(log("created target path successfully [%s]", dir))
@@ -420,6 +427,11 @@ func isDirMounted(plug *csiPlugin, dir string) (bool, error) {
 		return false, err
 	}
 	return !notMnt, nil
+}
+
+func isCorruptedDir(dir string) bool {
+	_, pathErr := mount.PathExists(dir)
+	return pathErr != nil && mount.IsCorruptedMnt(pathErr)
 }
 
 // removeMountDir cleans the mount dir when dir is not mounted and removed the volume data file in dir
