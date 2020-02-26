@@ -29,16 +29,17 @@ type topologyPair struct {
 
 // topologySpreadConstraint is an internal version for v1.TopologySpreadConstraint
 // and where the selector is parsed.
+// Fields are exported for comparison during testing.
 type topologySpreadConstraint struct {
-	maxSkew     int32
-	topologyKey string
-	selector    labels.Selector
+	MaxSkew     int32
+	TopologyKey string
+	Selector    labels.Selector
 }
 
-// nodeLabelsMatchSpreadConstraints checks if ALL topology keys in spread constraints are present in node labels.
+// nodeLabelsMatchSpreadConstraints checks if ALL topology keys in spread Constraints are present in node labels.
 func nodeLabelsMatchSpreadConstraints(nodeLabels map[string]string, constraints []topologySpreadConstraint) bool {
 	for _, c := range constraints {
-		if _, ok := nodeLabels[c.topologyKey]; !ok {
+		if _, ok := nodeLabels[c.TopologyKey]; !ok {
 			return false
 		}
 	}
@@ -54,9 +55,9 @@ func filterTopologySpreadConstraints(constraints []v1.TopologySpreadConstraint, 
 				return nil, err
 			}
 			result = append(result, topologySpreadConstraint{
-				maxSkew:     c.MaxSkew,
-				topologyKey: c.TopologyKey,
-				selector:    selector,
+				MaxSkew:     c.MaxSkew,
+				TopologyKey: c.TopologyKey,
+				Selector:    selector,
 			})
 		}
 	}
