@@ -64,6 +64,8 @@ func (r *BucketRateLimiter) Forget(item interface{}) {
 
 // ItemBucketRateLimiter implements a workqueue ratelimiter API using standard rate.Limiter.
 // Each key is using a separate limiter.
+// Unlike other RateLimiters in this file, this RateLimiter isn't intended to be used to rate
+// limit error retries, rather the successful path.
 type ItemBucketRateLimiter struct {
 	r     rate.Limit
 	burst int

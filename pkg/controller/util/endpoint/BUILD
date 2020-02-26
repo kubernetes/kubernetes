@@ -4,6 +4,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "controller_utils.go",
+        "deduplicating_rate_limiting_queue.go",
         "trigger_time_tracker.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/controller/util/endpoint",
@@ -19,6 +20,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/client-go/listers/core/v1:go_default_library",
         "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
+        "//staging/src/k8s.io/client-go/util/workqueue:go_default_library",
     ],
 )
 
@@ -26,6 +28,7 @@ go_test(
     name = "go_default_test",
     srcs = [
         "controller_utils_test.go",
+        "deduplicating_rate_limiting_queue_test.go",
         "trigger_time_tracker_test.go",
     ],
     embed = [":go_default_library"],
@@ -33,10 +36,15 @@ go_test(
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/clock:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//staging/src/k8s.io/client-go/informers:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/fake:go_default_library",
+        "//staging/src/k8s.io/client-go/util/workqueue:go_default_library",
+        "//vendor/golang.org/x/time/rate:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 
