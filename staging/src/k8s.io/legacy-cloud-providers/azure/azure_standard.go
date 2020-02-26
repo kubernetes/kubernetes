@@ -98,7 +98,7 @@ func (az *Cloud) getAvailabilitySetID(resourceGroup, availabilitySetName string)
 func (az *Cloud) getFrontendIPConfigID(lbName, rgName, fipConfigName string) string {
 	return fmt.Sprintf(
 		frontendIPConfigIDTemplate,
-		az.SubscriptionID,
+		az.getNetworkResourceSubscriptionID(),
 		rgName,
 		lbName,
 		fipConfigName)
@@ -108,7 +108,7 @@ func (az *Cloud) getFrontendIPConfigID(lbName, rgName, fipConfigName string) str
 func (az *Cloud) getBackendPoolID(lbName, rgName, backendPoolName string) string {
 	return fmt.Sprintf(
 		backendPoolIDTemplate,
-		az.SubscriptionID,
+		az.getNetworkResourceSubscriptionID(),
 		rgName,
 		lbName,
 		backendPoolName)
@@ -118,10 +118,18 @@ func (az *Cloud) getBackendPoolID(lbName, rgName, backendPoolName string) string
 func (az *Cloud) getLoadBalancerProbeID(lbName, rgName, lbRuleName string) string {
 	return fmt.Sprintf(
 		loadBalancerProbeIDTemplate,
-		az.SubscriptionID,
+		az.getNetworkResourceSubscriptionID(),
 		rgName,
 		lbName,
 		lbRuleName)
+}
+
+// getNetworkResourceSubscriptionID returns the subscription id which hosts network resources
+func (az *Cloud) getNetworkResourceSubscriptionID() string {
+	if az.Config.UsesNetworkResourceInDifferentTenant() {
+		return az.NetworkResourceSubscriptionID
+	}
+	return az.SubscriptionID
 }
 
 func (az *Cloud) mapLoadBalancerNameToVMSet(lbName string, clusterName string) (vmSetName string) {

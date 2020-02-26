@@ -556,7 +556,7 @@ func (az *Cloud) configAzureClients(
 		vmssVMClientConfig.Authorizer = multiTenantServicePrincipalTokenAuthorizer
 	}
 
-	// If uses network resources in different AAD Tenant, update Authorizer for network resources client config
+	// If uses network resources in different AAD Tenant, update SubscriptionID and Authorizer for network resources client config
 	if networkResourceServicePrincipalToken != nil {
 		networkResourceServicePrincipalTokenAuthorizer := autorest.NewBearerAuthorizer(networkResourceServicePrincipalToken)
 		routeClientConfig.Authorizer = networkResourceServicePrincipalTokenAuthorizer
@@ -565,6 +565,13 @@ func (az *Cloud) configAzureClients(
 		loadBalancerClientConfig.Authorizer = networkResourceServicePrincipalTokenAuthorizer
 		securityGroupClientConfig.Authorizer = networkResourceServicePrincipalTokenAuthorizer
 		publicIPClientConfig.Authorizer = networkResourceServicePrincipalTokenAuthorizer
+
+		routeClientConfig.SubscriptionID = az.Config.NetworkResourceSubscriptionID
+		subnetClientConfig.SubscriptionID = az.Config.NetworkResourceSubscriptionID
+		routeTableClientConfig.SubscriptionID = az.Config.NetworkResourceSubscriptionID
+		loadBalancerClientConfig.SubscriptionID = az.Config.NetworkResourceSubscriptionID
+		securityGroupClientConfig.SubscriptionID = az.Config.NetworkResourceSubscriptionID
+		publicIPClientConfig.SubscriptionID = az.Config.NetworkResourceSubscriptionID
 	}
 
 	// Initialize all azure clients based on client config
