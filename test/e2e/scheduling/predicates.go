@@ -217,6 +217,9 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		var beardsecond v1.ResourceName = "example.com/beardsecond"
 
 		ginkgo.BeforeEach(func() {
+			// Skip the test if featuregate not enabled
+			e2eskipper.SkipIfPodOverheadDisabled()
+
 			WaitForStableCluster(cs, masterNodes)
 			ginkgo.By("Add RuntimeClass and fake resource")
 

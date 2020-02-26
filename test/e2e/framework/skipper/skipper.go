@@ -133,6 +133,13 @@ func SkipUnlessLocalEphemeralStorageEnabled() {
 	}
 }
 
+// SkipIfPodOverheadDisabled skips test if PodOverhead feature gate is not enabled.
+func SkipIfPodOverheadDisabled() {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodOverhead) {
+		skipInternalf(1, "Only supported when %v feature is enabled", features.PodOverhead)
+	}
+}
+
 // SkipIfMissingResource skips if the gvr resource is missing.
 func SkipIfMissingResource(dynamicClient dynamic.Interface, gvr schema.GroupVersionResource, namespace string) {
 	resourceClient := dynamicClient.Resource(gvr).Namespace(namespace)
