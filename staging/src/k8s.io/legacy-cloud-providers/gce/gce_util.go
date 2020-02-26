@@ -29,16 +29,18 @@ import (
 	"strings"
 	"sync"
 
+	"cloud.google.com/go/compute/metadata"
+
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/meta"
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/mock"
+
+	compute "google.golang.org/api/compute/v1"
+	"google.golang.org/api/googleapi"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-
-	"cloud.google.com/go/compute/metadata"
-	compute "google.golang.org/api/compute/v1"
-	"google.golang.org/api/googleapi"
 	"k8s.io/client-go/kubernetes/fake"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	servicehelper "k8s.io/cloud-provider/service/helpers"
