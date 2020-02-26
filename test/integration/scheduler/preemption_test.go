@@ -128,18 +128,17 @@ func TestPreemption(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error registering a filter: %v", err)
 	}
-	plugins := &schedulerconfig.Plugins{
-		Filter: &schedulerconfig.PluginSet{
-			Enabled: []schedulerconfig.Plugin{
-				{
-					Name: filterPluginName,
+	prof := schedulerconfig.KubeSchedulerProfile{
+		SchedulerName: v1.DefaultSchedulerName,
+		Plugins: &schedulerconfig.Plugins{
+			Filter: &schedulerconfig.PluginSet{
+				Enabled: []schedulerconfig.Plugin{
+					{Name: filterPluginName},
 				},
 			},
-		},
-		PreFilter: &schedulerconfig.PluginSet{
-			Enabled: []schedulerconfig.Plugin{
-				{
-					Name: filterPluginName,
+			PreFilter: &schedulerconfig.PluginSet{
+				Enabled: []schedulerconfig.Plugin{
+					{Name: filterPluginName},
 				},
 			},
 		},
@@ -147,7 +146,7 @@ func TestPreemption(t *testing.T) {
 	testCtx := initTestSchedulerWithOptions(t,
 		initTestMaster(t, "preemptiom", nil),
 		false, nil, time.Second,
-		scheduler.WithFrameworkPlugins(plugins),
+		scheduler.WithProfiles(prof),
 		scheduler.WithFrameworkOutOfTreeRegistry(registry))
 
 	defer cleanupTest(t, testCtx)

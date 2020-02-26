@@ -21,6 +21,7 @@ import (
 	"reflect"
 
 	"k8s.io/klog"
+	"k8s.io/kubernetes/pkg/scheduler/profile"
 
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -209,7 +210,14 @@ func (sched *Scheduler) deletePodFromSchedulingQueue(obj interface{}) {
 		// Volume binder only wants to keep unassigned pods
 		sched.VolumeBinder.DeletePodBindings(pod)
 	}
-	sched.Framework.RejectWaitingPod(pod.UID)
+	prof, err := sched.profileForPod(pod)
+	if err != nil {
+		// This shouldn't happen, because we only accept for scheduling the pods
+		// which specify a scheduler name that matches one of the profiles.
+		klog.Error(err)
+		return
+	}
+	prof.Framework.RejectWaitingPod(pod.UID)
 }
 
 func (sched *Scheduler) addPodToCache(obj interface{}) {
@@ -286,8 +294,8 @@ func assignedPod(pod *v1.Pod) bool {
 }
 
 // responsibleForPod returns true if the pod has asked to be scheduled by the given scheduler.
-func responsibleForPod(pod *v1.Pod, schedulerName string) bool {
-	return schedulerName == pod.Spec.SchedulerName
+func responsibleForPod(pod *v1.Pod, profiles profile.Map) bool {
+	return profiles.HandlesSchedulerName(pod.Spec.SchedulerName)
 }
 
 // skipPodUpdate checks whether the specified pod update should be ignored.
@@ -337,11 +345,10 @@ func (sched *Scheduler) skipPodUpdate(pod *v1.Pod) bool {
 	return true
 }
 
-// AddAllEventHandlers is a helper function used in tests and in Scheduler
+// addAllEventHandlers is a helper function used in tests and in Scheduler
 // to add event handlers for various informers.
-func AddAllEventHandlers(
+func addAllEventHandlers(
 	sched *Scheduler,
-	schedulerName string,
 	informerFactory informers.SharedInformerFactory,
 	podInformer coreinformers.PodInformer,
 ) {
@@ -376,10 +383,10 @@ func AddAllEventHandlers(
 			FilterFunc: func(obj interface{}) bool {
 				switch t := obj.(type) {
 				case *v1.Pod:
-					return !assignedPod(t) && responsibleForPod(t, schedulerName)
+					return !assignedPod(t) && responsibleForPod(t, sched.Profiles)
 				case cache.DeletedFinalStateUnknown:
 					if pod, ok := t.Obj.(*v1.Pod); ok {
-						return !assignedPod(pod) && responsibleForPod(pod, schedulerName)
+						return !assignedPod(pod) && responsibleForPod(pod, sched.Profiles)
 					}
 					utilruntime.HandleError(fmt.Errorf("unable to convert object %T to *v1.Pod in %T", obj, sched))
 					return false

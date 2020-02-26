@@ -13,9 +13,9 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/test/integration/util",
     deps = [
-        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/controller/volume/persistentvolume/util:go_default_library",
         "//pkg/scheduler:go_default_library",
+        "//pkg/scheduler/profile:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/client-go/informers:go_default_library",

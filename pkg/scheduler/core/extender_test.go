@@ -42,6 +42,7 @@ import (
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	"k8s.io/kubernetes/pkg/scheduler/listers"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	"k8s.io/kubernetes/pkg/scheduler/profile"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 )
@@ -589,21 +590,22 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			prof := &profile.Profile{
+				Framework: fwk,
+			}
 
 			scheduler := NewGenericScheduler(
 				cache,
 				queue,
 				emptySnapshot,
-				fwk,
 				extenders,
-				nil,
 				informerFactory.Core().V1().PersistentVolumeClaims().Lister(),
 				informerFactory.Policy().V1beta1().PodDisruptionBudgets().Lister(),
 				false,
 				schedulerapi.DefaultPercentageOfNodesToScore,
 				false)
 			podIgnored := &v1.Pod{}
-			result, err := scheduler.Schedule(context.Background(), framework.NewCycleState(), podIgnored)
+			result, err := scheduler.Schedule(context.Background(), prof, framework.NewCycleState(), podIgnored)
 			if test.expectsErr {
 				if err == nil {
 					t.Errorf("Unexpected non-error, result %+v", result)

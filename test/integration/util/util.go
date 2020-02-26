@@ -29,9 +29,9 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/events"
 	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
 	"k8s.io/kubernetes/pkg/scheduler"
+	"k8s.io/kubernetes/pkg/scheduler/profile"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -69,12 +69,12 @@ func StartScheduler(clientSet clientset.Interface) (*scheduler.Scheduler, corein
 
 	evtBroadcaster.StartRecordingToSink(ctx.Done())
 
-	recorder := evtBroadcaster.NewRecorder(
-		legacyscheme.Scheme,
-		v1.DefaultSchedulerName,
-	)
-
-	sched, err := createScheduler(clientSet, informerFactory, podInformer, recorder, ctx.Done())
+	sched, err := scheduler.New(
+		clientSet,
+		informerFactory,
+		podInformer,
+		profile.NewRecorderFactory(evtBroadcaster),
+		ctx.Done())
 	if err != nil {
 		klog.Fatalf("Error creating scheduler: %v", err)
 	}
@@ -130,21 +130,4 @@ func StartFakePVController(clientSet clientset.Interface) ShutdownFunc {
 
 	informerFactory.Start(ctx.Done())
 	return ShutdownFunc(cancel)
-}
-
-// createScheduler create a scheduler with given informer factory and default name.
-func createScheduler(
-	clientSet clientset.Interface,
-	informerFactory informers.SharedInformerFactory,
-	podInformer coreinformers.PodInformer,
-	recorder events.EventRecorder,
-	stopCh <-chan struct{},
-) (*scheduler.Scheduler, error) {
-	return scheduler.New(
-		clientSet,
-		informerFactory,
-		podInformer,
-		recorder,
-		stopCh,
-	)
 }
