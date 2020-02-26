@@ -36,10 +36,10 @@ import (
 	"k8s.io/client-go/tools/record"
 	clientretry "k8s.io/client-go/util/retry"
 	cloudprovider "k8s.io/cloud-provider"
+	cloudproviderapi "k8s.io/cloud-provider/api"
 	cloudnodeutil "k8s.io/cloud-provider/node/helpers"
 	"k8s.io/klog"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 )
 
@@ -491,7 +491,7 @@ func (cnc *CloudNodeController) getNodeModifiersFromCloudProvider(ctx context.Co
 
 func getCloudTaint(taints []v1.Taint) *v1.Taint {
 	for _, taint := range taints {
-		if taint.Key == schedulerapi.TaintExternalCloudProvider {
+		if taint.Key == cloudproviderapi.TaintExternalCloudProvider {
 			return &taint
 		}
 	}
@@ -501,7 +501,7 @@ func getCloudTaint(taints []v1.Taint) *v1.Taint {
 func excludeCloudTaint(taints []v1.Taint) []v1.Taint {
 	newTaints := []v1.Taint{}
 	for _, taint := range taints {
-		if taint.Key == schedulerapi.TaintExternalCloudProvider {
+		if taint.Key == cloudproviderapi.TaintExternalCloudProvider {
 			continue
 		}
 		newTaints = append(newTaints, taint)
