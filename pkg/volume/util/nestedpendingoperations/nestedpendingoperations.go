@@ -106,6 +106,8 @@ type NestedPendingOperations interface {
 		volumeName v1.UniqueVolumeName,
 		podName volumetypes.UniquePodName,
 		nodeName types.NodeName) bool
+
+	IsDetachBackoffError(volumeName v1.UniqueVolumeName, podName volumetypes.UniquePodName, nodeName types.NodeName) bool
 }
 
 // NewNestedPendingOperations returns a new instance of NestedPendingOperations.
@@ -199,6 +201,24 @@ func (grm *nestedPendingOperations) IsOperationPending(
 	if exist && grm.operations[previousOpIndex].operationPending {
 		return true
 	}
+	return false
+}
+
+func (grm *nestedPendingOperations) IsDetachBackoffError(volumeName v1.UniqueVolumeName, podName volumetypes.UniquePodName, nodeName types.NodeName) bool {
+	grm.lock.Lock()
+	defer grm.lock.Unlock()
+
+	opKey := operationKey{volumeName, podName, nodeName}
+	opExists, previousOpIndex := grm.isOperationExists(opKey)
+	if opExists {
+		previousOp := grm.operations[previousOpIndex]
+		if err := previousOp.expBackoff.SafeToRetry(fmt.Sprintf("%+v", opKey)); err != nil {
+			if previousOp.operationName == "volume_detach" {
+				return true
+			}
+		}
+	}
+
 	return false
 }
 

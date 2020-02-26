@@ -147,6 +147,8 @@ type OperationExecutor interface {
 	ReconstructVolumeOperation(volumeMode v1.PersistentVolumeMode, plugin volume.VolumePlugin, mapperPlugin volume.BlockVolumePlugin, uid types.UID, podName volumetypes.UniquePodName, volumeSpecName string, volumePath string, pluginName string) (*volume.Spec, error)
 	// CheckVolumeExistenceOperation checks volume existence
 	CheckVolumeExistenceOperation(volumeSpec *volume.Spec, mountPath, volumeName string, mounter mount.Interface, uniqueVolumeName v1.UniqueVolumeName, podName volumetypes.UniquePodName, podUID types.UID, attachable volume.AttachableVolumePlugin) (bool, error)
+
+	IsDetachBackoffError(volumeToDetach AttachedVolume) bool
 }
 
 // NewOperationExecutor returns a new instance of OperationExecutor.
@@ -655,6 +657,10 @@ func (oe *operationExecutor) IsOperationPending(
 	podName volumetypes.UniquePodName,
 	nodeName types.NodeName) bool {
 	return oe.pendingOperations.IsOperationPending(volumeName, podName, nodeName)
+}
+
+func (oe *operationExecutor) IsDetachBackoffError(volumeToDetach AttachedVolume) bool {
+	return oe.pendingOperations.IsDetachBackoffError(volumeToDetach.VolumeName, "", "")
 }
 
 func (oe *operationExecutor) AttachVolume(

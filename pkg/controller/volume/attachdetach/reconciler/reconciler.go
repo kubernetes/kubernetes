@@ -175,6 +175,11 @@ func (rc *reconciler) reconcile() {
 				continue
 			}
 
+			if rc.attacherDetacher.IsDetachBackoffError(attachedVolume.AttachedVolume) {
+				klog.V(5).Infof("Volume %v on node %v is not needed detaching until next backoff retry", attachedVolume.VolumeName, attachedVolume.NodeName)
+				continue
+			}
+
 			// Before triggering volume detach, mark volume as detached and update the node status
 			// If it fails to update node status, skip detach volume
 			err = rc.actualStateOfWorld.RemoveVolumeFromReportAsAttached(attachedVolume.VolumeName, attachedVolume.NodeName)
