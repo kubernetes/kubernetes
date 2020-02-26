@@ -350,7 +350,7 @@ func (s *Server) InstallDefaultHandlers(enableCAdvisorJSONEndpoints bool) {
 	// deprecated endpoint which will be removed in release 1.20.0+.
 	s.addMetricsBucketMatcher("metrics/resource/v1alpha1")
 	v1alpha1ResourceRegistry := compbasemetrics.NewKubeRegistry()
-	v1alpha1ResourceRegistry.CustomMustRegister(stats.NewPrometheusResourceMetricCollector(s.resourceAnalyzer, v1alpha1.Config()))
+	v1alpha1ResourceRegistry.CustomMustRegister(stats.NewPrometheusResourceMetricCollector(s.resourceAnalyzer, stats.Config()))
 	s.restfulCont.Handle(path.Join(resourceMetricsPath, v1alpha1.Version),
 		compbasemetrics.HandlerFor(v1alpha1ResourceRegistry, compbasemetrics.HandlerOpts{ErrorHandling: compbasemetrics.ContinueOnError}),
 	)
