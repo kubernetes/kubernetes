@@ -25,6 +25,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
+	schedulerv1alpha2 "k8s.io/kube-scheduler/config/v1alpha2"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
 )
@@ -605,5 +606,51 @@ func TestResourceBinPackingMultipleExtended(t *testing.T) {
 				t.Errorf("expected %#v, got %#v", test.expectedList, gotList)
 			}
 		})
+	}
+}
+
+// TODO compatibility test once the plugin args move to v1beta1.
+// UtilizationShapePoint and ResourceSpec fields of the plugin args struct are not annotated
+// with JSON tags in v1alpha2 to maintain backward compatibility with the args shipped with v1.18.
+// See https://github.com/kubernetes/kubernetes/pull/88585#discussion_r405021905
+
+func TestPluginArgsJSONEncodingIsCaseInsensitive(t *testing.T) {
+	rawArgs := &runtime.Unknown{Raw: []byte(`
+	{
+		"shape": [{"Utilization": 1, "Score": 1}, {"utilization": 2, "score": 2}],
+		"resources": [{"Name":"a","Weight":1},{"name":"b","weight":2}]
+	}
+`)}
+
+	args := &schedulerv1alpha2.RequestedToCapacityRatioArgs{}
+	if err := framework.DecodeInto(rawArgs, args); err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+
+	expectedArgs := &schedulerv1alpha2.RequestedToCapacityRatioArgs{
+		Shape: []schedulerv1alpha2.UtilizationShapePoint{
+			{
+				Utilization: 1,
+				Score:       1,
+			},
+			{
+				Utilization: 2,
+				Score:       2,
+			},
+		},
+		Resources: []schedulerv1alpha2.ResourceSpec{
+			{
+				Name:   "a",
+				Weight: 1,
+			},
+			{
+				Name:   "b",
+				Weight: 2,
+			},
+		},
+	}
+
+	if !reflect.DeepEqual(expectedArgs, args) {
+		t.Errorf("expected: \n\t%#v,\ngot: \n\t%#v", expectedArgs, args)
 	}
 }

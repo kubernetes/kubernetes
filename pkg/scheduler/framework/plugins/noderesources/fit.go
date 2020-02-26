@@ -20,10 +20,11 @@ import (
 	"context"
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	schedulerv1alpha2 "k8s.io/kube-scheduler/config/v1alpha2"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
@@ -46,13 +47,6 @@ type Fit struct {
 	ignoredResources sets.String
 }
 
-// FitArgs holds the args that are used to configure the plugin.
-type FitArgs struct {
-	// IgnoredResources is the list of resources that NodeResources fit filter
-	// should ignore.
-	IgnoredResources []string `json:"ignoredResources,omitempty"`
-}
-
 // preFilterState computed at PreFilter and used at Filter.
 type preFilterState struct {
 	framework.Resource
@@ -66,6 +60,18 @@ func (s *preFilterState) Clone() framework.StateData {
 // Name returns name of the plugin. It is used in logs, etc.
 func (f *Fit) Name() string {
 	return FitName
+}
+
+// NewFit initializes a new plugin and returns it.
+func NewFit(plArgs *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
+	args := &schedulerv1alpha2.NodeResourcesFitArgs{}
+	if err := framework.DecodeInto(plArgs, args); err != nil {
+		return nil, err
+	}
+
+	fit := &Fit{}
+	fit.ignoredResources = sets.NewString(args.IgnoredResources...)
+	return fit, nil
 }
 
 // computePodResourceRequest returns a framework.Resource that covers the largest
@@ -251,16 +257,4 @@ func fitsRequest(podRequest *preFilterState, nodeInfo *framework.NodeInfo, ignor
 	}
 
 	return insufficientResources
-}
-
-// NewFit initializes a new plugin and returns it.
-func NewFit(plArgs *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
-	args := &FitArgs{}
-	if err := framework.DecodeInto(plArgs, args); err != nil {
-		return nil, err
-	}
-
-	fit := &Fit{}
-	fit.ignoredResources = sets.NewString(args.IgnoredResources...)
-	return fit, nil
 }

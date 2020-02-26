@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog"
+	schedulerv1alpha2 "k8s.io/kube-scheduler/config/v1alpha2"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultpodtopologyspread"
@@ -164,15 +165,15 @@ type ConfigProducerArgs struct {
 	// Weight used for priority functions.
 	Weight int32
 	// NodeLabelArgs is the args for the NodeLabel plugin.
-	NodeLabelArgs *nodelabel.Args
+	NodeLabelArgs *schedulerv1alpha2.NodeLabelArgs
 	// RequestedToCapacityRatioArgs is the args for the RequestedToCapacityRatio plugin.
-	RequestedToCapacityRatioArgs *noderesources.RequestedToCapacityRatioArgs
+	RequestedToCapacityRatioArgs *schedulerv1alpha2.RequestedToCapacityRatioArgs
 	// ServiceAffinityArgs is the args for the ServiceAffinity plugin.
-	ServiceAffinityArgs *serviceaffinity.Args
+	ServiceAffinityArgs *schedulerv1alpha2.ServiceAffinityArgs
 	// NodeResourcesFitArgs is the args for the NodeResources fit filter.
-	NodeResourcesFitArgs *noderesources.FitArgs
+	NodeResourcesFitArgs *schedulerv1alpha2.NodeResourcesFitArgs
 	// InterPodAffinityArgs is the args for InterPodAffinity plugin
-	InterPodAffinityArgs *interpodaffinity.Args
+	InterPodAffinityArgs *schedulerv1alpha2.InterPodAffinityArgs
 }
 
 // ConfigProducer returns the set of plugins and their configuration for a
@@ -525,7 +526,7 @@ func (lr *LegacyRegistry) ProcessPredicatePolicy(policy config.PredicatePolicy, 
 	if policy.Argument.ServiceAffinity != nil {
 		// map LabelsPresence policy to ConfigProducerArgs that's used to configure the ServiceAffinity plugin.
 		if pluginArgs.ServiceAffinityArgs == nil {
-			pluginArgs.ServiceAffinityArgs = &serviceaffinity.Args{}
+			pluginArgs.ServiceAffinityArgs = &schedulerv1alpha2.ServiceAffinityArgs{}
 		}
 		pluginArgs.ServiceAffinityArgs.AffinityLabels = append(pluginArgs.ServiceAffinityArgs.AffinityLabels, policy.Argument.ServiceAffinity.Labels...)
 
@@ -538,7 +539,7 @@ func (lr *LegacyRegistry) ProcessPredicatePolicy(policy config.PredicatePolicy, 
 	if policy.Argument.LabelsPresence != nil {
 		// Map LabelPresence policy to ConfigProducerArgs that's used to configure the NodeLabel plugin.
 		if pluginArgs.NodeLabelArgs == nil {
-			pluginArgs.NodeLabelArgs = &nodelabel.Args{}
+			pluginArgs.NodeLabelArgs = &schedulerv1alpha2.NodeLabelArgs{}
 		}
 		if policy.Argument.LabelsPresence.Presence {
 			pluginArgs.NodeLabelArgs.PresentLabels = append(pluginArgs.NodeLabelArgs.PresentLabels, policy.Argument.LabelsPresence.Labels...)
@@ -586,7 +587,7 @@ func (lr *LegacyRegistry) ProcessPriorityPolicy(policy config.PriorityPolicy, co
 		// This name is then used to find the registered plugin and run the plugin instead of the priority.
 		priorityName = serviceaffinity.Name
 		if configProducerArgs.ServiceAffinityArgs == nil {
-			configProducerArgs.ServiceAffinityArgs = &serviceaffinity.Args{}
+			configProducerArgs.ServiceAffinityArgs = &schedulerv1alpha2.ServiceAffinityArgs{}
 		}
 		configProducerArgs.ServiceAffinityArgs.AntiAffinityLabelsPreference = append(
 			configProducerArgs.ServiceAffinityArgs.AntiAffinityLabelsPreference,
@@ -600,7 +601,7 @@ func (lr *LegacyRegistry) ProcessPriorityPolicy(policy config.PriorityPolicy, co
 		// This name is then used to find the registered plugin and run the plugin instead of the priority.
 		priorityName = nodelabel.Name
 		if configProducerArgs.NodeLabelArgs == nil {
-			configProducerArgs.NodeLabelArgs = &nodelabel.Args{}
+			configProducerArgs.NodeLabelArgs = &schedulerv1alpha2.NodeLabelArgs{}
 		}
 		if policy.Argument.LabelPreference.Presence {
 			configProducerArgs.NodeLabelArgs.PresentLabelsPreference = append(
@@ -616,9 +617,27 @@ func (lr *LegacyRegistry) ProcessPriorityPolicy(policy config.PriorityPolicy, co
 	}
 
 	if policy.Argument.RequestedToCapacityRatioArguments != nil {
-		configProducerArgs.RequestedToCapacityRatioArgs = &noderesources.RequestedToCapacityRatioArgs{
-			RequestedToCapacityRatioArguments: *policy.Argument.RequestedToCapacityRatioArguments,
+		policyArgs := policy.Argument.RequestedToCapacityRatioArguments
+		args := &schedulerv1alpha2.RequestedToCapacityRatioArgs{}
+
+		args.Shape = make([]schedulerv1alpha2.UtilizationShapePoint, len(policyArgs.Shape))
+		for i, s := range policyArgs.Shape {
+			args.Shape[i] = schedulerv1alpha2.UtilizationShapePoint{
+				Utilization: s.Utilization,
+				Score:       s.Score,
+			}
 		}
+
+		args.Resources = make([]schedulerv1alpha2.ResourceSpec, len(policyArgs.Resources))
+		for i, r := range policyArgs.Resources {
+			args.Resources[i] = schedulerv1alpha2.ResourceSpec{
+				Name:   r.Name,
+				Weight: r.Weight,
+			}
+		}
+
+		configProducerArgs.RequestedToCapacityRatioArgs = args
+
 		// We do not allow specifying the name for custom plugins, see #83472
 		priorityName = noderesources.RequestedToCapacityRatioName
 	}

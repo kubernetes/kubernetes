@@ -7,6 +7,7 @@ go_library(
         "legacy_types.go",
         "register.go",
         "types.go",
+        "types_pluginargs.go",
         "zz_generated.deepcopy.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/scheduler/apis/config",

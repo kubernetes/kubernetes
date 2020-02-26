@@ -25,6 +25,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	schedulerv1alpha2 "k8s.io/kube-scheduler/config/v1alpha2"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	"k8s.io/utils/pointer"
@@ -520,7 +521,7 @@ func TestPreferredAffinity(t *testing.T) {
 			state := framework.NewCycleState()
 			snapshot := cache.NewSnapshot(test.pods, test.nodes)
 			p := &InterPodAffinity{
-				Args: Args{
+				args: schedulerv1alpha2.InterPodAffinityArgs{
 					HardPodAffinityWeight: pointer.Int32Ptr(DefaultHardPodAffinityWeight),
 				},
 				sharedLister: snapshot,

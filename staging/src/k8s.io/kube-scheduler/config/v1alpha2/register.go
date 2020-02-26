@@ -38,6 +38,11 @@ var (
 func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&KubeSchedulerConfiguration{},
+		&InterPodAffinityArgs{},
+		&NodeLabelArgs{},
+		&NodeResourcesFitArgs{},
+		&RequestedToCapacityRatioArgs{},
+		&ServiceAffinityArgs{},
 	)
 	return nil
 }

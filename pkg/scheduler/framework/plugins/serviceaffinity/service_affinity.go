@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	corelisters "k8s.io/client-go/listers/core/v1"
+	schedulerv1alpha2 "k8s.io/kube-scheduler/config/v1alpha2"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
@@ -39,16 +40,6 @@ const (
 	// ErrReason is used for CheckServiceAffinity predicate error.
 	ErrReason = "node(s) didn't match service affinity"
 )
-
-// Args holds the args that are used to configure the plugin.
-type Args struct {
-	// Labels are homogeneous for pods that are scheduled to a node.
-	// (i.e. it returns true IFF this pod can be added to this node such that all other pods in
-	// the same service are running on nodes with the exact same values for Labels).
-	AffinityLabels []string `json:"affinityLabels,omitempty"`
-	// AntiAffinityLabelsPreference are the labels to consider for service anti affinity scoring.
-	AntiAffinityLabelsPreference []string `json:"antiAffinityLabelsPreference,omitempty"`
-}
 
 // preFilterState computed at PreFilter and used at Filter.
 type preFilterState struct {
@@ -73,7 +64,7 @@ func (s *preFilterState) Clone() framework.StateData {
 
 // New initializes a new plugin and returns it.
 func New(plArgs *runtime.Unknown, handle framework.FrameworkHandle) (framework.Plugin, error) {
-	args := Args{}
+	args := schedulerv1alpha2.ServiceAffinityArgs{}
 	if err := framework.DecodeInto(plArgs, &args); err != nil {
 		return nil, err
 	}
@@ -89,7 +80,7 @@ func New(plArgs *runtime.Unknown, handle framework.FrameworkHandle) (framework.P
 
 // ServiceAffinity is a plugin that checks service affinity.
 type ServiceAffinity struct {
-	args          Args
+	args          schedulerv1alpha2.ServiceAffinityArgs
 	sharedLister  framework.SharedLister
 	serviceLister corelisters.ServiceLister
 }
