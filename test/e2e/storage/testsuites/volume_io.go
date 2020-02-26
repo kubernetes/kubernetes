@@ -241,7 +241,7 @@ func makePodSpec(config volume.TestConfig, initCmd string, volsrc v1.VolumeSourc
 		},
 	}
 
-	e2epod.SetNodeSelection(pod, config.ClientNodeSelection)
+	e2epod.SetNodeSelection(&pod.Spec, config.ClientNodeSelection)
 	return pod
 }
 

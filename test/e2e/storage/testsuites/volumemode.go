@@ -215,7 +215,7 @@ func (t *volumeModeTestSuite) DefineTests(driver TestDriver, pattern testpattern
 				ginkgo.By("Creating pod")
 				pod := e2epod.MakeSecPod(l.ns.Name, []*v1.PersistentVolumeClaim{l.Pvc}, nil, false, "", false, false, e2epv.SELinuxLabel, nil)
 				// Setting node
-				e2epod.SetNodeSelection(pod, l.config.ClientNodeSelection)
+				e2epod.SetNodeSelection(&pod.Spec, l.config.ClientNodeSelection)
 				pod, err = l.cs.CoreV1().Pods(l.ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
 				framework.ExpectNoError(err, "Failed to create pod")
 				defer func() {
