@@ -37,9 +37,9 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/events"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/scheduler"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/profile"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -270,9 +270,8 @@ priorities: []
 		sched, err := scheduler.New(clientSet,
 			informerFactory,
 			scheduler.NewPodInformer(clientSet, 0),
-			eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.DefaultSchedulerName),
+			profile.NewRecorderFactory(eventBroadcaster),
 			nil,
-			scheduler.WithName(v1.DefaultSchedulerName),
 			scheduler.WithAlgorithmSource(kubeschedulerconfig.SchedulerAlgorithmSource{
 				Policy: &kubeschedulerconfig.SchedulerPolicySource{
 					ConfigMap: &kubeschedulerconfig.SchedulerPolicyConfigMapSource{
@@ -287,7 +286,7 @@ priorities: []
 			t.Fatalf("couldn't make scheduler config for test %d: %v", i, err)
 		}
 
-		schedPlugins := sched.Framework.ListPlugins()
+		schedPlugins := sched.Profiles[v1.DefaultSchedulerName].ListPlugins()
 		if diff := cmp.Diff(test.expectedPlugins, schedPlugins); diff != "" {
 			t.Errorf("unexpected plugins diff (-want, +got): %s", diff)
 		}
@@ -317,9 +316,8 @@ func TestSchedulerCreationFromNonExistentConfigMap(t *testing.T) {
 	_, err := scheduler.New(clientSet,
 		informerFactory,
 		scheduler.NewPodInformer(clientSet, 0),
-		eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.DefaultSchedulerName),
+		profile.NewRecorderFactory(eventBroadcaster),
 		nil,
-		scheduler.WithName(v1.DefaultSchedulerName),
 		scheduler.WithAlgorithmSource(kubeschedulerconfig.SchedulerAlgorithmSource{
 			Policy: &kubeschedulerconfig.SchedulerPolicySource{
 				ConfigMap: &kubeschedulerconfig.SchedulerPolicyConfigMapSource{
@@ -461,7 +459,7 @@ func TestUnschedulableNodes(t *testing.T) {
 	}
 }
 
-func TestMultiScheduler(t *testing.T) {
+func TestMultipleSchedulers(t *testing.T) {
 	// This integration tests the multi-scheduler feature in the following way:
 	// 1. create a default scheduler
 	// 2. create a node
@@ -538,7 +536,8 @@ func TestMultiScheduler(t *testing.T) {
 	}
 
 	// 5. create and start a scheduler with name "foo-scheduler"
-	testCtx = initTestSchedulerWithOptions(t, testCtx, true, nil, time.Second, scheduler.WithName(fooScheduler))
+	fooProf := kubeschedulerconfig.KubeSchedulerProfile{SchedulerName: fooScheduler}
+	testCtx = initTestSchedulerWithOptions(t, testCtx, true, nil, time.Second, scheduler.WithProfiles(fooProf))
 
 	//	6. **check point-2**:
 	//		- testPodWithAnnotationFitsFoo should be scheduled

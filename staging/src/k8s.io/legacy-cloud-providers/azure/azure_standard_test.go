@@ -19,6 +19,7 @@ limitations under the License.
 package azure
 
 import (
+	"fmt"
 	"strconv"
 	"testing"
 
@@ -27,6 +28,11 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+const (
+	networkResourceTenantID       = "networkResourceTenantID"
+	networkResourceSubscriptionID = "networkResourceSubscriptionID"
 )
 
 func TestIsMasterNode(t *testing.T) {
@@ -414,5 +420,83 @@ func TestGetFrontendIPConfigName(t *testing.T) {
 
 		ipconfigName := az.getFrontendIPConfigName(svc)
 		assert.Equal(t, c.expected, ipconfigName, c.description)
+	}
+}
+
+func TestGetFrontendIPConfigID(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	az := GetTestCloud(ctrl)
+
+	testGetLoadBalancerSubResourceID(t, az, az.getFrontendIPConfigID, frontendIPConfigIDTemplate)
+}
+
+func TestGetBackendPoolID(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	az := GetTestCloud(ctrl)
+
+	testGetLoadBalancerSubResourceID(t, az, az.getBackendPoolID, backendPoolIDTemplate)
+}
+
+func TestGetLoadBalancerProbeID(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	az := GetTestCloud(ctrl)
+
+	testGetLoadBalancerSubResourceID(t, az, az.getLoadBalancerProbeID, loadBalancerProbeIDTemplate)
+}
+
+func testGetLoadBalancerSubResourceID(
+	t *testing.T,
+	az *Cloud,
+	getLoadBalancerSubResourceID func(string, string, string) string,
+	expectedResourceIDTemplate string) {
+	cases := []struct {
+		description                         string
+		loadBalancerName                    string
+		resourceGroupName                   string
+		subResourceName                     string
+		useNetworkResourceInDifferentTenant bool
+		expected                            string
+	}{
+		{
+			description:                         "resource id should contain NetworkResourceSubscriptionID when using network resources in different subscription",
+			loadBalancerName:                    "lbName",
+			resourceGroupName:                   "rgName",
+			subResourceName:                     "subResourceName",
+			useNetworkResourceInDifferentTenant: true,
+		},
+		{
+			description:                         "resource id should contain SubscriptionID when not using network resources in different subscription",
+			loadBalancerName:                    "lbName",
+			resourceGroupName:                   "rgName",
+			subResourceName:                     "subResourceName",
+			useNetworkResourceInDifferentTenant: false,
+		},
+	}
+
+	for _, c := range cases {
+		if c.useNetworkResourceInDifferentTenant {
+			az.NetworkResourceTenantID = networkResourceTenantID
+			az.NetworkResourceSubscriptionID = networkResourceSubscriptionID
+			c.expected = fmt.Sprintf(
+				expectedResourceIDTemplate,
+				az.NetworkResourceSubscriptionID,
+				c.resourceGroupName,
+				c.loadBalancerName,
+				c.subResourceName)
+		} else {
+			az.NetworkResourceTenantID = ""
+			az.NetworkResourceSubscriptionID = ""
+			c.expected = fmt.Sprintf(
+				expectedResourceIDTemplate,
+				az.SubscriptionID,
+				c.resourceGroupName,
+				c.loadBalancerName,
+				c.subResourceName)
+		}
+		subResourceID := getLoadBalancerSubResourceID(c.loadBalancerName, c.resourceGroupName, c.subResourceName)
+		assert.Equal(t, c.expected, subResourceID, c.description)
 	}
 }

@@ -117,9 +117,10 @@ func getEndpointPorts(service *corev1.Service, pod *corev1.Pod) []discovery.Endp
 
 		i32PortNum := int32(portNum)
 		endpointPorts = append(endpointPorts, discovery.EndpointPort{
-			Name:     &portName,
-			Port:     &i32PortNum,
-			Protocol: &portProto,
+			Name:        &portName,
+			Port:        &i32PortNum,
+			Protocol:    &portProto,
+			AppProtocol: servicePort.AppProtocol,
 		})
 	}
 

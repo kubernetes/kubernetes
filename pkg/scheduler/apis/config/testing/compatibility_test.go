@@ -20,6 +20,8 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"k8s.io/client-go/tools/events"
+	"k8s.io/kubernetes/pkg/scheduler/profile"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1294,41 +1296,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			}},
 		},
 		{
-			name: "enable alpha feature EvenPodsSpread",
-			JSON: `{
-		  "kind": "Policy",
-		  "apiVersion": "v1",
-		  "predicates": [
-			{"name": "EvenPodsSpread"}
-		  ],
-		  "priorities": [
-			{"name": "EvenPodsSpreadPriority",   "weight": 2}
-		  ]
-		}`,
-			featureGates: map[featuregate.Feature]bool{
-				features.EvenPodsSpread: true,
-			},
-			wantPlugins: map[string][]config.Plugin{
-				"QueueSortPlugin": {{Name: "PrioritySort"}},
-				"PreFilterPlugin": {
-					{Name: "PodTopologySpread"},
-				},
-				"FilterPlugin": {
-					{Name: "NodeUnschedulable"},
-					{Name: "TaintToleration"},
-					{Name: "PodTopologySpread"},
-				},
-				"PreScorePlugin": {
-					{Name: "PodTopologySpread"},
-				},
-				"ScorePlugin": {
-					{Name: "PodTopologySpread", Weight: 2},
-				},
-				"BindPlugin": {{Name: "DefaultBinder"}},
-			},
-		},
-		{
-			name: "enable alpha feature ResourceLimitsPriorityFunction",
+			name: "enable alpha feature ResourceLimitsPriorityFunction and disable beta feature EvenPodsSpread",
 			JSON: `{
 		  "kind": "Policy",
 		  "apiVersion": "v1",
@@ -1338,6 +1306,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		  ]
 		}`,
 			featureGates: map[featuregate.Feature]bool{
+				features.EvenPodsSpread:                 false,
 				features.ResourceLimitsPriorityFunction: true,
 			},
 			wantPlugins: map[string][]config.Plugin{
@@ -1376,12 +1345,13 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				},
 			}
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
+			recorderFactory := profile.NewRecorderFactory(events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1beta1().Events("")}))
 
 			sched, err := scheduler.New(
 				client,
 				informerFactory,
 				informerFactory.Core().V1().Pods(),
-				nil,
+				recorderFactory,
 				make(chan struct{}),
 				scheduler.WithAlgorithmSource(algorithmSrc),
 			)
@@ -1390,7 +1360,8 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				t.Fatalf("Error constructing: %v", err)
 			}
 
-			gotPlugins := sched.Framework.ListPlugins()
+			defProf := sched.Profiles["default-scheduler"]
+			gotPlugins := defProf.Framework.ListPlugins()
 			if diff := cmp.Diff(tc.wantPlugins, gotPlugins); diff != "" {
 				t.Errorf("unexpected plugins diff (-want, +got): %s", diff)
 			}
@@ -1538,12 +1509,13 @@ func TestAlgorithmProviderCompatibility(t *testing.T) {
 
 			client := fake.NewSimpleClientset()
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
+			recorderFactory := profile.NewRecorderFactory(events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1beta1().Events("")}))
 
 			sched, err := scheduler.New(
 				client,
 				informerFactory,
 				informerFactory.Core().V1().Pods(),
-				nil,
+				recorderFactory,
 				make(chan struct{}),
 				opts...,
 			)
@@ -1552,7 +1524,8 @@ func TestAlgorithmProviderCompatibility(t *testing.T) {
 				t.Fatalf("Error constructing: %v", err)
 			}
 
-			gotPlugins := sched.Framework.ListPlugins()
+			defProf := sched.Profiles["default-scheduler"]
+			gotPlugins := defProf.ListPlugins()
 			if diff := cmp.Diff(tc.wantPlugins, gotPlugins); diff != "" {
 				t.Errorf("unexpected plugins diff (-want, +got): %s", diff)
 			}
