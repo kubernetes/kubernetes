@@ -69,6 +69,13 @@ message Endpoint {
   //   endpoint is located. This should match the corresponding node label.
   // +optional
   map<string, string> topology = 5;
+
+  // TerminationGracePeriodSeconds is the termination grace period (in seconds) the
+  // endpoint is given to gracefully shutdown. Consumers should use this field to determine
+  // how long existing connections to an endpoint should be kept open after the endpoint
+  // is deleted.
+  // +optional
+  optional int64 terminationGracePeriodSeconds = 6;
 }
 
 // EndpointConditions represents the current condition of an endpoint.

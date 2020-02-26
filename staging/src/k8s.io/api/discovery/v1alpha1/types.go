@@ -108,6 +108,12 @@ type Endpoint struct {
 	//   endpoint is located. This should match the corresponding node label.
 	// +optional
 	Topology map[string]string `json:"topology,omitempty" protobuf:"bytes,5,opt,name=topology"`
+	// TerminationGracePeriodSeconds is the termination grace period duration the target
+	// reference is given to gracefully shutdown. Consumers use this field to determine
+	// how long existing connects to an endpoint should be kept open after the target
+	// is deleted.
+	// +optional
+	TerminationGracePeriodSeconds *int64 `json:"terminationGracePeriodSeconds,omitempty" protobuf:"bytes,6,opt,name=terminationGracePeriodSeconds"`
 }
 
 // EndpointConditions represents the current condition of an endpoint.
