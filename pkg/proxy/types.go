@@ -92,6 +92,8 @@ type Endpoint interface {
 	GetIsLocal() bool
 	// GetTopology returns the topology information of the endpoint.
 	GetTopology() map[string]string
+	// TerminationGracePeriodSeconds returns the graceful termination period for an endpoint in seconds
+	GetTerminationGracePeriodSeconds() *int64
 	// IP returns IP part of the endpoint.
 	IP() string
 	// Port returns the Port part of the endpoint.

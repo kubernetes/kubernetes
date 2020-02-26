@@ -75,8 +75,9 @@ type endpointSliceInfo struct {
 // Used for caching. Intentionally small to limit memory util.
 // Addresses and Topology are copied from EndpointSlice Endpoints.
 type endpointInfo struct {
-	Addresses []string
-	Topology  map[string]string
+	Addresses                     []string
+	Topology                      map[string]string
+	TerminationGracePeriodSeconds *int64
 }
 
 // spToEndpointMap stores groups Endpoint objects by ServicePortName and
@@ -121,8 +122,9 @@ func newEndpointSliceInfo(endpointSlice *discovery.EndpointSlice, remove bool) *
 		for _, endpoint := range endpointSlice.Endpoints {
 			if endpoint.Conditions.Ready == nil || *endpoint.Conditions.Ready {
 				esInfo.Endpoints = append(esInfo.Endpoints, &endpointInfo{
-					Addresses: endpoint.Addresses,
-					Topology:  endpoint.Topology,
+					Addresses:                     endpoint.Addresses,
+					Topology:                      endpoint.Topology,
+					TerminationGracePeriodSeconds: endpoint.TerminationGracePeriodSeconds,
 				})
 			}
 		}
@@ -242,7 +244,7 @@ func (cache *EndpointSliceCache) addEndpointsByIP(serviceNN types.NamespacedName
 	// iterate through endpoints to add them to endpointsByIP.
 	for _, endpoint := range endpoints {
 		if len(endpoint.Addresses) == 0 {
-			klog.Warningf("ignoring invalid endpoint port %s with empty addresses", endpoint)
+			klog.Warningf("ignoring invalid endpoint port %v with empty addresses", endpoint)
 			continue
 		}
 
@@ -256,7 +258,7 @@ func (cache *EndpointSliceCache) addEndpointsByIP(serviceNN types.NamespacedName
 		}
 
 		isLocal := cache.isLocal(endpoint.Topology[v1.LabelHostname])
-		endpointInfo := newBaseEndpointInfo(endpoint.Addresses[0], portNum, isLocal, endpoint.Topology)
+		endpointInfo := newBaseEndpointInfo(endpoint.Addresses[0], portNum, isLocal, endpoint.Topology, endpoint.TerminationGracePeriodSeconds)
 
 		// This logic ensures we're deduping potential overlapping endpoints
 		// isLocal should not vary between matching IPs, but if it does, we
