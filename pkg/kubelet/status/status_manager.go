@@ -160,13 +160,20 @@ func (m *manager) Start() {
 	syncTicker := time.Tick(syncPeriod)
 	// syncPod and syncBatch share the same go routine to avoid sync races.
 	go wait.Forever(func() {
-		select {
-		case syncRequest := <-m.podStatusChannel:
-			klog.V(5).Infof("Status Manager: syncing pod: %q, with status: (%d, %v) from podStatusChannel",
-				syncRequest.podUID, syncRequest.status.version, syncRequest.status.status)
-			m.syncPod(syncRequest.podUID, syncRequest.status)
-		case <-syncTicker:
-			m.syncBatch()
+		for {
+			select {
+			case syncRequest := <-m.podStatusChannel:
+				klog.V(5).Infof("Status Manager: syncing pod: %q, with status: (%d, %v) from podStatusChannel",
+					syncRequest.podUID, syncRequest.status.version, syncRequest.status.status)
+				m.syncPod(syncRequest.podUID, syncRequest.status)
+			case <-syncTicker:
+				klog.V(5).Infof("Status Manager: syncing batch")
+				// remove any entries in the status channel since the batch will handle them
+				for i := len(m.podStatusChannel); i > 0; i-- {
+					<-m.podStatusChannel
+				}
+				m.syncBatch()
+			}
 		}
 	}, 0)
 }
