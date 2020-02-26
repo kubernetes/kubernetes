@@ -1936,6 +1936,15 @@ func (proxier *Proxier) syncEndpoint(svcPortName proxy.ServicePortName, onlyNode
 	}
 
 	endpoints := proxier.endpointsMap[svcPortName]
+	gracePeriodByEndpoints := map[string]*int64{}
+
+	for _, epInfo := range endpoints {
+		if epInfo.GetTerminationGracePeriodSeconds() == nil {
+			continue
+		}
+
+		gracePeriodByEndpoints[epInfo.String()] = epInfo.GetTerminationGracePeriodSeconds()
+	}
 
 	// Service Topology will not be enabled in the following cases:
 	// 1. externalTrafficPolicy=Local (mutually exclusive with service topology).
@@ -1991,6 +2000,7 @@ func (proxier *Proxier) syncEndpoint(svcPortName proxy.ServicePortName, onlyNode
 			continue
 		}
 	}
+
 	// Delete old endpoints
 	for _, ep := range curEndpoints.Difference(newEndpoints).UnsortedList() {
 		// if curEndpoint is in gracefulDelete, skip
@@ -2015,7 +2025,7 @@ func (proxier *Proxier) syncEndpoint(svcPortName proxy.ServicePortName, onlyNode
 		}
 
 		klog.V(5).Infof("Using graceful delete to delete: %v", uniqueRS)
-		err = proxier.gracefuldeleteManager.GracefulDeleteRS(appliedVirtualServer, delDest)
+		err = proxier.gracefuldeleteManager.GracefulDeleteRS(appliedVirtualServer, delDest, gracePeriodByEndpoints[ep])
 		if err != nil {
 			klog.Errorf("Failed to delete destination: %v, error: %v", uniqueRS, err)
 			continue

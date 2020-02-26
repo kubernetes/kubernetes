@@ -36,6 +36,9 @@ const (
 type listItem struct {
 	VirtualServer *utilipvs.VirtualServer
 	RealServer    *utilipvs.RealServer
+
+	deletedAt                     time.Time
+	terminationGracePeriodSeconds *int64
 }
 
 // String return the unique real server name(with virtual server information)
@@ -133,11 +136,13 @@ func (m *GracefulTerminationManager) InTerminationList(uniqueRS string) bool {
 }
 
 // GracefulDeleteRS to update rs weight to 0, and add rs to graceful terminate list
-func (m *GracefulTerminationManager) GracefulDeleteRS(vs *utilipvs.VirtualServer, rs *utilipvs.RealServer) error {
+func (m *GracefulTerminationManager) GracefulDeleteRS(vs *utilipvs.VirtualServer, rs *utilipvs.RealServer, gracePeriod *int64) error {
 	// Try to delete rs before add it to graceful delete list
 	ele := &listItem{
-		VirtualServer: vs,
-		RealServer:    rs,
+		VirtualServer:                 vs,
+		RealServer:                    rs,
+		deletedAt:                     time.Now(),
+		terminationGracePeriodSeconds: gracePeriod,
 	}
 	deleted, err := m.deleteRsFunc(ele)
 	if err != nil {
@@ -163,23 +168,43 @@ func (m *GracefulTerminationManager) deleteRsFunc(rsToDelete *listItem) (bool, e
 		return false, err
 	}
 	for _, rs := range rss {
-		if rsToDelete.RealServer.Equal(rs) {
-			// For UDP traffic, no graceful termination, we immediately delete the RS
-			//     (existing connections will be deleted on the next packet because sysctlExpireNoDestConn=1)
-			// For other protocols, don't delete until all connections have expired)
-			if strings.ToUpper(rsToDelete.VirtualServer.Protocol) != "UDP" && rs.ActiveConn+rs.InactiveConn != 0 {
-				klog.V(5).Infof("Not deleting, RS %v: %v ActiveConn, %v InactiveConn", rsToDelete.String(), rs.ActiveConn, rs.InactiveConn)
-				return false, nil
-			}
-			klog.V(5).Infof("Deleting rs: %s", rsToDelete.String())
-			err := m.ipvs.DeleteRealServer(rsToDelete.VirtualServer, rs)
-			if err != nil {
-				return false, fmt.Errorf("Delete destination %q err: %v", rs.String(), err)
-			}
-			return true, nil
+		if !rsToDelete.RealServer.Equal(rs) {
+			continue
 		}
+
+		if !shouldDeleteRealServer(rsToDelete, rs) {
+			klog.V(5).Infof("Not deleting, RS %v: %v ActiveConn, %v InactiveConn", rsToDelete.String(), rs.ActiveConn, rs.InactiveConn)
+			return false, nil
+		}
+
+		klog.V(5).Infof("Deleting rs: %s", rsToDelete.String())
+		err := m.ipvs.DeleteRealServer(rsToDelete.VirtualServer, rs)
+		if err != nil {
+			return false, fmt.Errorf("Delete destination %q err: %v", rs.String(), err)
+		}
+		return true, nil
 	}
 	return true, fmt.Errorf("Failed to delete rs %q, can't find the real server", rsToDelete.String())
+}
+
+// For UDP traffic, no graceful termination, we immediately delete the RS
+//     (existing connections will be deleted on the next packet because sysctlExpireNoDestConn=1)
+// For other protocols, don't delete until all connections have expired)
+func shouldDeleteRealServer(l *listItem, rs *utilipvs.RealServer) bool {
+	if strings.ToUpper(l.VirtualServer.Protocol) == "UDP" {
+		return true
+	}
+
+	if rs.ActiveConn+rs.InactiveConn == 0 {
+		return true
+	}
+
+	if l.terminationGracePeriodSeconds != nil &&
+		time.Since(l.deletedAt) > time.Duration(*l.terminationGracePeriodSeconds)*time.Second {
+		return true
+	}
+
+	return false
 }
 
 func (m *GracefulTerminationManager) tryDeleteRs() {

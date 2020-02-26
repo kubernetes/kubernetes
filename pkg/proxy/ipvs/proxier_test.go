@@ -3726,17 +3726,20 @@ func TestEndpointSliceE2E(t *testing.T) {
 		}},
 		AddressType: discovery.AddressTypeIPv4,
 		Endpoints: []discovery.Endpoint{{
-			Addresses:  []string{"10.0.1.1"},
-			Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
-			Topology:   map[string]string{"kubernetes.io/hostname": testHostname},
+			Addresses:                     []string{"10.0.1.1"},
+			Conditions:                    discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+			Topology:                      map[string]string{"kubernetes.io/hostname": testHostname},
+			TerminationGracePeriodSeconds: utilpointer.Int64Ptr(30),
 		}, {
-			Addresses:  []string{"10.0.1.2"},
-			Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
-			Topology:   map[string]string{"kubernetes.io/hostname": "node2"},
+			Addresses:                     []string{"10.0.1.2"},
+			Conditions:                    discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+			Topology:                      map[string]string{"kubernetes.io/hostname": "node2"},
+			TerminationGracePeriodSeconds: utilpointer.Int64Ptr(30),
 		}, {
-			Addresses:  []string{"10.0.1.3"},
-			Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
-			Topology:   map[string]string{"kubernetes.io/hostname": "node3"},
+			Addresses:                     []string{"10.0.1.3"},
+			Conditions:                    discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+			Topology:                      map[string]string{"kubernetes.io/hostname": "node3"},
+			TerminationGracePeriodSeconds: utilpointer.Int64Ptr(30),
 		}},
 	}
 
@@ -3768,10 +3771,12 @@ func TestEndpointSliceE2E(t *testing.T) {
 	virtualServers2, vsErr2 := ipvs.GetVirtualServers()
 	assert.Nil(t, vsErr2, "Expected no error getting virtual servers")
 	assert.Len(t, virtualServers2, 1, "Expected 1 virtual server")
+	// Graceful termination does not apply here cause we can't mock the IPVS active/inactive connection count
 	realServers2, rsErr2 := ipvs.GetRealServers(virtualServers2[0])
 	assert.Nil(t, rsErr2, "Expected no error getting real servers")
 	assert.Len(t, realServers2, 0, "Expected 0 real servers")
 }
+
 func TestFilterCIDRs(t *testing.T) {
 	var cidrList []string
 	var cidrs []string
