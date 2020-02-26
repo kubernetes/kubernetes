@@ -32,12 +32,6 @@ type ClientConfig struct {
 	Authorizer              autorest.Authorizer
 	RateLimitConfig         *RateLimitConfig
 	Backoff                 *retry.Backoff
-
-	// Depracated configures (retry.Backoff is preferred).
-	// Those configurations would be removed after all Azure clients are moved to new implementations.
-	CloudProviderBackoffRetries    int
-	CloudProviderBackoffDuration   int
-	ShouldOmitCloudProviderBackoff bool
 }
 
 // WithRateLimiter returns a new ClientConfig with rateLimitConfig set.
