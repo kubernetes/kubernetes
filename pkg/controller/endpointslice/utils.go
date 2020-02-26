@@ -85,6 +85,7 @@ func podToEndpoint(pod *corev1.Pod, node *corev1.Node, service *corev1.Service) 
 			UID:             pod.ObjectMeta.UID,
 			ResourceVersion: pod.ObjectMeta.ResourceVersion,
 		},
+		TerminationGracePeriodSeconds: pod.Spec.TerminationGracePeriodSeconds,
 	}
 
 	if endpointutil.ShouldSetHostname(pod, service) {

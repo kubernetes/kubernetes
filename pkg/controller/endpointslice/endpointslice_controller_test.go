@@ -338,10 +338,11 @@ func TestSyncServiceFull(t *testing.T) {
 	}}, slice.Ports)
 
 	assert.ElementsMatch(t, []discovery.Endpoint{{
-		Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
-		Addresses:  []string{"1234::5678:0000:0000:9abc:def0"},
-		TargetRef:  &v1.ObjectReference{Kind: "Pod", Namespace: namespace, Name: pod2.Name},
-		Topology:   map[string]string{"kubernetes.io/hostname": "node-1"},
+		Conditions:                    discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+		Addresses:                     []string{"1234::5678:0000:0000:9abc:def0"},
+		TargetRef:                     &v1.ObjectReference{Kind: "Pod", Namespace: namespace, Name: pod2.Name},
+		Topology:                      map[string]string{"kubernetes.io/hostname": "node-1"},
+		TerminationGracePeriodSeconds: ptrint64(30),
 	}}, slice.Endpoints)
 }
 

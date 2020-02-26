@@ -123,6 +123,7 @@ func TestPodToEndpoint(t *testing.T) {
 					UID:             readyPod.UID,
 					ResourceVersion: readyPod.ResourceVersion,
 				},
+				TerminationGracePeriodSeconds: ptrint64(30),
 			},
 		},
 		{
@@ -140,6 +141,7 @@ func TestPodToEndpoint(t *testing.T) {
 					UID:             readyPod.UID,
 					ResourceVersion: readyPod.ResourceVersion,
 				},
+				TerminationGracePeriodSeconds: ptrint64(30),
 			},
 		},
 		{
@@ -157,6 +159,7 @@ func TestPodToEndpoint(t *testing.T) {
 					UID:             readyPod.UID,
 					ResourceVersion: readyPod.ResourceVersion,
 				},
+				TerminationGracePeriodSeconds: ptrint64(30),
 			},
 		},
 		{
@@ -174,6 +177,7 @@ func TestPodToEndpoint(t *testing.T) {
 					UID:             readyPod.UID,
 					ResourceVersion: readyPod.ResourceVersion,
 				},
+				TerminationGracePeriodSeconds: ptrint64(30),
 			},
 		},
 		{
@@ -196,6 +200,7 @@ func TestPodToEndpoint(t *testing.T) {
 					UID:             readyPod.UID,
 					ResourceVersion: readyPod.ResourceVersion,
 				},
+				TerminationGracePeriodSeconds: ptrint64(30),
 			},
 		},
 		{
@@ -218,6 +223,7 @@ func TestPodToEndpoint(t *testing.T) {
 					UID:             readyPod.UID,
 					ResourceVersion: readyPod.ResourceVersion,
 				},
+				TerminationGracePeriodSeconds: ptrint64(30),
 			},
 		},
 		{
@@ -241,6 +247,7 @@ func TestPodToEndpoint(t *testing.T) {
 					UID:             readyPodHostname.UID,
 					ResourceVersion: readyPodHostname.ResourceVersion,
 				},
+				TerminationGracePeriodSeconds: ptrint64(30),
 			},
 		},
 	}
@@ -372,7 +379,8 @@ func newPod(n int, namespace string, ready bool, nPorts int) *v1.Pod {
 			Containers: []v1.Container{{
 				Name: "container-1",
 			}},
-			NodeName: "node-1",
+			NodeName:                      "node-1",
+			TerminationGracePeriodSeconds: ptrint64(30),
 		},
 		Status: v1.PodStatus{
 			PodIP: fmt.Sprintf("1.2.3.%d", 4+n),
@@ -458,4 +466,9 @@ func newEmptyEndpointSlice(n int, namespace string, endpointMeta endpointMeta, s
 func podChangedHelper(oldPod, newPod *v1.Pod, endpointChanged endpointutil.EndpointsMatch) bool {
 	podChanged, _ := endpointutil.PodChanged(oldPod, newPod, podEndpointChanged)
 	return podChanged
+}
+
+func ptrint64(i int) *int64 {
+	val := int64(i)
+	return &val
 }

@@ -111,6 +111,7 @@ func TestReconcile1Pod(t *testing.T) {
 					Namespace: namespace,
 					Name:      "pod1",
 				},
+				TerminationGracePeriodSeconds: ptrint64(30),
 			},
 		},
 		"ipv6": {
@@ -129,6 +130,7 @@ func TestReconcile1Pod(t *testing.T) {
 					Namespace: namespace,
 					Name:      "pod1",
 				},
+				TerminationGracePeriodSeconds: ptrint64(30),
 			},
 		},
 		"ipv6-clusterip": {
@@ -147,6 +149,7 @@ func TestReconcile1Pod(t *testing.T) {
 					Namespace: namespace,
 					Name:      "pod1",
 				},
+				TerminationGracePeriodSeconds: ptrint64(30),
 			},
 		},
 	}
