@@ -2751,7 +2751,7 @@ type PreferredSchedulingTerm struct {
 type Taint struct {
 	// Required. The taint key to be applied to a node.
 	Key string `json:"key" protobuf:"bytes,1,opt,name=key"`
-	// Required. The taint value corresponding to the taint key.
+	// The taint value corresponding to the taint key.
 	// +optional
 	Value string `json:"value,omitempty" protobuf:"bytes,2,opt,name=value"`
 	// Required. The effect of the taint on pods
