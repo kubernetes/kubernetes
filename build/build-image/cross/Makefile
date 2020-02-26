@@ -14,14 +14,22 @@
 
 .PHONY:	build push
 
+STAGING_REGISTRY?=gcr.io/k8s-staging-build-image
+PROD_REGISTRY?=us.gcr.io/k8s-artifacts-prod/build-image
 IMAGE=kube-cross
-TAG=$(shell cat VERSION)
 
+TAG?=kubernetes-$(shell git describe --tags --match='v*' --abbrev=14)
+KUBE_CROSS_VERSION=$(shell cat VERSION)
 
-all: push
+all: build push
 
 build:
-	docker build --pull -t staging-k8s.gcr.io/$(IMAGE):$(TAG) .
+	docker build \
+		-t $(STAGING_REGISTRY)/$(IMAGE):$(TAG) \
+		-t $(STAGING_REGISTRY)/$(IMAGE):$(KUBE_CROSS_VERSION) \
+		-t $(PROD_REGISTRY)/$(IMAGE):$(KUBE_CROSS_VERSION) \
+		.
 
-push: build
-	docker push staging-k8s.gcr.io/$(IMAGE):$(TAG)
+push:
+	docker push $(STAGING_REGISTRY)/$(IMAGE):$(TAG)
+	docker push $(STAGING_REGISTRY)/$(IMAGE):$(KUBE_CROSS_VERSION)
