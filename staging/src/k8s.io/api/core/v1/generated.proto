@@ -1042,6 +1042,16 @@ message EndpointPort {
   // Default is TCP.
   // +optional
   optional string protocol = 3;
+
+  // The application protocol for this port.
+  // This field follows standard Kubernetes label syntax.
+  // Un-prefixed names are reserved for IANA standard service names (as per
+  // RFC-6335 and http://www.iana.org/assignments/service-names).
+  // Non-standard protocols should use prefixed names such as
+  // mycompany.com/my-custom-protocol.
+  // Field can be enabled with ServiceAppProtocol feature gate.
+  // +optional
+  optional string appProtocol = 4;
 }
 
 // EndpointSubset is a group of addresses with a common set of ports. The
@@ -4608,6 +4618,16 @@ message ServicePort {
   // Default is TCP.
   // +optional
   optional string protocol = 2;
+
+  // The application protocol for this port.
+  // This field follows standard Kubernetes label syntax.
+  // Un-prefixed names are reserved for IANA standard service names (as per
+  // RFC-6335 and http://www.iana.org/assignments/service-names).
+  // Non-standard protocols should use prefixed names such as
+  // mycompany.com/my-custom-protocol.
+  // Field can be enabled with ServiceAppProtocol feature gate.
+  // +optional
+  optional string appProtocol = 6;
 
   // The port that will be exposed by this service.
   optional int32 port = 3;
