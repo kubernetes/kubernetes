@@ -1708,6 +1708,15 @@
     be evicted if the taint is removed before toleration time ends.
   release: v1.16
   file: test/e2e/scheduling/taints.go
+- testname: Pod preemption verification
+  codename: '[sig-scheduling] PreemptionExecutionPath runs ReplicaSets to verify preemption
+    running path [Conformance]'
+  description: Four levels of Pods in ReplicaSets with different levels of Priority,
+    restricted by given CPU limits MUST launch. Priority 1 - 3 Pods MUST spawn first
+    followed by Priority 4 Pod. The ReplicaSets with Replicas MUST contain the expected
+    number of Replicas.
+  release: v1.17
+  file: test/e2e/scheduling/preemption.go
 - testname: Scheduler, resource limits
   codename: '[sig-scheduling] SchedulerPredicates [Serial] validates resource limits
     of pods that are allowed to run  [Conformance]'
