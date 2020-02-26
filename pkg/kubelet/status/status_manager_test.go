@@ -97,6 +97,7 @@ func getRandomPodStatus() v1.PodStatus {
 }
 
 func verifyActions(t *testing.T, manager *manager, expectedActions []core.Action) {
+	t.Helper()
 	manager.consumeUpdates()
 	actions := manager.kubeClient.(*fake.Clientset).Actions()
 	defer manager.kubeClient.(*fake.Clientset).ClearActions()
@@ -402,17 +403,17 @@ func TestStaleUpdates(t *testing.T) {
 	t.Logf("Nothing left in the channel to sync")
 	verifyActions(t, m, []core.Action{})
 
-	t.Log("Unchanged status should not send an update.")
+	t.Log("Unchanged status should not send an update")
 	m.SetPodStatus(pod, status)
 	verifyUpdates(t, m, 0)
 
-	t.Log("... unless it's stale.")
+	t.Log("... even if it's stale as long as nothing changes")
 	mirrorPodUID := kubetypes.MirrorPodUID(pod.UID)
 	m.apiStatusVersions[mirrorPodUID] = m.apiStatusVersions[mirrorPodUID] - 1
 
 	m.SetPodStatus(pod, status)
 	m.syncBatch()
-	verifyActions(t, m, []core.Action{getAction(), patchAction()})
+	verifyActions(t, m, []core.Action{getAction()})
 
 	t.Logf("Nothing stuck in the pipe.")
 	verifyUpdates(t, m, 0)
@@ -852,8 +853,9 @@ func TestReconcilePodStatus(t *testing.T) {
 	t.Logf("If the pod status is the same, a reconciliation is not needed and syncBatch should do nothing")
 	syncer.podManager.UpdatePod(testPod)
 	if syncer.needsReconcile(testPod.UID, podStatus) {
-		t.Errorf("Pod status is the same, a reconciliation is not needed")
+		t.Fatalf("Pod status is the same, a reconciliation is not needed")
 	}
+	syncer.SetPodStatus(testPod, podStatus)
 	syncer.syncBatch()
 	verifyActions(t, syncer, []core.Action{})
 
@@ -866,17 +868,19 @@ func TestReconcilePodStatus(t *testing.T) {
 	testPod.Status.StartTime = &normalizedStartTime
 	syncer.podManager.UpdatePod(testPod)
 	if syncer.needsReconcile(testPod.UID, podStatus) {
-		t.Errorf("Pod status only differs for timestamp format, a reconciliation is not needed")
+		t.Fatalf("Pod status only differs for timestamp format, a reconciliation is not needed")
 	}
+	syncer.SetPodStatus(testPod, podStatus)
 	syncer.syncBatch()
 	verifyActions(t, syncer, []core.Action{})
 
 	t.Logf("If the pod status is different, a reconciliation is needed, syncBatch should trigger an update")
-	testPod.Status = getRandomPodStatus()
+	changedPodStatus := getRandomPodStatus()
 	syncer.podManager.UpdatePod(testPod)
-	if !syncer.needsReconcile(testPod.UID, podStatus) {
-		t.Errorf("Pod status is different, a reconciliation is needed")
+	if !syncer.needsReconcile(testPod.UID, changedPodStatus) {
+		t.Fatalf("Pod status is different, a reconciliation is needed")
 	}
+	syncer.SetPodStatus(testPod, changedPodStatus)
 	syncer.syncBatch()
 	verifyActions(t, syncer, []core.Action{getAction(), patchAction()})
 }
