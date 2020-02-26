@@ -137,7 +137,7 @@ func TestTopNodeAllMetricsCustomDefaults(t *testing.T) {
 	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 
-	opts := &TopNodeOptions{
+	opts := &NodeOptions{
 		HeapsterOptions: HeapsterTopOptions{
 			Namespace: "custom-namespace",
 			Scheme:    "https",
@@ -463,7 +463,7 @@ func TestTopNodeAllMetricsFromMetricsServer(t *testing.T) {
 
 	// TODO in the long run, we want to test most of our commands like this. Wire the options struct with specific mocks
 	// TODO then check the particular Run functionality and harvest results from fake clients
-	cmdOptions := &TopNodeOptions{
+	cmdOptions := &NodeOptions{
 		IOStreams: streams,
 	}
 	if err := cmdOptions.Complete(tf, cmd, []string{}); err != nil {
@@ -530,7 +530,7 @@ func TestTopNodeWithNameMetricsFromMetricsServer(t *testing.T) {
 
 	// TODO in the long run, we want to test most of our commands like this. Wire the options struct with specific mocks
 	// TODO then check the particular Run functionality and harvest results from fake clients
-	cmdOptions := &TopNodeOptions{
+	cmdOptions := &NodeOptions{
 		IOStreams: streams,
 	}
 	if err := cmdOptions.Complete(tf, cmd, []string{expectedMetrics.Name}); err != nil {
@@ -609,7 +609,7 @@ func TestTopNodeWithLabelSelectorMetricsFromMetricsServer(t *testing.T) {
 
 	// TODO in the long run, we want to test most of our commands like this. Wire the options struct with specific mocks
 	// TODO then check the particular Run functionality and harvest results from fake clients
-	cmdOptions := &TopNodeOptions{
+	cmdOptions := &NodeOptions{
 		IOStreams: streams,
 	}
 	if err := cmdOptions.Complete(tf, cmd, []string{}); err != nil {
@@ -685,7 +685,7 @@ func TestTopNodeWithSortByCpuMetricsFromMetricsServer(t *testing.T) {
 
 	// TODO in the long run, we want to test most of our commands like this. Wire the options struct with specific mocks
 	// TODO then check the particular Run functionality and harvest results from fake clients
-	cmdOptions := &TopNodeOptions{
+	cmdOptions := &NodeOptions{
 		IOStreams: streams,
 		SortBy:    "cpu",
 	}
@@ -771,7 +771,7 @@ func TestTopNodeWithSortByMemoryMetricsFromMetricsServer(t *testing.T) {
 
 	// TODO in the long run, we want to test most of our commands like this. Wire the options struct with specific mocks
 	// TODO then check the particular Run functionality and harvest results from fake clients
-	cmdOptions := &TopNodeOptions{
+	cmdOptions := &NodeOptions{
 		IOStreams: streams,
 		SortBy:    "memory",
 	}

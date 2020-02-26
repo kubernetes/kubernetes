@@ -37,8 +37,8 @@ import (
 	metricsclientset "k8s.io/metrics/pkg/client/clientset/versioned"
 )
 
-// TopNodeOptions contains all the options for running the top-node cli command.
-type TopNodeOptions struct {
+// NodeOptions contains all the options for running the top-node cli command.
+type NodeOptions struct {
 	ResourceName    string
 	Selector        string
 	SortBy          string
@@ -53,6 +53,7 @@ type TopNodeOptions struct {
 	genericclioptions.IOStreams
 }
 
+// HeapsterTopOptions contains the attributes of Heapster.
 type HeapsterTopOptions struct {
 	Namespace string
 	Service   string
@@ -60,6 +61,7 @@ type HeapsterTopOptions struct {
 	Port      string
 }
 
+// Bind reflects HeapsterTopOptions to command flags.
 func (o *HeapsterTopOptions) Bind(flags *pflag.FlagSet) {
 	if len(o.Namespace) == 0 {
 		o.Namespace = metricsutil.DefaultHeapsterNamespace
@@ -94,9 +96,10 @@ var (
 		  kubectl top node NODE_NAME`))
 )
 
-func NewCmdTopNode(f cmdutil.Factory, o *TopNodeOptions, streams genericclioptions.IOStreams) *cobra.Command {
+// NewCmdTopNode returns a command object for getting metrics information for nodes.
+func NewCmdTopNode(f cmdutil.Factory, o *NodeOptions, streams genericclioptions.IOStreams) *cobra.Command {
 	if o == nil {
-		o = &TopNodeOptions{
+		o = &NodeOptions{
 			IOStreams: streams,
 		}
 	}
@@ -122,7 +125,8 @@ func NewCmdTopNode(f cmdutil.Factory, o *TopNodeOptions, streams genericclioptio
 	return cmd
 }
 
-func (o *TopNodeOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+// Complete takes the command arguments and factory and infers any remaining options.
+func (o *NodeOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	if len(args) == 1 {
 		o.ResourceName = args[0]
 	} else if len(args) > 1 {
@@ -152,7 +156,8 @@ func (o *TopNodeOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 	return nil
 }
 
-func (o *TopNodeOptions) Validate() error {
+// Validate checks the set of flags provided by the user.
+func (o *NodeOptions) Validate() error {
 	if len(o.SortBy) > 0 {
 		if o.SortBy != sortByCPU && o.SortBy != sortByMemory {
 			return errors.New("--sort-by accepts only cpu or memory")
@@ -164,7 +169,8 @@ func (o *TopNodeOptions) Validate() error {
 	return nil
 }
 
-func (o TopNodeOptions) RunTopNode() error {
+// RunTopNode performs the collection of node metric.
+func (o NodeOptions) RunTopNode() error {
 	var err error
 	selector := labels.Everything()
 	if len(o.Selector) > 0 {

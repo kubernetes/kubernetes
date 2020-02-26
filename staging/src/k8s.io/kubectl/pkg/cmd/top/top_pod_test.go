@@ -26,9 +26,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/googleapis/gnostic/OpenAPIv2"
+	openapi_v2 "github.com/googleapis/gnostic/OpenAPIv2"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -272,7 +272,7 @@ func TestTopPodWithMetricsServer(t *testing.T) {
 	testCases := []struct {
 		name            string
 		namespace       string
-		options         *TopPodOptions
+		options         *PodOptions
 		args            []string
 		expectedPath    string
 		expectedQuery   string
@@ -283,7 +283,7 @@ func TestTopPodWithMetricsServer(t *testing.T) {
 	}{
 		{
 			name:            "all namespaces",
-			options:         &TopPodOptions{AllNamespaces: true},
+			options:         &PodOptions{AllNamespaces: true},
 			expectedPath:    topMetricsAPIPathPrefix + "/pods",
 			namespaces:      []string{testNS, "secondtestns", "thirdtestns"},
 			listsNamespaces: true,
@@ -301,14 +301,14 @@ func TestTopPodWithMetricsServer(t *testing.T) {
 		},
 		{
 			name:          "pod with label selector",
-			options:       &TopPodOptions{Selector: "key=value"},
+			options:       &PodOptions{Selector: "key=value"},
 			expectedPath:  topMetricsAPIPathPrefix + "/namespaces/" + testNS + "/pods",
 			expectedQuery: "labelSelector=" + url.QueryEscape("key=value"),
 			namespaces:    []string{testNS, testNS},
 		},
 		{
 			name:         "pod with container metrics",
-			options:      &TopPodOptions{PrintContainers: true},
+			options:      &PodOptions{PrintContainers: true},
 			args:         []string{"pod1"},
 			expectedPath: topMetricsAPIPathPrefix + "/namespaces/" + testNS + "/pods/pod1",
 			namespaces:   []string{testNS},
@@ -316,14 +316,14 @@ func TestTopPodWithMetricsServer(t *testing.T) {
 		},
 		{
 			name:         "pod with label sort by cpu",
-			options:      &TopPodOptions{SortBy: "cpu"},
+			options:      &PodOptions{SortBy: "cpu"},
 			expectedPath: topPathPrefix + "/namespaces/" + testNS + "/pods",
 			expectedPods: []string{"pod2", "pod3", "pod1"},
 			namespaces:   []string{testNS, testNS, testNS},
 		},
 		{
 			name:         "pod with label sort by memory",
-			options:      &TopPodOptions{SortBy: "memory"},
+			options:      &PodOptions{SortBy: "memory"},
 			expectedPath: topPathPrefix + "/namespaces/" + testNS + "/pods",
 			expectedPods: []string{"pod2", "pod3", "pod1"},
 			namespaces:   []string{testNS, testNS, testNS},
@@ -389,11 +389,11 @@ func TestTopPodWithMetricsServer(t *testing.T) {
 			streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 
 			cmd := NewCmdTopPod(tf, nil, streams)
-			var cmdOptions *TopPodOptions
+			var cmdOptions *PodOptions
 			if testCase.options != nil {
 				cmdOptions = testCase.options
 			} else {
-				cmdOptions = &TopPodOptions{}
+				cmdOptions = &PodOptions{}
 			}
 			cmdOptions.IOStreams = streams
 
@@ -453,7 +453,7 @@ func TestTopPodNoResourcesFound(t *testing.T) {
 	testNS := "testns"
 	testCases := []struct {
 		name           string
-		options        *TopPodOptions
+		options        *PodOptions
 		namespace      string
 		expectedOutput string
 		expectedErr    string
@@ -461,7 +461,7 @@ func TestTopPodNoResourcesFound(t *testing.T) {
 	}{
 		{
 			name:           "all namespaces",
-			options:        &TopPodOptions{AllNamespaces: true},
+			options:        &PodOptions{AllNamespaces: true},
 			expectedOutput: "",
 			expectedErr:    "No resources found\n",
 			expectedPath:   topMetricsAPIPathPrefix + "/pods",
@@ -522,11 +522,11 @@ func TestTopPodNoResourcesFound(t *testing.T) {
 			streams, _, buf, errbuf := genericclioptions.NewTestIOStreams()
 
 			cmd := NewCmdTopPod(tf, nil, streams)
-			var cmdOptions *TopPodOptions
+			var cmdOptions *PodOptions
 			if testCase.options != nil {
 				cmdOptions = testCase.options
 			} else {
-				cmdOptions = &TopPodOptions{}
+				cmdOptions = &PodOptions{}
 			}
 			cmdOptions.IOStreams = streams
 
@@ -728,7 +728,7 @@ func TestTopPodCustomDefaults(t *testing.T) {
 			tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 			streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 
-			opts := &TopPodOptions{
+			opts := &PodOptions{
 				HeapsterOptions: HeapsterTopOptions{
 					Namespace: "custom-namespace",
 					Scheme:    "https",

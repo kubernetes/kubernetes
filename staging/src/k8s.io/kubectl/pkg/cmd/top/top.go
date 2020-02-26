@@ -61,7 +61,7 @@ func NewCmdTop(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Co
 	return cmd
 }
 
-//SupportedMetricsAPIVersionAvailable checks if there exists available Metrics APIVersion
+// SupportedMetricsAPIVersionAvailable checks if there exists available Metrics APIVersion
 func SupportedMetricsAPIVersionAvailable(discoveredAPIGroups *metav1.APIGroupList) bool {
 	for _, discoveredAPIGroup := range discoveredAPIGroups.Groups {
 		if discoveredAPIGroup.Name != metricsapi.GroupName {
