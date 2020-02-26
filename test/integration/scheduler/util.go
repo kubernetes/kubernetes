@@ -242,8 +242,8 @@ func initDisruptionController(t *testing.T, testCtx *testContext) *disruption.Di
 
 // initTest initializes a test environment and creates master and scheduler with default
 // configuration.
-func initTest(t *testing.T, nsPrefix string) *testContext {
-	return initTestScheduler(t, initTestMaster(t, nsPrefix, nil), true, nil)
+func initTest(t *testing.T, nsPrefix string, opts ...scheduler.Option) *testContext {
+	return initTestSchedulerWithOptions(t, initTestMaster(t, nsPrefix, nil), true, nil, time.Second, opts...)
 }
 
 // initTestDisablePreemption initializes a test environment and creates master and scheduler with default
