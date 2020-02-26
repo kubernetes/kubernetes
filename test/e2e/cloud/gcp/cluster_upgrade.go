@@ -65,6 +65,9 @@ var upgradeTests = []upgrades.Test{
 	&apps.DaemonSetUpgradeTest{},
 	&upgrades.AppArmorUpgradeTest{},
 	&storage.VolumeModeDowngradeTest{},
+}
+
+var topologyManagerUpgradeTests = []upgrades.Test{
 	&upgrades.TopologyManagerUpgradeTest{},
 }
 
@@ -278,6 +281,72 @@ var _ = SIGDescribe("gpu Upgrade [Feature:GPUUpgrade]", func() {
 			runUpgradeSuite(f, gpuUpgradeTests, testFrameworks, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
 		})
 	})
+})
+
+var _ = SIGDescribe("TopologyManager Upgrade [Feature:TopologyManagerUpgrade]", func() {
+	f := framework.NewDefaultFramework("topology-manager-upgrade")
+
+	// Create the frameworks here because we can only create them
+	// in a "Describe".
+	testFrameworks := createUpgradeFrameworks(topologyManagerUpgradeTests)
+	ginkgo.Describe("master upgrade", func() {
+		ginkgo.It("should maintain a functioning topology manager [Feature:TopologyManagerMasterUpgrade]", func() {
+			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), *upgradeTarget)
+			framework.ExpectNoError(err)
+
+			testSuite := &junit.TestSuite{Name: "Topology Manager master upgrade"}
+			topologyManagerUpgradeTest := &junit.TestCase{Name: "[sig-node] topology-manager-master-upgrade", Classname: "upgrade_tests"}
+			testSuite.TestCases = append(testSuite.TestCases, topologyManagerUpgradeTest)
+			upgradeFunc := func() {
+				start := time.Now()
+				defer finalizeUpgradeTest(start, topologyManagerUpgradeTest)
+				target := upgCtx.Versions[1].Version.String()
+				framework.ExpectNoError(framework.MasterUpgrade(f, target))
+				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
+			}
+			runUpgradeSuite(f, topologyManagerUpgradeTests, testFrameworks, testSuite, upgrades.MasterUpgrade, upgradeFunc)
+		})
+	})
+
+	ginkgo.Describe("cluster upgrade", func() {
+		ginkgo.It("should maintain a functioning topology manager [Feature:TopologyManagerClusterUpgrade]", func() {
+			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), *upgradeTarget)
+			framework.ExpectNoError(err)
+
+			testSuite := &junit.TestSuite{Name: "Topology Manager cluster upgrade"}
+			topologyManagerUpgradeTest := &junit.TestCase{Name: "[sig-node] topology-manager-cluster-upgrade", Classname: "upgrade_tests"}
+			testSuite.TestCases = append(testSuite.TestCases, topologyManagerUpgradeTest)
+			upgradeFunc := func() {
+				start := time.Now()
+				defer finalizeUpgradeTest(start, topologyManagerUpgradeTest)
+				target := upgCtx.Versions[1].Version.String()
+				framework.ExpectNoError(framework.MasterUpgrade(f, target))
+				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
+				framework.ExpectNoError(framework.NodeUpgrade(f, target, *upgradeImage))
+				framework.ExpectNoError(checkNodesVersions(f.ClientSet, target))
+			}
+			runUpgradeSuite(f, topologyManagerUpgradeTests, testFrameworks, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
+		})
+	})
+
+	ginkgo.Describe("node upgrade", func() {
+		ginkgo.It("should maintain a functioning topology manager [Feature:TopologyManagerNodeUpgrade]", func() {
+			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), *upgradeTarget)
+			framework.ExpectNoError(err)
+
+			testSuite := &junit.TestSuite{Name: "Topology Manager node upgrade"}
+			topologyManagerUpgradeTest := &junit.TestCase{Name: "[sig-node] topology-manager-node-upgrade", Classname: "upgrade_tests"}
+			upgradeFunc := func() {
+				start := time.Now()
+				defer finalizeUpgradeTest(start, topologyManagerUpgradeTest)
+				target := upgCtx.Versions[1].Version.String()
+				framework.ExpectNoError(framework.NodeUpgrade(f, target, *upgradeImage))
+				framework.ExpectNoError(checkNodesVersions(f.ClientSet, target))
+			}
+			runUpgradeSuite(f, topologyManagerUpgradeTests, testFrameworks, testSuite, upgrades.NodeUpgrade, upgradeFunc)
+		})
+	})
+
 })
 
 var _ = ginkgo.Describe("[sig-apps] stateful Upgrade [Feature:StatefulUpgrade]", func() {

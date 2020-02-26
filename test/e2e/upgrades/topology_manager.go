@@ -25,7 +25,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os/exec"
-	"reflect"
 	"regexp"
 	"strconv"
 	"time"
@@ -38,11 +37,9 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
-	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
@@ -82,6 +79,7 @@ func (t *TopologyManagerUpgradeTest) Setup(f *framework.Framework) {
 // a pod requesting aligned resources after the upgrade
 func (t *TopologyManagerUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upgrade UpgradeType) {
 	<-done
+
 	if !isRelevantUpgrade(upgrade) {
 		framework.Logf("upgrade %v not relevant for topology manager", upgrade)
 		return
@@ -114,64 +112,10 @@ func runTopologyManagerTest(f *framework.Framework, podName, stage string) {
 
 func runAndValidate(f *framework.Framework, name string, node *v1.Node, policy string) error {
 	pod := makePod(node.ObjectMeta.Name, f.Namespace.Name, name, testCmd)
+	framework.Logf("running pod %s/%s on %s", pod.Namespace, pod.Name, pod.Spec.NodeName)
 	pod = f.PodClient().CreateSync(pod)
-
-	output, err := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, pod.Spec.Containers[0].Name)
-	framework.ExpectNoError(err, fmt.Sprintf("Failed to get pod %q output", name))
-
-	// this is the only policy that can guarantee reliable rejects
-	if policy == topologymanager.PolicySingleNumaNode {
-		return validatePodOutput(output)
-	}
-	// else it is enough the pod created succesfully. We cannot really test much more.
-	return nil
-}
-
-func validatePodOutput(output string) error {
-	cpuMap := make(map[string][]int)
-	re := regexp.MustCompile(`(\w*)=(\w*)`)
-	for _, match := range re.FindAllStringSubmatch(output, -1) {
-		if len(match) != 3 {
-			framework.Logf("unexpected match %v", match)
-			continue
-		}
-
-		cset, err := cpuset.Parse(match[2])
-		framework.ExpectNoError(err, "parsing %v", match)
-		// ToSlice() returns a sorted slice
-		cpuMap[match[1]] = cset.ToSlice()
-	}
-
-	allowed, ok := cpuMap["ALLOWED"]
-	if !ok {
-		return fmt.Errorf("no allowed CPUs found in output")
-	}
-
-	if len(allowed) < 2 {
-		return fmt.Errorf("the test requires at least two CPUs requested for the pod")
-	}
-
-	for i := 1; i < len(allowed); i++ {
-		cpuNumPrev := allowed[i-1]
-		siblingsPrev, ok := cpuMap[fmt.Sprintf("SIBLING%d", cpuNumPrev)]
-		if !ok {
-			return fmt.Errorf("Unknown siblings for cpu %d", cpuNumPrev)
-		}
-
-		cpuNum := allowed[i]
-		siblings, ok := cpuMap[fmt.Sprintf("SIBLING%d", cpuNum)]
-		if !ok {
-			return fmt.Errorf("Unknown siblings for cpu %d", cpuNum)
-		}
-
-		// per https://www.kernel.org/doc/Documentation/cputopology.txt , cpu_siblings_list is
-		// "(the) human-readable list of cpuX's hardware threads within the same physical_package_id."
-		// hence, if two entries have the same ordered list of siblings, they are on the same
-		// physical package, thus in the same NUMA node.
-		if !reflect.DeepEqual(siblingsPrev, siblings) {
-			return fmt.Errorf("disaligned cpus %d and %d (%v and %v)", cpuNumPrev, cpuNum, siblingsPrev, siblings)
-		}
-	}
+	defer f.PodClient().DeleteSync(pod.Name, &metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
+	// else it is enough the pod created successfully. We cannot really test much more.
 	return nil
 }
 
@@ -187,8 +131,11 @@ func nodeSeemsMaster(node *v1.Node) bool {
 func getTopologyManagerEnabledNode(f *framework.Framework) (*v1.Node, string) {
 	// start local proxy, so we can send graceful deletion over query string, rather than body parameter
 	ginkgo.By("Opening proxy to cluster")
+
 	cp := setupClusterProxy(f.Namespace.Name)
 	defer cp.teardown()
+
+	ginkgo.By(fmt.Sprintf("Proxy to the cluster ready on %v", cp.getURLForAPI()))
 
 	selector := labels.Set{"node-role.kubernetes.io/worker=": ""}.AsSelector()
 	nodeList, err := f.ClientSet.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{
@@ -196,7 +143,7 @@ func getTopologyManagerEnabledNode(f *framework.Framework) (*v1.Node, string) {
 	})
 	framework.ExpectNoError(err)
 
-	ginkgo.By("Finding a worker node with Topology Manager configured")
+	ginkgo.By(fmt.Sprintf("Finding a worker node with Topology Manager configured from %d nodes", len(nodeList.Items)))
 
 	for _, node := range nodeList.Items {
 		if node.Spec.Unschedulable || nodeSeemsMaster(&node) {
@@ -229,12 +176,17 @@ func makePod(nodeName, namespace, podName, cmd string) *v1.Pod {
 					Name:  podName,
 					Image: imageutils.GetE2EImage(imageutils.BusyBox),
 					Resources: v1.ResourceRequirements{
+						// one exclusive core is really not enough to actually test the topology manager
+						// but the upgrade tests can run in severely resource-constrained environments,
+						// like GCP, and worker nodes can have as low as 2 full cores.
+						// Hence, we just require the real minimum for the topology manager to trigger,
+						// demanding to other test to verify the behaviour.
 						Requests: v1.ResourceList{
-							v1.ResourceName(v1.ResourceCPU):    resource.MustParse("2000m"),
+							v1.ResourceName(v1.ResourceCPU):    resource.MustParse("1000m"),
 							v1.ResourceName(v1.ResourceMemory): resource.MustParse("100Mi"),
 						},
 						Limits: v1.ResourceList{
-							v1.ResourceName(v1.ResourceCPU):    resource.MustParse("2000m"),
+							v1.ResourceName(v1.ResourceCPU):    resource.MustParse("1000m"),
 							v1.ResourceName(v1.ResourceMemory): resource.MustParse("100Mi"),
 						},
 					},
@@ -299,8 +251,9 @@ func getCurrentKubeletConfig(cp *clusterProxy, nodeName string) (*kubeletconfig.
 
 // Causes the test to fail, or returns a status 200 response from the /configz endpoint
 func pollConfigz(cp *clusterProxy, timeout time.Duration, pollInterval time.Duration, nodeName string) *http.Response {
-	ginkgo.By("http requesting node kubelet /configz")
 	endpoint := fmt.Sprintf("%s/nodes/%s/proxy/configz", cp.getURLForAPI(), nodeName)
+	ginkgo.By(fmt.Sprintf("http requesting node kubelet /configz %s", endpoint))
+
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
@@ -322,7 +275,7 @@ func pollConfigz(cp *clusterProxy, timeout time.Duration, pollInterval time.Dura
 		}
 
 		return true
-	}, timeout, pollInterval).Should(gomega.Equal(true))
+	}, timeout, pollInterval).Should(gomega.Equal(true), "Failed to get /configz from %s", endpoint)
 	return resp
 }
 

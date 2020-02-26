@@ -25,7 +25,6 @@ go_library(
     importpath = "k8s.io/kubernetes/test/e2e/upgrades",
     deps = [
         "//pkg/kubelet/apis/config:go_default_library",
-        "//pkg/kubelet/cm/cpuset:go_default_library",
         "//pkg/kubelet/cm/topologymanager:go_default_library",
         "//pkg/kubelet/sysctl:go_default_library",
         "//staging/src/k8s.io/api/apps/v1:go_default_library",
@@ -46,7 +45,6 @@ go_library(
         "//test/e2e/framework/job:go_default_library",
         "//test/e2e/framework/kubectl:go_default_library",
         "//test/e2e/framework/node:go_default_library",
-        "//test/e2e/framework/pod:go_default_library",
         "//test/e2e/framework/security:go_default_library",
         "//test/e2e/framework/service:go_default_library",
         "//test/e2e/framework/skipper:go_default_library",
