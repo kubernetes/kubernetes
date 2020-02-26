@@ -17,6 +17,7 @@ limitations under the License.
 package apps
 
 import (
+	"encoding/json"
 	"context"
 	"fmt"
 	"time"
@@ -34,12 +35,24 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	autoscalingv1 "k8s.io/api/autoscaling/v1"
+	"k8s.io/client-go/dynamic"
 
 	"github.com/onsi/ginkgo"
 )
 
 var _ = SIGDescribe("ReplicationController", func() {
 	f := framework.NewDefaultFramework("replication-controller")
+
+	var ns string
+	var dc dynamic.Interface
+
+	ginkgo.BeforeEach(func() {
+		ns = f.Namespace.Name
+		dc = f.DynamicClient
+	})
 
 	/*
 		Release : v1.9
@@ -83,6 +96,163 @@ var _ = SIGDescribe("ReplicationController", func() {
 	*/
 	framework.ConformanceIt("should release no longer matching pods", func() {
 		testRCReleaseControlledNotMatching(f)
+	})
+
+	ginkgo.It("should test the lifecycle of a ReplicationController", func() {
+		testRcName := "rc-test"
+		testRcNamespace := ns
+		testRcInitialReplicaCount := int32(1)
+		testRcMaxReplicaCount := int32(2)
+		rcResource := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "replicationcontrollers"}
+
+		rcTest := v1.ReplicationController{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: testRcName,
+				Labels: map[string]string{"test-rc-static": "true"},
+			},
+			Spec: v1.ReplicationControllerSpec{
+				Replicas: &testRcInitialReplicaCount,
+				Selector: map[string]string{"test-rc-static": "true"},
+				Template: &v1.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: testRcName,
+						Labels: map[string]string{"test-rc-static": "true"},
+					},
+					Spec: v1.PodSpec{
+						Containers: []v1.Container{{
+							Name: testRcName,
+							Image: "nginx",
+						}},
+					},
+				},
+			},
+		}
+
+		// Create a ReplicationController
+		_, err := f.ClientSet.CoreV1().ReplicationControllers(testRcNamespace).Create(context.TODO(), &rcTest, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "Failed to create ReplicationController")
+
+		// setup a watch for the RC
+		rcWatch, err := f.ClientSet.CoreV1().ReplicationControllers(testRcNamespace).Watch(context.TODO(), metav1.ListOptions{LabelSelector: "test-rc-static=true"})
+		framework.ExpectNoError(err, "Failed to setup watch on newly created ReplicationController")
+
+		rcWatchChan := rcWatch.ResultChan()
+
+		for event := range rcWatchChan {
+			rc, ok := event.Object.(*v1.ReplicationController)
+			framework.ExpectEqual(ok, true, "Unable to convert type of ReplicationController watch event")
+			if rc.Status.Replicas == testRcInitialReplicaCount && rc.Status.ReadyReplicas == testRcInitialReplicaCount {
+				break
+			}
+		}
+
+		rcLabelPatchPayload, err := json.Marshal(v1.ReplicationController{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{"test-rc": "patched"},
+			},
+		})
+		framework.ExpectNoError(err, "failed to marshal json of replicationcontroller label patch")
+		// Patch the ReplicationController
+		_, err = f.ClientSet.CoreV1().ReplicationControllers(testRcNamespace).Patch(context.TODO(), testRcName, types.StrategicMergePatchType, []byte(rcLabelPatchPayload), metav1.PatchOptions{})
+		framework.ExpectNoError(err, "Failed to patch ReplicationController")
+
+		rcStatusPatchPayload, err := json.Marshal(map[string]interface{}{
+			"status": map[string]interface{}{
+				"readyReplicas": 0,
+				"availableReplicas": 0,
+			},
+		})
+		framework.ExpectNoError(err, "Failed to marshal JSON of ReplicationController label patch")
+
+		// Patch the ReplicationController's status
+		rcStatus, err := f.ClientSet.CoreV1().ReplicationControllers(testRcNamespace).Patch(context.TODO(), testRcName, types.StrategicMergePatchType, []byte(rcStatusPatchPayload), metav1.PatchOptions{}, "status")
+		framework.ExpectNoError(err, "Failed to patch ReplicationControllerStatus")
+		framework.ExpectEqual(rcStatus.Status.ReadyReplicas, int32(0), "ReplicationControllerStatus's readyReplicas does not equal 0")
+
+		rcStatusUnstructured, err := dc.Resource(rcResource).Namespace(testRcNamespace).Get(testRcName, metav1.GetOptions{}, "status")
+		framework.ExpectNoError(err, "Failed to fetch ReplicationControllerStatus")
+
+		rcStatusUjson, err := json.Marshal(rcStatusUnstructured)
+		framework.ExpectNoError(err, "Failed to marshal json of replicationcontroller label patch")
+		json.Unmarshal(rcStatusUjson, &rcStatus)
+		framework.ExpectEqual(rcStatus.Status.Replicas, testRcInitialReplicaCount, "ReplicationController ReplicaSet cound does not match initial Replica count")
+
+		rcScalePatchPayload, err := json.Marshal(autoscalingv1.Scale{
+			Spec: autoscalingv1.ScaleSpec{
+				Replicas: 2,
+			},
+		})
+		framework.ExpectNoError(err, "Failed to marshal json of replicationcontroller label patch")
+
+		// Patch the ReplicationController's scale
+		rcScale, err := f.ClientSet.CoreV1().ReplicationControllers(testRcNamespace).Patch(context.TODO(), testRcName, types.StrategicMergePatchType, []byte(rcScalePatchPayload), metav1.PatchOptions{}, "scale")
+		framework.ExpectNoError(err, "Failed to patch ReplicationControllerScale")
+
+		for event := range rcWatchChan {
+			rc, ok := event.Object.(*v1.ReplicationController)
+			framework.ExpectEqual(ok, true, "Unable to convert type of ReplicationController watch event")
+			if rc.Status.Replicas == testRcMaxReplicaCount && rc.Status.ReadyReplicas == testRcMaxReplicaCount {
+				rcScale = rc
+				break
+			}
+		}
+		framework.ExpectEqual(rcScale.Status.Replicas, testRcMaxReplicaCount, "ReplicationController ReplicasSet Scale does not match the expected scale")
+
+		// Get the ReplicationController
+		rc, err := f.ClientSet.CoreV1().ReplicationControllers(testRcNamespace).Get(context.TODO(), testRcName, metav1.GetOptions{})
+		framework.ExpectNoError(err, "Failed to fetch ReplicationController")
+		framework.ExpectEqual(rc.ObjectMeta.Labels["test-rc"], "patched", "ReplicationController is missing a label from earlier patch")
+
+		rcStatusUpdatePayload := rc
+		rcStatusUpdatePayload.Status.AvailableReplicas = 1
+		rcStatusUpdatePayload.Status.ReadyReplicas = 1
+
+		// Replace the ReplicationController's status
+		rcStatus, err = f.ClientSet.CoreV1().ReplicationControllers(testRcNamespace).UpdateStatus(context.TODO(), rcStatusUpdatePayload, metav1.UpdateOptions{})
+		framework.ExpectNoError(err, "Failed to update ReplicationControllerStatus")
+		framework.ExpectEqual(rcStatus.Status.ReadyReplicas, int32(1), "ReplicationControllerStatus readyReplicas does not equal 1")
+
+		for event := range rcWatchChan {
+			rc, ok := event.Object.(*v1.ReplicationController)
+			framework.ExpectEqual(ok, true, "Unable to convert type of ReplicationController watch event")
+			if rc.Status.Replicas == testRcMaxReplicaCount && rc.Status.ReadyReplicas == testRcMaxReplicaCount {
+				break
+			}
+		}
+
+		rcs, err := f.ClientSet.CoreV1().ReplicationControllers("").List(context.TODO(), metav1.ListOptions{LabelSelector: "test-rc-static=true"})
+		framework.ExpectNoError(err, "Failed to list ReplicationController")
+		framework.ExpectEqual(len(rcs.Items) > 0, true)
+
+		foundRc := false
+		for _, rcItem := range rcs.Items {
+			if rcItem.ObjectMeta.Name == testRcName &&
+				rcItem.ObjectMeta.Namespace == testRcNamespace &&
+				rcItem.ObjectMeta.Labels["test-rc-static"] == "true" &&
+				rcItem.ObjectMeta.Labels["test-rc"] == "patched" &&
+				rcItem.Status.Replicas == testRcMaxReplicaCount &&
+				rcItem.Status.ReadyReplicas == testRcMaxReplicaCount {
+				foundRc = true
+			}
+		}
+		framework.ExpectEqual(foundRc, true)
+
+		// Delete ReplicationController
+		err = f.ClientSet.CoreV1().ReplicationControllers(testRcNamespace).DeleteCollection(context.TODO(), &metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: "test-rc-static=true"})
+		framework.ExpectNoError(err, "Failed to delete ReplicationControllers")
+
+		for event := range rcWatchChan {
+			rc, ok := event.Object.(*v1.ReplicationController)
+			framework.ExpectEqual(ok, true, "Unable to convert type of ReplicationController watch event")
+			if rc.ObjectMeta.DeletionTimestamp != nil {
+				break
+			}
+		}
+		time.Sleep(1 * time.Second)
+
+		// Get the ReplicationController to check that it's deleted
+		_, err = f.ClientSet.CoreV1().ReplicationControllers(testRcNamespace).Get(context.TODO(), testRcName, metav1.GetOptions{})
+		framework.ExpectError(err, "Failed to delete ReplicationController")
 	})
 })
 
