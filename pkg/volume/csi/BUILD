@@ -17,6 +17,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/features:go_default_library",
+        "//pkg/util/mount:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/csi/csiv0:go_default_library",
         "//pkg/volume/csi/nodeinfomanager:go_default_library",
@@ -81,6 +82,7 @@ go_test(
         "//staging/src/k8s.io/client-go/util/testing:go_default_library",
         "//staging/src/k8s.io/component-base/featuregate/testing:go_default_library",
         "//vendor/github.com/container-storage-interface/spec/lib/go/csi:go_default_library",
+        "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ],
 )
