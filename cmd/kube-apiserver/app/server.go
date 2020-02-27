@@ -383,8 +383,13 @@ func CreateKubeAPIServerConfig(
 	// Use the config.GenericConfig.EgressSelector lookup to find the dialer to connect to the kubelet
 	config.ExtraConfig.KubeletClientConfig.EgressSelector = config.GenericConfig.EgressSelector
 
-	// Use the config.GenericConfig.EgressSelector lookup as the transport used by the "proxy" subresources.
-	config.ExtraConfig.ProxyTransport.DialContext = config.GenericConfig.EgressSelector.GenerateDialer(config.ExtraConfig.ProxyTransport.DialContext, egressselector.Cluster.AsNetworkContext())
+	if config.GenericConfig.EgressSelector != nil {
+		newProxyTransport := proxyTransport.Clone()
+		// Use the config.GenericConfig.EgressSelector lookup as the transport used by the "proxy" subresources.
+		newProxyTransport.DialContext = config.GenericConfig.EgressSelector.GenerateDialer(newProxyTransport.DialContext, egressselector.Cluster.AsNetworkContext())
+		config.ExtraConfig.ProxyTransport = newProxyTransport
+
+	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountIssuerDiscovery) {
 		// Load the public keys.

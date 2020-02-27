@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/cache"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/server/egressselector"
 	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -261,7 +262,9 @@ func NewImagePolicyWebhook(configFile io.Reader) (*Plugin, error) {
 		return nil, err
 	}
 
-	gw, err := webhook.NewGenericWebhook(legacyscheme.Scheme, legacyscheme.Codecs, whConfig.KubeConfigFile, groupVersions, whConfig.RetryBackoff, nil)
+	egressInfo := egressselector.EgressInfo{egressselector.CreateEmptyEgressSelector(), egressselector.Master.AsNetworkContext()}
+
+	gw, err := webhook.NewGenericWebhook(legacyscheme.Scheme, legacyscheme.Codecs, whConfig.KubeConfigFile, groupVersions, whConfig.RetryBackoff, egressInfo)
 	if err != nil {
 		return nil, err
 	}

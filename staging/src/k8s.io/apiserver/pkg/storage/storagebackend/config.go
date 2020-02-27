@@ -40,7 +40,7 @@ type TransportConfig struct {
 	CertFile      string
 	TrustedCAFile string
 	// function to determine the egress dialer. (i.e. konnectivity server dialer)
-	EgressSelector egressselector.EgressSelector
+	EgressSelector *egressselector.EgressSelector
 }
 
 // Config is configuration for creating a storage backend.

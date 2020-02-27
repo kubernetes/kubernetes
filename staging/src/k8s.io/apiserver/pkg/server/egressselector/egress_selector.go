@@ -80,6 +80,7 @@ func (s EgressType) String() string {
 	}
 }
 
+// EgressInfo is a struct passed around to functions when the dialer needs to be replaced
 type EgressInfo struct {
 	// EgressSelector is the egress selector
 	EgressSelector *EgressSelector
@@ -276,6 +277,7 @@ func (cs *EgressSelector) Lookup(networkContext NetworkContext) (utilnet.DialFun
 	return cs.egressToDialer[networkContext.EgressSelectionName], nil
 }
 
+// CreateEmptyEgressSelector creates an empty egress selector config when egress selector is disabled
 func CreateEmptyEgressSelector() *EgressSelector {
 	return &EgressSelector{
 		egressToDialer: make(map[EgressType]utilnet.DialFunc),
@@ -283,17 +285,16 @@ func CreateEmptyEgressSelector() *EgressSelector {
 	}
 }
 
-// kenerateDialer generates the Dialer based on the network context
+// GenerateDialer generates the Dialer based on the network context
 // If EgressSelector is turned off, this function is a no op that just returns the passed in Dialer
 func (cs *EgressSelector) GenerateDialer(existingDialer utilnet.DialFunc, networkContext NetworkContext) utilnet.DialFunc {
 	if !cs.enabled {
 		return existingDialer
-	} else {
-		dialer, err := cs.Lookup(networkContext)
-		if err != nil {
-			// Print Error Message
-			return existingDialer
-		}
-		return dialer
 	}
+	dialer, err := cs.Lookup(networkContext)
+	if err != nil {
+		klog.Errorf("Unable to lookup egress selector: %v", err)
+		return existingDialer
+	}
+	return dialer
 }

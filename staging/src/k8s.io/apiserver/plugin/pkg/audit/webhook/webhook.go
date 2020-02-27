@@ -22,11 +22,11 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	utilnet "k8s.io/apimachinery/pkg/util/net"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/apis/audit/install"
 	"k8s.io/apiserver/pkg/audit"
+	"k8s.io/apiserver/pkg/server/egressselector"
 	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/rest"
 	utiltrace "k8s.io/utils/trace"
@@ -61,9 +61,9 @@ func retryOnError(err error) bool {
 	return false
 }
 
-func loadWebhook(configFile string, groupVersion schema.GroupVersion, initialBackoff time.Duration, customDial utilnet.DialFunc) (*webhook.GenericWebhook, error) {
+func loadWebhook(configFile string, groupVersion schema.GroupVersion, initialBackoff time.Duration, egressInfo egressselector.EgressInfo) (*webhook.GenericWebhook, error) {
 	w, err := webhook.NewGenericWebhook(audit.Scheme, audit.Codecs, configFile,
-		[]schema.GroupVersion{groupVersion}, initialBackoff, customDial)
+		[]schema.GroupVersion{groupVersion}, initialBackoff, egressInfo)
 	w.ShouldRetry = retryOnError
 	return w, err
 }
@@ -87,8 +87,8 @@ func NewDynamicBackend(rc *rest.RESTClient, initialBackoff time.Duration) audit.
 }
 
 // NewBackend returns an audit backend that sends events over HTTP to an external service.
-func NewBackend(kubeConfigFile string, groupVersion schema.GroupVersion, initialBackoff time.Duration, customDial utilnet.DialFunc) (audit.Backend, error) {
-	w, err := loadWebhook(kubeConfigFile, groupVersion, initialBackoff, customDial)
+func NewBackend(kubeConfigFile string, groupVersion schema.GroupVersion, initialBackoff time.Duration, egressInfo egressselector.EgressInfo) (audit.Backend, error) {
+	w, err := loadWebhook(kubeConfigFile, groupVersion, initialBackoff, egressInfo)
 	if err != nil {
 		return nil, err
 	}

@@ -18,7 +18,6 @@ package client
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -60,7 +59,7 @@ type KubeletClientConfig struct {
 	Dial utilnet.DialFunc
 
 	// EgressSelector provides a function to look up a generated dialer if it is configured for it
-	EgressSelector egressselector.EgressSelector
+	EgressSelector *egressselector.EgressSelector
 }
 
 // ConnectionInfo provides the information needed to connect to a kubelet
