@@ -1715,7 +1715,7 @@
     restricted by given CPU limits MUST launch. Priority 1 - 3 Pods MUST spawn first
     followed by Priority 4 Pod. The ReplicaSets with Replicas MUST contain the expected
     number of Replicas.
-  release: v1.17
+  release: v1.18
   file: test/e2e/scheduling/preemption.go
 - testname: Scheduler, resource limits
   codename: '[sig-scheduling] SchedulerPredicates [Serial] validates resource limits
