@@ -990,7 +990,7 @@ func Test_RemoveVolumeFromReportAsAttached_Positive_UnsetWithInitialSetVolumeMou
 
 // Populates data struct with one volume/node entry.
 // Calls RemoveVolumeFromReportAsAttached
-// Verifyies there is no valume as reported as attached
+// Verifies there is no volume as reported as attached
 func Test_RemoveVolumeFromReportAsAttached(t *testing.T) {
 	// Arrange
 	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
@@ -1023,7 +1023,7 @@ func Test_RemoveVolumeFromReportAsAttached(t *testing.T) {
 // Populates data struct with one volume/node entry.
 // Calls RemoveVolumeFromReportAsAttached
 // Calls AddVolumeToReportAsAttached to add volume back as attached
-// Verifyies there is one volume as reported as attached
+// Verifies there is one volume as reported as attached
 func Test_RemoveVolumeFromReportAsAttached_AddVolumeToReportAsAttached_Positive(t *testing.T) {
 	// Arrange
 	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
@@ -1066,7 +1066,7 @@ func Test_RemoveVolumeFromReportAsAttached_AddVolumeToReportAsAttached_Positive(
 // Calls RemoveVolumeFromReportAsAttached
 // Calls DeleteVolumeNode
 // Calls AddVolumeNode
-// Verifyies there is no volume as reported as attached
+// Verifies there is no volume as reported as attached
 func Test_RemoveVolumeFromReportAsAttached_Delete_AddVolumeNode(t *testing.T) {
 	// Arrange
 	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)

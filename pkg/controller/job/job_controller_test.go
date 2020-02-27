@@ -1147,7 +1147,7 @@ func TestSyncJobExpectations(t *testing.T) {
 
 	manager.expectations = FakeJobExpectations{
 		controller.NewControllerExpectations(), true, func() {
-			// If we check active pods before checking expectataions, the job
+			// If we check active pods before checking expectations, the job
 			// will create a new replica because it doesn't see this pod, but
 			// has fulfilled its expectations.
 			podIndexer.Add(&pods[1])

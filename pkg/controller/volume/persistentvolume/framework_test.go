@@ -769,7 +769,7 @@ func runMultisyncTests(t *testing.T, tests []controllerTest, storageClasses []*s
 				if err != nil {
 					if err == pvtesting.ErrVersionConflict {
 						// Ignore version errors
-						klog.V(4).Infof("test intentionaly ignores version error.")
+						klog.V(4).Infof("test intentionally ignores version error.")
 					} else {
 						t.Errorf("Error calling syncClaim: %v", err)
 						// Finish the loop on the first error
@@ -786,7 +786,7 @@ func runMultisyncTests(t *testing.T, tests []controllerTest, storageClasses []*s
 				if err != nil {
 					if err == pvtesting.ErrVersionConflict {
 						// Ignore version errors
-						klog.V(4).Infof("test intentionaly ignores version error.")
+						klog.V(4).Infof("test intentionally ignores version error.")
 					} else {
 						t.Errorf("Error calling syncVolume: %v", err)
 						// Finish the loop on the first error
