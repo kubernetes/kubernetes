@@ -272,10 +272,10 @@ func TestPartialPermanentFailure(t *testing.T) {
 		err: nil,
 	}
 	fake.lock.Unlock()
-	// We don't retry permanent errors, so it should fail.
+	// We do retry permanent errors, so it should succeed.
 	_, err = c.ServerResourcesForGroupVersion("astronomy/v8beta1")
-	if err == nil {
-		t.Errorf("Expected error, got nil")
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
 	}
 	c.Invalidate()
 

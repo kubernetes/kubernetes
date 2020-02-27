@@ -26,18 +26,12 @@ import (
 
 	openapi_v2 "github.com/googleapis/gnostic/openapiv2"
 
-	errorsutil "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/client-go/discovery"
 	restclient "k8s.io/client-go/rest"
 )
-
-type cacheEntry struct {
-	resourceList *metav1.APIResourceList
-	err          error
-}
 
 // memCacheClient can Invalidate() to stay up-to-date with discovery
 // information.
@@ -48,7 +42,7 @@ type memCacheClient struct {
 	delegate discovery.DiscoveryInterface
 
 	lock                   sync.RWMutex
-	groupToServerResources map[string]*cacheEntry
+	groupToServerResources map[string]*metav1.APIResourceList
 	groupList              *metav1.APIGroupList
 	cacheValid             bool
 }
@@ -79,18 +73,6 @@ func isTransientConnectionError(err error) bool {
 	return errno == syscall.ECONNREFUSED || errno == syscall.ECONNRESET
 }
 
-func isTransientError(err error) bool {
-	if isTransientConnectionError(err) {
-		return true
-	}
-
-	if t, ok := err.(errorsutil.APIStatus); ok && t.Status().Code >= 500 {
-		return true
-	}
-
-	return errorsutil.IsTooManyRequests(err)
-}
-
 // ServerResourcesForGroupVersion returns the supported resources for a group and version.
 func (d *memCacheClient) ServerResourcesForGroupVersion(groupVersion string) (*metav1.APIResourceList, error) {
 	d.lock.Lock()
@@ -100,21 +82,19 @@ func (d *memCacheClient) ServerResourcesForGroupVersion(groupVersion string) (*m
 			return nil, err
 		}
 	}
-	cachedVal, ok := d.groupToServerResources[groupVersion]
-	if !ok {
-		return nil, ErrCacheNotFound
+
+	if cachedVal, ok := d.groupToServerResources[groupVersion]; ok {
+		return cachedVal, nil
 	}
 
-	if cachedVal.err != nil && isTransientError(cachedVal.err) {
-		r, err := d.serverResourcesForGroupVersion(groupVersion)
-		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("couldn't get resource list for %v: %v", groupVersion, err))
-		}
-		cachedVal = &cacheEntry{r, err}
-		d.groupToServerResources[groupVersion] = cachedVal
+	r, err := d.serverResourcesForGroupVersion(groupVersion)
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("couldn't get resource list for %v: %v", groupVersion, err))
+		return nil, err
 	}
 
-	return cachedVal.resourceList, cachedVal.err
+	d.groupToServerResources[groupVersion] = r
+	return r, nil
 }
 
 // ServerResources returns the supported resources for all groups and versions.
@@ -192,7 +172,7 @@ func (d *memCacheClient) refreshLocked() error {
 
 	wg := &sync.WaitGroup{}
 	resultLock := &sync.Mutex{}
-	rl := map[string]*cacheEntry{}
+	rl := map[string]*metav1.APIResourceList{}
 	for _, g := range gl.Groups {
 		for _, v := range g.Versions {
 			gv := v.GroupVersion
@@ -204,11 +184,12 @@ func (d *memCacheClient) refreshLocked() error {
 				r, err := d.serverResourcesForGroupVersion(gv)
 				if err != nil {
 					utilruntime.HandleError(fmt.Errorf("couldn't get resource list for %v: %v", gv, err))
+					return
 				}
 
 				resultLock.Lock()
 				defer resultLock.Unlock()
-				rl[gv] = &cacheEntry{r, err}
+				rl[gv] = r
 			}()
 		}
 	}
@@ -233,11 +214,9 @@ func (d *memCacheClient) serverResourcesForGroupVersion(groupVersion string) (*m
 // NewMemCacheClient creates a new CachedDiscoveryInterface which caches
 // discovery information in memory and will stay up-to-date if Invalidate is
 // called with regularity.
-//
-// NOTE: The client will NOT resort to live lookups on cache misses.
 func NewMemCacheClient(delegate discovery.DiscoveryInterface) discovery.CachedDiscoveryInterface {
 	return &memCacheClient{
 		delegate:               delegate,
-		groupToServerResources: map[string]*cacheEntry{},
+		groupToServerResources: map[string]*metav1.APIResourceList{},
 	}
 }
