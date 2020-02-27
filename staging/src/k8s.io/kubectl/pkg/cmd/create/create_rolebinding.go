@@ -48,7 +48,7 @@ func NewCmdCreateRoleBinding(f cmdutil.Factory, ioStreams genericclioptions.IOSt
 	}
 
 	cmd := &cobra.Command{
-		Use:                   "rolebinding NAME --clusterrole=NAME|--role=NAME [--user=username] [--group=groupname] [--serviceaccount=namespace:serviceaccountname] [--dry-run]",
+		Use:                   "rolebinding NAME --clusterrole=NAME|--role=NAME [--user=username] [--group=groupname] [--serviceaccount=namespace:serviceaccountname] [--dry-run=server|client|none]",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Create a RoleBinding for a particular Role or ClusterRole"),
 		Long:                  roleBindingLong,
