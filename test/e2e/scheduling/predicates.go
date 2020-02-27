@@ -836,10 +836,14 @@ func initPausePod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
 				},
 			},
 			Tolerations:                   conf.Tolerations,
-			NodeName:                      conf.NodeName,
 			PriorityClassName:             conf.PriorityClassName,
 			TerminationGracePeriodSeconds: &gracePeriod,
 		},
+	}
+	// TODO: setting the Pod's nodeAffinity instead of setting .spec.nodeName works around the
+	// Preemption e2e flake (#88441), but we should investigate deeper to get to the bottom of it.
+	if len(conf.NodeName) != 0 {
+		e2epod.SetNodeAffinity(&pod.Spec, conf.NodeName)
 	}
 	if conf.Resources != nil {
 		pod.Spec.Containers[0].Resources = *conf.Resources
