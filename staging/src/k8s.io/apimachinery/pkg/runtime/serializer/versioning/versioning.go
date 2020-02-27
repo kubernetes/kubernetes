@@ -19,7 +19,6 @@ package versioning
 import (
 	"encoding/json"
 	"io"
-	"reflect"
 	"sync"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -128,8 +127,8 @@ func (c *codec) Decode(data []byte, defaultGVK *schema.GroupVersionKind, into ru
 	// create a new instance of the type so we always exercise the conversion path (skips short-circuiting on `into == obj`)
 	decodeInto := into
 	if into != nil {
-		if _, ok := into.(runtime.Unstructured); ok && !into.GetObjectKind().GroupVersionKind().GroupVersion().Empty() {
-			decodeInto = reflect.New(reflect.TypeOf(into).Elem()).Interface().(runtime.Object)
+		if u, ok := into.(runtime.Unstructured); ok && !into.GetObjectKind().GroupVersionKind().GroupVersion().Empty() {
+			decodeInto = u.NewEmptyInstance()
 		}
 	}
 

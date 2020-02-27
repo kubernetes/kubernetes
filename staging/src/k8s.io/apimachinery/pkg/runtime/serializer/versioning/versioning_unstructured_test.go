@@ -336,3 +336,26 @@ func TestDecodeUnstructured(t *testing.T) {
 		assert.Equal(t, testCase.expectedGVKOfSerializedData, actualSerializedGVK, "%v failed", testCase.name)
 	}
 }
+
+func TestDecodeUnstructuredUntypedIntoTyped(t *testing.T) {
+	v1GVK := schema.GroupVersionKind{
+		Group:   "crispy",
+		Version: "v1",
+		Kind:    "Noxu",
+	}
+
+	json := []byte(`{items:[]}`)
+	into := &unstructured.UnstructuredList{}
+	gv, k := v1GVK.ToAPIVersionAndKind()
+	into.SetAPIVersion(gv)
+	into.SetKind(k + "List")
+
+	decoder := &mockSerializer{actual: &v1GVK, obj: into}
+
+	codec := NewCodec(nil, decoder, nil, nil, nil, nil, nil, v1GVK.GroupVersion(), "noxu-scheme")
+	_, _, err := codec.Decode(json, nil, into)
+	assert.NoError(t, err)
+
+	// |into| knows what type it is. Make sure we didn't erase that for the decoder.
+	assert.False(t, decoder.into.GetObjectKind().GroupVersionKind().Empty())
+}
