@@ -17,9 +17,11 @@ limitations under the License.
 package metrics
 
 import (
+	"sync"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
+	compbasemetrics "k8s.io/component-base/metrics"
+	"k8s.io/component-base/metrics/legacyregistry"
 )
 
 const (
@@ -37,28 +39,29 @@ var (
 	requestDurationSecondsBuckets = []float64{0, 0.005, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 30}
 )
 
-func init() {
-	prometheus.MustRegister(apiserverRejectedRequests)
-	prometheus.MustRegister(apiserverCurrentInqueueRequests)
-	prometheus.MustRegister(apiserverRequestQueueLength)
-	prometheus.MustRegister(apiserverRequestConcurrencyLimit)
-	prometheus.MustRegister(apiserverCurrentExecutingRequests)
-	prometheus.MustRegister(apiserverRequestWaitingSeconds)
-	prometheus.MustRegister(apiserverRequestExecutionSeconds)
+var registerMetrics sync.Once
+
+// Register all metrics.
+func Register() {
+	registerMetrics.Do(func() {
+		for _, metric := range metrics {
+			legacyregistry.MustRegister(metric)
+		}
+	})
 }
 
 var (
-	apiserverRejectedRequests = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
+	apiserverRejectedRequestsTotal = compbasemetrics.NewCounterVec(
+		&compbasemetrics.CounterOpts{
 			Namespace: namespace,
 			Subsystem: subsystem,
-			Name:      "rejected_requests",
+			Name:      "rejected_requests_total",
 			Help:      "Number of rejected requests by api priority and fairness system",
 		},
 		[]string{priorityLevel, "reason"},
 	)
-	apiserverCurrentInqueueRequests = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
+	apiserverCurrentInqueueRequests = compbasemetrics.NewGaugeVec(
+		&compbasemetrics.GaugeOpts{
 			Namespace: namespace,
 			Subsystem: subsystem,
 			Name:      "current_inqueue_requests",
@@ -66,8 +69,8 @@ var (
 		},
 		[]string{priorityLevel},
 	)
-	apiserverRequestQueueLength = prometheus.NewHistogramVec(
-		prometheus.HistogramOpts{
+	apiserverRequestQueueLength = compbasemetrics.NewHistogramVec(
+		&compbasemetrics.HistogramOpts{
 			Namespace: namespace,
 			Subsystem: subsystem,
 			Name:      "request_queue_length",
@@ -76,8 +79,8 @@ var (
 		},
 		[]string{priorityLevel},
 	)
-	apiserverRequestConcurrencyLimit = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
+	apiserverRequestConcurrencyLimit = compbasemetrics.NewGaugeVec(
+		&compbasemetrics.GaugeOpts{
 			Namespace: namespace,
 			Subsystem: subsystem,
 			Name:      "request_concurrency_limit",
@@ -85,8 +88,8 @@ var (
 		},
 		[]string{priorityLevel},
 	)
-	apiserverCurrentExecutingRequests = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
+	apiserverCurrentExecutingRequests = compbasemetrics.NewGaugeVec(
+		&compbasemetrics.GaugeOpts{
 			Namespace: namespace,
 			Subsystem: subsystem,
 			Name:      "current_executing_requests",
@@ -94,8 +97,8 @@ var (
 		},
 		[]string{priorityLevel},
 	)
-	apiserverRequestWaitingSeconds = prometheus.NewHistogramVec(
-		prometheus.HistogramOpts{
+	apiserverRequestWaitingSeconds = compbasemetrics.NewHistogramVec(
+		&compbasemetrics.HistogramOpts{
 			Namespace: namespace,
 			Subsystem: subsystem,
 			Name:      "request_wait_duration_seconds",
@@ -104,8 +107,8 @@ var (
 		},
 		[]string{priorityLevel, flowSchema, "execute"},
 	)
-	apiserverRequestExecutionSeconds = prometheus.NewHistogramVec(
-		prometheus.HistogramOpts{
+	apiserverRequestExecutionSeconds = compbasemetrics.NewHistogramVec(
+		&compbasemetrics.HistogramOpts{
 			Namespace: namespace,
 			Subsystem: subsystem,
 			Name:      "request_execution_seconds",
@@ -114,6 +117,15 @@ var (
 		},
 		[]string{priorityLevel, flowSchema},
 	)
+	metrics = []compbasemetrics.Registerable{
+		apiserverRejectedRequestsTotal,
+		apiserverCurrentInqueueRequests,
+		apiserverRequestQueueLength,
+		apiserverRequestConcurrencyLimit,
+		apiserverCurrentExecutingRequests,
+		apiserverRequestWaitingSeconds,
+		apiserverRequestExecutionSeconds,
+	}
 )
 
 // UpdateFlowControlRequestsInQueue updates the value for the # of requests in the specified queues in flow control
@@ -133,7 +145,7 @@ func UpdateSharedConcurrencyLimit(priorityLevel string, limit int) {
 
 // AddReject increments the # of rejected requests for flow control
 func AddReject(priorityLevel string, reason string) {
-	apiserverRejectedRequests.WithLabelValues(priorityLevel, reason).Add(1)
+	apiserverRejectedRequestsTotal.WithLabelValues(priorityLevel, reason).Add(1)
 }
 
 // ObserveQueueLength observes the queue length for flow control
