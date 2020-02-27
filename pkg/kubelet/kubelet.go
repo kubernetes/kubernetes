@@ -236,6 +236,9 @@ type Dependencies struct {
 	useLegacyCadvisorStats bool
 }
 
+// DockerOptions contains docker specific configuration. Importantly, since it
+// lives outside of `dockershim`, it should not depend on the `docker/docker`
+// client library.
 type DockerOptions struct {
 	DockerEndpoint            string
 	RuntimeRequestTimeout     time.Duration
