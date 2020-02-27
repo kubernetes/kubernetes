@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM k8s.gcr.io/kube-cross:v1.13.6-1 as build_k8s_1_17_sample_apiserver
+FROM us.gcr.io/k8s-artifacts-prod/build-image/kube-cross:v1.13.8-1 as build_k8s_1_17_sample_apiserver
 
 ENV GOPATH /go
 RUN mkdir -p ${GOPATH}/src ${GOPATH}/bin

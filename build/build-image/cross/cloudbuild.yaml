@@ -1,0 +1,13 @@
+# See https://cloud.google.com/cloud-build/docs/build-config
+timeout: 1200s
+options:
+  substitution_option: ALLOW_LOOSE
+steps:
+  - name: 'gcr.io/k8s-testimages/gcb-docker-gcloud:v20191019-6567e5c'
+    entrypoint: make
+    env:
+    - DOCKER_CLI_EXPERIMENTAL=enabled
+    args:
+    - all
+images:
+  - 'gcr.io/$PROJECT_ID/kube-cross:kubernetes-${_GIT_TAG}'

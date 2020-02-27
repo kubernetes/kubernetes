@@ -734,7 +734,7 @@ func TestMonitorNodeHealthEvictPods(t *testing.T) {
 					return true, 0
 				})
 			} else {
-				t.Fatalf("Zone %v was unitialized!", zone)
+				t.Fatalf("Zone %v was uninitialized!", zone)
 			}
 		}
 

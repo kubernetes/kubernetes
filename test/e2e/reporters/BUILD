@@ -2,7 +2,10 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
-    srcs = ["progress.go"],
+    srcs = [
+        "progress.go",
+        "testDetails.go",
+    ],
     importpath = "k8s.io/kubernetes/test/e2e/reporters",
     visibility = ["//visibility:public"],
     deps = [

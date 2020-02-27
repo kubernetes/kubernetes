@@ -38,7 +38,6 @@ func TestSchedulerDefaults(t *testing.T) {
 			name:   "empty config",
 			config: &v1alpha2.KubeSchedulerConfiguration{},
 			expected: &v1alpha2.KubeSchedulerConfiguration{
-				AlgorithmSource:    v1alpha2.SchedulerAlgorithmSource{Provider: pointer.StringPtr("DefaultProvider")},
 				HealthzBindAddress: pointer.StringPtr("0.0.0.0:10251"),
 				MetricsBindAddress: pointer.StringPtr("0.0.0.0:10251"),
 				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
@@ -83,7 +82,6 @@ func TestSchedulerDefaults(t *testing.T) {
 				},
 			},
 			expected: &v1alpha2.KubeSchedulerConfiguration{
-				AlgorithmSource:    v1alpha2.SchedulerAlgorithmSource{Provider: pointer.StringPtr("DefaultProvider")},
 				HealthzBindAddress: pointer.StringPtr("0.0.0.0:10251"),
 				MetricsBindAddress: pointer.StringPtr("0.0.0.0:10251"),
 				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
@@ -143,7 +141,6 @@ func TestSchedulerDefaults(t *testing.T) {
 				},
 			},
 			expected: &v1alpha2.KubeSchedulerConfiguration{
-				AlgorithmSource:    v1alpha2.SchedulerAlgorithmSource{Provider: pointer.StringPtr("DefaultProvider")},
 				HealthzBindAddress: pointer.StringPtr("0.0.0.0:10251"),
 				MetricsBindAddress: pointer.StringPtr("0.0.0.0:10251"),
 				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
@@ -197,7 +194,6 @@ func TestSchedulerDefaults(t *testing.T) {
 				HealthzBindAddress: pointer.StringPtr("1.2.3.4"),
 			},
 			expected: &v1alpha2.KubeSchedulerConfiguration{
-				AlgorithmSource:    v1alpha2.SchedulerAlgorithmSource{Provider: pointer.StringPtr("DefaultProvider")},
 				HealthzBindAddress: pointer.StringPtr("1.2.3.4:10251"),
 				MetricsBindAddress: pointer.StringPtr("1.2.3.4:10251"),
 				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
@@ -237,7 +233,6 @@ func TestSchedulerDefaults(t *testing.T) {
 				HealthzBindAddress: pointer.StringPtr(":12345"),
 			},
 			expected: &v1alpha2.KubeSchedulerConfiguration{
-				AlgorithmSource:    v1alpha2.SchedulerAlgorithmSource{Provider: pointer.StringPtr("DefaultProvider")},
 				HealthzBindAddress: pointer.StringPtr("0.0.0.0:12345"),
 				MetricsBindAddress: pointer.StringPtr("0.0.0.0:12345"),
 				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{

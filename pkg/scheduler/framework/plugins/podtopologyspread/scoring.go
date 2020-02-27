@@ -34,12 +34,13 @@ import (
 const preScoreStateKey = "PreScore" + Name
 
 // preScoreState computed at PreScore and used at Score.
+// Fields are exported for comparison during testing.
 type preScoreState struct {
-	constraints []topologySpreadConstraint
-	// nodeNameSet is a string set holding all node names which have all constraints[*].topologyKey present.
-	nodeNameSet sets.String
-	// topologyPairToPodCounts is keyed with topologyPair, and valued with the number of matching pods.
-	topologyPairToPodCounts map[topologyPair]*int64
+	Constraints []topologySpreadConstraint
+	// NodeNameSet is a string set holding all node names which have all Constraints[*].topologyKey present.
+	NodeNameSet sets.String
+	// TopologyPairToPodCounts is keyed with topologyPair, and valued with the number of matching pods.
+	TopologyPairToPodCounts map[topologyPair]*int64
 }
 
 // Clone implements the mandatory Clone interface. We don't really copy the data since
@@ -50,8 +51,8 @@ func (s *preScoreState) Clone() framework.StateData {
 
 // initialize iterates "filteredNodes" to filter out the nodes which don't have required topologyKey(s),
 // and initialize two maps:
-// 1) s.topologyPairToPodCounts: keyed with both eligible topology pair and node names.
-// 2) s.nodeNameSet: keyed with node name, and valued with a *int64 pointer for eligible node only.
+// 1) s.TopologyPairToPodCounts: keyed with both eligible topology pair and node names.
+// 2) s.NodeNameSet: keyed with node name, and valued with a *int64 pointer for eligible node only.
 func (s *preScoreState) initialize(pod *v1.Pod, filteredNodes []*v1.Node) error {
 	constraints, err := filterTopologySpreadConstraints(pod.Spec.TopologySpreadConstraints, v1.ScheduleAnyway)
 	if err != nil {
@@ -60,20 +61,20 @@ func (s *preScoreState) initialize(pod *v1.Pod, filteredNodes []*v1.Node) error 
 	if constraints == nil {
 		return nil
 	}
-	s.constraints = constraints
+	s.Constraints = constraints
 	for _, node := range filteredNodes {
-		if !nodeLabelsMatchSpreadConstraints(node.Labels, s.constraints) {
+		if !nodeLabelsMatchSpreadConstraints(node.Labels, s.Constraints) {
 			continue
 		}
-		for _, constraint := range s.constraints {
-			pair := topologyPair{key: constraint.topologyKey, value: node.Labels[constraint.topologyKey]}
-			if s.topologyPairToPodCounts[pair] == nil {
-				s.topologyPairToPodCounts[pair] = new(int64)
+		for _, constraint := range s.Constraints {
+			pair := topologyPair{key: constraint.TopologyKey, value: node.Labels[constraint.TopologyKey]}
+			if s.TopologyPairToPodCounts[pair] == nil {
+				s.TopologyPairToPodCounts[pair] = new(int64)
 			}
 		}
-		s.nodeNameSet.Insert(node.Name)
+		s.NodeNameSet.Insert(node.Name)
 		// For those nodes which don't have all required topologyKeys present, it's intentional to leave
-		// their entries absent in nodeNameSet, so that we're able to score them to 0 afterwards.
+		// their entries absent in NodeNameSet, so that we're able to score them to 0 afterwards.
 	}
 	return nil
 }
@@ -96,16 +97,16 @@ func (pl *PodTopologySpread) PreScore(
 	}
 
 	state := &preScoreState{
-		nodeNameSet:             sets.String{},
-		topologyPairToPodCounts: make(map[topologyPair]*int64),
+		NodeNameSet:             sets.String{},
+		TopologyPairToPodCounts: make(map[topologyPair]*int64),
 	}
 	err = state.initialize(pod, filteredNodes)
 	if err != nil {
 		return framework.NewStatus(framework.Error, fmt.Sprintf("error when calculating preScoreState: %v", err))
 	}
 
-	// return if incoming pod doesn't have soft topology spread constraints.
-	if state.constraints == nil {
+	// return if incoming pod doesn't have soft topology spread Constraints.
+	if state.Constraints == nil {
 		cycleState.Write(preScoreStateKey, state)
 		return nil
 	}
@@ -119,15 +120,15 @@ func (pl *PodTopologySpread) PreScore(
 		// (1) `node` should satisfy incoming pod's NodeSelector/NodeAffinity
 		// (2) All topologyKeys need to be present in `node`
 		if !pluginhelper.PodMatchesNodeSelectorAndAffinityTerms(pod, node) ||
-			!nodeLabelsMatchSpreadConstraints(node.Labels, state.constraints) {
+			!nodeLabelsMatchSpreadConstraints(node.Labels, state.Constraints) {
 			return
 		}
 
-		for _, c := range state.constraints {
-			pair := topologyPair{key: c.topologyKey, value: node.Labels[c.topologyKey]}
+		for _, c := range state.Constraints {
+			pair := topologyPair{key: c.TopologyKey, value: node.Labels[c.TopologyKey]}
 			// If current topology pair is not associated with any candidate node,
 			// continue to avoid unnecessary calculation.
-			if state.topologyPairToPodCounts[pair] == nil {
+			if state.TopologyPairToPodCounts[pair] == nil {
 				continue
 			}
 
@@ -138,11 +139,11 @@ func (pl *PodTopologySpread) PreScore(
 				if existingPod.DeletionTimestamp != nil || existingPod.Namespace != pod.Namespace {
 					continue
 				}
-				if c.selector.Matches(labels.Set(existingPod.Labels)) {
+				if c.Selector.Matches(labels.Set(existingPod.Labels)) {
 					matchSum++
 				}
 			}
-			atomic.AddInt64(state.topologyPairToPodCounts[pair], matchSum)
+			atomic.AddInt64(state.TopologyPairToPodCounts[pair], matchSum)
 		}
 	}
 	workqueue.ParallelizeUntil(ctx, 16, len(allNodes), processAllNode)
@@ -167,17 +168,17 @@ func (pl *PodTopologySpread) Score(ctx context.Context, cycleState *framework.Cy
 	}
 
 	// Return if the node is not qualified.
-	if _, ok := s.nodeNameSet[node.Name]; !ok {
+	if _, ok := s.NodeNameSet[node.Name]; !ok {
 		return 0, nil
 	}
 
 	// For each present <pair>, current node gets a credit of <matchSum>.
 	// And we sum up <matchSum> and return it as this node's score.
 	var score int64
-	for _, c := range s.constraints {
-		if tpVal, ok := node.Labels[c.topologyKey]; ok {
-			pair := topologyPair{key: c.topologyKey, value: tpVal}
-			matchSum := *s.topologyPairToPodCounts[pair]
+	for _, c := range s.Constraints {
+		if tpVal, ok := node.Labels[c.TopologyKey]; ok {
+			pair := topologyPair{key: c.TopologyKey, value: tpVal}
+			matchSum := *s.TopologyPairToPodCounts[pair]
 			score += matchSum
 		}
 	}
@@ -198,8 +199,8 @@ func (pl *PodTopologySpread) NormalizeScore(ctx context.Context, cycleState *fra
 	var minScore int64 = math.MaxInt64
 	var total int64
 	for _, score := range scores {
-		// it's mandatory to check if <score.Name> is present in m.nodeNameSet
-		if _, ok := s.nodeNameSet[score.Name]; !ok {
+		// it's mandatory to check if <score.Name> is present in m.NodeNameSet
+		if _, ok := s.NodeNameSet[score.Name]; !ok {
 			continue
 		}
 		total += score.Score
@@ -228,7 +229,7 @@ func (pl *PodTopologySpread) NormalizeScore(ctx context.Context, cycleState *fra
 			continue
 		}
 
-		if _, ok := s.nodeNameSet[node.Name]; !ok {
+		if _, ok := s.NodeNameSet[node.Name]; !ok {
 			scores[i].Score = 0
 			continue
 		}

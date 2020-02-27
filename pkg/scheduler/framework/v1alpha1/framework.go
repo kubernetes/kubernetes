@@ -199,9 +199,6 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 
 	// get needed plugins from config
 	pg := f.pluginsNeeded(plugins)
-	if len(pg) == 0 {
-		return f, nil
-	}
 
 	pluginConfig := make(map[string]*runtime.Unknown, 0)
 	for i := range args {

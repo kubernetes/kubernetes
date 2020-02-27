@@ -416,228 +416,227 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 			}
 		})
 	})
-})
 
-// construct a fakecpu so as to set it to status of Node object
-// otherwise if we update CPU/Memory/etc, those values will be corrected back by kubelet
-var fakecpu v1.ResourceName = "example.com/fakecpu"
+	ginkgo.Context("PreemptionExecutionPath", func() {
+		// construct a fakecpu so as to set it to status of Node object
+		// otherwise if we update CPU/Memory/etc, those values will be corrected back by kubelet
+		var fakecpu v1.ResourceName = "example.com/fakecpu"
+		var cs clientset.Interface
+		var node *v1.Node
+		var ns, nodeHostNameLabel string
+		f := framework.NewDefaultFramework("sched-preemption-path")
 
-var _ = SIGDescribe("PreemptionExecutionPath", func() {
-	var cs clientset.Interface
-	var node *v1.Node
-	var ns, nodeHostNameLabel string
-	f := framework.NewDefaultFramework("sched-preemption-path")
+		priorityPairs := make([]priorityPair, 0)
 
-	priorityPairs := make([]priorityPair, 0)
-
-	ginkgo.AfterEach(func() {
-		// print out additional info if tests failed
-		if ginkgo.CurrentGinkgoTestDescription().Failed {
-			// list existing priorities
-			priorityList, err := cs.SchedulingV1().PriorityClasses().List(context.TODO(), metav1.ListOptions{})
-			if err != nil {
-				framework.Logf("Unable to list priorities: %v", err)
-			} else {
-				framework.Logf("List existing priorities:")
-				for _, p := range priorityList.Items {
-					framework.Logf("%v/%v created at %v", p.Name, p.Value, p.CreationTimestamp)
+		ginkgo.AfterEach(func() {
+			// print out additional info if tests failed
+			if ginkgo.CurrentGinkgoTestDescription().Failed {
+				// list existing priorities
+				priorityList, err := cs.SchedulingV1().PriorityClasses().List(context.TODO(), metav1.ListOptions{})
+				if err != nil {
+					framework.Logf("Unable to list priorities: %v", err)
+				} else {
+					framework.Logf("List existing priorities:")
+					for _, p := range priorityList.Items {
+						framework.Logf("%v/%v created at %v", p.Name, p.Value, p.CreationTimestamp)
+					}
 				}
 			}
-		}
 
-		if node != nil {
+			if node != nil {
+				nodeCopy := node.DeepCopy()
+				// force it to update
+				nodeCopy.ResourceVersion = "0"
+				delete(nodeCopy.Status.Capacity, fakecpu)
+				_, err := cs.CoreV1().Nodes().UpdateStatus(context.TODO(), nodeCopy, metav1.UpdateOptions{})
+				framework.ExpectNoError(err)
+			}
+			for _, pair := range priorityPairs {
+				cs.SchedulingV1().PriorityClasses().Delete(context.TODO(), pair.name, metav1.NewDeleteOptions(0))
+			}
+		})
+
+		ginkgo.BeforeEach(func() {
+			cs = f.ClientSet
+			ns = f.Namespace.Name
+
+			// find an available node
+			ginkgo.By("Finding an available node")
+			nodeName := GetNodeThatCanRunPod(f)
+			framework.Logf("found a healthy node: %s", nodeName)
+
+			// get the node API object
+			var err error
+			node, err = cs.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+			if err != nil {
+				framework.Failf("error getting node %q: %v", nodeName, err)
+			}
+			var ok bool
+			nodeHostNameLabel, ok = node.GetObjectMeta().GetLabels()["kubernetes.io/hostname"]
+			if !ok {
+				framework.Failf("error getting kubernetes.io/hostname label on node %s", nodeName)
+			}
+
+			// update Node API object with a fake resource
 			nodeCopy := node.DeepCopy()
 			// force it to update
 			nodeCopy.ResourceVersion = "0"
-			delete(nodeCopy.Status.Capacity, fakecpu)
-			_, err := cs.CoreV1().Nodes().UpdateStatus(context.TODO(), nodeCopy, metav1.UpdateOptions{})
+			nodeCopy.Status.Capacity[fakecpu] = resource.MustParse("1000")
+			node, err = cs.CoreV1().Nodes().UpdateStatus(context.TODO(), nodeCopy, metav1.UpdateOptions{})
 			framework.ExpectNoError(err)
-		}
-		for _, pair := range priorityPairs {
-			cs.SchedulingV1().PriorityClasses().Delete(context.TODO(), pair.name, metav1.NewDeleteOptions(0))
-		}
-	})
 
-	ginkgo.BeforeEach(func() {
-		cs = f.ClientSet
-		ns = f.Namespace.Name
-
-		// find an available node
-		ginkgo.By("Finding an available node")
-		nodeName := GetNodeThatCanRunPod(f)
-		framework.Logf("found a healthy node: %s", nodeName)
-
-		// get the node API object
-		var err error
-		node, err = cs.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
-		if err != nil {
-			framework.Failf("error getting node %q: %v", nodeName, err)
-		}
-		var ok bool
-		nodeHostNameLabel, ok = node.GetObjectMeta().GetLabels()["kubernetes.io/hostname"]
-		if !ok {
-			framework.Failf("error getting kubernetes.io/hostname label on node %s", nodeName)
-		}
-
-		// update Node API object with a fake resource
-		nodeCopy := node.DeepCopy()
-		// force it to update
-		nodeCopy.ResourceVersion = "0"
-		nodeCopy.Status.Capacity[fakecpu] = resource.MustParse("1000")
-		node, err = cs.CoreV1().Nodes().UpdateStatus(context.TODO(), nodeCopy, metav1.UpdateOptions{})
-		framework.ExpectNoError(err)
-
-		// create four PriorityClass: p1, p2, p3, p4
-		for i := 1; i <= 4; i++ {
-			priorityName := fmt.Sprintf("p%d", i)
-			priorityVal := int32(i)
-			priorityPairs = append(priorityPairs, priorityPair{name: priorityName, value: priorityVal})
-			_, err := cs.SchedulingV1().PriorityClasses().Create(context.TODO(), &schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: priorityName}, Value: priorityVal}, metav1.CreateOptions{})
-			if err != nil {
-				framework.Logf("Failed to create priority '%v/%v': %v", priorityName, priorityVal, err)
-				framework.Logf("Reason: %v. Msg: %v", apierrors.ReasonForError(err), err)
+			// create four PriorityClass: p1, p2, p3, p4
+			for i := 1; i <= 4; i++ {
+				priorityName := fmt.Sprintf("p%d", i)
+				priorityVal := int32(i)
+				priorityPairs = append(priorityPairs, priorityPair{name: priorityName, value: priorityVal})
+				_, err := cs.SchedulingV1().PriorityClasses().Create(context.TODO(), &schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: priorityName}, Value: priorityVal}, metav1.CreateOptions{})
+				if err != nil {
+					framework.Logf("Failed to create priority '%v/%v': %v", priorityName, priorityVal, err)
+					framework.Logf("Reason: %v. Msg: %v", apierrors.ReasonForError(err), err)
+				}
+				framework.ExpectEqual(err == nil || apierrors.IsAlreadyExists(err), true)
 			}
-			framework.ExpectEqual(err == nil || apierrors.IsAlreadyExists(err), true)
-		}
-	})
+		})
 
-	ginkgo.It("runs ReplicaSets to verify preemption running path", func() {
-		podNamesSeen := []int32{0, 0, 0}
-		stopCh := make(chan struct{})
+		ginkgo.It("runs ReplicaSets to verify preemption running path", func() {
+			podNamesSeen := []int32{0, 0, 0}
+			stopCh := make(chan struct{})
 
-		// create a pod controller to list/watch pod events from the test framework namespace
-		_, podController := cache.NewInformer(
-			&cache.ListWatch{
-				ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-					obj, err := f.ClientSet.CoreV1().Pods(ns).List(context.TODO(), options)
-					return runtime.Object(obj), err
+			// create a pod controller to list/watch pod events from the test framework namespace
+			_, podController := cache.NewInformer(
+				&cache.ListWatch{
+					ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+						obj, err := f.ClientSet.CoreV1().Pods(ns).List(context.TODO(), options)
+						return runtime.Object(obj), err
+					},
+					WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+						return f.ClientSet.CoreV1().Pods(ns).Watch(context.TODO(), options)
+					},
 				},
-				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-					return f.ClientSet.CoreV1().Pods(ns).Watch(context.TODO(), options)
-				},
-			},
-			&v1.Pod{},
-			0,
-			cache.ResourceEventHandlerFuncs{
-				AddFunc: func(obj interface{}) {
-					if pod, ok := obj.(*v1.Pod); ok {
-						if strings.HasPrefix(pod.Name, "rs-pod1") {
-							atomic.AddInt32(&podNamesSeen[0], 1)
-						} else if strings.HasPrefix(pod.Name, "rs-pod2") {
-							atomic.AddInt32(&podNamesSeen[1], 1)
-						} else if strings.HasPrefix(pod.Name, "rs-pod3") {
-							atomic.AddInt32(&podNamesSeen[2], 1)
+				&v1.Pod{},
+				0,
+				cache.ResourceEventHandlerFuncs{
+					AddFunc: func(obj interface{}) {
+						if pod, ok := obj.(*v1.Pod); ok {
+							if strings.HasPrefix(pod.Name, "rs-pod1") {
+								atomic.AddInt32(&podNamesSeen[0], 1)
+							} else if strings.HasPrefix(pod.Name, "rs-pod2") {
+								atomic.AddInt32(&podNamesSeen[1], 1)
+							} else if strings.HasPrefix(pod.Name, "rs-pod3") {
+								atomic.AddInt32(&podNamesSeen[2], 1)
+							}
 						}
+					},
+				},
+			)
+			go podController.Run(stopCh)
+			defer close(stopCh)
+
+			// prepare three ReplicaSet
+			rsConfs := []pauseRSConfig{
+				{
+					Replicas: int32(1),
+					PodConfig: pausePodConfig{
+						Name:              "pod1",
+						Namespace:         ns,
+						Labels:            map[string]string{"name": "pod1"},
+						PriorityClassName: "p1",
+						NodeSelector:      map[string]string{"kubernetes.io/hostname": nodeHostNameLabel},
+						Resources: &v1.ResourceRequirements{
+							Requests: v1.ResourceList{fakecpu: resource.MustParse("200")},
+							Limits:   v1.ResourceList{fakecpu: resource.MustParse("200")},
+						},
+					},
+				},
+				{
+					Replicas: int32(1),
+					PodConfig: pausePodConfig{
+						Name:              "pod2",
+						Namespace:         ns,
+						Labels:            map[string]string{"name": "pod2"},
+						PriorityClassName: "p2",
+						NodeSelector:      map[string]string{"kubernetes.io/hostname": nodeHostNameLabel},
+						Resources: &v1.ResourceRequirements{
+							Requests: v1.ResourceList{fakecpu: resource.MustParse("300")},
+							Limits:   v1.ResourceList{fakecpu: resource.MustParse("300")},
+						},
+					},
+				},
+				{
+					Replicas: int32(1),
+					PodConfig: pausePodConfig{
+						Name:              "pod3",
+						Namespace:         ns,
+						Labels:            map[string]string{"name": "pod3"},
+						PriorityClassName: "p3",
+						NodeSelector:      map[string]string{"kubernetes.io/hostname": nodeHostNameLabel},
+						Resources: &v1.ResourceRequirements{
+							Requests: v1.ResourceList{fakecpu: resource.MustParse("450")},
+							Limits:   v1.ResourceList{fakecpu: resource.MustParse("450")},
+						},
+					},
+				},
+			}
+			// create ReplicaSet{1,2,3} so as to occupy 950/1000 fake resource
+			for i := range rsConfs {
+				runPauseRS(f, rsConfs[i])
+			}
+
+			framework.Logf("pods created so far: %v", podNamesSeen)
+			framework.Logf("length of pods created so far: %v", len(podNamesSeen))
+
+			// create a Preemptor Pod
+			preemptorPodConf := pausePodConfig{
+				Name:              "pod4",
+				Namespace:         ns,
+				Labels:            map[string]string{"name": "pod4"},
+				PriorityClassName: "p4",
+				NodeSelector:      map[string]string{"kubernetes.io/hostname": nodeHostNameLabel},
+				Resources: &v1.ResourceRequirements{
+					Requests: v1.ResourceList{fakecpu: resource.MustParse("500")},
+					Limits:   v1.ResourceList{fakecpu: resource.MustParse("500")},
+				},
+			}
+			preemptorPod := createPod(f, preemptorPodConf)
+			waitForPreemptingWithTimeout(f, preemptorPod, framework.PodGetTimeout)
+
+			framework.Logf("pods created so far: %v", podNamesSeen)
+
+			// count pods number of ReplicaSet{1,2,3}:
+			// - if it's more than expected replicas, it denotes its pods have been over-preempted
+			// - if it's less than expected replicas, it denotes its pods are under-preempted
+			// "*2" means pods of ReplicaSet{1,2} are expected to be only preempted once.
+			expectedRSPods := []int32{1 * 2, 1 * 2, 1}
+			err := wait.Poll(framework.Poll, framework.PollShortTimeout, func() (bool, error) {
+				for i := 0; i < len(podNamesSeen); i++ {
+					got := atomic.LoadInt32(&podNamesSeen[i])
+					if got < expectedRSPods[i] {
+						framework.Logf("waiting for rs%d to observe %d pod creations, got %d", i+1, expectedRSPods[i], got)
+						return false, nil
+					} else if got > expectedRSPods[i] {
+						return false, fmt.Errorf("rs%d had more than %d pods created: %d", i+1, expectedRSPods[i], got)
 					}
-				},
-			},
-		)
-		go podController.Run(stopCh)
-		defer close(stopCh)
+				}
+				return true, nil
+			})
+			if err != nil {
+				framework.Logf("pods created so far: %v", podNamesSeen)
+				framework.Failf("failed pod observation expectations: %v", err)
+			}
 
-		// prepare three ReplicaSet
-		rsConfs := []pauseRSConfig{
-			{
-				Replicas: int32(1),
-				PodConfig: pausePodConfig{
-					Name:              "pod1",
-					Namespace:         ns,
-					Labels:            map[string]string{"name": "pod1"},
-					PriorityClassName: "p1",
-					NodeSelector:      map[string]string{"kubernetes.io/hostname": nodeHostNameLabel},
-					Resources: &v1.ResourceRequirements{
-						Requests: v1.ResourceList{fakecpu: resource.MustParse("200")},
-						Limits:   v1.ResourceList{fakecpu: resource.MustParse("200")},
-					},
-				},
-			},
-			{
-				Replicas: int32(1),
-				PodConfig: pausePodConfig{
-					Name:              "pod2",
-					Namespace:         ns,
-					Labels:            map[string]string{"name": "pod2"},
-					PriorityClassName: "p2",
-					NodeSelector:      map[string]string{"kubernetes.io/hostname": nodeHostNameLabel},
-					Resources: &v1.ResourceRequirements{
-						Requests: v1.ResourceList{fakecpu: resource.MustParse("300")},
-						Limits:   v1.ResourceList{fakecpu: resource.MustParse("300")},
-					},
-				},
-			},
-			{
-				Replicas: int32(1),
-				PodConfig: pausePodConfig{
-					Name:              "pod3",
-					Namespace:         ns,
-					Labels:            map[string]string{"name": "pod3"},
-					PriorityClassName: "p3",
-					NodeSelector:      map[string]string{"kubernetes.io/hostname": nodeHostNameLabel},
-					Resources: &v1.ResourceRequirements{
-						Requests: v1.ResourceList{fakecpu: resource.MustParse("450")},
-						Limits:   v1.ResourceList{fakecpu: resource.MustParse("450")},
-					},
-				},
-			},
-		}
-		// create ReplicaSet{1,2,3} so as to occupy 950/1000 fake resource
-		for i := range rsConfs {
-			runPauseRS(f, rsConfs[i])
-		}
-
-		framework.Logf("pods created so far: %v", podNamesSeen)
-		framework.Logf("length of pods created so far: %v", len(podNamesSeen))
-
-		// create a Preemptor Pod
-		preemptorPodConf := pausePodConfig{
-			Name:              "pod4",
-			Namespace:         ns,
-			Labels:            map[string]string{"name": "pod4"},
-			PriorityClassName: "p4",
-			NodeSelector:      map[string]string{"kubernetes.io/hostname": nodeHostNameLabel},
-			Resources: &v1.ResourceRequirements{
-				Requests: v1.ResourceList{fakecpu: resource.MustParse("500")},
-				Limits:   v1.ResourceList{fakecpu: resource.MustParse("500")},
-			},
-		}
-		preemptorPod := createPod(f, preemptorPodConf)
-		waitForPreemptingWithTimeout(f, preemptorPod, framework.PodGetTimeout)
-
-		framework.Logf("pods created so far: %v", podNamesSeen)
-
-		// count pods number of ReplicaSet{1,2,3}:
-		// - if it's more than expected replicas, it denotes its pods have been over-preempted
-		// - if it's less than expected replicas, it denotes its pods are under-preempted
-		// "*2" means pods of ReplicaSet{1,2} are expected to be only preempted once.
-		expectedRSPods := []int32{1 * 2, 1 * 2, 1}
-		err := wait.Poll(framework.Poll, framework.PollShortTimeout, func() (bool, error) {
+			// If logic continues to here, we should do a final check to ensure within a time period,
+			// the state is stable; otherwise, pods may be over-preempted.
+			time.Sleep(5 * time.Second)
 			for i := 0; i < len(podNamesSeen); i++ {
 				got := atomic.LoadInt32(&podNamesSeen[i])
 				if got < expectedRSPods[i] {
-					framework.Logf("waiting for rs%d to observe %d pod creations, got %d", i+1, expectedRSPods[i], got)
-					return false, nil
+					framework.Failf("pods of ReplicaSet%d have been under-preempted: expect %v pod names, but got %d", i+1, expectedRSPods[i], got)
 				} else if got > expectedRSPods[i] {
-					return false, fmt.Errorf("rs%d had more than %d pods created: %d", i+1, expectedRSPods[i], got)
+					framework.Failf("pods of ReplicaSet%d have been over-preempted: expect %v pod names, but got %d", i+1, expectedRSPods[i], got)
 				}
 			}
-			return true, nil
 		})
-		if err != nil {
-			framework.Logf("pods created so far: %v", podNamesSeen)
-			framework.Failf("failed pod observation expectations: %v", err)
-		}
-
-		// If logic continues to here, we should do a final check to ensure within a time period,
-		// the state is stable; otherwise, pods may be over-preempted.
-		time.Sleep(5 * time.Second)
-		for i := 0; i < len(podNamesSeen); i++ {
-			got := atomic.LoadInt32(&podNamesSeen[i])
-			if got < expectedRSPods[i] {
-				framework.Failf("pods of ReplicaSet%d have been under-preempted: expect %v pod names, but got %d", i+1, expectedRSPods[i], got)
-			} else if got > expectedRSPods[i] {
-				framework.Failf("pods of ReplicaSet%d have been over-preempted: expect %v pod names, but got %d", i+1, expectedRSPods[i], got)
-			}
-		}
 	})
 })
 

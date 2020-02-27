@@ -689,7 +689,7 @@ func startPausePodWithVolumeSource(cs clientset.Interface, volumeSource v1.Volum
 			},
 		},
 	}
-	e2epod.SetNodeSelection(pod, node)
+	e2epod.SetNodeSelection(&pod.Spec, node)
 	return cs.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
 }
 

@@ -15,13 +15,11 @@ clean up the tests.
 Example:
 ```
 /*
-  Testname: Kubelet-OutputToLogs
-  Release: v1.9
-  Description: By default the stdout and stderr from the process
-           being executed in a pod MUST be sent to the pod's logs.
+  Release : v1.13
+  Testname: Kubelet, log output, default
+  Description: By default the stdout and stderr from the process being executed in a pod MUST be sent to the pod's logs.
 */
-// Note this test needs to be fixed to also test for stderr
-It("it should print the output to logs [Conformance]", func() {
+framework.ConformanceIt("should print the output to logs [NodeConformance]", func() {
 ```
 
 would generate the following documentation for the test. Note that the "TestName" from the Documentation above will
@@ -29,12 +27,12 @@ be used to document the test which make it more human readable. The "Description
 documentation for that test.
 
 ### **Output:**
-## [Kubelet-OutputToLogs](https://github.com/kubernetes/kubernetes/blob/release-1.9/test/e2e_node/kubelet_test.go#L42)
+## [Kubelet, log output, default](https://github.com/kubernetes/kubernetes/tree/master/test/e2e/common/kubelet.go#L48)
 
-### Release v1.9
-By default the stdout and stderr from the process
-being executed in a pod MUST be sent to the pod's logs.
-Note this test needs to be fixed to also test for stderr
+- Added to conformance in release v1.13
+- Defined in code as: [k8s.io] Kubelet when scheduling a busybox command in a pod should print the output to logs [NodeConformance] [Conformance]
+
+By default the stdout and stderr from the process being executed in a pod MUST be sent to the pod's logs.
 
 Notational Conventions when documenting the tests with the key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED", "MAY", and "OPTIONAL" are to be interpreted as described in [RFC 2119](https://tools.ietf.org/html/rfc2119).
 

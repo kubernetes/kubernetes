@@ -408,7 +408,7 @@ func migrateCoreDNSCorefile(client clientset.Interface, cm *v1.ConfigMap, corefi
 	}, metav1.UpdateOptions{}); err != nil {
 		return errors.Wrap(err, "unable to update the CoreDNS ConfigMap")
 	}
-	fmt.Println("[addons]: Migrating CoreDNS Corefile")
+	fmt.Println("[addons] Migrating CoreDNS Corefile")
 	changes, err := migration.Deprecated(currentInstalledCoreDNSVersion, kubeadmconstants.CoreDNSVersion, corefile)
 	if err != nil {
 		return errors.Wrap(err, "unable to get list of changes to the configuration.")

@@ -1385,12 +1385,11 @@ func CreatePodWithPersistentVolume(client clientset.Interface, namespace string,
 			createError = fmt.Errorf("error creating PV: %s", err)
 			return
 		}
-		// We need to update status separately, as creating persistentvolumes resets status to the default one
-		// (so with Status.Phase will be equal to PersistentVolumePhase).
+		// We need to update statuses separately, as creating pv/pvc resets status to the default one.
 		if _, err := client.CoreV1().PersistentVolumes().UpdateStatus(context.TODO(), pv, metav1.UpdateOptions{}); err != nil {
 			lock.Lock()
 			defer lock.Unlock()
-			createError = fmt.Errorf("error creating PV: %s", err)
+			createError = fmt.Errorf("error updating PV status: %s", err)
 			return
 		}
 
@@ -1398,6 +1397,12 @@ func CreatePodWithPersistentVolume(client clientset.Interface, namespace string,
 			lock.Lock()
 			defer lock.Unlock()
 			createError = fmt.Errorf("error creating PVC: %s", err)
+			return
+		}
+		if _, err := client.CoreV1().PersistentVolumeClaims(namespace).UpdateStatus(context.TODO(), pvc, metav1.UpdateOptions{}); err != nil {
+			lock.Lock()
+			defer lock.Unlock()
+			createError = fmt.Errorf("error updating PVC status: %s", err)
 			return
 		}
 

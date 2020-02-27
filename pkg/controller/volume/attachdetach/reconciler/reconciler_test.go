@@ -263,7 +263,7 @@ func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithMountedVolume(t *test
 			nodeName)
 	}
 
-	// Assert -- Timer will triger detach
+	// Assert -- Timer will trigger detach
 	waitForNewDetacherCallCount(t, 1 /* expectedCallCount */, fakePlugin)
 	verifyNewAttacherCallCount(t, false /* expectZeroNewAttacherCallCount */, fakePlugin)
 	waitForAttachCallCount(t, 1 /* expectedAttachCallCount */, fakePlugin)
@@ -415,7 +415,7 @@ func Test_Run_OneVolumeAttachAndDetachMultipleNodesWithReadWriteMany(t *testing.
 			nodeName1)
 	}
 
-	// Assert -- Timer will triger detach
+	// Assert -- Timer will trigger detach
 	waitForNewDetacherCallCount(t, 1 /* expectedCallCount */, fakePlugin)
 	verifyNewAttacherCallCount(t, false /* expectZeroNewAttacherCallCount */, fakePlugin)
 	waitForTotalAttachCallCount(t, 2 /* expectedAttachCallCount */, fakePlugin)
@@ -433,7 +433,7 @@ func Test_Run_OneVolumeAttachAndDetachMultipleNodesWithReadWriteMany(t *testing.
 			nodeName2)
 	}
 
-	// Assert -- Timer will triger detach
+	// Assert -- Timer will trigger detach
 	waitForNewDetacherCallCount(t, 2 /* expectedCallCount */, fakePlugin)
 	verifyNewAttacherCallCount(t, false /* expectZeroNewAttacherCallCount */, fakePlugin)
 	waitForTotalAttachCallCount(t, 2 /* expectedAttachCallCount */, fakePlugin)
@@ -692,7 +692,7 @@ func Test_ReportMultiAttachError(t *testing.T) {
 			[]string{"Warning FailedAttachVolume Multi-Attach error for volume \"volume-name\" Volume is already used by pod(s) pod2"},
 		},
 		{
-			"pods in anotother namespace use the volume",
+			"pods in another namespace use the volume",
 			[]nodeWithPods{
 				{"node1", []string{"ns1/pod1"}},
 				{"node2", []string{"ns2/pod2"}},
@@ -700,7 +700,7 @@ func Test_ReportMultiAttachError(t *testing.T) {
 			[]string{"Warning FailedAttachVolume Multi-Attach error for volume \"volume-name\" Volume is already used by 1 pod(s) in different namespaces"},
 		},
 		{
-			"pods both in the same and anotother namespace use the volume",
+			"pods both in the same and another namespace use the volume",
 			[]nodeWithPods{
 				{"node1", []string{"ns1/pod1"}},
 				{"node2", []string{"ns2/pod2"}},
