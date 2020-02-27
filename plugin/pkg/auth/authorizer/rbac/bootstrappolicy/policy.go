@@ -332,14 +332,6 @@ func ClusterRoles() []rbacv1.ClusterRole {
 			},
 		},
 		{
-			// a role to use for heapster's connections back to the API server
-			ObjectMeta: metav1.ObjectMeta{Name: "system:heapster"},
-			Rules: []rbacv1.PolicyRule{
-				rbacv1helpers.NewRule(Read...).Groups(legacyGroup).Resources("events", "pods", "nodes", "namespaces").RuleOrDie(),
-				rbacv1helpers.NewRule(Read...).Groups(extensionsGroup).Resources("deployments").RuleOrDie(),
-			},
-		},
-		{
 			// a role for nodes to use to have the access they need for running pods
 			ObjectMeta: metav1.ObjectMeta{Name: "system:node"},
 			Rules:      NodeRules(),
