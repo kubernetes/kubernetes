@@ -259,7 +259,7 @@ func doTestPlugin(t *testing.T, config pluginTestConfig) {
 func TestPluginBackCompat(t *testing.T) {
 	basePath, err := utiltesting.MkTmpdir("emptydirTest")
 	if err != nil {
-		t.Fatalf("can't make a temp dir： %v", err)
+		t.Fatalf("can't make a temp dir: %v", err)
 	}
 	defer os.RemoveAll(basePath)
 
