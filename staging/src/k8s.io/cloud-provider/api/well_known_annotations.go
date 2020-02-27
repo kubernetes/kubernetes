@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package apis
+package api
 
 const (
 	// AnnotationProvidedIPAddr is a node IP annotation set by the "external" cloud provider.
