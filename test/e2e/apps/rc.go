@@ -17,28 +17,28 @@ limitations under the License.
 package apps
 
 import (
-	"encoding/json"
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
+	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/controller/replication"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	autoscalingv1 "k8s.io/api/autoscaling/v1"
-	"k8s.io/client-go/dynamic"
 
 	"github.com/onsi/ginkgo"
 )
@@ -107,7 +107,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 
 		rcTest := v1.ReplicationController{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: testRcName,
+				Name:   testRcName,
 				Labels: map[string]string{"test-rc-static": "true"},
 			},
 			Spec: v1.ReplicationControllerSpec{
@@ -115,12 +115,12 @@ var _ = SIGDescribe("ReplicationController", func() {
 				Selector: map[string]string{"test-rc-static": "true"},
 				Template: &v1.PodTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{
-						Name: testRcName,
+						Name:   testRcName,
 						Labels: map[string]string{"test-rc-static": "true"},
 					},
 					Spec: v1.PodSpec{
 						Containers: []v1.Container{{
-							Name: testRcName,
+							Name:  testRcName,
 							Image: "nginx",
 						}},
 					},
@@ -158,7 +158,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 
 		rcStatusPatchPayload, err := json.Marshal(map[string]interface{}{
 			"status": map[string]interface{}{
-				"readyReplicas": 0,
+				"readyReplicas":     0,
 				"availableReplicas": 0,
 			},
 		})
