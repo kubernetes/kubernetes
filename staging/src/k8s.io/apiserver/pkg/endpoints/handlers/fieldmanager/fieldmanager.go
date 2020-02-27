@@ -18,6 +18,7 @@ package fieldmanager
 
 import (
 	"fmt"
+	"os"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,6 +28,12 @@ import (
 	openapiproto "k8s.io/kube-openapi/pkg/util/proto"
 	"sigs.k8s.io/structured-merge-diff/v3/fieldpath"
 )
+
+// ShortCircuitManagedFields is the name of the environment variable to
+// set if you want to disable tracking managed fields for that specific
+// apiserver. The value is not actually read, setting/unsetting the
+// value is good enough to disable tracking.
+const ShortCircuitManagedFields = "KUBERNETES_SHORTCIRCUIT_MANAGEDFIELDS"
 
 // DefaultMaxUpdateManagers defines the default maximum retained number of managedFields entries from updates
 // if the number of update managers exceeds this, the oldest entries will be merged until the number is below the maximum.
@@ -96,7 +103,11 @@ func newDefaultFieldManager(f Manager, objectCreater runtime.ObjectCreater, kind
 	f = NewStripMetaManager(f)
 	f = NewBuildManagerInfoManager(f, kind.GroupVersion())
 	f = NewCapManagersManager(f, DefaultMaxUpdateManagers)
-	f = NewProbabilisticSkipNonAppliedManager(f, objectCreater, kind, DefaultTrackOnCreateProbability)
+	probability := DefaultTrackOnCreateProbability
+	if _, set := os.LookupEnv(ShortCircuitManagedFields); set {
+		probability = 0
+	}
+	f = NewProbabilisticSkipNonAppliedManager(f, objectCreater, kind, probability)
 	return NewFieldManager(f)
 }
 
