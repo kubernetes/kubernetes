@@ -128,6 +128,18 @@ aliases:
     - justaugustus # SIG Chair
     - saschagrunert # Branch Manager
     - tpepper # SIG Chair / Patch Release Team
+  build-image-approvers:
+    - BenTheElder
+    - cblecker
+    - dims
+    - justaugustus
+    - listx
+  build-image-reviewers:
+    - BenTheElder
+    - cblecker
+    - dims
+    - justaugustus
+    - listx
 
   sig-storage-reviewers:
     - saad-ali
