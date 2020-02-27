@@ -214,14 +214,14 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 			if len(pods) == 0 {
 				priorityName = lowPriorityClassName
 			}
-			pods[i] = createPausePod(f, pausePodConfig{
+			pods = append(pods, createPausePod(f, pausePodConfig{
 				Name:              fmt.Sprintf("pod%d-%v", i, priorityName),
 				PriorityClassName: priorityName,
 				Resources: &v1.ResourceRequirements{
 					Requests: podRes,
 				},
 				NodeName: node.Name,
-			})
+			}))
 			framework.Logf("Created pod: %v", pods[i].Name)
 		}
 		if len(pods) < 2 {
