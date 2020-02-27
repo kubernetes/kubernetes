@@ -816,7 +816,6 @@ egressSelections:
     transport:
       uds:
         udsName: /etc/srv/kubernetes/konnectivity-server/konnectivity-server.socket
-
 - name: master
   connection:
     proxyProtocol: Direct
