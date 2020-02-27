@@ -29,10 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authentication/user"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/features"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -319,8 +316,6 @@ func NewObjectInterfacesForTest() admission.ObjectInterfaces {
 }
 
 func TestValidate(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodOverhead, true)()
-
 	tests := []struct {
 		name         string
 		runtimeClass *v1beta1.RuntimeClass
@@ -368,6 +363,8 @@ func TestValidate(t *testing.T) {
 		},
 	}
 	rt := NewRuntimeClass()
+	rt.runtimeClassEnabled = true
+	rt.podOverheadEnabled = true
 	o := NewObjectInterfacesForTest()
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
