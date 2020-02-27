@@ -61,7 +61,7 @@ type Builder struct {
 	// it does not ever need to rely upon discovery.
 	objectTyper runtime.ObjectTyper
 
-	// codecFactory describes which codecs you want to use
+	// negotiatedSerializer controls how encodes and decodes data.
 	negotiatedSerializer runtime.NegotiatedSerializer
 
 	// local indicates that we cannot make server calls
