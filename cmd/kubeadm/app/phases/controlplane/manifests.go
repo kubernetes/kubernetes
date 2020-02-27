@@ -22,6 +22,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sort"
 
 	"github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
@@ -222,14 +223,23 @@ func getAuthzModes(authzModeExtraArgs string) string {
 
 		// only return the user provided mode if at least one was valid
 		if len(mode) > 0 {
-			klog.Warningf("the default kube-apiserver authorization-mode is %q; using %q",
-				strings.Join(defaultMode, ","),
-				strings.Join(mode, ","),
-			)
+			if !compareMode(defaultMode, mode) {
+				klog.Warningf("the default kube-apiserver authorization-mode is %q; using %q",
+					strings.Join(defaultMode, ","),
+					strings.Join(mode, ","),
+				)
+			}
 			return strings.Join(mode, ",")
 		}
 	}
 	return strings.Join(defaultMode, ",")
+}
+
+// compare two modes which contents are same regardless of index.
+func compareMode(modeA, modeB []string) bool {
+	sort.Strings(modeA)
+	sort.Strings(modeB)
+	return strings.Join(modeA, ",") == strings.Join(modeB, ",")
 }
 
 func isValidAuthzMode(authzMode string) bool {
