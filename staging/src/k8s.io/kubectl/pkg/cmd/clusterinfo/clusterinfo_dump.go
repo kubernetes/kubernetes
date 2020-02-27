@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"k8s.io/apimachinery/pkg/runtime"
 	"os"
 	"path"
 	"time"
@@ -93,11 +94,12 @@ var (
 	dumpLong = templates.LongDesc(i18n.T(`
     Dumps cluster info out suitable for debugging and diagnosing cluster problems.  By default, dumps everything to
     stdout. You can optionally specify a directory with --output-directory.  If you specify a directory, kubernetes will
-    build a set of files in that directory.  By default only dumps things in the 'kube-system' namespace, but you can
-    switch to a different namespace with the --namespaces flag, or specify --all-namespaces to dump all namespaces.
+    build a set of files in that directory.  By default, only dumps things in the 'kube-system' and the current 
+	context's namespace ('default' for example), but you can specify different namespaces with the --namespaces 
+	flag, or specify --all-namespaces to dump all namespaces.
 
-    The command also dumps the logs of all of the pods in the cluster, these logs are dumped into different directories
-    based on namespace and pod name.`))
+    When you specify a directory with --output-directory, the command also dumps the logs of all of the pods in the 
+	cluster, these logs are dumped into different directories based on namespace and pod name.`))
 
 	dumpExample = templates.Examples(i18n.T(`
     # Dump current cluster state to stdout
@@ -134,20 +136,12 @@ func (o *ClusterInfoDumpOptions) Complete(f cmdutil.Factory, cmd *cobra.Command)
 
 	o.PrintObj = printer.PrintObj
 
-	config, err := f.ToRESTConfig()
+	clientset, err := f.KubernetesClientSet()
 	if err != nil {
 		return err
 	}
-
-	o.CoreClient, err = corev1client.NewForConfig(config)
-	if err != nil {
-		return err
-	}
-
-	o.AppsClient, err = appsv1client.NewForConfig(config)
-	if err != nil {
-		return err
-	}
+	o.CoreClient = clientset.CoreV1()
+	o.AppsClient = clientset.AppsV1()
 
 	o.Timeout, err = cmdutil.GetPodRunningTimeoutFlag(cmd)
 	if err != nil {
@@ -166,10 +160,7 @@ func (o *ClusterInfoDumpOptions) Complete(f cmdutil.Factory, cmd *cobra.Command)
 }
 
 func (o *ClusterInfoDumpOptions) Run() error {
-	nodes, err := o.CoreClient.Nodes().List(context.TODO(), metav1.ListOptions{})
-	if err != nil {
-		return err
-	}
+	writingToStdout := len(o.OutputDir) == 0 || o.OutputDir == "-"
 
 	fileExtension := ".txt"
 	if o.PrintFlags.OutputFormat != nil {
@@ -181,7 +172,33 @@ func (o *ClusterInfoDumpOptions) Run() error {
 		}
 	}
 
-	if err := o.PrintObj(nodes, setupOutputWriter(o.OutputDir, o.Out, "nodes", fileExtension)); err != nil {
+	// When writing json to stdout, we need to wrap the entire output in []
+	if writingToStdout && *o.PrintFlags.OutputFormat == "json" {
+		o.Out.Write([]byte("["))
+		defer o.Out.Write([]byte("]"))
+	}
+
+	separatorNeeded := false
+
+	dump := func(object runtime.Object, outputPath string) error {
+		writer := setupOutputWriter(o.OutputDir, o.Out, outputPath, fileExtension)
+		if separatorNeeded {
+			switch *o.PrintFlags.OutputFormat {
+			case "json":
+				writer.Write([]byte(","))
+			case "yaml":
+				writer.Write([]byte("---\n"))
+			}
+		}
+		separatorNeeded = writingToStdout
+		return o.PrintObj(object, writer)
+	}
+
+	nodes, err := o.CoreClient.Nodes().List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+	if err := dump(nodes, "nodes"); err != nil {
 		return err
 	}
 
@@ -202,14 +219,16 @@ func (o *ClusterInfoDumpOptions) Run() error {
 			}
 		}
 	}
+
 	for _, namespace := range namespaces {
+
 		// TODO: this is repetitive in the extreme.  Use reflection or
 		// something to make this a for loop.
 		events, err := o.CoreClient.Events(namespace).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			return err
 		}
-		if err := o.PrintObj(events, setupOutputWriter(o.OutputDir, o.Out, path.Join(namespace, "events"), fileExtension)); err != nil {
+		if err := dump(events, path.Join(namespace, "events")); err != nil {
 			return err
 		}
 
@@ -217,7 +236,7 @@ func (o *ClusterInfoDumpOptions) Run() error {
 		if err != nil {
 			return err
 		}
-		if err := o.PrintObj(rcs, setupOutputWriter(o.OutputDir, o.Out, path.Join(namespace, "replication-controllers"), fileExtension)); err != nil {
+		if err := dump(rcs, path.Join(namespace, "replication-controllers")); err != nil {
 			return err
 		}
 
@@ -225,7 +244,7 @@ func (o *ClusterInfoDumpOptions) Run() error {
 		if err != nil {
 			return err
 		}
-		if err := o.PrintObj(svcs, setupOutputWriter(o.OutputDir, o.Out, path.Join(namespace, "services"), fileExtension)); err != nil {
+		if err := dump(svcs, path.Join(namespace, "services")); err != nil {
 			return err
 		}
 
@@ -233,7 +252,7 @@ func (o *ClusterInfoDumpOptions) Run() error {
 		if err != nil {
 			return err
 		}
-		if err := o.PrintObj(sets, setupOutputWriter(o.OutputDir, o.Out, path.Join(namespace, "daemonsets"), fileExtension)); err != nil {
+		if err := dump(sets, path.Join(namespace, "daemonsets")); err != nil {
 			return err
 		}
 
@@ -241,7 +260,7 @@ func (o *ClusterInfoDumpOptions) Run() error {
 		if err != nil {
 			return err
 		}
-		if err := o.PrintObj(deps, setupOutputWriter(o.OutputDir, o.Out, path.Join(namespace, "deployments"), fileExtension)); err != nil {
+		if err := dump(deps, path.Join(namespace, "deployments")); err != nil {
 			return err
 		}
 
@@ -249,7 +268,7 @@ func (o *ClusterInfoDumpOptions) Run() error {
 		if err != nil {
 			return err
 		}
-		if err := o.PrintObj(rps, setupOutputWriter(o.OutputDir, o.Out, path.Join(namespace, "replicasets"), fileExtension)); err != nil {
+		if err := dump(rps, path.Join(namespace, "replicasets")); err != nil {
 			return err
 		}
 
@@ -257,8 +276,7 @@ func (o *ClusterInfoDumpOptions) Run() error {
 		if err != nil {
 			return err
 		}
-
-		if err := o.PrintObj(pods, setupOutputWriter(o.OutputDir, o.Out, path.Join(namespace, "pods"), fileExtension)); err != nil {
+		if err := dump(pods, path.Join(namespace, "pods")); err != nil {
 			return err
 		}
 
@@ -284,27 +302,26 @@ func (o *ClusterInfoDumpOptions) Run() error {
 			}
 		}
 
-		for ix := range pods.Items {
-			pod := &pods.Items[ix]
-			initcontainers := pod.Spec.InitContainers
-			containers := pod.Spec.Containers
-			writer := setupOutputWriter(o.OutputDir, o.Out, path.Join(namespace, pod.Name, "logs"), ".txt")
+		// Only output logs when not writing to stdout because they are not in json or yaml format, just raw text
+		if !writingToStdout {
+			for ix := range pods.Items {
+				pod := &pods.Items[ix]
+				initcontainers := pod.Spec.InitContainers
+				containers := pod.Spec.Containers
+				writer := setupOutputWriter(o.OutputDir, o.Out, path.Join(namespace, pod.Name, "logs"), ".txt")
 
-			for i := range initcontainers {
-				printContainer(writer, initcontainers[i], pod)
-			}
-			for i := range containers {
-				printContainer(writer, containers[i], pod)
+				for i := range initcontainers {
+					printContainer(writer, initcontainers[i], pod)
+				}
+				for i := range containers {
+					printContainer(writer, containers[i], pod)
+				}
 			}
 		}
 	}
 
-	dest := o.OutputDir
-	if len(dest) == 0 {
-		dest = "standard output"
-	}
-	if dest != "-" {
-		fmt.Fprintf(o.Out, "Cluster info dumped to %s\n", dest)
+	if !writingToStdout {
+		fmt.Fprintf(o.Out, "Cluster info dumped to %s\n", o.OutputDir)
 	}
 	return nil
 }

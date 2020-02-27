@@ -12,6 +12,7 @@ go_library(
     deps = [
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/net:go_default_library",
         "//staging/src/k8s.io/cli-runtime/pkg/genericclioptions:go_default_library",
         "//staging/src/k8s.io/cli-runtime/pkg/printers:go_default_library",
@@ -34,8 +35,15 @@ go_test(
     srcs = ["clusterinfo_dump_test.go"],
     embed = [":go_default_library"],
     deps = [
+        "//staging/src/k8s.io/api/apps/v1:go_default_library",
+        "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/cli-runtime/pkg/genericclioptions:go_default_library",
+        "//staging/src/k8s.io/client-go/rest/fake:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/cmd/testing:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/scheme:go_default_library",
+        "//vendor/gopkg.in/yaml.v2:go_default_library",
     ],
 )
 
