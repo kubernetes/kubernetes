@@ -298,6 +298,133 @@ func TestKubernetes(t *testing.T) {
 	testJSONPathSortOutput(randomPrintOrderTests, t)
 }
 
+func TestNestedRanges(t *testing.T) {
+	var input = []byte(`{
+		"items": [
+			{
+				"metadata": {
+					"name": "pod1"
+				},
+				"spec": {
+					"containers": [
+						{
+							"name": "foo",
+							"another": [
+								{ "name": "value1" },
+								{ "name": "value2" }
+							]
+						},
+						{
+							"name": "bar",
+							"another": [
+								{ "name": "value1" },
+								{ "name": "value2" }
+							]
+						}
+					]
+                }
+			},
+			{
+				"metadata": {
+					"name": "pod2"
+				},
+				"spec": {
+					"containers": [
+						{
+							"name": "baz",
+							"another": [
+								{ "name": "value1" },
+								{ "name": "value2" }
+							]
+						}
+					]
+                }
+			}
+		]
+	}`)
+	var data interface{}
+	err := json.Unmarshal(input, &data)
+	if err != nil {
+		t.Error(err)
+	}
+
+	testJSONPath(
+		[]jsonpathTest{
+			{
+				"nested range with a trailing newline",
+				`{range .items[*]}` +
+					`{.metadata.name}` +
+					`{":"}` +
+					`{range @.spec.containers[*]}` +
+					`{.name}` +
+					`{","}` +
+					`{end}` +
+					`{"+"}` +
+					`{end}`,
+				data,
+				"pod1:foo,bar,+pod2:baz,+",
+				false,
+			},
+		},
+		false,
+		t,
+	)
+
+	testJSONPath(
+		[]jsonpathTest{
+			{
+				"nested range with a trailing character within another nested range with a trailing newline",
+				`{range .items[*]}` +
+					`{.metadata.name}` +
+					`{"~"}` +
+					`{range @.spec.containers[*]}` +
+					`{.name}` +
+					`{":"}` +
+					`{range @.another[*]}` +
+					`{.name}` +
+					`{","}` +
+					`{end}` +
+					`{"+"}` +
+					`{end}` +
+					`{"#"}` +
+					`{end}`,
+				data,
+				"pod1~foo:value1,value2,+bar:value1,value2,+#pod2~baz:value1,value2,+#",
+				false,
+			},
+		},
+		false,
+		t,
+	)
+
+	testJSONPath(
+		[]jsonpathTest{
+			{
+				"two nested ranges at the same level with a trailing newline",
+				`{range .items[*]}` +
+					`{.metadata.name}` +
+					`{"\t"}` +
+					`{range @.spec.containers[*]}` +
+					`{.name}` +
+					`{" "}` +
+					`{end}` +
+					`{"\t"}` +
+					`{range @.spec.containers[*]}` +
+					`{.name}` +
+					`{" "}` +
+					`{end}` +
+					`{"\n"}` +
+					`{end}`,
+				data,
+				"pod1\tfoo bar \tfoo bar \npod2\tbaz \tbaz \n",
+				false,
+			},
+		},
+		false,
+		t,
+	)
+}
+
 func TestFilterPartialMatchesSometimesMissingAnnotations(t *testing.T) {
 	// for https://issues.k8s.io/45546
 	var input = []byte(`{
