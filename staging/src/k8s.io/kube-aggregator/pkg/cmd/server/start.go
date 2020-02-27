@@ -19,7 +19,6 @@ package server
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -142,15 +141,8 @@ func (o AggregatorOptions) RunAggregator(stopCh <-chan struct{}) error {
 		},
 	}
 
-	var err error
-	config.ExtraConfig.ProxyClientCert, err = ioutil.ReadFile(o.ProxyClientCertFile)
-	if err != nil {
-		return err
-	}
-	config.ExtraConfig.ProxyClientKey, err = ioutil.ReadFile(o.ProxyClientKeyFile)
-	if err != nil {
-		return err
-	}
+	config.ExtraConfig.ProxyClientCertFile = o.ProxyClientCertFile
+	config.ExtraConfig.ProxyClientKeyFile = o.ProxyClientKeyFile
 
 	server, err := config.Complete().NewWithDelegate(genericapiserver.NewEmptyDelegate())
 	if err != nil {

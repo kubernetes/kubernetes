@@ -32,7 +32,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/server/egressselector"
@@ -50,6 +49,8 @@ import (
 	listers "k8s.io/kube-aggregator/pkg/client/listers/apiregistration/v1"
 	"k8s.io/kube-aggregator/pkg/controllers"
 )
+
+type certKeyFunc func() ([]byte, []byte)
 
 // ServiceResolver knows how to convert a service reference into an actual location.
 type ServiceResolver interface {
@@ -70,8 +71,9 @@ type AvailableConditionController struct {
 	endpointsLister v1listers.EndpointsLister
 	endpointsSynced cache.InformerSynced
 
-	discoveryClient *http.Client
-	serviceResolver ServiceResolver
+	proxyTransport             *http.Transport
+	proxyCurrentCertKeyContent certKeyFunc
+	serviceResolver            ServiceResolver
 
 	// To allow injection for testing.
 	syncFn func(key string) error
@@ -90,8 +92,7 @@ func NewAvailableConditionController(
 	endpointsInformer v1informers.EndpointsInformer,
 	apiServiceClient apiregistrationclient.APIServicesGetter,
 	proxyTransport *http.Transport,
-	proxyClientCert []byte,
-	proxyClientKey []byte,
+	proxyCurrentCertKeyContent certKeyFunc,
 	serviceResolver ServiceResolver,
 	egressSelector *egressselector.EgressSelector,
 ) (*AvailableConditionController, error) {
@@ -110,39 +111,8 @@ func NewAvailableConditionController(
 			// the maximum disruption time to a minimum, but it does prevent hot loops.
 			workqueue.NewItemExponentialFailureRateLimiter(5*time.Millisecond, 30*time.Second),
 			"AvailableConditionController"),
-	}
-
-	// if a particular transport was specified, use that otherwise build one
-	// construct an http client that will ignore TLS verification (if someone owns the network and messes with your status
-	// that's not so bad) and sets a very short timeout.  This is a best effort GET that provides no additional information
-	restConfig := &rest.Config{
-		TLSClientConfig: rest.TLSClientConfig{
-			Insecure: true,
-			CertData: proxyClientCert,
-			KeyData:  proxyClientKey,
-		},
-	}
-
-	if egressSelector != nil {
-		networkContext := egressselector.Cluster.AsNetworkContext()
-		var egressDialer utilnet.DialFunc
-		egressDialer, err := egressSelector.Lookup(networkContext)
-		if err != nil {
-			return nil, err
-		}
-		restConfig.Dial = egressDialer
-	} else if proxyTransport != nil && proxyTransport.DialContext != nil {
-		restConfig.Dial = proxyTransport.DialContext
-	}
-
-	transport, err := rest.TransportFor(restConfig)
-	if err != nil {
-		return nil, err
-	}
-	c.discoveryClient = &http.Client{
-		Transport: transport,
-		// the request should happen quickly.
-		Timeout: 5 * time.Second,
+		proxyTransport:             proxyTransport,
+		proxyCurrentCertKeyContent: proxyCurrentCertKeyContent,
 	}
 
 	// resync on this one because it is low cardinality and rechecking the actual discovery
@@ -181,6 +151,34 @@ func (c *AvailableConditionController) sync(key string) error {
 	}
 	if err != nil {
 		return err
+	}
+
+	// if a particular transport was specified, use that otherwise build one
+	// construct an http client that will ignore TLS verification (if someone owns the network and messes with your status
+	// that's not so bad) and sets a very short timeout.  This is a best effort GET that provides no additional information
+	restConfig := &rest.Config{
+		TLSClientConfig: rest.TLSClientConfig{
+			Insecure: true,
+		},
+	}
+
+	if c.proxyCurrentCertKeyContent != nil {
+		proxyClientCert, proxyClientKey := c.proxyCurrentCertKeyContent()
+
+		restConfig.TLSClientConfig.CertData = proxyClientCert
+		restConfig.TLSClientConfig.KeyData = proxyClientKey
+	}
+	if c.proxyTransport != nil && c.proxyTransport.DialContext != nil {
+		restConfig.Dial = c.proxyTransport.DialContext
+	}
+	restTransport, err := rest.TransportFor(restConfig)
+	if err != nil {
+		panic(err)
+	}
+	discoveryClient := &http.Client{
+		Transport: restTransport,
+		// the request should happen quickly.
+		Timeout: 5 * time.Second,
 	}
 
 	apiService := originalAPIService.DeepCopy()
@@ -298,7 +296,7 @@ func (c *AvailableConditionController) sync(key string) error {
 
 					// setting the system-masters identity ensures that we will always have access rights
 					transport.SetAuthProxyHeaders(newReq, "system:kube-aggregator", []string{"system:masters"}, nil)
-					resp, err := c.discoveryClient.Do(newReq)
+					resp, err := discoveryClient.Do(newReq)
 					if resp != nil {
 						resp.Body.Close()
 						// we should always been in the 200s or 300s
