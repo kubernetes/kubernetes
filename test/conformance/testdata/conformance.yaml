@@ -1663,6 +1663,14 @@
     fail.
   release: v1.14
   file: test/e2e/common/configmap.go
+- testname: ConfigMap lifecycle
+  codename: '[sig-node] ConfigMap should run through a ConfigMap lifecycle [Conformance]'
+  description: Attempt to create a ConfigMap. Patch the created ConfigMap. Fetching
+    the ConfigMap MUST reflect changes. By fetching all the ConfigMaps via a Label
+    selector it MUST find the ConfigMap by it's static label and updated value. The
+    ConfigMap must be deleted by Collection.
+  release: v1.18
+  file: test/e2e/common/configmap.go
 - testname: DownwardAPI, environment for CPU and memory limits and requests
   codename: '[sig-node] Downward API should provide container''s limits.cpu/memory
     and requests.cpu/memory as env vars [NodeConformance] [Conformance]'
