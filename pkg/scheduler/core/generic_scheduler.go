@@ -953,6 +953,7 @@ func (g *genericScheduler) selectVictimsOnNode(
 		}
 		status := prof.RunPreFilterExtensionRemovePod(ctx, state, pod, rp, nodeInfo)
 		if !status.IsSuccess() {
+			nodeInfo.AddPod(rp)
 			return status.AsError()
 		}
 		return nil
@@ -961,6 +962,7 @@ func (g *genericScheduler) selectVictimsOnNode(
 		nodeInfo.AddPod(ap)
 		status := prof.RunPreFilterExtensionAddPod(ctx, state, pod, ap, nodeInfo)
 		if !status.IsSuccess() {
+			nodeInfo.RemovePod(ap)
 			return status.AsError()
 		}
 		return nil
@@ -970,10 +972,10 @@ func (g *genericScheduler) selectVictimsOnNode(
 	podPriority := podutil.GetPodPriority(pod)
 	for _, p := range nodeInfo.Pods() {
 		if podutil.GetPodPriority(p) < podPriority {
-			potentialVictims = append(potentialVictims, p)
 			if err := removePod(p); err != nil {
-				return nil, 0, false
+				continue
 			}
+			potentialVictims = append(potentialVictims, p)
 		}
 	}
 	// If the new pod does not fit after removing all the lower priority pods,
