@@ -18,7 +18,6 @@ package resource
 
 import (
 	"context"
-	"strconv"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -75,27 +74,19 @@ func (m *Helper) WithFieldManager(fieldManager string) *Helper {
 	return m
 }
 
-func (m *Helper) Get(namespace, name string, export bool) (runtime.Object, error) {
+func (m *Helper) Get(namespace, name string) (runtime.Object, error) {
 	req := m.RESTClient.Get().
 		NamespaceIfScoped(namespace, m.NamespaceScoped).
 		Resource(m.Resource).
 		Name(name)
-	if export {
-		// TODO: I should be part of GetOptions
-		req.Param("export", strconv.FormatBool(export))
-	}
 	return req.Do(context.TODO()).Get()
 }
 
-func (m *Helper) List(namespace, apiVersion string, export bool, options *metav1.ListOptions) (runtime.Object, error) {
+func (m *Helper) List(namespace, apiVersion string, options *metav1.ListOptions) (runtime.Object, error) {
 	req := m.RESTClient.Get().
 		NamespaceIfScoped(namespace, m.NamespaceScoped).
 		Resource(m.Resource).
 		VersionedParams(options, metav1.ParameterCodec)
-	if export {
-		// TODO: I should be part of ListOptions
-		req.Param("export", strconv.FormatBool(export))
-	}
 	return req.Do(context.TODO()).Get()
 }
 
