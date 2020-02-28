@@ -109,13 +109,14 @@ func (ss *scaleSet) AttachDisk(isManagedDisk bool, diskName, diskURI string, nod
 			klog.Errorf("azureDisk - begin to filterNonExistingDisks(%s, %s) on rg(%s) vm(%s)", diskName, diskURI, nodeResourceGroup, nodeName)
 			disks := ss.filterNonExistingDisks(ctx, *newVM.VirtualMachineScaleSetVMProperties.StorageProfile.DataDisks)
 			newVM.VirtualMachineScaleSetVMProperties.StorageProfile.DataDisks = &disks
-			if rerr = ss.VirtualMachineScaleSetVMsClient.Update(ctx, nodeResourceGroup, ssName, instanceID, newVM, "attach_disk"); rerr != nil {
-				return rerr.Error()
-			}
+			rerr = ss.VirtualMachineScaleSetVMsClient.Update(ctx, nodeResourceGroup, ssName, instanceID, newVM, "attach_disk")
 		}
 	}
 
-	klog.V(2).Infof("azureDisk - update(%s): vm(%s) - attach disk(%s, %s) succeeded", nodeResourceGroup, nodeName, diskName, diskURI)
+	klog.V(2).Infof("azureDisk - update(%s): vm(%s) - attach disk(%s, %s)  returned with %v", nodeResourceGroup, nodeName, diskName, diskURI, rerr)
+	if rerr != nil {
+		return rerr.Error()
+	}
 	return nil
 }
 
@@ -181,14 +182,14 @@ func (ss *scaleSet) DetachDisk(diskName, diskURI string, nodeName types.NodeName
 			klog.Errorf("azureDisk - begin to filterNonExistingDisks(%s, %s) on rg(%s) vm(%s)", diskName, diskURI, nodeResourceGroup, nodeName)
 			disks := ss.filterNonExistingDisks(ctx, *newVM.VirtualMachineScaleSetVMProperties.StorageProfile.DataDisks)
 			newVM.VirtualMachineScaleSetVMProperties.StorageProfile.DataDisks = &disks
-			if rerr = ss.VirtualMachineScaleSetVMsClient.Update(ctx, nodeResourceGroup, ssName, instanceID, newVM, "detach_disk"); rerr != nil {
-				return rerr.Error()
-			}
+			rerr = ss.VirtualMachineScaleSetVMsClient.Update(ctx, nodeResourceGroup, ssName, instanceID, newVM, "detach_disk")
 		}
 	}
 
-	klog.V(2).Infof("azureDisk - update(%s): vm(%s) - detach disk(%s, %s) succeeded", nodeResourceGroup, nodeName, diskName, diskURI)
-
+	klog.V(2).Infof("azureDisk - update(%s): vm(%s) - detach disk(%s, %s) returned with %v", nodeResourceGroup, nodeName, diskName, diskURI, rerr)
+	if rerr != nil {
+		return rerr.Error()
+	}
 	return nil
 }
 
