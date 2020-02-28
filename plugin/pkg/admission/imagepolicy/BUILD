@@ -24,6 +24,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/util/cache:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/yaml:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/admission:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/server/egressselector:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/webhook:go_default_library",
         "//staging/src/k8s.io/client-go/rest:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",

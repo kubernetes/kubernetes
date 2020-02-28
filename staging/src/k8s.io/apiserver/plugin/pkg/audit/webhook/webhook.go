@@ -22,8 +22,8 @@ import (
 	"fmt"
 	"time"
 
-	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/apis/audit/install"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/server/egressselector"
