@@ -38,7 +38,7 @@ Import Path: `k8s.io/metrics/pkg/apis/custom_metrics`.
 This API allows consumers to access resource metrics (CPU and memory) for
 pods and nodes.
 
-The API is implemented by [Heapster](https://github.com/kubernetes/heapster) and [metrics-server](https://github.com/kubernetes-incubator/metrics-server).
+The API is implemented by [metrics-server](https://github.com/kubernetes-incubator/metrics-server).
 
 Import Path: `k8s.io/metrics/pkg/apis/metrics`.
 
@@ -54,7 +54,7 @@ page](http://kubernetes.io/community/).
 
 You can reach the maintainers of this repository at:
 
-- Slack: #sig-instrumentation channel at [kubernetes.slack.com](https://kubernetes.slack.com), you can get an
+- Slack: [#sig-instrumentation channel](https://kubernetes.slack.com/messages/sig-instrumentation), you can get an
   invite at [slack.kubernetes.io](https://slack.kubernetes.io).
 - [Mailing List](https://groups.google.com/forum/#!forum/kubernetes-sig-instrumentation)
 
