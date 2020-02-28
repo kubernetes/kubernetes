@@ -19,7 +19,6 @@ package azure
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"path"
 	"strings"
 	"sync"
@@ -46,7 +45,7 @@ const (
 	errLeaseFailed       = "AcquireDiskLeaseFailed"
 	errLeaseIDMissing    = "LeaseIdMissing"
 	errContainerNotFound = "ContainerNotFound"
-	errDiskBlobNotFound  = "DiskBlobNotFound"
+	errDiskNotFound      = "is not found"
 )
 
 var defaultBackOff = kwait.Backoff{
@@ -290,20 +289,6 @@ func (c *controllerCommon) DisksAreAttached(diskNames []string, nodeName types.N
 	return attached, nil
 }
 
-func filterDetachingDisks(unfilteredDisks []compute.DataDisk) []compute.DataDisk {
-	filteredDisks := []compute.DataDisk{}
-	for _, disk := range unfilteredDisks {
-		if disk.ToBeDetached != nil && *disk.ToBeDetached {
-			if disk.Name != nil {
-				klog.V(2).Infof("Filtering disk: %s with ToBeDetached flag set.", *disk.Name)
-			}
-		} else {
-			filteredDisks = append(filteredDisks, disk)
-		}
-	}
-	return filteredDisks
-}
-
 func (c *controllerCommon) filterNonExistingDisks(ctx context.Context, unfilteredDisks []compute.DataDisk) []compute.DataDisk {
 	filteredDisks := []compute.DataDisk{}
 	for _, disk := range unfilteredDisks {
@@ -336,11 +321,11 @@ func (c *controllerCommon) checkDiskExists(ctx context.Context, diskURI string) 
 		return false, err
 	}
 
-	if _, rerr := c.cloud.DisksClient.Get(ctx, resourceGroup, diskName); rerr != nil {
-		if rerr.HTTPStatusCode == http.StatusNotFound {
+	if _, err := c.cloud.DisksClient.Get(ctx, resourceGroup, diskName); err != nil {
+		if strings.Contains(err.Error(), errDiskNotFound) {
 			return false, nil
 		}
-		return false, rerr.Error()
+		return false, err
 	}
 
 	return true, nil
