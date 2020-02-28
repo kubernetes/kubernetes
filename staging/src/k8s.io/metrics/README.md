@@ -38,7 +38,7 @@ Import Path: `k8s.io/metrics/pkg/apis/custom_metrics`.
 This API allows consumers to access resource metrics (CPU and memory) for
 pods and nodes.
 
-The API is implemented by [metrics-server](https://github.com/kubernetes-incubator/metrics-server).
+The API is implemented by [metrics-server](https://github.com/kubernetes-sigs/metrics-server).
 
 Import Path: `k8s.io/metrics/pkg/apis/metrics`.
 
