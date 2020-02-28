@@ -69,6 +69,12 @@ func (s *runtimeState) setRuntimeState(err error) {
 	s.runtimeError = err
 }
 
+func (s *runtimeState) getRuntimeState() error {
+	s.Lock()
+	defer s.Unlock()
+	return s.runtimeError
+}
+
 func (s *runtimeState) setStorageState(err error) {
 	s.Lock()
 	defer s.Unlock()

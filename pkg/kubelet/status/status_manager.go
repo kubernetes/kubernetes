@@ -544,6 +544,8 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 	newPod, patchBytes, err := statusutil.PatchPodStatus(m.kubeClient, pod.Namespace, pod.Name, pod.UID, *oldStatus, mergePodStatus(*oldStatus, status.status))
 	klog.V(3).Infof("Patch status for pod %q with %q", format.Pod(pod), patchBytes)
 	if err != nil {
+		klog.Infof("oldStatus %v", *oldStatus)
+		klog.Infof("status %v", status.status)
 		klog.Warningf("Failed to update status for pod %q: %v", format.Pod(pod), err)
 		return
 	}

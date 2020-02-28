@@ -1687,7 +1687,33 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 	pullSecrets := kl.getPullSecretsForPod(pod)
 
 	// Call the container runtime's SyncPod callback
-	result := kl.containerRuntime.SyncPod(pod, podStatus, pullSecrets, kl.backOff)
+	result, podIPs, sandboxID := kl.containerRuntime.SyncPodSandbox(pod, podStatus, pullSecrets, kl.backOff)
+	kl.reasonCache.Update(pod.UID, result)
+	if err := result.Error(); err != nil {
+		// Do not return error if the only failures were pods in backoff
+		for _, r := range result.SyncResults {
+			if r.Error != kubecontainer.ErrCrashLoopBackOff && r.Error != images.ErrImagePullBackOff {
+				// Do not record an event here, as we keep all event logging for sync pod failures
+				// local to container runtime so we get better errors
+				return err
+			}
+		}
+
+		return nil
+	}
+	if len(podIPs) != 0 {
+		apiPodStatus.PodIP = podIPs[0]
+		klog.V(4).Infof("pod ip of sandbox is: %v", apiPodStatus.PodIP)
+		var runtimeErr error
+		kl.updateRuntimeUp()
+		if runtimeErr = kl.runtimeState.getRuntimeState(); runtimeErr != nil {
+			klog.Infof("runtime state is : %v", runtimeErr)
+		}
+		// Update status in the status manager
+		kl.statusManager.SetPodStatus(pod, apiPodStatus)
+	}
+
+	result = kl.containerRuntime.SyncPod(pod, podStatus, pullSecrets, kl.backOff, podIPs, sandboxID)
 	kl.reasonCache.Update(pod.UID, result)
 	if err := result.Error(); err != nil {
 		// Do not return error if the only failures were pods in backoff

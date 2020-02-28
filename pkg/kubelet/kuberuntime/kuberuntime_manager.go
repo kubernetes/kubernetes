@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 	goruntime "runtime"
+	"sync"
 	"time"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
@@ -133,6 +134,10 @@ type kubeGenericRuntimeManager struct {
 
 	// Cache last per-container error message to reduce log spam
 	logReduction *logreduction.LogReduction
+
+	podContainerChanges map[kubetypes.UID]podActions
+	// the lock protecting access to podContainerChanges
+	containerChangesLock sync.Mutex
 }
 
 // KubeGenericRuntime is a interface contains interfaces for container runtime and command.
@@ -190,6 +195,7 @@ func NewKubeGenericRuntimeManager(
 		legacyLogProvider:   legacyLogProvider,
 		runtimeClassManager: runtimeClassManager,
 		logReduction:        logreduction.NewLogReduction(identicalErrorDelay),
+		podContainerChanges: make(map[kubetypes.UID]podActions),
 	}
 
 	typedVersion, err := kubeRuntimeManager.getTypedVersion()
@@ -641,12 +647,25 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 //  2. Kill pod sandbox if necessary.
 //  3. Kill any containers that should not be running.
 //  4. Create sandbox if necessary.
-//  5. Create ephemeral containers.
-//  6. Create init containers.
-//  7. Create normal containers.
-func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontainer.PodStatus, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff) (result kubecontainer.PodSyncResult) {
+func (m *kubeGenericRuntimeManager) SyncPodSandbox(pod *v1.Pod, podStatus *kubecontainer.PodStatus, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff) (result kubecontainer.PodSyncResult, podIPs []string, podSandboxID string) {
 	// Step 1: Compute sandbox and container changes.
 	podContainerChanges := m.computePodActions(pod, podStatus)
+
+	m.containerChangesLock.Lock()
+	if m.podContainerChanges == nil {
+		m.podContainerChanges = make(map[kubetypes.UID]podActions)
+	}
+	m.podContainerChanges[pod.UID] = podContainerChanges
+	m.containerChangesLock.Unlock()
+
+	defer func() {
+		if err := result.Error(); err != nil {
+			m.containerChangesLock.Lock()
+			delete(m.podContainerChanges, pod.UID)
+			m.containerChangesLock.Unlock()
+		}
+	}()
+
 	klog.V(3).Infof("computePodActions got %+v for pod %q", podContainerChanges, format.Pod(pod))
 	if podContainerChanges.CreateSandbox {
 		ref, err := ref.GetReference(legacyscheme.Scheme, pod)
@@ -707,13 +726,12 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontaine
 	//
 	// We default to the IPs in the passed-in pod status, and overwrite them if the
 	// sandbox needs to be (re)started.
-	var podIPs []string
 	if podStatus != nil {
 		podIPs = podStatus.IPs
 	}
 
 	// Step 4: Create a sandbox for the pod if necessary.
-	podSandboxID := podContainerChanges.SandboxID
+	podSandboxID = podContainerChanges.SandboxID
 	if podContainerChanges.CreateSandbox {
 		var msg string
 		var err error
@@ -754,7 +772,13 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontaine
 			klog.V(4).Infof("Determined the ip %v for pod %q after sandbox changed", podIPs, format.Pod(pod))
 		}
 	}
+	return
+}
 
+//  5. Create ephemeral containers.
+//  6. Create init containers.
+//  7. Create normal containers.
+func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontainer.PodStatus, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff, podIPs []string, podSandboxID string) (result kubecontainer.PodSyncResult) {
 	// the start containers routines depend on pod ip(as in primary pod ip)
 	// instead of trying to figure out if we have 0 < len(podIPs)
 	// everytime, we short circuit it here
@@ -766,6 +790,11 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontaine
 	// Get podSandboxConfig for containers to start.
 	configPodSandboxResult := kubecontainer.NewSyncResult(kubecontainer.ConfigPodSandbox, podSandboxID)
 	result.AddSyncResult(configPodSandboxResult)
+
+	m.containerChangesLock.Lock()
+	podContainerChanges := m.podContainerChanges[pod.UID]
+	m.containerChangesLock.Unlock()
+
 	podSandboxConfig, err := m.generatePodSandboxConfig(pod, podContainerChanges.Attempt)
 	if err != nil {
 		message := fmt.Sprintf("GeneratePodSandboxConfig for pod %q failed: %v", format.Pod(pod), err)
@@ -832,6 +861,9 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontaine
 	for _, idx := range podContainerChanges.ContainersToStart {
 		start("container", &pod.Spec.Containers[idx])
 	}
+	m.containerChangesLock.Lock()
+	delete(m.podContainerChanges, pod.UID)
+	m.containerChangesLock.Unlock()
 
 	return
 }
