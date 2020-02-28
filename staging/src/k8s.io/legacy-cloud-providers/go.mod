@@ -21,7 +21,7 @@ require (
 	github.com/satori/go.uuid v1.2.0 // indirect
 	github.com/stretchr/testify v1.3.0
 	github.com/vmware/govmomi v0.20.1
-	golang.org/x/crypto v0.0.0-20190820162420-60c769a6c586
+	golang.org/x/crypto v0.0.0-20200220183623-bac4c82f6975
 	golang.org/x/oauth2 v0.0.0-20190604053449-0f29369cfe45
 	golang.org/x/sys v0.0.0-20190813064441-fde4db37ae7a
 	google.golang.org/api v0.6.1-0.20190607001116-5213b8090861
