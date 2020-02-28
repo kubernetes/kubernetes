@@ -537,3 +537,96 @@ func TestShuffleStrings(t *testing.T) {
 		}
 	}
 }
+
+func TestFilterIncorrectIPVersion(t *testing.T) {
+	testCases := []struct {
+		desc            string
+		ipString        []string
+		wantIPv6        bool
+		expectCorrect   []string
+		expectIncorrect []string
+	}{
+		{
+			desc:            "empty input IPv4",
+			ipString:        []string{},
+			wantIPv6:        false,
+			expectCorrect:   nil,
+			expectIncorrect: nil,
+		},
+		{
+			desc:            "empty input IPv6",
+			ipString:        []string{},
+			wantIPv6:        true,
+			expectCorrect:   nil,
+			expectIncorrect: nil,
+		},
+		{
+			desc:            "want IPv4 and receive IPv6",
+			ipString:        []string{"fd00:20::1"},
+			wantIPv6:        false,
+			expectCorrect:   nil,
+			expectIncorrect: []string{"fd00:20::1"},
+		},
+		{
+			desc:            "want IPv6 and receive IPv4",
+			ipString:        []string{"192.168.200.2"},
+			wantIPv6:        true,
+			expectCorrect:   nil,
+			expectIncorrect: []string{"192.168.200.2"},
+		},
+		{
+			desc:            "want IPv6 and receive IPv4 and IPv6",
+			ipString:        []string{"192.168.200.2", "192.1.34.23", "fd00:20::1", "2001:db9::3"},
+			wantIPv6:        true,
+			expectCorrect:   []string{"fd00:20::1", "2001:db9::3"},
+			expectIncorrect: []string{"192.168.200.2", "192.1.34.23"},
+		},
+		{
+			desc:            "want IPv4 and receive IPv4 and IPv6",
+			ipString:        []string{"192.168.200.2", "192.1.34.23", "fd00:20::1", "2001:db9::3"},
+			wantIPv6:        false,
+			expectCorrect:   []string{"192.168.200.2", "192.1.34.23"},
+			expectIncorrect: []string{"fd00:20::1", "2001:db9::3"},
+		},
+		{
+			desc:            "want IPv4 and receive IPv4 only",
+			ipString:        []string{"192.168.200.2", "192.1.34.23"},
+			wantIPv6:        false,
+			expectCorrect:   []string{"192.168.200.2", "192.1.34.23"},
+			expectIncorrect: nil,
+		},
+		{
+			desc:            "want IPv6 and receive IPv4 only",
+			ipString:        []string{"192.168.200.2", "192.1.34.23"},
+			wantIPv6:        true,
+			expectCorrect:   nil,
+			expectIncorrect: []string{"192.168.200.2", "192.1.34.23"},
+		},
+		{
+			desc:            "want IPv4 and receive IPv6 only",
+			ipString:        []string{"fd00:20::1", "2001:db9::3"},
+			wantIPv6:        false,
+			expectCorrect:   nil,
+			expectIncorrect: []string{"fd00:20::1", "2001:db9::3"},
+		},
+		{
+			desc:            "want IPv6 and receive IPv6 only",
+			ipString:        []string{"fd00:20::1", "2001:db9::3"},
+			wantIPv6:        true,
+			expectCorrect:   []string{"fd00:20::1", "2001:db9::3"},
+			expectIncorrect: nil,
+		},
+	}
+
+	for _, testcase := range testCases {
+		t.Run(testcase.desc, func(t *testing.T) {
+			correct, incorrect := FilterIncorrectIPVersion(testcase.ipString, testcase.wantIPv6)
+			if !reflect.DeepEqual(testcase.expectCorrect, correct) {
+				t.Errorf("Test %v failed: expected %v, got %v", testcase.desc, testcase.expectCorrect, correct)
+			}
+			if !reflect.DeepEqual(testcase.expectIncorrect, incorrect) {
+				t.Errorf("Test %v failed: expected %v, got %v", testcase.desc, testcase.expectIncorrect, incorrect)
+			}
+		})
+	}
+}
