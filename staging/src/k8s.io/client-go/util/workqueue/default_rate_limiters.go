@@ -62,24 +62,57 @@ func (r *BucketRateLimiter) NumRequeues(item interface{}) int {
 func (r *BucketRateLimiter) Forget(item interface{}) {
 }
 
+// itemState holds state for a single item in ItemBucketRateLimiter.
+type itemState struct {
+	// nextBatchStart is a time when the next batch starts.
+	// All requests before this batch should join this batch.
+	nextBatchStart time.Time
+	// limiter is used to rate limit starting new batches.
+	limiter *rate.Limiter
+}
+
 // ItemBucketRateLimiter implements a workqueue ratelimiter API using standard rate.Limiter.
-// Each key is using a separate limiter.
+// The rate limiter connects multiple items with the same key into batches.
+// It always keeps up to one future batch. Items can join that batch as long as it's not started yet.
+// Creating a new batch is rate limited according to qps and burst.
+//
+// Unlike other RateLimiters in this file, this RateLimiter isn't intended to be used to rate
+// limit error retries, rather the successful path.
+//
+// Intended usage:
+// // With qps = 1.0, burst = 1, the first batch can start instantanously, the next every 1s.
+// r := NewItemBucketRateLimiter(1.0, 1)
+//
+// t := time.Now()
+// queue.AddAfter("key1", r.When("key1")) // = AddAfter("key1", 0) => burst = 1 so it can go now.
+// time.Sleep(1 * time.Millisecond)
+//
+// queue.AddAfter("key1", r.When("key1")) // = AddAfter("key1", ~1s) => scheduled to be run at t + 1s
+// queue.AddAfter("key1", r.When("key1")) // = AddAfter("key1", ~1s) => scheduled to be run at t + 1s
+//
+// time.Sleep(1 * time.Second) // The t + 1s batch has started already.
+// queue.AddAfter("key1", r.When("key1")) // = AddAfter("key1", 1s)  // scheduled to be run at the next batch
+// queue.AddAfter("key2", r.When("key2"))
+//
+// // When key1 is deleted from the system.
+// queue.Forget("key1")
+//
 type ItemBucketRateLimiter struct {
-	r     rate.Limit
+	qps   float64
 	burst int
 
 	limitersLock sync.Mutex
-	limiters     map[interface{}]*rate.Limiter
+	limiters     map[interface{}]*itemState
 }
 
 var _ RateLimiter = &ItemBucketRateLimiter{}
 
 // NewItemBucketRateLimiter creates new ItemBucketRateLimiter instance.
-func NewItemBucketRateLimiter(r rate.Limit, burst int) *ItemBucketRateLimiter {
+func NewItemBucketRateLimiter(qps float64, burst int) *ItemBucketRateLimiter {
 	return &ItemBucketRateLimiter{
-		r:        r,
+		qps:      qps,
 		burst:    burst,
-		limiters: make(map[interface{}]*rate.Limiter),
+		limiters: make(map[interface{}]*itemState),
 	}
 }
 
@@ -88,13 +121,24 @@ func (r *ItemBucketRateLimiter) When(item interface{}) time.Duration {
 	r.limitersLock.Lock()
 	defer r.limitersLock.Unlock()
 
-	limiter, ok := r.limiters[item]
+	entry, ok := r.limiters[item]
 	if !ok {
-		limiter = rate.NewLimiter(r.r, r.burst)
-		r.limiters[item] = limiter
+		entry = &itemState{
+			// Set nextBucketStart far in past: January 1, year 1, 00:00:00 UTC.
+			nextBatchStart: time.Time{},
+			limiter:        rate.NewLimiter(rate.Limit(r.qps), r.burst),
+		}
+		r.limiters[item] = entry
 	}
 
-	return limiter.Reserve().Delay()
+	// Check when the next bucket starts, if it hasn't started yet, try to join that bucket.
+	if entry.nextBatchStart.After(time.Now()) {
+		return entry.nextBatchStart.Sub(time.Now())
+	}
+
+	delay := entry.limiter.Reserve().Delay()
+	entry.nextBatchStart = time.Now().Add(delay)
+	return delay
 }
 
 // NumRequeues returns always 0 (doesn't apply to ItemBucketRateLimiter).

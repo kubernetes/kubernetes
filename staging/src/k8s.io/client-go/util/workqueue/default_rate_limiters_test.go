@@ -19,8 +19,6 @@ package workqueue
 import (
 	"testing"
 	"time"
-
-	"golang.org/x/time/rate"
 )
 
 func TestItemExponentialFailureRateLimiter(t *testing.T) {
@@ -99,18 +97,24 @@ func TestItemExponentialFailureRateLimiterOverFlow(t *testing.T) {
 }
 
 func TestItemBucketRateLimiter(t *testing.T) {
-	limiter := NewItemBucketRateLimiter(rate.Every(100*time.Millisecond), 1)
+	limiter := NewItemBucketRateLimiter(10.0, 2)
 
 	// Use initial burst.
 	if got := limiter.When("one"); got != 0 {
-		t.Errorf("limiter.When(two) = %v; want 0", got)
+		t.Errorf("limiter.When(one) = %v; want 0", got)
 	}
+	if got := limiter.When("one"); got != 0 {
+		t.Errorf("limiter.When(one) = %v; want 0", got)
+	}
+
 	for i := 0; i < 1000; i++ {
-		limiter.When("one")
+		if got := limiter.When("one"); got == 0 {
+			t.Errorf("limiter.When(one) = %v; want > 0", got)
+		}
 	}
-	// limiter.When should be at this point = 1000 * rate.Limit.
-	// We set the threshold 1s below this value to avoid race conditions.
-	if got, want := limiter.When("one"), 990*100*time.Millisecond; got < want {
+	// limiter.When should be at this point = 1s / 10.0 = 100 ms.
+	// We check of 90ms to avoid races.
+	if got, want := limiter.When("one"), 90*time.Millisecond; got < want {
 		t.Errorf("limiter.When(one) = %v; want at least %v", got, want)
 	}
 
