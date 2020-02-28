@@ -30,7 +30,7 @@ import (
 
 // WithLimitUntilHealthy blocks all requests to the handler unless the API is healthy for the first time or it is a health or liveness check
 func WithLimitUntilHealthy(handler http.Handler, checks []healthz.HealthChecker) http.Handler {
-	healthyFirstTime := int32(0)
+	hasBeenHealthyBefore := int32(0)
 	allowedURLS := map[string]struct{}{
 		"healthz": {},
 		"livez":   {},
@@ -50,8 +50,8 @@ func WithLimitUntilHealthy(handler http.Handler, checks []healthz.HealthChecker)
 		}
 
 		// Runs the health checks to ensure that the apiserver is healthy
-		storedhealthyFirstTime := atomic.LoadInt32(&healthyFirstTime)
-		if storedhealthyFirstTime == 0 {
+		storedHasBeenHealthyBefore := atomic.LoadInt32(&hasBeenHealthyBefore)
+		if storedHasBeenHealthyBefore == 0 {
 			failed := false
 
 			for _, check := range checks {
@@ -62,11 +62,11 @@ func WithLimitUntilHealthy(handler http.Handler, checks []healthz.HealthChecker)
 			}
 
 			if !failed {
-				atomic.StoreInt32(&healthyFirstTime, 1)
+				atomic.StoreInt32(&hasBeenHealthyBefore, 1)
 			}
 		}
 
-		if _, ok := allowedURLS[urlPaths[1]]; storedhealthyFirstTime == 1 || isSelfRequest || ok {
+		if _, ok := allowedURLS[urlPaths[1]]; storedHasBeenHealthyBefore == 1 || isSelfRequest || ok {
 			handler.ServeHTTP(w, r)
 			return
 		}
