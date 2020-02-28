@@ -223,7 +223,7 @@ func getAuthzModes(authzModeExtraArgs string) string {
 
 		// only return the user provided mode if at least one was valid
 		if len(mode) > 0 {
-			if !compareMode(defaultMode, mode) {
+			if !compareAuthzModes(defaultMode, mode) {
 				klog.Warningf("the default kube-apiserver authorization-mode is %q; using %q",
 					strings.Join(defaultMode, ","),
 					strings.Join(mode, ","),
@@ -235,11 +235,17 @@ func getAuthzModes(authzModeExtraArgs string) string {
 	return strings.Join(defaultMode, ",")
 }
 
-// compare two modes which contents are same regardless of index.
-func compareMode(modeA, modeB []string) bool {
-	sort.Strings(modeA)
-	sort.Strings(modeB)
-	return strings.Join(modeA, ",") == strings.Join(modeB, ",")
+// compareAuthzModes compares two given authz modes and returns false if they do not match
+func compareAuthzModes(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i, m := range a {
+		if m != b[i] {
+			return false
+		}
+	}
+	return true
 }
 
 func isValidAuthzMode(authzMode string) bool {
