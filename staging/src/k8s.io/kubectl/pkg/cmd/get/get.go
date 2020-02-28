@@ -80,7 +80,6 @@ type GetOptions struct {
 	NoHeaders      bool
 	Sort           bool
 	IgnoreNotFound bool
-	Export         bool
 
 	genericclioptions.IOStreams
 }
@@ -183,8 +182,6 @@ func NewCmdGet(parent string, f cmdutil.Factory, streams genericclioptions.IOStr
 	cmd.Flags().BoolVarP(&o.AllNamespaces, "all-namespaces", "A", o.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
 	addOpenAPIPrintColumnFlags(cmd, o)
 	addServerPrintColumnFlags(cmd, o)
-	cmd.Flags().BoolVar(&o.Export, "export", o.Export, "If true, use 'export' for the resources.  Exported resources are stripped of cluster-specific information.")
-	cmd.Flags().MarkDeprecated("export", "This flag is deprecated and will be removed in future.")
 	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, "identifying the resource to get from a server.")
 	return cmd
 }
@@ -301,7 +298,7 @@ func (o *GetOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 // Validate checks the set of flags provided by the user.
 func (o *GetOptions) Validate(cmd *cobra.Command) error {
 	if len(o.Raw) > 0 {
-		if o.Watch || o.WatchOnly || len(o.LabelSelector) > 0 || o.Export {
+		if o.Watch || o.WatchOnly || len(o.LabelSelector) > 0 {
 			return fmt.Errorf("--raw may not be specified with other flags that filter the server request or alter the output")
 		}
 		if len(cmdutil.GetFlagString(cmd, "output")) > 0 {
@@ -473,7 +470,6 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 		FilenameParam(o.ExplicitNamespace, &o.FilenameOptions).
 		LabelSelectorParam(o.LabelSelector).
 		FieldSelectorParam(o.FieldSelector).
-		ExportParam(o.Export).
 		RequestChunksOf(chunkSize).
 		ResourceTypeOrNameArgs(true, args...).
 		ContinueOnError().
@@ -632,7 +628,6 @@ func (o *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []string)
 		FilenameParam(o.ExplicitNamespace, &o.FilenameOptions).
 		LabelSelectorParam(o.LabelSelector).
 		FieldSelectorParam(o.FieldSelector).
-		ExportParam(o.Export).
 		RequestChunksOf(o.ChunkSize).
 		ResourceTypeOrNameArgs(true, args...).
 		SingleResourceType().
