@@ -25,7 +25,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
-	"strings"
 
 	"k8s.io/klog"
 	"k8s.io/utils/mount"
@@ -65,13 +64,13 @@ const (
 
 // The constants are used to map from the machine type (number of CPUs) to the limit of
 // persistent disks that can be attached to an instance. Please refer to gcloud doc
-// https://cloud.google.com/compute/docs/disks/#increased_persistent_disk_limits
+// https://cloud.google.com/compute/docs/machine-types
 // These constants are all the documented attach limit minus one because the
 // node boot disk is considered an attachable disk so effective attach limit is
 // one less.
 const (
 	volumeLimitSmall = 15
-	VolumeLimitBig   = 127
+	volumeLimitBig   = 127
 )
 
 func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
@@ -149,12 +148,14 @@ func (plugin *gcePersistentDiskPlugin) GetVolumeLimits() (map[string]int64, erro
 		klog.Errorf("Failed to get instance type from GCE cloud provider")
 		return volumeLimits, nil
 	}
-	if strings.HasPrefix(instanceType, "n1-") || strings.HasPrefix(instanceType, "custom-") {
-		volumeLimits[util.GCEVolumeLimitKey] = VolumeLimitBig
-	} else {
-		volumeLimits[util.GCEVolumeLimitKey] = volumeLimitSmall
+	smallMachineTypes := []string{"f1-micro", "g1-small", "e2-micro", "e2-small", "e2-medium"}
+	for _, small := range smallMachineTypes {
+		if instanceType == small {
+			volumeLimits[util.GCEVolumeLimitKey] = volumeLimitSmall
+			return volumeLimits, nil
+		}
 	}
-
+	volumeLimits[util.GCEVolumeLimitKey] = volumeLimitBig
 	return volumeLimits, nil
 }
 
