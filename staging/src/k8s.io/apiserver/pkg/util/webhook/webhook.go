@@ -96,9 +96,7 @@ func newGenericWebhook(scheme *runtime.Scheme, codecFactory serializer.CodecFact
 	codec := codecFactory.LegacyCodec(groupVersions...)
 	clientConfig.ContentConfig.NegotiatedSerializer = serializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{Serializer: codec})
 
-	if customDial != nil {
-		clientConfig.Dial = customDial
-	}
+	clientConfig.Dial = customDial
 
 	restClient, err := rest.UnversionedRESTClientFor(clientConfig)
 	if err != nil {
