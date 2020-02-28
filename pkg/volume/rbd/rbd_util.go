@@ -731,6 +731,8 @@ func getRbdImageSize(output []byte) (int, error) {
 	info := struct {
 		Size int64 `json:"size"`
 	}{}
+	outputs := strings.Split(string(output), "\n")
+	output = []byte(outputs[len(outputs)-1])
 	if err := json.Unmarshal(output, &info); err != nil {
 		return 0, fmt.Errorf("parse rbd info output failed: %s, %v", string(output), err)
 	}
