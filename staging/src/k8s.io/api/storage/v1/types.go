@@ -312,6 +312,7 @@ type CSIDriverSpec struct {
 	// https://kubernetes-csi.github.io/docs/ephemeral-local-volumes.html
 	// A driver can support one or more of these modes and
 	// more modes may be added in the future.
+	// This field is beta.
 	// +optional
 	// +listType=set
 	VolumeLifecycleModes []VolumeLifecycleMode `json:"volumeLifecycleModes,omitempty" protobuf:"bytes,3,opt,name=volumeLifecycleModes"`

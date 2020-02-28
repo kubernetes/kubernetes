@@ -114,6 +114,7 @@ message CSIDriverSpec {
   // https://kubernetes-csi.github.io/docs/ephemeral-local-volumes.html
   // A driver can support one or more of these modes and
   // more modes may be added in the future.
+  // This field is beta.
   // +optional
   // +listType=set
   repeated string volumeLifecycleModes = 3;
