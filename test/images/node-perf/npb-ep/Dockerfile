@@ -34,7 +34,6 @@ RUN make EP CLASS=D
 # main container in the second build stage.
 RUN mkdir -p /lib-copy && find /usr/lib -name "*.so.*" -exec cp {} /lib-copy \;
 
-ARG BASEIMAGE
 FROM $BASEIMAGE
 
 COPY --from=build_node_perf_npb_ep /NPB3.3.1/NPB3.3-OMP/bin/ep.D.x /
