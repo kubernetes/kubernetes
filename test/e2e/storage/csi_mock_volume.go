@@ -21,7 +21,6 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -356,7 +355,6 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 	ginkgo.Context("CSI volume limit information using mock driver", func() {
 		ginkgo.It("should report attach limit when limit is bigger than 0 [Slow]", func() {
 			// define volume limit to be 2 for this test
-
 			var err error
 			init(testParameters{attachLimit: 2})
 			defer cleanup()
@@ -563,19 +561,15 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 })
 
 func waitForMaxVolumeCondition(pod *v1.Pod, cs clientset.Interface) error {
-	reg, err := regexp.Compile(`max.+volume.+count`)
-	if err != nil {
-		return err
-	}
 	waitErr := wait.PollImmediate(10*time.Second, csiPodUnschedulableTimeout, func() (bool, error) {
-		pod, err = cs.CoreV1().Pods(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
+		pod, err := cs.CoreV1().Pods(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
-		conditions := pod.Status.Conditions
-		for _, condition := range conditions {
-			matched := reg.MatchString(condition.Message)
-			if condition.Reason == v1.PodReasonUnschedulable && matched {
+		for _, c := range pod.Status.Conditions {
+			// Conformance tests cannot rely on specific output of optional fields (e.g., Reason
+			// and Message) because these fields are not suject to the deprecation policy.
+			if c.Type == v1.PodScheduled && c.Status == v1.ConditionFalse && c.Reason != "" && c.Message != "" {
 				return true, nil
 			}
 		}
