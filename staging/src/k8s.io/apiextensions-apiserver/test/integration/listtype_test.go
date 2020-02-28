@@ -67,6 +67,7 @@ properties:
     x-kubernetes-list-map-keys: ["a", "b"]
     items:
       type: object
+      required: ["a", "b"]
       properties:
         a:
           type: integer
@@ -86,6 +87,7 @@ properties:
     x-kubernetes-list-map-keys: ["a", "b"]
     items:
       type: object
+      required: ["a", "b"]
       properties:
         a:
           type: integer
@@ -106,9 +108,9 @@ kind: Foo
 apiVersion: tests.example.com/v1beta1
 metadata:
   name: foo
-correct-map: [{"a":1,"b":1,c:"1"},{"a":1,"b":2,c:"2"},{"a":1,c:"3"}]
+correct-map: [{"a":1,"b":1,c:"1"},{"a":1,"b":2,c:"2"},{"a":1,"b":3,c:"3"}]
 correct-set: [{"a":1,"b":1},{"a":1,"b":2},{"a":1},{"a":1,"b":4}]
-invalid-map: [{"a":1,"b":1,c:"1"},{"a":1,"b":2,c:"2"},{"a":1,c:"3"},{"a":1,"b":1,c:"4"}]
+invalid-map: [{"a":1,"b":1,c:"1"},{"a":1,"b":2,c:"2"},{"a":1,"b":3,c:"3"},{"a":1,"b":1,c:"4"}]
 invalid-set: [{"a":1,"b":1},{"a":1,"b":2},{"a":1},{"a":1,"b":4},{"a":1,"b":1}]
 `
 )
