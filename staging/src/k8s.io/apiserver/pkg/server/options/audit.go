@@ -325,7 +325,6 @@ func (o *AuditOptions) ApplyTo(
 		if checker == nil {
 			klog.V(2).Info("No audit policy file provided, no events will be recorded for webhook backend")
 		} else {
-
 			if c.EgressSelector != nil {
 				egressDialer, err := c.EgressSelector.Lookup(egressselector.Master.AsNetworkContext())
 				if err != nil {
