@@ -552,7 +552,7 @@ func buildGenericConfig(
 		lastErr = fmt.Errorf("failed to initialize admission: %v", err)
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIPriorityAndFairness) && s.GenericServerRunOptions.EnableInflightQuotaHandler {
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIPriorityAndFairness) && s.GenericServerRunOptions.EnablePriorityAndFairness {
 		genericConfig.FlowControl = BuildPriorityAndFairness(s, clientgoExternalClient, versionedInformers)
 	}
 
