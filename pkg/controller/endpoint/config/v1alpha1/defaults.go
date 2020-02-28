@@ -33,4 +33,13 @@ func RecommendedDefaultEndpointControllerConfiguration(obj *kubectrlmgrconfigv1a
 	if obj.ConcurrentEndpointSyncs == 0 {
 		obj.ConcurrentEndpointSyncs = 5
 	}
+
+	if obj.EndpointUpdatesQPS == 0.0 {
+		// Default 50.0 value matches default kube-api-qps limit for endpoint-controller.
+		obj.EndpointUpdatesQPS = 50.0
+	}
+
+	if obj.EndpointUpdatesBurst == 0 {
+		obj.EndpointUpdatesBurst = 1
+	}
 }

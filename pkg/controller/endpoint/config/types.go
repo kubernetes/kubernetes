@@ -33,4 +33,11 @@ type EndpointControllerConfiguration struct {
 	// in that period, they will be batched to a single endpoint update.
 	// Default 0 value means that each pod update triggers an endpoint update.
 	EndpointUpdatesBatchPeriod metav1.Duration
+
+	// EndpointUpdatesQPS defines a max number of pod-triggered endpoints updates.
+	EndpointUpdatesQPS float64
+
+	// EndpointUpdatesBurst defines a number of first pod-triggered endpoints updates that can be generated
+	// without additional delay.
+	EndpointUpdatesBurst int
 }

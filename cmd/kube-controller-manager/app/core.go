@@ -383,7 +383,8 @@ func startEndpointController(ctx ControllerContext) (http.Handler, bool, error) 
 		ctx.InformerFactory.Core().V1().Services(),
 		ctx.InformerFactory.Core().V1().Endpoints(),
 		ctx.ClientBuilder.ClientOrDie("endpoint-controller"),
-		ctx.ComponentConfig.EndpointController.EndpointUpdatesBatchPeriod.Duration,
+		ctx.ComponentConfig.EndpointController.EndpointUpdatesQPS,
+		ctx.ComponentConfig.EndpointController.EndpointUpdatesBurst,
 	).Run(int(ctx.ComponentConfig.EndpointController.ConcurrentEndpointSyncs), ctx.Stop)
 	return nil, true, nil
 }

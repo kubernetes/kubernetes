@@ -161,11 +161,11 @@ type endpointController struct {
 	endpointsStore cache.Store
 }
 
-func newController(url string, batchPeriod time.Duration) *endpointController {
+func newController(url string, qps float64) *endpointController {
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: url, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 	endpoints := NewEndpointController(informerFactory.Core().V1().Pods(), informerFactory.Core().V1().Services(),
-		informerFactory.Core().V1().Endpoints(), client, batchPeriod)
+		informerFactory.Core().V1().Endpoints(), client, qps, 1)
 	endpoints.podsSynced = alwaysReady
 	endpoints.servicesSynced = alwaysReady
 	endpoints.endpointsSynced = alwaysReady
@@ -181,7 +181,7 @@ func TestSyncEndpointsItemsPreserveNoSelector(t *testing.T) {
 	ns := metav1.NamespaceDefault
 	testServer, endpointsHandler := makeTestServer(t, ns)
 	defer testServer.Close()
-	endpoints := newController(testServer.URL, 0*time.Second)
+	endpoints := newController(testServer.URL, 50.0)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
@@ -205,7 +205,7 @@ func TestSyncEndpointsExistingNilSubsets(t *testing.T) {
 	ns := metav1.NamespaceDefault
 	testServer, endpointsHandler := makeTestServer(t, ns)
 	defer testServer.Close()
-	endpoints := newController(testServer.URL, 0*time.Second)
+	endpoints := newController(testServer.URL, 50.0)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
@@ -229,7 +229,7 @@ func TestSyncEndpointsExistingEmptySubsets(t *testing.T) {
 	ns := metav1.NamespaceDefault
 	testServer, endpointsHandler := makeTestServer(t, ns)
 	defer testServer.Close()
-	endpoints := newController(testServer.URL, 0*time.Second)
+	endpoints := newController(testServer.URL, 50.0)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
@@ -253,7 +253,7 @@ func TestSyncEndpointsNewNoSubsets(t *testing.T) {
 	ns := metav1.NamespaceDefault
 	testServer, endpointsHandler := makeTestServer(t, ns)
 	defer testServer.Close()
-	endpoints := newController(testServer.URL, 0*time.Second)
+	endpoints := newController(testServer.URL, 50.0)
 	endpoints.serviceStore.Add(&v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns},
 		Spec: v1.ServiceSpec{
@@ -269,7 +269,7 @@ func TestCheckLeftoverEndpoints(t *testing.T) {
 	ns := metav1.NamespaceDefault
 	testServer, _ := makeTestServer(t, ns)
 	defer testServer.Close()
-	endpoints := newController(testServer.URL, 0*time.Second)
+	endpoints := newController(testServer.URL, 50.0)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
@@ -295,7 +295,7 @@ func TestSyncEndpointsProtocolTCP(t *testing.T) {
 	ns := "other"
 	testServer, endpointsHandler := makeTestServer(t, ns)
 	defer testServer.Close()
-	endpoints := newController(testServer.URL, 0*time.Second)
+	endpoints := newController(testServer.URL, 50.0)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
@@ -339,7 +339,7 @@ func TestSyncEndpointsProtocolUDP(t *testing.T) {
 	ns := "other"
 	testServer, endpointsHandler := makeTestServer(t, ns)
 	defer testServer.Close()
-	endpoints := newController(testServer.URL, 0*time.Second)
+	endpoints := newController(testServer.URL, 50.0)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
@@ -383,7 +383,7 @@ func TestSyncEndpointsProtocolSCTP(t *testing.T) {
 	ns := "other"
 	testServer, endpointsHandler := makeTestServer(t, ns)
 	defer testServer.Close()
-	endpoints := newController(testServer.URL, 0*time.Second)
+	endpoints := newController(testServer.URL, 50.0)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
@@ -427,7 +427,7 @@ func TestSyncEndpointsItemsEmptySelectorSelectsAll(t *testing.T) {
 	ns := "other"
 	testServer, endpointsHandler := makeTestServer(t, ns)
 	defer testServer.Close()
-	endpoints := newController(testServer.URL, 0*time.Second)
+	endpoints := newController(testServer.URL, 50.0)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
@@ -467,7 +467,7 @@ func TestSyncEndpointsItemsEmptySelectorSelectsAllNotReady(t *testing.T) {
 	ns := "other"
 	testServer, endpointsHandler := makeTestServer(t, ns)
 	defer testServer.Close()
-	endpoints := newController(testServer.URL, 0*time.Second)
+	endpoints := newController(testServer.URL, 50.0)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
@@ -507,7 +507,7 @@ func TestSyncEndpointsItemsEmptySelectorSelectsAllMixed(t *testing.T) {
 	ns := "other"
 	testServer, endpointsHandler := makeTestServer(t, ns)
 	defer testServer.Close()
-	endpoints := newController(testServer.URL, 0*time.Second)
+	endpoints := newController(testServer.URL, 50.0)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
@@ -548,7 +548,7 @@ func TestSyncEndpointsItemsPreexisting(t *testing.T) {
 	ns := "bar"
 	testServer, endpointsHandler := makeTestServer(t, ns)
 	defer testServer.Close()
-	endpoints := newController(testServer.URL, 0*time.Second)
+	endpoints := newController(testServer.URL, 50.0)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
@@ -591,7 +591,7 @@ func TestSyncEndpointsItemsPreexistingIdentical(t *testing.T) {
 	ns := metav1.NamespaceDefault
 	testServer, endpointsHandler := makeTestServer(t, ns)
 	defer testServer.Close()
-	endpoints := newController(testServer.URL, 0*time.Second)
+	endpoints := newController(testServer.URL, 50.0)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			ResourceVersion: "1",
@@ -619,7 +619,7 @@ func TestSyncEndpointsItems(t *testing.T) {
 	ns := "other"
 	testServer, endpointsHandler := makeTestServer(t, ns)
 	defer testServer.Close()
-	endpoints := newController(testServer.URL, 0*time.Second)
+	endpoints := newController(testServer.URL, 50.0)
 	addPods(endpoints.podStore, ns, 3, 2, 0, false)
 	addPods(endpoints.podStore, "blah", 5, 2, 0, false) // make sure these aren't found!
 
@@ -664,7 +664,7 @@ func TestSyncEndpointsItemsWithLabels(t *testing.T) {
 	ns := "other"
 	testServer, endpointsHandler := makeTestServer(t, ns)
 	defer testServer.Close()
-	endpoints := newController(testServer.URL, 0*time.Second)
+	endpoints := newController(testServer.URL, 50.0)
 	addPods(endpoints.podStore, ns, 3, 2, 0, false)
 	serviceLabels := map[string]string{"foo": "bar"}
 	endpoints.serviceStore.Add(&v1.Service{
@@ -712,7 +712,7 @@ func TestSyncEndpointsItemsPreexistingLabelsChange(t *testing.T) {
 	ns := "bar"
 	testServer, endpointsHandler := makeTestServer(t, ns)
 	defer testServer.Close()
-	endpoints := newController(testServer.URL, 0*time.Second)
+	endpoints := newController(testServer.URL, 50.0)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
@@ -776,7 +776,7 @@ func TestWaitsForAllInformersToBeSynced2(t *testing.T) {
 			ns := "other"
 			testServer, endpointsHandler := makeTestServer(t, ns)
 			defer testServer.Close()
-			endpoints := newController(testServer.URL, 0*time.Second)
+			endpoints := newController(testServer.URL, 50.0)
 			addPods(endpoints.podStore, ns, 1, 1, 0, false)
 
 			service := &v1.Service{
@@ -817,7 +817,7 @@ func TestSyncEndpointsHeadlessService(t *testing.T) {
 	ns := "headless"
 	testServer, endpointsHandler := makeTestServer(t, ns)
 	defer testServer.Close()
-	endpoints := newController(testServer.URL, 0*time.Second)
+	endpoints := newController(testServer.URL, 50.0)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
@@ -867,7 +867,7 @@ func TestSyncEndpointsItemsExcludeNotReadyPodsWithRestartPolicyNeverAndPhaseFail
 	ns := "other"
 	testServer, endpointsHandler := makeTestServer(t, ns)
 	defer testServer.Close()
-	endpoints := newController(testServer.URL, 0*time.Second)
+	endpoints := newController(testServer.URL, 50.0)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
@@ -906,7 +906,7 @@ func TestSyncEndpointsItemsExcludeNotReadyPodsWithRestartPolicyNeverAndPhaseSucc
 	ns := "other"
 	testServer, endpointsHandler := makeTestServer(t, ns)
 	defer testServer.Close()
-	endpoints := newController(testServer.URL, 0*time.Second)
+	endpoints := newController(testServer.URL, 50.0)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
@@ -945,7 +945,7 @@ func TestSyncEndpointsItemsExcludeNotReadyPodsWithRestartPolicyOnFailureAndPhase
 	ns := "other"
 	testServer, endpointsHandler := makeTestServer(t, ns)
 	defer testServer.Close()
-	endpoints := newController(testServer.URL, 0*time.Second)
+	endpoints := newController(testServer.URL, 50.0)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
@@ -984,7 +984,7 @@ func TestSyncEndpointsHeadlessWithoutPort(t *testing.T) {
 	ns := metav1.NamespaceDefault
 	testServer, endpointsHandler := makeTestServer(t, ns)
 	defer testServer.Close()
-	endpoints := newController(testServer.URL, 0*time.Second)
+	endpoints := newController(testServer.URL, 50.0)
 	endpoints.serviceStore.Add(&v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns},
 		Spec: v1.ServiceSpec{
@@ -1404,7 +1404,7 @@ func TestLastTriggerChangeTimeAnnotation(t *testing.T) {
 	ns := "other"
 	testServer, endpointsHandler := makeTestServer(t, ns)
 	defer testServer.Close()
-	endpoints := newController(testServer.URL, 0*time.Second)
+	endpoints := newController(testServer.URL, 50.0)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
@@ -1451,7 +1451,7 @@ func TestLastTriggerChangeTimeAnnotation_AnnotationOverridden(t *testing.T) {
 	ns := "other"
 	testServer, endpointsHandler := makeTestServer(t, ns)
 	defer testServer.Close()
-	endpoints := newController(testServer.URL, 0*time.Second)
+	endpoints := newController(testServer.URL, 50.0)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
@@ -1501,7 +1501,7 @@ func TestLastTriggerChangeTimeAnnotation_AnnotationCleared(t *testing.T) {
 	ns := "other"
 	testServer, endpointsHandler := makeTestServer(t, ns)
 	defer testServer.Close()
-	endpoints := newController(testServer.URL, 0*time.Second)
+	endpoints := newController(testServer.URL, 50.0)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
@@ -1557,16 +1557,16 @@ func TestPodUpdatesBatching(t *testing.T) {
 
 	tests := []struct {
 		name             string
-		batchPeriod      time.Duration
+		qps              float64
 		podsCount        int
 		updates          []podUpdate
 		finalDelay       time.Duration
 		wantRequestCount int
 	}{
 		{
-			name:        "three updates with no batching",
-			batchPeriod: 0 * time.Second,
-			podsCount:   10,
+			name:      "three updates with no batching",
+			qps:       50.0,
+			podsCount: 10,
 			updates: []podUpdate{
 				{
 					// endpoints.Run needs ~100 ms to start processing updates.
@@ -1589,9 +1589,9 @@ func TestPodUpdatesBatching(t *testing.T) {
 			wantRequestCount: 3,
 		},
 		{
-			name:        "three updates in one batch",
-			batchPeriod: 1 * time.Second,
-			podsCount:   10,
+			name:      "three updates in two batches",
+			qps:       1.0,
+			podsCount: 10,
 			updates: []podUpdate{
 				{
 					// endpoints.Run needs ~100 ms to start processing updates.
@@ -1611,12 +1611,12 @@ func TestPodUpdatesBatching(t *testing.T) {
 				},
 			},
 			finalDelay:       3 * time.Second,
-			wantRequestCount: 1,
+			wantRequestCount: 2,
 		},
 		{
-			name:        "three updates in two batches",
-			batchPeriod: 1 * time.Second,
-			podsCount:   10,
+			name:      "four updates in two batches",
+			qps:       1.0,
+			podsCount: 10,
 			updates: []podUpdate{
 				{
 					// endpoints.Run needs ~100 ms to start processing updates.
@@ -1630,8 +1630,13 @@ func TestPodUpdatesBatching(t *testing.T) {
 					podIP:   "10.0.0.1",
 				},
 				{
-					delay:   1 * time.Second,
+					delay:   100 * time.Millisecond,
 					podName: "pod2",
+					podIP:   "10.0.0.2",
+				},
+				{
+					delay:   100 * time.Millisecond,
+					podName: "pod3",
 					podIP:   "10.0.0.2",
 				},
 			},
@@ -1646,7 +1651,7 @@ func TestPodUpdatesBatching(t *testing.T) {
 			resourceVersion := 1
 			testServer, endpointsHandler := makeTestServer(t, ns)
 			defer testServer.Close()
-			endpoints := newController(testServer.URL, tc.batchPeriod)
+			endpoints := newController(testServer.URL, tc.qps)
 			stopCh := make(chan struct{})
 			defer close(stopCh)
 			endpoints.podsSynced = alwaysReady
@@ -1702,14 +1707,14 @@ func TestPodAddsBatching(t *testing.T) {
 
 	tests := []struct {
 		name             string
-		batchPeriod      time.Duration
+		qps              float64
 		adds             []podAdd
 		finalDelay       time.Duration
 		wantRequestCount int
 	}{
 		{
-			name:        "three adds with no batching",
-			batchPeriod: 0 * time.Second,
+			name: "adds with no batching",
+			qps:  50.0,
 			adds: []podAdd{
 				{
 					// endpoints.Run needs ~100 ms to start processing updates.
@@ -1726,8 +1731,8 @@ func TestPodAddsBatching(t *testing.T) {
 			wantRequestCount: 3,
 		},
 		{
-			name:        "three adds in one batch",
-			batchPeriod: 1 * time.Second,
+			name: "adds in two batches",
+			qps:  1.0,
 			adds: []podAdd{
 				{
 					// endpoints.Run needs ~100 ms to start processing updates.
@@ -1741,11 +1746,11 @@ func TestPodAddsBatching(t *testing.T) {
 				},
 			},
 			finalDelay:       3 * time.Second,
-			wantRequestCount: 1,
+			wantRequestCount: 2,
 		},
 		{
-			name:        "three adds in two batches",
-			batchPeriod: 1 * time.Second,
+			name: "adds in two batches",
+			qps:  1.0,
 			adds: []podAdd{
 				{
 					// endpoints.Run needs ~100 ms to start processing updates.
@@ -1755,7 +1760,10 @@ func TestPodAddsBatching(t *testing.T) {
 					delay: 100 * time.Millisecond,
 				},
 				{
-					delay: 1 * time.Second,
+					delay: 100 * time.Millisecond,
+				},
+				{
+					delay: 100 * time.Millisecond,
 				},
 			},
 			finalDelay:       3 * time.Second,
@@ -1768,7 +1776,7 @@ func TestPodAddsBatching(t *testing.T) {
 			ns := "other"
 			testServer, endpointsHandler := makeTestServer(t, ns)
 			defer testServer.Close()
-			endpoints := newController(testServer.URL, tc.batchPeriod)
+			endpoints := newController(testServer.URL, tc.qps)
 			stopCh := make(chan struct{})
 			defer close(stopCh)
 			endpoints.podsSynced = alwaysReady
@@ -1811,16 +1819,16 @@ func TestPodDeleteBatching(t *testing.T) {
 
 	tests := []struct {
 		name             string
-		batchPeriod      time.Duration
+		qps              float64
 		podsCount        int
 		deletes          []podDelete
 		finalDelay       time.Duration
 		wantRequestCount int
 	}{
 		{
-			name:        "three deletes with no batching",
-			batchPeriod: 0 * time.Second,
-			podsCount:   10,
+			name:      "three deletes with no batching",
+			qps:       50.0,
+			podsCount: 10,
 			deletes: []podDelete{
 				{
 					// endpoints.Run needs ~100 ms to start processing updates.
@@ -1840,9 +1848,9 @@ func TestPodDeleteBatching(t *testing.T) {
 			wantRequestCount: 3,
 		},
 		{
-			name:        "three deletes in one batch",
-			batchPeriod: 1 * time.Second,
-			podsCount:   10,
+			name:      "three deletes in two batches",
+			qps:       1.0,
+			podsCount: 10,
 			deletes: []podDelete{
 				{
 					// endpoints.Run needs ~100 ms to start processing updates.
@@ -1859,12 +1867,12 @@ func TestPodDeleteBatching(t *testing.T) {
 				},
 			},
 			finalDelay:       3 * time.Second,
-			wantRequestCount: 1,
+			wantRequestCount: 2,
 		},
 		{
-			name:        "three deletes in two batches",
-			batchPeriod: 1 * time.Second,
-			podsCount:   10,
+			name:      "four deletes in two batches",
+			qps:       1.0,
+			podsCount: 10,
 			deletes: []podDelete{
 				{
 					// endpoints.Run needs ~100 ms to start processing updates.
@@ -1876,8 +1884,12 @@ func TestPodDeleteBatching(t *testing.T) {
 					podName: "pod1",
 				},
 				{
-					delay:   1 * time.Second,
+					delay:   100 * time.Millisecond,
 					podName: "pod2",
+				},
+				{
+					delay:   100 * time.Millisecond,
+					podName: "pod3",
 				},
 			},
 			finalDelay:       3 * time.Second,
@@ -1890,7 +1902,7 @@ func TestPodDeleteBatching(t *testing.T) {
 			ns := "other"
 			testServer, endpointsHandler := makeTestServer(t, ns)
 			defer testServer.Close()
-			endpoints := newController(testServer.URL, tc.batchPeriod)
+			endpoints := newController(testServer.URL, tc.qps)
 			stopCh := make(chan struct{})
 			defer close(stopCh)
 			endpoints.podsSynced = alwaysReady

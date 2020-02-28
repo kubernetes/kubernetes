@@ -298,6 +298,13 @@ type EndpointControllerConfiguration struct {
 	// Processing of pod changes will be delayed by this duration to join them with potential
 	// upcoming updates and reduce the overall number of endpoints updates.
 	EndpointUpdatesBatchPeriod metav1.Duration
+
+	// EndpointUpdatesQPS defines a max number of pod-triggered endpoints updates.
+	EndpointUpdatesQPS float64
+
+	// EndpointUpdatesBurst defines a number of first pod-triggered endpoints updates that can be generated
+	// without additional delay.
+	EndpointUpdatesBurst int
 }
 
 // EndpointSliceControllerConfiguration contains elements describing

@@ -61,12 +61,16 @@ func RegisterConversions(s *runtime.Scheme) error {
 func autoConvert_v1alpha1_EndpointControllerConfiguration_To_config_EndpointControllerConfiguration(in *v1alpha1.EndpointControllerConfiguration, out *config.EndpointControllerConfiguration, s conversion.Scope) error {
 	out.ConcurrentEndpointSyncs = in.ConcurrentEndpointSyncs
 	out.EndpointUpdatesBatchPeriod = in.EndpointUpdatesBatchPeriod
+	out.EndpointUpdatesQPS = in.EndpointUpdatesQPS
+	out.EndpointUpdatesBurst = in.EndpointUpdatesBurst
 	return nil
 }
 
 func autoConvert_config_EndpointControllerConfiguration_To_v1alpha1_EndpointControllerConfiguration(in *config.EndpointControllerConfiguration, out *v1alpha1.EndpointControllerConfiguration, s conversion.Scope) error {
 	out.ConcurrentEndpointSyncs = in.ConcurrentEndpointSyncs
 	out.EndpointUpdatesBatchPeriod = in.EndpointUpdatesBatchPeriod
+	out.EndpointUpdatesQPS = in.EndpointUpdatesQPS
+	out.EndpointUpdatesBurst = in.EndpointUpdatesBurst
 	return nil
 }
 

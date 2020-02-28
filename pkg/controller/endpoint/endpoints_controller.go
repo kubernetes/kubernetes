@@ -78,7 +78,7 @@ const (
 
 // NewEndpointController returns a new *EndpointController.
 func NewEndpointController(podInformer coreinformers.PodInformer, serviceInformer coreinformers.ServiceInformer,
-	endpointsInformer coreinformers.EndpointsInformer, client clientset.Interface, endpointUpdatesBatchPeriod time.Duration) *EndpointController {
+	endpointsInformer coreinformers.EndpointsInformer, client clientset.Interface, endpointUpdatesQPS float64, endpointUpdatesBurst int) *EndpointController {
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartLogging(klog.Infof)
 	broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: client.CoreV1().Events("")})
@@ -117,9 +117,7 @@ func NewEndpointController(podInformer coreinformers.PodInformer, serviceInforme
 	e.triggerTimeTracker = endpointutil.NewTriggerTimeTracker()
 	e.eventBroadcaster = broadcaster
 	e.eventRecorder = recorder
-
-	e.endpointUpdatesBatchPeriod = endpointUpdatesBatchPeriod
-
+	e.serviceRateLimiter = workqueue.NewItemBucketRateLimiter(endpointUpdatesQPS, endpointUpdatesBurst)
 	e.serviceSelectorCache = endpointutil.NewServiceSelectorCache()
 
 	return e
@@ -166,7 +164,13 @@ type EndpointController struct {
 	// annotation.
 	triggerTimeTracker *endpointutil.TriggerTimeTracker
 
-	endpointUpdatesBatchPeriod time.Duration
+	// serviceRateLimiter is used to rate limit pod-triggered endpoint updates.
+	// Each endpoint update generates significant load on the kube-apiserver.
+	// To save master resources during rolling updates, we do rate limit pod-triggered updates using endpointUpdatesRate rate
+	// and endpointUpdatesBurst burst.
+	// This means that first endpointUpdatesBurst will pass without rate limiting, and then we will allow at most
+	// endpointUpdatesQPS per updates second.
+	serviceRateLimiter *workqueue.ItemBucketRateLimiter
 
 	// serviceSelectorCache is a cache of service selectors to avoid high CPU consumption caused by frequent calls
 	// to AsSelectorPreValidated (see #73527)
@@ -208,7 +212,7 @@ func (e *EndpointController) addPod(obj interface{}) {
 		return
 	}
 	for key := range services {
-		e.queue.AddAfter(key, e.endpointUpdatesBatchPeriod)
+		e.queue.AddAfter(key, e.serviceRateLimiter.When(key))
 	}
 }
 
@@ -272,7 +276,7 @@ func endpointChanged(pod1, pod2 *v1.Pod) bool {
 func (e *EndpointController) updatePod(old, cur interface{}) {
 	services := endpointutil.GetServicesToUpdateOnPodChange(e.serviceLister, e.serviceSelectorCache, old, cur, endpointChanged)
 	for key := range services {
-		e.queue.AddAfter(key, e.endpointUpdatesBatchPeriod)
+		e.queue.AddAfter(key, e.serviceRateLimiter.When(key))
 	}
 }
 
@@ -374,6 +378,7 @@ func (e *EndpointController) syncService(key string) error {
 			return err
 		}
 		e.triggerTimeTracker.DeleteService(namespace, name)
+		e.serviceRateLimiter.Forget(key)
 		return nil
 	}
 

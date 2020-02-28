@@ -17,6 +17,8 @@ limitations under the License.
 package options
 
 import (
+	"time"
+
 	"github.com/spf13/pflag"
 
 	endpointconfig "k8s.io/kubernetes/pkg/controller/endpoint/config"
@@ -34,7 +36,10 @@ func (o *EndpointControllerOptions) AddFlags(fs *pflag.FlagSet) {
 	}
 
 	fs.Int32Var(&o.ConcurrentEndpointSyncs, "concurrent-endpoint-syncs", o.ConcurrentEndpointSyncs, "The number of endpoint syncing operations that will be done concurrently. Larger number = faster endpoint updating, but more CPU (and network) load")
-	fs.DurationVar(&o.EndpointUpdatesBatchPeriod.Duration, "endpoint-updates-batch-period", o.EndpointUpdatesBatchPeriod.Duration, "The length of endpoint updates batching period. Processing of pod changes will be delayed by this duration to join them with potential upcoming updates and reduce the overall number of endpoints updates. Larger number = higher endpoint programming latency, but lower number of endpoints revision generated")
+	fs.DurationVar(&o.EndpointUpdatesBatchPeriod.Duration, "endpoint-updates-batch-period", o.EndpointUpdatesBatchPeriod.Duration, "DEPRECATED: The length of endpoint updates batching period. Processing of pod changes will be delayed by this duration to join them with potential upcoming updates and reduce the overall number of endpoints updates. Larger number = higher endpoint programming latency, but lower number of endpoints revision generated. If set, overrides --endpoint-updates-qps.")
+	fs.MarkDeprecated("endpoint-updates-batch-period", "Deprecated. Use --endpoint-updates-qps instead.")
+	fs.Float64Var(&o.EndpointUpdatesQPS, "endpoint-updates-qps", o.EndpointUpdatesQPS, "Defines a maximum number of pod-triggered endpoint updates.")
+	fs.IntVar(&o.EndpointUpdatesBurst, "endpoint-updates-burst", o.EndpointUpdatesBurst, "Defines a number of first pod-triggered endpoint updates that are passed without delay.")
 }
 
 // ApplyTo fills up EndPointController config with options.
@@ -44,7 +49,13 @@ func (o *EndpointControllerOptions) ApplyTo(cfg *endpointconfig.EndpointControll
 	}
 
 	cfg.ConcurrentEndpointSyncs = o.ConcurrentEndpointSyncs
-	cfg.EndpointUpdatesBatchPeriod = o.EndpointUpdatesBatchPeriod
+	var zero time.Duration
+	if cfg.EndpointUpdatesBatchPeriod.Duration != zero {
+		cfg.EndpointUpdatesQPS = 1.0 / cfg.EndpointUpdatesBatchPeriod.Duration.Seconds()
+	} else {
+		cfg.EndpointUpdatesQPS = o.EndpointUpdatesQPS
+	}
+	cfg.EndpointUpdatesBurst = o.EndpointUpdatesBurst
 
 	return nil
 }

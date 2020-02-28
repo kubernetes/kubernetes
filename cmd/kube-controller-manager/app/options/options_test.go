@@ -241,6 +241,8 @@ func TestAddFlags(t *testing.T) {
 		EndpointController: &EndpointControllerOptions{
 			&endpointconfig.EndpointControllerConfiguration{
 				ConcurrentEndpointSyncs: 10,
+				EndpointUpdatesQPS:      50.0,
+				EndpointUpdatesBurst:    1,
 			},
 		},
 		EndpointSliceController: &EndpointSliceControllerOptions{
@@ -474,6 +476,8 @@ func TestApplyTo(t *testing.T) {
 			},
 			EndpointController: endpointconfig.EndpointControllerConfiguration{
 				ConcurrentEndpointSyncs: 10,
+				EndpointUpdatesQPS:      50.0,
+				EndpointUpdatesBurst:    1,
 			},
 			EndpointSliceController: endpointsliceconfig.EndpointSliceControllerConfiguration{
 				ConcurrentServiceEndpointSyncs: 10,
