@@ -21,7 +21,6 @@ package azure
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"path"
 	"strings"
 	"sync"
@@ -48,7 +47,7 @@ const (
 	errLeaseFailed       = "AcquireDiskLeaseFailed"
 	errLeaseIDMissing    = "LeaseIdMissing"
 	errContainerNotFound = "ContainerNotFound"
-	errDiskBlobNotFound  = "DiskBlobNotFound"
+	errDiskNotFound      = "is not found"
 )
 
 var defaultBackOff = kwait.Backoff{
@@ -342,11 +341,11 @@ func (c *controllerCommon) checkDiskExists(ctx context.Context, diskURI string) 
 		return false, err
 	}
 
-	if _, rerr := c.cloud.DisksClient.Get(ctx, resourceGroup, diskName); rerr != nil {
-		if rerr.HTTPStatusCode == http.StatusNotFound {
+	if _, err := c.cloud.DisksClient.Get(ctx, resourceGroup, diskName); err != nil {
+		if strings.Contains(err.Error(), errDiskNotFound) {
 			return false, nil
 		}
-		return false, rerr.Error()
+		return false, err
 	}
 
 	return true, nil

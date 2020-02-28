@@ -889,7 +889,7 @@ func (fDC *fakeDisksClient) Get(ctx context.Context, resourceGroupName string, d
 
 	return result, autorest.DetailedError{
 		StatusCode: http.StatusNotFound,
-		Message:    "Not such Disk",
+		Message:    fmt.Sprintf("Disk %s is not found.", diskName),
 	}
 }
 

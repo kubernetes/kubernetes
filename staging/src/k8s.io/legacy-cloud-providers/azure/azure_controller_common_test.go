@@ -26,6 +26,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/pointer"
 )
 
 func TestCommonAttachDisk(t *testing.T) {
@@ -250,13 +251,10 @@ func TestDisksAreAttached(t *testing.T) {
 }
 
 func TestCheckDiskExists(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
 	ctx, cancel := getContextWithCancel()
 	defer cancel()
 
-	testCloud := GetTestCloud(ctrl)
+	testCloud := getTestCloud()
 	common := &controllerCommon{
 		location:              testCloud.Location,
 		storageEndpointSuffix: testCloud.Environment.StorageEndpointSuffix,
@@ -270,7 +268,7 @@ func TestCheckDiskExists(t *testing.T) {
 	newDiskURI := fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/disks/%s",
 		testCloud.SubscriptionID, testCloud.ResourceGroup, newDiskName)
 	fDC := newFakeDisksClient()
-	rerr := fDC.CreateOrUpdate(ctx, testCloud.ResourceGroup, newDiskName, compute.Disk{})
+	_, rerr := fDC.CreateOrUpdate(ctx, testCloud.ResourceGroup, newDiskName, compute.Disk{})
 	assert.Equal(t, rerr == nil, true, "return error: %v", rerr)
 	testCloud.DisksClient = fDC
 
@@ -304,13 +302,10 @@ func TestCheckDiskExists(t *testing.T) {
 }
 
 func TestFilterNonExistingDisks(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
 	ctx, cancel := getContextWithCancel()
 	defer cancel()
 
-	testCloud := GetTestCloud(ctrl)
+	testCloud := getTestCloud()
 	common := &controllerCommon{
 		location:              testCloud.Location,
 		storageEndpointSuffix: testCloud.Environment.StorageEndpointSuffix,
@@ -325,7 +320,7 @@ func TestFilterNonExistingDisks(t *testing.T) {
 	newDiskName := "newdisk"
 	newDiskURI := diskURIPrefix + newDiskName
 	fDC := newFakeDisksClient()
-	rerr := fDC.CreateOrUpdate(ctx, testCloud.ResourceGroup, newDiskName, compute.Disk{})
+	_, rerr := fDC.CreateOrUpdate(ctx, testCloud.ResourceGroup, newDiskName, compute.Disk{})
 	assert.Equal(t, rerr == nil, true, "return error: %v", rerr)
 	testCloud.DisksClient = fDC
 
