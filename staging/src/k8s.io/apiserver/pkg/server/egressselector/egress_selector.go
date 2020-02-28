@@ -293,7 +293,7 @@ func (cs *EgressSelector) GenerateDialer(existingDialer utilnet.DialFunc, networ
 	}
 	dialer, err := cs.Lookup(networkContext)
 	if err != nil {
-		klog.Errorf("Unable to lookup egress selector: %v", err)
+		klog.Errorf("Error looking up egress dialer: %v", err)
 		return existingDialer
 	}
 	return dialer
