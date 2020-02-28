@@ -34,8 +34,6 @@ import (
 	"k8s.io/utils/mount"
 
 	v1 "k8s.io/api/core/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
@@ -469,25 +467,23 @@ func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) (string, error) {
 // If the volumeMode is 'Block', plugin creates a dir and persists iscsi configurations.
 // Since volume type is block, plugin doesn't need to format/mount the volume.
 func globalPDPathOperation(b iscsiDiskMounter) func(iscsiDiskMounter, string, *ISCSIUtil) (string, error) {
-	// TODO: remove feature gate check after no longer needed
-	if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
-		klog.V(5).Infof("iscsi: AttachDisk volumeMode: %s", b.volumeMode)
-		if b.volumeMode == v1.PersistentVolumeBlock {
-			// If the volumeMode is 'Block', plugin don't need to format the volume.
-			return func(b iscsiDiskMounter, devicePath string, util *ISCSIUtil) (string, error) {
-				globalPDPath := b.manager.MakeGlobalVDPDName(*b.iscsiDisk)
-				// Create dir like /var/lib/kubelet/plugins/kubernetes.io/iscsi/volumeDevices/{ifaceName}/{portal-some_iqn-lun-lun_id}
-				if err := os.MkdirAll(globalPDPath, 0750); err != nil {
-					klog.Errorf("iscsi: failed to mkdir %s, error", globalPDPath)
-					return "", err
-				}
-				// Persist iscsi disk config to json file for DetachDisk path
-				util.persistISCSI(*(b.iscsiDisk), globalPDPath)
-
-				return devicePath, nil
+	klog.V(5).Infof("iscsi: AttachDisk volumeMode: %s", b.volumeMode)
+	if b.volumeMode == v1.PersistentVolumeBlock {
+		// If the volumeMode is 'Block', plugin don't need to format the volume.
+		return func(b iscsiDiskMounter, devicePath string, util *ISCSIUtil) (string, error) {
+			globalPDPath := b.manager.MakeGlobalVDPDName(*b.iscsiDisk)
+			// Create dir like /var/lib/kubelet/plugins/kubernetes.io/iscsi/volumeDevices/{ifaceName}/{portal-some_iqn-lun-lun_id}
+			if err := os.MkdirAll(globalPDPath, 0750); err != nil {
+				klog.Errorf("iscsi: failed to mkdir %s, error", globalPDPath)
+				return "", err
 			}
+			// Persist iscsi disk config to json file for DetachDisk path
+			util.persistISCSI(*(b.iscsiDisk), globalPDPath)
+
+			return devicePath, nil
 		}
 	}
+
 	// If the volumeMode is 'Filesystem', plugin needs to format the volume
 	// and mount it to globalPDPath.
 	return func(b iscsiDiskMounter, devicePath string, util *ISCSIUtil) (string, error) {

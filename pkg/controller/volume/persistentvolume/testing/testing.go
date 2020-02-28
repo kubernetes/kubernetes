@@ -30,11 +30,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/watch"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 // ErrVersionConflict is the error returned when resource version of requested
@@ -114,7 +112,7 @@ func (r *VolumeReactor) React(action core.Action) (handled bool, ret runtime.Obj
 		}
 
 		// mimic apiserver defaulting
-		if volume.Spec.VolumeMode == nil && utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
+		if volume.Spec.VolumeMode == nil {
 			volume.Spec.VolumeMode = new(v1.PersistentVolumeMode)
 			*volume.Spec.VolumeMode = v1.PersistentVolumeFilesystem
 		}

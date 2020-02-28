@@ -28,8 +28,6 @@ import (
 	"k8s.io/utils/mount"
 
 	v1 "k8s.io/api/core/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
@@ -243,14 +241,12 @@ func (util *fcUtil) AttachDisk(b fcDiskMounter) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	// TODO: remove feature gate check after no longer needed
-	if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
-		// If the volumeMode is 'Block', plugin don't have to format the volume.
-		// The globalPDPath will be created by operationexecutor. Just return devicePath here.
-		klog.V(5).Infof("fc: AttachDisk volumeMode: %s, devicePath: %s", b.volumeMode, devicePath)
-		if b.volumeMode == v1.PersistentVolumeBlock {
-			return devicePath, nil
-		}
+
+	// If the volumeMode is 'Block', plugin don't have to format the volume.
+	// The globalPDPath will be created by operationexecutor. Just return devicePath here.
+	klog.V(5).Infof("fc: AttachDisk volumeMode: %s, devicePath: %s", b.volumeMode, devicePath)
+	if b.volumeMode == v1.PersistentVolumeBlock {
+		return devicePath, nil
 	}
 
 	// mount it

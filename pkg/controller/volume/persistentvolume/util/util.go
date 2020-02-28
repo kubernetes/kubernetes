@@ -307,23 +307,6 @@ func FindMatchingVolume(
 // CheckVolumeModeMismatches is a convenience method that checks volumeMode for PersistentVolume
 // and PersistentVolumeClaims
 func CheckVolumeModeMismatches(pvcSpec *v1.PersistentVolumeClaimSpec, pvSpec *v1.PersistentVolumeSpec) bool {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
-		if pvcSpec.VolumeMode != nil && *pvcSpec.VolumeMode == v1.PersistentVolumeBlock {
-			// Block PVC does not match anything when the feature is off. We explicitly want
-			// to prevent binding block PVC to filesystem PV.
-			// The PVC should be ignored by PV controller.
-			return true
-		}
-		if pvSpec.VolumeMode != nil && *pvSpec.VolumeMode == v1.PersistentVolumeBlock {
-			// Block PV does not match anything when the feature is off. We explicitly want
-			// to prevent binding block PV to filesystem PVC.
-			// The PV should be ignored by PV controller.
-			return true
-		}
-		// Both PV + PVC are not block.
-		return false
-	}
-
 	// In HA upgrades, we cannot guarantee that the apiserver is on a version >= controller-manager.
 	// So we default a nil volumeMode to filesystem
 	requestedVolumeMode := v1.PersistentVolumeFilesystem

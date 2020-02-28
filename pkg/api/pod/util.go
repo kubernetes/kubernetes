@@ -385,8 +385,6 @@ func dropDisabledFields(
 		})
 	}
 
-	dropDisabledVolumeDevicesFields(podSpec, oldPodSpec)
-
 	dropDisabledRunAsGroupField(podSpec, oldPodSpec)
 
 	dropDisabledGMSAFields(podSpec, oldPodSpec)
@@ -479,17 +477,6 @@ func dropDisabledProcMountField(podSpec, oldPodSpec *api.PodSpec) {
 				// Note: we cannot force the field to nil when the feature is disabled because it causes a diff against previously persisted data.
 				c.SecurityContext.ProcMount = &defaultProcMount
 			}
-			return true
-		})
-	}
-}
-
-// dropDisabledVolumeDevicesFields removes disabled fields from []VolumeDevice if it has not been already populated.
-// This should be called from PrepareForCreate/PrepareForUpdate for all resources containing a VolumeDevice
-func dropDisabledVolumeDevicesFields(podSpec, oldPodSpec *api.PodSpec) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) && !volumeDevicesInUse(oldPodSpec) {
-		VisitContainers(podSpec, func(c *api.Container) bool {
-			c.VolumeDevices = nil
 			return true
 		})
 	}
@@ -644,24 +631,6 @@ func emptyDirSizeLimitInUse(podSpec *api.PodSpec) bool {
 		}
 	}
 	return false
-}
-
-// volumeDevicesInUse returns true if the pod spec is non-nil and has VolumeDevices set.
-func volumeDevicesInUse(podSpec *api.PodSpec) bool {
-	if podSpec == nil {
-		return false
-	}
-
-	var inUse bool
-	VisitContainers(podSpec, func(c *api.Container) bool {
-		if c.VolumeDevices != nil {
-			inUse = true
-			return false
-		}
-		return true
-	})
-
-	return inUse
 }
 
 // runAsGroupInUse returns true if the pod spec is non-nil and has a SecurityContext's RunAsGroup field set
