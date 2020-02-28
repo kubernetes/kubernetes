@@ -61,12 +61,16 @@ func RegisterConversions(s *runtime.Scheme) error {
 func autoConvert_v1alpha1_EndpointSliceControllerConfiguration_To_config_EndpointSliceControllerConfiguration(in *v1alpha1.EndpointSliceControllerConfiguration, out *config.EndpointSliceControllerConfiguration, s conversion.Scope) error {
 	out.ConcurrentServiceEndpointSyncs = in.ConcurrentServiceEndpointSyncs
 	out.MaxEndpointsPerSlice = in.MaxEndpointsPerSlice
+	out.EndpointUpdatesQPS = in.EndpointUpdatesQPS
+	out.EndpointUpdatesBurst = in.EndpointUpdatesBurst
 	return nil
 }
 
 func autoConvert_config_EndpointSliceControllerConfiguration_To_v1alpha1_EndpointSliceControllerConfiguration(in *config.EndpointSliceControllerConfiguration, out *v1alpha1.EndpointSliceControllerConfiguration, s conversion.Scope) error {
 	out.ConcurrentServiceEndpointSyncs = in.ConcurrentServiceEndpointSyncs
 	out.MaxEndpointsPerSlice = in.MaxEndpointsPerSlice
+	out.EndpointUpdatesQPS = in.EndpointUpdatesQPS
+	out.EndpointUpdatesBurst = in.EndpointUpdatesBurst
 	return nil
 }
 

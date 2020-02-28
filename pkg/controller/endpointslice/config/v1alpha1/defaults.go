@@ -38,4 +38,13 @@ func RecommendedDefaultEndpointSliceControllerConfiguration(obj *kubectrlmgrconf
 	if obj.MaxEndpointsPerSlice == 0 {
 		obj.MaxEndpointsPerSlice = 100
 	}
+
+	if obj.EndpointUpdatesQPS == 0.0 {
+		// Default 50.0 value matches default kube-api-qps limit for endpoint-controller.
+		obj.EndpointUpdatesQPS = 50.0
+	}
+
+	if obj.EndpointUpdatesBurst == 0 {
+		obj.EndpointUpdatesBurst = 1
+	}
 }

@@ -43,6 +43,8 @@ func (o *EndpointSliceControllerOptions) AddFlags(fs *pflag.FlagSet) {
 
 	fs.Int32Var(&o.ConcurrentServiceEndpointSyncs, "concurrent-service-endpoint-syncs", o.ConcurrentServiceEndpointSyncs, "The number of service endpoint syncing operations that will be done concurrently. Larger number = faster endpoint slice updating, but more CPU (and network) load. Defaults to 5.")
 	fs.Int32Var(&o.MaxEndpointsPerSlice, "max-endpoints-per-slice", o.MaxEndpointsPerSlice, "The maximum number of endpoints that will be added to an EndpointSlice. More endpoints per slice will result in less endpoint slices, but larger resources. Defaults to 100.")
+	fs.Float64Var(&o.EndpointUpdatesQPS, "endpointslice-updates-qps", o.EndpointUpdatesQPS, "Defines a maximum number of pod-triggered endpoint updates per second.")
+	fs.IntVar(&o.EndpointUpdatesBurst, "endpointslice-updates-burst", o.EndpointUpdatesBurst, "Defines a number of first pod-triggered endpoint updates that are passed without delay.")
 }
 
 // ApplyTo fills up EndpointSliceController config with options.
@@ -53,6 +55,8 @@ func (o *EndpointSliceControllerOptions) ApplyTo(cfg *endpointsliceconfig.Endpoi
 
 	cfg.ConcurrentServiceEndpointSyncs = o.ConcurrentServiceEndpointSyncs
 	cfg.MaxEndpointsPerSlice = o.MaxEndpointsPerSlice
+	cfg.EndpointUpdatesQPS = o.EndpointUpdatesQPS
+	cfg.EndpointUpdatesBurst = o.EndpointUpdatesBurst
 
 	return nil
 }

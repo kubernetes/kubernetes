@@ -312,6 +312,13 @@ type EndpointSliceControllerConfiguration struct {
 	// added to an EndpointSlice. More endpoints per slice will result in fewer
 	// and larger endpoint slices, but larger resources.
 	MaxEndpointsPerSlice int32
+
+	// EndpointUpdatesQPS defines a max number of pod-triggered endpoints updates.
+	EndpointUpdatesQPS float64
+
+	// EndpointUpdatesBurst defines a number of first pod-triggered endpoints updates that can be generated
+	// without additional delay.
+	EndpointUpdatesBurst int
 }
 
 // GarbageCollectorControllerConfiguration contains elements describing GarbageCollectorController.

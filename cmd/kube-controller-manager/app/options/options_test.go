@@ -247,6 +247,8 @@ func TestAddFlags(t *testing.T) {
 			&endpointsliceconfig.EndpointSliceControllerConfiguration{
 				ConcurrentServiceEndpointSyncs: 10,
 				MaxEndpointsPerSlice:           200,
+				EndpointUpdatesQPS:             50.0,
+				EndpointUpdatesBurst:           1,
 			},
 		},
 		GarbageCollectorController: &GarbageCollectorControllerOptions{

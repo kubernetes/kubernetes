@@ -66,6 +66,8 @@ func NewController(podInformer coreinformers.PodInformer,
 	endpointSliceInformer discoveryinformers.EndpointSliceInformer,
 	maxEndpointsPerSlice int32,
 	client clientset.Interface,
+	endpointUpdatesQPS float64,
+	endpointUpdatesBurst int,
 ) *Controller {
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartLogging(klog.Infof)
@@ -129,6 +131,7 @@ func NewController(podInformer coreinformers.PodInformer,
 	c.eventBroadcaster = broadcaster
 	c.eventRecorder = recorder
 
+	c.serviceRateLimiter = workqueue.NewItemBucketRateLimiter(endpointUpdatesQPS, endpointUpdatesBurst)
 	c.serviceSelectorCache = endpointutil.NewServiceSelectorCache()
 
 	return c
@@ -193,6 +196,14 @@ type Controller struct {
 	// workerLoopPeriod is the time between worker runs. The workers
 	// process the queue of service and pod changes
 	workerLoopPeriod time.Duration
+
+	// serviceRateLimiter is used to rate limit pod-triggered endpoint updates.
+	// Each endpoint update generates significant load on the kube-apiserver.
+	// To save master resources during rolling updates, we do rate limit pod-triggered updates using endpointUpdatesRate rate
+	// and endpointUpdatesBurst burst.
+	// This means that first endpointUpdatesBurst will pass without rate limiting, and then we will allow at most
+	// endpointUpdatesQPS per updates second.
+	serviceRateLimiter *workqueue.ItemBucketRateLimiter
 
 	// serviceSelectorCache is a cache of service selectors to avoid high CPU consumption caused by frequent calls
 	// to AsSelectorPreValidated (see #73527)
@@ -277,6 +288,7 @@ func (c *Controller) syncService(key string) error {
 		if apierrors.IsNotFound(err) {
 			c.triggerTimeTracker.DeleteService(namespace, name)
 			c.reconciler.deleteService(namespace, name)
+			c.serviceRateLimiter.Forget(key)
 			// The service has been deleted, return nil so that it won't be retried.
 			return nil
 		}
@@ -414,14 +426,14 @@ func (c *Controller) addPod(obj interface{}) {
 		return
 	}
 	for key := range services {
-		c.queue.Add(key)
+		c.queue.AddAfter(key, c.serviceRateLimiter.When(key))
 	}
 }
 
 func (c *Controller) updatePod(old, cur interface{}) {
 	services := endpointutil.GetServicesToUpdateOnPodChange(c.serviceLister, c.serviceSelectorCache, old, cur, podEndpointChanged)
 	for key := range services {
-		c.queue.Add(key)
+		c.queue.AddAfter(key, c.serviceRateLimiter.When(key))
 	}
 }
 
