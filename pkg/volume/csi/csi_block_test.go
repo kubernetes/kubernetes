@@ -25,7 +25,7 @@ import (
 	"testing"
 
 	api "k8s.io/api/core/v1"
-	"k8s.io/api/storage/v1beta1"
+	storagev1 "k8s.io/api/storage/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -384,15 +384,15 @@ func TestBlockMapperMapPodDeviceNotSupportAttach(t *testing.T) {
 
 	fakeClient := fakeclient.NewSimpleClientset()
 	attachRequired := false
-	fakeDriver := &v1beta1.CSIDriver{
+	fakeDriver := &storagev1.CSIDriver{
 		ObjectMeta: meta.ObjectMeta{
 			Name: testDriver,
 		},
-		Spec: v1beta1.CSIDriverSpec{
+		Spec: storagev1.CSIDriverSpec{
 			AttachRequired: &attachRequired,
 		},
 	}
-	_, err := fakeClient.StorageV1beta1().CSIDrivers().Create(context.TODO(), fakeDriver, metav1.CreateOptions{})
+	_, err := fakeClient.StorageV1().CSIDrivers().Create(context.TODO(), fakeDriver, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Failed to create a fakeDriver: %v", err)
 	}

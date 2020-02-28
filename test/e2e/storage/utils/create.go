@@ -21,6 +21,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/pkg/errors"
@@ -29,7 +30,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -331,7 +331,7 @@ func patchItemRecursively(f *framework.Framework, item interface{}) error {
 		PatchName(f, &item.Name)
 	case *storagev1.StorageClass:
 		PatchName(f, &item.Name)
-	case *storagev1beta1.CSIDriver:
+	case *storagev1.CSIDriver:
 		PatchName(f, &item.Name)
 	case *v1.ServiceAccount:
 		PatchNamespace(f, &item.ObjectMeta.Namespace)
@@ -578,16 +578,16 @@ func (*storageClassFactory) Create(f *framework.Framework, i interface{}) (func(
 type csiDriverFactory struct{}
 
 func (f *csiDriverFactory) New() runtime.Object {
-	return &storagev1beta1.CSIDriver{}
+	return &storagev1.CSIDriver{}
 }
 
 func (*csiDriverFactory) Create(f *framework.Framework, i interface{}) (func() error, error) {
-	item, ok := i.(*storagev1beta1.CSIDriver)
+	item, ok := i.(*storagev1.CSIDriver)
 	if !ok {
 		return nil, errorItemNotSupported
 	}
 
-	client := f.ClientSet.StorageV1beta1().CSIDrivers()
+	client := f.ClientSet.StorageV1().CSIDrivers()
 	if _, err := client.Create(context.TODO(), item, metav1.CreateOptions{}); err != nil {
 		return nil, errors.Wrap(err, "create CSIDriver")
 	}

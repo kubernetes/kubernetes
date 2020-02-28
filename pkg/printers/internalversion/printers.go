@@ -39,7 +39,6 @@ import (
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -497,9 +496,9 @@ func AddHandlers(h printers.PrintHandler) {
 
 	csiDriverColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "AttachRequired", Type: "boolean", Description: storagev1beta1.CSIDriverSpec{}.SwaggerDoc()["attachRequired"]},
-		{Name: "PodInfoOnMount", Type: "boolean", Description: storagev1beta1.CSIDriverSpec{}.SwaggerDoc()["podInfoOnMount"]},
-		{Name: "Modes", Type: "string", Description: storagev1beta1.CSIDriverSpec{}.SwaggerDoc()["volumeLifecycleModes"]},
+		{Name: "AttachRequired", Type: "boolean", Description: storagev1.CSIDriverSpec{}.SwaggerDoc()["attachRequired"]},
+		{Name: "PodInfoOnMount", Type: "boolean", Description: storagev1.CSIDriverSpec{}.SwaggerDoc()["podInfoOnMount"]},
+		{Name: "Modes", Type: "string", Description: storagev1.CSIDriverSpec{}.SwaggerDoc()["volumeLifecycleModes"]},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 	}
 	h.TableHandler(csiDriverColumnDefinitions, printCSIDriver)

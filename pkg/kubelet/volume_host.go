@@ -32,7 +32,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
-	storagelisters "k8s.io/client-go/listers/storage/v1beta1"
+	storagelisters "k8s.io/client-go/listers/storage/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	cloudprovider "k8s.io/cloud-provider"
@@ -69,7 +69,7 @@ func NewInitializedVolumePluginMgr(
 		// Don't initialize if kubeClient is nil
 		if kubelet.kubeClient != nil {
 			informerFactory = informers.NewSharedInformerFactory(kubelet.kubeClient, resyncPeriod)
-			csiDriverInformer := informerFactory.Storage().V1beta1().CSIDrivers()
+			csiDriverInformer := informerFactory.Storage().V1().CSIDrivers()
 			csiDriverLister = csiDriverInformer.Lister()
 			csiDriversSynced = csiDriverInformer.Informer().HasSynced
 

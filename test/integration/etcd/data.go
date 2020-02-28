@@ -503,10 +503,10 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		}
 	}
 
-	// k8s.io/kubernetes/pkg/apis/storage/v1beta1
+	// k8s.io/kubernetes/pkg/apis/storage/v1
 	// add csidrivers if CSIDriverRegistry feature gate is enabled
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
-		etcdStorageData[gvr("storage.k8s.io", "v1beta1", "csidrivers")] = StorageData{
+		etcdStorageData[gvr("storage.k8s.io", "v1", "csidrivers")] = StorageData{
 			Stub:             `{"metadata": {"name": "csid1"}, "spec": {"attachRequired": true, "podInfoOnMount": true}}`,
 			ExpectedEtcdPath: "/registry/csidrivers/csid1",
 		}

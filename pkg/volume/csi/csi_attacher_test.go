@@ -1553,7 +1553,7 @@ func newTestWatchPlugin(t *testing.T, fakeClient *fakeclient.Clientset) (*csiPlu
 
 	// Start informer for CSIDrivers.
 	factory := informers.NewSharedInformerFactory(fakeClient, CsiResyncPeriod)
-	csiDriverInformer := factory.Storage().V1beta1().CSIDrivers()
+	csiDriverInformer := factory.Storage().V1().CSIDrivers()
 	csiDriverLister := csiDriverInformer.Lister()
 	factory.Start(wait.NeverStop)
 

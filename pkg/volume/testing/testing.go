@@ -42,7 +42,6 @@ import (
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	storagelistersv1 "k8s.io/client-go/listers/storage/v1"
-	storagelisters "k8s.io/client-go/listers/storage/v1beta1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	utiltesting "k8s.io/client-go/util/testing"
@@ -111,7 +110,7 @@ type fakeVolumeHost struct {
 	nodeLabels      map[string]string
 	nodeName        string
 	subpather       subpath.Interface
-	csiDriverLister storagelisters.CSIDriverLister
+	csiDriverLister storagelistersv1.CSIDriverLister
 	informerFactory informers.SharedInformerFactory
 	kubeletErr      error
 	mux             sync.Mutex
@@ -134,7 +133,7 @@ func NewFakeVolumeHostWithNodeLabels(t *testing.T, rootDir string, kubeClient cl
 	return volHost
 }
 
-func NewFakeVolumeHostWithCSINodeName(t *testing.T, rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, nodeName string, driverLister storagelisters.CSIDriverLister) *fakeVolumeHost {
+func NewFakeVolumeHostWithCSINodeName(t *testing.T, rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, nodeName string, driverLister storagelistersv1.CSIDriverLister) *fakeVolumeHost {
 	return newFakeVolumeHost(t, rootDir, kubeClient, plugins, nil, nil, nodeName, driverLister)
 }
 
@@ -142,7 +141,7 @@ func NewFakeVolumeHostWithMounterFSType(t *testing.T, rootDir string, kubeClient
 	return newFakeVolumeHost(t, rootDir, kubeClient, plugins, nil, pathToTypeMap, "", nil)
 }
 
-func newFakeVolumeHost(t *testing.T, rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, cloud cloudprovider.Interface, pathToTypeMap map[string]hostutil.FileType, nodeName string, driverLister storagelisters.CSIDriverLister) *fakeVolumeHost {
+func newFakeVolumeHost(t *testing.T, rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, cloud cloudprovider.Interface, pathToTypeMap map[string]hostutil.FileType, nodeName string, driverLister storagelistersv1.CSIDriverLister) *fakeVolumeHost {
 	host := &fakeVolumeHost{rootDir: rootDir, kubeClient: kubeClient, cloud: cloud, nodeName: nodeName, csiDriverLister: driverLister}
 	host.mounter = mount.NewFakeMounter(nil)
 	host.hostUtil = hostutil.NewFakeHostUtil(pathToTypeMap)
@@ -1730,7 +1729,7 @@ func ContainsAccessMode(modes []v1.PersistentVolumeAccessMode, mode v1.Persisten
 	return false
 }
 
-func (f *fakeVolumeHost) CSIDriverLister() storagelisters.CSIDriverLister {
+func (f *fakeVolumeHost) CSIDriverLister() storagelistersv1.CSIDriverLister {
 	return f.csiDriverLister
 }
 

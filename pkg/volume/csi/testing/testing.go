@@ -52,7 +52,7 @@ func NewTestPlugin(t *testing.T, client *fakeclient.Clientset) (*volume.VolumePl
 
 	// Start informer for CSIDrivers.
 	factory := informers.NewSharedInformerFactory(client, csi.CsiResyncPeriod)
-	csiDriverInformer := factory.Storage().V1beta1().CSIDrivers()
+	csiDriverInformer := factory.Storage().V1().CSIDrivers()
 	csiDriverLister := csiDriverInformer.Lister()
 	go factory.Start(wait.NeverStop)
 
