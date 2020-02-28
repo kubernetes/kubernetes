@@ -21,11 +21,8 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/node"
-	"k8s.io/kubernetes/pkg/features"
 	utilpointer "k8s.io/utils/pointer"
 
 	"github.com/stretchr/testify/assert"
@@ -134,9 +131,6 @@ func TestValidateRuntimeUpdate(t *testing.T) {
 }
 
 func TestValidateOverhead(t *testing.T) {
-
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodOverhead, true)()
-
 	successCase := []struct {
 		Name     string
 		overhead *node.Overhead

@@ -24,9 +24,6 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 func TestResourceHelpers(t *testing.T) {
@@ -68,8 +65,6 @@ func TestDefaultResourceHelpers(t *testing.T) {
 }
 
 func TestGetResourceRequest(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodOverhead, true)()
-
 	cases := []struct {
 		pod           *v1.Pod
 		cName         string
@@ -273,8 +268,6 @@ func TestExtractResourceValue(t *testing.T) {
 }
 
 func TestPodRequestsAndLimits(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodOverhead, true)()
-
 	cases := []struct {
 		pod              *v1.Pod
 		cName            string
