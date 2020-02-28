@@ -49,9 +49,9 @@ func SetVolumeOwnership(mounter Mounter, fsGroup *int64, fsGroupChangePolicy *v1
 	klog.Warningf("Setting volume ownership for %s and fsGroup set. If the volume has a lot of files then setting volume ownership could be slow, see https://github.com/kubernetes/kubernetes/issues/69699", mounter.GetPath())
 
 	// This code exists for legacy purposes, so as old behaviour is entirely preserved when feature gate is disabled
-	// TODO: remove this when ConfigurableFSGroupPolicy turns beta.
+	// TODO: remove this when ConfigurableFSGroupPolicy turns GA.
 	if !fsGroupPolicyEnabled {
-		return legacyPermissionChange(mounter, fsGroup)
+		return legacyOwnershipChange(mounter, fsGroup)
 	}
 
 	if skipPermissionChange(mounter, fsGroup, fsGroupChangePolicy) {
@@ -68,7 +68,7 @@ func SetVolumeOwnership(mounter Mounter, fsGroup *int64, fsGroupChangePolicy *v1
 
 }
 
-func legacyPermissionChange(mounter Mounter, fsGroup *int64) error {
+func legacyOwnershipChange(mounter Mounter, fsGroup *int64) error {
 	return filepath.Walk(mounter.GetPath(), func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -125,7 +125,7 @@ func changeFilePermission(filename string, fsGroup *int64, readonly bool, info o
 func skipPermissionChange(mounter Mounter, fsGroup *int64, fsGroupChangePolicy *v1.PodFSGroupChangePolicy) bool {
 	dir := mounter.GetPath()
 
-	if fsGroupChangePolicy == nil || *fsGroupChangePolicy != v1.OnRootMismatch {
+	if fsGroupChangePolicy == nil || *fsGroupChangePolicy != v1.FSGroupChangeOnRootMismatch {
 		klog.V(4).Infof("perform recursive ownership change for %s", dir)
 		return false
 	}
@@ -161,8 +161,13 @@ func requiresPermissionChange(rootDir string, fsGroup *int64, readonly bool) boo
 	unixPerms |= execMask
 	filePerm := fsInfo.Mode().Perm()
 
-	// We need to check if actual permissions of root directory is a superset of permissions required by unixPerms
-	// and setgid bits are set in permissions of the directory.
+	// We need to check if actual permissions of root directory is a superset of permissions required by unixPerms.
+	// This is done by checking if permission bits expected in unixPerms is set in actual permissions of the directory.
+	// We use bitwise AND operation to check set bits. For example:
+	//     unixPerms: 770, filePerms: 775 : 770&775 = 770 (perms on directory is a superset)
+	//     unixPerms: 770, filePerms: 770 : 770&770 = 770 (perms on directory is a superset)
+	//     unixPerms: 770, filePerms: 750 : 770&750 = 750 (perms on directory is NOT a superset)
+	// We also need to check if setgid bits are set in permissions of the directory.
 	if (unixPerms&filePerm != unixPerms) || (fsInfo.Mode()&os.ModeSetgid == 0) {
 		klog.V(4).Infof("performing recursive ownership change on %s because of mismatching mode", rootDir)
 		return true
