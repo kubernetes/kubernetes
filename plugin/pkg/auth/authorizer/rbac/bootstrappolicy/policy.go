@@ -17,6 +17,7 @@ limitations under the License.
 package bootstrappolicy
 
 import (
+	capi "k8s.io/api/certificates/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -457,6 +458,30 @@ func ClusterRoles() []rbacv1.ClusterRole {
 				rbacv1helpers.NewRule(ReadUpdate...).Groups(legacyGroup).Resources("persistentvolumes").RuleOrDie(),
 				rbacv1helpers.NewRule(Read...).Groups(storageGroup).Resources("storageclasses").RuleOrDie(),
 				rbacv1helpers.NewRule(ReadUpdate...).Groups(legacyGroup).Resources("persistentvolumeclaims").RuleOrDie(),
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "system:certificates.k8s.io:legacy-unknown-approver"},
+			Rules: []rbacv1.PolicyRule{
+				rbacv1helpers.NewRule("approve").Groups(certificatesGroup).Resources("signers").Names(capi.LegacyUnknownSignerName).RuleOrDie(),
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "system:certificates.k8s.io:kubelet-serving-approver"},
+			Rules: []rbacv1.PolicyRule{
+				rbacv1helpers.NewRule("approve").Groups(certificatesGroup).Resources("signers").Names(capi.KubeletServingSignerName).RuleOrDie(),
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "system:certificates.k8s.io:kube-apiserver-client-approver"},
+			Rules: []rbacv1.PolicyRule{
+				rbacv1helpers.NewRule("approve").Groups(certificatesGroup).Resources("signers").Names(capi.KubeAPIServerClientSignerName).RuleOrDie(),
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "system:certificates.k8s.io:kube-apiserver-client-kubelet-approver"},
+			Rules: []rbacv1.PolicyRule{
+				rbacv1helpers.NewRule("approve").Groups(certificatesGroup).Resources("signers").Names(capi.KubeAPIServerClientKubeletSignerName).RuleOrDie(),
 			},
 		},
 	}

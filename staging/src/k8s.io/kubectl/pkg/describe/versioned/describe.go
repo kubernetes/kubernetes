@@ -3239,6 +3239,9 @@ func describeCertificateSigningRequest(csr *certificatesv1beta1.CertificateSigni
 		w.Write(LEVEL_0, "Annotations:\t%s\n", labels.FormatLabels(csr.Annotations))
 		w.Write(LEVEL_0, "CreationTimestamp:\t%s\n", csr.CreationTimestamp.Time.Format(time.RFC1123Z))
 		w.Write(LEVEL_0, "Requesting User:\t%s\n", csr.Spec.Username)
+		if csr.Spec.SignerName != nil {
+			w.Write(LEVEL_0, "Signer:\t%s\n", *csr.Spec.SignerName)
+		}
 		w.Write(LEVEL_0, "Status:\t%s\n", status)
 
 		w.Write(LEVEL_0, "Subject:\n")

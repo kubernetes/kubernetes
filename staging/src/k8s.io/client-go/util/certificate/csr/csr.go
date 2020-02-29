@@ -46,7 +46,7 @@ import (
 // status, once approved by API server, it will return the API server's issued
 // certificate (pem-encoded). If there is any errors, or the watch timeouts, it
 // will return an error.
-func RequestCertificate(client certificatesclient.CertificateSigningRequestInterface, csrData []byte, name string, usages []certificates.KeyUsage, privateKey interface{}) (req *certificates.CertificateSigningRequest, err error) {
+func RequestCertificate(client certificatesclient.CertificateSigningRequestInterface, csrData []byte, name string, signerName string, usages []certificates.KeyUsage, privateKey interface{}) (req *certificates.CertificateSigningRequest, err error) {
 	csr := &certificates.CertificateSigningRequest{
 		// Username, UID, Groups will be injected by API server.
 		TypeMeta: metav1.TypeMeta{Kind: "CertificateSigningRequest"},
@@ -54,8 +54,9 @@ func RequestCertificate(client certificatesclient.CertificateSigningRequestInter
 			Name: name,
 		},
 		Spec: certificates.CertificateSigningRequestSpec{
-			Request: csrData,
-			Usages:  usages,
+			Request:    csrData,
+			Usages:     usages,
+			SignerName: &signerName,
 		},
 	}
 	if len(csr.Name) == 0 {
