@@ -25,7 +25,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
-	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -50,7 +50,7 @@ var (
 	watchTestTimeout int64 = 1
 	auditTestUser          = "kubecfg"
 
-	crd          = fixtures.NewRandomNameCustomResourceDefinition(apiextensionsv1beta1.ClusterScoped)
+	crd          = fixtures.NewRandomNameV1CustomResourceDefinition(apiextensionsv1.ClusterScoped)
 	crdName      = strings.SplitN(crd.Name, ".", 2)[0]
 	crdNamespace = strings.SplitN(crd.Name, ".", 2)[1]
 
@@ -600,9 +600,9 @@ var _ = SIGDescribe("Advanced Audit [DisabledForLargeClusters][Flaky]", func() {
 		apiExtensionClient, err := apiextensionclientset.NewForConfig(config)
 		framework.ExpectNoError(err, "failed to initialize apiExtensionClient")
 
-		crd, err = fixtures.CreateNewCustomResourceDefinition(crd, apiExtensionClient, f.DynamicClient)
+		crd, err = fixtures.CreateNewV1CustomResourceDefinition(crd, apiExtensionClient, f.DynamicClient)
 		framework.ExpectNoError(err, "failed to create custom resource definition")
-		err = fixtures.DeleteCustomResourceDefinition(crd, apiExtensionClient)
+		err = fixtures.DeleteV1CustomResourceDefinition(crd, apiExtensionClient)
 		framework.ExpectNoError(err, "failed to delete custom resource definition")
 
 		expectEvents(f, []utils.AuditEvent{
