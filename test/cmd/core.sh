@@ -751,21 +751,21 @@ run_create_secret_tests() {
     output_message=$(! kubectl get secrets mysecret 2>&1 "${kube_flags[@]}")
     kube::test::if_has_string "${output_message}" 'secrets "mysecret" not found'
     # Command
-    output_message=$(kubectl create "${kube_flags[@]}" secret generic mysecret --dry-run --from-literal=foo=bar -o jsonpath='{.metadata.namespace}' --namespace=user-specified)
+    output_message=$(kubectl create "${kube_flags[@]}" secret generic mysecret --dry-run=client --from-literal=foo=bar -o jsonpath='{.metadata.namespace}' --namespace=user-specified)
+    kube::test::if_has_string "${output_message}" 'user-specified'
     # Post-condition: mysecret still not created since --dry-run was used
     # Output from 'create' command should contain the specified --namespace value
     failure_message=$(! kubectl get secrets mysecret 2>&1 "${kube_flags[@]}")
     kube::test::if_has_string "${failure_message}" 'secrets "mysecret" not found'
-    kube::test::if_has_string "${output_message}" 'user-specified'
     # Command
-    output_message=$(kubectl create "${kube_flags[@]}" secret generic mysecret --dry-run --from-literal=foo=bar -o jsonpath='{.metadata.namespace}')
+    output_message=$(kubectl create "${kube_flags[@]}" secret generic mysecret --dry-run=client --from-literal=foo=bar -o jsonpath='{.metadata.namespace}')
     # Post-condition: jsonpath for .metadata.namespace should be empty for object since --namespace was not explicitly specified
     kube::test::if_empty_string "${output_message}"
 
 
     # check to make sure that replace correctly PUTs to a URL
     kubectl create configmap tester-update-cm -o json --dry-run=client | kubectl create "${kube_flags[@]}" --raw /api/v1/namespaces/default/configmaps -f -
-    output_message=$(kubectl create configmap tester-update-cm --from-literal=key1=config1 -o json --dry-run | kubectl replace "${kube_flags[@]}" --raw /api/v1/namespaces/default/configmaps/tester-update-cm -f -)
+    output_message=$(kubectl create configmap tester-update-cm --from-literal=key1=config1 -o json --dry-run=client | kubectl replace "${kube_flags[@]}" --raw /api/v1/namespaces/default/configmaps/tester-update-cm -f -)
     # the message should show the body returned which will include a UID not present in the input
     kube::test::if_has_string "${output_message}" 'uid'
     # if the PUT was well-formed, the server will now have a key and value we can retrieve on GET
@@ -789,7 +789,7 @@ run_secrets_test() {
   kube::log::status "Testing secrets"
 
   # Ensure dry run succeeds and includes kind, apiVersion and data, and doesn't require a server connection
-  output_message=$(kubectl create secret generic test --from-literal=key1=value1 --dry-run -o yaml --server=example.com --v=6)
+  output_message=$(kubectl create secret generic test --from-literal=key1=value1 --dry-run=client -o yaml --server=example.com --v=6)
   kube::test::if_has_string "${output_message}" 'kind: Secret'
   kube::test::if_has_string "${output_message}" 'apiVersion: v1'
   kube::test::if_has_string "${output_message}" 'key1: dmFsdWUx'
@@ -964,7 +964,7 @@ run_service_tests() {
 
   # Set selector of a local file without talking to the server
   kubectl set selector -f test/e2e/testing-manifests/guestbook/redis-master-service.yaml role=padawan --local -o yaml "${kube_flags[@]}"
-  kubectl set selector -f test/e2e/testing-manifests/guestbook/redis-master-service.yaml role=padawan --dry-run -o yaml "${kube_flags[@]}"
+  kubectl set selector -f test/e2e/testing-manifests/guestbook/redis-master-service.yaml role=padawan --dry-run=client -o yaml "${kube_flags[@]}"
   # Set command to change the selector.
   kubectl set selector -f test/e2e/testing-manifests/guestbook/redis-master-service.yaml role=padawan
   # prove role=padawan
@@ -1358,7 +1358,7 @@ run_rc_tests() {
   kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" ''
   # Set resources of a local file without talking to the server
   kubectl set resources -f hack/testdata/deployment-multicontainer-resources.yaml -c=perl --limits=cpu=300m --requests=cpu=300m --local -o yaml "${kube_flags[@]}"
-  ! kubectl set resources -f hack/testdata/deployment-multicontainer-resources.yaml -c=perl --limits=cpu=300m --requests=cpu=300m --dry-run -o yaml "${kube_flags[@]}" || exit 1
+  ! kubectl set resources -f hack/testdata/deployment-multicontainer-resources.yaml -c=perl --limits=cpu=300m --requests=cpu=300m --dry-run=client -o yaml "${kube_flags[@]}" || exit 1
   # Create a deployment
   kubectl create -f hack/testdata/deployment-multicontainer-resources.yaml "${kube_flags[@]}"
   kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" 'nginx-deployment-resources:'
@@ -1380,7 +1380,8 @@ run_rc_tests() {
   kube::test::get_object_assert deployment "{{range.items}}{{(index .spec.template.spec.containers 1).resources.limits.cpu}}:{{end}}" "300m:"
   kube::test::get_object_assert deployment "{{range.items}}{{(index .spec.template.spec.containers 1).resources.requests.cpu}}:{{end}}" "300m:"
   # Show dry-run works on running deployments
-  kubectl set resources deployment nginx-deployment-resources -c=perl --limits=cpu=400m --requests=cpu=400m --dry-run -o yaml "${kube_flags[@]}"
+  kubectl set resources deployment nginx-deployment-resources -c=perl --limits=cpu=400m --requests=cpu=400m --dry-run=client -o yaml "${kube_flags[@]}"
+  kubectl set resources deployment nginx-deployment-resources -c=perl --limits=cpu=400m --requests=cpu=400m --dry-run=server -o yaml "${kube_flags[@]}"
   ! kubectl set resources deployment nginx-deployment-resources -c=perl --limits=cpu=400m --requests=cpu=400m --local -o yaml "${kube_flags[@]}" || exit 1
   kube::test::get_object_assert deployment "{{range.items}}{{(index .spec.template.spec.containers 0).resources.limits.cpu}}:{{end}}" "200m:"
   kube::test::get_object_assert deployment "{{range.items}}{{(index .spec.template.spec.containers 1).resources.limits.cpu}}:{{end}}" "300m:"

@@ -85,7 +85,7 @@ func checkUnsupportedPlugins(client clientset.Interface) error {
 	if err != nil {
 		return err
 	}
-	if unsupportedCoreDNS != nil {
+	if len(unsupportedCoreDNS) != 0 {
 		var UnsupportedPlugins []string
 		for _, unsup := range unsupportedCoreDNS {
 			UnsupportedPlugins = append(UnsupportedPlugins, unsup.ToString())

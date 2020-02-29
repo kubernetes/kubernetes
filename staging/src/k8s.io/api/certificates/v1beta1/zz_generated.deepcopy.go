@@ -110,6 +110,11 @@ func (in *CertificateSigningRequestSpec) DeepCopyInto(out *CertificateSigningReq
 		*out = make([]byte, len(*in))
 		copy(*out, *in)
 	}
+	if in.SignerName != nil {
+		in, out := &in.SignerName, &out.SignerName
+		*out = new(string)
+		**out = **in
+	}
 	if in.Usages != nil {
 		in, out := &in.Usages, &out.Usages
 		*out = make([]KeyUsage, len(*in))

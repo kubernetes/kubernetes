@@ -52,8 +52,7 @@ var (
 		the --grace-period flag, or pass --now to set a grace-period of 1. Because these resources often
 		represent entities in the cluster, deletion may not be acknowledged immediately. If the node
 		hosting a pod is down or cannot reach the API server, termination may take significantly longer
-		than the grace period. To force delete a resource, you must pass a grace period of 0 and specify
-		the --force flag.
+		than the grace period. To force delete a resource, you must specify the --force flag.
 		Note: only a subset of resources support graceful deletion. In absence of the support, --grace-period is ignored.
 
 		IMPORTANT: Force deleting pods does not wait for confirmation that the pod's processes have been
@@ -90,7 +89,7 @@ var (
 		kubectl delete pod foo --now
 
 		# Force delete a pod on a dead node
-		kubectl delete pod foo --grace-period=0 --force
+		kubectl delete pod foo --force
 
 		# Delete all pods
 		kubectl delete pods --all`))
@@ -176,6 +175,9 @@ func (o *DeleteOptions) Complete(f cmdutil.Factory, args []string, cmd *cobra.Co
 		// into --grace-period=1. Users may provide --force to bypass this conversion.
 		o.GracePeriod = 1
 	}
+	if o.ForceDeletion && o.GracePeriod < 0 {
+		o.GracePeriod = 0
+	}
 
 	o.DryRunStrategy, err = cmdutil.GetDryRunStrategy(cmd)
 	if err != nil {
@@ -239,8 +241,8 @@ func (o *DeleteOptions) Validate() error {
 	switch {
 	case o.GracePeriod == 0 && o.ForceDeletion:
 		fmt.Fprintf(o.ErrOut, "warning: Immediate deletion does not wait for confirmation that the running resource has been terminated. The resource may continue to run on the cluster indefinitely.\n")
-	case o.ForceDeletion:
-		fmt.Fprintf(o.ErrOut, "warning: --force is ignored because --grace-period is not 0.\n")
+	case o.GracePeriod > 0 && o.ForceDeletion:
+		return fmt.Errorf("--force and --grace-period greater than 0 cannot be specified together")
 	}
 
 	if len(o.Raw) > 0 {

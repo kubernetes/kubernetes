@@ -21,14 +21,13 @@ import (
 	"context"
 	"crypto/x509"
 	"fmt"
-	"reflect"
-	"strings"
 
 	authorization "k8s.io/api/authorization/v1"
 	capi "k8s.io/api/certificates/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	certificatesinformers "k8s.io/client-go/informers/certificates/v1beta1"
 	clientset "k8s.io/client-go/kubernetes"
+
 	capihelper "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
 	"k8s.io/kubernetes/pkg/controller/certificates"
 )
@@ -81,7 +80,7 @@ func (a *sarApprover) handle(csr *capi.CertificateSigningRequest) error {
 	if approved, denied := certificates.GetCertApprovalCondition(&csr.Status); approved || denied {
 		return nil
 	}
-	x509cr, err := capihelper.ParseCSR(csr)
+	x509cr, err := capihelper.ParseCSR(csr.Spec.Request)
 	if err != nil {
 		return fmt.Errorf("unable to parse csr %q: %v", csr.Name, err)
 	}
@@ -146,45 +145,12 @@ func appendApprovalCondition(csr *capi.CertificateSigningRequest, message string
 	})
 }
 
-func hasExactUsages(csr *capi.CertificateSigningRequest, usages []capi.KeyUsage) bool {
-	if len(usages) != len(csr.Spec.Usages) {
-		return false
-	}
-
-	usageMap := map[capi.KeyUsage]struct{}{}
-	for _, u := range usages {
-		usageMap[u] = struct{}{}
-	}
-
-	for _, u := range csr.Spec.Usages {
-		if _, ok := usageMap[u]; !ok {
-			return false
-		}
-	}
-
-	return true
-}
-
-var kubeletClientUsages = []capi.KeyUsage{
-	capi.UsageKeyEncipherment,
-	capi.UsageDigitalSignature,
-	capi.UsageClientAuth,
-}
-
 func isNodeClientCert(csr *capi.CertificateSigningRequest, x509cr *x509.CertificateRequest) bool {
-	if !reflect.DeepEqual([]string{"system:nodes"}, x509cr.Subject.Organization) {
+	isClientCSR := capihelper.IsKubeletClientCSR(x509cr, csr.Spec.Usages)
+	if !isClientCSR {
 		return false
 	}
-	if len(x509cr.DNSNames) > 0 || len(x509cr.EmailAddresses) > 0 || len(x509cr.IPAddresses) > 0 || len(x509cr.URIs) > 0 {
-		return false
-	}
-	if !hasExactUsages(csr, kubeletClientUsages) {
-		return false
-	}
-	if !strings.HasPrefix(x509cr.Subject.CommonName, "system:node:") {
-		return false
-	}
-	return true
+	return *csr.Spec.SignerName == capi.KubeAPIServerClientKubeletSignerName
 }
 
 func isSelfNodeClientCert(csr *capi.CertificateSigningRequest, x509cr *x509.CertificateRequest) bool {

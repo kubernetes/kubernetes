@@ -193,7 +193,7 @@ func newV1TokenAuthenticator(serverURL string, clientCert, clientKey, ca []byte,
 		return nil, err
 	}
 
-	c, err := tokenReviewInterfaceFromKubeconfig(p, "v1")
+	c, err := tokenReviewInterfaceFromKubeconfig(p, "v1", nil)
 	if err != nil {
 		return nil, err
 	}

@@ -24,6 +24,9 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/admission/admit"
 	"k8s.io/kubernetes/plugin/pkg/admission/alwayspullimages"
 	"k8s.io/kubernetes/plugin/pkg/admission/antiaffinity"
+	certapproval "k8s.io/kubernetes/plugin/pkg/admission/certificates/approval"
+	certsigning "k8s.io/kubernetes/plugin/pkg/admission/certificates/signing"
+	certsubjectrestriction "k8s.io/kubernetes/plugin/pkg/admission/certificates/subjectrestriction"
 	"k8s.io/kubernetes/plugin/pkg/admission/defaulttolerationseconds"
 	"k8s.io/kubernetes/plugin/pkg/admission/deny"
 	"k8s.io/kubernetes/plugin/pkg/admission/eventratelimit"
@@ -87,6 +90,9 @@ var AllOrderedPlugins = []string{
 	gc.PluginName,                           // OwnerReferencesPermissionEnforcement
 	resize.PluginName,                       // PersistentVolumeClaimResize
 	runtimeclass.PluginName,                 // RuntimeClass
+	certapproval.PluginName,                 // CertificateApproval
+	certsigning.PluginName,                  // CertificateSigning
+	certsubjectrestriction.PluginName,       // CertificateSubjectRestriction
 
 	// new admission plugins should generally be inserted above here
 	// webhook, resourcequota, and deny plugins must go at the end
@@ -128,6 +134,9 @@ func RegisterAllAdmissionPlugins(plugins *admission.Plugins) {
 	setdefault.Register(plugins)
 	resize.Register(plugins)
 	storageobjectinuseprotection.Register(plugins)
+	certapproval.Register(plugins)
+	certsigning.Register(plugins)
+	certsubjectrestriction.Register(plugins)
 }
 
 // DefaultOffAdmissionPlugins get admission plugins off by default for kube-apiserver.
@@ -146,6 +155,9 @@ func DefaultOffAdmissionPlugins() sets.String {
 		podpriority.PluginName,                  //PodPriority
 		nodetaint.PluginName,                    //TaintNodesByCondition
 		runtimeclass.PluginName,                 //RuntimeClass, gates internally on the feature
+		certapproval.PluginName,                 // CertificateApproval
+		certsigning.PluginName,                  // CertificateSigning
+		certsubjectrestriction.PluginName,       // CertificateSubjectRestriction
 	)
 
 	return sets.NewString(AllOrderedPlugins...).Difference(defaultOnPlugins)

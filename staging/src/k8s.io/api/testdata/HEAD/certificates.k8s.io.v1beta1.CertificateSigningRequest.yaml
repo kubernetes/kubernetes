@@ -31,19 +31,20 @@ metadata:
   uid: "7"
 spec:
   extra:
-    "22":
-    - "23"
+    "23":
+    - "24"
   groups:
-  - "21"
+  - "22"
   request: OA==
-  uid: "20"
+  signerName: "19"
+  uid: "21"
   usages:
   - J枊a
-  username: "19"
+  username: "20"
 status:
   certificate: 9Q==
   conditions:
   - lastUpdateTime: "2901-11-14T22:54:07Z"
-    message: "25"
-    reason: "24"
+    message: "26"
+    reason: "25"
     type: o,c鮽ort昍řČ扷5Ɨ
