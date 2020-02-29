@@ -80,7 +80,7 @@ func (mounter *Mounter) MountSensitive(source string, target string, fstype stri
 	bindSource := source
 
 	// tell it's going to mount azure disk or azure file according to options
-	if bind, _, _, _ := MakeBindOpts(options, sensitiveOptions); bind {
+	if bind, _, _, _ := MakeBindOptsSensitive(options, sensitiveOptions); bind {
 		// mount azure disk
 		bindSource = NormalizeWindowsPath(source)
 	} else {
