@@ -30,6 +30,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -218,7 +219,7 @@ func run(config *hollowNodeConfig) {
 			runtimeService,
 			containerManager,
 		)
-		hollowKubelet.Run()
+		hollowKubelet.Run(wait.NeverStop)
 	}
 
 	if config.Morph == "proxy" {

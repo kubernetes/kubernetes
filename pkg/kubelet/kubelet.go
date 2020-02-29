@@ -200,7 +200,7 @@ type Bootstrap interface {
 	ListenAndServe(address net.IP, port uint, tlsOptions *server.TLSOptions, auth server.AuthInterface, enableCAdvisorJSONEndpoints, enableDebuggingHandlers, enableContentionProfiling bool)
 	ListenAndServeReadOnly(address net.IP, port uint, enableCAdvisorJSONEndpoints bool)
 	ListenAndServePodResources()
-	Run(<-chan kubetypes.PodUpdate)
+	Run(updates <-chan kubetypes.PodUpdate, stopCh <-chan struct{})
 	RunOnce(<-chan kubetypes.PodUpdate) ([]RunPodResult, error)
 }
 
@@ -1398,7 +1398,7 @@ func (kl *Kubelet) initializeRuntimeDependentModules() {
 }
 
 // Run starts the kubelet reacting to config updates
-func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
+func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate, stopCh <-chan struct{}) {
 	if kl.logServer == nil {
 		kl.logServer = http.StripPrefix("/logs/", http.FileServer(http.Dir("/var/log/")))
 	}
@@ -1408,7 +1408,7 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 
 	// Start the cloud provider sync manager
 	if kl.cloudResourceSyncManager != nil {
-		go kl.cloudResourceSyncManager.Run(wait.NeverStop)
+		go kl.cloudResourceSyncManager.Run(stopCh)
 	}
 
 	if err := kl.initializeModules(); err != nil {
@@ -1417,17 +1417,17 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 	}
 
 	// Start volume manager
-	go kl.volumeManager.Run(kl.sourcesReady, wait.NeverStop)
+	go kl.volumeManager.Run(kl.sourcesReady, stopCh)
 
 	if kl.kubeClient != nil {
 		// Start syncing node status immediately, this may set up things the runtime needs to run.
-		go wait.Until(kl.syncNodeStatus, kl.nodeStatusUpdateFrequency, wait.NeverStop)
+		go wait.Until(kl.syncNodeStatus, kl.nodeStatusUpdateFrequency, stopCh)
 		go kl.fastStatusUpdateOnce()
 
 		// start syncing lease
-		go kl.nodeLeaseController.Run(wait.NeverStop)
+		go kl.nodeLeaseController.Run(stopCh)
 	}
-	go wait.Until(kl.updateRuntimeUp, 5*time.Second, wait.NeverStop)
+	go wait.Until(kl.updateRuntimeUp, 5*time.Second, stopCh)
 
 	// Set up iptables util rules
 	if kl.makeIPTablesUtilChains {
@@ -1436,7 +1436,7 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 
 	// Start a goroutine responsible for killing pods (that are not properly
 	// handled by pod workers).
-	go wait.Until(kl.podKiller, 1*time.Second, wait.NeverStop)
+	go wait.Until(kl.podKiller, 1*time.Second, stopCh)
 
 	// Start component sync loops.
 	kl.statusManager.Start()
@@ -1444,7 +1444,7 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 
 	// Start syncing RuntimeClasses if enabled.
 	if kl.runtimeClassManager != nil {
-		kl.runtimeClassManager.Start(wait.NeverStop)
+		kl.runtimeClassManager.Start(stopCh)
 	}
 
 	// Start the pod lifecycle event generator.

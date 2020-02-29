@@ -126,14 +126,14 @@ func NewHollowKubelet(
 }
 
 // Starts this HollowKubelet and blocks.
-func (hk *HollowKubelet) Run() {
+func (hk *HollowKubelet) Run(stopCh <-chan struct{}) {
 	if err := kubeletapp.RunKubelet(&options.KubeletServer{
 		KubeletFlags:         *hk.KubeletFlags,
 		KubeletConfiguration: *hk.KubeletConfiguration,
-	}, hk.KubeletDeps, false); err != nil {
+	}, hk.KubeletDeps, false, stopCh); err != nil {
 		klog.Fatalf("Failed to run HollowKubelet: %v. Exiting.", err)
 	}
-	select {}
+	<-stopCh
 }
 
 // HollowKubletOptions contains settable parameters for hollow kubelet.
