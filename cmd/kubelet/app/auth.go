@@ -36,7 +36,7 @@ import (
 )
 
 // BuildAuth creates an authenticator, an authorizer, and a matching authorizer attributes getter compatible with the kubelet's needs
-func BuildAuth(nodeName types.NodeName, client clientset.Interface, config kubeletconfig.KubeletConfiguration) (server.AuthInterface, error) {
+func BuildAuth(nodeName types.NodeName, client clientset.Interface, config kubeletconfig.KubeletConfiguration) (server.AuthInterface, authenticatorfactory.CAContentProvider, error) {
 	// Get clients, if provided
 	var (
 		tokenClient authenticationclient.TokenReviewInterface
@@ -47,32 +47,32 @@ func BuildAuth(nodeName types.NodeName, client clientset.Interface, config kubel
 		sarClient = client.AuthorizationV1().SubjectAccessReviews()
 	}
 
-	authenticator, err := BuildAuthn(tokenClient, config.Authentication)
+	var clientCertificateCAContentProvider authenticatorfactory.CAContentProvider
+	if clientCAFile := config.Authentication.X509.ClientCAFile; len(clientCAFile) > 0 {
+		var err error
+		clientCertificateCAContentProvider, err = dynamiccertificates.NewDynamicCAContentFromFile("client-ca-bundle", clientCAFile)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+
+	authenticator, err := BuildAuthn(tokenClient, config.Authentication, clientCertificateCAContentProvider)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	attributes := server.NewNodeAuthorizerAttributesGetter(nodeName)
 
 	authorizer, err := BuildAuthz(sarClient, config.Authorization)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return server.NewKubeletAuth(authenticator, attributes, authorizer), nil
+	return server.NewKubeletAuth(authenticator, attributes, authorizer), clientCertificateCAContentProvider, nil
 }
 
 // BuildAuthn creates an authenticator compatible with the kubelet's needs
-func BuildAuthn(client authenticationclient.TokenReviewInterface, authn kubeletconfig.KubeletAuthentication) (authenticator.Request, error) {
-	var clientCertificateCAContentProvider authenticatorfactory.CAContentProvider
-	var err error
-	if len(authn.X509.ClientCAFile) > 0 {
-		clientCertificateCAContentProvider, err = dynamiccertificates.NewDynamicCAContentFromFile("client-ca-bundle", authn.X509.ClientCAFile)
-		if err != nil {
-			return nil, err
-		}
-	}
-
+func BuildAuthn(client authenticationclient.TokenReviewInterface, authn kubeletconfig.KubeletAuthentication, clientCertificateCAContentProvider authenticatorfactory.CAContentProvider) (authenticator.Request, error) {
 	authenticatorConfig := authenticatorfactory.DelegatingAuthenticatorConfig{
 		Anonymous:                          authn.Anonymous.Enabled,
 		CacheTTL:                           authn.Webhook.CacheTTL.Duration,

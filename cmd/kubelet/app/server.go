@@ -600,11 +600,12 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, featureGate f
 	}
 
 	if kubeDeps.Auth == nil {
-		auth, err := BuildAuth(nodeName, kubeDeps.KubeClient, s.KubeletConfiguration)
+		auth, clientCertificateCAContentProvider, err := BuildAuth(nodeName, kubeDeps.KubeClient, s.KubeletConfiguration)
 		if err != nil {
 			return err
 		}
 		kubeDeps.Auth = auth
+		kubeDeps.ClientCertificateCAContentProvider = clientCertificateCAContentProvider
 	}
 
 	var cgroupRoots []string
@@ -1007,27 +1008,14 @@ func InitializeTLS(kf *options.KubeletFlags, kc *kubeletconfiginternal.KubeletCo
 		return nil, err
 	}
 
-	tlsOptions := &server.TLSOptions{
+	return &server.TLSOptions{
 		Config: &tls.Config{
 			MinVersion:   minTLSVersion,
 			CipherSuites: tlsCipherSuites,
 		},
 		CertFile: kc.TLSCertFile,
 		KeyFile:  kc.TLSPrivateKeyFile,
-	}
-
-	if len(kc.Authentication.X509.ClientCAFile) > 0 {
-		clientCAs, err := certutil.NewPool(kc.Authentication.X509.ClientCAFile)
-		if err != nil {
-			return nil, fmt.Errorf("unable to load client CA file %s: %v", kc.Authentication.X509.ClientCAFile, err)
-		}
-		// Specify allowed CAs for client certificates
-		tlsOptions.Config.ClientCAs = clientCAs
-		// Populate PeerCertificates in requests, but don't reject connections without verified certificates
-		tlsOptions.Config.ClientAuth = tls.RequestClientCert
-	}
-
-	return tlsOptions, nil
+	}, nil
 }
 
 // setContentTypeForClient sets the appropritae content type into the rest config
