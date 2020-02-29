@@ -19,12 +19,14 @@ package metrics
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	clientset "k8s.io/client-go/kubernetes"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/master/ports"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/system"
 
 	"k8s.io/klog"
@@ -41,15 +43,16 @@ type Collection struct {
 
 // Grabber provides functions which grab metrics from components
 type Grabber struct {
-	client                    clientset.Interface
-	externalClient            clientset.Interface
-	grabFromAPIServer         bool
-	grabFromControllerManager bool
-	grabFromKubelets          bool
-	grabFromScheduler         bool
-	grabFromClusterAutoscaler bool
-	masterName                string
-	registeredMaster          bool
+	client                            clientset.Interface
+	externalClient                    clientset.Interface
+	grabFromAPIServer                 bool
+	grabFromControllerManager         bool
+	grabFromKubelets                  bool
+	grabFromScheduler                 bool
+	grabFromClusterAutoscaler         bool
+	masterName                        string
+	registeredMaster                  bool
+	waitForControllerManagerReadyOnce sync.Once
 }
 
 // NewMetricsGrabber returns new metrics which are initialized.
@@ -161,7 +164,12 @@ func (g *Grabber) GrabFromControllerManager() (ControllerManagerMetrics, error) 
 	if !g.registeredMaster {
 		return ControllerManagerMetrics{}, fmt.Errorf("Master's Kubelet is not registered. Skipping ControllerManager's metrics gathering")
 	}
-	output, err := g.getMetricsFromPod(g.client, fmt.Sprintf("%v-%v", "kube-controller-manager", g.masterName), metav1.NamespaceSystem, ports.InsecureKubeControllerManagerPort)
+
+	podName := fmt.Sprintf("%v-%v", "kube-controller-manager", g.masterName)
+	g.waitForControllerManagerReadyOnce.Do(func() {
+		e2epod.WaitForPodNameRunningInNamespace(g.client, podName, metav1.NamespaceSystem)
+	})
+	output, err := g.getMetricsFromPod(g.client, podName, metav1.NamespaceSystem, ports.InsecureKubeControllerManagerPort)
 	if err != nil {
 		return ControllerManagerMetrics{}, err
 	}

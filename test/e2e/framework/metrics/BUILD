@@ -32,6 +32,7 @@ go_library(
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/component-base/metrics/testutil:go_default_library",
         "//test/e2e/framework/log:go_default_library",
+        "//test/e2e/framework/pod:go_default_library",
         "//test/e2e/perftype:go_default_library",
         "//test/e2e/system:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
