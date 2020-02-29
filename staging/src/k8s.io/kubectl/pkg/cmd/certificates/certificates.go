@@ -234,7 +234,7 @@ func (o *CertificateOptions) modifyCertificateCondition(builder *resource.Builde
 			csr := info.Object.(*certificatesv1beta1.CertificateSigningRequest)
 			csr, hasCondition := modify(csr)
 			if !hasCondition || force {
-				csr, err = clientSet.CertificateSigningRequests().UpdateApproval(csr)
+				_, err = clientSet.CertificateSigningRequests().UpdateApproval(csr)
 				if errors.IsConflict(err) && i < 10 {
 					if err := info.Get(); err != nil {
 						return err
