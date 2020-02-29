@@ -299,25 +299,24 @@ func (cephfsVolume *cephfs) GetKeyringPath() string {
 
 func (cephfsVolume *cephfs) execMount(mountpoint string) error {
 	// cephfs mount option
-	cephOpt := ""
+	cephSensitiveOpt := []string{"name=" + cephfsVolume.id}
 	// override secretfile if secret is provided
 	if cephfsVolume.secret != "" {
-		cephOpt = "name=" + cephfsVolume.id + ",secret=" + cephfsVolume.secret
+		cephSensitiveOpt = append(cephSensitiveOpt, "secret="+cephfsVolume.secret)
 	} else {
-		cephOpt = "name=" + cephfsVolume.id + ",secretfile=" + cephfsVolume.secretFile
+		cephSensitiveOpt = append(cephSensitiveOpt, "secretfile="+cephfsVolume.secretFile)
 	}
 	// build option array
 	opt := []string{}
 	if cephfsVolume.readonly {
 		opt = append(opt, "ro")
 	}
-	opt = append(opt, cephOpt)
 
 	// build src like mon1:6789,mon2:6789,mon3:6789:/
 	src := strings.Join(cephfsVolume.mon, ",") + ":" + cephfsVolume.path
 
 	opt = util.JoinMountOptions(cephfsVolume.mountOptions, opt)
-	if err := cephfsVolume.mounter.Mount(src, mountpoint, "ceph", opt); err != nil {
+	if err := cephfsVolume.mounter.MountSensitive(src, mountpoint, "ceph", opt, cephSensitiveOpt); err != nil {
 		return fmt.Errorf("CephFS: mount failed: %v", err)
 	}
 
