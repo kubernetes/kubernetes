@@ -332,7 +332,8 @@ func getRecorderFactory(cc *schedulerserverconfig.CompletedConfig) profile.Recor
 	}
 }
 
-// WithPlugin creates an Option based on plugin name and factory. This function is used to register out-of-tree plugins.
+// WithPlugin creates an Option based on plugin name and factory. Please don't remove this function: it is used to register out-of-tree plugins,
+// hence there are no references to it from the kubernetes scheduler code base.
 func WithPlugin(name string, factory framework.PluginFactory) Option {
 	return func(registry framework.Registry) error {
 		return registry.Register(name, factory)
