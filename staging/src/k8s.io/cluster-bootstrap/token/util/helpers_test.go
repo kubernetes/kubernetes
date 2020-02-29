@@ -211,3 +211,32 @@ func TestValidateUsages(t *testing.T) {
 		}
 	}
 }
+
+func TestParseToken(t *testing.T) {
+	var tests = []struct {
+		token       string
+		tokenID     string
+		tokenSecret string
+	}{
+		{token: "", tokenID: "", tokenSecret: ""},
+		{token: "abcdef.0123456789abcdef", tokenID: "abcdef", tokenSecret: "0123456789abcdef"},
+		{token: "07401b.f395accd246ae52d", tokenID: "07401b", tokenSecret: "f395accd246ae52d"},
+		{token: "Abcdef.f395accd246ae52d", tokenID: "", tokenSecret: ""},
+		{token: "abcdef.f395accd246ae52d.", tokenID: "", tokenSecret: ""},
+		{token: "abcdef.ABCDEF", tokenID: "", tokenSecret: ""},
+		{token: "abcdef", tokenID: "", tokenSecret: ""},
+	}
+	for _, rt := range tests {
+		tokenID, tokenSecret, _ := ParseToken(rt.token)
+		if tokenID != rt.tokenID && tokenSecret != rt.tokenSecret {
+			t.Errorf(
+				"failed ParseToken for the token %q\n\t Got: tokenID: %q\t tokenSecret: %q \n Expected: tokenID: %q\t tokenSecret: %q\n",
+				rt.token,
+				rt.tokenID,
+				rt.tokenSecret,
+				tokenID,
+				tokenSecret,
+			)
+		}
+	}
+}

@@ -2125,7 +2125,6 @@ k8s.io/cluster-bootstrap/token/api
 k8s.io/cluster-bootstrap/token/jws
 k8s.io/cluster-bootstrap/token/util
 k8s.io/cluster-bootstrap/util/secrets
-k8s.io/cluster-bootstrap/util/tokens
 # k8s.io/code-generator v0.0.0 => ./staging/src/k8s.io/code-generator
 ## explicit
 # k8s.io/code-generator => ./staging/src/k8s.io/code-generator
