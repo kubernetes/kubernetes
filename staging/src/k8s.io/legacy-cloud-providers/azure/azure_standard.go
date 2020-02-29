@@ -264,18 +264,14 @@ func isInternalLoadBalancer(lb *network.LoadBalancer) bool {
 // getBackendPoolName the LB BackendPool name for a service.
 // to ensure backword and forward compat:
 // SingleStack -v4 (pre v1.16) => BackendPool name == clusterName
-// SingleStack -v6 => BackendPool name == clusterName (all cluster bootstrap uses this name)
+// SingleStack -v6 => BackendPool name == <clusterName>-IPv6 (all cluster bootstrap uses this name)
 // DualStack
 //	=> IPv4 BackendPool name == clusterName
 //  => IPv6 BackendPool name == <clusterName>-IPv6
 // This means:
-// clusters moving from IPv4 to duakstack will require no changes
-// clusters moving from IPv6 (while not seen in the wild, we can not rule out their existence)
-// to dualstack will require deleting backend pools (the reconciler will take care of creating correct backendpools)
-func getBackendPoolName(ipv6DualStackEnabled bool, clusterName string, service *v1.Service) string {
-	if !ipv6DualStackEnabled {
-		return clusterName
-	}
+// clusters moving from IPv4 to dualstack will require no changes
+// clusters moving from IPv6 to dualstack will require no changes as the IPv4 backend pool will created with <clusterName>
+func getBackendPoolName(clusterName string, service *v1.Service) string {
 	IPv6 := utilnet.IsIPv6String(service.Spec.ClusterIP)
 	if IPv6 {
 		return fmt.Sprintf("%v-IPv6", clusterName)
@@ -746,13 +742,13 @@ func (as *availabilitySet) EnsureHostInPool(service *v1.Service, nodeName types.
 	}
 
 	var primaryIPConfig *network.InterfaceIPConfiguration
-	if !as.Cloud.ipv6DualStackEnabled {
+	ipv6 := utilnet.IsIPv6String(service.Spec.ClusterIP)
+	if !as.Cloud.ipv6DualStackEnabled && !ipv6 {
 		primaryIPConfig, err = getPrimaryIPConfig(nic)
 		if err != nil {
 			return err
 		}
 	} else {
-		ipv6 := utilnet.IsIPv6String(service.Spec.ClusterIP)
 		primaryIPConfig, err = getIPConfigByIPFamily(nic, ipv6)
 		if err != nil {
 			return err
