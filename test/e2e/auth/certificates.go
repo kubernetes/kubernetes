@@ -68,7 +68,7 @@ var _ = SIGDescribe("Certificates API", func() {
 		csrs := f.ClientSet.CertificatesV1beta1().CertificateSigningRequests()
 
 		framework.Logf("creating CSR")
-		csr, err = csrs.Create(context.TODO(), csr)
+		csr, err = csrs.Create(context.TODO(), csr, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 
 		csrName := csr.Name

@@ -18,7 +18,6 @@ pkg/registry/core/service/storage
 pkg/util/coverage
 pkg/volume
 pkg/volume/azure_dd
-pkg/volume/azure_file
 pkg/volume/csi
 pkg/volume/flexvolume
 pkg/volume/iscsi
@@ -29,7 +28,6 @@ pkg/volume/storageos
 pkg/volume/util
 pkg/volume/util/fsquota
 pkg/volume/util/fsquota/common
-pkg/volume/util/operationexecutor
 pkg/volume/util/subpath
 test/e2e/apps
 test/e2e/autoscaling
@@ -94,19 +92,9 @@ vendor/k8s.io/client-go/restmapper
 vendor/k8s.io/client-go/tools/leaderelection
 vendor/k8s.io/client-go/transport
 vendor/k8s.io/component-base/metrics
-vendor/k8s.io/kubectl/pkg/cmd/certificates
-vendor/k8s.io/kubectl/pkg/cmd/config
 vendor/k8s.io/kubectl/pkg/cmd/edit
-vendor/k8s.io/kubectl/pkg/cmd/exec
 vendor/k8s.io/kubectl/pkg/cmd/get
-vendor/k8s.io/kubectl/pkg/cmd/proxy
-vendor/k8s.io/kubectl/pkg/cmd/rollingupdate
 vendor/k8s.io/kubectl/pkg/cmd/scale
 vendor/k8s.io/kubectl/pkg/cmd/set
 vendor/k8s.io/kubectl/pkg/cmd/testing
-vendor/k8s.io/kubectl/pkg/cmd/top
-vendor/k8s.io/kubectl/pkg/cmd/util/editor
-vendor/k8s.io/kubectl/pkg/cmd/wait
-vendor/k8s.io/kubectl/pkg/describe/versioned
-vendor/k8s.io/kubectl/pkg/scale
 vendor/k8s.io/metrics/pkg/client/custom_metrics

@@ -81,7 +81,7 @@ func (c *FakeNetworkPolicies) Watch(ctx context.Context, opts v1.ListOptions) (w
 }
 
 // Create takes the representation of a networkPolicy and creates it.  Returns the server's representation of the networkPolicy, and an error, if there is any.
-func (c *FakeNetworkPolicies) Create(ctx context.Context, networkPolicy *networkingv1.NetworkPolicy) (result *networkingv1.NetworkPolicy, err error) {
+func (c *FakeNetworkPolicies) Create(ctx context.Context, networkPolicy *networkingv1.NetworkPolicy, opts v1.CreateOptions) (result *networkingv1.NetworkPolicy, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(networkpoliciesResource, c.ns, networkPolicy), &networkingv1.NetworkPolicy{})
 
@@ -92,7 +92,7 @@ func (c *FakeNetworkPolicies) Create(ctx context.Context, networkPolicy *network
 }
 
 // Update takes the representation of a networkPolicy and updates it. Returns the server's representation of the networkPolicy, and an error, if there is any.
-func (c *FakeNetworkPolicies) Update(ctx context.Context, networkPolicy *networkingv1.NetworkPolicy) (result *networkingv1.NetworkPolicy, err error) {
+func (c *FakeNetworkPolicies) Update(ctx context.Context, networkPolicy *networkingv1.NetworkPolicy, opts v1.UpdateOptions) (result *networkingv1.NetworkPolicy, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(networkpoliciesResource, c.ns, networkPolicy), &networkingv1.NetworkPolicy{})
 
@@ -119,7 +119,7 @@ func (c *FakeNetworkPolicies) DeleteCollection(ctx context.Context, options *v1.
 }
 
 // Patch applies the patch and returns the patched networkPolicy.
-func (c *FakeNetworkPolicies) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *networkingv1.NetworkPolicy, err error) {
+func (c *FakeNetworkPolicies) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *networkingv1.NetworkPolicy, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(networkpoliciesResource, c.ns, name, pt, data, subresources...), &networkingv1.NetworkPolicy{})
 

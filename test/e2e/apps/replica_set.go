@@ -128,7 +128,7 @@ func testReplicaSetServeImageOrFail(f *framework.Framework, test string, image s
 	framework.Logf("Creating ReplicaSet %s", name)
 	newRS := newRS(name, replicas, map[string]string{"name": name}, name, image, []string{"serve-hostname"})
 	newRS.Spec.Template.Spec.Containers[0].Ports = []v1.ContainerPort{{ContainerPort: 9376}}
-	_, err := f.ClientSet.AppsV1().ReplicaSets(f.Namespace.Name).Create(context.TODO(), newRS)
+	_, err := f.ClientSet.AppsV1().ReplicaSets(f.Namespace.Name).Create(context.TODO(), newRS, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
 	// Check that pods for the new RS were created.
@@ -185,7 +185,7 @@ func testReplicaSetConditionCheck(f *framework.Framework) {
 
 	ginkgo.By(fmt.Sprintf("Creating quota %q that allows only two pods to run in the current namespace", name))
 	quota := newPodQuota(name, "2")
-	_, err := c.CoreV1().ResourceQuotas(namespace).Create(context.TODO(), quota)
+	_, err := c.CoreV1().ResourceQuotas(namespace).Create(context.TODO(), quota, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
 	err = wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
@@ -204,7 +204,7 @@ func testReplicaSetConditionCheck(f *framework.Framework) {
 
 	ginkgo.By(fmt.Sprintf("Creating replica set %q that asks for more than the allowed pod quota", name))
 	rs := newRS(name, 3, map[string]string{"name": name}, WebserverImageName, WebserverImage, nil)
-	rs, err = c.AppsV1().ReplicaSets(namespace).Create(context.TODO(), rs)
+	rs, err = c.AppsV1().ReplicaSets(namespace).Create(context.TODO(), rs, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
 	ginkgo.By(fmt.Sprintf("Checking replica set %q has the desired failure condition set", name))
@@ -284,7 +284,7 @@ func testRSAdoptMatchingAndReleaseNotMatching(f *framework.Framework) {
 	replicas := int32(1)
 	rsSt := newRS(name, replicas, map[string]string{"name": name}, name, WebserverImage, nil)
 	rsSt.Spec.Selector = &metav1.LabelSelector{MatchLabels: map[string]string{"name": name}}
-	rs, err := f.ClientSet.AppsV1().ReplicaSets(f.Namespace.Name).Create(context.TODO(), rsSt)
+	rs, err := f.ClientSet.AppsV1().ReplicaSets(f.Namespace.Name).Create(context.TODO(), rsSt, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
 	ginkgo.By("Then the orphan pod is adopted")
@@ -316,7 +316,7 @@ func testRSAdoptMatchingAndReleaseNotMatching(f *framework.Framework) {
 		framework.ExpectNoError(err)
 
 		pod.Labels = map[string]string{"name": "not-matching-name"}
-		_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Update(context.TODO(), pod)
+		_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Update(context.TODO(), pod, metav1.UpdateOptions{})
 		if err != nil && apierrors.IsConflict(err) {
 			return false, nil
 		}

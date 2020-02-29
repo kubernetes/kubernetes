@@ -23,21 +23,27 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2019-06-01/network"
 	"github.com/Azure/go-autorest/autorest/to"
+	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/legacy-cloud-providers/azure/clients/routetableclient/mockroutetableclient"
+	"k8s.io/legacy-cloud-providers/azure/mockvmsets"
 )
 
 func TestDeleteRoute(t *testing.T) {
-	fakeRoutes := newFakeRoutesClient()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	routeTableClient := mockroutetableclient.NewMockInterface(ctrl)
 
 	cloud := &Cloud{
-		RoutesClient: fakeRoutes,
+		RouteTablesClient: routeTableClient,
 		Config: Config{
 			RouteTableResourceGroup: "foo",
 			RouteTableName:          "bar",
@@ -46,29 +52,38 @@ func TestDeleteRoute(t *testing.T) {
 		unmanagedNodes:     sets.NewString(),
 		nodeInformerSynced: func() bool { return true },
 	}
-	route := cloudprovider.Route{TargetNode: "node", DestinationCIDR: "1.2.3.4/24"}
+	cache, _ := cloud.newRouteTableCache()
+	cloud.rtCache = cache
+	cloud.routeUpdater = newDelayedRouteUpdater(cloud, 100*time.Millisecond)
+	go cloud.routeUpdater.run()
+	route := cloudprovider.Route{
+		TargetNode:      "node",
+		DestinationCIDR: "1.2.3.4/24",
+	}
 	routeName := mapNodeNameToRouteName(false, route.TargetNode, route.DestinationCIDR)
-
-	fakeRoutes.FakeStore = map[string]map[string]network.Route{
-		cloud.RouteTableName: {
-			routeName: {},
+	routeTables := network.RouteTable{
+		Name:     &cloud.RouteTableName,
+		Location: &cloud.Location,
+		RouteTablePropertiesFormat: &network.RouteTablePropertiesFormat{
+			Routes: &[]network.Route{
+				{
+					Name: &routeName,
+				},
+			},
 		},
 	}
-
+	routeTablesAfterDeletion := network.RouteTable{
+		Name:     &cloud.RouteTableName,
+		Location: &cloud.Location,
+		RouteTablePropertiesFormat: &network.RouteTablePropertiesFormat{
+			Routes: &[]network.Route{},
+		},
+	}
+	routeTableClient.EXPECT().Get(gomock.Any(), cloud.RouteTableResourceGroup, cloud.RouteTableName, "").Return(routeTables, nil)
+	routeTableClient.EXPECT().CreateOrUpdate(gomock.Any(), cloud.RouteTableResourceGroup, cloud.RouteTableName, routeTablesAfterDeletion, "").Return(nil)
 	err := cloud.DeleteRoute(context.TODO(), "cluster", &route)
 	if err != nil {
 		t.Errorf("unexpected error deleting route: %v", err)
-		t.FailNow()
-	}
-
-	mp, found := fakeRoutes.FakeStore[cloud.RouteTableName]
-	if !found {
-		t.Errorf("unexpected missing item for %s", cloud.RouteTableName)
-		t.FailNow()
-	}
-	ob, found := mp[routeName]
-	if found {
-		t.Errorf("unexpectedly found: %v that should have been deleted.", ob)
 		t.FailNow()
 	}
 
@@ -95,14 +110,14 @@ func TestDeleteRoute(t *testing.T) {
 }
 
 func TestCreateRoute(t *testing.T) {
-	fakeTable := newFakeRouteTablesClient()
-	fakeVM := &fakeVMSet{}
-	fakeRoutes := newFakeRoutesClient()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	routeTableClient := mockroutetableclient.NewMockInterface(ctrl)
+	mockVMSet := mockvmsets.NewMockVMSet(ctrl)
 
 	cloud := &Cloud{
-		RouteTablesClient: fakeTable,
-		RoutesClient:      fakeRoutes,
-		vmSet:             fakeVM,
+		RouteTablesClient: routeTableClient,
+		vmSet:             mockVMSet,
 		Config: Config{
 			RouteTableResourceGroup: "foo",
 			RouteTableName:          "bar",
@@ -113,66 +128,48 @@ func TestCreateRoute(t *testing.T) {
 	}
 	cache, _ := cloud.newRouteTableCache()
 	cloud.rtCache = cache
+	cloud.routeUpdater = newDelayedRouteUpdater(cloud, 100*time.Millisecond)
+	go cloud.routeUpdater.run()
 
-	expectedTable := network.RouteTable{
+	currentTable := network.RouteTable{
+		Name:                       &cloud.RouteTableName,
+		Location:                   &cloud.Location,
+		RouteTablePropertiesFormat: &network.RouteTablePropertiesFormat{},
+	}
+	updatedTable := network.RouteTable{
 		Name:     &cloud.RouteTableName,
 		Location: &cloud.Location,
-	}
-	fakeTable.FakeStore = map[string]map[string]network.RouteTable{}
-	fakeTable.FakeStore[cloud.RouteTableResourceGroup] = map[string]network.RouteTable{
-		cloud.RouteTableName: expectedTable,
+		RouteTablePropertiesFormat: &network.RouteTablePropertiesFormat{
+			Routes: &[]network.Route{
+				{
+					Name: to.StringPtr("node"),
+					RoutePropertiesFormat: &network.RoutePropertiesFormat{
+						AddressPrefix:    to.StringPtr("1.2.3.4/24"),
+						NextHopIPAddress: to.StringPtr("2.4.6.8"),
+						NextHopType:      network.RouteNextHopTypeVirtualAppliance,
+					},
+				},
+			},
+		},
 	}
 	route := cloudprovider.Route{TargetNode: "node", DestinationCIDR: "1.2.3.4/24"}
-
 	nodeIP := "2.4.6.8"
-	fakeVM.NodeToIP = map[string]string{
-		"node": nodeIP,
-	}
 
+	routeTableClient.EXPECT().Get(gomock.Any(), cloud.RouteTableResourceGroup, cloud.RouteTableName, "").Return(currentTable, nil)
+	routeTableClient.EXPECT().CreateOrUpdate(gomock.Any(), cloud.RouteTableResourceGroup, cloud.RouteTableName, updatedTable, "").Return(nil)
+	mockVMSet.EXPECT().GetIPByNodeName("node").Return(nodeIP, "", nil).AnyTimes()
 	err := cloud.CreateRoute(context.TODO(), "cluster", "unused", &route)
 	if err != nil {
 		t.Errorf("unexpected error create if not exists route table: %v", err)
 		t.FailNow()
 	}
-	if len(fakeTable.Calls) != 1 || fakeTable.Calls[0] != "Get" {
-		t.Errorf("unexpected calls create if not exists, exists: %v", fakeTable.Calls)
-	}
-	if len(fakeRoutes.Calls) != 1 || fakeRoutes.Calls[0] != "CreateOrUpdate" {
-		t.Errorf("unexpected route calls create if not exists, exists: %v", fakeRoutes.Calls)
-	}
 
-	routeName := mapNodeNameToRouteName(false, route.TargetNode, string(route.DestinationCIDR))
-	routeInfo, found := fakeRoutes.FakeStore[cloud.RouteTableName][routeName]
-	if !found {
-		t.Errorf("could not find route: %v in %v", routeName, fakeRoutes.FakeStore)
-		t.FailNow()
-	}
-	if *routeInfo.AddressPrefix != route.DestinationCIDR {
-		t.Errorf("Expected cidr: %s, saw %s", *routeInfo.AddressPrefix, route.DestinationCIDR)
-	}
-	if routeInfo.NextHopType != network.RouteNextHopTypeVirtualAppliance {
-		t.Errorf("Expected next hop: %v, saw %v", network.RouteNextHopTypeVirtualAppliance, routeInfo.NextHopType)
-	}
-	if *routeInfo.NextHopIPAddress != nodeIP {
-		t.Errorf("Expected IP address: %s, saw %s", nodeIP, *routeInfo.NextHopIPAddress)
-	}
-
-	// test create again without real creation, clean fakeRoute calls
-	fakeRoutes.Calls = []string{}
-	routeInfo.Name = &routeName
-	route.Name = routeName
-	expectedTable.RouteTablePropertiesFormat = &network.RouteTablePropertiesFormat{
-		Routes: &[]network.Route{routeInfo},
-	}
-	cloud.rtCache.Set(cloud.RouteTableName, &expectedTable)
-
+	// test create again without real creation.
+	routeTableClient.EXPECT().Get(gomock.Any(), cloud.RouteTableResourceGroup, cloud.RouteTableName, "").Return(updatedTable, nil).Times(1)
 	err = cloud.CreateRoute(context.TODO(), "cluster", "unused", &route)
 	if err != nil {
 		t.Errorf("unexpected error creating route: %v", err)
 		t.FailNow()
-	}
-	if len(fakeRoutes.Calls) != 0 {
-		t.Errorf("unexpected route calls create if not exists, exists: %v", fakeRoutes.Calls)
 	}
 
 	// test create route for unmanaged nodes.
@@ -199,77 +196,13 @@ func TestCreateRoute(t *testing.T) {
 	}
 }
 
-func TestCreateRouteTableIfNotExists_Exists(t *testing.T) {
-	fake := newFakeRouteTablesClient()
-	cloud := &Cloud{
-		RouteTablesClient: fake,
-		Config: Config{
-			RouteTableResourceGroup: "foo",
-			RouteTableName:          "bar",
-			Location:                "location",
-		},
-	}
-	cache, _ := cloud.newRouteTableCache()
-	cloud.rtCache = cache
-
-	expectedTable := network.RouteTable{
-		Name:     &cloud.RouteTableName,
-		Location: &cloud.Location,
-	}
-	fake.FakeStore = map[string]map[string]network.RouteTable{}
-	fake.FakeStore[cloud.RouteTableResourceGroup] = map[string]network.RouteTable{
-		cloud.RouteTableName: expectedTable,
-	}
-	err := cloud.createRouteTableIfNotExists("clusterName", &cloudprovider.Route{TargetNode: "node", DestinationCIDR: "1.2.3.4/16"})
-	if err != nil {
-		t.Errorf("unexpected error create if not exists route table: %v", err)
-		t.FailNow()
-	}
-	if len(fake.Calls) != 1 || fake.Calls[0] != "Get" {
-		t.Errorf("unexpected calls create if not exists, exists: %v", fake.Calls)
-	}
-}
-
-func TestCreateRouteTableIfNotExists_NotExists(t *testing.T) {
-	fake := newFakeRouteTablesClient()
-	cloud := &Cloud{
-		RouteTablesClient: fake,
-		Config: Config{
-			RouteTableResourceGroup: "foo",
-			RouteTableName:          "bar",
-			Location:                "location",
-		},
-	}
-	cache, _ := cloud.newRouteTableCache()
-	cloud.rtCache = cache
-
-	expectedTable := network.RouteTable{
-		Name:     &cloud.RouteTableName,
-		Location: &cloud.Location,
-	}
-
-	err := cloud.createRouteTableIfNotExists("clusterName", &cloudprovider.Route{TargetNode: "node", DestinationCIDR: "1.2.3.4/16"})
-	if err != nil {
-		t.Errorf("unexpected error create if not exists route table: %v", err)
-		t.FailNow()
-	}
-
-	table := fake.FakeStore[cloud.RouteTableResourceGroup][cloud.RouteTableName]
-	if *table.Location != *expectedTable.Location {
-		t.Errorf("mismatch: %s vs %s", *table.Location, *expectedTable.Location)
-	}
-	if *table.Name != *expectedTable.Name {
-		t.Errorf("mismatch: %s vs %s", *table.Name, *expectedTable.Name)
-	}
-	if len(fake.Calls) != 2 || fake.Calls[0] != "Get" || fake.Calls[1] != "CreateOrUpdate" {
-		t.Errorf("unexpected calls create if not exists, exists: %v", fake.Calls)
-	}
-}
-
 func TestCreateRouteTable(t *testing.T) {
-	fake := newFakeRouteTablesClient()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	routeTableClient := mockroutetableclient.NewMockInterface(ctrl)
+
 	cloud := &Cloud{
-		RouteTablesClient: fake,
+		RouteTablesClient: routeTableClient,
 		Config: Config{
 			RouteTableResourceGroup: "foo",
 			RouteTableName:          "bar",
@@ -280,22 +213,15 @@ func TestCreateRouteTable(t *testing.T) {
 	cloud.rtCache = cache
 
 	expectedTable := network.RouteTable{
-		Name:     &cloud.RouteTableName,
-		Location: &cloud.Location,
+		Name:                       &cloud.RouteTableName,
+		Location:                   &cloud.Location,
+		RouteTablePropertiesFormat: &network.RouteTablePropertiesFormat{},
 	}
-
+	routeTableClient.EXPECT().CreateOrUpdate(gomock.Any(), cloud.RouteTableResourceGroup, cloud.RouteTableName, expectedTable, "").Return(nil)
 	err := cloud.createRouteTable()
 	if err != nil {
 		t.Errorf("unexpected error in creating route table: %v", err)
 		t.FailNow()
-	}
-
-	table := fake.FakeStore["foo"]["bar"]
-	if *table.Location != *expectedTable.Location {
-		t.Errorf("mismatch: %s vs %s", *table.Location, *expectedTable.Location)
-	}
-	if *table.Name != *expectedTable.Name {
-		t.Errorf("mismatch: %s vs %s", *table.Name, *expectedTable.Name)
 	}
 }
 

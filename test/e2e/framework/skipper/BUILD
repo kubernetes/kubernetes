@@ -16,8 +16,8 @@ go_library(
         "//staging/src/k8s.io/client-go/dynamic:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//test/e2e/framework:go_default_library",
-        "//test/e2e/framework/ginkgowrapper:go_default_library",
         "//test/e2e/framework/ssh:go_default_library",
+        "//vendor/github.com/onsi/ginkgo:go_default_library",
     ],
 )
 

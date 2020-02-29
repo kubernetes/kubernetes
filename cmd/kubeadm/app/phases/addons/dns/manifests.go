@@ -241,7 +241,7 @@ spec:
       - key: {{ .ControlPlaneTaintKey }}
         effect: NoSchedule
       nodeSelector:
-        beta.kubernetes.io/os: linux
+        kubernetes.io/os: linux
       containers:
       - name: coredns
         image: {{ .Image }}

@@ -38,14 +38,14 @@ type RuntimeClassesGetter interface {
 
 // RuntimeClassInterface has methods to work with RuntimeClass resources.
 type RuntimeClassInterface interface {
-	Create(context.Context, *v1alpha1.RuntimeClass) (*v1alpha1.RuntimeClass, error)
-	Update(context.Context, *v1alpha1.RuntimeClass) (*v1alpha1.RuntimeClass, error)
-	Delete(ctx context.Context, name string, options *v1.DeleteOptions) error
-	DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(ctx context.Context, name string, options v1.GetOptions) (*v1alpha1.RuntimeClass, error)
+	Create(ctx context.Context, runtimeClass *v1alpha1.RuntimeClass, opts v1.CreateOptions) (*v1alpha1.RuntimeClass, error)
+	Update(ctx context.Context, runtimeClass *v1alpha1.RuntimeClass, opts v1.UpdateOptions) (*v1alpha1.RuntimeClass, error)
+	Delete(ctx context.Context, name string, opts *v1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts *v1.DeleteOptions, listOpts v1.ListOptions) error
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1alpha1.RuntimeClass, error)
 	List(ctx context.Context, opts v1.ListOptions) (*v1alpha1.RuntimeClassList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.RuntimeClass, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.RuntimeClass, err error)
 	RuntimeClassExpansion
 }
 
@@ -104,10 +104,11 @@ func (c *runtimeClasses) Watch(ctx context.Context, opts v1.ListOptions) (watch.
 }
 
 // Create takes the representation of a runtimeClass and creates it.  Returns the server's representation of the runtimeClass, and an error, if there is any.
-func (c *runtimeClasses) Create(ctx context.Context, runtimeClass *v1alpha1.RuntimeClass) (result *v1alpha1.RuntimeClass, err error) {
+func (c *runtimeClasses) Create(ctx context.Context, runtimeClass *v1alpha1.RuntimeClass, opts v1.CreateOptions) (result *v1alpha1.RuntimeClass, err error) {
 	result = &v1alpha1.RuntimeClass{}
 	err = c.client.Post().
 		Resource("runtimeclasses").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(runtimeClass).
 		Do(ctx).
 		Into(result)
@@ -115,11 +116,12 @@ func (c *runtimeClasses) Create(ctx context.Context, runtimeClass *v1alpha1.Runt
 }
 
 // Update takes the representation of a runtimeClass and updates it. Returns the server's representation of the runtimeClass, and an error, if there is any.
-func (c *runtimeClasses) Update(ctx context.Context, runtimeClass *v1alpha1.RuntimeClass) (result *v1alpha1.RuntimeClass, err error) {
+func (c *runtimeClasses) Update(ctx context.Context, runtimeClass *v1alpha1.RuntimeClass, opts v1.UpdateOptions) (result *v1alpha1.RuntimeClass, err error) {
 	result = &v1alpha1.RuntimeClass{}
 	err = c.client.Put().
 		Resource("runtimeclasses").
 		Name(runtimeClass.Name).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(runtimeClass).
 		Do(ctx).
 		Into(result)
@@ -152,12 +154,13 @@ func (c *runtimeClasses) DeleteCollection(ctx context.Context, options *v1.Delet
 }
 
 // Patch applies the patch and returns the patched runtimeClass.
-func (c *runtimeClasses) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.RuntimeClass, err error) {
+func (c *runtimeClasses) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.RuntimeClass, err error) {
 	result = &v1alpha1.RuntimeClass{}
 	err = c.client.Patch(pt).
 		Resource("runtimeclasses").
-		SubResource(subresources...).
 		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

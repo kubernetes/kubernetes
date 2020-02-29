@@ -36,13 +36,6 @@ var _ framework.FilterPlugin = &VolumeBinding{}
 // Name is the name of the plugin used in Registry and configurations.
 const Name = "VolumeBinding"
 
-const (
-	// ErrReasonBindConflict is used for VolumeBindingNoMatch predicate error.
-	ErrReasonBindConflict = "node(s) didn't find available persistent volumes to bind"
-	// ErrReasonNodeConflict is used for VolumeNodeAffinityConflict predicate error.
-	ErrReasonNodeConflict = "node(s) had volume node affinity conflict"
-)
-
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *VolumeBinding) Name() string {
 	return Name
@@ -79,19 +72,16 @@ func (pl *VolumeBinding) Filter(ctx context.Context, cs *framework.CycleState, p
 		return nil
 	}
 
-	unboundSatisfied, boundSatisfied, err := pl.binder.Binder.FindPodVolumes(pod, node)
+	reasons, err := pl.binder.Binder.FindPodVolumes(pod, node)
 
 	if err != nil {
 		return framework.NewStatus(framework.Error, err.Error())
 	}
 
-	if !boundSatisfied || !unboundSatisfied {
+	if len(reasons) > 0 {
 		status := framework.NewStatus(framework.UnschedulableAndUnresolvable)
-		if !boundSatisfied {
-			status.AppendReason(ErrReasonNodeConflict)
-		}
-		if !unboundSatisfied {
-			status.AppendReason(ErrReasonBindConflict)
+		for _, reason := range reasons {
+			status.AppendReason(string(reason))
 		}
 		return status
 	}

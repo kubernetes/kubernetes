@@ -102,14 +102,14 @@ func TestWebhookLoadBalance(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	_, err = client.CoreV1().Pods("default").Create(context.TODO(), loadBalanceMarkerFixture)
+	_, err = client.CoreV1().Pods("default").Create(context.TODO(), loadBalanceMarkerFixture, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	upCh := recorder.Reset()
 	ns := "load-balance"
-	_, err = client.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ns}})
+	_, err = client.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ns}}, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -130,7 +130,7 @@ func TestWebhookLoadBalance(t *testing.T) {
 			FailurePolicy:           &fail,
 			AdmissionReviewVersions: []string{"v1beta1"},
 		}},
-	})
+	}, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -143,7 +143,7 @@ func TestWebhookLoadBalance(t *testing.T) {
 
 	// wait until new webhook is called the first time
 	if err := wait.PollImmediate(time.Millisecond*5, wait.ForeverTestTimeout, func() (bool, error) {
-		_, err = client.CoreV1().Pods("default").Patch(context.TODO(), loadBalanceMarkerFixture.Name, types.JSONPatchType, []byte("[]"))
+		_, err = client.CoreV1().Pods("default").Patch(context.TODO(), loadBalanceMarkerFixture.Name, types.JSONPatchType, []byte("[]"), metav1.PatchOptions{})
 		select {
 		case <-upCh:
 			return true, nil
@@ -176,7 +176,7 @@ func TestWebhookLoadBalance(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			_, err := client.CoreV1().Pods(ns).Create(context.TODO(), pod())
+			_, err := client.CoreV1().Pods(ns).Create(context.TODO(), pod(), metav1.CreateOptions{})
 			if err != nil {
 				t.Error(err)
 			}
@@ -195,7 +195,7 @@ func TestWebhookLoadBalance(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			_, err := client.CoreV1().Pods(ns).Create(context.TODO(), pod())
+			_, err := client.CoreV1().Pods(ns).Create(context.TODO(), pod(), metav1.CreateOptions{})
 			if err != nil {
 				t.Error(err)
 			}

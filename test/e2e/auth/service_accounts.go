@@ -125,7 +125,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 			sa, err := f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Get(context.TODO(), "default", metav1.GetOptions{})
 			framework.ExpectNoError(err)
 			sa.Secrets = nil
-			_, updateErr := f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Update(context.TODO(), sa)
+			_, updateErr := f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Update(context.TODO(), sa, metav1.UpdateOptions{})
 			framework.ExpectNoError(updateErr)
 		}
 
@@ -172,7 +172,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 	framework.ConformanceIt("should mount an API token into pods ", func() {
 		var rootCAContent string
 
-		sa, err := f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Create(context.TODO(), &v1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: "mount-test"}})
+		sa, err := f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Create(context.TODO(), &v1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: "mount-test"}}, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 
 		// Standard get, update retry loop
@@ -222,7 +222,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 				TerminationGracePeriodSeconds: &zero,
 				RestartPolicy:                 v1.RestartPolicyNever,
 			},
-		})
+		}, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(f.ClientSet, pod))
 
@@ -239,7 +239,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 		framework.ExpectEqual(mountedNamespace, f.Namespace.Name)
 		// Token should be a valid credential that identifies the pod's service account
 		tokenReview := &authenticationv1.TokenReview{Spec: authenticationv1.TokenReviewSpec{Token: mountedToken}}
-		tokenReview, err = f.ClientSet.AuthenticationV1().TokenReviews().Create(context.TODO(), tokenReview)
+		tokenReview, err = f.ClientSet.AuthenticationV1().TokenReviews().Create(context.TODO(), tokenReview, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 		framework.ExpectEqual(tokenReview.Status.Authenticated, true)
 		framework.ExpectEqual(tokenReview.Status.Error, "")
@@ -282,9 +282,9 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 		falseValue := false
 		mountSA := &v1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: "mount"}, AutomountServiceAccountToken: &trueValue}
 		nomountSA := &v1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: "nomount"}, AutomountServiceAccountToken: &falseValue}
-		mountSA, err = f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Create(context.TODO(), mountSA)
+		mountSA, err = f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Create(context.TODO(), mountSA, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
-		nomountSA, err = f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Create(context.TODO(), nomountSA)
+		nomountSA, err = f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Create(context.TODO(), nomountSA, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 
 		// Standard get, update retry loop
@@ -394,7 +394,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 					AutomountServiceAccountToken: tc.AutomountPodSpec,
 				},
 			}
-			createdPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod)
+			createdPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 			framework.Logf("created pod %s", tc.PodName)
 
@@ -426,7 +426,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 			Data: map[string]string{
 				"ca.crt": string(cfg.TLSClientConfig.CAData),
 			},
-		}); err != nil && !apierrors.IsAlreadyExists(err) {
+		}, metav1.CreateOptions{}); err != nil && !apierrors.IsAlreadyExists(err) {
 			framework.Failf("Unexpected err creating kube-ca-crt: %v", err)
 		}
 
@@ -489,7 +489,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 				}},
 			},
 		}
-		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod)
+		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 
 		framework.Logf("created pod")

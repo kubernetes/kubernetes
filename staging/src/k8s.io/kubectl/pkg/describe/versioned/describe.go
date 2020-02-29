@@ -2410,7 +2410,7 @@ func (i *IngressDescriber) describeIngress(ing *networkingv1beta1.Ingress, descr
 		if count == 0 {
 			w.Write(LEVEL_1, "%s\t%s \t%s (%s)\n", "*", "*", backendStringer(def), i.describeBackend(ns, def))
 		}
-		describeIngressAnnotations(w, ing.Annotations)
+		printAnnotationsMultiline(w, "Annotations", ing.Annotations)
 
 		if describerSettings.ShowEvents {
 			events, _ := i.CoreV1().Events(ing.Namespace).Search(scheme.Scheme, ing)
@@ -2430,14 +2430,6 @@ func describeIngressTLS(w PrefixWriter, ingTLS []networkingv1beta1.IngressTLS) {
 		} else {
 			w.Write(LEVEL_1, "%v terminates %v\n", t.SecretName, strings.Join(t.Hosts, ","))
 		}
-	}
-}
-
-// TODO: Move from annotations into Ingress status.
-func describeIngressAnnotations(w PrefixWriter, annotations map[string]string) {
-	w.Write(LEVEL_0, "Annotations:\n")
-	for k, v := range annotations {
-		w.Write(LEVEL_1, "%v:\t%s\n", k, v)
 	}
 }
 
@@ -3247,6 +3239,9 @@ func describeCertificateSigningRequest(csr *certificatesv1beta1.CertificateSigni
 		w.Write(LEVEL_0, "Annotations:\t%s\n", labels.FormatLabels(csr.Annotations))
 		w.Write(LEVEL_0, "CreationTimestamp:\t%s\n", csr.CreationTimestamp.Time.Format(time.RFC1123Z))
 		w.Write(LEVEL_0, "Requesting User:\t%s\n", csr.Spec.Username)
+		if csr.Spec.SignerName != nil {
+			w.Write(LEVEL_0, "Signer:\t%s\n", *csr.Spec.SignerName)
+		}
 		w.Write(LEVEL_0, "Status:\t%s\n", status)
 
 		w.Write(LEVEL_0, "Subject:\n")
@@ -3530,13 +3525,32 @@ func describeNodeResource(nodeNonTerminatedPodsList *corev1.PodList, node *corev
 		corev1.ResourceMemory, memoryReqs.String(), int64(fractionMemoryReqs), memoryLimits.String(), int64(fractionMemoryLimits))
 	w.Write(LEVEL_1, "%s\t%s (%d%%)\t%s (%d%%)\n",
 		corev1.ResourceEphemeralStorage, ephemeralstorageReqs.String(), int64(fractionEphemeralStorageReqs), ephemeralstorageLimits.String(), int64(fractionEphemeralStorageLimits))
+
 	extResources := make([]string, 0, len(allocatable))
+	hugePageResources := make([]string, 0, len(allocatable))
 	for resource := range allocatable {
-		if !resourcehelper.IsStandardContainerResourceName(string(resource)) && resource != corev1.ResourcePods {
+		if resourcehelper.IsHugePageResourceName(resource) {
+			hugePageResources = append(hugePageResources, string(resource))
+		} else if !resourcehelper.IsStandardContainerResourceName(string(resource)) && resource != corev1.ResourcePods {
 			extResources = append(extResources, string(resource))
 		}
 	}
+
 	sort.Strings(extResources)
+	sort.Strings(hugePageResources)
+
+	for _, resource := range hugePageResources {
+		hugePageSizeRequests, hugePageSizeLimits, hugePageSizeAllocable := reqs[corev1.ResourceName(resource)], limits[corev1.ResourceName(resource)], allocatable[corev1.ResourceName(resource)]
+		fractionHugePageSizeRequests := float64(0)
+		fractionHugePageSizeLimits := float64(0)
+		if hugePageSizeAllocable.Value() != 0 {
+			fractionHugePageSizeRequests = float64(hugePageSizeRequests.Value()) / float64(hugePageSizeAllocable.Value()) * 100
+			fractionHugePageSizeLimits = float64(hugePageSizeLimits.Value()) / float64(hugePageSizeAllocable.Value()) * 100
+		}
+		w.Write(LEVEL_1, "%s\t%s (%d%%)\t%s (%d%%)\n",
+			resource, hugePageSizeRequests.String(), int64(fractionHugePageSizeRequests), hugePageSizeLimits.String(), int64(fractionHugePageSizeLimits))
+	}
+
 	for _, ext := range extResources {
 		extRequests, extLimits := reqs[corev1.ResourceName(ext)], limits[corev1.ResourceName(ext)]
 		w.Write(LEVEL_1, "%s\t%s\t%s\n", ext, extRequests.String(), extLimits.String())

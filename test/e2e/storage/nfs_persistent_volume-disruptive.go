@@ -303,7 +303,7 @@ func initTestCase(f *framework.Framework, c clientset.Interface, pvConfig e2epv.
 	pod := e2epod.MakePod(ns, nil, []*v1.PersistentVolumeClaim{pvc}, true, "")
 	pod.Spec.NodeName = nodeName
 	framework.Logf("Creating NFS client pod.")
-	pod, err = c.CoreV1().Pods(ns).Create(context.TODO(), pod)
+	pod, err = c.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
 	framework.Logf("NFS client Pod %q created on Node %q", pod.Name, nodeName)
 	framework.ExpectNoError(err)
 	defer func() {

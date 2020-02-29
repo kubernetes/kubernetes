@@ -38,14 +38,14 @@ type LeasesGetter interface {
 
 // LeaseInterface has methods to work with Lease resources.
 type LeaseInterface interface {
-	Create(context.Context, *v1beta1.Lease) (*v1beta1.Lease, error)
-	Update(context.Context, *v1beta1.Lease) (*v1beta1.Lease, error)
-	Delete(ctx context.Context, name string, options *v1.DeleteOptions) error
-	DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(ctx context.Context, name string, options v1.GetOptions) (*v1beta1.Lease, error)
+	Create(ctx context.Context, lease *v1beta1.Lease, opts v1.CreateOptions) (*v1beta1.Lease, error)
+	Update(ctx context.Context, lease *v1beta1.Lease, opts v1.UpdateOptions) (*v1beta1.Lease, error)
+	Delete(ctx context.Context, name string, opts *v1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts *v1.DeleteOptions, listOpts v1.ListOptions) error
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1beta1.Lease, error)
 	List(ctx context.Context, opts v1.ListOptions) (*v1beta1.LeaseList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.Lease, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.Lease, err error)
 	LeaseExpansion
 }
 
@@ -109,11 +109,12 @@ func (c *leases) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interfac
 }
 
 // Create takes the representation of a lease and creates it.  Returns the server's representation of the lease, and an error, if there is any.
-func (c *leases) Create(ctx context.Context, lease *v1beta1.Lease) (result *v1beta1.Lease, err error) {
+func (c *leases) Create(ctx context.Context, lease *v1beta1.Lease, opts v1.CreateOptions) (result *v1beta1.Lease, err error) {
 	result = &v1beta1.Lease{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("leases").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(lease).
 		Do(ctx).
 		Into(result)
@@ -121,12 +122,13 @@ func (c *leases) Create(ctx context.Context, lease *v1beta1.Lease) (result *v1be
 }
 
 // Update takes the representation of a lease and updates it. Returns the server's representation of the lease, and an error, if there is any.
-func (c *leases) Update(ctx context.Context, lease *v1beta1.Lease) (result *v1beta1.Lease, err error) {
+func (c *leases) Update(ctx context.Context, lease *v1beta1.Lease, opts v1.UpdateOptions) (result *v1beta1.Lease, err error) {
 	result = &v1beta1.Lease{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("leases").
 		Name(lease.Name).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(lease).
 		Do(ctx).
 		Into(result)
@@ -161,13 +163,14 @@ func (c *leases) DeleteCollection(ctx context.Context, options *v1.DeleteOptions
 }
 
 // Patch applies the patch and returns the patched lease.
-func (c *leases) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.Lease, err error) {
+func (c *leases) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.Lease, err error) {
 	result = &v1beta1.Lease{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("leases").
-		SubResource(subresources...).
 		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

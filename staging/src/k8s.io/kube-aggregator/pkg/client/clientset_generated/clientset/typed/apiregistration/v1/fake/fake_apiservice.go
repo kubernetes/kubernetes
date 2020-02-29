@@ -77,7 +77,7 @@ func (c *FakeAPIServices) Watch(ctx context.Context, opts v1.ListOptions) (watch
 }
 
 // Create takes the representation of a aPIService and creates it.  Returns the server's representation of the aPIService, and an error, if there is any.
-func (c *FakeAPIServices) Create(ctx context.Context, aPIService *apiregistrationv1.APIService) (result *apiregistrationv1.APIService, err error) {
+func (c *FakeAPIServices) Create(ctx context.Context, aPIService *apiregistrationv1.APIService, opts v1.CreateOptions) (result *apiregistrationv1.APIService, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootCreateAction(apiservicesResource, aPIService), &apiregistrationv1.APIService{})
 	if obj == nil {
@@ -87,7 +87,7 @@ func (c *FakeAPIServices) Create(ctx context.Context, aPIService *apiregistratio
 }
 
 // Update takes the representation of a aPIService and updates it. Returns the server's representation of the aPIService, and an error, if there is any.
-func (c *FakeAPIServices) Update(ctx context.Context, aPIService *apiregistrationv1.APIService) (result *apiregistrationv1.APIService, err error) {
+func (c *FakeAPIServices) Update(ctx context.Context, aPIService *apiregistrationv1.APIService, opts v1.UpdateOptions) (result *apiregistrationv1.APIService, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootUpdateAction(apiservicesResource, aPIService), &apiregistrationv1.APIService{})
 	if obj == nil {
@@ -98,7 +98,7 @@ func (c *FakeAPIServices) Update(ctx context.Context, aPIService *apiregistratio
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeAPIServices) UpdateStatus(ctx context.Context, aPIService *apiregistrationv1.APIService) (*apiregistrationv1.APIService, error) {
+func (c *FakeAPIServices) UpdateStatus(ctx context.Context, aPIService *apiregistrationv1.APIService, opts v1.UpdateOptions) (*apiregistrationv1.APIService, error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootUpdateSubresourceAction(apiservicesResource, "status", aPIService), &apiregistrationv1.APIService{})
 	if obj == nil {
@@ -123,7 +123,7 @@ func (c *FakeAPIServices) DeleteCollection(ctx context.Context, options *v1.Dele
 }
 
 // Patch applies the patch and returns the patched aPIService.
-func (c *FakeAPIServices) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *apiregistrationv1.APIService, err error) {
+func (c *FakeAPIServices) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *apiregistrationv1.APIService, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootPatchSubresourceAction(apiservicesResource, name, pt, data, subresources...), &apiregistrationv1.APIService{})
 	if obj == nil {

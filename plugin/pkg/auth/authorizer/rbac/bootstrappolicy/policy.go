@@ -17,6 +17,7 @@ limitations under the License.
 package bootstrappolicy
 
 import (
+	capi "k8s.io/api/certificates/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,6 +28,8 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 )
 
+// Write and other vars are slices of the allowed verbs.
+// Label and Annotation are default maps of bootstrappolicy.
 var (
 	Write      = []string{"create", "update", "patch", "delete", "deletecollection"}
 	ReadWrite  = []string{"get", "list", "watch", "create", "update", "patch", "delete", "deletecollection"}
@@ -97,6 +100,7 @@ func addClusterRoleBindingLabel(rolebindings []rbacv1.ClusterRoleBinding) {
 	return
 }
 
+// NodeRules returns node policy rules, it is slice of rbacv1.PolicyRule.
 func NodeRules() []rbacv1.PolicyRule {
 	nodePolicyRules := []rbacv1.PolicyRule{
 		// Needed to check API access.  These creates are non-mutating
@@ -456,6 +460,45 @@ func ClusterRoles() []rbacv1.ClusterRole {
 				rbacv1helpers.NewRule(ReadUpdate...).Groups(legacyGroup).Resources("persistentvolumeclaims").RuleOrDie(),
 			},
 		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "system:certificates.k8s.io:legacy-unknown-approver"},
+			Rules: []rbacv1.PolicyRule{
+				rbacv1helpers.NewRule("approve").Groups(certificatesGroup).Resources("signers").Names(capi.LegacyUnknownSignerName).RuleOrDie(),
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "system:certificates.k8s.io:kubelet-serving-approver"},
+			Rules: []rbacv1.PolicyRule{
+				rbacv1helpers.NewRule("approve").Groups(certificatesGroup).Resources("signers").Names(capi.KubeletServingSignerName).RuleOrDie(),
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "system:certificates.k8s.io:kube-apiserver-client-approver"},
+			Rules: []rbacv1.PolicyRule{
+				rbacv1helpers.NewRule("approve").Groups(certificatesGroup).Resources("signers").Names(capi.KubeAPIServerClientSignerName).RuleOrDie(),
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "system:certificates.k8s.io:kube-apiserver-client-kubelet-approver"},
+			Rules: []rbacv1.PolicyRule{
+				rbacv1helpers.NewRule("approve").Groups(certificatesGroup).Resources("signers").Names(capi.KubeAPIServerClientKubeletSignerName).RuleOrDie(),
+			},
+		},
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountIssuerDiscovery) {
+		// Add the cluster role for reading the ServiceAccountIssuerDiscovery endpoints
+		// but do not bind it explicitly. Leave the decision of who can read it up
+		// to cluster admins.
+		roles = append(roles, rbacv1.ClusterRole{
+			ObjectMeta: metav1.ObjectMeta{Name: "system:service-account-issuer-discovery"},
+			Rules: []rbacv1.PolicyRule{
+				rbacv1helpers.NewRule("get").URLs(
+					"/.well-known/openid-configuration",
+					"/openid/v1/jwks",
+				).RuleOrDie(),
+			},
+		})
 	}
 
 	// node-proxier role is used by kube-proxy.
@@ -539,6 +582,7 @@ func ClusterRoleBindings() []rbacv1.ClusterRoleBinding {
 	return rolebindings
 }
 
+// ClusterRolesToAggregate maps from previous clusterrole name to the new clusterrole name
 func ClusterRolesToAggregate() map[string]string {
 	return map[string]string{
 		"admin": "system:aggregate-to-admin",

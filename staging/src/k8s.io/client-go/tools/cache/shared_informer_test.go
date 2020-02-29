@@ -271,8 +271,8 @@ func TestSharedInformerWatchDisruption(t *testing.T) {
 	// source simulates an apiserver object endpoint.
 	source := fcache.NewFakeControllerSource()
 
-	source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1", UID: "pod1"}})
-	source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod2", UID: "pod2"}})
+	source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1", UID: "pod1", ResourceVersion: "1"}})
+	source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod2", UID: "pod2", ResourceVersion: "2"}})
 
 	// create the shared informer and resync every 1s
 	informer := NewSharedInformer(source, &v1.Pod{}, 1*time.Second).(*sharedIndexInformer)
@@ -301,8 +301,8 @@ func TestSharedInformerWatchDisruption(t *testing.T) {
 	}
 
 	// Add pod3, bump pod2 but don't broadcast it, so that the change will be seen only on relist
-	source.AddDropWatch(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod3", UID: "pod3"}})
-	source.ModifyDropWatch(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod2", UID: "pod2"}})
+	source.AddDropWatch(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod3", UID: "pod3", ResourceVersion: "3"}})
+	source.ModifyDropWatch(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod2", UID: "pod2", ResourceVersion: "4"}})
 
 	// Ensure that nobody saw any changes
 	for _, listener := range listeners {
@@ -315,7 +315,7 @@ func TestSharedInformerWatchDisruption(t *testing.T) {
 		listener.receivedItemNames = []string{}
 	}
 
-	listenerNoResync.expectedItemNames = sets.NewString("pod1", "pod2", "pod3")
+	listenerNoResync.expectedItemNames = sets.NewString("pod2", "pod3")
 	listenerResync.expectedItemNames = sets.NewString("pod1", "pod2", "pod3")
 
 	// This calls shouldSync, which deletes noResync from the list of syncingListeners

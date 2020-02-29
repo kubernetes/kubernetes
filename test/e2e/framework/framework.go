@@ -612,7 +612,7 @@ func (f *Framework) CreateServiceForSimpleApp(contPort, svcPort int, appName str
 			Ports:    portsFunc(),
 			Selector: serviceSelector,
 		},
-	})
+	}, metav1.CreateOptions{})
 	ExpectNoError(err)
 	return service
 }
@@ -632,7 +632,7 @@ func (f *Framework) CreatePodsPerNodeForSimpleApp(appName string, podSpec func(n
 				Labels: podLabels,
 			},
 			Spec: podSpec(node),
-		})
+		}, metav1.CreateOptions{})
 		ExpectNoError(err)
 	}
 	return podLabels
@@ -876,19 +876,4 @@ func (cl *ClusterVerification) ForEach(podFunc func(v1.Pod)) error {
 	}
 
 	return err
-}
-
-const (
-	// preconfiguredRuntimeHandler is the name of the runtime handler that is expected to be
-	// preconfigured in the test environment.
-	preconfiguredRuntimeHandler = "test-handler"
-)
-
-// PreconfiguredRuntimeClassHandler returns configured runtime handler.
-func PreconfiguredRuntimeClassHandler() string {
-	if TestContext.ContainerRuntime == "docker" {
-		return TestContext.ContainerRuntime
-	}
-
-	return preconfiguredRuntimeHandler
 }

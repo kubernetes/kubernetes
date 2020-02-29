@@ -60,7 +60,7 @@ func NewServerTest(client clientset.Interface, namespace string, serviceName str
 	t.services = make(map[string]bool)
 
 	t.Name = "webserver"
-	t.Image = imageutils.GetE2EImage(imageutils.TestWebserver)
+	t.Image = imageutils.GetE2EImage(imageutils.Agnhost)
 
 	return t
 }
@@ -85,7 +85,7 @@ func (t *TestFixture) BuildServiceSpec() *v1.Service {
 
 // CreateRC creates a replication controller and records it for cleanup.
 func (t *TestFixture) CreateRC(rc *v1.ReplicationController) (*v1.ReplicationController, error) {
-	rc, err := t.Client.CoreV1().ReplicationControllers(t.Namespace).Create(context.TODO(), rc)
+	rc, err := t.Client.CoreV1().ReplicationControllers(t.Namespace).Create(context.TODO(), rc, metav1.CreateOptions{})
 	if err == nil {
 		t.rcs[rc.Name] = true
 	}
@@ -94,7 +94,7 @@ func (t *TestFixture) CreateRC(rc *v1.ReplicationController) (*v1.ReplicationCon
 
 // CreateService creates a service, and record it for cleanup
 func (t *TestFixture) CreateService(service *v1.Service) (*v1.Service, error) {
-	result, err := t.Client.CoreV1().Services(t.Namespace).Create(context.TODO(), service)
+	result, err := t.Client.CoreV1().Services(t.Namespace).Create(context.TODO(), service, metav1.CreateOptions{})
 	if err == nil {
 		t.services[service.Name] = true
 	}
@@ -126,7 +126,7 @@ func (t *TestFixture) Cleanup() []error {
 			}
 			x := int32(0)
 			old.Spec.Replicas = &x
-			if _, err := t.Client.CoreV1().ReplicationControllers(t.Namespace).Update(context.TODO(), old); err != nil {
+			if _, err := t.Client.CoreV1().ReplicationControllers(t.Namespace).Update(context.TODO(), old, metav1.UpdateOptions{}); err != nil {
 				if apierrors.IsNotFound(err) {
 					return nil
 				}

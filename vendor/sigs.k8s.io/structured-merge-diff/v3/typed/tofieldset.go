@@ -34,6 +34,7 @@ func (tv TypedValue) toFieldSetWalker() *toFieldSetWalker {
 	v.schema = tv.schema
 	v.typeRef = tv.typeRef
 	v.set = &fieldpath.Set{}
+	v.allocator = value.NewFreelistAllocator()
 	return v
 }
 
@@ -55,6 +56,7 @@ type toFieldSetWalker struct {
 
 	// Allocate only as many walkers as needed for the depth by storing them here.
 	spareWalkers *[]*toFieldSetWalker
+	allocator    value.Allocator
 }
 
 func (v *toFieldSetWalker) prepareDescent(pe fieldpath.PathElement, tr schema.TypeRef) *toFieldSetWalker {
@@ -94,7 +96,7 @@ func (v *toFieldSetWalker) doScalar(t *schema.Scalar) ValidationErrors {
 func (v *toFieldSetWalker) visitListItems(t *schema.List, list value.List) (errs ValidationErrors) {
 	for i := 0; i < list.Length(); i++ {
 		child := list.At(i)
-		pe, _ := listItemToPathElement(t, i, child)
+		pe, _ := listItemToPathElement(v.allocator, t, i, child)
 		v2 := v.prepareDescent(pe, t.ElementType)
 		v2.value = child
 		errs = append(errs, v2.toFieldSet()...)
@@ -106,8 +108,10 @@ func (v *toFieldSetWalker) visitListItems(t *schema.List, list value.List) (errs
 }
 
 func (v *toFieldSetWalker) doList(t *schema.List) (errs ValidationErrors) {
-	list, _ := listValue(v.value)
-
+	list, _ := listValue(v.allocator, v.value)
+	if list != nil {
+		defer v.allocator.Free(list)
+	}
 	if t.ElementRelationship == schema.Atomic {
 		v.set.Insert(v.path)
 		return nil
@@ -143,8 +147,10 @@ func (v *toFieldSetWalker) visitMapItems(t *schema.Map, m value.Map) (errs Valid
 }
 
 func (v *toFieldSetWalker) doMap(t *schema.Map) (errs ValidationErrors) {
-	m, _ := mapValue(v.value)
-
+	m, _ := mapValue(v.allocator, v.value)
+	if m != nil {
+		defer v.allocator.Free(m)
+	}
 	if t.ElementRelationship == schema.Atomic {
 		v.set.Insert(v.path)
 		return nil

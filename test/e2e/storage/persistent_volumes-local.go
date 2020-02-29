@@ -326,7 +326,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 			testVol := testVols[0]
 
 			pod := makeLocalPodWithNodeName(config, testVol, config.nodes[1].Name)
-			pod, err := config.client.CoreV1().Pods(config.ns).Create(context.TODO(), pod)
+			pod, err := config.client.CoreV1().Pods(config.ns).Create(context.TODO(), pod, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 
 			err = e2epod.WaitTimeoutForPodRunningInNamespace(config.client, pod.Name, pod.Namespace, framework.PodStartShortTimeout)
@@ -552,7 +552,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 					}
 
 					pod := e2epod.MakeSecPod(config.ns, pvcs, nil, false, "sleep 1", false, false, selinuxLabel, nil)
-					pod, err := config.client.CoreV1().Pods(config.ns).Create(context.TODO(), pod)
+					pod, err := config.client.CoreV1().Pods(config.ns).Create(context.TODO(), pod, metav1.CreateOptions{})
 					framework.ExpectNoError(err)
 					pods[pod.Name] = pod
 					numCreated++
@@ -646,7 +646,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 			ginkgo.By(fmt.Sprintf("Create %d pods to use this PVC", count))
 			for i := 0; i < count; i++ {
 				pod := e2epod.MakeSecPod(config.ns, []*v1.PersistentVolumeClaim{pvc}, nil, false, "", false, false, selinuxLabel, nil)
-				pod, err := config.client.CoreV1().Pods(config.ns).Create(context.TODO(), pod)
+				pod, err := config.client.CoreV1().Pods(config.ns).Create(context.TODO(), pod, metav1.CreateOptions{})
 				framework.ExpectNoError(err)
 				pods[pod.Name] = pod
 			}
@@ -697,7 +697,7 @@ func testPodWithNodeConflict(config *localTestConfig, testVolType localVolumeTyp
 	testVol := testVols[0]
 
 	pod := makeLocalPodFunc(config, testVol, nodeName)
-	pod, err := config.client.CoreV1().Pods(config.ns).Create(context.TODO(), pod)
+	pod, err := config.client.CoreV1().Pods(config.ns).Create(context.TODO(), pod, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
 	err = e2epod.WaitForPodNameUnschedulableInNamespace(config.client, pod.Name, pod.Namespace)
@@ -791,7 +791,7 @@ func setupStorageClass(config *localTestConfig, mode *storagev1.VolumeBindingMod
 		VolumeBindingMode: mode,
 	}
 
-	_, err := config.client.StorageV1().StorageClasses().Create(context.TODO(), sc)
+	_, err := config.client.StorageV1().StorageClasses().Create(context.TODO(), sc, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 }
 
@@ -988,7 +988,8 @@ func makeLocalPodWithNodeName(config *localTestConfig, volume *localTestVolume, 
 	if pod == nil {
 		return
 	}
-	pod.Spec.NodeName = nodeName
+
+	e2epod.SetNodeAffinity(&pod.Spec, nodeName)
 	return
 }
 
@@ -1155,7 +1156,7 @@ func createStatefulSet(config *localTestConfig, ssReplicas int32, volumeCount in
 		spec.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
 	}
 
-	ss, err := config.client.AppsV1().StatefulSets(config.ns).Create(context.TODO(), spec)
+	ss, err := config.client.AppsV1().StatefulSets(config.ns).Create(context.TODO(), spec, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
 	e2esset.WaitForRunningAndReady(config.client, ssReplicas, ss)

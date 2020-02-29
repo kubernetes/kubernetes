@@ -3,6 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = [
+        "allocator.go",
         "doc.go",
         "fields.go",
         "jsontagutil.go",
@@ -12,6 +13,7 @@ go_library(
         "map.go",
         "mapreflect.go",
         "mapunstructured.go",
+        "reflectcache.go",
         "scalar.go",
         "structreflect.go",
         "value.go",

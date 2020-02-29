@@ -233,7 +233,7 @@ func TestTaintTolerationScore(t *testing.T) {
 			fh, _ := framework.NewFramework(nil, nil, nil, framework.WithSnapshotSharedLister(snapshot))
 
 			p, _ := New(nil, fh)
-			status := p.(framework.PostFilterPlugin).PostFilter(context.Background(), state, test.pod, test.nodes, nil)
+			status := p.(framework.PreScorePlugin).PreScore(context.Background(), state, test.pod, test.nodes)
 			if !status.IsSuccess() {
 				t.Errorf("unexpected error: %v", status)
 			}

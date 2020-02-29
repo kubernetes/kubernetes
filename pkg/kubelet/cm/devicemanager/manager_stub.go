@@ -78,3 +78,8 @@ func (h *ManagerStub) GetDevices(_, _ string) []*podresourcesapi.ContainerDevice
 func (h *ManagerStub) ShouldResetExtendedResourceCapacity() bool {
 	return false
 }
+
+// UpdateAllocatedDevices returns nothing
+func (h *ManagerStub) UpdateAllocatedDevices() {
+	return
+}

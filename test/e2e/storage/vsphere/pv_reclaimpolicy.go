@@ -33,7 +33,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
-var _ = utils.SIGDescribe("PersistentVolumes [Feature:ReclaimPolicy]", func() {
+var _ = utils.SIGDescribe("PersistentVolumes [Feature:vsphere][Feature:ReclaimPolicy]", func() {
 	f := framework.NewDefaultFramework("persistentvolumereclaim")
 	var (
 		c          clientset.Interface
@@ -50,7 +50,7 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:ReclaimPolicy]", func() {
 		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(c, framework.TestContext.NodeSchedulableTimeout))
 	})
 
-	utils.SIGDescribe("persistentvolumereclaim:vsphere", func() {
+	utils.SIGDescribe("persistentvolumereclaim:vsphere [Feature:vsphere]", func() {
 		ginkgo.BeforeEach(func() {
 			e2eskipper.SkipUnlessProviderIs("vsphere")
 			Bootstrap(f)
@@ -187,12 +187,12 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:ReclaimPolicy]", func() {
 
 			ginkgo.By("Creating the PV for same volume path")
 			pv = getVSpherePersistentVolumeSpec(volumePath, v1.PersistentVolumeReclaimRetain, nil)
-			pv, err = c.CoreV1().PersistentVolumes().Create(context.TODO(), pv)
+			pv, err = c.CoreV1().PersistentVolumes().Create(context.TODO(), pv, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 
 			ginkgo.By("creating the pvc")
 			pvc = getVSpherePersistentVolumeClaimSpec(ns, nil)
-			pvc, err = c.CoreV1().PersistentVolumeClaims(ns).Create(context.TODO(), pvc)
+			pvc, err = c.CoreV1().PersistentVolumeClaims(ns).Create(context.TODO(), pvc, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 
 			ginkgo.By("wait for the pv and pvc to bind")
@@ -213,13 +213,13 @@ func testSetupVSpherePersistentVolumeReclaim(c clientset.Interface, nodeInfo *No
 	}
 	ginkgo.By("creating the pv")
 	pv = getVSpherePersistentVolumeSpec(volumePath, persistentVolumeReclaimPolicy, nil)
-	pv, err = c.CoreV1().PersistentVolumes().Create(context.TODO(), pv)
+	pv, err = c.CoreV1().PersistentVolumes().Create(context.TODO(), pv, metav1.CreateOptions{})
 	if err != nil {
 		return
 	}
 	ginkgo.By("creating the pvc")
 	pvc = getVSpherePersistentVolumeClaimSpec(ns, nil)
-	pvc, err = c.CoreV1().PersistentVolumeClaims(ns).Create(context.TODO(), pvc)
+	pvc, err = c.CoreV1().PersistentVolumeClaims(ns).Create(context.TODO(), pvc, metav1.CreateOptions{})
 	return
 }
 

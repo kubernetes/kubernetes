@@ -261,7 +261,7 @@ func TestRealHistory_CreateControllerRevision(t *testing.T) {
 
 		var collisionCount int32
 		for _, item := range test.existing {
-			_, err := client.AppsV1().ControllerRevisions(item.parent.GetNamespace()).Create(context.TODO(), item.revision)
+			_, err := client.AppsV1().ControllerRevisions(item.parent.GetNamespace()).Create(context.TODO(), item.revision, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatal(err)
 			}

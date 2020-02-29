@@ -40,9 +40,9 @@ func init() {
 
 // AddToScheme builds the kubescheduler scheme using all known versions of the kubescheduler api.
 func AddToScheme(scheme *runtime.Scheme) {
-	utilruntime.Must(kubeschedulerconfig.AddToScheme(Scheme))
-	utilruntime.Must(kubeschedulerconfigv1.AddToScheme(Scheme))
-	utilruntime.Must(kubeschedulerconfigv1alpha1.AddToScheme(Scheme))
-	utilruntime.Must(kubeschedulerconfigv1alpha2.AddToScheme(Scheme))
-	utilruntime.Must(scheme.SetVersionPriority(kubeschedulerconfigv1alpha1.SchemeGroupVersion))
+	utilruntime.Must(kubeschedulerconfig.AddToScheme(scheme))
+	utilruntime.Must(kubeschedulerconfigv1.AddToScheme(scheme))
+	utilruntime.Must(kubeschedulerconfigv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(kubeschedulerconfigv1alpha2.AddToScheme(scheme))
+	utilruntime.Must(scheme.SetVersionPriority(kubeschedulerconfigv1alpha2.SchemeGroupVersion, kubeschedulerconfigv1alpha1.SchemeGroupVersion))
 }

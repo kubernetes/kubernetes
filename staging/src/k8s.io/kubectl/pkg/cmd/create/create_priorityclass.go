@@ -38,7 +38,7 @@ var (
 
 		# Create a priorityclass named default-priority that considered as the global default priority
 		kubectl create priorityclass default-priority --value=1000 --global-default=true --description="default priority"
-		
+
 		# Create a priorityclass named high-priority that can not preempt pods with lower priority
 		kubectl create priorityclass high-priority --value=1000 --description="high priority" --preemption-policy="Never"`))
 )
@@ -55,7 +55,7 @@ func NewCmdCreatePriorityClass(f cmdutil.Factory, ioStreams genericclioptions.IO
 	}
 
 	cmd := &cobra.Command{
-		Use:                   "priorityclass NAME --value=VALUE --global-default=BOOL [--dry-run]",
+		Use:                   "priorityclass NAME --value=VALUE --global-default=BOOL [--dry-run=server|client|none]",
 		DisableFlagsInUseLine: true,
 		Aliases:               []string{"pc"},
 		Short:                 i18n.T("Create a priorityclass with the specified name."),

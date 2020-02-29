@@ -38,15 +38,15 @@ type PersistentVolumesGetter interface {
 
 // PersistentVolumeInterface has methods to work with PersistentVolume resources.
 type PersistentVolumeInterface interface {
-	Create(context.Context, *v1.PersistentVolume) (*v1.PersistentVolume, error)
-	Update(context.Context, *v1.PersistentVolume) (*v1.PersistentVolume, error)
-	UpdateStatus(context.Context, *v1.PersistentVolume) (*v1.PersistentVolume, error)
-	Delete(ctx context.Context, name string, options *metav1.DeleteOptions) error
-	DeleteCollection(ctx context.Context, options *metav1.DeleteOptions, listOptions metav1.ListOptions) error
-	Get(ctx context.Context, name string, options metav1.GetOptions) (*v1.PersistentVolume, error)
+	Create(ctx context.Context, persistentVolume *v1.PersistentVolume, opts metav1.CreateOptions) (*v1.PersistentVolume, error)
+	Update(ctx context.Context, persistentVolume *v1.PersistentVolume, opts metav1.UpdateOptions) (*v1.PersistentVolume, error)
+	UpdateStatus(ctx context.Context, persistentVolume *v1.PersistentVolume, opts metav1.UpdateOptions) (*v1.PersistentVolume, error)
+	Delete(ctx context.Context, name string, opts *metav1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.PersistentVolume, error)
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.PersistentVolumeList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.PersistentVolume, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.PersistentVolume, err error)
 	PersistentVolumeExpansion
 }
 
@@ -105,10 +105,11 @@ func (c *persistentVolumes) Watch(ctx context.Context, opts metav1.ListOptions) 
 }
 
 // Create takes the representation of a persistentVolume and creates it.  Returns the server's representation of the persistentVolume, and an error, if there is any.
-func (c *persistentVolumes) Create(ctx context.Context, persistentVolume *v1.PersistentVolume) (result *v1.PersistentVolume, err error) {
+func (c *persistentVolumes) Create(ctx context.Context, persistentVolume *v1.PersistentVolume, opts metav1.CreateOptions) (result *v1.PersistentVolume, err error) {
 	result = &v1.PersistentVolume{}
 	err = c.client.Post().
 		Resource("persistentvolumes").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(persistentVolume).
 		Do(ctx).
 		Into(result)
@@ -116,11 +117,12 @@ func (c *persistentVolumes) Create(ctx context.Context, persistentVolume *v1.Per
 }
 
 // Update takes the representation of a persistentVolume and updates it. Returns the server's representation of the persistentVolume, and an error, if there is any.
-func (c *persistentVolumes) Update(ctx context.Context, persistentVolume *v1.PersistentVolume) (result *v1.PersistentVolume, err error) {
+func (c *persistentVolumes) Update(ctx context.Context, persistentVolume *v1.PersistentVolume, opts metav1.UpdateOptions) (result *v1.PersistentVolume, err error) {
 	result = &v1.PersistentVolume{}
 	err = c.client.Put().
 		Resource("persistentvolumes").
 		Name(persistentVolume.Name).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(persistentVolume).
 		Do(ctx).
 		Into(result)
@@ -129,13 +131,13 @@ func (c *persistentVolumes) Update(ctx context.Context, persistentVolume *v1.Per
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-
-func (c *persistentVolumes) UpdateStatus(ctx context.Context, persistentVolume *v1.PersistentVolume) (result *v1.PersistentVolume, err error) {
+func (c *persistentVolumes) UpdateStatus(ctx context.Context, persistentVolume *v1.PersistentVolume, opts metav1.UpdateOptions) (result *v1.PersistentVolume, err error) {
 	result = &v1.PersistentVolume{}
 	err = c.client.Put().
 		Resource("persistentvolumes").
 		Name(persistentVolume.Name).
 		SubResource("status").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(persistentVolume).
 		Do(ctx).
 		Into(result)
@@ -168,12 +170,13 @@ func (c *persistentVolumes) DeleteCollection(ctx context.Context, options *metav
 }
 
 // Patch applies the patch and returns the patched persistentVolume.
-func (c *persistentVolumes) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.PersistentVolume, err error) {
+func (c *persistentVolumes) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.PersistentVolume, err error) {
 	result = &v1.PersistentVolume{}
 	err = c.client.Patch(pt).
 		Resource("persistentvolumes").
-		SubResource(subresources...).
 		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

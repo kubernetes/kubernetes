@@ -205,9 +205,9 @@ func TestUpdateStatus(t *testing.T) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 	obj, err := storage.Get(ctx, "foo", &metav1.GetOptions{})
-	autosclaerOut := obj.(*autoscaling.HorizontalPodAutoscaler)
+	autoscalerOut := obj.(*autoscaling.HorizontalPodAutoscaler)
 	// only compare the meaningful update b/c we can't compare due to metadata
-	if !apiequality.Semantic.DeepEqual(autoscalerIn.Status, autosclaerOut.Status) {
-		t.Errorf("unexpected object: %s", diff.ObjectDiff(autoscalerIn, autosclaerOut))
+	if !apiequality.Semantic.DeepEqual(autoscalerIn.Status, autoscalerOut.Status) {
+		t.Errorf("unexpected object: %s", diff.ObjectDiff(autoscalerIn, autoscalerOut))
 	}
 }

@@ -3083,8 +3083,33 @@ func validateContainersOnlyForPod(containers []core.Container, fldPath *field.Pa
 	return allErrs
 }
 
+// PodValidationOptions contains the different settings for pod validation
+type PodValidationOptions struct {
+	// Allow pod spec to have more than one huge page resource (with different sizes)
+	AllowMultipleHugePageResources bool
+}
+
+// ValidatePodSingleHugePageResources checks if there are multiple huge
+// pages resources in the pod object.
+func ValidatePodSingleHugePageResources(pod *core.Pod, specPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	hugePageResources := sets.NewString()
+	for i := range pod.Spec.Containers {
+		resourceSet := toContainerResourcesSet(&pod.Spec.Containers[i])
+		for resourceStr := range resourceSet {
+			if v1helper.IsHugePageResourceName(v1.ResourceName(resourceStr)) {
+				hugePageResources.Insert(resourceStr)
+			}
+		}
+	}
+	if len(hugePageResources) > 1 {
+		allErrs = append(allErrs, field.Invalid(specPath, hugePageResources.List(), "must use a single hugepage size in a pod spec"))
+	}
+	return allErrs
+}
+
 // ValidatePod tests if required fields in the pod are set.
-func ValidatePod(pod *core.Pod) field.ErrorList {
+func ValidatePod(pod *core.Pod, opts PodValidationOptions) field.ErrorList {
 	fldPath := field.NewPath("metadata")
 	allErrs := ValidateObjectMeta(&pod.ObjectMeta, true, ValidatePodName, fldPath)
 	allErrs = append(allErrs, ValidatePodSpecificAnnotations(pod.ObjectMeta.Annotations, &pod.Spec, fldPath.Child("annotations"))...)
@@ -3111,17 +3136,8 @@ func ValidatePod(pod *core.Pod) field.ErrorList {
 	allErrs = append(allErrs, validateContainersOnlyForPod(pod.Spec.Containers, specPath.Child("containers"))...)
 	allErrs = append(allErrs, validateContainersOnlyForPod(pod.Spec.InitContainers, specPath.Child("initContainers"))...)
 
-	hugePageResources := sets.NewString()
-	for i := range pod.Spec.Containers {
-		resourceSet := toContainerResourcesSet(&pod.Spec.Containers[i])
-		for resourceStr := range resourceSet {
-			if v1helper.IsHugePageResourceName(v1.ResourceName(resourceStr)) {
-				hugePageResources.Insert(resourceStr)
-			}
-		}
-	}
-	if len(hugePageResources) > 1 {
-		allErrs = append(allErrs, field.Invalid(specPath, hugePageResources, "must use a single hugepage size in a pod spec"))
+	if !opts.AllowMultipleHugePageResources {
+		allErrs = append(allErrs, ValidatePodSingleHugePageResources(pod, specPath)...)
 	}
 
 	podIPsField := field.NewPath("status", "podIPs")
@@ -3679,8 +3695,8 @@ func ValidateContainerUpdates(newContainers, oldContainers []core.Container, fld
 }
 
 // ValidatePodCreate validates a pod in the context of its initial create
-func ValidatePodCreate(pod *core.Pod) field.ErrorList {
-	allErrs := ValidatePod(pod)
+func ValidatePodCreate(pod *core.Pod, opts PodValidationOptions) field.ErrorList {
+	allErrs := ValidatePod(pod, opts)
 
 	fldPath := field.NewPath("spec")
 	// EphemeralContainers can only be set on update using the ephemeralcontainers subresource
@@ -3693,11 +3709,15 @@ func ValidatePodCreate(pod *core.Pod) field.ErrorList {
 
 // ValidatePodUpdate tests to see if the update is legal for an end user to make. newPod is updated with fields
 // that cannot be changed.
-func ValidatePodUpdate(newPod, oldPod *core.Pod) field.ErrorList {
+func ValidatePodUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions) field.ErrorList {
 	fldPath := field.NewPath("metadata")
 	allErrs := ValidateObjectMetaUpdate(&newPod.ObjectMeta, &oldPod.ObjectMeta, fldPath)
 	allErrs = append(allErrs, ValidatePodSpecificAnnotationUpdates(newPod, oldPod, fldPath.Child("annotations"))...)
 	specPath := field.NewPath("spec")
+
+	if !opts.AllowMultipleHugePageResources {
+		allErrs = append(allErrs, ValidatePodSingleHugePageResources(newPod, specPath)...)
+	}
 
 	// validate updateable fields:
 	// 1.  spec.containers[*].image
@@ -3908,7 +3928,7 @@ var supportedServiceType = sets.NewString(string(core.ServiceTypeClusterIP), str
 var supportedServiceIPFamily = sets.NewString(string(core.IPv4Protocol), string(core.IPv6Protocol))
 
 // ValidateService tests if required fields/annotations of a Service are valid.
-func ValidateService(service *core.Service) field.ErrorList {
+func ValidateService(service *core.Service, allowAppProtocol bool) field.ErrorList {
 	allErrs := ValidateObjectMeta(&service.ObjectMeta, true, ValidateServiceName, field.NewPath("metadata"))
 
 	specPath := field.NewPath("spec")
@@ -3953,7 +3973,7 @@ func ValidateService(service *core.Service) field.ErrorList {
 	portsPath := specPath.Child("ports")
 	for i := range service.Spec.Ports {
 		portPath := portsPath.Index(i)
-		allErrs = append(allErrs, validateServicePort(&service.Spec.Ports[i], len(service.Spec.Ports) > 1, isHeadlessService, &allPortNames, portPath)...)
+		allErrs = append(allErrs, validateServicePort(&service.Spec.Ports[i], len(service.Spec.Ports) > 1, isHeadlessService, allowAppProtocol, &allPortNames, portPath)...)
 	}
 
 	if service.Spec.Selector != nil {
@@ -4125,7 +4145,7 @@ func ValidateService(service *core.Service) field.ErrorList {
 	return allErrs
 }
 
-func validateServicePort(sp *core.ServicePort, requireName, isHeadlessService bool, allNames *sets.String, fldPath *field.Path) field.ErrorList {
+func validateServicePort(sp *core.ServicePort, requireName, isHeadlessService, allowAppProtocol bool, allNames *sets.String, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if requireName && len(sp.Name) == 0 {
@@ -4150,6 +4170,16 @@ func validateServicePort(sp *core.ServicePort, requireName, isHeadlessService bo
 	}
 
 	allErrs = append(allErrs, ValidatePortNumOrName(sp.TargetPort, fldPath.Child("targetPort"))...)
+
+	if sp.AppProtocol != nil {
+		if allowAppProtocol {
+			for _, msg := range validation.IsQualifiedName(*sp.AppProtocol) {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("appProtocol"), sp.AppProtocol, msg))
+			}
+		} else {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("appProtocol"), "This field can be enabled with the ServiceAppProtocol feature gate"))
+		}
+	}
 
 	// in the v1 API, targetPorts on headless services were tolerated.
 	// once we have version-specific validation, we can reject this on newer API versions, but until then, we have to tolerate it for compatibility.
@@ -4207,6 +4237,14 @@ func ValidateServiceExternalTrafficFieldsCombination(service *core.Service) fiel
 	return allErrs
 }
 
+// ValidateServiceCreate validates Services as they are created.
+func ValidateServiceCreate(service *core.Service) field.ErrorList {
+	// allow AppProtocol value if the feature gate is set.
+	allowAppProtocol := utilfeature.DefaultFeatureGate.Enabled(features.ServiceAppProtocol)
+
+	return ValidateService(service, allowAppProtocol)
+}
+
 // ValidateServiceUpdate tests if required fields in the service are set during an update
 func ValidateServiceUpdate(service, oldService *core.Service) field.ErrorList {
 	allErrs := ValidateObjectMetaUpdate(&service.ObjectMeta, &oldService.ObjectMeta, field.NewPath("metadata"))
@@ -4226,8 +4264,19 @@ func ValidateServiceUpdate(service, oldService *core.Service) field.ErrorList {
 		}
 	}
 
-	allErrs = append(allErrs, ValidateService(service)...)
-	return allErrs
+	// allow AppProtocol value if the feature gate is set or the field is
+	// already set on the resource.
+	allowAppProtocol := utilfeature.DefaultFeatureGate.Enabled(features.ServiceAppProtocol)
+	if !allowAppProtocol {
+		for _, port := range oldService.Spec.Ports {
+			if port.AppProtocol != nil {
+				allowAppProtocol = true
+				break
+			}
+		}
+	}
+
+	return append(allErrs, ValidateService(service, allowAppProtocol)...)
 }
 
 // ValidateServiceStatusUpdate tests if required fields in the Service are set when updating status.
@@ -5443,15 +5492,42 @@ func ValidateNamespaceFinalizeUpdate(newNamespace, oldNamespace *core.Namespace)
 	return allErrs
 }
 
-// ValidateEndpoints tests if required fields are set.
-func ValidateEndpoints(endpoints *core.Endpoints) field.ErrorList {
+// ValidateEndpoints validates Endpoints on create and update.
+func ValidateEndpoints(endpoints *core.Endpoints, allowAppProtocol bool) field.ErrorList {
 	allErrs := ValidateObjectMeta(&endpoints.ObjectMeta, true, ValidateEndpointsName, field.NewPath("metadata"))
 	allErrs = append(allErrs, ValidateEndpointsSpecificAnnotations(endpoints.Annotations, field.NewPath("annotations"))...)
-	allErrs = append(allErrs, validateEndpointSubsets(endpoints.Subsets, field.NewPath("subsets"))...)
+	allErrs = append(allErrs, validateEndpointSubsets(endpoints.Subsets, allowAppProtocol, field.NewPath("subsets"))...)
 	return allErrs
 }
 
-func validateEndpointSubsets(subsets []core.EndpointSubset, fldPath *field.Path) field.ErrorList {
+// ValidateEndpointsCreate validates Endpoints on create.
+func ValidateEndpointsCreate(endpoints *core.Endpoints) field.ErrorList {
+	allowAppProtocol := utilfeature.DefaultFeatureGate.Enabled(features.ServiceAppProtocol)
+	return ValidateEndpoints(endpoints, allowAppProtocol)
+}
+
+// ValidateEndpointsUpdate validates Endpoints on update. NodeName changes are
+// allowed during update to accommodate the case where nodeIP or PodCIDR is
+// reused. An existing endpoint ip will have a different nodeName if this
+// happens.
+func ValidateEndpointsUpdate(newEndpoints, oldEndpoints *core.Endpoints) field.ErrorList {
+	allErrs := ValidateObjectMetaUpdate(&newEndpoints.ObjectMeta, &oldEndpoints.ObjectMeta, field.NewPath("metadata"))
+	allowAppProtocol := utilfeature.DefaultFeatureGate.Enabled(features.ServiceAppProtocol)
+	if !allowAppProtocol {
+		for _, oldSubset := range oldEndpoints.Subsets {
+			for _, port := range oldSubset.Ports {
+				if port.AppProtocol != nil {
+					allowAppProtocol = true
+					break
+				}
+			}
+		}
+	}
+	allErrs = append(allErrs, ValidateEndpoints(newEndpoints, allowAppProtocol)...)
+	return allErrs
+}
+
+func validateEndpointSubsets(subsets []core.EndpointSubset, allowAppProtocol bool, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for i := range subsets {
 		ss := &subsets[i]
@@ -5469,7 +5545,7 @@ func validateEndpointSubsets(subsets []core.EndpointSubset, fldPath *field.Path)
 			allErrs = append(allErrs, validateEndpointAddress(&ss.NotReadyAddresses[addr], idxPath.Child("notReadyAddresses").Index(addr))...)
 		}
 		for port := range ss.Ports {
-			allErrs = append(allErrs, validateEndpointPort(&ss.Ports[port], len(ss.Ports) > 1, idxPath.Child("ports").Index(port))...)
+			allErrs = append(allErrs, validateEndpointPort(&ss.Ports[port], len(ss.Ports) > 1, allowAppProtocol, idxPath.Child("ports").Index(port))...)
 		}
 	}
 
@@ -5520,7 +5596,7 @@ func validateNonSpecialIP(ipAddress string, fldPath *field.Path) field.ErrorList
 	return allErrs
 }
 
-func validateEndpointPort(port *core.EndpointPort, requireName bool, fldPath *field.Path) field.ErrorList {
+func validateEndpointPort(port *core.EndpointPort, requireName, allowAppProtocol bool, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if requireName && len(port.Name) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
@@ -5535,16 +5611,15 @@ func validateEndpointPort(port *core.EndpointPort, requireName bool, fldPath *fi
 	} else if !supportedPortProtocols.Has(string(port.Protocol)) {
 		allErrs = append(allErrs, field.NotSupported(fldPath.Child("protocol"), port.Protocol, supportedPortProtocols.List()))
 	}
-	return allErrs
-}
-
-// ValidateEndpointsUpdate tests to make sure an endpoints update can be applied.
-// NodeName changes are allowed during update to accommodate the case where nodeIP or PodCIDR is reused.
-// An existing endpoint ip will have a different nodeName if this happens.
-func ValidateEndpointsUpdate(newEndpoints, oldEndpoints *core.Endpoints) field.ErrorList {
-	allErrs := ValidateObjectMetaUpdate(&newEndpoints.ObjectMeta, &oldEndpoints.ObjectMeta, field.NewPath("metadata"))
-	allErrs = append(allErrs, validateEndpointSubsets(newEndpoints.Subsets, field.NewPath("subsets"))...)
-	allErrs = append(allErrs, ValidateEndpointsSpecificAnnotations(newEndpoints.Annotations, field.NewPath("annotations"))...)
+	if port.AppProtocol != nil {
+		if allowAppProtocol {
+			for _, msg := range validation.IsQualifiedName(*port.AppProtocol) {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("appProtocol"), port.AppProtocol, msg))
+			}
+		} else {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("appProtocol"), "This field can be enabled with the ServiceAppProtocol feature gate"))
+		}
+	}
 	return allErrs
 }
 

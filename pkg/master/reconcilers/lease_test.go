@@ -421,7 +421,7 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 		clientset := fake.NewSimpleClientset()
 		if test.endpoints != nil {
 			for _, ep := range test.endpoints.Items {
-				if _, err := clientset.CoreV1().Endpoints(ep.Namespace).Create(context.TODO(), &ep); err != nil {
+				if _, err := clientset.CoreV1().Endpoints(ep.Namespace).Create(context.TODO(), &ep, metav1.CreateOptions{}); err != nil {
 					t.Errorf("case %q: unexpected error: %v", test.testName, err)
 					continue
 				}
@@ -523,7 +523,7 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 			clientset := fake.NewSimpleClientset()
 			if test.endpoints != nil {
 				for _, ep := range test.endpoints.Items {
-					if _, err := clientset.CoreV1().Endpoints(ep.Namespace).Create(context.TODO(), &ep); err != nil {
+					if _, err := clientset.CoreV1().Endpoints(ep.Namespace).Create(context.TODO(), &ep, metav1.CreateOptions{}); err != nil {
 						t.Errorf("case %q: unexpected error: %v", test.testName, err)
 						continue
 					}
@@ -638,7 +638,7 @@ func TestLeaseRemoveEndpoints(t *testing.T) {
 			fakeLeases.SetKeys(test.endpointKeys)
 			clientset := fake.NewSimpleClientset()
 			for _, ep := range test.endpoints.Items {
-				if _, err := clientset.CoreV1().Endpoints(ep.Namespace).Create(context.TODO(), &ep); err != nil {
+				if _, err := clientset.CoreV1().Endpoints(ep.Namespace).Create(context.TODO(), &ep, metav1.CreateOptions{}); err != nil {
 					t.Errorf("case %q: unexpected error: %v", test.testName, err)
 					continue
 				}

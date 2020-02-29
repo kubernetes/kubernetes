@@ -300,7 +300,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			framework.ExpectNoError(err)
 			for _, svc := range svcList.Items {
 				svc.Annotations[ingress.NEGAnnotation] = `{"ingress": false}`
-				_, err = f.ClientSet.CoreV1().Services(ns).Update(context.TODO(), &svc)
+				_, err = f.ClientSet.CoreV1().Services(ns).Update(context.TODO(), &svc, metav1.UpdateOptions{})
 				framework.ExpectNoError(err)
 			}
 			err = wait.Poll(5*time.Second, e2eservice.LoadBalancerPollTimeout, func() (bool, error) {
@@ -318,7 +318,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			framework.ExpectNoError(err)
 			for _, svc := range svcList.Items {
 				svc.Annotations[ingress.NEGAnnotation] = `{"ingress": true}`
-				_, err = f.ClientSet.CoreV1().Services(ns).Update(context.TODO(), &svc)
+				_, err = f.ClientSet.CoreV1().Services(ns).Update(context.TODO(), &svc, metav1.UpdateOptions{})
 				framework.ExpectNoError(err)
 			}
 			err = wait.Poll(5*time.Second, e2eservice.LoadBalancerPollTimeout, func() (bool, error) {
@@ -354,7 +354,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 				if scale.Spec.Replicas != int32(num) {
 					scale.ResourceVersion = "" // indicate the scale update should be unconditional
 					scale.Spec.Replicas = int32(num)
-					_, err = f.ClientSet.AppsV1().Deployments(ns).UpdateScale(context.TODO(), name, scale)
+					_, err = f.ClientSet.AppsV1().Deployments(ns).UpdateScale(context.TODO(), name, scale, metav1.UpdateOptions{})
 					framework.ExpectNoError(err)
 				}
 				err = wait.Poll(10*time.Second, negUpdateTimeout, func() (bool, error) {
@@ -405,7 +405,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			framework.ExpectNoError(err)
 			scale.ResourceVersion = "" // indicate the scale update should be unconditional
 			scale.Spec.Replicas = int32(replicas)
-			_, err = f.ClientSet.AppsV1().Deployments(ns).UpdateScale(context.TODO(), name, scale)
+			_, err = f.ClientSet.AppsV1().Deployments(ns).UpdateScale(context.TODO(), name, scale, metav1.UpdateOptions{})
 			framework.ExpectNoError(err)
 
 			err = wait.Poll(10*time.Second, e2eservice.LoadBalancerPollTimeout, func() (bool, error) {
@@ -423,7 +423,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			// trigger by changing graceful termination period to 60 seconds
 			gracePeriod := int64(60)
 			deploy.Spec.Template.Spec.TerminationGracePeriodSeconds = &gracePeriod
-			_, err = f.ClientSet.AppsV1().Deployments(ns).Update(context.TODO(), deploy)
+			_, err = f.ClientSet.AppsV1().Deployments(ns).Update(context.TODO(), deploy, metav1.UpdateOptions{})
 			framework.ExpectNoError(err)
 			err = wait.Poll(10*time.Second, e2eservice.LoadBalancerPollTimeout, func() (bool, error) {
 				res, err := jig.GetDistinctResponseFromIngress()
@@ -454,7 +454,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 				if scale.Spec.Replicas != int32(num) {
 					scale.ResourceVersion = "" // indicate the scale update should be unconditional
 					scale.Spec.Replicas = int32(num)
-					_, err = f.ClientSet.AppsV1().Deployments(ns).UpdateScale(context.TODO(), name, scale)
+					_, err = f.ClientSet.AppsV1().Deployments(ns).UpdateScale(context.TODO(), name, scale, metav1.UpdateOptions{})
 					framework.ExpectNoError(err)
 				}
 				err = wait.Poll(10*time.Second, negUpdateTimeout, func() (bool, error) {
@@ -542,7 +542,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			framework.ExpectNoError(err)
 			for _, svc := range svcList.Items {
 				svc.Annotations[ingress.NEGAnnotation] = `{"ingress":true,"exposed_ports":{"80":{},"443":{}}}`
-				_, err = f.ClientSet.CoreV1().Services(ns).Update(context.TODO(), &svc)
+				_, err = f.ClientSet.CoreV1().Services(ns).Update(context.TODO(), &svc, metav1.UpdateOptions{})
 				framework.ExpectNoError(err)
 			}
 			detectNegAnnotation(f, jig, gceController, ns, name, 2)
@@ -553,7 +553,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			framework.ExpectNoError(err)
 			for _, svc := range svcList.Items {
 				svc.Annotations[ingress.NEGAnnotation] = `{"ingress":true,"exposed_ports":{"443":{}}}`
-				_, err = f.ClientSet.CoreV1().Services(ns).Update(context.TODO(), &svc)
+				_, err = f.ClientSet.CoreV1().Services(ns).Update(context.TODO(), &svc, metav1.UpdateOptions{})
 				framework.ExpectNoError(err)
 			}
 			detectNegAnnotation(f, jig, gceController, ns, name, 2)
@@ -564,7 +564,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			framework.ExpectNoError(err)
 			for _, svc := range svcList.Items {
 				svc.Annotations[ingress.NEGAnnotation] = `{"ingress":false,"exposed_ports":{"443":{}}}`
-				_, err = f.ClientSet.CoreV1().Services(ns).Update(context.TODO(), &svc)
+				_, err = f.ClientSet.CoreV1().Services(ns).Update(context.TODO(), &svc, metav1.UpdateOptions{})
 				framework.ExpectNoError(err)
 			}
 			detectNegAnnotation(f, jig, gceController, ns, name, 1)
@@ -577,7 +577,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 				delete(svc.Annotations, ingress.NEGAnnotation)
 				// Service cannot be ClusterIP if it's using Instance Groups.
 				svc.Spec.Type = v1.ServiceTypeNodePort
-				_, err = f.ClientSet.CoreV1().Services(ns).Update(context.TODO(), &svc)
+				_, err = f.ClientSet.CoreV1().Services(ns).Update(context.TODO(), &svc, metav1.UpdateOptions{})
 				framework.ExpectNoError(err)
 			}
 			detectNegAnnotation(f, jig, gceController, ns, name, 0)

@@ -81,7 +81,7 @@ func (c *FakeReplicaSets) Watch(ctx context.Context, opts v1.ListOptions) (watch
 }
 
 // Create takes the representation of a replicaSet and creates it.  Returns the server's representation of the replicaSet, and an error, if there is any.
-func (c *FakeReplicaSets) Create(ctx context.Context, replicaSet *v1beta1.ReplicaSet) (result *v1beta1.ReplicaSet, err error) {
+func (c *FakeReplicaSets) Create(ctx context.Context, replicaSet *v1beta1.ReplicaSet, opts v1.CreateOptions) (result *v1beta1.ReplicaSet, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(replicasetsResource, c.ns, replicaSet), &v1beta1.ReplicaSet{})
 
@@ -92,7 +92,7 @@ func (c *FakeReplicaSets) Create(ctx context.Context, replicaSet *v1beta1.Replic
 }
 
 // Update takes the representation of a replicaSet and updates it. Returns the server's representation of the replicaSet, and an error, if there is any.
-func (c *FakeReplicaSets) Update(ctx context.Context, replicaSet *v1beta1.ReplicaSet) (result *v1beta1.ReplicaSet, err error) {
+func (c *FakeReplicaSets) Update(ctx context.Context, replicaSet *v1beta1.ReplicaSet, opts v1.UpdateOptions) (result *v1beta1.ReplicaSet, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(replicasetsResource, c.ns, replicaSet), &v1beta1.ReplicaSet{})
 
@@ -104,7 +104,7 @@ func (c *FakeReplicaSets) Update(ctx context.Context, replicaSet *v1beta1.Replic
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeReplicaSets) UpdateStatus(ctx context.Context, replicaSet *v1beta1.ReplicaSet) (*v1beta1.ReplicaSet, error) {
+func (c *FakeReplicaSets) UpdateStatus(ctx context.Context, replicaSet *v1beta1.ReplicaSet, opts v1.UpdateOptions) (*v1beta1.ReplicaSet, error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateSubresourceAction(replicasetsResource, "status", c.ns, replicaSet), &v1beta1.ReplicaSet{})
 
@@ -131,7 +131,7 @@ func (c *FakeReplicaSets) DeleteCollection(ctx context.Context, options *v1.Dele
 }
 
 // Patch applies the patch and returns the patched replicaSet.
-func (c *FakeReplicaSets) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.ReplicaSet, err error) {
+func (c *FakeReplicaSets) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.ReplicaSet, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(replicasetsResource, c.ns, name, pt, data, subresources...), &v1beta1.ReplicaSet{})
 
@@ -153,7 +153,7 @@ func (c *FakeReplicaSets) GetScale(ctx context.Context, replicaSetName string, o
 }
 
 // UpdateScale takes the representation of a scale and updates it. Returns the server's representation of the scale, and an error, if there is any.
-func (c *FakeReplicaSets) UpdateScale(ctx context.Context, replicaSetName string, scale *v1beta1.Scale) (result *v1beta1.Scale, err error) {
+func (c *FakeReplicaSets) UpdateScale(ctx context.Context, replicaSetName string, scale *v1beta1.Scale, opts v1.UpdateOptions) (result *v1beta1.Scale, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateSubresourceAction(replicasetsResource, "scale", c.ns, scale), &v1beta1.Scale{})
 

@@ -36,8 +36,8 @@ func VerifyDryRun(gvk schema.GroupVersionKind, dynamicClient dynamic.Interface, 
 
 func NewDryRunVerifier(dynamicClient dynamic.Interface, discoveryClient discovery.DiscoveryInterface) *DryRunVerifier {
 	return &DryRunVerifier{
-		Finder:        NewCRDFinder(CRDFromDynamic(dynamicClient)),
-		OpenAPIGetter: discoveryClient,
+		finder:        NewCRDFinder(CRDFromDynamic(dynamicClient)),
+		openAPIGetter: discoveryClient,
 	}
 }
 
@@ -71,24 +71,24 @@ func hasGVKExtension(extensions []*openapi_v2.NamedAny, gvk schema.GroupVersionK
 // delay the check for CRDs as much as possible though, since it
 // requires an extra round-trip to the server.
 type DryRunVerifier struct {
-	Finder        CRDFinder
-	OpenAPIGetter discovery.OpenAPISchemaInterface
+	finder        CRDFinder
+	openAPIGetter discovery.OpenAPISchemaInterface
 }
 
 // HasSupport verifies if the given gvk supports DryRun. An error is
 // returned if it doesn't.
 func (v *DryRunVerifier) HasSupport(gvk schema.GroupVersionKind) error {
-	oapi, err := v.OpenAPIGetter.OpenAPISchema()
+	oapi, err := v.openAPIGetter.OpenAPISchema()
 	if err != nil {
 		return fmt.Errorf("failed to download openapi: %v", err)
 	}
-	supports, err := SupportsDryRun(oapi, gvk)
+	supports, err := supportsDryRun(oapi, gvk)
 	if err != nil {
 		// We assume that we couldn't find the type, then check for namespace:
-		supports, _ = SupportsDryRun(oapi, schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Namespace"})
+		supports, _ = supportsDryRun(oapi, schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Namespace"})
 		// If namespace supports dryRun, then we will support dryRun for CRDs only.
 		if supports {
-			supports, err = v.Finder.HasCRD(gvk.GroupKind())
+			supports, err = v.finder.HasCRD(gvk.GroupKind())
 			if err != nil {
 				return fmt.Errorf("failed to check CRD: %v", err)
 			}
@@ -100,10 +100,10 @@ func (v *DryRunVerifier) HasSupport(gvk schema.GroupVersionKind) error {
 	return nil
 }
 
-// SupportsDryRun is a method that let's us look in the OpenAPI if the
+// supportsDryRun is a method that let's us look in the OpenAPI if the
 // specific group-version-kind supports the dryRun query parameter for
 // the PATCH end-point.
-func SupportsDryRun(doc *openapi_v2.Document, gvk schema.GroupVersionKind) (bool, error) {
+func supportsDryRun(doc *openapi_v2.Document, gvk schema.GroupVersionKind) (bool, error) {
 	for _, path := range doc.GetPaths().GetPath() {
 		// Is this describing the gvk we're looking for?
 		if !hasGVKExtension(path.GetValue().GetPatch().GetVendorExtension(), gvk) {

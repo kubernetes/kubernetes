@@ -103,7 +103,7 @@ func TestFakeClientsetInheritsNamespace(t *testing.T) {
 		testPod("nsA", "pod-1"),
 	)
 
-	_, err := tc.CoreV1().Namespaces().Create(context.TODO(), testNamespace("nsB"))
+	_, err := tc.CoreV1().Namespaces().Create(context.TODO(), testNamespace("nsB"), metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Namespaces.Create: %s", err)
 	}
@@ -116,7 +116,7 @@ func TestFakeClientsetInheritsNamespace(t *testing.T) {
 		t.Fatalf("Expected %d namespaces to match, got %d", expected, actual)
 	}
 
-	_, err = tc.CoreV1().Pods("nsB").Create(context.TODO(), testPod("", "pod-1"))
+	_, err = tc.CoreV1().Pods("nsB").Create(context.TODO(), testPod("", "pod-1"), metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Pods.Create nsB/pod-1: %s", err)
 	}
@@ -132,17 +132,17 @@ func TestFakeClientsetInheritsNamespace(t *testing.T) {
 		t.Fatalf("Expected to find pod nsB/pod-1t, got %s/%s", podB1.Namespace, podB1.Name)
 	}
 
-	_, err = tc.CoreV1().Pods("nsA").Create(context.TODO(), testPod("", "pod-1"))
+	_, err = tc.CoreV1().Pods("nsA").Create(context.TODO(), testPod("", "pod-1"), metav1.CreateOptions{})
 	if err == nil {
 		t.Fatalf("Expected Pods.Create to fail with already exists error")
 	}
 
-	_, err = tc.CoreV1().Pods("nsA").Update(context.TODO(), testPod("", "pod-1"))
+	_, err = tc.CoreV1().Pods("nsA").Update(context.TODO(), testPod("", "pod-1"), metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatalf("Pods.Update nsA/pod-1: %s", err)
 	}
 
-	_, err = tc.CoreV1().Pods("nsA").Create(context.TODO(), testPod("nsB", "pod-2"))
+	_, err = tc.CoreV1().Pods("nsA").Create(context.TODO(), testPod("nsB", "pod-2"), metav1.CreateOptions{})
 	if err == nil {
 		t.Fatalf("Expected Pods.Create to fail with bad request from namespace mismtach")
 	}
@@ -150,7 +150,7 @@ func TestFakeClientsetInheritsNamespace(t *testing.T) {
 		t.Fatalf("Expected Pods.Create error to provide object and request namespaces, got %q", err)
 	}
 
-	_, err = tc.CoreV1().Pods("nsA").Update(context.TODO(), testPod("", "pod-3"))
+	_, err = tc.CoreV1().Pods("nsA").Update(context.TODO(), testPod("", "pod-3"), metav1.UpdateOptions{})
 	if err == nil {
 		t.Fatalf("Expected Pods.Update nsA/pod-3 to fail with not found error")
 	}

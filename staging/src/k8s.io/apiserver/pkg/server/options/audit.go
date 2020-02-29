@@ -29,6 +29,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	auditv1 "k8s.io/apiserver/pkg/apis/audit/v1"
 	auditv1alpha1 "k8s.io/apiserver/pkg/apis/audit/v1alpha1"
@@ -37,6 +38,7 @@ import (
 	"k8s.io/apiserver/pkg/audit/policy"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server"
+	"k8s.io/apiserver/pkg/server/egressselector"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	pluginbuffered "k8s.io/apiserver/plugin/pkg/audit/buffered"
 	plugindynamic "k8s.io/apiserver/plugin/pkg/audit/dynamic"
@@ -323,7 +325,15 @@ func (o *AuditOptions) ApplyTo(
 		if checker == nil {
 			klog.V(2).Info("No audit policy file provided, no events will be recorded for webhook backend")
 		} else {
-			webhookBackend, err = o.WebhookOptions.newUntruncatedBackend()
+			if c.EgressSelector != nil {
+				egressDialer, err := c.EgressSelector.Lookup(egressselector.Master.AsNetworkContext())
+				if err != nil {
+					return err
+				}
+				webhookBackend, err = o.WebhookOptions.newUntruncatedBackend(egressDialer)
+			} else {
+				webhookBackend, err = o.WebhookOptions.newUntruncatedBackend(nil)
+			}
 			if err != nil {
 				return err
 			}
@@ -590,9 +600,9 @@ func (o *AuditWebhookOptions) enabled() bool {
 
 // newUntruncatedBackend returns a webhook backend without the truncate options applied
 // this is done so that the same trucate backend can wrap both the webhook and dynamic backends
-func (o *AuditWebhookOptions) newUntruncatedBackend() (audit.Backend, error) {
+func (o *AuditWebhookOptions) newUntruncatedBackend(customDial utilnet.DialFunc) (audit.Backend, error) {
 	groupVersion, _ := schema.ParseGroupVersion(o.GroupVersionString)
-	webhook, err := pluginwebhook.NewBackend(o.ConfigFile, groupVersion, o.InitialBackoff)
+	webhook, err := pluginwebhook.NewBackend(o.ConfigFile, groupVersion, o.InitialBackoff, customDial)
 	if err != nil {
 		return nil, fmt.Errorf("initializing audit webhook: %v", err)
 	}

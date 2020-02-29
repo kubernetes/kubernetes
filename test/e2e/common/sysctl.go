@@ -171,7 +171,7 @@ var _ = framework.KubeDescribe("Sysctls [LinuxOnly] [NodeFeature:Sysctls]", func
 
 		ginkgo.By("Creating a pod with one valid and two invalid sysctls")
 		client := f.ClientSet.CoreV1().Pods(f.Namespace.Name)
-		_, err := client.Create(context.TODO(), pod)
+		_, err := client.Create(context.TODO(), pod, metav1.CreateOptions{})
 
 		gomega.Expect(err).NotTo(gomega.BeNil())
 		gomega.Expect(err.Error()).To(gomega.ContainSubstring(`Invalid value: "foo-"`))

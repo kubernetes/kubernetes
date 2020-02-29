@@ -151,12 +151,10 @@ func (s *subPathTestSuite) DefineTests(driver TestDriver, pattern testpatterns.T
 
 		subPath := f.Namespace.Name
 		l.pod = SubpathTestPod(f, subPath, string(volType), l.resource.VolSource, true)
-		l.pod.Spec.NodeName = l.config.ClientNodeName
-		l.pod.Spec.NodeSelector = l.config.ClientNodeSelector
+		e2epod.SetNodeSelection(&l.pod.Spec, l.config.ClientNodeSelection)
 
 		l.formatPod = volumeFormatPod(f, l.resource.VolSource)
-		l.formatPod.Spec.NodeName = l.config.ClientNodeName
-		l.formatPod.Spec.NodeSelector = l.config.ClientNodeSelector
+		e2epod.SetNodeSelection(&l.formatPod.Spec, l.config.ClientNodeSelection)
 
 		l.subPathDir = filepath.Join(volumePath, subPath)
 		l.filePathInSubpath = filepath.Join(volumePath, fileName)
@@ -448,7 +446,7 @@ func (s *subPathTestSuite) DefineTests(driver TestDriver, pattern testpatterns.T
 
 		ginkgo.By(fmt.Sprintf("Creating pod %s", l.pod.Name))
 		removeUnusedContainers(l.pod)
-		pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), l.pod)
+		pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), l.pod, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "while creating pod")
 		defer func() {
 			ginkgo.By(fmt.Sprintf("Deleting pod %s", pod.Name))
@@ -734,7 +732,7 @@ func testPodFailSubpath(f *framework.Framework, pod *v1.Pod, allowContainerTermi
 func testPodFailSubpathError(f *framework.Framework, pod *v1.Pod, errorMsg string, allowContainerTerminationError bool) {
 	ginkgo.By(fmt.Sprintf("Creating pod %s", pod.Name))
 	removeUnusedContainers(pod)
-	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod)
+	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "while creating pod")
 	defer func() {
 		e2epod.DeletePodWithWait(f.ClientSet, pod)
@@ -817,7 +815,7 @@ func testPodContainerRestart(f *framework.Framework, pod *v1.Pod) {
 	// Start pod
 	ginkgo.By(fmt.Sprintf("Creating pod %s", pod.Name))
 	removeUnusedContainers(pod)
-	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod)
+	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "while creating pod")
 	defer func() {
 		e2epod.DeletePodWithWait(f.ClientSet, pod)
@@ -919,7 +917,7 @@ func testSubpathReconstruction(f *framework.Framework, hostExec utils.HostExec, 
 
 	ginkgo.By(fmt.Sprintf("Creating pod %s", pod.Name))
 	removeUnusedContainers(pod)
-	pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod)
+	pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "while creating pod")
 
 	err = e2epod.WaitForPodRunningInNamespace(f.ClientSet, pod)
@@ -950,7 +948,7 @@ func testSubpathReconstruction(f *framework.Framework, hostExec utils.HostExec, 
 
 func formatVolume(f *framework.Framework, pod *v1.Pod) {
 	ginkgo.By(fmt.Sprintf("Creating pod to format volume %s", pod.Name))
-	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod)
+	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "while creating volume init pod")
 
 	err = e2epod.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, pod.Namespace)

@@ -27,6 +27,7 @@ import (
 	"github.com/go-openapi/loads"
 	"github.com/go-openapi/spec"
 	"gopkg.in/yaml.v2"
+	"k8s.io/kubernetes/test/conformance/behaviors"
 )
 
 type options struct {
@@ -67,8 +68,8 @@ func main() {
 		defMap[d.Ref.String()] = d
 	}
 
-	var suites []Suite
-	var suiteMapping = make(map[string]*Suite)
+	var suites []behaviors.Suite
+	var suiteMapping = make(map[string]*behaviors.Suite)
 
 	for _, v := range defs {
 		if !v.TopLevel || o.resource != v.Name {
@@ -76,10 +77,10 @@ func main() {
 		}
 		name := trimObjectName(v.Name)
 
-		defaultsuite := Suite{
+		defaultsuite := behaviors.Suite{
 			Suite:       o.area + "/spec",
 			Description: "Base suite for " + o.area,
-			Behaviors:   []Behavior{},
+			Behaviors:   []behaviors.Behavior{},
 		}
 
 		_ = defaultsuite
@@ -89,10 +90,10 @@ func main() {
 
 			if propSchema.Ref.String() != "" || propSchema.Type[0] == "array" {
 				if _, ok := suiteMapping[id]; !ok {
-					newsuite := Suite{
+					newsuite := behaviors.Suite{
 						Suite:       o.area + "/" + p,
 						Description: "Suite for " + o.area + "/" + p,
-						Behaviors:   []Behavior{},
+						Behaviors:   []behaviors.Behavior{},
 					}
 					suiteMapping[id] = &newsuite
 				}
@@ -101,10 +102,10 @@ func main() {
 				suiteMapping[id].Behaviors = behaviors
 			} else {
 				if _, ok := suiteMapping["default"]; !ok {
-					newsuite := Suite{
+					newsuite := behaviors.Suite{
 						Suite:       o.area + "/spec",
 						Description: "Base suite for " + o.area,
-						Behaviors:   []Behavior{},
+						Behaviors:   []behaviors.Behavior{},
 					}
 					suiteMapping["default"] = &newsuite
 				}
@@ -122,12 +123,12 @@ func main() {
 		break
 	}
 
-	var area Area = Area{o.area, suites}
+	var area behaviors.Area = behaviors.Area{Area: o.area, Suites: suites}
 	countFields(suites)
 	printYAML(o.behaviorsDir+o.area, area)
 }
 
-func printYAML(fileName string, areaO Area) {
+func printYAML(fileName string, areaO behaviors.Area) {
 	f, err := os.Create(fileName + ".yaml")
 	if err != nil {
 		fmt.Printf("ERROR: %s\n", err.Error())
@@ -147,7 +148,7 @@ func printYAML(fileName string, areaO Area) {
 	}
 }
 
-func countFields(suites []Suite) {
+func countFields(suites []behaviors.Suite) {
 	var fieldsMapping map[string]int
 	fieldsMapping = make(map[string]int)
 	for _, suite := range suites {
@@ -174,21 +175,21 @@ func trimObjectName(name string) string {
 	return name
 }
 
-func objectBehaviors(id string, s *spec.Schema) []Behavior {
+func objectBehaviors(id string, s *spec.Schema) []behaviors.Behavior {
 	if strings.Contains(id, "openAPIV3Schema") || strings.Contains(id, "JSONSchema") || strings.Contains(s.Ref.String(), "JSONSchema") {
-		return []Behavior{}
+		return []behaviors.Behavior{}
 	}
 
 	ref, ok := defMap[s.Ref.String()]
 	if !ok {
-		return []Behavior{}
+		return []behaviors.Behavior{}
 	}
 
 	return schemaBehaviors(id, trimObjectName(ref.Name), ref.Schema)
 }
 
-func schemaBehaviors(base, apiObject string, s *spec.Schema) []Behavior {
-	var behaviors []Behavior
+func schemaBehaviors(base, apiObject string, s *spec.Schema) []behaviors.Behavior {
+	var behaviors []behaviors.Behavior
 	for p, propSchema := range s.Properties {
 		b := schemaBehavior(base, apiObject, p, propSchema)
 		behaviors = append(behaviors, b...)
@@ -196,21 +197,21 @@ func schemaBehaviors(base, apiObject string, s *spec.Schema) []Behavior {
 	return behaviors
 }
 
-func schemaBehavior(base, apiObject, p string, propSchema spec.Schema) []Behavior {
+func schemaBehavior(base, apiObject, p string, propSchema spec.Schema) []behaviors.Behavior {
 
 	id := strings.Join([]string{base, p}, "/")
 	if propSchema.Ref.String() != "" {
 		if apiObject == trimObjectName(propSchema.Ref.String()) {
-			return []Behavior{}
+			return []behaviors.Behavior{}
 		}
 		return objectBehaviors(id, &propSchema)
 	}
-	var b []Behavior
+	var b []behaviors.Behavior
 	switch propSchema.Type[0] {
 	case "array":
 		b = objectBehaviors(id, propSchema.Items.Schema)
 	case "boolean":
-		b = []Behavior{
+		b = []behaviors.Behavior{
 			{
 				ID:          id,
 				APIObject:   apiObject,
@@ -227,7 +228,7 @@ func schemaBehavior(base, apiObject, p string, propSchema spec.Schema) []Behavio
 			},
 		}
 	default:
-		b = []Behavior{{
+		b = []behaviors.Behavior{{
 			ID:          id,
 			APIObject:   apiObject,
 			APIField:    p,

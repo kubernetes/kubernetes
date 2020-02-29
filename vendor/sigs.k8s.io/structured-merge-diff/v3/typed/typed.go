@@ -238,6 +238,9 @@ func merge(lhs, rhs *TypedValue, rule, postRule mergeRule) (*TypedValue, error) 
 	mw.typeRef = lhs.typeRef
 	mw.rule = rule
 	mw.postItemHook = postRule
+	if mw.allocator == nil {
+		mw.allocator = value.NewFreelistAllocator()
+	}
 
 	errs := mw.merge(nil)
 	if len(errs) > 0 {

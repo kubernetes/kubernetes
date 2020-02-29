@@ -89,7 +89,7 @@ var _ = utils.SIGDescribe("Volume Provisioning On Clustered Datastore [Feature:v
 		podspec := getVSpherePodSpecWithVolumePaths([]string{volumePath}, nil, nil)
 
 		ginkgo.By("Creating pod")
-		pod, err := client.CoreV1().Pods(namespace).Create(context.TODO(), podspec)
+		pod, err := client.CoreV1().Pods(namespace).Create(context.TODO(), podspec, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 		ginkgo.By("Waiting for pod to be ready")
 		gomega.Expect(e2epod.WaitForPodNameRunningInNamespace(client, pod.Name, namespace)).To(gomega.Succeed())

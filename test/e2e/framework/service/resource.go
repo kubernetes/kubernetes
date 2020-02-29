@@ -72,7 +72,7 @@ func UpdateService(c clientset.Interface, namespace, serviceName string, update 
 
 		update(service)
 
-		service, err = c.CoreV1().Services(namespace).Update(context.TODO(), service)
+		service, err = c.CoreV1().Services(namespace).Update(context.TODO(), service, metav1.UpdateOptions{})
 
 		if !apierrors.IsConflict(err) && !apierrors.IsServerTimeout(err) {
 			return service, err

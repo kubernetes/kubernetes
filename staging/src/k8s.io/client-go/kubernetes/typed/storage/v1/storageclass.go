@@ -38,14 +38,14 @@ type StorageClassesGetter interface {
 
 // StorageClassInterface has methods to work with StorageClass resources.
 type StorageClassInterface interface {
-	Create(context.Context, *v1.StorageClass) (*v1.StorageClass, error)
-	Update(context.Context, *v1.StorageClass) (*v1.StorageClass, error)
-	Delete(ctx context.Context, name string, options *metav1.DeleteOptions) error
-	DeleteCollection(ctx context.Context, options *metav1.DeleteOptions, listOptions metav1.ListOptions) error
-	Get(ctx context.Context, name string, options metav1.GetOptions) (*v1.StorageClass, error)
+	Create(ctx context.Context, storageClass *v1.StorageClass, opts metav1.CreateOptions) (*v1.StorageClass, error)
+	Update(ctx context.Context, storageClass *v1.StorageClass, opts metav1.UpdateOptions) (*v1.StorageClass, error)
+	Delete(ctx context.Context, name string, opts *metav1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.StorageClass, error)
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.StorageClassList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.StorageClass, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.StorageClass, err error)
 	StorageClassExpansion
 }
 
@@ -104,10 +104,11 @@ func (c *storageClasses) Watch(ctx context.Context, opts metav1.ListOptions) (wa
 }
 
 // Create takes the representation of a storageClass and creates it.  Returns the server's representation of the storageClass, and an error, if there is any.
-func (c *storageClasses) Create(ctx context.Context, storageClass *v1.StorageClass) (result *v1.StorageClass, err error) {
+func (c *storageClasses) Create(ctx context.Context, storageClass *v1.StorageClass, opts metav1.CreateOptions) (result *v1.StorageClass, err error) {
 	result = &v1.StorageClass{}
 	err = c.client.Post().
 		Resource("storageclasses").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(storageClass).
 		Do(ctx).
 		Into(result)
@@ -115,11 +116,12 @@ func (c *storageClasses) Create(ctx context.Context, storageClass *v1.StorageCla
 }
 
 // Update takes the representation of a storageClass and updates it. Returns the server's representation of the storageClass, and an error, if there is any.
-func (c *storageClasses) Update(ctx context.Context, storageClass *v1.StorageClass) (result *v1.StorageClass, err error) {
+func (c *storageClasses) Update(ctx context.Context, storageClass *v1.StorageClass, opts metav1.UpdateOptions) (result *v1.StorageClass, err error) {
 	result = &v1.StorageClass{}
 	err = c.client.Put().
 		Resource("storageclasses").
 		Name(storageClass.Name).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(storageClass).
 		Do(ctx).
 		Into(result)
@@ -152,12 +154,13 @@ func (c *storageClasses) DeleteCollection(ctx context.Context, options *metav1.D
 }
 
 // Patch applies the patch and returns the patched storageClass.
-func (c *storageClasses) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.StorageClass, err error) {
+func (c *storageClasses) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.StorageClass, err error) {
 	result = &v1.StorageClass{}
 	err = c.client.Patch(pt).
 		Resource("storageclasses").
-		SubResource(subresources...).
 		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

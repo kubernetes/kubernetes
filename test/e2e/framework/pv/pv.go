@@ -293,7 +293,7 @@ func DeletePVCandValidatePVGroup(c clientset.Interface, ns string, pvols PVMap, 
 
 // create the PV resource. Fails test on error.
 func createPV(c clientset.Interface, pv *v1.PersistentVolume) (*v1.PersistentVolume, error) {
-	pv, err := c.CoreV1().PersistentVolumes().Create(context.TODO(), pv)
+	pv, err := c.CoreV1().PersistentVolumes().Create(context.TODO(), pv, metav1.CreateOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("PV Create API error: %v", err)
 	}
@@ -307,7 +307,7 @@ func CreatePV(c clientset.Interface, pv *v1.PersistentVolume) (*v1.PersistentVol
 
 // CreatePVC creates the PVC resource. Fails test on error.
 func CreatePVC(c clientset.Interface, ns string, pvc *v1.PersistentVolumeClaim) (*v1.PersistentVolumeClaim, error) {
-	pvc, err := c.CoreV1().PersistentVolumeClaims(ns).Create(context.TODO(), pvc)
+	pvc, err := c.CoreV1().PersistentVolumeClaims(ns).Create(context.TODO(), pvc, metav1.CreateOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("PVC Create API error: %v", err)
 	}

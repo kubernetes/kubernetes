@@ -50,11 +50,11 @@ func CreateStatefulSet(c clientset.Interface, manifestPath, ns string) *appsv1.S
 	framework.ExpectNoError(err)
 
 	framework.Logf(fmt.Sprintf("creating " + ss.Name + " service"))
-	_, err = c.CoreV1().Services(ns).Create(context.TODO(), svc)
+	_, err = c.CoreV1().Services(ns).Create(context.TODO(), svc, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
 	framework.Logf(fmt.Sprintf("creating statefulset %v/%v with %d replicas and selector %+v", ss.Namespace, ss.Name, *(ss.Spec.Replicas), ss.Spec.Selector))
-	_, err = c.AppsV1().StatefulSets(ns).Create(context.TODO(), ss)
+	_, err = c.AppsV1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 	WaitForRunningAndReady(c, *ss.Spec.Replicas, ss)
 	return ss
@@ -253,7 +253,7 @@ func update(c clientset.Interface, ns, name string, update func(ss *appsv1.State
 			framework.Failf("failed to get statefulset %q: %v", name, err)
 		}
 		update(ss)
-		ss, err = c.AppsV1().StatefulSets(ns).Update(context.TODO(), ss)
+		ss, err = c.AppsV1().StatefulSets(ns).Update(context.TODO(), ss, metav1.UpdateOptions{})
 		if err == nil {
 			return ss
 		}

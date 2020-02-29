@@ -38,31 +38,36 @@ type RegisterPluginFunc func(reg *framework.Registry, plugins *schedulerapi.Plug
 
 // RegisterQueueSortPlugin returns a function to register a QueueSort Plugin to a given registry.
 func RegisterQueueSortPlugin(pluginName string, pluginNewFunc framework.PluginFactory) RegisterPluginFunc {
-	return RegisterPluginAsExtensions(pluginName, 1, pluginNewFunc, "QueueSort")
+	return RegisterPluginAsExtensions(pluginName, pluginNewFunc, "QueueSort")
 }
 
 // RegisterFilterPlugin returns a function to register a Filter Plugin to a given registry.
 func RegisterFilterPlugin(pluginName string, pluginNewFunc framework.PluginFactory) RegisterPluginFunc {
-	return RegisterPluginAsExtensions(pluginName, 1, pluginNewFunc, "Filter")
+	return RegisterPluginAsExtensions(pluginName, pluginNewFunc, "Filter")
 }
 
 // RegisterScorePlugin returns a function to register a Score Plugin to a given registry.
 func RegisterScorePlugin(pluginName string, pluginNewFunc framework.PluginFactory, weight int32) RegisterPluginFunc {
-	return RegisterPluginAsExtensions(pluginName, weight, pluginNewFunc, "Score")
+	return RegisterPluginAsExtensionsWithWeight(pluginName, weight, pluginNewFunc, "Score")
 }
 
-// RegisterPostFilterPlugin returns a function to register a Score Plugin to a given registry.
-func RegisterPostFilterPlugin(pluginName string, pluginNewFunc framework.PluginFactory) RegisterPluginFunc {
-	return RegisterPluginAsExtensions(pluginName, 1, pluginNewFunc, "PostFilter")
+// RegisterPreScorePlugin returns a function to register a Score Plugin to a given registry.
+func RegisterPreScorePlugin(pluginName string, pluginNewFunc framework.PluginFactory) RegisterPluginFunc {
+	return RegisterPluginAsExtensions(pluginName, pluginNewFunc, "PreScore")
 }
 
 // RegisterBindPlugin returns a function to register a Bind Plugin to a given registry.
 func RegisterBindPlugin(pluginName string, pluginNewFunc framework.PluginFactory) RegisterPluginFunc {
-	return RegisterPluginAsExtensions(pluginName, 1, pluginNewFunc, "Bind")
+	return RegisterPluginAsExtensions(pluginName, pluginNewFunc, "Bind")
 }
 
 // RegisterPluginAsExtensions returns a function to register a Plugin as given extensionPoints to a given registry.
-func RegisterPluginAsExtensions(pluginName string, weight int32, pluginNewFunc framework.PluginFactory, extensions ...string) RegisterPluginFunc {
+func RegisterPluginAsExtensions(pluginName string, pluginNewFunc framework.PluginFactory, extensions ...string) RegisterPluginFunc {
+	return RegisterPluginAsExtensionsWithWeight(pluginName, 1, pluginNewFunc, extensions...)
+}
+
+// RegisterPluginAsExtensionsWithWeight returns a function to register a Plugin as given extensionPoints with weight to a given registry.
+func RegisterPluginAsExtensionsWithWeight(pluginName string, weight int32, pluginNewFunc framework.PluginFactory, extensions ...string) RegisterPluginFunc {
 	return func(reg *framework.Registry, plugins *schedulerapi.Plugins, pluginConfigs []schedulerapi.PluginConfig) {
 		reg.Register(pluginName, pluginNewFunc)
 		for _, extension := range extensions {
@@ -86,8 +91,8 @@ func getPluginSetByExtension(plugins *schedulerapi.Plugins, extension string) *s
 		return initializeIfNeeded(&plugins.Filter)
 	case "PreFilter":
 		return initializeIfNeeded(&plugins.PreFilter)
-	case "PostFilter":
-		return initializeIfNeeded(&plugins.PostFilter)
+	case "PreScore":
+		return initializeIfNeeded(&plugins.PreScore)
 	case "Score":
 		return initializeIfNeeded(&plugins.Score)
 	case "Bind":

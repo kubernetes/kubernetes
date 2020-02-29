@@ -416,7 +416,7 @@ func finalizeUpgradeTest(start time.Time, tc *junit.TestCase) {
 				Value:   fmt.Sprintf("%s\n\n%s", r.Message, r.FullStackTrace),
 			},
 		}
-	case ginkgowrapper.SkipPanic:
+	case e2eskipper.SkipPanic:
 		tc.Skipped = fmt.Sprintf("%s:%d %q", r.Filename, r.Line, r.Message)
 	default:
 		tc.Errors = []*junit.Error{

@@ -22,6 +22,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	nodev1beta1 "k8s.io/api/node/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -30,7 +31,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2eevents "k8s.io/kubernetes/test/e2e/framework/events"
 	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -62,12 +62,14 @@ type pausePodConfig struct {
 	Affinity                          *v1.Affinity
 	Annotations, Labels, NodeSelector map[string]string
 	Resources                         *v1.ResourceRequirements
+	RuntimeClassHandler               *string
 	Tolerations                       []v1.Toleration
 	NodeName                          string
 	Ports                             []v1.ContainerPort
 	OwnerReferences                   []metav1.OwnerReference
 	PriorityClassName                 string
 	DeletionGracePeriodSeconds        *int64
+	TopologySpreadConstraints         []v1.TopologySpreadConstraint
 }
 
 var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
@@ -194,6 +196,116 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		}
 		WaitForSchedulerAfterAction(f, createPausePodAction(f, conf), ns, podName, false)
 		verifyResult(cs, podsNeededForSaturation, 1, ns)
+	})
+
+	// This test verifies we don't allow scheduling of pods in a way that sum of limits +
+	// associated overhead is greater than machine's capacity.
+	// It assumes that cluster add-on pods stay stable and cannot be run in parallel
+	// with any other test that touches Nodes or Pods.
+	// Because of this we need to have precise control on what's running in the cluster.
+	// Test scenario:
+	// 1. Find the first ready node on the system, and add a fake resource for test
+	// 2. Create one with affinity to the particular node that uses 70% of the fake resource.
+	// 3. Wait for the pod to be scheduled.
+	// 4. Create another pod with affinity to the particular node that needs 20% of the fake resource and
+	//    an overhead set as 25% of the fake resource.
+	// 5. Make sure this additional pod is not scheduled.
+
+	ginkgo.Context("validates pod overhead is considered along with resource limits of pods that are allowed to run", func() {
+		var testNodeName string
+		var handler string
+		var beardsecond v1.ResourceName = "example.com/beardsecond"
+
+		ginkgo.BeforeEach(func() {
+			WaitForStableCluster(cs, masterNodes)
+			ginkgo.By("Add RuntimeClass and fake resource")
+
+			// find a node which can run a pod:
+			testNodeName = GetNodeThatCanRunPod(f)
+
+			// Get node object:
+			node, err := cs.CoreV1().Nodes().Get(context.TODO(), testNodeName, metav1.GetOptions{})
+			framework.ExpectNoError(err, "unable to get node object for node %v", testNodeName)
+
+			// update Node API object with a fake resource
+			nodeCopy := node.DeepCopy()
+			nodeCopy.ResourceVersion = "0"
+
+			nodeCopy.Status.Capacity[beardsecond] = resource.MustParse("1000")
+			_, err = cs.CoreV1().Nodes().UpdateStatus(context.TODO(), nodeCopy, metav1.UpdateOptions{})
+			framework.ExpectNoError(err, "unable to apply fake resource to %v", testNodeName)
+
+			// Register a runtimeClass with overhead set as 25% of the available beard-seconds
+			handler = e2enode.PreconfiguredRuntimeClassHandler(framework.TestContext.ContainerRuntime)
+
+			rc := &nodev1beta1.RuntimeClass{
+				ObjectMeta: metav1.ObjectMeta{Name: handler},
+				Handler:    handler,
+				Overhead: &nodev1beta1.Overhead{
+					PodFixed: v1.ResourceList{
+						beardsecond: resource.MustParse("250"),
+					},
+				},
+			}
+			_, err = cs.NodeV1beta1().RuntimeClasses().Create(context.TODO(), rc, metav1.CreateOptions{})
+			framework.ExpectNoError(err, "failed to create RuntimeClass resource")
+		})
+
+		ginkgo.AfterEach(func() {
+			ginkgo.By("Remove fake resource and RuntimeClass")
+			// remove fake resource:
+			if testNodeName != "" {
+				// Get node object:
+				node, err := cs.CoreV1().Nodes().Get(context.TODO(), testNodeName, metav1.GetOptions{})
+				framework.ExpectNoError(err, "unable to get node object for node %v", testNodeName)
+
+				nodeCopy := node.DeepCopy()
+				// force it to update
+				nodeCopy.ResourceVersion = "0"
+				delete(nodeCopy.Status.Capacity, beardsecond)
+				_, err = cs.CoreV1().Nodes().UpdateStatus(context.TODO(), nodeCopy, metav1.UpdateOptions{})
+				framework.ExpectNoError(err, "unable to update node %v", testNodeName)
+			}
+
+			// remove RuntimeClass
+			cs.NodeV1beta1().RuntimeClasses().Delete(context.TODO(), e2enode.PreconfiguredRuntimeClassHandler(framework.TestContext.ContainerRuntime), nil)
+		})
+
+		ginkgo.It("verify pod overhead is accounted for", func() {
+			framework.ExpectEqual(testNodeName != "", true)
+
+			ginkgo.By("Starting Pod to consume most of the node's resource.")
+
+			// Create pod which requires 70% of the available beard-seconds.
+			fillerPod := createPausePod(f, pausePodConfig{
+				Name: "filler-pod-" + string(uuid.NewUUID()),
+				Resources: &v1.ResourceRequirements{
+					Requests: v1.ResourceList{beardsecond: resource.MustParse("700")},
+					Limits:   v1.ResourceList{beardsecond: resource.MustParse("700")},
+				},
+			})
+
+			// Wait for filler pod to schedule.
+			framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(cs, fillerPod))
+
+			ginkgo.By("Creating another pod that requires unavailable amount of resources.")
+			// Create another pod that requires 20% of available beard-seconds, but utilizes the RuntimeClass
+			// which defines a pod overhead that requires an additional 25%.
+			// This pod should remain pending as at least 70% of beard-second in
+			// the node are already consumed.
+			podName := "additional-pod" + string(uuid.NewUUID())
+			conf := pausePodConfig{
+				RuntimeClassHandler: &handler,
+				Name:                podName,
+				Labels:              map[string]string{"name": "additional"},
+				Resources: &v1.ResourceRequirements{
+					Limits: v1.ResourceList{beardsecond: resource.MustParse("200")},
+				},
+			}
+
+			WaitForSchedulerAfterAction(f, createPausePodAction(f, conf), ns, podName, false)
+			verifyResult(cs, 1, 1, ns)
+		})
 	})
 
 	// This test verifies we don't allow scheduling of pods in a way that sum of
@@ -605,6 +717,84 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		ginkgo.By(fmt.Sprintf("Trying to create another pod(pod5) with hostport %v but hostIP 127.0.0.1 on the node which pod4 resides and expect not scheduled", port))
 		createHostPortPodOnNode(f, "pod5", ns, "127.0.0.1", port, v1.ProtocolTCP, nodeSelector, false)
 	})
+
+	ginkgo.Context("PodTopologySpread Filtering", func() {
+		var nodeNames []string
+		topologyKey := "kubernetes.io/e2e-pts-filter"
+
+		ginkgo.BeforeEach(func() {
+			ginkgo.By("Trying to get 2 available nodes which can run pod")
+			nodeNames = Get2NodesThatCanRunPod(f)
+			ginkgo.By(fmt.Sprintf("Apply dedicated topologyKey %v for this test on the 2 nodes.", topologyKey))
+			for _, nodeName := range nodeNames {
+				framework.AddOrUpdateLabelOnNode(cs, nodeName, topologyKey, nodeName)
+			}
+		})
+		ginkgo.AfterEach(func() {
+			for _, nodeName := range nodeNames {
+				framework.RemoveLabelOffNode(cs, nodeName, topologyKey)
+			}
+		})
+
+		ginkgo.It("validates 4 pods with MaxSkew=1 are evenly distributed into 2 nodes", func() {
+			podLabel := "e2e-pts-filter"
+			replicas := 4
+			rsConfig := pauseRSConfig{
+				Replicas: int32(replicas),
+				PodConfig: pausePodConfig{
+					Name:      podLabel,
+					Namespace: ns,
+					Labels:    map[string]string{podLabel: ""},
+					Affinity: &v1.Affinity{
+						NodeAffinity: &v1.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+								NodeSelectorTerms: []v1.NodeSelectorTerm{
+									{
+										MatchExpressions: []v1.NodeSelectorRequirement{
+											{
+												Key:      topologyKey,
+												Operator: v1.NodeSelectorOpIn,
+												Values:   nodeNames,
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+					TopologySpreadConstraints: []v1.TopologySpreadConstraint{
+						{
+							MaxSkew:           1,
+							TopologyKey:       topologyKey,
+							WhenUnsatisfiable: v1.DoNotSchedule,
+							LabelSelector: &metav1.LabelSelector{
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{
+										Key:      podLabel,
+										Operator: metav1.LabelSelectorOpExists,
+									},
+								},
+							},
+						},
+					},
+				},
+			}
+			runPauseRS(f, rsConfig)
+			podList, err := cs.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{})
+			framework.ExpectNoError(err)
+			numInNode1, numInNode2 := 0, 0
+			for _, pod := range podList.Items {
+				if pod.Spec.NodeName == nodeNames[0] {
+					numInNode1++
+				} else if pod.Spec.NodeName == nodeNames[1] {
+					numInNode2++
+				}
+			}
+			expected := replicas / len(nodeNames)
+			framework.ExpectEqual(numInNode1, expected, fmt.Sprintf("Pods are not distributed as expected on node %q", nodeNames[0]))
+			framework.ExpectEqual(numInNode2, expected, fmt.Sprintf("Pods are not distributed as expected on node %q", nodeNames[1]))
+		})
+	})
 })
 
 // printAllKubeletPods outputs status of all kubelet pods into log.
@@ -634,8 +824,10 @@ func initPausePod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
 			OwnerReferences: conf.OwnerReferences,
 		},
 		Spec: v1.PodSpec{
-			NodeSelector: conf.NodeSelector,
-			Affinity:     conf.Affinity,
+			NodeSelector:              conf.NodeSelector,
+			Affinity:                  conf.Affinity,
+			TopologySpreadConstraints: conf.TopologySpreadConstraints,
+			RuntimeClassName:          conf.RuntimeClassHandler,
 			Containers: []v1.Container{
 				{
 					Name:  conf.Name,
@@ -644,10 +836,14 @@ func initPausePod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
 				},
 			},
 			Tolerations:                   conf.Tolerations,
-			NodeName:                      conf.NodeName,
 			PriorityClassName:             conf.PriorityClassName,
 			TerminationGracePeriodSeconds: &gracePeriod,
 		},
+	}
+	// TODO: setting the Pod's nodeAffinity instead of setting .spec.nodeName works around the
+	// Preemption e2e flake (#88441), but we should investigate deeper to get to the bottom of it.
+	if len(conf.NodeName) != 0 {
+		e2epod.SetNodeAffinity(&pod.Spec, conf.NodeName)
 	}
 	if conf.Resources != nil {
 		pod.Spec.Containers[0].Resources = *conf.Resources
@@ -663,14 +859,14 @@ func createPausePod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
 	if len(namespace) == 0 {
 		namespace = f.Namespace.Name
 	}
-	pod, err := f.ClientSet.CoreV1().Pods(namespace).Create(context.TODO(), initPausePod(f, conf))
+	pod, err := f.ClientSet.CoreV1().Pods(namespace).Create(context.TODO(), initPausePod(f, conf), metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 	return pod
 }
 
 func runPausePod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
 	pod := createPausePod(f, conf)
-	framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(f.ClientSet, pod))
+	framework.ExpectNoError(e2epod.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace, framework.PollShortTimeout))
 	pod, err := f.ClientSet.CoreV1().Pods(pod.Namespace).Get(context.TODO(), conf.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err)
 	return pod
@@ -708,7 +904,7 @@ func getRequestedStorageEphemeralStorage(pod v1.Pod) int64 {
 
 // removeTaintFromNodeAction returns a closure that removes the given taint
 // from the given node upon invocation.
-func removeTaintFromNodeAction(cs clientset.Interface, nodeName string, testTaint v1.Taint) e2eevents.Action {
+func removeTaintFromNodeAction(cs clientset.Interface, nodeName string, testTaint v1.Taint) Action {
 	return func() error {
 		framework.RemoveTaintOffNode(cs, nodeName, testTaint)
 		return nil
@@ -716,21 +912,21 @@ func removeTaintFromNodeAction(cs clientset.Interface, nodeName string, testTain
 }
 
 // createPausePodAction returns a closure that creates a pause pod upon invocation.
-func createPausePodAction(f *framework.Framework, conf pausePodConfig) e2eevents.Action {
+func createPausePodAction(f *framework.Framework, conf pausePodConfig) Action {
 	return func() error {
-		_, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), initPausePod(f, conf))
+		_, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), initPausePod(f, conf), metav1.CreateOptions{})
 		return err
 	}
 }
 
 // WaitForSchedulerAfterAction performs the provided action and then waits for
 // scheduler to act on the given pod.
-func WaitForSchedulerAfterAction(f *framework.Framework, action e2eevents.Action, ns, podName string, expectSuccess bool) {
+func WaitForSchedulerAfterAction(f *framework.Framework, action Action, ns, podName string, expectSuccess bool) {
 	predicate := scheduleFailureEvent(podName)
 	if expectSuccess {
 		predicate = scheduleSuccessEvent(ns, podName, "" /* any node */)
 	}
-	success, err := e2eevents.ObserveEventAfterAction(f.ClientSet, f.Namespace.Name, predicate, action)
+	success, err := observeEventAfterAction(f.ClientSet, f.Namespace.Name, predicate, action)
 	framework.ExpectNoError(err)
 	framework.ExpectEqual(success, true)
 }
@@ -749,6 +945,30 @@ func verifyResult(c clientset.Interface, expectedScheduled int, expectedNotSched
 func GetNodeThatCanRunPod(f *framework.Framework) string {
 	ginkgo.By("Trying to launch a pod without a label to get a node which can launch it.")
 	return runPodAndGetNodeName(f, pausePodConfig{Name: "without-label"})
+}
+
+// Get2NodesThatCanRunPod return a 2-node slice where can run pod.
+func Get2NodesThatCanRunPod(f *framework.Framework) []string {
+	firstNode := GetNodeThatCanRunPod(f)
+	ginkgo.By("Trying to launch a pod without a label to get a node which can launch it.")
+	pod := pausePodConfig{
+		Name: "without-label",
+		Affinity: &v1.Affinity{
+			NodeAffinity: &v1.NodeAffinity{
+				RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+					NodeSelectorTerms: []v1.NodeSelectorTerm{
+						{
+							MatchFields: []v1.NodeSelectorRequirement{
+								{Key: "metadata.name", Operator: v1.NodeSelectorOpNotIn, Values: []string{firstNode}},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	secondNode := runPodAndGetNodeName(f, pod)
+	return []string{firstNode, secondNode}
 }
 
 func getNodeThatCanRunPodWithoutToleration(f *framework.Framework) string {

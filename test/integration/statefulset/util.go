@@ -190,7 +190,7 @@ func runControllerAndInformers(sc *statefulset.StatefulSetController, informers 
 }
 
 func createHeadlessService(t *testing.T, clientSet clientset.Interface, headlessService *v1.Service) {
-	_, err := clientSet.CoreV1().Services(headlessService.Namespace).Create(context.TODO(), headlessService)
+	_, err := clientSet.CoreV1().Services(headlessService.Namespace).Create(context.TODO(), headlessService, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("failed creating headless service: %v", err)
 	}
@@ -200,14 +200,14 @@ func createSTSsPods(t *testing.T, clientSet clientset.Interface, stss []*appsv1.
 	var createdSTSs []*appsv1.StatefulSet
 	var createdPods []*v1.Pod
 	for _, sts := range stss {
-		createdSTS, err := clientSet.AppsV1().StatefulSets(sts.Namespace).Create(context.TODO(), sts)
+		createdSTS, err := clientSet.AppsV1().StatefulSets(sts.Namespace).Create(context.TODO(), sts, metav1.CreateOptions{})
 		if err != nil {
 			t.Fatalf("failed to create sts %s: %v", sts.Name, err)
 		}
 		createdSTSs = append(createdSTSs, createdSTS)
 	}
 	for _, pod := range pods {
-		createdPod, err := clientSet.CoreV1().Pods(pod.Namespace).Create(context.TODO(), pod)
+		createdPod, err := clientSet.CoreV1().Pods(pod.Namespace).Create(context.TODO(), pod, metav1.CreateOptions{})
 		if err != nil {
 			t.Fatalf("failed to create pod %s: %v", pod.Name, err)
 		}
@@ -240,7 +240,7 @@ func updatePod(t *testing.T, podClient typedv1.PodInterface, podName string, upd
 			return err
 		}
 		updateFunc(newPod)
-		pod, err = podClient.Update(context.TODO(), newPod)
+		pod, err = podClient.Update(context.TODO(), newPod, metav1.UpdateOptions{})
 		return err
 	}); err != nil {
 		t.Fatalf("failed to update pod %s: %v", podName, err)
@@ -256,7 +256,7 @@ func updatePodStatus(t *testing.T, podClient typedv1.PodInterface, podName strin
 			return err
 		}
 		updateStatusFunc(newPod)
-		pod, err = podClient.UpdateStatus(context.TODO(), newPod)
+		pod, err = podClient.UpdateStatus(context.TODO(), newPod, metav1.UpdateOptions{})
 		return err
 	}); err != nil {
 		t.Fatalf("failed to update status of pod %s: %v", podName, err)
@@ -285,7 +285,7 @@ func updateSTS(t *testing.T, stsClient typedappsv1.StatefulSetInterface, stsName
 			return err
 		}
 		updateFunc(newSTS)
-		sts, err = stsClient.Update(context.TODO(), newSTS)
+		sts, err = stsClient.Update(context.TODO(), newSTS, metav1.UpdateOptions{})
 		return err
 	}); err != nil {
 		t.Fatalf("failed to update sts %s: %v", stsName, err)
@@ -302,7 +302,7 @@ func scaleSTS(t *testing.T, c clientset.Interface, sts *appsv1.StatefulSet, repl
 			return err
 		}
 		*newSTS.Spec.Replicas = replicas
-		sts, err = stsClient.Update(context.TODO(), newSTS)
+		sts, err = stsClient.Update(context.TODO(), newSTS, metav1.UpdateOptions{})
 		return err
 	}); err != nil {
 		t.Fatalf("failed to update .Spec.Replicas to %d for sts %s: %v", replicas, sts.Name, err)

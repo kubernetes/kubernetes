@@ -46,7 +46,7 @@ var _ = ginkgo.Describe("[sig-api-machinery] Secrets", func() {
 
 		ginkgo.By(fmt.Sprintf("Creating secret with name %s", secret.Name))
 		var err error
-		if secret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(context.TODO(), secret); err != nil {
+		if secret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(context.TODO(), secret, metav1.CreateOptions{}); err != nil {
 			framework.Failf("unable to create test secret %s: %v", secret.Name, err)
 		}
 
@@ -87,14 +87,14 @@ var _ = ginkgo.Describe("[sig-api-machinery] Secrets", func() {
 	/*
 		Release : v1.9
 		Testname: Secrets, pod environment from source
-		Description: Create a secret. Create a Pod with Container that declares a environment variable using ‘EnvFrom’ which references the secret created to extract a key value from the secret. Pod MUST have the environment variable that contains proper value for the key to the secret.
+		Description: Create a secret. Create a Pod with Container that declares a environment variable using 'EnvFrom' which references the secret created to extract a key value from the secret. Pod MUST have the environment variable that contains proper value for the key to the secret.
 	*/
 	framework.ConformanceIt("should be consumable via the environment [NodeConformance]", func() {
 		name := "secret-test-" + string(uuid.NewUUID())
 		secret := newEnvFromSecret(f.Namespace.Name, name)
 		ginkgo.By(fmt.Sprintf("creating secret %v/%v", f.Namespace.Name, secret.Name))
 		var err error
-		if secret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(context.TODO(), secret); err != nil {
+		if secret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(context.TODO(), secret, metav1.CreateOptions{}); err != nil {
 			framework.Failf("unable to create test secret %s: %v", secret.Name, err)
 		}
 
@@ -165,7 +165,7 @@ var _ = ginkgo.Describe("[sig-api-machinery] Secrets", func() {
 				"key": []byte("value"),
 			},
 			Type: "Opaque",
-		})
+		}, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create secret")
 
 		ginkgo.By("listing secrets in all namespaces to ensure that there are more than zero")
@@ -197,7 +197,7 @@ var _ = ginkgo.Describe("[sig-api-machinery] Secrets", func() {
 			"data": map[string][]byte{"key": []byte(secretPatchNewData)},
 		})
 		framework.ExpectNoError(err, "failed to marshal JSON")
-		_, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Patch(context.TODO(), secretCreatedName, types.StrategicMergePatchType, []byte(secretPatch))
+		_, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Patch(context.TODO(), secretCreatedName, types.StrategicMergePatchType, []byte(secretPatch), metav1.PatchOptions{})
 		framework.ExpectNoError(err, "failed to patch secret")
 
 		secret, err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Get(context.TODO(), secretCreatedName, metav1.GetOptions{})
@@ -258,5 +258,5 @@ func createEmptyKeySecretForTest(f *framework.Framework) (*v1.Secret, error) {
 		},
 	}
 	ginkgo.By(fmt.Sprintf("Creating projection with secret that has name %s", secret.Name))
-	return f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(context.TODO(), secret)
+	return f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(context.TODO(), secret, metav1.CreateOptions{})
 }

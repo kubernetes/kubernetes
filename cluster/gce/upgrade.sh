@@ -518,7 +518,7 @@ function update-coredns-config() {
   if test "$(printf '%s\n' ${CURRENT_COREDNS_VERSION} ${NEW_COREDNS_VERSION} | sort -V | head -n 1)" != ${NEW_COREDNS_VERSION}; then
      echo "== Upgrading the CoreDNS ConfigMap =="
      ${download_dir}/corefile-tool-${host_arch} migrate --from ${CURRENT_COREDNS_VERSION} --to ${NEW_COREDNS_VERSION} --corefile ${download_dir}/Corefile-old > ${download_dir}/Corefile
-     ${KUBE_ROOT}/cluster/kubectl.sh -n kube-system create configmap coredns --from-file ${download_dir}/Corefile -o yaml --dry-run | ${KUBE_ROOT}/cluster/kubectl.sh apply -f -
+     ${KUBE_ROOT}/cluster/kubectl.sh -n kube-system create configmap coredns --from-file ${download_dir}/Corefile -o yaml --dry-run=client | ${KUBE_ROOT}/cluster/kubectl.sh apply -f -
   else
      # In case of a downgrade, a custom CoreDNS Corefile will be overwritten by a default Corefile. In that case,
      # the user will need to manually modify the resulting (default) Corefile after the downgrade is complete.

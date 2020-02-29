@@ -38,14 +38,14 @@ type AuditSinksGetter interface {
 
 // AuditSinkInterface has methods to work with AuditSink resources.
 type AuditSinkInterface interface {
-	Create(context.Context, *v1alpha1.AuditSink) (*v1alpha1.AuditSink, error)
-	Update(context.Context, *v1alpha1.AuditSink) (*v1alpha1.AuditSink, error)
-	Delete(ctx context.Context, name string, options *v1.DeleteOptions) error
-	DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(ctx context.Context, name string, options v1.GetOptions) (*v1alpha1.AuditSink, error)
+	Create(ctx context.Context, auditSink *v1alpha1.AuditSink, opts v1.CreateOptions) (*v1alpha1.AuditSink, error)
+	Update(ctx context.Context, auditSink *v1alpha1.AuditSink, opts v1.UpdateOptions) (*v1alpha1.AuditSink, error)
+	Delete(ctx context.Context, name string, opts *v1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts *v1.DeleteOptions, listOpts v1.ListOptions) error
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1alpha1.AuditSink, error)
 	List(ctx context.Context, opts v1.ListOptions) (*v1alpha1.AuditSinkList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.AuditSink, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.AuditSink, err error)
 	AuditSinkExpansion
 }
 
@@ -104,10 +104,11 @@ func (c *auditSinks) Watch(ctx context.Context, opts v1.ListOptions) (watch.Inte
 }
 
 // Create takes the representation of a auditSink and creates it.  Returns the server's representation of the auditSink, and an error, if there is any.
-func (c *auditSinks) Create(ctx context.Context, auditSink *v1alpha1.AuditSink) (result *v1alpha1.AuditSink, err error) {
+func (c *auditSinks) Create(ctx context.Context, auditSink *v1alpha1.AuditSink, opts v1.CreateOptions) (result *v1alpha1.AuditSink, err error) {
 	result = &v1alpha1.AuditSink{}
 	err = c.client.Post().
 		Resource("auditsinks").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(auditSink).
 		Do(ctx).
 		Into(result)
@@ -115,11 +116,12 @@ func (c *auditSinks) Create(ctx context.Context, auditSink *v1alpha1.AuditSink) 
 }
 
 // Update takes the representation of a auditSink and updates it. Returns the server's representation of the auditSink, and an error, if there is any.
-func (c *auditSinks) Update(ctx context.Context, auditSink *v1alpha1.AuditSink) (result *v1alpha1.AuditSink, err error) {
+func (c *auditSinks) Update(ctx context.Context, auditSink *v1alpha1.AuditSink, opts v1.UpdateOptions) (result *v1alpha1.AuditSink, err error) {
 	result = &v1alpha1.AuditSink{}
 	err = c.client.Put().
 		Resource("auditsinks").
 		Name(auditSink.Name).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(auditSink).
 		Do(ctx).
 		Into(result)
@@ -152,12 +154,13 @@ func (c *auditSinks) DeleteCollection(ctx context.Context, options *v1.DeleteOpt
 }
 
 // Patch applies the patch and returns the patched auditSink.
-func (c *auditSinks) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.AuditSink, err error) {
+func (c *auditSinks) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.AuditSink, err error) {
 	result = &v1alpha1.AuditSink{}
 	err = c.client.Patch(pt).
 		Resource("auditsinks").
-		SubResource(subresources...).
 		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

@@ -310,7 +310,7 @@ func TestSyncLoadBalancerIfNeeded(t *testing.T) {
 			controller, cloud, client := newController()
 			cloud.Exists = tc.lbExists
 			key := fmt.Sprintf("%s/%s", tc.service.Namespace, tc.service.Name)
-			if _, err := client.CoreV1().Services(tc.service.Namespace).Create(context.TODO(), tc.service); err != nil {
+			if _, err := client.CoreV1().Services(tc.service.Namespace).Create(context.TODO(), tc.service, metav1.CreateOptions{}); err != nil {
 				t.Fatalf("Failed to prepare service %s for testing: %v", key, err)
 			}
 			client.ClearActions()
@@ -603,7 +603,7 @@ func TestProcessServiceCreateOrUpdate(t *testing.T) {
 
 	for _, tc := range testCases {
 		newSvc := tc.updateFn(tc.svc)
-		if _, err := client.CoreV1().Services(tc.svc.Namespace).Create(context.TODO(), tc.svc); err != nil {
+		if _, err := client.CoreV1().Services(tc.svc.Namespace).Create(context.TODO(), tc.svc, metav1.CreateOptions{}); err != nil {
 			t.Fatalf("Failed to prepare service %s for testing: %v", tc.key, err)
 		}
 		obtErr := controller.processServiceCreateOrUpdate(newSvc, tc.key)
@@ -952,7 +952,7 @@ func TestNeedsUpdate(t *testing.T) {
 			expectedNeedsUpdate: true,
 		},
 		{
-			testName: "If externel ip counts are different",
+			testName: "If external ip counts are different",
 			updateFn: func() {
 				oldSvc = defaultExternalService()
 				newSvc = defaultExternalService()
@@ -962,7 +962,7 @@ func TestNeedsUpdate(t *testing.T) {
 			expectedNeedsUpdate: true,
 		},
 		{
-			testName: "If externel ips are different",
+			testName: "If external ips are different",
 			updateFn: func() {
 				oldSvc = defaultExternalService()
 				newSvc = defaultExternalService()
@@ -1222,7 +1222,7 @@ func TestAddFinalizer(t *testing.T) {
 			s := &Controller{
 				kubeClient: c,
 			}
-			if _, err := s.kubeClient.CoreV1().Services(tc.svc.Namespace).Create(context.TODO(), tc.svc); err != nil {
+			if _, err := s.kubeClient.CoreV1().Services(tc.svc.Namespace).Create(context.TODO(), tc.svc, metav1.CreateOptions{}); err != nil {
 				t.Fatalf("Failed to prepare service for testing: %v", err)
 			}
 			if err := s.addFinalizer(tc.svc); err != nil {
@@ -1276,7 +1276,7 @@ func TestRemoveFinalizer(t *testing.T) {
 			s := &Controller{
 				kubeClient: c,
 			}
-			if _, err := s.kubeClient.CoreV1().Services(tc.svc.Namespace).Create(context.TODO(), tc.svc); err != nil {
+			if _, err := s.kubeClient.CoreV1().Services(tc.svc.Namespace).Create(context.TODO(), tc.svc, metav1.CreateOptions{}); err != nil {
 				t.Fatalf("Failed to prepare service for testing: %v", err)
 			}
 			if err := s.removeFinalizer(tc.svc); err != nil {
@@ -1376,7 +1376,7 @@ func TestPatchStatus(t *testing.T) {
 			s := &Controller{
 				kubeClient: c,
 			}
-			if _, err := s.kubeClient.CoreV1().Services(tc.svc.Namespace).Create(context.TODO(), tc.svc); err != nil {
+			if _, err := s.kubeClient.CoreV1().Services(tc.svc.Namespace).Create(context.TODO(), tc.svc, metav1.CreateOptions{}); err != nil {
 				t.Fatalf("Failed to prepare service for testing: %v", err)
 			}
 			if err := s.patchStatus(tc.svc, &tc.svc.Status.LoadBalancer, tc.newStatus); err != nil {

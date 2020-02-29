@@ -166,7 +166,7 @@ var _ = framework.KubeDescribe("NodeProblemDetector [NodeFeature:NodeProblemDete
 			_, err = c.CoreV1().ConfigMaps(ns).Create(context.TODO(), &v1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{Name: configName},
 				Data:       map[string]string{path.Base(configFile): config},
-			})
+			}, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 			ginkgo.By("Create the node problem detector")
 			hostPathType := new(v1.HostPathType)

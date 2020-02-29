@@ -139,8 +139,9 @@ var _ = SIGDescribe("[Feature:IPv6DualStackAlphaFeature] [LinuxOnly]", func() {
 			replicas,
 			map[string]string{"test": "dual-stack-server"},
 			"dualstack-test-server",
-			imageutils.GetE2EImage(imageutils.TestWebserver),
+			imageutils.GetE2EImage(imageutils.Agnhost),
 			appsv1.RollingUpdateDeploymentStrategyType)
+		serverDeploymentSpec.Spec.Template.Spec.Containers[0].Args = []string{"test-webserver"}
 
 		// to ensure all the pods land on different nodes and we can thereby
 		// validate connectivity across all nodes.
@@ -190,10 +191,10 @@ var _ = SIGDescribe("[Feature:IPv6DualStackAlphaFeature] [LinuxOnly]", func() {
 			},
 		}
 
-		serverDeployment, err := cs.AppsV1().Deployments(f.Namespace.Name).Create(context.TODO(), serverDeploymentSpec)
+		serverDeployment, err := cs.AppsV1().Deployments(f.Namespace.Name).Create(context.TODO(), serverDeploymentSpec, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 
-		clientDeployment, err := cs.AppsV1().Deployments(f.Namespace.Name).Create(context.TODO(), clientDeploymentSpec)
+		clientDeployment, err := cs.AppsV1().Deployments(f.Namespace.Name).Create(context.TODO(), clientDeploymentSpec, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 
 		err = e2edeploy.WaitForDeploymentComplete(cs, serverDeployment)

@@ -39,7 +39,7 @@ func resizeRC(c clientset.Interface, ns, name string, replicas int32) error {
 		return err
 	}
 	*(rc.Spec.Replicas) = replicas
-	_, err = c.CoreV1().ReplicationControllers(rc.Namespace).Update(context.TODO(), rc)
+	_, err = c.CoreV1().ReplicationControllers(rc.Namespace).Update(context.TODO(), rc, metav1.UpdateOptions{})
 	return err
 }
 

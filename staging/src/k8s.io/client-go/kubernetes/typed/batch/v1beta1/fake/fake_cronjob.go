@@ -81,7 +81,7 @@ func (c *FakeCronJobs) Watch(ctx context.Context, opts v1.ListOptions) (watch.In
 }
 
 // Create takes the representation of a cronJob and creates it.  Returns the server's representation of the cronJob, and an error, if there is any.
-func (c *FakeCronJobs) Create(ctx context.Context, cronJob *v1beta1.CronJob) (result *v1beta1.CronJob, err error) {
+func (c *FakeCronJobs) Create(ctx context.Context, cronJob *v1beta1.CronJob, opts v1.CreateOptions) (result *v1beta1.CronJob, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(cronjobsResource, c.ns, cronJob), &v1beta1.CronJob{})
 
@@ -92,7 +92,7 @@ func (c *FakeCronJobs) Create(ctx context.Context, cronJob *v1beta1.CronJob) (re
 }
 
 // Update takes the representation of a cronJob and updates it. Returns the server's representation of the cronJob, and an error, if there is any.
-func (c *FakeCronJobs) Update(ctx context.Context, cronJob *v1beta1.CronJob) (result *v1beta1.CronJob, err error) {
+func (c *FakeCronJobs) Update(ctx context.Context, cronJob *v1beta1.CronJob, opts v1.UpdateOptions) (result *v1beta1.CronJob, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(cronjobsResource, c.ns, cronJob), &v1beta1.CronJob{})
 
@@ -104,7 +104,7 @@ func (c *FakeCronJobs) Update(ctx context.Context, cronJob *v1beta1.CronJob) (re
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeCronJobs) UpdateStatus(ctx context.Context, cronJob *v1beta1.CronJob) (*v1beta1.CronJob, error) {
+func (c *FakeCronJobs) UpdateStatus(ctx context.Context, cronJob *v1beta1.CronJob, opts v1.UpdateOptions) (*v1beta1.CronJob, error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateSubresourceAction(cronjobsResource, "status", c.ns, cronJob), &v1beta1.CronJob{})
 
@@ -131,7 +131,7 @@ func (c *FakeCronJobs) DeleteCollection(ctx context.Context, options *v1.DeleteO
 }
 
 // Patch applies the patch and returns the patched cronJob.
-func (c *FakeCronJobs) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.CronJob, err error) {
+func (c *FakeCronJobs) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.CronJob, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(cronjobsResource, c.ns, name, pt, data, subresources...), &v1beta1.CronJob{})
 

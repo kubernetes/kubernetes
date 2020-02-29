@@ -60,7 +60,7 @@ func DoTestStorageClasses(t *testing.T, client clientset.Interface, ns *v1.Names
 		Provisioner: provisionerPluginName,
 	}
 
-	if _, err := client.StorageV1().StorageClasses().Create(context.TODO(), &s); err != nil {
+	if _, err := client.StorageV1().StorageClasses().Create(context.TODO(), &s, metav1.CreateOptions{}); err != nil {
 		t.Errorf("unable to create test storage class: %v", err)
 	}
 	defer deleteStorageClassOrErrorf(t, client, s.Namespace, s.Name)
@@ -80,7 +80,7 @@ func DoTestStorageClasses(t *testing.T, client clientset.Interface, ns *v1.Names
 	}
 
 	pvc.ObjectMeta.Name = "uses-storageclass"
-	if _, err := client.CoreV1().PersistentVolumeClaims(ns.Name).Create(context.TODO(), pvc); err != nil {
+	if _, err := client.CoreV1().PersistentVolumeClaims(ns.Name).Create(context.TODO(), pvc, metav1.CreateOptions{}); err != nil {
 		t.Errorf("Failed to create pvc: %v", err)
 	}
 	defer deletePersistentVolumeClaimOrErrorf(t, client, ns.Name, pvc.Name)

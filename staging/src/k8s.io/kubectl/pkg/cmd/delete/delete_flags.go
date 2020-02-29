@@ -116,7 +116,7 @@ func (f *DeleteFlags) AddFlags(cmd *cobra.Command) {
 		cmd.Flags().BoolVarP(f.AllNamespaces, "all-namespaces", "A", *f.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
 	}
 	if f.Force != nil {
-		cmd.Flags().BoolVar(f.Force, "force", *f.Force, "Only used when grace-period=0. If true, immediately remove resources from API and bypass graceful deletion. Note that immediate deletion of some resources may result in inconsistency or data loss and requires confirmation.")
+		cmd.Flags().BoolVar(f.Force, "force", *f.Force, "If true, immediately remove resources from API and bypass graceful deletion. Note that immediate deletion of some resources may result in inconsistency or data loss and requires confirmation.")
 	}
 	if f.Cascade != nil {
 		cmd.Flags().BoolVar(f.Cascade, "cascade", *f.Cascade, "If true, cascade the deletion of the resources managed by this resource (e.g. Pods created by a ReplicationController).  Default true.")

@@ -25,8 +25,10 @@ import (
 
 	authenticationv1 "k8s.io/api/authentication/v1"
 	authenticationv1beta1 "k8s.io/api/authentication/v1beta1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/util/webhook"
@@ -41,7 +43,7 @@ const retryBackoff = 500 * time.Millisecond
 var _ authenticator.Token = (*WebhookTokenAuthenticator)(nil)
 
 type tokenReviewer interface {
-	CreateContext(ctx context.Context, review *authenticationv1.TokenReview) (*authenticationv1.TokenReview, error)
+	Create(ctx context.Context, review *authenticationv1.TokenReview, _ metav1.CreateOptions) (*authenticationv1.TokenReview, error)
 }
 
 type WebhookTokenAuthenticator struct {
@@ -62,8 +64,8 @@ func NewFromInterface(tokenReview authenticationv1client.TokenReviewInterface, i
 // file. It is recommend to wrap this authenticator with the token cache
 // authenticator implemented in
 // k8s.io/apiserver/pkg/authentication/token/cache.
-func New(kubeConfigFile string, version string, implicitAuds authenticator.Audiences) (*WebhookTokenAuthenticator, error) {
-	tokenReview, err := tokenReviewInterfaceFromKubeconfig(kubeConfigFile, version)
+func New(kubeConfigFile string, version string, implicitAuds authenticator.Audiences, customDial utilnet.DialFunc) (*WebhookTokenAuthenticator, error) {
+	tokenReview, err := tokenReviewInterfaceFromKubeconfig(kubeConfigFile, version, customDial)
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +103,7 @@ func (w *WebhookTokenAuthenticator) AuthenticateToken(ctx context.Context, token
 		auds   authenticator.Audiences
 	)
 	webhook.WithExponentialBackoff(ctx, w.initialBackoff, func() error {
-		result, err = w.tokenReview.CreateContext(ctx, r)
+		result, err = w.tokenReview.Create(ctx, r, metav1.CreateOptions{})
 		return err
 	}, webhook.DefaultShouldRetry)
 	if err != nil {
@@ -152,7 +154,7 @@ func (w *WebhookTokenAuthenticator) AuthenticateToken(ctx context.Context, token
 // tokenReviewInterfaceFromKubeconfig builds a client from the specified kubeconfig file,
 // and returns a TokenReviewInterface that uses that client. Note that the client submits TokenReview
 // requests to the exact path specified in the kubeconfig file, so arbitrary non-API servers can be targeted.
-func tokenReviewInterfaceFromKubeconfig(kubeConfigFile string, version string) (tokenReviewer, error) {
+func tokenReviewInterfaceFromKubeconfig(kubeConfigFile string, version string, customDial utilnet.DialFunc) (tokenReviewer, error) {
 	localScheme := runtime.NewScheme()
 	if err := scheme.AddToScheme(localScheme); err != nil {
 		return nil, err
@@ -164,7 +166,7 @@ func tokenReviewInterfaceFromKubeconfig(kubeConfigFile string, version string) (
 		if err := localScheme.SetVersionPriority(groupVersions...); err != nil {
 			return nil, err
 		}
-		gw, err := webhook.NewGenericWebhook(localScheme, scheme.Codecs, kubeConfigFile, groupVersions, 0)
+		gw, err := webhook.NewGenericWebhook(localScheme, scheme.Codecs, kubeConfigFile, groupVersions, 0, customDial)
 		if err != nil {
 			return nil, err
 		}
@@ -175,7 +177,7 @@ func tokenReviewInterfaceFromKubeconfig(kubeConfigFile string, version string) (
 		if err := localScheme.SetVersionPriority(groupVersions...); err != nil {
 			return nil, err
 		}
-		gw, err := webhook.NewGenericWebhook(localScheme, scheme.Codecs, kubeConfigFile, groupVersions, 0)
+		gw, err := webhook.NewGenericWebhook(localScheme, scheme.Codecs, kubeConfigFile, groupVersions, 0, customDial)
 		if err != nil {
 			return nil, err
 		}
@@ -196,7 +198,7 @@ type tokenReviewV1Client struct {
 	w *webhook.GenericWebhook
 }
 
-func (t *tokenReviewV1Client) CreateContext(ctx context.Context, review *authenticationv1.TokenReview) (*authenticationv1.TokenReview, error) {
+func (t *tokenReviewV1Client) Create(ctx context.Context, review *authenticationv1.TokenReview, _ metav1.CreateOptions) (*authenticationv1.TokenReview, error) {
 	result := &authenticationv1.TokenReview{}
 	err := t.w.RestClient.Post().Body(review).Do(ctx).Into(result)
 	return result, err
@@ -206,7 +208,7 @@ type tokenReviewV1beta1Client struct {
 	w *webhook.GenericWebhook
 }
 
-func (t *tokenReviewV1beta1Client) CreateContext(ctx context.Context, review *authenticationv1.TokenReview) (*authenticationv1.TokenReview, error) {
+func (t *tokenReviewV1beta1Client) Create(ctx context.Context, review *authenticationv1.TokenReview, _ metav1.CreateOptions) (*authenticationv1.TokenReview, error) {
 	v1beta1Review := &authenticationv1beta1.TokenReview{Spec: v1SpecToV1beta1Spec(&review.Spec)}
 	v1beta1Result := &authenticationv1beta1.TokenReview{}
 	err := t.w.RestClient.Post().Body(v1beta1Review).Do(ctx).Into(v1beta1Result)

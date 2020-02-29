@@ -311,7 +311,7 @@ func CreateTestCRDs(t *testing.T, client apiextensionsclientset.Interface, skipC
 }
 
 func createTestCRD(t *testing.T, client apiextensionsclientset.Interface, skipCrdExistsInDiscovery bool, crd *apiextensionsv1beta1.CustomResourceDefinition) {
-	if _, err := client.ApiextensionsV1beta1().CustomResourceDefinitions().Create(context.TODO(), crd); err != nil {
+	if _, err := client.ApiextensionsV1beta1().CustomResourceDefinitions().Create(context.TODO(), crd, metav1.CreateOptions{}); err != nil {
 		t.Fatalf("Failed to create %s CRD; %v", crd.Name, err)
 	}
 	if skipCrdExistsInDiscovery {

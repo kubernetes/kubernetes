@@ -37,7 +37,6 @@ import (
 type createAuthInfoOptions struct {
 	configAccess      clientcmd.ConfigAccess
 	name              string
-	authPath          cliflag.StringFlag
 	clientCertificate cliflag.StringFlag
 	clientKey         cliflag.StringFlag
 	token             cliflag.StringFlag
@@ -104,7 +103,7 @@ var (
 		kubectl config set-credentials cluster-admin --auth-provider=oidc --auth-provider-arg=client-secret-
 
 		# Enable new exec auth plugin for the "cluster-admin" entry
-		kubectl config set-credentials cluster-admin --exec-command=/path/to/the/executable --exec-api-version=client.authentication.k8s.io/v1beta
+		kubectl config set-credentials cluster-admin --exec-command=/path/to/the/executable --exec-api-version=client.authentication.k8s.io/v1beta1
 
 		# Define new exec auth plugin args for the "cluster-admin" entry
 		kubectl config set-credentials cluster-admin --exec-arg=arg1 --exec-arg=arg2

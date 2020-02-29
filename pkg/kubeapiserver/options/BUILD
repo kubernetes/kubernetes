@@ -26,6 +26,9 @@ go_library(
         "//plugin/pkg/admission/admit:go_default_library",
         "//plugin/pkg/admission/alwayspullimages:go_default_library",
         "//plugin/pkg/admission/antiaffinity:go_default_library",
+        "//plugin/pkg/admission/certificates/approval:go_default_library",
+        "//plugin/pkg/admission/certificates/signing:go_default_library",
+        "//plugin/pkg/admission/certificates/subjectrestriction:go_default_library",
         "//plugin/pkg/admission/defaulttolerationseconds:go_default_library",
         "//plugin/pkg/admission/deny:go_default_library",
         "//plugin/pkg/admission/eventratelimit:go_default_library",
@@ -89,6 +92,7 @@ go_test(
         "admission_test.go",
         "authentication_test.go",
         "authorization_test.go",
+        "plugins_test.go",
     ],
     data = [
         "testdata/client-expired.pem",

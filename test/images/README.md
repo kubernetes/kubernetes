@@ -6,7 +6,7 @@ All the images found here are used in Kubernetes tests that ensure its features 
 The images are built and published as manifest lists, allowing multiarch and cross platform support.
 
 This guide will provide information on how to: make changes to images, bump their version, build the
-new images, test the changes made.
+new images, test the changes made, promote the newly built staging images.
 
 
 ## Prerequisites
@@ -38,43 +38,54 @@ different [functionalities](agnhost/README.md), used to validate different Kuber
 a new functionality needs testing, consider adding an `agnhost` subcommand for it first, before
 creating an entirely separate test image.
 
-Some test images (`mounttest`, `test-webserver`) are used as bases for other images (`mounttest-user`,
-`kitten`, `nautilus`). If the parent image's `VERSION` has been bumped, also bump the version in the
-children's `BASEIMAGE` files in order for base image changes to be reflected in the child images as well.
+Some test images (`agnhost`) are used as bases for other images (`kitten`, `nautilus`). If the parent
+image's `VERSION` has been bumped, also bump the version in the children's `BASEIMAGE` files in order
+for base image changes to be reflected in the child images as well.
 
-TODO: Once [Centralization part 4](https://github.com/kubernetes/kubernetes/pull/81226) merges, the paragraph
-above will have to be updated, as those images will be included into `agnhost`.
+Keep in mind that the Kubernetes CI will not run with the image changes you've made. It is a good idea
+to build the image and push it to your own registry first, and run some tests that are using that image.
+For these steps, see the sections below.
 
 After the desired changes have been made, the affected images will have to be built and published,
 and then tested. After the pull request with those changes has been approved, the new images will be
 built and published to the `gcr.io/kubernetes-e2e-test-images` registry as well.
 
+Currently, the image building process has been automated with the Image Promoter, but *only* for the
+Conformance images (`agnhost`, `jessie-dnsutils`, `kitten`, `nautilus`, `nonewprivs`, `resource-consumer`,
+`sample-apiserver`).  After the pull request merges, a postsubmit job will be started with the new changes,
+which can be tracked [here](https://testgrid.k8s.io/sig-testing-images#post-kubernetes-push-images).
+After it passes successfully, the new image will reside in the `gcr.io/k8s-staging-e2e-test-images/${IMAGE_NAME}:${VERSION}`
+registry, from which it will have to be promoted by adding a line for it
+[here](https://github.com/kubernetes/k8s.io/blob/master/k8s.gcr.io/images/k8s-staging-e2e-test-images/images.yaml).
+For this, you will need the image manifest list's digest, which can be obtained by running:
+
+```bash
+manifest-tool inspect --raw gcr.io/k8s-staging-e2e-test-images/${IMAGE_NAME}:${VERSION} | jq '.[0].Digest'
+```
+
 
 ## Building images
 
-The images are built through `make`. Since some images (`mounttest`, `test-webserver`)
-are used as a base for other images, it is recommended to build them first, if needed.
-
-TODO: Once [Centralization part 4](https://github.com/kubernetes/kubernetes/pull/81226) merges, the paragraph
-above will have to be updated, as those images will be included into `agnhost`.
+The images are built through `make`. Since some images (`agnhost`) are used as a base for other images,
+it is recommended to build them first, if needed.
 
 An image can be built by simply running the command:
 
 ```bash
-make all WHAT=test-webserver
+make all WHAT=agnhost
 ```
 
 To build AND push an image, the following command can be used:
 
 ```bash
-make all-push WHAT=test-webserver
+make all-push WHAT=agnhost
 ```
 
 By default, the images will be tagged and pushed under the `gcr.io/kubernetes-e2e-test-images`
 registry. That can changed by running this command instead:
 
 ```bash
-REGISTRY=foo_registry make all-push WHAT=test-webserver
+REGISTRY=foo_registry make all-push WHAT=agnhost
 ```
 
 *NOTE* (for test `gcr.io` image publishers): Some tests (e.g.: `should serve a basic image on each replica with a private image`)

@@ -537,7 +537,7 @@ func TestSimpleDaemonSetScheduleDaemonSetPodsLaunchesPods(t *testing.T) {
 		}
 
 		if len(nodeMap) != 0 {
-			t.Fatalf("did not foud pods on nodes %+v", nodeMap)
+			t.Fatalf("did not find pods on nodes %+v", nodeMap)
 		}
 	}
 
@@ -587,7 +587,7 @@ func TestDaemonSetPodCreateExpectationsError(t *testing.T) {
 		}
 
 		if !manager.expectations.SatisfiedExpectations(dsKey) {
-			t.Errorf("Unsatisfied pod creation expectatitons. Expected %d", creationExpectations)
+			t.Errorf("Unsatisfied pod creation expectations. Expected %d", creationExpectations)
 		}
 	}
 }
@@ -1146,7 +1146,7 @@ func TestNodeAffinityDaemonLaunchesPods(t *testing.T) {
 
 		manager, podControl, _, err := newTestController(daemon)
 		if err != nil {
-			t.Fatalf("rrror creating DaemonSetsController: %v", err)
+			t.Fatalf("error creating DaemonSetsController: %v", err)
 		}
 		addNodes(manager.nodeStore, 0, 4, nil)
 		addNodes(manager.nodeStore, 4, 3, simpleNodeLabel)
@@ -1786,7 +1786,7 @@ func TestNodeShouldRunDaemonPod(t *testing.T) {
 			shouldContinueRunning: true,
 		},
 		{
-			predicateName: "ShouldRunDaemonPodOnUnscheduableNode",
+			predicateName: "ShouldRunDaemonPodOnUnschedulableNode",
 			ds: &apps.DaemonSet{
 				Spec: apps.DaemonSetSpec{
 					Selector: &metav1.LabelSelector{MatchLabels: simpleDaemonSetLabel},

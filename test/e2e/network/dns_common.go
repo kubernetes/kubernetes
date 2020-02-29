@@ -157,11 +157,11 @@ func (t *dnsTestCommon) setConfigMap(cm *v1.ConfigMap) {
 
 	if len(cmList.Items) == 0 {
 		ginkgo.By(fmt.Sprintf("Creating the ConfigMap (%s:%s) %+v", t.ns, t.name, *cm))
-		_, err := t.c.CoreV1().ConfigMaps(t.ns).Create(context.TODO(), cm)
+		_, err := t.c.CoreV1().ConfigMaps(t.ns).Create(context.TODO(), cm, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create ConfigMap (%s:%s) %+v", t.ns, t.name, *cm)
 	} else {
 		ginkgo.By(fmt.Sprintf("Updating the ConfigMap (%s:%s) to %+v", t.ns, t.name, *cm))
-		_, err := t.c.CoreV1().ConfigMaps(t.ns).Update(context.TODO(), cm)
+		_, err := t.c.CoreV1().ConfigMaps(t.ns).Update(context.TODO(), cm, metav1.UpdateOptions{})
 		framework.ExpectNoError(err, "failed to update ConfigMap (%s:%s) to %+v", t.ns, t.name, *cm)
 	}
 }
@@ -219,7 +219,7 @@ func (t *dnsTestCommon) createUtilPodLabel(baseName string) {
 	}
 
 	var err error
-	t.utilPod, err = t.c.CoreV1().Pods(t.f.Namespace.Name).Create(context.TODO(), t.utilPod)
+	t.utilPod, err = t.c.CoreV1().Pods(t.f.Namespace.Name).Create(context.TODO(), t.utilPod, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "failed to create pod: %v", t.utilPod)
 	framework.Logf("Created pod %v", t.utilPod)
 	err = t.f.WaitForPodRunning(t.utilPod.Name)
@@ -245,7 +245,7 @@ func (t *dnsTestCommon) createUtilPodLabel(baseName string) {
 		},
 	}
 
-	t.utilService, err = t.c.CoreV1().Services(t.f.Namespace.Name).Create(context.TODO(), t.utilService)
+	t.utilService, err = t.c.CoreV1().Services(t.f.Namespace.Name).Create(context.TODO(), t.utilService, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "failed to create service: %s/%s", t.f.Namespace.Name, t.utilService.ObjectMeta.Name)
 	framework.Logf("Created service %v", t.utilService)
 }
@@ -312,7 +312,7 @@ func (t *dnsTestCommon) createDNSPodFromObj(pod *v1.Pod) {
 	t.dnsServerPod = pod
 
 	var err error
-	t.dnsServerPod, err = t.c.CoreV1().Pods(t.f.Namespace.Name).Create(context.TODO(), t.dnsServerPod)
+	t.dnsServerPod, err = t.c.CoreV1().Pods(t.f.Namespace.Name).Create(context.TODO(), t.dnsServerPod, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "failed to create pod: %v", t.dnsServerPod)
 	framework.Logf("Created pod %v", t.dnsServerPod)
 	err = t.f.WaitForPodRunning(t.dnsServerPod.Name)
@@ -396,7 +396,8 @@ func createDNSPod(namespace, wheezyProbeCmd, jessieProbeCmd, podHostName, servic
 				// TODO: Consider scraping logs instead of running a webserver.
 				{
 					Name:  "webserver",
-					Image: imageutils.GetE2EImage(imageutils.TestWebserver),
+					Image: imageutils.GetE2EImage(imageutils.Agnhost),
+					Args:  []string{"test-webserver"},
 					Ports: []v1.ContainerPort{
 						{
 							Name:          "http",
@@ -563,7 +564,7 @@ func validateDNSResults(f *framework.Framework, pod *v1.Pod, fileNames []string)
 		defer ginkgo.GinkgoRecover()
 		podClient.Delete(context.TODO(), pod.Name, metav1.NewDeleteOptions(0))
 	}()
-	if _, err := podClient.Create(context.TODO(), pod); err != nil {
+	if _, err := podClient.Create(context.TODO(), pod, metav1.CreateOptions{}); err != nil {
 		framework.Failf("ginkgo.Failed to create pod %s/%s: %v", pod.Namespace, pod.Name, err)
 	}
 
@@ -591,7 +592,7 @@ func validateTargetedProbeOutput(f *framework.Framework, pod *v1.Pod, fileNames 
 		defer ginkgo.GinkgoRecover()
 		podClient.Delete(context.TODO(), pod.Name, metav1.NewDeleteOptions(0))
 	}()
-	if _, err := podClient.Create(context.TODO(), pod); err != nil {
+	if _, err := podClient.Create(context.TODO(), pod, metav1.CreateOptions{}); err != nil {
 		framework.Failf("ginkgo.Failed to create pod %s/%s: %v", pod.Namespace, pod.Name, err)
 	}
 

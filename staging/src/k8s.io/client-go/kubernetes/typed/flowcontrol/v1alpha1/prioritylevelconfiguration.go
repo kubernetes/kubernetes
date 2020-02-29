@@ -38,15 +38,15 @@ type PriorityLevelConfigurationsGetter interface {
 
 // PriorityLevelConfigurationInterface has methods to work with PriorityLevelConfiguration resources.
 type PriorityLevelConfigurationInterface interface {
-	Create(context.Context, *v1alpha1.PriorityLevelConfiguration) (*v1alpha1.PriorityLevelConfiguration, error)
-	Update(context.Context, *v1alpha1.PriorityLevelConfiguration) (*v1alpha1.PriorityLevelConfiguration, error)
-	UpdateStatus(context.Context, *v1alpha1.PriorityLevelConfiguration) (*v1alpha1.PriorityLevelConfiguration, error)
-	Delete(ctx context.Context, name string, options *v1.DeleteOptions) error
-	DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(ctx context.Context, name string, options v1.GetOptions) (*v1alpha1.PriorityLevelConfiguration, error)
+	Create(ctx context.Context, priorityLevelConfiguration *v1alpha1.PriorityLevelConfiguration, opts v1.CreateOptions) (*v1alpha1.PriorityLevelConfiguration, error)
+	Update(ctx context.Context, priorityLevelConfiguration *v1alpha1.PriorityLevelConfiguration, opts v1.UpdateOptions) (*v1alpha1.PriorityLevelConfiguration, error)
+	UpdateStatus(ctx context.Context, priorityLevelConfiguration *v1alpha1.PriorityLevelConfiguration, opts v1.UpdateOptions) (*v1alpha1.PriorityLevelConfiguration, error)
+	Delete(ctx context.Context, name string, opts *v1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts *v1.DeleteOptions, listOpts v1.ListOptions) error
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1alpha1.PriorityLevelConfiguration, error)
 	List(ctx context.Context, opts v1.ListOptions) (*v1alpha1.PriorityLevelConfigurationList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.PriorityLevelConfiguration, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.PriorityLevelConfiguration, err error)
 	PriorityLevelConfigurationExpansion
 }
 
@@ -105,10 +105,11 @@ func (c *priorityLevelConfigurations) Watch(ctx context.Context, opts v1.ListOpt
 }
 
 // Create takes the representation of a priorityLevelConfiguration and creates it.  Returns the server's representation of the priorityLevelConfiguration, and an error, if there is any.
-func (c *priorityLevelConfigurations) Create(ctx context.Context, priorityLevelConfiguration *v1alpha1.PriorityLevelConfiguration) (result *v1alpha1.PriorityLevelConfiguration, err error) {
+func (c *priorityLevelConfigurations) Create(ctx context.Context, priorityLevelConfiguration *v1alpha1.PriorityLevelConfiguration, opts v1.CreateOptions) (result *v1alpha1.PriorityLevelConfiguration, err error) {
 	result = &v1alpha1.PriorityLevelConfiguration{}
 	err = c.client.Post().
 		Resource("prioritylevelconfigurations").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(priorityLevelConfiguration).
 		Do(ctx).
 		Into(result)
@@ -116,11 +117,12 @@ func (c *priorityLevelConfigurations) Create(ctx context.Context, priorityLevelC
 }
 
 // Update takes the representation of a priorityLevelConfiguration and updates it. Returns the server's representation of the priorityLevelConfiguration, and an error, if there is any.
-func (c *priorityLevelConfigurations) Update(ctx context.Context, priorityLevelConfiguration *v1alpha1.PriorityLevelConfiguration) (result *v1alpha1.PriorityLevelConfiguration, err error) {
+func (c *priorityLevelConfigurations) Update(ctx context.Context, priorityLevelConfiguration *v1alpha1.PriorityLevelConfiguration, opts v1.UpdateOptions) (result *v1alpha1.PriorityLevelConfiguration, err error) {
 	result = &v1alpha1.PriorityLevelConfiguration{}
 	err = c.client.Put().
 		Resource("prioritylevelconfigurations").
 		Name(priorityLevelConfiguration.Name).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(priorityLevelConfiguration).
 		Do(ctx).
 		Into(result)
@@ -129,13 +131,13 @@ func (c *priorityLevelConfigurations) Update(ctx context.Context, priorityLevelC
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-
-func (c *priorityLevelConfigurations) UpdateStatus(ctx context.Context, priorityLevelConfiguration *v1alpha1.PriorityLevelConfiguration) (result *v1alpha1.PriorityLevelConfiguration, err error) {
+func (c *priorityLevelConfigurations) UpdateStatus(ctx context.Context, priorityLevelConfiguration *v1alpha1.PriorityLevelConfiguration, opts v1.UpdateOptions) (result *v1alpha1.PriorityLevelConfiguration, err error) {
 	result = &v1alpha1.PriorityLevelConfiguration{}
 	err = c.client.Put().
 		Resource("prioritylevelconfigurations").
 		Name(priorityLevelConfiguration.Name).
 		SubResource("status").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(priorityLevelConfiguration).
 		Do(ctx).
 		Into(result)
@@ -168,12 +170,13 @@ func (c *priorityLevelConfigurations) DeleteCollection(ctx context.Context, opti
 }
 
 // Patch applies the patch and returns the patched priorityLevelConfiguration.
-func (c *priorityLevelConfigurations) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.PriorityLevelConfiguration, err error) {
+func (c *priorityLevelConfigurations) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.PriorityLevelConfiguration, err error) {
 	result = &v1alpha1.PriorityLevelConfiguration{}
 	err = c.client.Patch(pt).
 		Resource("prioritylevelconfigurations").
-		SubResource(subresources...).
 		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

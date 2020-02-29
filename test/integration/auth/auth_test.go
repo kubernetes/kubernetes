@@ -37,6 +37,7 @@ import (
 
 	authenticationv1beta1 "k8s.io/api/authentication/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/group"
 	"k8s.io/apiserver/pkg/authentication/request/bearertoken"
@@ -69,7 +70,7 @@ func getTestTokenAuth() authenticator.Request {
 	return group.NewGroupAdder(bearertoken.New(tokenAuthenticator), []string{user.AllAuthenticated})
 }
 
-func getTestWebhookTokenAuth(serverURL string) (authenticator.Request, error) {
+func getTestWebhookTokenAuth(serverURL string, customDial utilnet.DialFunc) (authenticator.Request, error) {
 	kubecfgFile, err := ioutil.TempFile("", "webhook-kubecfg")
 	if err != nil {
 		return nil, err
@@ -85,11 +86,17 @@ func getTestWebhookTokenAuth(serverURL string) (authenticator.Request, error) {
 	if err := json.NewEncoder(kubecfgFile).Encode(config); err != nil {
 		return nil, err
 	}
-	webhookTokenAuth, err := webhook.New(kubecfgFile.Name(), "v1beta1", nil)
+	webhookTokenAuth, err := webhook.New(kubecfgFile.Name(), "v1beta1", nil, customDial)
 	if err != nil {
 		return nil, err
 	}
 	return bearertoken.New(cache.New(webhookTokenAuth, false, 2*time.Minute, 2*time.Minute)), nil
+}
+
+func getTestWebhookTokenAuthCustomDialer(serverURL string) (authenticator.Request, error) {
+	customDial := http.DefaultTransport.(*http.Transport).DialContext
+
+	return getTestWebhookTokenAuth(serverURL, customDial)
 }
 
 func path(resource, namespace, name string) string {
@@ -1192,9 +1199,27 @@ func TestReadOnlyAuthorization(t *testing.T) {
 // authenticator to call out to a remote web server for authentication
 // decisions.
 func TestWebhookTokenAuthenticator(t *testing.T) {
+	testWebhookTokenAuthenticator(false, t)
+}
+
+// TestWebhookTokenAuthenticatorCustomDial is the same as TestWebhookTokenAuthenticator, but uses a
+// custom dialer
+func TestWebhookTokenAuthenticatorCustomDial(t *testing.T) {
+	testWebhookTokenAuthenticator(true, t)
+}
+
+func testWebhookTokenAuthenticator(customDialer bool, t *testing.T) {
 	authServer := newTestWebhookTokenAuthServer()
 	defer authServer.Close()
-	authenticator, err := getTestWebhookTokenAuth(authServer.URL)
+	var authenticator authenticator.Request
+	var err error
+
+	if customDialer == false {
+		authenticator, err = getTestWebhookTokenAuth(authServer.URL, nil)
+	} else {
+		authenticator, err = getTestWebhookTokenAuthCustomDialer(authServer.URL)
+	}
+
 	if err != nil {
 		t.Fatalf("error starting webhook token authenticator server: %v", err)
 	}

@@ -52,7 +52,7 @@ func NewAPIRenewer(client clientset.Interface) *APIRenewer {
 }
 
 // Renew a certificate using the K8s certificate API
-func (r *APIRenewer) Renew(cfg *certutil.Config) (*x509.Certificate, crypto.Signer, error) {
+func (r *APIRenewer) Renew(cfg *pkiutil.CertConfig) (*x509.Certificate, crypto.Signer, error) {
 	reqTmp := &x509.CertificateRequest{
 		Subject: pkix.Name{
 			CommonName:   cfg.CommonName,
@@ -62,7 +62,7 @@ func (r *APIRenewer) Renew(cfg *certutil.Config) (*x509.Certificate, crypto.Sign
 		IPAddresses: cfg.AltNames.IPs,
 	}
 
-	key, err := pkiutil.NewPrivateKey()
+	key, err := pkiutil.NewPrivateKey(cfg.PublicKeyAlgorithm)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't create new private key")
 	}
@@ -91,7 +91,7 @@ func (r *APIRenewer) Renew(cfg *certutil.Config) (*x509.Certificate, crypto.Sign
 		},
 	}
 
-	req, err := r.client.CertificateSigningRequests().Create(context.TODO(), k8sCSR)
+	req, err := r.client.CertificateSigningRequests().Create(context.TODO(), k8sCSR, metav1.CreateOptions{})
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't create certificate signing request")
 	}

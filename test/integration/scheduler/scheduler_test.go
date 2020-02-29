@@ -25,21 +25,21 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/events"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/scheduler"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/profile"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -105,6 +105,7 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 				"PreFilterPlugin": {
 					{Name: "NodeResourcesFit"},
 					{Name: "NodePorts"},
+					{Name: "PodTopologySpread"},
 					{Name: "InterPodAffinity"},
 				},
 				"FilterPlugin": {
@@ -121,15 +122,18 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 					{Name: "AzureDiskLimits"},
 					{Name: "VolumeBinding"},
 					{Name: "VolumeZone"},
+					{Name: "PodTopologySpread"},
 					{Name: "InterPodAffinity"},
 				},
-				"PostFilterPlugin": {
+				"PreScorePlugin": {
+					{Name: "PodTopologySpread"},
 					{Name: "InterPodAffinity"},
 					{Name: "DefaultPodTopologySpread"},
 					{Name: "TaintToleration"},
 				},
 				"ScorePlugin": {
 					{Name: "NodeResourcesBalancedAllocation", Weight: 1},
+					{Name: "PodTopologySpread", Weight: 1},
 					{Name: "ImageLocality", Weight: 1},
 					{Name: "InterPodAffinity", Weight: 1},
 					{Name: "NodeResourcesLeastAllocated", Weight: 1},
@@ -191,6 +195,7 @@ kind: Policy
 				"PreFilterPlugin": {
 					{Name: "NodeResourcesFit"},
 					{Name: "NodePorts"},
+					{Name: "PodTopologySpread"},
 					{Name: "InterPodAffinity"},
 				},
 				"FilterPlugin": {
@@ -207,15 +212,18 @@ kind: Policy
 					{Name: "AzureDiskLimits"},
 					{Name: "VolumeBinding"},
 					{Name: "VolumeZone"},
+					{Name: "PodTopologySpread"},
 					{Name: "InterPodAffinity"},
 				},
-				"PostFilterPlugin": {
+				"PreScorePlugin": {
+					{Name: "PodTopologySpread"},
 					{Name: "InterPodAffinity"},
 					{Name: "DefaultPodTopologySpread"},
 					{Name: "TaintToleration"},
 				},
 				"ScorePlugin": {
 					{Name: "NodeResourcesBalancedAllocation", Weight: 1},
+					{Name: "PodTopologySpread", Weight: 1},
 					{Name: "ImageLocality", Weight: 1},
 					{Name: "InterPodAffinity", Weight: 1},
 					{Name: "NodeResourcesLeastAllocated", Weight: 1},
@@ -251,7 +259,7 @@ priorities: []
 		}
 
 		policyConfigMap.APIVersion = "v1"
-		clientSet.CoreV1().ConfigMaps(metav1.NamespaceSystem).Create(context.TODO(), &policyConfigMap)
+		clientSet.CoreV1().ConfigMaps(metav1.NamespaceSystem).Create(context.TODO(), &policyConfigMap, metav1.CreateOptions{})
 
 		eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: clientSet.EventsV1beta1().Events("")})
 		stopCh := make(chan struct{})
@@ -262,9 +270,8 @@ priorities: []
 		sched, err := scheduler.New(clientSet,
 			informerFactory,
 			scheduler.NewPodInformer(clientSet, 0),
-			eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.DefaultSchedulerName),
+			profile.NewRecorderFactory(eventBroadcaster),
 			nil,
-			scheduler.WithName(v1.DefaultSchedulerName),
 			scheduler.WithAlgorithmSource(kubeschedulerconfig.SchedulerAlgorithmSource{
 				Policy: &kubeschedulerconfig.SchedulerPolicySource{
 					ConfigMap: &kubeschedulerconfig.SchedulerPolicyConfigMapSource{
@@ -273,14 +280,13 @@ priorities: []
 					},
 				},
 			}),
-			scheduler.WithHardPodAffinitySymmetricWeight(v1.DefaultHardPodAffinitySymmetricWeight),
 			scheduler.WithBindTimeoutSeconds(defaultBindTimeout),
 		)
 		if err != nil {
 			t.Fatalf("couldn't make scheduler config for test %d: %v", i, err)
 		}
 
-		schedPlugins := sched.Framework.ListPlugins()
+		schedPlugins := sched.Profiles[v1.DefaultSchedulerName].ListPlugins()
 		if diff := cmp.Diff(test.expectedPlugins, schedPlugins); diff != "" {
 			t.Errorf("unexpected plugins diff (-want, +got): %s", diff)
 		}
@@ -310,9 +316,8 @@ func TestSchedulerCreationFromNonExistentConfigMap(t *testing.T) {
 	_, err := scheduler.New(clientSet,
 		informerFactory,
 		scheduler.NewPodInformer(clientSet, 0),
-		eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.DefaultSchedulerName),
+		profile.NewRecorderFactory(eventBroadcaster),
 		nil,
-		scheduler.WithName(v1.DefaultSchedulerName),
 		scheduler.WithAlgorithmSource(kubeschedulerconfig.SchedulerAlgorithmSource{
 			Policy: &kubeschedulerconfig.SchedulerPolicySource{
 				ConfigMap: &kubeschedulerconfig.SchedulerPolicyConfigMapSource{
@@ -321,7 +326,6 @@ func TestSchedulerCreationFromNonExistentConfigMap(t *testing.T) {
 				},
 			},
 		}),
-		scheduler.WithHardPodAffinitySymmetricWeight(v1.DefaultHardPodAffinitySymmetricWeight),
 		scheduler.WithBindTimeoutSeconds(defaultBindTimeout))
 
 	if err == nil {
@@ -375,7 +379,7 @@ func TestUnschedulableNodes(t *testing.T) {
 		{
 			makeUnSchedulable: func(t *testing.T, n *v1.Node, nodeLister corelisters.NodeLister, c clientset.Interface) {
 				n.Spec.Unschedulable = true
-				if _, err := c.CoreV1().Nodes().Update(context.TODO(), n); err != nil {
+				if _, err := c.CoreV1().Nodes().Update(context.TODO(), n, metav1.UpdateOptions{}); err != nil {
 					t.Fatalf("Failed to update node with unschedulable=true: %v", err)
 				}
 				err = waitForReflection(t, nodeLister, nodeKey, func(node interface{}) bool {
@@ -391,7 +395,7 @@ func TestUnschedulableNodes(t *testing.T) {
 			},
 			makeSchedulable: func(t *testing.T, n *v1.Node, nodeLister corelisters.NodeLister, c clientset.Interface) {
 				n.Spec.Unschedulable = false
-				if _, err := c.CoreV1().Nodes().Update(context.TODO(), n); err != nil {
+				if _, err := c.CoreV1().Nodes().Update(context.TODO(), n, metav1.UpdateOptions{}); err != nil {
 					t.Fatalf("Failed to update node with unschedulable=false: %v", err)
 				}
 				err = waitForReflection(t, nodeLister, nodeKey, func(node interface{}) bool {
@@ -405,7 +409,7 @@ func TestUnschedulableNodes(t *testing.T) {
 	}
 
 	for i, mod := range nodeModifications {
-		unSchedNode, err := testCtx.clientSet.CoreV1().Nodes().Create(context.TODO(), node)
+		unSchedNode, err := testCtx.clientSet.CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{})
 		if err != nil {
 			t.Fatalf("Failed to create node: %v", err)
 		}
@@ -455,7 +459,7 @@ func TestUnschedulableNodes(t *testing.T) {
 	}
 }
 
-func TestMultiScheduler(t *testing.T) {
+func TestMultipleSchedulers(t *testing.T) {
 	// This integration tests the multi-scheduler feature in the following way:
 	// 1. create a default scheduler
 	// 2. create a node
@@ -488,7 +492,7 @@ func TestMultiScheduler(t *testing.T) {
 			},
 		},
 	}
-	testCtx.clientSet.CoreV1().Nodes().Create(context.TODO(), node)
+	testCtx.clientSet.CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{})
 
 	// 3. create 3 pods for testing
 	t.Logf("create 3 pods for testing")
@@ -532,7 +536,8 @@ func TestMultiScheduler(t *testing.T) {
 	}
 
 	// 5. create and start a scheduler with name "foo-scheduler"
-	testCtx = initTestSchedulerWithOptions(t, testCtx, true, nil, time.Second, scheduler.WithName(fooScheduler))
+	fooProf := kubeschedulerconfig.KubeSchedulerProfile{SchedulerName: fooScheduler}
+	testCtx = initTestSchedulerWithOptions(t, testCtx, true, nil, time.Second, scheduler.WithProfiles(fooProf))
 
 	//	6. **check point-2**:
 	//		- testPodWithAnnotationFitsFoo should be scheduled
@@ -590,6 +595,76 @@ func TestMultiScheduler(t *testing.T) {
 	*/
 }
 
+func TestMultipleSchedulingProfiles(t *testing.T) {
+	testCtx := initTest(t, "multi-scheduler", scheduler.WithProfiles(
+		kubeschedulerconfig.KubeSchedulerProfile{
+			SchedulerName: "default-scheduler",
+		},
+		kubeschedulerconfig.KubeSchedulerProfile{
+			SchedulerName: "custom-scheduler",
+		},
+	))
+	defer cleanupTest(t, testCtx)
+
+	node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: "node-multi-scheduler-test-node"},
+		Spec:       v1.NodeSpec{Unschedulable: false},
+		Status: v1.NodeStatus{
+			Capacity: v1.ResourceList{
+				v1.ResourcePods: *resource.NewQuantity(32, resource.DecimalSI),
+			},
+		},
+	}
+	if _, err := testCtx.clientSet.CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{}); err != nil {
+		t.Fatal(err)
+	}
+
+	evs, err := testCtx.clientSet.CoreV1().Events(testCtx.ns.Name).Watch(testCtx.ctx, metav1.ListOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer evs.Stop()
+
+	for _, pc := range []*pausePodConfig{
+		{Name: "foo", Namespace: testCtx.ns.Name},
+		{Name: "bar", Namespace: testCtx.ns.Name, SchedulerName: "unknown-scheduler"},
+		{Name: "baz", Namespace: testCtx.ns.Name, SchedulerName: "default-scheduler"},
+		{Name: "zet", Namespace: testCtx.ns.Name, SchedulerName: "custom-scheduler"},
+	} {
+		if _, err := createPausePod(testCtx.clientSet, initPausePod(testCtx.clientSet, pc)); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	wantProfiles := map[string]string{
+		"foo": "default-scheduler",
+		"baz": "default-scheduler",
+		"zet": "custom-scheduler",
+	}
+
+	gotProfiles := make(map[string]string)
+	if err := wait.Poll(100*time.Millisecond, 30*time.Second, func() (bool, error) {
+		var ev watch.Event
+		select {
+		case ev = <-evs.ResultChan():
+		case <-time.After(30 * time.Second):
+			return false, nil
+		}
+		e, ok := ev.Object.(*v1.Event)
+		if !ok || e.Reason != "Scheduled" {
+			return false, nil
+		}
+		gotProfiles[e.InvolvedObject.Name] = e.ReportingController
+		return len(gotProfiles) >= len(wantProfiles), nil
+	}); err != nil {
+		t.Errorf("waiting for scheduling events: %v", err)
+	}
+
+	if diff := cmp.Diff(wantProfiles, gotProfiles); diff != "" {
+		t.Errorf("pods scheduled by the wrong profile (-want, +got):\n%s", diff)
+	}
+}
+
 // This test will verify scheduler can work well regardless of whether kubelet is allocatable aware or not.
 func TestAllocatable(t *testing.T) {
 	testCtx := initTest(t, "allocatable")
@@ -639,7 +714,7 @@ func TestAllocatable(t *testing.T) {
 		},
 	}
 
-	if _, err := testCtx.clientSet.CoreV1().Nodes().UpdateStatus(context.TODO(), allocNode); err != nil {
+	if _, err := testCtx.clientSet.CoreV1().Nodes().UpdateStatus(context.TODO(), allocNode, metav1.UpdateOptions{}); err != nil {
 		t.Fatalf("Failed to update node with Status.Allocatable: %v", err)
 	}
 

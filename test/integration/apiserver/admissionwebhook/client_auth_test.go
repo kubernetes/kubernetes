@@ -153,14 +153,14 @@ plugins:
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	_, err = client.CoreV1().Pods("default").Create(context.TODO(), clientAuthMarkerFixture)
+	_, err = client.CoreV1().Pods("default").Create(context.TODO(), clientAuthMarkerFixture, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	upCh := recorder.Reset()
 	ns := "load-balance"
-	_, err = client.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ns}})
+	_, err = client.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ns}}, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -181,7 +181,7 @@ plugins:
 			FailurePolicy:           &fail,
 			AdmissionReviewVersions: []string{"v1beta1"},
 		}},
-	})
+	}, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -194,7 +194,7 @@ plugins:
 
 	// wait until new webhook is called
 	if err := wait.PollImmediate(time.Millisecond*5, wait.ForeverTestTimeout, func() (bool, error) {
-		_, err = client.CoreV1().Pods("default").Patch(context.TODO(), clientAuthMarkerFixture.Name, types.JSONPatchType, []byte("[]"))
+		_, err = client.CoreV1().Pods("default").Patch(context.TODO(), clientAuthMarkerFixture.Name, types.JSONPatchType, []byte("[]"), metav1.PatchOptions{})
 		if t.Failed() {
 			return true, nil
 		}

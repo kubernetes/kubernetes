@@ -175,7 +175,7 @@ func (o TopPodOptions) RunTopPod() error {
 
 	metricsAPIAvailable := SupportedMetricsAPIVersionAvailable(apiGroups)
 
-	metrics := &metricsapi.PodMetricsList{}
+	var metrics *metricsapi.PodMetricsList
 	if metricsAPIAvailable {
 		metrics, err = getMetricsFromMetricsAPI(o.MetricsClient, o.Namespace, o.ResourceName, o.AllNamespaces, selector)
 		if err != nil {
@@ -196,6 +196,13 @@ func (o TopPodOptions) RunTopPod() error {
 		e := verifyEmptyMetrics(o, selector)
 		if e != nil {
 			return e
+		}
+
+		// if we had no errors, be sure we output something.
+		if o.AllNamespaces {
+			fmt.Fprintln(o.ErrOut, "No resources found")
+		} else {
+			fmt.Fprintf(o.ErrOut, "No resources found in %s namespace.\n", o.Namespace)
 		}
 	}
 	if err != nil {

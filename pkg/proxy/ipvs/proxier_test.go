@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	netlinktest "k8s.io/kubernetes/pkg/proxy/ipvs/testing"
 	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
+	proxyutiliptables "k8s.io/kubernetes/pkg/proxy/util/iptables"
 	proxyutiltest "k8s.io/kubernetes/pkg/proxy/util/testing"
 	"k8s.io/kubernetes/pkg/util/async"
 	utilipset "k8s.io/kubernetes/pkg/util/ipset"
@@ -67,7 +68,7 @@ type fakePortOpener struct {
 
 // OpenLocalPort fakes out the listen() and bind() used by syncProxyRules
 // to lock a local port.
-func (f *fakePortOpener) OpenLocalPort(lp *utilproxy.LocalPort) (utilproxy.Closeable, error) {
+func (f *fakePortOpener) OpenLocalPort(lp *utilproxy.LocalPort, isIPv6 bool) (utilproxy.Closeable, error) {
 	f.openPorts = append(f.openPorts, lp)
 	return nil, nil
 }
@@ -125,8 +126,8 @@ func NewFakeProxier(ipt utiliptables.Interface, ipvs utilipvs.Interface, ipset u
 		iptables:              ipt,
 		ipvs:                  ipvs,
 		ipset:                 ipset,
-		clusterCIDR:           "10.0.0.0/24",
 		strictARP:             false,
+		localDetector:         proxyutiliptables.NewNoOpLocalDetector(),
 		hostname:              testHostname,
 		portsMap:              make(map[utilproxy.LocalPort]utilproxy.Closeable),
 		portMapper:            &fakePortOpener{[]*utilproxy.LocalPort{}},

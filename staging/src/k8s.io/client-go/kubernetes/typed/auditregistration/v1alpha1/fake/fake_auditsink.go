@@ -77,7 +77,7 @@ func (c *FakeAuditSinks) Watch(ctx context.Context, opts v1.ListOptions) (watch.
 }
 
 // Create takes the representation of a auditSink and creates it.  Returns the server's representation of the auditSink, and an error, if there is any.
-func (c *FakeAuditSinks) Create(ctx context.Context, auditSink *v1alpha1.AuditSink) (result *v1alpha1.AuditSink, err error) {
+func (c *FakeAuditSinks) Create(ctx context.Context, auditSink *v1alpha1.AuditSink, opts v1.CreateOptions) (result *v1alpha1.AuditSink, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootCreateAction(auditsinksResource, auditSink), &v1alpha1.AuditSink{})
 	if obj == nil {
@@ -87,7 +87,7 @@ func (c *FakeAuditSinks) Create(ctx context.Context, auditSink *v1alpha1.AuditSi
 }
 
 // Update takes the representation of a auditSink and updates it. Returns the server's representation of the auditSink, and an error, if there is any.
-func (c *FakeAuditSinks) Update(ctx context.Context, auditSink *v1alpha1.AuditSink) (result *v1alpha1.AuditSink, err error) {
+func (c *FakeAuditSinks) Update(ctx context.Context, auditSink *v1alpha1.AuditSink, opts v1.UpdateOptions) (result *v1alpha1.AuditSink, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootUpdateAction(auditsinksResource, auditSink), &v1alpha1.AuditSink{})
 	if obj == nil {
@@ -112,7 +112,7 @@ func (c *FakeAuditSinks) DeleteCollection(ctx context.Context, options *v1.Delet
 }
 
 // Patch applies the patch and returns the patched auditSink.
-func (c *FakeAuditSinks) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.AuditSink, err error) {
+func (c *FakeAuditSinks) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.AuditSink, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootPatchSubresourceAction(auditsinksResource, name, pt, data, subresources...), &v1alpha1.AuditSink{})
 	if obj == nil {

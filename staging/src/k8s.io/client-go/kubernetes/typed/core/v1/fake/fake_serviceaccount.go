@@ -82,7 +82,7 @@ func (c *FakeServiceAccounts) Watch(ctx context.Context, opts v1.ListOptions) (w
 }
 
 // Create takes the representation of a serviceAccount and creates it.  Returns the server's representation of the serviceAccount, and an error, if there is any.
-func (c *FakeServiceAccounts) Create(ctx context.Context, serviceAccount *corev1.ServiceAccount) (result *corev1.ServiceAccount, err error) {
+func (c *FakeServiceAccounts) Create(ctx context.Context, serviceAccount *corev1.ServiceAccount, opts v1.CreateOptions) (result *corev1.ServiceAccount, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(serviceaccountsResource, c.ns, serviceAccount), &corev1.ServiceAccount{})
 
@@ -93,7 +93,7 @@ func (c *FakeServiceAccounts) Create(ctx context.Context, serviceAccount *corev1
 }
 
 // Update takes the representation of a serviceAccount and updates it. Returns the server's representation of the serviceAccount, and an error, if there is any.
-func (c *FakeServiceAccounts) Update(ctx context.Context, serviceAccount *corev1.ServiceAccount) (result *corev1.ServiceAccount, err error) {
+func (c *FakeServiceAccounts) Update(ctx context.Context, serviceAccount *corev1.ServiceAccount, opts v1.UpdateOptions) (result *corev1.ServiceAccount, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(serviceaccountsResource, c.ns, serviceAccount), &corev1.ServiceAccount{})
 
@@ -120,7 +120,7 @@ func (c *FakeServiceAccounts) DeleteCollection(ctx context.Context, options *v1.
 }
 
 // Patch applies the patch and returns the patched serviceAccount.
-func (c *FakeServiceAccounts) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *corev1.ServiceAccount, err error) {
+func (c *FakeServiceAccounts) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *corev1.ServiceAccount, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(serviceaccountsResource, c.ns, name, pt, data, subresources...), &corev1.ServiceAccount{})
 
@@ -131,7 +131,7 @@ func (c *FakeServiceAccounts) Patch(ctx context.Context, name string, pt types.P
 }
 
 // CreateToken takes the representation of a tokenRequest and creates it.  Returns the server's representation of the tokenRequest, and an error, if there is any.
-func (c *FakeServiceAccounts) CreateToken(ctx context.Context, serviceAccountName string, tokenRequest *authenticationv1.TokenRequest) (result *authenticationv1.TokenRequest, err error) {
+func (c *FakeServiceAccounts) CreateToken(ctx context.Context, serviceAccountName string, tokenRequest *authenticationv1.TokenRequest, opts v1.CreateOptions) (result *authenticationv1.TokenRequest, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateSubresourceAction(serviceaccountsResource, serviceAccountName, "token", c.ns, tokenRequest), &authenticationv1.TokenRequest{})
 

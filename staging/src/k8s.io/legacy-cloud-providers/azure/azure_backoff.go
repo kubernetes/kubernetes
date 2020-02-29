@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog"
+	azcache "k8s.io/legacy-cloud-providers/azure/cache"
 	"k8s.io/legacy-cloud-providers/azure/retry"
 )
 
@@ -65,7 +66,7 @@ func (az *Cloud) Event(obj runtime.Object, eventtype, reason, message string) {
 }
 
 // GetVirtualMachineWithRetry invokes az.getVirtualMachine with exponential backoff retry
-func (az *Cloud) GetVirtualMachineWithRetry(name types.NodeName, crt cacheReadType) (compute.VirtualMachine, error) {
+func (az *Cloud) GetVirtualMachineWithRetry(name types.NodeName, crt azcache.AzureCacheReadType) (compute.VirtualMachine, error) {
 	var machine compute.VirtualMachine
 	var retryErr error
 	err := wait.ExponentialBackoff(az.RequestBackoff(), func() (bool, error) {
@@ -103,10 +104,6 @@ func (az *Cloud) ListVirtualMachines(resourceGroup string) ([]compute.VirtualMac
 // getPrivateIPsForMachine is wrapper for optional backoff getting private ips
 // list of a node by name
 func (az *Cloud) getPrivateIPsForMachine(nodeName types.NodeName) ([]string, error) {
-	if az.Config.shouldOmitCloudProviderBackoff() {
-		return az.vmSet.GetPrivateIPsByNodeName(string(nodeName))
-	}
-
 	return az.getPrivateIPsForMachineWithRetry(nodeName)
 }
 
@@ -130,10 +127,6 @@ func (az *Cloud) getPrivateIPsForMachineWithRetry(nodeName types.NodeName) ([]st
 }
 
 func (az *Cloud) getIPForMachine(nodeName types.NodeName) (string, string, error) {
-	if az.Config.shouldOmitCloudProviderBackoff() {
-		return az.vmSet.GetIPByNodeName(string(nodeName))
-	}
-
 	return az.GetIPForMachineWithRetry(nodeName)
 }
 
@@ -397,8 +390,4 @@ func (az *Cloud) CreateOrUpdateVMSS(resourceGroupName string, VMScaleSetName str
 	}
 
 	return nil
-}
-
-func (cfg *Config) shouldOmitCloudProviderBackoff() bool {
-	return cfg.CloudProviderBackoffMode == backoffModeV2
 }

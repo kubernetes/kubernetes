@@ -203,6 +203,15 @@ func (o *DescribeOptions) Run() error {
 		}
 	}
 
+	if len(infos) == 0 && len(allErrs) == 0 {
+		// if we wrote no output, and had no errors, be sure we output something.
+		if o.AllNamespaces {
+			fmt.Fprintln(o.ErrOut, "No resources found")
+		} else {
+			fmt.Fprintf(o.ErrOut, "No resources found in %s namespace.\n", o.Namespace)
+		}
+	}
+
 	return utilerrors.NewAggregate(allErrs)
 }
 

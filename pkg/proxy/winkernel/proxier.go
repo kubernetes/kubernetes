@@ -1091,6 +1091,7 @@ func (proxier *Proxier) syncProxyRules() {
 		klog.V(4).Infof("====Applying Policy for %s====", svcName)
 		// Create Remote endpoints for every endpoint, corresponding to the service
 		containsPublicIP := false
+		containsNodeIP := false
 
 		for _, ep := range proxier.endpointsMap[svcName] {
 			var newHnsEndpoint *endpointsInfo
@@ -1141,13 +1142,15 @@ func (proxier *Proxier) syncProxyRules() {
 						}
 						if ep.ip == rs.providerAddress {
 							providerAddress = rs.providerAddress
+							containsNodeIP = true
 						}
 					}
 					if len(providerAddress) == 0 {
-						klog.Errorf("Could not find provider address for %s", ep.ip)
+						klog.Infof("Could not find provider address for %s. Assuming it is a public IP", ep.ip)
 						providerAddress = proxier.nodeIP.String()
 						containsPublicIP = true
 					}
+
 					hnsEndpoint := &endpointsInfo{
 						ip:              ep.ip,
 						isLocal:         false,
@@ -1201,7 +1204,7 @@ func (proxier *Proxier) syncProxyRules() {
 		klog.V(4).Infof("Trying to Apply Policies for service %s", spew.Sdump(svcInfo))
 		var hnsLoadBalancer *loadBalancerInfo
 		var sourceVip = proxier.sourceVip
-		if containsPublicIP {
+		if containsPublicIP || containsNodeIP {
 			sourceVip = proxier.nodeIP.String()
 		}
 		hnsLoadBalancer, err := hns.getLoadBalancer(

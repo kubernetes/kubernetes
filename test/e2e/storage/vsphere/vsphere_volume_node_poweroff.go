@@ -80,7 +80,7 @@ var _ = utils.SIGDescribe("Node Poweroff [Feature:vsphere] [Slow] [Disruptive]",
 	ginkgo.It("verify volume status after node power off", func() {
 		ginkgo.By("Creating a Storage Class")
 		storageClassSpec := getVSphereStorageClassSpec("test-sc", nil, nil, "")
-		storageclass, err := client.StorageV1().StorageClasses().Create(context.TODO(), storageClassSpec)
+		storageclass, err := client.StorageV1().StorageClasses().Create(context.TODO(), storageClassSpec, metav1.CreateOptions{})
 		framework.ExpectNoError(err, fmt.Sprintf("Failed to create storage class with err: %v", err))
 		defer client.StorageV1().StorageClasses().Delete(context.TODO(), storageclass.Name, nil)
 

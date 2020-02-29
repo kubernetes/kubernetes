@@ -41,6 +41,7 @@ filegroup(
         "//test/integration/auth:all-srcs",
         "//test/integration/benchmark/extractlog:all-srcs",
         "//test/integration/benchmark/jsonify:all-srcs",
+        "//test/integration/certificates:all-srcs",
         "//test/integration/client:all-srcs",
         "//test/integration/configmap:all-srcs",
         "//test/integration/cronjob:all-srcs",

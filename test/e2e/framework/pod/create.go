@@ -36,7 +36,7 @@ var (
 // CreateUnschedulablePod with given claims based on node selector
 func CreateUnschedulablePod(client clientset.Interface, namespace string, nodeSelector map[string]string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool, command string) (*v1.Pod, error) {
 	pod := MakePod(namespace, nodeSelector, pvclaims, isPrivileged, command)
-	pod, err := client.CoreV1().Pods(namespace).Create(context.TODO(), pod)
+	pod, err := client.CoreV1().Pods(namespace).Create(context.TODO(), pod, metav1.CreateOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("pod Create API error: %v", err)
 	}
@@ -61,7 +61,7 @@ func CreateClientPod(c clientset.Interface, ns string, pvc *v1.PersistentVolumeC
 // CreatePod with given claims based on node selector
 func CreatePod(client clientset.Interface, namespace string, nodeSelector map[string]string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool, command string) (*v1.Pod, error) {
 	pod := MakePod(namespace, nodeSelector, pvclaims, isPrivileged, command)
-	pod, err := client.CoreV1().Pods(namespace).Create(context.TODO(), pod)
+	pod, err := client.CoreV1().Pods(namespace).Create(context.TODO(), pod, metav1.CreateOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("pod Create API error: %v", err)
 	}
@@ -86,12 +86,9 @@ func CreateSecPod(client clientset.Interface, namespace string, pvclaims []*v1.P
 // CreateSecPodWithNodeSelection creates security pod with given claims
 func CreateSecPodWithNodeSelection(client clientset.Interface, namespace string, pvclaims []*v1.PersistentVolumeClaim, inlineVolumeSources []*v1.VolumeSource, isPrivileged bool, command string, hostIPC bool, hostPID bool, seLinuxLabel *v1.SELinuxOptions, fsGroup *int64, node NodeSelection, timeout time.Duration) (*v1.Pod, error) {
 	pod := MakeSecPod(namespace, pvclaims, inlineVolumeSources, isPrivileged, command, hostIPC, hostPID, seLinuxLabel, fsGroup)
-	// Setting node
-	pod.Spec.NodeName = node.Name
-	pod.Spec.NodeSelector = node.Selector
-	pod.Spec.Affinity = node.Affinity
+	SetNodeSelection(&pod.Spec, node)
 
-	pod, err := client.CoreV1().Pods(namespace).Create(context.TODO(), pod)
+	pod, err := client.CoreV1().Pods(namespace).Create(context.TODO(), pod, metav1.CreateOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("pod Create API error: %v", err)
 	}

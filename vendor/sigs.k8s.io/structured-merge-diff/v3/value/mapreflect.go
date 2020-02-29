@@ -16,7 +16,9 @@ limitations under the License.
 
 package value
 
-import "reflect"
+import (
+	"reflect"
+)
 
 type mapReflect struct {
 	valueReflect
@@ -27,13 +29,27 @@ func (r mapReflect) Length() int {
 	return val.Len()
 }
 
+func (r mapReflect) Empty() bool {
+	val := r.Value
+	return val.Len() == 0
+}
+
 func (r mapReflect) Get(key string) (Value, bool) {
-	mapKey := r.toMapKey(key)
-	val := r.Value.MapIndex(mapKey)
-	if !val.IsValid() {
+	return r.GetUsing(HeapAllocator, key)
+}
+
+func (r mapReflect) GetUsing(a Allocator, key string) (Value, bool) {
+	k, v, ok := r.get(key)
+	if !ok {
 		return nil, false
 	}
-	return mustWrapValueReflectMapItem(&r.Value, &mapKey, val), val != reflect.Value{}
+	return a.allocValueReflect().mustReuse(v, nil, &r.Value, &k), true
+}
+
+func (r mapReflect) get(k string) (key, value reflect.Value, ok bool) {
+	mapKey := r.toMapKey(k)
+	val := r.Value.MapIndex(mapKey)
+	return mapKey, val, val.IsValid() && val != reflect.Value{}
 }
 
 func (r mapReflect) Has(key string) bool {
@@ -61,21 +77,29 @@ func (r mapReflect) toMapKey(key string) reflect.Value {
 }
 
 func (r mapReflect) Iterate(fn func(string, Value) bool) bool {
-	return eachMapEntry(r.Value, func(s string, value reflect.Value) bool {
-		mapVal := mustWrapValueReflect(value)
-		defer mapVal.Recycle()
-		return fn(s, mapVal)
+	return r.IterateUsing(HeapAllocator, fn)
+}
+
+func (r mapReflect) IterateUsing(a Allocator, fn func(string, Value) bool) bool {
+	if r.Value.Len() == 0 {
+		return true
+	}
+	v := a.allocValueReflect()
+	defer a.Free(v)
+	return eachMapEntry(r.Value, func(e *TypeReflectCacheEntry, key reflect.Value, value reflect.Value) bool {
+		return fn(key.String(), v.mustReuse(value, e, &r.Value, &key))
 	})
 }
 
-func eachMapEntry(val reflect.Value, fn func(string, reflect.Value) bool) bool {
+func eachMapEntry(val reflect.Value, fn func(*TypeReflectCacheEntry, reflect.Value, reflect.Value) bool) bool {
 	iter := val.MapRange()
+	entry := TypeReflectEntryOf(val.Type().Elem())
 	for iter.Next() {
 		next := iter.Value()
 		if !next.IsValid() {
 			continue
 		}
-		if !fn(iter.Key().String(), next) {
+		if !fn(entry, iter.Key(), next) {
 			return false
 		}
 	}
@@ -92,16 +116,94 @@ func (r mapReflect) Unstructured() interface{} {
 }
 
 func (r mapReflect) Equals(m Map) bool {
-	if r.Length() != m.Length() {
+	return r.EqualsUsing(HeapAllocator, m)
+}
+
+func (r mapReflect) EqualsUsing(a Allocator, m Map) bool {
+	lhsLength := r.Length()
+	rhsLength := m.Length()
+	if lhsLength != rhsLength {
 		return false
 	}
-
-	// TODO: Optimize to avoid Iterate looping here by using r.Value.MapRange or similar if it improves performance.
+	if lhsLength == 0 {
+		return true
+	}
+	vr := a.allocValueReflect()
+	defer a.Free(vr)
+	entry := TypeReflectEntryOf(r.Value.Type().Elem())
 	return m.Iterate(func(key string, value Value) bool {
-		lhsVal, ok := r.Get(key)
+		_, lhsVal, ok := r.get(key)
 		if !ok {
 			return false
 		}
-		return Equals(lhsVal, value)
+		return Equals(vr.mustReuse(lhsVal, entry, nil, nil), value)
 	})
+}
+
+func (r mapReflect) Zip(other Map, order MapTraverseOrder, fn func(key string, lhs, rhs Value) bool) bool {
+	return r.ZipUsing(HeapAllocator, other, order, fn)
+}
+
+func (r mapReflect) ZipUsing(a Allocator, other Map, order MapTraverseOrder, fn func(key string, lhs, rhs Value) bool) bool {
+	if otherMapReflect, ok := other.(*mapReflect); ok && order == Unordered {
+		return r.unorderedReflectZip(a, otherMapReflect, fn)
+	}
+	return defaultMapZip(a, &r, other, order, fn)
+}
+
+// unorderedReflectZip provides an optimized unordered zip for mapReflect types.
+func (r mapReflect) unorderedReflectZip(a Allocator, other *mapReflect, fn func(key string, lhs, rhs Value) bool) bool {
+	if r.Empty() && (other == nil || other.Empty()) {
+		return true
+	}
+
+	lhs := r.Value
+	lhsEntry := TypeReflectEntryOf(lhs.Type().Elem())
+
+	// map lookup via reflection is expensive enough that it is better to keep track of visited keys
+	visited := map[string]struct{}{}
+
+	vlhs, vrhs := a.allocValueReflect(), a.allocValueReflect()
+	defer a.Free(vlhs)
+	defer a.Free(vrhs)
+
+	if other != nil {
+		rhs := other.Value
+		rhsEntry := TypeReflectEntryOf(rhs.Type().Elem())
+		iter := rhs.MapRange()
+
+		for iter.Next() {
+			key := iter.Key()
+			keyString := key.String()
+			next := iter.Value()
+			if !next.IsValid() {
+				continue
+			}
+			rhsVal := vrhs.mustReuse(next, rhsEntry, &rhs, &key)
+			visited[keyString] = struct{}{}
+			var lhsVal Value
+			if _, v, ok := r.get(keyString); ok {
+				lhsVal = vlhs.mustReuse(v, lhsEntry, &lhs, &key)
+			}
+			if !fn(keyString, lhsVal, rhsVal) {
+				return false
+			}
+		}
+	}
+
+	iter := lhs.MapRange()
+	for iter.Next() {
+		key := iter.Key()
+		if _, ok := visited[key.String()]; ok {
+			continue
+		}
+		next := iter.Value()
+		if !next.IsValid() {
+			continue
+		}
+		if !fn(key.String(), vlhs.mustReuse(next, lhsEntry, &lhs, &key), nil) {
+			return false
+		}
+	}
+	return true
 }

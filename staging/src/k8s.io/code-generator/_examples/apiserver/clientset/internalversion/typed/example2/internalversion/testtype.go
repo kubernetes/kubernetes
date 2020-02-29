@@ -38,15 +38,15 @@ type TestTypesGetter interface {
 
 // TestTypeInterface has methods to work with TestType resources.
 type TestTypeInterface interface {
-	Create(context.Context, *example2.TestType) (*example2.TestType, error)
-	Update(context.Context, *example2.TestType) (*example2.TestType, error)
-	UpdateStatus(context.Context, *example2.TestType) (*example2.TestType, error)
-	Delete(ctx context.Context, name string, options *v1.DeleteOptions) error
-	DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(ctx context.Context, name string, options v1.GetOptions) (*example2.TestType, error)
+	Create(ctx context.Context, testType *example2.TestType, opts v1.CreateOptions) (*example2.TestType, error)
+	Update(ctx context.Context, testType *example2.TestType, opts v1.UpdateOptions) (*example2.TestType, error)
+	UpdateStatus(ctx context.Context, testType *example2.TestType, opts v1.UpdateOptions) (*example2.TestType, error)
+	Delete(ctx context.Context, name string, opts *v1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts *v1.DeleteOptions, listOpts v1.ListOptions) error
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*example2.TestType, error)
 	List(ctx context.Context, opts v1.ListOptions) (*example2.TestTypeList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *example2.TestType, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *example2.TestType, err error)
 	TestTypeExpansion
 }
 
@@ -105,10 +105,11 @@ func (c *testTypes) Watch(ctx context.Context, opts v1.ListOptions) (watch.Inter
 }
 
 // Create takes the representation of a testType and creates it.  Returns the server's representation of the testType, and an error, if there is any.
-func (c *testTypes) Create(ctx context.Context, testType *example2.TestType) (result *example2.TestType, err error) {
+func (c *testTypes) Create(ctx context.Context, testType *example2.TestType, opts v1.CreateOptions) (result *example2.TestType, err error) {
 	result = &example2.TestType{}
 	err = c.client.Post().
 		Resource("testtypes").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(testType).
 		Do(ctx).
 		Into(result)
@@ -116,11 +117,12 @@ func (c *testTypes) Create(ctx context.Context, testType *example2.TestType) (re
 }
 
 // Update takes the representation of a testType and updates it. Returns the server's representation of the testType, and an error, if there is any.
-func (c *testTypes) Update(ctx context.Context, testType *example2.TestType) (result *example2.TestType, err error) {
+func (c *testTypes) Update(ctx context.Context, testType *example2.TestType, opts v1.UpdateOptions) (result *example2.TestType, err error) {
 	result = &example2.TestType{}
 	err = c.client.Put().
 		Resource("testtypes").
 		Name(testType.Name).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(testType).
 		Do(ctx).
 		Into(result)
@@ -129,13 +131,13 @@ func (c *testTypes) Update(ctx context.Context, testType *example2.TestType) (re
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-
-func (c *testTypes) UpdateStatus(ctx context.Context, testType *example2.TestType) (result *example2.TestType, err error) {
+func (c *testTypes) UpdateStatus(ctx context.Context, testType *example2.TestType, opts v1.UpdateOptions) (result *example2.TestType, err error) {
 	result = &example2.TestType{}
 	err = c.client.Put().
 		Resource("testtypes").
 		Name(testType.Name).
 		SubResource("status").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(testType).
 		Do(ctx).
 		Into(result)
@@ -168,12 +170,13 @@ func (c *testTypes) DeleteCollection(ctx context.Context, options *v1.DeleteOpti
 }
 
 // Patch applies the patch and returns the patched testType.
-func (c *testTypes) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *example2.TestType, err error) {
+func (c *testTypes) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *example2.TestType, err error) {
 	result = &example2.TestType{}
 	err = c.client.Patch(pt).
 		Resource("testtypes").
-		SubResource(subresources...).
 		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

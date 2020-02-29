@@ -77,7 +77,7 @@ func (c *FakeFlowSchemas) Watch(ctx context.Context, opts v1.ListOptions) (watch
 }
 
 // Create takes the representation of a flowSchema and creates it.  Returns the server's representation of the flowSchema, and an error, if there is any.
-func (c *FakeFlowSchemas) Create(ctx context.Context, flowSchema *v1alpha1.FlowSchema) (result *v1alpha1.FlowSchema, err error) {
+func (c *FakeFlowSchemas) Create(ctx context.Context, flowSchema *v1alpha1.FlowSchema, opts v1.CreateOptions) (result *v1alpha1.FlowSchema, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootCreateAction(flowschemasResource, flowSchema), &v1alpha1.FlowSchema{})
 	if obj == nil {
@@ -87,7 +87,7 @@ func (c *FakeFlowSchemas) Create(ctx context.Context, flowSchema *v1alpha1.FlowS
 }
 
 // Update takes the representation of a flowSchema and updates it. Returns the server's representation of the flowSchema, and an error, if there is any.
-func (c *FakeFlowSchemas) Update(ctx context.Context, flowSchema *v1alpha1.FlowSchema) (result *v1alpha1.FlowSchema, err error) {
+func (c *FakeFlowSchemas) Update(ctx context.Context, flowSchema *v1alpha1.FlowSchema, opts v1.UpdateOptions) (result *v1alpha1.FlowSchema, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootUpdateAction(flowschemasResource, flowSchema), &v1alpha1.FlowSchema{})
 	if obj == nil {
@@ -98,7 +98,7 @@ func (c *FakeFlowSchemas) Update(ctx context.Context, flowSchema *v1alpha1.FlowS
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeFlowSchemas) UpdateStatus(ctx context.Context, flowSchema *v1alpha1.FlowSchema) (*v1alpha1.FlowSchema, error) {
+func (c *FakeFlowSchemas) UpdateStatus(ctx context.Context, flowSchema *v1alpha1.FlowSchema, opts v1.UpdateOptions) (*v1alpha1.FlowSchema, error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootUpdateSubresourceAction(flowschemasResource, "status", flowSchema), &v1alpha1.FlowSchema{})
 	if obj == nil {
@@ -123,7 +123,7 @@ func (c *FakeFlowSchemas) DeleteCollection(ctx context.Context, options *v1.Dele
 }
 
 // Patch applies the patch and returns the patched flowSchema.
-func (c *FakeFlowSchemas) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.FlowSchema, err error) {
+func (c *FakeFlowSchemas) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.FlowSchema, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootPatchSubresourceAction(flowschemasResource, name, pt, data, subresources...), &v1alpha1.FlowSchema{})
 	if obj == nil {

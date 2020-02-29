@@ -92,7 +92,7 @@ func TestRun(t *testing.T) {
 				},
 			},
 		},
-	})
+	}, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Failed to create deployment: %v", err)
 	}

@@ -85,7 +85,7 @@ func TestViewHistory(t *testing.T) {
 	)
 
 	fakeClientSet := fake.NewSimpleClientset(ssStub)
-	_, err := fakeClientSet.AppsV1().ControllerRevisions("default").Create(context.TODO(), ssStub1)
+	_, err := fakeClientSet.AppsV1().ControllerRevisions("default").Create(context.TODO(), ssStub1, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("create controllerRevisions error %v occurred ", err)
 	}

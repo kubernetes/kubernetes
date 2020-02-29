@@ -58,7 +58,6 @@ import (
 	"k8s.io/kubectl/pkg/cmd/portforward"
 	"k8s.io/kubectl/pkg/cmd/proxy"
 	"k8s.io/kubectl/pkg/cmd/replace"
-	"k8s.io/kubectl/pkg/cmd/rollingupdate"
 	"k8s.io/kubectl/pkg/cmd/rollout"
 	"k8s.io/kubectl/pkg/cmd/run"
 	"k8s.io/kubectl/pkg/cmd/scale"
@@ -263,10 +262,6 @@ __kubectl_custom_func() {
             ;;
         kubectl_exec | kubectl_port-forward | kubectl_top_pod | kubectl_attach)
             __kubectl_get_resource_pod
-            return
-            ;;
-        kubectl_rolling-update)
-            __kubectl_get_resource_rc
             return
             ;;
         kubectl_cordon | kubectl_uncordon | kubectl_drain | kubectl_top_node)
@@ -507,7 +502,6 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 			Message: "Deploy Commands:",
 			Commands: []*cobra.Command{
 				rollout.NewCmdRollout(f, ioStreams),
-				rollingupdate.NewCmdRollingUpdate(f, ioStreams),
 				scale.NewCmdScale(f, ioStreams),
 				autoscale.NewCmdAutoscale(f, ioStreams),
 			},

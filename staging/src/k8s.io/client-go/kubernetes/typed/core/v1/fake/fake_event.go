@@ -81,7 +81,7 @@ func (c *FakeEvents) Watch(ctx context.Context, opts v1.ListOptions) (watch.Inte
 }
 
 // Create takes the representation of a event and creates it.  Returns the server's representation of the event, and an error, if there is any.
-func (c *FakeEvents) Create(ctx context.Context, event *corev1.Event) (result *corev1.Event, err error) {
+func (c *FakeEvents) Create(ctx context.Context, event *corev1.Event, opts v1.CreateOptions) (result *corev1.Event, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(eventsResource, c.ns, event), &corev1.Event{})
 
@@ -92,7 +92,7 @@ func (c *FakeEvents) Create(ctx context.Context, event *corev1.Event) (result *c
 }
 
 // Update takes the representation of a event and updates it. Returns the server's representation of the event, and an error, if there is any.
-func (c *FakeEvents) Update(ctx context.Context, event *corev1.Event) (result *corev1.Event, err error) {
+func (c *FakeEvents) Update(ctx context.Context, event *corev1.Event, opts v1.UpdateOptions) (result *corev1.Event, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(eventsResource, c.ns, event), &corev1.Event{})
 
@@ -119,7 +119,7 @@ func (c *FakeEvents) DeleteCollection(ctx context.Context, options *v1.DeleteOpt
 }
 
 // Patch applies the patch and returns the patched event.
-func (c *FakeEvents) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *corev1.Event, err error) {
+func (c *FakeEvents) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *corev1.Event, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(eventsResource, c.ns, name, pt, data, subresources...), &corev1.Event{})
 

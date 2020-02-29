@@ -125,7 +125,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			framework.Logf("env %v", dp.Spec.Containers[0].Env)
 			dp.Spec.NodeName = framework.TestContext.NodeName
 			ginkgo.By("Create sample device plugin pod")
-			devicePluginPod, err := f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Create(context.TODO(), dp)
+			devicePluginPod, err := f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Create(context.TODO(), dp, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 
 			ginkgo.By("Waiting for devices to become available on the local node")
@@ -212,7 +212,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			framework.Logf("Trying to get dp pod after deletion. err must be non-nil. err: %v", err)
 			framework.ExpectError(err)
 
-			devicePluginPod, err = f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Create(context.TODO(), dp)
+			devicePluginPod, err = f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Create(context.TODO(), dp, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 
 			ensurePodContainerRestart(f, pod1.Name, pod1.Name)
@@ -258,7 +258,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			framework.ExpectEqual(devIDRestart2, devID2)
 
 			ginkgo.By("Re-register resources")
-			devicePluginPod, err = f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Create(context.TODO(), dp)
+			devicePluginPod, err = f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Create(context.TODO(), dp, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 
 			ginkgo.By("Waiting for the resource exported by the stub device plugin to become healthy on the local node")

@@ -73,7 +73,7 @@ var (
 			// TODO: The value for this should be based on some SLI definition (long term).
 			MaxAge:            5 * time.Hour,
 			StabilityLevel:    metrics.ALPHA,
-			DeprecatedVersion: "1.18.0",
+			DeprecatedVersion: "1.19.0",
 		},
 		[]string{OperationLabel},
 	)
@@ -102,7 +102,7 @@ var (
 			Help:              "Scheduling algorithm predicate evaluation duration in seconds",
 			Buckets:           metrics.ExponentialBuckets(0.001, 2, 15),
 			StabilityLevel:    metrics.ALPHA,
-			DeprecatedVersion: "1.18.0",
+			DeprecatedVersion: "1.19.0",
 		},
 	)
 	DeprecatedSchedulingAlgorithmPriorityEvaluationSecondsDuration = metrics.NewHistogram(
@@ -112,7 +112,7 @@ var (
 			Help:              "Scheduling algorithm priority evaluation duration in seconds",
 			Buckets:           metrics.ExponentialBuckets(0.001, 2, 15),
 			StabilityLevel:    metrics.ALPHA,
-			DeprecatedVersion: "1.18.0",
+			DeprecatedVersion: "1.19.0",
 		},
 	)
 	SchedulingAlgorithmPreemptionEvaluationDuration = metrics.NewHistogram(
@@ -218,7 +218,7 @@ var (
 		&metrics.HistogramOpts{
 			Subsystem:      SchedulerSubsystem,
 			Name:           "permit_wait_duration_seconds",
-			Help:           "Duration of waiting in RunPermitPlugins.",
+			Help:           "Duration of waiting on permit.",
 			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
 			StabilityLevel: metrics.ALPHA,
 		},

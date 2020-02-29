@@ -397,6 +397,7 @@ func AddHandlers(h printers.PrintHandler) {
 	certificateSigningRequestColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+		{Name: "SignerName", Type: "string", Description: certificatesv1beta1.CertificateSigningRequestSpec{}.SwaggerDoc()["signerName"]},
 		{Name: "Requestor", Type: "string", Description: certificatesv1beta1.CertificateSigningRequestSpec{}.SwaggerDoc()["request"]},
 		{Name: "Condition", Type: "string", Description: certificatesv1beta1.CertificateSigningRequestStatus{}.SwaggerDoc()["conditions"]},
 	}
@@ -1605,6 +1606,9 @@ func printEvent(obj *api.Event, options printers.GenerateOptions) ([]metav1.Tabl
 
 	firstTimestamp := translateTimestampSince(obj.FirstTimestamp)
 	lastTimestamp := translateTimestampSince(obj.LastTimestamp)
+	if obj.LastTimestamp.IsZero() {
+		lastTimestamp = firstTimestamp
+	}
 
 	var target string
 	if len(obj.InvolvedObject.Name) > 0 {
@@ -1713,7 +1717,11 @@ func printCertificateSigningRequest(obj *certificates.CertificateSigningRequest,
 	if err != nil {
 		return nil, err
 	}
-	row.Cells = append(row.Cells, obj.Name, translateTimestampSince(obj.CreationTimestamp), obj.Spec.Username, status)
+	signerName := "<none>"
+	if obj.Spec.SignerName != "" {
+		signerName = obj.Spec.SignerName
+	}
+	row.Cells = append(row.Cells, obj.Name, translateTimestampSince(obj.CreationTimestamp), signerName, obj.Spec.Username, status)
 	return []metav1.TableRow{row}, nil
 }
 

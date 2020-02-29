@@ -45,7 +45,6 @@ import (
 
 const (
 	dynamicConsumptionTimeInSeconds = 30
-	staticConsumptionTimeInSeconds  = 3600
 	dynamicRequestSizeInMillicores  = 100
 	dynamicRequestSizeInMegabytes   = 100
 	dynamicRequestSizeCustomMetric  = 10
@@ -64,8 +63,7 @@ const (
 )
 
 var (
-	resourceConsumerImage           = imageutils.GetE2EImage(imageutils.ResourceConsumer)
-	resourceConsumerControllerImage = imageutils.GetE2EImage(imageutils.ResourceController)
+	resourceConsumerImage = imageutils.GetE2EImage(imageutils.ResourceConsumer)
 )
 
 var (
@@ -440,7 +438,7 @@ func runServiceAndWorkloadForResourceConsumer(c clientset.Interface, ns, name st
 				"name": name,
 			},
 		},
-	})
+	}, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
 	rcConfig := testutils.RCConfig{
@@ -494,18 +492,18 @@ func runServiceAndWorkloadForResourceConsumer(c clientset.Interface, ns, name st
 				"name": controllerName,
 			},
 		},
-	})
+	}, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
 	dnsClusterFirst := v1.DNSClusterFirst
 	controllerRcConfig := testutils.RCConfig{
 		Client:    c,
-		Image:     resourceConsumerControllerImage,
+		Image:     imageutils.GetE2EImage(imageutils.Agnhost),
 		Name:      controllerName,
 		Namespace: ns,
 		Timeout:   timeoutRC,
 		Replicas:  1,
-		Command:   []string{"/controller", "--consumer-service-name=" + name, "--consumer-service-namespace=" + ns, "--consumer-port=80"},
+		Command:   []string{"/agnhost", "resource-consumer-controller", "--consumer-service-name=" + name, "--consumer-service-namespace=" + ns, "--consumer-port=80"},
 		DNSPolicy: &dnsClusterFirst,
 	}
 	framework.ExpectNoError(e2erc.RunRC(controllerRcConfig))
@@ -534,7 +532,7 @@ func CreateCPUHorizontalPodAutoscaler(rc *ResourceConsumer, cpu, minReplicas, ma
 			TargetCPUUtilizationPercentage: &cpu,
 		},
 	}
-	hpa, errHPA := rc.clientSet.AutoscalingV1().HorizontalPodAutoscalers(rc.nsName).Create(context.TODO(), hpa)
+	hpa, errHPA := rc.clientSet.AutoscalingV1().HorizontalPodAutoscalers(rc.nsName).Create(context.TODO(), hpa, metav1.CreateOptions{})
 	framework.ExpectNoError(errHPA)
 	return hpa
 }

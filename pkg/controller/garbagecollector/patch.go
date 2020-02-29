@@ -92,6 +92,7 @@ type objectForFinalizersPatch struct {
 	ObjectMetaForFinalizersPatch `json:"metadata"`
 }
 
+// ObjectMetaForFinalizersPatch defines object meta struct for finalizers patch operation.
 type ObjectMetaForFinalizersPatch struct {
 	ResourceVersion string   `json:"resourceVersion"`
 	Finalizers      []string `json:"finalizers"`
@@ -101,6 +102,7 @@ type objectForPatch struct {
 	ObjectMetaForPatch `json:"metadata"`
 }
 
+// ObjectMetaForPatch defines object meta struct for patch operation.
 type ObjectMetaForPatch struct {
 	ResourceVersion string                  `json:"resourceVersion"`
 	OwnerReferences []metav1.OwnerReference `json:"ownerReferences"`

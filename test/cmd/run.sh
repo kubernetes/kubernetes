@@ -25,6 +25,12 @@ run_kubectl_run_tests() {
   create_and_use_new_namespace
   kube::log::status "Testing kubectl run"
 
+  # Command with dry-run
+  kubectl run --dry-run=client nginx-extensions "--image=${IMAGE_NGINX}" "${kube_flags[@]:?}"
+  kubectl run --dry-run=server nginx-extensions "--image=${IMAGE_NGINX}" "${kube_flags[@]:?}"
+  # Post-Condition: no Pod exists
+  kube::test::get_object_assert pods "{{range.items}}{{${id_field:?}}}:{{end}}" ''
+
   # Pre-Condition: no Pod exists
   kube::test::get_object_assert pods "{{range.items}}{{${id_field:?}}}:{{end}}" ''
   # Command

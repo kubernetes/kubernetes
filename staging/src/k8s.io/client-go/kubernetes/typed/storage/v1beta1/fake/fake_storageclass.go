@@ -77,7 +77,7 @@ func (c *FakeStorageClasses) Watch(ctx context.Context, opts v1.ListOptions) (wa
 }
 
 // Create takes the representation of a storageClass and creates it.  Returns the server's representation of the storageClass, and an error, if there is any.
-func (c *FakeStorageClasses) Create(ctx context.Context, storageClass *v1beta1.StorageClass) (result *v1beta1.StorageClass, err error) {
+func (c *FakeStorageClasses) Create(ctx context.Context, storageClass *v1beta1.StorageClass, opts v1.CreateOptions) (result *v1beta1.StorageClass, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootCreateAction(storageclassesResource, storageClass), &v1beta1.StorageClass{})
 	if obj == nil {
@@ -87,7 +87,7 @@ func (c *FakeStorageClasses) Create(ctx context.Context, storageClass *v1beta1.S
 }
 
 // Update takes the representation of a storageClass and updates it. Returns the server's representation of the storageClass, and an error, if there is any.
-func (c *FakeStorageClasses) Update(ctx context.Context, storageClass *v1beta1.StorageClass) (result *v1beta1.StorageClass, err error) {
+func (c *FakeStorageClasses) Update(ctx context.Context, storageClass *v1beta1.StorageClass, opts v1.UpdateOptions) (result *v1beta1.StorageClass, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootUpdateAction(storageclassesResource, storageClass), &v1beta1.StorageClass{})
 	if obj == nil {
@@ -112,7 +112,7 @@ func (c *FakeStorageClasses) DeleteCollection(ctx context.Context, options *v1.D
 }
 
 // Patch applies the patch and returns the patched storageClass.
-func (c *FakeStorageClasses) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.StorageClass, err error) {
+func (c *FakeStorageClasses) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.StorageClass, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootPatchSubresourceAction(storageclassesResource, name, pt, data, subresources...), &v1beta1.StorageClass{})
 	if obj == nil {

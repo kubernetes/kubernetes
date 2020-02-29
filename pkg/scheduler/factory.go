@@ -18,15 +18,15 @@ package scheduler
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -52,6 +52,7 @@ import (
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	cachedebugger "k8s.io/kubernetes/pkg/scheduler/internal/cache/debugger"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
+	"k8s.io/kubernetes/pkg/scheduler/profile"
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
 )
 
@@ -70,6 +71,8 @@ type Binder interface {
 type Configurator struct {
 	client clientset.Interface
 
+	recorderFactory profile.RecorderFactory
+
 	informerFactory informers.SharedInformerFactory
 
 	podInformer coreinformers.PodInformer
@@ -78,11 +81,6 @@ type Configurator struct {
 	StopEverything <-chan struct{}
 
 	schedulerCache internalcache.Cache
-
-	// RequiredDuringScheduling affinity is not symmetric, but there is an implicit PreferredDuringScheduling affinity rule
-	// corresponding to every RequiredDuringScheduling affinity rule.
-	// HardPodAffinitySymmetricWeight represents the weight of implicit PreferredDuringScheduling affinity rule, in the range [0-100].
-	hardPodAffinitySymmetricWeight int32
 
 	// Handles volume binding decisions
 	volumeBinder *volumebinder.VolumeBinder
@@ -104,31 +102,37 @@ type Configurator struct {
 
 	enableNonPreempting bool
 
-	// framework configuration arguments.
+	profiles         []schedulerapi.KubeSchedulerProfile
 	registry         framework.Registry
-	plugins          *schedulerapi.Plugins
-	pluginConfig     []schedulerapi.PluginConfig
 	nodeInfoSnapshot *internalcache.Snapshot
 }
 
-// create a scheduler from a set of registered plugins.
-func (c *Configurator) create(extenders []core.SchedulerExtender) (*Scheduler, error) {
-	framework, err := framework.NewFramework(
+func (c *Configurator) buildFramework(p schedulerapi.KubeSchedulerProfile) (framework.Framework, error) {
+	return framework.NewFramework(
 		c.registry,
-		c.plugins,
-		c.pluginConfig,
+		p.Plugins,
+		p.PluginConfig,
 		framework.WithClientSet(c.client),
 		framework.WithInformerFactory(c.informerFactory),
 		framework.WithSnapshotSharedLister(c.nodeInfoSnapshot),
 		framework.WithRunAllFilters(c.alwaysCheckAllPredicates),
 		framework.WithVolumeBinder(c.volumeBinder),
 	)
-	if err != nil {
-		return nil, fmt.Errorf("initializing the scheduling framework: %v", err)
-	}
+}
 
+// create a scheduler from a set of registered plugins.
+func (c *Configurator) create(extenders []core.SchedulerExtender) (*Scheduler, error) {
+	profiles, err := profile.NewMap(c.profiles, c.buildFramework, c.recorderFactory)
+	if err != nil {
+		return nil, fmt.Errorf("initializing profiles: %v", err)
+	}
+	if len(profiles) == 0 {
+		return nil, errors.New("at least one profile is required")
+	}
+	// Profiles are required to have equivalent queue sort plugins.
+	lessFn := profiles[c.profiles[0].SchedulerName].Framework.QueueSortFunc()
 	podQueue := internalqueue.NewSchedulingQueue(
-		framework,
+		lessFn,
 		internalqueue.WithPodInitialBackoffDuration(time.Duration(c.podInitialBackoffSeconds)*time.Second),
 		internalqueue.WithPodMaxBackoffDuration(time.Duration(c.podMaxBackoffSeconds)*time.Second),
 	)
@@ -146,9 +150,7 @@ func (c *Configurator) create(extenders []core.SchedulerExtender) (*Scheduler, e
 		c.schedulerCache,
 		podQueue,
 		c.nodeInfoSnapshot,
-		framework,
 		extenders,
-		c.volumeBinder,
 		c.informerFactory.Core().V1().PersistentVolumeClaims().Lister(),
 		GetPodDisruptionBudgetLister(c.informerFactory),
 		c.disablePreemption,
@@ -159,7 +161,7 @@ func (c *Configurator) create(extenders []core.SchedulerExtender) (*Scheduler, e
 	return &Scheduler{
 		SchedulerCache:  c.schedulerCache,
 		Algorithm:       algo,
-		Framework:       framework,
+		Profiles:        profiles,
 		NextPod:         internalqueue.MakeNextPodFunc(podQueue),
 		Error:           MakeDefaultErrorFunc(c.client, podQueue, c.schedulerCache),
 		StopEverything:  c.StopEverything,
@@ -177,13 +179,13 @@ func (c *Configurator) createFromProvider(providerName string) (*Scheduler, erro
 		return nil, fmt.Errorf("algorithm provider %q is not registered", providerName)
 	}
 
-	// Combine the provided plugins with the ones from component config.
-	defaultPlugins.Apply(c.plugins)
-	c.plugins = defaultPlugins
-
-	pluginConfig := []schedulerapi.PluginConfig{c.interPodAffinityPluginConfig()}
-	pluginConfig = append(pluginConfig, c.pluginConfig...)
-	c.pluginConfig = pluginConfig
+	for i := range c.profiles {
+		prof := &c.profiles[i]
+		plugins := &schedulerapi.Plugins{}
+		plugins.Append(defaultPlugins)
+		plugins.Apply(prof.Plugins)
+		prof.Plugins = plugins
+	}
 
 	return c.create([]core.SchedulerExtender{})
 }
@@ -253,10 +255,13 @@ func (c *Configurator) createFromConfig(policy schedulerapi.Policy) (*Scheduler,
 		// place ignorable extenders to the tail of extenders
 		extenders = append(extenders, ignorableExtenders...)
 	}
-	// Providing HardPodAffinitySymmetricWeight in the policy config is the new and preferred way of providing the value.
-	// Give it higher precedence than scheduler CLI configuration when it is provided.
+	// HardPodAffinitySymmetricWeight in the policy config takes precedence over
+	// CLI configuration.
 	if policy.HardPodAffinitySymmetricWeight != 0 {
-		c.hardPodAffinitySymmetricWeight = policy.HardPodAffinitySymmetricWeight
+		v := policy.HardPodAffinitySymmetricWeight
+		args.InterPodAffinityArgs = &interpodaffinity.Args{
+			HardPodAffinityWeight: &v,
+		}
 	}
 
 	// When AlwaysCheckAllPredicates is set to true, scheduler checks all the configured
@@ -266,10 +271,6 @@ func (c *Configurator) createFromConfig(policy schedulerapi.Policy) (*Scheduler,
 	}
 
 	klog.V(2).Infof("Creating scheduler with fit predicates '%v' and priority functions '%v'", predicateKeys, priorityKeys)
-
-	args.InterPodAffinityArgs = &interpodaffinity.Args{
-		HardPodAffinityWeight: &c.hardPodAffinitySymmetricWeight,
-	}
 
 	pluginsForPredicates, pluginConfigForPredicates, err := getPredicateConfigs(predicateKeys, lr, args)
 	if err != nil {
@@ -282,10 +283,10 @@ func (c *Configurator) createFromConfig(policy schedulerapi.Policy) (*Scheduler,
 	}
 	// Combine all framework configurations. If this results in any duplication, framework
 	// instantiation should fail.
-	var defaultPlugins schedulerapi.Plugins
+	var defPlugins schedulerapi.Plugins
 	// "PrioritySort" and "DefaultBinder" were neither predicates nor priorities
 	// before. We add them by default.
-	defaultPlugins.Append(&schedulerapi.Plugins{
+	defPlugins.Append(&schedulerapi.Plugins{
 		QueueSort: &schedulerapi.PluginSet{
 			Enabled: []schedulerapi.Plugin{{Name: queuesort.Name}},
 		},
@@ -293,27 +294,25 @@ func (c *Configurator) createFromConfig(policy schedulerapi.Policy) (*Scheduler,
 			Enabled: []schedulerapi.Plugin{{Name: defaultbinder.Name}},
 		},
 	})
-	defaultPlugins.Append(pluginsForPredicates)
-	defaultPlugins.Append(pluginsForPriorities)
-	defaultPlugins.Apply(c.plugins)
-	c.plugins = &defaultPlugins
+	defPlugins.Append(pluginsForPredicates)
+	defPlugins.Append(pluginsForPriorities)
+	var defPluginConfig []schedulerapi.PluginConfig
+	defPluginConfig = append(defPluginConfig, pluginConfigForPredicates...)
+	defPluginConfig = append(defPluginConfig, pluginConfigForPriorities...)
+	for i := range c.profiles {
+		prof := &c.profiles[i]
+		plugins := &schedulerapi.Plugins{}
+		plugins.Append(&defPlugins)
+		plugins.Apply(prof.Plugins)
+		prof.Plugins = plugins
 
-	var pluginConfig []schedulerapi.PluginConfig
-	pluginConfig = append(pluginConfig, pluginConfigForPredicates...)
-	pluginConfig = append(pluginConfig, pluginConfigForPriorities...)
-	pluginConfig = append(pluginConfig, c.pluginConfig...)
-	c.pluginConfig = pluginConfig
+		var pluginConfig []schedulerapi.PluginConfig
+		pluginConfig = append(pluginConfig, defPluginConfig...)
+		pluginConfig = append(pluginConfig, prof.PluginConfig...)
+		prof.PluginConfig = pluginConfig
+	}
 
 	return c.create(extenders)
-}
-
-func (c *Configurator) interPodAffinityPluginConfig() schedulerapi.PluginConfig {
-	return schedulerapi.PluginConfig{
-		Name: interpodaffinity.Name,
-		Args: runtime.Unknown{
-			Raw: []byte(fmt.Sprintf(`{"hardPodAffinityWeight":%d}`, c.hardPodAffinitySymmetricWeight)),
-		},
-	}
 }
 
 // getPriorityConfigs returns priorities configuration: ones that will run as priorities and ones that will run
@@ -417,14 +416,14 @@ func MakeDefaultErrorFunc(client clientset.Interface, podQueue internalqueue.Sch
 		} else {
 			if _, ok := err.(*core.FitError); ok {
 				klog.V(2).Infof("Unable to schedule %v/%v: no fit: %v; waiting", pod.Namespace, pod.Name, err)
-			} else if errors.IsNotFound(err) {
+			} else if apierrors.IsNotFound(err) {
 				klog.V(2).Infof("Unable to schedule %v/%v: possibly due to node not found: %v; waiting", pod.Namespace, pod.Name, err)
-				if errStatus, ok := err.(errors.APIStatus); ok && errStatus.Status().Details.Kind == "node" {
+				if errStatus, ok := err.(apierrors.APIStatus); ok && errStatus.Status().Details.Kind == "node" {
 					nodeName := errStatus.Status().Details.Name
 					// when node is not found, We do not remove the node right away. Trying again to get
 					// the node and if the node is still not found, then remove it from the scheduler cache.
 					_, err := client.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
-					if err != nil && errors.IsNotFound(err) {
+					if err != nil && apierrors.IsNotFound(err) {
 						node := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName}}
 						if err := schedulerCache.RemoveNode(&node); err != nil {
 							klog.V(4).Infof("Node %q is not found; failed to remove it from the cache.", node.Name)
@@ -462,7 +461,7 @@ func MakeDefaultErrorFunc(client clientset.Interface, podQueue internalqueue.Sch
 					}
 					break
 				}
-				if errors.IsNotFound(err) {
+				if apierrors.IsNotFound(err) {
 					klog.Warningf("A pod %v no longer exists", podID)
 					return
 				}

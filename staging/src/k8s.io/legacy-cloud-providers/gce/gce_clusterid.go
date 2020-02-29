@@ -200,7 +200,7 @@ func (ci *ClusterID) getOrInitialize() error {
 		UIDProvider: newID,
 	}
 
-	if _, err := ci.client.CoreV1().ConfigMaps(UIDNamespace).Create(context.TODO(), cfg); err != nil {
+	if _, err := ci.client.CoreV1().ConfigMaps(UIDNamespace).Create(context.TODO(), cfg, metav1.CreateOptions{}); err != nil {
 		klog.Errorf("GCE cloud provider failed to create %v config map to store cluster id: %v", ci.cfgMapKey, err)
 		return err
 	}

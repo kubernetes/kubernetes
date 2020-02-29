@@ -18,6 +18,26 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+# Runs tests related to kubectl create --dry-run.
+run_kubectl_create_dry_run_tests() {
+  set -o nounset
+  set -o errexit
+
+  create_and_use_new_namespace
+  kube::log::status "Testing kubectl create dry-run"
+
+  # Pre-Condition: no POD exists
+  kube::test::get_object_assert pods "{{range.items}}{{${id_field:?}}}:{{end}}" ''
+  # dry-run create
+  kubectl create --dry-run=client -f hack/testdata/pod.yaml "${kube_flags[@]:?}"
+  kubectl create --dry-run=server -f hack/testdata/pod.yaml "${kube_flags[@]:?}"
+  # check no POD exists
+  kube::test::get_object_assert pods "{{range.items}}{{${id_field:?}}}:{{end}}" ''
+
+  set +o nounset
+  set +o errexit
+}
+
 # Runs tests related to kubectl create --filename(-f) --selector(-l).
 run_kubectl_create_filter_tests() {
   set -o nounset

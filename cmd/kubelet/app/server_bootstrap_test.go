@@ -300,7 +300,7 @@ func (s *csrSimulator) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			PrivateKey:  s.serverPrivateKey,
 			Backdate:    s.backdate,
 		}
-		cr, err := capihelper.ParseCSR(csr)
+		cr, err := capihelper.ParseCSR(csr.Spec.Request)
 		if err != nil {
 			t.Fatal(err)
 		}

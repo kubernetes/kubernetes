@@ -98,6 +98,16 @@ var (
 	zero       = int64(0)
 	lablecount = int64(0)
 
+	// The GC controller periodically rediscovers available APIs and syncs running informers for those resources.
+	// If previously available APIs are removed during that resync process, the sync process can fail and need to be retried.
+	//
+	// During e2e runs, parallel tests add/remove API resources (by creating/deleting CRDs and aggregated APIs),
+	// which makes it likely GC will need to retry informer resync at some point during an e2e run.
+	//
+	// This timeout covers two resync/retry periods, and should be added to wait timeouts to account for delays
+	// to the GC controller caused by API changes in other tests.
+	gcInformerResyncRetryTimeout = time.Minute
+
 	// CronJobGroupVersionResource unambiguously identifies a CronJob resource.
 	CronJobGroupVersionResource = schema.GroupVersionResource{Group: batchv1beta1.GroupName, Version: "v1beta1", Resource: "cronjobs"}
 )
@@ -321,7 +331,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		uniqLabels := getUniqLabel("gctest", "delete_pods")
 		rc := newOwnerRC(f, rcName, 2, uniqLabels)
 		ginkgo.By("create the rc")
-		rc, err := rcClient.Create(context.TODO(), rc)
+		rc, err := rcClient.Create(context.TODO(), rc, metav1.CreateOptions{})
 		if err != nil {
 			framework.Failf("Failed to create replication controller: %v", err)
 		}
@@ -351,7 +361,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		}
 		ginkgo.By("wait for all pods to be garbage collected")
 		// wait for the RCs and Pods to reach the expected numbers.
-		if err := wait.Poll(5*time.Second, 60*time.Second, func() (bool, error) {
+		if err := wait.Poll(5*time.Second, (60*time.Second)+gcInformerResyncRetryTimeout, func() (bool, error) {
 			objects := map[string]int{"ReplicationControllers": 0, "Pods": 0}
 			return verifyRemainingObjects(f, objects)
 		}); err != nil {
@@ -379,7 +389,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		uniqLabels := getUniqLabel("gctest", "orphan_pods")
 		rc := newOwnerRC(f, rcName, estimateMaximumPods(clientSet, 10, 100), uniqLabels)
 		ginkgo.By("create the rc")
-		rc, err := rcClient.Create(context.TODO(), rc)
+		rc, err := rcClient.Create(context.TODO(), rc, metav1.CreateOptions{})
 		if err != nil {
 			framework.Failf("Failed to create replication controller: %v", err)
 		}
@@ -411,7 +421,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		// actual qps is less than 5. Also, the e2e tests are running in
 		// parallel, the GC controller might get distracted by other tests.
 		// According to the test logs, 120s is enough time.
-		if err := wait.Poll(5*time.Second, 120*time.Second, func() (bool, error) {
+		if err := wait.Poll(5*time.Second, 120*time.Second+gcInformerResyncRetryTimeout, func() (bool, error) {
 			rcs, err := rcClient.List(context.TODO(), metav1.ListOptions{})
 			if err != nil {
 				return false, fmt.Errorf("failed to list rcs: %v", err)
@@ -445,7 +455,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		uniqLabels := getUniqLabel("gctest", "orphan_pods_nil_option")
 		rc := newOwnerRC(f, rcName, 2, uniqLabels)
 		ginkgo.By("create the rc")
-		rc, err := rcClient.Create(context.TODO(), rc)
+		rc, err := rcClient.Create(context.TODO(), rc, metav1.CreateOptions{})
 		if err != nil {
 			framework.Failf("Failed to create replication controller: %v", err)
 		}
@@ -493,7 +503,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		uniqLabels := getUniqLabel("gctest", "delete_rs")
 		deployment := newOwnerDeployment(f, deploymentName, uniqLabels)
 		ginkgo.By("create the deployment")
-		createdDeployment, err := deployClient.Create(context.TODO(), deployment)
+		createdDeployment, err := deployClient.Create(context.TODO(), deployment, metav1.CreateOptions{})
 		if err != nil {
 			framework.Failf("Failed to create deployment: %v", err)
 		}
@@ -518,7 +528,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 			framework.Failf("failed to delete the deployment: %v", err)
 		}
 		ginkgo.By("wait for all rs to be garbage collected")
-		err = wait.PollImmediate(500*time.Millisecond, 1*time.Minute, func() (bool, error) {
+		err = wait.PollImmediate(500*time.Millisecond, 1*time.Minute+gcInformerResyncRetryTimeout, func() (bool, error) {
 			objects := map[string]int{"Deployments": 0, "ReplicaSets": 0, "Pods": 0}
 			return verifyRemainingObjects(f, objects)
 		})
@@ -552,7 +562,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		uniqLabels := getUniqLabel("gctest", "orphan_rs")
 		deployment := newOwnerDeployment(f, deploymentName, uniqLabels)
 		ginkgo.By("create the deployment")
-		createdDeployment, err := deployClient.Create(context.TODO(), deployment)
+		createdDeployment, err := deployClient.Create(context.TODO(), deployment, metav1.CreateOptions{})
 		if err != nil {
 			framework.Failf("Failed to create deployment: %v", err)
 		}
@@ -577,7 +587,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 			framework.Failf("failed to delete the deployment: %v", err)
 		}
 		ginkgo.By("wait for deployment deletion to see if the garbage collector mistakenly deletes the rs")
-		err = wait.PollImmediate(500*time.Millisecond, 1*time.Minute, func() (bool, error) {
+		err = wait.PollImmediate(500*time.Millisecond, 1*time.Minute+gcInformerResyncRetryTimeout, func() (bool, error) {
 			dList, err := deployClient.List(context.TODO(), metav1.ListOptions{})
 			if err != nil {
 				return false, fmt.Errorf("failed to list deployments: %v", err)
@@ -636,7 +646,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		uniqLabels := getUniqLabel("gctest", "delete_pods_foreground")
 		rc := newOwnerRC(f, rcName, estimateMaximumPods(clientSet, 10, 100), uniqLabels)
 		ginkgo.By("create the rc")
-		rc, err := rcClient.Create(context.TODO(), rc)
+		rc, err := rcClient.Create(context.TODO(), rc, metav1.CreateOptions{})
 		if err != nil {
 			framework.Failf("Failed to create replication controller: %v", err)
 		}
@@ -665,7 +675,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		// owner deletion, but in practice there can be a long delay between owner
 		// deletion and dependent deletion processing. For now, increase the timeout
 		// and investigate the processing delay.
-		if err := wait.Poll(1*time.Second, 60*time.Second, func() (bool, error) {
+		if err := wait.Poll(1*time.Second, 30*time.Second+gcInformerResyncRetryTimeout, func() (bool, error) {
 			_, err := rcClient.Get(context.TODO(), rc.Name, metav1.GetOptions{})
 			if err == nil {
 				pods, _ := podClient.List(context.TODO(), metav1.ListOptions{})
@@ -723,7 +733,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		uniqLabelsDeleted := getUniqLabel("gctest_d", "valid_and_pending_owners_d")
 		rc1 := newOwnerRC(f, rc1Name, replicas, uniqLabelsDeleted)
 		ginkgo.By("create the rc1")
-		rc1, err := rcClient.Create(context.TODO(), rc1)
+		rc1, err := rcClient.Create(context.TODO(), rc1, metav1.CreateOptions{})
 		if err != nil {
 			framework.Failf("Failed to create replication controller: %v", err)
 		}
@@ -731,7 +741,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		uniqLabelsStay := getUniqLabel("gctest_s", "valid_and_pending_owners_s")
 		rc2 := newOwnerRC(f, rc2Name, 0, uniqLabelsStay)
 		ginkgo.By("create the rc2")
-		rc2, err = rcClient.Create(context.TODO(), rc2)
+		rc2, err = rcClient.Create(context.TODO(), rc2, metav1.CreateOptions{})
 		if err != nil {
 			framework.Failf("Failed to create replication controller: %v", err)
 		}
@@ -754,7 +764,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		patch := fmt.Sprintf(`{"metadata":{"ownerReferences":[{"apiVersion":"v1","kind":"ReplicationController","name":"%s","uid":"%s"}]}}`, rc2.ObjectMeta.Name, rc2.ObjectMeta.UID)
 		for i := 0; i < halfReplicas; i++ {
 			pod := pods.Items[i]
-			_, err := podClient.Patch(context.TODO(), pod.Name, types.StrategicMergePatchType, []byte(patch))
+			_, err := podClient.Patch(context.TODO(), pod.Name, types.StrategicMergePatchType, []byte(patch), metav1.PatchOptions{})
 			framework.ExpectNoError(err, "failed to apply to pod %s in namespace %s, a strategic merge patch: %s", pod.Name, f.Namespace.Name, patch)
 		}
 
@@ -829,30 +839,30 @@ var _ = SIGDescribe("Garbage collector", func() {
 		podClient := clientSet.CoreV1().Pods(f.Namespace.Name)
 		pod1Name := "pod1"
 		pod1 := newGCPod(pod1Name)
-		pod1, err := podClient.Create(context.TODO(), pod1)
+		pod1, err := podClient.Create(context.TODO(), pod1, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create pod %s in namespace: %s", pod1Name, f.Namespace.Name)
 		pod2Name := "pod2"
 		pod2 := newGCPod(pod2Name)
-		pod2, err = podClient.Create(context.TODO(), pod2)
+		pod2, err = podClient.Create(context.TODO(), pod2, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create pod %s in namespace: %s", pod2Name, f.Namespace.Name)
 		pod3Name := "pod3"
 		pod3 := newGCPod(pod3Name)
-		pod3, err = podClient.Create(context.TODO(), pod3)
+		pod3, err = podClient.Create(context.TODO(), pod3, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create pod %s in namespace: %s", pod3Name, f.Namespace.Name)
 		// create circular dependency
 		addRefPatch := func(name string, uid types.UID) []byte {
 			return []byte(fmt.Sprintf(`{"metadata":{"ownerReferences":[{"apiVersion":"v1","kind":"Pod","name":"%s","uid":"%s","controller":true,"blockOwnerDeletion":true}]}}`, name, uid))
 		}
 		patch1 := addRefPatch(pod3.Name, pod3.UID)
-		pod1, err = podClient.Patch(context.TODO(), pod1.Name, types.StrategicMergePatchType, patch1)
+		pod1, err = podClient.Patch(context.TODO(), pod1.Name, types.StrategicMergePatchType, patch1, metav1.PatchOptions{})
 		framework.ExpectNoError(err, "failed to apply to pod %s in namespace %s, a strategic merge patch: %s", pod1.Name, f.Namespace.Name, patch1)
 		framework.Logf("pod1.ObjectMeta.OwnerReferences=%#v", pod1.ObjectMeta.OwnerReferences)
 		patch2 := addRefPatch(pod1.Name, pod1.UID)
-		pod2, err = podClient.Patch(context.TODO(), pod2.Name, types.StrategicMergePatchType, patch2)
+		pod2, err = podClient.Patch(context.TODO(), pod2.Name, types.StrategicMergePatchType, patch2, metav1.PatchOptions{})
 		framework.ExpectNoError(err, "failed to apply to pod %s in namespace %s, a strategic merge patch: %s", pod2.Name, f.Namespace.Name, patch2)
 		framework.Logf("pod2.ObjectMeta.OwnerReferences=%#v", pod2.ObjectMeta.OwnerReferences)
 		patch3 := addRefPatch(pod2.Name, pod2.UID)
-		pod3, err = podClient.Patch(context.TODO(), pod3.Name, types.StrategicMergePatchType, patch3)
+		pod3, err = podClient.Patch(context.TODO(), pod3.Name, types.StrategicMergePatchType, patch3, metav1.PatchOptions{})
 		framework.ExpectNoError(err, "failed to apply to pod %s in namespace %s, a strategic merge patch: %s", pod3.Name, f.Namespace.Name, patch3)
 		framework.Logf("pod3.ObjectMeta.OwnerReferences=%#v", pod3.ObjectMeta.OwnerReferences)
 		// delete one pod, should result in the deletion of all pods
@@ -864,7 +874,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		var err2 error
 		// TODO: shorten the timeout when we make GC's periodic API rediscovery more efficient.
 		// Tracked at https://github.com/kubernetes/kubernetes/issues/50046.
-		if err := wait.Poll(5*time.Second, 90*time.Second, func() (bool, error) {
+		if err := wait.Poll(5*time.Second, 90*time.Second+gcInformerResyncRetryTimeout, func() (bool, error) {
 			pods, err2 = podClient.List(context.TODO(), metav1.ListOptions{})
 			if err2 != nil {
 				return false, fmt.Errorf("failed to list pods: %v", err)
@@ -1125,7 +1135,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 
 		ginkgo.By("Create the cronjob")
 		cronJob := newCronJob("simple", "*/1 * * * ?")
-		cronJob, err := f.ClientSet.BatchV1beta1().CronJobs(f.Namespace.Name).Create(context.TODO(), cronJob)
+		cronJob, err := f.ClientSet.BatchV1beta1().CronJobs(f.Namespace.Name).Create(context.TODO(), cronJob, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create cronjob: %+v, in namespace: %s", cronJob, f.Namespace.Name)
 
 		ginkgo.By("Wait for the CronJob to create new Job")

@@ -48,6 +48,8 @@ type mergingWalker struct {
 
 	// Allocate only as many walkers as needed for the depth by storing them here.
 	spareWalkers *[]*mergingWalker
+
+	allocator value.Allocator
 }
 
 // merge rules examine w.lhs and w.rhs (up to one of which may be nil) and
@@ -148,18 +150,15 @@ func (w *mergingWalker) finishDescent(w2 *mergingWalker) {
 	*w.spareWalkers = append(*w.spareWalkers, w2)
 }
 
-func (w *mergingWalker) derefMap(prefix string, v value.Value, dest *value.Map) (errs ValidationErrors) {
-	// taking dest as input so that it can be called as a one-liner with
-	// append.
+func (w *mergingWalker) derefMap(prefix string, v value.Value) (value.Map, ValidationErrors) {
 	if v == nil {
-		return nil
+		return nil, nil
 	}
-	m, err := mapValue(v)
+	m, err := mapValue(w.allocator, v)
 	if err != nil {
-		return errorf("%v: %v", prefix, err)
+		return nil, errorf("%v: %v", prefix, err)
 	}
-	*dest = m
-	return nil
+	return m, nil
 }
 
 func (w *mergingWalker) visitListItems(t *schema.List, lhs, rhs value.List) (errs ValidationErrors) {
@@ -184,7 +183,7 @@ func (w *mergingWalker) visitListItems(t *schema.List, lhs, rhs value.List) (err
 	if rhs != nil {
 		for i := 0; i < rhs.Length(); i++ {
 			child := rhs.At(i)
-			pe, err := listItemToPathElement(t, i, child)
+			pe, err := listItemToPathElement(w.allocator, t, i, child)
 			if err != nil {
 				errs = append(errs, errorf("rhs: element %v: %v", i, err.Error())...)
 				// If we can't construct the path element, we can't
@@ -205,7 +204,7 @@ func (w *mergingWalker) visitListItems(t *schema.List, lhs, rhs value.List) (err
 	if lhs != nil {
 		for i := 0; i < lhs.Length(); i++ {
 			child := lhs.At(i)
-			pe, err := listItemToPathElement(t, i, child)
+			pe, err := listItemToPathElement(w.allocator, t, i, child)
 			if err != nil {
 				errs = append(errs, errorf("lhs: element %v: %v", i, err.Error())...)
 				// If we can't construct the path element, we can't
@@ -253,24 +252,26 @@ func (w *mergingWalker) visitListItems(t *schema.List, lhs, rhs value.List) (err
 	return errs
 }
 
-func (w *mergingWalker) derefList(prefix string, v value.Value, dest *value.List) (errs ValidationErrors) {
-	// taking dest as input so that it can be called as a one-liner with
-	// append.
+func (w *mergingWalker) derefList(prefix string, v value.Value) (value.List, ValidationErrors) {
 	if v == nil {
-		return nil
+		return nil, nil
 	}
-	l, err := listValue(v)
+	l, err := listValue(w.allocator, v)
 	if err != nil {
-		return errorf("%v: %v", prefix, err)
+		return nil, errorf("%v: %v", prefix, err)
 	}
-	*dest = l
-	return nil
+	return l, nil
 }
 
 func (w *mergingWalker) doList(t *schema.List) (errs ValidationErrors) {
-	var lhs, rhs value.List
-	w.derefList("lhs: ", w.lhs, &lhs)
-	w.derefList("rhs: ", w.rhs, &rhs)
+	lhs, _ := w.derefList("lhs: ", w.lhs)
+	if lhs != nil {
+		defer w.allocator.Free(lhs)
+	}
+	rhs, _ := w.derefList("rhs: ", w.rhs)
+	if rhs != nil {
+		defer w.allocator.Free(rhs)
+	}
 
 	// If both lhs and rhs are empty/null, treat it as a
 	// leaf: this helps preserve the empty/null
@@ -311,31 +312,10 @@ func (w *mergingWalker) visitMapItem(t *schema.Map, out map[string]interface{}, 
 func (w *mergingWalker) visitMapItems(t *schema.Map, lhs, rhs value.Map) (errs ValidationErrors) {
 	out := map[string]interface{}{}
 
-	if lhs != nil {
-		lhs.Iterate(func(key string, val value.Value) bool {
-			var rval value.Value
-			if rhs != nil {
-				if item, ok := rhs.Get(key); ok {
-					rval = item
-					defer rval.Recycle()
-				}
-			}
-			errs = append(errs, w.visitMapItem(t, out, key, val, rval)...)
-			return true
-		})
-	}
-
-	if rhs != nil {
-		rhs.Iterate(func(key string, val value.Value) bool {
-			if lhs != nil {
-				if lhs.Has(key) {
-					return true
-				}
-			}
-			errs = append(errs, w.visitMapItem(t, out, key, nil, val)...)
-			return true
-		})
-	}
+	value.MapZipUsing(w.allocator, lhs, rhs, value.Unordered, func(key string, lhsValue, rhsValue value.Value) bool {
+		errs = append(errs, w.visitMapItem(t, out, key, lhsValue, rhsValue)...)
+		return true
+	})
 	if len(out) > 0 {
 		i := interface{}(out)
 		w.out = &i
@@ -345,14 +325,18 @@ func (w *mergingWalker) visitMapItems(t *schema.Map, lhs, rhs value.Map) (errs V
 }
 
 func (w *mergingWalker) doMap(t *schema.Map) (errs ValidationErrors) {
-	var lhs, rhs value.Map
-	w.derefMap("lhs: ", w.lhs, &lhs)
-	w.derefMap("rhs: ", w.rhs, &rhs)
-
+	lhs, _ := w.derefMap("lhs: ", w.lhs)
+	if lhs != nil {
+		defer w.allocator.Free(lhs)
+	}
+	rhs, _ := w.derefMap("rhs: ", w.rhs)
+	if rhs != nil {
+		defer w.allocator.Free(rhs)
+	}
 	// If both lhs and rhs are empty/null, treat it as a
 	// leaf: this helps preserve the empty/null
 	// distinction.
-	emptyPromoteToLeaf := (lhs == nil || lhs.Length() == 0) && (rhs == nil || rhs.Length() == 0)
+	emptyPromoteToLeaf := (lhs == nil || lhs.Empty()) && (rhs == nil || rhs.Empty())
 
 	if t.ElementRelationship == schema.Atomic || emptyPromoteToLeaf {
 		w.doLeaf()

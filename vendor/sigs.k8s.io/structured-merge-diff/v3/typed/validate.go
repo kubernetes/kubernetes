@@ -33,6 +33,9 @@ func (tv TypedValue) walker() *validatingObjectWalker {
 	v.value = tv.value
 	v.schema = tv.schema
 	v.typeRef = tv.typeRef
+	if v.allocator == nil {
+		v.allocator = value.NewFreelistAllocator()
+	}
 	return v
 }
 
@@ -49,6 +52,7 @@ type validatingObjectWalker struct {
 
 	// Allocate only as many walkers as needed for the depth by storing them here.
 	spareWalkers *[]*validatingObjectWalker
+	allocator    value.Allocator
 }
 
 func (v *validatingObjectWalker) prepareDescent(tr schema.TypeRef) *validatingObjectWalker {
@@ -112,13 +116,14 @@ func (v *validatingObjectWalker) doScalar(t *schema.Scalar) ValidationErrors {
 func (v *validatingObjectWalker) visitListItems(t *schema.List, list value.List) (errs ValidationErrors) {
 	observedKeys := fieldpath.MakePathElementSet(list.Length())
 	for i := 0; i < list.Length(); i++ {
-		child := list.At(i)
+		child := list.AtUsing(v.allocator, i)
+		defer v.allocator.Free(child)
 		var pe fieldpath.PathElement
 		if t.ElementRelationship != schema.Associative {
 			pe.Index = &i
 		} else {
 			var err error
-			pe, err = listItemToPathElement(t, i, child)
+			pe, err = listItemToPathElement(v.allocator, t, i, child)
 			if err != nil {
 				errs = append(errs, errorf("element %v: %v", i, err.Error())...)
 				// If we can't construct the path element, we can't
@@ -140,7 +145,7 @@ func (v *validatingObjectWalker) visitListItems(t *schema.List, list value.List)
 }
 
 func (v *validatingObjectWalker) doList(t *schema.List) (errs ValidationErrors) {
-	list, err := listValue(v.value)
+	list, err := listValue(v.allocator, v.value)
 	if err != nil {
 		return errorf(err.Error())
 	}
@@ -149,13 +154,14 @@ func (v *validatingObjectWalker) doList(t *schema.List) (errs ValidationErrors) 
 		return nil
 	}
 
+	defer v.allocator.Free(list)
 	errs = v.visitListItems(t, list)
 
 	return errs
 }
 
 func (v *validatingObjectWalker) visitMapItems(t *schema.Map, m value.Map) (errs ValidationErrors) {
-	m.Iterate(func(key string, val value.Value) bool {
+	m.IterateUsing(v.allocator, func(key string, val value.Value) bool {
 		pe := fieldpath.PathElement{FieldName: &key}
 		tr := t.ElementType
 		if sf, ok := t.FindField(key); ok {
@@ -175,15 +181,14 @@ func (v *validatingObjectWalker) visitMapItems(t *schema.Map, m value.Map) (errs
 }
 
 func (v *validatingObjectWalker) doMap(t *schema.Map) (errs ValidationErrors) {
-	m, err := mapValue(v.value)
+	m, err := mapValue(v.allocator, v.value)
 	if err != nil {
 		return errorf(err.Error())
 	}
-
 	if m == nil {
 		return nil
 	}
-
+	defer v.allocator.Free(m)
 	errs = v.visitMapItems(t, m)
 
 	return errs

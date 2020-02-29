@@ -45,7 +45,7 @@ type realSJControl struct {
 var _ sjControlInterface = &realSJControl{}
 
 func (c *realSJControl) UpdateStatus(sj *batchv1beta1.CronJob) (*batchv1beta1.CronJob, error) {
-	return c.KubeClient.BatchV1beta1().CronJobs(sj.Namespace).UpdateStatus(context.TODO(), sj)
+	return c.KubeClient.BatchV1beta1().CronJobs(sj.Namespace).UpdateStatus(context.TODO(), sj, metav1.UpdateOptions{})
 }
 
 // fakeSJControl is the default implementation of sjControlInterface.
@@ -107,15 +107,15 @@ func (r realJobControl) GetJob(namespace, name string) (*batchv1.Job, error) {
 }
 
 func (r realJobControl) UpdateJob(namespace string, job *batchv1.Job) (*batchv1.Job, error) {
-	return r.KubeClient.BatchV1().Jobs(namespace).Update(context.TODO(), job)
+	return r.KubeClient.BatchV1().Jobs(namespace).Update(context.TODO(), job, metav1.UpdateOptions{})
 }
 
 func (r realJobControl) PatchJob(namespace string, name string, pt types.PatchType, data []byte, subresources ...string) (*batchv1.Job, error) {
-	return r.KubeClient.BatchV1().Jobs(namespace).Patch(context.TODO(), name, pt, data, subresources...)
+	return r.KubeClient.BatchV1().Jobs(namespace).Patch(context.TODO(), name, pt, data, metav1.PatchOptions{}, subresources...)
 }
 
 func (r realJobControl) CreateJob(namespace string, job *batchv1.Job) (*batchv1.Job, error) {
-	return r.KubeClient.BatchV1().Jobs(namespace).Create(context.TODO(), job)
+	return r.KubeClient.BatchV1().Jobs(namespace).Create(context.TODO(), job, metav1.CreateOptions{})
 }
 
 func (r realJobControl) DeleteJob(namespace string, name string) error {

@@ -55,7 +55,7 @@ type Client struct {
 // New creates a new network interface client with ratelimiting.
 func New(config *azclients.ClientConfig) *Client {
 	baseURI := config.ResourceManagerEndpoint
-	authorizer := autorest.NewBearerAuthorizer(config.ServicePrincipalToken)
+	authorizer := config.Authorizer
 	armClient := armclient.New(authorizer, baseURI, "", APIVersion, config.Location, config.Backoff)
 	rateLimiterReader, rateLimiterWriter := azclients.NewRateLimiter(config.RateLimitConfig)
 
@@ -273,4 +273,47 @@ func (c *Client) createOrUpdateResponder(resp *http.Response) (*network.Interfac
 		autorest.ByUnmarshallingJSON(&result))
 	result.Response = autorest.Response{Response: resp}
 	return result, retry.GetError(resp, err)
+}
+
+// Delete deletes a network interface by name.
+func (c *Client) Delete(ctx context.Context, resourceGroupName string, networkInterfaceName string) *retry.Error {
+	mc := metrics.NewMetricContext("interfaces", "delete", resourceGroupName, c.subscriptionID, "")
+
+	// Report errors if the client is rate limited.
+	if !c.rateLimiterWriter.TryAccept() {
+		mc.RateLimitedCount()
+		return retry.GetRateLimitError(true, "NicDelete")
+	}
+
+	// Report errors if the client is throttled.
+	if c.RetryAfterWriter.After(time.Now()) {
+		mc.ThrottledCount()
+		rerr := retry.GetThrottlingError("NicDelete", "client throttled", c.RetryAfterWriter)
+		return rerr
+	}
+
+	rerr := c.deleteInterface(ctx, resourceGroupName, networkInterfaceName)
+	mc.Observe(rerr.Error())
+	if rerr != nil {
+		if rerr.IsThrottled() {
+			// Update RetryAfterReader so that no more requests would be sent until RetryAfter expires.
+			c.RetryAfterWriter = rerr.RetryAfter
+		}
+
+		return rerr
+	}
+
+	return nil
+}
+
+// deleteInterface deletes a network interface by name.
+func (c *Client) deleteInterface(ctx context.Context, resourceGroupName string, networkInterfaceName string) *retry.Error {
+	resourceID := armclient.GetResourceID(
+		c.subscriptionID,
+		resourceGroupName,
+		"Microsoft.Network/networkInterfaces",
+		networkInterfaceName,
+	)
+
+	return c.armClient.DeleteResource(ctx, resourceID, "")
 }

@@ -72,7 +72,7 @@ var _ = SIGDescribe("Events", func() {
 			ginkgo.By("deleting the pod")
 			podClient.Delete(context.TODO(), pod.Name, nil)
 		}()
-		if _, err := podClient.Create(context.TODO(), pod); err != nil {
+		if _, err := podClient.Create(context.TODO(), pod, metav1.CreateOptions{}); err != nil {
 			framework.Failf("Failed to create pod: %v", err)
 		}
 

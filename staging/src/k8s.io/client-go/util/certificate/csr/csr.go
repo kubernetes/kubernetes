@@ -46,7 +46,7 @@ import (
 // status, once approved by API server, it will return the API server's issued
 // certificate (pem-encoded). If there is any errors, or the watch timeouts, it
 // will return an error.
-func RequestCertificate(client certificatesclient.CertificateSigningRequestInterface, csrData []byte, name string, usages []certificates.KeyUsage, privateKey interface{}) (req *certificates.CertificateSigningRequest, err error) {
+func RequestCertificate(client certificatesclient.CertificateSigningRequestInterface, csrData []byte, name string, signerName string, usages []certificates.KeyUsage, privateKey interface{}) (req *certificates.CertificateSigningRequest, err error) {
 	csr := &certificates.CertificateSigningRequest{
 		// Username, UID, Groups will be injected by API server.
 		TypeMeta: metav1.TypeMeta{Kind: "CertificateSigningRequest"},
@@ -54,15 +54,16 @@ func RequestCertificate(client certificatesclient.CertificateSigningRequestInter
 			Name: name,
 		},
 		Spec: certificates.CertificateSigningRequestSpec{
-			Request: csrData,
-			Usages:  usages,
+			Request:    csrData,
+			Usages:     usages,
+			SignerName: &signerName,
 		},
 	}
 	if len(csr.Name) == 0 {
 		csr.GenerateName = "csr-"
 	}
 
-	req, err = client.Create(context.TODO(), csr)
+	req, err = client.Create(context.TODO(), csr, metav1.CreateOptions{})
 	switch {
 	case err == nil:
 	case errors.IsAlreadyExists(err) && len(name) > 0:
@@ -115,8 +116,12 @@ func WaitForCertificate(ctx context.Context, client certificatesclient.Certifica
 				if c.Type == certificates.CertificateDenied {
 					return false, fmt.Errorf("certificate signing request is not approved, reason: %v, message: %v", c.Reason, c.Message)
 				}
-				if c.Type == certificates.CertificateApproved && csr.Status.Certificate != nil {
-					return true, nil
+				if c.Type == certificates.CertificateApproved {
+					if csr.Status.Certificate != nil {
+						klog.V(2).Infof("certificate signing request %s is issued", csr.Name)
+						return true, nil
+					}
+					klog.V(2).Infof("certificate signing request %s is approved, waiting to be issued", csr.Name)
 				}
 			}
 			return false, nil

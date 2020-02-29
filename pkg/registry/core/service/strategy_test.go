@@ -196,7 +196,7 @@ func TestBeforeUpdate(t *testing.T) {
 			expectErr: true,
 		},
 		{
-			name: "change selectpor",
+			name: "change selector",
 			tweakSvc: func(oldSvc, newSvc *api.Service) {
 				newSvc.Spec.Selector = map[string]string{"newkey": "newvalue"}
 			},

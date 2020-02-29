@@ -227,7 +227,7 @@ func CreateVolumeResource(driver TestDriver, config *PerTestConfig, pattern test
 
 			ginkgo.By("creating a StorageClass " + r.Sc.Name)
 
-			r.Sc, err = cs.StorageV1().StorageClasses().Create(context.TODO(), r.Sc)
+			r.Sc, err = cs.StorageV1().StorageClasses().Create(context.TODO(), r.Sc, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 
 			if r.Sc != nil {
@@ -429,10 +429,9 @@ func convertTestConfig(in *PerTestConfig) volume.TestConfig {
 	}
 
 	return volume.TestConfig{
-		Namespace:      in.Framework.Namespace.Name,
-		Prefix:         in.Prefix,
-		ClientNodeName: in.ClientNodeName,
-		NodeSelector:   in.ClientNodeSelector,
+		Namespace:           in.Framework.Namespace.Name,
+		Prefix:              in.Prefix,
+		ClientNodeSelection: in.ClientNodeSelection,
 	}
 }
 

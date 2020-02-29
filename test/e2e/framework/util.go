@@ -87,8 +87,6 @@ const (
 	// PodListTimeout is how long to wait for the pod to be listable.
 	PodListTimeout = time.Minute
 	// PodStartTimeout is how long to wait for the pod to be started.
-	// Initial pod start can be delayed O(minutes) by slow docker pulls.
-	// TODO: Make this 30 seconds once #4566 is resolved.
 	PodStartTimeout = 5 * time.Minute
 
 	// PodStartShortTimeout is same as `PodStartTimeout` to wait for the pod to be started, but shorter.
@@ -104,12 +102,6 @@ const (
 
 	// PodEventTimeout is how much we wait for a pod event to occur.
 	PodEventTimeout = 2 * time.Minute
-
-	// NamespaceCleanupTimeout is how long to wait for the namespace to be deleted.
-	// If there are any orphaned namespaces to clean up, this test is running
-	// on a long lived cluster. A long wait here is preferably to spurious test
-	// failures caused by leaked resources from a previous test run.
-	NamespaceCleanupTimeout = 15 * time.Minute
 
 	// ServiceStartTimeout is how long to wait for a service endpoint to be resolvable.
 	ServiceStartTimeout = 3 * time.Minute
@@ -127,7 +119,6 @@ const (
 
 	// SingleCallTimeout is how long to try single API calls (like 'get' or 'list'). Used to prevent
 	// transient failures from failing tests.
-	// TODO: client should not apply this timeout to Watch calls. Increased from 30s until that is fixed.
 	SingleCallTimeout = 5 * time.Minute
 
 	// NodeReadyInitialTimeout is how long nodes have to be "ready" when a test begins. They should already
@@ -141,12 +132,8 @@ const (
 	// Use it case by case when we are sure this timeout is enough.
 	ClaimProvisionShortTimeout = 1 * time.Minute
 
-	// ClaimDeletingTimeout is How long claims have to become deleted.
-	ClaimDeletingTimeout = 3 * time.Minute
-
-	// RecreateNodeReadyAgainTimeout is how long a node is allowed to become "Ready" after it is recreated before
-	// the test is considered failed.
-	RecreateNodeReadyAgainTimeout = 10 * time.Minute
+	// ClaimProvisionTimeout is how long claims have to become dynamically provisioned.
+	ClaimProvisionTimeout = 5 * time.Minute
 
 	// RestartNodeReadyAgainTimeout is how long a node is allowed to become "Ready" after it is restarted before
 	// the test is considered failed.
@@ -174,9 +161,6 @@ const (
 )
 
 var (
-	// ClaimProvisionTimeout is how long claims have to become dynamically provisioned.
-	ClaimProvisionTimeout = 5 * time.Minute
-
 	// BusyBoxImage is the image URI of BusyBox.
 	BusyBoxImage = imageutils.GetE2EImage(imageutils.BusyBox)
 
@@ -383,7 +367,7 @@ func CreateTestingNS(baseName string, c clientset.Interface, labels map[string]s
 	var got *v1.Namespace
 	if err := wait.PollImmediate(Poll, 30*time.Second, func() (bool, error) {
 		var err error
-		got, err = c.CoreV1().Namespaces().Create(context.TODO(), namespaceObj)
+		got, err = c.CoreV1().Namespaces().Create(context.TODO(), namespaceObj, metav1.CreateOptions{})
 		if err != nil {
 			Logf("Unexpected error while creating namespace: %v", err)
 			return false, nil
@@ -609,7 +593,7 @@ func AssertCleanup(ns string, selectors ...string) {
 // executed in a specific pod container.
 // TODO(alejandrox1): move to pod/ subpkg once kubectl methods are refactored.
 func LookForStringInPodExec(ns, podName string, command []string, expectedString string, timeout time.Duration) (result string, err error) {
-	return LookForString(expectedString, timeout, func() string {
+	return lookForString(expectedString, timeout, func() string {
 		// use the first container
 		args := []string{"exec", podName, fmt.Sprintf("--namespace=%v", ns), "--"}
 		args = append(args, command...)
@@ -617,11 +601,11 @@ func LookForStringInPodExec(ns, podName string, command []string, expectedString
 	})
 }
 
-// LookForString looks for the given string in the output of fn, repeatedly calling fn until
+// lookForString looks for the given string in the output of fn, repeatedly calling fn until
 // the timeout is reached or the string is found. Returns last log and possibly
 // error if the string was not found.
 // TODO(alejandrox1): move to pod/ subpkg once kubectl methods are refactored.
-func LookForString(expectedString string, timeout time.Duration, fn func() string) (result string, err error) {
+func lookForString(expectedString string, timeout time.Duration, fn func() string) (result string, err error) {
 	for t := time.Now(); time.Since(t) < timeout; time.Sleep(Poll) {
 		result = fn()
 		if strings.Contains(result, expectedString) {
@@ -1538,7 +1522,11 @@ func headersForConfig(c *restclient.Config, url *url.URL) (http.Header, error) {
 	if err != nil {
 		return nil, err
 	}
-	if _, err := rt.RoundTrip(&http.Request{URL: url}); err != nil {
+	request, err := http.NewRequest("GET", url.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := rt.RoundTrip(request); err != nil {
 		return nil, err
 	}
 	return extract.Header, nil
@@ -1572,7 +1560,7 @@ func OpenWebSocketForURL(url *url.URL, config *restclient.Config, protocols []st
 
 // LookForStringInLog looks for the given string in the log of a specific pod container
 func LookForStringInLog(ns, podName, container, expectedString string, timeout time.Duration) (result string, err error) {
-	return LookForString(expectedString, timeout, func() string {
+	return lookForString(expectedString, timeout, func() string {
 		return RunKubectlOrDie(ns, "logs", podName, container, fmt.Sprintf("--namespace=%v", ns))
 	})
 }
@@ -1880,7 +1868,6 @@ func DumpDebugInfo(c clientset.Interface, ns string) {
 
 // DsFromManifest reads a .json/yaml file and returns the daemonset in it.
 func DsFromManifest(url string) (*appsv1.DaemonSet, error) {
-	var ds appsv1.DaemonSet
 	Logf("Parsing ds from %v", url)
 
 	var response *http.Response
@@ -1906,7 +1893,12 @@ func DsFromManifest(url string) (*appsv1.DaemonSet, error) {
 	if err != nil {
 		return nil, fmt.Errorf("Failed to read html response body: %v", err)
 	}
+	return DsFromData(data)
+}
 
+// DsFromData reads a byte slice and returns the daemonset in it.
+func DsFromData(data []byte) (*appsv1.DaemonSet, error) {
+	var ds appsv1.DaemonSet
 	dataJSON, err := utilyaml.ToJSON(data)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to parse data to json: %v", err)

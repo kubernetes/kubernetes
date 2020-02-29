@@ -38,15 +38,15 @@ type JobsGetter interface {
 
 // JobInterface has methods to work with Job resources.
 type JobInterface interface {
-	Create(context.Context, *v1.Job) (*v1.Job, error)
-	Update(context.Context, *v1.Job) (*v1.Job, error)
-	UpdateStatus(context.Context, *v1.Job) (*v1.Job, error)
-	Delete(ctx context.Context, name string, options *metav1.DeleteOptions) error
-	DeleteCollection(ctx context.Context, options *metav1.DeleteOptions, listOptions metav1.ListOptions) error
-	Get(ctx context.Context, name string, options metav1.GetOptions) (*v1.Job, error)
+	Create(ctx context.Context, job *v1.Job, opts metav1.CreateOptions) (*v1.Job, error)
+	Update(ctx context.Context, job *v1.Job, opts metav1.UpdateOptions) (*v1.Job, error)
+	UpdateStatus(ctx context.Context, job *v1.Job, opts metav1.UpdateOptions) (*v1.Job, error)
+	Delete(ctx context.Context, name string, opts *metav1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.Job, error)
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.JobList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Job, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Job, err error)
 	JobExpansion
 }
 
@@ -110,11 +110,12 @@ func (c *jobs) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interf
 }
 
 // Create takes the representation of a job and creates it.  Returns the server's representation of the job, and an error, if there is any.
-func (c *jobs) Create(ctx context.Context, job *v1.Job) (result *v1.Job, err error) {
+func (c *jobs) Create(ctx context.Context, job *v1.Job, opts metav1.CreateOptions) (result *v1.Job, err error) {
 	result = &v1.Job{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("jobs").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(job).
 		Do(ctx).
 		Into(result)
@@ -122,12 +123,13 @@ func (c *jobs) Create(ctx context.Context, job *v1.Job) (result *v1.Job, err err
 }
 
 // Update takes the representation of a job and updates it. Returns the server's representation of the job, and an error, if there is any.
-func (c *jobs) Update(ctx context.Context, job *v1.Job) (result *v1.Job, err error) {
+func (c *jobs) Update(ctx context.Context, job *v1.Job, opts metav1.UpdateOptions) (result *v1.Job, err error) {
 	result = &v1.Job{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("jobs").
 		Name(job.Name).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(job).
 		Do(ctx).
 		Into(result)
@@ -136,14 +138,14 @@ func (c *jobs) Update(ctx context.Context, job *v1.Job) (result *v1.Job, err err
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-
-func (c *jobs) UpdateStatus(ctx context.Context, job *v1.Job) (result *v1.Job, err error) {
+func (c *jobs) UpdateStatus(ctx context.Context, job *v1.Job, opts metav1.UpdateOptions) (result *v1.Job, err error) {
 	result = &v1.Job{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("jobs").
 		Name(job.Name).
 		SubResource("status").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(job).
 		Do(ctx).
 		Into(result)
@@ -178,13 +180,14 @@ func (c *jobs) DeleteCollection(ctx context.Context, options *metav1.DeleteOptio
 }
 
 // Patch applies the patch and returns the patched job.
-func (c *jobs) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Job, err error) {
+func (c *jobs) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Job, err error) {
 	result = &v1.Job{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("jobs").
-		SubResource(subresources...).
 		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

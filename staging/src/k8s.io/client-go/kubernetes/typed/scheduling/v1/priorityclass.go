@@ -38,14 +38,14 @@ type PriorityClassesGetter interface {
 
 // PriorityClassInterface has methods to work with PriorityClass resources.
 type PriorityClassInterface interface {
-	Create(context.Context, *v1.PriorityClass) (*v1.PriorityClass, error)
-	Update(context.Context, *v1.PriorityClass) (*v1.PriorityClass, error)
-	Delete(ctx context.Context, name string, options *metav1.DeleteOptions) error
-	DeleteCollection(ctx context.Context, options *metav1.DeleteOptions, listOptions metav1.ListOptions) error
-	Get(ctx context.Context, name string, options metav1.GetOptions) (*v1.PriorityClass, error)
+	Create(ctx context.Context, priorityClass *v1.PriorityClass, opts metav1.CreateOptions) (*v1.PriorityClass, error)
+	Update(ctx context.Context, priorityClass *v1.PriorityClass, opts metav1.UpdateOptions) (*v1.PriorityClass, error)
+	Delete(ctx context.Context, name string, opts *metav1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.PriorityClass, error)
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.PriorityClassList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.PriorityClass, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.PriorityClass, err error)
 	PriorityClassExpansion
 }
 
@@ -104,10 +104,11 @@ func (c *priorityClasses) Watch(ctx context.Context, opts metav1.ListOptions) (w
 }
 
 // Create takes the representation of a priorityClass and creates it.  Returns the server's representation of the priorityClass, and an error, if there is any.
-func (c *priorityClasses) Create(ctx context.Context, priorityClass *v1.PriorityClass) (result *v1.PriorityClass, err error) {
+func (c *priorityClasses) Create(ctx context.Context, priorityClass *v1.PriorityClass, opts metav1.CreateOptions) (result *v1.PriorityClass, err error) {
 	result = &v1.PriorityClass{}
 	err = c.client.Post().
 		Resource("priorityclasses").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(priorityClass).
 		Do(ctx).
 		Into(result)
@@ -115,11 +116,12 @@ func (c *priorityClasses) Create(ctx context.Context, priorityClass *v1.Priority
 }
 
 // Update takes the representation of a priorityClass and updates it. Returns the server's representation of the priorityClass, and an error, if there is any.
-func (c *priorityClasses) Update(ctx context.Context, priorityClass *v1.PriorityClass) (result *v1.PriorityClass, err error) {
+func (c *priorityClasses) Update(ctx context.Context, priorityClass *v1.PriorityClass, opts metav1.UpdateOptions) (result *v1.PriorityClass, err error) {
 	result = &v1.PriorityClass{}
 	err = c.client.Put().
 		Resource("priorityclasses").
 		Name(priorityClass.Name).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(priorityClass).
 		Do(ctx).
 		Into(result)
@@ -152,12 +154,13 @@ func (c *priorityClasses) DeleteCollection(ctx context.Context, options *metav1.
 }
 
 // Patch applies the patch and returns the patched priorityClass.
-func (c *priorityClasses) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.PriorityClass, err error) {
+func (c *priorityClasses) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.PriorityClass, err error) {
 	result = &v1.PriorityClass{}
 	err = c.client.Patch(pt).
 		Resource("priorityclasses").
-		SubResource(subresources...).
 		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

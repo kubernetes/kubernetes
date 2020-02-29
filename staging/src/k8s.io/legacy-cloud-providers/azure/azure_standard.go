@@ -39,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog"
+	azcache "k8s.io/legacy-cloud-providers/azure/cache"
 
 	"k8s.io/component-base/featuregate"
 	utilnet "k8s.io/utils/net"
@@ -97,7 +98,7 @@ func (az *Cloud) getAvailabilitySetID(resourceGroup, availabilitySetName string)
 func (az *Cloud) getFrontendIPConfigID(lbName, rgName, fipConfigName string) string {
 	return fmt.Sprintf(
 		frontendIPConfigIDTemplate,
-		az.SubscriptionID,
+		az.getNetworkResourceSubscriptionID(),
 		rgName,
 		lbName,
 		fipConfigName)
@@ -107,7 +108,7 @@ func (az *Cloud) getFrontendIPConfigID(lbName, rgName, fipConfigName string) str
 func (az *Cloud) getBackendPoolID(lbName, rgName, backendPoolName string) string {
 	return fmt.Sprintf(
 		backendPoolIDTemplate,
-		az.SubscriptionID,
+		az.getNetworkResourceSubscriptionID(),
 		rgName,
 		lbName,
 		backendPoolName)
@@ -117,10 +118,18 @@ func (az *Cloud) getBackendPoolID(lbName, rgName, backendPoolName string) string
 func (az *Cloud) getLoadBalancerProbeID(lbName, rgName, lbRuleName string) string {
 	return fmt.Sprintf(
 		loadBalancerProbeIDTemplate,
-		az.SubscriptionID,
+		az.getNetworkResourceSubscriptionID(),
 		rgName,
 		lbName,
 		lbRuleName)
+}
+
+// getNetworkResourceSubscriptionID returns the subscription id which hosts network resources
+func (az *Cloud) getNetworkResourceSubscriptionID() string {
+	if az.Config.UsesNetworkResourceInDifferentTenant() {
+		return az.NetworkResourceSubscriptionID
+	}
+	return az.SubscriptionID
 }
 
 func (az *Cloud) mapLoadBalancerNameToVMSet(lbName string, clusterName string) (vmSetName string) {
@@ -255,18 +264,14 @@ func isInternalLoadBalancer(lb *network.LoadBalancer) bool {
 // getBackendPoolName the LB BackendPool name for a service.
 // to ensure backword and forward compat:
 // SingleStack -v4 (pre v1.16) => BackendPool name == clusterName
-// SingleStack -v6 => BackendPool name == clusterName (all cluster bootstrap uses this name)
+// SingleStack -v6 => BackendPool name == <clusterName>-IPv6 (all cluster bootstrap uses this name)
 // DualStack
 //	=> IPv4 BackendPool name == clusterName
 //  => IPv6 BackendPool name == <clusterName>-IPv6
 // This means:
-// clusters moving from IPv4 to duakstack will require no changes
-// clusters moving from IPv6 (while not seen in the wild, we can not rule out their existence)
-// to dualstack will require deleting backend pools (the reconciler will take care of creating correct backendpools)
-func getBackendPoolName(ipv6DualStackEnabled bool, clusterName string, service *v1.Service) string {
-	if !ipv6DualStackEnabled {
-		return clusterName
-	}
+// clusters moving from IPv4 to dualstack will require no changes
+// clusters moving from IPv6 to dualstack will require no changes as the IPv4 backend pool will created with <clusterName>
+func getBackendPoolName(clusterName string, service *v1.Service) string {
 	IPv6 := utilnet.IsIPv6String(service.Spec.ClusterIP)
 	if IPv6 {
 		return fmt.Sprintf("%v-IPv6", clusterName)
@@ -391,14 +396,14 @@ func (as *availabilitySet) GetInstanceIDByNodeName(name string) (string, error) 
 	var machine compute.VirtualMachine
 	var err error
 
-	machine, err = as.getVirtualMachine(types.NodeName(name), cacheReadTypeUnsafe)
+	machine, err = as.getVirtualMachine(types.NodeName(name), azcache.CacheReadTypeUnsafe)
 	if err == cloudprovider.InstanceNotFound {
 		return "", cloudprovider.InstanceNotFound
 	}
 	if err != nil {
 		if as.CloudProviderBackoff {
 			klog.V(2).Infof("GetInstanceIDByNodeName(%s) backing off", name)
-			machine, err = as.GetVirtualMachineWithRetry(types.NodeName(name), cacheReadTypeUnsafe)
+			machine, err = as.GetVirtualMachineWithRetry(types.NodeName(name), azcache.CacheReadTypeUnsafe)
 			if err != nil {
 				klog.V(2).Infof("GetInstanceIDByNodeName(%s) abort backoff", name)
 				return "", err
@@ -419,7 +424,7 @@ func (as *availabilitySet) GetInstanceIDByNodeName(name string) (string, error) 
 
 // GetPowerStatusByNodeName returns the power state of the specified node.
 func (as *availabilitySet) GetPowerStatusByNodeName(name string) (powerState string, err error) {
-	vm, err := as.getVirtualMachine(types.NodeName(name), cacheReadTypeDefault)
+	vm, err := as.getVirtualMachine(types.NodeName(name), azcache.CacheReadTypeDefault)
 	if err != nil {
 		return powerState, err
 	}
@@ -452,7 +457,7 @@ func (as *availabilitySet) GetNodeNameByProviderID(providerID string) (types.Nod
 
 // GetInstanceTypeByNodeName gets the instance type by node name.
 func (as *availabilitySet) GetInstanceTypeByNodeName(name string) (string, error) {
-	machine, err := as.getVirtualMachine(types.NodeName(name), cacheReadTypeUnsafe)
+	machine, err := as.getVirtualMachine(types.NodeName(name), azcache.CacheReadTypeUnsafe)
 	if err != nil {
 		klog.Errorf("as.GetInstanceTypeByNodeName(%s) failed: as.getVirtualMachine(%s) err=%v", name, name, err)
 		return "", err
@@ -464,7 +469,7 @@ func (as *availabilitySet) GetInstanceTypeByNodeName(name string) (string, error
 // GetZoneByNodeName gets availability zone for the specified node. If the node is not running
 // with availability zone, then it returns fault domain.
 func (as *availabilitySet) GetZoneByNodeName(name string) (cloudprovider.Zone, error) {
-	vm, err := as.getVirtualMachine(types.NodeName(name), cacheReadTypeUnsafe)
+	vm, err := as.getVirtualMachine(types.NodeName(name), azcache.CacheReadTypeUnsafe)
 	if err != nil {
 		return cloudprovider.Zone{}, err
 	}
@@ -665,7 +670,7 @@ func extractResourceGroupByNicID(nicID string) (string, error) {
 func (as *availabilitySet) getPrimaryInterfaceWithVMSet(nodeName, vmSetName string) (network.Interface, error) {
 	var machine compute.VirtualMachine
 
-	machine, err := as.GetVirtualMachineWithRetry(types.NodeName(nodeName), cacheReadTypeDefault)
+	machine, err := as.GetVirtualMachineWithRetry(types.NodeName(nodeName), azcache.CacheReadTypeDefault)
 	if err != nil {
 		klog.V(2).Infof("GetPrimaryInterface(%s, %s) abort backoff", nodeName, vmSetName)
 		return network.Interface{}, err
@@ -737,13 +742,13 @@ func (as *availabilitySet) EnsureHostInPool(service *v1.Service, nodeName types.
 	}
 
 	var primaryIPConfig *network.InterfaceIPConfiguration
-	if !as.Cloud.ipv6DualStackEnabled {
+	ipv6 := utilnet.IsIPv6String(service.Spec.ClusterIP)
+	if !as.Cloud.ipv6DualStackEnabled && !ipv6 {
 		primaryIPConfig, err = getPrimaryIPConfig(nic)
 		if err != nil {
 			return err
 		}
 	} else {
-		ipv6 := utilnet.IsIPv6String(service.Spec.ClusterIP)
 		primaryIPConfig, err = getIPConfigByIPFamily(nic, ipv6)
 		if err != nil {
 			return err

@@ -66,21 +66,26 @@ func exerciseQueueSetUniformScenario(t *testing.T, name string, qs fq.QueueSet, 
 			go func(i, j int, uc uniformClient, igr test.Integrator) {
 				for k := 0; k < uc.nCalls; k++ {
 					ClockWait(clk, counter, uc.thinkDuration)
-					for {
-						tryAnother, execute, afterExecute := qs.Wait(context.Background(), uc.hash, name, []int{i, j, k})
-						t.Logf("%s: %d, %d, %d got a=%v, e=%v", clk.Now().Format(nsTimeFmt), i, j, k, tryAnother, execute)
-						if tryAnother {
-							continue
-						}
-						if !execute {
-							atomic.AddUint64(&failedCount, 1)
-							break
-						}
+					req, idle := qs.StartRequest(context.Background(), uc.hash, name, []int{i, j, k})
+					t.Logf("%s: %d, %d, %d got req=%p, idle=%v", clk.Now().Format(nsTimeFmt), i, j, k, req, idle)
+					if req == nil {
+						atomic.AddUint64(&failedCount, 1)
+						break
+					}
+					if idle {
+						t.Error("got request but QueueSet reported idle")
+					}
+					var executed bool
+					idle2 := req.Finish(func() {
+						executed = true
+						t.Logf("%s: %d, %d, %d executing", clk.Now().Format(nsTimeFmt), i, j, k)
 						igr.Add(1)
 						ClockWait(clk, counter, uc.execDuration)
-						afterExecute()
 						igr.Add(-1)
-						break
+					})
+					t.Logf("%s: %d, %d, %d got executed=%v, idle2=%v", clk.Now().Format(nsTimeFmt), i, j, k, executed, idle2)
+					if !executed {
+						atomic.AddUint64(&failedCount, 1)
 					}
 				}
 				counter.Add(-1)
@@ -262,29 +267,44 @@ func TestContextCancel(t *testing.T) {
 	qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: 1})
 	counter.Add(1) // account for the goroutine running this test
 	ctx1 := context.Background()
-	another1, exec1, cleanup1 := qs.Wait(ctx1, 1, "test", "one")
-	if another1 || !exec1 {
-		t.Errorf("Unexpected: another1=%v, exec1=%v", another1, exec1)
+	req1, _ := qs.StartRequest(ctx1, 1, "test", "one")
+	if req1 == nil {
+		t.Error("Request rejected")
 		return
 	}
-	defer cleanup1()
-	ctx2, cancel2 := context.WithCancel(context.Background())
-	tBefore := time.Now()
-	go func() {
-		time.Sleep(time.Second)
-		cancel2()
-	}()
-	another2, exec2, cleanup2 := qs.Wait(ctx2, 2, "test", "two")
-	tAfter := time.Now()
-	if another2 || exec2 {
-		t.Errorf("Unexpected: another2=%v, exec2=%v", another2, exec2)
-		if exec2 {
-			defer cleanup2()
+	var executed1 bool
+	idle1 := req1.Finish(func() {
+		executed1 = true
+		ctx2, cancel2 := context.WithCancel(context.Background())
+		tBefore := time.Now()
+		go func() {
+			time.Sleep(time.Second)
+			// account for unblocking the goroutine that waits on cancelation
+			counter.Add(1)
+			cancel2()
+		}()
+		req2, idle2a := qs.StartRequest(ctx2, 2, "test", "two")
+		if idle2a {
+			t.Error("2nd StartRequest returned idle")
 		}
-	} else {
+		if req2 != nil {
+			idle2b := req2.Finish(func() {
+				t.Error("Executing req2")
+			})
+			if idle2b {
+				t.Error("2nd Finish returned idle")
+			}
+		}
+		tAfter := time.Now()
 		dt := tAfter.Sub(tBefore)
 		if dt < time.Second || dt > 2*time.Second {
 			t.Errorf("Unexpected: dt=%d", dt)
 		}
+	})
+	if !executed1 {
+		t.Errorf("Unexpected: executed1=%v", executed1)
+	}
+	if !idle1 {
+		t.Error("Not idle at the end")
 	}
 }

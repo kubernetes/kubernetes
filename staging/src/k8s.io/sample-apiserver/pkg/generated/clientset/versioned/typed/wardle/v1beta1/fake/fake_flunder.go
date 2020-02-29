@@ -81,7 +81,7 @@ func (c *FakeFlunders) Watch(ctx context.Context, opts v1.ListOptions) (watch.In
 }
 
 // Create takes the representation of a flunder and creates it.  Returns the server's representation of the flunder, and an error, if there is any.
-func (c *FakeFlunders) Create(ctx context.Context, flunder *v1beta1.Flunder) (result *v1beta1.Flunder, err error) {
+func (c *FakeFlunders) Create(ctx context.Context, flunder *v1beta1.Flunder, opts v1.CreateOptions) (result *v1beta1.Flunder, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(flundersResource, c.ns, flunder), &v1beta1.Flunder{})
 
@@ -92,7 +92,7 @@ func (c *FakeFlunders) Create(ctx context.Context, flunder *v1beta1.Flunder) (re
 }
 
 // Update takes the representation of a flunder and updates it. Returns the server's representation of the flunder, and an error, if there is any.
-func (c *FakeFlunders) Update(ctx context.Context, flunder *v1beta1.Flunder) (result *v1beta1.Flunder, err error) {
+func (c *FakeFlunders) Update(ctx context.Context, flunder *v1beta1.Flunder, opts v1.UpdateOptions) (result *v1beta1.Flunder, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(flundersResource, c.ns, flunder), &v1beta1.Flunder{})
 
@@ -104,7 +104,7 @@ func (c *FakeFlunders) Update(ctx context.Context, flunder *v1beta1.Flunder) (re
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeFlunders) UpdateStatus(ctx context.Context, flunder *v1beta1.Flunder) (*v1beta1.Flunder, error) {
+func (c *FakeFlunders) UpdateStatus(ctx context.Context, flunder *v1beta1.Flunder, opts v1.UpdateOptions) (*v1beta1.Flunder, error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateSubresourceAction(flundersResource, "status", c.ns, flunder), &v1beta1.Flunder{})
 
@@ -131,7 +131,7 @@ func (c *FakeFlunders) DeleteCollection(ctx context.Context, options *v1.DeleteO
 }
 
 // Patch applies the patch and returns the patched flunder.
-func (c *FakeFlunders) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.Flunder, err error) {
+func (c *FakeFlunders) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.Flunder, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(flundersResource, c.ns, name, pt, data, subresources...), &v1beta1.Flunder{})
 

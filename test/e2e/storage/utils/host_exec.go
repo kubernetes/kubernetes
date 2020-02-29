@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/exec"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -72,9 +73,14 @@ func (h *hostExecutor) launchNodeExecPod(node string) *v1.Pod {
 	f := h.Framework
 	cs := f.ClientSet
 	ns := f.Namespace
+
 	hostExecPod := e2epod.NewExecPodSpec(ns.Name, "", true)
 	hostExecPod.GenerateName = fmt.Sprintf("hostexec-%s-", node)
-	hostExecPod.Spec.NodeName = node
+	// Use NodeAffinity instead of NodeName so that pods will not
+	// be immediately Failed by kubelet if it's out of space. Instead
+	// Pods will be pending in the scheduler until there is space freed
+	// up.
+	e2epod.SetNodeAffinity(&hostExecPod.Spec, node)
 	hostExecPod.Spec.Volumes = []v1.Volume{
 		{
 			// Required to enter into host mount namespace via nsenter.
@@ -98,7 +104,7 @@ func (h *hostExecutor) launchNodeExecPod(node string) *v1.Pod {
 			return &privileged
 		}(true),
 	}
-	pod, err := cs.CoreV1().Pods(ns.Name).Create(context.TODO(), hostExecPod)
+	pod, err := cs.CoreV1().Pods(ns.Name).Create(context.TODO(), hostExecPod, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 	err = e2epod.WaitForPodRunningInNamespace(cs, pod)
 	framework.ExpectNoError(err)

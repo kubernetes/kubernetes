@@ -202,11 +202,9 @@ type WaitingPod interface {
 	// Allow declares the waiting pod is allowed to be scheduled by plugin pluginName.
 	// If this is the last remaining plugin to allow, then a success signal is delivered
 	// to unblock the pod.
-	// Returns true if the allow signal was successfully dealt with, false otherwise.
-	Allow(pluginName string) bool
-	// Reject declares the waiting pod unschedulable. Returns true if the reject signal
-	// was successfully delivered, false otherwise.
-	Reject(msg string) bool
+	Allow(pluginName string)
+	// Reject declares the waiting pod unschedulable.
+	Reject(msg string)
 }
 
 // Plugin is the parent type for all the scheduling framework plugins.
@@ -304,17 +302,16 @@ type FilterPlugin interface {
 	Filter(ctx context.Context, state *CycleState, pod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *Status
 }
 
-// PostFilterPlugin is an interface for Post-filter plugin. Post-filter is an
+// PreScorePlugin is an interface for Pre-score plugin. Pre-score is an
 // informational extension point. Plugins will be called with a list of nodes
 // that passed the filtering phase. A plugin may use this data to update internal
 // state or to generate logs/metrics.
-type PostFilterPlugin interface {
+type PreScorePlugin interface {
 	Plugin
-	// PostFilter is called by the scheduling framework after a list of nodes
-	// passed the filtering phase. All postfilter plugins must return success or
-	// the pod will be rejected. The filteredNodesStatuses is the set of filtered nodes
-	// and their filter status.
-	PostFilter(ctx context.Context, state *CycleState, pod *v1.Pod, nodes []*v1.Node, filteredNodesStatuses NodeToStatusMap) *Status
+	// PreScore is called by the scheduling framework after a list of nodes
+	// passed the filtering phase. All prescore plugins must return success or
+	// the pod will be rejected
+	PreScore(ctx context.Context, state *CycleState, pod *v1.Pod, nodes []*v1.Node) *Status
 }
 
 // ScoreExtensions is an interface for Score extended functionality.
@@ -440,10 +437,9 @@ type Framework interface {
 	// status other than Success.
 	RunPreFilterExtensionRemovePod(ctx context.Context, state *CycleState, podToSchedule *v1.Pod, podToAdd *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *Status
 
-	// RunPostFilterPlugins runs the set of configured post-filter plugins. If any
-	// of these plugins returns any status other than "Success", the given node is
-	// rejected. The filteredNodeStatuses is the set of filtered nodes and their statuses.
-	RunPostFilterPlugins(ctx context.Context, state *CycleState, pod *v1.Pod, nodes []*v1.Node, filteredNodesStatuses NodeToStatusMap) *Status
+	// RunPreScorePlugins runs the set of configured pre-score plugins. If any
+	// of these plugins returns any status other than "Success", the given pod is rejected.
+	RunPreScorePlugins(ctx context.Context, state *CycleState, pod *v1.Pod, nodes []*v1.Node) *Status
 
 	// RunScorePlugins runs the set of configured scoring plugins. It returns a map that
 	// stores for each scoring plugin name the corresponding NodeScoreList(s).
@@ -472,11 +468,13 @@ type Framework interface {
 	// RunPermitPlugins runs the set of configured permit plugins. If any of these
 	// plugins returns a status other than "Success" or "Wait", it does not continue
 	// running the remaining plugins and returns an error. Otherwise, if any of the
-	// plugins returns "Wait", then this function will block for the timeout period
-	// returned by the plugin, if the time expires, then it will return an error.
-	// Note that if multiple plugins asked to wait, then we wait for the minimum
-	// timeout duration.
+	// plugins returns "Wait", then this function will create and add waiting pod
+	// to a map of currently waiting pods and return status with "Wait" code.
+	// Pod will remain waiting pod for the minimum duration returned by the permit plugins.
 	RunPermitPlugins(ctx context.Context, state *CycleState, pod *v1.Pod, nodeName string) *Status
+
+	// WaitOnPermit will block, if the pod is a waiting pod, until the waiting pod is rejected or allowed.
+	WaitOnPermit(ctx context.Context, pod *v1.Pod) *Status
 
 	// RunBindPlugins runs the set of configured bind plugins. A bind plugin may choose
 	// whether or not to handle the given Pod. If a bind plugin chooses to skip the
@@ -501,9 +499,9 @@ type Framework interface {
 type FrameworkHandle interface {
 	// SnapshotSharedLister returns listers from the latest NodeInfo Snapshot. The snapshot
 	// is taken at the beginning of a scheduling cycle and remains unchanged until
-	// a pod finishes "Reserve" point. There is no guarantee that the information
+	// a pod finishes "Permit" point. There is no guarantee that the information
 	// remains unchanged in the binding phase of scheduling, so plugins in the binding
-	// cycle(permit/pre-bind/bind/post-bind/un-reserve plugin) should not use it,
+	// cycle (pre-bind/bind/post-bind/un-reserve plugin) should not use it,
 	// otherwise a concurrent read/write error might occur, they should use scheduler
 	// cache instead.
 	SnapshotSharedLister() schedulerlisters.SharedLister

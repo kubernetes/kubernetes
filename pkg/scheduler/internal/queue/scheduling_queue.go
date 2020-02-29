@@ -99,8 +99,8 @@ type SchedulingQueue interface {
 }
 
 // NewSchedulingQueue initializes a priority queue as a new scheduling queue.
-func NewSchedulingQueue(fwk framework.Framework, opts ...Option) SchedulingQueue {
-	return NewPriorityQueue(fwk, opts...)
+func NewSchedulingQueue(lessFn framework.LessFunc, opts ...Option) SchedulingQueue {
+	return NewPriorityQueue(lessFn, opts...)
 }
 
 // NominatedNodeName returns nominated node name of a Pod.
@@ -118,8 +118,11 @@ func NominatedNodeName(pod *v1.Pod) string {
 type PriorityQueue struct {
 	stop  chan struct{}
 	clock util.Clock
-	// podBackoff tracks backoff for pods attempting to be rescheduled
-	podBackoff *PodBackoffMap
+
+	// pod initial backoff duration.
+	podInitialBackoffDuration time.Duration
+	// pod maximum backoff duration.
+	podMaxBackoffDuration time.Duration
 
 	lock sync.RWMutex
 	cond sync.Cond
@@ -197,7 +200,7 @@ func newPodInfoNoTimestamp(pod *v1.Pod) *framework.PodInfo {
 
 // NewPriorityQueue creates a PriorityQueue object.
 func NewPriorityQueue(
-	fwk framework.Framework,
+	lessFn framework.LessFunc,
 	opts ...Option,
 ) *PriorityQueue {
 	options := defaultPriorityQueueOptions
@@ -208,17 +211,18 @@ func NewPriorityQueue(
 	comp := func(podInfo1, podInfo2 interface{}) bool {
 		pInfo1 := podInfo1.(*framework.PodInfo)
 		pInfo2 := podInfo2.(*framework.PodInfo)
-		return fwk.QueueSortFunc()(pInfo1, pInfo2)
+		return lessFn(pInfo1, pInfo2)
 	}
 
 	pq := &PriorityQueue{
-		clock:            options.clock,
-		stop:             make(chan struct{}),
-		podBackoff:       NewPodBackoffMap(options.podInitialBackoffDuration, options.podMaxBackoffDuration, options.clock),
-		activeQ:          heap.NewWithRecorder(podInfoKeyFunc, comp, metrics.NewActivePodsRecorder()),
-		unschedulableQ:   newUnschedulablePodsMap(metrics.NewUnschedulablePodsRecorder()),
-		nominatedPods:    newNominatedPodMap(),
-		moveRequestCycle: -1,
+		clock:                     options.clock,
+		stop:                      make(chan struct{}),
+		podInitialBackoffDuration: options.podInitialBackoffDuration,
+		podMaxBackoffDuration:     options.podMaxBackoffDuration,
+		activeQ:                   heap.NewWithRecorder(podInfoKeyFunc, comp, metrics.NewActivePodsRecorder()),
+		unschedulableQ:            newUnschedulablePodsMap(metrics.NewUnschedulablePodsRecorder()),
+		nominatedPods:             newNominatedPodMap(),
+		moveRequestCycle:          -1,
 	}
 	pq.cond.L = &pq.lock
 	pq.podBackoffQ = heap.NewWithRecorder(podInfoKeyFunc, pq.podsCompareBackoffCompleted, metrics.NewBackoffPodsRecorder())
@@ -265,31 +269,11 @@ func nsNameForPod(pod *v1.Pod) ktypes.NamespacedName {
 	}
 }
 
-// clearPodBackoff clears all backoff state for a pod (resets expiry)
-func (p *PriorityQueue) clearPodBackoff(pod *v1.Pod) {
-	p.podBackoff.ClearPodBackoff(nsNameForPod(pod))
-}
-
-// isPodBackingOff returns true if a pod is still waiting for its backoff timer.
+// isPodBackingoff returns true if a pod is still waiting for its backoff timer.
 // If this returns true, the pod should not be re-tried.
-func (p *PriorityQueue) isPodBackingOff(pod *v1.Pod) bool {
-	boTime, exists := p.podBackoff.GetBackoffTime(nsNameForPod(pod))
-	if !exists {
-		return false
-	}
+func (p *PriorityQueue) isPodBackingoff(podInfo *framework.PodInfo) bool {
+	boTime := p.getBackoffTime(podInfo)
 	return boTime.After(p.clock.Now())
-}
-
-// backoffPod checks if pod is currently undergoing backoff. If it is not it updates the backoff
-// timeout otherwise it does nothing.
-func (p *PriorityQueue) backoffPod(pod *v1.Pod) {
-	p.podBackoff.CleanupPodsCompletesBackingoff()
-
-	podID := nsNameForPod(pod)
-	boTime, found := p.podBackoff.GetBackoffTime(podID)
-	if !found || boTime.Before(p.clock.Now()) {
-		p.podBackoff.BackoffPod(podID)
-	}
 }
 
 // SchedulingCycle returns current scheduling cycle.
@@ -320,9 +304,6 @@ func (p *PriorityQueue) AddUnschedulableIfNotPresent(pInfo *framework.PodInfo, p
 		return fmt.Errorf("pod %v is already present in the backoff queue", nsNameForPod(pod))
 	}
 
-	// Every unschedulable pod is subject to backoff timers.
-	p.backoffPod(pod)
-
 	// If a move request has been received, move it to the BackoffQ, otherwise move
 	// it to unschedulableQ.
 	if p.moveRequestCycle >= podSchedulingCycle {
@@ -350,16 +331,7 @@ func (p *PriorityQueue) flushBackoffQCompleted() {
 			return
 		}
 		pod := rawPodInfo.(*framework.PodInfo).Pod
-		boTime, found := p.podBackoff.GetBackoffTime(nsNameForPod(pod))
-		if !found {
-			klog.Errorf("Unable to find backoff value for pod %v in backoff queue", nsNameForPod(pod))
-			p.podBackoffQ.Pop()
-			p.activeQ.Add(rawPodInfo)
-			metrics.SchedulerQueueIncomingPods.WithLabelValues("active", BackoffComplete).Inc()
-			defer p.cond.Broadcast()
-			continue
-		}
-
+		boTime := p.getBackoffTime(rawPodInfo.(*framework.PodInfo))
 		if boTime.After(p.clock.Now()) {
 			return
 		}
@@ -465,8 +437,6 @@ func (p *PriorityQueue) Update(oldPod, newPod *v1.Pod) error {
 	if usPodInfo := p.unschedulableQ.get(newPod); usPodInfo != nil {
 		p.nominatedPods.update(oldPod, newPod)
 		if isPodUpdated(oldPod, newPod) {
-			// If the pod is updated reset backoff
-			p.clearPodBackoff(newPod)
 			p.unschedulableQ.delete(usPodInfo.Pod)
 			err := p.activeQ.Add(updatePod(usPodInfo, newPod))
 			if err == nil {
@@ -495,7 +465,6 @@ func (p *PriorityQueue) Delete(pod *v1.Pod) error {
 	p.nominatedPods.delete(pod)
 	err := p.activeQ.Delete(newPodInfoNoTimestamp(pod))
 	if err != nil { // The item was probably not found in the activeQ.
-		p.clearPodBackoff(pod)
 		p.podBackoffQ.Delete(newPodInfoNoTimestamp(pod))
 		p.unschedulableQ.delete(pod)
 	}
@@ -538,7 +507,7 @@ func (p *PriorityQueue) MoveAllToActiveOrBackoffQueue(event string) {
 func (p *PriorityQueue) movePodsToActiveOrBackoffQueue(podInfoList []*framework.PodInfo, event string) {
 	for _, pInfo := range podInfoList {
 		pod := pInfo.Pod
-		if p.isPodBackingOff(pod) {
+		if p.isPodBackingoff(pInfo) {
 			if err := p.podBackoffQ.Add(pInfo); err != nil {
 				klog.Errorf("Error adding pod %v to the backoff queue: %v", pod.Name, err)
 			} else {
@@ -640,8 +609,8 @@ func (p *PriorityQueue) UpdateNominatedPodForNode(pod *v1.Pod, nodeName string) 
 func (p *PriorityQueue) podsCompareBackoffCompleted(podInfo1, podInfo2 interface{}) bool {
 	pInfo1 := podInfo1.(*framework.PodInfo)
 	pInfo2 := podInfo2.(*framework.PodInfo)
-	bo1, _ := p.podBackoff.GetBackoffTime(nsNameForPod(pInfo1.Pod))
-	bo2, _ := p.podBackoff.GetBackoffTime(nsNameForPod(pInfo2.Pod))
+	bo1 := p.getBackoffTime(pInfo1)
+	bo2 := p.getBackoffTime(pInfo2)
 	return bo1.Before(bo2)
 }
 
@@ -660,6 +629,26 @@ func (p *PriorityQueue) newPodInfo(pod *v1.Pod) *framework.PodInfo {
 		Timestamp:               now,
 		InitialAttemptTimestamp: now,
 	}
+}
+
+// getBackoffTime returns the time that podInfo completes backoff
+func (p *PriorityQueue) getBackoffTime(podInfo *framework.PodInfo) time.Time {
+	duration := p.calculateBackoffDuration(podInfo)
+	backoffTime := podInfo.Timestamp.Add(duration)
+	return backoffTime
+}
+
+// calculateBackoffDuration is a helper function for calculating the backoffDuration
+// based on the number of attempts the pod has made.
+func (p *PriorityQueue) calculateBackoffDuration(podInfo *framework.PodInfo) time.Duration {
+	duration := p.podInitialBackoffDuration
+	for i := 1; i < podInfo.Attempts; i++ {
+		duration = duration * 2
+		if duration > p.podMaxBackoffDuration {
+			return p.podMaxBackoffDuration
+		}
+	}
+	return duration
 }
 
 func updatePod(oldPodInfo interface{}, newPod *v1.Pod) *framework.PodInfo {

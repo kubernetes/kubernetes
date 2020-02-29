@@ -38,15 +38,15 @@ type FoosGetter interface {
 
 // FooInterface has methods to work with Foo resources.
 type FooInterface interface {
-	Create(context.Context, *v1alpha1.Foo) (*v1alpha1.Foo, error)
-	Update(context.Context, *v1alpha1.Foo) (*v1alpha1.Foo, error)
-	UpdateStatus(context.Context, *v1alpha1.Foo) (*v1alpha1.Foo, error)
-	Delete(ctx context.Context, name string, options *v1.DeleteOptions) error
-	DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(ctx context.Context, name string, options v1.GetOptions) (*v1alpha1.Foo, error)
+	Create(ctx context.Context, foo *v1alpha1.Foo, opts v1.CreateOptions) (*v1alpha1.Foo, error)
+	Update(ctx context.Context, foo *v1alpha1.Foo, opts v1.UpdateOptions) (*v1alpha1.Foo, error)
+	UpdateStatus(ctx context.Context, foo *v1alpha1.Foo, opts v1.UpdateOptions) (*v1alpha1.Foo, error)
+	Delete(ctx context.Context, name string, opts *v1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts *v1.DeleteOptions, listOpts v1.ListOptions) error
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1alpha1.Foo, error)
 	List(ctx context.Context, opts v1.ListOptions) (*v1alpha1.FooList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.Foo, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.Foo, err error)
 	FooExpansion
 }
 
@@ -110,11 +110,12 @@ func (c *foos) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface,
 }
 
 // Create takes the representation of a foo and creates it.  Returns the server's representation of the foo, and an error, if there is any.
-func (c *foos) Create(ctx context.Context, foo *v1alpha1.Foo) (result *v1alpha1.Foo, err error) {
+func (c *foos) Create(ctx context.Context, foo *v1alpha1.Foo, opts v1.CreateOptions) (result *v1alpha1.Foo, err error) {
 	result = &v1alpha1.Foo{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("foos").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(foo).
 		Do(ctx).
 		Into(result)
@@ -122,12 +123,13 @@ func (c *foos) Create(ctx context.Context, foo *v1alpha1.Foo) (result *v1alpha1.
 }
 
 // Update takes the representation of a foo and updates it. Returns the server's representation of the foo, and an error, if there is any.
-func (c *foos) Update(ctx context.Context, foo *v1alpha1.Foo) (result *v1alpha1.Foo, err error) {
+func (c *foos) Update(ctx context.Context, foo *v1alpha1.Foo, opts v1.UpdateOptions) (result *v1alpha1.Foo, err error) {
 	result = &v1alpha1.Foo{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("foos").
 		Name(foo.Name).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(foo).
 		Do(ctx).
 		Into(result)
@@ -136,14 +138,14 @@ func (c *foos) Update(ctx context.Context, foo *v1alpha1.Foo) (result *v1alpha1.
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-
-func (c *foos) UpdateStatus(ctx context.Context, foo *v1alpha1.Foo) (result *v1alpha1.Foo, err error) {
+func (c *foos) UpdateStatus(ctx context.Context, foo *v1alpha1.Foo, opts v1.UpdateOptions) (result *v1alpha1.Foo, err error) {
 	result = &v1alpha1.Foo{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("foos").
 		Name(foo.Name).
 		SubResource("status").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(foo).
 		Do(ctx).
 		Into(result)
@@ -178,13 +180,14 @@ func (c *foos) DeleteCollection(ctx context.Context, options *v1.DeleteOptions, 
 }
 
 // Patch applies the patch and returns the patched foo.
-func (c *foos) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.Foo, err error) {
+func (c *foos) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.Foo, err error) {
 	result = &v1alpha1.Foo{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("foos").
-		SubResource(subresources...).
 		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

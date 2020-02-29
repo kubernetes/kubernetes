@@ -81,7 +81,7 @@ func (c *FakeFoos) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interf
 }
 
 // Create takes the representation of a foo and creates it.  Returns the server's representation of the foo, and an error, if there is any.
-func (c *FakeFoos) Create(ctx context.Context, foo *v1alpha1.Foo) (result *v1alpha1.Foo, err error) {
+func (c *FakeFoos) Create(ctx context.Context, foo *v1alpha1.Foo, opts v1.CreateOptions) (result *v1alpha1.Foo, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(foosResource, c.ns, foo), &v1alpha1.Foo{})
 
@@ -92,7 +92,7 @@ func (c *FakeFoos) Create(ctx context.Context, foo *v1alpha1.Foo) (result *v1alp
 }
 
 // Update takes the representation of a foo and updates it. Returns the server's representation of the foo, and an error, if there is any.
-func (c *FakeFoos) Update(ctx context.Context, foo *v1alpha1.Foo) (result *v1alpha1.Foo, err error) {
+func (c *FakeFoos) Update(ctx context.Context, foo *v1alpha1.Foo, opts v1.UpdateOptions) (result *v1alpha1.Foo, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(foosResource, c.ns, foo), &v1alpha1.Foo{})
 
@@ -104,7 +104,7 @@ func (c *FakeFoos) Update(ctx context.Context, foo *v1alpha1.Foo) (result *v1alp
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeFoos) UpdateStatus(ctx context.Context, foo *v1alpha1.Foo) (*v1alpha1.Foo, error) {
+func (c *FakeFoos) UpdateStatus(ctx context.Context, foo *v1alpha1.Foo, opts v1.UpdateOptions) (*v1alpha1.Foo, error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateSubresourceAction(foosResource, "status", c.ns, foo), &v1alpha1.Foo{})
 
@@ -131,7 +131,7 @@ func (c *FakeFoos) DeleteCollection(ctx context.Context, options *v1.DeleteOptio
 }
 
 // Patch applies the patch and returns the patched foo.
-func (c *FakeFoos) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.Foo, err error) {
+func (c *FakeFoos) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.Foo, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(foosResource, c.ns, name, pt, data, subresources...), &v1alpha1.Foo{})
 

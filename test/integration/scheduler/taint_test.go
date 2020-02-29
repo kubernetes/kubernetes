@@ -531,7 +531,7 @@ func TestTaintNodeByCondition(t *testing.T) {
 				},
 			}
 
-			if _, err := cs.CoreV1().Nodes().Create(context.TODO(), node); err != nil {
+			if _, err := cs.CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{}); err != nil {
 				t.Errorf("Failed to create node, err: %v", err)
 			}
 			if err := waitForNodeTaints(cs, node, test.expectedTaints); err != nil {
@@ -549,7 +549,7 @@ func TestTaintNodeByCondition(t *testing.T) {
 				pod.Name = fmt.Sprintf("%s-%d", pod.Name, i)
 				pod.Spec.Tolerations = p.tolerations
 
-				createdPod, err := cs.CoreV1().Pods(pod.Namespace).Create(context.TODO(), pod)
+				createdPod, err := cs.CoreV1().Pods(pod.Namespace).Create(context.TODO(), pod, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("Failed to create pod %s/%s, error: %v",
 						pod.Namespace, pod.Name, err)
@@ -669,7 +669,7 @@ func TestTaintBasedEvictions(t *testing.T) {
 			defer cleanupTest(t, testCtx)
 			cs := testCtx.clientSet
 			informers := testCtx.informerFactory
-			_, err := cs.CoreV1().Namespaces().Create(context.TODO(), testCtx.ns)
+			_, err := cs.CoreV1().Namespaces().Create(context.TODO(), testCtx.ns, metav1.CreateOptions{})
 			if err != nil {
 				t.Errorf("Failed to create namespace %+v", err)
 			}
@@ -731,7 +731,7 @@ func TestTaintBasedEvictions(t *testing.T) {
 						},
 					},
 				})
-				if _, err := cs.CoreV1().Nodes().Create(context.TODO(), nodes[i]); err != nil {
+				if _, err := cs.CoreV1().Nodes().Create(context.TODO(), nodes[i], metav1.CreateOptions{}); err != nil {
 					t.Errorf("Failed to create node, err: %v", err)
 				}
 			}
@@ -743,7 +743,7 @@ func TestTaintBasedEvictions(t *testing.T) {
 					test.pod.Spec.Tolerations[0].TolerationSeconds = &tolerationSeconds[i]
 				}
 
-				test.pod, err = cs.CoreV1().Pods(testCtx.ns.Name).Create(context.TODO(), test.pod)
+				test.pod, err = cs.CoreV1().Pods(testCtx.ns.Name).Create(context.TODO(), test.pod, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("Test Failed: error: %v, while creating pod", err)
 				}

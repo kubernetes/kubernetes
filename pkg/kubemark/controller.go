@@ -195,11 +195,11 @@ func (kubemarkController *KubemarkController) SetNodeGroupSize(nodeGroup string,
 		}
 	case delta > 0:
 		kubemarkController.nodeGroupQueueSizeLock.Lock()
+		kubemarkController.nodeGroupQueueSize[nodeGroup] += delta
+		kubemarkController.nodeGroupQueueSizeLock.Unlock()
 		for i := 0; i < delta; i++ {
-			kubemarkController.nodeGroupQueueSize[nodeGroup]++
 			kubemarkController.createNodeQueue <- nodeGroup
 		}
-		kubemarkController.nodeGroupQueueSizeLock.Unlock()
 	}
 
 	return nil
@@ -227,7 +227,7 @@ func (kubemarkController *KubemarkController) addNodeToNodeGroup(nodeGroup strin
 
 	var err error
 	for i := 0; i < numRetries; i++ {
-		_, err = kubemarkController.externalCluster.client.CoreV1().ReplicationControllers(node.Namespace).Create(context.TODO(), node)
+		_, err = kubemarkController.externalCluster.client.CoreV1().ReplicationControllers(node.Namespace).Create(context.TODO(), node, metav1.CreateOptions{})
 		if err == nil {
 			return nil
 		}

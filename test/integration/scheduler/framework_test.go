@@ -62,9 +62,9 @@ type ReservePlugin struct {
 	failReserve      bool
 }
 
-type PostFilterPlugin struct {
-	numPostFilterCalled int
-	failPostFilter      bool
+type PreScorePlugin struct {
+	numPreScoreCalled int
+	failPreScore      bool
 }
 
 type PreBindPlugin struct {
@@ -111,7 +111,7 @@ const (
 	scorePluginName              = "score-plugin"
 	scoreWithNormalizePluginName = "score-with-normalize-plugin"
 	filterPluginName             = "filter-plugin"
-	postFilterPluginName         = "postfilter-plugin"
+	preScorePluginName           = "prescore-plugin"
 	reservePluginName            = "reserve-plugin"
 	preBindPluginName            = "prebind-plugin"
 	unreservePluginName          = "unreserve-plugin"
@@ -125,7 +125,7 @@ var _ framework.FilterPlugin = &FilterPlugin{}
 var _ framework.ScorePlugin = &ScorePlugin{}
 var _ framework.ScorePlugin = &ScoreWithNormalizePlugin{}
 var _ framework.ReservePlugin = &ReservePlugin{}
-var _ framework.PostFilterPlugin = &PostFilterPlugin{}
+var _ framework.PreScorePlugin = &PreScorePlugin{}
 var _ framework.PreBindPlugin = &PreBindPlugin{}
 var _ framework.BindPlugin = &BindPlugin{}
 var _ framework.PostBindPlugin = &PostBindPlugin{}
@@ -242,24 +242,24 @@ func (rp *ReservePlugin) reset() {
 }
 
 // Name returns name of the plugin.
-func (*PostFilterPlugin) Name() string {
-	return postFilterPluginName
+func (*PreScorePlugin) Name() string {
+	return preScorePluginName
 }
 
-// PostFilter is a test function.
-func (pfp *PostFilterPlugin) PostFilter(ctx context.Context, _ *framework.CycleState, pod *v1.Pod, _ []*v1.Node, _ framework.NodeToStatusMap) *framework.Status {
-	pfp.numPostFilterCalled++
-	if pfp.failPostFilter {
+// PreScore is a test function.
+func (pfp *PreScorePlugin) PreScore(ctx context.Context, _ *framework.CycleState, pod *v1.Pod, _ []*v1.Node) *framework.Status {
+	pfp.numPreScoreCalled++
+	if pfp.failPreScore {
 		return framework.NewStatus(framework.Error, fmt.Sprintf("injecting failure for pod %v", pod.Name))
 	}
 
 	return nil
 }
 
-// reset used to reset postfilter plugin.
-func (pfp *PostFilterPlugin) reset() {
-	pfp.numPostFilterCalled = 0
-	pfp.failPostFilter = false
+// reset used to reset prescore plugin.
+func (pfp *PreScorePlugin) reset() {
+	pfp.numPreScoreCalled = 0
+	pfp.failPreScore = false
 }
 
 // Name returns name of the plugin.
@@ -470,11 +470,12 @@ func TestPreFilterPlugin(t *testing.T) {
 	registry := framework.Registry{prefilterPluginName: newPlugin(preFilterPlugin)}
 
 	// Setup initial prefilter plugin for testing.
-	plugins := &schedulerconfig.Plugins{
-		PreFilter: &schedulerconfig.PluginSet{
-			Enabled: []schedulerconfig.Plugin{
-				{
-					Name: prefilterPluginName,
+	prof := schedulerconfig.KubeSchedulerProfile{
+		SchedulerName: v1.DefaultSchedulerName,
+		Plugins: &schedulerconfig.Plugins{
+			PreFilter: &schedulerconfig.PluginSet{
+				Enabled: []schedulerconfig.Plugin{
+					{Name: prefilterPluginName},
 				},
 			},
 		},
@@ -482,7 +483,7 @@ func TestPreFilterPlugin(t *testing.T) {
 
 	// Create the master and the scheduler with the test plugin set.
 	testCtx := initTestSchedulerForFrameworkTest(t, initTestMaster(t, "prefilter-plugin", nil), 2,
-		scheduler.WithFrameworkPlugins(plugins),
+		scheduler.WithProfiles(prof),
 		scheduler.WithFrameworkOutOfTreeRegistry(registry))
 	defer cleanupTest(t, testCtx)
 
@@ -541,19 +542,19 @@ func TestScorePlugin(t *testing.T) {
 		scorePluginName: newPlugin(scorePlugin),
 	}
 
-	// Setup initial score plugin for testing.
-	plugins := &schedulerconfig.Plugins{
-		Score: &schedulerconfig.PluginSet{
-			Enabled: []schedulerconfig.Plugin{
-				{
-					Name: scorePluginName,
+	prof := schedulerconfig.KubeSchedulerProfile{
+		SchedulerName: v1.DefaultSchedulerName,
+		Plugins: &schedulerconfig.Plugins{
+			Score: &schedulerconfig.PluginSet{
+				Enabled: []schedulerconfig.Plugin{
+					{Name: scorePluginName},
 				},
 			},
 		},
 	}
 
 	testCtx := initTestSchedulerForFrameworkTest(t, initTestMaster(t, "score-plugin", nil), 10,
-		scheduler.WithFrameworkPlugins(plugins),
+		scheduler.WithProfiles(prof),
 		scheduler.WithFrameworkOutOfTreeRegistry(registry))
 	defer cleanupTest(t, testCtx)
 
@@ -601,17 +602,18 @@ func TestNormalizeScorePlugin(t *testing.T) {
 	}
 
 	// Setup initial score plugin for testing.
-	plugins := &schedulerconfig.Plugins{
-		Score: &schedulerconfig.PluginSet{
-			Enabled: []schedulerconfig.Plugin{
-				{
-					Name: scoreWithNormalizePluginName,
+	prof := schedulerconfig.KubeSchedulerProfile{
+		SchedulerName: v1.DefaultSchedulerName,
+		Plugins: &schedulerconfig.Plugins{
+			Score: &schedulerconfig.PluginSet{
+				Enabled: []schedulerconfig.Plugin{
+					{Name: scoreWithNormalizePluginName},
 				},
 			},
 		},
 	}
 	testCtx := initTestSchedulerForFrameworkTest(t, initTestMaster(t, "score-plugin", nil), 10,
-		scheduler.WithFrameworkPlugins(plugins),
+		scheduler.WithProfiles(prof),
 		scheduler.WithFrameworkOutOfTreeRegistry(registry))
 
 	defer cleanupTest(t, testCtx)
@@ -644,11 +646,14 @@ func TestReservePlugin(t *testing.T) {
 	registry := framework.Registry{reservePluginName: newPlugin(reservePlugin)}
 
 	// Setup initial reserve plugin for testing.
-	plugins := &schedulerconfig.Plugins{
-		Reserve: &schedulerconfig.PluginSet{
-			Enabled: []schedulerconfig.Plugin{
-				{
-					Name: reservePluginName,
+	prof := schedulerconfig.KubeSchedulerProfile{
+		SchedulerName: v1.DefaultSchedulerName,
+		Plugins: &schedulerconfig.Plugins{
+			Reserve: &schedulerconfig.PluginSet{
+				Enabled: []schedulerconfig.Plugin{
+					{
+						Name: reservePluginName,
+					},
 				},
 			},
 		},
@@ -656,7 +661,7 @@ func TestReservePlugin(t *testing.T) {
 
 	// Create the master and the scheduler with the test plugin set.
 	testCtx := initTestSchedulerForFrameworkTest(t, initTestMaster(t, "reserve-plugin", nil), 2,
-		scheduler.WithFrameworkPlugins(plugins),
+		scheduler.WithProfiles(prof),
 		scheduler.WithFrameworkOutOfTreeRegistry(registry))
 	defer cleanupTest(t, testCtx)
 
@@ -696,11 +701,14 @@ func TestPrebindPlugin(t *testing.T) {
 	registry := framework.Registry{preBindPluginName: newPlugin(preBindPlugin)}
 
 	// Setup initial prebind plugin for testing.
-	plugins := &schedulerconfig.Plugins{
-		PreBind: &schedulerconfig.PluginSet{
-			Enabled: []schedulerconfig.Plugin{
-				{
-					Name: preBindPluginName,
+	prof := schedulerconfig.KubeSchedulerProfile{
+		SchedulerName: v1.DefaultSchedulerName,
+		Plugins: &schedulerconfig.Plugins{
+			PreBind: &schedulerconfig.PluginSet{
+				Enabled: []schedulerconfig.Plugin{
+					{
+						Name: preBindPluginName,
+					},
 				},
 			},
 		},
@@ -708,7 +716,7 @@ func TestPrebindPlugin(t *testing.T) {
 
 	// Create the master and the scheduler with the test plugin set.
 	testCtx := initTestSchedulerForFrameworkTest(t, initTestMaster(t, "prebind-plugin", nil), 2,
-		scheduler.WithFrameworkPlugins(plugins),
+		scheduler.WithProfiles(prof),
 		scheduler.WithFrameworkOutOfTreeRegistry(registry))
 	defer cleanupTest(t, testCtx)
 
@@ -772,18 +780,21 @@ func TestUnreservePlugin(t *testing.T) {
 	}
 
 	// Setup initial unreserve and prebind plugin for testing.
-	plugins := &schedulerconfig.Plugins{
-		Unreserve: &schedulerconfig.PluginSet{
-			Enabled: []schedulerconfig.Plugin{
-				{
-					Name: unreservePluginName,
+	prof := schedulerconfig.KubeSchedulerProfile{
+		SchedulerName: v1.DefaultSchedulerName,
+		Plugins: &schedulerconfig.Plugins{
+			Unreserve: &schedulerconfig.PluginSet{
+				Enabled: []schedulerconfig.Plugin{
+					{
+						Name: unreservePluginName,
+					},
 				},
 			},
-		},
-		PreBind: &schedulerconfig.PluginSet{
-			Enabled: []schedulerconfig.Plugin{
-				{
-					Name: preBindPluginName,
+			PreBind: &schedulerconfig.PluginSet{
+				Enabled: []schedulerconfig.Plugin{
+					{
+						Name: preBindPluginName,
+					},
 				},
 			},
 		},
@@ -791,7 +802,7 @@ func TestUnreservePlugin(t *testing.T) {
 
 	// Create the master and the scheduler with the test plugin set.
 	testCtx := initTestSchedulerForFrameworkTest(t, initTestMaster(t, "unreserve-plugin", nil), 2,
-		scheduler.WithFrameworkPlugins(plugins),
+		scheduler.WithProfiles(prof),
 		scheduler.WithFrameworkOutOfTreeRegistry(registry))
 	defer cleanupTest(t, testCtx)
 
@@ -867,23 +878,26 @@ func TestBindPlugin(t *testing.T) {
 	}
 
 	// Setup initial unreserve and bind plugins for testing.
-	plugins := &schedulerconfig.Plugins{
-		Unreserve: &schedulerconfig.PluginSet{
-			Enabled: []schedulerconfig.Plugin{{Name: unreservePlugin.Name()}},
-		},
-		Bind: &schedulerconfig.PluginSet{
-			// Put DefaultBinder last.
-			Enabled:  []schedulerconfig.Plugin{{Name: bindPlugin1.Name()}, {Name: bindPlugin2.Name()}, {Name: defaultbinder.Name}},
-			Disabled: []schedulerconfig.Plugin{{Name: defaultbinder.Name}},
-		},
-		PostBind: &schedulerconfig.PluginSet{
-			Enabled: []schedulerconfig.Plugin{{Name: postBindPlugin.Name()}},
+	prof := schedulerconfig.KubeSchedulerProfile{
+		SchedulerName: v1.DefaultSchedulerName,
+		Plugins: &schedulerconfig.Plugins{
+			Unreserve: &schedulerconfig.PluginSet{
+				Enabled: []schedulerconfig.Plugin{{Name: unreservePlugin.Name()}},
+			},
+			Bind: &schedulerconfig.PluginSet{
+				// Put DefaultBinder last.
+				Enabled:  []schedulerconfig.Plugin{{Name: bindPlugin1.Name()}, {Name: bindPlugin2.Name()}, {Name: defaultbinder.Name}},
+				Disabled: []schedulerconfig.Plugin{{Name: defaultbinder.Name}},
+			},
+			PostBind: &schedulerconfig.PluginSet{
+				Enabled: []schedulerconfig.Plugin{{Name: postBindPlugin.Name()}},
+			},
 		},
 	}
 
 	// Create the master and the scheduler with the test plugin set.
 	testCtx := initTestSchedulerWithOptions(t, testContext, false, nil, time.Second,
-		scheduler.WithFrameworkPlugins(plugins),
+		scheduler.WithProfiles(prof),
 		scheduler.WithFrameworkOutOfTreeRegistry(registry))
 	defer cleanupTest(t, testCtx)
 
@@ -1024,18 +1038,21 @@ func TestPostBindPlugin(t *testing.T) {
 	}
 
 	// Setup initial prebind and postbind plugin for testing.
-	plugins := &schedulerconfig.Plugins{
-		PreBind: &schedulerconfig.PluginSet{
-			Enabled: []schedulerconfig.Plugin{
-				{
-					Name: preBindPluginName,
+	prof := schedulerconfig.KubeSchedulerProfile{
+		SchedulerName: v1.DefaultSchedulerName,
+		Plugins: &schedulerconfig.Plugins{
+			PreBind: &schedulerconfig.PluginSet{
+				Enabled: []schedulerconfig.Plugin{
+					{
+						Name: preBindPluginName,
+					},
 				},
 			},
-		},
-		PostBind: &schedulerconfig.PluginSet{
-			Enabled: []schedulerconfig.Plugin{
-				{
-					Name: postBindPluginName,
+			PostBind: &schedulerconfig.PluginSet{
+				Enabled: []schedulerconfig.Plugin{
+					{
+						Name: postBindPluginName,
+					},
 				},
 			},
 		},
@@ -1043,7 +1060,7 @@ func TestPostBindPlugin(t *testing.T) {
 
 	// Create the master and the scheduler with the test plugin set.
 	testCtx := initTestSchedulerForFrameworkTest(t, initTestMaster(t, "postbind-plugin", nil), 2,
-		scheduler.WithFrameworkPlugins(plugins),
+		scheduler.WithProfiles(prof),
 		scheduler.WithFrameworkOutOfTreeRegistry(registry))
 	defer cleanupTest(t, testCtx)
 
@@ -1095,11 +1112,11 @@ func TestPostBindPlugin(t *testing.T) {
 func TestPermitPlugin(t *testing.T) {
 	// Create a plugin registry for testing. Register only a permit plugin.
 	perPlugin := &PermitPlugin{name: permitPluginName}
-	registry, plugins := initRegistryAndConfig(perPlugin)
+	registry, prof := initRegistryAndConfig(perPlugin)
 
 	// Create the master and the scheduler with the test plugin set.
 	testCtx := initTestSchedulerForFrameworkTest(t, initTestMaster(t, "permit-plugin", nil), 2,
-		scheduler.WithFrameworkPlugins(plugins),
+		scheduler.WithProfiles(prof),
 		scheduler.WithFrameworkOutOfTreeRegistry(registry))
 	defer cleanupTest(t, testCtx)
 
@@ -1183,11 +1200,11 @@ func TestMultiplePermitPlugins(t *testing.T) {
 	// Create a plugin registry for testing.
 	perPlugin1 := &PermitPlugin{name: "permit-plugin-1"}
 	perPlugin2 := &PermitPlugin{name: "permit-plugin-2"}
-	registry, plugins := initRegistryAndConfig(perPlugin1, perPlugin2)
+	registry, prof := initRegistryAndConfig(perPlugin1, perPlugin2)
 
 	// Create the master and the scheduler with the test plugin set.
 	testCtx := initTestSchedulerForFrameworkTest(t, initTestMaster(t, "multi-permit-plugin", nil), 2,
-		scheduler.WithFrameworkPlugins(plugins),
+		scheduler.WithProfiles(prof),
 		scheduler.WithFrameworkOutOfTreeRegistry(registry))
 	defer cleanupTest(t, testCtx)
 
@@ -1238,11 +1255,11 @@ func TestPermitPluginsCancelled(t *testing.T) {
 	// Create a plugin registry for testing.
 	perPlugin1 := &PermitPlugin{name: "permit-plugin-1"}
 	perPlugin2 := &PermitPlugin{name: "permit-plugin-2"}
-	registry, plugins := initRegistryAndConfig(perPlugin1, perPlugin2)
+	registry, prof := initRegistryAndConfig(perPlugin1, perPlugin2)
 
 	// Create the master and the scheduler with the test plugin set.
 	testCtx := initTestSchedulerForFrameworkTest(t, initTestMaster(t, "permit-plugins", nil), 2,
-		scheduler.WithFrameworkPlugins(plugins),
+		scheduler.WithProfiles(prof),
 		scheduler.WithFrameworkOutOfTreeRegistry(registry))
 	defer cleanupTest(t, testCtx)
 
@@ -1279,11 +1296,11 @@ func TestPermitPluginsCancelled(t *testing.T) {
 func TestCoSchedulingWithPermitPlugin(t *testing.T) {
 	// Create a plugin registry for testing. Register only a permit plugin.
 	permitPlugin := &PermitPlugin{name: permitPluginName}
-	registry, plugins := initRegistryAndConfig(permitPlugin)
+	registry, prof := initRegistryAndConfig(permitPlugin)
 
 	// Create the master and the scheduler with the test plugin set.
 	testCtx := initTestSchedulerForFrameworkTest(t, initTestMaster(t, "permit-plugin", nil), 2,
-		scheduler.WithFrameworkPlugins(plugins),
+		scheduler.WithProfiles(prof),
 		scheduler.WithFrameworkOutOfTreeRegistry(registry))
 	defer cleanupTest(t, testCtx)
 
@@ -1352,11 +1369,14 @@ func TestFilterPlugin(t *testing.T) {
 	registry := framework.Registry{filterPluginName: newPlugin(filterPlugin)}
 
 	// Setup initial filter plugin for testing.
-	plugins := &schedulerconfig.Plugins{
-		Filter: &schedulerconfig.PluginSet{
-			Enabled: []schedulerconfig.Plugin{
-				{
-					Name: filterPluginName,
+	prof := schedulerconfig.KubeSchedulerProfile{
+		SchedulerName: v1.DefaultSchedulerName,
+		Plugins: &schedulerconfig.Plugins{
+			Filter: &schedulerconfig.PluginSet{
+				Enabled: []schedulerconfig.Plugin{
+					{
+						Name: filterPluginName,
+					},
 				},
 			},
 		},
@@ -1364,7 +1384,7 @@ func TestFilterPlugin(t *testing.T) {
 
 	// Create the master and the scheduler with the test plugin set.
 	testCtx := initTestSchedulerForFrameworkTest(t, initTestMaster(t, "filter-plugin", nil), 2,
-		scheduler.WithFrameworkPlugins(plugins),
+		scheduler.WithProfiles(prof),
 		scheduler.WithFrameworkOutOfTreeRegistry(registry))
 	defer cleanupTest(t, testCtx)
 
@@ -1396,31 +1416,34 @@ func TestFilterPlugin(t *testing.T) {
 	}
 }
 
-// TestPostFilterPlugin tests invocation of post-filter plugins.
-func TestPostFilterPlugin(t *testing.T) {
-	// Create a plugin registry for testing. Register only a post-filter plugin.
-	postFilterPlugin := &PostFilterPlugin{}
-	registry := framework.Registry{postFilterPluginName: newPlugin(postFilterPlugin)}
+// TestPreScorePlugin tests invocation of pre-score plugins.
+func TestPreScorePlugin(t *testing.T) {
+	// Create a plugin registry for testing. Register only a pre-score plugin.
+	preScorePlugin := &PreScorePlugin{}
+	registry := framework.Registry{preScorePluginName: newPlugin(preScorePlugin)}
 
-	// Setup initial post-filter plugin for testing.
-	plugins := &schedulerconfig.Plugins{
-		PostFilter: &schedulerconfig.PluginSet{
-			Enabled: []schedulerconfig.Plugin{
-				{
-					Name: postFilterPluginName,
+	// Setup initial pre-score plugin for testing.
+	prof := schedulerconfig.KubeSchedulerProfile{
+		SchedulerName: v1.DefaultSchedulerName,
+		Plugins: &schedulerconfig.Plugins{
+			PreScore: &schedulerconfig.PluginSet{
+				Enabled: []schedulerconfig.Plugin{
+					{
+						Name: preScorePluginName,
+					},
 				},
 			},
 		},
 	}
 
 	// Create the master and the scheduler with the test plugin set.
-	testCtx := initTestSchedulerForFrameworkTest(t, initTestMaster(t, "post-filter-plugin", nil), 2,
-		scheduler.WithFrameworkPlugins(plugins),
+	testCtx := initTestSchedulerForFrameworkTest(t, initTestMaster(t, "pre-score-plugin", nil), 2,
+		scheduler.WithProfiles(prof),
 		scheduler.WithFrameworkOutOfTreeRegistry(registry))
 	defer cleanupTest(t, testCtx)
 
 	for _, fail := range []bool{false, true} {
-		postFilterPlugin.failPostFilter = fail
+		preScorePlugin.failPreScore = fail
 		// Create a best effort pod.
 		pod, err := createPausePod(testCtx.clientSet,
 			initPausePod(testCtx.clientSet, &pausePodConfig{Name: "test-pod", Namespace: testCtx.ns.Name}))
@@ -1438,11 +1461,11 @@ func TestPostFilterPlugin(t *testing.T) {
 			}
 		}
 
-		if postFilterPlugin.numPostFilterCalled == 0 {
-			t.Errorf("Expected the post-filter plugin to be called.")
+		if preScorePlugin.numPreScoreCalled == 0 {
+			t.Errorf("Expected the pre-score plugin to be called.")
 		}
 
-		postFilterPlugin.reset()
+		preScorePlugin.reset()
 		cleanupPods(testCtx.clientSet, t, []*v1.Pod{pod})
 	}
 }
@@ -1451,11 +1474,11 @@ func TestPostFilterPlugin(t *testing.T) {
 func TestPreemptWithPermitPlugin(t *testing.T) {
 	// Create a plugin registry for testing. Register only a permit plugin.
 	permitPlugin := &PermitPlugin{}
-	registry, plugins := initRegistryAndConfig(permitPlugin)
+	registry, prof := initRegistryAndConfig(permitPlugin)
 
 	// Create the master and the scheduler with the test plugin set.
 	testCtx := initTestSchedulerForFrameworkTest(t, initTestMaster(t, "preempt-with-permit-plugin", nil), 0,
-		scheduler.WithFrameworkPlugins(plugins),
+		scheduler.WithProfiles(prof),
 		scheduler.WithFrameworkOutOfTreeRegistry(registry))
 	defer cleanupTest(t, testCtx)
 
@@ -1532,19 +1555,23 @@ func initTestSchedulerForFrameworkTest(t *testing.T, testCtx *testContext, nodeC
 
 // initRegistryAndConfig returns registry and plugins config based on give plugins.
 // TODO: refactor it to a more generic functions that accepts all kinds of Plugins as arguments
-func initRegistryAndConfig(pp ...*PermitPlugin) (registry framework.Registry, plugins *schedulerconfig.Plugins) {
+func initRegistryAndConfig(pp ...*PermitPlugin) (registry framework.Registry, prof schedulerconfig.KubeSchedulerProfile) {
 	if len(pp) == 0 {
 		return
 	}
 
 	registry = framework.Registry{}
-	plugins = &schedulerconfig.Plugins{
-		Permit: &schedulerconfig.PluginSet{},
-	}
-
+	var plugins []schedulerconfig.Plugin
 	for _, p := range pp {
 		registry.Register(p.Name(), newPermitPlugin(p))
-		plugins.Permit.Enabled = append(plugins.Permit.Enabled, schedulerconfig.Plugin{Name: p.Name()})
+		plugins = append(plugins, schedulerconfig.Plugin{Name: p.Name()})
+	}
+
+	prof.SchedulerName = v1.DefaultSchedulerName
+	prof.Plugins = &schedulerconfig.Plugins{
+		Permit: &schedulerconfig.PluginSet{
+			Enabled: plugins,
+		},
 	}
 	return
 }

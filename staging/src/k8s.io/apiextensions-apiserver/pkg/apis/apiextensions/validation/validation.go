@@ -64,6 +64,7 @@ func ValidateCustomResourceDefinition(obj *apiextensions.CustomResourceDefinitio
 		requireStructuralSchema:                  requireStructuralSchema(requestGV, nil),
 		requirePrunedDefaults:                    true,
 		requireAtomicSetType:                     true,
+		requireMapListKeysMapSetValidation:       true,
 	}
 
 	allErrs := genericvalidation.ValidateObjectMeta(&obj.ObjectMeta, false, nameValidationFn, field.NewPath("metadata"))
@@ -93,6 +94,10 @@ type validationOptions struct {
 	requirePrunedDefaults bool
 	// requireAtomicSetType indicates that the items type for a x-kubernetes-list-type=set list must be atomic.
 	requireAtomicSetType bool
+	// requireMapListKeysMapSetValidation indicates that:
+	// 1. For x-kubernetes-list-type=map list, key fields are not nullable, and are required or have a default
+	// 2. For x-kubernetes-list-type=map or x-kubernetes-list-type=set list, the whole item must not be nullable.
+	requireMapListKeysMapSetValidation bool
 }
 
 // ValidateCustomResourceDefinitionUpdate statically validates
@@ -106,6 +111,7 @@ func ValidateCustomResourceDefinitionUpdate(obj, oldObj *apiextensions.CustomRes
 		requireStructuralSchema:                  requireStructuralSchema(requestGV, &oldObj.Spec),
 		requirePrunedDefaults:                    requirePrunedDefaults(&oldObj.Spec),
 		requireAtomicSetType:                     requireAtomicSetType(&oldObj.Spec),
+		requireMapListKeysMapSetValidation:       requireMapListKeysMapSetValidation(&oldObj.Spec),
 	}
 
 	allErrs := genericvalidation.ValidateObjectMetaUpdate(&obj.ObjectMeta, &oldObj.ObjectMeta, field.NewPath("metadata"))
@@ -866,6 +872,58 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 		}
 	}
 
+	if opts.requireMapListKeysMapSetValidation {
+		allErrs = append(allErrs, validateMapListKeysMapSet(schema, fldPath)...)
+	}
+
+	return allErrs
+}
+
+func validateMapListKeysMapSet(schema *apiextensions.JSONSchemaProps, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if schema.Items == nil || schema.Items.Schema == nil {
+		return nil
+	}
+	if schema.XListType == nil {
+		return nil
+	}
+	if *schema.XListType != "set" && *schema.XListType != "map" {
+		return nil
+	}
+
+	// set and map list items cannot be nullable
+	if schema.Items.Schema.Nullable {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("items").Child("nullable"), "cannot be nullable when x-kubernetes-list-type is "+*schema.XListType))
+	}
+
+	switch *schema.XListType {
+	case "map":
+		// ensure all map keys are required or have a default
+		isRequired := make(map[string]bool, len(schema.Items.Schema.Required))
+		for _, required := range schema.Items.Schema.Required {
+			isRequired[required] = true
+		}
+
+		for _, k := range schema.XListMapKeys {
+			obj, ok := schema.Items.Schema.Properties[k]
+			if !ok {
+				// we validate that all XListMapKeys are existing properties in ValidateCustomResourceDefinitionOpenAPISchema, so skipping here is ok
+				continue
+			}
+
+			if isRequired[k] == false && obj.Default == nil {
+				allErrs = append(allErrs, field.Required(fldPath.Child("items").Child("properties").Key(k).Child("default"), "this property is in x-kubernetes-list-map-keys, so it must have a default or be a required property"))
+			}
+
+			if obj.Nullable {
+				allErrs = append(allErrs, field.Forbidden(fldPath.Child("items").Child("properties").Key(k).Child("nullable"), "this property is in x-kubernetes-list-map-keys, so it cannot be nullable"))
+			}
+		}
+	case "set":
+		// no other set-specific validation
+	}
+
 	return allErrs
 }
 
@@ -1265,6 +1323,16 @@ func hasNonAtomicSetType(schema *apiextensions.JSONSchemaProps) bool {
 			}
 		}
 		return false
+	})
+}
+
+func requireMapListKeysMapSetValidation(oldCRDSpec *apiextensions.CustomResourceDefinitionSpec) bool {
+	return !hasSchemaWith(oldCRDSpec, hasInvalidMapListKeysMapSet)
+}
+
+func hasInvalidMapListKeysMapSet(schema *apiextensions.JSONSchemaProps) bool {
+	return schemaHas(schema, func(schema *apiextensions.JSONSchemaProps) bool {
+		return len(validateMapListKeysMapSet(schema, field.NewPath(""))) > 0
 	})
 }
 

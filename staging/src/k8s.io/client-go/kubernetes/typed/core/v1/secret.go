@@ -38,14 +38,14 @@ type SecretsGetter interface {
 
 // SecretInterface has methods to work with Secret resources.
 type SecretInterface interface {
-	Create(context.Context, *v1.Secret) (*v1.Secret, error)
-	Update(context.Context, *v1.Secret) (*v1.Secret, error)
-	Delete(ctx context.Context, name string, options *metav1.DeleteOptions) error
-	DeleteCollection(ctx context.Context, options *metav1.DeleteOptions, listOptions metav1.ListOptions) error
-	Get(ctx context.Context, name string, options metav1.GetOptions) (*v1.Secret, error)
+	Create(ctx context.Context, secret *v1.Secret, opts metav1.CreateOptions) (*v1.Secret, error)
+	Update(ctx context.Context, secret *v1.Secret, opts metav1.UpdateOptions) (*v1.Secret, error)
+	Delete(ctx context.Context, name string, opts *metav1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.Secret, error)
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.SecretList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Secret, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Secret, err error)
 	SecretExpansion
 }
 
@@ -109,11 +109,12 @@ func (c *secrets) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Int
 }
 
 // Create takes the representation of a secret and creates it.  Returns the server's representation of the secret, and an error, if there is any.
-func (c *secrets) Create(ctx context.Context, secret *v1.Secret) (result *v1.Secret, err error) {
+func (c *secrets) Create(ctx context.Context, secret *v1.Secret, opts metav1.CreateOptions) (result *v1.Secret, err error) {
 	result = &v1.Secret{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("secrets").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(secret).
 		Do(ctx).
 		Into(result)
@@ -121,12 +122,13 @@ func (c *secrets) Create(ctx context.Context, secret *v1.Secret) (result *v1.Sec
 }
 
 // Update takes the representation of a secret and updates it. Returns the server's representation of the secret, and an error, if there is any.
-func (c *secrets) Update(ctx context.Context, secret *v1.Secret) (result *v1.Secret, err error) {
+func (c *secrets) Update(ctx context.Context, secret *v1.Secret, opts metav1.UpdateOptions) (result *v1.Secret, err error) {
 	result = &v1.Secret{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("secrets").
 		Name(secret.Name).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(secret).
 		Do(ctx).
 		Into(result)
@@ -161,13 +163,14 @@ func (c *secrets) DeleteCollection(ctx context.Context, options *metav1.DeleteOp
 }
 
 // Patch applies the patch and returns the patched secret.
-func (c *secrets) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Secret, err error) {
+func (c *secrets) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Secret, err error) {
 	result = &v1.Secret{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("secrets").
-		SubResource(subresources...).
 		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

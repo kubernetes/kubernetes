@@ -106,7 +106,7 @@ func (j *TestJig) CreateTCPServiceWithPort(tweak func(svc *v1.Service), port int
 	if tweak != nil {
 		tweak(svc)
 	}
-	result, err := j.Client.CoreV1().Services(j.Namespace).Create(context.TODO(), svc)
+	result, err := j.Client.CoreV1().Services(j.Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create TCP Service %q: %v", svc.Name, err)
 	}
@@ -121,7 +121,7 @@ func (j *TestJig) CreateTCPService(tweak func(svc *v1.Service)) (*v1.Service, er
 	if tweak != nil {
 		tweak(svc)
 	}
-	result, err := j.Client.CoreV1().Services(j.Namespace).Create(context.TODO(), svc)
+	result, err := j.Client.CoreV1().Services(j.Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create TCP Service %q: %v", svc.Name, err)
 	}
@@ -136,7 +136,7 @@ func (j *TestJig) CreateUDPService(tweak func(svc *v1.Service)) (*v1.Service, er
 	if tweak != nil {
 		tweak(svc)
 	}
-	result, err := j.Client.CoreV1().Services(j.Namespace).Create(context.TODO(), svc)
+	result, err := j.Client.CoreV1().Services(j.Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create UDP Service %q: %v", svc.Name, err)
 	}
@@ -161,7 +161,7 @@ func (j *TestJig) CreateExternalNameService(tweak func(svc *v1.Service)) (*v1.Se
 	if tweak != nil {
 		tweak(svc)
 	}
-	result, err := j.Client.CoreV1().Services(j.Namespace).Create(context.TODO(), svc)
+	result, err := j.Client.CoreV1().Services(j.Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create ExternalName Service %q: %v", svc.Name, err)
 	}
@@ -253,7 +253,7 @@ func (j *TestJig) CreateLoadBalancerService(timeout time.Duration, tweak func(sv
 	if tweak != nil {
 		tweak(svc)
 	}
-	_, err := j.Client.CoreV1().Services(j.Namespace).Create(context.TODO(), svc)
+	_, err := j.Client.CoreV1().Services(j.Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create LoadBalancer Service %q: %v", svc.Name, err)
 	}
@@ -443,7 +443,7 @@ func (j *TestJig) UpdateService(update func(*v1.Service)) (*v1.Service, error) {
 			return nil, fmt.Errorf("failed to get Service %q: %v", j.Name, err)
 		}
 		update(service)
-		result, err := j.Client.CoreV1().Services(j.Namespace).Update(context.TODO(), service)
+		result, err := j.Client.CoreV1().Services(j.Namespace).Update(context.TODO(), service, metav1.UpdateOptions{})
 		if err == nil {
 			return j.sanityCheckService(result, service.Spec.Type)
 		}
@@ -619,7 +619,7 @@ func (j *TestJig) AddRCAntiAffinity(rc *v1.ReplicationController) {
 // CreatePDB returns a PodDisruptionBudget for the given ReplicationController, or returns an error if a PodDisruptionBudget isn't ready
 func (j *TestJig) CreatePDB(rc *v1.ReplicationController) (*policyv1beta1.PodDisruptionBudget, error) {
 	pdb := j.newPDBTemplate(rc)
-	newPdb, err := j.Client.PolicyV1beta1().PodDisruptionBudgets(j.Namespace).Create(context.TODO(), pdb)
+	newPdb, err := j.Client.PolicyV1beta1().PodDisruptionBudgets(j.Namespace).Create(context.TODO(), pdb, metav1.CreateOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create PDB %q %v", pdb.Name, err)
 	}
@@ -659,7 +659,7 @@ func (j *TestJig) Run(tweak func(rc *v1.ReplicationController)) (*v1.Replication
 	if tweak != nil {
 		tweak(rc)
 	}
-	result, err := j.Client.CoreV1().ReplicationControllers(j.Namespace).Create(context.TODO(), rc)
+	result, err := j.Client.CoreV1().ReplicationControllers(j.Namespace).Create(context.TODO(), rc, metav1.CreateOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create RC %q: %v", rc.Name, err)
 	}
@@ -683,7 +683,7 @@ func (j *TestJig) Scale(replicas int) error {
 
 	scale.ResourceVersion = "" // indicate the scale update should be unconditional
 	scale.Spec.Replicas = int32(replicas)
-	_, err = j.Client.CoreV1().ReplicationControllers(j.Namespace).UpdateScale(context.TODO(), rc, scale)
+	_, err = j.Client.CoreV1().ReplicationControllers(j.Namespace).UpdateScale(context.TODO(), rc, scale, metav1.UpdateOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to scale RC %q: %v", rc, err)
 	}
@@ -764,9 +764,11 @@ func testReachabilityOverClusterIP(clusterIP string, sp v1.ServicePort, execPod 
 	return nil
 }
 
-func testReachabilityOverNodePorts(nodes *v1.NodeList, sp v1.ServicePort, pod *v1.Pod) error {
+func testReachabilityOverNodePorts(nodes *v1.NodeList, sp v1.ServicePort, pod *v1.Pod, clusterIP string) error {
 	internalAddrs := e2enode.CollectAddresses(nodes, v1.NodeInternalIP)
 	externalAddrs := e2enode.CollectAddresses(nodes, v1.NodeExternalIP)
+	isClusterIPV4 := net.ParseIP(clusterIP).To4() != nil
+
 	for _, internalAddr := range internalAddrs {
 		// If the node's internal address points to localhost, then we are not
 		// able to test the service reachability via that address
@@ -774,12 +776,25 @@ func testReachabilityOverNodePorts(nodes *v1.NodeList, sp v1.ServicePort, pod *v
 			framework.Logf("skipping testEndpointReachability() for internal adddress %s", internalAddr)
 			continue
 		}
+		isNodeInternalIPV4 := net.ParseIP(internalAddr).To4() != nil
+		// Check service reachability on the node internalIP which is same family
+		// as clusterIP
+		if isClusterIPV4 != isNodeInternalIPV4 {
+			framework.Logf("skipping testEndpointReachability() for internal adddress %s as it does not match clusterIP (%s) family", internalAddr, clusterIP)
+			continue
+		}
+
 		err := testEndpointReachability(internalAddr, sp.NodePort, sp.Protocol, pod)
 		if err != nil {
 			return err
 		}
 	}
 	for _, externalAddr := range externalAddrs {
+		isNodeExternalIPV4 := net.ParseIP(externalAddr).To4() != nil
+		if isClusterIPV4 != isNodeExternalIPV4 {
+			framework.Logf("skipping testEndpointReachability() for external adddress %s as it does not match clusterIP (%s) family", externalAddr, clusterIP)
+			continue
+		}
 		err := testEndpointReachability(externalAddr, sp.NodePort, sp.Protocol, pod)
 		if err != nil {
 			return err
@@ -879,7 +894,7 @@ func (j *TestJig) checkNodePortServiceReachability(svc *v1.Service, pod *v1.Pod)
 		if err != nil {
 			return err
 		}
-		err = testReachabilityOverNodePorts(nodes, servicePort, pod)
+		err = testReachabilityOverNodePorts(nodes, servicePort, pod, clusterIP)
 		if err != nil {
 			return err
 		}

@@ -66,7 +66,7 @@ func WaitForNamedAuthorizationUpdate(c v1authorization.SubjectAccessReviewsGette
 	}
 
 	err := wait.Poll(policyCachePollInterval, policyCachePollTimeout, func() (bool, error) {
-		response, err := c.SubjectAccessReviews().Create(context.TODO(), review)
+		response, err := c.SubjectAccessReviews().Create(context.TODO(), review, metav1.CreateOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -96,7 +96,7 @@ func BindClusterRole(c bindingsGetter, clusterRole, ns string, subjects ...rbacv
 			Name:     clusterRole,
 		},
 		Subjects: subjects,
-	})
+	}, metav1.CreateOptions{})
 
 	if err != nil {
 		return errors.Wrapf(err, "binding clusterrole/%s for %q for %v", clusterRole, ns, subjects)
@@ -133,7 +133,7 @@ func bindInNamespace(c bindingsGetter, roleType, role, ns string, subjects ...rb
 			Name:     role,
 		},
 		Subjects: subjects,
-	})
+	}, metav1.CreateOptions{})
 
 	if err != nil {
 		return errors.Wrapf(err, "binding %s/%s into %q for %v", roleType, role, ns, subjects)

@@ -97,7 +97,7 @@ var _ = SIGDescribe("[Feature:NodeAuthorizer]", func() {
 				"data": "content",
 			},
 		}
-		_, err := f.ClientSet.CoreV1().ConfigMaps(ns).Create(context.TODO(), configmap)
+		_, err := f.ClientSet.CoreV1().ConfigMaps(ns).Create(context.TODO(), configmap, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create configmap (%s:%s) %+v", ns, configmap.Name, *configmap)
 		_, err = c.CoreV1().ConfigMaps(ns).Get(context.TODO(), configmap.Name, metav1.GetOptions{})
 		framework.ExpectEqual(apierrors.IsForbidden(err), true)
@@ -114,7 +114,7 @@ var _ = SIGDescribe("[Feature:NodeAuthorizer]", func() {
 				"data": []byte("keep it secret"),
 			},
 		}
-		_, err := f.ClientSet.CoreV1().Secrets(ns).Create(context.TODO(), secret)
+		_, err := f.ClientSet.CoreV1().Secrets(ns).Create(context.TODO(), secret, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create secret (%s:%s)", ns, secret.Name)
 
 		ginkgo.By("Node should not get the secret")
@@ -147,7 +147,7 @@ var _ = SIGDescribe("[Feature:NodeAuthorizer]", func() {
 			},
 		}
 
-		_, err = f.ClientSet.CoreV1().Pods(ns).Create(context.TODO(), pod)
+		_, err = f.ClientSet.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create pod (%s:%s)", ns, pod.Name)
 
 		ginkgo.By("The node should able to access the secret")
@@ -173,7 +173,7 @@ var _ = SIGDescribe("[Feature:NodeAuthorizer]", func() {
 			},
 		}
 		ginkgo.By(fmt.Sprintf("Create node foo by user: %v", asUser))
-		_, err := c.CoreV1().Nodes().Create(context.TODO(), node)
+		_, err := c.CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{})
 		framework.ExpectEqual(apierrors.IsForbidden(err), true)
 	})
 

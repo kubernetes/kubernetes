@@ -40,7 +40,7 @@ func (s *Set) ToJSONStream(w io.Writer) error {
 	var r reusableBuilder
 
 	stream.WriteObjectStart()
-	err := s.emitContents_v1(false, stream, &r)
+	err := s.emitContentsV1(false, stream, &r)
 	if err != nil {
 		return err
 	}
@@ -76,7 +76,7 @@ func (r *reusableBuilder) reset() *bytes.Buffer {
 	return &r.Buffer
 }
 
-func (s *Set) emitContents_v1(includeSelf bool, stream *jsoniter.Stream, r *reusableBuilder) error {
+func (s *Set) emitContentsV1(includeSelf bool, stream *jsoniter.Stream, r *reusableBuilder) error {
 	mi, ci := 0, 0
 	first := true
 	preWrite := func() {
@@ -97,7 +97,7 @@ func (s *Set) emitContents_v1(includeSelf bool, stream *jsoniter.Stream, r *reus
 		mpe := s.Members.members[mi]
 		cpe := s.Children.members[ci].pathElement
 
-		if mpe.Less(cpe) {
+		if c := mpe.Compare(cpe); c < 0 {
 			preWrite()
 			if err := serializePathElementToWriter(r.reset(), mpe); err != nil {
 				return err
@@ -105,14 +105,14 @@ func (s *Set) emitContents_v1(includeSelf bool, stream *jsoniter.Stream, r *reus
 			stream.WriteObjectField(r.unsafeString())
 			stream.WriteEmptyObject()
 			mi++
-		} else if cpe.Less(mpe) {
+		} else if c > 0 {
 			preWrite()
 			if err := serializePathElementToWriter(r.reset(), cpe); err != nil {
 				return err
 			}
 			stream.WriteObjectField(r.unsafeString())
 			stream.WriteObjectStart()
-			if err := s.Children.members[ci].set.emitContents_v1(false, stream, r); err != nil {
+			if err := s.Children.members[ci].set.emitContentsV1(false, stream, r); err != nil {
 				return err
 			}
 			stream.WriteObjectEnd()
@@ -124,7 +124,7 @@ func (s *Set) emitContents_v1(includeSelf bool, stream *jsoniter.Stream, r *reus
 			}
 			stream.WriteObjectField(r.unsafeString())
 			stream.WriteObjectStart()
-			if err := s.Children.members[ci].set.emitContents_v1(true, stream, r); err != nil {
+			if err := s.Children.members[ci].set.emitContentsV1(true, stream, r); err != nil {
 				return err
 			}
 			stream.WriteObjectEnd()
@@ -154,7 +154,7 @@ func (s *Set) emitContents_v1(includeSelf bool, stream *jsoniter.Stream, r *reus
 		}
 		stream.WriteObjectField(r.unsafeString())
 		stream.WriteObjectStart()
-		if err := s.Children.members[ci].set.emitContents_v1(false, stream, r); err != nil {
+		if err := s.Children.members[ci].set.emitContentsV1(false, stream, r); err != nil {
 			return err
 		}
 		stream.WriteObjectEnd()
@@ -169,7 +169,7 @@ func (s *Set) FromJSON(r io.Reader) error {
 	// The iterator pool is completely useless for memory management, grrr.
 	iter := jsoniter.Parse(jsoniter.ConfigCompatibleWithStandardLibrary, r, 4096)
 
-	found, _ := readIter_v1(iter)
+	found, _ := readIterV1(iter)
 	if found == nil {
 		*s = Set{}
 	} else {
@@ -180,7 +180,7 @@ func (s *Set) FromJSON(r io.Reader) error {
 
 // returns true if this subtree is also (or only) a member of parent; s is nil
 // if there are no further children.
-func readIter_v1(iter *jsoniter.Iterator) (children *Set, isMember bool) {
+func readIterV1(iter *jsoniter.Iterator) (children *Set, isMember bool) {
 	iter.ReadMapCB(func(iter *jsoniter.Iterator, key string) bool {
 		if key == "." {
 			isMember = true
@@ -199,7 +199,7 @@ func readIter_v1(iter *jsoniter.Iterator) (children *Set, isMember bool) {
 			iter.Skip()
 			return true
 		}
-		grandchildren, childIsMember := readIter_v1(iter)
+		grandchildren, childIsMember := readIterV1(iter)
 		if childIsMember {
 			if children == nil {
 				children = &Set{}

@@ -77,7 +77,7 @@ func (c *FakeClusterRoleBindings) Watch(ctx context.Context, opts v1.ListOptions
 }
 
 // Create takes the representation of a clusterRoleBinding and creates it.  Returns the server's representation of the clusterRoleBinding, and an error, if there is any.
-func (c *FakeClusterRoleBindings) Create(ctx context.Context, clusterRoleBinding *rbacv1.ClusterRoleBinding) (result *rbacv1.ClusterRoleBinding, err error) {
+func (c *FakeClusterRoleBindings) Create(ctx context.Context, clusterRoleBinding *rbacv1.ClusterRoleBinding, opts v1.CreateOptions) (result *rbacv1.ClusterRoleBinding, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootCreateAction(clusterrolebindingsResource, clusterRoleBinding), &rbacv1.ClusterRoleBinding{})
 	if obj == nil {
@@ -87,7 +87,7 @@ func (c *FakeClusterRoleBindings) Create(ctx context.Context, clusterRoleBinding
 }
 
 // Update takes the representation of a clusterRoleBinding and updates it. Returns the server's representation of the clusterRoleBinding, and an error, if there is any.
-func (c *FakeClusterRoleBindings) Update(ctx context.Context, clusterRoleBinding *rbacv1.ClusterRoleBinding) (result *rbacv1.ClusterRoleBinding, err error) {
+func (c *FakeClusterRoleBindings) Update(ctx context.Context, clusterRoleBinding *rbacv1.ClusterRoleBinding, opts v1.UpdateOptions) (result *rbacv1.ClusterRoleBinding, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootUpdateAction(clusterrolebindingsResource, clusterRoleBinding), &rbacv1.ClusterRoleBinding{})
 	if obj == nil {
@@ -112,7 +112,7 @@ func (c *FakeClusterRoleBindings) DeleteCollection(ctx context.Context, options 
 }
 
 // Patch applies the patch and returns the patched clusterRoleBinding.
-func (c *FakeClusterRoleBindings) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *rbacv1.ClusterRoleBinding, err error) {
+func (c *FakeClusterRoleBindings) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *rbacv1.ClusterRoleBinding, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootPatchSubresourceAction(clusterrolebindingsResource, name, pt, data, subresources...), &rbacv1.ClusterRoleBinding{})
 	if obj == nil {

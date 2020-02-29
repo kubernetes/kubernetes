@@ -124,7 +124,7 @@ func TestAggregatedAPIServer(t *testing.T) {
 			GroupPriorityMinimum: 200,
 			VersionPriority:      200,
 		},
-	})
+	}, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}

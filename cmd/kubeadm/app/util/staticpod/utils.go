@@ -45,8 +45,8 @@ const (
 	kubeSchedulerBindAddressArg = "bind-address"
 )
 
-// ComponentPod returns a Pod object from the container and volume specifications
-func ComponentPod(container v1.Container, volumes map[string]v1.Volume) v1.Pod {
+// ComponentPod returns a Pod object from the container, volume and annotations specifications
+func ComponentPod(container v1.Container, volumes map[string]v1.Volume, annotations map[string]string) v1.Pod {
 	return v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "v1",
@@ -57,7 +57,8 @@ func ComponentPod(container v1.Container, volumes map[string]v1.Volume) v1.Pod {
 			Namespace: metav1.NamespaceSystem,
 			// The component and tier labels are useful for quickly identifying the control plane Pods when doing a .List()
 			// against Pods in the kube-system namespace. Can for example be used together with the WaitForPodsWithLabel function
-			Labels: map[string]string{"component": container.Name, "tier": "control-plane"},
+			Labels:      map[string]string{"component": container.Name, "tier": kubeadmconstants.ControlPlaneTier},
+			Annotations: annotations,
 		},
 		Spec: v1.PodSpec{
 			Containers:        []v1.Container{container},

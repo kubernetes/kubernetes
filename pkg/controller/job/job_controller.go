@@ -832,7 +832,7 @@ func (jm *JobController) updateJobStatus(job *batch.Job) error {
 			break
 		}
 		newJob.Status = job.Status
-		if _, err = jobClient.UpdateStatus(context.TODO(), newJob); err == nil {
+		if _, err = jobClient.UpdateStatus(context.TODO(), newJob, metav1.UpdateOptions{}); err == nil {
 			break
 		}
 	}

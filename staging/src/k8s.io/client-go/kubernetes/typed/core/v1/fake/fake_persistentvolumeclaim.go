@@ -81,7 +81,7 @@ func (c *FakePersistentVolumeClaims) Watch(ctx context.Context, opts v1.ListOpti
 }
 
 // Create takes the representation of a persistentVolumeClaim and creates it.  Returns the server's representation of the persistentVolumeClaim, and an error, if there is any.
-func (c *FakePersistentVolumeClaims) Create(ctx context.Context, persistentVolumeClaim *corev1.PersistentVolumeClaim) (result *corev1.PersistentVolumeClaim, err error) {
+func (c *FakePersistentVolumeClaims) Create(ctx context.Context, persistentVolumeClaim *corev1.PersistentVolumeClaim, opts v1.CreateOptions) (result *corev1.PersistentVolumeClaim, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(persistentvolumeclaimsResource, c.ns, persistentVolumeClaim), &corev1.PersistentVolumeClaim{})
 
@@ -92,7 +92,7 @@ func (c *FakePersistentVolumeClaims) Create(ctx context.Context, persistentVolum
 }
 
 // Update takes the representation of a persistentVolumeClaim and updates it. Returns the server's representation of the persistentVolumeClaim, and an error, if there is any.
-func (c *FakePersistentVolumeClaims) Update(ctx context.Context, persistentVolumeClaim *corev1.PersistentVolumeClaim) (result *corev1.PersistentVolumeClaim, err error) {
+func (c *FakePersistentVolumeClaims) Update(ctx context.Context, persistentVolumeClaim *corev1.PersistentVolumeClaim, opts v1.UpdateOptions) (result *corev1.PersistentVolumeClaim, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(persistentvolumeclaimsResource, c.ns, persistentVolumeClaim), &corev1.PersistentVolumeClaim{})
 
@@ -104,7 +104,7 @@ func (c *FakePersistentVolumeClaims) Update(ctx context.Context, persistentVolum
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakePersistentVolumeClaims) UpdateStatus(ctx context.Context, persistentVolumeClaim *corev1.PersistentVolumeClaim) (*corev1.PersistentVolumeClaim, error) {
+func (c *FakePersistentVolumeClaims) UpdateStatus(ctx context.Context, persistentVolumeClaim *corev1.PersistentVolumeClaim, opts v1.UpdateOptions) (*corev1.PersistentVolumeClaim, error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateSubresourceAction(persistentvolumeclaimsResource, "status", c.ns, persistentVolumeClaim), &corev1.PersistentVolumeClaim{})
 
@@ -131,7 +131,7 @@ func (c *FakePersistentVolumeClaims) DeleteCollection(ctx context.Context, optio
 }
 
 // Patch applies the patch and returns the patched persistentVolumeClaim.
-func (c *FakePersistentVolumeClaims) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *corev1.PersistentVolumeClaim, err error) {
+func (c *FakePersistentVolumeClaims) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *corev1.PersistentVolumeClaim, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(persistentvolumeclaimsResource, c.ns, name, pt, data, subresources...), &corev1.PersistentVolumeClaim{})
 

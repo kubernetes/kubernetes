@@ -38,16 +38,6 @@ func init() {
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterConversions(s *runtime.Scheme) error {
-	if err := s.AddGeneratedConversionFunc((*v1alpha1.KubeSchedulerConfiguration)(nil), (*config.KubeSchedulerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_KubeSchedulerConfiguration_To_config_KubeSchedulerConfiguration(a.(*v1alpha1.KubeSchedulerConfiguration), b.(*config.KubeSchedulerConfiguration), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*config.KubeSchedulerConfiguration)(nil), (*v1alpha1.KubeSchedulerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_KubeSchedulerConfiguration_To_v1alpha1_KubeSchedulerConfiguration(a.(*config.KubeSchedulerConfiguration), b.(*v1alpha1.KubeSchedulerConfiguration), scope)
-	}); err != nil {
-		return err
-	}
 	if err := s.AddGeneratedConversionFunc((*v1alpha1.Plugin)(nil), (*config.Plugin)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1alpha1_Plugin_To_config_Plugin(a.(*v1alpha1.Plugin), b.(*config.Plugin), scope)
 	}); err != nil {
@@ -75,16 +65,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddGeneratedConversionFunc((*config.PluginSet)(nil), (*v1alpha1.PluginSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_config_PluginSet_To_v1alpha1_PluginSet(a.(*config.PluginSet), b.(*v1alpha1.PluginSet), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*v1alpha1.Plugins)(nil), (*config.Plugins)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_Plugins_To_config_Plugins(a.(*v1alpha1.Plugins), b.(*config.Plugins), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*config.Plugins)(nil), (*v1alpha1.Plugins)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_Plugins_To_v1alpha1_Plugins(a.(*config.Plugins), b.(*v1alpha1.Plugins), scope)
 	}); err != nil {
 		return err
 	}
@@ -128,8 +108,23 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddConversionFunc((*config.KubeSchedulerConfiguration)(nil), (*v1alpha1.KubeSchedulerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_config_KubeSchedulerConfiguration_To_v1alpha1_KubeSchedulerConfiguration(a.(*config.KubeSchedulerConfiguration), b.(*v1alpha1.KubeSchedulerConfiguration), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddConversionFunc((*config.KubeSchedulerLeaderElectionConfiguration)(nil), (*v1alpha1.KubeSchedulerLeaderElectionConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_config_KubeSchedulerLeaderElectionConfiguration_To_v1alpha1_KubeSchedulerLeaderElectionConfiguration(a.(*config.KubeSchedulerLeaderElectionConfiguration), b.(*v1alpha1.KubeSchedulerLeaderElectionConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*config.Plugins)(nil), (*v1alpha1.Plugins)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_config_Plugins_To_v1alpha1_Plugins(a.(*config.Plugins), b.(*v1alpha1.Plugins), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1alpha1.KubeSchedulerConfiguration)(nil), (*config.KubeSchedulerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_KubeSchedulerConfiguration_To_config_KubeSchedulerConfiguration(a.(*v1alpha1.KubeSchedulerConfiguration), b.(*config.KubeSchedulerConfiguration), scope)
 	}); err != nil {
 		return err
 	}
@@ -138,19 +133,20 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddConversionFunc((*v1alpha1.Plugins)(nil), (*config.Plugins)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_Plugins_To_config_Plugins(a.(*v1alpha1.Plugins), b.(*config.Plugins), scope)
+	}); err != nil {
+		return err
+	}
 	return nil
 }
 
 func autoConvert_v1alpha1_KubeSchedulerConfiguration_To_config_KubeSchedulerConfiguration(in *v1alpha1.KubeSchedulerConfiguration, out *config.KubeSchedulerConfiguration, s conversion.Scope) error {
-	if err := v1.Convert_Pointer_string_To_string(&in.SchedulerName, &out.SchedulerName, s); err != nil {
-		return err
-	}
+	// WARNING: in.SchedulerName requires manual conversion: does not exist in peer-type
 	if err := Convert_v1alpha1_SchedulerAlgorithmSource_To_config_SchedulerAlgorithmSource(&in.AlgorithmSource, &out.AlgorithmSource, s); err != nil {
 		return err
 	}
-	if err := v1.Convert_Pointer_int32_To_int32(&in.HardPodAffinitySymmetricWeight, &out.HardPodAffinitySymmetricWeight, s); err != nil {
-		return err
-	}
+	// WARNING: in.HardPodAffinitySymmetricWeight requires manual conversion: does not exist in peer-type
 	if err := Convert_v1alpha1_KubeSchedulerLeaderElectionConfiguration_To_config_KubeSchedulerLeaderElectionConfiguration(&in.LeaderElection, &out.LeaderElection, s); err != nil {
 		return err
 	}
@@ -181,32 +177,13 @@ func autoConvert_v1alpha1_KubeSchedulerConfiguration_To_config_KubeSchedulerConf
 	if err := v1.Convert_Pointer_int64_To_int64(&in.PodMaxBackoffSeconds, &out.PodMaxBackoffSeconds, s); err != nil {
 		return err
 	}
-	if in.Plugins != nil {
-		in, out := &in.Plugins, &out.Plugins
-		*out = new(config.Plugins)
-		if err := Convert_v1alpha1_Plugins_To_config_Plugins(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.Plugins = nil
-	}
-	out.PluginConfig = *(*[]config.PluginConfig)(unsafe.Pointer(&in.PluginConfig))
+	// WARNING: in.Plugins requires manual conversion: does not exist in peer-type
+	// WARNING: in.PluginConfig requires manual conversion: does not exist in peer-type
 	return nil
 }
 
-// Convert_v1alpha1_KubeSchedulerConfiguration_To_config_KubeSchedulerConfiguration is an autogenerated conversion function.
-func Convert_v1alpha1_KubeSchedulerConfiguration_To_config_KubeSchedulerConfiguration(in *v1alpha1.KubeSchedulerConfiguration, out *config.KubeSchedulerConfiguration, s conversion.Scope) error {
-	return autoConvert_v1alpha1_KubeSchedulerConfiguration_To_config_KubeSchedulerConfiguration(in, out, s)
-}
-
 func autoConvert_config_KubeSchedulerConfiguration_To_v1alpha1_KubeSchedulerConfiguration(in *config.KubeSchedulerConfiguration, out *v1alpha1.KubeSchedulerConfiguration, s conversion.Scope) error {
-	if err := v1.Convert_string_To_Pointer_string(&in.SchedulerName, &out.SchedulerName, s); err != nil {
-		return err
-	}
 	if err := Convert_config_SchedulerAlgorithmSource_To_v1alpha1_SchedulerAlgorithmSource(&in.AlgorithmSource, &out.AlgorithmSource, s); err != nil {
-		return err
-	}
-	if err := v1.Convert_int32_To_Pointer_int32(&in.HardPodAffinitySymmetricWeight, &out.HardPodAffinitySymmetricWeight, s); err != nil {
 		return err
 	}
 	if err := Convert_config_KubeSchedulerLeaderElectionConfiguration_To_v1alpha1_KubeSchedulerLeaderElectionConfiguration(&in.LeaderElection, &out.LeaderElection, s); err != nil {
@@ -239,22 +216,8 @@ func autoConvert_config_KubeSchedulerConfiguration_To_v1alpha1_KubeSchedulerConf
 	if err := v1.Convert_int64_To_Pointer_int64(&in.PodMaxBackoffSeconds, &out.PodMaxBackoffSeconds, s); err != nil {
 		return err
 	}
-	if in.Plugins != nil {
-		in, out := &in.Plugins, &out.Plugins
-		*out = new(v1alpha1.Plugins)
-		if err := Convert_config_Plugins_To_v1alpha1_Plugins(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.Plugins = nil
-	}
-	out.PluginConfig = *(*[]v1alpha1.PluginConfig)(unsafe.Pointer(&in.PluginConfig))
+	// WARNING: in.Profiles requires manual conversion: does not exist in peer-type
 	return nil
-}
-
-// Convert_config_KubeSchedulerConfiguration_To_v1alpha1_KubeSchedulerConfiguration is an autogenerated conversion function.
-func Convert_config_KubeSchedulerConfiguration_To_v1alpha1_KubeSchedulerConfiguration(in *config.KubeSchedulerConfiguration, out *v1alpha1.KubeSchedulerConfiguration, s conversion.Scope) error {
-	return autoConvert_config_KubeSchedulerConfiguration_To_v1alpha1_KubeSchedulerConfiguration(in, out, s)
 }
 
 func autoConvert_v1alpha1_KubeSchedulerLeaderElectionConfiguration_To_config_KubeSchedulerLeaderElectionConfiguration(in *v1alpha1.KubeSchedulerLeaderElectionConfiguration, out *config.KubeSchedulerLeaderElectionConfiguration, s conversion.Scope) error {
@@ -411,15 +374,7 @@ func autoConvert_v1alpha1_Plugins_To_config_Plugins(in *v1alpha1.Plugins, out *c
 	} else {
 		out.Filter = nil
 	}
-	if in.PostFilter != nil {
-		in, out := &in.PostFilter, &out.PostFilter
-		*out = new(config.PluginSet)
-		if err := Convert_v1alpha1_PluginSet_To_config_PluginSet(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.PostFilter = nil
-	}
+	// WARNING: in.PostFilter requires manual conversion: does not exist in peer-type
 	if in.Score != nil {
 		in, out := &in.Score, &out.Score
 		*out = new(config.PluginSet)
@@ -484,11 +439,6 @@ func autoConvert_v1alpha1_Plugins_To_config_Plugins(in *v1alpha1.Plugins, out *c
 		out.Unreserve = nil
 	}
 	return nil
-}
-
-// Convert_v1alpha1_Plugins_To_config_Plugins is an autogenerated conversion function.
-func Convert_v1alpha1_Plugins_To_config_Plugins(in *v1alpha1.Plugins, out *config.Plugins, s conversion.Scope) error {
-	return autoConvert_v1alpha1_Plugins_To_config_Plugins(in, out, s)
 }
 
 func autoConvert_config_Plugins_To_v1alpha1_Plugins(in *config.Plugins, out *v1alpha1.Plugins, s conversion.Scope) error {
@@ -519,15 +469,7 @@ func autoConvert_config_Plugins_To_v1alpha1_Plugins(in *config.Plugins, out *v1a
 	} else {
 		out.Filter = nil
 	}
-	if in.PostFilter != nil {
-		in, out := &in.PostFilter, &out.PostFilter
-		*out = new(v1alpha1.PluginSet)
-		if err := Convert_config_PluginSet_To_v1alpha1_PluginSet(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.PostFilter = nil
-	}
+	// WARNING: in.PreScore requires manual conversion: does not exist in peer-type
 	if in.Score != nil {
 		in, out := &in.Score, &out.Score
 		*out = new(v1alpha1.PluginSet)
@@ -592,11 +534,6 @@ func autoConvert_config_Plugins_To_v1alpha1_Plugins(in *config.Plugins, out *v1a
 		out.Unreserve = nil
 	}
 	return nil
-}
-
-// Convert_config_Plugins_To_v1alpha1_Plugins is an autogenerated conversion function.
-func Convert_config_Plugins_To_v1alpha1_Plugins(in *config.Plugins, out *v1alpha1.Plugins, s conversion.Scope) error {
-	return autoConvert_config_Plugins_To_v1alpha1_Plugins(in, out, s)
 }
 
 func autoConvert_v1alpha1_SchedulerAlgorithmSource_To_config_SchedulerAlgorithmSource(in *v1alpha1.SchedulerAlgorithmSource, out *config.SchedulerAlgorithmSource, s conversion.Scope) error {

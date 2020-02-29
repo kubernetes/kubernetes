@@ -136,13 +136,13 @@ func TestPodUpdateActiveDeadlineSeconds(t *testing.T) {
 		pod.Spec.ActiveDeadlineSeconds = tc.original
 		pod.ObjectMeta.Name = fmt.Sprintf("activedeadlineseconds-test-%v", i)
 
-		if _, err := client.CoreV1().Pods(ns.Name).Create(context.TODO(), pod); err != nil {
+		if _, err := client.CoreV1().Pods(ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{}); err != nil {
 			t.Errorf("Failed to create pod: %v", err)
 		}
 
 		pod.Spec.ActiveDeadlineSeconds = tc.update
 
-		_, err := client.CoreV1().Pods(ns.Name).Update(context.TODO(), pod)
+		_, err := client.CoreV1().Pods(ns.Name).Update(context.TODO(), pod, metav1.UpdateOptions{})
 		if tc.valid && err != nil {
 			t.Errorf("%v: failed to update pod: %v", tc.name, err)
 		} else if !tc.valid && err == nil {
@@ -180,7 +180,7 @@ func TestPodReadOnlyFilesystem(t *testing.T) {
 		},
 	}
 
-	if _, err := client.CoreV1().Pods(ns.Name).Create(context.TODO(), pod); err != nil {
+	if _, err := client.CoreV1().Pods(ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{}); err != nil {
 		t.Errorf("Failed to create pod: %v", err)
 	}
 
@@ -224,7 +224,7 @@ func TestPodCreateEphemeralContainers(t *testing.T) {
 		},
 	}
 
-	if _, err := client.CoreV1().Pods(ns.Name).Create(context.TODO(), pod); err == nil {
+	if _, err := client.CoreV1().Pods(ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{}); err == nil {
 		t.Errorf("Unexpected allowed creation of pod with ephemeral containers")
 		integration.DeletePodOrErrorf(t, client, ns.Name, pod.Name)
 	} else if !strings.HasSuffix(err.Error(), "spec.ephemeralContainers: Forbidden: cannot be set on create") {
@@ -235,7 +235,7 @@ func TestPodCreateEphemeralContainers(t *testing.T) {
 // setUpEphemeralContainers creates a pod that has Ephemeral Containers. This is a two step
 // process because Ephemeral Containers are not allowed during pod creation.
 func setUpEphemeralContainers(podsClient typedv1.PodInterface, pod *v1.Pod, containers []v1.EphemeralContainer) error {
-	if _, err := podsClient.Create(context.TODO(), pod); err != nil {
+	if _, err := podsClient.Create(context.TODO(), pod, metav1.CreateOptions{}); err != nil {
 		return fmt.Errorf("failed to create pod: %v", err)
 	}
 
@@ -244,7 +244,7 @@ func setUpEphemeralContainers(podsClient typedv1.PodInterface, pod *v1.Pod, cont
 	}
 
 	pod.Spec.EphemeralContainers = containers
-	if _, err := podsClient.Update(context.TODO(), pod); err == nil {
+	if _, err := podsClient.Update(context.TODO(), pod, metav1.UpdateOptions{}); err == nil {
 		return fmt.Errorf("unexpected allowed direct update of ephemeral containers during set up: %v", err)
 	}
 
@@ -254,7 +254,7 @@ func setUpEphemeralContainers(podsClient typedv1.PodInterface, pod *v1.Pod, cont
 	}
 
 	ec.EphemeralContainers = containers
-	if _, err = podsClient.UpdateEphemeralContainers(context.TODO(), pod.Name, ec); err != nil {
+	if _, err = podsClient.UpdateEphemeralContainers(context.TODO(), pod.Name, ec, metav1.UpdateOptions{}); err != nil {
 		return fmt.Errorf("failed to update ephemeral containers for test case set up: %v", err)
 	}
 
@@ -457,7 +457,7 @@ func TestPodPatchEphemeralContainers(t *testing.T) {
 			t.Errorf("%v: %v", tc.name, err)
 		}
 
-		if _, err := client.CoreV1().Pods(ns.Name).Patch(context.TODO(), pod.Name, tc.patchType, tc.patchBody, "ephemeralcontainers"); tc.valid && err != nil {
+		if _, err := client.CoreV1().Pods(ns.Name).Patch(context.TODO(), pod.Name, tc.patchType, tc.patchBody, metav1.PatchOptions{}, "ephemeralcontainers"); tc.valid && err != nil {
 			t.Errorf("%v: failed to update ephemeral containers: %v", tc.name, err)
 		} else if !tc.valid && err == nil {
 			t.Errorf("%v: unexpected allowed update to ephemeral containers", tc.name)
@@ -653,7 +653,7 @@ func TestPodUpdateEphemeralContainers(t *testing.T) {
 		}
 
 		ec.EphemeralContainers = tc.update
-		if _, err := client.CoreV1().Pods(ns.Name).UpdateEphemeralContainers(context.TODO(), pod.Name, ec); tc.valid && err != nil {
+		if _, err := client.CoreV1().Pods(ns.Name).UpdateEphemeralContainers(context.TODO(), pod.Name, ec, metav1.UpdateOptions{}); tc.valid && err != nil {
 			t.Errorf("%v: failed to update ephemeral containers: %v", tc.name, err)
 		} else if !tc.valid && err == nil {
 			t.Errorf("%v: unexpected allowed update to ephemeral containers", tc.name)

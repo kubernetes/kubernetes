@@ -38,15 +38,15 @@ type ResourceQuotasGetter interface {
 
 // ResourceQuotaInterface has methods to work with ResourceQuota resources.
 type ResourceQuotaInterface interface {
-	Create(context.Context, *v1.ResourceQuota) (*v1.ResourceQuota, error)
-	Update(context.Context, *v1.ResourceQuota) (*v1.ResourceQuota, error)
-	UpdateStatus(context.Context, *v1.ResourceQuota) (*v1.ResourceQuota, error)
-	Delete(ctx context.Context, name string, options *metav1.DeleteOptions) error
-	DeleteCollection(ctx context.Context, options *metav1.DeleteOptions, listOptions metav1.ListOptions) error
-	Get(ctx context.Context, name string, options metav1.GetOptions) (*v1.ResourceQuota, error)
+	Create(ctx context.Context, resourceQuota *v1.ResourceQuota, opts metav1.CreateOptions) (*v1.ResourceQuota, error)
+	Update(ctx context.Context, resourceQuota *v1.ResourceQuota, opts metav1.UpdateOptions) (*v1.ResourceQuota, error)
+	UpdateStatus(ctx context.Context, resourceQuota *v1.ResourceQuota, opts metav1.UpdateOptions) (*v1.ResourceQuota, error)
+	Delete(ctx context.Context, name string, opts *metav1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.ResourceQuota, error)
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.ResourceQuotaList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.ResourceQuota, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ResourceQuota, err error)
 	ResourceQuotaExpansion
 }
 
@@ -110,11 +110,12 @@ func (c *resourceQuotas) Watch(ctx context.Context, opts metav1.ListOptions) (wa
 }
 
 // Create takes the representation of a resourceQuota and creates it.  Returns the server's representation of the resourceQuota, and an error, if there is any.
-func (c *resourceQuotas) Create(ctx context.Context, resourceQuota *v1.ResourceQuota) (result *v1.ResourceQuota, err error) {
+func (c *resourceQuotas) Create(ctx context.Context, resourceQuota *v1.ResourceQuota, opts metav1.CreateOptions) (result *v1.ResourceQuota, err error) {
 	result = &v1.ResourceQuota{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("resourcequotas").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(resourceQuota).
 		Do(ctx).
 		Into(result)
@@ -122,12 +123,13 @@ func (c *resourceQuotas) Create(ctx context.Context, resourceQuota *v1.ResourceQ
 }
 
 // Update takes the representation of a resourceQuota and updates it. Returns the server's representation of the resourceQuota, and an error, if there is any.
-func (c *resourceQuotas) Update(ctx context.Context, resourceQuota *v1.ResourceQuota) (result *v1.ResourceQuota, err error) {
+func (c *resourceQuotas) Update(ctx context.Context, resourceQuota *v1.ResourceQuota, opts metav1.UpdateOptions) (result *v1.ResourceQuota, err error) {
 	result = &v1.ResourceQuota{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("resourcequotas").
 		Name(resourceQuota.Name).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(resourceQuota).
 		Do(ctx).
 		Into(result)
@@ -136,14 +138,14 @@ func (c *resourceQuotas) Update(ctx context.Context, resourceQuota *v1.ResourceQ
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-
-func (c *resourceQuotas) UpdateStatus(ctx context.Context, resourceQuota *v1.ResourceQuota) (result *v1.ResourceQuota, err error) {
+func (c *resourceQuotas) UpdateStatus(ctx context.Context, resourceQuota *v1.ResourceQuota, opts metav1.UpdateOptions) (result *v1.ResourceQuota, err error) {
 	result = &v1.ResourceQuota{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("resourcequotas").
 		Name(resourceQuota.Name).
 		SubResource("status").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(resourceQuota).
 		Do(ctx).
 		Into(result)
@@ -178,13 +180,14 @@ func (c *resourceQuotas) DeleteCollection(ctx context.Context, options *metav1.D
 }
 
 // Patch applies the patch and returns the patched resourceQuota.
-func (c *resourceQuotas) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.ResourceQuota, err error) {
+func (c *resourceQuotas) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ResourceQuota, err error) {
 	result = &v1.ResourceQuota{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("resourcequotas").
-		SubResource(subresources...).
 		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

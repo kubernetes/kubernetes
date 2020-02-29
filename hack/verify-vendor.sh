@@ -14,6 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This script checks whether fixing of vendor directory or go.mod is needed or
+# not. We should run `hack/update-vendor.sh` if actually fixes them.
+# Usage: `hack/verify-vendor.sh`.
+
 set -o errexit
 set -o nounset
 set -o pipefail

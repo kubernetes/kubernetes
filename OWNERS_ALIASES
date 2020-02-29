@@ -121,12 +121,25 @@ aliases:
     - justaugustus # SIG Chair
     - tpepper # SIG Chair / Patch Release Team
   release-engineering-reviewers:
-    - aleksandra-malinowska # Patch Release Team
     - calebamiles # SIG Chair
+    - cpanato # Branch Manager
     - feiskyer # Patch Release Team
     - hoegaarden # Patch Release Team
     - justaugustus # SIG Chair
+    - saschagrunert # Branch Manager
     - tpepper # SIG Chair / Patch Release Team
+  build-image-approvers:
+    - BenTheElder
+    - cblecker
+    - dims
+    - justaugustus
+    - listx
+  build-image-reviewers:
+    - BenTheElder
+    - cblecker
+    - dims
+    - justaugustus
+    - listx
 
   sig-storage-reviewers:
     - saad-ali
@@ -151,6 +164,7 @@ aliases:
     - hex108
     - alculquicondor
     - liu-cong
+    - damemi
 
   sig-cli-maintainers:
     - adohe
@@ -217,6 +231,12 @@ aliases:
     - yujuhong
     - krmayankk
     - mattjmcnaughton
+    - matthyx
+
+  sig-network-driver-approvers:
+    - dcbw
+    - freehan
+
   sig-network-approvers:
     - andrewsykim
     - bowei
@@ -454,7 +474,7 @@ aliases:
     - andrewsykim     # Cloud Provider
     - bgrant0607      # Architecture
     - brancz          # Instrumentation
-    - bsalamat        # Scheduling
+    - ahg-g           # Scheduling
     - calebamiles     # Release
     - caseydavenport  # Network
     - countspongebob  # Scalability

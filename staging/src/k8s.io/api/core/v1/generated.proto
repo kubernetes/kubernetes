@@ -1042,6 +1042,16 @@ message EndpointPort {
   // Default is TCP.
   // +optional
   optional string protocol = 3;
+
+  // The application protocol for this port.
+  // This field follows standard Kubernetes label syntax.
+  // Un-prefixed names are reserved for IANA standard service names (as per
+  // RFC-6335 and http://www.iana.org/assignments/service-names).
+  // Non-standard protocols should use prefixed names such as
+  // mycompany.com/my-custom-protocol.
+  // Field can be enabled with ServiceAppProtocol feature gate.
+  // +optional
+  optional string appProtocol = 4;
 }
 
 // EndpointSubset is a group of addresses with a common set of ports. The
@@ -1921,7 +1931,6 @@ message LimitRange {
 // LimitRangeItem defines a min/max usage limit for any resource that matches on kind.
 message LimitRangeItem {
   // Type of resource that this limit applies to.
-  // +optional
   optional string type = 1;
 
   // Max usage constraints on this kind by resource name.
@@ -3519,8 +3528,7 @@ message PodSpec {
 
   // TopologySpreadConstraints describes how a group of pods ought to spread across topology
   // domains. Scheduler will schedule pods in a way which abides by the constraints.
-  // This field is alpha-level and is only honored by clusters that enables the EvenPodsSpread
-  // feature.
+  // This field is only honored by clusters that enable the EvenPodsSpread feature.
   // All topologySpreadConstraints are ANDed.
   // +optional
   // +patchMergeKey=topologyKey
@@ -4611,6 +4619,16 @@ message ServicePort {
   // +optional
   optional string protocol = 2;
 
+  // The application protocol for this port.
+  // This field follows standard Kubernetes label syntax.
+  // Un-prefixed names are reserved for IANA standard service names (as per
+  // RFC-6335 and http://www.iana.org/assignments/service-names).
+  // Non-standard protocols should use prefixed names such as
+  // mycompany.com/my-custom-protocol.
+  // Field can be enabled with ServiceAppProtocol feature gate.
+  // +optional
+  optional string appProtocol = 6;
+
   // The port that will be exposed by this service.
   optional int32 port = 3;
 
@@ -5301,7 +5319,6 @@ message WindowsSecurityContextOptions {
   // Defaults to the user specified in image metadata if unspecified.
   // May also be set in PodSecurityContext. If set in both SecurityContext and
   // PodSecurityContext, the value specified in SecurityContext takes precedence.
-  // This field is beta-level and may be disabled with the WindowsRunAsUserName feature flag.
   // +optional
   optional string runAsUserName = 3;
 }

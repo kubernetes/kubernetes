@@ -24,17 +24,20 @@ import (
 	"fmt"
 	"math/rand"
 	"net/http"
-	"strings"
 	"sync"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-07-01/compute"
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2019-06-01/network"
 	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2019-06-01/storage"
 	"github.com/Azure/go-autorest/autorest/to"
+	"github.com/golang/mock/gomock"
 
-	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
-	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/tools/record"
+	"k8s.io/legacy-cloud-providers/azure/auth"
+	"k8s.io/legacy-cloud-providers/azure/clients/routeclient/mockrouteclient"
+	"k8s.io/legacy-cloud-providers/azure/clients/routetableclient/mockroutetableclient"
+	"k8s.io/legacy-cloud-providers/azure/clients/subnetclient/mocksubnetclient"
 	"k8s.io/legacy-cloud-providers/azure/retry"
 )
 
@@ -292,6 +295,10 @@ func (fIC *fakeAzureInterfacesClient) GetVirtualMachineScaleSetNetworkInterface(
 		errors.New("Not such Interface"))
 }
 
+func (fIC *fakeAzureInterfacesClient) Delete(ctx context.Context, resourceGroupName string, networkInterfaceName string) *retry.Error {
+	return nil
+}
+
 func (fIC *fakeAzureInterfacesClient) setFakeStore(store map[string]map[string]network.Interface) {
 	fIC.mutex.Lock()
 	defer fIC.mutex.Unlock()
@@ -363,86 +370,15 @@ func (fVMC *fakeAzureVirtualMachinesClient) List(ctx context.Context, resourceGr
 	return result, nil
 }
 
+func (fVMC *fakeAzureVirtualMachinesClient) Delete(ctx context.Context, resourceGroupName string, VMName string) *retry.Error {
+	return nil
+}
+
 func (fVMC *fakeAzureVirtualMachinesClient) setFakeStore(store map[string]map[string]compute.VirtualMachine) {
 	fVMC.mutex.Lock()
 	defer fVMC.mutex.Unlock()
 
 	fVMC.FakeStore = store
-}
-
-type fakeAzureSubnetsClient struct {
-	mutex     *sync.Mutex
-	FakeStore map[string]map[string]network.Subnet
-}
-
-func newFakeAzureSubnetsClient() *fakeAzureSubnetsClient {
-	fASC := &fakeAzureSubnetsClient{}
-	fASC.FakeStore = make(map[string]map[string]network.Subnet)
-	fASC.mutex = &sync.Mutex{}
-	return fASC
-}
-
-func (fASC *fakeAzureSubnetsClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, virtualNetworkName string, subnetName string, subnetParameters network.Subnet) *retry.Error {
-	fASC.mutex.Lock()
-	defer fASC.mutex.Unlock()
-
-	rgVnet := strings.Join([]string{resourceGroupName, virtualNetworkName}, "AND")
-	if _, ok := fASC.FakeStore[rgVnet]; !ok {
-		fASC.FakeStore[rgVnet] = make(map[string]network.Subnet)
-	}
-	fASC.FakeStore[rgVnet][subnetName] = subnetParameters
-
-	return nil
-}
-
-func (fASC *fakeAzureSubnetsClient) Delete(ctx context.Context, resourceGroupName string, virtualNetworkName string, subnetName string) *retry.Error {
-	fASC.mutex.Lock()
-	defer fASC.mutex.Unlock()
-
-	rgVnet := strings.Join([]string{resourceGroupName, virtualNetworkName}, "AND")
-	if rgSubnets, ok := fASC.FakeStore[rgVnet]; ok {
-		if _, ok := rgSubnets[subnetName]; ok {
-			delete(rgSubnets, subnetName)
-			return nil
-		}
-	}
-
-	return retry.GetError(
-		&http.Response{
-			StatusCode: http.StatusNotFound,
-		},
-		errors.New("Not such Subnet"))
-}
-
-func (fASC *fakeAzureSubnetsClient) Get(ctx context.Context, resourceGroupName string, virtualNetworkName string, subnetName string, expand string) (result network.Subnet, err *retry.Error) {
-	fASC.mutex.Lock()
-	defer fASC.mutex.Unlock()
-	rgVnet := strings.Join([]string{resourceGroupName, virtualNetworkName}, "AND")
-	if _, ok := fASC.FakeStore[rgVnet]; ok {
-		if entity, ok := fASC.FakeStore[rgVnet][subnetName]; ok {
-			return entity, nil
-		}
-	}
-	return result, retry.GetError(
-		&http.Response{
-			StatusCode: http.StatusNotFound,
-		},
-		errors.New("Not such Subnet"))
-}
-
-func (fASC *fakeAzureSubnetsClient) List(ctx context.Context, resourceGroupName string, virtualNetworkName string) (result []network.Subnet, err *retry.Error) {
-	fASC.mutex.Lock()
-	defer fASC.mutex.Unlock()
-
-	rgVnet := strings.Join([]string{resourceGroupName, virtualNetworkName}, "AND")
-	var value []network.Subnet
-	if _, ok := fASC.FakeStore[rgVnet]; ok {
-		for _, v := range fASC.FakeStore[rgVnet] {
-			value = append(value, v)
-		}
-	}
-
-	return value, nil
 }
 
 type fakeAzureNSGClient struct {
@@ -661,96 +597,8 @@ func (fVMSSC *fakeVirtualMachineScaleSetsClient) UpdateInstances(ctx context.Con
 	return nil
 }
 
-type fakeRoutesClient struct {
-	mutex     *sync.Mutex
-	FakeStore map[string]map[string]network.Route
-	Calls     []string
-}
-
-func newFakeRoutesClient() *fakeRoutesClient {
-	fRC := &fakeRoutesClient{}
-	fRC.FakeStore = make(map[string]map[string]network.Route)
-	fRC.mutex = &sync.Mutex{}
-	return fRC
-}
-
-func (fRC *fakeRoutesClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, routeTableName string, routeName string, routeParameters network.Route, etag string) *retry.Error {
-	fRC.mutex.Lock()
-	defer fRC.mutex.Unlock()
-
-	fRC.Calls = append(fRC.Calls, "CreateOrUpdate")
-
-	if _, ok := fRC.FakeStore[routeTableName]; !ok {
-		fRC.FakeStore[routeTableName] = make(map[string]network.Route)
-	}
-	fRC.FakeStore[routeTableName][routeName] = routeParameters
-
+func (fVMSSC *fakeVirtualMachineScaleSetsClient) DeleteInstances(ctx context.Context, resourceGroupName string, vmScaleSetName string, vmInstanceIDs compute.VirtualMachineScaleSetVMInstanceRequiredIDs) *retry.Error {
 	return nil
-}
-
-func (fRC *fakeRoutesClient) Delete(ctx context.Context, resourceGroupName string, routeTableName string, routeName string) *retry.Error {
-	fRC.mutex.Lock()
-	defer fRC.mutex.Unlock()
-
-	fRC.Calls = append(fRC.Calls, "Delete")
-
-	if routes, ok := fRC.FakeStore[routeTableName]; ok {
-		if _, ok := routes[routeName]; ok {
-			delete(routes, routeName)
-			return nil
-		}
-	}
-
-	return retry.GetError(
-		&http.Response{
-			StatusCode: http.StatusNotFound,
-		},
-		errors.New("Not such Route"))
-}
-
-type fakeRouteTablesClient struct {
-	mutex     *sync.Mutex
-	FakeStore map[string]map[string]network.RouteTable
-	Calls     []string
-}
-
-func newFakeRouteTablesClient() *fakeRouteTablesClient {
-	fRTC := &fakeRouteTablesClient{}
-	fRTC.FakeStore = make(map[string]map[string]network.RouteTable)
-	fRTC.mutex = &sync.Mutex{}
-	return fRTC
-}
-
-func (fRTC *fakeRouteTablesClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, routeTableName string, parameters network.RouteTable, etag string) *retry.Error {
-	fRTC.mutex.Lock()
-	defer fRTC.mutex.Unlock()
-
-	fRTC.Calls = append(fRTC.Calls, "CreateOrUpdate")
-
-	if _, ok := fRTC.FakeStore[resourceGroupName]; !ok {
-		fRTC.FakeStore[resourceGroupName] = make(map[string]network.RouteTable)
-	}
-	fRTC.FakeStore[resourceGroupName][routeTableName] = parameters
-
-	return nil
-}
-
-func (fRTC *fakeRouteTablesClient) Get(ctx context.Context, resourceGroupName string, routeTableName string, expand string) (result network.RouteTable, err *retry.Error) {
-	fRTC.mutex.Lock()
-	defer fRTC.mutex.Unlock()
-
-	fRTC.Calls = append(fRTC.Calls, "Get")
-
-	if _, ok := fRTC.FakeStore[resourceGroupName]; ok {
-		if entity, ok := fRTC.FakeStore[resourceGroupName][routeTableName]; ok {
-			return entity, nil
-		}
-	}
-	return result, retry.GetError(
-		&http.Response{
-			StatusCode: http.StatusNotFound,
-		},
-		errors.New("Not such RouteTable"))
 }
 
 type fakeFileClient struct {
@@ -862,6 +710,10 @@ func (fDC *fakeDisksClient) CreateOrUpdate(ctx context.Context, resourceGroupNam
 	fDC.mutex.Lock()
 	defer fDC.mutex.Unlock()
 
+	provisioningStateSucceeded := string(compute.ProvisioningStateSucceeded)
+	diskParameter.DiskProperties = &compute.DiskProperties{ProvisioningState: &provisioningStateSucceeded}
+	diskParameter.ID = &diskName
+
 	if _, ok := fDC.FakeStore[resourceGroupName]; !ok {
 		fDC.FakeStore[resourceGroupName] = make(map[string]compute.Disk)
 	}
@@ -905,76 +757,54 @@ func (fDC *fakeDisksClient) Get(ctx context.Context, resourceGroupName string, d
 		errors.New("Not such Disk"))
 }
 
-type fakeVMSet struct {
-	NodeToIP map[string]string
-	Err      error
-}
-
-func (f *fakeVMSet) GetInstanceIDByNodeName(name string) (string, error) {
-	return "", fmt.Errorf("unimplemented")
-}
-
-func (f *fakeVMSet) GetInstanceTypeByNodeName(name string) (string, error) {
-	return "", fmt.Errorf("unimplemented")
-}
-
-func (f *fakeVMSet) GetPrivateIPsByNodeName(nodeName string) ([]string, error) {
-	return []string{}, fmt.Errorf("unimplemented")
-}
-
-func (f *fakeVMSet) GetIPByNodeName(name string) (string, string, error) {
-	ip, found := f.NodeToIP[name]
-	if !found {
-		return "", "", fmt.Errorf("not found")
+// GetTestCloud returns a fake azure cloud for unit tests in Azure related CSI drivers
+func GetTestCloud(ctrl *gomock.Controller) (az *Cloud) {
+	az = &Cloud{
+		Config: Config{
+			AzureAuthConfig: auth.AzureAuthConfig{
+				TenantID:       "tenant",
+				SubscriptionID: "subscription",
+			},
+			ResourceGroup:                "rg",
+			VnetResourceGroup:            "rg",
+			RouteTableResourceGroup:      "rg",
+			SecurityGroupResourceGroup:   "rg",
+			Location:                     "westus",
+			VnetName:                     "vnet",
+			SubnetName:                   "subnet",
+			SecurityGroupName:            "nsg",
+			RouteTableName:               "rt",
+			PrimaryAvailabilitySetName:   "as",
+			MaximumLoadBalancerRuleCount: 250,
+			VMType:                       vmTypeStandard,
+		},
+		nodeZones:          map[string]sets.String{},
+		nodeInformerSynced: func() bool { return true },
+		nodeResourceGroups: map[string]string{},
+		unmanagedNodes:     sets.NewString(),
+		routeCIDRs:         map[string]string{},
+		eventRecorder:      &record.FakeRecorder{},
 	}
+	az.DisksClient = newFakeDisksClient()
+	az.InterfacesClient = newFakeAzureInterfacesClient()
+	az.LoadBalancerClient = newFakeAzureLBClient()
+	az.PublicIPAddressesClient = newFakeAzurePIPClient(az.Config.SubscriptionID)
+	az.RoutesClient = mockrouteclient.NewMockInterface(ctrl)
+	az.RouteTablesClient = mockroutetableclient.NewMockInterface(ctrl)
+	az.SecurityGroupsClient = newFakeAzureNSGClient()
+	az.SubnetsClient = mocksubnetclient.NewMockInterface(ctrl)
+	az.VirtualMachineScaleSetsClient = newFakeVirtualMachineScaleSetsClient()
+	az.VirtualMachineScaleSetVMsClient = newFakeVirtualMachineScaleSetVMsClient()
+	az.VirtualMachinesClient = newFakeAzureVirtualMachinesClient()
+	az.vmSet = newAvailabilitySet(az)
+	az.vmCache, _ = az.newVMCache()
+	az.lbCache, _ = az.newLBCache()
+	az.nsgCache, _ = az.newNSGCache()
+	az.rtCache, _ = az.newRouteTableCache()
 
-	return ip, "", nil
-}
+	common := &controllerCommon{cloud: az}
+	az.controllerCommon = common
+	az.ManagedDiskController = &ManagedDiskController{common: common}
 
-func (f *fakeVMSet) GetPrimaryInterface(nodeName string) (network.Interface, error) {
-	return network.Interface{}, fmt.Errorf("unimplemented")
-}
-
-func (f *fakeVMSet) GetNodeNameByProviderID(providerID string) (types.NodeName, error) {
-	return types.NodeName(""), fmt.Errorf("unimplemented")
-}
-
-func (f *fakeVMSet) GetZoneByNodeName(name string) (cloudprovider.Zone, error) {
-	return cloudprovider.Zone{}, fmt.Errorf("unimplemented")
-}
-
-func (f *fakeVMSet) GetPrimaryVMSetName() string {
-	return ""
-}
-
-func (f *fakeVMSet) GetVMSetNames(service *v1.Service, nodes []*v1.Node) (availabilitySetNames *[]string, err error) {
-	return nil, fmt.Errorf("unimplemented")
-}
-
-func (f *fakeVMSet) EnsureHostsInPool(service *v1.Service, nodes []*v1.Node, backendPoolID string, vmSetName string, isInternal bool) error {
-	return fmt.Errorf("unimplemented")
-}
-
-func (f *fakeVMSet) EnsureHostInPool(service *v1.Service, nodeName types.NodeName, backendPoolID string, vmSetName string, isInternal bool) error {
-	return fmt.Errorf("unimplemented")
-}
-
-func (f *fakeVMSet) EnsureBackendPoolDeleted(service *v1.Service, backendPoolID, vmSetName string, backendAddressPools *[]network.BackendAddressPool) error {
-	return fmt.Errorf("unimplemented")
-}
-
-func (f *fakeVMSet) AttachDisk(isManagedDisk bool, diskName, diskURI string, nodeName types.NodeName, lun int32, cachingMode compute.CachingTypes, diskEncryptionSetID string) error {
-	return fmt.Errorf("unimplemented")
-}
-
-func (f *fakeVMSet) DetachDisk(diskName, diskURI string, nodeName types.NodeName) error {
-	return fmt.Errorf("unimplemented")
-}
-
-func (f *fakeVMSet) GetDataDisks(nodeName types.NodeName, crt cacheReadType) ([]compute.DataDisk, error) {
-	return nil, fmt.Errorf("unimplemented")
-}
-
-func (f *fakeVMSet) GetPowerStatusByNodeName(name string) (string, error) {
-	return "", fmt.Errorf("unimplemented")
+	return az
 }

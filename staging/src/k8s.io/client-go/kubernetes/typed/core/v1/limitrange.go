@@ -38,14 +38,14 @@ type LimitRangesGetter interface {
 
 // LimitRangeInterface has methods to work with LimitRange resources.
 type LimitRangeInterface interface {
-	Create(context.Context, *v1.LimitRange) (*v1.LimitRange, error)
-	Update(context.Context, *v1.LimitRange) (*v1.LimitRange, error)
-	Delete(ctx context.Context, name string, options *metav1.DeleteOptions) error
-	DeleteCollection(ctx context.Context, options *metav1.DeleteOptions, listOptions metav1.ListOptions) error
-	Get(ctx context.Context, name string, options metav1.GetOptions) (*v1.LimitRange, error)
+	Create(ctx context.Context, limitRange *v1.LimitRange, opts metav1.CreateOptions) (*v1.LimitRange, error)
+	Update(ctx context.Context, limitRange *v1.LimitRange, opts metav1.UpdateOptions) (*v1.LimitRange, error)
+	Delete(ctx context.Context, name string, opts *metav1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.LimitRange, error)
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.LimitRangeList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.LimitRange, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.LimitRange, err error)
 	LimitRangeExpansion
 }
 
@@ -109,11 +109,12 @@ func (c *limitRanges) Watch(ctx context.Context, opts metav1.ListOptions) (watch
 }
 
 // Create takes the representation of a limitRange and creates it.  Returns the server's representation of the limitRange, and an error, if there is any.
-func (c *limitRanges) Create(ctx context.Context, limitRange *v1.LimitRange) (result *v1.LimitRange, err error) {
+func (c *limitRanges) Create(ctx context.Context, limitRange *v1.LimitRange, opts metav1.CreateOptions) (result *v1.LimitRange, err error) {
 	result = &v1.LimitRange{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("limitranges").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(limitRange).
 		Do(ctx).
 		Into(result)
@@ -121,12 +122,13 @@ func (c *limitRanges) Create(ctx context.Context, limitRange *v1.LimitRange) (re
 }
 
 // Update takes the representation of a limitRange and updates it. Returns the server's representation of the limitRange, and an error, if there is any.
-func (c *limitRanges) Update(ctx context.Context, limitRange *v1.LimitRange) (result *v1.LimitRange, err error) {
+func (c *limitRanges) Update(ctx context.Context, limitRange *v1.LimitRange, opts metav1.UpdateOptions) (result *v1.LimitRange, err error) {
 	result = &v1.LimitRange{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("limitranges").
 		Name(limitRange.Name).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(limitRange).
 		Do(ctx).
 		Into(result)
@@ -161,13 +163,14 @@ func (c *limitRanges) DeleteCollection(ctx context.Context, options *metav1.Dele
 }
 
 // Patch applies the patch and returns the patched limitRange.
-func (c *limitRanges) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.LimitRange, err error) {
+func (c *limitRanges) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.LimitRange, err error) {
 	result = &v1.LimitRange{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("limitranges").
-		SubResource(subresources...).
 		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

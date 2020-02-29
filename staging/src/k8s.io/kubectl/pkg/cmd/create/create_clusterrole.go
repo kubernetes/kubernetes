@@ -73,7 +73,7 @@ func NewCmdCreateClusterRole(f cmdutil.Factory, ioStreams genericclioptions.IOSt
 		AggregationRule:   map[string]string{},
 	}
 	cmd := &cobra.Command{
-		Use:                   "clusterrole NAME --verb=verb --resource=resource.group [--resource-name=resourcename] [--dry-run]",
+		Use:                   "clusterrole NAME --verb=verb --resource=resource.group [--resource-name=resourcename] [--dry-run=server|client|none]",
 		DisableFlagsInUseLine: true,
 		Short:                 clusterRoleLong,
 		Long:                  clusterRoleLong,
@@ -200,8 +200,15 @@ func (c *CreateClusterRoleOptions) RunCreateRole() error {
 	}
 
 	// Create ClusterRole.
-	if !c.DryRun {
-		clusterRole, err = c.Client.ClusterRoles().Create(context.TODO(), clusterRole)
+	if c.DryRunStrategy != cmdutil.DryRunClient {
+		createOptions := metav1.CreateOptions{}
+		if c.DryRunStrategy == cmdutil.DryRunServer {
+			if err := c.DryRunVerifier.HasSupport(clusterRole.GroupVersionKind()); err != nil {
+				return err
+			}
+			createOptions.DryRun = []string{metav1.DryRunAll}
+		}
+		clusterRole, err = c.Client.ClusterRoles().Create(context.TODO(), clusterRole, createOptions)
 		if err != nil {
 			return err
 		}

@@ -103,6 +103,27 @@ func HugePageUnitSizeFromByteSize(size int64) (string, error) {
 	return fmt.Sprintf("%d%s", size, hugePageSizeUnitList[idx]), nil
 }
 
+// IsHugePageMedium returns true if the volume medium is in 'HugePages[-size]' format
+func IsHugePageMedium(medium v1.StorageMedium) bool {
+	if medium == v1.StorageMediumHugePages {
+		return true
+	}
+	return strings.HasPrefix(string(medium), string(v1.StorageMediumHugePagesPrefix))
+}
+
+// HugePageSizeFromMedium returns the page size for the specified huge page medium.
+// If the specified input is not a valid huge page medium an error is returned.
+func HugePageSizeFromMedium(medium v1.StorageMedium) (resource.Quantity, error) {
+	if !IsHugePageMedium(medium) {
+		return resource.Quantity{}, fmt.Errorf("medium: %s is not a hugepage medium", medium)
+	}
+	if medium == v1.StorageMediumHugePages {
+		return resource.Quantity{}, fmt.Errorf("medium: %s doesn't have size information", medium)
+	}
+	pageSize := strings.TrimPrefix(string(medium), string(v1.StorageMediumHugePagesPrefix))
+	return resource.ParseQuantity(pageSize)
+}
+
 // IsOvercommitAllowed returns true if the resource is in the default
 // namespace and is not hugepages.
 func IsOvercommitAllowed(name v1.ResourceName) bool {

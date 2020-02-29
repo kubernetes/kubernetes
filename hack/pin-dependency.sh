@@ -14,11 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Usage:
-#   hack/pin-dependency.sh $MODULE $SHA-OR-TAG
-#
-# Example:
-#   hack/pin-dependency.sh github.com/docker/docker 501cb131a7b7
+# This script switches to the preferred version for specified module.
+# Usage: `hack/pin-dependency.sh $MODULE $SHA-OR-TAG`.
+# Example: `hack/pin-dependency.sh github.com/docker/docker 501cb131a7b7`.
 
 set -o errexit
 set -o nounset

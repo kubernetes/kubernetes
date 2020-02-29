@@ -54,18 +54,13 @@ const (
 	podScheduledBeforeTimeout = podListTimeout + (20 * time.Second)
 
 	// podStartTimeout is how long to wait for the pod to be started.
-	// Initial pod start can be delayed O(minutes) by slow docker pulls.
-	// TODO: Make this 30 seconds once #4566 is resolved.
 	podStartTimeout = 5 * time.Minute
 
 	// poll is how often to poll pods, nodes and claims.
-	poll             = 2 * time.Second
-	pollShortTimeout = 1 * time.Minute
-	pollLongTimeout  = 5 * time.Minute
+	poll = 2 * time.Second
 
 	// singleCallTimeout is how long to try single API calls (like 'get' or 'list'). Used to prevent
 	// transient failures from failing tests.
-	// TODO: client should not apply this timeout to Watch calls. Increased from 30s until that is fixed.
 	singleCallTimeout = 5 * time.Minute
 
 	// Some pods can take much longer to get ready due to volume attach/detach latency.

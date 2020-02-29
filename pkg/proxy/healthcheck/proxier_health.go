@@ -42,13 +42,16 @@ type ProxierHealthUpdater interface {
 	// Updated should be called when the proxier has successfully updated the service
 	// rules to reflect the current state.
 	Updated()
+
+	// Run starts the healthz http server and returns.
+	Run()
 }
 
-var _ ProxierHealthUpdater = &ProxierHealthServer{}
+var _ ProxierHealthUpdater = &proxierHealthServer{}
 
-// ProxierHealthServer returns 200 "OK" by default. It verifies that the delay between
+// proxierHealthServer returns 200 "OK" by default. It verifies that the delay between
 // QueuedUpdate() calls and Updated() calls never exceeds healthTimeout.
-type ProxierHealthServer struct {
+type proxierHealthServer struct {
 	listener    listener
 	httpFactory httpServerFactory
 	clock       clock.Clock
@@ -63,12 +66,12 @@ type ProxierHealthServer struct {
 }
 
 // NewProxierHealthServer returns a proxier health http server.
-func NewProxierHealthServer(addr string, healthTimeout time.Duration, recorder record.EventRecorder, nodeRef *v1.ObjectReference) *ProxierHealthServer {
+func NewProxierHealthServer(addr string, healthTimeout time.Duration, recorder record.EventRecorder, nodeRef *v1.ObjectReference) ProxierHealthUpdater {
 	return newProxierHealthServer(stdNetListener{}, stdHTTPServerFactory{}, clock.RealClock{}, addr, healthTimeout, recorder, nodeRef)
 }
 
-func newProxierHealthServer(listener listener, httpServerFactory httpServerFactory, c clock.Clock, addr string, healthTimeout time.Duration, recorder record.EventRecorder, nodeRef *v1.ObjectReference) *ProxierHealthServer {
-	return &ProxierHealthServer{
+func newProxierHealthServer(listener listener, httpServerFactory httpServerFactory, c clock.Clock, addr string, healthTimeout time.Duration, recorder record.EventRecorder, nodeRef *v1.ObjectReference) *proxierHealthServer {
+	return &proxierHealthServer{
 		listener:      listener,
 		httpFactory:   httpServerFactory,
 		clock:         c,
@@ -80,17 +83,17 @@ func newProxierHealthServer(listener listener, httpServerFactory httpServerFacto
 }
 
 // Updated updates the lastUpdated timestamp.
-func (hs *ProxierHealthServer) Updated() {
+func (hs *proxierHealthServer) Updated() {
 	hs.lastUpdated.Store(hs.clock.Now())
 }
 
 // QueuedUpdate updates the lastQueued timestamp.
-func (hs *ProxierHealthServer) QueuedUpdate() {
+func (hs *proxierHealthServer) QueuedUpdate() {
 	hs.lastQueued.Store(hs.clock.Now())
 }
 
 // Run starts the healthz http server and returns.
-func (hs *ProxierHealthServer) Run() {
+func (hs *proxierHealthServer) Run() {
 	serveMux := http.NewServeMux()
 	serveMux.Handle("/healthz", healthzHandler{hs: hs})
 	server := hs.httpFactory.New(hs.addr, serveMux)
@@ -117,7 +120,7 @@ func (hs *ProxierHealthServer) Run() {
 }
 
 type healthzHandler struct {
-	hs *ProxierHealthServer
+	hs *proxierHealthServer
 }
 
 func (h healthzHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {

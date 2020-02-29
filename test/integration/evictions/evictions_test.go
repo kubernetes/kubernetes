@@ -82,12 +82,12 @@ func TestConcurrentEvictionRequests(t *testing.T) {
 		podName := fmt.Sprintf(podNameFormat, i)
 		pod := newPod(podName)
 
-		if _, err := clientSet.CoreV1().Pods(ns.Name).Create(context.TODO(), pod); err != nil {
+		if _, err := clientSet.CoreV1().Pods(ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{}); err != nil {
 			t.Errorf("Failed to create pod: %v", err)
 		}
 
 		addPodConditionReady(pod)
-		if _, err := clientSet.CoreV1().Pods(ns.Name).UpdateStatus(context.TODO(), pod); err != nil {
+		if _, err := clientSet.CoreV1().Pods(ns.Name).UpdateStatus(context.TODO(), pod, metav1.UpdateOptions{}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -95,7 +95,7 @@ func TestConcurrentEvictionRequests(t *testing.T) {
 	waitToObservePods(t, informers.Core().V1().Pods().Informer(), numOfEvictions, v1.PodRunning)
 
 	pdb := newPDB()
-	if _, err := clientSet.PolicyV1beta1().PodDisruptionBudgets(ns.Name).Create(context.TODO(), pdb); err != nil {
+	if _, err := clientSet.PolicyV1beta1().PodDisruptionBudgets(ns.Name).Create(context.TODO(), pdb, metav1.CreateOptions{}); err != nil {
 		t.Errorf("Failed to create PodDisruptionBudget: %v", err)
 	}
 
@@ -196,19 +196,19 @@ func TestTerminalPodEviction(t *testing.T) {
 		GracePeriodSeconds: &gracePeriodSeconds,
 	}
 	pod := newPod("test-terminal-pod1")
-	if _, err := clientSet.CoreV1().Pods(ns.Name).Create(context.TODO(), pod); err != nil {
+	if _, err := clientSet.CoreV1().Pods(ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{}); err != nil {
 		t.Errorf("Failed to create pod: %v", err)
 	}
 
 	addPodConditionSucceeded(pod)
-	if _, err := clientSet.CoreV1().Pods(ns.Name).UpdateStatus(context.TODO(), pod); err != nil {
+	if _, err := clientSet.CoreV1().Pods(ns.Name).UpdateStatus(context.TODO(), pod, metav1.UpdateOptions{}); err != nil {
 		t.Fatal(err)
 	}
 
 	waitToObservePods(t, informers.Core().V1().Pods().Informer(), 1, v1.PodSucceeded)
 
 	pdb := newPDB()
-	if _, err := clientSet.PolicyV1beta1().PodDisruptionBudgets(ns.Name).Create(context.TODO(), pdb); err != nil {
+	if _, err := clientSet.PolicyV1beta1().PodDisruptionBudgets(ns.Name).Create(context.TODO(), pdb, metav1.CreateOptions{}); err != nil {
 		t.Errorf("Failed to create PodDisruptionBudget: %v", err)
 	}
 

@@ -17,19 +17,10 @@ limitations under the License.
 package value
 
 import (
-	"bytes"
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"reflect"
-	"sync"
 )
-
-var reflectPool = sync.Pool{
-	New: func() interface{} {
-		return &valueReflect{}
-	},
-}
 
 // NewValueReflect creates a Value backed by an "interface{}" type,
 // typically an structured object in Kubernetes world that is uses reflection to expose.
@@ -45,33 +36,57 @@ func NewValueReflect(value interface{}) (Value, error) {
 		// The root value to reflect on must be a pointer so that map.Set() and map.Delete() operations are possible.
 		return nil, fmt.Errorf("value provided to NewValueReflect must be a pointer")
 	}
-	return wrapValueReflect(nil, nil, v)
+	return wrapValueReflect(v, nil, nil)
 }
 
-func wrapValueReflect(parentMap, parentMapKey *reflect.Value, value reflect.Value) (Value, error) {
-	// TODO: conversion of json.Marshaller interface types is expensive. This can be mostly optimized away by
-	// introducing conversion functions that do not require going through JSON and using those here.
-	if marshaler, ok := getMarshaler(value); ok {
-		return toUnstructured(marshaler, value)
-	}
-	value = dereference(value)
-	val := reflectPool.Get().(*valueReflect)
-	val.Value = value
-	val.ParentMap = parentMap
-	val.ParentMapKey = parentMapKey
-	return Value(val), nil
+// wrapValueReflect wraps the provide reflect.Value as a value. If parent in the data tree is a map, parentMap
+// and parentMapKey must be provided so that the returned value may be set and deleted.
+func wrapValueReflect(value reflect.Value, parentMap, parentMapKey *reflect.Value) (Value, error) {
+	val := HeapAllocator.allocValueReflect()
+	return val.reuse(value, nil, parentMap, parentMapKey)
 }
 
-func mustWrapValueReflect(value reflect.Value) Value {
-	v, err := wrapValueReflect(nil, nil, value)
+// wrapValueReflect wraps the provide reflect.Value as a value, and panics if there is an error. If parent in the data
+// tree is a map, parentMap and parentMapKey must be provided so that the returned value may be set and deleted.
+func mustWrapValueReflect(value reflect.Value, parentMap, parentMapKey *reflect.Value) Value {
+	v, err := wrapValueReflect(value, parentMap, parentMapKey)
 	if err != nil {
 		panic(err)
 	}
 	return v
 }
 
-func mustWrapValueReflectMapItem(parentMap, parentMapKey *reflect.Value, value reflect.Value) Value {
-	v, err := wrapValueReflect(parentMap, parentMapKey, value)
+// the value interface doesn't care about the type for value.IsNull, so we can use a constant
+var nilType = reflect.TypeOf(&struct{}{})
+
+// reuse replaces the value of the valueReflect. If parent in the data tree is a map, parentMap and parentMapKey
+// must be provided so that the returned value may be set and deleted.
+func (r *valueReflect) reuse(value reflect.Value, cacheEntry *TypeReflectCacheEntry, parentMap, parentMapKey *reflect.Value) (Value, error) {
+	if cacheEntry == nil {
+		cacheEntry = TypeReflectEntryOf(value.Type())
+	}
+	if cacheEntry.CanConvertToUnstructured() {
+		u, err := cacheEntry.ToUnstructured(value)
+		if err != nil {
+			return nil, err
+		}
+		if u == nil {
+			value = reflect.Zero(nilType)
+		} else {
+			value = reflect.ValueOf(u)
+		}
+	}
+	r.Value = dereference(value)
+	r.ParentMap = parentMap
+	r.ParentMapKey = parentMapKey
+	r.kind = kind(r.Value)
+	return r, nil
+}
+
+// mustReuse replaces the value of the valueReflect and panics if there is an error. If parent in the data tree is a
+// map, parentMap and parentMapKey must be provided so that the returned value may be set and deleted.
+func (r *valueReflect) mustReuse(value reflect.Value, cacheEntry *TypeReflectCacheEntry, parentMap, parentMapKey *reflect.Value) Value {
+	v, err := r.reuse(value, cacheEntry, parentMap, parentMapKey)
 	if err != nil {
 		panic(err)
 	}
@@ -90,53 +105,91 @@ type valueReflect struct {
 	ParentMap    *reflect.Value
 	ParentMapKey *reflect.Value
 	Value        reflect.Value
+	kind         reflectType
 }
 
 func (r valueReflect) IsMap() bool {
-	return r.isKind(reflect.Map, reflect.Struct)
+	return r.kind == mapType || r.kind == structMapType
 }
 
 func (r valueReflect) IsList() bool {
-	typ := r.Value.Type()
-	return typ.Kind() == reflect.Slice && !(typ.Elem().Kind() == reflect.Uint8)
+	return r.kind == listType
 }
 
 func (r valueReflect) IsBool() bool {
-	return r.isKind(reflect.Bool)
+	return r.kind == boolType
 }
 
 func (r valueReflect) IsInt() bool {
-	// Uint64 deliberately excluded, see valueUnstructured.Int.
-	return r.isKind(reflect.Int, reflect.Int64, reflect.Int32, reflect.Int16, reflect.Int8, reflect.Uint, reflect.Uint32, reflect.Uint16, reflect.Uint8)
+	return r.kind == intType || r.kind == uintType
 }
 
 func (r valueReflect) IsFloat() bool {
-	return r.isKind(reflect.Float64, reflect.Float32)
+	return r.kind == floatType
 }
 
 func (r valueReflect) IsString() bool {
-	kind := r.Value.Kind()
-	if kind == reflect.String {
-		return true
-	}
-	if kind == reflect.Slice && r.Value.Type().Elem().Kind() == reflect.Uint8 {
-		return true
-	}
-	return false
+	return r.kind == stringType || r.kind == byteStringType
 }
 
 func (r valueReflect) IsNull() bool {
-	return safeIsNil(r.Value)
+	return r.kind == nullType
 }
 
-func (r valueReflect) isKind(kinds ...reflect.Kind) bool {
-	kind := r.Value.Kind()
-	for _, k := range kinds {
-		if kind == k {
-			return true
+type reflectType = int
+
+const (
+	mapType = iota
+	structMapType
+	listType
+	intType
+	uintType
+	floatType
+	stringType
+	byteStringType
+	boolType
+	nullType
+)
+
+func kind(v reflect.Value) reflectType {
+	typ := v.Type()
+	rk := typ.Kind()
+	switch rk {
+	case reflect.Map:
+		if v.IsNil() {
+			return nullType
 		}
+		return mapType
+	case reflect.Struct:
+		return structMapType
+	case reflect.Int, reflect.Int64, reflect.Int32, reflect.Int16, reflect.Int8:
+		return intType
+	case reflect.Uint, reflect.Uint32, reflect.Uint16, reflect.Uint8:
+		// Uint64 deliberately excluded, see valueUnstructured.Int.
+		return uintType
+	case reflect.Float64, reflect.Float32:
+		return floatType
+	case reflect.String:
+		return stringType
+	case reflect.Bool:
+		return boolType
+	case reflect.Slice:
+		if v.IsNil() {
+			return nullType
+		}
+		elemKind := typ.Elem().Kind()
+		if elemKind == reflect.Uint8 {
+			return byteStringType
+		}
+		return listType
+	case reflect.Chan, reflect.Func, reflect.Ptr, reflect.UnsafePointer, reflect.Interface:
+		if v.IsNil() {
+			return nullType
+		}
+		panic(fmt.Sprintf("unsupported type: %v", v.Type()))
+	default:
+		panic(fmt.Sprintf("unsupported type: %v", v.Type()))
 	}
-	return false
 }
 
 // TODO find a cleaner way to avoid panics from reflect.IsNil()
@@ -150,24 +203,33 @@ func safeIsNil(v reflect.Value) bool {
 }
 
 func (r valueReflect) AsMap() Map {
-	val := r.Value
-	switch val.Kind() {
-	case reflect.Struct:
-		return structReflect{r}
-	case reflect.Map:
-		return mapReflect{r}
+	return r.AsMapUsing(HeapAllocator)
+}
+
+func (r valueReflect) AsMapUsing(a Allocator) Map {
+	switch r.kind {
+	case structMapType:
+		v := a.allocStructReflect()
+		v.valueReflect = r
+		return v
+	case mapType:
+		v := a.allocMapReflect()
+		v.valueReflect = r
+		return v
 	default:
 		panic("value is not a map or struct")
 	}
 }
 
-func (r *valueReflect) Recycle() {
-	reflectPool.Put(r)
+func (r valueReflect) AsList() List {
+	return r.AsListUsing(HeapAllocator)
 }
 
-func (r valueReflect) AsList() List {
+func (r valueReflect) AsListUsing(a Allocator) List {
 	if r.IsList() {
-		return listReflect{r.Value}
+		v := a.allocListReflect()
+		v.Value = r.Value
+		return v
 	}
 	panic("value is not a list")
 }
@@ -180,10 +242,10 @@ func (r valueReflect) AsBool() bool {
 }
 
 func (r valueReflect) AsInt() int64 {
-	if r.isKind(reflect.Int, reflect.Int64, reflect.Int32, reflect.Int16, reflect.Int8) {
+	if r.kind == intType {
 		return r.Value.Int()
 	}
-	if r.isKind(reflect.Uint, reflect.Uint32, reflect.Uint16, reflect.Uint8) {
+	if r.kind == uintType {
 		return int64(r.Value.Uint())
 	}
 
@@ -198,11 +260,10 @@ func (r valueReflect) AsFloat() float64 {
 }
 
 func (r valueReflect) AsString() string {
-	kind := r.Value.Kind()
-	if kind == reflect.String {
+	switch r.kind {
+	case stringType:
 		return r.Value.String()
-	}
-	if kind == reflect.Slice && r.Value.Type().Elem().Kind() == reflect.Uint8 {
+	case byteStringType:
 		return base64.StdEncoding.EncodeToString(r.Value.Bytes())
 	}
 	panic("value is not a string")
@@ -216,9 +277,9 @@ func (r valueReflect) Unstructured() interface{} {
 	case val.Kind() == reflect.Struct:
 		return structReflect{r}.Unstructured()
 	case val.Kind() == reflect.Map:
-		return mapReflect{r}.Unstructured()
+		return mapReflect{valueReflect: r}.Unstructured()
 	case r.IsList():
-		return listReflect{Value: r.Value}.Unstructured()
+		return listReflect{r.Value}.Unstructured()
 	case r.IsString():
 		return r.AsString()
 	case r.IsInt():
@@ -229,91 +290,5 @@ func (r valueReflect) Unstructured() interface{} {
 		return r.AsFloat()
 	default:
 		panic(fmt.Sprintf("value of type %s is not a supported by value reflector", val.Type()))
-	}
-}
-
-// The below getMarshaler and toUnstructured functions are based on
-// https://github.com/kubernetes/kubernetes/blob/40df9f82d0572a123f5ad13f48312978a2ff5877/staging/src/k8s.io/apimachinery/pkg/runtime/converter.go#L509
-// and should somehow be consolidated with it
-
-var marshalerType = reflect.TypeOf(new(json.Marshaler)).Elem()
-
-func getMarshaler(v reflect.Value) (json.Marshaler, bool) {
-	// Check value receivers if v is not a pointer and pointer receivers if v is a pointer
-	if v.Type().Implements(marshalerType) {
-		return v.Interface().(json.Marshaler), true
-	}
-	// Check pointer receivers if v is not a pointer
-	if v.Kind() != reflect.Ptr && v.CanAddr() {
-		v = v.Addr()
-		if v.Type().Implements(marshalerType) {
-			return v.Interface().(json.Marshaler), true
-		}
-	}
-	return nil, false
-}
-
-var (
-	nullBytes  = []byte("null")
-	trueBytes  = []byte("true")
-	falseBytes = []byte("false")
-)
-
-func toUnstructured(marshaler json.Marshaler, sv reflect.Value) (Value, error) {
-	data, err := marshaler.MarshalJSON()
-	if err != nil {
-		return nil, err
-	}
-	switch {
-	case len(data) == 0:
-		return nil, fmt.Errorf("error decoding from json: empty value")
-
-	case bytes.Equal(data, nullBytes):
-		// We're done - we don't need to store anything.
-		return NewValueInterface(nil), nil
-
-	case bytes.Equal(data, trueBytes):
-		return NewValueInterface(true), nil
-
-	case bytes.Equal(data, falseBytes):
-		return NewValueInterface(false), nil
-
-	case data[0] == '"':
-		var result string
-		err := json.Unmarshal(data, &result)
-		if err != nil {
-			return nil, fmt.Errorf("error decoding string from json: %v", err)
-		}
-		return NewValueInterface(result), nil
-
-	case data[0] == '{':
-		result := make(map[string]interface{})
-		err := json.Unmarshal(data, &result)
-		if err != nil {
-			return nil, fmt.Errorf("error decoding object from json: %v", err)
-		}
-		return NewValueInterface(result), nil
-
-	case data[0] == '[':
-		result := make([]interface{}, 0)
-		err := json.Unmarshal(data, &result)
-		if err != nil {
-			return nil, fmt.Errorf("error decoding array from json: %v", err)
-		}
-		return NewValueInterface(result), nil
-
-	default:
-		var (
-			resultInt   int64
-			resultFloat float64
-			err         error
-		)
-		if err = json.Unmarshal(data, &resultInt); err == nil {
-			return NewValueInterface(resultInt), nil
-		}
-		if err = json.Unmarshal(data, &resultFloat); err == nil {
-			return NewValueInterface(resultFloat), nil
-		}
-		return nil, fmt.Errorf("error decoding number from json: %v", err)
 	}
 }

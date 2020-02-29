@@ -35,6 +35,7 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	servicehelpers "k8s.io/cloud-provider/service/helpers"
 	"k8s.io/klog"
+	azcache "k8s.io/legacy-cloud-providers/azure/cache"
 	utilnet "k8s.io/utils/net"
 )
 
@@ -94,6 +95,7 @@ const (
 
 	// ServiceAnnotationLoadBalancerDisableTCPReset is the annotation used on the service
 	// to set enableTcpReset to false in load balancer rule. This only works for Azure standard load balancer backed service.
+	// TODO(feiskyer): disable-tcp-reset annotations has been depracated since v1.18, it would removed on v1.20.
 	ServiceAnnotationLoadBalancerDisableTCPReset = "service.beta.kubernetes.io/azure-load-balancer-disable-tcp-reset"
 
 	// serviceTagKey is the service key applied for public IP tags.
@@ -548,23 +550,21 @@ func (az *Cloud) ensurePublicIPExists(service *v1.Service, pipName string, domai
 		}
 	}
 
-	if az.ipv6DualStackEnabled {
-		// TODO: (khenidak) if we ever enable IPv6 single stack, then we should
-		// not wrap the following in a feature gate
-		ipv6 := utilnet.IsIPv6String(service.Spec.ClusterIP)
-		if ipv6 {
-			pip.PublicIPAddressVersion = network.IPv6
-			klog.V(2).Infof("service(%s): pip(%s) - creating as ipv6 for clusterIP:%v", serviceName, *pip.Name, service.Spec.ClusterIP)
+	// use the same family as the clusterIP as we support IPv6 single stack as well
+	// as dual-stack clusters
+	ipv6 := utilnet.IsIPv6String(service.Spec.ClusterIP)
+	if ipv6 {
+		pip.PublicIPAddressVersion = network.IPv6
+		klog.V(2).Infof("service(%s): pip(%s) - creating as ipv6 for clusterIP:%v", serviceName, *pip.Name, service.Spec.ClusterIP)
 
-			pip.PublicIPAddressPropertiesFormat.PublicIPAllocationMethod = network.Dynamic
-			if az.useStandardLoadBalancer() {
-				// standard sku must have static allocation method for ipv6
-				pip.PublicIPAddressPropertiesFormat.PublicIPAllocationMethod = network.Static
-			}
-		} else {
-			pip.PublicIPAddressVersion = network.IPv4
-			klog.V(2).Infof("service(%s): pip(%s) - creating as ipv4 for clusterIP:%v", serviceName, *pip.Name, service.Spec.ClusterIP)
+		pip.PublicIPAddressPropertiesFormat.PublicIPAllocationMethod = network.Dynamic
+		if az.useStandardLoadBalancer() {
+			// standard sku must have static allocation method for ipv6
+			pip.PublicIPAddressPropertiesFormat.PublicIPAllocationMethod = network.Static
 		}
+	} else {
+		pip.PublicIPAddressVersion = network.IPv4
+		klog.V(2).Infof("service(%s): pip(%s) - creating as ipv4 for clusterIP:%v", serviceName, *pip.Name, service.Spec.ClusterIP)
 	}
 
 	klog.V(2).Infof("ensurePublicIPExists for service(%s): pip(%s) - creating", serviceName, *pip.Name)
@@ -684,7 +684,7 @@ func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, 
 	klog.V(2).Infof("reconcileLoadBalancer for service(%s): lb(%s/%s) wantLb(%t) resolved load balancer name", serviceName, lbResourceGroup, lbName, wantLb)
 	lbFrontendIPConfigName := az.getFrontendIPConfigName(service)
 	lbFrontendIPConfigID := az.getFrontendIPConfigID(lbName, lbResourceGroup, lbFrontendIPConfigName)
-	lbBackendPoolName := getBackendPoolName(az.ipv6DualStackEnabled, clusterName, service)
+	lbBackendPoolName := getBackendPoolName(clusterName, service)
 	lbBackendPoolID := az.getBackendPoolID(lbName, lbResourceGroup, lbBackendPoolName)
 
 	lbIdleTimeout, err := getIdleTimeout(service)
@@ -961,7 +961,7 @@ func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, 
 
 			if isInternal {
 				// Refresh updated lb which will be used later in other places.
-				newLB, exist, err := az.getAzureLoadBalancer(lbName, cacheReadTypeDefault)
+				newLB, exist, err := az.getAzureLoadBalancer(lbName, azcache.CacheReadTypeDefault)
 				if err != nil {
 					klog.V(2).Infof("reconcileLoadBalancer for service(%s): getAzureLoadBalancer(%s) failed: %v", serviceName, lbName, err)
 					return nil, err
@@ -1008,6 +1008,7 @@ func (az *Cloud) reconcileLoadBalancerRule(
 	if az.useStandardLoadBalancer() {
 		enableTCPReset = to.BoolPtr(true)
 		if v, ok := service.Annotations[ServiceAnnotationLoadBalancerDisableTCPReset]; ok {
+			klog.Warning("annotation service.beta.kubernetes.io/azure-load-balancer-disable-tcp-reset has been depracated, it would be removed in a future release")
 			klog.V(2).Infof("reconcileLoadBalancerRule lb name (%s) flag(%s) is set to %s", lbName, ServiceAnnotationLoadBalancerDisableTCPReset, v)
 			enableTCPReset = to.BoolPtr(!strings.EqualFold(v, "true"))
 		}
@@ -1125,7 +1126,7 @@ func (az *Cloud) reconcileSecurityGroup(clusterName string, service *v1.Service,
 		ports = []v1.ServicePort{}
 	}
 
-	sg, err := az.getSecurityGroup(cacheReadTypeDefault)
+	sg, err := az.getSecurityGroup(azcache.CacheReadTypeDefault)
 	if err != nil {
 		return nil, err
 	}
@@ -1466,7 +1467,7 @@ func (az *Cloud) reconcilePublicIP(clusterName string, service *v1.Service, lbNa
 	}
 
 	if lbName != "" {
-		loadBalancer, _, err := az.getAzureLoadBalancer(lbName, cacheReadTypeDefault)
+		loadBalancer, _, err := az.getAzureLoadBalancer(lbName, azcache.CacheReadTypeDefault)
 		if err != nil {
 			return nil, err
 		}

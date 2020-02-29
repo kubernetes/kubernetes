@@ -38,14 +38,14 @@ type NetworkPoliciesGetter interface {
 
 // NetworkPolicyInterface has methods to work with NetworkPolicy resources.
 type NetworkPolicyInterface interface {
-	Create(context.Context, *v1.NetworkPolicy) (*v1.NetworkPolicy, error)
-	Update(context.Context, *v1.NetworkPolicy) (*v1.NetworkPolicy, error)
-	Delete(ctx context.Context, name string, options *metav1.DeleteOptions) error
-	DeleteCollection(ctx context.Context, options *metav1.DeleteOptions, listOptions metav1.ListOptions) error
-	Get(ctx context.Context, name string, options metav1.GetOptions) (*v1.NetworkPolicy, error)
+	Create(ctx context.Context, networkPolicy *v1.NetworkPolicy, opts metav1.CreateOptions) (*v1.NetworkPolicy, error)
+	Update(ctx context.Context, networkPolicy *v1.NetworkPolicy, opts metav1.UpdateOptions) (*v1.NetworkPolicy, error)
+	Delete(ctx context.Context, name string, opts *metav1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.NetworkPolicy, error)
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.NetworkPolicyList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.NetworkPolicy, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.NetworkPolicy, err error)
 	NetworkPolicyExpansion
 }
 
@@ -109,11 +109,12 @@ func (c *networkPolicies) Watch(ctx context.Context, opts metav1.ListOptions) (w
 }
 
 // Create takes the representation of a networkPolicy and creates it.  Returns the server's representation of the networkPolicy, and an error, if there is any.
-func (c *networkPolicies) Create(ctx context.Context, networkPolicy *v1.NetworkPolicy) (result *v1.NetworkPolicy, err error) {
+func (c *networkPolicies) Create(ctx context.Context, networkPolicy *v1.NetworkPolicy, opts metav1.CreateOptions) (result *v1.NetworkPolicy, err error) {
 	result = &v1.NetworkPolicy{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("networkpolicies").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(networkPolicy).
 		Do(ctx).
 		Into(result)
@@ -121,12 +122,13 @@ func (c *networkPolicies) Create(ctx context.Context, networkPolicy *v1.NetworkP
 }
 
 // Update takes the representation of a networkPolicy and updates it. Returns the server's representation of the networkPolicy, and an error, if there is any.
-func (c *networkPolicies) Update(ctx context.Context, networkPolicy *v1.NetworkPolicy) (result *v1.NetworkPolicy, err error) {
+func (c *networkPolicies) Update(ctx context.Context, networkPolicy *v1.NetworkPolicy, opts metav1.UpdateOptions) (result *v1.NetworkPolicy, err error) {
 	result = &v1.NetworkPolicy{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("networkpolicies").
 		Name(networkPolicy.Name).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(networkPolicy).
 		Do(ctx).
 		Into(result)
@@ -161,13 +163,14 @@ func (c *networkPolicies) DeleteCollection(ctx context.Context, options *metav1.
 }
 
 // Patch applies the patch and returns the patched networkPolicy.
-func (c *networkPolicies) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.NetworkPolicy, err error) {
+func (c *networkPolicies) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.NetworkPolicy, err error) {
 	result = &v1.NetworkPolicy{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("networkpolicies").
-		SubResource(subresources...).
 		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

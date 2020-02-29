@@ -99,11 +99,11 @@ func TestResourceLimits(t *testing.T) {
 
 	tests := []struct {
 		// input pod
-		pod            *v1.Pod
-		nodes          []*v1.Node
-		expectedList   framework.NodeScoreList
-		name           string
-		skipPostFilter bool
+		pod          *v1.Pod
+		nodes        []*v1.Node
+		expectedList framework.NodeScoreList
+		name         string
+		skipPreScore bool
 	}{
 		{
 			pod:          &v1.Pod{Spec: noResources},
@@ -136,11 +136,11 @@ func TestResourceLimits(t *testing.T) {
 			name:         "node does not advertise its allocatables",
 		},
 		{
-			pod:            &v1.Pod{Spec: cpuAndMemory},
-			nodes:          []*v1.Node{makeNode("machine1", 0, 0)},
-			expectedList:   []framework.NodeScore{{Name: "machine1", Score: 0}},
-			skipPostFilter: true,
-			name:           "postFilter skipped",
+			pod:          &v1.Pod{Spec: cpuAndMemory},
+			nodes:        []*v1.Node{makeNode("machine1", 0, 0)},
+			expectedList: []framework.NodeScore{{Name: "machine1", Score: 0}},
+			skipPreScore: true,
+			name:         "preScore skipped",
 		},
 	}
 
@@ -151,15 +151,15 @@ func TestResourceLimits(t *testing.T) {
 			p := &ResourceLimits{handle: fh}
 			for i := range test.nodes {
 				state := framework.NewCycleState()
-				if !test.skipPostFilter {
-					status := p.PostFilter(context.Background(), state, test.pod, test.nodes, nil)
+				if !test.skipPreScore {
+					status := p.PreScore(context.Background(), state, test.pod, test.nodes)
 					if !status.IsSuccess() {
 						t.Errorf("unexpected error: %v", status)
 					}
 				}
 
 				gotScore, err := p.Score(context.Background(), state, test.pod, test.nodes[i].Name)
-				if test.skipPostFilter {
+				if test.skipPreScore {
 					if err == nil {
 						t.Errorf("expected error")
 					}

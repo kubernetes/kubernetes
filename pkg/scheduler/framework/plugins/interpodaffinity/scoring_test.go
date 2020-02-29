@@ -22,11 +22,12 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
+	"k8s.io/utils/pointer"
 )
 
 func TestPreferredAffinity(t *testing.T) {
@@ -519,11 +520,13 @@ func TestPreferredAffinity(t *testing.T) {
 			state := framework.NewCycleState()
 			snapshot := cache.NewSnapshot(test.pods, test.nodes)
 			p := &InterPodAffinity{
-				sharedLister:          snapshot,
-				hardPodAffinityWeight: 1,
+				Args: Args{
+					HardPodAffinityWeight: pointer.Int32Ptr(DefaultHardPodAffinityWeight),
+				},
+				sharedLister: snapshot,
 			}
 
-			status := p.PostFilter(context.Background(), state, test.pod, test.nodes, nil)
+			status := p.PreScore(context.Background(), state, test.pod, test.nodes)
 			if !status.IsSuccess() {
 				t.Errorf("unexpected error: %v", status)
 			}
@@ -631,7 +634,7 @@ func TestPreferredAffinityWithHardPodAffinitySymmetricWeight(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			status := p.(framework.PostFilterPlugin).PostFilter(context.Background(), state, test.pod, test.nodes, nil)
+			status := p.(framework.PreScorePlugin).PreScore(context.Background(), state, test.pod, test.nodes)
 			if !status.IsSuccess() {
 				t.Errorf("unexpected error: %v", status)
 			}

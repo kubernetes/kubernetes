@@ -31,25 +31,33 @@ func NewNoRestraintFactory() fq.QueueSetFactory {
 
 type noRestraintFactory struct{}
 
-type noRestraintCompeter struct{}
+type noRestraintCompleter struct{}
 
 type noRestraint struct{}
 
+type noRestraintRequest struct{}
+
 func (noRestraintFactory) BeginConstruction(qCfg fq.QueuingConfig) (fq.QueueSetCompleter, error) {
-	return noRestraintCompeter{}, nil
+	return noRestraintCompleter{}, nil
 }
 
-func (noRestraintCompeter) Complete(dCfg fq.DispatchingConfig) fq.QueueSet {
+func (noRestraintCompleter) Complete(dCfg fq.DispatchingConfig) fq.QueueSet {
 	return noRestraint{}
 }
 
 func (noRestraint) BeginConfigChange(qCfg fq.QueuingConfig) (fq.QueueSetCompleter, error) {
-	return noRestraintCompeter{}, nil
+	return noRestraintCompleter{}, nil
 }
 
-func (noRestraint) Quiesce(fq.EmptyHandler) {
+func (noRestraint) IsIdle() bool {
+	return false
 }
 
-func (noRestraint) Wait(ctx context.Context, hashValue uint64, descr1, descr2 interface{}) (quiescent, execute bool, afterExecution func()) {
-	return false, true, func() {}
+func (noRestraint) StartRequest(ctx context.Context, hashValue uint64, descr1, descr2 interface{}) (fq.Request, bool) {
+	return noRestraintRequest{}, false
+}
+
+func (noRestraintRequest) Finish(execute func()) (idle bool) {
+	execute()
+	return false
 }

@@ -128,18 +128,17 @@ func TestPreemption(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error registering a filter: %v", err)
 	}
-	plugins := &schedulerconfig.Plugins{
-		Filter: &schedulerconfig.PluginSet{
-			Enabled: []schedulerconfig.Plugin{
-				{
-					Name: filterPluginName,
+	prof := schedulerconfig.KubeSchedulerProfile{
+		SchedulerName: v1.DefaultSchedulerName,
+		Plugins: &schedulerconfig.Plugins{
+			Filter: &schedulerconfig.PluginSet{
+				Enabled: []schedulerconfig.Plugin{
+					{Name: filterPluginName},
 				},
 			},
-		},
-		PreFilter: &schedulerconfig.PluginSet{
-			Enabled: []schedulerconfig.Plugin{
-				{
-					Name: filterPluginName,
+			PreFilter: &schedulerconfig.PluginSet{
+				Enabled: []schedulerconfig.Plugin{
+					{Name: filterPluginName},
 				},
 			},
 		},
@@ -147,7 +146,7 @@ func TestPreemption(t *testing.T) {
 	testCtx := initTestSchedulerWithOptions(t,
 		initTestMaster(t, "preemptiom", nil),
 		false, nil, time.Second,
-		scheduler.WithFrameworkPlugins(plugins),
+		scheduler.WithProfiles(prof),
 		scheduler.WithFrameworkOutOfTreeRegistry(registry))
 
 	defer cleanupTest(t, testCtx)
@@ -1172,7 +1171,7 @@ func TestPDBInPreemption(t *testing.T) {
 			}
 			// Add pod condition ready so that PDB is updated.
 			addPodConditionReady(p)
-			if _, err := testCtx.clientSet.CoreV1().Pods(testCtx.ns.Name).UpdateStatus(context.TODO(), p); err != nil {
+			if _, err := testCtx.clientSet.CoreV1().Pods(testCtx.ns.Name).UpdateStatus(context.TODO(), p, metav1.UpdateOptions{}); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -1183,7 +1182,7 @@ func TestPDBInPreemption(t *testing.T) {
 
 		// Create PDBs.
 		for _, pdb := range test.pdbs {
-			_, err := testCtx.clientSet.PolicyV1beta1().PodDisruptionBudgets(testCtx.ns.Name).Create(context.TODO(), pdb)
+			_, err := testCtx.clientSet.PolicyV1beta1().PodDisruptionBudgets(testCtx.ns.Name).Create(context.TODO(), pdb, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatalf("Failed to create PDB: %v", err)
 			}

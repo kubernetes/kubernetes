@@ -268,7 +268,7 @@ func TestSyncOne_RunOrNot(t *testing.T) {
 			sj.Status.LastScheduleTime = &metav1.Time{Time: justAfterThePriorHour()}
 			job, err = getJobFromTemplate(&sj, sj.Status.LastScheduleTime.Time)
 			if err != nil {
-				t.Fatalf("%s: nexpected error creating a job from template: %v", name, err)
+				t.Fatalf("%s: unexpected error creating a job from template: %v", name, err)
 			}
 			job.UID = "1234"
 			job.Namespace = ""

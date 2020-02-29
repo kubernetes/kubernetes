@@ -24,12 +24,21 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-07-01/compute"
 	"github.com/Azure/go-autorest/autorest/to"
+	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 
 	"k8s.io/apimachinery/pkg/types"
+	azcache "k8s.io/legacy-cloud-providers/azure/cache"
+)
+
+var (
+	fakeCacheTTL = 2 * time.Second
 )
 
 func TestStandardAttachDisk(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	testCases := []struct {
 		desc        string
 		nodeName    types.NodeName
@@ -48,17 +57,20 @@ func TestStandardAttachDisk(t *testing.T) {
 	}
 
 	for i, test := range testCases {
-		testCloud := getTestCloud()
+		testCloud := GetTestCloud(ctrl)
 		vmSet := testCloud.vmSet
 		setTestVirtualMachines(testCloud, map[string]string{"vm1": "PowerState/Running"}, false)
 
 		err := vmSet.AttachDisk(true, "",
-			"uri", test.nodeName, 0, compute.CachingTypesReadOnly, "")
+			"uri", test.nodeName, 0, compute.CachingTypesReadOnly, "", false)
 		assert.Equal(t, test.expectedErr, err != nil, "TestCase[%d]: %s, err: %v", i, test.desc, err)
 	}
 }
 
 func TestStandardDetachDisk(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	testCases := []struct {
 		desc          string
 		nodeName      types.NodeName
@@ -85,7 +97,7 @@ func TestStandardDetachDisk(t *testing.T) {
 	}
 
 	for i, test := range testCases {
-		testCloud := getTestCloud()
+		testCloud := GetTestCloud(ctrl)
 		vmSet := testCloud.vmSet
 		setTestVirtualMachines(testCloud, map[string]string{"vm1": "PowerState/Running"}, false)
 
@@ -95,19 +107,22 @@ func TestStandardDetachDisk(t *testing.T) {
 }
 
 func TestGetDataDisks(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	var testCases = []struct {
 		desc              string
 		nodeName          types.NodeName
 		expectedDataDisks []compute.DataDisk
 		expectedError     bool
-		crt               cacheReadType
+		crt               azcache.AzureCacheReadType
 	}{
 		{
 			desc:              "an error shall be returned if there's no corresponding vm",
 			nodeName:          "vm2",
 			expectedDataDisks: nil,
 			expectedError:     true,
-			crt:               cacheReadTypeDefault,
+			crt:               azcache.CacheReadTypeDefault,
 		},
 		{
 			desc:     "correct list of data disks shall be returned if everything is good",
@@ -119,7 +134,7 @@ func TestGetDataDisks(t *testing.T) {
 				},
 			},
 			expectedError: false,
-			crt:           cacheReadTypeDefault,
+			crt:           azcache.CacheReadTypeDefault,
 		},
 		{
 			desc:     "correct list of data disks shall be returned if everything is good",
@@ -131,11 +146,11 @@ func TestGetDataDisks(t *testing.T) {
 				},
 			},
 			expectedError: false,
-			crt:           cacheReadTypeUnsafe,
+			crt:           azcache.CacheReadTypeUnsafe,
 		},
 	}
 	for i, test := range testCases {
-		testCloud := getTestCloud()
+		testCloud := GetTestCloud(ctrl)
 		vmSet := testCloud.vmSet
 		setTestVirtualMachines(testCloud, map[string]string{"vm1": "PowerState/Running"}, false)
 
@@ -143,7 +158,7 @@ func TestGetDataDisks(t *testing.T) {
 		assert.Equal(t, test.expectedDataDisks, dataDisks, "TestCase[%d]: %s", i, test.desc)
 		assert.Equal(t, test.expectedError, err != nil, "TestCase[%d]: %s", i, test.desc)
 
-		if test.crt == cacheReadTypeUnsafe {
+		if test.crt == azcache.CacheReadTypeUnsafe {
 			time.Sleep(fakeCacheTTL)
 			dataDisks, err := vmSet.GetDataDisks(test.nodeName, test.crt)
 			assert.Equal(t, test.expectedDataDisks, dataDisks, "TestCase[%d]: %s", i, test.desc)

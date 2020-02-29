@@ -54,7 +54,7 @@ const (
 	storageclassname = "nginx-sc"
 )
 
-var _ = utils.SIGDescribe("vsphere statefulset", func() {
+var _ = utils.SIGDescribe("vsphere statefulset [Feature:vsphere]", func() {
 	f := framework.NewDefaultFramework("vsphere-statefulset")
 	var (
 		namespace string
@@ -76,7 +76,7 @@ var _ = utils.SIGDescribe("vsphere statefulset", func() {
 		scParameters := make(map[string]string)
 		scParameters["diskformat"] = "thin"
 		scSpec := getVSphereStorageClassSpec(storageclassname, scParameters, nil, "")
-		sc, err := client.StorageV1().StorageClasses().Create(context.TODO(), scSpec)
+		sc, err := client.StorageV1().StorageClasses().Create(context.TODO(), scSpec, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 		defer client.StorageV1().StorageClasses().Delete(context.TODO(), sc.Name, nil)
 

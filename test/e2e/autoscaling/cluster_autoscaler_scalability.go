@@ -457,7 +457,7 @@ func addAnnotation(f *framework.Framework, nodes []v1.Node, key, value string) e
 			return err
 		}
 
-		_, err = f.ClientSet.CoreV1().Nodes().Patch(context.TODO(), string(node.Name), types.StrategicMergePatchType, patchBytes)
+		_, err = f.ClientSet.CoreV1().Nodes().Patch(context.TODO(), string(node.Name), types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
 		if err != nil {
 			return err
 		}

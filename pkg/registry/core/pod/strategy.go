@@ -34,10 +34,12 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -86,7 +88,11 @@ func (podStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 // Validate validates a new pod.
 func (podStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	pod := obj.(*api.Pod)
-	allErrs := validation.ValidatePodCreate(pod)
+	opts := validation.PodValidationOptions{
+		// Allow multiple huge pages on pod create if feature is enabled
+		AllowMultipleHugePageResources: utilfeature.DefaultFeatureGate.Enabled(features.HugePageStorageMediumSize),
+	}
+	allErrs := validation.ValidatePodCreate(pod, opts)
 	allErrs = append(allErrs, validation.ValidateConditionalPod(pod, nil, field.NewPath(""))...)
 	return allErrs
 }
@@ -102,8 +108,13 @@ func (podStrategy) AllowCreateOnUpdate() bool {
 
 // ValidateUpdate is the default update validation for an end user.
 func (podStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	errorList := validation.ValidatePod(obj.(*api.Pod))
-	errorList = append(errorList, validation.ValidatePodUpdate(obj.(*api.Pod), old.(*api.Pod))...)
+	oldFailsSingleHugepagesValidation := len(validation.ValidatePodSingleHugePageResources(old.(*api.Pod), field.NewPath("spec"))) > 0
+	opts := validation.PodValidationOptions{
+		// Allow multiple huge pages on pod create if feature is enabled or if the old pod already has multiple hugepages specified
+		AllowMultipleHugePageResources: oldFailsSingleHugepagesValidation || utilfeature.DefaultFeatureGate.Enabled(features.HugePageStorageMediumSize),
+	}
+	errorList := validation.ValidatePod(obj.(*api.Pod), opts)
+	errorList = append(errorList, validation.ValidatePodUpdate(obj.(*api.Pod), old.(*api.Pod), opts)...)
 	errorList = append(errorList, validation.ValidateConditionalPod(obj.(*api.Pod), old.(*api.Pod), field.NewPath(""))...)
 	return errorList
 }
@@ -200,6 +211,25 @@ func NodeNameTriggerFunc(obj runtime.Object) string {
 	return obj.(*api.Pod).Spec.NodeName
 }
 
+// NodeNameIndexFunc return value spec.nodename of given object.
+func NodeNameIndexFunc(obj interface{}) ([]string, error) {
+	pod, ok := obj.(*api.Pod)
+	if !ok {
+		return nil, fmt.Errorf("not a pod")
+	}
+	return []string{pod.Spec.NodeName}, nil
+}
+
+// Indexers returns the indexers for pod storage.
+func Indexers() *cache.Indexers {
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.SelectorIndex) {
+		return &cache.Indexers{
+			storage.FieldIndex("spec.nodeName"): NodeNameIndexFunc,
+		}
+	}
+	return nil
+}
+
 // ToSelectableFields returns a field set that represents the object
 // TODO: fields are not labels, and the validation rules for them do not apply.
 func ToSelectableFields(pod *api.Pod) fields.Set {
@@ -289,15 +319,6 @@ func ResourceLocation(ctx context.Context, getter ResourceGetter, rt http.RoundT
 		loc.Host = net.JoinHostPort(podIP, port)
 	}
 	return loc, rt, nil
-}
-
-// getContainerNames returns a formatted string containing the container names
-func getContainerNames(containers []api.Container) string {
-	names := []string{}
-	for _, c := range containers {
-		names = append(names, c.Name)
-	}
-	return strings.Join(names, " ")
 }
 
 // LogLocation returns the log URL for a pod container. If opts.Container is blank
@@ -532,13 +553,13 @@ func validateContainer(container string, pod *api.Pod) (string, error) {
 		case 0:
 			return "", errors.NewBadRequest(fmt.Sprintf("a container name must be specified for pod %s", pod.Name))
 		default:
-			containerNames := getContainerNames(pod.Spec.Containers)
-			initContainerNames := getContainerNames(pod.Spec.InitContainers)
-			err := fmt.Sprintf("a container name must be specified for pod %s, choose one of: [%s]", pod.Name, containerNames)
-			if len(initContainerNames) > 0 {
-				err += fmt.Sprintf(" or one of the init containers: [%s]", initContainerNames)
-			}
-			return "", errors.NewBadRequest(err)
+			var containerNames []string
+			podutil.VisitContainers(&pod.Spec, func(c *api.Container) bool {
+				containerNames = append(containerNames, c.Name)
+				return true
+			})
+			errStr := fmt.Sprintf("a container name must be specified for pod %s, choose one of: %s", pod.Name, containerNames)
+			return "", errors.NewBadRequest(errStr)
 		}
 	} else {
 		if !podHasContainerWithName(pod, container) {

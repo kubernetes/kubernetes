@@ -107,6 +107,7 @@ func NewKubeletServerCertificateManager(kubeClient clientset.Interface, kubeCfg 
 			return certSigningRequestClient, nil
 		},
 		GetTemplate: getTemplate,
+		SignerName:  certificates.KubeletServingSignerName,
 		Usages: []certificates.KeyUsage{
 			// https://tools.ietf.org/html/rfc5280#section-4.2.1.3
 			//
@@ -238,6 +239,7 @@ func NewKubeletClientCertificateManager(
 				Organization: []string{"system:nodes"},
 			},
 		},
+		SignerName: certificates.KubeAPIServerClientKubeletSignerName,
 		Usages: []certificates.KeyUsage{
 			// https://tools.ietf.org/html/rfc5280#section-4.2.1.3
 			//

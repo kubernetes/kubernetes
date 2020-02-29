@@ -198,16 +198,16 @@ func (t *volumeModeTestSuite) DefineTests(driver TestDriver, pattern testpattern
 				var err error
 
 				ginkgo.By("Creating sc")
-				l.Sc, err = l.cs.StorageV1().StorageClasses().Create(context.TODO(), l.Sc)
+				l.Sc, err = l.cs.StorageV1().StorageClasses().Create(context.TODO(), l.Sc, metav1.CreateOptions{})
 				framework.ExpectNoError(err, "Failed to create sc")
 
 				ginkgo.By("Creating pv and pvc")
-				l.Pv, err = l.cs.CoreV1().PersistentVolumes().Create(context.TODO(), l.Pv)
+				l.Pv, err = l.cs.CoreV1().PersistentVolumes().Create(context.TODO(), l.Pv, metav1.CreateOptions{})
 				framework.ExpectNoError(err, "Failed to create pv")
 
 				// Prebind pv
 				l.Pvc.Spec.VolumeName = l.Pv.Name
-				l.Pvc, err = l.cs.CoreV1().PersistentVolumeClaims(l.ns.Name).Create(context.TODO(), l.Pvc)
+				l.Pvc, err = l.cs.CoreV1().PersistentVolumeClaims(l.ns.Name).Create(context.TODO(), l.Pvc, metav1.CreateOptions{})
 				framework.ExpectNoError(err, "Failed to create pvc")
 
 				framework.ExpectNoError(e2epv.WaitOnPVandPVC(l.cs, l.ns.Name, l.Pv, l.Pvc), "Failed to bind pv and pvc")
@@ -215,8 +215,8 @@ func (t *volumeModeTestSuite) DefineTests(driver TestDriver, pattern testpattern
 				ginkgo.By("Creating pod")
 				pod := e2epod.MakeSecPod(l.ns.Name, []*v1.PersistentVolumeClaim{l.Pvc}, nil, false, "", false, false, e2epv.SELinuxLabel, nil)
 				// Setting node
-				pod.Spec.NodeName = l.config.ClientNodeName
-				pod, err = l.cs.CoreV1().Pods(l.ns.Name).Create(context.TODO(), pod)
+				e2epod.SetNodeSelection(&pod.Spec, l.config.ClientNodeSelection)
+				pod, err = l.cs.CoreV1().Pods(l.ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
 				framework.ExpectNoError(err, "Failed to create pod")
 				defer func() {
 					framework.ExpectNoError(e2epod.DeletePodWithWait(l.cs, pod), "Failed to delete pod")
@@ -252,11 +252,11 @@ func (t *volumeModeTestSuite) DefineTests(driver TestDriver, pattern testpattern
 				var err error
 
 				ginkgo.By("Creating sc")
-				l.Sc, err = l.cs.StorageV1().StorageClasses().Create(context.TODO(), l.Sc)
+				l.Sc, err = l.cs.StorageV1().StorageClasses().Create(context.TODO(), l.Sc, metav1.CreateOptions{})
 				framework.ExpectNoError(err, "Failed to create sc")
 
 				ginkgo.By("Creating pv and pvc")
-				l.Pvc, err = l.cs.CoreV1().PersistentVolumeClaims(l.ns.Name).Create(context.TODO(), l.Pvc)
+				l.Pvc, err = l.cs.CoreV1().PersistentVolumeClaims(l.ns.Name).Create(context.TODO(), l.Pvc, metav1.CreateOptions{})
 				framework.ExpectNoError(err, "Failed to create pvc")
 
 				eventSelector := fields.Set{
@@ -297,7 +297,7 @@ func (t *volumeModeTestSuite) DefineTests(driver TestDriver, pattern testpattern
 		pod = swapVolumeMode(pod)
 
 		// Run the pod
-		pod, err = l.cs.CoreV1().Pods(l.ns.Name).Create(context.TODO(), pod)
+		pod, err = l.cs.CoreV1().Pods(l.ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "Failed to create pod")
 		defer func() {
 			framework.ExpectNoError(e2epod.DeletePodWithWait(l.cs, pod), "Failed to delete pod")
@@ -348,7 +348,7 @@ func (t *volumeModeTestSuite) DefineTests(driver TestDriver, pattern testpattern
 		}
 
 		// Run the pod
-		pod, err = l.cs.CoreV1().Pods(l.ns.Name).Create(context.TODO(), pod)
+		pod, err = l.cs.CoreV1().Pods(l.ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 		defer func() {
 			framework.ExpectNoError(e2epod.DeletePodWithWait(l.cs, pod))

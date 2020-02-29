@@ -38,15 +38,15 @@ type StatefulSetsGetter interface {
 
 // StatefulSetInterface has methods to work with StatefulSet resources.
 type StatefulSetInterface interface {
-	Create(context.Context, *v1beta1.StatefulSet) (*v1beta1.StatefulSet, error)
-	Update(context.Context, *v1beta1.StatefulSet) (*v1beta1.StatefulSet, error)
-	UpdateStatus(context.Context, *v1beta1.StatefulSet) (*v1beta1.StatefulSet, error)
-	Delete(ctx context.Context, name string, options *v1.DeleteOptions) error
-	DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(ctx context.Context, name string, options v1.GetOptions) (*v1beta1.StatefulSet, error)
+	Create(ctx context.Context, statefulSet *v1beta1.StatefulSet, opts v1.CreateOptions) (*v1beta1.StatefulSet, error)
+	Update(ctx context.Context, statefulSet *v1beta1.StatefulSet, opts v1.UpdateOptions) (*v1beta1.StatefulSet, error)
+	UpdateStatus(ctx context.Context, statefulSet *v1beta1.StatefulSet, opts v1.UpdateOptions) (*v1beta1.StatefulSet, error)
+	Delete(ctx context.Context, name string, opts *v1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts *v1.DeleteOptions, listOpts v1.ListOptions) error
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1beta1.StatefulSet, error)
 	List(ctx context.Context, opts v1.ListOptions) (*v1beta1.StatefulSetList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.StatefulSet, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.StatefulSet, err error)
 	StatefulSetExpansion
 }
 
@@ -110,11 +110,12 @@ func (c *statefulSets) Watch(ctx context.Context, opts v1.ListOptions) (watch.In
 }
 
 // Create takes the representation of a statefulSet and creates it.  Returns the server's representation of the statefulSet, and an error, if there is any.
-func (c *statefulSets) Create(ctx context.Context, statefulSet *v1beta1.StatefulSet) (result *v1beta1.StatefulSet, err error) {
+func (c *statefulSets) Create(ctx context.Context, statefulSet *v1beta1.StatefulSet, opts v1.CreateOptions) (result *v1beta1.StatefulSet, err error) {
 	result = &v1beta1.StatefulSet{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("statefulsets").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(statefulSet).
 		Do(ctx).
 		Into(result)
@@ -122,12 +123,13 @@ func (c *statefulSets) Create(ctx context.Context, statefulSet *v1beta1.Stateful
 }
 
 // Update takes the representation of a statefulSet and updates it. Returns the server's representation of the statefulSet, and an error, if there is any.
-func (c *statefulSets) Update(ctx context.Context, statefulSet *v1beta1.StatefulSet) (result *v1beta1.StatefulSet, err error) {
+func (c *statefulSets) Update(ctx context.Context, statefulSet *v1beta1.StatefulSet, opts v1.UpdateOptions) (result *v1beta1.StatefulSet, err error) {
 	result = &v1beta1.StatefulSet{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("statefulsets").
 		Name(statefulSet.Name).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(statefulSet).
 		Do(ctx).
 		Into(result)
@@ -136,14 +138,14 @@ func (c *statefulSets) Update(ctx context.Context, statefulSet *v1beta1.Stateful
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-
-func (c *statefulSets) UpdateStatus(ctx context.Context, statefulSet *v1beta1.StatefulSet) (result *v1beta1.StatefulSet, err error) {
+func (c *statefulSets) UpdateStatus(ctx context.Context, statefulSet *v1beta1.StatefulSet, opts v1.UpdateOptions) (result *v1beta1.StatefulSet, err error) {
 	result = &v1beta1.StatefulSet{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("statefulsets").
 		Name(statefulSet.Name).
 		SubResource("status").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(statefulSet).
 		Do(ctx).
 		Into(result)
@@ -178,13 +180,14 @@ func (c *statefulSets) DeleteCollection(ctx context.Context, options *v1.DeleteO
 }
 
 // Patch applies the patch and returns the patched statefulSet.
-func (c *statefulSets) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.StatefulSet, err error) {
+func (c *statefulSets) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.StatefulSet, err error) {
 	result = &v1beta1.StatefulSet{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("statefulsets").
-		SubResource(subresources...).
 		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

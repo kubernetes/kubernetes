@@ -182,10 +182,12 @@ func buildKubeConfigFromSpec(spec *kubeConfigSpec, clustername string) (*clientc
 	}
 
 	// otherwise, create a client certs
-	clientCertConfig := certutil.Config{
-		CommonName:   spec.ClientName,
-		Organization: spec.ClientCertAuth.Organizations,
-		Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+	clientCertConfig := pkiutil.CertConfig{
+		Config: certutil.Config{
+			CommonName:   spec.ClientName,
+			Organization: spec.ClientCertAuth.Organizations,
+			Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+		},
 	}
 	clientCert, clientKey, err := pkiutil.NewCertAndKey(spec.CACert, spec.ClientCertAuth.CAKey, &clientCertConfig)
 	if err != nil {

@@ -164,7 +164,7 @@ func TestUpdate(t *testing.T) {
 			})
 			return object
 		},
-		// invalid updateFunc: ObjeceMeta is not to be tampered with.
+		// invalid updateFunc: ObjectMeta is not to be tampered with.
 		func(obj runtime.Object) runtime.Object {
 			object := obj.(*networking.Ingress)
 			object.Name = ""

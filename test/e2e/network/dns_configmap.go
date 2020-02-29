@@ -22,6 +22,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
@@ -413,12 +414,12 @@ func (t *dnsExternalNameTest) run(isIPv6 bool) {
 	f := t.f
 	serviceName := "dns-externalname-upstream-test"
 	externalNameService := e2eservice.CreateServiceSpec(serviceName, googleDNSHostname, false, nil)
-	if _, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(context.TODO(), externalNameService); err != nil {
+	if _, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(context.TODO(), externalNameService, metav1.CreateOptions{}); err != nil {
 		ginkgo.Fail(fmt.Sprintf("ginkgo.Failed when creating service: %v", err))
 	}
 	serviceNameLocal := "dns-externalname-upstream-local"
 	externalNameServiceLocal := e2eservice.CreateServiceSpec(serviceNameLocal, fooHostname, false, nil)
-	if _, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(context.TODO(), externalNameServiceLocal); err != nil {
+	if _, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(context.TODO(), externalNameServiceLocal, metav1.CreateOptions{}); err != nil {
 		ginkgo.Fail(fmt.Sprintf("ginkgo.Failed when creating service: %v", err))
 	}
 	defer func() {

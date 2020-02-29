@@ -101,7 +101,7 @@ func (p *ephemeralTestSuite) DefineTests(driver TestDriver, pattern testpatterns
 			Client:     l.config.Framework.ClientSet,
 			Namespace:  f.Namespace.Name,
 			DriverName: eDriver.GetCSIDriverName(l.config),
-			Node:       e2epod.NodeSelection{Name: l.config.ClientNodeName},
+			Node:       l.config.ClientNodeSelection,
 			GetVolume: func(volumeNumber int) (map[string]string, bool, bool) {
 				return eDriver.GetVolume(l.config, volumeNumber)
 			},
@@ -291,9 +291,6 @@ func StartInPodWithInlineVolume(c clientset.Interface, ns, podName, command stri
 			},
 		},
 		Spec: v1.PodSpec{
-			NodeName:     node.Name,
-			NodeSelector: node.Selector,
-			Affinity:     node.Affinity,
 			Containers: []v1.Container{
 				{
 					Name:    "csi-volume-tester",
@@ -304,6 +301,7 @@ func StartInPodWithInlineVolume(c clientset.Interface, ns, podName, command stri
 			RestartPolicy: v1.RestartPolicyNever,
 		},
 	}
+	e2epod.SetNodeSelection(&pod.Spec, node)
 
 	for i, csiVolume := range csiVolumes {
 		name := fmt.Sprintf("my-volume-%d", i)
@@ -322,7 +320,7 @@ func StartInPodWithInlineVolume(c clientset.Interface, ns, podName, command stri
 			})
 	}
 
-	pod, err := c.CoreV1().Pods(ns).Create(context.TODO(), pod)
+	pod, err := c.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "failed to create pod")
 	return pod
 }
@@ -365,7 +363,7 @@ func CSIInlineVolumesEnabled(c clientset.Interface, ns string) (bool, error) {
 		},
 	}
 
-	pod, err := c.CoreV1().Pods(ns).Create(context.TODO(), pod)
+	pod, err := c.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
 
 	switch {
 	case err == nil:

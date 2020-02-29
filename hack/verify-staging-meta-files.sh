@@ -14,6 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This script checks whether the expected metadata files (such as OWNERS and
+# LICENSE) exist under the `staging/src/k8s.io/*` directories.
+# Usage: `hack/verify-staging-meta-files.sh`.
+
 set -o errexit
 set -o nounset
 set -o pipefail

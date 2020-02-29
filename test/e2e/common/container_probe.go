@@ -133,7 +133,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 	/*
 		Release : v1.9
 		Testname: Pod liveness probe, using local file, no restart
-		Description:  Pod is created with liveness probe that uses ‘exec’ command to cat /temp/health file. Liveness probe MUST not fail to check health and the restart count should remain 0.
+		Description:  Pod is created with liveness probe that uses 'exec' command to cat /temp/health file. Liveness probe MUST not fail to check health and the restart count should remain 0.
 	*/
 	framework.ConformanceIt("should *not* be restarted with a exec \"cat /tmp/health\" liveness probe [NodeConformance]", func() {
 		cmd := []string{"/bin/sh", "-c", "echo ok >/tmp/health; sleep 600"}
@@ -194,7 +194,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 	/*
 		Release : v1.9
 		Testname: Pod liveness probe, using http endpoint, failure
-		Description: A Pod is created with liveness probe on http endpoint ‘/’. Liveness probe on this endpoint will not fail. When liveness probe does not fail then the restart count MUST remain zero.
+		Description: A Pod is created with liveness probe on http endpoint '/'. Liveness probe on this endpoint will not fail. When liveness probe does not fail then the restart count MUST remain zero.
 	*/
 	framework.ConformanceIt("should *not* be restarted with a /healthz http liveness probe [NodeConformance]", func() {
 		livenessProbe := &v1.Probe{
@@ -303,7 +303,8 @@ func testWebServerPodSpec(readinessProbe, livenessProbe *v1.Probe, containerName
 			Containers: []v1.Container{
 				{
 					Name:           containerName,
-					Image:          imageutils.GetE2EImage(imageutils.TestWebserver),
+					Image:          imageutils.GetE2EImage(imageutils.Agnhost),
+					Args:           []string{"test-webserver"},
 					Ports:          []v1.ContainerPort{{ContainerPort: int32(port)}},
 					LivenessProbe:  livenessProbe,
 					ReadinessProbe: readinessProbe,

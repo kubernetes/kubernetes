@@ -833,7 +833,7 @@ func (p *glusterfsVolumeProvisioner) CreateVolume(gid int) (r *v1.GlusterfsPersi
 	endpoint.Subsets = subset
 	endpoint.Subsets[0].Addresses = addrlist
 	endpoint.Subsets[0].Ports = ports
-	_, err = kubeClient.CoreV1().Endpoints(epNamespace).Update(context.TODO(), endpoint)
+	_, err = kubeClient.CoreV1().Endpoints(epNamespace).Update(context.TODO(), endpoint, metav1.UpdateOptions{})
 	if err != nil {
 		deleteErr := cli.VolumeDelete(volume.Id)
 		if deleteErr != nil {
@@ -884,7 +884,7 @@ func (p *glusterfsVolumeProvisioner) createOrGetEndpointService(namespace string
 	if kubeClient == nil {
 		return nil, nil, fmt.Errorf("failed to get kube client when creating endpoint service")
 	}
-	_, err = kubeClient.CoreV1().Endpoints(namespace).Create(context.TODO(), endpoint)
+	_, err = kubeClient.CoreV1().Endpoints(namespace).Create(context.TODO(), endpoint, metav1.CreateOptions{})
 	if err != nil && errors.IsAlreadyExists(err) {
 		klog.V(1).Infof("endpoint %s already exist in namespace %s", endpoint, namespace)
 		err = nil
@@ -904,7 +904,7 @@ func (p *glusterfsVolumeProvisioner) createOrGetEndpointService(namespace string
 		Spec: v1.ServiceSpec{
 			Ports: []v1.ServicePort{
 				{Protocol: "TCP", Port: 1}}}}
-	_, err = kubeClient.CoreV1().Services(namespace).Create(context.TODO(), service)
+	_, err = kubeClient.CoreV1().Services(namespace).Create(context.TODO(), service, metav1.CreateOptions{})
 	if err != nil && errors.IsAlreadyExists(err) {
 		klog.V(1).Infof("service %s already exist in namespace %s", service, namespace)
 		err = nil

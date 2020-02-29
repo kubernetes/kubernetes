@@ -14,7 +14,7 @@ spec:
         topologyKey: failure-domain.beta.kubernetes.io/zone
         namespaces: ["sched-test", "sched-setup"]
   containers:
-  - image: k8s.gcr.io/pause:3.1
+  - image: k8s.gcr.io/pause:3.2
     name: pause
     ports:
     - containerPort: 80

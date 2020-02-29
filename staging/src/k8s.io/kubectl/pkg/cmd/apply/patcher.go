@@ -81,11 +81,11 @@ func newPatcher(o *ApplyOptions, info *resource.Info) (*Patcher, error) {
 	}
 
 	helper := resource.NewHelper(info.Client, info.Mapping)
-	if o.ServerDryRun {
-		if err := resource.VerifyDryRun(info.Mapping.GroupVersionKind, o.DynamicClient, o.DiscoveryClient); err != nil {
+	if o.DryRunStrategy == cmdutil.DryRunServer {
+		if err := o.DryRunVerifier.HasSupport(info.Mapping.GroupVersionKind); err != nil {
 			return nil, err
 		}
-		helper.DryRun(o.ServerDryRun)
+		helper.DryRun(true)
 	}
 	return &Patcher{
 		Mapping:       info.Mapping,
@@ -97,7 +97,7 @@ func newPatcher(o *ApplyOptions, info *resource.Info) (*Patcher, error) {
 		Cascade:       o.DeleteOptions.Cascade,
 		Timeout:       o.DeleteOptions.Timeout,
 		GracePeriod:   o.DeleteOptions.GracePeriod,
-		ServerDryRun:  o.ServerDryRun,
+		ServerDryRun:  o.DryRunStrategy == cmdutil.DryRunServer,
 		OpenapiSchema: openapiSchema,
 		Retries:       maxPatchRetry,
 	}, nil

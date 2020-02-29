@@ -38,17 +38,17 @@ type DeploymentsGetter interface {
 
 // DeploymentInterface has methods to work with Deployment resources.
 type DeploymentInterface interface {
-	Create(context.Context, *v1beta1.Deployment) (*v1beta1.Deployment, error)
-	Update(context.Context, *v1beta1.Deployment) (*v1beta1.Deployment, error)
-	UpdateStatus(context.Context, *v1beta1.Deployment) (*v1beta1.Deployment, error)
-	Delete(ctx context.Context, name string, options *v1.DeleteOptions) error
-	DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(ctx context.Context, name string, options v1.GetOptions) (*v1beta1.Deployment, error)
+	Create(ctx context.Context, deployment *v1beta1.Deployment, opts v1.CreateOptions) (*v1beta1.Deployment, error)
+	Update(ctx context.Context, deployment *v1beta1.Deployment, opts v1.UpdateOptions) (*v1beta1.Deployment, error)
+	UpdateStatus(ctx context.Context, deployment *v1beta1.Deployment, opts v1.UpdateOptions) (*v1beta1.Deployment, error)
+	Delete(ctx context.Context, name string, opts *v1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts *v1.DeleteOptions, listOpts v1.ListOptions) error
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1beta1.Deployment, error)
 	List(ctx context.Context, opts v1.ListOptions) (*v1beta1.DeploymentList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.Deployment, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.Deployment, err error)
 	GetScale(ctx context.Context, deploymentName string, options v1.GetOptions) (*v1beta1.Scale, error)
-	UpdateScale(ctx context.Context, deploymentName string, scale *v1beta1.Scale) (*v1beta1.Scale, error)
+	UpdateScale(ctx context.Context, deploymentName string, scale *v1beta1.Scale, opts v1.UpdateOptions) (*v1beta1.Scale, error)
 
 	DeploymentExpansion
 }
@@ -113,11 +113,12 @@ func (c *deployments) Watch(ctx context.Context, opts v1.ListOptions) (watch.Int
 }
 
 // Create takes the representation of a deployment and creates it.  Returns the server's representation of the deployment, and an error, if there is any.
-func (c *deployments) Create(ctx context.Context, deployment *v1beta1.Deployment) (result *v1beta1.Deployment, err error) {
+func (c *deployments) Create(ctx context.Context, deployment *v1beta1.Deployment, opts v1.CreateOptions) (result *v1beta1.Deployment, err error) {
 	result = &v1beta1.Deployment{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("deployments").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(deployment).
 		Do(ctx).
 		Into(result)
@@ -125,12 +126,13 @@ func (c *deployments) Create(ctx context.Context, deployment *v1beta1.Deployment
 }
 
 // Update takes the representation of a deployment and updates it. Returns the server's representation of the deployment, and an error, if there is any.
-func (c *deployments) Update(ctx context.Context, deployment *v1beta1.Deployment) (result *v1beta1.Deployment, err error) {
+func (c *deployments) Update(ctx context.Context, deployment *v1beta1.Deployment, opts v1.UpdateOptions) (result *v1beta1.Deployment, err error) {
 	result = &v1beta1.Deployment{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("deployments").
 		Name(deployment.Name).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(deployment).
 		Do(ctx).
 		Into(result)
@@ -139,14 +141,14 @@ func (c *deployments) Update(ctx context.Context, deployment *v1beta1.Deployment
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-
-func (c *deployments) UpdateStatus(ctx context.Context, deployment *v1beta1.Deployment) (result *v1beta1.Deployment, err error) {
+func (c *deployments) UpdateStatus(ctx context.Context, deployment *v1beta1.Deployment, opts v1.UpdateOptions) (result *v1beta1.Deployment, err error) {
 	result = &v1beta1.Deployment{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("deployments").
 		Name(deployment.Name).
 		SubResource("status").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(deployment).
 		Do(ctx).
 		Into(result)
@@ -181,13 +183,14 @@ func (c *deployments) DeleteCollection(ctx context.Context, options *v1.DeleteOp
 }
 
 // Patch applies the patch and returns the patched deployment.
-func (c *deployments) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.Deployment, err error) {
+func (c *deployments) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.Deployment, err error) {
 	result = &v1beta1.Deployment{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("deployments").
-		SubResource(subresources...).
 		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)
@@ -209,13 +212,14 @@ func (c *deployments) GetScale(ctx context.Context, deploymentName string, optio
 }
 
 // UpdateScale takes the top resource name and the representation of a scale and updates it. Returns the server's representation of the scale, and an error, if there is any.
-func (c *deployments) UpdateScale(ctx context.Context, deploymentName string, scale *v1beta1.Scale) (result *v1beta1.Scale, err error) {
+func (c *deployments) UpdateScale(ctx context.Context, deploymentName string, scale *v1beta1.Scale, opts v1.UpdateOptions) (result *v1beta1.Scale, err error) {
 	result = &v1beta1.Scale{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("deployments").
 		Name(deploymentName).
 		SubResource("scale").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(scale).
 		Do(ctx).
 		Into(result)

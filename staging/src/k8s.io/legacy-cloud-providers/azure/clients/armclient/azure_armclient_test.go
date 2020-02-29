@@ -154,7 +154,7 @@ func TestSendAsync(t *testing.T) {
 	assert.Nil(t, response)
 	assert.Equal(t, 1, count)
 	assert.NotNil(t, rerr)
-	assert.Equal(t, true, rerr.Retriable)
+	assert.Equal(t, false, rerr.Retriable)
 }
 
 func TestNormalizeAzureRegion(t *testing.T) {
@@ -236,7 +236,7 @@ func TestDeleteResourceAsync(t *testing.T) {
 	count := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		count++
-		http.Error(w, "failed", http.StatusForbidden)
+		http.Error(w, "failed", http.StatusInternalServerError)
 	}))
 
 	backoff := &retry.Backoff{Steps: 3}

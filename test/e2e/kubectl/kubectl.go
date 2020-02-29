@@ -52,20 +52,17 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
-	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
 	"k8s.io/kubernetes/pkg/controller"
 	commonutils "k8s.io/kubernetes/test/e2e/common"
@@ -113,7 +110,6 @@ const (
 
 var (
 	nautilusImage = imageutils.GetE2EImage(imageutils.Nautilus)
-	kittenImage   = imageutils.GetE2EImage(imageutils.Kitten)
 	httpdImage    = imageutils.GetE2EImage(imageutils.Httpd)
 	busyboxImage  = imageutils.GetE2EImage(imageutils.BusyBox)
 	agnhostImage  = imageutils.GetE2EImage(imageutils.Agnhost)
@@ -277,11 +273,10 @@ var _ = SIGDescribe("Kubectl client", func() {
 	}
 
 	ginkgo.Describe("Update Demo", func() {
-		var nautilus, kitten string
+		var nautilus string
 		ginkgo.BeforeEach(func() {
 			updateDemoRoot := "test/fixtures/doc-yaml/user-guide/update-demo"
 			nautilus = commonutils.SubstituteImageName(string(testfiles.ReadOrDie(filepath.Join(updateDemoRoot, "nautilus-rc.yaml.in"))))
-			kitten = commonutils.SubstituteImageName(string(testfiles.ReadOrDie(filepath.Join(updateDemoRoot, "kitten-rc.yaml.in"))))
 		})
 		/*
 			Release : v1.9
@@ -315,22 +310,6 @@ var _ = SIGDescribe("Kubectl client", func() {
 			debugDiscovery()
 			framework.RunKubectlOrDie(ns, "scale", "rc", "update-demo-nautilus", "--replicas=2", "--timeout=5m", fmt.Sprintf("--namespace=%v", ns))
 			validateController(c, nautilusImage, 2, "update-demo", updateDemoSelector, getUDData("nautilus.jpg", ns), ns)
-		})
-
-		/*
-			Release : v1.9
-			Testname: Kubectl, rolling update replication controller
-			Description: Create a Pod and a container with a given image. Configure replication controller to run 2 replicas. The number of running instances of the Pod MUST equal the number of replicas set on the replication controller which is 2. Run a rolling update to run a different version of the container. All running instances SHOULD now be running the newer version of the container as part of the rolling update.
-		*/
-		framework.ConformanceIt("should do a rolling update of a replication controller ", func() {
-			ginkgo.By("creating the initial replication controller")
-			framework.RunKubectlOrDieInput(ns, string(nautilus[:]), "create", "-f", "-", fmt.Sprintf("--namespace=%v", ns))
-			validateController(c, nautilusImage, 2, "update-demo", updateDemoSelector, getUDData("nautilus.jpg", ns), ns)
-			ginkgo.By("rolling-update to new replication controller")
-			debugDiscovery()
-			framework.RunKubectlOrDieInput(ns, string(kitten[:]), "rolling-update", "update-demo-nautilus", "--update-period=1s", "-f", "-", fmt.Sprintf("--namespace=%v", ns))
-			validateController(c, kittenImage, 2, "update-demo", updateDemoSelector, getUDData("kitten.jpg", ns), ns)
-			// Everything will hopefully be cleaned up when the namespace is deleted.
 		})
 	})
 
@@ -845,7 +824,7 @@ metadata:
 		/*
 			Release : v1.9
 			Testname: Kubectl, check version v1
-			Description: Run kubectl to get api versions, output MUST contain returned versions with ‘v1’ listed.
+			Description: Run kubectl to get api versions, output MUST contain returned versions with 'v1' listed.
 		*/
 		framework.ConformanceIt("should check if v1 is in available api versions ", func() {
 			ginkgo.By("validating api versions")
@@ -1345,7 +1324,7 @@ metadata:
 		/*
 			Release : v1.9
 			Testname: Kubectl, label update
-			Description: When a Pod is running, update a Label using ‘kubectl label’ command. The label MUST be created in the Pod. A ‘kubectl get pod’ with -l option on the container MUST verify that the label can be read back. Use ‘kubectl label label-’ to remove the label. ‘kubectl get pod’ with -l option SHOULD not list the deleted label as the label is removed.
+			Description: When a Pod is running, update a Label using 'kubectl label' command. The label MUST be created in the Pod. A 'kubectl get pod' with -l option on the container MUST verify that the label can be read back. Use 'kubectl label label-' to remove the label. 'kubectl get pod' with -l option SHOULD not list the deleted label as the label is removed.
 		*/
 		framework.ConformanceIt("should update the label on a resource ", func() {
 			labelName := "testing-label"
@@ -1428,11 +1407,11 @@ metadata:
 			Testname: Kubectl, logs
 			Description: When a Pod is running then it MUST generate logs.
 			Starting a Pod should have a expected log line. Also log command options MUST work as expected and described below.
-				‘kubectl logs -tail=1’ should generate a output of one line, the last line in the log.
-				‘kubectl --limit-bytes=1’ should generate a single byte output.
-				‘kubectl --tail=1 --timestamp should generate one line with timestamp in RFC3339 format
-				‘kubectl --since=1s’ should output logs that are only 1 second older from now
-				‘kubectl --since=24h’ should output logs that are only 1 day older from now
+				'kubectl logs -tail=1' should generate a output of one line, the last line in the log.
+				'kubectl --limit-bytes=1' should generate a single byte output.
+				'kubectl --tail=1 --timestamp should generate one line with timestamp in RFC3339 format
+				'kubectl --since=1s' should output logs that are only 1 second older from now
+				'kubectl --since=24h' should output logs that are only 1 day older from now
 		*/
 		framework.ConformanceIt("should be able to retrieve and filter logs ", func() {
 			// Split("something\n", "\n") returns ["something", ""], so
@@ -1492,7 +1471,7 @@ metadata:
 		/*
 			Release : v1.9
 			Testname: Kubectl, patch to annotate
-			Description: Start running agnhost and a replication controller. When the pod is running, using ‘kubectl patch’ command add annotations. The annotation MUST be added to running pods and SHOULD be able to read added annotations from each of the Pods running under the replication controller.
+			Description: Start running agnhost and a replication controller. When the pod is running, using 'kubectl patch' command add annotations. The annotation MUST be added to running pods and SHOULD be able to read added annotations from each of the Pods running under the replication controller.
 		*/
 		framework.ConformanceIt("should add annotations for pods in rc ", func() {
 			controllerJSON := commonutils.SubstituteImageName(string(readTestFileOrDie(agnhostControllerFilename)))
@@ -1526,7 +1505,7 @@ metadata:
 		/*
 			Release : v1.9
 			Testname: Kubectl, version
-			Description: The command ‘kubectl version’ MUST return the major, minor versions,  GitCommit, etc of the Client and the Server that the kubectl is configured to connect to.
+			Description: The command 'kubectl version' MUST return the major, minor versions,  GitCommit, etc of the Client and the Server that the kubectl is configured to connect to.
 		*/
 		framework.ConformanceIt("should check is all data is printed ", func() {
 			version := framework.RunKubectlOrDie(ns, "version")
@@ -1536,42 +1515,6 @@ metadata:
 					framework.Failf("Required item %s not found in %s", item, version)
 				}
 			}
-		})
-	})
-
-	ginkgo.Describe("Kubectl rolling-update", func() {
-		var nsFlag string
-		var rcName string
-		var httpdRC string
-		var c clientset.Interface
-
-		ginkgo.BeforeEach(func() {
-			c = f.ClientSet
-			nsFlag = fmt.Sprintf("--namespace=%v", ns)
-			rcName = "httpd-rc"
-			httpdRC = commonutils.SubstituteImageName(string(readTestFileOrDie(httpdRCFilename)))
-
-		})
-
-		ginkgo.AfterEach(func() {
-			framework.RunKubectlOrDie(ns, "delete", "rc", rcName, nsFlag)
-		})
-
-		/*
-			Release : v1.9
-			Testname: Kubectl, rolling update
-			Description: Command ‘kubectl rolling-update’ MUST replace the specified replication controller with a new replication controller by updating one pod at a time to use the new Pod spec.
-		*/
-		framework.ConformanceIt("should support rolling-update to same image ", func() {
-			ginkgo.By("running the image " + httpdImage)
-			framework.RunKubectlOrDieInput(ns, httpdRC, "create", "-f", "-", fmt.Sprintf("--namespace=%v", ns))
-			waitForRCToStabilize(c, ns, rcName, framework.PodStartTimeout)
-
-			ginkgo.By("rolling-update to same image controller")
-
-			debugDiscovery()
-			runKubectlRetryOrDie(ns, "rolling-update", rcName, "--update-period=1s", "--image="+httpdImage, "--image-pull-policy="+string(v1.PullIfNotPresent), nsFlag)
-			validateController(c, httpdImage, 1, rcName, "run="+rcName, noOpValidatorFn, ns)
 		})
 	})
 
@@ -1591,7 +1534,7 @@ metadata:
 		/*
 			Release : v1.9
 			Testname: Kubectl, run pod
-			Description: Command ‘kubectl run’ MUST create a pod, when a image name is specified in the run command. After the run command there SHOULD be a pod that should exist with one container running the specified image.
+			Description: Command 'kubectl run' MUST create a pod, when a image name is specified in the run command. After the run command there SHOULD be a pod that should exist with one container running the specified image.
 		*/
 		framework.ConformanceIt("should create a pod from an image when restart is Never ", func() {
 			ginkgo.By("running the image " + httpdImage)
@@ -1627,7 +1570,7 @@ metadata:
 		/*
 			Release : v1.9
 			Testname: Kubectl, replace
-			Description: Command ‘kubectl replace’ on a existing Pod with a new spec MUST update the image of the container running in the Pod. A -f option to ‘kubectl replace’ SHOULD force to re-create the resource. The new Pod SHOULD have the container with new change to the image.
+			Description: Command 'kubectl replace' on a existing Pod with a new spec MUST update the image of the container running in the Pod. A -f option to 'kubectl replace' SHOULD force to re-create the resource. The new Pod SHOULD have the container with new change to the image.
 		*/
 		framework.ConformanceIt("should update a single-container pod's image ", func() {
 			ginkgo.By("running the image " + httpdImage)
@@ -1667,7 +1610,7 @@ metadata:
 		/*
 			Release : v1.9
 			Testname: Kubectl, proxy port zero
-			Description: Start a proxy server on port zero by running ‘kubectl proxy’ with --port=0. Call the proxy server by requesting api versions from unix socket. The proxy server MUST provide at least one version string.
+			Description: Start a proxy server on port zero by running 'kubectl proxy' with --port=0. Call the proxy server by requesting api versions from unix socket. The proxy server MUST provide at least one version string.
 		*/
 		framework.ConformanceIt("should support proxy with --port 0 ", func() {
 			ginkgo.By("starting the proxy server")
@@ -1692,7 +1635,7 @@ metadata:
 		/*
 			Release : v1.9
 			Testname: Kubectl, proxy socket
-			Description: Start a proxy server on by running ‘kubectl proxy’ with --unix-socket=<some path>. Call the proxy server by requesting api versions from  http://locahost:0/api. The proxy server MUST provide at least one version string
+			Description: Start a proxy server on by running 'kubectl proxy' with --unix-socket=<some path>. Call the proxy server by requesting api versions from  http://locahost:0/api. The proxy server MUST provide at least one version string
 		*/
 		framework.ConformanceIt("should support --unix-socket=/path ", func() {
 			ginkgo.By("Starting the proxy")
@@ -2167,8 +2110,6 @@ func getUDData(jpgExpected string, ns string) func(clientset.Interface, string) 
 	}
 }
 
-func noOpValidatorFn(c clientset.Interface, podID string) error { return nil }
-
 // newBlockingReader returns a reader that allows reading the given string,
 // then blocks until Close() is called on the returned closer.
 //
@@ -2331,36 +2272,4 @@ func createObjValidateOutputAndCleanup(namespace string, client dynamic.Resource
 	for _, defaults := range defaultColumns {
 		framework.ExpectNotEqual(fields, defaults, fmt.Sprintf("expected non-default fields for resource: %s", resource.Name))
 	}
-}
-
-// waitForRCToStabilize waits till the RC has a matching generation/replica count between spec and status.
-func waitForRCToStabilize(c clientset.Interface, ns, name string, timeout time.Duration) error {
-	options := metav1.ListOptions{FieldSelector: fields.Set{
-		"metadata.name":      name,
-		"metadata.namespace": ns,
-	}.AsSelector().String()}
-	w, err := c.CoreV1().ReplicationControllers(ns).Watch(context.TODO(), options)
-	if err != nil {
-		return err
-	}
-	ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), timeout)
-	defer cancel()
-	_, err = watchtools.UntilWithoutRetry(ctx, w, func(event watch.Event) (bool, error) {
-		switch event.Type {
-		case watch.Deleted:
-			return false, apierrors.NewNotFound(schema.GroupResource{Resource: "replicationcontrollers"}, "")
-		}
-		switch rc := event.Object.(type) {
-		case *v1.ReplicationController:
-			if rc.Name == name && rc.Namespace == ns &&
-				rc.Generation <= rc.Status.ObservedGeneration &&
-				*(rc.Spec.Replicas) == rc.Status.Replicas {
-				return true, nil
-			}
-			framework.Logf("Waiting for rc %s to stabilize, generation %v observed generation %v spec.replicas %d status.replicas %d",
-				name, rc.Generation, rc.Status.ObservedGeneration, *(rc.Spec.Replicas), rc.Status.Replicas)
-		}
-		return false, nil
-	})
-	return err
 }

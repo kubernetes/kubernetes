@@ -86,7 +86,7 @@ func UpdateCustomResourceDefinitionWithRetry(client clientset.Interface, name st
 			return nil, fmt.Errorf("failed to get CustomResourceDefinition %q: %v", name, err)
 		}
 		update(crd)
-		crd, err = client.ApiextensionsV1beta1().CustomResourceDefinitions().Update(context.TODO(), crd)
+		crd, err = client.ApiextensionsV1beta1().CustomResourceDefinitions().Update(context.TODO(), crd, metav1.UpdateOptions{})
 		if err == nil {
 			return crd, nil
 		}
@@ -105,7 +105,7 @@ func UpdateV1CustomResourceDefinitionWithRetry(client clientset.Interface, name 
 			return nil, fmt.Errorf("failed to get CustomResourceDefinition %q: %v", name, err)
 		}
 		update(crd)
-		crd, err = client.ApiextensionsV1().CustomResourceDefinitions().Update(context.TODO(), crd)
+		crd, err = client.ApiextensionsV1().CustomResourceDefinitions().Update(context.TODO(), crd, metav1.UpdateOptions{})
 		if err == nil {
 			return crd, nil
 		}

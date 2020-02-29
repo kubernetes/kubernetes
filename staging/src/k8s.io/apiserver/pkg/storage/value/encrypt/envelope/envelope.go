@@ -33,6 +33,7 @@ import (
 
 func init() {
 	value.RegisterMetrics()
+	registerMetrics()
 }
 
 // Service allows encrypting and decrypting data using an external Key Management Service.
@@ -52,6 +53,7 @@ type envelopeTransformer struct {
 	// baseTransformerFunc creates a new transformer for encrypting the data with the DEK.
 	baseTransformerFunc func(cipher.Block) value.Transformer
 
+	cacheSize    int
 	cacheEnabled bool
 }
 
@@ -76,11 +78,14 @@ func NewEnvelopeTransformer(envelopeService Service, cacheSize int, baseTransfor
 		transformers:        cache,
 		baseTransformerFunc: baseTransformerFunc,
 		cacheEnabled:        cacheSize > 0,
+		cacheSize:           cacheSize,
 	}, nil
 }
 
 // TransformFromStorage decrypts data encrypted by this transformer using envelope encryption.
 func (t *envelopeTransformer) TransformFromStorage(data []byte, context value.Context) ([]byte, bool, error) {
+	recordArrival(fromStorageLabel, time.Now())
+
 	// Read the 16 bit length-of-DEK encoded at the start of the encrypted DEK. 16 bits can
 	// represent a maximum key length of 65536 bytes. We are using a 256 bit key, whose
 	// length cannot fit in 8 bits (1 byte). Thus, we use 16 bits (2 bytes) to store the length.
@@ -117,6 +122,7 @@ func (t *envelopeTransformer) TransformFromStorage(data []byte, context value.Co
 
 // TransformToStorage encrypts data to be written to disk using envelope encryption.
 func (t *envelopeTransformer) TransformToStorage(data []byte, context value.Context) ([]byte, error) {
+	recordArrival(toStorageLabel, time.Now())
 	newKey, err := generateKey(32)
 	if err != nil {
 		return nil, err
@@ -162,6 +168,7 @@ func (t *envelopeTransformer) addTransformer(encKey []byte, key []byte) (value.T
 	// cannot hash []uint8.
 	if t.cacheEnabled {
 		t.transformers.Add(base64.StdEncoding.EncodeToString(encKey), transformer)
+		dekCacheFillPercent.Set(float64(t.transformers.Len()) / float64(t.cacheSize))
 	}
 	return transformer, nil
 }

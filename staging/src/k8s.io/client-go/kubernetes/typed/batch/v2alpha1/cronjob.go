@@ -38,15 +38,15 @@ type CronJobsGetter interface {
 
 // CronJobInterface has methods to work with CronJob resources.
 type CronJobInterface interface {
-	Create(context.Context, *v2alpha1.CronJob) (*v2alpha1.CronJob, error)
-	Update(context.Context, *v2alpha1.CronJob) (*v2alpha1.CronJob, error)
-	UpdateStatus(context.Context, *v2alpha1.CronJob) (*v2alpha1.CronJob, error)
-	Delete(ctx context.Context, name string, options *v1.DeleteOptions) error
-	DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(ctx context.Context, name string, options v1.GetOptions) (*v2alpha1.CronJob, error)
+	Create(ctx context.Context, cronJob *v2alpha1.CronJob, opts v1.CreateOptions) (*v2alpha1.CronJob, error)
+	Update(ctx context.Context, cronJob *v2alpha1.CronJob, opts v1.UpdateOptions) (*v2alpha1.CronJob, error)
+	UpdateStatus(ctx context.Context, cronJob *v2alpha1.CronJob, opts v1.UpdateOptions) (*v2alpha1.CronJob, error)
+	Delete(ctx context.Context, name string, opts *v1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts *v1.DeleteOptions, listOpts v1.ListOptions) error
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*v2alpha1.CronJob, error)
 	List(ctx context.Context, opts v1.ListOptions) (*v2alpha1.CronJobList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v2alpha1.CronJob, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v2alpha1.CronJob, err error)
 	CronJobExpansion
 }
 
@@ -110,11 +110,12 @@ func (c *cronJobs) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interf
 }
 
 // Create takes the representation of a cronJob and creates it.  Returns the server's representation of the cronJob, and an error, if there is any.
-func (c *cronJobs) Create(ctx context.Context, cronJob *v2alpha1.CronJob) (result *v2alpha1.CronJob, err error) {
+func (c *cronJobs) Create(ctx context.Context, cronJob *v2alpha1.CronJob, opts v1.CreateOptions) (result *v2alpha1.CronJob, err error) {
 	result = &v2alpha1.CronJob{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("cronjobs").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(cronJob).
 		Do(ctx).
 		Into(result)
@@ -122,12 +123,13 @@ func (c *cronJobs) Create(ctx context.Context, cronJob *v2alpha1.CronJob) (resul
 }
 
 // Update takes the representation of a cronJob and updates it. Returns the server's representation of the cronJob, and an error, if there is any.
-func (c *cronJobs) Update(ctx context.Context, cronJob *v2alpha1.CronJob) (result *v2alpha1.CronJob, err error) {
+func (c *cronJobs) Update(ctx context.Context, cronJob *v2alpha1.CronJob, opts v1.UpdateOptions) (result *v2alpha1.CronJob, err error) {
 	result = &v2alpha1.CronJob{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("cronjobs").
 		Name(cronJob.Name).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(cronJob).
 		Do(ctx).
 		Into(result)
@@ -136,14 +138,14 @@ func (c *cronJobs) Update(ctx context.Context, cronJob *v2alpha1.CronJob) (resul
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-
-func (c *cronJobs) UpdateStatus(ctx context.Context, cronJob *v2alpha1.CronJob) (result *v2alpha1.CronJob, err error) {
+func (c *cronJobs) UpdateStatus(ctx context.Context, cronJob *v2alpha1.CronJob, opts v1.UpdateOptions) (result *v2alpha1.CronJob, err error) {
 	result = &v2alpha1.CronJob{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("cronjobs").
 		Name(cronJob.Name).
 		SubResource("status").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(cronJob).
 		Do(ctx).
 		Into(result)
@@ -178,13 +180,14 @@ func (c *cronJobs) DeleteCollection(ctx context.Context, options *v1.DeleteOptio
 }
 
 // Patch applies the patch and returns the patched cronJob.
-func (c *cronJobs) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v2alpha1.CronJob, err error) {
+func (c *cronJobs) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v2alpha1.CronJob, err error) {
 	result = &v2alpha1.CronJob{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("cronjobs").
-		SubResource(subresources...).
 		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

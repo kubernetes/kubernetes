@@ -125,7 +125,7 @@ func updateJobWithRetries(c clientset.Interface, namespace, name string, applyUp
 		}
 		// Apply the update, then attempt to push it to the apiserver.
 		applyUpdate(job)
-		if job, err = jobs.Update(context.TODO(), job); err == nil {
+		if job, err = jobs.Update(context.TODO(), job, metav1.UpdateOptions{}); err == nil {
 			framework.Logf("Updating job %s", name)
 			return true, nil
 		}

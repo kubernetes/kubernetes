@@ -81,7 +81,7 @@ func (c *FakeControllerRevisions) Watch(ctx context.Context, opts v1.ListOptions
 }
 
 // Create takes the representation of a controllerRevision and creates it.  Returns the server's representation of the controllerRevision, and an error, if there is any.
-func (c *FakeControllerRevisions) Create(ctx context.Context, controllerRevision *v1beta2.ControllerRevision) (result *v1beta2.ControllerRevision, err error) {
+func (c *FakeControllerRevisions) Create(ctx context.Context, controllerRevision *v1beta2.ControllerRevision, opts v1.CreateOptions) (result *v1beta2.ControllerRevision, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(controllerrevisionsResource, c.ns, controllerRevision), &v1beta2.ControllerRevision{})
 
@@ -92,7 +92,7 @@ func (c *FakeControllerRevisions) Create(ctx context.Context, controllerRevision
 }
 
 // Update takes the representation of a controllerRevision and updates it. Returns the server's representation of the controllerRevision, and an error, if there is any.
-func (c *FakeControllerRevisions) Update(ctx context.Context, controllerRevision *v1beta2.ControllerRevision) (result *v1beta2.ControllerRevision, err error) {
+func (c *FakeControllerRevisions) Update(ctx context.Context, controllerRevision *v1beta2.ControllerRevision, opts v1.UpdateOptions) (result *v1beta2.ControllerRevision, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(controllerrevisionsResource, c.ns, controllerRevision), &v1beta2.ControllerRevision{})
 
@@ -119,7 +119,7 @@ func (c *FakeControllerRevisions) DeleteCollection(ctx context.Context, options 
 }
 
 // Patch applies the patch and returns the patched controllerRevision.
-func (c *FakeControllerRevisions) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta2.ControllerRevision, err error) {
+func (c *FakeControllerRevisions) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta2.ControllerRevision, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(controllerrevisionsResource, c.ns, name, pt, data, subresources...), &v1beta2.ControllerRevision{})
 

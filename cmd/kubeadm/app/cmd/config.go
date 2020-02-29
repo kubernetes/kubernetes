@@ -23,6 +23,7 @@ import (
 	"io"
 	"io/ioutil"
 	"sort"
+	"strings"
 
 	"github.com/lithammer/dedent"
 	"github.com/pkg/errors"
@@ -31,10 +32,14 @@ import (
 	"k8s.io/klog"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
+	outputapischeme "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/scheme"
+	outputapiv1alpha1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/v1alpha1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	phaseutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
@@ -45,6 +50,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 	utilruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
 	utilsexec "k8s.io/utils/exec"
 )
@@ -527,6 +533,8 @@ func NewCmdConfigImagesList(out io.Writer, mockK8sVersion *string) *cobra.Comman
 		externalcfg.KubernetesVersion = *mockK8sVersion
 	}
 
+	outputFlags := output.NewOutputFlags(&imageTextPrintFlags{}).WithTypeSetter(outputapischeme.Scheme).WithDefaultOutput(output.TextOutput)
+
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "Print a list of images kubeadm will use. The configuration file is used in case any images or image repositories are customized",
@@ -536,14 +544,20 @@ func NewCmdConfigImagesList(out io.Writer, mockK8sVersion *string) *cobra.Comman
 				return err
 			}
 
+			printer, err := outputFlags.ToPrinter()
+			if err != nil {
+				return err
+			}
+
 			imagesList, err := NewImagesList(cfgPath, externalcfg)
 			if err != nil {
 				return err
 			}
 
-			return imagesList.Run(out)
+			return imagesList.Run(out, printer)
 		},
 	}
+	outputFlags.AddFlags(cmd)
 	AddImagesCommonConfigFlags(cmd.PersistentFlags(), externalcfg, &cfgPath, &featureGatesString)
 	return cmd
 }
@@ -572,11 +586,39 @@ type ImagesList struct {
 	cfg *kubeadmapi.InitConfiguration
 }
 
+// imageTextPrinter prints image info in a text form
+type imageTextPrinter struct {
+	output.TextPrinter
+}
+
+// PrintObj is an implementation of ResourcePrinter.PrintObj for plain text output
+func (itp *imageTextPrinter) PrintObj(obj runtime.Object, writer io.Writer) error {
+	var err error
+	if imgs, ok := obj.(*outputapiv1alpha1.Images); ok {
+		_, err = fmt.Fprintln(writer, strings.Join(imgs.Images, "\n"))
+	} else {
+		err = errors.New("unexpected object type")
+	}
+	return err
+}
+
+// imageTextPrintFlags provides flags necessary for printing image in a text form.
+type imageTextPrintFlags struct{}
+
+// ToPrinter returns kubeadm printer for the text output format
+func (ipf *imageTextPrintFlags) ToPrinter(outputFormat string) (output.Printer, error) {
+	if outputFormat == output.TextOutput {
+		return &imageTextPrinter{}, nil
+	}
+	return nil, genericclioptions.NoCompatiblePrinterError{OutputFormat: &outputFormat, AllowedFormats: []string{output.TextOutput}}
+}
+
 // Run runs the images command and writes the result to the io.Writer passed in
-func (i *ImagesList) Run(out io.Writer) error {
+func (i *ImagesList) Run(out io.Writer, printer output.Printer) error {
 	imgs := images.GetControlPlaneImages(&i.cfg.ClusterConfiguration)
-	for _, img := range imgs {
-		fmt.Fprintln(out, img)
+
+	if err := printer.PrintObj(&outputapiv1alpha1.Images{Images: imgs}, out); err != nil {
+		return errors.Wrap(err, "unable to print images")
 	}
 
 	return nil

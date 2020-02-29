@@ -121,6 +121,19 @@ func TestCreateOrUpdate(t *testing.T) {
 	assert.Nil(t, rerr)
 }
 
+func TestDelete(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	r := getTestInterface("interface1")
+	armClient := mockarmclient.NewMockInterface(ctrl)
+	armClient.EXPECT().DeleteResource(gomock.Any(), to.String(r.ID), "").Return(nil).Times(1)
+
+	diskClient := getTestInterfaceClient(armClient)
+	rerr := diskClient.Delete(context.TODO(), "rg", "interface1")
+	assert.Nil(t, rerr)
+}
+
 func getTestInterface(name string) network.Interface {
 	resourceID := fmt.Sprintf("/subscriptions/subscriptionID/resourceGroups/rg/providers/Microsoft.Network/networkInterfaces/%s", name)
 	return network.Interface{

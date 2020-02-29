@@ -464,7 +464,7 @@ function append_or_replace_prefixed_line {
   local -r tmpfile="$(mktemp -t filtered.XXXX --tmpdir=${dirname})"
 
   touch "${file}"
-  awk "substr(\$0,0,length(\"${prefix}\")) != \"${prefix}\" { print }" "${file}" > "${tmpfile}"
+  awk -v pfx="${prefix}" 'substr($0,1,length(pfx)) != pfx { print }' "${file}" > "${tmpfile}"
   echo "${prefix}${suffix}" >> "${tmpfile}"
   mv "${tmpfile}" "${file}"
 }
@@ -807,18 +807,16 @@ kind: EgressSelectorConfiguration
 egressSelections:
 - name: cluster
   connection:
-    type: http-connect
-    httpConnect:
-      url: https://127.0.0.1:8131
-      caBundle: /etc/srv/kubernetes/pki/konnectivity-server/ca.crt
-      clientKey: /etc/srv/kubernetes/pki/konnectivity-server/client.key
-      clientCert: /etc/srv/kubernetes/pki/konnectivity-server/client.crt
+    proxyProtocol: HTTPConnect
+    transport:
+      uds:
+        udsName: /etc/srv/kubernetes/konnectivity/konnectivity-server.socket
 - name: master
   connection:
-    type: direct
+    proxyProtocol: Direct
 - name: etcd
   connection:
-    type: direct
+    proxyProtocol: Direct
 EOF
   fi
 
@@ -1645,9 +1643,8 @@ function start-etcd-servers {
 
 # Replaces the variables in the konnectivity-server manifest file with the real values, and then
 # copy the file to the manifest dir
-# $1: value for variable "server_port"
-# $2: value for variable "agent_port"
-# $3: value for bariable "admin_port"
+# $1: value for variable "agent_port"
+# $2: value for bariable "admin_port"
 function prepare-konnectivity-server-manifest {
   local -r temp_file="/tmp/konnectivity-server.yaml"
   params=()
@@ -1655,24 +1652,20 @@ function prepare-konnectivity-server-manifest {
   params+=("--log-file=/var/log/konnectivity-server.log")
   params+=("--logtostderr=false")
   params+=("--log-file-max-size=0")
-  params+=("--server-ca-cert=${KONNECTIVITY_SERVER_CA_CERT_PATH}")
-  params+=("--server-cert=${KONNECTIVITY_SERVER_CERT_PATH}")
-  params+=("--server-key=${KONNECTIVITY_SERVER_KEY_PATH}")
-  params+=("--cluster-ca-cert=${KONNECTIVITY_AGENT_CA_CERT_PATH}")
-  params+=("--cluster-cert=${KONNECTIVITY_AGENT_CERT_PATH}")
-  params+=("--cluster-key=${KONNECTIVITY_AGENT_KEY_PATH}")
+  params+=("--uds-name=/etc/srv/kubernetes/konnectivity/konnectivity-server.socket")
+  params+=("--cluster-cert=/etc/srv/kubernetes/pki/apiserver.crt")
+  params+=("--cluster-key=/etc/srv/kubernetes/pki/apiserver.key")
   params+=("--mode=http-connect")
-  params+=("--server-port=$1")
-  params+=("--agent-port=$2")
-  params+=("--admin-port=$3")
+  params+=("--server-port=0")
+  params+=("--agent-port=$1")
+  params+=("--admin-port=$2")
   konnectivity_args=""
   for param in "${params[@]}"; do
     konnectivity_args+=", \"${param}\""
   done
   sed -i -e "s@{{ *konnectivity_args *}}@${konnectivity_args}@g" "${temp_file}"
-  sed -i -e "s@{{ *server_port *}}@$1@g" "${temp_file}"
-  sed -i -e "s@{{ *agent_port *}}@$2@g" "${temp_file}"
-  sed -i -e "s@{{ *admin_port *}}@$3@g" "${temp_file}"
+  sed -i -e "s@{{ *agent_port *}}@$1@g" "${temp_file}"
+  sed -i -e "s@{{ *admin_port *}}@$2@g" "${temp_file}"
   sed -i -e "s@{{ *liveness_probe_initial_delay *}}@30@g" "${temp_file}"
   mv "${temp_file}" /etc/kubernetes/manifests
 }
@@ -1683,7 +1676,7 @@ function prepare-konnectivity-server-manifest {
 function start-konnectivity-server {
   echo "Start konnectivity server pods"
   prepare-log-file /var/log/konnectivity-server.log
-  prepare-konnectivity-server-manifest "8131" "8132" "8133"
+  prepare-konnectivity-server-manifest "8132" "8133"
 }
 
 # Calculates the following variables based on env variables, which will be used
@@ -2668,8 +2661,6 @@ EOF
       cni_template_path=""
     fi
   fi
-  # Reuse docker group for containerd.
-  local containerd_gid="$(cat /etc/group | grep ^docker: | cut -d: -f 3)"
   cat > "${config_path}" <<EOF
 # Kubernetes doesn't use containerd restart manager.
 disabled_plugins = ["restart"]
@@ -2677,9 +2668,6 @@ oom_score = -999
 
 [debug]
   level = "${CONTAINERD_LOG_LEVEL:-"info"}"
-
-[grpc]
-  gid = ${containerd_gid}
 
 [plugins.cri]
   stream_server_address = "127.0.0.1"
@@ -2691,6 +2679,25 @@ oom_score = -999
 [plugins.cri.registry.mirrors."docker.io"]
   endpoint = ["https://mirror.gcr.io","https://registry-1.docker.io"]
 EOF
+
+  if [[ "${CONTAINER_RUNTIME_TEST_HANDLER:-}" == "true" ]]; then
+  cat >> "${config_path}" <<EOF
+# Setup a runtime with the magic name ("test-handler") used for Kubernetes
+# runtime class tests ...
+[plugins.cri.containerd.runtimes.test-handler]
+  runtime_type = "io.containerd.runtime.v1.linux"
+EOF
+  fi
+
+  # Reuse docker group for containerd.
+  local containerd_gid="$(cat /etc/group | grep ^docker: | cut -d: -f 3)"
+  if [[ ! -z "${containerd_gid:-}" ]]; then
+    cat >> "${config_path}" <<EOF
+# reuse id of the docker group
+[grpc]
+  gid = ${containerd_gid}
+EOF
+  fi
   chmod 644 "${config_path}"
 
   echo "Restart containerd to load the config change"
