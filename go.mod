@@ -54,9 +54,12 @@ require (
 	github.com/fsnotify/fsnotify v1.4.7
 	github.com/go-bindata/go-bindata v3.1.1+incompatible
 	github.com/go-openapi/analysis v0.19.5
+	github.com/go-openapi/jsonpointer v0.19.3
+	github.com/go-openapi/jsonreference v0.19.3
 	github.com/go-openapi/loads v0.19.4
 	github.com/go-openapi/spec v0.19.3
 	github.com/go-openapi/strfmt v0.19.3
+	github.com/go-openapi/swag v0.19.5
 	github.com/go-openapi/validate v0.19.5
 	github.com/go-ozzo/ozzo-validation v3.5.0+incompatible // indirect
 	github.com/godbus/dbus v0.0.0-20181101234600-2ff6f7ffd60f // indirect
@@ -162,7 +165,7 @@ require (
 	k8s.io/repo-infra v0.0.1-alpha.1
 	k8s.io/sample-apiserver v0.0.0
 	k8s.io/system-validators v1.0.4
-	k8s.io/utils v0.0.0-20191114184206-e782cd3c129f
+	k8s.io/utils v0.0.0-20200229041039-0a110f9eb7ab
 	sigs.k8s.io/kustomize v2.0.3+incompatible
 	sigs.k8s.io/yaml v1.1.0
 )
@@ -553,7 +556,7 @@ replace (
 	k8s.io/sample-cli-plugin => ./staging/src/k8s.io/sample-cli-plugin
 	k8s.io/sample-controller => ./staging/src/k8s.io/sample-controller
 	k8s.io/system-validators => k8s.io/system-validators v1.0.4
-	k8s.io/utils => k8s.io/utils v0.0.0-20191114184206-e782cd3c129f
+	k8s.io/utils => k8s.io/utils v0.0.0-20200229041039-0a110f9eb7ab
 	modernc.org/cc => modernc.org/cc v1.0.0
 	modernc.org/golex => modernc.org/golex v1.0.0
 	modernc.org/mathutil => modernc.org/mathutil v1.0.0
