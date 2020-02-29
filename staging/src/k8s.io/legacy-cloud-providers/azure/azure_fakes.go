@@ -530,6 +530,10 @@ func (fVMC *fakeVirtualMachineScaleSetVMsClient) Update(ctx context.Context, res
 	return nil
 }
 
+func (fVMC *fakeVirtualMachineScaleSetVMsClient) UpdateVMs(ctx context.Context, resourceGroupName string, VMScaleSetName string, instances map[string]compute.VirtualMachineScaleSetVM, source string) *retry.Error {
+	return nil
+}
+
 type fakeVirtualMachineScaleSetsClient struct {
 	mutex     *sync.Mutex
 	FakeStore map[string]map[string]compute.VirtualMachineScaleSet
