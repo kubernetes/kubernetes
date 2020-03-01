@@ -174,9 +174,6 @@ const (
 	Nonewprivs
 	// NonRoot runs with a default user of 1234
 	NonRoot
-	// Pause - when these values are updated, also update cmd/kubelet/app/options/container_runtime.go
-	// Pause image
-	Pause
 	// Perl image
 	Perl
 	// PrometheusDummyExporter image
@@ -232,8 +229,6 @@ func initImageConfigs() map[int]Config {
 	configs[NginxNew] = Config{dockerLibraryRegistry, "nginx", "1.15-alpine"}
 	configs[Nonewprivs] = Config{e2eRegistry, "nonewprivs", "1.0"}
 	configs[NonRoot] = Config{e2eRegistry, "nonroot", "1.0"}
-	// Pause - when these values are updated, also update cmd/kubelet/app/options/container_runtime.go
-	configs[Pause] = Config{gcRegistry, "pause", "3.2"}
 	configs[Perl] = Config{dockerLibraryRegistry, "perl", "5.26"}
 	configs[PrometheusDummyExporter] = Config{gcRegistry, "prometheus-dummy-exporter", "v0.1.0"}
 	configs[PrometheusToSd] = Config{gcRegistry, "prometheus-to-sd", "v0.5.0"}
@@ -271,7 +266,7 @@ func (i *Config) GetE2EImage() string {
 
 // GetPauseImageName returns the pause image name with proper version
 func GetPauseImageName() string {
-	return GetE2EImage(Pause)
+	return GetE2EImage(Agnhost)
 }
 
 // ReplaceRegistryInImageURL replaces the registry in the image URL with a custom one

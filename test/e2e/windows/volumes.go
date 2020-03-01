@@ -37,7 +37,7 @@ const (
 )
 
 var (
-	image = imageutils.GetE2EImage(imageutils.Pause)
+	image = imageutils.GetE2EImage(imageutils.Agnhost)
 )
 
 var _ = SIGDescribe("Windows volume mounts ", func() {

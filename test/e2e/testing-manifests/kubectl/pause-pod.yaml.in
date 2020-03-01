@@ -7,6 +7,6 @@ metadata:
 spec:
   containers:
   - name: pause
-    image: {{.PauseImage}}
+    image: {{.AgnhostImage}}
     ports:
     - containerPort: 80

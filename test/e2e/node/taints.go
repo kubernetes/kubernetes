@@ -39,7 +39,7 @@ import (
 )
 
 var (
-	pauseImage = imageutils.GetE2EImage(imageutils.Pause)
+	pauseImage = imageutils.GetE2EImage(imageutils.Agnhost)
 )
 
 func getTestTaint() v1.Taint {

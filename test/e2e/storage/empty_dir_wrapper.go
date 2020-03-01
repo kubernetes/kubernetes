@@ -388,7 +388,7 @@ func testNoWrappedVolumeRace(f *framework.Framework, volumes []v1.Volume, volume
 					Containers: []v1.Container{
 						{
 							Name:         "test-container",
-							Image:        imageutils.GetE2EImage(imageutils.Pause),
+							Image:        imageutils.GetE2EImage(imageutils.Agnhost),
 							VolumeMounts: volumeMounts,
 						},
 					},

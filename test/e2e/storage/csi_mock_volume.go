@@ -665,7 +665,7 @@ func startPausePodWithVolumeSource(cs clientset.Interface, volumeSource v1.Volum
 			Containers: []v1.Container{
 				{
 					Name:  "volume-tester",
-					Image: imageutils.GetE2EImage(imageutils.Pause),
+					Image: imageutils.GetE2EImage(imageutils.Agnhost),
 					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      "my-volume",
