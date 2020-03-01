@@ -109,15 +109,15 @@ func (c *FakeClusterTestTypes) UpdateStatus(ctx context.Context, clusterTestType
 }
 
 // Delete takes name of the clusterTestType and deletes it. Returns an error if one occurs.
-func (c *FakeClusterTestTypes) Delete(ctx context.Context, name string, options *v1.DeleteOptions) error {
+func (c *FakeClusterTestTypes) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewRootDeleteAction(clustertesttypesResource, name), &examplev1.ClusterTestType{})
 	return err
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeClusterTestTypes) DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(clustertesttypesResource, listOptions)
+func (c *FakeClusterTestTypes) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	action := testing.NewRootDeleteCollectionAction(clustertesttypesResource, listOpts)
 
 	_, err := c.Fake.Invokes(action, &examplev1.ClusterTestTypeList{})
 	return err

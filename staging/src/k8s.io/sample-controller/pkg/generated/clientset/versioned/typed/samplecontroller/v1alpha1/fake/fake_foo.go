@@ -115,7 +115,7 @@ func (c *FakeFoos) UpdateStatus(ctx context.Context, foo *v1alpha1.Foo, opts v1.
 }
 
 // Delete takes name of the foo and deletes it. Returns an error if one occurs.
-func (c *FakeFoos) Delete(ctx context.Context, name string, options *v1.DeleteOptions) error {
+func (c *FakeFoos) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(foosResource, c.ns, name), &v1alpha1.Foo{})
 
@@ -123,8 +123,8 @@ func (c *FakeFoos) Delete(ctx context.Context, name string, options *v1.DeleteOp
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeFoos) DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(foosResource, c.ns, listOptions)
+func (c *FakeFoos) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(foosResource, c.ns, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1alpha1.FooList{})
 	return err

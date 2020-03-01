@@ -103,7 +103,7 @@ func (c *FakeEvents) Update(ctx context.Context, event *corev1.Event, opts v1.Up
 }
 
 // Delete takes name of the event and deletes it. Returns an error if one occurs.
-func (c *FakeEvents) Delete(ctx context.Context, name string, options *v1.DeleteOptions) error {
+func (c *FakeEvents) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(eventsResource, c.ns, name), &corev1.Event{})
 
@@ -111,8 +111,8 @@ func (c *FakeEvents) Delete(ctx context.Context, name string, options *v1.Delete
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeEvents) DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(eventsResource, c.ns, listOptions)
+func (c *FakeEvents) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(eventsResource, c.ns, listOpts)
 
 	_, err := c.Fake.Invokes(action, &corev1.EventList{})
 	return err

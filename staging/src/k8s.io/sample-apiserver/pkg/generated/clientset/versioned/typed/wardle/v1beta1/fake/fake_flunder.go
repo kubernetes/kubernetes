@@ -115,7 +115,7 @@ func (c *FakeFlunders) UpdateStatus(ctx context.Context, flunder *v1beta1.Flunde
 }
 
 // Delete takes name of the flunder and deletes it. Returns an error if one occurs.
-func (c *FakeFlunders) Delete(ctx context.Context, name string, options *v1.DeleteOptions) error {
+func (c *FakeFlunders) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(flundersResource, c.ns, name), &v1beta1.Flunder{})
 
@@ -123,8 +123,8 @@ func (c *FakeFlunders) Delete(ctx context.Context, name string, options *v1.Dele
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeFlunders) DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(flundersResource, c.ns, listOptions)
+func (c *FakeFlunders) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(flundersResource, c.ns, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1beta1.FlunderList{})
 	return err

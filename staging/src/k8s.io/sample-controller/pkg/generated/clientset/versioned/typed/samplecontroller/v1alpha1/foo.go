@@ -41,8 +41,8 @@ type FooInterface interface {
 	Create(ctx context.Context, foo *v1alpha1.Foo, opts v1.CreateOptions) (*v1alpha1.Foo, error)
 	Update(ctx context.Context, foo *v1alpha1.Foo, opts v1.UpdateOptions) (*v1alpha1.Foo, error)
 	UpdateStatus(ctx context.Context, foo *v1alpha1.Foo, opts v1.UpdateOptions) (*v1alpha1.Foo, error)
-	Delete(ctx context.Context, name string, opts *v1.DeleteOptions) error
-	DeleteCollection(ctx context.Context, opts *v1.DeleteOptions, listOpts v1.ListOptions) error
+	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
 	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1alpha1.Foo, error)
 	List(ctx context.Context, opts v1.ListOptions) (*v1alpha1.FooList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
@@ -153,28 +153,28 @@ func (c *foos) UpdateStatus(ctx context.Context, foo *v1alpha1.Foo, opts v1.Upda
 }
 
 // Delete takes name of the foo and deletes it. Returns an error if one occurs.
-func (c *foos) Delete(ctx context.Context, name string, options *v1.DeleteOptions) error {
+func (c *foos) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("foos").
 		Name(name).
-		Body(options).
+		Body(&opts).
 		Do(ctx).
 		Error()
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *foos) DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *foos) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
 	var timeout time.Duration
-	if listOptions.TimeoutSeconds != nil {
-		timeout = time.Duration(*listOptions.TimeoutSeconds) * time.Second
+	if listOpts.TimeoutSeconds != nil {
+		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("foos").
-		VersionedParams(&listOptions, scheme.ParameterCodec).
+		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Body(options).
+		Body(&opts).
 		Do(ctx).
 		Error()
 }
