@@ -320,7 +320,7 @@ func (o Options) Validate() error {
 }
 
 // RunLogs retrieves a pod log
-func (o LogsOptions) RunLogs() error {
+func (o Options) RunLogs() error {
 	requests, err := o.LogsForObject(o.RESTClientGetter, o.Object, o.Options, o.GetPodTimeout, o.AllContainers)
 	if err != nil {
 		return err
@@ -340,7 +340,7 @@ func (o LogsOptions) RunLogs() error {
 	return o.sequentialConsumeRequest(requests)
 }
 
-func (o LogsOptions) parallelConsumeRequest(requests map[corev1.ObjectReference]rest.ResponseWrapper) error {
+func (o Options) parallelConsumeRequest(requests map[corev1.ObjectReference]rest.ResponseWrapper) error {
 	reader, writer := io.Pipe()
 	wg := &sync.WaitGroup{}
 	wg.Add(len(requests))
@@ -371,7 +371,7 @@ func (o LogsOptions) parallelConsumeRequest(requests map[corev1.ObjectReference]
 	return err
 }
 
-func (o LogsOptions) sequentialConsumeRequest(requests map[corev1.ObjectReference]rest.ResponseWrapper) error {
+func (o Options) sequentialConsumeRequest(requests map[corev1.ObjectReference]rest.ResponseWrapper) error {
 	for objRef, request := range requests {
 		out := o.addPrefixIfNeeded(objRef, o.Out)
 		if err := o.ConsumeRequestFn(request, out); err != nil {
@@ -382,7 +382,7 @@ func (o LogsOptions) sequentialConsumeRequest(requests map[corev1.ObjectReferenc
 	return nil
 }
 
-func (o LogsOptions) addPrefixIfNeeded(ref corev1.ObjectReference, writer io.Writer) io.Writer {
+func (o Options) addPrefixIfNeeded(ref corev1.ObjectReference, writer io.Writer) io.Writer {
 	if !o.Prefix || ref.FieldPath == "" || ref.Name == "" {
 		return writer
 	}
