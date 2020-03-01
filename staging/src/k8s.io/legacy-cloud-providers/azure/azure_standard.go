@@ -722,23 +722,23 @@ func (as *availabilitySet) getPrimaryInterfaceWithVMSet(nodeName, vmSetName stri
 
 // EnsureHostInPool ensures the given VM's Primary NIC's Primary IP Configuration is
 // participating in the specified LoadBalancer Backend Pool.
-func (as *availabilitySet) EnsureHostInPool(service *v1.Service, nodeName types.NodeName, backendPoolID string, vmSetName string, isInternal bool) error {
+func (as *availabilitySet) EnsureHostInPool(service *v1.Service, nodeName types.NodeName, backendPoolID string, vmSetName string, isInternal bool) (string, string, string, *compute.VirtualMachineScaleSetVM, error) {
 	vmName := mapNodeNameToVMName(nodeName)
 	serviceName := getServiceName(service)
 	nic, err := as.getPrimaryInterfaceWithVMSet(vmName, vmSetName)
 	if err != nil {
 		if err == errNotInVMSet {
 			klog.V(3).Infof("EnsureHostInPool skips node %s because it is not in the vmSet %s", nodeName, vmSetName)
-			return nil
+			return "", "", "", nil, nil
 		}
 
 		klog.Errorf("error: az.EnsureHostInPool(%s), az.vmSet.GetPrimaryInterface.Get(%s, %s), err=%v", nodeName, vmName, vmSetName, err)
-		return err
+		return "", "", "", nil, err
 	}
 
 	if nic.ProvisioningState != nil && *nic.ProvisioningState == nicFailedState {
 		klog.Warningf("EnsureHostInPool skips node %s because its primary nic %s is in Failed state", nodeName, *nic.Name)
-		return nil
+		return "", "", "", nil, nil
 	}
 
 	var primaryIPConfig *network.InterfaceIPConfiguration
@@ -746,12 +746,12 @@ func (as *availabilitySet) EnsureHostInPool(service *v1.Service, nodeName types.
 	if !as.Cloud.ipv6DualStackEnabled && !ipv6 {
 		primaryIPConfig, err = getPrimaryIPConfig(nic)
 		if err != nil {
-			return err
+			return "", "", "", nil, err
 		}
 	} else {
 		primaryIPConfig, err = getIPConfigByIPFamily(nic, ipv6)
 		if err != nil {
-			return err
+			return "", "", "", nil, err
 		}
 	}
 
@@ -780,11 +780,11 @@ func (as *availabilitySet) EnsureHostInPool(service *v1.Service, nodeName types.
 			}
 			isSameLB, oldLBName, err := isBackendPoolOnSameLB(backendPoolID, newBackendPoolsIDs)
 			if err != nil {
-				return err
+				return "", "", "", nil, err
 			}
 			if !isSameLB {
 				klog.V(4).Infof("Node %q has already been added to LB %q, omit adding it to a new one", nodeName, oldLBName)
-				return nil
+				return "", "", "", nil, nil
 			}
 		}
 
@@ -799,10 +799,10 @@ func (as *availabilitySet) EnsureHostInPool(service *v1.Service, nodeName types.
 		klog.V(3).Infof("nicupdate(%s): nic(%s) - updating", serviceName, nicName)
 		err := as.CreateOrUpdateInterface(service, nic)
 		if err != nil {
-			return err
+			return "", "", "", nil, err
 		}
 	}
-	return nil
+	return "", "", "", nil, nil
 }
 
 // EnsureHostsInPool ensures the given Node's primary IP configurations are
@@ -822,7 +822,7 @@ func (as *availabilitySet) EnsureHostsInPool(service *v1.Service, nodes []*v1.No
 		}
 
 		f := func() error {
-			err := as.EnsureHostInPool(service, types.NodeName(localNodeName), backendPoolID, vmSetName, isInternal)
+			_, _, _, _, err := as.EnsureHostInPool(service, types.NodeName(localNodeName), backendPoolID, vmSetName, isInternal)
 			if err != nil {
 				return fmt.Errorf("ensure(%s): backendPoolID(%s) - failed to ensure host in pool: %q", getServiceName(service), backendPoolID, err)
 			}
