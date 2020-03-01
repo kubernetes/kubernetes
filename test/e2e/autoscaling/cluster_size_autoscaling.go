@@ -1241,7 +1241,6 @@ func getPoolNodes(f *framework.Framework, poolName string) []*v1.Node {
 	if err != nil {
 		framework.Logf("Unexpected error occurred: %v", err)
 	}
-	// TODO: write a wrapper for ExpectNoErrorWithOffset()
 	framework.ExpectNoErrorWithOffset(0, err)
 	for _, node := range nodeList.Items {
 		if node.Labels[gkeNodepoolNameKey] == poolName {
