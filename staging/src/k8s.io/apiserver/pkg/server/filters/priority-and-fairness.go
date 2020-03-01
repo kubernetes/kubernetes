@@ -20,10 +20,8 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"sync/atomic"
 
-	_ "k8s.io/apiserver/pkg/util/flowcontrol/metrics"
-
-	"go.uber.org/atomic"
 	fcv1a1 "k8s.io/api/flowcontrol/v1alpha1"
 	apitypes "k8s.io/apimachinery/pkg/types"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -55,7 +53,7 @@ func GetClassification(ctx context.Context) *PriorityAndFairnessClassification {
 	return ctx.Value(priorityAndFairnessKey).(*PriorityAndFairnessClassification)
 }
 
-var atomicMutatingLen, atomicNonMutatingLen = atomic.NewInt32(0), atomic.NewInt32(0)
+var atomicMutatingLen, atomicNonMutatingLen int32
 
 // WithPriorityAndFairness limits the number of in-flight
 // requests in a fine-grained way.
@@ -103,16 +101,16 @@ func WithPriorityAndFairness(
 		execute := func() {
 			var mutatingLen, readOnlyLen int
 			if isMutatingRequest {
-				mutatingLen = int(atomicMutatingLen.Inc())
+				mutatingLen = int(atomic.AddInt32(&atomicMutatingLen, 1))
 			} else {
-				readOnlyLen = int(atomicNonMutatingLen.Inc())
+				readOnlyLen = int(atomic.AddInt32(&atomicNonMutatingLen, 1))
 			}
 			defer func() {
 				if isMutatingRequest {
-					atomicMutatingLen.Dec()
+					atomic.AddInt32(&atomicMutatingLen, -11)
 					watermark.recordMutating(mutatingLen)
 				} else {
-					atomicNonMutatingLen.Dec()
+					atomic.AddInt32(&atomicNonMutatingLen, -1)
 					watermark.recordReadOnly(readOnlyLen)
 				}
 			}()
