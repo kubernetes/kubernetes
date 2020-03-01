@@ -52,24 +52,24 @@ import (
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
-func getForegroundOptions() *metav1.DeleteOptions {
+func getForegroundOptions() metav1.DeleteOptions {
 	policy := metav1.DeletePropagationForeground
-	return &metav1.DeleteOptions{PropagationPolicy: &policy}
+	return metav1.DeleteOptions{PropagationPolicy: &policy}
 }
 
-func getOrphanOptions() *metav1.DeleteOptions {
+func getOrphanOptions() metav1.DeleteOptions {
 	var trueVar = true
-	return &metav1.DeleteOptions{OrphanDependents: &trueVar}
+	return metav1.DeleteOptions{OrphanDependents: &trueVar}
 }
 
-func getPropagateOrphanOptions() *metav1.DeleteOptions {
+func getPropagateOrphanOptions() metav1.DeleteOptions {
 	policy := metav1.DeletePropagationOrphan
-	return &metav1.DeleteOptions{PropagationPolicy: &policy}
+	return metav1.DeleteOptions{PropagationPolicy: &policy}
 }
 
-func getNonOrphanOptions() *metav1.DeleteOptions {
+func getNonOrphanOptions() metav1.DeleteOptions {
 	var falseVar = false
-	return &metav1.DeleteOptions{OrphanDependents: &falseVar}
+	return metav1.DeleteOptions{OrphanDependents: &falseVar}
 }
 
 const garbageCollectedPodName = "test.pod.1"
@@ -435,7 +435,7 @@ func TestCreateWithNonExistentOwner(t *testing.T) {
 	}
 }
 
-func setupRCsPods(t *testing.T, gc *garbagecollector.GarbageCollector, clientSet clientset.Interface, nameSuffix, namespace string, initialFinalizers []string, options *metav1.DeleteOptions, wg *sync.WaitGroup, rcUIDs chan types.UID) {
+func setupRCsPods(t *testing.T, gc *garbagecollector.GarbageCollector, clientSet clientset.Interface, nameSuffix, namespace string, initialFinalizers []string, options metav1.DeleteOptions, wg *sync.WaitGroup, rcUIDs chan types.UID) {
 	defer wg.Done()
 	rcClient := clientSet.CoreV1().ReplicationControllers(namespace)
 	podClient := clientSet.CoreV1().Pods(namespace)
@@ -461,9 +461,6 @@ func setupRCsPods(t *testing.T, gc *garbagecollector.GarbageCollector, clientSet
 	}
 	orphan := false
 	switch {
-	case options == nil:
-		// if there are no deletion options, the default policy for replication controllers is orphan
-		orphan = true
 	case options.OrphanDependents != nil:
 		// if the deletion options explicitly specify whether to orphan, that controls
 		orphan = *options.OrphanDependents
@@ -537,9 +534,9 @@ func TestStressingCascadingDeletion(t *testing.T) {
 	rcUIDs := make(chan types.UID, collections*5)
 	for i := 0; i < collections; i++ {
 		// rc is created with empty finalizers, deleted with nil delete options, pods will remain.
-		go setupRCsPods(t, gc, clientSet, "collection1-"+strconv.Itoa(i), ns.Name, []string{}, nil, &wg, rcUIDs)
+		go setupRCsPods(t, gc, clientSet, "collection1-"+strconv.Itoa(i), ns.Name, []string{}, metav1.DeleteOptions{}, &wg, rcUIDs)
 		// rc is created with the orphan finalizer, deleted with nil options, pods will remain.
-		go setupRCsPods(t, gc, clientSet, "collection2-"+strconv.Itoa(i), ns.Name, []string{metav1.FinalizerOrphanDependents}, nil, &wg, rcUIDs)
+		go setupRCsPods(t, gc, clientSet, "collection2-"+strconv.Itoa(i), ns.Name, []string{metav1.FinalizerOrphanDependents}, metav1.DeleteOptions{}, &wg, rcUIDs)
 		// rc is created with the orphan finalizer, deleted with DeleteOptions.OrphanDependents=false, pods will be deleted.
 		go setupRCsPods(t, gc, clientSet, "collection3-"+strconv.Itoa(i), ns.Name, []string{metav1.FinalizerOrphanDependents}, getNonOrphanOptions(), &wg, rcUIDs)
 		// rc is created with empty finalizers, deleted with DeleteOptions.OrphanDependents=true, pods will remain.

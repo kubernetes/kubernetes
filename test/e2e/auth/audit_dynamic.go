@@ -211,7 +211,7 @@ var _ = SIGDescribe("[Feature:DynamicAudit]", func() {
 					_, err = f.PodClient().Patch(context.TODO(), pod.Name, types.JSONPatchType, patch, metav1.PatchOptions{})
 					framework.ExpectNoError(err, "failed to patch pod")
 
-					f.PodClient().DeleteSync(pod.Name, &metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
+					f.PodClient().DeleteSync(pod.Name, metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
 				},
 				[]utils.AuditEvent{
 					{

@@ -99,9 +99,9 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 			false: "RW",
 		}
 		type testT struct {
-			descr     string                // It description
-			readOnly  bool                  // true means pd is read-only
-			deleteOpt *metav1.DeleteOptions // pod delete option
+			descr     string               // It description
+			readOnly  bool                 // true means pd is read-only
+			deleteOpt metav1.DeleteOptions // pod delete option
 		}
 		tests := []testT{
 			{
@@ -112,7 +112,7 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 			{
 				descr:     podDefaultGrace,
 				readOnly:  false,
-				deleteOpt: &metav1.DeleteOptions{},
+				deleteOpt: metav1.DeleteOptions{},
 			},
 			{
 				descr:     podImmediateGrace,
@@ -122,7 +122,7 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 			{
 				descr:     podDefaultGrace,
 				readOnly:  true,
-				deleteOpt: &metav1.DeleteOptions{},
+				deleteOpt: metav1.DeleteOptions{},
 			},
 		}
 

@@ -73,7 +73,7 @@ func TestConcurrentEvictionRequests(t *testing.T) {
 	}
 
 	var gracePeriodSeconds int64 = 30
-	deleteOption := &metav1.DeleteOptions{
+	deleteOption := metav1.DeleteOptions{
 		GracePeriodSeconds: &gracePeriodSeconds,
 	}
 
@@ -192,7 +192,7 @@ func TestTerminalPodEviction(t *testing.T) {
 	}
 
 	var gracePeriodSeconds int64 = 30
-	deleteOption := &metav1.DeleteOptions{
+	deleteOption := metav1.DeleteOptions{
 		GracePeriodSeconds: &gracePeriodSeconds,
 	}
 	pod := newPod("test-terminal-pod1")
@@ -309,7 +309,7 @@ func newPDB() *v1beta1.PodDisruptionBudget {
 	}
 }
 
-func newEviction(ns, evictionName string, deleteOption *metav1.DeleteOptions) *v1beta1.Eviction {
+func newEviction(ns, evictionName string, deleteOption metav1.DeleteOptions) *v1beta1.Eviction {
 	return &v1beta1.Eviction{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "Policy/v1beta1",
@@ -319,7 +319,7 @@ func newEviction(ns, evictionName string, deleteOption *metav1.DeleteOptions) *v
 			Name:      evictionName,
 			Namespace: ns,
 		},
-		DeleteOptions: deleteOption,
+		DeleteOptions: &deleteOption,
 	}
 }
 

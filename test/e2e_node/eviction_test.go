@@ -535,7 +535,7 @@ func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expe
 			ginkgo.By("deleting pods")
 			for _, spec := range testSpecs {
 				ginkgo.By(fmt.Sprintf("deleting pod: %s", spec.pod.Name))
-				f.PodClient().DeleteSync(spec.pod.Name, &metav1.DeleteOptions{}, 10*time.Minute)
+				f.PodClient().DeleteSync(spec.pod.Name, metav1.DeleteOptions{}, 10*time.Minute)
 			}
 
 			// In case a test fails before verifying that NodeCondition no longer exist on the node,

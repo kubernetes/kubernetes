@@ -79,19 +79,19 @@ func estimateMaximumPods(c clientset.Interface, min, max int32) int32 {
 	return availablePods
 }
 
-func getForegroundOptions() *metav1.DeleteOptions {
+func getForegroundOptions() metav1.DeleteOptions {
 	policy := metav1.DeletePropagationForeground
-	return &metav1.DeleteOptions{PropagationPolicy: &policy}
+	return metav1.DeleteOptions{PropagationPolicy: &policy}
 }
 
-func getBackgroundOptions() *metav1.DeleteOptions {
+func getBackgroundOptions() metav1.DeleteOptions {
 	policy := metav1.DeletePropagationBackground
-	return &metav1.DeleteOptions{PropagationPolicy: &policy}
+	return metav1.DeleteOptions{PropagationPolicy: &policy}
 }
 
-func getOrphanOptions() *metav1.DeleteOptions {
+func getOrphanOptions() metav1.DeleteOptions {
 	policy := metav1.DeletePropagationOrphan
-	return &metav1.DeleteOptions{PropagationPolicy: &policy}
+	return metav1.DeleteOptions{PropagationPolicy: &policy}
 }
 
 var (
@@ -473,8 +473,9 @@ var _ = SIGDescribe("Garbage collector", func() {
 			framework.Failf("failed to wait for the rc.Status.Replicas to reach rc.Spec.Replicas: %v", err)
 		}
 		ginkgo.By("delete the rc")
-		deleteOptions := &metav1.DeleteOptions{}
-		deleteOptions.Preconditions = metav1.NewUIDPreconditions(string(rc.UID))
+		deleteOptions := metav1.DeleteOptions{
+			Preconditions: metav1.NewUIDPreconditions(string(rc.UID)),
+		}
 		if err := rcClient.Delete(context.TODO(), rc.ObjectMeta.Name, deleteOptions); err != nil {
 			framework.Failf("failed to delete the rc: %v", err)
 		}
@@ -1101,7 +1102,8 @@ var _ = SIGDescribe("Garbage collector", func() {
 		framework.Logf("created dependent resource %q", dependentName)
 
 		// Delete the owner and orphan the dependent.
-		err = resourceClient.Delete(ownerName, getOrphanOptions())
+		delOpts := getOrphanOptions()
+		err = resourceClient.Delete(ownerName, &delOpts)
 		if err != nil {
 			framework.Failf("failed to delete owner resource %q: %v", ownerName, err)
 		}

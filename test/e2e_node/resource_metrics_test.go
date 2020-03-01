@@ -96,8 +96,8 @@ var _ = framework.KubeDescribe("ResourceMetricsAPI", func() {
 		})
 		ginkgo.AfterEach(func() {
 			ginkgo.By("Deleting test pods")
-			f.PodClient().DeleteSync(pod0, &metav1.DeleteOptions{}, 10*time.Minute)
-			f.PodClient().DeleteSync(pod1, &metav1.DeleteOptions{}, 10*time.Minute)
+			f.PodClient().DeleteSync(pod0, metav1.DeleteOptions{}, 10*time.Minute)
+			f.PodClient().DeleteSync(pod1, metav1.DeleteOptions{}, 10*time.Minute)
 			if !ginkgo.CurrentGinkgoTestDescription().Failed {
 				return
 			}

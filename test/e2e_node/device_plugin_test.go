@@ -281,8 +281,8 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			}, 10*time.Minute, framework.Poll).Should(gomega.BeTrue())
 
 			// Cleanup
-			f.PodClient().DeleteSync(pod1.Name, &metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
-			f.PodClient().DeleteSync(pod2.Name, &metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
+			f.PodClient().DeleteSync(pod1.Name, metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
+			f.PodClient().DeleteSync(pod2.Name, metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
 		})
 	})
 }
