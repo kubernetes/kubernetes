@@ -557,9 +557,16 @@ func (g *Cloud) createTargetPoolAndHealthCheck(svc *v1.Service, name, serviceNam
 		instances = append(instances, host.makeComparableHostPath())
 	}
 	klog.Infof("Creating targetpool %v with %d healthchecks", name, len(hcLinks))
+	description := forwardingRuleDescription{
+		ServiceName: serviceName,
+	}
+	descriptionStr, err := description.marshal()
+	if err != nil {
+		return err
+	}
 	pool := &compute.TargetPool{
 		Name:            name,
-		Description:     fmt.Sprintf(`{"kubernetes.io/service-name":"%s"}`, serviceName),
+		Description:     descriptionStr,
 		Instances:       instances,
 		SessionAffinity: translateAffinityType(svc.Spec.SessionAffinity),
 		HealthChecks:    hcLinks,
@@ -891,7 +898,13 @@ func (g *Cloud) firewallNeedsUpdate(name, serviceName, ipAddress string, ports [
 
 func (g *Cloud) ensureHTTPHealthCheckFirewall(svc *v1.Service, serviceName, ipAddress, region, clusterID string, hosts []*gceInstance, hcName string, hcPort int32, isNodesHealthCheck bool) error {
 	// Prepare the firewall params for creating / checking.
-	desc := fmt.Sprintf(`{"kubernetes.io/cluster-id":"%s"}`, clusterID)
+	description := forwardingFirewallDescription{
+		ClusterID: clusterID,
+	}
+	desc, err := description.marshal()
+	if err != nil {
+		return err
+	}
 	if !isNodesHealthCheck {
 		desc = makeFirewallDescription(serviceName, ipAddress)
 	}

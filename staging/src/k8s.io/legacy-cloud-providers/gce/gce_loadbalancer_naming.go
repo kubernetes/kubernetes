@@ -28,6 +28,7 @@ import (
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/json"
 )
 
 // Internal Load Balancer
@@ -88,14 +89,28 @@ func makeBackendServiceDescription(nm types.NamespacedName, shared bool) string 
 	if shared {
 		return ""
 	}
-	return fmt.Sprintf(`{"kubernetes.io/service-name":"%s"}`, nm.String())
+	description := forwardingRuleDescription{
+		ServiceName: nm.String(),
+	}
+	descriptionStr, err := description.marshal()
+	if err != nil {
+		return ""
+	}
+	return descriptionStr
 }
 
 // External Load Balancer
 
 // makeServiceDescription is used to generate descriptions for forwarding rules and addresses.
 func makeServiceDescription(serviceName string) string {
-	return fmt.Sprintf(`{"kubernetes.io/service-name":"%s"}`, serviceName)
+	description := forwardingRuleDescription{
+		ServiceName: serviceName,
+	}
+	descriptionStr, err := description.marshal()
+	if err != nil {
+		return ""
+	}
+	return descriptionStr
 }
 
 // MakeNodesHealthCheckName returns name of the health check resource used by
@@ -105,7 +120,14 @@ func MakeNodesHealthCheckName(clusterID string) string {
 }
 
 func makeHealthCheckDescription(serviceName string) string {
-	return fmt.Sprintf(`{"kubernetes.io/service-name":"%s"}`, serviceName)
+	description := forwardingRuleDescription{
+		ServiceName: serviceName,
+	}
+	descriptionStr, err := description.marshal()
+	if err != nil {
+		return ""
+	}
+	return descriptionStr
 }
 
 // MakeHealthCheckFirewallName returns the firewall name used by the GCE load
@@ -124,6 +146,28 @@ func MakeFirewallName(name string) string {
 }
 
 func makeFirewallDescription(serviceName, ipAddress string) string {
-	return fmt.Sprintf(`{"kubernetes.io/service-name":"%s", "kubernetes.io/service-ip":"%s"}`,
-		serviceName, ipAddress)
+	description := forwardingFirewallDescription{
+		ServiceName: serviceName,
+		ServiceIP:   ipAddress,
+	}
+	descriptionStr, err := description.marshal()
+	if err != nil {
+		return ""
+	}
+	return descriptionStr
+}
+
+type forwardingFirewallDescription struct {
+	ServiceName string `json:"kubernetes.io/service-name,omitempty"`
+	ServiceIP   string `json:"kubernetes.io/service-ip,omitempty"`
+	ClusterID   string `json:"kubernetes.io/cluster-id,omitempty"`
+}
+
+// marshal the description as a JSON-encoded string.
+func (d *forwardingFirewallDescription) marshal() (string, error) {
+	out, err := json.Marshal(d)
+	if err != nil {
+		return "", err
+	}
+	return string(out), err
 }

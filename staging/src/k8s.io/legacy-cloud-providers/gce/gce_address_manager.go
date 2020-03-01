@@ -122,9 +122,16 @@ func (am *addressManager) ReleaseAddress() error {
 func (am *addressManager) ensureAddressReservation() (string, error) {
 	// Try reserving the IP with controller-owned address name
 	// If am.targetIP is an empty string, a new IP will be created.
+	description := forwardingRuleDescription{
+		ServiceName: am.serviceName,
+	}
+	descriptionStr, err := description.marshal()
+	if err != nil {
+		return "", err
+	}
 	newAddr := &compute.Address{
 		Name:        am.name,
-		Description: fmt.Sprintf(`{"kubernetes.io/service-name":"%s"}`, am.serviceName),
+		Description: descriptionStr,
 		Address:     am.targetIP,
 		AddressType: string(am.addressType),
 		Subnetwork:  am.subnetURL,
