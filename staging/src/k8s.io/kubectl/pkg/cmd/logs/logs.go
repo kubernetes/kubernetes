@@ -88,7 +88,8 @@ const (
 	defaultPodLogsTimeout = 20 * time.Second
 )
 
-type LogsOptions struct {
+// Options contains the input to the logs command.
+type Options struct {
 	Namespace     string
 	ResourceArg   string
 	AllContainers bool
@@ -127,8 +128,9 @@ type LogsOptions struct {
 	containerNameFromRefSpecRegexp *regexp.Regexp
 }
 
-func NewLogsOptions(streams genericclioptions.IOStreams, allContainers bool) *LogsOptions {
-	return &LogsOptions{
+// NewLogsOptions returns a default LogOptions.
+func NewLogsOptions(streams genericclioptions.IOStreams, allContainers bool) *Options {
+	return &Options{
 		IOStreams:            streams,
 		AllContainers:        allContainers,
 		Tail:                 -1,
@@ -158,7 +160,9 @@ func NewCmdLogs(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	return cmd
 }
 
-func (o *LogsOptions) AddFlags(cmd *cobra.Command) {
+// AddFlags receives a *cobra.Command reference and binds
+// flags related to humanreadable and template printing.
+func (o *Options) AddFlags(cmd *cobra.Command) {
 	cmd.Flags().BoolVar(&o.AllContainers, "all-containers", o.AllContainers, "Get all containers' logs in the pod(s).")
 	cmd.Flags().BoolVarP(&o.Follow, "follow", "f", o.Follow, "Specify if the logs should be streamed.")
 	cmd.Flags().BoolVar(&o.Timestamps, "timestamps", o.Timestamps, "Include timestamps on each line in the log output")
@@ -177,7 +181,8 @@ func (o *LogsOptions) AddFlags(cmd *cobra.Command) {
 	cmd.Flags().BoolVar(&o.Prefix, "prefix", o.Prefix, "Prefix each log line with the log source (pod name and container name)")
 }
 
-func (o *LogsOptions) ToLogOptions() (*corev1.PodLogOptions, error) {
+// ToLogOptions generates a pod logs options object base on logs options.
+func (o *Options) ToLogOptions() (*corev1.PodLogOptions, error) {
 	logOptions := &corev1.PodLogOptions{
 		Container:                    o.Container,
 		Follow:                       o.Follow,
@@ -214,7 +219,8 @@ func (o *LogsOptions) ToLogOptions() (*corev1.PodLogOptions, error) {
 	return logOptions, nil
 }
 
-func (o *LogsOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+// Complete takes the command arguments and factory and infers any remaining options.
+func (o *Options) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	o.ContainerNameSpecified = cmd.Flag("container").Changed
 	o.TailSpecified = cmd.Flag("tail").Changed
 	o.Resources = args
@@ -280,7 +286,8 @@ func (o *LogsOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []str
 	return nil
 }
 
-func (o LogsOptions) Validate() error {
+// Validate checks the set of flags provided by the user.
+func (o Options) Validate() error {
 	if len(o.SinceTime) > 0 && o.SinceSeconds != 0 {
 		return fmt.Errorf("at most one of `sinceTime` or `sinceSeconds` may be specified")
 	}

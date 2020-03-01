@@ -40,13 +40,13 @@ import (
 func TestLog(t *testing.T) {
 	tests := []struct {
 		name                  string
-		opts                  func(genericclioptions.IOStreams) *LogsOptions
+		opts                  func(genericclioptions.IOStreams) *Options
 		expectedErr           string
 		expectedOutSubstrings []string
 	}{
 		{
 			name: "v1 - pod log",
-			opts: func(streams genericclioptions.IOStreams) *LogsOptions {
+			opts: func(streams genericclioptions.IOStreams) *Options {
 				mock := &logTestMock{
 					logsForObjectRequests: map[corev1.ObjectReference]restclient.ResponseWrapper{
 						{
@@ -67,7 +67,7 @@ func TestLog(t *testing.T) {
 		},
 		{
 			name: "pod logs with prefix",
-			opts: func(streams genericclioptions.IOStreams) *LogsOptions {
+			opts: func(streams genericclioptions.IOStreams) *Options {
 				mock := &logTestMock{
 					logsForObjectRequests: map[corev1.ObjectReference]restclient.ResponseWrapper{
 						{
@@ -89,7 +89,7 @@ func TestLog(t *testing.T) {
 		},
 		{
 			name: "pod logs with prefix: init container",
-			opts: func(streams genericclioptions.IOStreams) *LogsOptions {
+			opts: func(streams genericclioptions.IOStreams) *Options {
 				mock := &logTestMock{
 					logsForObjectRequests: map[corev1.ObjectReference]restclient.ResponseWrapper{
 						{
@@ -111,7 +111,7 @@ func TestLog(t *testing.T) {
 		},
 		{
 			name: "pod logs with prefix: ephemeral container",
-			opts: func(streams genericclioptions.IOStreams) *LogsOptions {
+			opts: func(streams genericclioptions.IOStreams) *Options {
 				mock := &logTestMock{
 					logsForObjectRequests: map[corev1.ObjectReference]restclient.ResponseWrapper{
 						{
@@ -133,7 +133,7 @@ func TestLog(t *testing.T) {
 		},
 		{
 			name: "get logs from multiple requests sequentially",
-			opts: func(streams genericclioptions.IOStreams) *LogsOptions {
+			opts: func(streams genericclioptions.IOStreams) *Options {
 				mock := &logTestMock{
 					logsForObjectRequests: map[corev1.ObjectReference]restclient.ResponseWrapper{
 						{
@@ -167,7 +167,7 @@ func TestLog(t *testing.T) {
 		},
 		{
 			name: "follow logs from multiple requests concurrently",
-			opts: func(streams genericclioptions.IOStreams) *LogsOptions {
+			opts: func(streams genericclioptions.IOStreams) *Options {
 				wg := &sync.WaitGroup{}
 				mock := &logTestMock{
 					logsForObjectRequests: map[corev1.ObjectReference]restclient.ResponseWrapper{
@@ -205,7 +205,7 @@ func TestLog(t *testing.T) {
 		},
 		{
 			name: "fail to follow logs from multiple requests when there are more logs sources then MaxFollowConcurrency allows",
-			opts: func(streams genericclioptions.IOStreams) *LogsOptions {
+			opts: func(streams genericclioptions.IOStreams) *Options {
 				wg := &sync.WaitGroup{}
 				mock := &logTestMock{
 					logsForObjectRequests: map[corev1.ObjectReference]restclient.ResponseWrapper{
@@ -240,7 +240,7 @@ func TestLog(t *testing.T) {
 		},
 		{
 			name: "fail if LogsForObject fails",
-			opts: func(streams genericclioptions.IOStreams) *LogsOptions {
+			opts: func(streams genericclioptions.IOStreams) *Options {
 				o := NewLogsOptions(streams, false)
 				o.LogsForObject = func(restClientGetter genericclioptions.RESTClientGetter, object, options runtime.Object, timeout time.Duration, allContainers bool) (map[corev1.ObjectReference]restclient.ResponseWrapper, error) {
 					return nil, errors.New("Error from the LogsForObject")
@@ -251,7 +251,7 @@ func TestLog(t *testing.T) {
 		},
 		{
 			name: "fail to get logs, if ConsumeRequestFn fails",
-			opts: func(streams genericclioptions.IOStreams) *LogsOptions {
+			opts: func(streams genericclioptions.IOStreams) *Options {
 				mock := &logTestMock{
 					logsForObjectRequests: map[corev1.ObjectReference]restclient.ResponseWrapper{
 						{
@@ -278,7 +278,7 @@ func TestLog(t *testing.T) {
 		},
 		{
 			name: "follow logs from multiple requests concurrently with prefix",
-			opts: func(streams genericclioptions.IOStreams) *LogsOptions {
+			opts: func(streams genericclioptions.IOStreams) *Options {
 				wg := &sync.WaitGroup{}
 				mock := &logTestMock{
 					logsForObjectRequests: map[corev1.ObjectReference]restclient.ResponseWrapper{
@@ -317,7 +317,7 @@ func TestLog(t *testing.T) {
 		},
 		{
 			name: "fail to follow logs from multiple requests, if ConsumeRequestFn fails",
-			opts: func(streams genericclioptions.IOStreams) *LogsOptions {
+			opts: func(streams genericclioptions.IOStreams) *Options {
 				wg := &sync.WaitGroup{}
 				mock := &logTestMock{
 					logsForObjectRequests: map[corev1.ObjectReference]restclient.ResponseWrapper{
@@ -353,7 +353,7 @@ func TestLog(t *testing.T) {
 		},
 		{
 			name: "fail to follow logs, if ConsumeRequestFn fails",
-			opts: func(streams genericclioptions.IOStreams) *LogsOptions {
+			opts: func(streams genericclioptions.IOStreams) *Options {
 				mock := &logTestMock{
 					logsForObjectRequests: map[corev1.ObjectReference]restclient.ResponseWrapper{
 						{
@@ -431,12 +431,12 @@ func TestValidateLogOptions(t *testing.T) {
 	tests := []struct {
 		name     string
 		args     []string
-		opts     func(genericclioptions.IOStreams) *LogsOptions
+		opts     func(genericclioptions.IOStreams) *Options
 		expected string
 	}{
 		{
 			name: "since & since-time",
-			opts: func(streams genericclioptions.IOStreams) *LogsOptions {
+			opts: func(streams genericclioptions.IOStreams) *Options {
 				o := NewLogsOptions(streams, false)
 				o.SinceSeconds = time.Hour
 				o.SinceTime = "2006-01-02T15:04:05Z"
@@ -454,7 +454,7 @@ func TestValidateLogOptions(t *testing.T) {
 		},
 		{
 			name: "negative since-time",
-			opts: func(streams genericclioptions.IOStreams) *LogsOptions {
+			opts: func(streams genericclioptions.IOStreams) *Options {
 				o := NewLogsOptions(streams, false)
 				o.SinceSeconds = -1 * time.Second
 
@@ -471,7 +471,7 @@ func TestValidateLogOptions(t *testing.T) {
 		},
 		{
 			name: "negative limit-bytes",
-			opts: func(streams genericclioptions.IOStreams) *LogsOptions {
+			opts: func(streams genericclioptions.IOStreams) *Options {
 				o := NewLogsOptions(streams, false)
 				o.LimitBytes = -100
 
@@ -488,7 +488,7 @@ func TestValidateLogOptions(t *testing.T) {
 		},
 		{
 			name: "negative tail",
-			opts: func(streams genericclioptions.IOStreams) *LogsOptions {
+			opts: func(streams genericclioptions.IOStreams) *Options {
 				o := NewLogsOptions(streams, false)
 				o.Tail = -100
 
@@ -505,7 +505,7 @@ func TestValidateLogOptions(t *testing.T) {
 		},
 		{
 			name: "container name combined with --all-containers",
-			opts: func(streams genericclioptions.IOStreams) *LogsOptions {
+			opts: func(streams genericclioptions.IOStreams) *Options {
 				o := NewLogsOptions(streams, true)
 				o.Container = "my-container"
 
@@ -522,7 +522,7 @@ func TestValidateLogOptions(t *testing.T) {
 		},
 		{
 			name: "container name combined with second argument",
-			opts: func(streams genericclioptions.IOStreams) *LogsOptions {
+			opts: func(streams genericclioptions.IOStreams) *Options {
 				o := NewLogsOptions(streams, false)
 				o.Container = "my-container"
 				o.ContainerNameSpecified = true
@@ -563,13 +563,13 @@ func TestLogComplete(t *testing.T) {
 	tests := []struct {
 		name     string
 		args     []string
-		opts     func(genericclioptions.IOStreams) *LogsOptions
+		opts     func(genericclioptions.IOStreams) *Options
 		expected string
 	}{
 		{
 			name: "One args case",
 			args: []string{"foo"},
-			opts: func(streams genericclioptions.IOStreams) *LogsOptions {
+			opts: func(streams genericclioptions.IOStreams) *Options {
 				o := NewLogsOptions(streams, false)
 				o.Selector = "foo"
 				return o

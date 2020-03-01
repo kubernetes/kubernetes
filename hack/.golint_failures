@@ -473,7 +473,6 @@ staging/src/k8s.io/kubectl/pkg/cmd/explain
 staging/src/k8s.io/kubectl/pkg/cmd/expose
 staging/src/k8s.io/kubectl/pkg/cmd/get
 staging/src/k8s.io/kubectl/pkg/cmd/label
-staging/src/k8s.io/kubectl/pkg/cmd/logs
 staging/src/k8s.io/kubectl/pkg/cmd/patch
 staging/src/k8s.io/kubectl/pkg/cmd/plugin
 staging/src/k8s.io/kubectl/pkg/cmd/portforward
