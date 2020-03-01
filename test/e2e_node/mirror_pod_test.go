@@ -119,11 +119,11 @@ var _ = framework.KubeDescribe("MirrorPod", func() {
 			framework.ExpectNoError(err)
 			uid := pod.UID
 
-			ginkgo.By("delete the mirror pod with grace period 0s")
+			ginkgo.By(fmt.Sprintf("delete the mirror pod %s with grace period 0s", mirrorPodName))
 			err = f.ClientSet.CoreV1().Pods(ns).Delete(context.TODO(), mirrorPodName, metav1.NewDeleteOptions(0))
 			framework.ExpectNoError(err)
 
-			ginkgo.By("wait for the mirror pod to be recreated")
+			ginkgo.By(fmt.Sprintf("wait for the mirror pod %s to be recreated", mirrorPodName))
 			gomega.Eventually(func() error {
 				return checkMirrorPodRecreatedAndRunning(f.ClientSet, mirrorPodName, ns, uid)
 			}, 2*time.Minute, time.Second*4).Should(gomega.BeNil())
