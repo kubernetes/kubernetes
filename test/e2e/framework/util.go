@@ -253,7 +253,7 @@ OUTER:
 		go func(nsName string) {
 			defer wg.Done()
 			defer ginkgo.GinkgoRecover()
-			gomega.Expect(c.CoreV1().Namespaces().Delete(context.TODO(), nsName, nil)).To(gomega.Succeed())
+			gomega.Expect(c.CoreV1().Namespaces().Delete(context.TODO(), nsName, metav1.DeleteOptions{})).To(gomega.Succeed())
 			Logf("namespace : %v api call to delete is complete ", nsName)
 		}(item.Name)
 	}

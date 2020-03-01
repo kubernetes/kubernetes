@@ -83,7 +83,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 
 		// delete the referenced secret
 		ginkgo.By("deleting the service account token")
-		framework.ExpectNoError(f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Delete(context.TODO(), secrets[0].Name, nil))
+		framework.ExpectNoError(f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Delete(context.TODO(), secrets[0].Name, metav1.DeleteOptions{}))
 
 		// wait for the referenced secret to be removed, and another one autocreated
 		framework.ExpectNoError(wait.Poll(time.Millisecond*500, framework.ServiceAccountProvisionTimeout, func() (bool, error) {

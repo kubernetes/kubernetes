@@ -431,7 +431,7 @@ func RunDeleteTokens(out io.Writer, client clientset.Interface, tokenIDsOrTokens
 
 		tokenSecretName := bootstraputil.BootstrapTokenSecretName(tokenID)
 		klog.V(1).Infof("[token] deleting token %q", tokenID)
-		if err := client.CoreV1().Secrets(metav1.NamespaceSystem).Delete(context.TODO(), tokenSecretName, nil); err != nil {
+		if err := client.CoreV1().Secrets(metav1.NamespaceSystem).Delete(context.TODO(), tokenSecretName, metav1.DeleteOptions{}); err != nil {
 			return errors.Wrapf(err, "failed to delete bootstrap token %q", tokenID)
 		}
 		fmt.Fprintf(out, "bootstrap token %q deleted\n", tokenID)

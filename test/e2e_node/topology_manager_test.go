@@ -489,16 +489,16 @@ func teardownSRIOVConfigOrFail(f *framework.Framework, sd *sriovData) {
 	}
 
 	ginkgo.By("Delete SRIOV device plugin pod %s/%s")
-	err = f.ClientSet.CoreV1().Pods(sd.pod.Namespace).Delete(context.TODO(), sd.pod.Name, &deleteOptions)
+	err = f.ClientSet.CoreV1().Pods(sd.pod.Namespace).Delete(context.TODO(), sd.pod.Name, deleteOptions)
 	framework.ExpectNoError(err)
 	waitForContainerRemoval(sd.pod.Spec.Containers[0].Name, sd.pod.Name, sd.pod.Namespace)
 
 	ginkgo.By(fmt.Sprintf("Deleting configMap %v/%v", metav1.NamespaceSystem, sd.configMap.Name))
-	err = f.ClientSet.CoreV1().ConfigMaps(metav1.NamespaceSystem).Delete(context.TODO(), sd.configMap.Name, &deleteOptions)
+	err = f.ClientSet.CoreV1().ConfigMaps(metav1.NamespaceSystem).Delete(context.TODO(), sd.configMap.Name, deleteOptions)
 	framework.ExpectNoError(err)
 
 	ginkgo.By(fmt.Sprintf("Deleting serviceAccount %v/%v", metav1.NamespaceSystem, sd.serviceAccount.Name))
-	err = f.ClientSet.CoreV1().ServiceAccounts(metav1.NamespaceSystem).Delete(context.TODO(), sd.serviceAccount.Name, &deleteOptions)
+	err = f.ClientSet.CoreV1().ServiceAccounts(metav1.NamespaceSystem).Delete(context.TODO(), sd.serviceAccount.Name, deleteOptions)
 	framework.ExpectNoError(err)
 }
 

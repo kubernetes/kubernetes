@@ -1268,7 +1268,7 @@ func restorePodHTTPProbe(ss *appsv1.StatefulSet, pod *v1.Pod) error {
 func deleteStatefulPodAtIndex(c clientset.Interface, index int, ss *appsv1.StatefulSet) {
 	name := getStatefulSetPodNameAtIndex(index, ss)
 	noGrace := int64(0)
-	if err := c.CoreV1().Pods(ss.Namespace).Delete(context.TODO(), name, &metav1.DeleteOptions{GracePeriodSeconds: &noGrace}); err != nil {
+	if err := c.CoreV1().Pods(ss.Namespace).Delete(context.TODO(), name, metav1.DeleteOptions{GracePeriodSeconds: &noGrace}); err != nil {
 		framework.Failf("Failed to delete stateful pod %v for StatefulSet %v/%v: %v", name, ss.Namespace, ss.Name, err)
 	}
 }

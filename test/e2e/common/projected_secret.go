@@ -382,7 +382,7 @@ var _ = ginkgo.Describe("[sig-storage] Projected secret", func() {
 		gomega.Eventually(pollDeleteLogs, podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("value-1"))
 
 		ginkgo.By(fmt.Sprintf("Deleting secret %v", deleteSecret.Name))
-		err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Delete(context.TODO(), deleteSecret.Name, &metav1.DeleteOptions{})
+		err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Delete(context.TODO(), deleteSecret.Name, metav1.DeleteOptions{})
 		framework.ExpectNoError(err, "Failed to delete secret %q in namespace %q", deleteSecret.Name, f.Namespace.Name)
 
 		ginkgo.By(fmt.Sprintf("Updating secret %v", updateSecret.Name))

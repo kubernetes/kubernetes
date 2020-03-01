@@ -141,7 +141,7 @@ func runKubernetesServiceTestContainer(c clientset.Interface, ns string) {
 		return
 	}
 	defer func() {
-		if err := c.CoreV1().Pods(ns).Delete(context.TODO(), p.Name, nil); err != nil {
+		if err := c.CoreV1().Pods(ns).Delete(context.TODO(), p.Name, metav1.DeleteOptions{}); err != nil {
 			framework.Logf("Failed to delete pod %v: %v", p.Name, err)
 		}
 	}()

@@ -553,7 +553,7 @@ func (config *NetworkingTestConfig) createSessionAffinityService(selector map[st
 
 // DeleteNodePortService deletes NodePort service.
 func (config *NetworkingTestConfig) DeleteNodePortService() {
-	err := config.getServiceClient().Delete(context.TODO(), config.NodePortService.Name, nil)
+	err := config.getServiceClient().Delete(context.TODO(), config.NodePortService.Name, metav1.DeleteOptions{})
 	framework.ExpectNoError(err, "error while deleting NodePortService. err:%v)", err)
 	time.Sleep(15 * time.Second) // wait for kube-proxy to catch up with the service being deleted.
 }

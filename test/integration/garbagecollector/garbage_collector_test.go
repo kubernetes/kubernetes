@@ -310,7 +310,7 @@ func createNamespaceOrDie(name string, c clientset.Interface, t *testing.T) *v1.
 func deleteNamespaceOrDie(name string, c clientset.Interface, t *testing.T) {
 	zero := int64(0)
 	background := metav1.DeletePropagationBackground
-	err := c.CoreV1().Namespaces().Delete(context.TODO(), name, &metav1.DeleteOptions{GracePeriodSeconds: &zero, PropagationPolicy: &background})
+	err := c.CoreV1().Namespaces().Delete(context.TODO(), name, metav1.DeleteOptions{GracePeriodSeconds: &zero, PropagationPolicy: &background})
 	if err != nil {
 		t.Fatalf("failed to delete namespace %q: %v", name, err)
 	}
@@ -1045,7 +1045,7 @@ func TestMixedRelationships(t *testing.T) {
 	}
 
 	// Delete the core owner.
-	err = configMapClient.Delete(context.TODO(), coreOwner.GetName(), &metav1.DeleteOptions{PropagationPolicy: &foreground})
+	err = configMapClient.Delete(context.TODO(), coreOwner.GetName(), metav1.DeleteOptions{PropagationPolicy: &foreground})
 	if err != nil {
 		t.Fatalf("failed to delete owner resource %q: %v", coreOwner.GetName(), err)
 	}

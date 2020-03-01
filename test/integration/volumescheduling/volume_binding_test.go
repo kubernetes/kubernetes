@@ -693,7 +693,7 @@ func TestPVAffinityConflict(t *testing.T) {
 			t.Fatalf("Failed as Pod's %s failure message does not contain expected message: node(s) didn't match node selector, node(s) had volume node affinity conflict. Got message %q", podName, p.Status.Conditions[0].Message)
 		}
 		// Deleting test pod
-		if err := config.client.CoreV1().Pods(config.ns).Delete(context.TODO(), podName, &metav1.DeleteOptions{}); err != nil {
+		if err := config.client.CoreV1().Pods(config.ns).Delete(context.TODO(), podName, metav1.DeleteOptions{}); err != nil {
 			t.Fatalf("Failed to delete Pod %s: %v", podName, err)
 		}
 	}
@@ -848,7 +848,7 @@ func TestRescheduleProvisioning(t *testing.T) {
 	defer func() {
 		close(controllerCh)
 		deleteTestObjects(clientset, ns, nil)
-		testCtx.clientSet.CoreV1().Nodes().DeleteCollection(context.TODO(), nil, metav1.ListOptions{})
+		testCtx.clientSet.CoreV1().Nodes().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
 		testCtx.closeFn()
 	}()
 

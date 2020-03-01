@@ -225,7 +225,7 @@ var _ = SIGDescribe("Advanced Audit [DisabledForLargeClusters][Flaky]", func() {
 		_, err = f.ClientSet.AppsV1().Deployments(namespace).List(context.TODO(), metav1.ListOptions{})
 		framework.ExpectNoError(err, "failed to create list deployments")
 
-		err = f.ClientSet.AppsV1().Deployments(namespace).Delete(context.TODO(), "audit-deployment", &metav1.DeleteOptions{})
+		err = f.ClientSet.AppsV1().Deployments(namespace).Delete(context.TODO(), "audit-deployment", metav1.DeleteOptions{})
 		framework.ExpectNoError(err, "failed to delete deployments")
 
 		expectEvents(f, []utils.AuditEvent{
@@ -358,7 +358,7 @@ var _ = SIGDescribe("Advanced Audit [DisabledForLargeClusters][Flaky]", func() {
 		_, err = f.ClientSet.CoreV1().ConfigMaps(namespace).List(context.TODO(), metav1.ListOptions{})
 		framework.ExpectNoError(err, "failed to list config maps")
 
-		err = f.ClientSet.CoreV1().ConfigMaps(namespace).Delete(context.TODO(), configMap.Name, &metav1.DeleteOptions{})
+		err = f.ClientSet.CoreV1().ConfigMaps(namespace).Delete(context.TODO(), configMap.Name, metav1.DeleteOptions{})
 		framework.ExpectNoError(err, "failed to delete audit-configmap")
 
 		expectEvents(f, []utils.AuditEvent{
@@ -490,7 +490,7 @@ var _ = SIGDescribe("Advanced Audit [DisabledForLargeClusters][Flaky]", func() {
 		_, err = f.ClientSet.CoreV1().Secrets(namespace).List(context.TODO(), metav1.ListOptions{})
 		framework.ExpectNoError(err, "failed to list secrets")
 
-		err = f.ClientSet.CoreV1().Secrets(namespace).Delete(context.TODO(), secret.Name, &metav1.DeleteOptions{})
+		err = f.ClientSet.CoreV1().Secrets(namespace).Delete(context.TODO(), secret.Name, metav1.DeleteOptions{})
 		framework.ExpectNoError(err, "failed to delete audit-secret")
 
 		expectEvents(f, []utils.AuditEvent{

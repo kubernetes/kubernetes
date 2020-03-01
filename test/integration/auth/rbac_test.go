@@ -742,7 +742,7 @@ func TestDiscoveryUpgradeBootstrapping(t *testing.T) {
 		t.Fatalf("Failed to update `system:basic-user` ClusterRoleBinding: %v", err)
 	}
 	t.Logf("Deleting default `system:public-info-viewer` ClusterRoleBinding")
-	if err = client.RbacV1().ClusterRoleBindings().Delete(context.TODO(), "system:public-info-viewer", &metav1.DeleteOptions{}); err != nil {
+	if err = client.RbacV1().ClusterRoleBindings().Delete(context.TODO(), "system:public-info-viewer", metav1.DeleteOptions{}); err != nil {
 		t.Fatalf("Failed to delete `system:public-info-viewer` ClusterRoleBinding: %v", err)
 	}
 

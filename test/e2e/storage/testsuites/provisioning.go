@@ -334,7 +334,7 @@ func (t StorageClassTest) TestDynamicProvisioning() *v1.PersistentVolume {
 		framework.ExpectNoError(err)
 		defer func() {
 			framework.Logf("deleting storage class %s", class.Name)
-			framework.ExpectNoError(client.StorageV1().StorageClasses().Delete(context.TODO(), class.Name, nil))
+			framework.ExpectNoError(client.StorageV1().StorageClasses().Delete(context.TODO(), class.Name, metav1.DeleteOptions{}))
 		}()
 	}
 
@@ -344,7 +344,7 @@ func (t StorageClassTest) TestDynamicProvisioning() *v1.PersistentVolume {
 	defer func() {
 		framework.Logf("deleting claim %q/%q", claim.Namespace, claim.Name)
 		// typically this claim has already been deleted
-		err = client.CoreV1().PersistentVolumeClaims(claim.Namespace).Delete(context.TODO(), claim.Name, nil)
+		err = client.CoreV1().PersistentVolumeClaims(claim.Namespace).Delete(context.TODO(), claim.Name, metav1.DeleteOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
 			framework.Failf("Error deleting claim %q. Error: %v", claim.Name, err)
 		}
@@ -358,7 +358,7 @@ func (t StorageClassTest) TestDynamicProvisioning() *v1.PersistentVolume {
 	pv := t.checkProvisioning(client, claim, class)
 
 	ginkgo.By(fmt.Sprintf("deleting claim %q/%q", claim.Namespace, claim.Name))
-	framework.ExpectNoError(client.CoreV1().PersistentVolumeClaims(claim.Namespace).Delete(context.TODO(), claim.Name, nil))
+	framework.ExpectNoError(client.CoreV1().PersistentVolumeClaims(claim.Namespace).Delete(context.TODO(), claim.Name, metav1.DeleteOptions{}))
 
 	// Wait for the PV to get deleted if reclaim policy is Delete. (If it's
 	// Retain, there's no use waiting because the PV won't be auto-deleted and
@@ -770,7 +770,7 @@ func prepareSnapshotDataSourceForProvisioning(
 		}
 
 		framework.Logf("deleting initClaim %q/%q", updatedClaim.Namespace, updatedClaim.Name)
-		err = client.CoreV1().PersistentVolumeClaims(updatedClaim.Namespace).Delete(context.TODO(), updatedClaim.Name, nil)
+		err = client.CoreV1().PersistentVolumeClaims(updatedClaim.Namespace).Delete(context.TODO(), updatedClaim.Name, metav1.DeleteOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
 			framework.Failf("Error deleting initClaim %q. Error: %v", updatedClaim.Name, err)
 		}
@@ -819,13 +819,13 @@ func preparePVCDataSourceForProvisioning(
 
 	cleanupFunc := func() {
 		framework.Logf("deleting source PVC %q/%q", sourcePVC.Namespace, sourcePVC.Name)
-		err := client.CoreV1().PersistentVolumeClaims(sourcePVC.Namespace).Delete(context.TODO(), sourcePVC.Name, nil)
+		err := client.CoreV1().PersistentVolumeClaims(sourcePVC.Namespace).Delete(context.TODO(), sourcePVC.Name, metav1.DeleteOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
 			framework.Failf("Error deleting source PVC %q. Error: %v", sourcePVC.Name, err)
 		}
 		if class != nil {
 			framework.Logf("deleting class %q", class.Name)
-			err := client.StorageV1().StorageClasses().Delete(context.TODO(), class.Name, nil)
+			err := client.StorageV1().StorageClasses().Delete(context.TODO(), class.Name, metav1.DeleteOptions{})
 			if err != nil && !apierrors.IsNotFound(err) {
 				framework.Failf("Error deleting storage class %q. Error: %v", class.Name, err)
 			}

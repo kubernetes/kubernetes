@@ -155,7 +155,7 @@ var _ = utils.SIGDescribe("Mounted flexvolume expand[Slow]", func() {
 		ginkgo.By("Creating a deployment with the provisioned volume")
 		deployment, err := e2edeploy.CreateDeployment(c, int32(1), map[string]string{"test": "app"}, nodeKeyValueLabel, ns, pvcClaims, "")
 		framework.ExpectNoError(err, "Failed creating deployment %v", err)
-		defer c.AppsV1().Deployments(ns).Delete(context.TODO(), deployment.Name, &metav1.DeleteOptions{})
+		defer c.AppsV1().Deployments(ns).Delete(context.TODO(), deployment.Name, metav1.DeleteOptions{})
 
 		ginkgo.By("Expanding current pvc")
 		newSize := resource.MustParse("6Gi")

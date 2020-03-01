@@ -301,7 +301,7 @@ func TestVolumeUnmountsFromDeletedPodWithForceOption(c clientset.Interface, f *f
 	if forceDelete {
 		err = c.CoreV1().Pods(clientPod.Namespace).Delete(context.TODO(), clientPod.Name, metav1.NewDeleteOptions(0))
 	} else {
-		err = c.CoreV1().Pods(clientPod.Namespace).Delete(context.TODO(), clientPod.Name, &metav1.DeleteOptions{})
+		err = c.CoreV1().Pods(clientPod.Namespace).Delete(context.TODO(), clientPod.Name, metav1.DeleteOptions{})
 	}
 	framework.ExpectNoError(err)
 
@@ -387,7 +387,7 @@ func TestVolumeUnmapsFromDeletedPodWithForceOption(c clientset.Interface, f *fra
 	if forceDelete {
 		err = c.CoreV1().Pods(clientPod.Namespace).Delete(context.TODO(), clientPod.Name, metav1.NewDeleteOptions(0))
 	} else {
-		err = c.CoreV1().Pods(clientPod.Namespace).Delete(context.TODO(), clientPod.Name, &metav1.DeleteOptions{})
+		err = c.CoreV1().Pods(clientPod.Namespace).Delete(context.TODO(), clientPod.Name, metav1.DeleteOptions{})
 	}
 	framework.ExpectNoError(err, "Failed to delete pod.")
 
@@ -579,7 +579,7 @@ func PrivilegedTestPSPClusterRoleBinding(client clientset.Interface,
 			},
 		}
 
-		roleBindingClient.Delete(context.TODO(), binding.GetName(), &metav1.DeleteOptions{})
+		roleBindingClient.Delete(context.TODO(), binding.GetName(), metav1.DeleteOptions{})
 		err := wait.Poll(2*time.Second, 2*time.Minute, func() (bool, error) {
 			_, err := roleBindingClient.Get(context.TODO(), binding.GetName(), metav1.GetOptions{})
 			return apierrors.IsNotFound(err), nil

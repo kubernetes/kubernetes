@@ -143,7 +143,7 @@ var _ = SIGDescribe("DNS", func() {
 		defer func() {
 			ginkgo.By("deleting the test headless service")
 			defer ginkgo.GinkgoRecover()
-			f.ClientSet.CoreV1().Services(f.Namespace.Name).Delete(context.TODO(), headlessService.Name, nil)
+			f.ClientSet.CoreV1().Services(f.Namespace.Name).Delete(context.TODO(), headlessService.Name, metav1.DeleteOptions{})
 		}()
 
 		regularServiceName := "test-service-2"
@@ -154,7 +154,7 @@ var _ = SIGDescribe("DNS", func() {
 		defer func() {
 			ginkgo.By("deleting the test service")
 			defer ginkgo.GinkgoRecover()
-			f.ClientSet.CoreV1().Services(f.Namespace.Name).Delete(context.TODO(), regularService.Name, nil)
+			f.ClientSet.CoreV1().Services(f.Namespace.Name).Delete(context.TODO(), regularService.Name, metav1.DeleteOptions{})
 		}()
 
 		// All the names we need to be able to resolve.
@@ -198,7 +198,7 @@ var _ = SIGDescribe("DNS", func() {
 		defer func() {
 			ginkgo.By("deleting the test headless service")
 			defer ginkgo.GinkgoRecover()
-			f.ClientSet.CoreV1().Services(f.Namespace.Name).Delete(context.TODO(), headlessService.Name, nil)
+			f.ClientSet.CoreV1().Services(f.Namespace.Name).Delete(context.TODO(), headlessService.Name, metav1.DeleteOptions{})
 		}()
 
 		regularServiceName := "test-service-2"
@@ -208,7 +208,7 @@ var _ = SIGDescribe("DNS", func() {
 		defer func() {
 			ginkgo.By("deleting the test service")
 			defer ginkgo.GinkgoRecover()
-			f.ClientSet.CoreV1().Services(f.Namespace.Name).Delete(context.TODO(), regularService.Name, nil)
+			f.ClientSet.CoreV1().Services(f.Namespace.Name).Delete(context.TODO(), regularService.Name, metav1.DeleteOptions{})
 		}()
 
 		// All the names we need to be able to resolve.
@@ -256,7 +256,7 @@ var _ = SIGDescribe("DNS", func() {
 		defer func() {
 			ginkgo.By("deleting the test headless service")
 			defer ginkgo.GinkgoRecover()
-			f.ClientSet.CoreV1().Services(f.Namespace.Name).Delete(context.TODO(), headlessService.Name, nil)
+			f.ClientSet.CoreV1().Services(f.Namespace.Name).Delete(context.TODO(), headlessService.Name, metav1.DeleteOptions{})
 		}()
 
 		hostFQDN := fmt.Sprintf("%s.%s.%s.svc.%s", podHostname, serviceName, f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
@@ -298,7 +298,7 @@ var _ = SIGDescribe("DNS", func() {
 		defer func() {
 			ginkgo.By("deleting the test headless service")
 			defer ginkgo.GinkgoRecover()
-			f.ClientSet.CoreV1().Services(f.Namespace.Name).Delete(context.TODO(), headlessService.Name, nil)
+			f.ClientSet.CoreV1().Services(f.Namespace.Name).Delete(context.TODO(), headlessService.Name, metav1.DeleteOptions{})
 		}()
 
 		hostFQDN := fmt.Sprintf("%s.%s.%s.svc.%s", podHostname, serviceName, f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
@@ -337,7 +337,7 @@ var _ = SIGDescribe("DNS", func() {
 		defer func() {
 			ginkgo.By("deleting the test externalName service")
 			defer ginkgo.GinkgoRecover()
-			f.ClientSet.CoreV1().Services(f.Namespace.Name).Delete(context.TODO(), externalNameService.Name, nil)
+			f.ClientSet.CoreV1().Services(f.Namespace.Name).Delete(context.TODO(), externalNameService.Name, metav1.DeleteOptions{})
 		}()
 		hostFQDN := fmt.Sprintf("%s.%s.svc.%s", serviceName, f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
 		wheezyProbeCmd, wheezyFileName := createTargetedProbeCommand(hostFQDN, "CNAME", "wheezy")
@@ -468,7 +468,7 @@ var _ = SIGDescribe("DNS", func() {
 
 		defer func() {
 			framework.Logf("Deleting configmap %s...", corednsConfig.Name)
-			err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Delete(context.TODO(), corednsConfig.Name, nil)
+			err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Delete(context.TODO(), corednsConfig.Name, metav1.DeleteOptions{})
 			framework.ExpectNoError(err, "Failed to delete configmap %s: %v", corednsConfig.Name)
 		}()
 

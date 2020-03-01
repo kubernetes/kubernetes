@@ -487,7 +487,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 								if localVolume.pv.Name != pv.Name {
 									continue
 								}
-								err = config.client.CoreV1().PersistentVolumes().Delete(context.TODO(), pv.Name, &metav1.DeleteOptions{})
+								err = config.client.CoreV1().PersistentVolumes().Delete(context.TODO(), pv.Name, metav1.DeleteOptions{})
 								framework.ExpectNoError(err)
 								pvConfig := makeLocalPVConfig(config, localVolume)
 								localVolume.pv, err = e2epv.CreatePV(config.client, e2epv.MakePersistentVolume(pvConfig))
@@ -628,7 +628,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 				return
 			}
 			ginkgo.By(fmt.Sprintf("Clean PV %s", pv.Name))
-			err := config.client.CoreV1().PersistentVolumes().Delete(context.TODO(), pv.Name, &metav1.DeleteOptions{})
+			err := config.client.CoreV1().PersistentVolumes().Delete(context.TODO(), pv.Name, metav1.DeleteOptions{})
 			framework.ExpectNoError(err)
 		})
 
@@ -673,7 +673,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 
 func deletePodAndPVCs(config *localTestConfig, pod *v1.Pod) error {
 	framework.Logf("Deleting pod %v", pod.Name)
-	if err := config.client.CoreV1().Pods(config.ns).Delete(context.TODO(), pod.Name, nil); err != nil {
+	if err := config.client.CoreV1().Pods(config.ns).Delete(context.TODO(), pod.Name, metav1.DeleteOptions{}); err != nil {
 		return err
 	}
 
@@ -796,7 +796,7 @@ func setupStorageClass(config *localTestConfig, mode *storagev1.VolumeBindingMod
 }
 
 func cleanupStorageClass(config *localTestConfig) {
-	framework.ExpectNoError(config.client.StorageV1().StorageClasses().Delete(context.TODO(), config.scName, nil))
+	framework.ExpectNoError(config.client.StorageV1().StorageClasses().Delete(context.TODO(), config.scName, metav1.DeleteOptions{}))
 }
 
 // podNode wraps RunKubectl to get node where pod is running

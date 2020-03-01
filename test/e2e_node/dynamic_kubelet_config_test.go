@@ -929,7 +929,7 @@ func recreateConfigMapFunc(f *framework.Framework, tc *nodeConfigTestCase) error
 
 // deleteConfigMapFunc simply deletes tc.configMap
 func deleteConfigMapFunc(f *framework.Framework, tc *nodeConfigTestCase) error {
-	return f.ClientSet.CoreV1().ConfigMaps(tc.configMap.Namespace).Delete(context.TODO(), tc.configMap.Name, &metav1.DeleteOptions{})
+	return f.ClientSet.CoreV1().ConfigMaps(tc.configMap.Namespace).Delete(context.TODO(), tc.configMap.Name, metav1.DeleteOptions{})
 }
 
 // createConfigMapFunc creates tc.configMap and updates the UID and ResourceVersion on tc.configMap

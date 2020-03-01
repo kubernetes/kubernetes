@@ -135,7 +135,7 @@ func TestWebhookLoadBalance(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() {
-		err := client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Delete(context.TODO(), mutatingCfg.GetName(), &metav1.DeleteOptions{})
+		err := client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Delete(context.TODO(), mutatingCfg.GetName(), metav1.DeleteOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}

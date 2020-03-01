@@ -179,7 +179,7 @@ var _ = SIGDescribe("[Feature:NodeAuthorizer]", func() {
 
 	ginkgo.It("A node shouldn't be able to delete another node", func() {
 		ginkgo.By(fmt.Sprintf("Create node foo by user: %v", asUser))
-		err := c.CoreV1().Nodes().Delete(context.TODO(), "foo", &metav1.DeleteOptions{})
+		err := c.CoreV1().Nodes().Delete(context.TODO(), "foo", metav1.DeleteOptions{})
 		framework.ExpectEqual(apierrors.IsForbidden(err), true)
 	})
 })

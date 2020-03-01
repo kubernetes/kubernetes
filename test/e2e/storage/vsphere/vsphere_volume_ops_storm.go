@@ -83,7 +83,7 @@ var _ = utils.SIGDescribe("Volume Operations Storm [Feature:vsphere]", func() {
 			e2epv.DeletePersistentVolumeClaim(client, claim.Name, namespace)
 		}
 		ginkgo.By("Deleting StorageClass")
-		err = client.StorageV1().StorageClasses().Delete(context.TODO(), storageclass.Name, nil)
+		err = client.StorageV1().StorageClasses().Delete(context.TODO(), storageclass.Name, metav1.DeleteOptions{})
 		framework.ExpectNoError(err)
 	})
 

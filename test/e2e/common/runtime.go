@@ -303,7 +303,7 @@ while true; do sleep 1; done
 					ginkgo.By("create image pull secret")
 					_, err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(context.TODO(), secret, metav1.CreateOptions{})
 					framework.ExpectNoError(err)
-					defer f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Delete(context.TODO(), secret.Name, nil)
+					defer f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Delete(context.TODO(), secret.Name, metav1.DeleteOptions{})
 					container.ImagePullSecrets = []string{secret.Name}
 				}
 				// checkContainerStatus checks whether the container status matches expectation.

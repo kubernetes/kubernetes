@@ -80,7 +80,7 @@ func DeletePods(kubeClient clientset.Interface, pods []*v1.Pod, recorder record.
 
 		klog.V(2).Infof("Starting deletion of pod %v/%v", pod.Namespace, pod.Name)
 		recorder.Eventf(pod, v1.EventTypeNormal, "NodeControllerEviction", "Marking for deletion Pod %s from Node %s", pod.Name, nodeName)
-		if err := kubeClient.CoreV1().Pods(pod.Namespace).Delete(context.TODO(), pod.Name, nil); err != nil {
+		if err := kubeClient.CoreV1().Pods(pod.Namespace).Delete(context.TODO(), pod.Name, metav1.DeleteOptions{}); err != nil {
 			if apierrors.IsNotFound(err) {
 				// NotFound error means that pod was already deleted.
 				// There is nothing left to do with this pod.

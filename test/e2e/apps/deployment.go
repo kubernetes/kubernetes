@@ -607,7 +607,7 @@ func testIterativeDeployments(f *framework.Framework) {
 				}
 				name := podList.Items[p].Name
 				framework.Logf("%02d: deleting deployment pod %q", i, name)
-				err := c.CoreV1().Pods(ns).Delete(context.TODO(), name, nil)
+				err := c.CoreV1().Pods(ns).Delete(context.TODO(), name, metav1.DeleteOptions{})
 				if err != nil && !apierrors.IsNotFound(err) {
 					framework.ExpectNoError(err)
 				}

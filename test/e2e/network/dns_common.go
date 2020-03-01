@@ -184,14 +184,14 @@ func (t *dnsTestCommon) restoreDNSConfigMap(configMapData map[string]string) {
 		t.setConfigMap(&v1.ConfigMap{Data: configMapData})
 		t.deleteCoreDNSPods()
 	} else {
-		t.c.CoreV1().ConfigMaps(t.ns).Delete(context.TODO(), t.name, nil)
+		t.c.CoreV1().ConfigMaps(t.ns).Delete(context.TODO(), t.name, metav1.DeleteOptions{})
 	}
 }
 
 func (t *dnsTestCommon) deleteConfigMap() {
 	ginkgo.By(fmt.Sprintf("Deleting the ConfigMap (%s:%s)", t.ns, t.name))
 	t.cm = nil
-	err := t.c.CoreV1().ConfigMaps(t.ns).Delete(context.TODO(), t.name, nil)
+	err := t.c.CoreV1().ConfigMaps(t.ns).Delete(context.TODO(), t.name, metav1.DeleteOptions{})
 	framework.ExpectNoError(err, "failed to delete config map: %s", t.name)
 }
 

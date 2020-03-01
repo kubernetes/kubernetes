@@ -292,7 +292,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 
 						t := time.Duration(rand.Intn(delay)) * time.Millisecond
 						time.Sleep(t)
-						err := podClient.Delete(context.TODO(), pod.Name, nil)
+						err := podClient.Delete(context.TODO(), pod.Name, metav1.DeleteOptions{})
 						framework.ExpectNoError(err, "failed to delete pod")
 
 						events, ok := <-ch

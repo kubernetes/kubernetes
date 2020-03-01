@@ -379,7 +379,7 @@ var _ = framework.KubeDescribe("NodeProblemDetector [NodeFeature:NodeProblemDete
 			ginkgo.By("Wait for the node problem detector to disappear")
 			gomega.Expect(e2epod.WaitForPodToDisappear(c, ns, name, labels.Everything(), pollInterval, pollTimeout)).To(gomega.Succeed())
 			ginkgo.By("Delete the config map")
-			c.CoreV1().ConfigMaps(ns).Delete(context.TODO(), configName, nil)
+			c.CoreV1().ConfigMaps(ns).Delete(context.TODO(), configName, metav1.DeleteOptions{})
 			ginkgo.By("Clean up the events")
 			gomega.Expect(c.CoreV1().Events(eventNamespace).DeleteCollection(context.TODO(), metav1.NewDeleteOptions(0), eventListOptions)).To(gomega.Succeed())
 			ginkgo.By("Clean up the node condition")

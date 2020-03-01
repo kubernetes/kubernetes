@@ -87,7 +87,7 @@ func DeleteAllStatefulSets(c clientset.Interface, ns string) {
 		framework.Logf("Deleting statefulset %v", ss.Name)
 		// Use OrphanDependents=false so it's deleted synchronously.
 		// We already made sure the Pods are gone inside Scale().
-		if err := c.AppsV1().StatefulSets(ss.Namespace).Delete(context.TODO(), ss.Name, &metav1.DeleteOptions{OrphanDependents: new(bool)}); err != nil {
+		if err := c.AppsV1().StatefulSets(ss.Namespace).Delete(context.TODO(), ss.Name, metav1.DeleteOptions{OrphanDependents: new(bool)}); err != nil {
 			errList = append(errList, fmt.Sprintf("%v", err))
 		}
 	}
@@ -105,7 +105,7 @@ func DeleteAllStatefulSets(c clientset.Interface, ns string) {
 			pvNames.Insert(pvc.Spec.VolumeName)
 			// TODO: Double check that there are no pods referencing the pvc
 			framework.Logf("Deleting pvc: %v with volume %v", pvc.Name, pvc.Spec.VolumeName)
-			if err := c.CoreV1().PersistentVolumeClaims(ns).Delete(context.TODO(), pvc.Name, nil); err != nil {
+			if err := c.CoreV1().PersistentVolumeClaims(ns).Delete(context.TODO(), pvc.Name, metav1.DeleteOptions{}); err != nil {
 				return false, nil
 			}
 		}

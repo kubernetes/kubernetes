@@ -119,6 +119,6 @@ var _ = SIGDescribe("Certificates API", func() {
 
 		newClient, err := v1beta1client.NewForConfig(rcfg)
 		framework.ExpectNoError(err)
-		framework.ExpectNoError(newClient.CertificateSigningRequests().Delete(context.TODO(), csrName, nil))
+		framework.ExpectNoError(newClient.CertificateSigningRequests().Delete(context.TODO(), csrName, metav1.DeleteOptions{}))
 	})
 })

@@ -1039,7 +1039,7 @@ func runDrainTest(f *framework.Framework, migSizes map[string]int, namespace str
 	_, err = f.ClientSet.PolicyV1beta1().PodDisruptionBudgets(namespace).Create(context.TODO(), pdb, metav1.CreateOptions{})
 
 	defer func() {
-		f.ClientSet.PolicyV1beta1().PodDisruptionBudgets(namespace).Delete(context.TODO(), pdb.Name, &metav1.DeleteOptions{})
+		f.ClientSet.PolicyV1beta1().PodDisruptionBudgets(namespace).Delete(context.TODO(), pdb.Name, metav1.DeleteOptions{})
 	}()
 
 	framework.ExpectNoError(err)
@@ -1879,7 +1879,7 @@ func addKubeSystemPdbs(f *framework.Framework) (func(), error) {
 		var finalErr error
 		for _, newPdbName := range newPdbs {
 			ginkgo.By(fmt.Sprintf("Delete PodDisruptionBudget %v", newPdbName))
-			err := f.ClientSet.PolicyV1beta1().PodDisruptionBudgets("kube-system").Delete(context.TODO(), newPdbName, &metav1.DeleteOptions{})
+			err := f.ClientSet.PolicyV1beta1().PodDisruptionBudgets("kube-system").Delete(context.TODO(), newPdbName, metav1.DeleteOptions{})
 			if err != nil {
 				// log error, but attempt to remove other pdbs
 				klog.Errorf("Failed to delete PodDisruptionBudget %v, err: %v", newPdbName, err)
@@ -1942,7 +1942,7 @@ func createPriorityClasses(f *framework.Framework) func() {
 
 	return func() {
 		for className := range priorityClasses {
-			err := f.ClientSet.SchedulingV1().PriorityClasses().Delete(context.TODO(), className, nil)
+			err := f.ClientSet.SchedulingV1().PriorityClasses().Delete(context.TODO(), className, metav1.DeleteOptions{})
 			if err != nil {
 				klog.Errorf("Error deleting priority class: %v", err)
 			}

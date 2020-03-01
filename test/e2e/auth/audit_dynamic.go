@@ -376,7 +376,7 @@ var _ = SIGDescribe("[Feature:DynamicAudit]", func() {
 			return len(missingReport.MissingEvents) == 0, nil
 		})
 		framework.ExpectNoError(err, "after %v failed to observe audit events", pollingTimeout)
-		err = f.ClientSet.AuditregistrationV1alpha1().AuditSinks().Delete(context.TODO(), "test", &metav1.DeleteOptions{})
+		err = f.ClientSet.AuditregistrationV1alpha1().AuditSinks().Delete(context.TODO(), "test", metav1.DeleteOptions{})
 		framework.ExpectNoError(err, "could not delete audit configuration")
 	})
 })
