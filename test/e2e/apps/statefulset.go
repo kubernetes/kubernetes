@@ -763,7 +763,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			}
 
 			ginkgo.By("Removing pod with conflicting port in namespace " + f.Namespace.Name)
-			err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), pod.Name, metav1.NewDeleteOptions(0))
+			err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), pod.Name, *metav1.NewDeleteOptions(0))
 			framework.ExpectNoError(err)
 
 			ginkgo.By("Waiting when stateful pod " + statefulPodName + " will be recreated in namespace " + f.Namespace.Name + " and will be in running state")

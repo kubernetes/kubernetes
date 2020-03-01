@@ -274,7 +274,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Deleting the pod")
-		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), podName, metav1.NewDeleteOptions(0))
+		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), podName, *metav1.NewDeleteOptions(0))
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Ensuring resource quota status released the pod usage")
@@ -712,7 +712,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Deleting the pod")
-		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), podName, metav1.NewDeleteOptions(0))
+		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), podName, *metav1.NewDeleteOptions(0))
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Ensuring resource quota status released the pod usage")
@@ -751,7 +751,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Deleting the pod")
-		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), podName, metav1.NewDeleteOptions(0))
+		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), podName, *metav1.NewDeleteOptions(0))
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Ensuring resource quota status released the pod usage")
@@ -808,7 +808,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Deleting the pod")
-		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), pod.Name, metav1.NewDeleteOptions(0))
+		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), pod.Name, *metav1.NewDeleteOptions(0))
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Ensuring resource quota status released the pod usage")
@@ -838,7 +838,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Deleting the pod")
-		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), pod.Name, metav1.NewDeleteOptions(0))
+		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), pod.Name, *metav1.NewDeleteOptions(0))
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Ensuring resource quota status released the pod usage")
@@ -938,7 +938,7 @@ var _ = SIGDescribe("ResourceQuota [Feature:ScopeSelectors]", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Deleting the pod")
-		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), pod.Name, metav1.NewDeleteOptions(0))
+		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), pod.Name, *metav1.NewDeleteOptions(0))
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Ensuring resource quota status released the pod usage")
@@ -968,7 +968,7 @@ var _ = SIGDescribe("ResourceQuota [Feature:ScopeSelectors]", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Deleting the pod")
-		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), pod.Name, metav1.NewDeleteOptions(0))
+		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), pod.Name, *metav1.NewDeleteOptions(0))
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Ensuring resource quota status released the pod usage")
@@ -1028,7 +1028,7 @@ var _ = SIGDescribe("ResourceQuota [Feature:ScopeSelectors]", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Deleting the pod")
-		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), podName, metav1.NewDeleteOptions(0))
+		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), podName, *metav1.NewDeleteOptions(0))
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Ensuring resource quota status released the pod usage")
@@ -1067,7 +1067,7 @@ var _ = SIGDescribe("ResourceQuota [Feature:ScopeSelectors]", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Deleting the pod")
-		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), podName, metav1.NewDeleteOptions(0))
+		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), podName, *metav1.NewDeleteOptions(0))
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Ensuring resource quota status released the pod usage")
@@ -1114,7 +1114,7 @@ var _ = SIGDescribe("ResourceQuota [Feature:PodPriority]", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Deleting the pod")
-		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), pod.Name, metav1.NewDeleteOptions(0))
+		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), pod.Name, *metav1.NewDeleteOptions(0))
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Ensuring resource quota status released the pod usage")
@@ -1159,7 +1159,7 @@ var _ = SIGDescribe("ResourceQuota [Feature:PodPriority]", func() {
 		framework.ExpectError(err)
 
 		ginkgo.By("Deleting first pod")
-		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), pod.Name, metav1.NewDeleteOptions(0))
+		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), pod.Name, *metav1.NewDeleteOptions(0))
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Ensuring resource quota status released the pod usage")
@@ -1209,9 +1209,9 @@ var _ = SIGDescribe("ResourceQuota [Feature:PodPriority]", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Deleting both pods")
-		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), pod.Name, metav1.NewDeleteOptions(0))
+		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), pod.Name, *metav1.NewDeleteOptions(0))
 		framework.ExpectNoError(err)
-		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), pod2.Name, metav1.NewDeleteOptions(0))
+		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), pod2.Name, *metav1.NewDeleteOptions(0))
 		framework.ExpectNoError(err)
 	})
 
@@ -1258,9 +1258,9 @@ var _ = SIGDescribe("ResourceQuota [Feature:PodPriority]", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Deleting both pods")
-		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), pod.Name, metav1.NewDeleteOptions(0))
+		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), pod.Name, *metav1.NewDeleteOptions(0))
 		framework.ExpectNoError(err)
-		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), pod2.Name, metav1.NewDeleteOptions(0))
+		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), pod2.Name, *metav1.NewDeleteOptions(0))
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Ensuring resource quota status released the pod usage")
@@ -1299,7 +1299,7 @@ var _ = SIGDescribe("ResourceQuota [Feature:PodPriority]", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Deleting the pod")
-		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), pod.Name, metav1.NewDeleteOptions(0))
+		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), pod.Name, *metav1.NewDeleteOptions(0))
 		framework.ExpectNoError(err)
 	})
 
@@ -1333,7 +1333,7 @@ var _ = SIGDescribe("ResourceQuota [Feature:PodPriority]", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Deleting the pod")
-		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), pod.Name, metav1.NewDeleteOptions(0))
+		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), pod.Name, *metav1.NewDeleteOptions(0))
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Ensuring resource quota status released the pod usage")
@@ -1391,7 +1391,7 @@ var _ = SIGDescribe("ResourceQuota [Feature:PodPriority]", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Deleting the pod")
-		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), pod.Name, metav1.NewDeleteOptions(0))
+		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), pod.Name, *metav1.NewDeleteOptions(0))
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Ensuring resource quota status released the pod usage")

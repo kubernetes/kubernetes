@@ -1451,7 +1451,7 @@ func drainNode(f *framework.Framework, node *v1.Node) {
 	pods, err := f.ClientSet.CoreV1().Pods(metav1.NamespaceAll).List(context.TODO(), podOpts)
 	framework.ExpectNoError(err)
 	for _, pod := range pods.Items {
-		err = f.ClientSet.CoreV1().Pods(pod.Namespace).Delete(context.TODO(), pod.Name, metav1.NewDeleteOptions(0))
+		err = f.ClientSet.CoreV1().Pods(pod.Namespace).Delete(context.TODO(), pod.Name, *metav1.NewDeleteOptions(0))
 		framework.ExpectNoError(err)
 	}
 }

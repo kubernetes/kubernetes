@@ -447,7 +447,7 @@ func waitCachedPodsStable(testCtx *testutils.TestContext, pods []*v1.Pod) error 
 
 // deletePod deletes the given pod in the given namespace.
 func deletePod(cs clientset.Interface, podName string, nsName string) error {
-	return cs.CoreV1().Pods(nsName).Delete(context.TODO(), podName, metav1.NewDeleteOptions(0))
+	return cs.CoreV1().Pods(nsName).Delete(context.TODO(), podName, *metav1.NewDeleteOptions(0))
 }
 
 func getPod(cs clientset.Interface, podName string, podNamespace string) (*v1.Pod, error) {

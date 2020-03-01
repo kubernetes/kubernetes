@@ -151,7 +151,7 @@ var _ = SIGDescribe("Generated clientset", func() {
 
 		ginkgo.By("deleting the pod gracefully")
 		gracePeriod := int64(31)
-		if err := podClient.Delete(context.TODO(), pod.Name, metav1.NewDeleteOptions(gracePeriod)); err != nil {
+		if err := podClient.Delete(context.TODO(), pod.Name, *metav1.NewDeleteOptions(gracePeriod)); err != nil {
 			framework.Failf("Failed to delete pod: %v", err)
 		}
 

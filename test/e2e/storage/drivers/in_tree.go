@@ -183,7 +183,7 @@ func (n *nfsDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConf
 		}, func() {
 			framework.ExpectNoError(e2epod.DeletePodWithWait(cs, n.externalProvisionerPod))
 			clusterRoleBindingName := ns.Name + "--" + "cluster-admin"
-			cs.RbacV1().ClusterRoleBindings().Delete(context.TODO(), clusterRoleBindingName, metav1.NewDeleteOptions(0))
+			cs.RbacV1().ClusterRoleBindings().Delete(context.TODO(), clusterRoleBindingName, *metav1.NewDeleteOptions(0))
 		}
 }
 

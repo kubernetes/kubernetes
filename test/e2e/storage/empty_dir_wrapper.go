@@ -156,7 +156,7 @@ var _ = utils.SIGDescribe("EmptyDir wrapper volumes", func() {
 				framework.Failf("unable to delete configmap %v: %v", configMap.Name, err)
 			}
 			ginkgo.By("Cleaning up the pod")
-			if err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), pod.Name, metav1.NewDeleteOptions(0)); err != nil {
+			if err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), pod.Name, *metav1.NewDeleteOptions(0)); err != nil {
 				framework.Failf("unable to delete pod %v: %v", pod.Name, err)
 			}
 		}()
@@ -260,7 +260,7 @@ func createGitServer(f *framework.Framework) (gitURL string, gitRepo string, cle
 
 	return "http://" + gitServerSvc.Spec.ClusterIP + ":" + strconv.Itoa(httpPort), "test", func() {
 		ginkgo.By("Cleaning up the git server pod")
-		if err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), gitServerPod.Name, metav1.NewDeleteOptions(0)); err != nil {
+		if err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), gitServerPod.Name, *metav1.NewDeleteOptions(0)); err != nil {
 			framework.Failf("unable to delete git server pod %v: %v", gitServerPod.Name, err)
 		}
 		ginkgo.By("Cleaning up the git server svc")

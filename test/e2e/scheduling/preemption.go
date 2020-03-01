@@ -73,7 +73,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 
 	ginkgo.AfterEach(func() {
 		for _, pair := range priorityPairs {
-			cs.SchedulingV1().PriorityClasses().Delete(context.TODO(), pair.name, metav1.NewDeleteOptions(0))
+			cs.SchedulingV1().PriorityClasses().Delete(context.TODO(), pair.name, *metav1.NewDeleteOptions(0))
 		}
 	})
 
@@ -239,7 +239,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 		defer func() {
 			// Clean-up the critical pod
 			// Always run cleanup to make sure the pod is properly cleaned up.
-			err := f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Delete(context.TODO(), "critical-pod", metav1.NewDeleteOptions(0))
+			err := f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Delete(context.TODO(), "critical-pod", *metav1.NewDeleteOptions(0))
 			if err != nil && !apierrors.IsNotFound(err) {
 				framework.Failf("Error cleanup pod `%s/%s`: %v", metav1.NamespaceSystem, "critical-pod", err)
 			}
@@ -256,7 +256,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 
 		defer func() {
 			// Clean-up the critical pod
-			err := f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Delete(context.TODO(), "critical-pod", metav1.NewDeleteOptions(0))
+			err := f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Delete(context.TODO(), "critical-pod", *metav1.NewDeleteOptions(0))
 			framework.ExpectNoError(err)
 		}()
 		// Make sure that the lowest priority pod is deleted.
@@ -460,7 +460,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 				framework.ExpectNoError(err)
 			}
 			for _, pair := range priorityPairs {
-				cs.SchedulingV1().PriorityClasses().Delete(context.TODO(), pair.name, metav1.NewDeleteOptions(0))
+				cs.SchedulingV1().PriorityClasses().Delete(context.TODO(), pair.name, *metav1.NewDeleteOptions(0))
 			}
 		})
 

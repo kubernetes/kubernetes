@@ -256,7 +256,7 @@ func (t *dnsTestCommon) createUtilPodLabel(baseName string) {
 
 func (t *dnsTestCommon) deleteUtilPod() {
 	podClient := t.c.CoreV1().Pods(t.f.Namespace.Name)
-	if err := podClient.Delete(context.TODO(), t.utilPod.Name, metav1.NewDeleteOptions(0)); err != nil {
+	if err := podClient.Delete(context.TODO(), t.utilPod.Name, *metav1.NewDeleteOptions(0)); err != nil {
 		framework.Logf("Delete of pod %v/%v failed: %v",
 			t.utilPod.Namespace, t.utilPod.Name, err)
 	}
@@ -273,7 +273,7 @@ func (t *dnsTestCommon) deleteCoreDNSPods() {
 	podClient := t.c.CoreV1().Pods(metav1.NamespaceSystem)
 
 	for _, pod := range pods.Items {
-		err = podClient.Delete(context.TODO(), pod.Name, metav1.NewDeleteOptions(0))
+		err = podClient.Delete(context.TODO(), pod.Name, *metav1.NewDeleteOptions(0))
 		framework.ExpectNoError(err, "failed to delete pod: %s", pod.Name)
 	}
 }
@@ -382,7 +382,7 @@ func (t *dnsTestCommon) createDNSServerWithPtrRecord(namespace string, isIPv6 bo
 
 func (t *dnsTestCommon) deleteDNSServerPod() {
 	podClient := t.c.CoreV1().Pods(t.f.Namespace.Name)
-	if err := podClient.Delete(context.TODO(), t.dnsServerPod.Name, metav1.NewDeleteOptions(0)); err != nil {
+	if err := podClient.Delete(context.TODO(), t.dnsServerPod.Name, *metav1.NewDeleteOptions(0)); err != nil {
 		framework.Logf("Delete of pod %v/%v failed: %v",
 			t.utilPod.Namespace, t.dnsServerPod.Name, err)
 	}
@@ -577,7 +577,7 @@ func validateDNSResults(f *framework.Framework, pod *v1.Pod, fileNames []string)
 	defer func() {
 		ginkgo.By("deleting the pod")
 		defer ginkgo.GinkgoRecover()
-		podClient.Delete(context.TODO(), pod.Name, metav1.NewDeleteOptions(0))
+		podClient.Delete(context.TODO(), pod.Name, *metav1.NewDeleteOptions(0))
 	}()
 	if _, err := podClient.Create(context.TODO(), pod, metav1.CreateOptions{}); err != nil {
 		framework.Failf("ginkgo.Failed to create pod %s/%s: %v", pod.Namespace, pod.Name, err)
@@ -605,7 +605,7 @@ func validateTargetedProbeOutput(f *framework.Framework, pod *v1.Pod, fileNames 
 	defer func() {
 		ginkgo.By("deleting the pod")
 		defer ginkgo.GinkgoRecover()
-		podClient.Delete(context.TODO(), pod.Name, metav1.NewDeleteOptions(0))
+		podClient.Delete(context.TODO(), pod.Name, *metav1.NewDeleteOptions(0))
 	}()
 	if _, err := podClient.Create(context.TODO(), pod, metav1.CreateOptions{}); err != nil {
 		framework.Failf("ginkgo.Failed to create pod %s/%s: %v", pod.Namespace, pod.Name, err)

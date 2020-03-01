@@ -198,7 +198,7 @@ var _ = SIGDescribe("PreStop", func() {
 		framework.ExpectNoError(err, "failed to GET scheduled pod")
 
 		ginkgo.By("deleting the pod gracefully")
-		err = podClient.Delete(context.TODO(), pod.Name, metav1.NewDeleteOptions(gracefulTerminationPeriodSeconds))
+		err = podClient.Delete(context.TODO(), pod.Name, *metav1.NewDeleteOptions(gracefulTerminationPeriodSeconds))
 		framework.ExpectNoError(err, "failed to delete pod")
 
 		//wait up to graceful termination period seconds

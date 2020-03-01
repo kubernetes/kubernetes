@@ -299,7 +299,7 @@ func TestVolumeUnmountsFromDeletedPodWithForceOption(c clientset.Interface, f *f
 
 	ginkgo.By(fmt.Sprintf("Deleting Pod %q", clientPod.Name))
 	if forceDelete {
-		err = c.CoreV1().Pods(clientPod.Namespace).Delete(context.TODO(), clientPod.Name, metav1.NewDeleteOptions(0))
+		err = c.CoreV1().Pods(clientPod.Namespace).Delete(context.TODO(), clientPod.Name, *metav1.NewDeleteOptions(0))
 	} else {
 		err = c.CoreV1().Pods(clientPod.Namespace).Delete(context.TODO(), clientPod.Name, metav1.DeleteOptions{})
 	}
@@ -385,7 +385,7 @@ func TestVolumeUnmapsFromDeletedPodWithForceOption(c clientset.Interface, f *fra
 
 	ginkgo.By(fmt.Sprintf("Deleting Pod %q", clientPod.Name))
 	if forceDelete {
-		err = c.CoreV1().Pods(clientPod.Namespace).Delete(context.TODO(), clientPod.Name, metav1.NewDeleteOptions(0))
+		err = c.CoreV1().Pods(clientPod.Namespace).Delete(context.TODO(), clientPod.Name, *metav1.NewDeleteOptions(0))
 	} else {
 		err = c.CoreV1().Pods(clientPod.Namespace).Delete(context.TODO(), clientPod.Name, metav1.DeleteOptions{})
 	}
