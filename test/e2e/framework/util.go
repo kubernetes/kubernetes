@@ -57,6 +57,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
+	"k8s.io/apimachinery/pkg/watch"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
@@ -65,11 +67,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	watchtools "k8s.io/client-go/tools/watch"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	"k8s.io/kubernetes/pkg/client/conditions"
-	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/master/ports"
-	taintutils "k8s.io/kubernetes/pkg/util/taints"
+	"k8s.io/component-base/featuregate"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	uexec "k8s.io/utils/exec"
@@ -158,6 +156,14 @@ const (
 
 	// ssh port
 	sshPort = "22"
+
+	// KubeletPort is the default port for the kubelet server on each host machine.
+	// May be overridden by a flag at startup.
+	KubeletPort = 10250
+	// InsecureKubeControllerManagerPort is the default port for the controller manager status server.
+	// May be overridden by a flag at startup.
+	// Deprecated: use the secure KubeControllerManagerPort instead.
+	InsecureKubeControllerManagerPort = 10252
 )
 
 var (
@@ -172,6 +178,9 @@ var (
 
 	// ServeHostnameImage is a serve hostname image name.
 	ServeHostnameImage = imageutils.GetE2EImage(imageutils.Agnhost)
+
+	// Allows running an ephemeral container in pod namespaces to troubleshoot a running pod.
+	EphemeralContainers featuregate.Feature = "EphemeralContainers"
 )
 
 // RunID is a unique identifier of the e2e run.
@@ -291,8 +300,22 @@ func waitForServiceAccountInNamespace(c clientset.Interface, ns, serviceAccountN
 	}
 	ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), timeout)
 	defer cancel()
-	_, err = watchtools.UntilWithoutRetry(ctx, w, conditions.ServiceAccountHasSecrets)
+	_, err = watchtools.UntilWithoutRetry(ctx, w, serviceAccountHasSecrets)
 	return err
+}
+
+// serviceAccountHasSecrets returns true if the service account has at least one secret,
+// false if it does not, or an error.
+func serviceAccountHasSecrets(event watch.Event) (bool, error) {
+	switch event.Type {
+	case watch.Deleted:
+		return false, apierrors.NewNotFound(schema.GroupResource{Resource: "serviceaccounts"}, "")
+	}
+	switch t := event.Object.(type) {
+	case *v1.ServiceAccount:
+		return len(t.Secrets) > 0, nil
+	}
+	return false, nil
 }
 
 // WaitForDefaultServiceAccountInNamespace waits for the default service account to be provisioned
@@ -828,7 +851,7 @@ func (f *Framework) MatchContainerOutput(
 
 	if podErr != nil {
 		// Pod failed. Dump all logs from all containers to see what's wrong
-		_ = podutil.VisitContainers(&podStatus.Spec, func(c *v1.Container) bool {
+		_ = visitContainers(&podStatus.Spec, func(c *v1.Container) bool {
 			logs, err := e2epod.GetPodLogs(f.ClientSet, ns, podStatus.Name, c.Name)
 			if err != nil {
 				Logf("Failed to get logs from node %q pod %q container %q: %v",
@@ -863,6 +886,35 @@ func (f *Framework) MatchContainerOutput(
 	}
 
 	return nil
+}
+
+// containerVisitor is called with each container spec, and returns true
+// if visiting should continue.
+type containerVisitor func(container *v1.Container) (shouldContinue bool)
+
+// visitContainers invokes the visitor function with a pointer to the container
+// spec of every container in the given pod spec. If visitor returns false,
+// visiting is short-circuited. visitContainers returns true if visiting completes,
+// false if visiting was short-circuited.
+func visitContainers(podSpec *v1.PodSpec, visitor containerVisitor) bool {
+	for i := range podSpec.InitContainers {
+		if !visitor(&podSpec.InitContainers[i]) {
+			return false
+		}
+	}
+	for i := range podSpec.Containers {
+		if !visitor(&podSpec.Containers[i]) {
+			return false
+		}
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(EphemeralContainers) {
+		for i := range podSpec.EphemeralContainers {
+			if !visitor((*v1.Container)(&podSpec.EphemeralContainers[i].EphemeralContainerCommon)) {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 // EventsLister is a func that lists events.
@@ -980,7 +1032,7 @@ func getKubeletPods(c clientset.Interface, node string) (*v1.PodList, error) {
 		client = c.CoreV1().RESTClient().Get().
 			Resource("nodes").
 			SubResource("proxy").
-			Name(fmt.Sprintf("%v:%v", node, ports.KubeletPort)).
+			Name(fmt.Sprintf("%v:%v", node, KubeletPort)).
 			Suffix("pods").
 			Do(context.TODO())
 
@@ -1081,13 +1133,13 @@ func ExpectNodeHasLabel(c clientset.Interface, nodeName string, labelKey string,
 
 // RemoveTaintOffNode removes the given taint from the given node.
 func RemoveTaintOffNode(c clientset.Interface, nodeName string, taint v1.Taint) {
-	ExpectNoError(controller.RemoveTaintOffNode(c, nodeName, nil, &taint))
+	ExpectNoError(e2enode.RemoveTaintOffNode(c, nodeName, nil, &taint))
 	verifyThatTaintIsGone(c, nodeName, &taint)
 }
 
 // AddOrUpdateTaintOnNode adds the given taint to the given node or updates taint.
 func AddOrUpdateTaintOnNode(c clientset.Interface, nodeName string, taint v1.Taint) {
-	ExpectNoError(controller.AddOrUpdateTaintOnNode(c, nodeName, &taint))
+	ExpectNoError(e2enode.AddOrUpdateTaintOnNode(c, nodeName, &taint))
 }
 
 // RemoveLabelOffNode is for cleaning up labels temporarily added to node,
@@ -1104,7 +1156,7 @@ func verifyThatTaintIsGone(c clientset.Interface, nodeName string, taint *v1.Tai
 	ginkgo.By("verifying the node doesn't have the taint " + taint.ToString())
 	nodeUpdated, err := c.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 	ExpectNoError(err)
-	if taintutils.TaintExists(nodeUpdated.Spec.Taints, taint) {
+	if taintExists(nodeUpdated.Spec.Taints, taint) {
 		Failf("Failed removing taint " + taint.ToString() + " of the node " + nodeName)
 	}
 }
@@ -1127,10 +1179,20 @@ func NodeHasTaint(c clientset.Interface, nodeName string, taint *v1.Taint) (bool
 
 	nodeTaints := node.Spec.Taints
 
-	if len(nodeTaints) == 0 || !taintutils.TaintExists(nodeTaints, taint) {
+	if len(nodeTaints) == 0 || !taintExists(nodeTaints, taint) {
 		return false, nil
 	}
 	return true, nil
+}
+
+// taintExists checks if the given taint exists in list of taints. Returns true if exists false otherwise.
+func taintExists(taints []v1.Taint, taintToFind *v1.Taint) bool {
+	for _, taint := range taints {
+		if taint.MatchTaint(taintToFind) {
+			return true
+		}
+	}
+	return false
 }
 
 // ScaleResource scales resource to the given size.
@@ -1250,7 +1312,7 @@ func waitForPodsInactive(ps *testutils.PodStore, interval, timeout time.Duration
 	var activePods []*v1.Pod
 	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
 		pods := ps.List()
-		activePods = controller.FilterActivePods(pods)
+		activePods = filterActivePods(pods)
 		if len(activePods) != 0 {
 			return false, nil
 		}
@@ -1264,6 +1326,26 @@ func waitForPodsInactive(ps *testutils.PodStore, interval, timeout time.Duration
 		return fmt.Errorf("there are %d active pods. E.g. %q on node %q", len(activePods), activePods[0].Name, activePods[0].Spec.NodeName)
 	}
 	return err
+}
+
+// filterActivePods returns pods that have not terminated.
+func filterActivePods(pods []*v1.Pod) []*v1.Pod {
+	isPodActive := func(p *v1.Pod) bool {
+		return v1.PodSucceeded != p.Status.Phase &&
+			v1.PodFailed != p.Status.Phase &&
+			p.DeletionTimestamp == nil
+	}
+
+	var result []*v1.Pod
+	for _, p := range pods {
+		if isPodActive(p) {
+			result = append(result, p)
+		} else {
+			klog.V(4).Infof("Ignoring inactive pod %v/%v in state %v, deletion time %v",
+				p.Namespace, p.Name, p.Status.Phase, p.DeletionTimestamp)
+		}
+	}
+	return result
 }
 
 // RunHostCmd runs the given cmd in the context of the given pod using `kubectl exec`
@@ -1492,7 +1574,7 @@ func RestartControllerManager() error {
 
 // WaitForControllerManagerUp waits for the kube-controller-manager to be up.
 func WaitForControllerManagerUp() error {
-	cmd := "curl http://localhost:" + strconv.Itoa(ports.InsecureKubeControllerManagerPort) + "/healthz"
+	cmd := "curl http://localhost:" + strconv.Itoa(InsecureKubeControllerManagerPort) + "/healthz"
 	for start := time.Now(); time.Since(start) < time.Minute; time.Sleep(5 * time.Second) {
 		result, err := e2essh.SSH(cmd, net.JoinHostPort(GetMasterHost(), sshPort), TestContext.Provider)
 		if err != nil || result.Code != 0 {

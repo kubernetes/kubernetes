@@ -31,9 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	"k8s.io/kubernetes/pkg/kubelet/events"
-	"k8s.io/kubernetes/pkg/kubelet/sysctl"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -227,10 +224,10 @@ func (c *PodClient) WaitForErrorEventOrSuccess(pod *v1.Pod) (*v1.Event, error) {
 		}
 		for _, e := range evnts.Items {
 			switch e.Reason {
-			case events.KillingContainer, events.FailedToCreateContainer, sysctl.ForbiddenReason:
+			case "Killing", "Failed", "SysctlForbidden":
 				ev = &e
 				return true, nil
-			case events.StartedContainer:
+			case "Started":
 				return true, nil
 			default:
 				// ignore all other errors
@@ -262,5 +259,20 @@ func (c *PodClient) MatchContainerOutput(name string, containerName string, expe
 func (c *PodClient) PodIsReady(name string) bool {
 	pod, err := c.Get(context.TODO(), name, metav1.GetOptions{})
 	ExpectNoError(err)
-	return podutil.IsPodReady(pod)
+	return IsPodReady(pod)
+}
+
+// IsPodReady returns true if a pod is ready; false otherwise.
+func IsPodReady(pod *v1.Pod) bool {
+	if pod.Status.Conditions == nil {
+		return false
+	}
+
+	for _, condition := range pod.Status.Conditions {
+		if condition.Type == v1.PodReady {
+			return condition.Status == v1.ConditionTrue
+		}
+	}
+
+	return false
 }

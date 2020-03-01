@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
@@ -75,7 +76,7 @@ var _ = utils.SIGDescribe("PVC Protection", func() {
 
 		ginkgo.By("Creating a PVC")
 		prefix := "pvc-protection"
-		e2epv.SkipIfNoDefaultStorageClass(client)
+		skipIfNoDefaultStorageClass(client)
 		t := testsuites.StorageClassTest{
 			ClaimSize: "1Gi",
 		}
@@ -172,3 +173,11 @@ var _ = utils.SIGDescribe("PVC Protection", func() {
 		pvcCreatedAndNotDeleted = false
 	})
 })
+
+// skipIfNoDefaultStorageClass skips tests if no default SC can be found.
+func skipIfNoDefaultStorageClass(c clientset.Interface) {
+	_, err := getDefaultStorageClassName(c)
+	if err != nil {
+		e2eskipper.Skipf("error finding default storageClass : %v", err)
+	}
+}

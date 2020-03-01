@@ -58,7 +58,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		ns = f.Namespace.Name
 		var err error
 		e2eskipper.SkipUnlessProviderIs("gce", "gke", "aws")
-		defaultScName, err = e2epv.GetDefaultStorageClassName(c)
+		defaultScName, err = getDefaultStorageClassName(c)
 		if err != nil {
 			framework.Failf(err.Error())
 		}

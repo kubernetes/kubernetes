@@ -23,11 +23,20 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	clientset "k8s.io/client-go/kubernetes"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/test/e2e/system"
 
 	"k8s.io/klog"
+)
+
+const (
+	// InsecureSchedulerPort is the default port for the scheduler status server.
+	// May be overridden by a flag at startup.
+	// Deprecated: use the secure KubeSchedulerPort instead.
+	InsecureSchedulerPort = 10251
+	// InsecureKubeControllerManagerPort is the default port for the controller manager status server.
+	// May be overridden by a flag at startup.
+	// Deprecated: use the secure KubeControllerManagerPort instead.
+	InsecureKubeControllerManagerPort = 10252
 )
 
 // Collection is metrics collection of components
@@ -101,7 +110,7 @@ func (g *Grabber) HasRegisteredMaster() bool {
 
 // GrabFromKubelet returns metrics from kubelet
 func (g *Grabber) GrabFromKubelet(nodeName string) (KubeletMetrics, error) {
-	nodes, err := g.client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{FieldSelector: fields.Set{api.ObjectNameField: nodeName}.AsSelector().String()})
+	nodes, err := g.client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{FieldSelector: fields.Set{"metadata.name": nodeName}.AsSelector().String()})
 	if err != nil {
 		return KubeletMetrics{}, err
 	}
@@ -128,7 +137,7 @@ func (g *Grabber) GrabFromScheduler() (SchedulerMetrics, error) {
 	if !g.registeredMaster {
 		return SchedulerMetrics{}, fmt.Errorf("Master's Kubelet is not registered. Skipping Scheduler's metrics gathering")
 	}
-	output, err := g.getMetricsFromPod(g.client, fmt.Sprintf("%v-%v", "kube-scheduler", g.masterName), metav1.NamespaceSystem, ports.InsecureSchedulerPort)
+	output, err := g.getMetricsFromPod(g.client, fmt.Sprintf("%v-%v", "kube-scheduler", g.masterName), metav1.NamespaceSystem, InsecureSchedulerPort)
 	if err != nil {
 		return SchedulerMetrics{}, err
 	}
@@ -161,7 +170,7 @@ func (g *Grabber) GrabFromControllerManager() (ControllerManagerMetrics, error) 
 	if !g.registeredMaster {
 		return ControllerManagerMetrics{}, fmt.Errorf("Master's Kubelet is not registered. Skipping ControllerManager's metrics gathering")
 	}
-	output, err := g.getMetricsFromPod(g.client, fmt.Sprintf("%v-%v", "kube-controller-manager", g.masterName), metav1.NamespaceSystem, ports.InsecureKubeControllerManagerPort)
+	output, err := g.getMetricsFromPod(g.client, fmt.Sprintf("%v-%v", "kube-controller-manager", g.masterName), metav1.NamespaceSystem, InsecureKubeControllerManagerPort)
 	if err != nil {
 		return ControllerManagerMetrics{}, err
 	}

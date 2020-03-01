@@ -18,7 +18,12 @@ package windows
 
 import (
 	"context"
+	"crypto/tls"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"net/http"
+	"regexp"
 	"strconv"
 	"time"
 
@@ -27,8 +32,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/kubernetes/scheme"
+	kubeletconfig "k8s.io/kubelet/config/v1beta1"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
+	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -189,7 +197,7 @@ func getNodeMemory(f *framework.Framework) nodeMemory {
 
 	nodeName := nodeList.Items[0].ObjectMeta.Name
 
-	kubeletConfig, err := e2ekubelet.GetCurrentKubeletConfig(nodeName, f.Namespace.Name, true)
+	kubeletConfig, err := GetCurrentKubeletConfig(nodeName, f.Namespace.Name, true)
 	framework.ExpectNoError(err)
 
 	systemReserve, err := resource.ParseQuantity(kubeletConfig.SystemReserved["memory"])
@@ -241,4 +249,100 @@ func getTotalAllocatableMemory(f *framework.Framework) *resource.Quantity {
 	}
 
 	return totalAllocatable
+}
+
+// GetCurrentKubeletConfig fetches the current Kubelet Config for the given node
+func GetCurrentKubeletConfig(nodeName, namespace string, useProxy bool) (*kubeletconfig.KubeletConfiguration, error) {
+	resp := pollConfigz(5*time.Minute, 5*time.Second, nodeName, namespace, useProxy)
+	if resp == nil {
+		return nil, fmt.Errorf("failed to fetch /configz from %q", nodeName)
+	}
+	kubeCfg, err := decodeConfigz(resp)
+	if err != nil {
+		return nil, err
+	}
+	return kubeCfg, nil
+}
+
+// returns a status 200 response from the /configz endpoint or nil if fails
+func pollConfigz(timeout time.Duration, pollInterval time.Duration, nodeName, namespace string, useProxy bool) *http.Response {
+	endpoint := ""
+	if useProxy {
+		// start local proxy, so we can send graceful deletion over query string, rather than body parameter
+		framework.Logf("Opening proxy to cluster")
+		tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, namespace)
+		cmd := tk.KubectlCmd("proxy", "-p", "0")
+		stdout, stderr, err := framework.StartCmdAndStreamOutput(cmd)
+		framework.ExpectNoError(err)
+		defer stdout.Close()
+		defer stderr.Close()
+		defer framework.TryKill(cmd)
+
+		buf := make([]byte, 128)
+		var n int
+		n, err = stdout.Read(buf)
+		framework.ExpectNoError(err)
+		output := string(buf[:n])
+		proxyRegexp := regexp.MustCompile("Starting to serve on 127.0.0.1:([0-9]+)")
+		match := proxyRegexp.FindStringSubmatch(output)
+		framework.ExpectEqual(len(match), 2)
+		port, err := strconv.Atoi(match[1])
+		framework.ExpectNoError(err)
+		framework.Logf("http requesting node kubelet /configz")
+		endpoint = fmt.Sprintf("http://127.0.0.1:%d/api/v1/nodes/%s/proxy/configz", port, nodeName)
+	} else {
+		endpoint = fmt.Sprintf("http://127.0.0.1:8080/api/v1/nodes/%s/proxy/configz", framework.TestContext.NodeName)
+	}
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+	client := &http.Client{Transport: tr}
+	req, err := http.NewRequest("GET", endpoint, nil)
+	framework.ExpectNoError(err)
+	req.Header.Add("Accept", "application/json")
+
+	var resp *http.Response
+	wait.PollImmediate(pollInterval, timeout, func() (bool, error) {
+		resp, err = client.Do(req)
+		if err != nil {
+			framework.Logf("Failed to get /configz, retrying. Error: %v", err)
+			return false, nil
+		}
+		if resp.StatusCode != 200 {
+			framework.Logf("/configz response status not 200, retrying. Response was: %+v", resp)
+			return false, nil
+		}
+
+		return true, nil
+	})
+	return resp
+}
+
+// Decodes the http response from /configz and returns a kubeletconfig.KubeletConfiguration (internal type).
+func decodeConfigz(resp *http.Response) (*kubeletconfig.KubeletConfiguration, error) {
+	// This hack because /configz reports the following structure:
+	// {"kubeletconfig": {the JSON representation of kubeletconfigv1beta1.KubeletConfiguration}}
+	type configzWrapper struct {
+		ComponentConfig kubeletconfig.KubeletConfiguration `json:"kubeletconfig"`
+	}
+
+	configz := configzWrapper{}
+	kubeCfg := kubeletconfig.KubeletConfiguration{}
+
+	contentsBytes, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	err = json.Unmarshal(contentsBytes, &configz)
+	if err != nil {
+		return nil, err
+	}
+
+	err = scheme.Scheme.Convert(&configz.ComponentConfig, &kubeCfg, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return &kubeCfg, nil
 }

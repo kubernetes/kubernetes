@@ -23,12 +23,16 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	clientset "k8s.io/client-go/kubernetes"
 	scaleclient "k8s.io/client-go/scale"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	testutils "k8s.io/kubernetes/test/utils"
+)
+
+var (
+	kindRC = schema.GroupKind{Kind: "ReplicationController"}
 )
 
 // ByNameContainer returns a ReplicationController with specified name and container
@@ -70,12 +74,12 @@ func ByNameContainer(name string, replicas int32, labels map[string]string, c v1
 
 // DeleteRCAndWaitForGC deletes only the Replication Controller and waits for GC to delete the pods.
 func DeleteRCAndWaitForGC(c clientset.Interface, ns, name string) error {
-	return framework.DeleteResourceAndWaitForGC(c, api.Kind("ReplicationController"), ns, name)
+	return framework.DeleteResourceAndWaitForGC(c, kindRC, ns, name)
 }
 
 // ScaleRC scales Replication Controller to be desired size.
 func ScaleRC(clientset clientset.Interface, scalesGetter scaleclient.ScalesGetter, ns, name string, size uint, wait bool) error {
-	return framework.ScaleResource(clientset, scalesGetter, ns, name, size, wait, api.Kind("ReplicationController"), api.SchemeGroupVersion.WithResource("replicationcontrollers"))
+	return framework.ScaleResource(clientset, scalesGetter, ns, name, size, wait, kindRC, v1.SchemeGroupVersion.WithResource("replicationcontrollers"))
 }
 
 // RunRC Launches (and verifies correctness) of a Replication Controller

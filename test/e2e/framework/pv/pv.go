@@ -29,10 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
-	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1/util"
-	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 )
 
 const (
@@ -53,6 +50,10 @@ const (
 
 	// VolumeSelectorKey is the key for volume selector.
 	VolumeSelectorKey = "e2e-pv-pool"
+
+	// VolumeGidAnnotationKey is the of the annotation on the PersistentVolume
+	// object that specifies a supplemental GID.
+	VolumeGidAnnotationKey = "pv.beta.kubernetes.io/gid"
 )
 
 var (
@@ -570,7 +571,7 @@ func MakePersistentVolume(pvConfig PersistentVolumeConfig) *v1.PersistentVolume 
 			GenerateName: pvConfig.NamePrefix,
 			Labels:       pvConfig.Labels,
 			Annotations: map[string]string{
-				util.VolumeGidAnnotationKey: "777",
+				VolumeGidAnnotationKey: "777",
 			},
 		},
 		Spec: v1.PersistentVolumeSpec{
@@ -769,34 +770,4 @@ func CreatePVSource(zone string) (*v1.PersistentVolumeSource, error) {
 // DeletePVSource deletes a PV source.
 func DeletePVSource(pvSource *v1.PersistentVolumeSource) error {
 	return framework.TestContext.CloudConfig.Provider.DeletePVSource(pvSource)
-}
-
-// GetDefaultStorageClassName returns default storageClass or return error
-func GetDefaultStorageClassName(c clientset.Interface) (string, error) {
-	list, err := c.StorageV1().StorageClasses().List(context.TODO(), metav1.ListOptions{})
-	if err != nil {
-		return "", fmt.Errorf("Error listing storage classes: %v", err)
-	}
-	var scName string
-	for _, sc := range list.Items {
-		if storageutil.IsDefaultAnnotation(sc.ObjectMeta) {
-			if len(scName) != 0 {
-				return "", fmt.Errorf("Multiple default storage classes found: %q and %q", scName, sc.Name)
-			}
-			scName = sc.Name
-		}
-	}
-	if len(scName) == 0 {
-		return "", fmt.Errorf("No default storage class found")
-	}
-	framework.Logf("Default storage class: %q", scName)
-	return scName, nil
-}
-
-// SkipIfNoDefaultStorageClass skips tests if no default SC can be found.
-func SkipIfNoDefaultStorageClass(c clientset.Interface) {
-	_, err := GetDefaultStorageClassName(c)
-	if err != nil {
-		e2eskipper.Skipf("error finding default storageClass : %v", err)
-	}
 }

@@ -32,13 +32,14 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	"k8s.io/kubernetes/pkg/client/conditions"
-	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
+
+// ErrPodCompleted is returned by PodRunning or PodContainerRunning to indicate that
+// the pod has already reached completed state.
+var ErrPodCompleted = fmt.Errorf("pod ran to completion")
 
 // TODO: Move to its own subpkg.
 // expectNoError checks if "err" is set, and if so, fails assertion while logging the error.
@@ -155,7 +156,7 @@ func podRunning(c clientset.Interface, podName, namespace string) wait.Condition
 		case v1.PodRunning:
 			return true, nil
 		case v1.PodFailed, v1.PodSucceeded:
-			return false, conditions.ErrPodCompleted
+			return false, ErrPodCompleted
 		}
 		return false, nil
 	}
@@ -184,14 +185,29 @@ func podRunningAndReady(c clientset.Interface, podName, namespace string) wait.C
 		switch pod.Status.Phase {
 		case v1.PodFailed, v1.PodSucceeded:
 			e2elog.Logf("The status of Pod %s is %s which is unexpected", podName, pod.Status.Phase)
-			return false, conditions.ErrPodCompleted
+			return false, ErrPodCompleted
 		case v1.PodRunning:
-			e2elog.Logf("The status of Pod %s is %s (Ready = %v)", podName, pod.Status.Phase, podutil.IsPodReady(pod))
-			return podutil.IsPodReady(pod), nil
+			e2elog.Logf("The status of Pod %s is %s (Ready = %v)", podName, pod.Status.Phase, isPodReady(pod))
+			return isPodReady(pod), nil
 		}
 		e2elog.Logf("The status of Pod %s is %s, waiting for it to be Running (with Ready = true)", podName, pod.Status.Phase)
 		return false, nil
 	}
+}
+
+// isPodReady returns true if a pod is ready; false otherwise.
+func isPodReady(pod *v1.Pod) bool {
+	if pod.Status.Conditions == nil {
+		return false
+	}
+
+	for _, condition := range pod.Status.Conditions {
+		if condition.Type == v1.PodReady {
+			return condition.Status == v1.ConditionTrue
+		}
+	}
+
+	return false
 }
 
 func podNotPending(c clientset.Interface, podName, namespace string) wait.ConditionFunc {
@@ -376,7 +392,7 @@ func FilterNonRestartablePods(pods []*v1.Pod) []*v1.Pod {
 }
 
 func isNotRestartAlwaysMirrorPod(p *v1.Pod) bool {
-	if !kubetypes.IsMirrorPod(p) {
+	if !isMirrorPod(p) {
 		return false
 	}
 	return p.Spec.RestartPolicy != v1.RestartPolicyAlways
@@ -542,4 +558,10 @@ func GetPodsInNamespace(c clientset.Interface, ns string, ignoreLabels map[strin
 		filtered = append(filtered, &p)
 	}
 	return filtered, nil
+}
+
+// isMirrorPod returns true if the passed Pod is a Mirror Pod.
+func isMirrorPod(pod *v1.Pod) bool {
+	_, ok := pod.Annotations[v1.MirrorPodAnnotationKey]
+	return ok
 }

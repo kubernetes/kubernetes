@@ -34,11 +34,12 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
 	watchtools "k8s.io/client-go/tools/watch"
+	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1/util"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2esset "k8s.io/kubernetes/test/e2e/framework/statefulset"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
@@ -119,7 +120,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		// StorageClass and a dynamic provisioner.
 		ginkgo.It("should provide basic identity", func() {
 			ginkgo.By("Creating statefulset " + ssName + " in namespace " + ns)
-			e2epv.SkipIfNoDefaultStorageClass(c)
+			skipIfNoDefaultStorageClass(c)
 			*(ss.Spec.Replicas) = 3
 			e2esset.PauseNewPods(ss)
 
@@ -158,7 +159,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		// StorageClass and a dynamic provisioner.
 		ginkgo.It("should adopt matching orphans and release non-matching pods", func() {
 			ginkgo.By("Creating statefulset " + ssName + " in namespace " + ns)
-			e2epv.SkipIfNoDefaultStorageClass(c)
+			skipIfNoDefaultStorageClass(c)
 			*(ss.Spec.Replicas) = 1
 			e2esset.PauseNewPods(ss)
 
@@ -243,7 +244,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		// StorageClass and a dynamic provisioner.
 		ginkgo.It("should not deadlock when a pod's predecessor fails", func() {
 			ginkgo.By("Creating statefulset " + ssName + " in namespace " + ns)
-			e2epv.SkipIfNoDefaultStorageClass(c)
+			skipIfNoDefaultStorageClass(c)
 			*(ss.Spec.Replicas) = 2
 			e2esset.PauseNewPods(ss)
 
@@ -279,7 +280,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		// StorageClass and a dynamic provisioner.
 		ginkgo.It("should perform rolling updates and roll backs of template modifications with PVCs", func() {
 			ginkgo.By("Creating a new StatefulSet with PVCs")
-			e2epv.SkipIfNoDefaultStorageClass(c)
+			skipIfNoDefaultStorageClass(c)
 			*(ss.Spec.Replicas) = 3
 			rollbackTest(c, ns, ss)
 		})
@@ -1312,4 +1313,34 @@ func getStatefulSet(c clientset.Interface, namespace, name string) *appsv1.State
 		framework.Failf("Failed to get StatefulSet %s/%s: %v", namespace, name, err)
 	}
 	return ss
+}
+
+// skipIfNoDefaultStorageClass skips tests if no default SC can be found.
+func skipIfNoDefaultStorageClass(c clientset.Interface) {
+	_, err := getDefaultStorageClassName(c)
+	if err != nil {
+		e2eskipper.Skipf("error finding default storageClass : %v", err)
+	}
+}
+
+// getDefaultStorageClassName returns default storageClass or return error
+func getDefaultStorageClassName(c clientset.Interface) (string, error) {
+	list, err := c.StorageV1().StorageClasses().List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		return "", fmt.Errorf("Error listing storage classes: %v", err)
+	}
+	var scName string
+	for _, sc := range list.Items {
+		if storageutil.IsDefaultAnnotation(sc.ObjectMeta) {
+			if len(scName) != 0 {
+				return "", fmt.Errorf("Multiple default storage classes found: %q and %q", scName, sc.Name)
+			}
+			scName = sc.Name
+		}
+	}
+	if len(scName) == 0 {
+		return "", fmt.Errorf("No default storage class found")
+	}
+	framework.Logf("Default storage class: %q", scName)
+	return scName, nil
 }

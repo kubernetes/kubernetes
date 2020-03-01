@@ -672,7 +672,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 		// Modifying the default storage class can be disruptive to other tests that depend on it
 		ginkgo.It("should be disabled by changing the default annotation [Serial] [Disruptive]", func() {
 			e2eskipper.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "vsphere", "azure")
-			scName, scErr := e2epv.GetDefaultStorageClassName(c)
+			scName, scErr := getDefaultStorageClassName(c)
 			if scErr != nil {
 				framework.Failf(scErr.Error())
 			}
@@ -709,7 +709,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 		// Modifying the default storage class can be disruptive to other tests that depend on it
 		ginkgo.It("should be disabled by removing the default annotation [Serial] [Disruptive]", func() {
 			e2eskipper.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "vsphere", "azure")
-			scName, scErr := e2epv.GetDefaultStorageClassName(c)
+			scName, scErr := getDefaultStorageClassName(c)
 			if scErr != nil {
 				framework.Failf(scErr.Error())
 			}
@@ -1062,4 +1062,26 @@ func getRandomClusterZone(c clientset.Interface) string {
 
 	zonesList := zones.UnsortedList()
 	return zonesList[rand.Intn(zones.Len())]
+}
+
+// getDefaultStorageClassName returns default storageClass or return error
+func getDefaultStorageClassName(c clientset.Interface) (string, error) {
+	list, err := c.StorageV1().StorageClasses().List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		return "", fmt.Errorf("Error listing storage classes: %v", err)
+	}
+	var scName string
+	for _, sc := range list.Items {
+		if storageutil.IsDefaultAnnotation(sc.ObjectMeta) {
+			if len(scName) != 0 {
+				return "", fmt.Errorf("Multiple default storage classes found: %q and %q", scName, sc.Name)
+			}
+			scName = sc.Name
+		}
+	}
+	if len(scName) == 0 {
+		return "", fmt.Errorf("No default storage class found")
+	}
+	framework.Logf("Default storage class: %q", scName)
+	return scName, nil
 }

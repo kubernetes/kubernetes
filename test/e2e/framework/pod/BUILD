@@ -12,10 +12,6 @@ go_library(
     importpath = "k8s.io/kubernetes/test/e2e/framework/pod",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/api/v1/pod:go_default_library",
-        "//pkg/client/conditions:go_default_library",
-        "//pkg/kubelet/types:go_default_library",
-        "//pkg/kubelet/util/format:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
