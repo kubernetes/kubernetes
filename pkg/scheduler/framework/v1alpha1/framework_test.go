@@ -1701,6 +1701,41 @@ func TestWaitOnPermit(t *testing.T) {
 	}
 }
 
+func TestListPlugins(t *testing.T) {
+	tests := []struct {
+		name    string
+		plugins *config.Plugins
+		// pluginSetCount include queue sort plugin and bind plugin.
+		pluginSetCount int
+	}{
+		{
+			name:           "Add empty plugin",
+			plugins:        &config.Plugins{},
+			pluginSetCount: 2,
+		},
+		{
+			name: "Add multiple plugins",
+			plugins: &config.Plugins{
+				Score: &config.PluginSet{Enabled: []config.Plugin{{Name: scorePlugin1}, {Name: scoreWithNormalizePlugin1}}},
+			},
+			pluginSetCount: 3,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f, err := newFrameworkWithQueueSortAndBind(registry, tt.plugins, emptyArgs)
+			if err != nil {
+				t.Fatalf("Failed to create framework for testing: %v", err)
+			}
+			plugins := f.ListPlugins()
+			if len(plugins) != tt.pluginSetCount {
+				t.Fatalf("Unexpected pluginSet count: %v", len(plugins))
+			}
+		})
+	}
+}
+
 func buildScoreConfigDefaultWeights(ps ...string) *config.Plugins {
 	return buildScoreConfigWithWeights(defaultWeights, ps...)
 }
