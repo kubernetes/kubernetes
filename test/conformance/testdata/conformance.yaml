@@ -1234,13 +1234,13 @@
     StorageClass or a dynamic provisioner.
   release: v1.9
   file: test/e2e/apps/statefulset.go
-- testname: ConfigMap lifecycle
+- testname: PodTemplate lifecycle
   codename: '[sig-architecture] PodTemplates should run the lifecycle of PodTemplates
     [Conformance]'
-  description: Attempt to create a ConfigMap. Patch the created ConfigMap. Fetching
-    the ConfigMap MUST reflect changes. By fetching all the ConfigMaps via a Label
-    selector it MUST find the ConfigMap by it's static label and updated value. The
-    ConfigMap must be deleted by Collection.
+  description: Attempt to create a PodTemplate. Patch the created PodTemplate. Fetching
+    the PodTemplate MUST reflect changes. By fetching all the PodTemplates via a Label
+    selector it MUST find the PodTemplate by it's static label and updated value.
+    The PodTemplate must be deleted.
   release: v1.18
   file: test/e2e/common/podtemplates.go
 - testname: Service account tokens auto mount optionally
