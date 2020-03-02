@@ -20,6 +20,7 @@ import (
 	"context"
 	goerrors "errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -1202,7 +1203,12 @@ func (og *operationGenerator) GenerateUnmapDeviceFunc(
 		globalMapPath := deviceToDetach.DeviceMountPath
 		refs, err := og.blkUtil.GetDeviceBindMountRefs(deviceToDetach.DevicePath, globalMapPath)
 		if err != nil {
-			return deviceToDetach.GenerateError("UnmapDevice.GetDeviceBindMountRefs check failed", err)
+			if os.IsNotExist(err) {
+				// Looks like SetupDevice did not complete. Fall through to TearDownDevice and mark the device as unmounted.
+				refs = nil
+			} else {
+				return deviceToDetach.GenerateError("UnmapDevice.GetDeviceBindMountRefs check failed", err)
+			}
 		}
 		if len(refs) > 0 {
 			err = fmt.Errorf("The device %q is still referenced from other Pods %v", globalMapPath, refs)
