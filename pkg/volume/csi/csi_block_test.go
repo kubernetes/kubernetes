@@ -18,11 +18,13 @@ package csi
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	api "k8s.io/api/core/v1"
 	"k8s.io/api/storage/v1beta1"
@@ -299,7 +301,7 @@ func TestBlockMapperSetupDeviceError(t *testing.T) {
 
 	csiMapper.csiClient = setupClient(t, true)
 	fClient := csiMapper.csiClient.(*fakeCsiDriverClient)
-	fClient.nodeClient.SetNextError(errors.New("mock final error"))
+	fClient.nodeClient.SetNextError(status.Error(codes.InvalidArgument, "mock final error"))
 
 	attachID := getAttachmentName(csiMapper.volumeID, string(csiMapper.driverName), string(nodeName))
 	attachment := makeTestAttachment(attachID, nodeName, pvName)
