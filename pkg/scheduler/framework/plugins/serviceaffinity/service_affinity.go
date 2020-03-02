@@ -46,7 +46,7 @@ type Args struct {
 	// Labels are homogeneous for pods that are scheduled to a node.
 	// (i.e. it returns true IFF this pod can be added to this node such that all other pods in
 	// the same service are running on nodes with the exact same values for Labels).
-	AffinityLabels []string `json:"labels,omitempty"`
+	AffinityLabels []string `json:"affinityLabels,omitempty"`
 	// AntiAffinityLabelsPreference are the labels to consider for service anti affinity scoring.
 	AntiAffinityLabelsPreference []string `json:"antiAffinityLabelsPreference,omitempty"`
 }
