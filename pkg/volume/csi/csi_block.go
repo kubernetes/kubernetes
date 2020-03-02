@@ -503,19 +503,8 @@ func (m *csiBlockMapper) UnmapPodDevice() error {
 	ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
 	defer cancel()
 
-	// Call NodeUnpublishVolume
-	if _, err := os.Stat(publishPath); err != nil {
-		if os.IsNotExist(err) {
-			klog.V(4).Infof(log("blockMapper.UnmapPodDevice publishPath(%s) has already been deleted, skip calling NodeUnpublishVolume", publishPath))
-		} else {
-			return err
-		}
-	} else {
-		err := m.unpublishVolumeForBlock(ctx, csiClient, publishPath)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
+	// Call NodeUnpublishVolume.
+	// Even if publishPath does not exist - previous NodePublish may have timed out
+	// and Kubernetes makes sure that the operation is finished.
+	return m.unpublishVolumeForBlock(ctx, csiClient, publishPath)
 }
