@@ -18,6 +18,7 @@ package queueset
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"sync/atomic"
 	"testing"
@@ -27,6 +28,7 @@ import (
 	fq "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing"
 	test "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/testing"
 	"k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/testing/clock"
+	"k8s.io/apiserver/pkg/util/flowcontrol/metrics"
 	"k8s.io/klog"
 )
 
@@ -52,21 +54,30 @@ type uniformClient struct {
 // expectPass indicates whether the QueueSet is expected to be fair.
 // expectedAllRequests indicates whether all requests are expected to get dispatched.
 func exerciseQueueSetUniformScenario(t *testing.T, name string, qs fq.QueueSet, sc uniformScenario,
-	evalDuration time.Duration, expectPass bool, expectedAllRequests bool,
+	evalDuration time.Duration,
+	expectPass, expectedAllRequests, expectInqueueMetrics, expectExecutingMetrics bool,
 	clk *clock.FakeEventClock, counter counter.GoRoutineCounter) {
 
 	now := time.Now()
 	t.Logf("%s: Start %s, clk=%p, grc=%p", clk.Now().Format(nsTimeFmt), name, clk, counter)
 	integrators := make([]test.Integrator, len(sc))
 	var failedCount uint64
+	expectedInqueue := ""
+	expectedExecuting := ""
+	if expectInqueueMetrics || expectExecutingMetrics {
+		metrics.Reset()
+	}
+	executions := make([]int32, len(sc))
 	for i, uc := range sc {
 		integrators[i] = test.NewIntegrator(clk)
+		fsName := fmt.Sprintf("client%d", i)
+		expectedInqueue = expectedInqueue + fmt.Sprintf(`				apiserver_flowcontrol_current_inqueue_requests{flowSchema=%q,priorityLevel=%q} 0%s`, fsName, name, "\n")
 		for j := 0; j < uc.nThreads; j++ {
 			counter.Add(1)
 			go func(i, j int, uc uniformClient, igr test.Integrator) {
 				for k := 0; k < uc.nCalls; k++ {
 					ClockWait(clk, counter, uc.thinkDuration)
-					req, idle := qs.StartRequest(context.Background(), uc.hash, name, []int{i, j, k})
+					req, idle := qs.StartRequest(context.Background(), uc.hash, fsName, name, []int{i, j, k})
 					t.Logf("%s: %d, %d, %d got req=%p, idle=%v", clk.Now().Format(nsTimeFmt), i, j, k, req, idle)
 					if req == nil {
 						atomic.AddUint64(&failedCount, 1)
@@ -79,6 +90,7 @@ func exerciseQueueSetUniformScenario(t *testing.T, name string, qs fq.QueueSet, 
 					idle2 := req.Finish(func() {
 						executed = true
 						t.Logf("%s: %d, %d, %d executing", clk.Now().Format(nsTimeFmt), i, j, k)
+						atomic.AddInt32(&executions[i], 1)
 						igr.Add(1)
 						ClockWait(clk, counter, uc.execDuration)
 						igr.Add(-1)
@@ -124,6 +136,32 @@ func exerciseQueueSetUniformScenario(t *testing.T, name string, qs fq.QueueSet, 
 	} else if !expectedAllRequests && failedCount == 0 {
 		t.Errorf("Expected failed requests but all requests succeeded")
 	}
+	if expectInqueueMetrics {
+		err := metrics.GatherAndCompare(`
+				# HELP apiserver_flowcontrol_current_inqueue_requests [ALPHA] Number of requests currently pending in queues of the API Priority and Fairness system
+				# TYPE apiserver_flowcontrol_current_inqueue_requests gauge
+`+expectedInqueue,
+			"apiserver_flowcontrol_current_inqueue_requests")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	for i := range sc {
+		fsName := fmt.Sprintf("client%d", i)
+		if atomic.AddInt32(&executions[i], 0) > 0 {
+			expectedExecuting = expectedExecuting + fmt.Sprintf(`				apiserver_flowcontrol_current_executing_requests{flowSchema=%q,priorityLevel=%q} 0%s`, fsName, name, "\n")
+		}
+	}
+	if expectExecutingMetrics && len(expectedExecuting) > 0 {
+		err := metrics.GatherAndCompare(`
+				# HELP apiserver_flowcontrol_current_executing_requests [ALPHA] Number of requests currently executing in the API Priority and Fairness system
+				# TYPE apiserver_flowcontrol_current_executing_requests gauge
+`+expectedExecuting,
+			"apiserver_flowcontrol_current_executing_requests")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
 }
 
 func ClockWait(clk *clock.FakeEventClock, counter counter.GoRoutineCounter, duration time.Duration) {
@@ -144,6 +182,7 @@ func init() {
 
 // TestNoRestraint should fail because the dummy QueueSet exercises no control
 func TestNoRestraint(t *testing.T) {
+	metrics.Register()
 	now := time.Now()
 	clk, counter := clock.NewFakeEventClock(now, 0, nil)
 	nrc, err := test.NewNoRestraintFactory().BeginConstruction(fq.QueuingConfig{})
@@ -154,10 +193,11 @@ func TestNoRestraint(t *testing.T) {
 	exerciseQueueSetUniformScenario(t, "NoRestraint", nr, []uniformClient{
 		{1001001001, 5, 10, time.Second, time.Second},
 		{2002002002, 2, 10, time.Second, time.Second / 2},
-	}, time.Second*10, false, true, clk, counter)
+	}, time.Second*10, false, true, false, false, clk, counter)
 }
 
 func TestUniformFlows(t *testing.T) {
+	metrics.Register()
 	now := time.Now()
 
 	clk, counter := clock.NewFakeEventClock(now, 0, nil)
@@ -175,13 +215,14 @@ func TestUniformFlows(t *testing.T) {
 	}
 	qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: 4})
 
-	exerciseQueueSetUniformScenario(t, "UniformFlows", qs, []uniformClient{
+	exerciseQueueSetUniformScenario(t, qCfg.Name, qs, []uniformClient{
 		{1001001001, 5, 10, time.Second, time.Second},
 		{2002002002, 5, 10, time.Second, time.Second},
-	}, time.Second*20, true, true, clk, counter)
+	}, time.Second*20, true, true, true, true, clk, counter)
 }
 
 func TestDifferentFlows(t *testing.T) {
+	metrics.Register()
 	now := time.Now()
 
 	clk, counter := clock.NewFakeEventClock(now, 0, nil)
@@ -199,13 +240,14 @@ func TestDifferentFlows(t *testing.T) {
 	}
 	qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: 4})
 
-	exerciseQueueSetUniformScenario(t, "DifferentFlows", qs, []uniformClient{
+	exerciseQueueSetUniformScenario(t, qCfg.Name, qs, []uniformClient{
 		{1001001001, 6, 10, time.Second, time.Second},
 		{2002002002, 5, 15, time.Second, time.Second / 2},
-	}, time.Second*20, true, true, clk, counter)
+	}, time.Second*20, true, true, true, true, clk, counter)
 }
 
 func TestDifferentFlowsWithoutQueuing(t *testing.T) {
+	metrics.Register()
 	now := time.Now()
 
 	clk, counter := clock.NewFakeEventClock(now, 0, nil)
@@ -220,13 +262,24 @@ func TestDifferentFlowsWithoutQueuing(t *testing.T) {
 	}
 	qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: 4})
 
-	exerciseQueueSetUniformScenario(t, "DifferentFlowsWithoutQueuing", qs, []uniformClient{
+	exerciseQueueSetUniformScenario(t, qCfg.Name, qs, []uniformClient{
 		{1001001001, 6, 10, time.Second, 57 * time.Millisecond},
 		{2002002002, 4, 15, time.Second, 750 * time.Millisecond},
-	}, time.Second*13, false, false, clk, counter)
+	}, time.Second*13, false, false, false, true, clk, counter)
+	err = metrics.GatherAndCompare(`
+				# HELP apiserver_flowcontrol_rejected_requests_total [ALPHA] Number of requests rejected by API Priority and Fairness system
+				# TYPE apiserver_flowcontrol_rejected_requests_total counter
+				apiserver_flowcontrol_rejected_requests_total{flowSchema="client0",priorityLevel="TestDifferentFlowsWithoutQueuing",reason="concurrency-limit"} 2
+				apiserver_flowcontrol_rejected_requests_total{flowSchema="client1",priorityLevel="TestDifferentFlowsWithoutQueuing",reason="concurrency-limit"} 4
+				`,
+		"apiserver_flowcontrol_rejected_requests_total")
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestTimeout(t *testing.T) {
+	metrics.Register()
 	now := time.Now()
 
 	clk, counter := clock.NewFakeEventClock(now, 0, nil)
@@ -244,17 +297,19 @@ func TestTimeout(t *testing.T) {
 	}
 	qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: 1})
 
-	exerciseQueueSetUniformScenario(t, "Timeout", qs, []uniformClient{
+	exerciseQueueSetUniformScenario(t, qCfg.Name, qs, []uniformClient{
 		{1001001001, 5, 100, time.Second, time.Second},
-	}, time.Second*10, true, false, clk, counter)
+	}, time.Second*10, true, false, true, true, clk, counter)
 }
 
 func TestContextCancel(t *testing.T) {
+	metrics.Register()
+	metrics.Reset()
 	now := time.Now()
 	clk, counter := clock.NewFakeEventClock(now, 0, nil)
 	qsf := NewQueueSetFactory(clk, counter)
 	qCfg := fq.QueuingConfig{
-		Name:             "TestTimeout",
+		Name:             "TestContextCancel",
 		DesiredNumQueues: 11,
 		QueueLengthLimit: 11,
 		HandSize:         1,
@@ -267,7 +322,7 @@ func TestContextCancel(t *testing.T) {
 	qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: 1})
 	counter.Add(1) // account for the goroutine running this test
 	ctx1 := context.Background()
-	req1, _ := qs.StartRequest(ctx1, 1, "test", "one")
+	req1, _ := qs.StartRequest(ctx1, 1, "fs1", "test", "one")
 	if req1 == nil {
 		t.Error("Request rejected")
 		return
@@ -283,7 +338,7 @@ func TestContextCancel(t *testing.T) {
 			counter.Add(1)
 			cancel2()
 		}()
-		req2, idle2a := qs.StartRequest(ctx2, 2, "test", "two")
+		req2, idle2a := qs.StartRequest(ctx2, 2, "fs2", "test", "two")
 		if idle2a {
 			t.Error("2nd StartRequest returned idle")
 		}
