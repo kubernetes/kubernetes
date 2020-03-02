@@ -246,6 +246,11 @@ type CSRSigningControllerConfiguration struct {
 	// clusterSigningDuration is the length of duration signed certificates
 	// will be given.
 	ClusterSigningDuration metav1.Duration
+	// clusterSigningCertFile is the optional filename containing a chain of
+	// PEM-encoded X509 certificates which will be appended to issued cluster
+	// scoped certificates. This is useful to return intermediates certificates
+	// to clients.
+	ClusterSigningChainFile string
 }
 
 // DaemonSetControllerConfiguration contains elements describing DaemonSetController.

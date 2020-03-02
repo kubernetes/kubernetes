@@ -62,6 +62,7 @@ func autoConvert_v1alpha1_CSRSigningControllerConfiguration_To_config_CSRSigning
 	out.ClusterSigningCertFile = in.ClusterSigningCertFile
 	out.ClusterSigningKeyFile = in.ClusterSigningKeyFile
 	out.ClusterSigningDuration = in.ClusterSigningDuration
+	out.ClusterSigningChainFile = in.ClusterSigningChainFile
 	return nil
 }
 
@@ -69,6 +70,7 @@ func autoConvert_config_CSRSigningControllerConfiguration_To_v1alpha1_CSRSigning
 	out.ClusterSigningCertFile = in.ClusterSigningCertFile
 	out.ClusterSigningKeyFile = in.ClusterSigningKeyFile
 	out.ClusterSigningDuration = in.ClusterSigningDuration
+	out.ClusterSigningChainFile = in.ClusterSigningChainFile
 	return nil
 }
 

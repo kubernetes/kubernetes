@@ -42,7 +42,7 @@ import (
 func TestSigner(t *testing.T) {
 	clock := clock.FakeClock{}
 
-	s, err := newSigner("./testdata/ca.crt", "./testdata/ca.key", nil, 1*time.Hour)
+	s, err := newSigner("./testdata/ca.crt", "./testdata/ca.key", nil, 1*time.Hour, "")
 	if err != nil {
 		t.Fatalf("failed to create signer: %v", err)
 	}
@@ -100,6 +100,78 @@ func TestSigner(t *testing.T) {
 	}
 
 	if !cmp.Equal(*certs[0], want, diff.IgnoreUnset()) {
+		t.Errorf("unexpected diff: %v", cmp.Diff(certs[0], want, diff.IgnoreUnset()))
+	}
+}
+
+func TestIntermediateSigner(t *testing.T) {
+	clock := clock.FakeClock{}
+
+	s, err := newSigner("./testdata/ca.crt", "./testdata/ca.key", nil, 1*time.Hour, "./testdata/ca.crt")
+	if err != nil {
+		t.Fatalf("failed to create signer: %v", err)
+	}
+	currCA, err := s.caProvider.currentCA()
+	if err != nil {
+		t.Fatal(err)
+	}
+	currCA.Now = clock.Now
+	currCA.Backdate = 0
+	s.caProvider.caValue.Store(currCA)
+
+	csrb, err := ioutil.ReadFile("./testdata/kubelet.csr")
+	if err != nil {
+		t.Fatalf("failed to read CSR: %v", err)
+	}
+	x509cr, err := capihelper.ParseCSR(csrb)
+	if err != nil {
+		t.Fatalf("failed to parse CSR: %v", err)
+	}
+
+	certData, err := s.sign(x509cr, []capi.KeyUsage{
+		capi.UsageSigning,
+		capi.UsageKeyEncipherment,
+		capi.UsageServerAuth,
+		capi.UsageClientAuth,
+	})
+	if err != nil {
+		t.Fatalf("failed to sign CSR: %v", err)
+	}
+	if len(certData) == 0 {
+		t.Fatalf("expected a certificate after signing")
+	}
+
+	certs, err := cert.ParseCertsPEM(certData)
+	if err != nil {
+		t.Fatalf("failed to parse certificate: %v", err)
+	}
+	if len(certs) != 2 {
+		t.Fatalf("expected two certificates")
+	}
+
+	want := x509.Certificate{
+		Version: 3,
+		Subject: pkix.Name{
+			CommonName:   "system:node:k-a-node-s36b",
+			Organization: []string{"system:nodes"},
+		},
+		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
+		BasicConstraintsValid: true,
+		NotAfter:              clock.Now().Add(1 * time.Hour),
+		PublicKeyAlgorithm:    x509.ECDSA,
+		SignatureAlgorithm:    x509.SHA256WithRSA,
+		MaxPathLen:            -1,
+	}
+
+	if !cmp.Equal(*certs[0], want, diff.IgnoreUnset()) {
+		t.Errorf("unexpected diff: %v", cmp.Diff(certs[0], want, diff.IgnoreUnset()))
+	}
+
+	wantCA := *currCA.Certificate
+	wantCA.PublicKey = nil
+	wantCA.SerialNumber = nil
+	if !cmp.Equal(*certs[1], wantCA, diff.IgnoreUnset()) {
 		t.Errorf("unexpected diff: %v", cmp.Diff(certs[0], want, diff.IgnoreUnset()))
 	}
 }
@@ -249,7 +321,7 @@ func TestHandle(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			client := &fake.Clientset{}
-			s, err := newSigner("./testdata/ca.crt", "./testdata/ca.key", client, 1*time.Hour)
+			s, err := newSigner("./testdata/ca.crt", "./testdata/ca.key", client, 1*time.Hour, "")
 			if err != nil {
 				t.Fatalf("failed to create signer: %v", err)
 			}

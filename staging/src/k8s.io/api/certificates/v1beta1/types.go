@@ -122,6 +122,9 @@ type CertificateSigningRequestStatus struct {
 	Conditions []CertificateSigningRequestCondition `json:"conditions,omitempty" protobuf:"bytes,1,rep,name=conditions"`
 
 	// If request was approved, the controller will place the issued certificate here.
+	// If more than one PEM block is present, and the definition of the requested spec.signerName
+	// does not indicate otherwise, the first block is the issued certificate,
+	// and subsequent blocks should be treated as intermediate certificates and presented in TLS handshakes.
 	// +optional
 	Certificate []byte `json:"certificate,omitempty" protobuf:"bytes,2,opt,name=certificate"`
 }

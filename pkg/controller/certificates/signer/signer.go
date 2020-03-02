@@ -18,6 +18,7 @@ limitations under the License.
 package signer
 
 import (
+	"bytes"
 	"context"
 	"crypto/x509"
 	"encoding/pem"
@@ -38,6 +39,7 @@ import (
 type CSRSigningController struct {
 	certificateController *certificates.CertificateController
 	dynamicCertReloader   dynamiccertificates.ControllerRunner
+	dynamicChainReloader  dynamiccertificates.ControllerRunner
 }
 
 func NewCSRSigningController(
@@ -45,13 +47,14 @@ func NewCSRSigningController(
 	csrInformer certificatesinformers.CertificateSigningRequestInformer,
 	caFile, caKeyFile string,
 	certTTL time.Duration,
+	chainFile string,
 ) (*CSRSigningController, error) {
-	signer, err := newSigner(caFile, caKeyFile, client, certTTL)
+	signer, err := newSigner(caFile, caKeyFile, client, certTTL, chainFile)
 	if err != nil {
 		return nil, err
 	}
 
-	return &CSRSigningController{
+	c := &CSRSigningController{
 		certificateController: certificates.NewCertificateController(
 			"csrsigning",
 			client,
@@ -59,12 +62,20 @@ func NewCSRSigningController(
 			signer.handle,
 		),
 		dynamicCertReloader: signer.caProvider.caLoader,
-	}, nil
+	}
+	if signer.chainProvider != nil {
+		c.dynamicChainReloader = signer.chainProvider
+	}
+
+	return c, nil
 }
 
 // Run the main goroutine responsible for watching and syncing jobs.
 func (c *CSRSigningController) Run(workers int, stopCh <-chan struct{}) {
 	go c.dynamicCertReloader.Run(workers, stopCh)
+	if c.dynamicChainReloader != nil {
+		go c.dynamicChainReloader.Run(workers, stopCh)
+	}
 
 	c.certificateController.Run(workers, stopCh)
 }
@@ -74,9 +85,11 @@ type signer struct {
 
 	client  clientset.Interface
 	certTTL time.Duration
+
+	chainProvider *dynamiccertificates.DynamicFileCAContent
 }
 
-func newSigner(caFile, caKeyFile string, client clientset.Interface, certificateDuration time.Duration) (*signer, error) {
+func newSigner(caFile, caKeyFile string, client clientset.Interface, certificateDuration time.Duration, chainFile string) (*signer, error) {
 	caProvider, err := newCAProvider(caFile, caKeyFile)
 	if err != nil {
 		return nil, err
@@ -86,6 +99,14 @@ func newSigner(caFile, caKeyFile string, client clientset.Interface, certificate
 		caProvider: caProvider,
 		client:     client,
 		certTTL:    certificateDuration,
+	}
+
+	if chainFile != "" {
+		chainProvider, err := dynamiccertificates.NewDynamicCAContentFromFile("csr-controller", chainFile)
+		if err != nil {
+			return nil, err
+		}
+		ret.chainProvider = chainProvider
 	}
 	return ret, nil
 }
@@ -135,7 +156,16 @@ func (s *signer) sign(x509cr *x509.CertificateRequest, usages []capi.KeyUsage) (
 	if err != nil {
 		return nil, err
 	}
-	return pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der}), nil
+	b := &bytes.Buffer{}
+	if err := pem.Encode(b, &pem.Block{Type: "CERTIFICATE", Bytes: der}); err != nil {
+		return nil, err
+	}
+	if s.chainProvider != nil {
+		chain := s.chainProvider.CurrentCABundleContent()
+
+		b.Write(chain)
+	}
+	return b.Bytes(), nil
 }
 
 func requestValidForSignerName(req *x509.CertificateRequest, usages []capi.KeyUsage, signerName string) bool {
