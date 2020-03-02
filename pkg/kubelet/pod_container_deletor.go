@@ -37,9 +37,11 @@ type podContainerDeletor struct {
 	containersToKeep int
 }
 
-func (a containerStatusbyCreatedList) Len() int           { return len(a) }
-func (a containerStatusbyCreatedList) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a containerStatusbyCreatedList) Less(i, j int) bool { return a[i].CreatedAt.After(a[j].CreatedAt) }
+func (a containerStatusbyCreatedList) Len() int      { return len(a) }
+func (a containerStatusbyCreatedList) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
+func (a containerStatusbyCreatedList) Less(i, j int) bool {
+	return a[i].CreatedAt.After(a[j].CreatedAt)
+}
 
 func newPodContainerDeletor(runtime kubecontainer.Runtime, containersToKeep int) *podContainerDeletor {
 	buffer := make(chan kubecontainer.ContainerID, containerDeletorBufferLimit)
