@@ -90,12 +90,6 @@ func (g *Cloud) ensureInternalLoadBalancer(clusterName, clusterID string, svc *v
 		g.eventRecorder.Event(svc, v1.EventTypeWarning, "ILBOptionsIgnored", "Internal LoadBalancer options are not supported with Legacy Networks.")
 		options = ILBOptions{}
 	}
-	if !g.AlphaFeatureGate.Enabled(AlphaFeatureILBCustomSubnet) {
-		if options.SubnetName != "" {
-			g.eventRecorder.Event(svc, v1.EventTypeWarning, "ILBCustomSubnetOptionIgnored", "Internal LoadBalancer CustomSubnet options ignored as the feature gate is disabled.")
-			options.SubnetName = ""
-		}
-	}
 
 	sharedBackend := shareBackendService(svc)
 	backendServiceName := makeBackendServiceName(loadBalancerName, clusterID, sharedBackend, scheme, protocol, svc.Spec.SessionAffinity)
@@ -136,20 +130,12 @@ func (g *Cloud) ensureInternalLoadBalancer(clusterName, clusterID string, svc *v
 	}
 
 	subnetworkURL := g.SubnetworkURL()
-	if g.AlphaFeatureGate.Enabled(AlphaFeatureILBCustomSubnet) {
-		// If this feature is enabled, changes to subnet annotation will be
-		// picked up and reflected in the forwarding rule.
-		// Removing the annotation will set the forwarding rule to use the default subnet.
-		if options.SubnetName != "" {
-			subnetworkURL = gceSubnetworkURL("", g.networkProjectID, g.region, options.SubnetName)
-		}
-	} else {
-		// TODO(84885) remove this once ILBCustomSubnet goes beta.
-		if existingFwdRule != nil && existingFwdRule.Subnetwork != "" {
-			// If the ILB already exists, continue using the subnet that it's already using.
-			// This is to support existing ILBs that were setup using the wrong subnet - https://github.com/kubernetes/kubernetes/pull/57861
-			subnetworkURL = existingFwdRule.Subnetwork
-		}
+	// Any subnet specified using the subnet annotation will be picked up and reflected in the forwarding rule.
+	// Removing the annotation will set the forwarding rule to use the default subnet and result in a VIP change.
+	// In order to support existing ILBs that were setup using the wrong subnet - https://github.com/kubernetes/kubernetes/pull/57861,
+	// users will need to specify that subnet with the annotation.
+	if options.SubnetName != "" {
+		subnetworkURL = gceSubnetworkURL("", g.networkProjectID, g.region, options.SubnetName)
 	}
 	// Determine IP which will be used for this LB. If no forwarding rule has been established
 	// or specified in the Service spec, then requestedIP = "".
