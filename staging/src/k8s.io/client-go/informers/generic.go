@@ -244,6 +244,8 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		// Group=networking.k8s.io, Version=v1beta1
 	case networkingv1beta1.SchemeGroupVersion.WithResource("ingresses"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Networking().V1beta1().Ingresses().Informer()}, nil
+	case networkingv1beta1.SchemeGroupVersion.WithResource("ingressclasses"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Networking().V1beta1().IngressClasses().Informer()}, nil
 
 		// Group=node.k8s.io, Version=v1alpha1
 	case nodev1alpha1.SchemeGroupVersion.WithResource("runtimeclasses"):

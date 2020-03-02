@@ -35,6 +35,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/controller/volume/scheduling"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
@@ -45,7 +46,6 @@ import (
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
-	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
 )
 
 const (
@@ -104,7 +104,7 @@ type Scheduler struct {
 	StopEverything <-chan struct{}
 
 	// VolumeBinder handles PVC/PV binding for the pod.
-	VolumeBinder *volumebinder.VolumeBinder
+	VolumeBinder scheduling.SchedulerVolumeBinder
 
 	// Disable pod preemption or not.
 	DisablePreemption bool
@@ -230,7 +230,7 @@ func New(client clientset.Interface,
 	}
 
 	schedulerCache := internalcache.New(30*time.Second, stopEverything)
-	volumeBinder := volumebinder.NewVolumeBinder(
+	volumeBinder := scheduling.NewVolumeBinder(
 		client,
 		informerFactory.Core().V1().Nodes(),
 		informerFactory.Storage().V1().CSINodes(),
@@ -440,7 +440,7 @@ func (sched *Scheduler) preempt(ctx context.Context, prof *profile.Profile, stat
 // retry scheduling.
 func (sched *Scheduler) bindVolumes(assumed *v1.Pod) error {
 	klog.V(5).Infof("Trying to bind volumes for pod \"%v/%v\"", assumed.Namespace, assumed.Name)
-	err := sched.VolumeBinder.Binder.BindPodVolumes(assumed)
+	err := sched.VolumeBinder.BindPodVolumes(assumed)
 	if err != nil {
 		klog.V(1).Infof("Failed to bind volumes for pod \"%v/%v\": %v", assumed.Namespace, assumed.Name, err)
 
@@ -599,7 +599,7 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 	// Otherwise, binding of volumes is started after the pod is assumed, but before pod binding.
 	//
 	// This function modifies 'assumedPod' if volume binding is required.
-	allBound, err := sched.VolumeBinder.Binder.AssumePodVolumes(assumedPod, scheduleResult.SuggestedHost)
+	allBound, err := sched.VolumeBinder.AssumePodVolumes(assumedPod, scheduleResult.SuggestedHost)
 	if err != nil {
 		sched.recordSchedulingFailure(prof, assumedPodInfo, err, SchedulerError,
 			fmt.Sprintf("AssumePodVolumes failed: %v", err))

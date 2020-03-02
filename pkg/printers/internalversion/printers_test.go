@@ -844,6 +844,7 @@ func TestPrintIngress(t *testing.T) {
 			CreationTimestamp: metav1.Time{Time: time.Now().AddDate(-10, 0, 0)},
 		},
 		Spec: networking.IngressSpec{
+			IngressClassName: utilpointer.StringPtr("foo"),
 			Backend: &networking.IngressBackend{
 				ServiceName: "svc",
 				ServicePort: intstr.FromInt(93),
@@ -861,7 +862,7 @@ func TestPrintIngress(t *testing.T) {
 		},
 	}
 	// Columns: Name, Hosts, Address, Ports, Age
-	expected := []metav1.TableRow{{Cells: []interface{}{"test1", "*", "2.3.4.5", "80", "10y"}}}
+	expected := []metav1.TableRow{{Cells: []interface{}{"test1", "foo", "*", "2.3.4.5", "80", "10y"}}}
 
 	rows, err := printIngress(&ingress, printers.GenerateOptions{})
 	if err != nil {
@@ -870,6 +871,71 @@ func TestPrintIngress(t *testing.T) {
 	rows[0].Object.Object = nil
 	if !reflect.DeepEqual(expected, rows) {
 		t.Errorf("mismatch: %s", diff.ObjectReflectDiff(expected, rows))
+	}
+}
+
+func TestPrintIngressClass(t *testing.T) {
+	testCases := []struct {
+		name         string
+		ingressClass *networking.IngressClass
+		expected     []metav1.TableRow
+	}{{
+		name: "example with params",
+		ingressClass: &networking.IngressClass{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:              "test1",
+				CreationTimestamp: metav1.Time{Time: time.Now().AddDate(-10, 0, 0)},
+			},
+			Spec: networking.IngressClassSpec{
+				Controller: "example.com/controller",
+				Parameters: &api.TypedLocalObjectReference{Kind: "customgroup", Name: "example"},
+			},
+		},
+		expected: []metav1.TableRow{{Cells: []interface{}{"test1", "example.com/controller", "customgroup/example", "10y"}}},
+	}, {
+		name: "example with params + API Group",
+		ingressClass: &networking.IngressClass{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:              "test1",
+				CreationTimestamp: metav1.Time{Time: time.Now().AddDate(-10, 0, 0)},
+			},
+			Spec: networking.IngressClassSpec{
+				Controller: "example.com/controller",
+				Parameters: &api.TypedLocalObjectReference{
+					APIGroup: utilpointer.StringPtr("example.com"),
+					Kind:     "customgroup",
+					Name:     "example",
+				},
+			},
+		},
+		expected: []metav1.TableRow{{Cells: []interface{}{"test1", "example.com/controller", "customgroup.example.com/example", "10y"}}},
+	}, {
+		name: "example without params",
+		ingressClass: &networking.IngressClass{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:              "test2",
+				CreationTimestamp: metav1.Time{Time: time.Now().AddDate(-11, 0, 0)},
+			},
+			Spec: networking.IngressClassSpec{
+				Controller: "example.com/controller2",
+			},
+		},
+		expected: []metav1.TableRow{{Cells: []interface{}{"test2", "example.com/controller2", "<none>", "11y"}}},
+	}}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			rows, err := printIngressClass(testCase.ingressClass, printers.GenerateOptions{})
+			if err != nil {
+				t.Fatalf("Error generating table rows for Ingress: %#v", err)
+			}
+			for i := range rows {
+				rows[i].Object.Object = nil
+			}
+			if !reflect.DeepEqual(testCase.expected, rows) {
+				t.Errorf("mismatch: %s", diff.ObjectReflectDiff(testCase.expected, rows))
+			}
+		})
 	}
 }
 

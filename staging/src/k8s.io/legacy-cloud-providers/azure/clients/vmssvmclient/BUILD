@@ -11,6 +11,7 @@ go_library(
     importpath = "k8s.io/legacy-cloud-providers/azure/clients/vmssvmclient",
     visibility = ["//visibility:public"],
     deps = [
+        "//staging/src/k8s.io/apimachinery/pkg/util/errors:go_default_library",
         "//staging/src/k8s.io/client-go/util/flowcontrol:go_default_library",
         "//staging/src/k8s.io/legacy-cloud-providers/azure/clients:go_default_library",
         "//staging/src/k8s.io/legacy-cloud-providers/azure/clients/armclient:go_default_library",
