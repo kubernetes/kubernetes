@@ -170,9 +170,8 @@ func findNUMANodeWithoutSRIOVDevicesFromSysfs(numaNodes int) (int, bool) {
 	}
 
 	if len(pciPerNuma) == 0 {
-		// if we got this far we already passed a rough check that SRIOV devices
-		// are available in the box, so something is seriously wrong
-		framework.Failf("failed to find any VF devices from %v", pciDevs)
+		framework.Logf("failed to find any VF device from %v", pciDevs)
+		return -1, false
 	}
 
 	for nodeNum := 0; nodeNum < numaNodes; nodeNum++ {
