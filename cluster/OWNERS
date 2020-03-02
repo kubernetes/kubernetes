@@ -9,6 +9,7 @@ reviewers:
   - zmerlynn
   - dims
 approvers:
+  - bentheelder
   - eparis
   - mikedanese
   - spiffxp
