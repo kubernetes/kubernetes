@@ -2770,6 +2770,12 @@ type PodSpec struct {
 	// All topologySpreadConstraints are ANDed.
 	// +optional
 	TopologySpreadConstraints []TopologySpreadConstraint
+	// ShareBurstableLimits sets the pod cgroup to the sum of the resource limits for all of its containers.
+	// This only has an effect in case the pod's QoS level is Burstable. It allows defining resource limits on the pod
+	// level without having to determine the limits on all of the containers in the pod.
+	// If not specified, the default is false.
+	// +optional
+	ShareBurstableLimits *bool
 }
 
 // HostAlias holds the mapping between IP and hostnames that will be injected as an entry in the

@@ -192,6 +192,24 @@ func TestResourceConfigForPod(t *testing.T) {
 			quotaPeriod:      tunedQuotaPeriod,
 			expected:         &ResourceConfig{CpuShares: &burstablePartialShares},
 		},
+		"burstable-with-shared-limits": {
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Resources: getResourceRequirements(getResourceList("100m", "100Mi"), getResourceList("200m", "200Mi")),
+						},
+						{
+							Resources: getResourceRequirements(getResourceList("100m", "100Mi"), getResourceList("", "")),
+						},
+					},
+					ShareBurstableLimits: func() *bool { t := true; return &t }(),
+				},
+			},
+			enforceCPULimits: false,
+			quotaPeriod:      tunedQuotaPeriod,
+			expected:         &ResourceConfig{CpuShares: &burstablePartialShares, CpuQuota: &cpuNoLimit, CpuPeriod: &tunedQuotaPeriod, Memory: &burstableMemory},
+		},
 		"guaranteed": {
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{

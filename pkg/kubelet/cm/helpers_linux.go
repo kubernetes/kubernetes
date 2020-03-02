@@ -148,6 +148,10 @@ func ResourceConfigForPod(pod *v1.Pod, enforceCPULimits bool, cpuPeriod uint64) 
 			}
 		}
 	}
+	if pod.Spec.ShareBurstableLimits != nil && *pod.Spec.ShareBurstableLimits {
+		cpuLimitsDeclared = true
+		memoryLimitsDeclared = true
+	}
 
 	// quota is not capped when cfs quota is disabled
 	if !enforceCPULimits {
@@ -156,15 +160,15 @@ func ResourceConfigForPod(pod *v1.Pod, enforceCPULimits bool, cpuPeriod uint64) 
 
 	// determine the qos class
 	qosClass := v1qos.GetPodQOS(pod)
-
 	// build the result
 	result := &ResourceConfig{}
-	if qosClass == v1.PodQOSGuaranteed {
+	switch qosClass {
+	case v1.PodQOSGuaranteed:
 		result.CpuShares = &cpuShares
 		result.CpuQuota = &cpuQuota
 		result.CpuPeriod = &cpuPeriod
 		result.Memory = &memoryLimits
-	} else if qosClass == v1.PodQOSBurstable {
+	case v1.PodQOSBurstable:
 		result.CpuShares = &cpuShares
 		if cpuLimitsDeclared {
 			result.CpuQuota = &cpuQuota
@@ -173,7 +177,7 @@ func ResourceConfigForPod(pod *v1.Pod, enforceCPULimits bool, cpuPeriod uint64) 
 		if memoryLimitsDeclared {
 			result.Memory = &memoryLimits
 		}
-	} else {
+	default:
 		shares := uint64(MinShares)
 		result.CpuShares = &shares
 	}
