@@ -22,6 +22,8 @@ import (
 	"sync"
 	"testing"
 
+	cnitypes "github.com/containernetworking/cni/pkg/types"
+	cnicurrent "github.com/containernetworking/cni/pkg/types/current"
 	utilsets "k8s.io/apimachinery/pkg/util/sets"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -245,5 +247,58 @@ func TestMultiPodParallelNetworkOps(t *testing.T) {
 
 	if !didWait {
 		t.Errorf("waiter pod didn't wait for runner pod!")
+	}
+}
+
+func getCNIResult(ifaceName string, sandbox string, ipConfigs []*cnicurrent.IPConfig) *cnicurrent.Result {
+	return &cnicurrent.Result{
+		CNIVersion: "0.3.1",
+		Interfaces: []*cnicurrent.Interface{
+			{
+				Name:    ifaceName,
+				Mac:     "00:11:22:33:44:55",
+				Sandbox: sandbox,
+			},
+		},
+		IPs: ipConfigs,
+	}
+
+}
+
+func TestGetIpsFromResult(t *testing.T) {
+	ifaceName := "eth0"
+	sandbox := "/proc/3553/ns/net"
+	ipv4, _ := cnitypes.ParseCIDR("1.2.3.30/24")
+	ipv6, _ := cnitypes.ParseCIDR("abcd:1234:ffff::cdde/64")
+
+	ipv4conf := &cnicurrent.IPConfig{
+		Version:   "4",
+		Interface: cnicurrent.Int(0),
+		Address:   *ipv4,
+		Gateway:   net.ParseIP("1.2.3.1"),
+	}
+	ipv6conf := &cnicurrent.IPConfig{
+		Version:   "6",
+		Interface: cnicurrent.Int(0),
+		Address:   *ipv6,
+		Gateway:   net.ParseIP("abcd:1234:ffff::1"),
+	}
+
+	res := getCNIResult(ifaceName, sandbox, []*cnicurrent.IPConfig{ipv4conf, ipv6conf})
+	ips := network.GetIpsFromResult(res, ifaceName)
+	if len(ips) != 2 || !ipv4.IP.Equal(ips[0]) || !ipv6.IP.Equal(ips[1]) {
+		t.Fatalf("Error getting ipv4 and ipv6 from result")
+	}
+
+	res = getCNIResult(ifaceName, "", []*cnicurrent.IPConfig{ipv4conf, ipv6conf})
+	ips = network.GetIpsFromResult(res, ifaceName)
+	if len(ips) != 1 || !ipv4.IP.Equal(ips[0]) {
+		t.Fatalf("Error getting first ip from result(empty sandbox)")
+	}
+
+	res = getCNIResult("eth1", sandbox, []*cnicurrent.IPConfig{ipv4conf, ipv6conf})
+	ips = network.GetIpsFromResult(res, ifaceName)
+	if len(ips) != 1 || !ipv4.IP.Equal(ips[0]) {
+		t.Fatalf("Error getting first ip from result(another iface)")
 	}
 }

@@ -23,6 +23,7 @@ import (
 	"sync"
 	"time"
 
+	cnicurrent "github.com/containernetworking/cni/pkg/types/current"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilsets "k8s.io/apimachinery/pkg/util/sets"
@@ -288,6 +289,32 @@ func GetPodIPs(execer utilexec.Interface, nsenterPath, netnsPath, interfaceName 
 	}
 	return list, nil
 
+}
+
+func GetIpsFromResult(res *cnicurrent.Result, ifaceName string) []net.IP {
+	if res == nil {
+		return nil
+	}
+	outlist := make([]net.IP, 0)
+	for _, ip := range res.IPs {
+		if ip.Interface == nil || *ip.Interface > len(res.Interfaces) {
+			continue
+		}
+		intf := res.Interfaces[*ip.Interface]
+		if intf.Sandbox != "" && intf.Name == ifaceName {
+			// Found our sandbox interface, use the IP
+			outlist = append(outlist, ip.Address.IP)
+		}
+	}
+	if len(outlist) > 0 {
+		return outlist
+	}
+	// Fall back to first un-associated address for compatibility
+	// with older CNI plugins
+	if len(res.Interfaces) > 0 {
+		klog.Warningf("There is no ip address associated with network interface : %s", ifaceName)
+	}
+	return []net.IP{res.IPs[0].Address.IP}
 }
 
 type NoopPortMappingGetter struct{}
