@@ -49,19 +49,26 @@ func (s *preScoreState) Clone() framework.StateData {
 	return s
 }
 
-// initialize iterates "filteredNodes" to filter out the nodes which don't have required topologyKey(s),
-// and initialize two maps:
+// initPreScoreState iterates "filteredNodes" to filter out the nodes which
+// don't have required topologyKey(s), and initialize two maps:
 // 1) s.TopologyPairToPodCounts: keyed with both eligible topology pair and node names.
 // 2) s.NodeNameSet: keyed with node name, and valued with a *int64 pointer for eligible node only.
-func (s *preScoreState) initialize(pod *v1.Pod, filteredNodes []*v1.Node) error {
-	constraints, err := filterTopologySpreadConstraints(pod.Spec.TopologySpreadConstraints, v1.ScheduleAnyway)
-	if err != nil {
-		return err
+func (pl *PodTopologySpread) initPreScoreState(s *preScoreState, pod *v1.Pod, filteredNodes []*v1.Node) error {
+	var err error
+	if len(pod.Spec.TopologySpreadConstraints) > 0 {
+		s.Constraints, err = filterTopologySpreadConstraints(pod.Spec.TopologySpreadConstraints, v1.ScheduleAnyway)
+		if err != nil {
+			return fmt.Errorf("obtaining pod's soft topology spread constraints: %v", err)
+		}
+	} else {
+		s.Constraints, err = pl.defaultConstraints(pod, v1.ScheduleAnyway)
+		if err != nil {
+			return fmt.Errorf("setting default soft topology spread constraints: %v", err)
+		}
 	}
-	if constraints == nil {
+	if len(s.Constraints) == 0 {
 		return nil
 	}
-	s.Constraints = constraints
 	for _, node := range filteredNodes {
 		if !nodeLabelsMatchSpreadConstraints(node.Labels, s.Constraints) {
 			continue
@@ -100,13 +107,13 @@ func (pl *PodTopologySpread) PreScore(
 		NodeNameSet:             sets.String{},
 		TopologyPairToPodCounts: make(map[topologyPair]*int64),
 	}
-	err = state.initialize(pod, filteredNodes)
+	err = pl.initPreScoreState(state, pod, filteredNodes)
 	if err != nil {
 		return framework.NewStatus(framework.Error, fmt.Sprintf("error when calculating preScoreState: %v", err))
 	}
 
 	// return if incoming pod doesn't have soft topology spread Constraints.
-	if state.Constraints == nil {
+	if len(state.Constraints) == 0 {
 		cycleState.Write(preScoreStateKey, state)
 		return nil
 	}

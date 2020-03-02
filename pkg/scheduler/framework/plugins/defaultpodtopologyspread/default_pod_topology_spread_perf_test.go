@@ -22,7 +22,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/informers"
-	clientsetfake "k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/kubernetes/fake"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
@@ -53,10 +53,9 @@ func BenchmarkTestSelectorSpreadPriority(b *testing.B) {
 			pod := st.MakePod().Name("p").Label("foo", "").Obj()
 			existingPods, allNodes, filteredNodes := st.MakeNodesAndPodsForEvenPodsSpread(pod.Labels, tt.existingPodsNum, tt.allNodesNum, tt.allNodesNum)
 			snapshot := cache.NewSnapshot(existingPods, allNodes)
-			services := &v1.ServiceList{
-				Items: []v1.Service{{Spec: v1.ServiceSpec{Selector: map[string]string{"foo": ""}}}},
-			}
-			client := clientsetfake.NewSimpleClientset(services)
+			client := fake.NewSimpleClientset(
+				&v1.Service{Spec: v1.ServiceSpec{Selector: map[string]string{"foo": ""}}},
+			)
 			ctx := context.Background()
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
 			_ = informerFactory.Core().V1().Services().Lister()
@@ -77,11 +76,17 @@ func BenchmarkTestSelectorSpreadPriority(b *testing.B) {
 				if !status.IsSuccess() {
 					b.Fatalf("unexpected error: %v", status)
 				}
+				var gotList framework.NodeScoreList
 				for _, node := range filteredNodes {
-					_, status := plugin.Score(ctx, state, pod, node.Name)
+					score, status := plugin.Score(ctx, state, pod, node.Name)
 					if !status.IsSuccess() {
 						b.Errorf("unexpected error: %v", status)
 					}
+					gotList = append(gotList, framework.NodeScore{Name: node.Name, Score: score})
+				}
+				status = plugin.NormalizeScore(context.Background(), state, pod, gotList)
+				if !status.IsSuccess() {
+					b.Fatal(status)
 				}
 			}
 		})

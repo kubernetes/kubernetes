@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	corelisters "k8s.io/client-go/listers/core/v1"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
 	"k8s.io/kubernetes/pkg/scheduler/nodeinfo"
@@ -109,7 +110,7 @@ func (pl *ServiceAffinity) createPreFilterState(pod *v1.Pod) (*preFilterState, e
 		return nil, fmt.Errorf("a pod is required to calculate service affinity preFilterState")
 	}
 	// Store services which match the pod.
-	matchingPodServices, err := schedulerlisters.GetPodServices(pl.serviceLister, pod)
+	matchingPodServices, err := helper.GetPodServices(pl.serviceLister, pod)
 	if err != nil {
 		return nil, fmt.Errorf("listing pod services: %v", err.Error())
 	}
@@ -282,7 +283,7 @@ func (pl *ServiceAffinity) Score(ctx context.Context, state *framework.CycleStat
 
 	// Pods matched namespace,selector on current node.
 	var selector labels.Selector
-	if services, err := schedulerlisters.GetPodServices(pl.serviceLister, pod); err == nil && len(services) > 0 {
+	if services, err := helper.GetPodServices(pl.serviceLister, pod); err == nil && len(services) > 0 {
 		selector = labels.SelectorFromSet(services[0].Spec.Selector)
 	} else {
 		selector = labels.NewSelector()
