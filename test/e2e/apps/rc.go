@@ -179,7 +179,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 
 		rcScalePatchPayload, err := json.Marshal(autoscalingv1.Scale{
 			Spec: autoscalingv1.ScaleSpec{
-				Replicas: 2,
+				Replicas: testRcMaxReplicaCount,
 			},
 		})
 		framework.ExpectNoError(err, "Failed to marshal json of replicationcontroller label patch")
