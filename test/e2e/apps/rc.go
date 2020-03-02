@@ -248,7 +248,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 				break
 			}
 		}
-		time.Sleep(1 * time.Second)
+		time.Sleep(10 * time.Second)
 
 		// Get the ReplicationController to check that it's deleted
 		_, err = f.ClientSet.CoreV1().ReplicationControllers(testRcNamespace).Get(context.TODO(), testRcName, metav1.GetOptions{})
