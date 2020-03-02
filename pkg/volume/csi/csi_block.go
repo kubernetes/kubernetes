@@ -189,7 +189,7 @@ func (m *csiBlockMapper) stageVolumeForBlock(
 		nil /* MountOptions */)
 
 	if err != nil {
-		return "", errors.New(log("blockMapper.stageVolumeForBlock failed: %v", err))
+		return "", err
 	}
 
 	klog.V(4).Infof(log("blockMapper.stageVolumeForBlock successfully requested NodeStageVolume [%s]", stagingPath))
@@ -249,7 +249,7 @@ func (m *csiBlockMapper) publishVolumeForBlock(
 	)
 
 	if err != nil {
-		return "", errors.New(log("blockMapper.publishVolumeForBlock failed: %v", err))
+		return "", err
 	}
 
 	return publishPath, nil
