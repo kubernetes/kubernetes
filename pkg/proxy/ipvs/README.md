@@ -183,7 +183,7 @@ ACCEPT     all  --  0.0.0.0/0            0.0.0.0/0            match-set KUBE-LOA
 **4. NodePort type service**
 
 For NodePort type service, IPVS proxier will install IPTABLES with match of ipset `KUBE-NODE-PORT-TCP/KUBE-NODE-PORT-UDP`.
-When specified `externalTrafficPolicy=local`, IPVS proxier will create ipset sets `KUBE-NODE-PORT-LOCAL-TC/KUBE-NODE-PORT-LOCAL-UDP`
+When specified `externalTrafficPolicy=local`, IPVS proxier will create ipset sets `KUBE-NODE-PORT-LOCAL-TCP/KUBE-NODE-PORT-LOCAL-UDP`
 and install IPTABLES accordingly, which should looks like what is shown below.
 
 Suppose service with TCP type nodePort.
@@ -323,7 +323,7 @@ export KUBE_PROXY_MODE=ipvs
 
 ### GCE Cluster
 
-Similar to local-up cluster, kube-proxy in [clusters running on GCE](https://kubernetes.io/docs/getting-started-guides/gce/) run in IPTABLES mode by default. Users need to  export the env `KUBE_PROXY_MODE=ipvs` before [starting a cluster](https://kubernetes.io/docs/getting-started-guides/gce/#starting-a-cluster):
+Similar to local-up cluster, kube-proxy in [clusters running on GCE](https://kubernetes.io/docs/getting-started-guides/gce/) run in IPTABLES mode by default. Users need to export the env `KUBE_PROXY_MODE=ipvs` before [starting a cluster](https://kubernetes.io/docs/getting-started-guides/gce/#starting-a-cluster):
 ```shell
 #before running one of the commands chosen to start a cluster:
 # curl -sS https://get.k8s.io | bash
@@ -369,7 +369,7 @@ Prot LocalAddress:Port Scheduler Flags
 TCP  10.0.0.1:443 rr persistent 10800
   -> 192.168.0.1:6443             Masq    1      1          0
 ```
-or similar logs occur in kube-proxy logs (for example, `/tmp/kube-proxy.log` for local-up cluster)  when the local cluster is running:
+or similar logs occur in kube-proxy logs (for example, `/tmp/kube-proxy.log` for local-up cluster) when the local cluster is running:
 ```
 Using ipvs Proxier.
 ```
