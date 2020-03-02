@@ -2379,18 +2379,11 @@ func TestConvertStatusToAPIStatus(t *testing.T) {
 	ephemeralContainerList := []v1.EphemeralContainer{
 		{EphemeralContainerCommon: v1.EphemeralContainerCommon{Name: ephemeralContainerName}},
 	}
-	pod := podWithUIDNameNs("uid1", "foo", "test")
-	podStatus := &kubecontainer.PodStatus{
-		ID:        pod.UID,
-		Name:      pod.Name,
-		Namespace: pod.Namespace,
-		//		ContainerStatuses: cStatuses,
-	}
 	for _, test := range []struct {
 		name          string
 		podSpec       v1.PodSpec
 		cStatuses     []*kubecontainer.ContainerStatus
-		wantContainer *v1.PodStatus
+		wantPodStatus *v1.PodStatus
 	}{
 		{
 			name: "regular container",
@@ -2403,7 +2396,7 @@ func TestConvertStatusToAPIStatus(t *testing.T) {
 					Name: containerName,
 				},
 			},
-			wantContainer: &v1.PodStatus{
+			wantPodStatus: &v1.PodStatus{
 				PodIPs:   []v1.PodIP{},
 				QOSClass: v1.PodQOSBestEffort,
 				ContainerStatuses: []v1.ContainerStatus{
@@ -2436,7 +2429,7 @@ func TestConvertStatusToAPIStatus(t *testing.T) {
 					Name: initContainerName,
 				},
 			},
-			wantContainer: &v1.PodStatus{
+			wantPodStatus: &v1.PodStatus{
 				PodIPs:   []v1.PodIP{},
 				QOSClass: v1.PodQOSBestEffort,
 				ContainerStatuses: []v1.ContainerStatus{
@@ -2486,7 +2479,7 @@ func TestConvertStatusToAPIStatus(t *testing.T) {
 					Name: ephemeralContainerName,
 				},
 			},
-			wantContainer: &v1.PodStatus{
+			wantPodStatus: &v1.PodStatus{
 				PodIPs:   []v1.PodIP{},
 				QOSClass: v1.PodQOSBestEffort,
 				ContainerStatuses: []v1.ContainerStatus{
@@ -2528,10 +2521,15 @@ func TestConvertStatusToAPIStatus(t *testing.T) {
 			},
 		},
 	} {
-		pod.Spec = test.podSpec
-		podStatus.ContainerStatuses = test.cStatuses
+		pod := podWithUIDNameNsSpec("uid1", "foo", "test", test.podSpec)
+		podStatus := &kubecontainer.PodStatus{
+			ID:                pod.UID,
+			Name:              pod.Name,
+			Namespace:         pod.Namespace,
+			ContainerStatuses: test.cStatuses,
+		}
 		apiStatus := kubelet.convertStatusToAPIStatus(pod, podStatus)
-		if diff := cmp.Diff(test.wantContainer, apiStatus); diff != "" {
+		if diff := cmp.Diff(test.wantPodStatus, apiStatus); diff != "" {
 			t.Fatalf("convertStatusToAPIStatus for %q returned diff (-want +got):%v", test.name, diff)
 		}
 	}
