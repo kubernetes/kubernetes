@@ -25,6 +25,7 @@ import (
 	"syscall"
 	"testing"
 
+	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -319,5 +320,30 @@ func TestDumpReaderToFile(t *testing.T) {
 	stringData := string(data)
 	if stringData != testString {
 		t.Fatalf("Wrong file content %s != %s", testString, stringData)
+	}
+}
+
+func TestGetApplyFlags(t *testing.T) {
+	cmd := &cobra.Command{}
+	cmd.Flags().String("dry-run", "client", "")
+	cmd.Flags().Bool("validate", true, "")
+	cmd.Flags().Bool("server-side", true, "")
+	cmd.Flags().Bool("force-conflicts", true, "")
+	af, err := GetApplyFlags(cmd)
+	if err != nil {
+		t.Errorf("unexpected error fetching ApplyFlags %v", err)
+	}
+
+	if !af.Validate {
+		t.Fatalf("Got: %t, expected: %t", af.Validate, true)
+	}
+	if !af.ServerSideApply {
+		t.Fatalf("Got: %t, expected: %t", af.ServerSideApply, true)
+	}
+	if !af.ForceConflicts {
+		t.Fatalf("Got: %t, expected: %t", af.ForceConflicts, true)
+	}
+	if af.DryRunStrategy != DryRunClient {
+		t.Fatalf("Got: %d, expected: %d", af.DryRunStrategy, DryRunClient)
 	}
 }

@@ -172,9 +172,12 @@ func NewCmdApply(baseName string, f cmdutil.Factory, ioStreams genericclioptions
 		Long:                  applyLong,
 		Example:               applyExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.Complete(f, cmd))
+			cmdutil.CheckErr(o.RecordFlags.Complete(cmd))
+			af, err := cmdutil.GetApplyFlags(cmd)
+			af.FieldManager = GetApplyFieldManagerFlag(cmd, o.ServerSideApply)
+			cmdutil.CheckErr(err)
+			cmdutil.CheckErr(o.Complete(f, af))
 			cmdutil.CheckErr(validateArgs(cmd, args))
-			cmdutil.CheckErr(validatePruneAll(o.Prune, o.All, o.Selector))
 			cmdutil.CheckErr(o.Run())
 		},
 	}
@@ -204,14 +207,11 @@ func NewCmdApply(baseName string, f cmdutil.Factory, ioStreams genericclioptions
 }
 
 // Complete verifies if ApplyOptions are valid and without conflicts.
-func (o *ApplyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
+func (o *ApplyOptions) Complete(f cmdutil.Factory, flags *cmdutil.ApplyFlags) error {
+	o.DryRunStrategy = flags.DryRunStrategy
+	o.ServerSideApply = flags.ServerSideApply
+	o.ForceConflicts = flags.ForceConflicts
 	var err error
-	o.ServerSideApply = cmdutil.GetServerSideApplyFlag(cmd)
-	o.ForceConflicts = cmdutil.GetForceConflictsFlag(cmd)
-	o.DryRunStrategy, err = cmdutil.GetDryRunStrategy(cmd)
-	if err != nil {
-		return err
-	}
 	o.DynamicClient, err = f.DynamicClient()
 	if err != nil {
 		return err
@@ -221,7 +221,7 @@ func (o *ApplyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 		return err
 	}
 	o.DryRunVerifier = resource.NewDryRunVerifier(o.DynamicClient, discoveryClient)
-	o.FieldManager = GetApplyFieldManagerFlag(cmd, o.ServerSideApply)
+	o.FieldManager = flags.FieldManager
 
 	if o.ForceConflicts && !o.ServerSideApply {
 		return fmt.Errorf("--force-conflicts only works with --server-side")
@@ -238,7 +238,6 @@ func (o *ApplyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 		return o.PrintFlags.ToPrinter()
 	}
 
-	o.RecordFlags.Complete(cmd)
 	o.Recorder, err = o.RecordFlags.ToRecorder()
 	if err != nil {
 		return err
@@ -255,7 +254,7 @@ func (o *ApplyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	}
 
 	o.OpenAPISchema, _ = f.OpenAPISchema()
-	o.Validator, err = f.Validator(cmdutil.GetFlagBool(cmd, "validate"))
+	o.Validator, err = f.Validator(flags.Validate)
 	if err != nil {
 		return err
 	}
@@ -278,6 +277,11 @@ func (o *ApplyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	}
 
 	o.PostProcessorFn = o.PrintAndPrunePostProcessor()
+
+	err = validatePruneAll(o.Prune, o.All, o.Selector)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }

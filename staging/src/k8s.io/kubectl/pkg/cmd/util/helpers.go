@@ -56,6 +56,14 @@ type debugError interface {
 	DebugError() (msg string, args []interface{})
 }
 
+type ApplyFlags struct {
+	ServerSideApply bool
+	Validate        bool
+	DryRunStrategy  DryRunStrategy
+	FieldManager    string
+	ForceConflicts  bool
+}
+
 // AddSourceToErr adds handleResourcePrefix and source string to error message.
 // verb is the string like "creating", "deleting" etc.
 // source is the filename or URL to the template file(*.json or *.yaml), or stdin to use to handle the resource.
@@ -390,6 +398,22 @@ func GetPodRunningTimeoutFlag(cmd *cobra.Command) (time.Duration, error) {
 		return timeout, fmt.Errorf("--pod-running-timeout must be higher than zero")
 	}
 	return timeout, nil
+}
+
+// GetApplyFlags extracts the additional flags needed for ApplyOptions.Complete()
+// in order to decouple it from cobra
+func GetApplyFlags(cmd *cobra.Command) (*ApplyFlags, error) {
+	drs, err := GetDryRunStrategy(cmd)
+	if err != nil {
+		return nil, err
+	}
+	af := ApplyFlags{
+		Validate:        GetFlagBool(cmd, "validate"),
+		DryRunStrategy:  drs,
+		ServerSideApply: GetServerSideApplyFlag(cmd),
+		ForceConflicts:  GetForceConflictsFlag(cmd),
+	}
+	return &af, nil
 }
 
 func AddValidateFlags(cmd *cobra.Command) {

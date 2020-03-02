@@ -59,6 +59,7 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/util/diff:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/scheme:go_default_library",
+        "//vendor/github.com/spf13/cobra:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
     ],
 )
