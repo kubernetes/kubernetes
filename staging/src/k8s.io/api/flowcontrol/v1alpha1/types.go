@@ -277,13 +277,7 @@ type NonResourcePolicyRule struct {
 	// +listType=set
 	// Required.
 	Verbs []string `json:"verbs" protobuf:"bytes,1,rep,name=verbs"`
-	// `nonResourceURLs` is a set of url prefixes that a user should have access to and may not be empty.
-	// For example:
-	//   - "/healthz" is legal
-	//   - "/hea*" is illegal
-	//   - "/hea" is legal but matches nothing
-	//   - "/hea/*" also matches nothing
-	//   - "/healthz/*" matches all per-component health checks.
+	// `nonResourceURLs` is a set of URLs that match and may not be empty.
 	// "*" matches all non-resource urls. if it is present, it must be the only entry.
 	// +listType=set
 	// Required.
