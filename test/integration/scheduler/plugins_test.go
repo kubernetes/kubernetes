@@ -19,21 +19,22 @@ package scheduler
 import (
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
+	testutils "k8s.io/kubernetes/test/integration/util"
 )
 
 func TestNodeResourceLimits(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ResourceLimitsPriorityFunction, true)()
 
 	testCtx := initTest(t, "node-resource-limits")
-	defer cleanupTest(t, testCtx)
+	defer testutils.CleanupTest(t, testCtx)
 
 	// Add one node
-	expectedNode, err := createNode(testCtx.clientSet, "test-node1", &v1.ResourceList{
+	expectedNode, err := createNode(testCtx.ClientSet, "test-node1", &v1.ResourceList{
 		v1.ResourcePods:   *resource.NewQuantity(32, resource.DecimalSI),
 		v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
 		v1.ResourceMemory: *resource.NewQuantity(2000, resource.DecimalSI),
@@ -43,7 +44,7 @@ func TestNodeResourceLimits(t *testing.T) {
 	}
 
 	// Add another node with less resource
-	_, err = createNode(testCtx.clientSet, "test-node2", &v1.ResourceList{
+	_, err = createNode(testCtx.ClientSet, "test-node2", &v1.ResourceList{
 		v1.ResourcePods:   *resource.NewQuantity(32, resource.DecimalSI),
 		v1.ResourceCPU:    *resource.NewMilliQuantity(1000, resource.DecimalSI),
 		v1.ResourceMemory: *resource.NewQuantity(1000, resource.DecimalSI),
@@ -53,9 +54,9 @@ func TestNodeResourceLimits(t *testing.T) {
 	}
 
 	podName := "pod-with-resource-limits"
-	pod, err := runPausePod(testCtx.clientSet, initPausePod(testCtx.clientSet, &pausePodConfig{
+	pod, err := runPausePod(testCtx.ClientSet, initPausePod(testCtx.ClientSet, &pausePodConfig{
 		Name:      podName,
-		Namespace: testCtx.ns.Name,
+		Namespace: testCtx.NS.Name,
 		Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 			v1.ResourceCPU:    *resource.NewMilliQuantity(500, resource.DecimalSI),
 			v1.ResourceMemory: *resource.NewQuantity(500, resource.DecimalSI)},

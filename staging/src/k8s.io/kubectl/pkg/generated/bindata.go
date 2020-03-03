@@ -13911,7 +13911,7 @@ func translationsKubectlIt_itLc_messagesK8sPo() (*asset, error) {
 	return a, nil
 }
 
-var _translationsKubectlJa_jpLc_messagesK8sMo = []byte("\xde\x12\x04\x95\x00\x00\x00\x00\xeb\x00\x00\x00\x1c\x00\x00\x00t\a\x00\x009\x01\x00\x00\xcc\x0e\x00\x00\x00\x00\x00\x00\xb0\x13\x00\x00\xdc\x00\x00\x00\xb1\x13\x00\x00\xb6\x00\x00\x00\x8e\x14\x00\x00\v\x02\x00\x00E\x15\x00\x00\x1f\x01\x00\x00Q\x17\x00\x00z\x00\x00\x00q\x18\x00\x00_\x02\x00\x00\xec\x18\x00\x00\u007f\x01\x00\x00L\x1b\x00\x00\x8f\x01\x00\x00\xcc\x1c\x00\x00k\x01\x00\x00\\\x1e\x00\x00k\x01\x00\x00\xc8\x1f\x00\x00>\x01\x00\x004!\x00\x00\x03\x02\x00\x00s\"\x00\x00o\x01\x00\x00w$\x00\x00H\x05\x00\x00\xe7%\x00\x00g\x02\x00\x000+\x00\x00\x1b\x02\x00\x00\x98-\x00\x00q\x01\x00\x00\xb4/\x00\x00\xa8\x01\x00\x00&1\x00\x00\xd4\x01\x00\x00\xcf2\x00\x00\x02\x02\x00\x00\xa44\x00\x00\xb4\x00\x00\x00\xa76\x00\x00\xb7\x02\x00\x00\\7\x00\x00\x92\x03\x00\x00\x14:\x00\x00\xbf\x01\x00\x00\xa7=\x00\x00=\x00\x00\x00g?\x00\x00;\x00\x00\x00\xa5?\x00\x00\xcd\x02\x00\x00\xe1?\x00\x00<\x00\x00\x00\xafB\x00\x00P\x00\x00\x00\xecB\x00\x00S\x00\x00\x00=C\x00\x00<\x00\x00\x00\x91C\x00\x00\xac\x01\x00\x00\xceC\x00\x00\x13\x03\x00\x00{E\x00\x00\xea\x01\x00\x00\x8fH\x00\x00\xfa\x01\x00\x00zJ\x00\x00\xda\x01\x00\x00uL\x00\x00c\x01\x00\x00PN\x00\x00T\x01\x00\x00\xb4O\x00\x00\xba\x06\x00\x00\tQ\x00\x00\xf9\x01\x00\x00\xc4W\x00\x00\xe0\x02\x00\x00\xbeY\x00\x00\x02\x03\x00\x00\x9f\\\x00\x00\xfb\x00\x00\x00\xa2_\x00\x00\xa5\x01\x00\x00\x9e`\x00\x00\xb4\x01\x00\x00Db\x00\x00\x18\x00\x00\x00\xf9c\x00\x00<\x00\x00\x00\x12d\x00\x00=\x00\x00\x00Od\x00\x00\xc6\x00\x00\x00\x8dd\x00\x00g\x02\x00\x00Te\x00\x00.\x00\x00\x00\xbcg\x00\x001\x03\x00\x00\xebg\x00\x00g\x00\x00\x00\x1dk\x00\x00Q\x00\x00\x00\x85k\x00\x00R\x00\x00\x00\xd7k\x00\x00\"\x00\x00\x00*l\x00\x00X\x02\x00\x00Ml\x00\x004\x00\x00\x00\xa6n\x00\x00}\x00\x00\x00\xdbn\x00\x00k\x01\x00\x00Yo\x00\x00\x81\a\x00\x00\xc5p\x00\x00f\x01\x00\x00Gx\x00\x00\x85\x00\x00\x00\xaey\x00\x00\xea\x00\x00\x004z\x00\x00\xd9\x00\x00\x00\x1f{\x00\x00\n\x05\x00\x00\xf9{\x00\x00\x10\x05\x00\x00\x04\x81\x00\x00\x1c\x00\x00\x00\x15\x86\x00\x00\x1e\x00\x00\x002\x86\x00\x00\x98\x02\x00\x00Q\x86\x00\x00\xbc\x01\x00\x00\xea\x88\x00\x00\x9c\x01\x00\x00\xa7\x8a\x00\x00q\x01\x00\x00D\x8c\x00\x00\x05\x01\x00\x00\xb6\x8d\x00\x00\xdf\x01\x00\x00\xbc\x8e\x00\x00\x1c\x01\x00\x00\x9c\x90\x00\x00\xc1\x01\x00\x00\xb9\x91\x00\x00\x1b\x02\x00\x00{\x93\x00\x00\xc0\x00\x00\x00\x97\x95\x00\x00\xd5\x02\x00\x00X\x96\x00\x00\x9d\x00\x00\x00.\x99\x00\x00X\x00\x00\x00\u0319\x00\x00%\x02\x00\x00%\x9a\x00\x00o\x00\x00\x00K\x9c\x00\x00u\x00\x00\x00\xbb\x9c\x00\x00\x01\x01\x00\x001\x9d\x00\x00v\x00\x00\x003\x9e\x00\x00t\x00\x00\x00\xaa\x9e\x00\x00\xef\x00\x00\x00\x1f\x9f\x00\x00}\x00\x00\x00\x0f\xa0\x00\x00j\x00\x00\x00\x8d\xa0\x00\x00\xc4\x01\x00\x00\xf8\xa0\x00\x00\xf7\x03\x00\x00\xbd\xa2\x00\x00;\x00\x00\x00\xb5\xa6\x00\x008\x00\x00\x00\xf1\xa6\x00\x001\x00\x00\x00*\xa7\x00\x007\x00\x00\x00\\\xa7\x00\x00u\x02\x00\x00\x94\xa7\x00\x00\xb0\x00\x00\x00\n\xaa\x00\x00[\x00\x00\x00\xbb\xaa\x00\x00J\x00\x00\x00\x17\xab\x00\x00a\x00\x00\x00b\xab\x00\x00\xbd\x00\x00\x00\u012b\x00\x009\x00\x00\x00\x82\xac\x00\x00\xc5\x00\x00\x00\xbc\xac\x00\x00\xae\x00\x00\x00\x82\xad\x00\x00\xd6\x00\x00\x001\xae\x00\x008\x00\x00\x00\b\xaf\x00\x00%\x00\x00\x00A\xaf\x00\x00W\x00\x00\x00g\xaf\x00\x00\x1d\x00\x00\x00\xbf\xaf\x00\x00=\x00\x00\x00\u076f\x00\x00u\x00\x00\x00\x1b\xb0\x00\x004\x00\x00\x00\x91\xb0\x00\x00-\x00\x00\x00\u01b0\x00\x00\xa3\x00\x00\x00\xf4\xb0\x00\x003\x00\x00\x00\x98\xb1\x00\x002\x00\x00\x00\u0331\x00\x008\x00\x00\x00\xff\xb1\x00\x00\x1e\x00\x00\x008\xb2\x00\x00\x1a\x00\x00\x00W\xb2\x00\x009\x00\x00\x00r\xb2\x00\x00\x13\x00\x00\x00\xac\xb2\x00\x00\x1b\x00\x00\x00\xc0\xb2\x00\x00@\x00\x00\x00\u0732\x00\x00,\x00\x00\x00\x1d\xb3\x00\x00*\x00\x00\x00J\xb3\x00\x007\x00\x00\x00u\xb3\x00\x00'\x00\x00\x00\xad\xb3\x00\x00&\x00\x00\x00\u0573\x00\x00.\x00\x00\x00\xfc\xb3\x00\x00=\x00\x00\x00+\xb4\x00\x00*\x00\x00\x00i\xb4\x00\x000\x00\x00\x00\x94\xb4\x00\x00,\x00\x00\x00\u0174\x00\x00\x1f\x00\x00\x00\xf2\xb4\x00\x00]\x00\x00\x00\x12\xb5\x00\x000\x00\x00\x00p\xb5\x00\x000\x00\x00\x00\xa1\xb5\x00\x00\"\x00\x00\x00\u04b5\x00\x00?\x00\x00\x00\xf5\xb5\x00\x00\x1d\x00\x00\x005\xb6\x00\x00,\x00\x00\x00S\xb6\x00\x00+\x00\x00\x00\x80\xb6\x00\x00$\x00\x00\x00\xac\xb6\x00\x00\x14\x00\x00\x00\u0476\x00\x00*\x00\x00\x00\xe6\xb6\x00\x00A\x00\x00\x00\x11\xb7\x00\x00\x1d\x00\x00\x00S\xb7\x00\x00\x1c\x00\x00\x00q\xb7\x00\x00\x1a\x00\x00\x00\x8e\xb7\x00\x00)\x00\x00\x00\xa9\xb7\x00\x006\x00\x00\x00\u04f7\x00\x00\x1d\x00\x00\x00\n\xb8\x00\x00\x19\x00\x00\x00(\xb8\x00\x00 \x00\x00\x00B\xb8\x00\x00v\x00\x00\x00c\xb8\x00\x00(\x00\x00\x00\u06b8\x00\x00\x16\x00\x00\x00\x03\xb9\x00\x00p\x00\x00\x00\x1a\xb9\x00\x00`\x00\x00\x00\x8b\xb9\x00\x00\x9b\x00\x00\x00\xec\xb9\x00\x00\x97\x00\x00\x00\x88\xba\x00\x00\xa8\x00\x00\x00 \xbb\x00\x00\x1b\x00\x00\x00\u027b\x00\x00\x18\x00\x00\x00\xe5\xbb\x00\x00\x1a\x00\x00\x00\xfe\xbb\x00\x00$\x00\x00\x00\x19\xbc\x00\x00\x1d\x00\x00\x00>\xbc\x00\x00\x17\x00\x00\x00\\\xbc\x00\x00a\x00\x00\x00t\xbc\x00\x00s\x00\x00\x00\u05bc\x00\x00B\x00\x00\x00J\xbd\x00\x00Y\x00\x00\x00\x8d\xbd\x00\x00+\x00\x00\x00\xe7\xbd\x00\x00+\x00\x00\x00\x13\xbe\x00\x006\x00\x00\x00?\xbe\x00\x00;\x00\x00\x00v\xbe\x00\x00q\x00\x00\x00\xb2\xbe\x00\x00/\x00\x00\x00$\xbf\x00\x001\x00\x00\x00T\xbf\x00\x00'\x00\x00\x00\x86\xbf\x00\x00'\x00\x00\x00\xae\xbf\x00\x00\x18\x00\x00\x00\u05bf\x00\x00&\x00\x00\x00\xef\xbf\x00\x00%\x00\x00\x00\x16\xc0\x00\x00(\x00\x00\x00<\xc0\x00\x00#\x00\x00\x00e\xc0\x00\x00K\x00\x00\x00\x89\xc0\x00\x00 \x00\x00\x00\xd5\xc0\x00\x00_\x00\x00\x00\xf6\xc0\x00\x00\x1e\x00\x00\x00V\xc1\x00\x00\"\x00\x00\x00u\xc1\x00\x00\"\x00\x00\x00\x98\xc1\x00\x00\x1f\x00\x00\x00\xbb\xc1\x00\x00-\x00\x00\x00\xdb\xc1\x00\x00-\x00\x00\x00\t\xc2\x00\x009\x00\x00\x007\xc2\x00\x00\x1e\x00\x00\x00q\xc2\x00\x00\x19\x00\x00\x00\x90\xc2\x00\x00c\x00\x00\x00\xaa\xc2\x00\x00#\x00\x00\x00\x0e\xc3\x00\x00\x82\x00\x00\x002\xc3\x00\x00\x94\x00\x00\x00\xb5\xc3\x00\x00H\x00\x00\x00J\xc4\x00\x00&\x00\x00\x00\x93\xc4\x00\x00e\x00\x00\x00\xba\xc4\x00\x00z\x00\x00\x00 \xc5\x00\x00J\x00\x00\x00\x9b\xc5\x00\x00\xe5\x00\x00\x00\xe6\xc5\x00\x00W\x00\x00\x00\xcc\xc6\x00\x00E\x00\x00\x00$\xc7\x00\x00a\x00\x00\x00j\xc7\x00\x00v\x00\x00\x00\xcc\xc7\x00\x00\xcb\x00\x00\x00C\xc8\x00\x00\xcf\x00\x00\x00\x0f\xc9\x00\x00\x1e\x01\x00\x00\xdf\xc9\x00\x00\x1c\x00\x00\x00\xfe\xca\x00\x00T\x00\x00\x00\x1b\xcb\x00\x00\x17\x00\x00\x00p\xcb\x00\x00/\x00\x00\x00\x88\xcb\x00\x009\x00\x00\x00\xb8\xcb\x00\x00\x1e\x00\x00\x00\xf2\xcb\x00\x00=\x00\x00\x00\x11\xcc\x00\x00$\x00\x00\x00O\xcc\x00\x00\x1f\x00\x00\x00t\xcc\x00\x00&\x00\x00\x00\x94\xcc\x00\x00+\x00\x00\x00\xbb\xcc\x00\x00G\x00\x00\x00\xe7\xcc\x00\x00\x14\x00\x00\x00/\xcd\x00\x00r\x00\x00\x00D\xcd\x00\x00\x13\x00\x00\x00\xb7\xcd\x00\x00\x18\x00\x00\x00\xcb\xcd\x00\x00/\x00\x00\x00\xe4\xcd\x00\x00\xaa\x01\x00\x00\x14\xce\x00\x00\xe0\x00\x00\x00\xbf\xcf\x00\x00\xba\x00\x00\x00\xa0\xd0\x00\x00\x10\x02\x00\x00[\xd1\x00\x00%\x01\x00\x00l\xd3\x00\x00z\x00\x00\x00\x92\xd4\x00\x00d\x02\x00\x00\r\xd5\x00\x00\x8b\x01\x00\x00r\xd7\x00\x00\x98\x01\x00\x00\xfe\xd8\x00\x00\x84\x01\x00\x00\x97\xda\x00\x00\x88\x01\x00\x00\x1c\xdc\x00\x00A\x01\x00\x00\xa5\xdd\x00\x00\a\x02\x00\x00\xe7\xde\x00\x00q\x01\x00\x00\xef\xe0\x00\x00\\\x05\x00\x00a\xe2\x00\x00s\x02\x00\x00\xbe\xe7\x00\x00#\x02\x00\x002\xea\x00\x00w\x01\x00\x00V\xec\x00\x00\xb9\x01\x00\x00\xce\xed\x00\x00\xe5\x01\x00\x00\x88\xef\x00\x00\n\x02\x00\x00n\xf1\x00\x00\xb4\x00\x00\x00y\xf3\x00\x00\xbf\x02\x00\x00.\xf4\x00\x00\x97\x03\x00\x00\xee\xf6\x00\x00\xbf\x01\x00\x00\x86\xfa\x00\x00A\x00\x00\x00F\xfc\x00\x00?\x00\x00\x00\x88\xfc\x00\x00,\x03\x00\x00\xc8\xfc\x00\x00<\x00\x00\x00\xf5\xff\x00\x00P\x00\x00\x002\x00\x01\x00S\x00\x00\x00\x83\x00\x01\x00<\x00\x00\x00\xd7\x00\x01\x00\xb3\x01\x00\x00\x14\x01\x01\x00\x15\x03\x00\x00\xc8\x02\x01\x00\xee\x01\x00\x00\xde\x05\x01\x00\x0e\x02\x00\x00\xcd\a\x01\x00\xdb\x01\x00\x00\xdc\t\x01\x00e\x01\x00\x00\xb8\v\x01\x00T\x01\x00\x00\x1e\r\x01\x00\xd4\x06\x00\x00s\x0e\x01\x00\x1d\x02\x00\x00H\x15\x01\x00\f\x03\x00\x00f\x17\x01\x00\x05\x03\x00\x00s\x1a\x01\x00\xfb\x00\x00\x00y\x1d\x01\x00\xb5\x01\x00\x00u\x1e\x01\x00\xb5\x01\x00\x00+ \x01\x00\x18\x00\x00\x00\xe1!\x01\x00<\x00\x00\x00\xfa!\x01\x00=\x00\x00\x007\"\x01\x00\xc6\x00\x00\x00u\"\x01\x00g\x02\x00\x00<#\x01\x00.\x00\x00\x00\xa4%\x01\x00>\x03\x00\x00\xd3%\x01\x00g\x00\x00\x00\x12)\x01\x00Q\x00\x00\x00z)\x01\x00R\x00\x00\x00\xcc)\x01\x00\"\x00\x00\x00\x1f*\x01\x00X\x02\x00\x00B*\x01\x004\x00\x00\x00\x9b,\x01\x00}\x00\x00\x00\xd0,\x01\x00k\x01\x00\x00N-\x01\x00\x83\a\x00\x00\xba.\x01\x00k\x01\x00\x00>6\x01\x00\x85\x00\x00\x00\xaa7\x01\x00\xee\x00\x00\x0008\x01\x00\xd9\x00\x00\x00\x1f9\x01\x00\x10\x05\x00\x00\xf99\x01\x00\x15\x05\x00\x00\n?\x01\x00\x1c\x00\x00\x00 D\x01\x00\x1e\x00\x00\x00=D\x01\x00\x99\x02\x00\x00\\D\x01\x00\xbc\x01\x00\x00\xf6F\x01\x00\x9c\x01\x00\x00\xb3H\x01\x00s\x01\x00\x00PJ\x01\x00\t\x01\x00\x00\xc4K\x01\x00\xec\x01\x00\x00\xceL\x01\x00\x1c\x01\x00\x00\xbbN\x01\x00\xc3\x01\x00\x00\xd8O\x01\x00\x1b\x02\x00\x00\x9cQ\x01\x00\xc0\x00\x00\x00\xb8S\x01\x00\xe1\x02\x00\x00yT\x01\x00\x9f\x00\x00\x00[W\x01\x00X\x00\x00\x00\xfbW\x01\x00*\x02\x00\x00TX\x01\x00o\x00\x00\x00\u007fZ\x01\x00v\x00\x00\x00\xefZ\x01\x00\x01\x01\x00\x00f[\x01\x00v\x00\x00\x00h\\\x01\x00u\x00\x00\x00\xdf\\\x01\x00\xf5\x00\x00\x00U]\x01\x00~\x00\x00\x00K^\x01\x00k\x00\x00\x00\xca^\x01\x00\xc8\x01\x00\x006_\x01\x00#\x04\x00\x00\xff`\x01\x00;\x00\x00\x00#e\x01\x008\x00\x00\x00_e\x01\x001\x00\x00\x00\x98e\x01\x007\x00\x00\x00\xcae\x01\x00|\x02\x00\x00\x02f\x01\x00\xb4\x00\x00\x00\u007fh\x01\x00[\x00\x00\x004i\x01\x00J\x00\x00\x00\x90i\x01\x00a\x00\x00\x00\xdbi\x01\x00\xbd\x00\x00\x00=j\x01\x009\x00\x00\x00\xfbj\x01\x00\xc5\x00\x00\x005k\x01\x00\xae\x00\x00\x00\xfbk\x01\x00\xd7\x00\x00\x00\xaal\x01\x00c\x00\x00\x00\x82m\x01\x00%\x00\x00\x00\xe6m\x01\x00_\x00\x00\x00\fn\x01\x00\x1d\x00\x00\x00ln\x01\x00=\x00\x00\x00\x8an\x01\x00y\x00\x00\x00\xc8n\x01\x004\x00\x00\x00Bo\x01\x00-\x00\x00\x00wo\x01\x00\xa5\x00\x00\x00\xa5o\x01\x003\x00\x00\x00Kp\x01\x002\x00\x00\x00\u007fp\x01\x008\x00\x00\x00\xb2p\x01\x00\x1e\x00\x00\x00\xebp\x01\x00\x1a\x00\x00\x00\nq\x01\x009\x00\x00\x00%q\x01\x00\x13\x00\x00\x00_q\x01\x00\x1b\x00\x00\x00sq\x01\x00@\x00\x00\x00\x8fq\x01\x00,\x00\x00\x00\xd0q\x01\x00*\x00\x00\x00\xfdq\x01\x007\x00\x00\x00(r\x01\x00'\x00\x00\x00`r\x01\x00Q\x00\x00\x00\x88r\x01\x00.\x00\x00\x00\xdar\x01\x00=\x00\x00\x00\ts\x01\x00*\x00\x00\x00Gs\x01\x000\x00\x00\x00rs\x01\x00,\x00\x00\x00\xa3s\x01\x00\x1f\x00\x00\x00\xd0s\x01\x00]\x00\x00\x00\xf0s\x01\x00:\x00\x00\x00Nt\x01\x00=\x00\x00\x00\x89t\x01\x00\"\x00\x00\x00\xc7t\x01\x00?\x00\x00\x00\xeat\x01\x007\x00\x00\x00*u\x01\x00,\x00\x00\x00bu\x01\x00+\x00\x00\x00\x8fu\x01\x00$\x00\x00\x00\xbbu\x01\x00'\x00\x00\x00\xe0u\x01\x00:\x00\x00\x00\bv\x01\x00b\x00\x00\x00Cv\x01\x001\x00\x00\x00\xa6v\x01\x00-\x00\x00\x00\xd8v\x01\x00$\x00\x00\x00\x06w\x01\x00)\x00\x00\x00+w\x01\x006\x00\x00\x00Uw\x01\x00\x1d\x00\x00\x00\x8cw\x01\x00\x19\x00\x00\x00\xaaw\x01\x00 \x00\x00\x00\xc4w\x01\x00w\x00\x00\x00\xe5w\x01\x00(\x00\x00\x00]x\x01\x00\x16\x00\x00\x00\x86x\x01\x00p\x00\x00\x00\x9dx\x01\x00h\x00\x00\x00\x0ey\x01\x00\x9b\x00\x00\x00wy\x01\x00\x97\x00\x00\x00\x13z\x01\x00\xa9\x00\x00\x00\xabz\x01\x00\x1b\x00\x00\x00U{\x01\x00\x18\x00\x00\x00q{\x01\x00\x1a\x00\x00\x00\x8a{\x01\x00$\x00\x00\x00\xa5{\x01\x00\x1d\x00\x00\x00\xca{\x01\x00%\x00\x00\x00\xe8{\x01\x00a\x00\x00\x00\x0e|\x01\x00s\x00\x00\x00p|\x01\x00B\x00\x00\x00\xe4|\x01\x00]\x00\x00\x00'}\x01\x00+\x00\x00\x00\x85}\x01\x00+\x00\x00\x00\xb1}\x01\x006\x00\x00\x00\xdd}\x01\x00;\x00\x00\x00\x14~\x01\x00q\x00\x00\x00P~\x01\x00/\x00\x00\x00\xc2~\x01\x001\x00\x00\x00\xf2~\x01\x00'\x00\x00\x00$\u007f\x01\x00'\x00\x00\x00L\u007f\x01\x00\x18\x00\x00\x00t\u007f\x01\x00&\x00\x00\x00\x8d\u007f\x01\x00%\x00\x00\x00\xb4\u007f\x01\x00(\x00\x00\x00\xda\u007f\x01\x00#\x00\x00\x00\x03\x80\x01\x00K\x00\x00\x00'\x80\x01\x00 \x00\x00\x00s\x80\x01\x00_\x00\x00\x00\x94\x80\x01\x00-\x00\x00\x00\xf4\x80\x01\x007\x00\x00\x00\"\x81\x01\x00:\x00\x00\x00Z\x81\x01\x004\x00\x00\x00\x95\x81\x01\x00:\x00\x00\x00\u0281\x01\x00:\x00\x00\x00\x05\x82\x01\x009\x00\x00\x00@\x82\x01\x00\x1e\x00\x00\x00z\x82\x01\x00\x1a\x00\x00\x00\x99\x82\x01\x00c\x00\x00\x00\xb4\x82\x01\x00#\x00\x00\x00\x18\x83\x01\x00\x82\x00\x00\x00<\x83\x01\x00\x99\x00\x00\x00\xbf\x83\x01\x00H\x00\x00\x00Y\x84\x01\x00&\x00\x00\x00\xa2\x84\x01\x00e\x00\x00\x00\u0244\x01\x00z\x00\x00\x00/\x85\x01\x00J\x00\x00\x00\xaa\x85\x01\x00\xf5\x00\x00\x00\xf5\x85\x01\x00X\x00\x00\x00\xeb\x86\x01\x00I\x00\x00\x00D\x87\x01\x00a\x00\x00\x00\x8e\x87\x01\x00w\x00\x00\x00\xf0\x87\x01\x00\xcf\x00\x00\x00h\x88\x01\x00\xd3\x00\x00\x008\x89\x01\x00/\x01\x00\x00\f\x8a\x01\x00\x1c\x00\x00\x00<\x8b\x01\x00X\x00\x00\x00Y\x8b\x01\x00*\x00\x00\x00\xb2\x8b\x01\x00:\x00\x00\x00\u074b\x01\x009\x00\x00\x00\x18\x8c\x01\x00\x1e\x00\x00\x00R\x8c\x01\x00=\x00\x00\x00q\x8c\x01\x003\x00\x00\x00\xaf\x8c\x01\x00'\x00\x00\x00\xe3\x8c\x01\x00&\x00\x00\x00\v\x8d\x01\x00+\x00\x00\x002\x8d\x01\x00G\x00\x00\x00^\x8d\x01\x00*\x00\x00\x00\xa6\x8d\x01\x00v\x00\x00\x00\u044d\x01\x00\x13\x00\x00\x00H\x8e\x01\x00\x18\x00\x00\x00\\\x8e\x01\x00/\x00\x00\x00u\x8e\x01\x00\x01\x00\x00\x00\x00\x00\x00\x00^\x00\x00\x00\\\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00F\x00\x00\x00\xc4\x00\x00\x00\x0f\x00\x00\x00\xc3\x00\x00\x00\x00\x00\x00\x00-\x00\x00\x00\x00\x00\x00\x00\x86\x00\x00\x00\xeb\x00\x00\x00c\x00\x00\x00\x00\x00\x00\x001\x00\x00\x00o\x00\x00\x00}\x00\x00\x00\x00\x00\x00\x00J\x00\x00\x00\x00\x00\x00\x00\xd8\x00\x00\x00\x98\x00\x00\x00U\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xdb\x00\x00\x00\x17\x00\x00\x00u\x00\x00\x00\x11\x00\x00\x00\x00\x00\x00\x00\x8a\x00\x00\x00\x90\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xc9\x00\x00\x00\xb7\x00\x00\x00\xd7\x00\x00\x00*\x00\x00\x00\x99\x00\x00\x00\x00\x00\x00\x00\x1f\x00\x00\x00\x84\x00\x00\x00\x9c\x00\x00\x00\xe6\x00\x00\x00\x9d\x00\x00\x00\xc5\x00\x00\x00\xd9\x00\x00\x00\xb9\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x19\x00\x00\x00\xcd\x00\x00\x00\xcb\x00\x00\x00y\x00\x00\x00\x97\x00\x00\x00\xba\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x18\x00\x00\x00\x00\x00\x00\x00C\x00\x00\x00\x93\x00\x00\x00\xad\x00\x00\x00\xe1\x00\x00\x00\xa6\x00\x00\x00\xd0\x00\x00\x00r\x00\x00\x00+\x00\x00\x006\x00\x00\x00\x00\x00\x00\x00\xa5\x00\x00\x00\x80\x00\x00\x00\x00\x00\x00\x00h\x00\x00\x00\xa0\x00\x00\x00\x00\x00\x00\x00\xd1\x00\x00\x00\xde\x00\x00\x00;\x00\x00\x00\x00\x00\x00\x00\xe9\x00\x00\x00\xe7\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00z\x00\x00\x00/\x00\x00\x00V\x00\x00\x00\x8d\x00\x00\x00\xe3\x00\x00\x00!\x00\x00\x00~\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xd3\x00\x00\x00\x88\x00\x00\x00l\x00\x00\x00s\x00\x00\x00g\x00\x00\x00\x05\x00\x00\x00\xc6\x00\x00\x00#\x00\x00\x00\x9f\x00\x00\x00\x00\x00\x00\x00\xb1\x00\x00\x00\x00\x00\x00\x00\xc2\x00\x00\x00\x13\x00\x00\x00S\x00\x00\x00G\x00\x00\x00$\x00\x00\x00\xc1\x00\x00\x00\xb5\x00\x00\x00X\x00\x00\x00m\x00\x00\x00\t\x00\x00\x00x\x00\x00\x00\xb8\x00\x00\x00\xbd\x00\x00\x00k\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00<\x00\x00\x00E\x00\x00\x00\xbf\x00\x00\x00\xbc\x00\x00\x00\x00\x00\x00\x00:\x00\x00\x00\x82\x00\x00\x00\x81\x00\x00\x00&\x00\x00\x00\xe0\x00\x00\x00\x00\x00\x00\x00[\x00\x00\x00I\x00\x00\x00e\x00\x00\x00\x04\x00\x00\x00>\x00\x00\x00\b\x00\x00\x00\x94\x00\x00\x00\x8f\x00\x00\x00\xce\x00\x00\x00?\x00\x00\x00Y\x00\x00\x00\xda\x00\x00\x00\x15\x00\x00\x00\x00\x00\x00\x00'\x00\x00\x004\x00\x00\x00\xcc\x00\x00\x00\f\x00\x00\x005\x00\x00\x00(\x00\x00\x00\x00\x00\x00\x00\xbb\x00\x00\x00\x00\x00\x00\x00\xa9\x00\x00\x00\x9e\x00\x00\x00\x00\x00\x00\x00\xe5\x00\x00\x00\x00\x00\x00\x00O\x00\x00\x00 \x00\x00\x00)\x00\x00\x00\xcf\x00\x00\x00\x00\x00\x00\x00\x1b\x00\x00\x00Z\x00\x00\x00\"\x00\x00\x00\x00\x00\x00\x00v\x00\x00\x00]\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00a\x00\x00\x00j\x00\x00\x008\x00\x00\x00\xa3\x00\x00\x00q\x00\x00\x00t\x00\x00\x00_\x00\x00\x00\x10\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\v\x00\x00\x00@\x00\x00\x00\xd2\x00\x00\x00,\x00\x00\x00\x00\x00\x00\x00\x85\x00\x00\x00\x00\x00\x00\x00\x92\x00\x00\x00\x00\x00\x00\x00\xc8\x00\x00\x00\x95\x00\x00\x00\x06\x00\x00\x00\xa8\x00\x00\x00\xae\x00\x00\x00\xa1\x00\x00\x00\x00\x00\x00\x00\x91\x00\x00\x00\x0e\x00\x00\x00{\x00\x00\x00\xa7\x00\x00\x00\x00\x00\x00\x00\xb6\x00\x00\x00i\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xd5\x00\x00\x00L\x00\x00\x00\x00\x00\x00\x00\xea\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00w\x00\x00\x00\x12\x00\x00\x00=\x00\x00\x00\xaf\x00\x00\x00\a\x00\x00\x00\xdf\x00\x00\x00\xc0\x00\x00\x00N\x00\x00\x00%\x00\x00\x009\x00\x00\x00\x00\x00\x00\x00\x03\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00.\x00\x00\x00\x00\x00\x00\x00\u007f\x00\x00\x00\xbe\x00\x00\x00\xe2\x00\x00\x00\x00\x00\x00\x00P\x00\x00\x00\xb3\x00\x00\x00\r\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00R\x00\x00\x00D\x00\x00\x00B\x00\x00\x00n\x00\x00\x00\x00\x00\x00\x00\xd6\x00\x00\x00\x83\x00\x00\x00\n\x00\x00\x00W\x00\x00\x00\x14\x00\x00\x00Q\x00\x00\x00\xd4\x00\x00\x00d\x00\x00\x00\xac\x00\x00\x00\x16\x00\x00\x00\x96\x00\x00\x00K\x00\x00\x002\x00\x00\x00\x1a\x00\x00\x00\xb4\x00\x00\x00f\x00\x00\x00\xa2\x00\x00\x00\xe8\x00\x00\x00\x02\x00\x00\x00A\x00\x00\x00\xe4\x00\x00\x00\x8c\x00\x00\x00\x9a\x00\x00\x00`\x00\x00\x00\xab\x00\x00\x00M\x00\x00\x007\x00\x00\x000\x00\x00\x00\x00\x00\x00\x00\x1d\x00\x00\x00\x00\x00\x00\x00\xdc\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x9b\x00\x00\x00\x89\x00\x00\x00\x00\x00\x00\x00\xdd\x00\x00\x00\x8e\x00\x00\x00\xca\x00\x00\x00H\x00\x00\x00\x00\x00\x00\x00\xb2\x00\x00\x00\x00\x00\x00\x00\x1c\x00\x00\x00\xb0\x00\x00\x00\x00\x00\x00\x00|\x00\x00\x003\x00\x00\x00T\x00\x00\x00\x87\x00\x00\x00b\x00\x00\x00\x00\x00\x00\x00\x1e\x00\x00\x00\xaa\x00\x00\x00\xa4\x00\x00\x00\x00\x00\x00\x00p\x00\x00\x00\xc7\x00\x00\x00\x8b\x00\x00\x00\x00\n\t\t  # Create a ClusterRoleBinding for user1, user2, and group1 using the cluster-admin ClusterRole\n\t\t  kubectl create clusterrolebinding cluster-admin --clusterrole=cluster-admin --user=user1 --user=user2 --group=group1\x00\n\t\t  # Create a RoleBinding for user1, user2, and group1 using the admin ClusterRole\n\t\t  kubectl create rolebinding admin --clusterrole=admin --user=user1 --user=user2 --group=group1\x00\n\t\t  # Create a new configmap named my-config based on folder bar\n\t\t  kubectl create configmap my-config --from-file=path/to/bar\n\n\t\t  # Create a new configmap named my-config with specified keys instead of file basenames on disk\n\t\t  kubectl create configmap my-config --from-file=key1=/path/to/bar/file1.txt --from-file=key2=/path/to/bar/file2.txt\n\n\t\t  # Create a new configmap named my-config with key1=config1 and key2=config2\n\t\t  kubectl create configmap my-config --from-literal=key1=config1 --from-literal=key2=config2\x00\n\t\t  # If you don't already have a .dockercfg file, you can create a dockercfg secret directly by using:\n\t\t  kubectl create secret docker-registry my-secret --docker-server=DOCKER_REGISTRY_SERVER --docker-username=DOCKER_USER --docker-password=DOCKER_PASSWORD --docker-email=DOCKER_EMAIL\x00\n\t\t  # Show metrics for all nodes\n\t\t  kubectl top node\n\n\t\t  # Show metrics for a given node\n\t\t  kubectl top node NODE_NAME\x00\n\t\t# Apply the configuration in pod.json to a pod.\n\t\tkubectl apply -f ./pod.json\n\n\t\t# Apply the JSON passed into stdin to a pod.\n\t\tcat pod.json | kubectl apply -f -\n\n\t\t# Note: --prune is still in Alpha\n\t\t# Apply the configuration in manifest.yaml that matches label app=nginx and delete all the other resources that are not in the file and match label app=nginx.\n\t\tkubectl apply --prune -f manifest.yaml -l app=nginx\n\n\t\t# Apply the configuration in manifest.yaml and delete all the other configmaps that are not in the file.\n\t\tkubectl apply --prune -f manifest.yaml --all --prune-whitelist=core/v1/ConfigMap\x00\n\t\t# Auto scale a deployment \"foo\", with the number of pods between 2 and 10, no target CPU utilization specified so a default autoscaling policy will be used:\n\t\tkubectl autoscale deployment foo --min=2 --max=10\n\n\t\t# Auto scale a replication controller \"foo\", with the number of pods between 1 and 5, target CPU utilization at 80%:\n\t\tkubectl autoscale rc foo --max=5 --cpu-percent=80\x00\n\t\t# Convert 'pod.yaml' to latest version and print to stdout.\n\t\tkubectl convert -f pod.yaml\n\n\t\t# Convert the live state of the resource specified by 'pod.yaml' to the latest version\n\t\t# and print to stdout in json format.\n\t\tkubectl convert -f pod.yaml --local -o json\n\n\t\t# Convert all files under current directory to latest version and create them all.\n\t\tkubectl convert -f . | kubectl create -f -\x00\n\t\t# Create a ClusterRole named \"pod-reader\" that allows user to perform \"get\", \"watch\" and \"list\" on pods\n\t\tkubectl create clusterrole pod-reader --verb=get,list,watch --resource=pods\n\n\t\t# Create a ClusterRole named \"pod-reader\" with ResourceName specified\n\t\tkubectl create clusterrole pod-reader --verb=get,list,watch --resource=pods --resource-name=readablepod\x00\n\t\t# Create a Role named \"pod-reader\" that allows user to perform \"get\", \"watch\" and \"list\" on pods\n\t\tkubectl create role pod-reader --verb=get --verb=list --verb=watch --resource=pods\n\n\t\t# Create a Role named \"pod-reader\" with ResourceName specified\n\t\tkubectl create role pod-reader --verb=get --verg=list --verb=watch --resource=pods --resource-name=readablepod\x00\n\t\t# Create a new resourcequota named my-quota\n\t\tkubectl create quota my-quota --hard=cpu=1,memory=1G,pods=2,services=3,replicationcontrollers=2,resourcequotas=1,secrets=5,persistentvolumeclaims=10\n\n\t\t# Create a new resourcequota named best-effort\n\t\tkubectl create quota best-effort --hard=pods=100 --scopes=BestEffort\x00\n\t\t# Create a pod disruption budget named my-pdb that will select all pods with the app=rails label\n\t\t# and require at least one of them being available at any point in time.\n\t\tkubectl create poddisruptionbudget my-pdb --selector=app=rails --min-available=1\n\n\t\t# Create a pod disruption budget named my-pdb that will select all pods with the app=nginx label\n\t\t# and require at least half of the pods selected to be available at any point in time.\n\t\tkubectl create pdb my-pdb --selector=app=nginx --min-available=50%\x00\n\t\t# Create a pod using the data in pod.json.\n\t\tkubectl create -f ./pod.json\n\n\t\t# Create a pod based on the JSON passed into stdin.\n\t\tcat pod.json | kubectl create -f -\n\n\t\t# Edit the data in docker-registry.yaml in JSON using the v1 API format then create the resource using the edited data.\n\t\tkubectl create -f docker-registry.yaml --edit --output-version=v1 -o json\x00\n\t\t# Create a service for a replicated nginx, which serves on port 80 and connects to the containers on port 8000.\n\t\tkubectl expose rc nginx --port=80 --target-port=8000\n\n\t\t# Create a service for a replication controller identified by type and name specified in \"nginx-controller.yaml\", which serves on port 80 and connects to the containers on port 8000.\n\t\tkubectl expose -f nginx-controller.yaml --port=80 --target-port=8000\n\n\t\t# Create a service for a pod valid-pod, which serves on port 444 with the name \"frontend\"\n\t\tkubectl expose pod valid-pod --port=444 --name=frontend\n\n\t\t# Create a second service based on the above service, exposing the container port 8443 as port 443 with the name \"nginx-https\"\n\t\tkubectl expose service nginx --port=443 --target-port=8443 --name=nginx-https\n\n\t\t# Create a service for a replicated streaming application on port 4100 balancing UDP traffic and named 'video-stream'.\n\t\tkubectl expose rc streamer --port=4100 --protocol=udp --name=video-stream\n\n\t\t# Create a service for a replicated nginx using replica set, which serves on port 80 and connects to the containers on port 8000.\n\t\tkubectl expose rs nginx --port=80 --target-port=8000\n\n\t\t# Create a service for an nginx deployment, which serves on port 80 and connects to the containers on port 8000.\n\t\tkubectl expose deployment nginx --port=80 --target-port=8000\x00\n\t\t# Delete a pod using the type and name specified in pod.json.\n\t\tkubectl delete -f ./pod.json\n\n\t\t# Delete a pod based on the type and name in the JSON passed into stdin.\n\t\tcat pod.json | kubectl delete -f -\n\n\t\t# Delete pods and services with same names \"baz\" and \"foo\"\n\t\tkubectl delete pod,service baz foo\n\n\t\t# Delete pods and services with label name=myLabel.\n\t\tkubectl delete pods,services -l name=myLabel\n\n\t\t# Delete a pod with minimal delay\n\t\tkubectl delete pod foo --now\n\n\t\t# Force delete a pod on a dead node\n\t\tkubectl delete pod foo --grace-period=0 --force\n\n\t\t# Delete all pods\n\t\tkubectl delete pods --all\x00\n\t\t# Describe a node\n\t\tkubectl describe nodes kubernetes-node-emt8.c.myproject.internal\n\n\t\t# Describe a pod\n\t\tkubectl describe pods/nginx\n\n\t\t# Describe a pod identified by type and name in \"pod.json\"\n\t\tkubectl describe -f pod.json\n\n\t\t# Describe all pods\n\t\tkubectl describe pods\n\n\t\t# Describe pods by label name=myLabel\n\t\tkubectl describe po -l name=myLabel\n\n\t\t# Describe all pods managed by the 'frontend' replication controller (rc-created pods\n\t\t# get the name of the rc as a prefix in the pod the name).\n\t\tkubectl describe pods frontend\x00\n\t\t# Drain node \"foo\", even if there are pods not managed by a ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet on it.\n\t\t$ kubectl drain foo --force\n\n\t\t# As above, but abort if there are pods not managed by a ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet, and use a grace period of 15 minutes.\n\t\t$ kubectl drain foo --grace-period=900\x00\n\t\t# Edit the service named 'docker-registry':\n\t\tkubectl edit svc/docker-registry\n\n\t\t# Use an alternative editor\n\t\tKUBE_EDITOR=\"nano\" kubectl edit svc/docker-registry\n\n\t\t# Edit the job 'myjob' in JSON using the v1 API format:\n\t\tkubectl edit job.v1.batch/myjob -o json\n\n\t\t# Edit the deployment 'mydeployment' in YAML and save the modified config in its annotation:\n\t\tkubectl edit deployment/mydeployment -o yaml --save-config\x00\n\t\t# Get output from running 'date' from pod 123456-7890, using the first container by default\n\t\tkubectl exec 123456-7890 date\n\n\t\t# Get output from running 'date' in ruby-container from pod 123456-7890\n\t\tkubectl exec 123456-7890 -c ruby-container date\n\n\t\t# Switch to raw terminal mode, sends stdin to 'bash' in ruby-container from pod 123456-7890\n\t\t# and sends stdout/stderr from 'bash' back to the client\n\t\tkubectl exec 123456-7890 -c ruby-container -i -t -- bash -il\x00\n\t\t# Get output from running pod 123456-7890, using the first container by default\n\t\tkubectl attach 123456-7890\n\n\t\t# Get output from ruby-container from pod 123456-7890\n\t\tkubectl attach 123456-7890 -c ruby-container\n\n\t\t# Switch to raw terminal mode, sends stdin to 'bash' in ruby-container from pod 123456-7890\n\t\t# and sends stdout/stderr from 'bash' back to the client\n\t\tkubectl attach 123456-7890 -c ruby-container -i -t\n\n\t\t# Get output from the first pod of a ReplicaSet named nginx\n\t\tkubectl attach rs/nginx\n\t\t\x00\n\t\t# Get the documentation of the resource and its fields\n\t\tkubectl explain pods\n\n\t\t# Get the documentation of a specific field of a resource\n\t\tkubectl explain pods.spec.containers\x00\n\t\t# Install bash completion on a Mac using homebrew\n\t\tbrew install bash-completion\n\t\tprintf \"\n# Bash completion support\nsource $(brew --prefix)/etc/bash_completion\n\" >> $HOME/.bash_profile\n\t\tsource $HOME/.bash_profile\n\n\t\t# Load the kubectl completion code for bash into the current shell\n\t\tsource <(kubectl completion bash)\n\n\t\t# Write bash completion code to a file and source if from .bash_profile\n\t\tkubectl completion bash > ~/.kube/completion.bash.inc\n\t\tprintf \"\n# Kubectl shell completion\nsource '$HOME/.kube/completion.bash.inc'\n\" >> $HOME/.bash_profile\n\t\tsource $HOME/.bash_profile\n\n\t\t# Load the kubectl completion code for zsh[1] into the current shell\n\t\tsource <(kubectl completion zsh)\x00\n\t\t# List all pods in ps output format.\n\t\tkubectl get pods\n\n\t\t# List all pods in ps output format with more information (such as node name).\n\t\tkubectl get pods -o wide\n\n\t\t# List a single replication controller with specified NAME in ps output format.\n\t\tkubectl get replicationcontroller web\n\n\t\t# List a single pod in JSON output format.\n\t\tkubectl get -o json pod web-pod-13je7\n\n\t\t# List a pod identified by type and name specified in \"pod.yaml\" in JSON output format.\n\t\tkubectl get -f pod.yaml -o json\n\n\t\t# Return only the phase value of the specified pod.\n\t\tkubectl get -o template pod/web-pod-13je7 --template={{.status.phase}}\n\n\t\t# List all replication controllers and services together in ps output format.\n\t\tkubectl get rc,services\n\n\t\t# List one or more resources by their type and names.\n\t\tkubectl get rc/web service/frontend pods/web-pod-13je7\n\n\t\t# List all resources with different types.\n\t\tkubectl get all\x00\n\t\t# Listen on ports 5000 and 6000 locally, forwarding data to/from ports 5000 and 6000 in the pod\n\t\tkubectl port-forward mypod 5000 6000\n\n\t\t# Listen on port 8888 locally, forwarding to 5000 in the pod\n\t\tkubectl port-forward mypod 8888:5000\n\n\t\t# Listen on a random port locally, forwarding to 5000 in the pod\n\t\tkubectl port-forward mypod :5000\n\n\t\t# Listen on a random port locally, forwarding to 5000 in the pod\n\t\tkubectl port-forward mypod 0:5000\x00\n\t\t# Mark node \"foo\" as schedulable.\n\t\t$ kubectl uncordon foo\x00\n\t\t# Mark node \"foo\" as unschedulable.\n\t\tkubectl cordon foo\x00\n\t\t# Partially update a node using strategic merge patch\n\t\tkubectl patch node k8s-node-1 -p '{\"spec\":{\"unschedulable\":true}}'\n\n\t\t# Partially update a node identified by the type and name specified in \"node.json\" using strategic merge patch\n\t\tkubectl patch -f node.json -p '{\"spec\":{\"unschedulable\":true}}'\n\n\t\t# Update a container's image; spec.containers[*].name is required because it's a merge key\n\t\tkubectl patch pod valid-pod -p '{\"spec\":{\"containers\":[{\"name\":\"kubernetes-serve-hostname\",\"image\":\"new image\"}]}}'\n\n\t\t# Update a container's image using a json patch with positional arrays\n\t\tkubectl patch pod valid-pod --type='json' -p='[{\"op\": \"replace\", \"path\": \"/spec/containers/0/image\", \"value\":\"new image\"}]'\x00\n\t\t# Print flags inherited by all commands\n\t\tkubectl options\x00\n\t\t# Print the address of the master and cluster services\n\t\tkubectl cluster-info\x00\n\t\t# Print the client and server versions for the current context\n\t\tkubectl version\x00\n\t\t# Print the supported API versions\n\t\tkubectl api-versions\x00\n\t\t# Replace a pod using the data in pod.json.\n\t\tkubectl replace -f ./pod.json\n\n\t\t# Replace a pod based on the JSON passed into stdin.\n\t\tcat pod.json | kubectl replace -f -\n\n\t\t# Update a single-container pod's image version (tag) to v4\n\t\tkubectl get pod mypod -o yaml | sed 's/\\(image: myimage\\):.*$/\x01:v4/' | kubectl replace -f -\n\n\t\t# Force replace, delete and then re-create the resource\n\t\tkubectl replace --force -f ./pod.json\x00\n\t\t# Return snapshot logs from pod nginx with only one container\n\t\tkubectl logs nginx\n\n\t\t# Return snapshot logs for the pods defined by label app=nginx\n\t\tkubectl logs -lapp=nginx\n\n\t\t# Return snapshot of previous terminated ruby container logs from pod web-1\n\t\tkubectl logs -p -c ruby web-1\n\n\t\t# Begin streaming the logs of the ruby container in pod web-1\n\t\tkubectl logs -f -c ruby web-1\n\n\t\t# Display only the most recent 20 lines of output in pod nginx\n\t\tkubectl logs --tail=20 nginx\n\n\t\t# Show all logs from pod nginx written in the last hour\n\t\tkubectl logs --since=1h nginx\n\n\t\t# Return snapshot logs from first container of a job named hello\n\t\tkubectl logs job/hello\n\n\t\t# Return snapshot logs from container nginx-1 of a deployment named nginx\n\t\tkubectl logs deployment/nginx -c nginx-1\x00\n\t\t# Run a proxy to kubernetes apiserver on port 8011, serving static content from ./local/www/\n\t\tkubectl proxy --port=8011 --www=./local/www/\n\n\t\t# Run a proxy to kubernetes apiserver on an arbitrary local port.\n\t\t# The chosen port for the server will be output to stdout.\n\t\tkubectl proxy --port=0\n\n\t\t# Run a proxy to kubernetes apiserver, changing the api prefix to k8s-api\n\t\t# This makes e.g. the pods api available at localhost:8001/k8s-api/v1/pods/\n\t\tkubectl proxy --api-prefix=/k8s-api\x00\n\t\t# Scale a replicaset named 'foo' to 3.\n\t\tkubectl scale --replicas=3 rs/foo\n\n\t\t# Scale a resource identified by type and name specified in \"foo.yaml\" to 3.\n\t\tkubectl scale --replicas=3 -f foo.yaml\n\n\t\t# If the deployment named mysql's current size is 2, scale mysql to 3.\n\t\tkubectl scale --current-replicas=2 --replicas=3 deployment/mysql\n\n\t\t# Scale multiple replication controllers.\n\t\tkubectl scale --replicas=5 rc/foo rc/bar rc/baz\n\n\t\t# Scale job named 'cron' to 3.\n\t\tkubectl scale --replicas=3 job/cron\x00\n\t\t# Set the last-applied-configuration of a resource to match the contents of a file.\n\t\tkubectl apply set-last-applied -f deploy.yaml\n\n\t\t# Execute set-last-applied against each configuration file in a directory.\n\t\tkubectl apply set-last-applied -f path/\n\n\t\t# Set the last-applied-configuration of a resource to match the contents of a file, will create the annotation if it does not already exist.\n\t\tkubectl apply set-last-applied -f deploy.yaml --create-annotation=true\n\t\t\x00\n\t\t# Show metrics for all pods in the default namespace\n\t\tkubectl top pod\n\n\t\t# Show metrics for all pods in the given namespace\n\t\tkubectl top pod --namespace=NAMESPACE\n\n\t\t# Show metrics for a given pod and its containers\n\t\tkubectl top pod POD_NAME --containers\n\n\t\t# Show metrics for the pods defined by label name=myLabel\n\t\tkubectl top pod -l name=myLabel\x00\n\t\t# Shut down foo.\n\t\tkubectl stop replicationcontroller foo\n\n\t\t# Stop pods and services with label name=myLabel.\n\t\tkubectl stop pods,services -l name=myLabel\n\n\t\t# Shut down the service defined in service.json\n\t\tkubectl stop -f service.json\n\n\t\t# Shut down all resources in the path/to/resources directory\n\t\tkubectl stop -f path/to/resources\x00\n\t\t# Start a single instance of nginx.\n\t\tkubectl run nginx --image=nginx\n\n\t\t# Start a single instance of hazelcast and let the container expose port 5701 .\n\t\tkubectl run hazelcast --image=hazelcast --port=5701\n\n\t\t# Start a single instance of hazelcast and set environment variables \"DNS_DOMAIN=cluster\" and \"POD_NAMESPACE=default\" in the container.\n\t\tkubectl run hazelcast --image=hazelcast --env=\"DNS_DOMAIN=cluster\" --env=\"POD_NAMESPACE=default\"\n\n\t\t# Start a replicated instance of nginx.\n\t\tkubectl run nginx --image=nginx --replicas=5\n\n\t\t# Dry run. Print the corresponding API objects without creating them.\n\t\tkubectl run nginx --image=nginx --dry-run\n\n\t\t# Start a single instance of nginx, but overload the spec of the deployment with a partial set of values parsed from JSON.\n\t\tkubectl run nginx --image=nginx --overrides='{ \"apiVersion\": \"v1\", \"spec\": { ... } }'\n\n\t\t# Start a pod of busybox and keep it in the foreground, don't restart it if it exits.\n\t\tkubectl run -i -t busybox --image=busybox --restart=Never\n\n\t\t# Start the nginx container using the default command, but use custom arguments (arg1 .. argN) for that command.\n\t\tkubectl run nginx --image=nginx -- <arg1> <arg2> ... <argN>\n\n\t\t# Start the nginx container using a different command and custom arguments.\n\t\tkubectl run nginx --image=nginx --command -- <cmd> <arg1> ... <argN>\n\n\t\t# Start the perl container to compute \u03c0 to 2000 places and print it out.\n\t\tkubectl run pi --image=perl --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(2000)'\n\n\t\t# Start the cron job to compute \u03c0 to 2000 places and print it out every 5 minutes.\n\t\tkubectl run pi --schedule=\"0/5 * * * ?\" --image=perl --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(2000)'\x00\n\t\t# Update node 'foo' with a taint with key 'dedicated' and value 'special-user' and effect 'NoSchedule'.\n\t\t# If a taint with that key and effect already exists, its value is replaced as specified.\n\t\tkubectl taint nodes foo dedicated=special-user:NoSchedule\n\n\t\t# Remove from node 'foo' the taint with key 'dedicated' and effect 'NoSchedule' if one exists.\n\t\tkubectl taint nodes foo dedicated:NoSchedule-\n\n\t\t# Remove from node 'foo' all the taints with key 'dedicated'\n\t\tkubectl taint nodes foo dedicated-\x00\n\t\t# Update pod 'foo' with the label 'unhealthy' and the value 'true'.\n\t\tkubectl label pods foo unhealthy=true\n\n\t\t# Update pod 'foo' with the label 'status' and the value 'unhealthy', overwriting any existing value.\n\t\tkubectl label --overwrite pods foo status=unhealthy\n\n\t\t# Update all pods in the namespace\n\t\tkubectl label pods --all status=unhealthy\n\n\t\t# Update a pod identified by the type and name in \"pod.json\"\n\t\tkubectl label -f pod.json status=unhealthy\n\n\t\t# Update pod 'foo' only if the resource is unchanged from version 1.\n\t\tkubectl label pods foo status=unhealthy --resource-version=1\n\n\t\t# Update pod 'foo' by removing a label named 'bar' if it exists.\n\t\t# Does not require the --overwrite flag.\n\t\tkubectl label pods foo bar-\x00\n\t\t# Update pods of frontend-v1 using new replication controller data in frontend-v2.json.\n\t\tkubectl rolling-update frontend-v1 -f frontend-v2.json\n\n\t\t# Update pods of frontend-v1 using JSON data passed into stdin.\n\t\tcat frontend-v2.json | kubectl rolling-update frontend-v1 -f -\n\n\t\t# Update the pods of frontend-v1 to frontend-v2 by just changing the image, and switching the\n\t\t# name of the replication controller.\n\t\tkubectl rolling-update frontend-v1 frontend-v2 --image=image:v2\n\n\t\t# Update the pods of frontend by just changing the image, and keeping the old name.\n\t\tkubectl rolling-update frontend --image=image:v2\n\n\t\t# Abort and reverse an existing rollout in progress (from frontend-v1 to frontend-v2).\n\t\tkubectl rolling-update frontend-v1 frontend-v2 --rollback\x00\n\t\t# View the last-applied-configuration annotations by type/name in YAML.\n\t\tkubectl apply view-last-applied deployment/nginx\n\n\t\t# View the last-applied-configuration annotations by file in JSON\n\t\tkubectl apply view-last-applied -f deploy.yaml -o json\x00\n\t\tApply a configuration to a resource by filename or stdin.\n\t\tThis resource will be created if it doesn't exist yet.\n\t\tTo use 'apply', always create the resource initially with either 'apply' or 'create --save-config'.\n\n\t\tJSON and YAML formats are accepted.\n\n\t\tAlpha Disclaimer: the --prune functionality is not yet complete. Do not use unless you are aware of what the current state is. See https://issues.k8s.io/34274.\x00\n\t\tConvert config files between different API versions. Both YAML\n\t\tand JSON formats are accepted.\n\n\t\tThe command takes filename, directory, or URL as input, and convert it into format\n\t\tof version specified by --output-version flag. If target version is not specified or\n\t\tnot supported, convert to latest version.\n\n\t\tThe default output will be printed to stdout in YAML format. One can use -o option\n\t\tto change to output destination.\x00\n\t\tCreate a ClusterRole.\x00\n\t\tCreate a ClusterRoleBinding for a particular ClusterRole.\x00\n\t\tCreate a RoleBinding for a particular Role or ClusterRole.\x00\n\t\tCreate a TLS secret from the given public/private key pair.\n\n\t\tThe public/private key pair must exist before hand. The public key certificate must be .PEM encoded and match the given private key.\x00\n\t\tCreate a configmap based on a file, directory, or specified literal value.\n\n\t\tA single configmap may package one or more key/value pairs.\n\n\t\tWhen creating a configmap based on a file, the key will default to the basename of the file, and the value will\n\t\tdefault to the file content.  If the basename is an invalid key, you may specify an alternate key.\n\n\t\tWhen creating a configmap based on a directory, each file whose basename is a valid key in the directory will be\n\t\tpackaged into the configmap.  Any directory entries except regular files are ignored (e.g. subdirectories,\n\t\tsymlinks, devices, pipes, etc).\x00\n\t\tCreate a namespace with the specified name.\x00\n\t\tCreate a new secret for use with Docker registries.\n\n\t\tDockercfg secrets are used to authenticate against Docker registries.\n\n\t\tWhen using the Docker command line to push images, you can authenticate to a given registry by running\n\n\t\t    $ docker login DOCKER_REGISTRY_SERVER --username=DOCKER_USER --password=DOCKER_PASSWORD --email=DOCKER_EMAIL'.\n\n    That produces a ~/.dockercfg file that is used by subsequent 'docker push' and 'docker pull' commands to\n\t\tauthenticate to the registry. The email address is optional.\n\n\t\tWhen creating applications, you may have a Docker registry that requires authentication.  In order for the\n\t\tnodes to pull images on your behalf, they have to have the credentials.  You can provide this information\n\t\tby creating a dockercfg secret and attaching it to your service account.\x00\n\t\tCreate a pod disruption budget with the specified name, selector, and desired minimum available pods\x00\n\t\tCreate a resource by filename or stdin.\n\n\t\tJSON and YAML formats are accepted.\x00\n\t\tCreate a resourcequota with the specified name, hard limits and optional scopes\x00\n\t\tCreate a role with single rule.\x00\n\t\tCreate a secret based on a file, directory, or specified literal value.\n\n\t\tA single secret may package one or more key/value pairs.\n\n\t\tWhen creating a secret based on a file, the key will default to the basename of the file, and the value will\n\t\tdefault to the file content.  If the basename is an invalid key, you may specify an alternate key.\n\n\t\tWhen creating a secret based on a directory, each file whose basename is a valid key in the directory will be\n\t\tpackaged into the secret.  Any directory entries except regular files are ignored (e.g. subdirectories,\n\t\tsymlinks, devices, pipes, etc).\x00\n\t\tCreate a service account with the specified name.\x00\n\t\tCreate and run a particular image, possibly replicated.\n\n\t\tCreates a deployment or job to manage the created container(s).\x00\n\t\tCreates an autoscaler that automatically chooses and sets the number of pods that run in a kubernetes cluster.\n\n\t\tLooks up a Deployment, ReplicaSet, or ReplicationController by name and creates an autoscaler that uses the given resource as a reference.\n\t\tAn autoscaler can automatically increase or decrease number of pods deployed within the system as needed.\x00\n\t\tDelete resources by filenames, stdin, resources and names, or by resources and label selector.\n\n\t\tJSON and YAML formats are accepted. Only one type of the arguments may be specified: filenames,\n\t\tresources and names, or resources and label selector.\n\n\t\tSome resources, such as pods, support graceful deletion. These resources define a default period\n\t\tbefore they are forcibly terminated (the grace period) but you may override that value with\n\t\tthe --grace-period flag, or pass --now to set a grace-period of 1. Because these resources often\n\t\trepresent entities in the cluster, deletion may not be acknowledged immediately. If the node\n\t\thosting a pod is down or cannot reach the API server, termination may take significantly longer\n\t\tthan the grace period. To force delete a resource,\tyou must pass a grace\tperiod of 0 and specify\n\t\tthe --force flag.\n\n\t\tIMPORTANT: Force deleting pods does not wait for confirmation that the pod's processes have been\n\t\tterminated, which can leave those processes running until the node detects the deletion and\n\t\tcompletes graceful deletion. If your processes use shared storage or talk to a remote API and\n\t\tdepend on the name of the pod to identify themselves, force deleting those pods may result in\n\t\tmultiple processes running on different machines using the same identification which may lead\n\t\tto data corruption or inconsistency. Only force delete pods when you are sure the pod is\n\t\tterminated, or if your application can tolerate multiple copies of the same pod running at once.\n\t\tAlso, if you force delete pods the scheduler may place new pods on those nodes before the node\n\t\thas released those resources and causing those pods to be evicted immediately.\n\n\t\tNote that the delete command does NOT do resource version checks, so if someone\n\t\tsubmits an update to a resource right when you submit a delete, their update\n\t\twill be lost along with the rest of the resource.\x00\n\t\tDeprecated: Gracefully shut down a resource by name or filename.\n\n\t\tThe stop command is deprecated, all its functionalities are covered by delete command.\n\t\tSee 'kubectl delete --help' for more details.\n\n\t\tAttempts to shut down and delete a resource that supports graceful termination.\n\t\tIf the resource is scalable it will be scaled to 0 before deletion.\x00\n\t\tDisplay Resource (CPU/Memory/Storage) usage of nodes.\n\n\t\tThe top-node command allows you to see the resource consumption of nodes.\x00\n\t\tDisplay Resource (CPU/Memory/Storage) usage of pods.\n\n\t\tThe 'top pod' command allows you to see the resource consumption of pods.\n\n\t\tDue to the metrics pipeline delay, they may be unavailable for a few minutes\n\t\tsince pod creation.\x00\n\t\tDisplay Resource (CPU/Memory/Storage) usage.\n\n\t\tThe top command allows you to see the resource consumption for nodes or pods.\n\n\t\tThis command requires Heapster to be correctly configured and working on the server. \x00\n\t\tDrain node in preparation for maintenance.\n\n\t\tThe given node will be marked unschedulable to prevent new pods from arriving.\n\t\t'drain' evicts the pods if the APIServer supports eviction\n\t\t(http://kubernetes.io/docs/admin/disruptions/). Otherwise, it will use normal DELETE\n\t\tto delete the pods.\n\t\tThe 'drain' evicts or deletes all pods except mirror pods (which cannot be deleted through\n\t\tthe API server).  If there are DaemonSet-managed pods, drain will not proceed\n\t\twithout --ignore-daemonsets, and regardless it will not delete any\n\t\tDaemonSet-managed pods, because those pods would be immediately replaced by the\n\t\tDaemonSet controller, which ignores unschedulable markings.  If there are any\n\t\tpods that are neither mirror pods nor managed by ReplicationController,\n\t\tReplicaSet, DaemonSet, StatefulSet or Job, then drain will not delete any pods unless you\n\t\tuse --force.  --force will also allow deletion to proceed if the managing resource of one\n\t\tor more pods is missing.\n\n\t\t'drain' waits for graceful termination. You should not operate on the machine until\n\t\tthe command completes.\n\n\t\tWhen you are ready to put the node back into service, use kubectl uncordon, which\n\t\twill make the node schedulable again.\n\n\t\t![Workflow](http://kubernetes.io/images/docs/kubectl_drain.svg)\x00\n\t\tEdit a resource from the default editor.\n\n\t\tThe edit command allows you to directly edit any API resource you can retrieve via the\n\t\tcommand line tools. It will open the editor defined by your KUBE_EDITOR, or EDITOR\n\t\tenvironment variables, or fall back to 'vi' for Linux or 'notepad' for Windows.\n\t\tYou can edit multiple objects, although changes are applied one at a time. The command\n\t\taccepts filenames as well as command line arguments, although the files you point to must\n\t\tbe previously saved versions of resources.\n\n\t\tEditing is done with the API version used to fetch the resource.\n\t\tTo edit using a specific API version, fully-qualify the resource, version, and group.\n\n\t\tThe default format is YAML. To edit in JSON, specify \"-o json\".\n\n\t\tThe flag --windows-line-endings can be used to force Windows line endings,\n\t\totherwise the default for your operating system will be used.\n\n\t\tIn the event an error occurs while updating, a temporary file will be created on disk\n\t\tthat contains your unapplied changes. The most common error when updating a resource\n\t\tis another editor changing the resource on the server. When this occurs, you will have\n\t\tto apply your changes to the newer version of the resource, or update your temporary\n\t\tsaved copy to include the latest resource version.\x00\n\t\tMark node as schedulable.\x00\n\t\tMark node as unschedulable.\x00\n\t\tOutput shell completion code for the specified shell (bash or zsh).\n\t\tThe shell code must be evaluated to provide interactive\n\t\tcompletion of kubectl commands.  This can be done by sourcing it from\n\t\tthe .bash_profile.\n\n\t\tNote: this requires the bash-completion framework, which is not installed\n\t\tby default on Mac.  This can be installed by using homebrew:\n\n\t\t    $ brew install bash-completion\n\n\t\tOnce installed, bash_completion must be evaluated.  This can be done by adding the\n\t\tfollowing line to the .bash_profile\n\n\t\t    $ source $(brew --prefix)/etc/bash_completion\n\n\t\tNote for zsh users: [1] zsh completions are only supported in versions of zsh >= 5.2\x00\n\t\tPerform a rolling update of the given ReplicationController.\n\n\t\tReplaces the specified replication controller with a new replication controller by updating one pod at a time to use the\n\t\tnew PodTemplate. The new-controller.json must specify the same namespace as the\n\t\texisting replication controller and overwrite at least one (common) label in its replicaSelector.\n\n\t\t![Workflow](http://kubernetes.io/images/docs/kubectl_rollingupdate.svg)\x00\n\t\tReplace a resource by filename or stdin.\n\n\t\tJSON and YAML formats are accepted. If replacing an existing resource, the\n\t\tcomplete resource spec must be provided. This can be obtained by\n\n\t\t    $ kubectl get TYPE NAME -o yaml\n\n\t\tPlease refer to the models in https://htmlpreview.github.io/?https://github.com/kubernetes/kubernetes/blob/HEAD/docs/api-reference/v1/definitions.html to find if a field is mutable.\x00\n\t\tSet a new size for a Deployment, ReplicaSet, Replication Controller, or Job.\n\n\t\tScale also allows users to specify one or more preconditions for the scale action.\n\n\t\tIf --current-replicas or --resource-version is specified, it is validated before the\n\t\tscale is attempted, and it is guaranteed that the precondition holds true when the\n\t\tscale is sent to the server.\x00\n\t\tSet the latest last-applied-configuration annotations by setting it to match the contents of a file.\n\t\tThis results in the last-applied-configuration being updated as though 'kubectl apply -f <file>' was run,\n\t\twithout updating any other parts of the object.\x00\n\t\tTo proxy all of the kubernetes api and nothing else, use:\n\n\t\t    $ kubectl proxy --api-prefix=/\n\n\t\tTo proxy only part of the kubernetes api and also some static files:\n\n\t\t    $ kubectl proxy --www=/my/files --www-prefix=/static/ --api-prefix=/api/\n\n\t\tThe above lets you 'curl localhost:8001/api/v1/pods'.\n\n\t\tTo proxy the entire kubernetes api at a different root, use:\n\n\t\t    $ kubectl proxy --api-prefix=/custom/\n\n\t\tThe above lets you 'curl localhost:8001/custom/api/v1/pods'\x00\n\t\tUpdate field(s) of a resource using strategic merge patch\n\n\t\tJSON and YAML formats are accepted.\n\n\t\tPlease refer to the models in https://htmlpreview.github.io/?https://github.com/kubernetes/kubernetes/blob/HEAD/docs/api-reference/v1/definitions.html to find if a field is mutable.\x00\n\t\tUpdate the labels on a resource.\n\n\t\t* A label must begin with a letter or number, and may contain letters, numbers, hyphens, dots, and underscores, up to %[1]d characters.\n\t\t* If --overwrite is true, then existing labels can be overwritten, otherwise attempting to overwrite a label will result in an error.\n\t\t* If --resource-version is specified, then updates will use this resource version, otherwise the existing resource-version will be used.\x00\n\t\tUpdate the taints on one or more nodes.\n\n\t\t* A taint consists of a key, value, and effect. As an argument here, it is expressed as key=value:effect.\n\t\t* The key must begin with a letter or number, and may contain letters, numbers, hyphens, dots, and underscores, up to %[1]d characters.\n\t\t* The value must begin with a letter or number, and may contain letters, numbers, hyphens, dots, and underscores, up to %[2]d characters.\n\t\t* The effect must be NoSchedule, PreferNoSchedule or NoExecute.\n\t\t* Currently taint can only apply to node.\x00\n\t\tView the latest last-applied-configuration annotations by type/name or file.\n\n\t\tThe default output will be printed to stdout in YAML format. One can use -o option\n\t\tto change output format.\x00\n\t    # !!!Important Note!!!\n\t    # Requires that the 'tar' binary is present in your container\n\t    # image.  If 'tar' is not present, 'kubectl cp' will fail.\n\n\t    # Copy /tmp/foo_dir local directory to /tmp/bar_dir in a remote pod in the default namespace\n\t\tkubectl cp /tmp/foo_dir <some-pod>:/tmp/bar_dir\n\n        # Copy /tmp/foo local file to /tmp/bar in a remote pod in a specific container\n\t\tkubectl cp /tmp/foo <some-pod>:/tmp/bar -c <specific-container>\n\n\t\t# Copy /tmp/foo local file to /tmp/bar in a remote pod in namespace <some-namespace>\n\t\tkubectl cp /tmp/foo <some-namespace>/<some-pod>:/tmp/bar\n\n\t\t# Copy /tmp/foo from a remote pod to /tmp/bar locally\n\t\tkubectl cp <some-namespace>/<some-pod>:/tmp/foo /tmp/bar\x00\n\t  # Create a new TLS secret named tls-secret with the given key pair:\n\t  kubectl create secret tls tls-secret --cert=path/to/tls.cert --key=path/to/tls.key\x00\n\t  # Create a new namespace named my-namespace\n\t  kubectl create namespace my-namespace\x00\n\t  # Create a new secret named my-secret with keys for each file in folder bar\n\t  kubectl create secret generic my-secret --from-file=path/to/bar\n\n\t  # Create a new secret named my-secret with specified keys instead of names on disk\n\t  kubectl create secret generic my-secret --from-file=ssh-privatekey=~/.ssh/id_rsa --from-file=ssh-publickey=~/.ssh/id_rsa.pub\n\n\t  # Create a new secret named my-secret with key1=supersecret and key2=topsecret\n\t  kubectl create secret generic my-secret --from-literal=key1=supersecret --from-literal=key2=topsecret\x00\n\t  # Create a new service account named my-service-account\n\t  kubectl create serviceaccount my-service-account\x00\n\t# Create a new ExternalName service named my-ns \n\tkubectl create service externalname my-ns --external-name bar.com\x00\n\tCreate an ExternalName service with the specified name.\n\n\tExternalName service references to an external DNS address instead of\n\tonly pods, which will allow application authors to reference services\n\tthat exist off platform, on other clusters, or locally.\x00\n\tHelp provides help for any command in the application.\n\tSimply type kubectl help [path to command] for full details.\x00\n    # Create a new LoadBalancer service named my-lbs\n    kubectl create service loadbalancer my-lbs --tcp=5678:8080\x00\n    # Create a new clusterIP service named my-cs\n    kubectl create service clusterip my-cs --tcp=5678:8080\n\n    # Create a new clusterIP service named my-cs (in headless mode)\n    kubectl create service clusterip my-cs --clusterip=\"None\"\x00\n    # Create a new deployment named my-dep that runs the busybox image.\n    kubectl create deployment my-dep --image=busybox\x00\n    # Create a new nodeport service named my-ns\n    kubectl create service nodeport my-ns --tcp=5678:8080\x00\n    # Dump current cluster state to stdout\n    kubectl cluster-info dump\n\n    # Dump current cluster state to /path/to/cluster-state\n    kubectl cluster-info dump --output-directory=/path/to/cluster-state\n\n    # Dump all namespaces to stdout\n    kubectl cluster-info dump --all-namespaces\n\n    # Dump a set of namespaces to /path/to/cluster-state\n    kubectl cluster-info dump --namespaces default,kube-system --output-directory=/path/to/cluster-state\x00\n    # Update pod 'foo' with the annotation 'description' and the value 'my frontend'.\n    # If the same annotation is set multiple times, only the last value will be applied\n    kubectl annotate pods foo description='my frontend'\n\n    # Update a pod identified by type and name in \"pod.json\"\n    kubectl annotate -f pod.json description='my frontend'\n\n    # Update pod 'foo' with the annotation 'description' and the value 'my frontend running nginx', overwriting any existing value.\n    kubectl annotate --overwrite pods foo description='my frontend running nginx'\n\n    # Update all pods in the namespace\n    kubectl annotate pods --all description='my frontend running nginx'\n\n    # Update pod 'foo' only if the resource is unchanged from version 1.\n    kubectl annotate pods foo description='my frontend running nginx' --resource-version=1\n\n    # Update pod 'foo' by removing an annotation named 'description' if it exists.\n    # Does not require the --overwrite flag.\n    kubectl annotate pods foo description-\x00\n    Create a LoadBalancer service with the specified name.\x00\n    Create a clusterIP service with the specified name.\x00\n    Create a deployment with the specified name.\x00\n    Create a nodeport service with the specified name.\x00\n    Dumps cluster info out suitable for debugging and diagnosing cluster problems.  By default, dumps everything to\n    stdout. You can optionally specify a directory with --output-directory.  If you specify a directory, kubernetes will\n    build a set of files in that directory.  By default only dumps things in the 'kube-system' namespace, but you can\n    switch to a different namespace with the --namespaces flag, or specify --all-namespaces to dump all namespaces.\n\n    The command also dumps the logs of all of the pods in the cluster, these logs are dumped into different directories\n    based on namespace and pod name.\x00\n  Display addresses of the master and services with label kubernetes.io/cluster-service=true\n  To further debug and diagnose cluster problems, use 'kubectl cluster-info dump'.\x00A comma-delimited set of quota scopes that must all match each object tracked by the quota.\x00A comma-delimited set of resource=quantity pairs that define a hard limit.\x00A label selector to use for this budget. Only equality-based selector requirements are supported.\x00A label selector to use for this service. Only equality-based selector requirements are supported. If empty (the default) infer the selector from the replication controller or replica set.)\x00A schedule in the Cron format the job should be run with.\x00Additional external IP address (not managed by Kubernetes) to accept for the service. If this IP is routed to a node, the service can be accessed by this IP in addition to its generated service IP.\x00An inline JSON override for the generated object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.\x00An inline JSON override for the generated service object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.  Only used if --expose is true.\x00Apply a configuration to a resource by filename or stdin\x00Approve a certificate signing request\x00Assign your own ClusterIP or set to 'None' for a 'headless' service (no loadbalancing).\x00Attach to a running container\x00Auto-scale a Deployment, ReplicaSet, or ReplicationController\x00ClusterIP to be assigned to the service. Leave empty to auto-allocate, or set to 'None' to create a headless service.\x00ClusterRole this ClusterRoleBinding should reference\x00ClusterRole this RoleBinding should reference\x00Container name which will have its image upgraded. Only relevant when --image is specified, ignored otherwise. Required when using --image on a multi-container pod\x00Convert config files between different API versions\x00Copy files and directories to and from containers.\x00Create a ClusterRoleBinding for a particular ClusterRole\x00Create a LoadBalancer service.\x00Create a NodePort service.\x00Create a RoleBinding for a particular Role or ClusterRole\x00Create a TLS secret\x00Create a clusterIP service.\x00Create a configmap from a local file, directory or literal value\x00Create a deployment with the specified name.\x00Create a namespace with the specified name\x00Create a pod disruption budget with the specified name.\x00Create a quota with the specified name.\x00Create a resource by filename or stdin\x00Create a secret for use with a Docker registry\x00Create a secret from a local file, directory or literal value\x00Create a secret using specified subcommand\x00Create a service account with the specified name\x00Create a service using specified subcommand.\x00Create an ExternalName service.\x00Delete resources by filenames, stdin, resources and names, or by resources and label selector\x00Delete the specified cluster from the kubeconfig\x00Delete the specified context from the kubeconfig\x00Deny a certificate signing request\x00Deprecated: Gracefully shut down a resource by name or filename\x00Describe one or many contexts\x00Display Resource (CPU/Memory) usage of nodes\x00Display Resource (CPU/Memory) usage of pods\x00Display Resource (CPU/Memory) usage.\x00Display cluster info\x00Display clusters defined in the kubeconfig\x00Display merged kubeconfig settings or a specified kubeconfig file\x00Display one or many resources\x00Displays the current-context\x00Documentation of resources\x00Drain node in preparation for maintenance\x00Dump lots of relevant info for debugging and diagnosis\x00Edit a resource on the server\x00Email for Docker registry\x00Execute a command in a container\x00Explicit policy for when to pull container images. Required when --image is same as existing image, ignored otherwise.\x00Forward one or more local ports to a pod\x00Help about any command\x00IP to assign to the Load Balancer. If empty, an ephemeral IP will be created and used (cloud-provider specific).\x00If non-empty, set the session affinity for the service to this; legal values: 'None', 'ClientIP'\x00If non-empty, the annotation update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource.\x00If non-empty, the labels update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource.\x00Image to use for upgrading the replication controller. Must be distinct from the existing image (either new image or new image tag).  Can not be used with --filename/-f\x00Manage a deployment rollout\x00Mark node as schedulable\x00Mark node as unschedulable\x00Mark the provided resource as paused\x00Modify certificate resources.\x00Modify kubeconfig files\x00Name or number for the port on the container that the service should direct traffic to. Optional.\x00Only return logs after a specific date (RFC3339). Defaults to all logs. Only one of since-time / since may be used.\x00Output shell completion code for the specified shell (bash or zsh)\x00Output the formatted object with the given group version (for ex: 'extensions/v1beta1').)\x00Password for Docker registry authentication\x00Path to PEM encoded public key certificate.\x00Path to private key associated with given certificate.\x00Perform a rolling update of the given ReplicationController\x00Precondition for resource version. Requires that the current resource version match this value in order to scale.\x00Print the client and server version information\x00Print the list of flags inherited by all commands\x00Print the logs for a container in a pod\x00Replace a resource by filename or stdin\x00Resume a paused resource\x00Role this RoleBinding should reference\x00Run a particular image on the cluster\x00Run a proxy to the Kubernetes API server\x00Server location for Docker registry\x00Set a new size for a Deployment, ReplicaSet, Replication Controller, or Job\x00Set specific features on objects\x00Set the last-applied-configuration annotation on a live object to match the contents of a file.\x00Set the selector on a resource\x00Sets a cluster entry in kubeconfig\x00Sets a context entry in kubeconfig\x00Sets a user entry in kubeconfig\x00Sets an individual value in a kubeconfig file\x00Sets the current-context in a kubeconfig file\x00Show details of a specific resource or group of resources\x00Show the status of the rollout\x00Synonym for --target-port\x00Take a replication controller, service, deployment or pod and expose it as a new Kubernetes Service\x00The image for the container to run.\x00The image pull policy for the container. If left empty, this value will not be specified by the client and defaulted by the server\x00The key to use to differentiate between two different controllers, default 'deployment'.  Only relevant when --image is specified, ignored otherwise\x00The minimum number or percentage of available pods this budget requires.\x00The name for the newly created object.\x00The name for the newly created object. If not specified, the name of the input resource will be used.\x00The name of the API generator to use, see http://kubernetes.io/docs/user-guide/kubectl-conventions/#generators for a list.\x00The name of the API generator to use. Currently there is only 1 generator.\x00The name of the API generator to use. There are 2 generators: 'service/v1' and 'service/v2'. The only difference between them is that service port in v1 is named 'default', while it is left unnamed in v2. Default is 'service/v2'.\x00The name of the generator to use for creating a service.  Only used if --expose is true\x00The network protocol for the service to be created. Default is 'TCP'.\x00The port that the service should serve on. Copied from the resource being exposed, if unspecified\x00The port that this container exposes.  If --expose is true, this is also the port used by the service that is created.\x00The resource requirement limits for this container.  For example, 'cpu=200m,memory=512Mi'.  Note that server side components may assign limits depending on the server configuration, such as limit ranges.\x00The resource requirement requests for this container.  For example, 'cpu=100m,memory=256Mi'.  Note that server side components may assign requests depending on the server configuration, such as limit ranges.\x00The restart policy for this Pod.  Legal values [Always, OnFailure, Never].  If set to 'Always' a deployment is created, if set to 'OnFailure' a job is created, if set to 'Never', a regular pod is created. For the latter two --replicas must be 1.  Default 'Always', for CronJobs `Never`.\x00The type of secret to create\x00Type for this service: ClusterIP, NodePort, or LoadBalancer. Default is 'ClusterIP'.\x00Undo a previous rollout\x00Unsets an individual value in a kubeconfig file\x00Update field(s) of a resource using strategic merge patch\x00Update image of a pod template\x00Update resource requests/limits on objects with pod templates\x00Update the annotations on a resource\x00Update the labels on a resource\x00Update the taints on one or more nodes\x00Username for Docker registry authentication\x00View latest last-applied-configuration annotations of a resource/object\x00View rollout history\x00Where to output the files.  If empty or '-' uses stdout, otherwise creates a directory hierarchy in that directory\x00dummy restart flag)\x00external name of service\x00kubectl controls the Kubernetes cluster manager\x00Project-Id-Version: gettext-go-examples-hello\nReport-Msgid-Bugs-To: EMAIL\nPOT-Creation-Date: 2017-03-14 21:32-0700\nPO-Revision-Date: 2019-02-14 10:33+0900\nLast-Translator: Giri Kuncoro <girikuncoro@gmail.com>\nLanguage-Team: \nLanguage: ja\nMIME-Version: 1.0\nContent-Type: text/plain; charset=UTF-8\nContent-Transfer-Encoding: 8bit\nX-Generator: Poedit 2.1.1\nX-Poedit-SourceCharset: UTF-8\nPlural-Forms: nplurals=2; plural=(n > 1);\n\x00\n\t\t  # Create a ClusterRoleBinding for user1, user2, and group1 using the cluster-admin ClusterRole\n\t\t  kubectl create clusterrolebinding cluster-admin \u2014clusterrole=cluster-admin \u2014user=user1 \u2014user=user2 \u2014group=group1\x00\n\t\t  # Create a RoleBinding for user1, user2, and group1 using the admin ClusterRole\n\t\t  kubectl create rolebinding admin \u2014clusterrole=admin \u2014user=user1 \u2014user=user2 \u2014group=group1\x00\n\t\t  # Create a new configmap named my-config based on folder bar\n\t\t  kubectl create configmap my-config \u2014from-file=path/to/bar\n\n\t\t  # Create a new configmap named my-config with specified keys instead of file basenames on disk\n\t\t  kubectl create configmap my-config \u2014from-file=key1=/path/to/bar/file1.txt \u2014from-file=key2=/path/to/bar/file2.txt\n\n\t\t  # Create a new configmap named my-config with key1=config1 and key2=config2\n\t\t  kubectl create configmap my-config \u2014from-literal=key1=config1 \u2014from-literal=key2=config2\x00\n\t\t  # If you don\u2019t already have a .dockercfg file, you can create a dockercfg secret directly by using:\n\t\t  kubectl create secret docker-registry my-secret \u2014docker-server=DOCKER_REGISTRY_SERVER \u2014docker-username=DOCKER_USER \u2014docker-password=DOCKER_PASSWORD \u2014docker-email=DOCKER_EMAIL\x00\n\t\t  # Show metrics for all nodes\n\t\t  kubectl top node\n\n\t\t  # Show metrics for a given node\n\t\t  kubectl top node NODE_NAME\x00\n\t\t# Apply the configuration in pod.json to a pod.\n\t\tkubectl apply -f ./pod.json\n\n\t\t# Apply the JSON passed into stdin to a pod.\n\t\tcat pod.json | kubectl apply -f -\n\n\t\t# Note: \u2014prune is still in Alpha\n\t\t# Apply the configuration in manifest.yaml that matches label app=nginx and delete all the other resources that are not in the file and match label app=nginx.\n\t\tkubectl apply \u2014prune -f manifest.yaml -l app=nginx\n\n\t\t# Apply the configuration in manifest.yaml and delete all the other configmaps that are not in the file.\n\t\tkubectl apply \u2014prune -f manifest.yaml \u2014all \u2014prune-whitelist=core/v1/ConfigMap\x00\n\t\t# Auto scale a deployment \u201cfoo\u201d, with the number of pods between 2 and 10, no target CPU utilization specified so a default autoscaling policy will be used:\n\t\tkubectl autoscale deployment foo \u2014min=2 \u2014max=10\n\n\t\t# Auto scale a replication controller \u201cfoo\u201d, with the number of pods between 1 and 5, target CPU utilization at 80%:\n\t\tkubectl autoscale rc foo \u2014max=5 \u2014cpu-percent=80\x00\n\t\t# Convert \u2018pod.yaml\u2019 to latest version and print to stdout.\n\t\tkubectl convert -f pod.yaml\n\n\t\t# Convert the live state of the resource specified by \u2018pod.yaml\u2019 to the latest version\n\t\t# and print to stdout in json format.\n\t\tkubectl convert -f pod.yaml \u2014local -o json\n\n\t\t# Convert all files under current directory to latest version and create them all.\n\t\tkubectl convert -f . | kubectl create -f -\x00\n\t\t# Create a ClusterRole named \u201cpod-reader\u201d that allows user to perform \u201cget\u201d, \u201cwatch\u201d and \u201clist\u201d on pods\n\t\tkubectl create clusterrole pod-reader \u2014verb=get,list,watch \u2014resource=pods\n\n\t\t# Create a ClusterRole named \u201cpod-reader\u201d with ResourceName specified\n\t\tkubectl create clusterrole pod-reader \u2014verb=get,list,watch \u2014resource=pods \u2014resource-name=readablepod\x00\n\t\t# Create a Role named \u201cpod-reader\u201d that allows user to perform \u201cget\u201d, \u201cwatch\u201d and \u201clist\u201d on pods\n\t\tkubectl create role pod-reader \u2014verb=get \u2014verb=list \u2014verb=watch \u2014resource=pods\n\n\t\t# Create a Role named \u201cpod-reader\u201d with ResourceName specified\n\t\tkubectl create role pod-reader \u2014verb=get \u2014verg=list \u2014verb=watch \u2014resource=pods \u2014resource-name=readablepod\x00\n\t\t# Create a new resourcequota named my-quota\n\t\tkubectl create quota my-quota \u2014hard=cpu=1,memory=1G,pods=2,services=3,replicationcontrollers=2,resourcequotas=1,secrets=5,persistentvolumeclaims=10\n\n\t\t# Create a new resourcequota named best-effort\n\t\tkubectl create quota best-effort \u2014hard=pods=100 \u2014scopes=BestEffort\x00\n\t\t# Create a pod disruption budget named my-pdb that will select all pods with the app=rails label\n\t\t# and require at least one of them being available at any point in time.\n\t\tkubectl create poddisruptionbudget my-pdb \u2014selector=app=rails \u2014min-available=1\n\n\t\t# Create a pod disruption budget named my-pdb that will select all pods with the app=nginx label\n\t\t# and require at least half of the pods selected to be available at any point in time.\n\t\tkubectl create pdb my-pdb \u2014selector=app=nginx \u2014min-available=50%\x00\n\t\t# Create a pod using the data in pod.json.\n\t\tkubectl create -f ./pod.json\n\n\t\t# Create a pod based on the JSON passed into stdin.\n\t\tcat pod.json | kubectl create -f -\n\n\t\t# Edit the data in docker-registry.yaml in JSON using the v1 API format then create the resource using the edited data.\n\t\tkubectl create -f docker-registry.yaml \u2014edit \u2014output-version=v1 -o json\x00\n\t\t# Create a service for a replicated nginx, which serves on port 80 and connects to the containers on port 8000.\n\t\tkubectl expose rc nginx --port=80 --target-port=8000\n\n\t\t# Create a service for a replication controller identified by type and name specified in \"nginx-controller.yaml\", which serves on port 80 and connects to the containers on port 8000.\n\t\tkubectl expose -f nginx-controller.yaml --port=80 --target-port=8000\n\n\t\t# Create a service for a pod valid-pod, which serves on port 444 with the name \"frontend\"\n\t\tkubectl expose pod valid-pod \u2014port=444 \u2014name=frontend\n\n\t\t# Create a second service based on the above service, exposing the container port 8443 as port 443 with the name \u201cnginx-https\u201d\n\t\tkubectl expose service nginx \u2014port=443 \u2014target-port=8443 \u2014name=nginx-https\n\n\t\t# Create a service for a replicated streaming application on port 4100 balancing UDP traffic and named \u2018video-stream\u2019.\n\t\tkubectl expose rc streamer \u2014port=4100 \u2014protocol=udp \u2014name=video-stream\n\n\t\t# Create a service for a replicated nginx using replica set, which serves on port 80 and connects to the containers on port 8000.\n\t\tkubectl expose rs nginx \u2014port=80 \u2014target-port=8000\n\n\t\t# Create a service for an nginx deployment, which serves on port 80 and connects to the containers on port 8000.\n\t\tkubectl expose deployment nginx \u2014port=80 \u2014target-port=8000\x00\n\t\t# Delete a pod using the type and name specified in pod.json.\n\t\tkubectl delete -f ./pod.json\n\n\t\t# Delete a pod based on the type and name in the JSON passed into stdin.\n\t\tcat pod.json | kubectl delete -f -\n\n\t\t# Delete pods and services with same names \u201cbaz\u201d and \u201cfoo\u201d\n\t\tkubectl delete pod,service baz foo\n\n\t\t# Delete pods and services with label name=myLabel.\n\t\tkubectl delete pods,services -l name=myLabel\n\n\t\t# Delete a pod with minimal delay\n\t\tkubectl delete pod foo \u2014now\n\n\t\t# Force delete a pod on a dead node\n\t\tkubectl delete pod foo \u2014grace-period=0 \u2014force\n\n\t\t# Delete all pods\n\t\tkubectl delete pods \u2014all\x00\n\t\t# Describe a node\n\t\tkubectl describe nodes kubernetes-node-emt8.c.myproject.internal\n\n\t\t# Describe a pod\n\t\tkubectl describe pods/nginx\n\n\t\t# Describe a pod identified by type and name in \u201cpod.json\u201d\n\t\tkubectl describe -f pod.json\n\n\t\t# Describe all pods\n\t\tkubectl describe pods\n\n\t\t# Describe pods by label name=myLabel\n\t\tkubectl describe po -l name=myLabel\n\n\t\t# Describe all pods managed by the \u2018frontend\u2019 replication controller (rc-created pods\n\t\t# get the name of the rc as a prefix in the pod the name).\n\t\tkubectl describe pods frontend\x00\n\t\t# Drain node \u201cfoo\u201d, even if there are pods not managed by a ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet on it.\n\t\t$ kubectl drain foo \u2014force\n\n\t\t# As above, but abort if there are pods not managed by a ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet, and use a grace period of 15 minutes.\n\t\t$ kubectl drain foo \u2014grace-period=900\x00\n\t\t# Edit the service named \u2018docker-registry\u2019:\n\t\tkubectl edit svc/docker-registry\n\n\t\t# Use an alternative editor\n\t\tKUBE_EDITOR=\u201cnano\u201d kubectl edit svc/docker-registry\n\n\t\t# Edit the job \u2018myjob\u2019 in JSON using the v1 API format:\n\t\tkubectl edit job.v1.batch/myjob -o json\n\n\t\t# Edit the deployment \u2018mydeployment\u2019 in YAML and save the modified config in its annotation:\n\t\tkubectl edit deployment/mydeployment -o yaml \u2014save-config\x00\n\t\t# Get output from running \u2018date\u2019 from pod 123456-7890, using the first container by default\n\t\tkubectl exec 123456-7890 date\n\n\t\t# Get output from running \u2018date\u2019 in ruby-container from pod 123456-7890\n\t\tkubectl exec 123456-7890 -c ruby-container date\n\n\t\t# Switch to raw terminal mode, sends stdin to \u2018bash\u2019 in ruby-container from pod 123456-7890\n\t\t# and sends stdout/stderr from \u2018bash\u2019 back to the client\n\t\tkubectl exec 123456-7890 -c ruby-container -i -t \u2014 bash -il\x00\n\t\t# Get output from running pod 123456-7890, using the first container by default\n\t\tkubectl attach 123456-7890\n\n\t\t# Get output from ruby-container from pod 123456-7890\n\t\tkubectl attach 123456-7890 -c ruby-container\n\n\t\t# Switch to raw terminal mode, sends stdin to \u2018bash\u2019 in ruby-container from pod 123456-7890\n\t\t# and sends stdout/stderr from \u2018bash\u2019 back to the client\n\t\tkubectl attach 123456-7890 -c ruby-container -i -t\n\n\t\t# Get output from the first pod of a ReplicaSet named nginx\n\t\tkubectl attach rs/nginx\n\t\t\x00\n\t\t# Get the documentation of the resource and its fields\n\t\tkubectl explain pods\n\n\t\t# Get the documentation of a specific field of a resource\n\t\tkubectl explain pods.spec.containers\x00\n\t\t# Install bash completion on a Mac using homebrew\n\t\tbrew install bash-completion\n\t\tprintf \"\n# Bash completion support\nsource $(brew --prefix)/etc/bash_completion\n\" >> $HOME/.bash_profile\n\t\tsource $HOME/.bash_profile\n\n\t\t# Load the kubectl completion code for bash into the current shell\n\t\tsource <(kubectl completion bash)\n\n\t\t# Write bash completion code to a file and source if from .bash_profile\n\t\tkubectl completion bash > ~/.kube/completion.bash.inc\n\t\tprintf \u201c\n# Kubectl shell completion\nsource \u2018$HOME/.kube/completion.bash.inc\u2019\n\u201c >> $HOME/.bash_profile\n\t\tsource $HOME/.bash_profile\n\n\t\t# Load the kubectl completion code for zsh[1] into the current shell\n\t\tsource <(kubectl completion zsh)\x00\n\t\t# List all pods in ps output format.\n\t\tkubectl get pods\n\n\t\t# List all pods in ps output format with more information (such as node name).\n\t\tkubectl get pods -o wide\n\n\t\t# List a single replication controller with specified NAME in ps output format.\n\t\tkubectl get replicationcontroller web\n\n\t\t# List a single pod in JSON output format.\n\t\tkubectl get -o json pod web-pod-13je7\n\n\t\t# List a pod identified by type and name specified in \u201cpod.yaml\u201d in JSON output format.\n\t\tkubectl get -f pod.yaml -o json\n\n\t\t# Return only the phase value of the specified pod.\n\t\tkubectl get -o template pod/web-pod-13je7 \u2014template={{.status.phase}}\n\n\t\t# List all replication controllers and services together in ps output format.\n\t\tkubectl get rc,services\n\n\t\t# List one or more resources by their type and names.\n\t\tkubectl get rc/web service/frontend pods/web-pod-13je7\n\n\t\t# List all resources with different types.\n\t\tkubectl get all\x00\n\t\t# Listen on ports 5000 and 6000 locally, forwarding data to/from ports 5000 and 6000 in the pod\n\t\tkubectl port-forward mypod 5000 6000\n\n\t\t# Listen on port 8888 locally, forwarding to 5000 in the pod\n\t\tkubectl port-forward mypod 8888:5000\n\n\t\t# Listen on a random port locally, forwarding to 5000 in the pod\n\t\tkubectl port-forward mypod :5000\n\n\t\t# Listen on a random port locally, forwarding to 5000 in the pod\n\t\tkubectl port-forward mypod 0:5000\x00\n\t\t# Mark node \u201cfoo\u201d as schedulable.\n\t\t$ kubectl uncordon foo\x00\n\t\t# Mark node \u201cfoo\u201d as unschedulable.\n\t\tkubectl cordon foo\x00\n\t\t# Partially update a node using strategic merge patch\n\t\tkubectl patch node k8s-node-1 -p \u2018{\u201cspec\u201d:{\u201cunschedulable\u201d:true}}\u2019\n\n\t\t# Partially update a node identified by the type and name specified in \u201cnode.json\u201d using strategic merge patch\n\t\tkubectl patch -f node.json -p \u2018{\u201cspec\u201d:{\u201cunschedulable\u201d:true}}\u2019\n\n\t\t# Update a container\u2019s image; spec.containers[*].name is required because it\u2019s a merge key\n\t\tkubectl patch pod valid-pod -p \u2018{\u201cspec\u201d:{\u201ccontainers\u201d:[{\u201cname\u201d:\u201dkubernetes-serve-hostname\u201d,\u201dimage\u201d:\u201dnew image\u201d}]}}\u2019\n\n\t\t# Update a container\u2019s image using a json patch with positional arrays\n\t\tkubectl patch pod valid-pod \u2014type=\u2018json\u2019 -p=\u2018[{\u201cop\u201d: \u201creplace\u201d, \u201cpath\u201d: \u201c/spec/containers/0/image\u201d, \u201cvalue\u201d:\u201dnew image\u201d}]\u2019\x00\n\t\t# Print flags inherited by all commands\n\t\tkubectl options\x00\n\t\t# Print the address of the master and cluster services\n\t\tkubectl cluster-info\x00\n\t\t# Print the client and server versions for the current context\n\t\tkubectl version\x00\n\t\t# Print the supported API versions\n\t\tkubectl api-versions\x00\n\t\t# Replace a pod using the data in pod.json.\n\t\tkubectl replace -f ./pod.json\n\n\t\t# Replace a pod based on the JSON passed into stdin.\n\t\tcat pod.json | kubectl replace -f -\n\n\t\t# Update a single-container pod\u2019s image version (tag) to v4\n\t\tkubectl get pod mypod -o yaml | sed \u2019s/\\(image: myimage\\):.*$/\x01:v4/\u2018 | kubectl replace -f -\n\n\t\t# Force replace, delete and then re-create the resource\n\t\tkubectl replace \u2014force -f ./pod.json\x00\n\t\t# Return snapshot logs from pod nginx with only one container\n\t\tkubectl logs nginx\n\n\t\t# Return snapshot logs for the pods defined by label app=nginx\n\t\tkubectl logs -lapp=nginx\n\n\t\t# Return snapshot of previous terminated ruby container logs from pod web-1\n\t\tkubectl logs -p -c ruby web-1\n\n\t\t# Begin streaming the logs of the ruby container in pod web-1\n\t\tkubectl logs -f -c ruby web-1\n\n\t\t# Display only the most recent 20 lines of output in pod nginx\n\t\tkubectl logs \u2014tail=20 nginx\n\n\t\t# Show all logs from pod nginx written in the last hour\n\t\tkubectl logs \u2014since=1h nginx\n\n\t\t# Return snapshot logs from first container of a job named hello\n\t\tkubectl logs job/hello\n\n\t\t# Return snapshot logs from container nginx-1 of a deployment named nginx\n\t\tkubectl logs deployment/nginx -c nginx-1\x00\n\t\t# Run a proxy to kubernetes apiserver on port 8011, serving static content from ./local/www/\n\t\tkubectl proxy \u2014port=8011 \u2014www=./local/www/\n\n\t\t# Run a proxy to kubernetes apiserver on an arbitrary local port.\n\t\t# The chosen port for the server will be output to stdout.\n\t\tkubectl proxy \u2014port=0\n\n\t\t# Run a proxy to kubernetes apiserver, changing the api prefix to k8s-api\n\t\t# This makes e.g. the pods api available at localhost:8001/k8s-api/v1/pods/\n\t\tkubectl proxy \u2014api-prefix=/k8s-api\x00\n\t\t# Scale a replicaset named \u2018foo\u2019 to 3.\n\t\tkubectl scale \u2014replicas=3 rs/foo\n\n\t\t# Scale a resource identified by type and name specified in \u201cfoo.yaml\u201d to 3.\n\t\tkubectl scale \u2014replicas=3 -f foo.yaml\n\n\t\t# If the deployment named mysql\u2019s current size is 2, scale mysql to 3.\n\t\tkubectl scale \u2014current-replicas=2 \u2014replicas=3 deployment/mysql\n\n\t\t# Scale multiple replication controllers.\n\t\tkubectl scale \u2014replicas=5 rc/foo rc/bar rc/baz\n\n\t\t# Scale job named \u2018cron\u2019 to 3.\n\t\tkubectl scale \u2014replicas=3 job/cron\x00\n\t\t# Set the last-applied-configuration of a resource to match the contents of a file.\n\t\tkubectl apply set-last-applied -f deploy.yaml\n\n\t\t# Execute set-last-applied against each configuration file in a directory.\n\t\tkubectl apply set-last-applied -f path/\n\n\t\t# Set the last-applied-configuration of a resource to match the contents of a file, will create the annotation if it does not already exist.\n\t\tkubectl apply set-last-applied -f deploy.yaml \u2014create-annotation=true\n\t\t\x00\n\t\t# Show metrics for all pods in the default namespace\n\t\tkubectl top pod\n\n\t\t# Show metrics for all pods in the given namespace\n\t\tkubectl top pod \u2014namespace=NAMESPACE\n\n\t\t# Show metrics for a given pod and its containers\n\t\tkubectl top pod POD_NAME \u2014containers\n\n\t\t# Show metrics for the pods defined by label name=myLabel\n\t\tkubectl top pod -l name=myLabel\x00\n\t\t# Shut down foo.\n\t\tkubectl stop replicationcontroller foo\n\n\t\t# Stop pods and services with label name=myLabel.\n\t\tkubectl stop pods,services -l name=myLabel\n\n\t\t# Shut down the service defined in service.json\n\t\tkubectl stop -f service.json\n\n\t\t# Shut down all resources in the path/to/resources directory\n\t\tkubectl stop -f path/to/resources\x00\n\t\t# Start a single instance of nginx.\n\t\tkubectl run nginx --image=nginx\n\n\t\t# Start a single instance of hazelcast and let the container expose port 5701 .\n\t\tkubectl run hazelcast --image=hazelcast --port=5701\n\n\t\t# Start a single instance of hazelcast and set environment variables \"DNS_DOMAIN=cluster\" and \"POD_NAMESPACE=default\" in the container.\n\t\tkubectl run hazelcast --image=hazelcast --env=\"DNS_DOMAIN=cluster\" --env=\"POD_NAMESPACE=default\"\n\n\t\t# Start a replicated instance of nginx.\n\t\tkubectl run nginx --image=nginx --replicas=5\n\n\t\t# Dry run. Print the corresponding API objects without creating them.\n\t\tkubectl run nginx --image=nginx --dry-run\n\n\t\t# Start a single instance of nginx, but overload the spec of the deployment with a partial set of values parsed from JSON.\n\t\tkubectl run nginx --image=nginx --overrides='{ \"apiVersion\": \"v1\", \"spec\": { ... } }'\n\n\t\t# Start a pod of busybox and keep it in the foreground, don't restart it if it exits.\n\t\tkubectl run -i -t busybox \u2014image=busybox \u2014restart=Never\n\n\t\t# Start the nginx container using the default command, but use custom arguments (arg1 .. argN) for that command.\n\t\tkubectl run nginx \u2014image=nginx \u2014 <arg1> <arg2> \u2026 <argN>\n\n\t\t# Start the nginx container using a different command and custom arguments.\n\t\tkubectl run nginx \u2014image=nginx \u2014command \u2014 <cmd> <arg1> \u2026 <argN>\n\n\t\t# Start the perl container to compute \u03c0 to 2000 places and print it out.\n\t\tkubectl run pi \u2014image=perl \u2014restart=OnFailure \u2014 perl -Mbignum=bpi -wle \u2018print bpi(2000)\u2019\n\n\t\t# Start the cron job to compute \u03c0 to 2000 places and print it out every 5 minutes.\n\t\tkubectl run pi \u2014schedule=\u201c0/5 * * * ?\u201d \u2014image=perl \u2014restart=OnFailure \u2014 perl -Mbignum=bpi -wle \u2018print bpi(2000)\u2019\x00\n\t\t# Update node \u2018foo\u2019 with a taint with key \u2018dedicated\u2019 and value \u2018special-user\u2019 and effect \u2018NoSchedule\u2019.\n\t\t# If a taint with that key and effect already exists, its value is replaced as specified.\n\t\tkubectl taint nodes foo dedicated=special-user:NoSchedule\n\n\t\t# Remove from node \u2018foo\u2019 the taint with key \u2018dedicated\u2019 and effect \u2018NoSchedule\u2019 if one exists.\n\t\tkubectl taint nodes foo dedicated:NoSchedule-\n\n\t\t# Remove from node \u2018foo\u2019 all the taints with key \u2018dedicated\u2019\n\t\tkubectl taint nodes foo dedicated-\x00\n\t\t# Update pod \u2018foo\u2019 with the label \u2018unhealthy\u2019 and the value \u2018true\u2019.\n\t\tkubectl label pods foo unhealthy=true\n\n\t\t# Update pod \u2018foo\u2019 with the label \u2018status\u2019 and the value \u2018unhealthy\u2019, overwriting any existing value.\n\t\tkubectl label \u2014overwrite pods foo status=unhealthy\n\n\t\t# Update all pods in the namespace\n\t\tkubectl label pods \u2014all status=unhealthy\n\n\t\t# Update a pod identified by the type and name in \u201cpod.json\u201d\n\t\tkubectl label -f pod.json status=unhealthy\n\n\t\t# Update pod \u2018foo\u2019 only if the resource is unchanged from version 1.\n\t\tkubectl label pods foo status=unhealthy \u2014resource-version=1\n\n\t\t# Update pod \u2018foo\u2019 by removing a label named \u2018bar\u2019 if it exists.\n\t\t# Does not require the \u2014overwrite flag.\n\t\tkubectl label pods foo bar-\x00\n\t\t# Update pods of frontend-v1 using new replication controller data in frontend-v2.json.\n\t\tkubectl rolling-update frontend-v1 -f frontend-v2.json\n\n\t\t# Update pods of frontend-v1 using JSON data passed into stdin.\n\t\tcat frontend-v2.json | kubectl rolling-update frontend-v1 -f -\n\n\t\t# Update the pods of frontend-v1 to frontend-v2 by just changing the image, and switching the\n\t\t# name of the replication controller.\n\t\tkubectl rolling-update frontend-v1 frontend-v2 \u2014image=image:v2\n\n\t\t# Update the pods of frontend by just changing the image, and keeping the old name.\n\t\tkubectl rolling-update frontend \u2014image=image:v2\n\n\t\t# Abort and reverse an existing rollout in progress (from frontend-v1 to frontend-v2).\n\t\tkubectl rolling-update frontend-v1 frontend-v2 \u2014rollback\x00\n\t\t# View the last-applied-configuration annotations by type/name in YAML.\n\t\tkubectl apply view-last-applied deployment/nginx\n\n\t\t# View the last-applied-configuration annotations by file in JSON\n\t\tkubectl apply view-last-applied -f deploy.yaml -o json\x00\n\t\tApply a configuration to a resource by filename or stdin.\n\t\tThis resource will be created if it doesn\u2019t exist yet.\n\t\tTo use \u2018apply\u2019, always create the resource initially with either \u2018apply\u2019 or \u2018create \u2014save-config\u2019.\n\n\t\tJSON and YAML formats are accepted.\n\n\t\tAlpha Disclaimer: the \u2014prune functionality is not yet complete. Do not use unless you are aware of what the current state is. See https://issues.k8s.io/34274.\x00\n\t\tConvert config files between different API versions. Both YAML\n\t\tand JSON formats are accepted.\n\n\t\tThe command takes filename, directory, or URL as input, and convert it into format\n\t\tof version specified by \u2014output-version flag. If target version is not specified or\n\t\tnot supported, convert to latest version.\n\n\t\tThe default output will be printed to stdout in YAML format. One can use -o option\n\t\tto change to output destination.\x00\n\t\tCreate a ClusterRole.\x00\n\t\tCreate a ClusterRoleBinding for a particular ClusterRole.\x00\n\t\tCreate a RoleBinding for a particular Role or ClusterRole.\x00\n\t\tCreate a TLS secret from the given public/private key pair.\n\n\t\tThe public/private key pair must exist before hand. The public key certificate must be .PEM encoded and match the given private key.\x00\n\t\tCreate a configmap based on a file, directory, or specified literal value.\n\n\t\tA single configmap may package one or more key/value pairs.\n\n\t\tWhen creating a configmap based on a file, the key will default to the basename of the file, and the value will\n\t\tdefault to the file content.  If the basename is an invalid key, you may specify an alternate key.\n\n\t\tWhen creating a configmap based on a directory, each file whose basename is a valid key in the directory will be\n\t\tpackaged into the configmap.  Any directory entries except regular files are ignored (e.g. subdirectories,\n\t\tsymlinks, devices, pipes, etc).\x00\n\t\tCreate a namespace with the specified name.\x00\n\t\tCreate a new secret for use with Docker registries.\n\n\t\tDockercfg secrets are used to authenticate against Docker registries.\n\n\t\tWhen using the Docker command line to push images, you can authenticate to a given registry by running\n\n\t\t    $ docker login DOCKER_REGISTRY_SERVER \u2014username=DOCKER_USER \u2014password=DOCKER_PASSWORD \u2014email=DOCKER_EMAIL\u2019.\n\n    That produces a ~/.dockercfg file that is used by subsequent \u2018docker push\u2019 and \u2018docker pull\u2019 commands to\n\t\tauthenticate to the registry. The email address is optional.\n\n\t\tWhen creating applications, you may have a Docker registry that requires authentication.  In order for the\n\t\tnodes to pull images on your behalf, they have to have the credentials.  You can provide this information\n\t\tby creating a dockercfg secret and attaching it to your service account.\x00\n\t\tCreate a pod disruption budget with the specified name, selector, and desired minimum available pods\x00\n\t\tCreate a resource by filename or stdin.\n\n\t\tJSON and YAML formats are accepted.\x00\n\t\tCreate a resourcequota with the specified name, hard limits and optional scopes\x00\n\t\tCreate a role with single rule.\x00\n\t\tCreate a secret based on a file, directory, or specified literal value.\n\n\t\tA single secret may package one or more key/value pairs.\n\n\t\tWhen creating a secret based on a file, the key will default to the basename of the file, and the value will\n\t\tdefault to the file content.  If the basename is an invalid key, you may specify an alternate key.\n\n\t\tWhen creating a secret based on a directory, each file whose basename is a valid key in the directory will be\n\t\tpackaged into the secret.  Any directory entries except regular files are ignored (e.g. subdirectories,\n\t\tsymlinks, devices, pipes, etc).\x00\n\t\tCreate a service account with the specified name.\x00\n\t\tCreate and run a particular image, possibly replicated.\n\n\t\tCreates a deployment or job to manage the created container(s).\x00\n\t\tCreates an autoscaler that automatically chooses and sets the number of pods that run in a kubernetes cluster.\n\n\t\tLooks up a Deployment, ReplicaSet, or ReplicationController by name and creates an autoscaler that uses the given resource as a reference.\n\t\tAn autoscaler can automatically increase or decrease number of pods deployed within the system as needed.\x00\n\t\tDelete resources by filenames, stdin, resources and names, or by resources and label selector.\n\n\t\tJSON and YAML formats are accepted. Only one type of the arguments may be specified: filenames,\n\t\tresources and names, or resources and label selector.\n\n\t\tSome resources, such as pods, support graceful deletion. These resources define a default period\n\t\tbefore they are forcibly terminated (the grace period) but you may override that value with\n\t\tthe --grace-period flag, or pass --now to set a grace-period of 1. Because these resources often\n\t\trepresent entities in the cluster, deletion may not be acknowledged immediately. If the node\n\t\thosting a pod is down or cannot reach the API server, termination may take significantly longer\n\t\tthan the grace period. To force delete a resource,\tyou must pass a grace\tperiod of 0 and specify\n\t\tthe --force flag.\n\n\t\tIMPORTANT: Force deleting pods does not wait for confirmation that the pod\u2019s processes have been\n\t\tterminated, which can leave those processes running until the node detects the deletion and\n\t\tcompletes graceful deletion. If your processes use shared storage or talk to a remote API and\n\t\tdepend on the name of the pod to identify themselves, force deleting those pods may result in\n\t\tmultiple processes running on different machines using the same identification which may lead\n\t\tto data corruption or inconsistency. Only force delete pods when you are sure the pod is\n\t\tterminated, or if your application can tolerate multiple copies of the same pod running at once.\n\t\tAlso, if you force delete pods the scheduler may place new pods on those nodes before the node\n\t\thas released those resources and causing those pods to be evicted immediately.\n\n\t\tNote that the delete command does NOT do resource version checks, so if someone\n\t\tsubmits an update to a resource right when you submit a delete, their update\n\t\twill be lost along with the rest of the resource.\x00\n\t\tDeprecated: Gracefully shut down a resource by name or filename.\n\n\t\tThe stop command is deprecated, all its functionalities are covered by delete command.\n\t\tSee \u2018kubectl delete \u2014help\u2019 for more details.\n\n\t\tAttempts to shut down and delete a resource that supports graceful termination.\n\t\tIf the resource is scalable it will be scaled to 0 before deletion.\x00\n\t\tDisplay Resource (CPU/Memory/Storage) usage of nodes.\n\n\t\tThe top-node command allows you to see the resource consumption of nodes.\x00\n\t\tDisplay Resource (CPU/Memory/Storage) usage of pods.\n\n\t\tThe \u2018top pod\u2019 command allows you to see the resource consumption of pods.\n\n\t\tDue to the metrics pipeline delay, they may be unavailable for a few minutes\n\t\tsince pod creation.\x00\n\t\tDisplay Resource (CPU/Memory/Storage) usage.\n\n\t\tThe top command allows you to see the resource consumption for nodes or pods.\n\n\t\tThis command requires Heapster to be correctly configured and working on the server. \x00\n\t\tDrain node in preparation for maintenance.\n\n\t\tThe given node will be marked unschedulable to prevent new pods from arriving.\n\t\t'drain' evicts the pods if the APIServer supports eviction\n\t\t(http://kubernetes.io/docs/admin/disruptions/). Otherwise, it will use normal DELETE\n\t\tto delete the pods.\n\t\tThe 'drain' evicts or deletes all pods except mirror pods (which cannot be deleted through\n\t\tthe API server).  If there are DaemonSet-managed pods, drain will not proceed\n\t\twithout --ignore-daemonsets, and regardless it will not delete any\n\t\tDaemonSet-managed pods, because those pods would be immediately replaced by the\n\t\tDaemonSet controller, which ignores unschedulable markings.  If there are any\n\t\tpods that are neither mirror pods nor managed by ReplicationController,\n\t\tReplicaSet, DaemonSet, StatefulSet or Job, then drain will not delete any pods unless you\n\t\tuse \u2014force.  \u2014force will also allow deletion to proceed if the managing resource of one\n\t\tor more pods is missing.\n\n\t\t\u2019drain\u2019 waits for graceful termination. You should not operate on the machine until\n\t\tthe command completes.\n\n\t\tWhen you are ready to put the node back into service, use kubectl uncordon, which\n\t\twill make the node schedulable again.\n\n\t\t![Workflow](http://kubernetes.io/images/docs/kubectl_drain.svg)\x00\n\t\tEdit a resource from the default editor.\n\n\t\tThe edit command allows you to directly edit any API resource you can retrieve via the\n\t\tcommand line tools. It will open the editor defined by your KUBE_EDITOR, or EDITOR\n\t\tenvironment variables, or fall back to 'vi' for Linux or 'notepad' for Windows.\n\t\tYou can edit multiple objects, although changes are applied one at a time. The command\n\t\taccepts filenames as well as command line arguments, although the files you point to must\n\t\tbe previously saved versions of resources.\n\n\t\tEditing is done with the API version used to fetch the resource.\n\t\tTo edit using a specific API version, fully-qualify the resource, version, and group.\n\n\t\tThe default format is YAML. To edit in JSON, specify \u201c-o json\u201d.\n\n\t\tThe flag \u2014windows-line-endings can be used to force Windows line endings,\n\t\totherwise the default for your operating system will be used.\n\n\t\tIn the event an error occurs while updating, a temporary file will be created on disk\n\t\tthat contains your unapplied changes. The most common error when updating a resource\n\t\tis another editor changing the resource on the server. When this occurs, you will have\n\t\tto apply your changes to the newer version of the resource, or update your temporary\n\t\tsaved copy to include the latest resource version.\x00\n\t\tMark node as schedulable.\x00\n\t\tMark node as unschedulable.\x00\n\t\tOutput shell completion code for the specified shell (bash or zsh).\n\t\tThe shell code must be evaluated to provide interactive\n\t\tcompletion of kubectl commands.  This can be done by sourcing it from\n\t\tthe .bash_profile.\n\n\t\tNote: this requires the bash-completion framework, which is not installed\n\t\tby default on Mac.  This can be installed by using homebrew:\n\n\t\t    $ brew install bash-completion\n\n\t\tOnce installed, bash_completion must be evaluated.  This can be done by adding the\n\t\tfollowing line to the .bash_profile\n\n\t\t    $ source $(brew \u2014prefix)/etc/bash_completion\n\n\t\tNote for zsh users: [1] zsh completions are only supported in versions of zsh >= 5.2\x00\n\t\tPerform a rolling update of the given ReplicationController.\n\n\t\tReplaces the specified replication controller with a new replication controller by updating one pod at a time to use the\n\t\tnew PodTemplate. The new-controller.json must specify the same namespace as the\n\t\texisting replication controller and overwrite at least one (common) label in its replicaSelector.\n\n\t\t![Workflow](http://kubernetes.io/images/docs/kubectl_rollingupdate.svg)\x00\n\t\tReplace a resource by filename or stdin.\n\n\t\tJSON and YAML formats are accepted. If replacing an existing resource, the\n\t\tcomplete resource spec must be provided. This can be obtained by\n\n\t\t    $ kubectl get TYPE NAME -o yaml\n\n\t\tPlease refer to the models in https://htmlpreview.github.io/?https://github.com/kubernetes/kubernetes/blob/HEAD/docs/api-reference/v1/definitions.html to find if a field is mutable.\x00\n\t\tSet a new size for a Deployment, ReplicaSet, Replication Controller, or Job.\n\n\t\tScale also allows users to specify one or more preconditions for the scale action.\n\n\t\tIf \u2014current-replicas or \u2014resource-version is specified, it is validated before the\n\t\tscale is attempted, and it is guaranteed that the precondition holds true when the\n\t\tscale is sent to the server.\x00\n\t\tSet the latest last-applied-configuration annotations by setting it to match the contents of a file.\n\t\tThis results in the last-applied-configuration being updated as though \u2018kubectl apply -f <file>\u2019 was run,\n\t\twithout updating any other parts of the object.\x00\n\t\tTo proxy all of the kubernetes api and nothing else, use:\n\n\t\t    $ kubectl proxy \u2014api-prefix=/\n\n\t\tTo proxy only part of the kubernetes api and also some static files:\n\n\t\t    $ kubectl proxy \u2014www=/my/files \u2014www-prefix=/static/ \u2014api-prefix=/api/\n\n\t\tThe above lets you \u2018curl localhost:8001/api/v1/pods\u2019.\n\n\t\tTo proxy the entire kubernetes api at a different root, use:\n\n\t\t    $ kubectl proxy \u2014api-prefix=/custom/\n\n\t\tThe above lets you \u2018curl localhost:8001/custom/api/v1/pods\u2019\x00\n\t\tUpdate field(s) of a resource using strategic merge patch\n\n\t\tJSON and YAML formats are accepted.\n\n\t\tPlease refer to the models in https://htmlpreview.github.io/?https://github.com/kubernetes/kubernetes/blob/HEAD/docs/api-reference/v1/definitions.html to find if a field is mutable.\x00\n\t\tUpdate the labels on a resource.\n\n\t\t* A label must begin with a letter or number, and may contain letters, numbers, hyphens, dots, and underscores, up to %[1]d characters.\n\t\t* If \u2014overwrite is true, then existing labels can be overwritten, otherwise attempting to overwrite a label will result in an error.\n\t\t* If \u2014resource-version is specified, then updates will use this resource version, otherwise the existing resource-version will be used.\x00\n\t\tUpdate the taints on one or more nodes.\n\n\t\t* A taint consists of a key, value, and effect. As an argument here, it is expressed as key=value:effect.\n\t\t* The key must begin with a letter or number, and may contain letters, numbers, hyphens, dots, and underscores, up to %[1]d characters.\n\t\t* The value must begin with a letter or number, and may contain letters, numbers, hyphens, dots, and underscores, up to %[2]d characters.\n\t\t* The effect must be NoSchedule, PreferNoSchedule or NoExecute.\n\t\t* Currently taint can only apply to node.\x00\n\t\tView the latest last-applied-configuration annotations by type/name or file.\n\n\t\tThe default output will be printed to stdout in YAML format. One can use -o option\n\t\tto change output format.\x00\n\t    # !!!Important Note!!!\n\t    # Requires that the \u2018tar\u2019 binary is present in your container\n\t    # image.  If \u2018tar\u2019 is not present, \u2018kubectl cp\u2019 will fail.\n\n\t    # Copy /tmp/foo_dir local directory to /tmp/bar_dir in a remote pod in the default namespace\n\t\tkubectl cp /tmp/foo_dir <some-pod>:/tmp/bar_dir\n\n        # Copy /tmp/foo local file to /tmp/bar in a remote pod in a specific container\n\t\tkubectl cp /tmp/foo <some-pod>:/tmp/bar -c <specific-container>\n\n\t\t# Copy /tmp/foo local file to /tmp/bar in a remote pod in namespace <some-namespace>\n\t\tkubectl cp /tmp/foo <some-namespace>/<some-pod>:/tmp/bar\n\n\t\t# Copy /tmp/foo from a remote pod to /tmp/bar locally\n\t\tkubectl cp <some-namespace>/<some-pod>:/tmp/foo /tmp/bar\x00\n\t  # Create a new TLS secret named tls-secret with the given key pair:\n\t  kubectl create secret tls tls-secret \u2014cert=path/to/tls.cert \u2014key=path/to/tls.key\x00\n\t  # Create a new namespace named my-namespace\n\t  kubectl create namespace my-namespace\x00\n\t  # Create a new secret named my-secret with keys for each file in folder bar\n\t  kubectl create secret generic my-secret \u2014from-file=path/to/bar\n\n\t  # Create a new secret named my-secret with specified keys instead of names on disk\n\t  kubectl create secret generic my-secret \u2014from-file=ssh-privatekey=~/.ssh/id_rsa \u2014from-file=ssh-publickey=~/.ssh/id_rsa.pub\n\n\t  # Create a new secret named my-secret with key1=supersecret and key2=topsecret\n\t  kubectl create secret generic my-secret \u2014from-literal=key1=supersecret \u2014from-literal=key2=topsecret\x00\n\t  # Create a new service account named my-service-account\n\t  kubectl create serviceaccount my-service-account\x00\n\t# Create a new ExternalName service named my-ns \n\tkubectl create service externalname my-ns \u2014external-name bar.com\x00\n\tCreate an ExternalName service with the specified name.\n\n\tExternalName service references to an external DNS address instead of\n\tonly pods, which will allow application authors to reference services\n\tthat exist off platform, on other clusters, or locally.\x00\n\tHelp provides help for any command in the application.\n\tSimply type kubectl help [path to command] for full details.\x00\n    # Create a new LoadBalancer service named my-lbs\n    kubectl create service loadbalancer my-lbs \u2014tcp=5678:8080\x00\n    # Create a new clusterIP service named my-cs\n    kubectl create service clusterip my-cs \u2014tcp=5678:8080\n\n    # Create a new clusterIP service named my-cs (in headless mode)\n    kubectl create service clusterip my-cs \u2014clusterip=\u201cNone\u201d\x00\n    # Create a new deployment named my-dep that runs the busybox image.\n    kubectl create deployment my-dep \u2014image=busybox\x00\n    # Create a new nodeport service named my-ns\n    kubectl create service nodeport my-ns \u2014tcp=5678:8080\x00\n    # Dump current cluster state to stdout\n    kubectl cluster-info dump\n\n    # Dump current cluster state to /path/to/cluster-state\n    kubectl cluster-info dump \u2014output-directory=/path/to/cluster-state\n\n    # Dump all namespaces to stdout\n    kubectl cluster-info dump \u2014all-namespaces\n\n    # Dump a set of namespaces to /path/to/cluster-state\n    kubectl cluster-info dump \u2014namespaces default,kube-system \u2014output-directory=/path/to/cluster-state\x00\n    # Update pod 'foo' with the annotation 'description' and the value 'my frontend'.\n    # If the same annotation is set multiple times, only the last value will be applied\n    kubectl annotate pods foo description='my frontend'\n\n    # Update a pod identified by type and name in \"pod.json\"\n    kubectl annotate -f pod.json description=\u2018my frontend\u2019\n\n    # Update pod \u2018foo\u2019 with the annotation \u2018description\u2019 and the value \u2018my frontend running nginx\u2019, overwriting any existing value.\n    kubectl annotate \u2014overwrite pods foo description=\u2018my frontend running nginx\u2019\n\n    # Update all pods in the namespace\n    kubectl annotate pods \u2014all description=\u2018my frontend running nginx\u2019\n\n    # Update pod \u2018foo\u2019 only if the resource is unchanged from version 1.\n    kubectl annotate pods foo description=\u2018my frontend running nginx\u2019 \u2014resource-version=1\n\n    # Update pod \u2018foo\u2019 by removing an annotation named \u2018description\u2019 if it exists.\n    # Does not require the \u2014overwrite flag.\n    kubectl annotate pods foo description-\x00\n    Create a LoadBalancer service with the specified name.\x00\n    Create a clusterIP service with the specified name.\x00\n    Create a deployment with the specified name.\x00\n    Create a nodeport service with the specified name.\x00\n    Dumps cluster info out suitable for debugging and diagnosing cluster problems.  By default, dumps everything to\n    stdout. You can optionally specify a directory with \u2014output-directory.  If you specify a directory, kubernetes will\n    build a set of files in that directory.  By default only dumps things in the \u2018kube-system\u2019 namespace, but you can\n    switch to a different namespace with the \u2014namespaces flag, or specify \u2014all-namespaces to dump all namespaces.\n\n    The command also dumps the logs of all of the pods in the cluster, these logs are dumped into different directories\n    based on namespace and pod name.\x00\n  Display addresses of the master and services with label kubernetes.io/cluster-service=true\n  To further debug and diagnose cluster problems, use \u2018kubectl cluster-info dump\u2019.\x00A comma-delimited set of quota scopes that must all match each object tracked by the quota.\x00A comma-delimited set of resource=quantity pairs that define a hard limit.\x00A label selector to use for this budget. Only equality-based selector requirements are supported.\x00A label selector to use for this service. Only equality-based selector requirements are supported. If empty (the default) infer the selector from the replication controller or replica set.)\x00A schedule in the Cron format the job should be run with.\x00Additional external IP address (not managed by Kubernetes) to accept for the service. If this IP is routed to a node, the service can be accessed by this IP in addition to its generated service IP.\x00An inline JSON override for the generated object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.\x00An inline JSON override for the generated service object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.  Only used if \u2014expose is true.\x00\u30d5\u30a1\u30a4\u30eb\u540d\u3092\u6307\u5b9a\u307e\u305f\u306f\u6a19\u6e96\u5165\u529b\u7d4c\u7531\u3067\u30ea\u30bd\u30fc\u30b9\u306b\u30b3\u30f3\u30d5\u30a3\u30b0\u3092\u9069\u7528\u3059\u308b\x00Approve a certificate signing request\x00Assign your own ClusterIP or set to \u2018None\u2019 for a \u2018headless\u2019 service (no loadbalancing).\x00Attach to a running container\x00Auto-scale a Deployment, ReplicaSet, or ReplicationController\x00ClusterIP to be assigned to the service. Leave empty to auto-allocate, or set to \u2018None\u2019 to create a headless service.\x00ClusterRole this ClusterRoleBinding should reference\x00ClusterRole this RoleBinding should reference\x00Container name which will have its image upgraded. Only relevant when \u2014image is specified, ignored otherwise. Required when using \u2014image on a multi-container pod\x00Convert config files between different API versions\x00Copy files and directories to and from containers.\x00Create a ClusterRoleBinding for a particular ClusterRole\x00Create a LoadBalancer service.\x00Create a NodePort service.\x00Create a RoleBinding for a particular Role or ClusterRole\x00Create a TLS secret\x00Create a clusterIP service.\x00Create a configmap from a local file, directory or literal value\x00Create a deployment with the specified name.\x00Create a namespace with the specified name\x00Create a pod disruption budget with the specified name.\x00Create a quota with the specified name.\x00\u30d5\u30a1\u30a4\u30eb\u540d\u3092\u6307\u5b9a\u307e\u305f\u306f\u6a19\u6e96\u5165\u529b\u7d4c\u7531\u3067\u30ea\u30bd\u30fc\u30b9\u3092\u4f5c\u6210\u3059\u308b\x00Create a secret for use with a Docker registry\x00Create a secret from a local file, directory or literal value\x00Create a secret using specified subcommand\x00Create a service account with the specified name\x00Create a service using specified subcommand.\x00Create an ExternalName service.\x00Delete resources by filenames, stdin, resources and names, or by resources and label selector\x00kubeconfig\u304b\u3089\u6307\u5b9a\u3057\u305f\u30af\u30e9\u30b9\u30bf\u30fc\u3092\u524a\u9664\u3059\u308b\x00kubeconfig\u304b\u3089\u6307\u5b9a\u3057\u305f\u30b3\u30f3\u30c6\u30ad\u30b9\u30c8\u3092\u524a\u9664\u3059\u308b\x00Deny a certificate signing request\x00Deprecated: Gracefully shut down a resource by name or filename\x001\u3064\u307e\u305f\u306f\u8907\u6570\u306e\u30b3\u30f3\u30c6\u30ad\u30b9\u30c8\u3092\u8a18\u8ff0\u3059\u308b\x00Display Resource (CPU/Memory) usage of nodes\x00Display Resource (CPU/Memory) usage of pods\x00Display Resource (CPU/Memory) usage.\x00\u30af\u30e9\u30b9\u30bf\u30fc\u306e\u60c5\u5831\u3092\u8868\u793a\u3059\u308b\x00kubeconfig\u3067\u5b9a\u7fa9\u3055\u308c\u305f\u30af\u30e9\u30b9\u30bf\u30fc\u3092\u8868\u793a\u3059\u308b\x00\u30de\u30fc\u30b8\u3055\u308c\u305fkubeconfig\u306e\u8a2d\u5b9a\u307e\u305f\u306f\u6307\u5b9a\u3055\u308c\u305fkubeconfig\u30d5\u30a1\u30a4\u30eb\u3092\u8868\u793a\u3059\u308b\x001\u3064\u307e\u305f\u306f\u8907\u6570\u306e\u30ea\u30bd\u30fc\u30b9\u3092\u8868\u793a\u3059\u308b\x00\u30ab\u30ec\u30f3\u30c8\u30b3\u30f3\u30c6\u30ad\u30b9\u30c8\u3092\u8868\u793a\u3059\u308b\x00\u30ea\u30bd\u30fc\u30b9\u306e\u8aac\u660e\u3092\u8868\u793a\u3059\u308b\x00Drain node in preparation for maintenance\x00Dump lots of relevant info for debugging and diagnosis\x00Edit a resource on the server\x00Email for Docker registry\x00Execute a command in a container\x00Explicit policy for when to pull container images. Required when \u2014image is same as existing image, ignored otherwise.\x00Forward one or more local ports to a pod\x00Help about any command\x00IP to assign to the Load Balancer. If empty, an ephemeral IP will be created and used (cloud-provider specific).\x00If non-empty, set the session affinity for the service to this; legal values: \u2018None\u2019, \u2018ClientIP\u2019\x00If non-empty, the annotation update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource.\x00If non-empty, the labels update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource.\x00Image to use for upgrading the replication controller. Must be distinct from the existing image (either new image or new image tag).  Can not be used with \u2014filename/-f\x00Manage a deployment rollout\x00Mark node as schedulable\x00Mark node as unschedulable\x00Mark the provided resource as paused\x00Modify certificate resources.\x00kubeconfig\u30d5\u30a1\u30a4\u30eb\u3092\u5909\u66f4\u3059\u308b\x00Name or number for the port on the container that the service should direct traffic to. Optional.\x00Only return logs after a specific date (RFC3339). Defaults to all logs. Only one of since-time / since may be used.\x00Output shell completion code for the specified shell (bash or zsh)\x00Output the formatted object with the given group version (for ex: \u2018extensions/v1beta1\u2019).)\x00Password for Docker registry authentication\x00Path to PEM encoded public key certificate.\x00Path to private key associated with given certificate.\x00Perform a rolling update of the given ReplicationController\x00Precondition for resource version. Requires that the current resource version match this value in order to scale.\x00Print the client and server version information\x00Print the list of flags inherited by all commands\x00Print the logs for a container in a pod\x00Replace a resource by filename or stdin\x00Resume a paused resource\x00Role this RoleBinding should reference\x00Run a particular image on the cluster\x00Run a proxy to the Kubernetes API server\x00Server location for Docker registry\x00Set a new size for a Deployment, ReplicaSet, Replication Controller, or Job\x00Set specific features on objects\x00Set the last-applied-configuration annotation on a live object to match the contents of a file.\x00\u30ea\u30bd\u30fc\u30b9\u306e\u30bb\u30ec\u30af\u30bf\u30fc\u3092\u8a2d\u5b9a\u3059\u308b\x00kubeconfig\u306b\u30af\u30e9\u30b9\u30bf\u30fc\u30a8\u30f3\u30c8\u30ea\u3092\u8a2d\u5b9a\u3059\u308b\x00kubeconfig\u306b\u30b3\u30f3\u30c6\u30ad\u30b9\u30c8\u30a8\u30f3\u30c8\u30ea\u3092\u8a2d\u5b9a\u3059\u308b\x00kubeconfig\u306b\u30e6\u30fc\u30b6\u30fc\u30a8\u30f3\u30c8\u30ea\u3092\u8a2d\u5b9a\u3059\u308b\x00kubeconfig\u30d5\u30a1\u30a4\u30eb\u5185\u306e\u5909\u6570\u3092\u500b\u5225\u306b\u8a2d\u5b9a\u3059\u308b\x00kubeconfig\u306b\u30ab\u30ec\u30f3\u30c8\u30b3\u30f3\u30c6\u30ad\u30b9\u30c8\u3092\u8a2d\u5b9a\u3059\u308b\x00Show details of a specific resource or group of resources\x00Show the status of the rollout\x00Synonym for \u2014target-port\x00Take a replication controller, service, deployment or pod and expose it as a new Kubernetes Service\x00The image for the container to run.\x00The image pull policy for the container. If left empty, this value will not be specified by the client and defaulted by the server\x00The key to use to differentiate between two different controllers, default \u2018deployment\u2019.  Only relevant when \u2014image is specified, ignored otherwise\x00The minimum number or percentage of available pods this budget requires.\x00The name for the newly created object.\x00The name for the newly created object. If not specified, the name of the input resource will be used.\x00The name of the API generator to use, see http://kubernetes.io/docs/user-guide/kubectl-conventions/#generators for a list.\x00The name of the API generator to use. Currently there is only 1 generator.\x00The name of the API generator to use. There are 2 generators: \u2018service/v1\u2019 and \u2018service/v2\u2019. The only difference between them is that service port in v1 is named \u2018default\u2019, while it is left unnamed in v2. Default is \u2018service/v2\u2019.\x00The name of the generator to use for creating a service.  Only used if \u2014expose is true\x00The network protocol for the service to be created. Default is \u2018TCP\u2019.\x00The port that the service should serve on. Copied from the resource being exposed, if unspecified\x00The port that this container exposes.  If \u2014expose is true, this is also the port used by the service that is created.\x00The resource requirement limits for this container.  For example, \u2018cpu=200m,memory=512Mi\u2019.  Note that server side components may assign limits depending on the server configuration, such as limit ranges.\x00The resource requirement requests for this container.  For example, \u2018cpu=100m,memory=256Mi\u2019.  Note that server side components may assign requests depending on the server configuration, such as limit ranges.\x00The restart policy for this Pod.  Legal values [Always, OnFailure, Never].  If set to \u2018Always\u2019 a deployment is created, if set to \u2018OnFailure\u2019 a job is created, if set to \u2018Never\u2019, a regular pod is created. For the latter two \u2014replicas must be 1.  Default \u2018Always\u2019, for CronJobs `Never`.\x00The type of secret to create\x00Type for this service: ClusterIP, NodePort, or LoadBalancer. Default is \u2018ClusterIP\u2019.\x00\u73fe\u5728\u306e\u30ed\u30fc\u30eb\u30a2\u30a6\u30c8\u3092\u53d6\u308a\u6d88\u3059\x00kubeconfig\u30d5\u30a1\u30a4\u30eb\u304b\u3089\u5909\u6570\u3092\u500b\u5225\u306b\u524a\u9664\u3059\u308b\x00Update field(s) of a resource using strategic merge patch\x00Update image of a pod template\x00Update resource requests/limits on objects with pod templates\x00\u30ea\u30bd\u30fc\u30b9\u306e\u30a2\u30ce\u30c6\u30fc\u30b7\u30e7\u30f3\u3092\u66f4\u65b0\u3059\u308b\x00\u30ea\u30bd\u30fc\u30b9\u306e\u30e9\u30d9\u30eb\u3092\u66f4\u65b0\u3059\u308b\x00Update the taints on one or more nodes\x00Username for Docker registry authentication\x00View latest last-applied-configuration annotations of a resource/object\x00\u30ed\u30fc\u30eb\u30a2\u30a6\u30c8\u306e\u5c65\u6b74\u3092\u8868\u793a\u3059\u308b\x00Where to output the files.  If empty or \u2018-\u2018 uses stdout, otherwise creates a directory hierarchy in that directory\x00dummy restart flag)\x00external name of service\x00kubectl controls the Kubernetes cluster manager\x00")
+var _translationsKubectlJa_jpLc_messagesK8sMo = []byte("\xde\x12\x04\x95\x00\x00\x00\x00\xeb\x00\x00\x00\x1c\x00\x00\x00t\a\x00\x009\x01\x00\x00\xcc\x0e\x00\x00\x00\x00\x00\x00\xb0\x13\x00\x00\xdc\x00\x00\x00\xb1\x13\x00\x00\xb6\x00\x00\x00\x8e\x14\x00\x00\v\x02\x00\x00E\x15\x00\x00\x1f\x01\x00\x00Q\x17\x00\x00z\x00\x00\x00q\x18\x00\x00_\x02\x00\x00\xec\x18\x00\x00\u007f\x01\x00\x00L\x1b\x00\x00\x8f\x01\x00\x00\xcc\x1c\x00\x00k\x01\x00\x00\\\x1e\x00\x00k\x01\x00\x00\xc8\x1f\x00\x00>\x01\x00\x004!\x00\x00\x03\x02\x00\x00s\"\x00\x00o\x01\x00\x00w$\x00\x00H\x05\x00\x00\xe7%\x00\x00g\x02\x00\x000+\x00\x00\x1b\x02\x00\x00\x98-\x00\x00q\x01\x00\x00\xb4/\x00\x00\xa8\x01\x00\x00&1\x00\x00\xd4\x01\x00\x00\xcf2\x00\x00\x02\x02\x00\x00\xa44\x00\x00\xb4\x00\x00\x00\xa76\x00\x00\xb7\x02\x00\x00\\7\x00\x00\x92\x03\x00\x00\x14:\x00\x00\xbb\x02\x00\x00\xa7=\x00\x00=\x00\x00\x00c@\x00\x00;\x00\x00\x00\xa1@\x00\x00\xcd\x02\x00\x00\xdd@\x00\x00<\x00\x00\x00\xabC\x00\x00P\x00\x00\x00\xe8C\x00\x00S\x00\x00\x009D\x00\x00<\x00\x00\x00\x8dD\x00\x00\xac\x01\x00\x00\xcaD\x00\x00\x13\x03\x00\x00wF\x00\x00\xea\x01\x00\x00\x8bI\x00\x00\xfa\x01\x00\x00vK\x00\x00\xda\x01\x00\x00qM\x00\x00c\x01\x00\x00LO\x00\x00T\x01\x00\x00\xb0P\x00\x00\xba\x06\x00\x00\x05R\x00\x00\xf9\x01\x00\x00\xc0X\x00\x00\xe0\x02\x00\x00\xbaZ\x00\x00\x02\x03\x00\x00\x9b]\x00\x00\xfb\x00\x00\x00\x9e`\x00\x00\xa5\x01\x00\x00\x9aa\x00\x00\xb4\x01\x00\x00@c\x00\x00\x18\x00\x00\x00\xf5d\x00\x00<\x00\x00\x00\x0ee\x00\x00=\x00\x00\x00Ke\x00\x00\xc6\x00\x00\x00\x89e\x00\x00g\x02\x00\x00Pf\x00\x00.\x00\x00\x00\xb8h\x00\x001\x03\x00\x00\xe7h\x00\x00g\x00\x00\x00\x19l\x00\x00Q\x00\x00\x00\x81l\x00\x00R\x00\x00\x00\xd3l\x00\x00\"\x00\x00\x00&m\x00\x00X\x02\x00\x00Im\x00\x004\x00\x00\x00\xa2o\x00\x00}\x00\x00\x00\xd7o\x00\x00k\x01\x00\x00Up\x00\x00\x81\a\x00\x00\xc1q\x00\x00f\x01\x00\x00Cy\x00\x00\x85\x00\x00\x00\xaaz\x00\x00\xea\x00\x00\x000{\x00\x00\xd9\x00\x00\x00\x1b|\x00\x00\n\x05\x00\x00\xf5|\x00\x00\x10\x05\x00\x00\x00\x82\x00\x00\x1c\x00\x00\x00\x11\x87\x00\x00\x1e\x00\x00\x00.\x87\x00\x00\x98\x02\x00\x00M\x87\x00\x00\xbc\x01\x00\x00\xe6\x89\x00\x00\x9c\x01\x00\x00\xa3\x8b\x00\x00q\x01\x00\x00@\x8d\x00\x00\x05\x01\x00\x00\xb2\x8e\x00\x00\xdf\x01\x00\x00\xb8\x8f\x00\x00\x1c\x01\x00\x00\x98\x91\x00\x00\xc1\x01\x00\x00\xb5\x92\x00\x00\x1b\x02\x00\x00w\x94\x00\x00\xc0\x00\x00\x00\x93\x96\x00\x00\xd5\x02\x00\x00T\x97\x00\x00\x9d\x00\x00\x00*\x9a\x00\x00X\x00\x00\x00\u021a\x00\x00%\x02\x00\x00!\x9b\x00\x00o\x00\x00\x00G\x9d\x00\x00u\x00\x00\x00\xb7\x9d\x00\x00\x01\x01\x00\x00-\x9e\x00\x00v\x00\x00\x00/\x9f\x00\x00t\x00\x00\x00\xa6\x9f\x00\x00\xef\x00\x00\x00\x1b\xa0\x00\x00}\x00\x00\x00\v\xa1\x00\x00j\x00\x00\x00\x89\xa1\x00\x00\xc4\x01\x00\x00\xf4\xa1\x00\x00\xf7\x03\x00\x00\xb9\xa3\x00\x00;\x00\x00\x00\xb1\xa7\x00\x008\x00\x00\x00\xed\xa7\x00\x001\x00\x00\x00&\xa8\x00\x007\x00\x00\x00X\xa8\x00\x00u\x02\x00\x00\x90\xa8\x00\x00\xb0\x00\x00\x00\x06\xab\x00\x00[\x00\x00\x00\xb7\xab\x00\x00J\x00\x00\x00\x13\xac\x00\x00a\x00\x00\x00^\xac\x00\x00\xbd\x00\x00\x00\xc0\xac\x00\x009\x00\x00\x00~\xad\x00\x00\xc5\x00\x00\x00\xb8\xad\x00\x00\xae\x00\x00\x00~\xae\x00\x00\xd6\x00\x00\x00-\xaf\x00\x008\x00\x00\x00\x04\xb0\x00\x00%\x00\x00\x00=\xb0\x00\x00W\x00\x00\x00c\xb0\x00\x00\x1d\x00\x00\x00\xbb\xb0\x00\x00=\x00\x00\x00\u0670\x00\x00u\x00\x00\x00\x17\xb1\x00\x004\x00\x00\x00\x8d\xb1\x00\x00-\x00\x00\x00\u00b1\x00\x00\xa3\x00\x00\x00\xf0\xb1\x00\x003\x00\x00\x00\x94\xb2\x00\x002\x00\x00\x00\u0232\x00\x008\x00\x00\x00\xfb\xb2\x00\x00\x1e\x00\x00\x004\xb3\x00\x00\x1a\x00\x00\x00S\xb3\x00\x009\x00\x00\x00n\xb3\x00\x00\x13\x00\x00\x00\xa8\xb3\x00\x00\x1b\x00\x00\x00\xbc\xb3\x00\x00@\x00\x00\x00\u0633\x00\x00,\x00\x00\x00\x19\xb4\x00\x00*\x00\x00\x00F\xb4\x00\x007\x00\x00\x00q\xb4\x00\x00'\x00\x00\x00\xa9\xb4\x00\x00&\x00\x00\x00\u0474\x00\x00.\x00\x00\x00\xf8\xb4\x00\x00=\x00\x00\x00'\xb5\x00\x00*\x00\x00\x00e\xb5\x00\x000\x00\x00\x00\x90\xb5\x00\x00,\x00\x00\x00\xc1\xb5\x00\x00\x1f\x00\x00\x00\xee\xb5\x00\x00]\x00\x00\x00\x0e\xb6\x00\x000\x00\x00\x00l\xb6\x00\x000\x00\x00\x00\x9d\xb6\x00\x00\"\x00\x00\x00\u03b6\x00\x00?\x00\x00\x00\xf1\xb6\x00\x00\x1d\x00\x00\x001\xb7\x00\x00,\x00\x00\x00O\xb7\x00\x00+\x00\x00\x00|\xb7\x00\x00$\x00\x00\x00\xa8\xb7\x00\x00\x14\x00\x00\x00\u0377\x00\x00*\x00\x00\x00\xe2\xb7\x00\x00A\x00\x00\x00\r\xb8\x00\x00\x1d\x00\x00\x00O\xb8\x00\x00\x1c\x00\x00\x00m\xb8\x00\x00\x1a\x00\x00\x00\x8a\xb8\x00\x00)\x00\x00\x00\xa5\xb8\x00\x006\x00\x00\x00\u03f8\x00\x00\x1d\x00\x00\x00\x06\xb9\x00\x00\x19\x00\x00\x00$\xb9\x00\x00 \x00\x00\x00>\xb9\x00\x00v\x00\x00\x00_\xb9\x00\x00(\x00\x00\x00\u05b9\x00\x00\x16\x00\x00\x00\xff\xb9\x00\x00p\x00\x00\x00\x16\xba\x00\x00`\x00\x00\x00\x87\xba\x00\x00\x9b\x00\x00\x00\xe8\xba\x00\x00\x97\x00\x00\x00\x84\xbb\x00\x00\xa8\x00\x00\x00\x1c\xbc\x00\x00\x1b\x00\x00\x00\u017c\x00\x00\x18\x00\x00\x00\xe1\xbc\x00\x00\x1a\x00\x00\x00\xfa\xbc\x00\x00$\x00\x00\x00\x15\xbd\x00\x00\x1d\x00\x00\x00:\xbd\x00\x00\x17\x00\x00\x00X\xbd\x00\x00a\x00\x00\x00p\xbd\x00\x00s\x00\x00\x00\u04bd\x00\x00B\x00\x00\x00F\xbe\x00\x00Y\x00\x00\x00\x89\xbe\x00\x00+\x00\x00\x00\xe3\xbe\x00\x00+\x00\x00\x00\x0f\xbf\x00\x006\x00\x00\x00;\xbf\x00\x00;\x00\x00\x00r\xbf\x00\x00q\x00\x00\x00\xae\xbf\x00\x00/\x00\x00\x00 \xc0\x00\x001\x00\x00\x00P\xc0\x00\x00'\x00\x00\x00\x82\xc0\x00\x00'\x00\x00\x00\xaa\xc0\x00\x00\x18\x00\x00\x00\xd2\xc0\x00\x00&\x00\x00\x00\xeb\xc0\x00\x00%\x00\x00\x00\x12\xc1\x00\x00(\x00\x00\x008\xc1\x00\x00#\x00\x00\x00a\xc1\x00\x00K\x00\x00\x00\x85\xc1\x00\x00 \x00\x00\x00\xd1\xc1\x00\x00_\x00\x00\x00\xf2\xc1\x00\x00\x1e\x00\x00\x00R\xc2\x00\x00\"\x00\x00\x00q\xc2\x00\x00\"\x00\x00\x00\x94\xc2\x00\x00\x1f\x00\x00\x00\xb7\xc2\x00\x00-\x00\x00\x00\xd7\xc2\x00\x00-\x00\x00\x00\x05\xc3\x00\x009\x00\x00\x003\xc3\x00\x00\x1e\x00\x00\x00m\xc3\x00\x00\x19\x00\x00\x00\x8c\xc3\x00\x00c\x00\x00\x00\xa6\xc3\x00\x00#\x00\x00\x00\n\xc4\x00\x00\x82\x00\x00\x00.\xc4\x00\x00\x94\x00\x00\x00\xb1\xc4\x00\x00H\x00\x00\x00F\xc5\x00\x00&\x00\x00\x00\x8f\xc5\x00\x00e\x00\x00\x00\xb6\xc5\x00\x00z\x00\x00\x00\x1c\xc6\x00\x00J\x00\x00\x00\x97\xc6\x00\x00\xe5\x00\x00\x00\xe2\xc6\x00\x00W\x00\x00\x00\xc8\xc7\x00\x00E\x00\x00\x00 \xc8\x00\x00a\x00\x00\x00f\xc8\x00\x00v\x00\x00\x00\xc8\xc8\x00\x00\xcb\x00\x00\x00?\xc9\x00\x00\xcf\x00\x00\x00\v\xca\x00\x00\x1e\x01\x00\x00\xdb\xca\x00\x00\x1c\x00\x00\x00\xfa\xcb\x00\x00T\x00\x00\x00\x17\xcc\x00\x00\x17\x00\x00\x00l\xcc\x00\x00/\x00\x00\x00\x84\xcc\x00\x009\x00\x00\x00\xb4\xcc\x00\x00\x1e\x00\x00\x00\xee\xcc\x00\x00=\x00\x00\x00\r\xcd\x00\x00$\x00\x00\x00K\xcd\x00\x00\x1f\x00\x00\x00p\xcd\x00\x00&\x00\x00\x00\x90\xcd\x00\x00+\x00\x00\x00\xb7\xcd\x00\x00G\x00\x00\x00\xe3\xcd\x00\x00\x14\x00\x00\x00+\xce\x00\x00r\x00\x00\x00@\xce\x00\x00\x13\x00\x00\x00\xb3\xce\x00\x00\x18\x00\x00\x00\xc7\xce\x00\x00/\x00\x00\x00\xe0\xce\x00\x00z\x01\x00\x00\x10\xcf\x00\x00\xdc\x00\x00\x00\x8b\xd0\x00\x00\xb6\x00\x00\x00h\xd1\x00\x00\v\x02\x00\x00\x1f\xd2\x00\x00\x1f\x01\x00\x00+\xd4\x00\x00z\x00\x00\x00K\xd5\x00\x00_\x02\x00\x00\xc6\xd5\x00\x00\u007f\x01\x00\x00&\xd8\x00\x00\x8f\x01\x00\x00\xa6\xd9\x00\x00k\x01\x00\x006\xdb\x00\x00k\x01\x00\x00\xa2\xdc\x00\x00>\x01\x00\x00\x0e\xde\x00\x00\x03\x02\x00\x00M\xdf\x00\x00o\x01\x00\x00Q\xe1\x00\x00H\x05\x00\x00\xc1\xe2\x00\x00g\x02\x00\x00\n\xe8\x00\x00\x1b\x02\x00\x00r\xea\x00\x00q\x01\x00\x00\x8e\xec\x00\x00\xa8\x01\x00\x00\x00\xee\x00\x00\xd4\x01\x00\x00\xa9\xef\x00\x00\x02\x02\x00\x00~\xf1\x00\x00\xb4\x00\x00\x00\x81\xf3\x00\x00\xb7\x02\x00\x006\xf4\x00\x00\x92\x03\x00\x00\xee\xf6\x00\x00\xbb\x02\x00\x00\x81\xfa\x00\x00=\x00\x00\x00=\xfd\x00\x00;\x00\x00\x00{\xfd\x00\x00\xcd\x02\x00\x00\xb7\xfd\x00\x00<\x00\x00\x00\x85\x00\x01\x00P\x00\x00\x00\xc2\x00\x01\x00S\x00\x00\x00\x13\x01\x01\x00<\x00\x00\x00g\x01\x01\x00\xac\x01\x00\x00\xa4\x01\x01\x00\x13\x03\x00\x00Q\x03\x01\x00\xea\x01\x00\x00e\x06\x01\x00\xfa\x01\x00\x00P\b\x01\x00\xda\x01\x00\x00K\n\x01\x00c\x01\x00\x00&\f\x01\x00T\x01\x00\x00\x8a\r\x01\x00\xba\x06\x00\x00\xdf\x0e\x01\x00\xf9\x01\x00\x00\x9a\x15\x01\x00\xe0\x02\x00\x00\x94\x17\x01\x00\x02\x03\x00\x00u\x1a\x01\x00\xfb\x00\x00\x00x\x1d\x01\x00\xa5\x01\x00\x00t\x1e\x01\x00\xb4\x01\x00\x00\x1a \x01\x00\x18\x00\x00\x00\xcf!\x01\x00<\x00\x00\x00\xe8!\x01\x00=\x00\x00\x00%\"\x01\x00\xc6\x00\x00\x00c\"\x01\x00g\x02\x00\x00*#\x01\x00.\x00\x00\x00\x92%\x01\x001\x03\x00\x00\xc1%\x01\x00g\x00\x00\x00\xf3(\x01\x00Q\x00\x00\x00[)\x01\x00R\x00\x00\x00\xad)\x01\x00\"\x00\x00\x00\x00*\x01\x00X\x02\x00\x00#*\x01\x004\x00\x00\x00|,\x01\x00}\x00\x00\x00\xb1,\x01\x00k\x01\x00\x00/-\x01\x00\x81\a\x00\x00\x9b.\x01\x00f\x01\x00\x00\x1d6\x01\x00\x85\x00\x00\x00\x847\x01\x00\xea\x00\x00\x00\n8\x01\x00\xd9\x00\x00\x00\xf58\x01\x00\n\x05\x00\x00\xcf9\x01\x00\x10\x05\x00\x00\xda>\x01\x00\x1c\x00\x00\x00\xebC\x01\x00\x1e\x00\x00\x00\bD\x01\x00\x98\x02\x00\x00'D\x01\x00\xbc\x01\x00\x00\xc0F\x01\x00\x9c\x01\x00\x00}H\x01\x00q\x01\x00\x00\x1aJ\x01\x00\x05\x01\x00\x00\x8cK\x01\x00\xdf\x01\x00\x00\x92L\x01\x00\x1c\x01\x00\x00rN\x01\x00\xc1\x01\x00\x00\x8fO\x01\x00\x1b\x02\x00\x00QQ\x01\x00\xc0\x00\x00\x00mS\x01\x00\xd5\x02\x00\x00.T\x01\x00\x9d\x00\x00\x00\x04W\x01\x00X\x00\x00\x00\xa2W\x01\x00%\x02\x00\x00\xfbW\x01\x00o\x00\x00\x00!Z\x01\x00u\x00\x00\x00\x91Z\x01\x00\x01\x01\x00\x00\a[\x01\x00v\x00\x00\x00\t\\\x01\x00t\x00\x00\x00\x80\\\x01\x00\xef\x00\x00\x00\xf5\\\x01\x00}\x00\x00\x00\xe5]\x01\x00j\x00\x00\x00c^\x01\x00\xc4\x01\x00\x00\xce^\x01\x00\xf7\x03\x00\x00\x93`\x01\x00;\x00\x00\x00\x8bd\x01\x008\x00\x00\x00\xc7d\x01\x001\x00\x00\x00\x00e\x01\x007\x00\x00\x002e\x01\x00u\x02\x00\x00je\x01\x00\xb0\x00\x00\x00\xe0g\x01\x00[\x00\x00\x00\x91h\x01\x00J\x00\x00\x00\xedh\x01\x00a\x00\x00\x008i\x01\x00\xbd\x00\x00\x00\x9ai\x01\x009\x00\x00\x00Xj\x01\x00\xc5\x00\x00\x00\x92j\x01\x00\xae\x00\x00\x00Xk\x01\x00\xd6\x00\x00\x00\al\x01\x00T\x00\x00\x00\xdel\x01\x00%\x00\x00\x003m\x01\x00W\x00\x00\x00Ym\x01\x00\x1d\x00\x00\x00\xb1m\x01\x00=\x00\x00\x00\xcfm\x01\x00u\x00\x00\x00\rn\x01\x004\x00\x00\x00\x83n\x01\x00-\x00\x00\x00\xb8n\x01\x00\xa3\x00\x00\x00\xe6n\x01\x003\x00\x00\x00\x8ao\x01\x002\x00\x00\x00\xbeo\x01\x008\x00\x00\x00\xf1o\x01\x00\x1e\x00\x00\x00*p\x01\x00\x1a\x00\x00\x00Ip\x01\x009\x00\x00\x00dp\x01\x00\x13\x00\x00\x00\x9ep\x01\x00\x1b\x00\x00\x00\xb2p\x01\x00@\x00\x00\x00\xcep\x01\x00,\x00\x00\x00\x0fq\x01\x00*\x00\x00\x00<q\x01\x007\x00\x00\x00gq\x01\x00'\x00\x00\x00\x9fq\x01\x00B\x00\x00\x00\xc7q\x01\x00.\x00\x00\x00\nr\x01\x00=\x00\x00\x009r\x01\x00*\x00\x00\x00wr\x01\x000\x00\x00\x00\xa2r\x01\x00,\x00\x00\x00\xd3r\x01\x00\x1f\x00\x00\x00\x00s\x01\x00]\x00\x00\x00 s\x01\x00=\x00\x00\x00~s\x01\x00=\x00\x00\x00\xbcs\x01\x00\"\x00\x00\x00\xfas\x01\x00?\x00\x00\x00\x1dt\x01\x007\x00\x00\x00]t\x01\x00,\x00\x00\x00\x95t\x01\x00+\x00\x00\x00\xc2t\x01\x00$\x00\x00\x00\xeet\x01\x00'\x00\x00\x00\x13u\x01\x00:\x00\x00\x00;u\x01\x00V\x00\x00\x00vu\x01\x001\x00\x00\x00\xcdu\x01\x00\x1e\x00\x00\x00\xffu\x01\x00$\x00\x00\x00\x1ev\x01\x00)\x00\x00\x00Cv\x01\x006\x00\x00\x00mv\x01\x00\x1d\x00\x00\x00\xa4v\x01\x00\x19\x00\x00\x00\xc2v\x01\x00 \x00\x00\x00\xdcv\x01\x00v\x00\x00\x00\xfdv\x01\x00(\x00\x00\x00tw\x01\x00\x16\x00\x00\x00\x9dw\x01\x00p\x00\x00\x00\xb4w\x01\x00`\x00\x00\x00%x\x01\x00\x9b\x00\x00\x00\x86x\x01\x00\x97\x00\x00\x00\"y\x01\x00\xa8\x00\x00\x00\xbay\x01\x00\x1b\x00\x00\x00cz\x01\x00\x18\x00\x00\x00\u007fz\x01\x00\x1a\x00\x00\x00\x98z\x01\x00$\x00\x00\x00\xb3z\x01\x00\x1d\x00\x00\x00\xd8z\x01\x00\x19\x00\x00\x00\xf6z\x01\x00a\x00\x00\x00\x10{\x01\x00s\x00\x00\x00r{\x01\x00B\x00\x00\x00\xe6{\x01\x00Y\x00\x00\x00)|\x01\x00+\x00\x00\x00\x83|\x01\x00+\x00\x00\x00\xaf|\x01\x006\x00\x00\x00\xdb|\x01\x00;\x00\x00\x00\x12}\x01\x00q\x00\x00\x00N}\x01\x00/\x00\x00\x00\xc0}\x01\x001\x00\x00\x00\xf0}\x01\x00'\x00\x00\x00\"~\x01\x00'\x00\x00\x00J~\x01\x00\x18\x00\x00\x00r~\x01\x00&\x00\x00\x00\x8b~\x01\x00%\x00\x00\x00\xb2~\x01\x00(\x00\x00\x00\xd8~\x01\x00#\x00\x00\x00\x01\u007f\x01\x00K\x00\x00\x00%\u007f\x01\x00 \x00\x00\x00q\u007f\x01\x00_\x00\x00\x00\x92\u007f\x01\x00-\x00\x00\x00\xf2\u007f\x01\x007\x00\x00\x00 \x80\x01\x00:\x00\x00\x00X\x80\x01\x004\x00\x00\x00\x93\x80\x01\x00+\x00\x00\x00\u0200\x01\x00+\x00\x00\x00\xf4\x80\x01\x009\x00\x00\x00 \x81\x01\x00\x1e\x00\x00\x00Z\x81\x01\x00\x19\x00\x00\x00y\x81\x01\x00c\x00\x00\x00\x93\x81\x01\x00#\x00\x00\x00\xf7\x81\x01\x00\x82\x00\x00\x00\x1b\x82\x01\x00\x94\x00\x00\x00\x9e\x82\x01\x00H\x00\x00\x003\x83\x01\x00&\x00\x00\x00|\x83\x01\x00e\x00\x00\x00\xa3\x83\x01\x00z\x00\x00\x00\t\x84\x01\x00J\x00\x00\x00\x84\x84\x01\x00\xe5\x00\x00\x00\u03c4\x01\x00W\x00\x00\x00\xb5\x85\x01\x00E\x00\x00\x00\r\x86\x01\x00a\x00\x00\x00S\x86\x01\x00v\x00\x00\x00\xb5\x86\x01\x00\xcb\x00\x00\x00,\x87\x01\x00\xcf\x00\x00\x00\xf8\x87\x01\x00\x1e\x01\x00\x00\u0208\x01\x00\x1c\x00\x00\x00\xe7\x89\x01\x00T\x00\x00\x00\x04\x8a\x01\x00*\x00\x00\x00Y\x8a\x01\x00.\x00\x00\x00\x84\x8a\x01\x009\x00\x00\x00\xb3\x8a\x01\x00\x1e\x00\x00\x00\xed\x8a\x01\x00=\x00\x00\x00\f\x8b\x01\x003\x00\x00\x00J\x8b\x01\x00'\x00\x00\x00~\x8b\x01\x00&\x00\x00\x00\xa6\x8b\x01\x00+\x00\x00\x00\u034b\x01\x00G\x00\x00\x00\xf9\x8b\x01\x00*\x00\x00\x00A\x8c\x01\x00r\x00\x00\x00l\x8c\x01\x00\x13\x00\x00\x00\u07cc\x01\x00\x18\x00\x00\x00\xf3\x8c\x01\x00/\x00\x00\x00\f\x8d\x01\x00\x01\x00\x00\x00\x00\x00\x00\x00^\x00\x00\x00\x19\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00F\x00\x00\x00\xc4\x00\x00\x00\x0f\x00\x00\x00\xc3\x00\x00\x00\x00\x00\x00\x00-\x00\x00\x00\x00\x00\x00\x00\x86\x00\x00\x00\xeb\x00\x00\x00c\x00\x00\x00\x00\x00\x00\x001\x00\x00\x00o\x00\x00\x00}\x00\x00\x00\x00\x00\x00\x00J\x00\x00\x00\x00\x00\x00\x00\xd8\x00\x00\x00\x98\x00\x00\x00U\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xdb\x00\x00\x00\x17\x00\x00\x00u\x00\x00\x00\x11\x00\x00\x00\x00\x00\x00\x00\x8a\x00\x00\x00\x90\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xc9\x00\x00\x00\xb7\x00\x00\x00\xd7\x00\x00\x00*\x00\x00\x00\x99\x00\x00\x00\x00\x00\x00\x00\x1f\x00\x00\x00\x84\x00\x00\x00\x9c\x00\x00\x00\xe6\x00\x00\x00\x9d\x00\x00\x00\xc5\x00\x00\x00\xd9\x00\x00\x00\xb9\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00E\x00\x00\x00\xcd\x00\x00\x00\xcb\x00\x00\x00y\x00\x00\x00\x97\x00\x00\x00\xba\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x18\x00\x00\x00\x00\x00\x00\x00C\x00\x00\x00\x93\x00\x00\x00\xad\x00\x00\x00\xe1\x00\x00\x00\xa6\x00\x00\x00\xd0\x00\x00\x00r\x00\x00\x00+\x00\x00\x006\x00\x00\x00\x00\x00\x00\x00\xa5\x00\x00\x00\x80\x00\x00\x00\x00\x00\x00\x00h\x00\x00\x00\xa0\x00\x00\x00\x00\x00\x00\x00\xd1\x00\x00\x00\xde\x00\x00\x00;\x00\x00\x00\x00\x00\x00\x00\xe9\x00\x00\x00\xe7\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00z\x00\x00\x00/\x00\x00\x00V\x00\x00\x00\x8d\x00\x00\x00\xe3\x00\x00\x00!\x00\x00\x00~\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xd3\x00\x00\x00\x88\x00\x00\x00l\x00\x00\x00s\x00\x00\x00g\x00\x00\x00\x05\x00\x00\x00\xc6\x00\x00\x00#\x00\x00\x00\x9f\x00\x00\x00\x00\x00\x00\x00\xb1\x00\x00\x00\x00\x00\x00\x00\xc2\x00\x00\x00\x13\x00\x00\x00S\x00\x00\x00G\x00\x00\x00$\x00\x00\x00\xc1\x00\x00\x00\xb5\x00\x00\x00X\x00\x00\x00m\x00\x00\x00\t\x00\x00\x00x\x00\x00\x00\xb8\x00\x00\x00\xbd\x00\x00\x00k\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00<\x00\x00\x00\xaf\x00\x00\x00\xbf\x00\x00\x00\xbc\x00\x00\x00\x00\x00\x00\x00:\x00\x00\x00\x82\x00\x00\x00\x81\x00\x00\x00&\x00\x00\x00\xe0\x00\x00\x00\x00\x00\x00\x00[\x00\x00\x00I\x00\x00\x00e\x00\x00\x00\x04\x00\x00\x00>\x00\x00\x00\b\x00\x00\x00\x94\x00\x00\x00\x8f\x00\x00\x00\xce\x00\x00\x00?\x00\x00\x00Y\x00\x00\x00\xda\x00\x00\x00\x15\x00\x00\x00\x00\x00\x00\x00'\x00\x00\x004\x00\x00\x00\xcc\x00\x00\x00\f\x00\x00\x005\x00\x00\x00(\x00\x00\x00\x00\x00\x00\x00\xbb\x00\x00\x00\x00\x00\x00\x00\xa9\x00\x00\x00\x9e\x00\x00\x00\x00\x00\x00\x00\xe5\x00\x00\x00\x00\x00\x00\x00O\x00\x00\x00 \x00\x00\x00)\x00\x00\x00\xcf\x00\x00\x00\x00\x00\x00\x00\x1b\x00\x00\x00Z\x00\x00\x00\"\x00\x00\x00\x00\x00\x00\x00v\x00\x00\x00]\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00a\x00\x00\x00j\x00\x00\x008\x00\x00\x00\xa3\x00\x00\x00q\x00\x00\x00t\x00\x00\x00_\x00\x00\x00\x10\x00\x00\x00\\\x00\x00\x00\x00\x00\x00\x00\v\x00\x00\x00@\x00\x00\x00\xd2\x00\x00\x00,\x00\x00\x00\x00\x00\x00\x00\x85\x00\x00\x00\x00\x00\x00\x00\x92\x00\x00\x00\x00\x00\x00\x00\xc8\x00\x00\x00\x95\x00\x00\x00\x06\x00\x00\x00\xa8\x00\x00\x00\xae\x00\x00\x00\xa1\x00\x00\x00\x00\x00\x00\x00\x91\x00\x00\x00\x0e\x00\x00\x00{\x00\x00\x00\xa7\x00\x00\x00\x00\x00\x00\x00\xb6\x00\x00\x00i\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xd5\x00\x00\x00L\x00\x00\x00\x00\x00\x00\x00\xea\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00w\x00\x00\x00\x12\x00\x00\x00=\x00\x00\x00\x00\x00\x00\x00\a\x00\x00\x00\xdf\x00\x00\x00\xc0\x00\x00\x00N\x00\x00\x00%\x00\x00\x009\x00\x00\x00\x00\x00\x00\x00\x03\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00.\x00\x00\x00\x00\x00\x00\x00\u007f\x00\x00\x00\xbe\x00\x00\x00\xe2\x00\x00\x00\x00\x00\x00\x00P\x00\x00\x00\xb3\x00\x00\x00\r\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00R\x00\x00\x00D\x00\x00\x00B\x00\x00\x00n\x00\x00\x00\x00\x00\x00\x00\xd6\x00\x00\x00\x83\x00\x00\x00\n\x00\x00\x00W\x00\x00\x00\x14\x00\x00\x00Q\x00\x00\x00\xd4\x00\x00\x00d\x00\x00\x00\xac\x00\x00\x00\x16\x00\x00\x00\x96\x00\x00\x00K\x00\x00\x002\x00\x00\x00\x1a\x00\x00\x00\xb4\x00\x00\x00f\x00\x00\x00\xa2\x00\x00\x00\xe8\x00\x00\x00\x02\x00\x00\x00A\x00\x00\x00\xe4\x00\x00\x00\x8c\x00\x00\x00\x9a\x00\x00\x00`\x00\x00\x00\xab\x00\x00\x00M\x00\x00\x007\x00\x00\x000\x00\x00\x00\x00\x00\x00\x00\x1d\x00\x00\x00\x00\x00\x00\x00\xdc\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x9b\x00\x00\x00\x89\x00\x00\x00\x00\x00\x00\x00\xdd\x00\x00\x00\x8e\x00\x00\x00\xca\x00\x00\x00H\x00\x00\x00\x00\x00\x00\x00\xb2\x00\x00\x00\x00\x00\x00\x00\x1c\x00\x00\x00\xb0\x00\x00\x00\x00\x00\x00\x00|\x00\x00\x003\x00\x00\x00T\x00\x00\x00\x87\x00\x00\x00b\x00\x00\x00\x00\x00\x00\x00\x1e\x00\x00\x00\xaa\x00\x00\x00\xa4\x00\x00\x00\x00\x00\x00\x00p\x00\x00\x00\xc7\x00\x00\x00\x8b\x00\x00\x00\x00\n\t\t  # Create a ClusterRoleBinding for user1, user2, and group1 using the cluster-admin ClusterRole\n\t\t  kubectl create clusterrolebinding cluster-admin --clusterrole=cluster-admin --user=user1 --user=user2 --group=group1\x00\n\t\t  # Create a RoleBinding for user1, user2, and group1 using the admin ClusterRole\n\t\t  kubectl create rolebinding admin --clusterrole=admin --user=user1 --user=user2 --group=group1\x00\n\t\t  # Create a new configmap named my-config based on folder bar\n\t\t  kubectl create configmap my-config --from-file=path/to/bar\n\n\t\t  # Create a new configmap named my-config with specified keys instead of file basenames on disk\n\t\t  kubectl create configmap my-config --from-file=key1=/path/to/bar/file1.txt --from-file=key2=/path/to/bar/file2.txt\n\n\t\t  # Create a new configmap named my-config with key1=config1 and key2=config2\n\t\t  kubectl create configmap my-config --from-literal=key1=config1 --from-literal=key2=config2\x00\n\t\t  # If you don't already have a .dockercfg file, you can create a dockercfg secret directly by using:\n\t\t  kubectl create secret docker-registry my-secret --docker-server=DOCKER_REGISTRY_SERVER --docker-username=DOCKER_USER --docker-password=DOCKER_PASSWORD --docker-email=DOCKER_EMAIL\x00\n\t\t  # Show metrics for all nodes\n\t\t  kubectl top node\n\n\t\t  # Show metrics for a given node\n\t\t  kubectl top node NODE_NAME\x00\n\t\t# Apply the configuration in pod.json to a pod.\n\t\tkubectl apply -f ./pod.json\n\n\t\t# Apply the JSON passed into stdin to a pod.\n\t\tcat pod.json | kubectl apply -f -\n\n\t\t# Note: --prune is still in Alpha\n\t\t# Apply the configuration in manifest.yaml that matches label app=nginx and delete all the other resources that are not in the file and match label app=nginx.\n\t\tkubectl apply --prune -f manifest.yaml -l app=nginx\n\n\t\t# Apply the configuration in manifest.yaml and delete all the other configmaps that are not in the file.\n\t\tkubectl apply --prune -f manifest.yaml --all --prune-whitelist=core/v1/ConfigMap\x00\n\t\t# Auto scale a deployment \"foo\", with the number of pods between 2 and 10, no target CPU utilization specified so a default autoscaling policy will be used:\n\t\tkubectl autoscale deployment foo --min=2 --max=10\n\n\t\t# Auto scale a replication controller \"foo\", with the number of pods between 1 and 5, target CPU utilization at 80%:\n\t\tkubectl autoscale rc foo --max=5 --cpu-percent=80\x00\n\t\t# Convert 'pod.yaml' to latest version and print to stdout.\n\t\tkubectl convert -f pod.yaml\n\n\t\t# Convert the live state of the resource specified by 'pod.yaml' to the latest version\n\t\t# and print to stdout in json format.\n\t\tkubectl convert -f pod.yaml --local -o json\n\n\t\t# Convert all files under current directory to latest version and create them all.\n\t\tkubectl convert -f . | kubectl create -f -\x00\n\t\t# Create a ClusterRole named \"pod-reader\" that allows user to perform \"get\", \"watch\" and \"list\" on pods\n\t\tkubectl create clusterrole pod-reader --verb=get,list,watch --resource=pods\n\n\t\t# Create a ClusterRole named \"pod-reader\" with ResourceName specified\n\t\tkubectl create clusterrole pod-reader --verb=get,list,watch --resource=pods --resource-name=readablepod\x00\n\t\t# Create a Role named \"pod-reader\" that allows user to perform \"get\", \"watch\" and \"list\" on pods\n\t\tkubectl create role pod-reader --verb=get --verb=list --verb=watch --resource=pods\n\n\t\t# Create a Role named \"pod-reader\" with ResourceName specified\n\t\tkubectl create role pod-reader --verb=get --verg=list --verb=watch --resource=pods --resource-name=readablepod\x00\n\t\t# Create a new resourcequota named my-quota\n\t\tkubectl create quota my-quota --hard=cpu=1,memory=1G,pods=2,services=3,replicationcontrollers=2,resourcequotas=1,secrets=5,persistentvolumeclaims=10\n\n\t\t# Create a new resourcequota named best-effort\n\t\tkubectl create quota best-effort --hard=pods=100 --scopes=BestEffort\x00\n\t\t# Create a pod disruption budget named my-pdb that will select all pods with the app=rails label\n\t\t# and require at least one of them being available at any point in time.\n\t\tkubectl create poddisruptionbudget my-pdb --selector=app=rails --min-available=1\n\n\t\t# Create a pod disruption budget named my-pdb that will select all pods with the app=nginx label\n\t\t# and require at least half of the pods selected to be available at any point in time.\n\t\tkubectl create pdb my-pdb --selector=app=nginx --min-available=50%\x00\n\t\t# Create a pod using the data in pod.json.\n\t\tkubectl create -f ./pod.json\n\n\t\t# Create a pod based on the JSON passed into stdin.\n\t\tcat pod.json | kubectl create -f -\n\n\t\t# Edit the data in docker-registry.yaml in JSON using the v1 API format then create the resource using the edited data.\n\t\tkubectl create -f docker-registry.yaml --edit --output-version=v1 -o json\x00\n\t\t# Create a service for a replicated nginx, which serves on port 80 and connects to the containers on port 8000.\n\t\tkubectl expose rc nginx --port=80 --target-port=8000\n\n\t\t# Create a service for a replication controller identified by type and name specified in \"nginx-controller.yaml\", which serves on port 80 and connects to the containers on port 8000.\n\t\tkubectl expose -f nginx-controller.yaml --port=80 --target-port=8000\n\n\t\t# Create a service for a pod valid-pod, which serves on port 444 with the name \"frontend\"\n\t\tkubectl expose pod valid-pod --port=444 --name=frontend\n\n\t\t# Create a second service based on the above service, exposing the container port 8443 as port 443 with the name \"nginx-https\"\n\t\tkubectl expose service nginx --port=443 --target-port=8443 --name=nginx-https\n\n\t\t# Create a service for a replicated streaming application on port 4100 balancing UDP traffic and named 'video-stream'.\n\t\tkubectl expose rc streamer --port=4100 --protocol=udp --name=video-stream\n\n\t\t# Create a service for a replicated nginx using replica set, which serves on port 80 and connects to the containers on port 8000.\n\t\tkubectl expose rs nginx --port=80 --target-port=8000\n\n\t\t# Create a service for an nginx deployment, which serves on port 80 and connects to the containers on port 8000.\n\t\tkubectl expose deployment nginx --port=80 --target-port=8000\x00\n\t\t# Delete a pod using the type and name specified in pod.json.\n\t\tkubectl delete -f ./pod.json\n\n\t\t# Delete a pod based on the type and name in the JSON passed into stdin.\n\t\tcat pod.json | kubectl delete -f -\n\n\t\t# Delete pods and services with same names \"baz\" and \"foo\"\n\t\tkubectl delete pod,service baz foo\n\n\t\t# Delete pods and services with label name=myLabel.\n\t\tkubectl delete pods,services -l name=myLabel\n\n\t\t# Delete a pod with minimal delay\n\t\tkubectl delete pod foo --now\n\n\t\t# Force delete a pod on a dead node\n\t\tkubectl delete pod foo --grace-period=0 --force\n\n\t\t# Delete all pods\n\t\tkubectl delete pods --all\x00\n\t\t# Describe a node\n\t\tkubectl describe nodes kubernetes-node-emt8.c.myproject.internal\n\n\t\t# Describe a pod\n\t\tkubectl describe pods/nginx\n\n\t\t# Describe a pod identified by type and name in \"pod.json\"\n\t\tkubectl describe -f pod.json\n\n\t\t# Describe all pods\n\t\tkubectl describe pods\n\n\t\t# Describe pods by label name=myLabel\n\t\tkubectl describe po -l name=myLabel\n\n\t\t# Describe all pods managed by the 'frontend' replication controller (rc-created pods\n\t\t# get the name of the rc as a prefix in the pod the name).\n\t\tkubectl describe pods frontend\x00\n\t\t# Drain node \"foo\", even if there are pods not managed by a ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet on it.\n\t\t$ kubectl drain foo --force\n\n\t\t# As above, but abort if there are pods not managed by a ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet, and use a grace period of 15 minutes.\n\t\t$ kubectl drain foo --grace-period=900\x00\n\t\t# Edit the service named 'docker-registry':\n\t\tkubectl edit svc/docker-registry\n\n\t\t# Use an alternative editor\n\t\tKUBE_EDITOR=\"nano\" kubectl edit svc/docker-registry\n\n\t\t# Edit the job 'myjob' in JSON using the v1 API format:\n\t\tkubectl edit job.v1.batch/myjob -o json\n\n\t\t# Edit the deployment 'mydeployment' in YAML and save the modified config in its annotation:\n\t\tkubectl edit deployment/mydeployment -o yaml --save-config\x00\n\t\t# Get output from running 'date' from pod 123456-7890, using the first container by default\n\t\tkubectl exec 123456-7890 date\n\n\t\t# Get output from running 'date' in ruby-container from pod 123456-7890\n\t\tkubectl exec 123456-7890 -c ruby-container date\n\n\t\t# Switch to raw terminal mode, sends stdin to 'bash' in ruby-container from pod 123456-7890\n\t\t# and sends stdout/stderr from 'bash' back to the client\n\t\tkubectl exec 123456-7890 -c ruby-container -i -t -- bash -il\x00\n\t\t# Get output from running pod 123456-7890, using the first container by default\n\t\tkubectl attach 123456-7890\n\n\t\t# Get output from ruby-container from pod 123456-7890\n\t\tkubectl attach 123456-7890 -c ruby-container\n\n\t\t# Switch to raw terminal mode, sends stdin to 'bash' in ruby-container from pod 123456-7890\n\t\t# and sends stdout/stderr from 'bash' back to the client\n\t\tkubectl attach 123456-7890 -c ruby-container -i -t\n\n\t\t# Get output from the first pod of a ReplicaSet named nginx\n\t\tkubectl attach rs/nginx\n\t\t\x00\n\t\t# Get the documentation of the resource and its fields\n\t\tkubectl explain pods\n\n\t\t# Get the documentation of a specific field of a resource\n\t\tkubectl explain pods.spec.containers\x00\n\t\t# Install bash completion on a Mac using homebrew\n\t\tbrew install bash-completion\n\t\tprintf \"\n# Bash completion support\nsource $(brew --prefix)/etc/bash_completion\n\" >> $HOME/.bash_profile\n\t\tsource $HOME/.bash_profile\n\n\t\t# Load the kubectl completion code for bash into the current shell\n\t\tsource <(kubectl completion bash)\n\n\t\t# Write bash completion code to a file and source if from .bash_profile\n\t\tkubectl completion bash > ~/.kube/completion.bash.inc\n\t\tprintf \"\n# Kubectl shell completion\nsource '$HOME/.kube/completion.bash.inc'\n\" >> $HOME/.bash_profile\n\t\tsource $HOME/.bash_profile\n\n\t\t# Load the kubectl completion code for zsh[1] into the current shell\n\t\tsource <(kubectl completion zsh)\x00\n\t\t# List all pods in ps output format.\n\t\tkubectl get pods\n\n\t\t# List all pods in ps output format with more information (such as node name).\n\t\tkubectl get pods -o wide\n\n\t\t# List a single replication controller with specified NAME in ps output format.\n\t\tkubectl get replicationcontroller web\n\n\t\t# List a single pod in JSON output format.\n\t\tkubectl get -o json pod web-pod-13je7\n\n\t\t# List a pod identified by type and name specified in \"pod.yaml\" in JSON output format.\n\t\tkubectl get -f pod.yaml -o json\n\n\t\t# Return only the phase value of the specified pod.\n\t\tkubectl get -o template pod/web-pod-13je7 --template={{.status.phase}}\n\n\t\t# List all replication controllers and services together in ps output format.\n\t\tkubectl get rc,services\n\n\t\t# List one or more resources by their type and names.\n\t\tkubectl get rc/web service/frontend pods/web-pod-13je7\n\n\t\t# List all resources with different types.\n\t\tkubectl get all\x00\n\t\t# Listen on ports 5000 and 6000 locally, forwarding data to/from ports 5000 and 6000 in the pod\t\tkubectl port-forward pod/mypod 5000 6000\n\t\t# Listen on ports 5000 and 6000 locally, forwarding data to/from ports 5000 and 6000 in a pod selected by the deployment\t\tkubectl port-forward deployment/mydeployment 5000 6000\n\t\t# Listen on ports 5000 and 6000 locally, forwarding data to/from ports 5000 and 6000 in a pod selected by the service\t\tkubectl port-forward service/myservice 5000 6000\n\t\t# Listen on port 8888 locally, forwarding to 5000 in the pod\t\tkubectl port-forward pod/mypod 8888:5000\n\t\t# Listen on a random port locally, forwarding to 5000 in the pod\t\tkubectl port-forward pod/mypod :5000\x00\n\t\t# Mark node \"foo\" as schedulable.\n\t\t$ kubectl uncordon foo\x00\n\t\t# Mark node \"foo\" as unschedulable.\n\t\tkubectl cordon foo\x00\n\t\t# Partially update a node using strategic merge patch\n\t\tkubectl patch node k8s-node-1 -p '{\"spec\":{\"unschedulable\":true}}'\n\n\t\t# Partially update a node identified by the type and name specified in \"node.json\" using strategic merge patch\n\t\tkubectl patch -f node.json -p '{\"spec\":{\"unschedulable\":true}}'\n\n\t\t# Update a container's image; spec.containers[*].name is required because it's a merge key\n\t\tkubectl patch pod valid-pod -p '{\"spec\":{\"containers\":[{\"name\":\"kubernetes-serve-hostname\",\"image\":\"new image\"}]}}'\n\n\t\t# Update a container's image using a json patch with positional arrays\n\t\tkubectl patch pod valid-pod --type='json' -p='[{\"op\": \"replace\", \"path\": \"/spec/containers/0/image\", \"value\":\"new image\"}]'\x00\n\t\t# Print flags inherited by all commands\n\t\tkubectl options\x00\n\t\t# Print the address of the master and cluster services\n\t\tkubectl cluster-info\x00\n\t\t# Print the client and server versions for the current context\n\t\tkubectl version\x00\n\t\t# Print the supported API versions\n\t\tkubectl api-versions\x00\n\t\t# Replace a pod using the data in pod.json.\n\t\tkubectl replace -f ./pod.json\n\n\t\t# Replace a pod based on the JSON passed into stdin.\n\t\tcat pod.json | kubectl replace -f -\n\n\t\t# Update a single-container pod's image version (tag) to v4\n\t\tkubectl get pod mypod -o yaml | sed 's/\\(image: myimage\\):.*$/\x01:v4/' | kubectl replace -f -\n\n\t\t# Force replace, delete and then re-create the resource\n\t\tkubectl replace --force -f ./pod.json\x00\n\t\t# Return snapshot logs from pod nginx with only one container\n\t\tkubectl logs nginx\n\n\t\t# Return snapshot logs for the pods defined by label app=nginx\n\t\tkubectl logs -lapp=nginx\n\n\t\t# Return snapshot of previous terminated ruby container logs from pod web-1\n\t\tkubectl logs -p -c ruby web-1\n\n\t\t# Begin streaming the logs of the ruby container in pod web-1\n\t\tkubectl logs -f -c ruby web-1\n\n\t\t# Display only the most recent 20 lines of output in pod nginx\n\t\tkubectl logs --tail=20 nginx\n\n\t\t# Show all logs from pod nginx written in the last hour\n\t\tkubectl logs --since=1h nginx\n\n\t\t# Return snapshot logs from first container of a job named hello\n\t\tkubectl logs job/hello\n\n\t\t# Return snapshot logs from container nginx-1 of a deployment named nginx\n\t\tkubectl logs deployment/nginx -c nginx-1\x00\n\t\t# Run a proxy to kubernetes apiserver on port 8011, serving static content from ./local/www/\n\t\tkubectl proxy --port=8011 --www=./local/www/\n\n\t\t# Run a proxy to kubernetes apiserver on an arbitrary local port.\n\t\t# The chosen port for the server will be output to stdout.\n\t\tkubectl proxy --port=0\n\n\t\t# Run a proxy to kubernetes apiserver, changing the api prefix to k8s-api\n\t\t# This makes e.g. the pods api available at localhost:8001/k8s-api/v1/pods/\n\t\tkubectl proxy --api-prefix=/k8s-api\x00\n\t\t# Scale a replicaset named 'foo' to 3.\n\t\tkubectl scale --replicas=3 rs/foo\n\n\t\t# Scale a resource identified by type and name specified in \"foo.yaml\" to 3.\n\t\tkubectl scale --replicas=3 -f foo.yaml\n\n\t\t# If the deployment named mysql's current size is 2, scale mysql to 3.\n\t\tkubectl scale --current-replicas=2 --replicas=3 deployment/mysql\n\n\t\t# Scale multiple replication controllers.\n\t\tkubectl scale --replicas=5 rc/foo rc/bar rc/baz\n\n\t\t# Scale job named 'cron' to 3.\n\t\tkubectl scale --replicas=3 job/cron\x00\n\t\t# Set the last-applied-configuration of a resource to match the contents of a file.\n\t\tkubectl apply set-last-applied -f deploy.yaml\n\n\t\t# Execute set-last-applied against each configuration file in a directory.\n\t\tkubectl apply set-last-applied -f path/\n\n\t\t# Set the last-applied-configuration of a resource to match the contents of a file, will create the annotation if it does not already exist.\n\t\tkubectl apply set-last-applied -f deploy.yaml --create-annotation=true\n\t\t\x00\n\t\t# Show metrics for all pods in the default namespace\n\t\tkubectl top pod\n\n\t\t# Show metrics for all pods in the given namespace\n\t\tkubectl top pod --namespace=NAMESPACE\n\n\t\t# Show metrics for a given pod and its containers\n\t\tkubectl top pod POD_NAME --containers\n\n\t\t# Show metrics for the pods defined by label name=myLabel\n\t\tkubectl top pod -l name=myLabel\x00\n\t\t# Shut down foo.\n\t\tkubectl stop replicationcontroller foo\n\n\t\t# Stop pods and services with label name=myLabel.\n\t\tkubectl stop pods,services -l name=myLabel\n\n\t\t# Shut down the service defined in service.json\n\t\tkubectl stop -f service.json\n\n\t\t# Shut down all resources in the path/to/resources directory\n\t\tkubectl stop -f path/to/resources\x00\n\t\t# Start a single instance of nginx.\n\t\tkubectl run nginx --image=nginx\n\n\t\t# Start a single instance of hazelcast and let the container expose port 5701 .\n\t\tkubectl run hazelcast --image=hazelcast --port=5701\n\n\t\t# Start a single instance of hazelcast and set environment variables \"DNS_DOMAIN=cluster\" and \"POD_NAMESPACE=default\" in the container.\n\t\tkubectl run hazelcast --image=hazelcast --env=\"DNS_DOMAIN=cluster\" --env=\"POD_NAMESPACE=default\"\n\n\t\t# Start a replicated instance of nginx.\n\t\tkubectl run nginx --image=nginx --replicas=5\n\n\t\t# Dry run. Print the corresponding API objects without creating them.\n\t\tkubectl run nginx --image=nginx --dry-run\n\n\t\t# Start a single instance of nginx, but overload the spec of the deployment with a partial set of values parsed from JSON.\n\t\tkubectl run nginx --image=nginx --overrides='{ \"apiVersion\": \"v1\", \"spec\": { ... } }'\n\n\t\t# Start a pod of busybox and keep it in the foreground, don't restart it if it exits.\n\t\tkubectl run -i -t busybox --image=busybox --restart=Never\n\n\t\t# Start the nginx container using the default command, but use custom arguments (arg1 .. argN) for that command.\n\t\tkubectl run nginx --image=nginx -- <arg1> <arg2> ... <argN>\n\n\t\t# Start the nginx container using a different command and custom arguments.\n\t\tkubectl run nginx --image=nginx --command -- <cmd> <arg1> ... <argN>\n\n\t\t# Start the perl container to compute \u03c0 to 2000 places and print it out.\n\t\tkubectl run pi --image=perl --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(2000)'\n\n\t\t# Start the cron job to compute \u03c0 to 2000 places and print it out every 5 minutes.\n\t\tkubectl run pi --schedule=\"0/5 * * * ?\" --image=perl --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(2000)'\x00\n\t\t# Update node 'foo' with a taint with key 'dedicated' and value 'special-user' and effect 'NoSchedule'.\n\t\t# If a taint with that key and effect already exists, its value is replaced as specified.\n\t\tkubectl taint nodes foo dedicated=special-user:NoSchedule\n\n\t\t# Remove from node 'foo' the taint with key 'dedicated' and effect 'NoSchedule' if one exists.\n\t\tkubectl taint nodes foo dedicated:NoSchedule-\n\n\t\t# Remove from node 'foo' all the taints with key 'dedicated'\n\t\tkubectl taint nodes foo dedicated-\x00\n\t\t# Update pod 'foo' with the label 'unhealthy' and the value 'true'.\n\t\tkubectl label pods foo unhealthy=true\n\n\t\t# Update pod 'foo' with the label 'status' and the value 'unhealthy', overwriting any existing value.\n\t\tkubectl label --overwrite pods foo status=unhealthy\n\n\t\t# Update all pods in the namespace\n\t\tkubectl label pods --all status=unhealthy\n\n\t\t# Update a pod identified by the type and name in \"pod.json\"\n\t\tkubectl label -f pod.json status=unhealthy\n\n\t\t# Update pod 'foo' only if the resource is unchanged from version 1.\n\t\tkubectl label pods foo status=unhealthy --resource-version=1\n\n\t\t# Update pod 'foo' by removing a label named 'bar' if it exists.\n\t\t# Does not require the --overwrite flag.\n\t\tkubectl label pods foo bar-\x00\n\t\t# Update pods of frontend-v1 using new replication controller data in frontend-v2.json.\n\t\tkubectl rolling-update frontend-v1 -f frontend-v2.json\n\n\t\t# Update pods of frontend-v1 using JSON data passed into stdin.\n\t\tcat frontend-v2.json | kubectl rolling-update frontend-v1 -f -\n\n\t\t# Update the pods of frontend-v1 to frontend-v2 by just changing the image, and switching the\n\t\t# name of the replication controller.\n\t\tkubectl rolling-update frontend-v1 frontend-v2 --image=image:v2\n\n\t\t# Update the pods of frontend by just changing the image, and keeping the old name.\n\t\tkubectl rolling-update frontend --image=image:v2\n\n\t\t# Abort and reverse an existing rollout in progress (from frontend-v1 to frontend-v2).\n\t\tkubectl rolling-update frontend-v1 frontend-v2 --rollback\x00\n\t\t# View the last-applied-configuration annotations by type/name in YAML.\n\t\tkubectl apply view-last-applied deployment/nginx\n\n\t\t# View the last-applied-configuration annotations by file in JSON\n\t\tkubectl apply view-last-applied -f deploy.yaml -o json\x00\n\t\tApply a configuration to a resource by filename or stdin.\n\t\tThis resource will be created if it doesn't exist yet.\n\t\tTo use 'apply', always create the resource initially with either 'apply' or 'create --save-config'.\n\n\t\tJSON and YAML formats are accepted.\n\n\t\tAlpha Disclaimer: the --prune functionality is not yet complete. Do not use unless you are aware of what the current state is. See https://issues.k8s.io/34274.\x00\n\t\tConvert config files between different API versions. Both YAML\n\t\tand JSON formats are accepted.\n\n\t\tThe command takes filename, directory, or URL as input, and convert it into format\n\t\tof version specified by --output-version flag. If target version is not specified or\n\t\tnot supported, convert to latest version.\n\n\t\tThe default output will be printed to stdout in YAML format. One can use -o option\n\t\tto change to output destination.\x00\n\t\tCreate a ClusterRole.\x00\n\t\tCreate a ClusterRoleBinding for a particular ClusterRole.\x00\n\t\tCreate a RoleBinding for a particular Role or ClusterRole.\x00\n\t\tCreate a TLS secret from the given public/private key pair.\n\n\t\tThe public/private key pair must exist before hand. The public key certificate must be .PEM encoded and match the given private key.\x00\n\t\tCreate a configmap based on a file, directory, or specified literal value.\n\n\t\tA single configmap may package one or more key/value pairs.\n\n\t\tWhen creating a configmap based on a file, the key will default to the basename of the file, and the value will\n\t\tdefault to the file content.  If the basename is an invalid key, you may specify an alternate key.\n\n\t\tWhen creating a configmap based on a directory, each file whose basename is a valid key in the directory will be\n\t\tpackaged into the configmap.  Any directory entries except regular files are ignored (e.g. subdirectories,\n\t\tsymlinks, devices, pipes, etc).\x00\n\t\tCreate a namespace with the specified name.\x00\n\t\tCreate a new secret for use with Docker registries.\n\n\t\tDockercfg secrets are used to authenticate against Docker registries.\n\n\t\tWhen using the Docker command line to push images, you can authenticate to a given registry by running\n\n\t\t    $ docker login DOCKER_REGISTRY_SERVER --username=DOCKER_USER --password=DOCKER_PASSWORD --email=DOCKER_EMAIL'.\n\n    That produces a ~/.dockercfg file that is used by subsequent 'docker push' and 'docker pull' commands to\n\t\tauthenticate to the registry. The email address is optional.\n\n\t\tWhen creating applications, you may have a Docker registry that requires authentication.  In order for the\n\t\tnodes to pull images on your behalf, they have to have the credentials.  You can provide this information\n\t\tby creating a dockercfg secret and attaching it to your service account.\x00\n\t\tCreate a pod disruption budget with the specified name, selector, and desired minimum available pods\x00\n\t\tCreate a resource by filename or stdin.\n\n\t\tJSON and YAML formats are accepted.\x00\n\t\tCreate a resourcequota with the specified name, hard limits and optional scopes\x00\n\t\tCreate a role with single rule.\x00\n\t\tCreate a secret based on a file, directory, or specified literal value.\n\n\t\tA single secret may package one or more key/value pairs.\n\n\t\tWhen creating a secret based on a file, the key will default to the basename of the file, and the value will\n\t\tdefault to the file content.  If the basename is an invalid key, you may specify an alternate key.\n\n\t\tWhen creating a secret based on a directory, each file whose basename is a valid key in the directory will be\n\t\tpackaged into the secret.  Any directory entries except regular files are ignored (e.g. subdirectories,\n\t\tsymlinks, devices, pipes, etc).\x00\n\t\tCreate a service account with the specified name.\x00\n\t\tCreate and run a particular image, possibly replicated.\n\n\t\tCreates a deployment or job to manage the created container(s).\x00\n\t\tCreates an autoscaler that automatically chooses and sets the number of pods that run in a kubernetes cluster.\n\n\t\tLooks up a Deployment, ReplicaSet, or ReplicationController by name and creates an autoscaler that uses the given resource as a reference.\n\t\tAn autoscaler can automatically increase or decrease number of pods deployed within the system as needed.\x00\n\t\tDelete resources by filenames, stdin, resources and names, or by resources and label selector.\n\n\t\tJSON and YAML formats are accepted. Only one type of the arguments may be specified: filenames,\n\t\tresources and names, or resources and label selector.\n\n\t\tSome resources, such as pods, support graceful deletion. These resources define a default period\n\t\tbefore they are forcibly terminated (the grace period) but you may override that value with\n\t\tthe --grace-period flag, or pass --now to set a grace-period of 1. Because these resources often\n\t\trepresent entities in the cluster, deletion may not be acknowledged immediately. If the node\n\t\thosting a pod is down or cannot reach the API server, termination may take significantly longer\n\t\tthan the grace period. To force delete a resource,\tyou must pass a grace\tperiod of 0 and specify\n\t\tthe --force flag.\n\n\t\tIMPORTANT: Force deleting pods does not wait for confirmation that the pod's processes have been\n\t\tterminated, which can leave those processes running until the node detects the deletion and\n\t\tcompletes graceful deletion. If your processes use shared storage or talk to a remote API and\n\t\tdepend on the name of the pod to identify themselves, force deleting those pods may result in\n\t\tmultiple processes running on different machines using the same identification which may lead\n\t\tto data corruption or inconsistency. Only force delete pods when you are sure the pod is\n\t\tterminated, or if your application can tolerate multiple copies of the same pod running at once.\n\t\tAlso, if you force delete pods the scheduler may place new pods on those nodes before the node\n\t\thas released those resources and causing those pods to be evicted immediately.\n\n\t\tNote that the delete command does NOT do resource version checks, so if someone\n\t\tsubmits an update to a resource right when you submit a delete, their update\n\t\twill be lost along with the rest of the resource.\x00\n\t\tDeprecated: Gracefully shut down a resource by name or filename.\n\n\t\tThe stop command is deprecated, all its functionalities are covered by delete command.\n\t\tSee 'kubectl delete --help' for more details.\n\n\t\tAttempts to shut down and delete a resource that supports graceful termination.\n\t\tIf the resource is scalable it will be scaled to 0 before deletion.\x00\n\t\tDisplay Resource (CPU/Memory/Storage) usage of nodes.\n\n\t\tThe top-node command allows you to see the resource consumption of nodes.\x00\n\t\tDisplay Resource (CPU/Memory/Storage) usage of pods.\n\n\t\tThe 'top pod' command allows you to see the resource consumption of pods.\n\n\t\tDue to the metrics pipeline delay, they may be unavailable for a few minutes\n\t\tsince pod creation.\x00\n\t\tDisplay Resource (CPU/Memory/Storage) usage.\n\n\t\tThe top command allows you to see the resource consumption for nodes or pods.\n\n\t\tThis command requires Heapster to be correctly configured and working on the server. \x00\n\t\tDrain node in preparation for maintenance.\n\n\t\tThe given node will be marked unschedulable to prevent new pods from arriving.\n\t\t'drain' evicts the pods if the APIServer supports eviction\n\t\t(http://kubernetes.io/docs/admin/disruptions/). Otherwise, it will use normal DELETE\n\t\tto delete the pods.\n\t\tThe 'drain' evicts or deletes all pods except mirror pods (which cannot be deleted through\n\t\tthe API server).  If there are DaemonSet-managed pods, drain will not proceed\n\t\twithout --ignore-daemonsets, and regardless it will not delete any\n\t\tDaemonSet-managed pods, because those pods would be immediately replaced by the\n\t\tDaemonSet controller, which ignores unschedulable markings.  If there are any\n\t\tpods that are neither mirror pods nor managed by ReplicationController,\n\t\tReplicaSet, DaemonSet, StatefulSet or Job, then drain will not delete any pods unless you\n\t\tuse --force.  --force will also allow deletion to proceed if the managing resource of one\n\t\tor more pods is missing.\n\n\t\t'drain' waits for graceful termination. You should not operate on the machine until\n\t\tthe command completes.\n\n\t\tWhen you are ready to put the node back into service, use kubectl uncordon, which\n\t\twill make the node schedulable again.\n\n\t\t![Workflow](http://kubernetes.io/images/docs/kubectl_drain.svg)\x00\n\t\tEdit a resource from the default editor.\n\n\t\tThe edit command allows you to directly edit any API resource you can retrieve via the\n\t\tcommand line tools. It will open the editor defined by your KUBE_EDITOR, or EDITOR\n\t\tenvironment variables, or fall back to 'vi' for Linux or 'notepad' for Windows.\n\t\tYou can edit multiple objects, although changes are applied one at a time. The command\n\t\taccepts filenames as well as command line arguments, although the files you point to must\n\t\tbe previously saved versions of resources.\n\n\t\tEditing is done with the API version used to fetch the resource.\n\t\tTo edit using a specific API version, fully-qualify the resource, version, and group.\n\n\t\tThe default format is YAML. To edit in JSON, specify \"-o json\".\n\n\t\tThe flag --windows-line-endings can be used to force Windows line endings,\n\t\totherwise the default for your operating system will be used.\n\n\t\tIn the event an error occurs while updating, a temporary file will be created on disk\n\t\tthat contains your unapplied changes. The most common error when updating a resource\n\t\tis another editor changing the resource on the server. When this occurs, you will have\n\t\tto apply your changes to the newer version of the resource, or update your temporary\n\t\tsaved copy to include the latest resource version.\x00\n\t\tMark node as schedulable.\x00\n\t\tMark node as unschedulable.\x00\n\t\tOutput shell completion code for the specified shell (bash or zsh).\n\t\tThe shell code must be evaluated to provide interactive\n\t\tcompletion of kubectl commands.  This can be done by sourcing it from\n\t\tthe .bash_profile.\n\n\t\tNote: this requires the bash-completion framework, which is not installed\n\t\tby default on Mac.  This can be installed by using homebrew:\n\n\t\t    $ brew install bash-completion\n\n\t\tOnce installed, bash_completion must be evaluated.  This can be done by adding the\n\t\tfollowing line to the .bash_profile\n\n\t\t    $ source $(brew --prefix)/etc/bash_completion\n\n\t\tNote for zsh users: [1] zsh completions are only supported in versions of zsh >= 5.2\x00\n\t\tPerform a rolling update of the given ReplicationController.\n\n\t\tReplaces the specified replication controller with a new replication controller by updating one pod at a time to use the\n\t\tnew PodTemplate. The new-controller.json must specify the same namespace as the\n\t\texisting replication controller and overwrite at least one (common) label in its replicaSelector.\n\n\t\t![Workflow](http://kubernetes.io/images/docs/kubectl_rollingupdate.svg)\x00\n\t\tReplace a resource by filename or stdin.\n\n\t\tJSON and YAML formats are accepted. If replacing an existing resource, the\n\t\tcomplete resource spec must be provided. This can be obtained by\n\n\t\t    $ kubectl get TYPE NAME -o yaml\n\n\t\tPlease refer to the models in https://htmlpreview.github.io/?https://github.com/kubernetes/kubernetes/blob/HEAD/docs/api-reference/v1/definitions.html to find if a field is mutable.\x00\n\t\tSet a new size for a Deployment, ReplicaSet, Replication Controller, or Job.\n\n\t\tScale also allows users to specify one or more preconditions for the scale action.\n\n\t\tIf --current-replicas or --resource-version is specified, it is validated before the\n\t\tscale is attempted, and it is guaranteed that the precondition holds true when the\n\t\tscale is sent to the server.\x00\n\t\tSet the latest last-applied-configuration annotations by setting it to match the contents of a file.\n\t\tThis results in the last-applied-configuration being updated as though 'kubectl apply -f <file>' was run,\n\t\twithout updating any other parts of the object.\x00\n\t\tTo proxy all of the kubernetes api and nothing else, use:\n\n\t\t    $ kubectl proxy --api-prefix=/\n\n\t\tTo proxy only part of the kubernetes api and also some static files:\n\n\t\t    $ kubectl proxy --www=/my/files --www-prefix=/static/ --api-prefix=/api/\n\n\t\tThe above lets you 'curl localhost:8001/api/v1/pods'.\n\n\t\tTo proxy the entire kubernetes api at a different root, use:\n\n\t\t    $ kubectl proxy --api-prefix=/custom/\n\n\t\tThe above lets you 'curl localhost:8001/custom/api/v1/pods'\x00\n\t\tUpdate field(s) of a resource using strategic merge patch\n\n\t\tJSON and YAML formats are accepted.\n\n\t\tPlease refer to the models in https://htmlpreview.github.io/?https://github.com/kubernetes/kubernetes/blob/HEAD/docs/api-reference/v1/definitions.html to find if a field is mutable.\x00\n\t\tUpdate the labels on a resource.\n\n\t\t* A label must begin with a letter or number, and may contain letters, numbers, hyphens, dots, and underscores, up to %[1]d characters.\n\t\t* If --overwrite is true, then existing labels can be overwritten, otherwise attempting to overwrite a label will result in an error.\n\t\t* If --resource-version is specified, then updates will use this resource version, otherwise the existing resource-version will be used.\x00\n\t\tUpdate the taints on one or more nodes.\n\n\t\t* A taint consists of a key, value, and effect. As an argument here, it is expressed as key=value:effect.\n\t\t* The key must begin with a letter or number, and may contain letters, numbers, hyphens, dots, and underscores, up to %[1]d characters.\n\t\t* The value must begin with a letter or number, and may contain letters, numbers, hyphens, dots, and underscores, up to %[2]d characters.\n\t\t* The effect must be NoSchedule, PreferNoSchedule or NoExecute.\n\t\t* Currently taint can only apply to node.\x00\n\t\tView the latest last-applied-configuration annotations by type/name or file.\n\n\t\tThe default output will be printed to stdout in YAML format. One can use -o option\n\t\tto change output format.\x00\n\t    # !!!Important Note!!!\n\t    # Requires that the 'tar' binary is present in your container\n\t    # image.  If 'tar' is not present, 'kubectl cp' will fail.\n\n\t    # Copy /tmp/foo_dir local directory to /tmp/bar_dir in a remote pod in the default namespace\n\t\tkubectl cp /tmp/foo_dir <some-pod>:/tmp/bar_dir\n\n        # Copy /tmp/foo local file to /tmp/bar in a remote pod in a specific container\n\t\tkubectl cp /tmp/foo <some-pod>:/tmp/bar -c <specific-container>\n\n\t\t# Copy /tmp/foo local file to /tmp/bar in a remote pod in namespace <some-namespace>\n\t\tkubectl cp /tmp/foo <some-namespace>/<some-pod>:/tmp/bar\n\n\t\t# Copy /tmp/foo from a remote pod to /tmp/bar locally\n\t\tkubectl cp <some-namespace>/<some-pod>:/tmp/foo /tmp/bar\x00\n\t  # Create a new TLS secret named tls-secret with the given key pair:\n\t  kubectl create secret tls tls-secret --cert=path/to/tls.cert --key=path/to/tls.key\x00\n\t  # Create a new namespace named my-namespace\n\t  kubectl create namespace my-namespace\x00\n\t  # Create a new secret named my-secret with keys for each file in folder bar\n\t  kubectl create secret generic my-secret --from-file=path/to/bar\n\n\t  # Create a new secret named my-secret with specified keys instead of names on disk\n\t  kubectl create secret generic my-secret --from-file=ssh-privatekey=~/.ssh/id_rsa --from-file=ssh-publickey=~/.ssh/id_rsa.pub\n\n\t  # Create a new secret named my-secret with key1=supersecret and key2=topsecret\n\t  kubectl create secret generic my-secret --from-literal=key1=supersecret --from-literal=key2=topsecret\x00\n\t  # Create a new service account named my-service-account\n\t  kubectl create serviceaccount my-service-account\x00\n\t# Create a new ExternalName service named my-ns \n\tkubectl create service externalname my-ns --external-name bar.com\x00\n\tCreate an ExternalName service with the specified name.\n\n\tExternalName service references to an external DNS address instead of\n\tonly pods, which will allow application authors to reference services\n\tthat exist off platform, on other clusters, or locally.\x00\n\tHelp provides help for any command in the application.\n\tSimply type kubectl help [path to command] for full details.\x00\n    # Create a new LoadBalancer service named my-lbs\n    kubectl create service loadbalancer my-lbs --tcp=5678:8080\x00\n    # Create a new clusterIP service named my-cs\n    kubectl create service clusterip my-cs --tcp=5678:8080\n\n    # Create a new clusterIP service named my-cs (in headless mode)\n    kubectl create service clusterip my-cs --clusterip=\"None\"\x00\n    # Create a new deployment named my-dep that runs the busybox image.\n    kubectl create deployment my-dep --image=busybox\x00\n    # Create a new nodeport service named my-ns\n    kubectl create service nodeport my-ns --tcp=5678:8080\x00\n    # Dump current cluster state to stdout\n    kubectl cluster-info dump\n\n    # Dump current cluster state to /path/to/cluster-state\n    kubectl cluster-info dump --output-directory=/path/to/cluster-state\n\n    # Dump all namespaces to stdout\n    kubectl cluster-info dump --all-namespaces\n\n    # Dump a set of namespaces to /path/to/cluster-state\n    kubectl cluster-info dump --namespaces default,kube-system --output-directory=/path/to/cluster-state\x00\n    # Update pod 'foo' with the annotation 'description' and the value 'my frontend'.\n    # If the same annotation is set multiple times, only the last value will be applied\n    kubectl annotate pods foo description='my frontend'\n\n    # Update a pod identified by type and name in \"pod.json\"\n    kubectl annotate -f pod.json description='my frontend'\n\n    # Update pod 'foo' with the annotation 'description' and the value 'my frontend running nginx', overwriting any existing value.\n    kubectl annotate --overwrite pods foo description='my frontend running nginx'\n\n    # Update all pods in the namespace\n    kubectl annotate pods --all description='my frontend running nginx'\n\n    # Update pod 'foo' only if the resource is unchanged from version 1.\n    kubectl annotate pods foo description='my frontend running nginx' --resource-version=1\n\n    # Update pod 'foo' by removing an annotation named 'description' if it exists.\n    # Does not require the --overwrite flag.\n    kubectl annotate pods foo description-\x00\n    Create a LoadBalancer service with the specified name.\x00\n    Create a clusterIP service with the specified name.\x00\n    Create a deployment with the specified name.\x00\n    Create a nodeport service with the specified name.\x00\n    Dumps cluster info out suitable for debugging and diagnosing cluster problems.  By default, dumps everything to\n    stdout. You can optionally specify a directory with --output-directory.  If you specify a directory, kubernetes will\n    build a set of files in that directory.  By default only dumps things in the 'kube-system' namespace, but you can\n    switch to a different namespace with the --namespaces flag, or specify --all-namespaces to dump all namespaces.\n\n    The command also dumps the logs of all of the pods in the cluster, these logs are dumped into different directories\n    based on namespace and pod name.\x00\n  Display addresses of the master and services with label kubernetes.io/cluster-service=true\n  To further debug and diagnose cluster problems, use 'kubectl cluster-info dump'.\x00A comma-delimited set of quota scopes that must all match each object tracked by the quota.\x00A comma-delimited set of resource=quantity pairs that define a hard limit.\x00A label selector to use for this budget. Only equality-based selector requirements are supported.\x00A label selector to use for this service. Only equality-based selector requirements are supported. If empty (the default) infer the selector from the replication controller or replica set.)\x00A schedule in the Cron format the job should be run with.\x00Additional external IP address (not managed by Kubernetes) to accept for the service. If this IP is routed to a node, the service can be accessed by this IP in addition to its generated service IP.\x00An inline JSON override for the generated object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.\x00An inline JSON override for the generated service object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.  Only used if --expose is true.\x00Apply a configuration to a resource by filename or stdin\x00Approve a certificate signing request\x00Assign your own ClusterIP or set to 'None' for a 'headless' service (no loadbalancing).\x00Attach to a running container\x00Auto-scale a Deployment, ReplicaSet, or ReplicationController\x00ClusterIP to be assigned to the service. Leave empty to auto-allocate, or set to 'None' to create a headless service.\x00ClusterRole this ClusterRoleBinding should reference\x00ClusterRole this RoleBinding should reference\x00Container name which will have its image upgraded. Only relevant when --image is specified, ignored otherwise. Required when using --image on a multi-container pod\x00Convert config files between different API versions\x00Copy files and directories to and from containers.\x00Create a ClusterRoleBinding for a particular ClusterRole\x00Create a LoadBalancer service.\x00Create a NodePort service.\x00Create a RoleBinding for a particular Role or ClusterRole\x00Create a TLS secret\x00Create a clusterIP service.\x00Create a configmap from a local file, directory or literal value\x00Create a deployment with the specified name.\x00Create a namespace with the specified name\x00Create a pod disruption budget with the specified name.\x00Create a quota with the specified name.\x00Create a resource by filename or stdin\x00Create a secret for use with a Docker registry\x00Create a secret from a local file, directory or literal value\x00Create a secret using specified subcommand\x00Create a service account with the specified name\x00Create a service using specified subcommand.\x00Create an ExternalName service.\x00Delete resources by filenames, stdin, resources and names, or by resources and label selector\x00Delete the specified cluster from the kubeconfig\x00Delete the specified context from the kubeconfig\x00Deny a certificate signing request\x00Deprecated: Gracefully shut down a resource by name or filename\x00Describe one or many contexts\x00Display Resource (CPU/Memory) usage of nodes\x00Display Resource (CPU/Memory) usage of pods\x00Display Resource (CPU/Memory) usage.\x00Display cluster info\x00Display clusters defined in the kubeconfig\x00Display merged kubeconfig settings or a specified kubeconfig file\x00Display one or many resources\x00Displays the current-context\x00Documentation of resources\x00Drain node in preparation for maintenance\x00Dump lots of relevant info for debugging and diagnosis\x00Edit a resource on the server\x00Email for Docker registry\x00Execute a command in a container\x00Explicit policy for when to pull container images. Required when --image is same as existing image, ignored otherwise.\x00Forward one or more local ports to a pod\x00Help about any command\x00IP to assign to the Load Balancer. If empty, an ephemeral IP will be created and used (cloud-provider specific).\x00If non-empty, set the session affinity for the service to this; legal values: 'None', 'ClientIP'\x00If non-empty, the annotation update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource.\x00If non-empty, the labels update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource.\x00Image to use for upgrading the replication controller. Must be distinct from the existing image (either new image or new image tag).  Can not be used with --filename/-f\x00Manage a deployment rollout\x00Mark node as schedulable\x00Mark node as unschedulable\x00Mark the provided resource as paused\x00Modify certificate resources.\x00Modify kubeconfig files\x00Name or number for the port on the container that the service should direct traffic to. Optional.\x00Only return logs after a specific date (RFC3339). Defaults to all logs. Only one of since-time / since may be used.\x00Output shell completion code for the specified shell (bash or zsh)\x00Output the formatted object with the given group version (for ex: 'extensions/v1beta1').)\x00Password for Docker registry authentication\x00Path to PEM encoded public key certificate.\x00Path to private key associated with given certificate.\x00Perform a rolling update of the given ReplicationController\x00Precondition for resource version. Requires that the current resource version match this value in order to scale.\x00Print the client and server version information\x00Print the list of flags inherited by all commands\x00Print the logs for a container in a pod\x00Replace a resource by filename or stdin\x00Resume a paused resource\x00Role this RoleBinding should reference\x00Run a particular image on the cluster\x00Run a proxy to the Kubernetes API server\x00Server location for Docker registry\x00Set a new size for a Deployment, ReplicaSet, Replication Controller, or Job\x00Set specific features on objects\x00Set the last-applied-configuration annotation on a live object to match the contents of a file.\x00Set the selector on a resource\x00Sets a cluster entry in kubeconfig\x00Sets a context entry in kubeconfig\x00Sets a user entry in kubeconfig\x00Sets an individual value in a kubeconfig file\x00Sets the current-context in a kubeconfig file\x00Show details of a specific resource or group of resources\x00Show the status of the rollout\x00Synonym for --target-port\x00Take a replication controller, service, deployment or pod and expose it as a new Kubernetes Service\x00The image for the container to run.\x00The image pull policy for the container. If left empty, this value will not be specified by the client and defaulted by the server\x00The key to use to differentiate between two different controllers, default 'deployment'.  Only relevant when --image is specified, ignored otherwise\x00The minimum number or percentage of available pods this budget requires.\x00The name for the newly created object.\x00The name for the newly created object. If not specified, the name of the input resource will be used.\x00The name of the API generator to use, see http://kubernetes.io/docs/user-guide/kubectl-conventions/#generators for a list.\x00The name of the API generator to use. Currently there is only 1 generator.\x00The name of the API generator to use. There are 2 generators: 'service/v1' and 'service/v2'. The only difference between them is that service port in v1 is named 'default', while it is left unnamed in v2. Default is 'service/v2'.\x00The name of the generator to use for creating a service.  Only used if --expose is true\x00The network protocol for the service to be created. Default is 'TCP'.\x00The port that the service should serve on. Copied from the resource being exposed, if unspecified\x00The port that this container exposes.  If --expose is true, this is also the port used by the service that is created.\x00The resource requirement limits for this container.  For example, 'cpu=200m,memory=512Mi'.  Note that server side components may assign limits depending on the server configuration, such as limit ranges.\x00The resource requirement requests for this container.  For example, 'cpu=100m,memory=256Mi'.  Note that server side components may assign requests depending on the server configuration, such as limit ranges.\x00The restart policy for this Pod.  Legal values [Always, OnFailure, Never].  If set to 'Always' a deployment is created, if set to 'OnFailure' a job is created, if set to 'Never', a regular pod is created. For the latter two --replicas must be 1.  Default 'Always', for CronJobs `Never`.\x00The type of secret to create\x00Type for this service: ClusterIP, NodePort, or LoadBalancer. Default is 'ClusterIP'.\x00Undo a previous rollout\x00Unsets an individual value in a kubeconfig file\x00Update field(s) of a resource using strategic merge patch\x00Update image of a pod template\x00Update resource requests/limits on objects with pod templates\x00Update the annotations on a resource\x00Update the labels on a resource\x00Update the taints on one or more nodes\x00Username for Docker registry authentication\x00View latest last-applied-configuration annotations of a resource/object\x00View rollout history\x00Where to output the files.  If empty or '-' uses stdout, otherwise creates a directory hierarchy in that directory\x00dummy restart flag)\x00external name of service\x00kubectl controls the Kubernetes cluster manager\x00Project-Id-Version: gettext-go-examples-hello\nReport-Msgid-Bugs-To: EMAIL\nPO-Revision-Date: 2020-01-05 09:55+0900\nLast-Translator: Kohei Ota <kohei.ota@zozo.com>\nLanguage-Team: \nLanguage: ja\nMIME-Version: 1.0\nContent-Type: text/plain; charset=UTF-8\nContent-Transfer-Encoding: 8bit\nX-Generator: Poedit 2.3\nX-Poedit-SourceCharset: UTF-8\nPlural-Forms: nplurals=2; plural=(n != 1);\n\x00\n\t\t  # Create a ClusterRoleBinding for user1, user2, and group1 using the cluster-admin ClusterRole\n\t\t  kubectl create clusterrolebinding cluster-admin --clusterrole=cluster-admin --user=user1 --user=user2 --group=group1\x00\n\t\t  # Create a RoleBinding for user1, user2, and group1 using the admin ClusterRole\n\t\t  kubectl create rolebinding admin --clusterrole=admin --user=user1 --user=user2 --group=group1\x00\n\t\t  # Create a new configmap named my-config based on folder bar\n\t\t  kubectl create configmap my-config --from-file=path/to/bar\n\n\t\t  # Create a new configmap named my-config with specified keys instead of file basenames on disk\n\t\t  kubectl create configmap my-config --from-file=key1=/path/to/bar/file1.txt --from-file=key2=/path/to/bar/file2.txt\n\n\t\t  # Create a new configmap named my-config with key1=config1 and key2=config2\n\t\t  kubectl create configmap my-config --from-literal=key1=config1 --from-literal=key2=config2\x00\n\t\t  # If you don't already have a .dockercfg file, you can create a dockercfg secret directly by using:\n\t\t  kubectl create secret docker-registry my-secret --docker-server=DOCKER_REGISTRY_SERVER --docker-username=DOCKER_USER --docker-password=DOCKER_PASSWORD --docker-email=DOCKER_EMAIL\x00\n\t\t  # Show metrics for all nodes\n\t\t  kubectl top node\n\n\t\t  # Show metrics for a given node\n\t\t  kubectl top node NODE_NAME\x00\n\t\t# Apply the configuration in pod.json to a pod.\n\t\tkubectl apply -f ./pod.json\n\n\t\t# Apply the JSON passed into stdin to a pod.\n\t\tcat pod.json | kubectl apply -f -\n\n\t\t# Note: --prune is still in Alpha\n\t\t# Apply the configuration in manifest.yaml that matches label app=nginx and delete all the other resources that are not in the file and match label app=nginx.\n\t\tkubectl apply --prune -f manifest.yaml -l app=nginx\n\n\t\t# Apply the configuration in manifest.yaml and delete all the other configmaps that are not in the file.\n\t\tkubectl apply --prune -f manifest.yaml --all --prune-whitelist=core/v1/ConfigMap\x00\n\t\t# Auto scale a deployment \"foo\", with the number of pods between 2 and 10, no target CPU utilization specified so a default autoscaling policy will be used:\n\t\tkubectl autoscale deployment foo --min=2 --max=10\n\n\t\t# Auto scale a replication controller \"foo\", with the number of pods between 1 and 5, target CPU utilization at 80%:\n\t\tkubectl autoscale rc foo --max=5 --cpu-percent=80\x00\n\t\t# Convert 'pod.yaml' to latest version and print to stdout.\n\t\tkubectl convert -f pod.yaml\n\n\t\t# Convert the live state of the resource specified by 'pod.yaml' to the latest version\n\t\t# and print to stdout in json format.\n\t\tkubectl convert -f pod.yaml --local -o json\n\n\t\t# Convert all files under current directory to latest version and create them all.\n\t\tkubectl convert -f . | kubectl create -f -\x00\n\t\t# Create a ClusterRole named \"pod-reader\" that allows user to perform \"get\", \"watch\" and \"list\" on pods\n\t\tkubectl create clusterrole pod-reader --verb=get,list,watch --resource=pods\n\n\t\t# Create a ClusterRole named \"pod-reader\" with ResourceName specified\n\t\tkubectl create clusterrole pod-reader --verb=get,list,watch --resource=pods --resource-name=readablepod\x00\n\t\t# Create a Role named \"pod-reader\" that allows user to perform \"get\", \"watch\" and \"list\" on pods\n\t\tkubectl create role pod-reader --verb=get --verb=list --verb=watch --resource=pods\n\n\t\t# Create a Role named \"pod-reader\" with ResourceName specified\n\t\tkubectl create role pod-reader --verb=get --verg=list --verb=watch --resource=pods --resource-name=readablepod\x00\n\t\t# Create a new resourcequota named my-quota\n\t\tkubectl create quota my-quota --hard=cpu=1,memory=1G,pods=2,services=3,replicationcontrollers=2,resourcequotas=1,secrets=5,persistentvolumeclaims=10\n\n\t\t# Create a new resourcequota named best-effort\n\t\tkubectl create quota best-effort --hard=pods=100 --scopes=BestEffort\x00\n\t\t# Create a pod disruption budget named my-pdb that will select all pods with the app=rails label\n\t\t# and require at least one of them being available at any point in time.\n\t\tkubectl create poddisruptionbudget my-pdb --selector=app=rails --min-available=1\n\n\t\t# Create a pod disruption budget named my-pdb that will select all pods with the app=nginx label\n\t\t# and require at least half of the pods selected to be available at any point in time.\n\t\tkubectl create pdb my-pdb --selector=app=nginx --min-available=50%\x00\n\t\t# Create a pod using the data in pod.json.\n\t\tkubectl create -f ./pod.json\n\n\t\t# Create a pod based on the JSON passed into stdin.\n\t\tcat pod.json | kubectl create -f -\n\n\t\t# Edit the data in docker-registry.yaml in JSON using the v1 API format then create the resource using the edited data.\n\t\tkubectl create -f docker-registry.yaml --edit --output-version=v1 -o json\x00\n\t\t# Create a service for a replicated nginx, which serves on port 80 and connects to the containers on port 8000.\n\t\tkubectl expose rc nginx --port=80 --target-port=8000\n\n\t\t# Create a service for a replication controller identified by type and name specified in \"nginx-controller.yaml\", which serves on port 80 and connects to the containers on port 8000.\n\t\tkubectl expose -f nginx-controller.yaml --port=80 --target-port=8000\n\n\t\t# Create a service for a pod valid-pod, which serves on port 444 with the name \"frontend\"\n\t\tkubectl expose pod valid-pod --port=444 --name=frontend\n\n\t\t# Create a second service based on the above service, exposing the container port 8443 as port 443 with the name \"nginx-https\"\n\t\tkubectl expose service nginx --port=443 --target-port=8443 --name=nginx-https\n\n\t\t# Create a service for a replicated streaming application on port 4100 balancing UDP traffic and named 'video-stream'.\n\t\tkubectl expose rc streamer --port=4100 --protocol=udp --name=video-stream\n\n\t\t# Create a service for a replicated nginx using replica set, which serves on port 80 and connects to the containers on port 8000.\n\t\tkubectl expose rs nginx --port=80 --target-port=8000\n\n\t\t# Create a service for an nginx deployment, which serves on port 80 and connects to the containers on port 8000.\n\t\tkubectl expose deployment nginx --port=80 --target-port=8000\x00\n\t\t# Delete a pod using the type and name specified in pod.json.\n\t\tkubectl delete -f ./pod.json\n\n\t\t# Delete a pod based on the type and name in the JSON passed into stdin.\n\t\tcat pod.json | kubectl delete -f -\n\n\t\t# Delete pods and services with same names \"baz\" and \"foo\"\n\t\tkubectl delete pod,service baz foo\n\n\t\t# Delete pods and services with label name=myLabel.\n\t\tkubectl delete pods,services -l name=myLabel\n\n\t\t# Delete a pod with minimal delay\n\t\tkubectl delete pod foo --now\n\n\t\t# Force delete a pod on a dead node\n\t\tkubectl delete pod foo --grace-period=0 --force\n\n\t\t# Delete all pods\n\t\tkubectl delete pods --all\x00\n\t\t# Describe a node\n\t\tkubectl describe nodes kubernetes-node-emt8.c.myproject.internal\n\n\t\t# Describe a pod\n\t\tkubectl describe pods/nginx\n\n\t\t# Describe a pod identified by type and name in \"pod.json\"\n\t\tkubectl describe -f pod.json\n\n\t\t# Describe all pods\n\t\tkubectl describe pods\n\n\t\t# Describe pods by label name=myLabel\n\t\tkubectl describe po -l name=myLabel\n\n\t\t# Describe all pods managed by the 'frontend' replication controller (rc-created pods\n\t\t# get the name of the rc as a prefix in the pod the name).\n\t\tkubectl describe pods frontend\x00\n\t\t# Drain node \"foo\", even if there are pods not managed by a ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet on it.\n\t\t$ kubectl drain foo --force\n\n\t\t# As above, but abort if there are pods not managed by a ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet, and use a grace period of 15 minutes.\n\t\t$ kubectl drain foo --grace-period=900\x00\n\t\t# Edit the service named 'docker-registry':\n\t\tkubectl edit svc/docker-registry\n\n\t\t# Use an alternative editor\n\t\tKUBE_EDITOR=\"nano\" kubectl edit svc/docker-registry\n\n\t\t# Edit the job 'myjob' in JSON using the v1 API format:\n\t\tkubectl edit job.v1.batch/myjob -o json\n\n\t\t# Edit the deployment 'mydeployment' in YAML and save the modified config in its annotation:\n\t\tkubectl edit deployment/mydeployment -o yaml --save-config\x00\n\t\t# Get output from running 'date' from pod 123456-7890, using the first container by default\n\t\tkubectl exec 123456-7890 date\n\n\t\t# Get output from running 'date' in ruby-container from pod 123456-7890\n\t\tkubectl exec 123456-7890 -c ruby-container date\n\n\t\t# Switch to raw terminal mode, sends stdin to 'bash' in ruby-container from pod 123456-7890\n\t\t# and sends stdout/stderr from 'bash' back to the client\n\t\tkubectl exec 123456-7890 -c ruby-container -i -t -- bash -il\x00\n\t\t# Get output from running pod 123456-7890, using the first container by default\n\t\tkubectl attach 123456-7890\n\n\t\t# Get output from ruby-container from pod 123456-7890\n\t\tkubectl attach 123456-7890 -c ruby-container\n\n\t\t# Switch to raw terminal mode, sends stdin to 'bash' in ruby-container from pod 123456-7890\n\t\t# and sends stdout/stderr from 'bash' back to the client\n\t\tkubectl attach 123456-7890 -c ruby-container -i -t\n\n\t\t# Get output from the first pod of a ReplicaSet named nginx\n\t\tkubectl attach rs/nginx\n\t\t\x00\n\t\t# Get the documentation of the resource and its fields\n\t\tkubectl explain pods\n\n\t\t# Get the documentation of a specific field of a resource\n\t\tkubectl explain pods.spec.containers\x00\n\t\t# Install bash completion on a Mac using homebrew\n\t\tbrew install bash-completion\n\t\tprintf \"\n# Bash completion support\nsource $(brew --prefix)/etc/bash_completion\n\" >> $HOME/.bash_profile\n\t\tsource $HOME/.bash_profile\n\n\t\t# Load the kubectl completion code for bash into the current shell\n\t\tsource <(kubectl completion bash)\n\n\t\t# Write bash completion code to a file and source if from .bash_profile\n\t\tkubectl completion bash > ~/.kube/completion.bash.inc\n\t\tprintf \"\n# Kubectl shell completion\nsource '$HOME/.kube/completion.bash.inc'\n\" >> $HOME/.bash_profile\n\t\tsource $HOME/.bash_profile\n\n\t\t# Load the kubectl completion code for zsh[1] into the current shell\n\t\tsource <(kubectl completion zsh)\x00\n\t\t# List all pods in ps output format.\n\t\tkubectl get pods\n\n\t\t# List all pods in ps output format with more information (such as node name).\n\t\tkubectl get pods -o wide\n\n\t\t# List a single replication controller with specified NAME in ps output format.\n\t\tkubectl get replicationcontroller web\n\n\t\t# List a single pod in JSON output format.\n\t\tkubectl get -o json pod web-pod-13je7\n\n\t\t# List a pod identified by type and name specified in \"pod.yaml\" in JSON output format.\n\t\tkubectl get -f pod.yaml -o json\n\n\t\t# Return only the phase value of the specified pod.\n\t\tkubectl get -o template pod/web-pod-13je7 --template={{.status.phase}}\n\n\t\t# List all replication controllers and services together in ps output format.\n\t\tkubectl get rc,services\n\n\t\t# List one or more resources by their type and names.\n\t\tkubectl get rc/web service/frontend pods/web-pod-13je7\n\n\t\t# List all resources with different types.\n\t\tkubectl get all\x00\n\t\t# Listen on ports 5000 and 6000 locally, forwarding data to/from ports 5000 and 6000 in the pod\t\tkubectl port-forward pod/mypod 5000 6000\n\t\t# Listen on ports 5000 and 6000 locally, forwarding data to/from ports 5000 and 6000 in a pod selected by the deployment\t\tkubectl port-forward deployment/mydeployment 5000 6000\n\t\t# Listen on ports 5000 and 6000 locally, forwarding data to/from ports 5000 and 6000 in a pod selected by the service\t\tkubectl port-forward service/myservice 5000 6000\n\t\t# Listen on port 8888 locally, forwarding to 5000 in the pod\t\tkubectl port-forward pod/mypod 8888:5000\n\t\t# Listen on a random port locally, forwarding to 5000 in the pod\t\tkubectl port-forward pod/mypod :5000\x00\n\t\t# Mark node \"foo\" as schedulable.\n\t\t$ kubectl uncordon foo\x00\n\t\t# Mark node \"foo\" as unschedulable.\n\t\tkubectl cordon foo\x00\n\t\t# Partially update a node using strategic merge patch\n\t\tkubectl patch node k8s-node-1 -p '{\"spec\":{\"unschedulable\":true}}'\n\n\t\t# Partially update a node identified by the type and name specified in \"node.json\" using strategic merge patch\n\t\tkubectl patch -f node.json -p '{\"spec\":{\"unschedulable\":true}}'\n\n\t\t# Update a container's image; spec.containers[*].name is required because it's a merge key\n\t\tkubectl patch pod valid-pod -p '{\"spec\":{\"containers\":[{\"name\":\"kubernetes-serve-hostname\",\"image\":\"new image\"}]}}'\n\n\t\t# Update a container's image using a json patch with positional arrays\n\t\tkubectl patch pod valid-pod --type='json' -p='[{\"op\": \"replace\", \"path\": \"/spec/containers/0/image\", \"value\":\"new image\"}]'\x00\n\t\t# Print flags inherited by all commands\n\t\tkubectl options\x00\n\t\t# Print the address of the master and cluster services\n\t\tkubectl cluster-info\x00\n\t\t# Print the client and server versions for the current context\n\t\tkubectl version\x00\n\t\t# Print the supported API versions\n\t\tkubectl api-versions\x00\n\t\t# Replace a pod using the data in pod.json.\n\t\tkubectl replace -f ./pod.json\n\n\t\t# Replace a pod based on the JSON passed into stdin.\n\t\tcat pod.json | kubectl replace -f -\n\n\t\t# Update a single-container pod's image version (tag) to v4\n\t\tkubectl get pod mypod -o yaml | sed 's/\\(image: myimage\\):.*$/\x01:v4/' | kubectl replace -f -\n\n\t\t# Force replace, delete and then re-create the resource\n\t\tkubectl replace --force -f ./pod.json\x00\n\t\t# Return snapshot logs from pod nginx with only one container\n\t\tkubectl logs nginx\n\n\t\t# Return snapshot logs for the pods defined by label app=nginx\n\t\tkubectl logs -lapp=nginx\n\n\t\t# Return snapshot of previous terminated ruby container logs from pod web-1\n\t\tkubectl logs -p -c ruby web-1\n\n\t\t# Begin streaming the logs of the ruby container in pod web-1\n\t\tkubectl logs -f -c ruby web-1\n\n\t\t# Display only the most recent 20 lines of output in pod nginx\n\t\tkubectl logs --tail=20 nginx\n\n\t\t# Show all logs from pod nginx written in the last hour\n\t\tkubectl logs --since=1h nginx\n\n\t\t# Return snapshot logs from first container of a job named hello\n\t\tkubectl logs job/hello\n\n\t\t# Return snapshot logs from container nginx-1 of a deployment named nginx\n\t\tkubectl logs deployment/nginx -c nginx-1\x00\n\t\t# Run a proxy to kubernetes apiserver on port 8011, serving static content from ./local/www/\n\t\tkubectl proxy --port=8011 --www=./local/www/\n\n\t\t# Run a proxy to kubernetes apiserver on an arbitrary local port.\n\t\t# The chosen port for the server will be output to stdout.\n\t\tkubectl proxy --port=0\n\n\t\t# Run a proxy to kubernetes apiserver, changing the api prefix to k8s-api\n\t\t# This makes e.g. the pods api available at localhost:8001/k8s-api/v1/pods/\n\t\tkubectl proxy --api-prefix=/k8s-api\x00\n\t\t# Scale a replicaset named 'foo' to 3.\n\t\tkubectl scale --replicas=3 rs/foo\n\n\t\t# Scale a resource identified by type and name specified in \"foo.yaml\" to 3.\n\t\tkubectl scale --replicas=3 -f foo.yaml\n\n\t\t# If the deployment named mysql's current size is 2, scale mysql to 3.\n\t\tkubectl scale --current-replicas=2 --replicas=3 deployment/mysql\n\n\t\t# Scale multiple replication controllers.\n\t\tkubectl scale --replicas=5 rc/foo rc/bar rc/baz\n\n\t\t# Scale job named 'cron' to 3.\n\t\tkubectl scale --replicas=3 job/cron\x00\n\t\t# Set the last-applied-configuration of a resource to match the contents of a file.\n\t\tkubectl apply set-last-applied -f deploy.yaml\n\n\t\t# Execute set-last-applied against each configuration file in a directory.\n\t\tkubectl apply set-last-applied -f path/\n\n\t\t# Set the last-applied-configuration of a resource to match the contents of a file, will create the annotation if it does not already exist.\n\t\tkubectl apply set-last-applied -f deploy.yaml --create-annotation=true\n\t\t\x00\n\t\t# Show metrics for all pods in the default namespace\n\t\tkubectl top pod\n\n\t\t# Show metrics for all pods in the given namespace\n\t\tkubectl top pod --namespace=NAMESPACE\n\n\t\t# Show metrics for a given pod and its containers\n\t\tkubectl top pod POD_NAME --containers\n\n\t\t# Show metrics for the pods defined by label name=myLabel\n\t\tkubectl top pod -l name=myLabel\x00\n\t\t# Shut down foo.\n\t\tkubectl stop replicationcontroller foo\n\n\t\t# Stop pods and services with label name=myLabel.\n\t\tkubectl stop pods,services -l name=myLabel\n\n\t\t# Shut down the service defined in service.json\n\t\tkubectl stop -f service.json\n\n\t\t# Shut down all resources in the path/to/resources directory\n\t\tkubectl stop -f path/to/resources\x00\n\t\t# Start a single instance of nginx.\n\t\tkubectl run nginx --image=nginx\n\n\t\t# Start a single instance of hazelcast and let the container expose port 5701 .\n\t\tkubectl run hazelcast --image=hazelcast --port=5701\n\n\t\t# Start a single instance of hazelcast and set environment variables \"DNS_DOMAIN=cluster\" and \"POD_NAMESPACE=default\" in the container.\n\t\tkubectl run hazelcast --image=hazelcast --env=\"DNS_DOMAIN=cluster\" --env=\"POD_NAMESPACE=default\"\n\n\t\t# Start a replicated instance of nginx.\n\t\tkubectl run nginx --image=nginx --replicas=5\n\n\t\t# Dry run. Print the corresponding API objects without creating them.\n\t\tkubectl run nginx --image=nginx --dry-run\n\n\t\t# Start a single instance of nginx, but overload the spec of the deployment with a partial set of values parsed from JSON.\n\t\tkubectl run nginx --image=nginx --overrides='{ \"apiVersion\": \"v1\", \"spec\": { ... } }'\n\n\t\t# Start a pod of busybox and keep it in the foreground, don't restart it if it exits.\n\t\tkubectl run -i -t busybox --image=busybox --restart=Never\n\n\t\t# Start the nginx container using the default command, but use custom arguments (arg1 .. argN) for that command.\n\t\tkubectl run nginx --image=nginx -- <arg1> <arg2> ... <argN>\n\n\t\t# Start the nginx container using a different command and custom arguments.\n\t\tkubectl run nginx --image=nginx --command -- <cmd> <arg1> ... <argN>\n\n\t\t# Start the perl container to compute \u03c0 to 2000 places and print it out.\n\t\tkubectl run pi --image=perl --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(2000)'\n\n\t\t# Start the cron job to compute \u03c0 to 2000 places and print it out every 5 minutes.\n\t\tkubectl run pi --schedule=\"0/5 * * * ?\" --image=perl --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(2000)'\x00\n\t\t# Update node 'foo' with a taint with key 'dedicated' and value 'special-user' and effect 'NoSchedule'.\n\t\t# If a taint with that key and effect already exists, its value is replaced as specified.\n\t\tkubectl taint nodes foo dedicated=special-user:NoSchedule\n\n\t\t# Remove from node 'foo' the taint with key 'dedicated' and effect 'NoSchedule' if one exists.\n\t\tkubectl taint nodes foo dedicated:NoSchedule-\n\n\t\t# Remove from node 'foo' all the taints with key 'dedicated'\n\t\tkubectl taint nodes foo dedicated-\x00\n\t\t# Update pod 'foo' with the label 'unhealthy' and the value 'true'.\n\t\tkubectl label pods foo unhealthy=true\n\n\t\t# Update pod 'foo' with the label 'status' and the value 'unhealthy', overwriting any existing value.\n\t\tkubectl label --overwrite pods foo status=unhealthy\n\n\t\t# Update all pods in the namespace\n\t\tkubectl label pods --all status=unhealthy\n\n\t\t# Update a pod identified by the type and name in \"pod.json\"\n\t\tkubectl label -f pod.json status=unhealthy\n\n\t\t# Update pod 'foo' only if the resource is unchanged from version 1.\n\t\tkubectl label pods foo status=unhealthy --resource-version=1\n\n\t\t# Update pod 'foo' by removing a label named 'bar' if it exists.\n\t\t# Does not require the --overwrite flag.\n\t\tkubectl label pods foo bar-\x00\n\t\t# Update pods of frontend-v1 using new replication controller data in frontend-v2.json.\n\t\tkubectl rolling-update frontend-v1 -f frontend-v2.json\n\n\t\t# Update pods of frontend-v1 using JSON data passed into stdin.\n\t\tcat frontend-v2.json | kubectl rolling-update frontend-v1 -f -\n\n\t\t# Update the pods of frontend-v1 to frontend-v2 by just changing the image, and switching the\n\t\t# name of the replication controller.\n\t\tkubectl rolling-update frontend-v1 frontend-v2 --image=image:v2\n\n\t\t# Update the pods of frontend by just changing the image, and keeping the old name.\n\t\tkubectl rolling-update frontend --image=image:v2\n\n\t\t# Abort and reverse an existing rollout in progress (from frontend-v1 to frontend-v2).\n\t\tkubectl rolling-update frontend-v1 frontend-v2 --rollback\x00\n\t\t# View the last-applied-configuration annotations by type/name in YAML.\n\t\tkubectl apply view-last-applied deployment/nginx\n\n\t\t# View the last-applied-configuration annotations by file in JSON\n\t\tkubectl apply view-last-applied -f deploy.yaml -o json\x00\n\t\tApply a configuration to a resource by filename or stdin.\n\t\tThis resource will be created if it doesn't exist yet.\n\t\tTo use 'apply', always create the resource initially with either 'apply' or 'create --save-config'.\n\n\t\tJSON and YAML formats are accepted.\n\n\t\tAlpha Disclaimer: the --prune functionality is not yet complete. Do not use unless you are aware of what the current state is. See https://issues.k8s.io/34274.\x00\n\t\tConvert config files between different API versions. Both YAML\n\t\tand JSON formats are accepted.\n\n\t\tThe command takes filename, directory, or URL as input, and convert it into format\n\t\tof version specified by --output-version flag. If target version is not specified or\n\t\tnot supported, convert to latest version.\n\n\t\tThe default output will be printed to stdout in YAML format. One can use -o option\n\t\tto change to output destination.\x00\n\t\tCreate a ClusterRole.\x00\n\t\tCreate a ClusterRoleBinding for a particular ClusterRole.\x00\n\t\tCreate a RoleBinding for a particular Role or ClusterRole.\x00\n\t\tCreate a TLS secret from the given public/private key pair.\n\n\t\tThe public/private key pair must exist before hand. The public key certificate must be .PEM encoded and match the given private key.\x00\n\t\tCreate a configmap based on a file, directory, or specified literal value.\n\n\t\tA single configmap may package one or more key/value pairs.\n\n\t\tWhen creating a configmap based on a file, the key will default to the basename of the file, and the value will\n\t\tdefault to the file content.  If the basename is an invalid key, you may specify an alternate key.\n\n\t\tWhen creating a configmap based on a directory, each file whose basename is a valid key in the directory will be\n\t\tpackaged into the configmap.  Any directory entries except regular files are ignored (e.g. subdirectories,\n\t\tsymlinks, devices, pipes, etc).\x00\n\t\tCreate a namespace with the specified name.\x00\n\t\tCreate a new secret for use with Docker registries.\n\n\t\tDockercfg secrets are used to authenticate against Docker registries.\n\n\t\tWhen using the Docker command line to push images, you can authenticate to a given registry by running\n\n\t\t    $ docker login DOCKER_REGISTRY_SERVER --username=DOCKER_USER --password=DOCKER_PASSWORD --email=DOCKER_EMAIL'.\n\n    That produces a ~/.dockercfg file that is used by subsequent 'docker push' and 'docker pull' commands to\n\t\tauthenticate to the registry. The email address is optional.\n\n\t\tWhen creating applications, you may have a Docker registry that requires authentication.  In order for the\n\t\tnodes to pull images on your behalf, they have to have the credentials.  You can provide this information\n\t\tby creating a dockercfg secret and attaching it to your service account.\x00\n\t\tCreate a pod disruption budget with the specified name, selector, and desired minimum available pods\x00\n\t\tCreate a resource by filename or stdin.\n\n\t\tJSON and YAML formats are accepted.\x00\n\t\tCreate a resourcequota with the specified name, hard limits and optional scopes\x00\n\t\tCreate a role with single rule.\x00\n\t\tCreate a secret based on a file, directory, or specified literal value.\n\n\t\tA single secret may package one or more key/value pairs.\n\n\t\tWhen creating a secret based on a file, the key will default to the basename of the file, and the value will\n\t\tdefault to the file content.  If the basename is an invalid key, you may specify an alternate key.\n\n\t\tWhen creating a secret based on a directory, each file whose basename is a valid key in the directory will be\n\t\tpackaged into the secret.  Any directory entries except regular files are ignored (e.g. subdirectories,\n\t\tsymlinks, devices, pipes, etc).\x00\n\t\tCreate a service account with the specified name.\x00\n\t\tCreate and run a particular image, possibly replicated.\n\n\t\tCreates a deployment or job to manage the created container(s).\x00\n\t\tCreates an autoscaler that automatically chooses and sets the number of pods that run in a kubernetes cluster.\n\n\t\tLooks up a Deployment, ReplicaSet, or ReplicationController by name and creates an autoscaler that uses the given resource as a reference.\n\t\tAn autoscaler can automatically increase or decrease number of pods deployed within the system as needed.\x00\n\t\tDelete resources by filenames, stdin, resources and names, or by resources and label selector.\n\n\t\tJSON and YAML formats are accepted. Only one type of the arguments may be specified: filenames,\n\t\tresources and names, or resources and label selector.\n\n\t\tSome resources, such as pods, support graceful deletion. These resources define a default period\n\t\tbefore they are forcibly terminated (the grace period) but you may override that value with\n\t\tthe --grace-period flag, or pass --now to set a grace-period of 1. Because these resources often\n\t\trepresent entities in the cluster, deletion may not be acknowledged immediately. If the node\n\t\thosting a pod is down or cannot reach the API server, termination may take significantly longer\n\t\tthan the grace period. To force delete a resource,\tyou must pass a grace\tperiod of 0 and specify\n\t\tthe --force flag.\n\n\t\tIMPORTANT: Force deleting pods does not wait for confirmation that the pod's processes have been\n\t\tterminated, which can leave those processes running until the node detects the deletion and\n\t\tcompletes graceful deletion. If your processes use shared storage or talk to a remote API and\n\t\tdepend on the name of the pod to identify themselves, force deleting those pods may result in\n\t\tmultiple processes running on different machines using the same identification which may lead\n\t\tto data corruption or inconsistency. Only force delete pods when you are sure the pod is\n\t\tterminated, or if your application can tolerate multiple copies of the same pod running at once.\n\t\tAlso, if you force delete pods the scheduler may place new pods on those nodes before the node\n\t\thas released those resources and causing those pods to be evicted immediately.\n\n\t\tNote that the delete command does NOT do resource version checks, so if someone\n\t\tsubmits an update to a resource right when you submit a delete, their update\n\t\twill be lost along with the rest of the resource.\x00\n\t\tDeprecated: Gracefully shut down a resource by name or filename.\n\n\t\tThe stop command is deprecated, all its functionalities are covered by delete command.\n\t\tSee 'kubectl delete --help' for more details.\n\n\t\tAttempts to shut down and delete a resource that supports graceful termination.\n\t\tIf the resource is scalable it will be scaled to 0 before deletion.\x00\n\t\tDisplay Resource (CPU/Memory/Storage) usage of nodes.\n\n\t\tThe top-node command allows you to see the resource consumption of nodes.\x00\n\t\tDisplay Resource (CPU/Memory/Storage) usage of pods.\n\n\t\tThe 'top pod' command allows you to see the resource consumption of pods.\n\n\t\tDue to the metrics pipeline delay, they may be unavailable for a few minutes\n\t\tsince pod creation.\x00\n\t\tDisplay Resource (CPU/Memory/Storage) usage.\n\n\t\tThe top command allows you to see the resource consumption for nodes or pods.\n\n\t\tThis command requires Heapster to be correctly configured and working on the server. \x00\n\t\tDrain node in preparation for maintenance.\n\n\t\tThe given node will be marked unschedulable to prevent new pods from arriving.\n\t\t'drain' evicts the pods if the APIServer supports eviction\n\t\t(http://kubernetes.io/docs/admin/disruptions/). Otherwise, it will use normal DELETE\n\t\tto delete the pods.\n\t\tThe 'drain' evicts or deletes all pods except mirror pods (which cannot be deleted through\n\t\tthe API server).  If there are DaemonSet-managed pods, drain will not proceed\n\t\twithout --ignore-daemonsets, and regardless it will not delete any\n\t\tDaemonSet-managed pods, because those pods would be immediately replaced by the\n\t\tDaemonSet controller, which ignores unschedulable markings.  If there are any\n\t\tpods that are neither mirror pods nor managed by ReplicationController,\n\t\tReplicaSet, DaemonSet, StatefulSet or Job, then drain will not delete any pods unless you\n\t\tuse --force.  --force will also allow deletion to proceed if the managing resource of one\n\t\tor more pods is missing.\n\n\t\t'drain' waits for graceful termination. You should not operate on the machine until\n\t\tthe command completes.\n\n\t\tWhen you are ready to put the node back into service, use kubectl uncordon, which\n\t\twill make the node schedulable again.\n\n\t\t![Workflow](http://kubernetes.io/images/docs/kubectl_drain.svg)\x00\n\t\tEdit a resource from the default editor.\n\n\t\tThe edit command allows you to directly edit any API resource you can retrieve via the\n\t\tcommand line tools. It will open the editor defined by your KUBE_EDITOR, or EDITOR\n\t\tenvironment variables, or fall back to 'vi' for Linux or 'notepad' for Windows.\n\t\tYou can edit multiple objects, although changes are applied one at a time. The command\n\t\taccepts filenames as well as command line arguments, although the files you point to must\n\t\tbe previously saved versions of resources.\n\n\t\tEditing is done with the API version used to fetch the resource.\n\t\tTo edit using a specific API version, fully-qualify the resource, version, and group.\n\n\t\tThe default format is YAML. To edit in JSON, specify \"-o json\".\n\n\t\tThe flag --windows-line-endings can be used to force Windows line endings,\n\t\totherwise the default for your operating system will be used.\n\n\t\tIn the event an error occurs while updating, a temporary file will be created on disk\n\t\tthat contains your unapplied changes. The most common error when updating a resource\n\t\tis another editor changing the resource on the server. When this occurs, you will have\n\t\tto apply your changes to the newer version of the resource, or update your temporary\n\t\tsaved copy to include the latest resource version.\x00\n\t\tMark node as schedulable.\x00\n\t\tMark node as unschedulable.\x00\n\t\tOutput shell completion code for the specified shell (bash or zsh).\n\t\tThe shell code must be evaluated to provide interactive\n\t\tcompletion of kubectl commands.  This can be done by sourcing it from\n\t\tthe .bash_profile.\n\n\t\tNote: this requires the bash-completion framework, which is not installed\n\t\tby default on Mac.  This can be installed by using homebrew:\n\n\t\t    $ brew install bash-completion\n\n\t\tOnce installed, bash_completion must be evaluated.  This can be done by adding the\n\t\tfollowing line to the .bash_profile\n\n\t\t    $ source $(brew --prefix)/etc/bash_completion\n\n\t\tNote for zsh users: [1] zsh completions are only supported in versions of zsh >= 5.2\x00\n\t\tPerform a rolling update of the given ReplicationController.\n\n\t\tReplaces the specified replication controller with a new replication controller by updating one pod at a time to use the\n\t\tnew PodTemplate. The new-controller.json must specify the same namespace as the\n\t\texisting replication controller and overwrite at least one (common) label in its replicaSelector.\n\n\t\t![Workflow](http://kubernetes.io/images/docs/kubectl_rollingupdate.svg)\x00\n\t\tReplace a resource by filename or stdin.\n\n\t\tJSON and YAML formats are accepted. If replacing an existing resource, the\n\t\tcomplete resource spec must be provided. This can be obtained by\n\n\t\t    $ kubectl get TYPE NAME -o yaml\n\n\t\tPlease refer to the models in https://htmlpreview.github.io/?https://github.com/kubernetes/kubernetes/blob/HEAD/docs/api-reference/v1/definitions.html to find if a field is mutable.\x00\n\t\tSet a new size for a Deployment, ReplicaSet, Replication Controller, or Job.\n\n\t\tScale also allows users to specify one or more preconditions for the scale action.\n\n\t\tIf --current-replicas or --resource-version is specified, it is validated before the\n\t\tscale is attempted, and it is guaranteed that the precondition holds true when the\n\t\tscale is sent to the server.\x00\n\t\tSet the latest last-applied-configuration annotations by setting it to match the contents of a file.\n\t\tThis results in the last-applied-configuration being updated as though 'kubectl apply -f <file>' was run,\n\t\twithout updating any other parts of the object.\x00\n\t\tTo proxy all of the kubernetes api and nothing else, use:\n\n\t\t    $ kubectl proxy --api-prefix=/\n\n\t\tTo proxy only part of the kubernetes api and also some static files:\n\n\t\t    $ kubectl proxy --www=/my/files --www-prefix=/static/ --api-prefix=/api/\n\n\t\tThe above lets you 'curl localhost:8001/api/v1/pods'.\n\n\t\tTo proxy the entire kubernetes api at a different root, use:\n\n\t\t    $ kubectl proxy --api-prefix=/custom/\n\n\t\tThe above lets you 'curl localhost:8001/custom/api/v1/pods'\x00\n\t\tUpdate field(s) of a resource using strategic merge patch\n\n\t\tJSON and YAML formats are accepted.\n\n\t\tPlease refer to the models in https://htmlpreview.github.io/?https://github.com/kubernetes/kubernetes/blob/HEAD/docs/api-reference/v1/definitions.html to find if a field is mutable.\x00\n\t\tUpdate the labels on a resource.\n\n\t\t* A label must begin with a letter or number, and may contain letters, numbers, hyphens, dots, and underscores, up to %[1]d characters.\n\t\t* If --overwrite is true, then existing labels can be overwritten, otherwise attempting to overwrite a label will result in an error.\n\t\t* If --resource-version is specified, then updates will use this resource version, otherwise the existing resource-version will be used.\x00\n\t\tUpdate the taints on one or more nodes.\n\n\t\t* A taint consists of a key, value, and effect. As an argument here, it is expressed as key=value:effect.\n\t\t* The key must begin with a letter or number, and may contain letters, numbers, hyphens, dots, and underscores, up to %[1]d characters.\n\t\t* The value must begin with a letter or number, and may contain letters, numbers, hyphens, dots, and underscores, up to %[2]d characters.\n\t\t* The effect must be NoSchedule, PreferNoSchedule or NoExecute.\n\t\t* Currently taint can only apply to node.\x00\n\t\tView the latest last-applied-configuration annotations by type/name or file.\n\n\t\tThe default output will be printed to stdout in YAML format. One can use -o option\n\t\tto change output format.\x00\n\t    # !!!Important Note!!!\n\t    # Requires that the 'tar' binary is present in your container\n\t    # image.  If 'tar' is not present, 'kubectl cp' will fail.\n\n\t    # Copy /tmp/foo_dir local directory to /tmp/bar_dir in a remote pod in the default namespace\n\t\tkubectl cp /tmp/foo_dir <some-pod>:/tmp/bar_dir\n\n        # Copy /tmp/foo local file to /tmp/bar in a remote pod in a specific container\n\t\tkubectl cp /tmp/foo <some-pod>:/tmp/bar -c <specific-container>\n\n\t\t# Copy /tmp/foo local file to /tmp/bar in a remote pod in namespace <some-namespace>\n\t\tkubectl cp /tmp/foo <some-namespace>/<some-pod>:/tmp/bar\n\n\t\t# Copy /tmp/foo from a remote pod to /tmp/bar locally\n\t\tkubectl cp <some-namespace>/<some-pod>:/tmp/foo /tmp/bar\x00\n\t  # Create a new TLS secret named tls-secret with the given key pair:\n\t  kubectl create secret tls tls-secret --cert=path/to/tls.cert --key=path/to/tls.key\x00\n\t  # Create a new namespace named my-namespace\n\t  kubectl create namespace my-namespace\x00\n\t  # Create a new secret named my-secret with keys for each file in folder bar\n\t  kubectl create secret generic my-secret --from-file=path/to/bar\n\n\t  # Create a new secret named my-secret with specified keys instead of names on disk\n\t  kubectl create secret generic my-secret --from-file=ssh-privatekey=~/.ssh/id_rsa --from-file=ssh-publickey=~/.ssh/id_rsa.pub\n\n\t  # Create a new secret named my-secret with key1=supersecret and key2=topsecret\n\t  kubectl create secret generic my-secret --from-literal=key1=supersecret --from-literal=key2=topsecret\x00\n\t  # Create a new service account named my-service-account\n\t  kubectl create serviceaccount my-service-account\x00\n\t# Create a new ExternalName service named my-ns \n\tkubectl create service externalname my-ns --external-name bar.com\x00\n\tCreate an ExternalName service with the specified name.\n\n\tExternalName service references to an external DNS address instead of\n\tonly pods, which will allow application authors to reference services\n\tthat exist off platform, on other clusters, or locally.\x00\n\tHelp provides help for any command in the application.\n\tSimply type kubectl help [path to command] for full details.\x00\n    # Create a new LoadBalancer service named my-lbs\n    kubectl create service loadbalancer my-lbs --tcp=5678:8080\x00\n    # Create a new clusterIP service named my-cs\n    kubectl create service clusterip my-cs --tcp=5678:8080\n\n    # Create a new clusterIP service named my-cs (in headless mode)\n    kubectl create service clusterip my-cs --clusterip=\"None\"\x00\n    # Create a new deployment named my-dep that runs the busybox image.\n    kubectl create deployment my-dep --image=busybox\x00\n    # Create a new nodeport service named my-ns\n    kubectl create service nodeport my-ns --tcp=5678:8080\x00\n    # Dump current cluster state to stdout\n    kubectl cluster-info dump\n\n    # Dump current cluster state to /path/to/cluster-state\n    kubectl cluster-info dump --output-directory=/path/to/cluster-state\n\n    # Dump all namespaces to stdout\n    kubectl cluster-info dump --all-namespaces\n\n    # Dump a set of namespaces to /path/to/cluster-state\n    kubectl cluster-info dump --namespaces default,kube-system --output-directory=/path/to/cluster-state\x00\n    # Update pod 'foo' with the annotation 'description' and the value 'my frontend'.\n    # If the same annotation is set multiple times, only the last value will be applied\n    kubectl annotate pods foo description='my frontend'\n\n    # Update a pod identified by type and name in \"pod.json\"\n    kubectl annotate -f pod.json description='my frontend'\n\n    # Update pod 'foo' with the annotation 'description' and the value 'my frontend running nginx', overwriting any existing value.\n    kubectl annotate --overwrite pods foo description='my frontend running nginx'\n\n    # Update all pods in the namespace\n    kubectl annotate pods --all description='my frontend running nginx'\n\n    # Update pod 'foo' only if the resource is unchanged from version 1.\n    kubectl annotate pods foo description='my frontend running nginx' --resource-version=1\n\n    # Update pod 'foo' by removing an annotation named 'description' if it exists.\n    # Does not require the --overwrite flag.\n    kubectl annotate pods foo description-\x00\n    Create a LoadBalancer service with the specified name.\x00\n    Create a clusterIP service with the specified name.\x00\n    Create a deployment with the specified name.\x00\n    Create a nodeport service with the specified name.\x00\n    Dumps cluster info out suitable for debugging and diagnosing cluster problems.  By default, dumps everything to\n    stdout. You can optionally specify a directory with --output-directory.  If you specify a directory, kubernetes will\n    build a set of files in that directory.  By default only dumps things in the 'kube-system' namespace, but you can\n    switch to a different namespace with the --namespaces flag, or specify --all-namespaces to dump all namespaces.\n\n    The command also dumps the logs of all of the pods in the cluster, these logs are dumped into different directories\n    based on namespace and pod name.\x00\n  Display addresses of the master and services with label kubernetes.io/cluster-service=true\n  To further debug and diagnose cluster problems, use 'kubectl cluster-info dump'.\x00A comma-delimited set of quota scopes that must all match each object tracked by the quota.\x00A comma-delimited set of resource=quantity pairs that define a hard limit.\x00A label selector to use for this budget. Only equality-based selector requirements are supported.\x00A label selector to use for this service. Only equality-based selector requirements are supported. If empty (the default) infer the selector from the replication controller or replica set.)\x00A schedule in the Cron format the job should be run with.\x00Additional external IP address (not managed by Kubernetes) to accept for the service. If this IP is routed to a node, the service can be accessed by this IP in addition to its generated service IP.\x00An inline JSON override for the generated object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.\x00An inline JSON override for the generated service object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.  Only used if --expose is true.\x00\u30d5\u30a1\u30a4\u30eb\u540d\u307e\u305f\u306f\u6a19\u6e96\u5165\u529b\u3067\u30ea\u30bd\u30fc\u30b9\u306b\u30b3\u30f3\u30d5\u30a3\u30b0\u3092\u9069\u7528\u3059\u308b\x00Approve a certificate signing request\x00Assign your own ClusterIP or set to 'None' for a 'headless' service (no loadbalancing).\x00Attach to a running container\x00Auto-scale a Deployment, ReplicaSet, or ReplicationController\x00ClusterIP to be assigned to the service. Leave empty to auto-allocate, or set to 'None' to create a headless service.\x00ClusterRole this ClusterRoleBinding should reference\x00ClusterRole this RoleBinding should reference\x00Container name which will have its image upgraded. Only relevant when --image is specified, ignored otherwise. Required when using --image on a multi-container pod\x00Convert config files between different API versions\x00Copy files and directories to and from containers.\x00Create a ClusterRoleBinding for a particular ClusterRole\x00Create a LoadBalancer service.\x00Create a NodePort service.\x00Create a RoleBinding for a particular Role or ClusterRole\x00Create a TLS secret\x00Create a clusterIP service.\x00Create a configmap from a local file, directory or literal value\x00Create a deployment with the specified name.\x00Create a namespace with the specified name\x00Create a pod disruption budget with the specified name.\x00Create a quota with the specified name.\x00\u30d5\u30a1\u30a4\u30eb\u540d\u307e\u305f\u306f\u6a19\u6e96\u5165\u529b\u3067\u30ea\u30bd\u30fc\u30b9\u3092\u4f5c\u6210\u3059\u308b\x00Create a secret for use with a Docker registry\x00Create a secret from a local file, directory or literal value\x00Create a secret using specified subcommand\x00Create a service account with the specified name\x00Create a service using specified subcommand.\x00Create an ExternalName service.\x00Delete resources by filenames, stdin, resources and names, or by resources and label selector\x00\u6307\u5b9a\u3057\u305f\u30b3\u30f3\u30c6\u30ad\u30b9\u30c8\u3092kubeconfig\u304b\u3089\u524a\u9664\u3059\u308b\x00\u6307\u5b9a\u3057\u305f\u30b3\u30f3\u30c6\u30ad\u30b9\u30c8\u3092kubeconfig\u304b\u3089\u524a\u9664\u3059\u308b\x00Deny a certificate signing request\x00Deprecated: Gracefully shut down a resource by name or filename\x001\u3064\u307e\u305f\u306f\u8907\u6570\u306e\u30b3\u30f3\u30c6\u30ad\u30b9\u30c8\u3092\u8a18\u8ff0\u3059\u308b\x00Display Resource (CPU/Memory) usage of nodes\x00Display Resource (CPU/Memory) usage of pods\x00Display Resource (CPU/Memory) usage.\x00\u30af\u30e9\u30b9\u30bf\u30fc\u306e\u60c5\u5831\u3092\u8868\u793a\u3059\u308b\x00kubeconfig\u3067\u5b9a\u7fa9\u3055\u308c\u305f\u30af\u30e9\u30b9\u30bf\u30fc\u3092\u8868\u793a\u3059\u308b\x00\u30de\u30fc\u30b8\u3055\u308c\u305fkubeconfig\u306e\u8a2d\u5b9a\u307e\u305f\u306f\u6307\u5b9a\u3055\u308c\u305fkubeconfig\u3092\u8868\u793a\u3059\u308b\x001\u3064\u307e\u305f\u306f\u8907\u6570\u306e\u30ea\u30bd\u30fc\u30b9\u3092\u8868\u793a\u3059\u308b\x00current-context\u3092\u8868\u793a\u3059\u308b\x00\u30ea\u30bd\u30fc\u30b9\u306e\u8aac\u660e\u3092\u8868\u793a\u3059\u308b\x00Drain node in preparation for maintenance\x00Dump lots of relevant info for debugging and diagnosis\x00Edit a resource on the server\x00Email for Docker registry\x00Execute a command in a container\x00Explicit policy for when to pull container images. Required when --image is same as existing image, ignored otherwise.\x00Forward one or more local ports to a pod\x00Help about any command\x00IP to assign to the Load Balancer. If empty, an ephemeral IP will be created and used (cloud-provider specific).\x00If non-empty, set the session affinity for the service to this; legal values: 'None', 'ClientIP'\x00If non-empty, the annotation update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource.\x00If non-empty, the labels update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource.\x00Image to use for upgrading the replication controller. Must be distinct from the existing image (either new image or new image tag).  Can not be used with --filename/-f\x00Manage a deployment rollout\x00Mark node as schedulable\x00Mark node as unschedulable\x00Mark the provided resource as paused\x00Modify certificate resources.\x00kubeconfig\u3092\u5909\u66f4\u3059\u308b\x00Name or number for the port on the container that the service should direct traffic to. Optional.\x00Only return logs after a specific date (RFC3339). Defaults to all logs. Only one of since-time / since may be used.\x00Output shell completion code for the specified shell (bash or zsh)\x00Output the formatted object with the given group version (for ex: 'extensions/v1beta1').)\x00Password for Docker registry authentication\x00Path to PEM encoded public key certificate.\x00Path to private key associated with given certificate.\x00Perform a rolling update of the given ReplicationController\x00Precondition for resource version. Requires that the current resource version match this value in order to scale.\x00Print the client and server version information\x00Print the list of flags inherited by all commands\x00Print the logs for a container in a pod\x00Replace a resource by filename or stdin\x00Resume a paused resource\x00Role this RoleBinding should reference\x00Run a particular image on the cluster\x00Run a proxy to the Kubernetes API server\x00Server location for Docker registry\x00Set a new size for a Deployment, ReplicaSet, Replication Controller, or Job\x00Set specific features on objects\x00Set the last-applied-configuration annotation on a live object to match the contents of a file.\x00\u30ea\u30bd\u30fc\u30b9\u306e\u30bb\u30ec\u30af\u30bf\u30fc\u3092\u8a2d\u5b9a\u3059\u308b\x00kubeconfig\u306b\u30af\u30e9\u30b9\u30bf\u30fc\u30a8\u30f3\u30c8\u30ea\u3092\u8a2d\u5b9a\u3059\u308b\x00kubeconfig\u306b\u30b3\u30f3\u30c6\u30ad\u30b9\u30c8\u30a8\u30f3\u30c8\u30ea\u3092\u8a2d\u5b9a\u3059\u308b\x00kubeconfig\u306b\u30e6\u30fc\u30b6\u30fc\u30a8\u30f3\u30c8\u30ea\u3092\u8a2d\u5b9a\u3059\u308b\x00kubeconfig\u306b\u500b\u5225\u306e\u5909\u6570\u3092\u8a2d\u5b9a\u3059\u308b\x00kubeconfig\u306bcurrent-context\u3092\u8a2d\u5b9a\u3059\u308b\x00Show details of a specific resource or group of resources\x00Show the status of the rollout\x00Synonym for --target-port\x00Take a replication controller, service, deployment or pod and expose it as a new Kubernetes Service\x00The image for the container to run.\x00The image pull policy for the container. If left empty, this value will not be specified by the client and defaulted by the server\x00The key to use to differentiate between two different controllers, default 'deployment'.  Only relevant when --image is specified, ignored otherwise\x00The minimum number or percentage of available pods this budget requires.\x00The name for the newly created object.\x00The name for the newly created object. If not specified, the name of the input resource will be used.\x00The name of the API generator to use, see http://kubernetes.io/docs/user-guide/kubectl-conventions/#generators for a list.\x00The name of the API generator to use. Currently there is only 1 generator.\x00The name of the API generator to use. There are 2 generators: 'service/v1' and 'service/v2'. The only difference between them is that service port in v1 is named 'default', while it is left unnamed in v2. Default is 'service/v2'.\x00The name of the generator to use for creating a service.  Only used if --expose is true\x00The network protocol for the service to be created. Default is 'TCP'.\x00The port that the service should serve on. Copied from the resource being exposed, if unspecified\x00The port that this container exposes.  If --expose is true, this is also the port used by the service that is created.\x00The resource requirement limits for this container.  For example, 'cpu=200m,memory=512Mi'.  Note that server side components may assign limits depending on the server configuration, such as limit ranges.\x00The resource requirement requests for this container.  For example, 'cpu=100m,memory=256Mi'.  Note that server side components may assign requests depending on the server configuration, such as limit ranges.\x00The restart policy for this Pod.  Legal values [Always, OnFailure, Never].  If set to 'Always' a deployment is created, if set to 'OnFailure' a job is created, if set to 'Never', a regular pod is created. For the latter two --replicas must be 1.  Default 'Always', for CronJobs `Never`.\x00The type of secret to create\x00Type for this service: ClusterIP, NodePort, or LoadBalancer. Default is 'ClusterIP'.\x00\u73fe\u5728\u306e\u30ed\u30fc\u30eb\u30a2\u30a6\u30c8\u3092\u53d6\u308a\u6d88\u3059\x00kubeconfig\u304b\u3089\u5909\u6570\u3092\u500b\u5225\u306b\u524a\u9664\u3059\u308b\x00Update field(s) of a resource using strategic merge patch\x00Update image of a pod template\x00Update resource requests/limits on objects with pod templates\x00\u30ea\u30bd\u30fc\u30b9\u306e\u30a2\u30ce\u30c6\u30fc\u30b7\u30e7\u30f3\u3092\u66f4\u65b0\u3059\u308b\x00\u30ea\u30bd\u30fc\u30b9\u306e\u30e9\u30d9\u30eb\u3092\u66f4\u65b0\u3059\u308b\x00Update the taints on one or more nodes\x00Username for Docker registry authentication\x00View latest last-applied-configuration annotations of a resource/object\x00\u30ed\u30fc\u30eb\u30a2\u30a6\u30c8\u306e\u5c65\u6b74\u3092\u8868\u793a\u3059\u308b\x00Where to output the files.  If empty or '-' uses stdout, otherwise creates a directory hierarchy in that directory\x00dummy restart flag)\x00external name of service\x00kubectl controls the Kubernetes cluster manager\x00")
 
 func translationsKubectlJa_jpLc_messagesK8sMoBytes() ([]byte, error) {
 	return _translationsKubectlJa_jpLc_messagesK8sMo, nil
@@ -13938,16 +13938,16 @@ msgstr ""
 "Project-Id-Version: gettext-go-examples-hello\n"
 "Report-Msgid-Bugs-To: EMAIL\n"
 "POT-Creation-Date: 2017-03-14 21:32-0700\n"
-"PO-Revision-Date: 2019-02-14 10:33+0900\n"
-"Last-Translator: Giri Kuncoro <girikuncoro@gmail.com>\n"
+"PO-Revision-Date: 2020-01-05 09:55+0900\n"
+"Last-Translator: Kohei Ota <kohei.ota@zozo.com>\n"
 "Language-Team: \n"
 "Language: ja\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"X-Generator: Poedit 2.1.1\n"
+"X-Generator: Poedit 2.2.4\n"
 "X-Poedit-SourceCharset: UTF-8\n"
-"Plural-Forms: nplurals=2; plural=(n > 1);\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
 #: pkg/kubectl/cmd/create_clusterrolebinding.go:35
 msgid ""
@@ -13960,8 +13960,8 @@ msgstr ""
 "\n"
 "\t\t  # Create a ClusterRoleBinding for user1, user2, and group1 using the "
 "cluster-admin ClusterRole\n"
-"\t\t  kubectl create clusterrolebinding cluster-admin —clusterrole=cluster-"
-"admin —user=user1 —user=user2 —group=group1"
+"\t\t  kubectl create clusterrolebinding cluster-admin --clusterrole=cluster-"
+"admin --user=user1 --user=user2 --group=group1"
 
 #: pkg/kubectl/cmd/create_rolebinding.go:35
 msgid ""
@@ -13974,8 +13974,8 @@ msgstr ""
 "\n"
 "\t\t  # Create a RoleBinding for user1, user2, and group1 using the admin "
 "ClusterRole\n"
-"\t\t  kubectl create rolebinding admin —clusterrole=admin —user=user1 —"
-"user=user2 —group=group1"
+"\t\t  kubectl create rolebinding admin --clusterrole=admin --user=user1 --"
+"user=user2 --group=group1"
 
 #: pkg/kubectl/cmd/create_configmap.go:44
 msgid ""
@@ -13995,16 +13995,16 @@ msgid ""
 msgstr ""
 "\n"
 "\t\t  # Create a new configmap named my-config based on folder bar\n"
-"\t\t  kubectl create configmap my-config —from-file=path/to/bar\n"
+"\t\t  kubectl create configmap my-config --from-file=path/to/bar\n"
 "\n"
 "\t\t  # Create a new configmap named my-config with specified keys instead "
 "of file basenames on disk\n"
-"\t\t  kubectl create configmap my-config —from-file=key1=/path/to/bar/file1."
-"txt —from-file=key2=/path/to/bar/file2.txt\n"
+"\t\t  kubectl create configmap my-config --from-file=key1=/path/to/bar/file1."
+"txt --from-file=key2=/path/to/bar/file2.txt\n"
 "\n"
 "\t\t  # Create a new configmap named my-config with key1=config1 and "
 "key2=config2\n"
-"\t\t  kubectl create configmap my-config —from-literal=key1=config1 —from-"
+"\t\t  kubectl create configmap my-config --from-literal=key1=config1 --from-"
 "literal=key2=config2"
 
 #: pkg/kubectl/cmd/create_secret.go:135
@@ -14017,11 +14017,11 @@ msgid ""
 "password=DOCKER_PASSWORD --docker-email=DOCKER_EMAIL"
 msgstr ""
 "\n"
-"\t\t  # If you don’t already have a .dockercfg file, you can create a "
+"\t\t  # If you don't already have a .dockercfg file, you can create a "
 "dockercfg secret directly by using:\n"
-"\t\t  kubectl create secret docker-registry my-secret —docker-"
-"server=DOCKER_REGISTRY_SERVER —docker-username=DOCKER_USER —docker-"
-"password=DOCKER_PASSWORD —docker-email=DOCKER_EMAIL"
+"\t\t  kubectl create secret docker-registry my-secret --docker-"
+"server=DOCKER_REGISTRY_SERVER --docker-username=DOCKER_USER --docker-"
+"password=DOCKER_PASSWORD --docker-email=DOCKER_EMAIL"
 
 #: pkg/kubectl/cmd/top_node.go:65
 msgid ""
@@ -14066,15 +14066,15 @@ msgstr ""
 "\t\t# Apply the JSON passed into stdin to a pod.\n"
 "\t\tcat pod.json | kubectl apply -f -\n"
 "\n"
-"\t\t# Note: —prune is still in Alpha\n"
+"\t\t# Note: --prune is still in Alpha\n"
 "\t\t# Apply the configuration in manifest.yaml that matches label app=nginx "
 "and delete all the other resources that are not in the file and match label "
 "app=nginx.\n"
-"\t\tkubectl apply —prune -f manifest.yaml -l app=nginx\n"
+"\t\tkubectl apply --prune -f manifest.yaml -l app=nginx\n"
 "\n"
 "\t\t# Apply the configuration in manifest.yaml and delete all the other "
 "configmaps that are not in the file.\n"
-"\t\tkubectl apply —prune -f manifest.yaml —all —prune-whitelist=core/v1/"
+"\t\tkubectl apply --prune -f manifest.yaml --all --prune-whitelist=core/v1/"
 "ConfigMap"
 
 #: pkg/kubectl/cmd/autoscale.go:40
@@ -14091,14 +14091,14 @@ msgid ""
 "\t\tkubectl autoscale rc foo --max=5 --cpu-percent=80"
 msgstr ""
 "\n"
-"\t\t# Auto scale a deployment “foo”, with the number of pods between 2 and "
+"\t\t# Auto scale a deployment \"foo\", with the number of pods between 2 and "
 "10, no target CPU utilization specified so a default autoscaling policy will "
 "be used:\n"
-"\t\tkubectl autoscale deployment foo —min=2 —max=10\n"
+"\t\tkubectl autoscale deployment foo --min=2 --max=10\n"
 "\n"
-"\t\t# Auto scale a replication controller “foo”, with the number of pods "
+"\t\t# Auto scale a replication controller \"foo\", with the number of pods "
 "between 1 and 5, target CPU utilization at 80%:\n"
-"\t\tkubectl autoscale rc foo —max=5 —cpu-percent=80"
+"\t\tkubectl autoscale rc foo --max=5 --cpu-percent=80"
 
 #: pkg/kubectl/cmd/convert.go:49
 msgid ""
@@ -14116,13 +14116,13 @@ msgid ""
 "\t\tkubectl convert -f . | kubectl create -f -"
 msgstr ""
 "\n"
-"\t\t# Convert ‘pod.yaml’ to latest version and print to stdout.\n"
+"\t\t# Convert 'pod.yaml' to latest version and print to stdout.\n"
 "\t\tkubectl convert -f pod.yaml\n"
 "\n"
-"\t\t# Convert the live state of the resource specified by ‘pod.yaml’ to the "
+"\t\t# Convert the live state of the resource specified by 'pod.yaml' to the "
 "latest version\n"
 "\t\t# and print to stdout in json format.\n"
-"\t\tkubectl convert -f pod.yaml —local -o json\n"
+"\t\tkubectl convert -f pod.yaml --local -o json\n"
 "\n"
 "\t\t# Convert all files under current directory to latest version and create "
 "them all.\n"
@@ -14141,14 +14141,14 @@ msgid ""
 "resource=pods --resource-name=readablepod"
 msgstr ""
 "\n"
-"\t\t# Create a ClusterRole named “pod-reader” that allows user to perform "
-"“get”, “watch” and “list” on pods\n"
-"\t\tkubectl create clusterrole pod-reader —verb=get,list,watch —"
+"\t\t# Create a ClusterRole named \"pod-reader\" that allows user to perform "
+"\"get\", \"watch\" and \"list\" on pods\n"
+"\t\tkubectl create clusterrole pod-reader --verb=get,list,watch --"
 "resource=pods\n"
 "\n"
-"\t\t# Create a ClusterRole named “pod-reader” with ResourceName specified\n"
-"\t\tkubectl create clusterrole pod-reader —verb=get,list,watch —"
-"resource=pods —resource-name=readablepod"
+"\t\t# Create a ClusterRole named \"pod-reader\" with ResourceName specified\n"
+"\t\tkubectl create clusterrole pod-reader --verb=get,list,watch --"
+"resource=pods --resource-name=readablepod"
 
 #: pkg/kubectl/cmd/create_role.go:41
 msgid ""
@@ -14163,14 +14163,14 @@ msgid ""
 "resource=pods --resource-name=readablepod"
 msgstr ""
 "\n"
-"\t\t# Create a Role named “pod-reader” that allows user to perform “get”, "
-"“watch” and “list” on pods\n"
-"\t\tkubectl create role pod-reader —verb=get —verb=list —verb=watch —"
+"\t\t# Create a Role named \"pod-reader\" that allows user to perform \"get"
+"\", \"watch\" and \"list\" on pods\n"
+"\t\tkubectl create role pod-reader --verb=get --verb=list --verb=watch --"
 "resource=pods\n"
 "\n"
-"\t\t# Create a Role named “pod-reader” with ResourceName specified\n"
-"\t\tkubectl create role pod-reader —verb=get —verg=list —verb=watch —"
-"resource=pods —resource-name=readablepod"
+"\t\t# Create a Role named \"pod-reader\" with ResourceName specified\n"
+"\t\tkubectl create role pod-reader --verb=get --verg=list --verb=watch --"
+"resource=pods --resource-name=readablepod"
 
 #: pkg/kubectl/cmd/create_quota.go:35
 msgid ""
@@ -14185,12 +14185,12 @@ msgid ""
 msgstr ""
 "\n"
 "\t\t# Create a new resourcequota named my-quota\n"
-"\t\tkubectl create quota my-quota —hard=cpu=1,memory=1G,pods=2,services=3,"
+"\t\tkubectl create quota my-quota --hard=cpu=1,memory=1G,pods=2,services=3,"
 "replicationcontrollers=2,resourcequotas=1,secrets=5,"
 "persistentvolumeclaims=10\n"
 "\n"
 "\t\t# Create a new resourcequota named best-effort\n"
-"\t\tkubectl create quota best-effort —hard=pods=100 —scopes=BestEffort"
+"\t\tkubectl create quota best-effort --hard=pods=100 --scopes=BestEffort"
 
 #: pkg/kubectl/cmd/create_pdb.go:35
 #, c-format
@@ -14214,14 +14214,14 @@ msgstr ""
 "with the app=rails label\n"
 "\t\t# and require at least one of them being available at any point in "
 "time.\n"
-"\t\tkubectl create poddisruptionbudget my-pdb —selector=app=rails —min-"
+"\t\tkubectl create poddisruptionbudget my-pdb --selector=app=rails --min-"
 "available=1\n"
 "\n"
 "\t\t# Create a pod disruption budget named my-pdb that will select all pods "
 "with the app=nginx label\n"
 "\t\t# and require at least half of the pods selected to be available at any "
 "point in time.\n"
-"\t\tkubectl create pdb my-pdb —selector=app=nginx —min-available=50%"
+"\t\tkubectl create pdb my-pdb --selector=app=nginx --min-available=50%"
 
 #: pkg/kubectl/cmd/create.go:47
 msgid ""
@@ -14245,7 +14245,7 @@ msgstr ""
 "\n"
 "\t\t# Edit the data in docker-registry.yaml in JSON using the v1 API format "
 "then create the resource using the edited data.\n"
-"\t\tkubectl create -f docker-registry.yaml —edit —output-version=v1 -o json"
+"\t\tkubectl create -f docker-registry.yaml --edit --output-version=v1 -o json"
 
 #: pkg/kubectl/cmd/expose.go:53
 msgid ""
@@ -14293,24 +14293,25 @@ msgstr ""
 "\n"
 "\t\t# Create a service for a pod valid-pod, which serves on port 444 with "
 "the name \"frontend\"\n"
-"\t\tkubectl expose pod valid-pod —port=444 —name=frontend\n"
+"\t\tkubectl expose pod valid-pod --port=444 --name=frontend\n"
 "\n"
 "\t\t# Create a second service based on the above service, exposing the "
-"container port 8443 as port 443 with the name “nginx-https”\n"
-"\t\tkubectl expose service nginx —port=443 —target-port=8443 —name=nginx-"
+"container port 8443 as port 443 with the name \"nginx-https\"\n"
+"\t\tkubectl expose service nginx --port=443 --target-port=8443 --name=nginx-"
 "https\n"
 "\n"
 "\t\t# Create a service for a replicated streaming application on port 4100 "
-"balancing UDP traffic and named ‘video-stream’.\n"
-"\t\tkubectl expose rc streamer —port=4100 —protocol=udp —name=video-stream\n"
+"balancing UDP traffic and named 'video-stream'.\n"
+"\t\tkubectl expose rc streamer --port=4100 --protocol=udp --name=video-"
+"stream\n"
 "\n"
 "\t\t# Create a service for a replicated nginx using replica set, which "
 "serves on port 80 and connects to the containers on port 8000.\n"
-"\t\tkubectl expose rs nginx —port=80 —target-port=8000\n"
+"\t\tkubectl expose rs nginx --port=80 --target-port=8000\n"
 "\n"
 "\t\t# Create a service for an nginx deployment, which serves on port 80 and "
 "connects to the containers on port 8000.\n"
-"\t\tkubectl expose deployment nginx —port=80 —target-port=8000"
+"\t\tkubectl expose deployment nginx --port=80 --target-port=8000"
 
 #: pkg/kubectl/cmd/delete.go:68
 msgid ""
@@ -14345,20 +14346,20 @@ msgstr ""
 "stdin.\n"
 "\t\tcat pod.json | kubectl delete -f -\n"
 "\n"
-"\t\t# Delete pods and services with same names “baz” and “foo”\n"
+"\t\t# Delete pods and services with same names \"baz\" and \"foo\"\n"
 "\t\tkubectl delete pod,service baz foo\n"
 "\n"
 "\t\t# Delete pods and services with label name=myLabel.\n"
 "\t\tkubectl delete pods,services -l name=myLabel\n"
 "\n"
 "\t\t# Delete a pod with minimal delay\n"
-"\t\tkubectl delete pod foo —now\n"
+"\t\tkubectl delete pod foo --now\n"
 "\n"
 "\t\t# Force delete a pod on a dead node\n"
-"\t\tkubectl delete pod foo —grace-period=0 —force\n"
+"\t\tkubectl delete pod foo --grace-period=0 --force\n"
 "\n"
 "\t\t# Delete all pods\n"
-"\t\tkubectl delete pods —all"
+"\t\tkubectl delete pods --all"
 
 #: pkg/kubectl/cmd/describe.go:54
 msgid ""
@@ -14390,7 +14391,7 @@ msgstr ""
 "\t\t# Describe a pod\n"
 "\t\tkubectl describe pods/nginx\n"
 "\n"
-"\t\t# Describe a pod identified by type and name in “pod.json”\n"
+"\t\t# Describe a pod identified by type and name in \"pod.json\"\n"
 "\t\tkubectl describe -f pod.json\n"
 "\n"
 "\t\t# Describe all pods\n"
@@ -14399,7 +14400,7 @@ msgstr ""
 "\t\t# Describe pods by label name=myLabel\n"
 "\t\tkubectl describe po -l name=myLabel\n"
 "\n"
-"\t\t# Describe all pods managed by the ‘frontend’ replication controller (rc-"
+"\t\t# Describe all pods managed by the 'frontend' replication controller (rc-"
 "created pods\n"
 "\t\t# get the name of the rc as a prefix in the pod the name).\n"
 "\t\tkubectl describe pods frontend"
@@ -14417,14 +14418,14 @@ msgid ""
 "\t\t$ kubectl drain foo --grace-period=900"
 msgstr ""
 "\n"
-"\t\t# Drain node “foo”, even if there are pods not managed by a "
+"\t\t# Drain node \"foo\", even if there are pods not managed by a "
 "ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet on it.\n"
-"\t\t$ kubectl drain foo —force\n"
+"\t\t$ kubectl drain foo --force\n"
 "\n"
 "\t\t# As above, but abort if there are pods not managed by a "
 "ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet, and use a "
 "grace period of 15 minutes.\n"
-"\t\t$ kubectl drain foo —grace-period=900"
+"\t\t$ kubectl drain foo --grace-period=900"
 
 #: pkg/kubectl/cmd/edit.go:80
 msgid ""
@@ -14443,18 +14444,18 @@ msgid ""
 "\t\tkubectl edit deployment/mydeployment -o yaml --save-config"
 msgstr ""
 "\n"
-"\t\t# Edit the service named ‘docker-registry’:\n"
+"\t\t# Edit the service named 'docker-registry':\n"
 "\t\tkubectl edit svc/docker-registry\n"
 "\n"
 "\t\t# Use an alternative editor\n"
-"\t\tKUBE_EDITOR=“nano” kubectl edit svc/docker-registry\n"
+"\t\tKUBE_EDITOR=\"nano\" kubectl edit svc/docker-registry\n"
 "\n"
-"\t\t# Edit the job ‘myjob’ in JSON using the v1 API format:\n"
+"\t\t# Edit the job 'myjob' in JSON using the v1 API format:\n"
 "\t\tkubectl edit job.v1.batch/myjob -o json\n"
 "\n"
-"\t\t# Edit the deployment ‘mydeployment’ in YAML and save the modified "
+"\t\t# Edit the deployment 'mydeployment' in YAML and save the modified "
 "config in its annotation:\n"
-"\t\tkubectl edit deployment/mydeployment -o yaml —save-config"
+"\t\tkubectl edit deployment/mydeployment -o yaml --save-config"
 
 #: pkg/kubectl/cmd/exec.go:41
 msgid ""
@@ -14472,17 +14473,17 @@ msgid ""
 "\t\tkubectl exec 123456-7890 -c ruby-container -i -t -- bash -il"
 msgstr ""
 "\n"
-"\t\t# Get output from running ‘date’ from pod 123456-7890, using the first "
+"\t\t# Get output from running 'date' from pod 123456-7890, using the first "
 "container by default\n"
 "\t\tkubectl exec 123456-7890 date\n"
 "\n"
-"\t\t# Get output from running ‘date’ in ruby-container from pod 123456-7890\n"
+"\t\t# Get output from running 'date' in ruby-container from pod 123456-7890\n"
 "\t\tkubectl exec 123456-7890 -c ruby-container date\n"
 "\n"
-"\t\t# Switch to raw terminal mode, sends stdin to ‘bash’ in ruby-container "
+"\t\t# Switch to raw terminal mode, sends stdin to 'bash' in ruby-container "
 "from pod 123456-7890\n"
-"\t\t# and sends stdout/stderr from ‘bash’ back to the client\n"
-"\t\tkubectl exec 123456-7890 -c ruby-container -i -t — bash -il"
+"\t\t# and sends stdout/stderr from 'bash' back to the client\n"
+"\t\tkubectl exec 123456-7890 -c ruby-container -i -t -- bash -il"
 
 #: pkg/kubectl/cmd/attach.go:42
 msgid ""
@@ -14511,9 +14512,9 @@ msgstr ""
 "\t\t# Get output from ruby-container from pod 123456-7890\n"
 "\t\tkubectl attach 123456-7890 -c ruby-container\n"
 "\n"
-"\t\t# Switch to raw terminal mode, sends stdin to ‘bash’ in ruby-container "
+"\t\t# Switch to raw terminal mode, sends stdin to 'bash' in ruby-container "
 "from pod 123456-7890\n"
-"\t\t# and sends stdout/stderr from ‘bash’ back to the client\n"
+"\t\t# and sends stdout/stderr from 'bash' back to the client\n"
 "\t\tkubectl attach 123456-7890 -c ruby-container -i -t\n"
 "\n"
 "\t\t# Get output from the first pod of a ReplicaSet named nginx\n"
@@ -14575,10 +14576,10 @@ msgstr ""
 "\n"
 "\t\t# Write bash completion code to a file and source if from .bash_profile\n"
 "\t\tkubectl completion bash > ~/.kube/completion.bash.inc\n"
-"\t\tprintf “\n"
+"\t\tprintf \"\n"
 "# Kubectl shell completion\n"
-"source ‘$HOME/.kube/completion.bash.inc’\n"
-"“ >> $HOME/.bash_profile\n"
+"source '$HOME/.kube/completion.bash.inc'\n"
+"\" >> $HOME/.bash_profile\n"
 "\t\tsource $HOME/.bash_profile\n"
 "\n"
 "\t\t# Load the kubectl completion code for zsh[1] into the current shell\n"
@@ -14633,12 +14634,12 @@ msgstr ""
 "\t\t# List a single pod in JSON output format.\n"
 "\t\tkubectl get -o json pod web-pod-13je7\n"
 "\n"
-"\t\t# List a pod identified by type and name specified in “pod.yaml” in JSON "
-"output format.\n"
+"\t\t# List a pod identified by type and name specified in \"pod.yaml\" in "
+"JSON output format.\n"
 "\t\tkubectl get -f pod.yaml -o json\n"
 "\n"
 "\t\t# Return only the phase value of the specified pod.\n"
-"\t\tkubectl get -o template pod/web-pod-13je7 —template={{.status.phase}}\n"
+"\t\tkubectl get -o template pod/web-pod-13je7 --template={{.status.phase}}\n"
 "\n"
 "\t\t# List all replication controllers and services together in ps output "
 "format.\n"
@@ -14653,32 +14654,36 @@ msgstr ""
 #: pkg/kubectl/cmd/portforward.go:53
 msgid ""
 "\n"
-"\t\t# Listen on ports 5000 and 6000 locally, forwarding data to/from ports "
-"5000 and 6000 in the pod\n"
-"\t\tkubectl port-forward mypod 5000 6000\n"
+"\t\t# Listen on ports 5000 and 6000 locally, forwarding data to/from ports 5000 and 6000 in the pod"
+"\t\tkubectl port-forward pod/mypod 5000 6000"
 "\n"
-"\t\t# Listen on port 8888 locally, forwarding to 5000 in the pod\n"
-"\t\tkubectl port-forward mypod 8888:5000\n"
+"\t\t# Listen on ports 5000 and 6000 locally, forwarding data to/from ports 5000 and 6000 in a pod selected by the deployment"
+"\t\tkubectl port-forward deployment/mydeployment 5000 6000"
 "\n"
-"\t\t# Listen on a random port locally, forwarding to 5000 in the pod\n"
-"\t\tkubectl port-forward mypod :5000\n"
+"\t\t# Listen on ports 5000 and 6000 locally, forwarding data to/from ports 5000 and 6000 in a pod selected by the service"
+"\t\tkubectl port-forward service/myservice 5000 6000"
 "\n"
-"\t\t# Listen on a random port locally, forwarding to 5000 in the pod\n"
-"\t\tkubectl port-forward mypod 0:5000"
+"\t\t# Listen on port 8888 locally, forwarding to 5000 in the pod"
+"\t\tkubectl port-forward pod/mypod 8888:5000"
+"\n"
+"\t\t# Listen on a random port locally, forwarding to 5000 in the pod"
+"\t\tkubectl port-forward pod/mypod :5000"
 msgstr ""
 "\n"
-"\t\t# Listen on ports 5000 and 6000 locally, forwarding data to/from ports "
-"5000 and 6000 in the pod\n"
-"\t\tkubectl port-forward mypod 5000 6000\n"
+"\t\t# Listen on ports 5000 and 6000 locally, forwarding data to/from ports 5000 and 6000 in the pod"
+"\t\tkubectl port-forward pod/mypod 5000 6000"
 "\n"
-"\t\t# Listen on port 8888 locally, forwarding to 5000 in the pod\n"
-"\t\tkubectl port-forward mypod 8888:5000\n"
+"\t\t# Listen on ports 5000 and 6000 locally, forwarding data to/from ports 5000 and 6000 in a pod selected by the deployment"
+"\t\tkubectl port-forward deployment/mydeployment 5000 6000"
 "\n"
-"\t\t# Listen on a random port locally, forwarding to 5000 in the pod\n"
-"\t\tkubectl port-forward mypod :5000\n"
+"\t\t# Listen on ports 5000 and 6000 locally, forwarding data to/from ports 5000 and 6000 in a pod selected by the service"
+"\t\tkubectl port-forward service/myservice 5000 6000"
 "\n"
-"\t\t# Listen on a random port locally, forwarding to 5000 in the pod\n"
-"\t\tkubectl port-forward mypod 0:5000"
+"\t\t# Listen on port 8888 locally, forwarding to 5000 in the pod"
+"\t\tkubectl port-forward pod/mypod 8888:5000"
+"\n"
+"\t\t# Listen on a random port locally, forwarding to 5000 in the pod"
+"\t\tkubectl port-forward pod/mypod :5000"
 
 #: pkg/kubectl/cmd/drain.go:118
 msgid ""
@@ -14687,9 +14692,10 @@ msgid ""
 "\t\t$ kubectl uncordon foo"
 msgstr ""
 "\n"
-"\t\t# Mark node “foo” as schedulable.\n"
+"\t\t# Mark node \"foo\" as schedulable.\n"
 "\t\t$ kubectl uncordon foo"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/drain.go#L102
 #: pkg/kubectl/cmd/drain.go:93
 msgid ""
 "\n"
@@ -14697,7 +14703,7 @@ msgid ""
 "\t\tkubectl cordon foo"
 msgstr ""
 "\n"
-"\t\t# Mark node “foo” as unschedulable.\n"
+"\t\t# Mark node \"foo\" as unschedulable.\n"
 "\t\tkubectl cordon foo"
 
 #: pkg/kubectl/cmd/patch.go:66
@@ -14721,21 +14727,22 @@ msgid ""
 msgstr ""
 "\n"
 "\t\t# Partially update a node using strategic merge patch\n"
-"\t\tkubectl patch node k8s-node-1 -p ‘{“spec”:{“unschedulable”:true}}’\n"
+"\t\tkubectl patch node k8s-node-1 -p '{\"spec\":{\"unschedulable\":true}}'\n"
 "\n"
 "\t\t# Partially update a node identified by the type and name specified in "
-"“node.json” using strategic merge patch\n"
-"\t\tkubectl patch -f node.json -p ‘{“spec”:{“unschedulable”:true}}’\n"
+"\"node.json\" using strategic merge patch\n"
+"\t\tkubectl patch -f node.json -p '{\"spec\":{\"unschedulable\":true}}'\n"
 "\n"
-"\t\t# Update a container’s image; spec.containers[*].name is required "
-"because it’s a merge key\n"
-"\t\tkubectl patch pod valid-pod -p ‘{“spec”:{“containers”:"
-"[{“name”:”kubernetes-serve-hostname”,”image”:”new image”}]}}’\n"
+"\t\t# Update a container's image; spec.containers[*].name is required "
+"because it's a merge key\n"
+"\t\tkubectl patch pod valid-pod -p '{\"spec\":{\"containers\":[{\"name\":"
+"\"kubernetes-serve-hostname\",\"image\":\"new image\"}]}}'\n"
 "\n"
-"\t\t# Update a container’s image using a json patch with positional arrays\n"
-"\t\tkubectl patch pod valid-pod —type=‘json’ -p=‘[{“op”: “replace”, “path”: "
-"“/spec/containers/0/image”, “value”:”new image”}]’"
+"\t\t# Update a container's image using a json patch with positional arrays\n"
+"\t\tkubectl patch pod valid-pod --type='json' -p='[{\"op\": \"replace\", "
+"\"path\": \"/spec/containers/0/image\", \"value\":\"new image\"}]'"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/options.go#L37
 #: pkg/kubectl/cmd/options.go:29
 msgid ""
 "\n"
@@ -14756,6 +14763,7 @@ msgstr ""
 "\t\t# Print the address of the master and cluster services\n"
 "\t\tkubectl cluster-info"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/version.go#L39
 #: pkg/kubectl/cmd/version.go:32
 msgid ""
 "\n"
@@ -14799,12 +14807,12 @@ msgstr ""
 "\t\t# Replace a pod based on the JSON passed into stdin.\n"
 "\t\tcat pod.json | kubectl replace -f -\n"
 "\n"
-"\t\t# Update a single-container pod’s image version (tag) to v4\n"
-"\t\tkubectl get pod mypod -o yaml | sed ’s/\\(image: myimage\\):.*$/:v4/‘ | "
+"\t\t# Update a single-container pod's image version (tag) to v4\n"
+"\t\tkubectl get pod mypod -o yaml | sed 's/\\(image: myimage\\):.*$/:v4/' | "
 "kubectl replace -f -\n"
 "\n"
 "\t\t# Force replace, delete and then re-create the resource\n"
-"\t\tkubectl replace —force -f ./pod.json"
+"\t\tkubectl replace --force -f ./pod.json"
 
 #: pkg/kubectl/cmd/logs.go:40
 msgid ""
@@ -14850,10 +14858,10 @@ msgstr ""
 "\t\tkubectl logs -f -c ruby web-1\n"
 "\n"
 "\t\t# Display only the most recent 20 lines of output in pod nginx\n"
-"\t\tkubectl logs —tail=20 nginx\n"
+"\t\tkubectl logs --tail=20 nginx\n"
 "\n"
 "\t\t# Show all logs from pod nginx written in the last hour\n"
-"\t\tkubectl logs —since=1h nginx\n"
+"\t\tkubectl logs --since=1h nginx\n"
 "\n"
 "\t\t# Return snapshot logs from first container of a job named hello\n"
 "\t\tkubectl logs job/hello\n"
@@ -14882,17 +14890,17 @@ msgstr ""
 "\n"
 "\t\t# Run a proxy to kubernetes apiserver on port 8011, serving static "
 "content from ./local/www/\n"
-"\t\tkubectl proxy —port=8011 —www=./local/www/\n"
+"\t\tkubectl proxy --port=8011 --www=./local/www/\n"
 "\n"
 "\t\t# Run a proxy to kubernetes apiserver on an arbitrary local port.\n"
 "\t\t# The chosen port for the server will be output to stdout.\n"
-"\t\tkubectl proxy —port=0\n"
+"\t\tkubectl proxy --port=0\n"
 "\n"
 "\t\t# Run a proxy to kubernetes apiserver, changing the api prefix to k8s-"
 "api\n"
 "\t\t# This makes e.g. the pods api available at localhost:8001/k8s-api/v1/"
 "pods/\n"
-"\t\tkubectl proxy —api-prefix=/k8s-api"
+"\t\tkubectl proxy --api-prefix=/k8s-api"
 
 #: pkg/kubectl/cmd/scale.go:43
 msgid ""
@@ -14914,21 +14922,21 @@ msgid ""
 "\t\tkubectl scale --replicas=3 job/cron"
 msgstr ""
 "\n"
-"\t\t# Scale a replicaset named ‘foo’ to 3.\n"
-"\t\tkubectl scale —replicas=3 rs/foo\n"
+"\t\t# Scale a replicaset named 'foo' to 3.\n"
+"\t\tkubectl scale --replicas=3 rs/foo\n"
 "\n"
-"\t\t# Scale a resource identified by type and name specified in “foo.yaml” "
+"\t\t# Scale a resource identified by type and name specified in \"foo.yaml\" "
 "to 3.\n"
-"\t\tkubectl scale —replicas=3 -f foo.yaml\n"
+"\t\tkubectl scale --replicas=3 -f foo.yaml\n"
 "\n"
-"\t\t# If the deployment named mysql’s current size is 2, scale mysql to 3.\n"
-"\t\tkubectl scale —current-replicas=2 —replicas=3 deployment/mysql\n"
+"\t\t# If the deployment named mysql's current size is 2, scale mysql to 3.\n"
+"\t\tkubectl scale --current-replicas=2 --replicas=3 deployment/mysql\n"
 "\n"
 "\t\t# Scale multiple replication controllers.\n"
-"\t\tkubectl scale —replicas=5 rc/foo rc/bar rc/baz\n"
+"\t\tkubectl scale --replicas=5 rc/foo rc/bar rc/baz\n"
 "\n"
-"\t\t# Scale job named ‘cron’ to 3.\n"
-"\t\tkubectl scale —replicas=3 job/cron"
+"\t\t# Scale job named 'cron' to 3.\n"
+"\t\tkubectl scale --replicas=3 job/cron"
 
 #: pkg/kubectl/cmd/apply_set_last_applied.go:67
 msgid ""
@@ -14957,7 +14965,7 @@ msgstr ""
 "\n"
 "\t\t# Set the last-applied-configuration of a resource to match the contents "
 "of a file, will create the annotation if it does not already exist.\n"
-"\t\tkubectl apply set-last-applied -f deploy.yaml —create-annotation=true\n"
+"\t\tkubectl apply set-last-applied -f deploy.yaml --create-annotation=true\n"
 "\t\t"
 
 #: pkg/kubectl/cmd/top_pod.go:61
@@ -14980,10 +14988,10 @@ msgstr ""
 "\t\tkubectl top pod\n"
 "\n"
 "\t\t# Show metrics for all pods in the given namespace\n"
-"\t\tkubectl top pod —namespace=NAMESPACE\n"
+"\t\tkubectl top pod --namespace=NAMESPACE\n"
 "\n"
 "\t\t# Show metrics for a given pod and its containers\n"
-"\t\tkubectl top pod POD_NAME —containers\n"
+"\t\tkubectl top pod POD_NAME --containers\n"
 "\n"
 "\t\t# Show metrics for the pods defined by label name=myLabel\n"
 "\t\tkubectl top pod -l name=myLabel"
@@ -15090,25 +15098,25 @@ msgstr ""
 "\n"
 "\t\t# Start a pod of busybox and keep it in the foreground, don't restart it "
 "if it exits.\n"
-"\t\tkubectl run -i -t busybox —image=busybox —restart=Never\n"
+"\t\tkubectl run -i -t busybox --image=busybox --restart=Never\n"
 "\n"
 "\t\t# Start the nginx container using the default command, but use custom "
 "arguments (arg1 .. argN) for that command.\n"
-"\t\tkubectl run nginx —image=nginx — <arg1> <arg2> … <argN>\n"
+"\t\tkubectl run nginx --image=nginx -- <arg1> <arg2> ... <argN>\n"
 "\n"
 "\t\t# Start the nginx container using a different command and custom "
 "arguments.\n"
-"\t\tkubectl run nginx —image=nginx —command — <cmd> <arg1> … <argN>\n"
+"\t\tkubectl run nginx --image=nginx --command -- <cmd> <arg1> ... <argN>\n"
 "\n"
 "\t\t# Start the perl container to compute π to 2000 places and print it "
 "out.\n"
-"\t\tkubectl run pi —image=perl —restart=OnFailure — perl -Mbignum=bpi -wle "
-"‘print bpi(2000)’\n"
+"\t\tkubectl run pi --image=perl --restart=OnFailure -- perl -Mbignum=bpi -"
+"wle 'print bpi(2000)'\n"
 "\n"
 "\t\t# Start the cron job to compute π to 2000 places and print it out every "
 "5 minutes.\n"
-"\t\tkubectl run pi —schedule=“0/5 * * * ?” —image=perl —restart=OnFailure — "
-"perl -Mbignum=bpi -wle ‘print bpi(2000)’"
+"\t\tkubectl run pi --schedule=\"0/5 * * * ?\" --image=perl --"
+"restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(2000)'"
 
 #: pkg/kubectl/cmd/taint.go:67
 msgid ""
@@ -15127,17 +15135,17 @@ msgid ""
 "\t\tkubectl taint nodes foo dedicated-"
 msgstr ""
 "\n"
-"\t\t# Update node ‘foo’ with a taint with key ‘dedicated’ and value ‘special-"
-"user’ and effect ‘NoSchedule’.\n"
+"\t\t# Update node 'foo' with a taint with key 'dedicated' and value 'special-"
+"user' and effect 'NoSchedule'.\n"
 "\t\t# If a taint with that key and effect already exists, its value is "
 "replaced as specified.\n"
 "\t\tkubectl taint nodes foo dedicated=special-user:NoSchedule\n"
 "\n"
-"\t\t# Remove from node ‘foo’ the taint with key ‘dedicated’ and effect "
-"‘NoSchedule’ if one exists.\n"
+"\t\t# Remove from node 'foo' the taint with key 'dedicated' and effect "
+"'NoSchedule' if one exists.\n"
 "\t\tkubectl taint nodes foo dedicated:NoSchedule-\n"
 "\n"
-"\t\t# Remove from node ‘foo’ all the taints with key ‘dedicated’\n"
+"\t\t# Remove from node 'foo' all the taints with key 'dedicated'\n"
 "\t\tkubectl taint nodes foo dedicated-"
 
 #: pkg/kubectl/cmd/label.go:77
@@ -15164,24 +15172,24 @@ msgid ""
 "\t\tkubectl label pods foo bar-"
 msgstr ""
 "\n"
-"\t\t# Update pod ‘foo’ with the label ‘unhealthy’ and the value ‘true’.\n"
+"\t\t# Update pod 'foo' with the label 'unhealthy' and the value 'true'.\n"
 "\t\tkubectl label pods foo unhealthy=true\n"
 "\n"
-"\t\t# Update pod ‘foo’ with the label ‘status’ and the value ‘unhealthy’, "
+"\t\t# Update pod 'foo' with the label 'status' and the value 'unhealthy', "
 "overwriting any existing value.\n"
-"\t\tkubectl label —overwrite pods foo status=unhealthy\n"
+"\t\tkubectl label --overwrite pods foo status=unhealthy\n"
 "\n"
 "\t\t# Update all pods in the namespace\n"
-"\t\tkubectl label pods —all status=unhealthy\n"
+"\t\tkubectl label pods --all status=unhealthy\n"
 "\n"
-"\t\t# Update a pod identified by the type and name in “pod.json”\n"
+"\t\t# Update a pod identified by the type and name in \"pod.json\"\n"
 "\t\tkubectl label -f pod.json status=unhealthy\n"
 "\n"
-"\t\t# Update pod ‘foo’ only if the resource is unchanged from version 1.\n"
-"\t\tkubectl label pods foo status=unhealthy —resource-version=1\n"
+"\t\t# Update pod 'foo' only if the resource is unchanged from version 1.\n"
+"\t\tkubectl label pods foo status=unhealthy --resource-version=1\n"
 "\n"
-"\t\t# Update pod ‘foo’ by removing a label named ‘bar’ if it exists.\n"
-"\t\t# Does not require the —overwrite flag.\n"
+"\t\t# Update pod 'foo' by removing a label named 'bar' if it exists.\n"
+"\t\t# Does not require the --overwrite flag.\n"
 "\t\tkubectl label pods foo bar-"
 
 #: pkg/kubectl/cmd/rollingupdate.go:54
@@ -15218,15 +15226,15 @@ msgstr ""
 "\t\t# Update the pods of frontend-v1 to frontend-v2 by just changing the "
 "image, and switching the\n"
 "\t\t# name of the replication controller.\n"
-"\t\tkubectl rolling-update frontend-v1 frontend-v2 —image=image:v2\n"
+"\t\tkubectl rolling-update frontend-v1 frontend-v2 --image=image:v2\n"
 "\n"
 "\t\t# Update the pods of frontend by just changing the image, and keeping "
 "the old name.\n"
-"\t\tkubectl rolling-update frontend —image=image:v2\n"
+"\t\tkubectl rolling-update frontend --image=image:v2\n"
 "\n"
 "\t\t# Abort and reverse an existing rollout in progress (from frontend-v1 to "
 "frontend-v2).\n"
-"\t\tkubectl rolling-update frontend-v1 frontend-v2 —rollback"
+"\t\tkubectl rolling-update frontend-v1 frontend-v2 --rollback"
 
 #: pkg/kubectl/cmd/apply_view_last_applied.go:52
 msgid ""
@@ -15260,13 +15268,13 @@ msgid ""
 msgstr ""
 "\n"
 "\t\tApply a configuration to a resource by filename or stdin.\n"
-"\t\tThis resource will be created if it doesn’t exist yet.\n"
-"\t\tTo use ‘apply’, always create the resource initially with either ‘apply’ "
-"or ‘create —save-config’.\n"
+"\t\tThis resource will be created if it doesn't exist yet.\n"
+"\t\tTo use 'apply', always create the resource initially with either 'apply' "
+"or 'create --save-config'.\n"
 "\n"
 "\t\tJSON and YAML formats are accepted.\n"
 "\n"
-"\t\tAlpha Disclaimer: the —prune functionality is not yet complete. Do not "
+"\t\tAlpha Disclaimer: the --prune functionality is not yet complete. Do not "
 "use unless you are aware of what the current state is. See https://issues."
 "k8s.io/34274."
 
@@ -15292,7 +15300,7 @@ msgstr ""
 "\n"
 "\t\tThe command takes filename, directory, or URL as input, and convert it "
 "into format\n"
-"\t\tof version specified by —output-version flag. If target version is not "
+"\t\tof version specified by --output-version flag. If target version is not "
 "specified or\n"
 "\t\tnot supported, convert to latest version.\n"
 "\n"
@@ -15300,6 +15308,7 @@ msgstr ""
 "-o option\n"
 "\t\tto change to output destination."
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_service.go#L68
 #: pkg/kubectl/cmd/create_clusterrole.go:31
 msgid ""
 "\n"
@@ -15308,6 +15317,7 @@ msgstr ""
 "\n"
 "\t\tCreate a ClusterRole."
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_clusterrolebinding.go#L43
 #: pkg/kubectl/cmd/create_clusterrolebinding.go:32
 msgid ""
 "\n"
@@ -15316,6 +15326,7 @@ msgstr ""
 "\n"
 "\t\tCreate a ClusterRoleBinding for a particular ClusterRole."
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_rolebinding.go#L43
 #: pkg/kubectl/cmd/create_rolebinding.go:32
 msgid ""
 "\n"
@@ -15374,6 +15385,7 @@ msgstr ""
 "are ignored (e.g. subdirectories,\n"
 "\t\tsymlinks, devices, pipes, etc)."
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_namespace.go#L44
 #: pkg/kubectl/cmd/create_namespace.go:32
 msgid ""
 "\n"
@@ -15413,11 +15425,11 @@ msgstr ""
 "\t\tWhen using the Docker command line to push images, you can authenticate "
 "to a given registry by running\n"
 "\n"
-"\t\t    $ docker login DOCKER_REGISTRY_SERVER —username=DOCKER_USER —"
-"password=DOCKER_PASSWORD —email=DOCKER_EMAIL’.\n"
+"\t\t    $ docker login DOCKER_REGISTRY_SERVER --username=DOCKER_USER --"
+"password=DOCKER_PASSWORD --email=DOCKER_EMAIL'.\n"
 "\n"
-"    That produces a ~/.dockercfg file that is used by subsequent ‘docker "
-"push’ and ‘docker pull’ commands to\n"
+"    That produces a ~/.dockercfg file that is used by subsequent 'docker "
+"push' and 'docker pull' commands to\n"
 "\t\tauthenticate to the registry. The email address is optional.\n"
 "\n"
 "\t\tWhen creating applications, you may have a Docker registry that requires "
@@ -15426,6 +15438,7 @@ msgstr ""
 "You can provide this information\n"
 "\t\tby creating a dockercfg secret and attaching it to your service account."
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_pdb.go#L49
 #: pkg/kubectl/cmd/create_pdb.go:32
 msgid ""
 "\n"
@@ -15436,6 +15449,7 @@ msgstr ""
 "\t\tCreate a pod disruption budget with the specified name, selector, and "
 "desired minimum available pods"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create.go#L56
 #: pkg/kubectl/cmd/create.go:42
 msgid ""
 "\n"
@@ -15448,6 +15462,7 @@ msgstr ""
 "\n"
 "\t\tJSON and YAML formats are accepted."
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_quota.go#L47
 #: pkg/kubectl/cmd/create_quota.go:32
 msgid ""
 "\n"
@@ -15458,6 +15473,7 @@ msgstr ""
 "\t\tCreate a resourcequota with the specified name, hard limits and optional "
 "scopes"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_quota.go#L47
 #: pkg/kubectl/cmd/create_role.go:38
 msgid ""
 "\n"
@@ -15500,6 +15516,7 @@ msgstr ""
 "are ignored (e.g. subdirectories,\n"
 "\t\tsymlinks, devices, pipes, etc)."
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_serviceaccount.go#L44
 #: pkg/kubectl/cmd/create_serviceaccount.go:32
 msgid ""
 "\n"
@@ -15612,7 +15629,7 @@ msgstr ""
 "\t\tthe --force flag.\n"
 "\n"
 "\t\tIMPORTANT: Force deleting pods does not wait for confirmation that the "
-"pod’s processes have been\n"
+"pod's processes have been\n"
 "\t\tterminated, which can leave those processes running until the node "
 "detects the deletion and\n"
 "\t\tcompletes graceful deletion. If your processes use shared storage or "
@@ -15654,7 +15671,7 @@ msgstr ""
 "\n"
 "\t\tThe stop command is deprecated, all its functionalities are covered by "
 "delete command.\n"
-"\t\tSee ‘kubectl delete —help’ for more details.\n"
+"\t\tSee 'kubectl delete --help' for more details.\n"
 "\n"
 "\t\tAttempts to shut down and delete a resource that supports graceful "
 "termination.\n"
@@ -15687,7 +15704,7 @@ msgstr ""
 "\n"
 "\t\tDisplay Resource (CPU/Memory/Storage) usage of pods.\n"
 "\n"
-"\t\tThe ‘top pod’ command allows you to see the resource consumption of "
+"\t\tThe 'top pod' command allows you to see the resource consumption of "
 "pods.\n"
 "\n"
 "\t\tDue to the metrics pipeline delay, they may be unavailable for a few "
@@ -15772,11 +15789,11 @@ msgstr ""
 "\t\tpods that are neither mirror pods nor managed by ReplicationController,\n"
 "\t\tReplicaSet, DaemonSet, StatefulSet or Job, then drain will not delete "
 "any pods unless you\n"
-"\t\tuse —force.  —force will also allow deletion to proceed if the managing "
-"resource of one\n"
+"\t\tuse --force.  --force will also allow deletion to proceed if the "
+"managing resource of one\n"
 "\t\tor more pods is missing.\n"
 "\n"
-"\t\t’drain’ waits for graceful termination. You should not operate on the "
+"\t\t'drain' waits for graceful termination. You should not operate on the "
 "machine until\n"
 "\t\tthe command completes.\n"
 "\n"
@@ -15842,9 +15859,9 @@ msgstr ""
 "\t\tTo edit using a specific API version, fully-qualify the resource, "
 "version, and group.\n"
 "\n"
-"\t\tThe default format is YAML. To edit in JSON, specify “-o json”.\n"
+"\t\tThe default format is YAML. To edit in JSON, specify \"-o json\".\n"
 "\n"
-"\t\tThe flag —windows-line-endings can be used to force Windows line "
+"\t\tThe flag --windows-line-endings can be used to force Windows line "
 "endings,\n"
 "\t\totherwise the default for your operating system will be used.\n"
 "\n"
@@ -15858,6 +15875,7 @@ msgstr ""
 "your temporary\n"
 "\t\tsaved copy to include the latest resource version."
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/drain.go#L127
 #: pkg/kubectl/cmd/drain.go:115
 msgid ""
 "\n"
@@ -15866,6 +15884,7 @@ msgstr ""
 "\n"
 "\t\tMark node as schedulable."
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/drain.go#L102
 #: pkg/kubectl/cmd/drain.go:90
 msgid ""
 "\n"
@@ -15913,7 +15932,7 @@ msgstr ""
 "adding the\n"
 "\t\tfollowing line to the .bash_profile\n"
 "\n"
-"\t\t    $ source $(brew —prefix)/etc/bash_completion\n"
+"\t\t    $ source $(brew --prefix)/etc/bash_completion\n"
 "\n"
 "\t\tNote for zsh users: [1] zsh completions are only supported in versions "
 "of zsh >= 5.2"
@@ -15994,8 +16013,8 @@ msgstr ""
 "\t\tScale also allows users to specify one or more preconditions for the "
 "scale action.\n"
 "\n"
-"\t\tIf —current-replicas or —resource-version is specified, it is validated "
-"before the\n"
+"\t\tIf --current-replicas or --resource-version is specified, it is "
+"validated before the\n"
 "\t\tscale is attempted, and it is guaranteed that the precondition holds "
 "true when the\n"
 "\t\tscale is sent to the server."
@@ -16013,7 +16032,7 @@ msgstr ""
 "\t\tSet the latest last-applied-configuration annotations by setting it to "
 "match the contents of a file.\n"
 "\t\tThis results in the last-applied-configuration being updated as though "
-"‘kubectl apply -f <file>’ was run,\n"
+"'kubectl apply -f <file>' was run,\n"
 "\t\twithout updating any other parts of the object."
 
 #: pkg/kubectl/cmd/proxy.go:36
@@ -16039,20 +16058,20 @@ msgstr ""
 "\n"
 "\t\tTo proxy all of the kubernetes api and nothing else, use:\n"
 "\n"
-"\t\t    $ kubectl proxy —api-prefix=/\n"
+"\t\t    $ kubectl proxy --api-prefix=/\n"
 "\n"
 "\t\tTo proxy only part of the kubernetes api and also some static files:\n"
 "\n"
-"\t\t    $ kubectl proxy —www=/my/files —www-prefix=/static/ —api-prefix=/"
+"\t\t    $ kubectl proxy --www=/my/files --www-prefix=/static/ --api-prefix=/"
 "api/\n"
 "\n"
-"\t\tThe above lets you ‘curl localhost:8001/api/v1/pods’.\n"
+"\t\tThe above lets you 'curl localhost:8001/api/v1/pods'.\n"
 "\n"
 "\t\tTo proxy the entire kubernetes api at a different root, use:\n"
 "\n"
-"\t\t    $ kubectl proxy —api-prefix=/custom/\n"
+"\t\t    $ kubectl proxy --api-prefix=/custom/\n"
 "\n"
-"\t\tThe above lets you ‘curl localhost:8001/custom/api/v1/pods’"
+"\t\tThe above lets you 'curl localhost:8001/custom/api/v1/pods'"
 
 #: pkg/kubectl/cmd/patch.go:59
 msgid ""
@@ -16092,10 +16111,10 @@ msgstr ""
 "\n"
 "\t\t* A label must begin with a letter or number, and may contain letters, "
 "numbers, hyphens, dots, and underscores, up to %[1]d characters.\n"
-"\t\t* If —overwrite is true, then existing labels can be overwritten, "
+"\t\t* If --overwrite is true, then existing labels can be overwritten, "
 "otherwise attempting to overwrite a label will result in an error.\n"
-"\t\t* If —resource-version is specified, then updates will use this resource "
-"version, otherwise the existing resource-version will be used."
+"\t\t* If --resource-version is specified, then updates will use this "
+"resource version, otherwise the existing resource-version will be used."
 
 #: pkg/kubectl/cmd/taint.go:58
 #, c-format
@@ -16166,8 +16185,8 @@ msgid ""
 msgstr ""
 "\n"
 "\t    # !!!Important Note!!!\n"
-"\t    # Requires that the ‘tar’ binary is present in your container\n"
-"\t    # image.  If ‘tar’ is not present, ‘kubectl cp’ will fail.\n"
+"\t    # Requires that the 'tar' binary is present in your container\n"
+"\t    # image.  If 'tar' is not present, 'kubectl cp' will fail.\n"
 "\n"
 "\t    # Copy /tmp/foo_dir local directory to /tmp/bar_dir in a remote pod in "
 "the default namespace\n"
@@ -16193,8 +16212,8 @@ msgid ""
 msgstr ""
 "\n"
 "\t  # Create a new TLS secret named tls-secret with the given key pair:\n"
-"\t  kubectl create secret tls tls-secret —cert=path/to/tls.cert —key=path/to/"
-"tls.key"
+"\t  kubectl create secret tls tls-secret --cert=path/to/tls.cert --key=path/"
+"to/tls.key"
 
 #: pkg/kubectl/cmd/create_namespace.go:35
 msgid ""
@@ -16226,17 +16245,17 @@ msgstr ""
 "\n"
 "\t  # Create a new secret named my-secret with keys for each file in folder "
 "bar\n"
-"\t  kubectl create secret generic my-secret —from-file=path/to/bar\n"
+"\t  kubectl create secret generic my-secret --from-file=path/to/bar\n"
 "\n"
 "\t  # Create a new secret named my-secret with specified keys instead of "
 "names on disk\n"
-"\t  kubectl create secret generic my-secret —from-file=ssh-privatekey=~/.ssh/"
-"id_rsa —from-file=ssh-publickey=~/.ssh/id_rsa.pub\n"
+"\t  kubectl create secret generic my-secret --from-file=ssh-privatekey=~/."
+"ssh/id_rsa --from-file=ssh-publickey=~/.ssh/id_rsa.pub\n"
 "\n"
 "\t  # Create a new secret named my-secret with key1=supersecret and "
 "key2=topsecret\n"
-"\t  kubectl create secret generic my-secret —from-literal=key1=supersecret —"
-"from-literal=key2=topsecret"
+"\t  kubectl create secret generic my-secret --from-literal=key1=supersecret "
+"--from-literal=key2=topsecret"
 
 #: pkg/kubectl/cmd/create_serviceaccount.go:35
 msgid ""
@@ -16256,7 +16275,7 @@ msgid ""
 msgstr ""
 "\n"
 "\t# Create a new ExternalName service named my-ns \n"
-"\tkubectl create service externalname my-ns —external-name bar.com"
+"\tkubectl create service externalname my-ns --external-name bar.com"
 
 #: pkg/kubectl/cmd/create_service.go:225
 msgid ""
@@ -16292,7 +16311,7 @@ msgid ""
 msgstr ""
 "\n"
 "    # Create a new LoadBalancer service named my-lbs\n"
-"    kubectl create service loadbalancer my-lbs —tcp=5678:8080"
+"    kubectl create service loadbalancer my-lbs --tcp=5678:8080"
 
 #: pkg/kubectl/cmd/create_service.go:53
 msgid ""
@@ -16305,10 +16324,10 @@ msgid ""
 msgstr ""
 "\n"
 "    # Create a new clusterIP service named my-cs\n"
-"    kubectl create service clusterip my-cs —tcp=5678:8080\n"
+"    kubectl create service clusterip my-cs --tcp=5678:8080\n"
 "\n"
 "    # Create a new clusterIP service named my-cs (in headless mode)\n"
-"    kubectl create service clusterip my-cs —clusterip=“None”"
+"    kubectl create service clusterip my-cs --clusterip=\"None\""
 
 #: pkg/kubectl/cmd/create_deployment.go:36
 msgid ""
@@ -16318,7 +16337,7 @@ msgid ""
 msgstr ""
 "\n"
 "    # Create a new deployment named my-dep that runs the busybox image.\n"
-"    kubectl create deployment my-dep —image=busybox"
+"    kubectl create deployment my-dep --image=busybox"
 
 #: pkg/kubectl/cmd/create_service.go:116
 msgid ""
@@ -16328,7 +16347,7 @@ msgid ""
 msgstr ""
 "\n"
 "    # Create a new nodeport service named my-ns\n"
-"    kubectl create service nodeport my-ns —tcp=5678:8080"
+"    kubectl create service nodeport my-ns --tcp=5678:8080"
 
 #: pkg/kubectl/cmd/clusterinfo_dump.go:62
 msgid ""
@@ -16351,13 +16370,13 @@ msgstr ""
 "    kubectl cluster-info dump\n"
 "\n"
 "    # Dump current cluster state to /path/to/cluster-state\n"
-"    kubectl cluster-info dump —output-directory=/path/to/cluster-state\n"
+"    kubectl cluster-info dump --output-directory=/path/to/cluster-state\n"
 "\n"
 "    # Dump all namespaces to stdout\n"
-"    kubectl cluster-info dump —all-namespaces\n"
+"    kubectl cluster-info dump --all-namespaces\n"
 "\n"
 "    # Dump a set of namespaces to /path/to/cluster-state\n"
-"    kubectl cluster-info dump —namespaces default,kube-system —output-"
+"    kubectl cluster-info dump --namespaces default,kube-system --output-"
 "directory=/path/to/cluster-state"
 
 #: pkg/kubectl/cmd/annotate.go:78
@@ -16397,25 +16416,26 @@ msgstr ""
 "    kubectl annotate pods foo description='my frontend'\n"
 "\n"
 "    # Update a pod identified by type and name in \"pod.json\"\n"
-"    kubectl annotate -f pod.json description=‘my frontend’\n"
+"    kubectl annotate -f pod.json description='my frontend'\n"
 "\n"
-"    # Update pod ‘foo’ with the annotation ‘description’ and the value ‘my "
-"frontend running nginx’, overwriting any existing value.\n"
-"    kubectl annotate —overwrite pods foo description=‘my frontend running "
-"nginx’\n"
+"    # Update pod 'foo' with the annotation 'description' and the value 'my "
+"frontend running nginx', overwriting any existing value.\n"
+"    kubectl annotate --overwrite pods foo description='my frontend running "
+"nginx'\n"
 "\n"
 "    # Update all pods in the namespace\n"
-"    kubectl annotate pods —all description=‘my frontend running nginx’\n"
+"    kubectl annotate pods --all description='my frontend running nginx'\n"
 "\n"
-"    # Update pod ‘foo’ only if the resource is unchanged from version 1.\n"
-"    kubectl annotate pods foo description=‘my frontend running nginx’ —"
+"    # Update pod 'foo' only if the resource is unchanged from version 1.\n"
+"    kubectl annotate pods foo description='my frontend running nginx' --"
 "resource-version=1\n"
 "\n"
-"    # Update pod ‘foo’ by removing an annotation named ‘description’ if it "
+"    # Update pod 'foo' by removing an annotation named 'description' if it "
 "exists.\n"
-"    # Does not require the —overwrite flag.\n"
+"    # Does not require the --overwrite flag.\n"
 "    kubectl annotate pods foo description-"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_namespace.go#L44
 #: pkg/kubectl/cmd/create_service.go:170
 msgid ""
 "\n"
@@ -16424,6 +16444,7 @@ msgstr ""
 "\n"
 "    Create a LoadBalancer service with the specified name."
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_serviceaccount.go#L44
 #: pkg/kubectl/cmd/create_service.go:50
 msgid ""
 "\n"
@@ -16432,6 +16453,7 @@ msgstr ""
 "\n"
 "    Create a clusterIP service with the specified name."
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_deployment.go#L44
 #: pkg/kubectl/cmd/create_deployment.go:33
 msgid ""
 "\n"
@@ -16440,6 +16462,7 @@ msgstr ""
 "\n"
 "    Create a deployment with the specified name."
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_deployment.go#L44
 #: pkg/kubectl/cmd/create_service.go:113
 msgid ""
 "\n"
@@ -16467,11 +16490,11 @@ msgstr ""
 "\n"
 "    Dumps cluster info out suitable for debugging and diagnosing cluster "
 "problems.  By default, dumps everything to\n"
-"    stdout. You can optionally specify a directory with —output-directory.  "
+"    stdout. You can optionally specify a directory with --output-directory.  "
 "If you specify a directory, kubernetes will\n"
 "    build a set of files in that directory.  By default only dumps things in "
-"the ‘kube-system’ namespace, but you can\n"
-"    switch to a different namespace with the —namespaces flag, or specify —"
+"the 'kube-system' namespace, but you can\n"
+"    switch to a different namespace with the --namespaces flag, or specify --"
 "all-namespaces to dump all namespaces.\n"
 "\n"
 "    The command also dumps the logs of all of the pods in the cluster, these "
@@ -16489,9 +16512,10 @@ msgstr ""
 "\n"
 "  Display addresses of the master and services with label kubernetes.io/"
 "cluster-service=true\n"
-"  To further debug and diagnose cluster problems, use ‘kubectl cluster-info "
-"dump’."
+"  To further debug and diagnose cluster problems, use 'kubectl cluster-info "
+"dump'."
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_quota.go#L61
 #: pkg/kubectl/cmd/create_quota.go:62
 msgid ""
 "A comma-delimited set of quota scopes that must all match each object "
@@ -16500,12 +16524,14 @@ msgstr ""
 "A comma-delimited set of quota scopes that must all match each object "
 "tracked by the quota."
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_quota.go#L60
 #: pkg/kubectl/cmd/create_quota.go:61
 msgid ""
 "A comma-delimited set of resource=quantity pairs that define a hard limit."
 msgstr ""
 "A comma-delimited set of resource=quantity pairs that define a hard limit."
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_pdb.go#L63
 #: pkg/kubectl/cmd/create_pdb.go:64
 msgid ""
 "A label selector to use for this budget. Only equality-based selector "
@@ -16514,6 +16540,7 @@ msgstr ""
 "A label selector to use for this budget. Only equality-based selector "
 "requirements are supported."
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/expose.go#L106
 #: pkg/kubectl/cmd/expose.go:104
 msgid ""
 "A label selector to use for this service. Only equality-based selector "
@@ -16524,10 +16551,12 @@ msgstr ""
 "requirements are supported. If empty (the default) infer the selector from "
 "the replication controller or replica set.)"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/run.go#L136
 #: pkg/kubectl/cmd/run.go:139
 msgid "A schedule in the Cron format the job should be run with."
 msgstr "A schedule in the Cron format the job should be run with."
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/expose.go#L111
 #: pkg/kubectl/cmd/expose.go:109
 msgid ""
 "Additional external IP address (not managed by Kubernetes) to accept for the "
@@ -16538,6 +16567,7 @@ msgstr ""
 "service. If this IP is routed to a node, the service can be accessed by this "
 "IP in addition to its generated service IP."
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/run.go#L119
 #: pkg/kubectl/cmd/expose.go:110 pkg/kubectl/cmd/run.go:122
 msgid ""
 "An inline JSON override for the generated object. If this is non-empty, it "
@@ -16548,6 +16578,7 @@ msgstr ""
 "is used to override the generated object. Requires that the object supply a "
 "valid apiVersion field."
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/run.go#L134
 #: pkg/kubectl/cmd/run.go:137
 msgid ""
 "An inline JSON override for the generated service object. If this is non-"
@@ -16556,140 +16587,167 @@ msgid ""
 msgstr ""
 "An inline JSON override for the generated service object. If this is non-"
 "empty, it is used to override the generated object. Requires that the object "
-"supply a valid apiVersion field.  Only used if —expose is true."
+"supply a valid apiVersion field.  Only used if --expose is true."
 
-# https://github.com/kubernetes/kubernetes/blob/masterpkg/kubectl/cmd/apply.go#L98
 #: pkg/kubectl/cmd/apply.go:104
 msgid "Apply a configuration to a resource by filename or stdin"
-msgstr "ファイル名を指定または標準入力経由でリソースにコンフィグを適用する"
+msgstr "ファイル名または標準入力でリソースにコンフィグを適用する"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/certificates.go#L71
 #: pkg/kubectl/cmd/certificates.go:72
 msgid "Approve a certificate signing request"
 msgstr "Approve a certificate signing request"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_service.go#L81
 #: pkg/kubectl/cmd/create_service.go:82
 msgid ""
 "Assign your own ClusterIP or set to 'None' for a 'headless' service (no "
 "loadbalancing)."
 msgstr ""
-"Assign your own ClusterIP or set to ‘None’ for a ‘headless’ service (no "
+"Assign your own ClusterIP or set to 'None' for a 'headless' service (no "
 "loadbalancing)."
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/attach.go#L64
 #: pkg/kubectl/cmd/attach.go:70
 msgid "Attach to a running container"
 msgstr "Attach to a running container"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/autoscale.go#L55
 #: pkg/kubectl/cmd/autoscale.go:56
 msgid "Auto-scale a Deployment, ReplicaSet, or ReplicationController"
 msgstr "Auto-scale a Deployment, ReplicaSet, or ReplicationController"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/expose.go#L115
 #: pkg/kubectl/cmd/expose.go:113
 msgid ""
 "ClusterIP to be assigned to the service. Leave empty to auto-allocate, or "
 "set to 'None' to create a headless service."
 msgstr ""
 "ClusterIP to be assigned to the service. Leave empty to auto-allocate, or "
-"set to ‘None’ to create a headless service."
+"set to 'None' to create a headless service."
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_clusterrolebinding.go#L55
 #: pkg/kubectl/cmd/create_clusterrolebinding.go:56
 msgid "ClusterRole this ClusterRoleBinding should reference"
 msgstr "ClusterRole this ClusterRoleBinding should reference"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_rolebinding.go#L55
 #: pkg/kubectl/cmd/create_rolebinding.go:56
 msgid "ClusterRole this RoleBinding should reference"
 msgstr "ClusterRole this RoleBinding should reference"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/rollingupdate.go#L101
 #: pkg/kubectl/cmd/rollingupdate.go:102
 msgid ""
 "Container name which will have its image upgraded. Only relevant when --"
 "image is specified, ignored otherwise. Required when using --image on a "
 "multi-container pod"
 msgstr ""
-"Container name which will have its image upgraded. Only relevant when —image "
-"is specified, ignored otherwise. Required when using —image on a multi-"
-"container pod"
+"Container name which will have its image upgraded. Only relevant when --"
+"image is specified, ignored otherwise. Required when using --image on a "
+"multi-container pod"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/convert.go#L67
 #: pkg/kubectl/cmd/convert.go:68
 msgid "Convert config files between different API versions"
 msgstr "Convert config files between different API versions"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/cp.go#L64
 #: pkg/kubectl/cmd/cp.go:65
 msgid "Copy files and directories to and from containers."
 msgstr "Copy files and directories to and from containers."
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_clusterrolebinding.go#L43
 #: pkg/kubectl/cmd/create_clusterrolebinding.go:44
 msgid "Create a ClusterRoleBinding for a particular ClusterRole"
 msgstr "Create a ClusterRoleBinding for a particular ClusterRole"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_service.go#L181
 #: pkg/kubectl/cmd/create_service.go:182
 msgid "Create a LoadBalancer service."
 msgstr "Create a LoadBalancer service."
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_service.go#L124
 #: pkg/kubectl/cmd/create_service.go:125
 msgid "Create a NodePort service."
 msgstr "Create a NodePort service."
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_rolebinding.go#L43
 #: pkg/kubectl/cmd/create_rolebinding.go:44
 msgid "Create a RoleBinding for a particular Role or ClusterRole"
 msgstr "Create a RoleBinding for a particular Role or ClusterRole"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_secret.go#L214
 #: pkg/kubectl/cmd/create_secret.go:214
 msgid "Create a TLS secret"
 msgstr "Create a TLS secret"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_service.go#L68
 #: pkg/kubectl/cmd/create_service.go:69
 msgid "Create a clusterIP service."
 msgstr "Create a clusterIP service."
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_configmap.go#L59
 #: pkg/kubectl/cmd/create_configmap.go:60
 msgid "Create a configmap from a local file, directory or literal value"
 msgstr "Create a configmap from a local file, directory or literal value"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_deployment.go#L44
 #: pkg/kubectl/cmd/create_deployment.go:46
 msgid "Create a deployment with the specified name."
 msgstr "Create a deployment with the specified name."
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_namespace.go#L44
 #: pkg/kubectl/cmd/create_namespace.go:45
 msgid "Create a namespace with the specified name"
 msgstr "Create a namespace with the specified name"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_pdb.go#L49
 #: pkg/kubectl/cmd/create_pdb.go:50
 msgid "Create a pod disruption budget with the specified name."
 msgstr "Create a pod disruption budget with the specified name."
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_quota.go#L47
 #: pkg/kubectl/cmd/create_quota.go:48
 msgid "Create a quota with the specified name."
 msgstr "Create a quota with the specified name."
 
-# https://github.com/kubernetes/kubernetes/blob/masterpkg/kubectl/cmd/apply.go#L98
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create.go#L56
 #: pkg/kubectl/cmd/create.go:63
 msgid "Create a resource by filename or stdin"
-msgstr "ファイル名を指定または標準入力経由でリソースを作成する"
+msgstr "ファイル名または標準入力でリソースを作成する"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_secret.go#L143
 #: pkg/kubectl/cmd/create_secret.go:144
 msgid "Create a secret for use with a Docker registry"
 msgstr "Create a secret for use with a Docker registry"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_secret.go#L73
 #: pkg/kubectl/cmd/create_secret.go:74
 msgid "Create a secret from a local file, directory or literal value"
 msgstr "Create a secret from a local file, directory or literal value"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_secret.go#L34
 #: pkg/kubectl/cmd/create_secret.go:35
 msgid "Create a secret using specified subcommand"
 msgstr "Create a secret using specified subcommand"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_serviceaccount.go#L44
 #: pkg/kubectl/cmd/create_serviceaccount.go:45
 msgid "Create a service account with the specified name"
 msgstr "Create a service account with the specified name"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_service.go#L36
 #: pkg/kubectl/cmd/create_service.go:37
 msgid "Create a service using specified subcommand."
 msgstr "Create a service using specified subcommand."
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_service.go#L240
 #: pkg/kubectl/cmd/create_service.go:241
 msgid "Create an ExternalName service."
 msgstr "Create an ExternalName service."
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/delete.go#L130
 #: pkg/kubectl/cmd/delete.go:132
 msgid ""
 "Delete resources by filenames, stdin, resources and names, or by resources "
@@ -16701,17 +16759,19 @@ msgstr ""
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/delete_cluster.go#L38
 #: pkg/kubectl/cmd/config/delete_cluster.go:39
 msgid "Delete the specified cluster from the kubeconfig"
-msgstr "kubeconfigから指定したクラスターを削除する"
+msgstr "指定したコンテキストをkubeconfigから削除する"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/delete_context.go#L38
 #: pkg/kubectl/cmd/config/delete_context.go:39
 msgid "Delete the specified context from the kubeconfig"
-msgstr "kubeconfigから指定したコンテキストを削除する"
+msgstr "指定したコンテキストをkubeconfigから削除する"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/certificates.go#L121
 #: pkg/kubectl/cmd/certificates.go:122
 msgid "Deny a certificate signing request"
 msgstr "Deny a certificate signing request"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/stop.go#L58
 #: pkg/kubectl/cmd/stop.go:59
 msgid "Deprecated: Gracefully shut down a resource by name or filename"
 msgstr "Deprecated: Gracefully shut down a resource by name or filename"
@@ -16721,21 +16781,23 @@ msgstr "Deprecated: Gracefully shut down a resource by name or filename"
 msgid "Describe one or many contexts"
 msgstr "1つまたは複数のコンテキストを記述する"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/top_node.go#L77
 #: pkg/kubectl/cmd/top_node.go:78
 msgid "Display Resource (CPU/Memory) usage of nodes"
 msgstr "Display Resource (CPU/Memory) usage of nodes"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/top_pod.go#L79
 #: pkg/kubectl/cmd/top_pod.go:80
 msgid "Display Resource (CPU/Memory) usage of pods"
 msgstr "Display Resource (CPU/Memory) usage of pods"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/top.go#L43
 #: pkg/kubectl/cmd/top.go:44
 msgid "Display Resource (CPU/Memory) usage."
 msgstr "Display Resource (CPU/Memory) usage."
 
-# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/get_clusters.go#L40
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/clusterinfo.go#L49
 #: pkg/kubectl/cmd/clusterinfo.go:51
-#| msgid "Display clusters defined in the kubeconfig"
 msgid "Display cluster info"
 msgstr "クラスターの情報を表示する"
 
@@ -16747,10 +16809,9 @@ msgstr "kubeconfigで定義されたクラスターを表示する"
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/view.go#L64
 #: pkg/kubectl/cmd/config/view.go:67
 msgid "Display merged kubeconfig settings or a specified kubeconfig file"
-msgstr ""
-"マージされたkubeconfigの設定または指定されたkubeconfigファイルを表示する"
+msgstr "マージされたkubeconfigの設定または指定されたkubeconfigを表示する"
 
-# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/get_contexts.go#L62
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/get.go#L107
 #: pkg/kubectl/cmd/get.go:111
 msgid "Display one or many resources"
 msgstr "1つまたは複数のリソースを表示する"
@@ -16758,48 +16819,58 @@ msgstr "1つまたは複数のリソースを表示する"
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/current_context.go#L48
 #: pkg/kubectl/cmd/config/current_context.go:49
 msgid "Displays the current-context"
-msgstr "カレントコンテキストを表示する"
+msgstr "current-contextを表示する"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/explain.go#L50
 #: pkg/kubectl/cmd/explain.go:51
 msgid "Documentation of resources"
 msgstr "リソースの説明を表示する"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/drain.go#L176
 #: pkg/kubectl/cmd/drain.go:178
 msgid "Drain node in preparation for maintenance"
 msgstr "Drain node in preparation for maintenance"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/clusterinfo_dump.go#L37
 #: pkg/kubectl/cmd/clusterinfo_dump.go:39
 msgid "Dump lots of relevant info for debugging and diagnosis"
 msgstr "Dump lots of relevant info for debugging and diagnosis"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/edit.go#L100
 #: pkg/kubectl/cmd/edit.go:110
 msgid "Edit a resource on the server"
 msgstr "Edit a resource on the server"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_secret.go#L159
 #: pkg/kubectl/cmd/create_secret.go:160
 msgid "Email for Docker registry"
 msgstr "Email for Docker registry"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/exec.go#L68
 #: pkg/kubectl/cmd/exec.go:69
 msgid "Execute a command in a container"
 msgstr "Execute a command in a container"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/rollingupdate.go#L102
 #: pkg/kubectl/cmd/rollingupdate.go:103
 msgid ""
 "Explicit policy for when to pull container images. Required when --image is "
 "same as existing image, ignored otherwise."
 msgstr ""
-"Explicit policy for when to pull container images. Required when —image is "
+"Explicit policy for when to pull container images. Required when --image is "
 "same as existing image, ignored otherwise."
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/portforward.go#L75
 #: pkg/kubectl/cmd/portforward.go:76
 msgid "Forward one or more local ports to a pod"
 msgstr "Forward one or more local ports to a pod"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/help.go#L36
 #: pkg/kubectl/cmd/help.go:37
 msgid "Help about any command"
 msgstr "Help about any command"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/expose.go#L105
 #: pkg/kubectl/cmd/expose.go:103
 msgid ""
 "IP to assign to the Load Balancer. If empty, an ephemeral IP will be created "
@@ -16808,14 +16879,16 @@ msgstr ""
 "IP to assign to the Load Balancer. If empty, an ephemeral IP will be created "
 "and used (cloud-provider specific)."
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/expose.go#L114
 #: pkg/kubectl/cmd/expose.go:112
 msgid ""
 "If non-empty, set the session affinity for the service to this; legal "
 "values: 'None', 'ClientIP'"
 msgstr ""
 "If non-empty, set the session affinity for the service to this; legal "
-"values: ‘None’, ‘ClientIP’"
+"values: 'None', 'ClientIP'"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/annotate.go#L135
 #: pkg/kubectl/cmd/annotate.go:136
 msgid ""
 "If non-empty, the annotation update will only succeed if this is the current "
@@ -16826,6 +16899,7 @@ msgstr ""
 "resource-version for the object. Only valid when specifying a single "
 "resource."
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/label.go#L132
 #: pkg/kubectl/cmd/label.go:134
 msgid ""
 "If non-empty, the labels update will only succeed if this is the current "
@@ -16836,6 +16910,7 @@ msgstr ""
 "resource-version for the object. Only valid when specifying a single "
 "resource."
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/rollingupdate.go#L98
 #: pkg/kubectl/cmd/rollingupdate.go:99
 msgid ""
 "Image to use for upgrading the replication controller. Must be distinct from "
@@ -16844,24 +16919,29 @@ msgid ""
 msgstr ""
 "Image to use for upgrading the replication controller. Must be distinct from "
 "the existing image (either new image or new image tag).  Can not be used "
-"with —filename/-f"
+"with --filename/-f"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/rollout/rollout.go#L46
 #: pkg/kubectl/cmd/rollout/rollout.go:47
 msgid "Manage a deployment rollout"
 msgstr "Manage a deployment rollout"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/drain.go#L127
 #: pkg/kubectl/cmd/drain.go:128
 msgid "Mark node as schedulable"
 msgstr "Mark node as schedulable"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/drain.go#L102
 #: pkg/kubectl/cmd/drain.go:103
 msgid "Mark node as unschedulable"
 msgstr "Mark node as unschedulable"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/rollout/rollout_pause.go#L73
 #: pkg/kubectl/cmd/rollout/rollout_pause.go:74
 msgid "Mark the provided resource as paused"
 msgstr "Mark the provided resource as paused"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/certificates.go#L35
 #: pkg/kubectl/cmd/certificates.go:36
 msgid "Modify certificate resources."
 msgstr "Modify certificate resources."
@@ -16869,8 +16949,9 @@ msgstr "Modify certificate resources."
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/config.go#L39
 #: pkg/kubectl/cmd/config/config.go:40
 msgid "Modify kubeconfig files"
-msgstr "kubeconfigファイルを変更する"
+msgstr "kubeconfigを変更する"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/expose.go#L110
 #: pkg/kubectl/cmd/expose.go:108
 msgid ""
 "Name or number for the port on the container that the service should direct "
@@ -16879,6 +16960,7 @@ msgstr ""
 "Name or number for the port on the container that the service should direct "
 "traffic to. Optional."
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/logs.go#L108
 #: pkg/kubectl/cmd/logs.go:113
 msgid ""
 "Only return logs after a specific date (RFC3339). Defaults to all logs. Only "
@@ -16887,34 +16969,41 @@ msgstr ""
 "Only return logs after a specific date (RFC3339). Defaults to all logs. Only "
 "one of since-time / since may be used."
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/completion.go#L97
 #: pkg/kubectl/cmd/completion.go:104
 msgid "Output shell completion code for the specified shell (bash or zsh)"
 msgstr "Output shell completion code for the specified shell (bash or zsh)"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/edit.go#L115
 #: pkg/kubectl/cmd/convert.go:85
 msgid ""
 "Output the formatted object with the given group version (for ex: "
 "'extensions/v1beta1').)"
 msgstr ""
 "Output the formatted object with the given group version (for ex: "
-"‘extensions/v1beta1’).)"
+"'extensions/v1beta1').)"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_secret.go#L157
 #: pkg/kubectl/cmd/create_secret.go:158
 msgid "Password for Docker registry authentication"
 msgstr "Password for Docker registry authentication"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_secret.go#L226
 #: pkg/kubectl/cmd/create_secret.go:226
 msgid "Path to PEM encoded public key certificate."
 msgstr "Path to PEM encoded public key certificate."
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_secret.go#L227
 #: pkg/kubectl/cmd/create_secret.go:227
 msgid "Path to private key associated with given certificate."
 msgstr "Path to private key associated with given certificate."
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/rollingupdate.go#L84
 #: pkg/kubectl/cmd/rollingupdate.go:85
 msgid "Perform a rolling update of the given ReplicationController"
 msgstr "Perform a rolling update of the given ReplicationController"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/scale.go#L82
 #: pkg/kubectl/cmd/scale.go:83
 msgid ""
 "Precondition for resource version. Requires that the current resource "
@@ -16923,49 +17012,59 @@ msgstr ""
 "Precondition for resource version. Requires that the current resource "
 "version match this value in order to scale."
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/version.go#L39
 #: pkg/kubectl/cmd/version.go:40
 msgid "Print the client and server version information"
 msgstr "Print the client and server version information"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/options.go#L37
 #: pkg/kubectl/cmd/options.go:38
 msgid "Print the list of flags inherited by all commands"
 msgstr "Print the list of flags inherited by all commands"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/logs.go#L86
 #: pkg/kubectl/cmd/logs.go:93
 msgid "Print the logs for a container in a pod"
 msgstr "Print the logs for a container in a pod"
 
-# https://github.com/kubernetes/kubernetes/blob/masterpkg/kubectl/cmd/apply.go#L98
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/replace.go#L70
 #: pkg/kubectl/cmd/replace.go:71
 msgid "Replace a resource by filename or stdin"
 msgstr "Replace a resource by filename or stdin"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/rollout/rollout_resume.go#L71
 #: pkg/kubectl/cmd/rollout/rollout_resume.go:72
 msgid "Resume a paused resource"
 msgstr "Resume a paused resource"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_rolebinding.go#L56
 #: pkg/kubectl/cmd/create_rolebinding.go:57
 msgid "Role this RoleBinding should reference"
 msgstr "Role this RoleBinding should reference"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/run.go#L94
 #: pkg/kubectl/cmd/run.go:97
 msgid "Run a particular image on the cluster"
 msgstr "Run a particular image on the cluster"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/proxy.go#L68
 #: pkg/kubectl/cmd/proxy.go:69
 msgid "Run a proxy to the Kubernetes API server"
 msgstr "Run a proxy to the Kubernetes API server"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_secret.go#L161
 #: pkg/kubectl/cmd/create_secret.go:161
 msgid "Server location for Docker registry"
 msgstr "Server location for Docker registry"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/scale.go#L71
 #: pkg/kubectl/cmd/scale.go:71
 msgid ""
 "Set a new size for a Deployment, ReplicaSet, Replication Controller, or Job"
 msgstr ""
 "Set a new size for a Deployment, ReplicaSet, Replication Controller, or Job"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/set/set.go#L37
 #: pkg/kubectl/cmd/set/set.go:38
 msgid "Set specific features on objects"
 msgstr "Set specific features on objects"
@@ -16978,6 +17077,7 @@ msgstr ""
 "Set the last-applied-configuration annotation on a live object to match the "
 "contents of a file."
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/set/set_selector.go#L81
 #: pkg/kubectl/cmd/set/set_selector.go:82
 msgid "Set the selector on a resource"
 msgstr "リソースのセレクターを設定する"
@@ -17000,25 +17100,29 @@ msgstr "kubeconfigにユーザーエントリを設定する"
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/set.go#L59
 #: pkg/kubectl/cmd/config/set.go:60
 msgid "Sets an individual value in a kubeconfig file"
-msgstr "kubeconfigファイル内の変数を個別に設定する"
+msgstr "kubeconfigに個別の変数を設定する"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/use_context.go#L48
 #: pkg/kubectl/cmd/config/use_context.go:49
 msgid "Sets the current-context in a kubeconfig file"
-msgstr "kubeconfigにカレントコンテキストを設定する"
+msgstr "kubeconfigにcurrent-contextを設定する"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/describe.go#L80
 #: pkg/kubectl/cmd/describe.go:86
 msgid "Show details of a specific resource or group of resources"
 msgstr "Show details of a specific resource or group of resources"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/rollout/rollout_status.go#L57
 #: pkg/kubectl/cmd/rollout/rollout_status.go:58
 msgid "Show the status of the rollout"
 msgstr "Show the status of the rollout"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/expose.go#L108
 #: pkg/kubectl/cmd/expose.go:106
 msgid "Synonym for --target-port"
-msgstr "Synonym for —target-port"
+msgstr "Synonym for --target-port"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/expose.go#L87
 #: pkg/kubectl/cmd/expose.go:88
 msgid ""
 "Take a replication controller, service, deployment or pod and expose it as a "
@@ -17027,10 +17131,12 @@ msgstr ""
 "Take a replication controller, service, deployment or pod and expose it as a "
 "new Kubernetes Service"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/run.go#L114
 #: pkg/kubectl/cmd/run.go:117
 msgid "The image for the container to run."
 msgstr "The image for the container to run."
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/run.go#L116
 #: pkg/kubectl/cmd/run.go:119
 msgid ""
 "The image pull policy for the container. If left empty, this value will not "
@@ -17039,24 +17145,28 @@ msgstr ""
 "The image pull policy for the container. If left empty, this value will not "
 "be specified by the client and defaulted by the server"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/rollingupdate.go#L100
 #: pkg/kubectl/cmd/rollingupdate.go:101
 msgid ""
 "The key to use to differentiate between two different controllers, default "
 "'deployment'.  Only relevant when --image is specified, ignored otherwise"
 msgstr ""
 "The key to use to differentiate between two different controllers, default "
-"‘deployment’.  Only relevant when —image is specified, ignored otherwise"
+"'deployment'.  Only relevant when --image is specified, ignored otherwise"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_pdb.go#L62
 #: pkg/kubectl/cmd/create_pdb.go:63
 msgid ""
 "The minimum number or percentage of available pods this budget requires."
 msgstr ""
 "The minimum number or percentage of available pods this budget requires."
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/expose.go#L113
 #: pkg/kubectl/cmd/expose.go:111
 msgid "The name for the newly created object."
 msgstr "The name for the newly created object."
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/autoscale.go#L71
 #: pkg/kubectl/cmd/autoscale.go:72
 msgid ""
 "The name for the newly created object. If not specified, the name of the "
@@ -17065,6 +17175,7 @@ msgstr ""
 "The name for the newly created object. If not specified, the name of the "
 "input resource will be used."
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/run.go#L113
 #: pkg/kubectl/cmd/run.go:116
 msgid ""
 "The name of the API generator to use, see http://kubernetes.io/docs/user-"
@@ -17073,12 +17184,14 @@ msgstr ""
 "The name of the API generator to use, see http://kubernetes.io/docs/user-"
 "guide/kubectl-conventions/#generators for a list."
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/autoscale.go#L66
 #: pkg/kubectl/cmd/autoscale.go:67
 msgid ""
 "The name of the API generator to use. Currently there is only 1 generator."
 msgstr ""
 "The name of the API generator to use. Currently there is only 1 generator."
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/expose.go#L98
 #: pkg/kubectl/cmd/expose.go:99
 msgid ""
 "The name of the API generator to use. There are 2 generators: 'service/v1' "
@@ -17086,23 +17199,26 @@ msgid ""
 "v1 is named 'default', while it is left unnamed in v2. Default is 'service/"
 "v2'."
 msgstr ""
-"The name of the API generator to use. There are 2 generators: ‘service/v1’ "
-"and ‘service/v2’. The only difference between them is that service port in "
-"v1 is named ‘default’, while it is left unnamed in v2. Default is ‘service/"
-"v2’."
+"The name of the API generator to use. There are 2 generators: 'service/v1' "
+"and 'service/v2'. The only difference between them is that service port in "
+"v1 is named 'default', while it is left unnamed in v2. Default is 'service/"
+"v2'."
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/run.go#L133
 #: pkg/kubectl/cmd/run.go:136
 msgid ""
 "The name of the generator to use for creating a service.  Only used if --"
 "expose is true"
 msgstr ""
-"The name of the generator to use for creating a service.  Only used if —"
+"The name of the generator to use for creating a service.  Only used if --"
 "expose is true"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/expose.go#L99
 #: pkg/kubectl/cmd/expose.go:100
 msgid "The network protocol for the service to be created. Default is 'TCP'."
-msgstr "The network protocol for the service to be created. Default is ‘TCP’."
+msgstr "The network protocol for the service to be created. Default is 'TCP'."
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/expose.go#L100
 #: pkg/kubectl/cmd/expose.go:101
 msgid ""
 "The port that the service should serve on. Copied from the resource being "
@@ -17111,24 +17227,27 @@ msgstr ""
 "The port that the service should serve on. Copied from the resource being "
 "exposed, if unspecified"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/run.go#L121
 #: pkg/kubectl/cmd/run.go:124
 msgid ""
 "The port that this container exposes.  If --expose is true, this is also the "
 "port used by the service that is created."
 msgstr ""
-"The port that this container exposes.  If —expose is true, this is also the "
+"The port that this container exposes.  If --expose is true, this is also the "
 "port used by the service that is created."
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/run.go#L131
 #: pkg/kubectl/cmd/run.go:134
 msgid ""
 "The resource requirement limits for this container.  For example, 'cpu=200m,"
 "memory=512Mi'.  Note that server side components may assign limits depending "
 "on the server configuration, such as limit ranges."
 msgstr ""
-"The resource requirement limits for this container.  For example, ‘cpu=200m,"
-"memory=512Mi’.  Note that server side components may assign limits depending "
+"The resource requirement limits for this container.  For example, 'cpu=200m,"
+"memory=512Mi'.  Note that server side components may assign limits depending "
 "on the server configuration, such as limit ranges."
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/run.go#L130
 #: pkg/kubectl/cmd/run.go:133
 msgid ""
 "The resource requirement requests for this container.  For example, "
@@ -17136,9 +17255,10 @@ msgid ""
 "requests depending on the server configuration, such as limit ranges."
 msgstr ""
 "The resource requirement requests for this container.  For example, "
-"‘cpu=100m,memory=256Mi’.  Note that server side components may assign "
+"'cpu=100m,memory=256Mi'.  Note that server side components may assign "
 "requests depending on the server configuration, such as limit ranges."
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/run.go#L128
 #: pkg/kubectl/cmd/run.go:131
 msgid ""
 "The restart policy for this Pod.  Legal values [Always, OnFailure, Never].  "
@@ -17147,22 +17267,25 @@ msgid ""
 "replicas must be 1.  Default 'Always', for CronJobs ` + "`" + `Never` + "`" + `."
 msgstr ""
 "The restart policy for this Pod.  Legal values [Always, OnFailure, Never].  "
-"If set to ‘Always’ a deployment is created, if set to ‘OnFailure’ a job is "
-"created, if set to ‘Never’, a regular pod is created. For the latter two —"
-"replicas must be 1.  Default ‘Always’, for CronJobs ` + "`" + `Never` + "`" + `."
+"If set to 'Always' a deployment is created, if set to 'OnFailure' a job is "
+"created, if set to 'Never', a regular pod is created. For the latter two --"
+"replicas must be 1.  Default 'Always', for CronJobs ` + "`" + `Never` + "`" + `."
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_secret.go#L87
 #: pkg/kubectl/cmd/create_secret.go:88
 msgid "The type of secret to create"
 msgstr "The type of secret to create"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/expose.go#L101
 #: pkg/kubectl/cmd/expose.go:102
 msgid ""
 "Type for this service: ClusterIP, NodePort, or LoadBalancer. Default is "
 "'ClusterIP'."
 msgstr ""
 "Type for this service: ClusterIP, NodePort, or LoadBalancer. Default is "
-"‘ClusterIP’."
+"'ClusterIP'."
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/rollout/rollout_undo.go#L71
 #: pkg/kubectl/cmd/rollout/rollout_undo.go:72
 msgid "Undo a previous rollout"
 msgstr "現在のロールアウトを取り消す"
@@ -17170,16 +17293,19 @@ msgstr "現在のロールアウトを取り消す"
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/unset.go#L47
 #: pkg/kubectl/cmd/config/unset.go:48
 msgid "Unsets an individual value in a kubeconfig file"
-msgstr "kubeconfigファイルから変数を個別に削除する"
+msgstr "kubeconfigから変数を個別に削除する"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/patch.go#L91
 #: pkg/kubectl/cmd/patch.go:96
 msgid "Update field(s) of a resource using strategic merge patch"
 msgstr "Update field(s) of a resource using strategic merge patch"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/set/set_image.go#L94
 #: pkg/kubectl/cmd/set/set_image.go:95
 msgid "Update image of a pod template"
 msgstr "Update image of a pod template"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/set/set_resources.go#L101
 #: pkg/kubectl/cmd/set/set_resources.go:102
 msgid "Update resource requests/limits on objects with pod templates"
 msgstr "Update resource requests/limits on objects with pod templates"
@@ -17188,14 +17314,17 @@ msgstr "Update resource requests/limits on objects with pod templates"
 msgid "Update the annotations on a resource"
 msgstr "リソースのアノテーションを更新する"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/label.go#L109
 #: pkg/kubectl/cmd/label.go:114
 msgid "Update the labels on a resource"
 msgstr "リソースのラベルを更新する"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/taint.go#L88
 #: pkg/kubectl/cmd/taint.go:87
 msgid "Update the taints on one or more nodes"
 msgstr "Update the taints on one or more nodes"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_secret.go#L155
 #: pkg/kubectl/cmd/create_secret.go:156
 msgid "Username for Docker registry authentication"
 msgstr "Username for Docker registry authentication"
@@ -17205,26 +17334,30 @@ msgid "View latest last-applied-configuration annotations of a resource/object"
 msgstr ""
 "View latest last-applied-configuration annotations of a resource/object"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/rollout/rollout_history.go#L51
 #: pkg/kubectl/cmd/rollout/rollout_history.go:52
 msgid "View rollout history"
 msgstr "ロールアウトの履歴を表示する"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/clusterinfo_dump.go#L45
 #: pkg/kubectl/cmd/clusterinfo_dump.go:46
 msgid ""
 "Where to output the files.  If empty or '-' uses stdout, otherwise creates a "
 "directory hierarchy in that directory"
 msgstr ""
-"Where to output the files.  If empty or ‘-‘ uses stdout, otherwise creates a "
+"Where to output the files.  If empty or '-' uses stdout, otherwise creates a "
 "directory hierarchy in that directory"
 
 #: pkg/kubectl/cmd/run_test.go:85
 msgid "dummy restart flag)"
 msgstr "dummy restart flag)"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_service.go#L253
 #: pkg/kubectl/cmd/create_service.go:254
 msgid "external name of service"
 msgstr "external name of service"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/cmd.go#L217
 #: pkg/kubectl/cmd/cmd.go:227
 msgid "kubectl controls the Kubernetes cluster manager"
 msgstr "kubectl controls the Kubernetes cluster manager"
@@ -17236,11 +17369,11 @@ msgstr "kubectl controls the Kubernetes cluster manager"
 #~ "watch is only supported on individual resources and resource collections "
 #~ "- %d resources were found"
 #~ msgstr[0] ""
-#~ "watchは単一リソース及びリソースコレクションのみサポートしています - %d個の"
-#~ "リソースが見つかりました"
+#~ "watchは単一リソース及びリソースコレクションのみサポートしています"
+#~ "- %d個のリソースが見つかりました"
 #~ msgstr[1] ""
-#~ "watchは単一リソース及びリソースコレクションのみサポートしています - %d個の"
-#~ "リソースが見つかりました"
+#~ "watchは単一リソース及びリソースコレクションのみサポートしています"
+#~ "- %d個のリソースが見つかりました"
 `)
 
 func translationsKubectlJa_jpLc_messagesK8sPoBytes() ([]byte, error) {

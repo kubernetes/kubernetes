@@ -597,6 +597,53 @@ func TestValidateKubeProxyIPVSConfiguration(t *testing.T) {
 			},
 			expectErr: false,
 		},
+		// IPVS Timeout can be 0
+		{
+			config: kubeproxyconfig.KubeProxyIPVSConfiguration{
+				SyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
+				TCPTimeout:    metav1.Duration{Duration: 0 * time.Second},
+				TCPFinTimeout: metav1.Duration{Duration: 0 * time.Second},
+				UDPTimeout:    metav1.Duration{Duration: 0 * time.Second},
+			},
+			expectErr: false,
+		},
+		// IPVS Timeout > 0
+		{
+			config: kubeproxyconfig.KubeProxyIPVSConfiguration{
+				SyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
+				TCPTimeout:    metav1.Duration{Duration: 1 * time.Second},
+				TCPFinTimeout: metav1.Duration{Duration: 2 * time.Second},
+				UDPTimeout:    metav1.Duration{Duration: 3 * time.Second},
+			},
+			expectErr: false,
+		},
+		// TCPTimeout Timeout < 0
+		{
+			config: kubeproxyconfig.KubeProxyIPVSConfiguration{
+				SyncPeriod: metav1.Duration{Duration: 5 * time.Second},
+				TCPTimeout: metav1.Duration{Duration: -1 * time.Second},
+			},
+			expectErr: true,
+			reason:    "TCPTimeout must be greater than or equal to 0",
+		},
+		// TCPFinTimeout Timeout < 0
+		{
+			config: kubeproxyconfig.KubeProxyIPVSConfiguration{
+				SyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
+				TCPFinTimeout: metav1.Duration{Duration: -1 * time.Second},
+			},
+			expectErr: true,
+			reason:    "TCPFinTimeout must be greater than or equal to 0",
+		},
+		// UDPTimeout Timeout < 0
+		{
+			config: kubeproxyconfig.KubeProxyIPVSConfiguration{
+				SyncPeriod: metav1.Duration{Duration: 5 * time.Second},
+				UDPTimeout: metav1.Duration{Duration: -1 * time.Second},
+			},
+			expectErr: true,
+			reason:    "UDPTimeout must be greater than or equal to 0",
+		},
 	}
 
 	for _, test := range testCases {

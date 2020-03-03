@@ -9,6 +9,7 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/controller/endpointslice/config",
     visibility = ["//visibility:public"],
+    deps = ["//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library"],
 )
 
 filegroup(

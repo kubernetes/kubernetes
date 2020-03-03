@@ -959,7 +959,42 @@ func (fv *FakeVolume) TearDownAt(dir string) error {
 func (fv *FakeVolume) SetUpDevice() error {
 	fv.Lock()
 	defer fv.Unlock()
+	if fv.VolName == TimeoutOnMountDeviceVolumeName {
+		fv.DeviceMountState[fv.VolName] = deviceMountUncertain
+		return volumetypes.NewUncertainProgressError("mount failed")
+	}
+	if fv.VolName == FailMountDeviceVolumeName {
+		fv.DeviceMountState[fv.VolName] = deviceNotMounted
+		return fmt.Errorf("error mapping disk: %s", fv.VolName)
+	}
+
+	if fv.VolName == TimeoutAndFailOnMountDeviceVolumeName {
+		_, ok := fv.DeviceMountState[fv.VolName]
+		if !ok {
+			fv.DeviceMountState[fv.VolName] = deviceMountUncertain
+			return volumetypes.NewUncertainProgressError("timed out mounting error")
+		}
+		fv.DeviceMountState[fv.VolName] = deviceNotMounted
+		return fmt.Errorf("error mapping disk: %s", fv.VolName)
+	}
+
+	if fv.VolName == SuccessAndTimeoutDeviceName {
+		_, ok := fv.DeviceMountState[fv.VolName]
+		if ok {
+			fv.DeviceMountState[fv.VolName] = deviceMountUncertain
+			return volumetypes.NewUncertainProgressError("error mounting state")
+		}
+	}
+	if fv.VolName == SuccessAndFailOnMountDeviceName {
+		_, ok := fv.DeviceMountState[fv.VolName]
+		if ok {
+			return fmt.Errorf("error mapping disk: %s", fv.VolName)
+		}
+	}
+
+	fv.DeviceMountState[fv.VolName] = deviceMounted
 	fv.SetUpDeviceCallCount++
+
 	return nil
 }
 
@@ -1044,6 +1079,45 @@ func (fv *FakeVolume) GetUnmapPodDeviceCallCount() int {
 func (fv *FakeVolume) MapPodDevice() (string, error) {
 	fv.Lock()
 	defer fv.Unlock()
+
+	if fv.VolName == TimeoutOnSetupVolumeName {
+		fv.VolumeMountState[fv.VolName] = volumeMountUncertain
+		return "", volumetypes.NewUncertainProgressError("time out on setup")
+	}
+
+	if fv.VolName == FailOnSetupVolumeName {
+		fv.VolumeMountState[fv.VolName] = volumeNotMounted
+		return "", fmt.Errorf("mounting volume failed")
+	}
+
+	if fv.VolName == TimeoutAndFailOnSetupVolumeName {
+		_, ok := fv.VolumeMountState[fv.VolName]
+		if !ok {
+			fv.VolumeMountState[fv.VolName] = volumeMountUncertain
+			return "", volumetypes.NewUncertainProgressError("time out on setup")
+		}
+		fv.VolumeMountState[fv.VolName] = volumeNotMounted
+		return "", fmt.Errorf("mounting volume failed")
+
+	}
+
+	if fv.VolName == SuccessAndFailOnSetupVolumeName {
+		_, ok := fv.VolumeMountState[fv.VolName]
+		if ok {
+			fv.VolumeMountState[fv.VolName] = volumeNotMounted
+			return "", fmt.Errorf("mounting volume failed")
+		}
+	}
+
+	if fv.VolName == SuccessAndTimeoutSetupVolumeName {
+		_, ok := fv.VolumeMountState[fv.VolName]
+		if ok {
+			fv.VolumeMountState[fv.VolName] = volumeMountUncertain
+			return "", volumetypes.NewUncertainProgressError("time out on setup")
+		}
+	}
+
+	fv.VolumeMountState[fv.VolName] = volumeMounted
 	fv.MapPodDeviceCallCount++
 	return "", nil
 }
@@ -1617,6 +1691,39 @@ func VerifyZeroTearDownDeviceCallCount(fakeVolumePlugin *FakeVolumePlugin) error
 		if actualCallCount != 0 {
 			return fmt.Errorf(
 				"At least one unmapper has non-zero TearDownDeviceCallCount: <%v>.",
+				actualCallCount)
+		}
+	}
+
+	return nil
+}
+
+// VerifyUnmapPodDeviceCallCount ensures that at least one of the Unmappers for this
+// plugin has the expected number of UnmapPodDevice calls. Otherwise it
+// returns an error.
+func VerifyUnmapPodDeviceCallCount(
+	expectedUnmapPodDeviceCallCount int,
+	fakeVolumePlugin *FakeVolumePlugin) error {
+	for _, unmapper := range fakeVolumePlugin.GetBlockVolumeUnmapper() {
+		actualCallCount := unmapper.GetUnmapPodDeviceCallCount()
+		if actualCallCount >= expectedUnmapPodDeviceCallCount {
+			return nil
+		}
+	}
+
+	return fmt.Errorf(
+		"No Unmapper have expected UnmapPodDeviceCallCount. Expected: <%v>.",
+		expectedUnmapPodDeviceCallCount)
+}
+
+// VerifyZeroUnmapPodDeviceCallCount ensures that all Mappers for this plugin have a
+// zero UnmapPodDevice calls. Otherwise it returns an error.
+func VerifyZeroUnmapPodDeviceCallCount(fakeVolumePlugin *FakeVolumePlugin) error {
+	for _, unmapper := range fakeVolumePlugin.GetBlockVolumeUnmapper() {
+		actualCallCount := unmapper.GetUnmapPodDeviceCallCount()
+		if actualCallCount != 0 {
+			return fmt.Errorf(
+				"At least one unmapper has non-zero UnmapPodDeviceCallCount: <%v>.",
 				actualCallCount)
 		}
 	}

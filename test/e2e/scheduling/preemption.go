@@ -394,15 +394,24 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 			// satisfy the pod topology spread constraints. Hence it needs to preempt another low pod
 			// to make the Pods spread like [<high>, <medium, low>].
 			runPausePod(f, mediumPodCfg)
-			e2epod.WaitForPodNotPending(cs, ns, mediumPodCfg.Name)
 
 			ginkgo.By("Verify there are 3 Pods left in this namespace")
 			wantPods := sets.NewString("high", "medium", "low")
 
-			podList, err := cs.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{})
-			pods := podList.Items
+			var pods []v1.Pod
+			// Wait until the number of pods stabilizes. Note that `medium` pod can get scheduled once the
+			// second low priority pod is marked as terminating.
+			// TODO: exact the wait.PollImmediate block to framework.WaitForNumberOfRunningPods.
+			err := wait.PollImmediate(framework.Poll, framework.PollShortTimeout, func() (bool, error) {
+				podList, err := cs.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{})
+				// ignore intermittent network error
+				if err != nil {
+					return false, nil
+				}
+				pods = podList.Items
+				return len(pods) == 3, nil
+			})
 			framework.ExpectNoError(err)
-			framework.ExpectEqual(len(pods), 3)
 
 			for _, pod := range pods {
 				// Remove the ordinal index for low pod.

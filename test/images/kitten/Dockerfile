@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM BASEIMAGE
+ARG BASEIMAGE
+FROM $BASEIMAGE
 COPY html/kitten.jpg kitten.jpg
 COPY html/data.json data.json
