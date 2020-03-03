@@ -148,58 +148,32 @@ func TestPVCDataSourceSpecFilter(t *testing.T) {
 	}
 
 	var tests = map[string]struct {
-		spec        core.PersistentVolumeClaimSpec
-		gateEnabled bool
-		want        *core.TypedLocalObjectReference
+		spec core.PersistentVolumeClaimSpec
+		want *core.TypedLocalObjectReference
 	}{
 		"enabled with empty ds": {
-			spec:        core.PersistentVolumeClaimSpec{},
-			gateEnabled: true,
-			want:        nil,
+			spec: core.PersistentVolumeClaimSpec{},
+			want: nil,
 		},
 		"enabled with invalid spec": {
-			spec:        invalidSpec,
-			gateEnabled: true,
-			want:        nil,
+			spec: invalidSpec,
+			want: nil,
 		},
 		"enabled with valid spec": {
-			spec:        validSpec,
-			gateEnabled: true,
-			want:        validSpec.DataSource,
-		},
-		"disabled with invalid spec": {
-			spec:        invalidSpec,
-			gateEnabled: false,
-			want:        nil,
-		},
-		"disabled with valid spec": {
-			spec:        validSpec,
-			gateEnabled: false,
-			want:        nil,
-		},
-		"diabled with empty ds": {
-			spec:        core.PersistentVolumeClaimSpec{},
-			gateEnabled: false,
-			want:        nil,
+			spec: validSpec,
+			want: validSpec.DataSource,
 		},
 		"enabled with valid spec but nil APIGroup": {
-			spec:        validSpecNilAPIGroup,
-			gateEnabled: true,
-			want:        validSpecNilAPIGroup.DataSource,
-		},
-		"disabled with valid spec but nil APIGroup": {
-			spec:        validSpecNilAPIGroup,
-			gateEnabled: false,
-			want:        nil,
+			spec: validSpecNilAPIGroup,
+			want: validSpecNilAPIGroup.DataSource,
 		},
 	}
 
 	for testName, test := range tests {
 		t.Run(testName, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumePVCDataSource, test.gateEnabled)()
 			DropDisabledFields(&test.spec, nil)
 			if test.spec.DataSource != test.want {
-				t.Errorf("expected drop datasource condition was not met, test: %s, gateEnabled: %v, spec: %v, expected: %v", testName, test.gateEnabled, test.spec, test.want)
+				t.Errorf("expected drop datasource condition was not met, test: %s, spec: %v, expected: %v", testName, test.spec, test.want)
 			}
 
 		})
