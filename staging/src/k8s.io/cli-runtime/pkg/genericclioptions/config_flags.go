@@ -17,6 +17,7 @@ limitations under the License.
 package genericclioptions
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -54,7 +55,17 @@ const (
 	flagHTTPCacheDir     = "cache-dir"
 )
 
-var defaultCacheDir = filepath.Join(homedir.HomeDir(), ".kube", "http-cache")
+var (
+	defaultCacheDir = filepath.Join(homedir.HomeDir(), ".kube", "http-cache")
+
+	ErrEmptyConfig = errors.New(`Missing or incomplete configuration info.  Please point to an existing, complete config file:
+
+  1. Via the command-line flag --kubeconfig
+  2. Via the KUBECONFIG environment variable
+  3. In your home directory as ~/.kube/config
+
+To view or setup config directly use the 'config' command.`)
+)
 
 // RESTClientGetter is an interface that the ConfigFlags describe to provide an easier way to mock for commands
 // and eliminate the direct coupling to a struct type.  Users may wish to duplicate this type in their own packages
@@ -108,7 +119,12 @@ type ConfigFlags struct {
 // to a .kubeconfig file, loading rules, and config flag overrides.
 // Expects the AddFlags method to have been called.
 func (f *ConfigFlags) ToRESTConfig() (*rest.Config, error) {
-	return f.ToRawKubeConfigLoader().ClientConfig()
+	config, err := f.ToRawKubeConfigLoader().ClientConfig()
+	// replace client-go's ErrEmptyConfig error with our custom, more verbose version
+	if clientcmd.IsEmptyConfig(err) {
+		return nil, ErrEmptyConfig
+	}
+	return config, err
 }
 
 // ToRawKubeConfigLoader binds config flag values to config overrides
