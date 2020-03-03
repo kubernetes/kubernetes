@@ -4912,7 +4912,7 @@ message Taint {
   // Required. The taint key to be applied to a node.
   optional string key = 1;
 
-  // Required. The taint value corresponding to the taint key.
+  // The taint value corresponding to the taint key.
   // +optional
   optional string value = 2;
 
