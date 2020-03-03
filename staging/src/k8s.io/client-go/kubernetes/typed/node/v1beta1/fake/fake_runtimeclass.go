@@ -61,7 +61,10 @@ func (c *FakeRuntimeClasses) List(ctx context.Context, opts v1.ListOptions) (res
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &v1beta1.RuntimeClassList{ListMeta: obj.(*v1beta1.RuntimeClassList).ListMeta}
+	list := &v1beta1.RuntimeClassList{
+		TypeMeta: obj.(*v1beta1.RuntimeClassList).TypeMeta,
+		ListMeta: obj.(*v1beta1.RuntimeClassList).ListMeta,
+	}
 	for _, item := range obj.(*v1beta1.RuntimeClassList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)

@@ -64,7 +64,10 @@ func (c *FakeRoles) List(ctx context.Context, opts v1.ListOptions) (result *rbac
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &rbacv1.RoleList{ListMeta: obj.(*rbacv1.RoleList).ListMeta}
+	list := &rbacv1.RoleList{
+		TypeMeta: obj.(*rbacv1.RoleList).TypeMeta,
+		ListMeta: obj.(*rbacv1.RoleList).ListMeta,
+	}
 	for _, item := range obj.(*rbacv1.RoleList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)

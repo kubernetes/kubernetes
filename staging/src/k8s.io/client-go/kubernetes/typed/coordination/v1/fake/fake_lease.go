@@ -64,7 +64,10 @@ func (c *FakeLeases) List(ctx context.Context, opts v1.ListOptions) (result *coo
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &coordinationv1.LeaseList{ListMeta: obj.(*coordinationv1.LeaseList).ListMeta}
+	list := &coordinationv1.LeaseList{
+		TypeMeta: obj.(*coordinationv1.LeaseList).TypeMeta,
+		ListMeta: obj.(*coordinationv1.LeaseList).ListMeta,
+	}
 	for _, item := range obj.(*coordinationv1.LeaseList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)

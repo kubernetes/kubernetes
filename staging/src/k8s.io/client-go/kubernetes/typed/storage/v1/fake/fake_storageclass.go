@@ -61,7 +61,10 @@ func (c *FakeStorageClasses) List(ctx context.Context, opts v1.ListOptions) (res
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &storagev1.StorageClassList{ListMeta: obj.(*storagev1.StorageClassList).ListMeta}
+	list := &storagev1.StorageClassList{
+		TypeMeta: obj.(*storagev1.StorageClassList).TypeMeta,
+		ListMeta: obj.(*storagev1.StorageClassList).ListMeta,
+	}
 	for _, item := range obj.(*storagev1.StorageClassList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)

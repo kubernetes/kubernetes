@@ -64,7 +64,10 @@ func (c *FakeCronJobs) List(ctx context.Context, opts v1.ListOptions) (result *v
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &v1beta1.CronJobList{ListMeta: obj.(*v1beta1.CronJobList).ListMeta}
+	list := &v1beta1.CronJobList{
+		TypeMeta: obj.(*v1beta1.CronJobList).TypeMeta,
+		ListMeta: obj.(*v1beta1.CronJobList).ListMeta,
+	}
 	for _, item := range obj.(*v1beta1.CronJobList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)

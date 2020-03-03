@@ -64,7 +64,10 @@ func (c *FakeJobs) List(ctx context.Context, opts v1.ListOptions) (result *batch
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &batchv1.JobList{ListMeta: obj.(*batchv1.JobList).ListMeta}
+	list := &batchv1.JobList{
+		TypeMeta: obj.(*batchv1.JobList).TypeMeta,
+		ListMeta: obj.(*batchv1.JobList).ListMeta,
+	}
 	for _, item := range obj.(*batchv1.JobList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)

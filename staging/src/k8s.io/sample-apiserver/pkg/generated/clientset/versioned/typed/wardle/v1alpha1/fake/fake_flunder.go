@@ -64,7 +64,10 @@ func (c *FakeFlunders) List(ctx context.Context, opts v1.ListOptions) (result *v
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &v1alpha1.FlunderList{ListMeta: obj.(*v1alpha1.FlunderList).ListMeta}
+	list := &v1alpha1.FlunderList{
+		TypeMeta: obj.(*v1alpha1.FlunderList).TypeMeta,
+		ListMeta: obj.(*v1alpha1.FlunderList).ListMeta,
+	}
 	for _, item := range obj.(*v1alpha1.FlunderList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)

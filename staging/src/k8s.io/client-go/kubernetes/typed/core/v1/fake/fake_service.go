@@ -64,7 +64,10 @@ func (c *FakeServices) List(ctx context.Context, opts v1.ListOptions) (result *c
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &corev1.ServiceList{ListMeta: obj.(*corev1.ServiceList).ListMeta}
+	list := &corev1.ServiceList{
+		TypeMeta: obj.(*corev1.ServiceList).TypeMeta,
+		ListMeta: obj.(*corev1.ServiceList).ListMeta,
+	}
 	for _, item := range obj.(*corev1.ServiceList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)

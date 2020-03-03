@@ -61,7 +61,10 @@ func (c *FakeCustomResourceDefinitions) List(ctx context.Context, opts v1.ListOp
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &apiextensionsv1.CustomResourceDefinitionList{ListMeta: obj.(*apiextensionsv1.CustomResourceDefinitionList).ListMeta}
+	list := &apiextensionsv1.CustomResourceDefinitionList{
+		TypeMeta: obj.(*apiextensionsv1.CustomResourceDefinitionList).TypeMeta,
+		ListMeta: obj.(*apiextensionsv1.CustomResourceDefinitionList).ListMeta,
+	}
 	for _, item := range obj.(*apiextensionsv1.CustomResourceDefinitionList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)

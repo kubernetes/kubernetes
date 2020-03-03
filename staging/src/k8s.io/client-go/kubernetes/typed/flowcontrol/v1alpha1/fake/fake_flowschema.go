@@ -61,7 +61,10 @@ func (c *FakeFlowSchemas) List(ctx context.Context, opts v1.ListOptions) (result
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &v1alpha1.FlowSchemaList{ListMeta: obj.(*v1alpha1.FlowSchemaList).ListMeta}
+	list := &v1alpha1.FlowSchemaList{
+		TypeMeta: obj.(*v1alpha1.FlowSchemaList).TypeMeta,
+		ListMeta: obj.(*v1alpha1.FlowSchemaList).ListMeta,
+	}
 	for _, item := range obj.(*v1alpha1.FlowSchemaList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)

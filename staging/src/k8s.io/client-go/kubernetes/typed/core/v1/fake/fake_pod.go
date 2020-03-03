@@ -64,7 +64,10 @@ func (c *FakePods) List(ctx context.Context, opts v1.ListOptions) (result *corev
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &corev1.PodList{ListMeta: obj.(*corev1.PodList).ListMeta}
+	list := &corev1.PodList{
+		TypeMeta: obj.(*corev1.PodList).TypeMeta,
+		ListMeta: obj.(*corev1.PodList).ListMeta,
+	}
 	for _, item := range obj.(*corev1.PodList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)

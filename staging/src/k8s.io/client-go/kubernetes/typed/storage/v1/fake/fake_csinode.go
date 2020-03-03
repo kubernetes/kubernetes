@@ -61,7 +61,10 @@ func (c *FakeCSINodes) List(ctx context.Context, opts v1.ListOptions) (result *s
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &storagev1.CSINodeList{ListMeta: obj.(*storagev1.CSINodeList).ListMeta}
+	list := &storagev1.CSINodeList{
+		TypeMeta: obj.(*storagev1.CSINodeList).TypeMeta,
+		ListMeta: obj.(*storagev1.CSINodeList).ListMeta,
+	}
 	for _, item := range obj.(*storagev1.CSINodeList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)

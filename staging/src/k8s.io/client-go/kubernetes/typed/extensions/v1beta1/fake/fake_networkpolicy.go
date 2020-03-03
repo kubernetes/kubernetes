@@ -64,7 +64,10 @@ func (c *FakeNetworkPolicies) List(ctx context.Context, opts v1.ListOptions) (re
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &v1beta1.NetworkPolicyList{ListMeta: obj.(*v1beta1.NetworkPolicyList).ListMeta}
+	list := &v1beta1.NetworkPolicyList{
+		TypeMeta: obj.(*v1beta1.NetworkPolicyList).TypeMeta,
+		ListMeta: obj.(*v1beta1.NetworkPolicyList).ListMeta,
+	}
 	for _, item := range obj.(*v1beta1.NetworkPolicyList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)

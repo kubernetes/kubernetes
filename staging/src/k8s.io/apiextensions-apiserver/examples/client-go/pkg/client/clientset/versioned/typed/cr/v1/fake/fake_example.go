@@ -64,7 +64,10 @@ func (c *FakeExamples) List(ctx context.Context, opts v1.ListOptions) (result *c
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &crv1.ExampleList{ListMeta: obj.(*crv1.ExampleList).ListMeta}
+	list := &crv1.ExampleList{
+		TypeMeta: obj.(*crv1.ExampleList).TypeMeta,
+		ListMeta: obj.(*crv1.ExampleList).ListMeta,
+	}
 	for _, item := range obj.(*crv1.ExampleList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)

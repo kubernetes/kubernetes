@@ -61,7 +61,10 @@ func (c *FakeMutatingWebhookConfigurations) List(ctx context.Context, opts v1.Li
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &v1beta1.MutatingWebhookConfigurationList{ListMeta: obj.(*v1beta1.MutatingWebhookConfigurationList).ListMeta}
+	list := &v1beta1.MutatingWebhookConfigurationList{
+		TypeMeta: obj.(*v1beta1.MutatingWebhookConfigurationList).TypeMeta,
+		ListMeta: obj.(*v1beta1.MutatingWebhookConfigurationList).ListMeta,
+	}
 	for _, item := range obj.(*v1beta1.MutatingWebhookConfigurationList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)

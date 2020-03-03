@@ -61,7 +61,10 @@ func (c *FakePriorityClasses) List(ctx context.Context, opts v1.ListOptions) (re
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &v1alpha1.PriorityClassList{ListMeta: obj.(*v1alpha1.PriorityClassList).ListMeta}
+	list := &v1alpha1.PriorityClassList{
+		TypeMeta: obj.(*v1alpha1.PriorityClassList).TypeMeta,
+		ListMeta: obj.(*v1alpha1.PriorityClassList).ListMeta,
+	}
 	for _, item := range obj.(*v1alpha1.PriorityClassList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)

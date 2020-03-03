@@ -62,7 +62,10 @@ func (c *FakeClusterTestTypes) List(ctx context.Context, opts v1.ListOptions) (r
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &examplev1.ClusterTestTypeList{ListMeta: obj.(*examplev1.ClusterTestTypeList).ListMeta}
+	list := &examplev1.ClusterTestTypeList{
+		TypeMeta: obj.(*examplev1.ClusterTestTypeList).TypeMeta,
+		ListMeta: obj.(*examplev1.ClusterTestTypeList).ListMeta,
+	}
 	for _, item := range obj.(*examplev1.ClusterTestTypeList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)

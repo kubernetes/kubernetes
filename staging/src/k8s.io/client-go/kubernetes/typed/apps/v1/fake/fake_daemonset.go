@@ -64,7 +64,10 @@ func (c *FakeDaemonSets) List(ctx context.Context, opts v1.ListOptions) (result 
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &appsv1.DaemonSetList{ListMeta: obj.(*appsv1.DaemonSetList).ListMeta}
+	list := &appsv1.DaemonSetList{
+		TypeMeta: obj.(*appsv1.DaemonSetList).TypeMeta,
+		ListMeta: obj.(*appsv1.DaemonSetList).ListMeta,
+	}
 	for _, item := range obj.(*appsv1.DaemonSetList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)

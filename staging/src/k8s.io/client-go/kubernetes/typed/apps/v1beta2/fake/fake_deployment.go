@@ -64,7 +64,10 @@ func (c *FakeDeployments) List(ctx context.Context, opts v1.ListOptions) (result
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &v1beta2.DeploymentList{ListMeta: obj.(*v1beta2.DeploymentList).ListMeta}
+	list := &v1beta2.DeploymentList{
+		TypeMeta: obj.(*v1beta2.DeploymentList).TypeMeta,
+		ListMeta: obj.(*v1beta2.DeploymentList).ListMeta,
+	}
 	for _, item := range obj.(*v1beta2.DeploymentList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)

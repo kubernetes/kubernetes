@@ -64,7 +64,10 @@ func (c *FakeHorizontalPodAutoscalers) List(ctx context.Context, opts v1.ListOpt
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &autoscalingv1.HorizontalPodAutoscalerList{ListMeta: obj.(*autoscalingv1.HorizontalPodAutoscalerList).ListMeta}
+	list := &autoscalingv1.HorizontalPodAutoscalerList{
+		TypeMeta: obj.(*autoscalingv1.HorizontalPodAutoscalerList).TypeMeta,
+		ListMeta: obj.(*autoscalingv1.HorizontalPodAutoscalerList).ListMeta,
+	}
 	for _, item := range obj.(*autoscalingv1.HorizontalPodAutoscalerList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)

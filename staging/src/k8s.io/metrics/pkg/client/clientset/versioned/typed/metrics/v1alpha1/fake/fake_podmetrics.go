@@ -63,7 +63,10 @@ func (c *FakePodMetricses) List(ctx context.Context, opts v1.ListOptions) (resul
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &v1alpha1.PodMetricsList{ListMeta: obj.(*v1alpha1.PodMetricsList).ListMeta}
+	list := &v1alpha1.PodMetricsList{
+		TypeMeta: obj.(*v1alpha1.PodMetricsList).TypeMeta,
+		ListMeta: obj.(*v1alpha1.PodMetricsList).ListMeta,
+	}
 	for _, item := range obj.(*v1alpha1.PodMetricsList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)

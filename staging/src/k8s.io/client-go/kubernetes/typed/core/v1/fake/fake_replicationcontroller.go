@@ -65,7 +65,10 @@ func (c *FakeReplicationControllers) List(ctx context.Context, opts v1.ListOptio
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &corev1.ReplicationControllerList{ListMeta: obj.(*corev1.ReplicationControllerList).ListMeta}
+	list := &corev1.ReplicationControllerList{
+		TypeMeta: obj.(*corev1.ReplicationControllerList).TypeMeta,
+		ListMeta: obj.(*corev1.ReplicationControllerList).ListMeta,
+	}
 	for _, item := range obj.(*corev1.ReplicationControllerList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)

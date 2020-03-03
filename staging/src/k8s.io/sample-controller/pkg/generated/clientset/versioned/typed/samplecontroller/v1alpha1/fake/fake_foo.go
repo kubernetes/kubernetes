@@ -64,7 +64,10 @@ func (c *FakeFoos) List(ctx context.Context, opts v1.ListOptions) (result *v1alp
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &v1alpha1.FooList{ListMeta: obj.(*v1alpha1.FooList).ListMeta}
+	list := &v1alpha1.FooList{
+		TypeMeta: obj.(*v1alpha1.FooList).TypeMeta,
+		ListMeta: obj.(*v1alpha1.FooList).ListMeta,
+	}
 	for _, item := range obj.(*v1alpha1.FooList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)

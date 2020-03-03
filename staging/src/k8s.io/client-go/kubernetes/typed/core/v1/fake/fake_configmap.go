@@ -64,7 +64,10 @@ func (c *FakeConfigMaps) List(ctx context.Context, opts v1.ListOptions) (result 
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &corev1.ConfigMapList{ListMeta: obj.(*corev1.ConfigMapList).ListMeta}
+	list := &corev1.ConfigMapList{
+		TypeMeta: obj.(*corev1.ConfigMapList).TypeMeta,
+		ListMeta: obj.(*corev1.ConfigMapList).ListMeta,
+	}
 	for _, item := range obj.(*corev1.ConfigMapList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)

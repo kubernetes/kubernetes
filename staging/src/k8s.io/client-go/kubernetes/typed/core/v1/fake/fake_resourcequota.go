@@ -64,7 +64,10 @@ func (c *FakeResourceQuotas) List(ctx context.Context, opts v1.ListOptions) (res
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &corev1.ResourceQuotaList{ListMeta: obj.(*corev1.ResourceQuotaList).ListMeta}
+	list := &corev1.ResourceQuotaList{
+		TypeMeta: obj.(*corev1.ResourceQuotaList).TypeMeta,
+		ListMeta: obj.(*corev1.ResourceQuotaList).ListMeta,
+	}
 	for _, item := range obj.(*corev1.ResourceQuotaList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)

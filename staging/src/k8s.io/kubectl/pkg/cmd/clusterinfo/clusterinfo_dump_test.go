@@ -18,23 +18,20 @@ package clusterinfo
 
 import (
 	"encoding/json"
-	"fmt"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/rest/fake"
-	"k8s.io/kubectl/pkg/scheme"
-	"net/http"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	clientsetfake "k8s.io/client-go/kubernetes/fake"
+	clienttesting "k8s.io/client-go/testing"
+	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	"os"
 	"path"
 	"strings"
 	"testing"
-
-	"k8s.io/cli-runtime/pkg/genericclioptions"
-	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 )
 
 func TestSetupOutputWriterNoOp(t *testing.T) {
@@ -106,69 +103,74 @@ func TestClusterInfoDump(t *testing.T) {
 			outputFlag:              "yaml",
 			expectStdoutIsValidYaml: true,
 		},
-		"should output valid json when no output format is specified": {
-			expectStdoutIsValidJson: true,
-		},
 		"should not output message indicating where output was written if output directory is -": {
+			outputFlag:                "json",
 			outputDirectoryFlag:       "-",
 			expectedStdoutNotContains: "Cluster info dumped to ",
 		},
 		"should not output message indicating where output was written if an output directory not specified": {
+			outputFlag:                "json",
 			expectedStdoutNotContains: "Cluster info dumped to ",
 		},
 		"should output message indicating where output was written if an output directory is specified": {
+			outputFlag:          "json",
 			outputDirectoryFlag: tempOutputDirectory,
 			expectedStdout:      "Cluster info dumped to test-directory",
 		},
 	}
 
-	// Define the expected requests and the response for each when it is called
-	expectedRequests := map[string]runtime.Object{
-		"GET /api/v1/nodes":                                         testNodeList(),
-		"GET /api/v1/namespaces/kube-system/events":                 testEventList(),
-		"GET /api/v1/namespaces/kube-system/replicationcontrollers": testReplicationControllerList(),
-		"GET /api/v1/namespaces/kube-system/services":               testServiceList(),
-		"GET /api/v1/namespaces/kube-system/pods":                   testPodList(),
-		"GET /apis/apps/v1/namespaces/kube-system/daemonsets":       testDaemonSetList(),
-		"GET /apis/apps/v1/namespaces/kube-system/deployments":      testDeploymentList(),
-		"GET /apis/apps/v1/namespaces/kube-system/replicasets":      testReplicaSetList(),
-		"GET /api/v1/namespaces/default/events":                     testEventList(),
-		"GET /api/v1/namespaces/default/replicationcontrollers":     testReplicationControllerList(),
-		"GET /api/v1/namespaces/default/services":                   testServiceList(),
-		"GET /api/v1/namespaces/default/pods":                       testPodList(),
-		"GET /apis/apps/v1/namespaces/default/daemonsets":           testDaemonSetList(),
-		"GET /apis/apps/v1/namespaces/default/deployments":          testDeploymentList(),
-		"GET /apis/apps/v1/namespaces/default/replicasets":          testReplicaSetList(),
-	}
-
 	for k, testCase := range testCases {
 		t.Run(k, func(t *testing.T) {
-			var actualRequests []string
+
+			fakeClientset := &clientsetfake.Clientset{}
+			fakeClientset.AddReactor("list", "*", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+				switch action.GetResource().String() {
+				case "/v1, Resource=nodes":
+					return true, testNodeList, nil
+				case "/v1, Resource=events":
+					return true, testEventList, nil
+				case "/v1, Resource=replicationcontrollers":
+					return true, testReplicationControllerList, nil
+				case "/v1, Resource=services":
+					return true, testServiceList, nil
+				case "/v1, Resource=pods":
+					return true, testPodList, nil
+				case "apps/v1, Resource=daemonsets":
+					return true, testDaemonSetList, nil
+				case "apps/v1, Resource=deployments":
+					return true, testDeploymentList, nil
+				case "apps/v1, Resource=replicasets":
+					return true, testReplicatSetList, nil
+				}
+				t.Fatalf("unexpected action: %v", action.GetResource().String())
+				return false, nil, nil
+			})
 
 			tf := cmdtesting.NewTestFactory()
 			defer tf.Cleanup()
 
-			codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
-			tf.Client = &fake.RESTClient{
-				NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
-				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-					requestKey := fmt.Sprintf("%s %s", req.Method, req.URL.Path)
-					actualRequests = append(actualRequests, requestKey)
-					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, expectedRequests[requestKey])}, nil
-				}),
-			}
-			tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
-
 			streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 			cmd := NewCmdClusterInfoDump(tf, streams)
 
-			if len(testCase.outputDirectoryFlag) > 0 {
-				_ = cmd.Flags().Set("output-directory", testCase.outputDirectoryFlag)
+			options := &ClusterInfoDumpOptions{
+				PrintFlags: &genericclioptions.PrintFlags{
+					JSONYamlPrintFlags: &genericclioptions.JSONYamlPrintFlags{},
+					OutputFormat:       &testCase.outputFlag,
+				},
+				OutputDir: testCase.outputDirectoryFlag,
+				IOStreams: streams,
 			}
-			if len(testCase.outputFlag) > 0 {
-				_ = cmd.Flags().Set("output", testCase.outputFlag)
+
+			if err := options.Complete(tf, cmd); err != nil {
+				t.Fatalf("unexcpted Complete error: %v", err)
 			}
-			cmd.Run(cmd, []string{})
+
+			options.CoreClient = fakeClientset.CoreV1()
+			options.AppsClient = fakeClientset.AppsV1()
+
+			if err := options.Run(); err != nil {
+				t.Fatalf("unexcpted Run error: %v", err)
+			}
 
 			if len(testCase.expectedStdout) > 0 && buf.String() == testCase.expectedStdout {
 				t.Fatalf("expected output of %v but got %v", testCase.expectedStdout, buf.String())
@@ -187,186 +189,133 @@ func TestClusterInfoDump(t *testing.T) {
 				}
 			}
 
-			// Make sure all expected requests were performed
-			for expectedRequest := range expectedRequests {
-				found := false
-				for _, actualRequest := range actualRequests {
-					if actualRequest == expectedRequest {
-						found = true
-						break
-					}
-				}
-				if !found {
-					t.Fatalf("expected request was not made: %v", expectedRequest)
-				}
-			}
+			expectAction(t, *fakeClientset, "list", "", "v1", "nodes")
 
-			// Make sure no unexpected requests were performed
-			for _, actualRequest := range actualRequests {
-				found := false
-				for expectedRequest := range expectedRequests {
-					if actualRequest == expectedRequest {
-						found = true
-						break
-					}
-				}
-				if !found {
-					t.Fatalf("unexpected request was made: %v", actualRequest)
-				}
-			}
+			expectAction(t, *fakeClientset, "list", "kube-system", "v1", "events")
+			expectAction(t, *fakeClientset, "list", "kube-system", "v1", "replicationcontrollers")
+			expectAction(t, *fakeClientset, "list", "kube-system", "v1", "services")
+			expectAction(t, *fakeClientset, "list", "kube-system", "v1", "pods")
+			expectAction(t, *fakeClientset, "list", "kube-system", "v1", "daemonsets")
+			expectAction(t, *fakeClientset, "list", "kube-system", "v1", "deployments")
+			expectAction(t, *fakeClientset, "list", "kube-system", "v1", "replicasets")
+
+			expectAction(t, *fakeClientset, "list", "default", "v1", "events")
+			expectAction(t, *fakeClientset, "list", "default", "v1", "replicationcontrollers")
+			expectAction(t, *fakeClientset, "list", "default", "v1", "services")
+			expectAction(t, *fakeClientset, "list", "default", "v1", "pods")
+			expectAction(t, *fakeClientset, "list", "default", "v1", "daemonsets")
+			expectAction(t, *fakeClientset, "list", "default", "v1", "deployments")
+			expectAction(t, *fakeClientset, "list", "default", "v1", "replicasets")
 		})
 	}
 }
 
-func testNodeList() *corev1.NodeList {
-	return &corev1.NodeList{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "List",
-			APIVersion: "v1",
-		},
-		Items: []corev1.Node{
-			{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
-				},
-				Spec: corev1.NodeSpec{
-					PodCIDR:  "10.244.0.0/24",
-					PodCIDRs: []string{"10.244.0.0/24"},
-				},
-			},
-			{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "bar",
-				},
-				Spec: corev1.NodeSpec{
-					PodCIDR:  "10.243.0.0/24",
-					PodCIDRs: []string{"10.244.0.0/24"},
-				},
-			},
-		},
+func expectAction(t *testing.T, clientset clientsetfake.Clientset, verb, namespace, version, resource string) {
+	for _, action := range clientset.Actions() {
+		if action.GetVerb() == verb &&
+			action.GetNamespace() == namespace &&
+			action.GetResource().Version == version &&
+			action.GetResource().Resource == resource {
+			return
+		}
 	}
+	t.Fatalf("expected %s action was not performed for %s/%s in namespace %s", verb, version, resource, namespace)
 }
 
-func testEventList() *corev1.EventList {
-	return &corev1.EventList{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "List",
-			APIVersion: "v1",
-		},
-		Items: []corev1.Event{
-			{
-				ObjectMeta:          metav1.ObjectMeta{},
-				InvolvedObject:      corev1.ObjectReference{},
-				Reason:              "foo",
-				Message:             "bar",
-				Source:              corev1.EventSource{},
-				FirstTimestamp:      metav1.Time{},
-				LastTimestamp:       metav1.Time{},
-				Count:               0,
-				Type:                "",
-				EventTime:           metav1.MicroTime{},
-				Series:              nil,
-				Action:              "",
-				Related:             nil,
-				ReportingController: "",
-				ReportingInstance:   "",
+var testNodeList = &corev1.NodeList{
+	TypeMeta: metav1.TypeMeta{Kind: "List", APIVersion: "v1"},
+	ListMeta: metav1.ListMeta{},
+	Items: []corev1.Node{
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			Spec: corev1.NodeSpec{
+				PodCIDR:  "10.244.0.0/24",
+				PodCIDRs: []string{"10.244.0.0/24"},
 			},
 		},
-	}
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "bar"},
+			Spec: corev1.NodeSpec{
+				PodCIDR:  "10.243.0.0/24",
+				PodCIDRs: []string{"10.244.0.0/24"},
+			},
+		},
+	},
 }
 
-func testReplicationControllerList() *corev1.ReplicationControllerList {
-	return &corev1.ReplicationControllerList{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "List",
-			APIVersion: "v1",
+var testEventList = &corev1.EventList{
+	TypeMeta: metav1.TypeMeta{Kind: "List", APIVersion: "v1"},
+	Items: []corev1.Event{
+		{
+			ObjectMeta: metav1.ObjectMeta{},
+			Reason:     "foo",
+			Message:    "bar",
 		},
-		Items: []corev1.ReplicationController{
-			{
-				ObjectMeta: metav1.ObjectMeta{},
-				Spec:       corev1.ReplicationControllerSpec{},
-				Status:     corev1.ReplicationControllerStatus{},
-			},
-		},
-	}
+	},
 }
 
-func testServiceList() *corev1.ServiceList {
-	return &corev1.ServiceList{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "List",
-			APIVersion: "v1",
+var testReplicationControllerList = &corev1.ReplicationControllerList{
+	TypeMeta: metav1.TypeMeta{Kind: "List", APIVersion: "v1"},
+	Items: []corev1.ReplicationController{
+		{
+			ObjectMeta: metav1.ObjectMeta{},
+			Spec:       corev1.ReplicationControllerSpec{},
+			Status:     corev1.ReplicationControllerStatus{},
 		},
-		Items: []corev1.Service{
-			{
-				ObjectMeta: metav1.ObjectMeta{},
-				Spec:       corev1.ServiceSpec{},
-				Status:     corev1.ServiceStatus{},
-			},
-		},
-	}
+	},
 }
 
-func testPodList() *corev1.PodList {
-	return &corev1.PodList{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "List",
-			APIVersion: "v1",
+var testServiceList = &corev1.ServiceList{
+	TypeMeta: metav1.TypeMeta{Kind: "List", APIVersion: "v1"},
+	Items: []corev1.Service{
+		{
+			ObjectMeta: metav1.ObjectMeta{},
+			Spec:       corev1.ServiceSpec{},
+			Status:     corev1.ServiceStatus{},
 		},
-		Items: []corev1.Pod{
-			{
-				ObjectMeta: metav1.ObjectMeta{},
-				Spec:       corev1.PodSpec{},
-				Status:     corev1.PodStatus{},
-			},
-		},
-	}
+	},
 }
 
-func testDaemonSetList() *appsv1.DaemonSetList {
-	return &appsv1.DaemonSetList{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "List",
-			APIVersion: "apps/v1",
+var testPodList = &corev1.PodList{
+	TypeMeta: metav1.TypeMeta{Kind: "List", APIVersion: "v1"},
+	Items: []corev1.Pod{
+		{
+			ObjectMeta: metav1.ObjectMeta{},
+			Spec:       corev1.PodSpec{},
+			Status:     corev1.PodStatus{},
 		},
-		Items: []appsv1.DaemonSet{
-			{
-				ObjectMeta: metav1.ObjectMeta{},
-				Spec:       appsv1.DaemonSetSpec{},
-				Status:     appsv1.DaemonSetStatus{},
-			},
-		},
-	}
+	},
 }
 
-func testDeploymentList() *appsv1.DeploymentList {
-	return &appsv1.DeploymentList{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "List",
-			APIVersion: "apps/v1",
+var testDaemonSetList = &appsv1.DaemonSetList{
+	TypeMeta: metav1.TypeMeta{Kind: "List", APIVersion: "apps/v1"},
+	Items: []appsv1.DaemonSet{
+		{
+			ObjectMeta: metav1.ObjectMeta{},
+			Spec:       appsv1.DaemonSetSpec{},
+			Status:     appsv1.DaemonSetStatus{},
 		},
-		Items: []appsv1.Deployment{
-			{
-				ObjectMeta: metav1.ObjectMeta{},
-				Spec:       appsv1.DeploymentSpec{},
-				Status:     appsv1.DeploymentStatus{},
-			},
-		},
-	}
+	},
 }
 
-func testReplicaSetList() *appsv1.ReplicaSetList {
-	return &appsv1.ReplicaSetList{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "List",
-			APIVersion: "apps/v1",
+var testDeploymentList = &appsv1.DeploymentList{
+	TypeMeta: metav1.TypeMeta{Kind: "List", APIVersion: "apps/v1"},
+	Items: []appsv1.Deployment{
+		{
+			ObjectMeta: metav1.ObjectMeta{},
+			Spec:       appsv1.DeploymentSpec{},
+			Status:     appsv1.DeploymentStatus{},
 		},
-		Items: []appsv1.ReplicaSet{
-			{
-				ObjectMeta: metav1.ObjectMeta{},
-				Spec:       appsv1.ReplicaSetSpec{},
-				Status:     appsv1.ReplicaSetStatus{},
-			},
+	},
+}
+
+var testReplicatSetList = &appsv1.ReplicaSetList{
+	TypeMeta: metav1.TypeMeta{Kind: "List", APIVersion: "apps/v1"},
+	Items: []appsv1.ReplicaSet{
+		{
+			ObjectMeta: metav1.ObjectMeta{},
+			Spec:       appsv1.ReplicaSetSpec{},
+			Status:     appsv1.ReplicaSetStatus{},
 		},
-	}
+	},
 }

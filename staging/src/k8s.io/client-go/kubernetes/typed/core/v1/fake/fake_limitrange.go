@@ -64,7 +64,10 @@ func (c *FakeLimitRanges) List(ctx context.Context, opts v1.ListOptions) (result
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &corev1.LimitRangeList{ListMeta: obj.(*corev1.LimitRangeList).ListMeta}
+	list := &corev1.LimitRangeList{
+		TypeMeta: obj.(*corev1.LimitRangeList).TypeMeta,
+		ListMeta: obj.(*corev1.LimitRangeList).ListMeta,
+	}
 	for _, item := range obj.(*corev1.LimitRangeList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)

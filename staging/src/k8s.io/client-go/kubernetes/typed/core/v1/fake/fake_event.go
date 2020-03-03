@@ -64,7 +64,10 @@ func (c *FakeEvents) List(ctx context.Context, opts v1.ListOptions) (result *cor
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &corev1.EventList{ListMeta: obj.(*corev1.EventList).ListMeta}
+	list := &corev1.EventList{
+		TypeMeta: obj.(*corev1.EventList).TypeMeta,
+		ListMeta: obj.(*corev1.EventList).ListMeta,
+	}
 	for _, item := range obj.(*corev1.EventList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)

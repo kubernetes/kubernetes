@@ -64,7 +64,10 @@ func (c *FakePodDisruptionBudgets) List(ctx context.Context, opts v1.ListOptions
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &v1beta1.PodDisruptionBudgetList{ListMeta: obj.(*v1beta1.PodDisruptionBudgetList).ListMeta}
+	list := &v1beta1.PodDisruptionBudgetList{
+		TypeMeta: obj.(*v1beta1.PodDisruptionBudgetList).TypeMeta,
+		ListMeta: obj.(*v1beta1.PodDisruptionBudgetList).ListMeta,
+	}
 	for _, item := range obj.(*v1beta1.PodDisruptionBudgetList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)

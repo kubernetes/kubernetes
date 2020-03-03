@@ -60,7 +60,10 @@ func (c *FakeNodeMetricses) List(ctx context.Context, opts v1.ListOptions) (resu
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &v1beta1.NodeMetricsList{ListMeta: obj.(*v1beta1.NodeMetricsList).ListMeta}
+	list := &v1beta1.NodeMetricsList{
+		TypeMeta: obj.(*v1beta1.NodeMetricsList).TypeMeta,
+		ListMeta: obj.(*v1beta1.NodeMetricsList).ListMeta,
+	}
 	for _, item := range obj.(*v1beta1.NodeMetricsList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)

@@ -337,7 +337,10 @@ func (c *Fake$.type|publicPlural$) List(ctx context.Context, opts $.ListOptions|
 	if label == nil {
 		label = $.Everything|raw$()
 	}
-	list := &$.type|raw$List{ListMeta: obj.(*$.type|raw$List).ListMeta}
+	list := &$.type|raw$List{
+		TypeMeta: obj.(*$.type|raw$List).TypeMeta,
+		ListMeta: obj.(*$.type|raw$List).ListMeta,
+	}
 	for _, item := range obj.(*$.type|raw$List).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)

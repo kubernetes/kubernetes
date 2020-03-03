@@ -64,7 +64,10 @@ func (c *FakeTestTypes) List(ctx context.Context, opts v1.ListOptions) (result *
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &example3iov1.TestTypeList{ListMeta: obj.(*example3iov1.TestTypeList).ListMeta}
+	list := &example3iov1.TestTypeList{
+		TypeMeta: obj.(*example3iov1.TestTypeList).TypeMeta,
+		ListMeta: obj.(*example3iov1.TestTypeList).ListMeta,
+	}
 	for _, item := range obj.(*example3iov1.TestTypeList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)

@@ -64,7 +64,10 @@ func (c *FakePodPresets) List(ctx context.Context, opts v1.ListOptions) (result 
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &v1alpha1.PodPresetList{ListMeta: obj.(*v1alpha1.PodPresetList).ListMeta}
+	list := &v1alpha1.PodPresetList{
+		TypeMeta: obj.(*v1alpha1.PodPresetList).TypeMeta,
+		ListMeta: obj.(*v1alpha1.PodPresetList).ListMeta,
+	}
 	for _, item := range obj.(*v1alpha1.PodPresetList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)

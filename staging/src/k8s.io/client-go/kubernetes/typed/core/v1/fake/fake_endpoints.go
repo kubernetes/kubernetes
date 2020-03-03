@@ -64,7 +64,10 @@ func (c *FakeEndpoints) List(ctx context.Context, opts v1.ListOptions) (result *
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &corev1.EndpointsList{ListMeta: obj.(*corev1.EndpointsList).ListMeta}
+	list := &corev1.EndpointsList{
+		TypeMeta: obj.(*corev1.EndpointsList).TypeMeta,
+		ListMeta: obj.(*corev1.EndpointsList).ListMeta,
+	}
 	for _, item := range obj.(*corev1.EndpointsList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)

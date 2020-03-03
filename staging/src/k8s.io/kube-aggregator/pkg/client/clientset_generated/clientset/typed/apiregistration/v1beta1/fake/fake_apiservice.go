@@ -61,7 +61,10 @@ func (c *FakeAPIServices) List(ctx context.Context, opts v1.ListOptions) (result
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &v1beta1.APIServiceList{ListMeta: obj.(*v1beta1.APIServiceList).ListMeta}
+	list := &v1beta1.APIServiceList{
+		TypeMeta: obj.(*v1beta1.APIServiceList).TypeMeta,
+		ListMeta: obj.(*v1beta1.APIServiceList).ListMeta,
+	}
 	for _, item := range obj.(*v1beta1.APIServiceList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)

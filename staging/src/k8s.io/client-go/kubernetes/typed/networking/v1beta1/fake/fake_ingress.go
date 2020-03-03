@@ -64,7 +64,10 @@ func (c *FakeIngresses) List(ctx context.Context, opts v1.ListOptions) (result *
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &v1beta1.IngressList{ListMeta: obj.(*v1beta1.IngressList).ListMeta}
+	list := &v1beta1.IngressList{
+		TypeMeta: obj.(*v1beta1.IngressList).TypeMeta,
+		ListMeta: obj.(*v1beta1.IngressList).ListMeta,
+	}
 	for _, item := range obj.(*v1beta1.IngressList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
