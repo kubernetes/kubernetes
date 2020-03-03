@@ -30,6 +30,141 @@ import (
 	capi "k8s.io/api/certificates/v1beta1"
 )
 
+func TestIsKubeletServingCSR(t *testing.T) {
+	newCSR := func(base pemOptions, overlays ...pemOptions) *x509.CertificateRequest {
+		b := csrWithOpts(base, overlays...)
+		csr, err := ParseCSR(b)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return csr
+	}
+	tests := map[string]struct {
+		req    *x509.CertificateRequest
+		usages []capi.KeyUsage
+		exp    bool
+	}{
+		"defaults for kubelet-serving": {
+			req:    newCSR(kubeletServerPEMOptions),
+			usages: kubeletServerUsages,
+			exp:    true,
+		},
+		"does not default to kube-apiserver-client-kubelet if org is not 'system:nodes'": {
+			req:    newCSR(kubeletServerPEMOptions, pemOptions{org: "not-system:nodes"}),
+			usages: kubeletServerUsages,
+			exp:    false,
+		},
+		"does not default to kubelet-serving if CN does not have system:node: prefix": {
+			req:    newCSR(kubeletServerPEMOptions, pemOptions{cn: "notprefixed"}),
+			usages: kubeletServerUsages,
+			exp:    false,
+		},
+		"does not default to kubelet-serving if it has an unexpected usage": {
+			req:    newCSR(kubeletServerPEMOptions),
+			usages: append(kubeletServerUsages, capi.UsageClientAuth),
+			exp:    false,
+		},
+		"does not default to kubelet-serving if it is missing an expected usage": {
+			req:    newCSR(kubeletServerPEMOptions),
+			usages: kubeletServerUsages[1:],
+			exp:    false,
+		},
+		"does not default to kubelet-serving if it does not specify any dnsNames or ipAddresses": {
+			req:    newCSR(kubeletServerPEMOptions, pemOptions{ipAddresses: []net.IP{}, dnsNames: []string{}}),
+			usages: kubeletServerUsages[1:],
+			exp:    false,
+		},
+		"does not default to kubelet-serving if it specifies a URI SAN": {
+			req:    newCSR(kubeletServerPEMOptions, pemOptions{uris: []string{"http://something"}}),
+			usages: kubeletServerUsages,
+			exp:    false,
+		},
+		"does not default to kubelet-serving if it specifies an emailAddress SAN": {
+			req:    newCSR(kubeletServerPEMOptions, pemOptions{emailAddresses: []string{"something"}}),
+			usages: kubeletServerUsages,
+			exp:    false,
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			got := IsKubeletServingCSR(test.req, test.usages)
+			if test.exp != got {
+				t.Errorf("unexpected IsKubeletClientCSR output: exp=%v, got=%v", test.exp, got)
+			}
+		})
+	}
+}
+
+func TestIsKubeletClientCSR(t *testing.T) {
+	newCSR := func(base pemOptions, overlays ...pemOptions) *x509.CertificateRequest {
+		b := csrWithOpts(base, overlays...)
+		csr, err := ParseCSR(b)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return csr
+	}
+	tests := map[string]struct {
+		req    *x509.CertificateRequest
+		usages []capi.KeyUsage
+		exp    bool
+	}{
+		"defaults for kube-apiserver-client-kubelet": {
+			req:    newCSR(kubeletClientPEMOptions),
+			usages: kubeletClientUsages,
+			exp:    true,
+		},
+		"does not default to kube-apiserver-client-kubelet if org is not 'system:nodes'": {
+			req:    newCSR(kubeletClientPEMOptions, pemOptions{org: "not-system:nodes"}),
+			usages: kubeletClientUsages,
+			exp:    false,
+		},
+		"does not default to kube-apiserver-client-kubelet if a dnsName is set": {
+			req:    newCSR(kubeletClientPEMOptions, pemOptions{dnsNames: []string{"something"}}),
+			usages: kubeletClientUsages,
+			exp:    false,
+		},
+		"does not default to kube-apiserver-client-kubelet if an emailAddress is set": {
+			req:    newCSR(kubeletClientPEMOptions, pemOptions{emailAddresses: []string{"something"}}),
+			usages: kubeletClientUsages,
+			exp:    false,
+		},
+		"does not default to kube-apiserver-client-kubelet if a uri SAN is set": {
+			req:    newCSR(kubeletClientPEMOptions, pemOptions{uris: []string{"http://something"}}),
+			usages: kubeletClientUsages,
+			exp:    false,
+		},
+		"does not default to kube-apiserver-client-kubelet if an ipAddress is set": {
+			req:    newCSR(kubeletClientPEMOptions, pemOptions{ipAddresses: []net.IP{{0, 0, 0, 0}}}),
+			usages: kubeletClientUsages,
+			exp:    false,
+		},
+		"does not default to kube-apiserver-client-kubelet if CN does not have 'system:node:' prefix": {
+			req:    newCSR(kubeletClientPEMOptions, pemOptions{cn: "not-prefixed"}),
+			usages: kubeletClientUsages,
+			exp:    false,
+		},
+		"does not default to kube-apiserver-client-kubelet if it has an unexpected usage": {
+			req:    newCSR(kubeletClientPEMOptions),
+			usages: append(kubeletClientUsages, capi.UsageServerAuth),
+			exp:    false,
+		},
+		"does not default to kube-apiserver-client-kubelet if it is missing an expected usage": {
+			req:    newCSR(kubeletClientPEMOptions),
+			usages: kubeletClientUsages[1:],
+			exp:    false,
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			got := IsKubeletClientCSR(test.req, test.usages)
+			if test.exp != got {
+				t.Errorf("unexpected IsKubeletClientCSR output: exp=%v, got=%v", test.exp, got)
+			}
+		})
+	}
+}
+
 var (
 	kubeletClientUsages = []capi.KeyUsage{
 		capi.UsageDigitalSignature,

@@ -150,6 +150,9 @@ func ensureCompatible(new, orig *certificates.CertificateSigningRequest, private
 	if !reflect.DeepEqual(newCSR.Subject, origCSR.Subject) {
 		return fmt.Errorf("csr subjects differ: new: %#v, orig: %#v", newCSR.Subject, origCSR.Subject)
 	}
+	if new.Spec.SignerName != nil && orig.Spec.SignerName != nil && *new.Spec.SignerName != *orig.Spec.SignerName {
+		return fmt.Errorf("csr signerNames differ: new %q, orig: %q", *new.Spec.SignerName, *orig.Spec.SignerName)
+	}
 	signer, ok := privateKey.(crypto.Signer)
 	if !ok {
 		return fmt.Errorf("privateKey is not a signer")
