@@ -274,10 +274,16 @@ func (h *UpgradeAwareHandler) tryUpgrade(w http.ResponseWriter, req *http.Reques
 	if h.InterceptRedirects {
 		klog.V(6).Infof("Connecting to backend proxy (intercepting redirects) %s\n  Headers: %v", &location, clone.Header)
 		backendConn, rawResponse, err = utilnet.ConnectWithRedirects(req.Method, &location, clone.Header, req.Body, utilnet.DialerFunc(h.DialForUpgrade), h.RequireSameHostRedirects)
+		if err != nil {
+			err = fmt.Errorf("failed connectWithRedirects: %v", err)
+		}
 	} else {
 		klog.V(6).Infof("Connecting to backend proxy (direct dial) %s\n  Headers: %v", &location, clone.Header)
 		clone.URL = &location
 		backendConn, err = h.DialForUpgrade(clone)
+		if err != nil {
+			err = fmt.Errorf("failed DialForUpgrade: %v", err)
+		}
 	}
 	if err != nil {
 		klog.V(6).Infof("Proxy connection error: %v", err)
@@ -348,6 +354,7 @@ func (h *UpgradeAwareHandler) tryUpgrade(w http.ResponseWriter, req *http.Reques
 	go func() {
 		var writer io.WriteCloser
 		if h.MaxBytesPerSec > 0 {
+			klog.Infof("CHAO: h.MaxBytesPerSec=", h.MaxBytesPerSec)
 			writer = flowrate.NewWriter(backendConn, h.MaxBytesPerSec)
 		} else {
 			writer = backendConn
@@ -390,8 +397,10 @@ func (h *UpgradeAwareHandler) Dial(req *http.Request) (net.Conn, error) {
 
 func (h *UpgradeAwareHandler) DialForUpgrade(req *http.Request) (net.Conn, error) {
 	if h.UpgradeTransport == nil {
+		klog.Infof("CHAO: nil upgradeTransport")
 		return dial(req, h.Transport)
 	}
+	klog.Infof("CHAO: non nil upgradeTransport")
 	updatedReq, err := h.UpgradeTransport.WrapRequest(req)
 	if err != nil {
 		return nil, err
@@ -416,6 +425,7 @@ func getResponse(r io.Reader) (*http.Response, []byte, error) {
 func dial(req *http.Request, transport http.RoundTripper) (net.Conn, error) {
 	conn, err := DialURL(req.Context(), req.URL, transport)
 	if err != nil {
+		klog.Info("CHAO: this is dialing backend failure")
 		return nil, fmt.Errorf("error dialing backend: %v", err)
 	}
 

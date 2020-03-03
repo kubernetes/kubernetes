@@ -366,19 +366,22 @@ func ConnectWithRedirects(originalMethod string, originalLocation *url.URL, head
 redirectLoop:
 	for redirects := 0; ; redirects++ {
 		if redirects > maxRedirects {
+			klog.Errorf("CHAO: too many redirects (%d)", redirects)
 			return nil, nil, fmt.Errorf("too many redirects (%d)", redirects)
 		}
 
 		req, err := http.NewRequest(method, location.String(), body)
 		if err != nil {
-			return nil, nil, err
+			klog.Errorf("CHAO: failed creating request %v", err)
+			return nil, nil, fmt.Errorf("failed creating request %v", err)
 		}
 
 		req.Header = header
 
 		intermediateConn, err = dialer.Dial(req)
 		if err != nil {
-			return nil, nil, err
+			klog.Errorf("CHAO: failed dialing to %s: %v", location.String(), err)
+			return nil, nil, fmt.Errorf("failed dialing to %s: %v", location.String(), err)
 		}
 
 		// Peek at the backend response.

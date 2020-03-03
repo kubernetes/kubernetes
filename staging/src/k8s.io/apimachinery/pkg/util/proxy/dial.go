@@ -60,6 +60,7 @@ func DialURL(ctx context.Context, url *url.URL, transport http.RoundTripper) (ne
 			// create a tls client using the connection.
 			netConn, err := dialer(ctx, "tcp", dialAddr)
 			if err != nil {
+				klog.Info("CHAO: inside dialer failed")
 				return nil, err
 			}
 			if tlsConfig == nil {
