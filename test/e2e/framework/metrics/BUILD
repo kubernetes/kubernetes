@@ -22,7 +22,6 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/test/e2e/framework/metrics",
     deps = [
-        "//pkg/apis/core:go_default_library",
         "//pkg/kubelet/dockershim/metrics:go_default_library",
         "//pkg/kubelet/metrics:go_default_library",
         "//pkg/master/ports:go_default_library",
