@@ -262,13 +262,6 @@ var _ = SIGDescribe("ReplicationController", func() {
 				break
 			}
 		}
-		ginkgo.By("waiting for 10 seconds to ensure that it's deleted")
-		time.Sleep(10 * time.Second)
-
-		// Get the ReplicationController to check that it's deleted
-		ginkgo.By("fetching the ReplicationController to ensure that it's deleted")
-		_, err = f.ClientSet.CoreV1().ReplicationControllers(testRcNamespace).Get(context.TODO(), testRcName, metav1.GetOptions{})
-		framework.ExpectError(err, "Failed to delete ReplicationController")
 	})
 })
 
