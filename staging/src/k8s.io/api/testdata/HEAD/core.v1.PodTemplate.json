@@ -1366,7 +1366,8 @@
             ]
           }
         }
-      ]
+      ],
+      "shareBurstableLimits": true
     }
   }
 }

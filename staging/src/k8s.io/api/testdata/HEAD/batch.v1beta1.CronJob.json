@@ -1421,14 +1421,15 @@
                   ]
                 }
               }
-            ]
+            ],
+            "shareBurstableLimits": false
           }
         },
-        "ttlSecondsAfterFinished": 920774957
+        "ttlSecondsAfterFinished": 233999136
       }
     },
-    "successfulJobsHistoryLimit": 1613009760,
-    "failedJobsHistoryLimit": 1560811691
+    "successfulJobsHistoryLimit": -1469601144,
+    "failedJobsHistoryLimit": -1670496118
   },
   "status": {
     "active": [
@@ -1436,7 +1437,7 @@
         "kind": "447",
         "namespace": "448",
         "name": "449",
-        "uid": "Ŋ)TiD¢ƿ媴h",
+        "uid": ")TiD¢ƿ媴h5ƅȸȓɻ猶N嫡",
         "apiVersion": "450",
         "resourceVersion": "451",
         "fieldPath": "452"

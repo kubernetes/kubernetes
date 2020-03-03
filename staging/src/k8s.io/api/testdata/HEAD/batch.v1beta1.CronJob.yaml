@@ -31,7 +31,7 @@ metadata:
   uid: "7"
 spec:
   concurrencyPolicy: Hr鯹)晿<o,c鮽ort昍řČ扷5Ɨ
-  failedJobsHistoryLimit: 1560811691
+  failedJobsHistoryLimit: -1670496118
   jobTemplate:
     metadata:
       annotations:
@@ -754,6 +754,7 @@ spec:
               runAsUserName: "383"
           serviceAccount: "375"
           serviceAccountName: "374"
+          shareBurstableLimits: false
           shareProcessNamespace: true
           subdomain: "388"
           terminationGracePeriodSeconds: 2666412258966278206
@@ -973,10 +974,10 @@ spec:
               storagePolicyID: "122"
               storagePolicyName: "121"
               volumePath: "119"
-      ttlSecondsAfterFinished: 920774957
+      ttlSecondsAfterFinished: 233999136
   schedule: "19"
   startingDeadlineSeconds: -2555947251840004808
-  successfulJobsHistoryLimit: 1613009760
+  successfulJobsHistoryLimit: -1469601144
   suspend: true
 status:
   active:
@@ -986,4 +987,4 @@ status:
     name: "449"
     namespace: "448"
     resourceVersion: "451"
-    uid: Ŋ)TiD¢ƿ媴h
+    uid: )TiD¢ƿ媴h5ƅȸȓɻ猶N嫡

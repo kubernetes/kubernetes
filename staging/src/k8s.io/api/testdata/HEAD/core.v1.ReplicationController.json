@@ -1361,21 +1361,22 @@
               ]
             }
           }
-        ]
+        ],
+        "shareBurstableLimits": false
       }
     }
   },
   "status": {
-    "replicas": -1530496417,
-    "fullyLabeledReplicas": -1698525469,
-    "readyReplicas": -525943726,
-    "availableReplicas": -578926701,
-    "observedGeneration": 8034206547748752944,
+    "replicas": -1698525469,
+    "fullyLabeledReplicas": -525943726,
+    "readyReplicas": -578926701,
+    "availableReplicas": -1028747728,
+    "observedGeneration": 7052813294072148403,
     "conditions": [
       {
-        "type": "Î磣:mʂ渢pɉ驻(+昒ȼȈɍ颬灲",
-        "status": "\u003e堵zŕƧ钖孝0蛮xAǫ\u0026tŧK剛Ʀ",
-        "lastTransitionTime": "2837-10-14T23:23:27Z",
+        "type": "磣:mʂ渢pɉ驻(+昒ȼȈɍ颬",
+        "status": "绡\u003e堵zŕƧ钖孝0蛮xAǫ\u0026",
+        "lastTransitionTime": "2270-12-17T08:26:56Z",
         "reason": "429",
         "message": "430"
       }

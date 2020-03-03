@@ -1419,10 +1419,11 @@
                 ]
               }
             }
-          ]
+          ],
+          "shareBurstableLimits": true
         }
       },
-      "ttlSecondsAfterFinished": 246849509
+      "ttlSecondsAfterFinished": 497722212
     }
   }
 }

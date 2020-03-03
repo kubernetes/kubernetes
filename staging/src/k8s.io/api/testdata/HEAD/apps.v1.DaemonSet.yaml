@@ -30,8 +30,8 @@ metadata:
   selfLink: "5"
   uid: "7"
 spec:
-  minReadySeconds: 212061711
-  revisionHistoryLimit: -1092090658
+  minReadySeconds: 696654600
+  revisionHistoryLimit: 407742062
   selector:
     matchExpressions:
     - key: p503---477-49p---o61---4fy--9---7--9-9s-0-u5lj2--10pq-0-7-9-2-0/fP81.-.9Vdx.TB_M-H_5_.t..bG0
@@ -720,6 +720,7 @@ spec:
           runAsUserName: "369"
       serviceAccount: "361"
       serviceAccountName: "360"
+      shareBurstableLimits: false
       shareProcessNamespace: true
       subdomain: "374"
       terminationGracePeriodSeconds: -3039830979334099524
@@ -943,20 +944,20 @@ spec:
   updateStrategy:
     rollingUpdate:
       maxUnavailable: 2
-    type: 荥ơ'禧ǵŊ)TiD¢ƿ媴h5
+    type: ơ'禧ǵŊ)TiD¢ƿ媴h5ƅȸȓɻ
 status:
-  collisionCount: -449319810
+  collisionCount: 867742020
   conditions:
-  - lastTransitionTime: "2469-07-10T03:20:34Z"
+  - lastTransitionTime: "2042-08-25T05:10:04Z"
     message: "434"
     reason: "433"
-    status: '''ƈoIǢ龞瞯å'
-    type: ""
-  currentNumberScheduled: -1979737528
-  desiredNumberScheduled: -424698834
-  numberAvailable: 1660081568
-  numberMisscheduled: -1707056814
-  numberReady: 407742062
-  numberUnavailable: 904244563
-  observedGeneration: 5741439505187758584
-  updatedNumberScheduled: 902022378
+    status: ""
+    type: 昞财Î嘝zʄ!ć惍Bi攵&ý"ʀ
+  currentNumberScheduled: 2115789304
+  desiredNumberScheduled: 1660081568
+  numberAvailable: -655315199
+  numberMisscheduled: 902022378
+  numberReady: 904244563
+  numberUnavailable: -918184784
+  observedGeneration: 3178958147838553180
+  updatedNumberScheduled: -1512660030

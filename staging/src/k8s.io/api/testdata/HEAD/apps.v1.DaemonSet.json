@@ -1374,33 +1374,34 @@
               ]
             }
           }
-        ]
+        ],
+        "shareBurstableLimits": false
       }
     },
     "updateStrategy": {
-      "type": "荥ơ'禧ǵŊ)TiD¢ƿ媴h5",
+      "type": "ơ'禧ǵŊ)TiD¢ƿ媴h5ƅȸȓɻ",
       "rollingUpdate": {
         "maxUnavailable": 2
       }
     },
-    "minReadySeconds": 212061711,
-    "revisionHistoryLimit": -1092090658
+    "minReadySeconds": 696654600,
+    "revisionHistoryLimit": 407742062
   },
   "status": {
-    "currentNumberScheduled": -1979737528,
-    "numberMisscheduled": -1707056814,
-    "desiredNumberScheduled": -424698834,
-    "numberReady": 407742062,
-    "observedGeneration": 5741439505187758584,
-    "updatedNumberScheduled": 902022378,
-    "numberAvailable": 1660081568,
-    "numberUnavailable": 904244563,
-    "collisionCount": -449319810,
+    "currentNumberScheduled": 2115789304,
+    "numberMisscheduled": 902022378,
+    "desiredNumberScheduled": 1660081568,
+    "numberReady": 904244563,
+    "observedGeneration": 3178958147838553180,
+    "updatedNumberScheduled": -1512660030,
+    "numberAvailable": -655315199,
+    "numberUnavailable": -918184784,
+    "collisionCount": 867742020,
     "conditions": [
       {
-        "type": "",
-        "status": "'ƈoIǢ龞瞯å",
-        "lastTransitionTime": "2469-07-10T03:20:34Z",
+        "type": "昞财Î嘝zʄ!ć惍Bi攵\u0026ý\"ʀ",
+        "status": "",
+        "lastTransitionTime": "2042-08-25T05:10:04Z",
         "reason": "433",
         "message": "434"
       }
