@@ -128,8 +128,8 @@ type Options struct {
 	containerNameFromRefSpecRegexp *regexp.Regexp
 }
 
-// NewLogsOptions returns a default LogOptions.
-func NewLogsOptions(streams genericclioptions.IOStreams, allContainers bool) *Options {
+// NewOptions returns a default LogOptions.
+func NewOptions(streams genericclioptions.IOStreams, allContainers bool) *Options {
 	return &Options{
 		IOStreams:            streams,
 		AllContainers:        allContainers,
@@ -142,7 +142,7 @@ func NewLogsOptions(streams genericclioptions.IOStreams, allContainers bool) *Op
 
 // NewCmdLogs creates a new pod logs command
 func NewCmdLogs(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := NewLogsOptions(streams, false)
+	o := NewOptions(streams, false)
 
 	cmd := &cobra.Command{
 		Use:                   logsUsageStr,
