@@ -199,6 +199,23 @@ func TestTLSServerName(t *testing.T) {
 	matchByteArg(nil, actualCfg.TLSClientConfig.CAData, t)
 }
 
+func TestTLSServerNameClearsWhenServerNameSet(t *testing.T) {
+	config := createValidTestConfig()
+
+	clientBuilder := NewNonInteractiveClientConfig(*config, "clean", &ConfigOverrides{
+		ClusterInfo: clientcmdapi.Cluster{
+			Server: "http://something",
+		},
+	}, nil)
+
+	actualCfg, err := clientBuilder.ClientConfig()
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	matchStringArg("", actualCfg.ServerName, t)
+}
+
 func TestMergeContext(t *testing.T) {
 	const namespace = "overridden-namespace"
 

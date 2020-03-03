@@ -124,6 +124,9 @@ func (o *createClusterOptions) modifyCluster(existingCluster clientcmdapi.Cluste
 
 	if o.server.Provided() {
 		modifiedCluster.Server = o.server.Value()
+		// specifying a --server on the command line, overrides the TLSServerName that was specified in the kubeconfig file.
+		// if both are specified, then the next if block will write the new TLSServerName.
+		modifiedCluster.TLSServerName = ""
 	}
 	if o.tlsServerName.Provided() {
 		modifiedCluster.TLSServerName = o.tlsServerName.Value()

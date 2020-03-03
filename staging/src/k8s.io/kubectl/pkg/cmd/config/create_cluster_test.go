@@ -58,7 +58,7 @@ func TestCreateCluster(t *testing.T) {
 func TestModifyCluster(t *testing.T) {
 	conf := clientcmdapi.Config{
 		Clusters: map[string]*clientcmdapi.Cluster{
-			"my-cluster": {Server: "https://192.168.0.1"},
+			"my-cluster": {Server: "https://192.168.0.1", TLSServerName: "to-be-cleared"},
 		},
 	}
 	test := createClusterTest{
@@ -72,6 +72,30 @@ func TestModifyCluster(t *testing.T) {
 		expectedConfig: clientcmdapi.Config{
 			Clusters: map[string]*clientcmdapi.Cluster{
 				"my-cluster": {Server: "https://192.168.0.99"},
+			},
+		},
+	}
+	test.run(t)
+}
+
+func TestModifyClusterServerAndTLS(t *testing.T) {
+	conf := clientcmdapi.Config{
+		Clusters: map[string]*clientcmdapi.Cluster{
+			"my-cluster": {Server: "https://192.168.0.1"},
+		},
+	}
+	test := createClusterTest{
+		description: "Testing 'kubectl config set-cluster' with an existing cluster",
+		config:      conf,
+		args:        []string{"my-cluster"},
+		flags: []string{
+			"--server=https://192.168.0.99",
+			"--tls-server-name=my-cluster-name",
+		},
+		expected: `Cluster "my-cluster" set.` + "\n",
+		expectedConfig: clientcmdapi.Config{
+			Clusters: map[string]*clientcmdapi.Cluster{
+				"my-cluster": {Server: "https://192.168.0.99", TLSServerName: "my-cluster-name"},
 			},
 		},
 	}
@@ -117,7 +141,7 @@ func (test createClusterTest) run(t *testing.T) {
 			t.Errorf("Fail in %q\n expected cluster server %v\n but got %v\n ", test.description, test.expectedConfig.Clusters[test.args[0]].Server, cluster.Server)
 		}
 		if cluster.TLSServerName != test.expectedConfig.Clusters[test.args[0]].TLSServerName {
-			t.Errorf("Fail in %q\n expected cluster TLS server name %v\n but got %v\n ", test.description, test.expectedConfig.Clusters[test.args[0]].TLSServerName, cluster.TLSServerName)
+			t.Errorf("Fail in %q\n expected cluster TLS server name %q\n but got %q\n ", test.description, test.expectedConfig.Clusters[test.args[0]].TLSServerName, cluster.TLSServerName)
 		}
 	}
 }

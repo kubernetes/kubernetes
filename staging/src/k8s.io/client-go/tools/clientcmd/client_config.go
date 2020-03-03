@@ -461,7 +461,11 @@ func (config *DirectClientConfig) getCluster() (clientcmdapi.Cluster, error) {
 		mergedClusterInfo.CertificateAuthorityData = config.overrides.ClusterInfo.CertificateAuthorityData
 	}
 
-	if config.overrides.ClusterInfo.TLSServerName != "" {
+	// if the --tls-server-name has been set in overrides, use that value.
+	// if the --server has been set in overrides, then use the value of --tls-server-name specified on the CLI too.  This gives the property
+	// that setting a --server will effectively clear the KUBECONFIG value of tls-server-name if it is specified on the command line which is
+	// usually correct.
+	if config.overrides.ClusterInfo.TLSServerName != "" || config.overrides.ClusterInfo.Server != "" {
 		mergedClusterInfo.TLSServerName = config.overrides.ClusterInfo.TLSServerName
 	}
 
