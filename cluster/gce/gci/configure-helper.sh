@@ -812,7 +812,7 @@ kind: EgressSelectorConfiguration
 egressSelections:
 - name: cluster
   connection:
-    proxyProtocol: GRPC
+    proxyProtocol: HTTPConnect
     transport:
       uds:
         udsName: /etc/srv/kubernetes/konnectivity-server/konnectivity-server.socket
@@ -1660,7 +1660,7 @@ function prepare-konnectivity-server-manifest {
   params+=("--uds-name=/etc/srv/kubernetes/konnectivity-server/konnectivity-server.socket")
   params+=("--cluster-cert=/etc/srv/kubernetes/pki/apiserver.crt")
   params+=("--cluster-key=/etc/srv/kubernetes/pki/apiserver.key")
-  params+=("--mode=grpc")
+  params+=("--mode=http-connect")
   params+=("--server-port=0")
   params+=("--agent-port=$1")
   params+=("--admin-port=$2")
