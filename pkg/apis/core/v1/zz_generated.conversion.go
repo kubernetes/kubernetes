@@ -6043,6 +6043,7 @@ func autoConvert_v1_PodSpec_To_core_PodSpec(in *v1.PodSpec, out *core.PodSpec, s
 	out.PreemptionPolicy = (*core.PreemptionPolicy)(unsafe.Pointer(in.PreemptionPolicy))
 	out.Overhead = *(*core.ResourceList)(unsafe.Pointer(&in.Overhead))
 	out.TopologySpreadConstraints = *(*[]core.TopologySpreadConstraint)(unsafe.Pointer(&in.TopologySpreadConstraints))
+	out.ShareBurstableLimits = (*bool)(unsafe.Pointer(in.ShareBurstableLimits))
 	return nil
 }
 
@@ -6094,6 +6095,7 @@ func autoConvert_core_PodSpec_To_v1_PodSpec(in *core.PodSpec, out *v1.PodSpec, s
 	out.Overhead = *(*v1.ResourceList)(unsafe.Pointer(&in.Overhead))
 	out.EnableServiceLinks = (*bool)(unsafe.Pointer(in.EnableServiceLinks))
 	out.TopologySpreadConstraints = *(*[]v1.TopologySpreadConstraint)(unsafe.Pointer(&in.TopologySpreadConstraints))
+	out.ShareBurstableLimits = (*bool)(unsafe.Pointer(in.ShareBurstableLimits))
 	return nil
 }
 

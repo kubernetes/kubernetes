@@ -3537,6 +3537,13 @@ message PodSpec {
   // +listMapKey=topologyKey
   // +listMapKey=whenUnsatisfiable
   repeated TopologySpreadConstraint topologySpreadConstraints = 33;
+
+  // ShareBurstableLimits sets the pod cgroup to the sum of the resource limits for all of its containers.
+  // This only has an effect in case the pod's QoS level is Burstable. It allows defining resource limits on the pod
+  // level without having to determine the limits on all of the containers in the pod.
+  // If not specified, the default is false.
+  // +optional
+  optional bool shareBurstableLimits = 35;
 }
 
 // PodStatus represents information about the status of a pod. Status may trail the actual
