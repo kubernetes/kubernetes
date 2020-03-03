@@ -239,23 +239,6 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 		return errors.New(log("attacher.MountDevice failed, deviceMountPath is empty"))
 	}
 
-	corruptedDir := false
-	mounted, err := isDirMounted(c.plugin, deviceMountPath)
-	if err != nil {
-		klog.Error(log("attacher.MountDevice failed while checking mount status for dir [%s]", deviceMountPath))
-		if isCorruptedDir(deviceMountPath) {
-			corruptedDir = true // leave to CSI driver to handle corrupted mount
-			klog.Warning(log("attacher.MountDevice detected corrupted mount for dir [%s]", deviceMountPath))
-		} else {
-			return err
-		}
-	}
-
-	if mounted && !corruptedDir {
-		klog.V(4).Info(log("attacher.MountDevice skipping mount, dir already mounted [%s]", deviceMountPath))
-		return nil
-	}
-
 	// Setup
 	if spec == nil {
 		return errors.New(log("attacher.MountDevice failed, spec is nil"))
@@ -304,11 +287,11 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 
 	// Store volume metadata for UnmountDevice. Keep it around even if the
 	// driver does not support NodeStage, UnmountDevice still needs it.
-	if err = os.MkdirAll(deviceMountPath, 0750); err != nil && !corruptedDir {
-		return errors.New(log("attacher.MountDevice failed to create dir %#v:  %v", deviceMountPath, err))
-	}
-	klog.V(4).Info(log("created target path successfully [%s]", deviceMountPath))
 	dataDir := filepath.Dir(deviceMountPath)
+	if err = os.MkdirAll(dataDir, 0750); err != nil {
+		return errors.New(log("attacher.MountDevice failed to create dir %#v:  %v", dataDir, err))
+	}
+	klog.V(4).Info(log("created target parent path successfully [%s]", dataDir))
 	data := map[string]string{
 		volDataKey.volHandle:  csiSource.VolumeHandle,
 		volDataKey.driverName: csiSource.Driver,
@@ -326,7 +309,7 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 		if err != nil && volumetypes.IsOperationFinishedError(err) {
 			// clean up metadata
 			klog.Errorf(log("attacher.MountDevice failed: %v", err))
-			if err := removeMountDir(c.plugin, deviceMountPath); err != nil {
+			if err := removeMountDir(c.plugin, dataDir); err != nil {
 				klog.Error(log("attacher.MountDevice failed to remove mount dir after error [%s]: %v", deviceMountPath, err))
 			}
 		}
