@@ -128,16 +128,19 @@ var _ = SIGDescribe("ReplicationController", func() {
 			},
 		}
 
+		ginkgo.By("creating a ReplicationController")
 		// Create a ReplicationController
 		_, err := f.ClientSet.CoreV1().ReplicationControllers(testRcNamespace).Create(context.TODO(), &rcTest, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "Failed to create ReplicationController")
 
 		// setup a watch for the RC
-		rcWatch, err := f.ClientSet.CoreV1().ReplicationControllers(testRcNamespace).Watch(context.TODO(), metav1.ListOptions{LabelSelector: "test-rc-static=true"})
+		rcWatchTimeoutSeconds := int64(60)
+		rcWatch, err := f.ClientSet.CoreV1().ReplicationControllers(testRcNamespace).Watch(context.TODO(), metav1.ListOptions{LabelSelector: "test-rc-static=true", TimeoutSeconds: &rcWatchTimeoutSeconds})
 		framework.ExpectNoError(err, "Failed to setup watch on newly created ReplicationController")
 
 		rcWatchChan := rcWatch.ResultChan()
 
+		ginkgo.By("waiting for available Replicas")
 		for event := range rcWatchChan {
 			rc, ok := event.Object.(*v1.ReplicationController)
 			framework.ExpectEqual(ok, true, "Unable to convert type of ReplicationController watch event")
@@ -153,6 +156,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 		})
 		framework.ExpectNoError(err, "failed to marshal json of replicationcontroller label patch")
 		// Patch the ReplicationController
+		ginkgo.By("patching ReplicationController")
 		_, err = f.ClientSet.CoreV1().ReplicationControllers(testRcNamespace).Patch(context.TODO(), testRcName, types.StrategicMergePatchType, []byte(rcLabelPatchPayload), metav1.PatchOptions{})
 		framework.ExpectNoError(err, "Failed to patch ReplicationController")
 
@@ -165,10 +169,12 @@ var _ = SIGDescribe("ReplicationController", func() {
 		framework.ExpectNoError(err, "Failed to marshal JSON of ReplicationController label patch")
 
 		// Patch the ReplicationController's status
+		ginkgo.By("patching ReplicationController status")
 		rcStatus, err := f.ClientSet.CoreV1().ReplicationControllers(testRcNamespace).Patch(context.TODO(), testRcName, types.StrategicMergePatchType, []byte(rcStatusPatchPayload), metav1.PatchOptions{}, "status")
 		framework.ExpectNoError(err, "Failed to patch ReplicationControllerStatus")
 		framework.ExpectEqual(rcStatus.Status.ReadyReplicas, int32(0), "ReplicationControllerStatus's readyReplicas does not equal 0")
 
+		ginkgo.By("fetching ReplicationController status")
 		rcStatusUnstructured, err := dc.Resource(rcResource).Namespace(testRcNamespace).Get(testRcName, metav1.GetOptions{}, "status")
 		framework.ExpectNoError(err, "Failed to fetch ReplicationControllerStatus")
 
@@ -185,6 +191,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 		framework.ExpectNoError(err, "Failed to marshal json of replicationcontroller label patch")
 
 		// Patch the ReplicationController's scale
+		ginkgo.By("patching ReplicationController scale")
 		rcScale, err := f.ClientSet.CoreV1().ReplicationControllers(testRcNamespace).Patch(context.TODO(), testRcName, types.StrategicMergePatchType, []byte(rcScalePatchPayload), metav1.PatchOptions{}, "scale")
 		framework.ExpectNoError(err, "Failed to patch ReplicationControllerScale")
 
@@ -199,6 +206,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 		framework.ExpectEqual(rcScale.Status.Replicas, testRcMaxReplicaCount, "ReplicationController ReplicasSet Scale does not match the expected scale")
 
 		// Get the ReplicationController
+		ginkgo.By("fetching ReplicationController; ensuring that it's patched")
 		rc, err := f.ClientSet.CoreV1().ReplicationControllers(testRcNamespace).Get(context.TODO(), testRcName, metav1.GetOptions{})
 		framework.ExpectNoError(err, "Failed to fetch ReplicationController")
 		framework.ExpectEqual(rc.ObjectMeta.Labels["test-rc"], "patched", "ReplicationController is missing a label from earlier patch")
@@ -208,10 +216,12 @@ var _ = SIGDescribe("ReplicationController", func() {
 		rcStatusUpdatePayload.Status.ReadyReplicas = 1
 
 		// Replace the ReplicationController's status
+		ginkgo.By("updating ReplicationController status")
 		rcStatus, err = f.ClientSet.CoreV1().ReplicationControllers(testRcNamespace).UpdateStatus(context.TODO(), rcStatusUpdatePayload, metav1.UpdateOptions{})
 		framework.ExpectNoError(err, "Failed to update ReplicationControllerStatus")
 		framework.ExpectEqual(rcStatus.Status.ReadyReplicas, int32(1), "ReplicationControllerStatus readyReplicas does not equal 1")
 
+		ginkgo.By(fmt.Sprintf("waiting for ReplicationController readyReplicas to be equal to %v", testRcMaxReplicaCount))
 		for event := range rcWatchChan {
 			rc, ok := event.Object.(*v1.ReplicationController)
 			framework.ExpectEqual(ok, true, "Unable to convert type of ReplicationController watch event")
@@ -220,10 +230,12 @@ var _ = SIGDescribe("ReplicationController", func() {
 			}
 		}
 
+		ginkgo.By("listing all ReplicationControllers")
 		rcs, err := f.ClientSet.CoreV1().ReplicationControllers("").List(context.TODO(), metav1.ListOptions{LabelSelector: "test-rc-static=true"})
 		framework.ExpectNoError(err, "Failed to list ReplicationController")
 		framework.ExpectEqual(len(rcs.Items) > 0, true)
 
+		ginkgo.By("checking that ReplicationController has expected values")
 		foundRc := false
 		for _, rcItem := range rcs.Items {
 			if rcItem.ObjectMeta.Name == testRcName &&
@@ -238,9 +250,11 @@ var _ = SIGDescribe("ReplicationController", func() {
 		framework.ExpectEqual(foundRc, true)
 
 		// Delete ReplicationController
+		ginkgo.By("deleting ReplicationControllers by collection")
 		err = f.ClientSet.CoreV1().ReplicationControllers(testRcNamespace).DeleteCollection(context.TODO(), &metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: "test-rc-static=true"})
 		framework.ExpectNoError(err, "Failed to delete ReplicationControllers")
 
+		ginkgo.By("waiting for ReplicationController is have a DeletionTimestamp")
 		for event := range rcWatchChan {
 			rc, ok := event.Object.(*v1.ReplicationController)
 			framework.ExpectEqual(ok, true, "Unable to convert type of ReplicationController watch event")
@@ -248,9 +262,11 @@ var _ = SIGDescribe("ReplicationController", func() {
 				break
 			}
 		}
+		ginkgo.By("waiting for 10 seconds to ensure that it's deleted")
 		time.Sleep(10 * time.Second)
 
 		// Get the ReplicationController to check that it's deleted
+		ginkgo.By("fetching the ReplicationController to ensure that it's deleted")
 		_, err = f.ClientSet.CoreV1().ReplicationControllers(testRcNamespace).Get(context.TODO(), testRcName, metav1.GetOptions{})
 		framework.ExpectError(err, "Failed to delete ReplicationController")
 	})
