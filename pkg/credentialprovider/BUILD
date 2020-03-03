@@ -11,12 +11,19 @@ go_library(
     srcs = [
         "config.go",
         "doc.go",
+        "external.go",
+        "external_config.go",
         "keyring.go",
         "plugins.go",
         "provider.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/credentialprovider",
     deps = [
+        "//pkg/credentialprovider/apis/registrycredentials:go_default_library",
+        "//pkg/credentialprovider/apis/registrycredentials/v1alpha1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ],
@@ -26,10 +33,15 @@ go_test(
     name = "go_default_test",
     srcs = [
         "config_test.go",
+        "external_test.go",
         "keyring_test.go",
         "provider_test.go",
     ],
     embed = [":go_default_library"],
+    deps = [
+        "//pkg/credentialprovider/apis/registrycredentials:go_default_library",
+        "//vendor/github.com/google/go-cmp/cmp:go_default_library",
+    ],
 )
 
 filegroup(
@@ -43,6 +55,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//pkg/credentialprovider/apis/registrycredentials:all-srcs",
         "//pkg/credentialprovider/aws:all-srcs",
         "//pkg/credentialprovider/azure:all-srcs",
         "//pkg/credentialprovider/gcp:all-srcs",

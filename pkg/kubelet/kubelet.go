@@ -702,6 +702,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		kubeDeps.ContainerManager.InternalContainerLifecycle(),
 		kubeDeps.dockerLegacyService,
 		klet.runtimeClassManager,
+		kubeCfg.RegistryCredentialConfigPath,
 	)
 	if err != nil {
 		return nil, err

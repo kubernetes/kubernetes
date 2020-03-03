@@ -126,6 +126,22 @@ KUBE_CONTROLLERS="${KUBE_CONTROLLERS:-"*"}"
 # Audit policy
 AUDIT_POLICY_FILE=${AUDIT_POLICY_FILE:-""}
 
+# Enable external credential providers
+ENABLE_EXTERNAL_CREDENTIAL_PROVIDERS=${ENABLE_EXTERNAL_CREDENTIAL_PROVIDERS:-false}
+
+# Kubelet Configuration file
+KUBELET_CONFIGURATION_FILE=${KUBELET_CONFIGURATION_FILE:-""}
+
+if [[ ${ENABLE_EXTERNAL_CREDENTIAL_PROVIDERS} == "true" ]]; then
+    EXTERNAL_CREDENTIAL_PROVIDER_CONFIG=${EXTERNAL_CREDENTIAL_PROVIDER_CONFIG:-"/var/lib/kubelet/providers/external.yaml"}
+    KUBELET_CONFIGURATION_FILE=${KUBELET_CONFIGURATION_FILE:-"/var/lib/kubelet/kubelet-configuration.yaml"}
+    if [[ ! -n $(echo "${FEATURE_GATES}" | grep "ExternalRegistryCredentialProviders=true") ]]; then
+        echo "The feature gate ExternalRegistryCredentialProviders must be enabled in order to use external credential providers."
+        echo "For example: FEATURE_GATES=\"ExternalRegistryCredentialProviders=true\" ENABLE_EXTERNAL_CREDENTIAL_PROVIDERS=true ./local-up-cluster.sh"
+        exit 1
+    fi
+fi
+
 # sanity check for OpenStack provider
 if [ "${CLOUD_PROVIDER}" == "openstack" ]; then
     if [ "${CLOUD_CONFIG}" == "" ]; then
@@ -695,9 +711,41 @@ function wait_node_ready(){
   fi
 }
 
+function write_kubelet_configuration {
+    sudo bash -c "cat <<EOF > /var/lib/kubelet/kubelet-configuration.yaml
+apiVersion: kubelet.config.k8s.io/v1beta1
+kind: KubeletConfiguration
+registryCredentialConfigPath: ${EXTERNAL_CREDENTIAL_PROVIDER_CONFIG}
+EOF"
+}
+
+function write_external_provider_config {
+    echo "Writing external provider config to ${EXTERNAL_CREDENTIAL_PROVIDER_CONFIG}"
+    if [[ ! -f "${EXTERNAL_CREDENTIAL_PROVIDER_CONFIG}" ]]; then
+        sudo mkdir -p "$(dirname "${EXTERNAL_CREDENTIAL_PROVIDER_CONFIG}")"
+    fi
+    sudo bash -c 'cat <<EOF > /var/lib/kubelet/providers/external.yaml
+apiVersion: registrycredentials.k8s.io/v1alpha1
+kind: RegistryCredentialConfig
+providers:
+-
+  imageMatchers:
+  - "*.dkr.ecr.*.amazonaws.com"
+  - "*.dkr.ecr.*.amazonaws.com.cn"
+  exec:
+    command: ecr-creds
+    args:
+    - get-credentials
+EOF'
+}
+
 function start_kubelet {
     KUBELET_LOG=${LOG_DIR}/kubelet.log
     mkdir -p "${POD_MANIFEST_PATH}" &>/dev/null || sudo mkdir -p "${POD_MANIFEST_PATH}"
+    if [[ -n $KUBELET_CONFIGURATION_FILE ]]; then
+        write_kubelet_configuration
+        KUBELET_FLAGS="${KUBELET_FLAGS} --config=${KUBELET_CONFIGURATION_FILE}"
+    fi
 
     cloud_config_arg=("--cloud-provider=${CLOUD_PROVIDER}" "--cloud-config=${CLOUD_CONFIG}")
     if [[ "${EXTERNAL_CLOUD_PROVIDER:-}" == "true" ]]; then
@@ -710,6 +758,13 @@ function start_kubelet {
     fi
 
     mkdir -p "/var/lib/kubelet" &>/dev/null || sudo mkdir -p "/var/lib/kubelet"
+
+    if [[ ${ENABLE_EXTERNAL_CREDENTIAL_PROVIDERS} == "true" ]]; then
+      if [[ "${CLOUD_PROVIDER}" == "aws" ]]; then
+        write_external_provider_config
+      fi
+    fi
+
     # Enable dns
     if [[ "${ENABLE_CLUSTER_DNS}" = true ]]; then
       if [[ "${ENABLE_NODELOCAL_DNS:-}" == "true" ]]; then

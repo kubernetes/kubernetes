@@ -171,6 +171,7 @@ func NewKubeGenericRuntimeManager(
 	internalLifecycle cm.InternalContainerLifecycle,
 	legacyLogProvider LegacyLogProvider,
 	runtimeClassManager *runtimeclass.Manager,
+	registryCredentialConfigPath string,
 ) (KubeGenericRuntime, error) {
 	kubeRuntimeManager := &kubeGenericRuntimeManager{
 		recorder:            recorder,
@@ -185,7 +186,6 @@ func NewKubeGenericRuntimeManager(
 		runtimeHelper:       runtimeHelper,
 		runtimeService:      newInstrumentedRuntimeService(runtimeService),
 		imageService:        newInstrumentedImageManagerService(imageService),
-		keyring:             credentialprovider.NewDockerKeyring(),
 		internalLifecycle:   internalLifecycle,
 		legacyLogProvider:   legacyLogProvider,
 		runtimeClassManager: runtimeClassManager,
@@ -222,13 +222,27 @@ func NewKubeGenericRuntimeManager(
 		}
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.ExternalRegistryCredentialProviders) && registryCredentialConfigPath != "" {
+		kubeRuntimeManager.keyring, err = credentialprovider.NewExternalProviderKeyring(registryCredentialConfigPath)
+		if err != nil {
+			klog.Errorf("Failed to read external registry credential provider config.  Kubelet may not be able to pull images: %v", err)
+			return nil, err
+		}
+	} else {
+		if utilfeature.DefaultFeatureGate.Enabled(features.ExternalRegistryCredentialProviders) && registryCredentialConfigPath == "" {
+			klog.Warningln("The feature gate ExternalRegistryCredentialProviders is enabled, but RegistryCredentialConfigPath is not set.  Using legacy credential provider.")
+		}
+		kubeRuntimeManager.keyring = credentialprovider.NewDockerKeyring()
+	}
+
 	kubeRuntimeManager.imagePuller = images.NewImageManager(
 		kubecontainer.FilterEventRecorder(recorder),
 		kubeRuntimeManager,
 		imageBackOff,
 		serializeImagePulls,
 		imagePullQPS,
-		imagePullBurst)
+		imagePullBurst,
+	)
 	kubeRuntimeManager.runner = lifecycle.NewHandlerRunner(httpClient, kubeRuntimeManager, kubeRuntimeManager)
 	kubeRuntimeManager.containerGC = newContainerGC(runtimeService, podStateProvider, kubeRuntimeManager)
 

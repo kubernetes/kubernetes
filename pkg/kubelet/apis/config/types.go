@@ -308,6 +308,12 @@ type KubeletConfiguration struct {
 	// These sysctls are namespaced but not allowed by default.  For example: "kernel.msg*,net.ipv4.route.min_pmtu"
 	// +optional
 	AllowedUnsafeSysctls []string
+	// The path to the directory where registry credential config
+	// will be located.  This config file specifies where registry credential provider binaries
+	// are located on the local filesystem and what image URLs they match. The
+	// ExternalCredentialProviders feature gate must be enabled.
+	// +optional
+	RegistryCredentialConfigPath string
 
 	/* the following fields are meant for Node Allocatable */
 

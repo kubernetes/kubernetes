@@ -685,6 +685,12 @@ type KubeletConfiguration struct {
 	// Default: "Watch"
 	// +optional
 	ConfigMapAndSecretChangeDetectionStrategy ResourceChangeDetectionStrategy `json:"configMapAndSecretChangeDetectionStrategy,omitempty"`
+	// The path to the directory where registry credential config
+	// will be located.  This config file specifies where registry credential provider binaries
+	// are located on the local filesystem and what image URLs they match. The
+	// ExternalCredentialProviders feature gate must be enabled.
+	// +optional
+	RegistryCredentialConfigPath string `json:"registryCredentialConfigPath,omitempty"`
 
 	/* the following fields are meant for Node Allocatable */
 
