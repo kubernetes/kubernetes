@@ -35,12 +35,12 @@ const (
 )
 
 // DescriberFunc gives a way to display the specified RESTMapping type
-type DescriberFunc func(restClientGetter genericclioptions.RESTClientGetter, mapping *meta.RESTMapping) (Describer, error)
+type DescriberFunc func(restClientGetter genericclioptions.RESTClientGetter, mapping *meta.RESTMapping) (ResourceDescriber, error)
 
-// Describer generates output for the named resource or an error
+// ResourceDescriber generates output for the named resource or an error
 // if the output could not be generated. Implementers typically
 // abstract the retrieval of the named object from a remote server.
-type Describer interface {
+type ResourceDescriber interface {
 	Describe(namespace, name string, describerSettings DescriberSettings) (output string, err error)
 }
 

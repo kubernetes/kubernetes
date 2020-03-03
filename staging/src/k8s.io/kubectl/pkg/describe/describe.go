@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package versioned
+package describe
 
 import (
 	"bytes"
@@ -68,7 +68,6 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/reference"
 	"k8s.io/klog"
-	"k8s.io/kubectl/pkg/describe"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util/certificate"
 	deploymentutil "k8s.io/kubectl/pkg/util/deployment"
@@ -95,11 +94,11 @@ var (
 	skipAnnotations = sets.NewString(corev1.LastAppliedConfigAnnotation)
 
 	// DescriberFn gives a way to easily override the function for unit testing if needed
-	DescriberFn describe.DescriberFunc = Describer
+	DescriberFn DescriberFunc = Describer
 )
 
 // Describer returns a Describer for displaying the specified RESTMapping type or an error.
-func Describer(restClientGetter genericclioptions.RESTClientGetter, mapping *meta.RESTMapping) (describe.Describer, error) {
+func Describer(restClientGetter genericclioptions.RESTClientGetter, mapping *meta.RESTMapping) (ResourceDescriber, error) {
 	clientConfig, err := restClientGetter.ToRESTConfig()
 	if err != nil {
 		return nil, err
@@ -157,13 +156,13 @@ func (pw *prefixWriter) Flush() {
 	}
 }
 
-func describerMap(clientConfig *rest.Config) (map[schema.GroupKind]describe.Describer, error) {
+func describerMap(clientConfig *rest.Config) (map[schema.GroupKind]ResourceDescriber, error) {
 	c, err := clientset.NewForConfig(clientConfig)
 	if err != nil {
 		return nil, err
 	}
 
-	m := map[schema.GroupKind]describe.Describer{
+	m := map[schema.GroupKind]ResourceDescriber{
 		{Group: corev1.GroupName, Kind: "Pod"}:                                    &PodDescriber{c},
 		{Group: corev1.GroupName, Kind: "ReplicationController"}:                  &ReplicationControllerDescriber{c},
 		{Group: corev1.GroupName, Kind: "Secret"}:                                 &SecretDescriber{c},
@@ -211,7 +210,7 @@ func describerMap(clientConfig *rest.Config) (map[schema.GroupKind]describe.Desc
 
 // DescriberFor returns the default describe functions for each of the standard
 // Kubernetes types.
-func DescriberFor(kind schema.GroupKind, clientConfig *rest.Config) (describe.Describer, bool) {
+func DescriberFor(kind schema.GroupKind, clientConfig *rest.Config) (ResourceDescriber, bool) {
 	describers, err := describerMap(clientConfig)
 	if err != nil {
 		klog.V(1).Info(err)
@@ -224,7 +223,7 @@ func DescriberFor(kind schema.GroupKind, clientConfig *rest.Config) (describe.De
 
 // GenericDescriberFor returns a generic describer for the specified mapping
 // that uses only information available from runtime.Unstructured
-func GenericDescriberFor(mapping *meta.RESTMapping, clientConfig *rest.Config) (describe.Describer, bool) {
+func GenericDescriberFor(mapping *meta.RESTMapping, clientConfig *rest.Config) (ResourceDescriber, bool) {
 	// used to fetch the resource
 	dynamicClient, err := dynamic.NewForConfig(clientConfig)
 	if err != nil {
@@ -247,7 +246,7 @@ type genericDescriber struct {
 	events  corev1client.EventsGetter
 }
 
-func (g *genericDescriber) Describe(namespace, name string, describerSettings describe.DescriberSettings) (output string, err error) {
+func (g *genericDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (output string, err error) {
 	obj, err := g.dynamic.Resource(g.mapping.Resource).Namespace(namespace).Get(name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
@@ -344,7 +343,7 @@ func smartLabelFor(field string) string {
 }
 
 // DefaultObjectDescriber can describe the default Kubernetes objects.
-var DefaultObjectDescriber describe.ObjectDescriber
+var DefaultObjectDescriber ObjectDescriber
 
 func init() {
 	d := &Describers{}
@@ -369,7 +368,7 @@ type NamespaceDescriber struct {
 	clientset.Interface
 }
 
-func (d *NamespaceDescriber) Describe(namespace, name string, describerSettings describe.DescriberSettings) (string, error) {
+func (d *NamespaceDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
 	ns, err := d.CoreV1().Namespaces().Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
@@ -542,7 +541,7 @@ type LimitRangeDescriber struct {
 	clientset.Interface
 }
 
-func (d *LimitRangeDescriber) Describe(namespace, name string, describerSettings describe.DescriberSettings) (string, error) {
+func (d *LimitRangeDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
 	lr := d.CoreV1().LimitRanges(namespace)
 
 	limitRange, err := lr.Get(context.TODO(), name, metav1.GetOptions{})
@@ -569,7 +568,7 @@ type ResourceQuotaDescriber struct {
 	clientset.Interface
 }
 
-func (d *ResourceQuotaDescriber) Describe(namespace, name string, describerSettings describe.DescriberSettings) (string, error) {
+func (d *ResourceQuotaDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
 	rq := d.CoreV1().ResourceQuotas(namespace)
 
 	resourceQuota, err := rq.Get(context.TODO(), name, metav1.GetOptions{})
@@ -639,7 +638,7 @@ type PodDescriber struct {
 	clientset.Interface
 }
 
-func (d *PodDescriber) Describe(namespace, name string, describerSettings describe.DescriberSettings) (string, error) {
+func (d *PodDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
 	pod, err := d.CoreV1().Pods(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		if describerSettings.ShowEvents {
@@ -1330,7 +1329,7 @@ type PersistentVolumeDescriber struct {
 	clientset.Interface
 }
 
-func (d *PersistentVolumeDescriber) Describe(namespace, name string, describerSettings describe.DescriberSettings) (string, error) {
+func (d *PersistentVolumeDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
 	c := d.CoreV1().PersistentVolumes()
 
 	pv, err := c.Get(context.TODO(), name, metav1.GetOptions{})
@@ -1478,7 +1477,7 @@ type PersistentVolumeClaimDescriber struct {
 	clientset.Interface
 }
 
-func (d *PersistentVolumeClaimDescriber) Describe(namespace, name string, describerSettings describe.DescriberSettings) (string, error) {
+func (d *PersistentVolumeClaimDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
 	c := d.CoreV1().PersistentVolumeClaims(namespace)
 
 	pvc, err := c.Get(context.TODO(), name, metav1.GetOptions{})
@@ -1951,7 +1950,7 @@ type ReplicationControllerDescriber struct {
 	clientset.Interface
 }
 
-func (d *ReplicationControllerDescriber) Describe(namespace, name string, describerSettings describe.DescriberSettings) (string, error) {
+func (d *ReplicationControllerDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
 	rc := d.CoreV1().ReplicationControllers(namespace)
 	pc := d.CoreV1().Pods(namespace)
 
@@ -2026,7 +2025,7 @@ type ReplicaSetDescriber struct {
 	clientset.Interface
 }
 
-func (d *ReplicaSetDescriber) Describe(namespace, name string, describerSettings describe.DescriberSettings) (string, error) {
+func (d *ReplicaSetDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
 	rsc := d.AppsV1().ReplicaSets(namespace)
 	pc := d.CoreV1().Pods(namespace)
 
@@ -2088,7 +2087,7 @@ type JobDescriber struct {
 	clientset.Interface
 }
 
-func (d *JobDescriber) Describe(namespace, name string, describerSettings describe.DescriberSettings) (string, error) {
+func (d *JobDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
 	job, err := d.BatchV1().Jobs(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
@@ -2149,7 +2148,7 @@ type CronJobDescriber struct {
 	client clientset.Interface
 }
 
-func (d *CronJobDescriber) Describe(namespace, name string, describerSettings describe.DescriberSettings) (string, error) {
+func (d *CronJobDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
 	cronJob, err := d.client.BatchV1beta1().CronJobs(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
@@ -2248,7 +2247,7 @@ type DaemonSetDescriber struct {
 	clientset.Interface
 }
 
-func (d *DaemonSetDescriber) Describe(namespace, name string, describerSettings describe.DescriberSettings) (string, error) {
+func (d *DaemonSetDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
 	dc := d.AppsV1().DaemonSets(namespace)
 	pc := d.CoreV1().Pods(namespace)
 
@@ -2306,7 +2305,7 @@ type SecretDescriber struct {
 	clientset.Interface
 }
 
-func (d *SecretDescriber) Describe(namespace, name string, describerSettings describe.DescriberSettings) (string, error) {
+func (d *SecretDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
 	c := d.CoreV1().Secrets(namespace)
 
 	secret, err := c.Get(context.TODO(), name, metav1.GetOptions{})
@@ -2345,7 +2344,7 @@ type IngressDescriber struct {
 	clientset.Interface
 }
 
-func (i *IngressDescriber) Describe(namespace, name string, describerSettings describe.DescriberSettings) (string, error) {
+func (i *IngressDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
 	c := i.NetworkingV1beta1().Ingresses(namespace)
 	ing, err := c.Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
@@ -2374,7 +2373,7 @@ func (i *IngressDescriber) describeBackend(ns string, backend *networkingv1beta1
 	return formatEndpoints(endpoints, sets.NewString(spName))
 }
 
-func (i *IngressDescriber) describeIngress(ing *networkingv1beta1.Ingress, describerSettings describe.DescriberSettings) (string, error) {
+func (i *IngressDescriber) describeIngress(ing *networkingv1beta1.Ingress, describerSettings DescriberSettings) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%v\n", ing.Name)
@@ -2442,7 +2441,7 @@ type IngressClassDescriber struct {
 	clientset.Interface
 }
 
-func (i *IngressClassDescriber) Describe(namespace, name string, describerSettings describe.DescriberSettings) (string, error) {
+func (i *IngressClassDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
 	c := i.NetworkingV1beta1().IngressClasses()
 	ic, err := c.Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
@@ -2451,7 +2450,7 @@ func (i *IngressClassDescriber) Describe(namespace, name string, describerSettin
 	return i.describeIngressClass(ic, describerSettings)
 }
 
-func (i *IngressClassDescriber) describeIngressClass(ic *networkingv1beta1.IngressClass, describerSettings describe.DescriberSettings) (string, error) {
+func (i *IngressClassDescriber) describeIngressClass(ic *networkingv1beta1.IngressClass, describerSettings DescriberSettings) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", ic.Name)
@@ -2477,7 +2476,7 @@ type ServiceDescriber struct {
 	clientset.Interface
 }
 
-func (d *ServiceDescriber) Describe(namespace, name string, describerSettings describe.DescriberSettings) (string, error) {
+func (d *ServiceDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
 	c := d.CoreV1().Services(namespace)
 
 	service, err := c.Get(context.TODO(), name, metav1.GetOptions{})
@@ -2580,7 +2579,7 @@ type EndpointsDescriber struct {
 	clientset.Interface
 }
 
-func (d *EndpointsDescriber) Describe(namespace, name string, describerSettings describe.DescriberSettings) (string, error) {
+func (d *EndpointsDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
 	c := d.CoreV1().Endpoints(namespace)
 
 	ep, err := c.Get(context.TODO(), name, metav1.GetOptions{})
@@ -2655,7 +2654,7 @@ type EndpointSliceDescriber struct {
 	clientset.Interface
 }
 
-func (d *EndpointSliceDescriber) Describe(namespace, name string, describerSettings describe.DescriberSettings) (string, error) {
+func (d *EndpointSliceDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
 	c := d.DiscoveryV1beta1().EndpointSlices(namespace)
 
 	eps, err := c.Get(context.TODO(), name, metav1.GetOptions{})
@@ -2748,7 +2747,7 @@ type ServiceAccountDescriber struct {
 	clientset.Interface
 }
 
-func (d *ServiceAccountDescriber) Describe(namespace, name string, describerSettings describe.DescriberSettings) (string, error) {
+func (d *ServiceAccountDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
 	c := d.CoreV1().ServiceAccounts(namespace)
 
 	serviceAccount, err := c.Get(context.TODO(), name, metav1.GetOptions{})
@@ -2865,7 +2864,7 @@ type RoleDescriber struct {
 	clientset.Interface
 }
 
-func (d *RoleDescriber) Describe(namespace, name string, describerSettings describe.DescriberSettings) (string, error) {
+func (d *RoleDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
 	role, err := d.RbacV1().Roles(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
@@ -2904,7 +2903,7 @@ type ClusterRoleDescriber struct {
 	clientset.Interface
 }
 
-func (d *ClusterRoleDescriber) Describe(namespace, name string, describerSettings describe.DescriberSettings) (string, error) {
+func (d *ClusterRoleDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
 	role, err := d.RbacV1().ClusterRoles().Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
@@ -2960,7 +2959,7 @@ type RoleBindingDescriber struct {
 	clientset.Interface
 }
 
-func (d *RoleBindingDescriber) Describe(namespace, name string, describerSettings describe.DescriberSettings) (string, error) {
+func (d *RoleBindingDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
 	binding, err := d.RbacV1().RoleBindings(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
@@ -2992,7 +2991,7 @@ type ClusterRoleBindingDescriber struct {
 	clientset.Interface
 }
 
-func (d *ClusterRoleBindingDescriber) Describe(namespace, name string, describerSettings describe.DescriberSettings) (string, error) {
+func (d *ClusterRoleBindingDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
 	binding, err := d.RbacV1().ClusterRoleBindings().Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
@@ -3024,7 +3023,7 @@ type NodeDescriber struct {
 	clientset.Interface
 }
 
-func (d *NodeDescriber) Describe(namespace, name string, describerSettings describe.DescriberSettings) (string, error) {
+func (d *NodeDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
 	mc := d.CoreV1().Nodes()
 	node, err := mc.Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
@@ -3180,7 +3179,7 @@ type StatefulSetDescriber struct {
 	client clientset.Interface
 }
 
-func (p *StatefulSetDescriber) Describe(namespace, name string, describerSettings describe.DescriberSettings) (string, error) {
+func (p *StatefulSetDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
 	ps, err := p.client.AppsV1().StatefulSets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
@@ -3238,7 +3237,7 @@ type CertificateSigningRequestDescriber struct {
 	client clientset.Interface
 }
 
-func (p *CertificateSigningRequestDescriber) Describe(namespace, name string, describerSettings describe.DescriberSettings) (string, error) {
+func (p *CertificateSigningRequestDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
 	csr, err := p.client.CertificatesV1beta1().CertificateSigningRequests().Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
@@ -3323,7 +3322,7 @@ type HorizontalPodAutoscalerDescriber struct {
 	client clientset.Interface
 }
 
-func (d *HorizontalPodAutoscalerDescriber) Describe(namespace, name string, describerSettings describe.DescriberSettings) (string, error) {
+func (d *HorizontalPodAutoscalerDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
 	var events *corev1.EventList
 
 	// autoscaling/v2beta2 is introduced since v1.12 and autoscaling/v1 does not have full backward compatibility
@@ -3651,7 +3650,7 @@ type DeploymentDescriber struct {
 	client clientset.Interface
 }
 
-func (dd *DeploymentDescriber) Describe(namespace, name string, describerSettings describe.DescriberSettings) (string, error) {
+func (dd *DeploymentDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
 	d, err := dd.client.AppsV1().Deployments(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
@@ -3754,7 +3753,7 @@ type ConfigMapDescriber struct {
 	clientset.Interface
 }
 
-func (d *ConfigMapDescriber) Describe(namespace, name string, describerSettings describe.DescriberSettings) (string, error) {
+func (d *ConfigMapDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
 	c := d.CoreV1().ConfigMaps(namespace)
 
 	configMap, err := c.Get(context.TODO(), name, metav1.GetOptions{})
@@ -3792,7 +3791,7 @@ type NetworkPolicyDescriber struct {
 	clientset.Interface
 }
 
-func (d *NetworkPolicyDescriber) Describe(namespace, name string, describerSettings describe.DescriberSettings) (string, error) {
+func (d *NetworkPolicyDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
 	c := d.NetworkingV1().NetworkPolicies(namespace)
 
 	networkPolicy, err := c.Get(context.TODO(), name, metav1.GetOptions{})
@@ -3948,7 +3947,7 @@ type StorageClassDescriber struct {
 	clientset.Interface
 }
 
-func (s *StorageClassDescriber) Describe(namespace, name string, describerSettings describe.DescriberSettings) (string, error) {
+func (s *StorageClassDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
 	sc, err := s.StorageV1().StorageClasses().Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
@@ -4000,7 +3999,7 @@ type CSINodeDescriber struct {
 	clientset.Interface
 }
 
-func (c *CSINodeDescriber) Describe(namespace, name string, describerSettings describe.DescriberSettings) (string, error) {
+func (c *CSINodeDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
 	csi, err := c.StorageV1().CSINodes().Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
@@ -4075,7 +4074,7 @@ type PodDisruptionBudgetDescriber struct {
 	clientset.Interface
 }
 
-func (p *PodDisruptionBudgetDescriber) Describe(namespace, name string, describerSettings describe.DescriberSettings) (string, error) {
+func (p *PodDisruptionBudgetDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
 	pdb, err := p.PolicyV1beta1().PodDisruptionBudgets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
@@ -4124,7 +4123,7 @@ type PriorityClassDescriber struct {
 	clientset.Interface
 }
 
-func (s *PriorityClassDescriber) Describe(namespace, name string, describerSettings describe.DescriberSettings) (string, error) {
+func (s *PriorityClassDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
 	pc, err := s.SchedulingV1().PriorityClasses().Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
@@ -4160,7 +4159,7 @@ type PodSecurityPolicyDescriber struct {
 	clientset.Interface
 }
 
-func (d *PodSecurityPolicyDescriber) Describe(namespace, name string, describerSettings describe.DescriberSettings) (string, error) {
+func (d *PodSecurityPolicyDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
 	psp, err := d.PolicyV1beta1().PodSecurityPolicies().Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
@@ -4326,7 +4325,7 @@ func newErrNoDescriber(types ...reflect.Type) error {
 	for _, t := range types {
 		names = append(names, t.String())
 	}
-	return describe.ErrNoDescriber{Types: names}
+	return ErrNoDescriber{Types: names}
 }
 
 // Describers implements ObjectDescriber against functions registered via Add. Those functions can
@@ -4373,7 +4372,7 @@ func (d *Describers) DescribeObject(exact interface{}, extra ...interface{}) (st
 	return "", newErrNoDescriber(append([]reflect.Type{exactType}, types...)...)
 }
 
-// Add adds one or more describer functions to the describe.Describer. The passed function must
+// Add adds one or more describer functions to the Describer. The passed function must
 // match the signature:
 //
 //     func(...) (string, error)
@@ -4845,12 +4844,12 @@ func findNodeRoles(node *corev1.Node) []string {
 	roles := sets.NewString()
 	for k, v := range node.Labels {
 		switch {
-		case strings.HasPrefix(k, describe.LabelNodeRolePrefix):
-			if role := strings.TrimPrefix(k, describe.LabelNodeRolePrefix); len(role) > 0 {
+		case strings.HasPrefix(k, LabelNodeRolePrefix):
+			if role := strings.TrimPrefix(k, LabelNodeRolePrefix); len(role) > 0 {
 				roles.Insert(role)
 			}
 
-		case k == describe.NodeLabelRole && v != "":
+		case k == NodeLabelRole && v != "":
 			roles.Insert(v)
 		}
 	}
@@ -4871,8 +4870,8 @@ func loadBalancerStatusStringer(s corev1.LoadBalancerStatus, wide bool) string {
 	}
 
 	r := strings.Join(result.List(), ",")
-	if !wide && len(r) > describe.LoadBalancerWidth {
-		r = r[0:(describe.LoadBalancerWidth-3)] + "..."
+	if !wide && len(r) > LoadBalancerWidth {
+		r = r[0:(LoadBalancerWidth-3)] + "..."
 	}
 	return r
 }
