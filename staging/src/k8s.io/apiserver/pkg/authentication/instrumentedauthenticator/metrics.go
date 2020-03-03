@@ -14,9 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package filters
+package instrumentedauthenticator
 
 import (
+	"context"
 	"strings"
 	"time"
 
@@ -46,7 +47,7 @@ var (
 			Help:           "Counter of authenticated requests broken out by username.",
 			StabilityLevel: metrics.ALPHA,
 		},
-		[]string{"username"},
+		[]string{"username", "authenticator"},
 	)
 
 	authenticatedAttemptsCounter = metrics.NewCounterVec(
@@ -55,7 +56,7 @@ var (
 			Help:           "Counter of authenticated attempts.",
 			StabilityLevel: metrics.ALPHA,
 		},
-		[]string{"result"},
+		[]string{"result", "authenticator"},
 	)
 
 	authenticationLatency = metrics.NewHistogramVec(
@@ -65,7 +66,7 @@ var (
 			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
 			StabilityLevel: metrics.ALPHA,
 		},
-		[]string{"result"},
+		[]string{"result", "authenticator"},
 	)
 )
 
@@ -75,21 +76,33 @@ func init() {
 	legacyregistry.MustRegister(authenticationLatency)
 }
 
-func recordAuthMetrics(resp *authenticator.Response, ok bool, err error, apiAudiences authenticator.Audiences, authStart time.Time) {
+func recordAuthMetrics(ctx context.Context, resp *authenticator.Response, authenticatorName string, authSuccess bool, err error, authStart time.Time) {
 	var resultLabel string
+
+	if resp == nil && err == nil {
+		// When both of these are nil, whe assume that the request was incompatible with the authenticator.
+		return
+	}
+
+	if len(authenticatorName) == 0 {
+		authenticatorName = "unknown"
+	}
+
+	// Ignoring "ok" since we expect nil value.
+	apiAudiences, _ := authenticator.AudiencesFrom(ctx)
 
 	switch {
 	case err != nil || (resp != nil && !audiencesAreAcceptable(apiAudiences, resp.Audiences)):
 		resultLabel = errorLabel
-	case !ok:
+	case !authSuccess:
 		resultLabel = failureLabel
 	default:
 		resultLabel = successLabel
-		authenticatedUserCounter.WithLabelValues(compressUsername(resp.User.GetName())).Inc()
+		authenticatedUserCounter.WithLabelValues(compressUsername(resp.User.GetName()), authenticatorName).Inc()
 	}
 
-	authenticatedAttemptsCounter.WithLabelValues(resultLabel).Inc()
-	authenticationLatency.WithLabelValues(resultLabel).Observe(time.Since(authStart).Seconds())
+	authenticatedAttemptsCounter.WithLabelValues(resultLabel, authenticatorName).Inc()
+	authenticationLatency.WithLabelValues(resultLabel, authenticatorName).Observe(time.Since(authStart).Seconds())
 }
 
 // compressUsername maps all possible usernames onto a small set of categories
@@ -112,4 +125,12 @@ func compressUsername(username string) string {
 	default:
 		return "other"
 	}
+}
+
+func audiencesAreAcceptable(apiAuds, responseAudiences authenticator.Audiences) bool {
+	if len(apiAuds) == 0 || len(responseAudiences) == 0 {
+		return true
+	}
+
+	return len(apiAuds.Intersect(responseAudiences)) > 0
 }

@@ -1729,6 +1729,7 @@ k8s.io/apiserver/pkg/audit/policy
 k8s.io/apiserver/pkg/authentication/authenticator
 k8s.io/apiserver/pkg/authentication/authenticatorfactory
 k8s.io/apiserver/pkg/authentication/group
+k8s.io/apiserver/pkg/authentication/instrumentedauthenticator
 k8s.io/apiserver/pkg/authentication/request/anonymous
 k8s.io/apiserver/pkg/authentication/request/bearertoken
 k8s.io/apiserver/pkg/authentication/request/headerrequest

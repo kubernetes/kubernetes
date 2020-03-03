@@ -20,7 +20,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -41,13 +40,10 @@ func WithAuthentication(handler http.Handler, auth authenticator.Request, failed
 		return handler
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		authenticationStart := time.Now()
-
 		if len(apiAuds) > 0 {
 			req = req.WithContext(authenticator.WithAudiences(req.Context(), apiAuds))
 		}
 		resp, ok, err := auth.AuthenticateRequest(req)
-		defer recordAuthMetrics(resp, ok, err, apiAuds, authenticationStart)
 		if err != nil || !ok {
 			if err != nil {
 				klog.Errorf("Unable to authenticate the request due to an error: %v", err)

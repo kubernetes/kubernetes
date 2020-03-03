@@ -25,6 +25,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/authenticatorfactory"
 	"k8s.io/apiserver/pkg/authentication/group"
+	"k8s.io/apiserver/pkg/authentication/instrumentedauthenticator"
 	"k8s.io/apiserver/pkg/authentication/request/anonymous"
 	"k8s.io/apiserver/pkg/authentication/request/bearertoken"
 	"k8s.io/apiserver/pkg/authentication/request/headerrequest"
@@ -44,6 +45,21 @@ import (
 	"k8s.io/client-go/util/keyutil"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/serviceaccount"
+)
+
+const (
+	// Labels that identify authenticators - used by metrics.
+	legacyServiceAccountAuthLabel = "legacy-service-account"
+	proxyAuthLabel                = "proxy"
+	tokenFileAuthLabel            = "token-file"
+	serviceAccountAuthLabel       = "service-account"
+	bootstrapAuthLabel            = "bootstrap"
+	oidcAuthLabel                 = "oidc"
+	webhookAuthLabel              = "webhook"
+	bearerTokenAuthLabel          = "bearer-token"
+	webSocketAuthLabel            = "websocket"
+	anonymousAuthLabel            = "anonymous"
+	x509AuthLabel                 = "x509"
 )
 
 // Config contains the data on how to authenticate a request to the Kube API Server
@@ -103,13 +119,23 @@ func (config Config) New() (authenticator.Request, *spec.SecurityDefinitions, er
 			config.RequestHeaderConfig.GroupHeaders,
 			config.RequestHeaderConfig.ExtraHeaderPrefixes,
 		)
-		authenticators = append(authenticators, authenticator.WrapAudienceAgnosticRequest(config.APIAudiences, requestHeaderAuthenticator))
+		authenticators = append(
+			authenticators,
+			instrumentedauthenticator.WrapRequest(
+				authenticator.WrapAudienceAgnosticRequest(
+					config.APIAudiences, requestHeaderAuthenticator),
+				proxyAuthLabel))
 	}
 
 	// X509 methods
 	if config.ClientCAContentProvider != nil {
 		certAuth := x509.NewDynamic(config.ClientCAContentProvider.VerifyOptions, x509.CommonNameUserConversion)
-		authenticators = append(authenticators, certAuth)
+		authenticators = append(
+			authenticators,
+			instrumentedauthenticator.WrapRequest(
+				certAuth,
+				x509AuthLabel),
+		)
 	}
 
 	// Bearer token methods, local first, then remote
@@ -118,26 +144,50 @@ func (config Config) New() (authenticator.Request, *spec.SecurityDefinitions, er
 		if err != nil {
 			return nil, nil, err
 		}
-		tokenAuthenticators = append(tokenAuthenticators, authenticator.WrapAudienceAgnosticToken(config.APIAudiences, tokenAuth))
+		tokenAuthenticators = append(
+			tokenAuthenticators,
+			instrumentedauthenticator.WrapToken(
+				authenticator.WrapAudienceAgnosticToken(
+					config.APIAudiences,
+					tokenAuth),
+				tokenFileAuthLabel),
+		)
 	}
 	if len(config.ServiceAccountKeyFiles) > 0 {
 		serviceAccountAuth, err := newLegacyServiceAccountAuthenticator(config.ServiceAccountKeyFiles, config.ServiceAccountLookup, config.APIAudiences, config.ServiceAccountTokenGetter)
 		if err != nil {
 			return nil, nil, err
 		}
-		tokenAuthenticators = append(tokenAuthenticators, serviceAccountAuth)
+		tokenAuthenticators = append(
+			tokenAuthenticators,
+			instrumentedauthenticator.WrapToken(
+				serviceAccountAuth,
+				legacyServiceAccountAuthLabel),
+		)
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.TokenRequest) && config.ServiceAccountIssuer != "" {
 		serviceAccountAuth, err := newServiceAccountAuthenticator(config.ServiceAccountIssuer, config.ServiceAccountKeyFiles, config.APIAudiences, config.ServiceAccountTokenGetter)
 		if err != nil {
 			return nil, nil, err
 		}
-		tokenAuthenticators = append(tokenAuthenticators, serviceAccountAuth)
+		tokenAuthenticators = append(
+			tokenAuthenticators,
+			instrumentedauthenticator.WrapToken(
+				serviceAccountAuth,
+				serviceAccountAuthLabel),
+		)
 	}
 	if config.BootstrapToken {
 		if config.BootstrapTokenAuthenticator != nil {
 			// TODO: This can sometimes be nil because of
-			tokenAuthenticators = append(tokenAuthenticators, authenticator.WrapAudienceAgnosticToken(config.APIAudiences, config.BootstrapTokenAuthenticator))
+			tokenAuthenticators = append(
+				tokenAuthenticators,
+				instrumentedauthenticator.WrapToken(
+					authenticator.WrapAudienceAgnosticToken(
+						config.APIAudiences,
+						config.BootstrapTokenAuthenticator),
+					bootstrapAuthLabel),
+			)
 		}
 	}
 	// NOTE(ericchiang): Keep the OpenID Connect after Service Accounts.
@@ -161,7 +211,13 @@ func (config Config) New() (authenticator.Request, *spec.SecurityDefinitions, er
 		if err != nil {
 			return nil, nil, err
 		}
-		tokenAuthenticators = append(tokenAuthenticators, authenticator.WrapAudienceAgnosticToken(config.APIAudiences, oidcAuth))
+		tokenAuthenticators = append(
+			tokenAuthenticators,
+			instrumentedauthenticator.WrapToken(
+				authenticator.WrapAudienceAgnosticToken(
+					config.APIAudiences, oidcAuth),
+				oidcAuthLabel),
+		)
 	}
 	if len(config.WebhookTokenAuthnConfigFile) > 0 {
 		webhookTokenAuth, err := newWebhookTokenAuthenticator(config)
@@ -169,7 +225,13 @@ func (config Config) New() (authenticator.Request, *spec.SecurityDefinitions, er
 			return nil, nil, err
 		}
 
-		tokenAuthenticators = append(tokenAuthenticators, webhookTokenAuth)
+		tokenAuthenticators = append(
+			tokenAuthenticators,
+			instrumentedauthenticator.WrapToken(
+				webhookTokenAuth,
+				webhookAuthLabel),
+		)
+
 	}
 
 	if len(tokenAuthenticators) > 0 {
@@ -179,7 +241,15 @@ func (config Config) New() (authenticator.Request, *spec.SecurityDefinitions, er
 		if config.TokenSuccessCacheTTL > 0 || config.TokenFailureCacheTTL > 0 {
 			tokenAuth = tokencache.New(tokenAuth, true, config.TokenSuccessCacheTTL, config.TokenFailureCacheTTL)
 		}
-		authenticators = append(authenticators, bearertoken.New(tokenAuth), websocket.NewProtocolAuthenticator(tokenAuth))
+		authenticators = append(
+			authenticators,
+			instrumentedauthenticator.WrapRequest(
+				bearertoken.New(tokenAuth),
+				bearerTokenAuthLabel),
+			instrumentedauthenticator.WrapRequest(
+				websocket.NewProtocolAuthenticator(tokenAuth),
+				webSocketAuthLabel),
+		)
 		securityDefinitions["BearerToken"] = &spec.SecurityScheme{
 			SecuritySchemeProps: spec.SecuritySchemeProps{
 				Type:        "apiKey",
@@ -192,22 +262,30 @@ func (config Config) New() (authenticator.Request, *spec.SecurityDefinitions, er
 
 	if len(authenticators) == 0 {
 		if config.Anonymous {
-			return anonymous.NewAuthenticator(), &securityDefinitions, nil
+			return instrumentedauthenticator.WrapRequest(
+					anonymous.NewAuthenticator(),
+					anonymousAuthLabel),
+				&securityDefinitions,
+				nil
 		}
 		return nil, &securityDefinitions, nil
 	}
 
-	authenticator := union.New(authenticators...)
-
-	authenticator = group.NewAuthenticatedGroupAdder(authenticator)
+	auth := union.New(authenticators...)
+	auth = group.NewAuthenticatedGroupAdder(auth)
 
 	if config.Anonymous {
 		// If the authenticator chain returns an error, return an error (don't consider a bad bearer token
 		// or invalid username/password combination anonymous).
-		authenticator = union.NewFailOnError(authenticator, anonymous.NewAuthenticator())
+		auth = union.NewFailOnError(
+			auth,
+			instrumentedauthenticator.WrapRequest(
+				anonymous.NewAuthenticator(),
+				anonymousAuthLabel),
+		)
 	}
 
-	return authenticator, &securityDefinitions, nil
+	return auth, &securityDefinitions, nil
 }
 
 // IsValidServiceAccountKeyFile returns true if a valid public RSA key can be read from the given file
