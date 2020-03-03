@@ -200,7 +200,7 @@ func (c *DynamicServingCertificateController) syncCerts() error {
 
 		klog.V(2).Infof("loaded serving cert [%q]: %s", c.servingCert.Name(), GetHumanCertDetail(x509Cert))
 		if c.eventRecorder != nil {
-			c.eventRecorder.Eventf(nil, nil, v1.EventTypeWarning, "TLSConfigChanged", "ServingCertificateReload", "loaded serving cert [%q]: %s", c.clientCA.Name(), GetHumanCertDetail(x509Cert))
+			c.eventRecorder.Eventf(nil, nil, v1.EventTypeWarning, "TLSConfigChanged", "ServingCertificateReload", "loaded serving cert [%q]: %s", c.servingCert.Name(), GetHumanCertDetail(x509Cert))
 		}
 
 		newTLSConfigCopy.Certificates = []tls.Certificate{cert}
