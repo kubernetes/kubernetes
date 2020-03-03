@@ -41,7 +41,7 @@ const workItemKey = "key"
 type DynamicServingCertificateController struct {
 	// baseTLSConfig is the static portion of the tlsConfig for serving to clients.  It is copied and the copy is mutated
 	// based on the dynamic cert state.
-	baseTLSConfig tls.Config
+	baseTLSConfig *tls.Config
 
 	// clientCA provides the very latest content of the ca bundle
 	clientCA CAContentProvider
@@ -65,7 +65,7 @@ var _ Listener = &DynamicServingCertificateController{}
 
 // NewDynamicServingCertificateController returns a controller that can be used to keep a TLSConfig up to date.
 func NewDynamicServingCertificateController(
-	baseTLSConfig tls.Config,
+	baseTLSConfig *tls.Config,
 	clientCA CAContentProvider,
 	servingCert CertKeyContentProvider,
 	sniCerts []SNICertKeyContentProvider,
