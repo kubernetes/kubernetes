@@ -76,6 +76,8 @@ type conformanceData struct {
 	Release string
 	// File is the filename where the test is defined. We intentionally don't save the line here to avoid meaningless changes.
 	File string
+	// Behaviors is the list of conformance behaviors tested by a particular e2e test
+	Behaviors []string `yaml:"behaviors,omitempty"`
 }
 
 func main() {
@@ -292,23 +294,40 @@ func commentToConformanceData(comment string) *conformanceData {
 	lines := strings.Split(comment, "\n")
 	descLines := []string{}
 	cd := &conformanceData{}
+	var curLine string
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
 		if len(line) == 0 {
 			continue
 		}
 		if sline := regexp.MustCompile("^Testname\\s*:\\s*").Split(line, -1); len(sline) == 2 {
+			curLine = "Testname"
 			cd.TestName = sline[1]
 			continue
 		}
 		if sline := regexp.MustCompile("^Release\\s*:\\s*").Split(line, -1); len(sline) == 2 {
+			curLine = "Release"
 			cd.Release = sline[1]
 			continue
 		}
 		if sline := regexp.MustCompile("^Description\\s*:\\s*").Split(line, -1); len(sline) == 2 {
-			line = sline[1]
+			curLine = "Description"
+			descLines = append(descLines, sline[1])
+			continue
 		}
-		descLines = append(descLines, line)
+		if sline := regexp.MustCompile("^Behaviors\\s*:\\s*").Split(line, -1); len(sline) == 2 {
+			curLine = "Behaviors"
+			continue
+		}
+
+		// Line has no header
+		if curLine == "Behaviors" {
+			if sline := regexp.MustCompile("^-\\s").Split(line, -1); len(sline) == 2 {
+				cd.Behaviors = append(cd.Behaviors, sline[1])
+			}
+		} else if curLine == "Description" {
+			descLines = append(descLines, line)
+		}
 	}
 	if cd.Release == "" && cd.TestName == "" {
 		return nil
