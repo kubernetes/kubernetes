@@ -1,4 +1,4 @@
-# Copyright 2019 The Kubernetes Authors.
+# Copyright 2020 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,33 +15,39 @@
 ARG BASEIMAGE
 FROM $BASEIMAGE
 
-CROSS_BUILD_COPY qemu-QEMUARCH-static /usr/bin/
-
 # from dnsutils image
 # install necessary packages:
 # - bind-tools: contains dig, which can used in DNS tests.
 # - CoreDNS: used in some DNS tests.
 # from hostexec image
-# install necessary packages:
-# - curl, nc: used by a lot of e2e tests
-# - iproute2: includes ss used in NodePort tests
+# installed necessary packages:
+# - curl, nc: used by a lot of e2e tests (inherited from BASEIMAGE)
 # from iperf image
-# install necessary packages: iperf, bash
-RUN apk --update add bind-tools curl netcat-openbsd iproute2 iperf bash && rm -rf /var/cache/apk/* \
-  && ln -s /usr/bin/iperf /usr/local/bin/iperf \
-  && ls -altrh /usr/local/bin/iperf
+# install necessary packages: iperf
+ENV chocolateyUseWindowsCompression false
+RUN powershell -Command "\
+    iex ((new-object net.webclient).DownloadString('https://chocolatey.org/install.ps1')); \
+    choco feature disable --name showDownloadProgress; \
+    choco install bind-toolsonly --version 9.10.3 -y
+RUN powershell -Command "\
+    wget -uri 'https://github.com/coredns/coredns/releases/download/v1.5.0/coredns_1.5.0_windows_amd64.tgz' -OutFile C:\coredns.tgz;\
+    tar -xzvf C:\coredns.tgz;\
+    Remove-Item C:\coredns.tgz"
 
-ADD https://github.com/coredns/coredns/releases/download/v1.6.2/coredns_1.6.2_linux_BASEARCH.tgz /coredns.tgz
-RUN tar -xzvf /coredns.tgz && rm -f /coredns.tgz
+RUN powershell -Command "\
+    wget -uri 'https://iperf.fr/download/windows/iperf-2.0.9-win64.zip' -OutFile C:\iperf.zip;\
+    Expand-Archive -Path C:\iperf.zip -DestinationPath C:\ -Force;\
+    Rename-Item C:\iperf-2.0.9-win64 C:\iperf;\
+    Remove-Item C:\iperf.zip"
 
 # PORT 80 needed by: test-webserver
-# PORT 8080 needed by: netexec, nettest, resource-consumer, resource-consumer-controller
+# PORT 8080 needed by: netexec, nettest
 # PORT 8081 needed by: netexec
 # PORT 9376 needed by: serve-hostname
 EXPOSE 80 8080 8081 9376
 
 # from netexec
-RUN mkdir /uploads
+RUN mkdir C:\uploads
 
 # from porter
 ADD porter/localhost.crt localhost.crt
@@ -52,7 +58,7 @@ ADD agnhost agnhost
 # needed for the entrypoint-tester related tests. Some of the entrypoint-tester related tests
 # overrides this image's entrypoint with agnhost-2 binary, and will verify that the correct
 # entrypoint is used by the containers.
-RUN ln -s agnhost agnhost-2
+RUN mklink agnhost-2 agnhost
 
 ENTRYPOINT ["/agnhost"]
 CMD ["pause"]

@@ -17,6 +17,9 @@ steps:
     - BASE_REF=$_PULL_BASE_REF
     - WHAT=$_WHAT
     - REGISTRY=gcr.io/k8s-staging-e2e-test-images
+    - REMOTE_DOCKER_URL_1809=tcp://img-promoter-1809.eastus.cloudapp.azure.com:2376
+    - REMOTE_DOCKER_URL_1903=tcp://img-promoter-1903.eastus.cloudapp.azure.com:2376
+    - REMOTE_DOCKER_URL_1909=tcp://img-promoter-1909.eastus.cloudapp.azure.com:2376
     args:
     - all-push
 substitutions:

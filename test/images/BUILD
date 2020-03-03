@@ -13,6 +13,7 @@ filegroup(
         ":package-srcs",
         "//test/images/agnhost:all-srcs",
         "//test/images/apparmor-loader:all-srcs",
+        "//test/images/busybox:all-srcs",
         "//test/images/echoserver:all-srcs",
         "//test/images/metadata-concealment:all-srcs",
         "//test/images/nonewprivs:all-srcs",

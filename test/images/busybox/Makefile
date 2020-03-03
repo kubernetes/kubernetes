@@ -1,4 +1,4 @@
-# Copyright 2016 The Kubernetes Authors.
+# Copyright 2020 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,13 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-ARG BASEIMAGE
-FROM $BASEIMAGE
+SRCS=hostname
+OS ?= linux
+ARCH ?= amd64
+TARGET ?= $(CURDIR)
+GOARM = 7
+GOLANG_VERSION ?= latest
+SRC_DIR = $(notdir $(shell pwd))
+export
 
-CROSS_BUILD_COPY qemu-QEMUARCH-static /usr/bin/
+bin:
+	../image-util.sh bin $(SRCS)
 
-RUN yum install -y targetcli && yum clean all
-ADD run_iscsi_target.sh /usr/local/bin/
-ADD block.tar.gz /
-
-ENTRYPOINT ["/usr/local/bin/run_iscsi_target.sh"]
+.PHONY: bin
