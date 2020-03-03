@@ -53,6 +53,7 @@ go_test(
         "cycle_state_test.go",
         "framework_test.go",
         "interface_test.go",
+        "metrics_recorder_test.go",
         "registry_test.go",
     ],
     embed = [":go_default_library"],
