@@ -2,21 +2,20 @@
 
 reviewers:
   - bentheelder
-  - eparis
   - justaugustus
   - Katharine
   - mikedanese
-  - zmerlynn
   - dims
 approvers:
-  - eparis
+  - bentheelder
   - mikedanese
   - spiffxp
-  - zmerlynn
   - dims
 emeritus_approvers:
+  - eparis
   - roberthbailey   # 2019-03-08
   - jbeda
+  - zmerlynn
 labels:
 - sig/cluster-lifecycle
 - area/release-eng
