@@ -11,7 +11,7 @@ spec:
   hostNetwork: true
   containers:
   - name: konnectivity-server-container
-    image: us.gcr.io/k8s-artifacts-prod/kas-network-proxy/proxy-server:v0.0.7
+    image: gcr.io/chao1-149704/proxy-server-amd64:v0.0.8
     resources:
       requests:
         cpu: 25m
