@@ -19,6 +19,7 @@ package network
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -37,6 +38,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -2678,6 +2680,97 @@ var _ = SIGDescribe("Services", func() {
 		}
 
 		framework.ExpectEqual(foundSvc, true, "could not find service 'kubernetes' in service list in all namespaces")
+	})
+
+	ginkgo.It("should test the lifecycle of an Endpoint", func() {
+		ns := f.Namespace.Name
+		testServiceName := "testservice"
+
+		ginkgo.By("creating a service")
+		_, err := f.ClientSet.CoreV1().Services(ns).Create(context.TODO(), &v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      testServiceName,
+				Namespace: ns,
+				Labels: map[string]string{
+					"testservice-static": "true",
+				},
+			},
+			Spec: v1.ServiceSpec{
+				Type: "ClusterIP",
+				Ports: []v1.ServicePort{{
+					Port:       80,
+					TargetPort: intstr.FromInt(80),
+					Protocol:   v1.ProtocolTCP,
+				}},
+				Selector: map[string]string{
+					"testservice-static": "true",
+				},
+			},
+		}, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "failed to create service")
+
+		// setup a watch for the Service
+		serviceWatchTimeoutSeconds := int64(60)
+		serviceWatch, err := f.ClientSet.CoreV1().Services(ns).Watch(context.TODO(), metav1.ListOptions{LabelSelector: "testservice-static=true", TimeoutSeconds: &serviceWatchTimeoutSeconds})
+		framework.ExpectNoError(err, "Failed to setup watch on newly created Service")
+		serviceWatchChan := serviceWatch.ResultChan()
+		ginkgo.By("waiting for available Service")
+		for event := range serviceWatchChan {
+			svc, ok := event.Object.(*v1.Service)
+			framework.ExpectEqual(ok, true, "Unable to convert type of Service watch event")
+			if svc.Spec.ClusterIP != "" {
+				break
+			}
+		}
+
+		ginkgo.By("listing all Endpoints")
+		endpointsList, err := f.ClientSet.CoreV1().Endpoints("").List(context.TODO(), metav1.ListOptions{LabelSelector: "testservice-static=true"})
+		framework.ExpectNoError(err, "failed to list Endpoints")
+		foundEndpointService := false
+		var foundEndpoint v1.Endpoints
+		for _, endpoint := range endpointsList.Items {
+			if endpoint.ObjectMeta.Name == testServiceName && endpoint.ObjectMeta.Namespace == ns {
+				foundEndpointService = true
+				foundEndpoint = endpoint
+				break
+			}
+		}
+		framework.ExpectEqual(foundEndpointService, true, "unable to find Endpoint Service in list of Endpoints")
+
+		ginkgo.By("updating the Endpoint")
+		foundEndpoint.ObjectMeta.Labels["testservice"] = "first-modification"
+		_, err = f.ClientSet.CoreV1().Endpoints(ns).Update(context.TODO(), &foundEndpoint, metav1.UpdateOptions{})
+		framework.ExpectNoError(err, "failed to update Endpoint with new label")
+
+		ginkgo.By("fetching the Endpoint")
+		_, err = f.ClientSet.CoreV1().Endpoints(ns).Get(context.TODO(), testServiceName, metav1.GetOptions{})
+		framework.ExpectNoError(err, "failed to fetch Endpoint")
+		framework.ExpectEqual(foundEndpoint.ObjectMeta.Labels["testservice"], "first-modification", "label not patched")
+
+		endpointPatch, err := json.Marshal(map[string]interface{}{
+			"metadata": map[string]interface{}{
+				"labels": map[string]string{
+					"testservice": "second-modification",
+				},
+			},
+		})
+		framework.ExpectNoError(err, "failed to marshal JSON for Event patch")
+		ginkgo.By("patching the Endpoint")
+		_, err = f.ClientSet.CoreV1().Endpoints(ns).Patch(context.TODO(), testServiceName, types.StrategicMergePatchType, []byte(endpointPatch), metav1.PatchOptions{})
+		framework.ExpectNoError(err, "failed to patch Endpoint")
+
+		ginkgo.By("fetching the Endpoint")
+		_, err = f.ClientSet.CoreV1().Endpoints(ns).Get(context.TODO(), testServiceName, metav1.GetOptions{})
+		framework.ExpectNoError(err, "failed to fetch Endpoint")
+		framework.ExpectEqual(foundEndpoint.ObjectMeta.Labels["testservice"], "first-modification", "failed to patch Endpoint with Label")
+
+		ginkgo.By("deleting the Endpoint by Collection")
+		err = f.ClientSet.CoreV1().Endpoints(ns).DeleteCollection(context.TODO(), &metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: "testservice-static=true"})
+		framework.ExpectNoError(err, "failed to delete Endpoint by Collection")
+
+		ginkgo.By("deleting the Service")
+		err = f.ClientSet.CoreV1().Services(ns).Delete(context.TODO(), testServiceName, &metav1.DeleteOptions{})
+		framework.ExpectNoError(err, "failed to delete Service")
 	})
 })
 
