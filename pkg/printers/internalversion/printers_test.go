@@ -1130,7 +1130,7 @@ func TestPrintPod(t *testing.T) {
 			[]metav1.TableRow{{Cells: []interface{}{"test5", "1/2", "podReason", int64(6), "<unknown>"}}},
 		},
 		{
-			// Test pod has 2 containers, one is running and the other is completed.
+			// Test pod has 2 containers, one is running and the other is completed, w/o ready condition
 			api.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "test6"},
 				Spec:       api.PodSpec{Containers: make([]api.Container, 2)},
@@ -1140,6 +1140,25 @@ func TestPrintPod(t *testing.T) {
 					ContainerStatuses: []api.ContainerStatus{
 						{Ready: true, RestartCount: 3, State: api.ContainerState{Terminated: &api.ContainerStateTerminated{Reason: "Completed", ExitCode: 0}}},
 						{Ready: true, RestartCount: 3, State: api.ContainerState{Running: &api.ContainerStateRunning{}}},
+					},
+				},
+			},
+			[]metav1.TableRow{{Cells: []interface{}{"test6", "1/2", "NotReady", int64(6), "<unknown>"}}},
+		},
+		{
+			// Test pod has 2 containers, one is running and the other is completed, with ready condition
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "test6"},
+				Spec:       api.PodSpec{Containers: make([]api.Container, 2)},
+				Status: api.PodStatus{
+					Phase:  "Running",
+					Reason: "",
+					ContainerStatuses: []api.ContainerStatus{
+						{Ready: true, RestartCount: 3, State: api.ContainerState{Terminated: &api.ContainerStateTerminated{Reason: "Completed", ExitCode: 0}}},
+						{Ready: true, RestartCount: 3, State: api.ContainerState{Running: &api.ContainerStateRunning{}}},
+					},
+					Conditions: []api.PodCondition{
+						{Type: api.PodReady, Status: api.ConditionTrue, LastProbeTime: metav1.Time{Time: time.Now()}},
 					},
 				},
 			},
