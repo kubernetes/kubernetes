@@ -312,6 +312,11 @@ type EndpointSliceControllerConfiguration struct {
 	// added to an EndpointSlice. More endpoints per slice will result in fewer
 	// and larger endpoint slices, but larger resources.
 	MaxEndpointsPerSlice int32
+
+	// EndpointUpdatesBatchPeriod describes the length of endpoint updates batching period.
+	// Processing of pod changes will be delayed by this duration to join them with potential
+	// upcoming updates and reduce the overall number of endpoints updates.
+	EndpointUpdatesBatchPeriod metav1.Duration
 }
 
 // GarbageCollectorControllerConfiguration contains elements describing GarbageCollectorController.
