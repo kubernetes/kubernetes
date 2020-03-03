@@ -724,17 +724,26 @@ func (util *RBDUtil) rbdInfo(b *rbdMounter) (int, error) {
 		return 0, fmt.Errorf("can not get image size info %s: %s", b.Image, string(output))
 	}
 
-	return getRbdImageSize(output)
+	outputs := strings.Split(string(output), "\n")
+
+	return getRbdImageSize(outputs)
 }
 
-func getRbdImageSize(output []byte) (int, error) {
+func getRbdImageSize(outputs []string) (int, error) {
+	var err error
 	info := struct {
 		Size int64 `json:"size"`
 	}{}
-	if err := json.Unmarshal(output, &info); err != nil {
-		return 0, fmt.Errorf("parse rbd info output failed: %s, %v", string(output), err)
+
+	for _, output := range outputs {
+		if err = json.Unmarshal([]byte(output), &info); err != nil {
+			continue
+		}
+		return int(info.Size / rbdImageSizeUnitMiB), nil
 	}
-	return int(info.Size / rbdImageSizeUnitMiB), nil
+	outputerr := strings.Join(outputs, "\n")
+
+	return 0, fmt.Errorf("parse rbd info output failed: %s, %v", string(outputerr), err)
 }
 
 // rbdStatus runs `rbd status` command to check if there is watcher on the image.
