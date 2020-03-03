@@ -90,8 +90,13 @@ const (
 	LEVEL_4
 )
 
-// DescriberFn gives a way to easily override the function for unit testing if needed
-var DescriberFn describe.DescriberFunc = Describer
+var (
+	// globally skipped annotations
+	skipAnnotations = sets.NewString(corev1.LastAppliedConfigAnnotation)
+
+	// DescriberFn gives a way to easily override the function for unit testing if needed
+	DescriberFn describe.DescriberFunc = Describer
+)
 
 // Describer returns a Describer for displaying the specified RESTMapping type or an error.
 func Describer(restClientGetter genericclioptions.RESTClientGetter, mapping *meta.RESTMapping) (describe.Describer, error) {
@@ -2318,8 +2323,7 @@ func describeSecret(secret *corev1.Secret) (string, error) {
 		w.Write(LEVEL_0, "Name:\t%s\n", secret.Name)
 		w.Write(LEVEL_0, "Namespace:\t%s\n", secret.Namespace)
 		printLabelsMultiline(w, "Labels", secret.Labels)
-		skipAnnotations := sets.NewString(corev1.LastAppliedConfigAnnotation)
-		printAnnotationsMultilineWithFilter(w, "Annotations", secret.Annotations, skipAnnotations)
+		printAnnotationsMultiline(w, "Annotations", secret.Annotations)
 
 		w.Write(LEVEL_0, "\nType:\t%s\n", secret.Type)
 
@@ -4682,21 +4686,10 @@ func (list SortableVolumeDevices) Less(i, j int) bool {
 
 var maxAnnotationLen = 140
 
-// printAnnotationsMultilineWithFilter prints filtered multiple annotations with a proper alignment.
-func printAnnotationsMultilineWithFilter(w PrefixWriter, title string, annotations map[string]string, skip sets.String) {
-	printAnnotationsMultilineWithIndent(w, "", title, "\t", annotations, skip)
-}
-
 // printAnnotationsMultiline prints multiple annotations with a proper alignment.
-func printAnnotationsMultiline(w PrefixWriter, title string, annotations map[string]string) {
-	printAnnotationsMultilineWithIndent(w, "", title, "\t", annotations, sets.NewString())
-}
-
-// printAnnotationsMultilineWithIndent prints multiple annotations with a user-defined alignment.
 // If annotation string is too long, we omit chars more than 200 length.
-func printAnnotationsMultilineWithIndent(w PrefixWriter, initialIndent, title, innerIndent string, annotations map[string]string, skip sets.String) {
-
-	w.Write(LEVEL_0, "%s%s:%s", initialIndent, title, innerIndent)
+func printAnnotationsMultiline(w PrefixWriter, title string, annotations map[string]string) {
+	w.Write(LEVEL_0, "%s:\t", title)
 
 	if len(annotations) == 0 {
 		w.WriteLine("<none>")
@@ -4706,7 +4699,7 @@ func printAnnotationsMultilineWithIndent(w PrefixWriter, initialIndent, title, i
 	// to print labels in the sorted order
 	keys := make([]string, 0, len(annotations))
 	for key := range annotations {
-		if skip.Has(key) {
+		if skipAnnotations.Has(key) {
 			continue
 		}
 		keys = append(keys, key)
@@ -4716,7 +4709,7 @@ func printAnnotationsMultilineWithIndent(w PrefixWriter, initialIndent, title, i
 		return
 	}
 	sort.Strings(keys)
-	indent := initialIndent + innerIndent
+	indent := "\t"
 	for i, key := range keys {
 		if i != 0 {
 			w.Write(LEVEL_0, indent)
