@@ -574,6 +574,13 @@ const (
 	//        medium: HugePages-1Gi
 	HugePageStorageMediumSize featuregate.Feature = "HugePageStorageMediumSize"
 
+	// owner: @freehan
+	// GA: v1.18
+	//
+	// Enable ExternalTrafficPolicy for Service ExternalIPs.
+	// This is for bug fix #69811
+	ExternalPolicyForExternalIP featuregate.Feature = "ExternalPolicyForExternalIP"
+
 	// owner: @bswartz
 	// alpha: v1.18
 	//
@@ -668,6 +675,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ImmutableEphemeralVolumes:                      {Default: false, PreRelease: featuregate.Alpha},
 	DefaultIngressClass:                            {Default: true, PreRelease: featuregate.Beta},
 	HugePageStorageMediumSize:                      {Default: false, PreRelease: featuregate.Alpha},
+	ExternalPolicyForExternalIP:                    {Default: false, PreRelease: featuregate.GA}, // remove in 1.19
 	AnyVolumeDataSource:                            {Default: false, PreRelease: featuregate.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
