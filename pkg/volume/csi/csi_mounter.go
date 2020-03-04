@@ -202,6 +202,17 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 		return fmt.Errorf("volume source not found in volume.Spec")
 	}
 
+	// create target_dir before call to NodePublish
+	if err := os.MkdirAll(dir, 0750); err != nil {
+		if isCorruptedDir(dir) {
+			// leave to CSI driver to handle corrupted mount
+			klog.Warning(log("mounter.SetUpAt detected corrupted mount for dir [%s]", dir))
+		} else {
+			return errors.New(log("mounter.SetUpAt failed to create dir %#v:  %v", dir, err))
+		}
+	}
+	klog.V(4).Info(log("created target path successfully [%s]", dir))
+
 	nodePublishSecrets = map[string]string{}
 	if secretRef != nil {
 		nodePublishSecrets, err = getCredentialsFromSecret(c.k8s, secretRef)

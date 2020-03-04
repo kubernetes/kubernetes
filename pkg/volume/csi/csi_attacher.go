@@ -287,11 +287,16 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 
 	// Store volume metadata for UnmountDevice. Keep it around even if the
 	// driver does not support NodeStage, UnmountDevice still needs it.
-	dataDir := filepath.Dir(deviceMountPath)
-	if err = os.MkdirAll(dataDir, 0750); err != nil {
-		return errors.New(log("attacher.MountDevice failed to create dir %#v:  %v", dataDir, err))
+	if err = os.MkdirAll(deviceMountPath, 0750); err != nil {
+		if isCorruptedDir(deviceMountPath) {
+			// leave to CSI driver to handle corrupted mount
+			klog.Warning(log("attacher.MountDevice detected corrupted mount for dir [%s]", deviceMountPath))
+		} else {
+			return errors.New(log("attacher.MountDevice failed to create dir %#v:  %v", deviceMountPath, err))
+		}
 	}
-	klog.V(4).Info(log("created target parent path successfully [%s]", dataDir))
+	klog.V(4).Info(log("created target path successfully [%s]", deviceMountPath))
+	dataDir := filepath.Dir(deviceMountPath)
 	data := map[string]string{
 		volDataKey.volHandle:  csiSource.VolumeHandle,
 		volDataKey.driverName: csiSource.Driver,
@@ -309,7 +314,7 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 		if err != nil && volumetypes.IsOperationFinishedError(err) {
 			// clean up metadata
 			klog.Errorf(log("attacher.MountDevice failed: %v", err))
-			if err := removeMountDir(c.plugin, dataDir); err != nil {
+			if err := removeMountDir(c.plugin, deviceMountPath); err != nil {
 				klog.Error(log("attacher.MountDevice failed to remove mount dir after error [%s]: %v", deviceMountPath, err))
 			}
 		}
