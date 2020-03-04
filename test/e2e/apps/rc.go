@@ -134,7 +134,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 		framework.ExpectNoError(err, "Failed to create ReplicationController")
 
 		// setup a watch for the RC
-		rcWatchTimeoutSeconds := int64(60)
+		rcWatchTimeoutSeconds := int64(180)
 		rcWatch, err := f.ClientSet.CoreV1().ReplicationControllers(testRcNamespace).Watch(context.TODO(), metav1.ListOptions{LabelSelector: "test-rc-static=true", TimeoutSeconds: &rcWatchTimeoutSeconds})
 		framework.ExpectNoError(err, "Failed to setup watch on newly created ReplicationController")
 
@@ -259,7 +259,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 		err = f.ClientSet.CoreV1().ReplicationControllers(testRcNamespace).DeleteCollection(context.TODO(), &metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: "test-rc-static=true"})
 		framework.ExpectNoError(err, "Failed to delete ReplicationControllers")
 
-		ginkgo.By("waiting for ReplicationController is have a DeletionTimestamp")
+		ginkgo.By("waiting for ReplicationController to have a DELETED event")
 		for event := range rcWatchChan {
 			if event.Type == "DELETED" {
 				break
