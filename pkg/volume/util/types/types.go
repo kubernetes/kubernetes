@@ -99,7 +99,7 @@ func IsOperationFinishedError(err error) bool {
 // IsFilesystemMismatchError checks if mount failed because requested filesystem
 // on PVC and actual filesystem on disk did not match
 func IsFilesystemMismatchError(err error) bool {
-	mountError := &mount.MountError{}
+	mountError := mount.MountError{}
 	if errors.As(err, &mountError) && mountError.Type == mount.FilesystemMismatch {
 		return true
 	}
