@@ -1,7 +1,7 @@
 // +build windows
 
 /*
-Copyright 2019 The Kubernetes Authors.
+Copyright 2020 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,12 +16,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package constants
+package kubelet
 
-const (
-	// DefaultDockerCRISocket defines the default Docker CRI socket
-	DefaultDockerCRISocket = "npipe:////./pipe/docker_engine"
-
-	// PauseVersion indicates the default pause image version for kubeadm
-	PauseVersion = "1.3.0"
-)
+// buildKubeletArgMap takes a kubeletFlagsOpts object and builds based on that a string-string map with flags
+// that should be given to the local Windows kubelet daemon.
+func buildKubeletArgMap(opts kubeletFlagsOpts) map[string]string {
+	return buildKubeletArgMapCommon(opts)
+}

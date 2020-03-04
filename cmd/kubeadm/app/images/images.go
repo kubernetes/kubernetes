@@ -87,11 +87,6 @@ func GetEtcdImage(cfg *kubeadmapi.ClusterConfiguration) string {
 	return GetGenericImage(etcdImageRepository, constants.Etcd, etcdImageTag)
 }
 
-// GetPauseImage returns the image for the "pause" container
-func GetPauseImage(cfg *kubeadmapi.ClusterConfiguration) string {
-	return GetGenericImage(cfg.ImageRepository, "pause", constants.PauseVersion)
-}
-
 // GetControlPlaneImages returns a list of container images kubeadm expects to use on a control plane node
 func GetControlPlaneImages(cfg *kubeadmapi.ClusterConfiguration) []string {
 	imgs := []string{}
