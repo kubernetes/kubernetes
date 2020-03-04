@@ -336,8 +336,6 @@ func (config *NetworkingTestConfig) GetEndpointsFromContainer(protocol, containe
 func (config *NetworkingTestConfig) DialFromNode(protocol, targetIP string, targetPort, maxTries, minTries int, expectedEps sets.String) {
 	var cmd string
 	if protocol == "udp" {
-		// TODO: It would be enough to pass 1s+epsilon to timeout, but unfortunately
-		// busybox timeout doesn't support non-integer values.
 		cmd = fmt.Sprintf("echo hostName | nc -w 1 -u %s %d", targetIP, targetPort)
 	} else {
 		ipPort := net.JoinHostPort(targetIP, strconv.Itoa(targetPort))
