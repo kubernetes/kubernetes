@@ -192,18 +192,20 @@ var _ = SIGDescribe("ReplicationController", func() {
 
 		// Patch the ReplicationController's scale
 		ginkgo.By("patching ReplicationController scale")
-		rcScale, err := f.ClientSet.CoreV1().ReplicationControllers(testRcNamespace).Patch(context.TODO(), testRcName, types.StrategicMergePatchType, []byte(rcScalePatchPayload), metav1.PatchOptions{}, "scale")
+		_, err = f.ClientSet.CoreV1().ReplicationControllers(testRcNamespace).Patch(context.TODO(), testRcName, types.StrategicMergePatchType, []byte(rcScalePatchPayload), metav1.PatchOptions{}, "scale")
 		framework.ExpectNoError(err, "Failed to patch ReplicationControllerScale")
 
+		var rcFromWatch *v1.ReplicationController
+		ginkgo.By("waiting for ReplicationController's scale to be the max amount")
 		for event := range rcWatchChan {
 			rc, ok := event.Object.(*v1.ReplicationController)
 			framework.ExpectEqual(ok, true, "Unable to convert type of ReplicationController watch event")
 			if rc.Status.Replicas == testRcMaxReplicaCount && rc.Status.ReadyReplicas == testRcMaxReplicaCount {
-				rcScale = rc
+				rcFromWatch = rc
 				break
 			}
 		}
-		framework.ExpectEqual(rcScale.Status.Replicas, testRcMaxReplicaCount, "ReplicationController ReplicasSet Scale does not match the expected scale")
+		framework.ExpectEqual(rcFromWatch.Status.Replicas, testRcMaxReplicaCount, "ReplicationController ReplicasSet Scale does not match the expected scale")
 
 		// Get the ReplicationController
 		ginkgo.By("fetching ReplicationController; ensuring that it's patched")
