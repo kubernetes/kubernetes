@@ -256,9 +256,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 
 		ginkgo.By("waiting for ReplicationController is have a DeletionTimestamp")
 		for event := range rcWatchChan {
-			rc, ok := event.Object.(*v1.ReplicationController)
-			framework.ExpectEqual(ok, true, "Unable to convert type of ReplicationController watch event")
-			if rc.ObjectMeta.DeletionTimestamp != nil {
+			if event.Type == "DELETED" {
 				break
 			}
 		}
