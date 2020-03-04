@@ -69,22 +69,22 @@ def cri_tarballs():
         )
 
 # Use go get -u github.com/estesp/manifest-tool to find these values
-_DEBIAN_BASE_DIGEST = {
-    "manifest": "sha256:6966a0aedd7592c18ff2dd803c08bd85780ee19f5e3a2e7cf908a4cd837afcde",
-    "amd64": "sha256:8ccb65cd2dd7e0c24193d0742a20e4a673dbd11af5a33f16fcd471a31486866c",
-    "arm": "sha256:3432b41de3f6dfffdc1386fce961cfd1f9f8e208b3a35070e10ef3e2a733cb17",
-    "arm64": "sha256:9189251e1d1eb4126d6e6add2e272338f9c8a6a3db38863044625bca4b667f31",
-    "ppc64le": "sha256:50aa659e1e75e4231ee8293c3b4115e5755bb0517142b9b4bddbc134bf4354db",
-    "s390x": "sha256:bbb8ee3a2aaca738c00809f450233d98029fea4e319d8faaa30aa94c8b17a806",
+_DEBIAN_BASE_DIGEST = { # v1.0.1
+    "manifest": "sha256:fea5ea4d6fb518231a0934f974c7ec5c6fc3e2f0dfdf3a0d7a12780a1df924bb",
+    "amd64": "sha256:7e9f2f88b813e8f39648252d5b3a380db32a4ba44220becf9f1b25c00be49594",
+    "arm": "sha256:91de8bb15da762ce75da317e842fd42dac1812e11b4c768f0894e407d21ab3f8",
+    "arm64": "sha256:3d4ab00d26393a2c16967b26a818d171be5b30a53e8e0152313bc57f72fc2d2b",
+    "ppc64le": "sha256:62787bdcacdce1d8f5c12561ccce32f65393a04c06b09bb34b15b8365fc363fe",
+    "s390x": "sha256:72e96f69e2aba1848d91934d904233b549e565c60f81d4e1c79ca9927182ef86",
 }
 
-_DEBIAN_IPTABLES_DIGEST = {
-    "manifest": "sha256:b522b0035dba3ac2d5c0dbaaf8217bd66248e790332ccfdf653e0f943a280dcf",
-    "amd64": "sha256:adc40e9ec817c15d35b26d1d6aa4d0f8096fba4c99e26a026159bb0bc98c6a89",
-    "arm": "sha256:58e8a1d3b187eed2d8d3664cd1c9723e5029698714a24dfca4b6ef42ea27a9d4",
-    "arm64": "sha256:1a63fdd216fe7b84561d40ab1ebaa0daae1fc73e4232a6caffbd8353d9a14cea",
-    "ppc64le": "sha256:9f90adbc7513cc96d92fcec7633c4b29e766dd31cf876af03c0b54374e22fa9c",
-    "s390x": "sha256:4f147708deff2a0163ee49b6980cc95423514bec5f4091612d65773b898fbdae",
+_DEBIAN_IPTABLES_DIGEST = { # v11.0.3
+    "manifest": "sha256:25c4396386a2d3f2f4785da473d3428bc542a6f774feee830e8b6bc6b053d11b",
+    "amd64": "sha256:1e531753f00f944e1f9d8b0ce63cf85b18afbe8e4d4608f5af974759ecb27ad1",
+    "arm": "sha256:eb9d3dae7109adbf3f7229aee92ac6dc99cc5f6aa48d5ffc92a3a03b46712c60",
+    "arm64": "sha256:273c8bbd034fbc22a02a7e08e8b543c6f0ba0e11c55b0a8c3c321e096d9c832e",
+    "ppc64le": "sha256:eab4fd0544662b2c46f6f8204239d0f2773eafade747f3199519d1fb17b9f0f7",
+    "s390x": "sha256:3a0cea52fd69178c28de7356b2df144735ee7aa2bcb909e6bdc6ee28680ef014",
 }
 
 _DEBIAN_HYPERKUBE_BASE_DIGEST = {
@@ -110,7 +110,7 @@ def debian_image_dependencies():
             digest = _digest(_DEBIAN_BASE_DIGEST, arch),
             registry = "k8s.gcr.io",
             repository = "debian-base",
-            tag = "0.4.1",  # ignored, but kept here for documentation
+            tag = "v1.0.1",  # ignored, but kept here for documentation
         )
 
         container_pull(
@@ -119,7 +119,7 @@ def debian_image_dependencies():
             digest = _digest(_DEBIAN_IPTABLES_DIGEST, arch),
             registry = "k8s.gcr.io",
             repository = "debian-iptables",
-            tag = "v11.0.2",  # ignored, but kept here for documentation
+            tag = "v11.0.3",  # ignored, but kept here for documentation
         )
 
         container_pull(
