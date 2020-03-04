@@ -150,7 +150,10 @@ func (dswp *desiredStateOfWorldPopulator) Run(sourcesReady config.SourcesReady, 
 
 func (dswp *desiredStateOfWorldPopulator) ReprocessPod(
 	podName volumetypes.UniquePodName) {
-	dswp.deleteProcessedPod(podName)
+	dswp.pods.Lock()
+	defer dswp.pods.Unlock()
+	//dswp.deleteProcessedPod(podName)
+	dswp.pods.processedPods[podName] = false
 }
 
 func (dswp *desiredStateOfWorldPopulator) HasAddedPods() bool {
@@ -362,6 +365,12 @@ func (dswp *desiredStateOfWorldPopulator) processPodVolumes(
 		dswp.actualStateOfWorld.MarkRemountRequired(uniquePodName)
 		// Remove any stored errors for the pod, everything went well in this processPodVolumes
 		dswp.desiredStateOfWorld.PopPodErrors(uniquePodName)
+	} else if dswp.podHasBeenProcessedOnce(uniquePodName) {
+		// For the Pod that has been processed at least once before, even though some volumes
+		// could not be reprocessed successfully this round, we still mark it as processed to avoid
+		// processing it at a very high freqency. The pod will be reprocessed when volume manager calls
+		// ReprocessPod() triggered by SyncPod.
+		dswp.markPodProcessed(uniquePodName)
 	}
 
 }
@@ -434,14 +443,26 @@ func volumeRequiresFSResize(pvc *v1.PersistentVolumeClaim, pv *v1.PersistentVolu
 }
 
 // podPreviouslyProcessed returns true if the volumes for this pod have already
-// been processed by the populator
+// been processed/reprocessed by the populator. Otherwise, the volumes for this pod need to
+// be reprocessed.
 func (dswp *desiredStateOfWorldPopulator) podPreviouslyProcessed(
 	podName volumetypes.UniquePodName) bool {
 	dswp.pods.RLock()
 	defer dswp.pods.RUnlock()
 
-	_, exists := dswp.pods.processedPods[podName]
-	return exists
+	processed := dswp.pods.processedPods[podName]
+	return processed
+}
+
+// podHasBeenProcessedOnce returns true if the pod has been processed by the popoulator
+// at least once.
+func (dswp *desiredStateOfWorldPopulator) podHasBeenProcessedOnce(
+	podName volumetypes.UniquePodName) bool {
+	dswp.pods.RLock()
+	defer dswp.pods.RUnlock()
+
+	_, exist := dswp.pods.processedPods[podName]
+	return exist
 }
 
 // markPodProcessed records that the volumes for the specified pod have been
