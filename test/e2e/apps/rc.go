@@ -197,20 +197,23 @@ var _ = SIGDescribe("ReplicationController", func() {
 
 		var rcFromWatch *v1.ReplicationController
 		ginkgo.By("waiting for ReplicationController's scale to be the max amount")
+		foundRcWithMaxScale := false
 		for event := range rcWatchChan {
 			rc, ok := event.Object.(*v1.ReplicationController)
 			framework.ExpectEqual(ok, true, "Unable to convert type of ReplicationController watch event")
-			if rc.Status.Replicas == testRcMaxReplicaCount && rc.Status.ReadyReplicas == testRcMaxReplicaCount {
+			if rc.ObjectMeta.Name == testRcName && rc.ObjectMeta.Namespace == testRcNamespace && rc.Status.Replicas == testRcMaxReplicaCount && rc.Status.ReadyReplicas == testRcMaxReplicaCount {
+				foundRcWithMaxScale = true
 				rcFromWatch = rc
 				break
 			}
 		}
+		framework.ExpectEqual(foundRcWithMaxScale, true, "failed to locate a ReplicationController with max scale")
 		framework.ExpectEqual(rcFromWatch.Status.Replicas, testRcMaxReplicaCount, "ReplicationController ReplicasSet Scale does not match the expected scale")
 
 		// Get the ReplicationController
 		ginkgo.By("fetching ReplicationController; ensuring that it's patched")
 		rc, err := f.ClientSet.CoreV1().ReplicationControllers(testRcNamespace).Get(context.TODO(), testRcName, metav1.GetOptions{})
-		framework.ExpectNoError(err, "Failed to fetch ReplicationController")
+		framework.ExpectNoError(err, "failed to fetch ReplicationController")
 		framework.ExpectEqual(rc.ObjectMeta.Labels["test-rc"], "patched", "ReplicationController is missing a label from earlier patch")
 
 		rcStatusUpdatePayload := rc
@@ -220,13 +223,13 @@ var _ = SIGDescribe("ReplicationController", func() {
 		// Replace the ReplicationController's status
 		ginkgo.By("updating ReplicationController status")
 		rcStatus, err = f.ClientSet.CoreV1().ReplicationControllers(testRcNamespace).UpdateStatus(context.TODO(), rcStatusUpdatePayload, metav1.UpdateOptions{})
-		framework.ExpectNoError(err, "Failed to update ReplicationControllerStatus")
+		framework.ExpectNoError(err, "failed to update ReplicationControllerStatus")
 		framework.ExpectEqual(rcStatus.Status.ReadyReplicas, int32(1), "ReplicationControllerStatus readyReplicas does not equal 1")
 
 		ginkgo.By(fmt.Sprintf("waiting for ReplicationController readyReplicas to be equal to %v", testRcMaxReplicaCount))
 		for event := range rcWatchChan {
 			rc, ok := event.Object.(*v1.ReplicationController)
-			framework.ExpectEqual(ok, true, "Unable to convert type of ReplicationController watch event")
+			framework.ExpectEqual(ok, true, "unable to convert type of ReplicationController watch event")
 			if rc.Status.Replicas == testRcMaxReplicaCount && rc.Status.ReadyReplicas == testRcMaxReplicaCount {
 				break
 			}
@@ -234,7 +237,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 
 		ginkgo.By("listing all ReplicationControllers")
 		rcs, err := f.ClientSet.CoreV1().ReplicationControllers("").List(context.TODO(), metav1.ListOptions{LabelSelector: "test-rc-static=true"})
-		framework.ExpectNoError(err, "Failed to list ReplicationController")
+		framework.ExpectNoError(err, "failed to list ReplicationController")
 		framework.ExpectEqual(len(rcs.Items) > 0, true)
 
 		ginkgo.By("checking that ReplicationController has expected values")
