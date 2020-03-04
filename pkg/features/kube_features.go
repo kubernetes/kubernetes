@@ -547,6 +547,13 @@ const (
 	//
 	// Enables topology aware service routing
 	ServiceTopology featuregate.Feature = "ServiceTopology"
+
+	// owner: @freehan
+	// GA: v1.18
+	//
+	// Enable ExternalTrafficPolicy for Service ExternalIPs.
+	// This is for bug fix #69811
+	ExternalPolicyForExternalIP featuregate.Feature = "ExternalPolicyForExternalIP"
 )
 
 func init() {
@@ -633,6 +640,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	AllowInsecureBackendProxy:                      {Default: true, PreRelease: featuregate.Beta},
 	PodDisruptionBudget:                            {Default: true, PreRelease: featuregate.Beta},
 	ServiceTopology:                                {Default: false, PreRelease: featuregate.Alpha},
+	ExternalPolicyForExternalIP:                    {Default: true, PreRelease: featuregate.GA}, // remove in 1.20
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
