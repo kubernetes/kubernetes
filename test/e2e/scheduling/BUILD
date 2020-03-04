@@ -10,7 +10,6 @@ go_library(
         "predicates.go",
         "preemption.go",
         "priorities.go",
-        "taints.go",
         "ubernetes_lite.go",
         "ubernetes_lite_volumes.go",
     ],
