@@ -23,7 +23,7 @@ spec:
         - key: "CriticalAddonsOnly"
           operator: "Exists"
       containers:
-        - image: gcr.io/chao1-149704/proxy-agent-amd64:v0.0.8
+        - image: gcr.io/chao1-149704/proxy-agent-amd64:v0.0.9
           name: konnectivity-agent
           command: ["/proxy-agent"]
           args: [
