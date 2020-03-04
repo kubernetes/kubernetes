@@ -172,6 +172,7 @@ const (
 	// owner: @saad-ali
 	// alpha: v1.12
 	// beta:  v1.14
+	// GA:    v1.18
 	// Enable all logic related to the CSIDriver API object in storage.k8s.io
 	CSIDriverRegistry featuregate.Feature = "CSIDriverRegistry"
 

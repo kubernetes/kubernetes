@@ -519,6 +519,7 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 	etcdStorageData[gvr("storage.k8s.io", "v1", "csidrivers")] = StorageData{
 		Stub:             `{"metadata": {"name": "csid2"}, "spec": {"attachRequired": true, "podInfoOnMount": true}}`,
 		ExpectedEtcdPath: "/registry/csidrivers/csid2",
+		ExpectedGVK:      gvkP("storage.k8s.io", "v1beta1", "CSIDriver"),
 	}
 
 	return etcdStorageData
