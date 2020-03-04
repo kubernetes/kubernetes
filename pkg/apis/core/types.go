@@ -302,7 +302,6 @@ type PersistentVolumeSpec struct {
 	MountOptions []string
 	// volumeMode defines if a volume is intended to be used with a formatted filesystem
 	// or to remain in raw block state. Value of Filesystem is implied when not included in spec.
-	// This is a beta feature.
 	// +optional
 	VolumeMode *PersistentVolumeMode
 	// NodeAffinity defines constraints that limit what nodes this volume can be accessed from.
@@ -416,7 +415,6 @@ type PersistentVolumeClaimSpec struct {
 	StorageClassName *string
 	// volumeMode defines what type of volume is required by the claim.
 	// Value of Filesystem is implied when not included in claim spec.
-	// This is a beta feature.
 	// +optional
 	VolumeMode *PersistentVolumeMode
 	// This field can be used to specify either:
@@ -2057,7 +2055,6 @@ type Container struct {
 	// +optional
 	VolumeMounts []VolumeMount
 	// volumeDevices is the list of block devices to be used by the container.
-	// This is a beta feature.
 	// +optional
 	VolumeDevices []VolumeDevice
 	// +optional
@@ -2969,7 +2966,6 @@ type EphemeralContainerCommon struct {
 	// +optional
 	VolumeMounts []VolumeMount
 	// volumeDevices is the list of block devices to be used by the container.
-	// This is a beta feature.
 	// +optional
 	VolumeDevices []VolumeDevice
 	// Probes are not allowed for ephemeral containers.
@@ -5096,14 +5092,12 @@ type SELinuxOptions struct {
 // WindowsSecurityContextOptions contain Windows-specific options and credentials.
 type WindowsSecurityContextOptions struct {
 	// GMSACredentialSpecName is the name of the GMSA credential spec to use.
-	// This field is alpha-level and is only honored by servers that enable the WindowsGMSA feature flag.
 	// +optional
 	GMSACredentialSpecName *string
 
 	// GMSACredentialSpec is where the GMSA admission webhook
 	// (https://github.com/kubernetes-sigs/windows-gmsa) inlines the contents of the
 	// GMSA credential spec named by the GMSACredentialSpecName field.
-	// This field is alpha-level and is only honored by servers that enable the WindowsGMSA feature flag.
 	// +optional
 	GMSACredentialSpec *string
 

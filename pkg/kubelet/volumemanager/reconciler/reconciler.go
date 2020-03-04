@@ -487,8 +487,7 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (*reconstructedVolume,
 	if err != nil {
 		return nil, err
 	}
-	// TODO: remove feature gate check after no longer needed
-	if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) && volume.volumeMode == v1.PersistentVolumeBlock && mapperPlugin == nil {
+	if volume.volumeMode == v1.PersistentVolumeBlock && mapperPlugin == nil {
 		return nil, fmt.Errorf("could not find block volume plugin %q (spec.Name: %q) pod %q (UID: %q)", volume.pluginName, volume.volumeSpecName, volume.podName, pod.UID)
 	}
 
@@ -521,8 +520,7 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (*reconstructedVolume,
 	// Path to the mount or block device to check
 	var checkPath string
 
-	// TODO: remove feature gate check after no longer needed
-	if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) && volume.volumeMode == v1.PersistentVolumeBlock {
+	if volume.volumeMode == v1.PersistentVolumeBlock {
 		var newMapperErr error
 		volumeMapper, newMapperErr = mapperPlugin.NewBlockVolumeMapper(
 			volumeSpec,
@@ -697,12 +695,10 @@ func getVolumesFromPodDir(podDir string) ([]podVolume, error) {
 		volumesDirs := map[v1.PersistentVolumeMode]string{
 			v1.PersistentVolumeFilesystem: path.Join(podDir, config.DefaultKubeletVolumesDirName),
 		}
-		// TODO: remove feature gate check after no longer needed
-		if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
-			// Find block volume information
-			// ex. block volume: /pods/{podUid}/volumeDevices/{escapeQualifiedPluginName}/{volumeName}
-			volumesDirs[v1.PersistentVolumeBlock] = path.Join(podDir, config.DefaultKubeletVolumeDevicesDirName)
-		}
+		// Find block volume information
+		// ex. block volume: /pods/{podUid}/volumeDevices/{escapeQualifiedPluginName}/{volumeName}
+		volumesDirs[v1.PersistentVolumeBlock] = path.Join(podDir, config.DefaultKubeletVolumeDevicesDirName)
+
 		for volumeMode, volumesDir := range volumesDirs {
 			var volumesDirInfo []os.FileInfo
 			if volumesDirInfo, err = ioutil.ReadDir(volumesDir); err != nil {

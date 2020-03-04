@@ -39,7 +39,7 @@ import (
 	discovery "k8s.io/client-go/discovery"
 	authorizationv1client "k8s.io/client-go/kubernetes/typed/authorization/v1"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
-	describeutil "k8s.io/kubectl/pkg/describe/versioned"
+	"k8s.io/kubectl/pkg/describe"
 	rbacutil "k8s.io/kubectl/pkg/util/rbac"
 	"k8s.io/kubectl/pkg/util/templates"
 )
@@ -367,7 +367,7 @@ func printAccessHeaders(out io.Writer) error {
 
 func printAccess(out io.Writer, rules []rbacv1.PolicyRule) error {
 	for _, r := range rules {
-		if _, err := fmt.Fprintf(out, "%s\t%v\t%v\t%v\n", describeutil.CombineResourceGroup(r.Resources, r.APIGroups), r.NonResourceURLs, r.ResourceNames, r.Verbs); err != nil {
+		if _, err := fmt.Fprintf(out, "%s\t%v\t%v\t%v\n", describe.CombineResourceGroup(r.Resources, r.APIGroups), r.NonResourceURLs, r.ResourceNames, r.Verbs); err != nil {
 			return err
 		}
 	}

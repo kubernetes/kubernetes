@@ -31,8 +31,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
@@ -134,32 +132,22 @@ func (plugin *fcPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID, 
 		io:      &osIOHandler{},
 		plugin:  plugin,
 	}
-	// TODO: remove feature gate check after no longer needed
-	if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
-		volumeMode, err := util.GetVolumeMode(spec)
-		if err != nil {
-			return nil, err
-		}
-		klog.V(5).Infof("fc: newMounterInternal volumeMode %s", volumeMode)
-		return &fcDiskMounter{
-			fcDisk:       fcDisk,
-			fsType:       fc.FSType,
-			volumeMode:   volumeMode,
-			readOnly:     readOnly,
-			mounter:      &mount.SafeFormatAndMount{Interface: mounter, Exec: exec},
-			deviceUtil:   util.NewDeviceHandler(util.NewIOHandler()),
-			mountOptions: util.MountOptionFromSpec(spec),
-		}, nil
+
+	volumeMode, err := util.GetVolumeMode(spec)
+	if err != nil {
+		return nil, err
 	}
+
+	klog.V(5).Infof("fc: newMounterInternal volumeMode %s", volumeMode)
 	return &fcDiskMounter{
 		fcDisk:       fcDisk,
 		fsType:       fc.FSType,
+		volumeMode:   volumeMode,
 		readOnly:     readOnly,
 		mounter:      &mount.SafeFormatAndMount{Interface: mounter, Exec: exec},
 		deviceUtil:   util.NewDeviceHandler(util.NewIOHandler()),
 		mountOptions: util.MountOptionFromSpec(spec),
 	}, nil
-
 }
 
 func (plugin *fcPlugin) NewBlockVolumeMapper(spec *volume.Spec, pod *v1.Pod, _ volume.VolumeOptions) (volume.BlockVolumeMapper, error) {

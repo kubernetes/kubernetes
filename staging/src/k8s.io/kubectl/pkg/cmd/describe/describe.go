@@ -30,7 +30,6 @@ import (
 	"k8s.io/cli-runtime/pkg/resource"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/describe"
-	describeversioned "k8s.io/kubectl/pkg/describe/versioned"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
@@ -74,7 +73,7 @@ type DescribeOptions struct {
 	Selector  string
 	Namespace string
 
-	Describer  func(*meta.RESTMapping) (describe.Describer, error)
+	Describer  func(*meta.RESTMapping) (describe.ResourceDescriber, error)
 	NewBuilder func() *resource.Builder
 
 	BuilderArgs []string
@@ -136,8 +135,8 @@ func (o *DescribeOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 
 	o.BuilderArgs = args
 
-	o.Describer = func(mapping *meta.RESTMapping) (describe.Describer, error) {
-		return describeversioned.DescriberFn(f, mapping)
+	o.Describer = func(mapping *meta.RESTMapping) (describe.ResourceDescriber, error) {
+		return describe.DescriberFn(f, mapping)
 	}
 
 	o.NewBuilder = f.NewBuilder
