@@ -210,6 +210,7 @@ func getServerIdentificationPartialConfig(configAuthInfo clientcmdapi.AuthInfo, 
 	configClientConfig.CAFile = configClusterInfo.CertificateAuthority
 	configClientConfig.CAData = configClusterInfo.CertificateAuthorityData
 	configClientConfig.Insecure = configClusterInfo.InsecureSkipTLSVerify
+	configClientConfig.ServerName = configClusterInfo.TLSServerName
 	mergo.MergeWithOverwrite(mergedConfig, configClientConfig)
 
 	return mergedConfig, nil
@@ -458,6 +459,14 @@ func (config *DirectClientConfig) getCluster() (clientcmdapi.Cluster, error) {
 		mergedClusterInfo.InsecureSkipTLSVerify = config.overrides.ClusterInfo.InsecureSkipTLSVerify
 		mergedClusterInfo.CertificateAuthority = config.overrides.ClusterInfo.CertificateAuthority
 		mergedClusterInfo.CertificateAuthorityData = config.overrides.ClusterInfo.CertificateAuthorityData
+	}
+
+	// if the --tls-server-name has been set in overrides, use that value.
+	// if the --server has been set in overrides, then use the value of --tls-server-name specified on the CLI too.  This gives the property
+	// that setting a --server will effectively clear the KUBECONFIG value of tls-server-name if it is specified on the command line which is
+	// usually correct.
+	if config.overrides.ClusterInfo.TLSServerName != "" || config.overrides.ClusterInfo.Server != "" {
+		mergedClusterInfo.TLSServerName = config.overrides.ClusterInfo.TLSServerName
 	}
 
 	return *mergedClusterInfo, nil

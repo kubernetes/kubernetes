@@ -41,6 +41,7 @@ const (
 	flagContext          = "context"
 	flagNamespace        = "namespace"
 	flagAPIServer        = "server"
+	flagTLSServerName    = "tls-server-name"
 	flagInsecure         = "insecure-skip-tls-verify"
 	flagCertFile         = "client-certificate"
 	flagKeyFile          = "client-key"
@@ -84,6 +85,7 @@ type ConfigFlags struct {
 	Context          *string
 	Namespace        *string
 	APIServer        *string
+	TLSServerName    *string
 	Insecure         *bool
 	CertFile         *string
 	KeyFile          *string
@@ -159,6 +161,9 @@ func (f *ConfigFlags) toRawKubeConfigLoader() clientcmd.ClientConfig {
 	// bind cluster flags
 	if f.APIServer != nil {
 		overrides.ClusterInfo.Server = *f.APIServer
+	}
+	if f.TLSServerName != nil {
+		overrides.ClusterInfo.TLSServerName = *f.TLSServerName
 	}
 	if f.CAFile != nil {
 		overrides.ClusterInfo.CertificateAuthority = *f.CAFile
@@ -294,6 +299,9 @@ func (f *ConfigFlags) AddFlags(flags *pflag.FlagSet) {
 	if f.APIServer != nil {
 		flags.StringVarP(f.APIServer, flagAPIServer, "s", *f.APIServer, "The address and port of the Kubernetes API server")
 	}
+	if f.TLSServerName != nil {
+		flags.StringVar(f.TLSServerName, flagTLSServerName, *f.TLSServerName, "Server name to use for server certificate validation. If it is not provided, the hostname used to contact the server is used")
+	}
 	if f.Insecure != nil {
 		flags.BoolVar(f.Insecure, flagInsecure, *f.Insecure, "If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure")
 	}
@@ -329,6 +337,7 @@ func NewConfigFlags(usePersistentConfig bool) *ConfigFlags {
 		Context:          stringptr(""),
 		Namespace:        stringptr(""),
 		APIServer:        stringptr(""),
+		TLSServerName:    stringptr(""),
 		CertFile:         stringptr(""),
 		KeyFile:          stringptr(""),
 		CAFile:           stringptr(""),
