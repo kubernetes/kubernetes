@@ -2709,7 +2709,7 @@ var _ = SIGDescribe("Services", func() {
 		framework.ExpectNoError(err, "failed to create Endpoint")
 
 		// setup a watch for the Endpoint
-		endpointWatchTimeoutSeconds := int64(60)
+		endpointWatchTimeoutSeconds := int64(180)
 		endpointWatch, err := f.ClientSet.CoreV1().Endpoints(ns).Watch(context.TODO(), metav1.ListOptions{LabelSelector: "testendpoint-static=true", TimeoutSeconds: &endpointWatchTimeoutSeconds})
 		framework.ExpectNoError(err, "failed to setup watch on newly created Endpoint")
 		endpointWatchChan := endpointWatch.ResultChan()
