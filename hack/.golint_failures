@@ -488,7 +488,7 @@ staging/src/k8s.io/kubectl/pkg/cmd/testing
 staging/src/k8s.io/kubectl/pkg/cmd/top
 staging/src/k8s.io/kubectl/pkg/cmd/util
 staging/src/k8s.io/kubectl/pkg/cmd/wait
-staging/src/k8s.io/kubectl/pkg/describe/versioned
+staging/src/k8s.io/kubectl/pkg/describe
 staging/src/k8s.io/kubectl/pkg/generate
 staging/src/k8s.io/kubectl/pkg/generate/versioned
 staging/src/k8s.io/kubectl/pkg/metricsutil
