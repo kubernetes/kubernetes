@@ -61,9 +61,10 @@
           "paths": [
             {
               "path": "25",
+              "pathType": "",
               "backend": {
                 "serviceName": "26",
-                "servicePort": "27"
+                "servicePort": -783752440
               }
             }
           ]
@@ -75,8 +76,8 @@
     "loadBalancer": {
       "ingress": [
         {
-          "ip": "28",
-          "hostname": "29"
+          "ip": "27",
+          "hostname": "28"
         }
       ]
     }
