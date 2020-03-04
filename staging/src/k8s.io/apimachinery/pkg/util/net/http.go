@@ -151,6 +151,7 @@ func DialerFor(transport http.RoundTripper) (DialFunc, error) {
 
 	switch transport := transport.(type) {
 	case *http.Transport:
+		klog.Info("CHAO: http transport")
 		// transport.DialContext takes precedence over transport.Dial
 		if transport.DialContext != nil {
 			return transport.DialContext, nil
@@ -164,6 +165,7 @@ func DialerFor(transport http.RoundTripper) (DialFunc, error) {
 		// otherwise return nil
 		return nil, nil
 	case RoundTripperWrapper:
+		klog.Info("CHAO: roundTripperWrapper")
 		return DialerFor(transport.WrappedRoundTripper())
 	default:
 		return nil, fmt.Errorf("unknown transport type: %T", transport)
@@ -380,8 +382,8 @@ redirectLoop:
 
 		intermediateConn, err = dialer.Dial(req)
 		if err != nil {
-			klog.Errorf("CHAO: failed dialing to %s: %v", location.String(), err)
-			return nil, nil, fmt.Errorf("failed dialing to %s: %v", location.String(), err)
+			klog.Errorf("CHAO: failed dialing to %s: %v, redirects=%d", location.String(), err, redirects)
+			return nil, nil, fmt.Errorf("failed dialing to %s: %v, redirects=%d", location.String(), err, redirects)
 		}
 
 		// Peek at the backend response.

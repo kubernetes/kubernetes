@@ -35,7 +35,7 @@ func DialURL(ctx context.Context, url *url.URL, transport http.RoundTripper) (ne
 
 	dialer, err := utilnet.DialerFor(transport)
 	if err != nil {
-		klog.V(5).Infof("Unable to unwrap transport %T to get dialer: %v", transport, err)
+		klog.Infof("Unable to unwrap transport %T to get dialer: %v", transport, err)
 	}
 
 	switch url.Scheme {
@@ -58,9 +58,10 @@ func DialURL(ctx context.Context, url *url.URL, transport http.RoundTripper) (ne
 		if dialer != nil {
 			// We have a dialer; use it to open the connection, then
 			// create a tls client using the connection.
+			klog.Infof("CHAO: dialAddr is %v", dialAddr)
 			netConn, err := dialer(ctx, "tcp", dialAddr)
 			if err != nil {
-				klog.Info("CHAO: inside dialer failed")
+				klog.Error("CHAO: inside dialer failed")
 				return nil, err
 			}
 			if tlsConfig == nil {
@@ -84,6 +85,7 @@ func DialURL(ctx context.Context, url *url.URL, transport http.RoundTripper) (ne
 			}
 			tlsConn = tls.Client(netConn, tlsConfig)
 			if err := tlsConn.Handshake(); err != nil {
+				klog.Errorf("CHAO: tlsHandshake err: %v", err)
 				netConn.Close()
 				return nil, err
 			}
@@ -92,6 +94,7 @@ func DialURL(ctx context.Context, url *url.URL, transport http.RoundTripper) (ne
 			// Dial. This Dial method does not allow to pass a context unfortunately
 			tlsConn, err = tls.Dial("tcp", dialAddr, tlsConfig)
 			if err != nil {
+				klog.Errorf("CHAO: plain tls dial err: %v", err)
 				return nil, err
 			}
 		}
@@ -107,6 +110,7 @@ func DialURL(ctx context.Context, url *url.URL, transport http.RoundTripper) (ne
 			host = tlsConfig.ServerName
 		}
 		if err := tlsConn.VerifyHostname(host); err != nil {
+			klog.Errorf("CHAO: verifyHostName err: %v", err)
 			tlsConn.Close()
 			return nil, err
 		}
