@@ -134,8 +134,8 @@ func (c *dynamicClientCert) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 
-	klog.Infof("Starting client certificate rotation controller")
-	defer klog.Infof("Shutting down client certificate rotation controller")
+	klog.V(3).Infof("Starting client certificate rotation controller")
+	defer klog.V(3).Infof("Shutting down client certificate rotation controller")
 
 	go wait.Until(c.runWorker, time.Second, stopCh)
 
