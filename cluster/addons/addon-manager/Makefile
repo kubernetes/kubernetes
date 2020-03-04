@@ -18,7 +18,7 @@ TEMP_DIR:=$(shell mktemp -d)
 VERSION=v9.0.2
 KUBECTL_VERSION?=v1.13.2
 
-BASEIMAGE=k8s.gcr.io/debian-base-$(ARCH):v1.0.0
+BASEIMAGE=k8s.gcr.io/debian-base-$(ARCH):v1.0.1
 
 SUDO=$(if $(filter 0,$(shell id -u)),,sudo)
 

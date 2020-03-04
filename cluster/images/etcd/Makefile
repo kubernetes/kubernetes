@@ -66,21 +66,8 @@ GOLANG_VERSION?=1.12.9
 GOARM?=7
 TEMP_DIR:=$(shell mktemp -d)
 
-ifeq ($(ARCH),amd64)
-    BASEIMAGE?=k8s.gcr.io/debian-base:v1.0.0
-endif
-ifeq ($(ARCH),arm)
-    BASEIMAGE?=k8s.gcr.io/debian-base-arm:v1.0.0
-endif
-ifeq ($(ARCH),arm64)
-    BASEIMAGE?=k8s.gcr.io/debian-base-arm64:v1.0.0
-endif
-ifeq ($(ARCH),ppc64le)
-    BASEIMAGE?=k8s.gcr.io/debian-base-ppc64le:v1.0.0
-endif
-ifeq ($(ARCH),s390x)
-    BASEIMAGE?=k8s.gcr.io/debian-base-s390x:v1.0.0
-endif
+
+BASEIMAGE?=k8s.gcr.io/debian-base-$(ARCH):v1.0.1
 
 build:
 	# Explicitly copy files to the temp directory
