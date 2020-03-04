@@ -293,6 +293,7 @@ func TestIsValidLabelValue(t *testing.T) {
 	successCases := []string{
 		"simple",
 		"now-with-dashes",
+		"now/with/slashes",
 		"1-starts-with-num",
 		"end-with-num-1",
 		"1234",                  // only num
@@ -313,6 +314,8 @@ func TestIsValidLabelValue(t *testing.T) {
 		"ends-with-dash-",
 		".starts.with.dot",
 		"ends.with.dot.",
+		"/starts/with/slash",
+		"ends/with/slash/",
 		strings.Repeat("a", 64), // over the limit
 	}
 	for i := range errorCases {

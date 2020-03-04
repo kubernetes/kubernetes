@@ -147,8 +147,10 @@ func IsDomainPrefixedPath(fldPath *field.Path, dpPath string) field.ErrorList {
 	return allErrs
 }
 
-const labelValueFmt string = "(" + qualifiedNameFmt + ")?"
-const labelValueErrMsg string = "a valid label must be an empty string or consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character"
+const labelValueCharFmt string = "[A-Za-z0-9]"
+const labelValueExtCharFmt string = "[-A-Za-z0-9_./]"
+const labelValueFmt string = "((" + labelValueCharFmt + labelValueExtCharFmt + "*)?" + labelValueCharFmt + ")?"
+const labelValueErrMsg string = "a valid label must be an empty string or consist of alphanumeric characters, '-', '_', '.' or '/', and must start and end with an alphanumeric character"
 
 // LabelValueMaxLength is a label's max length
 const LabelValueMaxLength int = 63
@@ -164,7 +166,7 @@ func IsValidLabelValue(value string) []string {
 		errs = append(errs, MaxLenError(LabelValueMaxLength))
 	}
 	if !labelValueRegexp.MatchString(value) {
-		errs = append(errs, RegexError(labelValueErrMsg, labelValueFmt, "MyValue", "my_value", "12345"))
+		errs = append(errs, RegexError(labelValueErrMsg, labelValueFmt, "MyValue", "my_value", "12345", "apps/v1/deployment/nginx"))
 	}
 	return errs
 }
