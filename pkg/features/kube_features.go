@@ -477,6 +477,7 @@ const (
 	// owner: @j-griffith
 	// alpha: v1.15
 	// beta: v1.16
+	// GA: v1.18
 	//
 	// Enable support for specifying an existing PVC as a DataSource
 	VolumePVCDataSource featuregate.Feature = "VolumePVCDataSource"
@@ -637,7 +638,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ServiceLoadBalancerFinalizer:   {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	LocalStorageCapacityIsolationFSQuotaMonitoring: {Default: false, PreRelease: featuregate.Alpha},
 	NonPreemptingPriority:                          {Default: false, PreRelease: featuregate.Alpha},
-	VolumePVCDataSource:                            {Default: true, PreRelease: featuregate.Beta},
+	VolumePVCDataSource:                            {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.20
 	PodOverhead:                                    {Default: true, PreRelease: featuregate.Beta},
 	IPv6DualStack:                                  {Default: false, PreRelease: featuregate.Alpha},
 	EndpointSlice:                                  {Default: true, PreRelease: featuregate.Beta},

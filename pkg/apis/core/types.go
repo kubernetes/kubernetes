@@ -418,10 +418,10 @@ type PersistentVolumeClaimSpec struct {
 	// +optional
 	VolumeMode *PersistentVolumeMode
 	// This field can be used to specify either:
-	// * An existing VolumeSnapshot object (snapshot.storage.k8s.io/VolumeSnapshot)
+	// * An existing VolumeSnapshot object (snapshot.storage.k8s.io/VolumeSnapshot - Beta)
 	// * An existing PVC (PersistentVolumeClaim)
-	// In order to use either of these DataSource types, the appropriate feature gate
-	// must be enabled (VolumeSnapshotDataSource, VolumePVCDataSource)
+	// In order to use VolumeSnapshot object types, the appropriate feature gate
+	// must be enabled (VolumeSnapshotDataSource)
 	// If the provisioner can support the specified data source, it will create
 	// a new volume based on the contents of the specified PVC or Snapshot.
 	// If the provisioner does not support the specified data source, the volume will

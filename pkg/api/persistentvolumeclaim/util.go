@@ -51,8 +51,7 @@ func dataSourceIsEnabled(pvcSpec *core.PersistentVolumeClaimSpec) bool {
 		if pvcSpec.DataSource.APIGroup != nil {
 			apiGroup = *pvcSpec.DataSource.APIGroup
 		}
-		if utilfeature.DefaultFeatureGate.Enabled(features.VolumePVCDataSource) &&
-			pvcSpec.DataSource.Kind == pvc &&
+		if pvcSpec.DataSource.Kind == pvc &&
 			apiGroup == "" {
 			return true
 
