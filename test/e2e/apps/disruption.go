@@ -431,15 +431,17 @@ func deletePDBCollection(cs kubernetes.Interface, ns string) {
 
 func waitForPDBCollectionToBeDeleted(cs kubernetes.Interface, ns string) {
 	ginkgo.By("Waiting for the PDB collection to be deleted")
-	wait.PollImmediate(framework.Poll, schedulingTimeout, func() (bool, error) {
+	err := wait.PollImmediate(framework.Poll, schedulingTimeout, func() (bool, error) {
 		pdbList, err := cs.PolicyV1beta1().PodDisruptionBudgets(ns).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			return false, err
 		}
-		framework.ExpectNoError(err, "Listing PDB set in namespace %s", ns)
-		framework.ExpectEqual(len(pdbList.Items), 0, "Expecting No PDBs returned in namespace %s", ns)
+		if len(pdbList.Items) != 0 {
+			return false, nil
+		}
 		return true, nil
 	})
+	framework.ExpectNoError(err, "Waiting for the PDB collection to be deleted in namespace %s", ns)
 }
 
 func createPodsOrDie(cs kubernetes.Interface, ns string, n int) {
