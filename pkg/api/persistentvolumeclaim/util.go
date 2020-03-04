@@ -47,6 +47,10 @@ func dataSourceInUse(oldPVCSpec *core.PersistentVolumeClaimSpec) bool {
 
 func dataSourceIsEnabled(pvcSpec *core.PersistentVolumeClaimSpec) bool {
 	if pvcSpec.DataSource != nil {
+		if utilfeature.DefaultFeatureGate.Enabled(features.AnyVolumeDataSource) {
+			return true
+		}
+
 		apiGroup := ""
 		if pvcSpec.DataSource.APIGroup != nil {
 			apiGroup = *pvcSpec.DataSource.APIGroup

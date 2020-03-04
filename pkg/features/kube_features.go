@@ -564,6 +564,12 @@ const (
 	// e.g. emptyDir:
 	//        medium: HugePages-1Gi
 	HugePageStorageMediumSize featuregate.Feature = "HugePageStorageMediumSize"
+
+	// owner: @bswartz
+	// alpha: v1.18
+	//
+	// Enables usage of any object for volume data source in PVCs
+	AnyVolumeDataSource featuregate.Feature = "AnyVolumeDataSource"
 )
 
 func init() {
@@ -652,6 +658,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ImmutableEphemeralVolumes:                      {Default: false, PreRelease: featuregate.Alpha},
 	DefaultIngressClass:                            {Default: true, PreRelease: featuregate.Beta},
 	HugePageStorageMediumSize:                      {Default: false, PreRelease: featuregate.Alpha},
+	AnyVolumeDataSource:                            {Default: false, PreRelease: featuregate.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
