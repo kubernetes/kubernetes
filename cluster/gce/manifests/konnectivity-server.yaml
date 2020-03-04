@@ -11,7 +11,7 @@ spec:
   hostNetwork: true
   containers:
   - name: konnectivity-server-container
-    image: gcr.io/chao1-149704/proxy-server-amd64:v0.0.8
+    image: gcr.io/chao1-149704/proxy-server-amd64:v0.0.9
     resources:
       requests:
         cpu: 25m
