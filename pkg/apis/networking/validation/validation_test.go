@@ -1008,6 +1008,28 @@ func TestValidateIngress(t *testing.T) {
 				"spec.rules[0].host",
 			},
 		},
+		"valid wildcard host": {
+			tweakIngress: func(ing *networking.Ingress) {
+				ing.Spec.Rules[0].Host = "*.bar.com"
+			},
+			expectErrsOnFields: []string{},
+		},
+		"invalid wildcard host (foo.*.bar.com)": {
+			tweakIngress: func(ing *networking.Ingress) {
+				ing.Spec.Rules[0].Host = "foo.*.bar.com"
+			},
+			expectErrsOnFields: []string{
+				"spec.rules[0].host",
+			},
+		},
+		"invalid wildcard host (*)": {
+			tweakIngress: func(ing *networking.Ingress) {
+				ing.Spec.Rules[0].Host = "*"
+			},
+			expectErrsOnFields: []string{
+				"spec.rules[0].host",
+			},
+		},
 	}
 
 	for name, testCase := range testCases {
@@ -1681,6 +1703,24 @@ func TestValidateIngressTLS(t *testing.T) {
 			if err.Field != s[0] || !strings.Contains(err.Error(), s[1]) {
 				t.Errorf("unexpected error: %q, expected: %q", err, k)
 			}
+		}
+	}
+
+	// Test for wildcard host and wildcard TLS
+	validCases := map[string]networking.Ingress{}
+	wildHost := "*.bar.com"
+	goodWildcardTLS := newValid()
+	goodWildcardTLS.Spec.Rules[0].Host = "*.bar.com"
+	goodWildcardTLS.Spec.TLS = []networking.IngressTLS{
+		{
+			Hosts: []string{wildHost},
+		},
+	}
+	validCases[fmt.Sprintf("spec.tls[0].hosts: Valid value: '%v'", wildHost)] = goodWildcardTLS
+	for k, v := range validCases {
+		errs := validateIngress(&v, IngressValidationOptions{requireRegexPath: true}, networkingv1beta1.SchemeGroupVersion)
+		if len(errs) != 0 {
+			t.Errorf("expected success for %q", k)
 		}
 	}
 }
