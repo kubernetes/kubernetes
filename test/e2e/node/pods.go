@@ -213,7 +213,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 		ginkgo.It("should never report success for a pending container", func() {
 			ginkgo.By("creating pods that should always exit 1 and terminating the pod after a random delay")
 
-			var reBug88766 = regexp.MustCompile(`ContainerCannotRun.*rootfs_linux\.go.*kubernetes\.io~secret.*no such file or directory`)
+			var reBug88766 = regexp.MustCompile(`rootfs_linux.*kubernetes\.io~secret.*no such file or directory`)
 
 			var (
 				lock sync.Mutex
@@ -350,7 +350,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 								switch {
 								case t.ExitCode == 1:
 									// expected
-								case t.ExitCode == 128 && reBug88766.MatchString(t.Message):
+								case t.ExitCode == 128 && t.Reason == "ContainerCannotRun" && reBug88766.MatchString(t.Message):
 									// pod volume teardown races with container start in CRI, which reports a failure
 									framework.Logf("pod %s on node %s failed with the symptoms of https://github.com/kubernetes/kubernetes/issues/88766")
 								default:
