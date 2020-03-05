@@ -167,6 +167,10 @@ func (f *structuredMergeManager) Apply(liveObj, patchObj runtime.Object, managed
 	}
 	managed = internal.NewManaged(managedFields, managed.Times())
 
+	if newObjTyped == nil {
+		return nil, managed, nil
+	}
+
 	newObj, err := f.typeConverter.TypedToObject(newObjTyped)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to convert new typed object to object: %v", err)

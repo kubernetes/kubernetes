@@ -58,6 +58,37 @@ func (v versionedSet) Applied() bool {
 // what version).
 type ManagedFields map[string]VersionedSet
 
+// Equals returns true if the two managedfields are the same, false
+// otherwise.
+func (lhs ManagedFields) Equals(rhs ManagedFields) bool {
+	if len(lhs) != len(rhs) {
+		return false
+	}
+
+	for manager, left := range lhs {
+		right, ok := rhs[manager]
+		if !ok {
+			return false
+		}
+		if left.APIVersion() != right.APIVersion() || left.Applied() != right.Applied() {
+			return false
+		}
+		if !left.Set().Equals(right.Set()) {
+			return false
+		}
+	}
+	return true
+}
+
+// Copy the list, this is mostly a shallow copy.
+func (lhs ManagedFields) Copy() ManagedFields {
+	copy := ManagedFields{}
+	for manager, set := range lhs {
+		copy[manager] = set
+	}
+	return copy
+}
+
 // Difference returns a symmetric difference between two Managers. If a
 // given user's entry has version X in lhs and version Y in rhs, then
 // the return value for that user will be from rhs. If the difference for

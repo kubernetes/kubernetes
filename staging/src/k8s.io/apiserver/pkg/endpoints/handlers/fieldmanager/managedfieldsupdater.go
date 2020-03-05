@@ -71,6 +71,9 @@ func (f *managedFieldsUpdater) Apply(liveObj, appliedObj runtime.Object, managed
 	if err != nil {
 		return object, managed, err
 	}
+	if object == nil {
+		object = liveObj
+	}
 	managed.Times()[fieldManager] = &metav1.Time{Time: time.Now().UTC()}
 	return object, managed, nil
 }
