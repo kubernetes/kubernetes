@@ -806,7 +806,8 @@ contexts:
 EOF
   fi
   if [[ "${ENABLE_EGRESS_VIA_KONNECTIVITY_SERVICE:-false}" == "true" ]]; then
-    cat <<EOF >/etc/srv/kubernetes/egress_selector_configuration.yaml
+    if [[ "${KONNECTIVITY_SERVICE_PROXY_PROTOCOL_MODE:-grpc}" == 'grpc' ]]; then
+      cat <<EOF >/etc/srv/kubernetes/egress_selector_configuration.yaml
 apiVersion: apiserver.k8s.io/v1alpha1
 kind: EgressSelectorConfiguration
 egressSelections:
@@ -823,6 +824,28 @@ egressSelections:
   connection:
     proxyProtocol: Direct
 EOF
+    elif [[ "${KONNECTIVITY_SERVICE_PROXY_PROTOCOL_MODE:-grpc}" == 'http-connect' ]]; then
+      cat <<EOF >/etc/srv/kubernetes/egress_selector_configuration.yaml
+apiVersion: apiserver.k8s.io/v1alpha1
+kind: EgressSelectorConfiguration
+egressSelections:
+- name: cluster
+  connection:
+    proxyProtocol: HTTPConnect
+    transport:
+      uds:
+        udsName: /etc/srv/kubernetes/konnectivity-server/konnectivity-server.socket
+- name: master
+  connection:
+    proxyProtocol: Direct
+- name: etcd
+  connection:
+    proxyProtocol: Direct
+EOF
+    else
+      echo "KONNECTIVITY_SERVICE_PROXY_PROTOCOL_MODE must be set to either grpc or http-connect"
+      exit 1
+    fi
   fi
 
   if [[ -n "${WEBHOOK_GKE_EXEC_AUTH:-}" ]]; then
@@ -1660,7 +1683,13 @@ function prepare-konnectivity-server-manifest {
   params+=("--uds-name=/etc/srv/kubernetes/konnectivity-server/konnectivity-server.socket")
   params+=("--cluster-cert=/etc/srv/kubernetes/pki/apiserver.crt")
   params+=("--cluster-key=/etc/srv/kubernetes/pki/apiserver.key")
-  params+=("--mode=grpc")
+  if [[ "${KONNECTIVITY_SERVICE_PROXY_PROTOCOL_MODE:-grpc}" == 'http-connect' ]]; then
+    params+=("--mode=http-connect")
+  else
+    # We can assume the mode is GRPC because we check for a valid protocol beforehand
+    params+=("--mode=grpc")
+  fi
+
   params+=("--server-port=0")
   params+=("--agent-port=$1")
   params+=("--admin-port=$2")
