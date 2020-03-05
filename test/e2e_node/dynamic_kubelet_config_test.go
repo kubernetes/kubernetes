@@ -60,6 +60,10 @@ type nodeConfigTestCase struct {
 	configMap          *v1.ConfigMap
 	expectConfigStatus expectNodeConfigStatus
 	expectConfig       *kubeletconfig.KubeletConfiguration
+	// whether to expect the new configmap to be set, making the expected configmap resource to be updated.
+	// When the new configmap is equal to the previous one, it new one will not be set, and the old ResourceVersion
+	// will remain in the last-known-good
+	expectedConfigUpdateSuccess bool
 	// whether to expect this substring in an error returned from the API server when updating the config source
 	apierr string
 	// whether the state would cause a config change event as a result of the update to Node.Spec.ConfigSource,
@@ -344,7 +348,10 @@ var _ = framework.KubeDescribe("[Feature:DynamicKubeletConfig][NodeFeature:Dynam
 							lastKnownGood: lkgStatus,
 						},
 						expectConfig: lkgKC,
-						event:        true,
+						// Since the applied config is the same as the previous, it will not be updated,
+						// and therefore we don't need to update the ResourceVersion
+						expectedConfigUpdateSuccess: false,
+						event:                       true,
 					},
 					{
 						desc:         "bad config",
@@ -459,8 +466,9 @@ var _ = framework.KubeDescribe("[Feature:DynamicKubeletConfig][NodeFeature:Dynam
 					expectConfigStatus: expectNodeConfigStatus{
 						lastKnownGood: lkgStatus1,
 					},
-					expectConfig: lkgKC,
-					event:        true,
+					expectConfig:                lkgKC,
+					expectedConfigUpdateSuccess: true,
+					event:                       true,
 				}
 
 				second := nodeConfigTestCase{
@@ -470,8 +478,9 @@ var _ = framework.KubeDescribe("[Feature:DynamicKubeletConfig][NodeFeature:Dynam
 					expectConfigStatus: expectNodeConfigStatus{
 						lastKnownGood: lkgStatus2,
 					},
-					expectConfig: lkgKC,
-					event:        true,
+					expectConfig:                lkgKC,
+					expectedConfigUpdateSuccess: true,
+					event:                       true,
 				}
 
 				// Manually actuate this to ensure we wait for each case to become the last-known-good
@@ -580,11 +589,12 @@ var _ = framework.KubeDescribe("[Feature:DynamicKubeletConfig][NodeFeature:Dynam
 
 				cases := []nodeConfigTestCase{
 					{
-						desc:         "correct",
-						configSource: source,
-						configMap:    correctConfigMap,
-						expectConfig: correctKC,
-						event:        true,
+						desc:                        "correct",
+						configSource:                source,
+						configMap:                   correctConfigMap,
+						expectConfig:                correctKC,
+						expectedConfigUpdateSuccess: true,
+						event:                       true,
 					},
 					{
 						desc:         "fail-parse",
@@ -665,8 +675,9 @@ var _ = framework.KubeDescribe("[Feature:DynamicKubeletConfig][NodeFeature:Dynam
 						expectConfigStatus: expectNodeConfigStatus{
 							lastKnownGood: lkgStatus,
 						},
-						expectConfig: lkgKC,
-						event:        true,
+						expectConfig:                lkgKC,
+						expectedConfigUpdateSuccess: true,
+						event:                       true,
 					},
 					{
 						// NOTE(mtaufen): If you see a strange "expected assigned x but got assigned y" error on this case,
@@ -731,19 +742,21 @@ var _ = framework.KubeDescribe("[Feature:DynamicKubeletConfig][NodeFeature:Dynam
 					},
 				}
 				(&nodeConfigTestCase{
-					desc:         "initial state (correct)",
-					configSource: source,
-					configMap:    correctConfigMap,
-					expectConfig: correctKC,
+					desc:                        "initial state (correct)",
+					configSource:                source,
+					configMap:                   correctConfigMap,
+					expectConfig:                correctKC,
+					expectedConfigUpdateSuccess: true,
 				}).run(f, setConfigSourceFunc, false, 0)
 
 				cases := []nodeConfigTestCase{
 					{
-						desc:         "correct",
-						configSource: source,
-						configMap:    correctConfigMap,
-						expectConfig: correctKC,
-						event:        true,
+						desc:                        "correct",
+						configSource:                source,
+						configMap:                   correctConfigMap,
+						expectConfig:                correctKC,
+						expectedConfigUpdateSuccess: true,
+						event:                       true,
 					},
 					{
 						desc:         "fail-parse",
@@ -799,10 +812,11 @@ var _ = framework.KubeDescribe("[Feature:DynamicKubeletConfig][NodeFeature:Dynam
 					},
 				}
 				(&nodeConfigTestCase{
-					desc:         "correct",
-					configSource: source,
-					configMap:    correctConfigMap,
-					expectConfig: correctKC,
+					desc:                        "correct",
+					configSource:                source,
+					configMap:                   correctConfigMap,
+					expectedConfigUpdateSuccess: true,
+					expectConfig:                correctKC,
 				}).run(f, setConfigSourceFunc, false, 0)
 
 				// delete the ConfigMap, and ensure an error is reported by the Kubelet while the ConfigMap is absent
@@ -813,15 +827,17 @@ var _ = framework.KubeDescribe("[Feature:DynamicKubeletConfig][NodeFeature:Dynam
 					expectConfigStatus: expectNodeConfigStatus{
 						err: fmt.Sprintf(status.SyncErrorFmt, status.DownloadError),
 					},
-					expectConfig: correctKC,
+					expectConfig:                correctKC,
+					expectedConfigUpdateSuccess: true,
 				}).run(f, deleteConfigMapFunc, false, 0)
 
 				// re-create the ConfigMap, and ensure the error disappears
 				(&nodeConfigTestCase{
-					desc:         "correct",
-					configSource: source,
-					configMap:    correctConfigMap,
-					expectConfig: correctKC,
+					desc:                        "correct",
+					configSource:                source,
+					configMap:                   correctConfigMap,
+					expectConfig:                correctKC,
+					expectedConfigUpdateSuccess: true,
 				}).run(f, createConfigMapFunc, false, 0)
 			})
 		})
@@ -907,6 +923,11 @@ func updateConfigMapFunc(f *framework.Framework, tc *nodeConfigTestCase) error {
 	cm, err := f.ClientSet.CoreV1().ConfigMaps(tc.configMap.Namespace).Update(context.TODO(), tc.configMap, metav1.UpdateOptions{})
 	if err != nil {
 		return err
+	}
+	// update the ResourceVersion of the expected config with the version from the newly set one if
+	// we expect it to succeed and to be set
+	if tc.expectedConfigUpdateSuccess && tc.expectConfig != nil && tc.expectConfigStatus.lastKnownGood != nil {
+		tc.expectConfigStatus.lastKnownGood.ConfigMap.ResourceVersion = cm.ResourceVersion
 	}
 	// update tc.configMap's ResourceVersion to match the updated ConfigMap, this makes
 	// sure our derived status checks have up-to-date information
@@ -999,6 +1020,7 @@ func expectConfigStatus(tc *nodeConfigTestCase, actual *v1.NodeConfigStatus) err
 	if !apiequality.Semantic.DeepEqual(expectAssigned, actual.Assigned) {
 		errs = append(errs, spew.Sprintf("expected Assigned %#v but got %#v", expectAssigned, actual.Assigned))
 	}
+
 	// check LastKnownGood matches tc.expectConfigStatus.lastKnownGood
 	if !apiequality.Semantic.DeepEqual(tc.expectConfigStatus.lastKnownGood, actual.LastKnownGood) {
 		errs = append(errs, spew.Sprintf("expected LastKnownGood %#v but got %#v", tc.expectConfigStatus.lastKnownGood, actual.LastKnownGood))
