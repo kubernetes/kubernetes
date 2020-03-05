@@ -22,6 +22,7 @@ import (
 	"bytes"
 	"fmt"
 	"os/exec"
+	"strconv"
 	"strings"
 
 	"golang.org/x/sys/unix"
@@ -55,8 +56,29 @@ func FsInfo(path string) (int64, int64, int64, int64, int64, int64, error) {
 	return available, capacity, usage, inodes, inodesFree, inodesUsed, nil
 }
 
+// hangingDuCheck will stop executing DiskUsage() if this check is pending from last period.
+func pendingDuCheck(path string) error {
+	out, err := exec.Command("bash", "-c", fmt.Sprintf("ps aux | grep 'nice -n 19 du -x -s -B 1 %s' | wc -l", path)).Output()
+	if err != nil {
+		return err
+	}
+	num, err := strconv.Atoi(strings.Fields(string(out))[0])
+	if err != nil {
+		return err
+	}
+	// "grep nice -n 19 du -x -s -B 1 $path" and "bash -c ps aux | grep 'nice -n 19 du -x -s -B 1 $path'" will be counted, exclude them.
+	if num-2 > 1 {
+		return fmt.Errorf("volume %s usage check pending from last period, skip check its usage for this period", path)
+	}
+	return nil
+}
+
 // DiskUsage gets disk usage of specified path.
 func DiskUsage(path string) (*resource.Quantity, error) {
+	if err := pendingDuCheck(path); err != nil {
+		return nil, err
+	}
+
 	// First check whether the quota system knows about this directory
 	// A nil quantity with no error means that the path does not support quotas
 	// and we should use other mechanisms.
