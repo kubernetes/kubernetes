@@ -460,6 +460,7 @@ func (qs *queueSet) removeTimedOutRequestsFromQueueLocked(queue *queue, fsName s
 			req.decision.SetLocked(decisionReject)
 			// get index for timed out requests
 			timeoutIdx = i
+			metrics.ChangeRequestsInQueues(qs.qCfg.Name, req.fsName, -1)
 		} else {
 			break
 		}
@@ -472,7 +473,6 @@ func (qs *queueSet) removeTimedOutRequestsFromQueueLocked(queue *queue, fsName s
 		queue.requests = reqs[removeIdx:]
 		// decrement the # of requestsEnqueued
 		qs.totRequestsWaiting -= removeIdx
-		metrics.ChangeRequestsInQueues(qs.qCfg.Name, fsName, -removeIdx)
 	}
 }
 
