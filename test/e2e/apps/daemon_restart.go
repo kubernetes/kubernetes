@@ -311,7 +311,6 @@ var _ = SIGDescribe("DaemonRestart [Disruptive]", func() {
 		if err != nil {
 			framework.Logf("Unexpected error occurred: %v", err)
 		}
-		// TODO: write a wrapper for ExpectNoErrorWithOffset()
 		framework.ExpectNoErrorWithOffset(0, err)
 		preRestarts, badNodes := getContainerRestarts(f.ClientSet, ns, labelSelector)
 		if preRestarts != 0 {
