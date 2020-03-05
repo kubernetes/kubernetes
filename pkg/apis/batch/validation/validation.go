@@ -124,11 +124,22 @@ func validateJobSpec(spec *batch.JobSpec, fldPath *field.Path) field.ErrorList {
 	}
 
 	allErrs = append(allErrs, apivalidation.ValidatePodTemplateSpec(&spec.Template, fldPath.Child("template"))...)
-	if spec.Template.Spec.RestartPolicy != api.RestartPolicyOnFailure &&
-		spec.Template.Spec.RestartPolicy != api.RestartPolicyNever {
-		allErrs = append(allErrs, field.NotSupported(fldPath.Child("template", "spec", "restartPolicy"),
-			spec.Template.Spec.RestartPolicy, []string{string(api.RestartPolicyOnFailure), string(api.RestartPolicyNever)}))
+
+	for i := 0; i < len(allErrs); {
+		if allErrs[i].Field == fldPath.Child("template", "spec", "restartPolicy").String() {
+			allErrs = append(allErrs[:i], allErrs[i+1:]...)
+		} else {
+			i++
+		}
 	}
+
+	jobRestartPolicy := spec.Template.Spec.RestartPolicy
+
+	if jobRestartPolicy != api.RestartPolicyOnFailure && jobRestartPolicy != api.RestartPolicyNever {
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("template", "spec", "restartPolicy"),
+			jobRestartPolicy, []string{string(api.RestartPolicyOnFailure), string(api.RestartPolicyNever)}))
+	}
+
 	return allErrs
 }
 
