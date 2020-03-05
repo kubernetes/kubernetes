@@ -108,6 +108,7 @@ func (c *DynamicCertKeyPairContent) loadCertKeyPair() error {
 	}
 
 	c.certKeyPair.Store(newCertKey)
+	klog.V(2).Infof("Loaded a new cert/key pair for %q", c.Name())
 
 	for _, listener := range c.listeners {
 		listener.Enqueue()
