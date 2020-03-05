@@ -148,7 +148,6 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 		if err != nil {
 			framework.Logf("Unexpected error occurred: %v", err)
 		}
-		// TODO: write a wrapper for ExpectNoErrorWithOffset()
 		framework.ExpectNoErrorWithOffset(0, err)
 
 		err = framework.CheckTestingNSDeletedExcept(cs, ns)

@@ -68,7 +68,7 @@ func (recorder *recorderImpl) makeEvent(refRegarding *v1.ObjectReference, refRel
 	t := metav1.Time{Time: recorder.clock.Now()}
 	namespace := refRegarding.Namespace
 	if namespace == "" {
-		namespace = metav1.NamespaceSystem
+		namespace = metav1.NamespaceDefault
 	}
 	return &v1beta1.Event{
 		ObjectMeta: metav1.ObjectMeta{

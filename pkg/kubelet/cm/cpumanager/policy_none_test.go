@@ -33,7 +33,7 @@ func TestNonePolicyName(t *testing.T) {
 	}
 }
 
-func TestNonePolicyAdd(t *testing.T) {
+func TestNonePolicyAllocate(t *testing.T) {
 	policy := &nonePolicy{}
 
 	st := &mockState{
@@ -44,9 +44,9 @@ func TestNonePolicyAdd(t *testing.T) {
 	testPod := makePod("fakePod", "fakeContainer", "1000m", "1000m")
 
 	container := &testPod.Spec.Containers[0]
-	err := policy.AddContainer(st, testPod, container)
+	err := policy.Allocate(st, testPod, container)
 	if err != nil {
-		t.Errorf("NonePolicy AddContainer() error. expected no error but got: %v", err)
+		t.Errorf("NonePolicy Allocate() error. expected no error but got: %v", err)
 	}
 }
 

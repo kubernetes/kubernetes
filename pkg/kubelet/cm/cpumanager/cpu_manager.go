@@ -55,6 +55,11 @@ type Manager interface {
 	// Start is called during Kubelet initialization.
 	Start(activePods ActivePodsFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService, initialContainers containermap.ContainerMap) error
 
+	// Called to trigger the allocation of CPUs to a container. This must be
+	// called at some point prior to the AddContainer() call for a container,
+	// e.g. at pod admission time.
+	Allocate(pod *v1.Pod, container *v1.Container) error
+
 	// AddContainer is called between container create and container start
 	// so that initial CPU affinity settings can be written through to the
 	// container runtime before the first process begins to execute.
@@ -206,39 +211,33 @@ func (m *manager) Start(activePods ActivePodsFunc, sourcesReady config.SourcesRe
 	return nil
 }
 
-func (m *manager) AddContainer(p *v1.Pod, c *v1.Container, containerID string) error {
+func (m *manager) Allocate(p *v1.Pod, c *v1.Container) error {
 	m.Lock()
-	// Proactively remove CPUs from init containers that have already run.
-	// They are guaranteed to have run to completion before any other
-	// container is run.
-	for _, initContainer := range p.Spec.InitContainers {
-		if c.Name != initContainer.Name {
-			err := m.policyRemoveContainerByRef(string(p.UID), initContainer.Name)
-			if err != nil {
-				klog.Warningf("[cpumanager] unable to remove init container (pod: %s, container: %s, error: %v)", string(p.UID), initContainer.Name, err)
-			}
-		}
-	}
+	defer m.Unlock()
 
 	// Call down into the policy to assign this container CPUs if required.
-	err := m.policyAddContainer(p, c, containerID)
+	err := m.policy.Allocate(m.state, p, c)
 	if err != nil {
-		klog.Errorf("[cpumanager] AddContainer error: %v", err)
-		m.Unlock()
+		klog.Errorf("[cpumanager] Allocate error: %v", err)
 		return err
 	}
 
-	// Get the CPUs just assigned to the container (or fall back to the default
-	// CPUSet if none were assigned).
+	return nil
+}
+
+func (m *manager) AddContainer(p *v1.Pod, c *v1.Container, containerID string) error {
+	m.Lock()
+	// Get the CPUs assigned to the container during Allocate()
+	// (or fall back to the default CPUSet if none were assigned).
 	cpus := m.state.GetCPUSetOrDefault(string(p.UID), c.Name)
 	m.Unlock()
 
 	if !cpus.IsEmpty() {
-		err = m.updateContainerCPUSet(containerID, cpus)
+		err := m.updateContainerCPUSet(containerID, cpus)
 		if err != nil {
 			klog.Errorf("[cpumanager] AddContainer error: error updating CPUSet for container (pod: %s, container: %s, container id: %s, err: %v)", p.Name, c.Name, containerID, err)
 			m.Lock()
-			err := m.policyRemoveContainerByID(containerID)
+			err := m.policyRemoveContainerByRef(string(p.UID), c.Name)
 			if err != nil {
 				klog.Errorf("[cpumanager] AddContainer rollback state error: %v", err)
 			}
@@ -246,6 +245,7 @@ func (m *manager) AddContainer(p *v1.Pod, c *v1.Container, containerID string) e
 		}
 		return err
 	}
+
 	klog.V(5).Infof("[cpumanager] update container resources is skipped due to cpu set is empty")
 	return nil
 }
@@ -261,14 +261,6 @@ func (m *manager) RemoveContainer(containerID string) error {
 	}
 
 	return nil
-}
-
-func (m *manager) policyAddContainer(p *v1.Pod, c *v1.Container, containerID string) error {
-	err := m.policy.AddContainer(m.state, p, c)
-	if err == nil {
-		m.containerMap.Add(string(p.UID), c.Name, containerID)
-	}
-	return err
 }
 
 func (m *manager) policyRemoveContainerByID(containerID string) error {

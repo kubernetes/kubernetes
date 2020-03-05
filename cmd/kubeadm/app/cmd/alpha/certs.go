@@ -43,7 +43,7 @@ var (
 	genericCertRenewLongDesc = cmdutil.LongDesc(`
 	Renew the %s.
 
-	Renewals run unconditionally, regardless of certificate expiration date; extra attributes such as SANs will 
+	Renewals run unconditionally, regardless of certificate expiration date; extra attributes such as SANs will
 	be based on the existing file/certificates, there is no need to resupply them.
 
 	Renewal by default tries to use the certificate authority in the local PKI managed by kubeadm; as alternative
@@ -208,7 +208,12 @@ func addRenewFlags(cmd *cobra.Command, flags *renewFlags) {
 	options.AddKubeConfigFlag(cmd.Flags(), &flags.kubeconfigPath)
 	options.AddCSRFlag(cmd.Flags(), &flags.csrOnly)
 	options.AddCSRDirFlag(cmd.Flags(), &flags.csrPath)
+	// TODO: remove the flag and related logic once legacy signers are removed,
+	// potentially with the release of certificates.k8s.io/v1:
+	//   https://github.com/kubernetes/kubeadm/issues/2047
 	cmd.Flags().BoolVar(&flags.useAPI, "use-api", flags.useAPI, "Use the Kubernetes certificate API to renew certificates")
+	cmd.Flags().MarkDeprecated("use-api", "certificate renewal from kubeadm using the Kubernetes API "+
+		"is deprecated and will be removed when 'certificates.k8s.io/v1' releases.")
 }
 
 func renewCert(flags *renewFlags, kdir string, internalcfg *kubeadmapi.InitConfiguration, handler *renewal.CertificateRenewHandler) error {

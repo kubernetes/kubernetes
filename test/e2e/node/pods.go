@@ -19,8 +19,13 @@ package node
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"math/rand"
 	"net/http"
+	"regexp"
 	"strconv"
+	"strings"
+	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -29,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -195,6 +201,229 @@ var _ = SIGDescribe("Pods Extended", func() {
 			pod, err := podClient.Get(context.TODO(), name, metav1.GetOptions{})
 			framework.ExpectNoError(err, "failed to query for pod")
 			framework.ExpectEqual(pod.Status.QOSClass, v1.PodQOSGuaranteed)
+		})
+	})
+
+	framework.KubeDescribe("Pod Container Status", func() {
+		var podClient *framework.PodClient
+		ginkgo.BeforeEach(func() {
+			podClient = f.PodClient()
+		})
+
+		ginkgo.It("should never report success for a pending container", func() {
+			ginkgo.By("creating pods that should always exit 1 and terminating the pod after a random delay")
+
+			var reBug88766 = regexp.MustCompile(`ContainerCannotRun.*rootfs_linux\.go.*kubernetes\.io~secret.*no such file or directory`)
+
+			var (
+				lock sync.Mutex
+				errs []error
+
+				wg sync.WaitGroup
+			)
+
+			const delay = 2000
+			const workers = 3
+			const pods = 15
+			var min, max time.Duration
+			for i := 0; i < workers; i++ {
+				wg.Add(1)
+				go func(i int) {
+					defer wg.Done()
+					for retries := 0; retries < pods; retries++ {
+						name := fmt.Sprintf("pod-submit-status-%d-%d", i, retries)
+						value := strconv.Itoa(time.Now().Nanosecond())
+						one := int64(1)
+						pod := &v1.Pod{
+							ObjectMeta: metav1.ObjectMeta{
+								Name: name,
+								Labels: map[string]string{
+									"name": "foo",
+									"time": value,
+								},
+							},
+							Spec: v1.PodSpec{
+								RestartPolicy:                 v1.RestartPolicyNever,
+								TerminationGracePeriodSeconds: &one,
+								Containers: []v1.Container{
+									{
+										Name:  "busybox",
+										Image: imageutils.GetE2EImage(imageutils.BusyBox),
+										Command: []string{
+											"/bin/false",
+										},
+										Resources: v1.ResourceRequirements{
+											Requests: v1.ResourceList{
+												v1.ResourceCPU:    resource.MustParse("5m"),
+												v1.ResourceMemory: resource.MustParse("10Mi"),
+											},
+										},
+									},
+								},
+							},
+						}
+
+						// create the pod, capture the change events, then delete the pod
+						start := time.Now()
+						created := podClient.Create(pod)
+						ch := make(chan []watch.Event)
+						go func() {
+							defer close(ch)
+							w, err := podClient.Watch(context.TODO(), metav1.ListOptions{
+								ResourceVersion: created.ResourceVersion,
+								FieldSelector:   fmt.Sprintf("metadata.name=%s", pod.Name),
+							})
+							if err != nil {
+								framework.Logf("Unable to watch pod %s: %v", pod.Name, err)
+								return
+							}
+							defer w.Stop()
+							events := []watch.Event{
+								{Type: watch.Added, Object: created},
+							}
+							for event := range w.ResultChan() {
+								events = append(events, event)
+								if event.Type == watch.Deleted {
+									break
+								}
+							}
+							ch <- events
+						}()
+
+						t := time.Duration(rand.Intn(delay)) * time.Millisecond
+						time.Sleep(t)
+						err := podClient.Delete(context.TODO(), pod.Name, nil)
+						framework.ExpectNoError(err, "failed to delete pod")
+
+						events, ok := <-ch
+						if !ok {
+							continue
+						}
+						if len(events) < 2 {
+							framework.Fail("only got a single event")
+						}
+
+						end := time.Now()
+
+						// check the returned events for consistency
+						var duration, completeDuration time.Duration
+						var hasContainers, hasTerminated, hasTerminalPhase, hasRunningContainers bool
+						verifyFn := func(event watch.Event) error {
+							var ok bool
+							pod, ok = event.Object.(*v1.Pod)
+							if !ok {
+								framework.Logf("Unexpected event object: %s %#v", event.Type, event.Object)
+								return nil
+							}
+
+							if len(pod.Status.InitContainerStatuses) != 0 {
+								return fmt.Errorf("pod %s on node %s had incorrect init containers: %#v", pod.Name, pod.Spec.NodeName, pod.Status.InitContainerStatuses)
+							}
+							if len(pod.Status.ContainerStatuses) == 0 {
+								if hasContainers {
+									return fmt.Errorf("pod %s on node %s had incorrect containers: %#v", pod.Name, pod.Spec.NodeName, pod.Status.ContainerStatuses)
+								}
+								return nil
+							}
+							hasContainers = true
+							if len(pod.Status.ContainerStatuses) != 1 {
+								return fmt.Errorf("pod %s on node %s had incorrect containers: %#v", pod.Name, pod.Spec.NodeName, pod.Status.ContainerStatuses)
+							}
+							status := pod.Status.ContainerStatuses[0]
+							t := status.State.Terminated
+							if hasTerminated {
+								if status.State.Waiting != nil || status.State.Running != nil {
+									return fmt.Errorf("pod %s on node %s was terminated and then changed state: %#v", pod.Name, pod.Spec.NodeName, status)
+								}
+								if t == nil {
+									return fmt.Errorf("pod %s on node %s was terminated and then had termination cleared: %#v", pod.Name, pod.Spec.NodeName, status)
+								}
+							}
+							hasRunningContainers = status.State.Waiting == nil && status.State.Terminated == nil
+							if t != nil {
+								if !t.FinishedAt.Time.IsZero() {
+									duration = t.FinishedAt.Sub(t.StartedAt.Time)
+									completeDuration = t.FinishedAt.Sub(pod.CreationTimestamp.Time)
+								}
+
+								defer func() { hasTerminated = true }()
+								switch {
+								case t.ExitCode == 1:
+									// expected
+								case t.ExitCode == 128 && reBug88766.MatchString(t.Message):
+									// pod volume teardown races with container start in CRI, which reports a failure
+									framework.Logf("pod %s on node %s failed with the symptoms of https://github.com/kubernetes/kubernetes/issues/88766")
+								default:
+									return fmt.Errorf("pod %s on node %s container unexpected exit code %d: start=%s end=%s reason=%s message=%s", pod.Name, pod.Spec.NodeName, t.ExitCode, t.StartedAt, t.FinishedAt, t.Reason, t.Message)
+								}
+							}
+							if pod.Status.Phase == v1.PodFailed || pod.Status.Phase == v1.PodSucceeded {
+								hasTerminalPhase = true
+							} else {
+								if hasTerminalPhase {
+									return fmt.Errorf("pod %s on node %s was in a terminal phase and then reverted: %#v", pod.Name, pod.Spec.NodeName, pod.Status)
+								}
+							}
+							return nil
+						}
+
+						var eventErr error
+						for _, event := range events[1:] {
+							if err := verifyFn(event); err != nil {
+								eventErr = err
+								break
+							}
+						}
+						func() {
+							defer lock.Unlock()
+							lock.Lock()
+
+							if eventErr != nil {
+								errs = append(errs, eventErr)
+								return
+							}
+
+							if !hasTerminalPhase {
+								var names []string
+								for _, status := range pod.Status.ContainerStatuses {
+									if status.State.Terminated != nil || status.State.Running != nil {
+										names = append(names, status.Name)
+									}
+								}
+								switch {
+								case len(names) > 0:
+									errs = append(errs, fmt.Errorf("pod %s on node %s did not reach a terminal phase before being deleted but had running containers: phase=%s, running-containers=%s", pod.Name, pod.Spec.NodeName, pod.Status.Phase, strings.Join(names, ",")))
+								case pod.Status.Phase != v1.PodPending:
+									errs = append(errs, fmt.Errorf("pod %s on node %s was not Pending but has no running containers: phase=%s", pod.Name, pod.Spec.NodeName, pod.Status.Phase))
+								}
+							}
+							if hasRunningContainers {
+								data, _ := json.MarshalIndent(pod.Status.ContainerStatuses, "", "  ")
+								errs = append(errs, fmt.Errorf("pod %s on node %s had running or unknown container status before being deleted:\n%s", pod.Name, pod.Spec.NodeName, string(data)))
+							}
+						}()
+
+						if duration < min {
+							min = duration
+						}
+						if duration > max || max == 0 {
+							max = duration
+						}
+						framework.Logf("Pod %s on node %s timings total=%s t=%s run=%s execute=%s", pod.Name, pod.Spec.NodeName, end.Sub(start), t, completeDuration, duration)
+					}
+
+				}(i)
+			}
+
+			wg.Wait()
+
+			if len(errs) > 0 {
+				var messages []string
+				for _, err := range errs {
+					messages = append(messages, err.Error())
+				}
+				framework.Failf("%d errors:\n%v", len(errs), strings.Join(messages, "\n"))
+			}
 		})
 	})
 })

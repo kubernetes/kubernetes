@@ -11,6 +11,7 @@ go_test(
     srcs = [
         "content_type_test.go",
         "cors_test.go",
+        "goaway_test.go",
         "maxinflight_test.go",
         "timeout_test.go",
     ],
@@ -25,6 +26,7 @@ go_test(
         "//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/endpoints/filters:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/endpoints/request:go_default_library",
+        "//vendor/golang.org/x/net/http2:go_default_library",
     ],
 )
 
@@ -34,6 +36,7 @@ go_library(
         "content_type.go",
         "cors.go",
         "doc.go",
+        "goaway.go",
         "longrunning.go",
         "maxinflight.go",
         "priority-and-fairness.go",

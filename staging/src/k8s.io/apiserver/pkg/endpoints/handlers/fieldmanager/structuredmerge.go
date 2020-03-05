@@ -42,6 +42,7 @@ type structuredMergeManager struct {
 }
 
 var _ Manager = &structuredMergeManager{}
+var atMostEverySecond = internal.NewAtMostEvery(time.Second)
 
 // NewStructuredMergeManager creates a new Manager that merges apply requests
 // and update managed fields for other types of requests.
@@ -99,13 +100,17 @@ func (f *structuredMergeManager) Update(liveObj, newObj runtime.Object, managed 
 	newObjTyped, err := f.typeConverter.ObjectToTyped(newObjVersioned)
 	if err != nil {
 		// Return newObj and just by-pass fields update. This really shouldn't happen.
-		klog.Errorf("[SHOULD NOT HAPPEN] failed to create typed new object of type %v: %v", newObjVersioned.GetObjectKind().GroupVersionKind(), err)
+		atMostEverySecond.Do(func() {
+			klog.Errorf("[SHOULD NOT HAPPEN] failed to create typed new object of type %v: %v", newObjVersioned.GetObjectKind().GroupVersionKind(), err)
+		})
 		return newObj, managed, nil
 	}
 	liveObjTyped, err := f.typeConverter.ObjectToTyped(liveObjVersioned)
 	if err != nil {
 		// Return newObj and just by-pass fields update. This really shouldn't happen.
-		klog.Errorf("[SHOULD NOT HAPPEN] failed to create typed live object of type %v: %v", liveObjVersioned.GetObjectKind().GroupVersionKind(), err)
+		atMostEverySecond.Do(func() {
+			klog.Errorf("[SHOULD NOT HAPPEN] failed to create typed live object of type %v: %v", liveObjVersioned.GetObjectKind().GroupVersionKind(), err)
+		})
 		return newObj, managed, nil
 	}
 	apiVersion := fieldpath.APIVersion(f.groupVersion.String())

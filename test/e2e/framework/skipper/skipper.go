@@ -20,11 +20,12 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"github.com/onsi/ginkgo"
 	"regexp"
 	"runtime"
 	"runtime/debug"
 	"strings"
+
+	"github.com/onsi/ginkgo"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -44,7 +45,7 @@ var TestContext framework.TestContextType
 
 func skipInternalf(caller int, format string, args ...interface{}) {
 	msg := fmt.Sprintf(format, args...)
-	framework.Logf("INFO", msg)
+	framework.Logf(msg)
 	skip(msg, caller+1)
 }
 
