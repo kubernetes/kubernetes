@@ -492,6 +492,7 @@ API rule violation: list_type_missing,k8s.io/kube-scheduler/config/v1,RequestedT
 API rule violation: list_type_missing,k8s.io/kube-scheduler/config/v1,RequestedToCapacityRatioArguments,Shape
 API rule violation: list_type_missing,k8s.io/kube-scheduler/config/v1,ServiceAffinity,Labels
 API rule violation: list_type_missing,k8s.io/kubelet/config/v1beta1,KubeletConfiguration,AllowedUnsafeSysctls
+API rule violation: list_type_missing,k8s.io/kubelet/config/v1beta1,KubeletConfiguration,CadvisorMetricsEnabled
 API rule violation: list_type_missing,k8s.io/kubelet/config/v1beta1,KubeletConfiguration,ClusterDNS
 API rule violation: list_type_missing,k8s.io/kubelet/config/v1beta1,KubeletConfiguration,EnforceNodeAllocatable
 API rule violation: list_type_missing,k8s.io/kubelet/config/v1beta1,KubeletConfiguration,TLSCipherSuites
@@ -698,6 +699,7 @@ API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,V
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,VolumeConfiguration,PersistentVolumeRecyclerConfiguration
 API rule violation: names_match,k8s.io/kube-proxy/config/v1alpha1,KubeProxyConfiguration,IPTables
 API rule violation: names_match,k8s.io/kube-scheduler/config/v1,Extender,EnableHTTPS
+API rule violation: names_match,k8s.io/kubelet/config/v1beta1,KubeletConfiguration,CadvisorMetricsEnabled
 API rule violation: names_match,k8s.io/kubelet/config/v1beta1,KubeletConfiguration,IPTablesDropBit
 API rule violation: names_match,k8s.io/kubelet/config/v1beta1,KubeletConfiguration,IPTablesMasqueradeBit
 API rule violation: names_match,k8s.io/kubelet/config/v1beta1,KubeletConfiguration,ResolverConfig

@@ -19,6 +19,7 @@ limitations under the License.
 package cadvisor
 
 import (
+	cadvisormetrics "github.com/google/cadvisor/container"
 	"github.com/google/cadvisor/events"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
@@ -33,7 +34,7 @@ type cadvisorClient struct {
 var _ Interface = new(cadvisorClient)
 
 // New creates a cAdvisor and exports its API on the specified port if port > 0.
-func New(imageFsInfoProvider ImageFsInfoProvider, rootPath string, cgroupRoots []string, usingLegacyStats bool) (Interface, error) {
+func New(imageFsInfoProvider ImageFsInfoProvider, rootPath string, cgroupRoots []string, metricsEnabled cadvisormetrics.MetricSet) (Interface, error) {
 	client, err := winstats.NewPerfCounterClient()
 	return &cadvisorClient{
 		rootPath:       rootPath,
