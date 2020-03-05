@@ -196,6 +196,7 @@ func NewCmdApply(baseName string, f cmdutil.Factory, ioStreams genericclioptions
 	cmd.Flags().MarkHidden("server-dry-run")
 	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddServerSideApplyFlags(cmd)
+	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, FieldManagerClientSideApply)
 
 	// apply subcommands
 	cmd.AddCommand(NewCmdApplyViewLastApplied(f, ioStreams))
@@ -223,7 +224,7 @@ func (o *ApplyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 		return err
 	}
 	o.DryRunVerifier = resource.NewDryRunVerifier(o.DynamicClient, discoveryClient)
-	o.FieldManager = cmdutil.GetFieldManagerFlag(cmd)
+	o.FieldManager = GetApplyFieldManagerFlag(cmd, o.ServerSideApply)
 
 	if o.ForceConflicts && !o.ServerSideApply {
 		return fmt.Errorf("--force-conflicts only works with --server-side")
@@ -414,11 +415,10 @@ func (o *ApplyOptions) applyOneObject(info *resource.Info) error {
 		}
 
 		options := metav1.PatchOptions{
-			Force:        &o.ForceConflicts,
-			FieldManager: o.FieldManager,
+			Force: &o.ForceConflicts,
 		}
-
-		helper := resource.NewHelper(info.Client, info.Mapping)
+		helper := resource.NewHelper(info.Client, info.Mapping).
+			WithFieldManager(o.FieldManager)
 		if o.DryRunStrategy == cmdutil.DryRunServer {
 			if err := o.DryRunVerifier.HasSupport(info.Mapping.GroupVersionKind); err != nil {
 				return err
@@ -495,7 +495,8 @@ See http://k8s.io/docs/reference/using-api/api-concepts/#conflicts`, err)
 
 		if o.DryRunStrategy != cmdutil.DryRunClient {
 			// Then create the resource and skip the three-way merge
-			helper := resource.NewHelper(info.Client, info.Mapping)
+			helper := resource.NewHelper(info.Client, info.Mapping).
+				WithFieldManager(o.FieldManager)
 			if o.DryRunStrategy == cmdutil.DryRunServer {
 				if err := o.DryRunVerifier.HasSupport(info.Mapping.GroupVersionKind); err != nil {
 					return cmdutil.AddSourceToErr("creating", info.Source, err)
@@ -669,4 +670,35 @@ func (o *ApplyOptions) PrintAndPrunePostProcessor() func() error {
 
 		return nil
 	}
+}
+
+const (
+	// FieldManagerClientSideApply is the default client-side apply field manager.
+	//
+	// The default field manager is not `kubectl-apply` to distinguish from
+	// server-side apply.
+	FieldManagerClientSideApply = "kubectl-client-side-apply"
+	// The default server-side apply field manager is `kubectl`
+	// instead of a field manager like `kubectl-server-side-apply`
+	// for backward compatibility to not conflict with old versions
+	// of kubectl server-side apply where `kubectl` has already been the field manager.
+	fieldManagerServerSideApply = "kubectl"
+)
+
+// GetApplyFieldManagerFlag gets the field manager for kubectl apply
+// if it is not set.
+//
+// The default field manager is not `kubectl-apply` to distinguish between
+// client-side and server-side apply.
+func GetApplyFieldManagerFlag(cmd *cobra.Command, serverSide bool) string {
+	// The field manager flag was set
+	if cmd.Flag("field-manager").Changed {
+		return cmdutil.GetFlagString(cmd, "field-manager")
+	}
+
+	if serverSide {
+		return fieldManagerServerSideApply
+	}
+
+	return FieldManagerClientSideApply
 }

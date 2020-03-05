@@ -55,6 +55,7 @@ type AnnotateOptions struct {
 	local           bool
 	dryRunStrategy  cmdutil.DryRunStrategy
 	dryRunVerifier  *resource.DryRunVerifier
+	fieldManager    string
 	all             bool
 	resourceVersion string
 	selector        string
@@ -150,6 +151,7 @@ func NewCmdAnnotate(parent string, f cmdutil.Factory, ioStreams genericclioption
 	usage := "identifying the resource to update the annotation"
 	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, usage)
 	cmdutil.AddDryRunFlag(cmd)
+	cmdutil.AddFieldManagerFlagVar(cmd, &o.fieldManager, "kubectl-annotate")
 
 	return cmd
 }
@@ -329,7 +331,8 @@ func (o AnnotateOptions) RunAnnotate() error {
 			}
 			helper := resource.
 				NewHelper(client, mapping).
-				DryRun(o.dryRunStrategy == cmdutil.DryRunServer)
+				DryRun(o.dryRunStrategy == cmdutil.DryRunServer).
+				WithFieldManager(o.fieldManager)
 
 			if createdPatch {
 				outputObj, err = helper.Patch(namespace, name, types.MergePatchType, patchBytes, nil)

@@ -46,6 +46,10 @@ type Helper struct {
 	// and on resources that support dry-run. If the apiserver or the resource
 	// does not support dry-run, then the change will be persisted to storage.
 	ServerDryRun bool
+
+	// FieldManager is the name associated with the actor or entity that is making
+	// changes.
+	FieldManager string
 }
 
 // NewHelper creates a Helper from a ResourceMapping
@@ -61,6 +65,13 @@ func NewHelper(client RESTClient, mapping *meta.RESTMapping) *Helper {
 // Otherwise, changes will be persisted to storage.
 func (m *Helper) DryRun(dryRun bool) *Helper {
 	m.ServerDryRun = dryRun
+	return m
+}
+
+// WithFieldManager sets the field manager option to indicate the actor or entity
+// that is making changes in a create or update operation.
+func (m *Helper) WithFieldManager(fieldManager string) *Helper {
+	m.FieldManager = fieldManager
 	return m
 }
 
@@ -141,6 +152,9 @@ func (m *Helper) CreateWithOptions(namespace string, modify bool, obj runtime.Ob
 	if m.ServerDryRun {
 		options.DryRun = []string{metav1.DryRunAll}
 	}
+	if m.FieldManager != "" {
+		options.FieldManager = m.FieldManager
+	}
 	if modify {
 		// Attempt to version the object based on client logic.
 		version, err := metadataAccessor.ResourceVersion(obj)
@@ -174,6 +188,9 @@ func (m *Helper) Patch(namespace, name string, pt types.PatchType, data []byte, 
 	if m.ServerDryRun {
 		options.DryRun = []string{metav1.DryRunAll}
 	}
+	if m.FieldManager != "" {
+		options.FieldManager = m.FieldManager
+	}
 	return m.RESTClient.Patch(pt).
 		NamespaceIfScoped(namespace, m.NamespaceScoped).
 		Resource(m.Resource).
@@ -189,6 +206,9 @@ func (m *Helper) Replace(namespace, name string, overwrite bool, obj runtime.Obj
 	var options = &metav1.UpdateOptions{}
 	if m.ServerDryRun {
 		options.DryRun = []string{metav1.DryRunAll}
+	}
+	if m.FieldManager != "" {
+		options.FieldManager = m.FieldManager
 	}
 
 	// Attempt to version the object based on client logic.

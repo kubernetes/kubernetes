@@ -80,6 +80,9 @@ run_pod_tests() {
   kube::test::get_object_assert 'pod valid-pod' "{{$id_field}}" 'valid-pod'
   kube::test::get_object_assert 'pod/valid-pod' "{{$id_field}}" 'valid-pod'
   kube::test::get_object_assert 'pods/valid-pod' "{{$id_field}}" 'valid-pod'
+  # pod has field manager for kubectl create
+  output_message=$(kubectl get -f test/fixtures/doc-yaml/admin/limitrange/valid-pod.yaml -o=jsonpath='{.metadata.managedFields[*].manager}' "${kube_flags[@]:?}" 2>&1)
+  kube::test::if_has_string "${output_message}" 'kubectl-create'
   # Repeat above test using jsonpath template
   kube::test::get_object_jsonpath_assert pods "{.items[*]$id_field}" 'valid-pod'
   kube::test::get_object_jsonpath_assert 'pod valid-pod' "{$id_field}" 'valid-pod'
@@ -364,6 +367,9 @@ run_pod_tests() {
   kubectl annotate pods valid-pod emptyannotation="" "${kube_flags[@]}"
   # Post-condition: valid pod contains "emptyannotation" with no value
   kube::test::get_object_assert 'pod valid-pod' "{{${annotations_field}.emptyannotation}}" ''
+  # pod has field for kubectl annotate field manager
+  output_message=$(kubectl get pod valid-pod -o=jsonpath='{.metadata.managedFields[*].manager}' "${kube_flags[@]:?}" 2>&1)
+  kube::test::if_has_string "${output_message}" 'kubectl-annotate'
 
   ### Record label change
   # Pre-condition: valid-pod does not have record annotation
@@ -372,6 +378,9 @@ run_pod_tests() {
   kubectl label pods valid-pod record-change=true --record=true "${kube_flags[@]}"
   # Post-condition: valid-pod has record annotation
   kube::test::get_object_assert 'pod valid-pod' "{{range$annotations_field}}{{.}}:{{end}}" ".*--record=true.*"
+  # pod has field for kubectl label field manager
+  output_message=$(kubectl get pod valid-pod -o=jsonpath='{.metadata.managedFields[*].manager}' "${kube_flags[@]:?}" 2>&1)
+  kube::test::if_has_string "${output_message}" 'kubectl-label'
 
   ### Do not record label change
   # Command
@@ -451,6 +460,11 @@ run_pod_tests() {
   # Post-condition: service named modified and rc named modified are created
   kube::test::get_object_assert service "{{range.items}}{{$id_field}}:{{end}}" 'modified:'
   kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" 'modified:'
+  # resources have field manager for kubectl create
+  output_message=$(kubectl get service/modified -o=jsonpath='{.metadata.managedFields[*].manager}' "${kube_flags[@]:?}" 2>&1)
+  kube::test::if_has_string "${output_message}" 'kubectl-create'
+  output_message=$(kubectl get rc/modified -o=jsonpath='{.metadata.managedFields[*].manager}' "${kube_flags[@]:?}" 2>&1)
+  kube::test::if_has_string "${output_message}" 'kubectl-create'
   # Clean up
   kubectl delete service/modified "${kube_flags[@]}"
   kubectl delete rc/modified "${kube_flags[@]}"
@@ -521,6 +535,10 @@ run_pod_tests() {
   # Post-condition: valid-pod POD has expected image
   kube::test::get_object_assert pods "{{range.items}}{{$image_field}}:{{end}}" 'k8s.gcr.io/pause:3.2:'
 
+  # pod has field for kubectl patch field manager
+  output_message=$(kubectl get pod valid-pod -o=jsonpath='{.metadata.managedFields[*].manager}' "${kube_flags[@]:?}" 2>&1)
+  kube::test::if_has_string "${output_message}" 'kubectl-patch'
+
   ## If resourceVersion is specified in the patch, it will be treated as a precondition, i.e., if the resourceVersion is different from that is stored in the server, the Patch should be rejected
   ERROR_FILE="${KUBE_TEMP}/conflict-error"
   ## If the resourceVersion is the same as the one stored in the server, the patch will be applied.
@@ -560,6 +578,10 @@ run_pod_tests() {
   kubectl replace "${kube_flags[@]}" --force -f /tmp/tmp-valid-pod.json
   # Post-condition: spec.container.name = "replaced-k8s-serve-hostname"
   kube::test::get_object_assert 'pod valid-pod' "{{(index .spec.containers 0).name}}" 'replaced-k8s-serve-hostname'
+
+  # Pod has field manager for kubectl replace
+  output_message=$(kubectl get pod valid-pod -o=jsonpath='{.metadata.managedFields[*].manager}' "${kube_flags[@]:?}" 2>&1)
+  kube::test::if_has_string "${output_message}" 'kubectl-replace'
 
   ## check replace --grace-period requires --force
   output_message=$(! kubectl replace "${kube_flags[@]}" --grace-period=1 -f /tmp/tmp-valid-pod.json 2>&1)
@@ -635,6 +657,9 @@ __EOF__
   grep -q 'Patch:' <<< "$(EDITOR=/tmp/tmp-editor.sh kubectl edit "${kube_flags[@]}" pods/valid-pod --output-patch=true)"
   # Post-condition: valid-pod POD has image k8s.gcr.io/serve_hostname
   kube::test::get_object_assert pods "{{range.items}}{{$image_field}}:{{end}}" 'k8s.gcr.io/serve_hostname:'
+  # pod has field for kubectl edit field manager
+  output_message=$(kubectl get pod valid-pod -o=jsonpath='{.metadata.managedFields[*].manager}' "${kube_flags[@]:?}" 2>&1)
+  kube::test::if_has_string "${output_message}" 'kubectl-edit'
   # cleaning
   rm /tmp/tmp-editor.sh
 
@@ -976,6 +1001,8 @@ run_service_tests() {
   # Show dry-run works on running selector
   kubectl set selector services redis-master role=padawan --dry-run=client -o yaml "${kube_flags[@]}"
   kubectl set selector services redis-master role=padawan --dry-run=server -o yaml "${kube_flags[@]}"
+  output_message=$(kubectl get services redis-master -o=jsonpath='{.metadata.managedFields[*].manager}' "${kube_flags[@]:?}" 2>&1)
+  kube::test::if_has_string "${output_message}" 'kubectl-set'
   ! kubectl set selector services redis-master role=padawan --local -o yaml "${kube_flags[@]}" || exit 1
   kube::test::get_object_assert 'services redis-master' "{{range$service_selector_field}}{{.}}:{{end}}" "redis:master:backend:"
   # --resource-version=<current-resource-version> succeeds
@@ -1111,12 +1138,18 @@ __EOF__
   # Check result
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'testmetadata:'
   kube::test::get_object_assert 'service testmetadata' "{{.metadata.annotations}}" "map\[zone-context:home\]"
+  # pod has field for kubectl run field manager
+  output_message=$(kubectl get pod testmetadata -o=jsonpath='{.metadata.managedFields[*].manager}' "${kube_flags[@]:?}" 2>&1)
+  kube::test::if_has_string "${output_message}" 'kubectl-run'
 
   ### Expose pod as a new service
   # Command
   kubectl expose pod testmetadata  --port=1000 --target-port=80 --type=NodePort --name=exposemetadata --overrides='{ "metadata": { "annotations": { "zone-context": "work" } } } '
   # Check result
   kube::test::get_object_assert 'service exposemetadata' "{{.metadata.annotations}}" "map\[zone-context:work\]"
+  # Service has field manager for kubectl expose
+  output_message=$(kubectl get service exposemetadata -o=jsonpath='{.metadata.managedFields[*].manager}' "${kube_flags[@]:?}" 2>&1)
+  kube::test::if_has_string "${output_message}" 'kubectl-expose'
 
   # Clean-Up
   # Command

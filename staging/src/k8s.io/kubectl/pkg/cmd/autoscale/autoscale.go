@@ -79,6 +79,7 @@ type AutoscaleOptions struct {
 	dryRunVerifier   *resource.DryRunVerifier
 	builder          *resource.Builder
 	generatorFunc    func(string, *meta.RESTMapping) (generate.StructuredGenerator, error)
+	fieldManager     string
 
 	HPAClient         autoscalingv1client.HorizontalPodAutoscalersGetter
 	scaleKindResolver scale.ScaleKindResolver
@@ -131,6 +132,7 @@ func NewCmdAutoscale(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *
 	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddFilenameOptionFlags(cmd, o.FilenameOptions, "identifying the resource to autoscale.")
 	cmdutil.AddApplyAnnotationFlags(cmd)
+	cmdutil.AddFieldManagerFlagVar(cmd, &o.fieldManager, "kubectl-autoscale")
 	return cmd
 }
 
@@ -272,6 +274,9 @@ func (o *AutoscaleOptions) Run() error {
 		}
 
 		createOptions := metav1.CreateOptions{}
+		if o.fieldManager != "" {
+			createOptions.FieldManager = o.fieldManager
+		}
 		if o.dryRunStrategy == cmdutil.DryRunServer {
 			if err := o.dryRunVerifier.HasSupport(hpa.GroupVersionKind()); err != nil {
 				return err
