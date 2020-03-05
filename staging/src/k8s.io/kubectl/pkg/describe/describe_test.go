@@ -1673,6 +1673,45 @@ func TestDescribeDeployment(t *testing.T) {
 	}
 }
 
+func TestDescribeIngress(t *testing.T) {
+	defaultBackend := networkingv1beta1.IngressBackend{
+		ServiceName: "default-backend",
+		ServicePort: intstr.FromInt(80),
+	}
+
+	fakeClient := fake.NewSimpleClientset(&networkingv1beta1.Ingress{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "bar",
+			Namespace: "foo",
+		},
+		Spec: networkingv1beta1.IngressSpec{
+			Rules: []networkingv1beta1.IngressRule{
+				{
+					Host: "foo.bar.com",
+					IngressRuleValue: networkingv1beta1.IngressRuleValue{
+						HTTP: &networkingv1beta1.HTTPIngressRuleValue{
+							Paths: []networkingv1beta1.HTTPIngressPath{
+								{
+									Path:    "/foo",
+									Backend: defaultBackend,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	})
+	i := IngressDescriber{fakeClient}
+	out, err := i.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !strings.Contains(out, "bar") || !strings.Contains(out, "foo") || !strings.Contains(out, "foo.bar.com") || !strings.Contains(out, "/foo") {
+		t.Errorf("unexpected out: %s", out)
+	}
+}
+
 func TestDescribeStorageClass(t *testing.T) {
 	reclaimPolicy := corev1.PersistentVolumeReclaimRetain
 	bindingMode := storagev1.VolumeBindingMode("bindingmode")
@@ -2660,8 +2699,15 @@ func TestDescribeEvents(t *testing.T) {
 			}, events),
 		},
 		// TODO(jchaloup): add tests for:
-		// - IngressDescriber
 		// - JobDescriber
+		"IngressDescriber": &IngressDescriber{
+			fake.NewSimpleClientset(&networkingv1beta1.Ingress{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "bar",
+					Namespace: "foo",
+				},
+			}, events),
+		},
 		"NodeDescriber": &NodeDescriber{
 			fake.NewSimpleClientset(&corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{
