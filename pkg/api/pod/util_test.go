@@ -41,11 +41,13 @@ func TestVisitContainers(t *testing.T) {
 		description string
 		haveSpec    *api.PodSpec
 		wantNames   []string
+		mask        ContainerType
 	}{
 		{
 			"empty podspec",
 			&api.PodSpec{},
 			[]string{},
+			DefaultContainers,
 		},
 		{
 			"regular containers",
@@ -56,6 +58,7 @@ func TestVisitContainers(t *testing.T) {
 				},
 			},
 			[]string{"c1", "c2"},
+			DefaultContainers,
 		},
 		{
 			"init containers",
@@ -66,6 +69,7 @@ func TestVisitContainers(t *testing.T) {
 				},
 			},
 			[]string{"i1", "i2"},
+			DefaultContainers,
 		},
 		{
 			"regular and init containers",
@@ -80,6 +84,7 @@ func TestVisitContainers(t *testing.T) {
 				},
 			},
 			[]string{"i1", "i2", "c1", "c2"},
+			DefaultContainers,
 		},
 		{
 			"ephemeral containers",
@@ -93,6 +98,7 @@ func TestVisitContainers(t *testing.T) {
 				},
 			},
 			[]string{"c1", "c2", "e1"},
+			DefaultContainers,
 		},
 		{
 			"all container types",
@@ -111,6 +117,26 @@ func TestVisitContainers(t *testing.T) {
 				},
 			},
 			[]string{"i1", "i2", "c1", "c2", "e1", "e2"},
+			DefaultContainers,
+		},
+		{
+			"all container types with init and regular container types chosen",
+			&api.PodSpec{
+				Containers: []api.Container{
+					{Name: "c1"},
+					{Name: "c2"},
+				},
+				InitContainers: []api.Container{
+					{Name: "i1"},
+					{Name: "i2"},
+				},
+				EphemeralContainers: []api.EphemeralContainer{
+					{EphemeralContainerCommon: api.EphemeralContainerCommon{Name: "e1"}},
+					{EphemeralContainerCommon: api.EphemeralContainerCommon{Name: "e2"}},
+				},
+			},
+			[]string{"i1", "i2", "c1", "c2"},
+			Containers | InitContainers,
 		},
 		{
 			"dropping fields",
@@ -129,12 +155,13 @@ func TestVisitContainers(t *testing.T) {
 				},
 			},
 			[]string{"i1", "i2", "c1", "c2", "e1", "e2"},
+			DefaultContainers,
 		},
 	}
 
 	for _, tc := range testCases {
 		gotNames := []string{}
-		VisitContainers(tc.haveSpec, func(c *api.Container) bool {
+		VisitContainers(tc.haveSpec, tc.mask, func(c *api.Container, containerType ContainerType) bool {
 			gotNames = append(gotNames, c.Name)
 			if c.SecurityContext != nil {
 				c.SecurityContext = nil

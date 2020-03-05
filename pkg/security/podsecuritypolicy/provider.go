@@ -111,7 +111,7 @@ func (s *simpleProvider) MutatePod(pod *api.Pod) error {
 	}
 
 	var retErr error
-	podutil.VisitContainers(&pod.Spec, func(c *api.Container) bool {
+	podutil.VisitContainers(&pod.Spec, podutil.AllContainers, func(c *api.Container, containerType podutil.ContainerType) bool {
 		retErr = s.mutateContainer(pod, c)
 		if retErr != nil {
 			return false
