@@ -21,6 +21,7 @@ package cadvisor
 import (
 	"errors"
 
+	cadvisormetrics "github.com/google/cadvisor/container"
 	"github.com/google/cadvisor/events"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
@@ -32,7 +33,7 @@ type cadvisorUnsupported struct {
 var _ Interface = new(cadvisorUnsupported)
 
 // New creates a new cAdvisor Interface for unsupported systems.
-func New(imageFsInfoProvider ImageFsInfoProvider, rootPath string, cgroupsRoots []string, usingLegacyStats bool) (Interface, error) {
+func New(imageFsInfoProvider ImageFsInfoProvider, rootPath string, cgroupsRoots []string, metricsEnabled cadvisormetrics.MetricSet) (Interface, error) {
 	return &cadvisorUnsupported{}, nil
 }
 

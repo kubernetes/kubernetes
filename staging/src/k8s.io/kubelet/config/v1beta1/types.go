@@ -755,6 +755,12 @@ type KubeletConfiguration struct {
 	// Default: []
 	// +optional
 	AllowedUnsafeSysctls []string `json:"allowedUnsafeSysctls,omitempty"`
+	// This option specifies the metrics enabled for cadvisor interface work background.
+	// Only if feature gates CustomCadvisorMetrics set to be true, it will accept custom configuration like:
+	// cpu,sched,memory,disk,network,tcp
+	// Default: []
+	// +optional
+	CadvisorMetricsEnabled []string
 }
 
 type KubeletAuthorizationMode string

@@ -19,6 +19,7 @@ package cadvisor
 import (
 	goruntime "runtime"
 
+	cadvisormetrics "github.com/google/cadvisor/container"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapi2 "github.com/google/cadvisor/info/v2"
 	"k8s.io/api/core/v1"
@@ -32,6 +33,36 @@ const (
 	// Please keep this in sync with the one in:
 	// github.com/google/cadvisor/container/crio/client.go
 	CrioSocket = "/var/run/crio/crio.sock"
+)
+
+var (
+	// IncludedMetrics refers to cadvisor metrics collected before
+	IncludedMetrics = cadvisormetrics.MetricSet{
+		cadvisormetrics.CpuUsageMetrics:         struct{}{},
+		cadvisormetrics.MemoryUsageMetrics:      struct{}{},
+		cadvisormetrics.CpuLoadMetrics:          struct{}{},
+		cadvisormetrics.DiskIOMetrics:           struct{}{},
+		cadvisormetrics.NetworkUsageMetrics:     struct{}{},
+		cadvisormetrics.AcceleratorUsageMetrics: struct{}{},
+		cadvisormetrics.AppMetrics:              struct{}{},
+		cadvisormetrics.ProcessMetrics:          struct{}{},
+	}
+
+	allMetrics = cadvisormetrics.MetricSet{
+		cadvisormetrics.CpuUsageMetrics:         struct{}{},
+		cadvisormetrics.ProcessSchedulerMetrics: struct{}{},
+		cadvisormetrics.PerCpuUsageMetrics:      struct{}{},
+		cadvisormetrics.MemoryUsageMetrics:      struct{}{},
+		cadvisormetrics.CpuLoadMetrics:          struct{}{},
+		cadvisormetrics.DiskIOMetrics:           struct{}{},
+		cadvisormetrics.DiskUsageMetrics:        struct{}{},
+		cadvisormetrics.NetworkUsageMetrics:     struct{}{},
+		cadvisormetrics.NetworkTcpUsageMetrics:  struct{}{},
+		cadvisormetrics.NetworkUdpUsageMetrics:  struct{}{},
+		cadvisormetrics.AcceleratorUsageMetrics: struct{}{},
+		cadvisormetrics.AppMetrics:              struct{}{},
+		cadvisormetrics.ProcessMetrics:          struct{}{},
+	}
 )
 
 // CapacityFromMachineInfo returns the capacity of the resources from the machine info.
@@ -76,4 +107,31 @@ func EphemeralStorageCapacityFromFsInfo(info cadvisorapi2.FsInfo) v1.ResourceLis
 func UsingLegacyCadvisorStats(runtime, runtimeEndpoint string) bool {
 	return (runtime == kubetypes.DockerContainerRuntime && goruntime.GOOS == "linux") ||
 		runtimeEndpoint == CrioSocket || runtimeEndpoint == "unix://"+CrioSocket
+}
+
+// SetCadvisorMetricsSet returns metrics set for cadvisor interface of kubelet work background.
+// If feature gate EnableCustomCadvisorMetrics equals to true,
+// cadivsor interface can work with metrics specified.
+func SetCadvisorMetricsSet(enableCustomMetrics, usingLegacyStats bool, cadvisorMetricsEnabled []string) cadvisormetrics.MetricSet {
+	if !enableCustomMetrics {
+		metricSet := IncludedMetrics
+		if usingLegacyStats {
+			metricSet[cadvisormetrics.DiskUsageMetrics] = struct{}{}
+		}
+		return metricSet
+	} else {
+		metricSet := cadvisormetrics.MetricSet{}
+		for _, metrics := range cadvisorMetricsEnabled {
+			if !allMetrics.Has(cadvisormetrics.MetricKind(metrics)) {
+				continue
+			}
+			metricSet[cadvisormetrics.MetricKind(metrics)] = struct{}{}
+		}
+
+		// mapping usingLegacyStats, if false, remove custom disk metrics from set
+		if !usingLegacyStats && metricSet.Has(cadvisormetrics.DiskUsageMetrics) {
+			delete(metricSet, cadvisormetrics.DiskUsageMetrics)
+		}
+		return metricSet
+	}
 }

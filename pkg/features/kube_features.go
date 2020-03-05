@@ -563,6 +563,12 @@ const (
 	// e.g. emptyDir:
 	//        medium: HugePages-1Gi
 	HugePageStorageMediumSize featuregate.Feature = "HugePageStorageMediumSize"
+
+	// owner: @KielChan
+	// alpha: v1.18
+	//
+	// Enables cadvisor metrics in kubelet by set CadvisorMetricsEnabled=cpu,sched,memory,disk,network,tcp
+	EnableCustomCadvisorMetrics featuregate.Feature = "EnableCustomCadvisorMetrics"
 )
 
 func init() {
@@ -651,6 +657,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ImmutableEphemeralVolumes:                      {Default: false, PreRelease: featuregate.Alpha},
 	DefaultIngressClass:                            {Default: true, PreRelease: featuregate.Beta},
 	HugePageStorageMediumSize:                      {Default: false, PreRelease: featuregate.Alpha},
+	EnableCustomCadvisorMetrics:                    {Default: false, PreRelease: featuregate.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:

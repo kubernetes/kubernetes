@@ -341,6 +341,11 @@ type KubeletConfiguration struct {
 	// The purpose of this format is make sure you have the opportunity to notice if the next release hides additional metrics,
 	// rather than being surprised when they are permanently removed in the release after that.
 	ShowHiddenMetricsForVersion string
+	// This option specifies the metrics enabled for cadvisor interface work background.
+	// Only if feature gates CustomCadvisorMetrics set to be true, it will accept custom configuration like:
+	// cpu,sched,memory,disk,network,tcp
+	// +optional
+	CadvisorMetricsEnabled []string
 }
 
 // KubeletAuthorizationMode denotes the authorization mode for the kubelet

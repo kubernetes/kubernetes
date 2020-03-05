@@ -72,6 +72,7 @@ import (
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	"k8s.io/kubernetes/pkg/features"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubeletscheme "k8s.io/kubernetes/pkg/kubelet/apis/config/scheme"
@@ -632,7 +633,10 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, featureGate f
 
 	if kubeDeps.CAdvisorInterface == nil {
 		imageFsInfoProvider := cadvisor.NewImageFsInfoProvider(s.ContainerRuntime, s.RemoteRuntimeEndpoint)
-		kubeDeps.CAdvisorInterface, err = cadvisor.New(imageFsInfoProvider, s.RootDirectory, cgroupRoots, cadvisor.UsingLegacyCadvisorStats(s.ContainerRuntime, s.RemoteRuntimeEndpoint))
+		usingLegacyStats := cadvisor.UsingLegacyCadvisorStats(s.ContainerRuntime, s.RemoteRuntimeEndpoint)
+		metricsEnabled := cadvisor.SetCadvisorMetricsSet(utilfeature.DefaultFeatureGate.Enabled(kubefeatures.EnableCustomCadvisorMetrics), usingLegacyStats, s.CadvisorMetricsEnabled)
+
+		kubeDeps.CAdvisorInterface, err = cadvisor.New(imageFsInfoProvider, s.RootDirectory, cgroupRoots, metricsEnabled)
 		if err != nil {
 			return err
 		}
