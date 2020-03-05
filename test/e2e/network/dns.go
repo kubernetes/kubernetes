@@ -460,10 +460,20 @@ var _ = SIGDescribe("DNS", func() {
 		testSearchPath := "resolv.conf.local"
 		testDNSNameFull := fmt.Sprintf("%s.%s", testDNSNameShort, testSearchPath)
 
-		testServerPod := generateDNSServerPod(map[string]string{
+		corednsConfig := generateCoreDNSConfigmap(f.Namespace.Name, map[string]string{
 			testDNSNameFull: testInjectedIP,
 		})
-		testServerPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), testServerPod, metav1.CreateOptions{})
+		corednsConfig, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(context.TODO(), corednsConfig, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "unable to create test configMap %s", corednsConfig.Name)
+
+		defer func() {
+			framework.Logf("Deleting configmap %s...", corednsConfig.Name)
+			err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Delete(context.TODO(), corednsConfig.Name, nil)
+			framework.ExpectNoError(err, "Failed to delete configmap %s: %v", corednsConfig.Name)
+		}()
+
+		testServerPod := generateCoreDNSServerPod(corednsConfig)
+		testServerPod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), testServerPod, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create pod: %s", testServerPod.Name)
 		framework.Logf("Created pod %v", testServerPod)
 		defer func() {
@@ -528,7 +538,7 @@ var _ = SIGDescribe("DNS", func() {
 		// This verifies both:
 		// - Custom search path is appended.
 		// - DNS query is sent to the specified server.
-		cmd = []string{"/usr/bin/dig", "+short", "+search", testDNSNameShort}
+		cmd = []string{"dig", "+short", "+search", testDNSNameShort}
 		digFunc := func() (bool, error) {
 			stdout, stderr, err := f.ExecWithOptions(framework.ExecOptions{
 				Command:       cmd,

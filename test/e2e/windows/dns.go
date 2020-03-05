@@ -102,7 +102,7 @@ func generateDNSUtilsPod() *v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:    "util",
-					Image:   imageutils.GetE2EImage(imageutils.Dnsutils),
+					Image:   imageutils.GetE2EImage(imageutils.Agnhost),
 					Command: []string{"sleep", "10000"},
 				},
 			},
