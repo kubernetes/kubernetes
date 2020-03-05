@@ -104,6 +104,7 @@ func NewTestFieldManager(gvk schema.GroupVersionKind) TestFieldManager {
 	live.SetKind(gvk.Kind)
 	live.SetAPIVersion(gvk.GroupVersion().String())
 	f = fieldmanager.NewStripMetaManager(f)
+	f = fieldmanager.NewManagedFieldsUpdater(f)
 	f = fieldmanager.NewBuildManagerInfoManager(f, gvk.GroupVersion())
 	return TestFieldManager{
 		fieldManager: f,

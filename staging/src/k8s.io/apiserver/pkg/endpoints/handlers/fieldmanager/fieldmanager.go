@@ -94,6 +94,7 @@ func NewDefaultCRDFieldManager(models openapiproto.Models, objectConverter runti
 // newDefaultFieldManager is a helper function which wraps a Manager with certain default logic.
 func newDefaultFieldManager(f Manager, objectCreater runtime.ObjectCreater, kind schema.GroupVersionKind) *FieldManager {
 	f = NewStripMetaManager(f)
+	f = NewManagedFieldsUpdater(f)
 	f = NewBuildManagerInfoManager(f, kind.GroupVersion())
 	f = NewCapManagersManager(f, DefaultMaxUpdateManagers)
 	f = NewProbabilisticSkipNonAppliedManager(f, objectCreater, kind, DefaultTrackOnCreateProbability)
