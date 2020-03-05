@@ -417,7 +417,7 @@ func (ds *dockerService) ContainerStatus(_ context.Context, req *runtimeapi.Cont
 
 	labels, annotations := extractLabels(r.Config.Labels)
 	imageName := r.Config.Image
-	if ir != nil && len(ir.RepoTags) > 0 {
+	if ir != nil && len(ir.RepoTags) == 1 {
 		imageName = ir.RepoTags[0]
 	}
 	status := &runtimeapi.ContainerStatus{

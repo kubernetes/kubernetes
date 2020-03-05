@@ -196,6 +196,60 @@ func TestContainerStatus(t *testing.T) {
 	assert.Error(t, err, fmt.Sprintf("status of container: %+v", resp))
 }
 
+// TestContainerStatusWithImageTag tests the container status returned shows the right image name when image has tags.
+func TestContainerStatusWithImageTag(t *testing.T) {
+	ds, fDocker, _ := newTestDockerService()
+	sConfig := makeSandboxConfig("foo", "bar", "1", 0)
+	labels := map[string]string{"abc.xyz": "foo"}
+	annotations := map[string]string{"foo.bar.baz": "abc"}
+
+	testCases := []struct {
+		description     string
+		containerName   string
+		imageName       string
+		imageTag        []string
+		expectImageName string
+	}{
+		{
+			description:     "no image tags, expect show image name",
+			containerName:   "container1",
+			imageName:       "image1",
+			imageTag:        []string{},
+			expectImageName: "image1",
+		},
+		{
+			description:     "one image tag, expect show image tag",
+			containerName:   "container2",
+			imageName:       "image2",
+			imageTag:        []string{"tag1"},
+			expectImageName: "tag1",
+		},
+		{
+			description:     "multiple image tags, expect show image name",
+			containerName:   "container3",
+			imageName:       "image3",
+			imageTag:        []string{"tag1", "tag2"},
+			expectImageName: "image3",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			config := makeContainerConfig(sConfig, tc.containerName, tc.imageName, 0, labels, annotations)
+			fDocker.InjectImages([]dockertypes.ImageSummary{{ID: tc.imageName, RepoTags: tc.imageTag}})
+			req := &runtimeapi.CreateContainerRequest{PodSandboxId: "sandboxid", Config: config, SandboxConfig: sConfig}
+			createResp, err := ds.CreateContainer(getTestCTX(), req)
+			require.NoError(t, err)
+			id := createResp.ContainerId
+			resp, err := ds.ContainerStatus(getTestCTX(), &runtimeapi.ContainerStatusRequest{ContainerId: id})
+			require.NoError(t, err)
+			if resp.Status.Image.Image != tc.expectImageName {
+				t.Errorf("[%s] expect to show image status with image name %v, but got %v", tc.description, tc.expectImageName, resp.Status.Image.Image)
+			}
+		})
+	}
+}
+
 // TestContainerLogPath tests the container log creation logic.
 func TestContainerLogPath(t *testing.T) {
 	ds, fDocker, _ := newTestDockerService()
