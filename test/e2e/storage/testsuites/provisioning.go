@@ -229,7 +229,7 @@ func (p *provisioningTestSuite) DefineTests(driver TestDriver, pattern testpatte
 					ExpectedContent: expectedContent,
 				},
 			}
-			volume.TestVolumeClient(f, testConfig, nil, "", tests)
+			volume.TestVolumeClientSlow(f, testConfig, nil, "", tests)
 		}
 		l.testCase.TestDynamicProvisioning()
 	})
@@ -257,7 +257,7 @@ func (p *provisioningTestSuite) DefineTests(driver TestDriver, pattern testpatte
 					ExpectedContent: expectedContent,
 				},
 			}
-			volume.TestVolumeClient(f, testConfig, nil, "", tests)
+			volume.TestVolumeClientSlow(f, testConfig, nil, "", tests)
 		}
 		l.testCase.TestDynamicProvisioning()
 	})
@@ -305,7 +305,7 @@ func (p *provisioningTestSuite) DefineTests(driver TestDriver, pattern testpatte
 							ExpectedContent: expectedContent,
 						},
 					}
-					volume.TestVolumeClient(f, myTestConfig, nil, "", tests)
+					volume.TestVolumeClientSlow(f, myTestConfig, nil, "", tests)
 				}
 				myTestCase.TestDynamicProvisioning()
 			}(i)
