@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/goroutinemap/exponentialbackoff"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
+	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 )
 
 // Reconciler runs a periodic loop to reconcile the desired state of the world with
@@ -150,12 +151,19 @@ func (rc *reconciler) reconcile() {
 			// The operation key format is different depending on whether the volume
 			// allows multi attach across different nodes.
 			if util.IsMultiAttachAllowed(attachedVolume.VolumeSpec) {
-				if rc.attacherDetacher.IsOperationPending(attachedVolume.VolumeName, "" /* podName */, attachedVolume.NodeName) {
+				if rc.attacherDetacher.IsOperationPending(
+					volumetypes.VolumeNodeKey(
+						attachedVolume.VolumeName,
+						attachedVolume.NodeName,
+					),
+				) {
 					klog.V(10).Infof("Operation for volume %q is already running for node %q. Can't start detach", attachedVolume.VolumeName, attachedVolume.NodeName)
 					continue
 				}
 			} else {
-				if rc.attacherDetacher.IsOperationPending(attachedVolume.VolumeName, "" /* podName */, "" /* nodeName */) {
+				if rc.attacherDetacher.IsOperationPending(
+					volumetypes.VolumeKey(attachedVolume.VolumeName),
+				) {
 					klog.V(10).Infof("Operation for volume %q is already running in the cluster. Can't start detach for %q", attachedVolume.VolumeName, attachedVolume.NodeName)
 					continue
 				}
@@ -238,7 +246,12 @@ func (rc *reconciler) attachDesiredVolumes() {
 		if util.IsMultiAttachAllowed(volumeToAttach.VolumeSpec) {
 
 			// Don't even try to start an operation if there is already one running for the given volume and node.
-			if rc.attacherDetacher.IsOperationPending(volumeToAttach.VolumeName, "" /* podName */, volumeToAttach.NodeName) {
+			if rc.attacherDetacher.IsOperationPending(
+				volumetypes.VolumeNodeKey(
+					volumeToAttach.VolumeName,
+					volumeToAttach.NodeName,
+				),
+			) {
 				if klog.V(10) {
 					klog.Infof("Operation for volume %q is already running for node %q. Can't start attach", volumeToAttach.VolumeName, volumeToAttach.NodeName)
 				}
@@ -248,7 +261,9 @@ func (rc *reconciler) attachDesiredVolumes() {
 		} else {
 
 			// Don't even try to start an operation if there is already one running for the given volume
-			if rc.attacherDetacher.IsOperationPending(volumeToAttach.VolumeName, "" /* podName */, "" /* nodeName */) {
+			if rc.attacherDetacher.IsOperationPending(
+				volumetypes.VolumeKey(volumeToAttach.VolumeName),
+			) {
 				if klog.V(10) {
 					klog.Infof("Operation for volume %q is already running. Can't start attach for %q", volumeToAttach.VolumeName, volumeToAttach.NodeName)
 				}

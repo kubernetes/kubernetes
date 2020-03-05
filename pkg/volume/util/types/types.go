@@ -20,6 +20,7 @@ package types
 import (
 	"errors"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/utils/mount"
@@ -119,5 +120,87 @@ const (
 	// VolumeResizerKey is key that will be used to store resizer used
 	// for resizing PVC. The generated key/value pair will be added
 	// as a annotation to the PVC.
+
 	VolumeResizerKey = "volume.kubernetes.io/storage-resizer"
 )
+
+// TODO (verult) comment
+type OperationKey interface {
+	// Equals returns true if `otherKey` is identical to the caller key.
+	Equals(otherKey OperationKey) bool
+
+	// Matches returns true if the operation with `otherKey` should be serialized
+	// with the operation with the caller key.
+	Matches(otherKey OperationKey) bool
+}
+
+type volumeOperationKey struct {
+	volumeName v1.UniqueVolumeName
+	podName    UniquePodName
+	nodeName   types.NodeName
+}
+
+func EmptyKey() OperationKey { return volumeOperationKey{} }
+
+func VolumeKey(volumeName v1.UniqueVolumeName) OperationKey {
+	return volumeOperationKey{ volumeName: volumeName }
+}
+
+func VolumePodKey(
+		volumeName v1.UniqueVolumeName,
+		podName UniquePodName) OperationKey {
+	return volumeOperationKey{
+		volumeName: volumeName,
+		podName: podName,
+	}
+}
+
+func VolumeNodeKey(
+		volumeName v1.UniqueVolumeName,
+		nodeName types.NodeName) OperationKey {
+	return volumeOperationKey{
+		volumeName: volumeName,
+		nodeName: nodeName,
+	}
+}
+
+func (key volumeOperationKey) Equals(otherKey OperationKey) bool {
+	otherVolumeKey, ok := otherKey.(volumeOperationKey)
+	if !ok {
+		return false
+	}
+
+	return key.volumeName == otherVolumeKey.volumeName &&
+			key.podName == otherVolumeKey.podName &&
+			key.nodeName == otherVolumeKey.nodeName
+}
+
+func (key volumeOperationKey) Matches(otherKey OperationKey) bool {
+	const (
+		emptyPodName UniquePodName = UniquePodName("")
+		emptyVolumeName v1.UniqueVolumeName = v1.UniqueVolumeName("")
+		emptyNodeName types.NodeName = types.NodeName("")
+	)
+
+	otherVolumeKey, ok := otherKey.(volumeOperationKey)
+	if !ok {
+		return false
+	}
+
+	if otherVolumeKey.volumeName == emptyVolumeName ||
+			key.volumeName == emptyVolumeName {
+		return false
+	}
+
+	volumeNameMatch := otherVolumeKey.volumeName == key.volumeName
+
+	podNameMatch := otherVolumeKey.podName == emptyPodName ||
+			key.podName == emptyPodName ||
+			otherVolumeKey.podName == key.podName
+
+	nodeNameMatch := otherVolumeKey.nodeName == emptyNodeName ||
+			key.nodeName == emptyNodeName ||
+			otherVolumeKey.nodeName == key.nodeName
+
+	return volumeNameMatch && podNameMatch && nodeNameMatch
+}

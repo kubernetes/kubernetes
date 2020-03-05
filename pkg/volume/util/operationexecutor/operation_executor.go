@@ -140,7 +140,8 @@ type OperationExecutor interface {
 
 	// IsOperationPending returns true if an operation for the given volumeName
 	// and one of podName or nodeName is pending, otherwise it returns false
-	IsOperationPending(volumeName v1.UniqueVolumeName, podName volumetypes.UniquePodName, nodeName types.NodeName) bool
+	// TODO (verult) update comment
+	IsOperationPending(opKey volumetypes.OperationKey) bool
 	// ExpandInUseVolume will resize volume's file system to expected size without unmounting the volume.
 	ExpandInUseVolume(volumeToMount VolumeToMount, actualStateOfWorld ActualStateOfWorldMounterUpdater) error
 	// ReconstructVolumeOperation construct a new volumeSpec and returns it created by plugin
@@ -651,10 +652,8 @@ type operationExecutor struct {
 }
 
 func (oe *operationExecutor) IsOperationPending(
-	volumeName v1.UniqueVolumeName,
-	podName volumetypes.UniquePodName,
-	nodeName types.NodeName) bool {
-	return oe.pendingOperations.IsOperationPending(volumeName, podName, nodeName)
+	opKey volumetypes.OperationKey) bool {
+	return oe.pendingOperations.IsOperationPending(opKey)
 }
 
 func (oe *operationExecutor) AttachVolume(
@@ -665,11 +664,17 @@ func (oe *operationExecutor) AttachVolume(
 
 	if util.IsMultiAttachAllowed(volumeToAttach.VolumeSpec) {
 		return oe.pendingOperations.Run(
-			volumeToAttach.VolumeName, "" /* podName */, volumeToAttach.NodeName, generatedOperations)
+			volumetypes.VolumeNodeKey(
+				volumeToAttach.VolumeName,
+				volumeToAttach.NodeName),
+			generatedOperations,
+		)
 	}
 
 	return oe.pendingOperations.Run(
-		volumeToAttach.VolumeName, "" /* podName */, "" /* nodeName */, generatedOperations)
+		volumetypes.VolumeKey(volumeToAttach.VolumeName),
+		generatedOperations,
+	)
 }
 
 func (oe *operationExecutor) DetachVolume(
@@ -684,11 +689,17 @@ func (oe *operationExecutor) DetachVolume(
 
 	if util.IsMultiAttachAllowed(volumeToDetach.VolumeSpec) {
 		return oe.pendingOperations.Run(
-			volumeToDetach.VolumeName, "" /* podName */, volumeToDetach.NodeName, generatedOperations)
+			volumetypes.VolumeNodeKey(
+				volumeToDetach.VolumeName,
+				volumeToDetach.NodeName,
+			),
+			generatedOperations,
+		)
 	}
 	return oe.pendingOperations.Run(
-		volumeToDetach.VolumeName, "" /* podName */, "" /* nodeName */, generatedOperations)
-
+		volumetypes.VolumeKey(volumeToDetach.VolumeName),
+		generatedOperations,
+	)
 }
 
 func (oe *operationExecutor) VerifyVolumesAreAttached(
@@ -774,7 +785,10 @@ func (oe *operationExecutor) VerifyVolumesAreAttached(
 
 		// Ugly hack to ensure - we don't do parallel bulk polling of same volume plugin
 		uniquePluginName := v1.UniqueVolumeName(pluginName)
-		err = oe.pendingOperations.Run(uniquePluginName, "" /* Pod Name */, "" /* nodeName */, generatedOperations)
+		err = oe.pendingOperations.Run(
+			volumetypes.VolumeKey(uniquePluginName),
+			generatedOperations,
+		)
 		if err != nil {
 			klog.Errorf("BulkVerifyVolumes.Run Error bulk volume verification for plugin %q  with %v", pluginName, err)
 		}
@@ -791,8 +805,11 @@ func (oe *operationExecutor) VerifyVolumesAreAttachedPerNode(
 		return err
 	}
 
-	// Give an empty UniqueVolumeName so that this operation could be executed concurrently.
-	return oe.pendingOperations.Run("" /* volumeName */, "" /* podName */, "" /* nodeName */, generatedOperations)
+	// Give an empty key so that this operation could be executed concurrently.
+	return oe.pendingOperations.Run(
+		volumetypes.EmptyKey(),
+		generatedOperations,
+	)
 }
 
 func (oe *operationExecutor) MountVolume(
@@ -833,7 +850,9 @@ func (oe *operationExecutor) MountVolume(
 
 	// TODO mount_device
 	return oe.pendingOperations.Run(
-		volumeToMount.VolumeName, podName, "" /* nodeName */, generatedOperations)
+		volumetypes.VolumePodKey(volumeToMount.VolumeName, podName),
+		generatedOperations,
+	)
 }
 
 func (oe *operationExecutor) UnmountVolume(
@@ -864,7 +883,9 @@ func (oe *operationExecutor) UnmountVolume(
 	podName := volumetypes.UniquePodName(volumeToUnmount.PodUID)
 
 	return oe.pendingOperations.Run(
-		volumeToUnmount.VolumeName, podName, "" /* nodeName */, generatedOperations)
+		volumetypes.VolumePodKey(volumeToUnmount.VolumeName, podName),
+		generatedOperations,
+	)
 }
 
 func (oe *operationExecutor) UnmountDevice(
@@ -895,7 +916,9 @@ func (oe *operationExecutor) UnmountDevice(
 	podName := nestedpendingoperations.EmptyUniquePodName
 
 	return oe.pendingOperations.Run(
-		deviceToDetach.VolumeName, podName, "" /* nodeName */, generatedOperations)
+		volumetypes.VolumePodKey(deviceToDetach.VolumeName, podName),
+		generatedOperations,
+	)
 }
 
 func (oe *operationExecutor) ExpandInUseVolume(volumeToMount VolumeToMount, actualStateOfWorld ActualStateOfWorldMounterUpdater) error {
@@ -903,7 +926,10 @@ func (oe *operationExecutor) ExpandInUseVolume(volumeToMount VolumeToMount, actu
 	if err != nil {
 		return err
 	}
-	return oe.pendingOperations.Run(volumeToMount.VolumeName, "", "" /* nodeName */, generatedOperations)
+	return oe.pendingOperations.Run(
+		volumetypes.VolumeKey(volumeToMount.VolumeName),
+		generatedOperations,
+	)
 }
 
 func (oe *operationExecutor) VerifyControllerAttachedVolume(
@@ -917,7 +943,9 @@ func (oe *operationExecutor) VerifyControllerAttachedVolume(
 	}
 
 	return oe.pendingOperations.Run(
-		volumeToMount.VolumeName, "" /* podName */, "" /* nodeName */, generatedOperations)
+		volumetypes.VolumeKey(volumeToMount.VolumeName),
+		generatedOperations,
+	)
 }
 
 // ReconstructVolumeOperation return a func to create volumeSpec from mount path

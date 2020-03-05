@@ -48,3 +48,5 @@ func TestIsFilesystemMismatchError(t *testing.T) {
 		}
 	}
 }
+
+// TODO (verult) operation key tests
