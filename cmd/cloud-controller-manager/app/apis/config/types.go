@@ -18,7 +18,7 @@ package config
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
+	controllermanagerconfig "k8s.io/component-base/controllermanager/config"
 	serviceconfig "k8s.io/kubernetes/pkg/controller/service/config"
 )
 
@@ -29,10 +29,10 @@ type CloudControllerManagerConfiguration struct {
 	metav1.TypeMeta
 
 	// Generic holds configuration for a generic controller-manager
-	Generic kubectrlmgrconfig.GenericControllerManagerConfiguration
+	Generic controllermanagerconfig.GenericControllerManagerConfiguration
 	// KubeCloudSharedConfiguration holds configuration for shared related features
 	// both in cloud controller manager and kube-controller manager.
-	KubeCloudShared kubectrlmgrconfig.KubeCloudSharedConfiguration
+	KubeCloudShared controllermanagerconfig.KubeCloudSharedConfiguration
 
 	// ServiceControllerConfiguration holds configuration for ServiceController
 	// related features.

@@ -22,20 +22,20 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	cliflag "k8s.io/component-base/cli/flag"
+	controllermanagerconfig "k8s.io/component-base/controllermanager/config"
 	"k8s.io/kubernetes/pkg/client/leaderelectionconfig"
-	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
 )
 
 // GenericControllerManagerConfigurationOptions holds the options which are generic.
 type GenericControllerManagerConfigurationOptions struct {
-	*kubectrlmgrconfig.GenericControllerManagerConfiguration
+	*controllermanagerconfig.GenericControllerManagerConfiguration
 	Debugging *DebuggingOptions
 }
 
 // NewGenericControllerManagerConfigurationOptions returns generic configuration default values for both
 // the kube-controller-manager and the cloud-contoller-manager. Any common changes should
 // be made here. Any individual changes should be made in that controller.
-func NewGenericControllerManagerConfigurationOptions(cfg *kubectrlmgrconfig.GenericControllerManagerConfiguration) *GenericControllerManagerConfigurationOptions {
+func NewGenericControllerManagerConfigurationOptions(cfg *controllermanagerconfig.GenericControllerManagerConfiguration) *GenericControllerManagerConfigurationOptions {
 	o := &GenericControllerManagerConfigurationOptions{
 		GenericControllerManagerConfiguration: cfg,
 		Debugging:                             RecommendedDebuggingOptions(),
@@ -66,7 +66,7 @@ func (o *GenericControllerManagerConfigurationOptions) AddFlags(fss *cliflag.Nam
 }
 
 // ApplyTo fills up generic config with options.
-func (o *GenericControllerManagerConfigurationOptions) ApplyTo(cfg *kubectrlmgrconfig.GenericControllerManagerConfiguration) error {
+func (o *GenericControllerManagerConfigurationOptions) ApplyTo(cfg *controllermanagerconfig.GenericControllerManagerConfiguration) error {
 	if o == nil {
 		return nil
 	}

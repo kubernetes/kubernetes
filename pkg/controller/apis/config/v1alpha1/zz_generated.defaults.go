@@ -22,6 +22,7 @@ package v1alpha1
 
 import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	controllermanagerconfigv1alpha1 "k8s.io/component-base/controllermanager/config/v1alpha1"
 	v1alpha1 "k8s.io/kube-controller-manager/config/v1alpha1"
 )
 
@@ -37,5 +38,5 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 
 func SetObjectDefaults_KubeControllerManagerConfiguration(in *v1alpha1.KubeControllerManagerConfiguration) {
 	SetDefaults_KubeControllerManagerConfiguration(in)
-	SetDefaults_KubeCloudSharedConfiguration(&in.KubeCloudShared)
+	controllermanagerconfigv1alpha1.SetDefaults_KubeCloudSharedConfiguration(&in.KubeCloudShared)
 }

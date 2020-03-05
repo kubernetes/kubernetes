@@ -28,8 +28,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	componentbaseconfig "k8s.io/component-base/config"
+	controllermanagerconfig "k8s.io/component-base/controllermanager/config"
 	cmoptions "k8s.io/kubernetes/cmd/controller-manager/app/options"
-	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
 	serviceconfig "k8s.io/kubernetes/pkg/controller/service/config"
 )
 
@@ -38,7 +38,7 @@ func TestDefaultFlags(t *testing.T) {
 
 	expected := &CloudControllerManagerOptions{
 		Generic: &cmoptions.GenericControllerManagerConfigurationOptions{
-			GenericControllerManagerConfiguration: &kubectrlmgrconfig.GenericControllerManagerConfiguration{
+			GenericControllerManagerConfiguration: &controllermanagerconfig.GenericControllerManagerConfiguration{
 				Port:            DefaultInsecureCloudControllerManagerPort, // Note: InsecureServingOptions.ApplyTo will write the flag value back into the component config
 				Address:         "0.0.0.0",                                 // Note: InsecureServingOptions.ApplyTo will write the flag value back into the component config
 				MinResyncPeriod: metav1.Duration{Duration: 12 * time.Hour},
@@ -67,7 +67,7 @@ func TestDefaultFlags(t *testing.T) {
 			},
 		},
 		KubeCloudShared: &cmoptions.KubeCloudSharedOptions{
-			KubeCloudSharedConfiguration: &kubectrlmgrconfig.KubeCloudSharedConfiguration{
+			KubeCloudSharedConfiguration: &controllermanagerconfig.KubeCloudSharedConfiguration{
 				RouteReconciliationPeriod: metav1.Duration{Duration: 10 * time.Second},
 				NodeMonitorPeriod:         metav1.Duration{Duration: 5 * time.Second},
 				ClusterName:               "kubernetes",
@@ -77,7 +77,7 @@ func TestDefaultFlags(t *testing.T) {
 				ConfigureCloudRoutes:      true,
 			},
 			CloudProvider: &cmoptions.CloudProviderOptions{
-				CloudProviderConfiguration: &kubectrlmgrconfig.CloudProviderConfiguration{
+				CloudProviderConfiguration: &controllermanagerconfig.CloudProviderConfiguration{
 					Name:            "",
 					CloudConfigFile: "",
 				},
@@ -170,7 +170,7 @@ func TestAddFlags(t *testing.T) {
 
 	expected := &CloudControllerManagerOptions{
 		Generic: &cmoptions.GenericControllerManagerConfigurationOptions{
-			GenericControllerManagerConfiguration: &kubectrlmgrconfig.GenericControllerManagerConfiguration{
+			GenericControllerManagerConfiguration: &controllermanagerconfig.GenericControllerManagerConfiguration{
 				Port:            DefaultInsecureCloudControllerManagerPort, // Note: InsecureServingOptions.ApplyTo will write the flag value back into the component config
 				Address:         "0.0.0.0",                                 // Note: InsecureServingOptions.ApplyTo will write the flag value back into the component config
 				MinResyncPeriod: metav1.Duration{Duration: 100 * time.Minute},
@@ -199,7 +199,7 @@ func TestAddFlags(t *testing.T) {
 			},
 		},
 		KubeCloudShared: &cmoptions.KubeCloudSharedOptions{
-			KubeCloudSharedConfiguration: &kubectrlmgrconfig.KubeCloudSharedConfiguration{
+			KubeCloudSharedConfiguration: &controllermanagerconfig.KubeCloudSharedConfiguration{
 				RouteReconciliationPeriod: metav1.Duration{Duration: 30 * time.Second},
 				NodeMonitorPeriod:         metav1.Duration{Duration: 5 * time.Second},
 				ClusterName:               "k8s",
@@ -209,7 +209,7 @@ func TestAddFlags(t *testing.T) {
 				ConfigureCloudRoutes:      false,
 			},
 			CloudProvider: &cmoptions.CloudProviderOptions{
-				CloudProviderConfiguration: &kubectrlmgrconfig.CloudProviderConfiguration{
+				CloudProviderConfiguration: &controllermanagerconfig.CloudProviderConfiguration{
 					Name:            "gce",
 					CloudConfigFile: "/cloud-config",
 				},

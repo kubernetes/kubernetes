@@ -3,19 +3,25 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = [
+        "conversion.go",
+        "defaults.go",
         "doc.go",
         "register.go",
         "types.go",
+        "zz_generated.conversion.go",
         "zz_generated.deepcopy.go",
+        "zz_generated.defaults.go",
     ],
-    importpath = "k8s.io/kubernetes/cmd/cloud-controller-manager/app/apis/config",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/component-base/controllermanager/config/v1alpha1",
+    importpath = "k8s.io/component-base/controllermanager/config/v1alpha1",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/controller/service/config:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/conversion:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//staging/src/k8s.io/component-base/config/v1alpha1:go_default_library",
         "//staging/src/k8s.io/component-base/controllermanager/config:go_default_library",
+        "//vendor/k8s.io/utils/pointer:go_default_library",
     ],
 )
 
@@ -28,11 +34,7 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [
-        ":package-srcs",
-        "//cmd/cloud-controller-manager/app/apis/config/scheme:all-srcs",
-        "//cmd/cloud-controller-manager/app/apis/config/v1alpha1:all-srcs",
-    ],
+    srcs = [":package-srcs"],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
 )

@@ -18,6 +18,7 @@ package v1alpha1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	controllermanagerconfig "k8s.io/component-base/controllermanager/config/v1alpha1"
 	kubectrlmgrconfigv1alpha1 "k8s.io/kube-controller-manager/config/v1alpha1"
 )
 
@@ -27,10 +28,10 @@ type CloudControllerManagerConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 
 	// Generic holds configuration for a generic controller-manager
-	Generic kubectrlmgrconfigv1alpha1.GenericControllerManagerConfiguration
+	Generic controllermanagerconfig.GenericControllerManagerConfiguration
 	// KubeCloudSharedConfiguration holds configuration for shared related features
 	// both in cloud controller manager and kube-controller manager.
-	KubeCloudShared kubectrlmgrconfigv1alpha1.KubeCloudSharedConfiguration
+	KubeCloudShared controllermanagerconfig.KubeCloudSharedConfiguration
 	// ServiceControllerConfiguration holds configuration for ServiceController
 	// related features.
 	ServiceController kubectrlmgrconfigv1alpha1.ServiceControllerConfiguration

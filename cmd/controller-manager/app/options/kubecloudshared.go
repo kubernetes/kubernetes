@@ -19,24 +19,24 @@ package options
 import (
 	"github.com/spf13/pflag"
 
-	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
+	controllermanagerconfig "k8s.io/component-base/controllermanager/config"
 )
 
 // KubeCloudSharedOptions holds the options shared between kube-controller-manager
 // and cloud-controller-manager.
 type KubeCloudSharedOptions struct {
-	*kubectrlmgrconfig.KubeCloudSharedConfiguration
+	*controllermanagerconfig.KubeCloudSharedConfiguration
 	CloudProvider *CloudProviderOptions
 }
 
 // NewKubeCloudSharedOptions returns common/default configuration values for both
 // the kube-controller-manager and the cloud-contoller-manager. Any common changes should
 // be made here. Any individual changes should be made in that controller.
-func NewKubeCloudSharedOptions(cfg *kubectrlmgrconfig.KubeCloudSharedConfiguration) *KubeCloudSharedOptions {
+func NewKubeCloudSharedOptions(cfg *controllermanagerconfig.KubeCloudSharedConfiguration) *KubeCloudSharedOptions {
 	o := &KubeCloudSharedOptions{
 		KubeCloudSharedConfiguration: cfg,
 		CloudProvider: &CloudProviderOptions{
-			CloudProviderConfiguration: &kubectrlmgrconfig.CloudProviderConfiguration{},
+			CloudProviderConfiguration: &controllermanagerconfig.CloudProviderConfiguration{},
 		},
 	}
 
@@ -70,7 +70,7 @@ func (o *KubeCloudSharedOptions) AddFlags(fs *pflag.FlagSet) {
 }
 
 // ApplyTo fills up KubeCloudShared config with options.
-func (o *KubeCloudSharedOptions) ApplyTo(cfg *kubectrlmgrconfig.KubeCloudSharedConfiguration) error {
+func (o *KubeCloudSharedOptions) ApplyTo(cfg *controllermanagerconfig.KubeCloudSharedConfiguration) error {
 	if o == nil {
 		return nil
 	}
