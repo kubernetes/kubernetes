@@ -17,7 +17,7 @@ spec:
       # since it replaces GCE Metadata Server with GKE Metadata Server. Remove
       # this requirement when issue is resolved and before any exposure of
       # metrics ports
-      hostNetwork: true 
+      hostNetwork: true
       serviceAccountName: csi-gce-pd-controller-sa
       containers:
         - name: csi-snapshotter
@@ -30,7 +30,7 @@ spec:
             - name: socket-dir
               mountPath: /csi
         - name: csi-provisioner
-          image: quay.io/k8scsi/csi-provisioner:v1.5.0-rc1
+          image: gcr.io/gke-release/csi-provisioner:v1.5.0-gke.0
           args:
             - "--v=5"
             - "--csi-address=/csi/csi.sock"
@@ -47,7 +47,7 @@ spec:
             - name: socket-dir
               mountPath: /csi
         - name: csi-resizer
-          image: gcr.io/gke-release/csi-resizer:v0.3.0-gke.0
+          image: gcr.io/gke-release/csi-resizer:v0.4.0-gke.0
           args:
             - "--v=5"
             - "--csi-address=/csi/csi.sock"
@@ -55,7 +55,7 @@ spec:
             - name: socket-dir
               mountPath: /csi
         - name: gce-pd-driver
-          image: gcr.io/gke-release/gcp-compute-persistent-disk-csi-driver:v0.6.2-gke.0
+          image: gcr.io/gke-release/gcp-compute-persistent-disk-csi-driver:v0.7.0-gke.0
           args:
             - "--v=5"
             - "--endpoint=unix:/csi/csi.sock"
