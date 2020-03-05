@@ -22,13 +22,13 @@ import (
 	"context"
 	"time"
 
+	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
 	v1 "k8s.io/code-generator/_examples/MixedCase/apis/example/v1"
 	scheme "k8s.io/code-generator/_examples/MixedCase/clientset/versioned/scheme"
-	autoscaling "k8s.io/kubernetes/pkg/apis/autoscaling"
 )
 
 // ClusterTestTypesGetter has a method to return a ClusterTestTypeInterface.
@@ -48,8 +48,8 @@ type ClusterTestTypeInterface interface {
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.ClusterTestTypeList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ClusterTestType, err error)
-	GetScale(ctx context.Context, clusterTestTypeName string, options metav1.GetOptions) (*autoscaling.Scale, error)
-	UpdateScale(ctx context.Context, clusterTestTypeName string, scale *autoscaling.Scale, opts metav1.UpdateOptions) (*autoscaling.Scale, error)
+	GetScale(ctx context.Context, clusterTestTypeName string, options metav1.GetOptions) (*autoscalingv1.Scale, error)
+	UpdateScale(ctx context.Context, clusterTestTypeName string, scale *autoscalingv1.Scale, opts metav1.UpdateOptions) (*autoscalingv1.Scale, error)
 
 	ClusterTestTypeExpansion
 }
@@ -187,9 +187,9 @@ func (c *clusterTestTypes) Patch(ctx context.Context, name string, pt types.Patc
 	return
 }
 
-// GetScale takes name of the clusterTestType, and returns the corresponding autoscaling.Scale object, and an error if there is any.
-func (c *clusterTestTypes) GetScale(ctx context.Context, clusterTestTypeName string, options metav1.GetOptions) (result *autoscaling.Scale, err error) {
-	result = &autoscaling.Scale{}
+// GetScale takes name of the clusterTestType, and returns the corresponding autoscalingv1.Scale object, and an error if there is any.
+func (c *clusterTestTypes) GetScale(ctx context.Context, clusterTestTypeName string, options metav1.GetOptions) (result *autoscalingv1.Scale, err error) {
+	result = &autoscalingv1.Scale{}
 	err = c.client.Get().
 		Resource("clustertesttypes").
 		Name(clusterTestTypeName).
@@ -201,8 +201,8 @@ func (c *clusterTestTypes) GetScale(ctx context.Context, clusterTestTypeName str
 }
 
 // UpdateScale takes the top resource name and the representation of a scale and updates it. Returns the server's representation of the scale, and an error, if there is any.
-func (c *clusterTestTypes) UpdateScale(ctx context.Context, clusterTestTypeName string, scale *autoscaling.Scale, opts metav1.UpdateOptions) (result *autoscaling.Scale, err error) {
-	result = &autoscaling.Scale{}
+func (c *clusterTestTypes) UpdateScale(ctx context.Context, clusterTestTypeName string, scale *autoscalingv1.Scale, opts metav1.UpdateOptions) (result *autoscalingv1.Scale, err error) {
+	result = &autoscalingv1.Scale{}
 	err = c.client.Put().
 		Resource("clustertesttypes").
 		Name(clusterTestTypeName).
