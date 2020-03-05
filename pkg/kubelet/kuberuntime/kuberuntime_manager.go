@@ -413,6 +413,10 @@ type podActions struct {
 	// EphemeralContainersToStart is a list of indexes for the ephemeral containers to start,
 	// where the index is the index of the specific container in pod.Spec.EphemeralContainers.
 	EphemeralContainersToStart []int
+
+	// ContainersToPrepull is a list of containers which can be pulled async to speed things
+	// up while an init container is running
+	ContainersToPrepull []v1.Container
 }
 
 // podSandboxChanged checks whether the spec of the pod is changed and returns
@@ -505,6 +509,8 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 		if len(pod.Spec.InitContainers) != 0 {
 			// Pod has init containers, return the first one.
 			changes.NextInitContainerToStart = &pod.Spec.InitContainers[0]
+			// Create a list of images that are needed with those needed first listed first
+			changes.ContainersToPrepull = append(pod.Spec.InitContainers, pod.Spec.Containers...)
 			return changes
 		}
 		// Start all containers by default but exclude the ones that succeeded if
@@ -668,6 +674,9 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontaine
 			klog.V(4).Infof("Stopping PodSandbox for %q because all other containers are dead.", format.Pod(pod))
 		}
 
+		// Cleanup any inflight async pull requests
+		m.imagePuller.RemoveAsyncPullsForPod(pod)
+
 		killResult := m.killPodWithSyncResult(pod, kubecontainer.ConvertPodStatusToRunningPod(m.runtimeName, podStatus), nil)
 		result.AddPodSyncResult(killResult)
 		if killResult.Error() != nil {
@@ -813,6 +822,17 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontaine
 	if utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) {
 		for _, idx := range podContainerChanges.EphemeralContainersToStart {
 			start("ephemeral container", ephemeralContainerStartSpec(&pod.Spec.EphemeralContainers[idx]))
+		}
+	}
+
+	// Async pull containers
+	if len(podContainerChanges.ContainersToPrepull) > 0 {
+		for _, container := range podContainerChanges.ContainersToPrepull {
+			_, _, err := m.imagePuller.EnsureImageExistsAsync(pod, &container, pullSecrets, podSandboxConfig)
+			if err != nil {
+				klog.V(3).Infof("On image: %s pre-pull failed: %v", container.Image, err)
+				continue
+			}
 		}
 	}
 

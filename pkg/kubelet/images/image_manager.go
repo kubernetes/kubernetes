@@ -18,6 +18,7 @@ package images
 
 import (
 	"fmt"
+	"sync"
 
 	dockerref "github.com/docker/distribution/reference"
 	v1 "k8s.io/api/core/v1"
@@ -37,7 +38,8 @@ type imageManager struct {
 	imageService kubecontainer.ImageService
 	backOff      *flowcontrol.Backoff
 	// It will check the presence of the image, and report the 'image pulling', image pulled' events correspondingly.
-	puller imagePuller
+	puller     imagePuller
+	asyncPulls sync.Map
 }
 
 var _ ImageManager = &imageManager{}
@@ -84,6 +86,91 @@ func (m *imageManager) logIt(ref *v1.ObjectReference, eventtype, event, prefix, 
 	}
 }
 
+// getAsyncPullKey generates a key used to track async image pulls
+func getAsyncPullKey(pod *v1.Pod, container *v1.Container) string {
+	return fmt.Sprintf("%s_%s_%s", pod.UID, container.Name, container.Image)
+}
+
+// RemoveAsyncPullsForPod removes any tracked async pulls for a given pod
+func (m *imageManager) RemoveAsyncPullsForPod(pod *v1.Pod) {
+	for _, container := range pod.Spec.InitContainers {
+		asyncKey := getAsyncPullKey(pod, &container)
+		if _, exists := m.asyncPulls.Load(asyncKey); exists {
+			m.asyncPulls.Delete(asyncKey)
+		}
+	}
+
+	for _, container := range pod.Spec.Containers {
+		asyncKey := getAsyncPullKey(pod, &container)
+		if _, exists := m.asyncPulls.Load(asyncKey); exists {
+			m.asyncPulls.Delete(asyncKey)
+		}
+	}
+}
+
+func (m *imageManager) ensureImageExistsInternal(ref *v1.ObjectReference, pod *v1.Pod, container *v1.Container, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, string, error, kubecontainer.ImageSpec) {
+	logPrefix := fmt.Sprintf("%s/%s", pod.Name, container.Image)
+
+	// If the image contains no tag or digest, a default tag should be applied.
+	image, err := applyDefaultImageTag(container.Image)
+	if err != nil {
+		msg := fmt.Sprintf("Failed to apply default image tag %q: %v", container.Image, err)
+		m.logIt(ref, v1.EventTypeWarning, events.FailedToInspectImage, logPrefix, msg, klog.Warning)
+		return "", msg, ErrInvalidImageName, kubecontainer.ImageSpec{}
+	}
+
+	spec := kubecontainer.ImageSpec{Image: image}
+	imageRef, err := m.imageService.GetImageRef(spec)
+	if err != nil {
+		msg := fmt.Sprintf("Failed to inspect image %q: %v", container.Image, err)
+		m.logIt(ref, v1.EventTypeWarning, events.FailedToInspectImage, logPrefix, msg, klog.Warning)
+		return "", msg, ErrImageInspect, spec
+	}
+
+	present := imageRef != ""
+	if !shouldPullImage(container, present) {
+		if present {
+			msg := fmt.Sprintf("Container image %q already present on machine", container.Image)
+			m.logIt(ref, v1.EventTypeNormal, events.PulledImage, logPrefix, msg, klog.Info)
+			return imageRef, "", nil, spec
+		}
+		msg := fmt.Sprintf("Container image %q is not present with pull policy of Never", container.Image)
+		m.logIt(ref, v1.EventTypeWarning, events.ErrImageNeverPullPolicy, logPrefix, msg, klog.Warning)
+		return "", msg, ErrImageNeverPull, spec
+	}
+
+	return "", "", nil, spec
+}
+
+// EnsureImageExistsAsync pulls the image for the specified pod and container, and returns
+// (imageRef, error message, error).
+func (m *imageManager) EnsureImageExistsAsync(pod *v1.Pod, container *v1.Container, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, string, error) {
+	logPrefix := fmt.Sprintf("%s/%s", pod.Name, container.Image)
+	ref, err := kubecontainer.GenerateContainerRef(pod, container)
+	if err != nil {
+		klog.Errorf("Couldn't make a ref to pod %v, container %v: '%v'", pod.Name, container.Name, err)
+	}
+
+	backOffKey := fmt.Sprintf("%s_%s", pod.UID, container.Image)
+	if m.backOff.IsInBackOffSinceUpdate(backOffKey, m.backOff.Clock.Now()) {
+		msg := fmt.Sprintf("Back-off pulling image %q", container.Image)
+		m.logIt(ref, v1.EventTypeNormal, events.BackOffPullImage, logPrefix, msg, klog.Info)
+		return "", msg, ErrImagePullBackOff
+	}
+
+	imageRef, errorMessage, err, imageSpec := m.ensureImageExistsInternal(ref, pod, container, pullSecrets, podSandboxConfig)
+	if err != nil {
+		return imageRef, errorMessage, err
+	}
+
+	m.logIt(ref, v1.EventTypeNormal, events.PullingImage, logPrefix, fmt.Sprintf("Async pulling image %q", container.Image), klog.Info)
+	pullChan := make(chan pullResult, 1)
+	m.puller.pullImage(imageSpec, pullSecrets, pullChan, podSandboxConfig)
+	m.asyncPulls.Store(getAsyncPullKey(pod, container), pullChan)
+
+	return "", "", nil
+}
+
 // EnsureImageExists pulls the image for the specified pod and container, and returns
 // (imageRef, error message, error).
 func (m *imageManager) EnsureImageExists(pod *v1.Pod, container *v1.Container, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, string, error) {
@@ -93,43 +180,31 @@ func (m *imageManager) EnsureImageExists(pod *v1.Pod, container *v1.Container, p
 		klog.Errorf("Couldn't make a ref to pod %v, container %v: '%v'", pod.Name, container.Name, err)
 	}
 
-	// If the image contains no tag or digest, a default tag should be applied.
-	image, err := applyDefaultImageTag(container.Image)
-	if err != nil {
-		msg := fmt.Sprintf("Failed to apply default image tag %q: %v", container.Image, err)
-		m.logIt(ref, v1.EventTypeWarning, events.FailedToInspectImage, logPrefix, msg, klog.Warning)
-		return "", msg, ErrInvalidImageName
-	}
-
-	spec := kubecontainer.ImageSpec{Image: image}
-	imageRef, err := m.imageService.GetImageRef(spec)
-	if err != nil {
-		msg := fmt.Sprintf("Failed to inspect image %q: %v", container.Image, err)
-		m.logIt(ref, v1.EventTypeWarning, events.FailedToInspectImage, logPrefix, msg, klog.Warning)
-		return "", msg, ErrImageInspect
-	}
-
-	present := imageRef != ""
-	if !shouldPullImage(container, present) {
-		if present {
-			msg := fmt.Sprintf("Container image %q already present on machine", container.Image)
-			m.logIt(ref, v1.EventTypeNormal, events.PulledImage, logPrefix, msg, klog.Info)
-			return imageRef, "", nil
-		}
-		msg := fmt.Sprintf("Container image %q is not present with pull policy of Never", container.Image)
-		m.logIt(ref, v1.EventTypeWarning, events.ErrImageNeverPullPolicy, logPrefix, msg, klog.Warning)
-		return "", msg, ErrImageNeverPull
-	}
-
 	backOffKey := fmt.Sprintf("%s_%s", pod.UID, container.Image)
 	if m.backOff.IsInBackOffSinceUpdate(backOffKey, m.backOff.Clock.Now()) {
 		msg := fmt.Sprintf("Back-off pulling image %q", container.Image)
 		m.logIt(ref, v1.EventTypeNormal, events.BackOffPullImage, logPrefix, msg, klog.Info)
 		return "", msg, ErrImagePullBackOff
 	}
-	m.logIt(ref, v1.EventTypeNormal, events.PullingImage, logPrefix, fmt.Sprintf("Pulling image %q", container.Image), klog.Info)
-	pullChan := make(chan pullResult)
-	m.puller.pullImage(spec, pullSecrets, pullChan, podSandboxConfig)
+
+	var pullChan chan pullResult
+
+	// If there is already an async pull started wait on it and return it's result.
+	asyncKey := getAsyncPullKey(pod, container)
+	if pullChanInt, asyncPullExists := m.asyncPulls.Load(asyncKey); asyncPullExists {
+		pullChan = pullChanInt.(chan pullResult)
+		m.asyncPulls.Delete(asyncKey)
+	} else {
+		imageRef, errorMessage, err, imageSpec := m.ensureImageExistsInternal(ref, pod, container, pullSecrets, podSandboxConfig)
+		if err != nil {
+			return imageRef, errorMessage, err
+		}
+
+		m.logIt(ref, v1.EventTypeNormal, events.PullingImage, logPrefix, fmt.Sprintf("Pulling image %q", container.Image), klog.Info)
+		pullChan = make(chan pullResult)
+		m.puller.pullImage(imageSpec, pullSecrets, pullChan, podSandboxConfig)
+	}
+
 	imagePullResult := <-pullChan
 	if imagePullResult.err != nil {
 		m.logIt(ref, v1.EventTypeWarning, events.FailedToPullImage, logPrefix, fmt.Sprintf("Failed to pull image %q: %v", container.Image, imagePullResult.err), klog.Warning)
