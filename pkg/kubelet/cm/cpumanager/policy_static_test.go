@@ -444,26 +444,26 @@ func TestStaticPolicyAdd(t *testing.T) {
 		}
 
 		container := &testCase.pod.Spec.Containers[0]
-		err := policy.AddContainer(st, testCase.pod, container)
+		err := policy.Allocate(st, testCase.pod, container)
 		if !reflect.DeepEqual(err, testCase.expErr) {
-			t.Errorf("StaticPolicy AddContainer() error (%v). expected add error: %v but got: %v",
+			t.Errorf("StaticPolicy Allocate() error (%v). expected add error: %v but got: %v",
 				testCase.description, testCase.expErr, err)
 		}
 
 		if testCase.expCPUAlloc {
 			cset, found := st.assignments[string(testCase.pod.UID)][container.Name]
 			if !found {
-				t.Errorf("StaticPolicy AddContainer() error (%v). expected container %v to be present in assignments %v",
+				t.Errorf("StaticPolicy Allocate() error (%v). expected container %v to be present in assignments %v",
 					testCase.description, container.Name, st.assignments)
 			}
 
 			if !reflect.DeepEqual(cset, testCase.expCSet) {
-				t.Errorf("StaticPolicy AddContainer() error (%v). expected cpuset %v but got %v",
+				t.Errorf("StaticPolicy Allocate() error (%v). expected cpuset %v but got %v",
 					testCase.description, testCase.expCSet, cset)
 			}
 
 			if !cset.Intersection(st.defaultCPUSet).IsEmpty() {
-				t.Errorf("StaticPolicy AddContainer() error (%v). expected cpuset %v to be disoint from the shared cpuset %v",
+				t.Errorf("StaticPolicy Allocate() error (%v). expected cpuset %v to be disoint from the shared cpuset %v",
 					testCase.description, cset, st.defaultCPUSet)
 			}
 		}
@@ -471,7 +471,7 @@ func TestStaticPolicyAdd(t *testing.T) {
 		if !testCase.expCPUAlloc {
 			_, found := st.assignments[string(testCase.pod.UID)][container.Name]
 			if found {
-				t.Errorf("StaticPolicy AddContainer() error (%v). Did not expect container %v to be present in assignments %v",
+				t.Errorf("StaticPolicy Allocate() error (%v). Did not expect container %v to be present in assignments %v",
 					testCase.description, container.Name, st.assignments)
 			}
 		}
@@ -786,26 +786,26 @@ func TestStaticPolicyAddWithResvList(t *testing.T) {
 		}
 
 		container := &testCase.pod.Spec.Containers[0]
-		err := policy.AddContainer(st, testCase.pod, container)
+		err := policy.Allocate(st, testCase.pod, container)
 		if !reflect.DeepEqual(err, testCase.expErr) {
-			t.Errorf("StaticPolicy AddContainer() error (%v). expected add error: %v but got: %v",
+			t.Errorf("StaticPolicy Allocate() error (%v). expected add error: %v but got: %v",
 				testCase.description, testCase.expErr, err)
 		}
 
 		if testCase.expCPUAlloc {
 			cset, found := st.assignments[string(testCase.pod.UID)][container.Name]
 			if !found {
-				t.Errorf("StaticPolicy AddContainer() error (%v). expected container %v to be present in assignments %v",
+				t.Errorf("StaticPolicy Allocate() error (%v). expected container %v to be present in assignments %v",
 					testCase.description, container.Name, st.assignments)
 			}
 
 			if !reflect.DeepEqual(cset, testCase.expCSet) {
-				t.Errorf("StaticPolicy AddContainer() error (%v). expected cpuset %v but got %v",
+				t.Errorf("StaticPolicy Allocate() error (%v). expected cpuset %v but got %v",
 					testCase.description, testCase.expCSet, cset)
 			}
 
 			if !cset.Intersection(st.defaultCPUSet).IsEmpty() {
-				t.Errorf("StaticPolicy AddContainer() error (%v). expected cpuset %v to be disoint from the shared cpuset %v",
+				t.Errorf("StaticPolicy Allocate() error (%v). expected cpuset %v to be disoint from the shared cpuset %v",
 					testCase.description, cset, st.defaultCPUSet)
 			}
 		}
@@ -813,7 +813,7 @@ func TestStaticPolicyAddWithResvList(t *testing.T) {
 		if !testCase.expCPUAlloc {
 			_, found := st.assignments[string(testCase.pod.UID)][container.Name]
 			if found {
-				t.Errorf("StaticPolicy AddContainer() error (%v). Did not expect container %v to be present in assignments %v",
+				t.Errorf("StaticPolicy Allocate() error (%v). Did not expect container %v to be present in assignments %v",
 					testCase.description, container.Name, st.assignments)
 			}
 		}

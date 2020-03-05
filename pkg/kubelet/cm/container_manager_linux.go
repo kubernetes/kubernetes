@@ -672,11 +672,51 @@ func (cm *containerManagerImpl) GetResources(pod *v1.Pod, container *v1.Containe
 }
 
 func (cm *containerManagerImpl) UpdatePluginResources(node *schedulernodeinfo.NodeInfo, attrs *lifecycle.PodAdmitAttributes) error {
-	return cm.deviceManager.Allocate(node, attrs)
+	return cm.deviceManager.UpdatePluginResources(node, attrs)
 }
 
-func (cm *containerManagerImpl) GetTopologyPodAdmitHandler() topologymanager.Manager {
-	return cm.topologyManager
+func (cm *containerManagerImpl) GetAllocateResourcesPodAdmitHandler() lifecycle.PodAdmitHandler {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.TopologyManager) {
+		return cm.topologyManager
+	}
+	// TODO: we need to think about a better way to do this. This will work for
+	// now so long as we have only the cpuManager and deviceManager relying on
+	// allocations here. However, going forward it is not generalized enough to
+	// work as we add more and more hint providers that the TopologyManager
+	// needs to call Allocate() on (that may not be directly intstantiated
+	// inside this component).
+	return &resourceAllocator{cm.cpuManager, cm.deviceManager}
+}
+
+type resourceAllocator struct {
+	cpuManager    cpumanager.Manager
+	deviceManager devicemanager.Manager
+}
+
+func (m *resourceAllocator) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+	pod := attrs.Pod
+
+	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
+		err := m.deviceManager.Allocate(pod, &container)
+		if err != nil {
+			return lifecycle.PodAdmitResult{
+				Message: fmt.Sprintf("Allocate failed due to %v, which is unexpected", err),
+				Reason:  "UnexpectedAdmissionError",
+				Admit:   false,
+			}
+		}
+
+		err = m.cpuManager.Allocate(pod, &container)
+		if err != nil {
+			return lifecycle.PodAdmitResult{
+				Message: fmt.Sprintf("Allocate failed due to %v, which is unexpected", err),
+				Reason:  "UnexpectedAdmissionError",
+				Admit:   false,
+			}
+		}
+	}
+
+	return lifecycle.PodAdmitResult{Admit: true}
 }
 
 func (cm *containerManagerImpl) SystemCgroupsLimit() v1.ResourceList {
