@@ -34,6 +34,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	certutil "k8s.io/client-go/util/cert"
+	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
@@ -77,6 +78,21 @@ func FetchInitConfigurationFromCluster(client clientset.Interface, w io.Writer, 
 	}
 
 	return cfg, nil
+}
+
+// EnforceEtcdSupportedVersion will change etcd's image tag to the desired etcd version based on the provided k8sVersion, only if etcd is configured as local
+func EnforceEtcdSupportedVersion(client clientset.Interface, k8sVersion string, cfg *kubeadmapi.InitConfiguration) error {
+	if cfg.Etcd.Local != nil {
+		desiredEtcdVersion, warning, err := constants.EtcdSupportedVersion(constants.SupportedEtcdVersion, k8sVersion)
+		if err != nil {
+			return errors.Wrapf(err, "failed to retrieve an etcd version for the target Kubernetes version %s", k8sVersion)
+		}
+		if warning != nil {
+			klog.Warning(warning)
+		}
+		cfg.Etcd.Local.ImageTag = desiredEtcdVersion.String()
+	}
+	return nil
 }
 
 // getInitConfigurationFromCluster is separate only for testing purposes, don't call it directly, use FetchInitConfigurationFromCluster instead

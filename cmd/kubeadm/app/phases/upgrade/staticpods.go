@@ -28,7 +28,6 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/version"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
@@ -282,13 +281,9 @@ func performEtcdStaticPodUpgrade(certsRenewMgr *renewal.Manager, client clientse
 		return true, errors.Wrap(err, "failed to back up etcd data")
 	}
 
-	// Need to check currently used version and version from constants, if differs then upgrade
-	desiredEtcdVersion, warning, err := constants.EtcdSupportedVersion(constants.SupportedEtcdVersion, cfg.KubernetesVersion)
+	desiredEtcdVersion, err := version.ParseSemantic(cfg.Etcd.Local.ImageTag)
 	if err != nil {
-		return true, errors.Wrap(err, "failed to retrieve an etcd version for the target Kubernetes version")
-	}
-	if warning != nil {
-		klog.Warningf("[upgrade/etcd] %v", warning)
+		return false, errors.Wrapf(err, "failed to parse the desired etcd version(%s)", cfg.Etcd.Local.ImageTag)
 	}
 
 	// gets the etcd version of the local/stacked etcd member running on the current machine

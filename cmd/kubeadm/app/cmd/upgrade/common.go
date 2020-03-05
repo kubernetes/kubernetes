@@ -95,6 +95,9 @@ func enforceRequirements(flags *applyPlanFlags, dryRun bool, newK8sVersion strin
 		cfg, err = configutil.LoadInitConfigurationFromFile(flags.cfgPath)
 	} else {
 		cfg, err = configutil.FetchInitConfigurationFromCluster(client, os.Stdout, "upgrade/config", false)
+		if err := configutil.EnforceEtcdSupportedVersion(client, newK8sVersion, cfg); err != nil {
+			return nil, nil, nil, err
+		}
 	}
 
 	if err != nil {
