@@ -133,6 +133,7 @@ require (
 	google.golang.org/api v0.6.1-0.20190607001116-5213b8090861
 	google.golang.org/grpc v1.26.0
 	gopkg.in/gcfg.v1 v1.2.0
+	gopkg.in/inf.v0 v0.9.1
 	gopkg.in/square/go-jose.v2 v2.2.2
 	gopkg.in/yaml.v2 v2.2.8
 	gotest.tools v2.2.0+incompatible
@@ -164,9 +165,11 @@ require (
 	k8s.io/metrics v0.0.0
 	k8s.io/repo-infra v0.0.1-alpha.1
 	k8s.io/sample-apiserver v0.0.0
+	k8s.io/sample-controller v0.0.0-00010101000000-000000000000 // indirect
 	k8s.io/system-validators v1.0.4
 	k8s.io/utils v0.0.0-20200229041039-0a110f9eb7ab
 	sigs.k8s.io/kustomize v2.0.3+incompatible
+	sigs.k8s.io/structured-merge-diff/v3 v3.0.0-20200207200219-5e70324e7c1c
 	sigs.k8s.io/yaml v1.2.0
 )
 
