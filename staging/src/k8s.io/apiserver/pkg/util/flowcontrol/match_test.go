@@ -87,201 +87,201 @@ func TestLiterals(t *testing.T) {
 	reqRN := RequestDigest{
 		&request.RequestInfo{
 			IsResourceRequest: true,
-			Path:              "/apis/gooda/v1/namespaces/goodn/goods",
-			Verb:              "goodv",
+			Path:              "/apis/goodapig/v1/namespaces/goodns/goodrscs",
+			Verb:              "goodverb",
 			APIPrefix:         "apis",
-			APIGroup:          "gooda",
+			APIGroup:          "goodapig",
 			APIVersion:        "v1",
-			Namespace:         "goodn",
-			Resource:          "goods",
+			Namespace:         "goodns",
+			Resource:          "goodrscs",
 			Name:              "eman",
-			Parts:             []string{"goods", "eman"}},
+			Parts:             []string{"goodrscs", "eman"}},
 		ui}
 	reqRU := RequestDigest{
 		&request.RequestInfo{
 			IsResourceRequest: true,
-			Path:              "/apis/gooda/v1/goods",
-			Verb:              "goodv",
+			Path:              "/apis/goodapig/v1/goodrscs",
+			Verb:              "goodverb",
 			APIPrefix:         "apis",
-			APIGroup:          "gooda",
+			APIGroup:          "goodapig",
 			APIVersion:        "v1",
 			Namespace:         "",
-			Resource:          "goods",
+			Resource:          "goodrscs",
 			Name:              "eman",
-			Parts:             []string{"goods", "eman"}},
+			Parts:             []string{"goodrscs", "eman"}},
 		ui}
 	reqN := RequestDigest{
 		&request.RequestInfo{
 			IsResourceRequest: false,
 			Path:              "/openapi/v2",
-			Verb:              "goodv"},
+			Verb:              "goodverb"},
 		ui}
 	checkRules(t, true, reqRN, []fcv1a1.PolicyRulesWithSubjects{{
 		Subjects: []fcv1a1.Subject{{Kind: fcv1a1.SubjectKindUser,
 			User: &fcv1a1.UserSubject{"goodu"}}},
 		ResourceRules: []fcv1a1.ResourcePolicyRule{{
-			Verbs:      []string{"goodv"},
-			APIGroups:  []string{"gooda"},
-			Resources:  []string{"goods"},
-			Namespaces: []string{"goodn"}}}}, {
+			Verbs:      []string{"goodverb"},
+			APIGroups:  []string{"goodapig"},
+			Resources:  []string{"goodrscs"},
+			Namespaces: []string{"goodns"}}}}, {
 		Subjects: []fcv1a1.Subject{{Kind: fcv1a1.SubjectKindGroup,
 			Group: &fcv1a1.GroupSubject{"goodg1"}}},
 		ResourceRules: []fcv1a1.ResourcePolicyRule{{
-			Verbs:      []string{"goodv"},
-			APIGroups:  []string{"gooda"},
-			Resources:  []string{"goods"},
-			Namespaces: []string{"goodn"}}}}, {
+			Verbs:      []string{"goodverb"},
+			APIGroups:  []string{"goodapig"},
+			Resources:  []string{"goodrscs"},
+			Namespaces: []string{"goodns"}}}}, {
 		Subjects: []fcv1a1.Subject{{Kind: fcv1a1.SubjectKindUser,
 			User: &fcv1a1.UserSubject{"*"}}},
 		ResourceRules: []fcv1a1.ResourcePolicyRule{{
-			Verbs:      []string{"goodv"},
-			APIGroups:  []string{"gooda"},
-			Resources:  []string{"goods"},
-			Namespaces: []string{"goodn"}}}}, {
+			Verbs:      []string{"goodverb"},
+			APIGroups:  []string{"goodapig"},
+			Resources:  []string{"goodrscs"},
+			Namespaces: []string{"goodns"}}}}, {
 		Subjects: []fcv1a1.Subject{{Kind: fcv1a1.SubjectKindGroup,
 			Group: &fcv1a1.GroupSubject{"*"}}},
 		ResourceRules: []fcv1a1.ResourcePolicyRule{{
-			Verbs:      []string{"goodv"},
-			APIGroups:  []string{"gooda"},
-			Resources:  []string{"goods"},
-			Namespaces: []string{"goodn"}}}}, {
+			Verbs:      []string{"goodverb"},
+			APIGroups:  []string{"goodapig"},
+			Resources:  []string{"goodrscs"},
+			Namespaces: []string{"goodns"}}}}, {
 		Subjects: []fcv1a1.Subject{{Kind: fcv1a1.SubjectKindUser,
 			User: &fcv1a1.UserSubject{"goodu"}}},
 		ResourceRules: []fcv1a1.ResourcePolicyRule{{
 			Verbs:      []string{"*"},
-			APIGroups:  []string{"gooda"},
-			Resources:  []string{"goods"},
-			Namespaces: []string{"goodn"}}}}, {
+			APIGroups:  []string{"goodapig"},
+			Resources:  []string{"goodrscs"},
+			Namespaces: []string{"goodns"}}}}, {
 		Subjects: []fcv1a1.Subject{{Kind: fcv1a1.SubjectKindUser,
 			User: &fcv1a1.UserSubject{"goodu"}}},
 		ResourceRules: []fcv1a1.ResourcePolicyRule{{
-			Verbs:      []string{"goodv"},
+			Verbs:      []string{"goodverb"},
 			APIGroups:  []string{"*"},
-			Resources:  []string{"goods"},
-			Namespaces: []string{"goodn"}}}}, {
+			Resources:  []string{"goodrscs"},
+			Namespaces: []string{"goodns"}}}}, {
 		Subjects: []fcv1a1.Subject{{Kind: fcv1a1.SubjectKindUser,
 			User: &fcv1a1.UserSubject{"goodu"}}},
 		ResourceRules: []fcv1a1.ResourcePolicyRule{{
-			Verbs:      []string{"goodv"},
-			APIGroups:  []string{"gooda"},
+			Verbs:      []string{"goodverb"},
+			APIGroups:  []string{"goodapig"},
 			Resources:  []string{"*"},
-			Namespaces: []string{"goodn"}}}}, {
+			Namespaces: []string{"goodns"}}}}, {
 		Subjects: []fcv1a1.Subject{{Kind: fcv1a1.SubjectKindUser,
 			User: &fcv1a1.UserSubject{"goodu"}}},
 		ResourceRules: []fcv1a1.ResourcePolicyRule{{
-			Verbs:      []string{"goodv"},
-			APIGroups:  []string{"gooda"},
-			Resources:  []string{"goods"},
+			Verbs:      []string{"goodverb"},
+			APIGroups:  []string{"goodapig"},
+			Resources:  []string{"goodrscs"},
 			Namespaces: []string{"*"}}}},
 	})
 	checkRules(t, false, reqRN, []fcv1a1.PolicyRulesWithSubjects{{
 		Subjects: []fcv1a1.Subject{{Kind: fcv1a1.SubjectKindUser,
 			User: &fcv1a1.UserSubject{"badu"}}},
 		ResourceRules: []fcv1a1.ResourcePolicyRule{{
-			Verbs:      []string{"goodv"},
-			APIGroups:  []string{"gooda"},
-			Resources:  []string{"goods"},
-			Namespaces: []string{"goodn"}}}}, {
+			Verbs:      []string{"goodverb"},
+			APIGroups:  []string{"goodapig"},
+			Resources:  []string{"goodrscs"},
+			Namespaces: []string{"goodns"}}}}, {
 		Subjects: []fcv1a1.Subject{{Kind: fcv1a1.SubjectKindGroup,
 			Group: &fcv1a1.GroupSubject{"badg"}}},
 		ResourceRules: []fcv1a1.ResourcePolicyRule{{
-			Verbs:      []string{"goodv"},
-			APIGroups:  []string{"gooda"},
-			Resources:  []string{"goods"},
-			Namespaces: []string{"goodn"}}}}, {
+			Verbs:      []string{"goodverb"},
+			APIGroups:  []string{"goodapig"},
+			Resources:  []string{"goodrscs"},
+			Namespaces: []string{"goodns"}}}}, {
 		Subjects: []fcv1a1.Subject{{Kind: fcv1a1.SubjectKindUser,
 			User: &fcv1a1.UserSubject{"goodu"}}},
 		ResourceRules: []fcv1a1.ResourcePolicyRule{{
-			Verbs:      []string{"badv"},
-			APIGroups:  []string{"gooda"},
-			Resources:  []string{"goods"},
-			Namespaces: []string{"goodn"}}}}, {
+			Verbs:      []string{"badverb"},
+			APIGroups:  []string{"goodapig"},
+			Resources:  []string{"goodrscs"},
+			Namespaces: []string{"goodns"}}}}, {
 		Subjects: []fcv1a1.Subject{{Kind: fcv1a1.SubjectKindUser,
 			User: &fcv1a1.UserSubject{"goodu"}}},
 		ResourceRules: []fcv1a1.ResourcePolicyRule{{
-			Verbs:      []string{"goodv"},
-			APIGroups:  []string{"bada"},
-			Resources:  []string{"goods"},
-			Namespaces: []string{"goodn"}}}}, {
+			Verbs:      []string{"goodverb"},
+			APIGroups:  []string{"badapig"},
+			Resources:  []string{"goodrscs"},
+			Namespaces: []string{"goodns"}}}}, {
 		Subjects: []fcv1a1.Subject{{Kind: fcv1a1.SubjectKindUser,
 			User: &fcv1a1.UserSubject{"goodu"}}},
 		ResourceRules: []fcv1a1.ResourcePolicyRule{{
-			Verbs:      []string{"goodv"},
-			APIGroups:  []string{"gooda"},
-			Resources:  []string{"bads"},
-			Namespaces: []string{"goodn"}}}}, {
+			Verbs:      []string{"goodverb"},
+			APIGroups:  []string{"goodapig"},
+			Resources:  []string{"badrscs"},
+			Namespaces: []string{"goodns"}}}}, {
 		Subjects: []fcv1a1.Subject{{Kind: fcv1a1.SubjectKindUser,
 			User: &fcv1a1.UserSubject{"goodu"}}},
 		ResourceRules: []fcv1a1.ResourcePolicyRule{{
-			Verbs:      []string{"goodv"},
-			APIGroups:  []string{"gooda"},
-			Resources:  []string{"goods"},
-			Namespaces: []string{"badn"}}}},
+			Verbs:      []string{"goodverb"},
+			APIGroups:  []string{"goodapig"},
+			Resources:  []string{"goodrscs"},
+			Namespaces: []string{"badns"}}}},
 	})
 	checkRules(t, true, reqRU, []fcv1a1.PolicyRulesWithSubjects{{
 		Subjects: []fcv1a1.Subject{{Kind: fcv1a1.SubjectKindUser,
 			User: &fcv1a1.UserSubject{"goodu"}}},
 		ResourceRules: []fcv1a1.ResourcePolicyRule{{
-			Verbs:        []string{"goodv"},
-			APIGroups:    []string{"gooda"},
-			Resources:    []string{"goods"},
+			Verbs:        []string{"goodverb"},
+			APIGroups:    []string{"goodapig"},
+			Resources:    []string{"goodrscs"},
 			ClusterScope: true}}}, {
 		Subjects: []fcv1a1.Subject{{Kind: fcv1a1.SubjectKindUser,
 			User: &fcv1a1.UserSubject{"goodu"}}},
 		ResourceRules: []fcv1a1.ResourcePolicyRule{{
 			Verbs:        []string{"*"},
-			APIGroups:    []string{"gooda"},
-			Resources:    []string{"goods"},
+			APIGroups:    []string{"goodapig"},
+			Resources:    []string{"goodrscs"},
 			ClusterScope: true}}}, {
 		Subjects: []fcv1a1.Subject{{Kind: fcv1a1.SubjectKindUser,
 			User: &fcv1a1.UserSubject{"goodu"}}},
 		ResourceRules: []fcv1a1.ResourcePolicyRule{{
-			Verbs:        []string{"goodv"},
+			Verbs:        []string{"goodverb"},
 			APIGroups:    []string{"*"},
-			Resources:    []string{"goods"},
+			Resources:    []string{"goodrscs"},
 			ClusterScope: true}}}, {
 		Subjects: []fcv1a1.Subject{{Kind: fcv1a1.SubjectKindUser,
 			User: &fcv1a1.UserSubject{"goodu"}}},
 		ResourceRules: []fcv1a1.ResourcePolicyRule{{
-			Verbs:        []string{"goodv"},
-			APIGroups:    []string{"gooda"},
+			Verbs:        []string{"goodverb"},
+			APIGroups:    []string{"goodapig"},
 			Resources:    []string{"*"},
 			ClusterScope: true}}}})
 	checkRules(t, false, reqRU, []fcv1a1.PolicyRulesWithSubjects{{
 		Subjects: []fcv1a1.Subject{{Kind: fcv1a1.SubjectKindUser,
 			User: &fcv1a1.UserSubject{"goodu"}}},
 		ResourceRules: []fcv1a1.ResourcePolicyRule{{
-			Verbs:        []string{"badv"},
-			APIGroups:    []string{"gooda"},
-			Resources:    []string{"goods"},
+			Verbs:        []string{"badverb"},
+			APIGroups:    []string{"goodapig"},
+			Resources:    []string{"goodrscs"},
 			ClusterScope: true}}}, {
 		Subjects: []fcv1a1.Subject{{Kind: fcv1a1.SubjectKindUser,
 			User: &fcv1a1.UserSubject{"goodu"}}},
 		ResourceRules: []fcv1a1.ResourcePolicyRule{{
-			Verbs:        []string{"goodv"},
-			APIGroups:    []string{"bada"},
-			Resources:    []string{"goods"},
+			Verbs:        []string{"goodverb"},
+			APIGroups:    []string{"badapig"},
+			Resources:    []string{"goodrscs"},
 			ClusterScope: true}}}, {
 		Subjects: []fcv1a1.Subject{{Kind: fcv1a1.SubjectKindUser,
 			User: &fcv1a1.UserSubject{"goodu"}}},
 		ResourceRules: []fcv1a1.ResourcePolicyRule{{
-			Verbs:        []string{"goodv"},
-			APIGroups:    []string{"gooda"},
-			Resources:    []string{"bads"},
+			Verbs:        []string{"goodverb"},
+			APIGroups:    []string{"goodapig"},
+			Resources:    []string{"badrscs"},
 			ClusterScope: true}}}, {
 		Subjects: []fcv1a1.Subject{{Kind: fcv1a1.SubjectKindUser,
 			User: &fcv1a1.UserSubject{"goodu"}}},
 		ResourceRules: []fcv1a1.ResourcePolicyRule{{
-			Verbs:        []string{"goodv"},
-			APIGroups:    []string{"gooda"},
-			Resources:    []string{"goods"},
+			Verbs:        []string{"goodverb"},
+			APIGroups:    []string{"goodapig"},
+			Resources:    []string{"goodrscs"},
 			ClusterScope: false}}},
 	})
 	checkRules(t, true, reqN, []fcv1a1.PolicyRulesWithSubjects{{
 		Subjects: []fcv1a1.Subject{{Kind: fcv1a1.SubjectKindUser,
 			User: &fcv1a1.UserSubject{"goodu"}}},
 		NonResourceRules: []fcv1a1.NonResourcePolicyRule{{
-			Verbs:           []string{"goodv"},
+			Verbs:           []string{"goodverb"},
 			NonResourceURLs: []string{"/openapi/v2"}}}}, {
 		Subjects: []fcv1a1.Subject{{Kind: fcv1a1.SubjectKindUser,
 			User: &fcv1a1.UserSubject{"goodu"}}},
@@ -291,19 +291,19 @@ func TestLiterals(t *testing.T) {
 		Subjects: []fcv1a1.Subject{{Kind: fcv1a1.SubjectKindUser,
 			User: &fcv1a1.UserSubject{"goodu"}}},
 		NonResourceRules: []fcv1a1.NonResourcePolicyRule{{
-			Verbs:           []string{"goodv"},
+			Verbs:           []string{"goodverb"},
 			NonResourceURLs: []string{"*"}}}},
 	})
 	checkRules(t, false, reqN, []fcv1a1.PolicyRulesWithSubjects{{
 		Subjects: []fcv1a1.Subject{{Kind: fcv1a1.SubjectKindUser,
 			User: &fcv1a1.UserSubject{"goodu"}}},
 		NonResourceRules: []fcv1a1.NonResourcePolicyRule{{
-			Verbs:           []string{"badv"},
+			Verbs:           []string{"badverb"},
 			NonResourceURLs: []string{"/openapi/v2"}}}}, {
 		Subjects: []fcv1a1.Subject{{Kind: fcv1a1.SubjectKindUser,
 			User: &fcv1a1.UserSubject{"goodu"}}},
 		NonResourceRules: []fcv1a1.NonResourcePolicyRule{{
-			Verbs:           []string{"goodv"},
+			Verbs:           []string{"goodverb"},
 			NonResourceURLs: []string{"/closedapi/v2"}}}},
 	})
 }
