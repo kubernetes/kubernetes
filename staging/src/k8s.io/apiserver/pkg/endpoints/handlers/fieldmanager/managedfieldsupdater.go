@@ -67,13 +67,16 @@ func (f *managedFieldsUpdater) Update(liveObj, newObj runtime.Object, managed Ma
 
 // Apply implements Manager.
 func (f *managedFieldsUpdater) Apply(liveObj, appliedObj runtime.Object, managed Managed, fieldManager string, force bool) (runtime.Object, Managed, error) {
+	formerManaged := managed.Fields().Copy()
 	object, managed, err := f.fieldManager.Apply(liveObj, appliedObj, managed, fieldManager, force)
 	if err != nil {
 		return object, managed, err
 	}
+	if object != nil || !managed.Fields().Equals(formerManaged) {
+		managed.Times()[fieldManager] = &metav1.Time{Time: time.Now().UTC()}
+	}
 	if object == nil {
 		object = liveObj
 	}
-	managed.Times()[fieldManager] = &metav1.Time{Time: time.Now().UTC()}
 	return object, managed, nil
 }
