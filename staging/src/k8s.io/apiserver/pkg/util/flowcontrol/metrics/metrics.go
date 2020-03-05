@@ -157,13 +157,13 @@ var (
 	}
 )
 
-// ChangeRequestsInQueues adds the given delta to the gauge of the # of requests in the queues of the specified flowSchema and priorityLevel
-func ChangeRequestsInQueues(priorityLevel, flowSchema string, delta int) {
+// AddRequestsInQueues adds the given delta to the gauge of the # of requests in the queues of the specified flowSchema and priorityLevel
+func AddRequestsInQueues(priorityLevel, flowSchema string, delta int) {
 	apiserverCurrentInqueueRequests.WithLabelValues(priorityLevel, flowSchema).Add(float64(delta))
 }
 
-// ChangeRequestsExecuting adds the given delta to the gauge of executing requests of the given flowSchema and priorityLevel
-func ChangeRequestsExecuting(priorityLevel, flowSchema string, delta int) {
+// AddRequestsExecuting adds the given delta to the gauge of executing requests of the given flowSchema and priorityLevel
+func AddRequestsExecuting(priorityLevel, flowSchema string, delta int) {
 	apiserverCurrentExecutingRequests.WithLabelValues(priorityLevel, flowSchema).Add(float64(delta))
 }
 

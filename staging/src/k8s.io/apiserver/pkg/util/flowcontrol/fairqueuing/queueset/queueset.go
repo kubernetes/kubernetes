@@ -460,7 +460,7 @@ func (qs *queueSet) removeTimedOutRequestsFromQueueLocked(queue *queue, fsName s
 			req.decision.SetLocked(decisionReject)
 			// get index for timed out requests
 			timeoutIdx = i
-			metrics.ChangeRequestsInQueues(qs.qCfg.Name, req.fsName, -1)
+			metrics.AddRequestsInQueues(qs.qCfg.Name, req.fsName, -1)
 		} else {
 			break
 		}
@@ -505,7 +505,7 @@ func (qs *queueSet) enqueueLocked(request *request) {
 	}
 	queue.Enqueue(request)
 	qs.totRequestsWaiting++
-	metrics.ChangeRequestsInQueues(qs.qCfg.Name, request.fsName, 1)
+	metrics.AddRequestsInQueues(qs.qCfg.Name, request.fsName, 1)
 }
 
 // dispatchAsMuchAsPossibleLocked runs a loop, as long as there
@@ -537,7 +537,7 @@ func (qs *queueSet) dispatchSansQueueLocked(ctx context.Context, fsName string, 
 	}
 	req.decision.SetLocked(decisionExecute)
 	qs.totRequestsExecuting++
-	metrics.ChangeRequestsExecuting(qs.qCfg.Name, fsName, 1)
+	metrics.AddRequestsExecuting(qs.qCfg.Name, fsName, 1)
 	if klog.V(5) {
 		klog.Infof("QS(%s) at r=%s v=%.9fs: immediate dispatch of request %q %#+v %#+v, qs will have %d executing", qs.qCfg.Name, now.Format(nsTimeFmt), qs.virtualTime, fsName, descr1, descr2, qs.totRequestsExecuting)
 	}
@@ -566,8 +566,8 @@ func (qs *queueSet) dispatchLocked() bool {
 	qs.totRequestsWaiting--
 	qs.totRequestsExecuting++
 	queue.requestsExecuting++
-	metrics.ChangeRequestsInQueues(qs.qCfg.Name, request.fsName, -1)
-	metrics.ChangeRequestsExecuting(qs.qCfg.Name, request.fsName, 1)
+	metrics.AddRequestsInQueues(qs.qCfg.Name, request.fsName, -1)
+	metrics.AddRequestsExecuting(qs.qCfg.Name, request.fsName, 1)
 	if klog.V(6) {
 		klog.Infof("QS(%s) at r=%s v=%.9fs: dispatching request %#+v %#+v from queue %d with virtual start time %.9fs, queue will have %d waiting & %d executing", qs.qCfg.Name, request.startTime.Format(nsTimeFmt), qs.virtualTime, request.descr1, request.descr2, queue.index, queue.virtualStart, len(queue.requests), queue.requestsExecuting)
 	}
@@ -595,7 +595,7 @@ func (qs *queueSet) cancelWait(req *request) {
 			// remove the request
 			queue.requests = append(queue.requests[:i], queue.requests[i+1:]...)
 			qs.totRequestsWaiting--
-			metrics.ChangeRequestsInQueues(qs.qCfg.Name, req.fsName, -1)
+			metrics.AddRequestsInQueues(qs.qCfg.Name, req.fsName, -1)
 			break
 		}
 	}
@@ -648,7 +648,7 @@ func (qs *queueSet) finishRequestAndDispatchAsMuchAsPossible(req *request) bool 
 // callback updates important state in the queueSet
 func (qs *queueSet) finishRequestLocked(r *request) {
 	qs.totRequestsExecuting--
-	metrics.ChangeRequestsExecuting(qs.qCfg.Name, r.fsName, -1)
+	metrics.AddRequestsExecuting(qs.qCfg.Name, r.fsName, -1)
 
 	if r.queue == nil {
 		if klog.V(6) {
