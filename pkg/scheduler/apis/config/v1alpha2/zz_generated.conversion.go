@@ -27,6 +27,7 @@ import (
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	v1alpha1 "k8s.io/component-base/config/v1alpha1"
+	configv1 "k8s.io/kube-scheduler/config/v1"
 	v1alpha2 "k8s.io/kube-scheduler/config/v1alpha2"
 	config "k8s.io/kubernetes/pkg/scheduler/apis/config"
 )
@@ -153,6 +154,7 @@ func autoConvert_v1alpha2_KubeSchedulerConfiguration_To_config_KubeSchedulerConf
 	} else {
 		out.Profiles = nil
 	}
+	out.Extenders = *(*[]config.Extender)(unsafe.Pointer(&in.Extenders))
 	return nil
 }
 
@@ -199,6 +201,7 @@ func autoConvert_config_KubeSchedulerConfiguration_To_v1alpha2_KubeSchedulerConf
 	} else {
 		out.Profiles = nil
 	}
+	out.Extenders = *(*[]configv1.Extender)(unsafe.Pointer(&in.Extenders))
 	return nil
 }
 

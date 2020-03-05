@@ -87,6 +87,12 @@ func TestValidateKubeSchedulerConfiguration(t *testing.T) {
 				},
 			},
 		},
+		Extenders: []config.Extender{
+			{
+				PrioritizeVerb: "prioritize",
+				Weight:         1,
+			},
+		},
 	}
 
 	resourceNameNotSet := validConfig.DeepCopy()
@@ -125,6 +131,22 @@ func TestValidateKubeSchedulerConfiguration(t *testing.T) {
 
 	oneEmptyQueueSort := validConfig.DeepCopy()
 	oneEmptyQueueSort.Profiles[0].Plugins = nil
+
+	extenderNegativeWeight := validConfig.DeepCopy()
+	extenderNegativeWeight.Extenders[0].Weight = -1
+
+	extenderDuplicateManagedResource := validConfig.DeepCopy()
+	extenderDuplicateManagedResource.Extenders[0].ManagedResources = []config.ExtenderManagedResource{
+		{Name: "foo", IgnoredByScheduler: false},
+		{Name: "foo", IgnoredByScheduler: false},
+	}
+
+	extenderDuplicateBind := validConfig.DeepCopy()
+	extenderDuplicateBind.Extenders[0].BindVerb = "foo"
+	extenderDuplicateBind.Extenders = append(extenderDuplicateBind.Extenders, config.Extender{
+		PrioritizeVerb: "prioritize",
+		BindVerb:       "bar",
+	})
 
 	scenarios := map[string]struct {
 		expectedToFail bool
@@ -177,6 +199,18 @@ func TestValidateKubeSchedulerConfiguration(t *testing.T) {
 		"one-empty-queue-sort": {
 			expectedToFail: true,
 			config:         oneEmptyQueueSort,
+		},
+		"extender-negative-weight": {
+			expectedToFail: true,
+			config:         extenderNegativeWeight,
+		},
+		"extender-duplicate-managed-resources": {
+			expectedToFail: true,
+			config:         extenderDuplicateManagedResource,
+		},
+		"extender-duplicate-bind": {
+			expectedToFail: true,
+			config:         extenderDuplicateBind,
 		},
 	}
 
@@ -232,7 +266,7 @@ func TestValidatePolicy(t *testing.T) {
 		{
 			name:     "invalid negative weight in policy extender config",
 			policy:   config.Policy{Extenders: []config.Extender{{URLPrefix: "http://127.0.0.1:8081/extender", PrioritizeVerb: "prioritize", Weight: -2}}},
-			expected: errors.New("Priority for extender http://127.0.0.1:8081/extender should have a positive weight applied to it"),
+			expected: errors.New("extenders[0].weight: Invalid value: -2: must have a positive weight applied to it"),
 		},
 		{
 			name:     "valid filter verb and url prefix",
@@ -251,7 +285,7 @@ func TestValidatePolicy(t *testing.T) {
 					{URLPrefix: "http://127.0.0.1:8081/extender", BindVerb: "bind"},
 					{URLPrefix: "http://127.0.0.1:8082/extender", BindVerb: "bind"},
 				}},
-			expected: errors.New("Only one extender can implement bind, found 2"),
+			expected: errors.New("extenders: Invalid value: \"found 2 extenders implementing bind\": only one extender can implement bind"),
 		},
 		{
 			name: "invalid duplicate extender resource name",
@@ -260,7 +294,7 @@ func TestValidatePolicy(t *testing.T) {
 					{URLPrefix: "http://127.0.0.1:8081/extender", ManagedResources: []config.ExtenderManagedResource{{Name: "foo.com/bar"}}},
 					{URLPrefix: "http://127.0.0.1:8082/extender", BindVerb: "bind", ManagedResources: []config.ExtenderManagedResource{{Name: "foo.com/bar"}}},
 				}},
-			expected: errors.New("Duplicate extender managed resource name foo.com/bar"),
+			expected: errors.New("extenders[1].managedResources[0].name: Invalid value: \"foo.com/bar\": duplicate extender managed resource name"),
 		},
 		{
 			name: "invalid extended resource name",
@@ -268,7 +302,7 @@ func TestValidatePolicy(t *testing.T) {
 				Extenders: []config.Extender{
 					{URLPrefix: "http://127.0.0.1:8081/extender", ManagedResources: []config.ExtenderManagedResource{{Name: "kubernetes.io/foo"}}},
 				}},
-			expected: errors.New("kubernetes.io/foo is an invalid extended resource name"),
+			expected: errors.New("extenders[0].managedResources[0].name: Invalid value: \"kubernetes.io/foo\": kubernetes.io/foo is an invalid extended resource name"),
 		},
 		{
 			name: "invalid redeclared RequestedToCapacityRatio custom priority",

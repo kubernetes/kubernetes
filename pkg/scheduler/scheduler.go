@@ -133,6 +133,7 @@ type schedulerOptions struct {
 	// Contains out-of-tree plugins to be merged with the in-tree registry.
 	frameworkOutOfTreeRegistry framework.Registry
 	profiles                   []schedulerapi.KubeSchedulerProfile
+	extenders                  []schedulerapi.Extender
 }
 
 // Option configures a Scheduler
@@ -193,6 +194,13 @@ func WithPodInitialBackoffSeconds(podInitialBackoffSeconds int64) Option {
 func WithPodMaxBackoffSeconds(podMaxBackoffSeconds int64) Option {
 	return func(o *schedulerOptions) {
 		o.podMaxBackoffSeconds = podMaxBackoffSeconds
+	}
+}
+
+// WithExtenders sets extenders for the Scheduler
+func WithExtenders(e ...schedulerapi.Extender) Option {
+	return func(o *schedulerOptions) {
+		o.extenders = e
 	}
 }
 
@@ -264,6 +272,7 @@ func New(client clientset.Interface,
 		profiles:                 append([]schedulerapi.KubeSchedulerProfile(nil), options.profiles...),
 		registry:                 registry,
 		nodeInfoSnapshot:         snapshot,
+		extenders:                options.extenders,
 	}
 
 	metrics.Register()
@@ -291,6 +300,10 @@ func New(client clientset.Interface,
 				return nil, err
 			}
 		}
+		// Set extenders on the configurator now that we've decoded the policy
+		// In this case, c.extenders should be nil since we're using a policy (and therefore not componentconfig,
+		// which would have set extenders in the above instantiation of Configurator from CC options)
+		configurator.extenders = policy.Extenders
 		sc, err := configurator.createFromConfig(*policy)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't create scheduler from policy: %v", err)

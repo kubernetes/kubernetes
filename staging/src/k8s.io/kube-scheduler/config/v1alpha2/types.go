@@ -20,6 +20,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	componentbaseconfigv1alpha1 "k8s.io/component-base/config/v1alpha1"
+	v1 "k8s.io/kube-scheduler/config/v1"
 )
 
 const (
@@ -91,6 +92,11 @@ type KubeSchedulerConfiguration struct {
 	// +listType=map
 	// +listMapKey=schedulerName
 	Profiles []KubeSchedulerProfile `json:"profiles"`
+
+	// Extenders are the list of scheduler extenders, each holding the values of how to communicate
+	// with the extender. These extenders are shared by all scheduler profiles.
+	// +listType=set
+	Extenders []v1.Extender `json:"extenders"`
 }
 
 // KubeSchedulerProfile is a scheduling profile.
