@@ -73,7 +73,7 @@ type AuthConfig struct {
 	RegistryToken string `json:"registrytoken,omitempty"`
 }
 
-// Add .
+// Add add some docker config in basic docker keyring
 func (dk *BasicDockerKeyring) Add(cfg DockerConfig) {
 	if dk.index == nil {
 		dk.index = make([]string, 0)
