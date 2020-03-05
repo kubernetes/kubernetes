@@ -1920,7 +1920,7 @@ var _ = SIGDescribe("Services", func() {
 		err = t.DeleteService(serviceName)
 		framework.ExpectNoError(err, "failed to delete service: %s in namespace: %s", serviceName, ns)
 
-		hostExec := launchHostExecPod(f.ClientSet, f.Namespace.Name, "hostexec")
+		hostExec := e2epod.CreateExecPodOrFail(f.ClientSet, f.Namespace.Name, "hostexec", nil)
 		cmd := fmt.Sprintf(`! ss -ant46 'sport = :%d' | tail -n +2 | grep LISTEN`, nodePort)
 		var stdout string
 		if pollErr := wait.PollImmediate(framework.Poll, e2eservice.KubeProxyLagTimeout, func() (bool, error) {
@@ -2215,7 +2215,7 @@ var _ = SIGDescribe("Services", func() {
 		//  a pod to test the service.
 		ginkgo.By("hitting the internal load balancer from pod")
 		framework.Logf("creating pod with host network")
-		hostExec := launchHostExecPod(f.ClientSet, f.Namespace.Name, "ilb-host-exec")
+		hostExec := e2epod.CreateExecPodOrFail(f.ClientSet, f.Namespace.Name, "ilb-host-exec", nil)
 
 		framework.Logf("Waiting up to %v for service %q's internal LB to respond to requests", createTimeout, serviceName)
 		tcpIngressIP := e2eservice.GetIngressPoint(lbIngress)
@@ -3290,17 +3290,6 @@ func createPodOrFail(c clientset.Interface, ns, name string, labels map[string]s
 	}
 	_, err := c.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "failed to create pod %s in namespace %s", name, ns)
-}
-
-// launchHostExecPod launches a hostexec pod in the given namespace and waits
-// until it's Running
-func launchHostExecPod(client clientset.Interface, ns, name string) *v1.Pod {
-	hostExecPod := e2epod.NewExecPodSpec(ns, name, true)
-	pod, err := client.CoreV1().Pods(ns).Create(context.TODO(), hostExecPod, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
-	err = e2epod.WaitForPodRunningInNamespace(client, pod)
-	framework.ExpectNoError(err)
-	return pod
 }
 
 // checkReachabilityFromPod checks reachability from the specified pod.
