@@ -617,7 +617,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, featureGate f
 		cgroupRoots = append(cgroupRoots, kubeletCgroup)
 	}
 
-	runtimeCgroup, err := cm.GetRuntimeContainer(s.ContainerRuntime, s.RuntimeCgroups)
+	runtimeCgroup, err := cm.GetRuntimeContainer(s.ContainerRuntime, s.RemoteRuntimeEndpoint, s.RuntimeCgroups)
 	if err != nil {
 		klog.Warningf("failed to get the container runtime's cgroup: %v. Runtime system container metrics may be missing.", err)
 	} else if runtimeCgroup != "" {

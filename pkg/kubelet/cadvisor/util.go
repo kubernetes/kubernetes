@@ -27,13 +27,6 @@ import (
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
-const (
-	// CrioSocket is the path to the CRI-O socket.
-	// Please keep this in sync with the one in:
-	// github.com/google/cadvisor/container/crio/client.go
-	CrioSocket = "/var/run/crio/crio.sock"
-)
-
 // CapacityFromMachineInfo returns the capacity of the resources from the machine info.
 func CapacityFromMachineInfo(info *cadvisorapi.MachineInfo) v1.ResourceList {
 	c := v1.ResourceList{
@@ -75,5 +68,5 @@ func EphemeralStorageCapacityFromFsInfo(info cadvisorapi2.FsInfo) v1.ResourceLis
 // https://github.com/kubernetes/kubernetes/issues/51798
 func UsingLegacyCadvisorStats(runtime, runtimeEndpoint string) bool {
 	return (runtime == kubetypes.DockerContainerRuntime && goruntime.GOOS == "linux") ||
-		runtimeEndpoint == CrioSocket || runtimeEndpoint == "unix://"+CrioSocket
+		runtimeEndpoint == kubetypes.CrioSocket || runtimeEndpoint == "unix://"+kubetypes.CrioSocket
 }

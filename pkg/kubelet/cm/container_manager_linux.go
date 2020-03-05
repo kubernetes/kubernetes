@@ -73,6 +73,8 @@ const (
 	dockerPidFile         = "/var/run/docker.pid"
 	containerdProcessName = "docker-containerd"
 	containerdPidFile     = "/run/docker/libcontainerd/docker-containerd.pid"
+	crioProcessName       = "crio"
+	crioPidFile           = "/var/run/crio/pid"
 	maxPidFileLength      = 1 << 10 // 1KB
 )
 

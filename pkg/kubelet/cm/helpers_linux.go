@@ -32,6 +32,7 @@ import (
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 const (
@@ -260,13 +261,23 @@ func GetKubeletContainer(kubeletCgroups string) (string, error) {
 }
 
 // GetRuntimeContainer returns the cgroup used by the container runtime
-func GetRuntimeContainer(containerRuntime, runtimeCgroups string) (string, error) {
-	if containerRuntime == "docker" {
+func GetRuntimeContainer(containerRuntime, runtimeEndpoint, runtimeCgroups string) (string, error) {
+	if containerRuntime == kubetypes.DockerContainerRuntime {
 		cont, err := getContainerNameForProcess(dockerProcessName, dockerPidFile)
 		if err != nil {
 			return "", fmt.Errorf("failed to get container name for docker process: %v", err)
 		}
 		return cont, nil
 	}
+	if containerRuntime == kubetypes.RemoteContainerRuntime {
+		if runtimeEndpoint == kubetypes.CrioSocket || runtimeEndpoint == "unix://"+kubetypes.CrioSocket {
+			cont, err := getContainerNameForProcess(crioProcessName, crioPidFile)
+			if err != nil {
+				return "", fmt.Errorf("failed to get container name for crio process: %v", err)
+			}
+			return cont, nil
+		}
+	}
+
 	return runtimeCgroups, nil
 }

@@ -28,6 +28,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
+        "constants_test.go",
         "labels_test.go",
         "pod_status_test.go",
         "pod_update_test.go",
@@ -39,7 +40,15 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/github.com/stretchr/testify/require:go_default_library",
-    ],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:android": [
+            "//vendor/github.com/google/cadvisor/container/crio:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:linux": [
+            "//vendor/github.com/google/cadvisor/container/crio:go_default_library",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 filegroup(
