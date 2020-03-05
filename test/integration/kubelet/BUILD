@@ -4,12 +4,14 @@ go_test(
     name = "go_default_test",
     srcs = [
         "main_test.go",
+        "oom_watcher_test.go",
         "watch_manager_test.go",
     ],
     rundir = ".",
     tags = ["integration"],
     deps = [
         "//cmd/kube-apiserver/app/testing:go_default_library",
+        "//pkg/kubelet/oom:go_default_library",
         "//pkg/kubelet/util/manager:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
@@ -18,7 +20,9 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/watch:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
+        "//staging/src/k8s.io/client-go/tools/record:go_default_library",
         "//test/integration/framework:go_default_library",
+        "//vendor/github.com/stretchr/testify/assert:go_default_library",
     ],
 )
 
