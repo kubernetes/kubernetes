@@ -10,6 +10,7 @@ go_library(
     ],
     deps = [
         "//staging/src/k8s.io/cli-runtime/pkg/genericclioptions:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/debug:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/cmd/util:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/util/i18n:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/util/templates:go_default_library",
@@ -37,6 +38,7 @@ filegroup(
         "//staging/src/k8s.io/kubectl/pkg/cmd/completion:all-srcs",
         "//staging/src/k8s.io/kubectl/pkg/cmd/config:all-srcs",
         "//staging/src/k8s.io/kubectl/pkg/cmd/create:all-srcs",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/debug:all-srcs",
         "//staging/src/k8s.io/kubectl/pkg/cmd/delete:all-srcs",
         "//staging/src/k8s.io/kubectl/pkg/cmd/describe:all-srcs",
         "//staging/src/k8s.io/kubectl/pkg/cmd/diff:all-srcs",
