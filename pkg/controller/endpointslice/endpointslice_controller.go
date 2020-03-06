@@ -66,6 +66,7 @@ func NewController(podInformer coreinformers.PodInformer,
 	endpointSliceInformer discoveryinformers.EndpointSliceInformer,
 	maxEndpointsPerSlice int32,
 	client clientset.Interface,
+	endpointUpdatesBatchPeriod time.Duration,
 ) *Controller {
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartLogging(klog.Infof)
@@ -129,6 +130,7 @@ func NewController(podInformer coreinformers.PodInformer,
 	c.eventBroadcaster = broadcaster
 	c.eventRecorder = recorder
 
+	c.endpointUpdatesBatchPeriod = endpointUpdatesBatchPeriod
 	c.serviceSelectorCache = endpointutil.NewServiceSelectorCache()
 
 	return c
@@ -193,6 +195,10 @@ type Controller struct {
 	// workerLoopPeriod is the time between worker runs. The workers
 	// process the queue of service and pod changes
 	workerLoopPeriod time.Duration
+
+	// endpointUpdatesBatchPeriod is an artificial delay added to all service syncs triggered by pod changes.
+	// This can be used to reduce overall number of all endpoint slice updates.
+	endpointUpdatesBatchPeriod time.Duration
 
 	// serviceSelectorCache is a cache of service selectors to avoid high CPU consumption caused by frequent calls
 	// to AsSelectorPreValidated (see #73527)
@@ -414,14 +420,14 @@ func (c *Controller) addPod(obj interface{}) {
 		return
 	}
 	for key := range services {
-		c.queue.Add(key)
+		c.queue.AddAfter(key, c.endpointUpdatesBatchPeriod)
 	}
 }
 
 func (c *Controller) updatePod(old, cur interface{}) {
 	services := endpointutil.GetServicesToUpdateOnPodChange(c.serviceLister, c.serviceSelectorCache, old, cur, podEndpointChanged)
 	for key := range services {
-		c.queue.Add(key)
+		c.queue.AddAfter(key, c.endpointUpdatesBatchPeriod)
 	}
 }
 

@@ -87,7 +87,6 @@ package_group(
     name = "prometheus_import_allow_list",
     packages = [
         "//cluster/images/etcd-version-monitor",
-        "//pkg/controller/endpointslice",
         "//pkg/master",
         "//pkg/scheduler/framework/v1alpha1",
         "//pkg/volume/util/operationexecutor",

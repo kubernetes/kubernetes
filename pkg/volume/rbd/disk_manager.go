@@ -58,7 +58,7 @@ type diskManager interface {
 }
 
 // utility to mount a disk based filesystem
-func diskSetUp(manager diskManager, b rbdMounter, volPath string, mounter mount.Interface, fsGroup *int64) error {
+func diskSetUp(manager diskManager, b rbdMounter, volPath string, mounter mount.Interface, fsGroup *int64, fsGroupChangePolicy *v1.PodFSGroupChangePolicy) error {
 	globalPDPath := manager.MakeGlobalPDName(*b.rbd)
 	notMnt, err := mounter.IsLikelyNotMountPoint(globalPDPath)
 	if err != nil && !os.IsNotExist(err) {
@@ -96,7 +96,7 @@ func diskSetUp(manager diskManager, b rbdMounter, volPath string, mounter mount.
 	klog.V(3).Infof("rbd: successfully bind mount %s to %s with options %v", globalPDPath, volPath, mountOptions)
 
 	if !b.ReadOnly {
-		volume.SetVolumeOwnership(&b, fsGroup)
+		volume.SetVolumeOwnership(&b, fsGroup, fsGroupChangePolicy)
 	}
 
 	return nil

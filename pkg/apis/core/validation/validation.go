@@ -31,14 +31,13 @@ import (
 
 	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -1563,11 +1562,6 @@ var supportedReclaimPolicy = sets.NewString(string(core.PersistentVolumeReclaimD
 
 var supportedVolumeModes = sets.NewString(string(core.PersistentVolumeBlock), string(core.PersistentVolumeFilesystem))
 
-var supportedDataSourceAPIGroupKinds = map[schema.GroupKind]bool{
-	{Group: "snapshot.storage.k8s.io", Kind: "VolumeSnapshot"}: true,
-	{Group: "", Kind: "PersistentVolumeClaim"}:                 true,
-}
-
 func ValidatePersistentVolumeSpec(pvSpec *core.PersistentVolumeSpec, pvName string, validateInlinePersistentVolumeSpec bool, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
@@ -1929,17 +1923,15 @@ func ValidatePersistentVolumeClaimSpec(spec *core.PersistentVolumeClaimSpec, fld
 		if len(spec.DataSource.Name) == 0 {
 			allErrs = append(allErrs, field.Required(fldPath.Child("dataSource", "name"), ""))
 		}
-
-		groupKind := schema.GroupKind{Group: "", Kind: spec.DataSource.Kind}
+		if len(spec.DataSource.Kind) == 0 {
+			allErrs = append(allErrs, field.Required(fldPath.Child("dataSource", "kind"), ""))
+		}
+		apiGroup := ""
 		if spec.DataSource.APIGroup != nil {
-			groupKind.Group = string(*spec.DataSource.APIGroup)
+			apiGroup = *spec.DataSource.APIGroup
 		}
-		groupKindList := make([]string, 0, len(supportedDataSourceAPIGroupKinds))
-		for grp := range supportedDataSourceAPIGroupKinds {
-			groupKindList = append(groupKindList, grp.String())
-		}
-		if !supportedDataSourceAPIGroupKinds[groupKind] {
-			allErrs = append(allErrs, field.NotSupported(fldPath.Child("dataSource"), groupKind.String(), groupKindList))
+		if len(apiGroup) == 0 && spec.DataSource.Kind != "PersistentVolumeClaim" {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("dataSource"), spec.DataSource.Kind, ""))
 		}
 	}
 
@@ -2824,6 +2816,16 @@ func validateDNSPolicy(dnsPolicy *core.DNSPolicy, fldPath *field.Path) field.Err
 	return allErrors
 }
 
+var validFSGroupChangePolicies = sets.NewString(string(core.FSGroupChangeOnRootMismatch), string(core.FSGroupChangeAlways))
+
+func validateFSGroupChangePolicy(fsGroupPolicy *core.PodFSGroupChangePolicy, fldPath *field.Path) field.ErrorList {
+	allErrors := field.ErrorList{}
+	if !validFSGroupChangePolicies.Has(string(*fsGroupPolicy)) {
+		allErrors = append(allErrors, field.NotSupported(fldPath, fsGroupPolicy, validFSGroupChangePolicies.List()))
+	}
+	return allErrors
+}
+
 const (
 	// Limits on various DNS parameters. These are derived from
 	// restrictions in Linux libc name resolution handling.
@@ -3665,6 +3667,10 @@ func ValidatePodSecurityContext(securityContext *core.PodSecurityContext, spec *
 
 		if len(securityContext.Sysctls) != 0 {
 			allErrs = append(allErrs, validateSysctls(securityContext.Sysctls, fldPath.Child("sysctls"))...)
+		}
+
+		if securityContext.FSGroupChangePolicy != nil {
+			allErrs = append(allErrs, validateFSGroupChangePolicy(securityContext.FSGroupChangePolicy, fldPath.Child("fsGroupChangePolicy"))...)
 		}
 
 		allErrs = append(allErrs, validateWindowsSecurityContextOptions(securityContext.WindowsOptions, fldPath.Child("windowsOptions"))...)

@@ -34,6 +34,7 @@ pkg/apis/events/v1beta1
 pkg/apis/extensions/v1beta1
 pkg/apis/flowcontrol/v1alpha1
 pkg/apis/networking/v1
+pkg/apis/networking/v1beta1
 pkg/apis/node/v1alpha1
 pkg/apis/policy/v1beta1
 pkg/apis/rbac/v1
@@ -210,7 +211,6 @@ pkg/volume/azure_file
 pkg/volume/csi/fake
 pkg/volume/git_repo
 pkg/volume/iscsi
-pkg/volume/rbd
 pkg/volume/testing
 pkg/volume/util/fs
 pkg/volume/util/volumepathhandler
@@ -326,6 +326,7 @@ staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/testcerts
 staging/src/k8s.io/apiserver/pkg/apis/apiserver
 staging/src/k8s.io/apiserver/pkg/apis/apiserver/v1
 staging/src/k8s.io/apiserver/pkg/apis/apiserver/v1alpha1
+staging/src/k8s.io/apiserver/pkg/apis/apiserver/v1beta1
 staging/src/k8s.io/apiserver/pkg/apis/audit
 staging/src/k8s.io/apiserver/pkg/apis/audit/v1
 staging/src/k8s.io/apiserver/pkg/apis/audit/v1alpha1
@@ -464,6 +465,7 @@ staging/src/k8s.io/kubectl/pkg/cmd/autoscale
 staging/src/k8s.io/kubectl/pkg/cmd/certificates
 staging/src/k8s.io/kubectl/pkg/cmd/clusterinfo
 staging/src/k8s.io/kubectl/pkg/cmd/create
+staging/src/k8s.io/kubectl/pkg/cmd/debug
 staging/src/k8s.io/kubectl/pkg/cmd/delete
 staging/src/k8s.io/kubectl/pkg/cmd/describe
 staging/src/k8s.io/kubectl/pkg/cmd/diff
@@ -488,7 +490,7 @@ staging/src/k8s.io/kubectl/pkg/cmd/testing
 staging/src/k8s.io/kubectl/pkg/cmd/top
 staging/src/k8s.io/kubectl/pkg/cmd/util
 staging/src/k8s.io/kubectl/pkg/cmd/wait
-staging/src/k8s.io/kubectl/pkg/describe/versioned
+staging/src/k8s.io/kubectl/pkg/describe
 staging/src/k8s.io/kubectl/pkg/generate
 staging/src/k8s.io/kubectl/pkg/generate/versioned
 staging/src/k8s.io/kubectl/pkg/metricsutil

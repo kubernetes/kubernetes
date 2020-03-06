@@ -306,16 +306,6 @@ func (dsc *DaemonSetsController) enqueue(ds *apps.DaemonSet) {
 	dsc.queue.Add(key)
 }
 
-func (dsc *DaemonSetsController) enqueueRateLimited(ds *apps.DaemonSet) {
-	key, err := controller.KeyFunc(ds)
-	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %#v: %v", ds, err))
-		return
-	}
-
-	dsc.queue.AddRateLimited(key)
-}
-
 func (dsc *DaemonSetsController) enqueueDaemonSetAfter(obj interface{}, after time.Duration) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {

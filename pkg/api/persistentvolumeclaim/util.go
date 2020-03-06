@@ -30,22 +30,9 @@ const (
 // DropDisabledFields removes disabled fields from the pvc spec.
 // This should be called from PrepareForCreate/PrepareForUpdate for all resources containing a pvc spec.
 func DropDisabledFields(pvcSpec, oldPVCSpec *core.PersistentVolumeClaimSpec) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) && !volumeModeInUse(oldPVCSpec) {
-		pvcSpec.VolumeMode = nil
-	}
 	if !dataSourceIsEnabled(pvcSpec) && !dataSourceInUse(oldPVCSpec) {
 		pvcSpec.DataSource = nil
 	}
-}
-
-func volumeModeInUse(oldPVCSpec *core.PersistentVolumeClaimSpec) bool {
-	if oldPVCSpec == nil {
-		return false
-	}
-	if oldPVCSpec.VolumeMode != nil {
-		return true
-	}
-	return false
 }
 
 func dataSourceInUse(oldPVCSpec *core.PersistentVolumeClaimSpec) bool {
@@ -60,12 +47,15 @@ func dataSourceInUse(oldPVCSpec *core.PersistentVolumeClaimSpec) bool {
 
 func dataSourceIsEnabled(pvcSpec *core.PersistentVolumeClaimSpec) bool {
 	if pvcSpec.DataSource != nil {
+		if utilfeature.DefaultFeatureGate.Enabled(features.AnyVolumeDataSource) {
+			return true
+		}
+
 		apiGroup := ""
 		if pvcSpec.DataSource.APIGroup != nil {
 			apiGroup = *pvcSpec.DataSource.APIGroup
 		}
-		if utilfeature.DefaultFeatureGate.Enabled(features.VolumePVCDataSource) &&
-			pvcSpec.DataSource.Kind == pvc &&
+		if pvcSpec.DataSource.Kind == pvc &&
 			apiGroup == "" {
 			return true
 

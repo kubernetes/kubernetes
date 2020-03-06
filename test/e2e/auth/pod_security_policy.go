@@ -246,7 +246,7 @@ func createAndBindPSP(f *framework.Framework, pspTemplate *policyv1beta1.PodSecu
 
 	return psp, func() {
 		// Cleanup non-namespaced PSP object.
-		f.ClientSet.PolicyV1beta1().PodSecurityPolicies().Delete(context.TODO(), name, &metav1.DeleteOptions{})
+		f.ClientSet.PolicyV1beta1().PodSecurityPolicies().Delete(context.TODO(), name, metav1.DeleteOptions{})
 	}
 }
 

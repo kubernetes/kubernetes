@@ -607,7 +607,7 @@ func testIterativeDeployments(f *framework.Framework) {
 				}
 				name := podList.Items[p].Name
 				framework.Logf("%02d: deleting deployment pod %q", i, name)
-				err := c.CoreV1().Pods(ns).Delete(context.TODO(), name, nil)
+				err := c.CoreV1().Pods(ns).Delete(context.TODO(), name, metav1.DeleteOptions{})
 				if err != nil && !apierrors.IsNotFound(err) {
 					framework.ExpectNoError(err)
 				}
@@ -854,7 +854,7 @@ func listDeploymentReplicaSets(c clientset.Interface, ns string, label map[strin
 
 func orphanDeploymentReplicaSets(c clientset.Interface, d *appsv1.Deployment) error {
 	trueVar := true
-	deleteOptions := &metav1.DeleteOptions{OrphanDependents: &trueVar}
+	deleteOptions := metav1.DeleteOptions{OrphanDependents: &trueVar}
 	deleteOptions.Preconditions = metav1.NewUIDPreconditions(string(d.UID))
 	return c.AppsV1().Deployments(d.Namespace).Delete(context.TODO(), d.Name, deleteOptions)
 }

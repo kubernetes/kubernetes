@@ -40,8 +40,8 @@ type ComponentStatusesGetter interface {
 type ComponentStatusInterface interface {
 	Create(ctx context.Context, componentStatus *v1.ComponentStatus, opts metav1.CreateOptions) (*v1.ComponentStatus, error)
 	Update(ctx context.Context, componentStatus *v1.ComponentStatus, opts metav1.UpdateOptions) (*v1.ComponentStatus, error)
-	Delete(ctx context.Context, name string, opts *metav1.DeleteOptions) error
-	DeleteCollection(ctx context.Context, opts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
+	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.ComponentStatus, error)
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.ComponentStatusList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
@@ -129,26 +129,26 @@ func (c *componentStatuses) Update(ctx context.Context, componentStatus *v1.Comp
 }
 
 // Delete takes name of the componentStatus and deletes it. Returns an error if one occurs.
-func (c *componentStatuses) Delete(ctx context.Context, name string, options *metav1.DeleteOptions) error {
+func (c *componentStatuses) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	return c.client.Delete().
 		Resource("componentstatuses").
 		Name(name).
-		Body(options).
+		Body(&opts).
 		Do(ctx).
 		Error()
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *componentStatuses) DeleteCollection(ctx context.Context, options *metav1.DeleteOptions, listOptions metav1.ListOptions) error {
+func (c *componentStatuses) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	var timeout time.Duration
-	if listOptions.TimeoutSeconds != nil {
-		timeout = time.Duration(*listOptions.TimeoutSeconds) * time.Second
+	if listOpts.TimeoutSeconds != nil {
+		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
 		Resource("componentstatuses").
-		VersionedParams(&listOptions, scheme.ParameterCodec).
+		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Body(options).
+		Body(&opts).
 		Do(ctx).
 		Error()
 }

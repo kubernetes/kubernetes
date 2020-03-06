@@ -135,7 +135,7 @@ func cleanupTest(t *testing.T, testCtx *testContext) {
 	// Kill the scheduler.
 	testCtx.cancelFn()
 	// Cleanup nodes.
-	testCtx.clientSet.CoreV1().Nodes().DeleteCollection(context.TODO(), nil, metav1.ListOptions{})
+	testCtx.clientSet.CoreV1().Nodes().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
 	framework.DeleteTestingNamespace(testCtx.ns, testCtx.httpServer, t)
 	testCtx.closeFn()
 }

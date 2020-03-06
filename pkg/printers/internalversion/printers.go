@@ -767,7 +767,11 @@ func printPod(pod *api.Pod, options printers.GenerateOptions) ([]metav1.TableRow
 
 		// change pod status back to "Running" if there is at least one container still reporting as "Running" status
 		if reason == "Completed" && hasRunning {
-			reason = "Running"
+			if hasPodReadyCondition(pod.Status.Conditions) {
+				reason = "Running"
+			} else {
+				reason = "NotReady"
+			}
 		}
 	}
 
@@ -816,6 +820,15 @@ func printPod(pod *api.Pod, options printers.GenerateOptions) ([]metav1.TableRow
 	}
 
 	return []metav1.TableRow{row}, nil
+}
+
+func hasPodReadyCondition(conditions []api.PodCondition) bool {
+	for _, condition := range conditions {
+		if condition.Type == api.PodReady && condition.Status == api.ConditionTrue {
+			return true
+		}
+	}
+	return false
 }
 
 func printPodTemplate(obj *api.PodTemplate, options printers.GenerateOptions) ([]metav1.TableRow, error) {

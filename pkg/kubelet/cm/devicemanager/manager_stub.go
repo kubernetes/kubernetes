@@ -45,7 +45,12 @@ func (h *ManagerStub) Stop() error {
 }
 
 // Allocate simply returns nil.
-func (h *ManagerStub) Allocate(node *schedulernodeinfo.NodeInfo, attrs *lifecycle.PodAdmitAttributes) error {
+func (h *ManagerStub) Allocate(pod *v1.Pod, container *v1.Container) error {
+	return nil
+}
+
+// UpdatePluginResources simply returns nil.
+func (h *ManagerStub) UpdatePluginResources(node *schedulernodeinfo.NodeInfo, attrs *lifecycle.PodAdmitAttributes) error {
 	return nil
 }
 

@@ -24,7 +24,6 @@ import (
 	"path/filepath"
 
 	"github.com/spf13/cobra"
-
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	cliflag "k8s.io/component-base/cli/flag"
@@ -37,6 +36,7 @@ type createClusterOptions struct {
 	configAccess          clientcmd.ConfigAccess
 	name                  string
 	server                cliflag.StringFlag
+	tlsServerName         cliflag.StringFlag
 	insecureSkipTLSVerify cliflag.Tristate
 	certificateAuthority  cliflag.StringFlag
 	embedCAData           cliflag.Tristate
@@ -56,7 +56,10 @@ var (
 		kubectl config set-cluster e2e --certificate-authority=~/.kube/e2e/kubernetes.ca.crt
 
 		# Disable cert checking for the dev cluster entry
-		kubectl config set-cluster e2e --insecure-skip-tls-verify=true`)
+		kubectl config set-cluster e2e --insecure-skip-tls-verify=true
+
+		# Set custom TLS server name to use for validation for the e2e cluster entry
+		kubectl config set-cluster e2e --tls-server-name=my-cluster-name`)
 )
 
 // NewCmdConfigSetCluster returns a Command instance for 'config set-cluster' sub command
@@ -64,7 +67,7 @@ func NewCmdConfigSetCluster(out io.Writer, configAccess clientcmd.ConfigAccess) 
 	options := &createClusterOptions{configAccess: configAccess}
 
 	cmd := &cobra.Command{
-		Use:                   fmt.Sprintf("set-cluster NAME [--%v=server] [--%v=path/to/certificate/authority] [--%v=true]", clientcmd.FlagAPIServer, clientcmd.FlagCAFile, clientcmd.FlagInsecure),
+		Use:                   fmt.Sprintf("set-cluster NAME [--%v=server] [--%v=path/to/certificate/authority] [--%v=true] [--%v=example.com]", clientcmd.FlagAPIServer, clientcmd.FlagCAFile, clientcmd.FlagInsecure, clientcmd.FlagTLSServerName),
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Sets a cluster entry in kubeconfig"),
 		Long:                  createClusterLong,
@@ -79,6 +82,7 @@ func NewCmdConfigSetCluster(out io.Writer, configAccess clientcmd.ConfigAccess) 
 	options.insecureSkipTLSVerify.Default(false)
 
 	cmd.Flags().Var(&options.server, clientcmd.FlagAPIServer, clientcmd.FlagAPIServer+" for the cluster entry in kubeconfig")
+	cmd.Flags().Var(&options.tlsServerName, clientcmd.FlagTLSServerName, clientcmd.FlagTLSServerName+" for the cluster entry in kubeconfig")
 	f := cmd.Flags().VarPF(&options.insecureSkipTLSVerify, clientcmd.FlagInsecure, "", clientcmd.FlagInsecure+" for the cluster entry in kubeconfig")
 	f.NoOptDefVal = "true"
 	cmd.Flags().Var(&options.certificateAuthority, clientcmd.FlagCAFile, "Path to "+clientcmd.FlagCAFile+" file for the cluster entry in kubeconfig")
@@ -120,6 +124,12 @@ func (o *createClusterOptions) modifyCluster(existingCluster clientcmdapi.Cluste
 
 	if o.server.Provided() {
 		modifiedCluster.Server = o.server.Value()
+		// specifying a --server on the command line, overrides the TLSServerName that was specified in the kubeconfig file.
+		// if both are specified, then the next if block will write the new TLSServerName.
+		modifiedCluster.TLSServerName = ""
+	}
+	if o.tlsServerName.Provided() {
+		modifiedCluster.TLSServerName = o.tlsServerName.Value()
 	}
 	if o.insecureSkipTLSVerify.Provided() {
 		modifiedCluster.InsecureSkipTLSVerify = o.insecureSkipTLSVerify.Value()

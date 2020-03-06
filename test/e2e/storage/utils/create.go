@@ -402,7 +402,7 @@ func (*serviceAccountFactory) Create(f *framework.Framework, i interface{}) (fun
 		return nil, errors.Wrap(err, "create ServiceAccount")
 	}
 	return func() error {
-		return client.Delete(context.TODO(), item.GetName(), &metav1.DeleteOptions{})
+		return client.Delete(context.TODO(), item.GetName(), metav1.DeleteOptions{})
 	}, nil
 }
 
@@ -424,7 +424,7 @@ func (*clusterRoleFactory) Create(f *framework.Framework, i interface{}) (func()
 		return nil, errors.Wrap(err, "create ClusterRole")
 	}
 	return func() error {
-		return client.Delete(context.TODO(), item.GetName(), &metav1.DeleteOptions{})
+		return client.Delete(context.TODO(), item.GetName(), metav1.DeleteOptions{})
 	}, nil
 }
 
@@ -445,7 +445,7 @@ func (*clusterRoleBindingFactory) Create(f *framework.Framework, i interface{}) 
 		return nil, errors.Wrap(err, "create ClusterRoleBinding")
 	}
 	return func() error {
-		return client.Delete(context.TODO(), item.GetName(), &metav1.DeleteOptions{})
+		return client.Delete(context.TODO(), item.GetName(), metav1.DeleteOptions{})
 	}, nil
 }
 
@@ -466,7 +466,7 @@ func (*roleFactory) Create(f *framework.Framework, i interface{}) (func() error,
 		return nil, errors.Wrap(err, "create Role")
 	}
 	return func() error {
-		return client.Delete(context.TODO(), item.GetName(), &metav1.DeleteOptions{})
+		return client.Delete(context.TODO(), item.GetName(), metav1.DeleteOptions{})
 	}, nil
 }
 
@@ -487,7 +487,7 @@ func (*roleBindingFactory) Create(f *framework.Framework, i interface{}) (func()
 		return nil, errors.Wrap(err, "create RoleBinding")
 	}
 	return func() error {
-		return client.Delete(context.TODO(), item.GetName(), &metav1.DeleteOptions{})
+		return client.Delete(context.TODO(), item.GetName(), metav1.DeleteOptions{})
 	}, nil
 }
 
@@ -508,7 +508,7 @@ func (*serviceFactory) Create(f *framework.Framework, i interface{}) (func() err
 		return nil, errors.Wrap(err, "create Service")
 	}
 	return func() error {
-		return client.Delete(context.TODO(), item.GetName(), &metav1.DeleteOptions{})
+		return client.Delete(context.TODO(), item.GetName(), metav1.DeleteOptions{})
 	}, nil
 }
 
@@ -529,7 +529,7 @@ func (*statefulSetFactory) Create(f *framework.Framework, i interface{}) (func()
 		return nil, errors.Wrap(err, "create StatefulSet")
 	}
 	return func() error {
-		return client.Delete(context.TODO(), item.GetName(), &metav1.DeleteOptions{})
+		return client.Delete(context.TODO(), item.GetName(), metav1.DeleteOptions{})
 	}, nil
 }
 
@@ -550,7 +550,7 @@ func (*daemonSetFactory) Create(f *framework.Framework, i interface{}) (func() e
 		return nil, errors.Wrap(err, "create DaemonSet")
 	}
 	return func() error {
-		return client.Delete(context.TODO(), item.GetName(), &metav1.DeleteOptions{})
+		return client.Delete(context.TODO(), item.GetName(), metav1.DeleteOptions{})
 	}, nil
 }
 
@@ -571,7 +571,7 @@ func (*storageClassFactory) Create(f *framework.Framework, i interface{}) (func(
 		return nil, errors.Wrap(err, "create StorageClass")
 	}
 	return func() error {
-		return client.Delete(context.TODO(), item.GetName(), &metav1.DeleteOptions{})
+		return client.Delete(context.TODO(), item.GetName(), metav1.DeleteOptions{})
 	}, nil
 }
 
@@ -592,7 +592,7 @@ func (*csiDriverFactory) Create(f *framework.Framework, i interface{}) (func() e
 		return nil, errors.Wrap(err, "create CSIDriver")
 	}
 	return func() error {
-		return client.Delete(context.TODO(), item.GetName(), &metav1.DeleteOptions{})
+		return client.Delete(context.TODO(), item.GetName(), metav1.DeleteOptions{})
 	}, nil
 }
 
@@ -613,7 +613,7 @@ func (*secretFactory) Create(f *framework.Framework, i interface{}) (func() erro
 		return nil, errors.Wrap(err, "create Secret")
 	}
 	return func() error {
-		return client.Delete(context.TODO(), item.GetName(), &metav1.DeleteOptions{})
+		return client.Delete(context.TODO(), item.GetName(), metav1.DeleteOptions{})
 	}, nil
 }
 

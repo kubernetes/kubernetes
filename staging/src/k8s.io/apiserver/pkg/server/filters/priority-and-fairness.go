@@ -20,11 +20,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-
-	// TODO: decide whether to also generate the old metrics, which
-	// categorize according to mutating vs readonly.
-
-	// "k8s.io/apiserver/pkg/endpoints/metrics"
+	"sync/atomic"
 
 	fcv1a1 "k8s.io/api/flowcontrol/v1alpha1"
 	apitypes "k8s.io/apimachinery/pkg/types"
@@ -38,8 +34,8 @@ type priorityAndFairnessKeyType int
 const priorityAndFairnessKey priorityAndFairnessKeyType = iota
 
 const (
-	responseHeaderMatchedPriorityLevelConfigurationUID = "X-Kubernetes-PF-PriorityLevelUID"
-	responseHeaderMatchedFlowSchemaUID                 = "X-Kubernetes-PF-FlowSchemaUID"
+	responseHeaderMatchedPriorityLevelConfigurationUID = "X-Kubernetes-PF-PriorityLevel-UID"
+	responseHeaderMatchedFlowSchemaUID                 = "X-Kubernetes-PF-FlowSchema-UID"
 )
 
 // PriorityAndFairnessClassification identifies the results of
@@ -57,6 +53,8 @@ func GetClassification(ctx context.Context) *PriorityAndFairnessClassification {
 	return ctx.Value(priorityAndFairnessKey).(*PriorityAndFairnessClassification)
 }
 
+var atomicMutatingLen, atomicNonMutatingLen int32
+
 // WithPriorityAndFairness limits the number of in-flight
 // requests in a fine-grained way.
 func WithPriorityAndFairness(
@@ -68,7 +66,7 @@ func WithPriorityAndFairness(
 		klog.Warningf("priority and fairness support not found, skipping")
 		return handler
 	}
-
+	startOnce.Do(startRecordingUsage)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		requestInfo, ok := apirequest.RequestInfoFrom(ctx)
@@ -97,8 +95,25 @@ func WithPriorityAndFairness(
 				PriorityLevelName: pl.Name,
 				PriorityLevelUID:  pl.UID}
 		}
+
 		var served bool
+		isMutatingRequest := !nonMutatingRequestVerbs.Has(requestInfo.Verb)
 		execute := func() {
+			var mutatingLen, readOnlyLen int
+			if isMutatingRequest {
+				mutatingLen = int(atomic.AddInt32(&atomicMutatingLen, 1))
+			} else {
+				readOnlyLen = int(atomic.AddInt32(&atomicNonMutatingLen, 1))
+			}
+			defer func() {
+				if isMutatingRequest {
+					atomic.AddInt32(&atomicMutatingLen, -11)
+					watermark.recordMutating(mutatingLen)
+				} else {
+					atomic.AddInt32(&atomicNonMutatingLen, -1)
+					watermark.recordReadOnly(readOnlyLen)
+				}
+			}()
 			served = true
 			innerCtx := context.WithValue(ctx, priorityAndFairnessKey, classification)
 			innerReq := r.Clone(innerCtx)

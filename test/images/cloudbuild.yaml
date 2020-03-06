@@ -17,8 +17,9 @@ steps:
     - BASE_REF=$_PULL_BASE_REF
     - WHAT=$_WHAT
     - REGISTRY=gcr.io/k8s-staging-e2e-test-images
+    # TODO(claudiub): Readd the REMOTE_DOCKER_URL_${os_version} to reenable the Windows test image building process.
     args:
-    - all-push
+    - all-build-and-push
 substitutions:
   # _GIT_TAG will be filled with a git-based tag for the image, of the form vYYYYMMDD-hash, and
   # can be used as a substitution

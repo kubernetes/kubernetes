@@ -103,7 +103,7 @@ func TestPodAndContainer(t *testing.T) {
 		{
 			p:             &ExecOptions{},
 			args:          []string{"foo", "cmd"},
-			argsLenAtDash: -1,
+			argsLenAtDash: 1,
 			expectedPod:   "foo",
 			expectedArgs:  []string{"cmd"},
 			name:          "cmd, w/o flags",
@@ -112,7 +112,7 @@ func TestPodAndContainer(t *testing.T) {
 		{
 			p:             &ExecOptions{},
 			args:          []string{"foo", "cmd"},
-			argsLenAtDash: 1,
+			argsLenAtDash: -1,
 			expectedPod:   "foo",
 			expectedArgs:  []string{"cmd"},
 			name:          "cmd, cmd is behind dash",

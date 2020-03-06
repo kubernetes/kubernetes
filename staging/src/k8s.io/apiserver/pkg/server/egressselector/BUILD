@@ -15,7 +15,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/apis/apiserver:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/apis/apiserver/install:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/apis/apiserver/v1alpha1:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/apis/apiserver/v1beta1:go_default_library",
         "//vendor/google.golang.org/grpc:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
         "//vendor/k8s.io/utils/path:go_default_library",

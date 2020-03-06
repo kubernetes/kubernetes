@@ -588,10 +588,14 @@ func genNRRIs(rng *rand.Rand, m int, verbs, urls []string) []*request.RequestInf
 	coords := chooseInts(rng, nv*nu, m)
 	ans := make([]*request.RequestInfo, 0, m)
 	for _, coord := range coords {
-		ans = append(ans, &request.RequestInfo{
+		ri := &request.RequestInfo{
 			IsResourceRequest: false,
 			Verb:              verbs[coord%nv],
-			Path:              urls[coord/nv]})
+			Path:              urls[coord/nv]}
+		if rng.Intn(2) == 1 {
+			ri.Path = ri.Path + "/more"
+		}
+		ans = append(ans, ri)
 	}
 	return ans
 }
@@ -614,14 +618,14 @@ func chooseInts(rng *rand.Rand, n, m int) []int {
 func genNonResourceRule(rng *rand.Rand, pfx string, matchAllNonResources, someMatchesAllNonResources bool) (fcv1a1.NonResourcePolicyRule, []*request.RequestInfo, []*request.RequestInfo) {
 	nrr := fcv1a1.NonResourcePolicyRule{
 		Verbs:           []string{pfx + "-v1", pfx + "-v2", pfx + "-v3"},
-		NonResourceURLs: []string{"/" + pfx + "/p1", "/" + pfx + "/p2", "/" + pfx + "/p3"},
+		NonResourceURLs: []string{"/" + pfx + "/g/p1", "/" + pfx + "/g/p2", "/" + pfx + "/g/p3"},
 	}
 	matchingRIs := genNRRIs(rng, 3, nrr.Verbs, nrr.NonResourceURLs)
 	var skippingRIs []*request.RequestInfo
 	if !someMatchesAllNonResources {
 		skippingRIs = genNRRIs(rng, 3,
 			[]string{pfx + "-v4", pfx + "-v5", pfx + "-v6"},
-			[]string{"/" + pfx + "/p4", "/" + pfx + "/p5", "/" + pfx + "/p6"})
+			[]string{"/" + pfx + "/b/p1", "/" + pfx + "/b/p2", "/" + pfx + "/b/p3"})
 	}
 	// choose a proper subset of fields to consider wildcarding; only matters if not matching all
 	starMask := rng.Intn(3)
@@ -630,6 +634,9 @@ func genNonResourceRule(rng *rand.Rand, pfx string, matchAllNonResources, someMa
 	}
 	if matchAllNonResources || starMask&2 == 2 && rng.Float32() < 0.1 {
 		nrr.NonResourceURLs = []string{"*"}
+	} else {
+		nrr.NonResourceURLs[rng.Intn(3)] = "/" + pfx + "/g/*"
+		nrr.NonResourceURLs[rng.Intn(3)] = "/" + pfx + "/g"
 	}
 	return nrr, matchingRIs, skippingRIs
 }

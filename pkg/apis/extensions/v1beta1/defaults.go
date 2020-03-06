@@ -165,3 +165,10 @@ func SetDefaults_NetworkPolicy(obj *extensionsv1beta1.NetworkPolicy) {
 		}
 	}
 }
+
+func SetDefaults_HTTPIngressPath(obj *extensionsv1beta1.HTTPIngressPath) {
+	var defaultPathType = extensionsv1beta1.PathTypeImplementationSpecific
+	if obj.PathType == nil {
+		obj.PathType = &defaultPathType
+	}
+}

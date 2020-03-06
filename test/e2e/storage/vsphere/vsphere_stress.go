@@ -109,7 +109,7 @@ var _ = utils.SIGDescribe("vsphere cloud provider stress [Feature:vsphere]", fun
 			}
 			gomega.Expect(sc).NotTo(gomega.BeNil())
 			framework.ExpectNoError(err)
-			defer client.StorageV1().StorageClasses().Delete(context.TODO(), scname, nil)
+			defer client.StorageV1().StorageClasses().Delete(context.TODO(), scname, metav1.DeleteOptions{})
 			scArrays[index] = sc
 		}
 

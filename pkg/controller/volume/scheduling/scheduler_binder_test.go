@@ -1813,7 +1813,7 @@ func TestBindPodVolumes(t *testing.T) {
 			delayFunc: func(t *testing.T, testEnv *testEnv, pod *v1.Pod, pvs []*v1.PersistentVolume, pvcs []*v1.PersistentVolumeClaim) {
 				pvc := pvcs[0]
 				// Delete PVC will fail check
-				if err := testEnv.client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(context.TODO(), pvc.Name, &metav1.DeleteOptions{}); err != nil {
+				if err := testEnv.client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(context.TODO(), pvc.Name, metav1.DeleteOptions{}); err != nil {
 					t.Errorf("failed to delete PVC %q: %v", pvc.Name, err)
 				}
 			},

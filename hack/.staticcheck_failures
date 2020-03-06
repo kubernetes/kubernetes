@@ -1,5 +1,4 @@
 cluster/images/etcd/migrate
-pkg/controller/daemon
 pkg/controller/deployment
 pkg/controller/garbagecollector
 pkg/controller/nodeipam

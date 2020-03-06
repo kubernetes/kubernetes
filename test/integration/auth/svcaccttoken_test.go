@@ -803,7 +803,7 @@ func createDeleteSvcAcct(t *testing.T, cs clientset.Interface, sa *v1.ServiceAcc
 			return
 		}
 		done = true
-		if err := cs.CoreV1().ServiceAccounts(sa.Namespace).Delete(context.TODO(), sa.Name, nil); err != nil {
+		if err := cs.CoreV1().ServiceAccounts(sa.Namespace).Delete(context.TODO(), sa.Name, metav1.DeleteOptions{}); err != nil {
 			t.Fatalf("err: %v", err)
 		}
 	}
@@ -822,7 +822,7 @@ func createDeletePod(t *testing.T, cs clientset.Interface, pod *v1.Pod) (*v1.Pod
 			return
 		}
 		done = true
-		if err := cs.CoreV1().Pods(pod.Namespace).Delete(context.TODO(), pod.Name, nil); err != nil {
+		if err := cs.CoreV1().Pods(pod.Namespace).Delete(context.TODO(), pod.Name, metav1.DeleteOptions{}); err != nil {
 			t.Fatalf("err: %v", err)
 		}
 	}
@@ -841,7 +841,7 @@ func createDeleteSecret(t *testing.T, cs clientset.Interface, sec *v1.Secret) (*
 			return
 		}
 		done = true
-		if err := cs.CoreV1().Secrets(sec.Namespace).Delete(context.TODO(), sec.Name, nil); err != nil {
+		if err := cs.CoreV1().Secrets(sec.Namespace).Delete(context.TODO(), sec.Name, metav1.DeleteOptions{}); err != nil {
 			t.Fatalf("err: %v", err)
 		}
 	}

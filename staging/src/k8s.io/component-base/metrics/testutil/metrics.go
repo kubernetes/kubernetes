@@ -320,3 +320,30 @@ func (hist *Histogram) Validate() error {
 
 	return nil
 }
+
+// GetGaugeMetricValue extract metric value from GaugeMetric
+func GetGaugeMetricValue(m metrics.GaugeMetric) (float64, error) {
+	metricProto := &dto.Metric{}
+	if err := m.Write(metricProto); err != nil {
+		return 0, fmt.Errorf("Error writing m: %v", err)
+	}
+	return metricProto.Gauge.GetValue(), nil
+}
+
+// GetCounterMetricValue extract metric value from CounterMetric
+func GetCounterMetricValue(m metrics.CounterMetric) (float64, error) {
+	metricProto := &dto.Metric{}
+	if err := m.(metrics.Metric).Write(metricProto); err != nil {
+		return 0, fmt.Errorf("Error writing m: %v", err)
+	}
+	return metricProto.Counter.GetValue(), nil
+}
+
+// GetHistogramMetricValue extract sum of all samples from ObserverMetric
+func GetHistogramMetricValue(m metrics.ObserverMetric) (float64, error) {
+	metricProto := &dto.Metric{}
+	if err := m.(metrics.Metric).Write(metricProto); err != nil {
+		return 0, fmt.Errorf("Error writing m: %v", err)
+	}
+	return metricProto.Histogram.GetSampleSum(), nil
+}

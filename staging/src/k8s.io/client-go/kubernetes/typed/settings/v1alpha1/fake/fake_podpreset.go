@@ -103,7 +103,7 @@ func (c *FakePodPresets) Update(ctx context.Context, podPreset *v1alpha1.PodPres
 }
 
 // Delete takes name of the podPreset and deletes it. Returns an error if one occurs.
-func (c *FakePodPresets) Delete(ctx context.Context, name string, options *v1.DeleteOptions) error {
+func (c *FakePodPresets) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(podpresetsResource, c.ns, name), &v1alpha1.PodPreset{})
 
@@ -111,8 +111,8 @@ func (c *FakePodPresets) Delete(ctx context.Context, name string, options *v1.De
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakePodPresets) DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(podpresetsResource, c.ns, listOptions)
+func (c *FakePodPresets) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(podpresetsResource, c.ns, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1alpha1.PodPresetList{})
 	return err

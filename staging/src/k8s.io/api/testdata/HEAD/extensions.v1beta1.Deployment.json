@@ -1154,7 +1154,8 @@
               "name": "363",
               "value": "364"
             }
-          ]
+          ],
+          "fsGroupChangePolicy": "Ņ#耗Ǚ("
         },
         "imagePullSecrets": [
           {
@@ -1171,7 +1172,7 @@
                   "matchExpressions": [
                     {
                       "key": "368",
-                      "operator": "ǧĒzŔ瘍N",
+                      "operator": "",
                       "values": [
                         "369"
                       ]

@@ -125,7 +125,7 @@ func (p *IntegrationTestNodePreparer) CleanupNodes() error {
 		klog.Fatalf("Error listing nodes: %v", err)
 	}
 	for i := range nodes.Items {
-		if err := p.client.CoreV1().Nodes().Delete(context.TODO(), nodes.Items[i].Name, &metav1.DeleteOptions{}); err != nil {
+		if err := p.client.CoreV1().Nodes().Delete(context.TODO(), nodes.Items[i].Name, metav1.DeleteOptions{}); err != nil {
 			klog.Errorf("Error while deleting Node: %v", err)
 		}
 	}

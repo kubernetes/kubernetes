@@ -78,7 +78,7 @@ func TestNamespaceCondition(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err = kubeClient.CoreV1().Namespaces().Delete(context.TODO(), nsName, nil); err != nil {
+	if err = kubeClient.CoreV1().Namespaces().Delete(context.TODO(), nsName, metav1.DeleteOptions{}); err != nil {
 		t.Fatal(err)
 	}
 

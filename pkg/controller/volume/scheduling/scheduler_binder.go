@@ -131,6 +131,9 @@ type SchedulerVolumeBinder interface {
 
 	// GetBindingsCache returns the cache used (if any) to store volume binding decisions.
 	GetBindingsCache() PodBindingCache
+
+	// DeletePodBindings will delete pod's bindingDecisions in podBindingCache.
+	DeletePodBindings(pod *v1.Pod)
 }
 
 type volumeBinder struct {
@@ -179,6 +182,14 @@ func NewVolumeBinder(
 
 func (b *volumeBinder) GetBindingsCache() PodBindingCache {
 	return b.podBindingCache
+}
+
+// DeletePodBindings will delete pod's bindingDecisions in podBindingCache.
+func (b *volumeBinder) DeletePodBindings(pod *v1.Pod) {
+	cache := b.podBindingCache
+	if pod != nil {
+		cache.DeleteBindings(pod)
+	}
 }
 
 // FindPodVolumes caches the matching PVs and PVCs to provision per node in podBindingCache.

@@ -40,7 +40,7 @@ For example, let's consider the following `pod.yaml` file:
       containers:
       - args:
         - dns-suffix
-        image: us.gcr.io/k8s-artifacts-prod/e2e-test-images/agnhost:2.10
+        image: us.gcr.io/k8s-artifacts-prod/e2e-test-images/agnhost:2.11
         name: agnhost
       dnsConfig:
         nameservers:
@@ -207,7 +207,7 @@ Usage:
 
 ```console
 guestbook="test/e2e/testing-manifests/guestbook"
-sed_expr="s|{{.AgnhostImage}}|us.gcr.io/k8s-artifacts-prod/e2e-test-images/agnhost:2.10|"
+sed_expr="s|{{.AgnhostImage}}|us.gcr.io/k8s-artifacts-prod/e2e-test-images/agnhost:2.11|"
 
 # create the services.
 kubectl create -f ${guestbook}/frontend-service.yaml
@@ -290,14 +290,14 @@ Examples:
 
 ```console
 docker run -i \
-  us.gcr.io/k8s-artifacts-prod/e2e-test-images/agnhost:2.10 \
+  us.gcr.io/k8s-artifacts-prod/e2e-test-images/agnhost:2.11 \
   logs-generator --log-lines-total 10 --run-duration 1s
 ```
 
 ```console
 kubectl run logs-generator \
   --generator=run-pod/v1 \
-  --image=us.gcr.io/k8s-artifacts-prod/e2e-test-images/agnhost:2.10 \
+  --image=us.gcr.io/k8s-artifacts-prod/e2e-test-images/agnhost:2.11 \
   --restart=Never \
   -- logs-generator -t 10 -d 1s
 ```
@@ -455,7 +455,7 @@ Usage:
 ```console
     kubectl run test-agnhost \
       --generator=run-pod/v1 \
-      --image=us.gcr.io/k8s-artifacts-prod/e2e-test-images/agnhost:2.10 \
+      --image=us.gcr.io/k8s-artifacts-prod/e2e-test-images/agnhost:2.11 \
       --restart=Never \
       --env "POD_IP=<POD_IP>" \
       --env "NODE_IP=<NODE_IP>" \
@@ -510,7 +510,7 @@ Usage:
 ```console
     kubectl run test-agnhost \
       --generator=run-pod/v1 \
-      --image=us.gcr.io/k8s-artifacts-prod/e2e-test-images/agnhost:2.10 \
+      --image=us.gcr.io/k8s-artifacts-prod/e2e-test-images/agnhost:2.11 \
       --restart=Never \
       --env "BIND_ADDRESS=localhost" \
       --env "BIND_PORT=8080" \
@@ -626,11 +626,18 @@ Usage:
 
 ## Other tools
 
-The image contains `iperf`, `curl`, `dns-tools` (including `dig`), CoreDNS.
+The image contains `iperf`, `curl`, `dns-tools` (including `dig`), CoreDNS, for both Windows and Linux.
+
+For Windows, the image is based on `busybox`, meaning that most of the Linux common tools are also
+available on it, making it possible to run most Linux commands in the `agnhost` Windows container
+as well. Keep in mind that there might still be some differences though (e.g.: `wget` does not
+have the `-T` argument on Windows).
+
+The Windows `agnhost` image includes a `nc` binary that is 100% compliant with its Linux equivalent.
 
 
 ## Image
 
-The image can be found at `us.gcr.io/k8s-artifacts-prod/e2e-test-images/agnhost:2.10` for Linux
-containers, and `e2eteam/agnhost:2.10` for Windows containers. In the future, the same
-repository can be used for both OSes.
+The image can be found at `us.gcr.io/k8s-artifacts-prod/e2e-test-images/agnhost:2.11` for both Linux and
+Windows containers (based on `mcr.microsoft.com/windows/servercore:ltsc2019`,
+`mcr.microsoft.com/windows/servercore:1903`, and `mcr.microsoft.com/windows/servercore:1909`).

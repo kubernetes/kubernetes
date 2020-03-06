@@ -201,7 +201,7 @@ var _ = SIGDescribe("LimitRange", func() {
 		framework.ExpectError(err)
 
 		ginkgo.By("Deleting a LimitRange")
-		err = f.ClientSet.CoreV1().LimitRanges(f.Namespace.Name).Delete(context.TODO(), limitRange.Name, metav1.NewDeleteOptions(30))
+		err = f.ClientSet.CoreV1().LimitRanges(f.Namespace.Name).Delete(context.TODO(), limitRange.Name, *metav1.NewDeleteOptions(30))
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Verifying the LimitRange was deleted")

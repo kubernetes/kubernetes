@@ -72,3 +72,26 @@ func RecommendedDefaultClientConnectionConfiguration(obj *ClientConnectionConfig
 		obj.Burst = 100
 	}
 }
+
+// RecommendedDebuggingConfiguration defaults profiling and debugging configuration.
+// This will set the recommended default
+// values, but they may be subject to change between API versions. This function
+// is intentionally not registered in the scheme as a "normal" `SetDefaults_Foo`
+// function to allow consumers of this type to set whatever defaults for their
+// embedded configs. Forcing consumers to use these defaults would be problematic
+// as defaulting in the scheme is done as part of the conversion, and there would
+// be no easy way to opt-out. Instead, if you want to use this defaulting method
+// run it in your wrapper struct of this type in its `SetDefaults_` method.
+func RecommendedDebuggingConfiguration(obj *DebuggingConfiguration) {
+	if obj.EnableProfiling == nil {
+		obj.EnableProfiling = utilpointer.BoolPtr(true) // profile debugging is cheap to have exposed and standard on kube binaries
+	}
+}
+
+// NewRecommendedDebuggingConfiguration returns the current recommended DebuggingConfiguration.
+// This may change between releases as recommendations shift.
+func NewRecommendedDebuggingConfiguration() *DebuggingConfiguration {
+	ret := &DebuggingConfiguration{}
+	RecommendedDebuggingConfiguration(ret)
+	return ret
+}

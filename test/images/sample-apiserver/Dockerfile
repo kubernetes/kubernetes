@@ -32,7 +32,8 @@ RUN GO111MODULE=on CGO_ENABLED=0 GOOS=linux GOARCH=BASEARCH go get k8s.io/sample
 # we can copy it out from this throw away container image from a standard location
 RUN find /go/bin -name sample-apiserver -exec cp {} / \;
 
-FROM BASEIMAGE
+ARG BASEIMAGE
+FROM $BASEIMAGE
 COPY --from=build_k8s_1_17_sample_apiserver /sample-apiserver /sample-apiserver
 
 ENTRYPOINT ["/sample-apiserver"]

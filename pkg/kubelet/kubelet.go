@@ -867,9 +867,9 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	}
 	klet.AddPodSyncLoopHandler(activeDeadlineHandler)
 	klet.AddPodSyncHandler(activeDeadlineHandler)
-	if utilfeature.DefaultFeatureGate.Enabled(features.TopologyManager) {
-		klet.admitHandlers.AddPodAdmitHandler(klet.containerManager.GetTopologyPodAdmitHandler())
-	}
+
+	klet.admitHandlers.AddPodAdmitHandler(klet.containerManager.GetAllocateResourcesPodAdmitHandler())
+
 	criticalPodAdmissionHandler := preemption.NewCriticalPodAdmissionHandler(klet.GetActivePods, killPodNow(klet.podWorkers, kubeDeps.Recorder), kubeDeps.Recorder)
 	klet.admitHandlers.AddPodAdmitHandler(lifecycle.NewPredicateAdmitHandler(klet.getNodeAnyWay, criticalPodAdmissionHandler, klet.containerManager.UpdatePluginResources))
 	// apply functional Option's
@@ -2001,18 +2001,22 @@ func (kl *Kubelet) syncLoopIteration(configCh <-chan kubetypes.PodUpdate, handle
 }
 
 // dispatchWork starts the asynchronous sync of the pod in a pod worker.
-// If the pod is terminated, dispatchWork
+// If the pod has completed termination, dispatchWork will perform no action.
 func (kl *Kubelet) dispatchWork(pod *v1.Pod, syncType kubetypes.SyncPodType, mirrorPod *v1.Pod, start time.Time) {
-	if kl.podIsTerminated(pod) {
-		if pod.DeletionTimestamp != nil {
-			// If the pod is in a terminated state, there is no pod worker to
-			// handle the work item. Check if the DeletionTimestamp has been
-			// set, and force a status update to trigger a pod deletion request
-			// to the apiserver.
-			kl.statusManager.TerminatePod(pod)
-		}
+	// check whether we are ready to delete the pod from the API server (all status up to date)
+	containersTerminal, podWorkerTerminal := kl.podAndContainersAreTerminal(pod)
+	if pod.DeletionTimestamp != nil && containersTerminal {
+		klog.V(4).Infof("Pod %q has completed execution and should be deleted from the API server: %s", format.Pod(pod), syncType)
+		kl.statusManager.TerminatePod(pod)
 		return
 	}
+
+	// optimization: avoid invoking the pod worker if no further changes are possible to the pod definition
+	if podWorkerTerminal {
+		klog.V(4).Infof("Pod %q has completed, ignoring remaining sync work: %s", format.Pod(pod), syncType)
+		return
+	}
+
 	// Run the sync in an async worker.
 	kl.podWorkers.UpdatePod(&UpdatePodOptions{
 		Pod:        pod,

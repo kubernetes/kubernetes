@@ -99,7 +99,7 @@ var _ = framework.KubeDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugi
 					continue
 				}
 
-				f.PodClient().Delete(context.TODO(), p.Name, &metav1.DeleteOptions{})
+				f.PodClient().Delete(context.TODO(), p.Name, metav1.DeleteOptions{})
 			}
 		})
 
@@ -135,7 +135,7 @@ var _ = framework.KubeDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugi
 			framework.ExpectEqual(devID1, devID2)
 
 			ginkgo.By("Deleting device plugin.")
-			f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Delete(context.TODO(), devicePluginPod.Name, &metav1.DeleteOptions{})
+			f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Delete(context.TODO(), devicePluginPod.Name, metav1.DeleteOptions{})
 			ginkgo.By("Waiting for GPUs to become unavailable on the local node")
 			gomega.Eventually(func() bool {
 				node, err := f.ClientSet.CoreV1().Nodes().Get(context.TODO(), framework.TestContext.NodeName, metav1.GetOptions{})
@@ -162,8 +162,8 @@ var _ = framework.KubeDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugi
 			logDevicePluginMetrics()
 
 			// Cleanup
-			f.PodClient().DeleteSync(p1.Name, &metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
-			f.PodClient().DeleteSync(p2.Name, &metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
+			f.PodClient().DeleteSync(p1.Name, metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
+			f.PodClient().DeleteSync(p2.Name, metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
 		})
 	})
 })

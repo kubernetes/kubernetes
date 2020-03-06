@@ -35,6 +35,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
+	testutils "k8s.io/kubernetes/test/integration/util"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -279,8 +280,8 @@ func machine3Prioritizer(pod *v1.Pod, nodes *v1.NodeList) (*extenderv1.HostPrior
 }
 
 func TestSchedulerExtender(t *testing.T) {
-	testCtx := initTestMaster(t, "scheduler-extender", nil)
-	clientSet := testCtx.clientSet
+	testCtx := testutils.InitTestMaster(t, "scheduler-extender", nil)
+	clientSet := testCtx.ClientSet
 
 	extender1 := &Extender{
 		name:         "extender1",
@@ -349,16 +350,16 @@ func TestSchedulerExtender(t *testing.T) {
 	}
 	policy.APIVersion = "v1"
 
-	testCtx = initTestScheduler(t, testCtx, false, &policy)
-	defer cleanupTest(t, testCtx)
+	testCtx = testutils.InitTestScheduler(t, testCtx, false, &policy)
+	defer testutils.CleanupTest(t, testCtx)
 
-	DoTestPodScheduling(testCtx.ns, t, clientSet)
+	DoTestPodScheduling(testCtx.NS, t, clientSet)
 }
 
 func DoTestPodScheduling(ns *v1.Namespace, t *testing.T, cs clientset.Interface) {
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
 	// non-namespaced objects (Nodes).
-	defer cs.CoreV1().Nodes().DeleteCollection(context.TODO(), nil, metav1.ListOptions{})
+	defer cs.CoreV1().Nodes().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
 
 	goodCondition := v1.NodeCondition{
 		Type:              v1.NodeReady,
@@ -405,7 +406,7 @@ func DoTestPodScheduling(ns *v1.Namespace, t *testing.T, cs clientset.Interface)
 		t.Fatalf("Failed to create pod: %v", err)
 	}
 
-	err = wait.Poll(time.Second, wait.ForeverTestTimeout, podScheduled(cs, myPod.Namespace, myPod.Name))
+	err = wait.Poll(time.Second, wait.ForeverTestTimeout, testutils.PodScheduled(cs, myPod.Namespace, myPod.Name))
 	if err != nil {
 		t.Fatalf("Failed to schedule pod: %v", err)
 	}
@@ -417,7 +418,7 @@ func DoTestPodScheduling(ns *v1.Namespace, t *testing.T, cs clientset.Interface)
 		t.Fatalf("Failed to schedule using extender, expected machine2, got %v", myPod.Spec.NodeName)
 	}
 	var gracePeriod int64
-	if err := cs.CoreV1().Pods(ns.Name).Delete(context.TODO(), myPod.Name, &metav1.DeleteOptions{GracePeriodSeconds: &gracePeriod}); err != nil {
+	if err := cs.CoreV1().Pods(ns.Name).Delete(context.TODO(), myPod.Name, metav1.DeleteOptions{GracePeriodSeconds: &gracePeriod}); err != nil {
 		t.Fatalf("Failed to delete pod: %v", err)
 	}
 	_, err = cs.CoreV1().Pods(ns.Name).Get(context.TODO(), myPod.Name, metav1.GetOptions{})

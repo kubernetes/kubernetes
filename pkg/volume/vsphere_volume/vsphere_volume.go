@@ -33,9 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	volumehelpers "k8s.io/cloud-provider/volume/helpers"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 )
@@ -272,7 +270,7 @@ func (b *vsphereVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArg
 		os.Remove(dir)
 		return err
 	}
-	volume.SetVolumeOwnership(b, mounterArgs.FsGroup)
+	volume.SetVolumeOwnership(b, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy)
 	klog.V(3).Infof("vSphere volume %s mounted to %s", b.volPath, dir)
 
 	return nil
@@ -382,13 +380,10 @@ func (v *vsphereVolumeProvisioner) Provision(selectedNode *v1.Node, allowedTopol
 		volSpec.Fstype = "ext4"
 	}
 
-	var volumeMode *v1.PersistentVolumeMode
-	if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
-		volumeMode = v.options.PVC.Spec.VolumeMode
-		if volumeMode != nil && *volumeMode == v1.PersistentVolumeBlock {
-			klog.V(5).Infof("vSphere block volume should not have any FSType")
-			volSpec.Fstype = ""
-		}
+	volumeMode := v.options.PVC.Spec.VolumeMode
+	if volumeMode != nil && *volumeMode == v1.PersistentVolumeBlock {
+		klog.V(5).Infof("vSphere block volume should not have any FSType")
+		volSpec.Fstype = ""
 	}
 
 	pv := &v1.PersistentVolume{

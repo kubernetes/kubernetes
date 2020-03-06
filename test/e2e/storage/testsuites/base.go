@@ -408,7 +408,7 @@ func isDelayedBinding(sc *storagev1.StorageClass) bool {
 
 // deleteStorageClass deletes the passed in StorageClass and catches errors other than "Not Found"
 func deleteStorageClass(cs clientset.Interface, className string) error {
-	err := cs.StorageV1().StorageClasses().Delete(context.TODO(), className, nil)
+	err := cs.StorageV1().StorageClasses().Delete(context.TODO(), className, metav1.DeleteOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}

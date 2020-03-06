@@ -362,7 +362,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 				ss, err = e2esset.Scale(c, ss, 0)
 				framework.ExpectNoError(err)
 				e2esset.WaitForStatusReplicas(c, ss, 0)
-				err = c.AppsV1().StatefulSets(ns).Delete(context.TODO(), ss.Name, &metav1.DeleteOptions{})
+				err = c.AppsV1().StatefulSets(ns).Delete(context.TODO(), ss.Name, metav1.DeleteOptions{})
 				framework.ExpectNoError(err)
 
 				ginkgo.By("Creating a new Statefulset and validating the data")

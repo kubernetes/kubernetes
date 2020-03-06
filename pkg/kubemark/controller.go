@@ -249,7 +249,7 @@ func (kubemarkController *KubemarkController) RemoveNodeFromNodeGroup(nodeGroup 
 	var err error
 	for i := 0; i < numRetries; i++ {
 		err = kubemarkController.externalCluster.client.CoreV1().ReplicationControllers(namespaceKubemark).Delete(context.TODO(), pod.ObjectMeta.Labels["name"],
-			&metav1.DeleteOptions{PropagationPolicy: &policy})
+			metav1.DeleteOptions{PropagationPolicy: &policy})
 		if err == nil {
 			klog.Infof("marking node %s for deletion", node)
 			// Mark node for deletion from kubemark cluster.
@@ -374,7 +374,7 @@ func (kubemarkCluster *kubemarkCluster) removeUnneededNodes(oldObj interface{}, 
 			defer kubemarkCluster.nodesToDeleteLock.Unlock()
 			if kubemarkCluster.nodesToDelete[node.Name] {
 				kubemarkCluster.nodesToDelete[node.Name] = false
-				if err := kubemarkCluster.client.CoreV1().Nodes().Delete(context.TODO(), node.Name, &metav1.DeleteOptions{}); err != nil {
+				if err := kubemarkCluster.client.CoreV1().Nodes().Delete(context.TODO(), node.Name, metav1.DeleteOptions{}); err != nil {
 					klog.Errorf("failed to delete node %s from kubemark cluster, err: %v", node.Name, err)
 				}
 			}

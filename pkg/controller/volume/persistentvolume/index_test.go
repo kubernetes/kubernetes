@@ -1060,91 +1060,56 @@ func TestVolumeModeCheck(t *testing.T) {
 		isExpectedMismatch bool
 		vol                *v1.PersistentVolume
 		pvc                *v1.PersistentVolumeClaim
-		enableBlock        bool
 	}{
-		"feature enabled - pvc block and pv filesystem": {
+		"pvc block and pv filesystem": {
 			isExpectedMismatch: true,
 			vol:                createVolumeModeFilesystemTestVolume(),
 			pvc:                makeVolumeModePVC("8G", &blockMode, nil),
-			enableBlock:        true,
 		},
-		"feature enabled - pvc filesystem and pv block": {
+		"pvc filesystem and pv block": {
 			isExpectedMismatch: true,
 			vol:                createVolumeModeBlockTestVolume(),
 			pvc:                makeVolumeModePVC("8G", &filesystemMode, nil),
-			enableBlock:        true,
 		},
-		"feature enabled - pvc block and pv block": {
+		"pvc block and pv block": {
 			isExpectedMismatch: false,
 			vol:                createVolumeModeBlockTestVolume(),
 			pvc:                makeVolumeModePVC("8G", &blockMode, nil),
-			enableBlock:        true,
 		},
-		"feature enabled - pvc filesystem and pv filesystem": {
+		"pvc filesystem and pv filesystem": {
 			isExpectedMismatch: false,
 			vol:                createVolumeModeFilesystemTestVolume(),
 			pvc:                makeVolumeModePVC("8G", &filesystemMode, nil),
-			enableBlock:        true,
 		},
-		"feature enabled - pvc filesystem and pv nil": {
+		"pvc filesystem and pv nil": {
 			isExpectedMismatch: false,
 			vol:                createVolumeModeNilTestVolume(),
 			pvc:                makeVolumeModePVC("8G", &filesystemMode, nil),
-			enableBlock:        true,
 		},
-		"feature enabled - pvc nil and pv filesystem": {
+		"pvc nil and pv filesystem": {
 			isExpectedMismatch: false,
 			vol:                createVolumeModeFilesystemTestVolume(),
 			pvc:                makeVolumeModePVC("8G", nil, nil),
-			enableBlock:        true,
 		},
-		"feature enabled - pvc nil and pv nil": {
+		"pvc nil and pv nil": {
 			isExpectedMismatch: false,
 			vol:                createVolumeModeNilTestVolume(),
 			pvc:                makeVolumeModePVC("8G", nil, nil),
-			enableBlock:        true,
 		},
-		"feature enabled - pvc nil and pv block": {
+		"pvc nil and pv block": {
 			isExpectedMismatch: true,
 			vol:                createVolumeModeBlockTestVolume(),
 			pvc:                makeVolumeModePVC("8G", nil, nil),
-			enableBlock:        true,
 		},
-		"feature enabled - pvc block and pv nil": {
+		"pvc block and pv nil": {
 			isExpectedMismatch: true,
 			vol:                createVolumeModeNilTestVolume(),
 			pvc:                makeVolumeModePVC("8G", &blockMode, nil),
-			enableBlock:        true,
-		},
-		"feature disabled - pvc block and pv filesystem": {
-			isExpectedMismatch: true,
-			vol:                createVolumeModeFilesystemTestVolume(),
-			pvc:                makeVolumeModePVC("8G", &blockMode, nil),
-			enableBlock:        false,
-		},
-		"feature disabled - pvc filesystem and pv block": {
-			isExpectedMismatch: true,
-			vol:                createVolumeModeBlockTestVolume(),
-			pvc:                makeVolumeModePVC("8G", &filesystemMode, nil),
-			enableBlock:        false,
-		},
-		"feature disabled - pvc block and pv block": {
-			isExpectedMismatch: true,
-			vol:                createVolumeModeBlockTestVolume(),
-			pvc:                makeVolumeModePVC("8G", &blockMode, nil),
-			enableBlock:        false,
-		},
-		"feature disabled - pvc filesystem and pv filesystem": {
-			isExpectedMismatch: false,
-			vol:                createVolumeModeFilesystemTestVolume(),
-			pvc:                makeVolumeModePVC("8G", &filesystemMode, nil),
-			enableBlock:        false,
 		},
 	}
 
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, scenario.enableBlock)()
 			expectedMismatch := pvutil.CheckVolumeModeMismatches(&scenario.pvc.Spec, &scenario.vol.Spec)
 			// expected to match but either got an error or no returned pvmatch
 			if expectedMismatch && !scenario.isExpectedMismatch {
@@ -1167,73 +1132,46 @@ func TestFilteringVolumeModes(t *testing.T) {
 		isExpectedMatch bool
 		vol             persistentVolumeOrderedIndex
 		pvc             *v1.PersistentVolumeClaim
-		enableBlock     bool
 	}{
-		"1-1 feature enabled - pvc block and pv filesystem": {
+		"pvc block and pv filesystem": {
 			isExpectedMatch: false,
 			vol:             createTestVolOrderedIndex(createVolumeModeFilesystemTestVolume()),
 			pvc:             makeVolumeModePVC("8G", &blockMode, nil),
-			enableBlock:     true,
 		},
-		"1-2 feature enabled - pvc filesystem and pv block": {
+		"pvc filesystem and pv block": {
 			isExpectedMatch: false,
 			vol:             createTestVolOrderedIndex(createVolumeModeBlockTestVolume()),
 			pvc:             makeVolumeModePVC("8G", &filesystemMode, nil),
-			enableBlock:     true,
 		},
-		"1-3 feature enabled - pvc block and pv no mode with default filesystem": {
+		"pvc block and pv no mode with default filesystem": {
 			isExpectedMatch: false,
 			vol:             createTestVolOrderedIndex(createVolumeModeFilesystemTestVolume()),
 			pvc:             makeVolumeModePVC("8G", &blockMode, nil),
-			enableBlock:     true,
 		},
-		"1-4 feature enabled - pvc no mode defaulted to filesystem and pv block": {
+		"pvc no mode defaulted to filesystem and pv block": {
 			isExpectedMatch: false,
 			vol:             createTestVolOrderedIndex(createVolumeModeBlockTestVolume()),
 			pvc:             makeVolumeModePVC("8G", &filesystemMode, nil),
-			enableBlock:     true,
 		},
-		"1-5 feature enabled - pvc block and pv block": {
+		"pvc block and pv block": {
 			isExpectedMatch: true,
 			vol:             createTestVolOrderedIndex(createVolumeModeBlockTestVolume()),
 			pvc:             makeVolumeModePVC("8G", &blockMode, nil),
-			enableBlock:     true,
 		},
-		"1-6 feature enabled - pvc filesystem and pv filesystem": {
+		"pvc filesystem and pv filesystem": {
 			isExpectedMatch: true,
 			vol:             createTestVolOrderedIndex(createVolumeModeFilesystemTestVolume()),
 			pvc:             makeVolumeModePVC("8G", &filesystemMode, nil),
-			enableBlock:     true,
 		},
-		"1-7 feature enabled - pvc mode is nil and defaulted and pv mode is nil and defaulted": {
+		"pvc mode is nil and defaulted and pv mode is nil and defaulted": {
 			isExpectedMatch: true,
 			vol:             createTestVolOrderedIndex(createVolumeModeFilesystemTestVolume()),
 			pvc:             makeVolumeModePVC("8G", &filesystemMode, nil),
-			enableBlock:     true,
-		},
-		"2-1 feature disabled - pvc mode is nil and pv mode is nil": {
-			isExpectedMatch: true,
-			vol:             createTestVolOrderedIndex(testVolume("nomode-1", "8G")),
-			pvc:             makeVolumeModePVC("8G", nil, nil),
-			enableBlock:     false,
-		},
-		"2-2 feature disabled - pvc mode is block and pv mode is block - fields should be dropped by api and not analyzed with gate disabled": {
-			isExpectedMatch: false,
-			vol:             createTestVolOrderedIndex(createVolumeModeBlockTestVolume()),
-			pvc:             makeVolumeModePVC("8G", &blockMode, nil),
-			enableBlock:     false,
-		},
-		"2-3 feature disabled - pvc mode is filesystem and pv mode is filesystem - fields should be dropped by api and not analyzed with gate disabled": {
-			isExpectedMatch: true,
-			vol:             createTestVolOrderedIndex(createVolumeModeFilesystemTestVolume()),
-			pvc:             makeVolumeModePVC("8G", &filesystemMode, nil),
-			enableBlock:     false,
 		},
 	}
 
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, scenario.enableBlock)()
 			pvmatch, err := scenario.vol.findBestMatchForClaim(scenario.pvc, false)
 			// expected to match but either got an error or no returned pvmatch
 			if pvmatch == nil && scenario.isExpectedMatch {

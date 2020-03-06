@@ -320,8 +320,8 @@ var defaultVerbTemplates = map[string]string{
 	"create":           `Create(ctx context.Context, $.inputType|private$ *$.inputType|raw$, opts $.CreateOptions|raw$) (*$.resultType|raw$, error)`,
 	"update":           `Update(ctx context.Context, $.inputType|private$ *$.inputType|raw$, opts $.UpdateOptions|raw$) (*$.resultType|raw$, error)`,
 	"updateStatus":     `UpdateStatus(ctx context.Context, $.inputType|private$ *$.type|raw$, opts $.UpdateOptions|raw$) (*$.type|raw$, error)`,
-	"delete":           `Delete(ctx context.Context, name string, opts *$.DeleteOptions|raw$) error`,
-	"deleteCollection": `DeleteCollection(ctx context.Context, opts *$.DeleteOptions|raw$, listOpts $.ListOptions|raw$) error`,
+	"delete":           `Delete(ctx context.Context, name string, opts $.DeleteOptions|raw$) error`,
+	"deleteCollection": `DeleteCollection(ctx context.Context, opts $.DeleteOptions|raw$, listOpts $.ListOptions|raw$) error`,
 	"get":              `Get(ctx context.Context, name string, opts $.GetOptions|raw$) (*$.resultType|raw$, error)`,
 	"list":             `List(ctx context.Context, opts $.ListOptions|raw$) (*$.resultType|raw$List, error)`,
 	"watch":            `Watch(ctx context.Context, opts $.ListOptions|raw$) ($.watchInterface|raw$, error)`,
@@ -463,12 +463,12 @@ func (c *$.type|privatePlural$) Get(ctx context.Context, $.type|private$Name str
 
 var deleteTemplate = `
 // Delete takes name of the $.type|private$ and deletes it. Returns an error if one occurs.
-func (c *$.type|privatePlural$) Delete(ctx context.Context, name string, options *$.DeleteOptions|raw$) error {
+func (c *$.type|privatePlural$) Delete(ctx context.Context, name string, opts $.DeleteOptions|raw$) error {
 	return c.client.Delete().
 		$if .namespaced$Namespace(c.ns).$end$
 		Resource("$.type|resource$").
 		Name(name).
-		Body(options).
+		Body(&opts).
 		Do(ctx).
 		Error()
 }
@@ -476,17 +476,17 @@ func (c *$.type|privatePlural$) Delete(ctx context.Context, name string, options
 
 var deleteCollectionTemplate = `
 // DeleteCollection deletes a collection of objects.
-func (c *$.type|privatePlural$) DeleteCollection(ctx context.Context, options *$.DeleteOptions|raw$, listOptions $.ListOptions|raw$) error {
+func (c *$.type|privatePlural$) DeleteCollection(ctx context.Context, opts $.DeleteOptions|raw$, listOpts $.ListOptions|raw$) error {
 	var timeout time.Duration
-	if listOptions.TimeoutSeconds != nil{
-		timeout = time.Duration(*listOptions.TimeoutSeconds) * time.Second
+	if listOpts.TimeoutSeconds != nil{
+		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
 		$if .namespaced$Namespace(c.ns).$end$
 		Resource("$.type|resource$").
-		VersionedParams(&listOptions, $.schemeParameterCodec|raw$).
+		VersionedParams(&listOpts, $.schemeParameterCodec|raw$).
 		Timeout(timeout).
-		Body(options).
+		Body(&opts).
 		Do(ctx).
 		Error()
 }

@@ -82,7 +82,7 @@ func invokeInvalidDatastoreTestNeg(client clientset.Interface, namespace string,
 	ginkgo.By("Creating Storage Class With Invalid Datastore")
 	storageclass, err := client.StorageV1().StorageClasses().Create(context.TODO(), getVSphereStorageClassSpec(datastoreSCName, scParameters, nil, ""), metav1.CreateOptions{})
 	framework.ExpectNoError(err, fmt.Sprintf("Failed to create storage class with err: %v", err))
-	defer client.StorageV1().StorageClasses().Delete(context.TODO(), storageclass.Name, nil)
+	defer client.StorageV1().StorageClasses().Delete(context.TODO(), storageclass.Name, metav1.DeleteOptions{})
 
 	ginkgo.By("Creating PVC using the Storage Class")
 	pvclaim, err := e2epv.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClass(namespace, "2Gi", storageclass))

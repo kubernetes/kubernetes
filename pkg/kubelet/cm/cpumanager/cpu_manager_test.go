@@ -104,7 +104,7 @@ func (p *mockPolicy) Start(s state.State) error {
 	return p.err
 }
 
-func (p *mockPolicy) AddContainer(s state.State, pod *v1.Pod, container *v1.Container) error {
+func (p *mockPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Container) error {
 	return p.err
 }
 
@@ -223,18 +223,20 @@ func TestCPUManagerAdd(t *testing.T) {
 		cpuset.NewCPUSet(),
 		topologymanager.NewFakeManager())
 	testCases := []struct {
-		description string
-		updateErr   error
-		policy      Policy
-		expCPUSet   cpuset.CPUSet
-		expErr      error
+		description        string
+		updateErr          error
+		policy             Policy
+		expCPUSet          cpuset.CPUSet
+		expAllocateErr     error
+		expAddContainerErr error
 	}{
 		{
-			description: "cpu manager add - no error",
-			updateErr:   nil,
-			policy:      testPolicy,
-			expCPUSet:   cpuset.NewCPUSet(3, 4),
-			expErr:      nil,
+			description:        "cpu manager add - no error",
+			updateErr:          nil,
+			policy:             testPolicy,
+			expCPUSet:          cpuset.NewCPUSet(3, 4),
+			expAllocateErr:     nil,
+			expAddContainerErr: nil,
 		},
 		{
 			description: "cpu manager add - policy add container error",
@@ -242,15 +244,17 @@ func TestCPUManagerAdd(t *testing.T) {
 			policy: &mockPolicy{
 				err: fmt.Errorf("fake reg error"),
 			},
-			expCPUSet: cpuset.NewCPUSet(1, 2, 3, 4),
-			expErr:    fmt.Errorf("fake reg error"),
+			expCPUSet:          cpuset.NewCPUSet(1, 2, 3, 4),
+			expAllocateErr:     fmt.Errorf("fake reg error"),
+			expAddContainerErr: nil,
 		},
 		{
-			description: "cpu manager add - container update error",
-			updateErr:   fmt.Errorf("fake update error"),
-			policy:      testPolicy,
-			expCPUSet:   cpuset.NewCPUSet(1, 2, 3, 4),
-			expErr:      fmt.Errorf("fake update error"),
+			description:        "cpu manager add - container update error",
+			updateErr:          fmt.Errorf("fake update error"),
+			policy:             testPolicy,
+			expCPUSet:          cpuset.NewCPUSet(1, 2, 3, 4),
+			expAllocateErr:     nil,
+			expAddContainerErr: fmt.Errorf("fake update error"),
 		},
 	}
 
@@ -271,10 +275,16 @@ func TestCPUManagerAdd(t *testing.T) {
 
 		pod := makePod("fakePod", "fakeContainer", "2", "2")
 		container := &pod.Spec.Containers[0]
-		err := mgr.AddContainer(pod, container, "fakeID")
-		if !reflect.DeepEqual(err, testCase.expErr) {
+		err := mgr.Allocate(pod, container)
+		if !reflect.DeepEqual(err, testCase.expAllocateErr) {
+			t.Errorf("CPU Manager Allocate() error (%v). expected error: %v but got: %v",
+				testCase.description, testCase.expAllocateErr, err)
+		}
+
+		err = mgr.AddContainer(pod, container, "fakeID")
+		if !reflect.DeepEqual(err, testCase.expAddContainerErr) {
 			t.Errorf("CPU Manager AddContainer() error (%v). expected error: %v but got: %v",
-				testCase.description, testCase.expErr, err)
+				testCase.description, testCase.expAddContainerErr, err)
 		}
 		if !testCase.expCPUSet.Equals(mgr.state.GetDefaultCPUSet()) {
 			t.Errorf("CPU Manager AddContainer() error (%v). expected cpuset: %v but got: %v",
@@ -494,7 +504,12 @@ func TestCPUManagerAddWithInitContainers(t *testing.T) {
 			testCase.expCSets...)
 
 		for i := range containers {
-			err := mgr.AddContainer(testCase.pod, &containers[i], containerIDs[i])
+			err := mgr.Allocate(testCase.pod, &containers[i])
+			if err != nil {
+				t.Errorf("StaticPolicy Allocate() error (%v). unexpected error for container id: %v: %v",
+					testCase.description, containerIDs[i], err)
+			}
+			err = mgr.AddContainer(testCase.pod, &containers[i], containerIDs[i])
 			if err != nil {
 				t.Errorf("StaticPolicy AddContainer() error (%v). unexpected error for container id: %v: %v",
 					testCase.description, containerIDs[i], err)
@@ -970,25 +985,28 @@ func TestCPUManagerAddWithResvList(t *testing.T) {
 		cpuset.NewCPUSet(0),
 		topologymanager.NewFakeManager())
 	testCases := []struct {
-		description string
-		updateErr   error
-		policy      Policy
-		expCPUSet   cpuset.CPUSet
-		expErr      error
+		description        string
+		updateErr          error
+		policy             Policy
+		expCPUSet          cpuset.CPUSet
+		expAllocateErr     error
+		expAddContainerErr error
 	}{
 		{
-			description: "cpu manager add - no error",
-			updateErr:   nil,
-			policy:      testPolicy,
-			expCPUSet:   cpuset.NewCPUSet(0, 3),
-			expErr:      nil,
+			description:        "cpu manager add - no error",
+			updateErr:          nil,
+			policy:             testPolicy,
+			expCPUSet:          cpuset.NewCPUSet(0, 3),
+			expAllocateErr:     nil,
+			expAddContainerErr: nil,
 		},
 		{
-			description: "cpu manager add - container update error",
-			updateErr:   fmt.Errorf("fake update error"),
-			policy:      testPolicy,
-			expCPUSet:   cpuset.NewCPUSet(0, 1, 2, 3),
-			expErr:      fmt.Errorf("fake update error"),
+			description:        "cpu manager add - container update error",
+			updateErr:          fmt.Errorf("fake update error"),
+			policy:             testPolicy,
+			expCPUSet:          cpuset.NewCPUSet(0, 1, 2, 3),
+			expAllocateErr:     nil,
+			expAddContainerErr: fmt.Errorf("fake update error"),
 		},
 	}
 
@@ -1009,10 +1027,16 @@ func TestCPUManagerAddWithResvList(t *testing.T) {
 
 		pod := makePod("fakePod", "fakeContainer", "2", "2")
 		container := &pod.Spec.Containers[0]
-		err := mgr.AddContainer(pod, container, "fakeID")
-		if !reflect.DeepEqual(err, testCase.expErr) {
+		err := mgr.Allocate(pod, container)
+		if !reflect.DeepEqual(err, testCase.expAllocateErr) {
+			t.Errorf("CPU Manager Allocate() error (%v). expected error: %v but got: %v",
+				testCase.description, testCase.expAllocateErr, err)
+		}
+
+		err = mgr.AddContainer(pod, container, "fakeID")
+		if !reflect.DeepEqual(err, testCase.expAddContainerErr) {
 			t.Errorf("CPU Manager AddContainer() error (%v). expected error: %v but got: %v",
-				testCase.description, testCase.expErr, err)
+				testCase.description, testCase.expAddContainerErr, err)
 		}
 		if !testCase.expCPUSet.Equals(mgr.state.GetDefaultCPUSet()) {
 			t.Errorf("CPU Manager AddContainer() error (%v). expected cpuset: %v but got: %v",
