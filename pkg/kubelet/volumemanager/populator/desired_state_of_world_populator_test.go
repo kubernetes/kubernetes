@@ -47,6 +47,111 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util/types"
 )
 
+func pluginPVOmittingClient(dswp *desiredStateOfWorldPopulator) {
+	fakeClient := &fake.Clientset{}
+	fakeClient.AddReactor("get", "persistentvolumeclaims", func(action core.Action) (bool, runtime.Object, error) {
+		return false, nil, nil
+	})
+	fakeClient.AddReactor("get", "persistentvolumes", func(action core.Action) (bool, runtime.Object, error) {
+		return false, nil, nil
+	})
+	dswp.kubeClient = fakeClient
+}
+
+func prepareDswpWithVolume(t *testing.T) (*desiredStateOfWorldPopulator, kubepod.Manager) {
+	// create dswp
+	mode := v1.PersistentVolumeFilesystem
+	pv := &v1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "dswp-test-volume-name",
+		},
+		Spec: v1.PersistentVolumeSpec{
+			ClaimRef:   &v1.ObjectReference{Namespace: "ns", Name: "file-bound"},
+			VolumeMode: &mode,
+		},
+	}
+	pvc := &v1.PersistentVolumeClaim{
+		Spec: v1.PersistentVolumeClaimSpec{
+			VolumeName: "dswp-test-volume-name",
+		},
+		Status: v1.PersistentVolumeClaimStatus{
+			Phase: v1.ClaimBound,
+		},
+	}
+	dswp, fakePodManager, _ := createDswpWithVolume(t, pv, pvc)
+	return dswp, fakePodManager
+}
+
+func TestFindAndAddNewPods_WithReprocessPodAndVolumeRetrievalError(t *testing.T) {
+	// create dswp
+	dswp, fakePodManager := prepareDswpWithVolume(t)
+
+	// create pod
+	containers := []v1.Container{
+		{
+			VolumeMounts: []v1.VolumeMount{
+				{
+					Name:      "dswp-test-volume-name",
+					MountPath: "/mnt",
+				},
+			},
+		},
+	}
+	pod := createPodWithVolume("dswp-test-pod", "dswp-test-volume-name", "file-bound", containers)
+
+	fakePodManager.AddPod(pod)
+
+	podName := util.GetUniquePodName(pod)
+
+	dswp.findAndAddNewPods()
+
+	if !dswp.podPreviouslyProcessed(podName) {
+		t.Fatalf("Failed to record that the volumes for the specified pod: %s have been processed by the populator", podName)
+	}
+	pluginPVOmittingClient(dswp)
+
+	dswp.ReprocessPod(podName)
+	dswp.findAndAddNewPods()
+
+	if !dswp.podPreviouslyProcessed(podName) {
+		t.Fatalf("Failed to record that the volumes for the specified pod: %s have been processed by the populator", podName)
+	}
+	fakePodManager.DeletePod(pod)
+}
+
+func TestFindAndAddNewPods_WithVolumeRetrievalError(t *testing.T) {
+	// create dswp
+	dswp, fakePodManager := prepareDswpWithVolume(t)
+
+	pluginPVOmittingClient(dswp)
+
+	// create pod
+	containers := []v1.Container{
+		{
+			VolumeMounts: []v1.VolumeMount{
+				{
+					Name:      "dswp-test-volume-name",
+					MountPath: "/mnt",
+				},
+			},
+		},
+	}
+	pod := createPodWithVolume("dswp-test-pod", "dswp-test-volume-name", "file-bound", containers)
+
+	fakePodManager.AddPod(pod)
+
+	podName := util.GetUniquePodName(pod)
+
+	dswp.findAndAddNewPods()
+
+	if dswp.podPreviouslyProcessed(podName) {
+		t.Fatalf("The volumes for the specified pod: %s should not have been processed by the populator", podName)
+	}
+	if dswp.podHasBeenSeenOnce(podName) {
+		t.Fatalf("The volumes for the specified pod: %s should not have been processed by the populator", podName)
+	}
+}
+
 func TestFindAndAddNewPods_FindAndRemoveDeletedPods(t *testing.T) {
 	// create dswp
 	mode := v1.PersistentVolumeFilesystem
