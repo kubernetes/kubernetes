@@ -29,7 +29,7 @@ import (
 
 	api "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
-	storage "k8s.io/api/storage/v1beta1"
+	storage "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -296,10 +296,6 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 }
 
 func (c *csiMountMgr) podAttributes() (map[string]string, error) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
-		return nil, nil
-	}
-
 	kletHost, ok := c.plugin.host.(volume.KubeletVolumeHost)
 	if ok {
 		kletHost.WaitForCacheSync()

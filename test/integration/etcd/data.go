@@ -507,13 +507,19 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		}
 	}
 
+	// add csidrivers
 	// k8s.io/kubernetes/pkg/apis/storage/v1beta1
-	// add csidrivers if CSIDriverRegistry feature gate is enabled
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
-		etcdStorageData[gvr("storage.k8s.io", "v1beta1", "csidrivers")] = StorageData{
-			Stub:             `{"metadata": {"name": "csid1"}, "spec": {"attachRequired": true, "podInfoOnMount": true}}`,
-			ExpectedEtcdPath: "/registry/csidrivers/csid1",
-		}
+	etcdStorageData[gvr("storage.k8s.io", "v1beta1", "csidrivers")] = StorageData{
+		Stub:             `{"metadata": {"name": "csid1"}, "spec": {"attachRequired": true, "podInfoOnMount": true}}`,
+		ExpectedEtcdPath: "/registry/csidrivers/csid1",
+	}
+
+	// k8s.io/kubernetes/pkg/apis/storage/v1
+	// TODO: Remove ExpectedGVK in next release
+	etcdStorageData[gvr("storage.k8s.io", "v1", "csidrivers")] = StorageData{
+		Stub:             `{"metadata": {"name": "csid2"}, "spec": {"attachRequired": true, "podInfoOnMount": true}}`,
+		ExpectedEtcdPath: "/registry/csidrivers/csid2",
+		ExpectedGVK:      gvkP("storage.k8s.io", "v1beta1", "CSIDriver"),
 	}
 
 	return etcdStorageData

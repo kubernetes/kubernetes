@@ -172,6 +172,7 @@ const (
 	// owner: @saad-ali
 	// alpha: v1.12
 	// beta:  v1.14
+	// GA:    v1.18
 	// Enable all logic related to the CSIDriver API object in storage.k8s.io
 	CSIDriverRegistry featuregate.Feature = "CSIDriverRegistry"
 
@@ -608,7 +609,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	TopologyManager:                {Default: true, PreRelease: featuregate.Beta},
 	ServiceNodeExclusion:           {Default: false, PreRelease: featuregate.Alpha},
 	NodeDisruptionExclusion:        {Default: false, PreRelease: featuregate.Alpha},
-	CSIDriverRegistry:              {Default: true, PreRelease: featuregate.Beta},
+	CSIDriverRegistry:              {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.20
 	CSINodeInfo:                    {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.19
 	BlockVolume:                    {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.20
 	StorageObjectInUseProtection:   {Default: true, PreRelease: featuregate.GA},
