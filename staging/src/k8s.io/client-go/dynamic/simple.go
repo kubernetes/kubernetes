@@ -199,14 +199,11 @@ func (c *dynamicResourceClient) UpdateStatus(obj *unstructured.Unstructured, opt
 	return uncastObj.(*unstructured.Unstructured), nil
 }
 
-func (c *dynamicResourceClient) Delete(name string, opts *metav1.DeleteOptions, subresources ...string) error {
+func (c *dynamicResourceClient) Delete(name string, opts metav1.DeleteOptions, subresources ...string) error {
 	if len(name) == 0 {
 		return fmt.Errorf("name is required")
 	}
-	if opts == nil {
-		opts = &metav1.DeleteOptions{}
-	}
-	deleteOptionsByte, err := runtime.Encode(deleteOptionsCodec.LegacyCodec(schema.GroupVersion{Version: "v1"}), opts)
+	deleteOptionsByte, err := runtime.Encode(deleteOptionsCodec.LegacyCodec(schema.GroupVersion{Version: "v1"}), &opts)
 	if err != nil {
 		return err
 	}
@@ -219,11 +216,8 @@ func (c *dynamicResourceClient) Delete(name string, opts *metav1.DeleteOptions, 
 	return result.Error()
 }
 
-func (c *dynamicResourceClient) DeleteCollection(opts *metav1.DeleteOptions, listOptions metav1.ListOptions) error {
-	if opts == nil {
-		opts = &metav1.DeleteOptions{}
-	}
-	deleteOptionsByte, err := runtime.Encode(deleteOptionsCodec.LegacyCodec(schema.GroupVersion{Version: "v1"}), opts)
+func (c *dynamicResourceClient) DeleteCollection(opts metav1.DeleteOptions, listOptions metav1.ListOptions) error {
+	deleteOptionsByte, err := runtime.Encode(deleteOptionsCodec.LegacyCodec(schema.GroupVersion{Version: "v1"}), &opts)
 	if err != nil {
 		return err
 	}

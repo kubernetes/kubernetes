@@ -93,7 +93,7 @@ func TestDynamicSharedInformerFactory(t *testing.T) {
 			gvr:         schema.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "deployments"},
 			existingObj: newUnstructured("extensions/v1beta1", "Deployment", "ns-foo", "name-foo"),
 			trigger: func(gvr schema.GroupVersionResource, ns string, fakeClient *fake.FakeDynamicClient, testObject *unstructured.Unstructured) *unstructured.Unstructured {
-				err := fakeClient.Resource(gvr).Namespace(ns).Delete(testObject.GetName(), &metav1.DeleteOptions{})
+				err := fakeClient.Resource(gvr).Namespace(ns).Delete(testObject.GetName(), metav1.DeleteOptions{})
 				if err != nil {
 					t.Error(err)
 				}

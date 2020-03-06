@@ -196,7 +196,7 @@ func (c *dynamicResourceClient) UpdateStatus(obj *unstructured.Unstructured, opt
 	return ret, err
 }
 
-func (c *dynamicResourceClient) Delete(name string, opts *metav1.DeleteOptions, subresources ...string) error {
+func (c *dynamicResourceClient) Delete(name string, opts metav1.DeleteOptions, subresources ...string) error {
 	var err error
 	switch {
 	case len(c.namespace) == 0 && len(subresources) == 0:
@@ -219,7 +219,7 @@ func (c *dynamicResourceClient) Delete(name string, opts *metav1.DeleteOptions, 
 	return err
 }
 
-func (c *dynamicResourceClient) DeleteCollection(opts *metav1.DeleteOptions, listOptions metav1.ListOptions) error {
+func (c *dynamicResourceClient) DeleteCollection(opts metav1.DeleteOptions, listOptions metav1.ListOptions) error {
 	var err error
 	switch {
 	case len(c.namespace) == 0:

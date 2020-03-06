@@ -234,7 +234,7 @@ func TestDelete(t *testing.T) {
 		namespace     string
 		name          string
 		path          string
-		deleteOptions *metav1.DeleteOptions
+		deleteOptions metav1.DeleteOptions
 	}{
 		{
 			name: "normal_delete",
@@ -260,7 +260,7 @@ func TestDelete(t *testing.T) {
 			namespace:     "nstest",
 			name:          "namespaced_delete_with_options",
 			path:          "/apis/gtest/vtest/namespaces/nstest/rtest/namespaced_delete_with_options",
-			deleteOptions: &metav1.DeleteOptions{Preconditions: &metav1.Preconditions{UID: &uid}, PropagationPolicy: &background},
+			deleteOptions: metav1.DeleteOptions{Preconditions: &metav1.Preconditions{UID: &uid}, PropagationPolicy: &background},
 		},
 	}
 	for _, tc := range tcs {
@@ -331,7 +331,7 @@ func TestDeleteCollection(t *testing.T) {
 		}
 		defer srv.Close()
 
-		err = cl.Resource(resource).Namespace(tc.namespace).DeleteCollection(nil, metav1.ListOptions{})
+		err = cl.Resource(resource).Namespace(tc.namespace).DeleteCollection(metav1.DeleteOptions{}, metav1.ListOptions{})
 		if err != nil {
 			t.Errorf("unexpected error when deleting collection %q: %v", tc.name, err)
 			continue
