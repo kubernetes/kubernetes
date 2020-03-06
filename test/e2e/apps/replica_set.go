@@ -159,9 +159,7 @@ func testReplicaSetServeImageOrFail(f *framework.Framework, test string, image s
 	}
 
 	// Sanity check
-	if running != replicas {
-		framework.ExpectNoError(fmt.Errorf("unexpected number of running pods: %+v", pods.Items))
-	}
+	framework.ExpectEqual(running, replicas, "unexpected number of running pods: %+v", pods.Items)
 
 	// Verify that something is listening.
 	framework.Logf("Trying to dial the pod")
