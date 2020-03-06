@@ -130,6 +130,19 @@ func (e *REST) List(ctx context.Context, options *metainternalversion.ListOption
 	return l, nil
 }
 
+func (r *REST) DeleteCollection(ctx context.Context, deleteValidation rest.ValidateObjectFunc, options *metav1.DeleteOptions, listOptions *metainternalversion.ListOptions) (runtime.Object, error) {
+	l, err := r.Store.DeleteCollection(ctx, deleteValidation, options, listOptions)
+	if err != nil {
+		return nil, err
+	}
+	if ul, ok := l.(*unstructured.UnstructuredList); ok {
+		for i := range ul.Items {
+			shallowCopyObjectMeta(&ul.Items[i])
+		}
+	}
+	return l, nil
+}
+
 func (r *REST) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
 	o, err := r.Store.Get(ctx, name, options)
 	if err != nil {
