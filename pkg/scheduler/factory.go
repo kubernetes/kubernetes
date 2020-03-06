@@ -317,15 +317,16 @@ func (c *Configurator) createFromConfig(policy schedulerapi.Policy) (*Scheduler,
 	defPluginConfig = append(defPluginConfig, pluginConfigForPriorities...)
 	for i := range c.profiles {
 		prof := &c.profiles[i]
-		plugins := &schedulerapi.Plugins{}
-		plugins.Append(&defPlugins)
-		plugins.Apply(prof.Plugins)
-		prof.Plugins = plugins
+		if prof.Plugins != nil {
+			return nil, errors.New("using Plugins and Policy simultaneously is not supported")
+		}
+		prof.Plugins = &schedulerapi.Plugins{}
+		prof.Plugins.Append(&defPlugins)
 
-		var pluginConfig []schedulerapi.PluginConfig
-		pluginConfig = append(pluginConfig, defPluginConfig...)
-		pluginConfig = append(pluginConfig, prof.PluginConfig...)
-		prof.PluginConfig = pluginConfig
+		if len(prof.PluginConfig) != 0 {
+			return nil, errors.New("using PluginConfig and Policy simultaneously is not supported")
+		}
+		prof.PluginConfig = append(prof.PluginConfig, defPluginConfig...)
 	}
 
 	return c.create()
