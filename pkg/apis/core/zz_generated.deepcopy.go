@@ -3861,6 +3861,11 @@ func (in *PodSpec) DeepCopyInto(out *PodSpec) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.ShareBurstableLimits != nil {
+		in, out := &in.ShareBurstableLimits, &out.ShareBurstableLimits
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 
