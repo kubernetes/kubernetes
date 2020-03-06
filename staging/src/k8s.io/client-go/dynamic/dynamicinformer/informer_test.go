@@ -48,7 +48,7 @@ func TestDynamicSharedInformerFactory(t *testing.T) {
 			gvr:  schema.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "deployments"},
 			trigger: func(gvr schema.GroupVersionResource, ns string, fakeClient *fake.FakeDynamicClient, _ *unstructured.Unstructured) *unstructured.Unstructured {
 				testObject := newUnstructured("extensions/v1beta1", "Deployment", "ns-foo", "name-foo")
-				createdObj, err := fakeClient.Resource(gvr).Namespace(ns).Create(testObject, metav1.CreateOptions{})
+				createdObj, err := fakeClient.Resource(gvr).Namespace(ns).Create(context.TODO(), testObject, metav1.CreateOptions{})
 				if err != nil {
 					t.Error(err)
 				}
@@ -71,7 +71,7 @@ func TestDynamicSharedInformerFactory(t *testing.T) {
 			existingObj: newUnstructured("extensions/v1beta1", "Deployment", "ns-foo", "name-foo"),
 			trigger: func(gvr schema.GroupVersionResource, ns string, fakeClient *fake.FakeDynamicClient, testObject *unstructured.Unstructured) *unstructured.Unstructured {
 				testObject.Object["spec"] = "updatedName"
-				updatedObj, err := fakeClient.Resource(gvr).Namespace(ns).Update(testObject, metav1.UpdateOptions{})
+				updatedObj, err := fakeClient.Resource(gvr).Namespace(ns).Update(context.TODO(), testObject, metav1.UpdateOptions{})
 				if err != nil {
 					t.Error(err)
 				}
@@ -93,7 +93,7 @@ func TestDynamicSharedInformerFactory(t *testing.T) {
 			gvr:         schema.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "deployments"},
 			existingObj: newUnstructured("extensions/v1beta1", "Deployment", "ns-foo", "name-foo"),
 			trigger: func(gvr schema.GroupVersionResource, ns string, fakeClient *fake.FakeDynamicClient, testObject *unstructured.Unstructured) *unstructured.Unstructured {
-				err := fakeClient.Resource(gvr).Namespace(ns).Delete(testObject.GetName(), &metav1.DeleteOptions{})
+				err := fakeClient.Resource(gvr).Namespace(ns).Delete(context.TODO(), testObject.GetName(), metav1.DeleteOptions{})
 				if err != nil {
 					t.Error(err)
 				}

@@ -922,7 +922,7 @@ func TestCustomResourceCascadingDeletion(t *testing.T) {
 
 	// Create a custom owner resource.
 	owner := newCRDInstance(definition, ns.Name, names.SimpleNameGenerator.GenerateName("owner"))
-	owner, err := resourceClient.Create(owner, metav1.CreateOptions{})
+	owner, err := resourceClient.Create(context.TODO(), owner, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("failed to create owner resource %q: %v", owner.GetName(), err)
 	}
@@ -932,7 +932,7 @@ func TestCustomResourceCascadingDeletion(t *testing.T) {
 	dependent := newCRDInstance(definition, ns.Name, names.SimpleNameGenerator.GenerateName("dependent"))
 	link(t, owner, dependent)
 
-	dependent, err = resourceClient.Create(dependent, metav1.CreateOptions{})
+	dependent, err = resourceClient.Create(context.TODO(), dependent, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("failed to create dependent resource %q: %v", dependent.GetName(), err)
 	}
@@ -940,21 +940,21 @@ func TestCustomResourceCascadingDeletion(t *testing.T) {
 
 	// Delete the owner.
 	foreground := metav1.DeletePropagationForeground
-	err = resourceClient.Delete(owner.GetName(), &metav1.DeleteOptions{PropagationPolicy: &foreground})
+	err = resourceClient.Delete(context.TODO(), owner.GetName(), metav1.DeleteOptions{PropagationPolicy: &foreground})
 	if err != nil {
 		t.Fatalf("failed to delete owner resource %q: %v", owner.GetName(), err)
 	}
 
 	// Ensure the owner is deleted.
 	if err := wait.Poll(1*time.Second, 60*time.Second, func() (bool, error) {
-		_, err := resourceClient.Get(owner.GetName(), metav1.GetOptions{})
+		_, err := resourceClient.Get(context.TODO(), owner.GetName(), metav1.GetOptions{})
 		return apierrors.IsNotFound(err), nil
 	}); err != nil {
 		t.Fatalf("failed waiting for owner resource %q to be deleted", owner.GetName())
 	}
 
 	// Ensure the dependent is deleted.
-	_, err = resourceClient.Get(dependent.GetName(), metav1.GetOptions{})
+	_, err = resourceClient.Get(context.TODO(), dependent.GetName(), metav1.GetOptions{})
 	if err == nil {
 		t.Fatalf("expected dependent %q to be deleted", dependent.GetName())
 	} else {
@@ -983,7 +983,7 @@ func TestMixedRelationships(t *testing.T) {
 	definition, resourceClient := createRandomCustomResourceDefinition(t, apiExtensionClient, dynamicClient, ns.Name)
 
 	// Create a custom owner resource.
-	customOwner, err := resourceClient.Create(newCRDInstance(definition, ns.Name, names.SimpleNameGenerator.GenerateName("owner")), metav1.CreateOptions{})
+	customOwner, err := resourceClient.Create(context.TODO(), newCRDInstance(definition, ns.Name, names.SimpleNameGenerator.GenerateName("owner")), metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("failed to create owner: %v", err)
 	}
@@ -1010,7 +1010,7 @@ func TestMixedRelationships(t *testing.T) {
 	coreOwner.TypeMeta.Kind = "ConfigMap"
 	coreOwner.TypeMeta.APIVersion = "v1"
 	link(t, coreOwner, customDependent)
-	customDependent, err = resourceClient.Create(customDependent, metav1.CreateOptions{})
+	customDependent, err = resourceClient.Create(context.TODO(), customDependent, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("failed to create dependent: %v", err)
 	}
@@ -1018,21 +1018,21 @@ func TestMixedRelationships(t *testing.T) {
 
 	// Delete the custom owner.
 	foreground := metav1.DeletePropagationForeground
-	err = resourceClient.Delete(customOwner.GetName(), &metav1.DeleteOptions{PropagationPolicy: &foreground})
+	err = resourceClient.Delete(context.TODO(), customOwner.GetName(), metav1.DeleteOptions{PropagationPolicy: &foreground})
 	if err != nil {
 		t.Fatalf("failed to delete owner resource %q: %v", customOwner.GetName(), err)
 	}
 
 	// Ensure the owner is deleted.
 	if err := wait.Poll(1*time.Second, 60*time.Second, func() (bool, error) {
-		_, err := resourceClient.Get(customOwner.GetName(), metav1.GetOptions{})
+		_, err := resourceClient.Get(context.TODO(), customOwner.GetName(), metav1.GetOptions{})
 		return apierrors.IsNotFound(err), nil
 	}); err != nil {
 		t.Fatalf("failed waiting for owner resource %q to be deleted", customOwner.GetName())
 	}
 
 	// Ensure the dependent is deleted.
-	_, err = resourceClient.Get(coreDependent.GetName(), metav1.GetOptions{})
+	_, err = resourceClient.Get(context.TODO(), coreDependent.GetName(), metav1.GetOptions{})
 	if err == nil {
 		t.Fatalf("expected dependent %q to be deleted", coreDependent.GetName())
 	} else {
@@ -1056,7 +1056,7 @@ func TestMixedRelationships(t *testing.T) {
 	}
 
 	// Ensure the dependent is deleted.
-	_, err = resourceClient.Get(customDependent.GetName(), metav1.GetOptions{})
+	_, err = resourceClient.Get(context.TODO(), customDependent.GetName(), metav1.GetOptions{})
 	if err == nil {
 		t.Fatalf("expected dependent %q to be deleted", customDependent.GetName())
 	} else {
@@ -1096,7 +1096,7 @@ func testCRDDeletion(t *testing.T, ctx *testContext, ns *v1.Namespace, definitio
 	configMapClient := clientSet.CoreV1().ConfigMaps(ns.Name)
 
 	// Create a custom owner resource.
-	owner, err := resourceClient.Create(newCRDInstance(definition, ns.Name, names.SimpleNameGenerator.GenerateName("owner")), metav1.CreateOptions{})
+	owner, err := resourceClient.Create(context.TODO(), newCRDInstance(definition, ns.Name, names.SimpleNameGenerator.GenerateName("owner")), metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("failed to create owner: %v", err)
 	}
@@ -1120,7 +1120,7 @@ func testCRDDeletion(t *testing.T, ctx *testContext, ns *v1.Namespace, definitio
 
 	// Ensure the owner is deleted.
 	if err := wait.Poll(1*time.Second, 60*time.Second, func() (bool, error) {
-		_, err := resourceClient.Get(owner.GetName(), metav1.GetOptions{})
+		_, err := resourceClient.Get(context.TODO(), owner.GetName(), metav1.GetOptions{})
 		return apierrors.IsNotFound(err), nil
 	}); err != nil {
 		t.Fatalf("failed waiting for owner %q to be deleted", owner.GetName())

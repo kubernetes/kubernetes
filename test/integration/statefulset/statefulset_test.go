@@ -88,7 +88,7 @@ func TestVolumeTemplateNoopUpdate(t *testing.T) {
 	stsClient := c.Resource(appsv1.SchemeGroupVersion.WithResource("statefulsets")).Namespace("default")
 
 	// Create the statefulset
-	persistedSTS, err := stsClient.Create(sts, metav1.CreateOptions{})
+	persistedSTS, err := stsClient.Create(context.TODO(), sts, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -102,7 +102,7 @@ func TestVolumeTemplateNoopUpdate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = stsClient.Update(persistedSTS, metav1.UpdateOptions{})
+	_, err = stsClient.Update(context.TODO(), persistedSTS, metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}

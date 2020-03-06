@@ -462,11 +462,11 @@ func isWatchCachePrimed(crd *apiextensionsv1.CustomResourceDefinition, dynamicCl
 			"spec":    map[string]interface{}{},
 		},
 	}
-	createdInstance, err := resourceClient.Create(instance, metav1.CreateOptions{})
+	createdInstance, err := resourceClient.Create(context.TODO(), instance, metav1.CreateOptions{})
 	if err != nil {
 		return false, err
 	}
-	err = resourceClient.Delete(createdInstance.GetName(), nil)
+	err = resourceClient.Delete(context.TODO(), createdInstance.GetName(), metav1.DeleteOptions{})
 	if err != nil {
 		return false, err
 	}
@@ -480,6 +480,7 @@ func isWatchCachePrimed(crd *apiextensionsv1.CustomResourceDefinition, dynamicCl
 	// delivered to any future watch with resourceVersion=0.
 	for _, v := range versions {
 		noxuWatch, err := resourceClientForVersion(crd, dynamicClientSet, ns, v).Watch(
+			context.TODO(),
 			metav1.ListOptions{ResourceVersion: createdInstance.GetResourceVersion()})
 		if err != nil {
 			return false, err

@@ -599,7 +599,7 @@ func TestMetadataClient(t *testing.T) {
 			want: func(t *testing.T) {
 				ns := "metadata-crd"
 				crclient := dynamicClient.Resource(crdGVR).Namespace(ns)
-				cr, err := crclient.Create(&unstructured.Unstructured{
+				cr, err := crclient.Create(context.TODO(), &unstructured.Unstructured{
 					Object: map[string]interface{}{
 						"apiVersion": "cr.bar.com/v1",
 						"kind":       "Foo",
@@ -727,7 +727,7 @@ func TestMetadataClient(t *testing.T) {
 			want: func(t *testing.T) {
 				ns := "metadata-watch-crd"
 				crclient := dynamicClient.Resource(crdGVR).Namespace(ns)
-				cr, err := crclient.Create(&unstructured.Unstructured{
+				cr, err := crclient.Create(context.TODO(), &unstructured.Unstructured{
 					Object: map[string]interface{}{
 						"apiVersion": "cr.bar.com/v1",
 						"kind":       "Foo",
@@ -858,11 +858,11 @@ func TestAPICRDProtobuf(t *testing.T) {
 			name:   "server returns 406 when asking for protobuf for CRDs, which dynamic client does not support",
 			accept: "application/vnd.kubernetes.protobuf",
 			object: func(t *testing.T) (metav1.Object, string, string) {
-				cr, err := crclient.Create(&unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "cr.bar.com/v1", "kind": "Foo", "metadata": map[string]interface{}{"name": "test-1"}}}, metav1.CreateOptions{})
+				cr, err := crclient.Create(context.TODO(), &unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "cr.bar.com/v1", "kind": "Foo", "metadata": map[string]interface{}{"name": "test-1"}}}, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("unable to create cr: %v", err)
 				}
-				if _, err := crclient.Patch("test-1", types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{}); err != nil {
+				if _, err := crclient.Patch(context.TODO(), "test-1", types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{}); err != nil {
 					t.Fatalf("unable to patch cr: %v", err)
 				}
 				return cr, crdGVR.Group, "foos"
@@ -887,11 +887,11 @@ func TestAPICRDProtobuf(t *testing.T) {
 			name:   "server returns JSON when asking for protobuf and json for CRDs",
 			accept: "application/vnd.kubernetes.protobuf,application/json",
 			object: func(t *testing.T) (metav1.Object, string, string) {
-				cr, err := crclient.Create(&unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "cr.bar.com/v1", "kind": "Foo", "spec": map[string]interface{}{"field": 1}, "metadata": map[string]interface{}{"name": "test-2"}}}, metav1.CreateOptions{})
+				cr, err := crclient.Create(context.TODO(), &unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "cr.bar.com/v1", "kind": "Foo", "spec": map[string]interface{}{"field": 1}, "metadata": map[string]interface{}{"name": "test-2"}}}, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("unable to create cr: %v", err)
 				}
-				if _, err := crclient.Patch("test-2", types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{}); err != nil {
+				if _, err := crclient.Patch(context.TODO(), "test-2", types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{}); err != nil {
 					t.Fatalf("unable to patch cr: %v", err)
 				}
 				return cr, crdGVR.Group, "foos"
@@ -916,11 +916,11 @@ func TestAPICRDProtobuf(t *testing.T) {
 			accept:      "application/vnd.kubernetes.protobuf",
 			subresource: "status",
 			object: func(t *testing.T) (metav1.Object, string, string) {
-				cr, err := crclient.Create(&unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "cr.bar.com/v1", "kind": "Foo", "metadata": map[string]interface{}{"name": "test-3"}}}, metav1.CreateOptions{})
+				cr, err := crclient.Create(context.TODO(), &unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "cr.bar.com/v1", "kind": "Foo", "metadata": map[string]interface{}{"name": "test-3"}}}, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("unable to create cr: %v", err)
 				}
-				if _, err := crclient.Patch("test-3", types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"3"}}}`), metav1.PatchOptions{}); err != nil {
+				if _, err := crclient.Patch(context.TODO(), "test-3", types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"3"}}}`), metav1.PatchOptions{}); err != nil {
 					t.Fatalf("unable to patch cr: %v", err)
 				}
 				return cr, crdGVR.Group, "foos"
@@ -946,11 +946,11 @@ func TestAPICRDProtobuf(t *testing.T) {
 			accept:      "application/vnd.kubernetes.protobuf,application/json",
 			subresource: "status",
 			object: func(t *testing.T) (metav1.Object, string, string) {
-				cr, err := crclient.Create(&unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "cr.bar.com/v1", "kind": "Foo", "spec": map[string]interface{}{"field": 1}, "metadata": map[string]interface{}{"name": "test-4"}}}, metav1.CreateOptions{})
+				cr, err := crclient.Create(context.TODO(), &unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "cr.bar.com/v1", "kind": "Foo", "spec": map[string]interface{}{"field": 1}, "metadata": map[string]interface{}{"name": "test-4"}}}, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("unable to create cr: %v", err)
 				}
-				if _, err := crclient.Patch("test-4", types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"4"}}}`), metav1.PatchOptions{}); err != nil {
+				if _, err := crclient.Patch(context.TODO(), "test-4", types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"4"}}}`), metav1.PatchOptions{}); err != nil {
 					t.Fatalf("unable to patch cr: %v", err)
 				}
 				return cr, crdGVR.Group, "foos"
@@ -1079,11 +1079,11 @@ func TestTransform(t *testing.T) {
 			name:   "v1beta1 verify columns on CRDs in json",
 			accept: "application/json;as=Table;g=meta.k8s.io;v=v1beta1",
 			object: func(t *testing.T) (metav1.Object, string, string) {
-				cr, err := crclient.Create(&unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "cr.bar.com/v1", "kind": "Foo", "metadata": map[string]interface{}{"name": "test-1"}}}, metav1.CreateOptions{})
+				cr, err := crclient.Create(context.TODO(), &unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "cr.bar.com/v1", "kind": "Foo", "metadata": map[string]interface{}{"name": "test-1"}}}, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("unable to create cr: %v", err)
 				}
-				if _, err := crclient.Patch("test-1", types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{}); err != nil {
+				if _, err := crclient.Patch(context.TODO(), "test-1", types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{}); err != nil {
 					t.Fatalf("unable to patch cr: %v", err)
 				}
 				return cr, crdGVR.Group, "foos"
@@ -1096,11 +1096,11 @@ func TestTransform(t *testing.T) {
 			name:   "v1beta1 verify columns on CRDs in json;stream=watch",
 			accept: "application/json;stream=watch;as=Table;g=meta.k8s.io;v=v1beta1",
 			object: func(t *testing.T) (metav1.Object, string, string) {
-				cr, err := crclient.Create(&unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "cr.bar.com/v1", "kind": "Foo", "metadata": map[string]interface{}{"name": "test-2"}}}, metav1.CreateOptions{})
+				cr, err := crclient.Create(context.TODO(), &unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "cr.bar.com/v1", "kind": "Foo", "metadata": map[string]interface{}{"name": "test-2"}}}, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("unable to create cr: %v", err)
 				}
-				if _, err := crclient.Patch("test-2", types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{}); err != nil {
+				if _, err := crclient.Patch(context.TODO(), "test-2", types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{}); err != nil {
 					t.Fatalf("unable to patch cr: %v", err)
 				}
 				return cr, crdGVR.Group, "foos"
@@ -1113,11 +1113,11 @@ func TestTransform(t *testing.T) {
 			name:   "v1beta1 verify columns on CRDs in yaml",
 			accept: "application/yaml;as=Table;g=meta.k8s.io;v=v1beta1",
 			object: func(t *testing.T) (metav1.Object, string, string) {
-				cr, err := crclient.Create(&unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "cr.bar.com/v1", "kind": "Foo", "metadata": map[string]interface{}{"name": "test-3"}}}, metav1.CreateOptions{})
+				cr, err := crclient.Create(context.TODO(), &unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "cr.bar.com/v1", "kind": "Foo", "metadata": map[string]interface{}{"name": "test-3"}}}, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("unable to create cr: %v", err)
 				}
-				if _, err := crclient.Patch("test-3", types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{}); err != nil {
+				if _, err := crclient.Patch(context.TODO(), "test-3", types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{}); err != nil {
 					t.Fatalf("unable to patch cr: %v", err)
 				}
 				return cr, crdGVR.Group, "foos"
@@ -1230,11 +1230,11 @@ func TestTransform(t *testing.T) {
 			name:   "v1beta1 verify partial metadata object on CRDs in protobuf",
 			accept: "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1",
 			object: func(t *testing.T) (metav1.Object, string, string) {
-				cr, err := crclient.Create(&unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "cr.bar.com/v1", "kind": "Foo", "metadata": map[string]interface{}{"name": "test-4", "annotations": map[string]string{"test": "0"}}}}, metav1.CreateOptions{})
+				cr, err := crclient.Create(context.TODO(), &unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "cr.bar.com/v1", "kind": "Foo", "metadata": map[string]interface{}{"name": "test-4", "annotations": map[string]string{"test": "0"}}}}, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("unable to create cr: %v", err)
 				}
-				if _, err := crclient.Patch("test-4", types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{}); err != nil {
+				if _, err := crclient.Patch(context.TODO(), "test-4", types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{}); err != nil {
 					t.Fatalf("unable to patch cr: %v", err)
 				}
 				return cr, crdGVR.Group, "foos"
@@ -1335,11 +1335,11 @@ func TestTransform(t *testing.T) {
 			name:   "v1 verify columns on CRDs in json",
 			accept: "application/json;as=Table;g=meta.k8s.io;v=v1",
 			object: func(t *testing.T) (metav1.Object, string, string) {
-				cr, err := crclient.Create(&unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "cr.bar.com/v1", "kind": "Foo", "metadata": map[string]interface{}{"name": "test-5"}}}, metav1.CreateOptions{})
+				cr, err := crclient.Create(context.TODO(), &unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "cr.bar.com/v1", "kind": "Foo", "metadata": map[string]interface{}{"name": "test-5"}}}, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("unable to create cr: %v", err)
 				}
-				if _, err := crclient.Patch("test-5", types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{}); err != nil {
+				if _, err := crclient.Patch(context.TODO(), "test-5", types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{}); err != nil {
 					t.Fatalf("unable to patch cr: %v", err)
 				}
 				return cr, crdGVR.Group, "foos"
@@ -1352,11 +1352,11 @@ func TestTransform(t *testing.T) {
 			name:   "v1 verify columns on CRDs in json;stream=watch",
 			accept: "application/json;stream=watch;as=Table;g=meta.k8s.io;v=v1",
 			object: func(t *testing.T) (metav1.Object, string, string) {
-				cr, err := crclient.Create(&unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "cr.bar.com/v1", "kind": "Foo", "metadata": map[string]interface{}{"name": "test-6"}}}, metav1.CreateOptions{})
+				cr, err := crclient.Create(context.TODO(), &unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "cr.bar.com/v1", "kind": "Foo", "metadata": map[string]interface{}{"name": "test-6"}}}, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("unable to create cr: %v", err)
 				}
-				if _, err := crclient.Patch("test-6", types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{}); err != nil {
+				if _, err := crclient.Patch(context.TODO(), "test-6", types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{}); err != nil {
 					t.Fatalf("unable to patch cr: %v", err)
 				}
 				return cr, crdGVR.Group, "foos"
@@ -1369,11 +1369,11 @@ func TestTransform(t *testing.T) {
 			name:   "v1 verify columns on CRDs in yaml",
 			accept: "application/yaml;as=Table;g=meta.k8s.io;v=v1",
 			object: func(t *testing.T) (metav1.Object, string, string) {
-				cr, err := crclient.Create(&unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "cr.bar.com/v1", "kind": "Foo", "metadata": map[string]interface{}{"name": "test-7"}}}, metav1.CreateOptions{})
+				cr, err := crclient.Create(context.TODO(), &unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "cr.bar.com/v1", "kind": "Foo", "metadata": map[string]interface{}{"name": "test-7"}}}, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("unable to create cr: %v", err)
 				}
-				if _, err := crclient.Patch("test-7", types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{}); err != nil {
+				if _, err := crclient.Patch(context.TODO(), "test-7", types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{}); err != nil {
 					t.Fatalf("unable to patch cr: %v", err)
 				}
 				return cr, crdGVR.Group, "foos"
@@ -1486,11 +1486,11 @@ func TestTransform(t *testing.T) {
 			name:   "v1 verify partial metadata object on CRDs in protobuf",
 			accept: "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1",
 			object: func(t *testing.T) (metav1.Object, string, string) {
-				cr, err := crclient.Create(&unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "cr.bar.com/v1", "kind": "Foo", "metadata": map[string]interface{}{"name": "test-8", "annotations": map[string]string{"test": "0"}}}}, metav1.CreateOptions{})
+				cr, err := crclient.Create(context.TODO(), &unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "cr.bar.com/v1", "kind": "Foo", "metadata": map[string]interface{}{"name": "test-8", "annotations": map[string]string{"test": "0"}}}}, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("unable to create cr: %v", err)
 				}
-				if _, err := crclient.Patch(cr.GetName(), types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{}); err != nil {
+				if _, err := crclient.Patch(context.TODO(), cr.GetName(), types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{}); err != nil {
 					t.Fatalf("unable to patch cr: %v", err)
 				}
 				return cr, crdGVR.Group, "foos"

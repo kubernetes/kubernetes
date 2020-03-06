@@ -346,7 +346,7 @@ func (d *driverDefinition) GetSnapshotClass(config *testsuites.PerTestConfig) *u
 	case d.SnapshotClass.FromName:
 		// Do nothing (just use empty parameters)
 	case d.SnapshotClass.FromExistingClassName != "":
-		snapshotClass, err := f.DynamicClient.Resource(testsuites.SnapshotClassGVR).Get(d.SnapshotClass.FromExistingClassName, metav1.GetOptions{})
+		snapshotClass, err := f.DynamicClient.Resource(testsuites.SnapshotClassGVR).Get(context.TODO(), d.SnapshotClass.FromExistingClassName, metav1.GetOptions{})
 		framework.ExpectNoError(err, "getting snapshot class %s", d.SnapshotClass.FromExistingClassName)
 
 		if params, ok := snapshotClass.Object["parameters"].(map[string]interface{}); ok {

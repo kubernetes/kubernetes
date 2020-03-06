@@ -600,7 +600,7 @@ func waitForPdbToObserveHealthyPods(cs kubernetes.Interface, ns string, healthyC
 
 func getPDBStatusOrDie(dc dynamic.Interface, ns string, name string) *policyv1beta1.PodDisruptionBudget {
 	pdbStatusResource := policyv1beta1.SchemeGroupVersion.WithResource("poddisruptionbudgets")
-	unstruct, err := dc.Resource(pdbStatusResource).Namespace(ns).Get(name, metav1.GetOptions{}, "status")
+	unstruct, err := dc.Resource(pdbStatusResource).Namespace(ns).Get(context.TODO(), name, metav1.GetOptions{}, "status")
 	pdb, err := unstructuredToPDB(unstruct)
 	framework.ExpectNoError(err, "Getting the status of the pdb %s in namespace %s", name, ns)
 	return pdb
