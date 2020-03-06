@@ -51,7 +51,7 @@ var (
 type ImageManager interface {
 	// EnsureImageExists ensures that image specified in `container` exists.
 	EnsureImageExists(pod *v1.Pod, container *v1.Container, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, string, error)
-	EnsureImageExistsAsync(pod *v1.Pod, container *v1.Container, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, string, error)
+	EnsureImageExistsAsync(pod *v1.Pod, container *v1.Container, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error)
 	RemoveAsyncPullsForPod(pod *v1.Pod)
 
 	// TODO(ronl): consolidating image managing and deleting operation in this interface

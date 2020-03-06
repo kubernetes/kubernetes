@@ -828,7 +828,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontaine
 	// Async pull containers
 	if len(podContainerChanges.ContainersToPrepull) > 0 {
 		for _, container := range podContainerChanges.ContainersToPrepull {
-			_, _, err := m.imagePuller.EnsureImageExistsAsync(pod, &container, pullSecrets, podSandboxConfig)
+			_, err := m.imagePuller.EnsureImageExistsAsync(pod, &container, pullSecrets, podSandboxConfig)
 			if err != nil {
 				klog.V(3).Infof("On image: %s pre-pull failed: %v", container.Image, err)
 				continue

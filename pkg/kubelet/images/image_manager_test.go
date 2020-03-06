@@ -22,12 +22,14 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	. "k8s.io/kubernetes/pkg/kubelet/container"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	ctest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 )
 
@@ -42,6 +44,7 @@ type pullerTestCase struct {
 	inspectErr     error
 	pullerErr      error
 	expected       []pullerExpects
+	asyncExpected  pullerExpects
 }
 
 func pullerTestCases() []pullerTestCase {
@@ -130,6 +133,7 @@ func pullerTestEnv(c pullerTestCase, serialized bool) (puller ImageManager, fake
 	fakeRuntime.InspectErr = c.inspectErr
 
 	puller = NewImageManager(fakeRecorder, fakeRuntime, backOff, serialized, 0, 0)
+
 	return
 }
 
@@ -201,4 +205,173 @@ func TestApplyDefaultImageTag(t *testing.T) {
 			t.Errorf("Expected image reference: %q, got %q", testCase.Output, image)
 		}
 	}
+}
+
+func asyncPullerTestCases() []pullerTestCase {
+	return []pullerTestCase{
+		{ // #0 pull missing image
+			containerImage: "missing_image",
+			policy:         v1.PullIfNotPresent,
+			inspectErr:     nil,
+			pullerErr:      nil,
+			asyncExpected:  pullerExpects{[]string{"GetImageRef", "PullImage"}, nil},
+			expected: []pullerExpects{
+				{[]string{}, nil},
+			}},
+
+		{ // #1 image present, don't pull
+			containerImage: "present_image",
+			policy:         v1.PullIfNotPresent,
+			inspectErr:     nil,
+			pullerErr:      nil,
+			asyncExpected:  pullerExpects{[]string{"GetImageRef"}, nil},
+			expected: []pullerExpects{
+				{[]string{}, nil},
+				{[]string{"GetImageRef"}, nil},
+			}},
+		// #2 image present, pull it
+		{containerImage: "present_image",
+			policy:        v1.PullAlways,
+			inspectErr:    nil,
+			pullerErr:     nil,
+			asyncExpected: pullerExpects{[]string{"GetImageRef", "PullImage"}, nil},
+			expected: []pullerExpects{
+				{[]string{}, nil},
+				{[]string{"GetImageRef", "PullImage"}, nil},
+				{[]string{"GetImageRef", "PullImage"}, nil},
+			}},
+		// #3 missing image, error PullNever
+		{containerImage: "missing_image",
+			policy:        v1.PullNever,
+			inspectErr:    nil,
+			pullerErr:     nil,
+			asyncExpected: pullerExpects{[]string{"GetImageRef"}, ErrImageNeverPull},
+			expected: []pullerExpects{
+				{[]string{"GetImageRef"}, ErrImageNeverPull},
+				{[]string{"GetImageRef"}, ErrImageNeverPull},
+				{[]string{"GetImageRef"}, ErrImageNeverPull},
+			}},
+		// #4 missing image, unable to inspect
+		{containerImage: "missing_image",
+			policy:        v1.PullIfNotPresent,
+			inspectErr:    errors.New("unknown inspectError"),
+			pullerErr:     nil,
+			asyncExpected: pullerExpects{[]string{"GetImageRef"}, ErrImageInspect},
+			expected: []pullerExpects{
+				{[]string{"GetImageRef"}, ErrImageInspect},
+				{[]string{"GetImageRef"}, ErrImageInspect},
+				{[]string{"GetImageRef"}, ErrImageInspect},
+			}},
+		// #5 missing image, unable to fetch
+		{containerImage: "typo_image",
+			policy:        v1.PullIfNotPresent,
+			inspectErr:    nil,
+			pullerErr:     errors.New("404"),
+			asyncExpected: pullerExpects{[]string{"GetImageRef", "PullImage"}, nil},
+			expected: []pullerExpects{
+				{[]string{}, ErrImagePull},
+				{[]string{"GetImageRef", "PullImage"}, ErrImagePull},
+				{[]string{"GetImageRef"}, ErrImagePullBackOff},
+				{[]string{"GetImageRef", "PullImage"}, ErrImagePull},
+				{[]string{"GetImageRef"}, ErrImagePullBackOff},
+				{[]string{"GetImageRef"}, ErrImagePullBackOff},
+			}},
+	}
+}
+
+var _ imagePuller = &immediateTestPuller{}
+
+type immediateTestPuller struct {
+	imageService kubecontainer.ImageService
+}
+
+func (pip *immediateTestPuller) pullImage(spec kubecontainer.ImageSpec, pullSecrets []v1.Secret, pullChan chan<- pullResult, podSandboxConfig *runtimeapi.PodSandboxConfig) {
+	imageRef, err := pip.imageService.PullImage(spec, pullSecrets, podSandboxConfig)
+	pullChan <- pullResult{
+		imageRef: imageRef,
+		err:      err,
+	}
+	return
+}
+
+func setImagePuller(manager ImageManager, puller imagePuller) {
+	manager.(*imageManager).puller = puller
+}
+
+func TestAsyncPull(t *testing.T) {
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "test_pod",
+			Namespace:       "test-ns",
+			UID:             "bar",
+			ResourceVersion: "42",
+			SelfLink:        "/api/v1/pods/foo",
+		}}
+
+	cases := asyncPullerTestCases()
+
+	useSerializedEnv := false
+	for i, c := range cases {
+		puller, fakeClock, fakeRuntime, container := pullerTestEnv(c, useSerializedEnv)
+
+		// Why replace the puller?
+		// The `EnsureImageExistsAsync` doesn't receive off the channel passed to `pullImage` on `parallelImagePuller`.
+		// This means it can return before the goroutine calls `PullImage` on `imageservice`.
+		// `immediatePuller` doesn't use a goroutine so `PullImage` is always called before `EnsureImageExistsAsync` returns.
+		setImagePuller(puller, &immediateTestPuller{
+			imageService: fakeRuntime,
+		})
+
+		_, err := puller.EnsureImageExistsAsync(pod, container, nil, nil)
+
+		assert.NoError(t, fakeRuntime.AssertCalls(c.asyncExpected.calls), "in test %d image=%s async", i, c.containerImage)
+		assert.Equal(t, c.asyncExpected.err, err, "in test %d image=%s async", i, c.containerImage)
+
+		// Set normal image puller
+		setImagePuller(puller, newParallelImagePuller(fakeRuntime))
+
+		for tick, expected := range c.expected {
+			fakeRuntime.CalledFunctions = []string{}
+			fakeClock.Step(time.Second)
+			_, _, err = puller.EnsureImageExists(pod, container, nil, nil)
+			assert.NoError(t, fakeRuntime.AssertCalls(expected.calls), "in test %d image=%s tick=%d", i, c.containerImage, tick)
+			assert.Equal(t, expected.err, err, "in test %d image=%s tick=%d", i, c.containerImage, tick)
+		}
+	}
+}
+
+func TestAsyncPullRespectsBackoff(t *testing.T) {
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "test_pod",
+			Namespace:       "test-ns",
+			UID:             "bar",
+			ResourceVersion: "42",
+			SelfLink:        "/api/v1/pods/foo",
+		},
+	}
+
+	pullCase := pullerTestCase{containerImage: "typo_image",
+		policy:     v1.PullIfNotPresent,
+		inspectErr: nil,
+		pullerErr:  errors.New("404"),
+	}
+
+	puller, _, fakeRuntime, container := pullerTestEnv(pullCase, false)
+
+	// Attempt first async pull
+	_, err := puller.EnsureImageExistsAsync(pod, container, nil, nil)
+	assert.NoError(t, fakeRuntime.AssertCalls([]string{"GetImageRef"}), "")
+	assert.Equal(t, nil, err, "")
+
+	// Wait for pull to fail
+	_, _, err = puller.EnsureImageExists(pod, container, nil, nil)
+	assert.Equal(t, ErrImagePull, err, "")
+
+	// retry async pull
+	fakeRuntime.ClearCalls()
+	_, err = puller.EnsureImageExistsAsync(pod, container, nil, nil)
+	assert.NoError(t, fakeRuntime.AssertCalls([]string{"GetImageRef"}), "")
+	assert.Equal(t, ErrImagePullBackOff, err, "")
+
 }
