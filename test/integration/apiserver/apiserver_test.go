@@ -547,7 +547,7 @@ func TestMetadataClient(t *testing.T) {
 				})
 
 				client := metadata.NewForConfigOrDie(cfg).Resource(v1.SchemeGroupVersion.WithResource("services"))
-				items, err := client.Namespace(ns).List(metav1.ListOptions{})
+				items, err := client.Namespace(ns).List(context.TODO(), metav1.ListOptions{})
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -566,7 +566,7 @@ func TestMetadataClient(t *testing.T) {
 				}
 				wrapper.resp = nil
 
-				item, err := client.Namespace(ns).Get("test-1", metav1.GetOptions{})
+				item, err := client.Namespace(ns).Get(context.TODO(), "test-1", metav1.GetOptions{})
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -577,7 +577,7 @@ func TestMetadataClient(t *testing.T) {
 					t.Fatalf("unexpected response: %#v", wrapper.resp)
 				}
 
-				item, err = client.Namespace(ns).Patch("test-1", types.MergePatchType, []byte(`{"metadata":{"annotations":{"foo":"baz"}}}`), metav1.PatchOptions{})
+				item, err = client.Namespace(ns).Patch(context.TODO(), "test-1", types.MergePatchType, []byte(`{"metadata":{"annotations":{"foo":"baz"}}}`), metav1.PatchOptions{})
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -585,11 +585,11 @@ func TestMetadataClient(t *testing.T) {
 					t.Fatalf("unexpected object: %#v", item)
 				}
 
-				if err := client.Namespace(ns).Delete("test-1", &metav1.DeleteOptions{Preconditions: &metav1.Preconditions{UID: &item.UID}}); err != nil {
+				if err := client.Namespace(ns).Delete(context.TODO(), "test-1", metav1.DeleteOptions{Preconditions: &metav1.Preconditions{UID: &item.UID}}); err != nil {
 					t.Fatal(err)
 				}
 
-				if _, err := client.Namespace(ns).Get("test-1", metav1.GetOptions{}); !apierrors.IsNotFound(err) {
+				if _, err := client.Namespace(ns).Get(context.TODO(), "test-1", metav1.GetOptions{}); !apierrors.IsNotFound(err) {
 					t.Fatal(err)
 				}
 			},
@@ -624,7 +624,7 @@ func TestMetadataClient(t *testing.T) {
 				})
 
 				client := metadata.NewForConfigOrDie(cfg).Resource(crdGVR)
-				items, err := client.Namespace(ns).List(metav1.ListOptions{})
+				items, err := client.Namespace(ns).List(context.TODO(), metav1.ListOptions{})
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -643,7 +643,7 @@ func TestMetadataClient(t *testing.T) {
 				}
 				wrapper.resp = nil
 
-				item, err := client.Namespace(ns).Get("test-1", metav1.GetOptions{})
+				item, err := client.Namespace(ns).Get(context.TODO(), "test-1", metav1.GetOptions{})
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -654,7 +654,7 @@ func TestMetadataClient(t *testing.T) {
 					t.Fatalf("unexpected response: %#v", wrapper.resp)
 				}
 
-				item, err = client.Namespace(ns).Patch("test-1", types.MergePatchType, []byte(`{"metadata":{"annotations":{"foo":"baz"}}}`), metav1.PatchOptions{})
+				item, err = client.Namespace(ns).Patch(context.TODO(), "test-1", types.MergePatchType, []byte(`{"metadata":{"annotations":{"foo":"baz"}}}`), metav1.PatchOptions{})
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -662,10 +662,10 @@ func TestMetadataClient(t *testing.T) {
 					t.Fatalf("unexpected object: %#v", item)
 				}
 
-				if err := client.Namespace(ns).Delete("test-1", &metav1.DeleteOptions{Preconditions: &metav1.Preconditions{UID: &item.UID}}); err != nil {
+				if err := client.Namespace(ns).Delete(context.TODO(), "test-1", metav1.DeleteOptions{Preconditions: &metav1.Preconditions{UID: &item.UID}}); err != nil {
 					t.Fatal(err)
 				}
-				if _, err := client.Namespace(ns).Get("test-1", metav1.GetOptions{}); !apierrors.IsNotFound(err) {
+				if _, err := client.Namespace(ns).Get(context.TODO(), "test-1", metav1.GetOptions{}); !apierrors.IsNotFound(err) {
 					t.Fatal(err)
 				}
 			},
@@ -690,7 +690,7 @@ func TestMetadataClient(t *testing.T) {
 				})
 
 				client := metadata.NewForConfigOrDie(cfg).Resource(v1.SchemeGroupVersion.WithResource("services"))
-				w, err := client.Namespace(ns).Watch(metav1.ListOptions{ResourceVersion: svc.ResourceVersion, Watch: true})
+				w, err := client.Namespace(ns).Watch(context.TODO(), metav1.ListOptions{ResourceVersion: svc.ResourceVersion, Watch: true})
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -747,7 +747,7 @@ func TestMetadataClient(t *testing.T) {
 				cfg := metadata.ConfigFor(config)
 				client := metadata.NewForConfigOrDie(cfg).Resource(crdGVR)
 
-				patched, err := client.Namespace(ns).Patch("test-2", types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{})
+				patched, err := client.Namespace(ns).Patch(context.TODO(), "test-2", types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{})
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -762,7 +762,7 @@ func TestMetadataClient(t *testing.T) {
 				})
 				client = metadata.NewForConfigOrDie(cfg).Resource(crdGVR)
 
-				w, err := client.Namespace(ns).Watch(metav1.ListOptions{ResourceVersion: cr.GetResourceVersion(), Watch: true})
+				w, err := client.Namespace(ns).Watch(context.TODO(), metav1.ListOptions{ResourceVersion: cr.GetResourceVersion(), Watch: true})
 				if err != nil {
 					t.Fatal(err)
 				}
