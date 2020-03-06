@@ -153,7 +153,19 @@ func matchPolicyRuleVerb(policyRuleVerbs []string, requestVerb string) bool {
 }
 
 func matchPolicyRuleNonResourceURL(policyRuleRequestURLs []string, requestPath string) bool {
-	return containsString(requestPath, policyRuleRequestURLs, fctypesv1a1.NonResourceAll)
+	for _, rulePath := range policyRuleRequestURLs {
+		if rulePath == fctypesv1a1.NonResourceAll || rulePath == requestPath {
+			return true
+		}
+		rulePrefix := strings.TrimSuffix(rulePath, "*")
+		if !strings.HasSuffix(rulePrefix, "/") {
+			rulePrefix = rulePrefix + "/"
+		}
+		if strings.HasPrefix(requestPath, rulePrefix) {
+			return true
+		}
+	}
+	return false
 }
 
 func matchPolicyRuleAPIGroup(policyRuleAPIGroups []string, requestAPIGroup string) bool {
