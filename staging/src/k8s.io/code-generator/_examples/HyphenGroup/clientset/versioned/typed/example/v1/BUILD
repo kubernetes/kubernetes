@@ -13,7 +13,7 @@ go_library(
     importpath = "k8s.io/code-generator/_examples/HyphenGroup/clientset/versioned/typed/example/v1",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/apis/autoscaling:go_default_library",
+        "//staging/src/k8s.io/api/autoscaling/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/watch:go_default_library",
