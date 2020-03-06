@@ -706,12 +706,14 @@ func (m *resourceAllocator) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle
 			}
 		}
 
-		err = m.cpuManager.Allocate(pod, &container)
-		if err != nil {
-			return lifecycle.PodAdmitResult{
-				Message: fmt.Sprintf("Allocate failed due to %v, which is unexpected", err),
-				Reason:  "UnexpectedAdmissionError",
-				Admit:   false,
+		if m.cpuManager != nil {
+			err = m.cpuManager.Allocate(pod, &container)
+			if err != nil {
+				return lifecycle.PodAdmitResult{
+					Message: fmt.Sprintf("Allocate failed due to %v, which is unexpected", err),
+					Reason:  "UnexpectedAdmissionError",
+					Admit:   false,
+				}
 			}
 		}
 	}
