@@ -237,6 +237,14 @@ push() {
   docker manifest push --purge "${REGISTRY}/${image}:${TAG}"
 }
 
+# This function is for building AND pushing images. Useful if ${WHAT} is "all-conformance".
+# This will allow images to be pushed immediately after they've been pushed.
+build_and_push() {
+  image=$1
+  build "${image}"
+  push "${image}"
+}
+
 # This function is for building the go code
 bin() {
   local arch_prefix=""
