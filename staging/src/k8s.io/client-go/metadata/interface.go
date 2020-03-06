@@ -17,6 +17,8 @@ limitations under the License.
 package metadata
 
 import (
+	"context"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -32,12 +34,12 @@ type Interface interface {
 // ResourceInterface contains the set of methods that may be invoked on objects by their metadata.
 // Update is not supported by the server, but Patch can be used for the actions Update would handle.
 type ResourceInterface interface {
-	Delete(name string, options *metav1.DeleteOptions, subresources ...string) error
-	DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error
-	Get(name string, options metav1.GetOptions, subresources ...string) (*metav1.PartialObjectMetadata, error)
-	List(opts metav1.ListOptions) (*metav1.PartialObjectMetadataList, error)
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, options metav1.PatchOptions, subresources ...string) (*metav1.PartialObjectMetadata, error)
+	Delete(ctx context.Context, name string, options metav1.DeleteOptions, subresources ...string) error
+	DeleteCollection(ctx context.Context, options metav1.DeleteOptions, listOptions metav1.ListOptions) error
+	Get(ctx context.Context, name string, options metav1.GetOptions, subresources ...string) (*metav1.PartialObjectMetadata, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*metav1.PartialObjectMetadataList, error)
+	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, options metav1.PatchOptions, subresources ...string) (*metav1.PartialObjectMetadata, error)
 }
 
 // Getter handles both namespaced and non-namespaced resource types consistently.

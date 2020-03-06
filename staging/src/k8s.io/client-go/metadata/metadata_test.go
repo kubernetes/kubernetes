@@ -17,6 +17,7 @@ limitations under the License.
 package metadata
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -72,7 +73,7 @@ func TestClient(t *testing.T) {
 				})
 			},
 			want: func(t *testing.T, client *Client) {
-				obj, err := client.Resource(gvr).Namespace("ns").Get("name", metav1.GetOptions{})
+				obj, err := client.Resource(gvr).Namespace("ns").Get(context.TODO(), "name", metav1.GetOptions{})
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -120,7 +121,7 @@ func TestClient(t *testing.T) {
 				})
 			},
 			want: func(t *testing.T, client *Client) {
-				objs, err := client.Resource(gvr).Namespace("ns").List(metav1.ListOptions{})
+				objs, err := client.Resource(gvr).Namespace("ns").List(context.TODO(), metav1.ListOptions{})
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -162,7 +163,7 @@ func TestClient(t *testing.T) {
 				})
 			},
 			want: func(t *testing.T, client *Client) {
-				obj, err := client.Resource(gvr).Namespace("ns").Get("name", metav1.GetOptions{})
+				obj, err := client.Resource(gvr).Namespace("ns").Get(context.TODO(), "name", metav1.GetOptions{})
 				if err == nil || !runtime.IsMissingKind(err) {
 					t.Fatal(err)
 				}
@@ -191,7 +192,7 @@ func TestClient(t *testing.T) {
 				})
 			},
 			want: func(t *testing.T, client *Client) {
-				obj, err := client.Resource(gvr).Namespace("ns").Get("name", metav1.GetOptions{})
+				obj, err := client.Resource(gvr).Namespace("ns").Get(context.TODO(), "name", metav1.GetOptions{})
 				if err == nil || !runtime.IsMissingVersion(err) {
 					t.Fatal(err)
 				}
@@ -219,7 +220,7 @@ func TestClient(t *testing.T) {
 				})
 			},
 			want: func(t *testing.T, client *Client) {
-				obj, err := client.Resource(gvr).Namespace("ns").Get("name", metav1.GetOptions{})
+				obj, err := client.Resource(gvr).Namespace("ns").Get(context.TODO(), "name", metav1.GetOptions{})
 				if err == nil || !strings.Contains(err.Error(), "object does not appear to match the ObjectMeta schema") {
 					t.Fatal(err)
 				}

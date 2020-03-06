@@ -17,6 +17,7 @@ limitations under the License.
 package garbagecollector
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"sync"
@@ -347,7 +348,7 @@ func (gc *GarbageCollector) isDangling(reference metav1.OwnerReference, item *no
 	// TODO: It's only necessary to talk to the API server if the owner node
 	// is a "virtual" node. The local graph could lag behind the real
 	// status, but in practice, the difference is small.
-	owner, err = gc.metadataClient.Resource(resource).Namespace(resourceDefaultNamespace(namespaced, item.identity.Namespace)).Get(reference.Name, metav1.GetOptions{})
+	owner, err = gc.metadataClient.Resource(resource).Namespace(resourceDefaultNamespace(namespaced, item.identity.Namespace)).Get(context.TODO(), reference.Name, metav1.GetOptions{})
 	switch {
 	case errors.IsNotFound(err):
 		gc.absentOwnerCache.Add(reference.UID)
