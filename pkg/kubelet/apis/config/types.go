@@ -345,7 +345,7 @@ type KubeletConfiguration struct {
 	// Only if feature gates CustomCadvisorMetrics set to be true, it will accept custom configuration like:
 	// cpu,sched,memory,disk,network,tcp
 	// +optional
-	CadvisorMetricsEnabled []string
+	CadvisorMetrics []string
 }
 
 // KubeletAuthorizationMode denotes the authorization mode for the kubelet

@@ -574,8 +574,8 @@ const (
 	// owner: @KielChan
 	// alpha: v1.18
 	//
-	// Enables cadvisor metrics in kubelet by set CadvisorMetricsEnabled=cpu,sched,memory,disk,network,tcp
-	EnableCustomCadvisorMetrics featuregate.Feature = "EnableCustomCadvisorMetrics"
+	// Enables cadvisor metrics in kubelet by set CadvisorMetrics=cpu,sched,memory,disk,network,tcp
+	CustomCadvisorMetrics featuregate.Feature = "CustomCadvisorMetrics"
 )
 
 func init() {
@@ -665,7 +665,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	DefaultIngressClass:                            {Default: true, PreRelease: featuregate.Beta},
 	HugePageStorageMediumSize:                      {Default: false, PreRelease: featuregate.Alpha},
 	AnyVolumeDataSource:                            {Default: false, PreRelease: featuregate.Alpha},
-	EnableCustomCadvisorMetrics:                    {Default: false, PreRelease: featuregate.Alpha},
+	CustomCadvisorMetrics:                          {Default: false, PreRelease: featuregate.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:

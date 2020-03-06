@@ -83,10 +83,10 @@ func init() {
 }
 
 // New creates a new cAdvisor Interface for linux systems.
-func New(imageFsInfoProvider ImageFsInfoProvider, rootPath string, cgroupRoots []string, metricsEnabled cadvisormetrics.MetricSet) (Interface, error) {
+func New(imageFsInfoProvider ImageFsInfoProvider, rootPath string, cgroupRoots []string, metricSet cadvisormetrics.MetricSet) (Interface, error) {
 	sysFs := sysfs.NewRealSysFs()
 	// Create the cAdvisor container manager.
-	m, err := manager.New(memory.New(statsCacheDuration, nil), sysFs, maxHousekeepingInterval, allowDynamicHousekeeping, metricsEnabled, http.DefaultClient, cgroupRoots)
+	m, err := manager.New(memory.New(statsCacheDuration, nil), sysFs, maxHousekeepingInterval, allowDynamicHousekeeping, metricSet, http.DefaultClient, cgroupRoots)
 	if err != nil {
 		return nil, err
 	}

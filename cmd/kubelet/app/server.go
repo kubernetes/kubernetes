@@ -634,9 +634,13 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, featureGate f
 	if kubeDeps.CAdvisorInterface == nil {
 		imageFsInfoProvider := cadvisor.NewImageFsInfoProvider(s.ContainerRuntime, s.RemoteRuntimeEndpoint)
 		usingLegacyStats := cadvisor.UsingLegacyCadvisorStats(s.ContainerRuntime, s.RemoteRuntimeEndpoint)
-		metricsEnabled := cadvisor.SetCadvisorMetricsSet(utilfeature.DefaultFeatureGate.Enabled(kubefeatures.EnableCustomCadvisorMetrics), usingLegacyStats, s.CadvisorMetricsEnabled)
 
-		kubeDeps.CAdvisorInterface, err = cadvisor.New(imageFsInfoProvider, s.RootDirectory, cgroupRoots, metricsEnabled)
+		MetricSet := cadvisor.DefaultCadvisorMetricSet(usingLegacyStats)
+		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CustomCadvisorMetrics) {
+			MetricSet = cadvisor.CustomCadvisorMetricSet(usingLegacyStats, s.CadvisorMetrics)
+		}
+
+		kubeDeps.CAdvisorInterface, err = cadvisor.New(imageFsInfoProvider, s.RootDirectory, cgroupRoots, MetricSet)
 		if err != nil {
 			return err
 		}

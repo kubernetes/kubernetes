@@ -109,29 +109,35 @@ func UsingLegacyCadvisorStats(runtime, runtimeEndpoint string) bool {
 		runtimeEndpoint == CrioSocket || runtimeEndpoint == "unix://"+CrioSocket
 }
 
-// SetCadvisorMetricsSet returns metrics set for cadvisor interface of kubelet work background.
-// If feature gate EnableCustomCadvisorMetrics equals to true,
-// cadivsor interface can work with metrics specified.
-func SetCadvisorMetricsSet(enableCustomMetrics, usingLegacyStats bool, cadvisorMetricsEnabled []string) cadvisormetrics.MetricSet {
-	if !enableCustomMetrics {
-		metricSet := IncludedMetrics
-		if usingLegacyStats {
-			metricSet[cadvisormetrics.DiskUsageMetrics] = struct{}{}
-		}
-		return metricSet
-	} else {
-		metricSet := cadvisormetrics.MetricSet{}
-		for _, metrics := range cadvisorMetricsEnabled {
-			if !allMetrics.Has(cadvisormetrics.MetricKind(metrics)) {
-				continue
-			}
-			metricSet[cadvisormetrics.MetricKind(metrics)] = struct{}{}
-		}
-
-		// mapping usingLegacyStats, if false, remove custom disk metrics from set
-		if !usingLegacyStats && metricSet.Has(cadvisormetrics.DiskUsageMetrics) {
-			delete(metricSet, cadvisormetrics.DiskUsageMetrics)
-		}
-		return metricSet
+// DefaultCadvisorMetricSet returns default metrics set for cadivsor interface of kubelet work background.
+func DefaultCadvisorMetricSet(usingLegacyStats bool) cadvisormetrics.MetricSet {
+	metricSet := cadvisormetrics.MetricSet{}
+	for metricKind := range IncludedMetrics {
+		metricSet.Add(metricKind)
 	}
+
+	if usingLegacyStats {
+		metricSet.Add(cadvisormetrics.DiskUsageMetrics)
+	}
+	return metricSet
+}
+
+// CustomCadvisorMetricSet returns custom metrics set for cadvisor interface of kubelet work background.
+// If feature gate CustomCadvisorMetrics equals to true,
+// cadivsor interface can work with metrics specified.
+func CustomCadvisorMetricSet(usingLegacyStats bool, cadvisorMetricList []string) cadvisormetrics.MetricSet {
+	metricSet := cadvisormetrics.MetricSet{}
+	for _, metrics := range cadvisorMetricList {
+		if !allMetrics.Has(cadvisormetrics.MetricKind(metrics)) {
+			continue
+		}
+		metricSet.Add(cadvisormetrics.MetricKind(metrics))
+	}
+
+	// mapping usingLegacyStats, if false, remove custom disk metrics from set
+	if !usingLegacyStats && metricSet.Has(cadvisormetrics.DiskUsageMetrics) {
+		delete(metricSet, cadvisormetrics.DiskUsageMetrics)
+	}
+	return metricSet
+
 }

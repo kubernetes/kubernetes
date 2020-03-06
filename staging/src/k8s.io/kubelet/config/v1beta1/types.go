@@ -760,7 +760,7 @@ type KubeletConfiguration struct {
 	// cpu,sched,memory,disk,network,tcp
 	// Default: []
 	// +optional
-	CadvisorMetricsEnabled []string
+	CadvisorMetrics []string
 }
 
 type KubeletAuthorizationMode string
