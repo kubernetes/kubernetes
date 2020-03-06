@@ -247,7 +247,7 @@ type genericDescriber struct {
 }
 
 func (g *genericDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (output string, err error) {
-	obj, err := g.dynamic.Resource(g.mapping.Resource).Namespace(namespace).Get(name, metav1.GetOptions{})
+	obj, err := g.dynamic.Resource(g.mapping.Resource).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}

@@ -144,7 +144,7 @@ func TestCRD(t *testing.T) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 	fooResource := schema.GroupVersionResource{Group: "cr.bar.com", Version: "v1", Resource: "foos"}
-	_, err = dynamicClient.Resource(fooResource).Namespace(testNamespace).List(metav1.ListOptions{})
+	_, err = dynamicClient.Resource(fooResource).Namespace(testNamespace).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		t.Errorf("Failed to list foos.cr.bar.com instances: %v", err)
 	}
