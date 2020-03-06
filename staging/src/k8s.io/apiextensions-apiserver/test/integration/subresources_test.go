@@ -17,6 +17,7 @@ limitations under the License.
 package integration
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"reflect"
@@ -328,7 +329,7 @@ func TestScaleSubresource(t *testing.T) {
 			}
 
 			// get the scale object
-			gottenScale, err := scaleClient.Scales("not-the-default").Get(groupResource, "foo")
+			gottenScale, err := scaleClient.Scales("not-the-default").Get(context.TODO(), groupResource, "foo", metav1.GetOptions{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -349,7 +350,7 @@ func TestScaleSubresource(t *testing.T) {
 			// check that spec is updated, but status is not
 			gottenScale.Spec.Replicas = 5
 			gottenScale.Status.Selector = "baz"
-			updatedScale, err := scaleClient.Scales("not-the-default").Update(groupResource, gottenScale)
+			updatedScale, err := scaleClient.Scales("not-the-default").Update(context.TODO(), groupResource, gottenScale, metav1.UpdateOptions{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -842,7 +843,7 @@ func TestSubresourcePatch(t *testing.T) {
 			}
 
 			// Scale.Spec.Replicas = 7 but Scale.Status.Replicas should remain 0
-			gottenScale, err := scaleClient.Scales("not-the-default").Get(groupResource, "foo")
+			gottenScale, err := scaleClient.Scales("not-the-default").Get(context.TODO(), groupResource, "foo", metav1.GetOptions{})
 			if err != nil {
 				t.Fatal(err)
 			}

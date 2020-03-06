@@ -648,7 +648,7 @@ func (a *HorizontalController) reconcileAutoscaler(hpav1Shared *autoscalingv1.Ho
 
 	if rescale {
 		scale.Spec.Replicas = desiredReplicas
-		_, err = a.scaleNamespacer.Scales(hpa.Namespace).Update(targetGR, scale)
+		_, err = a.scaleNamespacer.Scales(hpa.Namespace).Update(context.TODO(), targetGR, scale, metav1.UpdateOptions{})
 		if err != nil {
 			a.eventRecorder.Eventf(hpa, v1.EventTypeWarning, "FailedRescale", "New size: %d; reason: %s; error: %v", desiredReplicas, rescaleReason, err.Error())
 			setCondition(hpa, autoscalingv2.AbleToScale, v1.ConditionFalse, "FailedUpdateScale", "the HPA controller was unable to update the target scale: %v", err)
@@ -1050,7 +1050,7 @@ func (a *HorizontalController) scaleForResourceMappings(namespace, name string, 
 	var firstErr error
 	for i, mapping := range mappings {
 		targetGR := mapping.Resource.GroupResource()
-		scale, err := a.scaleNamespacer.Scales(namespace).Get(targetGR, name)
+		scale, err := a.scaleNamespacer.Scales(namespace).Get(context.TODO(), targetGR, name, metav1.GetOptions{})
 		if err == nil {
 			return scale, targetGR, nil
 		}
