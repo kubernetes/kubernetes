@@ -38,7 +38,17 @@ go_library(
         "//vendor/k8s.io/klog:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
         "//vendor/k8s.io/utils/mount:go_default_library",
-    ],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:android": [
+            "//pkg/features:go_default_library",
+            "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:linux": [
+            "//pkg/features:go_default_library",
+            "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 go_test(
