@@ -196,6 +196,7 @@ type LocalMode string
 // Currently supported modes for LocalMode
 const (
 	LocalModeClusterCIDR LocalMode = "ClusterCIDR"
+	LocalModeNodeCIDR    LocalMode = "NodeCIDR"
 )
 
 // IPVSSchedulerMethod is the algorithm for allocating TCP connections and
