@@ -16,7 +16,7 @@ go_library(
         "//pkg/controller/volume/attachdetach/statusupdater:go_default_library",
         "//pkg/kubelet/events:go_default_library",
         "//pkg/util/goroutinemap/exponentialbackoff:go_default_library",
-        "//pkg/volume:go_default_library",
+        "//pkg/volume/util:go_default_library",
         "//pkg/volume/util/operationexecutor:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
