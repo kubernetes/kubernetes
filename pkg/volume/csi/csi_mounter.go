@@ -28,6 +28,7 @@ import (
 	"k8s.io/klog"
 
 	api "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -281,7 +282,7 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 	// The following logic is derived from https://github.com/kubernetes/kubernetes/issues/66323
 	// if fstype is "", then skip fsgroup (could be indication of non-block filesystem)
 	// if fstype is provided and pv.AccessMode == ReadWriteOnly, then apply fsgroup
-	err = c.applyFSGroup(fsType, mounterArgs.FsGroup)
+	err = c.applyFSGroup(fsType, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy)
 	if err != nil {
 		// At this point mount operation is successful:
 		//   1. Since volume can not be used by the pod because of invalid permissions, we must return error
@@ -380,7 +381,7 @@ func (c *csiMountMgr) TearDownAt(dir string) error {
 // from https://github.com/kubernetes/kubernetes/issues/66323
 // 1) if fstype is "", then skip fsgroup (could be indication of non-block filesystem)
 // 2) if fstype is provided and pv.AccessMode == ReadWriteOnly and !c.spec.ReadOnly then apply fsgroup
-func (c *csiMountMgr) applyFSGroup(fsType string, fsGroup *int64) error {
+func (c *csiMountMgr) applyFSGroup(fsType string, fsGroup *int64, fsGroupChangePolicy *v1.PodFSGroupChangePolicy) error {
 	if fsGroup != nil {
 		if fsType == "" {
 			klog.V(4).Info(log("mounter.SetupAt WARNING: skipping fsGroup, fsType not provided"))
@@ -402,7 +403,7 @@ func (c *csiMountMgr) applyFSGroup(fsType string, fsGroup *int64) error {
 			return nil
 		}
 
-		err := volume.SetVolumeOwnership(c, fsGroup)
+		err := volume.SetVolumeOwnership(c, fsGroup, fsGroupChangePolicy)
 		if err != nil {
 			return err
 		}
