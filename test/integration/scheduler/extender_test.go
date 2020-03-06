@@ -232,7 +232,7 @@ func (e *Extender) Bind(binding *extenderv1.ExtenderBindingArgs) error {
 		},
 	}
 
-	return e.Client.CoreV1().Pods(b.Namespace).Bind(b)
+	return e.Client.CoreV1().Pods(b.Namespace).Bind(context.TODO(), b, metav1.CreateOptions{})
 }
 
 func machine1_2_3Predicate(pod *v1.Pod, node *v1.Node) (bool, error) {

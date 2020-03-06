@@ -100,7 +100,7 @@ func (a *sarApprover) handle(csr *capi.CertificateSigningRequest) error {
 		}
 		if approved {
 			appendApprovalCondition(csr, r.successMessage)
-			_, err = a.client.CertificatesV1beta1().CertificateSigningRequests().UpdateApproval(csr)
+			_, err = a.client.CertificatesV1beta1().CertificateSigningRequests().UpdateApproval(context.Background(), csr, metav1.UpdateOptions{})
 			if err != nil {
 				return fmt.Errorf("error updating approval for csr: %v", err)
 			}

@@ -292,7 +292,7 @@ func (d *namespacedResourcesDeleter) finalizeNamespace(namespace *v1.Namespace) 
 	for _, value := range finalizerSet.List() {
 		namespaceFinalize.Spec.Finalizers = append(namespaceFinalize.Spec.Finalizers, v1.FinalizerName(value))
 	}
-	namespace, err := d.nsClient.Finalize(&namespaceFinalize)
+	namespace, err := d.nsClient.Finalize(context.Background(), &namespaceFinalize, metav1.UpdateOptions{})
 	if err != nil {
 		// it was removed already, so life is good
 		if errors.IsNotFound(err) {
