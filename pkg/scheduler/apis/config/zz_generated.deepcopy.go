@@ -112,6 +112,13 @@ func (in *KubeSchedulerConfiguration) DeepCopyInto(out *KubeSchedulerConfigurati
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.Extenders != nil {
+		in, out := &in.Extenders, &out.Extenders
+		*out = make([]Extender, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
 	return
 }
 

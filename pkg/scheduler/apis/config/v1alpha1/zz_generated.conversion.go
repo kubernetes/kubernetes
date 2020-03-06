@@ -217,6 +217,7 @@ func autoConvert_config_KubeSchedulerConfiguration_To_v1alpha1_KubeSchedulerConf
 		return err
 	}
 	// WARNING: in.Profiles requires manual conversion: does not exist in peer-type
+	// WARNING: in.Extenders requires manual conversion: does not exist in peer-type
 	return nil
 }
 
