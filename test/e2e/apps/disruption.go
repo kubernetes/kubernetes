@@ -404,7 +404,7 @@ func patchPDBOrDie(cs kubernetes.Interface, dc dynamic.Interface, ns string, nam
 }
 
 func deletePDBOrDie(cs kubernetes.Interface, ns string, name string) {
-	err := cs.PolicyV1beta1().PodDisruptionBudgets(ns).Delete(context.TODO(), name, &metav1.DeleteOptions{})
+	err := cs.PolicyV1beta1().PodDisruptionBudgets(ns).Delete(context.TODO(), name, metav1.DeleteOptions{})
 	framework.ExpectNoError(err, "Deleting pdb in namespace %s", ns)
 	waitForPdbToBeDeleted(cs, ns, name)
 }
@@ -423,7 +423,7 @@ func listPDBs(cs kubernetes.Interface, ns string, labelSelector string, count in
 
 func deletePDBCollection(cs kubernetes.Interface, ns string) {
 	ginkgo.By("deleting a collection of PDBs")
-	err := cs.PolicyV1beta1().PodDisruptionBudgets(ns).DeleteCollection(context.TODO(), &metav1.DeleteOptions{}, metav1.ListOptions{})
+	err := cs.PolicyV1beta1().PodDisruptionBudgets(ns).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
 	framework.ExpectNoError(err, "Deleting PDB set in namespace %s", ns)
 
 	waitForPDBCollectionToBeDeleted(cs, ns)

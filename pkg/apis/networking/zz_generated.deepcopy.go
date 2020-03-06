@@ -35,7 +35,7 @@ func (in *HTTPIngressPath) DeepCopyInto(out *HTTPIngressPath) {
 		*out = new(PathType)
 		**out = **in
 	}
-	out.Backend = in.Backend
+	in.Backend.DeepCopyInto(&out.Backend)
 	return
 }
 
@@ -125,6 +125,11 @@ func (in *Ingress) DeepCopyObject() runtime.Object {
 func (in *IngressBackend) DeepCopyInto(out *IngressBackend) {
 	*out = *in
 	out.ServicePort = in.ServicePort
+	if in.Resource != nil {
+		in, out := &in.Resource, &out.Resource
+		*out = new(core.TypedLocalObjectReference)
+		(*in).DeepCopyInto(*out)
+	}
 	return
 }
 
@@ -301,7 +306,7 @@ func (in *IngressSpec) DeepCopyInto(out *IngressSpec) {
 	if in.Backend != nil {
 		in, out := &in.Backend, &out.Backend
 		*out = new(IngressBackend)
-		**out = **in
+		(*in).DeepCopyInto(*out)
 	}
 	if in.TLS != nil {
 		in, out := &in.TLS, &out.TLS

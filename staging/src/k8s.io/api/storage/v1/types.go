@@ -221,6 +221,132 @@ type VolumeError struct {
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// CSIDriver captures information about a Container Storage Interface (CSI)
+// volume driver deployed on the cluster.
+// Kubernetes attach detach controller uses this object to determine whether attach is required.
+// Kubelet uses this object to determine whether pod information needs to be passed on mount.
+// CSIDriver objects are non-namespaced.
+type CSIDriver struct {
+	metav1.TypeMeta `json:",inline"`
+
+	// Standard object metadata.
+	// metadata.Name indicates the name of the CSI driver that this object
+	// refers to; it MUST be the same name returned by the CSI GetPluginName()
+	// call for that driver.
+	// The driver name must be 63 characters or less, beginning and ending with
+	// an alphanumeric character ([a-z0-9A-Z]) with dashes (-), dots (.), and
+	// alphanumerics between.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// Specification of the CSI Driver.
+	Spec CSIDriverSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// CSIDriverList is a collection of CSIDriver objects.
+type CSIDriverList struct {
+	metav1.TypeMeta `json:",inline"`
+
+	// Standard list metadata
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+	// +optional
+	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// items is the list of CSIDriver
+	Items []CSIDriver `json:"items" protobuf:"bytes,2,rep,name=items"`
+}
+
+// CSIDriverSpec is the specification of a CSIDriver.
+type CSIDriverSpec struct {
+	// attachRequired indicates this CSI volume driver requires an attach
+	// operation (because it implements the CSI ControllerPublishVolume()
+	// method), and that the Kubernetes attach detach controller should call
+	// the attach volume interface which checks the volumeattachment status
+	// and waits until the volume is attached before proceeding to mounting.
+	// The CSI external-attacher coordinates with CSI volume driver and updates
+	// the volumeattachment status when the attach operation is complete.
+	// If the CSIDriverRegistry feature gate is enabled and the value is
+	// specified to false, the attach operation will be skipped.
+	// Otherwise the attach operation will be called.
+	// +optional
+	AttachRequired *bool `json:"attachRequired,omitempty" protobuf:"varint,1,opt,name=attachRequired"`
+
+	// If set to true, podInfoOnMount indicates this CSI volume driver
+	// requires additional pod information (like podName, podUID, etc.) during
+	// mount operations.
+	// If set to false, pod information will not be passed on mount.
+	// Default is false.
+	// The CSI driver specifies podInfoOnMount as part of driver deployment.
+	// If true, Kubelet will pass pod information as VolumeContext in the CSI
+	// NodePublishVolume() calls.
+	// The CSI driver is responsible for parsing and validating the information
+	// passed in as VolumeContext.
+	// The following VolumeConext will be passed if podInfoOnMount is set to true.
+	// This list might grow, but the prefix will be used.
+	// "csi.storage.k8s.io/pod.name": pod.Name
+	// "csi.storage.k8s.io/pod.namespace": pod.Namespace
+	// "csi.storage.k8s.io/pod.uid": string(pod.UID)
+	// "csi.storage.k8s.io/ephemeral": "true" iff the volume is an ephemeral inline volume
+	//                                 defined by a CSIVolumeSource, otherwise "false"
+	//
+	// "csi.storage.k8s.io/ephemeral" is a new feature in Kubernetes 1.16. It is only
+	// required for drivers which support both the "Persistent" and "Ephemeral" VolumeLifecycleMode.
+	// Other drivers can leave pod info disabled and/or ignore this field.
+	// As Kubernetes 1.15 doesn't support this field, drivers can only support one mode when
+	// deployed on such a cluster and the deployment determines which mode that is, for example
+	// via a command line parameter of the driver.
+	// +optional
+	PodInfoOnMount *bool `json:"podInfoOnMount,omitempty" protobuf:"bytes,2,opt,name=podInfoOnMount"`
+
+	// volumeLifecycleModes defines what kind of volumes this CSI volume driver supports.
+	// The default if the list is empty is "Persistent", which is the usage
+	// defined by the CSI specification and implemented in Kubernetes via the usual
+	// PV/PVC mechanism.
+	// The other mode is "Ephemeral". In this mode, volumes are defined inline
+	// inside the pod spec with CSIVolumeSource and their lifecycle is tied to
+	// the lifecycle of that pod. A driver has to be aware of this
+	// because it is only going to get a NodePublishVolume call for such a volume.
+	// For more information about implementing this mode, see
+	// https://kubernetes-csi.github.io/docs/ephemeral-local-volumes.html
+	// A driver can support one or more of these modes and
+	// more modes may be added in the future.
+	// This field is beta.
+	// +optional
+	// +listType=set
+	VolumeLifecycleModes []VolumeLifecycleMode `json:"volumeLifecycleModes,omitempty" protobuf:"bytes,3,opt,name=volumeLifecycleModes"`
+}
+
+// VolumeLifecycleMode is an enumeration of possible usage modes for a volume
+// provided by a CSI driver. More modes may be added in the future.
+type VolumeLifecycleMode string
+
+const (
+	// VolumeLifecyclePersistent explicitly confirms that the driver implements
+	// the full CSI spec. It is the default when CSIDriverSpec.VolumeLifecycleModes is not
+	// set. Such volumes are managed in Kubernetes via the persistent volume
+	// claim mechanism and have a lifecycle that is independent of the pods which
+	// use them.
+	VolumeLifecyclePersistent VolumeLifecycleMode = "Persistent"
+
+	// VolumeLifecycleEphemeral indicates that the driver can be used for
+	// ephemeral inline volumes. Such volumes are specified inside the pod
+	// spec with a CSIVolumeSource and, as far as Kubernetes is concerned, have
+	// a lifecycle that is tied to the lifecycle of the pod. For example, such
+	// a volume might contain data that gets created specifically for that pod,
+	// like secrets.
+	// But how the volume actually gets created and managed is entirely up to
+	// the driver. It might also use reference counting to share the same volume
+	// instance among different pods if the CSIVolumeSource of those pods is
+	// identical.
+	VolumeLifecycleEphemeral VolumeLifecycleMode = "Ephemeral"
+)
+
+// +genclient
+// +genclient:nonNamespaced
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // CSINode holds information about all CSI drivers installed on a node.
 // CSI drivers do not need to create the CSINode object directly. As long as
 // they use the node-driver-registrar sidecar container, the kubelet will

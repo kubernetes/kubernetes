@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
+	testutils "k8s.io/kubernetes/test/utils"
 	"os/exec"
 	"regexp"
 	"strconv"
@@ -49,8 +50,9 @@ import (
 const (
 	numalignCmd = `export CPULIST_ALLOWED=$( awk -F":\t*" '/Cpus_allowed_list/ { print $2 }' /proc/self/status); env; sleep 1d`
 
-	minNumaNodes = 2
-	minCoreCount = 4
+	minNumaNodes     = 2
+	minCoreCount     = 4
+	minSriovResource = 7 // This is the min number of SRIOV VFs needed on the system under test.
 )
 
 // Helper for makeTopologyManagerPod().
@@ -276,8 +278,9 @@ func readServiceAccountV1OrDie(objBytes []byte) *v1.ServiceAccount {
 }
 
 func findSRIOVResource(node *v1.Node) (string, int64) {
+	framework.Logf("Node status allocatable: %v", node.Status.Allocatable)
 	re := regexp.MustCompile(`^intel.com/.*sriov.*`)
-	for key, val := range node.Status.Capacity {
+	for key, val := range node.Status.Allocatable {
 		resource := string(key)
 		if re.MatchString(resource) {
 			v := val.Value()
@@ -461,16 +464,20 @@ func setupSRIOVConfigOrFail(f *framework.Framework, configMap *v1.ConfigMap) *sr
 	dpPod, err := f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Create(context.TODO(), dp, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
+	if err = e2epod.WaitForPodCondition(f.ClientSet, metav1.NamespaceSystem, dp.Name, "Ready", 120*time.Second, testutils.PodRunningReady); err != nil {
+		framework.Logf("SRIOV Pod %v took too long to enter running/ready: %v", dp.Name, err)
+	}
+	framework.ExpectNoError(err)
+
 	sriovResourceName := ""
 	var sriovResourceAmount int64
 	ginkgo.By("Waiting for devices to become available on the local node")
 	gomega.Eventually(func() bool {
 		node := getLocalNode(f)
-		framework.Logf("Node status: %v", node.Status.Capacity)
 		sriovResourceName, sriovResourceAmount = findSRIOVResource(node)
-		return sriovResourceAmount > 0
+		return sriovResourceAmount > minSriovResource
 	}, 2*time.Minute, framework.Poll).Should(gomega.BeTrue())
-	framework.Logf("Successfully created device plugin pod, detected %d SRIOV device %q", sriovResourceAmount, sriovResourceName)
+	framework.Logf("Successfully created device plugin pod, detected %d SRIOV allocatable devices %q", sriovResourceAmount, sriovResourceName)
 
 	return &sriovData{
 		configMap:      configMap,
@@ -489,16 +496,16 @@ func teardownSRIOVConfigOrFail(f *framework.Framework, sd *sriovData) {
 	}
 
 	ginkgo.By("Delete SRIOV device plugin pod %s/%s")
-	err = f.ClientSet.CoreV1().Pods(sd.pod.Namespace).Delete(context.TODO(), sd.pod.Name, &deleteOptions)
+	err = f.ClientSet.CoreV1().Pods(sd.pod.Namespace).Delete(context.TODO(), sd.pod.Name, deleteOptions)
 	framework.ExpectNoError(err)
 	waitForContainerRemoval(sd.pod.Spec.Containers[0].Name, sd.pod.Name, sd.pod.Namespace)
 
 	ginkgo.By(fmt.Sprintf("Deleting configMap %v/%v", metav1.NamespaceSystem, sd.configMap.Name))
-	err = f.ClientSet.CoreV1().ConfigMaps(metav1.NamespaceSystem).Delete(context.TODO(), sd.configMap.Name, &deleteOptions)
+	err = f.ClientSet.CoreV1().ConfigMaps(metav1.NamespaceSystem).Delete(context.TODO(), sd.configMap.Name, deleteOptions)
 	framework.ExpectNoError(err)
 
 	ginkgo.By(fmt.Sprintf("Deleting serviceAccount %v/%v", metav1.NamespaceSystem, sd.serviceAccount.Name))
-	err = f.ClientSet.CoreV1().ServiceAccounts(metav1.NamespaceSystem).Delete(context.TODO(), sd.serviceAccount.Name, &deleteOptions)
+	err = f.ClientSet.CoreV1().ServiceAccounts(metav1.NamespaceSystem).Delete(context.TODO(), sd.serviceAccount.Name, deleteOptions)
 	framework.ExpectNoError(err)
 }
 

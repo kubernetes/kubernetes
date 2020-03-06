@@ -37,4 +37,7 @@ all-container:
 all-push: all-container
 	./image-util.sh push $(WHAT)
 
-.PHONY: all all-push all-container
+all-build-and-push:
+	./image-util.sh build_and_push ${WHAT}
+
+.PHONY: all all-build-and-push all-push all-container

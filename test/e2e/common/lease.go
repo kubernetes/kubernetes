@@ -144,14 +144,14 @@ var _ = framework.KubeDescribe("Lease", func() {
 		framework.ExpectEqual(len(leases.Items), 2)
 
 		selector := labels.Set(map[string]string{"deletecollection": "true"}).AsSelector()
-		err = leaseClient.DeleteCollection(context.TODO(), &metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: selector.String()})
+		err = leaseClient.DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: selector.String()})
 		framework.ExpectNoError(err, "couldn't delete collection")
 
 		leases, err = leaseClient.List(context.TODO(), metav1.ListOptions{})
 		framework.ExpectNoError(err, "couldn't list Leases")
 		framework.ExpectEqual(len(leases.Items), 1)
 
-		err = leaseClient.Delete(context.TODO(), name, &metav1.DeleteOptions{})
+		err = leaseClient.Delete(context.TODO(), name, metav1.DeleteOptions{})
 		framework.ExpectNoError(err, "deleting Lease failed")
 
 		_, err = leaseClient.Get(context.TODO(), name, metav1.GetOptions{})

@@ -56,7 +56,7 @@ type testConfig struct {
 var (
 	// Delete API objects immediately
 	deletePeriod = int64(0)
-	deleteOption = &metav1.DeleteOptions{GracePeriodSeconds: &deletePeriod}
+	deleteOption = metav1.DeleteOptions{GracePeriodSeconds: &deletePeriod}
 
 	modeWait      = storagev1.VolumeBindingWaitForFirstConsumer
 	modeImmediate = storagev1.VolumeBindingImmediate
@@ -693,7 +693,7 @@ func TestPVAffinityConflict(t *testing.T) {
 			t.Fatalf("Failed as Pod's %s failure message does not contain expected message: node(s) didn't match node selector, node(s) had volume node affinity conflict. Got message %q", podName, p.Status.Conditions[0].Message)
 		}
 		// Deleting test pod
-		if err := config.client.CoreV1().Pods(config.ns).Delete(context.TODO(), podName, &metav1.DeleteOptions{}); err != nil {
+		if err := config.client.CoreV1().Pods(config.ns).Delete(context.TODO(), podName, metav1.DeleteOptions{}); err != nil {
 			t.Fatalf("Failed to delete Pod %s: %v", podName, err)
 		}
 	}
@@ -847,8 +847,8 @@ func TestRescheduleProvisioning(t *testing.T) {
 
 	defer func() {
 		close(controllerCh)
-		deleteTestObjects(clientset, ns, nil)
-		testCtx.clientSet.CoreV1().Nodes().DeleteCollection(context.TODO(), nil, metav1.ListOptions{})
+		deleteTestObjects(clientset, ns, metav1.DeleteOptions{})
+		testCtx.clientSet.CoreV1().Nodes().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
 		testCtx.closeFn()
 	}()
 
@@ -931,7 +931,7 @@ func setupCluster(t *testing.T, nsName string, numberOfNodes int, resyncPeriod t
 		stop:   textCtx.ctx.Done(),
 		teardown: func() {
 			klog.Infof("test cluster %q start to tear down", ns)
-			deleteTestObjects(clientset, ns, nil)
+			deleteTestObjects(clientset, ns, metav1.DeleteOptions{})
 			cleanupTest(t, textCtx)
 		},
 	}
@@ -983,7 +983,7 @@ func initPVController(t *testing.T, testCtx *testContext, provisionDelaySeconds 
 	return ctrl, informerFactory, nil
 }
 
-func deleteTestObjects(client clientset.Interface, ns string, option *metav1.DeleteOptions) {
+func deleteTestObjects(client clientset.Interface, ns string, option metav1.DeleteOptions) {
 	client.CoreV1().Pods(ns).DeleteCollection(context.TODO(), option, metav1.ListOptions{})
 	client.CoreV1().PersistentVolumeClaims(ns).DeleteCollection(context.TODO(), option, metav1.ListOptions{})
 	client.CoreV1().PersistentVolumes().DeleteCollection(context.TODO(), option, metav1.ListOptions{})

@@ -46,6 +46,7 @@ import (
 	"context"
 
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -131,7 +132,7 @@ var _ = ginkgo.Describe("[sig-storage] GCP Volumes", func() {
 			name := config.Prefix + "-server"
 			defer func() {
 				volume.TestServerCleanup(f, config)
-				err := c.CoreV1().Endpoints(namespace.Name).Delete(context.TODO(), name, nil)
+				err := c.CoreV1().Endpoints(namespace.Name).Delete(context.TODO(), name, metav1.DeleteOptions{})
 				framework.ExpectNoError(err, "defer: Gluster delete endpoints failed")
 			}()
 

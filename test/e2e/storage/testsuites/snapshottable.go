@@ -137,7 +137,7 @@ func (s *snapshottableTestSuite) DefineTests(driver TestDriver, pattern testpatt
 		framework.ExpectNoError(err)
 		defer func() {
 			framework.Logf("deleting storage class %s", class.Name)
-			framework.ExpectNoError(cs.StorageV1().StorageClasses().Delete(context.TODO(), class.Name, nil))
+			framework.ExpectNoError(cs.StorageV1().StorageClasses().Delete(context.TODO(), class.Name, metav1.DeleteOptions{}))
 		}()
 
 		ginkgo.By("creating a claim")
@@ -146,7 +146,7 @@ func (s *snapshottableTestSuite) DefineTests(driver TestDriver, pattern testpatt
 		defer func() {
 			framework.Logf("deleting claim %q/%q", pvc.Namespace, pvc.Name)
 			// typically this claim has already been deleted
-			err = cs.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(context.TODO(), pvc.Name, nil)
+			err = cs.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(context.TODO(), pvc.Name, metav1.DeleteOptions{})
 			if err != nil && !apierrors.IsNotFound(err) {
 				framework.Failf("Error deleting claim %q. Error: %v", pvc.Name, err)
 			}

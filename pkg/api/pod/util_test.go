@@ -41,11 +41,13 @@ func TestVisitContainers(t *testing.T) {
 		description string
 		haveSpec    *api.PodSpec
 		wantNames   []string
+		mask        ContainerType
 	}{
 		{
 			"empty podspec",
 			&api.PodSpec{},
 			[]string{},
+			DefaultContainers,
 		},
 		{
 			"regular containers",
@@ -56,6 +58,7 @@ func TestVisitContainers(t *testing.T) {
 				},
 			},
 			[]string{"c1", "c2"},
+			DefaultContainers,
 		},
 		{
 			"init containers",
@@ -66,6 +69,7 @@ func TestVisitContainers(t *testing.T) {
 				},
 			},
 			[]string{"i1", "i2"},
+			DefaultContainers,
 		},
 		{
 			"regular and init containers",
@@ -80,6 +84,7 @@ func TestVisitContainers(t *testing.T) {
 				},
 			},
 			[]string{"i1", "i2", "c1", "c2"},
+			DefaultContainers,
 		},
 		{
 			"ephemeral containers",
@@ -93,6 +98,7 @@ func TestVisitContainers(t *testing.T) {
 				},
 			},
 			[]string{"c1", "c2", "e1"},
+			DefaultContainers,
 		},
 		{
 			"all container types",
@@ -111,6 +117,26 @@ func TestVisitContainers(t *testing.T) {
 				},
 			},
 			[]string{"i1", "i2", "c1", "c2", "e1", "e2"},
+			DefaultContainers,
+		},
+		{
+			"all container types with init and regular container types chosen",
+			&api.PodSpec{
+				Containers: []api.Container{
+					{Name: "c1"},
+					{Name: "c2"},
+				},
+				InitContainers: []api.Container{
+					{Name: "i1"},
+					{Name: "i2"},
+				},
+				EphemeralContainers: []api.EphemeralContainer{
+					{EphemeralContainerCommon: api.EphemeralContainerCommon{Name: "e1"}},
+					{EphemeralContainerCommon: api.EphemeralContainerCommon{Name: "e2"}},
+				},
+			},
+			[]string{"i1", "i2", "c1", "c2"},
+			Containers | InitContainers,
 		},
 		{
 			"dropping fields",
@@ -129,12 +155,13 @@ func TestVisitContainers(t *testing.T) {
 				},
 			},
 			[]string{"i1", "i2", "c1", "c2", "e1", "e2"},
+			DefaultContainers,
 		},
 	}
 
 	for _, tc := range testCases {
 		gotNames := []string{}
-		VisitContainers(tc.haveSpec, func(c *api.Container) bool {
+		VisitContainers(tc.haveSpec, tc.mask, func(c *api.Container, containerType ContainerType) bool {
 			gotNames = append(gotNames, c.Name)
 			if c.SecurityContext != nil {
 				c.SecurityContext = nil
@@ -433,6 +460,133 @@ func TestPodConfigmaps(t *testing.T) {
 		t.Logf("Extra names:\n%s", strings.Join(extraNames.List(), "\n"))
 		t.Error("Extra names extracted. Verify VisitPodConfigmapNames() is correctly extracting resource names")
 	}
+}
+
+func TestDropFSGroupFields(t *testing.T) {
+	nofsGroupPod := func() *api.Pod {
+		return &api.Pod{
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name:  "container1",
+						Image: "testimage",
+					},
+				},
+			},
+		}
+	}
+
+	var podFSGroup int64 = 100
+	changePolicy := api.FSGroupChangeAlways
+
+	fsGroupPod := func() *api.Pod {
+		return &api.Pod{
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name:  "container1",
+						Image: "testimage",
+					},
+				},
+				SecurityContext: &api.PodSecurityContext{
+					FSGroup:             &podFSGroup,
+					FSGroupChangePolicy: &changePolicy,
+				},
+			},
+		}
+	}
+	podInfos := []struct {
+		description                  string
+		featureEnabled               bool
+		newPodHasFSGroupChangePolicy bool
+		pod                          func() *api.Pod
+		expectPolicyInPod            bool
+	}{
+		{
+			description:                  "oldPod.FSGroupChangePolicy=nil, feature=true, newPod.FSGroupChangePolicy=true",
+			featureEnabled:               true,
+			pod:                          nofsGroupPod,
+			newPodHasFSGroupChangePolicy: true,
+			expectPolicyInPod:            true,
+		},
+		{
+			description:                  "oldPod=nil, feature=false, newPod.FSGroupChangePolicy=true",
+			featureEnabled:               false,
+			pod:                          func() *api.Pod { return nil },
+			newPodHasFSGroupChangePolicy: true,
+			expectPolicyInPod:            false,
+		},
+		{
+			description:                  "oldPod=nil, feature=true, newPod.FSGroupChangePolicy=true",
+			featureEnabled:               true,
+			pod:                          func() *api.Pod { return nil },
+			newPodHasFSGroupChangePolicy: true,
+			expectPolicyInPod:            true,
+		},
+		{
+			description:                  "oldPod.FSGroupChangePolicy=nil, feature=false, newPod.FSGroupChangePolicy=true",
+			featureEnabled:               false,
+			pod:                          nofsGroupPod,
+			newPodHasFSGroupChangePolicy: true,
+			expectPolicyInPod:            false,
+		},
+		{
+			description:                  "oldPod.FSGroupChangePolicy=true, feature=false, newPod.FSGroupChangePolicy=true",
+			featureEnabled:               false,
+			pod:                          fsGroupPod,
+			newPodHasFSGroupChangePolicy: true,
+			expectPolicyInPod:            true,
+		},
+		{
+			description:                  "oldPod.FSGroupChangePolicy=true, feature=false, newPod.FSGroupChangePolicy=false",
+			featureEnabled:               false,
+			pod:                          fsGroupPod,
+			newPodHasFSGroupChangePolicy: false,
+			expectPolicyInPod:            false,
+		},
+		{
+			description:                  "oldPod.FSGroupChangePolicy=true, feature=true, newPod.FSGroupChangePolicy=false",
+			featureEnabled:               true,
+			pod:                          fsGroupPod,
+			newPodHasFSGroupChangePolicy: false,
+			expectPolicyInPod:            false,
+		},
+	}
+	for _, podInfo := range podInfos {
+		t.Run(podInfo.description, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConfigurableFSGroupPolicy, podInfo.featureEnabled)()
+			oldPod := podInfo.pod()
+			newPod := oldPod.DeepCopy()
+			if oldPod == nil && podInfo.newPodHasFSGroupChangePolicy {
+				newPod = fsGroupPod()
+			}
+
+			if oldPod != nil {
+				if podInfo.newPodHasFSGroupChangePolicy {
+					newPod.Spec.SecurityContext = &api.PodSecurityContext{
+						FSGroup:             &podFSGroup,
+						FSGroupChangePolicy: &changePolicy,
+					}
+				} else {
+					newPod.Spec.SecurityContext = &api.PodSecurityContext{}
+				}
+			}
+			DropDisabledPodFields(newPod, oldPod)
+
+			if podInfo.expectPolicyInPod {
+				secContext := newPod.Spec.SecurityContext
+				if secContext == nil || secContext.FSGroupChangePolicy == nil {
+					t.Errorf("for %s, expected fsGroupChangepolicy found none", podInfo.description)
+				}
+			} else {
+				secConext := newPod.Spec.SecurityContext
+				if secConext != nil && secConext.FSGroupChangePolicy != nil {
+					t.Errorf("for %s, unexpected fsGroupChangepolicy set", podInfo.description)
+				}
+			}
+		})
+	}
+
 }
 
 func TestDropSubPath(t *testing.T) {

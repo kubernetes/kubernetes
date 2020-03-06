@@ -840,7 +840,7 @@ func (p *glusterfsVolumeProvisioner) CreateVolume(gid int) (r *v1.GlusterfsPersi
 			klog.Errorf("failed to delete volume: %v, manual deletion of the volume required", deleteErr)
 		}
 		klog.V(3).Infof("failed to update endpoint, deleting %s", endpoint)
-		err = kubeClient.CoreV1().Services(epNamespace).Delete(context.TODO(), epServiceName, nil)
+		err = kubeClient.CoreV1().Services(epNamespace).Delete(context.TODO(), epServiceName, metav1.DeleteOptions{})
 		if err != nil && errors.IsNotFound(err) {
 			klog.V(1).Infof("service %s does not exist in namespace %s", epServiceName, epNamespace)
 			err = nil
@@ -921,7 +921,7 @@ func (d *glusterfsVolumeDeleter) deleteEndpointService(namespace string, epServi
 	if kubeClient == nil {
 		return fmt.Errorf("failed to get kube client when deleting endpoint service")
 	}
-	err = kubeClient.CoreV1().Services(namespace).Delete(context.TODO(), epServiceName, nil)
+	err = kubeClient.CoreV1().Services(namespace).Delete(context.TODO(), epServiceName, metav1.DeleteOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to delete service %s/%s: %v", namespace, epServiceName, err)
 	}

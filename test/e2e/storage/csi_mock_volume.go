@@ -187,7 +187,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 			ginkgo.By(fmt.Sprintf("Deleting claim %s", claim.Name))
 			claim, err := cs.CoreV1().PersistentVolumeClaims(claim.Namespace).Get(context.TODO(), claim.Name, metav1.GetOptions{})
 			if err == nil {
-				cs.CoreV1().PersistentVolumeClaims(claim.Namespace).Delete(context.TODO(), claim.Name, nil)
+				cs.CoreV1().PersistentVolumeClaims(claim.Namespace).Delete(context.TODO(), claim.Name, metav1.DeleteOptions{})
 				framework.WaitForPersistentVolumeDeleted(cs, claim.Spec.VolumeName, framework.Poll, 2*time.Minute)
 			}
 
@@ -195,7 +195,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 
 		for _, sc := range m.sc {
 			ginkgo.By(fmt.Sprintf("Deleting storageclass %s", sc.Name))
-			cs.StorageV1().StorageClasses().Delete(context.TODO(), sc.Name, nil)
+			cs.StorageV1().StorageClasses().Delete(context.TODO(), sc.Name, metav1.DeleteOptions{})
 		}
 
 		ginkgo.By("Cleaning up resources")
@@ -773,7 +773,7 @@ func waitForCSIDriver(cs clientset.Interface, driverName string) error {
 
 	framework.Logf("waiting up to %v for CSIDriver %q", timeout, driverName)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(framework.Poll) {
-		_, err := cs.StorageV1beta1().CSIDrivers().Get(context.TODO(), driverName, metav1.GetOptions{})
+		_, err := cs.StorageV1().CSIDrivers().Get(context.TODO(), driverName, metav1.GetOptions{})
 		if !apierrors.IsNotFound(err) {
 			return err
 		}
@@ -782,12 +782,12 @@ func waitForCSIDriver(cs clientset.Interface, driverName string) error {
 }
 
 func destroyCSIDriver(cs clientset.Interface, driverName string) {
-	driverGet, err := cs.StorageV1beta1().CSIDrivers().Get(context.TODO(), driverName, metav1.GetOptions{})
+	driverGet, err := cs.StorageV1().CSIDrivers().Get(context.TODO(), driverName, metav1.GetOptions{})
 	if err == nil {
 		framework.Logf("deleting %s.%s: %s", driverGet.TypeMeta.APIVersion, driverGet.TypeMeta.Kind, driverGet.ObjectMeta.Name)
 		// Uncomment the following line to get full dump of CSIDriver object
 		// framework.Logf("%s", framework.PrettyPrint(driverGet))
-		cs.StorageV1beta1().CSIDrivers().Delete(context.TODO(), driverName, nil)
+		cs.StorageV1().CSIDrivers().Delete(context.TODO(), driverName, metav1.DeleteOptions{})
 	}
 }
 

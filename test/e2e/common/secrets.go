@@ -209,7 +209,7 @@ var _ = ginkgo.Describe("[sig-api-machinery] Secrets", func() {
 		framework.ExpectEqual(string(secretDecodedstring), "value1", "found secret, but the data wasn't updated from the patch")
 
 		ginkgo.By("deleting the secret using a LabelSelector")
-		err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).DeleteCollection(context.TODO(), &metav1.DeleteOptions{}, metav1.ListOptions{
+		err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{
 			LabelSelector: "testsecret=true",
 		})
 		framework.ExpectNoError(err, "failed to delete patched secret")

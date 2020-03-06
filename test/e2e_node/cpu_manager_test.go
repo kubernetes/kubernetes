@@ -87,7 +87,7 @@ func deletePods(f *framework.Framework, podNames []string) {
 		delOpts := metav1.DeleteOptions{
 			GracePeriodSeconds: &gp,
 		}
-		f.PodClient().DeleteSync(podName, &delOpts, framework.DefaultPodDeletionTimeout)
+		f.PodClient().DeleteSync(podName, delOpts, framework.DefaultPodDeletionTimeout)
 	}
 }
 

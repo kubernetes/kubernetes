@@ -220,19 +220,19 @@ func (t *volumeLimitsTestSuite) DefineTests(driver TestDriver, pattern testpatte
 func cleanupTest(cs clientset.Interface, ns string, runningPodName, unschedulablePodName string, pvcs []*v1.PersistentVolumeClaim, pvNames sets.String) error {
 	var cleanupErrors []string
 	if runningPodName != "" {
-		err := cs.CoreV1().Pods(ns).Delete(context.TODO(), runningPodName, nil)
+		err := cs.CoreV1().Pods(ns).Delete(context.TODO(), runningPodName, metav1.DeleteOptions{})
 		if err != nil {
 			cleanupErrors = append(cleanupErrors, fmt.Sprintf("failed to delete pod %s: %s", runningPodName, err))
 		}
 	}
 	if unschedulablePodName != "" {
-		err := cs.CoreV1().Pods(ns).Delete(context.TODO(), unschedulablePodName, nil)
+		err := cs.CoreV1().Pods(ns).Delete(context.TODO(), unschedulablePodName, metav1.DeleteOptions{})
 		if err != nil {
 			cleanupErrors = append(cleanupErrors, fmt.Sprintf("failed to delete pod %s: %s", unschedulablePodName, err))
 		}
 	}
 	for _, pvc := range pvcs {
-		err := cs.CoreV1().PersistentVolumeClaims(ns).Delete(context.TODO(), pvc.Name, nil)
+		err := cs.CoreV1().PersistentVolumeClaims(ns).Delete(context.TODO(), pvc.Name, metav1.DeleteOptions{})
 		if err != nil {
 			cleanupErrors = append(cleanupErrors, fmt.Sprintf("failed to delete PVC %s: %s", pvc.Name, err))
 		}

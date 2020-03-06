@@ -38,7 +38,7 @@ type internalContainerLifecycleImpl struct {
 }
 
 func (i *internalContainerLifecycleImpl) PreStartContainer(pod *v1.Pod, container *v1.Container, containerID string) error {
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CPUManager) {
+	if i.cpuManager != nil {
 		err := i.cpuManager.AddContainer(pod, container, containerID)
 		if err != nil {
 			return err
@@ -54,14 +54,14 @@ func (i *internalContainerLifecycleImpl) PreStartContainer(pod *v1.Pod, containe
 }
 
 func (i *internalContainerLifecycleImpl) PreStopContainer(containerID string) error {
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CPUManager) {
+	if i.cpuManager != nil {
 		return i.cpuManager.RemoveContainer(containerID)
 	}
 	return nil
 }
 
 func (i *internalContainerLifecycleImpl) PostStopContainer(containerID string) error {
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CPUManager) {
+	if i.cpuManager != nil {
 		err := i.cpuManager.RemoveContainer(containerID)
 		if err != nil {
 			return err

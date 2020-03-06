@@ -26,28 +26,55 @@ import (
 	"k8s.io/kubernetes/pkg/security/apparmor"
 )
 
+// ContainerType signifies container type
+type ContainerType int
+
+// DefaultContainers defines default behavior: Iterate containers based on feature gates
+const DefaultContainers ContainerType = 0
+
+const (
+	// Containers is for normal containers
+	Containers ContainerType = 1 << iota
+	// InitContainers is for init containers
+	InitContainers
+	// EphemeralContainers is for ephemeral containers
+	EphemeralContainers
+)
+
+// AllContainers specifies that all containers be visited
+const AllContainers ContainerType = (InitContainers | Containers | EphemeralContainers)
+
 // ContainerVisitor is called with each container spec, and returns true
 // if visiting should continue.
-type ContainerVisitor func(container *api.Container) (shouldContinue bool)
+type ContainerVisitor func(container *api.Container, containerType ContainerType) (shouldContinue bool)
 
 // VisitContainers invokes the visitor function with a pointer to the container
 // spec of every container in the given pod spec. If visitor returns false,
 // visiting is short-circuited. VisitContainers returns true if visiting completes,
 // false if visiting was short-circuited.
-func VisitContainers(podSpec *api.PodSpec, visitor ContainerVisitor) bool {
-	for i := range podSpec.InitContainers {
-		if !visitor(&podSpec.InitContainers[i]) {
-			return false
+//
+// With the default mask (zero value or DefaultContainers) VisitContainers will visit all containers
+// enabled by current feature gates. If mask is non-zero, VisitContainers will unconditionally visit
+// container types specified by mask, and no feature gate checks will be performed.
+func VisitContainers(podSpec *api.PodSpec, mask ContainerType, visitor ContainerVisitor) bool {
+	if mask == DefaultContainers || (mask&InitContainers) > 0 {
+		for i := range podSpec.InitContainers {
+			if !visitor(&podSpec.InitContainers[i], InitContainers) {
+				return false
+			}
 		}
 	}
-	for i := range podSpec.Containers {
-		if !visitor(&podSpec.Containers[i]) {
-			return false
+	if mask == DefaultContainers || (mask&Containers) > 0 {
+		for i := range podSpec.Containers {
+			if !visitor(&podSpec.Containers[i], Containers) {
+				return false
+			}
 		}
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) {
+	if (mask == DefaultContainers && utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers)) ||
+		(mask&EphemeralContainers) > 0 {
 		for i := range podSpec.EphemeralContainers {
-			if !visitor((*api.Container)(&podSpec.EphemeralContainers[i].EphemeralContainerCommon)) {
+			if !visitor((*api.Container)(&podSpec.EphemeralContainers[i].EphemeralContainerCommon), EphemeralContainers) {
 				return false
 			}
 		}
@@ -68,7 +95,7 @@ func VisitPodSecretNames(pod *api.Pod, visitor Visitor) bool {
 			return false
 		}
 	}
-	VisitContainers(&pod.Spec, func(c *api.Container) bool {
+	VisitContainers(&pod.Spec, AllContainers, func(c *api.Container, containerType ContainerType) bool {
 		return visitContainerSecretNames(c, visitor)
 	})
 	var source *api.VolumeSource
@@ -151,7 +178,7 @@ func visitContainerSecretNames(container *api.Container, visitor Visitor) bool {
 // Transitive references (e.g. pod -> pvc -> pv -> secret) are not visited.
 // Returns true if visiting completed, false if visiting was short-circuited.
 func VisitPodConfigmapNames(pod *api.Pod, visitor Visitor) bool {
-	VisitContainers(&pod.Spec, func(c *api.Container) bool {
+	VisitContainers(&pod.Spec, AllContainers, func(c *api.Container, containerType ContainerType) bool {
 		return visitContainerConfigmapNames(c, visitor)
 	})
 	var source *api.VolumeSource
@@ -356,7 +383,7 @@ func dropDisabledFields(
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeSubpath) && !subpathInUse(oldPodSpec) {
 		// drop subpath from the pod if the feature is disabled and the old spec did not specify subpaths
-		VisitContainers(podSpec, func(c *api.Container) bool {
+		VisitContainers(podSpec, AllContainers, func(c *api.Container, containerType ContainerType) bool {
 			for i := range c.VolumeMounts {
 				c.VolumeMounts[i].SubPath = ""
 			}
@@ -369,7 +396,7 @@ func dropDisabledFields(
 
 	if (!utilfeature.DefaultFeatureGate.Enabled(features.VolumeSubpath) || !utilfeature.DefaultFeatureGate.Enabled(features.VolumeSubpathEnvExpansion)) && !subpathExprInUse(oldPodSpec) {
 		// drop subpath env expansion from the pod if either of the subpath features is disabled and the old spec did not specify subpath env expansion
-		VisitContainers(podSpec, func(c *api.Container) bool {
+		VisitContainers(podSpec, AllContainers, func(c *api.Container, containerType ContainerType) bool {
 			for i := range c.VolumeMounts {
 				c.VolumeMounts[i].SubPathExpr = ""
 			}
@@ -379,13 +406,15 @@ func dropDisabledFields(
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.StartupProbe) && !startupProbeInUse(oldPodSpec) {
 		// drop startupProbe from all containers if the feature is disabled
-		VisitContainers(podSpec, func(c *api.Container) bool {
+		VisitContainers(podSpec, AllContainers, func(c *api.Container, containerType ContainerType) bool {
 			c.StartupProbe = nil
 			return true
 		})
 	}
 
 	dropDisabledRunAsGroupField(podSpec, oldPodSpec)
+
+	dropDisabledFSGroupFields(podSpec, oldPodSpec)
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.RuntimeClass) && !runtimeClassInUse(oldPodSpec) {
 		// Set RuntimeClassName to nil only if feature is disabled and it is not used
@@ -421,7 +450,7 @@ func dropDisabledRunAsGroupField(podSpec, oldPodSpec *api.PodSpec) {
 		if podSpec.SecurityContext != nil {
 			podSpec.SecurityContext.RunAsGroup = nil
 		}
-		VisitContainers(podSpec, func(c *api.Container) bool {
+		VisitContainers(podSpec, AllContainers, func(c *api.Container, containerType ContainerType) bool {
 			if c.SecurityContext != nil {
 				c.SecurityContext.RunAsGroup = nil
 			}
@@ -435,7 +464,7 @@ func dropDisabledRunAsGroupField(podSpec, oldPodSpec *api.PodSpec) {
 func dropDisabledProcMountField(podSpec, oldPodSpec *api.PodSpec) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ProcMountType) && !procMountInUse(oldPodSpec) {
 		defaultProcMount := api.DefaultProcMount
-		VisitContainers(podSpec, func(c *api.Container) bool {
+		VisitContainers(podSpec, AllContainers, func(c *api.Container, containerType ContainerType) bool {
 			if c.SecurityContext != nil && c.SecurityContext.ProcMount != nil {
 				// The ProcMount field was improperly forced to non-nil in 1.12.
 				// If the feature is disabled, and the existing object is not using any non-default values, and the ProcMount field is present in the incoming object, force to the default value.
@@ -444,6 +473,16 @@ func dropDisabledProcMountField(podSpec, oldPodSpec *api.PodSpec) {
 			}
 			return true
 		})
+	}
+}
+
+func dropDisabledFSGroupFields(podSpec, oldPodSpec *api.PodSpec) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ConfigurableFSGroupPolicy) && !fsGroupPolicyInUse(oldPodSpec) {
+		// if oldPodSpec had no FSGroupChangePolicy set then we should prevent new pod from having this field
+		// if ConfigurableFSGroupPolicy feature is disabled
+		if podSpec.SecurityContext != nil {
+			podSpec.SecurityContext.FSGroupChangePolicy = nil
+		}
 	}
 }
 
@@ -464,6 +503,17 @@ func ephemeralContainersInUse(podSpec *api.PodSpec) bool {
 	return len(podSpec.EphemeralContainers) > 0
 }
 
+func fsGroupPolicyInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+	securityContext := podSpec.SecurityContext
+	if securityContext != nil && securityContext.FSGroupChangePolicy != nil {
+		return true
+	}
+	return false
+}
+
 // subpathInUse returns true if the pod spec is non-nil and has a volume mount that makes use of the subPath feature
 func subpathInUse(podSpec *api.PodSpec) bool {
 	if podSpec == nil {
@@ -471,7 +521,7 @@ func subpathInUse(podSpec *api.PodSpec) bool {
 	}
 
 	var inUse bool
-	VisitContainers(podSpec, func(c *api.Container) bool {
+	VisitContainers(podSpec, AllContainers, func(c *api.Container, containerType ContainerType) bool {
 		for i := range c.VolumeMounts {
 			if len(c.VolumeMounts[i].SubPath) > 0 {
 				inUse = true
@@ -521,7 +571,7 @@ func procMountInUse(podSpec *api.PodSpec) bool {
 	}
 
 	var inUse bool
-	VisitContainers(podSpec, func(c *api.Container) bool {
+	VisitContainers(podSpec, AllContainers, func(c *api.Container, containerType ContainerType) bool {
 		if c.SecurityContext == nil || c.SecurityContext.ProcMount == nil {
 			return true
 		}
@@ -609,7 +659,7 @@ func runAsGroupInUse(podSpec *api.PodSpec) bool {
 	}
 
 	var inUse bool
-	VisitContainers(podSpec, func(c *api.Container) bool {
+	VisitContainers(podSpec, AllContainers, func(c *api.Container, containerType ContainerType) bool {
 		if c.SecurityContext != nil && c.SecurityContext.RunAsGroup != nil {
 			inUse = true
 			return false
@@ -627,7 +677,7 @@ func subpathExprInUse(podSpec *api.PodSpec) bool {
 	}
 
 	var inUse bool
-	VisitContainers(podSpec, func(c *api.Container) bool {
+	VisitContainers(podSpec, AllContainers, func(c *api.Container, containerType ContainerType) bool {
 		for i := range c.VolumeMounts {
 			if len(c.VolumeMounts[i].SubPathExpr) > 0 {
 				inUse = true
@@ -647,7 +697,7 @@ func startupProbeInUse(podSpec *api.PodSpec) bool {
 	}
 
 	var inUse bool
-	VisitContainers(podSpec, func(c *api.Container) bool {
+	VisitContainers(podSpec, AllContainers, func(c *api.Container, containerType ContainerType) bool {
 		if c.StartupProbe != nil {
 			inUse = true
 			return false

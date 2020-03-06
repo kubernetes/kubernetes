@@ -75,7 +75,7 @@ func deleteNodes(t *testing.T, client *clientset.Clientset, startIndex, endIndex
 		go func(idx int) {
 			defer wg.Done()
 			name := fmt.Sprintf("node-%d", idx)
-			if err := client.CoreV1().Nodes().Delete(context.TODO(), name, &metav1.DeleteOptions{}); err != nil {
+			if err := client.CoreV1().Nodes().Delete(context.TODO(), name, metav1.DeleteOptions{}); err != nil {
 				t.Fatalf("Failed to delete node: %v", err)
 			}
 		}(i)

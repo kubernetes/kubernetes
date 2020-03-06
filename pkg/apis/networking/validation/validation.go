@@ -198,7 +198,8 @@ var ValidateIngressName = apimachineryvalidation.NameIsDNSSubdomain
 
 // IngressValidationOptions cover beta to GA transitions for HTTP PathType
 type IngressValidationOptions struct {
-	requireRegexPath bool
+	requireRegexPath     bool
+	allowResourceBackend bool
 }
 
 // ValidateIngress validates Ingresses on create and update.
@@ -215,6 +216,8 @@ func ValidateIngressCreate(ingress *networking.Ingress, requestGV schema.GroupVe
 	opts = IngressValidationOptions{
 		// TODO(robscott): Remove regex validation for 1.19.
 		requireRegexPath: true,
+		// TODO(cmluciano): Allow resource backend for 1.19.
+		allowResourceBackend: false,
 	}
 	allErrs = append(allErrs, validateIngress(ingress, opts, requestGV)...)
 	annotationVal, annotationIsSet := ingress.Annotations[annotationIngressClass]
@@ -233,7 +236,8 @@ func ValidateIngressUpdate(ingress, oldIngress *networking.Ingress, requestGV sc
 		// TODO(robscott): Remove regex validation for 1.19.
 		// Only require regex path validation for this Ingress if the previous
 		// version of the Ingress also passed that validation.
-		requireRegexPath: allPathsPassRegexValidation(oldIngress),
+		requireRegexPath:     allPathsPassRegexValidation(oldIngress),
+		allowResourceBackend: resourceBackendPresent(oldIngress),
 	}
 
 	allErrs = append(allErrs, validateIngress(ingress, opts, requestGV)...)
@@ -269,7 +273,7 @@ func ValidateIngressSpec(spec *networking.IngressSpec, fldPath *field.Path, opts
 		allErrs = append(allErrs, field.Invalid(fldPath, spec.Rules, errMsg))
 	}
 	if spec.Backend != nil {
-		allErrs = append(allErrs, validateIngressBackend(spec.Backend, fldPath.Child("backend"))...)
+		allErrs = append(allErrs, validateIngressBackend(spec.Backend, fldPath.Child("backend"), opts)...)
 	}
 	if len(spec.Rules) > 0 {
 		allErrs = append(allErrs, validateIngressRules(spec.Rules, fldPath.Child("rules"), opts)...)
@@ -381,22 +385,34 @@ func validateHTTPIngressPath(path *networking.HTTPIngressPath, fldPath *field.Pa
 		}
 	}
 
-	allErrs = append(allErrs, validateIngressBackend(&path.Backend, fldPath.Child("backend"))...)
+	allErrs = append(allErrs, validateIngressBackend(&path.Backend, fldPath.Child("backend"), opts)...)
 	return allErrs
 }
 
 // validateIngressBackend tests if a given backend is valid.
-func validateIngressBackend(backend *networking.IngressBackend, fldPath *field.Path) field.ErrorList {
+func validateIngressBackend(backend *networking.IngressBackend, fldPath *field.Path, opts IngressValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	// All backends must reference a single local service by name, and a single service port by name or number.
-	if len(backend.ServiceName) == 0 {
-		return append(allErrs, field.Required(fldPath.Child("serviceName"), ""))
+	hasResourceBackend := backend.Resource != nil
+	hasServiceBackend := len(backend.ServiceName) > 0 || backend.ServicePort.IntVal != 0 || len(backend.ServicePort.StrVal) > 0
+
+	switch {
+	case hasResourceBackend && hasServiceBackend:
+		return append(allErrs, field.Invalid(fldPath, "", "cannot set both resource and service backends"))
+	case hasResourceBackend && !opts.allowResourceBackend:
+		return append(allErrs, field.Forbidden(fldPath.Child("resource"), "not supported; only service backends are supported in this version"))
+	case hasResourceBackend:
+		allErrs = append(allErrs, validateIngressTypedLocalObjectReference(backend.Resource, fldPath.Child("resource"))...)
+	default:
+		if len(backend.ServiceName) == 0 {
+			return append(allErrs, field.Required(fldPath.Child("serviceName"), ""))
+		}
+		for _, msg := range apivalidation.ValidateServiceName(backend.ServiceName, false) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("serviceName"), backend.ServiceName, msg))
+		}
+		allErrs = append(allErrs, apivalidation.ValidatePortNumOrName(backend.ServicePort, fldPath.Child("servicePort"))...)
+
 	}
-	for _, msg := range apivalidation.ValidateServiceName(backend.ServiceName, false) {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("serviceName"), backend.ServiceName, msg))
-	}
-	allErrs = append(allErrs, apivalidation.ValidatePortNumOrName(backend.ServicePort, fldPath.Child("servicePort"))...)
 	return allErrs
 }
 
@@ -426,7 +442,7 @@ func validateIngressClassSpec(spec *networking.IngressClassSpec, fldPath *field.
 		allErrs = append(allErrs, field.TooLong(fldPath.Child("controller"), spec.Controller, maxLenIngressClassController))
 	}
 	allErrs = append(allErrs, validation.IsDomainPrefixedPath(fldPath.Child("controller"), spec.Controller)...)
-	allErrs = append(allErrs, validateIngressClassParameters(spec.Parameters, fldPath.Child("parameters"))...)
+	allErrs = append(allErrs, validateIngressTypedLocalObjectReference(spec.Parameters, fldPath.Child("parameters"))...)
 	return allErrs
 }
 
@@ -436,8 +452,8 @@ func validateIngressClassSpecUpdate(newSpec, oldSpec *networking.IngressClassSpe
 	return apivalidation.ValidateImmutableField(newSpec.Controller, oldSpec.Controller, fldPath.Child("controller"))
 }
 
-// validateIngressClassParameters ensures that Parameters fields are valid.
-func validateIngressClassParameters(params *api.TypedLocalObjectReference, fldPath *field.Path) field.ErrorList {
+// validateIngressTypedLocalObjectReference ensures that Parameters fields are valid.
+func validateIngressTypedLocalObjectReference(params *api.TypedLocalObjectReference, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if params == nil {
@@ -486,4 +502,21 @@ func allPathsPassRegexValidation(ingress *networking.Ingress) bool {
 		}
 	}
 	return true
+}
+
+func resourceBackendPresent(ingress *networking.Ingress) bool {
+	if ingress.Spec.Backend != nil && ingress.Spec.Backend.Resource != nil {
+		return true
+	}
+	for _, rule := range ingress.Spec.Rules {
+		if rule.HTTP == nil {
+			continue
+		}
+		for _, path := range rule.HTTP.Paths {
+			if path.Backend.Resource != nil {
+				return true
+			}
+		}
+	}
+	return false
 }

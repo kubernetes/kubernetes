@@ -21,6 +21,7 @@ package fake
 import (
 	"context"
 
+	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -28,7 +29,6 @@ import (
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
 	examplev1 "k8s.io/code-generator/_examples/HyphenGroup/apis/example/v1"
-	autoscaling "k8s.io/kubernetes/pkg/apis/autoscaling"
 )
 
 // FakeClusterTestTypes implements ClusterTestTypeInterface
@@ -109,15 +109,15 @@ func (c *FakeClusterTestTypes) UpdateStatus(ctx context.Context, clusterTestType
 }
 
 // Delete takes name of the clusterTestType and deletes it. Returns an error if one occurs.
-func (c *FakeClusterTestTypes) Delete(ctx context.Context, name string, options *v1.DeleteOptions) error {
+func (c *FakeClusterTestTypes) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewRootDeleteAction(clustertesttypesResource, name), &examplev1.ClusterTestType{})
 	return err
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeClusterTestTypes) DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(clustertesttypesResource, listOptions)
+func (c *FakeClusterTestTypes) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	action := testing.NewRootDeleteCollectionAction(clustertesttypesResource, listOpts)
 
 	_, err := c.Fake.Invokes(action, &examplev1.ClusterTestTypeList{})
 	return err
@@ -134,21 +134,21 @@ func (c *FakeClusterTestTypes) Patch(ctx context.Context, name string, pt types.
 }
 
 // GetScale takes name of the clusterTestType, and returns the corresponding scale object, and an error if there is any.
-func (c *FakeClusterTestTypes) GetScale(ctx context.Context, clusterTestTypeName string, options v1.GetOptions) (result *autoscaling.Scale, err error) {
+func (c *FakeClusterTestTypes) GetScale(ctx context.Context, clusterTestTypeName string, options v1.GetOptions) (result *autoscalingv1.Scale, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetSubresourceAction(clustertesttypesResource, "scale", clusterTestTypeName), &autoscaling.Scale{})
+		Invokes(testing.NewRootGetSubresourceAction(clustertesttypesResource, "scale", clusterTestTypeName), &autoscalingv1.Scale{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*autoscaling.Scale), err
+	return obj.(*autoscalingv1.Scale), err
 }
 
 // UpdateScale takes the representation of a scale and updates it. Returns the server's representation of the scale, and an error, if there is any.
-func (c *FakeClusterTestTypes) UpdateScale(ctx context.Context, clusterTestTypeName string, scale *autoscaling.Scale, opts v1.UpdateOptions) (result *autoscaling.Scale, err error) {
+func (c *FakeClusterTestTypes) UpdateScale(ctx context.Context, clusterTestTypeName string, scale *autoscalingv1.Scale, opts v1.UpdateOptions) (result *autoscalingv1.Scale, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateSubresourceAction(clustertesttypesResource, "scale", scale), &autoscaling.Scale{})
+		Invokes(testing.NewRootUpdateSubresourceAction(clustertesttypesResource, "scale", scale), &autoscalingv1.Scale{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*autoscaling.Scale), err
+	return obj.(*autoscalingv1.Scale), err
 }

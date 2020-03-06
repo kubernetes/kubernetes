@@ -186,7 +186,7 @@ func PVPVCMapCleanup(c clientset.Interface, ns string, pvols PVMap, claims PVCMa
 func DeletePersistentVolume(c clientset.Interface, pvName string) error {
 	if c != nil && len(pvName) > 0 {
 		framework.Logf("Deleting PersistentVolume %q", pvName)
-		err := c.CoreV1().PersistentVolumes().Delete(context.TODO(), pvName, nil)
+		err := c.CoreV1().PersistentVolumes().Delete(context.TODO(), pvName, metav1.DeleteOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
 			return fmt.Errorf("PV Delete API error: %v", err)
 		}
@@ -198,7 +198,7 @@ func DeletePersistentVolume(c clientset.Interface, pvName string) error {
 func DeletePersistentVolumeClaim(c clientset.Interface, pvcName string, ns string) error {
 	if c != nil && len(pvcName) > 0 {
 		framework.Logf("Deleting PersistentVolumeClaim %q", pvcName)
-		err := c.CoreV1().PersistentVolumeClaims(ns).Delete(context.TODO(), pvcName, nil)
+		err := c.CoreV1().PersistentVolumeClaims(ns).Delete(context.TODO(), pvcName, metav1.DeleteOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
 			return fmt.Errorf("PVC Delete API error: %v", err)
 		}

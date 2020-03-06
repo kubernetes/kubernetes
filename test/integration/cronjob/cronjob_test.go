@@ -89,7 +89,7 @@ func newCronJob(name, namespace, schedule string) *batchv1beta1.CronJob {
 
 func cleanupCronJobs(t *testing.T, cjClient clientbatchv1beta1.CronJobInterface, name string) {
 	deletePropagation := metav1.DeletePropagationForeground
-	err := cjClient.Delete(context.TODO(), name, &metav1.DeleteOptions{PropagationPolicy: &deletePropagation})
+	err := cjClient.Delete(context.TODO(), name, metav1.DeleteOptions{PropagationPolicy: &deletePropagation})
 	if err != nil {
 		t.Errorf("Failed to delete CronJob: %v", err)
 	}

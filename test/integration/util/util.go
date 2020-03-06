@@ -161,7 +161,7 @@ type TestContext struct {
 
 // CleanupNodes cleans all nodes which were created during integration test
 func CleanupNodes(cs clientset.Interface, t *testing.T) {
-	err := cs.CoreV1().Nodes().DeleteCollection(context.TODO(), metav1.NewDeleteOptions(0), metav1.ListOptions{})
+	err := cs.CoreV1().Nodes().DeleteCollection(context.TODO(), *metav1.NewDeleteOptions(0), metav1.ListOptions{})
 	if err != nil {
 		t.Errorf("error while deleting all nodes: %v", err)
 	}
@@ -186,7 +186,7 @@ func CleanupTest(t *testing.T, testCtx *TestContext) {
 	// Kill the scheduler.
 	testCtx.CancelFn()
 	// Cleanup nodes.
-	testCtx.ClientSet.CoreV1().Nodes().DeleteCollection(context.TODO(), nil, metav1.ListOptions{})
+	testCtx.ClientSet.CoreV1().Nodes().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
 	framework.DeleteTestingNamespace(testCtx.NS, testCtx.HTTPServer, t)
 	testCtx.CloseFn()
 }
@@ -194,7 +194,7 @@ func CleanupTest(t *testing.T, testCtx *TestContext) {
 // CleanupPods deletes the given pods and waits for them to be actually deleted.
 func CleanupPods(cs clientset.Interface, t *testing.T, pods []*v1.Pod) {
 	for _, p := range pods {
-		err := cs.CoreV1().Pods(p.Namespace).Delete(context.TODO(), p.Name, metav1.NewDeleteOptions(0))
+		err := cs.CoreV1().Pods(p.Namespace).Delete(context.TODO(), p.Name, *metav1.NewDeleteOptions(0))
 		if err != nil && !apierrors.IsNotFound(err) {
 			t.Errorf("error while deleting pod %v/%v: %v", p.Namespace, p.Name, err)
 		}

@@ -18,6 +18,10 @@ limitations under the License.
 
 package volume
 
-func SetVolumeOwnership(mounter Mounter, fsGroup *int64) error {
+import (
+	v1 "k8s.io/api/core/v1"
+)
+
+func SetVolumeOwnership(mounter Mounter, fsGroup *int64, fsGroupChangePolicy *v1.PodFSGroupChangePolicy) error {
 	return nil
 }

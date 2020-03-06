@@ -447,7 +447,7 @@ func waitCachedPodsStable(testCtx *testutils.TestContext, pods []*v1.Pod) error 
 
 // deletePod deletes the given pod in the given namespace.
 func deletePod(cs clientset.Interface, podName string, nsName string) error {
-	return cs.CoreV1().Pods(nsName).Delete(context.TODO(), podName, metav1.NewDeleteOptions(0))
+	return cs.CoreV1().Pods(nsName).Delete(context.TODO(), podName, *metav1.NewDeleteOptions(0))
 }
 
 func getPod(cs clientset.Interface, podName string, podNamespace string) (*v1.Pod, error) {
@@ -469,7 +469,7 @@ func noPodsInNamespace(c clientset.Interface, podNamespace string) wait.Conditio
 // cleanupPodsInNamespace deletes the pods in the given namespace and waits for them to
 // be actually deleted.
 func cleanupPodsInNamespace(cs clientset.Interface, t *testing.T, ns string) {
-	if err := cs.CoreV1().Pods(ns).DeleteCollection(context.TODO(), nil, metav1.ListOptions{}); err != nil {
+	if err := cs.CoreV1().Pods(ns).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{}); err != nil {
 		t.Errorf("error while listing pod in namespace %v: %v", ns, err)
 		return
 	}

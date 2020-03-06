@@ -70,7 +70,7 @@ func (cc *ConformanceContainer) Create() {
 }
 
 func (cc *ConformanceContainer) Delete() error {
-	return cc.PodClient.Delete(context.TODO(), cc.podName, metav1.NewDeleteOptions(0))
+	return cc.PodClient.Delete(context.TODO(), cc.podName, *metav1.NewDeleteOptions(0))
 }
 
 func (cc *ConformanceContainer) IsReady() (bool, error) {

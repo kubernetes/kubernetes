@@ -204,7 +204,13 @@ push() {
   # Windows images into the manifest list.
   if test -z "${REMOTE_DOCKER_URL:-}" && printf "%s\n" "$os_archs" | grep -q '^windows'; then
     echo "Skipping pushing the image '${image}' for Windows. REMOTE_DOCKER_URL_\${os_version} should be set, containing the URL to a Windows docker daemon."
-    os_archs=$(printf "%s\n" "$os_archs" | grep -v "^windows")
+    os_archs=$(printf "%s\n" "$os_archs" | grep -v "^windows" || true)
+  fi
+
+  if test -z "${os_archs}"; then
+    # this can happen for Windows-only images if they have been skipped entirely.
+    echo "No image for the manifest list. Skipping ${image}."
+    return
   fi
 
   kube::util::ensure-gnu-sed
@@ -235,6 +241,14 @@ push() {
     docker manifest annotate --os "${os_name}" --arch "${arch}" "${REGISTRY}/${image}:${TAG}" "${REGISTRY}/${image}:${TAG}-${suffix}"
   done
   docker manifest push --purge "${REGISTRY}/${image}:${TAG}"
+}
+
+# This function is for building AND pushing images. Useful if ${WHAT} is "all-conformance".
+# This will allow images to be pushed immediately after they've been built.
+build_and_push() {
+  image=$1
+  build "${image}"
+  push "${image}"
 }
 
 # This function is for building the go code

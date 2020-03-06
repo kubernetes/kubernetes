@@ -118,6 +118,6 @@ func createBasicIngress(cs clientset.Interface, namespace string) (*networkingv1
 }
 
 func deleteIngressClass(cs clientset.Interface, name string) {
-	err := cs.NetworkingV1beta1().IngressClasses().Delete(context.TODO(), name, &metav1.DeleteOptions{})
+	err := cs.NetworkingV1beta1().IngressClasses().Delete(context.TODO(), name, metav1.DeleteOptions{})
 	framework.ExpectNoError(err)
 }

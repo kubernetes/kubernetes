@@ -3278,6 +3278,15 @@ message PodSecurityContext {
   // sysctls (by the container runtime) might fail to launch.
   // +optional
   repeated Sysctl sysctls = 7;
+
+  // fsGroupChangePolicy defines behavior of changing ownership and permission of the volume
+  // before being exposed inside Pod. This field will only apply to
+  // volume types which support fsGroup based ownership(and permissions).
+  // It will have no effect on ephemeral volume types such as: secret, configmaps
+  // and emptydir.
+  // Valid values are "OnRootMismatch" and "Always". If not specified defaults to "Always".
+  // +optional
+  optional string fsGroupChangePolicy = 9;
 }
 
 // Describes the class of pods that should avoid this node.

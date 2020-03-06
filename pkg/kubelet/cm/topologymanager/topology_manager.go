@@ -18,6 +18,7 @@ package topologymanager
 
 import (
 	"fmt"
+	"sync"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/klog"
@@ -54,6 +55,7 @@ type Manager interface {
 }
 
 type manager struct {
+	mutex sync.Mutex
 	//The list of components registered with the Manager
 	hintProviders []HintProvider
 	//Mapping of a Pods mapping of Containers and their TopologyHints
@@ -203,13 +205,18 @@ func (m *manager) AddHintProvider(h HintProvider) {
 }
 
 func (m *manager) AddContainer(pod *v1.Pod, containerID string) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
 	m.podMap[containerID] = string(pod.UID)
 	return nil
 }
 
 func (m *manager) RemoveContainer(containerID string) error {
-	klog.Infof("[topologymanager] RemoveContainer - Container ID: %v", containerID)
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
 
+	klog.Infof("[topologymanager] RemoveContainer - Container ID: %v", containerID)
 	podUIDString := m.podMap[containerID]
 	delete(m.podMap, containerID)
 	if _, exists := m.podTopologyHints[podUIDString]; exists {
@@ -223,15 +230,22 @@ func (m *manager) RemoveContainer(containerID string) error {
 }
 
 func (m *manager) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
-	// Unconditionally admit the pod if we are running with the 'none' policy.
-	if m.policy.Name() == PolicyNone {
-		return lifecycle.PodAdmitResult{Admit: true}
-	}
-
 	klog.Infof("[topologymanager] Topology Admit Handler")
 	pod := attrs.Pod
 
 	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
+		if m.policy.Name() == PolicyNone {
+			err := m.allocateAlignedResources(pod, &container)
+			if err != nil {
+				return lifecycle.PodAdmitResult{
+					Message: fmt.Sprintf("Allocate failed due to %v, which is unexpected", err),
+					Reason:  "UnexpectedAdmissionError",
+					Admit:   false,
+				}
+			}
+			continue
+		}
+
 		result, admit := m.calculateAffinity(pod, &container)
 		if !admit {
 			return lifecycle.PodAdmitResult{
