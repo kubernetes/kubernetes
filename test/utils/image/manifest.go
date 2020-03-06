@@ -215,7 +215,7 @@ func initImageConfigs() map[int]Config {
 	configs[CudaVectorAdd] = Config{e2eRegistry, "cuda-vector-add", "1.0"}
 	configs[CudaVectorAdd2] = Config{e2eRegistry, "cuda-vector-add", "2.0"}
 	configs[Dnsutils] = Config{e2eRegistry, "dnsutils", "1.1"}
-	configs[DebianBase] = Config{googleContainerRegistry, "debian-base", "0.4.1"}
+	configs[DebianBase] = Config{googleContainerRegistry, "debian-base", "v1.0.1"}
 	configs[EchoServer] = Config{e2eRegistry, "echoserver", "2.2"}
 	configs[Etcd] = Config{gcRegistry, "etcd", "3.3.15"}
 	configs[GBFrontend] = Config{sampleRegistry, "gb-frontend", "v6"}
