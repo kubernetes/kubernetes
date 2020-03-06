@@ -140,6 +140,7 @@ const (
 
 	// owner: @lmdaly
 	// alpha: v1.16
+	// beta: v1.18
 	//
 	// Enable resource managers to make NUMA aligned decisions
 	TopologyManager featuregate.Feature = "TopologyManager"
@@ -598,7 +599,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	AttachVolumeLimit:              {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.19
 	CPUManager:                     {Default: true, PreRelease: featuregate.Beta},
 	CPUCFSQuotaPeriod:              {Default: false, PreRelease: featuregate.Alpha},
-	TopologyManager:                {Default: false, PreRelease: featuregate.Alpha},
+	TopologyManager:                {Default: true, PreRelease: featuregate.Beta},
 	ServiceNodeExclusion:           {Default: false, PreRelease: featuregate.Alpha},
 	NodeDisruptionExclusion:        {Default: false, PreRelease: featuregate.Alpha},
 	CSIDriverRegistry:              {Default: true, PreRelease: featuregate.Beta},

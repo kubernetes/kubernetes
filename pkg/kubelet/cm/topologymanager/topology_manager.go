@@ -18,6 +18,7 @@ package topologymanager
 
 import (
 	"fmt"
+	"sync"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/klog"
@@ -54,6 +55,7 @@ type Manager interface {
 }
 
 type manager struct {
+	mutex sync.Mutex
 	//The list of components registered with the Manager
 	hintProviders []HintProvider
 	//Mapping of a Pods mapping of Containers and their TopologyHints
@@ -203,13 +205,18 @@ func (m *manager) AddHintProvider(h HintProvider) {
 }
 
 func (m *manager) AddContainer(pod *v1.Pod, containerID string) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
 	m.podMap[containerID] = string(pod.UID)
 	return nil
 }
 
 func (m *manager) RemoveContainer(containerID string) error {
-	klog.Infof("[topologymanager] RemoveContainer - Container ID: %v", containerID)
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
 
+	klog.Infof("[topologymanager] RemoveContainer - Container ID: %v", containerID)
 	podUIDString := m.podMap[containerID]
 	delete(m.podMap, containerID)
 	if _, exists := m.podTopologyHints[podUIDString]; exists {
