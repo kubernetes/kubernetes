@@ -23,10 +23,12 @@ import (
 	"sort"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -312,9 +314,10 @@ func (c *Configurator) createFromConfig(policy schedulerapi.Policy) (*Scheduler,
 	})
 	defPlugins.Append(pluginsForPredicates)
 	defPlugins.Append(pluginsForPriorities)
-	var defPluginConfig []schedulerapi.PluginConfig
-	defPluginConfig = append(defPluginConfig, pluginConfigForPredicates...)
-	defPluginConfig = append(defPluginConfig, pluginConfigForPriorities...)
+	defPluginConfig, err := mergePluginConfigsFromPolicy(pluginConfigForPredicates, pluginConfigForPriorities)
+	if err != nil {
+		return nil, err
+	}
 	for i := range c.profiles {
 		prof := &c.profiles[i]
 		if prof.Plugins != nil {
@@ -330,6 +333,30 @@ func (c *Configurator) createFromConfig(policy schedulerapi.Policy) (*Scheduler,
 	}
 
 	return c.create()
+}
+
+// mergePluginConfigsFromPolicy merges the giving plugin configs ensuring that,
+// if a plugin name is repeated, the arguments are the same.
+func mergePluginConfigsFromPolicy(pc1, pc2 []schedulerapi.PluginConfig) ([]schedulerapi.PluginConfig, error) {
+	args := make(map[string]runtime.Unknown)
+	for _, c := range pc1 {
+		args[c.Name] = c.Args
+	}
+	for _, c := range pc2 {
+		if v, ok := args[c.Name]; ok && !cmp.Equal(v, c.Args) {
+			// This should be unreachable.
+			return nil, fmt.Errorf("inconsistent configuration produced for plugin %s", c.Name)
+		}
+		args[c.Name] = c.Args
+	}
+	pc := make([]schedulerapi.PluginConfig, 0, len(args))
+	for k, v := range args {
+		pc = append(pc, schedulerapi.PluginConfig{
+			Name: k,
+			Args: v,
+		})
+	}
+	return pc, nil
 }
 
 // getPriorityConfigs returns priorities configuration: ones that will run as priorities and ones that will run
