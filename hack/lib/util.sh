@@ -317,6 +317,9 @@ kube::util::group-version-to-pkg-path() {
     meta/v1beta1)
       echo "vendor/k8s.io/apimachinery/pkg/apis/meta/v1beta1"
       ;;
+    kubescheduler.config.k8s.io/*)
+      echo "vendor/k8s.io/kube-scheduler/config/${group_version/*\/}"
+      ;;
     *.k8s.io)
       echo "pkg/apis/${group_version%.*k8s.io}"
       ;;
