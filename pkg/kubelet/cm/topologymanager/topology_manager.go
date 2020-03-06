@@ -230,15 +230,22 @@ func (m *manager) RemoveContainer(containerID string) error {
 }
 
 func (m *manager) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
-	// Unconditionally admit the pod if we are running with the 'none' policy.
-	if m.policy.Name() == PolicyNone {
-		return lifecycle.PodAdmitResult{Admit: true}
-	}
-
 	klog.Infof("[topologymanager] Topology Admit Handler")
 	pod := attrs.Pod
 
 	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
+		if m.policy.Name() == PolicyNone {
+			err := m.allocateAlignedResources(pod, &container)
+			if err != nil {
+				return lifecycle.PodAdmitResult{
+					Message: fmt.Sprintf("Allocate failed due to %v, which is unexpected", err),
+					Reason:  "UnexpectedAdmissionError",
+					Admit:   false,
+				}
+			}
+			continue
+		}
+
 		result, admit := m.calculateAffinity(pod, &container)
 		if !admit {
 			return lifecycle.PodAdmitResult{
