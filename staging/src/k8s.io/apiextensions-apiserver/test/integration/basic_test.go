@@ -265,7 +265,7 @@ func testSimpleCRUD(t *testing.T, ns string, noxuDefinition *apiextensionsv1beta
 		}
 
 		// Delete test
-		if err := noxuResourceClient.Delete("foo", metav1.NewDeleteOptions(0)); err != nil {
+		if err := noxuResourceClient.Delete("foo", *metav1.NewDeleteOptions(0)); err != nil {
 			t.Fatal(err)
 		}
 
@@ -305,7 +305,7 @@ func testSimpleCRUD(t *testing.T, ns string, noxuDefinition *apiextensionsv1beta
 		}
 
 		// Delete test
-		if err := noxuResourceClient.DeleteCollection(metav1.NewDeleteOptions(0), metav1.ListOptions{}); err != nil {
+		if err := noxuResourceClient.DeleteCollection(*metav1.NewDeleteOptions(0), metav1.ListOptions{}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -468,10 +468,10 @@ func testFieldSelector(t *testing.T, ns string, noxuDefinition *apiextensionsv1b
 		t.Errorf("expected %v, got %v", e, a)
 	}
 
-	if err := noxuResourceClient.Delete("bar", nil); err != nil {
+	if err := noxuResourceClient.Delete("bar", metav1.DeleteOptions{}); err != nil {
 		t.Fatal(err)
 	}
-	if err := noxuResourceClient.Delete("foo", nil); err != nil {
+	if err := noxuResourceClient.Delete("foo", metav1.DeleteOptions{}); err != nil {
 		t.Fatal(err)
 	}
 

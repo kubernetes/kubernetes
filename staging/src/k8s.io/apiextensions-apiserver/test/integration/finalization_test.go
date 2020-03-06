@@ -50,7 +50,7 @@ func TestFinalization(t *testing.T) {
 	require.NoError(t, err)
 
 	uid := createdNoxuInstance.GetUID()
-	err = noxuResourceClient.Delete(name, &metav1.DeleteOptions{
+	err = noxuResourceClient.Delete(name, metav1.DeleteOptions{
 		Preconditions: &metav1.Preconditions{
 			UID: &uid,
 		},
@@ -65,7 +65,7 @@ func TestFinalization(t *testing.T) {
 	require.NotNil(t, gottenNoxuInstance.GetDeletionTimestamp())
 
 	// Trying to delete it again to confirm it will not remove the object because finalizer is still there.
-	err = noxuResourceClient.Delete(name, &metav1.DeleteOptions{
+	err = noxuResourceClient.Delete(name, metav1.DeleteOptions{
 		Preconditions: &metav1.Preconditions{
 			UID: &uid,
 		},
@@ -116,7 +116,7 @@ func TestFinalizationAndDeletion(t *testing.T) {
 
 	// Delete a CR. Because there's a finalizer, it will not get deleted now.
 	uid := createdNoxuInstance.GetUID()
-	err = noxuResourceClient.Delete(name, &metav1.DeleteOptions{
+	err = noxuResourceClient.Delete(name, metav1.DeleteOptions{
 		Preconditions: &metav1.Preconditions{
 			UID: &uid,
 		},

@@ -2238,7 +2238,7 @@ func verbsContain(verbs metav1.Verbs, str string) bool {
 
 // deleteObj deletes an Object with the provided client and name.
 func deleteObj(client dynamic.ResourceInterface, name string) {
-	err := client.Delete(name, &metav1.DeleteOptions{})
+	err := client.Delete(name, metav1.DeleteOptions{})
 	framework.ExpectNoError(err)
 }
 

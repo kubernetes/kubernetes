@@ -466,7 +466,7 @@ func isWatchCachePrimed(crd *apiextensionsv1.CustomResourceDefinition, dynamicCl
 	if err != nil {
 		return false, err
 	}
-	err = resourceClient.Delete(createdInstance.GetName(), nil)
+	err = resourceClient.Delete(createdInstance.GetName(), metav1.DeleteOptions{})
 	if err != nil {
 		return false, err
 	}

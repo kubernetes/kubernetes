@@ -128,7 +128,7 @@ func TestMultipleResourceInstances(t *testing.T) {
 		}
 	}
 	for key := range instances {
-		if err := noxuNamespacedResourceClient.Delete(key, nil); err != nil {
+		if err := noxuNamespacedResourceClient.Delete(key, metav1.DeleteOptions{}); err != nil {
 			t.Fatalf("unable to delete %s:%v", key, err)
 		}
 	}
@@ -292,7 +292,7 @@ func TestDeRegistrationAndReRegistration(t *testing.T) {
 			t.Fatalf("expected %v, got %v", e, a)
 		}
 
-		if err := noxuNamespacedResourceClient.Delete(sameInstanceName, nil); err != nil {
+		if err := noxuNamespacedResourceClient.Delete(sameInstanceName, metav1.DeleteOptions{}); err != nil {
 			t.Fatal(err)
 		}
 		if _, err = noxuNamespacedResourceClient.Get(sameInstanceName, metav1.GetOptions{}); err == nil || !errors.IsNotFound(err) {

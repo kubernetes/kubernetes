@@ -145,9 +145,9 @@ func (p *pruner) delete(namespace, name string, mapping *meta.RESTMapping) error
 }
 
 func runDelete(namespace, name string, mapping *meta.RESTMapping, c dynamic.Interface, cascade bool, gracePeriod int, serverDryRun bool) error {
-	options := &metav1.DeleteOptions{}
+	options := metav1.DeleteOptions{}
 	if gracePeriod >= 0 {
-		options = metav1.NewDeleteOptions(int64(gracePeriod))
+		options = *metav1.NewDeleteOptions(int64(gracePeriod))
 	}
 	if serverDryRun {
 		options.DryRun = []string{metav1.DryRunAll}

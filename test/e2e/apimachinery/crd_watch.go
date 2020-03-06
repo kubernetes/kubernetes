@@ -175,7 +175,7 @@ func patchCustomResource(client dynamic.ResourceInterface, name string) error {
 }
 
 func deleteCustomResource(client dynamic.ResourceInterface, name string) error {
-	return client.Delete(name, &metav1.DeleteOptions{})
+	return client.Delete(name, metav1.DeleteOptions{})
 }
 
 func newNamespacedCustomResourceClient(ns string, client dynamic.Interface, crd *apiextensionsv1.CustomResourceDefinition) (dynamic.ResourceInterface, error) {

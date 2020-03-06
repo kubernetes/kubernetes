@@ -291,7 +291,7 @@ func (c *allClient) cleanup(all *[]cleanupData) error {
 		obj := (*all)[i].obj
 		gvr := (*all)[i].resource
 
-		if err := c.dynamicClient.Resource(gvr).Namespace(obj.GetNamespace()).Delete(obj.GetName(), nil); err != nil {
+		if err := c.dynamicClient.Resource(gvr).Namespace(obj.GetNamespace()).Delete(obj.GetName(), metav1.DeleteOptions{}); err != nil {
 			return err
 		}
 	}

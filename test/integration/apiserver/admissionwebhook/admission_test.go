@@ -669,7 +669,7 @@ func testResourceDelete(c *testContext) {
 	background := metav1.DeletePropagationBackground
 	zero := int64(0)
 	c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), gvkDeleteOptions, v1beta1.Delete, obj.GetName(), obj.GetNamespace(), false, true, true)
-	err = c.client.Resource(c.gvr).Namespace(obj.GetNamespace()).Delete(obj.GetName(), &metav1.DeleteOptions{GracePeriodSeconds: &zero, PropagationPolicy: &background})
+	err = c.client.Resource(c.gvr).Namespace(obj.GetNamespace()).Delete(obj.GetName(), metav1.DeleteOptions{GracePeriodSeconds: &zero, PropagationPolicy: &background})
 	if err != nil {
 		c.t.Error(err)
 		return
@@ -713,7 +713,7 @@ func testResourceDelete(c *testContext) {
 		return
 	}
 	c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), gvkDeleteOptions, v1beta1.Delete, obj.GetName(), obj.GetNamespace(), false, true, true)
-	err = c.client.Resource(c.gvr).Namespace(obj.GetNamespace()).Delete(obj.GetName(), &metav1.DeleteOptions{GracePeriodSeconds: &zero, PropagationPolicy: &background})
+	err = c.client.Resource(c.gvr).Namespace(obj.GetNamespace()).Delete(obj.GetName(), metav1.DeleteOptions{GracePeriodSeconds: &zero, PropagationPolicy: &background})
 	if err != nil {
 		c.t.Error(err)
 		return
@@ -793,7 +793,7 @@ func testResourceDeletecollection(c *testContext) {
 	c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), gvkDeleteOptions, v1beta1.Delete, "", obj.GetNamespace(), false, true, true)
 
 	// delete
-	err = c.client.Resource(c.gvr).Namespace(obj.GetNamespace()).DeleteCollection(&metav1.DeleteOptions{GracePeriodSeconds: &zero, PropagationPolicy: &background}, metav1.ListOptions{LabelSelector: "webhooktest=true"})
+	err = c.client.Resource(c.gvr).Namespace(obj.GetNamespace()).DeleteCollection(metav1.DeleteOptions{GracePeriodSeconds: &zero, PropagationPolicy: &background}, metav1.ListOptions{LabelSelector: "webhooktest=true"})
 	if err != nil {
 		c.t.Error(err)
 		return
@@ -919,7 +919,7 @@ func testNamespaceDelete(c *testContext) {
 	zero := int64(0)
 
 	c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), gvkDeleteOptions, v1beta1.Delete, obj.GetName(), obj.GetNamespace(), false, true, true)
-	err = c.client.Resource(c.gvr).Namespace(obj.GetNamespace()).Delete(obj.GetName(), &metav1.DeleteOptions{GracePeriodSeconds: &zero, PropagationPolicy: &background})
+	err = c.client.Resource(c.gvr).Namespace(obj.GetNamespace()).Delete(obj.GetName(), metav1.DeleteOptions{GracePeriodSeconds: &zero, PropagationPolicy: &background})
 	if err != nil {
 		c.t.Error(err)
 		return

@@ -1890,7 +1890,7 @@ func testBlockingCustomResourceUpdateDeletion(f *framework.Framework, crd *apiex
 	}
 
 	ginkgo.By("Deleting the custom resource should be denied")
-	err = customResourceClient.Delete(crInstanceName, &metav1.DeleteOptions{})
+	err = customResourceClient.Delete(crInstanceName, metav1.DeleteOptions{})
 	framework.ExpectError(err, "deleting custom resource %s in namespace: %s should be denied", crInstanceName, f.Namespace.Name)
 	expectedErrMsg1 := "the custom resource cannot be deleted because it contains unwanted key and value"
 	if !strings.Contains(err.Error(), expectedErrMsg1) {
@@ -1909,7 +1909,7 @@ func testBlockingCustomResourceUpdateDeletion(f *framework.Framework, crd *apiex
 	framework.ExpectNoError(err, "failed to update custom resource %s in namespace: %s", crInstanceName, f.Namespace.Name)
 
 	ginkgo.By("Deleting the updated custom resource should be successful")
-	err = customResourceClient.Delete(crInstanceName, &metav1.DeleteOptions{})
+	err = customResourceClient.Delete(crInstanceName, metav1.DeleteOptions{})
 	framework.ExpectNoError(err, "failed to delete custom resource %s in namespace: %s", crInstanceName, f.Namespace.Name)
 
 }

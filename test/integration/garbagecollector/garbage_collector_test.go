@@ -940,7 +940,7 @@ func TestCustomResourceCascadingDeletion(t *testing.T) {
 
 	// Delete the owner.
 	foreground := metav1.DeletePropagationForeground
-	err = resourceClient.Delete(owner.GetName(), &metav1.DeleteOptions{PropagationPolicy: &foreground})
+	err = resourceClient.Delete(owner.GetName(), metav1.DeleteOptions{PropagationPolicy: &foreground})
 	if err != nil {
 		t.Fatalf("failed to delete owner resource %q: %v", owner.GetName(), err)
 	}
@@ -1018,7 +1018,7 @@ func TestMixedRelationships(t *testing.T) {
 
 	// Delete the custom owner.
 	foreground := metav1.DeletePropagationForeground
-	err = resourceClient.Delete(customOwner.GetName(), &metav1.DeleteOptions{PropagationPolicy: &foreground})
+	err = resourceClient.Delete(customOwner.GetName(), metav1.DeleteOptions{PropagationPolicy: &foreground})
 	if err != nil {
 		t.Fatalf("failed to delete owner resource %q: %v", customOwner.GetName(), err)
 	}

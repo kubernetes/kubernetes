@@ -174,7 +174,7 @@ func (s *snapshottableTestSuite) DefineTests(driver TestDriver, pattern testpatt
 		framework.ExpectNoError(err)
 		defer func() {
 			framework.Logf("deleting SnapshotClass %s", vsc.GetName())
-			framework.ExpectNoError(dc.Resource(SnapshotClassGVR).Delete(vsc.GetName(), nil))
+			framework.ExpectNoError(dc.Resource(SnapshotClassGVR).Delete(vsc.GetName(), metav1.DeleteOptions{}))
 		}()
 
 		ginkgo.By("creating a snapshot")
@@ -185,7 +185,7 @@ func (s *snapshottableTestSuite) DefineTests(driver TestDriver, pattern testpatt
 		defer func() {
 			framework.Logf("deleting snapshot %q/%q", snapshot.GetNamespace(), snapshot.GetName())
 			// typically this snapshot has already been deleted
-			err = dc.Resource(SnapshotGVR).Namespace(snapshot.GetNamespace()).Delete(snapshot.GetName(), nil)
+			err = dc.Resource(SnapshotGVR).Namespace(snapshot.GetNamespace()).Delete(snapshot.GetName(), metav1.DeleteOptions{})
 			if err != nil && !apierrors.IsNotFound(err) {
 				framework.Failf("Error deleting snapshot %q. Error: %v", pvc.Name, err)
 			}

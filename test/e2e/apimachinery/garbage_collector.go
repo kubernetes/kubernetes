@@ -968,7 +968,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 
 		// Delete the owner.
 		background := metav1.DeletePropagationBackground
-		err = resourceClient.Delete(ownerName, &metav1.DeleteOptions{PropagationPolicy: &background})
+		err = resourceClient.Delete(ownerName, metav1.DeleteOptions{PropagationPolicy: &background})
 		if err != nil {
 			framework.Failf("failed to delete owner resource %q: %v", ownerName, err)
 		}
@@ -988,7 +988,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		}
 		framework.Logf("created canary resource %q", canaryName)
 		foreground := metav1.DeletePropagationForeground
-		err = resourceClient.Delete(canaryName, &metav1.DeleteOptions{PropagationPolicy: &foreground})
+		err = resourceClient.Delete(canaryName, metav1.DeleteOptions{PropagationPolicy: &foreground})
 		if err != nil {
 			framework.Failf("failed to delete canary resource %q: %v", canaryName, err)
 		}
@@ -1102,8 +1102,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		framework.Logf("created dependent resource %q", dependentName)
 
 		// Delete the owner and orphan the dependent.
-		delOpts := getOrphanOptions()
-		err = resourceClient.Delete(ownerName, &delOpts)
+		err = resourceClient.Delete(ownerName, getOrphanOptions())
 		if err != nil {
 			framework.Failf("failed to delete owner resource %q: %v", ownerName, err)
 		}

@@ -185,7 +185,7 @@ func main() {
 	prompt()
 	fmt.Println("Deleting deployment...")
 	deletePolicy := metav1.DeletePropagationForeground
-	deleteOptions := &metav1.DeleteOptions{
+	deleteOptions := metav1.DeleteOptions{
 		PropagationPolicy: &deletePolicy,
 	}
 	if err := client.Resource(deploymentRes).Namespace(namespace).Delete("demo-deployment", deleteOptions); err != nil {

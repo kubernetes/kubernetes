@@ -181,7 +181,7 @@ func TestInvalidObjectMetaInStorage(t *testing.T) {
 
 	t.Logf("Checking that invalid objects can be deleted")
 	noxuResourceClient := newNamespacedCustomResourceClient("default", dynamicClient, noxuDefinition)
-	if err := noxuResourceClient.Delete("foo", &metav1.DeleteOptions{}); err != nil {
+	if err := noxuResourceClient.Delete("foo", metav1.DeleteOptions{}); err != nil {
 		t.Fatalf("Unexpected delete error %v", err)
 	}
 	if _, err := etcdclient.Put(ctx, key, string(val)); err != nil {

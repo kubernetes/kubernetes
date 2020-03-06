@@ -246,7 +246,7 @@ func TestCustomResourceValidation(t *testing.T) {
 			if err != nil {
 				t.Fatalf("unable to create noxu instance: %v", err)
 			}
-			noxuResourceClient.Delete("foo", &metav1.DeleteOptions{})
+			noxuResourceClient.Delete("foo", metav1.DeleteOptions{})
 		}
 		if err := fixtures.DeleteCustomResourceDefinition(noxuDefinition, apiExtensionClient); err != nil {
 			t.Fatal(err)
@@ -473,7 +473,7 @@ func TestCustomResourceUpdateValidation(t *testing.T) {
 			if err == nil {
 				t.Fatalf("unexpected non-error: alpha and beta should be present while updating %v", gottenNoxuInstance)
 			}
-			noxuResourceClient.Delete("foo", &metav1.DeleteOptions{})
+			noxuResourceClient.Delete("foo", metav1.DeleteOptions{})
 		}
 		if err := fixtures.DeleteCustomResourceDefinition(noxuDefinition, apiExtensionClient); err != nil {
 			t.Fatal(err)
@@ -648,7 +648,7 @@ func TestCRValidationOnCRDUpdate(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			noxuResourceClient.Delete("foo", &metav1.DeleteOptions{})
+			noxuResourceClient.Delete("foo", metav1.DeleteOptions{})
 			if err := fixtures.DeleteCustomResourceDefinition(noxuDefinition, apiExtensionClient); err != nil {
 				t.Fatal(err)
 			}

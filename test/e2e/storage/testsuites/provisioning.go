@@ -764,7 +764,7 @@ func prepareSnapshotDataSourceForProvisioning(
 
 	cleanupFunc := func() {
 		framework.Logf("deleting snapshot %q/%q", snapshot.GetNamespace(), snapshot.GetName())
-		err = dynamicClient.Resource(SnapshotGVR).Namespace(updatedClaim.Namespace).Delete(snapshot.GetName(), nil)
+		err = dynamicClient.Resource(SnapshotGVR).Namespace(updatedClaim.Namespace).Delete(snapshot.GetName(), metav1.DeleteOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
 			framework.Failf("Error deleting snapshot %q. Error: %v", snapshot.GetName(), err)
 		}
@@ -776,7 +776,7 @@ func prepareSnapshotDataSourceForProvisioning(
 		}
 
 		framework.Logf("deleting SnapshotClass %s", snapshotClass.GetName())
-		framework.ExpectNoError(dynamicClient.Resource(SnapshotClassGVR).Delete(snapshotClass.GetName(), nil))
+		framework.ExpectNoError(dynamicClient.Resource(SnapshotClassGVR).Delete(snapshotClass.GetName(), metav1.DeleteOptions{}))
 	}
 
 	return dataSourceRef, cleanupFunc

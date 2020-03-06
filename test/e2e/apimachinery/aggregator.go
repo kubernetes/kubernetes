@@ -489,7 +489,7 @@ func TestSampleAPIServer(f *framework.Framework, aggrclient *aggregatorclient.Cl
 	}
 
 	// kubectl delete flunder test-flunder
-	err = dynamicClient.Delete(flunderName, &metav1.DeleteOptions{})
+	err = dynamicClient.Delete(flunderName, metav1.DeleteOptions{})
 	validateErrorWithDebugInfo(f, err, pods, "deleting flunders(%v) using dynamic client", unstructuredList.Items)
 
 	// kubectl get flunders

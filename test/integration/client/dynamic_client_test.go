@@ -105,7 +105,7 @@ func TestDynamicClient(t *testing.T) {
 	}
 
 	// delete the pod dynamically
-	err = dynamicClient.Resource(resource).Namespace("default").Delete(actual.Name, nil)
+	err = dynamicClient.Resource(resource).Namespace("default").Delete(actual.Name, metav1.DeleteOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error when deleting pod: %v", err)
 	}

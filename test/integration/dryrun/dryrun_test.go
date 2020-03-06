@@ -178,7 +178,7 @@ func DryRunUpdateTest(t *testing.T, rsc dynamic.ResourceInterface, name string) 
 }
 
 func DryRunDeleteCollectionTest(t *testing.T, rsc dynamic.ResourceInterface, name string) {
-	err := rsc.DeleteCollection(&metav1.DeleteOptions{DryRun: []string{metav1.DryRunAll}}, metav1.ListOptions{})
+	err := rsc.DeleteCollection(metav1.DeleteOptions{DryRun: []string{metav1.DryRunAll}}, metav1.ListOptions{})
 	if err != nil {
 		t.Fatalf("dry-run delete collection failed: %v", err)
 	}
@@ -193,7 +193,7 @@ func DryRunDeleteCollectionTest(t *testing.T, rsc dynamic.ResourceInterface, nam
 }
 
 func DryRunDeleteTest(t *testing.T, rsc dynamic.ResourceInterface, name string) {
-	err := rsc.Delete(name, &metav1.DeleteOptions{DryRun: []string{metav1.DryRunAll}})
+	err := rsc.Delete(name, metav1.DeleteOptions{DryRun: []string{metav1.DryRunAll}})
 	if err != nil {
 		t.Fatalf("dry-run delete failed: %v", err)
 	}
@@ -294,7 +294,7 @@ func TestDryRun(t *testing.T) {
 			}
 			DryRunDeleteTest(t, rsc, name)
 
-			if err = rsc.Delete(obj.GetName(), metav1.NewDeleteOptions(0)); err != nil {
+			if err = rsc.Delete(obj.GetName(), *metav1.NewDeleteOptions(0)); err != nil {
 				t.Fatalf("deleting final object failed: %v", err)
 			}
 		})

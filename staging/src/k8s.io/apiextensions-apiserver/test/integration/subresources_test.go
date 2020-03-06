@@ -249,7 +249,7 @@ func TestStatusSubresource(t *testing.T) {
 			if statusNum != int64(20) {
 				t.Fatalf(".status.num: expected: %v, got: %v", int64(20), statusNum)
 			}
-			noxuResourceClient.Delete("foo", &metav1.DeleteOptions{})
+			noxuResourceClient.Delete("foo", mmetav1.DeleteOptions{})
 		}
 		if err := fixtures.DeleteCustomResourceDefinition(noxuDefinition, apiExtensionClient); err != nil {
 			t.Fatal(err)
@@ -394,7 +394,7 @@ func TestScaleSubresource(t *testing.T) {
 			if err == nil {
 				t.Fatalf("unexpected non-error: .spec.replicas should be less than 2147483647")
 			}
-			noxuResourceClient.Delete("foo", &metav1.DeleteOptions{})
+			noxuResourceClient.Delete("foo", mmetav1.DeleteOptions{})
 			if err := fixtures.DeleteCustomResourceDefinition(noxuDefinition, apiExtensionClient); err != nil {
 				t.Fatal(err)
 			}
@@ -547,7 +547,7 @@ func TestValidateOnlyStatus(t *testing.T) {
 			if !strings.Contains(statusError.Error(), "Invalid value") {
 				t.Fatalf("expected 'Invalid value' in error, got: %v", err)
 			}
-			noxuResourceClient.Delete("foo", &metav1.DeleteOptions{})
+			noxuResourceClient.Delete("foo", mmetav1.DeleteOptions{})
 		}
 		if err := fixtures.DeleteCustomResourceDefinition(noxuDefinition, apiExtensionClient); err != nil {
 			t.Fatal(err)
@@ -711,7 +711,7 @@ func TestGeneration(t *testing.T) {
 			if updatedInstance.GetGeneration() != 2 {
 				t.Fatalf("updating spec should increment .metadata.generation: expected: %v, got: %v", 2, updatedStatusInstance.GetGeneration())
 			}
-			noxuResourceClient.Delete("foo", &metav1.DeleteOptions{})
+			noxuResourceClient.Delete("foo", metav1.DeleteOptions{})
 		}
 		if err := fixtures.DeleteCustomResourceDefinition(noxuDefinition, apiExtensionClient); err != nil {
 			t.Fatal(err)
@@ -885,7 +885,7 @@ func TestSubresourcePatch(t *testing.T) {
 			if err == nil {
 				t.Fatalf("unexpected non-error: strategic merge patch is not supported for custom resources")
 			}
-			noxuResourceClient.Delete("foo", &metav1.DeleteOptions{})
+			noxuResourceClient.Delete("foo", mmetav1.DeleteOptions{})
 		}
 		if err := fixtures.DeleteCustomResourceDefinition(noxuDefinition, apiExtensionClient); err != nil {
 			t.Fatal(err)

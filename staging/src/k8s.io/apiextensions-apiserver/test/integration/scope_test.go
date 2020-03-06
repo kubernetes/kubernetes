@@ -128,16 +128,16 @@ func TestHandlerScope(t *testing.T) {
 			_, err = otherScopeClient.Patch(name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{}, "scale")
 			assert.True(t, apierrors.IsNotFound(err))
 
-			err = otherScopeClient.Delete(name, &metav1.DeleteOptions{})
+			err = otherScopeClient.Delete(name, metav1.DeleteOptions{})
 			assert.True(t, apierrors.IsNotFound(err))
 
-			err = otherScopeClient.Delete(name, &metav1.DeleteOptions{}, "status")
+			err = otherScopeClient.Delete(name, metav1.DeleteOptions{}, "status")
 			assert.True(t, apierrors.IsNotFound(err))
 
-			err = otherScopeClient.Delete(name, &metav1.DeleteOptions{}, "scale")
+			err = otherScopeClient.Delete(name, metav1.DeleteOptions{}, "scale")
 			assert.True(t, apierrors.IsNotFound(err))
 
-			err = otherScopeClient.DeleteCollection(&metav1.DeleteOptions{}, metav1.ListOptions{})
+			err = otherScopeClient.DeleteCollection(metav1.DeleteOptions{}, metav1.ListOptions{})
 			assert.True(t, apierrors.IsNotFound(err))
 
 			if scope == apiextensionsv1beta1.ClusterScoped {

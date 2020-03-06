@@ -512,7 +512,7 @@ func waitWebhookConversionReady(f *framework.Framework, crd *apiextensionsv1.Cus
 			return false, nil
 		}
 
-		framework.ExpectNoError(customResourceClients[version].Delete(crInstance.GetName(), nil), "cleaning up stub object")
+		framework.ExpectNoError(customResourceClients[version].Delete(crInstance.GetName(), metav1.DeleteOptions{}), "cleaning up stub object")
 		return true, nil
 	}))
 }
