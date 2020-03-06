@@ -22,16 +22,21 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"google.golang.org/grpc"
 	"io/ioutil"
-	utilnet "k8s.io/apimachinery/pkg/util/net"
-	"k8s.io/apiserver/pkg/apis/apiserver"
-	"k8s.io/klog"
 	"net"
 	"net/http"
 	"net/url"
-	client "sigs.k8s.io/apiserver-network-proxy/konnectivity-client/pkg/client"
 	"strings"
+	"time"
+
+	"google.golang.org/grpc"
+
+	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apiserver/pkg/apis/apiserver"
+	egressmetrics "k8s.io/apiserver/pkg/server/egressselector/metrics"
+	"k8s.io/klog"
+	utiltrace "k8s.io/utils/trace"
+	client "sigs.k8s.io/apiserver-network-proxy/konnectivity-client/pkg/client"
 )
 
 var directDialer utilnet.DialFunc = http.DefaultTransport.(*http.Transport).DialContext
@@ -123,16 +128,122 @@ func tunnelHTTPConnect(proxyConn net.Conn, proxyAddress, addr string) (net.Conn,
 	return proxyConn, nil
 }
 
-func createConnectTCPDialer(tcpTransport *apiserver.TCPTransport) (utilnet.DialFunc, error) {
-	clientCert := tcpTransport.TLSConfig.ClientCert
-	clientKey := tcpTransport.TLSConfig.ClientKey
-	caCert := tcpTransport.TLSConfig.CABundle
-	proxyURL, err := url.Parse(tcpTransport.URL)
-	if err != nil {
-		return nil, fmt.Errorf("invalid proxy server url %q: %v", tcpTransport.URL, err)
-	}
-	proxyAddress := proxyURL.Host
+type proxier interface {
+	// proxy returns a connection to addr.
+	proxy(addr string) (net.Conn, error)
+}
 
+var _ proxier = &httpConnectProxier{}
+
+type httpConnectProxier struct {
+	conn         net.Conn
+	proxyAddress string
+}
+
+func (t *httpConnectProxier) proxy(addr string) (net.Conn, error) {
+	return tunnelHTTPConnect(t.conn, t.proxyAddress, addr)
+}
+
+var _ proxier = &grpcProxier{}
+
+type grpcProxier struct {
+	tunnel client.Tunnel
+}
+
+func (g *grpcProxier) proxy(addr string) (net.Conn, error) {
+	return g.tunnel.Dial("tcp", addr)
+}
+
+type proxyServerConnector interface {
+	// connect establishes connection to the proxy server, and returns a
+	// proxier based on the connection.
+	connect() (proxier, error)
+}
+
+type tcpHTTPConnectConnector struct {
+	proxyAddress string
+	tlsConfig    *tls.Config
+}
+
+func (t *tcpHTTPConnectConnector) connect() (proxier, error) {
+	conn, err := tls.Dial("tcp", t.proxyAddress, t.tlsConfig)
+	if err != nil {
+		return nil, err
+	}
+	return &httpConnectProxier{conn: conn, proxyAddress: t.proxyAddress}, nil
+}
+
+type udsHTTPConnectConnector struct {
+	udsName string
+}
+
+func (u *udsHTTPConnectConnector) connect() (proxier, error) {
+	conn, err := net.Dial("unix", u.udsName)
+	if err != nil {
+		return nil, err
+	}
+	return &httpConnectProxier{conn: conn, proxyAddress: u.udsName}, nil
+}
+
+type udsGRPCConnector struct {
+	udsName string
+}
+
+func (u *udsGRPCConnector) connect() (proxier, error) {
+	udsName := u.udsName
+	dialOption := grpc.WithContextDialer(func(context.Context, string) (net.Conn, error) {
+		c, err := net.Dial("unix", udsName)
+		if err != nil {
+			klog.Errorf("failed to create connection to uds name %s, error: %v", udsName, err)
+		}
+		return c, err
+	})
+
+	tunnel, err := client.CreateGrpcTunnel(udsName, dialOption, grpc.WithInsecure())
+	if err != nil {
+		return nil, err
+	}
+	return &grpcProxier{tunnel: tunnel}, nil
+}
+
+type dialerCreator struct {
+	connector proxyServerConnector
+	direct    bool
+	options   metricsOptions
+}
+
+type metricsOptions struct {
+	transport string
+	protocol  string
+}
+
+func (d *dialerCreator) createDialer() utilnet.DialFunc {
+	if d.direct {
+		return directDialer
+	}
+	return func(ctx context.Context, network, addr string) (net.Conn, error) {
+		trace := utiltrace.New(fmt.Sprintf("Proxy via HTTP Connect over %s", d.options.transport), utiltrace.Field{Key: "address", Value: addr})
+		defer trace.LogIfLong(500 * time.Millisecond)
+		start := egressmetrics.Metrics.Clock().Now()
+		proxier, err := d.connector.connect()
+		if err != nil {
+			egressmetrics.Metrics.ObserveDialFailure(d.options.protocol, d.options.transport, egressmetrics.StageConnect)
+			return nil, err
+		}
+		conn, err := proxier.proxy(addr)
+		if err != nil {
+			egressmetrics.Metrics.ObserveDialFailure(d.options.protocol, d.options.transport, egressmetrics.StageProxy)
+			return nil, err
+		}
+		egressmetrics.Metrics.ObserveDialLatency(egressmetrics.Metrics.Clock().Now().Sub(start), d.options.protocol, d.options.transport)
+		return conn, nil
+	}
+}
+
+func getTLSConfig(t *apiserver.TLSConfig) (*tls.Config, error) {
+	clientCert := t.ClientCert
+	clientKey := t.ClientKey
+	caCert := t.CABundle
 	clientCerts, err := tls.LoadX509KeyPair(clientCert, clientKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read key pair %s & %s, got %v", clientCert, clientKey, err)
@@ -151,56 +262,75 @@ func createConnectTCPDialer(tcpTransport *apiserver.TCPTransport) (utilnet.DialF
 		// Use host's root CA set instead of providing our own
 		certPool = nil
 	}
-	contextDialer := func(ctx context.Context, network, addr string) (net.Conn, error) {
-		klog.V(4).Infof("Sending request to %q.", addr)
-		proxyConn, err := tls.Dial("tcp", proxyAddress,
-			&tls.Config{
-				Certificates: []tls.Certificate{clientCerts},
-				RootCAs:      certPool,
-			},
-		)
-		if err != nil {
-			return nil, fmt.Errorf("dialing proxy %q failed: %v", proxyAddress, err)
-		}
-		return tunnelHTTPConnect(proxyConn, proxyAddress, addr)
-	}
-	return contextDialer, nil
+	return &tls.Config{
+		Certificates: []tls.Certificate{clientCerts},
+		RootCAs:      certPool,
+	}, nil
 }
 
-func createConnectUDSDialer(udsConfig *apiserver.UDSTransport) (utilnet.DialFunc, error) {
-	contextDialer := func(ctx context.Context, network, addr string) (net.Conn, error) {
-		proxyConn, err := net.Dial("unix", udsConfig.UDSName)
-		if err != nil {
-			return nil, fmt.Errorf("dialing proxy %q failed: %v", udsConfig.UDSName, err)
-		}
-		return tunnelHTTPConnect(proxyConn, udsConfig.UDSName, addr)
+func getProxyAddress(urlString string) (string, error) {
+	proxyURL, err := url.Parse(urlString)
+	if err != nil {
+		return "", fmt.Errorf("invalid proxy server url %q: %v", urlString, err)
 	}
-	return contextDialer, nil
+	return proxyURL.Host, nil
 }
 
-func createGRPCUDSDialer(udsName string) (utilnet.DialFunc, error) {
-	contextDialer := func(ctx context.Context, network, addr string) (net.Conn, error) {
+func connectionToDialerCreator(c apiserver.Connection) (*dialerCreator, error) {
+	switch c.ProxyProtocol {
 
-		dialOption := grpc.WithContextDialer(func(context.Context, string) (net.Conn, error) {
-			c, err := net.Dial("unix", udsName)
+	case apiserver.ProtocolHTTPConnect:
+		if c.Transport.UDS != nil {
+			return &dialerCreator{
+				connector: &udsHTTPConnectConnector{
+					udsName: c.Transport.UDS.UDSName,
+				},
+				options: metricsOptions{
+					transport: egressmetrics.TransportUDS,
+					protocol:  egressmetrics.ProtocolHTTPConnect,
+				},
+			}, nil
+		} else if c.Transport.TCP != nil {
+			tlsConfig, err := getTLSConfig(c.Transport.TCP.TLSConfig)
 			if err != nil {
-				klog.Errorf("failed to create connection to uds name %s, error: %v", udsName, err)
+				return nil, err
 			}
-			return c, err
-		})
-
-		tunnel, err := client.CreateGrpcTunnel(udsName, dialOption, grpc.WithInsecure())
-		if err != nil {
-			return nil, err
+			proxyAddress, err := getProxyAddress(c.Transport.TCP.URL)
+			if err != nil {
+				return nil, err
+			}
+			return &dialerCreator{
+				connector: &tcpHTTPConnectConnector{
+					tlsConfig:    tlsConfig,
+					proxyAddress: proxyAddress,
+				},
+				options: metricsOptions{
+					transport: egressmetrics.TransportTCP,
+					protocol:  egressmetrics.ProtocolHTTPConnect,
+				},
+			}, nil
+		} else {
+			return nil, fmt.Errorf("Either a TCP or UDS transport must be specified")
 		}
-
-		proxyConn, err := tunnel.Dial("tcp", addr)
-		if err != nil {
-			return nil, err
+	case apiserver.ProtocolGRPC:
+		if c.Transport.UDS != nil {
+			return &dialerCreator{
+				connector: &udsGRPCConnector{
+					udsName: c.Transport.UDS.UDSName,
+				},
+				options: metricsOptions{
+					transport: egressmetrics.TransportUDS,
+					protocol:  egressmetrics.ProtocolGRPC,
+				},
+			}, nil
 		}
-		return proxyConn, nil
+		return nil, fmt.Errorf("UDS transport must be specified for GRPC")
+	case apiserver.ProtocolDirect:
+		return &dialerCreator{direct: true}, nil
+	default:
+		return nil, fmt.Errorf("unrecognized service connection protocol %q", c.ProxyProtocol)
 	}
-	return contextDialer, nil
+
 }
 
 // NewEgressSelector configures lookup mechanism for Lookup.
@@ -218,40 +348,11 @@ func NewEgressSelector(config *apiserver.EgressSelectorConfiguration) (*EgressSe
 		if err != nil {
 			return nil, err
 		}
-		switch service.Connection.ProxyProtocol {
-
-		case apiserver.ProtocolHTTPConnect:
-			if service.Connection.Transport.UDS != nil {
-				contextDialer, err := createConnectUDSDialer(service.Connection.Transport.UDS)
-				if err != nil {
-					return nil, fmt.Errorf("failed to create HTTPConnect uds dialer: %v", err)
-				}
-				cs.egressToDialer[name] = contextDialer
-			} else if service.Connection.Transport.TCP != nil {
-				contextDialer, err := createConnectTCPDialer(service.Connection.Transport.TCP)
-				if err != nil {
-					return nil, fmt.Errorf("failed to create HTTPConnect dialer: %v", err)
-				}
-				cs.egressToDialer[name] = contextDialer
-			} else {
-				return nil, fmt.Errorf("Either a TCP or UDS transport must be specified")
-			}
-		case apiserver.ProtocolGRPC:
-			if service.Connection.Transport.UDS != nil {
-				grpcContextDialer, err := createGRPCUDSDialer(service.Connection.Transport.UDS.UDSName)
-				if err != nil {
-					return nil, fmt.Errorf("failed to create grpc dialer: %v", err)
-				}
-				cs.egressToDialer[name] = grpcContextDialer
-
-			} else {
-				return nil, fmt.Errorf("UDS transport must be specified for GRPC")
-			}
-		case apiserver.ProtocolDirect:
-			cs.egressToDialer[name] = directDialer
-		default:
-			return nil, fmt.Errorf("unrecognized service connection protocol %q", service.Connection.ProxyProtocol)
+		dialerCreator, err := connectionToDialerCreator(service.Connection)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create dialer for egressSelection %q: %v", name, err)
 		}
+		cs.egressToDialer[name] = dialerCreator.createDialer()
 	}
 	return cs, nil
 }
