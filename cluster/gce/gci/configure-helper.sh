@@ -1683,11 +1683,13 @@ function prepare-konnectivity-server-manifest {
   params+=("--uds-name=/etc/srv/kubernetes/konnectivity-server/konnectivity-server.socket")
   params+=("--cluster-cert=/etc/srv/kubernetes/pki/apiserver.crt")
   params+=("--cluster-key=/etc/srv/kubernetes/pki/apiserver.key")
-  if [[ "${KONNECTIVITY_SERVICE_PROXY_PROTOCOL_MODE:-grpc}" == 'http-connect' ]]; then
+  if [[ "${KONNECTIVITY_SERVICE_PROXY_PROTOCOL_MODE:-grpc}" == 'grpc' ]]; then
+    params+=("--mode=grpc")
+  elif [[ "${KONNECTIVITY_SERVICE_PROXY_PROTOCOL_MODE:-grpc}" == 'http-connect' ]]; then
     params+=("--mode=http-connect")
   else
-    # We can assume the mode is GRPC because we check for a valid protocol beforehand
-    params+=("--mode=grpc")
+    echo "KONNECTIVITY_SERVICE_PROXY_PROTOCOL_MODE must be set to either grpc or http-connect"
+    exit 1
   fi
 
   params+=("--server-port=0")
