@@ -850,7 +850,7 @@ func TestInterPodAffinity(t *testing.T) {
 			t.Errorf("Test Failed: %v, err %v, test.fits %v", test.test, err, test.fits)
 		}
 
-		err = cs.CoreV1().Pods(testCtx.NS.Name).Delete(context.TODO(), test.pod.Name, metav1.NewDeleteOptions(0))
+		err = cs.CoreV1().Pods(testCtx.NS.Name).Delete(context.TODO(), test.pod.Name, *metav1.NewDeleteOptions(0))
 		if err != nil {
 			t.Errorf("Test Failed: error, %v, while deleting pod during test: %v", err, test.test)
 		}
@@ -865,7 +865,7 @@ func TestInterPodAffinity(t *testing.T) {
 			} else {
 				nsName = testCtx.NS.Name
 			}
-			err = cs.CoreV1().Pods(nsName).Delete(context.TODO(), pod.Name, metav1.NewDeleteOptions(0))
+			err = cs.CoreV1().Pods(nsName).Delete(context.TODO(), pod.Name, *metav1.NewDeleteOptions(0))
 			if err != nil {
 				t.Errorf("Test Failed: error, %v, while deleting pod during test: %v", err, test.test)
 			}

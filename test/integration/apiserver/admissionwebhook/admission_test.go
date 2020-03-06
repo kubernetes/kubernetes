@@ -1046,7 +1046,7 @@ func testPodBindingEviction(c *testContext) {
 
 	background := metav1.DeletePropagationBackground
 	zero := int64(0)
-	forceDelete := &metav1.DeleteOptions{GracePeriodSeconds: &zero, PropagationPolicy: &background}
+	forceDelete := metav1.DeleteOptions{GracePeriodSeconds: &zero, PropagationPolicy: &background}
 	defer func() {
 		err := c.clientset.CoreV1().Pods(pod.GetNamespace()).Delete(context.TODO(), pod.GetName(), forceDelete)
 		if err != nil && !apierrors.IsNotFound(err) {
@@ -1073,7 +1073,7 @@ func testPodBindingEviction(c *testContext) {
 	case gvr("", "v1", "pods/eviction"):
 		err = c.clientset.CoreV1().RESTClient().Post().Namespace(pod.GetNamespace()).Resource("pods").Name(pod.GetName()).SubResource("eviction").Body(&policyv1beta1.Eviction{
 			ObjectMeta:    metav1.ObjectMeta{Name: pod.GetName()},
-			DeleteOptions: forceDelete,
+			DeleteOptions: &forceDelete,
 		}).Do(context.TODO()).Error()
 
 	default:

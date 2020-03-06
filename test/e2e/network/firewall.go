@@ -99,7 +99,7 @@ var _ = SIGDescribe("Firewall rule", func() {
 				svc.Spec.LoadBalancerSourceRanges = nil
 			})
 			framework.ExpectNoError(err)
-			err = cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, nil)
+			err = cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
 			framework.ExpectNoError(err)
 			ginkgo.By("Waiting for the local traffic health check firewall rule to be deleted")
 			localHCFwName := gce.MakeHealthCheckFirewallNameForLBService(clusterID, cloudprovider.DefaultLoadBalancerName(svc), false)
@@ -159,7 +159,7 @@ var _ = SIGDescribe("Firewall rule", func() {
 
 			defer func() {
 				framework.Logf("Cleaning up the netexec pod: %v", podName)
-				err = cs.CoreV1().Pods(ns).Delete(context.TODO(), podName, nil)
+				err = cs.CoreV1().Pods(ns).Delete(context.TODO(), podName, metav1.DeleteOptions{})
 				framework.ExpectNoError(err)
 			}()
 		}

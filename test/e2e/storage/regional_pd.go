@@ -188,7 +188,7 @@ func testZonalFailover(c clientset.Interface, ns string) {
 	framework.ExpectNoError(err)
 	defer func() {
 		framework.Logf("deleting storage class %s", class.Name)
-		framework.ExpectNoError(c.StorageV1().StorageClasses().Delete(context.TODO(), class.Name, nil),
+		framework.ExpectNoError(c.StorageV1().StorageClasses().Delete(context.TODO(), class.Name, metav1.DeleteOptions{}),
 			"Error deleting StorageClass %s", class.Name)
 	}()
 
@@ -201,12 +201,12 @@ func testZonalFailover(c clientset.Interface, ns string) {
 	defer func() {
 		framework.Logf("deleting statefulset%q/%q", statefulSet.Namespace, statefulSet.Name)
 		// typically this claim has already been deleted
-		framework.ExpectNoError(c.AppsV1().StatefulSets(ns).Delete(context.TODO(), statefulSet.Name, nil),
+		framework.ExpectNoError(c.AppsV1().StatefulSets(ns).Delete(context.TODO(), statefulSet.Name, metav1.DeleteOptions{}),
 			"Error deleting StatefulSet %s", statefulSet.Name)
 
 		framework.Logf("deleting claims in namespace %s", ns)
 		pvc := getPVC(c, ns, regionalPDLabels)
-		framework.ExpectNoError(c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(context.TODO(), pvc.Name, nil),
+		framework.ExpectNoError(c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(context.TODO(), pvc.Name, metav1.DeleteOptions{}),
 			"Error deleting claim %s.", pvc.Name)
 		if pvc.Spec.VolumeName != "" {
 			err = framework.WaitForPersistentVolumeDeleted(c, pvc.Spec.VolumeName, framework.Poll, pvDeletionTimeout)
@@ -244,7 +244,7 @@ func testZonalFailover(c clientset.Interface, ns string) {
 	}()
 
 	ginkgo.By("deleting StatefulSet pod")
-	err = c.CoreV1().Pods(ns).Delete(context.TODO(), pod.Name, &metav1.DeleteOptions{})
+	err = c.CoreV1().Pods(ns).Delete(context.TODO(), pod.Name, metav1.DeleteOptions{})
 
 	// Verify the pod is scheduled in the other zone.
 	ginkgo.By("verifying the pod is scheduled in a different zone.")

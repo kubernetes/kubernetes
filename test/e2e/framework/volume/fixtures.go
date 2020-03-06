@@ -312,7 +312,7 @@ func startVolumeServer(client clientset.Interface, config TestConfig) *v1.Pod {
 	}
 	if config.WaitForCompletion {
 		framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespace(client, serverPod.Name, serverPod.Namespace))
-		framework.ExpectNoError(podClient.Delete(context.TODO(), serverPod.Name, nil))
+		framework.ExpectNoError(podClient.Delete(context.TODO(), serverPod.Name, metav1.DeleteOptions{}))
 	} else {
 		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(client, serverPod))
 		if pod == nil {

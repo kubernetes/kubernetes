@@ -35,7 +35,7 @@ import (
 
 // DeletePodOrErrorf deletes a pod or fails with a call to t.Errorf.
 func DeletePodOrErrorf(t *testing.T, c clientset.Interface, ns, name string) {
-	if err := c.CoreV1().Pods(ns).Delete(context.TODO(), name, nil); err != nil {
+	if err := c.CoreV1().Pods(ns).Delete(context.TODO(), name, metav1.DeleteOptions{}); err != nil {
 		t.Errorf("unable to delete pod %v: %v", name, err)
 	}
 }

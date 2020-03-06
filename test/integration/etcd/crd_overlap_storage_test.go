@@ -174,7 +174,7 @@ func TestOverlappingCustomResourceAPIService(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = apiServiceClient.APIServices().Delete(context.TODO(), testAPIService.Name, &metav1.DeleteOptions{})
+	err = apiServiceClient.APIServices().Delete(context.TODO(), testAPIService.Name, metav1.DeleteOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -197,7 +197,7 @@ func TestOverlappingCustomResourceAPIService(t *testing.T) {
 	}
 
 	// Delete the overlapping CRD
-	err = crdClient.CustomResourceDefinitions().Delete(context.TODO(), crdCRD.Name, &metav1.DeleteOptions{})
+	err = crdClient.CustomResourceDefinitions().Delete(context.TODO(), crdCRD.Name, metav1.DeleteOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -348,7 +348,7 @@ func TestOverlappingCustomResourceCustomResourceDefinition(t *testing.T) {
 	}
 
 	// Delete the overlapping CRD
-	err = crdClient.CustomResourceDefinitions().Delete(context.TODO(), crdCRD.Name, &metav1.DeleteOptions{})
+	err = crdClient.CustomResourceDefinitions().Delete(context.TODO(), crdCRD.Name, metav1.DeleteOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}

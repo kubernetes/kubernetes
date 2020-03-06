@@ -364,7 +364,7 @@ func getCronJob(c clientset.Interface, ns, name string) (*batchv1beta1.CronJob, 
 
 func deleteCronJob(c clientset.Interface, ns, name string) error {
 	propagationPolicy := metav1.DeletePropagationBackground // Also delete jobs and pods related to cronjob
-	return c.BatchV1beta1().CronJobs(ns).Delete(context.TODO(), name, &metav1.DeleteOptions{PropagationPolicy: &propagationPolicy})
+	return c.BatchV1beta1().CronJobs(ns).Delete(context.TODO(), name, metav1.DeleteOptions{PropagationPolicy: &propagationPolicy})
 }
 
 // Wait for at least given amount of active jobs.

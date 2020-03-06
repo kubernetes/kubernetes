@@ -99,7 +99,7 @@ func (adapter *EndpointsAdapter) EnsureEndpointSliceFromEndpoints(namespace stri
 
 	// required for transition from IP to IPv4 address type.
 	if currentEndpointSlice.AddressType != endpointSlice.AddressType {
-		err = adapter.endpointSliceClient.EndpointSlices(namespace).Delete(context.TODO(), endpointSlice.Name, &metav1.DeleteOptions{})
+		err = adapter.endpointSliceClient.EndpointSlices(namespace).Delete(context.TODO(), endpointSlice.Name, metav1.DeleteOptions{})
 		if err != nil {
 			return err
 		}

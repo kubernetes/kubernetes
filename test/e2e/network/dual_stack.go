@@ -115,7 +115,7 @@ var _ = SIGDescribe("[Feature:IPv6DualStackAlphaFeature] [LinuxOnly]", func() {
 		framework.ExpectEqual(isIPv4(p.Status.PodIPs[0].IP) != isIPv4(p.Status.PodIPs[1].IP), true)
 
 		ginkgo.By("deleting the pod")
-		err = podClient.Delete(context.TODO(), pod.Name, metav1.NewDeleteOptions(30))
+		err = podClient.Delete(context.TODO(), pod.Name, *metav1.NewDeleteOptions(30))
 		framework.ExpectNoError(err, "failed to delete pod")
 	})
 

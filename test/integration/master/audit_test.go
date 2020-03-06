@@ -384,7 +384,7 @@ func configMapOperations(t *testing.T, kubeclient kubernetes.Interface) {
 	_, err = kubeclient.CoreV1().ConfigMaps(namespace).List(context.TODO(), metav1.ListOptions{})
 	expectNoError(t, err, "failed to list config maps")
 
-	err = kubeclient.CoreV1().ConfigMaps(namespace).Delete(context.TODO(), configMap.Name, &metav1.DeleteOptions{})
+	err = kubeclient.CoreV1().ConfigMaps(namespace).Delete(context.TODO(), configMap.Name, metav1.DeleteOptions{})
 	expectNoError(t, err, "failed to delete audit-configmap")
 }
 

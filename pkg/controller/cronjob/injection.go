@@ -120,7 +120,7 @@ func (r realJobControl) CreateJob(namespace string, job *batchv1.Job) (*batchv1.
 
 func (r realJobControl) DeleteJob(namespace string, name string) error {
 	background := metav1.DeletePropagationBackground
-	return r.KubeClient.BatchV1().Jobs(namespace).Delete(context.TODO(), name, &metav1.DeleteOptions{PropagationPolicy: &background})
+	return r.KubeClient.BatchV1().Jobs(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{PropagationPolicy: &background})
 }
 
 type fakeJobControl struct {
@@ -222,7 +222,7 @@ func (r realPodControl) ListPods(namespace string, opts metav1.ListOptions) (*v1
 }
 
 func (r realPodControl) DeletePod(namespace string, name string) error {
-	return r.KubeClient.CoreV1().Pods(namespace).Delete(context.TODO(), name, nil)
+	return r.KubeClient.CoreV1().Pods(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
 }
 
 type fakePodControl struct {

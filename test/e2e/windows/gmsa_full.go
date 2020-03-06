@@ -313,7 +313,7 @@ func createRBACRoleForGmsa(f *framework.Framework) (string, func(), error) {
 	}
 
 	cleanUpFunc := func() {
-		f.ClientSet.RbacV1().ClusterRoles().Delete(context.TODO(), roleName, &metav1.DeleteOptions{})
+		f.ClientSet.RbacV1().ClusterRoles().Delete(context.TODO(), roleName, metav1.DeleteOptions{})
 	}
 
 	_, err := f.ClientSet.RbacV1().ClusterRoles().Create(context.TODO(), role, metav1.CreateOptions{})

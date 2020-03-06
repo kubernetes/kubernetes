@@ -183,7 +183,7 @@ func (n *nfsDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConf
 		}, func() {
 			framework.ExpectNoError(e2epod.DeletePodWithWait(cs, n.externalProvisionerPod))
 			clusterRoleBindingName := ns.Name + "--" + "cluster-admin"
-			cs.RbacV1().ClusterRoleBindings().Delete(context.TODO(), clusterRoleBindingName, metav1.NewDeleteOptions(0))
+			cs.RbacV1().ClusterRoleBindings().Delete(context.TODO(), clusterRoleBindingName, *metav1.NewDeleteOptions(0))
 		}
 }
 
@@ -325,7 +325,7 @@ func (v *glusterVolume) DeleteVolume() {
 	name := v.prefix + "-server"
 
 	framework.Logf("Deleting Gluster endpoints %q...", name)
-	err := cs.CoreV1().Endpoints(ns.Name).Delete(context.TODO(), name, nil)
+	err := cs.CoreV1().Endpoints(ns.Name).Delete(context.TODO(), name, metav1.DeleteOptions{})
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
 			framework.Failf("Gluster delete endpoints failed: %v", err)
@@ -1944,7 +1944,7 @@ func cleanUpVolumeServerWithSecret(f *framework.Framework, serverPod *v1.Pod, se
 
 	if secret != nil {
 		framework.Logf("Deleting server secret %q...", secret.Name)
-		err := cs.CoreV1().Secrets(ns.Name).Delete(context.TODO(), secret.Name, &metav1.DeleteOptions{})
+		err := cs.CoreV1().Secrets(ns.Name).Delete(context.TODO(), secret.Name, metav1.DeleteOptions{})
 		if err != nil {
 			framework.Logf("Delete secret failed: %v", err)
 		}

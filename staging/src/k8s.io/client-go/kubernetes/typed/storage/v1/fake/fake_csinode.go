@@ -97,15 +97,15 @@ func (c *FakeCSINodes) Update(ctx context.Context, cSINode *storagev1.CSINode, o
 }
 
 // Delete takes name of the cSINode and deletes it. Returns an error if one occurs.
-func (c *FakeCSINodes) Delete(ctx context.Context, name string, options *v1.DeleteOptions) error {
+func (c *FakeCSINodes) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewRootDeleteAction(csinodesResource, name), &storagev1.CSINode{})
 	return err
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeCSINodes) DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(csinodesResource, listOptions)
+func (c *FakeCSINodes) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	action := testing.NewRootDeleteCollectionAction(csinodesResource, listOpts)
 
 	_, err := c.Fake.Invokes(action, &storagev1.CSINodeList{})
 	return err

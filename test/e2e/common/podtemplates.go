@@ -84,7 +84,7 @@ var _ = ginkgo.Describe("[sig-architecture] PodTemplates", func() {
 		framework.ExpectEqual(podTemplateRead.ObjectMeta.Labels["podtemplate"], "patched", "failed to patch template, new label not found")
 
 		// delete the PodTemplate
-		err = f.ClientSet.CoreV1().PodTemplates(testNamespaceName).Delete(context.TODO(), podTemplateName, &metav1.DeleteOptions{})
+		err = f.ClientSet.CoreV1().PodTemplates(testNamespaceName).Delete(context.TODO(), podTemplateName, metav1.DeleteOptions{})
 		framework.ExpectNoError(err, "failed to delete PodTemplate")
 
 		// list the PodTemplates

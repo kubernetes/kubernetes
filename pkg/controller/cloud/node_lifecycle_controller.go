@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -190,7 +191,7 @@ func (c *CloudNodeLifecycleController) MonitorNodes() {
 			fmt.Sprintf("Deleting node %v because it does not exist in the cloud provider", node.Name),
 			"Node %s event: %s", node.Name, deleteNodeEvent)
 
-		if err := c.kubeClient.CoreV1().Nodes().Delete(context.TODO(), node.Name, nil); err != nil {
+		if err := c.kubeClient.CoreV1().Nodes().Delete(context.TODO(), node.Name, metav1.DeleteOptions{}); err != nil {
 			klog.Errorf("unable to delete node %q: %v", node.Name, err)
 		}
 	}

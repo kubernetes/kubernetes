@@ -121,8 +121,8 @@ func CheckEvictionSupport(clientset kubernetes.Interface) (string, error) {
 	return "", nil
 }
 
-func (d *Helper) makeDeleteOptions() *metav1.DeleteOptions {
-	deleteOptions := &metav1.DeleteOptions{}
+func (d *Helper) makeDeleteOptions() metav1.DeleteOptions {
+	deleteOptions := metav1.DeleteOptions{}
 	if d.GracePeriodSeconds >= 0 {
 		gracePeriodSeconds := int64(d.GracePeriodSeconds)
 		deleteOptions.GracePeriodSeconds = &gracePeriodSeconds
@@ -150,6 +150,8 @@ func (d *Helper) EvictPod(pod corev1.Pod, policyGroupVersion string) error {
 			return err
 		}
 	}
+
+	delOpts := d.makeDeleteOptions()
 	eviction := &policyv1beta1.Eviction{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: policyGroupVersion,
@@ -159,8 +161,9 @@ func (d *Helper) EvictPod(pod corev1.Pod, policyGroupVersion string) error {
 			Name:      pod.Name,
 			Namespace: pod.Namespace,
 		},
-		DeleteOptions: d.makeDeleteOptions(),
+		DeleteOptions: &delOpts,
 	}
+
 	// Remember to change change the URL manipulation func when Eviction's version change
 	return d.Client.PolicyV1beta1().Evictions(eviction.Namespace).Evict(eviction)
 }

@@ -58,7 +58,7 @@ var _ = SIGDescribe("DNS configMap federations [Feature:Federation]", func() {
 func (t *dnsFederationsConfigMapTest) run() {
 	t.init()
 
-	defer t.c.CoreV1().ConfigMaps(t.ns).Delete(context.TODO(), t.name, nil)
+	defer t.c.CoreV1().ConfigMaps(t.ns).Delete(context.TODO(), t.name, metav1.DeleteOptions{})
 	t.createUtilPodLabel("e2e-dns-configmap")
 	defer t.deleteUtilPod()
 	originalConfigMapData := t.fetchDNSConfigMapData()
@@ -425,8 +425,8 @@ func (t *dnsExternalNameTest) run(isIPv6 bool) {
 	defer func() {
 		ginkgo.By("deleting the test externalName service")
 		defer ginkgo.GinkgoRecover()
-		f.ClientSet.CoreV1().Services(f.Namespace.Name).Delete(context.TODO(), externalNameService.Name, nil)
-		f.ClientSet.CoreV1().Services(f.Namespace.Name).Delete(context.TODO(), externalNameServiceLocal.Name, nil)
+		f.ClientSet.CoreV1().Services(f.Namespace.Name).Delete(context.TODO(), externalNameService.Name, metav1.DeleteOptions{})
+		f.ClientSet.CoreV1().Services(f.Namespace.Name).Delete(context.TODO(), externalNameServiceLocal.Name, metav1.DeleteOptions{})
 	}()
 
 	if isIPv6 {

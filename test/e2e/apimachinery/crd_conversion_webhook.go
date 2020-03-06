@@ -209,10 +209,10 @@ var _ = SIGDescribe("CustomResourceConversionWebhook [Privileged:ClusterAdmin]",
 })
 
 func cleanCRDWebhookTest(client clientset.Interface, namespaceName string) {
-	_ = client.CoreV1().Services(namespaceName).Delete(context.TODO(), serviceCRDName, nil)
-	_ = client.AppsV1().Deployments(namespaceName).Delete(context.TODO(), deploymentCRDName, nil)
-	_ = client.CoreV1().Secrets(namespaceName).Delete(context.TODO(), secretCRDName, nil)
-	_ = client.RbacV1().RoleBindings("kube-system").Delete(context.TODO(), roleBindingCRDName, nil)
+	_ = client.CoreV1().Services(namespaceName).Delete(context.TODO(), serviceCRDName, metav1.DeleteOptions{})
+	_ = client.AppsV1().Deployments(namespaceName).Delete(context.TODO(), deploymentCRDName, metav1.DeleteOptions{})
+	_ = client.CoreV1().Secrets(namespaceName).Delete(context.TODO(), secretCRDName, metav1.DeleteOptions{})
+	_ = client.RbacV1().RoleBindings("kube-system").Delete(context.TODO(), roleBindingCRDName, metav1.DeleteOptions{})
 }
 
 func createAuthReaderRoleBindingForCRDConversion(f *framework.Framework, namespace string) {

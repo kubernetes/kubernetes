@@ -92,7 +92,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		}
 
 		if invalidSc != nil {
-			err := c.StorageV1().StorageClasses().Delete(context.TODO(), invalidSc.Name, nil)
+			err := c.StorageV1().StorageClasses().Delete(context.TODO(), invalidSc.Name, metav1.DeleteOptions{})
 			framework.ExpectNoError(err, "Error deleting storageclass %v: %v", invalidSc.Name, err)
 			invalidSc = nil
 		}

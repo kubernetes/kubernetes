@@ -103,7 +103,7 @@ func (c *FakeControllerRevisions) Update(ctx context.Context, controllerRevision
 }
 
 // Delete takes name of the controllerRevision and deletes it. Returns an error if one occurs.
-func (c *FakeControllerRevisions) Delete(ctx context.Context, name string, options *v1.DeleteOptions) error {
+func (c *FakeControllerRevisions) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(controllerrevisionsResource, c.ns, name), &appsv1.ControllerRevision{})
 
@@ -111,8 +111,8 @@ func (c *FakeControllerRevisions) Delete(ctx context.Context, name string, optio
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeControllerRevisions) DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(controllerrevisionsResource, c.ns, listOptions)
+func (c *FakeControllerRevisions) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(controllerrevisionsResource, c.ns, listOpts)
 
 	_, err := c.Fake.Invokes(action, &appsv1.ControllerRevisionList{})
 	return err
