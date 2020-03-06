@@ -96,10 +96,18 @@ message Ingress {
 // IngressBackend describes all endpoints for a given service and port.
 message IngressBackend {
   // Specifies the name of the referenced service.
+  // +optional
   optional string serviceName = 1;
 
   // Specifies the port of the referenced service.
+  // +optional
   optional k8s.io.apimachinery.pkg.util.intstr.IntOrString servicePort = 2;
+
+  // Resource is an ObjectRef to another Kubernetes resource in the namespace
+  // of the Ingress object. If resource is specified, serviceName and servicePort
+  // must not be specified.
+  // +optional
+  optional k8s.io.api.core.v1.TypedLocalObjectReference resource = 3;
 }
 
 // IngressClass represents the class of the Ingress, referenced by the Ingress

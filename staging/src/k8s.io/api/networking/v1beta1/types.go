@@ -252,10 +252,18 @@ type HTTPIngressPath struct {
 // IngressBackend describes all endpoints for a given service and port.
 type IngressBackend struct {
 	// Specifies the name of the referenced service.
-	ServiceName string `json:"serviceName" protobuf:"bytes,1,opt,name=serviceName"`
+	// +optional
+	ServiceName string `json:"serviceName,omitempty" protobuf:"bytes,1,opt,name=serviceName"`
 
 	// Specifies the port of the referenced service.
-	ServicePort intstr.IntOrString `json:"servicePort" protobuf:"bytes,2,opt,name=servicePort"`
+	// +optional
+	ServicePort intstr.IntOrString `json:"servicePort,omitempty" protobuf:"bytes,2,opt,name=servicePort"`
+
+	// Resource is an ObjectRef to another Kubernetes resource in the namespace
+	// of the Ingress object. If resource is specified, serviceName and servicePort
+	// must not be specified.
+	// +optional
+	Resource *v1.TypedLocalObjectReference `json:"resource,omitempty" protobuf:"bytes,3,opt,name=resource"`
 }
 
 // +genclient

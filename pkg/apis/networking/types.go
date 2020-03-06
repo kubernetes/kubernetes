@@ -464,8 +464,16 @@ type HTTPIngressPath struct {
 // IngressBackend describes all endpoints for a given service and port.
 type IngressBackend struct {
 	// Specifies the name of the referenced service.
+	// +optional
 	ServiceName string
 
 	// Specifies the port of the referenced service.
+	// +optional
 	ServicePort intstr.IntOrString
+
+	// Resource is an ObjectRef to another Kubernetes resource in the namespace
+	// of the Ingress object. If resource is specified, serviceName and servicePort
+	// must not be specified.
+	// +optional
+	Resource *api.TypedLocalObjectReference
 }
