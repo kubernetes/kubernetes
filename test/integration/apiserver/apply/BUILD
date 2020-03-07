@@ -6,6 +6,7 @@ go_test(
     srcs = [
         "apply_crd_test.go",
         "apply_test.go",
+        "benchmark_test.go",
         "main_test.go",
     ],
     tags = [
