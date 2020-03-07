@@ -51,7 +51,7 @@ require (
 	k8s.io/kube-openapi v0.0.0-20200121204235-bf4fb3bd569c
 	k8s.io/utils v0.0.0-20200229041039-0a110f9eb7ab
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.7
-	sigs.k8s.io/structured-merge-diff/v3 v3.0.0-20200207200219-5e70324e7c1c
+	sigs.k8s.io/structured-merge-diff/v3 v3.0.0
 	sigs.k8s.io/yaml v1.2.0
 )
 

@@ -148,7 +148,8 @@ func (s *Updater) Update(liveObject, newObject *typed.TypedValue, version fieldp
 
 // Apply should be called when Apply is run, given the current object as
 // well as the configuration that is applied. This will merge the object
-// and return it.
+// and return it. If the object hasn't changed, nil is returned (the
+// managers can still have changed though).
 func (s *Updater) Apply(liveObject, configObject *typed.TypedValue, version fieldpath.APIVersion, managers fieldpath.ManagedFields, manager string, force bool) (*typed.TypedValue, fieldpath.ManagedFields, error) {
 	managers = shallowCopyManagers(managers)
 	var err error
@@ -178,9 +179,12 @@ func (s *Updater) Apply(liveObject, configObject *typed.TypedValue, version fiel
 	if err != nil {
 		return nil, fieldpath.ManagedFields{}, fmt.Errorf("failed to prune fields: %v", err)
 	}
-	managers, _, err = s.update(liveObject, newObject, version, managers, manager, force)
+	managers, compare, err := s.update(liveObject, newObject, version, managers, manager, force)
 	if err != nil {
 		return nil, fieldpath.ManagedFields{}, err
+	}
+	if compare.IsSame() {
+		newObject = nil
 	}
 	return newObject, managers, nil
 }
