@@ -22,6 +22,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"io/ioutil"
 	"math/rand"
 	"testing"
@@ -99,8 +100,8 @@ func TestSigner(t *testing.T) {
 		MaxPathLen:            -1,
 	}
 
-	if !cmp.Equal(*certs[0], want, diff.IgnoreUnset()) {
-		t.Errorf("unexpected diff: %v", cmp.Diff(certs[0], want, diff.IgnoreUnset()))
+	if d := cmp.Diff(*certs[0], want, diff.IgnoreUnset()); d != "" {
+		t.Errorf("Unexpected diff in certificate (-got +want): %v", d)
 	}
 }
 
@@ -164,15 +165,14 @@ func TestIntermediateSigner(t *testing.T) {
 		MaxPathLen:            -1,
 	}
 
-	if !cmp.Equal(*certs[0], want, diff.IgnoreUnset()) {
-		t.Errorf("unexpected diff: %v", cmp.Diff(certs[0], want, diff.IgnoreUnset()))
+	if d := cmp.Diff(*certs[0], want, diff.IgnoreUnset()); d != "" {
+		t.Errorf("Unexpected diff in certificate (-got +want): %v", d)
 	}
 
-	wantCA := *currCA.Certificate
-	wantCA.PublicKey = nil
-	wantCA.SerialNumber = nil
-	if !cmp.Equal(*certs[1], wantCA, diff.IgnoreUnset()) {
-		t.Errorf("unexpected diff: %v", cmp.Diff(certs[0], want, diff.IgnoreUnset()))
+	if d := cmp.Diff(*certs[1], *currCA.Certificate, diff.IgnoreUnset(),
+		cmpopts.IgnoreFields(x509.Certificate{}, "PublicKey", "SerialNumber"),
+	); d != "" {
+		t.Errorf("Unexpected diff in certificate (-got +want): %v", d)
 	}
 }
 

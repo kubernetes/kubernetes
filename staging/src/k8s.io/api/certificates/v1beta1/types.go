@@ -121,10 +121,8 @@ type CertificateSigningRequestStatus struct {
 	// +optional
 	Conditions []CertificateSigningRequestCondition `json:"conditions,omitempty" protobuf:"bytes,1,rep,name=conditions"`
 
-	// If request was approved, the controller will place the issued certificate here.
-	// If more than one PEM block is present, and the definition of the requested spec.signerName
-	// does not indicate otherwise, the first block is the issued certificate,
-	// and subsequent blocks should be treated as intermediate certificates and presented in TLS handshakes.
+	// This is a sequence (chain) of X.509v3 certificates. The issued certificate comes first in the list. Each following
+	// certificate, if any, directly certifies the one preceding it, and should be presented in TLS handshakes.
 	// +optional
 	Certificate []byte `json:"certificate,omitempty" protobuf:"bytes,2,opt,name=certificate"`
 }

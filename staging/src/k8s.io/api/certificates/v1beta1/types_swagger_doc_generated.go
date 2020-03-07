@@ -65,7 +65,7 @@ func (CertificateSigningRequestSpec) SwaggerDoc() map[string]string {
 
 var map_CertificateSigningRequestStatus = map[string]string{
 	"conditions":  "Conditions applied to the request, such as approval or denial.",
-	"certificate": "If request was approved, the controller will place the issued certificate here. If more than one PEM block is present, and the definition of the requested spec.signerName does not indicate otherwise, the first block is the issued certificate, and subsequent blocks should be treated as intermediate certificates and presented in TLS handshakes.",
+	"certificate": "This is a sequence (chain) of X.509v3 certificates. The issued certificate comes first in the list. Each following certificate, if any, directly certifies the one preceding it, and should be presented in TLS handshakes.",
 }
 
 func (CertificateSigningRequestStatus) SwaggerDoc() map[string]string {

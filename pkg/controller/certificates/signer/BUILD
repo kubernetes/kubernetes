@@ -24,6 +24,7 @@ go_test(
         "//staging/src/k8s.io/client-go/testing:go_default_library",
         "//staging/src/k8s.io/client-go/util/cert:go_default_library",
         "//vendor/github.com/google/go-cmp/cmp:go_default_library",
+        "//vendor/github.com/google/go-cmp/cmp/cmpopts:go_default_library",
     ],
 )
 

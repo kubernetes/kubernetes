@@ -64,7 +64,9 @@ func NewCSRSigningController(
 		dynamicCertReloader: signer.caProvider.caLoader,
 	}
 	if signer.chainProvider != nil {
-		c.dynamicChainReloader = signer.chainProvider
+		if r, ok := signer.chainProvider.(dynamiccertificates.ControllerRunner); ok {
+			c.dynamicChainReloader = r
+		}
 	}
 
 	return c, nil
@@ -86,7 +88,7 @@ type signer struct {
 	client  clientset.Interface
 	certTTL time.Duration
 
-	chainProvider *dynamiccertificates.DynamicFileCAContent
+	chainProvider dynamiccertificates.CAContentProvider
 }
 
 func newSigner(caFile, caKeyFile string, client clientset.Interface, certificateDuration time.Duration, chainFile string) (*signer, error) {
