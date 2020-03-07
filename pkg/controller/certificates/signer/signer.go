@@ -39,7 +39,6 @@ import (
 type CSRSigningController struct {
 	certificateController *certificates.CertificateController
 	dynamicCertReloader   dynamiccertificates.ControllerRunner
-	dynamicChainReloader  dynamiccertificates.ControllerRunner
 }
 
 func NewCSRSigningController(
@@ -47,9 +46,9 @@ func NewCSRSigningController(
 	csrInformer certificatesinformers.CertificateSigningRequestInformer,
 	caFile, caKeyFile string,
 	certTTL time.Duration,
-	chainFile string,
+	includeSigners bool,
 ) (*CSRSigningController, error) {
-	signer, err := newSigner(caFile, caKeyFile, client, certTTL, chainFile)
+	signer, err := newSigner(caFile, caKeyFile, client, certTTL, includeSigners)
 	if err != nil {
 		return nil, err
 	}
@@ -63,11 +62,6 @@ func NewCSRSigningController(
 		),
 		dynamicCertReloader: signer.caProvider.caLoader,
 	}
-	if signer.chainProvider != nil {
-		if r, ok := signer.chainProvider.(dynamiccertificates.ControllerRunner); ok {
-			c.dynamicChainReloader = r
-		}
-	}
 
 	return c, nil
 }
@@ -75,41 +69,31 @@ func NewCSRSigningController(
 // Run the main goroutine responsible for watching and syncing jobs.
 func (c *CSRSigningController) Run(workers int, stopCh <-chan struct{}) {
 	go c.dynamicCertReloader.Run(workers, stopCh)
-	if c.dynamicChainReloader != nil {
-		go c.dynamicChainReloader.Run(workers, stopCh)
-	}
 
 	c.certificateController.Run(workers, stopCh)
 }
 
 type signer struct {
-	caProvider *caProvider
+	caProvider     *caProvider
+	includeSigners bool
 
 	client  clientset.Interface
 	certTTL time.Duration
-
-	chainProvider dynamiccertificates.CAContentProvider
 }
 
-func newSigner(caFile, caKeyFile string, client clientset.Interface, certificateDuration time.Duration, chainFile string) (*signer, error) {
+func newSigner(caFile, caKeyFile string, client clientset.Interface, certificateDuration time.Duration, includeSigners bool) (*signer, error) {
 	caProvider, err := newCAProvider(caFile, caKeyFile)
 	if err != nil {
 		return nil, err
 	}
 
 	ret := &signer{
-		caProvider: caProvider,
-		client:     client,
-		certTTL:    certificateDuration,
+		caProvider:     caProvider,
+		client:         client,
+		certTTL:        certificateDuration,
+		includeSigners: includeSigners,
 	}
 
-	if chainFile != "" {
-		chainProvider, err := dynamiccertificates.NewDynamicCAContentFromFile("csr-controller", chainFile)
-		if err != nil {
-			return nil, err
-		}
-		ret.chainProvider = chainProvider
-	}
 	return ret, nil
 }
 
@@ -158,14 +142,16 @@ func (s *signer) sign(x509cr *x509.CertificateRequest, usages []capi.KeyUsage) (
 	if err != nil {
 		return nil, err
 	}
-	b := &bytes.Buffer{}
-	if err := pem.Encode(b, &pem.Block{Type: "CERTIFICATE", Bytes: der}); err != nil {
+	var b bytes.Buffer
+	if err := pem.Encode(&b, &pem.Block{Type: "CERTIFICATE", Bytes: der}); err != nil {
 		return nil, err
 	}
-	if s.chainProvider != nil {
-		chain := s.chainProvider.CurrentCABundleContent()
-
-		b.Write(chain)
+	if s.includeSigners {
+		// Append the full content of the provided signing cer
+		// TODO(jackkleeman): Permit providing a chain of signing certificates, and append them all here
+		if err := pem.Encode(&b, &pem.Block{Type: "CERTIFICATE", Bytes: currCA.Certificate.Raw}); err != nil {
+			return nil, err
+		}
 	}
 	return b.Bytes(), nil
 }

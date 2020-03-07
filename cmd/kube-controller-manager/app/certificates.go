@@ -96,7 +96,7 @@ func startCSRSigningController(ctx ControllerContext) (http.Handler, bool, error
 		ctx.ComponentConfig.CSRSigningController.ClusterSigningCertFile,
 		ctx.ComponentConfig.CSRSigningController.ClusterSigningKeyFile,
 		ctx.ComponentConfig.CSRSigningController.ClusterSigningDuration.Duration,
-		ctx.ComponentConfig.CSRSigningController.ClusterSigningChainFile,
+		ctx.ComponentConfig.CSRSigningController.ClusterSigningIncludeSigners,
 	)
 	if err != nil {
 		return nil, false, fmt.Errorf("failed to start certificate controller: %v", err)

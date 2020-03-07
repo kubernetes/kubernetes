@@ -43,7 +43,7 @@ import (
 func TestSigner(t *testing.T) {
 	clock := clock.FakeClock{}
 
-	s, err := newSigner("./testdata/ca.crt", "./testdata/ca.key", nil, 1*time.Hour, "")
+	s, err := newSigner("./testdata/ca.crt", "./testdata/ca.key", nil, 1*time.Hour, false)
 	if err != nil {
 		t.Fatalf("failed to create signer: %v", err)
 	}
@@ -108,7 +108,7 @@ func TestSigner(t *testing.T) {
 func TestIntermediateSigner(t *testing.T) {
 	clock := clock.FakeClock{}
 
-	s, err := newSigner("./testdata/ca.crt", "./testdata/ca.key", nil, 1*time.Hour, "./testdata/ca.crt")
+	s, err := newSigner("./testdata/ca.crt", "./testdata/ca.key", nil, 1*time.Hour, true)
 	if err != nil {
 		t.Fatalf("failed to create signer: %v", err)
 	}
@@ -321,7 +321,7 @@ func TestHandle(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			client := &fake.Clientset{}
-			s, err := newSigner("./testdata/ca.crt", "./testdata/ca.key", client, 1*time.Hour, "")
+			s, err := newSigner("./testdata/ca.crt", "./testdata/ca.key", client, 1*time.Hour, false)
 			if err != nil {
 				t.Fatalf("failed to create signer: %v", err)
 			}
