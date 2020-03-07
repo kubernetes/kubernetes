@@ -62,7 +62,12 @@ func (proxier *metaProxier) SyncLoop() {
 
 // OnServiceAdd is called whenever creation of new service object is observed.
 func (proxier *metaProxier) OnServiceAdd(service *v1.Service) {
-	if *(service.Spec.IPFamily) == v1.IPv4Protocol {
+	family, err := servicesIPFamily(service)
+	if family == nil || err != nil {
+		klog.Warningf("unable to determine IPFamily: %v", err)
+		return
+	}
+	if *(family) == v1.IPv4Protocol {
 		proxier.ipv4Proxier.OnServiceAdd(service)
 		return
 	}
@@ -73,7 +78,12 @@ func (proxier *metaProxier) OnServiceAdd(service *v1.Service) {
 // service object is observed.
 func (proxier *metaProxier) OnServiceUpdate(oldService, service *v1.Service) {
 	// IPFamily is immutable, hence we only need to check on the new service
-	if *(service.Spec.IPFamily) == v1.IPv4Protocol {
+	family, err := servicesIPFamily(service)
+	if family == nil || err != nil {
+		klog.Warningf("unable to determine IPFamily: %v", err)
+		return
+	}
+	if *(family) == v1.IPv4Protocol {
 		proxier.ipv4Proxier.OnServiceUpdate(oldService, service)
 		return
 	}
@@ -84,7 +94,12 @@ func (proxier *metaProxier) OnServiceUpdate(oldService, service *v1.Service) {
 // OnServiceDelete is called whenever deletion of an existing service
 // object is observed.
 func (proxier *metaProxier) OnServiceDelete(service *v1.Service) {
-	if *(service.Spec.IPFamily) == v1.IPv4Protocol {
+	family, err := servicesIPFamily(service)
+	if family == nil || err != nil {
+		klog.Warningf("unable to determine IPFamily: %v", err)
+		return
+	}
+	if *(family) == v1.IPv4Protocol {
 		proxier.ipv4Proxier.OnServiceDelete(service)
 		return
 	}
@@ -198,6 +213,30 @@ func (proxier *metaProxier) OnEndpointSliceDelete(endpointSlice *discovery.Endpo
 func (proxier *metaProxier) OnEndpointSlicesSynced() {
 	proxier.ipv4Proxier.OnEndpointSlicesSynced()
 	proxier.ipv6Proxier.OnEndpointSlicesSynced()
+}
+
+// servicesIPFamily that returns IPFamily of services or error if
+// failed to identify the IP family.
+func servicesIPFamily(service *v1.Service) (*v1.IPFamily, error) {
+	if service == nil {
+		return nil, fmt.Errorf("failed to identify ipfamily for service")
+	}
+	if service.Spec.IPFamily != nil {
+		return service.Spec.IPFamily, nil
+	}
+	if len(service.Spec.ClusterIP) == 0 {
+		return nil, fmt.Errorf("failed to identify ipfamily for service (no ClusterIP)")
+	}
+	if v1.ClusterIPNone == service.Spec.ClusterIP {
+		return nil, fmt.Errorf("failed to identify ipfamily for headless service")
+	}
+	ipv4 := v1.IPv4Protocol
+	ipv6 := v1.IPv6Protocol
+	if utilnet.IsIPv6String(service.Spec.ClusterIP) {
+		return &ipv6, nil
+	}
+
+	return &ipv4, nil
 }
 
 // endpointsIPFamily that returns IPFamily of endpoints or error if
