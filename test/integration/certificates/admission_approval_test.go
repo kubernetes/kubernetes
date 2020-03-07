@@ -77,7 +77,7 @@ func TestCSRSignerNameApprovalPlugin(t *testing.T) {
 				Reason:  "AutoApproved",
 				Message: "Approved during integration test",
 			})
-			_, err := testuserClient.CertificatesV1beta1().CertificateSigningRequests().UpdateApproval(csr)
+			_, err := testuserClient.CertificatesV1beta1().CertificateSigningRequests().UpdateApproval(context.TODO(), csr, metav1.UpdateOptions{})
 			if err != nil && test.error != err.Error() {
 				t.Errorf("expected error %q but got: %v", test.error, err)
 			}
