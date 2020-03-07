@@ -271,6 +271,18 @@ func (dk *providersDockerKeyring) Lookup(image string) ([]AuthConfig, bool) {
 	return keyring.Lookup(image)
 }
 
+// FakeKeyring a fake config credentials
+type FakeKeyring struct {
+	auth []AuthConfig
+	ok   bool
+}
+
+// Lookup implements the DockerKeyring method for fetching credentials based on image name
+// return fake auth and ok
+func (f *FakeKeyring) Lookup(image string) ([]AuthConfig, bool) {
+	return f.auth, f.ok
+}
+
 // UnionDockerKeyring delegates to a set of keyrings.
 type UnionDockerKeyring []DockerKeyring
 
