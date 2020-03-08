@@ -297,7 +297,7 @@ func setupSuite() {
 	}
 
 	if framework.TestContext.NodeKiller.Enabled {
-		nodeKiller := framework.NewNodeKiller(framework.TestContext.NodeKiller, c, framework.TestContext.Provider)
+		nodeKiller := e2enode.NewNodeKiller(framework.TestContext.NodeKiller, c, framework.TestContext.Provider)
 		go nodeKiller.Run(framework.TestContext.NodeKiller.NodeKillerStopCh)
 	}
 }

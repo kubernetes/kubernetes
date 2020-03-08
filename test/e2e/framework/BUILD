@@ -11,7 +11,6 @@ go_library(
         "google_compute.go",
         "log.go",
         "log_size_monitoring.go",
-        "nodes_util.go",
         "pods.go",
         "provider.go",
         "psp.go",

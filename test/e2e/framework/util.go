@@ -1413,7 +1413,7 @@ func RestartApiserver(namespace string, cs clientset.Interface) error {
 	if err != nil {
 		return err
 	}
-	return masterUpgradeGKE(namespace, v.GitVersion[1:]) // strip leading 'v'
+	return e2enode.masterUpgradeGKE(namespace, v.GitVersion[1:]) // strip leading 'v'
 }
 
 func sshRestartMaster() error {
