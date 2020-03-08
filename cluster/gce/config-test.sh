@@ -517,7 +517,9 @@ ROTATE_CERTIFICATES="${ROTATE_CERTIFICATES:-}"
 # into kube-controller-manager via `--concurrent-service-syncs`
 CONCURRENT_SERVICE_SYNCS="${CONCURRENT_SERVICE_SYNCS:-}"
 
-SERVICEACCOUNT_ISSUER="https://kubernetes.io/${CLUSTER_NAME}"
+# The value kubernetes.default.svc is only usable in Pods and should only be
+# set for tests. DO NOT COPY THIS VALUE FOR PRODUCTION CLUSTERS.
+SERVICEACCOUNT_ISSUER="https://kubernetes.default.svc"
 
 # Optional: Enable Node termination Handler for Preemptible and GPU VMs.
 # https://github.com/GoogleCloudPlatform/k8s-node-termination-handler

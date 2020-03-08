@@ -63,7 +63,7 @@ func TestNamespaceCondition(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = dynamicClient.Resource(corev1.SchemeGroupVersion.WithResource("pods")).Namespace(nsName).Create(podJSON, metav1.CreateOptions{})
+	_, err = dynamicClient.Resource(corev1.SchemeGroupVersion.WithResource("pods")).Namespace(nsName).Create(context.TODO(), podJSON, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -73,7 +73,7 @@ func TestNamespaceCondition(t *testing.T) {
 		t.Fatal(err)
 	}
 	deploymentJSON.SetFinalizers([]string{"custom.io/finalizer"})
-	_, err = dynamicClient.Resource(appsv1.SchemeGroupVersion.WithResource("deployments")).Namespace(nsName).Create(deploymentJSON, metav1.CreateOptions{})
+	_, err = dynamicClient.Resource(appsv1.SchemeGroupVersion.WithResource("deployments")).Namespace(nsName).Create(context.TODO(), deploymentJSON, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}

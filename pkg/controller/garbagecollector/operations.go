@@ -17,6 +17,7 @@ limitations under the License.
 package garbagecollector
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 
@@ -56,7 +57,7 @@ func (gc *GarbageCollector) deleteObject(item objectReference, policy *metav1.De
 	uid := item.UID
 	preconditions := metav1.Preconditions{UID: &uid}
 	deleteOptions := metav1.DeleteOptions{Preconditions: &preconditions, PropagationPolicy: policy}
-	return gc.metadataClient.Resource(resource).Namespace(resourceDefaultNamespace(namespaced, item.Namespace)).Delete(item.Name, &deleteOptions)
+	return gc.metadataClient.Resource(resource).Namespace(resourceDefaultNamespace(namespaced, item.Namespace)).Delete(context.TODO(), item.Name, deleteOptions)
 }
 
 func (gc *GarbageCollector) getObject(item objectReference) (*metav1.PartialObjectMetadata, error) {
@@ -64,7 +65,7 @@ func (gc *GarbageCollector) getObject(item objectReference) (*metav1.PartialObje
 	if err != nil {
 		return nil, err
 	}
-	return gc.metadataClient.Resource(resource).Namespace(resourceDefaultNamespace(namespaced, item.Namespace)).Get(item.Name, metav1.GetOptions{})
+	return gc.metadataClient.Resource(resource).Namespace(resourceDefaultNamespace(namespaced, item.Namespace)).Get(context.TODO(), item.Name, metav1.GetOptions{})
 }
 
 func (gc *GarbageCollector) patchObject(item objectReference, patch []byte, pt types.PatchType) (*metav1.PartialObjectMetadata, error) {
@@ -72,7 +73,7 @@ func (gc *GarbageCollector) patchObject(item objectReference, patch []byte, pt t
 	if err != nil {
 		return nil, err
 	}
-	return gc.metadataClient.Resource(resource).Namespace(resourceDefaultNamespace(namespaced, item.Namespace)).Patch(item.Name, pt, patch, metav1.PatchOptions{})
+	return gc.metadataClient.Resource(resource).Namespace(resourceDefaultNamespace(namespaced, item.Namespace)).Patch(context.TODO(), item.Name, pt, patch, metav1.PatchOptions{})
 }
 
 func (gc *GarbageCollector) removeFinalizer(owner *node, targetFinalizer string) error {

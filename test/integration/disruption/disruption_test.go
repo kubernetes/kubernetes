@@ -124,7 +124,7 @@ func TestPDBWithScaleSubresource(t *testing.T) {
 			},
 		},
 	}
-	createdResource, err := resourceClient.Create(resource, metav1.CreateOptions{})
+	createdResource, err := resourceClient.Create(context.TODO(), resource, metav1.CreateOptions{})
 	if err != nil {
 		t.Error(err)
 	}

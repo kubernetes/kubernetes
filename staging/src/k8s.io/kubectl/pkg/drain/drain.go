@@ -165,7 +165,7 @@ func (d *Helper) EvictPod(pod corev1.Pod, policyGroupVersion string) error {
 	}
 
 	// Remember to change change the URL manipulation func when Eviction's version change
-	return d.Client.PolicyV1beta1().Evictions(eviction.Namespace).Evict(eviction)
+	return d.Client.PolicyV1beta1().Evictions(eviction.Namespace).Evict(context.TODO(), eviction)
 }
 
 // GetPodsForDeletion receives resource info for a node, and returns those pods as PodDeleteList,

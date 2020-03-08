@@ -19,6 +19,7 @@ package skipper
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"fmt"
 	"regexp"
 	"runtime"
@@ -137,7 +138,7 @@ func SkipUnlessLocalEphemeralStorageEnabled() {
 // SkipIfMissingResource skips if the gvr resource is missing.
 func SkipIfMissingResource(dynamicClient dynamic.Interface, gvr schema.GroupVersionResource, namespace string) {
 	resourceClient := dynamicClient.Resource(gvr).Namespace(namespace)
-	_, err := resourceClient.List(metav1.ListOptions{})
+	_, err := resourceClient.List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		// not all resources support list, so we ignore those
 		if apierrors.IsMethodNotSupported(err) || apierrors.IsNotFound(err) || apierrors.IsForbidden(err) {

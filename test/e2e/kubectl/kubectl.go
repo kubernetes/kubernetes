@@ -2238,7 +2238,7 @@ func verbsContain(verbs metav1.Verbs, str string) bool {
 
 // deleteObj deletes an Object with the provided client and name.
 func deleteObj(client dynamic.ResourceInterface, name string) {
-	err := client.Delete(name, &metav1.DeleteOptions{})
+	err := client.Delete(context.TODO(), name, metav1.DeleteOptions{})
 	framework.ExpectNoError(err)
 }
 
@@ -2246,7 +2246,7 @@ func deleteObj(client dynamic.ResourceInterface, name string) {
 // and then verifies that the kubectl get output provides custom columns. Once
 // the test has completed, it deletes the object.
 func createObjValidateOutputAndCleanup(namespace string, client dynamic.ResourceInterface, obj *unstructured.Unstructured, resource metav1.APIResource) {
-	_, err := client.Create(obj, metav1.CreateOptions{})
+	_, err := client.Create(context.TODO(), obj, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 	defer deleteObj(client, obj.GetName())
 

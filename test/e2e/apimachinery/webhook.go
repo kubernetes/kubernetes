@@ -1678,11 +1678,11 @@ func updateCustomResource(c dynamic.ResourceInterface, ns, name string, update u
 	var cr *unstructured.Unstructured
 	pollErr := wait.PollImmediate(2*time.Second, 1*time.Minute, func() (bool, error) {
 		var err error
-		if cr, err = c.Get(name, metav1.GetOptions{}); err != nil {
+		if cr, err = c.Get(context.TODO(), name, metav1.GetOptions{}); err != nil {
 			return false, err
 		}
 		update(cr)
-		if cr, err = c.Update(cr, metav1.UpdateOptions{}); err == nil {
+		if cr, err = c.Update(context.TODO(), cr, metav1.UpdateOptions{}); err == nil {
 			return true, nil
 		}
 		// Only retry update on conflict
@@ -1846,7 +1846,7 @@ func testCustomResourceWebhook(f *framework.Framework, crd *apiextensionsv1.Cust
 			},
 		},
 	}
-	_, err := customResourceClient.Create(crInstance, metav1.CreateOptions{})
+	_, err := customResourceClient.Create(context.TODO(), crInstance, metav1.CreateOptions{})
 	framework.ExpectError(err, "create custom resource %s in namespace %s should be denied by webhook", crInstanceName, f.Namespace.Name)
 	expectedErrMsg := "the custom resource contains unwanted data"
 	if !strings.Contains(err.Error(), expectedErrMsg) {
@@ -1870,7 +1870,7 @@ func testBlockingCustomResourceUpdateDeletion(f *framework.Framework, crd *apiex
 			},
 		},
 	}
-	_, err := customResourceClient.Create(crInstance, metav1.CreateOptions{})
+	_, err := customResourceClient.Create(context.TODO(), crInstance, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "failed to create custom resource %s in namespace: %s", crInstanceName, f.Namespace.Name)
 
 	ginkgo.By("Updating the custom resource with disallowed data should be denied")
@@ -1890,7 +1890,7 @@ func testBlockingCustomResourceUpdateDeletion(f *framework.Framework, crd *apiex
 	}
 
 	ginkgo.By("Deleting the custom resource should be denied")
-	err = customResourceClient.Delete(crInstanceName, &metav1.DeleteOptions{})
+	err = customResourceClient.Delete(context.TODO(), crInstanceName, metav1.DeleteOptions{})
 	framework.ExpectError(err, "deleting custom resource %s in namespace: %s should be denied", crInstanceName, f.Namespace.Name)
 	expectedErrMsg1 := "the custom resource cannot be deleted because it contains unwanted key and value"
 	if !strings.Contains(err.Error(), expectedErrMsg1) {
@@ -1909,7 +1909,7 @@ func testBlockingCustomResourceUpdateDeletion(f *framework.Framework, crd *apiex
 	framework.ExpectNoError(err, "failed to update custom resource %s in namespace: %s", crInstanceName, f.Namespace.Name)
 
 	ginkgo.By("Deleting the updated custom resource should be successful")
-	err = customResourceClient.Delete(crInstanceName, &metav1.DeleteOptions{})
+	err = customResourceClient.Delete(context.TODO(), crInstanceName, metav1.DeleteOptions{})
 	framework.ExpectNoError(err, "failed to delete custom resource %s in namespace: %s", crInstanceName, f.Namespace.Name)
 
 }
@@ -1930,7 +1930,7 @@ func testMutatingCustomResourceWebhook(f *framework.Framework, crd *apiextension
 			},
 		},
 	}
-	mutatedCR, err := customResourceClient.Create(cr, metav1.CreateOptions{})
+	mutatedCR, err := customResourceClient.Create(context.TODO(), cr, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "failed to create custom resource %s in namespace: %s", crName, f.Namespace.Name)
 	expectedCRData := map[string]interface{}{
 		"mutation-start":   "yes",
@@ -1961,7 +1961,7 @@ func testMultiVersionCustomResourceWebhook(f *framework.Framework, testcrd *crd.
 			},
 		},
 	}
-	_, err := customResourceClient.Create(cr, metav1.CreateOptions{})
+	_, err := customResourceClient.Create(context.TODO(), cr, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "failed to create custom resource %s in namespace: %s", crName, f.Namespace.Name)
 
 	ginkgo.By("Patching Custom Resource Definition to set v2 as storage")
@@ -1992,7 +1992,7 @@ func testMultiVersionCustomResourceWebhook(f *framework.Framework, testcrd *crd.
 
 	ginkgo.By("Patching the custom resource while v2 is storage version")
 	crDummyPatch := fmt.Sprint(`[{ "op": "add", "path": "/dummy", "value": "test" }]`)
-	mutatedCR, err := testcrd.DynamicClients["v2"].Patch(crName, types.JSONPatchType, []byte(crDummyPatch), metav1.PatchOptions{})
+	mutatedCR, err := testcrd.DynamicClients["v2"].Patch(context.TODO(), crName, types.JSONPatchType, []byte(crDummyPatch), metav1.PatchOptions{})
 	framework.ExpectNoError(err, "failed to patch custom resource %s in namespace: %s", crName, f.Namespace.Name)
 	expectedCRData := map[string]interface{}{
 		"mutation-start":   "yes",

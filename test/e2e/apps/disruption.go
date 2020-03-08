@@ -246,7 +246,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 			}
 
 			if c.shouldDeny {
-				err = cs.CoreV1().Pods(ns).Evict(e)
+				err = cs.CoreV1().Pods(ns).Evict(context.TODO(), e)
 				gomega.Expect(err).Should(gomega.MatchError("Cannot evict pod as it would violate the pod's disruption budget."))
 			} else {
 				// Only wait for running pods in the "allow" case
@@ -257,7 +257,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 				// Since disruptionAllowed starts out false, if an eviction is ever allowed,
 				// that means the controller is working.
 				err = wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
-					err = cs.CoreV1().Pods(ns).Evict(e)
+					err = cs.CoreV1().Pods(ns).Evict(context.TODO(), e)
 					if err != nil {
 						return false, nil
 					}
@@ -284,7 +284,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 				Namespace: ns,
 			},
 		}
-		err = cs.CoreV1().Pods(ns).Evict(e)
+		err = cs.CoreV1().Pods(ns).Evict(context.TODO(), e)
 		gomega.Expect(err).Should(gomega.MatchError("Cannot evict pod as it would violate the pod's disruption budget."))
 
 		ginkgo.By("Updating the pdb to allow a pod to be evicted")
@@ -297,7 +297,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 		ginkgo.By("Trying to evict the same pod we tried earlier which should now be evictable")
 		waitForPodsOrDie(cs, ns, 3)
 		waitForPdbToObserveHealthyPods(cs, ns, 3)
-		err = cs.CoreV1().Pods(ns).Evict(e)
+		err = cs.CoreV1().Pods(ns).Evict(context.TODO(), e)
 		framework.ExpectNoError(err) // the eviction is now allowed
 
 		ginkgo.By("Patching the pdb to disallow a pod to be evicted")
@@ -319,7 +319,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 				Namespace: ns,
 			},
 		}
-		err = cs.CoreV1().Pods(ns).Evict(e)
+		err = cs.CoreV1().Pods(ns).Evict(context.TODO(), e)
 		gomega.Expect(err).Should(gomega.MatchError("Cannot evict pod as it would violate the pod's disruption budget."))
 
 		ginkgo.By("Deleting the pdb to allow a pod to be evicted")
@@ -327,7 +327,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 
 		ginkgo.By("Trying to evict the same pod we tried earlier which should now be evictable")
 		waitForPodsOrDie(cs, ns, 3)
-		err = cs.CoreV1().Pods(ns).Evict(e)
+		err = cs.CoreV1().Pods(ns).Evict(context.TODO(), e)
 		framework.ExpectNoError(err) // the eviction is now allowed
 	})
 
@@ -600,7 +600,7 @@ func waitForPdbToObserveHealthyPods(cs kubernetes.Interface, ns string, healthyC
 
 func getPDBStatusOrDie(dc dynamic.Interface, ns string, name string) *policyv1beta1.PodDisruptionBudget {
 	pdbStatusResource := policyv1beta1.SchemeGroupVersion.WithResource("poddisruptionbudgets")
-	unstruct, err := dc.Resource(pdbStatusResource).Namespace(ns).Get(name, metav1.GetOptions{}, "status")
+	unstruct, err := dc.Resource(pdbStatusResource).Namespace(ns).Get(context.TODO(), name, metav1.GetOptions{}, "status")
 	pdb, err := unstructuredToPDB(unstruct)
 	framework.ExpectNoError(err, "Getting the status of the pdb %s in namespace %s", name, ns)
 	return pdb

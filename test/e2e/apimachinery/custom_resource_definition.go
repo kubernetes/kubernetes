@@ -163,7 +163,7 @@ var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin
 			updateCondition := v1.CustomResourceDefinitionCondition{Message: "updated"}
 			err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
 				// Use dynamic client to read the status sub-resource since typed client does not expose it.
-				u, err := resourceClient.Get(crd.GetName(), metav1.GetOptions{}, "status")
+				u, err := resourceClient.Get(context.TODO(), crd.GetName(), metav1.GetOptions{}, "status")
 				framework.ExpectNoError(err, "getting CustomResourceDefinition status")
 				status := unstructuredToCRD(u)
 				if !equality.Semantic.DeepEqual(status.Spec, crd.Spec) {
@@ -294,7 +294,7 @@ var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin
 			Resource: crd.Spec.Names.Plural,
 		}
 		crClient := dynamicClient.Resource(gvr)
-		_, err = crClient.Create(&unstructured.Unstructured{Object: map[string]interface{}{
+		_, err = crClient.Create(context.TODO(), &unstructured.Unstructured{Object: map[string]interface{}{
 			"apiVersion": gvr.Group + "/" + gvr.Version,
 			"kind":       crd.Spec.Names.Kind,
 			"metadata": map[string]interface{}{
@@ -310,7 +310,7 @@ var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin
 		framework.ExpectNoError(err, "setting default for a to \"A\" in schema")
 
 		err = wait.PollImmediate(time.Millisecond*100, wait.ForeverTestTimeout, func() (bool, error) {
-			u1, err := crClient.Get(name1, metav1.GetOptions{})
+			u1, err := crClient.Get(context.TODO(), name1, metav1.GetOptions{})
 			if err != nil {
 				return false, err
 			}
@@ -330,7 +330,7 @@ var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin
 
 		// create CR with default in storage
 		name2 := names.SimpleNameGenerator.GenerateName("cr-2")
-		u2, err := crClient.Create(&unstructured.Unstructured{Object: map[string]interface{}{
+		u2, err := crClient.Create(context.TODO(), &unstructured.Unstructured{Object: map[string]interface{}{
 			"apiVersion": gvr.Group + "/" + gvr.Version,
 			"kind":       crd.Spec.Names.Kind,
 			"metadata": map[string]interface{}{
@@ -350,7 +350,7 @@ var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin
 		framework.ExpectNoError(err, "setting default for b to \"B\" and remove default for a")
 
 		err = wait.PollImmediate(time.Millisecond*100, wait.ForeverTestTimeout, func() (bool, error) {
-			u2, err := crClient.Get(name2, metav1.GetOptions{})
+			u2, err := crClient.Get(context.TODO(), name2, metav1.GetOptions{})
 			if err != nil {
 				return false, err
 			}
