@@ -84,10 +84,10 @@ fi
 # Also please update corresponding image for node e2e at:
 # https://github.com/kubernetes/kubernetes/blob/master/test/e2e_node/jenkins/image-config.yaml
 GCI_VERSION=${KUBE_GCI_VERSION:-cos-81-12871-59-0}
-MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-}
-MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-cos-cloud}
-NODE_IMAGE=${KUBE_GCE_NODE_IMAGE:-${GCI_VERSION}}
-NODE_IMAGE_PROJECT=${KUBE_GCE_NODE_PROJECT:-cos-cloud}
+MASTER_IMAGE=daily-ubuntu-2004-focal-v20200330
+MASTER_IMAGE_PROJECT=ubuntu-os-cloud-devel
+NODE_IMAGE=daily-ubuntu-2004-focal-v20200330
+NODE_IMAGE_PROJECT=ubuntu-os-cloud-devel
 NODE_SERVICE_ACCOUNT=${KUBE_GCE_NODE_SERVICE_ACCOUNT:-default}
 
 # KUBELET_TEST_ARGS are extra arguments passed to kubelet.

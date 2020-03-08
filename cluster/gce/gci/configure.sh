@@ -428,7 +428,7 @@ function install-docker {
     | apt-key add -
   add-apt-repository \
     "deb [arch=amd64] https://download.docker.com/linux/$(. /etc/os-release; echo "$ID") \
-    $(lsb_release -cs) stable"
+    eoan stable"
 
   # Install Docker
   apt-get update && \
@@ -467,7 +467,7 @@ function install-containerd-ubuntu {
     | apt-key add -
   add-apt-repository \
     "deb [arch=amd64] https://download.docker.com/linux/$(. /etc/os-release; echo "$ID") \
-    $(lsb_release -cs) stable"
+    eoan stable"
 
   # Install containerd from Docker repo
   apt-get update && \
