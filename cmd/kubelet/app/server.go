@@ -608,8 +608,8 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, featureGate f
 	}
 
 	var cgroupRoots []string
-
-	cgroupRoots = append(cgroupRoots, cm.NodeAllocatableRoot(s.CgroupRoot, s.CgroupDriver))
+	nodeAllocatableRoot := cm.NodeAllocatableRoot(s.CgroupRoot, s.CgroupsPerQOS, s.CgroupDriver)
+	cgroupRoots = append(cgroupRoots, nodeAllocatableRoot)
 	kubeletCgroup, err := cm.GetKubeletContainer(s.KubeletCgroups)
 	if err != nil {
 		klog.Warningf("failed to get the kubelet's cgroup: %v.  Kubelet system container metrics may be missing.", err)
