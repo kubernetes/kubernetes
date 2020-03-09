@@ -1399,6 +1399,7 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 			s.HostIP = hostIP.String()
 			if kubecontainer.IsHostNetworkPod(pod) && s.PodIP == "" {
 				s.PodIP = hostIP.String()
+				s.PodIPs = []v1.PodIP{{IP: s.PodIP}}
 			}
 		}
 	}
