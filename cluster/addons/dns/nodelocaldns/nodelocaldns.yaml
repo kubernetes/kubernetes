@@ -131,6 +131,10 @@ spec:
       tolerations:
       - key: "CriticalAddonsOnly"
         operator: "Exists"
+      - effect: "NoExecute"
+        operator: "Exists"
+      - effect: "NoSchedule"
+        operator: "Exists"
       containers:
       - name: node-cache
         image: k8s.gcr.io/k8s-dns-node-cache:1.15.10
