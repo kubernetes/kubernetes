@@ -434,6 +434,9 @@ var _ = SIGDescribe("Kubectl client", func() {
 				// ignored for being disruptive in an e2e, and getting automatically deleted by a controller
 				"Node": true,
 
+				// ignored due to skew test - fixed in 1.18+ by #88966
+				"IngressClass": true,
+
 				// ignored temporarily while waiting for bug fix.
 				"ComponentStatus":    true,
 				"ClusterRoleBinding": true,
