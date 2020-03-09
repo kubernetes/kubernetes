@@ -641,12 +641,10 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 //  2. Kill pod sandbox if necessary.
 //  3. Kill any containers that should not be running.
 //  4. Create sandbox if necessary.
-//  5. Create ephemeral containers.
-//  6. Create init containers.
-//  7. Create normal containers.
-func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontainer.PodStatus, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff) (result kubecontainer.PodSyncResult) {
+func (m *kubeGenericRuntimeManager) SyncPodSandbox(pod *v1.Pod, podStatus *kubecontainer.PodStatus) (result kubecontainer.PodSyncResult, podIPs []string, podSandboxID string) {
 	// Step 1: Compute sandbox and container changes.
 	podContainerChanges := m.computePodActions(pod, podStatus)
+
 	klog.V(3).Infof("computePodActions got %+v for pod %q", podContainerChanges, format.Pod(pod))
 	if podContainerChanges.CreateSandbox {
 		ref, err := ref.GetReference(legacyscheme.Scheme, pod)
@@ -707,13 +705,12 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontaine
 	//
 	// We default to the IPs in the passed-in pod status, and overwrite them if the
 	// sandbox needs to be (re)started.
-	var podIPs []string
 	if podStatus != nil {
 		podIPs = podStatus.IPs
 	}
 
 	// Step 4: Create a sandbox for the pod if necessary.
-	podSandboxID := podContainerChanges.SandboxID
+	podSandboxID = podContainerChanges.SandboxID
 	if podContainerChanges.CreateSandbox {
 		var msg string
 		var err error
@@ -754,7 +751,13 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontaine
 			klog.V(4).Infof("Determined the ip %v for pod %q after sandbox changed", podIPs, format.Pod(pod))
 		}
 	}
+	return
+}
 
+//  5. Create ephemeral containers.
+//  6. Create init containers.
+//  7. Create normal containers.
+func (m *kubeGenericRuntimeManager) SyncPodContainers(pod *v1.Pod, podStatus *kubecontainer.PodStatus, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff, podIPs []string, podSandboxID string) (result kubecontainer.PodSyncResult) {
 	// the start containers routines depend on pod ip(as in primary pod ip)
 	// instead of trying to figure out if we have 0 < len(podIPs)
 	// everytime, we short circuit it here
@@ -766,6 +769,8 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontaine
 	// Get podSandboxConfig for containers to start.
 	configPodSandboxResult := kubecontainer.NewSyncResult(kubecontainer.ConfigPodSandbox, podSandboxID)
 	result.AddSyncResult(configPodSandboxResult)
+
+	podContainerChanges := m.computePodActions(pod, podStatus)
 	podSandboxConfig, err := m.generatePodSandboxConfig(pod, podContainerChanges.Attempt)
 	if err != nil {
 		message := fmt.Sprintf("GeneratePodSandboxConfig for pod %q failed: %v", format.Pod(pod), err)
@@ -838,6 +843,9 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontaine
 // If a container is still in backoff, the function will return a brief backoff error and
 // a detailed error message.
 func (m *kubeGenericRuntimeManager) doBackOff(pod *v1.Pod, container *v1.Container, podStatus *kubecontainer.PodStatus, backOff *flowcontrol.Backoff) (bool, string, error) {
+	if podStatus == nil || len(podStatus.ContainerStatuses) == 0 {
+		return false, "", nil
+	}
 	var cStatus *kubecontainer.ContainerStatus
 	for _, c := range podStatus.ContainerStatuses {
 		if c.Name == container.Name && c.State == kubecontainer.ContainerStateExited {

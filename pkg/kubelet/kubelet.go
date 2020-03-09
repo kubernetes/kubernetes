@@ -1687,7 +1687,37 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 	pullSecrets := kl.getPullSecretsForPod(pod)
 
 	// Call the container runtime's SyncPod callback
-	result := kl.containerRuntime.SyncPod(pod, podStatus, pullSecrets, kl.backOff)
+	result, podIPs, sandboxID := kl.containerRuntime.SyncPodSandbox(pod, podStatus)
+	kl.reasonCache.Update(pod.UID, result)
+	if err := result.Error(); err != nil {
+		// Do not return error if the only failures were pods in backoff
+		for _, r := range result.SyncResults {
+			if r.Error != kubecontainer.ErrCrashLoopBackOff && r.Error != images.ErrImagePullBackOff {
+				// Do not record an event here, as we keep all event logging for sync pod failures
+				// local to container runtime so we get better errors
+				return err
+			}
+		}
+
+		return nil
+	}
+	podStatus2, err := kl.containerRuntime.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
+	if err != nil {
+		klog.Warningf("unable to get pod status for %s : %v", pod.Name, err)
+	} else {
+		if len(podIPs) != 0 {
+			klog.Infof("podIP is %s, IPs from current podStatus %v", podIPs[0], podStatus2.IPs)
+			podStatus.IPs = podIPs
+		} else {
+			klog.Infof("IPs from current podStatus %v, from prior %v", podStatus2.IPs, podStatus.IPs)
+			podStatus.IPs = podStatus2.IPs
+		}
+		apiPodStatus := kl.generateAPIPodStatus(pod, podStatus)
+		// Update status in the status manager
+		kl.statusManager.SetPodStatus(pod, apiPodStatus)
+	}
+
+	result = kl.containerRuntime.SyncPodContainers(pod, podStatus, pullSecrets, kl.backOff, podIPs, sandboxID)
 	kl.reasonCache.Update(pod.UID, result)
 	if err := result.Error(); err != nil {
 		// Do not return error if the only failures were pods in backoff

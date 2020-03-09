@@ -72,7 +72,11 @@ func (r *Mock) GetPods(all bool) ([]*kubecontainer.Pod, error) {
 	return args.Get(0).([]*kubecontainer.Pod), args.Error(1)
 }
 
-func (r *Mock) SyncPod(pod *v1.Pod, status *kubecontainer.PodStatus, secrets []v1.Secret, backOff *flowcontrol.Backoff) kubecontainer.PodSyncResult {
+func (f *Mock) SyncPodSandbox(pod *v1.Pod, _ *kubecontainer.PodStatus) (result kubecontainer.PodSyncResult, podIPs []string, podSandboxID string) {
+	return
+}
+
+func (r *Mock) SyncPodContainers(pod *v1.Pod, status *kubecontainer.PodStatus, secrets []v1.Secret, backOff *flowcontrol.Backoff, podIPs []string, podSandboxID string) kubecontainer.PodSyncResult {
 	args := r.Called(pod, status, secrets, backOff)
 	return args.Get(0).(kubecontainer.PodSyncResult)
 }
