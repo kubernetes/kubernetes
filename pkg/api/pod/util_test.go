@@ -589,6 +589,95 @@ func TestDropFSGroupFields(t *testing.T) {
 
 }
 
+func TestDropDisabledPodFields(t *testing.T) {
+	pod := func() *api.Pod {
+		return &api.Pod{
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name:  "container1",
+						Image: "testimage",
+					},
+				},
+			},
+		}
+	}
+
+	podInfos := []struct {
+		description    string
+		featureEnabled bool
+		pod            func() *api.Pod
+	}{
+		{
+			description:    "pod.Overhead=nil, feature=false",
+			featureEnabled: false,
+			pod:            pod,
+		},
+	}
+	for _, podInfo := range podInfos {
+		t.Run(podInfo.description, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodOverhead, podInfo.featureEnabled)()
+			oldPod := podInfo.pod()
+			newPod := oldPod.DeepCopy()
+			if oldPod == nil {
+				newPod = pod()
+			}
+
+			DropDisabledPodFields(newPod, oldPod)
+
+			if newPod.Spec.Overhead != nil {
+				t.Errorf("for %s, expected Overhead is nil", podInfo.description)
+			}
+		})
+	}
+
+}
+
+func TestTopologySpreadConstraintsInUse(t *testing.T) {
+	pod := func() *api.Pod {
+		return &api.Pod{
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name:  "container1",
+						Image: "testimage",
+					},
+				},
+				TopologySpreadConstraints: make([]api.TopologySpreadConstraint, 0),
+			},
+		}
+	}
+
+	podInfos := []struct {
+		description    string
+		featureEnabled bool
+		pod            func() *api.Pod
+	}{
+		{
+			description:    "pod.TopologySpreadConstraints=nil, feature=false",
+			featureEnabled: false,
+			pod:            pod,
+		},
+	}
+	for _, podInfo := range podInfos {
+		t.Run(podInfo.description, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EvenPodsSpread, podInfo.featureEnabled)()
+			oldPod := podInfo.pod()
+			newPod := oldPod.DeepCopy()
+			if oldPod == nil {
+				newPod = pod()
+			}
+
+			DropDisabledPodFields(newPod, oldPod)
+
+			if newPod.Spec.TopologySpreadConstraints != nil {
+				t.Errorf("for %s, expected TopologySpreadConstraints is nil", podInfo.description)
+			}
+		})
+	}
+
+}
+
 func TestDropSubPath(t *testing.T) {
 	podWithSubpaths := func() *api.Pod {
 		return &api.Pod{

@@ -33,12 +33,5 @@ func DropDisabledFields(pvSpec *api.PersistentVolumeSpec, oldPVSpec *api.Persist
 }
 
 func hasExpansionSecrets(oldPVSpec *api.PersistentVolumeSpec) bool {
-	if oldPVSpec == nil || oldPVSpec.CSI == nil {
-		return false
-	}
-
-	if oldPVSpec.CSI.ControllerExpandSecretRef != nil {
-		return true
-	}
-	return false
+	return oldPVSpec != nil && oldPVSpec.CSI != nil && oldPVSpec.CSI.ControllerExpandSecretRef != nil
 }

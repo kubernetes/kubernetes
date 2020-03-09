@@ -45,24 +45,9 @@ func DropDisabledFields(pspSpec, oldPSPSpec *policy.PodSecurityPolicySpec) {
 }
 
 func allowedProcMountTypesInUse(oldPSPSpec *policy.PodSecurityPolicySpec) bool {
-	if oldPSPSpec == nil {
-		return false
-	}
-
-	if oldPSPSpec.AllowedProcMountTypes != nil {
-		return true
-	}
-
-	return false
-
+	return oldPSPSpec != nil && oldPSPSpec.AllowedProcMountTypes != nil
 }
 
 func sysctlsInUse(oldPSPSpec *policy.PodSecurityPolicySpec) bool {
-	if oldPSPSpec == nil {
-		return false
-	}
-	if oldPSPSpec.AllowedUnsafeSysctls != nil || oldPSPSpec.ForbiddenSysctls != nil {
-		return true
-	}
-	return false
+	return oldPSPSpec != nil && (oldPSPSpec.AllowedUnsafeSysctls != nil || oldPSPSpec.ForbiddenSysctls != nil)
 }

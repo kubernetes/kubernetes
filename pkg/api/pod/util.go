@@ -536,32 +536,17 @@ func subpathInUse(podSpec *api.PodSpec) bool {
 
 // runtimeClassInUse returns true if the pod spec is non-nil and has a RuntimeClassName set
 func runtimeClassInUse(podSpec *api.PodSpec) bool {
-	if podSpec == nil {
-		return false
-	}
-	if podSpec.RuntimeClassName != nil {
-		return true
-	}
-	return false
+	return podSpec != nil && podSpec.RuntimeClassName != nil
 }
 
 // overheadInUse returns true if the pod spec is non-nil and has Overhead set
 func overheadInUse(podSpec *api.PodSpec) bool {
-	if podSpec == nil {
-		return false
-	}
-	if podSpec.Overhead != nil {
-		return true
-	}
-	return false
+	return podSpec != nil && podSpec.Overhead != nil
 }
 
 // topologySpreadConstraintsInUse returns true if the pod spec is non-nil and has a TopologySpreadConstraints slice
 func topologySpreadConstraintsInUse(podSpec *api.PodSpec) bool {
-	if podSpec == nil {
-		return false
-	}
-	return len(podSpec.TopologySpreadConstraints) > 0
+	return podSpec != nil && len(podSpec.TopologySpreadConstraints) > 0
 }
 
 // procMountInUse returns true if the pod spec is non-nil and has a SecurityContext's ProcMount field set to a non-default value
@@ -614,23 +599,11 @@ func tokenRequestProjectionInUse(podSpec *api.PodSpec) bool {
 
 // podPriorityInUse returns true if the pod spec is non-nil and has Priority or PriorityClassName set.
 func podPriorityInUse(podSpec *api.PodSpec) bool {
-	if podSpec == nil {
-		return false
-	}
-	if podSpec.Priority != nil || podSpec.PriorityClassName != "" {
-		return true
-	}
-	return false
+	return podSpec != nil && (podSpec.Priority != nil || podSpec.PriorityClassName != "")
 }
 
 func sysctlsInUse(podSpec *api.PodSpec) bool {
-	if podSpec == nil {
-		return false
-	}
-	if podSpec.SecurityContext != nil && podSpec.SecurityContext.Sysctls != nil {
-		return true
-	}
-	return false
+	return podSpec != nil && podSpec.SecurityContext != nil && podSpec.SecurityContext.Sysctls != nil
 }
 
 // emptyDirSizeLimitInUse returns true if any pod's EmptyDir volumes use SizeLimit.
@@ -723,11 +696,5 @@ func csiInUse(podSpec *api.PodSpec) bool {
 
 // podPriorityInUse returns true if status is not nil and number of PodIPs is greater than one
 func multiplePodIPsInUse(podStatus *api.PodStatus) bool {
-	if podStatus == nil {
-		return false
-	}
-	if len(podStatus.PodIPs) > 1 {
-		return true
-	}
-	return false
+	return podStatus != nil && len(podStatus.PodIPs) > 1
 }
