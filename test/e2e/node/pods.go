@@ -350,7 +350,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 								switch {
 								case t.ExitCode == 1:
 									// expected
-								case t.ExitCode == 128 && t.Reason == "ContainerCannotRun" && reBug88766.MatchString(t.Message):
+								case t.ExitCode == 128 && (t.Reason == "StartError" || t.Reason == "ContainerCannotRun") && reBug88766.MatchString(t.Message):
 									// pod volume teardown races with container start in CRI, which reports a failure
 									framework.Logf("pod %s on node %s failed with the symptoms of https://github.com/kubernetes/kubernetes/issues/88766")
 								default:
