@@ -329,7 +329,7 @@ func commentToConformanceData(comment string) *conformanceData {
 			descLines = append(descLines, line)
 		}
 	}
-	if cd.Release == "" && cd.TestName == "" {
+	if cd.TestName == "" {
 		return nil
 	}
 
