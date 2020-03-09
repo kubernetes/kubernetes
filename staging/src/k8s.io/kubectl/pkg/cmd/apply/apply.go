@@ -414,7 +414,7 @@ func (o *ApplyOptions) Run() error {
 			)
 			if err != nil {
 				if isIncompatibleServerError(err) {
-					err = fmt.Errorf("Server-side apply not available on the server: (%v)", err)
+					err = fmt.Errorf("server-side apply not available on the server: (%v)", err)
 				}
 				if errors.IsConflict(err) {
 					err = fmt.Errorf(`%v
