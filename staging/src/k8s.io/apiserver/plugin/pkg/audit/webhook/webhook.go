@@ -64,8 +64,12 @@ func retryOnError(err error) bool {
 func loadWebhook(configFile string, groupVersion schema.GroupVersion, initialBackoff time.Duration, customDial utilnet.DialFunc) (*webhook.GenericWebhook, error) {
 	w, err := webhook.NewGenericWebhook(audit.Scheme, audit.Codecs, configFile,
 		[]schema.GroupVersion{groupVersion}, initialBackoff, customDial)
+	if err != nil {
+		return nil, err
+	}
+
 	w.ShouldRetry = retryOnError
-	return w, err
+	return w, nil
 }
 
 type backend struct {
