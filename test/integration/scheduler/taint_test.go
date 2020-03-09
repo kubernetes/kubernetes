@@ -98,7 +98,6 @@ func TestTaintNodeByCondition(t *testing.T) {
 		100,         // Large cluster threshold
 		100,         // Unhealthy zone threshold
 		true,        // Run taint manager
-		true,        // Use taint based evictions
 	)
 	if err != nil {
 		t.Errorf("Failed to create node controller: %v", err)

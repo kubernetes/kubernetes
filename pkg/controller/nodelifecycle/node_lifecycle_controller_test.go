@@ -180,7 +180,6 @@ func newNodeLifecycleControllerFromClient(
 		largeClusterThreshold,
 		unhealthyZoneThreshold,
 		useTaints,
-		useTaints,
 	)
 	if err != nil {
 		return nil, err
