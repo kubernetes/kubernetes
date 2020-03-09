@@ -213,5 +213,8 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"returns success, but /readyz immediately returns failure. Graceful termination starts after this delay "+
 		"has elapsed. This can be used to allow load balancer to stop sending traffic to this server.")
 
+	fs.Int64Var(&s.MaxRequestBodyBytes, "max-resource-write-bytes", s.MaxRequestBodyBytes, ""+
+		"The maximum number of bytes for Request entity")
+
 	utilfeature.DefaultMutableFeatureGate.AddFlag(fs)
 }
