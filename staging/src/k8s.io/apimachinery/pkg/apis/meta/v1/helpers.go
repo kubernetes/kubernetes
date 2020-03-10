@@ -252,7 +252,9 @@ func ResetObjectMetaForStatus(meta, existingMeta Object) {
 	meta.SetAnnotations(existingMeta.GetAnnotations())
 	meta.SetFinalizers(existingMeta.GetFinalizers())
 	meta.SetOwnerReferences(existingMeta.GetOwnerReferences())
-	meta.SetManagedFields(existingMeta.GetManagedFields())
+	// DO NOT Reset ManagedFields, since we need it to track fields
+	// in status.
+	// meta.SetManagedFields(existingMeta.GetManagedFields())
 }
 
 // MarshalJSON implements json.Marshaler
