@@ -71,7 +71,8 @@ func (ss *scaleSet) newVMSSCache() (*timedCache, error) {
 				return nil, err
 			}
 
-			for _, scaleSet := range allScaleSets {
+			for i := range allScaleSets {
+				scaleSet := allScaleSets[i]
 				if scaleSet.Name == nil || *scaleSet.Name == "" {
 					klog.Warning("failed to get the name of VMSS")
 					continue
