@@ -46,6 +46,7 @@ import (
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1/util"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/auth"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
@@ -1056,7 +1057,7 @@ func deleteProvisionedVolumesAndDisks(c clientset.Interface, pvs []*v1.Persisten
 }
 
 func getRandomClusterZone(c clientset.Interface) string {
-	zones, err := framework.GetClusterZones(c)
+	zones, err := e2enode.GetClusterZones(c)
 	framework.ExpectNoError(err)
 	framework.ExpectNotEqual(len(zones), 0)
 

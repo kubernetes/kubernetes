@@ -40,6 +40,7 @@ import (
 	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -140,7 +141,7 @@ func testVolumeProvisioning(c clientset.Interface, ns string) {
 
 				err := checkGCEPD(volume, "pd-standard")
 				framework.ExpectNoError(err, "checkGCEPD")
-				zones, err := framework.GetClusterZones(c)
+				zones, err := e2enode.GetClusterZones(c)
 				framework.ExpectNoError(err, "GetClusterZones")
 				err = verifyZonesInPV(volume, zones, false /* match */)
 				framework.ExpectNoError(err, "verifyZonesInPV")
@@ -547,7 +548,7 @@ func newPodTemplate(labels map[string]string) *v1.PodTemplateSpec {
 }
 
 func getTwoRandomZones(c clientset.Interface) []string {
-	zones, err := framework.GetClusterZones(c)
+	zones, err := e2enode.GetClusterZones(c)
 	framework.ExpectNoError(err)
 	gomega.Expect(zones.Len()).To(gomega.BeNumerically(">=", 2),
 		"The test should only be run in multizone clusters.")
