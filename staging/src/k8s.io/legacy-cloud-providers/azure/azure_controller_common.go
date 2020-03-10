@@ -45,7 +45,7 @@ const (
 	errLeaseFailed       = "AcquireDiskLeaseFailed"
 	errLeaseIDMissing    = "LeaseIdMissing"
 	errContainerNotFound = "ContainerNotFound"
-	errDiskBlobNotFound  = "DiskBlobNotFound"
+	errDiskNotFound      = "is not found"
 )
 
 var defaultBackOff = kwait.Backoff{
@@ -287,4 +287,46 @@ func (c *controllerCommon) DisksAreAttached(diskNames []string, nodeName types.N
 	}
 
 	return attached, nil
+}
+
+func (c *controllerCommon) filterNonExistingDisks(ctx context.Context, unfilteredDisks []compute.DataDisk) []compute.DataDisk {
+	filteredDisks := []compute.DataDisk{}
+	for _, disk := range unfilteredDisks {
+		filter := false
+		if disk.ManagedDisk != nil && disk.ManagedDisk.ID != nil {
+			diskURI := *disk.ManagedDisk.ID
+			exist, err := c.cloud.checkDiskExists(ctx, diskURI)
+			if err != nil {
+				klog.Errorf("checkDiskExists(%s) failed with error: %v", diskURI, err)
+			} else {
+				// only filter disk when checkDiskExists returns <false, nil>
+				filter = !exist
+				if filter {
+					klog.Errorf("disk(%s) does not exist, removed from data disk list", diskURI)
+				}
+			}
+		}
+
+		if !filter {
+			filteredDisks = append(filteredDisks, disk)
+		}
+	}
+	return filteredDisks
+}
+
+func (c *controllerCommon) checkDiskExists(ctx context.Context, diskURI string) (bool, error) {
+	diskName := path.Base(diskURI)
+	resourceGroup, err := getResourceGroupFromDiskURI(diskURI)
+	if err != nil {
+		return false, err
+	}
+
+	if _, err := c.cloud.DisksClient.Get(ctx, resourceGroup, diskName); err != nil {
+		if strings.Contains(err.Error(), errDiskNotFound) {
+			return false, nil
+		}
+		return false, err
+	}
+
+	return true, nil
 }
