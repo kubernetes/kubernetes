@@ -97,6 +97,7 @@ const (
 	filenameRCPatchTest       = "../../../testdata/apply/patch.json"
 	dirName                   = "../../../testdata/apply/testdir"
 	filenameRCJSON            = "../../../testdata/apply/rc.json"
+	filenamePodGeneratedName  = "../../../testdata/apply/pod-generated-name.yaml"
 
 	filenameWidgetClientside    = "../../../testdata/apply/widget-clientside.yaml"
 	filenameWidgetServerside    = "../../../testdata/apply/widget-serverside.yaml"
@@ -1409,4 +1410,23 @@ func TestDontAllowForceApplyWithServerDryRun(t *testing.T) {
 	cmd.Run(cmd, []string{})
 
 	t.Fatalf(`expected error "%s"`, expectedError)
+}
+
+func TestDontAllowApplyWithPodGeneratedName(t *testing.T) {
+	expectedError := "error: from testing-: cannot use generate name with apply"
+	cmdutil.BehaviorOnFatal(func(str string, code int) {
+		if str != expectedError {
+			t.Fatalf(`expected error "%s", but got "%s"`, expectedError, str)
+		}
+	})
+
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
+
+	ioStreams, _, _, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdApply("kubectl", tf, ioStreams)
+	cmd.Flags().Set("filename", filenamePodGeneratedName)
+	cmd.Flags().Set("dry-run", "client")
+	cmd.Run(cmd, []string{})
 }
