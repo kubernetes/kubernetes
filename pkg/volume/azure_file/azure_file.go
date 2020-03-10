@@ -23,6 +23,7 @@ import (
 	"io/ioutil"
 	"os"
 	"runtime"
+	"time"
 
 	"k8s.io/klog"
 	"k8s.io/utils/mount"
@@ -32,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	cloudprovider "k8s.io/cloud-provider"
 	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 	"k8s.io/kubernetes/pkg/volume"
@@ -285,7 +287,15 @@ func (b *azureFileMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) e
 		mountOptions = appendDefaultMountOptions(mountOptions, mounterArgs.FsGroup)
 	}
 
-	err = b.mounter.Mount(source, dir, "cifs", mountOptions)
+	mountComplete := false
+	err = wait.Poll(5*time.Second, 10*time.Minute, func() (bool, error) {
+		err := b.mounter.Mount(source, dir, "cifs", mountOptions)
+		mountComplete = true
+		return true, err
+	})
+	if !mountComplete {
+		return fmt.Errorf("volume(%s) mount on %s timeout(10m)", source, dir)
+	}
 	if err != nil {
 		notMnt, mntErr := b.mounter.IsLikelyNotMountPoint(dir)
 		if mntErr != nil {
