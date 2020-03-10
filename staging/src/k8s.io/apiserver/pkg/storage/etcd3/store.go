@@ -33,6 +33,7 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
@@ -391,6 +392,8 @@ func (s *store) GetToList(ctx context.Context, key string, resourceVersion strin
 		return fmt.Errorf("need ptr to slice: %v", err)
 	}
 
+	newItemFunc := getNewItemFunc(listObj, v)
+
 	key = path.Join(s.pathPrefix, key)
 	startTime := time.Now()
 	getResp, err := s.client.KV.Get(ctx, key, s.getOps...)
@@ -404,12 +407,29 @@ func (s *store) GetToList(ctx context.Context, key string, resourceVersion strin
 		if err != nil {
 			return storage.NewInternalError(err.Error())
 		}
-		if err := appendListItem(v, data, uint64(getResp.Kvs[0].ModRevision), pred, s.codec, s.versioner); err != nil {
+		if err := appendListItem(v, data, uint64(getResp.Kvs[0].ModRevision), pred, s.codec, s.versioner, newItemFunc); err != nil {
 			return err
 		}
 	}
 	// update version with cluster level revision
 	return s.versioner.UpdateList(listObj, uint64(getResp.Header.Revision), "", nil)
+}
+
+func getNewItemFunc(listObj runtime.Object, v reflect.Value) func() runtime.Object {
+	// For unstructured lists with a target group/version, preserve the group/version in the instantiated list items
+	if unstructuredList, isUnstructured := listObj.(*unstructured.UnstructuredList); isUnstructured {
+		if apiVersion := unstructuredList.GetAPIVersion(); len(apiVersion) > 0 {
+			return func() runtime.Object {
+				return &unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": apiVersion}}
+			}
+		}
+	}
+
+	// Otherwise just instantiate an empty item
+	elem := v.Type().Elem()
+	return func() runtime.Object {
+		return reflect.New(elem).Interface().(runtime.Object)
+	}
 }
 
 func (s *store) Count(key string) (int64, error) {
@@ -519,6 +539,8 @@ func (s *store) List(ctx context.Context, key, resourceVersion string, pred stor
 		options = append(options, clientv3.WithLimit(pred.Limit))
 	}
 
+	newItemFunc := getNewItemFunc(listObj, v)
+
 	var returnedRV, continueRV int64
 	var continueKey string
 	switch {
@@ -611,7 +633,7 @@ func (s *store) List(ctx context.Context, key, resourceVersion string, pred stor
 				return storage.NewInternalErrorf("unable to transform key %q: %v", kv.Key, err)
 			}
 
-			if err := appendListItem(v, data, uint64(kv.ModRevision), pred, s.codec, s.versioner); err != nil {
+			if err := appendListItem(v, data, uint64(kv.ModRevision), pred, s.codec, s.versioner, newItemFunc); err != nil {
 				return err
 			}
 		}
@@ -816,8 +838,8 @@ func decode(codec runtime.Codec, versioner storage.Versioner, value []byte, objP
 }
 
 // appendListItem decodes and appends the object (if it passes filter) to v, which must be a slice.
-func appendListItem(v reflect.Value, data []byte, rev uint64, pred storage.SelectionPredicate, codec runtime.Codec, versioner storage.Versioner) error {
-	obj, _, err := codec.Decode(data, nil, reflect.New(v.Type().Elem()).Interface().(runtime.Object))
+func appendListItem(v reflect.Value, data []byte, rev uint64, pred storage.SelectionPredicate, codec runtime.Codec, versioner storage.Versioner, newItemFunc func() runtime.Object) error {
+	obj, _, err := codec.Decode(data, nil, newItemFunc())
 	if err != nil {
 		return err
 	}
