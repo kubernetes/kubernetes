@@ -158,7 +158,7 @@ type IPBlock struct {
 	Except []string
 }
 
-// NetworkPolicyPeer describes a peer to allow traffic from.
+// NetworkPolicyPeer describes a peer to allow traffic to/from.
 type NetworkPolicyPeer struct {
 	// This is a label selector which selects Pods. This field follows standard label
 	// selector semantics; if present but empty, it selects all pods.
