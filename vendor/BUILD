@@ -112,7 +112,6 @@ filegroup(
         "//vendor/github.com/docker/distribution/registry/api/errcode:all-srcs",
         "//vendor/github.com/docker/docker/api:all-srcs",
         "//vendor/github.com/docker/docker/client:all-srcs",
-        "//vendor/github.com/docker/docker/daemon/logger/jsonfilelog/jsonlog:all-srcs",
         "//vendor/github.com/docker/docker/errdefs:all-srcs",
         "//vendor/github.com/docker/docker/pkg/jsonmessage:all-srcs",
         "//vendor/github.com/docker/docker/pkg/mount:all-srcs",
