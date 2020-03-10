@@ -26,6 +26,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/pointer"
 )
 
 func TestCommonAttachDisk(t *testing.T) {
@@ -247,4 +248,114 @@ func TestDisksAreAttached(t *testing.T) {
 		assert.Equal(t, test.expectedAttached, attached, "TestCase[%d]: %s", i, test.desc)
 		assert.Equal(t, test.expectedErr, err != nil, "TestCase[%d]: %s", i, test.desc)
 	}
+}
+
+func TestCheckDiskExists(t *testing.T) {
+	ctx, cancel := getContextWithCancel()
+	defer cancel()
+
+	testCloud := getTestCloud()
+	common := &controllerCommon{
+		location:              testCloud.Location,
+		storageEndpointSuffix: testCloud.Environment.StorageEndpointSuffix,
+		resourceGroup:         testCloud.ResourceGroup,
+		subscriptionID:        testCloud.SubscriptionID,
+		cloud:                 testCloud,
+		vmLockMap:             newLockMap(),
+	}
+	// create a new disk before running test
+	newDiskName := "newdisk"
+	newDiskURI := fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/disks/%s",
+		testCloud.SubscriptionID, testCloud.ResourceGroup, newDiskName)
+	fDC := newFakeDisksClient()
+	_, rerr := fDC.CreateOrUpdate(ctx, testCloud.ResourceGroup, newDiskName, compute.Disk{})
+	assert.Equal(t, rerr == nil, true, "return error: %v", rerr)
+	testCloud.DisksClient = fDC
+
+	testCases := []struct {
+		diskURI        string
+		expectedResult bool
+		expectedErr    bool
+	}{
+		{
+			diskURI:        "incorrect disk URI format",
+			expectedResult: false,
+			expectedErr:    true,
+		},
+		{
+			diskURI:        "/subscriptions/xxx/resourceGroups/xxx/providers/Microsoft.Compute/disks/non-existing-disk",
+			expectedResult: false,
+			expectedErr:    false,
+		},
+		{
+			diskURI:        newDiskURI,
+			expectedResult: true,
+			expectedErr:    false,
+		},
+	}
+
+	for i, test := range testCases {
+		exist, err := common.checkDiskExists(ctx, test.diskURI)
+		assert.Equal(t, test.expectedResult, exist, "TestCase[%d]", i, exist)
+		assert.Equal(t, test.expectedErr, err != nil, "TestCase[%d], return error: %v", i, err)
+	}
+}
+
+func TestFilterNonExistingDisks(t *testing.T) {
+	ctx, cancel := getContextWithCancel()
+	defer cancel()
+
+	testCloud := getTestCloud()
+	common := &controllerCommon{
+		location:              testCloud.Location,
+		storageEndpointSuffix: testCloud.Environment.StorageEndpointSuffix,
+		resourceGroup:         testCloud.ResourceGroup,
+		subscriptionID:        testCloud.SubscriptionID,
+		cloud:                 testCloud,
+		vmLockMap:             newLockMap(),
+	}
+	// create a new disk before running test
+	diskURIPrefix := fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/disks/",
+		testCloud.SubscriptionID, testCloud.ResourceGroup)
+	newDiskName := "newdisk"
+	newDiskURI := diskURIPrefix + newDiskName
+	fDC := newFakeDisksClient()
+	_, rerr := fDC.CreateOrUpdate(ctx, testCloud.ResourceGroup, newDiskName, compute.Disk{})
+	assert.Equal(t, rerr == nil, true, "return error: %v", rerr)
+	testCloud.DisksClient = fDC
+
+	disks := []compute.DataDisk{
+		{
+			Name: &newDiskName,
+			ManagedDisk: &compute.ManagedDiskParameters{
+				ID: &newDiskURI,
+			},
+		},
+		{
+			Name: pointer.StringPtr("DiskName2"),
+			ManagedDisk: &compute.ManagedDiskParameters{
+				ID: pointer.StringPtr(diskURIPrefix + "DiskName2"),
+			},
+		},
+		{
+			Name: pointer.StringPtr("DiskName3"),
+			ManagedDisk: &compute.ManagedDiskParameters{
+				ID: pointer.StringPtr(diskURIPrefix + "DiskName3"),
+			},
+		},
+		{
+			Name: pointer.StringPtr("DiskName4"),
+			ManagedDisk: &compute.ManagedDiskParameters{
+				ID: pointer.StringPtr(diskURIPrefix + "DiskName4"),
+			},
+		},
+	}
+
+	filteredDisks := common.filterNonExistingDisks(ctx, disks)
+	assert.Equal(t, 1, len(filteredDisks))
+	assert.Equal(t, newDiskName, *filteredDisks[0].Name)
+
+	disks = []compute.DataDisk{}
+	filteredDisks = filterDetachingDisks(disks)
+	assert.Equal(t, 0, len(filteredDisks))
 }
