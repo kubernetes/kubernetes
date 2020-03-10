@@ -27,6 +27,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	apiextensionclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -38,6 +39,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -1414,5 +1416,200 @@ func TestClearManagedFieldsWithUpdate(t *testing.T) {
 
 	if labels := accessor.GetLabels(); len(labels) < 1 {
 		t.Fatalf("Expected other fields to stay untouched, got: %v", object)
+	}
+}
+
+func TestApplyStatusPod(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
+
+	_, client, closeFn := setup(t)
+	defer closeFn()
+
+	_, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+		Namespace("default").
+		Resource("pods").
+		Name("test-pod").
+		Param("fieldManager", "apply_test").
+		Body([]byte(`{
+			"apiVersion": "v1",
+			"kind": "Pod",
+			"metadata": {
+				"name": "test-pod"
+			},
+			"spec": {
+				"containers": [{
+					"name":  "test-container",
+					"image": "test-image"
+				}]
+			}
+		}`)).
+		Do(context.TODO()).
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to create object using Apply patch: %v", err)
+	}
+
+	_, err = client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+		Namespace("default").
+		Resource("pods").
+		Name("test-pod").
+		Param("fieldManager", "apply_test").
+		SubResource("status").
+		Body([]byte(`{
+			"apiVersion": "v1",
+			"kind": "Pod",
+			"metadata": {
+				"name": "test-pod"
+			},
+			"status": {
+				"conditions": [{
+					"status": "False",
+					"type": "Initialized"
+				}]
+			}
+		}`)).
+		Do(context.TODO()).
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to apply status: %v", err)
+	}
+	_, err = client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+		Namespace("default").
+		Resource("pods").
+		Name("test-pod").
+		Param("fieldManager", "apply_test_other").
+		SubResource("status").
+		Body([]byte(`{
+			"apiVersion": "v1",
+			"kind": "Pod",
+			"metadata": {
+				"name": "test-pod"
+			},
+			"status": {
+				"conditions": [{
+					"status": "True",
+					"type": "Initialized"
+				}]
+			}
+		}`)).
+		Do(context.TODO()).
+		Get()
+	if err == nil {
+		t.Fatal("Expected conflict error but got nothing")
+	} else if !apierrors.IsConflict(err) {
+		t.Fatalf("Expected conflict errors but got: %v", err)
+	}
+}
+
+func TestApplyStatusCRD(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
+
+	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), nil, framework.SharedEtcd())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer server.TearDownFn()
+	config := server.ClientConfig
+
+	client, err := apiextensionclientset.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	obj, err := client.ApiextensionsV1().RESTClient().Patch(types.ApplyPatchType).
+		Resource("customresourcedefinitions").
+		Name("crontabs.stable.example.com").
+		Param("fieldManager", "apply_test").
+		Body([]byte(`
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: crontabs.stable.example.com
+spec:
+  group: stable.example.com
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              properties:
+                cronSpec:
+                  type: string
+                image:
+                  type: string
+                replicas:
+                  type: integer
+  scope: Namespaced
+  names:
+    plural: crontabs
+    singular: crontab
+    kind: CronTab
+    shortNames:
+    - ct`)).
+		Do(context.TODO()).
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to create object using Apply patch: %v", err)
+	}
+	fmt.Println("Object:", obj)
+
+	obj, err = client.ApiextensionsV1().RESTClient().Patch(types.ApplyPatchType).
+		Resource("customresourcedefinitions").
+		Name("crontabs.stable.example.com").
+		Param("fieldManager", "apply_test").
+		Param("force", "true").
+		SubResource("status").
+		Body([]byte(`
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: crontabs.stable.example.com
+spec:
+  group: stable.example.com
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              properties:
+                cronSpec:
+                  type: string
+                image:
+                  type: string
+                replicas:
+                  type: integer
+  scope: Namespaced
+  names:
+    plural: crontabs
+    singular: crontab
+    kind: CronTab
+    shortNames:
+    - ct
+status:
+  conditions:
+  - status: "False"
+    type: MyTestCondition`)).
+		Do(context.TODO()).
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to apply status: %v", err)
+	}
+
+	accessor, err := meta.Accessor(obj)
+	if err != nil {
+		t.Fatalf("Failed to get meta accessor: %v", err)
+	}
+
+	if managedFields := accessor.GetManagedFields(); len(managedFields) != 2 {
+		t.Fatalf("Expected 2 managers, got: %v", managedFields)
 	}
 }
