@@ -21,6 +21,7 @@ import (
 	"net/url"
 	"reflect"
 	"strings"
+	"sync"
 
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -48,6 +49,8 @@ type Scheme struct {
 	// versionMap allows one to figure out the go type of an object with
 	// the given version and name.
 	gvkToType map[schema.GroupVersionKind]reflect.Type
+	// gvkToTypeLock protects access to gvkToType
+	gvkToTypeLock sync.Mutex
 
 	// typeToGroupVersion allows one to find metadata for a given go object.
 	// The reflect.Type we index by should *not* be a pointer.
@@ -199,11 +202,14 @@ func (s *Scheme) AddKnownTypeWithName(gvk schema.GroupVersionKind, obj Object) {
 		panic("All types must be pointers to structs.")
 	}
 
+	s.gvkToTypeLock.Lock()
 	if oldT, found := s.gvkToType[gvk]; found && oldT != t {
+		s.gvkToTypeLock.Unlock()
 		panic(fmt.Sprintf("Double registration of different types for %v: old=%v.%v, new=%v.%v in scheme %q", gvk, oldT.PkgPath(), oldT.Name(), t.PkgPath(), t.Name(), s.schemeName))
 	}
 
 	s.gvkToType[gvk] = t
+	s.gvkToTypeLock.Unlock()
 
 	for _, existingGvk := range s.typeToGVK[t] {
 		if existingGvk == gvk {
@@ -216,6 +222,7 @@ func (s *Scheme) AddKnownTypeWithName(gvk schema.GroupVersionKind, obj Object) {
 // KnownTypes returns the types known for the given version.
 func (s *Scheme) KnownTypes(gv schema.GroupVersion) map[string]reflect.Type {
 	types := make(map[string]reflect.Type)
+	s.gvkToTypeLock.Lock()
 	for gvk, t := range s.gvkToType {
 		if gv != gvk.GroupVersion() {
 			continue
@@ -223,6 +230,7 @@ func (s *Scheme) KnownTypes(gv schema.GroupVersion) map[string]reflect.Type {
 
 		types[gvk.Kind] = t
 	}
+	s.gvkToTypeLock.Unlock()
 	return types
 }
 
@@ -265,7 +273,9 @@ func (s *Scheme) ObjectKinds(obj Object) ([]schema.GroupVersionKind, bool, error
 // Recognizes returns true if the scheme is able to handle the provided group,version,kind
 // of an object.
 func (s *Scheme) Recognizes(gvk schema.GroupVersionKind) bool {
+	s.gvkToTypeLock.Lock()
 	_, exists := s.gvkToType[gvk]
+	s.gvkToTypeLock.Unlock()
 	return exists
 }
 
@@ -286,6 +296,8 @@ func (s *Scheme) IsUnversioned(obj Object) (bool, bool) {
 // New returns a new API object of the given version and name, or an error if it hasn't
 // been registered. The version and kind fields must be specified.
 func (s *Scheme) New(kind schema.GroupVersionKind) (Object, error) {
+	s.gvkToTypeLock.Lock()
+	defer s.gvkToTypeLock.Unlock()
 	if t, exists := s.gvkToType[kind]; exists {
 		return reflect.New(t).Interface().(Object), nil
 	}
