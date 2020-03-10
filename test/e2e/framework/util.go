@@ -39,8 +39,6 @@ import (
 
 	"golang.org/x/net/websocket"
 
-	"k8s.io/klog"
-
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 	gomegatypes "github.com/onsi/gomega/types"
@@ -1685,65 +1683,6 @@ func RunCmdEnv(env []string, command string, args ...string) (string, string, er
 			command, args, err, stdout, stderr)
 	}
 	return stdout, stderr, nil
-}
-
-// E2ETestNodePreparer implements testutils.TestNodePreparer interface, which is used
-// to create/modify Nodes before running a test.
-type E2ETestNodePreparer struct {
-	client clientset.Interface
-	// Specifies how many nodes should be modified using the given strategy.
-	// Only one strategy can be applied to a single Node, so there needs to
-	// be at least <sum_of_keys> Nodes in the cluster.
-	countToStrategy       []testutils.CountToStrategy
-	nodeToAppliedStrategy map[string]testutils.PrepareNodeStrategy
-}
-
-// PrepareNodes prepares nodes in the cluster.
-func (p *E2ETestNodePreparer) PrepareNodes() error {
-	nodes, err := e2enode.GetReadySchedulableNodes(p.client)
-	if err != nil {
-		return err
-	}
-	numTemplates := 0
-	for _, v := range p.countToStrategy {
-		numTemplates += v.Count
-	}
-	if numTemplates > len(nodes.Items) {
-		return fmt.Errorf("Can't prepare Nodes. Got more templates than existing Nodes")
-	}
-	index := 0
-	sum := 0
-	for _, v := range p.countToStrategy {
-		sum += v.Count
-		for ; index < sum; index++ {
-			if err := testutils.DoPrepareNode(p.client, &nodes.Items[index], v.Strategy); err != nil {
-				klog.Errorf("Aborting node preparation: %v", err)
-				return err
-			}
-			p.nodeToAppliedStrategy[nodes.Items[index].Name] = v.Strategy
-		}
-	}
-	return nil
-}
-
-// CleanupNodes cleanups nodes in the cluster.
-func (p *E2ETestNodePreparer) CleanupNodes() error {
-	var encounteredError error
-	nodes, err := e2enode.GetReadySchedulableNodes(p.client)
-	if err != nil {
-		return err
-	}
-	for i := range nodes.Items {
-		name := nodes.Items[i].Name
-		strategy, found := p.nodeToAppliedStrategy[name]
-		if found {
-			if err = testutils.DoCleanupNode(p.client, name, strategy); err != nil {
-				klog.Errorf("Skipping cleanup of Node: failed update of %v: %v", name, err)
-				encounteredError = err
-			}
-		}
-	}
-	return encounteredError
 }
 
 // getMasterAddresses returns the externalIP, internalIP and hostname fields of the master.
