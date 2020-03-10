@@ -26,6 +26,9 @@ import (
 // spec.namespace means "in all namespaces".
 type SubjectAccessReview struct {
 	metav1.TypeMeta
+
+	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
+	// +optional
 	metav1.ObjectMeta
 
 	// Spec holds information about the request being evaluated
@@ -42,6 +45,9 @@ type SubjectAccessReview struct {
 // to check whether they can perform an action
 type SelfSubjectAccessReview struct {
 	metav1.TypeMeta
+
+	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
+	// +optional
 	metav1.ObjectMeta
 
 	// Spec holds information about the request being evaluated.
@@ -58,6 +64,9 @@ type SelfSubjectAccessReview struct {
 // checking.
 type LocalSubjectAccessReview struct {
 	metav1.TypeMeta
+
+	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
+	// +optional
 	metav1.ObjectMeta
 
 	// Spec holds information about the request being evaluated.  spec.namespace must be equal to the namespace
@@ -157,6 +166,9 @@ type SubjectAccessReviewStatus struct {
 // SubjectAccessReview, and LocalAccessReview are the correct way to defer authorization decisions to the API server.
 type SelfSubjectRulesReview struct {
 	metav1.TypeMeta
+
+	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
+	// +optional
 	metav1.ObjectMeta
 
 	// Spec holds information about the request being evaluated.
