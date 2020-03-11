@@ -27,7 +27,10 @@ import (
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -719,4 +722,114 @@ spec:
 		t.Fatalf("failed to apply object with force after updating replicas: %v:\n%v", err, string(result))
 	}
 	verifyReplicas(t, result, 1)
+}
+
+// TestApplyCustomResourceStatus makes sure that one acquires fields
+// when updating the status of a custom resource.
+func TestApplyCustomResourceStatus(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
+
+	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), nil, framework.SharedEtcd())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer server.TearDownFn()
+	config := server.ClientConfig
+
+	apiExtensionClient, err := clientset.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dynamicClient, err := dynamic.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	noxuDefinition := fixtures.NewMultipleVersionNoxuCRD(apiextensionsv1beta1.ClusterScoped)
+
+	var c apiextensionsv1beta1.CustomResourceValidation
+	err = json.Unmarshal([]byte(`{
+		"openAPIV3Schema": {
+			"type": "object",
+			"properties": {
+				"spec": {
+					"type": "object",
+					"properties": {
+						"ports": {
+							"type": "integer"
+						}
+					}
+				},
+				"status": {
+					"type": "object",
+					"properties": {
+						"conditions": {
+							"type": "array",
+							"x-kubernetes-list-type": "set",
+							"items": {
+								"type": "integer"
+							}
+						}
+					}
+				}
+			}
+		}
+	}`), &c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	noxuDefinition.Spec.Validation = &c
+	falseBool := false
+	noxuDefinition.Spec.PreserveUnknownFields = &falseBool
+	noxuDefinition.Spec.Subresources = &apiextensionsv1beta1.CustomResourceSubresources{
+		Status: &apiextensionsv1beta1.CustomResourceSubresourceStatus{},
+	}
+
+	noxuDefinition, err = fixtures.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	kind := noxuDefinition.Spec.Names.Kind
+	apiVersion := noxuDefinition.Spec.Group + "/" + noxuDefinition.Spec.Version
+	name := "mytest"
+
+	client := dynamicClient.Resource(schema.GroupVersionResource{
+		Group:    noxuDefinition.Spec.Group,
+		Version:  noxuDefinition.Spec.Version,
+		Resource: noxuDefinition.Spec.Names.Plural,
+	})
+
+	yamlBody := []byte(fmt.Sprintf(`
+apiVersion: %s
+kind: %s
+metadata:
+  name: %s
+spec:
+  ports: 0
+`, apiVersion, kind, name))
+	obj, err := client.Patch(context.TODO(), name, types.ApplyPatchType, yamlBody, metav1.PatchOptions{FieldManager: "apply_test"})
+	if err != nil {
+		t.Fatalf("failed to create custom resource with apply: %v:\n%v", err, obj)
+	}
+	yamlBody = []byte(fmt.Sprintf(`
+apiVersion: %s
+kind: %s
+metadata:
+  name: %s
+status:
+  conditions:
+  - 0
+`, apiVersion, kind, name))
+	obj, err = client.Patch(context.TODO(), name, types.ApplyPatchType, yamlBody, metav1.PatchOptions{FieldManager: "apply_status_test"})
+	if err != nil {
+		t.Fatalf("failed to apply status: %v:\n%v", err, obj)
+	}
+	accessor, err := meta.Accessor(obj)
+	if err != nil {
+		t.Fatalf("Failed to get meta accessor: %v:\n%v", err, obj)
+	}
+
+	if managedFields := accessor.GetManagedFields(); len(managedFields) != 2 {
+		t.Fatalf("Expected 2 managers, got: %v", managedFields)
+	}
 }
