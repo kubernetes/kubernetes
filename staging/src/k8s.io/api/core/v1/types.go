@@ -2852,6 +2852,7 @@ type PodSpec struct {
 	// Init containers cannot currently be added or removed.
 	// Cannot be updated.
 	// More info: https://kubernetes.io/docs/concepts/workloads/pods/init-containers/
+	// +optional
 	// +patchMergeKey=name
 	// +patchStrategy=merge
 	InitContainers []Container `json:"initContainers,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,20,rep,name=initContainers"`
