@@ -20,9 +20,11 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/master/ports"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -164,10 +166,27 @@ func (g *Grabber) GrabFromControllerManager() (ControllerManagerMetrics, error) 
 		return ControllerManagerMetrics{}, fmt.Errorf("Master's Kubelet is not registered. Skipping ControllerManager's metrics gathering")
 	}
 
+	var err error
 	podName := fmt.Sprintf("%v-%v", "kube-controller-manager", g.masterName)
 	g.waitForControllerManagerReadyOnce.Do(func() {
-		e2epod.WaitForPodNameRunningInNamespace(g.client, podName, metav1.NamespaceSystem)
+		if runningErr := e2epod.WaitForPodNameRunningInNamespace(g.client, podName, metav1.NamespaceSystem); runningErr != nil {
+			err = fmt.Errorf("error waiting for controller manager pod to be running: %w", err)
+			return
+		}
+
+		var lastMetricsFetchErr error
+		if metricsWaitErr := wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
+			_, lastMetricsFetchErr = g.getMetricsFromPod(g.client, podName, metav1.NamespaceSystem, ports.InsecureKubeControllerManagerPort)
+			return lastMetricsFetchErr == nil, nil
+		}); metricsWaitErr != nil {
+			err = fmt.Errorf("error waiting for controller manager pod to expose metrics: %v; %v", err, lastMetricsFetchErr)
+			return
+		}
 	})
+	if err != nil {
+		return ControllerManagerMetrics{}, err
+	}
+
 	output, err := g.getMetricsFromPod(g.client, podName, metav1.NamespaceSystem, ports.InsecureKubeControllerManagerPort)
 	if err != nil {
 		return ControllerManagerMetrics{}, err
