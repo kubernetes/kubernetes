@@ -119,7 +119,7 @@ var _ = ginkgo.Describe("[sig-storage] Projected configMap", func() {
 	   Description: A Pod is created with projected volume source 'ConfigMap' to store a configMap and performs a create and update to new value. Pod MUST be able to create the configMap with value-1. Pod MUST be able to update the value in the confgiMap to value-2.
 	*/
 	framework.ConformanceIt("updates should be reflected in volume [NodeConformance]", func() {
-		podLogTimeout := framework.GetPodSecretUpdateTimeout(f.ClientSet)
+		podLogTimeout := e2epod.GetPodSecretUpdateTimeout(f.ClientSet)
 		containerTimeoutArg := fmt.Sprintf("--retry_time=%v", int(podLogTimeout.Seconds()))
 
 		name := "projected-configmap-test-upd-" + string(uuid.NewUUID())
@@ -207,7 +207,7 @@ var _ = ginkgo.Describe("[sig-storage] Projected configMap", func() {
 	   Description: Create a Pod with three containers with ConfigMaps namely a create, update and delete container. Create Container when started MUST not have configMap, update and delete containers MUST be created with a ConfigMap value as 'value-1'. Create a configMap in the create container, the Pod MUST be able to read the configMap from the create container. Update the configMap in the update container, Pod MUST be able to read the updated configMap value. Delete the configMap in the delete container. Pod MUST fail to read the configMap from the delete container.
 	*/
 	framework.ConformanceIt("optional updates should be reflected in volume [NodeConformance]", func() {
-		podLogTimeout := framework.GetPodSecretUpdateTimeout(f.ClientSet)
+		podLogTimeout := e2epod.GetPodSecretUpdateTimeout(f.ClientSet)
 		containerTimeoutArg := fmt.Sprintf("--retry_time=%v", int(podLogTimeout.Seconds()))
 		trueVal := true
 		volumeMountPath := "/etc/projected-configmap-volumes"

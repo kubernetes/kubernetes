@@ -119,7 +119,7 @@ var _ = ginkgo.Describe("[sig-storage] ConfigMap", func() {
 		Description: The ConfigMap that is created MUST be accessible to read from the newly created Pod using the volume mount that is mapped to custom path in the Pod. When the ConfigMap is updated the change to the config map MUST be verified by reading the content from the mounted file in the Pod.
 	*/
 	framework.ConformanceIt("updates should be reflected in volume [NodeConformance]", func() {
-		podLogTimeout := framework.GetPodSecretUpdateTimeout(f.ClientSet)
+		podLogTimeout := e2epod.GetPodSecretUpdateTimeout(f.ClientSet)
 		containerTimeoutArg := fmt.Sprintf("--retry_time=%v", int(podLogTimeout.Seconds()))
 
 		name := "configmap-test-upd-" + string(uuid.NewUUID())
@@ -202,7 +202,7 @@ var _ = ginkgo.Describe("[sig-storage] ConfigMap", func() {
 		Description: The ConfigMap that is created with text data and binary data MUST be accessible to read from the newly created Pod using the volume mount that is mapped to custom path in the Pod. ConfigMap's text data and binary data MUST be verified by reading the content from the mounted files in the Pod.
 	*/
 	framework.ConformanceIt("binary data should be reflected in volume [NodeConformance]", func() {
-		podLogTimeout := framework.GetPodSecretUpdateTimeout(f.ClientSet)
+		podLogTimeout := e2epod.GetPodSecretUpdateTimeout(f.ClientSet)
 		containerTimeoutArg := fmt.Sprintf("--retry_time=%v", int(podLogTimeout.Seconds()))
 
 		name := "configmap-test-upd-" + string(uuid.NewUUID())
@@ -298,7 +298,7 @@ var _ = ginkgo.Describe("[sig-storage] ConfigMap", func() {
 		Description: The ConfigMap that is created MUST be accessible to read from the newly created Pod using the volume mount that is mapped to custom path in the Pod. When the config map is updated the change to the config map MUST be verified by reading the content from the mounted file in the Pod. Also when the item(file) is deleted from the map that MUST result in a error reading that item(file).
 	*/
 	framework.ConformanceIt("optional updates should be reflected in volume [NodeConformance]", func() {
-		podLogTimeout := framework.GetPodSecretUpdateTimeout(f.ClientSet)
+		podLogTimeout := e2epod.GetPodSecretUpdateTimeout(f.ClientSet)
 		containerTimeoutArg := fmt.Sprintf("--retry_time=%v", int(podLogTimeout.Seconds()))
 		trueVal := true
 		volumeMountPath := "/etc/configmap-volumes"
@@ -795,7 +795,7 @@ func doConfigMapE2EWithMappings(f *framework.Framework, asUser bool, fsGroup int
 }
 
 func createNonOptionalConfigMapPod(f *framework.Framework, volumeMountPath, podName string) error {
-	podLogTimeout := framework.GetPodSecretUpdateTimeout(f.ClientSet)
+	podLogTimeout := e2epod.GetPodSecretUpdateTimeout(f.ClientSet)
 	containerTimeoutArg := fmt.Sprintf("--retry_time=%v", int(podLogTimeout.Seconds()))
 	falseValue := false
 
@@ -845,7 +845,7 @@ func createNonOptionalConfigMapPod(f *framework.Framework, volumeMountPath, podN
 }
 
 func createNonOptionalConfigMapPodWithConfig(f *framework.Framework, volumeMountPath, podName string) error {
-	podLogTimeout := framework.GetPodSecretUpdateTimeout(f.ClientSet)
+	podLogTimeout := e2epod.GetPodSecretUpdateTimeout(f.ClientSet)
 	containerTimeoutArg := fmt.Sprintf("--retry_time=%v", int(podLogTimeout.Seconds()))
 	falseValue := false
 
