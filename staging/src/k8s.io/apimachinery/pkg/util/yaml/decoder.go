@@ -92,6 +92,10 @@ type YAMLDecoder struct {
 // the caller in framing the chunk.
 func NewDocumentDecoder(r io.ReadCloser) io.ReadCloser {
 	scanner := bufio.NewScanner(r)
+	// Adding maxCapacity to set the Buffer size to 5M to fix #89016
+	maxCapacity := 5120 * 1024
+	buf := make([]byte, maxCapacity)
+	scanner.Buffer(buf, maxCapacity)
 	scanner.Split(splitYAMLDocument)
 	return &YAMLDecoder{
 		r:       r,
