@@ -77,6 +77,8 @@ kube::etcd::start() {
 
   # Start etcd
   ETCD_DIR=${ETCD_DIR:-$(mktemp -d 2>/dev/null || mktemp -d -t test-etcd.XXXXXX)}
+  kube::log::info "Notice: it is better to use a ramdisk for ${ETCD_DIR} to get better performance, so that the test results will be more stable."
+
   if [[ -d "${ARTIFACTS:-}" ]]; then
     ETCD_LOGFILE="${ARTIFACTS}/etcd.$(uname -n).$(id -un).log.DEBUG.$(date +%Y%m%d-%H%M%S).$$"
   else
