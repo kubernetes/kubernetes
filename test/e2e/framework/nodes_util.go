@@ -50,7 +50,7 @@ func EtcdUpgrade(targetStorage, targetVersion string) error {
 func MasterUpgrade(f *Framework, v string) error {
 	switch TestContext.Provider {
 	case "gce":
-		return masterUpgradeGCE(v, false)
+		return masterUpgradeGCE(v)
 	case "gke":
 		return masterUpgradeGKE(f.Namespace.Name, v)
 	case "kubernetes-anywhere":
@@ -68,32 +68,6 @@ func etcdUpgradeGCE(targetStorage, targetVersion string) error {
 		"TEST_ETCD_IMAGE="+etcdImage)
 
 	_, _, err := RunCmdEnv(env, gceUpgradeScript(), "-l", "-M")
-	return err
-}
-
-// MasterUpgradeGCEWithKubeProxyDaemonSet upgrades master node on GCE with enabling/disabling the daemon set of kube-proxy.
-// TODO(mrhohn): Remove this function when kube-proxy is run as a DaemonSet by default.
-func MasterUpgradeGCEWithKubeProxyDaemonSet(v string, enableKubeProxyDaemonSet bool) error {
-	return masterUpgradeGCE(v, enableKubeProxyDaemonSet)
-}
-
-// TODO(mrhohn): Remove 'enableKubeProxyDaemonSet' when kube-proxy is run as a DaemonSet by default.
-func masterUpgradeGCE(rawV string, enableKubeProxyDaemonSet bool) error {
-	env := append(os.Environ(), fmt.Sprintf("KUBE_PROXY_DAEMONSET=%v", enableKubeProxyDaemonSet))
-	// TODO: Remove these variables when they're no longer needed for downgrades.
-	if TestContext.EtcdUpgradeVersion != "" && TestContext.EtcdUpgradeStorage != "" {
-		env = append(env,
-			"TEST_ETCD_VERSION="+TestContext.EtcdUpgradeVersion,
-			"STORAGE_BACKEND="+TestContext.EtcdUpgradeStorage,
-			"TEST_ETCD_IMAGE="+etcdImage)
-	} else {
-		// In e2e tests, we skip the confirmation prompt about
-		// implicit etcd upgrades to simulate the user entering "y".
-		env = append(env, "TEST_ALLOW_IMPLICIT_ETCD_UPGRADE=true")
-	}
-
-	v := "v" + rawV
-	_, _, err := RunCmdEnv(env, gceUpgradeScript(), "-M", v)
 	return err
 }
 
@@ -179,7 +153,7 @@ func NodeUpgrade(f *Framework, v string, img string) error {
 	var err error
 	switch TestContext.Provider {
 	case "gce":
-		err = nodeUpgradeGCE(v, img, false)
+		err = nodeUpgradeGCE(v, img)
 	case "gke":
 		err = nodeUpgradeGKE(f.Namespace.Name, v, img)
 	default:
@@ -191,11 +165,34 @@ func NodeUpgrade(f *Framework, v string, img string) error {
 	return waitForNodesReadyAfterUpgrade(f)
 }
 
+// MasterUpgradeGCEWithKubeProxyDaemonSet upgrades master node on GCE with enabling/disabling the daemon set of kube-proxy.
+func MasterUpgradeGCE(v string) error {
+	return masterUpgradeGCE(v)
+}
+
+func masterUpgradeGCE(rawV string) error {
+	env := os.Environ()
+	// TODO: Remove these variables when they're no longer needed for downgrades.
+	if TestContext.EtcdUpgradeVersion != "" && TestContext.EtcdUpgradeStorage != "" {
+		env = append(env,
+			"TEST_ETCD_VERSION="+TestContext.EtcdUpgradeVersion,
+			"STORAGE_BACKEND="+TestContext.EtcdUpgradeStorage,
+			"TEST_ETCD_IMAGE="+etcdImage)
+	} else {
+		// In e2e tests, we skip the confirmation prompt about
+		// implicit etcd upgrades to simulate the user entering "y".
+		env = append(env, "TEST_ALLOW_IMPLICIT_ETCD_UPGRADE=true")
+	}
+
+	v := "v" + rawV
+	_, _, err := RunCmdEnv(env, gceUpgradeScript(), "-M", v)
+	return err
+}
+
 // NodeUpgradeGCEWithKubeProxyDaemonSet upgrades nodes on GCE with enabling/disabling the daemon set of kube-proxy.
-// TODO(mrhohn): Remove this function when kube-proxy is run as a DaemonSet by default.
-func NodeUpgradeGCEWithKubeProxyDaemonSet(f *Framework, v string, img string, enableKubeProxyDaemonSet bool) error {
+func NodeUpgradeGCE(f *Framework, v string, img string) error {
 	// Perform the upgrade.
-	if err := nodeUpgradeGCE(v, img, enableKubeProxyDaemonSet); err != nil {
+	if err := nodeUpgradeGCE(v, img); err != nil {
 		return err
 	}
 	return waitForNodesReadyAfterUpgrade(f)
@@ -217,10 +214,9 @@ func waitForNodesReadyAfterUpgrade(f *Framework) error {
 	return nil
 }
 
-// TODO(mrhohn): Remove 'enableKubeProxyDaemonSet' when kube-proxy is run as a DaemonSet by default.
-func nodeUpgradeGCE(rawV, img string, enableKubeProxyDaemonSet bool) error {
+func nodeUpgradeGCE(rawV, img string) error {
 	v := "v" + rawV
-	env := append(os.Environ(), fmt.Sprintf("KUBE_PROXY_DAEMONSET=%v", enableKubeProxyDaemonSet))
+	env := os.Environ()
 	if img != "" {
 		env = append(env, "KUBE_NODE_OS_DISTRIBUTION="+img)
 		_, _, err := RunCmdEnv(env, gceUpgradeScript(), "-N", "-o", v)
