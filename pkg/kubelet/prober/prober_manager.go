@@ -248,20 +248,27 @@ func (m *manager) UpdatePodStatus(podUID types.UID, podStatus *v1.PodStatus) {
 		}
 		podStatus.ContainerStatuses[i].Ready = ready
 
+		var setStarted bool
 		var started bool
-		if c.State.Running == nil {
-			started = false
-		} else if !utilfeature.DefaultFeatureGate.Enabled(features.StartupProbe) {
+		if !utilfeature.DefaultFeatureGate.Enabled(features.StartupProbe) {
 			// the container is running, assume it is started if the StartupProbe feature is disabled
+			setStarted = false
 			started = true
+		} else if c.State.Running == nil {
+			setStarted = true
+			started = false
 		} else if result, ok := m.startupManager.Get(kubecontainer.ParseContainerID(c.ContainerID)); ok {
+			setStarted = true
 			started = result == results.Success
 		} else {
 			// The check whether there is a probe which hasn't run yet.
 			_, exists := m.getWorker(podUID, c.Name, startup)
+			setStarted = true
 			started = !exists
 		}
-		podStatus.ContainerStatuses[i].Started = &started
+		if setStarted {
+			podStatus.ContainerStatuses[i].Started = &started
+		}
 	}
 	// init containers are ready if they have exited with success or if a readiness probe has
 	// succeeded.
