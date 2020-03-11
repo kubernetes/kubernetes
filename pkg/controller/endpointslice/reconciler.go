@@ -85,29 +85,31 @@ func (r *reconciler) reconcile(service *corev1.Service, pods []*corev1.Pod, exis
 	numDesiredEndpoints := 0
 
 	for _, pod := range pods {
-		if endpointutil.ShouldPodBeInEndpoints(pod) {
-			endpointPorts := getEndpointPorts(service, pod)
-			epHash := endpointutil.NewPortMapKey(endpointPorts)
-			if _, ok := desiredEndpointsByPortMap[epHash]; !ok {
-				desiredEndpointsByPortMap[epHash] = endpointSet{}
-			}
+		if !endpointutil.ShouldPodBeInEndpoints(pod, service.Spec.PublishNotReadyAddresses) {
+			continue
+		}
 
-			if _, ok := desiredMetaByPortMap[epHash]; !ok {
-				desiredMetaByPortMap[epHash] = &endpointMeta{
-					AddressType: addressType,
-					Ports:       endpointPorts,
-				}
-			}
+		endpointPorts := getEndpointPorts(service, pod)
+		epHash := endpointutil.NewPortMapKey(endpointPorts)
+		if _, ok := desiredEndpointsByPortMap[epHash]; !ok {
+			desiredEndpointsByPortMap[epHash] = endpointSet{}
+		}
 
-			node, err := r.nodeLister.Get(pod.Spec.NodeName)
-			if err != nil {
-				return err
+		if _, ok := desiredMetaByPortMap[epHash]; !ok {
+			desiredMetaByPortMap[epHash] = &endpointMeta{
+				AddressType: addressType,
+				Ports:       endpointPorts,
 			}
-			endpoint := podToEndpoint(pod, node, service)
-			if len(endpoint.Addresses) > 0 {
-				desiredEndpointsByPortMap[epHash].Insert(&endpoint)
-				numDesiredEndpoints++
-			}
+		}
+
+		node, err := r.nodeLister.Get(pod.Spec.NodeName)
+		if err != nil {
+			return err
+		}
+		endpoint := podToEndpoint(pod, node, service)
+		if len(endpoint.Addresses) > 0 {
+			desiredEndpointsByPortMap[epHash].Insert(&endpoint)
+			numDesiredEndpoints++
 		}
 	}
 
