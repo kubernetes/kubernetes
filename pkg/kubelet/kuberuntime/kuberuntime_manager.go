@@ -635,6 +635,22 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 	return changes
 }
 
+// We will continue killing containers in the case of error return from killContainer
+func (m *kubeGenericRuntimeManager) killAllContainersIgnoringFailures(pod *v1.Pod, podContainerChanges podActions, result *kubecontainer.PodSyncResult) bool {
+	seenError := false
+	for containerID, containerInfo := range podContainerChanges.ContainersToKill {
+		klog.V(3).Infof("Killing unwanted container %q(id=%q) for pod %q", containerInfo.name, containerID, format.Pod(pod))
+		killContainerResult := kubecontainer.NewSyncResult(kubecontainer.KillContainer, containerInfo.name)
+		result.AddSyncResult(killContainerResult)
+		if err := m.killContainer(pod, containerID, containerInfo.name, containerInfo.message, nil); err != nil {
+			killContainerResult.Fail(kubecontainer.ErrKillContainer, err.Error())
+			klog.Errorf("killContainer %q(id=%q) for pod %q failed: %v", containerInfo.name, containerID, format.Pod(pod), err)
+			seenError = true
+		}
+	}
+	return seenError
+}
+
 // SyncPod syncs the running pod into the desired pod by executing following steps:
 //
 //  1. Compute sandbox and container changes.
@@ -680,15 +696,8 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontaine
 		}
 	} else {
 		// Step 3: kill any running containers in this pod which are not to keep.
-		for containerID, containerInfo := range podContainerChanges.ContainersToKill {
-			klog.V(3).Infof("Killing unwanted container %q(id=%q) for pod %q", containerInfo.name, containerID, format.Pod(pod))
-			killContainerResult := kubecontainer.NewSyncResult(kubecontainer.KillContainer, containerInfo.name)
-			result.AddSyncResult(killContainerResult)
-			if err := m.killContainer(pod, containerID, containerInfo.name, containerInfo.message, nil); err != nil {
-				killContainerResult.Fail(kubecontainer.ErrKillContainer, err.Error())
-				klog.Errorf("killContainer %q(id=%q) for pod %q failed: %v", containerInfo.name, containerID, format.Pod(pod), err)
-				return
-			}
+		if errEncountered := m.killAllContainersIgnoringFailures(pod, podContainerChanges, &result); errEncountered {
+			return
 		}
 	}
 
