@@ -1,0 +1,9 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+approvers:
+- sig-autoscaling-maintainers
+reviewers:
+- sig-autoscaling
+labels:
+- sig/scheduling
+- sig/autoscaling
