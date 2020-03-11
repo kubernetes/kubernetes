@@ -77,6 +77,10 @@ kube::etcd::start() {
 
   # Start etcd
   ETCD_DIR=${ETCD_DIR:-$(mktemp -d 2>/dev/null || mktemp -d -t test-etcd.XXXXXX)}
+  # Using ramdisk to get a better performance
+  kube::log::info "mount tmpfs ${ETCD_DIR} -t tmpfs"
+  mount tmpfs ${ETCD_DIR} -t tmpfs
+
   if [[ -d "${ARTIFACTS:-}" ]]; then
     ETCD_LOGFILE="${ARTIFACTS}/etcd.$(uname -n).$(id -un).log.DEBUG.$(date +%Y%m%d-%H%M%S).$$"
   else
@@ -100,6 +104,7 @@ kube::etcd::stop() {
 
 kube::etcd::clean_etcd_dir() {
   if [[ -n "${ETCD_DIR-}" ]]; then
+    umount ${ETCD_DIR}
     rm -rf "${ETCD_DIR}"
   fi
 }
