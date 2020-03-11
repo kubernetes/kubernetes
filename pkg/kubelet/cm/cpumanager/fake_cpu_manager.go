@@ -17,7 +17,7 @@ limitations under the License.
 package cpumanager
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
@@ -30,8 +30,8 @@ type fakeManager struct {
 	state state.State
 }
 
-func (m *fakeManager) Start(activePods ActivePodsFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService, initialContainers containermap.ContainerMap) error {
-	klog.Info("[fake cpumanager] Start()")
+func (m *fakeManager) Init(activePods ActivePodsFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService, initialContainers containermap.ContainerMap) error {
+	klog.Info("[fake cpumanager] Init()")
 	return nil
 }
 
@@ -48,6 +48,11 @@ func (m *fakeManager) Allocate(pod *v1.Pod, container *v1.Container) error {
 func (m *fakeManager) AddContainer(pod *v1.Pod, container *v1.Container, containerID string) error {
 	klog.Infof("[fake cpumanager] AddContainer (pod: %s, container: %s, container id: %s)", pod.Name, container.Name, containerID)
 	return nil
+}
+
+func (m *fakeManager) ReconcileState() ([]reconciledContainer, []reconciledContainer) {
+	klog.Info("[fake cpumanager] ReconcileState()")
+	return nil, nil
 }
 
 func (m *fakeManager) RemoveContainer(containerID string) error {

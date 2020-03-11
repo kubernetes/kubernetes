@@ -17,7 +17,7 @@ limitations under the License.
 package cpumanager
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 )
@@ -25,7 +25,7 @@ import (
 // Policy implements logic for pod container to CPU assignment.
 type Policy interface {
 	Name() string
-	Start(s state.State) error
+	Init(s state.State) error
 	// Allocate call is idempotent
 	Allocate(s state.State, pod *v1.Pod, container *v1.Container) error
 	// RemoveContainer call is idempotent

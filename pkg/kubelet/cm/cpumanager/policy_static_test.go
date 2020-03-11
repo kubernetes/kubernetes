@@ -126,7 +126,7 @@ func TestStaticPolicyStart(t *testing.T) {
 				assignments:   testCase.stAssignments,
 				defaultCPUSet: testCase.stDefaultCPUSet,
 			}
-			err := policy.Start(st)
+			err := policy.Init(st)
 			if !reflect.DeepEqual(err, testCase.expErr) {
 				t.Errorf("StaticPolicy Start() error (%v). expected error: %v but got: %v",
 					testCase.description, testCase.expErr, err)
@@ -633,7 +633,7 @@ func TestTopologyAwareAllocateCPUs(t *testing.T) {
 			assignments:   tc.stAssignments,
 			defaultCPUSet: tc.stDefaultCPUSet,
 		}
-		err := policy.Start(st)
+		err := policy.Init(st)
 		if err != nil {
 			t.Errorf("StaticPolicy Start() error (%v)", err)
 			continue
@@ -714,7 +714,7 @@ func TestStaticPolicyStartWithResvList(t *testing.T) {
 				assignments:   testCase.stAssignments,
 				defaultCPUSet: testCase.stDefaultCPUSet,
 			}
-			err = policy.Start(st)
+			err = policy.Init(st)
 			if !reflect.DeepEqual(err, testCase.expErr) {
 				t.Errorf("StaticPolicy Start() error (%v). expected error: %v but got: %v",
 					testCase.description, testCase.expErr, err)

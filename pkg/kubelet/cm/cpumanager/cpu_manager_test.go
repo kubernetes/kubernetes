@@ -100,7 +100,7 @@ func (p *mockPolicy) Name() string {
 	return "mock"
 }
 
-func (p *mockPolicy) Start(s state.State) error {
+func (p *mockPolicy) Init(s state.State) error {
 	return p.err
 }
 

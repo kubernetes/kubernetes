@@ -579,10 +579,12 @@ func (cm *containerManagerImpl) Start(node *v1.Node,
 		if err != nil {
 			return fmt.Errorf("failed to build map of initial containers from runtime: %v", err)
 		}
-		err = cm.cpuManager.Start(cpumanager.ActivePodsFunc(activePods), sourcesReady, podStatusProvider, runtimeService, containerMap)
+		err = cm.cpuManager.Init(cpumanager.ActivePodsFunc(activePods), sourcesReady, podStatusProvider, runtimeService, containerMap)
 		if err != nil {
 			return fmt.Errorf("start cpu manager error: %v", err)
 		}
+		go wait.Until(func() { cm.reconcileState() }, 5*time.Second, wait.NeverStop)
+
 	}
 
 	// cache the node Info including resource capacity and
@@ -647,6 +649,11 @@ func (cm *containerManagerImpl) Start(node *v1.Node,
 	}
 
 	return nil
+}
+
+func (cm *containerManagerImpl) reconcileState() {
+	cm.cpuManager.ReconcileState()
+	// here you can add additional calls to ReconcileState of others managers
 }
 
 func (cm *containerManagerImpl) GetPluginRegistrationHandler() cache.PluginHandler {

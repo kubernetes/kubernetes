@@ -24,7 +24,6 @@ import (
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog"
 
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
@@ -52,8 +51,8 @@ const cpuManagerStateFileName = "cpu_manager_state"
 
 // Manager interface provides methods for Kubelet to manage pod cpus.
 type Manager interface {
-	// Start is called during Kubelet initialization.
-	Start(activePods ActivePodsFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService, initialContainers containermap.ContainerMap) error
+	// Init
+	Init(activePods ActivePodsFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService, initialContainers containermap.ContainerMap) error
 
 	// Called to trigger the allocation of CPUs to a container. This must be
 	// called at some point prior to the AddContainer() call for a container,
@@ -64,6 +63,9 @@ type Manager interface {
 	// so that initial CPU affinity settings can be written through to the
 	// container runtime before the first process begins to execute.
 	AddContainer(p *v1.Pod, c *v1.Container, containerID string) error
+
+	// ReconcileState
+	ReconcileState() ([]reconciledContainer, []reconciledContainer)
 
 	// RemoveContainer is called after Kubelet decides to kill or delete a
 	// container. After this call, the CPU manager stops trying to reconcile
@@ -180,9 +182,8 @@ func NewManager(cpuPolicyName string, reconcilePeriod time.Duration, machineInfo
 	return manager, nil
 }
 
-func (m *manager) Start(activePods ActivePodsFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService, initialContainers containermap.ContainerMap) error {
-	klog.Infof("[cpumanager] starting with %s policy", m.policy.Name())
-	klog.Infof("[cpumanager] reconciling every %v", m.reconcilePeriod)
+func (m *manager) Init(activePods ActivePodsFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService, initialContainers containermap.ContainerMap) error {
+	klog.Infof("[cpumanager] initialize with %s policy", m.policy.Name())
 	m.sourcesReady = sourcesReady
 	m.activePods = activePods
 	m.podStatusProvider = podStatusProvider
@@ -196,18 +197,11 @@ func (m *manager) Start(activePods ActivePodsFunc, sourcesReady config.SourcesRe
 	}
 	m.state = stateImpl
 
-	err = m.policy.Start(m.state)
+	err = m.policy.Init(m.state)
 	if err != nil {
 		klog.Errorf("[cpumanager] policy start error: %v", err)
 		return err
 	}
-
-	if m.policy.Name() == string(PolicyNone) {
-		return nil
-	}
-	// Periodically call m.reconcileState() to continue to keep the CPU sets of
-	// all pods in sync with and guaranteed CPUs handed out among them.
-	go wait.Until(func() { m.reconcileState() }, m.reconcilePeriod, wait.NeverStop)
 	return nil
 }
 
@@ -295,6 +289,14 @@ func (m *manager) GetTopologyHints(pod *v1.Pod, container *v1.Container) map[str
 	m.removeStaleState()
 	// Delegate to active policy
 	return m.policy.GetTopologyHints(m.state, pod, container)
+}
+
+func (m *manager) ReconcileState() (success []reconciledContainer, failure []reconciledContainer) {
+	if m.policy.Name() == string(PolicyNone) {
+		return
+	}
+
+	return m.reconcileState()
 }
 
 type reconciledContainer struct {

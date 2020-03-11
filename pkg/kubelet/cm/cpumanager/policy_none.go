@@ -17,7 +17,7 @@ limitations under the License.
 package cpumanager
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
@@ -39,8 +39,8 @@ func (p *nonePolicy) Name() string {
 	return string(PolicyNone)
 }
 
-func (p *nonePolicy) Start(s state.State) error {
-	klog.Info("[cpumanager] none policy: Start")
+func (p *nonePolicy) Init(s state.State) error {
+	klog.Info("[cpumanager] none policy: Init")
 	return nil
 }
 

@@ -117,7 +117,7 @@ func (p *staticPolicy) Name() string {
 	return string(PolicyStatic)
 }
 
-func (p *staticPolicy) Start(s state.State) error {
+func (p *staticPolicy) Init(s state.State) error {
 	if err := p.validateState(s); err != nil {
 		klog.Errorf("[cpumanager] static policy invalid state: %v, please drain node and remove policy state file", err)
 		return err
