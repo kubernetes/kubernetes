@@ -33,31 +33,44 @@ func ParallelizeUntil(ctx context.Context, workers, pieces int, doWorkPiece DoWo
 		stop = ctx.Done()
 	}
 
-	toProcess := make(chan int, pieces)
-	for i := 0; i < pieces; i++ {
-		toProcess <- i
-	}
-	close(toProcess)
-
-	if pieces < workers {
-		workers = pieces
-	}
-
 	wg := sync.WaitGroup{}
-	wg.Add(workers)
-	for i := 0; i < workers; i++ {
-		go func() {
-			defer utilruntime.HandleCrash()
-			defer wg.Done()
-			for piece := range toProcess {
+	if pieces <= workers {
+		wg.Add(pieces)
+		for i := 0; i < pieces; i++ {
+			go func(piece int) {
+				defer utilruntime.HandleCrash()
+				defer wg.Done()
 				select {
 				case <-stop:
 					return
 				default:
 					doWorkPiece(piece)
 				}
-			}
-		}()
+			}(i)
+		}
+		wg.Wait()
+	} else {
+		toProcess := make(chan int, pieces)
+		for i := 0; i < pieces; i++ {
+			toProcess <- i
+		}
+		close(toProcess)
+
+		wg.Add(workers)
+		for i := 0; i < workers; i++ {
+			go func() {
+				defer utilruntime.HandleCrash()
+				defer wg.Done()
+				for piece := range toProcess {
+					select {
+					case <-stop:
+						return
+					default:
+						doWorkPiece(piece)
+					}
+				}
+			}()
+		}
+		wg.Wait()
 	}
-	wg.Wait()
 }
