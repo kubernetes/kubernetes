@@ -272,10 +272,6 @@ type AuthenticationInfo struct {
 	APIAudiences authenticator.Audiences
 	// Authenticator determines which subject is making the request
 	Authenticator authenticator.Request
-	// SupportsBasicAuth indicates that's at least one Authenticator supports basic auth
-	// If this is true, a basic auth challenge is returned on authentication failure
-	// TODO(roberthbailey): Remove once the server no longer supports http basic auth.
-	SupportsBasicAuth bool
 }
 
 type AuthorizationInfo struct {
@@ -670,7 +666,7 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 	}
 	handler = genericapifilters.WithImpersonation(handler, c.Authorization.Authorizer, c.Serializer)
 	handler = genericapifilters.WithAudit(handler, c.AuditBackend, c.AuditPolicyChecker, c.LongRunningFunc)
-	failedHandler := genericapifilters.Unauthorized(c.Serializer, c.Authentication.SupportsBasicAuth)
+	failedHandler := genericapifilters.Unauthorized(c.Serializer)
 	failedHandler = genericapifilters.WithFailedAuthenticationAudit(failedHandler, c.AuditBackend, c.AuditPolicyChecker)
 	handler = genericapifilters.WithAuthentication(handler, c.Authentication.Authenticator, failedHandler, c.Authentication.APIAudiences)
 	handler = genericfilters.WithCORS(handler, c.CorsAllowedOriginList, nil, nil, nil, "true")
