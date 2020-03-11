@@ -18,6 +18,7 @@ package pleg
 
 import (
 	"fmt"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -53,6 +54,8 @@ type GenericPLEG struct {
 	runtime kubecontainer.Runtime
 	// The channel from which the subscriber listens events.
 	eventChannel chan *PodLifecycleEvent
+	// prLock avoids race of podRecords which happens in two relist period.
+	prLock sync.Mutex
 	// The internal cache for pod/container information.
 	podRecords podRecords
 	// Time of the last relisting.
@@ -211,6 +214,9 @@ func (g *GenericPLEG) relist() {
 	pods := kubecontainer.Pods(podList)
 	// update running pod and container count
 	updateRunningPodAndContainerMetrics(pods)
+
+	g.prLock.Lock()
+	defer g.prLock.Unlock()
 	g.podRecords.setCurrent(pods)
 
 	// Compare the old and the current pods, and generate events.
