@@ -466,7 +466,9 @@ func strategicPatchObject(
 ) error {
 	originalObjMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(originalObject)
 	if err != nil {
-		return err
+		return errors.NewInvalid(schema.GroupKind{}, "", field.ErrorList{
+			field.Invalid(field.NewPath("patch"), "", err.Error()),
+		})
 	}
 
 	patchMap := make(map[string]interface{})

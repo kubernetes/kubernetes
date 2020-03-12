@@ -220,7 +220,7 @@ func fromUnstructured(sv, dv reflect.Value) error {
 	case reflect.Interface:
 		return interfaceFromUnstructured(sv, dv)
 	default:
-		return fmt.Errorf("unrecognized type: %v", dt.Kind())
+		return fmt.Errorf("can't convert type %v -> %v", st.Kind(), dt.Kind())
 	}
 }
 
@@ -520,7 +520,7 @@ func toUnstructured(sv, dv reflect.Value) error {
 	case reflect.Interface:
 		return interfaceToUnstructured(sv, dv)
 	default:
-		return fmt.Errorf("unrecognized type: %v", st.Kind())
+		return fmt.Errorf("can't convert value %#v of type %v -> %v", sv, st.Kind(), dv.Type().Kind())
 	}
 }
 
