@@ -238,10 +238,11 @@ func (o *AutoscaleOptions) Run() error {
 			return fmt.Errorf("cannot autoscale a %v: %v", mapping.GroupVersionKind.Kind, err)
 		}
 
-		if o.Name == "" {
-			o.Name = info.Name
+		name := o.Name
+		if name == "" {
+			name = info.Name
 		}
-		generator, err := o.generatorFunc(o.Name, info.Name, mapping)
+		generator, err := o.generatorFunc(name, info.Name, mapping)
 		if err != nil {
 			return err
 		}
