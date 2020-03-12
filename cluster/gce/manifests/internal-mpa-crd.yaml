@@ -1,9 +1,11 @@
-apiVersion: apiextensions.k8s.io/v1beta1
+apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   name: multidimpodautoscalers.autoscaling.k8s.io
   labels:
     addonmanager.kubernetes.io/mode: Reconcile
+  annotations:
+    "api-approved.kubernetes.io": "unapproved.*"
 spec:
   group: autoscaling.k8s.io
   scope: Namespaced
@@ -17,62 +19,94 @@ spec:
   - name: v1beta1
     served: true
     storage: true
-  validation:
-    openAPIV3Schema:
-      required: ["spec"]
-      properties:
-        spec:
-          type: object
-          required: ["scaleTargetRef"]
-          properties:
-            scaleTargetRef:
-              type: object
-            updatePolicy:
-              type: object
-              properties:
-                updateMode:
-                  type: string
-                  enum: ["Off", "Auto"]
-            resourcePolicy:
-              type: object
-              properties:
-                containerRecommendationMode:
-                  type: string
-                  enum: ["Memory"]
-                containerPolicies:
-                  type: array
-                  items:
+    schema:
+      openAPIV3Schema:
+        type: object
+        required: ["spec"]
+        properties:
+          spec:
+            type: object
+            required: ["scaleTargetRef"]
+            properties:
+              scaleTargetRef:
+                type: object
+                properties:
+                  kind:
+                    type: string
+                  name:
+                    type: string
+                  apiVersion:
+                    type: string
+              goals:
+                type: object
+                properties:
+                  metrics:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        type:
+                          type: string
+                          enum: ["Resource"]
+                        resource:
+                          type: object
+                          properties:
+                            name:
+                              type: string
+                              enum: ["cpu"]
+                            target:
+                              type: object
+              constraints:
+                type: object
+                properties:
+                  global:
                     type: object
-                horizontalPolicy:
-                  type: object
-                  properties:
-                    minReplicas:
-                      type: int
-                      minimum: 0
-                    maxReplicas:
-                      type: int
-                      minimum: 0
-                    metrics:
-                      type: array
-                      items:
+                    properties:
+                      minReplicas:
+                        type: integer
+                        minimum: 0
+                      maxReplicas:
+                        type: integer
+                        minimum: 0
+                      requests:
                         type: object
----
-apiVersion: apiextensions.k8s.io/v1beta1
-kind: CustomResourceDefinition
-metadata:
-  name: multidimpodautoscalercheckpoints.autoscaling.k8s.io
-  labels:
-    addonmanager.kubernetes.io/mode: Reconcile
-spec:
-  group: autoscaling.k8s.io
-  scope: Namespaced
-  names:
-    plural: multidimpodautoscalercheckpoints
-    singular: multidimpodautoscalercheckpoint
-    kind: MultidimPodAutoscalerCheckpoint
-    shortNames:
-    - mpacheckpoint
-  versions:
-  - name: v1beta1
-    served: true
-    storage: true
+                        properties:
+                          minAllowed:
+                            type: object
+                          maxAllowed:
+                            type: object
+                  pod:
+                    type: object
+                    properties:
+                      requests:
+                        type: object
+                        properties:
+                          minAllowed:
+                            type: object
+                          maxAllowed:
+                            type: object
+                  containerControlledResources:
+                    type: array
+                    items:
+                      type: string
+                      enum: ["memory"]
+                  container:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        name:
+                          type: string
+                        requests:
+                          type: object
+                          properties:
+                            minAllowed:
+                              type: object
+                            maxAllowed:
+                              type: object
+              policy:
+                type: object
+                properties:
+                  updateMode:
+                    type: string
+                    enum: ["Off", "Auto"]
