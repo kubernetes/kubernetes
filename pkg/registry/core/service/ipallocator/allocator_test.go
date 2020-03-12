@@ -30,29 +30,34 @@ func TestAllocate(t *testing.T) {
 		cidr             string
 		free             int
 		released         string
-		outOfRange1      string
-		outOfRange2      string
-		outOfRange3      string
+		outOfRange       []string
 		alreadyAllocated string
 	}{
 		{
-			name:             "IPv4",
-			cidr:             "192.168.1.0/24",
-			free:             254,
-			released:         "192.168.1.5",
-			outOfRange1:      "192.168.0.1",
-			outOfRange2:      "192.168.1.0",
-			outOfRange3:      "192.168.1.255",
+			name:     "IPv4",
+			cidr:     "192.168.1.0/24",
+			free:     254,
+			released: "192.168.1.5",
+			outOfRange: []string{
+				"192.168.0.1",   // not in 192.168.1.0/24
+				"192.168.1.0",   // reserved (base address)
+				"192.168.1.255", // reserved (broadcast address)
+				"192.168.2.2",   // not in 192.168.1.0/24
+			},
 			alreadyAllocated: "192.168.1.1",
 		},
 		{
-			name:             "IPv6",
-			cidr:             "2001:db8:1::/48",
-			free:             65534,
-			released:         "2001:db8:1::5",
-			outOfRange1:      "2001:db8::1",
-			outOfRange2:      "2001:db8:1::",
-			outOfRange3:      "2001:db8:1::ffff",
+			name:     "IPv6",
+			cidr:     "2001:db8:1::/48",
+			free:     65534,
+			released: "2001:db8:1::5",
+			outOfRange: []string{
+				"2001:db8::1",      // not in 2001:db8:1::/48
+				"2001:db8:1::",     // reserved (base address)
+				"2001:db8:1::ffff", // reserved (broadcast address)
+				"2001:db8:1::1:0",  // not in the low 16 bits of 2001:db8:1::/48
+				"2001:db8:2::2",    // not in 2001:db8:1::/48
+			},
 			alreadyAllocated: "2001:db8:1::1",
 		},
 	}
@@ -119,19 +124,13 @@ func TestAllocate(t *testing.T) {
 		if err := r.Release(released); err != nil {
 			t.Fatal(err)
 		}
-		err = r.Allocate(net.ParseIP(tc.outOfRange1))
-		if _, ok := err.(*ErrNotInRange); !ok {
-			t.Fatal(err)
+		for _, outOfRange := range tc.outOfRange {
+			err = r.Allocate(net.ParseIP(outOfRange))
+			if _, ok := err.(*ErrNotInRange); !ok {
+				t.Fatal(err)
+			}
 		}
 		if err := r.Allocate(net.ParseIP(tc.alreadyAllocated)); err != ErrAllocated {
-			t.Fatal(err)
-		}
-		err = r.Allocate(net.ParseIP(tc.outOfRange2))
-		if _, ok := err.(*ErrNotInRange); !ok {
-			t.Fatal(err)
-		}
-		err = r.Allocate(net.ParseIP(tc.outOfRange3))
-		if _, ok := err.(*ErrNotInRange); !ok {
 			t.Fatal(err)
 		}
 		if f := r.Free(); f != 1 {
