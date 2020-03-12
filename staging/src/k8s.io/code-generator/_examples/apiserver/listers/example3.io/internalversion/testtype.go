@@ -83,7 +83,11 @@ func (s testTypeNamespaceLister) List(selector labels.Selector) (ret []*example3
 
 // Get retrieves the TestType from the indexer for a given namespace and name.
 func (s testTypeNamespaceLister) Get(name string) (*example3io.TestType, error) {
-	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
+	key := name
+	if s.namespace != "" {
+		key = s.namespace + "/" + name
+	}
+	obj, exists, err := s.indexer.GetByKey(key)
 	if err != nil {
 		return nil, err
 	}
