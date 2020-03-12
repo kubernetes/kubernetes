@@ -267,7 +267,7 @@ function gke-setup-containerd {
       "type": "portmap",
       "capabilities": {
         "portMappings": true
-      },
+      }
     }
   ]
 }
