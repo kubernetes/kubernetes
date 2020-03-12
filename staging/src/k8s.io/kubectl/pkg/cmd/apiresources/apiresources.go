@@ -67,6 +67,8 @@ type APIResourceOptions struct {
 	Cached     bool
 
 	genericclioptions.IOStreams
+	SupportedOutputTypes sets.String
+	SupportedSortTypes   sets.String
 }
 
 // groupResource contains the APIGroup and APIResource
@@ -78,8 +80,10 @@ type groupResource struct {
 // NewAPIResourceOptions creates the options for APIResource
 func NewAPIResourceOptions(ioStreams genericclioptions.IOStreams) *APIResourceOptions {
 	return &APIResourceOptions{
-		IOStreams:  ioStreams,
-		Namespaced: true,
+		IOStreams:            ioStreams,
+		Namespaced:           true,
+		SupportedOutputTypes: sets.NewString("", "wide", "name"),
+		SupportedSortTypes:   sets.NewString("", "name", "kind"),
 	}
 }
 
@@ -101,7 +105,6 @@ func NewCmdAPIResources(f cmdutil.Factory, ioStreams genericclioptions.IOStreams
 
 	cmd.Flags().BoolVar(&o.NoHeaders, "no-headers", o.NoHeaders, "When using the default or custom-column output format, don't print headers (default print headers).")
 	cmd.Flags().StringVarP(&o.Output, "output", "o", o.Output, "Output format. One of: wide|name.")
-
 	cmd.Flags().StringVar(&o.APIGroup, "api-group", o.APIGroup, "Limit to resources in the specified API group.")
 	cmd.Flags().BoolVar(&o.Namespaced, "namespaced", o.Namespaced, "If false, non-namespaced resources will be returned, otherwise returning namespaced resources by default.")
 	cmd.Flags().StringSliceVar(&o.Verbs, "verbs", o.Verbs, "Limit to resources that support the specified verbs.")
@@ -110,15 +113,14 @@ func NewCmdAPIResources(f cmdutil.Factory, ioStreams genericclioptions.IOStreams
 	return cmd
 }
 
-// Validate checks to the APIResourceOptions to see if there is sufficient information run the command
+// Validate checks the APIResourceOptions to see if there is sufficient information run the command
 func (o *APIResourceOptions) Validate() error {
-	supportedOutputTypes := sets.NewString("", "wide", "name")
-	if !supportedOutputTypes.Has(o.Output) {
+	if !o.SupportedOutputTypes.Has(o.Output) {
 		return fmt.Errorf("--output %v is not available", o.Output)
 	}
-	supportedSortTypes := sets.NewString("", "name", "kind")
+
 	if len(o.SortBy) > 0 {
-		if !supportedSortTypes.Has(o.SortBy) {
+		if !o.SupportedSortTypes.Has(o.SortBy) {
 			return fmt.Errorf("--sort-by accepts only name or kind")
 		}
 	}
