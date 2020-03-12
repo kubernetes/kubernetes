@@ -96,15 +96,15 @@ func TestClusterSerivceIPRange(t *testing.T) {
 			enableDualStack: false,
 		},
 		{
-			name:            "service cidr to big",
+			name:            "service cidr too big",
 			expectErrors:    true,
 			options:         makeOptionsWithCIDRs("10.0.0.0/8", ""),
 			enableDualStack: true,
 		},
 		{
-			name:            "dual-stack secondary cidr to big",
+			name:            "dual-stack secondary cidr too big",
 			expectErrors:    true,
-			options:         makeOptionsWithCIDRs("10.0.0.0/16", "3000::/64"),
+			options:         makeOptionsWithCIDRs("10.0.0.0/16", "3000::/48"),
 			enableDualStack: true,
 		},
 		/* success cases */
@@ -124,6 +124,12 @@ func TestClusterSerivceIPRange(t *testing.T) {
 			name:            "valid v6-v4 dual stack + gate on",
 			expectErrors:    false,
 			options:         makeOptionsWithCIDRs("3000::/108", "10.0.0.0/16"),
+			enableDualStack: true,
+		},
+		{
+			name:            "valid v6 with /64",
+			expectErrors:    false,
+			options:         makeOptionsWithCIDRs("3000::/64", ""),
 			enableDualStack: true,
 		},
 	}
@@ -175,19 +181,19 @@ func TestValidateMaxCIDRRange(t *testing.T) {
 			expectErrors:         false,
 		},
 		{
-			name:                 "ipv4 cidr to big",
-			cidr:                 *getIPnetFromCIDR("10.92.0.0/8"),
+			name:                 "ipv4 cidr too big",
+			cidr:                 *getIPnetFromCIDR("10.0.0.0/8"),
 			maxCIDRBits:          20,
 			cidrFlag:             "--service-cluster-ip-range",
-			expectedErrorMessage: "specified --service-cluster-ip-range is too large; for 32-bit addresses, the mask must be >= 12",
+			expectedErrorMessage: "specified --service-cluster-ip-range (10.0.0.0/8) is too large (prefix length should be /12 or greater)",
 			expectErrors:         true,
 		},
 		{
-			name:                 "ipv6 cidr to big",
-			cidr:                 *getIPnetFromCIDR("3000::/64"),
+			name:                 "ipv6 cidr too big",
+			cidr:                 *getIPnetFromCIDR("3000::/48"),
 			maxCIDRBits:          20,
 			cidrFlag:             "--service-cluster-ip-range",
-			expectedErrorMessage: "specified --service-cluster-ip-range is too large; for 128-bit addresses, the mask must be >= 108",
+			expectedErrorMessage: "specified --service-cluster-ip-range (3000::/48) is invalid (prefix length should be /64, or else /108 or greater)",
 			expectErrors:         true,
 		},
 	}

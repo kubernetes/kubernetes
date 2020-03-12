@@ -719,7 +719,7 @@ func TestGetControllerManagerCommand(t *testing.T) {
 			cfg: &kubeadmapi.ClusterConfiguration{
 				Networking: kubeadmapi.Networking{
 					PodSubnet:     "2001:db8::/64",
-					ServiceSubnet: "fd03::/112",
+					ServiceSubnet: "fd03::/64",
 				},
 				CertificatesDir:   testCertsDir,
 				KubernetesVersion: cpVersion,
@@ -742,7 +742,7 @@ func TestGetControllerManagerCommand(t *testing.T) {
 				"--allocate-node-cidrs=true",
 				"--cluster-cidr=2001:db8::/64",
 				"--node-cidr-mask-size=80",
-				"--service-cluster-ip-range=fd03::/112",
+				"--service-cluster-ip-range=fd03::/64",
 			},
 		},
 		{
@@ -750,7 +750,7 @@ func TestGetControllerManagerCommand(t *testing.T) {
 			cfg: &kubeadmapi.ClusterConfiguration{
 				Networking: kubeadmapi.Networking{
 					PodSubnet:     "2001:db8::/64,10.1.0.0/16",
-					ServiceSubnet: "fd03::/112,192.168.0.0/16",
+					ServiceSubnet: "fd03::/64,192.168.0.0/16",
 				},
 				CertificatesDir:   testCertsDir,
 				KubernetesVersion: cpVersion,
@@ -776,7 +776,7 @@ func TestGetControllerManagerCommand(t *testing.T) {
 				"--cluster-cidr=2001:db8::/64,10.1.0.0/16",
 				"--node-cidr-mask-size-ipv4=24",
 				"--node-cidr-mask-size-ipv6=80",
-				"--service-cluster-ip-range=fd03::/112,192.168.0.0/16",
+				"--service-cluster-ip-range=fd03::/64,192.168.0.0/16",
 			},
 		},
 		{

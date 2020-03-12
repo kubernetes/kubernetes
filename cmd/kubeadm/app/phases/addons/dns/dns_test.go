@@ -176,13 +176,13 @@ func TestGetDNSIP(t *testing.T) {
 		},
 		{
 			name:          "dual-stack ipv4 primary, subnet mask 26",
-			svcSubnet:     "10.87.116.64/26,fd03::/112",
+			svcSubnet:     "10.87.116.64/26,fd03::/64",
 			expectedDNSIP: "10.87.116.74",
 			isDualStack:   true,
 		},
 		{
-			name:          "dual-stack ipv6 primary, subnet mask 112",
-			svcSubnet:     "fd03::/112,10.87.116.64/26",
+			name:          "dual-stack ipv6 primary, subnet mask 64",
+			svcSubnet:     "fd03::/64,10.87.116.64/26",
 			expectedDNSIP: "fd03::a",
 			isDualStack:   true,
 		},

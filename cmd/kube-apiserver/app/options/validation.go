@@ -88,11 +88,20 @@ func validateMaxCIDRRange(cidr net.IPNet, maxCIDRBits int, cidrFlag string) erro
 	// bigger cidr (specially those offered by IPv6) will add no value
 	// significantly increase snapshotting time.
 	var ones, bits = cidr.Mask.Size()
-	if bits-ones > maxCIDRBits {
-		return fmt.Errorf("specified %s is too large; for %d-bit addresses, the mask must be >= %d", cidrFlag, bits, bits-maxCIDRBits)
+	if bits-ones <= maxCIDRBits {
+		return nil
 	}
 
-	return nil
+	// For IPv6, we historically allowed /108 or greater (20 bits), but only used at most 16 bits of it.
+	// Now we recommend using exactly /64, for consistency with other IPv6 subnets, but we still only
+	// use 16 bits of it.
+	if bits == 128 {
+		if ones == 64 {
+			return  nil
+		}
+		return fmt.Errorf("specified %s (%s) is invalid (prefix length should be /64, or else /%d or greater)", cidrFlag, cidr.String(), bits-maxCIDRBits)
+	}
+	return fmt.Errorf("specified %s (%s) is too large (prefix length should be /%d or greater)", cidrFlag, cidr.String(), bits-maxCIDRBits)
 }
 
 func validateServiceNodePort(options *ServerRunOptions) []error {

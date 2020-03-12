@@ -269,7 +269,7 @@ func makeIPNet(t *testing.T) *net.IPNet {
 	return net
 }
 func makeIPNet6(t *testing.T) *net.IPNet {
-	_, net, err := net.ParseCIDR("2000::/108")
+	_, net, err := net.ParseCIDR("2000::/64")
 	if err != nil {
 		t.Error(err)
 	}

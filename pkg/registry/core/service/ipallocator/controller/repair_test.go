@@ -292,7 +292,7 @@ func TestRepairDualStack(t *testing.T) {
 		item: &api.RangeAllocation{Range: "192.168.1.0/24"},
 	}
 	secondaryIPRegistry := &mockRangeRegistry{
-		item: &api.RangeAllocation{Range: "2000::/108"},
+		item: &api.RangeAllocation{Range: "2000::/64"},
 	}
 
 	_, cidr, _ := net.ParseCIDR(ipregistry.item.Range)
@@ -314,7 +314,7 @@ func TestRepairDualStack(t *testing.T) {
 		updateErr: fmt.Errorf("test error"),
 	}
 	secondaryIPRegistry = &mockRangeRegistry{
-		item:      &api.RangeAllocation{Range: "2000::/108"},
+		item:      &api.RangeAllocation{Range: "2000::/64"},
 		updateErr: fmt.Errorf("test error"),
 	}
 
@@ -335,7 +335,7 @@ func TestRepairLeakDualStack(t *testing.T) {
 
 	previous.Allocate(net.ParseIP("192.168.1.10"))
 
-	_, secondaryCIDR, _ := net.ParseCIDR("2000::/108")
+	_, secondaryCIDR, _ := net.ParseCIDR("2000::/64")
 	secondaryPrevious, err := ipallocator.NewCIDRRange(secondaryCIDR)
 	if err != nil {
 		t.Fatal(err)
@@ -425,7 +425,7 @@ func TestRepairWithExistingDualStack(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, secondaryCIDR, _ := net.ParseCIDR("2000::/108")
+	_, secondaryCIDR, _ := net.ParseCIDR("2000::/64")
 	secondaryPrevious, err := ipallocator.NewCIDRRange(secondaryCIDR)
 	if err != nil {
 		t.Fatal(err)
