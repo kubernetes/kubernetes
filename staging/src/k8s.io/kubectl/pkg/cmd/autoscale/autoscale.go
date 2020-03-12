@@ -78,7 +78,7 @@ type AutoscaleOptions struct {
 	dryRunStrategy   cmdutil.DryRunStrategy
 	dryRunVerifier   *resource.DryRunVerifier
 	builder          *resource.Builder
-	generatorFunc    func(string, *meta.RESTMapping) (generate.StructuredGenerator, error)
+	generatorFunc    func(string, string, *meta.RESTMapping) (generate.StructuredGenerator, error)
 
 	HPAClient         autoscalingv1client.HorizontalPodAutoscalersGetter
 	scaleKindResolver scale.ScaleKindResolver
@@ -168,7 +168,7 @@ func (o *AutoscaleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 	o.HPAClient = kubeClient.AutoscalingV1()
 
 	// get the generator
-	o.generatorFunc = func(name string, mapping *meta.RESTMapping) (generate.StructuredGenerator, error) {
+	o.generatorFunc = func(name, scaleRefName string, mapping *meta.RESTMapping) (generate.StructuredGenerator, error) {
 		switch o.Generator {
 		case generateversioned.HorizontalPodAutoscalerV1GeneratorName:
 			return &generateversioned.HorizontalPodAutoscalerGeneratorV1{
@@ -176,7 +176,7 @@ func (o *AutoscaleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 				MinReplicas:        o.Min,
 				MaxReplicas:        o.Max,
 				CPUPercent:         o.CPUPercent,
-				ScaleRefName:       name,
+				ScaleRefName:       scaleRefName,
 				ScaleRefKind:       mapping.GroupVersionKind.Kind,
 				ScaleRefAPIVersion: mapping.GroupVersionKind.GroupVersion().String(),
 			}, nil
@@ -238,7 +238,10 @@ func (o *AutoscaleOptions) Run() error {
 			return fmt.Errorf("cannot autoscale a %v: %v", mapping.GroupVersionKind.Kind, err)
 		}
 
-		generator, err := o.generatorFunc(info.Name, mapping)
+		if o.Name == "" {
+			o.Name = info.Name
+		}
+		generator, err := o.generatorFunc(o.Name, info.Name, mapping)
 		if err != nil {
 			return err
 		}
