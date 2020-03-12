@@ -50,8 +50,11 @@ var (
 		  # Create a new configmap named my-config with key1=config1 and key2=config2
 		  kubectl create configmap my-config --from-literal=key1=config1 --from-literal=key2=config2
 
-		  # Create a new configmap named my-config from the key=value pairs in the file
+		  # Create a new configmap named my-config with the files basename as key and files content as value
 		  kubectl create configmap my-config --from-file=path/to/bar
+
+		  # Create a new configmap named my-config with key as key and the files content as value
+		  kubectl create configmap my-config --from-file=key=path/to/bar
 
 		  # Create a new configmap named my-config from an env file
 		  kubectl create configmap my-config --from-env-file=path/to/bar.env`))
