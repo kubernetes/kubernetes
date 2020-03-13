@@ -218,13 +218,13 @@ func TestAuthenticateTokenTimeout(t *testing.T) {
 
 	// now we change the testClient and see if the testToken will still be
 	// valid instead of timing out
-	changeClient, ret := oauthClients.Get("testClient", metav1.GetOptions{})
+	changeClient, ret := oauthClients.Get(context.TODO(), "testClient", metav1.GetOptions{})
 	if ret != nil {
 		t.Error("Failed to get testClient")
 	} else {
 		longTimeout := int32(20)
 		changeClient.AccessTokenInactivityTimeoutSeconds = &longTimeout
-		_, ret = oauthClients.Update(changeClient)
+		_, ret = oauthClients.Update(context.TODO(), changeClient, metav1.UpdateOptions{})
 		if ret != nil {
 			t.Error("Failed to update testClient")
 		}
@@ -259,7 +259,7 @@ func TestAuthenticateTokenTimeout(t *testing.T) {
 
 	wait(t, timeoutsSync)
 	// and should be updated to last at least till the 31st second
-	token, err := accessTokenGetter.Get("testToken", metav1.GetOptions{})
+	token, err := accessTokenGetter.Get(context.TODO(), "testToken", metav1.GetOptions{})
 	if err != nil {
 		t.Error("Failed to get testToken")
 	} else {
@@ -269,12 +269,12 @@ func TestAuthenticateTokenTimeout(t *testing.T) {
 	}
 
 	//now change testClient again, so that tokens do not expire anymore
-	changeclient, ret := oauthClients.Get("testClient", metav1.GetOptions{})
+	changeclient, ret := oauthClients.Get(context.TODO(), "testClient", metav1.GetOptions{})
 	if ret != nil {
 		t.Error("Failed to get testClient")
 	} else {
 		changeclient.AccessTokenInactivityTimeoutSeconds = new(int32)
-		_, ret = oauthClients.Update(changeclient)
+		_, ret = oauthClients.Update(context.TODO(), changeclient, metav1.UpdateOptions{})
 		if ret != nil {
 			t.Error("Failed to update testClient")
 		}
@@ -291,7 +291,7 @@ func TestAuthenticateTokenTimeout(t *testing.T) {
 	wait(t, timeoutsSync)
 
 	// and should be updated to have a ZERO timeout
-	token, err = accessTokenGetter.Get("testToken", metav1.GetOptions{})
+	token, err = accessTokenGetter.Get(context.TODO(), "testToken", metav1.GetOptions{})
 	if err != nil {
 		t.Error("Failed to get testToken")
 	} else {
@@ -306,7 +306,7 @@ type fakeOAuthClientLister struct {
 }
 
 func (f fakeOAuthClientLister) Get(name string) (*oauthv1.OAuthClient, error) {
-	return f.clients.Get(name, metav1.GetOptions{})
+	return f.clients.Get(context.TODO(), name, metav1.GetOptions{})
 }
 
 func (f fakeOAuthClientLister) List(selector labels.Selector) ([]*oauthv1.OAuthClient, error) {
@@ -328,7 +328,7 @@ func checkToken(t *testing.T, name string, authf authenticator.Token, tokens oau
 		}
 	} else {
 		if found {
-			token, tokenErr := tokens.Get(name, metav1.GetOptions{})
+			token, tokenErr := tokens.Get(context.TODO(), name, metav1.GetOptions{})
 			if tokenErr != nil {
 				t.Fatal(tokenErr)
 			}

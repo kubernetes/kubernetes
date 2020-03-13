@@ -169,7 +169,7 @@ func (q *restrictUsersAdmission) Validate(ctx context.Context, a admission.Attri
 	// RoleBindingRestrictions admission plugin is DefaultAllow, hence RBRs can't use an informer,
 	// because it's impossible to know if cache is up-to-date
 	roleBindingRestrictionList, err := q.roleBindingRestrictionsGetter.RoleBindingRestrictions(ns).
-		List(metav1.ListOptions{})
+		List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return admission.NewForbidden(a, fmt.Errorf("could not list rolebinding restrictions: %v", err))
 	}
