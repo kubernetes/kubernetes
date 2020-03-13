@@ -124,15 +124,15 @@ func (c *ManagedDiskController) CreateManagedDisk(options *ManagedDiskOptions) (
 		}
 		diskProperties.DiskIOPSReadWrite = to.Int64Ptr(diskIOPSReadWrite)
 
-		diskMBpsReadWrite := int32(defaultDiskMBpsReadWrite)
+		diskMBpsReadWrite := int64(defaultDiskMBpsReadWrite)
 		if options.DiskMBpsReadWrite != "" {
 			v, err := strconv.Atoi(options.DiskMBpsReadWrite)
 			if err != nil {
 				return "", fmt.Errorf("AzureDisk - failed to parse DiskMBpsReadWrite: %v", err)
 			}
-			diskMBpsReadWrite = int32(v)
+			diskMBpsReadWrite = int64(v)
 		}
-		diskProperties.DiskMBpsReadWrite = to.Int32Ptr(diskMBpsReadWrite)
+		diskProperties.DiskMBpsReadWrite = to.Int64Ptr(diskMBpsReadWrite)
 	} else {
 		if options.DiskIOPSReadWrite != "" {
 			return "", fmt.Errorf("AzureDisk - DiskIOPSReadWrite parameter is only applicable in UltraSSD_LRS disk type")
