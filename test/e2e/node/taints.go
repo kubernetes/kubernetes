@@ -453,7 +453,7 @@ var _ = SIGDescribe("NoExecuteTaintManager Multiple Pods [Serial]", func() {
 		wait.PollImmediate(1*time.Second, (kubeletPodDeletionDelaySeconds+14*additionalWaitPerDeleteSeconds)*time.Second, func() (bool, error) {
 			deleted := 0
 			for i := 1; i < 3; i++ {
-				_, err := cs.CoreV1().Pods(ns).Get(fmt.Sprintf("%s%d", podGroup, i), metav1.GetOptions{})
+				_, err := cs.CoreV1().Pods(ns).Get(context.TODO(), fmt.Sprintf("%s%d", podGroup, i), metav1.GetOptions{})
 				if err == nil {
 					return false, nil
 				}

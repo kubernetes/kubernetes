@@ -1,6 +1,7 @@
 package apiserver
 
 import (
+	"context"
 	"fmt"
 	"regexp"
 	"strings"
@@ -56,7 +57,7 @@ func (a apiserverV1) validateSNINames(obj *configv1.APIServer) field.ErrorList {
 		return errs
 	}
 
-	infrastructure, err := a.infrastructureGetter().Infrastructures().Get("cluster", metav1.GetOptions{})
+	infrastructure, err := a.infrastructureGetter().Infrastructures().Get(context.TODO(), "cluster", metav1.GetOptions{})
 	if err != nil {
 		errs = append(errs, field.InternalError(field.NewPath("metadata"), err))
 	}

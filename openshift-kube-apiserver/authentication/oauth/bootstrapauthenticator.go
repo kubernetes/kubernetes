@@ -34,7 +34,7 @@ func NewBootstrapAuthenticator(tokens oauthclient.OAuthAccessTokenInterface, get
 }
 
 func (a *bootstrapAuthenticator) AuthenticateToken(ctx context.Context, name string) (*kauthenticator.Response, bool, error) {
-	token, err := a.tokens.Get(name, metav1.GetOptions{})
+	token, err := a.tokens.Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return nil, false, errLookup // mask the error so we do not leak token data in logs
 	}

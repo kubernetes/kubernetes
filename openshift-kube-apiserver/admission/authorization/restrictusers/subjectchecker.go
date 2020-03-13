@@ -1,6 +1,7 @@
 package restrictusers
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -90,7 +91,7 @@ func (ctx *RoleBindingRestrictionContext) labelSetForUser(subject rbac.Subject) 
 		return labelSet, nil
 	}
 
-	user, err := ctx.userClient.Users().Get(subject.Name, metav1.GetOptions{})
+	user, err := ctx.userClient.Users().Get(context.TODO(), subject.Name, metav1.GetOptions{})
 	if err != nil {
 		return labels.Set{}, err
 	}
@@ -127,7 +128,7 @@ func (ctx *RoleBindingRestrictionContext) labelSetForGroup(subject rbac.Subject)
 		return labelSet, nil
 	}
 
-	group, err := ctx.userClient.Groups().Get(subject.Name, metav1.GetOptions{})
+	group, err := ctx.userClient.Groups().Get(context.TODO(), subject.Name, metav1.GetOptions{})
 	if err != nil {
 		return labels.Set{}, err
 	}
