@@ -17,15 +17,24 @@ limitations under the License.
 package serviceaccount
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
 
 	"gopkg.in/square/go-jose.v2/jwt"
-	"k8s.io/klog"
-
+	"k8s.io/apiserver/pkg/audit"
 	apiserverserviceaccount "k8s.io/apiserver/pkg/authentication/serviceaccount"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/apis/core"
+)
+
+const (
+	// Injected bound service account token expiration which triggers monitoring of its time-bound feature.
+	WarnOnlyBoundTokenExpirationSeconds = 60*60 + 7
+
+	// Extended expiration for those modifed tokens involved in safe rollout if time-bound feature.
+	ExpirationExtensionSeconds = 24 * 365 * 60 * 60
 )
 
 // time.Now stubbed out to allow testing
@@ -36,10 +45,11 @@ type privateClaims struct {
 }
 
 type kubernetes struct {
-	Namespace string `json:"namespace,omitempty"`
-	Svcacct   ref    `json:"serviceaccount,omitempty"`
-	Pod       *ref   `json:"pod,omitempty"`
-	Secret    *ref   `json:"secret,omitempty"`
+	Namespace string          `json:"namespace,omitempty"`
+	Svcacct   ref             `json:"serviceaccount,omitempty"`
+	Pod       *ref            `json:"pod,omitempty"`
+	Secret    *ref            `json:"secret,omitempty"`
+	WarnAfter jwt.NumericDate `json:"warnafter,omitempty"`
 }
 
 type ref struct {
@@ -47,7 +57,7 @@ type ref struct {
 	UID  string `json:"uid,omitempty"`
 }
 
-func Claims(sa core.ServiceAccount, pod *core.Pod, secret *core.Secret, expirationSeconds int64, audience []string) (*jwt.Claims, interface{}) {
+func Claims(sa core.ServiceAccount, pod *core.Pod, secret *core.Secret, expirationSeconds, warnafter int64, audience []string) (*jwt.Claims, interface{}) {
 	now := now()
 	sc := &jwt.Claims{
 		Subject:   apiserverserviceaccount.MakeUsername(sa.Namespace, sa.Name),
@@ -77,6 +87,11 @@ func Claims(sa core.ServiceAccount, pod *core.Pod, secret *core.Secret, expirati
 			UID:  string(secret.UID),
 		}
 	}
+
+	if warnafter != 0 {
+		pc.Kubernetes.WarnAfter = jwt.NewNumericDate(now.Add(time.Duration(warnafter) * time.Second))
+	}
+
 	return sc, pc
 }
 
@@ -92,7 +107,7 @@ type validator struct {
 
 var _ = Validator(&validator{})
 
-func (v *validator) Validate(_ string, public *jwt.Claims, privateObj interface{}) (*ServiceAccountInfo, error) {
+func (v *validator) Validate(ctx context.Context, _ string, public *jwt.Claims, privateObj interface{}) (*ServiceAccountInfo, error) {
 	private, ok := privateObj.(*privateClaims)
 	if !ok {
 		klog.Errorf("jwt validator expected private claim of type *privateClaims but got: %T", privateObj)
@@ -167,6 +182,19 @@ func (v *validator) Validate(_ string, public *jwt.Claims, privateObj interface{
 		}
 		podName = podref.Name
 		podUID = podref.UID
+	}
+
+	// Check special 'warnafter' field for projected service account token transition.
+	warnafter := private.Kubernetes.WarnAfter
+	if warnafter != 0 {
+		if nowTime.After(warnafter.Time()) {
+			secondsAfterWarn := nowTime.Unix() - warnafter.Time().Unix()
+			auditInfo := fmt.Sprintf("subject: %s, seconds after warning threshold: %d", public.Subject, secondsAfterWarn)
+			audit.AddAuditAnnotation(ctx, "authentication.k8s.io/stale-token", auditInfo)
+			staleTokensTotal.Inc()
+		} else {
+			validTokensTotal.Inc()
+		}
 	}
 
 	return &ServiceAccountInfo{

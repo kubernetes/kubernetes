@@ -351,6 +351,7 @@ func CreateKubeAPIServerConfig(
 
 			ServiceAccountIssuer:        s.ServiceAccountIssuer,
 			ServiceAccountMaxExpiration: s.ServiceAccountTokenMaxExpiration,
+			ExtendExpiration:            s.Authentication.ServiceAccounts.ExtendExpiration,
 
 			VersionedInformers: versionedInformers,
 		},
@@ -688,6 +689,14 @@ func Complete(s *options.ServerRunOptions) (completedServerRunOptions, error) {
 			if s.Authentication.ServiceAccounts.MaxExpiration < lowBound ||
 				s.Authentication.ServiceAccounts.MaxExpiration > upBound {
 				return options, fmt.Errorf("the serviceaccount max expiration must be between 1 hour to 2^32 seconds")
+			}
+			if s.Authentication.ServiceAccounts.ExtendExpiration {
+				if s.Authentication.ServiceAccounts.MaxExpiration < serviceaccount.WarnOnlyBoundTokenExpirationSeconds*time.Second {
+					klog.Warningf("service-account-extend-token-expiration is true, in order to correctly trigger safe transition logic, service-account-max-token-expiration must be set longer than 3607 seconds (currently %s)", s.Authentication.ServiceAccounts.MaxExpiration)
+				}
+				if s.Authentication.ServiceAccounts.MaxExpiration < serviceaccount.ExpirationExtensionSeconds*time.Second {
+					klog.Warningf("service-account-extend-token-expiration is true, enabling tokens valid up to 1 year, which is longer than service-account-max-token-expiration set to %s", s.Authentication.ServiceAccounts.MaxExpiration)
+				}
 			}
 		}
 

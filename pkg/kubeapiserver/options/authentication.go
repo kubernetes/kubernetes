@@ -73,11 +73,12 @@ type OIDCAuthenticationOptions struct {
 }
 
 type ServiceAccountAuthenticationOptions struct {
-	KeyFiles      []string
-	Lookup        bool
-	Issuer        string
-	JWKSURI       string
-	MaxExpiration time.Duration
+	KeyFiles         []string
+	Lookup           bool
+	Issuer           string
+	JWKSURI          string
+	MaxExpiration    time.Duration
+	ExtendExpiration bool
 }
 
 type TokenFileAuthenticationOptions struct {
@@ -304,6 +305,12 @@ func (s *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 		fs.DurationVar(&s.ServiceAccounts.MaxExpiration, "service-account-max-token-expiration", s.ServiceAccounts.MaxExpiration, ""+
 			"The maximum validity duration of a token created by the service account token issuer. If an otherwise valid "+
 			"TokenRequest with a validity duration larger than this value is requested, a token will be issued with a validity duration of this value.")
+
+		fs.BoolVar(&s.ServiceAccounts.ExtendExpiration, "service-account-extend-token-expiration", s.ServiceAccounts.ExtendExpiration, ""+
+			"Turns on projected service account expiration extension during token generation, "+
+			"which helps safe transition from legacy token to bound service account token feature. "+
+			"If this flag is enabled, admission injected tokens would be extended up to 1 year to "+
+			"prevent unexpected failure during transition, ignoring value of service-account-max-token-expiration.")
 	}
 
 	if s.TokenFile != nil {
