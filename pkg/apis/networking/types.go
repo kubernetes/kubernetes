@@ -297,10 +297,9 @@ type IngressClassSpec struct {
 	// "acme.io/ingress-controller". This field is immutable.
 	Controller string
 
-	// Parameters is a link to a resource containing additional configuration
-	// for the controller. This is optional if the controller does not require
-	// extra parameters. Example configuration resources include
-	// `core.ConfigMap` or a controller specific Custom Resource.
+	// Parameters is a link to a custom resource containing additional
+	// configuration for the controller. This is optional if the controller does
+	// not require extra parameters.
 	// +optional
 	Parameters *api.TypedLocalObjectReference
 }
