@@ -170,7 +170,7 @@ func (g *Grabber) GrabFromControllerManager() (ControllerManagerMetrics, error) 
 	podName := fmt.Sprintf("%v-%v", "kube-controller-manager", g.masterName)
 	g.waitForControllerManagerReadyOnce.Do(func() {
 		if runningErr := e2epod.WaitForPodNameRunningInNamespace(g.client, podName, metav1.NamespaceSystem); runningErr != nil {
-			err = fmt.Errorf("error waiting for controller manager pod to be running: %w", err)
+			err = fmt.Errorf("error waiting for controller manager pod to be running: %w", runningErr)
 			return
 		}
 
@@ -179,7 +179,7 @@ func (g *Grabber) GrabFromControllerManager() (ControllerManagerMetrics, error) 
 			_, lastMetricsFetchErr = g.getMetricsFromPod(g.client, podName, metav1.NamespaceSystem, ports.InsecureKubeControllerManagerPort)
 			return lastMetricsFetchErr == nil, nil
 		}); metricsWaitErr != nil {
-			err = fmt.Errorf("error waiting for controller manager pod to expose metrics: %v; %v", err, lastMetricsFetchErr)
+			err = fmt.Errorf("error waiting for controller manager pod to expose metrics: %v; %v", metricsWaitErr, lastMetricsFetchErr)
 			return
 		}
 	})
