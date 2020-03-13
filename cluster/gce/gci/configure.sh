@@ -498,7 +498,7 @@ function ensure-container-runtime {
     docker version
   elif [[ "${container_runtime}" == "containerd" ]]; then
     # Install containerd/runc if requested
-    if [[ ! -z "${UBUNTU_INSTALL_CONTAINERD_VERSION:-}" || ! -z "${UBUNTU_INSTALL_RUNC_VERSION}" ]]; then
+    if [[ ! -z "${UBUNTU_INSTALL_CONTAINERD_VERSION:-}" || ! -z "${UBUNTU_INSTALL_RUNC_VERSION:-}" ]]; then
       install-containerd-ubuntu
     fi
     # Verify presence and print versions of ctr, containerd, runc
