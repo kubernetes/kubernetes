@@ -31,7 +31,9 @@ if [[ "${KUBE_BUILD_CONFORMANCE}" =~ [yY] ]]; then
 fi
 
 # TODO(dims): Remove this when we get rid of hyperkube image
-CMD_TARGETS="${CMD_TARGETS} cmd/kubelet cmd/kubectl"
+if [[ "${KUBE_BUILD_HYPERKUBE}" =~ [yY] ]]; then
+    CMD_TARGETS=$(echo "${CMD_TARGETS} cmd/kubelet cmd/kubectl" | tr ' ' '\n' | sort | uniq | tr '\n' ' ')
+fi
 
 kube::build::verify_prereqs
 kube::build::build_image
