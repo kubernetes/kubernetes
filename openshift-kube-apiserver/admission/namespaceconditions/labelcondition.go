@@ -116,7 +116,7 @@ func (p pluginHandlerWithNamespaceLabelConditions) getNamespaceLabels(attr admis
 	}
 	if apierrors.IsNotFound(err) {
 		// in case of latency in our caches, make a call direct to storage to verify that it truly exists or not
-		namespace, err = p.namespaceClient.Namespaces().Get(namespaceName, metav1.GetOptions{})
+		namespace, err = p.namespaceClient.Namespaces().Get(context.TODO(), namespaceName, metav1.GetOptions{})
 		if err != nil {
 			return nil, err
 		}

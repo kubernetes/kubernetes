@@ -35,12 +35,12 @@ func NewTokenAuthenticator(tokens oauthclient.OAuthAccessTokenInterface, users u
 }
 
 func (a *tokenAuthenticator) AuthenticateToken(ctx context.Context, name string) (*kauthenticator.Response, bool, error) {
-	token, err := a.tokens.Get(name, metav1.GetOptions{})
+	token, err := a.tokens.Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return nil, false, errLookup // mask the error so we do not leak token data in logs
 	}
 
-	user, err := a.users.Get(token.UserName, metav1.GetOptions{})
+	user, err := a.users.Get(context.TODO(), token.UserName, metav1.GetOptions{})
 	if err != nil {
 		return nil, false, err
 	}
