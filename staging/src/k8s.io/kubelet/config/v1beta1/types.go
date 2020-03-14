@@ -490,6 +490,11 @@ type KubeletConfiguration struct {
 	// Default: "/etc/resolv.conf"
 	// +optional
 	ResolverConfig string `json:"resolvConf,omitempty"`
+	// RunOnce causes the Kubelet to check the API server once for pods,
+	// run those in addition to the pods specified by static pod files, and exit.
+	// Default: false
+	// +optional
+	RunOnce bool `json:"runOnce,omitempty"`
 	// cpuCFSQuota enables CPU CFS quota enforcement for containers that
 	// specify CPU limits.
 	// Dynamic Kubelet Config (beta): If dynamically updating this field, consider that

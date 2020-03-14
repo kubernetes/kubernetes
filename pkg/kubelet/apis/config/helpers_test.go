@@ -214,6 +214,7 @@ var (
 		"RegistryPullQPS",
 		"ReservedSystemCPUs",
 		"RuntimeRequestTimeout.Duration",
+		"RunOnce",
 		"SerializeImagePulls",
 		"ShowHiddenMetricsForVersion",
 		"StreamingConnectionIdleTimeout.Duration",
