@@ -48,15 +48,6 @@ genrule(
     tools = [":instrumentation"],
 )
 
-sh_test(
-    name = "verify_stable_metric",
-    srcs = ["verify-stable-metrics.sh"],
-    data = [
-        "testdata/stable-metrics-list.yaml",
-        ":list_stable_metrics",
-    ],
-)
-
 go_test(
     name = "go_default_test",
     srcs = ["main_test.go"],
