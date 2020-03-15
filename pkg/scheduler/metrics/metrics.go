@@ -261,14 +261,20 @@ var registerMetrics sync.Once
 func Register() {
 	// Register the metrics.
 	registerMetrics.Do(func() {
-		for _, metric := range metricsList {
-			legacyregistry.MustRegister(metric)
-		}
+		RegisterMetrics(metricsList...)
 		volumeschedulingmetrics.RegisterVolumeSchedulingMetrics()
 		PodScheduleSuccesses = scheduleAttempts.With(metrics.Labels{"result": "scheduled"})
 		PodScheduleFailures = scheduleAttempts.With(metrics.Labels{"result": "unschedulable"})
 		PodScheduleErrors = scheduleAttempts.With(metrics.Labels{"result": "error"})
 	})
+}
+
+// RegisterMetrics registers a list of metrics.
+// This function is exported because it is intended to be used by out-of-tree plugins to register their custom metrics.
+func RegisterMetrics(extraMetrics ...metrics.Registerable) {
+	for _, metric := range extraMetrics {
+		legacyregistry.MustRegister(metric)
+	}
 }
 
 // GetGather returns the gatherer. It used by test case outside current package.
