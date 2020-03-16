@@ -237,15 +237,8 @@ function gke-configure-node-sysctls {
   sudo sysctl -a > "${KUBE_HOME}/npd-custom-plugins/configs/init-sysctls.conf"
 }
 
-function gke-setup-containerd {
-  local -r CONTAINERD_HOME="/home/containerd"
-  mkdir -p "${CONTAINERD_HOME}"
-
-  echo "Generating containerd config"
-  local -r config_path="${CONTAINERD_CONFIG_PATH:-"/etc/containerd/config.toml"}"
-  mkdir -p "$(dirname "${config_path}")"
-  local cni_template_path="${CONTAINERD_HOME}/cni.template"
-  cat > "${cni_template_path}" <<EOF
+function _gke_cni_template {
+  cat <<EOF
 {
   "name": "k8s-pod-network",
   "cniVersion": "0.3.1",
@@ -272,6 +265,17 @@ function gke-setup-containerd {
   ]
 }
 EOF
+}
+
+function gke-setup-containerd {
+  local -r CONTAINERD_HOME="/home/containerd"
+  mkdir -p "${CONTAINERD_HOME}"
+
+  echo "Generating containerd config"
+  local -r config_path="${CONTAINERD_CONFIG_PATH:-"/etc/containerd/config.toml"}"
+  mkdir -p "$(dirname "${config_path}")"
+  local cni_template_path="${CONTAINERD_HOME}/cni.template"
+  _gke_cni_template > "${cni_template_path}"
   if [[ "${KUBERNETES_MASTER:-}" != "true" ]]; then
     if [[ "${NETWORK_POLICY_PROVIDER:-"none"}" != "none" || "${ENABLE_NETD:-}" == "true" ]]; then
       # Use Kubernetes cni daemonset on node if network policy provider is specified

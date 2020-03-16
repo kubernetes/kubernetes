@@ -33,6 +33,23 @@ go_test(
     ],
 )
 
+sh_library(
+    name="gke-lib",
+    srcs = [
+        "gke-internal-configure-helper.sh"
+    ],
+    visibility = ["//cluster/gce:__subpackages__"],
+)
+
+sh_test(
+    name = "gke-internal-configure-helper-test",
+    size = "small",
+    srcs = [
+        "gke-internal-configure-helper-test.sh",
+    ],
+    deps = [ "//cluster/gce/gci:gke-lib" ],
+)
+
 # Having the COS code from the GCE cluster deploy hosted with the release is
 # useful for GKE.  This list should match the list in
 # kubernetes/release/lib/releaselib.sh.
