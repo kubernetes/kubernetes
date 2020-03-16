@@ -96,7 +96,11 @@ type csiDriverClient struct {
 }
 
 type csiResizeOptions struct {
-	volumeid          string
+	volumeID string
+	// volumePath is path where volume is available. It could be:
+	//   - path where node is staged if NodeExpandVolume is called after NodeStageVolume
+	//   - path where volume is published if NodeExpandVolume is called after NodePublishVolume
+	// DEPRECATION NOTICE: in future NodeExpandVolume will be always called after NodePublish
 	volumePath        string
 	stagingTargetPath string
 	fsType            string
@@ -260,10 +264,10 @@ func (c *csiDriverClient) NodeExpandVolume(ctx context.Context, opts csiResizeOp
 		return opts.newSize, fmt.Errorf("version of CSI driver does not support volume expansion")
 	}
 
-	if opts.volumeid == "" {
+	if opts.volumeID == "" {
 		return opts.newSize, errors.New("missing volume id")
 	}
-	if opts.volumeid == "" {
+	if opts.volumePath == "" {
 		return opts.newSize, errors.New("missing volume path")
 	}
 
@@ -278,7 +282,7 @@ func (c *csiDriverClient) NodeExpandVolume(ctx context.Context, opts csiResizeOp
 	defer closer.Close()
 
 	req := &csipbv1.NodeExpandVolumeRequest{
-		VolumeId:          opts.volumeid,
+		VolumeId:          opts.volumeID,
 		VolumePath:        opts.volumePath,
 		StagingTargetPath: opts.stagingTargetPath,
 		CapacityRange:     &csipbv1.CapacityRange{RequiredBytes: opts.newSize.Value()},

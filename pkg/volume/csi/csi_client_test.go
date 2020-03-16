@@ -287,7 +287,7 @@ func (c *fakeCsiDriverClient) NodeSupportsStageUnstage(ctx context.Context) (boo
 func (c *fakeCsiDriverClient) NodeExpandVolume(ctx context.Context, opts csiResizeOptions) (resource.Quantity, error) {
 	c.t.Log("calling fake.NodeExpandVolume")
 	req := &csipbv1.NodeExpandVolumeRequest{
-		VolumeId:          opts.volumeid,
+		VolumeId:          opts.volumeID,
 		VolumePath:        opts.volumePath,
 		StagingTargetPath: opts.stagingTargetPath,
 		CapacityRange:     &csipbv1.CapacityRange{RequiredBytes: opts.newSize.Value()},
@@ -653,7 +653,7 @@ func TestNodeExpandVolume(t *testing.T) {
 				return nodeClient, fakeCloser, nil
 			},
 		}
-		opts := csiResizeOptions{volumeid: tc.volID, volumePath: tc.volumePath, newSize: tc.newSize}
+		opts := csiResizeOptions{volumeID: tc.volID, volumePath: tc.volumePath, newSize: tc.newSize}
 		_, err := client.NodeExpandVolume(context.Background(), opts)
 		checkErr(t, tc.mustFail, err)
 		if !tc.mustFail {

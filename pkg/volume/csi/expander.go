@@ -102,7 +102,7 @@ func (c *csiPlugin) nodeExpandWithClient(
 	opts := csiResizeOptions{
 		volumePath:        resizeOptions.DeviceMountPath,
 		stagingTargetPath: resizeOptions.DeviceStagePath,
-		volumeid:          csiSource.VolumeHandle,
+		volumeID:          csiSource.VolumeHandle,
 		newSize:           resizeOptions.NewSize,
 		fsType:            csiSource.FSType,
 		accessMode:        api.ReadWriteOnce,

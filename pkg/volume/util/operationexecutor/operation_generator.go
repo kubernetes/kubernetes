@@ -603,6 +603,10 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 				return volumeToMount.GenerateError("MountVolume.MarkDeviceAsMounted failed", markDeviceMountedErr)
 			}
 
+			// If volume expansion is performed after MountDevice but before SetUp then
+			// deviceMountPath and deviceStagePath is going to be the same.
+			// Deprecation: Calling NodeExpandVolume after NodeStage/MountDevice will be deprecated
+			// in a future version of k8s.
 			resizeOptions.DeviceMountPath = deviceMountPath
 			resizeOptions.DeviceStagePath = deviceMountPath
 			resizeOptions.CSIVolumePhase = volume.CSIVolumeStaged
