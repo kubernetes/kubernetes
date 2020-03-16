@@ -34,6 +34,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
@@ -829,6 +832,80 @@ func TestExternalIPsReject(t *testing.T) {
 	kubeSvcRules := ipt.GetRules(string(kubeExternalServicesChain))
 	if !hasJump(kubeSvcRules, iptablestest.Reject, svcExternalIPs, svcPort) {
 		errorf(fmt.Sprintf("Failed to find a %v rule for externalIP %v with no endpoints", iptablestest.Reject, svcPortName), kubeSvcRules, t)
+	}
+}
+
+func TestOnlyLocalExternalIPs(t *testing.T) {
+	// TODO(freehan): remove this in k8s 1.19
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExternalPolicyForExternalIP, true)()
+
+	ipt := iptablestest.NewFake()
+	fp := NewFakeProxier(ipt, false)
+	svcIP := "10.20.30.41"
+	svcPort := 80
+	svcExternalIPs := "50.60.70.81"
+	svcPortName := proxy.ServicePortName{
+		NamespacedName: makeNSN("ns1", "svc1"),
+		Port:           "p80",
+	}
+
+	makeServiceMap(fp,
+		makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *v1.Service) {
+			svc.Spec.Type = "NodePort"
+			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+			svc.Spec.ClusterIP = svcIP
+			svc.Spec.ExternalIPs = []string{svcExternalIPs}
+			svc.Spec.Ports = []v1.ServicePort{{
+				Name:       svcPortName.Port,
+				Port:       int32(svcPort),
+				Protocol:   v1.ProtocolTCP,
+				TargetPort: intstr.FromInt(svcPort),
+			}}
+		}),
+	)
+	makeEndpointsMap(fp)
+	epIP1 := "10.180.0.1"
+	epIP2 := "10.180.2.1"
+	epStrLocal := fmt.Sprintf("%s:%d", epIP1, svcPort)
+	epStrNonLocal := fmt.Sprintf("%s:%d", epIP2, svcPort)
+	makeEndpointsMap(fp,
+		makeTestEndpoints(svcPortName.Namespace, svcPortName.Name, func(ept *v1.Endpoints) {
+			ept.Subsets = []v1.EndpointSubset{{
+				Addresses: []v1.EndpointAddress{{
+					IP:       epIP1,
+					NodeName: nil,
+				}, {
+					IP:       epIP2,
+					NodeName: utilpointer.StringPtr(testHostname),
+				}},
+				Ports: []v1.EndpointPort{{
+					Name:     svcPortName.Port,
+					Port:     int32(svcPort),
+					Protocol: v1.ProtocolTCP,
+				}},
+			}}
+		}),
+	)
+
+	fp.syncProxyRules()
+
+	proto := strings.ToLower(string(v1.ProtocolTCP))
+	lbChain := string(serviceLBChainName(svcPortName.String(), proto))
+
+	nonLocalEpChain := string(servicePortEndpointChainName(svcPortName.String(), strings.ToLower(string(v1.ProtocolTCP)), epStrLocal))
+	localEpChain := string(servicePortEndpointChainName(svcPortName.String(), strings.ToLower(string(v1.ProtocolTCP)), epStrNonLocal))
+
+	kubeSvcRules := ipt.GetRules(string(kubeServicesChain))
+	if !hasJump(kubeSvcRules, lbChain, svcExternalIPs, svcPort) {
+		errorf(fmt.Sprintf("Failed to find jump to xlb chain %v", lbChain), kubeSvcRules, t)
+	}
+
+	lbRules := ipt.GetRules(lbChain)
+	if hasJump(lbRules, nonLocalEpChain, "", 0) {
+		errorf(fmt.Sprintf("Found jump from lb chain %v to non-local ep %v", lbChain, epStrLocal), lbRules, t)
+	}
+	if !hasJump(lbRules, localEpChain, "", 0) {
+		errorf(fmt.Sprintf("Didn't find jump from lb chain %v to local ep %v", lbChain, epStrNonLocal), lbRules, t)
 	}
 }
 
