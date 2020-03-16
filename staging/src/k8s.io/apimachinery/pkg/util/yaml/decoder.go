@@ -92,7 +92,7 @@ type YAMLDecoder struct {
 // the caller in framing the chunk.
 func NewDocumentDecoder(r io.ReadCloser) io.ReadCloser {
 	scanner := bufio.NewScanner(r)
-	buf := make([]byte, 64*1024)
+	buf := make([]byte, 4096)
 	scanner.Buffer(buf, 5*1024*1024)
 	scanner.Split(splitYAMLDocument)
 	return &YAMLDecoder{
