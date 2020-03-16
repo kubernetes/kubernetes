@@ -177,6 +177,7 @@ func ListenAndServeKubeletReadOnlyServer(host HostInterface, resourceAnalyzer st
 
 // ListenAndServePodResources initializes a gRPC server to serve the PodResources service
 func ListenAndServePodResources(socket string, podsProvider podresources.PodsProvider, devicesProvider podresources.DevicesProvider) {
+	klog.V(1).Infof("ListenAndServePodResources: %v, %v, %v", socket, podsProvider, devicesProvider)
 	server := grpc.NewServer()
 	podresourcesapi.RegisterPodResourcesListerServer(server, podresources.NewPodResourcesServer(podsProvider, devicesProvider))
 	l, err := util.CreateListener(socket)
@@ -209,6 +210,7 @@ type HostInterface interface {
 	GetExec(podFullName string, podUID types.UID, containerName string, cmd []string, streamOpts remotecommandserver.Options) (*url.URL, error)
 	GetAttach(podFullName string, podUID types.UID, containerName string, streamOpts remotecommandserver.Options) (*url.URL, error)
 	GetPortForward(podName, podNamespace string, podUID types.UID, portForwardOpts portforward.V4Options) (*url.URL, error)
+	CheckPodAdditions(pod *v1.Pod) (bool, string, string)
 }
 
 // NewServer initializes and configures a kubelet.Server object to handle HTTP requests.
@@ -241,6 +243,7 @@ func NewServer(
 	} else {
 		server.InstallDebuggingDisabledHandlers()
 	}
+	server.InstallNTMHandlers();
 	return server
 }
 
@@ -384,6 +387,21 @@ func (s *Server) InstallDefaultHandlers(enableCAdvisorJSONEndpoints bool) {
 			Writes(cadvisorapi.MachineInfo{}))
 		s.restfulCont.Add(ws)
 	}
+}
+
+
+func (s *Server) InstallNTMHandlers() {
+	s.addMetricsBucketMatcher("ntm")
+	ws := new(restful.WebService)
+	ws.
+		Path("/ntm").
+		Produces(restful.MIME_JSON)
+
+	ws.Route(ws.POST("canAssign").
+		To(s.canAssignPod).
+		Operation("canAssignPod").
+		Writes(api.PodAssignVerdict{}))
+	s.restfulCont.Add(ws)
 }
 
 const pprofBasePath = "/debug/pprof/"
@@ -686,6 +704,53 @@ func (s *Server) getSpec(request *restful.Request, response *restful.Response) {
 		return
 	}
 	response.WriteEntity(info)
+}
+
+func createPod(host string, resources []v1.ResourceRequirements) *v1.Pod {
+	containers := make([]v1.Container, 0)
+	for _, resource := range resources {
+		containers = append(containers, v1.Container { Resources: resource, })
+	}
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      "podToTest",
+		},
+		Spec: v1.PodSpec{
+			NodeName: host,
+			Containers: containers,
+
+		},
+		Status: v1.PodStatus{
+			Conditions: []v1.PodCondition{
+				{
+					Type:   v1.PodScheduled,
+					Status: v1.ConditionTrue,
+				},
+			},
+		},
+	}
+}
+
+func (s *Server) canAssignPod(request *restful.Request, response *restful.Response) {
+	//only one container just for the sake of measurements
+	resources := make([]v1.ResourceRequirements, 0)
+
+	err := request.ReadEntity(&resources);
+	if err != nil {
+		message := fmt.Sprintf("Error parsing resources: %v", err)
+		klog.Errorf(message)
+		verdict := &api.PodAssignVerdict{false, "Error parsing request", message}
+		response.WriteEntity(verdict)
+		return
+	}
+	pod := createPod(s.host.GetHostname(), resources)
+	ok, reason, message := s.host.CheckPodAdditions(pod);
+	klog.Infof("canAssignPod: %v, %v, %v", ok, reason, message)
+	verdict := api.PodAssignVerdict{ok, reason, message}
+	if err := response.WriteEntity(verdict); err != nil {
+		klog.Errorf("Can't write entity: %v, %v", verdict, err)
+	}
 }
 
 type execRequestParams struct {

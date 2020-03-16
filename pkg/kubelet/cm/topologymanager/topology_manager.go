@@ -255,6 +255,10 @@ func (m *manager) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitR
 			}
 		}
 
+		if attrs.SkipAllocate {
+			return lifecycle.PodAdmitResult{Admit: true}
+		}
+
 		klog.Infof("[topologymanager] Topology Affinity for (pod: %v container: %v): %v", pod.UID, container.Name, result)
 		if m.podTopologyHints[string(pod.UID)] == nil {
 			m.podTopologyHints[string(pod.UID)] = make(map[string]TopologyHint)

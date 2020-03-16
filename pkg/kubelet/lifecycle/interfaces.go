@@ -25,6 +25,8 @@ type PodAdmitAttributes struct {
 	Pod *v1.Pod
 	// all pods bound to the kubelet excluding the pod being evaluated
 	OtherPods []*v1.Pod
+	// Do not allocate pod, needed just to check admission ability
+	SkipAllocate bool
 }
 
 // PodAdmitResult provides the result of a pod admission decision.

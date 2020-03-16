@@ -1750,13 +1750,15 @@ func (kl *Kubelet) rejectPod(pod *v1.Pod, reason, message string) {
 // The function returns a boolean value indicating whether the pod
 // can be admitted, a brief single-word reason and a message explaining why
 // the pod cannot be admitted.
-func (kl *Kubelet) canAdmitPod(pods []*v1.Pod, pod *v1.Pod) (bool, string, string) {
+func (kl *Kubelet) canAdmitPod(pods []*v1.Pod, pod *v1.Pod, skipAllocate bool) (bool, string, string) {
 	// the kubelet will invoke each pod admit handler in sequence
 	// if any handler rejects, the pod is rejected.
 	// TODO: move out of disk check into a pod admitter
 	// TODO: out of resource eviction should have a pod admitter call-out
-	attrs := &lifecycle.PodAdmitAttributes{Pod: pod, OtherPods: pods}
+	attrs := &lifecycle.PodAdmitAttributes{Pod: pod, OtherPods: pods, SkipAllocate: skipAllocate}
+	klog.Infof("canAdmitPod, admitHandlers: %v", kl.admitHandlers)
 	for _, podAdmitHandler := range kl.admitHandlers {
+		klog.Infof("podAdmitHandler: %v", podAdmitHandler)
 		if result := podAdmitHandler.Admit(attrs); !result.Admit {
 			return false, result.Reason, result.Message
 		}
@@ -2011,6 +2013,20 @@ func (kl *Kubelet) handleMirrorPod(mirrorPod *v1.Pod, start time.Time) {
 	}
 }
 
+
+func (kl *Kubelet) CheckPodAdditions(pod *v1.Pod) (bool, string, string) {
+	existingPods := kl.podManager.GetPods()
+
+	if !kl.podIsTerminated(pod) {
+		// the same as in HandlePodAdditions
+		activePods := kl.filterOutTerminatedPods(existingPods)
+		klog.Infof("pod: %v, activePods: %v", pod, activePods)
+		// Check if we can admit the pod
+		return kl.canAdmitPod(activePods, pod, true)
+	}
+	return false, "", ""
+}
+
 // HandlePodAdditions is the callback in SyncHandler for pods being added from
 // a config source.
 func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
@@ -2038,7 +2054,7 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 			activePods := kl.filterOutTerminatedPods(existingPods)
 
 			// Check if we can admit the pod; if not, reject it.
-			if ok, reason, message := kl.canAdmitPod(activePods, pod); !ok {
+			if ok, reason, message := kl.canAdmitPod(activePods, pod, false); !ok {
 				kl.rejectPod(pod, reason, message)
 				continue
 			}
