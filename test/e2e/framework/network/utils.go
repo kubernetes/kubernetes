@@ -567,7 +567,7 @@ func (config *NetworkingTestConfig) createTestPods() {
 		config.createPod(hostTestContainerPod)
 	}
 
-	framework.ExpectNoError(config.f.WaitForPodRunning(testContainerPod.Name))
+	framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(config.f.ClientSet, testContainerPod.Name, config.f.Namespace.Name))
 
 	var err error
 	config.TestContainerPod, err = config.getPodClient().Get(context.TODO(), testContainerPod.Name, metav1.GetOptions{})
@@ -576,7 +576,7 @@ func (config *NetworkingTestConfig) createTestPods() {
 	}
 
 	if config.HostNetwork {
-		framework.ExpectNoError(config.f.WaitForPodRunning(hostTestContainerPod.Name))
+		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(config.f.ClientSet, hostTestContainerPod.Name, config.f.Namespace.Name))
 		config.HostTestContainerPod, err = config.getPodClient().Get(context.TODO(), hostTestContainerPod.Name, metav1.GetOptions{})
 		if err != nil {
 			framework.Failf("Failed to retrieve %s pod: %v", hostTestContainerPod.Name, err)

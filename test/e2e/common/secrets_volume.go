@@ -632,7 +632,7 @@ func createNonOptionalSecretPod(f *framework.Framework, volumeMountPath, podName
 	}
 	ginkgo.By("Creating the pod")
 	pod = f.PodClient().Create(pod)
-	return f.WaitForPodRunning(pod.Name)
+	return e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
 }
 
 func createNonOptionalSecretPodWithSecret(f *framework.Framework, volumeMountPath, podName string) error {
@@ -693,5 +693,5 @@ func createNonOptionalSecretPodWithSecret(f *framework.Framework, volumeMountPat
 	}
 	ginkgo.By("Creating the pod")
 	pod = f.PodClient().Create(pod)
-	return f.WaitForPodRunning(pod.Name)
+	return e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
 }

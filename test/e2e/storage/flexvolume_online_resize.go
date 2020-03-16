@@ -157,7 +157,7 @@ var _ = utils.SIGDescribe("Mounted flexvolume volume expand [Slow] [Feature:Expa
 		defer e2epod.DeletePodWithWait(c, pod)
 
 		ginkgo.By("Waiting for pod to go to 'running' state")
-		err = f.WaitForPodRunning(pod.ObjectMeta.Name)
+		err = e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.ObjectMeta.Name, f.Namespace.Name)
 		framework.ExpectNoError(err, "Pod didn't go to 'running' state %v", err)
 
 		ginkgo.By("Expanding current pvc")
