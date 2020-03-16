@@ -59,7 +59,11 @@ kube::test::find_dirs() {
   )
 }
 
-KUBE_TIMEOUT=${KUBE_TIMEOUT:--timeout=120s}
+# The default timeout of 120s is not sufficient for the following packages
+# whose successful execution takes longer than that.
+# - k8s.io/kubernetes/pkg/kubelet/volumemanager/reconciler
+# - k8s.io/kubernetes/pkg/volume/csi
+KUBE_TIMEOUT=${KUBE_TIMEOUT:--timeout=180s}
 KUBE_COVER=${KUBE_COVER:-n} # set to 'y' to enable coverage collection
 KUBE_COVERMODE=${KUBE_COVERMODE:-atomic}
 # The directory to save test coverage reports to, if generating them. If unset,
