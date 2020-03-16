@@ -108,7 +108,7 @@ type ScheduleAlgorithm interface {
 	// It returns the node where preemption happened, a list of preempted pods, a
 	// list of pods whose nominated node name should be removed, and error if any.
 	Preempt(context.Context, *profile.Profile, *framework.CycleState, *v1.Pod, error) (selectedNode *v1.Node, preemptedPods []*v1.Pod, cleanupNominatedPods []*v1.Pod, err error)
-	// Prioritizers returns a slice of priority config. This is exposed for
+	// Extenders returns a slice of extender config. This is exposed for
 	// testing.
 	Extenders() []SchedulerExtender
 }
