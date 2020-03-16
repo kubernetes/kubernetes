@@ -1920,11 +1920,19 @@ func formatHPAMetrics(specs []autoscaling.MetricSpec, statuses []autoscaling.Met
 			}
 			list = append(list, fmt.Sprintf("%s/%s", current, spec.Pods.Target.AverageValue.String()))
 		case autoscaling.ObjectMetricSourceType:
-			current := "<unknown>"
-			if len(statuses) > i && statuses[i].Object != nil {
-				current = statuses[i].Object.Current.Value.String()
+			if spec.Object.Target.AverageValue != nil {
+				current := "<unknown>"
+				if len(statuses) > i && statuses[i].Object != nil && statuses[i].Object.Current.AverageValue != nil {
+					current = statuses[i].Object.Current.AverageValue.String()
+				}
+				list = append(list, fmt.Sprintf("%s/%s (avg)", current, spec.Object.Target.AverageValue.String()))
+			} else {
+				current := "<unknown>"
+				if len(statuses) > i && statuses[i].Object != nil {
+					current = statuses[i].Object.Current.Value.String()
+				}
+				list = append(list, fmt.Sprintf("%s/%s", current, spec.Object.Target.Value.String()))
 			}
-			list = append(list, fmt.Sprintf("%s/%s", current, spec.Object.Target.Value.String()))
 		case autoscaling.ResourceMetricSourceType:
 			if spec.Resource.Target.AverageValue != nil {
 				current := "<unknown>"
