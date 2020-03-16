@@ -17,6 +17,9 @@ spec:
         k8s-app: fluentd-gcp-scaler
     spec:
       serviceAccountName: fluentd-gcp-scaler
+      tolerations:
+      - key: "components.gke.io/gke-managed-components"
+        operator: "Exists"
       containers:
       - name: fluentd-gcp-scaler
         image: k8s.gcr.io/fluentd-gcp-scaler:0.5.2

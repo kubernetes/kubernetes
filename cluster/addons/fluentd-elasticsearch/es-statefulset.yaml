@@ -96,6 +96,9 @@ spec:
               port: transport
             initialDelaySeconds: 5
             timeoutSeconds: 10
+          tolerations:
+            - key: components.gke.io/gke-managed-components
+              operator: Exists
           volumeMounts:
             - name: elasticsearch-logging
               mountPath: /data

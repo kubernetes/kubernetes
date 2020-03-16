@@ -36,3 +36,6 @@ spec:
           limits:
             cpu: 10m
       serviceAccountName: typha-cpha
+      tolerations:
+      - key: "components.gke.io/gke-managed-components"
+        operator: "Exists"

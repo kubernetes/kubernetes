@@ -76,6 +76,9 @@ spec:
                 fieldPath: metadata.namespace
       # END_PROMETHEUS_TO_SD
       terminationGracePeriodSeconds: 30
+      tolerations:
+      - key: "components.gke.io/gke-managed-components"
+        operator: "Exists"
       volumes:
       - name: ssl-certs
         hostPath:
