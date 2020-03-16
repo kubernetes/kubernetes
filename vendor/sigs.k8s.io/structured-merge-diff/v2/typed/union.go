@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"strings"
 
-	"sigs.k8s.io/structured-merge-diff/schema"
-	"sigs.k8s.io/structured-merge-diff/value"
+	"sigs.k8s.io/structured-merge-diff/v2/schema"
+	"sigs.k8s.io/structured-merge-diff/v2/value"
 )
 
 func normalizeUnions(w *mergingWalker) error {

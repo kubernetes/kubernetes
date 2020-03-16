@@ -4,21 +4,16 @@ go_library(
     name = "go_default_library",
     srcs = [
         "doc.go",
-        "element.go",
-        "fromvalue.go",
-        "managers.go",
-        "path.go",
-        "pathelementmap.go",
-        "serialize.go",
-        "serialize-pe.go",
-        "set.go",
+        "fastjson.go",
+        "unstructured.go",
+        "value.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/sigs.k8s.io/structured-merge-diff/fieldpath",
-    importpath = "sigs.k8s.io/structured-merge-diff/fieldpath",
+    importmap = "k8s.io/kubernetes/vendor/sigs.k8s.io/structured-merge-diff/v2/value",
+    importpath = "sigs.k8s.io/structured-merge-diff/v2/value",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/json-iterator/go:go_default_library",
-        "//vendor/sigs.k8s.io/structured-merge-diff/value:go_default_library",
+        "//vendor/gopkg.in/yaml.v2:go_default_library",
     ],
 )
 

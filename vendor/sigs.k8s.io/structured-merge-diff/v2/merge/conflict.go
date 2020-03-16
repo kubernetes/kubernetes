@@ -21,7 +21,7 @@ import (
 	"sort"
 	"strings"
 
-	"sigs.k8s.io/structured-merge-diff/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v2/fieldpath"
 )
 
 // Conflict is a conflict on a specific field with the current manager of
