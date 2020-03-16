@@ -610,8 +610,8 @@ var _ volume.BlockVolumeMapper = &localVolumeMapper{}
 var _ volume.CustomBlockVolumeMapper = &localVolumeMapper{}
 
 // SetUpDevice prepares the volume to the node by the plugin specific way.
-func (m *localVolumeMapper) SetUpDevice() error {
-	return nil
+func (m *localVolumeMapper) SetUpDevice() (string, error) {
+	return "", nil
 }
 
 // MapPodDevice provides physical device path for the local PV.

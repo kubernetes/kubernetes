@@ -234,13 +234,12 @@ func TestBlockMapperSetupDevice(t *testing.T) {
 	}
 	t.Log("created attachement ", attachID)
 
-	err = csiMapper.SetUpDevice()
+	stagingPath, err := csiMapper.SetUpDevice()
 	if err != nil {
 		t.Fatalf("mapper failed to SetupDevice: %v", err)
 	}
 
 	// Check if NodeStageVolume staged to the right path
-	stagingPath := csiMapper.getStagingPath()
 	svols := csiMapper.csiClient.(*fakeCsiDriverClient).nodeClient.GetNodeStagedVolumes()
 	svol, ok := svols[csiMapper.volumeID]
 	if !ok {

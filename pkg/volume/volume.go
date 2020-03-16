@@ -174,7 +174,7 @@ type CustomBlockVolumeMapper interface {
 	// For most in-tree plugins, attacher.Attach() and attacher.WaitForAttach()
 	// will do necessary works.
 	// This may be called more than once, so implementations must be idempotent.
-	SetUpDevice() error
+	SetUpDevice() (string, error)
 
 	// MapPodDevice maps the block device to a path and return the path.
 	// Unique device path across kubelet node reboot is required to avoid

@@ -947,6 +947,7 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 
 	mapVolumeFunc := func() (simpleErr error, detailedErr error) {
 		var devicePath string
+		var stagingPath string
 		// Set up global map path under the given plugin directory using symbolic link
 		globalMapPath, err :=
 			blockVolumeMapper.GetGlobalMapPath(volumeToMount.VolumeSpec)
@@ -970,7 +971,8 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 		}
 		// Call SetUpDevice if blockVolumeMapper implements CustomBlockVolumeMapper
 		if customBlockVolumeMapper, ok := blockVolumeMapper.(volume.CustomBlockVolumeMapper); ok {
-			mapErr := customBlockVolumeMapper.SetUpDevice()
+			var mapErr error
+			stagingPath, mapErr = customBlockVolumeMapper.SetUpDevice()
 			if mapErr != nil {
 				og.markDeviceErrorState(volumeToMount, devicePath, globalMapPath, mapErr, actualStateOfWorld)
 				// On failure, return error. Caller will log and retry.
@@ -1073,8 +1075,9 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 		klog.V(verbosity).Infof(detailedMsg)
 
 		resizeOptions := volume.NodeResizeOptions{
-			DevicePath:     devicePath,
-			CSIVolumePhase: volume.CSIVolumePublished,
+			DevicePath:      devicePath,
+			DeviceStagePath: stagingPath,
+			CSIVolumePhase:  volume.CSIVolumePublished,
 		}
 		_, resizeError := og.nodeExpandVolume(volumeToMount, resizeOptions)
 		if resizeError != nil {
