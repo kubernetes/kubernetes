@@ -64,6 +64,7 @@ func (g *Cloud) ListInstanceGroups(zone string) ([]*compute.InstanceGroup, error
 
 // ListInstanceGroupsWithPrefix lists all InstanceGroups in the project and
 // zone with given prefix.
+// When the prefix is empty it lists all the instance groups.
 func (g *Cloud) ListInstanceGroupsWithPrefix(zone string, prefix string) ([]*compute.InstanceGroup, error) {
 	ctx, cancel := cloud.ContextWithCallTimeout()
 	defer cancel()

@@ -659,7 +659,10 @@ func gceInstanceNames(instances []*gceInstance) []string {
 	return ret
 }
 
-// reuseInstanceGroup returns true if all the instances in the ig are part of the instancesToInclude and list of instances in the ig.
+// reuseInstanceGroupForInternalLoadbalancer returns true if all the instances in the ig are part of the instancesToInclude and list of instances in the ig.
+// reuseInstanceGroupForInternalLoadbalancer returns true when all the instances in `instancesToInclude` are already part of the instance group `ig`
+// reuseInstanceGroupForInternalLoadbalancer also returns a list of all the instances in the instance group `ig`
+// reuseInstanceGroupForInternalLoadbalancer returns an error when it fails to list instances in the instance group `ig`
 func (g *Cloud) reuseInstanceGroupForInternalLoadbalancer(ig *compute.InstanceGroup, instancesToInclude sets.String) (bool, []string, error) {
 	igInstances, err := g.ListInstancesInInstanceGroup(ig.Name, ig.Zone, allInstances)
 	if err != nil {
