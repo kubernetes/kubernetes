@@ -47,6 +47,7 @@ var (
 
 	defaultTests = []struct{ nodes, existingPods, minPods int }{
 		{nodes: 500, existingPods: 500, minPods: 1000},
+		{nodes: 600, existingPods: 10000, minPods: 1000},
 		{nodes: 5000, existingPods: 5000, minPods: 1000},
 	}
 	testNamespace  = "sched-test"

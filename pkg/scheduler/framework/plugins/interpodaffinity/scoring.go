@@ -22,9 +22,9 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	"k8s.io/kubernetes/pkg/scheduler/internal/parallelize"
 	"k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
@@ -259,7 +259,7 @@ func (pl *InterPodAffinity) PreScore(
 			pl.Unlock()
 		}
 	}
-	workqueue.ParallelizeUntil(ctx, 16, len(allNodes), processNode)
+	parallelize.Until(ctx, len(allNodes), processNode)
 	if err := errCh.ReceiveError(); err != nil {
 		return framework.NewStatus(framework.Error, err.Error())
 	}

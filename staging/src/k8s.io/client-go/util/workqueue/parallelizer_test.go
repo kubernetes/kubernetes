@@ -83,24 +83,29 @@ func BenchmarkParallelizeUntil(b *testing.B) {
 		b.Run(tc.String(), func(b *testing.B) {
 			ctx := context.Background()
 			isPrime := make([]bool, tc.pieces)
+			b.ResetTimer()
 			for c := 0; c < b.N; c++ {
 				ParallelizeUntil(ctx, tc.workers, tc.pieces, func(p int) {
-					if p <= 1 {
-						return
-					}
-					isPrime[p] = true
-					for i := 2; i*i <= p; i++ {
-						if p%i == 0 {
-							isPrime[p] = false
-							return
-						}
-					}
+					isPrime[p] = calPrime(p)
 				}, WithChunkSize(tc.chunkSize))
 			}
+			b.StopTimer()
 			want := []bool{false, false, true, true, false, true, false, true, false, false, false, true}
 			if diff := cmp.Diff(want, isPrime[:len(want)]); diff != "" {
 				b.Errorf("miscalculated isPrime (-want,+got):\n%s", diff)
 			}
 		})
 	}
+}
+
+func calPrime(p int) bool {
+	if p <= 1 {
+		return false
+	}
+	for i := 2; i*i <= p; i++ {
+		if p%i == 0 {
+			return false
+		}
+	}
+	return true
 }

@@ -19,16 +19,15 @@ package interpodaffinity
 import (
 	"context"
 	"fmt"
-	"math"
 	"sync"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	"k8s.io/kubernetes/pkg/scheduler/internal/parallelize"
 	"k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
@@ -37,8 +36,6 @@ const (
 	// preFilterStateKey is the key in CycleState to InterPodAffinity pre-computed data for Filtering.
 	// Using the name of the plugin will likely help us avoid collisions with other plugins.
 	preFilterStateKey = "PreFilter" + Name
-	// minChunkSize is the minimum number of work items sent to a routine when parallelizing.
-	minChunkSize = 8
 
 	// ErrReasonExistingAntiAffinityRulesNotMatch is used for ExistingPodsAntiAffinityRulesNotMatch predicate error.
 	ErrReasonExistingAntiAffinityRulesNotMatch = "node(s) didn't satisfy existing pods anti-affinity rules"
@@ -243,7 +240,7 @@ func getTPMapMatchingExistingAntiAffinity(pod *v1.Pod, allNodes []*nodeinfo.Node
 			}
 		}
 	}
-	workqueue.ParallelizeUntil(ctx, 16, len(allNodes), processNode, chunkSizeFor(len(allNodes)))
+	parallelize.Until(ctx, len(allNodes), processNode)
 
 	if err := errCh.ReceiveError(); err != nil {
 		return nil, err
@@ -307,7 +304,7 @@ func getTPMapMatchingIncomingAffinityAntiAffinity(pod *v1.Pod, allNodes []*nodei
 			appendResult(node.Name, nodeTopologyPairsAffinityPodsMap, nodeTopologyPairsAntiAffinityPodsMap)
 		}
 	}
-	workqueue.ParallelizeUntil(context.Background(), 16, len(allNodes), processNode, chunkSizeFor(len(allNodes)))
+	parallelize.Until(context.Background(), len(allNodes), processNode)
 
 	return topologyPairsAffinityPodsMap, topologyToMatchedExistingAntiAffinityTerms, nil
 }
@@ -547,12 +544,4 @@ func (pl *InterPodAffinity) Filter(ctx context.Context, cycleState *framework.Cy
 	}
 
 	return nil
-}
-
-func chunkSizeFor(n int) workqueue.Options {
-	s := int(math.Sqrt(float64(n)))
-	if s < minChunkSize {
-		s = minChunkSize
-	}
-	return workqueue.WithChunkSize(s)
 }

@@ -123,6 +123,7 @@ filegroup(
         "//pkg/scheduler/framework:all-srcs",
         "//pkg/scheduler/internal/cache:all-srcs",
         "//pkg/scheduler/internal/heap:all-srcs",
+        "//pkg/scheduler/internal/parallelize:all-srcs",
         "//pkg/scheduler/internal/queue:all-srcs",
         "//pkg/scheduler/listers:all-srcs",
         "//pkg/scheduler/metrics:all-srcs",
