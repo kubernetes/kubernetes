@@ -207,7 +207,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	s.GenericAPIServer.Handler.NonGoRestfulMux.Handle("/apis", crdHandler)
 	s.GenericAPIServer.Handler.NonGoRestfulMux.HandlePrefix("/apis/", crdHandler)
 
-	crdController := NewDiscoveryController(s.Informers.Apiextensions().V1().CustomResourceDefinitions(), versionDiscoveryHandler, groupDiscoveryHandler)
+	discoveryController := NewDiscoveryController(s.Informers.Apiextensions().V1().CustomResourceDefinitions(), versionDiscoveryHandler, groupDiscoveryHandler)
 	namingController := status.NewNamingConditionController(s.Informers.Apiextensions().V1().CustomResourceDefinitions(), crdClient.ApiextensionsV1())
 	nonStructuralSchemaController := nonstructuralschema.NewConditionController(s.Informers.Apiextensions().V1().CustomResourceDefinitions(), crdClient.ApiextensionsV1())
 	apiApprovalController := apiapproval.NewKubernetesAPIApprovalPolicyConformantConditionController(s.Informers.Apiextensions().V1().CustomResourceDefinitions(), crdClient.ApiextensionsV1())
@@ -231,12 +231,19 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 			go openapiController.Run(s.GenericAPIServer.StaticOpenAPISpec, s.GenericAPIServer.OpenAPIVersionedService, context.StopCh)
 		}
 
-		go crdController.Run(context.StopCh)
 		go namingController.Run(context.StopCh)
 		go establishingController.Run(context.StopCh)
 		go nonStructuralSchemaController.Run(5, context.StopCh)
 		go apiApprovalController.Run(5, context.StopCh)
 		go finalizingController.Run(5, context.StopCh)
+
+		discoverySyncedCh := make(chan struct{})
+		go discoveryController.Run(context.StopCh, discoverySyncedCh)
+		select {
+		case <-context.StopCh:
+		case <-discoverySyncedCh:
+		}
+
 		return nil
 	})
 	// we don't want to report healthy until we can handle all CRDs that have already been registered.  Waiting for the informer
