@@ -361,3 +361,56 @@ func TestNodeAddresses(t *testing.T) {
 		}
 	}
 }
+
+func TestIsCurrentInstance(t *testing.T) {
+	cloud := &Cloud{
+		Config: Config{
+			VMType: vmTypeVMSS,
+		},
+	}
+	testcases := []struct {
+		nodeName       string
+		metadataVMName string
+		expected       bool
+		expectError    bool
+	}{
+		{
+			nodeName:       "node1",
+			metadataVMName: "node1",
+			expected:       true,
+		},
+		{
+			nodeName:       "node1",
+			metadataVMName: "node2",
+			expected:       false,
+		},
+		{
+			nodeName:       "vmss000001",
+			metadataVMName: "vmss_1",
+			expected:       true,
+		},
+		{
+			nodeName:       "vmss_2",
+			metadataVMName: "vmss000000",
+			expected:       false,
+		},
+		{
+			nodeName:       "vmss123456",
+			metadataVMName: "vmss_$123",
+			expected:       false,
+			expectError:    true,
+		},
+	}
+
+	for i, test := range testcases {
+		real, err := cloud.isCurrentInstance(types.NodeName(test.nodeName), test.metadataVMName)
+		if test.expectError {
+			if err == nil {
+				t.Errorf("Test[%d] unexpected nil err", i)
+			}
+		}
+		if real != test.expected {
+			t.Errorf("Test[%d] unexpected isCurrentInstance result %v != %v", i, real, test.expected)
+		}
+	}
+}
