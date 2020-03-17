@@ -59,7 +59,7 @@ dependencies:
 
 
   - name: "coredns-kube-up"
-    version: 1.6.5
+    version: 1.6.7
     refPaths:
     - path: cluster/addons/dns/coredns/coredns.yaml.base
       match: k8s.gcr.io/coredns
