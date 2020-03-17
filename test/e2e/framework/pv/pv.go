@@ -53,13 +53,13 @@ const (
 	// VolumeSelectorKey is the key for volume selector.
 	VolumeSelectorKey = "e2e-pv-pool"
 
-	// IsDefaultStorageClassAnnotation represents a StorageClass annotation that
+	// isDefaultStorageClassAnnotation represents a StorageClass annotation that
 	// marks a class as the default StorageClass
-	IsDefaultStorageClassAnnotation = "storageclass.kubernetes.io/is-default-class"
+	isDefaultStorageClassAnnotation = "storageclass.kubernetes.io/is-default-class"
 
-	// BetaIsDefaultStorageClassAnnotation is the beta version of IsDefaultStorageClassAnnotation.
+	// betaIsDefaultStorageClassAnnotation is the beta version of IsDefaultStorageClassAnnotation.
 	// TODO: remove Beta when no longer used
-	BetaIsDefaultStorageClassAnnotation = "storageclass.beta.kubernetes.io/is-default-class"
+	betaIsDefaultStorageClassAnnotation = "storageclass.beta.kubernetes.io/is-default-class"
 )
 
 var (
@@ -804,10 +804,10 @@ func GetDefaultStorageClassName(c clientset.Interface) (string, error) {
 // annotation is set
 // TODO: remove Beta when no longer needed
 func isDefaultAnnotation(obj metav1.ObjectMeta) bool {
-	if obj.Annotations[IsDefaultStorageClassAnnotation] == "true" {
+	if obj.Annotations[isDefaultStorageClassAnnotation] == "true" {
 		return true
 	}
-	if obj.Annotations[BetaIsDefaultStorageClassAnnotation] == "true" {
+	if obj.Annotations[betaIsDefaultStorageClassAnnotation] == "true" {
 		return true
 	}
 
