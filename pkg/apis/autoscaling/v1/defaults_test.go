@@ -20,7 +20,10 @@ import (
 	"reflect"
 	"testing"
 
+	"k8s.io/kubernetes/pkg/apis/autoscaling"
+
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -63,6 +66,53 @@ func TestSetDefaultHPA(t *testing.T) {
 			t.Errorf("unexpected nil MinReplicas")
 		} else if test.expectReplicas != *hpa2.Spec.MinReplicas {
 			t.Errorf("expected: %d MinReplicas, got: %d", test.expectReplicas, *hpa2.Spec.MinReplicas)
+		}
+	}
+}
+
+func TestHorizontalPodAutoscalerConditionsAnnotationHPA(t *testing.T) {
+	tests := []struct {
+		hpa  autoscalingv1.HorizontalPodAutoscaler
+		test string
+	}{
+		{
+			hpa: autoscalingv1.HorizontalPodAutoscaler{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						autoscaling.HorizontalPodAutoscalerConditionsAnnotation: "",
+					},
+				},
+			},
+			test: "test empty value for HorizontalPodAutoscalerConditionsAnnotation",
+		},
+		{
+			hpa: autoscalingv1.HorizontalPodAutoscaler{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						autoscaling.HorizontalPodAutoscalerConditionsAnnotation: "abc",
+					},
+				},
+			},
+			test: "test random value for HorizontalPodAutoscalerConditionsAnnotation",
+		},
+		{
+			hpa: autoscalingv1.HorizontalPodAutoscaler{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						autoscaling.HorizontalPodAutoscalerConditionsAnnotation: "[]",
+					},
+				},
+			},
+			test: "test empty array value for HorizontalPodAutoscalerConditionsAnnotation",
+		},
+	}
+
+	for _, test := range tests {
+		hpa := &test.hpa
+		obj := roundTrip(t, runtime.Object(hpa))
+		_, ok := obj.(*autoscalingv1.HorizontalPodAutoscaler)
+		if !ok {
+			t.Fatalf("unexpected object: %v", obj)
 		}
 	}
 }

@@ -404,7 +404,10 @@ func Convert_v1_HorizontalPodAutoscaler_To_autoscaling_HorizontalPodAutoscaler(i
 	if currentConditionsEnc, hasCurrentConditions := out.Annotations[autoscaling.HorizontalPodAutoscalerConditionsAnnotation]; hasCurrentConditions {
 		var currentConditions []autoscalingv1.HorizontalPodAutoscalerCondition
 		if err := json.Unmarshal([]byte(currentConditionsEnc), &currentConditions); err != nil {
-			return err
+			//ignore unmarshalling errors because we persist invalid annotations into v1 objects
+			// Issue - https://github.com/kubernetes/kubernetes/issues/88738
+			delete(out.Annotations, autoscaling.HorizontalPodAutoscalerConditionsAnnotation)
+			return nil
 		}
 
 		out.Status.Conditions = make([]autoscaling.HorizontalPodAutoscalerCondition, len(currentConditions))
