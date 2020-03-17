@@ -519,7 +519,6 @@ filegroup(
         "//vendor/sigs.k8s.io/kustomize/pkg/target:all-srcs",
         "//vendor/sigs.k8s.io/kustomize/pkg/transformers:all-srcs",
         "//vendor/sigs.k8s.io/kustomize/pkg/types:all-srcs",
-        "//vendor/sigs.k8s.io/structured-merge-diff/schema:all-srcs",
         "//vendor/sigs.k8s.io/structured-merge-diff/v2/fieldpath:all-srcs",
         "//vendor/sigs.k8s.io/structured-merge-diff/v2/merge:all-srcs",
         "//vendor/sigs.k8s.io/structured-merge-diff/v2/schema:all-srcs",
