@@ -32,6 +32,7 @@ import (
 	storage "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/features"
@@ -360,13 +361,17 @@ func (c *csiMountMgr) TearDownAt(dir string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
 	defer cancel()
 
+	var retErrors []error
 	if err := csi.NodeUnpublishVolume(ctx, volID, dir); err != nil {
-		return errors.New(log("mounter.TearDownAt failed: %v", err))
+		retErrors = append(retErrors, errors.New(log("mounter.TearDownAt failed: %v", err)))
 	}
 
 	// clean mount point dir
 	if err := removeMountDir(c.plugin, dir); err != nil {
-		return errors.New(log("mounter.TearDownAt failed to clean mount dir [%s]: %v", dir, err))
+		retErrors = append(retErrors, errors.New(log("mounter.TearDownAt failed to clean mount dir [%s]: %v", dir, err)))
+	}
+	if len(retErrors) != 0 {
+		return utilerrors.NewAggregate(retErrors)
 	}
 	klog.V(4).Infof(log("mounter.TearDownAt successfully unmounted dir [%s]", dir))
 
