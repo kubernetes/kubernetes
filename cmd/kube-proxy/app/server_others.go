@@ -302,6 +302,7 @@ func newProxyServer(
 				healthzServer,
 				config.IPVS.Scheduler,
 				config.NodePortAddresses,
+				kernelHandler,
 			)
 		} else {
 			var localDetector proxyutiliptables.LocalTrafficDetector
@@ -332,6 +333,7 @@ func newProxyServer(
 				healthzServer,
 				config.IPVS.Scheduler,
 				config.NodePortAddresses,
+				kernelHandler,
 			)
 		}
 		if err != nil {
