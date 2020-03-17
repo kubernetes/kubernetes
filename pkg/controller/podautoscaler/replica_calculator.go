@@ -35,10 +35,11 @@ const (
 	// defaultTestingTolerance is default value for calculating when to
 	// scale up/scale down.
 	defaultTestingTolerance                     = 0.1
-	defaultTestingCpuInitializationPeriod       = 2 * time.Minute
+	defaultTestingCPUInitializationPeriod       = 2 * time.Minute
 	defaultTestingDelayOfInitialReadinessStatus = 10 * time.Second
 )
 
+// ReplicaCalculator bundles all needed information to calculate the target amount of replicas
 type ReplicaCalculator struct {
 	metricsClient                 metricsclient.MetricsClient
 	podLister                     corelisters.PodLister
@@ -47,6 +48,7 @@ type ReplicaCalculator struct {
 	delayOfInitialReadinessStatus time.Duration
 }
 
+// NewReplicaCalculator creates a new ReplicaCalculator and passes all necessary information to the new instance
 func NewReplicaCalculator(metricsClient metricsclient.MetricsClient, podLister corelisters.PodLister, tolerance float64, cpuInitializationPeriod, delayOfInitialReadinessStatus time.Duration) *ReplicaCalculator {
 	return &ReplicaCalculator{
 		metricsClient:                 metricsClient,
