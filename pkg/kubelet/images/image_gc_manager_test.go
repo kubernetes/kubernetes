@@ -548,16 +548,6 @@ func TestValidateImageGCPolicy(t *testing.T) {
 	}
 }
 
-func TestImageCacheReturnCopiedList(t *testing.T) {
-	cache := &imageCache{}
-	testList := []container.Image{{ID: "1"}, {ID: "2"}}
-	cache.set(testList)
-	list := cache.get()
-	assert.Len(t, list, 2)
-	list[0].ID = "3"
-	assert.Equal(t, cache.get(), testList)
-}
-
 func uint64Ptr(i uint64) *uint64 {
 	return &i
 }
