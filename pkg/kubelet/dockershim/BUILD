@@ -78,7 +78,6 @@ go_library(
             "//pkg/kubelet/apis:go_default_library",
             "//pkg/kubelet/winstats:go_default_library",
             "//vendor/github.com/Microsoft/hcsshim:go_default_library",
-            "//vendor/github.com/docker/docker/pkg/sysinfo:go_default_library",
             "//vendor/golang.org/x/sys/windows/registry:go_default_library",
         ],
         "//conditions:default": [],
